@@ -8,7 +8,7 @@ export const DEMO_DRIVERS: LiveTimingDriver[] = Array.from({ length: 30 }, (_, i
     position,
     kart: String(100 + position),
     name: `PILOTO ${String(position).padStart(2, '0')}`,
-    time: position === 1 ? '00:33.012' : `+00:${String(position + 3).padStart(2, '0')}.${String(120 + position).padStart(3, '0')}`,
+    time: `00:${String(32 + position).padStart(2, '0')}.${String(10 + position).padStart(3, '0')}`,
   };
 });
 
