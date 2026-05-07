@@ -1,0 +1,14 @@
+FROM mcr.microsoft.com/playwright:v1.56.1-noble
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV LIVETIME_HEADLESS=true
+ENV LIVETIME_SCRAPER_POLL_MS=2000
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+
+CMD ["npm", "run", "scraper"]

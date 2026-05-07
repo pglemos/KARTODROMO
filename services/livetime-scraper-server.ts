@@ -14,6 +14,15 @@ const scraper = new LiveTimeScraper({
 const server = http.createServer((request, response) => {
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
 
+  if (url.pathname === '/healthz') {
+    response.writeHead(200, {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+    });
+    response.end(JSON.stringify({ ok: true, status: scraper.getSnapshot().status }));
+    return;
+  }
+
   if (url.pathname !== '/api/livetime-snapshot') {
     response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' });
     response.end(JSON.stringify({ error: 'not_found' }));
