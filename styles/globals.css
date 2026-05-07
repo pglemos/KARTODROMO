@@ -1,0 +1,44 @@
+:root {
+  --bg: #000000;
+  --table-bg: #222222;
+  --table-alt: #303030;
+  --header-bg: #0b6427;
+  --border: #444444;
+  --position: #04ff00;
+  --kart: #1e90ff;
+  --text: #ffffff;
+  --muted: #b7b7b7;
+  --danger: #ff3b30;
+  --warning: #ffcc00;
+  --font-scale: 1;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  min-width: 2048px;
+  min-height: 512px;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.telao-page {
+  width: 2048px;
+  height: 512px;
+  overflow: hidden;
+  background: var(--bg);
+}

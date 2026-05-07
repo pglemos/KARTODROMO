@@ -1,0 +1,187 @@
+.telao-theme-dark {
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+}
+
+.telao-status {
+  width: 2048px;
+  height: 58px;
+  display: grid;
+  grid-template-columns: 1fr 148px 120px;
+  align-items: center;
+  gap: 16px;
+  padding: 0 18px;
+  background: #111111;
+  border-bottom: 2px solid var(--border);
+  overflow: hidden;
+}
+
+.telao-event {
+  display: flex;
+  align-items: baseline;
+  gap: 22px;
+  min-width: 0;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.telao-event strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: calc(30px * var(--font-scale));
+  font-weight: 900;
+  line-height: 1;
+}
+
+.telao-event span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font-size: calc(22px * var(--font-scale));
+  font-weight: 800;
+  line-height: 1;
+}
+
+.telao-badge,
+.telao-updated {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--border);
+  font-size: calc(20px * var(--font-scale));
+  font-weight: 900;
+  line-height: 1;
+  color: #000000;
+  background: var(--position);
+  font-variant-numeric: tabular-nums;
+}
+
+.telao-updated {
+  color: var(--text);
+  background: #222222;
+}
+
+.telao-badge-demo {
+  background: var(--warning);
+}
+
+.telao-badge-waiting,
+.telao-badge-empty {
+  background: #f2f2f2;
+}
+
+.telao-badge-error {
+  color: #ffffff;
+  background: var(--danger);
+}
+
+.telao-table-wrap {
+  width: 2048px;
+  height: 454px;
+  overflow: hidden;
+}
+
+.telao-no-header .telao-table-wrap {
+  height: 512px;
+}
+
+.livetime-table {
+  width: 2048px;
+  height: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  background: var(--table-bg);
+  color: var(--text);
+  font-weight: 900;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+
+.livetime-table th,
+.livetime-table td {
+  border: 2px solid var(--border);
+  padding: 0 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.livetime-table th {
+  height: 42px;
+  background: var(--header-bg);
+  color: #ffffff;
+  font-size: calc(26px * var(--font-scale));
+  text-align: center;
+}
+
+.livetime-table td {
+  height: calc((100% - 42px) / 5);
+  background: var(--table-bg);
+  font-size: calc(30px * var(--font-scale));
+}
+
+.livetime-table tbody tr:nth-child(even) td {
+  background: var(--table-alt);
+}
+
+.head-pos,
+.cell-pos {
+  width: 39px;
+  text-align: center;
+  padding-left: 1px;
+  padding-right: 1px;
+  text-overflow: clip;
+}
+
+.head-kart,
+.cell-kart {
+  width: 56px;
+  text-align: center;
+  padding-left: 1px;
+  padding-right: 1px;
+  text-overflow: clip;
+}
+
+.head-name,
+.cell-name {
+  width: 132px;
+  text-align: left;
+}
+
+.head-time,
+.cell-time {
+  width: 114px;
+  text-align: center;
+  padding-left: 1px;
+  padding-right: 1px;
+  text-overflow: clip;
+}
+
+.livetime-table .cell-pos {
+  color: var(--position);
+  font-size: calc(24px * var(--font-scale));
+}
+
+.livetime-table .cell-kart {
+  color: var(--kart);
+  font-size: calc(24px * var(--font-scale));
+}
+
+.livetime-table .cell-name {
+  color: var(--text);
+  letter-spacing: 0;
+}
+
+.livetime-table .cell-time {
+  color: var(--text);
+  font-size: calc(23px * var(--font-scale));
+}
+
+.livetime-table .cell-time-leader {
+  color: var(--position);
+}
