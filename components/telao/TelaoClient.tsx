@@ -24,6 +24,7 @@ function readParams() {
       uid: process.env.NEXT_PUBLIC_DEFAULT_UID || DEFAULT_UID,
       showHeader: true,
       fontScale: 1,
+      demo: false,
     };
   }
 
@@ -34,6 +35,7 @@ function readParams() {
     uid: params.get('uid') || process.env.NEXT_PUBLIC_DEFAULT_UID || DEFAULT_UID,
     showHeader: params.get('showHeader') !== 'false',
     fontScale: Number.isFinite(fontScale) ? Math.min(Math.max(fontScale, 0.85), 1.2) : 1,
+    demo: params.get('demo') === 'true',
   };
 }
 
@@ -55,7 +57,7 @@ export function TelaoClient() {
       controller = new AbortController();
 
       try {
-        const nextSnapshot = await fetchLiveTimingSnapshot(config.uid, controller.signal);
+        const nextSnapshot = await fetchLiveTimingSnapshot(config.uid, controller.signal, config.demo);
         if (stopped) return;
 
         if (nextSnapshot.drivers.length > 0) {

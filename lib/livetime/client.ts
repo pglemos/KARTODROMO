@@ -1,8 +1,9 @@
 import type { LiveTimingSnapshot } from '@/lib/livetime/types';
 import { createDemoSnapshot } from '@/lib/livetime/demo-data';
 
-export async function fetchLiveTimingSnapshot(uid: string, signal?: AbortSignal): Promise<LiveTimingSnapshot> {
+export async function fetchLiveTimingSnapshot(uid: string, signal?: AbortSignal, demo = false): Promise<LiveTimingSnapshot> {
   const params = new URLSearchParams({ uid });
+  if (demo) params.set('demo', 'true');
   const response = await fetch(`/api/livetime-snapshot?${params.toString()}`, {
     cache: 'no-store',
     signal,

@@ -14,6 +14,7 @@ Parâmetros suportados:
 uid=<uid-da-corrida>
 fontScale=0.85..1.2
 showHeader=true|false
+demo=true
 ```
 
 ## Desenvolvimento local
