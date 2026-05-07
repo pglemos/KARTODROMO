@@ -10,7 +10,8 @@ const LABELS: Record<LiveTimingSnapshot['status'], string> = {
 
 export function StatusBar({ snapshot }: { snapshot: LiveTimingSnapshot }) {
   const updatedAt = new Date(snapshot.updatedAt);
-  const time = Number.isNaN(updatedAt.getTime())
+  const isInitialTimestamp = snapshot.updatedAt === '1970-01-01T00:00:00.000Z';
+  const time = Number.isNaN(updatedAt.getTime()) || isInitialTimestamp
     ? '--:--:--'
     : updatedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
