@@ -10,3 +10,4 @@ test-results
 *.log
 .playwright-mcp
 tsconfig.tsbuildinfo
+.vercel
