@@ -1,17 +1,25 @@
+import type { CSSProperties } from 'react';
 import type { LiveTimingDriver } from '@/lib/livetime/types';
 import { driversByPosition, getPositionForCell, GROUP_COUNT, ROW_COUNT } from '@/lib/livetime/layout';
 
+function firstName(name?: string): string {
+  return name?.trim().split(/\s+/)[0] || '';
+}
+
 function DriverCells({ driver, position }: { driver?: LiveTimingDriver; position: number }) {
-  const isLeader = position === 1;
+  const isLeader = position === 1 && Boolean(driver);
+  const stateClass = driver ? 'driver-cells-filled' : 'driver-cells-empty';
+  const leaderClass = isLeader ? 'driver-cells-leader' : '';
+  const cellClass = `driver-cells ${stateClass} ${leaderClass}`.trim();
 
   return (
     <>
-      <td className="cell-pos">{position}</td>
-      <td className="cell-kart">{driver?.kart || '-'}</td>
-      <td className="cell-name" title={driver?.name || ''}>
-        {driver?.name || ''}
+      <td className={`${cellClass} cell-pos`}>{position}</td>
+      <td className={`${cellClass} cell-kart`}>{driver?.kart || '-'}</td>
+      <td className={`${cellClass} cell-name`} title={driver?.name || ''}>
+        {firstName(driver?.name)}
       </td>
-      <td className={isLeader ? 'cell-time cell-time-leader' : 'cell-time'}>{driver?.time || ''}</td>
+      <td className={`${cellClass} cell-time`}>{driver?.time || ''}</td>
     </>
   );
 }
@@ -20,7 +28,16 @@ export function LiveTimingTable({ drivers }: { drivers: LiveTimingDriver[] }) {
   const mappedDrivers = driversByPosition(drivers);
 
   return (
-    <table className="livetime-table" aria-label="Classificacao ao vivo">
+    <table
+      className={`livetime-table livetime-table-${GROUP_COUNT} livetime-rows-${ROW_COUNT}`}
+      aria-label="Classificacao ao vivo"
+      style={{ '--display-groups': GROUP_COUNT } as CSSProperties}
+    >
+      <colgroup>
+        {Array.from({ length: GROUP_COUNT }, (_, groupIndex) => (
+          <FragmentCols key={groupIndex} />
+        ))}
+      </colgroup>
       <thead>
         <tr>
           {Array.from({ length: GROUP_COUNT }, (_, groupIndex) => (
@@ -39,6 +56,17 @@ export function LiveTimingTable({ drivers }: { drivers: LiveTimingDriver[] }) {
         ))}
       </tbody>
     </table>
+  );
+}
+
+function FragmentCols() {
+  return (
+    <>
+      <col className="col-pos" />
+      <col className="col-kart" />
+      <col className="col-name" />
+      <col className="col-time" />
+    </>
   );
 }
 

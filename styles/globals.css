@@ -1,15 +1,20 @@
 :root {
-  --bg: #000000;
-  --table-bg: #222222;
-  --table-alt: #303030;
-  --header-bg: #0b6427;
-  --border: #444444;
-  --position: #04ff00;
-  --kart: #1e90ff;
+  --bg: #03110f;
+  --surface: #061a17;
+  --surface-2: #09231f;
+  --table-bg: #08211d;
+  --table-alt: #0b2a25;
+  --header-bg: #007965;
+  --header-bg-dark: #004d43;
+  --border: #1a5148;
+  --border-strong: #eab308;
+  --position: #facc15;
+  --kart: #ffffff;
   --text: #ffffff;
-  --muted: #b7b7b7;
-  --danger: #ff3b30;
-  --warning: #ffcc00;
+  --muted: #b8d4cf;
+  --danger: #dc2626;
+  --warning: #eab308;
+  --success: #22c55e;
   --font-scale: 1;
 }
 
@@ -26,7 +31,7 @@ body {
   background: var(--bg);
   color: var(--text);
   overflow: hidden;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Arial Narrow", "Roboto Condensed", Arial, Helvetica, sans-serif;
 }
 
 button,

@@ -39,10 +39,14 @@ function readParams() {
   };
 }
 
-export function TelaoClient() {
+type TelaoClientProps = {
+  initialSnapshot?: LiveTimingSnapshot;
+};
+
+export function TelaoClient({ initialSnapshot = INITIAL_SNAPSHOT }: TelaoClientProps) {
   const config = useMemo(readParams, []);
-  const [snapshot, setSnapshot] = useState<LiveTimingSnapshot>(INITIAL_SNAPSHOT);
-  const lastValid = useRef<LiveTimingSnapshot | null>(null);
+  const [snapshot, setSnapshot] = useState<LiveTimingSnapshot>(initialSnapshot);
+  const lastValid = useRef<LiveTimingSnapshot | null>(initialSnapshot.drivers.length > 0 ? initialSnapshot : null);
 
   useEffect(() => {
     document.documentElement.style.setProperty('--font-scale', String(config.fontScale));
@@ -51,9 +55,11 @@ export function TelaoClient() {
   useEffect(() => {
     let stopped = false;
     let controller: AbortController | null = null;
+    let inFlight = false;
 
     async function load() {
-      controller?.abort();
+      if (inFlight) return;
+      inFlight = true;
       controller = new AbortController();
 
       try {
@@ -82,18 +88,20 @@ export function TelaoClient() {
           status: 'error',
           drivers: [],
         });
+      } finally {
+        inFlight = false;
       }
     }
 
     void load();
-    const interval = window.setInterval(load, 2000);
+    const interval = window.setInterval(load, 1000);
 
     return () => {
       stopped = true;
       controller?.abort();
       window.clearInterval(interval);
     };
-  }, [config.uid]);
+  }, [config.uid, config.demo]);
 
   return (
     <main className={`telao-page telao-theme-dark ${config.showHeader ? '' : 'telao-no-header'}`}>

@@ -1,41 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createDemoSnapshot, DEFAULT_UID } from '@/lib/livetime/demo-data';
+import { fetchExternalSnapshot } from '@/lib/livetime/snapshot-service';
 import { getLastSnapshot, isFresh, setLastSnapshot } from '@/lib/livetime/snapshot-cache';
 import type { LiveTimingSnapshot } from '@/lib/livetime/types';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-function resolveExternalUrl(endpoint: string, uid: string): string {
-  if (endpoint.includes('{uid}')) return endpoint.split('{uid}').join(encodeURIComponent(uid));
-  const url = new URL(endpoint);
-  url.searchParams.set('uid', uid);
-  return url.toString();
-}
-
-async function fetchExternalSnapshot(uid: string): Promise<LiveTimingSnapshot> {
-  const endpoint = process.env.LIVETIME_SNAPSHOT_ENDPOINT;
-  if (!endpoint) return createDemoSnapshot('LIVETIME_SNAPSHOT_ENDPOINT nao configurado');
-
-  const timeoutMs = Number(process.env.LIVETIME_TIMEOUT_MS || '3000');
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const response = await fetch(resolveExternalUrl(endpoint, uid), {
-      cache: 'no-store',
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Snapshot HTTP ${response.status}`);
-    }
-
-    return (await response.json()) as LiveTimingSnapshot;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
 
 export async function GET(request: NextRequest) {
   const uid = request.nextUrl.searchParams.get('uid') || process.env.NEXT_PUBLIC_DEFAULT_UID || DEFAULT_UID;
