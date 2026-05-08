@@ -1,0 +1,138 @@
+.designer-page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  background: #050505;
+  color: #ffffff;
+  overflow: auto;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.designer-sidebar {
+  min-height: 100vh;
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  padding: 22px;
+  border-right: 1px solid #16433c;
+  background: #080f0e;
+}
+
+.designer-sidebar h1,
+.designer-sidebar h2,
+.designer-sidebar p {
+  margin: 0;
+}
+
+.designer-sidebar h1 {
+  font-size: 26px;
+}
+
+.designer-sidebar h2 {
+  font-size: 16px;
+  color: #eab308;
+  text-transform: uppercase;
+}
+
+.designer-sidebar p,
+.designer-message {
+  color: #b8d4cf;
+  font-size: 13px;
+}
+
+.designer-section {
+  display: grid;
+  gap: 10px;
+}
+
+.designer-preset-grid,
+.designer-check-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.designer-preset-grid button,
+.designer-save {
+  height: 40px;
+  border: 1px solid #007965;
+  border-radius: 8px;
+  color: #ffffff;
+  background: #001f1a;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.designer-save {
+  border-color: #eab308;
+  color: #050505;
+  background: #eab308;
+}
+
+.designer-field {
+  display: grid;
+  grid-template-columns: 1fr 110px;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #dfeeed;
+}
+
+.designer-field input,
+.designer-field select {
+  width: 100%;
+  height: 34px;
+  border: 1px solid #2e5e56;
+  border-radius: 8px;
+  padding: 0 9px;
+  color: #ffffff;
+  background: #000000;
+}
+
+.designer-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #dfeeed;
+  font-size: 13px;
+}
+
+.designer-preview-area {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 24px;
+  overflow: auto;
+}
+
+.designer-preview-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  max-width: 1024px;
+}
+
+.designer-preview-label strong {
+  font-size: 20px;
+}
+
+.designer-preview-label span {
+  color: #eab308;
+  font-weight: 800;
+}
+
+.designer-preview-shell {
+  width: 1024px;
+  height: 256px;
+  overflow: hidden;
+  border: 1px solid #2e5e56;
+  background: #000000;
+}
+
+.designer-preview-scale {
+  width: 2048px;
+  height: 512px;
+  transform: scale(0.5);
+  transform-origin: left top;
+}

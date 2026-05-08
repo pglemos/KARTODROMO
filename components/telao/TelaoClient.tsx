@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createDemoSnapshot, DEFAULT_UID } from '@/lib/livetime/demo-data';
 import { fetchLiveTimingSnapshot } from '@/lib/livetime/client';
 import type { LiveTimingSnapshot } from '@/lib/livetime/types';
+import { DEFAULT_TELAO_LAYOUT, normalizeTelaoLayoutConfig, type TelaoLayoutConfig } from '@/lib/telao-layout-config';
 import { LiveTimingTable } from '@/components/telao/LiveTimingTable';
 import { StatusBar } from '@/components/telao/StatusBar';
 import './telao.css';
@@ -46,6 +47,7 @@ type TelaoClientProps = {
 export function TelaoClient({ initialSnapshot = INITIAL_SNAPSHOT }: TelaoClientProps) {
   const config = useMemo(readParams, []);
   const [snapshot, setSnapshot] = useState<LiveTimingSnapshot>(initialSnapshot);
+  const [layout, setLayout] = useState<TelaoLayoutConfig>(DEFAULT_TELAO_LAYOUT);
   const lastValid = useRef<LiveTimingSnapshot | null>(initialSnapshot.drivers.length > 0 ? initialSnapshot : null);
 
   useEffect(() => {
@@ -103,11 +105,36 @@ export function TelaoClient({ initialSnapshot = INITIAL_SNAPSHOT }: TelaoClientP
     };
   }, [config.uid, config.demo]);
 
+  useEffect(() => {
+    let stopped = false;
+
+    async function loadLayout() {
+      try {
+        const response = await fetch(`/api/telao-layout?_ts=${Date.now()}`, { cache: 'no-store' });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!stopped) setLayout(normalizeTelaoLayoutConfig(data.layout));
+      } catch {
+        // Keep the last valid layout if the designer API is temporarily unavailable.
+      }
+    }
+
+    void loadLayout();
+    const interval = window.setInterval(loadLayout, 2000);
+
+    return () => {
+      stopped = true;
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  const showHeader = config.showHeader && layout.showHeader;
+
   return (
-    <main className={`telao-page telao-theme-dark ${config.showHeader ? '' : 'telao-no-header'}`}>
-      {config.showHeader ? <StatusBar snapshot={snapshot} /> : null}
+    <main className={`telao-page telao-theme-dark ${showHeader ? '' : 'telao-no-header'}`}>
+      {showHeader ? <StatusBar snapshot={snapshot} /> : null}
       <section className="telao-table-wrap">
-        <LiveTimingTable drivers={snapshot.drivers} />
+        <LiveTimingTable drivers={snapshot.drivers} layout={layout} />
       </section>
     </main>
   );

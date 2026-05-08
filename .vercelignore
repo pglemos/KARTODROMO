@@ -18,3 +18,5 @@ tsconfig.tsbuildinfo
 .cursor
 .gemini
 .playwright-mcp
+.runtime
+.tmp
