@@ -40,6 +40,7 @@ export default defineConfig(({ mode }) => {
         '/_content': myLapTimeProxy,
         '/_framework': myLapTimeProxy,
         '/_blazor': myLapTimeProxy,
+        '/api/auth': myLapTimeProxy,
         '/LapTime.Web.Tools.styles.css': myLapTimeProxy,
       },
     },
