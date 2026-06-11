@@ -1,4 +1,4 @@
-import { ArrowLeft, Calendar, Award, Users, Compass, Shield, Users2, Sparkles, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, Award, Users, Compass, Shield, Users2, Sparkles, CheckCircle, Camera } from 'lucide-react';
 
 const History = () => {
   return (
@@ -167,7 +167,7 @@ const History = () => {
               ))}
               <div className="border border-dashed border-zinc-300 rounded-xl flex items-center justify-center p-4 h-36 bg-white">
                 <div className="text-center">
-                  <span className="text-2xl mb-1.5 block">📸</span>
+                  <Camera className="mx-auto mb-1.5 h-7 w-7 text-zinc-400" aria-hidden="true" />
                   <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Mais fotos em breve</p>
                 </div>
               </div>

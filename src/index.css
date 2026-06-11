@@ -15,6 +15,46 @@
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Montserrat', sans-serif;
   }
+
+  a,
+  button,
+  [role='button'],
+  summary,
+  label,
+  input[type='button'],
+  input[type='submit'],
+  input[type='reset'] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled='true'],
+  input:disabled,
+  select:disabled,
+  textarea:disabled {
+    cursor: not-allowed;
+  }
+
+  a,
+  button,
+  [role='button'],
+  summary,
+  input,
+  select,
+  textarea {
+    transition-duration: 200ms;
+  }
+
+  a:focus-visible,
+  button:focus-visible,
+  [role='button']:focus-visible,
+  summary:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 3px solid rgba(0, 200, 83, 0.72);
+    outline-offset: 3px;
+  }
 }
 
 /* Custom Scrollbar */
@@ -30,6 +70,33 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #00c853;
+}
+
+/* Accessibility color hardening for light surfaces */
+.text-primary-500,
+.text-primary-600 {
+  color: #007a30 !important;
+}
+
+.text-zinc-400,
+.text-zinc-500 {
+  color: #52525b !important;
+}
+
+.text-zinc-300 {
+  color: #52525b !important;
+}
+
+.text-yellow-600 {
+  color: #854d0e !important;
+}
+
+.text-red-600 {
+  color: #991b1b !important;
+}
+
+#agendamento button:disabled {
+  color: #52525b !important;
 }
 
 /* Neon Glow Effects (optimized for light theme) */
@@ -486,7 +553,7 @@
 }
 
 .kac-section-heading span {
-  color: var(--kac-green);
+  color: var(--kac-green-dark);
   font-size: clamp(3rem, 8vw, 5.8rem);
   font-weight: 950;
   line-height: 0.82;
@@ -742,7 +809,7 @@
 
 .kac-score-card span {
   display: block;
-  color: var(--kac-green);
+  color: var(--kac-green-dark);
   font-size: clamp(4rem, 10vw, 7rem);
   font-weight: 950;
   line-height: 0.85;
@@ -1044,21 +1111,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .home-hero *,
-  .home-hero *::before,
-  .home-hero *::after,
-  #pista *,
-  #pista *::before,
-  #pista *::after,
-  #eventos *,
-  #eventos *::before,
-  #eventos *::after,
-  .animate-fadeIn,
-  .animate-scaleUp,
-  .animate-slideDown,
-  .kac-page *,
-  .kac-page *::before,
-  .kac-page *::after {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
