@@ -5,10 +5,8 @@ import {
   CheckCircle2,
   ChefHat,
   Flag,
-  MapPin,
   MessageSquare,
   Phone,
-  Sparkles,
   Trophy,
   Users,
 } from 'lucide-react';
@@ -41,8 +39,8 @@ const eventSpaces = [
     icon: ChefHat,
     title: 'Espaço Gourmet',
     capacity: 'Até 150 convidados',
-    text: 'Segundo pavimento com apoio gastronômico, vista para o circuito e estrutura para uma experiência mais completa.',
-    points: ['Vista panorâmica', 'Cozinha e churrasqueira', 'Recepção mais premium'],
+    text: 'Segundo pavimento com apoio gastronômico, vista para o circuito e estrutura para receber grupos maiores.',
+    points: ['Vista panorâmica', 'Cozinha e churrasqueira', 'Área para recepção'],
   },
 ];
 
@@ -74,16 +72,16 @@ const Events = () => {
               Voltar para a página inicial
             </a>
 
-            <div className="mb-5 inline-flex items-center gap-2 rounded-lg border border-primary-500/25 bg-[#fbfcf8]/90 px-3 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-primary-700 shadow-sm">
-              <Sparkles className="h-4 w-4" />
-              Eventos com kart, pódio e estrutura completa
+            <div className="mb-5 flex items-center gap-3 text-xs font-black uppercase tracking-[0.16em] text-primary-700">
+              <span aria-hidden="true" className="h-px w-10 bg-primary-600" />
+              Eventos no Kartódromo de Betim
             </div>
 
             <h1 className="max-w-4xl text-5xl font-black uppercase leading-[0.88] tracking-tight text-zinc-950 md:text-7xl lg:text-8xl">
-              Seu evento com pista, salão e adrenalina no mesmo lugar
+              Eventos com kart, pódio e espaço para receber seu grupo
             </h1>
             <p className="mt-7 max-w-2xl text-base leading-8 text-zinc-600 md:text-lg">
-              Confraternizações, aniversários e encontros corporativos ganham outra energia quando a experiência combina kart, ranking, pódio, gastronomia e apoio operacional.
+              Organize confraternizações, aniversários e encontros corporativos com baterias de kart, ranking, pódio, gastronomia e apoio da equipe.
             </p>
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
@@ -144,15 +142,15 @@ const Events = () => {
       <div className="border-y border-zinc-200/80 bg-[#eef5ed]">
         <div className="mx-auto grid max-w-7xl grid-cols-1 gap-10 px-4 py-16 md:px-8 lg:grid-cols-[0.82fr_1.18fr]">
           <div className="max-w-xl">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-lg border border-primary-500/20 bg-[#fbfcf8] px-3 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-primary-700">
-              <MapPin className="h-4 w-4" />
+            <div className="mb-4 flex items-center gap-3 text-xs font-black uppercase tracking-[0.16em] text-primary-700">
+              <span aria-hidden="true" className="h-px w-10 bg-primary-600" />
               Estrutura do evento
             </div>
             <h2 className="text-4xl font-black uppercase leading-none tracking-tight text-zinc-950 md:text-5xl">
-              Escolha o espaço pelo tipo de experiência
+              Escolha o espaço para o seu evento
             </h2>
             <p className="mt-5 text-sm leading-7 text-zinc-600">
-              A página agora separa capacidade, uso e benefícios de cada ambiente para facilitar a decisão de quem está cotando um evento.
+              Compare a capacidade, o uso indicado e a estrutura de cada ambiente antes de solicitar seu orçamento.
             </p>
           </div>
 
@@ -216,7 +214,7 @@ const Events = () => {
         <div className="mx-auto max-w-7xl px-4 py-16 md:px-8">
           <div className="mb-8">
             <div>
-              <span className="text-xs font-black uppercase tracking-[0.18em] text-primary-700">Galeria real</span>
+              <span className="text-xs font-black uppercase tracking-[0.16em] text-primary-700">Ambientes e estrutura</span>
               <h2 className="mt-3 text-3xl font-black uppercase leading-none tracking-tight text-zinc-950 md:text-5xl">
                 Estrutura física do kartódromo
               </h2>
@@ -251,7 +249,7 @@ const Events = () => {
           />
           <div className="relative z-10 grid gap-8 md:grid-cols-[1fr_auto] md:items-center">
             <div>
-              <span className="text-xs font-black uppercase tracking-[0.18em] text-primary-400">Pronto para cotar</span>
+              <span className="text-xs font-black uppercase tracking-[0.16em] text-primary-400">Orçamento para eventos</span>
               <h2 className="mt-3 max-w-3xl text-3xl font-black uppercase leading-none tracking-tight md:text-5xl">
                 Monte seu evento com bateria de kart, pódio e estrutura de apoio.
               </h2>

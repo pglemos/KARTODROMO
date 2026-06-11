@@ -145,7 +145,6 @@
   text-shadow: 0 16px 48px rgba(6, 79, 34, 0.08);
 }
 
-.home-eyebrow,
 .home-cta,
 .home-stat {
   border-radius: 0.5rem;
@@ -236,7 +235,7 @@
   }
 }
 
-/* KAC premium white campaign page */
+/* KAC championship page */
 .kac-page {
   --kac-ink: #111412;
   --kac-muted: #637069;
@@ -345,19 +344,12 @@
     opacity 500ms var(--kac-ease);
 }
 
-.kac-hero-mark,
 .kac-label {
   color: var(--kac-green-dark);
   font-size: 0.72rem;
   font-weight: 900;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-}
-
-.kac-hero-mark {
-  border: 1px solid rgba(0, 200, 83, 0.24);
-  background: rgba(232, 251, 243, 0.82);
-  padding: 0.7rem 0.86rem;
 }
 
 .kac-title {

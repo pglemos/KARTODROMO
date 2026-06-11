@@ -35,8 +35,8 @@ const Hero = () => {
 
       <div className="container relative z-20 mx-auto w-full px-4">
         <div className="max-w-5xl">
-          <div className="home-eyebrow mb-5 inline-flex items-center gap-2 border border-primary-500/25 bg-white/85 px-3.5 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-primary-700 shadow-sm backdrop-blur md:mb-6 md:tracking-[0.22em]">
-            <Zap className="h-4 w-4" />
+          <div className="mb-5 flex items-center gap-3 text-xs font-black uppercase tracking-[0.16em] text-primary-700 md:mb-6">
+            <span aria-hidden="true" className="h-px w-10 bg-primary-600" />
             <span>Pista padrão internacional</span>
           </div>
 
@@ -45,8 +45,8 @@ const Hero = () => {
           </h1>
 
           <p className="mb-7 max-w-2xl text-sm leading-7 text-zinc-700 md:mb-10 md:text-lg md:leading-8">
-            Sinta a velocidade pura em uma pista homologada de <strong className="font-semibold text-zinc-950">1.110 metros</strong> de extensão.
-            Karts modernos, total segurança e a estrutura de lazer mais completa de Minas Gerais para você e sua família.
+            Corra em uma pista homologada de <strong className="font-semibold text-zinc-950">1.110 metros</strong> com cronometragem eletrônica,
+            equipe de pista e estrutura para receber pilotos, famílias e grupos.
           </p>
 
           <div className="mb-8 flex flex-col gap-3 sm:flex-row md:mb-14 md:gap-4">
@@ -86,7 +86,7 @@ const Hero = () => {
               </div>
               <div>
                 <div className="text-xl font-black leading-tight text-zinc-950">42</div>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Traçados diferentes</div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Configurações mapeadas</div>
               </div>
             </div>
 
@@ -106,7 +106,7 @@ const Hero = () => {
               </div>
               <div>
                 <div className="text-xl font-black leading-tight text-zinc-950">25+ anos</div>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Tradição e emoção</div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Em operação desde 1996</div>
               </div>
             </div>
           </div>

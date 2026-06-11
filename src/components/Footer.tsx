@@ -15,7 +15,7 @@ const Footer = () => {
               />
             </div>
             <p className="text-zinc-600 text-sm font-light leading-relaxed max-w-md">
-              Há mais de 25 anos proporcionando o melhor em velocidade, emoção e segurança nas pistas de Minas Gerais. Uma estrutura completa de lazer para toda a família.
+              Pista homologada de 1.110 metros, kart de locação, campeonatos e estrutura para eventos em Betim.
             </p>
             <div className="flex space-x-3 pt-2">
               <a href="https://www.facebook.com/kartodromodebetim" target="_blank" rel="noopener noreferrer" aria-label="Facebook do Kartódromo de Betim" className="w-10 h-10 bg-white border border-zinc-200 text-zinc-500 rounded-xl flex items-center justify-center hover:bg-primary-500 hover:text-zinc-950 hover:border-primary-500 transition-all duration-300 shadow-sm">

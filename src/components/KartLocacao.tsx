@@ -1,4 +1,4 @@
-import { Phone, CreditCard, Coins, QrCode, ArrowLeft, ShieldAlert, Sparkles, MessageSquare, Info, ShieldCheck } from 'lucide-react';
+import { Phone, CreditCard, Coins, QrCode, ArrowLeft, ShieldAlert, CheckCircle, MessageSquare, Info, ShieldCheck } from 'lucide-react';
 
 const KartLocacao = () => {
   return (
@@ -164,7 +164,7 @@ const KartLocacao = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-2">
                 <div className="bg-white border border-zinc-200 p-5 rounded-2xl shadow-sm">
                   <h4 className="text-sm font-bold text-zinc-900 uppercase tracking-wide mb-1 flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-primary-600" />
+                    <CheckCircle className="w-4 h-4 text-primary-600" />
                     Kart Light
                   </h4>
                   <p className="text-xs text-zinc-500 font-light leading-normal">
@@ -173,7 +173,7 @@ const KartLocacao = () => {
                 </div>
                 <div className="bg-white border border-zinc-200 p-5 rounded-2xl shadow-sm">
                   <h4 className="text-sm font-bold text-zinc-900 uppercase tracking-wide mb-1 flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-primary-600" />
+                    <CheckCircle className="w-4 h-4 text-primary-600" />
                     Super Kart
                   </h4>
                   <p className="text-xs text-zinc-500 font-light leading-normal">

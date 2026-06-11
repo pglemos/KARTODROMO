@@ -11,7 +11,7 @@ const About = () => {
           </h2>
           <div className="w-20 h-1.5 bg-primary-500 mx-auto rounded-full mb-6"></div>
           <p className="text-lg text-zinc-600 max-w-3xl mx-auto font-light leading-relaxed">
-            Desde 1996, onde ousadia se transformou em legado: o Kartódromo Internacional de Betim é sinônimo de adrenalina com segurança em cada curva.
+            Desde 1996, o Kartódromo Internacional de Betim recebe pilotos, famílias, campeonatos e eventos em uma pista de 1.110 metros.
           </p>
         </div>
 
@@ -22,13 +22,11 @@ const About = () => {
               Mais de 25 Anos de Tradição e Velocidade
             </h3>
             <p className="text-zinc-600 leading-relaxed font-light">
-              Inaugurado em 1996, o Kartódromo Internacional de Betim é fruto de um projeto audacioso 
-              que se tornou referência nacional em diversão e automobilismo. Nossa pista profissional de 1.110 metros 
-              oferece curvas desafiadoras e retas velozes para pilotos de todos os níveis.
+              Inaugurado em 1996, o Kartódromo Internacional de Betim possui pista homologada de 1.110 metros,
+              áreas de escape gramadas e estrutura para kart de locação, treinos e campeonatos.
             </p>
             <p className="text-zinc-600 leading-relaxed font-light">
-              Hoje somos mais do que uma pista de corridas: somos o principal ponto de encontro de famílias 
-              e amigos entusiastas de velocidade, com estrutura completa de eventos, gastronomia e atendimento premium.
+              O complexo também recebe famílias, grupos e eventos, com área gourmet, salões e atendimento dedicado.
             </p>
             
             <div className="pt-2">
@@ -75,9 +73,9 @@ const About = () => {
               <div className="w-12 h-12 bg-primary-50 border border-primary-500/20 rounded-xl flex items-center justify-center mb-4 text-primary-600">
                 <Shield className="w-6 h-6" />
               </div>
-              <h4 className="text-lg font-bold text-zinc-900 mb-2">Segurança Máxima</h4>
+              <h4 className="text-lg font-bold text-zinc-900 mb-2">Equipe e Segurança</h4>
               <p className="text-sm text-zinc-600 leading-relaxed font-light">
-                Indumentária completa inclusa, ambulatório completo com socorrista e fiscais de pista altamente treinados.
+                Indumentária inclusa, ambulatório com socorrista e fiscais acompanhando todas as baterias.
               </p>
             </div>
 

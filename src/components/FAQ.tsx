@@ -93,7 +93,7 @@ export default function FAQ() {
           </h1>
           <div className="w-20 h-1.5 bg-primary-500 mx-auto rounded-full mb-6"></div>
           <p className="text-lg text-zinc-600 max-w-3xl mx-auto font-light leading-relaxed">
-            Consulte as principais regras de conduta, segurança e dúvidas comuns para garantir uma experiência fantástica na pista.
+            Consulte regras de conduta, orientações de segurança e respostas para as dúvidas mais comuns antes de correr.
           </p>
         </div>
 

@@ -1,4 +1,4 @@
-import { ArrowLeft, Calendar, Award, Users, Compass, Shield, Users2, Sparkles, CheckCircle, Camera } from 'lucide-react';
+import { ArrowLeft, Calendar, Award, Users, Compass, Shield, Users2, CheckCircle, Camera } from 'lucide-react';
 
 const History = () => {
   return (
@@ -35,7 +35,7 @@ const History = () => {
             
             <div className="space-y-4 text-zinc-600 text-sm leading-relaxed font-light">
               <p>
-                <strong className="text-zinc-900 font-semibold">Inaugurado em 1996</strong>, o Kartódromo Internacional de Betim nasceu de um projeto audacioso. 
+                <strong className="text-zinc-900 font-semibold">Inaugurado em 1996</strong>, o Kartódromo Internacional de Betim foi construído para receber o kartismo mineiro.
                 A ideia inicial partiu do então secretário de esportes de Betim, Wesley Silva, em parceria com os governos estadual e municipal, além do suporte estratégico da Fiat Automóveis (instalada no município desde os anos 70).
               </p>
               <p>
@@ -112,7 +112,7 @@ const History = () => {
                   <span>Capacidade máxima de grid: 35 karts simultâneos</span>
                 </div>
                 <div className="flex items-center space-x-2.5">
-                  <Sparkles className="w-4 h-4 text-primary-600 flex-shrink-0" />
+                  <CheckCircle className="w-4 h-4 text-primary-600 flex-shrink-0" />
                   <span>Frota de Kart Light: 60 unidades Honda GX390</span>
                 </div>
               </div>

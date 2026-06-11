@@ -12,7 +12,7 @@ const Services = () => {
           </h2>
           <div className="w-20 h-1.5 bg-primary-500 mx-auto rounded-full mb-6"></div>
           <p className="text-lg text-zinc-600 max-w-3xl mx-auto font-light leading-relaxed">
-            Escolha o nível de adrenalina ideal e venha correr na pista profissional de kart mais tradicional do estado.
+            Compare as categorias disponíveis e escolha a opção adequada ao seu nível de experiência.
           </p>
         </div>
 

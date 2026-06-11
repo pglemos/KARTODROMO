@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Compass, Flag, Map, Route, RotateCcw, Sparkles, Timer, Zap } from 'lucide-react';
+import { ArrowLeft, Compass, Flag, Map, Route, RotateCcw, Timer } from 'lucide-react';
 import trackImages from '../data/trackImages.json';
 
 type TrackFilter = 'all' | 'normal' | 'invertido' | 'chicane';
@@ -15,7 +15,7 @@ const trackNotes = [
   {
     icon: Compass,
     title: 'Leitura de pista',
-    text: 'Cada variação muda frenagem, tangência e saída de curva. O piloto treina adaptação real, não repetição automática.',
+    text: 'Cada variação muda frenagem, tangência e saída de curva. O piloto precisa adaptar referências e ritmo a cada configuração.',
   },
   {
     icon: Timer,
@@ -23,7 +23,7 @@ const trackNotes = [
     text: 'Layouts curtos deixam a sessão mais agressiva. Traçados longos favorecem constância e ultrapassagem planejada.',
   },
   {
-    icon: Zap,
+    icon: Route,
     title: 'Chicane ativa',
     text: 'As opções com chicane quebram velocidade de reta e deixam o kart mais técnico nas mudanças de direção.',
   },
@@ -99,13 +99,13 @@ const Track = () => {
               Voltar para a página inicial
             </a>
 
-            <div className="mb-5 inline-flex items-center gap-2 rounded-lg border border-primary-500/25 bg-primary-50 px-3 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-primary-700">
-              <Sparkles className="h-4 w-4" />
+            <div className="mb-5 flex items-center gap-3 text-xs font-black uppercase tracking-[0.16em] text-primary-700">
+              <span aria-hidden="true" className="h-px w-10 bg-primary-600" />
               Circuito internacional de Betim
             </div>
 
             <h1 className="max-w-4xl text-5xl font-black uppercase leading-[0.88] tracking-tight text-zinc-950 md:text-7xl lg:text-8xl">
-              Pista de <span className="text-primary-600">1.110m</span> para acelerar de verdade
+              Pista homologada de <span className="text-primary-600">1.110m</span>
             </h1>
             <p className="mt-7 max-w-2xl text-base leading-8 text-zinc-600 md:text-lg">
               Conheça os mapas oficiais do Kartódromo de Betim e entenda as características de cada configuração. Alterações de traçado são realizadas exclusivamente em campeonatos, conforme o calendário oficial.
@@ -166,15 +166,15 @@ const Track = () => {
       <div className="border-y border-zinc-200/80 bg-[#eef5ed]">
         <div className="mx-auto grid max-w-7xl grid-cols-1 gap-10 px-4 py-16 md:px-8 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="max-w-xl">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-lg border border-primary-500/20 bg-[#fbfcf8] px-3 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-primary-700">
-              <Compass className="h-4 w-4" />
+            <div className="mb-4 flex items-center gap-3 text-xs font-black uppercase tracking-[0.16em] text-primary-700">
+              <span aria-hidden="true" className="h-px w-10 bg-primary-600" />
               Como ler a pista
             </div>
             <h2 className="text-4xl font-black uppercase leading-none tracking-tight text-zinc-950 md:text-5xl">
               Cada desenho muda o jeito de pilotar
             </h2>
             <p className="mt-5 text-sm leading-7 text-zinc-600">
-              A experiência fica mais clara quando o visitante enxerga o mapa real e entende o impacto prático de cada modo. Por isso a grade usa as imagens oficiais e separa Normal, Invertido e Chicane.
+              Os mapas abaixo apresentam o sentido da volta e as diferenças entre as configurações Normal, Invertido e Chicane.
             </p>
           </div>
 

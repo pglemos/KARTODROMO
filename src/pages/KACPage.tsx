@@ -14,7 +14,6 @@ import {
   Medal,
   MessageSquare,
   ShieldCheck,
-  Sparkles,
   Timer,
   Trophy,
   Users,
@@ -187,8 +186,8 @@ const KACPage = () => {
                 Campeonatos
               </a>
 
-              <div className="kac-hero-mark mb-5 inline-flex items-center gap-2">
-                <Sparkles className="h-4 w-4" />
+              <div className="mb-5 flex items-center gap-3 text-xs font-black uppercase tracking-[0.16em] text-primary-700">
+                <span aria-hidden="true" className="h-px w-10 bg-primary-600" />
                 Regulamento oficial 2026
               </div>
 
@@ -359,7 +358,7 @@ const KACPage = () => {
               <img src="/kac/regulamento-page-1.png" alt="Capa do regulamento KAC Iniciantes 2026" />
             </div>
             <div className="self-center" data-reveal style={{ transitionDelay: '120ms' }}>
-              <p className="kac-label">Documento premium da temporada</p>
+              <p className="kac-label">Documento oficial da temporada</p>
               <h3 className="mt-3 text-4xl font-black uppercase leading-none text-zinc-950 md:text-5xl">PDF oficial 2026 pronto para consulta</h3>
               <p className="mt-6 max-w-2xl text-base leading-8 text-zinc-700">
                 O regulamento reúne estrutura, categoria, pontuação, desempate, premiação, calendário, punições, troca de kart, peso mínimo e disposições gerais.
