@@ -313,12 +313,8 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
             ))}
           </div>
 
-          <p className="mx-auto mt-9 max-w-5xl text-center text-lg font-light leading-relaxed text-zinc-600 md:text-xl">
-            Peça seu <strong className="font-extrabold">cartão fidelidade</strong> e faça um carimbo na secretaria em toda bateria que correr, a cada 10 corridas 1 é por nossa conta, basta trocar seu cartão fidelidade com 10 carimbos por 1 corrida totalmente de graça. (O cartão fidelidade é pessoal e intransferível).
-          </p>
-
-          <p className="mt-9 text-center text-xl font-semibold leading-tight text-zinc-800 md:text-2xl">
-            <span className="font-black text-primary-600">Reserve agora</span> e pague <span className="font-black text-primary-600">somente na data</span> da sua corrida!
+          <p className="mt-7 text-center text-xl font-semibold leading-tight text-zinc-800 md:text-2xl">
+            <span className="font-black text-primary-600">Reserve agora.</span> Faça o pagamento por meio de nossa <span className="font-black text-primary-600">reserva on-line.</span>
           </p>
 
           <div className="relative mx-auto mt-12 max-w-[1316px] rounded-2xl border border-zinc-200 bg-zinc-50 px-4 pb-16 pt-12 shadow-sm md:min-h-[900px] md:px-24 md:pb-24 md:pt-16">

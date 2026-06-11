@@ -777,6 +777,16 @@
   box-shadow: inset 4px 0 0 var(--kac-green);
 }
 
+.kac-table-wrap tbody .kac-calendar-exception {
+  background: #fff8dc;
+  box-shadow: inset 4px 0 0 #ca8a04;
+}
+
+.kac-table-wrap tbody .kac-calendar-exception:hover {
+  background: #fff3bd;
+  box-shadow: inset 4px 0 0 #ca8a04;
+}
+
 .kac-race-number {
   display: inline-grid;
   height: 1.8rem;
@@ -865,15 +875,17 @@
   aspect-ratio: 3 / 4;
   height: 100%;
   width: 100%;
+  filter: saturate(2.15) contrast(1.12) brightness(0.94);
   object-fit: cover;
   object-position: top;
   transform: rotateY(-3deg) rotateX(1deg);
   transform-origin: left center;
   box-shadow: 18px 22px 34px rgba(17, 20, 18, 0.11);
-  transition: transform 500ms var(--kac-ease), box-shadow 500ms var(--kac-ease);
+  transition: filter 500ms var(--kac-ease), transform 500ms var(--kac-ease), box-shadow 500ms var(--kac-ease);
 }
 
 .kac-pdf-frame:hover img {
+  filter: saturate(2.35) contrast(1.14) brightness(0.94);
   transform: rotateY(0deg) rotateX(0deg) translateY(-4px);
   box-shadow: 24px 30px 44px rgba(17, 20, 18, 0.14);
 }

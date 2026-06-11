@@ -269,7 +269,7 @@ const Championships = () => {
                         className="px-6 py-3.5 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-400 hover:to-primary-500 text-zinc-950 font-bold uppercase tracking-wider text-xs rounded-xl flex items-center justify-center gap-2 transition-all duration-300 shadow-sm"
                       >
                         <Trophy className="w-4 h-4" />
-                        Página Completa
+                        Acesse a Página do KAC
                       </a>
                     )}
                     {champ.status === 'open' && (

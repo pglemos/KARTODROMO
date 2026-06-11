@@ -76,9 +76,9 @@ const Promotions = () => {
                 href="https://wa.me/553135112373?text=Ol%C3%A1!%20Gostaria%20de%20agendar%20minha%20corrida%20de%20aniversariante%20do%20m%C3%AAs."
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full py-3 bg-white border border-zinc-200 hover:border-primary-500/30 hover:bg-zinc-50 text-zinc-700 font-bold uppercase tracking-wider text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all duration-300 shadow-sm"
+                className="w-full min-h-14 px-5 py-3.5 bg-[#087f3e] border border-[#066c35] hover:-translate-y-0.5 hover:bg-[#066c35] text-white font-black uppercase tracking-wider text-xs rounded-xl flex items-center justify-center gap-2 transition-all duration-300 shadow-[0_12px_28px_rgba(8,127,62,0.28)] hover:shadow-[0_16px_34px_rgba(8,127,62,0.36)]"
               >
-                <MessageCircle className="w-4 h-4 text-primary-600" />
+                <MessageCircle className="w-5 h-5" />
                 Agendar Bateria de Aniversário
               </a>
             </div>
@@ -143,9 +143,9 @@ const Promotions = () => {
                 href="https://wa.me/553135112373?text=Ol%C3%A1!%20Gostaria%20de%20solicitar%20a%20promo%C3%A7%C3%A3o%20de%20compra%20coletiva%20para%20meu%20grupo."
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full py-3 bg-white border border-zinc-200 hover:border-yellow-500/30 hover:bg-zinc-50 text-zinc-700 font-bold uppercase tracking-wider text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all duration-300 shadow-sm"
+                className="w-full min-h-14 px-5 py-3.5 bg-yellow-400 border border-yellow-500 hover:-translate-y-0.5 hover:bg-yellow-500 text-zinc-950 font-black uppercase tracking-wider text-xs rounded-xl flex items-center justify-center gap-2 transition-all duration-300 shadow-[0_12px_28px_rgba(234,179,8,0.28)] hover:shadow-[0_16px_34px_rgba(234,179,8,0.38)]"
               >
-                <MessageCircle className="w-4 h-4 text-yellow-600" />
+                <MessageCircle className="w-5 h-5" />
                 Agendar Compra Coletiva
               </a>
             </div>

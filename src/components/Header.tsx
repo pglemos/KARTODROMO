@@ -8,32 +8,33 @@ const Header = () => {
   return (
     <>
       {/* Top Bar */}
-      <div className="hidden bg-zinc-100 text-zinc-600 py-2.5 px-4 border-b border-zinc-200 md:block">
-        <div className="container mx-auto flex flex-wrap justify-between items-center text-xs gap-2">
-          <div className="flex items-center space-x-6">
-            <a href="tel:+553135112373" className="flex items-center space-x-1.5 hover:text-primary-600 transition-colors">
-              <Phone className="w-3.5 h-3.5 text-primary-500" />
-              <span className="font-semibold text-zinc-700">(31) 3511-2373</span>
+      <div className="border-b border-white/15 bg-[#087f67] px-4 py-2.5 text-white shadow-sm">
+        <div className="container mx-auto flex flex-wrap items-center justify-between gap-x-5 gap-y-2 text-[11px] sm:text-xs">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <a href="tel:+553135112373" className="flex items-center space-x-1.5 text-white transition-colors hover:text-white/75">
+              <Phone className="h-4 w-4 text-white" />
+              <span className="font-semibold">(31) 3511-2373</span>
             </a>
-            <div className="flex items-center space-x-1.5 text-zinc-500">
-              <MapPin className="w-3.5 h-3.5 text-primary-500" />
-              <span>Av. Adutora Várzea das Flores, 477 - Betim, MG</span>
+            <div className="flex items-center space-x-1.5 text-white/95">
+              <MapPin className="h-4 w-4 text-white" />
+              <span className="md:hidden">Betim - MG</span>
+              <span className="hidden md:inline">Av. Adutora Várzea das Flores, 477 - Betim, MG</span>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center space-x-1.5 text-zinc-500">
-              <Clock className="w-3.5 h-3.5 text-primary-500" />
-              <span className="hidden sm:inline">Funcionamento:</span>
-              <span className="text-zinc-700 font-medium">Ter-Sex: 16h-22h | Sáb-Dom: 08h-19h</span>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <div className="flex items-center space-x-1.5 text-white/95">
+              <Clock className="h-4 w-4 text-white" />
+              <span className="hidden lg:inline">Funcionamento:</span>
+              <span className="font-medium">Ter-Sex: 16h-22h | Sáb-Dom: 08h-19h</span>
             </div>
-            <div className="flex space-x-3 ml-2 border-l border-zinc-300 pl-4">
-              <a href="https://www.facebook.com/kartodromodebetim" target="_blank" rel="noopener noreferrer" aria-label="Facebook do Kartódromo de Betim" className="text-zinc-500 hover:text-primary-600 transition-colors">
+            <div className="ml-2 hidden space-x-3 border-l border-white/25 pl-4 lg:flex">
+              <a href="https://www.facebook.com/kartodromodebetim" target="_blank" rel="noopener noreferrer" aria-label="Facebook do Kartódromo de Betim" className="text-white/80 transition-colors hover:text-white">
                 <Facebook className="w-4 h-4" />
               </a>
-              <a href="https://www.instagram.com/kartodromobetim/" target="_blank" rel="noopener noreferrer" aria-label="Instagram do Kartódromo de Betim" className="text-zinc-500 hover:text-primary-600 transition-colors">
+              <a href="https://www.instagram.com/kartodromobetim/" target="_blank" rel="noopener noreferrer" aria-label="Instagram do Kartódromo de Betim" className="text-white/80 transition-colors hover:text-white">
                 <Instagram className="w-4 h-4" />
               </a>
-              <a href="https://www.youtube.com/kartodromodebetim31" target="_blank" rel="noopener noreferrer" aria-label="YouTube do Kartódromo de Betim" className="text-zinc-500 hover:text-primary-600 transition-colors">
+              <a href="https://www.youtube.com/kartodromodebetim31" target="_blank" rel="noopener noreferrer" aria-label="YouTube do Kartódromo de Betim" className="text-white/80 transition-colors hover:text-white">
                 <Youtube className="w-4 h-4" />
               </a>
             </div>
@@ -42,7 +43,7 @@ const Header = () => {
       </div>
 
       {/* Main Header */}
-      <header className="bg-white/90 backdrop-blur-md border-b border-zinc-200/80 sticky top-0 z-50 shadow-sm">
+      <header className="sticky top-0 z-50 border-b border-zinc-200/80 bg-white shadow-sm">
         <div className="container mx-auto px-4">
           <div className="flex justify-between items-center py-4">
             {/* Logo */}

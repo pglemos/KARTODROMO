@@ -44,14 +44,14 @@ const seasonSpecs = [
 ];
 
 const calendarRows = [
-  ['1', '06/06', 'Sábado', '11:10', '12:10', '1 Invertido'],
-  ['2', '07/06', 'Domingo', '11:10', '12:10', '1 Invertido'],
+  ['1', '06/06', 'Sábado', '11:10', '12:10', '1 Normal'],
+  ['2', '07/06', 'Domingo', '11:10', '12:10', '1 Normal'],
   ['3', '13/06', 'Sábado', '11:10', '12:10', '1 Normal'],
-  ['4', '14/06', 'Domingo', '11:10', '12:10', '1 Normal'],
-  ['5', '20/06', 'Sábado', '11:10', '12:10', '1 Invertido'],
-  ['6', '21/06', 'Domingo', '11:10', '12:10', '1 Invertido'],
-  ['7', '27/06', 'Sábado', '11:10', '12:10', '11 Normal'],
-  ['8', '28/06', 'Domingo', '11:10', '12:10', '11 Normal'],
+  ['4', '14/06', 'Domingo', '10:35', '11:35', '1 Normal'],
+  ['5', '20/06', 'Sábado', '11:10', '12:10', '1 Normal'],
+  ['6', '21/06', 'Domingo', '11:10', '12:10', '1 Normal'],
+  ['7', '27/06', 'Sábado', '11:10', '12:10', '1 Normal'],
+  ['8', '28/06', 'Domingo', '11:10', '12:10', '1 Normal'],
 ];
 
 const rules = [
@@ -68,7 +68,7 @@ const rules = [
   {
     icon: Flag,
     title: 'Traçados oficiais',
-    text: 'A bateria mensal utiliza os traçados 1 Normal, 1 Invertido e 11 Normal, publicados no calendário oficial da etapa.',
+    text: 'Todas as etapas de junho utilizam o traçado 1 Normal, conforme o calendário oficial.',
   },
   {
     icon: Weight,
@@ -83,7 +83,6 @@ const tieBreakers = [
   'Maior número de terceiros lugares (P3)',
   'Maior número de quartos lugares (P4)',
   'Soma dos 5 melhores resultados',
-  'Match race com 1 volta em 2 karts diferentes',
 ];
 
 const penalties = [
@@ -289,7 +288,7 @@ const KACPage = () => {
           <div className="kac-calendar-heading" data-reveal>
             <div>
               <p className="kac-label">Horários do KAC Junho</p>
-              <h3>Chegada às 11:10. Corrida às 12:10.</h3>
+              <h3>Confira os horários de chegada e largada de cada etapa.</h3>
             </div>
             <CalendarDays className="h-12 w-12 text-primary-600" />
           </div>
@@ -308,7 +307,7 @@ const KACPage = () => {
                 </thead>
                 <tbody>
                   {calendarRows.map((row) => (
-                    <tr key={row[0]}>
+                    <tr key={row[0]} className={row[0] === '4' ? 'kac-calendar-exception' : undefined}>
                       {row.map((cell, index) => (
                         <td key={`${row[0]}-${index}`}>
                           {index === 0 ? <span className="kac-race-number">{cell}</span> : cell}
@@ -368,7 +367,7 @@ const KACPage = () => {
               <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {[
                   'Equipamentos de segurança obrigatórios',
-                  'Datas sujeitas a aviso prévio',
+                  'Calendário oficial mensal atualizado no site',
                   'Casos omissos avaliados pela direção',
                   'Aceite integral para participar',
                 ].map((item) => (

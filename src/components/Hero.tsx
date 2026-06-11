@@ -1,5 +1,15 @@
 import { Calendar, Compass, Trophy, Zap } from 'lucide-react';
-import { MYLAPTIME_BOOKING_URL } from '../config/booking';
+import { MYLAPTIME_BOOKING_URL, WHATSAPP_BOOKING_URL } from '../config/booking';
+
+const WhatsAppIcon = () => (
+  <svg
+    aria-hidden="true"
+    className="h-5 w-5 flex-shrink-0 fill-current"
+    viewBox="0 0 24 24"
+  >
+    <path d="M12.04 2a9.84 9.84 0 0 0-8.42 14.93L2 22l5.23-1.58A9.95 9.95 0 1 0 12.04 2Zm0 17.92a8.08 8.08 0 0 1-4.12-1.13l-.3-.18-3.1.94.96-3.02-.2-.31a8.02 8.02 0 1 1 6.76 3.7Zm4.42-6.04c-.24-.12-1.43-.7-1.65-.78-.22-.08-.38-.12-.54.12-.16.24-.62.78-.76.94-.14.16-.28.18-.52.06-.24-.12-1.02-.38-1.94-1.2a7.27 7.27 0 0 1-1.34-1.67c-.14-.24-.02-.37.1-.49.11-.11.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42-.06-.12-.54-1.3-.74-1.78-.2-.47-.4-.4-.54-.41h-.46c-.16 0-.42.06-.64.3-.22.24-.84.82-.84 2s.86 2.32.98 2.48c.12.16 1.7 2.6 4.12 3.64.58.25 1.03.4 1.38.51.58.18 1.1.16 1.52.1.46-.07 1.43-.59 1.63-1.15.2-.56.2-1.04.14-1.14-.06-.1-.22-.16-.46-.28Z" />
+  </svg>
+);
 
 const Hero = () => {
   return (
@@ -49,12 +59,13 @@ const Hero = () => {
               Reservar corrida online
             </a>
             <a
-              href="https://wa.me/553135112373"
+              href={WHATSAPP_BOOKING_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="home-cta inline-flex min-h-12 items-center justify-center border border-zinc-200 bg-white/82 px-6 py-3.5 text-center text-xs font-black uppercase tracking-[0.14em] text-zinc-800 shadow-sm backdrop-blur transition-all duration-300 hover:-translate-y-0.5 hover:border-primary-500/40 hover:bg-white md:min-h-14 md:px-8 md:py-4 md:tracking-[0.16em]"
+              className="home-cta inline-flex min-h-12 items-center justify-center gap-2.5 border border-[#087f3e] bg-[#087f3e] px-6 py-3.5 text-center text-xs font-black uppercase tracking-[0.14em] text-white shadow-[0_16px_34px_rgba(8,127,62,0.24)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#066c35] hover:bg-[#066c35] hover:shadow-[0_20px_42px_rgba(8,127,62,0.3)] md:min-h-14 md:px-8 md:py-4 md:tracking-[0.16em]"
             >
-              Falar no WhatsApp
+              <WhatsAppIcon />
+              Reservar pelo WhatsApp
             </a>
           </div>
 

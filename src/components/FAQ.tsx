@@ -74,7 +74,7 @@ export default function FAQ() {
       question: "Quais são as formas de pagamento disponíveis?",
       answer: (
         <p>
-          No balcão de atendimento aceitamos dinheiro físico, Pix, cartões de débito e crédito (principais bandeiras). Para garantir tarifas com descontos promocionais (como compra coletiva ou pagamento antecipado do grupo), a quitação total deve ser realizada via Pix de forma antecipada pelo WhatsApp.
+          No balcão de atendimento aceitamos dinheiro físico, Pix, cartões de débito e crédito (principais bandeiras). Para garantir tarifas com descontos promocionais (como compra coletiva ou pagamento antecipado do grupo), a quitação total pode ser realizada antecipadamente por Pix ou cartão de crédito.
         </p>
       )
     }

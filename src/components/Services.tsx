@@ -1,4 +1,4 @@
-import { MessageCircle, Star, ArrowRight, ShieldCheck, CheckCircle, Gauge, Zap } from 'lucide-react';
+import { CreditCard, MessageCircle, Star, ArrowRight, ShieldCheck, CheckCircle, Gauge, Zap } from 'lucide-react';
 import { MYLAPTIME_BOOKING_URL } from '../config/booking';
 
 const Services = () => {
@@ -40,9 +40,9 @@ const Services = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Online Pre-pay */}
                   <div className="bg-white border border-primary-500/30 rounded-2xl p-5 relative overflow-hidden group-hover:border-primary-500/50 transition-colors">
-                    <div className="absolute top-2 right-2 text-xs font-semibold text-primary-600 flex items-center">
-                      <MessageCircle className="w-3.5 h-3.5 mr-0.5" />
-                      PIX
+                    <div className="mb-2 flex items-center gap-1 text-xs font-semibold uppercase text-primary-600">
+                      <CreditCard className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
+                      Pix ou cartão de crédito
                     </div>
                     <div className="text-xs text-zinc-500 uppercase font-bold tracking-wider mb-1">Antecipado Online</div>
                     <div className="text-3xl font-black text-primary-600 tracking-tight">R$ 145,00</div>

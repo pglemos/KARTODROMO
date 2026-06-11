@@ -72,8 +72,8 @@ const Track = () => {
   const alternateTrack = trackLayouts.find((track) => track.label === '8 Normal') ?? trackLayouts[7] ?? featuredTrack;
   const trackHighlights = [
     { label: 'Extensão', value: '1.110m', detail: 'Circuito técnico' },
-    { label: 'Traçados', value: String(trackLayouts.length), detail: 'Normal, invertido e chicane' },
-    { label: 'Uso', value: '3 modos', detail: 'Lazer, treino e campeonato' },
+    { label: 'Traçados oficiais', value: String(trackLayouts.length), detail: 'Normal, invertido e chicane' },
+    { label: 'Alterações', value: 'Campeonatos', detail: 'Conforme calendário oficial' },
   ];
 
   useEffect(() => {
@@ -108,7 +108,7 @@ const Track = () => {
               Pista de <span className="text-primary-600">1.110m</span> para acelerar de verdade
             </h1>
             <p className="mt-7 max-w-2xl text-base leading-8 text-zinc-600 md:text-lg">
-              A página da pista agora usa os mapas oficiais reais do Kartódromo de Betim. Você compara traçados, entende o sentido da volta e escolhe a melhor configuração para treino, lazer ou campeonato.
+              Conheça os mapas oficiais do Kartódromo de Betim e entenda as características de cada configuração. Alterações de traçado são realizadas exclusivamente em campeonatos, conforme o calendário oficial.
             </p>
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
@@ -117,7 +117,7 @@ const Track = () => {
                 className="track-primary-action inline-flex items-center justify-center gap-2 rounded-lg bg-primary-500 px-6 py-3.5 text-xs font-black uppercase tracking-[0.16em] text-zinc-950 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-400"
               >
                 <Map className="h-4 w-4" />
-                Ver traçados
+                Ver traçados oficiais
               </a>
               <a
                 href="https://wa.me/553135112373?text=Ol%C3%A1!%20Quero%20saber%20qual%20tra%C3%A7ado%20estar%C3%A1%20ativo%20na%20pista."
@@ -200,7 +200,7 @@ const Track = () => {
               <span className="text-xs font-black uppercase tracking-[0.18em]">Catálogo oficial</span>
             </div>
             <h2 className="text-3xl font-black uppercase leading-none tracking-tight text-zinc-950 md:text-5xl">
-              Todos os traçados disponíveis
+              Traçados oficiais do circuito
             </h2>
           </div>
 
@@ -277,12 +277,12 @@ const Track = () => {
             className="aspect-square w-full rounded-xl border border-zinc-200 bg-[#fdfefb] object-contain"
           />
           <div className="flex flex-col justify-center">
-            <span className="mb-4 text-xs font-black uppercase tracking-[0.18em] text-primary-700">Dica para grupos</span>
+            <span className="mb-4 text-xs font-black uppercase tracking-[0.18em] text-primary-700">Informação importante</span>
             <h3 className="text-3xl font-black uppercase leading-none tracking-tight text-zinc-950 md:text-4xl">
-              Quer uma bateria mais técnica? Peça um traçado com chicane.
+              Alterações de traçado são exclusivas para campeonatos.
             </h3>
             <p className="mt-5 max-w-2xl text-sm leading-7 text-zinc-600">
-              Para eventos e confraternizações, o time pode ajudar a escolher a configuração ideal conforme experiência dos pilotos, duração da bateria e perfil competitivo do grupo.
+              Nas baterias de lazer, treinos e eventos, é utilizado o traçado definido pelo Kartódromo. Configurações diferentes, incluindo opções com chicane ou sentido invertido, são adotadas somente em campeonatos conforme o calendário oficial.
             </p>
           </div>
         </div>

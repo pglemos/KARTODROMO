@@ -184,7 +184,7 @@ const Events = () => {
       </div>
 
       <div className="mx-auto max-w-7xl px-4 py-16 md:px-8">
-        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="mb-8">
           <div>
             <div className="mb-3 flex items-center gap-2 text-primary-700">
               <Users className="h-5 w-5" />
@@ -194,9 +194,6 @@ const Events = () => {
               Um evento com ritmo, disputa e memória
             </h2>
           </div>
-          <p className="max-w-xl text-sm leading-7 text-zinc-600">
-            A experiência fica clara para empresas, famílias e grupos: não é só alugar um salão, é montar uma programação.
-          </p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -217,16 +214,13 @@ const Events = () => {
 
       <div className="border-y border-zinc-200/80 bg-[#f7faf4]">
         <div className="mx-auto max-w-7xl px-4 py-16 md:px-8">
-          <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div className="mb-8">
             <div>
               <span className="text-xs font-black uppercase tracking-[0.18em] text-primary-700">Galeria real</span>
               <h2 className="mt-3 text-3xl font-black uppercase leading-none tracking-tight text-zinc-950 md:text-5xl">
                 Estrutura física do kartódromo
               </h2>
             </div>
-            <p className="max-w-lg text-sm leading-7 text-zinc-600">
-              Fotos amplas, legenda no hover e proporções diferentes para parecer uma galeria real, não uma grade repetida.
-            </p>
           </div>
 
           <div className="grid auto-rows-[210px] grid-cols-1 gap-4 md:grid-cols-4">
