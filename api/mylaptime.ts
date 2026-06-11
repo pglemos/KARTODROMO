@@ -78,9 +78,10 @@ const patchBookingHtml = (html: string) => {
                 if (!window.Blazor || window.__kibBlazorStarted) return;
                 window.__kibBlazorStarted = true;
                 window.Blazor.start({
+                    logLevel: 4,
                     circuit: {
                         configureSignalR: function (builder) {
-                            builder.withUrl('/_blazor', { transport: 4 });
+                            builder.withUrl('/_blazor');
                         }
                     }
                 }).catch(function (error) {
