@@ -143,6 +143,22 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
     window.scrollTo({ top: Math.max(top, 0), behavior: 'auto' });
   }, [surface]);
 
+  const cleanOfficialBookingFrame = useCallback(() => {
+    const doc = iframeRef.current?.contentDocument;
+    if (!doc?.body) {
+      return;
+    }
+
+    doc.querySelectorAll('.adc-footer').forEach((element) => element.remove());
+
+    if (!doc.getElementById('kib-booking-cleanup')) {
+      const style = doc.createElement('style');
+      style.id = 'kib-booking-cleanup';
+      style.textContent = '.adc-footer{display:none!important}';
+      doc.head?.appendChild(style);
+    }
+  }, []);
+
   const readOfficialBookingState = useCallback(() => {
     if (officialFlowOpen) {
       return;
@@ -153,6 +169,8 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
     if (!doc?.body) {
       return;
     }
+
+    cleanOfficialBookingFrame();
 
     const monthLabel = normalizeText(doc.querySelector('.cal-month-label')?.textContent);
     const { monthIndex, year } = parseMonthLabel(monthLabel);
@@ -203,7 +221,7 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
       slots,
       loaded: true,
     });
-  }, [officialFlowOpen]);
+  }, [cleanOfficialBookingFrame, officialFlowOpen]);
 
   const clickOfficialDay = useCallback((day: number) => {
     const doc = iframeRef.current?.contentDocument;
@@ -462,7 +480,10 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
                 title="Agendamento oficial MyLapTime do Kartódromo de Betim"
                 src={MYLAPTIME_BOOKING_PROXY_URL}
                 onLoad={() => {
+                  cleanOfficialBookingFrame();
                   keepBookingAnchored();
+                  window.setTimeout(cleanOfficialBookingFrame, 1200);
+                  window.setTimeout(cleanOfficialBookingFrame, 3500);
                   window.setTimeout(readOfficialBookingState, 1200);
                   window.setTimeout(readOfficialBookingState, 3500);
                 }}
@@ -472,10 +493,6 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
                 className={officialFlowOpen ? 'block w-full border-0 bg-white' : 'block border-0 bg-white'}
               />
             </div>
-
-            <p className="mt-6 text-right text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-300">
-              Powered by MyLapTime
-            </p>
           </div>
         </div>
       </div>
