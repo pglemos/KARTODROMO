@@ -77,6 +77,15 @@ const patchBookingHtml = (html: string) => {
             function startBlazorWithLongPolling() {
                 if (!window.Blazor || window.__kibBlazorStarted) return;
                 window.__kibBlazorStarted = true;
+                var originalWarn = console.warn.bind(console);
+                console.warn = function () {
+                    var message = Array.prototype.join.call(arguments, ' ');
+                    if (message.indexOf('Failed to connect via WebSockets, using the Long Polling fallback transport') !== -1) {
+                        return;
+                    }
+
+                    originalWarn.apply(console, arguments);
+                };
                 window.Blazor.start({
                     logLevel: 4,
                     circuit: {
