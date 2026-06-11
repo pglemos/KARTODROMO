@@ -81,7 +81,8 @@ const patchBookingHtml = (html: string) => {
                     logLevel: 4,
                     circuit: {
                         configureSignalR: function (builder) {
-                            builder.withUrl('/_blazor');
+                            builder.configureLogging(4);
+                            builder.withUrl('/_blazor', { transport: 4 });
                         }
                     }
                 }).catch(function (error) {
