@@ -41,6 +41,16 @@ Este arquivo define as instrucoes do projeto para o Codex CLI.
 - `npm run validate:agents`
 <!-- AIOX-MANAGED-END: commands -->
 
+<!-- AIOX-MANAGED-START: codex-background-agents -->
+## Codex Background Agents
+
+- Nao use agentes nativos em segundo plano do Codex para trabalho de agentes AIOX.
+- Nomes como McClintock e Aquinas sao workers internos do Codex, nao agentes do projeto.
+- Para orquestracao, use `aiox-master` via `/skills` ou `.aiox-core/development/agents/aiox-master.md`.
+- Para especialistas, use `/skills` com `aiox-<agent-id>` ou carregue `.aiox-core/development/agents/<agent-id>.md`.
+- Para paralelismo, use workflows AIOX e o orquestrador AIOX, nao o roteamento `multi_agent` nativo do Codex.
+<!-- AIOX-MANAGED-END: codex-background-agents -->
+
 <!-- AIOX-MANAGED-START: shortcuts -->
 ## Agent Shortcuts
 

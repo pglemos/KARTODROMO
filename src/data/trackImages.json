@@ -1,0 +1,224 @@
+{
+  "officialTracks": [
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/1NORMAL.jpg",
+      "alt": "Traçado Oficial 1"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/1INVERTIDO.jpg",
+      "alt": "Traçado Oficial 2"
+    }
+  ],
+  "allTracks": [
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/1NORMAL.jpg",
+      "alt": "Traçado 1 Normal",
+      "label": "1 Normal"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/1INVERTIDO.jpg",
+      "alt": "Traçado 1 Invertido",
+      "label": "1 Invertido"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/1CHICANE.jpg",
+      "alt": "Traçado 1 Chicane",
+      "label": "1 Chicane"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/2NORMAL.jpg",
+      "alt": "Traçado 2 Normal",
+      "label": "2 Normal"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/2INVERTIDO.jpg",
+      "alt": "Traçado 2 Invertido",
+      "label": "2 Invertido"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/2CHICANE.jpg",
+      "alt": "Traçado 2 Chicane",
+      "label": "2 Chicane"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/3NORMAL.jpg",
+      "alt": "Traçado 3 Normal",
+      "label": "3 Normal"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/3INVERTIDO.jpg",
+      "alt": "Traçado 3 Invertido",
+      "label": "3 Invertido"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/3CHICANE.jpg",
+      "alt": "Traçado 3 Chicane",
+      "label": "3 Chicane"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/4NORMAL.jpg",
+      "alt": "Traçado 4 Normal",
+      "label": "4 Normal"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/4INVERTIDO.jpg",
+      "alt": "Traçado 4 Invertido",
+      "label": "4 Invertido"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/4CHICANE.jpg",
+      "alt": "Traçado 4 Chicane",
+      "label": "4 Chicane"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/5NORMAL.jpg",
+      "alt": "Traçado 5 Normal",
+      "label": "5 Normal"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/5INVERTIDO.jpg",
+      "alt": "Traçado 5 Invertido",
+      "label": "5 Invertido"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/5CHICANE.jpg",
+      "alt": "Traçado 5 Chicane",
+      "label": "5 Chicane"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/6NORMAL.jpg",
+      "alt": "Traçado 6 Normal",
+      "label": "6 Normal"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/6INVERTIDO.jpg",
+      "alt": "Traçado 6 Invertido",
+      "label": "6 Invertido"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/6CHICANE.jpg",
+      "alt": "Traçado 6 Chicane",
+      "label": "6 Chicane"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/7NORMAL.jpg",
+      "alt": "Traçado 7 Normal",
+      "label": "7 Normal"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/7INVERTIDO.jpg",
+      "alt": "Traçado 7 Invertido",
+      "label": "7 Invertido"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/7CHICANE.jpg",
+      "alt": "Traçado 7 Chicane",
+      "label": "7 Chicane"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/8NORMAL.jpg",
+      "alt": "Traçado 8 Normal",
+      "label": "8 Normal"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/8INVERTIDO.jpg",
+      "alt": "Traçado 8 Invertido",
+      "label": "8 Invertido"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/8CHICANE.jpg",
+      "alt": "Traçado 8 Chicane",
+      "label": "8 Chicane"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/9NORMAL.jpg",
+      "alt": "Traçado 9 Normal",
+      "label": "9 Normal"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/9INVERTIDO.jpg",
+      "alt": "Traçado 9 Invertido",
+      "label": "9 Invertido"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/9CHICANE.jpg",
+      "alt": "Traçado 9 Chicane",
+      "label": "9 Chicane"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/10NORMAL.jpg",
+      "alt": "Traçado 10 Normal",
+      "label": "10 Normal"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/10INVERTIDO.jpg",
+      "alt": "Traçado 10 Invertido",
+      "label": "10 Invertido"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/10CHICANE.jpg",
+      "alt": "Traçado 10 Chicane",
+      "label": "10 Chicane"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/11NORMAL.jpg",
+      "alt": "Traçado 11 Normal",
+      "label": "11 Normal"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/11INVERTIDO.jpg",
+      "alt": "Traçado 11 Invertido",
+      "label": "11 Invertido"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/11CHICANE.jpg",
+      "alt": "Traçado 11 Chicane",
+      "label": "11 Chicane"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/12NORMAL.jpg",
+      "alt": "Traçado 12 Normal",
+      "label": "12 Normal"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/12INVERTIDO.jpg",
+      "alt": "Traçado 12 Invertido",
+      "label": "12 Invertido"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/12CHICANE.jpg",
+      "alt": "Traçado 12 Chicane",
+      "label": "12 Chicane"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/13NORMAL.jpg",
+      "alt": "Traçado 13 Normal",
+      "label": "13 Normal"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/13INVERTIDO.jpg",
+      "alt": "Traçado 13 Invertido",
+      "label": "13 Invertido"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/13CHICANE.jpg",
+      "alt": "Traçado 13 Chicane",
+      "label": "13 Chicane"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/14NORMAL.jpg",
+      "alt": "Traçado 14 Normal",
+      "label": "14 Normal"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/14INVERTIDO.jpg",
+      "alt": "Traçado 14 Invertido",
+      "label": "14 Invertido"
+    },
+    {
+      "url": "https://storage.googleapis.com/agentpro-cdn/kartodromoDeBetim/track_v1/14CHICANE.jpg",
+      "alt": "Traçado 14 Chicane",
+      "label": "14 Chicane"
+    }
+  ]
+}

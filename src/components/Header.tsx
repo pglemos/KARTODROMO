@@ -1,0 +1,137 @@
+import { useState } from 'react';
+import { Menu, X, Phone, MapPin, Clock, Facebook, Instagram, Youtube } from 'lucide-react';
+import { MYLAPTIME_BOOKING_URL } from '../config/booking';
+
+const Header = () => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  return (
+    <>
+      {/* Top Bar */}
+      <div className="hidden bg-zinc-100 text-zinc-600 py-2.5 px-4 border-b border-zinc-200 md:block">
+        <div className="container mx-auto flex flex-wrap justify-between items-center text-xs gap-2">
+          <div className="flex items-center space-x-6">
+            <a href="tel:+553135112373" className="flex items-center space-x-1.5 hover:text-primary-600 transition-colors">
+              <Phone className="w-3.5 h-3.5 text-primary-500" />
+              <span className="font-semibold text-zinc-700">(31) 3511-2373</span>
+            </a>
+            <div className="flex items-center space-x-1.5 text-zinc-500">
+              <MapPin className="w-3.5 h-3.5 text-primary-500" />
+              <span>Av. Adutora Várzea das Flores, 477 - Betim, MG</span>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center space-x-1.5 text-zinc-500">
+              <Clock className="w-3.5 h-3.5 text-primary-500" />
+              <span className="hidden sm:inline">Funcionamento:</span>
+              <span className="text-zinc-700 font-medium">Ter-Sex: 16h-22h | Sáb-Dom: 08h-19h</span>
+            </div>
+            <div className="flex space-x-3 ml-2 border-l border-zinc-300 pl-4">
+              <a href="https://www.facebook.com/kartodromodebetim" target="_blank" rel="noopener noreferrer" aria-label="Facebook do Kartódromo de Betim" className="text-zinc-500 hover:text-primary-600 transition-colors">
+                <Facebook className="w-4 h-4" />
+              </a>
+              <a href="https://www.instagram.com/kartodromobetim/" target="_blank" rel="noopener noreferrer" aria-label="Instagram do Kartódromo de Betim" className="text-zinc-500 hover:text-primary-600 transition-colors">
+                <Instagram className="w-4 h-4" />
+              </a>
+              <a href="https://www.youtube.com/kartodromodebetim31" target="_blank" rel="noopener noreferrer" aria-label="YouTube do Kartódromo de Betim" className="text-zinc-500 hover:text-primary-600 transition-colors">
+                <Youtube className="w-4 h-4" />
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Header */}
+      <header className="bg-white/90 backdrop-blur-md border-b border-zinc-200/80 sticky top-0 z-50 shadow-sm">
+        <div className="container mx-auto px-4">
+          <div className="flex justify-between items-center py-4">
+            {/* Logo */}
+            <a href="/" className="flex items-center">
+              <img
+                src="/brand/kib-logo.png"
+                alt="Logo Kartódromo de Betim"
+                className="h-12 w-auto filter brightness-100 drop-shadow-[0_2px_4px_rgba(0,0,0,0.05)]"
+              />
+            </a>
+
+            {/* Desktop Menu */}
+            <nav className="hidden lg:flex items-center gap-4 xl:gap-6 text-xs xl:text-sm font-bold tracking-wide">
+              <a href="/#home" className="text-zinc-700 hover:text-primary-600 transition-colors py-1">Home</a>
+              <a href="/#sobre" className="text-zinc-700 hover:text-primary-600 transition-colors py-1">Sobre</a>
+              <a href="/#servicos" className="text-zinc-700 hover:text-primary-600 transition-colors py-1">Modalidades</a>
+              <a href="/#promocoes" className="text-zinc-700 hover:text-primary-600 transition-colors py-1 flex items-center">
+                <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full mr-1.5 animate-pulse"></span>
+                Promoções
+              </a>
+              <a href="/pista" className="text-zinc-700 hover:text-primary-600 transition-colors py-1">A Pista</a>
+              <a href="/kart-locacao" className="text-zinc-700 hover:text-primary-600 transition-colors py-1">Locação</a>
+              <a 
+                href={MYLAPTIME_BOOKING_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-zinc-700 hover:text-primary-600 transition-colors py-1 flex items-center"
+              >
+                <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full mr-1.5 animate-pulse"></span>
+                Reservas Online
+              </a>
+              <a href="/campeonatos" className="text-zinc-700 hover:text-primary-600 transition-colors py-1 flex items-center">
+                <span className="w-1.5 h-1.5 bg-primary-500 rounded-full mr-1.5 animate-pulse"></span>
+                Campeonatos
+              </a>
+              <a href="/eventos" className="text-zinc-700 hover:text-primary-600 transition-colors py-1">Eventos</a>
+              <a href="/duvidas" className="text-zinc-700 hover:text-primary-600 transition-colors py-1">Dúvidas</a>
+              <a href="/#contato" className="text-zinc-700 hover:text-primary-600 transition-colors py-1">Contato</a>
+            </nav>
+
+            {/* Mobile Menu Button */}
+            <button
+              className="lg:hidden text-zinc-700 hover:text-primary-600 transition-colors focus:outline-none p-1.5"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              aria-label="Alternar Menu"
+              aria-expanded={isMenuOpen}
+              aria-controls="mobile-navigation"
+            >
+              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
+
+          {/* Mobile Menu */}
+          {isMenuOpen && (
+            <div id="mobile-navigation" className="lg:hidden pb-6 pt-2 border-t border-zinc-200/80 animate-fadeIn">
+              <nav className="flex flex-col space-y-3 text-base font-semibold">
+                <a href="/#home" onClick={() => setIsMenuOpen(false)} className="text-zinc-700 hover:text-primary-600 py-1 transition-colors">Home</a>
+                <a href="/#sobre" onClick={() => setIsMenuOpen(false)} className="text-zinc-700 hover:text-primary-600 py-1 transition-colors">Sobre</a>
+                <a href="/#servicos" onClick={() => setIsMenuOpen(false)} className="text-zinc-700 hover:text-primary-600 py-1 transition-colors">Modalidades</a>
+                <a href="/#promocoes" onClick={() => setIsMenuOpen(false)} className="text-zinc-700 hover:text-primary-600 py-1 transition-colors flex items-center">
+                  <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
+                  Promoções
+                </a>
+                <a href="/pista" onClick={() => setIsMenuOpen(false)} className="text-zinc-700 hover:text-primary-600 py-1 transition-colors">A Pista</a>
+                <a href="/kart-locacao" onClick={() => setIsMenuOpen(false)} className="text-zinc-700 hover:text-primary-600 py-1 transition-colors">Locação</a>
+                <a 
+                  href={MYLAPTIME_BOOKING_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setIsMenuOpen(false)} 
+                  className="text-zinc-700 hover:text-primary-600 py-1 transition-colors flex items-center"
+                >
+                  <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
+                  Reservas Online
+                </a>
+                <a href="/campeonatos" onClick={() => setIsMenuOpen(false)} className="text-zinc-700 hover:text-primary-600 py-1 transition-colors flex items-center">
+                  <span className="w-2 h-2 bg-primary-500 rounded-full mr-2"></span>
+                  Campeonatos
+                </a>
+                <a href="/eventos" onClick={() => setIsMenuOpen(false)} className="text-zinc-700 hover:text-primary-600 py-1 transition-colors">Eventos</a>
+                <a href="/duvidas" onClick={() => setIsMenuOpen(false)} className="text-zinc-700 hover:text-primary-600 py-1 transition-colors">Dúvidas</a>
+                <a href="/#contato" onClick={() => setIsMenuOpen(false)} className="text-zinc-700 hover:text-primary-600 py-1 transition-colors">Contato</a>
+              </nav>
+            </div>
+          )}
+        </div>
+      </header>
+    </>
+  );
+};
+
+export default Header;
