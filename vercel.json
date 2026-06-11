@@ -4,6 +4,7 @@
     { "source": "/mylaptime/(.*)", "destination": "https://tools.mylaptime.com.br/$1" },
     { "source": "/_content/(.*)", "destination": "https://tools.mylaptime.com.br/_content/$1" },
     { "source": "/_framework/(.*)", "destination": "https://tools.mylaptime.com.br/_framework/$1" },
+    { "source": "/_blazor", "destination": "https://tools.mylaptime.com.br/_blazor" },
     { "source": "/_blazor/(.*)", "destination": "https://tools.mylaptime.com.br/_blazor/$1" },
     { "source": "/LapTime.Web.Tools.styles.css", "destination": "https://tools.mylaptime.com.br/LapTime.Web.Tools.styles.css" },
     { "source": "/assets/(.*)", "destination": "/assets/$1" },

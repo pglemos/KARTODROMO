@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarCheck, ChevronLeft, ChevronRight, ExternalLink, ShieldCheck } from 'lucide-react';
-import { MYLAPTIME_BOOKING_PROXY_URL, MYLAPTIME_BOOKING_URL, WHATSAPP_BOOKING_URL } from '../config/booking';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { MYLAPTIME_BOOKING_PROXY_URL } from '../config/booking';
 
 type QuickBookingProps = {
   surface?: 'home' | 'page';
@@ -106,22 +106,12 @@ const emptyBookingState = (): BookingState => {
 const normalizeText = (value: string | null | undefined) =>
   value?.replace(/\s+/g, ' ').trim() ?? '';
 
-const canUseEmbeddedMyLapTime = () => {
-  if (typeof window === 'undefined') {
-    return false;
-  }
-
-  return ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
-};
-
 const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
   const HeadingTag = surface === 'page' ? 'h1' : 'h2';
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [bookingState, setBookingState] = useState<BookingState>(() => emptyBookingState());
   const [officialFlowOpen, setOfficialFlowOpen] = useState(false);
   const [reservingTime, setReservingTime] = useState<string | null>(null);
-  const [embeddedSyncEnabled] = useState(() => canUseEmbeddedMyLapTime());
-  const [syncUnavailable, setSyncUnavailable] = useState(() => !canUseEmbeddedMyLapTime());
 
   const availableDays = useMemo(
     () => new Set(bookingState.days.map((day) => day.day)),
@@ -154,7 +144,7 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
   }, [surface]);
 
   const readOfficialBookingState = useCallback(() => {
-    if (officialFlowOpen || !embeddedSyncEnabled) {
+    if (officialFlowOpen) {
       return;
     }
 
@@ -204,7 +194,6 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
       return;
     }
 
-    setSyncUnavailable(false);
     setBookingState({
       monthLabel,
       monthIndex,
@@ -214,14 +203,9 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
       slots,
       loaded: true,
     });
-  }, [embeddedSyncEnabled, officialFlowOpen]);
+  }, [officialFlowOpen]);
 
   const clickOfficialDay = useCallback((day: number) => {
-    if (!embeddedSyncEnabled) {
-      window.open(MYLAPTIME_BOOKING_URL, '_blank', 'noopener,noreferrer');
-      return;
-    }
-
     const doc = iframeRef.current?.contentDocument;
     const dayElement = Array.from(doc?.querySelectorAll<HTMLElement>('.cal-strip-day') ?? [])
       .find((element) => normalizeText(element.querySelector('.cal-strip-number')?.textContent) === String(day));
@@ -233,7 +217,7 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
     dayElement.click();
     window.setTimeout(readOfficialBookingState, 700);
     window.setTimeout(readOfficialBookingState, 1600);
-  }, [embeddedSyncEnabled, readOfficialBookingState]);
+  }, [readOfficialBookingState]);
 
   const navigateOfficialCalendar = useCallback((direction: 'previous' | 'next') => {
     const doc = iframeRef.current?.contentDocument;
@@ -256,7 +240,7 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
     const button = slotElement?.querySelector<HTMLButtonElement>('.bk-qty-plus');
 
     if (!button || button.disabled) {
-      window.open(MYLAPTIME_BOOKING_URL, '_blank', 'noopener,noreferrer');
+      window.open(MYLAPTIME_BOOKING_PROXY_URL, '_blank', 'noopener,noreferrer');
       return;
     }
 
@@ -288,10 +272,6 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
   }, [keepBookingAnchored, surface]);
 
   useEffect(() => {
-    if (!embeddedSyncEnabled) {
-      return undefined;
-    }
-
     const interval = window.setInterval(readOfficialBookingState, 900);
     const stopPolling = window.setTimeout(() => window.clearInterval(interval), 25000);
 
@@ -299,16 +279,7 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
       window.clearInterval(interval);
       window.clearTimeout(stopPolling);
     };
-  }, [embeddedSyncEnabled, readOfficialBookingState]);
-
-  useEffect(() => {
-    if (!embeddedSyncEnabled || bookingState.loaded) {
-      return undefined;
-    }
-
-    const timeout = window.setTimeout(() => setSyncUnavailable(true), 9000);
-    return () => window.clearTimeout(timeout);
-  }, [bookingState.loaded, embeddedSyncEnabled]);
+  }, [readOfficialBookingState]);
 
   useEffect(() => {
     if (!officialFlowOpen) {
@@ -350,12 +321,8 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
             <span className="font-black text-primary-600">Reserve agora</span> e pague <span className="font-black text-primary-600">somente na data</span> da sua corrida!
           </p>
 
-          <div
-            className={`relative mx-auto mt-12 max-w-[1316px] rounded-2xl border border-zinc-200 bg-zinc-50 px-4 pb-16 pt-12 shadow-sm md:px-24 md:pb-24 md:pt-16 ${
-              syncUnavailable ? '' : 'md:min-h-[900px]'
-            }`}
-          >
-            {!officialFlowOpen && !syncUnavailable && (
+          <div className="relative mx-auto mt-12 max-w-[1316px] rounded-2xl border border-zinc-200 bg-zinc-50 px-4 pb-16 pt-12 shadow-sm md:min-h-[900px] md:px-24 md:pb-24 md:pt-16">
+            {!officialFlowOpen && (
               <>
                 <div className="mx-auto mb-8 w-full max-w-[23rem] rounded-2xl border border-zinc-200 bg-white p-6 text-center shadow-sm">
                   <div className="mb-5 flex items-center justify-between">
@@ -475,58 +442,6 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
               </>
             )}
 
-            {!officialFlowOpen && syncUnavailable && (
-              <div className="mx-auto max-w-5xl rounded-2xl border border-zinc-200 bg-white p-6 text-left shadow-sm md:p-8">
-                <div className="grid gap-6 md:grid-cols-[1fr_auto] md:items-center">
-                  <div>
-                    <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary-500/20 bg-primary-50 px-3 py-1 text-xs font-black uppercase tracking-wider text-primary-700">
-                      <CalendarCheck className="h-4 w-4" />
-                      Agenda oficial
-                    </div>
-                    <h3 className="text-2xl font-black uppercase tracking-tight text-zinc-950 md:text-3xl">
-                      Consulte os horários ao vivo no MyLapTime
-                    </h3>
-                    <p className="mt-3 max-w-3xl text-base leading-relaxed text-zinc-600">
-                      A reserva, cadastro e pagamento continuam no fluxo oficial do kartódromo. Abra a agenda para ver datas, vagas e valores atualizados em tempo real.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col gap-3 md:w-72">
-                    <a
-                      href={MYLAPTIME_BOOKING_URL}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="home-cta inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary-500 px-6 text-sm font-black uppercase tracking-wider text-white transition-colors hover:bg-primary-600"
-                    >
-                      Abrir agenda
-                      <ExternalLink className="h-4 w-4" />
-                    </a>
-                    <a
-                      href={WHATSAPP_BOOKING_URL}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex h-12 items-center justify-center rounded-xl border border-zinc-200 bg-white px-6 text-sm font-black uppercase tracking-wider text-zinc-800 transition-colors hover:border-primary-500/40 hover:text-primary-700"
-                    >
-                      Tirar dúvida
-                    </a>
-                  </div>
-                </div>
-
-                <div className="mt-8 grid gap-3 border-t border-zinc-100 pt-6 md:grid-cols-3">
-                  {[
-                    'Datas e horários oficiais',
-                    'Cadastro no sistema MyLapTime',
-                    'Pagamento Pix, débito ou crédito',
-                  ].map((item) => (
-                    <div key={item} className="flex items-center gap-3 rounded-xl bg-zinc-50 px-4 py-3 text-sm font-bold text-zinc-700">
-                      <ShieldCheck className="h-5 w-5 text-primary-600" />
-                      {item}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {officialFlowOpen && (
               <div className="mx-auto max-w-6xl text-left">
                 <button
@@ -539,30 +454,28 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
               </div>
             )}
 
-            {embeddedSyncEnabled && (
-              <div
-                className={
-                  officialFlowOpen
-                    ? 'mx-auto max-w-6xl overflow-hidden bg-white shadow-[0_14px_30px_rgba(0,0,0,0.14)]'
-                    : 'pointer-events-none fixed -left-[200vw] top-0 h-[900px] w-[1280px] overflow-hidden opacity-0'
-                }
-              >
-                <iframe
-                  ref={iframeRef}
-                  title="Agendamento oficial MyLapTime do Kartódromo de Betim"
-                  src={MYLAPTIME_BOOKING_PROXY_URL}
-                  onLoad={() => {
-                    keepBookingAnchored();
-                    window.setTimeout(readOfficialBookingState, 1200);
-                    window.setTimeout(readOfficialBookingState, 3500);
-                  }}
-                  tabIndex={officialFlowOpen ? 0 : -1}
-                  aria-hidden={!officialFlowOpen}
-                  style={officialFlowOpen ? { height: 780 } : { height: 900, width: 1280 }}
-                  className={officialFlowOpen ? 'block w-full border-0 bg-white' : 'block border-0 bg-white'}
-                />
-              </div>
-            )}
+            <div
+              className={
+                officialFlowOpen
+                  ? 'mx-auto max-w-6xl overflow-hidden bg-white shadow-[0_14px_30px_rgba(0,0,0,0.14)]'
+                  : 'pointer-events-none fixed -left-[200vw] top-0 h-[900px] w-[1280px] overflow-hidden opacity-0'
+              }
+            >
+              <iframe
+                ref={iframeRef}
+                title="Agendamento oficial MyLapTime do Kartódromo de Betim"
+                src={MYLAPTIME_BOOKING_PROXY_URL}
+                onLoad={() => {
+                  keepBookingAnchored();
+                  window.setTimeout(readOfficialBookingState, 1200);
+                  window.setTimeout(readOfficialBookingState, 3500);
+                }}
+                tabIndex={officialFlowOpen ? 0 : -1}
+                aria-hidden={!officialFlowOpen}
+                style={officialFlowOpen ? { height: 780 } : { height: 900, width: 1280 }}
+                className={officialFlowOpen ? 'block w-full border-0 bg-white' : 'block border-0 bg-white'}
+              />
+            </div>
 
             <p className="mt-6 text-right text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-300">
               Powered by MyLapTime
