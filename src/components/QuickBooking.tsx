@@ -370,7 +370,7 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
                           disabled={!isEnabled}
                           className={`min-h-11 border-b border-r border-zinc-100 py-3 text-base font-semibold transition-colors ${
                             isSelected
-                              ? 'bg-primary-500 text-white'
+                              ? 'bg-primary-500 text-zinc-950'
                               : isEnabled
                                 ? 'text-zinc-700 hover:bg-primary-50 hover:text-primary-700'
                                 : 'cursor-not-allowed text-zinc-200'

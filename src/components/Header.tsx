@@ -8,34 +8,34 @@ const Header = () => {
   return (
     <>
       {/* Top Bar */}
-      <div className="border-b border-white/15 bg-[#087f67] px-4 py-2.5 text-white shadow-sm">
-        <div className="container mx-auto flex flex-wrap items-center justify-between gap-x-5 gap-y-2 text-[11px] sm:text-xs">
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <a href="tel:+553135112373" className="flex items-center space-x-1.5 text-white transition-colors hover:text-white/75">
-              <Phone className="h-4 w-4 text-white" />
+      <div className="border-b border-white/15 bg-[#087f67] px-4 py-3 text-white shadow-sm">
+        <div className="container mx-auto flex flex-wrap items-center justify-between gap-x-7 gap-y-2.5 text-[13px] leading-none md:text-sm">
+          <div className="flex flex-wrap items-center gap-x-7 gap-y-2.5">
+            <a href="tel:+553135112373" className="flex items-center space-x-2 text-white transition-colors hover:text-white/75">
+              <Phone className="h-[18px] w-[18px] text-white" />
               <span className="font-semibold">(31) 3511-2373</span>
             </a>
-            <div className="flex items-center space-x-1.5 text-white/95">
-              <MapPin className="h-4 w-4 text-white" />
+            <div className="flex items-center space-x-2 text-white/95">
+              <MapPin className="h-[18px] w-[18px] text-white" />
               <span className="md:hidden">Betim - MG</span>
               <span className="hidden md:inline">Av. Adutora Várzea das Flores, 477 - Betim, MG</span>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <div className="flex items-center space-x-1.5 text-white/95">
-              <Clock className="h-4 w-4 text-white" />
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2.5">
+            <div className="flex items-center space-x-2 text-white/95">
+              <Clock className="h-[18px] w-[18px] text-white" />
               <span className="hidden lg:inline">Funcionamento:</span>
               <span className="font-medium">Ter-Sex: 16h-22h | Sáb-Dom: 08h-19h</span>
             </div>
-            <div className="ml-2 hidden space-x-3 border-l border-white/25 pl-4 lg:flex">
+            <div className="ml-2 hidden space-x-4 border-l border-white/25 pl-5 lg:flex">
               <a href="https://www.facebook.com/kartodromodebetim" target="_blank" rel="noopener noreferrer" aria-label="Facebook do Kartódromo de Betim" className="text-white/80 transition-colors hover:text-white">
-                <Facebook className="w-4 h-4" />
+                <Facebook className="h-[18px] w-[18px]" />
               </a>
               <a href="https://www.instagram.com/kartodromobetim/" target="_blank" rel="noopener noreferrer" aria-label="Instagram do Kartódromo de Betim" className="text-white/80 transition-colors hover:text-white">
-                <Instagram className="w-4 h-4" />
+                <Instagram className="h-[18px] w-[18px]" />
               </a>
               <a href="https://www.youtube.com/kartodromodebetim31" target="_blank" rel="noopener noreferrer" aria-label="YouTube do Kartódromo de Betim" className="text-white/80 transition-colors hover:text-white">
-                <Youtube className="w-4 h-4" />
+                <Youtube className="h-[18px] w-[18px]" />
               </a>
             </div>
           </div>
