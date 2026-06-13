@@ -293,20 +293,43 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
     };
   }, [readOfficialBookingState]);
 
+  useEffect(() => {
+    if (surface !== 'home' || window.location.hash !== '#agendamento') {
+      return undefined;
+    }
+
+    const anchorSection = () => {
+      const target = document.getElementById('agendamento');
+
+      if (!target) {
+        return;
+      }
+
+      const top = target.getBoundingClientRect().top + window.scrollY - 84;
+      window.scrollTo({ top: Math.max(top, 0), behavior: 'auto' });
+    };
+
+    const timeouts = [80, 400, 1000, 2000, 3500].map((delay) => window.setTimeout(anchorSection, delay));
+
+    return () => {
+      timeouts.forEach(window.clearTimeout);
+    };
+  }, [surface]);
+
   return (
     <section
       id="agendamento"
       className="scroll-mt-28 border-t border-zinc-200 bg-[#efefef] py-16 md:scroll-mt-24 md:py-20"
     >
       <div className="mx-auto max-w-7xl px-4 text-center">
-        <HeadingTag className="text-3xl font-semibold tracking-tight text-zinc-900 md:text-5xl">
-          Consulte e <span className="font-black text-[#4699d7]">agende seu horário</span>
+        <HeadingTag className="font-sans text-[34px] font-normal tracking-tight text-zinc-900 md:text-[44px]">
+          Consulte e <span className="font-extrabold text-primary-700">agende seu horário</span>
         </HeadingTag>
 
         <div aria-hidden="true" className="mx-auto mt-8 grid w-10 grid-cols-2 gap-1 opacity-80">
           <span className="h-2.5 w-2.5 skew-x-[-12deg] bg-zinc-300" />
-          <span className="h-2.5 w-2.5 skew-x-[-12deg] bg-[#4699d7]" />
-          <span className="h-2.5 w-2.5 skew-x-[-12deg] bg-[#4699d7]" />
+          <span className="h-2.5 w-2.5 skew-x-[-12deg] bg-primary-600" />
+          <span className="h-2.5 w-2.5 skew-x-[-12deg] bg-primary-600" />
           <span className="h-2.5 w-2.5 skew-x-[-12deg] bg-zinc-300" />
         </div>
 
@@ -317,7 +340,7 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
         </p>
 
         <p className="mt-8 text-center text-xl font-medium leading-tight text-zinc-900 md:text-2xl">
-          <span className="font-black text-[#4699d7]">Reserve agora</span> e pague <span className="font-black text-[#4699d7]">somente na data</span> da sua corrida!
+          <span className="font-black text-primary-700">Reserve agora</span> e pague <span className="font-black text-primary-700">somente na data</span> da sua corrida!
         </p>
 
         <div className="relative mx-auto mt-12 max-w-[1316px] bg-white px-4 pb-16 pt-12 md:min-h-[900px] md:px-24 md:pb-24 md:pt-16">
@@ -327,7 +350,7 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
                 type="button"
                 aria-label="Mês anterior"
                 onClick={() => navigateOfficialCalendar('previous')}
-                className="flex h-10 w-10 items-center justify-center rounded border border-zinc-200 text-zinc-400 transition-colors hover:border-[#4699d7]/50 hover:text-[#4699d7] disabled:cursor-not-allowed disabled:opacity-30"
+                className="flex h-10 w-10 items-center justify-center rounded border border-zinc-200 text-zinc-400 transition-colors hover:border-primary-600/50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-30"
                 disabled={!bookingState.loaded}
               >
                 <ChevronLeft className="h-5 w-5" />
@@ -339,7 +362,7 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
                 type="button"
                 aria-label="Próximo mês"
                 onClick={() => navigateOfficialCalendar('next')}
-                className="flex h-10 w-10 items-center justify-center rounded border border-zinc-200 text-zinc-400 transition-colors hover:border-[#4699d7]/50 hover:text-[#4699d7] disabled:cursor-not-allowed disabled:opacity-30"
+                className="flex h-10 w-10 items-center justify-center rounded border border-zinc-200 text-zinc-400 transition-colors hover:border-primary-600/50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-30"
                 disabled={!bookingState.loaded}
               >
                 <ChevronRight className="h-5 w-5" />
@@ -369,9 +392,9 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
                     disabled={!isEnabled}
                     className={`min-h-11 border-b border-r border-zinc-100 py-3 text-base font-semibold transition-colors ${
                       isSelected
-                        ? 'bg-[#48a9e5] text-white'
+                        ? 'bg-primary-600 text-white'
                         : isEnabled
-                          ? 'text-zinc-700 hover:bg-[#eaf6fd] hover:text-[#277eb8]'
+                          ? 'text-zinc-700 hover:bg-primary-50 hover:text-primary-700'
                           : 'cursor-not-allowed text-zinc-200'
                     }`}
                   >
@@ -412,7 +435,7 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
                     <span className="text-sm font-medium text-zinc-700 md:text-right">
                       {slot.name}
                     </span>
-                    <span className="text-base font-black text-[#48a9e5]">
+                    <span className="text-base font-black text-primary-700">
                       {slot.vacancies}
                     </span>
                     <span className="text-base font-medium text-zinc-800">
@@ -422,7 +445,7 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
                       type="button"
                       onClick={() => reserveSlot(slot)}
                       disabled={!slot.available || reservingTime === slot.time}
-                      className="h-9 rounded bg-[#48a9e5] px-6 text-base font-medium text-white transition-colors hover:bg-[#277eb8] disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-400"
+                      className="h-9 rounded bg-primary-600 px-6 text-base font-medium text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-400"
                     >
                       {reservingTime === slot.time ? 'Abrindo...' : 'Reservar'}
                     </button>
@@ -447,7 +470,7 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
                 <button
                   type="button"
                   onClick={() => setOfficialCheckoutOpen(false)}
-                  className="rounded border border-zinc-200 bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.1em] text-zinc-600 transition-colors hover:border-[#48a9e5] hover:text-[#277eb8]"
+                  className="rounded border border-zinc-200 bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.1em] text-zinc-600 transition-colors hover:border-primary-600 hover:text-primary-700"
                 >
                   Voltar aos horários
                 </button>
