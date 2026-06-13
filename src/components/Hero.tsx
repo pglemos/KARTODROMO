@@ -1,5 +1,5 @@
 import { Calendar, Compass, MapPin, Trophy, Zap } from 'lucide-react';
-import { MYLAPTIME_BOOKING_URL, WHATSAPP_BOOKING_URL } from '../config/booking';
+import { SITE_BOOKING_ANCHOR, WHATSAPP_BOOKING_URL } from '../config/booking';
 
 const WhatsAppIcon = () => (
   <svg
@@ -51,9 +51,7 @@ const Hero = () => {
 
           <div className="mb-4 flex flex-col gap-3 sm:flex-row md:gap-4">
             <a
-              href={MYLAPTIME_BOOKING_URL}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={SITE_BOOKING_ANCHOR}
               className="home-cta inline-flex min-h-12 items-center justify-center bg-primary-500 px-6 py-3.5 text-center text-xs font-black uppercase tracking-[0.14em] text-zinc-950 shadow-[0_18px_38px_rgba(0,200,83,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-400 hover:shadow-[0_22px_46px_rgba(0,200,83,0.26)] md:min-h-14 md:px-8 md:py-4 md:tracking-[0.16em]"
             >
               Reservar corrida online

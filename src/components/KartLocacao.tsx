@@ -13,7 +13,7 @@ import {
   UserCheck,
   Zap,
 } from 'lucide-react';
-import { MYLAPTIME_BOOKING_URL, WHATSAPP_BOOKING_URL } from '../config/booking';
+import { SITE_BOOKING_ANCHOR, WHATSAPP_BOOKING_URL } from '../config/booking';
 
 const sessionFlow = [
   {
@@ -98,9 +98,7 @@ const KartLocacao = () => {
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <a
-                href={MYLAPTIME_BOOKING_URL}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={SITE_BOOKING_ANCHOR}
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-primary-500 px-6 py-3.5 text-xs font-black uppercase tracking-[0.14em] text-zinc-950 shadow-[0_18px_42px_rgba(0,200,83,0.28)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-400"
               >
                 <CalendarCheck className="h-4 w-4" aria-hidden="true" />
@@ -264,9 +262,7 @@ const KartLocacao = () => {
 
                 <div className="mt-7 grid gap-3">
                   <a
-                    href={MYLAPTIME_BOOKING_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href={SITE_BOOKING_ANCHOR}
                     className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-primary-500 px-5 py-3 text-xs font-black uppercase tracking-[0.14em] text-zinc-950 transition-colors hover:bg-primary-400"
                   >
                     <CalendarCheck className="h-4 w-4" aria-hidden="true" />

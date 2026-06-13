@@ -1,5 +1,5 @@
 import { CreditCard, MessageCircle, Star, ArrowRight, ShieldCheck, CheckCircle, Gauge, Zap } from 'lucide-react';
-import { MYLAPTIME_BOOKING_URL } from '../config/booking';
+import { SITE_BOOKING_ANCHOR } from '../config/booking';
 
 const Services = () => {
   return (
@@ -88,9 +88,7 @@ const Services = () => {
             {/* Action Footer */}
             <div className="p-8 border-t border-zinc-200 bg-zinc-100/50">
               <a 
-                href={MYLAPTIME_BOOKING_URL}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={SITE_BOOKING_ANCHOR}
                 className="w-full py-3.5 px-4 bg-white border border-zinc-200 hover:border-primary-500/40 hover:bg-zinc-50 text-zinc-700 font-bold uppercase tracking-wider text-sm rounded-xl flex items-center justify-center gap-2 transition-all duration-300 shadow-sm"
               >
                 <span>Reservar Kart Light</span>

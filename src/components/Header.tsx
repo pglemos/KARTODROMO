@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Menu, X, Phone, MapPin, Clock, Facebook, Instagram, Youtube } from 'lucide-react';
-import { MYLAPTIME_BOOKING_URL } from '../config/booking';
+import { SITE_BOOKING_ANCHOR } from '../config/booking';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -67,9 +67,7 @@ const Header = () => {
               <a href="/pista" className="text-zinc-700 hover:text-primary-600 transition-colors py-1">A Pista</a>
               <a href="/kart-locacao" className="text-zinc-700 hover:text-primary-600 transition-colors py-1">Locação</a>
               <a 
-                href={MYLAPTIME_BOOKING_URL}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={SITE_BOOKING_ANCHOR}
                 className="text-zinc-700 hover:text-primary-600 transition-colors py-1 flex items-center"
               >
                 <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full mr-1.5 animate-pulse"></span>
@@ -110,9 +108,7 @@ const Header = () => {
                 <a href="/pista" onClick={() => setIsMenuOpen(false)} className="text-zinc-700 hover:text-primary-600 py-1 transition-colors">A Pista</a>
                 <a href="/kart-locacao" onClick={() => setIsMenuOpen(false)} className="text-zinc-700 hover:text-primary-600 py-1 transition-colors">Locação</a>
                 <a 
-                  href={MYLAPTIME_BOOKING_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href={SITE_BOOKING_ANCHOR}
                   onClick={() => setIsMenuOpen(false)} 
                   className="text-zinc-700 hover:text-primary-600 py-1 transition-colors flex items-center"
                 >

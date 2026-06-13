@@ -121,6 +121,7 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [bookingState, setBookingState] = useState<BookingState>(() => emptyBookingState());
   const [officialCheckoutOpen, setOfficialCheckoutOpen] = useState(false);
+  const [bookingActionMessage, setBookingActionMessage] = useState('');
   const [reservingTime, setReservingTime] = useState<string | null>(null);
 
   const calendarCells = useMemo(
@@ -270,10 +271,11 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
     const button = slotElement?.querySelector<HTMLButtonElement>('.bk-qty-plus, button:not([disabled])');
 
     if (!button || button.disabled) {
-      window.open(MYLAPTIME_BOOKING_PROXY_URL, '_blank', 'noopener,noreferrer');
+      setBookingActionMessage('Não foi possível acionar este horário agora. Selecione a data novamente e tente reservar sem sair desta página.');
       return;
     }
 
+    setBookingActionMessage('');
     setReservingTime(slot.time);
     button.click();
     setOfficialCheckoutOpen(true);
@@ -453,6 +455,12 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
                 ))}
               </div>
             )}
+
+            {bookingActionMessage && (
+              <div className="mt-4 rounded border border-primary-600/30 bg-primary-50 px-4 py-3 text-sm font-semibold text-primary-800">
+                {bookingActionMessage}
+              </div>
+            )}
           </div>
 
           <div
@@ -488,6 +496,7 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
               }}
               tabIndex={officialCheckoutOpen ? 0 : -1}
               aria-hidden={!officialCheckoutOpen}
+              sandbox="allow-scripts allow-forms allow-same-origin"
               className={
                 officialCheckoutOpen
                   ? 'block h-[820px] w-full border-0 bg-white'

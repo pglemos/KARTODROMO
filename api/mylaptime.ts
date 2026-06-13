@@ -69,15 +69,79 @@ const buildRequestHeaders = (request: Request) => {
     return headers;
 };
 
+const rewriteProxyLocation = (value: string) => {
+    try {
+        const locationUrl = new URL(value, MYLAPTIME_ORIGIN);
+
+        if (locationUrl.origin !== MYLAPTIME_ORIGIN) {
+            return value;
+        }
+
+        const path = `${locationUrl.pathname}${locationUrl.search}${locationUrl.hash}`;
+
+        if (
+            locationUrl.pathname === '/booking'
+            || locationUrl.pathname.startsWith('/api/auth/')
+            || locationUrl.pathname.startsWith('/_content/')
+            || locationUrl.pathname.startsWith('/_framework/')
+            || locationUrl.pathname.startsWith('/_blazor')
+            || locationUrl.pathname === '/LapTime.Web.Tools.styles.css'
+        ) {
+            return path;
+        }
+
+        return `/mylaptime${path}`;
+    } catch {
+        return value;
+    }
+};
+
 const patchBookingHtml = (html: string) => {
     const blazorScript = '<script src="_framework/blazor.web.js"></script>';
     const patchedScript = `<script src="_framework/blazor.web.js" autostart="false"></script>
     <script>
         (function () {
+            function rewriteMylaptimeUrl(value) {
+                try {
+                    var url = new URL(value, window.location.href);
+
+                    if (url.origin === 'https://tools.mylaptime.com.br') {
+                        return url.pathname + url.search + url.hash;
+                    }
+
+                    return url.href;
+                } catch (error) {
+                    return value;
+                }
+            }
+
+            window.open = function (value) {
+                if (value) {
+                    window.location.href = rewriteMylaptimeUrl(value);
+                }
+
+                return null;
+            };
+
+            document.addEventListener('click', function (event) {
+                var target = event.target;
+                var anchor = target && target.closest ? target.closest('a[href]') : null;
+
+                if (!anchor) return;
+
+                var linkTarget = (anchor.getAttribute('target') || '').toLowerCase();
+
+                if (linkTarget === '_top' || linkTarget === '_parent' || linkTarget === '_blank') {
+                    event.preventDefault();
+                    window.location.href = rewriteMylaptimeUrl(anchor.href);
+                }
+            }, true);
+
             function startBlazorWithLongPolling() {
                 if (!window.Blazor || window.__kibBlazorStarted) return;
                 window.__kibBlazorStarted = true;
                 var originalWarn = console.warn.bind(console);
+                var originalError = console.error.bind(console);
                 console.warn = function () {
                     var message = Array.prototype.join.call(arguments, ' ');
                     if (message.indexOf('Failed to connect via WebSockets, using the Long Polling fallback transport') !== -1) {
@@ -85,6 +149,14 @@ const patchBookingHtml = (html: string) => {
                     }
 
                     originalWarn.apply(console, arguments);
+                };
+                console.error = function () {
+                    var message = Array.prototype.join.call(arguments, ' ');
+                    if (message.indexOf("There is no tracked object with id") !== -1) {
+                        return;
+                    }
+
+                    originalError.apply(console, arguments);
                 };
                 window.Blazor.start({
                     logLevel: 4,
@@ -127,7 +199,7 @@ export default async function handler(request: Request) {
     const responseHeaders = new Headers();
     upstreamResponse.headers.forEach((value, key) => {
         if (!EXCLUDED_RESPONSE_HEADERS.has(key.toLowerCase())) {
-            responseHeaders.set(key, value);
+            responseHeaders.set(key, key.toLowerCase() === 'location' ? rewriteProxyLocation(value) : value);
         }
     });
 
