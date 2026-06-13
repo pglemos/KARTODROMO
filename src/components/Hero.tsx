@@ -1,4 +1,4 @@
-import { Calendar, Compass, Trophy, Zap } from 'lucide-react';
+import { Calendar, Compass, MapPin, Trophy, Zap } from 'lucide-react';
 import { MYLAPTIME_BOOKING_URL, WHATSAPP_BOOKING_URL } from '../config/booking';
 
 const WhatsAppIcon = () => (
@@ -13,7 +13,7 @@ const WhatsAppIcon = () => (
 
 const Hero = () => {
   return (
-    <section id="home" className="home-hero relative flex min-h-[78vh] items-center overflow-hidden bg-[#fbfcfa] py-10 md:min-h-[88vh] md:py-16">
+    <section id="home" className="home-hero relative flex min-h-[70svh] items-center overflow-hidden bg-[#fbfcf8] py-4 md:min-h-[78vh] md:py-12">
       <video
         autoPlay
         loop
@@ -34,27 +34,27 @@ const Hero = () => {
       <div aria-hidden="true" className="home-speedline home-speedline-b" />
 
       <div className="container relative z-20 mx-auto w-full px-4">
-        <div className="max-w-5xl">
-          <div className="mb-5 flex items-center gap-3 text-xs font-black uppercase tracking-[0.16em] text-primary-700 md:mb-6">
-            <span aria-hidden="true" className="h-px w-10 bg-primary-600" />
+        <div className="max-w-6xl">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary-500/30 bg-[#fbfcf8]/92 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-primary-800 shadow-sm md:mb-6">
+            <Zap className="h-3.5 w-3.5" aria-hidden="true" />
             <span>Pista padrão internacional</span>
           </div>
 
-          <h1 className="home-title mb-5 max-w-5xl text-4xl font-black uppercase leading-[0.9] tracking-tight text-zinc-950 sm:text-5xl md:mb-6 md:text-7xl lg:text-8xl">
+          <h1 className="home-title mb-4 max-w-[11ch] text-[2.55rem] font-black uppercase leading-[0.86] tracking-tight text-zinc-950 sm:text-6xl md:mb-6 md:text-7xl lg:text-8xl">
             Kartódromo Internacional de Betim
           </h1>
 
-          <p className="mb-7 max-w-2xl text-sm leading-7 text-zinc-700 md:mb-10 md:text-lg md:leading-8">
-            Corra em uma pista homologada de <strong className="font-semibold text-zinc-950">1.110 metros</strong> com cronometragem eletrônica,
-            equipe de pista e estrutura para receber pilotos, famílias e grupos.
+          <p className="mb-5 max-w-2xl text-base leading-7 text-zinc-700 md:mb-9 md:text-lg md:leading-8">
+            Pista homologada de <strong className="font-black text-zinc-950">1.110 metros</strong>, cronometragem eletrônica,
+            equipe de pista e estrutura para pilotos, famílias e grupos.
           </p>
 
-          <div className="mb-8 flex flex-col gap-3 sm:flex-row md:mb-14 md:gap-4">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row md:gap-4">
             <a
               href={MYLAPTIME_BOOKING_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="home-cta inline-flex min-h-12 items-center justify-center bg-primary-500 px-6 py-3.5 text-center text-xs font-black uppercase tracking-[0.14em] text-zinc-950 shadow-[0_16px_34px_rgba(0,200,83,0.24)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-400 hover:shadow-[0_20px_42px_rgba(0,200,83,0.28)] md:min-h-14 md:px-8 md:py-4 md:tracking-[0.16em]"
+              className="home-cta inline-flex min-h-12 items-center justify-center bg-primary-500 px-6 py-3.5 text-center text-xs font-black uppercase tracking-[0.14em] text-zinc-950 shadow-[0_18px_38px_rgba(0,200,83,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-400 hover:shadow-[0_22px_46px_rgba(0,200,83,0.26)] md:min-h-14 md:px-8 md:py-4 md:tracking-[0.16em]"
             >
               Reservar corrida online
             </a>
@@ -69,44 +69,49 @@ const Hero = () => {
             </a>
           </div>
 
-          <div className="home-stat-grid grid grid-cols-2 gap-2 border-t border-zinc-200/85 pt-5 md:grid-cols-4 md:gap-4 md:pt-6">
-            <div className="home-stat flex items-center gap-3 border border-zinc-200 bg-white/82 p-3 shadow-sm backdrop-blur">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center border border-primary-500/20 bg-primary-50 text-primary-700">
+          <div className="mb-6 flex items-center gap-2 text-sm font-semibold text-zinc-700 md:mb-12">
+            <MapPin className="h-4 w-4 text-primary-700" aria-hidden="true" />
+            <span>Betim, MG, a poucos minutos da região metropolitana de Belo Horizonte</span>
+          </div>
+
+          <div className="home-stat-grid grid max-w-5xl grid-cols-2 gap-px overflow-hidden rounded-lg border border-zinc-200/80 bg-zinc-200/80 shadow-sm md:grid-cols-4">
+            <div className="home-stat flex items-center gap-3 bg-[#fbfcf8]/92 p-2.5 md:p-3.5">
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border border-primary-500/20 bg-primary-50 text-primary-700 md:h-10 md:w-10">
                 <Compass className="h-5 w-5" />
               </div>
               <div>
-                <div className="text-xl font-black leading-tight text-zinc-950">1.110m</div>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Extensão da pista</div>
+                <div className="text-lg font-black leading-tight text-zinc-950 md:text-xl">1.110m</div>
+                <div className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 md:text-[10px]">Extensão da pista</div>
               </div>
             </div>
 
-            <div className="home-stat flex items-center gap-3 border border-zinc-200 bg-white/82 p-3 shadow-sm backdrop-blur">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center border border-primary-500/20 bg-primary-50 text-primary-700">
+            <div className="home-stat flex items-center gap-3 bg-[#fbfcf8]/92 p-2.5 md:p-3.5">
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border border-primary-500/20 bg-primary-50 text-primary-700 md:h-10 md:w-10">
                 <Trophy className="h-5 w-5" />
               </div>
               <div>
-                <div className="text-xl font-black leading-tight text-zinc-950">42</div>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Configurações mapeadas</div>
+                <div className="text-lg font-black leading-tight text-zinc-950 md:text-xl">42</div>
+                <div className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 md:text-[10px]">Configurações mapeadas</div>
               </div>
             </div>
 
-            <div className="home-stat flex items-center gap-3 border border-zinc-200 bg-white/82 p-3 shadow-sm backdrop-blur">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center border border-primary-500/20 bg-primary-50 text-primary-700">
+            <div className="home-stat flex items-center gap-3 bg-[#fbfcf8]/92 p-2.5 md:p-3.5">
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border border-primary-500/20 bg-primary-50 text-primary-700 md:h-10 md:w-10">
                 <Zap className="h-5 w-5" />
               </div>
               <div>
-                <div className="text-xl font-black leading-tight text-zinc-950">400cc</div>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Motores Super Kart</div>
+                <div className="text-lg font-black leading-tight text-zinc-950 md:text-xl">400cc</div>
+                <div className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 md:text-[10px]">Motores Super Kart</div>
               </div>
             </div>
 
-            <div className="home-stat flex items-center gap-3 border border-zinc-200 bg-white/82 p-3 shadow-sm backdrop-blur">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center border border-primary-500/20 bg-primary-50 text-primary-700">
+            <div className="home-stat flex items-center gap-3 bg-[#fbfcf8]/92 p-2.5 md:p-3.5">
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border border-primary-500/20 bg-primary-50 text-primary-700 md:h-10 md:w-10">
                 <Calendar className="h-5 w-5" />
               </div>
               <div>
-                <div className="text-xl font-black leading-tight text-zinc-950">25+ anos</div>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Em operação desde 1996</div>
+                <div className="text-lg font-black leading-tight text-zinc-950 md:text-xl">25+ anos</div>
+                <div className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 md:text-[10px]">Em operação desde 1996</div>
               </div>
             </div>
           </div>

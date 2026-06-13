@@ -9,14 +9,14 @@ type QuickBookingProps = {
 type OfficialDay = {
   day: number;
   weekday: string;
+  monthIndex: number;
+  year: number;
   selected: boolean;
-  today: boolean;
 };
 
 type BookingSlot = {
   time: string;
   name: string;
-  weekday: string;
   vacancies: string;
   price: string;
   available: boolean;
@@ -30,12 +30,12 @@ type BookingState = {
   days: OfficialDay[];
   slots: BookingSlot[];
   loaded: boolean;
+  emptyMessage: string;
 };
 
 type CalendarCell = {
   key: string;
   day: number | null;
-  iso: string | null;
 };
 
 const monthNames = [
@@ -53,41 +53,22 @@ const monthNames = [
   'dezembro',
 ];
 
+const monthAbbreviations: Record<string, number> = {
+  jan: 0,
+  fev: 1,
+  mar: 2,
+  abr: 3,
+  mai: 4,
+  jun: 5,
+  jul: 6,
+  ago: 7,
+  set: 8,
+  out: 9,
+  nov: 10,
+  dez: 11,
+};
+
 const weekLabels = ['do', '2ª', '3ª', '4ª', '5ª', '6ª', 'sá'];
-
-const parseMonthLabel = (label: string) => {
-  const normalizedLabel = label.trim().toLowerCase();
-  const monthIndex = monthNames.findIndex((month) => normalizedLabel.includes(month));
-  const yearMatch = normalizedLabel.match(/\b(20\d{2})\b/);
-
-  return {
-    monthIndex: monthIndex >= 0 ? monthIndex : new Date().getMonth(),
-    year: yearMatch ? Number(yearMatch[1]) : new Date().getFullYear(),
-  };
-};
-
-const formatIsoDate = (year: number, monthIndex: number, day: number) =>
-  `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-
-const buildCalendarCells = (year: number, monthIndex: number): CalendarCell[] => {
-  const firstWeekDay = new Date(year, monthIndex, 1).getDay();
-  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-  const cells: CalendarCell[] = [];
-
-  for (let index = 0; index < firstWeekDay; index += 1) {
-    cells.push({ key: `blank-${index}`, day: null, iso: null });
-  }
-
-  for (let day = 1; day <= daysInMonth; day += 1) {
-    cells.push({
-      key: formatIsoDate(year, monthIndex, day),
-      day,
-      iso: formatIsoDate(year, monthIndex, day),
-    });
-  }
-
-  return cells;
-};
 
 const emptyBookingState = (): BookingState => {
   const now = new Date();
@@ -100,48 +81,61 @@ const emptyBookingState = (): BookingState => {
     days: [],
     slots: [],
     loaded: false,
+    emptyMessage: '',
   };
 };
 
 const normalizeText = (value: string | null | undefined) =>
   value?.replace(/\s+/g, ' ').trim() ?? '';
 
+const parseMonthRange = (label: string) => {
+  const normalized = label.toLowerCase();
+  const firstMonth = Object.entries(monthAbbreviations).find(([name]) => normalized.includes(name));
+  const yearMatch = normalized.match(/\b(20\d{2})\b/);
+  const now = new Date();
+
+  return {
+    monthIndex: firstMonth ? firstMonth[1] : now.getMonth(),
+    year: yearMatch ? Number(yearMatch[1]) : now.getFullYear(),
+  };
+};
+
+const buildCalendarCells = (year: number, monthIndex: number): CalendarCell[] => {
+  const firstWeekDay = new Date(year, monthIndex, 1).getDay();
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const cells: CalendarCell[] = [];
+
+  for (let index = 0; index < firstWeekDay; index += 1) {
+    cells.push({ key: `blank-${index}`, day: null });
+  }
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    cells.push({ key: `${year}-${monthIndex}-${day}`, day });
+  }
+
+  return cells;
+};
+
 const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
   const HeadingTag = surface === 'page' ? 'h1' : 'h2';
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [bookingState, setBookingState] = useState<BookingState>(() => emptyBookingState());
-  const [officialFlowOpen, setOfficialFlowOpen] = useState(false);
+  const [officialCheckoutOpen, setOfficialCheckoutOpen] = useState(false);
   const [reservingTime, setReservingTime] = useState<string | null>(null);
-
-  const availableDays = useMemo(
-    () => new Set(bookingState.days.map((day) => day.day)),
-    [bookingState.days],
-  );
 
   const calendarCells = useMemo(
     () => buildCalendarCells(bookingState.year, bookingState.monthIndex),
     [bookingState.monthIndex, bookingState.year],
   );
 
-  const keepBookingAnchored = useCallback(() => {
-    if (surface === 'home' && window.location.hash !== '#agendamento') {
-      return;
-    }
-
-    const target = document.getElementById('agendamento');
-    if (!target) {
-      return;
-    }
-
-    const frame = iframeRef.current;
-    if (frame && document.activeElement === frame) {
-      frame.blur();
-      window.focus();
-    }
-
-    const top = target.getBoundingClientRect().top + window.scrollY - 92;
-    window.scrollTo({ top: Math.max(top, 0), behavior: 'auto' });
-  }, [surface]);
+  const availableDays = useMemo(
+    () => new Set(
+      bookingState.days
+        .filter((day) => day.monthIndex === bookingState.monthIndex && day.year === bookingState.year)
+        .map((day) => day.day),
+    ),
+    [bookingState.days, bookingState.monthIndex, bookingState.year],
+  );
 
   const cleanOfficialBookingFrame = useCallback(() => {
     const doc = iframeRef.current?.contentDocument;
@@ -160,81 +154,99 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
   }, []);
 
   const readOfficialBookingState = useCallback(() => {
-    if (officialFlowOpen) {
-      return;
-    }
-
-    const frame = iframeRef.current;
-    const doc = frame?.contentDocument;
+    const doc = iframeRef.current?.contentDocument;
     if (!doc?.body) {
       return;
     }
 
     cleanOfficialBookingFrame();
 
-    const monthLabel = normalizeText(doc.querySelector('.cal-month-label')?.textContent);
-    const { monthIndex, year } = parseMonthLabel(monthLabel);
-    const days = Array.from(doc.querySelectorAll<HTMLElement>('.cal-strip-day'))
+    const rangeLabel = normalizeText(doc.querySelector('.cal-month-label')?.textContent);
+    const { monthIndex: rangeMonthIndex, year: rangeYear } = parseMonthRange(rangeLabel);
+    const stripDays = Array.from(doc.querySelectorAll<HTMLElement>('.cal-strip-day'));
+
+    if (stripDays.length === 0) {
+      return;
+    }
+
+    let currentMonthIndex = rangeMonthIndex;
+    let currentYear = rangeYear;
+    let previousDay = 0;
+
+    const days = stripDays
       .map((dayElement) => {
         const day = Number(normalizeText(dayElement.querySelector('.cal-strip-number')?.textContent));
         const weekday = normalizeText(dayElement.querySelector('.cal-strip-weekday')?.textContent);
 
-        if (!Number.isFinite(day)) {
+        if (!Number.isFinite(day) || day <= 0) {
           return null;
         }
+
+        if (previousDay > 0 && day < previousDay) {
+          currentMonthIndex += 1;
+          if (currentMonthIndex > 11) {
+            currentMonthIndex = 0;
+            currentYear += 1;
+          }
+        }
+        previousDay = day;
 
         return {
           day,
           weekday,
+          monthIndex: currentMonthIndex,
+          year: currentYear,
           selected: dayElement.classList.contains('cal-selected'),
-          today: dayElement.classList.contains('cal-today'),
         };
       })
       .filter((day): day is OfficialDay => day !== null);
 
-    const slots = Array.from(doc.querySelectorAll<HTMLElement>('.bk-card')).map((slotElement) => {
+    const selected = days.find((day) => day.selected) ?? days[0];
+    const monthIndex = selected?.monthIndex ?? rangeMonthIndex;
+    const year = selected?.year ?? rangeYear;
+    const monthLabel = `${monthNames[monthIndex]} ${year}`;
+
+    const slotCards = Array.from(doc.querySelectorAll<HTMLElement>('.bk-card'));
+    const slots = slotCards.map((slotElement) => {
       const vacanciesText = normalizeText(slotElement.querySelector('.bk-badge-vacancies')?.textContent)
         .replace(/^group\s*/i, '');
       const price = normalizeText(slotElement.querySelector('.bk-badge-price')?.textContent);
-      const addButton = slotElement.querySelector<HTMLButtonElement>('.bk-qty-plus');
+      const addButton = slotElement.querySelector<HTMLButtonElement>('.bk-qty-plus, button:not([disabled])');
 
       return {
         time: normalizeText(slotElement.querySelector('.bk-time')?.textContent),
-        weekday: normalizeText(slotElement.querySelector('.bk-day')?.textContent),
-        name: normalizeText(slotElement.querySelector('.bk-name-text')?.textContent),
+        name: normalizeText(slotElement.querySelector('.bk-name-text')?.textContent) || 'Kart Rental 25 min',
         vacancies: vacanciesText || 'Indisponível',
         price: price || 'Consultar',
         available: Boolean(addButton && !addButton.disabled),
       };
-    });
-
-    if (!monthLabel || days.length === 0) {
-      return;
-    }
+    }).filter((slot) => slot.time);
 
     setBookingState({
       monthLabel,
       monthIndex,
       year,
-      selectedDay: days.find((day) => day.selected)?.day ?? days[0]?.day ?? null,
+      selectedDay: selected?.day ?? null,
       days,
       slots,
-      loaded: true,
+      loaded: days.length > 0,
+      emptyMessage: normalizeText(doc.querySelector('.no-bookings')?.textContent) || 'Nenhum horário disponível para esta data.',
     });
-  }, [cleanOfficialBookingFrame, officialFlowOpen]);
+  }, [cleanOfficialBookingFrame]);
 
   const clickOfficialDay = useCallback((day: number) => {
     const doc = iframeRef.current?.contentDocument;
-    const dayElement = Array.from(doc?.querySelectorAll<HTMLElement>('.cal-strip-day') ?? [])
+    const target = Array.from(doc?.querySelectorAll<HTMLElement>('.cal-strip-day') ?? [])
       .find((element) => normalizeText(element.querySelector('.cal-strip-number')?.textContent) === String(day));
 
-    if (!dayElement) {
+    if (!target) {
       return;
     }
 
-    dayElement.click();
-    window.setTimeout(readOfficialBookingState, 700);
-    window.setTimeout(readOfficialBookingState, 1600);
+    setOfficialCheckoutOpen(false);
+    target.click();
+    window.setTimeout(readOfficialBookingState, 500);
+    window.setTimeout(readOfficialBookingState, 1400);
   }, [readOfficialBookingState]);
 
   const navigateOfficialCalendar = useCallback((direction: 'previous' | 'next') => {
@@ -247,15 +259,15 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
     }
 
     button.click();
-    window.setTimeout(readOfficialBookingState, 900);
-    window.setTimeout(readOfficialBookingState, 1800);
+    window.setTimeout(readOfficialBookingState, 700);
+    window.setTimeout(readOfficialBookingState, 1600);
   }, [readOfficialBookingState]);
 
   const reserveSlot = useCallback((slot: BookingSlot) => {
     const doc = iframeRef.current?.contentDocument;
     const slotElement = Array.from(doc?.querySelectorAll<HTMLElement>('.bk-card') ?? [])
       .find((element) => normalizeText(element.querySelector('.bk-time')?.textContent) === slot.time);
-    const button = slotElement?.querySelector<HTMLButtonElement>('.bk-qty-plus');
+    const button = slotElement?.querySelector<HTMLButtonElement>('.bk-qty-plus, button:not([disabled])');
 
     if (!button || button.disabled) {
       window.open(MYLAPTIME_BOOKING_PROXY_URL, '_blank', 'noopener,noreferrer');
@@ -264,34 +276,16 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
 
     setReservingTime(slot.time);
     button.click();
-
+    setOfficialCheckoutOpen(true);
     window.setTimeout(() => {
-      setOfficialFlowOpen(true);
       setReservingTime(null);
-    }, 1000);
+      iframeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 800);
   }, []);
 
   useEffect(() => {
-    if (surface === 'home' && window.location.hash !== '#agendamento') {
-      return undefined;
-    }
-
-    const timeouts = [0, 300, 900, 1800, 3500, 7000, 11000, 16000].map((delay) =>
-      window.setTimeout(keepBookingAnchored, delay),
-    );
-    const interval = window.setInterval(keepBookingAnchored, 400);
-    const stopInterval = window.setTimeout(() => window.clearInterval(interval), 18000);
-
-    return () => {
-      timeouts.forEach(window.clearTimeout);
-      window.clearInterval(interval);
-      window.clearTimeout(stopInterval);
-    };
-  }, [keepBookingAnchored, surface]);
-
-  useEffect(() => {
     const interval = window.setInterval(readOfficialBookingState, 900);
-    const stopPolling = window.setTimeout(() => window.clearInterval(interval), 25000);
+    const stopPolling = window.setTimeout(() => window.clearInterval(interval), 20000);
 
     return () => {
       window.clearInterval(interval);
@@ -299,200 +293,184 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
     };
   }, [readOfficialBookingState]);
 
-  useEffect(() => {
-    if (!officialFlowOpen) {
-      return;
-    }
-
-    window.setTimeout(keepBookingAnchored, 120);
-    window.setTimeout(keepBookingAnchored, 900);
-  }, [keepBookingAnchored, officialFlowOpen]);
-
   return (
     <section
       id="agendamento"
-      className="scroll-mt-28 border-t border-zinc-200/60 bg-white py-24 md:scroll-mt-24"
+      className="scroll-mt-28 border-t border-zinc-200 bg-[#efefef] py-16 md:scroll-mt-24 md:py-20"
     >
-      <div className="container mx-auto px-4">
-        <div className="mx-auto max-w-7xl text-center">
-          <HeadingTag className="text-3xl font-black uppercase tracking-tight text-zinc-950 md:text-5xl">
-            Consulte e <span className="text-primary-600">agende seu horário</span>
-          </HeadingTag>
-          <div className="mx-auto mt-4 h-1.5 w-20 rounded-full bg-primary-500" />
+      <div className="mx-auto max-w-7xl px-4 text-center">
+        <HeadingTag className="text-3xl font-semibold tracking-tight text-zinc-900 md:text-5xl">
+          Consulte e <span className="font-black text-[#4699d7]">agende seu horário</span>
+        </HeadingTag>
 
-          <div aria-hidden="true" className="mx-auto mt-7 grid w-11 grid-cols-3 gap-1 opacity-90">
-            {Array.from({ length: 6 }, (_, index) => (
-              <span
-                key={index}
-                className={`h-3 w-3 rotate-6 rounded-[1px] ${
-                  index % 2 === 0 ? 'bg-primary-500' : 'bg-yellow-500'
-                }`}
-              />
-            ))}
+        <div aria-hidden="true" className="mx-auto mt-8 grid w-10 grid-cols-2 gap-1 opacity-80">
+          <span className="h-2.5 w-2.5 skew-x-[-12deg] bg-zinc-300" />
+          <span className="h-2.5 w-2.5 skew-x-[-12deg] bg-[#4699d7]" />
+          <span className="h-2.5 w-2.5 skew-x-[-12deg] bg-[#4699d7]" />
+          <span className="h-2.5 w-2.5 skew-x-[-12deg] bg-zinc-300" />
+        </div>
+
+        <p className="mx-auto mt-8 max-w-5xl text-center text-xl leading-8 text-zinc-800 md:text-2xl md:leading-9">
+          Peça seu <strong className="font-black">cartão fidelidade</strong> e faça um carimbo na secretaria em toda bateria que correr,
+          a cada 10 corridas 1 é por nossa conta, basta trocar seu cartão fidelidade com 10 carimbos por 1 corrida totalmente
+          de graça. (O cartão fidelidade é pessoal e intransferível).
+        </p>
+
+        <p className="mt-8 text-center text-xl font-medium leading-tight text-zinc-900 md:text-2xl">
+          <span className="font-black text-[#4699d7]">Reserve agora</span> e pague <span className="font-black text-[#4699d7]">somente na data</span> da sua corrida!
+        </p>
+
+        <div className="relative mx-auto mt-12 max-w-[1316px] bg-white px-4 pb-16 pt-12 md:min-h-[900px] md:px-24 md:pb-24 md:pt-16">
+          <div className="mx-auto mb-8 w-full max-w-[23rem] rounded-md border border-zinc-200 bg-white p-6 text-center shadow-sm">
+            <div className="mb-5 flex items-center justify-between">
+              <button
+                type="button"
+                aria-label="Mês anterior"
+                onClick={() => navigateOfficialCalendar('previous')}
+                className="flex h-10 w-10 items-center justify-center rounded border border-zinc-200 text-zinc-400 transition-colors hover:border-[#4699d7]/50 hover:text-[#4699d7] disabled:cursor-not-allowed disabled:opacity-30"
+                disabled={!bookingState.loaded}
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <strong className="text-xl font-black lowercase text-zinc-800">
+                {bookingState.monthLabel}
+              </strong>
+              <button
+                type="button"
+                aria-label="Próximo mês"
+                onClick={() => navigateOfficialCalendar('next')}
+                className="flex h-10 w-10 items-center justify-center rounded border border-zinc-200 text-zinc-400 transition-colors hover:border-[#4699d7]/50 hover:text-[#4699d7] disabled:cursor-not-allowed disabled:opacity-30"
+                disabled={!bookingState.loaded}
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-7 text-xs font-bold lowercase text-zinc-400">
+              {weekLabels.map((day) => (
+                <span key={day} className="py-2">{day}</span>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-7 overflow-hidden border-l border-t border-zinc-100 text-center">
+              {calendarCells.map((cell) => {
+                if (!cell.day) {
+                  return <span key={cell.key} className="min-h-11 border-b border-r border-zinc-100" />;
+                }
+
+                const isEnabled = availableDays.has(cell.day);
+                const isSelected = cell.day === bookingState.selectedDay;
+
+                return (
+                  <button
+                    key={cell.key}
+                    type="button"
+                    onClick={() => clickOfficialDay(cell.day as number)}
+                    disabled={!isEnabled}
+                    className={`min-h-11 border-b border-r border-zinc-100 py-3 text-base font-semibold transition-colors ${
+                      isSelected
+                        ? 'bg-[#48a9e5] text-white'
+                        : isEnabled
+                          ? 'text-zinc-700 hover:bg-[#eaf6fd] hover:text-[#277eb8]'
+                          : 'cursor-not-allowed text-zinc-200'
+                    }`}
+                  >
+                    {cell.day}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          <p className="mt-7 text-center text-xl font-semibold leading-tight text-zinc-800 md:text-2xl">
-            <span className="font-black text-primary-600">Reserve agora.</span> Faça o pagamento por meio de nossa <span className="font-black text-primary-600">reserva on-line.</span>
-          </p>
-
-          <div className="relative mx-auto mt-12 max-w-[1316px] rounded-2xl border border-zinc-200 bg-zinc-50 px-4 pb-16 pt-12 shadow-sm md:min-h-[900px] md:px-24 md:pb-24 md:pt-16">
-            {!officialFlowOpen && (
-              <>
-                <div className="mx-auto mb-8 w-full max-w-[23rem] rounded-2xl border border-zinc-200 bg-white p-6 text-center shadow-sm">
-                  <div className="mb-5 flex items-center justify-between">
-                    <button
-                      type="button"
-                      aria-label="Mês anterior"
-                      onClick={() => navigateOfficialCalendar('previous')}
-                      className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200 text-zinc-400 transition-colors hover:border-primary-500/40 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-30"
-                      disabled={!bookingState.loaded}
-                    >
-                      <ChevronLeft className="h-5 w-5" />
-                    </button>
-                    <strong className="text-xl font-black lowercase text-zinc-900">
-                      {bookingState.monthLabel}
-                    </strong>
-                    <button
-                      type="button"
-                      aria-label="Próximo mês"
-                      onClick={() => navigateOfficialCalendar('next')}
-                      className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200 text-zinc-400 transition-colors hover:border-primary-500/40 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-30"
-                      disabled={!bookingState.loaded}
-                    >
-                      <ChevronRight className="h-5 w-5" />
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-7 text-xs font-bold lowercase text-zinc-400">
-                    {weekLabels.map((day) => (
-                      <span key={day} className="py-2">{day}</span>
-                    ))}
-                  </div>
-
-                  <div className="grid grid-cols-7 overflow-hidden border-l border-t border-zinc-100 text-center">
-                    {calendarCells.map((cell) => {
-                      if (!cell.day) {
-                        return <span key={cell.key} className="min-h-11 border-b border-r border-zinc-100" />;
-                      }
-
-                      const isEnabled = availableDays.has(cell.day);
-                      const isSelected = cell.day === bookingState.selectedDay;
-                      const officialDay = bookingState.days.find((day) => day.day === cell.day);
-
-                      return (
-                        <button
-                          key={cell.key}
-                          type="button"
-                          aria-label={`Selecionar ${cell.iso}`}
-                          onClick={() => clickOfficialDay(cell.day as number)}
-                          disabled={!isEnabled}
-                          className={`min-h-11 border-b border-r border-zinc-100 py-3 text-base font-semibold transition-colors ${
-                            isSelected
-                              ? 'bg-primary-500 text-zinc-950'
-                              : isEnabled
-                                ? 'text-zinc-700 hover:bg-primary-50 hover:text-primary-700'
-                                : 'cursor-not-allowed text-zinc-200'
-                          } ${officialDay?.today && !isSelected ? 'bg-zinc-50' : ''}`}
-                        >
-                          {cell.day}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="mx-auto max-w-5xl">
-                  {!bookingState.loaded && (
-                    <div className="space-y-2">
-                      {Array.from({ length: 6 }, (_, index) => (
-                        <div
-                          key={index}
-                          className="h-[46px] animate-pulse rounded-xl bg-white shadow-sm"
-                        />
-                      ))}
-                    </div>
-                  )}
-
-                  {bookingState.loaded && bookingState.slots.length === 0 && (
-                    <div className="rounded-2xl border border-zinc-200 bg-white px-6 py-8 text-center text-sm font-semibold text-zinc-500 shadow-sm">
-                      Nenhum horário disponível para esta data.
-                    </div>
-                  )}
-
-                  {bookingState.loaded && bookingState.slots.length > 0 && (
-                    <div className="space-y-2">
-                      {bookingState.slots.map((slot) => (
-                        <div
-                          key={`${slot.time}-${slot.name}`}
-                          className={`booking-slot-row grid min-h-[52px] grid-cols-1 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-left shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary-500/30 hover:shadow-md md:gap-3 md:py-0 ${
-                            slot.available ? '' : 'opacity-45'
-                          }`}
-                        >
-                          <strong className="text-[27px] font-black leading-none text-zinc-950 md:text-[28px]">
-                            {slot.time}
-                          </strong>
-                          <span className="text-xs font-bold uppercase tracking-wide text-zinc-600 md:text-right">
-                            {slot.name || `Bateria ${slot.time}`}
-                          </span>
-                          <span className="text-base font-black text-primary-600">
-                            {slot.vacancies}
-                          </span>
-                          <span className="text-base font-black text-zinc-800">
-                            {slot.price}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => reserveSlot(slot)}
-                            disabled={!slot.available || reservingTime === slot.time}
-                            className="home-cta h-10 rounded-xl bg-primary-500 px-6 text-xs font-black uppercase tracking-wider text-white transition-colors hover:bg-primary-600 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:text-zinc-500"
-                          >
-                            {reservingTime === slot.time ? 'Abrindo...' : 'Reservar'}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </>
+          <div className="mx-auto max-w-5xl">
+            {!bookingState.loaded && (
+              <div className="space-y-2">
+                {Array.from({ length: 7 }, (_, index) => (
+                  <div key={index} className="h-[46px] animate-pulse rounded bg-zinc-100 shadow-sm" />
+                ))}
+              </div>
             )}
 
-            {officialFlowOpen && (
-              <div className="mx-auto max-w-6xl text-left">
+            {bookingState.loaded && bookingState.slots.length === 0 && (
+              <div className="rounded border border-zinc-200 bg-white px-6 py-8 text-center text-sm font-semibold text-zinc-500 shadow-sm">
+                {bookingState.emptyMessage}
+              </div>
+            )}
+
+            {bookingState.loaded && bookingState.slots.length > 0 && (
+              <div className="space-y-2">
+                {bookingState.slots.map((slot) => (
+                  <div
+                    key={`${slot.time}-${slot.name}`}
+                    className={`booking-slot-row grid min-h-[46px] grid-cols-1 items-center gap-2 rounded border border-zinc-100 bg-white px-4 py-3 text-left shadow-[0_2px_9px_rgba(0,0,0,0.12)] md:gap-3 md:py-0 ${
+                      slot.available ? '' : 'opacity-45'
+                    }`}
+                  >
+                    <strong className="text-[27px] font-black leading-none text-zinc-800">
+                      {slot.time}
+                    </strong>
+                    <span className="text-sm font-medium text-zinc-700 md:text-right">
+                      {slot.name}
+                    </span>
+                    <span className="text-base font-black text-[#48a9e5]">
+                      {slot.vacancies}
+                    </span>
+                    <span className="text-base font-medium text-zinc-800">
+                      {slot.price}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => reserveSlot(slot)}
+                      disabled={!slot.available || reservingTime === slot.time}
+                      className="h-9 rounded bg-[#48a9e5] px-6 text-base font-medium text-white transition-colors hover:bg-[#277eb8] disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-400"
+                    >
+                      {reservingTime === slot.time ? 'Abrindo...' : 'Reservar'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div
+            className={
+              officialCheckoutOpen
+                ? 'mx-auto mt-10 max-w-6xl overflow-hidden bg-white text-left shadow-[0_14px_30px_rgba(0,0,0,0.14)]'
+                : 'pointer-events-none fixed -left-[200vw] top-0 h-[1060px] w-[1320px] overflow-hidden opacity-0'
+            }
+          >
+            {officialCheckoutOpen && (
+              <div className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3 md:px-6">
+                <strong className="text-sm font-black uppercase tracking-[0.12em] text-zinc-800">
+                  Finalizar reserva
+                </strong>
                 <button
                   type="button"
-                  onClick={() => setOfficialFlowOpen(false)}
-                  className="mb-4 inline-flex h-10 items-center rounded-xl border border-zinc-200 bg-white px-4 text-xs font-black uppercase tracking-wider text-zinc-600 transition-colors hover:border-primary-500/40 hover:text-primary-700"
+                  onClick={() => setOfficialCheckoutOpen(false)}
+                  className="rounded border border-zinc-200 bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.1em] text-zinc-600 transition-colors hover:border-[#48a9e5] hover:text-[#277eb8]"
                 >
-                  &lt; Voltar aos horários
+                  Voltar aos horários
                 </button>
               </div>
             )}
 
-            <div
+            <iframe
+              ref={iframeRef}
+              title="Agendamento oficial MyLapTime do Kartódromo de Betim"
+              src={MYLAPTIME_BOOKING_PROXY_URL}
+              onLoad={() => {
+                cleanOfficialBookingFrame();
+                window.setTimeout(readOfficialBookingState, 900);
+                window.setTimeout(readOfficialBookingState, 2200);
+              }}
+              tabIndex={officialCheckoutOpen ? 0 : -1}
+              aria-hidden={!officialCheckoutOpen}
               className={
-                officialFlowOpen
-                  ? 'mx-auto max-w-6xl overflow-hidden bg-white shadow-[0_14px_30px_rgba(0,0,0,0.14)]'
-                  : 'pointer-events-none fixed -left-[200vw] top-0 h-[900px] w-[1280px] overflow-hidden opacity-0'
+                officialCheckoutOpen
+                  ? 'block h-[820px] w-full border-0 bg-white'
+                  : 'block h-[1060px] w-[1320px] border-0 bg-white'
               }
-            >
-              <iframe
-                ref={iframeRef}
-                title="Agendamento oficial MyLapTime do Kartódromo de Betim"
-                src={MYLAPTIME_BOOKING_PROXY_URL}
-                onLoad={() => {
-                  cleanOfficialBookingFrame();
-                  keepBookingAnchored();
-                  window.setTimeout(cleanOfficialBookingFrame, 1200);
-                  window.setTimeout(cleanOfficialBookingFrame, 3500);
-                  window.setTimeout(readOfficialBookingState, 1200);
-                  window.setTimeout(readOfficialBookingState, 3500);
-                }}
-                tabIndex={officialFlowOpen ? 0 : -1}
-                aria-hidden={!officialFlowOpen}
-                style={officialFlowOpen ? { height: 780 } : { height: 900, width: 1280 }}
-                className={officialFlowOpen ? 'block w-full border-0 bg-white' : 'block border-0 bg-white'}
-              />
-            </div>
+            />
           </div>
         </div>
       </div>

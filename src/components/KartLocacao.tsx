@@ -1,194 +1,308 @@
-import { Phone, CreditCard, Coins, QrCode, ArrowLeft, ShieldAlert, CheckCircle, MessageSquare, Info, ShieldCheck } from 'lucide-react';
+import {
+  CalendarCheck,
+  CheckCircle,
+  Clock3,
+  Coins,
+  CreditCard,
+  Gauge,
+  MapPin,
+  MessageCircle,
+  QrCode,
+  ShieldCheck,
+  Timer,
+  UserCheck,
+  Zap,
+} from 'lucide-react';
+import { MYLAPTIME_BOOKING_URL, WHATSAPP_BOOKING_URL } from '../config/booking';
+
+const sessionFlow = [
+  {
+    time: '5 min',
+    label: 'Tomada',
+    text: 'Voltas de classificação para montar o grid.',
+  },
+  {
+    time: '5 min',
+    label: 'Grid',
+    text: 'Organização da largada com orientação da equipe.',
+  },
+  {
+    time: '20 min',
+    label: 'Corrida',
+    text: 'Disputa cronometrada na pista de 1.110 metros.',
+  },
+];
+
+const requirements = [
+  ['14 anos', 'idade mínima'],
+  ['1,50 m', 'altura mínima'],
+  ['50 kg', 'peso mínimo'],
+  ['Tênis', 'calçado fechado'],
+];
+
+const includedItems = [
+  'Capacete com viseira e macacão emprestados pelo kartódromo.',
+  'Briefing de segurança antes da entrada na pista.',
+  'Fiscais de pista, mecânicos e ambulatório com socorrista.',
+];
+
+const paymentMethods = [
+  { icon: QrCode, label: 'Pix' },
+  { icon: CreditCard, label: 'Cartão' },
+  { icon: Coins, label: 'Dinheiro' },
+];
 
 const KartLocacao = () => {
   return (
-    <section className="py-24 bg-white min-h-screen text-zinc-600">
-      <div className="container mx-auto px-4">
-        {/* Back Button */}
-        <div className="mb-8 max-w-4xl mx-auto">
-          <a href="/" className="inline-flex items-center text-zinc-500 hover:text-primary-600 font-semibold transition-colors">
-            <ArrowLeft className="w-5 h-5 mr-2" />
-            Voltar para a página inicial
-          </a>
-        </div>
+    <main className="bg-[#fbfcf8] text-zinc-800">
+      <section className="relative isolate overflow-hidden bg-zinc-950 text-[#fbfcf8]">
+        <img
+          src="/posters/home-karting.jpg"
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 z-[-3] h-full w-full object-cover opacity-72"
+        />
+        <div className="absolute inset-0 z-[-2] bg-[linear-gradient(90deg,rgba(9,9,11,0.95)_0%,rgba(9,9,11,0.78)_42%,rgba(9,9,11,0.28)_100%)]" />
+        <div className="absolute inset-x-0 bottom-0 z-[-1] h-40 bg-[linear-gradient(180deg,transparent,rgba(9,9,11,0.92))]" />
 
-        {/* Section Header */}
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-5xl font-black text-zinc-950 mb-4 uppercase tracking-tight">
-            Kart de <span className="text-primary-600">Locação</span>
-          </h2>
-          <div className="w-20 h-1.5 bg-primary-500 mx-auto rounded-full mb-6"></div>
-          <p className="text-lg text-zinc-600 max-w-3xl mx-auto font-light leading-relaxed">
-            Seja piloto por um dia! Confira todas as regras, requisitos e valores para vir correr na nossa pista.
-          </p>
-        </div>
+        <div className="container mx-auto grid min-h-[72svh] gap-8 px-4 pb-7 pt-10 md:min-h-[78vh] md:grid-cols-[0.96fr_1.04fr] md:items-end md:pb-10 md:pt-14">
+          <div className="max-w-3xl">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#fbfcf8]/20 bg-zinc-950/45 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-primary-300">
+              <Zap className="h-3.5 w-3.5" aria-hidden="true" />
+              Kart de locação
+            </div>
 
-        <div className="max-w-4xl mx-auto space-y-8">
-          {/* Contact & Fast Booking */}
-          <div className="bg-zinc-50 border border-zinc-200 rounded-3xl p-8 shadow-sm">
-            <h3 className="text-xl font-bold text-zinc-900 uppercase tracking-wider mb-6">Como Agendar</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-              <div className="space-y-4">
-                <p className="text-zinc-600 text-sm font-light leading-relaxed">
-                  Para agendar sua bateria, basta entrar em contato com nossa central de reservas via WhatsApp ou telefone. Não é obrigatório ter um grupo mínimo para correr.
-                </p>
-                <div className="space-y-3.5">
-                  <a href="tel:+553135112373" className="flex items-center space-x-3 text-sm hover:text-primary-600 transition-colors">
-                    <Phone className="w-5 h-5 text-primary-500" />
-                    <span className="text-zinc-700"><strong>Telefone:</strong> (31) 3511-2373</span>
-                  </a>
-                  <a href="https://wa.me/553135112373" target="_blank" rel="noopener noreferrer" className="flex items-center space-x-3 text-sm hover:text-primary-600 transition-colors">
-                    <MessageSquare className="w-5 h-5 text-primary-500" />
-                    <span className="text-zinc-700"><strong>WhatsApp:</strong> (31) 99884-2898</span>
-                  </a>
-                </div>
-              </div>
-              
-              <div className="flex flex-col sm:flex-row gap-3 md:justify-end">
-                <a href="tel:+553135112373" className="px-5 py-3.5 bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-700 font-bold uppercase tracking-wider text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm">
-                  <Phone className="w-4 h-4 text-primary-600" />
-                  Ligar no Fixo
-                </a>
-                <a href="https://wa.me/553135112373?text=Ol%C3%A1!%20Gostaria%20de%20reservar%20uma%20bateria%20de%20kart%20light." target="_blank" rel="noopener noreferrer" className="px-5 py-3.5 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-400 hover:to-primary-500 text-zinc-950 font-bold uppercase tracking-wider text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md">
-                  <MessageSquare className="w-4 h-4" />
-                  Chamar no Whats
-                </a>
-              </div>
-            </div>
-          </div>
+            <h1 className="max-w-[10ch] text-[3.4rem] font-black uppercase leading-[0.82] tracking-tight text-[#fbfcf8] sm:text-7xl md:text-8xl">
+              Entre no grid hoje.
+            </h1>
 
-          {/* Race Info */}
-          <div className="bg-zinc-50 border border-zinc-200 rounded-3xl p-8 shadow-sm">
-            <div className="flex items-center space-x-3.5 mb-6">
-              <div className="w-10 h-10 rounded-lg bg-white border border-zinc-200 flex items-center justify-center text-primary-600 shadow-sm">
-                <Info className="w-5 h-5" />
-              </div>
-              <h3 className="text-xl font-bold text-zinc-900 uppercase tracking-wider">Estrutura da Bateria</h3>
-            </div>
-            <div className="space-y-4 text-sm text-zinc-600 font-light leading-relaxed">
-              <p>
-                Cada corrida/bateria tem duração total de <strong className="text-zinc-900 font-semibold">30 minutos</strong> dentro da pista, estruturada da seguinte forma:
-              </p>
-              <div className="grid grid-cols-3 gap-4 py-4 text-center">
-                <div className="bg-white border border-zinc-200 p-4 rounded-2xl shadow-sm">
-                  <div className="text-xl font-black text-primary-600 mb-1">5 MIN</div>
-                  <div className="text-[10px] text-zinc-400 uppercase font-semibold">Tomada de Tempo (Qualify)</div>
-                </div>
-                <div className="bg-white border border-zinc-200 p-4 rounded-2xl shadow-sm">
-                  <div className="text-xl font-black text-primary-600 mb-1">5 MIN</div>
-                  <div className="text-[10px] text-zinc-400 uppercase font-semibold">Formação do Grid</div>
-                </div>
-                <div className="bg-white border border-zinc-200 p-4 rounded-2xl shadow-sm">
-                  <div className="text-xl font-black text-primary-600 mb-1">20 MIN</div>
-                  <div className="text-[10px] text-zinc-400 uppercase font-semibold">Corrida de Disputa</div>
-                </div>
-              </div>
-              <p>
-                <strong className="text-zinc-900 font-semibold">Importante:</strong> É obrigatório que todos os pilotos inscritos se apresentem no guichê do kartódromo com no mínimo <strong className="text-zinc-900 font-semibold">1 hora de antecedência</strong> do horário agendado. Esse período é necessário para validação do termo de responsabilidade nos tótens digitais, pesagem oficial, distribuição de macacões e capacetes, além da instrução de segurança (briefing).
-              </p>
-            </div>
-          </div>
-
-          {/* Requirements */}
-          <div className="bg-zinc-50 border border-zinc-200 rounded-3xl p-8 shadow-sm">
-            <div className="flex items-center space-x-3.5 mb-6">
-              <div className="w-10 h-10 rounded-lg bg-white border border-zinc-200 flex items-center justify-center text-primary-600 shadow-sm">
-                <ShieldAlert className="w-5 h-5" />
-              </div>
-              <h3 className="text-xl font-bold text-zinc-900 uppercase tracking-wider">Requisitos Mínimos para Pilotar</h3>
-            </div>
-            <div className="space-y-4 text-sm text-zinc-600 font-light leading-relaxed">
-              <p>
-                O esporte é acessível a todos, não exigindo qualquer licença esportiva ou habilitação (CNH). Basta preencher os seguintes critérios físicos mínimos:
-              </p>
-              <ul className="grid grid-cols-1 md:grid-cols-3 gap-4 py-2 text-center">
-                <li className="bg-white border border-zinc-200 p-4 rounded-2xl flex flex-col justify-center shadow-sm">
-                  <span className="text-xs text-zinc-400 uppercase font-bold mb-1">Idade Mínima</span>
-                  <span className="text-lg font-bold text-zinc-900">14 anos completos</span>
-                </li>
-                <li className="bg-white border border-zinc-200 p-4 rounded-2xl flex flex-col justify-center shadow-sm">
-                  <span className="text-xs text-zinc-400 uppercase font-bold mb-1">Altura Mínima</span>
-                  <span className="text-lg font-bold text-zinc-900">1,50 metros</span>
-                </li>
-                <li className="bg-white border border-zinc-200 p-4 rounded-2xl flex flex-col justify-center shadow-sm">
-                  <span className="text-xs text-zinc-400 uppercase font-bold mb-1">Peso Mínimo</span>
-                  <span className="text-lg font-bold text-zinc-900">50 quilogramas</span>
-                </li>
-              </ul>
-              <p>
-                <strong className="text-zinc-900 font-semibold">Vestimenta:</strong> É obrigatório correr de <strong className="text-zinc-900 font-semibold">calçado totalmente fechado</strong> (tênis). Os demais equipamentos de proteção (como capacete com viseira e macacão de corrida) são fornecidos sob regime de empréstimo gratuito pelo próprio kartódromo.
-              </p>
-            </div>
-          </div>
-
-          {/* Payment */}
-          <div className="bg-zinc-50 border border-zinc-200 rounded-3xl p-8 shadow-sm">
-            <h3 className="text-xl font-bold text-zinc-900 uppercase tracking-wider mb-6">Métodos de Pagamento</h3>
-            <p className="text-sm text-zinc-500 font-light mb-8">
-              Oferecemos flexibilidade de pagamento no local da corrida ou de forma antecipada para garantir as tarifas promocionais.
+            <p className="mt-6 max-w-[60ch] text-base leading-8 text-zinc-200 md:text-lg">
+              Bateria de 30 minutos com kart de locação, cronometragem, equipamento incluso
+              e equipe de pista em uma pista homologada de 1.110 metros.
             </p>
-            <div className="grid grid-cols-3 gap-4 text-center max-w-md mx-auto">
-              <div className="flex flex-col items-center">
-                <div className="w-12 h-12 bg-white border border-zinc-200 rounded-2xl flex items-center justify-center text-primary-600 mb-2 shadow-sm">
-                  <Coins className="w-6 h-6" />
-                </div>
-                <span className="text-xs font-bold text-zinc-800 uppercase tracking-wider">Dinheiro</span>
+
+            <div className="mt-6 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-[#fbfcf8]/18 bg-[#fbfcf8]/18 md:hidden">
+              <div className="bg-zinc-950/90 p-3">
+                <strong className="block text-xl font-black leading-none text-primary-300">R$ 145</strong>
+                <span className="mt-1 block text-[9px] font-black uppercase tracking-[0.12em] text-zinc-400">online</span>
               </div>
-              <div className="flex flex-col items-center">
-                <div className="w-12 h-12 bg-white border border-zinc-200 rounded-2xl flex items-center justify-center text-primary-600 mb-2 shadow-sm">
-                  <QrCode className="w-6 h-6" />
-                </div>
-                <span className="text-xs font-bold text-zinc-800 uppercase tracking-wider">Pix</span>
+              <div className="bg-zinc-950/90 p-3">
+                <strong className="block text-xl font-black leading-none text-[#fbfcf8]">30 min</strong>
+                <span className="mt-1 block text-[9px] font-black uppercase tracking-[0.12em] text-zinc-400">bateria</span>
               </div>
-              <div className="flex flex-col items-center">
-                <div className="w-12 h-12 bg-white border border-zinc-200 rounded-2xl flex items-center justify-center text-primary-600 mb-2 shadow-sm">
-                  <CreditCard className="w-6 h-6" />
+              <div className="bg-zinc-950/90 p-3">
+                <strong className="block text-xl font-black leading-none text-[#fbfcf8]">14+</strong>
+                <span className="mt-1 block text-[9px] font-black uppercase tracking-[0.12em] text-zinc-400">idade</span>
+              </div>
+            </div>
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <a
+                href={MYLAPTIME_BOOKING_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-primary-500 px-6 py-3.5 text-xs font-black uppercase tracking-[0.14em] text-zinc-950 shadow-[0_18px_42px_rgba(0,200,83,0.28)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-400"
+              >
+                <CalendarCheck className="h-4 w-4" aria-hidden="true" />
+                Reservar online
+              </a>
+              <a
+                href={WHATSAPP_BOOKING_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-[#fbfcf8]/24 bg-[#fbfcf8]/8 px-6 py-3.5 text-xs font-black uppercase tracking-[0.14em] text-[#fbfcf8] transition-all duration-300 hover:-translate-y-0.5 hover:border-primary-300 hover:text-primary-200"
+              >
+                <MessageCircle className="h-4 w-4" aria-hidden="true" />
+                Tirar dúvida
+              </a>
+            </div>
+          </div>
+
+          <div className="hidden gap-px overflow-hidden rounded-lg border border-[#fbfcf8]/18 bg-[#fbfcf8]/18 md:mb-3 md:grid md:max-w-xl md:justify-self-end">
+            <div className="grid grid-cols-2 gap-px bg-[#fbfcf8]/18">
+              <div className="bg-zinc-950/82 p-4 md:p-5">
+                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400">Online</span>
+                <strong className="mt-2 block text-3xl font-black leading-none text-primary-300">R$ 145</strong>
+                <p className="mt-2 text-xs font-semibold leading-5 text-zinc-300">Pix ou cartão no agendamento.</p>
+              </div>
+              <div className="bg-zinc-950/82 p-4 md:p-5">
+                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400">No balcão</span>
+                <strong className="mt-2 block text-3xl font-black leading-none text-[#fbfcf8]">R$ 175</strong>
+                <p className="mt-2 text-xs font-semibold leading-5 text-zinc-300">Crédito, débito, dinheiro ou Pix.</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-px bg-[#fbfcf8]/18">
+              <div className="bg-zinc-950/82 p-4">
+                <Timer className="mb-2 h-4 w-4 text-primary-300" aria-hidden="true" />
+                <strong className="block text-xl font-black">30 min</strong>
+                <span className="text-[10px] font-black uppercase tracking-[0.12em] text-zinc-400">bateria</span>
+              </div>
+              <div className="bg-zinc-950/82 p-4">
+                <Gauge className="mb-2 h-4 w-4 text-primary-300" aria-hidden="true" />
+                <strong className="block text-xl font-black">400cc</strong>
+                <span className="text-[10px] font-black uppercase tracking-[0.12em] text-zinc-400">Honda</span>
+              </div>
+              <div className="bg-zinc-950/82 p-4">
+                <UserCheck className="mb-2 h-4 w-4 text-primary-300" aria-hidden="true" />
+                <strong className="block text-xl font-black">14+</strong>
+                <span className="text-[10px] font-black uppercase tracking-[0.12em] text-zinc-400">idade</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-zinc-200 bg-[#fbfcf8] py-14 md:py-20">
+        <div className="container mx-auto px-4">
+          <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.74fr_1.26fr] lg:items-start">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-primary-700">
+                A bateria
+              </p>
+              <h2 className="mt-4 max-w-xl text-3xl font-black uppercase leading-none tracking-tight text-zinc-950 md:text-5xl">
+                Trinta minutos dentro da pista.
+              </h2>
+              <p className="mt-5 max-w-[62ch] text-sm leading-7 text-zinc-600 md:text-base">
+                Chegue com 1 hora de antecedência para cadastro, pesagem, retirada dos equipamentos e briefing.
+                Depois, a sessão segue em três etapas simples.
+              </p>
+            </div>
+
+            <div className="grid overflow-hidden rounded-lg border border-zinc-200 bg-zinc-200 md:grid-cols-3">
+              {sessionFlow.map((step, index) => (
+                <article key={step.label} className="bg-[#fffffb] p-6 md:min-h-64">
+                  <span className="text-[11px] font-black uppercase tracking-[0.14em] text-zinc-500">
+                    Etapa {index + 1}
+                  </span>
+                  <strong className="mt-7 block text-5xl font-black uppercase leading-none text-primary-700">
+                    {step.time}
+                  </strong>
+                  <h3 className="mt-5 text-lg font-black text-zinc-950">{step.label}</h3>
+                  <p className="mt-2 text-sm leading-6 text-zinc-600">{step.text}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-[#eef5ed] py-14 md:py-20">
+        <div className="container mx-auto px-4">
+          <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[1fr_0.92fr]">
+            <div className="rounded-lg border border-zinc-200 bg-[#fbfcf8] p-6 shadow-sm md:p-8">
+              <div className="flex items-start gap-4">
+                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-md bg-zinc-950 text-[#fbfcf8]">
+                  <ShieldCheck className="h-5 w-5" aria-hidden="true" />
                 </div>
-                <span className="text-xs font-bold text-zinc-800 uppercase tracking-wider">Cartão</span>
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-primary-700">
+                    Para pilotar
+                  </p>
+                  <h2 className="mt-2 text-2xl font-black uppercase tracking-tight text-zinc-950 md:text-3xl">
+                    Requisitos rápidos
+                  </h2>
+                </div>
+              </div>
+
+              <div className="mt-7 grid gap-px overflow-hidden rounded-lg border border-zinc-200 bg-zinc-200 sm:grid-cols-2">
+                {requirements.map(([value, label]) => (
+                  <div key={label} className="bg-[#fffffb] p-4">
+                    <strong className="block text-2xl font-black text-zinc-950">{value}</strong>
+                    <span className="mt-2 block text-[11px] font-black uppercase tracking-[0.12em] text-zinc-500">
+                      {label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <ul className="mt-7 space-y-3">
+                {includedItems.map((item) => (
+                  <li key={item} className="flex gap-3 text-sm leading-6 text-zinc-700">
+                    <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary-700" aria-hidden="true" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="grid gap-8">
+              <div className="rounded-lg border border-zinc-200 bg-[#fbfcf8] p-6 shadow-sm md:p-8">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-primary-700">
+                  Pagamento
+                </p>
+                <h2 className="mt-2 text-2xl font-black uppercase tracking-tight text-zinc-950 md:text-3xl">
+                  Escolha como pagar
+                </h2>
+                <div className="mt-6 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-zinc-200 bg-zinc-200">
+                  {paymentMethods.map((method) => {
+                    const Icon = method.icon;
+
+                    return (
+                      <div key={method.label} className="bg-[#fffffb] p-4 text-center">
+                        <Icon className="mx-auto h-5 w-5 text-primary-700" aria-hidden="true" />
+                        <span className="mt-3 block text-xs font-black uppercase tracking-[0.1em] text-zinc-700">
+                          {method.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-zinc-200 bg-zinc-950 p-6 text-[#fbfcf8] shadow-[0_24px_70px_rgba(17,20,18,0.16)] md:p-8">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-primary-300">
+                  Reserva
+                </p>
+                <h2 className="mt-3 text-2xl font-black uppercase leading-none tracking-tight md:text-4xl">
+                  Veja horários disponíveis agora.
+                </h2>
+                <p className="mt-5 text-sm leading-7 text-zinc-300">
+                  Reserve online para garantir a bateria. Para grupos, aniversários ou dúvidas sobre horário,
+                  fale com a equipe pelo WhatsApp.
+                </p>
+
+                <div className="mt-7 grid gap-3">
+                  <a
+                    href={MYLAPTIME_BOOKING_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-primary-500 px-5 py-3 text-xs font-black uppercase tracking-[0.14em] text-zinc-950 transition-colors hover:bg-primary-400"
+                  >
+                    <CalendarCheck className="h-4 w-4" aria-hidden="true" />
+                    Abrir agenda online
+                  </a>
+                  <a
+                    href={WHATSAPP_BOOKING_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-[#fbfcf8]/20 px-5 py-3 text-xs font-black uppercase tracking-[0.14em] text-[#fbfcf8] transition-colors hover:border-primary-400 hover:text-primary-200"
+                  >
+                    <MessageCircle className="h-4 w-4" aria-hidden="true" />
+                    Chamar no WhatsApp
+                  </a>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Safety */}
-          <div className="bg-zinc-50 border border-zinc-200 rounded-3xl p-8 shadow-sm">
-            <div className="flex items-center space-x-3.5 mb-6">
-              <div className="w-10 h-10 rounded-lg bg-white border border-zinc-200 flex items-center justify-center text-primary-600 shadow-sm">
-                <ShieldCheck className="w-5 h-5" />
-              </div>
-              <h3 className="text-xl font-bold text-zinc-900 uppercase tracking-wider">Segurança e Tecnologia da Frota</h3>
+          <div className="mx-auto mt-12 grid max-w-6xl gap-5 border-t border-zinc-200 pt-8 text-sm leading-7 text-zinc-600 md:grid-cols-3">
+            <div className="flex gap-3">
+              <MapPin className="mt-1 h-4 w-4 flex-shrink-0 text-primary-700" aria-hidden="true" />
+              <span>Av. Adutora Várzea das Flores, 477, Betim, MG.</span>
             </div>
-            <div className="space-y-4 text-sm text-zinc-600 font-light leading-relaxed">
-              <p>
-                Contamos com uma frota de karts modernos e seguros, equipados com robustos motores <strong className="text-zinc-900 font-semibold">Honda GX390 de 13HP (400cc)</strong>. A frota é dividida em duas categorias:
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-2">
-                <div className="bg-white border border-zinc-200 p-5 rounded-2xl shadow-sm">
-                  <h4 className="text-sm font-bold text-zinc-900 uppercase tracking-wide mb-1 flex items-center gap-1.5">
-                    <CheckCircle className="w-4 h-4 text-primary-600" />
-                    Kart Light
-                  </h4>
-                  <p className="text-xs text-zinc-500 font-light leading-normal">
-                    Focado no público amador e iniciantes, garantindo aceleração suave e alto nível de proteção contra impactos laterais.
-                  </p>
-                </div>
-                <div className="bg-white border border-zinc-200 p-5 rounded-2xl shadow-sm">
-                  <h4 className="text-sm font-bold text-zinc-900 uppercase tracking-wide mb-1 flex items-center gap-1.5">
-                    <CheckCircle className="w-4 h-4 text-primary-600" />
-                    Super Kart
-                  </h4>
-                  <p className="text-xs text-zinc-500 font-light leading-normal">
-                    Destinado a pilotos filiados e experientes que buscam tempos baixos, maior torque nas saídas de curva e regulagem de chassis.
-                  </p>
-                </div>
-              </div>
-              <p>
-                O Kartódromo de Betim dispõe de ambulatório com atendimento de socorrista qualificado e UTI móvel de prontidão nos dias de funcionamento. Além disso, fiscais de pista e mecânicos coordenam a pista em tempo integral para que sua corrida ocorra em clima 100% esportivo.
-              </p>
+            <div className="flex gap-3">
+              <Clock3 className="mt-1 h-4 w-4 flex-shrink-0 text-primary-700" aria-hidden="true" />
+              <span>Terça a sexta das 16h às 22h. Sábado e domingo das 08h às 19h.</span>
+            </div>
+            <div className="flex gap-3">
+              <Gauge className="mt-1 h-4 w-4 flex-shrink-0 text-primary-700" aria-hidden="true" />
+              <span>Karts Honda GX390 de 13HP preparados para locação.</span>
             </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </main>
   );
 };
 

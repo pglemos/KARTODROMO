@@ -1,128 +1,130 @@
-import { Award, Shield, Clock, CheckCircle, ArrowRight } from 'lucide-react';
+import { ArrowRight, Award, CheckCircle, Clock, MapPin, Shield } from 'lucide-react';
+
+const facts = [
+  { value: '1996', label: 'início da operação' },
+  { value: '1.110m', label: 'de pista homologada' },
+  { value: '42', label: 'traçados mapeados' },
+  { value: '50K+', label: 'corridas realizadas' },
+];
+
+const features = [
+  {
+    icon: Award,
+    title: 'Pista profissional',
+    text: 'Circuito técnico com áreas de escape gramadas, zebras e leitura clara para pilotos de níveis diferentes.',
+  },
+  {
+    icon: Shield,
+    title: 'Operação assistida',
+    text: 'Indumentária inclusa, equipe de pista, fiscais e ambulatório com socorrista durante as baterias.',
+  },
+];
+
+const hours = [
+  ['Terça a sexta-feira', '16h às 22h', 'Primeira bateria: 17h00 | Última: 21h40'],
+  ['Sábado', '08h às 19h', 'Primeira bateria: 09h15 | Última: 18h35'],
+  ['Domingo', '08h às 19h', 'Primeira bateria: 09h15 | Última: 18h00'],
+];
 
 const About = () => {
   return (
-    <section id="sobre" className="py-24 bg-white border-t border-zinc-200/60">
+    <section id="sobre" className="border-t border-zinc-200/70 bg-[#fbfcf8] pb-16 pt-8 md:pb-24 md:pt-20">
       <div className="container mx-auto px-4">
-        {/* Header */}
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-5xl font-black text-zinc-950 mb-4 uppercase tracking-tight">
-            Sobre o <span className="text-primary-600">Kartódromo</span>
-          </h2>
-          <div className="w-20 h-1.5 bg-primary-500 mx-auto rounded-full mb-6"></div>
-          <p className="text-lg text-zinc-600 max-w-3xl mx-auto font-light leading-relaxed">
-            Desde 1996, o Kartódromo Internacional de Betim recebe pilotos, famílias, campeonatos e eventos em uma pista de 1.110 metros.
-          </p>
-        </div>
+        <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[0.94fr_1.06fr] lg:items-start">
+          <div>
+            <p className="mb-4 text-xs font-black uppercase tracking-[0.18em] text-primary-700">
+              Desde 1996 em Betim
+            </p>
+            <h2 className="max-w-2xl text-3xl font-black uppercase leading-none tracking-tight text-zinc-950 md:text-5xl">
+              Estrutura de corrida para lazer, treino e eventos.
+            </h2>
+            <p className="mt-6 max-w-[68ch] text-base leading-8 text-zinc-700 md:text-lg">
+              O Kartódromo Internacional de Betim reúne pista homologada, karts de locação, Super Kart,
+              cronometragem eletrônica e atendimento para quem quer correr com segurança, seja em bateria aberta,
+              campeonato ou grupo fechado.
+            </p>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start max-w-6xl mx-auto">
-          {/* Text & Stats */}
-          <div className="lg:col-span-6 space-y-6">
-            <h3 className="text-2xl md:text-3xl font-bold text-zinc-900 tracking-tight">
-              Mais de 25 Anos de Tradição e Velocidade
-            </h3>
-            <p className="text-zinc-600 leading-relaxed font-light">
-              Inaugurado em 1996, o Kartódromo Internacional de Betim possui pista homologada de 1.110 metros,
-              áreas de escape gramadas e estrutura para kart de locação, treinos e campeonatos.
-            </p>
-            <p className="text-zinc-600 leading-relaxed font-light">
-              O complexo também recebe famílias, grupos e eventos, com área gourmet, salões e atendimento dedicado.
-            </p>
-            
-            <div className="pt-2">
-              <a href="/historia" className="inline-flex items-center text-primary-600 hover:text-primary-700 font-semibold transition-colors group">
-                <span>Conheça nossa história completa</span>
-                <ArrowRight className="w-4 h-4 ml-2 transform group-hover:translate-x-1 transition-transform" />
-              </a>
+            <div className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-zinc-200 bg-zinc-200 md:grid-cols-4">
+              {facts.map((fact) => (
+                <div key={fact.label} className="bg-[#f7faf4] p-4">
+                  <strong className="block text-2xl font-black leading-none text-zinc-950">
+                    {fact.value}
+                  </strong>
+                  <span className="mt-2 block text-[11px] font-bold uppercase leading-snug tracking-[0.08em] text-zinc-500">
+                    {fact.label}
+                  </span>
+                </div>
+              ))}
             </div>
-            
-            {/* Quick Stats Grid */}
-            <div className="grid grid-cols-2 gap-4 pt-6 border-t border-zinc-200">
-              <div className="bg-zinc-50 border border-zinc-200/80 rounded-xl p-4 text-center">
-                <div className="text-3xl font-extrabold text-primary-600 mb-1">25+</div>
-                <div className="text-xs text-zinc-500 uppercase tracking-widest font-bold">Anos de Experiência</div>
-              </div>
-              <div className="bg-zinc-50 border border-zinc-200/80 rounded-xl p-4 text-center">
-                <div className="text-3xl font-extrabold text-primary-600 mb-1">50K+</div>
-                <div className="text-xs text-zinc-500 uppercase tracking-widest font-bold">Corridas Realizadas</div>
-              </div>
-              <div className="bg-zinc-50 border border-zinc-200/80 rounded-xl p-4 text-center">
-                <div className="text-3xl font-extrabold text-primary-600 mb-1">1.110m</div>
-                <div className="text-xs text-zinc-500 uppercase tracking-widest font-bold">Pista Homologada</div>
-              </div>
-              <div className="bg-zinc-50 border border-zinc-200/80 rounded-xl p-4 text-center">
-                <div className="text-3xl font-extrabold text-primary-600 mb-1">100%</div>
-                <div className="text-xs text-zinc-500 uppercase tracking-widest font-bold">Foco em Segurança</div>
-              </div>
+
+            <div className="mt-8 grid gap-5 sm:grid-cols-2">
+              {features.map((feature) => {
+                const Icon = feature.icon;
+
+                return (
+                  <div key={feature.title} className="flex gap-4">
+                    <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-md border border-primary-500/20 bg-primary-50 text-primary-700">
+                      <Icon className="h-5 w-5" aria-hidden="true" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-zinc-950">{feature.title}</h3>
+                      <p className="mt-2 text-sm leading-6 text-zinc-600">{feature.text}</p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
+
+            <a
+              href="/historia"
+              className="group mt-9 inline-flex items-center gap-2 text-sm font-black uppercase tracking-[0.12em] text-primary-700 transition-colors hover:text-primary-800"
+            >
+              Conheça nossa história
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+            </a>
           </div>
 
-          {/* Cards Features & Hours */}
-          <div className="lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="bg-zinc-50 border border-zinc-200/80 p-6 rounded-2xl hover:border-primary-500/30 hover:shadow-md transition-all duration-300">
-              <div className="w-12 h-12 bg-primary-50 border border-primary-500/20 rounded-xl flex items-center justify-center mb-4 text-primary-600">
-                <Award className="w-6 h-6" />
+          <div className="space-y-5">
+            <figure className="overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100 shadow-[0_24px_70px_rgba(17,20,18,0.10)]">
+              <img
+                src="/history/1.jpg"
+                alt="Karts alinhados na pista do Kartódromo de Betim"
+                className="aspect-[4/3] w-full object-cover"
+                loading="lazy"
+              />
+            </figure>
+
+            <div className="grid gap-5 rounded-lg border border-zinc-200 bg-[#f7faf4] p-5 md:grid-cols-[0.92fr_1.08fr] md:p-6">
+              <div className="space-y-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-md bg-zinc-950 text-[#fbfcf8]">
+                  <Clock className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black uppercase tracking-tight text-zinc-950">
+                    Funcionamento
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-zinc-600">
+                    Abertura para reservas, baterias mistas e grupos fechados conforme disponibilidade.
+                  </p>
+                </div>
               </div>
-              <h4 className="text-lg font-bold text-zinc-900 mb-2">Pista Profissional</h4>
-              <p className="text-sm text-zinc-600 leading-relaxed font-light">
-                Circuito oficial homologado, áreas de escape gramadas e traçados técnicos dinâmicos.
-              </p>
-            </div>
 
-            <div className="bg-zinc-50 border border-zinc-200/80 p-6 rounded-2xl hover:border-primary-500/30 hover:shadow-md transition-all duration-300">
-              <div className="w-12 h-12 bg-primary-50 border border-primary-500/20 rounded-xl flex items-center justify-center mb-4 text-primary-600">
-                <Shield className="w-6 h-6" />
-              </div>
-              <h4 className="text-lg font-bold text-zinc-900 mb-2">Equipe e Segurança</h4>
-              <p className="text-sm text-zinc-600 leading-relaxed font-light">
-                Indumentária inclusa, ambulatório com socorrista e fiscais acompanhando todas as baterias.
-              </p>
-            </div>
-
-            <div className="bg-zinc-50 border border-zinc-200/80 p-6 rounded-2xl hover:border-primary-500/30 transition-all duration-300 sm:col-span-2 space-y-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-primary-50 border border-primary-500/20 rounded-xl flex items-center justify-center text-primary-600">
-                  <Clock className="w-6 h-6" />
-                </div>
-                <h4 className="text-lg font-bold text-zinc-900">Horários de Funcionamento</h4>
-              </div>
-              <div className="space-y-3 pt-2 text-sm text-zinc-600">
-                <div className="border-b border-zinc-200/60 pb-2">
-                  <div className="flex justify-between font-bold text-zinc-800 mb-1">
-                    <span>Terça a Sexta-feira</span>
-                    <span className="text-primary-600 font-extrabold">16h às 22h</span>
+              <div className="space-y-3">
+                {hours.map(([day, time, note]) => (
+                  <div key={day} className="border-b border-zinc-200 pb-3 last:border-b-0 last:pb-0">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-sm font-black text-zinc-900">{day}</span>
+                      <span className="text-sm font-black text-primary-700">{time}</span>
+                    </div>
+                    <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-zinc-500">
+                      <CheckCircle className="h-3.5 w-3.5 text-primary-700" aria-hidden="true" />
+                      {note}
+                    </p>
                   </div>
-                  <div className="flex items-center text-xs text-zinc-500">
-                    <CheckCircle className="w-3.5 h-3.5 mr-1.5 text-primary-600" />
-                    <span>Primeira bateria: 17h00 | Última bateria: 21h40</span>
-                  </div>
-                </div>
-
-                <div className="border-b border-zinc-200/60 pb-2">
-                  <div className="flex justify-between font-bold text-zinc-800 mb-1">
-                    <span>Sábado</span>
-                    <span className="text-primary-600 font-extrabold">08h às 19h</span>
-                  </div>
-                  <div className="flex items-center text-xs text-zinc-500">
-                    <CheckCircle className="w-3.5 h-3.5 mr-1.5 text-primary-600" />
-                    <span>Primeira bateria: 09h15 | Última bateria: 18h35</span>
-                  </div>
-                </div>
-
-                <div className="border-b border-zinc-200/60 pb-2">
-                  <div className="flex justify-between font-bold text-zinc-800 mb-1">
-                    <span>Domingo</span>
-                    <span className="text-primary-600 font-extrabold">08h às 19h</span>
-                  </div>
-                  <div className="flex items-center text-xs text-zinc-500">
-                    <CheckCircle className="w-3.5 h-3.5 mr-1.5 text-primary-600" />
-                    <span>Primeira bateria: 09h15 | Última bateria: 18h00</span>
-                  </div>
-                </div>
-
-                <div className="flex justify-between font-bold text-red-600/90 text-xs pt-1">
-                  <span>Segunda-feira</span>
-                  <span>Fechado para manutenção interna</span>
+                ))}
+                <div className="flex items-center gap-2 pt-1 text-xs font-black uppercase tracking-[0.08em] text-red-700">
+                  <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+                  Segunda-feira fechado para manutenção
                 </div>
               </div>
             </div>
