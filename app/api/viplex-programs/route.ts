@@ -36,8 +36,7 @@ function remoteFailureError(error: unknown) {
 }
 
 async function loadLocalViplexPrograms() {
-  const modulePath = ['@/lib', 'viplex-programs'].join('/');
-  return import(modulePath) as Promise<typeof import('@/lib/viplex-programs')>;
+  return import('../../../lib/viplex-programs');
 }
 
 async function proxyRemote(request: NextRequest, endpoint: string) {

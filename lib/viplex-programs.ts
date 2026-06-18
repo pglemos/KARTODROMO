@@ -184,7 +184,7 @@ function viplexUploadFile(targetDir: string, fileName: string, filePath: string)
 }
 
 function runtimePath(...parts: string[]) {
-  return join(process.cwd(), '.runtime', ...parts);
+  return join(/* turbopackIgnore: true */ process.cwd(), '.runtime', ...parts);
 }
 
 function md5File(filePath: string) {
@@ -409,7 +409,14 @@ function ffmpegPath() {
   const configured = process.env.TB50_FFMPEG_PATH;
   if (configured && existsSync(/* turbopackIgnore: true */ configured)) return configured;
 
-  const bundled = join(process.cwd(), '.tools', 'ffmpeg', 'ffmpeg-8.1-essentials_build', 'bin', 'ffmpeg.exe');
+  const bundled = join(
+    /* turbopackIgnore: true */ process.cwd(),
+    '.tools',
+    'ffmpeg',
+    'ffmpeg-8.1-essentials_build',
+    'bin',
+    'ffmpeg.exe',
+  );
   if (existsSync(/* turbopackIgnore: true */ bundled)) return bundled;
 
   return 'ffmpeg';

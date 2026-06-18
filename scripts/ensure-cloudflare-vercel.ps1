@@ -9,6 +9,9 @@ $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $RuntimeDir = Join-Path $RepoRoot ".runtime"
 $EnvPath = Join-Path $RepoRoot ".env"
 $Cloudflared = Join-Path $RepoRoot ".tools\cloudflared\cloudflared.exe"
+$CloudflaredVersion = "2026.6.1"
+$CloudflaredSha256 = "5253e66f1f493c4e13539749f1aa86fd0c61e3072900fec29a44ba046a6d97e2"
+$ProductionBaseUrl = "https://kartodromobetim.vercel.app"
 $OutLog = Join-Path $RuntimeDir "cloudflared-4010.out.log"
 $ErrLog = Join-Path $RuntimeDir "cloudflared-4010.err.log"
 $UrlPath = Join-Path $RuntimeDir "cloudflared-4010.url"
@@ -83,14 +86,50 @@ function Test-PublicHealth {
     $response = Invoke-WebRequest -UseBasicParsing -Uri "$Url/healthz" -TimeoutSec 15
     return $response.StatusCode -eq 200
   } catch {
-    return $false
+    try {
+      $hostName = ([uri]$Url).DnsSafeHost
+      $ip = Resolve-DnsName $hostName -Type A -Server 1.1.1.1 -DnsOnly -ErrorAction Stop |
+        Where-Object IPAddress |
+        Select-Object -First 1 -ExpandProperty IPAddress
+      if (-not $ip) {
+        return $false
+      }
+
+      & curl.exe --silent --show-error --fail --max-time 15 `
+        --resolve "$hostName`:443:$ip" "$Url/healthz" | Out-Null
+      return $LASTEXITCODE -eq 0
+    } catch {
+      return $false
+    }
   }
 }
 
-function Start-CloudflareTunnel {
-  if (-not (Test-Path $Cloudflared)) {
-    throw "cloudflared.exe not found at $Cloudflared"
+function Install-Cloudflared {
+  if (Test-Path $Cloudflared) {
+    $currentHash = (Get-FileHash -Algorithm SHA256 $Cloudflared).Hash.ToLowerInvariant()
+    if ($currentHash -eq $CloudflaredSha256) {
+      return
+    }
   }
+
+  $cloudflaredDir = Split-Path -Parent $Cloudflared
+  New-Item -ItemType Directory -Force -Path $cloudflaredDir | Out-Null
+  $downloadUrl = "https://github.com/cloudflare/cloudflared/releases/download/$CloudflaredVersion/cloudflared-windows-amd64.exe"
+  $temporaryPath = "$Cloudflared.download"
+
+  Invoke-WebRequest -UseBasicParsing -Uri $downloadUrl -OutFile $temporaryPath -TimeoutSec 180
+  $downloadHash = (Get-FileHash -Algorithm SHA256 $temporaryPath).Hash.ToLowerInvariant()
+  if ($downloadHash -ne $CloudflaredSha256) {
+    Remove-Item -LiteralPath $temporaryPath -Force -ErrorAction SilentlyContinue
+    throw "cloudflared SHA256 validation failed."
+  }
+
+  Move-Item -LiteralPath $temporaryPath -Destination $Cloudflared -Force
+  Write-TunnelLog "Installed cloudflared $CloudflaredVersion with verified SHA256."
+}
+
+function Start-CloudflareTunnel {
+  Install-Cloudflared
 
   Get-CloudflaredProcess | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
   Remove-Item -Force $OutLog, $ErrLog -ErrorAction SilentlyContinue
@@ -143,12 +182,12 @@ function Test-VercelUsesTunnel {
   param([string]$Url)
 
   try {
-    $layout = Invoke-RestMethod -UseBasicParsing -Uri "https://kartodromo-telao-livetime.vercel.app/api/telao-layout?_ts=$(Get-Date -Format FileDateTimeUniversal)" -TimeoutSec 20
+    $layout = Invoke-RestMethod -UseBasicParsing -Uri "$ProductionBaseUrl/api/telao-layout?_ts=$(Get-Date -Format FileDateTimeUniversal)" -TimeoutSec 20
     if ($layout.store.remoteEndpoint -ne "$Url/api/telao-layout-local") {
       return $false
     }
 
-    $snapshot = Invoke-RestMethod -UseBasicParsing -Uri "https://kartodromo-telao-livetime.vercel.app/api/livetime-snapshot?_ts=$(Get-Date -Format FileDateTimeUniversal)" -TimeoutSec 20
+    $snapshot = Invoke-RestMethod -UseBasicParsing -Uri "$ProductionBaseUrl/api/livetime-snapshot?_ts=$(Get-Date -Format FileDateTimeUniversal)" -TimeoutSec 20
     return [bool]$snapshot.status -and $snapshot.message -ne "fetch failed"
   } catch {
     return $false
