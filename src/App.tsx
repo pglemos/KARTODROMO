@@ -1,14 +1,14 @@
 import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
-import Home from './pages/Home';
-import HistoryPage from './pages/HistoryPage';
-import FAQPage from './pages/FAQPage';
-import EventsPage from './pages/EventsPage';
-import PistaPage from './pages/PistaPage';
-import KartLocacaoPage from './pages/KartLocacaoPage';
-import ReservasPage from './pages/ReservasPage';
-import ChampionshipsPage from './pages/ChampionshipsPage';
-import KACPage from './pages/KACPage';
+import Home from './site-pages/Home';
+import HistoryPage from './site-pages/HistoryPage';
+import FAQPage from './site-pages/FAQPage';
+import EventsPage from './site-pages/EventsPage';
+import PistaPage from './site-pages/PistaPage';
+import KartLocacaoPage from './site-pages/KartLocacaoPage';
+import ReservasPage from './site-pages/ReservasPage';
+import ChampionshipsPage from './site-pages/ChampionshipsPage';
+import KACPage from './site-pages/KACPage';
 import Header from './components/Header';
 import Footer from './components/Footer';
 

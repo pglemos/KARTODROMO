@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Menu, X, Phone, MapPin, Clock, Facebook, Instagram, Youtube } from 'lucide-react';
+import { Menu, X, Phone, MapPin, Clock, Users as Facebook, Camera as Instagram, Video as Youtube } from 'lucide-react';
 import { SITE_BOOKING_ANCHOR } from '../config/booking';
 
 const Header = () => {

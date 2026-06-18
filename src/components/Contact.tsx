@@ -1,4 +1,4 @@
-import { Phone, Mail, MapPin, Clock, Facebook, Instagram, Youtube, Compass, ArrowUpRight, MessageCircle } from 'lucide-react';
+import { Phone, Mail, MapPin, Clock, Users as Facebook, Camera as Instagram, Video as Youtube, Compass, ArrowUpRight, MessageCircle } from 'lucide-react';
 
 const Contact = () => {
   return (

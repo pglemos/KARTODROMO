@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 const baseUrl = 'http://127.0.0.1:4173';
 const viewports = [
@@ -9,7 +9,7 @@ const viewports = [
 ];
 const paths = ['/', '/pista', '/eventos', '/campeonatos', '/duvidas', '/historia', '/kart-locacao', '/reservas', '/campeonatos/kac'];
 
-const auditPage = async (page) => page.evaluate(() => {
+const auditPage = async (page: Page) => page.evaluate(() => {
   const isVisible = (element: Element) => {
     const htmlElement = element as HTMLElement;
     const rect = htmlElement.getBoundingClientRect();
