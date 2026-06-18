@@ -3,6 +3,11 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { LockKeyhole } from 'lucide-react';
 
+function normalizeNextPath(nextPath: string): string {
+  if (!nextPath || !nextPath.startsWith('/') || nextPath.startsWith('//')) return '/admin/telao';
+  return nextPath;
+}
+
 export function LoginForm({ nextPath }: { nextPath: string }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -10,8 +15,7 @@ export function LoginForm({ nextPath }: { nextPath: string }) {
   const [loading, setLoading] = useState(false);
 
   const destination = useMemo(() => {
-    if (!nextPath || !nextPath.startsWith('/')) return '/admin/telao';
-    return nextPath;
+    return normalizeNextPath(nextPath);
   }, [nextPath]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {

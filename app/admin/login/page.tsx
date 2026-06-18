@@ -1,4 +1,4 @@
-import { LoginForm } from './LoginForm';
+import { redirect } from 'next/navigation';
 
 export default async function AdminLoginPage({
   searchParams,
@@ -6,5 +6,6 @@ export default async function AdminLoginPage({
   searchParams?: Promise<{ next?: string }>;
 }) {
   const params = await searchParams;
-  return <LoginForm nextPath={params?.next || '/admin/telao'} />;
+  const nextPath = params?.next && params.next.startsWith('/') && !params.next.startsWith('//') ? params.next : '/admin/telao';
+  redirect(`/login?next=${encodeURIComponent(nextPath)}`);
 }

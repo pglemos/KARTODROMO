@@ -10,7 +10,7 @@ export default async function AdminTelaoPage() {
   const session = cookieStore.get(adminCookieName())?.value;
 
   if (!verifyAdminSession(session)) {
-    redirect('/admin/login?next=/admin/telao');
+    redirect('/login?next=/admin/telao');
   }
 
   const uid = process.env.NEXT_PUBLIC_DEFAULT_UID || DEFAULT_UID;
