@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
-import { AdminModulePage } from '@/components/admin/AdminModulePage';
 import { AdminShell } from '@/components/admin/AdminShell';
+import { LegacyAdminContent } from '@/components/admin/LegacyAdminContent';
 import { getAdminModule } from '@/components/admin/navigation';
 import { requireAdminSession } from '@/lib/require-admin-session';
 
@@ -16,7 +16,7 @@ export default async function AdminModuleRoute({ params }: { params: Promise<{ m
 
   return (
     <AdminShell currentPath={module.href} sessionEmail={session.email} title={module.title}>
-      <AdminModulePage module={module} />
+      <LegacyAdminContent moduleKey={module.key} sessionEmail={session.email} />
     </AdminShell>
   );
 }

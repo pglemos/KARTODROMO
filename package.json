@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@remotion/player": "^4.0.459",
+    "@supabase/supabase-js": "^2.108.2",
     "@vercel/blob": "^2.3.3",
     "lucide-react": "^1.21.0",
     "mssql": "^12.5.5",
