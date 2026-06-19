@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 const COOKIE_NAME = 'kartodromo_admin_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 12;
 
-type SessionPayload = {
+export type AdminSessionPayload = {
   email: string;
   exp: number;
 };
@@ -46,31 +46,36 @@ export function createAdminSession(email: string) {
   const { secret } = getConfig();
   if (!secret) throw new Error('ADMIN_SESSION_SECRET is not configured');
 
-  const payload: SessionPayload = {
+  const payload: AdminSessionPayload = {
     email,
     exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
   };
+
   const encodedPayload = base64url(JSON.stringify(payload));
   return `${encodedPayload}.${sign(encodedPayload, secret)}`;
 }
 
-export function verifyAdminSession(value?: string) {
+export function readAdminSession(value?: string): AdminSessionPayload | null {
   const { email, secret } = getConfig();
-  if (!value || !email || !secret) return false;
+  if (!value || !email || !secret) return null;
 
   const [payload, signature] = value.split('.');
-  if (!payload || !signature) return false;
+  if (!payload || !signature) return null;
 
   const expected = sign(payload, secret);
   const validSignature =
-    signature.length === expected.length &&
-    crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-  if (!validSignature) return false;
+    signature.length === expected.length && crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+  if (!validSignature) return null;
 
   try {
-    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as SessionPayload;
-    return data.email === email && data.exp > Math.floor(Date.now() / 1000);
+    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as AdminSessionPayload;
+    if (data.email !== email || data.exp <= Math.floor(Date.now() / 1000)) return null;
+    return data;
   } catch {
-    return false;
+    return null;
   }
+}
+
+export function verifyAdminSession(value?: string) {
+  return Boolean(readAdminSession(value));
 }

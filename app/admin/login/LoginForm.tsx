@@ -4,7 +4,7 @@ import { FormEvent, useMemo, useState } from 'react';
 import { LockKeyhole } from 'lucide-react';
 
 function normalizeNextPath(nextPath: string): string {
-  if (!nextPath || !nextPath.startsWith('/') || nextPath.startsWith('//')) return '/admin/telao';
+  if (!nextPath || !nextPath.startsWith('/') || nextPath.startsWith('//')) return '/admin';
   return nextPath;
 }
 

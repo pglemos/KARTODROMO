@@ -6,6 +6,6 @@ export default async function AdminLoginPage({
   searchParams?: Promise<{ next?: string }>;
 }) {
   const params = await searchParams;
-  const nextPath = params?.next && params.next.startsWith('/') && !params.next.startsWith('//') ? params.next : '/admin/telao';
+  const nextPath = params?.next && params.next.startsWith('/') && !params.next.startsWith('//') ? params.next : '/admin';
   redirect(`/login?next=${encodeURIComponent(nextPath)}`);
 }
