@@ -6,6 +6,8 @@ export type Tb50DisplayMode = 'live' | 'final-real' | 'final-demo';
 
 export type Tb50DisplayModeState = {
   mode: Tb50DisplayMode;
+  /** Modo automático: troca placar↔pódio conforme o estado da corrida (default true). */
+  auto: boolean;
   updatedAt: string | null;
   persistent: boolean;
 };
@@ -14,6 +16,7 @@ const statePath = join(process.cwd(), '.runtime', 'tb50-display-mode.json');
 const blobPath = process.env.TB50_DISPLAY_MODE_BLOB_PATH || 'tb50-display-mode/current.json';
 let memoryState: Tb50DisplayModeState = {
   mode: 'live',
+  auto: true,
   updatedAt: null,
   persistent: false,
 };
@@ -34,6 +37,7 @@ function normalizeState(value: unknown, persistent: boolean): Tb50DisplayModeSta
 
   return {
     mode: normalizeMode(input.mode),
+    auto: typeof input.auto === 'boolean' ? input.auto : true,
     updatedAt: typeof input.updatedAt === 'string' ? input.updatedAt : null,
     persistent,
   };
@@ -71,18 +75,28 @@ export async function readTb50DisplayModeFromStore(): Promise<Tb50DisplayModeSta
   return readTb50DisplayMode();
 }
 
-export async function writeTb50DisplayMode(mode: unknown): Promise<Tb50DisplayModeState> {
+export async function writeTb50DisplayMode(input: unknown): Promise<Tb50DisplayModeState> {
+  const current = readTb50DisplayMode();
+  const patch: Record<string, unknown> =
+    typeof input === 'string'
+      ? { mode: input }
+      : input && typeof input === 'object'
+        ? (input as Record<string, unknown>)
+        : {};
+
   const state: Tb50DisplayModeState = {
-    mode: normalizeMode(mode),
+    mode: patch.mode !== undefined ? normalizeMode(patch.mode) : current.mode,
+    auto: typeof patch.auto === 'boolean' ? patch.auto : current.auto,
     updatedAt: new Date().toISOString(),
     persistent: false,
   };
 
   memoryState = state;
+  const payload = JSON.stringify({ mode: state.mode, auto: state.auto, updatedAt: state.updatedAt }, null, 2);
 
   if (hasBlobStore()) {
     try {
-      await put(blobPath, `${JSON.stringify({ mode: state.mode, updatedAt: state.updatedAt }, null, 2)}\n`, {
+      await put(blobPath, `${payload}\n`, {
         access: 'private',
         allowOverwrite: true,
         contentType: 'application/json',
@@ -99,7 +113,7 @@ export async function writeTb50DisplayMode(mode: unknown): Promise<Tb50DisplayMo
 
   try {
     mkdirSync(dirname(statePath), { recursive: true });
-    writeFileSync(statePath, JSON.stringify({ mode: state.mode, updatedAt: state.updatedAt }, null, 2));
+    writeFileSync(statePath, payload);
     memoryState = { ...state, persistent: true };
   } catch {
     memoryState = state;

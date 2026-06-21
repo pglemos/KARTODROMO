@@ -62,6 +62,33 @@ export function TelaoProgramacao() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [autoMode, setAutoMode] = useState<boolean | null>(null);
+
+  const loadAuto = useCallback(async () => {
+    try {
+      const res = await fetch('/api/tb50-display-mode', { cache: 'no-store' });
+      const data = await res.json();
+      setAutoMode(data?.auto !== false);
+    } catch {
+      setAutoMode(null);
+    }
+  }, []);
+
+  async function toggleAuto(next: boolean) {
+    setAutoMode(next);
+    try {
+      const res = await fetch('/api/tb50-display-mode', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auto: next }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setMessage({ type: 'ok', text: next ? 'Modo automático ligado.' : 'Modo automático desligado (controle manual).' });
+    } catch {
+      setMessage({ type: 'err', text: 'Falha ao alterar o modo automático.' });
+      void loadAuto();
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,7 +105,8 @@ export function TelaoProgramacao() {
 
   useEffect(() => {
     void load();
-  }, [load]);
+    void loadAuto();
+  }, [load, loadAuto]);
 
   function patch(id: string, changes: Partial<TelaoPlaylistItem>) {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...changes } : it)));
@@ -149,6 +177,24 @@ export function TelaoProgramacao() {
 
   return (
     <section style={{ ...box, marginTop: 20 }} aria-label="Programação do telão">
+      <div style={{ ...box, marginBottom: 16, borderColor: autoMode === false ? '#9e6a03' : '#1a7f37' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div>
+            <span style={{ color: '#8b949e', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Corrida</span>
+            <h2 style={{ margin: 0, fontSize: 18 }}>Modo automático (placar ↔ pódio)</h2>
+            <p style={{ margin: '4px 0 0', color: '#8b949e', fontSize: 13, maxWidth: 620 }}>
+              Tomada de tempo e corrida ao vivo mostram o <b>placar</b>. Quando a cronometragem <b>encerra a corrida</b>,
+              aparece o <b>pódio</b> automaticamente; na próxima sessão volta o placar. Desligue para controlar manualmente.
+            </p>
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+            <span style={{ fontSize: 13, fontWeight: 800, color: autoMode === false ? '#e3a008' : '#3fb950' }}>
+              {autoMode === null ? '...' : autoMode ? 'LIGADO' : 'DESLIGADO'}
+            </span>
+            <input type="checkbox" checked={autoMode !== false} onChange={(e) => void toggleAuto(e.target.checked)} style={{ width: 22, height: 22 }} />
+          </label>
+        </div>
+      </div>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <div>
           <span style={{ color: '#8b949e', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Conteúdo</span>
