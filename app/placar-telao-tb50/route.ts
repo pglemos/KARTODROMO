@@ -199,11 +199,13 @@ async function loadSnapshot(uid: string, demoRequested: boolean, finalPreviewReq
 
 async function resolveRequestedDisplayMode(request: NextRequest) {
   const finalParam = request.nextUrl.searchParams.get('final');
-  const storedMode = (await readTb50DisplayModeFromStore()).mode;
+  const storedState = await readTb50DisplayModeFromStore();
+  const storedMode = storedState.mode;
   const finalPreviewRequested = finalParam === 'true' || finalParam === 'demo' || (!finalParam && storedMode === 'final-demo');
   const forceFinalFromQuery = finalParam === 'real';
   const forceFinalFromStore = !finalParam && storedMode === 'final-real';
-  const suppressAutoFinal = finalParam === 'live';
+  // Modo automático desligado (auto=false) suprime o pódio automático — controla pelo /telao.
+  const suppressAutoFinal = finalParam === 'live' || storedState.auto === false;
 
   return {
     finalPreviewRequested,

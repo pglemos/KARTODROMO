@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DEFAULT_TELAO_LAYOUT, type TelaoLayoutConfig } from '@/lib/telao-layout-config';
 import type { LiveTimingSnapshot } from '@/lib/livetime/types';
 import type { ViplexDeviceProgram } from '@/lib/viplex-programs';
+import { TelaoProgramacao } from './TelaoProgramacao';
 
 type LayoutResponse = {
   layout?: TelaoLayoutConfig;
@@ -525,6 +526,8 @@ export function HomeDashboard({ uid }: { uid: string }) {
           </section>
         </aside>
       </section>
+
+      <TelaoProgramacao />
 
       <section className="home-tools-grid" aria-label="Ferramentas">
         <a href={LINKS.designer}>Designer do telão</a>

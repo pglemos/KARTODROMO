@@ -17,6 +17,6 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
-  const state = await writeTb50DisplayMode(body?.mode);
+  const state = await writeTb50DisplayMode(body);
   return NextResponse.json({ ...state, store: tb50DisplayModeStoreStatus() }, { headers: NO_CACHE_HEADERS });
 }
