@@ -1,4 +1,4 @@
-import { supabase } from '../../lib/supabase';
+import { apiDelete, apiGet, apiGetById, apiPatch, apiPost } from '../../lib/api-client';
 import type {
   Categoria,
   CategoriaPayload,
@@ -10,195 +10,70 @@ import type {
   ResumoFinanceiro,
 } from './financeira.types';
 
-const queryError = (operation: string, message: string): Error =>
-  new Error(`${operation}: ${message}`);
-
-const missingDataError = (operation: string): Error =>
-  new Error(`${operation}: o banco de dados não retornou o registro.`);
+type LancamentoFullRow = Lancamento & { categoria_nome: string | null; categoria_tipo: string | null };
 
 export const listLancamentos = async (): Promise<LancamentoWithCategoria[]> => {
-  const { data, error } = await supabase
-    .from('financeiro_lancamentos')
-    .select('*, financeiro_categorias(id, nome, tipo)')
-    .order('data', { ascending: false })
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    throw queryError('Não foi possível carregar os lançamentos', error.message);
-  }
-
-  return (data ?? []) as LancamentoWithCategoria[];
+  const rows = await apiGet<LancamentoFullRow[]>('financeiro_full');
+  return rows.map((row) => ({
+    ...row,
+    financeiro_categorias:
+      row.categoria_nome || row.categoria_tipo
+        ? { id: row.categoria_id, nome: row.categoria_nome as string, tipo: row.categoria_tipo as Categoria['tipo'] }
+        : null,
+  }));
 };
 
-export const getLancamentoById = async (
-  id: string,
-): Promise<LancamentoWithCategoria> => {
-  const { data, error } = await supabase
-    .from('financeiro_lancamentos')
-    .select('*, financeiro_categorias(id, nome, tipo)')
-    .eq('id', id)
-    .single();
-
-  if (error) {
-    throw queryError('Não foi possível carregar o lançamento', error.message);
-  }
-  if (!data) {
-    throw missingDataError('Não foi possível carregar o lançamento');
-  }
-
-  return data as LancamentoWithCategoria;
+export const getLancamentoById = async (id: string): Promise<LancamentoWithCategoria> => {
+  const rows = await apiGet<LancamentoFullRow[]>('financeiro_full');
+  const row = rows.find((r) => r.id === id);
+  if (!row) throw new Error('Não foi possível carregar o lançamento: registro não encontrado.');
+  return {
+    ...row,
+    financeiro_categorias:
+      row.categoria_nome || row.categoria_tipo
+        ? { id: row.categoria_id, nome: row.categoria_nome as string, tipo: row.categoria_tipo as Categoria['tipo'] }
+        : null,
+  };
 };
 
-export const createLancamento = async (
-  payload: LancamentoPayload,
-): Promise<Lancamento> => {
-  const { data, error } = await supabase
-    .from('financeiro_lancamentos')
-    .insert(payload)
-    .select()
-    .single();
+export const createLancamento = async (payload: LancamentoPayload): Promise<Lancamento> =>
+  apiPost<Lancamento>('financeiro_lancamentos', payload);
 
-  if (error) {
-    throw queryError('Não foi possível criar o lançamento', error.message);
-  }
-  if (!data) {
-    throw missingDataError('Não foi possível criar o lançamento');
-  }
-
-  return data as Lancamento;
-};
-
-export const updateLancamento = async (
-  id: string,
-  payload: LancamentoUpdate,
-): Promise<Lancamento> => {
-  const { data, error } = await supabase
-    .from('financeiro_lancamentos')
-    .update(payload)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) {
-    throw queryError('Não foi possível atualizar o lançamento', error.message);
-  }
-  if (!data) {
-    throw missingDataError('Não foi possível atualizar o lançamento');
-  }
-
-  return data as Lancamento;
-};
+export const updateLancamento = async (id: string, payload: LancamentoUpdate): Promise<Lancamento> =>
+  apiPatch<Lancamento>(`financeiro_lancamentos/${id}`, payload);
 
 export const removeLancamento = async (id: string): Promise<void> => {
-  const { error } = await supabase.from('financeiro_lancamentos').delete().eq('id', id);
-
-  if (error) {
-    throw queryError('Não foi possível excluir o lançamento', error.message);
-  }
+  await apiDelete(`financeiro_lancamentos/${id}`);
 };
 
-export const listCategorias = async (): Promise<Categoria[]> => {
-  const { data, error } = await supabase
-    .from('financeiro_categorias')
-    .select('id, nome, tipo')
-    .order('tipo')
-    .order('nome');
+export const listCategorias = async (): Promise<Categoria[]> =>
+  apiGet<Categoria[]>('financeiro_categorias?order=tipo');
 
-  if (error) {
-    throw queryError('Não foi possível carregar as categorias', error.message);
-  }
+export const getCategoriaById = async (id: string): Promise<Categoria> =>
+  apiGetById<Categoria>('financeiro_categorias', id);
 
-  return (data ?? []) as Categoria[];
-};
+export const createCategoria = async (payload: CategoriaPayload): Promise<Categoria> =>
+  apiPost<Categoria>('financeiro_categorias', payload);
 
-export const getCategoriaById = async (id: string): Promise<Categoria> => {
-  const { data, error } = await supabase
-    .from('financeiro_categorias')
-    .select('id, nome, tipo')
-    .eq('id', id)
-    .single();
-
-  if (error) {
-    throw queryError('Não foi possível carregar a categoria', error.message);
-  }
-  if (!data) {
-    throw missingDataError('Não foi possível carregar a categoria');
-  }
-
-  return data as Categoria;
-};
-
-export const createCategoria = async (payload: CategoriaPayload): Promise<Categoria> => {
-  const { data, error } = await supabase
-    .from('financeiro_categorias')
-    .insert(payload)
-    .select()
-    .single();
-
-  if (error) {
-    throw queryError('Não foi possível criar a categoria', error.message);
-  }
-  if (!data) {
-    throw missingDataError('Não foi possível criar a categoria');
-  }
-
-  return data as Categoria;
-};
-
-export const updateCategoria = async (
-  id: string,
-  payload: CategoriaUpdate,
-): Promise<Categoria> => {
-  const { data, error } = await supabase
-    .from('financeiro_categorias')
-    .update(payload)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) {
-    throw queryError('Não foi possível atualizar a categoria', error.message);
-  }
-  if (!data) {
-    throw missingDataError('Não foi possível atualizar a categoria');
-  }
-
-  return data as Categoria;
-};
+export const updateCategoria = async (id: string, payload: CategoriaUpdate): Promise<Categoria> =>
+  apiPatch<Categoria>(`financeiro_categorias/${id}`, payload);
 
 export const removeCategoria = async (id: string): Promise<void> => {
-  const { error } = await supabase.from('financeiro_categorias').delete().eq('id', id);
-
-  if (error) {
-    throw queryError('Não foi possível excluir a categoria', error.message);
-  }
+  await apiDelete(`financeiro_categorias/${id}`);
 };
 
 export const getResumo = async (): Promise<ResumoFinanceiro> => {
-  const { data, error } = await supabase
-    .from('financeiro_lancamentos')
-    .select('valor, tipo')
-    .eq('status', 'confirmado');
+  const rows = await apiGet<Pick<Lancamento, 'valor' | 'tipo' | 'status'>[]>('financeiro_lancamentos?eq_status=confirmado');
 
-  if (error) {
-    throw queryError('Não foi possível carregar o resumo financeiro', error.message);
-  }
-
-  const totais = ((data ?? []) as Pick<Lancamento, 'valor' | 'tipo'>[]).reduce(
+  const totais = rows.reduce(
     (resumo, lancamento) => {
       const valor = Number(lancamento.valor);
-      if (lancamento.tipo === 'receita') {
-        resumo.receitas += valor;
-      } else {
-        resumo.despesas += valor;
-      }
+      if (lancamento.tipo === 'receita') resumo.receitas += valor;
+      else resumo.despesas += valor;
       return resumo;
     },
     { receitas: 0, despesas: 0 },
   );
 
-  return {
-    ...totais,
-    saldo: totais.receitas - totais.despesas,
-  };
+  return { ...totais, saldo: totais.receitas - totais.despesas };
 };

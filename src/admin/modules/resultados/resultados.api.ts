@@ -1,4 +1,4 @@
-import { supabase } from '../../lib/supabase';
+import { apiDelete, apiGet, apiGetById, apiPatch, apiPost } from '../../lib/api-client';
 import type {
   Corrida,
   CorridaPayload,
@@ -10,146 +10,47 @@ import type {
   ResultadoWithPiloto,
 } from './resultados.types';
 
-const queryError = (operation: string, message: string): Error =>
-  new Error(`${operation}: ${message}`);
+type CorridaFullRow = Corrida & { campeonato_nome: string | null; etapa_nome: string | null };
 
 export const listCorridas = async (): Promise<CorridaWithRelations[]> => {
-  const { data, error } = await supabase
-    .from('corridas')
-    .select(
-      'id, etapa_id, campeonato_id, titulo, data, status, source, campeonatos(nome), etapas(nome)',
-    )
-    .order('data', { ascending: false });
-
-  if (error) {
-    throw queryError('Não foi possível carregar as corridas', error.message);
-  }
-
-  return (data ?? []) as unknown as CorridaWithRelations[];
+  const rows = await apiGet<CorridaFullRow[]>('corridas_full');
+  return rows.map((row) => ({
+    ...row,
+    campeonatos: row.campeonato_nome ? { nome: row.campeonato_nome } : null,
+    etapas: row.etapa_nome ? { nome: row.etapa_nome } : null,
+  }));
 };
 
-export const getCorridaById = async (id: string): Promise<Corrida> => {
-  const { data, error } = await supabase
-    .from('corridas')
-    .select('id, etapa_id, campeonato_id, titulo, data, status, source')
-    .eq('id', id)
-    .single();
+export const getCorridaById = async (id: string): Promise<Corrida> => apiGetById<Corrida>('corridas', id);
 
-  if (error) {
-    throw queryError('Não foi possível carregar a corrida', error.message);
-  }
+export const createCorrida = async (payload: CorridaPayload): Promise<Corrida> =>
+  apiPost<Corrida>('corridas', payload);
 
-  return data as Corrida;
-};
-
-export const createCorrida = async (payload: CorridaPayload): Promise<Corrida> => {
-  const { data, error } = await supabase.from('corridas').insert(payload).select().single();
-
-  if (error) {
-    throw queryError('Não foi possível criar a corrida', error.message);
-  }
-
-  return data as Corrida;
-};
-
-export const updateCorrida = async (
-  id: string,
-  payload: CorridaUpdate,
-): Promise<Corrida> => {
-  const { data, error } = await supabase
-    .from('corridas')
-    .update(payload)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) {
-    throw queryError('Não foi possível atualizar a corrida', error.message);
-  }
-
-  return data as Corrida;
-};
+export const updateCorrida = async (id: string, payload: CorridaUpdate): Promise<Corrida> =>
+  apiPatch<Corrida>(`corridas/${id}`, payload);
 
 export const removeCorrida = async (id: string): Promise<void> => {
-  const { error } = await supabase.from('corridas').delete().eq('id', id);
-
-  if (error) {
-    throw queryError('Não foi possível excluir a corrida', error.message);
-  }
+  await apiDelete(`corridas/${id}`);
 };
 
-export const listResultados = async (
-  corridaId: string,
-): Promise<ResultadoWithPiloto[]> => {
-  const { data, error } = await supabase
-    .from('resultados')
-    .select(
-      'id, corrida_id, piloto_id, piloto_nome, posicao, melhor_volta, voltas, pontos, gap, pilotos(numero, equipe)',
-    )
-    .eq('corrida_id', corridaId)
-    .order('posicao');
+type ResultadoFullRow = Resultado & { piloto_numero: string | null; piloto_equipe: string | null };
 
-  if (error) {
-    throw queryError('Não foi possível carregar os resultados', error.message);
-  }
-
-  return (data ?? []) as unknown as ResultadoWithPiloto[];
+export const listResultados = async (corridaId: string): Promise<ResultadoWithPiloto[]> => {
+  const rows = await apiGet<ResultadoFullRow[]>(`resultados_full?corrida_id=${encodeURIComponent(corridaId)}`);
+  return rows.map((row) => ({
+    ...row,
+    pilotos: row.piloto_numero || row.piloto_equipe ? { numero: row.piloto_numero, equipe: row.piloto_equipe } : null,
+  }));
 };
 
-export const getResultadoById = async (id: string): Promise<Resultado> => {
-  const { data, error } = await supabase
-    .from('resultados')
-    .select(
-      'id, corrida_id, piloto_id, piloto_nome, posicao, melhor_volta, voltas, pontos, gap',
-    )
-    .eq('id', id)
-    .single();
+export const getResultadoById = async (id: string): Promise<Resultado> => apiGetById<Resultado>('resultados', id);
 
-  if (error) {
-    throw queryError('Não foi possível carregar o resultado', error.message);
-  }
+export const createResultado = async (payload: ResultadoPayload): Promise<Resultado> =>
+  apiPost<Resultado>('resultados', payload);
 
-  return data as Resultado;
-};
-
-export const createResultado = async (
-  payload: ResultadoPayload,
-): Promise<Resultado> => {
-  const { data, error } = await supabase
-    .from('resultados')
-    .insert(payload)
-    .select()
-    .single();
-
-  if (error) {
-    throw queryError('Não foi possível criar o resultado', error.message);
-  }
-
-  return data as Resultado;
-};
-
-export const updateResultado = async (
-  id: string,
-  payload: ResultadoUpdate,
-): Promise<Resultado> => {
-  const { data, error } = await supabase
-    .from('resultados')
-    .update(payload)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) {
-    throw queryError('Não foi possível atualizar o resultado', error.message);
-  }
-
-  return data as Resultado;
-};
+export const updateResultado = async (id: string, payload: ResultadoUpdate): Promise<Resultado> =>
+  apiPatch<Resultado>(`resultados/${id}`, payload);
 
 export const removeResultado = async (id: string): Promise<void> => {
-  const { error } = await supabase.from('resultados').delete().eq('id', id);
-
-  if (error) {
-    throw queryError('Não foi possível excluir o resultado', error.message);
-  }
+  await apiDelete(`resultados/${id}`);
 };

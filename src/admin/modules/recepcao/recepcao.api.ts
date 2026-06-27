@@ -1,4 +1,4 @@
-import { supabase } from '../../lib/supabase';
+import { apiDelete, apiGet, apiPatch, apiPost } from '../../lib/api-client';
 import type {
   Atendimento,
   AtendimentoPayload,
@@ -9,107 +9,47 @@ import type {
   ReservaOption,
 } from './recepcao.types';
 
-const queryError = (operation: string, message: string): Error =>
-  new Error(`${operation}: ${message}`);
+type AtendimentoFullRow = Atendimento & {
+  cliente_nome: string | null;
+  reserva_data_inicio: string | null;
+  reserva_status: string | null;
+};
+
+const toRelations = (row: AtendimentoFullRow): AtendimentoWithRelations => ({
+  ...row,
+  clientes: row.cliente_nome ? { nome: row.cliente_nome } : null,
+  reservas:
+    row.reserva_data_inicio || row.reserva_status
+      ? { data_inicio: row.reserva_data_inicio as string, status: row.reserva_status as ReservaOption['status'] }
+      : null,
+});
 
 export const listAtendimentos = async (): Promise<AtendimentoWithRelations[]> => {
-  const { data, error } = await supabase
-    .from('recepcao_atendimentos')
-    .select('*, clientes(nome), reservas(data_inicio, status)')
-    .order('created_at', { ascending: true });
-
-  if (error) {
-    throw queryError('Não foi possível carregar os atendimentos', error.message);
-  }
-
-  return (data ?? []) as AtendimentoWithRelations[];
+  const rows = await apiGet<AtendimentoFullRow[]>('recepcao_full');
+  return rows.map(toRelations);
 };
 
-export const getAtendimentoById = async (
-  id: string,
-): Promise<AtendimentoWithRelations> => {
-  const { data, error } = await supabase
-    .from('recepcao_atendimentos')
-    .select('*, clientes(nome), reservas(data_inicio, status)')
-    .eq('id', id)
-    .single();
-
-  if (error) {
-    throw queryError('Não foi possível carregar o atendimento', error.message);
-  }
-
-  return data as AtendimentoWithRelations;
+export const getAtendimentoById = async (id: string): Promise<AtendimentoWithRelations> => {
+  const rows = await apiGet<AtendimentoFullRow[]>('recepcao_full');
+  const row = rows.find((r) => r.id === id);
+  if (!row) throw new Error('Não foi possível carregar o atendimento: registro não encontrado.');
+  return toRelations(row);
 };
 
-export const createAtendimento = async (
-  payload: AtendimentoPayload,
-): Promise<Atendimento> => {
-  const { data, error } = await supabase
-    .from('recepcao_atendimentos')
-    .insert(payload)
-    .select()
-    .single();
+export const createAtendimento = async (payload: AtendimentoPayload): Promise<Atendimento> =>
+  apiPost<Atendimento>('recepcao_atendimentos', payload);
 
-  if (error) {
-    throw queryError('Não foi possível criar o atendimento', error.message);
-  }
-
-  return data as Atendimento;
-};
-
-export const updateAtendimento = async (
-  id: string,
-  payload: AtendimentoUpdate,
-): Promise<Atendimento> => {
-  const { data, error } = await supabase
-    .from('recepcao_atendimentos')
-    .update(payload)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) {
-    throw queryError('Não foi possível atualizar o atendimento', error.message);
-  }
-
-  return data as Atendimento;
-};
+export const updateAtendimento = async (id: string, payload: AtendimentoUpdate): Promise<Atendimento> =>
+  apiPatch<Atendimento>(`recepcao_atendimentos/${id}`, { ...payload, updated_at: new Date().toISOString() });
 
 export const removeAtendimento = async (id: string): Promise<void> => {
-  const { error } = await supabase.from('recepcao_atendimentos').delete().eq('id', id);
-
-  if (error) {
-    throw queryError('Não foi possível excluir o atendimento', error.message);
-  }
+  await apiDelete(`recepcao_atendimentos/${id}`);
 };
 
-export const updateStatus = async (
-  id: string,
-  status: AtendimentoStatus,
-): Promise<Atendimento> => updateAtendimento(id, { status });
+export const updateStatus = async (id: string, status: AtendimentoStatus): Promise<Atendimento> =>
+  updateAtendimento(id, { status });
 
-export const listClientes = async (): Promise<ClienteOption[]> => {
-  const { data, error } = await supabase
-    .from('clientes')
-    .select('id, nome')
-    .order('nome');
+export const listClientes = async (): Promise<ClienteOption[]> => apiGet<ClienteOption[]>('clientes?order=nome');
 
-  if (error) {
-    throw queryError('Não foi possível carregar os clientes', error.message);
-  }
-
-  return (data ?? []) as ClienteOption[];
-};
-
-export const listReservas = async (): Promise<ReservaOption[]> => {
-  const { data, error } = await supabase
-    .from('reservas')
-    .select('id, cliente_id, data_inicio, status')
-    .order('data_inicio', { ascending: false });
-
-  if (error) {
-    throw queryError('Não foi possível carregar as reservas', error.message);
-  }
-
-  return (data ?? []) as ReservaOption[];
-};
+export const listReservas = async (): Promise<ReservaOption[]> =>
+  apiGet<ReservaOption[]>('reservas?order=data_inicio&dir=desc');

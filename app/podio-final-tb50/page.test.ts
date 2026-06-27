@@ -11,7 +11,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/lib/tb50-display-mode-store', () => ({
-  readTb50DisplayModeFromStore: vi.fn(async () => ({ mode: 'live', updatedAt: null, persistent: true })),
+  readTb50DisplayModeFromStore: vi.fn(async () => ({ mode: 'live', auto: true, updatedAt: null, persistent: true })),
 }));
 
 vi.mock('@/lib/livetime/snapshot-cache', () => ({
@@ -39,7 +39,7 @@ const liveSnapshot: LiveTimingSnapshot = {
 describe('/podio-final-tb50 display mode guard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(readTb50DisplayModeFromStore).mockResolvedValue({ mode: 'live', updatedAt: null, persistent: true });
+    vi.mocked(readTb50DisplayModeFromStore).mockResolvedValue({ mode: 'live', auto: true, updatedAt: null, persistent: true });
     vi.mocked(fetchExternalSnapshot).mockResolvedValue(liveSnapshot);
   });
 
@@ -52,6 +52,7 @@ describe('/podio-final-tb50 display mode guard', () => {
   it('keeps the podium page available when manual final-real mode has a finished race snapshot', async () => {
     vi.mocked(readTb50DisplayModeFromStore).mockResolvedValueOnce({
       mode: 'final-real',
+      auto: true,
       updatedAt: '2026-05-24T13:00:00.000Z',
       persistent: true,
     });
@@ -121,6 +122,7 @@ describe('/podio-final-tb50 display mode guard', () => {
   it('redirects manual final-real mode back to the scoreboard for a finished qualifying snapshot', async () => {
     vi.mocked(readTb50DisplayModeFromStore).mockResolvedValueOnce({
       mode: 'final-real',
+      auto: true,
       updatedAt: '2026-05-24T13:00:00.000Z',
       persistent: true,
     });

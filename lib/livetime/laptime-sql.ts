@@ -197,6 +197,32 @@ async function fetchRacingWithDrivers(pool: sql.ConnectionPool): Promise<{ racin
   return best || { racing: null, drivers: [] };
 }
 
+// Bandeiras que marcam o ENCERRAMENTO da corrida (a cronometragem aperta a "bandeira de
+// encerramento"). Este LapTime nao usa RacingState=6; o fim e detectado pela bandeira da
+// ultima passagem. 4=Finish, 5=bandeira de encerramento usada na operacao.
+const FINISH_FLAG_IDS = (process.env.LAPTIME_FINISH_FLAG_IDS || '4,5')
+  .split(',')
+  .map((v) => Number(v.trim()))
+  .filter((v) => Number.isInteger(v));
+
+async function racingIsFinished(pool: sql.ConnectionPool, racingId: number): Promise<boolean> {
+  try {
+    const result = await pool
+      .request()
+      .input('racingId', sql.BigInt, racingId)
+      .query<{ Id_RacingFlag: number | null }>(`
+        select top 1 Id_RacingFlag
+        from dbo.Passing with (nolock)
+        where Id_Racing = @racingId
+        order by Id_Passing desc
+      `);
+    const flag = result.recordset[0]?.Id_RacingFlag;
+    return flag != null && FINISH_FLAG_IDS.includes(Number(flag));
+  } catch {
+    return false;
+  }
+}
+
 export async function fetchLapTimeSqlSnapshot(options: LapTimeSqlOptions): Promise<LiveTimingSnapshot> {
   const pool = new sql.ConnectionPool(sqlConfig(options));
 
@@ -218,8 +244,10 @@ export async function fetchLapTimeSqlSnapshot(options: LapTimeSqlOptions): Promi
     const displayRacingName = racingNameForDisplay(typeName, clean(racing.Name));
     const eventName = [clean(racing.RacingEventName), clean(racing.RacingGroupName), displayRacingName].filter(Boolean).join(' - ');
 
+    const finishedByFlag = drivers.length > 0 && (await racingIsFinished(pool, racing.Id_Racing));
+
     return {
-      status: statusFromRacing(racing, drivers),
+      status: finishedByFlag ? 'finished' : statusFromRacing(racing, drivers),
       source: 'sql',
       updatedAt: new Date().toISOString(),
       sessionType: sessionTypeFromLapTime(typeName, eventName),

@@ -39,3 +39,6 @@ Thumbs.db
 .claude/settings.local.json
 .aiox/install-log.txt
 .env*.local
+
+# Local tooling binaries (not part of the deployable app)
+.tools/
