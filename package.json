@@ -12,6 +12,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:pre-delivery": "playwright test tests/pre-delivery-audit.spec.ts",
+    "build:worker": "opennextjs-cloudflare build",
+    "preview:worker": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy:worker": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "scraper": "tsx services/livetime-scraper-server.ts",
     "stream:tb50": "tsx services/tb50-streamer.ts",
     "tb50:install-autostart": "powershell -ExecutionPolicy Bypass -File scripts/install-tb50-autostart.ps1",
@@ -19,9 +22,9 @@
     "livetime:install-cloudflare-watch": "powershell -ExecutionPolicy Bypass -File scripts/install-cloudflare-vercel-watch.ps1"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1075.0",
     "@remotion/player": "^4.0.459",
     "@supabase/supabase-js": "^2.108.2",
-    "@vercel/blob": "^2.3.3",
     "lucide-react": "^1.21.0",
     "mssql": "^12.5.5",
     "next": "^16.0.0",
@@ -36,6 +39,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
+    "@opennextjs/cloudflare": "^1.20.1",
     "@playwright/test": "^1.60.0",
     "@types/mssql": "^12.3.0",
     "@types/node": "^24.0.0",
@@ -54,6 +58,7 @@
     "typescript": "^5.9.0",
     "typescript-eslint": "^8.3.0",
     "vite": "^5.4.2",
-    "vitest": "^4.0.0"
+    "vitest": "^4.0.0",
+    "wrangler": "^4.105.0"
   }
 }

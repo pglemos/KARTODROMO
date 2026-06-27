@@ -13,6 +13,8 @@ tsconfig.tsbuildinfo
 .vercel
 .runtime
 .tmp
+.open-next
+.wrangler
 
 # Environment & Secrets (AIOX)
 *.key

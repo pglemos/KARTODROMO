@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { get, put } from '@vercel/blob';
+import { getR2Json, hasR2Store, putR2Json } from '@/lib/r2-client';
 import { DEFAULT_TELAO_LAYOUT, normalizeTelaoLayoutConfig, type TelaoLayoutConfig } from '@/lib/telao-layout-config';
 
 const configPath = join(process.cwd(), '.runtime', 'telao-layout.json');
@@ -12,7 +12,7 @@ let lastBlobReadFailedAt = 0;
 let lastBlobWriteFailedAt = 0;
 
 function hasBlobStore(): boolean {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  return hasR2Store();
 }
 
 export function readTelaoLayoutConfig(): TelaoLayoutConfig {
@@ -35,9 +35,9 @@ export function writeTelaoLayoutConfigToFile(input: unknown): TelaoLayoutConfig 
 export async function readTelaoLayoutConfigFromStore(): Promise<TelaoLayoutConfig> {
   if (hasBlobStore()) {
     try {
-      const blob = await get(blobPath, { access: 'private', useCache: false });
-      if (blob?.statusCode === 200) {
-        const config = normalizeTelaoLayoutConfig(await new Response(blob.stream).json());
+      const stored = await getR2Json<unknown>(blobPath);
+      if (stored !== null) {
+        const config = normalizeTelaoLayoutConfig(stored);
         memoryConfig = config;
         lastBlobReadAt = Date.now();
         return config;
@@ -90,12 +90,7 @@ export async function writeTelaoLayoutConfig(input: unknown): Promise<TelaoLayou
 
   if (hasBlobStore()) {
     try {
-      await put(blobPath, `${JSON.stringify(config, null, 2)}\n`, {
-        access: 'private',
-        allowOverwrite: true,
-        contentType: 'application/json',
-        cacheControlMaxAge: 60,
-      });
+      await putR2Json(blobPath, config);
 
       lastBlobReadAt = Date.now();
       return { layout: config, storage: 'blob', persistent: true };

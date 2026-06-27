@@ -1,19 +1,11 @@
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { listViplexPrograms, startViplexProgram } from '@/lib/viplex-programs';
 import { GET, PUT } from './route';
-
-vi.mock('@/lib/viplex-programs', () => ({
-  listViplexPrograms: vi.fn(),
-  startViplexProgram: vi.fn(),
-}));
 
 describe('/api/viplex-programs', () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
-    vi.mocked(listViplexPrograms).mockReset();
-    vi.mocked(startViplexProgram).mockReset();
   });
 
   afterEach(() => {
@@ -106,44 +98,15 @@ describe('/api/viplex-programs', () => {
     expect(payload).toEqual({ ok: true, identifier: 'program-1' });
   });
 
-  it('loads local ViPlex programs when no remote endpoint is configured', async () => {
-    vi.mocked(listViplexPrograms).mockResolvedValue([
-      {
-        id: '1',
-        identifier: 'program-1',
-        name: 'CRONOMETRAGEM',
-        width: 2048,
-        height: 512,
-        duration: 10000,
-        statusCode: 1,
-        source: 0,
-      },
-    ]);
-
+  it('returns an explicit error when no remote endpoint is configured (GET)', async () => {
     const response = await GET(new NextRequest('http://localhost/api/viplex-programs'));
     const payload = await response.json();
 
     expect(response.status).toBe(200);
-    expect(payload).toEqual({
-      programs: [
-        {
-          id: '1',
-          identifier: 'program-1',
-          name: 'CRONOMETRAGEM',
-          width: 2048,
-          height: 512,
-          duration: 10000,
-          statusCode: 1,
-          source: 0,
-        },
-      ],
-      local: true,
-    });
+    expect(payload).toEqual({ programs: [], error: 'viplex_remote_not_configured' });
   });
 
-  it('starts a local ViPlex program when no remote endpoint is configured', async () => {
-    vi.mocked(startViplexProgram).mockResolvedValue({ ok: true, identifier: 'program-1' });
-
+  it('returns an explicit error when no remote endpoint is configured (PUT)', async () => {
     const response = await PUT(
       new NextRequest('http://localhost/api/viplex-programs', {
         method: 'PUT',
@@ -152,8 +115,7 @@ describe('/api/viplex-programs', () => {
     );
     const payload = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(payload).toEqual({ ok: true, identifier: 'program-1' });
-    expect(startViplexProgram).toHaveBeenCalledWith('program-1');
+    expect(response.status).toBe(400);
+    expect(payload).toEqual({ ok: false, error: 'viplex_remote_not_configured' });
   });
 });

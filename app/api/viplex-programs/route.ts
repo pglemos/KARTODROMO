@@ -35,10 +35,6 @@ function remoteFailureError(error: unknown) {
   return error instanceof Error ? error.message : 'viplex_remote_failed';
 }
 
-async function loadLocalViplexPrograms() {
-  return import('../../../lib/viplex-programs');
-}
-
 async function proxyRemote(request: NextRequest, endpoint: string) {
   const body = request.method === 'GET' ? undefined : await request.text();
   const controller = new AbortController();
@@ -85,30 +81,18 @@ export async function GET(request: NextRequest) {
   const endpoint = viplexRemoteEndpoint();
   if (endpoint) return proxyRemote(request, endpoint);
 
-  try {
-    const { listViplexPrograms } = await loadLocalViplexPrograms();
-    return NextResponse.json({ programs: await listViplexPrograms(), local: true }, { headers: NO_CACHE_HEADERS });
-  } catch (error) {
-    return NextResponse.json(
-      { programs: [], error: error instanceof Error ? error.message : 'viplex_programs_failed' },
-      { headers: NO_CACHE_HEADERS },
-    );
-  }
+  return NextResponse.json(
+    { programs: [], error: 'viplex_remote_not_configured' },
+    { headers: NO_CACHE_HEADERS },
+  );
 }
 
 export async function PUT(request: NextRequest) {
   const endpoint = viplexRemoteEndpoint();
   if (endpoint) return proxyRemote(request, endpoint);
 
-  try {
-    const body = await request.json().catch(() => ({}));
-    const { startViplexProgram } = await loadLocalViplexPrograms();
-    const result = await startViplexProgram(body?.identifier);
-    return NextResponse.json(result, { headers: NO_CACHE_HEADERS });
-  } catch (error) {
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : 'viplex_start_failed' },
-      { status: 400, headers: NO_CACHE_HEADERS },
-    );
-  }
+  return NextResponse.json(
+    { ok: false, error: 'viplex_remote_not_configured' },
+    { status: 400, headers: NO_CACHE_HEADERS },
+  );
 }

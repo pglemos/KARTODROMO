@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { get, put } from '@vercel/blob';
+import { getR2Json, hasR2Store, putR2Json } from '@/lib/r2-client';
 
 export type Tb50DisplayMode = 'live' | 'final-real' | 'final-demo';
 
@@ -22,7 +22,7 @@ let lastBlobReadFailedAt = 0;
 let lastBlobWriteFailedAt = 0;
 
 function hasBlobStore(): boolean {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  return hasR2Store();
 }
 
 function normalizeMode(value: unknown): Tb50DisplayMode {
@@ -56,9 +56,9 @@ export function readTb50DisplayMode(): Tb50DisplayModeState {
 export async function readTb50DisplayModeFromStore(): Promise<Tb50DisplayModeState> {
   if (hasBlobStore()) {
     try {
-      const blob = await get(blobPath, { access: 'private', useCache: false });
-      if (blob?.statusCode === 200) {
-        const state = normalizeState(await new Response(blob.stream).json(), true);
+      const stored = await getR2Json<unknown>(blobPath);
+      if (stored !== null) {
+        const state = normalizeState(stored, true);
         memoryState = state;
         lastBlobReadAt = Date.now();
         return { ...state, persistent: true };
@@ -82,12 +82,7 @@ export async function writeTb50DisplayMode(mode: unknown): Promise<Tb50DisplayMo
 
   if (hasBlobStore()) {
     try {
-      await put(blobPath, `${JSON.stringify({ mode: state.mode, updatedAt: state.updatedAt }, null, 2)}\n`, {
-        access: 'private',
-        allowOverwrite: true,
-        contentType: 'application/json',
-        cacheControlMaxAge: 10,
-      });
+      await putR2Json(blobPath, { mode: state.mode, updatedAt: state.updatedAt });
 
       lastBlobReadAt = Date.now();
       memoryState = { ...state, persistent: true };

@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { get, put } from '@vercel/blob';
+import { getR2Json, hasR2Store, putR2Json } from '@/lib/r2-client';
 
 export type Tb50PageState = {
   offset: number;
@@ -23,7 +23,7 @@ let lastBlobReadFailedAt = 0;
 let lastBlobWriteFailedAt = 0;
 
 function hasBlobStore(): boolean {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  return hasR2Store();
 }
 
 function pageRemoteEndpoint(): string | undefined {
@@ -82,9 +82,9 @@ export function writeTb50PageToFile(offset: unknown): Tb50PageState {
 export async function readTb50PageFromStore(): Promise<Tb50PageState> {
   if (hasBlobStore()) {
     try {
-      const blob = await get(blobPath, { access: 'private', useCache: false });
-      if (blob?.statusCode === 200) {
-        const state = normalizeState(await new Response(blob.stream).json(), true);
+      const stored = await getR2Json<unknown>(blobPath);
+      if (stored !== null) {
+        const state = normalizeState(stored, true);
         memoryState = state;
         lastBlobReadAt = Date.now();
         return { ...state, persistent: true };
@@ -133,12 +133,7 @@ export async function writeTb50Page(offset: unknown): Promise<Tb50PageState> {
 
   if (hasBlobStore()) {
     try {
-      await put(blobPath, `${JSON.stringify({ offset: state.offset, updatedAt: state.updatedAt }, null, 2)}\n`, {
-        access: 'private',
-        allowOverwrite: true,
-        contentType: 'application/json',
-        cacheControlMaxAge: 10,
-      });
+      await putR2Json(blobPath, { offset: state.offset, updatedAt: state.updatedAt });
 
       lastBlobReadAt = Date.now();
       memoryState = { ...state, persistent: true };
