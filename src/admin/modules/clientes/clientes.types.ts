@@ -17,3 +17,13 @@ export type ClienteLapTime = {
   estado: string | null;
   criadoEm: string | null;
 };
+
+export type ClienteCalXPro = {
+  id: string;
+  nome: string;
+  email: string | null;
+  telefone: string | null;
+  documento: string | null;
+  cidade: string | null;
+  criadoEm: string | null;
+};

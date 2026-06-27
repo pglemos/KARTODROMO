@@ -1,5 +1,5 @@
 import { apiGetPage, type Page } from '../../lib/api-client';
-import type { ClienteLapTime, ClienteLocal } from './clientes.types';
+import type { ClienteCalXPro, ClienteLapTime, ClienteLocal } from './clientes.types';
 
 export const listClientesLocalPage = async (
   q: string,
@@ -32,4 +32,27 @@ export const listClientesLapTimePage = async (
   const totalHeader = response.headers.get('x-total-count');
   const total = totalHeader ? Number(totalHeader) : (data as ClienteLapTime[]).length;
   return { data: data as ClienteLapTime[], total };
+};
+
+export const listClientesCalXProPage = async (
+  q: string,
+  page: number,
+  pageSize: number,
+): Promise<Page<ClienteCalXPro>> => {
+  const params = new URLSearchParams({ limit: String(pageSize), offset: String(page * pageSize) });
+  if (q) params.set('q', q);
+
+  const response = await fetch(`/api/admin/calxpro-clientes?${params.toString()}`, {
+    headers: { 'content-type': 'application/json' },
+  });
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : [];
+
+  if (!response.ok) {
+    throw new Error((data && data.error) || `HTTP ${response.status}`);
+  }
+
+  const totalHeader = response.headers.get('x-total-count');
+  const total = totalHeader ? Number(totalHeader) : (data as ClienteCalXPro[]).length;
+  return { data: data as ClienteCalXPro[], total };
 };

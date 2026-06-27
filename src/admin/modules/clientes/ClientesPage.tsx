@@ -4,10 +4,10 @@ import { DataTable, type DataTableColumn } from '../../ui/DataTable';
 import { PageHeader } from '../../ui/PageHeader';
 import { Pagination } from '../../ui/Pagination';
 import { Tabs } from '../../ui/Tabs';
-import { listClientesLapTimePage, listClientesLocalPage } from './clientes.api';
-import type { ClienteLapTime, ClienteLocal } from './clientes.types';
+import { listClientesCalXProPage, listClientesLapTimePage, listClientesLocalPage } from './clientes.api';
+import type { ClienteCalXPro, ClienteLapTime, ClienteLocal } from './clientes.types';
 
-type TabKey = 'local' | 'laptime';
+type TabKey = 'local' | 'laptime' | 'calxpro';
 
 const PAGE_SIZE = 10;
 
@@ -43,6 +43,19 @@ const laptimeColumns: readonly DataTableColumn<ClienteLapTime>[] = [
   },
 ];
 
+const calxproColumns: readonly DataTableColumn<ClienteCalXPro>[] = [
+  { key: 'nome', label: 'Nome' },
+  { key: 'email', label: 'E-mail', render: (cliente) => cliente.email ?? '—' },
+  { key: 'telefone', label: 'Telefone', render: (cliente) => cliente.telefone ?? '—' },
+  { key: 'documento', label: 'CPF', render: (cliente) => cliente.documento ?? '—' },
+  { key: 'cidade', label: 'Cidade', render: (cliente) => cliente.cidade ?? '—' },
+  {
+    key: 'criadoEm',
+    label: 'Cadastrado em',
+    render: (cliente) => (cliente.criadoEm ? dateFormatter.format(new Date(cliente.criadoEm)) : '—'),
+  },
+];
+
 export const ClientesPage = () => {
   const [activeTab, setActiveTab] = useState<TabKey>('local');
 
@@ -61,6 +74,14 @@ export const ClientesPage = () => {
   const [laptimeQuery, setLaptimeQuery] = useState('');
   const [laptimeLoading, setLaptimeLoading] = useState(true);
   const [laptimeError, setLaptimeError] = useState<string | null>(null);
+
+  const [calxproRows, setCalxproRows] = useState<ClienteCalXPro[]>([]);
+  const [calxproTotal, setCalxproTotal] = useState(0);
+  const [calxproPage, setCalxproPage] = useState(0);
+  const [calxproSearchInput, setCalxproSearchInput] = useState('');
+  const [calxproQuery, setCalxproQuery] = useState('');
+  const [calxproLoading, setCalxproLoading] = useState(true);
+  const [calxproError, setCalxproError] = useState<string | null>(null);
 
   const loadLocal = useCallback(async () => {
     setLocalLoading(true);
@@ -90,6 +111,20 @@ export const ClientesPage = () => {
     }
   }, [laptimeQuery, laptimePage]);
 
+  const loadCalxpro = useCallback(async () => {
+    setCalxproLoading(true);
+    setCalxproError(null);
+    try {
+      const page = await listClientesCalXProPage(calxproQuery, calxproPage, PAGE_SIZE);
+      setCalxproRows(page.data);
+      setCalxproTotal(page.total);
+    } catch (error: unknown) {
+      setCalxproError(getErrorMessage(error));
+    } finally {
+      setCalxproLoading(false);
+    }
+  }, [calxproQuery, calxproPage]);
+
   useEffect(() => {
     void loadLocal();
   }, [loadLocal]);
@@ -97,6 +132,10 @@ export const ClientesPage = () => {
   useEffect(() => {
     void loadLaptime();
   }, [loadLaptime]);
+
+  useEffect(() => {
+    void loadCalxpro();
+  }, [loadCalxpro]);
 
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -114,10 +153,18 @@ export const ClientesPage = () => {
     return () => clearTimeout(handle);
   }, [laptimeSearchInput]);
 
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setCalxproQuery(calxproSearchInput);
+      setCalxproPage(0);
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [calxproSearchInput]);
+
   return (
     <section>
       <PageHeader
-        subtitle="Base unificada de clientes cadastrados no sistema local (SRVKART) e no LapTime (CRONO1)."
+        subtitle="Base unificada de clientes: sistema local (SRVKART), LapTime (CRONO1) e histórico do CalXPro (sistema anterior, até jan/2025)."
         title="Clientes"
       />
 
@@ -126,6 +173,7 @@ export const ClientesPage = () => {
           items={[
             { key: 'local', label: 'Local (SRVKART)' },
             { key: 'laptime', label: 'LapTime (CRONO1)' },
+            { key: 'calxpro', label: 'CalXPro (histórico)' },
           ]}
           onChange={(key) => setActiveTab(key as TabKey)}
           value={activeTab}
@@ -180,6 +228,32 @@ export const ClientesPage = () => {
             rows={laptimeRows}
           />
           <Pagination onPageChange={setLaptimePage} page={laptimePage} pageSize={PAGE_SIZE} total={laptimeTotal} />
+        </div>
+      ) : null}
+
+      {activeTab === 'calxpro' ? (
+        <div className="mt-5 space-y-4">
+          <Card className="p-4">
+            <p className="text-sm text-zinc-400">
+              Clientes cadastrados no sistema anterior (CalXPro), em uso de 2002 até jan/2025, quando a operação
+              migrou para o LapTime. Somente leitura. Total: {calxproTotal.toLocaleString('pt-BR')}.
+            </p>
+            <input
+              className={`${inputClassName} mt-3 sm:max-w-xs`}
+              onChange={(event) => setCalxproSearchInput(event.target.value)}
+              placeholder="Buscar por nome, e-mail, telefone ou CPF..."
+              value={calxproSearchInput}
+            />
+          </Card>
+          <DataTable
+            columns={calxproColumns}
+            emptyLabel="Nenhum cliente encontrado."
+            error={calxproError}
+            loading={calxproLoading}
+            onRetry={() => void loadCalxpro()}
+            rows={calxproRows}
+          />
+          <Pagination onPageChange={setCalxproPage} page={calxproPage} pageSize={PAGE_SIZE} total={calxproTotal} />
         </div>
       ) : null}
     </section>

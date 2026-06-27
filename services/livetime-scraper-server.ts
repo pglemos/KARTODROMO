@@ -7,6 +7,7 @@ import { readTelaoLayoutConfig, telaoLayoutStoreStatus, writeTelaoLayoutConfigTo
 import { readTb50Page, tb50PageStoreStatus, writeTb50PageToFile } from '@/lib/tb50-page-store';
 import { listViplexPrograms, startViplexProgram } from '@/lib/viplex-programs';
 import { fetchLapTimeCustomersPage } from '@/lib/livetime/laptime-customers';
+import { fetchCalXProCustomersPage } from '@/lib/livetime/calxpro-customers';
 import { fetchLapTimeBookingCustomers, fetchLapTimeBookingsPage } from '@/lib/livetime/laptime-bookings';
 import { fetchLapTimeRacingCompetitors, fetchLapTimeRacingsPage } from '@/lib/livetime/laptime-racings';
 import { LiveTimeScraper } from './livetime-scraper';
@@ -42,6 +43,18 @@ const laptimeSqlOptions = process.env.LAPTIME_SQL_SERVER
       password: process.env.LAPTIME_SQL_PASSWORD || '',
       port: process.env.LAPTIME_SQL_PORT ? Number(process.env.LAPTIME_SQL_PORT) : undefined,
       timeoutMs: Number(process.env.LAPTIME_SQL_TIMEOUT_MS || process.env.LIVETIME_TIMEOUT_MS || '3000'),
+    }
+  : undefined;
+
+const calxproSqlOptions = process.env.CALXPRO_SQL_SERVER
+  ? {
+      server: process.env.CALXPRO_SQL_SERVER,
+      instanceName: process.env.CALXPRO_SQL_INSTANCE,
+      database: process.env.CALXPRO_SQL_DATABASE || 'CALXPRO',
+      user: process.env.CALXPRO_SQL_USER || '',
+      password: process.env.CALXPRO_SQL_PASSWORD || '',
+      port: process.env.CALXPRO_SQL_PORT ? Number(process.env.CALXPRO_SQL_PORT) : undefined,
+      timeoutMs: Number(process.env.CALXPRO_SQL_TIMEOUT_MS || '5000'),
     }
   : undefined;
 
@@ -201,6 +214,25 @@ async function handleLaptimeClientes(url: URL, response: http.ServerResponse) {
   }
 }
 
+async function handleCalXProClientes(url: URL, response: http.ServerResponse) {
+  if (!calxproSqlOptions) {
+    sendJson(response, 503, { error: 'calxpro_sql_not_configured' });
+    return;
+  }
+
+  try {
+    const { rows, total } = await fetchCalXProCustomersPage(calxproSqlOptions, {
+      q: url.searchParams.get('q') || undefined,
+      limit: url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : undefined,
+      offset: url.searchParams.get('offset') ? Number(url.searchParams.get('offset')) : undefined,
+    });
+    response.writeHead(200, { ...NO_CACHE_HEADERS, 'x-total-count': String(total) });
+    response.end(JSON.stringify(rows));
+  } catch (error) {
+    sendJson(response, 502, { error: error instanceof Error ? error.message : 'calxpro_sql_query_failed' });
+  }
+}
+
 async function handleLaptimeBookings(url: URL, response: http.ServerResponse) {
   if (!laptimeSqlOptions) {
     sendJson(response, 503, { error: 'laptime_sql_not_configured' });
@@ -327,6 +359,11 @@ const server = http.createServer((request, response) => {
 
   if (url.pathname === '/api/laptime-clientes') {
     void handleLaptimeClientes(url, response);
+    return;
+  }
+
+  if (url.pathname === '/api/calxpro-clientes') {
+    void handleCalXProClientes(url, response);
     return;
   }
 
