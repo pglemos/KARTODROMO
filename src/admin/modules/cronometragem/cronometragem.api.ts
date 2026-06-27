@@ -15,7 +15,7 @@ import type {
 } from './cronometragem.types';
 import { msParaTexto } from './cronometragem.types';
 
-export const DEFAULT_LIVE_URL = 'http://localhost:4010/api/livetime-snapshot';
+export const DEFAULT_LIVE_URL = '/api/livetime-snapshot';
 
 const POINTS_BY_POSITION = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1] as const;
 
