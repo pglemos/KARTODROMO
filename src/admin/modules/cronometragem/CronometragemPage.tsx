@@ -33,6 +33,13 @@ import { StatCard } from '../../ui/StatCard';
 import { Tabs } from '../../ui/Tabs';
 import { useToast } from '../../ui/useToast';
 import {
+  listLapTimeRacingCompetitors,
+  listLapTimeRacingsPage,
+  type LapTimeRacing,
+  type LapTimeRacingCompetitor,
+  type LapTimeRacingsFilters,
+} from '../resultados/laptime-racings.api';
+import {
   DEFAULT_LIVE_URL,
   createSessao,
   createVolta,
@@ -66,7 +73,7 @@ import {
   type VoltaUpdate,
 } from './cronometragem.types';
 
-type TabKey = 'ao-vivo' | 'sessoes' | 'voltas';
+type TabKey = 'ao-vivo' | 'historico' | 'sessoes' | 'voltas';
 const PAGE_SIZE = 10;
 
 type SessaoFormState = {
@@ -188,6 +195,19 @@ export const CronometragemPage = () => {
     canAccess(role, 'cronometragem') && ['owner', 'admin', 'operador_telao'].includes(role);
 
   const [activeTab, setActiveTab] = useState<TabKey>('ao-vivo');
+
+  const [historico, setHistorico] = useState<LapTimeRacing[]>([]);
+  const [historicoTotal, setHistoricoTotal] = useState(0);
+  const [historicoPage, setHistoricoPage] = useState(0);
+  const [historicoSearchInput, setHistoricoSearchInput] = useState('');
+  const [historicoFilters, setHistoricoFilters] = useState<LapTimeRacingsFilters>({});
+  const [historicoLoading, setHistoricoLoading] = useState(true);
+  const [historicoError, setHistoricoError] = useState<string | null>(null);
+  const [selectedHistoricoId, setSelectedHistoricoId] = useState<string | null>(null);
+  const [historicoCompetitors, setHistoricoCompetitors] = useState<LapTimeRacingCompetitor[]>([]);
+  const [historicoCompetitorsLoading, setHistoricoCompetitorsLoading] = useState(false);
+  const [historicoCompetitorsError, setHistoricoCompetitorsError] = useState<string | null>(null);
+
   const [sessoes, setSessoes] = useState<SessaoWithCampeonato[]>([]);
   const [sessoesRows, setSessoesRows] = useState<SessaoWithCampeonato[]>([]);
   const [sessoesTotal, setSessoesTotal] = useState(0);
@@ -313,6 +333,100 @@ export const CronometragemPage = () => {
     setSessoesFilters((current) => ({ ...current, tipo }));
     setSessoesPage(0);
   };
+
+  const loadHistorico = useCallback(async () => {
+    setHistoricoLoading(true);
+    setHistoricoError(null);
+    try {
+      const result = await listLapTimeRacingsPage(historicoFilters, historicoPage, PAGE_SIZE);
+      setHistorico(result.data);
+      setHistoricoTotal(result.total);
+      setSelectedHistoricoId((current) =>
+        current && result.data.some((racing) => racing.id === current) ? current : result.data[0]?.id ?? null,
+      );
+    } catch (error: unknown) {
+      setHistoricoError(getErrorMessage(error));
+    } finally {
+      setHistoricoLoading(false);
+    }
+  }, [historicoFilters, historicoPage]);
+
+  const loadHistoricoCompetitors = useCallback(async () => {
+    if (!selectedHistoricoId) {
+      setHistoricoCompetitors([]);
+      setHistoricoCompetitorsError(null);
+      return;
+    }
+    setHistoricoCompetitorsLoading(true);
+    setHistoricoCompetitorsError(null);
+    try {
+      setHistoricoCompetitors(await listLapTimeRacingCompetitors(selectedHistoricoId));
+    } catch (error: unknown) {
+      setHistoricoCompetitorsError(getErrorMessage(error));
+    } finally {
+      setHistoricoCompetitorsLoading(false);
+    }
+  }, [selectedHistoricoId]);
+
+  useEffect(() => {
+    if (activeTab === 'historico') void loadHistorico();
+  }, [activeTab, loadHistorico]);
+
+  useEffect(() => {
+    if (activeTab === 'historico') void loadHistoricoCompetitors();
+  }, [activeTab, loadHistoricoCompetitors]);
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setHistoricoFilters((current) => ({ ...current, q: historicoSearchInput || undefined }));
+      setHistoricoPage(0);
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [historicoSearchInput]);
+
+  const selectedHistorico = useMemo(
+    () => historico.find((racing) => racing.id === selectedHistoricoId) ?? null,
+    [historico, selectedHistoricoId],
+  );
+
+  const historicoColumns = useMemo<readonly DataTableColumn<LapTimeRacing>[]>(
+    () => [
+      {
+        key: 'nome',
+        label: 'Corrida',
+        render: (racing) => (
+          <button
+            className={`text-left font-bold underline-offset-4 hover:underline ${
+              selectedHistoricoId === racing.id ? 'text-brand-300' : 'text-white'
+            }`}
+            onClick={() => setSelectedHistoricoId(racing.id)}
+            type="button"
+          >
+            {racing.nome}
+          </button>
+        ),
+      },
+      { key: 'tipo', label: 'Tipo', render: (racing) => racing.tipo ?? '—' },
+      {
+        key: 'dataHora',
+        label: 'Data/hora',
+        render: (racing) => dateFormatter.format(new Date(racing.dataHora)),
+      },
+      { key: 'participantes', label: 'Participantes' },
+    ],
+    [selectedHistoricoId],
+  );
+
+  const historicoCompetitorColumns = useMemo<readonly DataTableColumn<LapTimeRacingCompetitor>[]>(
+    () => [
+      { key: 'posicao', label: 'Pos.', render: (item) => item.posicao ?? '—' },
+      { key: 'numero', label: 'Kart', render: (item) => item.numero ?? '—' },
+      { key: 'nome', label: 'Piloto' },
+      { key: 'voltas', label: 'Voltas', render: (item) => item.voltas ?? '—' },
+      { key: 'melhorVolta', label: 'Melhor volta', render: (item) => item.melhorVolta ?? '—' },
+    ],
+    [],
+  );
 
   const loadVoltas = useCallback(async () => {
     if (!selectedSessaoId) {
@@ -770,6 +884,7 @@ export const CronometragemPage = () => {
       <Tabs
         items={[
           { key: 'ao-vivo', label: 'Ao Vivo' },
+          { key: 'historico', label: 'Histórico real (LapTime)' },
           { key: 'sessoes', label: 'Sessões' },
           { key: 'voltas', label: 'Voltas' },
         ]}
@@ -907,6 +1022,59 @@ export const CronometragemPage = () => {
               ) : null}
             </Card>
           )}
+        </div>
+      ) : null}
+
+      {activeTab === 'historico' ? (
+        <div className="space-y-5">
+          <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+            <input
+              className={`${inputClassName} sm:max-w-xs`}
+              onChange={(event) => setHistoricoSearchInput(event.target.value)}
+              placeholder="Buscar por nome da corrida..."
+              value={historicoSearchInput}
+            />
+            <input
+              className={`${inputClassName} sm:max-w-[180px]`}
+              onChange={(event) =>
+                setHistoricoFilters((current) => ({ ...current, from: event.target.value || undefined }))
+              }
+              type="date"
+              value={historicoFilters.from ?? ''}
+            />
+            <input
+              className={`${inputClassName} sm:max-w-[180px]`}
+              onChange={(event) =>
+                setHistoricoFilters((current) => ({ ...current, to: event.target.value || undefined }))
+              }
+              type="date"
+              value={historicoFilters.to ?? ''}
+            />
+          </Card>
+          <DataTable
+            columns={historicoColumns}
+            emptyLabel="Nenhuma corrida encontrada."
+            error={historicoError}
+            loading={historicoLoading}
+            onRetry={() => void loadHistorico()}
+            rows={historico}
+          />
+          <Pagination onPageChange={setHistoricoPage} page={historicoPage} pageSize={PAGE_SIZE} total={historicoTotal} />
+
+          <div className="border-t border-zinc-800 pt-6">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-brand-300">Resultado da corrida</p>
+            <h2 className="mt-2 text-xl font-black text-white">{selectedHistorico?.nome ?? 'Selecione uma corrida'}</h2>
+            <div className="mt-4">
+              <DataTable
+                columns={historicoCompetitorColumns}
+                emptyLabel={selectedHistorico ? 'Nenhum participante registrado.' : 'Selecione uma corrida na tabela acima.'}
+                error={historicoCompetitorsError}
+                loading={historicoCompetitorsLoading}
+                onRetry={() => void loadHistoricoCompetitors()}
+                rows={historicoCompetitors}
+              />
+            </div>
+          </div>
         </div>
       ) : null}
 

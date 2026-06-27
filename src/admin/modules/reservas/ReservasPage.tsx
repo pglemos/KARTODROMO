@@ -2,13 +2,22 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { useAuth } from '../../auth/AuthContext';
 import { canAccess } from '../../lib/rbac';
 import { Button } from '../../ui/Button';
+import { Card } from '../../ui/Card';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { DataTable, type DataTableColumn } from '../../ui/DataTable';
 import { FormField } from '../../ui/FormField';
 import { Modal } from '../../ui/Modal';
 import { PageHeader } from '../../ui/PageHeader';
 import { Pagination } from '../../ui/Pagination';
+import { Tabs } from '../../ui/Tabs';
 import { useToast } from '../../ui/useToast';
+import {
+  listLapTimeBookingCustomers,
+  listLapTimeBookingsPage,
+  type LapTimeBooking,
+  type LapTimeBookingCustomer,
+  type LapTimeBookingsFilters,
+} from './laptime-bookings.api';
 import {
   createReserva,
   listClientes,
@@ -27,6 +36,7 @@ import type {
 } from './reservas.types';
 
 const PAGE_SIZE = 10;
+type ReservasTabKey = 'agenda' | 'manual';
 
 type ReservaFormState = {
   cliente_id: string;
@@ -131,6 +141,20 @@ const validateForm = (form: ReservaFormState): ReservaFormErrors => {
 export const ReservasPage = () => {
   const { role } = useAuth();
   const toast = useToast();
+  const [activeTab, setActiveTab] = useState<ReservasTabKey>('agenda');
+
+  const [bookings, setBookings] = useState<LapTimeBooking[]>([]);
+  const [bookingsTotal, setBookingsTotal] = useState(0);
+  const [bookingsPage, setBookingsPage] = useState(0);
+  const [bookingsSearchInput, setBookingsSearchInput] = useState('');
+  const [bookingsFilters, setBookingsFilters] = useState<LapTimeBookingsFilters>({ status: 'aberta' });
+  const [bookingsLoading, setBookingsLoading] = useState(true);
+  const [bookingsError, setBookingsError] = useState<string | null>(null);
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [bookingCustomers, setBookingCustomers] = useState<LapTimeBookingCustomer[]>([]);
+  const [bookingCustomersLoading, setBookingCustomersLoading] = useState(false);
+  const [bookingCustomersError, setBookingCustomersError] = useState<string | null>(null);
+
   const [reservas, setReservas] = useState<ReservaWithRelations[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -189,6 +213,163 @@ export const ReservasPage = () => {
     setFilters((current) => ({ ...current, status }));
     setPage(0);
   };
+
+  const loadBookings = useCallback(async () => {
+    setBookingsLoading(true);
+    setBookingsError(null);
+    try {
+      const result = await listLapTimeBookingsPage(bookingsFilters, bookingsPage, PAGE_SIZE);
+      setBookings(result.data);
+      setBookingsTotal(result.total);
+      setSelectedBookingId((current) =>
+        current && result.data.some((booking) => booking.id === current) ? current : result.data[0]?.id ?? null,
+      );
+    } catch (error: unknown) {
+      setBookingsError(getErrorMessage(error));
+    } finally {
+      setBookingsLoading(false);
+    }
+  }, [bookingsFilters, bookingsPage]);
+
+  const loadBookingCustomers = useCallback(async () => {
+    if (!selectedBookingId) {
+      setBookingCustomers([]);
+      setBookingCustomersError(null);
+      return;
+    }
+    setBookingCustomersLoading(true);
+    setBookingCustomersError(null);
+    try {
+      setBookingCustomers(await listLapTimeBookingCustomers(selectedBookingId));
+    } catch (error: unknown) {
+      setBookingCustomersError(getErrorMessage(error));
+    } finally {
+      setBookingCustomersLoading(false);
+    }
+  }, [selectedBookingId]);
+
+  useEffect(() => {
+    if (activeTab === 'agenda') void loadBookings();
+  }, [activeTab, loadBookings]);
+
+  useEffect(() => {
+    if (activeTab === 'agenda') void loadBookingCustomers();
+  }, [activeTab, loadBookingCustomers]);
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setBookingsFilters((current) => ({ ...current, q: bookingsSearchInput || undefined }));
+      setBookingsPage(0);
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [bookingsSearchInput]);
+
+  const updateBookingsStatusFilter = (status: 'aberta' | 'encerrada' | '') => {
+    setBookingsFilters((current) => ({ ...current, status }));
+    setBookingsPage(0);
+  };
+
+  const selectedBooking = useMemo(
+    () => bookings.find((booking) => booking.id === selectedBookingId) ?? null,
+    [bookings, selectedBookingId],
+  );
+
+  const bookingColumns = useMemo<readonly DataTableColumn<LapTimeBooking>[]>(
+    () => [
+      {
+        key: 'nome',
+        label: 'Bateria',
+        render: (booking) => (
+          <button
+            className={`text-left font-bold underline-offset-4 hover:underline ${
+              selectedBookingId === booking.id ? 'text-brand-300' : 'text-white'
+            }`}
+            onClick={() => setSelectedBookingId(booking.id)}
+            type="button"
+          >
+            {booking.nome}
+          </button>
+        ),
+      },
+      {
+        key: 'dataHora',
+        label: 'Data/hora',
+        render: (booking) => dateFormatter.format(new Date(booking.dataHora)),
+      },
+      {
+        key: 'vagasTotal',
+        label: 'Vagas',
+        render: (booking) => `${booking.vagasTotal - booking.vagasLivres}/${booking.vagasTotal}`,
+      },
+      { key: 'pagos', label: 'Pagos' },
+      { key: 'aprovados', label: 'Aprovados' },
+      { key: 'pendentes', label: 'Pendentes' },
+      {
+        key: 'encerrada',
+        label: 'Status',
+        render: (booking) => (
+          <span
+            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${
+              booking.encerrada
+                ? 'border-zinc-700 bg-zinc-900 text-zinc-400'
+                : 'border-brand-800 bg-brand-950 text-brand-100'
+            }`}
+          >
+            {booking.encerrada ? 'Encerrada' : 'Aberta'}
+          </span>
+        ),
+      },
+    ],
+    [selectedBookingId],
+  );
+
+  const bookingCustomerColumns = useMemo<readonly DataTableColumn<LapTimeBookingCustomer>[]>(
+    () => [
+      { key: 'clienteNome', label: 'Cliente' },
+      { key: 'clienteTelefone', label: 'Telefone', render: (item) => item.clienteTelefone ?? '—' },
+      {
+        key: 'preco',
+        label: 'Valor',
+        render: (item) => currencyFormatter.format(item.preco),
+      },
+      {
+        key: 'pagou',
+        label: 'Pagamento',
+        render: (item) => (
+          <span
+            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${
+              item.pagou
+                ? 'border-brand-800 bg-brand-950 text-brand-100'
+                : 'border-amber-800 bg-amber-950 text-amber-200'
+            }`}
+          >
+            {item.pagou ? 'Pago' : 'Pendente'}
+          </span>
+        ),
+      },
+      {
+        key: 'aprovado',
+        label: 'Aprovação',
+        render: (item) => (
+          <span
+            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${
+              item.aprovado
+                ? 'border-brand-800 bg-brand-950 text-brand-100'
+                : 'border-amber-800 bg-amber-950 text-amber-200'
+            }`}
+          >
+            {item.aprovado ? 'Aprovado' : 'Pendente'}
+          </span>
+        ),
+      },
+      {
+        key: 'cancelado',
+        label: 'Cancelado',
+        render: (item) => (item.cancelado ? 'Sim' : 'Não'),
+      },
+    ],
+    [],
+  );
 
   const columns = useMemo<readonly DataTableColumn<ReservaWithRelations>[]>(
     () => [
@@ -314,56 +495,136 @@ export const ReservasPage = () => {
   return (
     <section>
       <PageHeader
-        actionLabel={canWrite ? 'Nova reserva' : undefined}
-        onAction={canWrite ? openCreateModal : undefined}
-        subtitle="Gerencie horários, clientes, pistas e o andamento das reservas."
+        actionLabel={activeTab === 'manual' && canWrite ? 'Nova reserva' : undefined}
+        onAction={activeTab === 'manual' && canWrite ? openCreateModal : undefined}
+        subtitle="Agenda real de baterias do LapTime e cadastro manual local de reservas."
         title="Reservas"
       />
 
-      <div className="mt-8 flex flex-wrap items-end gap-4">
-        <div className="w-full max-w-xs">
-          <FormField htmlFor="reservas-busca" label="Buscar">
-            <input
-              className={inputClassName}
-              id="reservas-busca"
-              onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Cliente ou pista"
-              value={searchInput}
-            />
-          </FormField>
-        </div>
-        <div className="w-full max-w-xs">
-          <FormField htmlFor="reservas-status-filtro" label="Status">
-            <select
-              className={inputClassName}
-              id="reservas-status-filtro"
-              onChange={(event) => updateStatusFilter(event.target.value as ReservaStatus | '')}
-              value={filters.status}
-            >
-              <option value="">Todos</option>
-              {Object.entries(statusLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </FormField>
-        </div>
+      <div className="mt-6">
+        <Tabs
+          items={[
+            { key: 'agenda', label: 'Agenda real (LapTime)' },
+            { key: 'manual', label: 'Manual (local)' },
+          ]}
+          onChange={(key) => setActiveTab(key as ReservasTabKey)}
+          value={activeTab}
+        />
       </div>
 
-      <div className="mt-4">
-        <DataTable
-          columns={columns}
-          emptyLabel="Nenhuma reserva encontrada."
-          error={loadError}
-          loading={loading}
-          onDelete={canWrite ? setDeletingReserva : undefined}
-          onEdit={canWrite ? openEditModal : undefined}
-          onRetry={() => void loadData()}
-          rows={reservas}
-        />
-        <Pagination onPageChange={setPage} page={page} pageSize={PAGE_SIZE} total={total} />
-      </div>
+      {activeTab === 'agenda' ? (
+        <div className="mt-6 space-y-5">
+          <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+            <input
+              className={`${inputClassName} sm:max-w-xs`}
+              onChange={(event) => setBookingsSearchInput(event.target.value)}
+              placeholder="Buscar por nome da bateria..."
+              value={bookingsSearchInput}
+            />
+            <select
+              className={`${inputClassName} sm:max-w-[180px]`}
+              onChange={(event) => updateBookingsStatusFilter(event.target.value as 'aberta' | 'encerrada' | '')}
+              value={bookingsFilters.status ?? ''}
+            >
+              <option value="">Todos os status</option>
+              <option value="aberta">Aberta</option>
+              <option value="encerrada">Encerrada</option>
+            </select>
+            <input
+              className={`${inputClassName} sm:max-w-[180px]`}
+              onChange={(event) =>
+                setBookingsFilters((current) => ({ ...current, from: event.target.value || undefined }))
+              }
+              type="date"
+              value={bookingsFilters.from ?? ''}
+            />
+            <input
+              className={`${inputClassName} sm:max-w-[180px]`}
+              onChange={(event) =>
+                setBookingsFilters((current) => ({ ...current, to: event.target.value || undefined }))
+              }
+              type="date"
+              value={bookingsFilters.to ?? ''}
+            />
+          </Card>
+
+          <DataTable
+            columns={bookingColumns}
+            emptyLabel="Nenhuma bateria encontrada."
+            error={bookingsError}
+            loading={bookingsLoading}
+            onRetry={() => void loadBookings()}
+            rows={bookings}
+          />
+          <Pagination onPageChange={setBookingsPage} page={bookingsPage} pageSize={PAGE_SIZE} total={bookingsTotal} />
+
+          <div className="border-t border-zinc-800 pt-6">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-brand-300">
+              Reservas da bateria selecionada
+            </p>
+            <h2 className="mt-2 text-xl font-black text-white">{selectedBooking?.nome ?? 'Selecione uma bateria'}</h2>
+            <div className="mt-4">
+              <DataTable
+                columns={bookingCustomerColumns}
+                emptyLabel={selectedBooking ? 'Nenhuma reserva para esta bateria.' : 'Selecione uma bateria na tabela acima.'}
+                error={bookingCustomersError}
+                loading={bookingCustomersLoading}
+                onRetry={() => void loadBookingCustomers()}
+                rows={bookingCustomers}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {activeTab === 'manual' ? (
+        <>
+          <div className="mt-6 flex flex-wrap items-end gap-4">
+            <div className="w-full max-w-xs">
+              <FormField htmlFor="reservas-busca" label="Buscar">
+                <input
+                  className={inputClassName}
+                  id="reservas-busca"
+                  onChange={(event) => setSearchInput(event.target.value)}
+                  placeholder="Cliente ou pista"
+                  value={searchInput}
+                />
+              </FormField>
+            </div>
+            <div className="w-full max-w-xs">
+              <FormField htmlFor="reservas-status-filtro" label="Status">
+                <select
+                  className={inputClassName}
+                  id="reservas-status-filtro"
+                  onChange={(event) => updateStatusFilter(event.target.value as ReservaStatus | '')}
+                  value={filters.status}
+                >
+                  <option value="">Todos</option>
+                  {Object.entries(statusLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <DataTable
+              columns={columns}
+              emptyLabel="Nenhuma reserva encontrada."
+              error={loadError}
+              loading={loading}
+              onDelete={canWrite ? setDeletingReserva : undefined}
+              onEdit={canWrite ? openEditModal : undefined}
+              onRetry={() => void loadData()}
+              rows={reservas}
+            />
+            <Pagination onPageChange={setPage} page={page} pageSize={PAGE_SIZE} total={total} />
+          </div>
+        </>
+      ) : null}
 
       <Modal
         footer={

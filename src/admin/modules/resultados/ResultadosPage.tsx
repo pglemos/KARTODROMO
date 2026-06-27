@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { Button } from '../../ui/Button';
+import { Card } from '../../ui/Card';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { DataTable, type DataTableColumn } from '../../ui/DataTable';
 import { FormField } from '../../ui/FormField';
 import { Modal } from '../../ui/Modal';
 import { PageHeader } from '../../ui/PageHeader';
 import { Pagination } from '../../ui/Pagination';
+import { Tabs } from '../../ui/Tabs';
 import { useToast } from '../../ui/useToast';
 import {
   listCampeonatos,
@@ -18,6 +20,13 @@ import type {
   EtapaWithCampeonato,
   Piloto,
 } from '../campeonatos/campeonatos.types';
+import {
+  listLapTimeRacingCompetitors,
+  listLapTimeRacingsPage,
+  type LapTimeRacing,
+  type LapTimeRacingCompetitor,
+  type LapTimeRacingsFilters,
+} from './laptime-racings.api';
 import {
   createCorrida,
   createResultado,
@@ -38,6 +47,7 @@ import type {
 } from './resultados.types';
 
 const PAGE_SIZE = 10;
+type ResultadosTabKey = 'reais' | 'manual';
 
 type CorridaFormState = {
   campeonato_id: string;
@@ -125,6 +135,20 @@ const CorridaStatusBadge = ({ status }: { status: CorridaStatus }) => (
 export const ResultadosPage = () => {
   const { role } = useAuth();
   const toast = useToast();
+  const [activeTab, setActiveTab] = useState<ResultadosTabKey>('reais');
+
+  const [racings, setRacings] = useState<LapTimeRacing[]>([]);
+  const [racingsTotal, setRacingsTotal] = useState(0);
+  const [racingsPage, setRacingsPage] = useState(0);
+  const [racingsSearchInput, setRacingsSearchInput] = useState('');
+  const [racingsFilters, setRacingsFilters] = useState<LapTimeRacingsFilters>({});
+  const [racingsLoading, setRacingsLoading] = useState(true);
+  const [racingsError, setRacingsError] = useState<string | null>(null);
+  const [selectedRacingId, setSelectedRacingId] = useState<string | null>(null);
+  const [racingCompetitors, setRacingCompetitors] = useState<LapTimeRacingCompetitor[]>([]);
+  const [racingCompetitorsLoading, setRacingCompetitorsLoading] = useState(false);
+  const [racingCompetitorsError, setRacingCompetitorsError] = useState<string | null>(null);
+
   const [corridas, setCorridas] = useState<CorridaWithRelations[]>([]);
   const [corridasTotal, setCorridasTotal] = useState(0);
   const [corridasPage, setCorridasPage] = useState(0);
@@ -205,6 +229,121 @@ export const ResultadosPage = () => {
     setCorridasFilters((current) => ({ ...current, status }));
     setCorridasPage(0);
   };
+
+  const loadRacings = useCallback(async () => {
+    setRacingsLoading(true);
+    setRacingsError(null);
+    try {
+      const result = await listLapTimeRacingsPage(racingsFilters, racingsPage, PAGE_SIZE);
+      setRacings(result.data);
+      setRacingsTotal(result.total);
+      setSelectedRacingId((current) =>
+        current && result.data.some((racing) => racing.id === current) ? current : result.data[0]?.id ?? null,
+      );
+    } catch (error: unknown) {
+      setRacingsError(getErrorMessage(error));
+    } finally {
+      setRacingsLoading(false);
+    }
+  }, [racingsFilters, racingsPage]);
+
+  const loadRacingCompetitors = useCallback(async () => {
+    if (!selectedRacingId) {
+      setRacingCompetitors([]);
+      setRacingCompetitorsError(null);
+      return;
+    }
+    setRacingCompetitorsLoading(true);
+    setRacingCompetitorsError(null);
+    try {
+      setRacingCompetitors(await listLapTimeRacingCompetitors(selectedRacingId));
+    } catch (error: unknown) {
+      setRacingCompetitorsError(getErrorMessage(error));
+    } finally {
+      setRacingCompetitorsLoading(false);
+    }
+  }, [selectedRacingId]);
+
+  useEffect(() => {
+    if (activeTab === 'reais') void loadRacings();
+  }, [activeTab, loadRacings]);
+
+  useEffect(() => {
+    if (activeTab === 'reais') void loadRacingCompetitors();
+  }, [activeTab, loadRacingCompetitors]);
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setRacingsFilters((current) => ({ ...current, q: racingsSearchInput || undefined }));
+      setRacingsPage(0);
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [racingsSearchInput]);
+
+  const updateRacingsStatusFilter = (status: 'finalizada' | 'aberta' | '') => {
+    setRacingsFilters((current) => ({ ...current, status }));
+    setRacingsPage(0);
+  };
+
+  const selectedRacing = useMemo(
+    () => racings.find((racing) => racing.id === selectedRacingId) ?? null,
+    [racings, selectedRacingId],
+  );
+
+  const racingColumns = useMemo<readonly DataTableColumn<LapTimeRacing>[]>(
+    () => [
+      {
+        key: 'nome',
+        label: 'Corrida',
+        render: (racing) => (
+          <button
+            className={`text-left font-bold underline-offset-4 hover:underline ${
+              selectedRacingId === racing.id ? 'text-brand-300' : 'text-white'
+            }`}
+            onClick={() => setSelectedRacingId(racing.id)}
+            type="button"
+          >
+            {racing.nome}
+          </button>
+        ),
+      },
+      { key: 'tipo', label: 'Tipo', render: (racing) => racing.tipo ?? '—' },
+      {
+        key: 'dataHora',
+        label: 'Data/hora',
+        render: (racing) => dateFormatter.format(new Date(racing.dataHora)),
+      },
+      { key: 'participantes', label: 'Participantes' },
+      {
+        key: 'estado',
+        label: 'Status',
+        render: (racing) => (
+          <span
+            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${
+              racing.finalizada
+                ? 'border-brand-800 bg-brand-950 text-brand-100'
+                : 'border-amber-800 bg-amber-950 text-amber-200'
+            }`}
+          >
+            {racing.finalizada ? 'Finalizada' : 'Em andamento'}
+          </span>
+        ),
+      },
+    ],
+    [selectedRacingId],
+  );
+
+  const racingCompetitorColumns = useMemo<readonly DataTableColumn<LapTimeRacingCompetitor>[]>(
+    () => [
+      { key: 'posicao', label: 'Pos.', render: (item) => item.posicao ?? '—' },
+      { key: 'numero', label: 'Kart', render: (item) => item.numero ?? '—' },
+      { key: 'nome', label: 'Piloto' },
+      { key: 'voltas', label: 'Voltas', render: (item) => item.voltas ?? '—' },
+      { key: 'melhorVolta', label: 'Melhor volta', render: (item) => item.melhorVolta ?? '—' },
+      { key: 'tempoTotal', label: 'Tempo total', render: (item) => item.tempoTotal ?? '—' },
+    ],
+    [],
+  );
 
   const loadResultados = useCallback(async () => {
     if (!selectedCorridaId) {
@@ -498,93 +637,173 @@ export const ResultadosPage = () => {
   return (
     <section>
       <PageHeader
-        actionLabel={canWrite ? 'Nova corrida' : undefined}
-        onAction={canWrite ? openCreateCorrida : undefined}
-        subtitle="Cadastre corridas e mantenha os resultados oficiais de cada prova."
+        actionLabel={activeTab === 'manual' && canWrite ? 'Nova corrida' : undefined}
+        onAction={activeTab === 'manual' && canWrite ? openCreateCorrida : undefined}
+        subtitle="Corridas e resultados reais do LapTime, além do cadastro manual local de provas."
         title="Resultados"
       />
 
-      <div className="mt-8">
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <input
-            className={`${inputClassName} sm:max-w-xs`}
-            onChange={(event) => setCorridasSearchInput(event.target.value)}
-            placeholder="Buscar por título..."
-            value={corridasSearchInput}
+      <div className="mt-6">
+        <Tabs
+          items={[
+            { key: 'reais', label: 'Corridas reais (LapTime)' },
+            { key: 'manual', label: 'Manual (local)' },
+          ]}
+          onChange={(key) => setActiveTab(key as ResultadosTabKey)}
+          value={activeTab}
+        />
+      </div>
+
+      {activeTab === 'reais' ? (
+        <div className="mt-6 space-y-5">
+          <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+            <input
+              className={`${inputClassName} sm:max-w-xs`}
+              onChange={(event) => setRacingsSearchInput(event.target.value)}
+              placeholder="Buscar por nome da corrida..."
+              value={racingsSearchInput}
+            />
+            <select
+              className={`${inputClassName} sm:max-w-[180px]`}
+              onChange={(event) => updateRacingsStatusFilter(event.target.value as 'finalizada' | 'aberta' | '')}
+              value={racingsFilters.status ?? ''}
+            >
+              <option value="">Todos os status</option>
+              <option value="finalizada">Finalizada</option>
+              <option value="aberta">Em andamento</option>
+            </select>
+            <input
+              className={`${inputClassName} sm:max-w-[180px]`}
+              onChange={(event) =>
+                setRacingsFilters((current) => ({ ...current, from: event.target.value || undefined }))
+              }
+              type="date"
+              value={racingsFilters.from ?? ''}
+            />
+            <input
+              className={`${inputClassName} sm:max-w-[180px]`}
+              onChange={(event) =>
+                setRacingsFilters((current) => ({ ...current, to: event.target.value || undefined }))
+              }
+              type="date"
+              value={racingsFilters.to ?? ''}
+            />
+          </Card>
+
+          <DataTable
+            columns={racingColumns}
+            emptyLabel="Nenhuma corrida encontrada."
+            error={racingsError}
+            loading={racingsLoading}
+            onRetry={() => void loadRacings()}
+            rows={racings}
           />
-          <select
-            className={`${inputClassName} sm:max-w-[180px]`}
-            onChange={(event) => updateCorridasStatusFilter(event.target.value as CorridaStatus | '')}
-            value={corridasFilters.status ?? ''}
-          >
-            <option value="">Todos os status</option>
-            {Object.entries(corridaStatusLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <DataTable
-          columns={corridaColumns}
-          emptyLabel="Nenhuma corrida encontrada."
-          error={loadError}
-          loading={loading}
-          onDelete={
-            canWrite ? (item) => setDeleteTarget({ kind: 'corrida', item }) : undefined
-          }
-          onEdit={canWrite ? openEditCorrida : undefined}
-          onRetry={() => void loadData()}
-          rows={corridas}
-        />
-        <Pagination
-          onPageChange={setCorridasPage}
-          page={corridasPage}
-          pageSize={PAGE_SIZE}
-          total={corridasTotal}
-        />
-      </div>
+          <Pagination onPageChange={setRacingsPage} page={racingsPage} pageSize={PAGE_SIZE} total={racingsTotal} />
 
-      <div className="mt-10 border-t border-zinc-800 pt-8">
-        <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <div>
+          <div className="border-t border-zinc-800 pt-6">
             <p className="text-xs font-black uppercase tracking-[0.18em] text-brand-300">
-              Corrida selecionada
+              Resultado da corrida selecionada
             </p>
-            <h2 className="mt-2 text-2xl font-black text-white">
-              {selectedCorrida?.titulo ?? 'Selecione uma corrida'}
-            </h2>
-            {selectedCorrida ? (
-              <p className="mt-1 text-sm text-zinc-400">
-                {selectedCorrida.campeonatos?.nome ?? 'Campeonato não informado'} ·{' '}
-                {selectedCorrida.etapas?.nome ?? 'Etapa não informada'}
-              </p>
-            ) : null}
+            <h2 className="mt-2 text-xl font-black text-white">{selectedRacing?.nome ?? 'Selecione uma corrida'}</h2>
+            <div className="mt-4">
+              <DataTable
+                columns={racingCompetitorColumns}
+                emptyLabel={selectedRacing ? 'Nenhum participante registrado.' : 'Selecione uma corrida na tabela acima.'}
+                error={racingCompetitorsError}
+                loading={racingCompetitorsLoading}
+                onRetry={() => void loadRacingCompetitors()}
+                rows={racingCompetitors}
+              />
+            </div>
           </div>
-          {canWrite && selectedCorrida ? (
-            <Button onClick={openCreateResultado}>Novo resultado</Button>
-          ) : null}
         </div>
+      ) : null}
 
-        <DataTable
-          columns={resultadoColumns}
-          emptyLabel={
-            selectedCorrida
-              ? 'Nenhum resultado cadastrado para esta corrida.'
-              : 'Selecione uma corrida na tabela acima.'
-          }
-          error={resultadosError}
-          loading={resultadosLoading}
-          onDelete={
-            canWrite && selectedCorrida
-              ? (item) => setDeleteTarget({ kind: 'resultado', item })
-              : undefined
-          }
-          onEdit={canWrite && selectedCorrida ? openEditResultado : undefined}
-          onRetry={() => void loadResultados()}
-          rows={resultados}
-        />
-      </div>
+      {activeTab === 'manual' ? (
+        <>
+          <div className="mt-6">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <input
+                className={`${inputClassName} sm:max-w-xs`}
+                onChange={(event) => setCorridasSearchInput(event.target.value)}
+                placeholder="Buscar por título..."
+                value={corridasSearchInput}
+              />
+              <select
+                className={`${inputClassName} sm:max-w-[180px]`}
+                onChange={(event) => updateCorridasStatusFilter(event.target.value as CorridaStatus | '')}
+                value={corridasFilters.status ?? ''}
+              >
+                <option value="">Todos os status</option>
+                {Object.entries(corridaStatusLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <DataTable
+              columns={corridaColumns}
+              emptyLabel="Nenhuma corrida encontrada."
+              error={loadError}
+              loading={loading}
+              onDelete={
+                canWrite ? (item) => setDeleteTarget({ kind: 'corrida', item }) : undefined
+              }
+              onEdit={canWrite ? openEditCorrida : undefined}
+              onRetry={() => void loadData()}
+              rows={corridas}
+            />
+            <Pagination
+              onPageChange={setCorridasPage}
+              page={corridasPage}
+              pageSize={PAGE_SIZE}
+              total={corridasTotal}
+            />
+          </div>
+
+          <div className="mt-10 border-t border-zinc-800 pt-8">
+            <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-brand-300">
+                  Corrida selecionada
+                </p>
+                <h2 className="mt-2 text-2xl font-black text-white">
+                  {selectedCorrida?.titulo ?? 'Selecione uma corrida'}
+                </h2>
+                {selectedCorrida ? (
+                  <p className="mt-1 text-sm text-zinc-400">
+                    {selectedCorrida.campeonatos?.nome ?? 'Campeonato não informado'} ·{' '}
+                    {selectedCorrida.etapas?.nome ?? 'Etapa não informada'}
+                  </p>
+                ) : null}
+              </div>
+              {canWrite && selectedCorrida ? (
+                <Button onClick={openCreateResultado}>Novo resultado</Button>
+              ) : null}
+            </div>
+
+            <DataTable
+              columns={resultadoColumns}
+              emptyLabel={
+                selectedCorrida
+                  ? 'Nenhum resultado cadastrado para esta corrida.'
+                  : 'Selecione uma corrida na tabela acima.'
+              }
+              error={resultadosError}
+              loading={resultadosLoading}
+              onDelete={
+                canWrite && selectedCorrida
+                  ? (item) => setDeleteTarget({ kind: 'resultado', item })
+                  : undefined
+              }
+              onEdit={canWrite && selectedCorrida ? openEditResultado : undefined}
+              onRetry={() => void loadResultados()}
+              rows={resultados}
+            />
+          </div>
+        </>
+      ) : null}
 
       <Modal
         footer={

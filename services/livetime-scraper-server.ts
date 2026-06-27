@@ -7,6 +7,8 @@ import { readTelaoLayoutConfig, telaoLayoutStoreStatus, writeTelaoLayoutConfigTo
 import { readTb50Page, tb50PageStoreStatus, writeTb50PageToFile } from '@/lib/tb50-page-store';
 import { listViplexPrograms, startViplexProgram } from '@/lib/viplex-programs';
 import { fetchLapTimeCustomersPage } from '@/lib/livetime/laptime-customers';
+import { fetchLapTimeBookingCustomers, fetchLapTimeBookingsPage } from '@/lib/livetime/laptime-bookings';
+import { fetchLapTimeRacingCompetitors, fetchLapTimeRacingsPage } from '@/lib/livetime/laptime-racings';
 import { LiveTimeScraper } from './livetime-scraper';
 
 function loadLocalEnv() {
@@ -199,6 +201,92 @@ async function handleLaptimeClientes(url: URL, response: http.ServerResponse) {
   }
 }
 
+async function handleLaptimeBookings(url: URL, response: http.ServerResponse) {
+  if (!laptimeSqlOptions) {
+    sendJson(response, 503, { error: 'laptime_sql_not_configured' });
+    return;
+  }
+
+  try {
+    const status = url.searchParams.get('status');
+    const { rows, total } = await fetchLapTimeBookingsPage(laptimeSqlOptions, {
+      q: url.searchParams.get('q') || undefined,
+      status: status === 'aberta' || status === 'encerrada' ? status : undefined,
+      from: url.searchParams.get('from') || undefined,
+      to: url.searchParams.get('to') || undefined,
+      limit: url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : undefined,
+      offset: url.searchParams.get('offset') ? Number(url.searchParams.get('offset')) : undefined,
+    });
+    response.writeHead(200, { ...NO_CACHE_HEADERS, 'x-total-count': String(total) });
+    response.end(JSON.stringify(rows));
+  } catch (error) {
+    sendJson(response, 502, { error: error instanceof Error ? error.message : 'laptime_sql_query_failed' });
+  }
+}
+
+async function handleLaptimeBookingCustomers(url: URL, response: http.ServerResponse) {
+  if (!laptimeSqlOptions) {
+    sendJson(response, 503, { error: 'laptime_sql_not_configured' });
+    return;
+  }
+
+  const bookingId = url.searchParams.get('bookingId');
+  if (!bookingId) {
+    sendJson(response, 400, { error: 'bookingId_required' });
+    return;
+  }
+
+  try {
+    const rows = await fetchLapTimeBookingCustomers(laptimeSqlOptions, bookingId);
+    sendJson(response, 200, rows);
+  } catch (error) {
+    sendJson(response, 502, { error: error instanceof Error ? error.message : 'laptime_sql_query_failed' });
+  }
+}
+
+async function handleLaptimeRacings(url: URL, response: http.ServerResponse) {
+  if (!laptimeSqlOptions) {
+    sendJson(response, 503, { error: 'laptime_sql_not_configured' });
+    return;
+  }
+
+  try {
+    const status = url.searchParams.get('status');
+    const { rows, total } = await fetchLapTimeRacingsPage(laptimeSqlOptions, {
+      q: url.searchParams.get('q') || undefined,
+      status: status === 'finalizada' || status === 'aberta' ? status : undefined,
+      from: url.searchParams.get('from') || undefined,
+      to: url.searchParams.get('to') || undefined,
+      limit: url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : undefined,
+      offset: url.searchParams.get('offset') ? Number(url.searchParams.get('offset')) : undefined,
+    });
+    response.writeHead(200, { ...NO_CACHE_HEADERS, 'x-total-count': String(total) });
+    response.end(JSON.stringify(rows));
+  } catch (error) {
+    sendJson(response, 502, { error: error instanceof Error ? error.message : 'laptime_sql_query_failed' });
+  }
+}
+
+async function handleLaptimeRacingCompetitors(url: URL, response: http.ServerResponse) {
+  if (!laptimeSqlOptions) {
+    sendJson(response, 503, { error: 'laptime_sql_not_configured' });
+    return;
+  }
+
+  const racingId = url.searchParams.get('racingId');
+  if (!racingId) {
+    sendJson(response, 400, { error: 'racingId_required' });
+    return;
+  }
+
+  try {
+    const rows = await fetchLapTimeRacingCompetitors(laptimeSqlOptions, racingId);
+    sendJson(response, 200, rows);
+  } catch (error) {
+    sendJson(response, 502, { error: error instanceof Error ? error.message : 'laptime_sql_query_failed' });
+  }
+}
+
 const server = http.createServer((request, response) => {
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
 
@@ -239,6 +327,26 @@ const server = http.createServer((request, response) => {
 
   if (url.pathname === '/api/laptime-clientes') {
     void handleLaptimeClientes(url, response);
+    return;
+  }
+
+  if (url.pathname === '/api/laptime-bookings') {
+    void handleLaptimeBookings(url, response);
+    return;
+  }
+
+  if (url.pathname === '/api/laptime-booking-customers') {
+    void handleLaptimeBookingCustomers(url, response);
+    return;
+  }
+
+  if (url.pathname === '/api/laptime-racings') {
+    void handleLaptimeRacings(url, response);
+    return;
+  }
+
+  if (url.pathname === '/api/laptime-racing-competitors') {
+    void handleLaptimeRacingCompetitors(url, response);
     return;
   }
 
