@@ -4,7 +4,7 @@
 // Workers/OpenNext never executes — the api/*.ts convention is Vercel-only.
 
 export const dynamic = 'force-dynamic';
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 type Pilot = {
     nome?: unknown;
