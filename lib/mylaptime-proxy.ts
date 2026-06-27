@@ -4,10 +4,12 @@ const EXCLUDED_RESPONSE_HEADERS = new Set([
   'connection',
   'content-encoding',
   'content-length',
+  'content-security-policy',
   'keep-alive',
   'set-cookie',
   'transfer-encoding',
   'upgrade',
+  'x-frame-options',
 ]);
 
 const EXCLUDED_REQUEST_HEADERS = new Set(['connection', 'host', 'keep-alive', 'transfer-encoding', 'upgrade']);
