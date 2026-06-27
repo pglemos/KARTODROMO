@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from '../../lib/api-client';
+import { apiDelete, apiGet, apiGetPage, apiPatch, apiPost, apiPut, type Page } from '../../lib/api-client';
 import type {
   CampeonatoOption,
   EtapaOption,
@@ -7,6 +7,8 @@ import type {
   PilotoOption,
   Sessao,
   SessaoPayload,
+  SessaoStatus,
+  SessaoTipo,
   SessaoUpdate,
   SessaoWithCampeonato,
   Volta,
@@ -129,9 +131,40 @@ const normalizeName = (value: string): string =>
 
 type SessaoFullRow = Sessao & { campeonato_nome: string | null };
 
+const toSessaoWithCampeonato = (row: SessaoFullRow): SessaoWithCampeonato => ({
+  ...row,
+  campeonatos: row.campeonato_nome ? { nome: row.campeonato_nome } : null,
+});
+
 export const listSessoes = async (): Promise<SessaoWithCampeonato[]> => {
   const rows = await apiGet<SessaoFullRow[]>('sessoes_full');
-  return rows.map((row) => ({ ...row, campeonatos: row.campeonato_nome ? { nome: row.campeonato_nome } : null }));
+  return rows.map(toSessaoWithCampeonato);
+};
+
+export type SessoesFilters = {
+  etapa_id?: string;
+  campeonato_id?: string;
+  status?: SessaoStatus | '';
+  tipo?: SessaoTipo | '';
+  q?: string;
+};
+
+export const listSessoesPage = async (
+  filters: SessoesFilters,
+  page: number,
+  pageSize: number,
+): Promise<Page<SessaoWithCampeonato>> => {
+  const params = new URLSearchParams();
+  if (filters.etapa_id) params.set('etapa_id', filters.etapa_id);
+  if (filters.campeonato_id) params.set('campeonato_id', filters.campeonato_id);
+  if (filters.status) params.set('status', filters.status);
+  if (filters.tipo) params.set('tipo', filters.tipo);
+  if (filters.q) params.set('q', filters.q);
+  params.set('limit', String(pageSize));
+  params.set('offset', String(page * pageSize));
+
+  const { data, total } = await apiGetPage<SessaoFullRow>(`sessoes_full?${params.toString()}`);
+  return { data: data.map(toSessaoWithCampeonato), total };
 };
 
 export const createSessao = async (payload: SessaoPayload): Promise<Sessao> => apiPost<Sessao>('sessoes', payload);

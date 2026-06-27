@@ -8,6 +8,7 @@ export type AdminModuleKey =
   | 'resultados'
   | 'telao'
   | 'financeira'
+  | 'clientes'
   | 'administrativa';
 
 export type AdminModule = {
@@ -101,6 +102,15 @@ export const adminModules: AdminModule[] = [
     summary: 'Lançamentos, categorias, saldo e visão financeira da operação.',
     status: 'Módulo restaurado',
     features: ['Lançamentos', 'Categorias', 'Saldo'],
+  },
+  {
+    key: 'clientes',
+    title: 'Clientes',
+    href: '/admin/clientes',
+    group: 'Gestão',
+    summary: 'Base unificada de clientes do sistema local (SRVKART) e do LapTime (CRONO1).',
+    status: 'Módulo novo',
+    features: ['Clientes locais', 'Clientes LapTime', 'Busca e paginação'],
   },
   {
     key: 'administrativa',

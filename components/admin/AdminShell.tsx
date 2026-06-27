@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   Timer,
   Trophy,
+  Users,
   UtensilsCrossed,
   WalletCards,
   Zap,
@@ -26,6 +27,7 @@ const iconMap: Record<AdminModuleKey, LucideIcon> = {
   resultados: Flag,
   telao: Monitor,
   financeira: WalletCards,
+  clientes: Users,
   administrativa: ShieldCheck,
 };
 

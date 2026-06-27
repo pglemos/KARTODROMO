@@ -1,7 +1,8 @@
-import { apiDelete, apiGet, apiGetById, apiPatch, apiPost } from '../../lib/api-client';
+import { apiDelete, apiGet, apiGetById, apiGetPage, apiPatch, apiPost, type Page } from '../../lib/api-client';
 import type {
   Corrida,
   CorridaPayload,
+  CorridaStatus,
   CorridaUpdate,
   CorridaWithRelations,
   Resultado,
@@ -12,13 +13,37 @@ import type {
 
 type CorridaFullRow = Corrida & { campeonato_nome: string | null; etapa_nome: string | null };
 
+const toCorridaWithRelations = (row: CorridaFullRow): CorridaWithRelations => ({
+  ...row,
+  campeonatos: row.campeonato_nome ? { nome: row.campeonato_nome } : null,
+  etapas: row.etapa_nome ? { nome: row.etapa_nome } : null,
+});
+
 export const listCorridas = async (): Promise<CorridaWithRelations[]> => {
   const rows = await apiGet<CorridaFullRow[]>('corridas_full');
-  return rows.map((row) => ({
-    ...row,
-    campeonatos: row.campeonato_nome ? { nome: row.campeonato_nome } : null,
-    etapas: row.etapa_nome ? { nome: row.etapa_nome } : null,
-  }));
+  return rows.map(toCorridaWithRelations);
+};
+
+export type CorridasFilters = {
+  campeonato_id?: string;
+  status?: CorridaStatus | '';
+  q?: string;
+};
+
+export const listCorridasPage = async (
+  filters: CorridasFilters,
+  page: number,
+  pageSize: number,
+): Promise<Page<CorridaWithRelations>> => {
+  const params = new URLSearchParams();
+  if (filters.campeonato_id) params.set('campeonato_id', filters.campeonato_id);
+  if (filters.status) params.set('status', filters.status);
+  if (filters.q) params.set('q', filters.q);
+  params.set('limit', String(pageSize));
+  params.set('offset', String(page * pageSize));
+
+  const { data, total } = await apiGetPage<CorridaFullRow>(`corridas_full?${params.toString()}`);
+  return { data: data.map(toCorridaWithRelations), total };
 };
 
 export const getCorridaById = async (id: string): Promise<Corrida> => apiGetById<Corrida>('corridas', id);

@@ -18,6 +18,22 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const apiGet = <T>(path: string): Promise<T> => request<T>(path);
 
+export type Page<T> = { data: T[]; total: number };
+
+export async function apiGetPage<T>(path: string): Promise<Page<T>> {
+  const response = await fetch(`${BASE}/${path}`, { headers: { 'content-type': 'application/json' } });
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : [];
+
+  if (!response.ok) {
+    throw new Error((data && data.error) || `HTTP ${response.status}`);
+  }
+
+  const totalHeader = response.headers.get('x-total-count');
+  const total = totalHeader ? Number(totalHeader) : (data as T[]).length;
+  return { data: data as T[], total };
+}
+
 export const apiPost = <T>(path: string, body: unknown): Promise<T> =>
   request<T>(path, { method: 'POST', body: JSON.stringify(body) });
 

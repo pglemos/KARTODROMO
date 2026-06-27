@@ -7,14 +7,16 @@ import { DataTable, type DataTableColumn } from '../../ui/DataTable';
 import { FormField } from '../../ui/FormField';
 import { Modal } from '../../ui/Modal';
 import { PageHeader } from '../../ui/PageHeader';
+import { Pagination } from '../../ui/Pagination';
 import { useToast } from '../../ui/useToast';
 import {
   createReserva,
   listClientes,
   listPistas,
-  listReservas,
+  listReservasPage,
   removeReserva,
   updateReserva,
+  type ReservasFilters,
 } from './reservas.api';
 import type {
   Cliente,
@@ -23,6 +25,8 @@ import type {
   ReservaStatus,
   ReservaWithRelations,
 } from './reservas.types';
+
+const PAGE_SIZE = 10;
 
 type ReservaFormState = {
   cliente_id: string;
@@ -128,6 +132,10 @@ export const ReservasPage = () => {
   const { role } = useAuth();
   const toast = useToast();
   const [reservas, setReservas] = useState<ReservaWithRelations[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
+  const [filters, setFilters] = useState<ReservasFilters>({ status: '', q: '' });
+  const [searchInput, setSearchInput] = useState('');
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [pistas, setPistas] = useState<Pista[]>([]);
   const [loading, setLoading] = useState(true);
@@ -148,12 +156,13 @@ export const ReservasPage = () => {
     setLoadError(null);
 
     try {
-      const [reservasData, clientesData, pistasData] = await Promise.all([
-        listReservas(),
+      const [reservasPage, clientesData, pistasData] = await Promise.all([
+        listReservasPage(filters, page, PAGE_SIZE),
         listClientes(),
         listPistas(),
       ]);
-      setReservas(reservasData);
+      setReservas(reservasPage.data);
+      setTotal(reservasPage.total);
       setClientes(clientesData);
       setPistas(pistasData);
     } catch (error: unknown) {
@@ -161,11 +170,25 @@ export const ReservasPage = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filters, page]);
 
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  // debounce free-text search before it becomes a filter (and resets to page 0)
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setFilters((current) => ({ ...current, q: searchInput }));
+      setPage(0);
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [searchInput]);
+
+  const updateStatusFilter = (status: ReservaStatus | '') => {
+    setFilters((current) => ({ ...current, status }));
+    setPage(0);
+  };
 
   const columns = useMemo<readonly DataTableColumn<ReservaWithRelations>[]>(
     () => [
@@ -297,10 +320,41 @@ export const ReservasPage = () => {
         title="Reservas"
       />
 
-      <div className="mt-8">
+      <div className="mt-8 flex flex-wrap items-end gap-4">
+        <div className="w-full max-w-xs">
+          <FormField htmlFor="reservas-busca" label="Buscar">
+            <input
+              className={inputClassName}
+              id="reservas-busca"
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder="Cliente ou pista"
+              value={searchInput}
+            />
+          </FormField>
+        </div>
+        <div className="w-full max-w-xs">
+          <FormField htmlFor="reservas-status-filtro" label="Status">
+            <select
+              className={inputClassName}
+              id="reservas-status-filtro"
+              onChange={(event) => updateStatusFilter(event.target.value as ReservaStatus | '')}
+              value={filters.status}
+            >
+              <option value="">Todos</option>
+              {Object.entries(statusLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </FormField>
+        </div>
+      </div>
+
+      <div className="mt-4">
         <DataTable
           columns={columns}
-          emptyLabel="Nenhuma reserva cadastrada."
+          emptyLabel="Nenhuma reserva encontrada."
           error={loadError}
           loading={loading}
           onDelete={canWrite ? setDeletingReserva : undefined}
@@ -308,6 +362,7 @@ export const ReservasPage = () => {
           onRetry={() => void loadData()}
           rows={reservas}
         />
+        <Pagination onPageChange={setPage} page={page} pageSize={PAGE_SIZE} total={total} />
       </div>
 
       <Modal

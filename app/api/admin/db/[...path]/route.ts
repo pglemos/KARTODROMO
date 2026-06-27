@@ -39,10 +39,11 @@ async function proxy(request: NextRequest, path: string[]) {
     });
 
     const text = await response.text();
-    return new NextResponse(text, {
-      status: response.status,
-      headers: { 'content-type': 'application/json; charset=utf-8' },
-    });
+    const headers: Record<string, string> = { 'content-type': 'application/json; charset=utf-8' };
+    const totalCount = response.headers.get('x-total-count');
+    if (totalCount) headers['x-total-count'] = totalCount;
+
+    return new NextResponse(text, { status: response.status, headers });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'local_api_unreachable' },

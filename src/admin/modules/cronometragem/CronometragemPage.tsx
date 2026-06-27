@@ -28,6 +28,7 @@ import { DataTable, type DataTableColumn } from '../../ui/DataTable';
 import { FormField } from '../../ui/FormField';
 import { Modal } from '../../ui/Modal';
 import { PageHeader } from '../../ui/PageHeader';
+import { Pagination } from '../../ui/Pagination';
 import { StatCard } from '../../ui/StatCard';
 import { Tabs } from '../../ui/Tabs';
 import { useToast } from '../../ui/useToast';
@@ -42,11 +43,13 @@ import {
   listEtapas,
   listPilotos,
   listSessoes,
+  listSessoesPage,
   listVoltas,
   removeSessao,
   removeVolta,
   updateSessao,
   updateVolta,
+  type SessoesFilters,
 } from './cronometragem.api';
 import {
   msParaTexto,
@@ -55,6 +58,7 @@ import {
   type LiveSnapshot,
   type PilotoOption,
   type SessaoPayload,
+  type SessaoStatus,
   type SessaoTipo,
   type SessaoWithCampeonato,
   type Volta,
@@ -63,6 +67,7 @@ import {
 } from './cronometragem.types';
 
 type TabKey = 'ao-vivo' | 'sessoes' | 'voltas';
+const PAGE_SIZE = 10;
 
 type SessaoFormState = {
   nome: string;
@@ -184,13 +189,18 @@ export const CronometragemPage = () => {
 
   const [activeTab, setActiveTab] = useState<TabKey>('ao-vivo');
   const [sessoes, setSessoes] = useState<SessaoWithCampeonato[]>([]);
+  const [sessoesRows, setSessoesRows] = useState<SessaoWithCampeonato[]>([]);
+  const [sessoesTotal, setSessoesTotal] = useState(0);
+  const [sessoesPage, setSessoesPage] = useState(0);
+  const [sessoesSearchInput, setSessoesSearchInput] = useState('');
+  const [sessoesFilters, setSessoesFilters] = useState<SessoesFilters>({});
+  const [sessoesTabLoading, setSessoesTabLoading] = useState(true);
+  const [sessoesTabError, setSessoesTabError] = useState<string | null>(null);
   const [campeonatos, setCampeonatos] = useState<CampeonatoOption[]>([]);
   const [etapas, setEtapas] = useState<EtapaOption[]>([]);
   const [pilotos, setPilotos] = useState<PilotoOption[]>([]);
   const [selectedSessaoId, setSelectedSessaoId] = useState('');
   const [voltas, setVoltas] = useState<Volta[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [voltasLoading, setVoltasLoading] = useState(false);
   const [voltasError, setVoltasError] = useState<string | null>(null);
 
@@ -242,8 +252,6 @@ export const CronometragemPage = () => {
   );
 
   const loadData = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
     try {
       const [sessoesData, campeonatosData, etapasData, pilotosData] = await Promise.all([
         listSessoes(),
@@ -266,11 +274,45 @@ export const CronometragemPage = () => {
           : (sessoesData[0]?.id ?? ''),
       );
     } catch (error: unknown) {
-      setLoadError(getErrorMessage(error));
-    } finally {
-      setLoading(false);
+      toast.error(getErrorMessage(error));
     }
-  }, []);
+  }, [toast]);
+
+  const loadSessoesTab = useCallback(async () => {
+    setSessoesTabLoading(true);
+    setSessoesTabError(null);
+    try {
+      const page = await listSessoesPage(sessoesFilters, sessoesPage, PAGE_SIZE);
+      setSessoesRows(page.data);
+      setSessoesTotal(page.total);
+    } catch (error: unknown) {
+      setSessoesTabError(getErrorMessage(error));
+    } finally {
+      setSessoesTabLoading(false);
+    }
+  }, [sessoesFilters, sessoesPage]);
+
+  useEffect(() => {
+    void loadSessoesTab();
+  }, [loadSessoesTab]);
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setSessoesFilters((current) => ({ ...current, q: sessoesSearchInput || undefined }));
+      setSessoesPage(0);
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [sessoesSearchInput]);
+
+  const updateSessoesStatusFilter = (status: SessaoStatus | '') => {
+    setSessoesFilters((current) => ({ ...current, status }));
+    setSessoesPage(0);
+  };
+
+  const updateSessoesTipoFilter = (tipo: SessaoTipo | '') => {
+    setSessoesFilters((current) => ({ ...current, tipo }));
+    setSessoesPage(0);
+  };
 
   const loadVoltas = useCallback(async () => {
     if (!selectedSessaoId) {
@@ -431,7 +473,7 @@ export const CronometragemPage = () => {
         toast.success('Sessão criada com sucesso.');
       }
       setSessaoModalOpen(false);
-      await loadData();
+      await Promise.all([loadData(), loadSessoesTab()]);
     } catch (error: unknown) {
       toast.error(getErrorMessage(error));
     } finally {
@@ -530,7 +572,7 @@ export const CronometragemPage = () => {
       setSelectedSessaoId(targetId);
       setImportModalOpen(false);
       toast.success(`${numberFormatter.format(count)} pilotos importados para a sessão.`);
-      await loadData();
+      await Promise.all([loadData(), loadSessoesTab()]);
       await listVoltas(targetId).then(setVoltas);
     } catch (error: unknown) {
       toast.error(getErrorMessage(error));
@@ -546,7 +588,7 @@ export const CronometragemPage = () => {
       if (deleteTarget.kind === 'sessao') {
         await removeSessao(deleteTarget.item.id);
         toast.success('Sessão excluída com sucesso.');
-        await loadData();
+        await Promise.all([loadData(), loadSessoesTab()]);
       } else {
         await removeVolta(deleteTarget.item.id);
         toast.success('Volta excluída com sucesso.');
@@ -565,7 +607,7 @@ export const CronometragemPage = () => {
     try {
       await updateSessao(sessao.id, { status: 'encerrada' });
       toast.success('Sessão encerrada.');
-      await loadData();
+      await Promise.all([loadData(), loadSessoesTab()]);
     } catch (error: unknown) {
       toast.error(getErrorMessage(error));
     }
@@ -869,16 +911,46 @@ export const CronometragemPage = () => {
       ) : null}
 
       {activeTab === 'sessoes' ? (
-        <DataTable
-          columns={sessaoColumns}
-          emptyLabel="Nenhuma sessão cadastrada."
-          error={loadError}
-          loading={loading}
-          onDelete={canWrite ? (sessao) => setDeleteTarget({ kind: 'sessao', item: sessao }) : undefined}
-          onEdit={canWrite ? openEditSessao : undefined}
-          onRetry={() => void loadData()}
-          rows={sessoes}
-        />
+        <div className="space-y-4">
+          <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+            <input
+              className={`${inputClassName} sm:max-w-xs`}
+              onChange={(event) => setSessoesSearchInput(event.target.value)}
+              placeholder="Buscar por nome..."
+              value={sessoesSearchInput}
+            />
+            <select
+              className={`${inputClassName} sm:max-w-[180px]`}
+              onChange={(event) => updateSessoesTipoFilter(event.target.value as SessaoTipo | '')}
+              value={sessoesFilters.tipo ?? ''}
+            >
+              <option value="">Todos os tipos</option>
+              <option value="treino">Treino</option>
+              <option value="classificacao">Classificação</option>
+              <option value="corrida">Corrida</option>
+            </select>
+            <select
+              className={`${inputClassName} sm:max-w-[180px]`}
+              onChange={(event) => updateSessoesStatusFilter(event.target.value as SessaoStatus | '')}
+              value={sessoesFilters.status ?? ''}
+            >
+              <option value="">Todos os status</option>
+              <option value="aberta">Aberta</option>
+              <option value="encerrada">Encerrada</option>
+            </select>
+          </Card>
+          <DataTable
+            columns={sessaoColumns}
+            emptyLabel="Nenhuma sessão encontrada."
+            error={sessoesTabError}
+            loading={sessoesTabLoading}
+            onDelete={canWrite ? (sessao) => setDeleteTarget({ kind: 'sessao', item: sessao }) : undefined}
+            onEdit={canWrite ? openEditSessao : undefined}
+            onRetry={() => void loadSessoesTab()}
+            rows={sessoesRows}
+          />
+          <Pagination onPageChange={setSessoesPage} page={sessoesPage} pageSize={PAGE_SIZE} total={sessoesTotal} />
+        </div>
       ) : null}
 
       {activeTab === 'voltas' ? (

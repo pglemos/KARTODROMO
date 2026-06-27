@@ -17,6 +17,7 @@ export type ModuleKey =
   | 'lanchonete'
   | 'recepcao'
   | 'telao'
+  | 'clientes'
   | 'administrativa';
 
 export const roles: readonly Role[] = [
@@ -39,6 +40,7 @@ const allModules: readonly ModuleKey[] = [
   'lanchonete',
   'recepcao',
   'telao',
+  'clientes',
   'administrativa',
 ];
 
@@ -46,7 +48,7 @@ export const roleModules: Readonly<Record<Role, readonly ModuleKey[]>> = {
   owner: allModules,
   admin: allModules,
   financeiro: ['dashboard', 'financeira'],
-  recepcao: ['dashboard', 'reservas', 'recepcao'],
+  recepcao: ['dashboard', 'reservas', 'recepcao', 'clientes'],
   lanchonete: ['dashboard', 'lanchonete'],
   operador_telao: ['dashboard', 'cronometragem', 'resultados', 'telao'],
   viewer: ['dashboard'],

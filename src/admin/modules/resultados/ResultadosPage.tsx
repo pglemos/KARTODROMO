@@ -6,6 +6,7 @@ import { DataTable, type DataTableColumn } from '../../ui/DataTable';
 import { FormField } from '../../ui/FormField';
 import { Modal } from '../../ui/Modal';
 import { PageHeader } from '../../ui/PageHeader';
+import { Pagination } from '../../ui/Pagination';
 import { useToast } from '../../ui/useToast';
 import {
   listCampeonatos,
@@ -20,12 +21,13 @@ import type {
 import {
   createCorrida,
   createResultado,
-  listCorridas,
+  listCorridasPage,
   listResultados,
   removeCorrida,
   removeResultado,
   updateCorrida,
   updateResultado,
+  type CorridasFilters,
 } from './resultados.api';
 import type {
   CorridaPayload,
@@ -34,6 +36,8 @@ import type {
   ResultadoPayload,
   ResultadoWithPiloto,
 } from './resultados.types';
+
+const PAGE_SIZE = 10;
 
 type CorridaFormState = {
   campeonato_id: string;
@@ -122,6 +126,10 @@ export const ResultadosPage = () => {
   const { role } = useAuth();
   const toast = useToast();
   const [corridas, setCorridas] = useState<CorridaWithRelations[]>([]);
+  const [corridasTotal, setCorridasTotal] = useState(0);
+  const [corridasPage, setCorridasPage] = useState(0);
+  const [corridasSearchInput, setCorridasSearchInput] = useState('');
+  const [corridasFilters, setCorridasFilters] = useState<CorridasFilters>({});
   const [campeonatos, setCampeonatos] = useState<Campeonato[]>([]);
   const [etapas, setEtapas] = useState<EtapaWithCampeonato[]>([]);
   const [pilotos, setPilotos] = useState<Piloto[]>([]);
@@ -163,26 +171,40 @@ export const ResultadosPage = () => {
     setLoadError(null);
 
     try {
-      const [corridasData, campeonatosData, etapasData, pilotosData] = await Promise.all([
-        listCorridas(),
+      const [corridasPageData, campeonatosData, etapasData, pilotosData] = await Promise.all([
+        listCorridasPage(corridasFilters, corridasPage, PAGE_SIZE),
         listCampeonatos(),
         listEtapas(),
         listPilotos(),
       ]);
-      setCorridas(corridasData);
+      setCorridas(corridasPageData.data);
+      setCorridasTotal(corridasPageData.total);
       setCampeonatos(campeonatosData);
       setEtapas(etapasData);
       setPilotos(pilotosData);
       setSelectedCorridaId((current) => {
-        if (corridasData.some((corrida) => corrida.id === current)) return current;
-        return corridasData[0]?.id ?? '';
+        if (corridasPageData.data.some((corrida) => corrida.id === current)) return current;
+        return corridasPageData.data[0]?.id ?? '';
       });
     } catch (error: unknown) {
       setLoadError(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [corridasFilters, corridasPage]);
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setCorridasFilters((current) => ({ ...current, q: corridasSearchInput || undefined }));
+      setCorridasPage(0);
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [corridasSearchInput]);
+
+  const updateCorridasStatusFilter = (status: CorridaStatus | '') => {
+    setCorridasFilters((current) => ({ ...current, status }));
+    setCorridasPage(0);
+  };
 
   const loadResultados = useCallback(async () => {
     if (!selectedCorridaId) {
@@ -483,9 +505,29 @@ export const ResultadosPage = () => {
       />
 
       <div className="mt-8">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <input
+            className={`${inputClassName} sm:max-w-xs`}
+            onChange={(event) => setCorridasSearchInput(event.target.value)}
+            placeholder="Buscar por título..."
+            value={corridasSearchInput}
+          />
+          <select
+            className={`${inputClassName} sm:max-w-[180px]`}
+            onChange={(event) => updateCorridasStatusFilter(event.target.value as CorridaStatus | '')}
+            value={corridasFilters.status ?? ''}
+          >
+            <option value="">Todos os status</option>
+            {Object.entries(corridaStatusLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
         <DataTable
           columns={corridaColumns}
-          emptyLabel="Nenhuma corrida cadastrada."
+          emptyLabel="Nenhuma corrida encontrada."
           error={loadError}
           loading={loading}
           onDelete={
@@ -494,6 +536,12 @@ export const ResultadosPage = () => {
           onEdit={canWrite ? openEditCorrida : undefined}
           onRetry={() => void loadData()}
           rows={corridas}
+        />
+        <Pagination
+          onPageChange={setCorridasPage}
+          page={corridasPage}
+          pageSize={PAGE_SIZE}
+          total={corridasTotal}
         />
       </div>
 

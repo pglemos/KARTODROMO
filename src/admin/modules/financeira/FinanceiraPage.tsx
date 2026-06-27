@@ -8,17 +8,19 @@ import { DataTable, type DataTableColumn } from '../../ui/DataTable';
 import { FormField } from '../../ui/FormField';
 import { Modal } from '../../ui/Modal';
 import { PageHeader } from '../../ui/PageHeader';
+import { Pagination } from '../../ui/Pagination';
 import { useToast } from '../../ui/useToast';
 import {
   createCategoria,
   createLancamento,
   getResumo,
   listCategorias,
-  listLancamentos,
+  listLancamentosPage,
   removeCategoria,
   removeLancamento,
   updateCategoria,
   updateLancamento,
+  type LancamentosFilters,
 } from './financeira.api';
 import type {
   Categoria,
@@ -32,6 +34,8 @@ import type {
 } from './financeira.types';
 
 type Section = 'lancamentos' | 'categorias';
+
+const PAGE_SIZE = 10;
 
 type LancamentoFormState = {
   descricao: string;
@@ -152,6 +156,10 @@ export const FinanceiraPage = () => {
   const hasFinanceAccess = canAccess(role, 'financeira') && financeRoles.includes(role);
   const [section, setSection] = useState<Section>('lancamentos');
   const [lancamentos, setLancamentos] = useState<LancamentoWithCategoria[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
+  const [filters, setFilters] = useState<LancamentosFilters>({ status: '', tipo: '', q: '' });
+  const [searchInput, setSearchInput] = useState('');
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [resumo, setResumo] = useState<ResumoFinanceiro>(emptyResumo);
   const [loading, setLoading] = useState(true);
@@ -177,12 +185,13 @@ export const FinanceiraPage = () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const [lancamentosData, categoriasData, resumoData] = await Promise.all([
-        listLancamentos(),
+      const [lancamentosPage, categoriasData, resumoData] = await Promise.all([
+        listLancamentosPage(filters, page, PAGE_SIZE),
         listCategorias(),
         getResumo(),
       ]);
-      setLancamentos(lancamentosData);
+      setLancamentos(lancamentosPage.data);
+      setTotal(lancamentosPage.total);
       setCategorias(categoriasData);
       setResumo(resumoData);
     } catch (error: unknown) {
@@ -190,11 +199,29 @@ export const FinanceiraPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [hasFinanceAccess]);
+  }, [hasFinanceAccess, filters, page]);
 
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setFilters((current) => ({ ...current, q: searchInput }));
+      setPage(0);
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [searchInput]);
+
+  const updateStatusFilter = (status: LancamentoStatus | '') => {
+    setFilters((current) => ({ ...current, status }));
+    setPage(0);
+  };
+
+  const updateTipoFilter = (tipo: FinanceiroTipo | '') => {
+    setFilters((current) => ({ ...current, tipo }));
+    setPage(0);
+  };
 
   const lancamentoColumns = useMemo<readonly DataTableColumn<LancamentoWithCategoria>[]>(
     () => [
@@ -452,16 +479,66 @@ export const FinanceiraPage = () => {
 
       <div className="mt-6">
         {section === 'lancamentos' ? (
-          <DataTable
-            columns={lancamentoColumns}
-            emptyLabel="Nenhum lançamento cadastrado."
-            error={loadError}
-            loading={loading}
-            onDelete={setDeletingLancamento}
-            onEdit={openEditLancamento}
-            onRetry={() => void loadData()}
-            rows={lancamentos}
-          />
+          <div>
+            <div className="mb-4 flex flex-wrap items-end gap-4">
+              <div className="w-full max-w-xs">
+                <FormField htmlFor="financeira-busca" label="Buscar">
+                  <input
+                    className={inputClassName}
+                    id="financeira-busca"
+                    onChange={(event) => setSearchInput(event.target.value)}
+                    placeholder="Descrição"
+                    value={searchInput}
+                  />
+                </FormField>
+              </div>
+              <div className="w-full max-w-xs">
+                <FormField htmlFor="financeira-tipo-filtro" label="Tipo">
+                  <select
+                    className={inputClassName}
+                    id="financeira-tipo-filtro"
+                    onChange={(event) => updateTipoFilter(event.target.value as FinanceiroTipo | '')}
+                    value={filters.tipo}
+                  >
+                    <option value="">Todos</option>
+                    {Object.entries(tipoLabels).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+              </div>
+              <div className="w-full max-w-xs">
+                <FormField htmlFor="financeira-status-filtro" label="Status">
+                  <select
+                    className={inputClassName}
+                    id="financeira-status-filtro"
+                    onChange={(event) => updateStatusFilter(event.target.value as LancamentoStatus | '')}
+                    value={filters.status}
+                  >
+                    <option value="">Todos</option>
+                    {Object.entries(statusLabels).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+              </div>
+            </div>
+            <DataTable
+              columns={lancamentoColumns}
+              emptyLabel="Nenhum lançamento encontrado."
+              error={loadError}
+              loading={loading}
+              onDelete={setDeletingLancamento}
+              onEdit={openEditLancamento}
+              onRetry={() => void loadData()}
+              rows={lancamentos}
+            />
+            <Pagination onPageChange={setPage} page={page} pageSize={PAGE_SIZE} total={total} />
+          </div>
         ) : (
           <DataTable
             columns={categoriaColumns}

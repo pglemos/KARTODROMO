@@ -6,21 +6,24 @@ import { DataTable, type DataTableColumn } from '../../ui/DataTable';
 import { FormField } from '../../ui/FormField';
 import { Modal } from '../../ui/Modal';
 import { PageHeader } from '../../ui/PageHeader';
+import { Pagination } from '../../ui/Pagination';
 import { useToast } from '../../ui/useToast';
 import {
   createCampeonato,
   createEtapa,
   createPiloto,
   listCampeonatos,
-  listClassificacao,
-  listEtapas,
-  listPilotos,
+  listCampeonatosPage,
+  listClassificacaoPage,
+  listEtapasPage,
+  listPilotosPage,
   removeCampeonato,
   removeEtapa,
   removePiloto,
   updateCampeonato,
   updateEtapa,
   updatePiloto,
+  type EtapasFilters,
 } from './campeonatos.api';
 import type {
   Campeonato,
@@ -36,6 +39,8 @@ import type {
 
 type Tab = 'campeonatos' | 'etapas' | 'pilotos' | 'classificacao';
 type FormKind = Exclude<Tab, 'classificacao'>;
+
+const PAGE_SIZE = 10;
 
 type CampeonatoFormState = {
   nome: string;
@@ -153,12 +158,41 @@ export const CampeonatosPage = () => {
   const { role } = useAuth();
   const toast = useToast();
   const [activeTab, setActiveTab] = useState<Tab>('campeonatos');
+
+  // full, unpaginated campeonatos list — feeds the dropdowns (etapa form, classificacao filter)
   const [campeonatos, setCampeonatos] = useState<Campeonato[]>([]);
-  const [etapas, setEtapas] = useState<EtapaWithCampeonato[]>([]);
-  const [pilotos, setPilotos] = useState<Piloto[]>([]);
-  const [classificacao, setClassificacao] = useState<ClassificacaoWithPiloto[]>([]);
+
+  // Campeonatos tab (own paginated/searchable view)
+  const [campeonatosRows, setCampeonatosRows] = useState<Campeonato[]>([]);
+  const [campeonatosTotal, setCampeonatosTotal] = useState(0);
+  const [campeonatosPage, setCampeonatosPage] = useState(0);
+  const [campeonatosSearchInput, setCampeonatosSearchInput] = useState('');
+  const [campeonatosSearch, setCampeonatosSearch] = useState('');
+
+  // Etapas tab
+  const [etapasRows, setEtapasRows] = useState<EtapaWithCampeonato[]>([]);
+  const [etapasTotal, setEtapasTotal] = useState(0);
+  const [etapasPage, setEtapasPage] = useState(0);
   const [etapaCampeonatoId, setEtapaCampeonatoId] = useState('');
+  const [etapaStatusFilter, setEtapaStatusFilter] = useState<EtapaStatus | ''>('');
+  const [etapasSearchInput, setEtapasSearchInput] = useState('');
+  const [etapasSearch, setEtapasSearch] = useState('');
+
+  // Pilotos tab
+  const [pilotosRows, setPilotosRows] = useState<Piloto[]>([]);
+  const [pilotosTotal, setPilotosTotal] = useState(0);
+  const [pilotosPage, setPilotosPage] = useState(0);
+  const [pilotosSearchInput, setPilotosSearchInput] = useState('');
+  const [pilotosSearch, setPilotosSearch] = useState('');
+
+  // Classificacao tab
+  const [classificacao, setClassificacao] = useState<ClassificacaoWithPiloto[]>([]);
+  const [classificacaoTotal, setClassificacaoTotal] = useState(0);
+  const [classificacaoPage, setClassificacaoPage] = useState(0);
   const [classificacaoCampeonatoId, setClassificacaoCampeonatoId] = useState('');
+  const [classificacaoSearchInput, setClassificacaoSearchInput] = useState('');
+  const [classificacaoSearch, setClassificacaoSearch] = useState('');
+
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [classificacaoLoading, setClassificacaoLoading] = useState(false);
@@ -178,19 +212,15 @@ export const CampeonatosPage = () => {
 
   const canWrite = ['owner', 'admin', 'operador_telao'].includes(role);
 
-  const loadData = useCallback(async () => {
+  const PAGE_SIZE_LOCAL = PAGE_SIZE;
+
+  // unpaginated campeonatos, for dropdowns + classificacao default selection
+  const loadCampeonatosAll = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
-
     try {
-      const [campeonatosData, etapasData, pilotosData] = await Promise.all([
-        listCampeonatos(),
-        listEtapas(),
-        listPilotos(),
-      ]);
+      const campeonatosData = await listCampeonatos();
       setCampeonatos(campeonatosData);
-      setEtapas(etapasData);
-      setPilotos(pilotosData);
       setClassificacaoCampeonatoId((current) => {
         if (campeonatosData.some((campeonato) => campeonato.id === current)) {
           return current;
@@ -204,9 +234,45 @@ export const CampeonatosPage = () => {
     }
   }, []);
 
+  const loadCampeonatosTab = useCallback(async () => {
+    try {
+      const result = await listCampeonatosPage(campeonatosSearch, campeonatosPage, PAGE_SIZE_LOCAL);
+      setCampeonatosRows(result.data);
+      setCampeonatosTotal(result.total);
+    } catch (error: unknown) {
+      setLoadError(getErrorMessage(error));
+    }
+  }, [campeonatosSearch, campeonatosPage, PAGE_SIZE_LOCAL]);
+
+  const loadEtapasTab = useCallback(async () => {
+    const filters: EtapasFilters = {
+      campeonato_id: etapaCampeonatoId || undefined,
+      status: etapaStatusFilter,
+      q: etapasSearch,
+    };
+    try {
+      const result = await listEtapasPage(filters, etapasPage, PAGE_SIZE_LOCAL);
+      setEtapasRows(result.data);
+      setEtapasTotal(result.total);
+    } catch (error: unknown) {
+      setLoadError(getErrorMessage(error));
+    }
+  }, [etapaCampeonatoId, etapaStatusFilter, etapasSearch, etapasPage, PAGE_SIZE_LOCAL]);
+
+  const loadPilotosTab = useCallback(async () => {
+    try {
+      const result = await listPilotosPage(pilotosSearch, pilotosPage, PAGE_SIZE_LOCAL);
+      setPilotosRows(result.data);
+      setPilotosTotal(result.total);
+    } catch (error: unknown) {
+      setLoadError(getErrorMessage(error));
+    }
+  }, [pilotosSearch, pilotosPage, PAGE_SIZE_LOCAL]);
+
   const loadClassificacao = useCallback(async () => {
     if (!classificacaoCampeonatoId) {
       setClassificacao([]);
+      setClassificacaoTotal(0);
       setClassificacaoError(null);
       return;
     }
@@ -214,28 +280,82 @@ export const CampeonatosPage = () => {
     setClassificacaoLoading(true);
     setClassificacaoError(null);
     try {
-      setClassificacao(await listClassificacao(classificacaoCampeonatoId));
+      const result = await listClassificacaoPage(
+        classificacaoCampeonatoId,
+        classificacaoSearch,
+        classificacaoPage,
+        PAGE_SIZE_LOCAL,
+      );
+      setClassificacao(result.data);
+      setClassificacaoTotal(result.total);
     } catch (error: unknown) {
       setClassificacaoError(getErrorMessage(error));
     } finally {
       setClassificacaoLoading(false);
     }
-  }, [classificacaoCampeonatoId]);
+  }, [classificacaoCampeonatoId, classificacaoSearch, classificacaoPage, PAGE_SIZE_LOCAL]);
+
+  const reloadAll = useCallback(async () => {
+    await Promise.all([loadCampeonatosAll(), loadCampeonatosTab(), loadEtapasTab(), loadPilotosTab()]);
+    await loadClassificacao();
+  }, [loadCampeonatosAll, loadCampeonatosTab, loadEtapasTab, loadPilotosTab, loadClassificacao]);
 
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    void loadCampeonatosAll();
+  }, [loadCampeonatosAll]);
+
+  useEffect(() => {
+    void loadCampeonatosTab();
+  }, [loadCampeonatosTab]);
+
+  useEffect(() => {
+    void loadEtapasTab();
+  }, [loadEtapasTab]);
+
+  useEffect(() => {
+    void loadPilotosTab();
+  }, [loadPilotosTab]);
 
   useEffect(() => {
     void loadClassificacao();
   }, [loadClassificacao]);
 
+  // debounced search inputs -> committed filters (resets to page 0)
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setCampeonatosSearch(campeonatosSearchInput);
+      setCampeonatosPage(0);
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [campeonatosSearchInput]);
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setEtapasSearch(etapasSearchInput);
+      setEtapasPage(0);
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [etapasSearchInput]);
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setPilotosSearch(pilotosSearchInput);
+      setPilotosPage(0);
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [pilotosSearchInput]);
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setClassificacaoSearch(classificacaoSearchInput);
+      setClassificacaoPage(0);
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [classificacaoSearchInput]);
+
   const etapasFiltradas = useMemo(
-    () =>
-      etapaCampeonatoId
-        ? etapas.filter((etapa) => etapa.campeonato_id === etapaCampeonatoId)
-        : etapas,
-    [etapaCampeonatoId, etapas],
+    () => etapasRows,
+    [etapasRows],
   );
 
   const campeonatoColumns = useMemo<readonly DataTableColumn<Campeonato>[]>(
@@ -432,7 +552,7 @@ export const CampeonatosPage = () => {
         toast.success('Campeonato criado com sucesso.');
       }
       setFormKind(null);
-      await loadData();
+      await reloadAll();
     } catch (error: unknown) {
       toast.error(getErrorMessage(error));
     } finally {
@@ -462,7 +582,7 @@ export const CampeonatosPage = () => {
         toast.success('Etapa criada com sucesso.');
       }
       setFormKind(null);
-      await loadData();
+      await reloadAll();
     } catch (error: unknown) {
       toast.error(getErrorMessage(error));
     } finally {
@@ -491,7 +611,7 @@ export const CampeonatosPage = () => {
         toast.success('Piloto criado com sucesso.');
       }
       setFormKind(null);
-      await loadData();
+      await reloadAll();
     } catch (error: unknown) {
       toast.error(getErrorMessage(error));
     } finally {
@@ -515,7 +635,7 @@ export const CampeonatosPage = () => {
         toast.success('Piloto excluído com sucesso.');
       }
       setDeleteTarget(null);
-      await loadData();
+      await reloadAll();
       await loadClassificacao();
     } catch (error: unknown) {
       toast.error(getErrorMessage(error));
@@ -576,40 +696,95 @@ export const CampeonatosPage = () => {
 
       <div className="mt-6" role="tabpanel">
         {activeTab === 'campeonatos' ? (
-          <DataTable
-            columns={campeonatoColumns}
-            emptyLabel="Nenhum campeonato cadastrado."
-            error={loadError}
-            loading={loading}
-            onDelete={
-              canWrite
-                ? (item) => setDeleteTarget({ kind: 'campeonato', item })
-                : undefined
-            }
-            onEdit={canWrite ? openEditCampeonato : undefined}
-            onRetry={() => void loadData()}
-            rows={campeonatos}
-          />
+          <div>
+            <div className="mb-4 max-w-xs">
+              <FormField htmlFor="campeonatos-busca" label="Buscar">
+                <input
+                  className={inputClassName}
+                  id="campeonatos-busca"
+                  onChange={(event) => setCampeonatosSearchInput(event.target.value)}
+                  placeholder="Nome, slug ou temporada"
+                  value={campeonatosSearchInput}
+                />
+              </FormField>
+            </div>
+            <DataTable
+              columns={campeonatoColumns}
+              emptyLabel="Nenhum campeonato encontrado."
+              error={loadError}
+              loading={loading}
+              onDelete={
+                canWrite
+                  ? (item) => setDeleteTarget({ kind: 'campeonato', item })
+                  : undefined
+              }
+              onEdit={canWrite ? openEditCampeonato : undefined}
+              onRetry={() => void reloadAll()}
+              rows={campeonatosRows}
+            />
+            <Pagination
+              onPageChange={setCampeonatosPage}
+              page={campeonatosPage}
+              pageSize={PAGE_SIZE}
+              total={campeonatosTotal}
+            />
+          </div>
         ) : null}
 
         {activeTab === 'etapas' ? (
           <div className="space-y-5">
-            <div className="max-w-sm">
-              <FormField htmlFor="etapas-filtro-campeonato" label="Filtrar por campeonato">
-                <select
-                  className={inputClassName}
-                  id="etapas-filtro-campeonato"
-                  onChange={(event) => setEtapaCampeonatoId(event.target.value)}
-                  value={etapaCampeonatoId}
-                >
-                  <option value="">Todos os campeonatos</option>
-                  {campeonatos.map((campeonato) => (
-                    <option key={campeonato.id} value={campeonato.id}>
-                      {campeonato.nome} — {campeonato.temporada ?? 'Sem temporada'}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="w-full max-w-xs">
+                <FormField htmlFor="etapas-busca" label="Buscar">
+                  <input
+                    className={inputClassName}
+                    id="etapas-busca"
+                    onChange={(event) => setEtapasSearchInput(event.target.value)}
+                    placeholder="Nome da etapa"
+                    value={etapasSearchInput}
+                  />
+                </FormField>
+              </div>
+              <div className="w-full max-w-xs">
+                <FormField htmlFor="etapas-filtro-campeonato" label="Filtrar por campeonato">
+                  <select
+                    className={inputClassName}
+                    id="etapas-filtro-campeonato"
+                    onChange={(event) => {
+                      setEtapaCampeonatoId(event.target.value);
+                      setEtapasPage(0);
+                    }}
+                    value={etapaCampeonatoId}
+                  >
+                    <option value="">Todos os campeonatos</option>
+                    {campeonatos.map((campeonato) => (
+                      <option key={campeonato.id} value={campeonato.id}>
+                        {campeonato.nome} — {campeonato.temporada ?? 'Sem temporada'}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+              </div>
+              <div className="w-full max-w-xs">
+                <FormField htmlFor="etapas-filtro-status" label="Status">
+                  <select
+                    className={inputClassName}
+                    id="etapas-filtro-status"
+                    onChange={(event) => {
+                      setEtapaStatusFilter(event.target.value as EtapaStatus | '');
+                      setEtapasPage(0);
+                    }}
+                    value={etapaStatusFilter}
+                  >
+                    <option value="">Todos</option>
+                    {Object.entries(etapaStatusLabels).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+              </div>
             </div>
             <DataTable
               columns={etapaColumns}
@@ -620,45 +795,76 @@ export const CampeonatosPage = () => {
                 canWrite ? (item) => setDeleteTarget({ kind: 'etapa', item }) : undefined
               }
               onEdit={canWrite ? openEditEtapa : undefined}
-              onRetry={() => void loadData()}
+              onRetry={() => void reloadAll()}
               rows={etapasFiltradas}
             />
+            <Pagination onPageChange={setEtapasPage} page={etapasPage} pageSize={PAGE_SIZE} total={etapasTotal} />
           </div>
         ) : null}
 
         {activeTab === 'pilotos' ? (
-          <DataTable
-            columns={pilotoColumns}
-            emptyLabel="Nenhum piloto cadastrado."
-            error={loadError}
-            loading={loading}
-            onDelete={
-              canWrite ? (item) => setDeleteTarget({ kind: 'piloto', item }) : undefined
-            }
-            onEdit={canWrite ? openEditPiloto : undefined}
-            onRetry={() => void loadData()}
-            rows={pilotos}
-          />
+          <div>
+            <div className="mb-4 max-w-xs">
+              <FormField htmlFor="pilotos-busca" label="Buscar">
+                <input
+                  className={inputClassName}
+                  id="pilotos-busca"
+                  onChange={(event) => setPilotosSearchInput(event.target.value)}
+                  placeholder="Nome, número ou equipe"
+                  value={pilotosSearchInput}
+                />
+              </FormField>
+            </div>
+            <DataTable
+              columns={pilotoColumns}
+              emptyLabel="Nenhum piloto encontrado."
+              error={loadError}
+              loading={loading}
+              onDelete={
+                canWrite ? (item) => setDeleteTarget({ kind: 'piloto', item }) : undefined
+              }
+              onEdit={canWrite ? openEditPiloto : undefined}
+              onRetry={() => void reloadAll()}
+              rows={pilotosRows}
+            />
+            <Pagination onPageChange={setPilotosPage} page={pilotosPage} pageSize={PAGE_SIZE} total={pilotosTotal} />
+          </div>
         ) : null}
 
         {activeTab === 'classificacao' ? (
           <div className="space-y-5">
-            <div className="max-w-sm">
-              <FormField htmlFor="classificacao-campeonato" label="Campeonato">
-                <select
-                  className={inputClassName}
-                  id="classificacao-campeonato"
-                  onChange={(event) => setClassificacaoCampeonatoId(event.target.value)}
-                  value={classificacaoCampeonatoId}
-                >
-                  <option value="">Selecione</option>
-                  {campeonatos.map((campeonato) => (
-                    <option key={campeonato.id} value={campeonato.id}>
-                      {campeonato.nome} — {campeonato.temporada ?? 'Sem temporada'}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="w-full max-w-xs">
+                <FormField htmlFor="classificacao-campeonato" label="Campeonato">
+                  <select
+                    className={inputClassName}
+                    id="classificacao-campeonato"
+                    onChange={(event) => {
+                      setClassificacaoCampeonatoId(event.target.value);
+                      setClassificacaoPage(0);
+                    }}
+                    value={classificacaoCampeonatoId}
+                  >
+                    <option value="">Selecione</option>
+                    {campeonatos.map((campeonato) => (
+                      <option key={campeonato.id} value={campeonato.id}>
+                        {campeonato.nome} — {campeonato.temporada ?? 'Sem temporada'}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+              </div>
+              <div className="w-full max-w-xs">
+                <FormField htmlFor="classificacao-busca" label="Buscar piloto">
+                  <input
+                    className={inputClassName}
+                    id="classificacao-busca"
+                    onChange={(event) => setClassificacaoSearchInput(event.target.value)}
+                    placeholder="Nome do piloto"
+                    value={classificacaoSearchInput}
+                  />
+                </FormField>
+              </div>
             </div>
             <DataTable
               columns={classificacaoColumns}
@@ -671,6 +877,12 @@ export const CampeonatosPage = () => {
               loading={classificacaoLoading}
               onRetry={() => void loadClassificacao()}
               rows={classificacao}
+            />
+            <Pagination
+              onPageChange={setClassificacaoPage}
+              page={classificacaoPage}
+              pageSize={PAGE_SIZE}
+              total={classificacaoTotal}
             />
           </div>
         ) : null}
