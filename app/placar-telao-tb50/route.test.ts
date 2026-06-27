@@ -43,7 +43,7 @@ vi.mock('@/lib/livetime/snapshot-service', () => ({
 }));
 
 vi.mock('@/lib/tb50-display-mode-store', () => ({
-  readTb50DisplayModeFromStore: vi.fn(async () => ({ mode: 'live', updatedAt: null, persistent: true })),
+  readTb50DisplayModeFromStore: vi.fn(async () => ({ mode: 'live', auto: true, updatedAt: null, persistent: true })),
 }));
 
 vi.mock('@/lib/tb50-page-store', () => ({
@@ -55,7 +55,7 @@ describe('/placar-telao-tb50 layout selection', () => {
     vi.useRealTimers();
     vi.clearAllMocks();
     clearSnapshotCacheForTests();
-    vi.mocked(readTb50DisplayModeFromStore).mockResolvedValue({ mode: 'live', updatedAt: null, persistent: true });
+    vi.mocked(readTb50DisplayModeFromStore).mockResolvedValue({ mode: 'live', auto: true, updatedAt: null, persistent: true });
     vi.mocked(readTb50PageFromRemote).mockResolvedValue({ offset: 0, updatedAt: null, persistent: true });
   });
 
@@ -271,7 +271,7 @@ describe('/placar-telao-tb50 layout selection', () => {
   });
 
   it('keeps a manual final-real request on the grid for qualifying data', async () => {
-    vi.mocked(readTb50DisplayModeFromStore).mockResolvedValueOnce({ mode: 'final-real', updatedAt: '2026-05-12T12:00:00.000Z', persistent: true });
+    vi.mocked(readTb50DisplayModeFromStore).mockResolvedValueOnce({ mode: 'final-real', auto: true, updatedAt: '2026-05-12T12:00:00.000Z', persistent: true });
     vi.mocked(fetchExternalSnapshot).mockResolvedValueOnce({
       status: 'finished',
       source: 'dom-scraper',
@@ -419,7 +419,7 @@ describe('/placar-telao-tb50 layout selection', () => {
   });
 
   it('can switch to final video from the manual display mode without a final query param', async () => {
-    vi.mocked(readTb50DisplayModeFromStore).mockResolvedValueOnce({ mode: 'final-real', updatedAt: '2026-05-09T12:00:00.000Z', persistent: true });
+    vi.mocked(readTb50DisplayModeFromStore).mockResolvedValueOnce({ mode: 'final-real', auto: true, updatedAt: '2026-05-09T12:00:00.000Z', persistent: true });
     vi.mocked(fetchExternalSnapshot).mockResolvedValueOnce({
       status: 'finished',
       source: 'dom-scraper',
@@ -443,7 +443,7 @@ describe('/placar-telao-tb50 layout selection', () => {
   });
 
   it('keeps manual final-real mode on the grid during a live race', async () => {
-    vi.mocked(readTb50DisplayModeFromStore).mockResolvedValueOnce({ mode: 'final-real', updatedAt: '2026-05-09T12:00:00.000Z', persistent: true });
+    vi.mocked(readTb50DisplayModeFromStore).mockResolvedValueOnce({ mode: 'final-real', auto: true, updatedAt: '2026-05-09T12:00:00.000Z', persistent: true });
     vi.mocked(fetchExternalSnapshot).mockResolvedValueOnce({
       status: 'live',
       source: 'dom-scraper',
@@ -500,7 +500,7 @@ describe('/placar-telao-tb50 layout selection', () => {
   it('keeps manual final-real mode on the cached grid when the current source returns no active drivers without a finished race status', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-09T12:00:05.000Z'));
-    vi.mocked(readTb50DisplayModeFromStore).mockResolvedValue({ mode: 'final-real', updatedAt: '2026-05-09T12:00:00.000Z', persistent: true });
+    vi.mocked(readTb50DisplayModeFromStore).mockResolvedValue({ mode: 'final-real', auto: true, updatedAt: '2026-05-09T12:00:00.000Z', persistent: true });
 
     vi.mocked(fetchExternalSnapshot)
       .mockResolvedValueOnce({

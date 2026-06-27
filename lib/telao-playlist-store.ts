@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { get, put } from '@vercel/blob';
+import { getR2Json, hasR2Store, putR2Json } from '@/lib/r2-client';
 
 export type TelaoPlaylistItemType = 'scoreboard' | 'image' | 'video' | 'youtube' | 'stream' | 'web';
 
@@ -51,7 +51,7 @@ let lastBlobReadFailedAt = 0;
 let lastBlobWriteFailedAt = 0;
 
 function hasBlobStore(): boolean {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  return hasR2Store();
 }
 
 function playlistRemoteEndpoint(): string | undefined {
@@ -151,9 +151,9 @@ export function writeTelaoPlaylistToFile(value: unknown): TelaoPlaylistState {
 export async function readTelaoPlaylistFromStore(): Promise<TelaoPlaylistState> {
   if (hasBlobStore()) {
     try {
-      const blob = await get(blobPath, { access: 'private', useCache: false });
-      if (blob?.statusCode === 200) {
-        const state = normalizeState(await new Response(blob.stream).json(), true);
+      const stored = await getR2Json<unknown>(blobPath);
+      if (stored !== null) {
+        const state = normalizeState(stored, true);
         memoryState = state;
         lastBlobReadAt = Date.now();
         return { ...state, persistent: true };
@@ -194,12 +194,7 @@ export async function writeTelaoPlaylist(value: unknown): Promise<TelaoPlaylistS
   memoryState = state;
   if (hasBlobStore()) {
     try {
-      await put(blobPath, `${serialize(state)}\n`, {
-        access: 'private',
-        allowOverwrite: true,
-        contentType: 'application/json',
-        cacheControlMaxAge: 10,
-      });
+      await putR2Json(blobPath, { items: state.items, updatedAt: state.updatedAt });
       lastBlobReadAt = Date.now();
       memoryState = { ...state, persistent: true };
       return memoryState;

@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { CalendarCheck2, ConciergeBell, UtensilsCrossed, WalletCards } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
+import { apiGet } from '../../lib/api-client';
 import { canAccess } from '../../lib/rbac';
-import { supabase } from '../../lib/supabase';
 import { Card } from '../../ui/Card';
 import { PageHeader } from '../../ui/PageHeader';
 import { StatCard } from '../../ui/StatCard';
@@ -50,55 +50,64 @@ export const DashboardPage = () => {
   const loadData = useCallback(async () => {
     setLoading(true);
 
-    const reservasCount = await supabase
-      .from('reservas')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'confirmada');
+    try {
+      const [confirmadas, fila, vendas] = await Promise.all([
+        apiGet<{ id: string }[]>('reservas?eq_status=confirmada'),
+        apiGet<{ id: string }[]>('recepcao_atendimentos?in_status=aguardando,em_atendimento'),
+        apiGet<{ total: number }[]>('lanchonete_vendas'),
+      ]);
 
-    const filaCount = await supabase
-      .from('recepcao_atendimentos')
-      .select('id', { count: 'exact', head: true })
-      .in('status', ['aguardando', 'em_atendimento']);
-
-    const vendasData = await supabase.from('lanchonete_vendas').select('total');
-    const vendasTotal = vendasData.error
-      ? null
-      : (vendasData.data ?? []).reduce((sum, row) => sum + Number(row.total ?? 0), 0);
-
-    let saldo: number | null = null;
-    if (canFinance) {
-      const fin = await supabase
-        .from('financeiro_lancamentos')
-        .select('tipo, valor')
-        .eq('status', 'confirmado');
-      if (!fin.error) {
-        saldo = (fin.data ?? []).reduce(
+      let saldo: number | null = null;
+      if (canFinance) {
+        const fin = await apiGet<{ tipo: string; valor: number }[]>('financeiro_lancamentos?eq_status=confirmado');
+        saldo = fin.reduce(
           (sum, row) => sum + (row.tipo === 'receita' ? Number(row.valor) : -Number(row.valor)),
           0,
         );
       }
+
+      const proximasRows = await apiGet<
+        Array<{ id: string; data_inicio: string; status: string; cliente_nome: string | null; pista_nome: string | null }>
+      >('reservas_full?dir=asc&limit=5');
+
+      const classificacaoRows = await apiGet<
+        Array<{
+          id: string;
+          pontos: number;
+          piloto_nome: string | null;
+          campeonato_nome: string | null;
+        }>
+      >('classificacao_full?limit=3');
+
+      setStats({
+        reservas: confirmadas.length,
+        saldo,
+        vendas: vendas.reduce((sum, row) => sum + Number(row.total ?? 0), 0),
+        fila: fila.length,
+      });
+      setReservas(
+        proximasRows.map((row) => ({
+          id: row.id,
+          data_inicio: row.data_inicio,
+          status: row.status,
+          clientes: row.cliente_nome ? { nome: row.cliente_nome } : null,
+          pistas: row.pista_nome ? { nome: row.pista_nome } : null,
+        })),
+      );
+      setLideres(
+        classificacaoRows.map((row) => ({
+          id: row.id,
+          pontos: row.pontos,
+          pilotos: row.piloto_nome ? { nome: row.piloto_nome } : null,
+          campeonatos: row.campeonato_nome ? { nome: row.campeonato_nome } : null,
+        })),
+      );
+    } catch {
+      setStats({ reservas: null, saldo: null, vendas: null, fila: null });
+      setReservas([]);
+      setLideres([]);
     }
 
-    const proximas = await supabase
-      .from('reservas')
-      .select('id, data_inicio, status, clientes(nome), pistas(nome)')
-      .order('data_inicio', { ascending: true })
-      .limit(5);
-
-    const classificacao = await supabase
-      .from('classificacao')
-      .select('id, pontos, pilotos(nome), campeonatos(nome)')
-      .order('pontos', { ascending: false })
-      .limit(3);
-
-    setStats({
-      reservas: reservasCount.error ? null : (reservasCount.count ?? 0),
-      saldo,
-      vendas: vendasTotal,
-      fila: filaCount.error ? null : (filaCount.count ?? 0),
-    });
-    setReservas(proximas.error ? [] : ((proximas.data ?? []) as unknown as ReservaRow[]));
-    setLideres(classificacao.error ? [] : ((classificacao.data ?? []) as unknown as ClassificacaoRow[]));
     setLoading(false);
   }, [canFinance]);
 
