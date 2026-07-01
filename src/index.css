@@ -457,13 +457,15 @@
 
 .kac-logo-stage {
   position: absolute;
-  inset: 4rem 2rem 11rem;
+  inset: 3.5rem 2rem 14rem;
   display: grid;
   place-items: center;
 }
 
 .kac-logo-img {
-  width: min(27rem, 82vw);
+  width: min(25rem, 82%);
+  max-height: 100%;
+  object-fit: contain;
   filter: drop-shadow(0 24px 28px rgba(6, 79, 34, 0.18));
   animation: kac-float 5.8s ease-in-out infinite;
 }
@@ -1096,15 +1098,35 @@
   }
 
   .kac-orbit-card {
-    min-height: 33rem;
+    display: flex;
+    min-height: auto;
+    flex-direction: column;
+    gap: 1.75rem;
+    padding: 1.5rem 1rem 1rem;
+  }
+
+  .kac-track-svg {
+    display: none;
   }
 
   .kac-logo-stage {
-    inset: 2.2rem 1rem 13rem;
+    position: relative;
+    inset: auto;
+    z-index: 1;
+  }
+
+  .kac-logo-img {
+    width: min(16.5rem, 80vw);
   }
 
   .kac-spec-panel {
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    z-index: 2;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    background: #ffffff;
   }
 
   .kac-spec-row:nth-child(3n) {

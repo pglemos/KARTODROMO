@@ -42,3 +42,6 @@ Thumbs.db
 
 # Local tooling binaries (not part of the deployable app)
 .tools/
+
+# Reverse-engineering workspace — secrets, decompiled binaries, never publish
+/KARTODROMO - SISTEMA/

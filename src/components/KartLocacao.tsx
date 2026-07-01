@@ -81,18 +81,18 @@ const KartLocacao = () => {
               e equipe de pista em uma pista homologada de 1.110 metros.
             </p>
 
-            <div className="mt-6 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-[#fbfcf8]/18 bg-[#fbfcf8]/18 md:hidden">
-              <div className="bg-zinc-950/90 p-3">
+            <div className="mt-6 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-[#fbfcf8]/45 bg-[#fbfcf8]/35 shadow-[0_18px_42px_rgba(0,0,0,0.38)] md:hidden">
+              <div className="bg-zinc-950/95 p-3">
                 <strong className="block text-xl font-black leading-none text-primary-300">R$ 145</strong>
-                <span className="mt-1 block text-[9px] font-black uppercase tracking-[0.12em] text-zinc-400">online</span>
+                <span className="mt-1 block text-[9px] font-black uppercase tracking-[0.12em] text-[#fbfcf8]/80">online</span>
               </div>
-              <div className="bg-zinc-950/90 p-3">
+              <div className="bg-zinc-950/95 p-3">
                 <strong className="block text-xl font-black leading-none text-[#fbfcf8]">30 min</strong>
-                <span className="mt-1 block text-[9px] font-black uppercase tracking-[0.12em] text-zinc-400">bateria</span>
+                <span className="mt-1 block text-[9px] font-black uppercase tracking-[0.12em] text-[#fbfcf8]/80">bateria</span>
               </div>
-              <div className="bg-zinc-950/90 p-3">
+              <div className="bg-zinc-950/95 p-3">
                 <strong className="block text-xl font-black leading-none text-[#fbfcf8]">14+</strong>
-                <span className="mt-1 block text-[9px] font-black uppercase tracking-[0.12em] text-zinc-400">idade</span>
+                <span className="mt-1 block text-[9px] font-black uppercase tracking-[0.12em] text-[#fbfcf8]/80">idade</span>
               </div>
             </div>
 
@@ -116,35 +116,35 @@ const KartLocacao = () => {
             </div>
           </div>
 
-          <div className="hidden gap-px overflow-hidden rounded-lg border border-[#fbfcf8]/18 bg-[#fbfcf8]/18 md:mb-3 md:grid md:max-w-xl md:justify-self-end">
-            <div className="grid grid-cols-2 gap-px bg-[#fbfcf8]/18">
-              <div className="bg-zinc-950/82 p-4 md:p-5">
-                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400">Online</span>
+          <div className="hidden gap-px overflow-hidden rounded-lg border border-[#fbfcf8]/55 bg-[#fbfcf8]/35 shadow-[0_24px_70px_rgba(0,0,0,0.42)] md:mb-3 md:grid md:max-w-xl md:justify-self-end">
+            <div className="grid grid-cols-2 gap-px bg-[#fbfcf8]/35">
+              <div className="bg-zinc-950/95 p-4 md:p-5">
+                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#fbfcf8]/78">Online</span>
                 <strong className="mt-2 block text-3xl font-black leading-none text-primary-300">R$ 145</strong>
-                <p className="mt-2 text-xs font-semibold leading-5 text-zinc-300">Pix ou cartão no agendamento.</p>
+                <p className="mt-2 text-xs font-semibold leading-5 text-[#fbfcf8]/82">Pix ou cartão no agendamento.</p>
               </div>
-              <div className="bg-zinc-950/82 p-4 md:p-5">
-                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400">No balcão</span>
+              <div className="bg-zinc-950/95 p-4 md:p-5">
+                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#fbfcf8]/78">No balcão</span>
                 <strong className="mt-2 block text-3xl font-black leading-none text-[#fbfcf8]">R$ 175</strong>
-                <p className="mt-2 text-xs font-semibold leading-5 text-zinc-300">Crédito, débito, dinheiro ou Pix.</p>
+                <p className="mt-2 text-xs font-semibold leading-5 text-[#fbfcf8]/82">Crédito, débito, dinheiro ou Pix.</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-px bg-[#fbfcf8]/18">
-              <div className="bg-zinc-950/82 p-4">
+            <div className="grid grid-cols-3 gap-px bg-[#fbfcf8]/35">
+              <div className="bg-zinc-950/95 p-4">
                 <Timer className="mb-2 h-4 w-4 text-primary-300" aria-hidden="true" />
                 <strong className="block text-xl font-black">30 min</strong>
-                <span className="text-[10px] font-black uppercase tracking-[0.12em] text-zinc-400">bateria</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.12em] text-[#fbfcf8]/78">bateria</span>
               </div>
-              <div className="bg-zinc-950/82 p-4">
+              <div className="bg-zinc-950/95 p-4">
                 <Gauge className="mb-2 h-4 w-4 text-primary-300" aria-hidden="true" />
                 <strong className="block text-xl font-black">400cc</strong>
-                <span className="text-[10px] font-black uppercase tracking-[0.12em] text-zinc-400">Honda</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.12em] text-[#fbfcf8]/78">Honda</span>
               </div>
-              <div className="bg-zinc-950/82 p-4">
+              <div className="bg-zinc-950/95 p-4">
                 <UserCheck className="mb-2 h-4 w-4 text-primary-300" aria-hidden="true" />
                 <strong className="block text-xl font-black">14+</strong>
-                <span className="text-[10px] font-black uppercase tracking-[0.12em] text-zinc-400">idade</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.12em] text-[#fbfcf8]/78">idade</span>
               </div>
             </div>
           </div>

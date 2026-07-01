@@ -1,19 +1,21 @@
 status:
   branch: main
   modifiedFiles:
-    - .aiox-core/product/templates/ide-rules/codex-rules.md
-    - AGENTS.md
-    - CHECKLIST-CAPTURA-ENDPOINT.md
-    - CHECKLIST-TB50.md
-    - Dockerfile.scraper
-  modifiedFilesTotalCount: 124
+    - .gitignore
+    - docs/brandbook-kartodromo.md
+    - lib/booking/official-days.test.ts
+    - lib/booking/official-days.ts
+    - src/components/KartLocacao.tsx
+    - src/components/QuickBooking.tsx
+    - src/index.css
+  modifiedFilesTotalCount: 8
   recentCommits:
-    - 'fix: use tb50 static scoreboard route'
-    - Refine telão layout for 30 positions and live clock
+    - 'Adiciona aba CalXPro (histórico) em /admin/clientes'
+    - 'fix(inscricao): usa runtime nodejs em vez de edge na rota de inscricao'
   currentEpic: null
   currentStory: null
-  lastUpdate: '2026-06-11T16:21:47.243Z'
+  lastUpdate: '2026-07-01T07:45:13.156Z'
   isGitRepo: true
-timestamp: 1781194907244
+timestamp: 1782891913158
 ttl: 60
-gitFingerprint: 1778193748038.904:1778428645026.82
+gitFingerprint: 1781827414770.3198:1782890313708.3167

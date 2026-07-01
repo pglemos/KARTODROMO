@@ -1,17 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  getOfficialDayTime,
+  mergeOfficialDays,
+  readOfficialDays,
+  type OfficialDay,
+} from '@/lib/booking/official-days';
 import { MYLAPTIME_BOOKING_PROXY_URL } from '../config/booking';
 
 type QuickBookingProps = {
   surface?: 'home' | 'page';
-};
-
-type OfficialDay = {
-  day: number;
-  weekday: string;
-  monthIndex: number;
-  year: number;
-  selected: boolean;
 };
 
 type BookingSlot = {
@@ -53,21 +51,6 @@ const monthNames = [
   'dezembro',
 ];
 
-const monthAbbreviations: Record<string, number> = {
-  jan: 0,
-  fev: 1,
-  mar: 2,
-  abr: 3,
-  mai: 4,
-  jun: 5,
-  jul: 6,
-  ago: 7,
-  set: 8,
-  out: 9,
-  nov: 10,
-  dez: 11,
-};
-
 const weekLabels = ['do', '2ª', '3ª', '4ª', '5ª', '6ª', 'sá'];
 
 const emptyBookingState = (): BookingState => {
@@ -87,18 +70,6 @@ const emptyBookingState = (): BookingState => {
 
 const normalizeText = (value: string | null | undefined) =>
   value?.replace(/\s+/g, ' ').trim() ?? '';
-
-const parseMonthRange = (label: string) => {
-  const normalized = label.toLowerCase();
-  const firstMonth = Object.entries(monthAbbreviations).find(([name]) => normalized.includes(name));
-  const yearMatch = normalized.match(/\b(20\d{2})\b/);
-  const now = new Date();
-
-  return {
-    monthIndex: firstMonth ? firstMonth[1] : now.getMonth(),
-    year: yearMatch ? Number(yearMatch[1]) : now.getFullYear(),
-  };
-};
 
 const buildCalendarCells = (year: number, monthIndex: number): CalendarCell[] => {
   const firstWeekDay = new Date(year, monthIndex, 1).getDay();
@@ -161,50 +132,15 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
     }
 
     cleanOfficialBookingFrame();
+    const days = readOfficialDays(doc);
 
-    const rangeLabel = normalizeText(doc.querySelector('.cal-month-label')?.textContent);
-    const { monthIndex: rangeMonthIndex, year: rangeYear } = parseMonthRange(rangeLabel);
-    const stripDays = Array.from(doc.querySelectorAll<HTMLElement>('.cal-strip-day'));
-
-    if (stripDays.length === 0) {
+    if (days.length === 0) {
       return;
     }
 
-    let currentMonthIndex = rangeMonthIndex;
-    let currentYear = rangeYear;
-    let previousDay = 0;
-
-    const days = stripDays
-      .map((dayElement) => {
-        const day = Number(normalizeText(dayElement.querySelector('.cal-strip-number')?.textContent));
-        const weekday = normalizeText(dayElement.querySelector('.cal-strip-weekday')?.textContent);
-
-        if (!Number.isFinite(day) || day <= 0) {
-          return null;
-        }
-
-        if (previousDay > 0 && day < previousDay) {
-          currentMonthIndex += 1;
-          if (currentMonthIndex > 11) {
-            currentMonthIndex = 0;
-            currentYear += 1;
-          }
-        }
-        previousDay = day;
-
-        return {
-          day,
-          weekday,
-          monthIndex: currentMonthIndex,
-          year: currentYear,
-          selected: dayElement.classList.contains('cal-selected'),
-        };
-      })
-      .filter((day): day is OfficialDay => day !== null);
-
     const selected = days.find((day) => day.selected) ?? days[0];
-    const monthIndex = selected?.monthIndex ?? rangeMonthIndex;
-    const year = selected?.year ?? rangeYear;
+    const monthIndex = selected.monthIndex;
+    const year = selected.year;
     const monthLabel = `${monthNames[monthIndex]} ${year}`;
 
     const slotCards = Array.from(doc.querySelectorAll<HTMLElement>('.bk-card'));
@@ -223,32 +159,79 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
       };
     }).filter((slot) => slot.time);
 
-    setBookingState({
+    setBookingState((currentState) => ({
       monthLabel,
       monthIndex,
       year,
       selectedDay: selected?.day ?? null,
-      days,
+      days: mergeOfficialDays(currentState.days, days),
       slots,
       loaded: days.length > 0,
       emptyMessage: normalizeText(doc.querySelector('.no-bookings')?.textContent) || 'Nenhum horário disponível para esta data.',
-    });
+    }));
   }, [cleanOfficialBookingFrame]);
 
   const clickOfficialDay = useCallback((day: number) => {
     const doc = iframeRef.current?.contentDocument;
-    const target = Array.from(doc?.querySelectorAll<HTMLElement>('.cal-strip-day') ?? [])
-      .find((element) => normalizeText(element.querySelector('.cal-strip-number')?.textContent) === String(day));
-
-    if (!target) {
+    if (!doc?.body) {
       return;
     }
 
-    setOfficialCheckoutOpen(false);
-    target.click();
-    window.setTimeout(readOfficialBookingState, 500);
-    window.setTimeout(readOfficialBookingState, 1400);
-  }, [readOfficialBookingState]);
+    const clickVisibleDay = () => {
+      const visibleDays = readOfficialDays(doc);
+      const targetIndex = visibleDays.findIndex((visibleDay) => (
+        visibleDay.day === day
+        && visibleDay.monthIndex === bookingState.monthIndex
+        && visibleDay.year === bookingState.year
+      ));
+      const target = Array.from(doc.querySelectorAll<HTMLElement>('.cal-strip-day'))[targetIndex];
+
+      if (!target) {
+        return false;
+      }
+
+      setOfficialCheckoutOpen(false);
+      target.click();
+      window.setTimeout(readOfficialBookingState, 500);
+      window.setTimeout(readOfficialBookingState, 1400);
+      return true;
+    };
+
+    if (clickVisibleDay()) {
+      return;
+    }
+
+    const visibleDays = readOfficialDays(doc);
+    const firstVisibleDay = visibleDays[0];
+    const lastVisibleDay = visibleDays[visibleDays.length - 1];
+
+    if (!firstVisibleDay || !lastVisibleDay) {
+      return;
+    }
+
+    const targetTime = new Date(bookingState.year, bookingState.monthIndex, day).getTime();
+    const firstVisibleTime = getOfficialDayTime(firstVisibleDay);
+    const lastVisibleTime = getOfficialDayTime(lastVisibleDay);
+    const direction = targetTime < firstVisibleTime ? 'previous' : targetTime > lastVisibleTime ? 'next' : null;
+
+    if (!direction) {
+      return;
+    }
+
+    const buttons = Array.from(doc.querySelectorAll<HTMLButtonElement>('.cal-nav-btn'));
+    const button = direction === 'previous' ? buttons[0] : buttons[1];
+
+    if (!button || button.disabled) {
+      return;
+    }
+
+    button.click();
+    window.setTimeout(() => {
+      readOfficialBookingState();
+      clickVisibleDay();
+    }, 900);
+    window.setTimeout(readOfficialBookingState, 1700);
+  }, [bookingState.monthIndex, bookingState.year, readOfficialBookingState]);
 
   const navigateOfficialCalendar = useCallback((direction: 'previous' | 'next') => {
     const doc = iframeRef.current?.contentDocument;
@@ -336,13 +319,13 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
         </div>
 
         <p className="mx-auto mt-8 max-w-5xl text-center text-xl leading-8 text-zinc-800 md:text-2xl md:leading-9">
-          Peça seu <strong className="font-black">cartão fidelidade</strong> e faça um carimbo na secretaria em toda bateria que correr,
-          a cada 10 corridas 1 é por nossa conta, basta trocar seu cartão fidelidade com 10 carimbos por 1 corrida totalmente
-          de graça. (O cartão fidelidade é pessoal e intransferível).
+          Após 10 corridas, você conquista a <strong className="font-black">CARTEIRA de PILOTO</strong> e pode correr no Super Kart.
         </p>
 
-        <p className="mt-8 text-center text-xl font-medium leading-tight text-zinc-900 md:text-2xl">
-          <span className="font-black text-primary-700">Reserve agora</span> e pague <span className="font-black text-primary-700">somente na data</span> da sua corrida!
+        <p className="mx-auto mt-8 max-w-4xl text-center text-xl font-medium leading-tight text-zinc-900 md:text-2xl">
+          Preço normal <span className="font-black text-primary-700">R$ 175,00</span>, mas reserve agora e pague antecipado com
+          super desconto, saindo por apenas <span className="font-black text-primary-700">R$ 145,00</span>. (Promoção por tempo
+          limitado) <span className="font-black text-primary-700">APROVEITE!!</span>
         </p>
 
         <div className="relative mx-auto mt-12 max-w-[1316px] bg-white px-4 pb-16 pt-12 md:min-h-[900px] md:px-24 md:pb-24 md:pt-16">
@@ -503,11 +486,33 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
                   : 'block h-[1060px] w-[1320px] border-0 bg-white'
               }
             />
-          </div>
         </div>
       </div>
-    </section>
-  );
+
+      {surface === 'page' && (
+        <div className="mx-auto mt-10 max-w-5xl rounded border border-zinc-200 bg-white px-5 py-6 text-left shadow-sm md:px-8">
+          <h2 className="text-lg font-black uppercase tracking-[0.08em] text-zinc-900">
+            Política de Cancelamento e Extorno
+          </h2>
+          <div className="mt-4 space-y-3 text-sm leading-6 text-zinc-700 md:text-base">
+            <p>
+              O cancelamento de reservas deve ser solicitado com antecedência mínima de 24 horas em relação ao horário
+              agendado.
+            </p>
+            <p>
+              Solicitações realizadas dentro desse prazo poderão ser reagendadas conforme disponibilidade da agenda. Em
+              caso de solicitação de extorno, a devolução será processada pelo mesmo meio de pagamento utilizado na
+              compra, respeitando os prazos da operadora ou instituição financeira.
+            </p>
+            <p>
+              Em caso de não comparecimento ou solicitação fora do prazo, o valor pago não será reembolsado.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  </section>
+);
 };
 
 export default QuickBooking;
