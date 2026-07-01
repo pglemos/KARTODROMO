@@ -32,8 +32,14 @@ import type {
   LancamentoWithCategoria,
   ResumoFinanceiro,
 } from './financeira.types';
+import {
+  listCalXProCreditosPage,
+  listCalXProReceitasPage,
+  type CalXProCredito,
+  type CalXProReceita,
+} from './calxpro-financeiro.api';
 
-type Section = 'lancamentos' | 'categorias';
+type Section = 'lancamentos' | 'categorias' | 'calxpro-receitas' | 'calxpro-creditos';
 
 const PAGE_SIZE = 10;
 
@@ -117,6 +123,8 @@ const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
   timeZone: 'UTC',
 });
 
+const dateTimeFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' });
+
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : 'Ocorreu um erro inesperado.';
 
@@ -177,6 +185,20 @@ export const FinanceiraPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const [calxproReceitas, setCalxproReceitas] = useState<CalXProReceita[]>([]);
+  const [calxproReceitasTotal, setCalxproReceitasTotal] = useState(0);
+  const [calxproReceitasPage, setCalxproReceitasPage] = useState(0);
+  const [calxproReceitasSearchInput, setCalxproReceitasSearchInput] = useState('');
+  const [calxproReceitasQuery, setCalxproReceitasQuery] = useState('');
+  const [calxproReceitasLoading, setCalxproReceitasLoading] = useState(true);
+  const [calxproReceitasError, setCalxproReceitasError] = useState<string | null>(null);
+
+  const [calxproCreditos, setCalxproCreditos] = useState<CalXProCredito[]>([]);
+  const [calxproCreditosTotal, setCalxproCreditosTotal] = useState(0);
+  const [calxproCreditosPage, setCalxproCreditosPage] = useState(0);
+  const [calxproCreditosLoading, setCalxproCreditosLoading] = useState(true);
+  const [calxproCreditosError, setCalxproCreditosError] = useState<string | null>(null);
+
   const loadData = useCallback(async () => {
     if (!hasFinanceAccess) {
       return;
@@ -212,6 +234,50 @@ export const FinanceiraPage = () => {
     }, 350);
     return () => clearTimeout(handle);
   }, [searchInput]);
+
+  const loadCalxproReceitas = useCallback(async () => {
+    setCalxproReceitasLoading(true);
+    setCalxproReceitasError(null);
+    try {
+      const result = await listCalXProReceitasPage(calxproReceitasQuery, calxproReceitasPage, PAGE_SIZE);
+      setCalxproReceitas(result.data);
+      setCalxproReceitasTotal(result.total);
+    } catch (error: unknown) {
+      setCalxproReceitasError(getErrorMessage(error));
+    } finally {
+      setCalxproReceitasLoading(false);
+    }
+  }, [calxproReceitasQuery, calxproReceitasPage]);
+
+  const loadCalxproCreditos = useCallback(async () => {
+    setCalxproCreditosLoading(true);
+    setCalxproCreditosError(null);
+    try {
+      const result = await listCalXProCreditosPage(calxproCreditosPage, PAGE_SIZE);
+      setCalxproCreditos(result.data);
+      setCalxproCreditosTotal(result.total);
+    } catch (error: unknown) {
+      setCalxproCreditosError(getErrorMessage(error));
+    } finally {
+      setCalxproCreditosLoading(false);
+    }
+  }, [calxproCreditosPage]);
+
+  useEffect(() => {
+    if (section === 'calxpro-receitas' && hasFinanceAccess) void loadCalxproReceitas();
+  }, [section, hasFinanceAccess, loadCalxproReceitas]);
+
+  useEffect(() => {
+    if (section === 'calxpro-creditos' && hasFinanceAccess) void loadCalxproCreditos();
+  }, [section, hasFinanceAccess, loadCalxproCreditos]);
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setCalxproReceitasQuery(calxproReceitasSearchInput);
+      setCalxproReceitasPage(0);
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [calxproReceitasSearchInput]);
 
   const updateStatusFilter = (status: LancamentoStatus | '') => {
     setFilters((current) => ({ ...current, status }));
@@ -274,6 +340,40 @@ export const FinanceiraPage = () => {
             {tipoLabels[categoria.tipo]}
           </span>
         ),
+      },
+    ],
+    [],
+  );
+
+  const calxproReceitaColumns = useMemo<readonly DataTableColumn<CalXProReceita>[]>(
+    () => [
+      {
+        key: 'dataLancamento',
+        label: 'Data',
+        render: (item) => (item.dataLancamento ? dateTimeFormatter.format(new Date(item.dataLancamento)) : '—'),
+      },
+      { key: 'descricao', label: 'Descrição' },
+      { key: 'cliente', label: 'Cliente', render: (item) => item.cliente ?? '—' },
+      {
+        key: 'valor',
+        label: 'Valor',
+        render: (item) => <span className="font-bold text-emerald-300">{currencyFormatter.format(item.valor)}</span>,
+      },
+    ],
+    [],
+  );
+
+  const calxproCreditoColumns = useMemo<readonly DataTableColumn<CalXProCredito>[]>(
+    () => [
+      { key: 'clienteId', label: 'ID Cliente' },
+      { key: 'documento', label: 'Documento', render: (item) => item.documento ?? '—' },
+      { key: 'valor', label: 'Valor', render: (item) => currencyFormatter.format(item.valor) },
+      { key: 'status', label: 'Status', render: (item) => item.status ?? '—' },
+      { key: 'data', label: 'Data', render: (item) => (item.data ? dateTimeFormatter.format(new Date(item.data)) : '—') },
+      {
+        key: 'cancelado',
+        label: 'Situação',
+        render: (item) => (item.cancelado ? 'Cancelado' : 'Ativo'),
       },
     ],
     [],
@@ -449,8 +549,16 @@ export const FinanceiraPage = () => {
   return (
     <section>
       <PageHeader
-        actionLabel={section === 'lancamentos' ? 'Novo lançamento' : 'Nova categoria'}
-        onAction={section === 'lancamentos' ? openCreateLancamento : openCreateCategoria}
+        actionLabel={
+          section === 'lancamentos' ? 'Novo lançamento' : section === 'categorias' ? 'Nova categoria' : undefined
+        }
+        onAction={
+          section === 'lancamentos'
+            ? openCreateLancamento
+            : section === 'categorias'
+              ? openCreateCategoria
+              : undefined
+        }
         subtitle="Acompanhe receitas, despesas, saldo e categorias financeiras."
         title="Financeira"
       />
@@ -474,6 +582,18 @@ export const FinanceiraPage = () => {
         </Button>
         <Button onClick={() => setSection('categorias')} variant={section === 'categorias' ? 'primary' : 'ghost'}>
           Categorias
+        </Button>
+        <Button
+          onClick={() => setSection('calxpro-receitas')}
+          variant={section === 'calxpro-receitas' ? 'primary' : 'ghost'}
+        >
+          Receitas (CalXPro)
+        </Button>
+        <Button
+          onClick={() => setSection('calxpro-creditos')}
+          variant={section === 'calxpro-creditos' ? 'primary' : 'ghost'}
+        >
+          Créditos de cliente (CalXPro)
         </Button>
       </div>
 
@@ -539,7 +659,9 @@ export const FinanceiraPage = () => {
             />
             <Pagination onPageChange={setPage} page={page} pageSize={PAGE_SIZE} total={total} />
           </div>
-        ) : (
+        ) : null}
+
+        {section === 'categorias' ? (
           <DataTable
             columns={categoriaColumns}
             emptyLabel="Nenhuma categoria cadastrada."
@@ -550,7 +672,64 @@ export const FinanceiraPage = () => {
             onRetry={() => void loadData()}
             rows={categorias}
           />
-        )}
+        ) : null}
+
+        {section === 'calxpro-receitas' ? (
+          <div>
+            <p className="mb-4 text-sm text-zinc-400">
+              Lançamentos de faturamento do sistema anterior (CalXPro), de 2018-09-28 até 2025-01-29, quando a
+              operação migrou para o LapTime. Somente leitura. Total: {calxproReceitasTotal.toLocaleString('pt-BR')}.
+            </p>
+            <div className="mb-4 w-full max-w-xs">
+              <FormField htmlFor="calxpro-receitas-busca" label="Buscar">
+                <input
+                  className={inputClassName}
+                  id="calxpro-receitas-busca"
+                  onChange={(event) => setCalxproReceitasSearchInput(event.target.value)}
+                  placeholder="Cliente ou descrição"
+                  value={calxproReceitasSearchInput}
+                />
+              </FormField>
+            </div>
+            <DataTable
+              columns={calxproReceitaColumns}
+              emptyLabel="Nenhum lançamento encontrado."
+              error={calxproReceitasError}
+              loading={calxproReceitasLoading}
+              onRetry={() => void loadCalxproReceitas()}
+              rows={calxproReceitas}
+            />
+            <Pagination
+              onPageChange={setCalxproReceitasPage}
+              page={calxproReceitasPage}
+              pageSize={PAGE_SIZE}
+              total={calxproReceitasTotal}
+            />
+          </div>
+        ) : null}
+
+        {section === 'calxpro-creditos' ? (
+          <div>
+            <p className="mb-4 text-sm text-zinc-400">
+              Créditos de clientes registrados no sistema anterior (CalXPro). Somente leitura. Total:{' '}
+              {calxproCreditosTotal.toLocaleString('pt-BR')}.
+            </p>
+            <DataTable
+              columns={calxproCreditoColumns}
+              emptyLabel="Nenhum crédito encontrado."
+              error={calxproCreditosError}
+              loading={calxproCreditosLoading}
+              onRetry={() => void loadCalxproCreditos()}
+              rows={calxproCreditos}
+            />
+            <Pagination
+              onPageChange={setCalxproCreditosPage}
+              page={calxproCreditosPage}
+              pageSize={PAGE_SIZE}
+              total={calxproCreditosTotal}
+            />
+          </div>
+        ) : null}
       </div>
 
       <Modal

@@ -28,6 +28,13 @@ import {
   type LapTimeRacingsFilters,
 } from './laptime-racings.api';
 import {
+  listCalXProCorridaCompetidores,
+  listCalXProCorridasPage,
+  type CalXProCorrida,
+  type CalXProCorridaCompetidor,
+  type CalXProCorridasFilters,
+} from './calxpro-corridas.api';
+import {
   createCorrida,
   createResultado,
   listCorridasPage,
@@ -47,7 +54,7 @@ import type {
 } from './resultados.types';
 
 const PAGE_SIZE = 10;
-type ResultadosTabKey = 'reais' | 'manual';
+type ResultadosTabKey = 'reais' | 'manual' | 'calxpro';
 
 type CorridaFormState = {
   campeonato_id: string;
@@ -175,6 +182,18 @@ export const ResultadosPage = () => {
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [calxproCorridas, setCalxproCorridas] = useState<CalXProCorrida[]>([]);
+  const [calxproCorridasTotal, setCalxproCorridasTotal] = useState(0);
+  const [calxproCorridasPage, setCalxproCorridasPage] = useState(0);
+  const [calxproSearchInput, setCalxproSearchInput] = useState('');
+  const [calxproFilters, setCalxproFilters] = useState<CalXProCorridasFilters>({});
+  const [calxproCorridasLoading, setCalxproCorridasLoading] = useState(true);
+  const [calxproCorridasError, setCalxproCorridasError] = useState<string | null>(null);
+  const [selectedCalxproCorridaId, setSelectedCalxproCorridaId] = useState<string | null>(null);
+  const [calxproCompetidores, setCalxproCompetidores] = useState<CalXProCorridaCompetidor[]>([]);
+  const [calxproCompetidoresLoading, setCalxproCompetidoresLoading] = useState(false);
+  const [calxproCompetidoresError, setCalxproCompetidoresError] = useState<string | null>(null);
+
   const canWrite = ['owner', 'admin', 'operador_telao'].includes(role);
 
   const selectedCorrida = useMemo(
@@ -280,6 +299,56 @@ export const ResultadosPage = () => {
     return () => clearTimeout(handle);
   }, [racingsSearchInput]);
 
+  const loadCalxproCorridas = useCallback(async () => {
+    setCalxproCorridasLoading(true);
+    setCalxproCorridasError(null);
+    try {
+      const result = await listCalXProCorridasPage(calxproFilters, calxproCorridasPage, PAGE_SIZE);
+      setCalxproCorridas(result.data);
+      setCalxproCorridasTotal(result.total);
+      setSelectedCalxproCorridaId((current) =>
+        current && result.data.some((corrida) => corrida.id === current) ? current : result.data[0]?.id ?? null,
+      );
+    } catch (error: unknown) {
+      setCalxproCorridasError(getErrorMessage(error));
+    } finally {
+      setCalxproCorridasLoading(false);
+    }
+  }, [calxproFilters, calxproCorridasPage]);
+
+  const loadCalxproCompetidores = useCallback(async () => {
+    if (!selectedCalxproCorridaId) {
+      setCalxproCompetidores([]);
+      setCalxproCompetidoresError(null);
+      return;
+    }
+    setCalxproCompetidoresLoading(true);
+    setCalxproCompetidoresError(null);
+    try {
+      setCalxproCompetidores(await listCalXProCorridaCompetidores(selectedCalxproCorridaId));
+    } catch (error: unknown) {
+      setCalxproCompetidoresError(getErrorMessage(error));
+    } finally {
+      setCalxproCompetidoresLoading(false);
+    }
+  }, [selectedCalxproCorridaId]);
+
+  useEffect(() => {
+    if (activeTab === 'calxpro') void loadCalxproCorridas();
+  }, [activeTab, loadCalxproCorridas]);
+
+  useEffect(() => {
+    if (activeTab === 'calxpro') void loadCalxproCompetidores();
+  }, [activeTab, loadCalxproCompetidores]);
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setCalxproFilters((current) => ({ ...current, q: calxproSearchInput || undefined }));
+      setCalxproCorridasPage(0);
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [calxproSearchInput]);
+
   const updateRacingsStatusFilter = (status: 'finalizada' | 'aberta' | '') => {
     setRacingsFilters((current) => ({ ...current, status }));
     setRacingsPage(0);
@@ -331,6 +400,45 @@ export const ResultadosPage = () => {
       },
     ],
     [selectedRacingId],
+  );
+
+  const calxproCorridaColumns = useMemo<readonly DataTableColumn<CalXProCorrida>[]>(
+    () => [
+      {
+        key: 'nome',
+        label: 'Corrida',
+        render: (corrida) => (
+          <button
+            className={`text-left font-bold underline-offset-4 hover:underline ${
+              selectedCalxproCorridaId === corrida.id ? 'text-brand-300' : 'text-white'
+            }`}
+            onClick={() => setSelectedCalxproCorridaId(corrida.id)}
+            type="button"
+          >
+            {corrida.nome}
+          </button>
+        ),
+      },
+      {
+        key: 'dataHora',
+        label: 'Data/hora',
+        render: (corrida) => dateFormatter.format(new Date(corrida.dataHora)),
+      },
+      { key: 'participantes', label: 'Participantes' },
+    ],
+    [selectedCalxproCorridaId],
+  );
+
+  const calxproCompetidorColumns = useMemo<readonly DataTableColumn<CalXProCorridaCompetidor>[]>(
+    () => [
+      { key: 'posicao', label: 'Pos.', render: (item) => item.posicao ?? '—' },
+      { key: 'nome', label: 'Piloto' },
+      { key: 'cidade', label: 'Cidade', render: (item) => item.cidade ?? '—' },
+      { key: 'voltas', label: 'Voltas', render: (item) => item.voltas ?? '—' },
+      { key: 'melhorVolta', label: 'Melhor volta', render: (item) => item.melhorVolta ?? '—' },
+      { key: 'tempoTotal', label: 'Tempo total', render: (item) => item.tempoTotal ?? '—' },
+    ],
+    [],
   );
 
   const racingCompetitorColumns = useMemo<readonly DataTableColumn<LapTimeRacingCompetitor>[]>(
@@ -647,6 +755,7 @@ export const ResultadosPage = () => {
         <Tabs
           items={[
             { key: 'reais', label: 'Corridas reais (LapTime)' },
+            { key: 'calxpro', label: 'Corridas (CalXPro histórico)' },
             { key: 'manual', label: 'Manual (local)' },
           ]}
           onChange={(key) => setActiveTab(key as ResultadosTabKey)}
@@ -713,6 +822,60 @@ export const ResultadosPage = () => {
                 loading={racingCompetitorsLoading}
                 onRetry={() => void loadRacingCompetitors()}
                 rows={racingCompetitors}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {activeTab === 'calxpro' ? (
+        <div className="mt-6 space-y-5">
+          <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+            <p className="text-sm text-zinc-400">
+              Corridas do sistema anterior (CalXPro), ativo até jan/2025. Somente leitura. Total:{' '}
+              {calxproCorridasTotal.toLocaleString('pt-BR')}.
+            </p>
+            <input
+              className={`${inputClassName} sm:max-w-xs`}
+              onChange={(event) => setCalxproSearchInput(event.target.value)}
+              placeholder="Buscar por nome da corrida..."
+              value={calxproSearchInput}
+            />
+          </Card>
+
+          <DataTable
+            columns={calxproCorridaColumns}
+            emptyLabel="Nenhuma corrida encontrada."
+            error={calxproCorridasError}
+            loading={calxproCorridasLoading}
+            onRetry={() => void loadCalxproCorridas()}
+            rows={calxproCorridas}
+          />
+          <Pagination
+            onPageChange={setCalxproCorridasPage}
+            page={calxproCorridasPage}
+            pageSize={PAGE_SIZE}
+            total={calxproCorridasTotal}
+          />
+
+          <div className="border-t border-zinc-800 pt-6">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-brand-300">
+              Resultado da corrida selecionada
+            </p>
+            <h2 className="mt-2 text-xl font-black text-white">
+              {calxproCorridas.find((corrida) => corrida.id === selectedCalxproCorridaId)?.nome ??
+                'Selecione uma corrida'}
+            </h2>
+            <div className="mt-4">
+              <DataTable
+                columns={calxproCompetidorColumns}
+                emptyLabel={
+                  selectedCalxproCorridaId ? 'Nenhum participante registrado.' : 'Selecione uma corrida na tabela acima.'
+                }
+                error={calxproCompetidoresError}
+                loading={calxproCompetidoresLoading}
+                onRetry={() => void loadCalxproCompetidores()}
+                rows={calxproCompetidores}
               />
             </div>
           </div>
