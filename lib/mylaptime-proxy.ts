@@ -70,6 +70,7 @@ function rewriteProxyLocation(value: string): string {
     if (
       locationUrl.pathname === '/booking' ||
       locationUrl.pathname.startsWith('/api/auth/') ||
+      locationUrl.pathname.startsWith('/auth/') ||
       locationUrl.pathname.startsWith('/_content/') ||
       locationUrl.pathname.startsWith('/_framework/') ||
       locationUrl.pathname.startsWith('/_blazor') ||

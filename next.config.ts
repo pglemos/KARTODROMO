@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
     return [
       { source: '/booking', destination: '/api/mylaptime-proxy/booking' },
       { source: '/api/auth/:path*', destination: '/api/mylaptime-proxy/auth/:path*' },
+      { source: '/auth/:path*', destination: '/api/mylaptime-proxy/auth-page/:path*' },
       { source: '/mylaptime/:path*', destination: '/api/mylaptime-proxy/mylaptime/:path*' },
       { source: '/_content/:path*', destination: '/api/mylaptime-proxy/content/:path*' },
       { source: '/_framework/:path*', destination: '/api/mylaptime-proxy/framework/:path*' },

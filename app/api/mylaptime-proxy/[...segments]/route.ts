@@ -11,6 +11,8 @@ function resolveUpstream(segments: string[]): { path: string; mode: 'transform' 
       return { path: 'booking', mode: 'transform' };
     case 'auth':
       return { path: `api/auth/${rest.join('/')}`, mode: 'transform' };
+    case 'auth-page':
+      return { path: `auth/${rest.join('/')}`, mode: 'transform' };
     case 'content':
       return { path: `_content/${rest.join('/')}`, mode: 'passthrough' };
     case 'framework':
