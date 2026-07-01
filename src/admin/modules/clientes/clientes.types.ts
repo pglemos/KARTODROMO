@@ -27,3 +27,12 @@ export type ClienteCalXPro = {
   cidade: string | null;
   criadoEm: string | null;
 };
+
+export type ContatoCalXPro = {
+  id: string;
+  nome: string;
+  telefone: string | null;
+  celular: string | null;
+  cidade: string | null;
+  criadoEm: string | null;
+};

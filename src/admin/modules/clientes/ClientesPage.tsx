@@ -4,10 +4,15 @@ import { DataTable, type DataTableColumn } from '../../ui/DataTable';
 import { PageHeader } from '../../ui/PageHeader';
 import { Pagination } from '../../ui/Pagination';
 import { Tabs } from '../../ui/Tabs';
-import { listClientesCalXProPage, listClientesLapTimePage, listClientesLocalPage } from './clientes.api';
-import type { ClienteCalXPro, ClienteLapTime, ClienteLocal } from './clientes.types';
+import {
+  listClientesCalXProPage,
+  listClientesLapTimePage,
+  listClientesLocalPage,
+  listContatosCalXProPage,
+} from './clientes.api';
+import type { ClienteCalXPro, ClienteLapTime, ClienteLocal, ContatoCalXPro } from './clientes.types';
 
-type TabKey = 'local' | 'laptime' | 'calxpro';
+type TabKey = 'local' | 'laptime' | 'calxpro' | 'calxpro-contatos';
 
 const PAGE_SIZE = 10;
 
@@ -56,6 +61,18 @@ const calxproColumns: readonly DataTableColumn<ClienteCalXPro>[] = [
   },
 ];
 
+const contatoColumns: readonly DataTableColumn<ContatoCalXPro>[] = [
+  { key: 'nome', label: 'Nome' },
+  { key: 'telefone', label: 'Telefone', render: (contato) => contato.telefone ?? '—' },
+  { key: 'celular', label: 'Celular', render: (contato) => contato.celular ?? '—' },
+  { key: 'cidade', label: 'Cidade', render: (contato) => contato.cidade ?? '—' },
+  {
+    key: 'criadoEm',
+    label: 'Cadastrado em',
+    render: (contato) => (contato.criadoEm ? dateFormatter.format(new Date(contato.criadoEm)) : '—'),
+  },
+];
+
 export const ClientesPage = () => {
   const [activeTab, setActiveTab] = useState<TabKey>('local');
 
@@ -82,6 +99,14 @@ export const ClientesPage = () => {
   const [calxproQuery, setCalxproQuery] = useState('');
   const [calxproLoading, setCalxproLoading] = useState(true);
   const [calxproError, setCalxproError] = useState<string | null>(null);
+
+  const [contatosRows, setContatosRows] = useState<ContatoCalXPro[]>([]);
+  const [contatosTotal, setContatosTotal] = useState(0);
+  const [contatosPage, setContatosPage] = useState(0);
+  const [contatosSearchInput, setContatosSearchInput] = useState('');
+  const [contatosQuery, setContatosQuery] = useState('');
+  const [contatosLoading, setContatosLoading] = useState(true);
+  const [contatosError, setContatosError] = useState<string | null>(null);
 
   const loadLocal = useCallback(async () => {
     setLocalLoading(true);
@@ -125,6 +150,20 @@ export const ClientesPage = () => {
     }
   }, [calxproQuery, calxproPage]);
 
+  const loadContatos = useCallback(async () => {
+    setContatosLoading(true);
+    setContatosError(null);
+    try {
+      const page = await listContatosCalXProPage(contatosQuery, contatosPage, PAGE_SIZE);
+      setContatosRows(page.data);
+      setContatosTotal(page.total);
+    } catch (error: unknown) {
+      setContatosError(getErrorMessage(error));
+    } finally {
+      setContatosLoading(false);
+    }
+  }, [contatosQuery, contatosPage]);
+
   useEffect(() => {
     void loadLocal();
   }, [loadLocal]);
@@ -136,6 +175,10 @@ export const ClientesPage = () => {
   useEffect(() => {
     void loadCalxpro();
   }, [loadCalxpro]);
+
+  useEffect(() => {
+    void loadContatos();
+  }, [loadContatos]);
 
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -161,6 +204,14 @@ export const ClientesPage = () => {
     return () => clearTimeout(handle);
   }, [calxproSearchInput]);
 
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setContatosQuery(contatosSearchInput);
+      setContatosPage(0);
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [contatosSearchInput]);
+
   return (
     <section>
       <PageHeader
@@ -174,6 +225,7 @@ export const ClientesPage = () => {
             { key: 'local', label: 'Local (SRVKART)' },
             { key: 'laptime', label: 'LapTime (CRONO1)' },
             { key: 'calxpro', label: 'CalXPro (histórico)' },
+            { key: 'calxpro-contatos', label: 'Contatos (CalXPro)' },
           ]}
           onChange={(key) => setActiveTab(key as TabKey)}
           value={activeTab}
@@ -254,6 +306,32 @@ export const ClientesPage = () => {
             rows={calxproRows}
           />
           <Pagination onPageChange={setCalxproPage} page={calxproPage} pageSize={PAGE_SIZE} total={calxproTotal} />
+        </div>
+      ) : null}
+
+      {activeTab === 'calxpro-contatos' ? (
+        <div className="mt-5 space-y-4">
+          <Card className="p-4">
+            <p className="text-sm text-zinc-400">
+              Contatos cadastrados no sistema anterior (CalXPro), tabela separada do cadastro de clientes
+              (orçamentos, leads, agenda de contatos). Somente leitura. Total: {contatosTotal.toLocaleString('pt-BR')}.
+            </p>
+            <input
+              className={`${inputClassName} mt-3 sm:max-w-xs`}
+              onChange={(event) => setContatosSearchInput(event.target.value)}
+              placeholder="Buscar por nome, telefone ou celular..."
+              value={contatosSearchInput}
+            />
+          </Card>
+          <DataTable
+            columns={contatoColumns}
+            emptyLabel="Nenhum contato encontrado."
+            error={contatosError}
+            loading={contatosLoading}
+            onRetry={() => void loadContatos()}
+            rows={contatosRows}
+          />
+          <Pagination onPageChange={setContatosPage} page={contatosPage} pageSize={PAGE_SIZE} total={contatosTotal} />
         </div>
       ) : null}
     </section>

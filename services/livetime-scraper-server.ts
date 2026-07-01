@@ -8,6 +8,9 @@ import { readTb50Page, tb50PageStoreStatus, writeTb50PageToFile } from '@/lib/tb
 import { listViplexPrograms, startViplexProgram } from '@/lib/viplex-programs';
 import { fetchLapTimeCustomersPage } from '@/lib/livetime/laptime-customers';
 import { fetchCalXProCustomersPage } from '@/lib/livetime/calxpro-customers';
+import { fetchCalXProContatosPage } from '@/lib/livetime/calxpro-contatos';
+import { fetchCalXProCreditosPage, fetchCalXProReceitasPage } from '@/lib/livetime/calxpro-receitas';
+import { fetchCalXProCorridaCompetidores, fetchCalXProCorridasPage } from '@/lib/livetime/calxpro-corridas';
 import { fetchLapTimeBookingCustomers, fetchLapTimeBookingsPage } from '@/lib/livetime/laptime-bookings';
 import { fetchLapTimeRacingCompetitors, fetchLapTimeRacingsPage } from '@/lib/livetime/laptime-racings';
 import { LiveTimeScraper } from './livetime-scraper';
@@ -233,6 +236,104 @@ async function handleCalXProClientes(url: URL, response: http.ServerResponse) {
   }
 }
 
+async function handleCalXProContatos(url: URL, response: http.ServerResponse) {
+  if (!calxproSqlOptions) {
+    sendJson(response, 503, { error: 'calxpro_sql_not_configured' });
+    return;
+  }
+
+  try {
+    const { rows, total } = await fetchCalXProContatosPage(calxproSqlOptions, {
+      q: url.searchParams.get('q') || undefined,
+      limit: url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : undefined,
+      offset: url.searchParams.get('offset') ? Number(url.searchParams.get('offset')) : undefined,
+    });
+    response.writeHead(200, { ...NO_CACHE_HEADERS, 'x-total-count': String(total) });
+    response.end(JSON.stringify(rows));
+  } catch (error) {
+    sendJson(response, 502, { error: error instanceof Error ? error.message : 'calxpro_sql_query_failed' });
+  }
+}
+
+async function handleCalXProReceitas(url: URL, response: http.ServerResponse) {
+  if (!calxproSqlOptions) {
+    sendJson(response, 503, { error: 'calxpro_sql_not_configured' });
+    return;
+  }
+
+  try {
+    const { rows, total } = await fetchCalXProReceitasPage(calxproSqlOptions, {
+      q: url.searchParams.get('q') || undefined,
+      limit: url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : undefined,
+      offset: url.searchParams.get('offset') ? Number(url.searchParams.get('offset')) : undefined,
+    });
+    response.writeHead(200, { ...NO_CACHE_HEADERS, 'x-total-count': String(total) });
+    response.end(JSON.stringify(rows));
+  } catch (error) {
+    sendJson(response, 502, { error: error instanceof Error ? error.message : 'calxpro_sql_query_failed' });
+  }
+}
+
+async function handleCalXProCreditos(url: URL, response: http.ServerResponse) {
+  if (!calxproSqlOptions) {
+    sendJson(response, 503, { error: 'calxpro_sql_not_configured' });
+    return;
+  }
+
+  try {
+    const { rows, total } = await fetchCalXProCreditosPage(calxproSqlOptions, {
+      limit: url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : undefined,
+      offset: url.searchParams.get('offset') ? Number(url.searchParams.get('offset')) : undefined,
+    });
+    response.writeHead(200, { ...NO_CACHE_HEADERS, 'x-total-count': String(total) });
+    response.end(JSON.stringify(rows));
+  } catch (error) {
+    sendJson(response, 502, { error: error instanceof Error ? error.message : 'calxpro_sql_query_failed' });
+  }
+}
+
+async function handleCalXProCorridas(url: URL, response: http.ServerResponse) {
+  if (!calxproSqlOptions) {
+    sendJson(response, 503, { error: 'calxpro_sql_not_configured' });
+    return;
+  }
+
+  try {
+    const { rows, total } = await fetchCalXProCorridasPage(calxproSqlOptions, {
+      q: url.searchParams.get('q') || undefined,
+      from: url.searchParams.get('from') || undefined,
+      to: url.searchParams.get('to') || undefined,
+      limit: url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : undefined,
+      offset: url.searchParams.get('offset') ? Number(url.searchParams.get('offset')) : undefined,
+    });
+    response.writeHead(200, { ...NO_CACHE_HEADERS, 'x-total-count': String(total) });
+    response.end(JSON.stringify(rows));
+  } catch (error) {
+    sendJson(response, 502, { error: error instanceof Error ? error.message : 'calxpro_sql_query_failed' });
+  }
+}
+
+async function handleCalXProCorridaCompetidores(url: URL, response: http.ServerResponse) {
+  if (!calxproSqlOptions) {
+    sendJson(response, 503, { error: 'calxpro_sql_not_configured' });
+    return;
+  }
+
+  const corridaId = url.searchParams.get('corridaId');
+  if (!corridaId) {
+    sendJson(response, 400, { error: 'missing_corridaId' });
+    return;
+  }
+
+  try {
+    const rows = await fetchCalXProCorridaCompetidores(calxproSqlOptions, corridaId);
+    response.writeHead(200, NO_CACHE_HEADERS);
+    response.end(JSON.stringify(rows));
+  } catch (error) {
+    sendJson(response, 502, { error: error instanceof Error ? error.message : 'calxpro_sql_query_failed' });
+  }
+}
+
 async function handleLaptimeBookings(url: URL, response: http.ServerResponse) {
   if (!laptimeSqlOptions) {
     sendJson(response, 503, { error: 'laptime_sql_not_configured' });
@@ -364,6 +465,31 @@ const server = http.createServer((request, response) => {
 
   if (url.pathname === '/api/calxpro-clientes') {
     void handleCalXProClientes(url, response);
+    return;
+  }
+
+  if (url.pathname === '/api/calxpro-contatos') {
+    void handleCalXProContatos(url, response);
+    return;
+  }
+
+  if (url.pathname === '/api/calxpro-receitas') {
+    void handleCalXProReceitas(url, response);
+    return;
+  }
+
+  if (url.pathname === '/api/calxpro-creditos') {
+    void handleCalXProCreditos(url, response);
+    return;
+  }
+
+  if (url.pathname === '/api/calxpro-corridas') {
+    void handleCalXProCorridas(url, response);
+    return;
+  }
+
+  if (url.pathname === '/api/calxpro-corrida-competidores') {
+    void handleCalXProCorridaCompetidores(url, response);
     return;
   }
 
