@@ -12,7 +12,26 @@ const EXCLUDED_RESPONSE_HEADERS = new Set([
   'x-frame-options',
 ]);
 
-const EXCLUDED_REQUEST_HEADERS = new Set(['connection', 'host', 'keep-alive', 'transfer-encoding', 'upgrade']);
+const EXCLUDED_REQUEST_HEADERS = new Set([
+  'connection',
+  'host',
+  'keep-alive',
+  'transfer-encoding',
+  'upgrade',
+  'forwarded',
+  'x-forwarded-host',
+  'x-forwarded-for',
+  'x-forwarded-proto',
+  'x-forwarded-port',
+  'x-real-ip',
+]);
+
+const EXCLUDED_REQUEST_HEADER_PREFIXES = ['cf-', 'x-vercel-'];
+
+function isExcludedRequestHeader(key: string): boolean {
+  const lower = key.toLowerCase();
+  return EXCLUDED_REQUEST_HEADERS.has(lower) || EXCLUDED_REQUEST_HEADER_PREFIXES.some((prefix) => lower.startsWith(prefix));
+}
 
 const splitSetCookie = (value: string) =>
   value.split(/,(?=\s*[^;,=\s]+=[^;]+)/g).map((cookie) => cookie.trim()).filter(Boolean);
@@ -32,7 +51,7 @@ function buildRequestHeaders(request: Request): Headers {
   const headers = new Headers();
 
   request.headers.forEach((value, key) => {
-    if (!EXCLUDED_REQUEST_HEADERS.has(key.toLowerCase())) headers.set(key, value);
+    if (!isExcludedRequestHeader(key)) headers.set(key, value);
   });
 
   headers.set('origin', MYLAPTIME_ORIGIN);
