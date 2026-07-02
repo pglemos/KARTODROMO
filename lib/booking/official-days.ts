@@ -36,21 +36,6 @@ const parseMonthRange = (label: string) => {
   };
 };
 
-const officialDayKey = (day: OfficialDay) => `${day.year}-${day.monthIndex}-${day.day}`;
-
-export const mergeOfficialDays = (currentDays: OfficialDay[], incomingDays: OfficialDay[]): OfficialDay[] => {
-  const mergedDays = new Map(currentDays.map((day) => [officialDayKey(day), day]));
-
-  incomingDays.forEach((day) => {
-    mergedDays.set(officialDayKey(day), day);
-  });
-
-  return Array.from(mergedDays.values()).sort((first, second) => (
-    new Date(first.year, first.monthIndex, first.day).getTime()
-    - new Date(second.year, second.monthIndex, second.day).getTime()
-  ));
-};
-
 export const getOfficialDayTime = (day: Pick<OfficialDay, 'day' | 'monthIndex' | 'year'>) => (
   new Date(day.year, day.monthIndex, day.day).getTime()
 );

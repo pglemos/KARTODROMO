@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import {
-  getOfficialDayTime,
-  mergeOfficialDays,
-  readOfficialDays,
-  type OfficialDay,
-} from '@/lib/booking/official-days';
+import { getOfficialDayTime, readOfficialDays } from '@/lib/booking/official-days';
 import { MYLAPTIME_BOOKING_PROXY_URL } from '../config/booking';
 
 type QuickBookingProps = {
@@ -25,7 +20,6 @@ type BookingState = {
   monthIndex: number;
   year: number;
   selectedDay: number | null;
-  days: OfficialDay[];
   slots: BookingSlot[];
   loaded: boolean;
   emptyMessage: string;
@@ -53,15 +47,22 @@ const monthNames = [
 
 const weekLabels = ['do', '2ª', '3ª', '4ª', '5ª', '6ª', 'sá'];
 
+const SELECT_DATE_MESSAGE = 'Selecione uma data no calendário para ver os horários disponíveis.';
+
+const capitalize = (value: string) => (value ? value.charAt(0).toUpperCase() + value.slice(1) : value);
+
+const monthLabelFor = (monthIndex: number, year: number) => `${capitalize(monthNames[monthIndex])} ${year}`;
+
+const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+
 const emptyBookingState = (): BookingState => {
   const now = new Date();
 
   return {
-    monthLabel: `${monthNames[now.getMonth()]} ${now.getFullYear()}`,
+    monthLabel: monthLabelFor(now.getMonth(), now.getFullYear()),
     monthIndex: now.getMonth(),
     year: now.getFullYear(),
     selectedDay: null,
-    days: [],
     slots: [],
     loaded: false,
     emptyMessage: '',
@@ -70,6 +71,12 @@ const emptyBookingState = (): BookingState => {
 
 const normalizeText = (value: string | null | undefined) =>
   value?.replace(/\s+/g, ' ').trim() ?? '';
+
+const isPastDate = (year: number, monthIndex: number, day: number) => {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  return new Date(year, monthIndex, day).getTime() < startOfToday;
+};
 
 const buildCalendarCells = (year: number, monthIndex: number): CalendarCell[] => {
   const firstWeekDay = new Date(year, monthIndex, 1).getDay();
@@ -90,7 +97,11 @@ const buildCalendarCells = (year: number, monthIndex: number): CalendarCell[] =>
 const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
   const HeadingTag = surface === 'page' ? 'h1' : 'h2';
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const prefetchStartedRef = useRef(false);
+  // Enquanto true, o estado local espelha o que o widget oficial mostra (usado pelo polling de
+  // "tempo real"). Vira false quando o cliente só navega o calendário localmente (sem pedir uma
+  // data ainda) — assim o polling em segundo plano não sobrescreve o mês que ele escolheu ver.
+  const trackWidgetRef = useRef(true);
+  const isSeekingRef = useRef(false);
   const [bookingState, setBookingState] = useState<BookingState>(() => emptyBookingState());
   const [officialCheckoutOpen, setOfficialCheckoutOpen] = useState(false);
   const [bookingActionMessage, setBookingActionMessage] = useState('');
@@ -99,15 +110,6 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
   const calendarCells = useMemo(
     () => buildCalendarCells(bookingState.year, bookingState.monthIndex),
     [bookingState.monthIndex, bookingState.year],
-  );
-
-  const availableDays = useMemo(
-    () => new Set(
-      bookingState.days
-        .filter((day) => day.monthIndex === bookingState.monthIndex && day.year === bookingState.year)
-        .map((day) => day.day),
-    ),
-    [bookingState.days, bookingState.monthIndex, bookingState.year],
   );
 
   const cleanOfficialBookingFrame = useCallback(() => {
@@ -142,7 +144,6 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
     const selected = days.find((day) => day.selected) ?? days[0];
     const monthIndex = selected.monthIndex;
     const year = selected.year;
-    const monthLabel = `${monthNames[monthIndex]} ${year}`;
 
     const slotCards = Array.from(doc.querySelectorAll<HTMLElement>('.bk-card'));
     const slots = slotCards.map((slotElement) => {
@@ -160,166 +161,129 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
       };
     }).filter((slot) => slot.time);
 
-    setBookingState((currentState) => ({
-      monthLabel,
+    setBookingState({
+      monthLabel: monthLabelFor(monthIndex, year),
       monthIndex,
       year,
       selectedDay: selected?.day ?? null,
-      days: mergeOfficialDays(currentState.days, days),
       slots,
-      loaded: days.length > 0,
+      loaded: true,
       emptyMessage: normalizeText(doc.querySelector('.no-bookings')?.textContent) || 'Nenhum horário disponível para esta data.',
-    }));
+    });
   }, [cleanOfficialBookingFrame]);
 
-  const mergeVisibleDays = useCallback(() => {
-    const doc = iframeRef.current?.contentDocument;
-    if (!doc?.body) {
-      return;
-    }
+  // O calendario desta pagina deve deixar o cliente navegar por qualquer mes e escolher qualquer
+  // data futura, mesmo sem saber de antemao se tem bateria/vaga — o widget oficial e' quem decide
+  // isso ao carregar aquela data. Por isso a navegacao de mes e' puramente local (nao mexe no
+  // iframe ainda), e so quando uma data e' clicada e' que buscamos ("seek") aquele dia no widget.
+  const navigateMonth = useCallback((direction: 'previous' | 'next') => {
+    trackWidgetRef.current = false;
 
-    const days = readOfficialDays(doc);
-    if (days.length === 0) {
-      return;
-    }
+    setBookingState((current) => {
+      const base = new Date(current.year, current.monthIndex + (direction === 'next' ? 1 : -1), 1);
+      const monthIndex = base.getMonth();
+      const year = base.getFullYear();
 
-    setBookingState((currentState) => ({
-      ...currentState,
-      days: mergeOfficialDays(currentState.days, days),
-    }));
+      return {
+        monthLabel: monthLabelFor(monthIndex, year),
+        monthIndex,
+        year,
+        selectedDay: null,
+        slots: [],
+        loaded: true,
+        emptyMessage: SELECT_DATE_MESSAGE,
+      };
+    });
   }, []);
 
-  // O widget oficial só renderiza uma janela deslizante de ~20 dias por vez (confirmado em
-  // 2026-07-02): o dia calculado pelo servidor aparece só depois de avançar a janela com o botão
-  // "próximo" do próprio widget. Sem isso, dias do fim do mês nunca entram em `bookingState.days`
-  // e ficam permanentemente desabilitados no calendário desta página.
-  const prefetchOfficialDays = useCallback(async () => {
+  // Avanca/retrocede a janela deslizante de ~20 dias do widget oficial ate encontrar a data
+  // pedida (mesmo que seja em outro mes), depois clica nela. Necessario porque o widget so
+  // conhece "hoje" quando carrega e nao tem um jeito direto de "ir pro dia X do mes Y".
+  const seekToOfficialDay = useCallback(async (targetMonthIndex: number, targetYear: number, targetDay: number) => {
     const doc = iframeRef.current?.contentDocument;
     if (!doc?.body) {
-      return;
+      return false;
     }
 
-    const initialDays = readOfficialDays(doc);
-    const referenceDay = initialDays.find((day) => day.selected) ?? initialDays[0];
-    if (!referenceDay) {
-      return;
-    }
+    const targetTime = new Date(targetYear, targetMonthIndex, targetDay).getTime();
+    const maxSteps = 30;
 
-    const { monthIndex, year } = referenceDay;
-    const lastDayOfMonth = new Date(year, monthIndex + 1, 0).getDate();
-    const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
-
-    let forwardClicks = 0;
-    const maxClicks = 6;
-
-    while (forwardClicks < maxClicks) {
+    for (let step = 0; step < maxSteps; step += 1) {
       const visibleDays = readOfficialDays(doc);
-      const coversMonthEnd = visibleDays.some(
-        (day) => day.monthIndex === monthIndex && day.year === year && day.day === lastDayOfMonth,
-      );
-      if (coversMonthEnd) {
-        break;
+      const matchIndex = visibleDays.findIndex((visibleDay) => getOfficialDayTime(visibleDay) === targetTime);
+
+      if (matchIndex !== -1) {
+        const target = Array.from(doc.querySelectorAll<HTMLElement>('.cal-strip-day'))[matchIndex];
+        if (!target) {
+          return false;
+        }
+
+        target.click();
+        await sleep(500);
+        return true;
       }
 
-      const nextButton = Array.from(doc.querySelectorAll<HTMLButtonElement>('.cal-nav-btn'))[1];
-      if (!nextButton || nextButton.disabled) {
-        break;
-      }
-
-      nextButton.click();
-      forwardClicks += 1;
-      await sleep(700);
-      mergeVisibleDays();
-    }
-
-    for (let index = 0; index < forwardClicks; index += 1) {
-      const prevButton = Array.from(doc.querySelectorAll<HTMLButtonElement>('.cal-nav-btn'))[0];
-      if (!prevButton || prevButton.disabled) {
-        break;
-      }
-
-      prevButton.click();
-      await sleep(500);
-    }
-
-    readOfficialBookingState();
-  }, [mergeVisibleDays, readOfficialBookingState]);
-
-  const clickOfficialDay = useCallback((day: number) => {
-    const doc = iframeRef.current?.contentDocument;
-    if (!doc?.body) {
-      return;
-    }
-
-    const clickVisibleDay = () => {
-      const visibleDays = readOfficialDays(doc);
-      const targetIndex = visibleDays.findIndex((visibleDay) => (
-        visibleDay.day === day
-        && visibleDay.monthIndex === bookingState.monthIndex
-        && visibleDay.year === bookingState.year
-      ));
-      const target = Array.from(doc.querySelectorAll<HTMLElement>('.cal-strip-day'))[targetIndex];
-
-      if (!target) {
+      const firstVisible = visibleDays[0];
+      const lastVisible = visibleDays[visibleDays.length - 1];
+      if (!firstVisible || !lastVisible) {
         return false;
       }
 
-      setOfficialCheckoutOpen(false);
-      target.click();
-      window.setTimeout(readOfficialBookingState, 500);
-      window.setTimeout(readOfficialBookingState, 1400);
-      return true;
-    };
+      const direction = targetTime < getOfficialDayTime(firstVisible)
+        ? 'previous'
+        : targetTime > getOfficialDayTime(lastVisible)
+          ? 'next'
+          : null;
 
-    if (clickVisibleDay()) {
+      if (!direction) {
+        return false;
+      }
+
+      const buttons = Array.from(doc.querySelectorAll<HTMLButtonElement>('.cal-nav-btn'));
+      const button = direction === 'previous' ? buttons[0] : buttons[1];
+
+      if (!button || button.disabled) {
+        return false;
+      }
+
+      button.click();
+      await sleep(600);
+    }
+
+    return false;
+  }, []);
+
+  const clickOfficialDay = useCallback(async (day: number) => {
+    if (isSeekingRef.current || !bookingState.loaded) {
       return;
     }
 
-    const visibleDays = readOfficialDays(doc);
-    const firstVisibleDay = visibleDays[0];
-    const lastVisibleDay = visibleDays[visibleDays.length - 1];
-
-    if (!firstVisibleDay || !lastVisibleDay) {
-      return;
-    }
-
-    const targetTime = new Date(bookingState.year, bookingState.monthIndex, day).getTime();
-    const firstVisibleTime = getOfficialDayTime(firstVisibleDay);
-    const lastVisibleTime = getOfficialDayTime(lastVisibleDay);
-    const direction = targetTime < firstVisibleTime ? 'previous' : targetTime > lastVisibleTime ? 'next' : null;
-
-    if (!direction) {
-      return;
-    }
-
-    const buttons = Array.from(doc.querySelectorAll<HTMLButtonElement>('.cal-nav-btn'));
-    const button = direction === 'previous' ? buttons[0] : buttons[1];
-
-    if (!button || button.disabled) {
-      return;
-    }
-
-    button.click();
-    window.setTimeout(() => {
-      readOfficialBookingState();
-      clickVisibleDay();
-    }, 900);
-    window.setTimeout(readOfficialBookingState, 1700);
-  }, [bookingState.monthIndex, bookingState.year, readOfficialBookingState]);
-
-  const navigateOfficialCalendar = useCallback((direction: 'previous' | 'next') => {
     const doc = iframeRef.current?.contentDocument;
-    const buttons = Array.from(doc?.querySelectorAll<HTMLButtonElement>('.cal-nav-btn') ?? []);
-    const button = direction === 'previous' ? buttons[0] : buttons[1];
-
-    if (!button || button.disabled) {
+    if (!doc?.body) {
       return;
     }
 
-    button.click();
-    window.setTimeout(readOfficialBookingState, 700);
-    window.setTimeout(readOfficialBookingState, 1600);
-  }, [readOfficialBookingState]);
+    isSeekingRef.current = true;
+    setOfficialCheckoutOpen(false);
+    setBookingState((current) => ({ ...current, selectedDay: day, loaded: false }));
+
+    const found = await seekToOfficialDay(bookingState.monthIndex, bookingState.year, day);
+
+    if (found) {
+      trackWidgetRef.current = true;
+      readOfficialBookingState();
+      window.setTimeout(readOfficialBookingState, 700);
+    } else {
+      setBookingState((current) => ({
+        ...current,
+        loaded: true,
+        slots: [],
+        emptyMessage: 'Não foi possível carregar esta data agora. Tente novamente em instantes.',
+      }));
+    }
+
+    isSeekingRef.current = false;
+  }, [bookingState.loaded, bookingState.monthIndex, bookingState.year, readOfficialBookingState, seekToOfficialDay]);
 
   const reserveSlot = useCallback((slot: BookingSlot) => {
     const doc = iframeRef.current?.contentDocument;
@@ -343,12 +307,25 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
   }, []);
 
   useEffect(() => {
-    const interval = window.setInterval(readOfficialBookingState, 900);
-    const stopPolling = window.setTimeout(() => window.clearInterval(interval), 20000);
+    const pollIfTrackingWidget = () => {
+      if (!isSeekingRef.current && trackWidgetRef.current) {
+        readOfficialBookingState();
+      }
+    };
+
+    // Rajada inicial rapida pra pegar o primeiro render do widget (SignalR demora a conectar).
+    const fastInterval = window.setInterval(pollIfTrackingWidget, 900);
+    const stopFastInterval = window.setTimeout(() => window.clearInterval(fastInterval), 20000);
+
+    // Polling continuo e mais espacado pra manter vagas/horarios atualizados "em tempo real"
+    // enquanto o cliente olha uma data (o backend do LapTime pode liberar/fechar vagas a qualquer
+    // momento).
+    const liveInterval = window.setInterval(pollIfTrackingWidget, 20000);
 
     return () => {
-      window.clearInterval(interval);
-      window.clearTimeout(stopPolling);
+      window.clearInterval(fastInterval);
+      window.clearTimeout(stopFastInterval);
+      window.clearInterval(liveInterval);
     };
   }, [readOfficialBookingState]);
 
@@ -408,19 +385,19 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
               <button
                 type="button"
                 aria-label="Mês anterior"
-                onClick={() => navigateOfficialCalendar('previous')}
+                onClick={() => navigateMonth('previous')}
                 className="flex h-10 w-10 items-center justify-center rounded border border-zinc-200 text-zinc-400 transition-colors hover:border-primary-600/50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-30"
                 disabled={!bookingState.loaded}
               >
                 <ChevronLeft className="h-5 w-5" />
               </button>
-              <strong className="text-xl font-black lowercase text-zinc-800">
+              <strong className="text-xl font-black text-zinc-800">
                 {bookingState.monthLabel}
               </strong>
               <button
                 type="button"
                 aria-label="Próximo mês"
-                onClick={() => navigateOfficialCalendar('next')}
+                onClick={() => navigateMonth('next')}
                 className="flex h-10 w-10 items-center justify-center rounded border border-zinc-200 text-zinc-400 transition-colors hover:border-primary-600/50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-30"
                 disabled={!bookingState.loaded}
               >
@@ -440,7 +417,7 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
                   return <span key={cell.key} className="min-h-11 border-b border-r border-zinc-100" />;
                 }
 
-                const isEnabled = availableDays.has(cell.day);
+                const isEnabled = bookingState.loaded && !isPastDate(bookingState.year, bookingState.monthIndex, cell.day);
                 const isSelected = cell.day === bookingState.selectedDay;
 
                 return (
@@ -550,13 +527,6 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
                 cleanOfficialBookingFrame();
                 window.setTimeout(readOfficialBookingState, 900);
                 window.setTimeout(readOfficialBookingState, 2200);
-                window.setTimeout(() => {
-                  if (prefetchStartedRef.current) {
-                    return;
-                  }
-                  prefetchStartedRef.current = true;
-                  void prefetchOfficialDays();
-                }, 2800);
               }}
               tabIndex={officialCheckoutOpen ? 0 : -1}
               aria-hidden={!officialCheckoutOpen}
