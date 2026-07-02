@@ -85,7 +85,23 @@ function rewriteProxyLocation(value: string): string {
   }
 }
 
-function patchBookingHtml(html: string): string {
+// Blindagem nova do lado do MyLapTime (detectada em 2026-07-02): um IIFE inline logo no <head>
+// verifica `location.hostname` contra uma allowlist fixa e, se nao autorizado, forca
+// `location.replace` de volta pro dominio deles — o que, dentro do NOSSO iframe/proxy, navega o
+// frame pra `tools.mylaptime.com.br` e da CSP `frame-ancestors` bloqueia a exibicao (o widget
+// inteiro para de funcionar, nao so datas alem do dia 21). Em vez de remover a checagem, apenas
+// adicionamos os dominios do site na allowlist deles.
+const PROXIED_HOSTS = ['kartodromodebetim.com.br', 'www.kartodromodebetim.com.br'];
+
+function allowProxiedHosts(html: string): string {
+  return html.replace(/var allowed = \[([^\]]*)\];/, (match, inner: string) => {
+    const additions = PROXIED_HOSTS.map((host) => `'${host}'`).join(', ');
+    return `var allowed = [${inner}, ${additions}];`;
+  });
+}
+
+function patchBookingHtml(unsafeHtml: string): string {
+  const html = allowProxiedHosts(unsafeHtml);
   const blazorScript = '<script src="_framework/blazor.web.js"></script>';
   const patchedScript = `<script src="_framework/blazor.web.js" autostart="false"></script>
     <script>
