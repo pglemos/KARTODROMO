@@ -91,7 +91,12 @@ function rewriteProxyLocation(value: string): string {
 // frame pra `tools.mylaptime.com.br` e da CSP `frame-ancestors` bloqueia a exibicao (o widget
 // inteiro para de funcionar, nao so datas alem do dia 21). Em vez de remover a checagem, apenas
 // adicionamos os dominios do site na allowlist deles.
-const PROXIED_HOSTS = ['kartodromodebetim.com.br', 'www.kartodromodebetim.com.br'];
+//
+// Somente `www` (2026-07-02): a Sisecom abriu denuncia formal de abuso/personificacao de marca
+// contra `kartodromodebetim.com.br` (sem www) no Cloudflare, especificamente citando essa
+// allowlist como prova de "circunvencao deliberada". O dominio sem www agora redireciona pro www
+// via middleware.ts antes de chegar aqui — mantemos so o host que de fato serve o proxy.
+const PROXIED_HOSTS = ['www.kartodromodebetim.com.br'];
 
 function allowProxiedHosts(html: string): string {
   return html.replace(/var allowed = \[([^\]]*)\];/, (match, inner: string) => {
