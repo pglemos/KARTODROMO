@@ -90,6 +90,7 @@ const buildCalendarCells = (year: number, monthIndex: number): CalendarCell[] =>
 const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
   const HeadingTag = surface === 'page' ? 'h1' : 'h2';
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const prefetchStartedRef = useRef(false);
   const [bookingState, setBookingState] = useState<BookingState>(() => emptyBookingState());
   const [officialCheckoutOpen, setOfficialCheckoutOpen] = useState(false);
   const [bookingActionMessage, setBookingActionMessage] = useState('');
@@ -170,6 +171,79 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
       emptyMessage: normalizeText(doc.querySelector('.no-bookings')?.textContent) || 'Nenhum horário disponível para esta data.',
     }));
   }, [cleanOfficialBookingFrame]);
+
+  const mergeVisibleDays = useCallback(() => {
+    const doc = iframeRef.current?.contentDocument;
+    if (!doc?.body) {
+      return;
+    }
+
+    const days = readOfficialDays(doc);
+    if (days.length === 0) {
+      return;
+    }
+
+    setBookingState((currentState) => ({
+      ...currentState,
+      days: mergeOfficialDays(currentState.days, days),
+    }));
+  }, []);
+
+  // O widget oficial só renderiza uma janela deslizante de ~20 dias por vez (confirmado em
+  // 2026-07-02): o dia calculado pelo servidor aparece só depois de avançar a janela com o botão
+  // "próximo" do próprio widget. Sem isso, dias do fim do mês nunca entram em `bookingState.days`
+  // e ficam permanentemente desabilitados no calendário desta página.
+  const prefetchOfficialDays = useCallback(async () => {
+    const doc = iframeRef.current?.contentDocument;
+    if (!doc?.body) {
+      return;
+    }
+
+    const initialDays = readOfficialDays(doc);
+    const referenceDay = initialDays.find((day) => day.selected) ?? initialDays[0];
+    if (!referenceDay) {
+      return;
+    }
+
+    const { monthIndex, year } = referenceDay;
+    const lastDayOfMonth = new Date(year, monthIndex + 1, 0).getDate();
+    const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+
+    let forwardClicks = 0;
+    const maxClicks = 6;
+
+    while (forwardClicks < maxClicks) {
+      const visibleDays = readOfficialDays(doc);
+      const coversMonthEnd = visibleDays.some(
+        (day) => day.monthIndex === monthIndex && day.year === year && day.day === lastDayOfMonth,
+      );
+      if (coversMonthEnd) {
+        break;
+      }
+
+      const nextButton = Array.from(doc.querySelectorAll<HTMLButtonElement>('.cal-nav-btn'))[1];
+      if (!nextButton || nextButton.disabled) {
+        break;
+      }
+
+      nextButton.click();
+      forwardClicks += 1;
+      await sleep(700);
+      mergeVisibleDays();
+    }
+
+    for (let index = 0; index < forwardClicks; index += 1) {
+      const prevButton = Array.from(doc.querySelectorAll<HTMLButtonElement>('.cal-nav-btn'))[0];
+      if (!prevButton || prevButton.disabled) {
+        break;
+      }
+
+      prevButton.click();
+      await sleep(500);
+    }
+
+    readOfficialBookingState();
+  }, [mergeVisibleDays, readOfficialBookingState]);
 
   const clickOfficialDay = useCallback((day: number) => {
     const doc = iframeRef.current?.contentDocument;
@@ -476,6 +550,13 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
                 cleanOfficialBookingFrame();
                 window.setTimeout(readOfficialBookingState, 900);
                 window.setTimeout(readOfficialBookingState, 2200);
+                window.setTimeout(() => {
+                  if (prefetchStartedRef.current) {
+                    return;
+                  }
+                  prefetchStartedRef.current = true;
+                  void prefetchOfficialDays();
+                }, 2800);
               }}
               tabIndex={officialCheckoutOpen ? 0 : -1}
               aria-hidden={!officialCheckoutOpen}
