@@ -1,9 +1,6 @@
 export const MYLAPTIME_BOOKING_URL =
   'https://tools.mylaptime.com.br/booking?uid=5729bbc1-572b-4e32-84ec-e9e93ab08ced';
 
-export const MYLAPTIME_BOOKING_PROXY_URL =
-  '/booking?uid=5729bbc1-572b-4e32-84ec-e9e93ab08ced';
-
 export const SITE_BOOKING_ANCHOR = '/#agendamento';
 
 export const WHATSAPP_BOOKING_URL =
