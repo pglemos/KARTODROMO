@@ -61,6 +61,33 @@ const calxproSqlOptions = process.env.CALXPRO_SQL_SERVER
     }
   : undefined;
 
+// Espelho (LapTimeMirror no SRVKART, ver lib/livetime/laptime-mirror-sync.ts). Mesmo schema da
+// producao (tabela/coluna por nome identico), preenchido por um daemon separado com alguns
+// segundos/minutos de atraso — ver [[laptime-espelho-srvkart]] na memoria do projeto.
+const mirrorSqlOptions = process.env.SRVKART_SQL_SERVER
+  ? {
+      server: process.env.SRVKART_SQL_SERVER,
+      instanceName: process.env.SRVKART_SQL_INSTANCE,
+      database: process.env.SRVKART_SQL_DATABASE || 'LapTimeMirror',
+      user: process.env.SRVKART_SQL_USER || '',
+      password: process.env.SRVKART_SQL_PASSWORD || '',
+      port: process.env.SRVKART_SQL_PORT ? Number(process.env.SRVKART_SQL_PORT) : undefined,
+      timeoutMs: Number(process.env.SRVKART_SQL_TIMEOUT_MS || '5000'),
+    }
+  : undefined;
+
+// Migracao pagina-por-pagina pro espelho (2026-07-02): cada leitura do LapTime pode ser apontada
+// pro espelho individualmente via env var, default 'production' (comportamento atual, sem
+// mudanca). So' muda de fato quando a var especifica for setada pra 'mirror' E o espelho estiver
+// configurado — senao cai pra producao (nunca quebra por falta de config do espelho).
+type LaptimeReadSource = 'bookings' | 'racings' | 'clientes';
+
+function resolveLaptimeSqlOptions(feature: LaptimeReadSource) {
+  const envKey = `LAPTIME_READ_SOURCE_${feature.toUpperCase()}`;
+  const wantsMirror = (process.env[envKey] || 'production').toLowerCase() === 'mirror';
+  return wantsMirror && mirrorSqlOptions ? mirrorSqlOptions : laptimeSqlOptions;
+}
+
 const scraper = new LiveTimeScraper({
   uid,
   sourceUrl: process.env.LIVETIME_SOURCE_URL,
@@ -199,13 +226,14 @@ async function handleViplexPrograms(request: http.IncomingMessage, response: htt
 }
 
 async function handleLaptimeClientes(url: URL, response: http.ServerResponse) {
-  if (!laptimeSqlOptions) {
+  const sqlOptions = resolveLaptimeSqlOptions('clientes');
+  if (!sqlOptions) {
     sendJson(response, 503, { error: 'laptime_sql_not_configured' });
     return;
   }
 
   try {
-    const { rows, total } = await fetchLapTimeCustomersPage(laptimeSqlOptions, {
+    const { rows, total } = await fetchLapTimeCustomersPage(sqlOptions, {
       q: url.searchParams.get('q') || undefined,
       limit: url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : undefined,
       offset: url.searchParams.get('offset') ? Number(url.searchParams.get('offset')) : undefined,
@@ -335,14 +363,15 @@ async function handleCalXProCorridaCompetidores(url: URL, response: http.ServerR
 }
 
 async function handleLaptimeBookings(url: URL, response: http.ServerResponse) {
-  if (!laptimeSqlOptions) {
+  const sqlOptions = resolveLaptimeSqlOptions('bookings');
+  if (!sqlOptions) {
     sendJson(response, 503, { error: 'laptime_sql_not_configured' });
     return;
   }
 
   try {
     const status = url.searchParams.get('status');
-    const { rows, total } = await fetchLapTimeBookingsPage(laptimeSqlOptions, {
+    const { rows, total } = await fetchLapTimeBookingsPage(sqlOptions, {
       q: url.searchParams.get('q') || undefined,
       status: status === 'aberta' || status === 'encerrada' ? status : undefined,
       from: url.searchParams.get('from') || undefined,
@@ -358,7 +387,8 @@ async function handleLaptimeBookings(url: URL, response: http.ServerResponse) {
 }
 
 async function handleLaptimeBookingCustomers(url: URL, response: http.ServerResponse) {
-  if (!laptimeSqlOptions) {
+  const sqlOptions = resolveLaptimeSqlOptions('bookings');
+  if (!sqlOptions) {
     sendJson(response, 503, { error: 'laptime_sql_not_configured' });
     return;
   }
@@ -370,7 +400,7 @@ async function handleLaptimeBookingCustomers(url: URL, response: http.ServerResp
   }
 
   try {
-    const rows = await fetchLapTimeBookingCustomers(laptimeSqlOptions, bookingId);
+    const rows = await fetchLapTimeBookingCustomers(sqlOptions, bookingId);
     sendJson(response, 200, rows);
   } catch (error) {
     sendJson(response, 502, { error: error instanceof Error ? error.message : 'laptime_sql_query_failed' });
@@ -378,14 +408,15 @@ async function handleLaptimeBookingCustomers(url: URL, response: http.ServerResp
 }
 
 async function handleLaptimeRacings(url: URL, response: http.ServerResponse) {
-  if (!laptimeSqlOptions) {
+  const sqlOptions = resolveLaptimeSqlOptions('racings');
+  if (!sqlOptions) {
     sendJson(response, 503, { error: 'laptime_sql_not_configured' });
     return;
   }
 
   try {
     const status = url.searchParams.get('status');
-    const { rows, total } = await fetchLapTimeRacingsPage(laptimeSqlOptions, {
+    const { rows, total } = await fetchLapTimeRacingsPage(sqlOptions, {
       q: url.searchParams.get('q') || undefined,
       status: status === 'finalizada' || status === 'aberta' ? status : undefined,
       from: url.searchParams.get('from') || undefined,
@@ -401,7 +432,8 @@ async function handleLaptimeRacings(url: URL, response: http.ServerResponse) {
 }
 
 async function handleLaptimeRacingCompetitors(url: URL, response: http.ServerResponse) {
-  if (!laptimeSqlOptions) {
+  const sqlOptions = resolveLaptimeSqlOptions('racings');
+  if (!sqlOptions) {
     sendJson(response, 503, { error: 'laptime_sql_not_configured' });
     return;
   }
@@ -413,7 +445,7 @@ async function handleLaptimeRacingCompetitors(url: URL, response: http.ServerRes
   }
 
   try {
-    const rows = await fetchLapTimeRacingCompetitors(laptimeSqlOptions, racingId);
+    const rows = await fetchLapTimeRacingCompetitors(sqlOptions, racingId);
     sendJson(response, 200, rows);
   } catch (error) {
     sendJson(response, 502, { error: error instanceof Error ? error.message : 'laptime_sql_query_failed' });
