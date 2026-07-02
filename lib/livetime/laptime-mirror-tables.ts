@@ -30,7 +30,12 @@ export type SourceTableInfo = {
 };
 
 // Tabelas de sistema/EF que nao espelhamos.
-const SKIP_TABLES = new Set(['sysdiagrams', '__EFMigrationsHistory']);
+// VehicleHistory (117k, historico de uso por kart) tem uma linha com TimeofUse = '0001-01-01'
+// (valor sentinela "nao definido") que dispara um bug conhecido do driver tedious ("Out of range")
+// ao reinserir datetime2 de ano 1 em bulk. Nao e' lida pelo site (nenhuma pagina usa historico de
+// kart hoje), entao fica de fora do espelho. Se precisar no futuro, coagir esse sentinela para
+// NULL/1753 na copia resolve.
+const SKIP_TABLES = new Set(['sysdiagrams', '__EFMigrationsHistory', 'VehicleHistory']);
 
 // Grandes e so-insercao (logs/historico/vendas). Sincronizadas incrementalmente por identity.
 const APPEND_ONLY_TABLES = new Set([

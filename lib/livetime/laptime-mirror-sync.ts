@@ -106,7 +106,7 @@ export class LapTimeMirrorEngine {
                c.is_identity as isIdentity
         from sys.columns c
         join sys.tables t on t.object_id = c.object_id
-        join sys.types ty on ty.user_type_id = c.user_type_id
+        join sys.types ty on ty.user_type_id = c.system_type_id
         where t.name = @t
         order by c.column_id
       `);
@@ -137,6 +137,11 @@ export class LapTimeMirrorEngine {
       case 'decimal':
       case 'numeric':
         typeDef = `${t}(${col.precision},${col.scale})`;
+        break;
+      case 'datetime':
+        // `datetime` (limite minimo 1753) pode estourar com datas legadas < 1753 no historico do
+        // LapTime. No espelho usamos `datetime2` (aceita 0001-9999), um superset seguro.
+        typeDef = 'datetime2';
         break;
       default:
         typeDef = t;
@@ -205,15 +210,22 @@ export class LapTimeMirrorEngine {
       case 'real':
         return sql.Real();
       case 'datetime':
-        return sql.DateTime();
+        // Espelhado como datetime2 (ver columnDdl) — evita o limite de 1753 do datetime.
+        return sql.DateTime2(7);
       case 'datetime2':
-        return sql.DateTime2();
+        return sql.DateTime2(col.scale);
       case 'smalldatetime':
         return sql.SmallDateTime();
       case 'date':
         return sql.Date();
       case 'time':
-        return sql.Time();
+        return sql.Time(col.scale);
+      case 'image':
+        return sql.Image();
+      case 'text':
+        return sql.Text();
+      case 'ntext':
+        return sql.NText();
       case 'uniqueidentifier':
         return sql.UniqueIdentifier();
       case 'char':
