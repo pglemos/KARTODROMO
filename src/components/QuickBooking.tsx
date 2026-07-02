@@ -265,7 +265,15 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
 
     isSeekingRef.current = true;
     setOfficialCheckoutOpen(false);
-    setBookingState((current) => ({ ...current, selectedDay: day, loaded: false }));
+
+    // A maioria dos cliques cai dentro da janela de ~20 dias que o widget ja tem carregada — nesse
+    // caso o clique e' instantaneo e nao precisa do esqueleto de carregamento. So mostramos o
+    // esqueleto quando de fato precisamos avancar/retroceder a janela do widget (o que leva
+    // alguns segundos), pra evitar o "pisca-pisca" em toda troca de data.
+    const targetTime = new Date(bookingState.year, bookingState.monthIndex, day).getTime();
+    const alreadyVisible = readOfficialDays(doc).some((visibleDay) => getOfficialDayTime(visibleDay) === targetTime);
+
+    setBookingState((current) => ({ ...current, selectedDay: day, loaded: alreadyVisible ? current.loaded : false }));
 
     const found = await seekToOfficialDay(bookingState.monthIndex, bookingState.year, day);
 
