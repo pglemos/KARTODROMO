@@ -52,7 +52,7 @@ try {
     Start-Sleep -Seconds $DelaySeconds
   }
 
-  $port = 4020
+  $port = if ($env:MIRROR_PORT) { [int]$env:MIRROR_PORT } else { 4030 }
   if (-not (Get-NodeProcessByPattern "laptime-mirror-server")) {
     Write-MirrorLog "Iniciando daemon de espelho (npm run mirror) na porta $port."
     Start-Process -FilePath (Get-NpmCmdPath) `
