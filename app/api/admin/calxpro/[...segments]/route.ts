@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 
 const TIMEOUT_MS = Number(process.env.CALXPRO_BRIDGE_TIMEOUT_MS || '8000');
 
-const ALLOWED_SLUGS = new Set(['contatos', 'receitas', 'creditos', 'corridas', 'corrida-competidores']);
+const ALLOWED_SLUGS = new Set(['receitas', 'creditos', 'corridas', 'corrida-competidores']);
 
 async function requireSession() {
   const cookieStore = await cookies();

@@ -6,9 +6,7 @@ import { TELAO_LAYOUT_PRESETS } from '@/lib/telao-layout-config';
 import { readTelaoLayoutConfig, telaoLayoutStoreStatus, writeTelaoLayoutConfigToFile } from '@/lib/telao-layout-store';
 import { readTb50Page, tb50PageStoreStatus, writeTb50PageToFile } from '@/lib/tb50-page-store';
 import { listViplexPrograms, startViplexProgram } from '@/lib/viplex-programs';
-import { fetchLapTimeCustomersPage } from '@/lib/livetime/laptime-customers';
-import { fetchCalXProCustomersPage } from '@/lib/livetime/calxpro-customers';
-import { fetchCalXProContatosPage } from '@/lib/livetime/calxpro-contatos';
+import { fetchClientesPage } from '@/lib/livetime/cliente-unificado';
 import { fetchCalXProCreditosPage, fetchCalXProReceitasPage } from '@/lib/livetime/calxpro-receitas';
 import { fetchCalXProCorridaCompetidores, fetchCalXProCorridasPage } from '@/lib/livetime/calxpro-corridas';
 import { fetchLapTimeBookingCustomers, fetchLapTimeBookingsPage } from '@/lib/livetime/laptime-bookings';
@@ -79,8 +77,10 @@ const mirrorSqlOptions = process.env.SRVKART_SQL_SERVER
 // Migracao pagina-por-pagina pro espelho (2026-07-02): cada leitura do LapTime pode ser apontada
 // pro espelho individualmente via env var, default 'production' (comportamento atual, sem
 // mudanca). So' muda de fato quando a var especifica for setada pra 'mirror' E o espelho estiver
-// configurado — senao cai pra producao (nunca quebra por falta de config do espelho).
-type LaptimeReadSource = 'bookings' | 'racings' | 'clientes';
+// configurado — senao cai pra producao (nunca quebra por falta de config do espelho). Clientes nao
+// usa esse toggle: sempre le de dbo.ClienteUnificado no espelho (ver cliente-unificado.ts), que so'
+// existe la'.
+type LaptimeReadSource = 'bookings' | 'racings';
 
 function resolveLaptimeSqlOptions(feature: LaptimeReadSource) {
   const envKey = `LAPTIME_READ_SOURCE_${feature.toUpperCase()}`;
@@ -225,15 +225,14 @@ async function handleViplexPrograms(request: http.IncomingMessage, response: htt
   sendJson(response, 405, { error: 'method_not_allowed' });
 }
 
-async function handleLaptimeClientes(url: URL, response: http.ServerResponse) {
-  const sqlOptions = resolveLaptimeSqlOptions('clientes');
-  if (!sqlOptions) {
-    sendJson(response, 503, { error: 'laptime_sql_not_configured' });
+async function handleClientes(url: URL, response: http.ServerResponse) {
+  if (!mirrorSqlOptions) {
+    sendJson(response, 503, { error: 'mirror_sql_not_configured' });
     return;
   }
 
   try {
-    const { rows, total } = await fetchLapTimeCustomersPage(sqlOptions, {
+    const { rows, total } = await fetchClientesPage(mirrorSqlOptions, {
       q: url.searchParams.get('q') || undefined,
       limit: url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : undefined,
       offset: url.searchParams.get('offset') ? Number(url.searchParams.get('offset')) : undefined,
@@ -241,45 +240,7 @@ async function handleLaptimeClientes(url: URL, response: http.ServerResponse) {
     response.writeHead(200, { ...NO_CACHE_HEADERS, 'x-total-count': String(total) });
     response.end(JSON.stringify(rows));
   } catch (error) {
-    sendJson(response, 502, { error: error instanceof Error ? error.message : 'laptime_sql_query_failed' });
-  }
-}
-
-async function handleCalXProClientes(url: URL, response: http.ServerResponse) {
-  if (!calxproSqlOptions) {
-    sendJson(response, 503, { error: 'calxpro_sql_not_configured' });
-    return;
-  }
-
-  try {
-    const { rows, total } = await fetchCalXProCustomersPage(calxproSqlOptions, {
-      q: url.searchParams.get('q') || undefined,
-      limit: url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : undefined,
-      offset: url.searchParams.get('offset') ? Number(url.searchParams.get('offset')) : undefined,
-    });
-    response.writeHead(200, { ...NO_CACHE_HEADERS, 'x-total-count': String(total) });
-    response.end(JSON.stringify(rows));
-  } catch (error) {
-    sendJson(response, 502, { error: error instanceof Error ? error.message : 'calxpro_sql_query_failed' });
-  }
-}
-
-async function handleCalXProContatos(url: URL, response: http.ServerResponse) {
-  if (!calxproSqlOptions) {
-    sendJson(response, 503, { error: 'calxpro_sql_not_configured' });
-    return;
-  }
-
-  try {
-    const { rows, total } = await fetchCalXProContatosPage(calxproSqlOptions, {
-      q: url.searchParams.get('q') || undefined,
-      limit: url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : undefined,
-      offset: url.searchParams.get('offset') ? Number(url.searchParams.get('offset')) : undefined,
-    });
-    response.writeHead(200, { ...NO_CACHE_HEADERS, 'x-total-count': String(total) });
-    response.end(JSON.stringify(rows));
-  } catch (error) {
-    sendJson(response, 502, { error: error instanceof Error ? error.message : 'calxpro_sql_query_failed' });
+    sendJson(response, 502, { error: error instanceof Error ? error.message : 'mirror_sql_query_failed' });
   }
 }
 
@@ -490,18 +451,8 @@ const server = http.createServer((request, response) => {
     return;
   }
 
-  if (url.pathname === '/api/laptime-clientes') {
-    void handleLaptimeClientes(url, response);
-    return;
-  }
-
-  if (url.pathname === '/api/calxpro-clientes') {
-    void handleCalXProClientes(url, response);
-    return;
-  }
-
-  if (url.pathname === '/api/calxpro-contatos') {
-    void handleCalXProContatos(url, response);
+  if (url.pathname === '/api/clientes') {
+    void handleClientes(url, response);
     return;
   }
 

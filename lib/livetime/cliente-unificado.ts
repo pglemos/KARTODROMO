@@ -1,44 +1,50 @@
 import sql from 'mssql';
 import type { LapTimeSqlOptions } from '@/lib/livetime/laptime-sql';
 
-export type CalXProCustomer = {
+/**
+ * Leitura da tabela unificada de clientes (`dbo.ClienteUnificado`), mantida pelo daemon de
+ * espelho no SRVKART (ver lib/livetime/cliente-unificado-sync.ts). Concentra LapTime + CalXPro
+ * (histórico + contatos) numa unica lista, sem expor de qual sistema cada registro veio — essa
+ * distincao e' puramente interna (coluna `OrigemSistema`, nao selecionada aqui).
+ */
+export type Cliente = {
   id: string;
   nome: string;
   email: string | null;
   telefone: string | null;
   documento: string | null;
   cidade: string | null;
+  estado: string | null;
   criadoEm: string | null;
 };
 
-export type CalXProCustomersFilters = {
+export type ClientesFilters = {
   q?: string;
   limit?: number;
   offset?: number;
 };
 
 type ClienteRow = {
-  ID_CLIENTE: number;
-  ST_NOME: string | null;
-  ST_SOBRENOME: string | null;
-  ST_EMAIL: string | null;
-  ST_CELULAR: string | null;
-  ST_TELEFONE: string | null;
-  ST_CPF: string | null;
-  ST_CIDADE: string | null;
-  DT_INC: Date | null;
+  Id: number;
+  Nome: string;
+  Email: string | null;
+  Telefone: string | null;
+  Documento: string | null;
+  Cidade: string | null;
+  Estado: string | null;
+  CriadoEm: Date | null;
 };
 
-function toCustomer(row: ClienteRow): CalXProCustomer {
-  const nome = [row.ST_NOME?.trim(), row.ST_SOBRENOME?.trim()].filter(Boolean).join(' ');
+function toCliente(row: ClienteRow): Cliente {
   return {
-    id: String(row.ID_CLIENTE),
-    nome: nome || 'Sem nome',
-    email: row.ST_EMAIL?.trim() || null,
-    telefone: row.ST_CELULAR?.trim() || row.ST_TELEFONE?.trim() || null,
-    documento: row.ST_CPF?.trim() || null,
-    cidade: row.ST_CIDADE?.trim() || null,
-    criadoEm: row.DT_INC ? row.DT_INC.toISOString() : null,
+    id: String(row.Id),
+    nome: row.Nome,
+    email: row.Email,
+    telefone: row.Telefone,
+    documento: row.Documento,
+    cidade: row.Cidade,
+    estado: row.Estado,
+    criadoEm: row.CriadoEm ? row.CriadoEm.toISOString() : null,
   };
 }
 
@@ -60,10 +66,10 @@ function sqlConfig(options: LapTimeSqlOptions): sql.config {
   };
 }
 
-export async function fetchCalXProCustomersPage(
+export async function fetchClientesPage(
   options: LapTimeSqlOptions,
-  filters: CalXProCustomersFilters,
-): Promise<{ rows: CalXProCustomer[]; total: number }> {
+  filters: ClientesFilters,
+): Promise<{ rows: Cliente[]; total: number }> {
   const limit = Math.max(1, Math.min(2000, filters.limit ?? 1000));
   const offset = Math.max(0, filters.offset ?? 0);
   const q = filters.q?.trim();
@@ -73,7 +79,7 @@ export async function fetchCalXProCustomersPage(
     await pool.connect();
 
     const whereSql = q
-      ? 'where ST_NOME like @q or ST_SOBRENOME like @q or ST_EMAIL like @q or ST_CELULAR like @q or ST_CPF like @q'
+      ? 'where Nome like @q or Email like @q or Telefone like @q or Documento like @q'
       : '';
     const bindQ = (request: sql.Request) => {
       if (q) request.input('q', sql.NVarChar, `%${q}%`);
@@ -81,7 +87,7 @@ export async function fetchCalXProCustomersPage(
     };
 
     const totalResult = await bindQ(pool.request()).query<{ c: number }>(
-      `select count(*) as c from dbo.CLIENTE ${whereSql}`,
+      `select count(*) as c from dbo.ClienteUnificado ${whereSql}`,
     );
     const total = totalResult.recordset[0]?.c ?? 0;
 
@@ -89,14 +95,14 @@ export async function fetchCalXProCustomersPage(
       .input('limit', sql.Int, limit)
       .input('offset', sql.Int, offset)
       .query<ClienteRow>(`
-        select ID_CLIENTE, ST_NOME, ST_SOBRENOME, ST_EMAIL, ST_CELULAR, ST_TELEFONE, ST_CPF, ST_CIDADE, DT_INC
-        from dbo.CLIENTE
+        select Id, Nome, Email, Telefone, Documento, Cidade, Estado, CriadoEm
+        from dbo.ClienteUnificado
         ${whereSql}
-        order by ID_CLIENTE desc
+        order by Nome
         offset @offset rows fetch next @limit rows only
       `);
 
-    return { rows: rowsResult.recordset.map(toCustomer), total };
+    return { rows: rowsResult.recordset.map(toCliente), total };
   } finally {
     await pool.close().catch(() => undefined);
   }

@@ -1,9 +1,11 @@
 import http from 'node:http';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import sql from 'mssql';
 import { LapTimeMirrorEngine } from '@/lib/livetime/laptime-mirror-sync';
-import type { MirrorSqlOptions, SourceSqlOptions } from '@/lib/livetime/laptime-mirror-sql';
+import { mirrorSqlConfig, type MirrorSqlOptions, type SourceSqlOptions } from '@/lib/livetime/laptime-mirror-sql';
 import type { TableSyncPlan } from '@/lib/livetime/laptime-mirror-tables';
+import { ensureClienteUnificadoTable, syncClienteUnificado } from '@/lib/livetime/cliente-unificado-sync';
 
 // Le .env.local manualmente (mesmo padrao de services/livetime-scraper-server.ts — dotenv nao e'
 // usado neste projeto).
@@ -89,6 +91,34 @@ async function tick() {
   }
 }
 
+// Job separado: concentra LapTime (Customer) + CalXPro (CLIENTE/CONTATO) numa unica tabela
+// dbo.ClienteUnificado no espelho, ver lib/livetime/cliente-unificado-sync.ts. Cadencia propria
+// (mais lenta que Customer, pois 2 das 3 fontes sao historico estatico) e nao entra no plano
+// generico de tabelas porque nao e' um espelho 1:1 de uma tabela de origem.
+const CLIENTE_UNIFICADO_INTERVAL_MS = Number(process.env.MIRROR_CLIENTE_UNIFICADO_INTERVAL_MS || '300000');
+let lastClienteUnificadoRunAt = 0;
+let clienteUnificadoTicking = false;
+
+async function tickClienteUnificado() {
+  if (clienteUnificadoTicking) return;
+  const now = Date.now();
+  if (now - lastClienteUnificadoRunAt < CLIENTE_UNIFICADO_INTERVAL_MS) return;
+  clienteUnificadoTicking = true;
+  const pool = new sql.ConnectionPool(mirrorSqlConfig(mirrorOptions));
+  try {
+    await pool.connect();
+    await ensureClienteUnificadoTable(pool);
+    const count = await syncClienteUnificado(pool);
+    lastClienteUnificadoRunAt = Date.now();
+    engine.log(`sync: ClienteUnificado = ${count} linhas em ${Date.now() - now}ms`);
+  } catch (err) {
+    engine.log(`sync ERRO ClienteUnificado: ${(err as Error).message}`);
+  } finally {
+    await pool.close().catch(() => undefined);
+    clienteUnificadoTicking = false;
+  }
+}
+
 const NO_CACHE_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
   'cache-control': 'no-store',
@@ -99,8 +129,11 @@ const server = http.createServer((request, response) => {
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
   if (url.pathname === '/healthz') {
     const status = engine.getStatus();
+    const clienteUnificado = {
+      lastSyncUtc: lastClienteUnificadoRunAt ? new Date(lastClienteUnificadoRunAt).toISOString() : null,
+    };
     response.writeHead(200, NO_CACHE_HEADERS);
-    response.end(JSON.stringify({ ok: true, ...status }));
+    response.end(JSON.stringify({ ok: true, ...status, clienteUnificado }));
     return;
   }
   response.writeHead(404, NO_CACHE_HEADERS);
@@ -127,8 +160,10 @@ async function main() {
   const loopMs = Number(process.env.MIRROR_LOOP_MS || '2000');
   setInterval(() => {
     void tick();
+    void tickClienteUnificado();
   }, loopMs);
   void tick();
+  void tickClienteUnificado();
 }
 
 process.on('SIGINT', () => {

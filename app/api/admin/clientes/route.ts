@@ -5,7 +5,7 @@ import { adminCookieName, verifyAdminSession } from '@/lib/admin-auth';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const TIMEOUT_MS = Number(process.env.CALXPRO_CLIENTES_TIMEOUT_MS || '8000');
+const TIMEOUT_MS = Number(process.env.CLIENTES_TIMEOUT_MS || '8000');
 
 async function requireSession() {
   const cookieStore = await cookies();
@@ -25,10 +25,10 @@ export async function GET(request: NextRequest) {
 
   const base = resolveBridgeBase();
   if (!base) {
-    return NextResponse.json({ error: 'calxpro_bridge_not_configured' }, { status: 503 });
+    return NextResponse.json({ error: 'laptime_bridge_not_configured' }, { status: 503 });
   }
 
-  const targetUrl = `${base}/api/calxpro-clientes${request.nextUrl.search}`;
+  const targetUrl = `${base}/api/clientes${request.nextUrl.search}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     return new NextResponse(text, { status: response.status, headers });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'calxpro_bridge_unreachable' },
+      { error: error instanceof Error ? error.message : 'laptime_bridge_unreachable' },
       { status: 502 },
     );
   } finally {
