@@ -35,7 +35,7 @@ const anchorLinks = [
 
 const seasonSpecs = [
   ['Formato', 'Mensal'],
-  ['Corridas', '8 no mês'],
+  ['Corridas', '7 no mês'],
   ['Ranking', '4 melhores'],
   ['Inscrição', 'R$ 50,00'],
   ['Corrida', 'R$ 145,00'],
@@ -43,14 +43,13 @@ const seasonSpecs = [
 ];
 
 const calendarRows = [
-  ['1', '06/06', 'Sábado', '11:10', '12:10', '1 Normal'],
-  ['2', '07/06', 'Domingo', '11:10', '12:10', '1 Normal'],
-  ['3', '13/06', 'Sábado', '11:10', '12:10', '1 Normal'],
-  ['4', '14/06', 'Domingo', '10:35', '11:35', '1 Normal'],
-  ['5', '20/06', 'Sábado', '11:10', '12:10', '1 Normal'],
-  ['6', '21/06', 'Domingo', '11:10', '12:10', '1 Normal'],
-  ['7', '27/06', 'Sábado', '11:10', '12:10', '1 Normal'],
-  ['8', '28/06', 'Domingo', '11:10', '12:10', '1 Normal'],
+  ['1', '04/07', 'Julho', '11:10', '12:10'],
+  ['2', '05/07', 'Julho', '11:10', '12:10'],
+  ['3', '12/07', 'Julho', '11:10', '12:10'],
+  ['4', '18/07', 'Julho', '11:10', '12:10'],
+  ['5', '19/07', 'Julho', '11:10', '12:10'],
+  ['6', '25/07', 'Julho', '11:10', '12:10'],
+  ['7', '26/07', 'Julho', '11:10', '12:10'],
 ];
 
 const rules = [
@@ -62,12 +61,12 @@ const rules = [
   {
     icon: ClipboardList,
     title: 'Classificação mensal',
-    text: 'Até 8 corridas no mês, com as 4 melhores válidas para o ranking. As 4 piores são descartadas, incluindo faltas.',
+    text: 'Até 7 corridas no mês, com as 4 melhores válidas para o ranking. As 3 piores são descartadas, incluindo faltas.',
   },
   {
     icon: Flag,
     title: 'Traçados oficiais',
-    text: 'Todas as etapas de junho utilizam o traçado 1 Normal, conforme o calendário oficial.',
+    text: 'Todas as corridas de julho seguem o calendário oficial divulgado pela organização.',
   },
   {
     icon: Weight,
@@ -275,7 +274,7 @@ const KACPage = () => {
               <p className="kac-label">Valores oficiais</p>
               <PriceLine label="Inscrição" value="R$ 50,00" />
               <PriceLine label="Cada corrida" value="R$ 145,00" />
-              <PriceLine label="Formato" value="8 corridas / 4 válidas" />
+              <PriceLine label="Formato" value="7 corridas / 4 válidas" />
               <ActionLink href={whatsappUrl} external icon={MessageSquare} full>
                 Reservar vaga
               </ActionLink>
@@ -286,8 +285,8 @@ const KACPage = () => {
         <Section id="calendario" number="02" title="Calendário oficial de provas">
           <div className="kac-calendar-heading" data-reveal>
             <div>
-              <p className="kac-label">Horários do KAC Junho</p>
-              <h3>Confira os horários de chegada e largada de cada etapa.</h3>
+                <p className="kac-label">Horários do KAC Julho</p>
+              <h3>Confira os horários de chegada e corrida de cada etapa.</h3>
             </div>
             <CalendarDays className="h-12 w-12 text-primary-600" />
           </div>
@@ -297,7 +296,7 @@ const KACPage = () => {
               <table className="w-full min-w-[760px] border-collapse text-left">
                 <thead>
                   <tr>
-                    {['Corrida', 'Data', 'Dia', 'Chegada', 'Largada', 'Traçado'].map((head) => (
+                    {['Corrida', 'Data', 'Mês', 'Horário de chegada', 'Horário da corrida'].map((head) => (
                       <th key={head} scope="col">
                         {head}
                       </th>
@@ -305,8 +304,8 @@ const KACPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {calendarRows.map((row) => (
-                    <tr key={row[0]} className={row[0] === '4' ? 'kac-calendar-exception' : undefined}>
+                    {calendarRows.map((row) => (
+                      <tr key={row[0]}>
                       {row.map((cell, index) => (
                         <td key={`${row[0]}-${index}`}>
                           {index === 0 ? <span className="kac-race-number">{cell}</span> : cell}
@@ -324,7 +323,7 @@ const KACPage = () => {
           <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
             <FeatureCard icon={ClipboardList} title="Resultado individual" text="A pontuação respeita os resultados individuais de cada piloto." />
             <FeatureCard icon={Award} title="Queda por posição" text="A partir do 5º colocado, aplica-se -1 ponto por posição." />
-            <FeatureCard icon={CheckCircle2} title="Regularidade" text="As 4 melhores contam e as 4 piores são descartadas." />
+            <FeatureCard icon={CheckCircle2} title="Regularidade" text="As 4 melhores contam e as 3 piores são descartadas." />
           </div>
 
           <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-[0.86fr_1.14fr]">
@@ -333,8 +332,8 @@ const KACPage = () => {
                 <span>4</span>
                 <strong>melhores corridas contam</strong>
               </div>
-              <div>
-                <span>4</span>
+            <div>
+                <span>3</span>
                 <strong>piores corridas descartadas</strong>
               </div>
             </div>
