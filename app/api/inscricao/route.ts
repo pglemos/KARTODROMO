@@ -1,121 +1,92 @@
-// Proxies championship registration submissions to the n8n webhook.
-// Keeps API credentials server-side only (never exposed to the browser).
-// Ported from the old api/inscricao.ts (Vercel Edge Function), which Cloudflare
-// Workers/OpenNext never executes — the api/*.ts convention is Vercel-only.
+import {
+  generateRegistrationProtocol,
+  getChampionshipServiceClient,
+  normalizeChampionshipRegistration,
+  validateChampionshipRegistration,
+  type ChampionshipRegistrationInput,
+} from '@/lib/championship-registrations';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-type Pilot = {
-    nome?: unknown;
-    peso_kg?: unknown;
-};
-
-type RegistrationPayload = {
-    evento?: unknown;
-    nome_da_equipe?: unknown;
-    nome_do_chefe_da_equipe?: unknown;
-    email?: unknown;
-    telefone?: unknown;
-    pilotos?: unknown;
-    quantidade_karts_no_campeonato?: unknown;
-    pagamento?: unknown;
-};
+const MAX_CONTENT_LENGTH = 30000;
 
 const jsonResponse = (payload: unknown, status = 200) =>
-    new Response(JSON.stringify(payload), {
-        status,
-        headers: { 'Content-Type': 'application/json' },
-    });
+  new Response(JSON.stringify(payload), {
+    status,
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+  });
 
 const readEnv = (...keys: string[]) => {
-    for (const key of keys) {
-        const value = process.env[key];
-        if (value) return value;
-    }
-    return '';
+  for (const key of keys) {
+    const value = process.env[key];
+    if (value) return value;
+  }
+  return '';
 };
 
-const isNonEmptyString = (value: unknown) => typeof value === 'string' && value.trim().length > 0;
+async function forwardToWebhook(body: unknown) {
+  const user = readEnv('FORM_MANAGEMENT_USER', 'FORM_MANAGERMENT_USER', 'VITE_FORM_MANAGERMENT_USER');
+  const key = readEnv('FORM_MANAGEMENT_KEY', 'FORM_MANAGERMENT_KEY', 'VITE_FORM_MANAGERMENT_KEY');
+  const webhookUrl = readEnv('FORM_WEBHOOK_URL', 'VITE_WEBHOOK_URL');
 
-const validatePayload = (body: RegistrationPayload) => {
-    const errors: string[] = [];
+  if (!user || !key || !webhookUrl) return;
 
-    if (!isNonEmptyString(body.evento)) errors.push('Evento é obrigatório.');
-    if (!isNonEmptyString(body.nome_da_equipe)) errors.push('Nome da equipe é obrigatório.');
-    if (!isNonEmptyString(body.nome_do_chefe_da_equipe)) errors.push('Nome do chefe da equipe é obrigatório.');
-
-    if (body.email !== undefined && body.email !== '' && typeof body.email === 'string' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) {
-        errors.push('E-mail inválido.');
-    }
-
-    if (!Array.isArray(body.pilotos) || body.pilotos.length < 1 || body.pilotos.length > 50) {
-        errors.push('Informe de 1 a 50 pilotos.');
-    } else {
-        body.pilotos.forEach((pilot: Pilot, index: number) => {
-            if (!isNonEmptyString(pilot.nome)) errors.push(`Nome do piloto ${index + 1} é obrigatório.`);
-            const weight = Number(pilot.peso_kg);
-            if (!Number.isFinite(weight) || weight < 30 || weight > 200) {
-                errors.push(`Peso do piloto ${index + 1} deve estar entre 30 kg e 200 kg.`);
-            }
-        });
-    }
-
-    const kartCount = Number(body.quantidade_karts_no_campeonato);
-    if (!Number.isInteger(kartCount) || kartCount < 1 || kartCount > 50) {
-        errors.push('Quantidade de karts deve estar entre 1 e 50.');
-    }
-
-    return errors;
-};
+  const credentials = btoa(`${user}:${key}`);
+  await fetch(webhookUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${credentials}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  }).catch(() => undefined);
+}
 
 export async function POST(request: Request) {
-    const contentLength = Number(request.headers.get('content-length') || 0);
-    if (contentLength > 20000) {
-        return jsonResponse({ error: 'Payload too large' }, 413);
+  const contentLength = Number(request.headers.get('content-length') || 0);
+  if (contentLength > MAX_CONTENT_LENGTH) {
+    return jsonResponse({ error: 'Payload too large' }, 413);
+  }
+
+  let rawBody: ChampionshipRegistrationInput;
+  try {
+    rawBody = (await request.json()) as ChampionshipRegistrationInput;
+  } catch {
+    return jsonResponse({ error: 'Payload inválido.' }, 400);
+  }
+
+  const payload = normalizeChampionshipRegistration(rawBody);
+  const validationErrors = validateChampionshipRegistration(payload);
+
+  if (validationErrors.length > 0) {
+    return jsonResponse({ error: 'Invalid registration payload', details: validationErrors }, 400);
+  }
+
+  try {
+    const supabase = getChampionshipServiceClient();
+    const protocol = generateRegistrationProtocol();
+    const { data, error } = await supabase.rpc('kartodromo_create_campeonato_inscricao', {
+      p_payload: { ...payload, protocol },
+    });
+
+    if (error) {
+      return jsonResponse({ error: error.message }, 500);
     }
 
-    const user = readEnv('FORM_MANAGEMENT_USER', 'FORM_MANAGERMENT_USER', 'VITE_FORM_MANAGERMENT_USER');
-    const key = readEnv('FORM_MANAGEMENT_KEY', 'FORM_MANAGERMENT_KEY', 'VITE_FORM_MANAGERMENT_KEY');
-    const webhookUrl = readEnv('FORM_WEBHOOK_URL', 'VITE_WEBHOOK_URL');
+    const row = Array.isArray(data) ? data[0] : data;
 
-    if (!user || !key || !webhookUrl) {
-        return jsonResponse({ error: 'Server misconfigured' }, 500);
-    }
+    await forwardToWebhook({ ...rawBody, protocol });
 
-    try {
-        const body = await request.json() as RegistrationPayload;
-        const validationErrors = validatePayload(body);
-
-        if (validationErrors.length > 0) {
-            return jsonResponse({ error: 'Invalid registration payload', details: validationErrors }, 400);
-        }
-
-        const credentials = btoa(`${user}:${key}`);
-
-        const webhookResponse = await fetch(webhookUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Basic ${credentials}`,
-            },
-            body: JSON.stringify(body),
-        });
-
-        const responseData = await webhookResponse.text();
-        let responsePayload: unknown = {
-            ok: webhookResponse.ok,
-            message: responseData || (webhookResponse.ok ? 'Registration forwarded' : 'Webhook rejected registration'),
-        };
-
-        try {
-            responsePayload = responseData ? JSON.parse(responseData) : responsePayload;
-        } catch {
-            // n8n can return plain text; keep a valid JSON response for the client.
-        }
-
-        return jsonResponse(responsePayload, webhookResponse.status);
-    } catch {
-        return jsonResponse({ error: 'Failed to process registration' }, 500);
-    }
+    return jsonResponse({
+      ok: true,
+      id: row.id,
+      protocol: row.protocol,
+      status: row.status,
+      message: 'Inscrição recebida com sucesso.',
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to process registration';
+    return jsonResponse({ error: message }, 500);
+  }
 }

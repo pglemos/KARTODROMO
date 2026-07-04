@@ -51,3 +51,50 @@ export type Classificacao = {
 export type ClassificacaoWithPiloto = Classificacao & {
   pilotos: Pick<Piloto, 'nome' | 'numero' | 'equipe'> | null;
 };
+
+export type CampeonatoInscricaoStatus = 'pendente' | 'em_analise' | 'confirmada' | 'recusada' | 'cancelada';
+export type CampeonatoInscricaoModalidade = 'equipe' | 'individual';
+
+export type CampeonatoInscricao = {
+  id: string;
+  protocol: string;
+  campeonato_id: string | null;
+  evento: string;
+  modalidade: CampeonatoInscricaoModalidade;
+  status: CampeonatoInscricaoStatus;
+  nome_equipe: string | null;
+  nome_chefe: string | null;
+  nome_completo: string | null;
+  cpf: string | null;
+  data_nascimento: string | null;
+  idade: number | null;
+  peso_kg: number | null;
+  email: string | null;
+  telefone: string | null;
+  cidade: string | null;
+  experiencia: string | null;
+  nivel_atual: string | null;
+  disponibilidade: string | null;
+  participacao_desejada: string | null;
+  interesse_ranking: string | null;
+  janelas_preferidas: string | null;
+  equipamento: string | null;
+  equipamento_detalhes: string | null;
+  contato_emergencia_nome: string | null;
+  contato_emergencia_telefone: string | null;
+  restricoes_medicas: string | null;
+  alergias: string | null;
+  medicamentos: string | null;
+  objetivos: string | null;
+  observacoes: string | null;
+  quantidade_karts: number | null;
+  pilotos: Array<{ nome: string; peso_kg: number | null }>;
+  pagamento: string | null;
+  aceites: Record<string, boolean>;
+  admin_notes: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CampeonatoInscricaoUpdate = Partial<Pick<CampeonatoInscricao, 'status' | 'admin_notes'>>;

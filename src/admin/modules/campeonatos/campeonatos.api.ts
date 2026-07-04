@@ -1,6 +1,9 @@
 import { apiDelete, apiGet, apiGetById, apiGetPage, apiPatch, apiPost, type Page } from '../../lib/api-client';
 import type {
   Campeonato,
+  CampeonatoInscricao,
+  CampeonatoInscricaoStatus,
+  CampeonatoInscricaoUpdate,
   CampeonatoPayload,
   CampeonatoUpdate,
   ClassificacaoWithPiloto,
@@ -25,6 +28,59 @@ export const listCampeonatosPage = async (
   const params = new URLSearchParams({ order: 'nome', limit: String(pageSize), offset: String(page * pageSize) });
   if (q) params.set('q', q);
   return apiGetPage<Campeonato>(`campeonatos?${params.toString()}`);
+};
+
+export type CampeonatoInscricoesFilters = {
+  status?: CampeonatoInscricaoStatus | '';
+  evento?: string;
+  q?: string;
+};
+
+export const listCampeonatoInscricoesPage = async (
+  filters: CampeonatoInscricoesFilters,
+  page: number,
+  pageSize: number,
+): Promise<Page<CampeonatoInscricao>> => {
+  const params = new URLSearchParams({ limit: String(pageSize), offset: String(page * pageSize) });
+  if (filters.status) params.set('status', filters.status);
+  if (filters.evento) params.set('evento', filters.evento);
+  if (filters.q) params.set('q', filters.q);
+
+  const response = await fetch(`/api/admin/campeonatos/inscricoes?${params.toString()}`, {
+    cache: 'no-store',
+    headers: { 'content-type': 'application/json' },
+  });
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : [];
+
+  if (!response.ok) {
+    throw new Error((data && data.error) || `HTTP ${response.status}`);
+  }
+
+  const totalHeader = response.headers.get('x-total-count');
+  return {
+    data: data as CampeonatoInscricao[],
+    total: totalHeader ? Number(totalHeader) : (data as CampeonatoInscricao[]).length,
+  };
+};
+
+export const updateCampeonatoInscricao = async (
+  id: string,
+  payload: CampeonatoInscricaoUpdate,
+): Promise<CampeonatoInscricao> => {
+  const response = await fetch(`/api/admin/campeonatos/inscricoes/${id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : null;
+
+  if (!response.ok) {
+    throw new Error((data && data.error) || `HTTP ${response.status}`);
+  }
+
+  return data as CampeonatoInscricao;
 };
 
 export const getCampeonatoById = async (id: string): Promise<Campeonato> =>

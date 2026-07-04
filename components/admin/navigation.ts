@@ -72,9 +72,9 @@ export const adminModules: AdminModule[] = [
     title: 'Campeonatos',
     href: '/admin/campeonatos',
     group: 'Competição',
-    summary: 'Campeonatos, etapas, pilotos e regras de pontuação.',
+    summary: 'Inscrições, campeonatos, etapas, pilotos e regras de pontuação.',
     status: 'Módulo restaurado',
-    features: ['Campeonatos', 'Etapas', 'Pilotos'],
+    features: ['Inscrições', 'Campeonatos', 'Etapas', 'Pilotos'],
   },
   {
     key: 'resultados',

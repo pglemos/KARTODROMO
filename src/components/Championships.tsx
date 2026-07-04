@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Trophy, Calendar, Users, ChevronRight, X, Plus, Minus, Loader2, CheckCircle, AlertCircle, MessageSquare } from 'lucide-react';
 
 interface Pilot {
@@ -81,8 +81,30 @@ const Championships = () => {
   const [nomeChefe, setNomeChefe] = useState('');
   const [email, setEmail] = useState('');
   const [telefone, setTelefone] = useState('');
-  const [pilotos, setPilotos] = useState<Pilot[]>([{ nome: '', peso_kg: 0 }]);
-  const [quantidadeKarts, setQuantidadeKarts] = useState(1);
+const [pilotos, setPilotos] = useState<Pilot[]>([{ nome: '', peso_kg: 0 }]);
+const [quantidadeKarts, setQuantidadeKarts] = useState(1);
+const [fullName, setFullName] = useState('');
+const [cpf, setCpf] = useState('');
+const [birthDate, setBirthDate] = useState('');
+const [city, setCity] = useState('');
+const [age, setAge] = useState('');
+const [weight, setWeight] = useState('');
+const [experience, setExperience] = useState('Já andei algumas vezes');
+const [currentLevel, setCurrentLevel] = useState('A definir pela organização');
+const [availability, setAvailability] = useState('');
+const [intendedHeats, setIntendedHeats] = useState('Quero participar quando houver vaga');
+const [rankingInterest, setRankingInterest] = useState('Quero entrar no ranking geral');
+const [preferredRaceWindows, setPreferredRaceWindows] = useState('Sem preferência definida');
+const [equipment, setEquipment] = useState('Tenho capacete próprio');
+const [emergencyContactName, setEmergencyContactName] = useState('');
+const [emergencyContactPhone, setEmergencyContactPhone] = useState('');
+const [medicalRestrictions, setMedicalRestrictions] = useState('');
+const [goals, setGoals] = useState('');
+const [notes, setNotes] = useState('');
+const [acceptedContact, setAcceptedContact] = useState(false);
+const [acceptedRules, setAcceptedRules] = useState(false);
+const [acceptedResponsibility, setAcceptedResponsibility] = useState(false);
+const [acceptedImage, setAcceptedImage] = useState(false);
 
   const openModal = (championship: Championship) => {
     setSelectedEvent(championship);
@@ -91,16 +113,51 @@ const Championships = () => {
     setNomeEquipe('');
     setNomeChefe('');
     setEmail('');
-    setTelefone('');
-    setPilotos([{ nome: '', peso_kg: 0 }]);
-    setQuantidadeKarts(1);
-  };
+setTelefone('');
+setPilotos([{ nome: '', peso_kg: 0 }]);
+setQuantidadeKarts(1);
+setFullName('');
+setCpf('');
+setBirthDate('');
+setCity('');
+setAge('');
+setWeight('');
+setExperience('Já andei algumas vezes');
+setCurrentLevel('A definir pela organização');
+setAvailability('');
+setIntendedHeats('Quero participar quando houver vaga');
+setRankingInterest('Quero entrar no ranking geral');
+setPreferredRaceWindows('Sem preferência definida');
+setEquipment('Tenho capacete próprio');
+setEmergencyContactName('');
+setEmergencyContactPhone('');
+setMedicalRestrictions('');
+setGoals('');
+setNotes('');
+setAcceptedContact(false);
+setAcceptedRules(false);
+setAcceptedResponsibility(false);
+setAcceptedImage(false);
+if (window.location.hash !== '#inscricao') {
+window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#inscricao`);
+}
+};
 
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setSelectedEvent(null);
-    setSubmitResult(null);
-  };
+useEffect(() => {
+if (window.location.hash === '#inscricao') {
+const firstOpenChampionship = championships.find((championship) => championship.status === 'open');
+if (firstOpenChampionship) openModal(firstOpenChampionship);
+}
+}, []);
+
+const closeModal = () => {
+setIsModalOpen(false);
+setSelectedEvent(null);
+setSubmitResult(null);
+if (window.location.hash === '#inscricao') {
+window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+}
+};
 
   const addPiloto = () => {
     setPilotos([...pilotos, { nome: '', peso_kg: 0 }]);
@@ -129,16 +186,47 @@ const Championships = () => {
     setIsSubmitting(true);
     setSubmitResult(null);
 
-    const payload = {
-      evento: selectedEvent.evento,
-      nome_da_equipe: nomeEquipe.trim(),
-      nome_do_chefe_da_equipe: nomeChefe.trim(),
-      email: email.trim(),
-      telefone: telefone.trim(),
-      pilotos: pilotos.filter(p => p.nome.trim() !== ''),
-      quantidade_karts_no_campeonato: quantidadeKarts,
-      pagamento: 'PENDENTE',
-    };
+const payload = selectedEvent.requiresTeamForm
+? {
+evento: selectedEvent.evento,
+modalidade: 'equipe',
+nome_da_equipe: nomeEquipe.trim(),
+nome_do_chefe_da_equipe: nomeChefe.trim(),
+email: email.trim(),
+telefone: telefone.trim(),
+pilotos: pilotos.filter((p) => p.nome.trim() !== ''),
+quantidade_karts_no_campeonato: quantidadeKarts,
+pagamento: 'PENDENTE',
+}
+: {
+evento: selectedEvent.evento,
+modalidade: 'individual',
+fullName: fullName.trim(),
+cpf: cpf.trim(),
+birthDate: birthDate.trim(),
+whatsapp: telefone.trim(),
+email: email.trim(),
+city: city.trim(),
+age: age.trim(),
+weight: weight.trim(),
+experience,
+currentLevel,
+availability: availability.trim(),
+intendedHeats,
+rankingInterest,
+preferredRaceWindows,
+equipment,
+emergencyContactName: emergencyContactName.trim(),
+emergencyContactPhone: emergencyContactPhone.trim(),
+medicalRestrictions: medicalRestrictions.trim(),
+goals: goals.trim(),
+notes: notes.trim(),
+acceptedContact,
+acceptedRules,
+acceptedResponsibility,
+acceptedImage,
+pagamento: 'PENDENTE',
+};
 
     try {
       const response = await fetch('/api/inscricao', {
@@ -254,15 +342,24 @@ const Championships = () => {
 
                   {/* CTA Buttons */}
                   <div className="flex flex-wrap gap-4 border-t border-zinc-200 pt-6">
-                    {champ.status === 'open' && champ.requiresTeamForm && (
-                      <button
-                        onClick={() => openModal(champ)}
+{champ.status === 'open' && champ.requiresTeamForm && (
+<button
+onClick={() => openModal(champ)}
                         className="px-6 py-3.5 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-400 hover:to-primary-500 text-zinc-950 font-bold uppercase tracking-wider text-xs rounded-xl flex items-center justify-center gap-2 transition-all duration-300 shadow-sm"
                       >
                         <Users className="w-4 h-4" />
-                        Formulário de Inscrição
-                      </button>
-                    )}
+Formulário de Inscrição
+</button>
+)}
+{champ.status === 'open' && !champ.requiresTeamForm && (
+<button
+onClick={() => openModal(champ)}
+className="px-6 py-3.5 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-400 hover:to-primary-500 text-zinc-950 font-bold uppercase tracking-wider text-xs rounded-xl flex items-center justify-center gap-2 transition-all duration-300 shadow-sm"
+>
+<Users className="w-4 h-4" />
+Inscrição do Piloto
+</button>
+)}
                     {champ.id === 'kac-iniciantes' && (
                       <a
                         href="/campeonatos/kac"
@@ -398,10 +495,12 @@ const Championships = () => {
             )}
 
             {/* Form Fields */}
-            {!submitResult && (
-              <form onSubmit={handleSubmit} className="p-6 space-y-5">
-                {/* Nome da Equipe */}
-                <div>
+{!submitResult && (
+<form onSubmit={handleSubmit} className="p-6 space-y-5">
+{selectedEvent.requiresTeamForm ? (
+<>
+{/* Nome da Equipe */}
+<div>
                   <label htmlFor="team-name" className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">
                     Nome da Equipe *
                   </label>
@@ -525,8 +624,8 @@ const Championships = () => {
                   <label htmlFor="kart-count" className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">
                     Quantidade de Karts no Campeonato *
                   </label>
-                  <input
-                    id="kart-count"
+<input
+id="kart-count"
                     type="number"
                     required
                     min={1}
@@ -534,10 +633,131 @@ const Championships = () => {
                     value={quantidadeKarts}
                     onChange={(e) => setQuantidadeKarts(Number(e.target.value))}
                     className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-primary-500 focus:bg-white outline-none text-zinc-800 text-sm transition-all focus:ring-1 focus:ring-primary-500"
-                  />
-                </div>
+/>
+</div>
+</>
+) : (
+<>
+<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+<div className="sm:col-span-2">
+<label htmlFor="driver-name" className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">
+Nome completo *
+</label>
+<input id="driver-name" type="text" required value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-primary-500 focus:bg-white outline-none text-zinc-800 text-sm transition-all focus:ring-1 focus:ring-primary-500" placeholder="Nome e sobrenome" />
+</div>
+<div>
+<label htmlFor="driver-phone" className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">WhatsApp *</label>
+<input id="driver-phone" type="tel" required value={telefone} onChange={(e) => setTelefone(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-primary-500 focus:bg-white outline-none text-zinc-800 text-sm transition-all focus:ring-1 focus:ring-primary-500" placeholder="(31) 99999-9999" />
+</div>
+<div>
+<label htmlFor="driver-email" className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">E-mail *</label>
+<input id="driver-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-primary-500 focus:bg-white outline-none text-zinc-800 text-sm transition-all focus:ring-1 focus:ring-primary-500" placeholder="piloto@email.com" />
+</div>
+<div>
+<label htmlFor="driver-cpf" className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">CPF</label>
+<input id="driver-cpf" value={cpf} onChange={(e) => setCpf(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-primary-500 focus:bg-white outline-none text-zinc-800 text-sm transition-all focus:ring-1 focus:ring-primary-500" placeholder="000.000.000-00" />
+</div>
+<div>
+<label htmlFor="driver-birth" className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Nascimento</label>
+<input id="driver-birth" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-primary-500 focus:bg-white outline-none text-zinc-800 text-sm transition-all focus:ring-1 focus:ring-primary-500" placeholder="dd/mm/aaaa" />
+</div>
+<div>
+<label htmlFor="driver-city" className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Cidade</label>
+<input id="driver-city" value={city} onChange={(e) => setCity(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-primary-500 focus:bg-white outline-none text-zinc-800 text-sm transition-all focus:ring-1 focus:ring-primary-500" placeholder="Betim / MG" />
+</div>
+<div className="grid grid-cols-2 gap-3">
+<div>
+<label htmlFor="driver-age" className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Idade</label>
+<input id="driver-age" type="number" min={8} max={90} value={age} onChange={(e) => setAge(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-primary-500 focus:bg-white outline-none text-zinc-800 text-sm transition-all focus:ring-1 focus:ring-primary-500" />
+</div>
+<div>
+<label htmlFor="driver-weight" className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Peso kg</label>
+<input id="driver-weight" type="number" min={30} max={180} value={weight} onChange={(e) => setWeight(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-primary-500 focus:bg-white outline-none text-zinc-800 text-sm transition-all focus:ring-1 focus:ring-primary-500" />
+</div>
+</div>
+</div>
 
-                {/* Info Text */}
+<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+<div>
+<label htmlFor="driver-experience" className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Experiência</label>
+<select id="driver-experience" value={experience} onChange={(e) => setExperience(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-primary-500 focus:bg-white outline-none text-zinc-800 text-sm transition-all focus:ring-1 focus:ring-primary-500">
+<option>Nunca corri campeonato</option>
+<option>Já andei algumas vezes</option>
+<option>Corro mensalmente</option>
+<option>Tenho experiência em campeonatos</option>
+</select>
+</div>
+<div>
+<label htmlFor="driver-level" className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Nível atual</label>
+<select id="driver-level" value={currentLevel} onChange={(e) => setCurrentLevel(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-primary-500 focus:bg-white outline-none text-zinc-800 text-sm transition-all focus:ring-1 focus:ring-primary-500">
+<option>A definir pela organização</option>
+<option>Estreante</option>
+<option>Intermediário</option>
+<option>Competitivo</option>
+</select>
+</div>
+<div>
+<label htmlFor="driver-heats" className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Participação desejada</label>
+<select id="driver-heats" value={intendedHeats} onChange={(e) => setIntendedHeats(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-primary-500 focus:bg-white outline-none text-zinc-800 text-sm transition-all focus:ring-1 focus:ring-primary-500">
+<option>Quero participar quando houver vaga</option>
+<option>Quero correr o máximo de etapas possível</option>
+<option>Quero baterias avulsas</option>
+</select>
+</div>
+<div>
+<label htmlFor="driver-ranking" className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Ranking</label>
+<select id="driver-ranking" value={rankingInterest} onChange={(e) => setRankingInterest(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-primary-500 focus:bg-white outline-none text-zinc-800 text-sm transition-all focus:ring-1 focus:ring-primary-500">
+<option>Quero entrar no ranking geral</option>
+<option>Quero entender regras antes de decidir</option>
+<option>Quero apenas experiência avulsa</option>
+</select>
+</div>
+<div>
+<label htmlFor="driver-window" className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Janelas preferidas</label>
+<input id="driver-window" value={preferredRaceWindows} onChange={(e) => setPreferredRaceWindows(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-primary-500 focus:bg-white outline-none text-zinc-800 text-sm transition-all focus:ring-1 focus:ring-primary-500" />
+</div>
+<div>
+<label htmlFor="driver-equipment" className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Equipamento</label>
+<select id="driver-equipment" value={equipment} onChange={(e) => setEquipment(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-primary-500 focus:bg-white outline-none text-zinc-800 text-sm transition-all focus:ring-1 focus:ring-primary-500">
+<option>Tenho capacete próprio</option>
+<option>Preciso de capacete do kartódromo</option>
+<option>Tenho equipamento completo</option>
+</select>
+</div>
+</div>
+
+<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+<div>
+<label htmlFor="emergency-name" className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Contato de emergência</label>
+<input id="emergency-name" value={emergencyContactName} onChange={(e) => setEmergencyContactName(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-primary-500 focus:bg-white outline-none text-zinc-800 text-sm transition-all focus:ring-1 focus:ring-primary-500" placeholder="Nome" />
+</div>
+<div>
+<label htmlFor="emergency-phone" className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Telefone emergência</label>
+<input id="emergency-phone" value={emergencyContactPhone} onChange={(e) => setEmergencyContactPhone(e.target.value)} className="w-full px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-primary-500 focus:bg-white outline-none text-zinc-800 text-sm transition-all focus:ring-1 focus:ring-primary-500" placeholder="(31) 99999-9999" />
+</div>
+</div>
+
+<textarea value={goals} onChange={(e) => setGoals(e.target.value)} className="w-full min-h-24 px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-primary-500 focus:bg-white outline-none text-zinc-800 text-sm transition-all focus:ring-1 focus:ring-primary-500" placeholder="Objetivo no campeonato" />
+<textarea value={medicalRestrictions} onChange={(e) => setMedicalRestrictions(e.target.value)} className="w-full min-h-20 px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-primary-500 focus:bg-white outline-none text-zinc-800 text-sm transition-all focus:ring-1 focus:ring-primary-500" placeholder="Restrições médicas, alergias ou medicamentos" />
+<textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full min-h-20 px-4 py-3 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-primary-500 focus:bg-white outline-none text-zinc-800 text-sm transition-all focus:ring-1 focus:ring-primary-500" placeholder="Observações operacionais" />
+
+<div className="space-y-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-xs text-zinc-700">
+{[
+['contact', acceptedContact, setAcceptedContact, 'Autorizo contato por WhatsApp ou e-mail para confirmação de vaga.'],
+['rules', acceptedRules, setAcceptedRules, 'Declaro ciência de que devo seguir regulamento, briefing e decisões da organização.'],
+['responsibility', acceptedResponsibility, setAcceptedResponsibility, 'Declaro estar apto a participar e assumo responsabilidade pelas informações enviadas.'],
+['image', acceptedImage, setAcceptedImage, 'Autorizo uso de imagem em registros e divulgação do campeonato.'],
+].map(([key, checked, setter, label]) => (
+<label key={String(key)} className="flex gap-3">
+<input type="checkbox" checked={Boolean(checked)} onChange={(e) => (setter as React.Dispatch<React.SetStateAction<boolean>>)(e.target.checked)} className="mt-0.5" required />
+<span>{String(label)}</span>
+</label>
+))}
+</div>
+</>
+)}
+
+{/* Info Text */}
                 <div className="bg-primary-50/50 border border-primary-500/20 rounded-xl p-4 text-xs text-primary-800 leading-relaxed font-light">
                   <strong>Nota sobre pagamento:</strong> Após a submissão do formulário, as inscrições ficam no status pendente até a validação do Pix ou boleto de cobrança com o chefe de equipe via WhatsApp.
                 </div>

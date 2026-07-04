@@ -8,6 +8,7 @@ import { Modal } from '../../ui/Modal';
 import { PageHeader } from '../../ui/PageHeader';
 import { Pagination } from '../../ui/Pagination';
 import { useToast } from '../../ui/useToast';
+import { CampeonatoInscricoesPanel } from './CampeonatoInscricoesPanel';
 import {
   createCampeonato,
   createEtapa,
@@ -23,7 +24,7 @@ import {
   updateCampeonato,
   updateEtapa,
   updatePiloto,
-  type EtapasFilters,
+ type EtapasFilters,
 } from './campeonatos.api';
 import type {
   Campeonato,
@@ -37,8 +38,8 @@ import type {
   PilotoPayload,
 } from './campeonatos.types';
 
-type Tab = 'campeonatos' | 'etapas' | 'pilotos' | 'classificacao';
-type FormKind = Exclude<Tab, 'classificacao'>;
+type Tab = 'inscricoes' | 'campeonatos' | 'etapas' | 'pilotos' | 'classificacao';
+type FormKind = Exclude<Tab, 'classificacao' | 'inscricoes'>;
 
 const PAGE_SIZE = 10;
 
@@ -119,9 +120,10 @@ const etapaStatusClasses: Record<EtapaStatus, string> = {
 };
 
 const tabLabels: Record<Tab, string> = {
-  campeonatos: 'Campeonatos',
-  etapas: 'Etapas',
-  pilotos: 'Pilotos',
+ inscricoes: 'Inscrições',
+ campeonatos: 'Campeonatos',
+ etapas: 'Etapas',
+ pilotos: 'Pilotos',
   classificacao: 'Classificação',
 };
 
@@ -157,7 +159,7 @@ const EtapasStatus = ({ status }: { status: EtapaStatus }) => (
 export const CampeonatosPage = () => {
   const { role } = useAuth();
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState<Tab>('campeonatos');
+const [activeTab, setActiveTab] = useState<Tab>('inscricoes');
 
   // full, unpaginated campeonatos list — feeds the dropdowns (etapa form, classificacao filter)
   const [campeonatos, setCampeonatos] = useState<Campeonato[]>([]);
@@ -663,11 +665,11 @@ export const CampeonatosPage = () => {
       <PageHeader
         actionLabel={actionLabel}
         onAction={
-          actionLabel && activeTab !== 'classificacao'
+          actionLabel && (activeTab === 'campeonatos' || activeTab === 'etapas' || activeTab === 'pilotos')
             ? () => openCreateModal(activeTab)
             : undefined
         }
-        subtitle="Gerencie campeonatos, etapas, pilotos e consulte a classificação geral."
+        subtitle="Gerencie inscrições, campeonatos, etapas, pilotos e consulte a classificação geral."
         title="Campeonatos"
       />
 
@@ -694,8 +696,10 @@ export const CampeonatosPage = () => {
         ))}
       </div>
 
-      <div className="mt-6" role="tabpanel">
-        {activeTab === 'campeonatos' ? (
+<div className="mt-6" role="tabpanel">
+{activeTab === 'inscricoes' ? <CampeonatoInscricoesPanel /> : null}
+
+{activeTab === 'campeonatos' ? (
           <div>
             <div className="mb-4 max-w-xs">
               <FormField htmlFor="campeonatos-busca" label="Buscar">
