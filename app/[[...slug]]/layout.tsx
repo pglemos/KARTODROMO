@@ -1,4 +1,7 @@
 import { Anton, Oswald, Rajdhani } from 'next/font/google';
+import MobileStickyBar from '@/src/components/site-ui/MobileStickyBar';
+import ScrollProgressBar from '@/src/components/site-ui/ScrollProgressBar';
+import WhatsAppFloat from '@/src/components/site-ui/WhatsAppFloat';
 
 const anton = Anton({
   subsets: ['latin'],
@@ -23,8 +26,11 @@ const rajdhani = Rajdhani({
 
 export default function PublicSiteLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className={`${anton.variable} ${oswald.variable} ${rajdhani.variable} bg-ink-950 font-body text-white`}>
+    <div className={`${anton.variable} ${oswald.variable} ${rajdhani.variable} bg-ink-950 pb-16 font-body text-white md:pb-0`}>
+      <ScrollProgressBar />
       {children}
+      <WhatsAppFloat />
+      <MobileStickyBar />
     </div>
   );
 }

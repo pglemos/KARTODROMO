@@ -106,7 +106,6 @@ const whatsappUrl =
 
 const KACPage = () => {
   const [activeSection, setActiveSection] = useState('inscricao');
-  const [scrollProgress, setScrollProgress] = useState(0);
 
   useEffect(() => {
     const sectionNodes = anchorLinks
@@ -114,9 +113,6 @@ const KACPage = () => {
       .filter(Boolean) as HTMLElement[];
 
     const updateProgress = () => {
-      const documentHeight = document.documentElement.scrollHeight - window.innerHeight;
-      setScrollProgress(documentHeight > 0 ? window.scrollY / documentHeight : 0);
-
       const anchorOffset = window.innerWidth < 768 ? 190 : 170;
       const current = [...sectionNodes]
         .reverse()
@@ -138,8 +134,6 @@ const KACPage = () => {
   return (
     <div className="min-h-screen bg-ink-950 text-white/80">
       <Header />
-
-      <div aria-hidden="true" className="fixed top-0 left-0 z-[60] h-[3px] w-full origin-left bg-primary-400" style={{ transform: `scaleX(${scrollProgress})` }} />
 
       <main>
         <section className="relative overflow-hidden border-b border-white/10 bg-ink-900">
