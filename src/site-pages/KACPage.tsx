@@ -8,7 +8,6 @@ import {
   ChevronRight,
   ClipboardList,
   Download,
-  Flag,
   Gauge,
   MapPin,
   Medal,
@@ -17,10 +16,11 @@ import {
   Timer,
   Trophy,
   Users,
-  Weight,
 } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import AngledButton from '../components/site-ui/AngledButton';
+import GlassPanel from '../components/site-ui/GlassPanel';
 
 const anchorLinks = [
   { label: 'Inscrição', href: '#inscricao' },
@@ -64,12 +64,12 @@ const rules = [
     text: 'Até 7 corridas no mês, com as 4 melhores válidas para o ranking. As 3 piores são descartadas, incluindo faltas.',
   },
   {
-    icon: Flag,
+    icon: Award,
     title: 'Traçados oficiais',
     text: 'Todas as corridas de julho seguem o calendário oficial divulgado pela organização.',
   },
   {
-    icon: Weight,
+    icon: Gauge,
     title: 'Peso e lastro',
     text: 'Peso mínimo de 90 kg com equipamentos de segurança. Pilotos abaixo do peso utilizam lastro adicional no kart.',
   },
@@ -109,32 +109,10 @@ const KACPage = () => {
   const [scrollProgress, setScrollProgress] = useState(0);
 
   useEffect(() => {
-    const revealNodes = Array.from(document.querySelectorAll<HTMLElement>('[data-reveal]'));
-
-    if (!('IntersectionObserver' in window)) {
-      revealNodes.forEach((node) => node.classList.add('is-visible'));
-      return undefined;
-    }
-
-    document.documentElement.classList.add('kac-reveal-ready');
-
-    const revealObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('is-visible');
-            revealObserver.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.16, rootMargin: '0px 0px -8% 0px' },
-    );
-
-    revealNodes.forEach((node) => revealObserver.observe(node));
-
     const sectionNodes = anchorLinks
       .map((link) => document.querySelector<HTMLElement>(link.href))
       .filter(Boolean) as HTMLElement[];
+
     const updateProgress = () => {
       const documentHeight = document.documentElement.scrollHeight - window.innerHeight;
       setScrollProgress(documentHeight > 0 ? window.scrollY / documentHeight : 0);
@@ -153,91 +131,66 @@ const KACPage = () => {
     window.addEventListener('scroll', updateProgress, { passive: true });
 
     return () => {
-      revealObserver.disconnect();
       window.removeEventListener('scroll', updateProgress);
-      document.documentElement.classList.remove('kac-reveal-ready');
     };
   }, []);
 
   return (
-    <div className="kac-page min-h-screen bg-[#fbfcfa] text-zinc-900">
+    <div className="min-h-screen bg-ink-950 text-white/80">
       <Header />
 
-      <a href="#kac-main" className="kac-skip-link">
-        Pular para o conteúdo
-      </a>
+      <div aria-hidden="true" className="fixed top-0 left-0 z-[60] h-[3px] w-full origin-left bg-primary-400" style={{ transform: `scaleX(${scrollProgress})` }} />
 
-      <div aria-hidden="true" className="kac-progress" style={{ transform: `scaleX(${scrollProgress})` }} />
-
-      <main id="kac-main">
-        <section className="kac-hero relative overflow-hidden">
-          <div aria-hidden="true" className="kac-hero-grid" />
-          <div aria-hidden="true" className="kac-speedline kac-speedline-a" />
-          <div aria-hidden="true" className="kac-speedline kac-speedline-b" />
-
-          <div className="relative mx-auto grid min-h-[760px] max-w-7xl grid-cols-1 items-center gap-14 px-4 py-20 md:grid-cols-[1.02fr_0.98fr] md:px-8">
-            <div className="max-w-3xl" data-reveal>
-              <a
-                href="/campeonatos"
-                className="kac-back-link mb-10 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.22em] text-zinc-500"
-              >
+      <main>
+        <section className="relative overflow-hidden border-b border-white/10 bg-ink-900">
+          <div className="relative mx-auto grid min-h-[600px] max-w-7xl grid-cols-1 items-center gap-12 px-4 py-16 md:grid-cols-[1.02fr_0.98fr] md:px-8">
+            <div className="max-w-3xl">
+              <a href="/campeonatos" className="mb-8 inline-flex items-center gap-2 font-race text-xs italic font-bold uppercase tracking-[0.2em] text-white/55 hover:text-primary-400">
                 <ArrowLeft className="h-4 w-4" />
                 Campeonatos
               </a>
 
-              <div className="mb-5 flex items-center gap-3 text-xs font-black uppercase tracking-[0.16em] text-primary-700">
-                <span aria-hidden="true" className="h-px w-10 bg-primary-600" />
+              <div className="mb-5 flex items-center gap-3 font-race text-xs italic font-bold uppercase tracking-[0.16em] text-primary-400">
+                <span aria-hidden="true" className="h-px w-10 bg-primary-400" />
                 Regulamento oficial 2026
               </div>
 
-              <h1 aria-label="KAC Iniciantes" className="kac-title max-w-4xl text-6xl font-black uppercase leading-[0.82] tracking-tight text-zinc-950 md:text-8xl lg:text-9xl">
-                KAC{' '}
-                <span className="block text-primary-500">Iniciantes</span>
+              <h1 className="max-w-2xl font-display text-6xl italic uppercase leading-[0.8] tracking-tight text-white md:text-8xl">
+                KAC <span className="block text-primary-400">Iniciantes</span>
               </h1>
-              <p className="mt-8 max-w-2xl text-base leading-8 text-zinc-700 md:text-lg">
+              <p className="mt-7 max-w-2xl text-base leading-8 text-white/70 md:text-lg">
                 Campeonato mensal de kart light para pilotos iniciantes no Kartódromo Internacional de Betim. O formato valoriza constância, evolução e tomada de decisão em pista.
               </p>
 
-              <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-                <ActionLink href={whatsappUrl} external icon={MessageSquare}>
+              <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+                <AngledButton href={whatsappUrl} external>
+                  <MessageSquare className="h-4 w-4" />
                   Inscrever pelo WhatsApp
-                </ActionLink>
-                <ActionLink href="/regulamentos/kac-iniciantes-betim-2026.pdf" external icon={Download} variant="secondary">
+                </AngledButton>
+                <AngledButton href="/regulamentos/kac-iniciantes-betim-2026.pdf" variant="outline" external>
+                  <Download className="h-4 w-4" />
                   Baixar regulamento
-                </ActionLink>
+                </AngledButton>
               </div>
             </div>
 
-            <div className="relative" data-reveal style={{ transitionDelay: '140ms' }}>
-              <div className="kac-orbit-card">
-                <svg aria-hidden="true" focusable="false" className="kac-track-svg" viewBox="0 0 420 420">
-                  <path
-                    className="kac-track-path"
-                    d="M92 247c-51-42-36-126 27-151 48-19 99 2 123 40 14 23 47 30 72 17 39-20 77 10 79 50 2 44-35 75-78 68-35-6-57 9-76 36-29 41-102 35-147-60Z"
-                    fill="none"
-                  />
-                </svg>
-                <div className="kac-logo-stage">
-                  <img
-                    src="/championships/5.png"
-                    alt="Logo KAC Iniciantes"
-                    className="kac-logo-img"
-                  />
-                </div>
-                <div className="kac-spec-panel">
-                  {seasonSpecs.map(([label, value], index) => (
-                    <div key={label} className="kac-spec-row" style={{ transitionDelay: `${220 + index * 45}ms` }}>
-                      <span>{label}</span>
-                      <strong>{value}</strong>
-                    </div>
-                  ))}
-                </div>
+            <GlassPanel className="mx-auto w-full max-w-md p-6">
+              <div className="mb-5 flex items-center justify-center">
+                <img src="/championships/5.png" alt="Logo KAC Iniciantes" className="h-28 w-28 object-contain" />
               </div>
-            </div>
+              <div className="divide-y divide-white/10">
+                {seasonSpecs.map(([label, value]) => (
+                  <div key={label} className="flex items-center justify-between py-2.5 text-sm">
+                    <span className="text-white/55">{label}</span>
+                    <strong className="font-race italic text-white">{value}</strong>
+                  </div>
+                ))}
+              </div>
+            </GlassPanel>
           </div>
         </section>
 
-        <nav aria-label="Seções do KAC Iniciantes" className="kac-section-nav sticky top-[81px] z-30 border-y border-zinc-200 bg-[#fbfcfa]/92 backdrop-blur-md">
+        <nav aria-label="Seções do KAC Iniciantes" className="sticky top-[81px] z-30 border-y border-white/10 bg-ink-950/95 backdrop-blur-md">
           <div className="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 py-3 md:px-8">
             {anchorLinks.map((link) => {
               const id = link.href.slice(1);
@@ -246,7 +199,9 @@ const KACPage = () => {
                   key={link.href}
                   href={link.href}
                   aria-current={activeSection === id ? 'location' : undefined}
-                  className={`kac-nav-pill ${activeSection === id ? 'is-active' : ''}`}
+                  className={`whitespace-nowrap px-4 py-2 font-race text-xs italic font-bold uppercase tracking-wide transition-colors ${
+                    activeSection === id ? 'bg-primary-400 text-ink-950' : 'text-white/55 hover:text-primary-400'
+                  }`}
                 >
                   {link.label}
                 </a>
@@ -255,7 +210,7 @@ const KACPage = () => {
           </div>
         </nav>
 
-        <section id="inscricao" className="bg-[#f4f8f3] py-14">
+        <section id="inscricao" className="border-b border-white/10 bg-ink-900 py-14">
           <div className="mx-auto grid max-w-7xl grid-cols-1 gap-4 px-4 md:grid-cols-3 md:px-8">
             <InfoTile icon={ShieldCheck} title="Edição oficial" value="Temporada 2026" />
             <InfoTile icon={MapPin} title="Sede" value="Kartódromo Internacional de Betim" />
@@ -266,56 +221,56 @@ const KACPage = () => {
         <Section id="estrutura" number="01" title="Estrutura do campeonato">
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_390px]">
             <div className="grid gap-4">
-              {rules.map((rule, index) => (
-                <RuleRow key={rule.title} {...rule} delay={index * 70} />
+              {rules.map((rule) => (
+                <RuleRow key={rule.title} {...rule} />
               ))}
             </div>
-            <div className="kac-price-board" data-reveal>
-              <p className="kac-label">Valores oficiais</p>
+            <GlassPanel className="p-6">
+              <p className="mb-4 font-race text-xs italic font-bold uppercase tracking-widest text-white/50">Valores oficiais</p>
               <PriceLine label="Inscrição" value="R$ 50,00" />
               <PriceLine label="Cada corrida" value="R$ 145,00" />
               <PriceLine label="Formato" value="7 corridas / 4 válidas" />
-              <ActionLink href={whatsappUrl} external icon={MessageSquare} full>
-                Reservar vaga
-              </ActionLink>
-            </div>
+              <div className="mt-5">
+                <AngledButton href={whatsappUrl} external className="w-full">
+                  Reservar vaga
+                </AngledButton>
+              </div>
+            </GlassPanel>
           </div>
         </Section>
 
         <Section id="calendario" number="02" title="Calendário oficial de provas">
-          <div className="kac-calendar-heading" data-reveal>
+          <div className="mb-8 flex items-center justify-between gap-4">
             <div>
-                <p className="kac-label">Horários do KAC Julho</p>
-              <h3>Confira os horários de chegada e corrida de cada etapa.</h3>
+              <p className="mb-2 font-race text-xs italic font-bold uppercase tracking-widest text-white/50">Horários do KAC Julho</p>
+              <h3 className="font-race text-lg italic font-bold text-white">Confira os horários de chegada e corrida de cada etapa.</h3>
             </div>
-            <CalendarDays className="h-12 w-12 text-primary-600" />
+            <CalendarDays className="h-12 w-12 flex-shrink-0 text-primary-400" />
           </div>
 
-          <div className="kac-table-wrap" data-reveal>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] border-collapse text-left">
-                <thead>
-                  <tr>
-                    {['Corrida', 'Data', 'Mês', 'Horário de chegada', 'Horário da corrida'].map((head) => (
-                      <th key={head} scope="col">
-                        {head}
-                      </th>
+          <div className="overflow-x-auto border border-white/10 bg-ink-900">
+            <table className="w-full min-w-[720px] border-collapse text-left">
+              <thead>
+                <tr>
+                  {['Corrida', 'Data', 'Mês', 'Horário de chegada', 'Horário da corrida'].map((head) => (
+                    <th key={head} className="border-b border-white/10 bg-ink-950 px-5 py-4 font-race text-[11px] italic font-bold uppercase text-primary-400">
+                      {head}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {calendarRows.map((row) => (
+                  <tr key={row[0]}>
+                    {row.map((cell, index) => (
+                      <td key={`${row[0]}-${index}`} className="border-b border-white/10 px-5 py-4 text-white/75">
+                        {index === 0 ? <span className="font-display text-2xl italic text-primary-400">{cell}</span> : cell}
+                      </td>
                     ))}
                   </tr>
-                </thead>
-                <tbody>
-                    {calendarRows.map((row) => (
-                      <tr key={row[0]}>
-                      {row.map((cell, index) => (
-                        <td key={`${row[0]}-${index}`}>
-                          {index === 0 ? <span className="kac-race-number">{cell}</span> : cell}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
         </Section>
 
@@ -327,23 +282,23 @@ const KACPage = () => {
           </div>
 
           <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-[0.86fr_1.14fr]">
-            <div className="kac-score-card" data-reveal>
-              <div>
-                <span>4</span>
-                <strong>melhores corridas contam</strong>
+            <div className="grid grid-cols-2 gap-px border border-white/10 bg-white/10">
+              <div className="bg-ink-900 p-6 text-center">
+                <span className="block font-display text-4xl italic text-primary-400">4</span>
+                <strong className="mt-2 block font-race text-xs italic font-bold uppercase text-white">melhores corridas contam</strong>
               </div>
-            <div>
-                <span>3</span>
-                <strong>piores corridas descartadas</strong>
+              <div className="bg-ink-900 p-6 text-center">
+                <span className="block font-display text-4xl italic text-primary-400">3</span>
+                <strong className="mt-2 block font-race text-xs italic font-bold uppercase text-white">piores corridas descartadas</strong>
               </div>
             </div>
-            <div data-reveal>
-              <p className="kac-label mb-4">Critérios de desempate</p>
-              <div className="space-y-3">
+            <div>
+              <p className="mb-4 font-race text-xs italic font-bold uppercase tracking-widest text-white/50">Critérios de desempate</p>
+              <div className="space-y-2">
                 {tieBreakers.map((item, index) => (
-                  <div key={item} className="kac-ranking-row">
-                    <span>{index + 1}</span>
-                    <p>{item}</p>
+                  <div key={item} className="flex items-center gap-4 border border-white/10 bg-ink-900 px-4 py-3">
+                    <span className="font-display text-lg italic text-primary-400">{index + 1}</span>
+                    <p className="text-sm text-white/70">{item}</p>
                   </div>
                 ))}
               </div>
@@ -353,13 +308,13 @@ const KACPage = () => {
 
         <Section id="regulamento" number="04" title="Regulamento oficial">
           <div className="grid grid-cols-1 gap-9 lg:grid-cols-[0.82fr_1.18fr]">
-            <div className="kac-pdf-frame" data-reveal>
-              <img src="/kac/regulamento-page-1.png" alt="Capa do regulamento KAC Iniciantes 2026" />
+            <div className="border border-white/10 bg-ink-900 p-3">
+              <img src="/kac/regulamento-page-1.png" alt="Capa do regulamento KAC Iniciantes 2026" className="w-full" />
             </div>
-            <div className="self-center" data-reveal style={{ transitionDelay: '120ms' }}>
-              <p className="kac-label">Documento oficial da temporada</p>
-              <h3 className="mt-3 text-4xl font-black uppercase leading-none text-zinc-950 md:text-5xl">PDF oficial 2026 pronto para consulta</h3>
-              <p className="mt-6 max-w-2xl text-base leading-8 text-zinc-700">
+            <div className="self-center">
+              <p className="font-race text-xs italic font-bold uppercase tracking-widest text-white/50">Documento oficial da temporada</p>
+              <h3 className="mt-3 font-display text-4xl italic uppercase leading-none text-white md:text-5xl">PDF oficial 2026 pronto para consulta</h3>
+              <p className="mt-6 max-w-2xl text-base leading-8 text-white/70">
                 O regulamento reúne estrutura, categoria, pontuação, desempate, premiação, calendário, punições, troca de kart, peso mínimo e disposições gerais.
               </p>
               <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -369,15 +324,16 @@ const KACPage = () => {
                   'Casos omissos avaliados pela direção',
                   'Aceite integral para participar',
                 ].map((item) => (
-                  <div key={item} className="kac-note">
+                  <div key={item} className="border border-white/10 bg-ink-900 px-4 py-3 text-xs text-white/65">
                     {item}
                   </div>
                 ))}
               </div>
               <div className="mt-8">
-                <ActionLink href="/regulamentos/kac-iniciantes-betim-2026.pdf" external icon={Download}>
+                <AngledButton href="/regulamentos/kac-iniciantes-betim-2026.pdf" external>
+                  <Download className="h-4 w-4" />
                   Abrir PDF oficial
-                </ActionLink>
+                </AngledButton>
               </div>
             </div>
           </div>
@@ -393,45 +349,50 @@ const KACPage = () => {
 
         <Section id="punicoes" number="06" title="Punições e troca de kart">
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-            {penalties.map((penalty, index) => (
-              <div key={penalty.title} className="kac-penalty" data-reveal style={{ transitionDelay: `${index * 80}ms` }}>
-                <AlertTriangle className="h-8 w-8 text-primary-600" />
-                <p>{penalty.title}</p>
-                <h3>{penalty.label}</h3>
-                <span>{penalty.text}</span>
+            {penalties.map((penalty) => (
+              <div key={penalty.title} className="relative overflow-hidden border border-white/10 bg-ink-900 p-6">
+                <AlertTriangle className="h-8 w-8 text-primary-400" />
+                <p className="mt-4 font-race text-xs italic font-bold uppercase text-white/50">{penalty.title}</p>
+                <h3 className="mt-1 font-display text-2xl italic uppercase text-white">{penalty.label}</h3>
+                <span className="mt-2 block text-sm text-white/65">{penalty.text}</span>
               </div>
             ))}
           </div>
 
-          <div className="kac-kart-swap" data-reveal>
-            <Timer className="h-9 w-9 text-primary-600" />
+          <div className="mt-8 flex items-start gap-5 border border-white/10 bg-ink-900 p-6">
+            <Timer className="h-9 w-9 flex-shrink-0 text-primary-400" />
             <div>
-              <h3>Troca de kart</h3>
-              <p>
+              <h3 className="font-race text-base italic font-bold uppercase text-white">Troca de kart</h3>
+              <p className="mt-2 text-sm leading-6 text-white/65">
                 Nas 4 corridas válidas do mês, é permitida apenas 1 troca de kart por piloto. A solicitação só pode ser feita durante a tomada de tempo e o piloto larga da última posição.
               </p>
             </div>
           </div>
         </Section>
 
-        <section id="contato-kac" className="kac-final-cta">
+        <section id="contato-kac" className="border-t border-white/10 bg-ink-900 py-16 md:py-24">
           <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 md:grid-cols-[1fr_0.85fr] md:px-8">
-            <div data-reveal>
-              <p className="kac-label">KAC Iniciantes Betim</p>
-              <h2 className="mt-4 text-5xl font-black uppercase leading-[0.9] text-zinc-950 md:text-7xl">Pronto para entrar no grid?</h2>
-              <p className="mt-6 max-w-2xl text-base leading-8 text-zinc-700">
+            <div>
+              <p className="mb-4 font-race text-xs italic font-bold uppercase tracking-widest text-primary-400">KAC Iniciantes Betim</p>
+              <h2 className="font-display text-5xl italic uppercase leading-[0.85] text-white md:text-7xl">Pronto para entrar no grid?</h2>
+              <p className="mt-6 max-w-2xl text-base leading-8 text-white/70">
                 Fale com a equipe do Kartódromo de Betim para confirmar disponibilidade, tirar dúvidas sobre regulamento, pesos, lastro e garantir sua vaga.
               </p>
             </div>
-            <div className="kac-contact-card" data-reveal style={{ transitionDelay: '120ms' }}>
-              <p>Email: contato@kartodromodebetim.com.br</p>
-              <p>Telefone: (31) 3511-2373</p>
-              <p>WhatsApp: (31) 99884-2898</p>
-              <p>Av. Adutora Várzea das Flores, 477 - Itacolomi, Betim - MG</p>
-              <ActionLink href={whatsappUrl} external icon={MessageSquare} full>
-                Chamar no WhatsApp
-              </ActionLink>
-            </div>
+            <GlassPanel className="p-6">
+              <div className="space-y-2 text-sm text-white/70">
+                <p>Email: contato@kartodromodebetim.com.br</p>
+                <p>Telefone: (31) 3511-2373</p>
+                <p>WhatsApp: (31) 99884-2898</p>
+                <p>Av. Adutora Várzea das Flores, 477 - Itacolomi, Betim - MG</p>
+              </div>
+              <div className="mt-6">
+                <AngledButton href={whatsappUrl} external className="w-full">
+                  <MessageSquare className="h-4 w-4" />
+                  Chamar no WhatsApp
+                </AngledButton>
+              </div>
+            </GlassPanel>
           </div>
         </section>
       </main>
@@ -445,27 +406,6 @@ interface IconProps {
   className?: string;
 }
 
-interface ActionLinkProps {
-  href: string;
-  children: React.ReactNode;
-  icon: React.ComponentType<IconProps>;
-  external?: boolean;
-  full?: boolean;
-  variant?: 'primary' | 'secondary';
-}
-
-const ActionLink = ({ href, children, icon: Icon, external, full, variant = 'primary' }: ActionLinkProps) => (
-  <a
-    href={href}
-    target={external ? '_blank' : undefined}
-    rel={external ? 'noopener noreferrer' : undefined}
-    className={`kac-action ${variant === 'secondary' ? 'kac-action-secondary' : ''} ${full ? 'w-full' : ''}`}
-  >
-    <span>{children}</span>
-    <Icon className="h-4 w-4" />
-  </a>
-);
-
 interface SectionProps {
   id: string;
   number: string;
@@ -474,11 +414,11 @@ interface SectionProps {
 }
 
 const Section = ({ id, number, title, children }: SectionProps) => (
-  <section id={id} className="kac-section">
+  <section id={id} className="border-t border-white/10 bg-ink-950 py-16 md:py-24">
     <div className="mx-auto max-w-7xl px-4 md:px-8">
-      <div className="kac-section-heading" data-reveal>
-        <span>{number}</span>
-        <h2>{title}</h2>
+      <div className="mb-10 flex items-baseline gap-5">
+        <span className="font-display text-4xl italic text-primary-400">{number}</span>
+        <h2 className="font-display text-3xl italic uppercase leading-none tracking-tight text-white md:text-5xl">{title}</h2>
       </div>
       {children}
     </div>
@@ -492,11 +432,11 @@ interface InfoTileProps {
 }
 
 const InfoTile = ({ icon: Icon, title, value }: InfoTileProps) => (
-  <div className="kac-info-tile" data-reveal>
-    <Icon className="h-8 w-8 text-primary-600" />
+  <div className="flex items-center gap-4 border border-white/10 bg-ink-950 p-5">
+    <Icon className="h-8 w-8 flex-shrink-0 text-primary-400" />
     <div>
-      <p>{title}</p>
-      <strong>{value}</strong>
+      <p className="text-xs text-white/50">{title}</p>
+      <strong className="font-race italic text-white">{value}</strong>
     </div>
   </div>
 );
@@ -505,19 +445,18 @@ interface RuleRowProps {
   icon: React.ComponentType<IconProps>;
   title: string;
   text: string;
-  delay?: number;
 }
 
-const RuleRow = ({ icon: Icon, title, text, delay = 0 }: RuleRowProps) => (
-  <div className="kac-rule-row" data-reveal style={{ transitionDelay: `${delay}ms` }}>
-    <div className="kac-icon-box">
+const RuleRow = ({ icon: Icon, title, text }: RuleRowProps) => (
+  <div className="group flex items-start gap-5 border border-white/10 bg-ink-900 p-6">
+    <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center border border-primary-400/30 bg-white/5 text-primary-400">
       <Icon className="h-7 w-7" />
     </div>
-    <div>
-      <h3>{title}</h3>
-      <p>{text}</p>
+    <div className="flex-1">
+      <h3 className="font-race text-base italic font-bold uppercase text-white">{title}</h3>
+      <p className="mt-1 text-sm leading-6 text-white/65">{text}</p>
     </div>
-    <ChevronRight className="kac-row-arrow h-5 w-5" />
+    <ChevronRight className="h-5 w-5 flex-shrink-0 text-white/30 transition-transform group-hover:translate-x-1" />
   </div>
 );
 
@@ -527,9 +466,9 @@ interface PriceLineProps {
 }
 
 const PriceLine = ({ label, value }: PriceLineProps) => (
-  <div className="kac-price-line">
-    <span>{label}</span>
-    <strong>{value}</strong>
+  <div className="flex items-center justify-between border-b border-white/10 py-3 last:border-b-0">
+    <span className="text-sm text-white/60">{label}</span>
+    <strong className="font-display text-xl italic text-primary-400">{value}</strong>
   </div>
 );
 
@@ -540,10 +479,10 @@ interface FeatureCardProps {
 }
 
 const FeatureCard = ({ icon: Icon, title, text }: FeatureCardProps) => (
-  <div className="kac-feature-card" data-reveal>
-    <Icon className="h-9 w-9 text-primary-600" />
-    <h3>{title}</h3>
-    <p>{text}</p>
+  <div className="border border-white/10 bg-ink-900 p-6">
+    <Icon className="h-9 w-9 text-primary-400" />
+    <h3 className="mt-4 font-race text-base italic font-bold uppercase text-white">{title}</h3>
+    <p className="mt-2 text-sm leading-6 text-white/65">{text}</p>
   </div>
 );
 
