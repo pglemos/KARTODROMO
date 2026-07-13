@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { SITE_BOOKING_ANCHOR, WHATSAPP_BOOKING_URL } from '../config/booking';
 import AngledButton from './site-ui/AngledButton';
+import BigCTA from './site-ui/BigCTA';
 import SectionHeading from './site-ui/SectionHeading';
 
 const sessionFlow = [
@@ -276,6 +277,19 @@ const KartLocacao = () => {
               <Gauge className="mt-1 h-4 w-4 flex-shrink-0 text-primary-400" aria-hidden="true" />
               <span>Karts Honda GX390 de 13HP preparados para locação.</span>
             </div>
+          </div>
+
+          <div className="mx-auto mt-16 max-w-6xl">
+            <BigCTA
+              watermark="GRID"
+              title={<>Entre no grid<br /><span className="text-primary-400">agora mesmo</span></>}
+              text="Reserve online em poucos minutos ou fale com a equipe pelo WhatsApp para tirar dúvidas."
+            >
+              <AngledButton href={SITE_BOOKING_ANCHOR}>Reservar online</AngledButton>
+              <AngledButton href={WHATSAPP_BOOKING_URL} variant="outline" external>
+                Falar no WhatsApp
+              </AngledButton>
+            </BigCTA>
           </div>
         </div>
       </section>

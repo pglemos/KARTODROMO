@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Compass, Flag, Map, Route, RotateCcw, Timer } from 'lucide-react';
 import trackImages from '../data/trackImages.json';
 import AngledButton from './site-ui/AngledButton';
+import BigCTA from './site-ui/BigCTA';
 import SectionHeading from './site-ui/SectionHeading';
 
 type TrackFilter = 'all' | 'normal' | 'invertido' | 'chicane';
@@ -124,18 +125,13 @@ const Track = () => {
             </div>
           </div>
 
-          <div>
-            <figure className="relative mx-auto max-w-[560px] border border-white/10 bg-ink-950 p-3 [clip-path:polygon(3%_0,100%_0,97%_100%,0_100%)]">
-              <img
-                src={featuredTrack.url}
-                alt={featuredTrack.alt}
-                className="aspect-square w-full object-contain invert"
-              />
-              <figcaption className="mt-3 flex items-center justify-between gap-3 px-2 pb-1 font-race text-xs italic font-bold uppercase tracking-[0.14em] text-white/60">
-                <span>Traçado 1 Normal</span>
-                <span className="bg-primary-400 px-2.5 py-1 text-ink-950">1.110m</span>
-              </figcaption>
-            </figure>
+          <div className="text-right">
+            <span className="block font-display text-[22vw] italic leading-[0.7] text-transparent [-webkit-text-stroke:1px_rgba(0,230,118,0.4)] md:text-[13vw]">
+              1110
+            </span>
+            <span className="-mt-4 block font-race text-sm italic font-bold uppercase tracking-[0.18em] text-primary-400">
+              metros de desafio
+            </span>
           </div>
         </div>
       </div>
@@ -270,6 +266,21 @@ const Track = () => {
               Nas baterias de lazer, treinos e eventos, é utilizado o traçado definido pelo Kartódromo. Configurações diferentes, incluindo opções com chicane ou sentido invertido, são adotadas somente em campeonatos conforme o calendário oficial.
             </p>
           </div>
+        </div>
+
+        <div className="mt-16">
+          <BigCTA
+            watermark="READY"
+            title={<>Sua volta começa<br /><span className="text-primary-400">agora</span></>}
+            text="Consulte os horários disponíveis e venha descobrir cada setor da pista."
+          >
+            <AngledButton href="https://tools.mylaptime.com.br/booking?uid=5729bbc1-572b-4e32-84ec-e9e93ab08ced" external>
+              Reservar corrida
+            </AngledButton>
+            <AngledButton href="https://wa.me/5531998842898" variant="outline" external>
+              Falar no WhatsApp
+            </AngledButton>
+          </BigCTA>
         </div>
       </div>
     </section>
