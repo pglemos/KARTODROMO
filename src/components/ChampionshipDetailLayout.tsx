@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from 'react';
+import type { ComponentType } from 'react';
 import { ArrowLeft, Download, MessageSquare } from 'lucide-react';
 import Header from './Header';
 import Footer from './Footer';
@@ -112,7 +112,7 @@ const ChampionshipDetailLayout = ({
           </div>
 
           <div className="border-t border-white/10 bg-ink-950/60 py-8 text-right">
-            <span className="block font-display text-[16vw] italic leading-[0.65] text-transparent [-webkit-text-stroke:1px_rgba(0,230,118,0.35)] md:text-[8vw]">
+            <span aria-hidden="true" className="block font-display text-[16vw] italic leading-[0.65] text-transparent [-webkit-text-stroke:1px_rgba(0,230,118,0.35)] md:text-[8vw]">
               {watermark}
             </span>
             <span className="mr-4 block font-race text-xs italic font-bold uppercase tracking-[0.18em] text-primary-400 md:mr-8">

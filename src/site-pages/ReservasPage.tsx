@@ -4,7 +4,7 @@ import QuickBooking from "../components/QuickBooking";
 
 const ReservasPage = () => {
   return (
-    <div className="min-h-screen bg-white text-zinc-800">
+    <div className="min-h-screen bg-ink-950 text-white/80">
       <Header />
 
       <main>

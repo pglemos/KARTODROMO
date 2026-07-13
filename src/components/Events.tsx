@@ -15,13 +15,12 @@ import BigCTA from './site-ui/BigCTA';
 import SectionHeading from './site-ui/SectionHeading';
 
 const eventGallery = [
-  { url: '/events/1.jpg', alt: 'Salão principal preparado para eventos', span: 'md:row-span-2' },
-  { url: '/events/2.jpg', alt: 'Área de apoio gourmet' },
-  { url: '/events/3.jpg', alt: 'Ambiente superior com vista' },
-  { url: '/events/4.jpg', alt: 'Estrutura externa do kartódromo', span: 'md:col-span-2' },
-  { url: '/events/5.jpg', alt: 'Cozinha e churrasqueira de apoio' },
-  { url: '/events/6.jpg', alt: 'Espaço mobiliado para recepção' },
-  { url: '/events/7.jpg', alt: 'Acesso e fachada do kartódromo', span: 'md:col-span-2' },
+  { url: '/events/2.jpg', alt: 'Salão principal preparado para eventos', span: 'md:row-span-2' },
+  { url: '/events/7.jpg', alt: 'Espaço gourmet com vista para a pista' },
+  { url: '/events/6.jpg', alt: 'Ambiente superior com vista' },
+  { url: '/track/aerial-day.jpg', alt: 'Estrutura completa do complexo', span: 'md:col-span-2' },
+  { url: '/events/3.jpg', alt: 'Cozinha e área de apoio' },
+  { url: '/events/recepcao.jpg', alt: 'Recepção equipada' },
 ];
 
 const eventStats = [

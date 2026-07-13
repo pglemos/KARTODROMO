@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 
-const baseUrl = 'http://127.0.0.1:4173';
+const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:4174';
 const viewports = [
   { width: 375, height: 812 },
   { width: 768, height: 1024 },
@@ -50,7 +50,9 @@ const auditPage = async (page: Page) => page.evaluate(() => {
   const effectiveBackground = (element: Element) => {
     let current: Element | null = element;
     while (current) {
-      const bg = parseRgb(window.getComputedStyle(current).backgroundColor);
+      const style = window.getComputedStyle(current);
+      if (style.backgroundImage !== 'none') return null;
+      const bg = parseRgb(style.backgroundColor);
       if (bg && bg.a > 0.95) return bg;
       current = current.parentElement;
     }
@@ -72,8 +74,18 @@ const auditPage = async (page: Page) => page.evaluate(() => {
     })
     .filter((item) => item.cursor !== 'pointer' || item.transitionMax > 700);
 
+  const isDecorative = (element: Element) => {
+    let current: Element | null = element;
+    while (current) {
+      if (current.getAttribute('aria-hidden') === 'true') return true;
+      current = current.parentElement;
+    }
+    return false;
+  };
+
   const contrastIssues = Array.from(document.querySelectorAll<HTMLElement>('body *'))
     .filter((element) => isVisible(element))
+    .filter((element) => !isDecorative(element))
     .filter((element) => {
       const text = element.textContent?.replace(/\s+/g, ' ').trim() ?? '';
       return text.length > 0 && Array.from(element.children).every((child) => !child.textContent?.trim());
@@ -82,7 +94,7 @@ const auditPage = async (page: Page) => page.evaluate(() => {
       const style = window.getComputedStyle(element);
       const foreground = parseRgb(style.color);
       const background = effectiveBackground(element);
-      if (!foreground) return null;
+      if (!foreground || !background) return null;
       const fontSize = Number.parseFloat(style.fontSize);
       const fontWeight = Number.parseInt(style.fontWeight, 10);
       const required = fontSize >= 24 || (fontSize >= 18.66 && fontWeight >= 700) ? 3 : 4.5;

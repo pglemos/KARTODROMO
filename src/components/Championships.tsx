@@ -291,7 +291,7 @@ pagamento: 'PENDENTE',
           </div>
 
           <div className="text-right">
-            <span className="block font-display text-[16vw] italic leading-[0.7] text-transparent [-webkit-text-stroke:1px_rgba(0,230,118,0.4)] md:text-[7vw]">
+            <span aria-hidden="true" className="block font-display text-[16vw] italic leading-[0.7] text-transparent [-webkit-text-stroke:1px_rgba(0,230,118,0.4)] md:text-[7vw]">
               2026
             </span>
             <span className="-mt-2 block font-race text-sm italic font-bold uppercase tracking-[0.18em] text-primary-400">

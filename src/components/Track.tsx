@@ -1,18 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Compass, Flag, Map, Route, RotateCcw, Timer } from 'lucide-react';
-import trackImages from '../data/trackImages.json';
+import { ArrowLeft, Compass, Flag, Map, MessageSquare, Route, Timer } from 'lucide-react';
 import AngledButton from './site-ui/AngledButton';
 import BigCTA from './site-ui/BigCTA';
 import SectionHeading from './site-ui/SectionHeading';
-
-type TrackFilter = 'all' | 'normal' | 'invertido' | 'chicane';
-
-const filterLabels: Record<TrackFilter, string> = {
-  all: 'Todos',
-  normal: 'Normal',
-  invertido: 'Invertido',
-  chicane: 'Chicane',
-};
 
 const trackNotes = [
   {
@@ -32,65 +21,26 @@ const trackNotes = [
   },
 ];
 
-const getTrackType = (label: string) => {
-  const normalized = label.toLowerCase();
-  if (normalized.includes('invertido')) return 'Invertido';
-  if (normalized.includes('chicane')) return 'Chicane';
-  return 'Normal';
-};
+const trackHighlights = [
+  { label: 'Extensão', value: '1.110m', detail: 'Circuito técnico' },
+  { label: 'Configurações mapeadas', value: '42', detail: 'Normal, invertido e chicane' },
+  { label: 'Alterações', value: 'Campeonatos', detail: 'Conforme calendário oficial' },
+];
 
-const getTrackAccent = (type: string) => {
-  if (type === 'Invertido') return 'bg-primary-400/10 text-primary-300 border-primary-400/30';
-  if (type === 'Chicane') return 'bg-yellow-500/10 text-yellow-300 border-yellow-500/30';
-  return 'bg-white/5 text-white/60 border-white/15';
-};
+const trackGallery = [
+  { url: '/track/aerial-day.jpg', alt: 'Vista aérea do circuito completo' },
+  { url: '/track/sunset.jpg', alt: 'Última curva da pista ao entardecer' },
+];
 
 const Track = () => {
-  const [activeTab, setActiveTab] = useState<TrackFilter>('all');
-  const [showAllTracks, setShowAllTracks] = useState(false);
-
-  const trackLayouts = useMemo(
-    () =>
-      trackImages.allTracks.map((track, index) => {
-        const type = getTrackType(track.label);
-        return {
-          id: `${track.label}-${index}`,
-          url: track.url,
-          label: track.label,
-          alt: track.alt,
-          type,
-          number: track.label.match(/\d+/)?.[0] ?? String(index + 1),
-        };
-      }),
-    [],
-  );
-
-  const filteredTracks = trackLayouts.filter((track) => {
-    if (activeTab === 'all') return true;
-    return track.type.toLowerCase() === activeTab;
-  });
-
-  const visibleTracks = showAllTracks ? filteredTracks : filteredTracks.slice(0, 12);
-  const featuredTrack = trackLayouts[0];
-  const alternateTrack = trackLayouts.find((track) => track.label === '8 Normal') ?? trackLayouts[7] ?? featuredTrack;
-  const trackHighlights = [
-    { label: 'Extensão', value: '1.110m', detail: 'Circuito técnico' },
-    { label: 'Traçados oficiais', value: String(trackLayouts.length), detail: 'Normal, invertido e chicane' },
-    { label: 'Alterações', value: 'Campeonatos', detail: 'Conforme calendário oficial' },
-  ];
-
-  useEffect(() => {
-    setShowAllTracks(false);
-  }, [activeTab]);
-
   return (
     <section id="pista" className="min-h-screen overflow-hidden bg-ink-950 text-white/80">
       <div className="relative isolate border-b border-white/10 bg-ink-900">
         <img
-          src={featuredTrack.url}
+          src={trackGallery[0].url}
           alt=""
           aria-hidden="true"
-          className="absolute inset-y-0 right-0 z-[-2] hidden h-full w-[58%] object-contain object-center opacity-[0.1] invert lg:block"
+          className="absolute inset-y-0 right-0 z-[-2] hidden h-full w-[58%] object-cover object-center opacity-20 lg:block"
         />
         <div className="absolute inset-0 z-[-1] bg-[linear-gradient(90deg,#070b08_0%,rgba(7,11,8,0.94)_48%,rgba(7,11,8,0.72)_100%)]" />
 
@@ -110,13 +60,13 @@ const Track = () => {
               Pista homologada de <span className="text-primary-400">1.110m</span>
             </h1>
             <p className="mt-7 max-w-2xl text-base leading-8 text-white/70 md:text-lg">
-              Conheça os mapas oficiais do Kartódromo de Betim e entenda as características de cada configuração. Alterações de traçado são realizadas exclusivamente em campeonatos, conforme o calendário oficial.
+              Conheça o circuito do Kartódromo de Betim e entenda as características de cada configuração. Alterações de traçado são realizadas exclusivamente em campeonatos, conforme o calendário oficial.
             </p>
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <AngledButton href="#tracados">
+              <AngledButton href="#galeria">
                 <Map className="h-4 w-4" />
-                Ver traçados oficiais
+                Ver a pista
               </AngledButton>
               <AngledButton href="https://wa.me/553135112373?text=Ol%C3%A1!%20Quero%20saber%20qual%20tra%C3%A7ado%20estar%C3%A1%20ativo%20na%20pista." variant="outline" external>
                 <Flag className="h-4 w-4" />
@@ -126,7 +76,7 @@ const Track = () => {
           </div>
 
           <div className="text-right">
-            <span className="block font-display text-[22vw] italic leading-[0.7] text-transparent [-webkit-text-stroke:1px_rgba(0,230,118,0.4)] md:text-[13vw]">
+            <span aria-hidden="true" className="block font-display text-[22vw] italic leading-[0.7] text-transparent [-webkit-text-stroke:1px_rgba(0,230,118,0.4)] md:text-[13vw]">
               1110
             </span>
             <span className="-mt-4 block font-race text-sm italic font-bold uppercase tracking-[0.18em] text-primary-400">
@@ -156,7 +106,7 @@ const Track = () => {
           <div className="max-w-xl">
             <SectionHeading eyebrow="Como ler a pista" title="Cada desenho muda o jeito de pilotar" />
             <p className="mt-5 text-sm leading-7 text-white/65">
-              Os mapas abaixo apresentam o sentido da volta e as diferenças entre as configurações Normal, Invertido e Chicane.
+              O circuito recebe até 42 configurações mapeadas entre traçados Normal, Invertido e Chicane, usadas conforme o calendário de campeonatos.
             </p>
           </div>
 
@@ -174,88 +124,43 @@ const Track = () => {
         </div>
       </div>
 
-      <div id="tracados" className="mx-auto max-w-7xl px-4 py-16 md:px-8">
+      <div id="galeria" className="mx-auto max-w-7xl px-4 py-16 md:px-8">
         <div className="mb-8 flex flex-col gap-6 border-b border-white/10 pb-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="mb-3 flex items-center gap-2 text-primary-400">
               <Map className="h-5 w-5" />
-              <span className="font-race text-xs italic font-bold uppercase tracking-[0.18em]">Catálogo oficial</span>
+              <span className="font-race text-xs italic font-bold uppercase tracking-[0.18em]">Circuito de Betim</span>
             </div>
             <h2 className="font-display text-3xl italic uppercase leading-none tracking-tight text-white md:text-5xl">
-              Traçados oficiais do circuito
+              A pista por dentro
             </h2>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {(Object.keys(filterLabels) as TrackFilter[]).map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2.5 font-race text-xs italic font-bold uppercase tracking-[0.14em] transition-all duration-300 ${
-                  activeTab === tab
-                    ? 'bg-primary-400 text-ink-950'
-                    : 'border border-white/15 bg-white/5 text-white/60 hover:-translate-y-0.5 hover:border-primary-400/40 hover:text-primary-400'
-                }`}
-              >
-                {filterLabels[tab]}
-              </button>
-            ))}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {visibleTracks.map((track) => (
-            <article
-              key={track.id}
-              className="group border border-white/10 bg-ink-900 p-3 transition-all duration-300 hover:-translate-y-1 hover:border-primary-400/40"
-            >
-              <div className="relative aspect-square overflow-hidden bg-ink-950">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          {trackGallery.map((track) => (
+            <figure key={track.url} className="group overflow-hidden border border-white/10 bg-ink-900">
+              <div className="relative aspect-[4/3] overflow-hidden bg-ink-950">
                 <img
                   src={track.url}
                   alt={track.alt}
                   loading="lazy"
-                  className="h-full w-full object-contain invert transition-transform duration-500 group-hover:scale-[1.035]"
+                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.035]"
                 />
-                <span className="absolute left-3 top-3 bg-ink-950/90 px-2.5 py-1 font-race text-[10px] italic font-bold uppercase tracking-[0.16em] text-white">
-                  #{track.number}
-                </span>
               </div>
-
-              <div className="px-1 pb-1 pt-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="font-race text-sm italic font-bold uppercase tracking-tight text-white">{track.label}</h3>
-                    <p className="mt-1 text-xs leading-5 text-white/50">{track.alt}</p>
-                  </div>
-                  <span className={`inline-flex items-center gap-1 border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${getTrackAccent(track.type)}`}>
-                    {track.type === 'Invertido' ? <RotateCcw className="h-3 w-3" /> : <Route className="h-3 w-3" />}
-                    {track.type}
-                  </span>
-                </div>
-              </div>
-            </article>
+              <figcaption className="p-4 font-race text-xs italic font-bold uppercase tracking-[0.14em] text-white/60">
+                {track.alt}
+              </figcaption>
+            </figure>
           ))}
         </div>
 
-        {filteredTracks.length > visibleTracks.length && (
-          <div className="mt-10 flex justify-center">
-            <button
-              type="button"
-              onClick={() => setShowAllTracks(true)}
-              className="border border-white/15 bg-white/5 px-6 py-3.5 font-race text-xs italic font-bold uppercase tracking-[0.16em] text-white/70 transition-all duration-300 hover:-translate-y-0.5 hover:border-primary-400/40 hover:text-primary-400"
-            >
-              Mostrar todos os {filteredTracks.length} traçados
-            </button>
-          </div>
-        )}
-
         <div className="mt-16 grid gap-6 border border-white/10 bg-ink-900 p-5 md:grid-cols-[0.86fr_1fr] md:p-8">
           <img
-            src={alternateTrack.url}
-            alt={alternateTrack.alt}
+            src={trackGallery[0].url}
+            alt={trackGallery[0].alt}
             loading="lazy"
-            className="aspect-square w-full border border-white/10 bg-ink-950 object-contain invert"
+            className="aspect-square w-full border border-white/10 bg-ink-950 object-cover"
           />
           <div className="flex flex-col justify-center">
             <span className="mb-4 font-race text-xs italic font-bold uppercase tracking-[0.18em] text-primary-400">Informação importante</span>
@@ -265,6 +170,12 @@ const Track = () => {
             <p className="mt-5 max-w-2xl text-sm leading-7 text-white/65">
               Nas baterias de lazer, treinos e eventos, é utilizado o traçado definido pelo Kartódromo. Configurações diferentes, incluindo opções com chicane ou sentido invertido, são adotadas somente em campeonatos conforme o calendário oficial.
             </p>
+            <div className="mt-6">
+              <AngledButton href="https://wa.me/553135112373?text=Ol%C3%A1!%20Quero%20saber%20qual%20tra%C3%A7ado%20estar%C3%A1%20ativo%20na%20pista." variant="outline" external>
+                <MessageSquare className="h-4 w-4" />
+                Perguntar no WhatsApp
+              </AngledButton>
+            </div>
           </div>
         </div>
 
