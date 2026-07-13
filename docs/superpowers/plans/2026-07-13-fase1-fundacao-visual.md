@@ -603,8 +603,10 @@ import { Menu, X, Phone, MapPin, Clock, Users as Facebook, Camera as Instagram, 
 import { SITE_BOOKING_ANCHOR } from '../config/booking';
 
 const navLinks = [
+  { href: '/#home', label: 'Home' },
   { href: '/#sobre', label: 'Sobre' },
   { href: '/#servicos', label: 'Modalidades' },
+  { href: '/#promocoes', label: 'Promoções' },
   { href: '/pista', label: 'A Pista' },
   { href: '/kart-locacao', label: 'Locação' },
   { href: SITE_BOOKING_ANCHOR, label: 'Reservas Online' },

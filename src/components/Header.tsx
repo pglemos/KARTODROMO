@@ -2,39 +2,53 @@ import { useState } from 'react';
 import { Menu, X, Phone, MapPin, Clock, Users as Facebook, Camera as Instagram, Video as Youtube } from 'lucide-react';
 import { SITE_BOOKING_ANCHOR } from '../config/booking';
 
+const navLinks = [
+  { href: '/#home', label: 'Home' },
+  { href: '/#sobre', label: 'Sobre' },
+  { href: '/#servicos', label: 'Modalidades' },
+  { href: '/#promocoes', label: 'Promoções' },
+  { href: '/pista', label: 'A Pista' },
+  { href: '/kart-locacao', label: 'Locação' },
+  { href: SITE_BOOKING_ANCHOR, label: 'Reservas Online' },
+  { href: '/campeonatos', label: 'Campeonatos' },
+  { href: '/eventos', label: 'Eventos' },
+  { href: '/duvidas', label: 'Dúvidas' },
+  { href: '/#contato', label: 'Contato' },
+];
+
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
     <>
       {/* Top Bar */}
-      <div className="border-b border-white/15 bg-[#087f67] px-4 py-3 text-white shadow-sm">
-        <div className="container mx-auto flex flex-wrap items-center justify-between gap-x-7 gap-y-2.5 text-[13px] leading-none md:text-sm">
+      <div className="border-b border-white/10 bg-ink-900 px-4 py-3 text-white">
+        <div className="container mx-auto flex flex-wrap items-center justify-between gap-x-7 gap-y-2.5 font-race text-[13px] italic leading-none md:text-sm">
           <div className="flex flex-wrap items-center gap-x-7 gap-y-2.5">
-            <a href="tel:+553135112373" className="flex items-center space-x-2 text-white transition-colors hover:text-white/75">
-              <Phone className="h-[18px] w-[18px] text-white" />
-              <span className="font-semibold">(31) 3511-2373</span>
+            <a href="tel:+553135112373" className="flex items-center space-x-2 text-white transition-colors hover:text-primary-400">
+              <Phone className="h-[18px] w-[18px] text-primary-400" />
+              <span className="font-bold not-italic">(31) 3511-2373</span>
             </a>
-            <div className="flex items-center space-x-2 text-white/95">
-              <MapPin className="h-[18px] w-[18px] text-white" />
+            <div className="flex items-center space-x-2 text-white/80">
+              <MapPin className="h-[18px] w-[18px] text-primary-400" />
               <span className="md:hidden">Betim - MG</span>
               <span className="hidden md:inline">Av. Adutora Várzea das Flores, 477 - Betim, MG</span>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2.5">
-            <div className="flex items-center space-x-2 text-white/95">
-              <Clock className="h-[18px] w-[18px] text-white" />
+            <div className="flex items-center space-x-2 text-white/80">
+              <Clock className="h-[18px] w-[18px] text-primary-400" />
               <span className="hidden lg:inline">Funcionamento:</span>
-              <span className="font-medium">Ter-Sex: 16h-22h | Sáb-Dom: 08h-19h</span>
+              <span className="font-semibold">Ter-Sex: 16h-22h | Sáb-Dom: 08h-19h</span>
             </div>
-            <div className="ml-2 hidden space-x-4 border-l border-white/25 pl-5 lg:flex">
-              <a href="https://www.facebook.com/kartodromodebetim" target="_blank" rel="noopener noreferrer" aria-label="Facebook do Kartódromo de Betim" className="text-white/80 transition-colors hover:text-white">
+            <div className="ml-2 hidden space-x-4 border-l border-white/15 pl-5 lg:flex">
+              <a href="https://www.facebook.com/kartodromodebetim" target="_blank" rel="noopener noreferrer" aria-label="Facebook do Kartódromo de Betim" className="text-white/70 transition-colors hover:text-primary-400">
                 <Facebook className="h-[18px] w-[18px]" />
               </a>
-              <a href="https://www.instagram.com/kartodromobetim/" target="_blank" rel="noopener noreferrer" aria-label="Instagram do Kartódromo de Betim" className="text-white/80 transition-colors hover:text-white">
+              <a href="https://www.instagram.com/kartodromobetim/" target="_blank" rel="noopener noreferrer" aria-label="Instagram do Kartódromo de Betim" className="text-white/70 transition-colors hover:text-primary-400">
                 <Instagram className="h-[18px] w-[18px]" />
               </a>
-              <a href="https://www.youtube.com/kartodromodebetim31" target="_blank" rel="noopener noreferrer" aria-label="YouTube do Kartódromo de Betim" className="text-white/80 transition-colors hover:text-white">
+              <a href="https://www.youtube.com/kartodromodebetim31" target="_blank" rel="noopener noreferrer" aria-label="YouTube do Kartódromo de Betim" className="text-white/70 transition-colors hover:text-primary-400">
                 <Youtube className="h-[18px] w-[18px]" />
               </a>
             </div>
@@ -43,85 +57,53 @@ const Header = () => {
       </div>
 
       {/* Main Header */}
-      <header className="sticky top-0 z-50 border-b border-zinc-200/80 bg-white shadow-sm">
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-ink-950/90 backdrop-blur-xl">
         <div className="container mx-auto px-4">
-          <div className="flex justify-between items-center py-4">
-            {/* Logo */}
+          <div className="flex items-center justify-between py-4">
             <a href="/" className="flex items-center">
               <img
                 src="/brand/kib-logo.png"
                 alt="Logo Kartódromo de Betim"
-                className="h-12 w-auto filter brightness-100 drop-shadow-[0_2px_4px_rgba(0,0,0,0.05)]"
+                className="h-12 w-auto drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
               />
             </a>
 
-            {/* Desktop Menu */}
-            <nav className="hidden lg:flex items-center gap-4 xl:gap-6 text-xs xl:text-sm font-bold tracking-wide">
-              <a href="/#home" className="text-zinc-700 hover:text-primary-600 transition-colors py-1">Home</a>
-              <a href="/#sobre" className="text-zinc-700 hover:text-primary-600 transition-colors py-1">Sobre</a>
-              <a href="/#servicos" className="text-zinc-700 hover:text-primary-600 transition-colors py-1">Modalidades</a>
-              <a href="/#promocoes" className="text-zinc-700 hover:text-primary-600 transition-colors py-1 flex items-center">
-                <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full mr-1.5 animate-pulse"></span>
-                Promoções
-              </a>
-              <a href="/pista" className="text-zinc-700 hover:text-primary-600 transition-colors py-1">A Pista</a>
-              <a href="/kart-locacao" className="text-zinc-700 hover:text-primary-600 transition-colors py-1">Locação</a>
-              <a 
-                href={SITE_BOOKING_ANCHOR}
-                className="text-zinc-700 hover:text-primary-600 transition-colors py-1 flex items-center"
-              >
-                <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full mr-1.5 animate-pulse"></span>
-                Reservas Online
-              </a>
-              <a href="/campeonatos" className="text-zinc-700 hover:text-primary-600 transition-colors py-1 flex items-center">
-                <span className="w-1.5 h-1.5 bg-primary-500 rounded-full mr-1.5 animate-pulse"></span>
-                Campeonatos
-              </a>
-              <a href="/eventos" className="text-zinc-700 hover:text-primary-600 transition-colors py-1">Eventos</a>
-              <a href="/duvidas" className="text-zinc-700 hover:text-primary-600 transition-colors py-1">Dúvidas</a>
-              <a href="/#contato" className="text-zinc-700 hover:text-primary-600 transition-colors py-1">Contato</a>
+            <nav className="hidden items-center gap-4 font-race text-[11px] italic font-bold uppercase tracking-wide lg:flex xl:gap-6 xl:text-xs">
+              {navLinks.map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  className="relative py-1 text-white/80 transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-[2px] after:origin-left after:scale-x-0 after:bg-primary-400 after:transition-transform after:duration-200 hover:text-white hover:after:scale-x-100"
+                >
+                  {link.label}
+                </a>
+              ))}
             </nav>
 
-            {/* Mobile Menu Button */}
             <button
-              className="lg:hidden text-zinc-700 hover:text-primary-600 transition-colors focus:outline-none p-1.5"
+              className="p-1.5 text-white transition-colors hover:text-primary-400 focus:outline-none lg:hidden"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               aria-label="Alternar Menu"
               aria-expanded={isMenuOpen}
               aria-controls="mobile-navigation"
             >
-              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
           </div>
 
-          {/* Mobile Menu */}
           {isMenuOpen && (
-            <div id="mobile-navigation" className="lg:hidden pb-6 pt-2 border-t border-zinc-200/80 animate-fadeIn">
-              <nav className="flex flex-col space-y-3 text-base font-semibold">
-                <a href="/#home" onClick={() => setIsMenuOpen(false)} className="text-zinc-700 hover:text-primary-600 py-1 transition-colors">Home</a>
-                <a href="/#sobre" onClick={() => setIsMenuOpen(false)} className="text-zinc-700 hover:text-primary-600 py-1 transition-colors">Sobre</a>
-                <a href="/#servicos" onClick={() => setIsMenuOpen(false)} className="text-zinc-700 hover:text-primary-600 py-1 transition-colors">Modalidades</a>
-                <a href="/#promocoes" onClick={() => setIsMenuOpen(false)} className="text-zinc-700 hover:text-primary-600 py-1 transition-colors flex items-center">
-                  <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
-                  Promoções
-                </a>
-                <a href="/pista" onClick={() => setIsMenuOpen(false)} className="text-zinc-700 hover:text-primary-600 py-1 transition-colors">A Pista</a>
-                <a href="/kart-locacao" onClick={() => setIsMenuOpen(false)} className="text-zinc-700 hover:text-primary-600 py-1 transition-colors">Locação</a>
-                <a 
-                  href={SITE_BOOKING_ANCHOR}
-                  onClick={() => setIsMenuOpen(false)} 
-                  className="text-zinc-700 hover:text-primary-600 py-1 transition-colors flex items-center"
-                >
-                  <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
-                  Reservas Online
-                </a>
-                <a href="/campeonatos" onClick={() => setIsMenuOpen(false)} className="text-zinc-700 hover:text-primary-600 py-1 transition-colors flex items-center">
-                  <span className="w-2 h-2 bg-primary-500 rounded-full mr-2"></span>
-                  Campeonatos
-                </a>
-                <a href="/eventos" onClick={() => setIsMenuOpen(false)} className="text-zinc-700 hover:text-primary-600 py-1 transition-colors">Eventos</a>
-                <a href="/duvidas" onClick={() => setIsMenuOpen(false)} className="text-zinc-700 hover:text-primary-600 py-1 transition-colors">Dúvidas</a>
-                <a href="/#contato" onClick={() => setIsMenuOpen(false)} className="text-zinc-700 hover:text-primary-600 py-1 transition-colors">Contato</a>
+            <div id="mobile-navigation" className="border-t border-white/10 pb-6 pt-2 lg:hidden">
+              <nav className="flex flex-col space-y-1 font-display text-2xl italic uppercase">
+                {navLinks.map((link) => (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setIsMenuOpen(false)}
+                    className="border-b border-white/10 py-3 text-white transition-colors hover:text-primary-400"
+                  >
+                    {link.label}
+                  </a>
+                ))}
               </nav>
             </div>
           )}
