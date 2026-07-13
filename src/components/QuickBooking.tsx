@@ -1,4 +1,6 @@
 import { MYLAPTIME_BOOKING_URL } from '../config/booking';
+import AngledButton from './site-ui/AngledButton';
+import SectionHeading from './site-ui/SectionHeading';
 
 type QuickBookingProps = {
   surface?: 'home' | 'page';
@@ -21,59 +23,53 @@ type QuickBookingProps = {
  * oficial deles.
  */
 const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
-  const HeadingTag = surface === 'page' ? 'h1' : 'h2';
-
   return (
     <section
       id="agendamento"
-      className="scroll-mt-28 border-t border-zinc-200 bg-[#efefef] py-16 md:scroll-mt-24 md:py-20"
+      className="scroll-mt-28 border-t border-white/10 bg-ink-900 py-16 md:scroll-mt-24 md:py-20"
     >
       <div className="mx-auto max-w-7xl px-4 text-center">
-        <HeadingTag className="font-sans text-[34px] font-normal tracking-tight text-zinc-900 md:text-[44px]">
-          Consulte e <span className="font-extrabold text-primary-700">agende seu horário</span>
-        </HeadingTag>
+        <SectionHeading
+          align="center"
+          eyebrow="Agendamento"
+          title={
+            <>
+              Consulte e <span className="text-primary-400">agende seu horário</span>
+            </>
+          }
+        />
 
-        <div aria-hidden="true" className="mx-auto mt-8 grid w-10 grid-cols-2 gap-1 opacity-80">
-          <span className="h-2.5 w-2.5 skew-x-[-12deg] bg-zinc-300" />
-          <span className="h-2.5 w-2.5 skew-x-[-12deg] bg-primary-600" />
-          <span className="h-2.5 w-2.5 skew-x-[-12deg] bg-primary-600" />
-          <span className="h-2.5 w-2.5 skew-x-[-12deg] bg-zinc-300" />
-        </div>
-
-        <p className="mx-auto mt-8 max-w-5xl text-center text-xl leading-8 text-zinc-800 md:text-2xl md:leading-9">
-          Após 10 corridas, você conquista a <strong className="font-black">CARTEIRA de PILOTO</strong> e pode correr no Super Kart.
+        <p className="mx-auto mt-8 max-w-5xl text-center text-xl leading-8 text-white/75 md:text-2xl md:leading-9">
+          Após 10 corridas, você conquista a <strong className="font-black text-white">CARTEIRA de PILOTO</strong> e pode correr no Super Kart.
         </p>
 
-        <p className="mx-auto mt-8 max-w-4xl text-center text-xl font-medium leading-tight text-zinc-900 md:text-2xl">
-          Preço normal <span className="font-black text-primary-700">R$ 175,00</span>, mas reserve agora e pague antecipado com
-          super desconto, saindo por apenas <span className="font-black text-primary-700">R$ 145,00</span>. (Promoção por tempo
-          limitado) <span className="font-black text-primary-700">APROVEITE!!</span>
+        <p className="mx-auto mt-8 max-w-4xl text-center text-xl font-medium leading-tight text-white/85 md:text-2xl">
+          Preço normal <span className="font-black text-primary-400">R$ 175,00</span>, mas reserve agora e pague antecipado com
+          super desconto, saindo por apenas <span className="font-black text-primary-400">R$ 145,00</span>. (Promoção por tempo
+          limitado) <span className="font-black text-primary-400">APROVEITE!!</span>
         </p>
 
-        <div className="mx-auto mt-12 max-w-2xl rounded-lg border border-zinc-200 bg-white px-6 py-12 shadow-sm md:px-16 md:py-16">
-          <p className="text-lg font-medium text-zinc-700 md:text-xl">
+        <div className="mx-auto mt-12 max-w-2xl border border-white/10 bg-ink-950 px-6 py-12 md:px-16 md:py-16">
+          <p className="text-lg font-medium text-white/75 md:text-xl">
             A consulta de horários e a reserva são feitas na plataforma oficial de agendamento.
           </p>
-          <a
-            href={MYLAPTIME_BOOKING_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-8 inline-flex items-center justify-center rounded bg-primary-600 px-10 py-4 text-lg font-bold uppercase tracking-wide text-white transition-colors hover:bg-primary-700"
-          >
-            Consultar horários e agendar
-          </a>
-          <p className="mt-4 text-sm text-zinc-500">
+          <div className="mt-8 flex justify-center">
+            <AngledButton href={MYLAPTIME_BOOKING_URL} external>
+              Consultar horários e agendar
+            </AngledButton>
+          </div>
+          <p className="mt-4 text-sm text-white/50">
             Abre em uma nova aba, no site oficial de reservas.
           </p>
         </div>
       </div>
 
       {surface === 'page' && (
-        <div className="mx-auto mt-10 max-w-5xl rounded border border-zinc-200 bg-white px-5 py-6 text-left shadow-sm md:px-8">
-          <h2 className="text-lg font-black uppercase tracking-[0.08em] text-zinc-900">
+        <div className="mx-auto mt-10 max-w-5xl border border-white/10 bg-ink-950 px-5 py-6 text-left md:px-8">
+          <h2 className="font-race text-lg italic font-bold uppercase tracking-[0.08em] text-white">
             Política de Cancelamento e Extorno
           </h2>
-          <div className="mt-4 space-y-3 text-sm leading-6 text-zinc-700 md:text-base">
+          <div className="mt-4 space-y-3 text-sm leading-6 text-white/70 md:text-base">
             <p>
               O cancelamento de reservas deve ser solicitado com antecedência mínima de 24 horas em relação ao horário
               agendado.
