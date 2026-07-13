@@ -48,6 +48,18 @@ export default {
           900: '#18181b',
           950: '#09090b',
         },
+        ink: {
+          950: '#030504',
+          900: '#070b08',
+          800: '#0b100c',
+          700: '#101711',
+          600: '#151e16',
+        },
+      },
+      fontFamily: {
+        display: ['var(--font-display)', 'Arial Black', 'Impact', 'sans-serif'],
+        race: ['var(--font-race)', 'Arial Narrow', 'Arial', 'sans-serif'],
+        body: ['var(--font-body)', 'Arial', 'sans-serif'],
       },
     },
   },
