@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { HelpCircle, ChevronDown, MessageSquare, ShieldAlert } from 'lucide-react';
+import SectionHeading from './site-ui/SectionHeading';
 
 interface FAQItem {
   question: string;
@@ -81,45 +82,52 @@ export default function FAQ() {
   ];
 
   return (
-    <section className="py-24 bg-zinc-50 min-h-screen text-zinc-700">
+    <section className="border-t border-white/10 bg-ink-950 py-16 text-white/70 md:py-24">
       <div className="container mx-auto px-4">
-        {/* Header */}
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-50 border border-primary-500/20 rounded-2xl mb-6 text-primary-600">
-            <HelpCircle className="w-8 h-8" />
-          </div>
-          <h1 className="text-3xl md:text-5xl font-black text-zinc-950 mb-4 uppercase tracking-tight">
-            Dúvidas <span className="text-primary-600">Frequentes</span>
-          </h1>
-          <div className="w-20 h-1.5 bg-primary-500 mx-auto rounded-full mb-6"></div>
-          <p className="text-lg text-zinc-600 max-w-3xl mx-auto font-light leading-relaxed">
-            Consulte regras de conduta, orientações de segurança e respostas para as dúvidas mais comuns antes de correr.
-          </p>
+        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center border border-primary-400/30 bg-white/5 text-primary-400">
+          <HelpCircle className="h-8 w-8" />
         </div>
+        <SectionHeading
+          align="center"
+          eyebrow="Antes de correr"
+          title={
+            <>
+              Dúvidas <span className="text-primary-400">Frequentes</span>
+            </>
+          }
+        />
+        <p className="mx-auto mt-6 max-w-3xl text-center text-lg font-light leading-relaxed text-white/70">
+          Consulte regras de conduta, orientações de segurança e respostas para as dúvidas mais comuns antes de correr.
+        </p>
 
-        {/* Accordion Layout */}
-        <div className="max-w-3xl mx-auto space-y-4 mb-16">
+        <div className="mx-auto mb-16 mt-16 max-w-3xl space-y-3">
           {faqItems.map((item, index) => {
             const isOpen = openIndex === index;
             return (
-              <div 
+              <div
                 key={index}
-                className="bg-white border border-zinc-200 rounded-2xl overflow-hidden hover:border-primary-500/30 hover:shadow-sm transition-all duration-300"
+                className="border border-white/10 bg-ink-900 transition-colors hover:border-primary-400/30"
               >
                 <button
+                  type="button"
                   onClick={() => toggleFAQ(index)}
-                  className="w-full px-6 py-5 flex items-center justify-between text-left focus:outline-none transition-colors"
+                  aria-expanded={isOpen}
+                  className="flex w-full items-center justify-between px-6 py-5 text-left focus:outline-none"
                 >
-                  <span className="font-bold text-zinc-900 text-sm md:text-base tracking-wide pr-4">
+                  <span className="pr-4 font-race text-sm italic font-bold uppercase tracking-wide text-white md:text-base">
                     {item.question}
                   </span>
-                  <div className={`w-8 h-8 rounded-lg bg-zinc-50 border border-zinc-200 flex items-center justify-center text-primary-600 flex-shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-180 border-primary-500/30 text-primary-600' : ''}`}>
-                    <ChevronDown className="w-4 h-4" />
+                  <div
+                    className={`flex h-8 w-8 flex-shrink-0 items-center justify-center border border-white/15 bg-white/5 text-primary-400 transition-transform duration-300 ${
+                      isOpen ? 'rotate-180 border-primary-400/40' : ''
+                    }`}
+                  >
+                    <ChevronDown className="h-4 w-4" />
                   </div>
                 </button>
-                
+
                 {isOpen && (
-                  <div className="px-6 pb-6 pt-1 text-sm text-zinc-600 leading-relaxed font-light border-t border-zinc-100 animate-slideDown">
+                  <div className="border-t border-white/10 px-6 pb-6 pt-4 text-sm font-light leading-relaxed text-white/65">
                     {item.answer}
                   </div>
                 )}
@@ -128,20 +136,19 @@ export default function FAQ() {
           })}
         </div>
 
-        {/* Support Callout */}
-        <div className="max-w-3xl mx-auto bg-white border border-primary-500/25 rounded-3xl p-8 text-center shadow-sm">
-          <ShieldAlert className="w-10 h-10 text-primary-600 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-zinc-950 mb-2 uppercase tracking-wide">Ainda precisa de ajuda?</h3>
-          <p className="text-zinc-600 text-sm max-w-xl mx-auto mb-6 font-light leading-relaxed">
+        <div className="mx-auto max-w-3xl border border-primary-400/25 bg-ink-900 p-8 text-center">
+          <ShieldAlert className="mx-auto mb-4 h-10 w-10 text-primary-400" />
+          <h3 className="mb-2 font-display text-xl italic uppercase tracking-wide text-white">Ainda precisa de ajuda?</h3>
+          <p className="mx-auto mb-6 max-w-xl text-sm font-light leading-relaxed text-white/65">
             Nossa equipe de suporte está à disposição no WhatsApp para esclarecer dúvidas sobre campeonatos, regulamentos específicos e cotações sob medida.
           </p>
           <a
             href="https://wa.me/553135112373?text=Ol%C3%A1!%20Tenho%20uma%20d%C3%BAvida%20que%20n%C3%A3o%20encontrei%20nas%20FAQ%20do%20site."
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center px-6 py-3.5 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-400 hover:to-primary-500 text-zinc-950 font-bold uppercase tracking-wider text-xs rounded-xl transition-all duration-300 shadow-md"
+            className="inline-flex items-center gap-2 bg-gradient-to-br from-primary-400 to-primary-600 px-6 py-3.5 font-race text-xs italic font-bold uppercase tracking-wider text-ink-950 [clip-path:polygon(7%_0,100%_0,93%_100%,0_100%)]"
           >
-            <MessageSquare className="w-4 h-4 mr-2" />
+            <MessageSquare className="h-4 w-4" />
             Falar no WhatsApp
           </a>
         </div>
