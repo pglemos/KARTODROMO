@@ -9,13 +9,12 @@ import {
   MessageCircle,
   QrCode,
   ShieldCheck,
-  Timer,
-  UserCheck,
   Zap,
 } from 'lucide-react';
 import { SITE_BOOKING_ANCHOR, WHATSAPP_BOOKING_URL } from '../config/booking';
 import AngledButton from './site-ui/AngledButton';
 import BigCTA from './site-ui/BigCTA';
+import GlassPanel from './site-ui/GlassPanel';
 import SectionHeading from './site-ui/SectionHeading';
 
 const sessionFlow = [
@@ -111,38 +110,33 @@ const KartLocacao = () => {
             </div>
           </div>
 
-          <div className="hidden gap-px overflow-hidden border border-white/15 bg-white/10 md:mb-3 md:grid md:max-w-xl md:justify-self-end">
-            <div className="grid grid-cols-2 gap-px bg-white/10">
-              <div className="bg-ink-900 p-4 md:p-5">
-                <span className="font-race text-[10px] italic font-bold uppercase tracking-[0.16em] text-white/55">Online</span>
-                <strong className="mt-2 block font-display text-3xl italic leading-none text-primary-400">R$ 145</strong>
-                <p className="mt-2 text-xs font-semibold leading-5 text-white/65">Pix ou cartão no agendamento.</p>
+          <GlassPanel className="hidden p-6 md:mb-3 md:block md:max-w-xl md:justify-self-end md:p-7">
+            <h2 className="mb-4 font-race text-xl italic uppercase text-white">Valor da bateria</h2>
+            <div className="flex items-end gap-2 border-y border-white/10 py-4">
+              <span className="font-display text-5xl italic text-primary-400">R$145</span>
+              <span className="mb-1 font-race text-[11px] italic uppercase text-white/55">por piloto antecipado</span>
+            </div>
+            <div className="my-5 grid gap-3">
+              <div className="relative pl-4 text-white/70">
+                <span aria-hidden="true" className="absolute left-0 top-1.5 h-1.5 w-1.5 rotate-45 border-2 border-primary-400" />
+                <strong className="block font-race text-xs italic uppercase text-white">Preço normal R$175</strong>
+                <span className="text-xs leading-tight">Desconto no pagamento antecipado.</span>
               </div>
-              <div className="bg-ink-900 p-4 md:p-5">
-                <span className="font-race text-[10px] italic font-bold uppercase tracking-[0.16em] text-white/55">No balcão</span>
-                <strong className="mt-2 block font-display text-3xl italic leading-none text-white">R$ 175</strong>
-                <p className="mt-2 text-xs font-semibold leading-5 text-white/65">Crédito, débito, dinheiro ou Pix.</p>
+              <div className="relative pl-4 text-white/70">
+                <span aria-hidden="true" className="absolute left-0 top-1.5 h-1.5 w-1.5 rotate-45 border-2 border-primary-400" />
+                <strong className="block font-race text-xs italic uppercase text-white">Pix ou cartão</strong>
+                <span className="text-xs leading-tight">Pagamento no agendamento online.</span>
+              </div>
+              <div className="relative pl-4 text-white/70">
+                <span aria-hidden="true" className="absolute left-0 top-1.5 h-1.5 w-1.5 rotate-45 border-2 border-primary-400" />
+                <strong className="block font-race text-xs italic uppercase text-white">Equipamento incluso</strong>
+                <span className="text-xs leading-tight">Capacete e orientações de segurança.</span>
               </div>
             </div>
-
-            <div className="grid grid-cols-3 gap-px bg-white/10">
-              <div className="bg-ink-900 p-4">
-                <Timer className="mb-2 h-4 w-4 text-primary-400" aria-hidden="true" />
-                <strong className="block text-xl font-black text-white">30 min</strong>
-                <span className="text-[10px] font-black uppercase tracking-[0.12em] text-white/55">bateria</span>
-              </div>
-              <div className="bg-ink-900 p-4">
-                <Gauge className="mb-2 h-4 w-4 text-primary-400" aria-hidden="true" />
-                <strong className="block text-xl font-black text-white">400cc</strong>
-                <span className="text-[10px] font-black uppercase tracking-[0.12em] text-white/55">Honda</span>
-              </div>
-              <div className="bg-ink-900 p-4">
-                <UserCheck className="mb-2 h-4 w-4 text-primary-400" aria-hidden="true" />
-                <strong className="block text-xl font-black text-white">14+</strong>
-                <span className="text-[10px] font-black uppercase tracking-[0.12em] text-white/55">idade</span>
-              </div>
-            </div>
-          </div>
+            <AngledButton href={SITE_BOOKING_ANCHOR} className="w-full">
+              Ver horários
+            </AngledButton>
+          </GlassPanel>
         </div>
       </section>
 
@@ -193,7 +187,7 @@ const KartLocacao = () => {
                 </div>
               </div>
 
-              <div className="mt-7 grid gap-px overflow-hidden border border-white/10 bg-white/10 sm:grid-cols-2">
+              <div className="mt-7 grid grid-cols-2 gap-px overflow-hidden border border-white/10 bg-white/10 sm:grid-cols-4">
                 {requirements.map(([value, label]) => (
                   <div key={label} className="bg-ink-900 p-4">
                     <strong className="block text-2xl font-black text-white">{value}</strong>
@@ -260,6 +254,37 @@ const KartLocacao = () => {
                     Chamar no WhatsApp
                   </AngledButton>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mx-auto mt-16 grid max-w-6xl gap-8 lg:grid-cols-[1fr_0.92fr]">
+            <div className="border border-white/10 bg-ink-950 p-6 md:p-8">
+              <h3 className="font-race text-sm italic font-bold uppercase tracking-wider text-white/60">Economia antecipada</h3>
+              <div className="mt-6 font-display text-6xl italic text-primary-400 md:text-7xl">R$30</div>
+              <div className="mt-8 grid grid-cols-2 gap-4">
+                <div>
+                  <span className="font-race text-[10px] italic font-bold uppercase tracking-wider text-white/50">Normal</span>
+                  <strong className="mt-1 block font-display text-3xl italic text-white">175</strong>
+                  <span className="text-xs text-white/55">Pagamento convencional.</span>
+                </div>
+                <div>
+                  <span className="font-race text-[10px] italic font-bold uppercase tracking-wider text-white/50">Online</span>
+                  <strong className="mt-1 block font-display text-3xl italic text-primary-400">145</strong>
+                  <span className="text-xs text-white/55">Pagamento antecipado.</span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <SectionHeading eyebrow="Grupos fechados" title="A pista inteira para sua turma" />
+              <p className="mt-5 text-sm leading-7 text-white/65">
+                Terça a sexta: mínimo de 25 pilotos. Finais de semana e feriados: mínimo de 30 pilotos, conforme disponibilidade.
+              </p>
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                <AngledButton href="/eventos">Conhecer eventos</AngledButton>
+                <AngledButton href="https://wa.me/553135112373" variant="outline" external>
+                  Consultar grupo
+                </AngledButton>
               </div>
             </div>
           </div>
