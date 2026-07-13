@@ -9,6 +9,9 @@ import KartLocacaoPage from './site-pages/KartLocacaoPage';
 import ReservasPage from './site-pages/ReservasPage';
 import ChampionshipsPage from './site-pages/ChampionshipsPage';
 import KACPage from './site-pages/KACPage';
+import KACSuperPage from './site-pages/KACSuperPage';
+import TwoHundredMilesPage from './site-pages/TwoHundredMilesPage';
+import FiveHundredMilesPage from './site-pages/FiveHundredMilesPage';
 import Header from './components/Header';
 import Footer from './components/Footer';
 
@@ -100,6 +103,9 @@ function App() {
         <Route path="/reservas" element={<ReservasPage />} />
         <Route path="/campeonatos" element={<ChampionshipsPage />} />
         <Route path="/campeonatos/kac" element={<KACPage />} />
+        <Route path="/campeonatos/kac-super" element={<KACSuperPage />} />
+        <Route path="/campeonatos/200-milhas" element={<TwoHundredMilesPage />} />
+        <Route path="/campeonatos/500-milhas" element={<FiveHundredMilesPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Router>
