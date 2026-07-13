@@ -1,4 +1,4 @@
-import { Coins, Fuel, Gauge, ShieldAlert, Trophy, Users } from 'lucide-react';
+import { Award, ClipboardList, Gauge, ShieldAlert, Trophy, Users } from 'lucide-react';
 import ChampionshipDetailLayout from '../components/ChampionshipDetailLayout';
 
 const FiveHundredMilesPage = () => {
@@ -14,24 +14,23 @@ const FiveHundredMilesPage = () => {
       watermarkCaption="inscrições abertas · 22/08/2026"
       specs={[
         ['Data', '22/08/2026'],
-        ['Valor', 'R$ 6.800 / equipe'],
         ['Duração', '12 horas'],
         ['Formato', 'Equipe'],
+        ['Valores', 'Via WhatsApp'],
       ]}
       primaryAction={{ kind: 'form', championshipId: '500-milhas', label: 'Inscrever equipe' }}
-      regulationPdf="/regulamentos/500-milhas-de-betim-2026.pdf"
-      rulesTitle="Controle, ritmo e disciplina"
+      rulesTitle="Dados necessários para inscrição"
       rules={[
-        { icon: Coins, title: 'Valor único', text: 'R$ 6.800 por equipe, independentemente do número de pilotos.' },
-        { icon: Users, title: 'Operação de equipe', text: 'Estratégia de revezamento, ritmo e decisões de box.' },
-        { icon: Gauge, title: 'Peso e lastro', text: 'Critérios definidos para equilibrar o desempenho.' },
-        { icon: Fuel, title: 'Procedimento de boxes', text: 'Velocidade, parada e trocas monitoradas pela direção.' },
-        { icon: ShieldAlert, title: 'Punições', text: 'Tempo, posições ou exclusão conforme gravidade.' },
-        { icon: Trophy, title: 'Inscrição', text: 'Vaga confirmada conforme pagamento e documentação.' },
+        { icon: ClipboardList, title: 'Nome da equipe', text: 'Informe o nome oficial da equipe no ato da inscrição.' },
+        { icon: Users, title: 'Chefe de equipe', text: 'Indique o responsável pela equipe durante o campeonato.' },
+        { icon: Gauge, title: 'Pilotos e peso', text: 'Nome de cada piloto e peso individual em kg.' },
+        { icon: Award, title: 'Quantidade de karts', text: 'Informe quantos karts a equipe vai inscrever na prova.' },
+        { icon: ShieldAlert, title: 'Regulamento', text: 'Valores, regras de boxes e critérios completos são enviados pela organização via WhatsApp.' },
+        { icon: Trophy, title: 'Inscrição', text: 'Vaga confirmada conforme retorno da organização.' },
       ]}
       ctaTitleLine1="Inscrever equipe"
       ctaTitleLine2="agora"
-      ctaText="Fale com a organização para confirmar vaga, documentos e próximos passos."
+      ctaText="Fale com a organização para confirmar vaga, valores e próximos passos."
     />
   );
 };

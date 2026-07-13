@@ -29,7 +29,7 @@ type ChampionshipDetailLayoutProps = {
   watermarkCaption: string;
   specs: Spec[];
   primaryAction: PrimaryAction;
-  regulationPdf: string;
+  regulationPdf?: string;
   rulesTitle: string;
   rules: Rule[];
   ctaTitleLine1: string;
@@ -89,10 +89,12 @@ const ChampionshipDetailLayout = ({
                   <MessageSquare className="h-4 w-4" />
                   {primaryAction.label}
                 </AngledButton>
-                <AngledButton href={regulationPdf} variant="outline" external>
-                  <Download className="h-4 w-4" />
-                  Baixar regulamento
-                </AngledButton>
+                {regulationPdf && (
+                  <AngledButton href={regulationPdf} variant="outline" external>
+                    <Download className="h-4 w-4" />
+                    Baixar regulamento
+                  </AngledButton>
+                )}
               </div>
             </div>
 
@@ -138,12 +140,14 @@ const ChampionshipDetailLayout = ({
                 </article>
               ))}
             </div>
-            <div className="mt-8">
-              <AngledButton href={regulationPdf} variant="outline" external>
-                <Download className="h-4 w-4" />
-                Abrir PDF completo
-              </AngledButton>
-            </div>
+            {regulationPdf && (
+              <div className="mt-8">
+                <AngledButton href={regulationPdf} variant="outline" external>
+                  <Download className="h-4 w-4" />
+                  Abrir PDF completo
+                </AngledButton>
+              </div>
+            )}
           </div>
         </section>
 

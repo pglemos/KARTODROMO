@@ -1,4 +1,4 @@
-import { Flag, Fuel, Gauge, ShieldAlert, Trophy, Users } from 'lucide-react';
+import { Award, ClipboardList, Gauge, ShieldAlert, Trophy, Users } from 'lucide-react';
 import ChampionshipDetailLayout from '../components/ChampionshipDetailLayout';
 
 const TwoHundredMilesPage = () => {
@@ -11,10 +11,10 @@ const TwoHundredMilesPage = () => {
       logo="/championships/2.png"
       logoAlt="Logo 200 Milhas de Betim"
       watermark="200"
-      watermarkCaption="edição 07/02/2026 realizada"
+      watermarkCaption="edição 07/02/2026 · inscrições encerradas"
       specs={[
         ['Última edição', '07/02/2026'],
-        ['Status', 'Já aconteceu'],
+        ['Status', 'Inscrições encerradas'],
         ['Duração', '5 horas'],
         ['Formato', 'Equipe'],
       ]}
@@ -23,19 +23,18 @@ const TwoHundredMilesPage = () => {
         text: 'Olá! Quero ser avisado sobre a próxima edição das 200 Milhas de Betim.',
         label: 'Avisem-me da próxima edição',
       }}
-      regulationPdf="/regulamentos/200-milhas-de-betim-2026.pdf"
-      rulesTitle="Controle, ritmo e disciplina"
+      rulesTitle="Como era a inscrição"
       rules={[
-        { icon: Users, title: 'Equipe e revezamento', text: 'Pilotos dividem a prova e cumprem janelas e procedimentos de troca.' },
-        { icon: Gauge, title: 'Peso e lastro', text: 'A prova aplica critérios de peso definidos no regulamento oficial.' },
-        { icon: Fuel, title: 'Abastecimento e boxes', text: 'Entrada, velocidade e operação de boxes seguem fiscalização.' },
-        { icon: Flag, title: 'Bandeiras', text: 'Sinalização de pista deve ser obedecida imediatamente.' },
-        { icon: ShieldAlert, title: 'Punições', text: 'Condutas irregulares geram advertência, tempo ou posições.' },
-        { icon: Trophy, title: 'Resultado', text: 'Vence a equipe que completa a distância nas condições oficiais.' },
+        { icon: ClipboardList, title: 'Nome da equipe', text: 'Nome oficial da equipe informado no ato da inscrição.' },
+        { icon: Users, title: 'Chefe de equipe', text: 'Responsável pela equipe durante o campeonato.' },
+        { icon: Gauge, title: 'Pilotos e peso', text: 'Nome de cada piloto e peso individual em kg.' },
+        { icon: Award, title: 'Quantidade de karts', text: 'Karts participantes inscritos pela equipe.' },
+        { icon: ShieldAlert, title: 'Próxima edição', text: 'Data, valores e regulamento da próxima edição serão anunciados pela organização.' },
+        { icon: Trophy, title: 'Tradição regional', text: 'Uma das provas de endurance mais tradicionais do kartismo de Minas Gerais.' },
       ]}
-      ctaTitleLine1="Avisem-me da próxima edição"
-      ctaTitleLine2="agora"
-      ctaText="Fale com a organização para confirmar vaga, documentos e próximos passos quando a próxima edição for anunciada."
+      ctaTitleLine1="Avisem-me da"
+      ctaTitleLine2="próxima edição"
+      ctaText="Fale com a organização para ser avisado assim que a próxima edição for anunciada."
     />
   );
 };
