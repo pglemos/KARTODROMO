@@ -1,4 +1,5 @@
-import { Phone, Mail, MapPin, Clock, Users as Facebook, Camera as Instagram, Video as Youtube } from 'lucide-react';
+import { Phone, Mail, MapPin, Clock } from 'lucide-react';
+import { FacebookIcon, InstagramIcon, YoutubeIcon } from './site-ui/SocialIcons';
 
 const quickLinks = [
   { href: '/#home', label: 'Home' },
@@ -25,13 +26,13 @@ const Footer = () => {
             </p>
             <div className="flex space-x-3 pt-2">
               <a href="https://www.facebook.com/kartodromodebetim" target="_blank" rel="noopener noreferrer" aria-label="Facebook do Kartódromo de Betim" className="flex h-10 w-10 items-center justify-center border border-white/15 bg-white/5 text-white/70 transition-all hover:border-primary-400 hover:text-primary-400">
-                <Facebook className="h-5 w-5" />
+                <FacebookIcon className="h-5 w-5" />
               </a>
               <a href="https://www.instagram.com/kartodromobetim/" target="_blank" rel="noopener noreferrer" aria-label="Instagram do Kartódromo de Betim" className="flex h-10 w-10 items-center justify-center border border-white/15 bg-white/5 text-white/70 transition-all hover:border-primary-400 hover:text-primary-400">
-                <Instagram className="h-5 w-5" />
+                <InstagramIcon className="h-5 w-5" />
               </a>
               <a href="https://www.youtube.com/kartodromodebetim31" target="_blank" rel="noopener noreferrer" aria-label="YouTube do Kartódromo de Betim" className="flex h-10 w-10 items-center justify-center border border-white/15 bg-white/5 text-white/70 transition-all hover:border-primary-400 hover:text-primary-400">
-                <Youtube className="h-5 w-5" />
+                <YoutubeIcon className="h-5 w-5" />
               </a>
             </div>
           </div>

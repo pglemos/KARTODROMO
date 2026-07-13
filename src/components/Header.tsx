@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Menu, X, Phone, MapPin, Clock, Users as Facebook, Camera as Instagram, Video as Youtube } from 'lucide-react';
+import { Menu, X, Phone, MapPin, Clock } from 'lucide-react';
 import { SITE_BOOKING_ANCHOR } from '../config/booking';
+import { FacebookIcon, InstagramIcon, YoutubeIcon } from './site-ui/SocialIcons';
 
 const navLinks = [
   { href: '/#home', label: 'Home' },
@@ -43,13 +44,13 @@ const Header = () => {
             </div>
             <div className="ml-2 hidden space-x-4 border-l border-white/15 pl-5 lg:flex">
               <a href="https://www.facebook.com/kartodromodebetim" target="_blank" rel="noopener noreferrer" aria-label="Facebook do Kartódromo de Betim" className="text-white/70 transition-colors hover:text-primary-400">
-                <Facebook className="h-[18px] w-[18px]" />
+                <FacebookIcon className="h-[18px] w-[18px]" />
               </a>
               <a href="https://www.instagram.com/kartodromobetim/" target="_blank" rel="noopener noreferrer" aria-label="Instagram do Kartódromo de Betim" className="text-white/70 transition-colors hover:text-primary-400">
-                <Instagram className="h-[18px] w-[18px]" />
+                <InstagramIcon className="h-[18px] w-[18px]" />
               </a>
               <a href="https://www.youtube.com/kartodromodebetim31" target="_blank" rel="noopener noreferrer" aria-label="YouTube do Kartódromo de Betim" className="text-white/70 transition-colors hover:text-primary-400">
-                <Youtube className="h-[18px] w-[18px]" />
+                <YoutubeIcon className="h-[18px] w-[18px]" />
               </a>
             </div>
           </div>

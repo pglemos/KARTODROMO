@@ -145,10 +145,10 @@ const History = () => {
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
               {[
                 { url: '/history/1.jpg', alt: 'Vista do Circuito' },
-                { url: '/history/2.jpg', alt: 'Pilotos em Bateria' },
+                { url: '/history/pilotos-bateria.jpg', alt: 'Pilotos em Bateria' },
                 { url: '/history/3.jpg', alt: 'Complexo Betim' },
                 { url: '/history/4.jpg', alt: 'Convivência' },
-                { url: '/history/5.jpg', alt: 'Vista Aérea' },
+                { url: '/track/aerial-day.jpg', alt: 'Vista Aérea' },
               ].map((img) => (
                 <div key={img.url} className="group relative h-36 overflow-hidden border border-white/10 bg-ink-950">
                   <img
