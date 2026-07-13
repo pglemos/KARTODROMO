@@ -1,5 +1,7 @@
 import { Calendar, Compass, MapPin, Trophy, Zap } from 'lucide-react';
 import { SITE_BOOKING_ANCHOR, WHATSAPP_BOOKING_URL } from '../config/booking';
+import AngledButton from './site-ui/AngledButton';
+import StatCounter from './site-ui/StatCounter';
 
 const WhatsAppIcon = () => (
   <svg
@@ -11,9 +13,16 @@ const WhatsAppIcon = () => (
   </svg>
 );
 
+const stats = [
+  { icon: Compass, target: 1110, suffix: 'm', label: 'Extensão da pista' },
+  { icon: Trophy, target: 42, suffix: '', label: 'Configurações mapeadas' },
+  { icon: Zap, target: 400, suffix: 'cc', label: 'Motores Super Kart' },
+  { icon: Calendar, target: 25, suffix: '+ anos', label: 'Em operação desde 1996' },
+];
+
 const Hero = () => {
   return (
-    <section id="home" className="home-hero relative flex min-h-[70svh] items-center overflow-hidden bg-[#fbfcf8] py-4 md:min-h-[78vh] md:py-12">
+    <section id="home" className="relative flex min-h-[92svh] items-center overflow-hidden bg-ink-950 pt-24">
       <video
         autoPlay
         loop
@@ -21,97 +30,46 @@ const Hero = () => {
         playsInline
         preload="auto"
         poster="/posters/home-karting.jpg"
-        className="absolute inset-0 z-0 h-full w-full object-cover"
+        className="absolute inset-0 z-0 h-full w-full object-cover brightness-[0.45] contrast-[1.15] grayscale-[0.15]"
       >
-        <source
-          src="/videos/home-karting.mp4"
-          type="video/mp4"
-        />
+        <source src="/videos/home-karting.mp4" type="video/mp4" />
       </video>
 
-      <div aria-hidden="true" className="home-hero-wash absolute inset-0 z-10" />
-      <div aria-hidden="true" className="home-speedline home-speedline-a" />
-      <div aria-hidden="true" className="home-speedline home-speedline-b" />
+      <div aria-hidden="true" className="absolute inset-0 z-10 bg-gradient-to-t from-ink-950 via-ink-950/60 to-ink-950/20" />
 
-      <div className="container relative z-20 mx-auto w-full px-4">
+      <div className="container relative z-20 mx-auto w-full px-4 py-10">
         <div className="max-w-6xl">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary-500/30 bg-[#fbfcf8]/92 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-primary-800 shadow-sm md:mb-6">
+          <div className="mb-6 inline-flex items-center gap-2 border border-primary-400/30 bg-white/5 px-4 py-2 font-race text-[11px] italic font-bold uppercase tracking-[0.18em] text-primary-400 backdrop-blur-md">
             <Zap className="h-3.5 w-3.5" aria-hidden="true" />
             <span>Pista padrão internacional</span>
           </div>
 
-          <h1 className="home-title mb-4 max-w-[11ch] text-[2.55rem] font-black uppercase leading-[0.86] tracking-tight text-zinc-950 sm:text-6xl md:mb-6 md:text-7xl lg:text-8xl">
+          <h1 className="mb-6 max-w-[13ch] font-display text-[2.7rem] italic uppercase leading-[0.82] tracking-tight text-white sm:text-6xl md:text-7xl lg:text-8xl">
             Kartódromo Internacional de Betim
           </h1>
 
-          <p className="mb-5 max-w-2xl text-base leading-7 text-zinc-700 md:mb-9 md:text-lg md:leading-8">
-            Pista homologada de <strong className="font-black text-zinc-950">1.110 metros</strong>, cronometragem eletrônica,
+          <p className="mb-9 max-w-2xl text-base leading-7 text-white/75 md:text-lg md:leading-8">
+            Pista homologada de <strong className="font-black text-white">1.110 metros</strong>, cronometragem eletrônica,
             equipe de pista e estrutura para pilotos, famílias e grupos.
           </p>
 
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row md:gap-4">
-            <a
-              href={SITE_BOOKING_ANCHOR}
-              className="home-cta inline-flex min-h-12 items-center justify-center bg-primary-500 px-6 py-3.5 text-center text-xs font-black uppercase tracking-[0.14em] text-zinc-950 shadow-[0_18px_38px_rgba(0,200,83,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-400 hover:shadow-[0_22px_46px_rgba(0,200,83,0.26)] md:min-h-14 md:px-8 md:py-4 md:tracking-[0.16em]"
-            >
-              Reservar corrida online
-            </a>
-            <a
-              href={WHATSAPP_BOOKING_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="home-cta inline-flex min-h-12 items-center justify-center gap-2.5 border border-[#087f3e] bg-[#087f3e] px-6 py-3.5 text-center text-xs font-black uppercase tracking-[0.14em] text-white shadow-[0_16px_34px_rgba(8,127,62,0.24)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#066c35] hover:bg-[#066c35] hover:shadow-[0_20px_42px_rgba(8,127,62,0.3)] md:min-h-14 md:px-8 md:py-4 md:tracking-[0.16em]"
-            >
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row md:gap-4">
+            <AngledButton href={SITE_BOOKING_ANCHOR}>Reservar corrida online</AngledButton>
+            <AngledButton href={WHATSAPP_BOOKING_URL} variant="outline" external>
               <WhatsAppIcon />
               Reservar pelo WhatsApp
-            </a>
+            </AngledButton>
           </div>
 
-          <div className="mb-6 flex items-center gap-2 text-sm font-semibold text-zinc-700 md:mb-12">
-            <MapPin className="h-4 w-4 text-primary-700" aria-hidden="true" />
+          <div className="mb-10 flex items-center gap-2 text-sm font-semibold text-white/70">
+            <MapPin className="h-4 w-4 text-primary-400" aria-hidden="true" />
             <span>Betim, MG, a poucos minutos da região metropolitana de Belo Horizonte</span>
           </div>
 
-          <div className="home-stat-grid grid max-w-5xl grid-cols-2 gap-px overflow-hidden rounded-lg border border-zinc-200/80 bg-zinc-200/80 shadow-sm md:grid-cols-4">
-            <div className="home-stat flex items-center gap-3 bg-[#fbfcf8]/92 p-2.5 md:p-3.5">
-              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border border-primary-500/20 bg-primary-50 text-primary-700 md:h-10 md:w-10">
-                <Compass className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="text-lg font-black leading-tight text-zinc-950 md:text-xl">1.110m</div>
-                <div className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 md:text-[10px]">Extensão da pista</div>
-              </div>
-            </div>
-
-            <div className="home-stat flex items-center gap-3 bg-[#fbfcf8]/92 p-2.5 md:p-3.5">
-              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border border-primary-500/20 bg-primary-50 text-primary-700 md:h-10 md:w-10">
-                <Trophy className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="text-lg font-black leading-tight text-zinc-950 md:text-xl">42</div>
-                <div className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 md:text-[10px]">Configurações mapeadas</div>
-              </div>
-            </div>
-
-            <div className="home-stat flex items-center gap-3 bg-[#fbfcf8]/92 p-2.5 md:p-3.5">
-              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border border-primary-500/20 bg-primary-50 text-primary-700 md:h-10 md:w-10">
-                <Zap className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="text-lg font-black leading-tight text-zinc-950 md:text-xl">400cc</div>
-                <div className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 md:text-[10px]">Motores Super Kart</div>
-              </div>
-            </div>
-
-            <div className="home-stat flex items-center gap-3 bg-[#fbfcf8]/92 p-2.5 md:p-3.5">
-              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border border-primary-500/20 bg-primary-50 text-primary-700 md:h-10 md:w-10">
-                <Calendar className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="text-lg font-black leading-tight text-zinc-950 md:text-xl">25+ anos</div>
-                <div className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 md:text-[10px]">Em operação desde 1996</div>
-              </div>
-            </div>
+          <div className="grid max-w-5xl grid-cols-2 border border-white/10 bg-ink-900/80 backdrop-blur-md md:grid-cols-4">
+            {stats.map((stat) => (
+              <StatCounter key={stat.label} target={stat.target} suffix={stat.suffix} label={stat.label} />
+            ))}
           </div>
         </div>
       </div>
