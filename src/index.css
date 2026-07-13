@@ -1181,3 +1181,9 @@
     grid-template-columns: 150px minmax(0, 1fr) 120px 115px 230px;
   }
 }
+
+@keyframes ticker {
+  to {
+    transform: translateX(-50%);
+  }
+}
