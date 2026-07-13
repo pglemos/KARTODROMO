@@ -1,6 +1,7 @@
 import { Calendar, Compass, MapPin, Trophy, Zap } from 'lucide-react';
 import { SITE_BOOKING_ANCHOR, WHATSAPP_BOOKING_URL } from '../config/booking';
 import AngledButton from './site-ui/AngledButton';
+import GlassPanel from './site-ui/GlassPanel';
 import StatCounter from './site-ui/StatCounter';
 
 const WhatsAppIcon = () => (
@@ -20,9 +21,15 @@ const stats = [
   { icon: Calendar, target: 25, suffix: '+ anos', label: 'Em operação desde 1996' },
 ];
 
+const panelBullets = [
+  { title: 'Pista homologada', text: 'Segurança, equipe e alto desempenho.' },
+  { title: 'Cronometragem eletrônica', text: 'Resultados individuais em tempo real.' },
+  { title: 'Estrutura completa', text: 'Equipamento incluso e equipe de pista.' },
+];
+
 const Hero = () => {
   return (
-    <section id="home" className="relative flex min-h-[92svh] items-center overflow-hidden bg-ink-950 pt-24">
+    <section id="home" className="relative flex min-h-[100svh] items-end overflow-hidden bg-ink-950 pt-24">
       <video
         autoPlay
         loop
@@ -37,7 +44,7 @@ const Hero = () => {
 
       <div aria-hidden="true" className="absolute inset-0 z-10 bg-gradient-to-t from-ink-950 via-ink-950/60 to-ink-950/20" />
 
-      <div className="container relative z-20 mx-auto w-full px-4 py-10">
+      <div className="container relative z-20 mx-auto grid w-full gap-10 px-4 py-14 lg:grid-cols-[1.25fr_0.62fr] lg:items-end">
         <div className="max-w-6xl">
           <div className="mb-6 inline-flex items-center gap-2 border border-primary-400/30 bg-white/5 px-4 py-2 font-race text-[11px] italic font-bold uppercase tracking-[0.18em] text-primary-400 backdrop-blur-md">
             <Zap className="h-3.5 w-3.5" aria-hidden="true" />
@@ -72,6 +79,31 @@ const Hero = () => {
             ))}
           </div>
         </div>
+
+        <GlassPanel className="hidden p-7 lg:block">
+          <h2 className="mb-4 font-race text-xl italic uppercase text-white">Reserve sua corrida</h2>
+          <div className="flex items-end gap-2 border-y border-white/10 py-4">
+            <span className="font-display text-5xl italic text-primary-400">R$145</span>
+            <span className="mb-1 font-race text-[11px] italic uppercase text-white/55">por pessoa online</span>
+          </div>
+          <div className="my-5 grid gap-3">
+            {panelBullets.map((bullet) => (
+              <div key={bullet.title} className="relative pl-4 text-white/70">
+                <span aria-hidden="true" className="absolute left-0 top-1.5 h-1.5 w-1.5 rotate-45 border-2 border-primary-400" />
+                <strong className="block font-race text-xs italic uppercase text-white">{bullet.title}</strong>
+                <span className="text-xs leading-tight">{bullet.text}</span>
+              </div>
+            ))}
+          </div>
+          <div className="grid gap-2.5">
+            <AngledButton href={SITE_BOOKING_ANCHOR} className="w-full">
+              Reservar online
+            </AngledButton>
+            <AngledButton href={WHATSAPP_BOOKING_URL} variant="outline" external className="w-full">
+              Falar no WhatsApp
+            </AngledButton>
+          </div>
+        </GlassPanel>
       </div>
     </section>
   );
