@@ -10,6 +10,8 @@ import {
   Trophy,
   Users,
 } from 'lucide-react';
+import AngledButton from './site-ui/AngledButton';
+import SectionHeading from './site-ui/SectionHeading';
 
 const eventGallery = [
   { url: '/events/1.jpg', alt: 'Salão principal preparado para eventos', span: 'md:row-span-2' },
@@ -54,68 +56,60 @@ const Events = () => {
   const heroImage = eventGallery[3];
 
   return (
-    <section id="eventos" className="min-h-screen overflow-hidden bg-[#fbfcf8] text-zinc-800">
-      <div className="relative isolate border-b border-zinc-200/80">
+    <section id="eventos" className="min-h-screen overflow-hidden bg-ink-950 text-white/80">
+      <div className="relative isolate border-b border-white/10">
         <img
           src={heroImage.url}
           alt=""
           aria-hidden="true"
-          className="absolute inset-0 z-[-2] h-full w-full object-cover opacity-35"
+          className="absolute inset-0 z-[-2] h-full w-full object-cover opacity-20 brightness-75"
         />
-        <div className="absolute inset-0 z-[-1] bg-[linear-gradient(90deg,#fbfcf8_0%,rgba(251,252,248,0.94)_48%,rgba(251,252,248,0.70)_100%)]" />
-        <div className="absolute inset-x-0 bottom-0 z-[-1] h-44 bg-gradient-to-t from-[#fbfcf8] to-transparent" />
+        <div className="absolute inset-0 z-[-1] bg-gradient-to-r from-ink-950 via-ink-950/90 to-ink-950/50" />
+        <div className="absolute inset-x-0 bottom-0 z-[-1] h-44 bg-gradient-to-t from-ink-950 to-transparent" />
 
         <div className="mx-auto grid min-h-[720px] max-w-7xl grid-cols-1 items-center gap-12 px-4 py-14 md:px-8 lg:grid-cols-[0.92fr_1.08fr]">
-          <div className="motion-rise max-w-3xl">
-            <a href="/" className="mb-8 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-zinc-600 transition-colors hover:text-primary-700">
+          <div className="max-w-3xl">
+            <a href="/" className="mb-8 inline-flex items-center gap-2 font-race text-xs italic font-bold uppercase tracking-[0.18em] text-white/60 transition-colors hover:text-primary-400">
               <ArrowLeft className="h-4 w-4" />
               Voltar para a página inicial
             </a>
 
-            <div className="mb-5 flex items-center gap-3 text-xs font-black uppercase tracking-[0.16em] text-primary-700">
-              <span aria-hidden="true" className="h-px w-10 bg-primary-600" />
+            <div className="mb-5 flex items-center gap-3 font-race text-xs italic font-bold uppercase tracking-[0.16em] text-primary-400">
+              <span aria-hidden="true" className="h-px w-10 bg-primary-400" />
               Eventos no Kartódromo de Betim
             </div>
 
-            <h1 className="max-w-4xl text-5xl font-black uppercase leading-[0.88] tracking-tight text-zinc-950 md:text-7xl lg:text-8xl">
+            <h1 className="max-w-4xl font-display text-5xl italic uppercase leading-[0.82] tracking-tight text-white md:text-7xl lg:text-8xl">
               Eventos com kart, pódio e espaço para receber seu grupo
             </h1>
-            <p className="mt-7 max-w-2xl text-base leading-8 text-zinc-600 md:text-lg">
+            <p className="mt-7 max-w-2xl text-base leading-8 text-white/70 md:text-lg">
               Organize confraternizações, aniversários e encontros corporativos com baterias de kart, ranking, pódio, gastronomia e apoio da equipe.
             </p>
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <a
-                href="https://wa.me/553135112373?text=Ol%C3%A1!%20Gostaria%20de%20saber%20valores%20e%20disponibilidade%20para%20realizar%20um%20evento%20no%20Kart%C3%B3dromo."
-                target="_blank"
-                rel="noopener noreferrer"
-                className="track-primary-action inline-flex items-center justify-center gap-2 rounded-lg bg-primary-500 px-6 py-3.5 text-xs font-black uppercase tracking-[0.16em] text-zinc-950 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-400"
-              >
+              <AngledButton href="https://wa.me/553135112373?text=Ol%C3%A1!%20Gostaria%20de%20saber%20valores%20e%20disponibilidade%20para%20realizar%20um%20evento%20no%20Kart%C3%B3dromo." external>
                 <MessageSquare className="h-4 w-4" />
                 Orçamento via WhatsApp
-              </a>
-              <a
-                href="tel:+553135112373"
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-[#fbfcf8]/90 px-6 py-3.5 text-xs font-black uppercase tracking-[0.16em] text-zinc-800 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary-500/45 hover:text-primary-700"
-              >
+              </AngledButton>
+              <AngledButton href="tel:+553135112373" variant="outline">
                 <Phone className="h-4 w-4" />
                 Ligar agora
-              </a>
+              </AngledButton>
             </div>
           </div>
 
-          <div className="motion-rise motion-delay-1 grid grid-cols-2 gap-3 md:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
             {eventGallery.slice(0, 5).map((image, index) => (
               <figure
                 key={image.url}
-                className={`group relative overflow-hidden rounded-2xl border border-[#fbfcf8]/80 bg-[#f7faf4] shadow-[0_22px_54px_rgba(17,20,18,0.14)] ${index === 0 ? 'col-span-2 row-span-2 md:col-span-2' : ''}`}
+                className={`group relative overflow-hidden border border-white/10 bg-ink-900 ${index === 0 ? 'col-span-2 row-span-2 md:col-span-2' : ''}`}
               >
                 <img
                   src={image.url}
                   alt={image.alt}
-                  className={`${index === 0 ? 'h-[360px]' : 'h-[170px]'} w-full object-cover transition-transform duration-700 group-hover:scale-105`}
+                  className={`${index === 0 ? 'h-[360px]' : 'h-[170px]'} w-full object-cover brightness-[0.75] transition-transform duration-700 group-hover:scale-105 group-hover:brightness-100`}
                 />
-                <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-zinc-950/82 to-transparent px-4 pb-4 pt-12 text-xs font-black uppercase tracking-[0.12em] text-[#fbfcf8] opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink-950/90 to-transparent px-4 pb-4 pt-12 font-race text-xs italic font-bold uppercase tracking-[0.12em] text-white opacity-0 transition-opacity duration-300 group-hover:opacity-100">
                   {image.alt}
                 </figcaption>
               </figure>
@@ -126,51 +120,41 @@ const Events = () => {
 
       <div className="mx-auto max-w-7xl px-4 py-16 md:px-8">
         <div className="grid gap-4 md:grid-cols-3">
-          {eventStats.map((item, index) => (
-            <div
-              key={item.label}
-              className="motion-rise rounded-xl border border-zinc-200 bg-[#fdfefb] p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary-500/35 hover:shadow-md"
-              style={{ animationDelay: `${index * 90}ms` }}
-            >
-              <strong className="block text-4xl font-black tracking-tight text-zinc-950">{item.value}</strong>
-              <span className="mt-2 block text-xs font-black uppercase tracking-[0.16em] text-zinc-500">{item.label}</span>
+          {eventStats.map((item) => (
+            <div key={item.label} className="border border-white/10 bg-ink-900 p-6 transition-all duration-300 hover:-translate-y-1 hover:border-primary-400/40">
+              <strong className="block font-display text-4xl italic tracking-tight text-primary-400">{item.value}</strong>
+              <span className="mt-2 block font-race text-xs italic font-bold uppercase tracking-[0.16em] text-white/55">{item.label}</span>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="border-y border-zinc-200/80 bg-[#eef5ed]">
+      <div className="border-y border-white/10 bg-ink-900">
         <div className="mx-auto grid max-w-7xl grid-cols-1 gap-10 px-4 py-16 md:px-8 lg:grid-cols-[0.82fr_1.18fr]">
           <div className="max-w-xl">
-            <div className="mb-4 flex items-center gap-3 text-xs font-black uppercase tracking-[0.16em] text-primary-700">
-              <span aria-hidden="true" className="h-px w-10 bg-primary-600" />
-              Estrutura do evento
-            </div>
-            <h2 className="text-4xl font-black uppercase leading-none tracking-tight text-zinc-950 md:text-5xl">
-              Escolha o espaço para o seu evento
-            </h2>
-            <p className="mt-5 text-sm leading-7 text-zinc-600">
+            <SectionHeading eyebrow="Estrutura do evento" title="Escolha o espaço para o seu evento" />
+            <p className="mt-5 text-sm leading-7 text-white/65">
               Compare a capacidade, o uso indicado e a estrutura de cada ambiente antes de solicitar seu orçamento.
             </p>
           </div>
 
           <div className="grid gap-5 md:grid-cols-2">
             {eventSpaces.map((space) => (
-              <article key={space.title} className="rounded-2xl border border-zinc-200 bg-[#fbfcf8] p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
+              <article key={space.title} className="border border-white/10 bg-ink-950 p-6 transition-all duration-300 hover:-translate-y-1 hover:border-primary-400/40">
                 <div className="mb-6 flex items-start justify-between gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary-500 text-zinc-950">
+                  <div className="flex h-12 w-12 items-center justify-center border border-primary-400/30 bg-white/5 text-primary-400">
                     <space.icon className="h-6 w-6" />
                   </div>
-                  <span className="rounded-md border border-zinc-200 bg-[#fdfefb] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-zinc-600">
+                  <span className="border border-white/15 bg-white/5 px-3 py-1.5 font-race text-[10px] italic font-bold uppercase tracking-[0.14em] text-white/60">
                     {space.capacity}
                   </span>
                 </div>
-                <h3 className="text-2xl font-black uppercase tracking-tight text-zinc-950">{space.title}</h3>
-                <p className="mt-4 text-sm leading-7 text-zinc-600">{space.text}</p>
+                <h3 className="font-display text-2xl italic uppercase tracking-tight text-white">{space.title}</h3>
+                <p className="mt-4 text-sm leading-7 text-white/65">{space.text}</p>
                 <ul className="mt-5 space-y-3">
                   {space.points.map((point) => (
-                    <li key={point} className="flex items-center gap-2 text-sm font-semibold text-zinc-700">
-                      <CheckCircle2 className="h-4 w-4 text-primary-600" />
+                    <li key={point} className="flex items-center gap-2 text-sm font-semibold text-white/75">
+                      <CheckCircle2 className="h-4 w-4 text-primary-400" />
                       {point}
                     </li>
                   ))}
@@ -182,55 +166,47 @@ const Events = () => {
       </div>
 
       <div className="mx-auto max-w-7xl px-4 py-16 md:px-8">
-        <div className="mb-8">
-          <div>
-            <div className="mb-3 flex items-center gap-2 text-primary-700">
-              <Users className="h-5 w-5" />
-              <span className="text-xs font-black uppercase tracking-[0.18em]">Como funciona</span>
-            </div>
-            <h2 className="text-3xl font-black uppercase leading-none tracking-tight text-zinc-950 md:text-5xl">
-              Um evento com ritmo, disputa e memória
-            </h2>
-          </div>
+        <div className="mb-8 flex items-center gap-2 text-primary-400">
+          <Users className="h-5 w-5" />
+          <span className="font-race text-xs italic font-bold uppercase tracking-[0.18em]">Como funciona</span>
         </div>
+        <h2 className="mb-8 font-display text-3xl italic uppercase leading-none tracking-tight text-white md:text-5xl">
+          Um evento com ritmo, disputa e memória
+        </h2>
 
         <div className="grid gap-4 md:grid-cols-3">
           {eventFlow.map((step, index) => (
-            <article key={step.title} className="rounded-xl border border-zinc-200 bg-[#fdfefb] p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary-500/35 hover:shadow-md">
+            <article key={step.title} className="border border-white/10 bg-ink-900 p-6 transition-all duration-300 hover:-translate-y-1 hover:border-primary-400/40">
               <div className="mb-6 flex items-center justify-between">
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-zinc-950 text-[#fbfcf8]">
+                <div className="flex h-11 w-11 items-center justify-center border border-primary-400/30 bg-white/5 text-primary-400">
                   <step.icon className="h-5 w-5" />
                 </div>
-                <span className="text-xs font-black uppercase tracking-[0.18em] text-zinc-400">0{index + 1}</span>
+                <span className="font-race text-xs italic font-bold uppercase tracking-[0.18em] text-white/35">0{index + 1}</span>
               </div>
-              <h3 className="text-lg font-black uppercase tracking-tight text-zinc-950">{step.title}</h3>
-              <p className="mt-3 text-sm leading-7 text-zinc-600">{step.text}</p>
+              <h3 className="font-race text-lg italic font-bold uppercase tracking-tight text-white">{step.title}</h3>
+              <p className="mt-3 text-sm leading-7 text-white/65">{step.text}</p>
             </article>
           ))}
         </div>
       </div>
 
-      <div className="border-y border-zinc-200/80 bg-[#f7faf4]">
+      <div className="border-y border-white/10 bg-ink-900">
         <div className="mx-auto max-w-7xl px-4 py-16 md:px-8">
-          <div className="mb-8">
-            <div>
-              <span className="text-xs font-black uppercase tracking-[0.16em] text-primary-700">Ambientes e estrutura</span>
-              <h2 className="mt-3 text-3xl font-black uppercase leading-none tracking-tight text-zinc-950 md:text-5xl">
-                Estrutura física do kartódromo
-              </h2>
-            </div>
-          </div>
+          <span className="font-race text-xs italic font-bold uppercase tracking-[0.16em] text-primary-400">Ambientes e estrutura</span>
+          <h2 className="mt-3 mb-8 font-display text-3xl italic uppercase leading-none tracking-tight text-white md:text-5xl">
+            Estrutura física do kartódromo
+          </h2>
 
           <div className="grid auto-rows-[210px] grid-cols-1 gap-4 md:grid-cols-4">
             {eventGallery.map((image) => (
-              <figure key={image.url} className={`group relative overflow-hidden rounded-2xl border border-zinc-200 bg-[#fdfefb] shadow-sm ${image.span ?? ''}`}>
+              <figure key={image.url} className={`group relative overflow-hidden border border-white/10 bg-ink-950 ${image.span ?? ''}`}>
                 <img
                   src={image.url}
                   alt={image.alt}
                   loading="lazy"
-                  className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  className="h-full w-full object-cover brightness-[0.75] transition-transform duration-700 group-hover:scale-105 group-hover:brightness-100"
                 />
-                <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-zinc-950/85 to-transparent px-4 pb-4 pt-14 text-xs font-black uppercase tracking-[0.12em] text-[#fbfcf8] opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink-950/90 to-transparent px-4 pb-4 pt-14 font-race text-xs italic font-bold uppercase tracking-[0.12em] text-white opacity-0 transition-opacity duration-300 group-hover:opacity-100">
                   {image.alt}
                 </figcaption>
               </figure>
@@ -240,40 +216,32 @@ const Events = () => {
       </div>
 
       <div className="mx-auto max-w-7xl px-4 py-16 md:px-8">
-        <div className="relative overflow-hidden rounded-2xl border border-primary-500/25 bg-zinc-950 p-6 text-[#fbfcf8] shadow-[0_28px_80px_rgba(17,20,18,0.18)] md:p-10">
+        <div className="relative overflow-hidden border border-primary-400/25 bg-ink-900 p-6 md:p-10">
           <img
             src={eventGallery[6].url}
             alt=""
             aria-hidden="true"
-            className="absolute inset-0 h-full w-full object-cover opacity-[0.18]"
+            className="absolute inset-0 h-full w-full object-cover opacity-[0.12]"
           />
           <div className="relative z-10 grid gap-8 md:grid-cols-[1fr_auto] md:items-center">
             <div>
-              <span className="text-xs font-black uppercase tracking-[0.16em] text-primary-400">Orçamento para eventos</span>
-              <h2 className="mt-3 max-w-3xl text-3xl font-black uppercase leading-none tracking-tight md:text-5xl">
+              <span className="font-race text-xs italic font-bold uppercase tracking-[0.16em] text-primary-400">Orçamento para eventos</span>
+              <h2 className="mt-3 max-w-3xl font-display text-3xl italic uppercase leading-none tracking-tight text-white md:text-5xl">
                 Monte seu evento com bateria de kart, pódio e estrutura de apoio.
               </h2>
-              <p className="mt-5 max-w-2xl text-sm leading-7 text-zinc-200">
+              <p className="mt-5 max-w-2xl text-sm leading-7 text-white/70">
                 Envie data, quantidade de pessoas e tipo de evento. A equipe retorna com formato, disponibilidade e próximos passos.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row md:flex-col">
-              <a
-                href="https://wa.me/553135112373?text=Ol%C3%A1!%20Quero%20montar%20um%20evento%20no%20Kart%C3%B3dromo%20de%20Betim."
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary-500 px-6 py-3.5 text-xs font-black uppercase tracking-[0.16em] text-zinc-950 transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-400"
-              >
+              <AngledButton href="https://wa.me/553135112373?text=Ol%C3%A1!%20Quero%20montar%20um%20evento%20no%20Kart%C3%B3dromo%20de%20Betim." external>
                 <MessageSquare className="h-4 w-4" />
                 Chamar no WhatsApp
-              </a>
-              <a
-                href="tel:+553135112373"
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#fbfcf8]/25 bg-[#fbfcf8]/10 px-6 py-3.5 text-xs font-black uppercase tracking-[0.16em] text-[#fbfcf8] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#fbfcf8]/16"
-              >
+              </AngledButton>
+              <AngledButton href="tel:+553135112373" variant="outline">
                 <Phone className="h-4 w-4" />
                 (31) 3511-2373
-              </a>
+              </AngledButton>
             </div>
           </div>
         </div>
