@@ -749,6 +749,7 @@ git commit -m "feat(site): restyle Header with dark motorsport theme, same real 
 import { Phone, Mail, MapPin, Clock, Users as Facebook, Camera as Instagram, Video as Youtube } from 'lucide-react';
 
 const quickLinks = [
+  { href: '/#home', label: 'Home' },
   { href: '/#sobre', label: 'Sobre' },
   { href: '/#servicos', label: 'Modalidades' },
   { href: '/#promocoes', label: 'Promoções' },
