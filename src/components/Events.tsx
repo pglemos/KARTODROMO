@@ -11,6 +11,7 @@ import {
   Users,
 } from 'lucide-react';
 import AngledButton from './site-ui/AngledButton';
+import BigCTA from './site-ui/BigCTA';
 import SectionHeading from './site-ui/SectionHeading';
 
 const eventGallery = [
@@ -216,35 +217,20 @@ const Events = () => {
       </div>
 
       <div className="mx-auto max-w-7xl px-4 py-16 md:px-8">
-        <div className="relative overflow-hidden border border-primary-400/25 bg-ink-900 p-6 md:p-10">
-          <img
-            src={eventGallery[6].url}
-            alt=""
-            aria-hidden="true"
-            className="absolute inset-0 h-full w-full object-cover opacity-[0.12]"
-          />
-          <div className="relative z-10 grid gap-8 md:grid-cols-[1fr_auto] md:items-center">
-            <div>
-              <span className="font-race text-xs italic font-bold uppercase tracking-[0.16em] text-primary-400">Orçamento para eventos</span>
-              <h2 className="mt-3 max-w-3xl font-display text-3xl italic uppercase leading-none tracking-tight text-white md:text-5xl">
-                Monte seu evento com bateria de kart, pódio e estrutura de apoio.
-              </h2>
-              <p className="mt-5 max-w-2xl text-sm leading-7 text-white/70">
-                Envie data, quantidade de pessoas e tipo de evento. A equipe retorna com formato, disponibilidade e próximos passos.
-              </p>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row md:flex-col">
-              <AngledButton href="https://wa.me/553135112373?text=Ol%C3%A1!%20Quero%20montar%20um%20evento%20no%20Kart%C3%B3dromo%20de%20Betim." external>
-                <MessageSquare className="h-4 w-4" />
-                Chamar no WhatsApp
-              </AngledButton>
-              <AngledButton href="tel:+553135112373" variant="outline">
-                <Phone className="h-4 w-4" />
-                (31) 3511-2373
-              </AngledButton>
-            </div>
-          </div>
-        </div>
+        <BigCTA
+          watermark="VIP"
+          title={<>Seu próximo evento<br /><span className="text-primary-400">merece velocidade</span></>}
+          text="Envie data, quantidade de pessoas e tipo de evento. A equipe retorna com formato, disponibilidade e próximos passos."
+        >
+          <AngledButton href="https://wa.me/553135112373?text=Ol%C3%A1!%20Quero%20montar%20um%20evento%20no%20Kart%C3%B3dromo%20de%20Betim." external>
+            <MessageSquare className="h-4 w-4" />
+            Chamar no WhatsApp
+          </AngledButton>
+          <AngledButton href="tel:+553135112373" variant="outline">
+            <Phone className="h-4 w-4" />
+            (31) 3511-2373
+          </AngledButton>
+        </BigCTA>
       </div>
     </section>
   );
