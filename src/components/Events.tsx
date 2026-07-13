@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   ArrowLeft,
   Building,
@@ -13,6 +14,7 @@ import {
 import AngledButton from './site-ui/AngledButton';
 import BigCTA from './site-ui/BigCTA';
 import SectionHeading from './site-ui/SectionHeading';
+import WhatsAppQuoteModal from './site-ui/WhatsAppQuoteModal';
 
 const eventGallery = [
   { url: '/events/2.jpg', alt: 'Salão principal preparado para eventos', span: 'md:row-span-2' },
@@ -54,6 +56,7 @@ const eventFlow = [
 
 const Events = () => {
   const heroImage = eventGallery[3];
+  const [isQuoteOpen, setIsQuoteOpen] = useState(false);
 
   return (
     <section id="eventos" className="min-h-screen overflow-hidden bg-ink-950 text-white/80">
@@ -87,9 +90,9 @@ const Events = () => {
             </p>
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <AngledButton href="https://wa.me/553135112373?text=Ol%C3%A1!%20Gostaria%20de%20saber%20valores%20e%20disponibilidade%20para%20realizar%20um%20evento%20no%20Kart%C3%B3dromo." external>
+              <AngledButton type="button" onClick={() => setIsQuoteOpen(true)}>
                 <MessageSquare className="h-4 w-4" />
-                Orçamento via WhatsApp
+                Solicitar orçamento
               </AngledButton>
               <AngledButton href="tel:+553135112373" variant="outline">
                 <Phone className="h-4 w-4" />
@@ -221,9 +224,9 @@ const Events = () => {
           title={<>Seu próximo evento<br /><span className="text-primary-400">merece velocidade</span></>}
           text="Envie data, quantidade de pessoas e tipo de evento. A equipe retorna com formato, disponibilidade e próximos passos."
         >
-          <AngledButton href="https://wa.me/553135112373?text=Ol%C3%A1!%20Quero%20montar%20um%20evento%20no%20Kart%C3%B3dromo%20de%20Betim." external>
+          <AngledButton type="button" onClick={() => setIsQuoteOpen(true)}>
             <MessageSquare className="h-4 w-4" />
-            Chamar no WhatsApp
+            Montar meu evento
           </AngledButton>
           <AngledButton href="tel:+553135112373" variant="outline">
             <Phone className="h-4 w-4" />
@@ -231,6 +234,13 @@ const Events = () => {
           </AngledButton>
         </BigCTA>
       </div>
+
+      <WhatsAppQuoteModal
+        isOpen={isQuoteOpen}
+        onClose={() => setIsQuoteOpen(false)}
+        subtitle="Orçamento de evento"
+        title="Crie sua experiência"
+      />
     </section>
   );
 };
