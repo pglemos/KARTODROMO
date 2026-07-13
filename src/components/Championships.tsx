@@ -141,23 +141,27 @@ setAcceptedContact(false);
 setAcceptedRules(false);
 setAcceptedResponsibility(false);
 setAcceptedImage(false);
-if (window.location.hash !== '#inscricao') {
-window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#inscricao`);
+const targetHash = `#inscricao-${championship.id}`;
+if (window.location.hash !== targetHash) {
+window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${targetHash}`);
 }
 };
 
 useEffect(() => {
-if (window.location.hash === '#inscricao') {
-const firstOpenChampionship = championships.find((championship) => championship.status === 'open');
-if (firstOpenChampionship) openModal(firstOpenChampionship);
-}
+const hash = window.location.hash;
+if (!hash.startsWith('#inscricao')) return;
+
+const requestedId = hash.startsWith('#inscricao-') ? hash.slice('#inscricao-'.length) : null;
+const requested = requestedId ? championships.find((championship) => championship.id === requestedId) : null;
+const target = requested ?? championships.find((championship) => championship.status === 'open');
+if (target) openModal(target);
 }, []);
 
 const closeModal = () => {
 setIsModalOpen(false);
 setSelectedEvent(null);
 setSubmitResult(null);
-if (window.location.hash === '#inscricao') {
+if (window.location.hash.startsWith('#inscricao')) {
 window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
 }
 };
