@@ -185,7 +185,7 @@ const KACPage = () => {
         </section>
 
         <nav aria-label="Seções do KAC Iniciantes" className="sticky top-[81px] z-30 border-y border-white/10 bg-ink-950/95 backdrop-blur-md">
-          <div className="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 py-3 md:px-8">
+          <div className="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 py-3 md:px-8 [mask-image:linear-gradient(to_right,black_92%,transparent)] [-webkit-mask-image:linear-gradient(to_right,black_92%,transparent)] md:[mask-image:none] md:[-webkit-mask-image:none]">
             {anchorLinks.map((link) => {
               const id = link.href.slice(1);
               return (
@@ -242,7 +242,10 @@ const KACPage = () => {
             <CalendarDays className="h-12 w-12 flex-shrink-0 text-primary-400" />
           </div>
 
-          <div className="overflow-x-auto border border-white/10 bg-ink-900">
+          <p className="mb-2 font-race text-[10px] italic font-bold uppercase tracking-wide text-white/40 sm:hidden">
+            Arraste para o lado para ver todas as colunas →
+          </p>
+          <div className="overflow-x-auto border border-white/10 bg-ink-900 [mask-image:linear-gradient(to_right,black_94%,transparent)] [-webkit-mask-image:linear-gradient(to_right,black_94%,transparent)] sm:[mask-image:none] sm:[-webkit-mask-image:none]">
             <table className="w-full min-w-[720px] border-collapse text-left">
               <thead>
                 <tr>
