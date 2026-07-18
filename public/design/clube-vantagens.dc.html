@@ -14,6 +14,8 @@
   <link rel="icon" type="image/png" href="assets/brand/kib-logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="./beneficios-nav.css" rel="stylesheet">
+  <link href="./clube-portal.css" rel="stylesheet">
   <style>
     html { scroll-behavior: smooth; }
     body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size: 17px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
@@ -141,11 +143,11 @@
       <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto;">
         <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Área do cliente</p>
         <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(38px,5vw,64px); line-height:0.85;">Tudo em um<br><span style="color:#00e676;">só painel</span></h2>
-        <div style="margin-top:44px; display:grid; grid-template-columns:repeat(4,1fr); gap:12px;">
+        <div class="club-launcher">
           <sc-for list="{{ portalLinks }}" as="p" hint-placeholder-count="8">
-            <a href="{{ p.href }}" style="display:grid; gap:10px; border:1px solid rgba(255,255,255,.12); background:#0b100c; padding:20px; text-decoration:none; color:#fff;">
-              <strong style="font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:15px;">{{ p.title }}</strong>
-              <span style="font-size:12.5px; color:#a8b2aa; line-height:1.4;">{{ p.desc }}</span>
+            <a class="club-launcher__item" data-reveal data-index="{{ p.index }}" href="{{ p.href }}">
+              <span class="club-launcher__top"><span class="club-launcher__index">PORTAL / {{ p.index }}</span><span class="club-launcher__arrow" aria-hidden="true">↗</span></span>
+              <span class="club-launcher__content"><strong class="club-launcher__title">{{ p.title }}</strong><span class="club-launcher__copy">{{ p.desc }}</span></span>
             </a>
           </sc-for>
         </div>
@@ -237,7 +239,7 @@ class Component extends DCLogic {
       { label: 'A Pista', href: '/pista', id: 'pista' },
       { label: 'Campeonatos', href: '/campeonatos', id: 'campeonatos' },
       { label: 'Eventos', href: '/eventos', id: 'eventos' },
-      { label: 'Clube', href: '/clube-vantagens', id: 'clube' },
+      { label: 'BENEFÍCIOS', href: '/clube-vantagens', id: 'clube' },
       { label: 'Dúvidas', href: '/duvidas', id: 'duvidas' },
     ];
     const navLinks = pages.map((p) => ({ label: p.label, href: p.href, current: p.id === 'clube' ? 'page' : undefined, style: Object.assign({}, navBase, { color: p.id === 'clube' ? '#fff' : '#e1e6e1' }) }));
@@ -282,14 +284,14 @@ class Component extends DCLogic {
         { nome: 'Voucher para uma corrida', pontos: 300 },
       ],
       portalLinks: [
-        { title: 'Meu Painel', href: '/clube-painel', desc: 'Saldo de pontos e próxima recompensa' },
-        { title: 'Minha Pontuação', href: '/clube-pontuacao', desc: 'Como você ganha pontos' },
-        { title: 'Histórico de Corridas', href: '/clube-corridas', desc: 'Todas as corridas pontuadas' },
-        { title: 'Histórico de Resgates', href: '/clube-resgates', desc: 'Recompensas já resgatadas' },
-        { title: 'Catálogo de Recompensas', href: '/clube-catalogo', desc: 'Troque pontos por prêmios' },
-        { title: 'Campanhas Especiais', href: '/clube-campanhas', desc: 'Bônus e promoções ativas' },
-        { title: 'Meu Perfil', href: '/clube-perfil', desc: 'Seus dados cadastrais' },
-        { title: 'Regulamento', href: '/clube-regulamento', desc: 'Regras completas do clube' },
+        { index: '01', title: 'Meu Painel', href: '/clube-painel', desc: 'Saldo, progresso e próxima recompensa em uma visão rápida.' },
+        { index: '02', title: 'Minha Pontuação', href: '/clube-pontuacao', desc: 'Entenda como cada corrida movimenta o seu saldo.' },
+        { index: '03', title: 'Histórico de Corridas', href: '/clube-corridas', desc: 'Todas as corridas que geraram pontos para você.' },
+        { index: '04', title: 'Histórico de Resgates', href: '/clube-resgates', desc: 'Acompanhe as recompensas já retiradas.' },
+        { index: '05', title: 'Catálogo', href: '/clube-catalogo', desc: 'Troque seus pontos por experiências e produtos.' },
+        { index: '06', title: 'Campanhas', href: '/clube-campanhas', desc: 'Bônus e condições especiais ativas.' },
+        { index: '07', title: 'Meu Perfil', href: '/clube-perfil', desc: 'Mantenha seus dados cadastrais atualizados.' },
+        { index: '08', title: 'Regulamento', href: '/clube-regulamento', desc: 'Consulte as regras completas do programa.' },
       ],
     };
   }

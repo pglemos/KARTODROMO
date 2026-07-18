@@ -14,6 +14,7 @@
   <link rel="icon" type="image/png" href="assets/brand/kib-logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="./beneficios-nav.css" rel="stylesheet">
   <style>
     html { scroll-behavior: smooth; }
     body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size: 17px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
@@ -287,6 +288,7 @@ class Component extends DCLogic {
       { label: 'Locação', href: '/kart-locacao', id: 'locacao' },
       { label: 'Campeonatos', href: '/campeonatos', id: 'campeonatos' },
       { label: 'Eventos', href: '/eventos', id: 'eventos' },
+      { label: 'BENEFÍCIOS', href: '/clube-vantagens', id: 'clube' },
       { label: 'Dúvidas', href: '/duvidas', id: 'duvidas' },
     ];
     const navLinks = pages.map((p) => ({ label: p.label, href: p.href, current: p.id === 'eventos' ? 'page' : undefined, style: { ...navBase, color: p.id === 'eventos' ? '#fff' : '#e1e6e1' } }));
