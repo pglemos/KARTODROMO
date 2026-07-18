@@ -157,7 +157,7 @@ const Services = () => {
 
             <div className="border-t border-white/10 p-8">
               <a
-                href="https://wa.me/553135112373?text=Ol%C3%A1!%20Gostaria%20de%20saber%20sobre%20os%20hor%C3%A1rios%20dispon%C3%ADveis%20para%20o%20Super%20Kart."
+                href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Gostaria%20de%20saber%20sobre%20os%20hor%C3%A1rios%20dispon%C3%ADveis%20para%20o%20Super%20Kart."
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex w-full items-center justify-center gap-2 border border-white/15 bg-white/5 px-4 py-3.5 font-race text-sm italic font-bold uppercase tracking-wider text-white transition-all hover:border-yellow-500/50"
@@ -178,7 +178,7 @@ const Services = () => {
             </p>
           </div>
           <a
-            href="https://wa.me/553135112373"
+            href="https://wa.me/5531998842898"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-2 bg-gradient-to-br from-primary-400 to-primary-600 px-6 py-3.5 font-race text-xs italic font-bold uppercase tracking-wider text-ink-950 [clip-path:polygon(7%_0,100%_0,93%_100%,0_100%)]"

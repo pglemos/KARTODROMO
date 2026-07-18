@@ -9,7 +9,8 @@ export type AdminModuleKey =
   | 'telao'
   | 'financeira'
   | 'clientes'
-  | 'administrativa';
+  | 'administrativa'
+  | 'clube';
 
 export type AdminModule = {
   key: AdminModuleKey;
@@ -120,6 +121,15 @@ export const adminModules: AdminModule[] = [
     summary: 'Usuários, papéis de acesso, auditoria e configurações gerais.',
     status: 'Módulo restaurado',
     features: ['Usuários', 'Papéis', 'Auditoria'],
+  },
+  {
+    key: 'clube',
+    title: 'Clube de Vantagens',
+    href: '/admin/clube',
+    group: 'Gestão',
+    summary: 'Participantes, pontuação, recompensas, campanhas e aprovação de resgates.',
+    status: 'Operacional',
+    features: ['Participantes', 'Recompensas', 'Campanhas', 'Resgates'],
   },
 ];
 

@@ -228,11 +228,11 @@ export default function FAQ() {
             title={<>Ainda precisa<br /><span className="text-primary-400">de ajuda?</span></>}
             text="A equipe esclarece dúvidas sobre horários, grupos, campeonatos e regulamentos."
           >
-            <AngledButton href="https://wa.me/553135112373?text=Ol%C3%A1!%20Tenho%20uma%20d%C3%BAvida%20que%20n%C3%A3o%20encontrei%20nas%20FAQ%20do%20site." external>
+            <AngledButton href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Tenho%20uma%20d%C3%BAvida%20que%20n%C3%A3o%20encontrei%20nas%20FAQ%20do%20site." external>
               <MessageSquare className="h-4 w-4" />
               Falar com suporte
             </AngledButton>
-            <AngledButton href="https://wa.me/553135112373" variant="outline" external>
+            <AngledButton href="https://wa.me/5531998842898" variant="outline" external>
               <ShieldAlert className="h-4 w-4" />
               Falar no WhatsApp
             </AngledButton>

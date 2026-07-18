@@ -58,7 +58,7 @@ const ChampionshipDetailLayout = ({
   const primaryHref =
     primaryAction.kind === 'form'
       ? `/campeonatos#inscricao-${primaryAction.championshipId}`
-      : `https://wa.me/553135112373?text=${encodeURIComponent(primaryAction.text)}`;
+      : `https://wa.me/5531998842898?text=${encodeURIComponent(primaryAction.text)}`;
   const primaryExternal = primaryAction.kind === 'whatsapp';
 
   return (
@@ -162,7 +162,7 @@ const ChampionshipDetailLayout = ({
                 <MessageSquare className="h-4 w-4" />
                 {primaryAction.label}
               </AngledButton>
-              <AngledButton href="https://wa.me/553135112373" variant="outline" external>
+              <AngledButton href="https://wa.me/5531998842898" variant="outline" external>
                 Falar no WhatsApp
               </AngledButton>
             </BigCTA>

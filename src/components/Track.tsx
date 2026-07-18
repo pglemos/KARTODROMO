@@ -95,7 +95,7 @@ const Track = () => {
                 <Map className="h-4 w-4" />
                 Ver traçados oficiais
               </AngledButton>
-              <AngledButton href="https://wa.me/553135112373?text=Ol%C3%A1!%20Quero%20saber%20qual%20tra%C3%A7ado%20estar%C3%A1%20ativo%20na%20pista." variant="outline" external>
+              <AngledButton href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Quero%20saber%20qual%20tra%C3%A7ado%20estar%C3%A1%20ativo%20na%20pista." variant="outline" external>
                 <Flag className="h-4 w-4" />
                 Consultar pista ativa
               </AngledButton>
@@ -240,7 +240,7 @@ const Track = () => {
               Nas baterias de lazer, treinos e eventos, é utilizado o traçado definido pelo Kartódromo. Configurações diferentes, incluindo opções com chicane ou sentido invertido, são adotadas somente em campeonatos conforme o calendário oficial.
             </p>
             <div className="mt-6">
-              <AngledButton href="https://wa.me/553135112373?text=Ol%C3%A1!%20Quero%20saber%20qual%20tra%C3%A7ado%20estar%C3%A1%20ativo%20na%20pista." variant="outline" external>
+              <AngledButton href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Quero%20saber%20qual%20tra%C3%A7ado%20estar%C3%A1%20ativo%20na%20pista." variant="outline" external>
                 <MessageSquare className="h-4 w-4" />
                 Perguntar no WhatsApp
               </AngledButton>

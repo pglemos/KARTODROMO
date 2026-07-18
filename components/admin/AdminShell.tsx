@@ -9,6 +9,7 @@ import {
   Timer,
   Trophy,
   Users,
+  BadgePercent,
   UtensilsCrossed,
   WalletCards,
   Zap,
@@ -29,6 +30,7 @@ const iconMap: Record<AdminModuleKey, LucideIcon> = {
   financeira: WalletCards,
   clientes: Users,
   administrativa: ShieldCheck,
+  clube: BadgePercent,
 };
 
 function isActive(currentPath: string, href: string) {

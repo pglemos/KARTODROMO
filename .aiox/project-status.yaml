@@ -1,15 +1,15 @@
 status:
-  branch: main
+  branch: feature/site-redesign-fase1
   modifiedFiles:
-    - src/site-pages/KACPage.tsx
+    - CLAUDE.md
   modifiedFilesTotalCount: 1
   recentCommits:
-    - 'fix: update booking flow and KAC mobile layout'
-    - Adiciona aba CalXPro (histórico) em /admin/clientes
+    - 'fix: hard text/column cutoff on KAC page mobile scroll bars'
+    - 'feat(events): add WhatsApp quote modal, matching draft''s lead form'
   currentEpic: null
   currentStory: null
-  lastUpdate: '2026-07-04T13:51:47.209Z'
+  lastUpdate: '2026-07-18T10:39:33.180Z'
   isGitRepo: true
-timestamp: 1783173107210
+timestamp: 1784371173181
 ttl: 60
-gitFingerprint: 1782892251232.171:1783172984565.4995
+gitFingerprint: 1783922990107.7737:1783977224397.918

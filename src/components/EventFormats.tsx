@@ -9,7 +9,7 @@ const formats = [
     title: 'Aniversariante',
     description: 'Traga 10 amigos pagantes e sua bateria de aniversário sai por preço especial, com pódio e fotos pra lembrar.',
     ctaLabel: 'Agendar aniversário',
-    href: 'https://wa.me/553135112373?text=Ol%C3%A1!%20Gostaria%20de%20agendar%20minha%20corrida%20de%20aniversariante%20do%20m%C3%AAs.',
+    href: 'https://wa.me/5531998842898?text=Ol%C3%A1!%20Gostaria%20de%20agendar%20minha%20corrida%20de%20aniversariante%20do%20m%C3%AAs.',
   },
   {
     number: '02',
@@ -18,7 +18,7 @@ const formats = [
     title: 'Grupo de Amigos',
     description: 'Compra coletiva com pagamento único: a turma corre por um preço fixo por pessoa, com desconto garantido.',
     ctaLabel: 'Montar grupo',
-    href: 'https://wa.me/553135112373?text=Ol%C3%A1!%20Gostaria%20de%20solicitar%20a%20promo%C3%A7%C3%A3o%20de%20compra%20coletiva%20para%20meu%20grupo.',
+    href: 'https://wa.me/5531998842898?text=Ol%C3%A1!%20Gostaria%20de%20solicitar%20a%20promo%C3%A7%C3%A3o%20de%20compra%20coletiva%20para%20meu%20grupo.',
   },
   {
     number: '03',

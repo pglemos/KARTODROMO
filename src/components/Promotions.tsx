@@ -73,7 +73,7 @@ const Promotions = () => {
 
             <div className="pt-8">
               <a
-                href="https://wa.me/553135112373?text=Ol%C3%A1!%20Gostaria%20de%20agendar%20minha%20corrida%20de%20aniversariante%20do%20m%C3%AAs."
+                href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Gostaria%20de%20agendar%20minha%20corrida%20de%20aniversariante%20do%20m%C3%AAs."
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex min-h-14 w-full items-center justify-center gap-2 bg-gradient-to-br from-primary-400 to-primary-600 px-5 py-3.5 font-race text-xs italic font-black uppercase tracking-wider text-ink-950 [clip-path:polygon(7%_0,100%_0,93%_100%,0_100%)]"
@@ -138,7 +138,7 @@ const Promotions = () => {
 
             <div className="pt-8">
               <a
-                href="https://wa.me/553135112373?text=Ol%C3%A1!%20Gostaria%20de%20solicitar%20a%20promo%C3%A7%C3%A3o%20de%20compra%20coletiva%20para%20meu%20grupo."
+                href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Gostaria%20de%20solicitar%20a%20promo%C3%A7%C3%A3o%20de%20compra%20coletiva%20para%20meu%20grupo."
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex min-h-14 w-full items-center justify-center gap-2 bg-yellow-400 px-5 py-3.5 font-race text-xs italic font-black uppercase tracking-wider text-ink-950 [clip-path:polygon(7%_0,100%_0,93%_100%,0_100%)] transition-colors hover:bg-yellow-300"

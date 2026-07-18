@@ -282,7 +282,7 @@ const KartLocacao = () => {
               </p>
               <div className="mt-7 flex flex-col gap-3 sm:flex-row">
                 <AngledButton href="/eventos">Conhecer eventos</AngledButton>
-                <AngledButton href="https://wa.me/553135112373" variant="outline" external>
+                <AngledButton href="https://wa.me/5531998842898" variant="outline" external>
                   Consultar grupo
                 </AngledButton>
               </div>

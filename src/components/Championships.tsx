@@ -430,7 +430,7 @@ pagamento: 'PENDENTE',
                 )}
                 {champ.status === 'open' && (
                   <a
-                    href={`https://wa.me/553135112373?text=Ol%C3%A1!%20Gostaria%20de%20saber%20valores%20e%20regulamento%20para%20o%20campeonato%20${encodeURIComponent(champ.evento)}`}
+                    href={`https://wa.me/5531998842898?text=Ol%C3%A1!%20Gostaria%20de%20saber%20valores%20e%20regulamento%20para%20o%20campeonato%20${encodeURIComponent(champ.evento)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center justify-center gap-2 border border-white/15 bg-white/5 px-6 py-3.5 font-race text-xs italic font-bold uppercase tracking-wider text-white transition-colors hover:border-primary-400/40"
@@ -482,11 +482,11 @@ pagamento: 'PENDENTE',
             title={<>Escolha sua categoria<br /><span className="text-primary-400">e entre no grid</span></>}
             text="A organização orienta sobre inscrições, pesos, regras e vagas disponíveis."
           >
-            <AngledButton href="https://wa.me/553135112373?text=Ol%C3%A1!%20Gostaria%20de%20receber%20regulamentos%20e%20valores%20dos%20campeonatos%20do%20Kart%C3%B3dromo." external>
+            <AngledButton href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Gostaria%20de%20receber%20regulamentos%20e%20valores%20dos%20campeonatos%20do%20Kart%C3%B3dromo." external>
               <MessageSquare className="h-4 w-4" />
               Falar com a organização
             </AngledButton>
-            <AngledButton href="https://wa.me/553135112373" variant="outline" external>
+            <AngledButton href="https://wa.me/5531998842898" variant="outline" external>
               Falar no WhatsApp
             </AngledButton>
           </BigCTA>
@@ -529,7 +529,7 @@ pagamento: 'PENDENTE',
                   Os dados da sua equipe foram cadastrados com sucesso. Entre em contato pelo WhatsApp para concluir o pagamento e confirmar o grid.
                 </p>
                 <a
-                  href={`https://wa.me/553135112373?text=Ol%C3%A1!%20Acabei%20de%20enviar%20o%20formul%C3%A1rio%20de%20inscri%C3%A7%C3%A3o%20para%20o%20campeonato%20${encodeURIComponent(selectedEvent.evento)}.%20Gostaria%20do%20link%20de%20pagamento.`}
+                  href={`https://wa.me/5531998842898?text=Ol%C3%A1!%20Acabei%20de%20enviar%20o%20formul%C3%A1rio%20de%20inscri%C3%A7%C3%A3o%20para%20o%20campeonato%20${encodeURIComponent(selectedEvent.evento)}.%20Gostaria%20do%20link%20de%20pagamento.`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 bg-gradient-to-br from-primary-400 to-primary-600 px-6 py-3.5 font-race text-xs italic font-bold uppercase tracking-wider text-ink-950 [clip-path:polygon(7%_0,100%_0,93%_100%,0_100%)]"
@@ -559,7 +559,7 @@ pagamento: 'PENDENTE',
                     Tentar Novamente
                   </button>
                   <a
-                    href="https://wa.me/553135112373"
+                    href="https://wa.me/5531998842898"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center justify-center gap-2 bg-gradient-to-br from-primary-400 to-primary-600 px-5 py-3 font-race text-xs italic font-bold uppercase tracking-wider text-ink-950 [clip-path:polygon(7%_0,100%_0,93%_100%,0_100%)]"

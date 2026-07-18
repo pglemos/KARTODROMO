@@ -7,6 +7,7 @@ import { LegacyAuthProvider } from '@/src/admin/auth/AuthContext';
 import { AdministrativaPage } from '@/src/admin/modules/administrativa/AdministrativaPage';
 import { CampeonatosPage } from '@/src/admin/modules/campeonatos/CampeonatosPage';
 import { ClientesPage } from '@/src/admin/modules/clientes/ClientesPage';
+import { ClubePage } from '@/src/admin/modules/clube/ClubePage';
 import { CronometragemPage } from '@/src/admin/modules/cronometragem/CronometragemPage';
 import { DashboardPage } from '@/src/admin/modules/dashboard/DashboardPage';
 import { FinanceiraPage } from '@/src/admin/modules/financeira/FinanceiraPage';
@@ -21,6 +22,7 @@ const legacyPages: Partial<Record<AdminModuleKey, ComponentType>> = {
   administrativa: AdministrativaPage,
   campeonatos: CampeonatosPage,
   clientes: ClientesPage,
+  clube: ClubePage,
   cronometragem: CronometragemPage,
   dashboard: DashboardPage,
   financeira: FinanceiraPage,

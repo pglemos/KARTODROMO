@@ -14,6 +14,9 @@ import TwoHundredMilesPage from './site-pages/TwoHundredMilesPage';
 import FiveHundredMilesPage from './site-pages/FiveHundredMilesPage';
 import Header from './components/Header';
 import Footer from './components/Footer';
+import ClubPage, { type ClubPageKey } from './site-pages/ClubPages';
+
+const clubRoutes: ClubPageKey[] = ['vantagens', 'cadastro', 'consulta', 'painel', 'corridas', 'pontuacao', 'catalogo', 'resgates', 'perfil', 'regulamento', 'campanhas'];
 
 const NotFoundPage = () => (
   <div className="min-h-screen bg-ink-950 text-white/80">
@@ -103,9 +106,14 @@ function App() {
         <Route path="/reservas" element={<ReservasPage />} />
         <Route path="/campeonatos" element={<ChampionshipsPage />} />
         <Route path="/campeonatos/kac" element={<KACPage />} />
+        <Route path="/kac" element={<KACPage />} />
         <Route path="/campeonatos/kac-super" element={<KACSuperPage />} />
+        <Route path="/kac-super" element={<KACSuperPage />} />
         <Route path="/campeonatos/200-milhas" element={<TwoHundredMilesPage />} />
+        <Route path="/200-milhas" element={<TwoHundredMilesPage />} />
         <Route path="/campeonatos/500-milhas" element={<FiveHundredMilesPage />} />
+        <Route path="/500-milhas" element={<FiveHundredMilesPage />} />
+        {clubRoutes.map((page) => <Route element={<ClubPage page={page} />} key={page} path={`/clube-${page}`} />)}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Router>
