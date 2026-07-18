@@ -327,6 +327,18 @@
   .admin-login__showcase { display: none; }
   .admin-login__form-side { min-height: 100vh; }
   .admin-main { padding: 18px 14px 48px; }
+  .telao-programacao-header {
+    align-items: flex-start !important;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .telao-programacao-header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .telao-programacao-header-actions > button { flex: 1 1 180px; }
+  .telao-programacao-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .telao-programacao-row-actions { justify-content: flex-end; }
 }
 
 @media (prefers-reduced-motion: reduce) {

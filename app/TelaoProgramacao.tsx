@@ -195,7 +195,7 @@ export function TelaoProgramacao() {
           </label>
         </div>
       </div>
-      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+      <header className="telao-programacao-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <div>
           <span style={{ color: '#8b949e', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Conteúdo</span>
           <h2 style={{ margin: 0, fontSize: 18 }}>Programação do telão</h2>
@@ -203,7 +203,7 @@ export function TelaoProgramacao() {
             Placar, imagens, vídeos, YouTube ao vivo e propaganda — com duração, repetição e horário.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="telao-programacao-header-actions" style={{ display: 'flex', gap: 8 }}>
           <button type="button" style={ghost} onClick={() => setItems((p) => [...p, newItem()])}>+ Conteúdo</button>
           <button type="button" style={btn} onClick={() => void save()} disabled={saving}>
             {saving ? 'Salvando...' : 'Salvar programação'}
@@ -225,7 +225,7 @@ export function TelaoProgramacao() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {items.map((it, idx) => (
             <article key={it.id} style={{ ...box, padding: 12, opacity: it.enabled ? 1 : 0.55 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr 90px 80px auto', gap: 8, alignItems: 'center' }}>
+              <div className="telao-programacao-grid" style={{ display: 'grid', gridTemplateColumns: '160px minmax(0, 1fr) 90px 80px auto', gap: 8, alignItems: 'center' }}>
                 <select style={input} value={it.type} onChange={(e) => patch(it.id, { type: e.target.value as TelaoPlaylistItemType })}>
                   {TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
@@ -238,7 +238,7 @@ export function TelaoProgramacao() {
                 />
                 <input style={input} type="number" min={1} title="Duração (s)" value={it.durationSec} onChange={(e) => patch(it.id, { durationSec: Number(e.target.value) })} />
                 <input style={input} type="number" min={1} title="Repete" value={it.repeat} onChange={(e) => patch(it.id, { repeat: Number(e.target.value) })} />
-                <div style={{ display: 'flex', gap: 6 }}>
+                <div className="telao-programacao-row-actions" style={{ display: 'flex', gap: 6 }}>
                   <button type="button" style={ghost} title="Subir" onClick={() => move(it.id, -1)} disabled={idx === 0}>↑</button>
                   <button type="button" style={ghost} title="Descer" onClick={() => move(it.id, 1)} disabled={idx === items.length - 1}>↓</button>
                   <button type="button" style={{ ...ghost, background: '#3d1418' }} title="Remover" onClick={() => remove(it.id)}>✕</button>
