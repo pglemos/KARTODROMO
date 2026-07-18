@@ -14,7 +14,7 @@ export function LogoutButton() {
 
   return (
     <button
-      className="inline-flex items-center justify-center gap-2 rounded-md border border-zinc-700/80 bg-zinc-900 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-zinc-200 transition-colors hover:border-primary-400/70 hover:text-primary-300 disabled:opacity-60"
+      className="inline-flex items-center justify-center gap-2 rounded-md border border-[var(--admin-border)] bg-transparent px-3 py-2 text-xs font-bold uppercase tracking-[0.1em] text-[var(--admin-danger)] transition-colors hover:border-[var(--admin-danger)] disabled:opacity-60"
       disabled={loading}
       onClick={() => void logout()}
       type="button"

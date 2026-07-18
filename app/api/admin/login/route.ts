@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const email = String(body?.email || '').trim().toLowerCase();
   const password = String(body?.password || '');
+  const remember = body?.remember !== false;
 
   if (!validateAdminCredentials(email, password)) {
     return NextResponse.json({ error: 'invalid_credentials' }, { status: 401 });
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
-    maxAge: adminSessionTtlSeconds(),
+    ...(remember ? { maxAge: adminSessionTtlSeconds() } : {}),
     path: '/',
   });
   return response;

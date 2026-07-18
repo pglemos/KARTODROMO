@@ -44,7 +44,7 @@ export function LegacyAdminContent({ moduleKey, sessionEmail }: { moduleKey: Adm
 
   if (!mounted) {
     return (
-      <div className="mx-auto max-w-[1500px] rounded-lg border border-zinc-800 bg-zinc-900 p-5 text-sm font-bold text-zinc-400">
+      <div className="admin-card mx-auto max-w-[1500px] p-5 text-sm font-bold text-[var(--admin-muted)]">
         Carregando módulo...
       </div>
     );

@@ -1,18 +1,24 @@
-import type { ReactNode } from 'react';
+'use client';
+
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
+  BadgePercent,
   CalendarDays,
   ConciergeBell,
   Flag,
+  Grid2X2,
   LayoutDashboard,
+  Menu,
   Monitor,
+  Moon,
   ShieldCheck,
+  Sun,
   Timer,
   Trophy,
   Users,
-  BadgePercent,
   UtensilsCrossed,
   WalletCards,
-  Zap,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 import { adminModules, adminNavigationGroups, type AdminModuleKey } from './navigation';
@@ -38,6 +44,39 @@ function isActive(currentPath: string, href: string) {
   return currentPath === href || currentPath.startsWith(`${href}/`);
 }
 
+function Navigation({ currentPath, onNavigate }: { currentPath: string; onNavigate?: () => void }) {
+  return (
+    <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Módulos do sistema">
+      {adminNavigationGroups.map((group) => {
+        const items = adminModules.filter((module) => module.group === group);
+        return (
+          <section className="mb-[22px]" key={group}>
+            <h2 className="mb-1.5 px-2.5 text-[10.5px] font-bold uppercase tracking-[.1em] text-[var(--admin-faint)]">{group}</h2>
+            <div className="grid gap-0.5">
+              {items.map((item) => {
+                const Icon = iconMap[item.key];
+                const active = isActive(currentPath, item.href);
+                return (
+                  <a
+                    aria-current={active ? 'page' : undefined}
+                    className="admin-nav-link"
+                    href={item.href}
+                    key={item.key}
+                    onClick={onNavigate}
+                  >
+                    <Icon aria-hidden="true" size={17} strokeWidth={1.8} />
+                    {item.title}
+                  </a>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })}
+    </nav>
+  );
+}
+
 export function AdminShell({
   children,
   currentPath,
@@ -49,98 +88,126 @@ export function AdminShell({
   sessionEmail: string;
   title: string;
 }) {
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const mobileDrawerRef = useRef<HTMLElement>(null);
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    try {
+      setTheme(localStorage.getItem('kib-admin-theme') === 'dark' ? 'dark' : 'light');
+    } catch {
+      // Local storage can be disabled without preventing admin usage.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!mobileNavOpen) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileNavOpen(false);
+        window.setTimeout(() => mobileMenuButtonRef.current?.focus(), 0);
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = Array.from(
+        mobileDrawerRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? [],
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    window.setTimeout(() => mobileDrawerRef.current?.querySelector<HTMLElement>('button, a[href]')?.focus(), 0);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [mobileNavOpen]);
+
+  function closeMobileNav() {
+    setMobileNavOpen(false);
+    window.setTimeout(() => mobileMenuButtonRef.current?.focus(), 0);
+  }
+
+  function toggleTheme() {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    try {
+      localStorage.setItem('kib-admin-theme', next);
+    } catch {
+      // Theme persistence is progressive enhancement.
+    }
+  }
+
+  const Brand = () => (
+    <a className="flex items-center gap-2.5 border-b border-[var(--admin-border)] px-[18px] py-5 no-underline" href="/admin">
+      <span className="admin-brand-mark"><Grid2X2 aria-hidden="true" size={18} /></span>
+      <span>
+        <span className="block text-[10px] font-bold uppercase tracking-[.12em] text-[var(--admin-accent)]">Sistema</span>
+        <strong className="block text-sm font-bold text-[var(--admin-text)]">Kartódromo Betim</strong>
+      </span>
+    </a>
+  );
+
   return (
-    <main className="min-h-screen bg-zinc-950 text-zinc-100">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-zinc-800 bg-zinc-950 lg:flex">
-        <div className="flex h-16 items-center gap-3 border-b border-zinc-800 px-5">
-          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-500 text-zinc-950">
-            <Zap aria-hidden="true" size={21} />
-          </span>
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-primary-300">Sistema</p>
-            <strong className="block text-sm font-black uppercase tracking-tight text-white">Kartódromo Betim</strong>
-          </div>
-        </div>
-
-        <nav className="flex-1 overflow-y-auto px-3 py-5" aria-label="Módulos do sistema">
-          {adminNavigationGroups.map((group) => {
-            const items = adminModules.filter((module) => module.group === group);
-            return (
-              <section className="mb-6" key={group}>
-                <h2 className="mb-2 px-3 text-[11px] font-black uppercase tracking-[0.16em] text-zinc-500">{group}</h2>
-                <div className="grid gap-1">
-                  {items.map((item) => {
-                    const Icon = iconMap[item.key];
-                    const active = isActive(currentPath, item.href);
-                    return (
-                      <a
-                        aria-current={active ? 'page' : undefined}
-                        className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold transition-colors ${
-                          active
-                            ? 'bg-primary-500 text-zinc-950'
-                            : 'text-zinc-300 hover:bg-zinc-900 hover:text-primary-300'
-                        }`}
-                        href={item.href}
-                        key={item.key}
-                      >
-                        <Icon aria-hidden="true" size={18} />
-                        {item.title}
-                      </a>
-                    );
-                  })}
-                </div>
-              </section>
-            );
-          })}
-        </nav>
-
-        <div className="border-t border-zinc-800 p-4">
-          <p className="truncate text-xs font-bold text-zinc-400">{sessionEmail}</p>
-          <div className="mt-3">
-            <LogoutButton />
-          </div>
+    <main className="admin-root" data-theme={theme}>
+      <aside className="admin-sidebar">
+        <Brand />
+        <Navigation currentPath={currentPath} />
+        <div className="border-t border-[var(--admin-border)] px-[18px] py-3.5">
+          <p className="mb-2 truncate text-xs font-semibold text-[var(--admin-muted)]">{sessionEmail}</p>
+          <LogoutButton />
         </div>
       </aside>
 
-      <div className="lg:pl-64">
-        <header className="sticky top-0 z-30 border-b border-zinc-800 bg-zinc-950/95 px-4 py-3 backdrop-blur md:px-6">
-          <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-4">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-primary-300">Administração</p>
-              <h1 className="text-xl font-black uppercase tracking-tight text-white md:text-2xl">{title}</h1>
+      <button
+        aria-label="Fechar menu"
+        className="admin-mobile-overlay"
+        data-open={mobileNavOpen}
+        onClick={closeMobileNav}
+        type="button"
+      />
+      <aside aria-hidden={!mobileNavOpen} className="admin-mobile-drawer" data-open={mobileNavOpen} id="admin-mobile-navigation" inert={!mobileNavOpen} ref={mobileDrawerRef}>
+        <div className="flex items-center justify-between border-b border-[var(--admin-border)] px-[18px] py-4">
+          <strong className="text-sm font-bold text-[var(--admin-text)]">Menu</strong>
+          <button className="admin-icon-button" onClick={closeMobileNav} type="button" aria-label="Fechar menu">
+            <X aria-hidden="true" size={18} />
+          </button>
+        </div>
+        <Navigation currentPath={currentPath} onNavigate={closeMobileNav} />
+        <div className="border-t border-[var(--admin-border)] px-[18px] py-3.5">
+          <p className="mb-2 truncate text-xs font-semibold text-[var(--admin-muted)]">{sessionEmail}</p>
+          <LogoutButton />
+        </div>
+      </aside>
+
+      <div className="admin-content">
+        <header className="admin-topbar">
+          <div className="flex min-w-0 items-center gap-3.5">
+            <button ref={mobileMenuButtonRef} className="admin-icon-button min-[1081px]:hidden" type="button" onClick={() => setMobileNavOpen(true)} aria-label="Abrir menu" aria-expanded={mobileNavOpen} aria-controls="admin-mobile-navigation">
+              <Menu aria-hidden="true" size={20} />
+            </button>
+            <div className="min-w-0">
+              <p className="mb-0.5 text-[10.5px] font-bold uppercase tracking-[.14em] text-[var(--admin-accent)]">Administração</p>
+              <h1 className="m-0 truncate text-[22px] font-bold leading-tight text-[var(--admin-text)]">{title}</h1>
             </div>
-            <div className="flex items-center gap-3">
-              <a
-                className="hidden rounded-md border border-zinc-700 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-zinc-300 transition-colors hover:border-primary-400/70 hover:text-primary-300 md:inline-flex"
-                href="/"
-              >
-                Site
-              </a>
-              <LogoutButton />
-            </div>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <button className="admin-icon-button" type="button" onClick={toggleTheme} aria-label="Alternar tema">
+              {theme === 'dark' ? <Sun aria-hidden="true" size={17} /> : <Moon aria-hidden="true" size={17} />}
+            </button>
+            <a className="hidden h-[38px] items-center rounded-[9px] border border-[var(--admin-border)] px-3.5 text-xs font-bold text-[var(--admin-muted)] no-underline transition-colors hover:border-[var(--admin-accent-border)] hover:text-[var(--admin-accent)] sm:inline-flex" href="/">
+              Ver site
+            </a>
           </div>
         </header>
 
-        <nav className="border-b border-zinc-800 bg-zinc-950 px-4 py-3 lg:hidden" aria-label="Módulos do sistema">
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {adminModules.map((item) => {
-              const active = isActive(currentPath, item.href);
-              return (
-                <a
-                  className={`shrink-0 rounded-md px-3 py-2 text-xs font-black uppercase tracking-[0.1em] ${
-                    active ? 'bg-primary-500 text-zinc-950' : 'bg-zinc-900 text-zinc-300'
-                  }`}
-                  href={item.href}
-                  key={item.key}
-                >
-                  {item.title}
-                </a>
-              );
-            })}
-          </div>
-        </nav>
-
-        <div className="px-4 py-5 md:px-6">{children}</div>
+        <div className="admin-main">{children}</div>
       </div>
     </main>
   );
