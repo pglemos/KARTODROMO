@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Menu, X, Phone, MapPin, Clock } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { SITE_BOOKING_ANCHOR } from '../config/booking';
 import { FacebookIcon, InstagramIcon, YoutubeIcon } from './site-ui/SocialIcons';
 
@@ -20,6 +21,7 @@ const navLinks = [
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { pathname } = useLocation();
 
   return (
     <>
@@ -75,8 +77,9 @@ const Header = () => {
                 <a
                   key={link.href}
                   href={link.href}
+                  aria-current={link.href === pathname ? 'page' : undefined}
                   className={link.featured
-                    ? 'relative inline-flex min-h-9 items-center border border-primary-400/60 bg-primary-400/10 px-4 text-primary-300 [clip-path:polygon(9px_0,100%_0,calc(100%_-_9px)_100%,0_100%)] transition-[color,background-color,transform,box-shadow] duration-200 after:ml-2 after:h-1.5 after:w-1.5 after:rotate-45 after:bg-current after:shadow-[0_0_10px_currentColor] hover:-translate-y-0.5 hover:bg-primary-400 hover:text-ink-950 hover:shadow-[0_10px_28px_rgba(0,230,118,.24)]'
+                    ? 'relative inline-flex min-h-[38px] items-center rounded-full border border-primary-300/35 bg-[linear-gradient(180deg,rgba(25,48,34,.96),rgba(7,20,12,.98))] px-4 text-[#d9ffe8] shadow-[inset_0_1px_0_rgba(255,255,255,.09),0_8px_24px_rgba(0,0,0,.22)] transition-[color,background,transform,box-shadow] duration-200 after:ml-2 after:h-[7px] after:w-[7px] after:rounded-full after:border-2 after:border-primary-400 after:bg-primary-400/20 after:shadow-[0_0_0_3px_rgba(0,230,118,.08),0_0_12px_rgba(0,230,118,.72)] hover:-translate-y-0.5 hover:bg-primary-400 hover:text-ink-950 hover:shadow-[0_10px_28px_rgba(0,230,118,.24)]'
                     : 'relative py-1 text-white/80 transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-[2px] after:origin-left after:scale-x-0 after:bg-primary-400 after:transition-transform after:duration-200 hover:text-white hover:after:scale-x-100'}
                 >
                   {link.label}
@@ -102,9 +105,10 @@ const Header = () => {
                   <a
                     key={link.href}
                     href={link.href}
+                    aria-current={link.href === pathname ? 'page' : undefined}
                     onClick={() => setIsMenuOpen(false)}
                     className={link.featured
-                      ? 'mt-2 flex items-center justify-between border border-primary-400/60 bg-primary-400/10 px-5 py-4 text-primary-300 [clip-path:polygon(12px_0,100%_0,calc(100%_-_12px)_100%,0_100%)] after:text-sm after:content-["◆"] hover:bg-primary-400 hover:text-ink-950'
+                      ? 'mt-2 flex items-center justify-between rounded-2xl border border-primary-300/40 bg-[linear-gradient(135deg,rgba(28,57,39,.96),rgba(8,22,13,.98))] px-5 py-4 text-[#d9ffe8] shadow-[inset_0_1px_0_rgba(255,255,255,.08),0_16px_36px_rgba(0,0,0,.22)] after:text-sm after:content-["→"] hover:bg-primary-400 hover:text-ink-950'
                       : 'border-b border-white/10 py-3 text-white transition-colors hover:text-primary-400'}
                   >
                     {link.label}
