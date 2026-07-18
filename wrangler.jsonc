@@ -16,5 +16,13 @@
 	],
 	"images": {
 		"binding": "IMAGES"
-	}
+	},
+	"d1_databases": [
+		{
+			"binding": "KARTODROMO_ADMIN_DB",
+			"database_name": "kartodromo-admin",
+			"database_id": "daeb26fd-cef9-42b8-b51a-22e20b1607fe",
+			"migrations_dir": "migrations/d1"
+		}
+	]
 }

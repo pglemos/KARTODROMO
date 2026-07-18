@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { adminCookieName, verifyAdminSession } from '@/lib/admin-auth';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
+import { adminCookieName, readAdminSession } from '@/lib/admin-auth';
+import { handleAdminD1, type AdminD1Database } from '@/lib/admin-d1';
+
+declare global {
+  interface CloudflareEnv {
+    KARTODROMO_ADMIN_DB?: AdminD1Database;
+  }
+}
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -9,12 +17,22 @@ const TIMEOUT_MS = Number(process.env.KARTODROMO_LOCAL_API_TIMEOUT_MS || '8000')
 
 async function requireSession() {
   const cookieStore = await cookies();
-  return verifyAdminSession(cookieStore.get(adminCookieName())?.value);
+  return readAdminSession(cookieStore.get(adminCookieName())?.value);
 }
 
 async function proxy(request: NextRequest, path: string[]) {
-  if (!(await requireSession())) {
+  const session = await requireSession();
+  if (!session) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const { env } = await getCloudflareContext({ async: true });
+    if (env.KARTODROMO_ADMIN_DB) {
+      return handleAdminD1(request, path, env.KARTODROMO_ADMIN_DB, session.email);
+    }
+  } catch {
+    // `next dev` and conventional Node deployments do not expose Cloudflare bindings.
   }
 
   const endpoint = process.env.KARTODROMO_LOCAL_API_ENDPOINT;
@@ -39,6 +57,13 @@ async function proxy(request: NextRequest, path: string[]) {
     });
 
     const text = await response.text();
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.toLowerCase().includes('application/json')) {
+      return NextResponse.json(
+        { error: 'local_api_invalid_response', upstreamStatus: response.status },
+        { status: 502 },
+      );
+    }
     const headers: Record<string, string> = { 'content-type': 'application/json; charset=utf-8' };
     const totalCount = response.headers.get('x-total-count');
     if (totalCount) headers['x-total-count'] = totalCount;
