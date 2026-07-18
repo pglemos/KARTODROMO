@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+  <meta name="description" content="Meu Painel — Clube de Vantagens Kartódromo de Betim">
+  <link rel="icon" type="image/png" href="assets/brand/kib-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size: 17px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    a { color: #00e676; }
+    a:hover { color: #3ce396; }
+    button, input { font: inherit; }
+    button:focus-visible, a:focus-visible { outline: 2px solid #00e676; outline-offset: 2px; }
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root) { animation: 260ms cubic-bezier(.16,1,.3,1) both kib-page-out; }
+    ::view-transition-new(root) { animation: 320ms cubic-bezier(.16,1,.3,1) both kib-page-in; }
+    @keyframes kib-page-out { to { opacity: 0; transform: translateY(-8px); } }
+    @keyframes kib-page-in { from { opacity: 0; transform: translateY(8px); } }
+    @media (prefers-reduced-motion: reduce) { ::view-transition-old(root), ::view-transition-new(root) { animation: none; } }
+  </style>
+</helmet>
+<div data-screen-label="Clube — Meu Painel" style="min-height:100vh; background:#030504; color:#f7faf6;">
+
+  <header style="position:sticky; top:0; z-index:100; background:rgba(3,5,4,.92); backdrop-filter:blur(18px); border-bottom:1px solid rgba(255,255,255,.12);">
+    <div style="width:min(1200px,calc(100% - 40px)); margin:0 auto; min-height:74px; display:flex; align-items:center; justify-content:space-between; gap:16px;">
+      <a href="/clube-vantagens" style="width:150px; flex:none;"><img src="assets/brand/kib-logo.png" alt="Kartódromo Internacional de Betim" style="width:100%;"></a>
+      <div style="display:flex; align-items:center; gap:14px;">
+        <span style="{{ styles.pointsChip }}">{{ pontos }} pts</span>
+        <a href="/clube-vantagens" style="font-size:12.5px; font-weight:700; color:#a8b2aa; text-decoration:none;">Sair</a>
+      </div>
+    </div>
+    <nav aria-label="Menu do portal" style="width:min(1200px,calc(100% - 40px)); margin:0 auto; display:flex; gap:4px; overflow-x:auto; padding-bottom:2px;">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="8">
+        <a href="{{ t.href }}" style="{{ t.style }}">{{ t.label }}</a>
+      </sc-for>
+    </nav>
+  </header>
+
+  <main style="width:min(1200px,calc(100% - 40px)); margin:0 auto; padding:36px 0 80px; display:grid; gap:22px;">
+    <div>
+      <p style="margin:0 0 4px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.14em; text-transform:uppercase;">Meu painel</p>
+      <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(30px,4vw,44px); line-height:0.9;">Olá, {{ firstName }}</h1>
+    </div>
+
+    <div style="{{ styles.grid2 }}">
+      <section style="{{ styles.card }}">
+        <span style="{{ styles.cardLabel }}">Saldo atual</span>
+        <strong style="{{ styles.bigNumber }}">{{ pontos }} <span style="font-size:.35em; color:#a8b2aa;">pts</span></strong>
+        <div style="margin-top:18px;">
+          <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#a8b2aa; margin-bottom:8px;"><span>Próxima recompensa: {{ nextRewardName }}</span><span>{{ progressLabel }}</span></div>
+          <div style="height:8px; background:rgba(255,255,255,.1); overflow:hidden;"><div style="{{ progressBarStyle }}"></div></div>
+        </div>
+        <a href="/clube-catalogo" style="{{ styles.primaryBtn }}">Ver catálogo de recompensas</a>
+      </section>
+
+      <section style="{{ styles.card }}">
+        <span style="{{ styles.cardLabel }}">Avisos e campanhas</span>
+        <div style="display:grid; gap:10px; margin-top:14px;">
+          <sc-for list="{{ activeCampaigns }}" as="c" hint-placeholder-count="2">
+            <div style="border:1px solid rgba(255,255,255,.12); background:#070b08; padding:14px;">
+              <strong style="font-size:13.5px;">{{ c.nome }}</strong>
+              <p style="margin:6px 0 0; font-size:12.5px; color:#a8b2aa; line-height:1.4;">{{ c.desc }}</p>
+            </div>
+          </sc-for>
+        </div>
+        <a href="/clube-campanhas" style="{{ styles.ghostLink }}">Ver todas as campanhas →</a>
+      </section>
+    </div>
+
+    <section style="{{ styles.card }}">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <span style="{{ styles.cardLabel }}">Últimas movimentações</span>
+        <a href="/clube-pontuacao" style="font-size:12.5px; font-weight:700; text-decoration:none;">Ver tudo →</a>
+      </div>
+      <div style="display:grid; gap:1px; background:rgba(255,255,255,.1); margin-top:14px;">
+        <sc-for list="{{ recentMovements }}" as="m" hint-placeholder-count="5">
+          <div style="display:flex; justify-content:space-between; background:#070b08; padding:12px 14px; font-size:13.5px;">
+            <span style="color:#d7ddd8;">{{ m.dataLabel }} · {{ m.descricao }}</span>
+            <strong style="{{ m.pontosStyle }}">{{ m.pontosLabel }}</strong>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+  </main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  currentTab = 'painel';
+  state = { customer: null, rewards: [], movements: [], campaigns: [] };
+
+  componentDidMount() {
+    import('./clube-shared.js').then((m) => {
+      this.setState({
+        customer: m.CUSTOMER,
+        rewards: m.REWARDS,
+        movements: m.RACE_HISTORY.concat(m.REDEMPTION_HISTORY).sort((a, b) => (a.data < b.data ? 1 : -1)).slice(0, 5),
+        campaigns: m.CAMPAIGNS.filter((c) => c.ativa),
+        nextRewardFn: m.nextReward, formatDateBR: m.formatDateBR,
+      });
+    });
+  }
+
+  tabDefs() {
+    return [
+      { key: 'painel', label: 'Meu Painel', href: '/clube-painel' },
+      { key: 'pontuacao', label: 'Minha Pontuação', href: '/clube-pontuacao' },
+      { key: 'corridas', label: 'Histórico de Corridas', href: '/clube-corridas' },
+      { key: 'resgates', label: 'Histórico de Resgates', href: '/clube-resgates' },
+      { key: 'catalogo', label: 'Catálogo', href: '/clube-catalogo' },
+      { key: 'campanhas', label: 'Campanhas', href: '/clube-campanhas' },
+      { key: 'perfil', label: 'Meu Perfil', href: '/clube-perfil' },
+      { key: 'regulamento', label: 'Regulamento', href: '/clube-regulamento' },
+    ];
+  }
+
+  styles() {
+    return {
+      pointsChip: { fontSize: '12px', fontWeight: 700, padding: '7px 13px', borderRadius: '999px', background: 'rgba(0,230,118,.14)', color: '#00e676' },
+      grid2: { display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '18px', alignItems: 'start' },
+      card: { background: '#0b100c', border: '1px solid rgba(255,255,255,.12)', padding: '24px' },
+      cardLabel: { fontSize: '11.5px', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: '#a8b2aa' },
+      bigNumber: { display: 'block', marginTop: '10px', fontFamily: "'Anton',sans-serif", fontWeight: 400, fontSize: '54px', lineHeight: 0.75, color: '#00e676' },
+      primaryBtn: { display: 'block', marginTop: '20px', textAlign: 'center', minHeight: '48px', lineHeight: '48px', clipPath: 'polygon(7% 0,100% 0,93% 100%,0 100%)', background: 'linear-gradient(135deg,#00e676,#00c853)', color: '#041301', fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '12px', textDecoration: 'none' },
+      ghostLink: { display: 'inline-block', marginTop: '14px', fontSize: '12.5px', fontWeight: 700, textDecoration: 'none' },
+    };
+  }
+
+  renderVals() {
+    const { customer, movements, campaigns } = this.state;
+    const s = this.styles();
+    const tabs = this.tabDefs().map((t) => ({
+      label: t.label, href: t.href,
+      style: { flex: 'none', padding: '10px 14px', fontSize: '12.5px', fontWeight: 700, textDecoration: 'none', borderBottom: '2px solid ' + (t.key === this.currentTab ? '#00e676' : 'transparent'), color: t.key === this.currentTab ? '#fff' : '#a8b2aa', whiteSpace: 'nowrap' },
+    }));
+
+    if (!customer) {
+      return { styles: s, tabs, firstName: '', pontos: 0, nextRewardName: '', progressLabel: '', progressBarStyle: { height: '100%', width: '0%' }, activeCampaigns: [], recentMovements: [] };
+    }
+
+    const next = this.state.nextRewardFn(customer.pontos);
+    const pct = Math.max(4, Math.min(100, Math.round((customer.pontos / next.pontos) * 100)));
+    const recentMovements = movements.map((m) => ({
+      dataLabel: this.state.formatDateBR(m.data), descricao: m.descricao,
+      pontosLabel: (m.pontos > 0 ? '+' : '') + m.pontos,
+      pontosStyle: { color: m.pontos > 0 ? '#00e676' : '#ff6b6b' },
+    }));
+
+    return {
+      styles: s, tabs, firstName: customer.nome.split(' ')[0], pontos: customer.pontos,
+      nextRewardName: next.nome, progressLabel: customer.pontos + ' / ' + next.pontos + ' pts',
+      progressBarStyle: { height: '100%', width: pct + '%', background: 'linear-gradient(90deg,#00e676,#3ce396)' },
+      activeCampaigns: campaigns, recentMovements,
+    };
+  }
+}
+
+</script>
+</body>
+</html>

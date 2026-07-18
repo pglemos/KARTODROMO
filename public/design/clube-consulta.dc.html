@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+  <meta name="description" content="Consultar pontos — Clube de Vantagens Kartódromo de Betim">
+  <link rel="icon" type="image/png" href="assets/brand/kib-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size: 17px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    a { color: #00e676; }
+    a:hover { color: #3ce396; }
+    button, input { font: inherit; }
+    input:focus, button:focus-visible, a:focus-visible { outline: 2px solid #00e676; outline-offset: 2px; }
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root) { animation: 320ms cubic-bezier(.16,1,.3,1) both kib-page-out; }
+    ::view-transition-new(root) { animation: 420ms cubic-bezier(.16,1,.3,1) both kib-page-in; }
+    @keyframes kib-page-out { to { opacity: 0; transform: translateX(-24px); filter: blur(3px); } }
+    @keyframes kib-page-in { from { opacity: 0; transform: translateX(24px); filter: blur(3px); } }
+    @media (prefers-reduced-motion: reduce) { ::view-transition-old(root), ::view-transition-new(root) { animation: none; } }
+  </style>
+</helmet>
+<div data-screen-label="Consultar Pontos" style="min-height:100vh; background:#030504; color:#f7faf6;">
+
+  <header style="position:fixed; inset:0 0 auto; z-index:300; background:rgba(3,5,4,.9); backdrop-filter:blur(18px); border-bottom:1px solid rgba(255,255,255,.12);">
+    <div style="width:min(900px,calc(100% - 48px)); margin:0 auto; min-height:78px; display:flex; align-items:center; justify-content:space-between; gap:24px;">
+      <a href="/" style="width:160px; flex:none;"><img src="assets/brand/kib-logo.png" alt="Kartódromo Internacional de Betim" style="width:100%;"></a>
+      <a href="/clube-vantagens" style="font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; letter-spacing:0.04em; color:#e1e6e1; text-decoration:none;">← Clube de Vantagens</a>
+    </div>
+  </header>
+
+  <main style="padding:150px 24px 90px; display:grid; justify-items:center;">
+    <div style="width:min(560px,100%);">
+      <p style="margin:0 0 12px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase; text-align:center;">Clube de Vantagens</p>
+      <h1 style="margin:0; text-align:center; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(34px,5vw,50px); line-height:0.9;">Consultar meus pontos</h1>
+      <p style="margin:16px 0 0; text-align:center; color:#a8b2aa; font-size:15px; line-height:1.5;">Digite seu CPF para ver seu saldo, histórico e recompensas disponíveis.</p>
+
+      <form onSubmit="{{ onSubmit }}" style="margin-top:34px; display:flex; gap:10px; flex-wrap:wrap;">
+        <input value="{{ cpfInput }}" onChange="{{ onCpfChange }}" inputmode="numeric" placeholder="000.000.000-00" aria-label="CPF" style="flex:1; min-width:220px; height:54px; border:1px solid rgba(255,255,255,.18); background:#0b100c; color:#fff; padding:0 16px; font-size:16px; outline:none;">
+        <button type="submit" style="min-height:54px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); border:0; cursor:pointer; background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em;">{{ submitLabel }}</button>
+      </form>
+      <sc-if value="{{ formError }}"><p style="margin:12px 0 0; color:#ff6b6b; font-size:13.5px;">{{ formError }}</p></sc-if>
+
+      <sc-if value="{{ result }}">
+        <div style="margin-top:34px; border:1px solid rgba(255,255,255,.18); background:#0b100c; padding:28px;">
+          <p style="margin:0 0 4px; color:#a8b2aa; font-size:13px;">{{ result.cpfMasked }}</p>
+          <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:26px;">{{ result.nome }}</h2>
+          <div style="display:flex; align-items:flex-end; gap:10px; margin-top:20px; padding:18px 0; border-block:1px solid rgba(255,255,255,.12);">
+            <strong style="font-family:'Anton',sans-serif; font-weight:400; font-size:56px; line-height:0.7; color:#00e676;">{{ result.pontos }}</strong>
+            <span style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; margin-bottom:4px; color:#a8b2aa;">pontos disponíveis</span>
+          </div>
+          <div style="margin-top:16px;">
+            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#a8b2aa; margin-bottom:8px;"><span>Próxima recompensa: {{ result.nextRewardName }}</span><span>{{ result.progressLabel }}</span></div>
+            <div style="height:8px; background:rgba(255,255,255,.1); overflow:hidden;"><div style="{{ result.progressBarStyle }}"></div></div>
+          </div>
+          <h3 style="margin:26px 0 12px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:14px; color:#a8b2aa;">Movimentações recentes</h3>
+          <div style="display:grid; gap:1px; background:rgba(255,255,255,.1);">
+            <sc-for list="{{ result.history }}" as="h" hint-placeholder-count="4">
+              <div style="display:flex; justify-content:space-between; background:#070b08; padding:12px 14px; font-size:13.5px;">
+                <span style="color:#d7ddd8;">{{ h.dataLabel }} · {{ h.descricao }}</span>
+                <strong style="{{ h.pontosStyle }}">{{ h.pontosLabel }}</strong>
+              </div>
+            </sc-for>
+          </div>
+          <a href="/clube-catalogo" style="display:block; margin-top:22px; text-align:center; min-height:50px; line-height:50px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12.5px; letter-spacing:0.04em; text-decoration:none;">Ver catálogo de recompensas</a>
+        </div>
+      </sc-if>
+    </div>
+  </main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { cpfInput: '', result: null, formError: null, loading: false };
+
+  onCpfChange = (e) => this.setState({ cpfInput: e.target.value, formError: null });
+
+  onSubmit = (e) => {
+    e.preventDefault();
+    const digits = this.state.cpfInput.replace(/\D/g, '');
+    if (digits.length !== 11) { this.setState({ formError: 'Informe um CPF válido com 11 dígitos.', result: null }); return; }
+    this.setState({ loading: true, formError: null });
+    import('./clube-shared.js').then((m) => {
+      const found = m.lookupByCpf(digits);
+      if (!found) { this.setState({ loading: false, formError: 'Nenhum cadastro encontrado para esse CPF.', result: null }); return; }
+      const next = m.nextReward(found.pontos);
+      const pct = Math.max(4, Math.min(100, Math.round((found.pontos / next.pontos) * 100)));
+      const history = found.history.map((h) => ({
+        dataLabel: m.formatDateBR(h.data), descricao: h.descricao,
+        pontosLabel: (h.pontos > 0 ? '+' : '') + h.pontos,
+        pontosStyle: { color: h.pontos > 0 ? '#00e676' : '#ff6b6b' },
+      }));
+      this.setState({
+        loading: false,
+        result: {
+          nome: found.nome, cpfMasked: found.cpfMasked, pontos: found.pontos,
+          nextRewardName: next.nome, progressLabel: found.pontos + ' / ' + next.pontos + ' pts',
+          progressBarStyle: { height: '100%', width: pct + '%', background: 'linear-gradient(90deg,#00e676,#3ce396)' },
+          history,
+        },
+      });
+    });
+  };
+
+  renderVals() {
+    const { cpfInput, result, formError, loading } = this.state;
+    return {
+      cpfInput, onCpfChange: this.onCpfChange, onSubmit: this.onSubmit,
+      submitLabel: loading ? 'Consultando…' : 'Consultar', formError, result,
+    };
+  }
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+  <meta name="description" content="Regulamento — Clube de Vantagens Kartódromo de Betim">
+  <link rel="icon" type="image/png" href="assets/brand/kib-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size: 17px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    a { color: #00e676; }
+    a:hover { color: #3ce396; }
+    a:focus-visible { outline: 2px solid #00e676; outline-offset: 2px; }
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root) { animation: 260ms cubic-bezier(.16,1,.3,1) both kib-page-out; }
+    ::view-transition-new(root) { animation: 320ms cubic-bezier(.16,1,.3,1) both kib-page-in; }
+    @keyframes kib-page-out { to { opacity: 0; transform: translateY(-8px); } }
+    @keyframes kib-page-in { from { opacity: 0; transform: translateY(8px); } }
+    @media (prefers-reduced-motion: reduce) { ::view-transition-old(root), ::view-transition-new(root) { animation: none; } }
+  </style>
+</helmet>
+<div data-screen-label="Clube — Regulamento" style="min-height:100vh; background:#030504; color:#f7faf6;">
+
+  <header style="position:sticky; top:0; z-index:100; background:rgba(3,5,4,.92); backdrop-filter:blur(18px); border-bottom:1px solid rgba(255,255,255,.12);">
+    <div style="width:min(1200px,calc(100% - 40px)); margin:0 auto; min-height:74px; display:flex; align-items:center; justify-content:space-between; gap:16px;">
+      <a href="/clube-vantagens" style="width:150px; flex:none;"><img src="assets/brand/kib-logo.png" alt="Kartódromo Internacional de Betim" style="width:100%;"></a>
+      <a href="/clube-vantagens" style="font-size:12.5px; font-weight:700; color:#a8b2aa; text-decoration:none;">Voltar ao clube</a>
+    </div>
+    <nav aria-label="Menu do portal" style="width:min(1200px,calc(100% - 40px)); margin:0 auto; display:flex; gap:4px; overflow-x:auto; padding-bottom:2px;">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="8"><a href="{{ t.href }}" style="{{ t.style }}">{{ t.label }}</a></sc-for>
+    </nav>
+  </header>
+
+  <main style="width:min(840px,calc(100% - 40px)); margin:0 auto; padding:36px 0 80px; display:grid; gap:22px;">
+    <div>
+      <p style="margin:0 0 4px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.14em; text-transform:uppercase;">Termos</p>
+      <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(30px,4vw,44px); line-height:0.9;">Regulamento do clube</h1>
+    </div>
+
+    <sc-for list="{{ sections }}" as="s" hint-placeholder-count="4">
+      <section style="border-top:1px solid rgba(255,255,255,.12); padding-top:20px;">
+        <h2 style="margin:0 0 10px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:19px; color:#00e676;">{{ s.title }}</h2>
+        <div style="display:grid; gap:8px;">
+          <sc-for list="{{ s.items }}" as="i" hint-placeholder-count="3">
+            <p style="margin:0; color:#c8d0c9; font-size:15px; line-height:1.6;">{{ i }}</p>
+          </sc-for>
+        </div>
+      </section>
+    </sc-for>
+  </main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  currentTab = 'regulamento';
+
+  tabDefs() {
+    return [
+      { key: 'painel', label: 'Meu Painel', href: '/clube-painel' },
+      { key: 'pontuacao', label: 'Minha Pontuação', href: '/clube-pontuacao' },
+      { key: 'corridas', label: 'Histórico de Corridas', href: '/clube-corridas' },
+      { key: 'resgates', label: 'Histórico de Resgates', href: '/clube-resgates' },
+      { key: 'catalogo', label: 'Catálogo', href: '/clube-catalogo' },
+      { key: 'campanhas', label: 'Campanhas', href: '/clube-campanhas' },
+      { key: 'perfil', label: 'Meu Perfil', href: '/clube-perfil' },
+      { key: 'regulamento', label: 'Regulamento', href: '/clube-regulamento' },
+    ];
+  }
+
+  renderVals() {
+    const tabs = this.tabDefs().map((t) => ({
+      label: t.label, href: t.href,
+      style: { flex: 'none', padding: '10px 14px', fontSize: '12.5px', fontWeight: 700, textDecoration: 'none', borderBottom: '2px solid ' + (t.key === this.currentTab ? '#00e676' : 'transparent'), color: t.key === this.currentTab ? '#fff' : '#a8b2aa', whiteSpace: 'nowrap' },
+    }));
+
+    return {
+      tabs,
+      sections: [
+        {
+          title: '1. O programa', items: [
+            'O Clube de Vantagens é o programa oficial de relacionamento do Kartódromo Internacional de Betim, criado para reconhecer e recompensar os clientes que fazem parte da nossa história.',
+            'A adesão é gratuita e pode ser feita a qualquer momento pelo portal do Kartódromo.',
+          ],
+        },
+        {
+          title: '2. Pontuação', items: [
+            'Corridas realizadas de terça a sexta-feira geram 20 pontos.',
+            'Corridas realizadas aos sábados, domingos e feriados geram 10 pontos.',
+            'A pontuação é creditada automaticamente após a confirmação da corrida.',
+          ],
+        },
+        {
+          title: '3. Resgates', items: [
+            'Os pontos acumulados podem ser trocados por produtos, experiências e benefícios do catálogo.',
+            'O catálogo pode ser atualizado periodicamente conforme disponibilidade de estoque e campanhas promocionais.',
+            'Resgates aprovados não podem ser cancelados ou convertidos novamente em pontos.',
+          ],
+        },
+        {
+          title: '4. Campanhas especiais', items: [
+            'O programa poderá oferecer campanhas especiais durante o ano, como bônus de aniversário, campanhas de indicação e promoções em datas comemorativas.',
+            'As condições de cada campanha serão divulgadas no momento do seu lançamento.',
+          ],
+        },
+        {
+          title: '5. Disposições gerais', items: [
+            'O Kartódromo Internacional de Betim pode alterar este regulamento a qualquer momento, mediante aviso prévio aos participantes.',
+            'Dúvidas sobre o programa podem ser esclarecidas pelos canais de atendimento do Kartódromo.',
+          ],
+        },
+      ],
+    };
+  }
+}
+
+</script>
+</body>
+</html>

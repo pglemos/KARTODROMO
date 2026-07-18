@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+  <meta name="description" content="Conheça os campeonatos 500 Milhas, Desafio 2 Horas, 200 Milhas, KAC Super Kart e KAC Iniciantes de Betim.">
+  <link rel="icon" type="image/png" href="assets/brand/kib-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size: 17px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    a { color: #00e676; }
+    a:hover { color: #3ce396; }
+    ::selection { background: #00e676; color: #041301; }
+    img, video { display: block; max-width: 100%; }
+    button, input, select, textarea { font: inherit; }
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root) { animation: 320ms cubic-bezier(.16,1,.3,1) both kib-page-out; }
+    ::view-transition-new(root) { animation: 420ms cubic-bezier(.16,1,.3,1) both kib-page-in; }
+    @keyframes kib-page-out { to { opacity: 0; transform: translateX(-24px); filter: blur(3px); } }
+    @keyframes kib-page-in { from { opacity: 0; transform: translateX(24px); filter: blur(3px); } }
+    @media (prefers-reduced-motion: reduce) { ::view-transition-old(root), ::view-transition-new(root) { animation: none; } }
+    [style*="background:linear-gradient(135deg,#00e676,#00c853)"] { transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s; }
+    [style*="background:linear-gradient(135deg,#00e676,#00c853)"]:hover { transform: translateY(-4px); box-shadow: 0 22px 55px rgba(0,230,118,.4); }
+    [style*="background:rgba(255,255,255,.035)"][style*="border:1px solid rgba(255,255,255,.22)"] { transition: border-color .25s, color .25s, transform .25s cubic-bezier(.16,1,.3,1); }
+    [style*="background:rgba(255,255,255,.035)"][style*="border:1px solid rgba(255,255,255,.22)"]:hover { border-color:#00e676; color:#00e676; transform: translateY(-4px); }
+  </style>
+</helmet>
+<div data-screen-label="Campeonatos" style="min-height:100vh; background:#030504; color:#f7faf6;">
+
+  <a href="#conteudo" style="{{ skipLinkStyle }}">Pular para o conteúdo</a>
+  <div id="progress" aria-hidden="true" style="position:fixed; top:0; left:0; width:100%; height:3px; z-index:520; transform:scaleX(0); transform-origin:left; background:linear-gradient(90deg,#00e676,#3ce396); box-shadow:0 0 22px rgba(0,230,118,.55); pointer-events:none;"></div>
+
+  <header style="{{ headerStyle }}">
+    <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; min-height:84px; display:flex; align-items:center; justify-content:space-between; gap:24px;">
+      <a href="/" style="width:180px; flex:none;"><img src="assets/brand/kib-logo.png" alt="Kartódromo Internacional de Betim" style="width:100%; filter:drop-shadow(0 10px 24px rgba(0,0,0,.55));"></a>
+      <nav aria-label="Navegação principal" style="{{ navRowStyle }}">
+        <sc-for list="{{ navLinks }}" as="link" hint-placeholder-count="6">
+          <a href="{{ link.href }}" aria-current="{{ link.current }}" style="{{ link.style }}" style-hover="color:#ffffff; border-bottom-color:#00e676;">{{ link.label }}</a>
+        </sc-for>
+      </nav>
+      <a href="https://tools.mylaptime.com.br/booking?uid=5729bbc1-572b-4e32-84ec-e9e93ab08ced" target="_blank" rel="noopener noreferrer" style="{{ reservaCtaStyle }}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="1"/><path d="M16 3v4M8 3v4M3 10h18"/></svg> Reservar agora
+      </a>
+      <button type="button" aria-label="{{ menuToggleLabel }}" aria-controls="mobile-navigation" aria-expanded="{{ mobileNavOpen }}" onClick="{{ toggleMobileNav }}" style="{{ hamburgerBtnStyle }}">
+        <span style="{{ hamburgerLine1 }}"></span><span style="{{ hamburgerLine2 }}"></span><span style="{{ hamburgerLine3 }}"></span>
+      </button>
+    </div>
+  </header>
+
+  <nav id="mobile-navigation" aria-label="Navegação móvel" aria-hidden="{{ mobileNavClosed }}" style="{{ mobileNavStyle }}">
+    <sc-for list="{{ navLinks }}" as="link" hint-placeholder-count="6">
+      <a href="{{ link.href }}" onClick="{{ closeMobileNav }}" style="display:flex; align-items:center; min-height:58px; padding:13px 0; border-bottom:1px solid rgba(255,255,255,.12); font-family:'Anton',sans-serif; text-transform:uppercase; font-size:clamp(38px,11vw,60px); line-height:0.9; color:#f7faf6; text-decoration:none;">{{ link.label }}</a>
+    </sc-for>
+  </nav>
+
+  <main id="conteudo">
+  <!-- HERO -->
+  <section style="position:relative; overflow:hidden; padding-top:90px; background:#070b08; border-bottom:1px solid rgba(255,255,255,.1);">
+    <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:1fr auto; gap:32px; align-items:center; padding:100px 0 40px;">
+      <div style="max-width:640px;">
+        <p style="margin:0 0 16px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase; display:flex; align-items:center; gap:12px;"><span style="width:38px; height:1px; background:#00e676;"></span>Calendário competitivo</p>
+        <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; line-height:0.82; letter-spacing:-0.01em; font-size:clamp(44px,6.5vw,84px);">A temporada <span style="color:#00e676;">começa aqui</span></h1>
+        <p style="max-width:56ch; margin:22px 0 0; font-size:clamp(16px,1.3vw,19px); line-height:1.55; color:#d7ded8;">Faça parte da história do automobilismo mineiro. Inscreva sua equipe e acelere nas competições mais disputadas da região.</p>
+      </div>
+      <div style="text-align:right;">
+        <span aria-hidden="true" style="display:block; font-family:'Anton',sans-serif; font-size:clamp(60px,9vw,120px); line-height:0.7; color:transparent; -webkit-text-stroke:1px rgba(0,230,118,.4);">2026</span>
+        <span style="display:block; margin-top:-4px; font-family:'Anton',sans-serif; font-size:12px; text-transform:uppercase; letter-spacing:0.18em; color:#00e676;">temporada oficial</span>
+      </div>
+    </div>
+    <div style="border-top:1px solid rgba(255,255,255,.1); background:rgba(3,5,4,.5);">
+      <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:repeat(4,1fr);">
+        <sc-for list="{{ topStats }}" as="s" hint-placeholder-count="4">
+          <div style="display:flex; align-items:center; gap:12px; padding:20px; border-right:1px solid rgba(255,255,255,.08);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00e676" stroke-width="1.8" aria-hidden="true"><path d="{{ s.icon }}"/></svg>
+            <div><strong style="display:block; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px;">{{ s.title }}</strong><span style="font-size:11px; color:#8b948c;">{{ s.text }}</span></div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <!-- CARDS -->
+  <section style="padding:clamp(56px,7vw,90px) 0;">
+    <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:repeat(2,1fr); gap:20px;">
+      <sc-for list="{{ championships }}" as="c" hint-placeholder-count="5">
+        <article style="{{ c.cardStyle }}">
+          <div>
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:18px;">
+              <img src="{{ c.logo }}" alt="Logo {{ c.title }}" style="height:78px; width:78px; object-fit:contain;">
+              <span style="{{ c.badgeStyle }}">{{ c.statusLabel }}</span>
+            </div>
+            <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; line-height:0.9; font-size:26px;">{{ c.title }}</h2>
+            <p style="margin:14px 0 0; font-size:14px; line-height:1.55; color:#a8b2aa;">{{ c.desc }}</p>
+            <div style="margin:18px 0; display:flex; align-items:center; gap:8px; font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#8b948c;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="1"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+              <span>{{ c.dateLabel }}: {{ c.date }}</span>
+            </div>
+            <div style="border:1px solid rgba(255,255,255,.1); background:#030504; padding:18px;">
+              <h4 style="margin:0 0 10px; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; letter-spacing:0.08em;">Dados de inscrição necessários</h4>
+              <ul style="list-style:none; margin:0; padding:0; display:grid; gap:8px;">
+                <sc-for list="{{ c.requirements }}" as="req" hint-placeholder-count="4">
+                  <li style="display:flex; gap:8px; font-size:12px; color:#a8b2aa;"><span style="color:#00e676;">›</span>{{ req }}</li>
+                </sc-for>
+              </ul>
+            </div>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:10px; border-top:1px solid rgba(255,255,255,.1); padding-top:22px; margin-top:22px;">
+            <sc-if value="{{ c.canRegister }}">
+              <button type="button" onClick="{{ c.onRegister }}" style="display:inline-flex; align-items:center; gap:8px; min-height:48px; padding:0 20px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; letter-spacing:0.04em; border:0; cursor:pointer;">{{ c.registerLabel }}</button>
+            </sc-if>
+            <sc-if value="{{ c.pageHref }}">
+              <a href="{{ c.pageHref }}" style="display:inline-flex; align-items:center; gap:8px; min-height:48px; padding:0 20px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; letter-spacing:0.04em; text-decoration:none;">Página oficial</a>
+            </sc-if>
+            <sc-if value="{{ c.showWhatsapp }}">
+              <a href="{{ c.whatsappHref }}" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:8px; min-height:48px; padding:0 20px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; letter-spacing:0.04em; text-decoration:none;">Valores via WhatsApp</a>
+            </sc-if>
+            <sc-if value="{{ c.closedLabel }}"><span style="border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.05); padding:14px 20px; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; color:#5b615a;">{{ c.closedLabel }}</span></sc-if>
+          </div>
+        </article>
+      </sc-for>
+    </div>
+  </section>
+
+  <!-- EVOLUÇÃO -->
+  <section style="background:#070b08; border-top:1px solid rgba(255,255,255,.1); padding:clamp(56px,7vw,90px) 0;">
+    <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto;">
+      <p style="margin:0 0 14px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Evolução competitiva</p>
+      <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(30px,3.6vw,42px); line-height:0.95;">Do primeiro grid<br><span style="color:#00e676;">à longa duração</span></h2>
+      <p style="max-width:60ch; margin:16px 0 0; font-size:14.5px; color:#a8b2aa;">Comece no KAC Iniciantes, evolua para o Super Kart e descubra o trabalho de equipe nas provas de endurance.</p>
+      <div style="margin-top:34px; display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.1);">
+        <sc-for list="{{ evolutionSteps }}" as="e" hint-placeholder-count="3">
+          <div style="background:#0b100c; padding:28px;"><span style="font-family:'Anton',sans-serif; font-size:28px; color:#00e676;">{{ e.num }}</span><h3 style="margin:14px 0 0; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:16px;">{{ e.title }}</h3><p style="margin:8px 0 0; color:#a8b2aa; font-size:14px; line-height:1.5;">{{ e.text }}</p></div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <!-- BIG CTA -->
+  <section style="padding:clamp(56px,7vw,90px) 0;">
+    <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto;">
+      <div style="position:relative; overflow:hidden; border:1px solid rgba(255,255,255,.22); background:linear-gradient(135deg,#101711,#030504); padding:clamp(34px,5vw,72px); display:grid; grid-template-columns:1.2fr .8fr; gap:36px; align-items:center;">
+        <div style="min-width:0;"><h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(38px,5.5vw,68px); line-height:0.85;">Escolha sua categoria<br><span style="color:#00e676;">e entre no grid</span></h2><p style="margin:14px 0 0; color:#a8b2aa; font-size:18px;">A organização orienta sobre inscrições, pesos, regras e vagas disponíveis.</p></div>
+        <div style="display:grid; gap:12px;">
+          <a href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Gostaria%20de%20receber%20regulamentos%20e%20valores%20dos%20campeonatos%20do%20Kart%C3%B3dromo." target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;">Falar com a organização</a>
+          <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;">Falar no WhatsApp</a>
+        </div>
+      </div>
+    </div>
+  </section>
+  </main>
+
+  <!-- MODAL INSCRIÇÃO -->
+  <div role="dialog" aria-modal="true" aria-hidden="{{ modalClosed }}" aria-labelledby="reg-modal-title" style="{{ modalOverlayStyle }}" onClick="{{ closeModal }}">
+    <div style="width:min(560px,100%); max-height:90vh; overflow:auto; background:#0b100c; border:1px solid rgba(255,255,255,.15); box-shadow:0 30px 90px rgba(0,0,0,.55); position:relative;" onClick="{{ stopPropagation }}">
+      <div style="position:sticky; top:0; z-index:2; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid rgba(255,255,255,.1); background:rgba(11,16,12,.97); padding:20px 24px;">
+        <div><h3 id="reg-modal-title" style="margin:0; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:16px;">Formulário de inscrição</h3><p style="margin:4px 0 0; color:#00e676; font-size:12px; font-weight:700;">{{ selectedTitle }}</p></div>
+        <button type="button" onClick="{{ closeModal }}" aria-label="Fechar formulário" style="width:32px; height:32px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#c7cbc4; cursor:pointer;">×</button>
+      </div>
+      <form onSubmit="{{ onSubmitRegistration }}" style="padding:24px; display:grid; gap:14px;">
+        <sc-if value="{{ selectedIsTeam }}">
+          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">Nome da equipe *</label><input name="nome_equipe" type="text" required="" placeholder="Ex: Minas Racing Team" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">Nome do chefe de equipe *</label><input name="nome_chefe" type="text" required="" placeholder="Nome completo do responsável" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">Pilotos e pesos (um por linha) *</label><textarea name="pilotos" required="" placeholder="Ex: João Silva - 78kg" style="width:100%; min-height:90px; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none; resize:vertical;"></textarea></div>
+          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">Quantidade de karts *</label><input name="qtd_karts" type="number" min="1" max="50" required="" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+        </sc-if>
+        <sc-if value="{{ selectedIsIndividual }}">
+          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">Nome completo *</label><input name="nome" type="text" required="" placeholder="Nome e sobrenome" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+            <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">Idade</label><input name="idade" type="number" min="8" max="90" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+            <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">Peso (kg)</label><input name="peso" type="number" min="30" max="180" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+          </div>
+          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">Cidade</label><input name="cidade" type="text" placeholder="Betim / MG" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+        </sc-if>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">WhatsApp *</label><input name="whatsapp" type="tel" required="" placeholder="(31) 99999-9999" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">E-mail</label><input name="email" type="email" placeholder="voce@email.com" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+        </div>
+        <div style="background:rgba(0,230,118,.08); border:1px solid rgba(0,230,118,.25); padding:14px; font-size:12px; line-height:1.5; color:#7fd9a8;"><strong>Nota sobre pagamento:</strong> após o envio, sua inscrição fica pendente até a validação do Pix ou boleto com o chefe de equipe via WhatsApp.</div>
+        <button type="submit" style="width:100%; appearance:none; border:0; cursor:pointer; min-height:52px; clip-path:polygon(3% 0,100% 0,97% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12.5px; letter-spacing:0.04em;">Confirmar e enviar inscrição</button>
+      </form>
+    </div>
+  </div>
+
+  <footer style="border-top:1px solid rgba(255,255,255,.12); padding:64px 0 28px; background:#020302;">
+    <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:1.2fr .7fr .7fr; gap:50px;">
+      <div><img src="assets/brand/kib-logo.png" alt="Kartódromo Internacional de Betim" style="width:220px;"><p style="margin:16px 0 0; max-width:380px; color:#a8b2aa; line-height:1.55;">Pista homologada de 1.110 metros, kart de locação, campeonatos e estrutura para aniversários, grupos e empresas em Betim.</p></div>
+      <div>
+        <h3 style="margin:0 0 18px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:14px; color:#00e676;">Navegar</h3>
+        <div style="display:grid; gap:10px;">
+          <a href="/pista" style="display:flex; align-items:center; min-height:32px; color:#d7ddd8; text-decoration:none; transition:color .2s;" style-hover="color:#00e676;">A pista</a>
+          <a href="/kart-locacao" style="display:flex; align-items:center; min-height:32px; color:#d7ddd8; text-decoration:none; transition:color .2s;" style-hover="color:#00e676;">Kart de locação</a>
+          <a href="/campeonatos" style="display:flex; align-items:center; min-height:32px; color:#d7ddd8; text-decoration:none; transition:color .2s;" style-hover="color:#00e676;">Campeonatos</a>
+          <a href="/eventos" style="display:flex; align-items:center; min-height:32px; color:#d7ddd8; text-decoration:none; transition:color .2s;" style-hover="color:#00e676;">Eventos</a>
+          <a href="/duvidas" style="display:flex; align-items:center; min-height:32px; color:#d7ddd8; text-decoration:none; transition:color .2s;" style-hover="color:#00e676;">Dúvidas</a>
+        </div>
+      </div>
+      <div>
+        <h3 style="margin:0 0 18px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:14px; color:#00e676;">Contato</h3>
+        <div style="display:grid; gap:10px;">
+          <a href="tel:+553135112373" style="display:flex; align-items:center; min-height:32px; color:#d7ddd8; text-decoration:none; transition:color .2s;" style-hover="color:#00e676;">(31) 3511‑2373</a>
+          <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" style="display:flex; align-items:center; min-height:32px; color:#d7ddd8; text-decoration:none; transition:color .2s;" style-hover="color:#00e676;">(31) 99884‑2898</a>
+          <span style="color:#a8b2aa;">Av. Adutora Várzea das Flores, 477<br>Betim, MG</span>
+        </div>
+      </div>
+    </div>
+    <div style="width:min(1480px,calc(100% - 48px)); margin:46px auto 0; padding-top:22px; border-top:1px solid rgba(255,255,255,.12); display:flex; flex-wrap:wrap; justify-content:space-between; gap:20px; color:#667067; font-size:12px;">
+      <span>© 2026 Kartódromo Internacional de Betim</span><span>Motorsport editorial experience</span>
+    </div>
+  </footer>
+
+  <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" style="position:fixed; right:20px; bottom:20px; z-index:250; width:58px; height:58px; border-radius:50%; display:grid; place-items:center; background:#20d466; color:#fff; box-shadow:0 18px 45px rgba(32,212,102,.35); text-decoration:none; transition:transform .25s;" style-hover="transform:translateY(-5px) scale(1.05);">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-11.9 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5Z"/><path d="M8.5 8.5c.5 3 2 4.5 5 5"/></svg>
+  </a>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+
+const CHAMPIONSHIPS_DATA = [
+  { id: '500-milhas', title: '500 Milhas de Betim', desc: 'O maior desafio do calendário, com alto nível de competitividade e emoção. Uma corrida com 12 horas de duração que exige preparo físico, mental e estratégia apurada das equipes.', date: '22/08/2026', status: 'open', statusLabel: 'INSCRIÇÕES ABERTAS', logo: 'assets/championships/500-milhas-logo.png', requiresTeamForm: true, pageHref: '/500-milhas' },
+  { id: 'desafio-2h', title: 'Desafio 2 Horas de Betim', desc: 'Prova dinâmica e estratégica, com duas horas de corrida intensa. Ideal para quem busca adrenalina, constância e trabalho em equipe em um formato competitivo e equilibrado.', date: '08/08/2026', status: 'soon', statusLabel: 'INSCRIÇÕES EM BREVE', logo: 'assets/championships/desafio-2h-logo.png', requiresTeamForm: true, pageHref: null },
+  { id: '200-milhas', title: '200 Milhas de Betim', desc: 'Prova com duração de 5 horas que desafia estratégia, resistência e trabalho em equipe. Uma das corridas mais tradicionais do kartismo regional, reunindo pilotos em uma disputa intensa do início ao fim.', date: '07/02/2026', status: 'past', statusLabel: 'JÁ ACONTECEU', logo: 'assets/championships/200-milhas-logo.png', requiresTeamForm: true, pageHref: '/200-milhas' },
+  { id: 'kac-super-kart', title: 'KAC Super Kart', desc: 'Um campeonato anual disputado na categoria Super Kart com 9 etapas, sendo uma corrida por mês, para pilotos experientes.', date: 'Mensal', status: 'open', statusLabel: 'INSCRIÇÕES ABERTAS', logo: 'assets/championships/kac-super-kart-logo.png', requiresTeamForm: false, pageHref: '/kac-super' },
+  { id: 'kac-iniciantes', title: 'KAC Iniciantes', desc: 'Um campeonato mensal disputado na categoria Kart Light para pilotos iniciantes, com 7 corridas no mês. As 4 melhores corridas entram no ranking, com regulamento, calendário, pontuação e premiação oficiais.', date: 'Mensal', status: 'open', statusLabel: 'INSCRIÇÕES ABERTAS', logo: 'assets/championships/kac-iniciantes-logo.png', requiresTeamForm: false, pageHref: '/kac' },
+];
+
+class Component extends DCLogic {
+  state = { headerScrolled: false, mobileNavOpen: false, isMobile: typeof window !== 'undefined' && window.matchMedia('(max-width: 1100px)').matches, modalOpen: false, selectedId: null };
+
+  componentDidMount() {
+    this._onScroll = () => {
+      if (this._scrollFrame) return;
+      this._scrollFrame = requestAnimationFrame(() => {
+        this._scrollFrame = 0;
+        const scrolled = window.scrollY > 24;
+        if (scrolled !== this.state.headerScrolled) this.setState({ headerScrolled: scrolled });
+      });
+    };
+    window.addEventListener('scroll', this._onScroll, { passive: true });
+    this._mq = window.matchMedia('(max-width: 1100px)');
+    this._onMqChange = (e) => this.setState({ isMobile: e.matches });
+    if (this._mq.addEventListener) this._mq.addEventListener('change', this._onMqChange); else this._mq.addListener(this._onMqChange);
+    this._onKeydown = (e) => {
+      if (e.key === 'Escape') {
+        if (this.state.modalOpen) this.closeModal();
+        if (this.state.mobileNavOpen) this.setState({ mobileNavOpen: false });
+      }
+    };
+    window.addEventListener('keydown', this._onKeydown);
+    import('./motion.js').then((m) => { this._cleanup = m.initPageMotion({ progressBarSelector: '#progress' }); });
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('scroll', this._onScroll);
+    window.removeEventListener('keydown', this._onKeydown);
+    if (this._mq) { if (this._mq.removeEventListener) this._mq.removeEventListener('change', this._onMqChange); else this._mq.removeListener(this._onMqChange); }
+    if (this._cleanup) this._cleanup();
+  }
+
+  toggleMobileNav = () => this.setState((s) => ({ mobileNavOpen: !s.mobileNavOpen }));
+  closeMobileNav = () => this.setState({ mobileNavOpen: false });
+  openModal = (id) => { this._trigger = document.activeElement; this.setState({ modalOpen: true, selectedId: id }); };
+  closeModal = () => { this.setState({ modalOpen: false }); if (this._trigger && this._trigger.focus) this._trigger.focus(); };
+  stopPropagation = (e) => e.stopPropagation();
+
+  onSubmitRegistration = (e) => {
+    e.preventDefault();
+    const champ = CHAMPIONSHIPS_DATA.find((c) => c.id === this.state.selectedId);
+    const data = new FormData(e.target);
+    const lines = ['Olá! Quero me inscrever no ' + (champ ? champ.title : 'campeonato') + '.', ''];
+    if (champ && champ.requiresTeamForm) {
+      lines.push('Equipe: ' + (data.get('nome_equipe') || ''));
+      lines.push('Chefe de equipe: ' + (data.get('nome_chefe') || ''));
+      lines.push('Pilotos: ' + (data.get('pilotos') || ''));
+      lines.push('Qtd. karts: ' + (data.get('qtd_karts') || ''));
+    } else {
+      lines.push('Nome: ' + (data.get('nome') || ''));
+      lines.push('Idade: ' + (data.get('idade') || ''));
+      lines.push('Peso: ' + (data.get('peso') || ''));
+      lines.push('Cidade: ' + (data.get('cidade') || ''));
+    }
+    lines.push('WhatsApp: ' + (data.get('whatsapp') || ''));
+    lines.push('E-mail: ' + (data.get('email') || ''));
+    window.open('https://wa.me/5531998842898?text=' + encodeURIComponent(lines.join('\n')), '_blank', 'noopener,noreferrer');
+    this.closeModal();
+  };
+
+  renderVals() {
+    const { headerScrolled, mobileNavOpen, isMobile, modalOpen, selectedId } = this.state;
+    const navBase = { fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.04em', padding: '10px 0', borderBottom: '2px solid transparent', textDecoration: 'none', transition: 'color .25s, border-color .25s' };
+    const pages = [
+      { label: 'Home', href: '/', id: 'home' },
+      { label: 'A Pista', href: '/pista', id: 'pista' },
+      { label: 'Locação', href: '/kart-locacao', id: 'locacao' },
+      { label: 'Campeonatos', href: '/campeonatos', id: 'campeonatos' },
+      { label: 'Eventos', href: '/eventos', id: 'eventos' },
+      { label: 'Dúvidas', href: '/duvidas', id: 'duvidas' },
+    ];
+    const navLinks = pages.map((p) => ({ label: p.label, href: p.href, current: p.id === 'campeonatos' ? 'page' : undefined, style: { ...navBase, color: p.id === 'campeonatos' ? '#fff' : '#e1e6e1' } }));
+
+    const statusStyles = {
+      open: { background: 'rgba(0,230,118,.1)', color: '#00e676', border: '1px solid rgba(0,230,118,.3)' },
+      past: { background: 'rgba(255,255,255,.05)', color: 'rgba(255,255,255,.4)', border: '1px solid rgba(255,255,255,.1)' },
+      soon: { background: 'rgba(245,197,24,.1)', color: '#f5c518', border: '1px solid rgba(245,197,24,.25)' },
+    };
+    const badgeBase = { display: 'inline-flex', whiteSpace: 'nowrap', padding: '5px 12px', fontFamily: "'Anton',sans-serif", fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' };
+
+    const championships = CHAMPIONSHIPS_DATA.map((c) => ({
+      id: c.id, title: c.title, desc: c.desc, date: c.date, statusLabel: c.statusLabel, logo: c.logo,
+      dateLabel: c.status === 'open' ? (c.date === 'Mensal' ? 'Formato' : 'Data') : 'Data',
+      cardStyle: { display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid rgba(255,255,255,.12)', background: '#0b100c', padding: '28px', opacity: c.status === 'past' ? 0.55 : 1 },
+      badgeStyle: { ...badgeBase, ...statusStyles[c.status] },
+      requirements: c.requiresTeamForm
+        ? ['Nome oficial da equipe', 'Nome do chefe de equipe', 'Nome dos pilotos e peso individual em kg', 'Quantidade de karts participantes']
+        : ['Taxa de inscrição única do campeonato', 'Pagamento individual de cada etapa corrida'],
+      canRegister: c.status === 'open',
+      registerLabel: c.requiresTeamForm ? 'Formulário de inscrição' : 'Inscrição do piloto',
+      onRegister: () => this.openModal(c.id),
+      pageHref: c.pageHref,
+      showWhatsapp: c.status === 'open',
+      whatsappHref: 'https://wa.me/5531998842898?text=' + encodeURIComponent('Olá! Gostaria de saber valores e regulamento para o campeonato ' + c.title),
+      closedLabel: c.status === 'past' ? 'Inscrições encerradas' : c.status === 'soon' ? 'Em breve / Pré-inscrições' : null,
+    }));
+
+    const selected = CHAMPIONSHIPS_DATA.find((c) => c.id === selectedId);
+
+    return {
+      skipLinkStyle: { position: 'fixed', left: '16px', top: '12px', zIndex: 1000, padding: '12px 16px', background: '#00e676', color: '#041301', fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '12px', transform: 'translateY(-180%)', transition: 'transform .2s' },
+      headerStyle: { position: 'fixed', insetInline: 0, top: 0, zIndex: 300, transition: '.28s', background: headerScrolled ? 'rgba(3,5,4,.86)' : 'transparent', backdropFilter: headerScrolled ? 'blur(18px)' : 'none', borderBottom: headerScrolled ? '1px solid rgba(255,255,255,.12)' : '1px solid transparent' },
+      navLinks,
+      menuToggleLabel: mobileNavOpen ? 'Fechar menu' : 'Abrir menu',
+      mobileNavOpen,
+      mobileNavClosed: !mobileNavOpen,
+      hamburgerLine1: { display: 'block', width: '21px', height: '2px', background: '#fff', margin: '5px auto', transition: '.25s', transform: mobileNavOpen ? 'translateY(7px) rotate(45deg)' : 'none' },
+      hamburgerLine2: { display: 'block', width: '21px', height: '2px', background: '#fff', margin: '5px auto', transition: '.25s', opacity: mobileNavOpen ? 0 : 1 },
+      hamburgerLine3: { display: 'block', width: '21px', height: '2px', background: '#fff', margin: '5px auto', transition: '.25s', transform: mobileNavOpen ? 'translateY(-7px) rotate(-45deg)' : 'none' },
+      mobileNavStyle: { position: 'fixed', inset: 0, zIndex: 280, background: 'rgba(2,4,3,.98)', backdropFilter: 'blur(18px)', padding: '112px 24px 40px', display: 'grid', alignContent: 'start', opacity: mobileNavOpen ? 1 : 0, visibility: mobileNavOpen ? 'visible' : 'hidden', transform: mobileNavOpen ? 'none' : 'translateY(-18px)', transition: '.3s', pointerEvents: mobileNavOpen ? 'auto' : 'none' },
+      toggleMobileNav: this.toggleMobileNav,
+      closeMobileNav: this.closeMobileNav,
+      navRowStyle: { display: isMobile ? 'none' : 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 'clamp(14px,2vw,28px)', alignItems: 'center' },
+      reservaCtaStyle: { display: isMobile ? 'none' : 'inline-flex', flex: 'none', alignItems: 'center', gap: '8px', minHeight: '46px', padding: '0 20px', clipPath: 'polygon(7% 0,100% 0,93% 100%,0 100%)', background: 'linear-gradient(135deg,#00e676,#00c853)', color: '#041301', fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '12px', letterSpacing: '0.04em', textDecoration: 'none' },
+      hamburgerBtnStyle: { display: isMobile ? 'block' : 'none', width: '48px', height: '48px', flex: 'none', border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)', cursor: 'pointer' },
+
+      topStats: [
+        { icon: 'M3 5h18v16H3zM8 3v4M16 3v4M3 10h18', title: 'Temporada 2026', text: 'Etapas ao longo do ano' },
+        { icon: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75', title: 'Pilotos e equipes', text: 'Categorias para diferentes níveis' },
+        { icon: 'M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4ZM7 6H4v2a4 4 0 0 0 4 4M17 6h3v2a4 4 0 0 1-4 4', title: 'Premiação oficial', text: 'Troféus e classificação acumulada' },
+        { icon: 'M5 21V4m0 1c5-3 9 3 14 0v9c-5 3-9-3-14 0', title: 'Regras publicadas', text: 'Regulamentos para download' },
+      ],
+      championships,
+      evolutionSteps: [
+        { num: '01', title: 'KAC Iniciantes', text: 'Aprenda a competir com formato mensal e ambiente de evolução.' },
+        { num: '02', title: 'KAC Super Kart', text: 'Dispute uma temporada anual com pilotos mais experientes.' },
+        { num: '03', title: 'Endurance', text: 'Divida estratégia, ritmo e responsabilidade com sua equipe.' },
+      ],
+
+      modalOpen, closeModal: this.closeModal, stopPropagation: this.stopPropagation, onSubmitRegistration: this.onSubmitRegistration,
+      modalClosed: !modalOpen,
+      modalOverlayStyle: { position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(0,0,0,.78)', backdropFilter: 'blur(12px)', display: 'grid', placeItems: 'center', padding: '20px', opacity: modalOpen ? 1 : 0, visibility: modalOpen ? 'visible' : 'hidden', transition: '.3s', pointerEvents: modalOpen ? 'auto' : 'none' },
+      selectedTitle: selected ? selected.title : '',
+      selectedIsTeam: !!(selected && selected.requiresTeamForm),
+      selectedIsIndividual: !!(selected && !selected.requiresTeamForm),
+    };
+  }
+}
+
+</script>
+</body>
+</html>
