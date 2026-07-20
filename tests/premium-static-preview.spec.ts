@@ -78,8 +78,6 @@ async function comparePngBuffers(
         return {
           width: cleanImage.width,
           height: cleanImage.height,
-          referenceWidth: referenceImage.width,
-          referenceHeight: referenceImage.height,
           averageChannelDifference: Number.POSITIVE_INFINITY,
           significantPixelRatio: 1,
           maximumChannelDifference: 255,
@@ -153,6 +151,16 @@ async function preparePage(page: Page, url: string) {
     { timeout: 20_000 },
   );
 
+  await page.waitForFunction(
+    () => Array.from(document.images).every((image) => {
+      const source = image.currentSrc || image.getAttribute('src') || '';
+      if (!source || source.includes('{{')) return true;
+      return image.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
+    }),
+    undefined,
+    { timeout: 60_000 },
+  );
+
   await page.addStyleTag({ content: deterministicCss });
   await page.evaluate(async () => {
     await document.fonts.ready;
@@ -179,6 +187,14 @@ async function preparePage(page: Page, url: string) {
     return html.includes('{{') || html.includes('<sc-for');
   });
   expect(unresolvedTemplates, `${url} manteve templates não resolvidos no DOM final`).toBe(false);
+
+  const incompleteImages = await page.locator('img').evaluateAll((images) => images
+    .filter((image) => {
+      const source = image.currentSrc || image.getAttribute('src') || '';
+      return source && !source.includes('{{') && (!image.complete || image.naturalWidth === 0);
+    })
+    .map((image) => image.currentSrc || image.getAttribute('src')));
+  expect(incompleteImages, `${url} manteve imagens finais incompletas`).toEqual([]);
 
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
