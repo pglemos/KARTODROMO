@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:4174';
+const canonicalOrigin = 'https://kartodromodebetim.com.br';
 const viewports = [
   { width: 375, height: 812 },
   { width: 768, height: 1024 },
@@ -179,9 +180,10 @@ test.describe('pre-delivery checklist', () => {
         await page.goto(`${baseUrl}${path}`, { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(100);
         const result = await auditPage(page);
+        const expectedCanonical = `${canonicalOrigin}${path === '/' ? '' : path}`;
 
         expect(result.title, `${path} needs a route title`).not.toBe('');
-        expect(result.canonical, `${path} needs a canonical URL`).toContain(path === '/' ? baseUrl.replace('127.0.0.1:4174', 'kartodromodebetim.com.br') : path);
+        expect(result.canonical, `${path} needs a canonical URL`).toBe(expectedCanonical);
         expect(result.unresolvedTemplates, `${path} exposes template expressions`).toEqual([]);
         expect(result.designLinks, `${path} links to design documents`).toEqual([]);
         expect(result.emojiMatches, `${path} has emoji text/icons`).toHaveLength(0);
@@ -242,5 +244,11 @@ test.describe('pre-delivery checklist', () => {
     const championship = await request.get(`${baseUrl}/campeonatos/kac`, { maxRedirects: 0 });
     expect([301, 308]).toContain(championship.status());
     expect(championship.headers().location).toBe('/kac');
+  });
+
+  test('unknown public routes return a real 404', async ({ request }) => {
+    const response = await request.get(`${baseUrl}/rota-publica-inexistente`);
+    expect(response.status()).toBe(404);
+    expect(await response.text()).toContain('Essa rota não existe');
   });
 });
