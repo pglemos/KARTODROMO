@@ -125,10 +125,10 @@ function App() {
   const route = findPublicRoute(pathname);
 
   return (
-    <>
+    <div className="public-site">
       <ScrollController pathname={pathname} hash={hash} />
       {route ? <RouteContent routeKey={route.key} /> : <NotFoundPage />}
-    </>
+    </div>
   );
 }
 
