@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kartodromo-premium-preview",
+  "main": "workers/premium-preview-worker.mjs",
+  "compatibility_date": "2026-07-20",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "premium-dist",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "services": [
+    {
+      "binding": "LEGACY",
+      "service": "kartodromo"
+    }
+  ]
+}
