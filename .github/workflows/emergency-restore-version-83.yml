@@ -1,0 +1,23 @@
+name: Emergency restore Worker version 83
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  restore:
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'incident/restore-worker-version-83-2026-07-20'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Prepare restoration
+        run: echo 'Restoration workflow prepared'
