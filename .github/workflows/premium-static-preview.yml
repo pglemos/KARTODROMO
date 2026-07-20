@@ -44,8 +44,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Validate reference-copy contract
-        run: npx vitest run tests/premium-static-recovery.test.ts
+      - name: Validate ZIP source contract
+        run: npx vitest run tests/premium-zip-source.test.ts tests/premium-static-recovery.test.ts
 
       - name: Build exact premium references
         run: node scripts/build-premium-reference.mjs premium-dist
