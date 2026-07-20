@@ -75,9 +75,12 @@ jobs:
           exit 1
 
       - name: Responsive and accessibility audit
+        shell: bash
         env:
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:4174
-        run: npm run test:pre-delivery
+        run: |
+          set -o pipefail
+          npm run test:pre-delivery 2>&1 | tee /tmp/playwright.log
 
       - name: Build Cloudflare Worker
         run: npm run build:worker
@@ -91,6 +94,9 @@ jobs:
             /tmp/npm-lock.log
             /tmp/npm-ci.log
             /tmp/kartodromo-next.log
+            /tmp/playwright.log
+            playwright-report
+            test-results
           if-no-files-found: ignore
 
   deploy:
