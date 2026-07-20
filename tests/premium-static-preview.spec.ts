@@ -31,6 +31,10 @@ const deterministicCss = `
     transition: none !important;
     caret-color: transparent !important;
   }
+  a[href="#conteudo"] {
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
 `;
 
 type PixelComparison = {
@@ -133,6 +137,14 @@ async function comparePngBuffers(
   ) as Promise<PixelComparison>;
 }
 
+async function waitForRuntime(page: Page) {
+  await page.waitForFunction(
+    () => !document.body.innerText.includes('{{') && !document.body.innerText.includes('<sc-for'),
+    undefined,
+    { timeout: 20_000 },
+  );
+}
+
 async function preparePage(page: Page, url: string) {
   const failedResources: string[] = [];
   const listener = (response: { status(): number; url(): string }) => {
@@ -144,12 +156,7 @@ async function preparePage(page: Page, url: string) {
 
   const response = await page.goto(url, { waitUntil: 'domcontentloaded' });
   expect(response?.status(), `${url} deveria carregar`).toBeLessThan(400);
-
-  await page.waitForFunction(
-    () => !document.body.innerText.includes('{{') && !document.body.innerText.includes('<sc-for'),
-    undefined,
-    { timeout: 20_000 },
-  );
+  await waitForRuntime(page);
 
   await page.evaluate(async () => {
     const delay = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -181,6 +188,7 @@ async function preparePage(page: Page, url: string) {
   await page.addStyleTag({ content: deterministicCss });
   await page.evaluate(async () => {
     await document.fonts.ready;
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     document.querySelectorAll('[data-reveal]').forEach((element) => {
       const htmlElement = element as HTMLElement;
       htmlElement.style.opacity = '1';
@@ -275,5 +283,17 @@ test.describe('premium reference recovery', () => {
     await expect(page.locator('#event-modal')).toHaveAttribute('aria-hidden', 'false');
     await page.keyboard.press('Escape');
     await expect(page.locator('#event-modal')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  test('skip link aparece ao navegar por teclado', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const response = await page.goto(new URL('/', baseURL).href, { waitUntil: 'domcontentloaded' });
+    expect(response?.status()).toBe(200);
+    await waitForRuntime(page);
+
+    const skipLink = page.locator('a[href="#conteudo"]');
+    await page.keyboard.press('Tab');
+    await expect(skipLink).toBeFocused();
+    await expect(skipLink).toBeVisible();
   });
 });
