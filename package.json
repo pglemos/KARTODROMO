@@ -11,7 +11,7 @@
     "lint": "eslint app components lib services src api tests --max-warnings=0",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:pre-delivery": "playwright test tests/pre-delivery-audit.spec.ts",
+    "test:pre-delivery": "playwright test tests/pre-delivery-audit.spec.ts tests/public-navigation.spec.ts",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
