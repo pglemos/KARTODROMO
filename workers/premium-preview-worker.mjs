@@ -24,13 +24,23 @@ const normalizePath = (pathname) => {
   return pathname.replace(/\/+$/, "") || "/";
 };
 
-const withSecurityHeaders = (response, { reference = false } = {}) => {
+const withSecurityHeaders = (response, { reference = false, html = false } = {}) => {
   const headers = new Headers(response.headers);
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  headers.set("X-Premium-Site", "reference-source-v1");
+  headers.set("X-Premium-Site", "reference-source-v2");
+
+  if (html) {
+    headers.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    headers.set("CDN-Cache-Control", "no-store");
+    headers.set("Cloudflare-CDN-Cache-Control", "no-store");
+    headers.set("Pragma", "no-cache");
+    headers.set("Expires", "0");
+  }
+
   if (reference) headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -57,7 +67,7 @@ export default {
 
     const premiumAsset = PREMIUM_ROUTES.get(path);
     if (premiumAsset) {
-      return fetchAsset(env, premiumAsset);
+      return fetchAsset(env, premiumAsset, { html: true });
     }
 
     if (path === "/sitemap.xml" || path === "/robots.txt") {
@@ -74,13 +84,13 @@ export default {
     }
 
     if (path.startsWith("/design/")) {
-      return fetchAsset(env, path, { reference: true });
+      return fetchAsset(env, path, { reference: true, html: path.endsWith(".html") });
     }
 
     if (env.LEGACY && typeof env.LEGACY.fetch === "function") {
       return env.LEGACY.fetch(request);
     }
 
-    return fetchAsset(env, "/404.html", { reference: true });
+    return fetchAsset(env, "/404.html", { reference: true, html: true });
   },
 };
