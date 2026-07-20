@@ -1,0 +1,117 @@
+name: Emergency detach Cloudflare routes
+
+on:
+  push:
+    branches:
+      - deploy/production-rollback-worker-routes-2026-07-20
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: emergency-detach-kartodromo-routes
+  cancel-in-progress: false
+
+jobs:
+  detach:
+    name: Restore previous production origin
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+
+    steps:
+      - name: Detach Worker routes and purge cache
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          api='https://api.cloudflare.com/client/v4'
+          auth="Authorization: Bearer ${CLOUDFLARE_API_TOKEN}"
+
+          curl -fsS -G "${api}/zones" \
+            -H "$auth" \
+            -H 'Content-Type: application/json' \
+            --data-urlencode 'name=kartodromodebetim.com.br' \
+            --data-urlencode "account.id=${CLOUDFLARE_ACCOUNT_ID}" \
+            > /tmp/zones.json
+
+          zone_id=$(jq -r '.result[0].id // empty' /tmp/zones.json)
+          test -n "$zone_id"
+
+          curl -fsS "${api}/zones/${zone_id}/workers/routes" \
+            -H "$auth" \
+            -H 'Content-Type: application/json' \
+            > /tmp/routes-before.json
+
+          mapfile -t route_ids < <(jq -r '.result[] | select(.pattern == "kartodromodebetim.com.br/*" or .pattern == "www.kartodromodebetim.com.br/*") | .id' /tmp/routes-before.json)
+
+          for route_id in "${route_ids[@]}"; do
+            curl -fsS -X DELETE "${api}/zones/${zone_id}/workers/routes/${route_id}" \
+              -H "$auth" \
+              -H 'Content-Type: application/json' \
+              > "/tmp/deleted-${route_id}.json"
+            jq -e '.success == true' "/tmp/deleted-${route_id}.json" > /dev/null
+          done
+
+          curl -fsS -X POST "${api}/zones/${zone_id}/purge_cache" \
+            -H "$auth" \
+            -H 'Content-Type: application/json' \
+            --data '{"purge_everything":true}' \
+            > /tmp/purge.json
+          jq -e '.success == true' /tmp/purge.json > /dev/null
+
+          curl -fsS "${api}/zones/${zone_id}/workers/routes" \
+            -H "$auth" \
+            -H 'Content-Type: application/json' \
+            > /tmp/routes-after.json
+
+          remaining=$(jq '[.result[] | select(.pattern == "kartodromodebetim.com.br/*" or .pattern == "www.kartodromodebetim.com.br/*")] | length' /tmp/routes-after.json)
+          test "$remaining" -eq 0
+
+      - name: Verify restored public origin
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/origin-check
+
+          for attempt in $(seq 1 24); do
+            curl -sS -L --max-redirs 5 \
+              -H 'Cache-Control: no-cache' \
+              -H 'Pragma: no-cache' \
+              -D /tmp/origin-check/home.headers \
+              -o /tmp/origin-check/home.html \
+              -w '%{http_code} %{url_effective}\n' \
+              'https://kartodromodebetim.com.br/' \
+              > /tmp/origin-check/home.meta || true
+
+            read -r status effective < /tmp/origin-check/home.meta || true
+            if [[ "${status:-}" == '200' ]] \
+              && [[ "${effective:-}" != *'/design/'* ]] \
+              && ! grep -Fq '{{' /tmp/origin-check/home.html \
+              && ! grep -Fqi '^x-opennext: 1' /tmp/origin-check/home.headers; then
+              exit 0
+            fi
+            sleep 5
+          done
+
+          echo 'A origem anterior respondeu, mas ainda não passou na validação.'
+          cat /tmp/origin-check/home.meta || true
+          cat /tmp/origin-check/home.headers || true
+          exit 1
+
+      - name: Upload rollback evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: emergency-cloudflare-route-rollback
+          path: |
+            /tmp/zones.json
+            /tmp/routes-before.json
+            /tmp/routes-after.json
+            /tmp/deleted-*.json
+            /tmp/purge.json
+            /tmp/origin-check
+          if-no-files-found: ignore
