@@ -20,7 +20,7 @@ const expectedPages = [
 
 beforeAll(() => {
   rmSync(output, { recursive: true, force: true });
-  execFileSync(process.execPath, ['scripts/build-premium-static.mjs', output], {
+  execFileSync(process.execPath, ['scripts/build-premium-site.mjs', output], {
     cwd: root,
     stdio: 'pipe',
   });
@@ -46,7 +46,15 @@ describe('premium static recovery', () => {
       expect(html).not.toContain('<sc-for');
       expect(html).toMatch(/<h1[\s>]/i);
       expect(html).toMatch(/<meta name="description"/i);
+      expect(html).toContain("document.documentElement.classList.add('js')");
     }
+  });
+
+  it('mantém conteúdo visível sem JavaScript e anima somente com progressive enhancement', () => {
+    const css = readFileSync(join(output, 'assets/css/site.css'), 'utf8');
+    expect(css).toMatch(/\.reveal\s*\{\s*opacity:\s*1;/s);
+    expect(css).toMatch(/\.js\s+\.reveal\s*\{\s*opacity:\s*0;/s);
+    expect(css).not.toContain('rotate(-1deg) scale(1.01)');
   });
 
   it('gera os recursos compartilhados e rotas limpas', () => {
