@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ArrowRight, Clock, MapPin, Menu, Phone } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import MobileNavigation, { type PublicNavItem } from './site-ui/MobileNavigation';
@@ -27,10 +27,6 @@ const Header = () => {
   const pathname = usePathname() || '/';
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const closeMenu = useCallback(() => setIsMenuOpen(false), []);
-
-  useEffect(() => {
-    setIsMenuOpen(false);
-  }, [pathname]);
 
   return (
     <>
@@ -93,7 +89,7 @@ const Header = () => {
             <a
               href="/reservas"
               aria-current={pathname === '/reservas' ? 'page' : undefined}
-              className="group inline-flex min-h-11 items-center justify-center gap-2 bg-gradient-to-br from-primary-400 to-primary-600 px-5 font-display text-base uppercase tracking-[0.04em] text-ink-950 shadow-[0_14px_34px_rgba(0,230,118,.2)] [clip-path:polygon(10px_0,100%_0,calc(100%-10px)_100%,0_100%)] transition-transform hover:-translate-y-0.5"
+              className="group inline-flex min-h-11 items-center justify-center gap-2 bg-gradient-to-br from-primary-400 to-primary-600 px-5 font-display text-base uppercase tracking-[0.04em] text-ink-950 shadow-[0_14px_34px_rgba(0,230,118,.2)] [clip-path:polygon(7%_0,100%_0,93%_100%,0_100%)] transition-transform hover:-translate-y-0.5"
             >
               Reservar agora
               <ArrowRight aria-hidden="true" className="h-4 w-4 transition-transform group-hover:translate-x-1" />
