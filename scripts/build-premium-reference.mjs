@@ -30,16 +30,11 @@ for (const page of pages) {
 
 await cp(designDir, join(output, 'design'), { recursive: true });
 await cp(join(publicDir, 'assets'), join(output, 'assets'), { recursive: true });
-await cp(join(publicDir, 'support.js'), join(output, 'support.js'));
 
-for (const helper of ['motion.js', 'beneficios-nav.css']) {
-  const source = join(designDir, helper);
-  try {
-    await access(source);
-    await cp(source, join(output, helper));
-  } catch {
-    // Helper opcional. A validação de navegador detecta qualquer referência ausente.
-  }
+for (const helper of ['support.js', 'motion.js', 'beneficios-nav.css']) {
+  const source = join(publicDir, helper);
+  await access(source);
+  await cp(source, join(output, helper));
 }
 
 const routes = [
@@ -50,7 +45,7 @@ const site = 'https://kartodromodebetim.com.br';
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/sitemap/0.9">\n${routes.map((route) => `  <url><loc>${site}${route === '/' ? '/' : route}</loc><changefreq>weekly</changefreq><priority>${route === '/' ? '1.0' : '0.8'}</priority></url>`).join('\n')}\n</urlset>\n`;
 await writeFile(join(output, 'sitemap.xml'), sitemap);
 await writeFile(join(output, 'robots.txt'), `User-agent: *\nAllow: /\nDisallow: /design/\nSitemap: ${site}/sitemap.xml\n`);
-await writeFile(join(output, '_headers'), `/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  Permissions-Policy: camera=(), microphone=(), geolocation=()\n\n/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/support.js\n  Cache-Control: public, max-age=31536000, immutable\n\n/design/*\n  X-Robots-Tag: noindex, nofollow, noarchive\n  Cache-Control: public, max-age=300, must-revalidate\n`);
+await writeFile(join(output, '_headers'), `/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  Permissions-Policy: camera=(), microphone=(), geolocation=()\n\n/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/support.js\n  Cache-Control: public, max-age=31536000, immutable\n\n/motion.js\n  Cache-Control: public, max-age=31536000, immutable\n\n/beneficios-nav.css\n  Cache-Control: public, max-age=31536000, immutable\n\n/design/*\n  X-Robots-Tag: noindex, nofollow, noarchive\n  Cache-Control: public, max-age=300, must-revalidate\n`);
 
 const notFound = await readFile(join(designDir, 'home.dc.html'), 'utf8');
 const fallback = notFound
