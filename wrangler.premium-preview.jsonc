@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "kartodromo-premium-preview",
+  "name": "kartodromo-premium-reference",
   "main": "workers/premium-preview-worker.mjs",
   "compatibility_date": "2026-07-20",
   "compatibility_flags": ["nodejs_compat"],
