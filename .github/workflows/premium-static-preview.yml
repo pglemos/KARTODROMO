@@ -48,7 +48,7 @@ jobs:
         run: npx vitest run tests/premium-static-recovery.test.ts
 
       - name: Generate premium static site
-        run: node scripts/build-premium-static.mjs premium-dist
+        run: node scripts/build-premium-site.mjs premium-dist
 
       - name: Check JavaScript syntax
         run: |
