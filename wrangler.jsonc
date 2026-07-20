@@ -4,17 +4,7 @@
   "name": "kartodromo",
   "compatibility_date": "2026-07-20",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
-  "workers_dev": false,
-  "routes": [
-    {
-      "pattern": "kartodromodebetim.com.br/*",
-      "zone_name": "kartodromodebetim.com.br"
-    },
-    {
-      "pattern": "www.kartodromodebetim.com.br/*",
-      "zone_name": "kartodromodebetim.com.br"
-    }
-  ],
+  "workers_dev": true,
   "observability": {
     "enabled": true
   },
