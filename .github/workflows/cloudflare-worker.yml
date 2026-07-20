@@ -9,6 +9,11 @@ on:
   pull_request:
     branches:
       - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - labeled
 
 concurrency:
   group: cloudflare-worker-${{ github.ref }}
@@ -101,7 +106,16 @@ jobs:
 
   deploy:
     name: Deploy to Cloudflare Workers
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: >-
+      needs.verify.result == 'success' &&
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        (
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          contains(github.event.pull_request.labels.*.name, 'deploy-production')
+        )
+      )
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -111,8 +125,10 @@ jobs:
       statuses: write
 
     steps:
-      - name: Checkout
+      - name: Checkout deployment revision
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -140,10 +156,13 @@ jobs:
           script: |
             const succeeded = process.env.DEPLOY_OUTCOME === 'success';
             const outcome = process.env.DEPLOY_OUTCOME || 'not-run';
+            const sha = context.eventName === 'pull_request'
+              ? context.payload.pull_request.head.sha
+              : context.sha;
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              sha: context.sha,
+              sha,
               state: succeeded ? 'success' : 'failure',
               context: 'cloudflare/deploy',
               description: succeeded
