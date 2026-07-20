@@ -1,14 +1,14 @@
 const PREMIUM_ROUTES = new Map([
-  ["/", "/index.html"],
-  ["/pista", "/pista.html"],
-  ["/kart-locacao", "/kart-locacao.html"],
-  ["/campeonatos", "/campeonatos.html"],
-  ["/eventos", "/eventos.html"],
-  ["/duvidas", "/duvidas.html"],
-  ["/kac", "/kac.html"],
-  ["/kac-super", "/kac-super.html"],
-  ["/200-milhas", "/200-milhas.html"],
-  ["/500-milhas", "/500-milhas.html"],
+  ["/", "/design/home.dc.html"],
+  ["/pista", "/design/pista.dc.html"],
+  ["/kart-locacao", "/design/kart-locacao.dc.html"],
+  ["/campeonatos", "/design/campeonatos.dc.html"],
+  ["/eventos", "/design/eventos.dc.html"],
+  ["/duvidas", "/design/duvidas.dc.html"],
+  ["/kac", "/design/kac.dc.html"],
+  ["/kac-super", "/design/kac-super.dc.html"],
+  ["/200-milhas", "/design/200-milhas.dc.html"],
+  ["/500-milhas", "/design/500-milhas.dc.html"],
 ]);
 
 const PERMANENT_REDIRECTS = new Map([
@@ -24,12 +24,13 @@ const normalizePath = (pathname) => {
   return pathname.replace(/\/+$/, "") || "/";
 };
 
-const withSecurityHeaders = (response) => {
+const withSecurityHeaders = (response, { reference = false } = {}) => {
   const headers = new Headers(response.headers);
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  headers.set("X-Premium-Site", "preview-v1");
+  headers.set("X-Premium-Site", "reference-source-v1");
+  if (reference) headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -37,10 +38,10 @@ const withSecurityHeaders = (response) => {
   });
 };
 
-const fetchAsset = async (env, assetPath) => {
+const fetchAsset = async (env, assetPath, options = {}) => {
   const assetURL = new URL(assetPath, "https://assets.local");
   const response = await env.ASSETS.fetch(new Request(assetURL));
-  return withSecurityHeaders(response);
+  return withSecurityHeaders(response, options);
 };
 
 export default {
@@ -59,14 +60,27 @@ export default {
       return fetchAsset(env, premiumAsset);
     }
 
-    if (path === "/sitemap.xml" || path === "/robots.txt" || path.startsWith("/assets/")) {
+    if (path === "/sitemap.xml" || path === "/robots.txt") {
       return fetchAsset(env, path);
+    }
+
+    if (
+      path === "/support.js" ||
+      path === "/motion.js" ||
+      path === "/beneficios-nav.css" ||
+      path.startsWith("/assets/")
+    ) {
+      return fetchAsset(env, path);
+    }
+
+    if (path.startsWith("/design/")) {
+      return fetchAsset(env, path, { reference: true });
     }
 
     if (env.LEGACY && typeof env.LEGACY.fetch === "function") {
       return env.LEGACY.fetch(request);
     }
 
-    return fetchAsset(env, "/404.html");
+    return fetchAsset(env, "/404.html", { reference: true });
   },
 };
