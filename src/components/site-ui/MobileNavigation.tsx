@@ -47,6 +47,7 @@ export default function MobileNavigation({
       />
 
       <aside
+        id="mobile-navigation"
         ref={panelRef}
         role="dialog"
         aria-modal="true"
@@ -97,7 +98,7 @@ export default function MobileNavigation({
           <a
             href="/reservas"
             onClick={onClose}
-            className="mt-7 inline-flex min-h-14 w-full items-center justify-center bg-gradient-to-br from-primary-400 to-primary-600 px-6 font-display text-lg uppercase text-ink-950 shadow-[0_18px_44px_rgba(0,230,118,.22)] [clip-path:polygon(14px_0,100%_0,calc(100%-14px)_100%,0_100%)]"
+            className="mt-7 inline-flex min-h-14 w-full items-center justify-center bg-gradient-to-br from-primary-400 to-primary-600 px-6 font-display text-lg uppercase text-ink-950 shadow-[0_18px_44px_rgba(0,230,118,.22)] [clip-path:polygon(7%_0,100%_0,93%_100%,0_100%)]"
           >
             Reservar agora
           </a>
