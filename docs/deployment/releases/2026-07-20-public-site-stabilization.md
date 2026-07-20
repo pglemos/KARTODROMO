@@ -14,6 +14,7 @@ Publicação da estabilização do site público do Kartódromo Internacional de
 - remoção de dados e operações fictícias do Clube de Vantagens;
 - estado explícito de implantação nas áreas transacionais do Clube;
 - auditoria Playwright das 23 rotas em mobile, tablet e desktop;
+- rotas Cloudflare do domínio raiz e do `www` vinculadas ao Worker;
 - build e deploy por Cloudflare Workers.
 
 ## Verificação anterior
@@ -26,6 +27,17 @@ A versão foi aprovada em:
 - build Next.js;
 - Playwright em 375, 768, 1024 e 1440 px;
 - build OpenNext para Cloudflare Workers.
+
+## Verificação pós-deploy
+
+O pipeline valida o domínio público depois de cada publicação:
+
+- Home responde com HTTP 200 sem redirecionar para `/design`;
+- HTML não contém templates `{{ ... }}`;
+- canonical aponta para o domínio oficial;
+- páginas transacionais do Clube mostram `Portal em implantação`;
+- `/valores` redireciona permanentemente para `/kart-locacao`;
+- sitemap e robots estão disponíveis e coerentes.
 
 ## Procedimento
 
