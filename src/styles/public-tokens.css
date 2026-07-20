@@ -31,26 +31,22 @@
   -webkit-font-smoothing: antialiased;
 }
 
-.public-site :where(h1, h2, h3, h4, h5, h6) {
+:where(.public-site h1, .public-site h2, .public-site h3, .public-site h4, .public-site h5, .public-site h6) {
   margin-block: 0;
   font-family: var(--font-display), Impact, 'Arial Narrow', sans-serif;
   font-weight: 400;
   text-wrap: balance;
 }
 
-.public-site :where(p, li, dd, dt, label, input, select, textarea, button) {
-  font-family: var(--font-body), 'Rajdhani', ui-sans-serif, system-ui, sans-serif;
-}
-
-.public-site :where(p) {
+:where(.public-site p) {
   text-wrap: pretty;
 }
 
-.public-site :where(a) {
+:where(.public-site a) {
   text-underline-offset: 0.2em;
 }
 
-.public-site :where(img, video, svg) {
+:where(.public-site img, .public-site video, .public-site svg) {
   display: block;
   max-width: 100%;
 }
