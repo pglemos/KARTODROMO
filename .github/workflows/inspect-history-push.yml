@@ -1,0 +1,79 @@
+name: Inspect historical Worker versions push
+
+on:
+  push:
+    branches:
+      - fix/inspect-historical-worker-versions
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Inspect immutable version URLs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/version-audit
+          cat > /tmp/versions.txt <<'VERSIONS'
+          82|1e387c70-f5f0-4eb3-9924-f4d9cf0e8826
+          81|409fcb6b-f164-495c-801f-2ae8e10d583b
+          80|7d96f127-b7f4-4afc-ba78-2b7e39ad453c
+          79|35b70548-a27b-45c1-9742-ca84e3be6ce0
+          78|dd05f102-f72a-4a15-97f3-4d48236ff8ff
+          77|7b59f307-983e-4491-97cb-7c2658a364d1
+          76|54591a38-4c4c-4dc7-ab21-342c0b9205e9
+          75|2c15047d-c661-4125-a20f-948fd4b05603
+          74|07e0a72c-b4f7-42a9-8201-82c26589b9a3
+          73|263c6104-8070-4593-8b36-83c1199f8167
+          72|c19743c0-7894-4769-9827-95811c9a80a9
+          71|0108054a-bcf2-478c-b936-40cbb63943fc
+          70|57aa3b94-3073-47b9-ae76-6ae87d1c33d2
+          69|8ff12c9b-7cd0-44f6-bf23-1431674cef82
+          68|baebf846-73d8-4f33-b34c-9830f1356aea
+          67|fee0f3b3-5a87-4a5f-9ddb-748947feeebf
+          66|8609062d-fa5c-474e-8f4c-d4424d7fec00
+          65|75e394a8-e95f-4feb-8879-246c5ae6b578
+          64|5fdab760-aa4e-4087-a473-bf41525f0ca0
+          63|2c595a8a-aeda-48b0-924e-93a8fba33953
+          62|a99785f5-a0fc-4c93-a37b-09336cbc5574
+          61|0bbe4a72-756a-4ba8-9be4-96e43d73413c
+          60|9c8837fc-2c09-4fca-904e-54d61765d63f
+          VERSIONS
+
+          printf 'number\tversion\tstatus\teffective\tdesign\tplaceholder\topennext\tnextjs\tbytes\ttitle\n' > /tmp/version-audit/summary.tsv
+          while IFS='|' read -r number version; do
+            short="${version%%-*}"
+            base="https://${short}-kartodromo.kartodromo.workers.dev"
+            dir="/tmp/version-audit/${number}-${short}"
+            mkdir -p "$dir"
+            curl -sS -L --max-redirs 8 --connect-timeout 10 --max-time 30 \
+              -D "$dir/headers" -o "$dir/home.html" \
+              -w '%{http_code}\t%{url_effective}\t%{size_download}\n' \
+              "$base/" > "$dir/meta" || printf '000\t%s\t0\n' "$base/" > "$dir/meta"
+            IFS=$'\t' read -r status effective bytes < "$dir/meta"
+            design=0; placeholder=0; opennext=0; nextjs=0
+            [[ "$effective" == *'/design/'* ]] && design=1
+            grep -Fq '{{' "$dir/home.html" && placeholder=1 || true
+            grep -Eqi '^x-opennext:[[:space:]]*1' "$dir/headers" && opennext=1 || true
+            grep -Eqi '^x-powered-by:[[:space:]]*Next.js' "$dir/headers" && nextjs=1 || true
+            title=$(python - "$dir/home.html" <<'PY'
+import re,sys
+s=open(sys.argv[1],errors='ignore').read()
+m=re.search(r'<title[^>]*>(.*?)</title>',s,re.I|re.S)
+print(re.sub(r'\s+',' ',m.group(1)).strip() if m else '')
+PY
+)
+            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$number" "$version" "$status" "$effective" "$design" "$placeholder" "$opennext" "$nextjs" "$bytes" "$title" >> /tmp/version-audit/summary.tsv
+          done < /tmp/versions.txt
+          column -t -s $'\t' /tmp/version-audit/summary.tsv
+
+      - name: Upload version audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: historical-worker-version-audit
+          path: /tmp/version-audit
+          if-no-files-found: error
