@@ -24,7 +24,7 @@
     "mirror:bootstrap": "tsx services/laptime-mirror-server.ts --bootstrap",
     "mirror:install-autostart": "powershell -ExecutionPolicy Bypass -File scripts/install-laptime-mirror-autostart.ps1",
     "stream:tb50": "tsx services/tb50-streamer.ts",
-    "tb50:install-autostart": "powershell -ExecutionPolicy Bypass -File scripts/install-tb50-streamer-autostart.ps1",
+    "tb50:install-autostart": "powershell -ExecutionPolicy Bypass -File scripts/install-tb50-autostart.ps1",
     "tb50:install-watchdog": "powershell -ExecutionPolicy Bypass -File scripts/install-tb50-watchdog.ps1",
     "livetime:install-cloudflare-watch": "powershell -ExecutionPolicy Bypass -File scripts/install-cloudflare-vercel-watch.ps1"
   },
