@@ -1,4 +1,4 @@
-name: Premium static preview
+name: Premium reference preview
 
 on:
   push:
@@ -18,7 +18,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: premium-static-preview-${{ github.ref }}
+  group: premium-reference-preview-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -28,7 +28,7 @@ jobs:
       github.ref == 'refs/heads/fix/premium-static-recovery-2026-07-20' ||
       github.head_ref == 'fix/premium-static-recovery-2026-07-20'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     environment: production
 
     steps:
@@ -44,18 +44,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Validate generator contract
+      - name: Validate reference-copy contract
         run: npx vitest run tests/premium-static-recovery.test.ts
 
-      - name: Generate premium static site
-        run: node scripts/build-premium-site.mjs premium-dist
+      - name: Build exact premium references
+        run: node scripts/build-premium-reference.mjs premium-dist
 
-      - name: Check JavaScript syntax
+      - name: Check Worker and runtime syntax
         run: |
-          node --check premium-src/site.js
           node --check workers/premium-preview-worker.mjs
+          node --check premium-dist/support.js
 
-      - name: Deploy isolated premium Worker
+      - name: Deploy isolated reference Worker
         id: deploy
         shell: bash
         env:
@@ -69,7 +69,7 @@ jobs:
           echo "url=$preview_url" >> "$GITHUB_OUTPUT"
           echo "$preview_url" > /tmp/premium-preview-url.txt
 
-      - name: Smoke test clean premium routes
+      - name: Smoke test clean routes and runtime assets
         shell: bash
         env:
           PREMIUM_PREVIEW_URL: ${{ steps.deploy.outputs.url }}
@@ -88,21 +88,22 @@ jobs:
             test "$status" = '200'
             [[ "$effective" != *'/design/'* ]]
             grep -Fqi '<h1' "/tmp/premium-smoke/${key}.html"
-            grep -Fqi 'x-premium-site: preview-v1' "/tmp/premium-smoke/${key}.headers"
-            ! grep -Fq '{{' "/tmp/premium-smoke/${key}.html"
-            ! grep -Fq '<sc-for' "/tmp/premium-smoke/${key}.html"
-            ! grep -Fq '.dc' "/tmp/premium-smoke/${key}.html"
+            grep -Fqi 'x-premium-site: reference-source-v1' "/tmp/premium-smoke/${key}.headers"
           done
+          curl -fsS "${PREMIUM_PREVIEW_URL}/support.js" -o /tmp/premium-smoke/support.js
+          curl -fsS "${PREMIUM_PREVIEW_URL}/beneficios-nav.css" -o /tmp/premium-smoke/beneficios-nav.css
+          test -s /tmp/premium-smoke/support.js
+          test -s /tmp/premium-smoke/beneficios-nav.css
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Capture and audit preview
+      - name: Compare clean routes with original references
         env:
           PREMIUM_PREVIEW_URL: ${{ steps.deploy.outputs.url }}
         run: npx playwright test tests/premium-static-preview.spec.ts --reporter=html,line
 
-      - name: Publish preview URL on pull request
+      - name: Publish verified preview URL on pull request
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         env:
@@ -110,7 +111,7 @@ jobs:
         with:
           script: |
             const marker = '<!-- premium-static-preview -->';
-            const body = `${marker}\n## Preview premium isolado\n\n${process.env.PREVIEW_URL}\n\nEste Worker não possui domínio oficial e não altera produção. As 10 rotas foram verificadas sem \`/design\`, \`.dc\` ou placeholders.`;
+            const body = `${marker}\n## Preview idêntico às referências originais\n\n${process.env.PREVIEW_URL}\n\nAs 10 rotas limpas foram comparadas com os arquivos \`/design/*.dc.html\` originais em mobile, tablet e desktop. A execução só fica verde quando as capturas são byte a byte idênticas e o runtime resolve todos os placeholders.`;
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -134,16 +135,15 @@ jobs:
               });
             }
 
-      - name: Upload preview evidence
+      - name: Upload comparison evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: premium-static-preview-evidence
+          name: premium-reference-preview-evidence
           path: |
-            premium-dist
             /tmp/premium-preview-deploy.log
             /tmp/premium-preview-url.txt
             /tmp/premium-smoke
             playwright-report
-            test-results
+            test-results/premium-reference-comparison
           if-no-files-found: ignore
