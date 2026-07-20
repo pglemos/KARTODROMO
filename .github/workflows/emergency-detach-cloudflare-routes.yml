@@ -1,4 +1,4 @@
-name: Recover previous Cloudflare DNS configuration
+name: Recover previous Worker deployment
 
 on:
   push:
@@ -17,12 +17,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: recover-kartodromo-dns-history
+  group: recover-kartodromo-worker-deployment
   cancel-in-progress: true
 
 jobs:
-  audit:
-    name: Collect Cloudflare audit evidence
+  inspect:
+    name: Collect Worker versions and deployments
     if: >-
       github.event_name != 'pull_request' ||
       github.head_ref == 'deploy/production-rollback-worker-routes-2026-07-20'
@@ -31,88 +31,85 @@ jobs:
     environment: production
 
     steps:
-      - name: Collect zone and audit logs
+      - name: Collect Worker deployment history
         shell: bash
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          mkdir -p /tmp/cloudflare-audit
+          mkdir -p /tmp/worker-history
           api='https://api.cloudflare.com/client/v4'
           auth="Authorization: Bearer ${CLOUDFLARE_API_TOKEN}"
-          since='2026-07-20T15:00:00Z'
-          before='2026-07-20T19:00:00Z'
+          script='kartodromo'
+
+          curl -sS "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/${script}/deployments" \
+            -H "$auth" -H 'Content-Type: application/json' \
+            -o /tmp/worker-history/deployments.json \
+            -w '%{http_code}\n' > /tmp/worker-history/deployments.status
+
+          curl -sS -G "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/workers/${script}/versions" \
+            -H "$auth" -H 'Content-Type: application/json' \
+            --data-urlencode 'per_page=100' \
+            -o /tmp/worker-history/versions.json \
+            -w '%{http_code}\n' > /tmp/worker-history/versions.status
+
+          curl -sS "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/${script}/settings" \
+            -H "$auth" -H 'Content-Type: application/json' \
+            -o /tmp/worker-history/settings.json \
+            -w '%{http_code}\n' > /tmp/worker-history/settings.status
+
+          curl -sS "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/domains" \
+            -H "$auth" -H 'Content-Type: application/json' \
+            -o /tmp/worker-history/domains.json \
+            -w '%{http_code}\n' > /tmp/worker-history/domains.status
 
           curl -sS -G "${api}/zones" \
             -H "$auth" -H 'Content-Type: application/json' \
             --data-urlencode 'name=kartodromodebetim.com.br' \
             --data-urlencode "account.id=${CLOUDFLARE_ACCOUNT_ID}" \
-            -o /tmp/cloudflare-audit/zones.json \
-            -w '%{http_code}\n' > /tmp/cloudflare-audit/zones.status
+            -o /tmp/worker-history/zones.json \
+            -w '%{http_code}\n' > /tmp/worker-history/zones.status
 
-          zone_id=$(jq -r '.result[0].id // empty' /tmp/cloudflare-audit/zones.json 2>/dev/null || true)
-          echo "$zone_id" > /tmp/cloudflare-audit/zone-id.txt
-
-          curl -sS -G "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/audit_logs" \
-            -H "$auth" -H 'Content-Type: application/json' \
-            --data-urlencode "since=${since}" \
-            --data-urlencode "before=${before}" \
-            --data-urlencode 'per_page=1000' \
-            --data-urlencode 'direction=desc' \
-            -o /tmp/cloudflare-audit/audit-v1-all.json \
-            -w '%{http_code}\n' > /tmp/cloudflare-audit/audit-v1-all.status
-
+          zone_id=$(jq -r '.result[0].id // empty' /tmp/worker-history/zones.json 2>/dev/null || true)
           if [[ -n "$zone_id" ]]; then
-            curl -sS -G "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/audit_logs" \
+            curl -sS "${api}/zones/${zone_id}/workers/routes" \
               -H "$auth" -H 'Content-Type: application/json' \
-              --data-urlencode "since=${since}" \
-              --data-urlencode "before=${before}" \
-              --data-urlencode "zone_id=${zone_id}" \
-              --data-urlencode 'per_page=1000' \
-              --data-urlencode 'direction=desc' \
-              -o /tmp/cloudflare-audit/audit-v1-zone.json \
-              -w '%{http_code}\n' > /tmp/cloudflare-audit/audit-v1-zone.status
-          fi
-
-          curl -sS -G "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/logs/audit" \
-            -H "$auth" -H 'Content-Type: application/json' \
-            --data-urlencode "since=${since}" \
-            --data-urlencode "before=${before}" \
-            --data-urlencode 'limit=1000' \
-            -o /tmp/cloudflare-audit/audit-v2-all.json \
-            -w '%{http_code}\n' > /tmp/cloudflare-audit/audit-v2-all.status
-
-          if [[ -n "$zone_id" ]]; then
+              -o /tmp/worker-history/routes.json \
+              -w '%{http_code}\n' > /tmp/worker-history/routes.status
             curl -sS -G "${api}/zones/${zone_id}/dns_records" \
               -H "$auth" -H 'Content-Type: application/json' \
               --data-urlencode 'per_page=100' \
-              -o /tmp/cloudflare-audit/dns-current.json \
-              -w '%{http_code}\n' > /tmp/cloudflare-audit/dns-current.status
-
-            curl -sS "${api}/zones/${zone_id}/workers/routes" \
-              -H "$auth" -H 'Content-Type: application/json' \
-              -o /tmp/cloudflare-audit/routes-current.json \
-              -w '%{http_code}\n' > /tmp/cloudflare-audit/routes-current.status
+              -o /tmp/worker-history/dns.json \
+              -w '%{http_code}\n' > /tmp/worker-history/dns.status
           fi
 
-          curl -sS "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/domains" \
-            -H "$auth" -H 'Content-Type: application/json' \
-            -o /tmp/cloudflare-audit/worker-domains-current.json \
-            -w '%{http_code}\n' > /tmp/cloudflare-audit/worker-domains-current.status
+          jq -r '.result[]? | [
+            .created_on,
+            .id,
+            .source,
+            ((.versions // []) | map(.version_id + ":" + (.percentage|tostring)) | join(",")),
+            (.annotations["workers/message"] // ""),
+            (.annotations["workers/triggered_by"] // "")
+          ] | @tsv' /tmp/worker-history/deployments.json > /tmp/worker-history/deployments.tsv 2>/dev/null || true
 
-          for file in /tmp/cloudflare-audit/audit-v1-all.json /tmp/cloudflare-audit/audit-v1-zone.json /tmp/cloudflare-audit/audit-v2-all.json; do
-            [[ -f "$file" ]] || continue
-            jq '.. | objects | select((.action.type? // .action? // .type? // "") | tostring | test("dns|record|worker|domain|route"; "i"))' "$file" > "${file%.json}-filtered.json" 2>/dev/null || true
-          done
+          jq -r '.result[]? | [
+            .created_on,
+            .id,
+            (.number|tostring),
+            (.annotations["workers/message"] // ""),
+            (.annotations["workers/triggered_by"] // "")
+          ] | @tsv' /tmp/worker-history/versions.json > /tmp/worker-history/versions.tsv 2>/dev/null || true
 
           echo 'HTTP statuses:'
-          for status in /tmp/cloudflare-audit/*.status; do printf '%s: ' "$(basename "$status")"; cat "$status"; done
+          for status in /tmp/worker-history/*.status; do printf '%s: ' "$(basename "$status")"; cat "$status"; done
+          echo 'Deployments:'
+          cat /tmp/worker-history/deployments.tsv || true
 
-      - name: Upload Cloudflare audit evidence
+      - name: Upload Worker deployment history
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cloudflare-dns-history-audit
-          path: /tmp/cloudflare-audit
+          name: worker-deployment-history
+          path: /tmp/worker-history
           if-no-files-found: error
