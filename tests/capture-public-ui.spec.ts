@@ -61,7 +61,9 @@ async function preparePage(page: Page, url: string, expectTemplatesResolved: boo
     ).catch(() => undefined);
   }
 
-  await page.waitForTimeout(750);
+  // Stat counters and client-rendered reference values need one complete animation frame cycle
+  // before animations are disabled for the screenshot.
+  await page.waitForTimeout(1_600);
 }
 
 test.describe.configure({ mode: 'serial' });
