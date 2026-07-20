@@ -9,6 +9,8 @@ export default tseslint.config(
     ignores: [
       'dist/**',
       '.next/**',
+      '.open-next/**',
+      '.wrangler/**',
       '.aiox-core/**',
       '.agents/**',
       '.codex/**',
@@ -30,5 +32,20 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': 'off',
     },
-  }
+  },
+  {
+    files: [
+      'tests/**/*.{ts,tsx}',
+      'app/**/*.test.{ts,tsx}',
+      'lib/**/*.test.{ts,tsx}',
+      'next.config.ts',
+      'open-next.config.ts',
+    ],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
+    },
+  },
 );
