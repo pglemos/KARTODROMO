@@ -1,0 +1,113 @@
+.public-site {
+  --public-bg: #030504;
+  --public-surface: #070b08;
+  --public-surface-raised: #0b100c;
+  --public-surface-strong: #101711;
+  --public-accent: #00e676;
+  --public-accent-action: #00c853;
+  --public-accent-deep: #007a30;
+  --public-text: #f7faf6;
+  --public-text-muted: #aeb8b0;
+  --public-text-faint: #7f8a81;
+  --public-border: rgba(247, 250, 246, 0.12);
+  --public-border-strong: rgba(247, 250, 246, 0.22);
+  --public-accent-border: rgba(0, 230, 118, 0.38);
+  --public-danger: #ff7474;
+  --public-warning: #f2b23b;
+  --public-container: 92rem;
+  --public-reading: 46rem;
+  --public-shadow-card: 0 24px 70px rgba(0, 0, 0, 0.34);
+  --public-shadow-action: 0 18px 48px rgba(0, 230, 118, 0.2);
+  --public-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  min-height: 100svh;
+  overflow: clip;
+  background: var(--public-bg);
+  color: var(--public-text);
+  color-scheme: dark;
+  font-family: var(--font-body), 'Rajdhani', ui-sans-serif, system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+.public-site :where(h1, h2, h3, h4, h5, h6) {
+  margin-block: 0;
+  color: var(--public-text);
+  font-family: var(--font-display), Impact, 'Arial Narrow', sans-serif;
+  font-weight: 400;
+  text-wrap: balance;
+}
+
+.public-site :where(p, li, dd, dt, label, input, select, textarea, button) {
+  font-family: var(--font-body), 'Rajdhani', ui-sans-serif, system-ui, sans-serif;
+}
+
+.public-site :where(p) {
+  text-wrap: pretty;
+}
+
+.public-site :where(a) {
+  color: inherit;
+  text-underline-offset: 0.2em;
+}
+
+.public-site :where(img, video, svg) {
+  display: block;
+  max-width: 100%;
+}
+
+.public-site ::selection {
+  background: var(--public-accent);
+  color: #041301;
+}
+
+.public-site .public-container {
+  width: min(var(--public-container), calc(100% - 2rem));
+  margin-inline: auto;
+}
+
+.public-site .public-section {
+  padding-block: clamp(4.75rem, 8vw, 8.5rem);
+}
+
+.public-site .public-eyebrow {
+  color: var(--public-accent);
+  font-family: var(--font-body), 'Rajdhani', sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.17em;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.public-site .public-card {
+  border: 1px solid var(--public-border);
+  background: var(--public-surface-raised);
+  box-shadow: var(--public-shadow-card);
+}
+
+.public-site .public-muted {
+  color: var(--public-text-muted);
+}
+
+.public-site .public-angle {
+  clip-path: polygon(0.75rem 0, 100% 0, calc(100% - 0.75rem) 100%, 0 100%);
+}
+
+@media (min-width: 48rem) {
+  .public-site .public-container {
+    width: min(var(--public-container), calc(100% - 3rem));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-site *,
+  .public-site *::before,
+  .public-site *::after {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    scroll-behavior: auto;
+    transition-duration: 0.01ms;
+  }
+}
