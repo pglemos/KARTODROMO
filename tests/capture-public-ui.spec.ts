@@ -37,15 +37,6 @@ const deterministicCss = `
 `;
 
 async function preparePage(page: Page, url: string, expectTemplatesResolved: boolean) {
-  await page.route('**/*', async (route) => {
-    const resourceType = route.request().resourceType();
-    if (resourceType === 'media') {
-      await route.abort();
-      return;
-    }
-    await route.continue();
-  });
-
   const response = await page.goto(url, { waitUntil: 'domcontentloaded' });
   expect(response?.status(), `${url} should load`).toBeLessThan(400);
 
@@ -57,7 +48,7 @@ async function preparePage(page: Page, url: string, expectTemplatesResolved: boo
       try {
         video.currentTime = 0;
       } catch {
-        // Cross-browser media implementations may reject seeking before metadata.
+        // Media implementations may reject seeking before metadata.
       }
     });
   });
@@ -80,6 +71,14 @@ mkdirSync(outputDir, { recursive: true });
 
 for (const viewport of viewports) {
   test(`captures ${viewport.name} public UI baseline`, async ({ page }) => {
+    await page.route('**/*', async (route) => {
+      if (route.request().resourceType() === 'media') {
+        await route.abort();
+        return;
+      }
+      await route.continue();
+    });
+
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
 
     for (const item of pages) {
