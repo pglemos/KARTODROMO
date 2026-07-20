@@ -26,6 +26,7 @@ test.describe('premium static preview', () => {
     for (const [name, route] of routes) {
       test(`${name} ${viewport.name}`, async ({ page }) => {
         await page.setViewportSize(viewport);
+        await page.emulateMedia({ reducedMotion: 'reduce' });
         const response = await page.goto(`${baseURL}${route}`, { waitUntil: 'networkidle' });
         expect(response?.status()).toBe(200);
         expect(page.url()).not.toContain('/design/');
@@ -56,5 +57,15 @@ test.describe('premium static preview', () => {
     await page.keyboard.press('Escape');
     await expect(button).toHaveAttribute('aria-expanded', 'false');
     await expect(button).toBeFocused();
+  });
+
+  test('conteúdo permanece visível quando JavaScript está desabilitado', async ({ browser }) => {
+    const context = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 844 } });
+    const page = await context.newPage();
+    const response = await page.goto(`${baseURL}/`, { waitUntil: 'load' });
+    expect(response?.status()).toBe(200);
+    await expect(page.locator('.poster-card').first()).toBeVisible();
+    await expect(page.locator('.step').first()).toBeVisible();
+    await context.close();
   });
 });
