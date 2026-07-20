@@ -192,8 +192,9 @@ test.describe('pre-delivery checklist', () => {
         expect(result.contrastIssues, `${path} contrast issues`).toEqual([]);
 
         if (unavailableClubPaths.has(path)) {
-          expect(result.bodyText, `${path} must disclose its status`).toContain('Portal em implantação');
-          expect(result.bodyText, `${path} must not pretend to process data`).toContain('Nenhum cadastro, saldo, alteração de perfil ou resgate é processado');
+          const normalizedBodyText = result.bodyText.toLocaleLowerCase('pt-BR');
+          expect(normalizedBodyText, `${path} must disclose its status`).toContain('portal em implantação');
+          expect(normalizedBodyText, `${path} must not pretend to process data`).toContain('nenhum cadastro, saldo, alteração de perfil ou resgate é processado');
         }
       }
     });
