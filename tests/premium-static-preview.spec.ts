@@ -36,10 +36,21 @@ const deterministicCss = `
 
 const sha256 = (buffer: Buffer) => createHash('sha256').update(buffer).digest('hex');
 
+function isTransientTemplateRequest(url: string) {
+  try {
+    const decodedURL = decodeURIComponent(url);
+    return decodedURL.includes('{{') && decodedURL.includes('}}');
+  } catch {
+    return false;
+  }
+}
+
 async function preparePage(page: Page, url: string) {
   const failedResources: string[] = [];
   const listener = (response: { status(): number; url(): string }) => {
-    if (response.status() >= 400) failedResources.push(`${response.status()} ${response.url()}`);
+    if (response.status() >= 400 && !isTransientTemplateRequest(response.url())) {
+      failedResources.push(`${response.status()} ${response.url()}`);
+    }
   };
   page.on('response', listener);
 
@@ -73,11 +84,17 @@ async function preparePage(page: Page, url: string) {
   await page.waitForTimeout(250);
 
   await expect(page.locator('h1')).toBeVisible();
+  const unresolvedTemplates = await page.locator('body').evaluate((body) => {
+    const html = body.innerHTML;
+    return html.includes('{{') || html.includes('<sc-for');
+  });
+  expect(unresolvedTemplates, `${url} manteve templates não resolvidos no DOM final`).toBe(false);
+
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(overflow, `${url} possui overflow horizontal`).toBeLessThanOrEqual(1);
-  expect(failedResources, `Recursos quebrados em ${url}`).toEqual([]);
+  expect(failedResources, `Recursos reais quebrados em ${url}`).toEqual([]);
   page.off('response', listener);
 }
 
