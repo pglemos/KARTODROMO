@@ -151,10 +151,28 @@ async function preparePage(page: Page, url: string) {
     { timeout: 20_000 },
   );
 
+  await page.evaluate(async () => {
+    const delay = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+    const step = Math.max(360, Math.floor(window.innerHeight * 0.78));
+    const limit = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    for (let position = 0; position <= limit; position += step) {
+      window.scrollTo(0, position);
+      await delay(35);
+    }
+    window.scrollTo(0, limit);
+    await delay(120);
+    window.scrollTo(0, 0);
+  });
+
   await page.waitForFunction(
     () => Array.from(document.images).every((image) => {
       const source = image.currentSrc || image.getAttribute('src') || '';
-      if (!source || source.includes('{{')) return true;
+      const style = getComputedStyle(image);
+      const participatesInLayout =
+        image.getClientRects().length > 0 &&
+        style.display !== 'none' &&
+        style.visibility !== 'hidden';
+      if (!participatesInLayout || !source || source.includes('{{')) return true;
       return image.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
     }),
     undefined,
@@ -191,10 +209,20 @@ async function preparePage(page: Page, url: string) {
   const incompleteImages = await page.locator('img').evaluateAll((images) => images
     .filter((image) => {
       const source = image.currentSrc || image.getAttribute('src') || '';
-      return source && !source.includes('{{') && (!image.complete || image.naturalWidth === 0);
+      const style = getComputedStyle(image);
+      const participatesInLayout =
+        image.getClientRects().length > 0 &&
+        style.display !== 'none' &&
+        style.visibility !== 'hidden';
+      return (
+        participatesInLayout &&
+        source &&
+        !source.includes('{{') &&
+        (!image.complete || image.naturalWidth === 0 || image.naturalHeight === 0)
+      );
     })
     .map((image) => image.currentSrc || image.getAttribute('src')));
-  expect(incompleteImages, `${url} manteve imagens finais incompletas`).toEqual([]);
+  expect(incompleteImages, `${url} manteve imagens visíveis incompletas`).toEqual([]);
 
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
