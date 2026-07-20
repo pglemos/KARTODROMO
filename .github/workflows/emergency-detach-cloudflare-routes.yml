@@ -27,11 +27,11 @@ jobs:
       github.event_name != 'pull_request' ||
       github.head_ref == 'deploy/production-rollback-worker-routes-2026-07-20'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     environment: production
 
     steps:
-      - name: Detach Worker routes and purge cache
+      - name: Detach Worker routes, custom domains and purge cache
         shell: bash
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -52,34 +52,49 @@ jobs:
           test -n "$zone_id"
 
           curl -fsS "${api}/zones/${zone_id}/workers/routes" \
-            -H "$auth" \
-            -H 'Content-Type: application/json' \
+            -H "$auth" -H 'Content-Type: application/json' \
             > /tmp/routes-before.json
 
           mapfile -t route_ids < <(jq -r '.result[] | select(.pattern == "kartodromodebetim.com.br/*" or .pattern == "www.kartodromodebetim.com.br/*") | .id' /tmp/routes-before.json)
-
           for route_id in "${route_ids[@]}"; do
             curl -fsS -X DELETE "${api}/zones/${zone_id}/workers/routes/${route_id}" \
-              -H "$auth" \
-              -H 'Content-Type: application/json' \
-              > "/tmp/deleted-${route_id}.json"
-            jq -e '.success == true' "/tmp/deleted-${route_id}.json" > /dev/null
+              -H "$auth" -H 'Content-Type: application/json' \
+              > "/tmp/deleted-route-${route_id}.json"
+            jq -e '.success == true' "/tmp/deleted-route-${route_id}.json" > /dev/null
           done
 
+          curl -fsS "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/domains" \
+            -H "$auth" -H 'Content-Type: application/json' \
+            > /tmp/worker-domains-before.json
+
+          mapfile -t domain_ids < <(jq -r '.result[] | select(.hostname == "kartodromodebetim.com.br" or .hostname == "www.kartodromodebetim.com.br") | .id' /tmp/worker-domains-before.json)
+          for domain_id in "${domain_ids[@]}"; do
+            curl -fsS -X DELETE "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/domains/${domain_id}" \
+              -H "$auth" -H 'Content-Type: application/json' \
+              > "/tmp/deleted-domain-${domain_id}.json"
+            jq -e '.success == true' "/tmp/deleted-domain-${domain_id}.json" > /dev/null
+          done
+
+          curl -fsS -G "${api}/zones/${zone_id}/dns_records" \
+            -H "$auth" -H 'Content-Type: application/json' \
+            --data-urlencode 'per_page=100' \
+            > /tmp/dns-records.json
+
           curl -fsS -X POST "${api}/zones/${zone_id}/purge_cache" \
-            -H "$auth" \
-            -H 'Content-Type: application/json' \
+            -H "$auth" -H 'Content-Type: application/json' \
             --data '{"purge_everything":true}' \
             > /tmp/purge.json
           jq -e '.success == true' /tmp/purge.json > /dev/null
 
           curl -fsS "${api}/zones/${zone_id}/workers/routes" \
-            -H "$auth" \
-            -H 'Content-Type: application/json' \
+            -H "$auth" -H 'Content-Type: application/json' \
             > /tmp/routes-after.json
+          curl -fsS "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/domains" \
+            -H "$auth" -H 'Content-Type: application/json' \
+            > /tmp/worker-domains-after.json
 
-          remaining=$(jq '[.result[] | select(.pattern == "kartodromodebetim.com.br/*" or .pattern == "www.kartodromodebetim.com.br/*")] | length' /tmp/routes-after.json)
-          test "$remaining" -eq 0
+          test "$(jq '[.result[] | select(.pattern == "kartodromodebetim.com.br/*" or .pattern == "www.kartodromodebetim.com.br/*")] | length' /tmp/routes-after.json)" -eq 0
+          test "$(jq '[.result[] | select(.hostname == "kartodromodebetim.com.br" or .hostname == "www.kartodromodebetim.com.br")] | length' /tmp/worker-domains-after.json)" -eq 0
 
       - name: Verify restored public origin
         shell: bash
@@ -87,7 +102,7 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/origin-check
 
-          for attempt in $(seq 1 24); do
+          for attempt in $(seq 1 30); do
             curl -sS -L --max-redirs 5 \
               -H 'Cache-Control: no-cache' \
               -H 'Pragma: no-cache' \
@@ -101,13 +116,13 @@ jobs:
             if [[ "${status:-}" == '200' ]] \
               && [[ "${effective:-}" != *'/design/'* ]] \
               && ! grep -Fq '{{' /tmp/origin-check/home.html \
-              && ! grep -Fqi '^x-opennext: 1' /tmp/origin-check/home.headers; then
+              && ! grep -Eqi '^x-opennext:[[:space:]]*1' /tmp/origin-check/home.headers; then
               exit 0
             fi
             sleep 5
           done
 
-          echo 'A origem anterior respondeu, mas ainda não passou na validação.'
+          echo 'A origem anterior ainda não foi restaurada.'
           cat /tmp/origin-check/home.meta || true
           cat /tmp/origin-check/home.headers || true
           exit 1
@@ -121,7 +136,10 @@ jobs:
             /tmp/zones.json
             /tmp/routes-before.json
             /tmp/routes-after.json
+            /tmp/worker-domains-before.json
+            /tmp/worker-domains-after.json
             /tmp/deleted-*.json
+            /tmp/dns-records.json
             /tmp/purge.json
             /tmp/origin-check
           if-no-files-found: ignore
