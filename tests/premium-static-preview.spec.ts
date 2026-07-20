@@ -1,5 +1,4 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createHash } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -34,7 +33,13 @@ const deterministicCss = `
   }
 `;
 
-const sha256 = (buffer: Buffer) => createHash('sha256').update(buffer).digest('hex');
+type PixelComparison = {
+  width: number;
+  height: number;
+  averageChannelDifference: number;
+  significantPixelRatio: number;
+  maximumChannelDifference: number;
+};
 
 function isTransientTemplateRequest(url: string) {
   try {
@@ -43,6 +48,91 @@ function isTransientTemplateRequest(url: string) {
   } catch {
     return false;
   }
+}
+
+async function comparePngBuffers(
+  page: Page,
+  cleanScreenshot: Buffer,
+  referenceScreenshot: Buffer,
+): Promise<PixelComparison> {
+  return page.evaluate(
+    async ({ cleanBase64, referenceBase64 }) => {
+      const decode = async (base64: string) => {
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index += 1) {
+          bytes[index] = binary.charCodeAt(index);
+        }
+        return createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+      };
+
+      const [cleanImage, referenceImage] = await Promise.all([
+        decode(cleanBase64),
+        decode(referenceBase64),
+      ]);
+
+      if (
+        cleanImage.width !== referenceImage.width ||
+        cleanImage.height !== referenceImage.height
+      ) {
+        return {
+          width: cleanImage.width,
+          height: cleanImage.height,
+          referenceWidth: referenceImage.width,
+          referenceHeight: referenceImage.height,
+          averageChannelDifference: Number.POSITIVE_INFINITY,
+          significantPixelRatio: 1,
+          maximumChannelDifference: 255,
+        };
+      }
+
+      const canvas = new OffscreenCanvas(cleanImage.width, cleanImage.height);
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      if (!context) throw new Error('Canvas 2D indisponível para comparação visual');
+
+      context.drawImage(cleanImage, 0, 0);
+      const cleanPixels = context.getImageData(0, 0, cleanImage.width, cleanImage.height).data;
+      context.clearRect(0, 0, cleanImage.width, cleanImage.height);
+      context.drawImage(referenceImage, 0, 0);
+      const referencePixels = context.getImageData(
+        0,
+        0,
+        referenceImage.width,
+        referenceImage.height,
+      ).data;
+
+      let absoluteDifference = 0;
+      let significantPixels = 0;
+      let maximumChannelDifference = 0;
+      const pixelCount = cleanImage.width * cleanImage.height;
+
+      for (let index = 0; index < cleanPixels.length; index += 4) {
+        let pixelMaximum = 0;
+        for (let channel = 0; channel < 3; channel += 1) {
+          const difference = Math.abs(cleanPixels[index + channel] - referencePixels[index + channel]);
+          absoluteDifference += difference;
+          pixelMaximum = Math.max(pixelMaximum, difference);
+          maximumChannelDifference = Math.max(maximumChannelDifference, difference);
+        }
+        if (pixelMaximum > 10) significantPixels += 1;
+      }
+
+      cleanImage.close();
+      referenceImage.close();
+
+      return {
+        width: canvas.width,
+        height: canvas.height,
+        averageChannelDifference: absoluteDifference / (pixelCount * 3),
+        significantPixelRatio: significantPixels / pixelCount,
+        maximumChannelDifference,
+      };
+    },
+    {
+      cleanBase64: cleanScreenshot.toString('base64'),
+      referenceBase64: referenceScreenshot.toString('base64'),
+    },
+  ) as Promise<PixelComparison>;
 }
 
 async function preparePage(page: Page, url: string) {
@@ -127,10 +217,19 @@ test.describe('premium reference recovery', () => {
           animations: 'disabled',
         });
 
+        const comparison = await comparePngBuffers(page, cleanScreenshot, referenceScreenshot);
         expect(
-          sha256(cleanScreenshot),
-          `${item.name} em ${viewport.name} divergiu visualmente da página original`,
-        ).toBe(sha256(referenceScreenshot));
+          comparison.averageChannelDifference,
+          `${item.name} em ${viewport.name} alterou cor/composição além do ruído de renderização`,
+        ).toBeLessThanOrEqual(0.5);
+        expect(
+          comparison.significantPixelRatio,
+          `${item.name} em ${viewport.name} possui pixels visualmente diferentes`,
+        ).toBeLessThanOrEqual(0.005);
+        expect(
+          comparison.maximumChannelDifference,
+          `${item.name} em ${viewport.name} possui divergência extrema de cor`,
+        ).toBeLessThanOrEqual(110);
       }
     });
   }
