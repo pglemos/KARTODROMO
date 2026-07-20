@@ -68,8 +68,14 @@ describe('production routing', () => {
   });
 
   it('does not use BrowserRouter or a white mount gate', () => {
-    expect(read('src/App.tsx')).not.toContain('BrowserRouter');
-    expect(read('src/App.tsx')).toContain('usePathname');
+    const appSource = read('src/App.tsx');
+    const headerSource = read('src/components/Header.tsx');
+
+    expect(appSource).not.toContain('BrowserRouter');
+    expect(appSource).not.toContain('react-router-dom');
+    expect(appSource).toContain('usePathname');
+    expect(headerSource).not.toContain('react-router-dom');
+    expect(headerSource).toContain('usePathname');
     expect(read('app/PublicSiteClient.tsx')).not.toContain('bg-white');
     expect(read('app/PublicSiteClient.tsx')).not.toContain('setMounted');
   });
