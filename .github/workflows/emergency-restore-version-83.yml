@@ -13,11 +13,62 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: emergency-restore-worker-version-83
+  cancel-in-progress: false
+
 jobs:
   restore:
     if: github.event_name == 'workflow_dispatch' || github.head_ref == 'incident/restore-worker-version-83-2026-07-20'
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     environment: production
     steps:
-      - name: Prepare restoration
-        run: echo 'Restoration workflow prepared'
+      - name: Restore pre-incident deployment and domains
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/restore
+          api='https://api.cloudflare.com/client/v4'
+          auth="Authorization: Bearer ${CLOUDFLARE_API_TOKEN}"
+          target='32632ea1-6f92-4d5e-84e4-ccaedc1ab1fc'
+          zone='b10bc7d100cd6e531702df35f1028361'
+
+          curl -fsS -X POST "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/kartodromo/deployments" \
+            -H "$auth" -H 'Content-Type: application/json' \
+            --data "{\"strategy\":\"percentage\",\"versions\":[{\"version_id\":\"${target}\",\"percentage\":100}]}" \
+            > /tmp/restore/deployment.json
+          jq -e '.success == true' /tmp/restore/deployment.json > /dev/null
+
+          for host in kartodromodebetim.com.br www.kartodromodebetim.com.br; do
+            curl -fsS -X PUT "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/domains" \
+              -H "$auth" -H 'Content-Type: application/json' \
+              --data "{\"hostname\":\"${host}\",\"service\":\"kartodromo\",\"environment\":\"production\",\"zone_id\":\"${zone}\"}" \
+              > "/tmp/restore/domain-${host}.json"
+            jq -e '.success == true' "/tmp/restore/domain-${host}.json" > /dev/null
+          done
+
+          curl -fsS "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/kartodromo/deployments" \
+            -H "$auth" > /tmp/restore/deployments-after.json
+          curl -fsS "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/domains" \
+            -H "$auth" > /tmp/restore/domains-after.json
+
+          active=$(jq -r '.result.deployments[0].versions[0].version_id // empty' /tmp/restore/deployments-after.json)
+          domains=$(jq '[.result[] | select((.hostname == "kartodromodebetim.com.br" or .hostname == "www.kartodromodebetim.com.br") and .service == "kartodromo")] | length' /tmp/restore/domains-after.json)
+          test "$active" = "$target"
+          test "$domains" -eq 2
+
+          curl -fsS -X POST "${api}/zones/${zone}/purge_cache" \
+            -H "$auth" -H 'Content-Type: application/json' \
+            --data '{"purge_everything":true}' > /tmp/restore/purge.json
+
+      - name: Upload restoration API evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: worker-version-83-api-restoration
+          path: /tmp/restore
+          if-no-files-found: error
