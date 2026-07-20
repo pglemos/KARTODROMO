@@ -1,5 +1,7 @@
-import { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+'use client';
+
+import { useEffect, useState, type ComponentType } from 'react';
+import { usePathname } from 'next/navigation';
 import Home from './site-pages/Home';
 import HistoryPage from './site-pages/HistoryPage';
 import FAQPage from './site-pages/FAQPage';
@@ -15,8 +17,22 @@ import FiveHundredMilesPage from './site-pages/FiveHundredMilesPage';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import ClubPage, { type ClubPageKey } from './site-pages/ClubPages';
+import { findPublicRoute, type PublicRouteKey } from './config/publicRoutes';
 
-const clubRoutes: ClubPageKey[] = ['vantagens', 'cadastro', 'consulta', 'painel', 'corridas', 'pontuacao', 'catalogo', 'resgates', 'perfil', 'regulamento', 'campanhas'];
+const standardPages: Partial<Record<PublicRouteKey, ComponentType>> = {
+  home: Home,
+  historia: HistoryPage,
+  duvidas: FAQPage,
+  eventos: EventsPage,
+  pista: PistaPage,
+  'kart-locacao': KartLocacaoPage,
+  reservas: ReservasPage,
+  campeonatos: ChampionshipsPage,
+  kac: KACPage,
+  'kac-super': KACSuperPage,
+  '200-milhas': TwoHundredMilesPage,
+  '500-milhas': FiveHundredMilesPage,
+};
 
 const NotFoundPage = () => (
   <div className="min-h-screen bg-ink-950 text-white/80">
@@ -38,9 +54,20 @@ const NotFoundPage = () => (
   </div>
 );
 
-const ScrollController = () => {
-  const { pathname, hash } = useLocation();
+function useLocationHash(pathname: string): string {
+  const [hash, setHash] = useState('');
 
+  useEffect(() => {
+    const updateHash = () => setHash(window.location.hash);
+    updateHash();
+    window.addEventListener('hashchange', updateHash);
+    return () => window.removeEventListener('hashchange', updateHash);
+  }, [pathname]);
+
+  return hash;
+}
+
+const ScrollController = ({ pathname, hash }: { pathname: string; hash: string }) => {
   useEffect(() => {
     if ('scrollRestoration' in window.history) {
       window.history.scrollRestoration = 'manual';
@@ -49,9 +76,7 @@ const ScrollController = () => {
     if (hash) {
       let userInteracted = false;
       const scrollToTarget = () => {
-        if (userInteracted) {
-          return;
-        }
+        if (userInteracted) return;
 
         const target = document.querySelector(hash);
         if (target) {
@@ -61,14 +86,9 @@ const ScrollController = () => {
       };
 
       requestAnimationFrame(scrollToTarget);
-      const timeouts = [300, 900, 1800, 3500, 7000, 12000, 18000].map((delay) =>
-        window.setTimeout(scrollToTarget, delay),
-      );
-      const interval = window.setInterval(scrollToTarget, 400);
-      const stopInterval = window.setTimeout(() => window.clearInterval(interval), 24000);
+      const timeouts = [300, 900, 1800].map((delay) => window.setTimeout(scrollToTarget, delay));
       const markInteracted = () => {
         userInteracted = true;
-        window.clearInterval(interval);
       };
 
       window.addEventListener('wheel', markInteracted, { passive: true });
@@ -77,8 +97,6 @@ const ScrollController = () => {
 
       return () => {
         timeouts.forEach(window.clearTimeout);
-        window.clearInterval(interval);
-        window.clearTimeout(stopInterval);
         window.removeEventListener('wheel', markInteracted);
         window.removeEventListener('touchstart', markInteracted);
         window.removeEventListener('keydown', markInteracted);
@@ -92,31 +110,25 @@ const ScrollController = () => {
   return null;
 };
 
+function RouteContent({ routeKey }: { routeKey: PublicRouteKey }) {
+  if (routeKey.startsWith('clube-')) {
+    return <ClubPage page={routeKey.slice('clube-'.length) as ClubPageKey} />;
+  }
+
+  const Page = standardPages[routeKey];
+  return Page ? <Page /> : <NotFoundPage />;
+}
+
 function App() {
+  const pathname = usePathname() || '/';
+  const hash = useLocationHash(pathname);
+  const route = findPublicRoute(pathname);
+
   return (
-    <Router>
-      <ScrollController />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/historia" element={<HistoryPage />} />
-        <Route path="/duvidas" element={<FAQPage />} />
-        <Route path="/eventos" element={<EventsPage />} />
-        <Route path="/pista" element={<PistaPage />} />
-        <Route path="/kart-locacao" element={<KartLocacaoPage />} />
-        <Route path="/reservas" element={<ReservasPage />} />
-        <Route path="/campeonatos" element={<ChampionshipsPage />} />
-        <Route path="/campeonatos/kac" element={<KACPage />} />
-        <Route path="/kac" element={<KACPage />} />
-        <Route path="/campeonatos/kac-super" element={<KACSuperPage />} />
-        <Route path="/kac-super" element={<KACSuperPage />} />
-        <Route path="/campeonatos/200-milhas" element={<TwoHundredMilesPage />} />
-        <Route path="/200-milhas" element={<TwoHundredMilesPage />} />
-        <Route path="/campeonatos/500-milhas" element={<FiveHundredMilesPage />} />
-        <Route path="/500-milhas" element={<FiveHundredMilesPage />} />
-        {clubRoutes.map((page) => <Route element={<ClubPage page={page} />} key={page} path={`/clube-${page}`} />)}
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
-    </Router>
+    <>
+      <ScrollController pathname={pathname} hash={hash} />
+      {route ? <RouteContent routeKey={route.key} /> : <NotFoundPage />}
+    </>
   );
 }
 
