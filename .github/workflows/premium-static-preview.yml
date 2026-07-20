@@ -73,6 +73,7 @@ jobs:
         shell: bash
         env:
           PREMIUM_PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+          BUILD_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           mkdir -p /tmp/premium-smoke
@@ -83,15 +84,16 @@ jobs:
               -D "/tmp/premium-smoke/${key}.headers" \
               -o "/tmp/premium-smoke/${key}.html" \
               -w '%{http_code} %{url_effective}\n' \
-              "${PREMIUM_PREVIEW_URL}/${path}" > "/tmp/premium-smoke/${key}.meta"
+              "${PREMIUM_PREVIEW_URL}/${path}?build=${BUILD_SHA}" > "/tmp/premium-smoke/${key}.meta"
             read -r status effective < "/tmp/premium-smoke/${key}.meta"
             test "$status" = '200'
             [[ "$effective" != *'/design/'* ]]
             grep -Fqi '<h1' "/tmp/premium-smoke/${key}.html"
-            grep -Fqi 'x-premium-site: reference-source-v1' "/tmp/premium-smoke/${key}.headers"
+            grep -Fqi 'x-premium-site: reference-source-v2' "/tmp/premium-smoke/${key}.headers"
+            grep -Fqi 'cache-control: no-store' "/tmp/premium-smoke/${key}.headers"
           done
-          curl -fsS "${PREMIUM_PREVIEW_URL}/support.js" -o /tmp/premium-smoke/support.js
-          curl -fsS "${PREMIUM_PREVIEW_URL}/beneficios-nav.css" -o /tmp/premium-smoke/beneficios-nav.css
+          curl -fsS "${PREMIUM_PREVIEW_URL}/support.js?build=${BUILD_SHA}" -o /tmp/premium-smoke/support.js
+          curl -fsS "${PREMIUM_PREVIEW_URL}/beneficios-nav.css?build=${BUILD_SHA}" -o /tmp/premium-smoke/beneficios-nav.css
           test -s /tmp/premium-smoke/support.js
           test -s /tmp/premium-smoke/beneficios-nav.css
 
@@ -111,7 +113,7 @@ jobs:
         with:
           script: |
             const marker = '<!-- premium-static-preview -->';
-            const body = `${marker}\n## Preview idêntico às referências originais\n\n${process.env.PREVIEW_URL}\n\nAs 10 rotas limpas foram comparadas com os arquivos \`/design/*.dc.html\` originais em mobile, tablet e desktop. A execução só fica verde quando as capturas são byte a byte idênticas e o runtime resolve todos os placeholders.`;
+            const body = `${marker}\n## Preview idêntico às referências originais\n\n${process.env.PREVIEW_URL}\n\nAs 10 rotas limpas foram comparadas com os arquivos \`/design/*.dc.html\` originais em mobile, tablet e desktop. A execução só fica verde quando as capturas são byte a byte idênticas, os placeholders são resolvidos e nenhum HTML antigo é servido pelo cache.`;
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner: context.repo.owner,
               repo: context.repo.repo,
