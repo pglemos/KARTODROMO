@@ -69,6 +69,24 @@ jobs:
           echo "url=$preview_url" >> "$GITHUB_OUTPUT"
           echo "$preview_url" > /tmp/premium-preview-url.txt
 
+      - name: Wait for Worker propagation
+        shell: bash
+        env:
+          PREMIUM_PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+          BUILD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          ready=0
+          for attempt in $(seq 1 18); do
+            status=$(curl -sS -o /tmp/premium-ready.html -D /tmp/premium-ready.headers -w '%{http_code}' "${PREMIUM_PREVIEW_URL}/?build=${BUILD_SHA}&attempt=${attempt}" || true)
+            if [[ "$status" == "200" ]] && grep -Fqi 'x-premium-site: reference-source-v2' /tmp/premium-ready.headers; then
+              ready=1
+              break
+            fi
+            sleep 5
+          done
+          test "$ready" = '1'
+
       - name: Smoke test clean routes and runtime assets
         shell: bash
         env:
@@ -145,6 +163,8 @@ jobs:
           path: |
             /tmp/premium-preview-deploy.log
             /tmp/premium-preview-url.txt
+            /tmp/premium-ready.headers
+            /tmp/premium-ready.html
             /tmp/premium-smoke
             playwright-report
             test-results/premium-reference-comparison
