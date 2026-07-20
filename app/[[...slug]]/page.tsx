@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { PublicSiteClient } from '../PublicSiteClient';
-import { getPublicRoute, normalizePublicPath, SITE_ORIGIN } from '@/src/config/publicRoutes';
+import { findPublicRoute, normalizePublicPath, SITE_ORIGIN } from '@/src/config/publicRoutes';
 
 type PublicSitePageProps = {
   params: Promise<{ slug?: string[] }>;
@@ -12,7 +13,17 @@ function pathnameFromSlug(slug?: string[]): string {
 
 export async function generateMetadata({ params }: PublicSitePageProps): Promise<Metadata> {
   const { slug } = await params;
-  const route = getPublicRoute(pathnameFromSlug(slug));
+  const pathname = pathnameFromSlug(slug);
+  const route = findPublicRoute(pathname);
+
+  if (!route) {
+    return {
+      title: 'Página não encontrada | Kartódromo Internacional de Betim',
+      description: 'O endereço informado não corresponde a uma página pública ativa do Kartódromo Internacional de Betim.',
+      robots: { index: false, follow: false, noarchive: true },
+    };
+  }
+
   const canonical = `${SITE_ORIGIN}${route.path === '/' ? '' : route.path}`;
 
   return {
@@ -47,6 +58,10 @@ export async function generateMetadata({ params }: PublicSitePageProps): Promise
   };
 }
 
-export default function PublicSitePage() {
+export default async function PublicSitePage({ params }: PublicSitePageProps) {
+  const { slug } = await params;
+  const route = findPublicRoute(pathnameFromSlug(slug));
+  if (!route) notFound();
+
   return <PublicSiteClient />;
 }
