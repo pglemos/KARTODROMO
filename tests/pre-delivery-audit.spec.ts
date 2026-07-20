@@ -1,13 +1,49 @@
 import { test, expect, type Page } from '@playwright/test';
 
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:4174';
+const canonicalOrigin = 'https://kartodromodebetim.com.br';
 const viewports = [
   { width: 375, height: 812 },
   { width: 768, height: 1024 },
   { width: 1024, height: 768 },
   { width: 1440, height: 900 },
 ];
-const paths = ['/', '/pista', '/eventos', '/campeonatos', '/duvidas', '/historia', '/kart-locacao', '/reservas', '/campeonatos/kac'];
+const paths = [
+  '/',
+  '/pista',
+  '/kart-locacao',
+  '/reservas',
+  '/eventos',
+  '/campeonatos',
+  '/historia',
+  '/duvidas',
+  '/kac',
+  '/kac-super',
+  '/200-milhas',
+  '/500-milhas',
+  '/clube-vantagens',
+  '/clube-cadastro',
+  '/clube-consulta',
+  '/clube-painel',
+  '/clube-corridas',
+  '/clube-pontuacao',
+  '/clube-catalogo',
+  '/clube-resgates',
+  '/clube-perfil',
+  '/clube-regulamento',
+  '/clube-campanhas',
+];
+const unavailableClubPaths = new Set([
+  '/clube-cadastro',
+  '/clube-consulta',
+  '/clube-painel',
+  '/clube-corridas',
+  '/clube-pontuacao',
+  '/clube-catalogo',
+  '/clube-resgates',
+  '/clube-perfil',
+  '/clube-campanhas',
+]);
 
 const auditPage = async (page: Page) => page.evaluate(() => {
   const isVisible = (element: Element) => {
@@ -18,9 +54,7 @@ const auditPage = async (page: Page) => page.evaluate(() => {
     let current: Element | null = htmlElement;
     while (current) {
       const style = window.getComputedStyle(current);
-      if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) === 0) {
-        return false;
-      }
+      if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) === 0) return false;
       current = current.parentElement;
     }
 
@@ -112,27 +146,56 @@ const auditPage = async (page: Page) => page.evaluate(() => {
     .filter((item) => item.ratio < item.required)
     .slice(0, 20);
 
+  const html = document.documentElement.innerHTML;
   const emojiMatches = document.body.textContent?.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu) ?? [];
+  const designLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href]'))
+    .map((link) => link.getAttribute('href') || '')
+    .filter((href) => href.includes('/design/') || href.includes('.dc.html'));
 
   return {
     overflowX: document.documentElement.scrollWidth - window.innerWidth,
     clickableIssues,
     contrastIssues,
     emojiMatches,
+    unresolvedTemplates: html.match(/\{\{[^}]+\}\}/g) ?? [],
+    designLinks,
+    canonical: document.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href ?? '',
+    title: document.title,
+    bodyText: document.body.innerText,
   };
 });
 
 test.describe('pre-delivery checklist', () => {
+  test.setTimeout(360_000);
+
   for (const viewport of viewports) {
     test(`responsive/accessibility audit ${viewport.width}`, async ({ page }) => {
+      await page.route('**/*', async (route) => {
+        if (route.request().resourceType() === 'media') await route.abort();
+        else await route.continue();
+      });
       await page.setViewportSize(viewport);
+
       for (const path of paths) {
-        await page.goto(`${baseUrl}${path}`, { waitUntil: 'networkidle' });
+        await page.goto(`${baseUrl}${path}`, { waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(100);
         const result = await auditPage(page);
+        const expectedCanonical = new URL(path, canonicalOrigin).href;
+
+        expect(result.title, `${path} needs a route title`).not.toBe('');
+        expect(result.canonical, `${path} needs a canonical URL`).toBe(expectedCanonical);
+        expect(result.unresolvedTemplates, `${path} exposes template expressions`).toEqual([]);
+        expect(result.designLinks, `${path} links to design documents`).toEqual([]);
         expect(result.emojiMatches, `${path} has emoji text/icons`).toHaveLength(0);
         expect(result.overflowX, `${path} overflows horizontally at ${viewport.width}px`).toBeLessThanOrEqual(2);
         expect(result.clickableIssues, `${path} clickable cursor/transition issues`).toEqual([]);
         expect(result.contrastIssues, `${path} contrast issues`).toEqual([]);
+
+        if (unavailableClubPaths.has(path)) {
+          const normalizedBodyText = result.bodyText.toLocaleLowerCase('pt-BR');
+          expect(normalizedBodyText, `${path} must disclose its status`).toContain('portal em implantação');
+          expect(normalizedBodyText, `${path} must not pretend to process data`).toContain('nenhum cadastro, saldo, alteração de perfil ou resgate é processado');
+        }
       }
     });
   }
@@ -140,7 +203,7 @@ test.describe('pre-delivery checklist', () => {
   test('focus states and reduced motion', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 768 });
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto(baseUrl, { waitUntil: 'networkidle' });
+    await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
     const result = await page.evaluate(() => {
       const maxDurationMs = (value: string) => Math.max(...value.split(',').map((part) => {
         const trimmed = part.trim();
@@ -172,5 +235,21 @@ test.describe('pre-delivery checklist', () => {
     expect(result.outline).not.toBe('none');
     expect(result.outlineWidth).not.toBe('0px');
     expect(result.reducedMotionOk).toBeTruthy();
+  });
+
+  test('legacy routes permanently redirect to canonical pages', async ({ request }) => {
+    const values = await request.get(`${baseUrl}/valores`, { maxRedirects: 0 });
+    expect([301, 308]).toContain(values.status());
+    expect(values.headers().location).toBe('/kart-locacao');
+
+    const championship = await request.get(`${baseUrl}/campeonatos/kac`, { maxRedirects: 0 });
+    expect([301, 308]).toContain(championship.status());
+    expect(championship.headers().location).toBe('/kac');
+  });
+
+  test('unknown public routes return a real 404', async ({ request }) => {
+    const response = await request.get(`${baseUrl}/rota-publica-inexistente`);
+    expect(response.status()).toBe(404);
+    expect(await response.text()).toContain('Essa rota não existe');
   });
 });

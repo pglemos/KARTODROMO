@@ -1,6 +1,8 @@
+'use client';
+
 import { useState } from 'react';
 import { Menu, X, Phone, MapPin, Clock } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { usePathname } from 'next/navigation';
 import { SITE_BOOKING_ANCHOR } from '../config/booking';
 import { FacebookIcon, InstagramIcon, YoutubeIcon } from './site-ui/SocialIcons';
 
@@ -19,13 +21,17 @@ const navLinks = [
   { href: '/#contato', label: 'Contato' },
 ];
 
+function isCurrentPath(href: string, pathname: string): boolean {
+  const [hrefPath] = href.split('#');
+  return hrefPath === pathname && !href.includes('#');
+}
+
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { pathname } = useLocation();
+  const pathname = usePathname() || '/';
 
   return (
     <>
-      {/* Top Bar */}
       <div className="border-b border-white/10 bg-ink-900 px-4 py-3 text-white">
         <div className="container mx-auto flex flex-wrap items-center justify-between gap-x-7 gap-y-2.5 font-race text-[13px] italic leading-none md:text-sm">
           <div className="flex flex-wrap items-center gap-x-7 gap-y-2.5">
@@ -60,7 +66,6 @@ const Header = () => {
         </div>
       </div>
 
-      {/* Main Header */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-ink-950/90 backdrop-blur-xl">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between py-4">
@@ -77,7 +82,7 @@ const Header = () => {
                 <a
                   key={link.href}
                   href={link.href}
-                  aria-current={link.href === pathname ? 'page' : undefined}
+                  aria-current={isCurrentPath(link.href, pathname) ? 'page' : undefined}
                   className={link.featured
                     ? 'relative inline-flex min-h-[38px] items-center rounded-full border border-primary-300/35 bg-[linear-gradient(180deg,rgba(25,48,34,.96),rgba(7,20,12,.98))] px-4 text-[#d9ffe8] shadow-[inset_0_1px_0_rgba(255,255,255,.09),0_8px_24px_rgba(0,0,0,.22)] transition-[color,background,transform,box-shadow] duration-200 after:ml-2 after:h-[7px] after:w-[7px] after:rounded-full after:border-2 after:border-primary-400 after:bg-primary-400/20 after:shadow-[0_0_0_3px_rgba(0,230,118,.08),0_0_12px_rgba(0,230,118,.72)] hover:-translate-y-0.5 hover:bg-primary-400 hover:text-ink-950 hover:shadow-[0_10px_28px_rgba(0,230,118,.24)]'
                     : 'relative py-1 text-white/80 transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-[2px] after:origin-left after:scale-x-0 after:bg-primary-400 after:transition-transform after:duration-200 hover:text-white hover:after:scale-x-100'}
@@ -89,10 +94,11 @@ const Header = () => {
 
             <button
               className="p-1.5 text-white transition-colors hover:text-primary-400 focus:outline-none lg:hidden"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              aria-label="Alternar Menu"
+              onClick={() => setIsMenuOpen((open) => !open)}
+              aria-label={isMenuOpen ? 'Fechar menu' : 'Abrir menu'}
               aria-expanded={isMenuOpen}
               aria-controls="mobile-navigation"
+              type="button"
             >
               {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
@@ -105,7 +111,7 @@ const Header = () => {
                   <a
                     key={link.href}
                     href={link.href}
-                    aria-current={link.href === pathname ? 'page' : undefined}
+                    aria-current={isCurrentPath(link.href, pathname) ? 'page' : undefined}
                     onClick={() => setIsMenuOpen(false)}
                     className={link.featured
                       ? 'mt-2 flex items-center justify-between rounded-2xl border border-primary-300/40 bg-[linear-gradient(135deg,rgba(28,57,39,.96),rgba(8,22,13,.98))] px-5 py-4 text-[#d9ffe8] shadow-[inset_0_1px_0_rgba(255,255,255,.08),0_16px_36px_rgba(0,0,0,.22)] after:text-sm after:content-["→"] hover:bg-primary-400 hover:text-ink-950'

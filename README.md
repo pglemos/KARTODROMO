@@ -1,251 +1,206 @@
-# Kartodromo Internacional de Betim
+# Kartódromo Internacional de Betim
 
-Site institucional do Kartodromo Internacional de Betim, reconstruido com React, TypeScript, Vite e Tailwind CSS.
+Aplicação oficial do Kartódromo Internacional de Betim, com site público, campeonatos, reservas, Clube de Vantagens em implantação e painel administrativo.
 
-O projeto concentra a experiencia publica do kartodromo: apresentacao da pista, reservas online, kart de locacao, eventos, campeonatos, pagina dedicada ao KAC Iniciantes e conteudos institucionais.
+## Stack atual
 
-![Home do Kartodromo de Betim](public/posters/home-karting.jpg)
+- Next.js 16 com App Router
+- React 19
+- TypeScript 5.9
+- Tailwind CSS 3
+- Supabase
+- Cloudflare Workers
+- OpenNext Cloudflare
+- Cloudflare D1 e Images
+- Vitest e Playwright
 
-## Visao Geral
+## Arquitetura pública
 
-- Site responsivo em portugues para desktop, tablet e mobile.
-- Reservas online integradas ao MyLapTime.
-- Pagina de reservas com leitura da agenda oficial via iframe/proxy.
-- Formulario de inscricao para campeonatos com envio por webhook.
-- Paginas dedicadas para pista, eventos, campeonatos, KAC, historia e duvidas frequentes.
-- Assets locais organizados em `public/`, incluindo imagens de pista, eventos, historia, campeonatos, videos e regulamentos.
-- Deploy preparado para Vercel com rewrites para SPA, MyLapTime e Edge Functions.
+As URLs públicas são servidas pela aplicação Next através de `app/[[...slug]]/page.tsx`.
 
-## Stack
-
-- React 18
-- TypeScript
-- Vite 5
-- Tailwind CSS
-- React Router
-- Lucide React
-- Vercel Edge Functions
-- Playwright para auditoria pre-entrega
-
-## Rotas
-
-| Rota | Conteudo |
-| --- | --- |
-| `/` | Home com hero, apresentacao, reservas, servicos, promocoes e contato |
-| `/pista` | Informacoes da pista, mapas e configuracoes de tracado |
-| `/kart-locacao` | Pagina comercial de kart de locacao |
-| `/reservas` | Experiencia dedicada de reserva online |
-| `/eventos` | Eventos corporativos, grupos e confraternizacoes |
-| `/campeonatos` | Lista de campeonatos e formulario de inscricao |
-| `/campeonatos/kac` | Pagina oficial do KAC Iniciantes |
-| `/historia` | Historia do kartodromo |
-| `/duvidas` | FAQ |
-
-## Estrutura
+O registro canônico de rotas fica em:
 
 ```txt
-.
-├── api/
-│   ├── inscricao.ts       # Edge Function para inscricoes de campeonatos
-│   └── mylaptime.ts       # Proxy do MyLapTime usado na reserva online
-├── public/
-│   ├── brand/             # Logo e elementos de marca
-│   ├── championships/     # Imagens dos campeonatos
-│   ├── events/            # Imagens de eventos
-│   ├── history/           # Imagens historicas
-│   ├── kac/               # Assets da pagina KAC
-│   ├── posters/           # Posters de videos
-│   ├── regulamentos/      # PDFs publicos
-│   └── videos/            # Videos publicos
-├── src/
-│   ├── components/        # Componentes reutilizaveis
-│   ├── config/            # URLs e configuracoes do front
-│   ├── data/              # Dados estaticos
-│   ├── pages/             # Paginas roteadas
-│   ├── App.tsx            # Rotas da aplicacao
-│   └── main.tsx           # Entrada React
-├── tests/
-│   └── pre-delivery-audit.spec.ts
-├── vercel.json
-└── vite.config.ts
+src/config/publicRoutes.ts
 ```
 
-## Pre-requisitos
+Esse arquivo é a fonte de verdade para:
 
-- Node.js 18 ou superior
+- título e descrição por página;
+- canonical;
+- Open Graph e Twitter Card;
+- sitemap;
+- disponibilidade das áreas do Clube;
+- resolução da página pública.
+
+Os documentos antigos em `public/design/*.dc.html` permanecem apenas como referência visual e não são páginas canônicas de produção.
+
+## Rotas públicas
+
+### Institucional
+
+- `/`
+- `/pista`
+- `/kart-locacao`
+- `/reservas`
+- `/eventos`
+- `/campeonatos`
+- `/historia`
+- `/duvidas`
+
+### Campeonatos
+
+- `/kac`
+- `/kac-super`
+- `/200-milhas`
+- `/500-milhas`
+
+Aliases antigos em `/campeonatos/*` usam redirect permanente para a URL canônica.
+
+### Clube de Vantagens
+
+- `/clube-vantagens`
+- `/clube-regulamento`
+- demais rotas `/clube-*`
+
+As áreas transacionais do Clube permanecem em estado explícito de implantação até existirem autenticação, persistência, integração com corridas e resgates auditáveis. O site não exibe clientes, CPFs, saldos ou confirmações fictícias.
+
+## Requisitos
+
+- Node.js 22
 - npm
+- acesso ao projeto Cloudflare Workers para deploy
 
-Verifique as versoes:
-
-```bash
-node -v
-npm -v
-```
-
-## Rodando Localmente
-
-Instale as dependencias:
+## Desenvolvimento
 
 ```bash
-npm install
-```
-
-Crie um arquivo `.env` na raiz do projeto:
-
-```env
-FORM_MANAGEMENT_USER=usuario_do_webhook
-FORM_MANAGEMENT_KEY=senha_ou_chave_do_webhook
-FORM_WEBHOOK_URL=https://seu-n8n.exemplo/webhook/seu-id
-
-# Opcionais para o proxy local do Vite.
-# Se nao forem informadas, o projeto usa os defaults definidos em vite.config.ts.
-FORM_WEBHOOK_TARGET=https://seu-n8n.exemplo
-FORM_WEBHOOK_PATH=/webhook/seu-id
-```
-
-Inicie o servidor de desenvolvimento:
-
-```bash
+npm ci
 npm run dev
 ```
 
-Acesse:
+A aplicação fica disponível em `http://localhost:3000`.
 
-```txt
-http://localhost:5173
-```
-
-## Variaveis de Ambiente
-
-| Variavel | Uso | Obrigatoria |
-| --- | --- | --- |
-| `FORM_MANAGEMENT_USER` | Usuario para autenticar o envio ao webhook de inscricoes | Sim, para inscricoes |
-| `FORM_MANAGEMENT_KEY` | Chave/senha para autenticar o envio ao webhook | Sim, para inscricoes |
-| `FORM_WEBHOOK_URL` | URL completa do webhook usado pela Edge Function `/api/inscricao` | Sim, em producao |
-| `FORM_WEBHOOK_TARGET` | Origem usada pelo proxy local do Vite | Opcional |
-| `FORM_WEBHOOK_PATH` | Caminho usado pelo proxy local do Vite | Opcional |
-
-O codigo ainda aceita os nomes legados `FORM_MANAGERMENT_USER`, `FORM_MANAGERMENT_KEY`, `VITE_FORM_MANAGERMENT_USER`, `VITE_FORM_MANAGERMENT_KEY` e `VITE_WEBHOOK_URL` para compatibilidade. Para novos ambientes, prefira as variaveis sem `VITE_`, porque credenciais nao devem ser expostas ao navegador.
-
-## Scripts
-
-| Comando | Descricao |
-| --- | --- |
-| `npm run dev` | Inicia o Vite em modo desenvolvimento |
-| `npm run build` | Gera a build de producao em `dist/` |
-| `npm run preview` | Serve a build de producao localmente |
-| `npm run typecheck` | Executa verificacao TypeScript sem emitir arquivos |
-| `npm run lint` | Executa ESLint no projeto |
-| `npm run test:pre-delivery` | Executa auditoria Playwright de responsividade, contraste, overflow e interacoes |
-
-## Auditoria Pre-entrega
-
-O teste `test:pre-delivery` espera a build em preview na porta `4173`.
-
-Em um terminal:
+## Verificação
 
 ```bash
+npm run typecheck
+npm run lint
+npm test
 npm run build
-npm run preview -- --host 127.0.0.1 --port 4173
+```
+
+### Auditoria visual e funcional
+
+Depois do build:
+
+```bash
+npm start -- -p 4174
 ```
 
 Em outro terminal:
 
 ```bash
-npm run test:pre-delivery
+PLAYWRIGHT_BASE_URL=http://127.0.0.1:4174 npm run test:pre-delivery
 ```
 
-A auditoria cobre as rotas principais nos viewports `375`, `768`, `1024` e `1440`, verificando:
+A auditoria cobre as 23 rotas canônicas em:
 
-- ausencia de overflow horizontal;
-- contraste minimo em textos visiveis;
-- cursores e transicoes de elementos clicaveis;
-- ausencia de emoji em texto da interface;
-- estado de foco;
-- suporte a `prefers-reduced-motion`.
+- 375 × 812;
+- 768 × 1024;
+- 1024 × 768;
+- 1440 × 900.
 
-## Integracoes
+Ela verifica overflow, contraste, foco, movimento reduzido, metadata, canonical, templates não resolvidos, links para documentos `.dc` e o estado seguro das páginas do Clube.
 
-### MyLapTime
+## Cloudflare Workers
 
-As URLs oficiais de reserva ficam em `src/config/booking.ts`.
+O projeto usa `@opennextjs/cloudflare` e `wrangler.jsonc`.
 
-No desenvolvimento, `vite.config.ts` cria proxies para endpoints do MyLapTime. Em producao, `vercel.json` redireciona as rotas necessarias e `api/mylaptime.ts` atua como proxy para a pagina de reserva.
-
-Rotas relacionadas:
-
-- `/booking`
-- `/mylaptime/*`
-- `/_content/*`
-- `/_framework/*`
-- `/_blazor`
-- `/api/auth/*`
-
-### Inscricoes de Campeonatos
-
-O formulario de campeonatos envia dados para `/api/inscricao`.
-
-A Edge Function valida:
-
-- evento;
-- nome da equipe;
-- nome do chefe da equipe;
-- e-mail, quando informado;
-- lista de pilotos;
-- peso dos pilotos;
-- quantidade de karts.
-
-Depois da validacao, a funcao encaminha o payload ao webhook configurado em `FORM_WEBHOOK_URL`.
-
-## Deploy
-
-O projeto esta preparado para deploy na Vercel.
-
-Configuracoes relevantes:
-
-- `vercel.json` contem rewrites para SPA, MyLapTime e assets remotos.
-- `api/inscricao.ts` e `api/mylaptime.ts` usam runtime Edge.
-- As variaveis de ambiente de inscricao devem ser configuradas no painel da Vercel.
-
-Build command:
+### Preview no runtime do Worker
 
 ```bash
-npm run build
+npm run preview
 ```
 
-Output directory:
+### Build do Worker
+
+```bash
+npm run build:worker
+```
+
+### Deploy manual
+
+```bash
+npm run deploy
+```
+
+O deploy exige:
+
+```env
+CLOUDFLARE_API_TOKEN=
+CLOUDFLARE_ACCOUNT_ID=
+NEXT_PUBLIC_SITE_URL=https://kartodromodebetim.com.br
+```
+
+Nunca versione valores reais.
+
+## CI/CD
+
+O workflow `.github/workflows/cloudflare-worker.yml` executa em pull requests e branches de correção:
+
+1. instalação com `npm ci`;
+2. typecheck;
+3. lint;
+4. testes unitários;
+5. build Next;
+6. Playwright;
+7. build OpenNext.
+
+Em push para `main`, o deploy de produção ocorre somente depois da verificação completa.
+
+Secrets exigidos no GitHub:
+
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+
+Consulte `docs/deployment/cloudflare-workers.md` para o procedimento completo.
+
+## Bindings Cloudflare
+
+O Worker usa:
+
+- `ASSETS` para arquivos estáticos;
+- `WORKER_SELF_REFERENCE` para autorreferência do Worker;
+- `IMAGES` para Cloudflare Images;
+- `KARTODROMO_ADMIN_DB` para o banco D1 `kartodromo-admin`.
+
+As migrations do D1 ficam em:
 
 ```txt
-dist
+migrations/d1
 ```
 
-## Boas Praticas de Conteudo
+## Reservas
 
-- Mantenha imagens publicas dentro de `public/`.
-- Para novos assets de pagina, prefira subpastas tematicas em `public/`.
-- Atualize `src/config/booking.ts` quando URLs oficiais de reserva mudarem.
-- Nao versione `.env` nem credenciais reais.
-- Antes de publicar, rode `typecheck`, `lint`, `build` e a auditoria Playwright.
+A reserva abre a plataforma oficial do MyLapTime em nova aba. Não clone, incorpore por proxy ou reescreva a aplicação de terceiros.
 
-## Solucao de Problemas
+## Variáveis Supabase
 
-### Porta 5173 ocupada
+O projeto aceita os nomes atuais:
 
-```bash
-npm run dev -- --port 3000
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
 ```
 
-### Dependencias inconsistentes
+Os nomes legados sem o sublinhado após `PUBLIC` continuam temporariamente suportados para evitar interrupção durante a migração.
 
-```bash
-rm -rf node_modules
-npm install
-```
+## Regras de contribuição
 
-### Formulario de campeonato retorna erro 500
-
-Verifique se `FORM_MANAGEMENT_USER`, `FORM_MANAGEMENT_KEY` e `FORM_WEBHOOK_URL` estao configuradas no ambiente em execucao.
-
-### Reserva online nao carrega no preview local
-
-Confirme se a aplicacao esta rodando por servidor Vite/Vercel. A reserva depende de proxy e nao deve ser testada abrindo arquivos diretamente pelo navegador.
+- não faça alterações diretamente em `main`;
+- use branch e pull request;
+- não publique dados de demonstração como dados reais;
+- não versione secrets;
+- atualize `src/config/publicRoutes.ts` ao criar uma rota pública;
+- execute todos os comandos de verificação antes do merge;
+- valide o build OpenNext, não apenas o servidor Node local.

@@ -5,8 +5,12 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
-    include: ['app/**/*.test.{ts,tsx}', 'lib/**/*.test.{ts,tsx}'],
-    exclude: ['node_modules/**', '.next/**', '.aiox-core/**', 'tmp/**'],
+    include: [
+      'app/**/*.test.{ts,tsx}',
+      'lib/**/*.test.{ts,tsx}',
+      'tests/**/*.test.{ts,tsx}',
+    ],
+    exclude: ['node_modules/**', '.next/**', '.open-next/**', '.aiox-core/**', 'tmp/**'],
   },
   resolve: {
     alias: {

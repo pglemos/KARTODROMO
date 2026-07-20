@@ -1,39 +1,53 @@
 import type { NextConfig } from 'next';
 
+const supabaseUrl =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  process.env.NEXT_PUBLICSUPABASE_URL ||
+  process.env.VITE_PUBLICSUPABASE_URL ||
+  '';
+const supabaseAnonKey =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  process.env.NEXT_PUBLICSUPABASE_ANON_KEY ||
+  process.env.VITE_PUBLICSUPABASE_ANON_KEY ||
+  '';
+
+const securityHeaders = [
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self)' },
+];
+
 const nextConfig: NextConfig = {
   env: {
-    NEXT_PUBLICSUPABASE_URL: process.env.NEXT_PUBLICSUPABASE_URL || process.env.VITE_PUBLICSUPABASE_URL || '',
-    NEXT_PUBLICSUPABASE_ANON_KEY:
-      process.env.NEXT_PUBLICSUPABASE_ANON_KEY || process.env.VITE_PUBLICSUPABASE_ANON_KEY || '',
+    NEXT_PUBLIC_SUPABASE_URL: supabaseUrl,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseAnonKey,
+    NEXT_PUBLICSUPABASE_URL: supabaseUrl,
+    NEXT_PUBLICSUPABASE_ANON_KEY: supabaseAnonKey,
   },
   reactStrictMode: true,
   async redirects() {
     return [
-      { source: '/', destination: '/design/home.dc.html', permanent: false },
-      { source: '/pista', destination: '/design/pista.dc.html', permanent: false },
-      { source: '/kart-locacao', destination: '/design/kart-locacao.dc.html', permanent: false },
-      { source: '/campeonatos', destination: '/design/campeonatos.dc.html', permanent: false },
-      { source: '/eventos', destination: '/design/eventos.dc.html', permanent: false },
-      { source: '/duvidas', destination: '/design/duvidas.dc.html', permanent: false },
-      { source: '/kac', destination: '/design/kac.dc.html', permanent: false },
-      { source: '/campeonatos/kac', destination: '/design/kac.dc.html', permanent: false },
-      { source: '/kac-super', destination: '/design/kac-super.dc.html', permanent: false },
-      { source: '/campeonatos/kac-super', destination: '/design/kac-super.dc.html', permanent: false },
-      { source: '/200-milhas', destination: '/design/200-milhas.dc.html', permanent: false },
-      { source: '/campeonatos/200-milhas', destination: '/design/200-milhas.dc.html', permanent: false },
-      { source: '/500-milhas', destination: '/design/500-milhas.dc.html', permanent: false },
-      { source: '/campeonatos/500-milhas', destination: '/design/500-milhas.dc.html', permanent: false },
-      { source: '/clube-vantagens', destination: '/design/clube-vantagens.dc.html', permanent: false },
-      { source: '/clube-cadastro', destination: '/design/clube-cadastro.dc.html', permanent: false },
-      { source: '/clube-consulta', destination: '/design/clube-consulta.dc.html', permanent: false },
-      { source: '/clube-painel', destination: '/design/clube-painel.dc.html', permanent: false },
-      { source: '/clube-corridas', destination: '/design/clube-corridas.dc.html', permanent: false },
-      { source: '/clube-pontuacao', destination: '/design/clube-pontuacao.dc.html', permanent: false },
-      { source: '/clube-catalogo', destination: '/design/clube-catalogo.dc.html', permanent: false },
-      { source: '/clube-resgates', destination: '/design/clube-resgates.dc.html', permanent: false },
-      { source: '/clube-perfil', destination: '/design/clube-perfil.dc.html', permanent: false },
-      { source: '/clube-regulamento', destination: '/design/clube-regulamento.dc.html', permanent: false },
-      { source: '/clube-campanhas', destination: '/design/clube-campanhas.dc.html', permanent: false },
+      { source: '/valores', destination: '/kart-locacao', permanent: true },
+      { source: '/campeonatos/kac', destination: '/kac', permanent: true },
+      { source: '/campeonatos/kac-super', destination: '/kac-super', permanent: true },
+      { source: '/campeonatos/200-milhas', destination: '/200-milhas', permanent: true },
+      { source: '/campeonatos/500-milhas', destination: '/500-milhas', permanent: true },
+    ];
+  },
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: securityHeaders,
+      },
+      {
+        source: '/design/:path*',
+        headers: [
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' },
+          { key: 'Cache-Control', value: 'public, max-age=3600, s-maxage=3600' },
+        ],
+      },
     ];
   },
 };
