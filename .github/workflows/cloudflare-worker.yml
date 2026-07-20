@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
@@ -33,16 +33,28 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Verify lockfile
+      - name: Refresh or verify lockfile
         shell: bash
         run: |
           set -o pipefail
           npm install --package-lock-only --ignore-scripts --no-audit --no-fund 2>&1 | tee /tmp/npm-lock.log
-          if ! git diff --quiet -- package-lock.json; then
-            cp package-lock.json /tmp/package-lock.generated.json
-            echo "::error::package-lock.json está desatualizado. O arquivo regenerado foi anexado ao workflow."
-            exit 1
+
+          if git diff --quiet -- package-lock.json; then
+            exit 0
           fi
+
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" == refs/heads/fix/* ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json
+            git commit -m "chore: atualiza package-lock"
+            git push
+            exit 0
+          fi
+
+          cp package-lock.json /tmp/package-lock.generated.json
+          echo "::error::package-lock.json está desatualizado."
+          exit 1
 
       - name: Install dependencies
         shell: bash
@@ -105,6 +117,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: production
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
