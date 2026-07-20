@@ -149,12 +149,82 @@ jobs:
           set -o pipefail
           npm run deploy:worker 2>&1 | tee /tmp/cloudflare-deploy.log
 
-      - name: Upload Cloudflare deployment log
+      - name: Smoke test production domain
+        id: smoke
+        shell: bash
+        env:
+          RELEASE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          base='https://kartodromodebetim.com.br'
+          mkdir -p /tmp/production-smoke
+
+          root_ok=false
+          for attempt in $(seq 1 30); do
+            root_url="${base}/?release=${RELEASE_SHA}&attempt=${attempt}"
+            curl -sS -L --max-redirs 5 \
+              -H 'Cache-Control: no-cache' \
+              -H 'Pragma: no-cache' \
+              -D /tmp/production-smoke/root.headers \
+              -o /tmp/production-smoke/root.html \
+              -w '%{http_code} %{url_effective}\n' \
+              "$root_url" > /tmp/production-smoke/root.meta
+
+            read -r root_status root_effective < /tmp/production-smoke/root.meta
+            if [[ "$root_status" == '200' ]] \
+              && [[ "$root_effective" != *'/design/'* ]] \
+              && ! grep -Fq '{{' /tmp/production-smoke/root.html \
+              && grep -Fq 'rel="canonical"' /tmp/production-smoke/root.html \
+              && grep -Fq 'https://kartodromodebetim.com.br' /tmp/production-smoke/root.html; then
+              root_ok=true
+              break
+            fi
+            sleep 5
+          done
+
+          cat /tmp/production-smoke/root.meta
+          test "$root_ok" = true
+
+          curl -sS -L \
+            -H 'Cache-Control: no-cache' \
+            -D /tmp/production-smoke/club.headers \
+            -o /tmp/production-smoke/club.html \
+            -w '%{http_code} %{url_effective}\n' \
+            "${base}/clube-cadastro?release=${RELEASE_SHA}" > /tmp/production-smoke/club.meta
+          read -r club_status club_effective < /tmp/production-smoke/club.meta
+          test "$club_status" = '200'
+          [[ "$club_effective" != *'/design/'* ]]
+          grep -Fqi 'Portal em implantação' /tmp/production-smoke/club.html
+          ! grep -Fq 'Rafael Nogueira' /tmp/production-smoke/club.html
+
+          curl -sS --max-redirs 0 \
+            -H 'Cache-Control: no-cache' \
+            -D /tmp/production-smoke/values.headers \
+            -o /tmp/production-smoke/values.body \
+            "${base}/valores"
+          values_status=$(awk 'NR==1 {print $2}' /tmp/production-smoke/values.headers)
+          values_location=$(awk 'BEGIN{IGNORECASE=1} /^location:/ {sub(/\r$/, "", $2); print $2}' /tmp/production-smoke/values.headers | tail -1)
+          [[ "$values_status" == '301' || "$values_status" == '308' ]]
+          [[ "$values_location" == /kart-locacao* ]]
+
+          curl -sS -f -H 'Cache-Control: no-cache' \
+            "${base}/sitemap.xml?release=${RELEASE_SHA}" \
+            -o /tmp/production-smoke/sitemap.xml
+          grep -Fq 'https://kartodromodebetim.com.br/kart-locacao' /tmp/production-smoke/sitemap.xml
+
+          curl -sS -f -H 'Cache-Control: no-cache' \
+            "${base}/robots.txt?release=${RELEASE_SHA}" \
+            -o /tmp/production-smoke/robots.txt
+          grep -Fq 'Sitemap: https://kartodromodebetim.com.br/sitemap.xml' /tmp/production-smoke/robots.txt
+
+      - name: Upload Cloudflare deployment evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cloudflare-deployment-log
-          path: /tmp/cloudflare-deploy.log
+          name: cloudflare-deployment-evidence
+          path: |
+            /tmp/cloudflare-deploy.log
+            /tmp/production-smoke
           if-no-files-found: ignore
 
       - name: Publish Cloudflare deployment status
@@ -162,10 +232,13 @@ jobs:
         uses: actions/github-script@v7
         env:
           DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
+          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
         with:
           script: |
-            const succeeded = process.env.DEPLOY_OUTCOME === 'success';
-            const outcome = process.env.DEPLOY_OUTCOME || 'not-run';
+            const succeeded = process.env.DEPLOY_OUTCOME === 'success'
+              && process.env.SMOKE_OUTCOME === 'success';
+            const deployOutcome = process.env.DEPLOY_OUTCOME || 'not-run';
+            const smokeOutcome = process.env.SMOKE_OUTCOME || 'not-run';
             const sha = context.eventName === 'pull_request'
               ? context.payload.pull_request.head.sha
               : context.sha;
@@ -176,7 +249,7 @@ jobs:
               state: succeeded ? 'success' : 'failure',
               context: 'cloudflare/deploy',
               description: succeeded
-                ? 'Cloudflare Worker published successfully'
-                : `Cloudflare Worker deployment failed (${outcome})`,
+                ? 'Worker published and production smoke tests passed'
+                : `Deploy ${deployOutcome}; smoke ${smokeOutcome}`,
               target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
             });
