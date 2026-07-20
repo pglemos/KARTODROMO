@@ -37,10 +37,9 @@ const withSecurityHeaders = (response) => {
   });
 };
 
-const fetchAsset = async (request, env, assetPath) => {
-  const url = new URL(request.url);
-  url.pathname = assetPath;
-  const response = await env.ASSETS.fetch(new Request(url, request));
+const fetchAsset = async (env, assetPath) => {
+  const assetURL = new URL(assetPath, "https://assets.local");
+  const response = await env.ASSETS.fetch(new Request(assetURL));
   return withSecurityHeaders(response);
 };
 
@@ -57,21 +56,17 @@ export default {
 
     const premiumAsset = PREMIUM_ROUTES.get(path);
     if (premiumAsset) {
-      return fetchAsset(request, env, premiumAsset);
+      return fetchAsset(env, premiumAsset);
     }
 
-    if (path === "/sitemap.xml" || path === "/robots.txt") {
-      return fetchAsset(request, env, path);
-    }
-
-    if (path.startsWith("/assets/")) {
-      return withSecurityHeaders(await env.ASSETS.fetch(request));
+    if (path === "/sitemap.xml" || path === "/robots.txt" || path.startsWith("/assets/")) {
+      return fetchAsset(env, path);
     }
 
     if (env.LEGACY && typeof env.LEGACY.fetch === "function") {
       return env.LEGACY.fetch(request);
     }
 
-    return fetchAsset(request, env, "/404.html");
+    return fetchAsset(env, "/404.html");
   },
 };
