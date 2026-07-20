@@ -77,12 +77,17 @@ describe('production routing', () => {
 
 describe('club safety', () => {
   it('does not expose mock identities or fake transactional success', () => {
-    const source = read('src/site-pages/ClubPages.tsx');
+    const source = [
+      read('src/site-pages/ClubPages.tsx'),
+      read('src/components/club/ClubPortalUnavailable.tsx'),
+    ].join('\n');
+
     expect(source).not.toContain('Rafael Nogueira');
     expect(source).not.toContain('123.456.789-00');
     expect(source).not.toContain('Cadastro realizado!');
     expect(source).not.toContain('Alterações salvas.');
     expect(source).not.toContain('onClick={()=>setBalance');
     expect(source).toContain('Portal em implantação');
+    expect(source).toContain('Nenhum cadastro, saldo, alteração de perfil ou resgate é processado');
   });
 });
