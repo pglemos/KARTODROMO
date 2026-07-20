@@ -41,10 +41,10 @@ describe('premium reference recovery', () => {
 
   it('inclui o runtime e todos os recursos compartilhados obrigatórios', () => {
     expect(existsSync(join(output, 'support.js'))).toBe(true);
+    expect(existsSync(join(output, 'motion.js'))).toBe(true);
+    expect(existsSync(join(output, 'beneficios-nav.css'))).toBe(true);
     expect(existsSync(join(output, 'assets/brand/kib-logo.png'))).toBe(true);
     expect(existsSync(join(output, 'assets/posters/home-karting.jpg'))).toBe(true);
-    expect(existsSync(join(output, 'design/beneficios-nav.css'))).toBe(true);
-    expect(existsSync(join(output, 'beneficios-nav.css'))).toBe(true);
   });
 
   it('mapeia cada URL pública limpa para a referência correspondente', () => {
