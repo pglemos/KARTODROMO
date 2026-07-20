@@ -180,7 +180,7 @@ test.describe('pre-delivery checklist', () => {
         await page.goto(`${baseUrl}${path}`, { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(100);
         const result = await auditPage(page);
-        const expectedCanonical = `${canonicalOrigin}${path === '/' ? '' : path}`;
+        const expectedCanonical = new URL(path, canonicalOrigin).href;
 
         expect(result.title, `${path} needs a route title`).not.toBe('');
         expect(result.canonical, `${path} needs a canonical URL`).toBe(expectedCanonical);
