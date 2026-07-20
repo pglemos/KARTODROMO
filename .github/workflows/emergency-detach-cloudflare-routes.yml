@@ -22,12 +22,12 @@ concurrency:
 
 jobs:
   inspect:
-    name: Collect Worker versions and deployments
+    name: Collect Worker deployments
     if: >-
       github.event_name != 'pull_request' ||
       github.head_ref == 'deploy/production-rollback-worker-routes-2026-07-20'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     environment: production
 
     steps:
@@ -43,46 +43,16 @@ jobs:
           auth="Authorization: Bearer ${CLOUDFLARE_API_TOKEN}"
           script='kartodromo'
 
-          curl -sS "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/${script}/deployments" \
+          curl --max-time 30 -sS "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/${script}/deployments" \
             -H "$auth" -H 'Content-Type: application/json' \
             -o /tmp/worker-history/deployments.json \
             -w '%{http_code}\n' > /tmp/worker-history/deployments.status
 
-          curl -sS -G "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/workers/${script}/versions" \
+          curl --max-time 30 -sS -G "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/workers/${script}/versions" \
             -H "$auth" -H 'Content-Type: application/json' \
             --data-urlencode 'per_page=100' \
             -o /tmp/worker-history/versions.json \
-            -w '%{http_code}\n' > /tmp/worker-history/versions.status
-
-          curl -sS "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/${script}/settings" \
-            -H "$auth" -H 'Content-Type: application/json' \
-            -o /tmp/worker-history/settings.json \
-            -w '%{http_code}\n' > /tmp/worker-history/settings.status
-
-          curl -sS "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/domains" \
-            -H "$auth" -H 'Content-Type: application/json' \
-            -o /tmp/worker-history/domains.json \
-            -w '%{http_code}\n' > /tmp/worker-history/domains.status
-
-          curl -sS -G "${api}/zones" \
-            -H "$auth" -H 'Content-Type: application/json' \
-            --data-urlencode 'name=kartodromodebetim.com.br' \
-            --data-urlencode "account.id=${CLOUDFLARE_ACCOUNT_ID}" \
-            -o /tmp/worker-history/zones.json \
-            -w '%{http_code}\n' > /tmp/worker-history/zones.status
-
-          zone_id=$(jq -r '.result[0].id // empty' /tmp/worker-history/zones.json 2>/dev/null || true)
-          if [[ -n "$zone_id" ]]; then
-            curl -sS "${api}/zones/${zone_id}/workers/routes" \
-              -H "$auth" -H 'Content-Type: application/json' \
-              -o /tmp/worker-history/routes.json \
-              -w '%{http_code}\n' > /tmp/worker-history/routes.status
-            curl -sS -G "${api}/zones/${zone_id}/dns_records" \
-              -H "$auth" -H 'Content-Type: application/json' \
-              --data-urlencode 'per_page=100' \
-              -o /tmp/worker-history/dns.json \
-              -w '%{http_code}\n' > /tmp/worker-history/dns.status
-          fi
+            -w '%{http_code}\n' > /tmp/worker-history/versions.status || true
 
           jq -r '.result[]? | [
             .created_on,
@@ -91,20 +61,20 @@ jobs:
             ((.versions // []) | map(.version_id + ":" + (.percentage|tostring)) | join(",")),
             (.annotations["workers/message"] // ""),
             (.annotations["workers/triggered_by"] // "")
-          ] | @tsv' /tmp/worker-history/deployments.json > /tmp/worker-history/deployments.tsv 2>/dev/null || true
+          ] | @tsv' /tmp/worker-history/deployments.json > /tmp/worker-history/deployments.tsv
 
-          jq -r '.result[]? | [
-            .created_on,
-            .id,
-            (.number|tostring),
-            (.annotations["workers/message"] // ""),
-            (.annotations["workers/triggered_by"] // "")
-          ] | @tsv' /tmp/worker-history/versions.json > /tmp/worker-history/versions.tsv 2>/dev/null || true
+          if [[ -f /tmp/worker-history/versions.json ]]; then
+            jq -r '.result[]? | [
+              .created_on,
+              .id,
+              (.number|tostring),
+              (.annotations["workers/message"] // ""),
+              (.annotations["workers/triggered_by"] // "")
+            ] | @tsv' /tmp/worker-history/versions.json > /tmp/worker-history/versions.tsv 2>/dev/null || true
+          fi
 
-          echo 'HTTP statuses:'
-          for status in /tmp/worker-history/*.status; do printf '%s: ' "$(basename "$status")"; cat "$status"; done
           echo 'Deployments:'
-          cat /tmp/worker-history/deployments.tsv || true
+          cat /tmp/worker-history/deployments.tsv
 
       - name: Upload Worker deployment history
         if: always()
