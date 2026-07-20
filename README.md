@@ -158,6 +158,8 @@ O workflow `.github/workflows/cloudflare-worker.yml` executa em pull requests e 
 
 Em push para `main`, o deploy de produção ocorre somente depois da verificação completa.
 
+Cada execução de produção publica o contexto `cloudflare/deploy` no commit de `main`, registrando sucesso ou falha e apontando para o respectivo workflow do GitHub Actions.
+
 Secrets exigidos no GitHub:
 
 - `CLOUDFLARE_API_TOKEN`
