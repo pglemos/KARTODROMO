@@ -27,7 +27,7 @@ jobs:
       github.event_name != 'pull_request' ||
       github.head_ref == 'deploy/production-rollback-worker-routes-2026-07-20'
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     environment: production
 
     steps:
@@ -57,10 +57,10 @@ jobs:
 
           mapfile -t route_ids < <(jq -r '.result[] | select(.pattern == "kartodromodebetim.com.br/*" or .pattern == "www.kartodromodebetim.com.br/*") | .id' /tmp/routes-before.json)
           for route_id in "${route_ids[@]}"; do
-            curl -fsS -X DELETE "${api}/zones/${zone_id}/workers/routes/${route_id}" \
-              -H "$auth" -H 'Content-Type: application/json' \
-              > "/tmp/deleted-route-${route_id}.json"
-            jq -e '.success == true' "/tmp/deleted-route-${route_id}.json" > /dev/null
+            status=$(curl -sS -o "/tmp/deleted-route-${route_id}.body" -w '%{http_code}' \
+              -X DELETE "${api}/zones/${zone_id}/workers/routes/${route_id}" \
+              -H "$auth" -H 'Content-Type: application/json')
+            [[ "$status" == '200' || "$status" == '204' ]]
           done
 
           curl -fsS "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/domains" \
@@ -69,10 +69,10 @@ jobs:
 
           mapfile -t domain_ids < <(jq -r '.result[] | select(.hostname == "kartodromodebetim.com.br" or .hostname == "www.kartodromodebetim.com.br") | .id' /tmp/worker-domains-before.json)
           for domain_id in "${domain_ids[@]}"; do
-            curl -fsS -X DELETE "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/domains/${domain_id}" \
-              -H "$auth" -H 'Content-Type: application/json' \
-              > "/tmp/deleted-domain-${domain_id}.json"
-            jq -e '.success == true' "/tmp/deleted-domain-${domain_id}.json" > /dev/null
+            status=$(curl -sS -o "/tmp/deleted-domain-${domain_id}.body" -w '%{http_code}' \
+              -X DELETE "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/domains/${domain_id}" \
+              -H "$auth" -H 'Content-Type: application/json')
+            [[ "$status" == '200' || "$status" == '204' ]]
           done
 
           curl -fsS -G "${api}/zones/${zone_id}/dns_records" \
@@ -101,30 +101,41 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/origin-check
+          paths=('' 'pista' 'kart-locacao' 'eventos' 'campeonatos')
+          hosts=('kartodromodebetim.com.br' 'www.kartodromodebetim.com.br')
 
           for attempt in $(seq 1 30); do
-            curl -sS -L --max-redirs 5 \
-              -H 'Cache-Control: no-cache' \
-              -H 'Pragma: no-cache' \
-              -D /tmp/origin-check/home.headers \
-              -o /tmp/origin-check/home.html \
-              -w '%{http_code} %{url_effective}\n' \
-              'https://kartodromodebetim.com.br/' \
-              > /tmp/origin-check/home.meta || true
+            all_ok=true
+            for host in "${hosts[@]}"; do
+              for path in "${paths[@]}"; do
+                key="${host//./-}-${path:-home}"
+                curl -sS -L --max-redirs 5 \
+                  -H 'Cache-Control: no-cache' \
+                  -H 'Pragma: no-cache' \
+                  -D "/tmp/origin-check/${key}.headers" \
+                  -o "/tmp/origin-check/${key}.html" \
+                  -w '%{http_code} %{url_effective}\n' \
+                  "https://${host}/${path}" \
+                  > "/tmp/origin-check/${key}.meta" || true
 
-            read -r status effective < /tmp/origin-check/home.meta || true
-            if [[ "${status:-}" == '200' ]] \
-              && [[ "${effective:-}" != *'/design/'* ]] \
-              && ! grep -Fq '{{' /tmp/origin-check/home.html \
-              && ! grep -Eqi '^x-opennext:[[:space:]]*1' /tmp/origin-check/home.headers; then
+                read -r status effective < "/tmp/origin-check/${key}.meta" || true
+                if [[ "${status:-}" != '200' ]] \
+                  || [[ "${effective:-}" == *'/design/'* ]] \
+                  || grep -Fq '{{' "/tmp/origin-check/${key}.html" \
+                  || grep -Eqi '^x-opennext:[[:space:]]*1' "/tmp/origin-check/${key}.headers"; then
+                  all_ok=false
+                fi
+              done
+            done
+
+            if [[ "$all_ok" == true ]]; then
               exit 0
             fi
             sleep 5
           done
 
-          echo 'A origem anterior ainda não foi restaurada.'
-          cat /tmp/origin-check/home.meta || true
-          cat /tmp/origin-check/home.headers || true
+          echo 'A origem anterior ainda não foi restaurada em todas as páginas.'
+          for meta in /tmp/origin-check/*.meta; do echo "--- $meta"; cat "$meta"; done
           exit 1
 
       - name: Upload rollback evidence
@@ -138,7 +149,7 @@ jobs:
             /tmp/routes-after.json
             /tmp/worker-domains-before.json
             /tmp/worker-domains-after.json
-            /tmp/deleted-*.json
+            /tmp/deleted-*.body
             /tmp/dns-records.json
             /tmp/purge.json
             /tmp/origin-check
