@@ -1,193 +1,108 @@
-name: Emergency restore production origin
+name: Recover previous Cloudflare DNS configuration
 
 on:
   push:
     branches:
       - deploy/production-rollback-worker-routes-2026-07-20
-  pull_request:
-    branches:
-      - main
-    types:
-      - opened
-      - synchronize
-      - reopened
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: emergency-restore-kartodromo-origin
-  cancel-in-progress: false
+  group: recover-kartodromo-dns-history
+  cancel-in-progress: true
 
 jobs:
-  restore:
-    name: Restore previous production origin
-    if: >-
-      github.event_name != 'pull_request' ||
-      github.head_ref == 'deploy/production-rollback-worker-routes-2026-07-20'
+  audit:
+    name: Collect Cloudflare audit evidence
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     environment: production
 
     steps:
-      - name: Detach Worker and inspect current DNS
+      - name: Collect zone and audit logs
         shell: bash
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
+          mkdir -p /tmp/cloudflare-audit
           api='https://api.cloudflare.com/client/v4'
           auth="Authorization: Bearer ${CLOUDFLARE_API_TOKEN}"
+          since='2026-07-20T15:00:00Z'
+          before='2026-07-20T19:00:00Z'
 
-          curl -fsS -G "${api}/zones" \
+          curl -sS -G "${api}/zones" \
             -H "$auth" -H 'Content-Type: application/json' \
             --data-urlencode 'name=kartodromodebetim.com.br' \
             --data-urlencode "account.id=${CLOUDFLARE_ACCOUNT_ID}" \
-            > /tmp/zones.json
-          zone_id=$(jq -r '.result[0].id // empty' /tmp/zones.json)
-          test -n "$zone_id"
-          echo "$zone_id" > /tmp/zone-id
+            -o /tmp/cloudflare-audit/zones.json \
+            -w '%{http_code}\n' > /tmp/cloudflare-audit/zones.status
 
-          curl -fsS "${api}/zones/${zone_id}/workers/routes" -H "$auth" > /tmp/routes-before.json
-          mapfile -t route_ids < <(jq -r '.result[] | select(.pattern == "kartodromodebetim.com.br/*" or .pattern == "www.kartodromodebetim.com.br/*") | .id' /tmp/routes-before.json)
-          for route_id in "${route_ids[@]}"; do
-            status=$(curl -sS -o "/tmp/deleted-route-${route_id}.body" -w '%{http_code}' -X DELETE \
-              "${api}/zones/${zone_id}/workers/routes/${route_id}" -H "$auth")
-            [[ "$status" == '200' || "$status" == '204' ]]
-          done
+          zone_id=$(jq -r '.result[0].id // empty' /tmp/cloudflare-audit/zones.json 2>/dev/null || true)
+          echo "$zone_id" > /tmp/cloudflare-audit/zone-id.txt
 
-          curl -fsS "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/domains" -H "$auth" > /tmp/worker-domains-before.json
-          mapfile -t domain_ids < <(jq -r '.result[] | select(.hostname == "kartodromodebetim.com.br" or .hostname == "www.kartodromodebetim.com.br") | .id' /tmp/worker-domains-before.json)
-          for domain_id in "${domain_ids[@]}"; do
-            status=$(curl -sS -o "/tmp/deleted-domain-${domain_id}.body" -w '%{http_code}' -X DELETE \
-              "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/domains/${domain_id}" -H "$auth")
-            [[ "$status" == '200' || "$status" == '204' ]]
-          done
-
-          curl -fsS -G "${api}/zones/${zone_id}/dns_records" \
-            -H "$auth" --data-urlencode 'per_page=100' > /tmp/dns-before.json
-
-          origin_ip=$(jq -r '.result[] | select(.type == "A" and (.name == "whm.kartodromodebetim.com.br" or .name == "mail.kartodromodebetim.com.br")) | .content' /tmp/dns-before.json | head -1)
-          test -n "$origin_ip"
-          echo "$origin_ip" > /tmp/origin-ip
-
-      - name: Probe previous HostGator origin before DNS changes
-        shell: bash
-        run: |
-          set -euo pipefail
-          origin_ip=$(cat /tmp/origin-ip)
-          mkdir -p /tmp/origin-probe
-
-          curl -ksS -L --max-redirs 5 \
-            --resolve "kartodromodebetim.com.br:443:${origin_ip}" \
-            --resolve "www.kartodromodebetim.com.br:443:${origin_ip}" \
-            -D /tmp/origin-probe/home.headers \
-            -o /tmp/origin-probe/home.html \
-            -w '%{http_code} %{url_effective}\n' \
-            'https://kartodromodebetim.com.br/' \
-            > /tmp/origin-probe/home.meta
-
-          read -r status effective < /tmp/origin-probe/home.meta
-          test "$status" = '200'
-          [[ "$effective" != *'/design/'* ]]
-          ! grep -Fq '{{' /tmp/origin-probe/home.html
-          ! grep -Eqi '^x-opennext:[[:space:]]*1' /tmp/origin-probe/home.headers
-
-      - name: Restore root and www DNS records
-        shell: bash
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: |
-          set -euo pipefail
-          api='https://api.cloudflare.com/client/v4'
-          auth="Authorization: Bearer ${CLOUDFLARE_API_TOKEN}"
-          zone_id=$(cat /tmp/zone-id)
-          origin_ip=$(cat /tmp/origin-ip)
-
-          curl -fsS -G "${api}/zones/${zone_id}/dns_records" \
-            -H "$auth" --data-urlencode 'per_page=100' > /tmp/dns-current.json
-
-          mapfile -t conflicting_ids < <(jq -r '.result[] | select((.name == "kartodromodebetim.com.br" or .name == "www.kartodromodebetim.com.br") and (.type == "A" or .type == "AAAA" or .type == "CNAME")) | .id' /tmp/dns-current.json)
-          for record_id in "${conflicting_ids[@]}"; do
-            status=$(curl -sS -o "/tmp/deleted-dns-${record_id}.body" -w '%{http_code}' -X DELETE \
-              "${api}/zones/${zone_id}/dns_records/${record_id}" -H "$auth")
-            [[ "$status" == '200' || "$status" == '204' ]]
-          done
-
-          curl -fsS -X POST "${api}/zones/${zone_id}/dns_records" \
+          curl -sS -G "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/audit_logs" \
             -H "$auth" -H 'Content-Type: application/json' \
-            --data "{\"type\":\"A\",\"name\":\"kartodromodebetim.com.br\",\"content\":\"${origin_ip}\",\"ttl\":1,\"proxied\":true}" \
-            > /tmp/root-dns-created.json
-          jq -e '.success == true' /tmp/root-dns-created.json > /dev/null
+            --data-urlencode "since=${since}" \
+            --data-urlencode "before=${before}" \
+            --data-urlencode 'per_page=1000' \
+            --data-urlencode 'direction=desc' \
+            -o /tmp/cloudflare-audit/audit-v1-all.json \
+            -w '%{http_code}\n' > /tmp/cloudflare-audit/audit-v1-all.status
 
-          curl -fsS -X POST "${api}/zones/${zone_id}/dns_records" \
+          if [[ -n "$zone_id" ]]; then
+            curl -sS -G "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/audit_logs" \
+              -H "$auth" -H 'Content-Type: application/json' \
+              --data-urlencode "since=${since}" \
+              --data-urlencode "before=${before}" \
+              --data-urlencode "zone_id=${zone_id}" \
+              --data-urlencode 'per_page=1000' \
+              --data-urlencode 'direction=desc' \
+              -o /tmp/cloudflare-audit/audit-v1-zone.json \
+              -w '%{http_code}\n' > /tmp/cloudflare-audit/audit-v1-zone.status
+          fi
+
+          curl -sS -G "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/logs/audit" \
             -H "$auth" -H 'Content-Type: application/json' \
-            --data '{"type":"CNAME","name":"www","content":"kartodromodebetim.com.br","ttl":1,"proxied":true}' \
-            > /tmp/www-dns-created.json
-          jq -e '.success == true' /tmp/www-dns-created.json > /dev/null
+            --data-urlencode "since=${since}" \
+            --data-urlencode "before=${before}" \
+            --data-urlencode 'limit=1000' \
+            -o /tmp/cloudflare-audit/audit-v2-all.json \
+            -w '%{http_code}\n' > /tmp/cloudflare-audit/audit-v2-all.status
 
-          curl -fsS -X POST "${api}/zones/${zone_id}/purge_cache" \
+          if [[ -n "$zone_id" ]]; then
+            curl -sS -G "${api}/zones/${zone_id}/dns_records" \
+              -H "$auth" -H 'Content-Type: application/json' \
+              --data-urlencode 'per_page=100' \
+              -o /tmp/cloudflare-audit/dns-current.json \
+              -w '%{http_code}\n' > /tmp/cloudflare-audit/dns-current.status
+
+            curl -sS "${api}/zones/${zone_id}/workers/routes" \
+              -H "$auth" -H 'Content-Type: application/json' \
+              -o /tmp/cloudflare-audit/routes-current.json \
+              -w '%{http_code}\n' > /tmp/cloudflare-audit/routes-current.status
+          fi
+
+          curl -sS "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/domains" \
             -H "$auth" -H 'Content-Type: application/json' \
-            --data '{"purge_everything":true}' > /tmp/purge.json
-          jq -e '.success == true' /tmp/purge.json > /dev/null
+            -o /tmp/cloudflare-audit/worker-domains-current.json \
+            -w '%{http_code}\n' > /tmp/cloudflare-audit/worker-domains-current.status
 
-          curl -fsS -G "${api}/zones/${zone_id}/dns_records" \
-            -H "$auth" --data-urlencode 'per_page=100' > /tmp/dns-after.json
-
-      - name: Verify restored production pages
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/public-check
-          paths=('' 'pista' 'kart-locacao' 'eventos' 'campeonatos')
-          hosts=('kartodromodebetim.com.br' 'www.kartodromodebetim.com.br')
-
-          for attempt in $(seq 1 36); do
-            all_ok=true
-            for host in "${hosts[@]}"; do
-              for path in "${paths[@]}"; do
-                key="${host//./-}-${path:-home}"
-                curl -sS -L --max-redirs 5 \
-                  -H 'Cache-Control: no-cache' -H 'Pragma: no-cache' \
-                  -D "/tmp/public-check/${key}.headers" \
-                  -o "/tmp/public-check/${key}.html" \
-                  -w '%{http_code} %{url_effective}\n' \
-                  "https://${host}/${path}" > "/tmp/public-check/${key}.meta" || true
-
-                read -r status effective < "/tmp/public-check/${key}.meta" || true
-                if [[ "${status:-}" != '200' ]] \
-                  || [[ "${effective:-}" == *'/design/'* ]] \
-                  || grep -Fq '{{' "/tmp/public-check/${key}.html" \
-                  || grep -Eqi '^x-opennext:[[:space:]]*1' "/tmp/public-check/${key}.headers"; then
-                  all_ok=false
-                fi
-              done
-            done
-            if [[ "$all_ok" == true ]]; then exit 0; fi
-            sleep 5
+          for file in /tmp/cloudflare-audit/audit-v1-all.json /tmp/cloudflare-audit/audit-v1-zone.json /tmp/cloudflare-audit/audit-v2-all.json; do
+            [[ -f "$file" ]] || continue
+            jq '.. | objects | select((.action.type? // .action? // .type? // "") | tostring | test("dns|record|worker|domain|route"; "i"))' "$file" > "${file%.json}-filtered.json" 2>/dev/null || true
           done
 
-          for meta in /tmp/public-check/*.meta; do echo "--- $meta"; cat "$meta"; done
-          exit 1
+          echo 'HTTP statuses:'
+          for status in /tmp/cloudflare-audit/*.status; do printf '%s: ' "$(basename "$status")"; cat "$status"; done
 
-      - name: Upload restoration evidence
+      - name: Upload Cloudflare audit evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: emergency-production-origin-restoration
-          path: |
-            /tmp/zones.json
-            /tmp/routes-before.json
-            /tmp/worker-domains-before.json
-            /tmp/dns-before.json
-            /tmp/dns-current.json
-            /tmp/dns-after.json
-            /tmp/origin-ip
-            /tmp/origin-probe
-            /tmp/root-dns-created.json
-            /tmp/www-dns-created.json
-            /tmp/purge.json
-            /tmp/public-check
-          if-no-files-found: ignore
+          name: cloudflare-dns-history-audit
+          path: /tmp/cloudflare-audit
+          if-no-files-found: error
