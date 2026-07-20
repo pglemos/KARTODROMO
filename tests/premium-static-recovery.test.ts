@@ -5,6 +5,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const root = process.cwd();
 const output = join(root, '.premium-test-dist');
+const responsivePatch = readFileSync(
+  join(root, 'premium-src/reference-responsive-patch.css'),
+  'utf8',
+);
+const patchTag = `<style id="kib-reference-responsive-recovery">\n${responsivePatch}\n</style>`;
 const expectedPages = [
   'home.dc.html',
   'pista.dc.html',
@@ -31,11 +36,16 @@ afterAll(() => {
 });
 
 describe('premium reference recovery', () => {
-  it('copia exatamente as dez páginas originais aprovadas', () => {
+  it('preserva cada página original e acrescenta somente o patch responsivo aprovado', () => {
     for (const page of expectedPages) {
-      const source = readFileSync(join(root, 'public/design', page));
-      const generated = readFileSync(join(output, 'design', page));
-      expect(generated.equals(source), `${page} foi alterada durante o build`).toBe(true);
+      const source = readFileSync(join(root, 'public/design', page), 'utf8');
+      const generated = readFileSync(join(output, 'design', page), 'utf8');
+      const expected = source.includes('</helmet>')
+        ? source.replace('</helmet>', `${patchTag}\n</helmet>`)
+        : source.replace('</head>', `${patchTag}\n</head>`);
+      expect(generated, `${page} recebeu alteração além do patch responsivo`).toBe(expected);
+      expect(source).not.toContain('kib-reference-responsive-recovery');
+      expect(generated).toContain('kib-reference-responsive-recovery');
     }
   });
 
