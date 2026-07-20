@@ -11,7 +11,13 @@ const viewports = [
   { name: 'desktop', width: 1440, height: 900 },
 ] as const;
 
-const pages = [
+type CapturePage = {
+  name: string;
+  route: string;
+  reference?: string;
+};
+
+const pages: readonly CapturePage[] = [
   { name: 'home', route: '/', reference: '/design/home.dc.html' },
   { name: 'pista', route: '/pista', reference: '/design/pista.dc.html' },
   { name: 'kart-locacao', route: '/kart-locacao', reference: '/design/kart-locacao.dc.html' },
@@ -25,7 +31,7 @@ const pages = [
   { name: '200-milhas', route: '/200-milhas', reference: '/design/200-milhas.dc.html' },
   { name: '500-milhas', route: '/500-milhas', reference: '/design/500-milhas.dc.html' },
   { name: 'clube-vantagens', route: '/clube-vantagens', reference: '/design/clube-vantagens.dc.html' },
-] as const;
+];
 
 const deterministicCss = `
   html { scroll-behavior: auto !important; }
@@ -61,8 +67,7 @@ async function preparePage(page: Page, url: string, expectTemplatesResolved: boo
     ).catch(() => undefined);
   }
 
-  // Stat counters and client-rendered reference values need one complete animation frame cycle
-  // before animations are disabled for the screenshot.
+  // Stat counters and client-rendered reference values need one complete animation cycle.
   await page.waitForTimeout(1_600);
 }
 
