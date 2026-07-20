@@ -157,9 +157,13 @@ async function preparePage(page: Page, url: string) {
   const response = await page.goto(url, { waitUntil: 'domcontentloaded' });
   expect(response?.status(), `${url} deveria carregar`).toBeLessThan(400);
   await waitForRuntime(page);
+  await page.addStyleTag({ content: deterministicCss });
 
   await page.evaluate(async () => {
     const delay = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+    document.documentElement.style.scrollBehavior = 'auto';
+    document.body.style.scrollBehavior = 'auto';
+
     const images = Array.from(document.images).filter((image) => {
       const source = image.currentSrc || image.getAttribute('src') || '';
       return source && !source.includes('{{');
@@ -177,15 +181,15 @@ async function preparePage(page: Page, url: string) {
     const step = Math.max(360, Math.floor(window.innerHeight * 0.78));
     const limit = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
     for (let position = 0; position <= limit; position += step) {
-      window.scrollTo(0, position);
+      window.scrollTo({ top: position, left: 0, behavior: 'instant' });
       await delay(35);
     }
-    window.scrollTo(0, limit);
+    window.scrollTo({ top: limit, left: 0, behavior: 'instant' });
     await delay(250);
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    await delay(100);
   });
 
-  await page.addStyleTag({ content: deterministicCss });
   await page.evaluate(async () => {
     await document.fonts.ready;
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
@@ -202,8 +206,9 @@ async function preparePage(page: Page, url: string) {
         // O navegador pode bloquear seek antes dos metadados; o vídeo permanece pausado.
       }
     });
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   });
+  await page.waitForFunction(() => window.scrollY === 0 && window.scrollX === 0);
   await page.waitForTimeout(500);
 
   await expect(page.locator('h1')).toBeVisible();
