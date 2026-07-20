@@ -1,71 +1,138 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+import { createHash } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 const baseURL = process.env.PREMIUM_PREVIEW_URL;
-const routes = [
-  ['home', '/'],
-  ['pista', '/pista'],
-  ['locacao', '/kart-locacao'],
-  ['campeonatos', '/campeonatos'],
-  ['eventos', '/eventos'],
-  ['duvidas', '/duvidas'],
-  ['kac', '/kac'],
-  ['kac-super', '/kac-super'],
-  ['200-milhas', '/200-milhas'],
-  ['500-milhas', '/500-milhas'],
+const outputDir = join(process.cwd(), 'test-results', 'premium-reference-comparison');
+
+const pages = [
+  { name: 'home', route: '/', reference: '/design/home.dc.html' },
+  { name: 'pista', route: '/pista', reference: '/design/pista.dc.html' },
+  { name: 'kart-locacao', route: '/kart-locacao', reference: '/design/kart-locacao.dc.html' },
+  { name: 'campeonatos', route: '/campeonatos', reference: '/design/campeonatos.dc.html' },
+  { name: 'eventos', route: '/eventos', reference: '/design/eventos.dc.html' },
+  { name: 'duvidas', route: '/duvidas', reference: '/design/duvidas.dc.html' },
+  { name: 'kac', route: '/kac', reference: '/design/kac.dc.html' },
+  { name: 'kac-super', route: '/kac-super', reference: '/design/kac-super.dc.html' },
+  { name: '200-milhas', route: '/200-milhas', reference: '/design/200-milhas.dc.html' },
+  { name: '500-milhas', route: '/500-milhas', reference: '/design/500-milhas.dc.html' },
 ] as const;
 
 const viewports = [
   { name: 'mobile', width: 390, height: 844 },
+  { name: 'tablet', width: 820, height: 1180 },
   { name: 'desktop', width: 1440, height: 900 },
 ] as const;
 
-test.describe('premium static preview', () => {
+const deterministicCss = `
+  html { scroll-behavior: auto !important; }
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+    caret-color: transparent !important;
+  }
+`;
+
+const sha256 = (buffer: Buffer) => createHash('sha256').update(buffer).digest('hex');
+
+async function preparePage(page: Page, url: string) {
+  const failedResources: string[] = [];
+  const listener = (response: { status(): number; url(): string }) => {
+    if (response.status() >= 400) failedResources.push(`${response.status()} ${response.url()}`);
+  };
+  page.on('response', listener);
+
+  const response = await page.goto(url, { waitUntil: 'domcontentloaded' });
+  expect(response?.status(), `${url} deveria carregar`).toBeLessThan(400);
+
+  await page.waitForFunction(
+    () => !document.body.innerText.includes('{{') && !document.body.innerText.includes('<sc-for'),
+    undefined,
+    { timeout: 20_000 },
+  );
+
+  await page.addStyleTag({ content: deterministicCss });
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    document.querySelectorAll('[data-reveal]').forEach((element) => {
+      const htmlElement = element as HTMLElement;
+      htmlElement.style.opacity = '1';
+      htmlElement.style.transform = 'none';
+    });
+    document.querySelectorAll('video').forEach((video) => {
+      video.pause();
+      try {
+        video.currentTime = 0;
+      } catch {
+        // O navegador pode bloquear seek antes dos metadados; o vídeo permanece pausado.
+      }
+    });
+    window.scrollTo(0, 0);
+  });
+  await page.waitForTimeout(250);
+
+  await expect(page.locator('h1')).toBeVisible();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow, `${url} possui overflow horizontal`).toBeLessThanOrEqual(1);
+  expect(failedResources, `Recursos quebrados em ${url}`).toEqual([]);
+  page.off('response', listener);
+}
+
+test.describe.configure({ mode: 'serial' });
+test.setTimeout(1_200_000);
+
+test.describe('premium reference recovery', () => {
   test.skip(!baseURL, 'PREMIUM_PREVIEW_URL não informado');
+  mkdirSync(outputDir, { recursive: true });
 
   for (const viewport of viewports) {
-    for (const [name, route] of routes) {
-      test(`${name} ${viewport.name}`, async ({ page }) => {
-        await page.setViewportSize(viewport);
-        await page.emulateMedia({ reducedMotion: 'reduce' });
-        const response = await page.goto(`${baseURL}${route}`, { waitUntil: 'networkidle' });
-        expect(response?.status()).toBe(200);
+    test(`rotas limpas são visualmente idênticas às referências em ${viewport.name}`, async ({ page }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+      for (const item of pages) {
+        const cleanURL = new URL(item.route, baseURL).href;
+        await preparePage(page, cleanURL);
         expect(page.url()).not.toContain('/design/');
-        await expect(page.locator('h1')).toBeVisible();
-        await expect(page).toHaveTitle(/Kart|KAC|Milhas|Dúvidas|Eventos|Campeonatos|pista/i);
-        const html = await page.content();
-        expect(html).not.toContain('{{');
-        expect(html).not.toContain('<sc-for');
-        expect(html).not.toContain('.dc');
-        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-        expect(overflow).toBeLessThanOrEqual(1);
-        await page.screenshot({
-          path: `test-results/premium-${name}-${viewport.name}.png`,
+        const cleanScreenshot = await page.screenshot({
+          path: join(outputDir, `${viewport.name}--${item.name}--clean.png`),
           fullPage: true,
+          animations: 'disabled',
         });
-      });
-    }
+
+        const referenceURL = new URL(item.reference, baseURL).href;
+        await preparePage(page, referenceURL);
+        const referenceScreenshot = await page.screenshot({
+          path: join(outputDir, `${viewport.name}--${item.name}--reference.png`),
+          fullPage: true,
+          animations: 'disabled',
+        });
+
+        expect(
+          sha256(cleanScreenshot),
+          `${item.name} em ${viewport.name} divergiu visualmente da página original`,
+        ).toBe(sha256(referenceScreenshot));
+      }
+    });
   }
 
-  test('menu mobile controla foco, scroll e Escape', async ({ page }) => {
+  test('menu mobile e modal continuam funcionais pelo runtime original', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(`${baseURL}/`, { waitUntil: 'networkidle' });
-    const button = page.locator('.menu-toggle');
-    await button.click();
-    await expect(button).toHaveAttribute('aria-expanded', 'true');
-    await expect(page.locator('.mobile-nav')).toHaveClass(/open/);
-    await expect(page.locator('body')).toHaveClass(/menu-open/);
-    await page.keyboard.press('Escape');
-    await expect(button).toHaveAttribute('aria-expanded', 'false');
-    await expect(button).toBeFocused();
-  });
+    await preparePage(page, new URL('/', baseURL).href);
 
-  test('conteúdo permanece visível quando JavaScript está desabilitado', async ({ browser }) => {
-    const context = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 844 } });
-    const page = await context.newPage();
-    const response = await page.goto(`${baseURL}/`, { waitUntil: 'load' });
-    expect(response?.status()).toBe(200);
-    await expect(page.locator('.poster-card').first()).toBeVisible();
-    await expect(page.locator('.step').first()).toBeVisible();
-    await context.close();
+    const menuButton = page.locator('button[aria-controls="mobile-navigation"]');
+    await menuButton.click();
+    await expect(menuButton).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator('#mobile-navigation')).toHaveAttribute('aria-hidden', 'false');
+    await page.keyboard.press('Escape');
+    await expect(menuButton).toHaveAttribute('aria-expanded', 'false');
+
+    const modalButton = page.locator('button[aria-controls="event-modal"]').first();
+    await modalButton.click();
+    await expect(page.locator('#event-modal')).toHaveAttribute('aria-hidden', 'false');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#event-modal')).toHaveAttribute('aria-hidden', 'true');
   });
 });
