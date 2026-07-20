@@ -1,0 +1,35 @@
+name: Lint Diagnostics
+
+on:
+  push:
+    branches:
+      - feat/public-ui-premium-foundation-2026-07-20
+    paths:
+      - .github/workflows/lint-diagnostics.yml
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run lint with complete log
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run lint 2>&1 | tee /tmp/lint.log
+      - name: Upload lint log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-diagnostics
+          path: /tmp/lint.log
+          if-no-files-found: error
