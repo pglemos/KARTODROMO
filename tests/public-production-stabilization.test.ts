@@ -81,6 +81,31 @@ describe('production routing', () => {
   });
 });
 
+describe('public visual system', () => {
+  it('uses an isolated dark theme without global light utility overrides', () => {
+    const appSource = read('src/App.tsx');
+    const layoutSource = read('app/layout.tsx');
+    const indexCss = read('src/index.css');
+    const publicTokens = read('src/styles/public-tokens.css');
+
+    expect(appSource).toContain('className="public-site"');
+    expect(layoutSource).toContain("import '@/src/styles/public-tokens.css'");
+    expect(layoutSource).toContain("variable: '--font-display'");
+    expect(layoutSource).toContain("variable: '--font-body'");
+
+    expect(indexCss).not.toContain('@apply bg-white text-zinc-800');
+    expect(indexCss).not.toContain("font-family: 'Inter'");
+    expect(indexCss).not.toContain("font-family: 'Montserrat'");
+    expect(indexCss).not.toMatch(/\.text-primary-500[\s\S]{0,240}!important/);
+    expect(indexCss).not.toMatch(/\.text-zinc-400[\s\S]{0,240}!important/);
+
+    expect(publicTokens).toContain('.public-site');
+    expect(publicTokens).toContain('--public-bg: #030504');
+    expect(publicTokens).toContain('--public-accent: #00e676');
+    expect(publicTokens).toContain('font-family: var(--font-body)');
+  });
+});
+
 describe('club safety', () => {
   it('does not expose mock identities or fake transactional success', () => {
     const source = [
