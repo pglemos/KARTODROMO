@@ -33,6 +33,17 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Verify lockfile
+        shell: bash
+        run: |
+          set -o pipefail
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund 2>&1 | tee /tmp/npm-lock.log
+          if ! git diff --quiet -- package-lock.json; then
+            cp package-lock.json /tmp/package-lock.generated.json
+            echo "::error::package-lock.json está desatualizado. O arquivo regenerado foi anexado ao workflow."
+            exit 1
+          fi
+
       - name: Install dependencies
         shell: bash
         run: |
@@ -81,6 +92,8 @@ jobs:
         with:
           name: verification-diagnostics
           path: |
+            /tmp/npm-lock.log
+            /tmp/package-lock.generated.json
             /tmp/npm-ci.log
             /tmp/kartodromo-next.log
           if-no-files-found: ignore
