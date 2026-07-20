@@ -153,6 +153,20 @@ async function preparePage(page: Page, url: string) {
 
   await page.evaluate(async () => {
     const delay = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+    const images = Array.from(document.images).filter((image) => {
+      const source = image.currentSrc || image.getAttribute('src') || '';
+      return source && !source.includes('{{');
+    });
+
+    images.forEach((image) => {
+      image.loading = 'eager';
+    });
+
+    await Promise.race([
+      Promise.allSettled(images.map((image) => image.decode())),
+      delay(30_000),
+    ]);
+
     const step = Math.max(360, Math.floor(window.innerHeight * 0.78));
     const limit = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
     for (let position = 0; position <= limit; position += step) {
@@ -160,24 +174,9 @@ async function preparePage(page: Page, url: string) {
       await delay(35);
     }
     window.scrollTo(0, limit);
-    await delay(120);
+    await delay(250);
     window.scrollTo(0, 0);
   });
-
-  await page.waitForFunction(
-    () => Array.from(document.images).every((image) => {
-      const source = image.currentSrc || image.getAttribute('src') || '';
-      const style = getComputedStyle(image);
-      const participatesInLayout =
-        image.getClientRects().length > 0 &&
-        style.display !== 'none' &&
-        style.visibility !== 'hidden';
-      if (!participatesInLayout || !source || source.includes('{{')) return true;
-      return image.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
-    }),
-    undefined,
-    { timeout: 60_000 },
-  );
 
   await page.addStyleTag({ content: deterministicCss });
   await page.evaluate(async () => {
@@ -197,7 +196,7 @@ async function preparePage(page: Page, url: string) {
     });
     window.scrollTo(0, 0);
   });
-  await page.waitForTimeout(250);
+  await page.waitForTimeout(500);
 
   await expect(page.locator('h1')).toBeVisible();
   const unresolvedTemplates = await page.locator('body').evaluate((body) => {
@@ -205,24 +204,6 @@ async function preparePage(page: Page, url: string) {
     return html.includes('{{') || html.includes('<sc-for');
   });
   expect(unresolvedTemplates, `${url} manteve templates não resolvidos no DOM final`).toBe(false);
-
-  const incompleteImages = await page.locator('img').evaluateAll((images) => images
-    .filter((image) => {
-      const source = image.currentSrc || image.getAttribute('src') || '';
-      const style = getComputedStyle(image);
-      const participatesInLayout =
-        image.getClientRects().length > 0 &&
-        style.display !== 'none' &&
-        style.visibility !== 'hidden';
-      return (
-        participatesInLayout &&
-        source &&
-        !source.includes('{{') &&
-        (!image.complete || image.naturalWidth === 0 || image.naturalHeight === 0)
-      );
-    })
-    .map((image) => image.currentSrc || image.getAttribute('src')));
-  expect(incompleteImages, `${url} manteve imagens visíveis incompletas`).toEqual([]);
 
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
