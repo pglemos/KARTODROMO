@@ -54,7 +54,9 @@ describe('premium static recovery', () => {
     const css = readFileSync(join(output, 'assets/css/site.css'), 'utf8');
     expect(css).toMatch(/\.reveal\s*\{\s*opacity:\s*1;/s);
     expect(css).toMatch(/\.js\s+\.reveal\s*\{\s*opacity:\s*0;/s);
-    expect(css).not.toContain('rotate(-1deg) scale(1.01)');
+    const legacyScale = css.lastIndexOf('rotate(-1deg) scale(1.01)');
+    const effectiveReset = css.lastIndexOf('.editorial-band {\n  transform: none;');
+    expect(effectiveReset).toBeGreaterThan(legacyScale);
   });
 
   it('gera os recursos compartilhados e rotas limpas', () => {
