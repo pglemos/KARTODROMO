@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 const root = process.cwd();
 const sourceRoot = join(root, 'premium-src', 'kartodromo-betim-premium-revisado-final');
@@ -38,6 +39,13 @@ const routeMappings: Record<string, string> = {
 };
 
 const sha256 = (path: string) => createHash('sha256').update(readFileSync(path)).digest('hex');
+
+beforeAll(() => {
+  execFileSync(process.execPath, ['scripts/extract-premium-zip-source.mjs'], {
+    cwd: root,
+    stdio: 'pipe',
+  });
+});
 
 describe('pacote premium final fornecido no ZIP', () => {
   it('preserva byte a byte os HTMLs, CSS, JavaScript e documentos de QA', () => {

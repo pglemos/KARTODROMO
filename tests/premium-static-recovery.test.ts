@@ -1,27 +1,17 @@
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const root = process.cwd();
 const output = join(root, '.premium-test-dist');
-const responsivePatch = readFileSync(
-  join(root, 'premium-src/reference-responsive-patch.css'),
-  'utf8',
-);
-const patchTag = `<style id="kib-reference-responsive-recovery">\n${responsivePatch}\n</style>`;
-const expectedPages = [
-  'home.dc.html',
-  'pista.dc.html',
-  'kart-locacao.dc.html',
-  'campeonatos.dc.html',
-  'eventos.dc.html',
-  'duvidas.dc.html',
-  'kac.dc.html',
-  'kac-super.dc.html',
-  '200-milhas.dc.html',
-  '500-milhas.dc.html',
+const sourceRoot = join(root, 'premium-src', 'kartodromo-betim-premium-revisado-final');
+const pages = [
+  'index.html', 'pista.html', 'kart-locacao.html', 'campeonatos.html', 'eventos.html',
+  'duvidas.html', 'kac.html', 'kac-super.html', '200-milhas.html', '500-milhas.html',
 ];
+const sha256 = (path: string) => createHash('sha256').update(readFileSync(path)).digest('hex');
 
 beforeAll(() => {
   rmSync(output, { recursive: true, force: true });
@@ -31,55 +21,46 @@ beforeAll(() => {
   });
 });
 
-afterAll(() => {
-  rmSync(output, { recursive: true, force: true });
-});
+afterAll(() => rmSync(output, { recursive: true, force: true }));
 
-describe('premium reference recovery', () => {
-  it('preserva cada página original e acrescenta somente o patch responsivo aprovado', () => {
-    for (const page of expectedPages) {
-      const source = readFileSync(join(root, 'public/design', page), 'utf8');
-      const generated = readFileSync(join(output, 'design', page), 'utf8');
-      const expected = source.includes('</helmet>')
-        ? source.replace('</helmet>', `${patchTag}\n</helmet>`)
-        : source.replace('</head>', `${patchTag}\n</head>`);
-      expect(generated, `${page} recebeu alteração além do patch responsivo`).toBe(expected);
-      expect(source).not.toContain('kib-reference-responsive-recovery');
-      expect(generated).toContain('kib-reference-responsive-recovery');
+describe('build do pacote premium final', () => {
+  it('publica as dez páginas sem alterar um byte', () => {
+    for (const page of pages) {
+      expect(sha256(join(output, 'site', page))).toBe(sha256(join(sourceRoot, page)));
     }
   });
 
-  it('inclui o runtime e todos os recursos compartilhados obrigatórios', () => {
-    expect(existsSync(join(output, 'support.js'))).toBe(true);
-    expect(existsSync(join(output, 'motion.js'))).toBe(true);
-    expect(existsSync(join(output, 'beneficios-nav.css'))).toBe(true);
-    expect(existsSync(join(output, 'assets/brand/kib-logo.png'))).toBe(true);
-    expect(existsSync(join(output, 'assets/posters/home-karting.jpg'))).toBe(true);
+  it('publica CSS e JavaScript exatos nas rotas limpa e de referência', () => {
+    for (const asset of ['assets/css/site.css', 'assets/js/site.js']) {
+      const expected = sha256(join(sourceRoot, asset));
+      expect(sha256(join(output, asset))).toBe(expected);
+      expect(sha256(join(output, 'site', asset))).toBe(expected);
+    }
   });
 
-  it('mapeia cada URL pública limpa para a referência correspondente', () => {
-    const worker = readFileSync(join(root, 'workers/premium-preview-worker.mjs'), 'utf8');
-    const mappings = [
-      ['/', '/design/home.dc.html'],
-      ['/pista', '/design/pista.dc.html'],
-      ['/kart-locacao', '/design/kart-locacao.dc.html'],
-      ['/campeonatos', '/design/campeonatos.dc.html'],
-      ['/eventos', '/design/eventos.dc.html'],
-      ['/duvidas', '/design/duvidas.dc.html'],
-      ['/kac', '/design/kac.dc.html'],
-      ['/kac-super', '/design/kac-super.dc.html'],
-      ['/200-milhas', '/design/200-milhas.dc.html'],
-      ['/500-milhas', '/design/500-milhas.dc.html'],
-    ];
-    for (const [route, reference] of mappings) {
-      expect(worker).toContain(`[${JSON.stringify(route)}, ${JSON.stringify(reference)}]`);
+  it('inclui os ativos binários exigidos pelo manifesto do ZIP', () => {
+    for (const asset of [
+      'assets/brand/kib-logo.png',
+      'assets/posters/home-karting.jpg',
+      'assets/videos/home-karting.mp4',
+      'assets/regulamentos/kac-iniciantes-betim-2026.pdf',
+      'assets/championships/500-milhas-logo.png',
+    ]) {
+      expect(existsSync(join(output, asset)), `${asset} ausente na raiz`).toBe(true);
+      expect(existsSync(join(output, 'site', asset)), `${asset} ausente na referência`).toBe(true);
     }
+  });
+
+  it('não publica páginas .dc nem o patch responsivo descartado', () => {
+    expect(existsSync(join(output, 'design'))).toBe(false);
+    expect(existsSync(join(output, 'support.js'))).toBe(false);
+    expect(existsSync(join(output, 'beneficios-nav.css'))).toBe(false);
   });
 
   it('mantém as referências internas fora dos mecanismos de busca', () => {
     const robots = readFileSync(join(output, 'robots.txt'), 'utf8');
-    expect(robots).toContain('Disallow: /design/');
-    const worker = readFileSync(join(root, 'workers/premium-preview-worker.mjs'), 'utf8');
+    expect(robots).toContain('Disallow: /site/');
+    const worker = readFileSync(join(root, 'workers', 'premium-preview-worker.mjs'), 'utf8');
     expect(worker).toContain('noindex, nofollow, noarchive');
   });
 });

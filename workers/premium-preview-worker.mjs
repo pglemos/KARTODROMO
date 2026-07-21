@@ -1,14 +1,14 @@
 const PREMIUM_ROUTES = new Map([
-  ["/", "/design/home.dc.html"],
-  ["/pista", "/design/pista.dc.html"],
-  ["/kart-locacao", "/design/kart-locacao.dc.html"],
-  ["/campeonatos", "/design/campeonatos.dc.html"],
-  ["/eventos", "/design/eventos.dc.html"],
-  ["/duvidas", "/design/duvidas.dc.html"],
-  ["/kac", "/design/kac.dc.html"],
-  ["/kac-super", "/design/kac-super.dc.html"],
-  ["/200-milhas", "/design/200-milhas.dc.html"],
-  ["/500-milhas", "/design/500-milhas.dc.html"],
+  ["/", "/site/index.html"],
+  ["/pista", "/site/pista.html"],
+  ["/kart-locacao", "/site/kart-locacao.html"],
+  ["/campeonatos", "/site/campeonatos.html"],
+  ["/eventos", "/site/eventos.html"],
+  ["/duvidas", "/site/duvidas.html"],
+  ["/kac", "/site/kac.html"],
+  ["/kac-super", "/site/kac-super.html"],
+  ["/200-milhas", "/site/200-milhas.html"],
+  ["/500-milhas", "/site/500-milhas.html"],
 ]);
 
 const PERMANENT_REDIRECTS = new Map([
@@ -29,7 +29,7 @@ const withSecurityHeaders = (response, { reference = false, html = false } = {})
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  headers.set("X-Premium-Site", "reference-source-v2");
+  headers.set("X-Premium-Site", "zip-final-v1");
 
   if (html) {
     headers.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
@@ -60,31 +60,22 @@ export default {
     const path = normalizePath(url.pathname);
 
     const redirect = PERMANENT_REDIRECTS.get(path);
-    if (redirect) {
-      const target = new URL(redirect, url);
-      return Response.redirect(target, 308);
-    }
+    if (redirect) return Response.redirect(new URL(redirect, url), 308);
 
     const premiumAsset = PREMIUM_ROUTES.get(path);
-    if (premiumAsset) {
-      return fetchAsset(env, premiumAsset, { html: true });
-    }
+    if (premiumAsset) return fetchAsset(env, premiumAsset, { html: true });
 
     if (path === "/sitemap.xml" || path === "/robots.txt") {
       return fetchAsset(env, path);
     }
 
-    if (
-      path === "/support.js" ||
-      path === "/motion.js" ||
-      path === "/beneficios-nav.css" ||
-      path.startsWith("/assets/")
-    ) {
-      return fetchAsset(env, path);
-    }
+    if (path.startsWith("/assets/")) return fetchAsset(env, path);
 
-    if (path.startsWith("/design/")) {
-      return fetchAsset(env, path, { reference: true, html: path.endsWith(".html") });
+    if (path.startsWith("/site/")) {
+      return fetchAsset(env, path, {
+        reference: true,
+        html: path.endsWith(".html"),
+      });
     }
 
     if (env.LEGACY && typeof env.LEGACY.fetch === "function") {

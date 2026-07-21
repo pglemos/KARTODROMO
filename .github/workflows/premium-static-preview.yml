@@ -1,4 +1,4 @@
-name: Premium reference preview
+name: Premium ZIP preview
 
 on:
   push:
@@ -7,10 +7,7 @@ on:
   pull_request:
     branches:
       - main
-    types:
-      - opened
-      - synchronize
-      - reopened
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 permissions:
@@ -18,7 +15,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: premium-reference-preview-${{ github.ref }}
+  group: premium-zip-preview-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -32,30 +29,26 @@ jobs:
     environment: production
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+      - run: npm ci
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Validate ZIP source contract
+      - name: Validate exact ZIP source
         run: npx vitest run tests/premium-zip-source.test.ts tests/premium-static-recovery.test.ts
 
-      - name: Build exact premium references
+      - name: Build exact ZIP package
         run: node scripts/build-premium-reference.mjs premium-dist
 
-      - name: Check Worker and runtime syntax
+      - name: Validate generated package
         run: |
           node --check workers/premium-preview-worker.mjs
-          node --check premium-dist/support.js
+          node --check premium-dist/assets/js/site.js
+          python3 premium-dist/site/qa_check.py
 
-      - name: Deploy isolated reference Worker
+      - name: Deploy isolated ZIP Worker
         id: deploy
         shell: bash
         env:
@@ -79,7 +72,7 @@ jobs:
           ready=0
           for attempt in $(seq 1 18); do
             status=$(curl -sS -o /tmp/premium-ready.html -D /tmp/premium-ready.headers -w '%{http_code}' "${PREMIUM_PREVIEW_URL}/?build=${BUILD_SHA}&attempt=${attempt}" || true)
-            if [[ "$status" == "200" ]] && grep -Fqi 'x-premium-site: reference-source-v2' /tmp/premium-ready.headers; then
+            if [[ "$status" == "200" ]] && grep -Fqi 'x-premium-site: zip-final-v1' /tmp/premium-ready.headers; then
               ready=1
               break
             fi
@@ -87,7 +80,7 @@ jobs:
           done
           test "$ready" = '1'
 
-      - name: Smoke test clean routes and runtime assets
+      - name: Smoke test clean routes and ZIP assets
         shell: bash
         env:
           PREMIUM_PREVIEW_URL: ${{ steps.deploy.outputs.url }}
@@ -105,20 +98,20 @@ jobs:
               "${PREMIUM_PREVIEW_URL}/${path}?build=${BUILD_SHA}" > "/tmp/premium-smoke/${key}.meta"
             read -r status effective < "/tmp/premium-smoke/${key}.meta"
             test "$status" = '200'
-            [[ "$effective" != *'/design/'* ]]
+            [[ "$effective" != *'/site/'* ]]
             grep -Fqi '<h1' "/tmp/premium-smoke/${key}.html"
-            grep -Fqi 'x-premium-site: reference-source-v2' "/tmp/premium-smoke/${key}.headers"
+            grep -Fqi 'x-premium-site: zip-final-v1' "/tmp/premium-smoke/${key}.headers"
             grep -Fqi 'cache-control: no-store' "/tmp/premium-smoke/${key}.headers"
           done
-          curl -fsS "${PREMIUM_PREVIEW_URL}/support.js?build=${BUILD_SHA}" -o /tmp/premium-smoke/support.js
-          curl -fsS "${PREMIUM_PREVIEW_URL}/beneficios-nav.css?build=${BUILD_SHA}" -o /tmp/premium-smoke/beneficios-nav.css
-          test -s /tmp/premium-smoke/support.js
-          test -s /tmp/premium-smoke/beneficios-nav.css
+          curl -fsS "${PREMIUM_PREVIEW_URL}/assets/css/site.css?build=${BUILD_SHA}" -o /tmp/premium-smoke/site.css
+          curl -fsS "${PREMIUM_PREVIEW_URL}/assets/js/site.js?build=${BUILD_SHA}" -o /tmp/premium-smoke/site.js
+          test -s /tmp/premium-smoke/site.css
+          test -s /tmp/premium-smoke/site.js
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Compare clean routes with original references
+      - name: Compare clean routes with ZIP HTML
         env:
           PREMIUM_PREVIEW_URL: ${{ steps.deploy.outputs.url }}
         run: npx playwright test tests/premium-static-preview.spec.ts --reporter=html,line
@@ -131,7 +124,7 @@ jobs:
         with:
           script: |
             const marker = '<!-- premium-static-preview -->';
-            const body = `${marker}\n## Preview idêntico às referências originais\n\n${process.env.PREVIEW_URL}\n\nAs 10 rotas limpas foram comparadas com os arquivos \`/design/*.dc.html\` originais em mobile, tablet e desktop. A execução só fica verde quando as capturas são byte a byte idênticas, os placeholders são resolvidos e nenhum HTML antigo é servido pelo cache.`;
+            const body = `${marker}\n## Preview do ZIP final anexado\n\n${process.env.PREVIEW_URL}\n\nAs 10 rotas limpas usam os HTMLs, CSS e JavaScript do pacote \`kartodromo-betim-premium-revisado-final\`. A esteira valida hashes SHA-256, QA estrutural, recursos, overflow e screenshots em mobile, tablet e desktop.`;
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -140,26 +133,16 @@ jobs:
             });
             const previous = comments.find((comment) => comment.body?.includes(marker));
             if (previous) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: previous.id,
-                body,
-              });
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: previous.id, body });
             } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body,
-              });
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body });
             }
 
       - name: Upload comparison evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: premium-reference-preview-evidence
+          name: premium-zip-preview-evidence
           path: |
             /tmp/premium-preview-deploy.log
             /tmp/premium-preview-url.txt
@@ -167,5 +150,5 @@ jobs:
             /tmp/premium-ready.html
             /tmp/premium-smoke
             playwright-report
-            test-results/premium-reference-comparison
+            test-results/premium-zip-comparison
           if-no-files-found: ignore
