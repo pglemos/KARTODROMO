@@ -2,19 +2,38 @@
 <html>
 <head>
 <base href="/">
+<title>Regulamento do Clube de Vantagens | Kartódromo de Betim</title>
+<meta name="description" content="Consulte as regras públicas do Clube de Vantagens do Kartódromo Internacional de Betim.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://kartodromodebetim.com.br/clube-regulamento">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:site_name" content="Kartódromo Internacional de Betim">
+<meta property="og:title" content="Regulamento do Clube de Vantagens | Kartódromo de Betim">
+<meta property="og:description" content="Consulte as regras públicas do Clube de Vantagens do Kartódromo Internacional de Betim.">
+<meta property="og:url" content="https://kartodromodebetim.com.br/clube-regulamento">
+<meta property="og:image" content="https://kartodromodebetim.com.br/posters/home-karting.jpg">
+<meta name="twitter:card" content="summary_large_image">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="./support.js"></script>
+<style data-generated="mobile-fit">
+@media (max-width: 720px) {
+  [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+  [style*="grid-auto-flow:column"], [style*="grid-auto-flow: column"] { grid-auto-flow: row !important; }
+  [style*="display:flex"]:not([style*="flex-wrap:nowrap"]) { flex-wrap: wrap; }
+  img, video, iframe, canvas, svg, table { max-width: 100%; }
+  [style*="white-space:nowrap"] { white-space: normal; }
+}
+</style>
 </head>
 <body>
 <x-dc>
 
 <helmet>
-  <meta name="description" content="Regulamento — Clube de Vantagens Kartódromo de Betim">
   <link rel="icon" type="image/png" href="assets/brand/kib-logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link href="./clube-portal.css" rel="stylesheet">
   <style>
     html { scroll-behavior: smooth; }
     body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size: 17px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
@@ -31,14 +50,14 @@
 </helmet>
 <div data-screen-label="Clube — Regulamento" style="min-height:100vh; background:#030504; color:#f7faf6;">
 
-  <header class="club-shell-header" style="position:sticky; top:0; z-index:100; background:rgba(3,5,4,.92); backdrop-filter:blur(18px); border-bottom:1px solid rgba(255,255,255,.12);">
-    <div class="club-shell-topbar" style="width:min(1200px,calc(100% - 40px)); margin:0 auto; min-height:74px; display:flex; align-items:center; justify-content:space-between; gap:16px;">
-      <a class="club-shell-brand" href="/clube-vantagens" style="width:150px; flex:none;"><img src="assets/brand/kib-logo.png" alt="Kartódromo Internacional de Betim" style="width:100%;"></a>
-      <a class="club-exit-link" href="/clube-vantagens" style="font-size:12.5px; font-weight:700; color:#a8b2aa; text-decoration:none;">Voltar ao clube</a>
+  <header style="position:sticky; top:0; z-index:100; background:rgba(3,5,4,.92); backdrop-filter:blur(18px); border-bottom:1px solid rgba(255,255,255,.12);">
+    <div style="width:min(1200px,calc(100% - 40px)); margin:0 auto; min-height:74px; display:flex; align-items:center; justify-content:space-between; gap:16px;">
+      <a href="/clube-vantagens" style="width:150px; flex:none;"><img src="assets/brand/kib-logo.png" alt="Kartódromo Internacional de Betim" style="width:100%;"></a>
+      <a href="/clube-vantagens" style="font-size:12.5px; font-weight:700; color:#a8b2aa; text-decoration:none;">Voltar ao clube</a>
     </div>
-    <div class="club-nav-wrap"><nav class="club-portal-nav" aria-label="Menu do portal" style="width:min(1200px,calc(100% - 40px)); margin:0 auto; display:flex; gap:4px; overflow-x:auto; padding-bottom:2px;">
-      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="8"><a class="club-tab" href="{{ t.href }}" aria-current="{{ t.current }}" style="{{ t.style }}">{{ t.label }}</a></sc-for>
-    </nav></div>
+    <nav aria-label="Menu do portal" style="width:min(1200px,calc(100% - 40px)); margin:0 auto; display:flex; gap:4px; overflow-x:auto; padding-bottom:2px;">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="8"><a href="{{ t.href }}" style="{{ t.style }}">{{ t.label }}</a></sc-for>
+    </nav>
   </header>
 
   <main style="width:min(840px,calc(100% - 40px)); margin:0 auto; padding:36px 0 80px; display:grid; gap:22px;">
@@ -80,7 +99,7 @@ class Component extends DCLogic {
 
   renderVals() {
     const tabs = this.tabDefs().map((t) => ({
-      label: t.label, href: t.href, current: t.key === this.currentTab ? 'page' : undefined,
+      label: t.label, href: t.href,
       style: { flex: 'none', padding: '10px 14px', fontSize: '12.5px', fontWeight: 700, textDecoration: 'none', borderBottom: '2px solid ' + (t.key === this.currentTab ? '#00e676' : 'transparent'), color: t.key === this.currentTab ? '#fff' : '#a8b2aa', whiteSpace: 'nowrap' },
     }));
 
@@ -125,7 +144,6 @@ class Component extends DCLogic {
 }
 
 </script>
-<script>(function(){var n=location.pathname.split("/").pop();n=n.endsWith(".html")?n.slice(0,-5):n;n=n.endsWith(".dc")?n.slice(0,-3):n;var m={home:"/",pista:"/pista","kart-locacao":"/kart-locacao",campeonatos:"/campeonatos",eventos:"/eventos",duvidas:"/duvidas",kac:"/kac","kac-super":"/kac-super","200-milhas":"/200-milhas","500-milhas":"/500-milhas","clube-vantagens":"/clube-vantagens","clube-cadastro":"/clube-cadastro","clube-consulta":"/clube-consulta","clube-painel":"/clube-painel","clube-corridas":"/clube-corridas","clube-pontuacao":"/clube-pontuacao","clube-catalogo":"/clube-catalogo","clube-resgates":"/clube-resgates","clube-perfil":"/clube-perfil","clube-regulamento":"/clube-regulamento","clube-campanhas":"/clube-campanhas"};if(m[n]&&location.pathname!==m[n])history.replaceState(null,"",m[n]+location.hash)})();</script>
-<script src="./clube-portal.js"></script>
+<script>(function(){var n=location.pathname.split("/").pop();n=n.endsWith(".html")?n.slice(0,-5):n;n=n.endsWith(".dc")?n.slice(0,-3):n;var m={"home":"/","pista":"/pista","kart-locacao":"/kart-locacao","campeonatos":"/campeonatos","eventos":"/eventos","duvidas":"/duvidas","kac":"/kac","kac-super":"/kac-super","200-milhas":"/200-milhas","500-milhas":"/500-milhas","clube-vantagens":"/clube-vantagens","clube-cadastro":"/clube-cadastro","clube-consulta":"/clube-consulta","clube-painel":"/clube-painel","clube-corridas":"/clube-corridas","clube-pontuacao":"/clube-pontuacao","clube-catalogo":"/clube-catalogo","clube-resgates":"/clube-resgates","clube-perfil":"/clube-perfil","clube-regulamento":"/clube-regulamento","clube-campanhas":"/clube-campanhas"};if(m[n]&&location.pathname!==m[n])history.replaceState(null,"",m[n]+location.hash)})();</script>
 </body>
 </html>

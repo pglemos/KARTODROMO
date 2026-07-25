@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+  <meta name="description" content="Campanhas Especiais — Clube de Vantagens Kartódromo de Betim">
+  <link rel="icon" type="image/png" href="assets/brand/kib-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size: 17px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    a { color: #00e676; }
+    a:hover { color: #3ce396; }
+    a:focus-visible { outline: 2px solid #00e676; outline-offset: 2px; }
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root) { animation: 260ms cubic-bezier(.16,1,.3,1) both kib-page-out; }
+    ::view-transition-new(root) { animation: 320ms cubic-bezier(.16,1,.3,1) both kib-page-in; }
+    @keyframes kib-page-out { to { opacity: 0; transform: translateY(-8px); } }
+    @keyframes kib-page-in { from { opacity: 0; transform: translateY(8px); } }
+    @media (prefers-reduced-motion: reduce) { ::view-transition-old(root), ::view-transition-new(root) { animation: none; } }
+  </style>
+</helmet>
+<div data-screen-label="Clube — Campanhas" style="min-height:100vh; background:#030504; color:#f7faf6;">
+
+  <header style="position:sticky; top:0; z-index:100; background:rgba(3,5,4,.92); backdrop-filter:blur(18px); border-bottom:1px solid rgba(255,255,255,.12);">
+    <div style="width:min(1200px,calc(100% - 40px)); margin:0 auto; min-height:74px; display:flex; align-items:center; justify-content:space-between; gap:16px;">
+      <a href="clube-vantagens.dc.html" style="width:150px; flex:none;"><img src="assets/brand/kib-logo.png" alt="Kartódromo Internacional de Betim" style="width:100%;"></a>
+      <div style="display:flex; align-items:center; gap:14px;">
+        <span style="{{ styles.pointsChip }}">{{ pontos }} pts</span>
+        <a href="clube-vantagens.dc.html" style="font-size:12.5px; font-weight:700; color:#a8b2aa; text-decoration:none;">Sair</a>
+      </div>
+    </div>
+    <nav aria-label="Menu do portal" style="width:min(1200px,calc(100% - 40px)); margin:0 auto; display:flex; gap:4px; overflow-x:auto; padding-bottom:2px;">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="8"><a href="{{ t.href }}" style="{{ t.style }}">{{ t.label }}</a></sc-for>
+    </nav>
+  </header>
+
+  <main style="width:min(1200px,calc(100% - 40px)); margin:0 auto; padding:36px 0 80px; display:grid; gap:22px;">
+    <div>
+      <p style="margin:0 0 4px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.14em; text-transform:uppercase;">Campanhas</p>
+      <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(30px,4vw,44px); line-height:0.9;">Bônus e promoções</h1>
+    </div>
+    <div style="{{ styles.grid }}">
+      <sc-for list="{{ campaigns }}" as="c" hint-placeholder-count="3">
+        <article style="{{ styles.card }}">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <strong style="font-size:16px;">{{ c.nome }}</strong>
+            <span style="{{ c.statusStyle }}">{{ c.statusLabel }}</span>
+          </div>
+          <p style="margin:10px 0 0; color:#a8b2aa; font-size:13.5px; line-height:1.5;">{{ c.desc }}</p>
+        </article>
+      </sc-for>
+    </div>
+  </main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  currentTab = 'campanhas';
+  state = { customer: null, campaigns: [] };
+
+  componentDidMount() {
+    import('./clube-shared.js').then((m) => { this.setState({ customer: m.CUSTOMER, campaigns: m.CAMPAIGNS }); });
+  }
+
+  tabDefs() {
+    return [
+      { key: 'painel', label: 'Meu Painel', href: 'clube-painel.dc.html' },
+      { key: 'pontuacao', label: 'Minha Pontuação', href: 'clube-pontuacao.dc.html' },
+      { key: 'corridas', label: 'Histórico de Corridas', href: 'clube-corridas.dc.html' },
+      { key: 'resgates', label: 'Histórico de Resgates', href: 'clube-resgates.dc.html' },
+      { key: 'catalogo', label: 'Catálogo', href: 'clube-catalogo.dc.html' },
+      { key: 'campanhas', label: 'Campanhas', href: 'clube-campanhas.dc.html' },
+      { key: 'perfil', label: 'Meu Perfil', href: 'clube-perfil.dc.html' },
+      { key: 'regulamento', label: 'Regulamento', href: 'clube-regulamento.dc.html' },
+    ];
+  }
+
+  styles() {
+    return {
+      pointsChip: { fontSize: '12px', fontWeight: 700, padding: '7px 13px', borderRadius: '999px', background: 'rgba(0,230,118,.14)', color: '#00e676' },
+      grid: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '14px' },
+      card: { background: '#0b100c', border: '1px solid rgba(255,255,255,.12)', padding: '20px' },
+    };
+  }
+
+  renderVals() {
+    const { customer, campaigns } = this.state;
+    const s = this.styles();
+    const tabs = this.tabDefs().map((t) => ({
+      label: t.label, href: t.href,
+      style: { flex: 'none', padding: '10px 14px', fontSize: '12.5px', fontWeight: 700, textDecoration: 'none', borderBottom: '2px solid ' + (t.key === this.currentTab ? '#00e676' : 'transparent'), color: t.key === this.currentTab ? '#fff' : '#a8b2aa', whiteSpace: 'nowrap' },
+    }));
+    if (!customer) return { styles: s, tabs, pontos: 0, campaigns: [] };
+
+    const campaignsOut = campaigns.map((c) => ({
+      nome: c.nome, desc: c.desc,
+      statusLabel: c.ativa ? 'Ativa' : 'Em breve',
+      statusStyle: { fontSize: '10.5px', fontWeight: 700, padding: '4px 10px', borderRadius: '999px', background: c.ativa ? 'rgba(0,230,118,.14)' : 'rgba(255,255,255,.08)', color: c.ativa ? '#00e676' : '#a8b2aa' },
+    }));
+    return { styles: s, tabs, pontos: customer.pontos, campaigns: campaignsOut };
+  }
+}
+
+</script>
+</body>
+</html>

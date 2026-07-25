@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+  <meta name="description" content="Clube de Vantagens — Kartódromo Internacional de Betim">
+  <link rel="icon" type="image/png" href="assets/brand/kib-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size: 17px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    a { color: #00e676; }
+    a:hover { color: #3ce396; }
+    ::selection { background: #00e676; color: #041301; }
+    img, video { display: block; max-width: 100%; }
+    button, input, select, textarea { font: inherit; }
+    table { width: 100%; border-collapse: collapse; }
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root) { animation: 320ms cubic-bezier(.16,1,.3,1) both kib-page-out; }
+    ::view-transition-new(root) { animation: 420ms cubic-bezier(.16,1,.3,1) both kib-page-in; }
+    @keyframes kib-page-out { to { opacity: 0; transform: translateX(-24px); filter: blur(3px); } }
+    @keyframes kib-page-in { from { opacity: 0; transform: translateX(24px); filter: blur(3px); } }
+    @media (prefers-reduced-motion: reduce) { ::view-transition-old(root), ::view-transition-new(root) { animation: none; } }
+    [style*="background:linear-gradient(135deg,#00e676,#00c853)"] { transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s; }
+    [style*="background:linear-gradient(135deg,#00e676,#00c853)"]:hover { transform: translateY(-4px); box-shadow: 0 22px 55px rgba(0,230,118,.4); }
+    [style*="background:rgba(255,255,255,.035)"][style*="border:1px solid rgba(255,255,255,.22)"] { transition: border-color .25s, color .25s, transform .25s cubic-bezier(.16,1,.3,1); }
+    [style*="background:rgba(255,255,255,.035)"][style*="border:1px solid rgba(255,255,255,.22)"]:hover { border-color:#00e676; color:#00e676; transform: translateY(-4px); }
+  </style>
+</helmet>
+<div data-screen-label="Clube de Vantagens" style="min-height:100vh; background:#030504; color:#f7faf6;">
+
+  <a href="#conteudo" style="{{ skipLinkStyle }}">Pular para o conteúdo</a>
+  <div id="progress" aria-hidden="true" style="position:fixed; top:0; left:0; width:100%; height:3px; z-index:520; transform:scaleX(0); transform-origin:left; background:linear-gradient(90deg,#00e676,#3ce396); box-shadow:0 0 22px rgba(0,230,118,.55); pointer-events:none;"></div>
+
+  <header style="{{ headerStyle }}">
+    <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; min-height:84px; display:flex; align-items:center; justify-content:space-between; gap:24px;">
+      <a href="home.dc.html" style="width:180px; flex:none;"><img src="assets/brand/kib-logo.png" alt="Kartódromo Internacional de Betim" style="width:100%; filter:drop-shadow(0 10px 24px rgba(0,0,0,.55));"></a>
+      <nav aria-label="Navegação principal" style="{{ navRowStyle }}">
+        <sc-for list="{{ navLinks }}" as="link" hint-placeholder-count="7">
+          <a href="{{ link.href }}" aria-current="{{ link.current }}" style="{{ link.style }}" style-hover="color:#ffffff; border-bottom-color:#00e676;">{{ link.label }}</a>
+        </sc-for>
+      </nav>
+      <a href="clube-consulta.dc.html" style="{{ reservaCtaStyle }}">Consultar pontos</a>
+      <button type="button" aria-label="{{ menuToggleLabel }}" aria-controls="mobile-navigation" aria-expanded="{{ mobileNavOpen }}" onClick="{{ toggleMobileNav }}" style="{{ hamburgerBtnStyle }}">
+        <span style="{{ hamburgerLine1 }}"></span><span style="{{ hamburgerLine2 }}"></span><span style="{{ hamburgerLine3 }}"></span>
+      </button>
+    </div>
+  </header>
+
+  <nav id="mobile-navigation" aria-label="Navegação móvel" aria-hidden="{{ mobileNavClosed }}" style="{{ mobileNavStyle }}">
+    <sc-for list="{{ navLinks }}" as="link" hint-placeholder-count="7">
+      <a href="{{ link.href }}" onClick="{{ closeMobileNav }}" style="display:flex; align-items:center; min-height:58px; padding:13px 0; border-bottom:1px solid rgba(255,255,255,.12); font-family:'Anton',sans-serif; text-transform:uppercase; font-size:clamp(34px,10vw,52px); line-height:0.9; color:#f7faf6; text-decoration:none;">{{ link.label }}</a>
+    </sc-for>
+  </nav>
+
+  <main id="conteudo">
+    <section style="position:relative; min-height:82svh; display:flex; align-items:flex-end; overflow:hidden; padding-top:90px; background:radial-gradient(circle at 70% 20%, rgba(0,230,118,.14), transparent 45%), #020302;">
+      <div style="position:relative; z-index:5; width:min(1480px,calc(100% - 48px)); margin:0 auto; padding:clamp(120px,16vh,190px) 0 64px;">
+        <p data-reveal style="display:flex; align-items:center; gap:12px; margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase; opacity:0; transform:translateY(16px); transition:opacity .6s cubic-bezier(.16,1,.3,1), transform .6s cubic-bezier(.16,1,.3,1);">Programa oficial de relacionamento</p>
+        <h1 data-reveal style="margin:0; max-width:16ch; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; line-height:0.82; font-size:clamp(52px,7.5vw,110px); opacity:0; transition:opacity .8s cubic-bezier(.16,1,.3,1) 60ms, transform .8s cubic-bezier(.16,1,.3,1) 60ms;">Clube de <span style="color:#00e676;">Vantagens</span></h1>
+        <p data-reveal style="max-width:62ch; margin:26px 0 0; font-size:clamp(17px,1.4vw,21px); line-height:1.6; color:#d5ddd6; opacity:0; transform:translateY(18px); transition:opacity .7s cubic-bezier(.16,1,.3,1) 160ms, transform .7s cubic-bezier(.16,1,.3,1) 160ms;">
+          Mais do que um programa de pontos: reconhecemos e recompensamos quem faz parte da nossa história. A cada corrida você acumula pontos e troca por produtos, experiências e vantagens exclusivas. Quanto mais você corre, mais benefícios conquista.
+        </p>
+        <div data-reveal style="display:flex; flex-wrap:wrap; gap:12px; margin-top:30px; opacity:0; transform:translateY(18px); transition:opacity .7s cubic-bezier(.16,1,.3,1) 240ms, transform .7s cubic-bezier(.16,1,.3,1) 240ms;">
+          <a href="clube-cadastro.dc.html" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;">Fazer meu cadastro</a>
+          <a href="clube-consulta.dc.html" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none; backdrop-filter:blur(12px);">Consultar meus pontos</a>
+        </div>
+      </div>
+    </section>
+
+    <section style="padding:clamp(80px,9vw,130px) 0; background:#070b08;">
+      <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto;">
+        <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Objetivos do programa</p>
+        <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(38px,5vw,64px); line-height:0.85;">Por que criamos<br><span style="color:#00e676;">o clube</span></h2>
+        <div style="margin-top:44px; display:grid; grid-template-columns:1fr 1fr; gap:18px 28px;">
+          <sc-for list="{{ objectives }}" as="o" hint-placeholder-count="6">
+            <div style="display:grid; grid-template-columns:24px 1fr; gap:12px;">
+              <span aria-hidden="true" style="width:20px; height:20px; border:1px solid #00e676; border-radius:50%; display:grid; place-items:center; color:#00e676; font-size:11px;">✓</span>
+              <p style="margin:0; color:#d7ddd8; font-size:15px; line-height:1.5;">{{ o }}</p>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+
+    <section style="padding:clamp(80px,9vw,130px) 0;">
+      <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto;">
+        <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Como funciona</p>
+        <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(38px,5vw,64px); line-height:0.85;">Adesão gratuita.<br><span style="color:#00e676;">Pontos automáticos.</span></h2>
+        <div style="margin-top:44px; display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:1px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.12);">
+          <sc-for list="{{ steps }}" as="step" hint-placeholder-count="3">
+            <article style="background:#070b08; padding:30px; min-height:190px; position:relative; overflow:hidden;">
+              <span aria-hidden="true" style="position:absolute; right:12px; bottom:-20px; font-family:'Anton',sans-serif; font-size:110px; color:rgba(255,255,255,.035);">{{ step.num }}</span>
+              <h3 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:17px;">{{ step.title }}</h3>
+              <p style="margin:10px 0 0; color:#a8b2aa; font-size:14px; line-height:1.5; max-width:34ch;">{{ step.text }}</p>
+            </article>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+
+    <section style="padding:clamp(80px,9vw,130px) 0; background:#070b08;">
+      <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:clamp(28px,5vw,70px); align-items:start;">
+        <div>
+          <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Regras de pontuação</p>
+          <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(34px,4.4vw,54px); line-height:0.88;">Pontuação creditada automaticamente</h2>
+          <p style="max-width:48ch; margin:20px 0 0; color:#a8b2aa; font-size:15px; line-height:1.6;">Após a confirmação de cada corrida elegível, os pontos entram direto na sua conta do clube.</p>
+          <div style="margin-top:28px; border:1px solid rgba(255,255,255,.12); background:#0b100c;">
+            <sc-for list="{{ pointRules }}" as="rule" hint-placeholder-count="2">
+              <div style="display:flex; align-items:center; justify-content:space-between; padding:20px 22px; border-bottom:1px solid rgba(255,255,255,.1);">
+                <span style="font-size:15px; color:#d7ddd8;">{{ rule.label }}</span>
+                <strong style="font-family:'Anton',sans-serif; font-weight:400; color:#00e676; font-size:24px;">{{ rule.pontos }} pts</strong>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div>
+          <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Catálogo de recompensas</p>
+          <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(34px,4.4vw,54px); line-height:0.88;">Troque seus pontos</h2>
+          <div style="margin-top:28px; display:grid; gap:10px;">
+            <sc-for list="{{ rewardsPreview }}" as="r" hint-placeholder-count="5">
+              <div style="display:flex; align-items:center; justify-content:space-between; border:1px solid rgba(255,255,255,.12); background:#0b100c; padding:16px 18px;">
+                <span style="font-size:14.5px; font-weight:600;">{{ r.nome }}</span>
+                <strong style="font-family:'Anton',sans-serif; font-weight:400; color:#00e676; font-size:18px;">{{ r.pontos }} pts</strong>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section style="padding:clamp(80px,9vw,130px) 0;">
+      <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto;">
+        <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Área do cliente</p>
+        <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(38px,5vw,64px); line-height:0.85;">Tudo em um<br><span style="color:#00e676;">só painel</span></h2>
+        <div style="margin-top:44px; display:grid; grid-template-columns:repeat(4,1fr); gap:12px;">
+          <sc-for list="{{ portalLinks }}" as="p" hint-placeholder-count="8">
+            <a href="{{ p.href }}" style="display:grid; gap:10px; border:1px solid rgba(255,255,255,.12); background:#0b100c; padding:20px; text-decoration:none; color:#fff;">
+              <strong style="font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:15px;">{{ p.title }}</strong>
+              <span style="font-size:12.5px; color:#a8b2aa; line-height:1.4;">{{ p.desc }}</span>
+            </a>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+
+    <section style="padding:clamp(80px,9vw,130px) 0;">
+      <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto;">
+        <div style="position:relative; overflow:hidden; border:1px solid rgba(255,255,255,.22); background:linear-gradient(135deg,#101711,#030504); padding:clamp(34px,5vw,64px); display:grid; grid-template-columns:1.2fr .8fr; gap:36px; align-items:center;">
+          <div>
+            <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(38px,5.5vw,68px); line-height:0.82;">Pronto para entrar<br><span style="color:#00e676;">no clube?</span></h2>
+            <p style="margin:14px 0 0; color:#a8b2aa; font-size:17px;">Cadastro gratuito. Comece a acumular pontos na próxima corrida.</p>
+          </div>
+          <div style="display:grid; gap:12px;">
+            <a href="clube-cadastro.dc.html" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;">Fazer meu cadastro</a>
+            <a href="clube-regulamento.dc.html" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;">Ver regulamento</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer style="border-top:1px solid rgba(255,255,255,.12); padding:64px 0 28px; background:#020302;">
+    <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:1.2fr .7fr .7fr; gap:50px;">
+      <div><img src="assets/brand/kib-logo.png" alt="Kartódromo Internacional de Betim" style="width:220px;"><p style="margin:16px 0 0; max-width:380px; color:#a8b2aa; line-height:1.55;">Pista homologada de 1.110 metros, kart de locação, campeonatos e o Clube de Vantagens para nossos pilotos.</p></div>
+      <div>
+        <h3 style="margin:0 0 18px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:14px; color:#00e676;">Clube</h3>
+        <div style="display:grid; gap:10px;">
+          <a href="clube-cadastro.dc.html" style="display:flex; align-items:center; min-height:32px; color:#d7ddd8; text-decoration:none; transition:color .2s;" style-hover="color:#00e676;">Fazer cadastro</a>
+          <a href="clube-consulta.dc.html" style="display:flex; align-items:center; min-height:32px; color:#d7ddd8; text-decoration:none; transition:color .2s;" style-hover="color:#00e676;">Consultar pontos</a>
+          <a href="clube-regulamento.dc.html" style="display:flex; align-items:center; min-height:32px; color:#d7ddd8; text-decoration:none; transition:color .2s;" style-hover="color:#00e676;">Regulamento</a>
+        </div>
+      </div>
+      <div>
+        <h3 style="margin:0 0 18px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:14px; color:#00e676;">Contato</h3>
+        <div style="display:grid; gap:10px;">
+          <a href="tel:+553135112373" style="display:flex; align-items:center; min-height:32px; color:#d7ddd8; text-decoration:none; transition:color .2s;" style-hover="color:#00e676;">(31) 3511‑2373</a>
+          <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" style="display:flex; align-items:center; min-height:32px; color:#d7ddd8; text-decoration:none; transition:color .2s;" style-hover="color:#00e676;">(31) 99884‑2898</a>
+        </div>
+      </div>
+    </div>
+    <div style="width:min(1480px,calc(100% - 48px)); margin:46px auto 0; padding-top:22px; border-top:1px solid rgba(255,255,255,.12); display:flex; flex-wrap:wrap; justify-content:space-between; gap:20px; color:#667067; font-size:12px;">
+      <span>© 2026 Kartódromo Internacional de Betim</span><span>Clube de Vantagens</span>
+    </div>
+  </footer>
+
+  <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" style="position:fixed; right:20px; bottom:20px; z-index:250; width:58px; height:58px; border-radius:50%; display:grid; place-items:center; background:#20d466; color:#fff; box-shadow:0 18px 45px rgba(32,212,102,.35); text-decoration:none; transition:transform .25s;" style-hover="transform:translateY(-5px) scale(1.05);">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-11.9 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5Z"/><path d="M8.5 8.5c.5 3 2 4.5 5 5"/></svg>
+  </a>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { headerScrolled: false, mobileNavOpen: false, isMobile: typeof window !== 'undefined' && window.matchMedia('(max-width: 1100px)').matches };
+
+  componentDidMount() {
+    this._onScroll = () => {
+      if (this._scrollFrame) return;
+      this._scrollFrame = requestAnimationFrame(() => {
+        this._scrollFrame = 0;
+        const scrolled = window.scrollY > 24;
+        if (scrolled !== this.state.headerScrolled) this.setState({ headerScrolled: scrolled });
+      });
+    };
+    window.addEventListener('scroll', this._onScroll, { passive: true });
+    this._mq = window.matchMedia('(max-width: 1100px)');
+    this._onMqChange = (e) => this.setState({ isMobile: e.matches });
+    if (this._mq.addEventListener) this._mq.addEventListener('change', this._onMqChange); else this._mq.addListener(this._onMqChange);
+    this._onKeydown = (e) => { if (e.key === 'Escape' && this.state.mobileNavOpen) this.setState({ mobileNavOpen: false }); };
+    window.addEventListener('keydown', this._onKeydown);
+    import('./motion.js').then((m) => { this._cleanup = m.initPageMotion({ progressBarSelector: '#progress' }); });
+  }
+  componentWillUnmount() {
+    window.removeEventListener('scroll', this._onScroll);
+    window.removeEventListener('keydown', this._onKeydown);
+    if (this._mq) { if (this._mq.removeEventListener) this._mq.removeEventListener('change', this._onMqChange); else this._mq.removeListener(this._onMqChange); }
+    if (this._cleanup) this._cleanup();
+  }
+
+  toggleMobileNav = () => this.setState((s) => ({ mobileNavOpen: !s.mobileNavOpen }));
+  closeMobileNav = () => this.setState({ mobileNavOpen: false });
+
+  renderVals() {
+    const { headerScrolled, mobileNavOpen, isMobile } = this.state;
+    const navBase = { fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.04em', padding: '10px 0', borderBottom: '2px solid transparent', textDecoration: 'none', transition: 'color .25s, border-color .25s' };
+    const pages = [
+      { label: 'Home', href: 'home.dc.html', id: 'home' },
+      { label: 'A Pista', href: 'pista.dc.html', id: 'pista' },
+      { label: 'Campeonatos', href: 'campeonatos.dc.html', id: 'campeonatos' },
+      { label: 'Eventos', href: 'eventos.dc.html', id: 'eventos' },
+      { label: 'Clube', href: 'clube-vantagens.dc.html', id: 'clube' },
+      { label: 'Dúvidas', href: 'duvidas.dc.html', id: 'duvidas' },
+    ];
+    const navLinks = pages.map((p) => ({ label: p.label, href: p.href, current: p.id === 'clube' ? 'page' : undefined, style: Object.assign({}, navBase, { color: p.id === 'clube' ? '#fff' : '#e1e6e1' }) }));
+
+    return {
+      skipLinkStyle: { position: 'fixed', left: '16px', top: '12px', zIndex: 1000, padding: '12px 16px', background: '#00e676', color: '#041301', fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '12px', transform: 'translateY(-180%)', transition: 'transform .2s' },
+      headerStyle: { position: 'fixed', insetInline: 0, top: 0, zIndex: 300, transition: '.28s', background: headerScrolled ? 'rgba(3,5,4,.86)' : 'transparent', backdropFilter: headerScrolled ? 'blur(18px)' : 'none', borderBottom: headerScrolled ? '1px solid rgba(255,255,255,.12)' : '1px solid transparent' },
+      navLinks,
+      menuToggleLabel: mobileNavOpen ? 'Fechar menu' : 'Abrir menu',
+      mobileNavOpen, mobileNavClosed: !mobileNavOpen,
+      hamburgerLine1: { display: 'block', width: '21px', height: '2px', background: '#fff', margin: '5px auto', transition: '.25s', transform: mobileNavOpen ? 'translateY(7px) rotate(45deg)' : 'none' },
+      hamburgerLine2: { display: 'block', width: '21px', height: '2px', background: '#fff', margin: '5px auto', transition: '.25s', opacity: mobileNavOpen ? 0 : 1 },
+      hamburgerLine3: { display: 'block', width: '21px', height: '2px', background: '#fff', margin: '5px auto', transition: '.25s', transform: mobileNavOpen ? 'translateY(-7px) rotate(-45deg)' : 'none' },
+      mobileNavStyle: { position: 'fixed', inset: 0, zIndex: 280, background: 'rgba(2,4,3,.98)', backdropFilter: 'blur(18px)', padding: '112px 24px 40px', display: 'grid', alignContent: 'start', opacity: mobileNavOpen ? 1 : 0, visibility: mobileNavOpen ? 'visible' : 'hidden', transform: mobileNavOpen ? 'none' : 'translateY(-18px)', transition: '.3s', pointerEvents: mobileNavOpen ? 'auto' : 'none' },
+      toggleMobileNav: this.toggleMobileNav, closeMobileNav: this.closeMobileNav,
+      navRowStyle: { display: isMobile ? 'none' : 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 'clamp(12px,1.6vw,22px)', alignItems: 'center' },
+      reservaCtaStyle: { display: isMobile ? 'none' : 'inline-flex', flex: 'none', alignItems: 'center', gap: '8px', minHeight: '46px', padding: '0 20px', clipPath: 'polygon(7% 0,100% 0,93% 100%,0 100%)', background: 'linear-gradient(135deg,#00e676,#00c853)', color: '#041301', fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '12px', letterSpacing: '0.04em', textDecoration: 'none' },
+      hamburgerBtnStyle: { display: isMobile ? 'block' : 'none', width: '48px', height: '48px', flex: 'none', border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)', cursor: 'pointer' },
+
+      objectives: [
+        'Aumentar a recorrência dos clientes.',
+        'Incentivar a realização de mais corridas.',
+        'Elevar o ticket médio por cliente.',
+        'Fortalecer o relacionamento com a base de clientes.',
+        'Criar uma comunidade de pilotos em torno da marca.',
+        'Disponibilizar um canal permanente de comunicação com os participantes.',
+      ],
+      steps: [
+        { num: '01', title: 'Cadastro gratuito', text: 'Confirme seus dados e passe a fazer parte do Clube de Vantagens.' },
+        { num: '02', title: 'Corra normalmente', text: 'Toda corrida elegível gera pontos automaticamente.' },
+        { num: '03', title: 'Resgate recompensas', text: 'Troque seus pontos por produtos e experiências no catálogo.' },
+      ],
+      pointRules: [
+        { label: 'Terça a Sexta', pontos: 20 },
+        { label: 'Sábados, domingos e feriados', pontos: 10 },
+      ],
+      rewardsPreview: [
+        { nome: 'Boné Oficial', pontos: 100 },
+        { nome: 'Troféu Pequeno', pontos: 100 },
+        { nome: 'Camiseta Oficial', pontos: 200 },
+        { nome: 'Troféu Grande', pontos: 200 },
+        { nome: 'Voucher para uma corrida', pontos: 300 },
+      ],
+      portalLinks: [
+        { title: 'Meu Painel', href: 'clube-painel.dc.html', desc: 'Saldo de pontos e próxima recompensa' },
+        { title: 'Minha Pontuação', href: 'clube-pontuacao.dc.html', desc: 'Como você ganha pontos' },
+        { title: 'Histórico de Corridas', href: 'clube-corridas.dc.html', desc: 'Todas as corridas pontuadas' },
+        { title: 'Histórico de Resgates', href: 'clube-resgates.dc.html', desc: 'Recompensas já resgatadas' },
+        { title: 'Catálogo de Recompensas', href: 'clube-catalogo.dc.html', desc: 'Troque pontos por prêmios' },
+        { title: 'Campanhas Especiais', href: 'clube-campanhas.dc.html', desc: 'Bônus e promoções ativas' },
+        { title: 'Meu Perfil', href: 'clube-perfil.dc.html', desc: 'Seus dados cadastrais' },
+        { title: 'Regulamento', href: 'clube-regulamento.dc.html', desc: 'Regras completas do clube' },
+      ],
+    };
+  }
+}
+
+</script>
+</body>
+</html>

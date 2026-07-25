@@ -1,7 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import nextConfig from '../next.config';
+import nextConfig, { designRoutes } from '../next.config';
 import { PUBLIC_ROUTES, getPublicRoute } from '../src/config/publicRoutes';
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8');
@@ -52,11 +52,44 @@ describe('public route registry', () => {
 });
 
 describe('production routing', () => {
-  it('never redirects canonical pages to design documents', async () => {
-    const redirects = await nextConfig.redirects?.();
-    expect(redirects ?? []).not.toEqual(expect.arrayContaining([
-      expect.objectContaining({ destination: expect.stringContaining('/design/') }),
-    ]));
+  it('serves every canonical design page from the approved prototypes', async () => {
+    const redirects = (await nextConfig.redirects?.()) ?? [];
+
+    for (const [source, page] of Object.entries(designRoutes)) {
+      expect(redirects).toEqual(expect.arrayContaining([
+        expect.objectContaining({ source, destination: `/design/${page}.dc.html`, permanent: false }),
+      ]));
+      expect(existsSync(join(process.cwd(), 'public', 'design', `${page}.dc.html`))).toBe(true);
+    }
+  });
+
+  it('keeps the design route map aligned with the generator', async () => {
+    const { routes } = await import('../scripts/sync-design.mjs');
+    const generated = Object.fromEntries(
+      Object.entries(routes as Record<string, string>).map(([page, path]) => [path, page]),
+    );
+
+    expect(generated).toEqual(designRoutes);
+  });
+
+  it('does not leave routes without an implementation', () => {
+    const reactOnly = PUBLIC_ROUTES.filter((route) => !(route.path in designRoutes)).map((route) => route.path);
+
+    expect(reactOnly).toEqual(['/reservas', '/historia']);
+  });
+
+  it('injects canonical SEO metadata into every served prototype', () => {
+    for (const [path, page] of Object.entries(designRoutes)) {
+      const html = read(join('public', 'design', `${page}.dc.html`));
+      const route = getPublicRoute(path);
+      const canonical = `https://kartodromodebetim.com.br${path === '/' ? '' : path}`;
+      const robots = route.availability === 'active' ? 'index, follow' : 'noindex, follow, noarchive';
+
+      expect(html, `${page}: title`).toContain(`<title>${route.title}</title>`);
+      expect(html, `${page}: canonical`).toContain(`<link rel="canonical" href="${canonical}">`);
+      expect(html, `${page}: robots`).toContain(`<meta name="robots" content="${robots}">`);
+      expect(html.match(/<meta name="description"/g)?.length ?? 0, `${page}: description única`).toBe(1);
+    }
   });
 
   it('permanently normalizes legacy aliases', async () => {

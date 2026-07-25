@@ -26,7 +26,9 @@
     "stream:tb50": "tsx services/tb50-streamer.ts",
     "tb50:install-autostart": "powershell -ExecutionPolicy Bypass -File scripts/install-tb50-autostart.ps1",
     "tb50:install-watchdog": "powershell -ExecutionPolicy Bypass -File scripts/install-tb50-watchdog.ps1",
-    "livetime:install-cloudflare-watch": "powershell -ExecutionPolicy Bypass -File scripts/install-cloudflare-vercel-watch.ps1"
+    "livetime:install-cloudflare-watch": "powershell -ExecutionPolicy Bypass -File scripts/install-cloudflare-vercel-watch.ps1",
+    "sync:design": "node scripts/sync-design.mjs",
+    "check:design": "node scripts/sync-design.mjs --check"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+  <meta name="description" content="Meu Perfil — Clube de Vantagens Kartódromo de Betim">
+  <link rel="icon" type="image/png" href="assets/brand/kib-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size: 17px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    a { color: #00e676; }
+    a:hover { color: #3ce396; }
+    button, input { font: inherit; }
+    input:focus, button:focus-visible, a:focus-visible { outline: 2px solid #00e676; outline-offset: 2px; }
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root) { animation: 260ms cubic-bezier(.16,1,.3,1) both kib-page-out; }
+    ::view-transition-new(root) { animation: 320ms cubic-bezier(.16,1,.3,1) both kib-page-in; }
+    @keyframes kib-page-out { to { opacity: 0; transform: translateY(-8px); } }
+    @keyframes kib-page-in { from { opacity: 0; transform: translateY(8px); } }
+    @media (prefers-reduced-motion: reduce) { ::view-transition-old(root), ::view-transition-new(root) { animation: none; } }
+  </style>
+</helmet>
+<div data-screen-label="Clube — Meu Perfil" style="min-height:100vh; background:#030504; color:#f7faf6;">
+
+  <header style="position:sticky; top:0; z-index:100; background:rgba(3,5,4,.92); backdrop-filter:blur(18px); border-bottom:1px solid rgba(255,255,255,.12);">
+    <div style="width:min(1200px,calc(100% - 40px)); margin:0 auto; min-height:74px; display:flex; align-items:center; justify-content:space-between; gap:16px;">
+      <a href="clube-vantagens.dc.html" style="width:150px; flex:none;"><img src="assets/brand/kib-logo.png" alt="Kartódromo Internacional de Betim" style="width:100%;"></a>
+      <div style="display:flex; align-items:center; gap:14px;">
+        <span style="{{ styles.pointsChip }}">{{ pontos }} pts</span>
+        <a href="clube-vantagens.dc.html" style="font-size:12.5px; font-weight:700; color:#a8b2aa; text-decoration:none;">Sair</a>
+      </div>
+    </div>
+    <nav aria-label="Menu do portal" style="width:min(1200px,calc(100% - 40px)); margin:0 auto; display:flex; gap:4px; overflow-x:auto; padding-bottom:2px;">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="8"><a href="{{ t.href }}" style="{{ t.style }}">{{ t.label }}</a></sc-for>
+    </nav>
+  </header>
+
+  <main style="width:min(1200px,calc(100% - 40px)); margin:0 auto; padding:36px 0 80px; display:grid; gap:22px;">
+    <div>
+      <p style="margin:0 0 4px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.14em; text-transform:uppercase;">Conta</p>
+      <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(30px,4vw,44px); line-height:0.9;">Meu perfil</h1>
+    </div>
+
+    <form onSubmit="{{ onSubmit }}" style="{{ styles.card }}">
+      <div style="display:grid; gap:14px; grid-template-columns:1fr 1fr;">
+        <div style="grid-column:1/-1; display:grid; gap:6px;"><label style="{{ styles.label }}">Nome completo</label><input value="{{ form.nome }}" onChange="{{ onFieldChange('nome') }}" style="{{ styles.input }}"></div>
+        <div style="display:grid; gap:6px;"><label style="{{ styles.label }}">CPF</label><input value="{{ form.cpf }}" disabled="" style="{{ styles.inputDisabled }}"></div>
+        <div style="display:grid; gap:6px;"><label style="{{ styles.label }}">Telefone</label><input value="{{ form.telefone }}" onChange="{{ onFieldChange('telefone') }}" style="{{ styles.input }}"></div>
+        <div style="display:grid; gap:6px;"><label style="{{ styles.label }}">E-mail</label><input value="{{ form.email }}" onChange="{{ onFieldChange('email') }}" type="email" style="{{ styles.input }}"></div>
+        <div style="display:grid; gap:6px;"><label style="{{ styles.label }}">Cidade</label><input value="{{ form.cidade }}" onChange="{{ onFieldChange('cidade') }}" style="{{ styles.input }}"></div>
+      </div>
+      <p style="margin:16px 0 0; color:#a8b2aa; font-size:12.5px;">Membro do clube desde {{ memberSince }}.</p>
+      <button type="submit" style="{{ styles.submitBtn }}">Salvar alterações</button>
+      <sc-if value="{{ saved }}"><p style="margin:14px 0 0; color:#00e676; font-size:13px; font-weight:700;">Dados atualizados com sucesso.</p></sc-if>
+    </form>
+  </main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  currentTab = 'perfil';
+  state = { customer: null, form: null, saved: false };
+
+  componentDidMount() {
+    import('./clube-shared.js').then((m) => {
+      this.setState({ customer: m.CUSTOMER, form: { nome: m.CUSTOMER.nome, cpf: m.CUSTOMER.cpf, telefone: m.CUSTOMER.telefone, email: m.CUSTOMER.email, cidade: m.CUSTOMER.cidade }, memberSince: m.formatDateBR(m.CUSTOMER.membroDesde) });
+    });
+  }
+
+  onFieldChange = (key) => (e) => this.setState((s) => ({ form: Object.assign({}, s.form, { [key]: e.target.value }), saved: false }));
+  onSubmit = (e) => { e.preventDefault(); this.setState({ saved: true }); };
+
+  tabDefs() {
+    return [
+      { key: 'painel', label: 'Meu Painel', href: 'clube-painel.dc.html' },
+      { key: 'pontuacao', label: 'Minha Pontuação', href: 'clube-pontuacao.dc.html' },
+      { key: 'corridas', label: 'Histórico de Corridas', href: 'clube-corridas.dc.html' },
+      { key: 'resgates', label: 'Histórico de Resgates', href: 'clube-resgates.dc.html' },
+      { key: 'catalogo', label: 'Catálogo', href: 'clube-catalogo.dc.html' },
+      { key: 'campanhas', label: 'Campanhas', href: 'clube-campanhas.dc.html' },
+      { key: 'perfil', label: 'Meu Perfil', href: 'clube-perfil.dc.html' },
+      { key: 'regulamento', label: 'Regulamento', href: 'clube-regulamento.dc.html' },
+    ];
+  }
+
+  styles() {
+    return {
+      pointsChip: { fontSize: '12px', fontWeight: 700, padding: '7px 13px', borderRadius: '999px', background: 'rgba(0,230,118,.14)', color: '#00e676' },
+      card: { background: '#0b100c', border: '1px solid rgba(255,255,255,.12)', padding: '26px', maxWidth: '640px' },
+      label: { fontSize: '11px', fontWeight: 700, letterSpacing: '.03em', textTransform: 'uppercase', color: '#a8b2aa' },
+      input: { width: '100%', height: '46px', border: '1px solid rgba(255,255,255,.18)', background: '#070b08', color: '#fff', padding: '0 14px', outline: 'none' },
+      inputDisabled: { width: '100%', height: '46px', border: '1px solid rgba(255,255,255,.1)', background: '#070b08', color: '#6b756c', padding: '0 14px', outline: 'none' },
+      submitBtn: { marginTop: '20px', minHeight: '48px', padding: '0 26px', border: 0, cursor: 'pointer', clipPath: 'polygon(7% 0,100% 0,93% 100%,0 100%)', background: 'linear-gradient(135deg,#00e676,#00c853)', color: '#041301', fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '12.5px' },
+    };
+  }
+
+  renderVals() {
+    const { customer, form, saved, memberSince } = this.state;
+    const s = this.styles();
+    const tabs = this.tabDefs().map((t) => ({
+      label: t.label, href: t.href,
+      style: { flex: 'none', padding: '10px 14px', fontSize: '12.5px', fontWeight: 700, textDecoration: 'none', borderBottom: '2px solid ' + (t.key === this.currentTab ? '#00e676' : 'transparent'), color: t.key === this.currentTab ? '#fff' : '#a8b2aa', whiteSpace: 'nowrap' },
+    }));
+    if (!customer || !form) return { styles: s, tabs, pontos: 0, form: { nome: '', cpf: '', telefone: '', email: '', cidade: '' }, onFieldChange: this.onFieldChange, onSubmit: this.onSubmit, saved: false, memberSince: '' };
+
+    return { styles: s, tabs, pontos: customer.pontos, form, onFieldChange: this.onFieldChange, onSubmit: this.onSubmit, saved, memberSince };
+  }
+}
+
+</script>
+</body>
+</html>

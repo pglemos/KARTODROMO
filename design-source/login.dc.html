@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+  <meta name="description" content="Login administrativo — Kartódromo Internacional de Betim">
+  <link rel="icon" type="image/png" href="assets/brand/kib-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    html { scroll-behavior: smooth; }
+    body { margin: 0; font-family: 'Rajdhani', sans-serif; font-size: 15px; -webkit-font-smoothing: antialiased; }
+    button, input { font: inherit; }
+    input:focus, button:focus-visible, a:focus-visible { outline: 2px solid #00c853; outline-offset: 2px; }
+  </style>
+</helmet>
+
+<div data-screen-label="Login" style="{{ styles.page }}">
+  <div style="{{ styles.side }}">
+    <div style="position:relative; z-index:2;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="{{ styles.logoMark }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h7v7H4zM13 4h7v4h-7zM13 11h7v9h-7zM4 14h7v6H4z"/></svg></span>
+        <strong style="font-size:15px; font-weight:700;">Kartódromo Betim</strong>
+      </div>
+      <h1 style="{{ styles.sideTitle }}">Sistema de gestão da operação</h1>
+      <p style="{{ styles.sideText }}">Reservas, recepção, lanchonete, cronometragem, campeonatos, resultados, telão, financeiro, clientes e administração — tudo em um só painel.</p>
+      <div style="display:grid; gap:14px; margin-top:32px;">
+        <sc-for list="{{ sideFeatures }}" as="f" hint-placeholder-count="3">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span style="width:8px; height:8px; border-radius:50%; background:#00e676; flex:none;"></span>
+            <span style="font-size:14px; color:rgba(255,255,255,.82);">{{ f }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <div style="{{ styles.formSide }}">
+    <button type="button" aria-label="Alternar tema" onClick="{{ toggleTheme }}" style="{{ styles.themeToggle }}">
+      <sc-if value="{{ isDark }}" hint-placeholder-val="{{ false }}">☀️</sc-if>
+      <sc-if value="{{ isLight }}" hint-placeholder-val="{{ true }}">🌙</sc-if>
+    </button>
+    <form onSubmit="{{ onSubmit }}" style="{{ styles.formCard }}" novalidate="">
+      <p style="{{ styles.formEyebrow }}">Área restrita</p>
+      <h2 style="{{ styles.formTitle }}">Entrar no painel</h2>
+      <p style="{{ styles.formSubtitle }}">Use suas credenciais de administrador.</p>
+
+      <div style="display:grid; gap:16px; margin-top:26px;">
+        <div style="display:grid; gap:7px;">
+          <label for="login-email" style="{{ styles.label }}">E-mail</label>
+          <input id="login-email" name="email" type="email" autocomplete="username" value="{{ email }}" onChange="{{ onEmailChange }}" placeholder="seu.usuario@kartodromodebetim.com.br" style="{{ styles.input }}">
+          <sc-if value="{{ emailError }}"><span style="{{ styles.fieldError }}">{{ emailError }}</span></sc-if>
+        </div>
+        <div style="display:grid; gap:7px;">
+          <label for="login-senha" style="{{ styles.label }}">Senha</label>
+          <div style="position:relative;">
+            <input id="login-senha" name="senha" type="{{ passwordFieldType }}" autocomplete="current-password" value="{{ password }}" onChange="{{ onPasswordChange }}" placeholder="••••••••" style="{{ styles.input }}">
+            <button type="button" onClick="{{ togglePasswordVisibility }}" style="{{ styles.passwordToggle }}">{{ passwordToggleLabel }}</button>
+          </div>
+          <sc-if value="{{ passwordError }}"><span style="{{ styles.fieldError }}">{{ passwordError }}</span></sc-if>
+        </div>
+
+        <label style="display:flex; align-items:center; gap:9px; font-size:13.5px; font-weight:600; color:{{ tokens.textMuted }}; cursor:pointer;">
+          <input type="checkbox" checked="{{ remember }}" onChange="{{ onRememberChange }}" style="width:16px; height:16px; accent-color:{{ tokens.accent }};">
+          Manter conectado
+        </label>
+
+        <sc-if value="{{ formError }}"><div style="{{ styles.formAlert }}">{{ formError }}</div></sc-if>
+
+        <button type="submit" style="{{ styles.submitBtn }}">{{ submitLabel }}</button>
+      </div>
+
+      <p style="{{ styles.helpText }}">Esqueceu a senha? Fale com a administração do sistema.</p>
+    </form>
+    <a href="home.dc.html" style="{{ styles.backLink }}">← Voltar para o site</a>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    theme: (function () { try { return localStorage.getItem('kib-admin-theme') === 'dark' ? 'dark' : 'light'; } catch (e) { return 'light'; } })(),
+    email: '', password: '', remember: true, showPassword: false,
+    emailError: null, passwordError: null, formError: null, submitting: false,
+  };
+
+  toggleTheme = () => {
+    const next = this.state.theme === 'dark' ? 'light' : 'dark';
+    this.setState({ theme: next });
+    try { localStorage.setItem('kib-admin-theme', next); } catch (e) {}
+  };
+  onEmailChange = (e) => this.setState({ email: e.target.value, emailError: null, formError: null });
+  onPasswordChange = (e) => this.setState({ password: e.target.value, passwordError: null, formError: null });
+  onRememberChange = (e) => this.setState({ remember: e.target.checked });
+  togglePasswordVisibility = () => this.setState((s) => ({ showPassword: !s.showPassword }));
+
+  onSubmit = (e) => {
+    e.preventDefault();
+    const { email, password } = this.state;
+    let emailError = null, passwordError = null;
+    if (!email.trim()) emailError = 'Informe o e-mail.';
+    else if (!/^\S+@\S+\.\S+$/.test(email)) emailError = 'E-mail inválido.';
+    if (!password) passwordError = 'Informe a senha.';
+    if (emailError || passwordError) { this.setState({ emailError, passwordError }); return; }
+    this.setState({ submitting: true, formError: null });
+    window.setTimeout(() => {
+      this.setState({ submitting: false });
+      window.location.href = 'admin-dashboard.dc.html';
+    }, 500);
+  };
+
+  getTokens(theme) {
+    const dark = theme === 'dark';
+    return {
+      bg: dark ? '#0a0d0a' : '#f5f7f5', surface: dark ? '#121613' : '#ffffff', surface2: dark ? '#181d19' : '#eef1ee',
+      border: dark ? '#242b25' : '#e2e6e1', borderStrong: dark ? '#333c34' : '#d3d9d2',
+      text: dark ? '#f2f5f1' : '#14170f', textMuted: dark ? '#8b988c' : '#5d6660', textFaint: dark ? '#5a655c' : '#8a938a',
+      accent: dark ? '#00e676' : '#00a856', accentContrast: dark ? '#041a0d' : '#ffffff',
+      danger: dark ? '#ff6b6b' : '#d92d2d', dangerSoft: dark ? 'rgba(255,107,107,.14)' : 'rgba(217,45,45,.08)',
+      shadow: dark ? '0 20px 60px rgba(0,0,0,.5)' : '0 20px 60px rgba(20,30,20,.12)',
+    };
+  }
+
+  renderVals() {
+    const { theme, email, password, remember, showPassword, emailError, passwordError, formError, submitting } = this.state;
+    const t = this.getTokens(theme);
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 900;
+
+    const styles = {
+      page: { minHeight: '100vh', display: isMobile ? 'flex' : 'grid', flexDirection: 'column', gridTemplateColumns: '1fr 1fr', background: t.bg, fontFamily: "'Rajdhani',sans-serif" },
+      side: { display: isMobile ? 'none' : 'flex', flexDirection: 'column', justifyContent: 'center', position: 'relative', overflow: 'hidden', padding: '70px 64px', background: 'linear-gradient(150deg,#0a0d0a,#122016 70%)', color: '#fff' },
+      logoMark: { display: 'grid', placeItems: 'center', width: '38px', height: '38px', borderRadius: '10px', background: '#00e676', color: '#041a0d', flex: 'none' },
+      sideTitle: { margin: '34px 0 0', fontSize: 'clamp(30px,3vw,42px)', fontWeight: 700, lineHeight: 1.1, maxWidth: '13ch' },
+      sideText: { margin: '18px 0 0', maxWidth: '46ch', lineHeight: 1.6, color: 'rgba(255,255,255,.72)', fontSize: '15px' },
+      formSide: { position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '22px', padding: isMobile ? '60px 20px' : '40px', background: t.bg },
+      themeToggle: { position: 'absolute', top: '20px', right: '20px', width: '38px', height: '38px', borderRadius: '9px', border: '1px solid ' + t.border, background: t.surface, cursor: 'pointer', fontSize: '15px' },
+      formCard: { width: 'min(400px,100%)', background: t.surface, border: '1px solid ' + t.border, borderRadius: '18px', padding: '34px', boxShadow: t.shadow },
+      formEyebrow: { margin: '0 0 6px', fontSize: '11px', fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: t.accent },
+      formTitle: { margin: 0, fontSize: '26px', fontWeight: 700, color: t.text },
+      formSubtitle: { margin: '8px 0 0', fontSize: '14px', color: t.textMuted },
+      label: { fontSize: '12px', fontWeight: 700, letterSpacing: '.03em', textTransform: 'uppercase', color: t.textMuted },
+      input: { width: '100%', height: '46px', borderRadius: '9px', border: '1px solid ' + t.border, background: t.surface2, color: t.text, padding: '0 14px', outline: 'none' },
+      passwordToggle: { position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', border: 0, background: 'transparent', color: t.textMuted, fontSize: '11.5px', fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase' },
+      fieldError: { fontSize: '12.5px', fontWeight: 600, color: t.danger },
+      formAlert: { padding: '12px 14px', borderRadius: '9px', background: t.dangerSoft, color: t.danger, fontSize: '13px', fontWeight: 600 },
+      submitBtn: { height: '48px', borderRadius: '9px', border: 0, background: t.accent, color: t.accentContrast, fontWeight: 700, fontSize: '14.5px', cursor: 'pointer', opacity: submitting ? 0.7 : 1 },
+      helpText: { margin: '20px 0 0', fontSize: '12.5px', color: t.textFaint, textAlign: 'center' },
+      backLink: { fontSize: '13px', fontWeight: 700, color: t.textMuted, textDecoration: 'none' },
+    };
+
+    return {
+      tokens: t, styles,
+      isDark: theme === 'dark', isLight: theme === 'light', toggleTheme: this.toggleTheme,
+      email, password, remember, emailError, passwordError, formError,
+      onEmailChange: this.onEmailChange, onPasswordChange: this.onPasswordChange, onRememberChange: this.onRememberChange,
+      onSubmit: this.onSubmit, togglePasswordVisibility: this.togglePasswordVisibility,
+      passwordFieldType: showPassword ? 'text' : 'password',
+      passwordToggleLabel: showPassword ? 'Ocultar' : 'Ver',
+      submitLabel: submitting ? 'Entrando…' : 'Entrar',
+      sideFeatures: ['Reservas e recepção em tempo real', 'Cronometragem e resultados ao vivo', 'Financeiro, clientes e telão integrados'],
+    };
+  }
+}
+
+</script>
+</body>
+</html>
