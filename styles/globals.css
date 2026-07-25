@@ -61,6 +61,7 @@ textarea {
   a[href^='tel:'],
   a[href^='mailto:'] {
     min-height: 44px;
+    min-width: 44px;
     display: inline-flex;
     align-items: center;
   }

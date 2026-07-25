@@ -158,14 +158,14 @@ const History = () => {
                     className="h-full w-full object-cover brightness-[0.8] transition-transform duration-500 group-hover:scale-105 group-hover:brightness-100"
                   />
                   <div className="absolute inset-0 flex items-end justify-center bg-gradient-to-t from-ink-950/90 via-ink-950/20 to-transparent p-2.5 opacity-0 transition-opacity group-hover:opacity-100">
-                    <span className="font-race text-[10px] italic font-bold uppercase tracking-wider text-white">{img.alt}</span>
+                    <span className="font-race text-[11px] italic font-bold uppercase tracking-wider text-white">{img.alt}</span>
                   </div>
                 </div>
               ))}
               <div className="flex h-36 items-center justify-center border border-dashed border-white/15 bg-ink-950 p-4">
                 <div className="text-center">
                   <Camera className="mx-auto mb-1.5 h-7 w-7 text-white/30" aria-hidden="true" />
-                  <p className="font-race text-[10px] italic font-bold uppercase tracking-widest text-white/40">Mais fotos em breve</p>
+                  <p className="font-race text-[11px] italic font-bold uppercase tracking-widest text-white/40">Mais fotos em breve</p>
                 </div>
               </div>
             </div>
