@@ -3,8 +3,9 @@ export type Cliente = {
   nome: string;
   email: string | null;
   telefone: string | null;
-  documento: string | null;
+  cpf: string | null;
   cidade: string | null;
   estado: string | null;
-  criadoEm: string | null;
+  created_at: string | null;
+  notes: string | null;
 };

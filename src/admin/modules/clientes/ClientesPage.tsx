@@ -20,16 +20,16 @@ const columns: readonly DataTableColumn<Cliente>[] = [
   { key: 'nome', label: 'Nome' },
   { key: 'email', label: 'E-mail', render: (cliente) => cliente.email ?? '—' },
   { key: 'telefone', label: 'Telefone', render: (cliente) => cliente.telefone ?? '—' },
-  { key: 'documento', label: 'CPF', render: (cliente) => cliente.documento ?? '—' },
+  { key: 'cpf', label: 'CPF', render: (cliente) => cliente.cpf ?? '—' },
   {
     key: 'cidade',
     label: 'Cidade/UF',
     render: (cliente) => [cliente.cidade, cliente.estado].filter(Boolean).join(' / ') || '—',
   },
   {
-    key: 'criadoEm',
+    key: 'created_at',
     label: 'Cadastrado em',
-    render: (cliente) => (cliente.criadoEm ? dateFormatter.format(new Date(cliente.criadoEm)) : '—'),
+    render: (cliente) => (cliente.created_at ? dateFormatter.format(new Date(cliente.created_at)) : '—'),
   },
 ];
 

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
-import { adminCookieName, readAdminSession } from '@/lib/admin-auth';
+import { requireAdminSession } from '@/lib/require-admin-session';
 import { handleAdminD1, type AdminD1Database } from '@/lib/admin-d1';
+import { getLocalSQLiteDb, isLocalSQLiteAvailable } from '@/lib/local-sqlite-db';
 
 declare global {
   interface CloudflareEnv {
@@ -11,21 +11,25 @@ declare global {
 }
 
 export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
 
 const TIMEOUT_MS = Number(process.env.KARTODROMO_LOCAL_API_TIMEOUT_MS || '8000');
 
 async function requireSession() {
-  const cookieStore = await cookies();
-  return readAdminSession(cookieStore.get(adminCookieName())?.value);
+  return requireAdminSession('/admin');
 }
 
 async function proxy(request: NextRequest, path: string[]) {
   const session = await requireSession();
-  if (!session) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+  // 1. Try local SQLite (next dev mode)
+  if (isLocalSQLiteAvailable()) {
+    const localDb = getLocalSQLiteDb();
+    if (localDb) {
+      return handleAdminD1(request, path, localDb, session.email);
+    }
   }
 
+  // 2. Try Cloudflare D1 (production / wrangler preview)
   try {
     const { env } = await getCloudflareContext({ async: true });
     if (env.KARTODROMO_ADMIN_DB) {
@@ -35,9 +39,16 @@ async function proxy(request: NextRequest, path: string[]) {
     // `next dev` and conventional Node deployments do not expose Cloudflare bindings.
   }
 
+  // 3. Try remote bridge endpoint (configured via env var)
   const endpoint = process.env.KARTODROMO_LOCAL_API_ENDPOINT;
   if (!endpoint) {
-    return NextResponse.json({ error: 'local_api_not_configured' }, { status: 503 });
+    return NextResponse.json(
+      {
+        error: 'local_api_not_configured',
+        hint: 'Install better-sqlite3 for local dev, or set KARTODROMO_LOCAL_API_ENDPOINT',
+      },
+      { status: 503 },
+    );
   }
 
   const search = request.nextUrl.search;

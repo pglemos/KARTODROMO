@@ -28,7 +28,7 @@ type ResourceConfig = {
 const resources = {
   profiles: { columns: ['id', 'email', 'full_name', 'role', 'phone', 'active', 'created_at'], booleans: ['active'], search: ['email', 'full_name', 'phone'], defaultOrder: 'full_name' },
   audit_log: { columns: ['id', 'actor', 'action', 'entity', 'entity_id', 'details', 'created_at'], json: ['details'], search: ['actor', 'action', 'entity'], defaultOrder: 'created_at', defaultDir: 'desc', readOnly: true },
-  clientes: { columns: ['id', 'nome', 'email', 'telefone', 'cpf', 'notes'], search: ['nome', 'email', 'telefone', 'cpf'], defaultOrder: 'nome' },
+  clientes: { columns: ['id', 'nome', 'email', 'telefone', 'cpf', 'cidade', 'estado', 'created_at', 'notes'], search: ['nome', 'email', 'telefone', 'cpf'], defaultOrder: 'nome' },
   pistas: { columns: ['id', 'nome', 'descricao', 'ativa'], booleans: ['ativa'], search: ['nome', 'descricao'], defaultOrder: 'nome' },
   reservas: { columns: ['id', 'cliente_id', 'pista_id', 'data_inicio', 'data_fim', 'qtd_pilotos', 'valor', 'status', 'notes', 'created_at'], search: ['notes'], defaultOrder: 'data_inicio', defaultDir: 'desc', dateColumn: 'data_inicio' },
   reservas_full: { columns: ['id', 'cliente_id', 'pista_id', 'data_inicio', 'data_fim', 'qtd_pilotos', 'valor', 'status', 'notes', 'created_at', 'cliente_nome', 'pista_nome'], search: ['cliente_nome', 'pista_nome', 'notes'], defaultOrder: 'data_inicio', defaultDir: 'desc', dateColumn: 'data_inicio', readOnly: true },
@@ -54,6 +54,20 @@ const resources = {
   resultados: { columns: ['id', 'corrida_id', 'piloto_id', 'piloto_nome', 'posicao', 'melhor_volta', 'voltas', 'pontos', 'gap'], search: ['piloto_nome'], defaultOrder: 'posicao' },
   resultados_full: { columns: ['id', 'corrida_id', 'piloto_id', 'piloto_nome', 'posicao', 'melhor_volta', 'voltas', 'pontos', 'gap', 'piloto_numero', 'piloto_equipe'], search: ['piloto_nome', 'piloto_numero', 'piloto_equipe'], defaultOrder: 'posicao', readOnly: true },
   cronometragem_live: { columns: ['id', 'payload', 'updated_at'], defaultOrder: 'id', readOnly: true },
+  // Karts management
+  karts: { columns: ['id', 'numero', 'modelo', 'categoria', 'motor', 'status', 'km_total', 'ultima_manutencao', 'proxima_manutencao', 'notes', 'ativo', 'created_at'], booleans: ['ativo'], search: ['numero', 'modelo', 'categoria', 'motor'], defaultOrder: 'numero' },
+  karts_manutencao: { columns: ['id', 'kart_id', 'tipo', 'descricao', 'custo', 'data', 'responsavel', 'status', 'created_at'], search: ['tipo', 'descricao', 'responsavel'], defaultOrder: 'data', defaultDir: 'desc', dateColumn: 'data' },
+  karts_full: { columns: ['id', 'numero', 'modelo', 'categoria', 'motor', 'status', 'km_total', 'ultima_manutencao', 'proxima_manutencao', 'notes', 'ativo', 'created_at', 'manutencoes_pendentes'], search: ['numero', 'modelo', 'categoria'], defaultOrder: 'numero', readOnly: true },
+  // Eventos
+  eventos: { columns: ['id', 'titulo', 'descricao', 'tipo', 'cliente_id', 'pista_id', 'data_inicio', 'data_fim', 'qtd_participantes', 'valor', 'status', 'cor_tema', 'notes', 'created_at'], search: ['titulo', 'descricao', 'tipo'], defaultOrder: 'data_inicio', defaultDir: 'desc', dateColumn: 'data_inicio' },
+  eventos_full: { columns: ['id', 'titulo', 'descricao', 'tipo', 'cliente_id', 'pista_id', 'data_inicio', 'data_fim', 'qtd_participantes', 'valor', 'status', 'cor_tema', 'notes', 'created_at', 'cliente_nome', 'pista_nome'], search: ['titulo', 'descricao', 'tipo', 'cliente_nome'], defaultOrder: 'data_inicio', defaultDir: 'desc', dateColumn: 'data_inicio', readOnly: true },
+  // Clube de Vantagens
+  clube_participantes: { columns: ['id', 'cliente_id', 'nome', 'email', 'pontos', 'nivel', 'ativo', 'created_at', 'updated_at'], booleans: ['ativo'], search: ['nome', 'email'], defaultOrder: 'pontos', defaultDir: 'desc' },
+  clube_recompensas: { columns: ['id', 'nome', 'descricao', 'categoria', 'pontos_necessarios', 'estoque', 'ativo', 'imagem_url', 'created_at'], booleans: ['ativo'], search: ['nome', 'descricao', 'categoria'], defaultOrder: 'pontos_necessarios' },
+  clube_resgates: { columns: ['id', 'participante_id', 'recompensa_id', 'pontos', 'status', 'notes', 'created_at', 'updated_at'], search: ['notes'], defaultOrder: 'created_at', defaultDir: 'desc' },
+  clube_resgates_full: { columns: ['id', 'participante_id', 'recompensa_id', 'pontos', 'status', 'notes', 'created_at', 'updated_at', 'participante_nome', 'participante_pontos', 'recompensa_nome', 'pontos_necessarios'], search: ['participante_nome', 'recompensa_nome', 'notes'], defaultOrder: 'created_at', defaultDir: 'desc', readOnly: true },
+  clube_campanhas: { columns: ['id', 'nome', 'descricao', 'tipo', 'multiplicador', 'ativo', 'data_inicio', 'data_fim', 'created_at'], booleans: ['ativo'], search: ['nome', 'descricao', 'tipo'], defaultOrder: 'nome' },
+  clube_transacoes: { columns: ['id', 'participante_id', 'tipo', 'pontos', 'descricao', 'referencia', 'created_at'], search: ['descricao', 'referencia'], defaultOrder: 'created_at', defaultDir: 'desc' }
 } as const satisfies Record<string, ResourceConfig>;
 
 type ResourceName = keyof typeof resources;
@@ -115,10 +129,10 @@ async function syncClientesFromBridge(db: AdminD1Database, request: NextRequest,
       if (!value || typeof value !== 'object') return [];
       const cliente = value as Row;
       if (!cliente.id || !cliente.nome) return [];
-      return [db.prepare(`INSERT INTO clientes (id, nome, email, telefone, cpf)
-        VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET
-        nome=excluded.nome, email=excluded.email, telefone=excluded.telefone, cpf=excluded.cpf`)
-        .bind(String(cliente.id), String(cliente.nome), cliente.email ?? null, cliente.telefone ?? null, cliente.documento ?? null)];
+      return [db.prepare(`INSERT INTO clientes (id, nome, email, telefone, documento, cidade, estado, criadoEm)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET
+        nome=excluded.nome, email=excluded.email, telefone=excluded.telefone, documento=excluded.documento, cidade=excluded.cidade, estado=excluded.estado, criadoEm=excluded.criadoEm`)
+        .bind(String(cliente.id), String(cliente.nome), cliente.email ?? null, cliente.telefone ?? null, cliente.documento ?? null, cliente.cidade ?? null, cliente.estado ?? null, cliente.criadoEm ?? null)];
     });
     for (let index = 0; index < statements.length; index += 100) {
       await db.batch(statements.slice(index, index + 100));

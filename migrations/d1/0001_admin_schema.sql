@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   id TEXT PRIMARY KEY,
   email TEXT UNIQUE,
   full_name TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'staff' CHECK (role IN ('owner','admin','manager','staff','viewer')),
+  role TEXT NOT NULL DEFAULT 'staff' CHECK (role IN ('owner','admin','manager','staff','viewer','financeiro','recepcao','lanchonete','operador_telao')),
   phone TEXT,
   active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0,1)),
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -26,6 +26,11 @@ CREATE TABLE IF NOT EXISTS clientes (
   email TEXT,
   telefone TEXT,
   cpf TEXT,
+  documento TEXT,
+  cidade TEXT,
+  estado TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  criadoEm TEXT NOT NULL DEFAULT (datetime('now')),
   notes TEXT
 );
 

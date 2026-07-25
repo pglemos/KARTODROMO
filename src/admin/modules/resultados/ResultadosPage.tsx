@@ -116,6 +116,12 @@ const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
   timeStyle: 'short',
 });
 
+const formatDateSafe = (value: unknown): string => {
+  if (!value) return '—';
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? '—' : dateFormatter.format(date);
+};
+
 const pointsFormatter = new Intl.NumberFormat('pt-BR', {
   minimumFractionDigits: 0,
   maximumFractionDigits: 2,
@@ -380,7 +386,7 @@ export const ResultadosPage = () => {
       {
         key: 'dataHora',
         label: 'Data/hora',
-        render: (racing) => dateFormatter.format(new Date(racing.dataHora)),
+        render: (racing) => formatDateSafe(racing.dataHora),
       },
       { key: 'participantes', label: 'Participantes' },
       {

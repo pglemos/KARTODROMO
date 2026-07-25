@@ -18,7 +18,8 @@ export type ModuleKey =
   | 'recepcao'
   | 'telao'
   | 'clientes'
-  | 'administrativa';
+  | 'administrativa'
+  | 'clube';
 
 export const roles: readonly Role[] = [
   'owner',
@@ -42,6 +43,7 @@ const allModules: readonly ModuleKey[] = [
   'telao',
   'clientes',
   'administrativa',
+  'clube',
 ];
 
 export const roleModules: Readonly<Record<Role, readonly ModuleKey[]>> = {
