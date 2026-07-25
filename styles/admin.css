@@ -202,6 +202,23 @@
   box-shadow: 0 0 0 3px var(--admin-accent-soft);
 }
 
+/* No iOS um campo abaixo de 16px faz a página dar zoom ao receber foco. */
+@media (max-width: 720px) {
+  .admin-root :is(input, select, textarea),
+  .admin-login :is(input, select, textarea),
+  .admin-input {
+    font-size: 16px;
+  }
+
+  .admin-login a,
+  .admin-root .admin-topbar a,
+  .admin-root .admin-nav-link {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
 .admin-submit {
   height: 48px;
   border: 0;

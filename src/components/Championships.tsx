@@ -272,7 +272,7 @@ pagamento: 'PENDENTE',
       <div className="relative isolate overflow-hidden border-b border-white/10 bg-ink-900 pt-10">
         <div className="container relative mx-auto grid gap-10 px-4 py-14 md:grid-cols-[1fr_auto] md:items-center md:px-8">
           <div className="max-w-3xl">
-            <a href="/" className="mb-8 inline-flex items-center gap-2 font-race text-xs italic font-bold uppercase tracking-[0.18em] text-white/55 transition-colors hover:text-primary-400">
+            <a href="/" className="mb-8 inline-flex min-h-[44px] items-center gap-2 font-race text-xs italic font-bold uppercase tracking-[0.18em] text-white/55 transition-colors hover:text-primary-400">
               <ArrowLeft className="h-4 w-4" />
               Voltar para a página inicial
             </a>

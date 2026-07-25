@@ -49,3 +49,25 @@ textarea {
   overflow: hidden;
   background: var(--bg);
 }
+
+/*
+ * Uso no celular: alvo de toque de 44px na navegação e nos contatos, e campos
+ * com 16px para o iOS não dar zoom ao focar. Vale para as páginas React
+ * (/reservas, /historia, /login); as páginas do design system têm a própria
+ * camada gerada em public/design.
+ */
+@media (max-width: 720px) {
+  :is(header, footer, nav) a,
+  a[href^='tel:'],
+  a[href^='mailto:'] {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

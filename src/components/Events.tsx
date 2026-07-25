@@ -72,7 +72,7 @@ const Events = () => {
 
         <div className="mx-auto grid min-h-[720px] max-w-7xl grid-cols-1 items-center gap-12 px-4 py-14 md:px-8 lg:grid-cols-[0.92fr_1.08fr]">
           <div className="max-w-3xl">
-            <a href="/" className="mb-8 inline-flex items-center gap-2 font-race text-xs italic font-bold uppercase tracking-[0.18em] text-white/60 transition-colors hover:text-primary-400">
+            <a href="/" className="mb-8 inline-flex min-h-[44px] items-center gap-2 font-race text-xs italic font-bold uppercase tracking-[0.18em] text-white/60 transition-colors hover:text-primary-400">
               <ArrowLeft className="h-4 w-4" />
               Voltar para a página inicial
             </a>
