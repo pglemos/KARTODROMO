@@ -92,6 +92,19 @@ describe('production routing', () => {
     }
   });
 
+  it('keeps the mobile layer on every served page', () => {
+    for (const [path, page] of Object.entries(designRoutes)) {
+      const html = read(join('public', 'design', `${page}.dc.html`));
+
+      expect(html, `${page}: camada mobile`).toContain('data-generated="mobile-fit"');
+      expect(html, `${page}: alvo de toque`).toContain('min-height: 44px');
+      expect(html, `${page}: zoom iOS`).toContain('input, select, textarea { font-size: 16px !important; }');
+      if (path.startsWith('/clube-')) {
+        expect(html, `${page}: aba ativa no mobile`).toContain('data-generated="club-tab-focus"');
+      }
+    }
+  });
+
   it('permanently normalizes legacy aliases', async () => {
     const redirects = await nextConfig.redirects?.();
     expect(redirects).toEqual(expect.arrayContaining([

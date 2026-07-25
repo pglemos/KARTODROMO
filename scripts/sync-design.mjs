@@ -115,8 +115,51 @@ const mobileFitStyle = `<style data-generated="mobile-fit">
   [style*="display:flex"]:not([style*="flex-wrap:nowrap"]) { flex-wrap: wrap; }
   img, video, iframe, canvas, svg, table { max-width: 100%; }
   [style*="white-space:nowrap"] { white-space: normal; }
+
+  /* Alvo de toque mínimo de 44px nos links e botões de navegação. */
+  header a, header button, nav a, nav button, footer a {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+  [style*="min-height:32px"], [style*="min-height: 32px"],
+  [style*="min-height:34px"], [style*="min-height: 34px"],
+  [style*="min-height:38px"], [style*="min-height: 38px"],
+  [style*="min-height:40px"], [style*="min-height: 40px"] { min-height: 44px !important; }
+  header a:not([style*="width"]), header button { padding-inline: 12px; }
+  :is(div, section, article, main, aside) > a[style*="font-weight:700"]:not([style*="min-height"]),
+  :is(div, section, article, main, aside) > a[style*="font-weight: 700"]:not([style*="min-height"]) {
+    min-height: 44px;
+    display: inline-flex !important;
+    align-items: center;
+  }
+  input[type="checkbox"], input[type="radio"] {
+    width: 24px !important;
+    height: 24px !important;
+    flex: none;
+  }
+
+  /* Legibilidade: nada abaixo de 11px no celular. */
+  small { font-size: 11px !important; }
+  [style*="font-size:9px"], [style*="font-size: 9px"],
+  [style*="font-size:9.5px"], [style*="font-size: 9.5px"],
+  [style*="font-size:10px"], [style*="font-size: 10px"],
+  [style*="font-size:10.5px"], [style*="font-size: 10.5px"] { font-size: 11px !important; }
+
+  /* Evita o zoom automático do iOS ao focar um campo. */
+  input, select, textarea { font-size: 16px !important; }
+
+  /* Faixas que rolam na horizontal ganham rolagem suave por toque. */
+  [style*="overflow-x:auto"], [style*="overflow-x: auto"] {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
 }
 </style>
+`;
+
+/** No celular a faixa de abas do portal rola: centraliza a aba da página atual. */
+const clubTabScript = `<script data-generated="club-tab-focus">(function(){function focusTab(){var nav=document.querySelector('nav[aria-label="Menu do portal"]');if(!nav)return false;var current=nav.querySelector('a[href="'+location.pathname+'"]');if(!current)return false;if(nav.scrollWidth>nav.clientWidth+1){var offset=current.offsetLeft-(nav.clientWidth-current.offsetWidth)/2;nav.scrollTo({left:Math.max(0,offset),behavior:'auto'})}current.setAttribute('aria-current','page');return true}if(!focusTab()){var tries=0;var timer=setInterval(function(){if(focusTab()||++tries>40)clearInterval(timer)},100)}})();</script>
 `;
 
 /** Keeps the address bar on the clean route when the static prototype is served. */
@@ -161,6 +204,10 @@ function build(page, source) {
     html = html.replace('<base href="/">\n', `<base href="/">\n${seoHead(page)}`);
     html = html.replace('</head>', `${mobileFitStyle}</head>`);
     html = html.replace('</body>', `${cleanUrlScript()}</body>`);
+
+    if (page.startsWith('clube-')) {
+      html = html.replace('</body>', `${clubTabScript}</body>`);
+    }
   }
   return html;
 }
