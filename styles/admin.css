@@ -1,0 +1,366 @@
+.admin-login,
+.admin-root {
+  --admin-bg: #f5f7f5;
+  --admin-surface: #ffffff;
+  --admin-surface-2: #eef1ee;
+  --admin-border: #e2e6e1;
+  --admin-border-strong: #d3d9d2;
+  --admin-text: #14170f;
+  --admin-muted: #5d6660;
+  --admin-faint: #7b857d;
+  --admin-accent: #007a3d;
+  --admin-accent-soft: rgba(0, 122, 61, 0.1);
+  --admin-accent-border: rgba(0, 122, 61, 0.38);
+  --admin-accent-contrast: #ffffff;
+  --admin-danger: #d92d2d;
+  --admin-danger-soft: rgba(217, 45, 45, 0.08);
+  --admin-warning: #b8720a;
+  --admin-info: #1868c2;
+  --admin-shadow: 0 12px 32px rgba(20, 30, 20, 0.08);
+  --admin-overlay: rgba(10, 14, 10, 0.42);
+  color: var(--admin-text);
+  font-family: var(--font-admin, 'Rajdhani'), ui-sans-serif, system-ui, sans-serif;
+}
+
+.admin-login[data-theme='dark'],
+.admin-root[data-theme='dark'] {
+  --admin-bg: #0a0d0a;
+  --admin-surface: #121613;
+  --admin-surface-2: #181d19;
+  --admin-border: #242b25;
+  --admin-border-strong: #333c34;
+  --admin-text: #f2f5f1;
+  --admin-muted: #a6b1a7;
+  --admin-faint: #778279;
+  --admin-accent: #00e676;
+  --admin-accent-soft: rgba(0, 230, 118, 0.14);
+  --admin-accent-border: rgba(0, 230, 118, 0.4);
+  --admin-accent-contrast: #041a0d;
+  --admin-danger: #ff7474;
+  --admin-danger-soft: rgba(255, 107, 107, 0.14);
+  --admin-warning: #f2b23b;
+  --admin-info: #5eb6ff;
+  --admin-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  --admin-overlay: rgba(3, 5, 4, 0.72);
+}
+
+.admin-root {
+  min-height: 100vh;
+  background: var(--admin-bg);
+  transition: background-color 240ms, color 240ms;
+}
+
+.admin-root ::selection,
+.admin-login ::selection {
+  background: var(--admin-accent);
+  color: var(--admin-accent-contrast);
+}
+
+.admin-root :is(h1, h2, h3, h4, h5, h6),
+.admin-login :is(h1, h2, h3, h4, h5, h6) {
+  font-family: inherit;
+}
+
+.admin-root :is(input, select, textarea) {
+  border-color: var(--admin-border) !important;
+  background: var(--admin-surface-2) !important;
+  color: var(--admin-text) !important;
+}
+
+.admin-root :is(input, select, textarea)::placeholder {
+  color: var(--admin-faint);
+}
+
+.admin-root [class*='bg-zinc-950'] { background-color: var(--admin-bg) !important; }
+.admin-root [class*='bg-zinc-900'] { background-color: var(--admin-surface) !important; }
+.admin-root [class*='bg-zinc-800'] { background-color: var(--admin-surface-2) !important; }
+.admin-root [class*='border-zinc-800'],
+.admin-root [class*='border-zinc-700'],
+.admin-root [class*='divide-zinc-800'] { border-color: var(--admin-border) !important; }
+.admin-root [class*='text-zinc-50'],
+.admin-root [class*='text-zinc-100'],
+.admin-root [class*='text-zinc-200'] { color: var(--admin-text) !important; }
+.admin-root [class*='text-zinc-300'],
+.admin-root [class*='text-zinc-400'] { color: var(--admin-muted) !important; }
+.admin-root [class*='text-zinc-500'] { color: var(--admin-faint) !important; }
+.admin-root [class*='text-primary-300'],
+.admin-root [class*='text-brand-300'],
+.admin-root [class*='text-brand-400'] { color: var(--admin-accent) !important; }
+.admin-root [class*='bg-primary-500'],
+.admin-root [class*='bg-brand-500'] { background-color: var(--admin-accent-soft) !important; }
+.admin-root a[class*='bg-primary-500'],
+.admin-root button[class*='bg-primary-500'],
+.admin-root button[class*='bg-brand-500'] {
+  background-color: var(--admin-accent) !important;
+  color: var(--admin-accent-contrast) !important;
+}
+
+.admin-card {
+  border: 1px solid var(--admin-border);
+  border-radius: 14px;
+  background: var(--admin-surface);
+  box-shadow: var(--admin-shadow);
+}
+
+.admin-icon-button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--admin-border);
+  border-radius: 9px;
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  transition: border-color 180ms, color 180ms, transform 180ms;
+}
+
+.admin-icon-button:hover {
+  border-color: var(--admin-accent-border);
+  color: var(--admin-accent);
+  transform: translateY(-1px);
+}
+
+.admin-login {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--admin-bg);
+}
+
+.admin-login__showcase {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  align-items: center;
+  padding: clamp(48px, 7vw, 88px);
+  background:
+    radial-gradient(circle at 20% 84%, rgba(0, 230, 118, 0.16), transparent 32%),
+    linear-gradient(150deg, #080c09, #122016 70%);
+  color: #fff;
+}
+
+.admin-login__showcase::after {
+  position: absolute;
+  right: -14%;
+  bottom: -15%;
+  width: 70%;
+  height: 52%;
+  border: 1px solid rgba(0, 230, 118, 0.13);
+  border-radius: 50%;
+  content: '';
+  transform: rotate(-15deg);
+}
+
+.admin-login__mark,
+.admin-brand-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 9px;
+  background: var(--admin-accent);
+  color: var(--admin-accent-contrast);
+}
+
+.admin-login__mark { width: 38px; height: 38px; }
+.admin-brand-mark { width: 34px; height: 34px; }
+
+.admin-login__form-side {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  padding: 60px 24px;
+}
+
+.admin-login__card {
+  width: min(400px, 100%);
+  padding: 34px;
+  border: 1px solid var(--admin-border);
+  border-radius: 18px;
+  background: var(--admin-surface);
+  box-shadow: var(--admin-shadow);
+  animation: admin-card-in 520ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+.admin-input {
+  width: 100%;
+  height: 46px;
+  border: 1px solid var(--admin-border);
+  border-radius: 9px;
+  background: var(--admin-surface-2);
+  color: var(--admin-text);
+  padding: 0 14px;
+  outline: none;
+  transition: border-color 180ms, box-shadow 180ms;
+}
+
+.admin-input:focus {
+  border-color: var(--admin-accent);
+  box-shadow: 0 0 0 3px var(--admin-accent-soft);
+}
+
+/* No iOS um campo abaixo de 16px faz a página dar zoom ao receber foco. */
+@media (max-width: 720px) {
+  .admin-root :is(input, select, textarea),
+  .admin-login :is(input, select, textarea),
+  .admin-input {
+    font-size: 16px;
+  }
+
+  .admin-login a,
+  .admin-root .admin-topbar a,
+  .admin-root .admin-nav-link {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+.admin-submit {
+  height: 48px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--admin-accent);
+  color: var(--admin-accent-contrast);
+  font-size: 14.5px;
+  font-weight: 700;
+  transition: transform 180ms cubic-bezier(.16, 1, .3, 1), box-shadow 180ms;
+}
+
+.admin-submit:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 26px color-mix(in srgb, var(--admin-accent) 24%, transparent);
+}
+
+.admin-sidebar {
+  position: fixed;
+  inset-block: 0;
+  left: 0;
+  z-index: 200;
+  display: flex;
+  width: 260px;
+  flex-direction: column;
+  border-right: 1px solid var(--admin-border);
+  background: var(--admin-surface);
+}
+
+.admin-nav-link {
+  display: flex;
+  min-height: 39px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--admin-muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 180ms, color 180ms, transform 180ms;
+}
+
+.admin-nav-link:hover {
+  background: var(--admin-surface-2);
+  color: var(--admin-text);
+  transform: translateX(2px);
+}
+
+.admin-nav-link[aria-current='page'] {
+  background: var(--admin-accent-soft);
+  color: var(--admin-accent);
+  font-weight: 700;
+}
+
+.admin-nav-link[aria-current='page']::after {
+  width: 5px;
+  height: 5px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 10px currentColor;
+  content: '';
+}
+
+.admin-content { min-height: 100vh; margin-left: 260px; }
+.admin-mobile-overlay,
+.admin-mobile-drawer { display: none; }
+
+.admin-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  min-height: 70px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--admin-border);
+  background: color-mix(in srgb, var(--admin-surface) 94%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.admin-main { padding: 22px 20px 60px; }
+
+@keyframes admin-card-in {
+  from { opacity: 0; transform: translateY(12px); }
+}
+
+@media (max-width: 1080px) {
+  .admin-sidebar { display: none; }
+  .admin-content { margin-left: 0; }
+  .admin-mobile-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 210;
+    display: block;
+    border: 0;
+    background: var(--admin-overlay);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 220ms, visibility 220ms;
+  }
+  .admin-mobile-overlay[data-open='true'] { opacity: 1; visibility: visible; }
+  .admin-mobile-drawer {
+    position: fixed;
+    inset-block: 0;
+    left: 0;
+    z-index: 220;
+    display: flex;
+    width: min(84vw, 300px);
+    flex-direction: column;
+    background: var(--admin-surface);
+    box-shadow: var(--admin-shadow);
+    transform: translateX(-100%);
+    transition: transform 300ms cubic-bezier(.16, 1, .3, 1);
+  }
+  .admin-mobile-drawer[data-open='true'] { transform: none; }
+}
+
+@media (max-width: 899px) {
+  .admin-login { display: flex; flex-direction: column; }
+  .admin-login__showcase { display: none; }
+  .admin-login__form-side { min-height: 100vh; }
+  .admin-main { padding: 18px 14px 48px; }
+  .telao-programacao-header {
+    align-items: flex-start !important;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .telao-programacao-header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .telao-programacao-header-actions > button { flex: 1 1 180px; }
+  .telao-programacao-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .telao-programacao-row-actions { justify-content: flex-end; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-login__card,
+  .admin-mobile-drawer,
+  .admin-nav-link,
+  .admin-submit { animation: none; transition: none; }
+}

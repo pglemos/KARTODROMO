@@ -1,0 +1,40 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "main": ".open-next/worker.js",
+  "name": "kartodromo",
+  "compatibility_date": "2024-09-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "kartodromodebetim.com.br/*", "zone_name": "kartodromodebetim.com.br" },
+    { "pattern": "www.kartodromodebetim.com.br/*", "zone_name": "kartodromodebetim.com.br" }
+  ],
+  "observability": { "enabled": true },
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "images": { "binding": "IMAGES" },
+  "vars": {
+    "ADMIN_EMAIL": "",
+    "ADMIN_PASSWORD": "",
+    "ADMIN_SESSION_SECRET": "",
+    "LIVETIME_SNAPSHOT_ENDPOINT": "",
+    "LAPTIME_MIRROR_DB_HOST": "",
+    "LAPTIME_MIRROR_DB_PORT": "",
+    "LAPTIME_MIRROR_DB_NAME": "",
+    "LAPTIME_MIRROR_DB_USER": "",
+    "LAPTIME_MIRROR_DB_PASSWORD": "",
+    "LAPTIME_API_BASE_URL": "",
+    "LAPTIME_SQL_HOST": "",
+    "LAPTIME_SQL_PORT": "",
+    "LAPTIME_SQL_DB": "",
+    "LAPTIME_SQL_USER": "",
+    "LAPTIME_SQL_PASSWORD": ""
+  },
+  "d1_databases": [
+    {
+      "binding": "KARTODROMO_ADMIN_DB",
+      "database_name": "kartodromo-admin",
+      "database_id": "daeb26fd-cef9-42b8-b51a-22e20b1607fe",
+      "migrations_dir": "migrations/d1"
+    }
+  ]
+}

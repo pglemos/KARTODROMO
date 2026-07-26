@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+  <meta name="description" content="Conheça a pista homologada de 1.110 metros do Kartódromo de Betim e os traçados oficiais.">
+  <link rel="icon" type="image/png" href="assets/brand/kib-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size: 17px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    a { color: #00e676; }
+    a:hover { color: #3ce396; }
+    ::selection { background: #00e676; color: #041301; }
+    img, video { display: block; max-width: 100%; }
+    button, input, select, textarea { font: inherit; }
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root) { animation: 320ms cubic-bezier(.16,1,.3,1) both kib-page-out; }
+    ::view-transition-new(root) { animation: 420ms cubic-bezier(.16,1,.3,1) both kib-page-in; }
+    @keyframes kib-page-out { to { opacity: 0; transform: translateX(-24px); filter: blur(3px); } }
+    @keyframes kib-page-in { from { opacity: 0; transform: translateX(24px); filter: blur(3px); } }
+    @media (prefers-reduced-motion: reduce) { ::view-transition-old(root), ::view-transition-new(root) { animation: none; } }
+    [style*="background:linear-gradient(135deg,#00e676,#00c853)"] { transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s; }
+    [style*="background:linear-gradient(135deg,#00e676,#00c853)"]:hover { transform: translateY(-4px); box-shadow: 0 22px 55px rgba(0,230,118,.4); }
+    [style*="background:rgba(255,255,255,.035)"][style*="border:1px solid rgba(255,255,255,.22)"] { transition: border-color .25s, color .25s, transform .25s cubic-bezier(.16,1,.3,1); }
+    [style*="background:rgba(255,255,255,.035)"][style*="border:1px solid rgba(255,255,255,.22)"]:hover { border-color:#00e676; color:#00e676; transform: translateY(-4px); }
+  </style>
+</helmet>
+<div data-screen-label="A Pista" style="min-height:100vh; background:#030504; color:#f7faf6;">
+
+  <a href="#conteudo" style="{{ skipLinkStyle }}">Pular para o conteúdo</a>
+  <div id="progress" aria-hidden="true" style="position:fixed; top:0; left:0; width:100%; height:3px; z-index:520; transform:scaleX(0); transform-origin:left; background:linear-gradient(90deg,#00e676,#3ce396); box-shadow:0 0 22px rgba(0,230,118,.55); pointer-events:none;"></div>
+
+  <header style="{{ headerStyle }}">
+    <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; min-height:84px; display:flex; align-items:center; justify-content:space-between; gap:24px;">
+      <a href="home.dc.html" style="width:180px; flex:none;"><img src="assets/brand/kib-logo.png" alt="Kartódromo Internacional de Betim" style="width:100%; filter:drop-shadow(0 10px 24px rgba(0,0,0,.55));"></a>
+      <nav aria-label="Navegação principal" style="{{ navRowStyle }}">
+        <sc-for list="{{ navLinks }}" as="link" hint-placeholder-count="6">
+          <a href="{{ link.href }}" aria-current="{{ link.current }}" style="{{ link.style }}" style-hover="color:#ffffff; border-bottom-color:#00e676;">{{ link.label }}</a>
+        </sc-for>
+      </nav>
+      <a href="https://tools.mylaptime.com.br/booking?uid=5729bbc1-572b-4e32-84ec-e9e93ab08ced" target="_blank" rel="noopener noreferrer" style="{{ reservaCtaStyle }}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="1"/><path d="M16 3v4M8 3v4M3 10h18"/></svg> Reservar agora
+      </a>
+      <button type="button" aria-label="{{ menuToggleLabel }}" aria-controls="mobile-navigation" aria-expanded="{{ mobileNavOpen }}" onClick="{{ toggleMobileNav }}" style="{{ hamburgerBtnStyle }}">
+        <span style="{{ hamburgerLine1 }}"></span><span style="{{ hamburgerLine2 }}"></span><span style="{{ hamburgerLine3 }}"></span>
+      </button>
+    </div>
+  </header>
+
+  <nav id="mobile-navigation" aria-label="Navegação móvel" aria-hidden="{{ mobileNavClosed }}" style="{{ mobileNavStyle }}">
+    <sc-for list="{{ navLinks }}" as="link" hint-placeholder-count="6">
+      <a href="{{ link.href }}" onClick="{{ closeMobileNav }}" style="display:flex; align-items:center; min-height:58px; padding:13px 0; border-bottom:1px solid rgba(255,255,255,.12); font-family:'Anton',sans-serif; text-transform:uppercase; font-size:clamp(38px,11vw,60px); line-height:0.9; color:#f7faf6; text-decoration:none;">{{ link.label }}</a>
+    </sc-for>
+  </nav>
+
+  <main id="conteudo">
+  <!-- HERO -->
+  <section style="position:relative; overflow:hidden; padding-top:90px; background:#070b08; border-bottom:1px solid rgba(255,255,255,.1);">
+    <img src="assets/track/aerial-day.jpg" alt="" aria-hidden="true" style="{{ aerialImgStyle }}">
+    <div aria-hidden="true" style="position:absolute; inset:0; z-index:1; background:linear-gradient(90deg,#070b08 0%, rgba(7,11,8,.94) 48%, rgba(7,11,8,.72) 100%);"></div>
+    <div style="position:relative; z-index:2; width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:1fr minmax(280px,.7fr); gap:48px; align-items:center; padding:110px 0 70px; min-height:600px;">
+      <div style="min-width:0; max-width:760px;">
+        <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase; display:flex; align-items:center; gap:12px;"><span style="width:38px; height:1px; background:#00e676;"></span>Circuito internacional de Betim</p>
+        <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; line-height:0.8; letter-spacing:-0.01em; font-size:clamp(50px,8vw,110px);">Pista homologada de <span style="color:#00e676;">1.110m</span></h1>
+        <p style="max-width:640px; margin:26px 0 0; font-size:clamp(16px,1.3vw,19px); line-height:1.5; color:#d7ded8;">Conheça os mapas oficiais do Kartódromo de Betim e entenda as características de cada configuração. Alterações de traçado são realizadas exclusivamente em campeonatos, conforme o calendário oficial.</p>
+        <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:28px;">
+          <a href="#tracados" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:54px; padding:0 24px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12.5px; letter-spacing:0.04em; text-decoration:none;">Ver traçados oficiais</a>
+          <a href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Quero%20saber%20qual%20tra%C3%A7ado%20estar%C3%A1%20ativo%20na%20pista." target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:54px; padding:0 24px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12.5px; letter-spacing:0.04em; text-decoration:none;">Consultar pista ativa</a>
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <span aria-hidden="true" style="display:block; font-family:'Anton',sans-serif; font-size:clamp(90px,13vw,190px); line-height:0.7; color:transparent; -webkit-text-stroke:1px rgba(0,230,118,.4);">1110</span>
+        <span style="display:block; margin-top:-6px; font-family:'Anton',sans-serif; font-size:13px; text-transform:uppercase; letter-spacing:0.18em; color:#00e676;">metros de desafio</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- HIGHLIGHTS -->
+  <section style="padding:56px 0;">
+    <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:repeat(3,1fr); gap:16px;">
+      <sc-for list="{{ highlights }}" as="h" hint-placeholder-count="3">
+        <div style="border:1px solid rgba(255,255,255,.12); background:#0b100c; padding:24px;">
+          <span style="font-family:'Anton',sans-serif; font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:#a8b2aa;">{{ h.label }}</span>
+          <strong style="display:block; margin-top:10px; font-family:'Anton',sans-serif; font-weight:400; font-size:clamp(32px,4vw,44px); color:#00e676;">{{ h.value }}</strong>
+          <p style="margin:8px 0 0; font-size:14px; line-height:1.5; color:#a8b2aa;">{{ h.detail }}</p>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <!-- COMO LER A PISTA -->
+  <section style="border-top:1px solid rgba(255,255,255,.1); border-bottom:1px solid rgba(255,255,255,.1); background:#070b08; padding:clamp(60px,7vw,100px) 0;">
+    <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:0.9fr 1.1fr; gap:40px;">
+      <div style="max-width:480px;">
+        <p style="margin:0 0 14px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Como ler a pista</p>
+        <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(30px,3.6vw,42px); line-height:0.95;">Cada desenho muda o jeito de pilotar</h2>
+        <p style="margin:18px 0 0; font-size:14.5px; line-height:1.6; color:#a8b2aa;">Os mapas abaixo apresentam o sentido da volta e as diferenças entre as configurações Normal, Invertido e Invertido com chicane.</p>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px;">
+        <sc-for list="{{ trackNotes }}" as="n" hint-placeholder-count="3">
+          <article style="border:1px solid rgba(255,255,255,.12); background:#030504; padding:20px;">
+            <div style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:#00e676; color:#041301; margin-bottom:20px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="{{ n.icon }}"/></svg></div>
+            <h3 style="margin:0; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:15px;">{{ n.title }}</h3>
+            <p style="margin:10px 0 0; font-size:13px; line-height:1.55; color:#a8b2aa;">{{ n.text }}</p>
+          </article>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <!-- CATÁLOGO -->
+  <section id="tracados" style="padding:clamp(60px,7vw,100px) 0;">
+    <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto;">
+      <div style="display:flex; flex-wrap:wrap; gap:24px; align-items:flex-end; justify-content:space-between; border-bottom:1px solid rgba(255,255,255,.1); padding-bottom:24px; margin-bottom:34px;">
+        <div>
+          <p style="margin:0 0 10px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Catálogo oficial</p>
+          <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(28px,4vw,44px); line-height:0.9;">Traçados oficiais do circuito</h2>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          <sc-for list="{{ filters }}" as="f" hint-placeholder-count="4">
+            <button type="button" onClick="{{ f.onSelect }}" style="{{ f.style }}">{{ f.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:18px;">
+        <sc-for list="{{ visibleTracks }}" as="t" hint-placeholder-count="12">
+          <article style="border:1px solid rgba(255,255,255,.12); background:#0b100c; padding:10px;">
+            <div style="position:relative; aspect-ratio:1/1; overflow:hidden; background:#fff;">
+              <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3C/svg%3E" data-src="{{ t.url }}" alt="{{ t.label }}" loading="lazy" style="width:100%; height:100%; object-fit:contain;">
+              <span style="position:absolute; left:10px; top:10px; background:#030504; padding:4px 8px; font-family:'Anton',sans-serif; font-size:10px; letter-spacing:0.14em; text-transform:uppercase;">#{{ t.number }}</span>
+            </div>
+            <div style="padding:12px 4px 2px; display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
+              <h3 style="margin:0; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px;">Traçado {{ t.number }}</h3>
+              <span style="{{ t.badgeStyle }}">{{ t.variantLabel }}</span>
+            </div>
+          </article>
+        </sc-for>
+      </div>
+
+      <sc-if value="{{ showMoreVisible }}">
+        <div style="margin-top:36px; text-align:center;">
+          <button type="button" onClick="{{ showAll }}" style="border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#c7cbc4; padding:16px 26px; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.14em; cursor:pointer;">Mostrar todos os {{ filteredCount }} traçados</button>
+        </div>
+      </sc-if>
+
+      <!-- DESTAQUE -->
+      <div style="margin-top:60px; display:grid; grid-template-columns:0.86fr 1fr; gap:24px; border:1px solid rgba(255,255,255,.12); background:#0b100c; padding:28px;">
+        <img src="assets/track/tracados/tracado-01-normal.jpg" alt="Traçado 1 Normal" loading="lazy" style="width:100%; aspect-ratio:1/1; object-fit:contain; background:#fff; border:1px solid rgba(255,255,255,.1);">
+        <div style="display:flex; flex-direction:column; justify-content:center;">
+          <span style="margin-bottom:12px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Informação importante</span>
+          <h3 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(24px,3vw,32px); line-height:1;">Alterações de traçado são exclusivas para campeonatos.</h3>
+          <p style="margin:16px 0 0; max-width:56ch; font-size:14px; line-height:1.6; color:#a8b2aa;">Nas baterias de lazer, treinos e eventos, é utilizado o traçado definido pelo Kartódromo. Configurações diferentes, incluindo opções com chicane ou sentido invertido, são adotadas somente em campeonatos conforme o calendário oficial.</p>
+          <div style="margin-top:20px;">
+            <a href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Quero%20saber%20qual%20tra%C3%A7ado%20estar%C3%A1%20ativo%20na%20pista." target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:50px; padding:0 22px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Perguntar no WhatsApp</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BIG CTA -->
+  <section style="padding:0 0 clamp(88px,9vw,140px);">
+    <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto;">
+      <div style="position:relative; overflow:hidden; border:1px solid rgba(255,255,255,.22); background:linear-gradient(135deg,#101711,#030504); padding:clamp(34px,5vw,72px); display:grid; grid-template-columns:1.2fr .8fr; gap:36px; align-items:center;">
+        <div style="min-width:0;"><h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(44px,6vw,80px); line-height:0.82;">Sua volta começa<br><span style="color:#00e676;">agora</span></h2><p style="margin:14px 0 0; color:#a8b2aa; font-size:18px;">Consulte os horários disponíveis e venha descobrir cada setor da pista.</p></div>
+        <div style="display:grid; gap:12px;">
+          <a href="https://tools.mylaptime.com.br/booking?uid=5729bbc1-572b-4e32-84ec-e9e93ab08ced" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;">Reservar corrida</a>
+          <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;">Falar no WhatsApp</a>
+        </div>
+      </div>
+    </div>
+  </section>
+  </main>
+
+  <footer style="border-top:1px solid rgba(255,255,255,.12); padding:64px 0 28px; background:#020302;">
+    <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:1.2fr .7fr .7fr; gap:50px;">
+      <div><img src="assets/brand/kib-logo.png" alt="Kartódromo Internacional de Betim" style="width:220px;"><p style="margin:16px 0 0; max-width:380px; color:#a8b2aa; line-height:1.55;">Pista homologada de 1.110 metros, kart de locação, campeonatos e estrutura para aniversários, grupos e empresas em Betim.</p></div>
+      <div>
+        <h3 style="margin:0 0 18px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:14px; color:#00e676;">Navegar</h3>
+        <div style="display:grid; gap:10px;">
+          <a href="pista.dc.html" style="display:flex; align-items:center; min-height:32px; color:#d7ddd8; text-decoration:none; transition:color .2s;" style-hover="color:#00e676;">A pista</a>
+          <a href="kart-locacao.dc.html" style="display:flex; align-items:center; min-height:32px; color:#d7ddd8; text-decoration:none; transition:color .2s;" style-hover="color:#00e676;">Kart de locação</a>
+          <a href="campeonatos.dc.html" style="display:flex; align-items:center; min-height:32px; color:#d7ddd8; text-decoration:none; transition:color .2s;" style-hover="color:#00e676;">Campeonatos</a>
+          <a href="eventos.dc.html" style="display:flex; align-items:center; min-height:32px; color:#d7ddd8; text-decoration:none; transition:color .2s;" style-hover="color:#00e676;">Eventos</a>
+          <a href="duvidas.dc.html" style="display:flex; align-items:center; min-height:32px; color:#d7ddd8; text-decoration:none; transition:color .2s;" style-hover="color:#00e676;">Dúvidas</a>
+        </div>
+      </div>
+      <div>
+        <h3 style="margin:0 0 18px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:14px; color:#00e676;">Contato</h3>
+        <div style="display:grid; gap:10px;">
+          <a href="tel:+553135112373" style="display:flex; align-items:center; min-height:32px; color:#d7ddd8; text-decoration:none; transition:color .2s;" style-hover="color:#00e676;">(31) 3511‑2373</a>
+          <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" style="display:flex; align-items:center; min-height:32px; color:#d7ddd8; text-decoration:none; transition:color .2s;" style-hover="color:#00e676;">(31) 99884‑2898</a>
+          <span style="color:#a8b2aa;">Av. Adutora Várzea das Flores, 477<br>Betim, MG</span>
+        </div>
+      </div>
+    </div>
+    <div style="width:min(1480px,calc(100% - 48px)); margin:46px auto 0; padding-top:22px; border-top:1px solid rgba(255,255,255,.12); display:flex; flex-wrap:wrap; justify-content:space-between; gap:20px; color:#667067; font-size:12px;">
+      <span>© 2026 Kartódromo Internacional de Betim</span><span>Motorsport editorial experience</span>
+    </div>
+  </footer>
+
+  <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" style="position:fixed; right:20px; bottom:20px; z-index:250; width:58px; height:58px; border-radius:50%; display:grid; place-items:center; background:#20d466; color:#fff; box-shadow:0 18px 45px rgba(32,212,102,.35); text-decoration:none; transition:transform .25s;" style-hover="transform:translateY(-5px) scale(1.05);">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-11.9 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5Z"/><path d="M8.5 8.5c.5 3 2 4.5 5 5"/></svg>
+  </a>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+
+const TRACK_NUMBERS = [1, 2, 3, 4, 5, 6, 9, 10, 11, 12];
+const VARIANTS = [
+  { key: 'normal', suffix: 'normal', label: 'Normal' },
+  { key: 'invertido', suffix: 'invertido', label: 'Invertido' },
+  { key: 'invertido-chicane', suffix: 'invertido-chicane', label: 'Invertido + Chicane' },
+];
+const ALL_TRACKS = TRACK_NUMBERS.flatMap((number) => VARIANTS.map((v) => ({
+  id: number + '-' + v.key, number, variant: v.key, variantLabel: v.label,
+  label: 'Traçado ' + number + ' ' + v.label,
+  url: 'assets/track/tracados/tracado-' + String(number).padStart(2, '0') + '-' + v.suffix + '.jpg',
+})));
+
+class Component extends DCLogic {
+  state = { headerScrolled: false, mobileNavOpen: false, isMobile: typeof window !== 'undefined' && window.matchMedia('(max-width: 1100px)').matches, filter: 'all', showAll: false };
+
+  componentDidMount() {
+    this._onScroll = () => {
+      if (this._scrollFrame) return;
+      this._scrollFrame = requestAnimationFrame(() => {
+        this._scrollFrame = 0;
+        const scrolled = window.scrollY > 24;
+        if (scrolled !== this.state.headerScrolled) this.setState({ headerScrolled: scrolled });
+      });
+    };
+    window.addEventListener('scroll', this._onScroll, { passive: true });
+    this._mq = window.matchMedia('(max-width: 1100px)');
+    this._onMqChange = (e) => this.setState({ isMobile: e.matches });
+    if (this._mq.addEventListener) this._mq.addEventListener('change', this._onMqChange); else this._mq.addListener(this._onMqChange);
+    this._onKeydown = (e) => { if (e.key === 'Escape' && this.state.mobileNavOpen) this.setState({ mobileNavOpen: false }); };
+    window.addEventListener('keydown', this._onKeydown);
+    import('./motion.js').then((m) => { this._cleanup = m.initPageMotion({ progressBarSelector: '#progress' }); });
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('scroll', this._onScroll);
+    window.removeEventListener('keydown', this._onKeydown);
+    if (this._mq) { if (this._mq.removeEventListener) this._mq.removeEventListener('change', this._onMqChange); else this._mq.removeListener(this._onMqChange); }
+    if (this._cleanup) this._cleanup();
+  }
+
+  toggleMobileNav = () => this.setState((s) => ({ mobileNavOpen: !s.mobileNavOpen }));
+  closeMobileNav = () => this.setState({ mobileNavOpen: false });
+  setFilter = (key) => this.setState({ filter: key, showAll: false });
+  showAll = () => this.setState({ showAll: true });
+
+  renderVals() {
+    const { headerScrolled, mobileNavOpen, isMobile, filter, showAll } = this.state;
+    const navBase = { fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.04em', padding: '10px 0', borderBottom: '2px solid transparent', textDecoration: 'none', transition: 'color .25s, border-color .25s' };
+    const pages = [
+      { label: 'Home', href: 'home.dc.html', id: 'home' },
+      { label: 'A Pista', href: 'pista.dc.html', id: 'pista' },
+      { label: 'Locação', href: 'kart-locacao.dc.html', id: 'locacao' },
+      { label: 'Campeonatos', href: 'campeonatos.dc.html', id: 'campeonatos' },
+      { label: 'Eventos', href: 'eventos.dc.html', id: 'eventos' },
+      { label: 'Dúvidas', href: 'duvidas.dc.html', id: 'duvidas' },
+    ];
+    const navLinks = pages.map((p) => ({ label: p.label, href: p.href, current: p.id === 'pista' ? 'page' : undefined, style: { ...navBase, color: p.id === 'pista' ? '#fff' : '#e1e6e1' } }));
+
+    const filterDefs = [
+      { key: 'all', label: 'Todos' },
+      { key: 'normal', label: 'Normal' },
+      { key: 'invertido', label: 'Invertido' },
+      { key: 'invertido-chicane', label: 'Invertido + Chicane' },
+    ];
+    const filters = filterDefs.map((f) => ({
+      label: f.label, onSelect: () => this.setFilter(f.key),
+      style: { border: '1px solid rgba(255,255,255,.15)', background: filter === f.key ? '#00e676' : 'rgba(255,255,255,.05)', color: filter === f.key ? '#041301' : '#c7cbc4', padding: '11px 16px', fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.06em', cursor: 'pointer', minHeight: '44px' },
+    }));
+
+    const filtered = filter === 'all' ? ALL_TRACKS : ALL_TRACKS.filter((t) => t.variant === filter);
+    const visible = showAll ? filtered : filtered.slice(0, 12);
+    const badgeColor = (variant) => (variant === 'invertido' ? '#00e676' : variant === 'invertido-chicane' ? '#f5c518' : '#a8b2aa');
+    const visibleTracks = visible.map((t) => ({
+      ...t,
+      badgeStyle: { border: '1px solid ' + badgeColor(t.variant), color: badgeColor(t.variant), fontSize: '9.5px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', padding: '3px 7px', whiteSpace: 'nowrap' },
+    }));
+
+    return {
+      skipLinkStyle: { position: 'fixed', left: '16px', top: '12px', zIndex: 1000, padding: '12px 16px', background: '#00e676', color: '#041301', fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '12px', transform: 'translateY(-180%)', transition: 'transform .2s' },
+      headerStyle: { position: 'fixed', insetInline: 0, top: 0, zIndex: 300, transition: '.28s', background: headerScrolled ? 'rgba(3,5,4,.86)' : 'transparent', backdropFilter: headerScrolled ? 'blur(18px)' : 'none', borderBottom: headerScrolled ? '1px solid rgba(255,255,255,.12)' : '1px solid transparent' },
+      navLinks,
+      menuToggleLabel: mobileNavOpen ? 'Fechar menu' : 'Abrir menu',
+      mobileNavOpen,
+      mobileNavClosed: !mobileNavOpen,
+      hamburgerLine1: { display: 'block', width: '21px', height: '2px', background: '#fff', margin: '5px auto', transition: '.25s', transform: mobileNavOpen ? 'translateY(7px) rotate(45deg)' : 'none' },
+      hamburgerLine2: { display: 'block', width: '21px', height: '2px', background: '#fff', margin: '5px auto', transition: '.25s', opacity: mobileNavOpen ? 0 : 1 },
+      hamburgerLine3: { display: 'block', width: '21px', height: '2px', background: '#fff', margin: '5px auto', transition: '.25s', transform: mobileNavOpen ? 'translateY(-7px) rotate(-45deg)' : 'none' },
+      mobileNavStyle: { position: 'fixed', inset: 0, zIndex: 280, background: 'rgba(2,4,3,.98)', backdropFilter: 'blur(18px)', padding: '112px 24px 40px', display: 'grid', alignContent: 'start', opacity: mobileNavOpen ? 1 : 0, visibility: mobileNavOpen ? 'visible' : 'hidden', transform: mobileNavOpen ? 'none' : 'translateY(-18px)', transition: '.3s', pointerEvents: mobileNavOpen ? 'auto' : 'none' },
+      toggleMobileNav: this.toggleMobileNav,
+      closeMobileNav: this.closeMobileNav,
+      navRowStyle: { display: isMobile ? 'none' : 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 'clamp(14px,2vw,28px)', alignItems: 'center' },
+      reservaCtaStyle: { display: isMobile ? 'none' : 'inline-flex', flex: 'none', alignItems: 'center', gap: '8px', minHeight: '46px', padding: '0 20px', clipPath: 'polygon(7% 0,100% 0,93% 100%,0 100%)', background: 'linear-gradient(135deg,#00e676,#00c853)', color: '#041301', fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '12px', letterSpacing: '0.04em', textDecoration: 'none' },
+      hamburgerBtnStyle: { display: isMobile ? 'block' : 'none', width: '48px', height: '48px', flex: 'none', border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)', cursor: 'pointer' },
+
+      highlights: [
+        { label: 'Extensão', value: '1.110m', detail: 'Circuito técnico' },
+        { label: 'Configurações mapeadas', value: String(ALL_TRACKS.length), detail: 'Normal, invertido e chicane' },
+        { label: 'Alterações', value: 'Campeonatos', detail: 'Conforme calendário oficial' },
+      ],
+      aerialImgStyle: { position: 'absolute', top: 0, right: 0, bottom: 0, zIndex: 0, width: '58%', height: '100%', objectFit: 'cover', opacity: 0.2, display: isMobile ? 'none' : 'block' },
+      trackNotes: [
+        { icon: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 5v5l4 2', title: 'Leitura de pista', text: 'Cada variação muda frenagem, tangência e saída de curva. O piloto precisa adaptar referências e ritmo a cada configuração.' },
+        { icon: 'M12 8v4l3 3M12 22a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z', title: 'Ritmo de bateria', text: 'Layouts curtos deixam a sessão mais agressiva. Traçados longos favorecem constância e ultrapassagem planejada.' },
+        { icon: 'M4 6h16M4 12h10M4 18h16', title: 'Chicane ativa', text: 'As opções com chicane quebram velocidade de reta e deixam o kart mais técnico nas mudanças de direção.' },
+      ],
+      filters,
+      visibleTracks,
+      showMoreVisible: filtered.length > visible.length,
+      filteredCount: filtered.length,
+      showAll: this.showAll,
+    };
+  }
+}
+
+</script>
+</body>
+</html>

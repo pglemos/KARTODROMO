@@ -1,0 +1,27 @@
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/brand/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+/posters/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+/videos/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+/history/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+/track/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+/events/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+/championships/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+/design/*
+  X-Robots-Tag: noindex, nofollow, noarchive
+  Cache-Control: public, max-age=3600

@@ -1,0 +1,351 @@
+{
+  "championshipId": "kac",
+  "championshipName": "KAC Iniciantes",
+  "season": "2026",
+  "title": "KAC Iniciantes - Corrida 3",
+  "date": "2026-06-13",
+  "round": 3,
+  "status": "final",
+  "source": "http://192.168.20.254/laptimewebtv/livetime",
+  "generatedAt": "2026-06-13T17:15:10.487Z",
+  "entries": [
+    {
+      "position": 1,
+      "name": "RENNER GOMES",
+      "bestLap": "1:19.063",
+      "bestLapMs": 79063,
+      "points": 25
+    },
+    {
+      "position": 2,
+      "name": "IGOR CESRIOALVES",
+      "bestLap": "1:20.823",
+      "bestLapMs": 80823,
+      "points": 22
+    },
+    {
+      "position": 3,
+      "name": "DOUGLAS EMANUEL",
+      "bestLap": "1:21.078",
+      "bestLapMs": 81078,
+      "points": 20
+    },
+    {
+      "position": 4,
+      "name": "LUIZ FILLIPE",
+      "bestLap": "1:22.434",
+      "bestLapMs": 82434,
+      "points": 18
+    },
+    {
+      "position": 5,
+      "name": "MARIA EDUARDA",
+      "bestLap": "1:26.480",
+      "bestLapMs": 86480,
+      "points": 17
+    },
+    {
+      "position": 6,
+      "name": "MARCELO FELIPE",
+      "bestLap": "1:26.533",
+      "bestLapMs": 86533,
+      "points": 16
+    },
+    {
+      "position": 7,
+      "name": "JHON LENNON",
+      "bestLap": "1:28.008",
+      "bestLapMs": 88008,
+      "points": 15
+    },
+    {
+      "position": 8,
+      "name": "ANDRÉ SANTOS",
+      "bestLap": "1:29.156",
+      "bestLapMs": 89156,
+      "points": 14
+    },
+    {
+      "position": 9,
+      "name": "PAULO RENATO",
+      "bestLap": "1:30.584",
+      "bestLapMs": 90584,
+      "points": 13
+    },
+    {
+      "position": 10,
+      "name": "THIAGO DEOLIVEIRA",
+      "bestLap": "1:30.974",
+      "bestLapMs": 90974,
+      "points": 12
+    },
+    {
+      "position": 11,
+      "name": "JOSUE CORREA",
+      "bestLap": "1:31.056",
+      "bestLapMs": 91056,
+      "points": 11
+    },
+    {
+      "position": 12,
+      "name": "PEDRO PAULO",
+      "bestLap": "1:31.092",
+      "bestLapMs": 91092,
+      "points": 10
+    },
+    {
+      "position": 13,
+      "name": "SARA KETLYNDE",
+      "bestLap": "1:33.049",
+      "bestLapMs": 93049,
+      "points": 9
+    },
+    {
+      "position": 14,
+      "name": "TIAGO BATISTA",
+      "bestLap": "1:34.162",
+      "bestLapMs": 94162,
+      "points": 8
+    },
+    {
+      "position": 15,
+      "name": "DEISE CRISTIANE",
+      "bestLap": "1:43.406",
+      "bestLapMs": 103406,
+      "points": 7
+    },
+    {
+      "position": 16,
+      "name": "ELICE ANDREIA",
+      "bestLap": "1:44.987",
+      "bestLapMs": 104987,
+      "points": 6
+    }
+  ],
+  "standings": [
+    {
+      "position": 1,
+      "name": "RENNER GOMES",
+      "points": 25,
+      "starts": 1,
+      "wins": 1,
+      "seconds": 0,
+      "thirds": 0,
+      "fourths": 0,
+      "countedResults": [
+        25
+      ],
+      "discardedResults": []
+    },
+    {
+      "position": 2,
+      "name": "IGOR CESRIOALVES",
+      "points": 22,
+      "starts": 1,
+      "wins": 0,
+      "seconds": 1,
+      "thirds": 0,
+      "fourths": 0,
+      "countedResults": [
+        22
+      ],
+      "discardedResults": []
+    },
+    {
+      "position": 3,
+      "name": "DOUGLAS EMANUEL",
+      "points": 20,
+      "starts": 1,
+      "wins": 0,
+      "seconds": 0,
+      "thirds": 1,
+      "fourths": 0,
+      "countedResults": [
+        20
+      ],
+      "discardedResults": []
+    },
+    {
+      "position": 4,
+      "name": "LUIZ FILLIPE",
+      "points": 18,
+      "starts": 1,
+      "wins": 0,
+      "seconds": 0,
+      "thirds": 0,
+      "fourths": 1,
+      "countedResults": [
+        18
+      ],
+      "discardedResults": []
+    },
+    {
+      "position": 5,
+      "name": "MARIA EDUARDA",
+      "points": 17,
+      "starts": 1,
+      "wins": 0,
+      "seconds": 0,
+      "thirds": 0,
+      "fourths": 0,
+      "countedResults": [
+        17
+      ],
+      "discardedResults": []
+    },
+    {
+      "position": 6,
+      "name": "MARCELO FELIPE",
+      "points": 16,
+      "starts": 1,
+      "wins": 0,
+      "seconds": 0,
+      "thirds": 0,
+      "fourths": 0,
+      "countedResults": [
+        16
+      ],
+      "discardedResults": []
+    },
+    {
+      "position": 7,
+      "name": "JHON LENNON",
+      "points": 15,
+      "starts": 1,
+      "wins": 0,
+      "seconds": 0,
+      "thirds": 0,
+      "fourths": 0,
+      "countedResults": [
+        15
+      ],
+      "discardedResults": []
+    },
+    {
+      "position": 8,
+      "name": "ANDRÉ SANTOS",
+      "points": 14,
+      "starts": 1,
+      "wins": 0,
+      "seconds": 0,
+      "thirds": 0,
+      "fourths": 0,
+      "countedResults": [
+        14
+      ],
+      "discardedResults": []
+    },
+    {
+      "position": 9,
+      "name": "PAULO RENATO",
+      "points": 13,
+      "starts": 1,
+      "wins": 0,
+      "seconds": 0,
+      "thirds": 0,
+      "fourths": 0,
+      "countedResults": [
+        13
+      ],
+      "discardedResults": []
+    },
+    {
+      "position": 10,
+      "name": "THIAGO DEOLIVEIRA",
+      "points": 12,
+      "starts": 1,
+      "wins": 0,
+      "seconds": 0,
+      "thirds": 0,
+      "fourths": 0,
+      "countedResults": [
+        12
+      ],
+      "discardedResults": []
+    },
+    {
+      "position": 11,
+      "name": "JOSUE CORREA",
+      "points": 11,
+      "starts": 1,
+      "wins": 0,
+      "seconds": 0,
+      "thirds": 0,
+      "fourths": 0,
+      "countedResults": [
+        11
+      ],
+      "discardedResults": []
+    },
+    {
+      "position": 12,
+      "name": "PEDRO PAULO",
+      "points": 10,
+      "starts": 1,
+      "wins": 0,
+      "seconds": 0,
+      "thirds": 0,
+      "fourths": 0,
+      "countedResults": [
+        10
+      ],
+      "discardedResults": []
+    },
+    {
+      "position": 13,
+      "name": "SARA KETLYNDE",
+      "points": 9,
+      "starts": 1,
+      "wins": 0,
+      "seconds": 0,
+      "thirds": 0,
+      "fourths": 0,
+      "countedResults": [
+        9
+      ],
+      "discardedResults": []
+    },
+    {
+      "position": 14,
+      "name": "TIAGO BATISTA",
+      "points": 8,
+      "starts": 1,
+      "wins": 0,
+      "seconds": 0,
+      "thirds": 0,
+      "fourths": 0,
+      "countedResults": [
+        8
+      ],
+      "discardedResults": []
+    },
+    {
+      "position": 15,
+      "name": "DEISE CRISTIANE",
+      "points": 7,
+      "starts": 1,
+      "wins": 0,
+      "seconds": 0,
+      "thirds": 0,
+      "fourths": 0,
+      "countedResults": [
+        7
+      ],
+      "discardedResults": []
+    },
+    {
+      "position": 16,
+      "name": "ELICE ANDREIA",
+      "points": 6,
+      "starts": 1,
+      "wins": 0,
+      "seconds": 0,
+      "thirds": 0,
+      "fourths": 0,
+      "countedResults": [
+        6
+      ],
+      "discardedResults": []
+    }
+  ]
+}

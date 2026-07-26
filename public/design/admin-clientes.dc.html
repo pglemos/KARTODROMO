@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base href="/">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+  <meta name="description" content="Clientes — Painel administrativo Kartódromo de Betim">
+  <link rel="icon" type="image/png" href="assets/brand/kib-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    html { scroll-behavior: smooth; }
+    body { margin: 0; font-family: 'Rajdhani', sans-serif; font-size: 15px; -webkit-font-smoothing: antialiased; }
+    button, input { font: inherit; }
+    input:focus, button:focus-visible, a:focus-visible { outline: 2px solid #00c853; outline-offset: 2px; }
+    table { width: 100%; border-collapse: collapse; }
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root) { animation: 260ms cubic-bezier(.16,1,.3,1) both kib-page-out; }
+    ::view-transition-new(root) { animation: 320ms cubic-bezier(.16,1,.3,1) both kib-page-in; }
+    @keyframes kib-page-out { to { opacity: 0; transform: translateY(-8px); } }
+    @keyframes kib-page-in { from { opacity: 0; transform: translateY(8px); } }
+    @media (prefers-reduced-motion: reduce) { ::view-transition-old(root), ::view-transition-new(root) { animation: none; } }
+  </style>
+</helmet>
+
+<div data-screen-label="Admin — Clientes" style="{{ styles.page }}">
+  <aside style="{{ styles.sidebar }}">
+    <a href="admin-dashboard.dc.html" style="display:flex; align-items:center; gap:10px; padding:20px 18px; border-bottom:1px solid {{ tokens.border }}; text-decoration:none;">
+      <span style="{{ styles.logoMark }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h7v7H4zM13 4h7v4h-7zM13 11h7v9h-7zM4 14h7v6H4z"/></svg></span>
+      <div><p style="{{ styles.brandEyebrow }}">Sistema</p><strong style="{{ styles.brandName }}">Kartódromo Betim</strong></div>
+    </a>
+    <nav aria-label="Módulos do sistema" style="flex:1; overflow-y:auto; padding:16px 12px;">
+      <sc-for list="{{ navGroups }}" as="grp" hint-placeholder-count="4">
+        <section style="margin-bottom:22px;">
+          <h2 style="{{ styles.navGroupLabel }}">{{ grp.label }}</h2>
+          <div style="display:grid; gap:2px;">
+            <sc-for list="{{ grp.items }}" as="item" hint-placeholder-count="3">
+              <a href="{{ item.href }}" aria-current="{{ item.current }}" style="{{ item.style }}">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="{{ item.icon }}"/></svg>
+                {{ item.title }}
+              </a>
+            </sc-for>
+          </div>
+        </section>
+      </sc-for>
+    </nav>
+    <div style="border-top:1px solid {{ tokens.border }}; padding:14px 18px;">
+      <p style="{{ styles.userEmail }}">operacao@kartodromodebetim.com.br</p>
+      <a href="login.dc.html" style="{{ styles.logoutLink }}">Sair</a>
+    </div>
+  </aside>
+
+  <div style="{{ styles.mobileOverlay }}" onClick="{{ closeMobileNav }}"></div>
+  <aside style="{{ styles.mobileDrawer }}" aria-hidden="{{ mobileNavClosed }}">
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid {{ tokens.border }};">
+      <strong style="{{ styles.brandName }}">Menu</strong>
+      <button type="button" aria-label="Fechar menu" onClick="{{ closeMobileNav }}" style="{{ styles.iconBtn }}">✕</button>
+    </div>
+    <nav aria-label="Módulos do sistema (mobile)" style="flex:1; overflow-y:auto; padding:14px 12px;">
+      <sc-for list="{{ navGroups }}" as="grp" hint-placeholder-count="4">
+        <section style="margin-bottom:20px;">
+          <h2 style="{{ styles.navGroupLabel }}">{{ grp.label }}</h2>
+          <div style="display:grid; gap:2px;">
+            <sc-for list="{{ grp.items }}" as="item" hint-placeholder-count="3">
+              <a href="{{ item.href }}" onClick="{{ closeMobileNav }}" aria-current="{{ item.current }}" style="{{ item.style }}">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="{{ item.icon }}"/></svg>
+                {{ item.title }}
+              </a>
+            </sc-for>
+          </div>
+        </section>
+      </sc-for>
+    </nav>
+  </aside>
+
+  <div style="{{ styles.contentWrap }}">
+    <header style="{{ styles.header }}">
+      <div style="display:flex; align-items:center; gap:14px; min-width:0;">
+        <button type="button" aria-label="Abrir menu" onClick="{{ toggleMobileNav }}" style="{{ styles.menuToggleBtn }}">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div style="min-width:0;">
+          <p style="{{ styles.headerEyebrow }}">Gestão</p>
+          <h1 style="{{ styles.headerTitle }}">Clientes</h1>
+        </div>
+      </div>
+      <button type="button" aria-label="Alternar tema" onClick="{{ toggleTheme }}" style="{{ styles.iconBtn }}">
+        <sc-if value="{{ isDark }}" hint-placeholder-val="{{ false }}">☀️</sc-if>
+        <sc-if value="{{ isLight }}" hint-placeholder-val="{{ true }}">🌙</sc-if>
+      </button>
+    </header>
+
+    <main style="{{ styles.main }}">
+      <div style="{{ styles.kpiGrid }}">
+        <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="3">
+          <article style="{{ styles.kpiCard }}"><span style="{{ styles.kpiLabel }}">{{ k.label }}</span><strong style="{{ styles.kpiValue }}">{{ k.value }}</strong></article>
+        </sc-for>
+      </div>
+
+      <section style="{{ styles.card }}">
+        <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:flex-end; margin-bottom:16px;">
+          <input type="search" value="{{ search }}" onChange="{{ onSearchChange }}" placeholder="Buscar por nome, e-mail ou cidade…" style="{{ styles.searchInput }}">
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr><th style="{{ styles.th }}">Nome</th><th style="{{ styles.th }}">Contato</th><th style="{{ styles.th }}">Cidade/UF</th><th style="{{ styles.th }}">Origem</th><th style="{{ styles.th }}">Cliente desde</th></tr></thead>
+            <tbody>
+              <sc-for list="{{ filteredClientes }}" as="r" hint-placeholder-count="7">
+                <tr>
+                  <td style="{{ styles.td }}"><strong style="color:{{ tokens.text }};">{{ r.nome }}</strong></td>
+                  <td style="{{ styles.td }}">{{ r.email }}<br><span style="color:{{ tokens.textFaint }};">{{ r.telefone }}</span></td>
+                  <td style="{{ styles.td }}">{{ r.cidadeUf }}</td>
+                  <td style="{{ styles.td }}"><span style="{{ r.sourceStyle }}">{{ r.sourceLabel }}</span></td>
+                  <td style="{{ styles.td }}">{{ r.criadoEmLabel }}</td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+        <sc-if value="{{ noResults }}"><p style="{{ styles.emptyState }}">Nenhum cliente encontrado.</p></sc-if>
+      </section>
+    </main>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  currentKey = 'clientes';
+  state = {
+    theme: (function () { try { return localStorage.getItem('kib-admin-theme') === 'dark' ? 'dark' : 'light'; } catch (e) { return 'light'; } })(),
+    mobileNavOpen: false, modules: [], isMobile: typeof window !== 'undefined' && window.matchMedia('(max-width: 1080px)').matches,
+    sourceFilter: 'todos', search: '',
+    rows: [
+      { nome: 'Marcos Vinícius', email: 'marcos.v@email.com', telefone: '(31) 99811-2233', cidade: 'Betim', estado: 'MG', source: 'local', criadoEm: '2025-03-14' },
+      { nome: 'Ana Beatriz Souza', email: 'ana.souza@email.com', telefone: '(31) 98722-4411', cidade: 'Contagem', estado: 'MG', source: 'laptime', criadoEm: '2024-11-02' },
+      { nome: 'Construtora Alfa Ltda', email: 'contato@alfaltda.com', telefone: '(31) 3241-0090', cidade: 'Belo Horizonte', estado: 'MG', source: 'local', criadoEm: '2025-08-19' },
+      { nome: 'Rafael Nogueira', email: 'rafael.nog@email.com', telefone: '(31) 99456-7788', cidade: 'Betim', estado: 'MG', source: 'laptime', criadoEm: '2023-06-30' },
+      { nome: 'Juliana Prado', email: 'ju.prado@email.com', telefone: '(31) 98877-1122', cidade: 'Ibirité', estado: 'MG', source: 'local', criadoEm: '2026-01-10' },
+      { nome: 'Diego Fontes', email: 'diego.fontes@email.com', telefone: '(31) 99911-3344', cidade: 'Betim', estado: 'MG', source: 'laptime', criadoEm: '2022-09-25' },
+      { nome: 'Pedro Guilherme', email: 'pedro.g@email.com', telefone: '(31) 98600-5522', cidade: 'Betim', estado: 'MG', source: 'local', criadoEm: '2026-05-02' },
+    ],
+  };
+
+  componentDidMount() {
+    import('./admin-shared.js').then((m) => { this._shared = m; this.setState({ modules: m.adminModules }); });
+    this._mq = window.matchMedia('(max-width: 1080px)');
+    this._onMqChange = (e) => this.setState({ isMobile: e.matches });
+    if (this._mq.addEventListener) this._mq.addEventListener('change', this._onMqChange); else this._mq.addListener(this._onMqChange);
+  }
+  componentWillUnmount() {
+    if (this._mq) { if (this._mq.removeEventListener) this._mq.removeEventListener('change', this._onMqChange); else this._mq.removeListener(this._onMqChange); }
+  }
+
+  toggleTheme = () => { const next = this.state.theme === 'dark' ? 'light' : 'dark'; this.setState({ theme: next }); try { localStorage.setItem('kib-admin-theme', next); } catch (e) {} };
+  toggleMobileNav = () => this.setState((s) => ({ mobileNavOpen: !s.mobileNavOpen }));
+  closeMobileNav = () => this.setState({ mobileNavOpen: false });
+  setSourceFilter = (v) => this.setState({ sourceFilter: v });
+  onSearchChange = (e) => this.setState({ search: e.target.value });
+
+  getTokens(theme) {
+    const dark = theme === 'dark';
+    return {
+      bg: dark ? '#0a0d0a' : '#f5f7f5', surface: dark ? '#121613' : '#ffffff', surface2: dark ? '#181d19' : '#eef1ee',
+      border: dark ? '#242b25' : '#e2e6e1', borderStrong: dark ? '#333c34' : '#d3d9d2',
+      text: dark ? '#f2f5f1' : '#14170f', textMuted: dark ? '#8b988c' : '#5d6660', textFaint: dark ? '#5a655c' : '#8a938a',
+      accent: dark ? '#00e676' : '#00a856', accentSoft: dark ? 'rgba(0,230,118,.14)' : 'rgba(0,168,86,.1)',
+      accentBorder: dark ? 'rgba(0,230,118,.4)' : 'rgba(0,168,86,.35)', accentContrast: dark ? '#041a0d' : '#ffffff',
+      danger: dark ? '#ff6b6b' : '#d92d2d', info: dark ? '#5eb6ff' : '#1868c2', infoSoft: dark ? 'rgba(94,182,255,.14)' : 'rgba(24,104,194,.08)',
+      shadow: dark ? '0 20px 60px rgba(0,0,0,.45)' : '0 12px 32px rgba(20,30,20,.08)', overlay: dark ? 'rgba(3,5,4,.72)' : 'rgba(10,14,10,.42)',
+    };
+  }
+
+  baseStyles(t, mobileNavOpen, isMobile) {
+    return {
+      page: { minHeight: '100vh', background: t.bg, color: t.text, fontFamily: "'Rajdhani',sans-serif" },
+      sidebar: { position: 'fixed', insetBlock: 0, left: 0, width: '260px', zIndex: 200, display: isMobile ? 'none' : 'flex', flexDirection: 'column', background: t.surface, borderRight: '1px solid ' + t.border },
+      logoMark: { display: 'grid', placeItems: 'center', width: '34px', height: '34px', borderRadius: '9px', background: t.accent, color: t.accentContrast, flex: 'none' },
+      brandEyebrow: { margin: 0, fontSize: '10px', fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: t.accent },
+      brandName: { display: 'block', fontSize: '14px', fontWeight: 700, color: t.text },
+      navGroupLabel: { margin: '0 0 6px', padding: '0 10px', fontSize: '10.5px', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: t.textFaint },
+      userEmail: { margin: '0 0 8px', fontSize: '12px', fontWeight: 600, color: t.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+      logoutLink: { fontSize: '12px', fontWeight: 700, color: t.danger, textDecoration: 'none' },
+      mobileOverlay: { position: 'fixed', inset: 0, zIndex: 210, background: t.overlay, opacity: mobileNavOpen ? 1 : 0, visibility: isMobile && mobileNavOpen ? 'visible' : 'hidden', transition: '.25s', pointerEvents: isMobile && mobileNavOpen ? 'auto' : 'none' },
+      mobileDrawer: { position: 'fixed', insetBlock: 0, left: 0, width: 'min(84vw,300px)', zIndex: 220, background: t.surface, display: 'flex', flexDirection: 'column', transform: isMobile && mobileNavOpen ? 'none' : 'translateX(-100%)', transition: '.3s cubic-bezier(.16,1,.3,1)', boxShadow: mobileNavOpen ? t.shadow : 'none' },
+      iconBtn: { width: '38px', height: '38px', display: 'grid', placeItems: 'center', border: '1px solid ' + t.border, borderRadius: '9px', background: t.surface, color: t.text, cursor: 'pointer', fontSize: '15px', flex: 'none' },
+      menuToggleBtn: { width: '38px', height: '38px', display: isMobile ? 'grid' : 'none', placeItems: 'center', border: '1px solid ' + t.border, borderRadius: '9px', background: t.surface, color: t.text, cursor: 'pointer', flex: 'none' },
+      contentWrap: { minHeight: '100vh', marginLeft: isMobile ? 0 : '260px' },
+      header: { position: 'sticky', top: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', padding: '14px 20px', background: t.surface + 'f2', backdropFilter: 'blur(10px)', borderBottom: '1px solid ' + t.border },
+      headerEyebrow: { margin: '0 0 2px', fontSize: '10.5px', fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: t.accent },
+      headerTitle: { margin: 0, fontSize: '22px', fontWeight: 700, color: t.text },
+      main: { padding: '22px 20px 60px', display: 'grid', gap: '22px' },
+      kpiGrid: { display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: '14px' },
+      kpiCard: { background: t.surface, border: '1px solid ' + t.border, borderRadius: '14px', padding: '16px' },
+      kpiLabel: { display: 'block', fontSize: '11.5px', fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: t.textMuted },
+      kpiValue: { display: 'block', marginTop: '8px', fontSize: '24px', fontWeight: 700, color: t.text },
+      card: { background: t.surface, border: '1px solid ' + t.border, borderRadius: '16px', padding: isMobile ? '16px' : '22px' },
+      searchInput: { height: '38px', minWidth: '240px', borderRadius: '9px', border: '1px solid ' + t.border, background: t.surface2, color: t.text, padding: '0 12px', outline: 'none' },
+      th: { textAlign: 'left', padding: '10px 12px', fontSize: '11px', fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: t.textFaint, borderBottom: '1px solid ' + t.border, whiteSpace: 'nowrap' },
+      td: { padding: '13px 12px', fontSize: '13.5px', color: t.textMuted, borderBottom: '1px solid ' + t.border },
+      emptyState: { textAlign: 'center', padding: '30px 0 6px', color: t.textFaint, fontSize: '13.5px' },
+    };
+  }
+
+  renderVals() {
+    const { theme, modules, mobileNavOpen, isMobile, sourceFilter, search, rows } = this.state;
+    const t = this.getTokens(theme);
+    const s = this.baseStyles(t, mobileNavOpen, isMobile);
+
+    const navGroups = ['Geral', 'Operação', 'Competição', 'Gestão'].map((label) => ({
+      label,
+      items: modules.filter((m) => m.group === label).map((m) => ({
+        title: m.title, href: m.href, icon: m.icon, current: m.key === this.currentKey ? 'page' : undefined,
+        style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 10px', borderRadius: '8px', fontSize: '13.5px', fontWeight: 700, textDecoration: 'none', background: m.key === this.currentKey ? t.accent : 'transparent', color: m.key === this.currentKey ? t.accentContrast : t.textMuted },
+      })),
+    }));
+
+    const searchLower = search.trim().toLowerCase();
+    const filteredClientes = rows
+      .filter((r) => !searchLower || (r.nome + r.email + r.cidade).toLowerCase().includes(searchLower))
+      .map((r) => ({
+        nome: r.nome, email: r.email, telefone: r.telefone, cidadeUf: r.cidade + '/' + r.estado,
+        sourceLabel: r.source === 'local' ? 'Sistema local' : 'LapTime',
+        sourceStyle: { fontSize: '10.5px', fontWeight: 700, padding: '4px 9px', borderRadius: '999px', background: r.source === 'local' ? t.accentSoft : t.infoSoft, color: r.source === 'local' ? t.accent : t.info },
+        criadoEmLabel: new Date(r.criadoEm + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+      }));
+
+    return {
+      tokens: t, styles: s, navGroups, mobileNavOpen, mobileNavClosed: !mobileNavOpen,
+      isDark: theme === 'dark', isLight: theme === 'light', toggleTheme: this.toggleTheme,
+      toggleMobileNav: this.toggleMobileNav, closeMobileNav: this.closeMobileNav,
+      search, onSearchChange: this.onSearchChange, filteredClientes, noResults: filteredClientes.length === 0,
+      kpis: [
+        { label: 'Total de clientes', value: String(rows.length) },
+        { label: 'Sistema local (SRVKART)', value: String(rows.filter((r) => r.source === 'local').length) },
+        { label: 'LapTime (CRONO1)', value: String(rows.filter((r) => r.source === 'laptime').length) },
+      ],
+    };
+  }
+}
+
+</script>
+</body>
+</html>

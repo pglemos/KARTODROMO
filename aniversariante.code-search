@@ -1,0 +1,25 @@
+# Query: aniversariante
+# ContextLines: 1
+
+6 results - 1 file
+
+src\components\Promotions.tsx:
+  18          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+  19:           {/* Promoção Aniversariante */}
+  20            <div className="bg-neutral-50 rounded-2xl p-8 shadow-lg border-2 border-primary-100">
+
+  25                <div>
+  26:                 <h3 className="text-2xl font-bold text-neutral-800">Aniversariante do Mês</h3>
+  27                  <p className="text-primary-500 font-semibold">VOUCHER GRATUITO!</p>
+
+  32                <p className="text-neutral-50 font-medium mb-2">
+  33:                 O aniversariante do mês, trazendo pelo menos mais <strong>10 amigos</strong>, 
+  34                  ganha um voucher para correr de graça!
+
+  78                    <CheckCircle className="w-4 h-4 mr-2 text-red-500 mt-0.5 flex-shrink-0" />
+  79:                   <span>No dia da corrida o aniversariante precisa apresentar documento de identificação com foto. Promoção válida para qualquer dia de funcionamento, e válida apenas para o Kart Light.
+  80  </span>
+
+  83                    <CheckCircle className="w-4 h-4 mr-2 text-red-500 mt-0.5 flex-shrink-0" />
+  84:                   <span>Se no dia da corrida não comparecer no mínimo de 11 pessoas (aniversariante + 10), a promoção não será validada. Necessário solicitar a promoção de aniversariante no ato do agendamento.
+  85  </span>

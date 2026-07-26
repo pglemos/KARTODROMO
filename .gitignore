@@ -1,0 +1,81 @@
+.next
+.open-next
+node_modules
+coverage
+dist
+.env
+.env.local
+.env.*.local
+playwright-report
+test-results
+*.log
+.playwright-mcp
+tsconfig.tsbuildinfo
+.vercel
+.runtime
+.tmp
+
+# Environment & Secrets (AIOX)
+*.key
+*.pem
+
+# Dependencies (AIOX)
+node_modules/
+
+# Build & Logs (AIOX)
+dist/
+build/
+logs/
+
+# IDE & OS (AIOX)
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# AIOX Local (AIOX)
+.aiox-core/local/
+.claude/settings.local.json
+.aiox/install-log.txt
+
+# AIOX Framework (not project code)
+.aiox-core/
+
+# Per-developer IDE configs
+.claude/
+.codex/
+.cursor/
+.gemini/
+.antigravity/
+.tools/
+
+.vercel
+.wrangler
+
+# Large / non-essential
+/KARTODROMO - SISTEMA/
+/KARTODROMO - SISTEMA.zip
+/1.webp
+/2.webp
+/3.webp
+/4.webp
+/5.webp
+/6.webp
+/7.webp
+/8.webp
+/9.webp
+/10.webp
+/11.webp
+/Captura de Tela*.png
+/current_homepage.png
+/new_homepage.png
+/home-video-final.png
+/home-video-visible.png
+/eventos-hero-redesign.png
+/eventos-redesign.png
+/pista-corrigida.png
+/pista-hero-redesign.png
+/pista-redesign.png
+
+# Secrets
+wrangler.jsonc

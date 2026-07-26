@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base href="/">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+  <meta name="description" content="Campeonatos — Painel administrativo Kartódromo de Betim">
+  <link rel="icon" type="image/png" href="assets/brand/kib-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    html { scroll-behavior: smooth; }
+    body { margin: 0; font-family: 'Rajdhani', sans-serif; font-size: 15px; -webkit-font-smoothing: antialiased; }
+    button, input, select, textarea { font: inherit; }
+    input:focus, select:focus, button:focus-visible, a:focus-visible { outline: 2px solid #00c853; outline-offset: 2px; }
+    table { width: 100%; border-collapse: collapse; }
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root) { animation: 260ms cubic-bezier(.16,1,.3,1) both kib-page-out; }
+    ::view-transition-new(root) { animation: 320ms cubic-bezier(.16,1,.3,1) both kib-page-in; }
+    @keyframes kib-page-out { to { opacity: 0; transform: translateY(-8px); } }
+    @keyframes kib-page-in { from { opacity: 0; transform: translateY(8px); } }
+    @media (prefers-reduced-motion: reduce) { ::view-transition-old(root), ::view-transition-new(root) { animation: none; } }
+  </style>
+</helmet>
+
+<div data-screen-label="Admin — Campeonatos" style="{{ styles.page }}">
+  <aside style="{{ styles.sidebar }}">
+    <a href="admin-dashboard.dc.html" style="display:flex; align-items:center; gap:10px; padding:20px 18px; border-bottom:1px solid {{ tokens.border }}; text-decoration:none;">
+      <span style="{{ styles.logoMark }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h7v7H4zM13 4h7v4h-7zM13 11h7v9h-7zM4 14h7v6H4z"/></svg></span>
+      <div><p style="{{ styles.brandEyebrow }}">Sistema</p><strong style="{{ styles.brandName }}">Kartódromo Betim</strong></div>
+    </a>
+    <nav aria-label="Módulos do sistema" style="flex:1; overflow-y:auto; padding:16px 12px;">
+      <sc-for list="{{ navGroups }}" as="grp" hint-placeholder-count="4">
+        <section style="margin-bottom:22px;">
+          <h2 style="{{ styles.navGroupLabel }}">{{ grp.label }}</h2>
+          <div style="display:grid; gap:2px;">
+            <sc-for list="{{ grp.items }}" as="item" hint-placeholder-count="3">
+              <a href="{{ item.href }}" aria-current="{{ item.current }}" style="{{ item.style }}">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="{{ item.icon }}"/></svg>
+                {{ item.title }}
+              </a>
+            </sc-for>
+          </div>
+        </section>
+      </sc-for>
+    </nav>
+    <div style="border-top:1px solid {{ tokens.border }}; padding:14px 18px;">
+      <p style="{{ styles.userEmail }}">operacao@kartodromodebetim.com.br</p>
+      <a href="login.dc.html" style="{{ styles.logoutLink }}">Sair</a>
+    </div>
+  </aside>
+
+  <div style="{{ styles.mobileOverlay }}" onClick="{{ closeMobileNav }}"></div>
+  <aside style="{{ styles.mobileDrawer }}" aria-hidden="{{ mobileNavClosed }}">
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid {{ tokens.border }};">
+      <strong style="{{ styles.brandName }}">Menu</strong>
+      <button type="button" aria-label="Fechar menu" onClick="{{ closeMobileNav }}" style="{{ styles.iconBtn }}">✕</button>
+    </div>
+    <nav aria-label="Módulos do sistema (mobile)" style="flex:1; overflow-y:auto; padding:14px 12px;">
+      <sc-for list="{{ navGroups }}" as="grp" hint-placeholder-count="4">
+        <section style="margin-bottom:20px;">
+          <h2 style="{{ styles.navGroupLabel }}">{{ grp.label }}</h2>
+          <div style="display:grid; gap:2px;">
+            <sc-for list="{{ grp.items }}" as="item" hint-placeholder-count="3">
+              <a href="{{ item.href }}" onClick="{{ closeMobileNav }}" aria-current="{{ item.current }}" style="{{ item.style }}">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="{{ item.icon }}"/></svg>
+                {{ item.title }}
+              </a>
+            </sc-for>
+          </div>
+        </section>
+      </sc-for>
+    </nav>
+  </aside>
+
+  <div style="{{ styles.contentWrap }}">
+    <header style="{{ styles.header }}">
+      <div style="display:flex; align-items:center; gap:14px; min-width:0;">
+        <button type="button" aria-label="Abrir menu" onClick="{{ toggleMobileNav }}" style="{{ styles.menuToggleBtn }}">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div style="min-width:0;">
+          <p style="{{ styles.headerEyebrow }}">Competição</p>
+          <h1 style="{{ styles.headerTitle }}">Campeonatos</h1>
+        </div>
+      </div>
+      <button type="button" aria-label="Alternar tema" onClick="{{ toggleTheme }}" style="{{ styles.iconBtn }}">
+        <sc-if value="{{ isDark }}" hint-placeholder-val="{{ false }}">☀️</sc-if>
+        <sc-if value="{{ isLight }}" hint-placeholder-val="{{ true }}">🌙</sc-if>
+      </button>
+    </header>
+
+    <main style="{{ styles.main }}">
+      <div style="{{ styles.kpiGrid }}">
+        <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+          <article style="{{ styles.kpiCard }}"><span style="{{ styles.kpiLabel }}">{{ k.label }}</span><strong style="{{ styles.kpiValue }}">{{ k.value }}</strong></article>
+        </sc-for>
+      </div>
+
+      <section style="{{ styles.card }}">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+          <h2 style="{{ styles.sectionTitle }}">Inscrições</h2>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <sc-for list="{{ statusFilters }}" as="f" hint-placeholder-count="5">
+              <button type="button" onClick="{{ f.onClick }}" style="{{ f.style }}">{{ f.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr><th style="{{ styles.th }}">Protocolo</th><th style="{{ styles.th }}">Piloto/Equipe</th><th style="{{ styles.th }}">Evento</th><th style="{{ styles.th }}">Cidade</th><th style="{{ styles.th }}">Status</th><th style="{{ styles.th }}">Ações</th></tr></thead>
+            <tbody>
+              <sc-for list="{{ filteredInscricoes }}" as="r" hint-placeholder-count="6">
+                <tr>
+                  <td style="{{ styles.td }}">{{ r.protocol }}</td>
+                  <td style="{{ styles.td }}"><strong style="color:{{ tokens.text }};">{{ r.nome }}</strong></td>
+                  <td style="{{ styles.td }}">{{ r.evento }}</td>
+                  <td style="{{ styles.td }}">{{ r.cidade }}</td>
+                  <td style="{{ styles.td }}"><span style="{{ r.statusStyle }}">{{ r.statusLabel }}</span></td>
+                  <td style="{{ styles.td }}">
+                    <div style="display:flex; gap:8px;">
+                      <sc-if value="{{ r.canApprove }}"><button type="button" onClick="{{ r.onApprove }}" style="{{ styles.rowActionAccent }}">Aprovar</button></sc-if>
+                      <sc-if value="{{ r.canReject }}"><button type="button" onClick="{{ r.onReject }}" style="{{ styles.rowActionDanger }}">Recusar</button></sc-if>
+                    </div>
+                  </td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2 style="{{ styles.sectionTitle }}">Campeonatos ativos</h2>
+        <div style="{{ styles.champGrid }}">
+          <sc-for list="{{ campeonatos }}" as="c" hint-placeholder-count="3">
+            <article style="{{ styles.champCard }}">
+              <div style="display:flex; align-items:center; justify-content:space-between;">
+                <strong style="font-size:15px;">{{ c.nome }}</strong>
+                <span style="{{ c.statusStyle }}">{{ c.statusLabel }}</span>
+              </div>
+              <span style="{{ styles.champMeta }}">Temporada {{ c.temporada }} · {{ c.etapasCount }} etapas</span>
+            </article>
+          </sc-for>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  currentKey = 'campeonatos';
+  state = {
+    theme: (function () { try { return localStorage.getItem('kib-admin-theme') === 'dark' ? 'dark' : 'light'; } catch (e) { return 'light'; } })(),
+    mobileNavOpen: false, modules: [], isMobile: typeof window !== 'undefined' && window.matchMedia('(max-width: 1080px)').matches,
+    statusFilter: 'todas',
+    inscricoes: [
+      { id: 'i1', protocol: 'KAC-2607', nome: 'Diego Fontes', evento: 'KAC Iniciantes', cidade: 'Betim', status: 'pendente' },
+      { id: 'i2', protocol: 'KAC-2608', nome: 'Equipe Alfa Racing', evento: 'KAC Super Kart', cidade: 'Contagem', status: 'em_analise' },
+      { id: 'i3', protocol: 'KAC-2609', nome: 'Ana Beatriz Souza', evento: 'KAC Iniciantes', cidade: 'Betim', status: 'confirmada' },
+      { id: 'i4', protocol: 'KAC-2610', nome: 'Rafael Nogueira', evento: '500 Milhas', cidade: 'Belo Horizonte', status: 'pendente' },
+      { id: 'i5', protocol: 'KAC-2611', nome: 'Equipe Velocidade Total', evento: '200 Milhas', cidade: 'Betim', status: 'recusada' },
+      { id: 'i6', protocol: 'KAC-2612', nome: 'Marcos Vinícius', evento: 'KAC Super Kart', cidade: 'Betim', status: 'confirmada' },
+    ],
+    campeonatos: [
+      { id: 'c1', nome: 'KAC Iniciantes', temporada: '2026', status: 'ativo', etapas: 8 },
+      { id: 'c2', nome: 'KAC Super Kart', temporada: '2026', status: 'ativo', etapas: 10 },
+      { id: 'c3', nome: '500 Milhas de Betim', temporada: '2026', status: 'rascunho', etapas: 1 },
+    ],
+  };
+
+  componentDidMount() {
+    import('./admin-shared.js').then((m) => { this._shared = m; this.setState({ modules: m.adminModules }); });
+    this._mq = window.matchMedia('(max-width: 1080px)');
+    this._onMqChange = (e) => this.setState({ isMobile: e.matches });
+    if (this._mq.addEventListener) this._mq.addEventListener('change', this._onMqChange); else this._mq.addListener(this._onMqChange);
+  }
+  componentWillUnmount() {
+    if (this._mq) { if (this._mq.removeEventListener) this._mq.removeEventListener('change', this._onMqChange); else this._mq.removeListener(this._onMqChange); }
+  }
+
+  toggleTheme = () => { const next = this.state.theme === 'dark' ? 'light' : 'dark'; this.setState({ theme: next }); try { localStorage.setItem('kib-admin-theme', next); } catch (e) {} };
+  toggleMobileNav = () => this.setState((s) => ({ mobileNavOpen: !s.mobileNavOpen }));
+  closeMobileNav = () => this.setState({ mobileNavOpen: false });
+  setStatusFilter = (v) => this.setState({ statusFilter: v });
+  approveRow = (id) => this.setState((s) => ({ inscricoes: s.inscricoes.map((r) => (r.id === id ? Object.assign({}, r, { status: 'confirmada' }) : r)) }));
+  rejectRow = (id) => this.setState((s) => ({ inscricoes: s.inscricoes.map((r) => (r.id === id ? Object.assign({}, r, { status: 'recusada' }) : r)) }));
+
+  getTokens(theme) {
+    const dark = theme === 'dark';
+    return {
+      bg: dark ? '#0a0d0a' : '#f5f7f5', surface: dark ? '#121613' : '#ffffff', surface2: dark ? '#181d19' : '#eef1ee',
+      border: dark ? '#242b25' : '#e2e6e1', borderStrong: dark ? '#333c34' : '#d3d9d2',
+      text: dark ? '#f2f5f1' : '#14170f', textMuted: dark ? '#8b988c' : '#5d6660', textFaint: dark ? '#5a655c' : '#8a938a',
+      accent: dark ? '#00e676' : '#00a856', accentSoft: dark ? 'rgba(0,230,118,.14)' : 'rgba(0,168,86,.1)',
+      accentBorder: dark ? 'rgba(0,230,118,.4)' : 'rgba(0,168,86,.35)', accentContrast: dark ? '#041a0d' : '#ffffff',
+      danger: dark ? '#ff6b6b' : '#d92d2d', dangerSoft: dark ? 'rgba(255,107,107,.14)' : 'rgba(217,45,45,.08)',
+      warning: dark ? '#f2b23b' : '#b8720a', warningSoft: dark ? 'rgba(242,178,59,.14)' : 'rgba(184,114,10,.1)',
+      info: dark ? '#5eb6ff' : '#1868c2', infoSoft: dark ? 'rgba(94,182,255,.14)' : 'rgba(24,104,194,.08)',
+      shadow: dark ? '0 20px 60px rgba(0,0,0,.45)' : '0 12px 32px rgba(20,30,20,.08)', overlay: dark ? 'rgba(3,5,4,.72)' : 'rgba(10,14,10,.42)',
+    };
+  }
+
+  baseStyles(t, mobileNavOpen, isMobile) {
+    return {
+      page: { minHeight: '100vh', background: t.bg, color: t.text, fontFamily: "'Rajdhani',sans-serif" },
+      sidebar: { position: 'fixed', insetBlock: 0, left: 0, width: '260px', zIndex: 200, display: isMobile ? 'none' : 'flex', flexDirection: 'column', background: t.surface, borderRight: '1px solid ' + t.border },
+      logoMark: { display: 'grid', placeItems: 'center', width: '34px', height: '34px', borderRadius: '9px', background: t.accent, color: t.accentContrast, flex: 'none' },
+      brandEyebrow: { margin: 0, fontSize: '10px', fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: t.accent },
+      brandName: { display: 'block', fontSize: '14px', fontWeight: 700, color: t.text },
+      navGroupLabel: { margin: '0 0 6px', padding: '0 10px', fontSize: '10.5px', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: t.textFaint },
+      userEmail: { margin: '0 0 8px', fontSize: '12px', fontWeight: 600, color: t.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+      logoutLink: { fontSize: '12px', fontWeight: 700, color: t.danger, textDecoration: 'none' },
+      mobileOverlay: { position: 'fixed', inset: 0, zIndex: 210, background: t.overlay, opacity: mobileNavOpen ? 1 : 0, visibility: isMobile && mobileNavOpen ? 'visible' : 'hidden', transition: '.25s', pointerEvents: isMobile && mobileNavOpen ? 'auto' : 'none' },
+      mobileDrawer: { position: 'fixed', insetBlock: 0, left: 0, width: 'min(84vw,300px)', zIndex: 220, background: t.surface, display: 'flex', flexDirection: 'column', transform: isMobile && mobileNavOpen ? 'none' : 'translateX(-100%)', transition: '.3s cubic-bezier(.16,1,.3,1)', boxShadow: mobileNavOpen ? t.shadow : 'none' },
+      iconBtn: { width: '38px', height: '38px', display: 'grid', placeItems: 'center', border: '1px solid ' + t.border, borderRadius: '9px', background: t.surface, color: t.text, cursor: 'pointer', fontSize: '15px', flex: 'none' },
+      menuToggleBtn: { width: '38px', height: '38px', display: isMobile ? 'grid' : 'none', placeItems: 'center', border: '1px solid ' + t.border, borderRadius: '9px', background: t.surface, color: t.text, cursor: 'pointer', flex: 'none' },
+      contentWrap: { minHeight: '100vh', marginLeft: isMobile ? 0 : '260px' },
+      header: { position: 'sticky', top: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', padding: '14px 20px', background: t.surface + 'f2', backdropFilter: 'blur(10px)', borderBottom: '1px solid ' + t.border },
+      headerEyebrow: { margin: '0 0 2px', fontSize: '10.5px', fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: t.accent },
+      headerTitle: { margin: 0, fontSize: '22px', fontWeight: 700, color: t.text },
+      main: { padding: '22px 20px 60px', display: 'grid', gap: '22px' },
+      kpiGrid: { display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: '14px' },
+      kpiCard: { background: t.surface, border: '1px solid ' + t.border, borderRadius: '14px', padding: '16px' },
+      kpiLabel: { display: 'block', fontSize: '11.5px', fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: t.textMuted },
+      kpiValue: { display: 'block', marginTop: '8px', fontSize: '24px', fontWeight: 700, color: t.text },
+      card: { background: t.surface, border: '1px solid ' + t.border, borderRadius: '16px', padding: isMobile ? '16px' : '22px' },
+      sectionTitle: { margin: '0 0 14px', fontSize: '17px', fontWeight: 700, color: t.text },
+      th: { textAlign: 'left', padding: '10px 12px', fontSize: '11px', fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: t.textFaint, borderBottom: '1px solid ' + t.border, whiteSpace: 'nowrap' },
+      td: { padding: '13px 12px', fontSize: '13.5px', color: t.textMuted, borderBottom: '1px solid ' + t.border, whiteSpace: 'nowrap' },
+      rowActionAccent: { border: '1px solid ' + t.accentBorder, background: t.accentSoft, color: t.accent, borderRadius: '7px', padding: '6px 10px', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer' },
+      rowActionDanger: { border: '1px solid transparent', background: t.dangerSoft, color: t.danger, borderRadius: '7px', padding: '6px 10px', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer' },
+      champGrid: { display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: '14px', marginTop: '14px' },
+      champCard: { display: 'grid', gap: '8px', background: t.surface, border: '1px solid ' + t.border, borderRadius: '14px', padding: '16px' },
+      champMeta: { fontSize: '12.5px', color: t.textFaint },
+    };
+  }
+
+  renderVals() {
+    const { theme, modules, mobileNavOpen, isMobile, statusFilter, inscricoes, campeonatos } = this.state;
+    const t = this.getTokens(theme);
+    const s = this.baseStyles(t, mobileNavOpen, isMobile);
+
+    const navGroups = ['Geral', 'Operação', 'Competição', 'Gestão'].map((label) => ({
+      label,
+      items: modules.filter((m) => m.group === label).map((m) => ({
+        title: m.title, href: m.href, icon: m.icon, current: m.key === this.currentKey ? 'page' : undefined,
+        style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 10px', borderRadius: '8px', fontSize: '13.5px', fontWeight: 700, textDecoration: 'none', background: m.key === this.currentKey ? t.accent : 'transparent', color: m.key === this.currentKey ? t.accentContrast : t.textMuted },
+      })),
+    }));
+
+    const filterDefs = [['todas', 'Todas'], ['pendente', 'Pendentes'], ['em_analise', 'Em análise'], ['confirmada', 'Confirmadas'], ['recusada', 'Recusadas']];
+    const statusFilters = filterDefs.map(([key, label]) => ({
+      label, onClick: () => this.setStatusFilter(key),
+      style: { height: '34px', padding: '0 14px', borderRadius: '999px', border: '1px solid ' + (statusFilter === key ? t.accentBorder : t.border), background: statusFilter === key ? t.accentSoft : 'transparent', color: statusFilter === key ? t.accent : t.textMuted, fontSize: '12.5px', fontWeight: 700, cursor: 'pointer' },
+    }));
+
+    const statusMeta = { pendente: ['Pendente', t.warningSoft, t.warning], em_analise: ['Em análise', t.infoSoft, t.info], confirmada: ['Confirmada', t.accentSoft, t.accent], recusada: ['Recusada', t.dangerSoft, t.danger] };
+    const filteredInscricoes = inscricoes.filter((r) => statusFilter === 'todas' || r.status === statusFilter).map((r) => {
+      const [label, bg, fg] = statusMeta[r.status];
+      return {
+        protocol: r.protocol, nome: r.nome, evento: r.evento, cidade: r.cidade,
+        statusLabel: label, statusStyle: { fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '999px', background: bg, color: fg },
+        canApprove: r.status === 'pendente' || r.status === 'em_analise', canReject: r.status === 'pendente' || r.status === 'em_analise',
+        onApprove: () => this.approveRow(r.id), onReject: () => this.rejectRow(r.id),
+      };
+    });
+
+    const champStatusMeta = { ativo: ['Ativo', t.accentSoft, t.accent], encerrado: ['Encerrado', t.surface2, t.textFaint], rascunho: ['Rascunho', t.warningSoft, t.warning] };
+    const campeonatosOut = campeonatos.map((c) => {
+      const [label, bg, fg] = champStatusMeta[c.status];
+      return { nome: c.nome, temporada: c.temporada, etapasCount: c.etapas, statusLabel: label, statusStyle: { fontSize: '10.5px', fontWeight: 700, padding: '3px 9px', borderRadius: '999px', background: bg, color: fg } };
+    });
+
+    return {
+      tokens: t, styles: s, navGroups, mobileNavOpen, mobileNavClosed: !mobileNavOpen,
+      isDark: theme === 'dark', isLight: theme === 'light', toggleTheme: this.toggleTheme,
+      toggleMobileNav: this.toggleMobileNav, closeMobileNav: this.closeMobileNav,
+      statusFilters, filteredInscricoes, campeonatos: campeonatosOut,
+      kpis: [
+        { label: 'Inscrições pendentes', value: String(inscricoes.filter((r) => r.status === 'pendente').length) },
+        { label: 'Em análise', value: String(inscricoes.filter((r) => r.status === 'em_analise').length) },
+        { label: 'Confirmadas', value: String(inscricoes.filter((r) => r.status === 'confirmada').length) },
+        { label: 'Campeonatos ativos', value: String(campeonatos.filter((c) => c.status === 'ativo').length) },
+      ],
+    };
+  }
+}
+
+</script>
+</body>
+</html>

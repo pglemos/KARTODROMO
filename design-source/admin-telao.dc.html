@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+  <meta name="description" content="Telão — Painel administrativo Kartódromo de Betim">
+  <link rel="icon" type="image/png" href="assets/brand/kib-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Anton&display=swap" rel="stylesheet">
+  <style>
+    html { scroll-behavior: smooth; }
+    body { margin: 0; font-family: 'Rajdhani', sans-serif; font-size: 15px; -webkit-font-smoothing: antialiased; }
+    button, input { font: inherit; }
+    input:focus, button:focus-visible, a:focus-visible { outline: 2px solid #00c853; outline-offset: 2px; }
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root) { animation: 260ms cubic-bezier(.16,1,.3,1) both kib-page-out; }
+    ::view-transition-new(root) { animation: 320ms cubic-bezier(.16,1,.3,1) both kib-page-in; }
+    @keyframes kib-page-out { to { opacity: 0; transform: translateY(-8px); } }
+    @keyframes kib-page-in { from { opacity: 0; transform: translateY(8px); } }
+    @media (prefers-reduced-motion: reduce) { ::view-transition-old(root), ::view-transition-new(root) { animation: none; } }
+  </style>
+</helmet>
+
+<div data-screen-label="Admin — Telão" style="{{ styles.page }}">
+  <aside style="{{ styles.sidebar }}">
+    <a href="admin-dashboard.dc.html" style="display:flex; align-items:center; gap:10px; padding:20px 18px; border-bottom:1px solid {{ tokens.border }}; text-decoration:none;">
+      <span style="{{ styles.logoMark }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h7v7H4zM13 4h7v4h-7zM13 11h7v9h-7zM4 14h7v6H4z"/></svg></span>
+      <div><p style="{{ styles.brandEyebrow }}">Sistema</p><strong style="{{ styles.brandName }}">Kartódromo Betim</strong></div>
+    </a>
+    <nav aria-label="Módulos do sistema" style="flex:1; overflow-y:auto; padding:16px 12px;">
+      <sc-for list="{{ navGroups }}" as="grp" hint-placeholder-count="4">
+        <section style="margin-bottom:22px;">
+          <h2 style="{{ styles.navGroupLabel }}">{{ grp.label }}</h2>
+          <div style="display:grid; gap:2px;">
+            <sc-for list="{{ grp.items }}" as="item" hint-placeholder-count="3">
+              <a href="{{ item.href }}" aria-current="{{ item.current }}" style="{{ item.style }}">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="{{ item.icon }}"/></svg>
+                {{ item.title }}
+              </a>
+            </sc-for>
+          </div>
+        </section>
+      </sc-for>
+    </nav>
+    <div style="border-top:1px solid {{ tokens.border }}; padding:14px 18px;">
+      <p style="{{ styles.userEmail }}">operacao@kartodromodebetim.com.br</p>
+      <a href="login.dc.html" style="{{ styles.logoutLink }}">Sair</a>
+    </div>
+  </aside>
+
+  <div style="{{ styles.mobileOverlay }}" onClick="{{ closeMobileNav }}"></div>
+  <aside style="{{ styles.mobileDrawer }}" aria-hidden="{{ mobileNavClosed }}">
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid {{ tokens.border }};">
+      <strong style="{{ styles.brandName }}">Menu</strong>
+      <button type="button" aria-label="Fechar menu" onClick="{{ closeMobileNav }}" style="{{ styles.iconBtn }}">✕</button>
+    </div>
+    <nav aria-label="Módulos do sistema (mobile)" style="flex:1; overflow-y:auto; padding:14px 12px;">
+      <sc-for list="{{ navGroups }}" as="grp" hint-placeholder-count="4">
+        <section style="margin-bottom:20px;">
+          <h2 style="{{ styles.navGroupLabel }}">{{ grp.label }}</h2>
+          <div style="display:grid; gap:2px;">
+            <sc-for list="{{ grp.items }}" as="item" hint-placeholder-count="3">
+              <a href="{{ item.href }}" onClick="{{ closeMobileNav }}" aria-current="{{ item.current }}" style="{{ item.style }}">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="{{ item.icon }}"/></svg>
+                {{ item.title }}
+              </a>
+            </sc-for>
+          </div>
+        </section>
+      </sc-for>
+    </nav>
+  </aside>
+
+  <div style="{{ styles.contentWrap }}">
+    <header style="{{ styles.header }}">
+      <div style="display:flex; align-items:center; gap:14px; min-width:0;">
+        <button type="button" aria-label="Abrir menu" onClick="{{ toggleMobileNav }}" style="{{ styles.menuToggleBtn }}">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div style="min-width:0;">
+          <p style="{{ styles.headerEyebrow }}">Competição</p>
+          <h1 style="{{ styles.headerTitle }}">Telão</h1>
+        </div>
+      </div>
+      <button type="button" aria-label="Alternar tema" onClick="{{ toggleTheme }}" style="{{ styles.iconBtn }}">
+        <sc-if value="{{ isDark }}" hint-placeholder-val="{{ false }}">☀️</sc-if>
+        <sc-if value="{{ isLight }}" hint-placeholder-val="{{ true }}">🌙</sc-if>
+      </button>
+    </header>
+
+    <main style="{{ styles.main }}">
+      <div style="{{ styles.layoutGrid }}">
+        <section style="{{ styles.previewCard }}">
+          <div style="{{ styles.previewScreen }}">
+            <sc-if value="{{ isLeaderboardMode }}">
+              <div style="width:100%;">
+                <p style="{{ styles.previewEyebrow }}">Ao vivo · Classificação</p>
+                <sc-for list="{{ previewLeaderboard }}" as="row" hint-placeholder-count="5">
+                  <div style="{{ styles.previewRow }}"><span>{{ row.posicao }}</span><strong>{{ row.nome }}</strong><span>{{ row.tempo }}</span></div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ isSponsorMode }}">
+              <div style="text-align:center;">
+                <p style="{{ styles.previewEyebrow }}">Patrocinadores</p>
+                <strong style="{{ styles.previewSponsor }}">{{ currentSponsor }}</strong>
+              </div>
+            </sc-if>
+            <sc-if value="{{ isPodiumMode }}">
+              <div style="text-align:center;">
+                <p style="{{ styles.previewEyebrow }}">Pódio final</p>
+                <strong style="{{ styles.previewSponsor }}">🏆 {{ podiumWinner }}</strong>
+              </div>
+            </sc-if>
+          </div>
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-top:14px;">
+            <span style="{{ statusBadgeStyle }}">{{ statusLabel }}</span>
+            <button type="button" onClick="{{ togglePlaying }}" style="{{ styles.primaryBtnSm }}">{{ playPauseLabel }}</button>
+          </div>
+        </section>
+
+        <section style="{{ styles.card }}">
+          <h2 style="{{ styles.sectionTitle }}">Modo de exibição</h2>
+          <div style="display:grid; gap:8px; margin-top:12px;">
+            <sc-for list="{{ modes }}" as="m" hint-placeholder-count="3">
+              <button type="button" onClick="{{ m.onClick }}" style="{{ m.style }}">
+                <strong>{{ m.label }}</strong>
+                <span style="{{ styles.modeDesc }}">{{ m.desc }}</span>
+              </button>
+            </sc-for>
+          </div>
+
+          <h2 style="{{ styles.sectionTitle }}">Brilho do painel</h2>
+          <div style="display:flex; align-items:center; gap:12px; margin-top:10px;">
+            <input type="range" min="10" max="100" value="{{ brightness }}" onChange="{{ onBrightnessChange }}" style="flex:1;">
+            <strong style="{{ styles.brightnessValue }}">{{ brightness }}%</strong>
+          </div>
+
+          <h2 style="{{ styles.sectionTitle }}">Playlist de patrocinadores</h2>
+          <div style="display:grid; gap:8px; margin-top:12px;">
+            <sc-for list="{{ playlist }}" as="p" hint-placeholder-count="4">
+              <div style="{{ styles.playlistRow }}">
+                <span>{{ p.nome }}</span>
+                <button type="button" onClick="{{ p.onToggle }}" style="{{ p.toggleStyle }}">{{ p.toggleLabel }}</button>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  currentKey = 'telao';
+  state = {
+    theme: (function () { try { return localStorage.getItem('kib-admin-theme') === 'dark' ? 'dark' : 'light'; } catch (e) { return 'light'; } })(),
+    mobileNavOpen: false, modules: [], isMobile: typeof window !== 'undefined' && window.matchMedia('(max-width: 1080px)').matches,
+    mode: 'leaderboard', playing: true, brightness: 80,
+    playlist: [
+      { id: 'sp1', nome: 'Auto Peças Betim', active: true },
+      { id: 'sp2', nome: 'Pneus Rally', active: true },
+      { id: 'sp3', nome: 'Energético RushCan', active: false },
+      { id: 'sp4', nome: 'Oficina Turbo Center', active: true },
+    ],
+  };
+
+  componentDidMount() {
+    import('./admin-shared.js').then((m) => { this._shared = m; this.setState({ modules: m.adminModules }); });
+    this._mq = window.matchMedia('(max-width: 1080px)');
+    this._onMqChange = (e) => this.setState({ isMobile: e.matches });
+    if (this._mq.addEventListener) this._mq.addEventListener('change', this._onMqChange); else this._mq.addListener(this._onMqChange);
+  }
+  componentWillUnmount() {
+    if (this._mq) { if (this._mq.removeEventListener) this._mq.removeEventListener('change', this._onMqChange); else this._mq.removeListener(this._onMqChange); }
+  }
+
+  toggleTheme = () => { const next = this.state.theme === 'dark' ? 'light' : 'dark'; this.setState({ theme: next }); try { localStorage.setItem('kib-admin-theme', next); } catch (e) {} };
+  toggleMobileNav = () => this.setState((s) => ({ mobileNavOpen: !s.mobileNavOpen }));
+  closeMobileNav = () => this.setState({ mobileNavOpen: false });
+  setMode = (v) => this.setState({ mode: v });
+  togglePlaying = () => this.setState((s) => ({ playing: !s.playing }));
+  onBrightnessChange = (e) => this.setState({ brightness: Number(e.target.value) });
+  togglePlaylistItem = (id) => this.setState((s) => ({ playlist: s.playlist.map((p) => (p.id === id ? Object.assign({}, p, { active: !p.active }) : p)) }));
+
+  getTokens(theme) {
+    const dark = theme === 'dark';
+    return {
+      bg: dark ? '#0a0d0a' : '#f5f7f5', surface: dark ? '#121613' : '#ffffff', surface2: dark ? '#181d19' : '#eef1ee',
+      border: dark ? '#242b25' : '#e2e6e1', borderStrong: dark ? '#333c34' : '#d3d9d2',
+      text: dark ? '#f2f5f1' : '#14170f', textMuted: dark ? '#8b988c' : '#5d6660', textFaint: dark ? '#5a655c' : '#8a938a',
+      accent: dark ? '#00e676' : '#00a856', accentSoft: dark ? 'rgba(0,230,118,.14)' : 'rgba(0,168,86,.1)',
+      accentBorder: dark ? 'rgba(0,230,118,.4)' : 'rgba(0,168,86,.35)', accentContrast: dark ? '#041a0d' : '#ffffff',
+      danger: dark ? '#ff6b6b' : '#d92d2d', info: dark ? '#5eb6ff' : '#1868c2', infoSoft: dark ? 'rgba(94,182,255,.14)' : 'rgba(24,104,194,.08)',
+      shadow: dark ? '0 20px 60px rgba(0,0,0,.45)' : '0 12px 32px rgba(20,30,20,.08)', overlay: dark ? 'rgba(3,5,4,.72)' : 'rgba(10,14,10,.42)',
+    };
+  }
+
+  baseStyles(t, mobileNavOpen, isMobile) {
+    return {
+      page: { minHeight: '100vh', background: t.bg, color: t.text, fontFamily: "'Rajdhani',sans-serif" },
+      sidebar: { position: 'fixed', insetBlock: 0, left: 0, width: '260px', zIndex: 200, display: isMobile ? 'none' : 'flex', flexDirection: 'column', background: t.surface, borderRight: '1px solid ' + t.border },
+      logoMark: { display: 'grid', placeItems: 'center', width: '34px', height: '34px', borderRadius: '9px', background: t.accent, color: t.accentContrast, flex: 'none' },
+      brandEyebrow: { margin: 0, fontSize: '10px', fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: t.accent },
+      brandName: { display: 'block', fontSize: '14px', fontWeight: 700, color: t.text },
+      navGroupLabel: { margin: '0 0 6px', padding: '0 10px', fontSize: '10.5px', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: t.textFaint },
+      userEmail: { margin: '0 0 8px', fontSize: '12px', fontWeight: 600, color: t.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+      logoutLink: { fontSize: '12px', fontWeight: 700, color: t.danger, textDecoration: 'none' },
+      mobileOverlay: { position: 'fixed', inset: 0, zIndex: 210, background: t.overlay, opacity: mobileNavOpen ? 1 : 0, visibility: isMobile && mobileNavOpen ? 'visible' : 'hidden', transition: '.25s', pointerEvents: isMobile && mobileNavOpen ? 'auto' : 'none' },
+      mobileDrawer: { position: 'fixed', insetBlock: 0, left: 0, width: 'min(84vw,300px)', zIndex: 220, background: t.surface, display: 'flex', flexDirection: 'column', transform: isMobile && mobileNavOpen ? 'none' : 'translateX(-100%)', transition: '.3s cubic-bezier(.16,1,.3,1)', boxShadow: mobileNavOpen ? t.shadow : 'none' },
+      iconBtn: { width: '38px', height: '38px', display: 'grid', placeItems: 'center', border: '1px solid ' + t.border, borderRadius: '9px', background: t.surface, color: t.text, cursor: 'pointer', fontSize: '15px', flex: 'none' },
+      menuToggleBtn: { width: '38px', height: '38px', display: isMobile ? 'grid' : 'none', placeItems: 'center', border: '1px solid ' + t.border, borderRadius: '9px', background: t.surface, color: t.text, cursor: 'pointer', flex: 'none' },
+      contentWrap: { minHeight: '100vh', marginLeft: isMobile ? 0 : '260px' },
+      header: { position: 'sticky', top: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', padding: '14px 20px', background: t.surface + 'f2', backdropFilter: 'blur(10px)', borderBottom: '1px solid ' + t.border },
+      headerEyebrow: { margin: '0 0 2px', fontSize: '10.5px', fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: t.accent },
+      headerTitle: { margin: 0, fontSize: '22px', fontWeight: 700, color: t.text },
+      main: { padding: '22px 20px 60px', display: 'grid', gap: '22px' },
+      card: { background: t.surface, border: '1px solid ' + t.border, borderRadius: '16px', padding: isMobile ? '16px' : '22px' },
+      previewCard: { background: t.surface, border: '1px solid ' + t.border, borderRadius: '16px', padding: '18px' },
+      previewScreen: { minHeight: '260px', borderRadius: '12px', background: '#050705', color: '#f2f5f1', display: 'grid', placeItems: 'center', padding: '24px' },
+      previewEyebrow: { margin: '0 0 14px', fontSize: '11px', fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: t.accent, textAlign: 'center' },
+      previewRow: { display: 'flex', justifyContent: 'space-between', gap: '14px', padding: '6px 10px', fontSize: '14px', borderBottom: '1px solid rgba(255,255,255,.08)' },
+      previewSponsor: { fontSize: '26px', fontWeight: 700 },
+      sectionTitle: { margin: '18px 0 0', fontSize: '15px', fontWeight: 700, color: t.text },
+      modeDesc: { display: 'block', fontSize: '12px', color: t.textFaint, marginTop: '2px', fontWeight: 500 },
+      brightnessValue: { fontSize: '13px', fontWeight: 700, color: t.text, width: '44px', textAlign: 'right' },
+      playlistRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13.5px', color: t.text, background: t.surface2, borderRadius: '9px', padding: '9px 12px' },
+      primaryBtnSm: { height: '38px', padding: '0 16px', borderRadius: '9px', border: 0, background: t.accent, color: t.accentContrast, fontWeight: 700, fontSize: '13px', cursor: 'pointer' },
+      layoutGrid: { display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.2fr 1fr', gap: '18px', alignItems: 'start' },
+    };
+  }
+
+  renderVals() {
+    const { theme, modules, mobileNavOpen, isMobile, mode, playing, brightness, playlist } = this.state;
+    const t = this.getTokens(theme);
+    const s = this.baseStyles(t, mobileNavOpen, isMobile);
+
+    const navGroups = ['Geral', 'Operação', 'Competição', 'Gestão'].map((label) => ({
+      label,
+      items: modules.filter((m) => m.group === label).map((m) => ({
+        title: m.title, href: m.href, icon: m.icon, current: m.key === this.currentKey ? 'page' : undefined,
+        style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 10px', borderRadius: '8px', fontSize: '13.5px', fontWeight: 700, textDecoration: 'none', background: m.key === this.currentKey ? t.accent : 'transparent', color: m.key === this.currentKey ? t.accentContrast : t.textMuted },
+      })),
+    }));
+
+    const modeDefs = [
+      ['leaderboard', 'Classificação ao vivo', 'Exibe posição e tempos em tempo real'],
+      ['sponsor', 'Playlist patrocinadores', 'Rotaciona anúncios cadastrados'],
+      ['podium', 'Pódio final', 'Mostra o vencedor após a bandeirada'],
+    ];
+    const modes = modeDefs.map(([key, label, desc]) => ({
+      label, desc, onClick: () => this.setMode(key),
+      style: { textAlign: 'left', border: '1px solid ' + (mode === key ? t.accentBorder : t.border), background: mode === key ? t.accentSoft : t.surface2, color: mode === key ? t.accent : t.text, borderRadius: '10px', padding: '11px 13px', cursor: 'pointer', fontSize: '13.5px', fontWeight: 700 },
+    }));
+
+    const playlistOut = playlist.map((p) => ({
+      nome: p.nome, onToggle: () => this.togglePlaylistItem(p.id),
+      toggleLabel: p.active ? 'Ativo' : 'Pausado',
+      toggleStyle: { border: '1px solid ' + (p.active ? t.accentBorder : t.border), background: p.active ? t.accentSoft : t.surface, color: p.active ? t.accent : t.textFaint, borderRadius: '7px', padding: '5px 11px', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer' },
+    }));
+
+    return {
+      tokens: t, styles: s, navGroups, mobileNavOpen, mobileNavClosed: !mobileNavOpen,
+      isDark: theme === 'dark', isLight: theme === 'light', toggleTheme: this.toggleTheme,
+      toggleMobileNav: this.toggleMobileNav, closeMobileNav: this.closeMobileNav,
+      isLeaderboardMode: mode === 'leaderboard', isSponsorMode: mode === 'sponsor', isPodiumMode: mode === 'podium',
+      previewLeaderboard: [
+        { posicao: 1, nome: 'Marcos Vinícius', tempo: '0:53.900' },
+        { posicao: 2, nome: 'Ana Beatriz Souza', tempo: '+2.410' },
+        { posicao: 3, nome: 'Diego Fontes', tempo: '+5.120' },
+      ],
+      currentSponsor: 'Auto Peças Betim', podiumWinner: 'Marcos Vinícius',
+      statusLabel: playing ? 'Ao vivo' : 'Pausado',
+      statusBadgeStyle: { fontSize: '11px', fontWeight: 700, padding: '5px 12px', borderRadius: '999px', background: playing ? t.infoSoft : t.surface2, color: playing ? t.info : t.textFaint },
+      playPauseLabel: playing ? 'Pausar' : 'Retomar', togglePlaying: this.togglePlaying,
+      modes, brightness, onBrightnessChange: this.onBrightnessChange, playlist: playlistOut,
+    };
+  }
+}
+
+</script>
+</body>
+</html>

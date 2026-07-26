@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base href="/">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+  <meta name="description" content="Recepção — Painel administrativo Kartódromo de Betim">
+  <link rel="icon" type="image/png" href="assets/brand/kib-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    html { scroll-behavior: smooth; }
+    body { margin: 0; font-family: 'Rajdhani', sans-serif; font-size: 15px; -webkit-font-smoothing: antialiased; }
+    button, input, select, textarea { font: inherit; }
+    input:focus, select:focus, button:focus-visible, a:focus-visible { outline: 2px solid #00c853; outline-offset: 2px; }
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root) { animation: 260ms cubic-bezier(.16,1,.3,1) both kib-page-out; }
+    ::view-transition-new(root) { animation: 320ms cubic-bezier(.16,1,.3,1) both kib-page-in; }
+    @keyframes kib-page-out { to { opacity: 0; transform: translateY(-8px); } }
+    @keyframes kib-page-in { from { opacity: 0; transform: translateY(8px); } }
+    @media (prefers-reduced-motion: reduce) { ::view-transition-old(root), ::view-transition-new(root) { animation: none; } }
+  </style>
+</helmet>
+
+<div data-screen-label="Admin — Recepção" style="{{ styles.page }}">
+  <aside style="{{ styles.sidebar }}">
+    <a href="admin-dashboard.dc.html" style="display:flex; align-items:center; gap:10px; padding:20px 18px; border-bottom:1px solid {{ tokens.border }}; text-decoration:none;">
+      <span style="{{ styles.logoMark }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h7v7H4zM13 4h7v4h-7zM13 11h7v9h-7zM4 14h7v6H4z"/></svg></span>
+      <div><p style="{{ styles.brandEyebrow }}">Sistema</p><strong style="{{ styles.brandName }}">Kartódromo Betim</strong></div>
+    </a>
+    <nav aria-label="Módulos do sistema" style="flex:1; overflow-y:auto; padding:16px 12px;">
+      <sc-for list="{{ navGroups }}" as="grp" hint-placeholder-count="4">
+        <section style="margin-bottom:22px;">
+          <h2 style="{{ styles.navGroupLabel }}">{{ grp.label }}</h2>
+          <div style="display:grid; gap:2px;">
+            <sc-for list="{{ grp.items }}" as="item" hint-placeholder-count="3">
+              <a href="{{ item.href }}" aria-current="{{ item.current }}" style="{{ item.style }}">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="{{ item.icon }}"/></svg>
+                {{ item.title }}
+              </a>
+            </sc-for>
+          </div>
+        </section>
+      </sc-for>
+    </nav>
+    <div style="border-top:1px solid {{ tokens.border }}; padding:14px 18px;">
+      <p style="{{ styles.userEmail }}">operacao@kartodromodebetim.com.br</p>
+      <a href="login.dc.html" style="{{ styles.logoutLink }}">Sair</a>
+    </div>
+  </aside>
+
+  <div style="{{ styles.mobileOverlay }}" onClick="{{ closeMobileNav }}"></div>
+  <aside style="{{ styles.mobileDrawer }}" aria-hidden="{{ mobileNavClosed }}">
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid {{ tokens.border }};">
+      <strong style="{{ styles.brandName }}">Menu</strong>
+      <button type="button" aria-label="Fechar menu" onClick="{{ closeMobileNav }}" style="{{ styles.iconBtn }}">✕</button>
+    </div>
+    <nav aria-label="Módulos do sistema (mobile)" style="flex:1; overflow-y:auto; padding:14px 12px;">
+      <sc-for list="{{ navGroups }}" as="grp" hint-placeholder-count="4">
+        <section style="margin-bottom:20px;">
+          <h2 style="{{ styles.navGroupLabel }}">{{ grp.label }}</h2>
+          <div style="display:grid; gap:2px;">
+            <sc-for list="{{ grp.items }}" as="item" hint-placeholder-count="3">
+              <a href="{{ item.href }}" onClick="{{ closeMobileNav }}" aria-current="{{ item.current }}" style="{{ item.style }}">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="{{ item.icon }}"/></svg>
+                {{ item.title }}
+              </a>
+            </sc-for>
+          </div>
+        </section>
+      </sc-for>
+    </nav>
+  </aside>
+
+  <div style="{{ styles.contentWrap }}">
+    <header style="{{ styles.header }}">
+      <div style="display:flex; align-items:center; gap:14px; min-width:0;">
+        <button type="button" aria-label="Abrir menu" onClick="{{ toggleMobileNav }}" style="{{ styles.menuToggleBtn }}">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div style="min-width:0;">
+          <p style="{{ styles.headerEyebrow }}">Operação</p>
+          <h1 style="{{ styles.headerTitle }}">Recepção</h1>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <button type="button" aria-label="Alternar tema" onClick="{{ toggleTheme }}" style="{{ styles.iconBtn }}">
+          <sc-if value="{{ isDark }}" hint-placeholder-val="{{ false }}">☀️</sc-if>
+          <sc-if value="{{ isLight }}" hint-placeholder-val="{{ true }}">🌙</sc-if>
+        </button>
+        <button type="button" onClick="{{ openModal }}" style="{{ styles.primaryBtnSm }}">+ Check-in</button>
+      </div>
+    </header>
+
+    <main style="{{ styles.main }}">
+      <div style="{{ styles.kpiGrid }}">
+        <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="3">
+          <article style="{{ styles.kpiCard }}">
+            <span style="{{ styles.kpiLabel }}">{{ k.label }}</span>
+            <strong style="{{ styles.kpiValue }}">{{ k.value }}</strong>
+          </article>
+        </sc-for>
+      </div>
+
+      <div style="{{ styles.queueGrid }}">
+        <sc-for list="{{ queueColumns }}" as="col" hint-placeholder-count="3">
+          <section style="{{ styles.queueCol }}">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+              <h2 style="{{ styles.queueColTitle }}">{{ col.title }}</h2>
+              <span style="{{ styles.queueColCount }}">{{ col.count }}</span>
+            </div>
+            <div style="display:grid; gap:10px;">
+              <sc-for list="{{ col.items }}" as="item" hint-placeholder-count="2">
+                <article style="{{ styles.queueCard }}">
+                  <strong style="{{ styles.queueCardName }}">{{ item.nome }}</strong>
+                  <span style="{{ styles.queueCardMeta }}">{{ item.tipo }} · reserva {{ item.reservaLabel }}</span>
+                  <sc-if value="{{ item.notes }}"><span style="{{ styles.queueCardNotes }}">{{ item.notes }}</span></sc-if>
+                  <div style="display:flex; gap:8px; margin-top:10px;">
+                    <sc-if value="{{ item.nextAction }}"><button type="button" onClick="{{ item.onNext }}" style="{{ styles.rowActionAccent }}">{{ item.nextAction }}</button></sc-if>
+                    <sc-if value="{{ item.canCancel }}"><button type="button" onClick="{{ item.onCancel }}" style="{{ styles.rowActionDanger }}">Cancelar</button></sc-if>
+                  </div>
+                </article>
+              </sc-for>
+              <sc-if value="{{ col.empty }}"><p style="{{ styles.emptyState }}">Fila vazia</p></sc-if>
+            </div>
+          </section>
+        </sc-for>
+      </div>
+    </main>
+  </div>
+
+  <sc-if value="{{ modalOpen }}">
+    <div style="{{ styles.modalOverlay }}" onClick="{{ closeModal }}">
+      <form onSubmit="{{ onCreate }}" onClick="{{ stopPropagation }}" style="{{ styles.modalDialog }}">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
+          <h2 style="{{ styles.modalTitle }}">Novo check-in</h2>
+          <button type="button" aria-label="Fechar" onClick="{{ closeModal }}" style="{{ styles.iconBtn }}">✕</button>
+        </div>
+        <div style="display:grid; gap:14px;">
+          <div style="display:grid; gap:6px;"><label style="{{ styles.label }}">Nome do piloto</label><input required="" name="nome" placeholder="Nome completo" style="{{ styles.input }}"></div>
+          <div style="display:grid; gap:6px;"><label style="{{ styles.label }}">Tipo</label>
+            <select name="tipo" style="{{ styles.input }}"><option>Aniversário</option><option>Grupo de amigos</option><option>Corporativo</option><option>Avulso</option></select>
+          </div>
+          <div style="display:grid; gap:6px;"><label style="{{ styles.label }}">Observações</label><textarea name="notes" style="{{ styles.textarea }}"></textarea></div>
+        </div>
+        <button type="submit" style="{{ styles.submitBtn }}">Adicionar à fila</button>
+      </form>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  currentKey = 'recepcao';
+  state = {
+    theme: (function () { try { return localStorage.getItem('kib-admin-theme') === 'dark' ? 'dark' : 'light'; } catch (e) { return 'light'; } })(),
+    mobileNavOpen: false, modules: [], isMobile: typeof window !== 'undefined' && window.matchMedia('(max-width: 1080px)').matches,
+    modalOpen: false,
+    rows: [
+      { id: 'a1', nome: 'Marcos Vinícius', tipo: 'Aniversário', reservaLabel: '#r1', status: 'aguardando', notes: 'Grupo de 6, bolo às 11h' },
+      { id: 'a2', nome: 'Ana Beatriz Souza', tipo: 'Grupo de amigos', reservaLabel: '#r2', status: 'aguardando', notes: '' },
+      { id: 'a3', nome: 'Rafael Nogueira', tipo: 'Avulso', reservaLabel: '#r4', status: 'em_atendimento', notes: 'Já assinou termo' },
+      { id: 'a4', nome: 'Construtora Alfa Ltda', tipo: 'Corporativo', reservaLabel: '#r3', status: 'em_atendimento', notes: '22 pilotos, dividir em 3 baterias' },
+      { id: 'a5', nome: 'Juliana Prado', tipo: 'Avulso', reservaLabel: '#r5', status: 'finalizado', notes: '' },
+    ],
+  };
+
+  componentDidMount() {
+    import('./admin-shared.js').then((m) => { this._shared = m; this.setState({ modules: m.adminModules }); });
+    this._onKeydown = (e) => { if (e.key === 'Escape') { if (this.state.modalOpen) this.closeModal(); else if (this.state.mobileNavOpen) this.setState({ mobileNavOpen: false }); } };
+    window.addEventListener('keydown', this._onKeydown);
+    this._mq = window.matchMedia('(max-width: 1080px)');
+    this._onMqChange = (e) => this.setState({ isMobile: e.matches });
+    if (this._mq.addEventListener) this._mq.addEventListener('change', this._onMqChange); else this._mq.addListener(this._onMqChange);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('keydown', this._onKeydown);
+    if (this._mq) { if (this._mq.removeEventListener) this._mq.removeEventListener('change', this._onMqChange); else this._mq.removeListener(this._onMqChange); }
+  }
+
+  toggleTheme = () => { const next = this.state.theme === 'dark' ? 'light' : 'dark'; this.setState({ theme: next }); try { localStorage.setItem('kib-admin-theme', next); } catch (e) {} };
+  toggleMobileNav = () => this.setState((s) => ({ mobileNavOpen: !s.mobileNavOpen }));
+  closeMobileNav = () => this.setState({ mobileNavOpen: false });
+  openModal = () => this.setState({ modalOpen: true });
+  closeModal = () => this.setState({ modalOpen: false });
+  stopPropagation = (e) => e.stopPropagation();
+
+  advance = (id) => this.setState((s) => ({
+    rows: s.rows.map((r) => {
+      if (r.id !== id) return r;
+      const next = r.status === 'aguardando' ? 'em_atendimento' : 'finalizado';
+      return Object.assign({}, r, { status: next });
+    }),
+  }));
+  cancelRow = (id) => this.setState((s) => ({ rows: s.rows.map((r) => (r.id === id ? Object.assign({}, r, { status: 'cancelado' }) : r)) }));
+
+  onCreate = (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const row = { id: 'a' + Date.now(), nome: f.get('nome') || 'Piloto', tipo: f.get('tipo') || 'Avulso', reservaLabel: '—', status: 'aguardando', notes: f.get('notes') || '' };
+    this.setState((s) => ({ rows: [row].concat(s.rows), modalOpen: false }));
+  };
+
+  getTokens(theme) {
+    const dark = theme === 'dark';
+    return {
+      bg: dark ? '#0a0d0a' : '#f5f7f5', surface: dark ? '#121613' : '#ffffff', surface2: dark ? '#181d19' : '#eef1ee',
+      border: dark ? '#242b25' : '#e2e6e1', borderStrong: dark ? '#333c34' : '#d3d9d2',
+      text: dark ? '#f2f5f1' : '#14170f', textMuted: dark ? '#8b988c' : '#5d6660', textFaint: dark ? '#5a655c' : '#8a938a',
+      accent: dark ? '#00e676' : '#00a856', accentSoft: dark ? 'rgba(0,230,118,.14)' : 'rgba(0,168,86,.1)',
+      accentBorder: dark ? 'rgba(0,230,118,.4)' : 'rgba(0,168,86,.35)', accentContrast: dark ? '#041a0d' : '#ffffff',
+      danger: dark ? '#ff6b6b' : '#d92d2d', dangerSoft: dark ? 'rgba(255,107,107,.14)' : 'rgba(217,45,45,.08)',
+      warning: dark ? '#f2b23b' : '#b8720a', warningSoft: dark ? 'rgba(242,178,59,.14)' : 'rgba(184,114,10,.1)',
+      info: dark ? '#5eb6ff' : '#1868c2', infoSoft: dark ? 'rgba(94,182,255,.14)' : 'rgba(24,104,194,.08)',
+      shadow: dark ? '0 20px 60px rgba(0,0,0,.45)' : '0 12px 32px rgba(20,30,20,.08)', overlay: dark ? 'rgba(3,5,4,.72)' : 'rgba(10,14,10,.42)',
+    };
+  }
+
+  baseStyles(t, mobileNavOpen, isMobile) {
+    return {
+      page: { minHeight: '100vh', background: t.bg, color: t.text, fontFamily: "'Rajdhani',sans-serif" },
+      sidebar: { position: 'fixed', insetBlock: 0, left: 0, width: '260px', zIndex: 200, display: isMobile ? 'none' : 'flex', flexDirection: 'column', background: t.surface, borderRight: '1px solid ' + t.border },
+      logoMark: { display: 'grid', placeItems: 'center', width: '34px', height: '34px', borderRadius: '9px', background: t.accent, color: t.accentContrast, flex: 'none' },
+      brandEyebrow: { margin: 0, fontSize: '10px', fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: t.accent },
+      brandName: { display: 'block', fontSize: '14px', fontWeight: 700, color: t.text },
+      navGroupLabel: { margin: '0 0 6px', padding: '0 10px', fontSize: '10.5px', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: t.textFaint },
+      userEmail: { margin: '0 0 8px', fontSize: '12px', fontWeight: 600, color: t.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+      logoutLink: { fontSize: '12px', fontWeight: 700, color: t.danger, textDecoration: 'none' },
+      mobileOverlay: { position: 'fixed', inset: 0, zIndex: 210, background: t.overlay, opacity: mobileNavOpen ? 1 : 0, visibility: isMobile && mobileNavOpen ? 'visible' : 'hidden', transition: '.25s', pointerEvents: isMobile && mobileNavOpen ? 'auto' : 'none' },
+      mobileDrawer: { position: 'fixed', insetBlock: 0, left: 0, width: 'min(84vw,300px)', zIndex: 220, background: t.surface, display: 'flex', flexDirection: 'column', transform: isMobile && mobileNavOpen ? 'none' : 'translateX(-100%)', transition: '.3s cubic-bezier(.16,1,.3,1)', boxShadow: mobileNavOpen ? t.shadow : 'none' },
+      iconBtn: { width: '38px', height: '38px', display: 'grid', placeItems: 'center', border: '1px solid ' + t.border, borderRadius: '9px', background: t.surface, color: t.text, cursor: 'pointer', fontSize: '15px', flex: 'none' },
+      menuToggleBtn: { width: '38px', height: '38px', display: isMobile ? 'grid' : 'none', placeItems: 'center', border: '1px solid ' + t.border, borderRadius: '9px', background: t.surface, color: t.text, cursor: 'pointer', flex: 'none' },
+      contentWrap: { minHeight: '100vh', marginLeft: isMobile ? 0 : '260px' },
+      header: { position: 'sticky', top: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', padding: '14px 20px', background: t.surface + 'f2', backdropFilter: 'blur(10px)', borderBottom: '1px solid ' + t.border },
+      headerEyebrow: { margin: '0 0 2px', fontSize: '10.5px', fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: t.accent },
+      headerTitle: { margin: 0, fontSize: '22px', fontWeight: 700, color: t.text },
+      primaryBtnSm: { height: '38px', padding: '0 16px', borderRadius: '9px', border: 0, background: t.accent, color: t.accentContrast, fontWeight: 700, fontSize: '13px', cursor: 'pointer' },
+      main: { padding: '22px 20px 60px', display: 'grid', gap: '22px' },
+      kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '14px' },
+      kpiCard: { background: t.surface, border: '1px solid ' + t.border, borderRadius: '14px', padding: '16px' },
+      kpiLabel: { display: 'block', fontSize: '11.5px', fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: t.textMuted },
+      kpiValue: { display: 'block', marginTop: '8px', fontSize: '24px', fontWeight: 700, color: t.text },
+      queueGrid: { display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: '16px', alignItems: 'start' },
+      queueCol: { background: t.surface, border: '1px solid ' + t.border, borderRadius: '16px', padding: '16px' },
+      queueColTitle: { margin: 0, fontSize: '14.5px', fontWeight: 700, color: t.text },
+      queueColCount: { fontSize: '12px', fontWeight: 700, color: t.textFaint, background: t.surface2, padding: '3px 9px', borderRadius: '999px' },
+      queueCard: { background: t.surface2, border: '1px solid ' + t.border, borderRadius: '11px', padding: '13px' },
+      queueCardName: { display: 'block', fontSize: '14px', fontWeight: 700, color: t.text },
+      queueCardMeta: { display: 'block', marginTop: '3px', fontSize: '12px', color: t.textMuted },
+      queueCardNotes: { display: 'block', marginTop: '6px', fontSize: '12px', color: t.textFaint, fontStyle: 'italic' },
+      rowActionAccent: { border: '1px solid ' + t.accentBorder, background: t.accentSoft, color: t.accent, borderRadius: '7px', padding: '6px 10px', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer' },
+      rowActionDanger: { border: '1px solid transparent', background: t.dangerSoft, color: t.danger, borderRadius: '7px', padding: '6px 10px', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer' },
+      emptyState: { textAlign: 'center', padding: '18px 0', color: t.textFaint, fontSize: '13px' },
+      modalOverlay: { position: 'fixed', inset: 0, zIndex: 400, background: t.overlay, display: 'grid', placeItems: 'center', padding: '20px' },
+      modalDialog: { width: 'min(480px,100%)', maxHeight: '90vh', overflow: 'auto', background: t.surface, border: '1px solid ' + t.border, borderRadius: '16px', padding: '26px', boxShadow: t.shadow },
+      modalTitle: { margin: 0, fontSize: '20px', fontWeight: 700, color: t.text },
+      label: { fontSize: '11.5px', fontWeight: 700, letterSpacing: '.03em', textTransform: 'uppercase', color: t.textMuted },
+      input: { width: '100%', height: '42px', borderRadius: '8px', border: '1px solid ' + t.border, background: t.surface2, color: t.text, padding: '0 12px', outline: 'none' },
+      textarea: { width: '100%', minHeight: '80px', borderRadius: '8px', border: '1px solid ' + t.border, background: t.surface2, color: t.text, padding: '10px 12px', outline: 'none', resize: 'vertical' },
+      submitBtn: { marginTop: '20px', width: '100%', height: '46px', borderRadius: '9px', border: 0, background: t.accent, color: t.accentContrast, fontWeight: 700, fontSize: '14px', cursor: 'pointer' },
+    };
+  }
+
+  renderVals() {
+    const { theme, modules, mobileNavOpen, isMobile, modalOpen, rows } = this.state;
+    const t = this.getTokens(theme);
+    const s = this.baseStyles(t, mobileNavOpen, isMobile);
+
+    const navGroups = ['Geral', 'Operação', 'Competição', 'Gestão'].map((label) => ({
+      label,
+      items: modules.filter((m) => m.group === label).map((m) => ({
+        title: m.title, href: m.href, icon: m.icon, current: m.key === this.currentKey ? 'page' : undefined,
+        style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 10px', borderRadius: '8px', fontSize: '13.5px', fontWeight: 700, textDecoration: 'none', background: m.key === this.currentKey ? t.accent : 'transparent', color: m.key === this.currentKey ? t.accentContrast : t.textMuted },
+      })),
+    }));
+
+    const cols = [
+      { key: 'aguardando', title: 'Aguardando', nextLabel: 'Chamar' },
+      { key: 'em_atendimento', title: 'Em atendimento', nextLabel: 'Finalizar' },
+      { key: 'finalizado', title: 'Finalizado', nextLabel: null },
+    ];
+    const queueColumns = cols.map((c) => {
+      const items = rows.filter((r) => r.status === c.key).map((r) => ({
+        nome: r.nome, tipo: r.tipo, reservaLabel: r.reservaLabel, notes: r.notes,
+        nextAction: c.nextLabel, onNext: () => this.advance(r.id),
+        canCancel: c.key !== 'finalizado', onCancel: () => this.cancelRow(r.id),
+      }));
+      return { title: c.title, count: items.length, items, empty: items.length === 0 };
+    });
+
+    return {
+      tokens: t, styles: s, navGroups, mobileNavOpen, mobileNavClosed: !mobileNavOpen,
+      isDark: theme === 'dark', isLight: theme === 'light', toggleTheme: this.toggleTheme,
+      toggleMobileNav: this.toggleMobileNav, closeMobileNav: this.closeMobileNav,
+      modalOpen, openModal: this.openModal, closeModal: this.closeModal, stopPropagation: this.stopPropagation, onCreate: this.onCreate,
+      queueColumns,
+      kpis: [
+        { label: 'Na fila', value: String(rows.filter((r) => r.status === 'aguardando').length) },
+        { label: 'Em atendimento', value: String(rows.filter((r) => r.status === 'em_atendimento').length) },
+        { label: 'Finalizados hoje', value: String(rows.filter((r) => r.status === 'finalizado').length) },
+      ],
+    };
+  }
+}
+
+</script>
+</body>
+</html>
