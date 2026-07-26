@@ -22,19 +22,6 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  if (!process.env.LIVETIME_SNAPSHOT_ENDPOINT && process.env.NODE_ENV === 'production') {
-    return NextResponse.json(
-      {
-        status: 'error',
-        source: 'dom-scraper',
-        updatedAt: new Date().toISOString(),
-        message: 'LIVETIME_SNAPSHOT_ENDPOINT nao configurado em producao',
-        drivers: [],
-      } satisfies LiveTimingSnapshot,
-      { headers: NO_CACHE_HEADERS },
-    );
-  }
-
   try {
     const snapshot = await fetchExternalSnapshot(uid);
     if (snapshot.drivers.length > 0) {

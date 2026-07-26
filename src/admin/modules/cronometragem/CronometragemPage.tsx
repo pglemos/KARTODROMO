@@ -123,7 +123,7 @@ const inputClassName =
 const checkboxClassName =
   'h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-brand-500 focus:ring-brand-500/30';
 
-const dateFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+const dateFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo' });
 
 const formatDateSafe = (value: unknown): string => {
   if (!value) return '—';
@@ -187,7 +187,10 @@ export const CronometragemPage = () => {
 
   const [searchInput, setSearchInput] = useState('');
   const [sourceFilter, setSourceFilter] = useState<string>('');
-  const [dateFrom, setDateFrom] = useState('');
+  const [dateFrom, setDateFrom] = useState(() => {
+    try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()); }
+    catch { return ''; }
+  });
   const [dateTo, setDateTo] = useState('');
 
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -269,6 +272,14 @@ export const CronometragemPage = () => {
 
       const results = await Promise.all(promises);
       let all = results.flatMap((r) => r.rows);
+      if (dateFrom) {
+        const fromDate = new Date(dateFrom + 'T00:00:00.000-03:00');
+        all = all.filter((item) => new Date(item.dataHora) >= fromDate);
+      }
+      if (dateTo) {
+        const toDate = new Date(dateTo + 'T23:59:59.999-03:00');
+        all = all.filter((item) => new Date(item.dataHora) <= toDate);
+      }
       all.sort((a, b) => new Date(b.dataHora).getTime() - new Date(a.dataHora).getTime());
 
       const total = all.length;
