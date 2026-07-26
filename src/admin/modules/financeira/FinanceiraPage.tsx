@@ -120,7 +120,6 @@ const currencyFormatter = new Intl.NumberFormat('pt-BR', {
 
 const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
   dateStyle: 'short',
-  timeZone: 'UTC',
 });
 
 const dateTimeFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' });
@@ -129,7 +128,7 @@ const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : 'Ocorreu um erro inesperado.';
 
 const formatDate = (value: string): string =>
-  dateFormatter.format(new Date(`${value}T00:00:00Z`));
+  dateFormatter.format(new Date(`${value}T12:00:00`));
 
 const lancamentoToForm = (lancamento: LancamentoWithCategoria): LancamentoFormState => ({
   descricao: lancamento.descricao,
@@ -210,7 +209,7 @@ export const FinanceiraPage = () => {
       const [lancamentosPage, categoriasData, resumoData] = await Promise.all([
         listLancamentosPage(filters, page, PAGE_SIZE),
         listCategorias(),
-        getResumo(),
+        getResumo(filters.from, filters.to),
       ]);
       setLancamentos(lancamentosPage.data);
       setTotal(lancamentosPage.total);
@@ -644,6 +643,34 @@ export const FinanceiraPage = () => {
                       </option>
                     ))}
                   </select>
+                </FormField>
+              </div>
+              <div className="w-full max-w-[11rem]">
+                <FormField htmlFor="financeira-data-de" label="De">
+                  <input
+                    className={inputClassName}
+                    id="financeira-data-de"
+                    onChange={(event) => {
+                      setFilters((current) => ({ ...current, from: event.target.value }));
+                      setPage(0);
+                    }}
+                    type="date"
+                    value={filters.from ?? ''}
+                  />
+                </FormField>
+              </div>
+              <div className="w-full max-w-[11rem]">
+                <FormField htmlFor="financeira-data-ate" label="Até">
+                  <input
+                    className={inputClassName}
+                    id="financeira-data-ate"
+                    onChange={(event) => {
+                      setFilters((current) => ({ ...current, to: event.target.value }));
+                      setPage(0);
+                    }}
+                    type="date"
+                    value={filters.to ?? ''}
+                  />
                 </FormField>
               </div>
             </div>

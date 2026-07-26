@@ -231,6 +231,29 @@ const AtendimentoCard = ({
   );
 };
 
+const getTodayLocal = () => {
+  const d = new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+};
+
+type DateFilterPreset = 'today' | 'week' | 'all';
+
+const dateFilterPresets: Record<DateFilterPreset, { label: string; days: number }> = {
+  today: { label: 'Hoje', days: 0 },
+  week: { label: 'Últimos 7 dias', days: 7 },
+  all: { label: 'Todos', days: -1 },
+};
+
+const getDateRange = (preset: DateFilterPreset): { from?: string; to?: string } => {
+  if (preset === 'all') return {};
+  const to = getTodayLocal();
+  if (preset === 'today') return { from: to, to };
+  const fromDate = new Date();
+  fromDate.setDate(fromDate.getDate() - 7);
+  const from = new Date(fromDate.getTime() - fromDate.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+  return { from, to };
+};
+
 export const RecepcaoPage = () => {
   const { role } = useAuth();
   const toast = useToast();
@@ -239,6 +262,7 @@ export const RecepcaoPage = () => {
   const [reservas, setReservas] = useState<ReservaOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [dateFilter, setDateFilter] = useState<DateFilterPreset>('today');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [form, setForm] = useState<AtendimentoFormState>(emptyForm);
   const [formErrors, setFormErrors] = useState<AtendimentoFormErrors>({});
@@ -255,8 +279,9 @@ export const RecepcaoPage = () => {
     setLoadError(null);
 
     try {
+      const range = getDateRange(dateFilter);
       const [atendimentosData, clientesData, reservasData] = await Promise.all([
-        listAtendimentos(),
+        listAtendimentos(range.from, range.to),
         listClientes(),
         listReservas(),
       ]);
@@ -268,7 +293,7 @@ export const RecepcaoPage = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [dateFilter]);
 
   useEffect(() => {
     void loadData();
@@ -388,8 +413,28 @@ export const RecepcaoPage = () => {
         title="Recepção"
       />
 
+      <div className="mt-6 mb-4 flex flex-wrap items-center gap-3">
+        <span className="text-xs font-bold uppercase tracking-[0.1em] text-zinc-400">Filtrar:</span>
+        {(Object.entries(dateFilterPresets) as [DateFilterPreset, typeof dateFilterPresets[DateFilterPreset]][]).map(
+          ([key, preset]) => (
+            <button
+              key={key}
+              className={`rounded-full border px-3 py-1.5 text-xs font-bold transition-colors ${
+                dateFilter === key
+                  ? 'border-brand-500 bg-brand-500/20 text-brand-200'
+                  : 'border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200'
+              }`}
+              onClick={() => setDateFilter(key)}
+              type="button"
+            >
+              {preset.label}
+            </button>
+          ),
+        )}
+      </div>
+
       {loadError ? (
-        <div className="mt-8 flex min-h-52 flex-col items-center justify-center rounded-xl border border-red-900/70 bg-red-950/30 p-6 text-center">
+        <div className="flex min-h-52 flex-col items-center justify-center rounded-xl border border-red-900/70 bg-red-950/30 p-6 text-center">
           <AlertCircle aria-hidden="true" className="text-red-300" size={28} />
           <p className="mt-3 text-sm text-red-200" role="alert">
             {loadError}
@@ -400,7 +445,7 @@ export const RecepcaoPage = () => {
           </Button>
         </div>
       ) : (
-        <div className="mt-8 grid items-start gap-5 xl:grid-cols-3">
+        <div className="grid items-start gap-5 xl:grid-cols-3">
           {columns.map((column) => {
             const Icon = column.icon;
             const columnAtendimentos = atendimentosByStatus[column.status];
@@ -504,7 +549,14 @@ export const RecepcaoPage = () => {
             <select
               className={inputClassName}
               id="atendimento-cliente"
-              onChange={(event) => updateForm('cliente_id', event.target.value)}
+              onChange={(event) => {
+                const clienteId = event.target.value;
+                updateForm('cliente_id', clienteId);
+                if (clienteId) {
+                  const cliente = clientes.find((c) => c.id === clienteId);
+                  if (cliente) updateForm('nome', cliente.nome);
+                }
+              }}
               value={form.cliente_id}
             >
               <option value="">Não vincular cliente</option>

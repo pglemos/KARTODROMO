@@ -94,8 +94,11 @@ export const removeCategoria = async (id: string): Promise<void> => {
   await apiDelete(`financeiro_categorias/${id}`);
 };
 
-export const getResumo = async (): Promise<ResumoFinanceiro> => {
-  const rows = await apiGet<Pick<Lancamento, 'valor' | 'tipo' | 'status'>[]>('financeiro_lancamentos?eq_status=confirmado');
+export const getResumo = async (from?: string, to?: string): Promise<ResumoFinanceiro> => {
+  const params = new URLSearchParams({ eq_status: 'confirmado' });
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const rows = await apiGet<Pick<Lancamento, 'valor' | 'tipo' | 'status'>[]>(`financeiro_lancamentos?${params.toString()}`);
 
   const totais = rows.reduce(
     (resumo, lancamento) => {

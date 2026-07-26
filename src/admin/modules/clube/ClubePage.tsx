@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Gift, Megaphone, Users, TrendingUp, Award, ChevronRight, Plus, X, CheckCircle, XCircle } from 'lucide-react';
+import { Gift, Megaphone, Users, TrendingUp, Award, ChevronRight, Plus, CheckCircle, XCircle } from 'lucide-react';
+import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
+import { FormField } from '../../ui/FormField';
+import { Modal } from '../../ui/Modal';
 import { PageHeader } from '../../ui/PageHeader';
 import { DataTable, type DataTableColumn } from '../../ui/DataTable';
 import { useToast } from '../../ui/useToast';
@@ -80,7 +83,7 @@ const resgatesColumns: readonly DataTableColumn<Resgate>[] = [
 
 export function ClubePage() {
   const { role } = useAuth();
-  const { error: toastError, success: toastSuccess } = useToast();
+  const toast = useToast();
   const canWrite = canAccess(role, 'clube') && ['owner', 'admin'].includes(role);
   const [participantes, setParticipantes] = useState<Participante[]>([]);
   const [recompensas, setRecompensas] = useState<Recompensa[]>([]);
@@ -105,11 +108,11 @@ export function ClubePage() {
       setResgates(re);
       setCampanhas(c);
     } catch (err) {
-      toastError(err instanceof Error ? err.message : 'Erro ao carregar dados');
+      toast.error(err instanceof Error ? err.message : 'Erro ao carregar dados');
     } finally {
       setLoading(false);
     }
-  }, [toastError]);
+  }, [toast]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -117,9 +120,9 @@ export function ClubePage() {
     try {
       await apiPatch<Campanha>(`clube_campanhas/${campanha.id}`, { ativo: !campanha.ativo });
       setCampanhas((all) => all.map((c) => c.id === campanha.id ? { ...c, ativo: !c.ativo } : c));
-      toastSuccess(`Campanha ${campanha.ativo ? 'desativada' : 'ativada'}!`);
+      toast.success(`Campanha ${campanha.ativo ? 'desativada' : 'ativada'}!`);
     } catch {
-      toastError('Erro ao alterar campanha');
+      toast.error('Erro ao alterar campanha');
     }
   }
 
@@ -127,9 +130,9 @@ export function ClubePage() {
     try {
       await apiPatch<Resgate>(`clube_resgates/${resgate.id}`, { status: 'aprovado' });
       setResgates((all) => all.map((r) => r.id === resgate.id ? { ...r, status: 'aprovado' as const } : r));
-      toastSuccess('Resgate aprovado!');
+      toast.success('Resgate aprovado!');
     } catch {
-      toastError('Erro ao aprovar resgate');
+      toast.error('Erro ao aprovar resgate');
     }
   }
 
@@ -137,9 +140,9 @@ export function ClubePage() {
     try {
       await apiPatch<Resgate>(`clube_resgates/${resgate.id}`, { status: 'recusado' });
       setResgates((all) => all.map((r) => r.id === resgate.id ? { ...r, status: 'recusado' as const } : r));
-      toastSuccess('Resgate recusado.');
+      toast.success('Resgate recusado.');
     } catch {
-      toastError('Erro ao recusar resgate');
+      toast.error('Erro ao recusar resgate');
     }
   }
 
@@ -157,9 +160,9 @@ export function ClubePage() {
       });
       setRecompensas((all) => [...all, nova]);
       setModalRecompensa(false);
-      toastSuccess('Recompensa criada!');
+      toast.success('Recompensa criada!');
     } catch {
-      toastError('Erro ao criar recompensa');
+      toast.error('Erro ao criar recompensa');
     }
   }
 
@@ -176,9 +179,9 @@ export function ClubePage() {
       });
       setCampanhas((all) => [...all, nova]);
       setModalCampanha(false);
-      toastSuccess('Campanha criada!');
+      toast.success('Campanha criada!');
     } catch {
-      toastError('Erro ao criar campanha');
+      toast.error('Erro ao criar campanha');
     }
   }
 
@@ -214,16 +217,19 @@ export function ClubePage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 rounded-xl border border-zinc-800 bg-zinc-900/50 p-1">
+      <div className="flex flex-wrap gap-2 border-b border-zinc-800 pb-4" role="tablist">
         {tabs.map((t) => (
           <button
+            aria-selected={tab === t.key}
+            className={`whitespace-nowrap border-b-2 px-4 py-3 text-sm font-bold transition-colors ${
+              tab === t.key
+                ? 'border-brand-400 text-brand-200'
+                : 'border-transparent text-zinc-400 hover:text-white'
+            }`}
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-              tab === t.key
-                ? 'bg-brand-500 text-zinc-950'
-                : 'text-zinc-400 hover:text-zinc-100'
-            }`}
+            role="tab"
+            type="button"
           >
             {t.label}
           </button>
@@ -271,13 +277,9 @@ export function ClubePage() {
         <Card className="p-5">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-bold text-zinc-100">Recompensas e Estoque</h2>
-            <button
-              className="flex items-center gap-2 rounded bg-brand-500 px-3 py-2 text-xs font-bold text-zinc-950 disabled:opacity-50"
-              disabled={!canWrite}
-              onClick={() => setModalRecompensa(true)}
-            >
+            <Button disabled={!canWrite} onClick={() => setModalRecompensa(true)}>
               <Plus size={14} /> Nova recompensa
-            </button>
+            </Button>
           </div>
           <div className="space-y-2">
             {loading ? (
@@ -324,20 +326,20 @@ export function ClubePage() {
                       <p className="text-xs text-zinc-500">{r.recompensa_nome} · {r.pontos} pontos</p>
                     </div>
                     <div className="flex gap-2">
-                      <button
-                        className="flex items-center gap-1 rounded border border-green-700 bg-green-950 px-3 py-1.5 text-xs font-bold text-green-300 disabled:opacity-50"
+                      <Button
                         disabled={!canWrite}
                         onClick={() => void aprovarResgate(r)}
+                        variant="ghost"
                       >
                         <CheckCircle size={13} /> Aprovar
-                      </button>
-                      <button
-                        className="flex items-center gap-1 rounded border border-red-800 bg-red-950 px-3 py-1.5 text-xs font-bold text-red-300 disabled:opacity-50"
+                      </Button>
+                      <Button
                         disabled={!canWrite}
                         onClick={() => void recusarResgate(r)}
+                        variant="danger"
                       >
                         <XCircle size={13} /> Recusar
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -364,13 +366,9 @@ export function ClubePage() {
         <Card className="p-5">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-bold text-zinc-100">Campanhas de Pontuação</h2>
-            <button
-              className="flex items-center gap-2 rounded bg-brand-500 px-3 py-2 text-xs font-bold text-zinc-950 disabled:opacity-50"
-              disabled={!canWrite}
-              onClick={() => setModalCampanha(true)}
-            >
+            <Button disabled={!canWrite} onClick={() => setModalCampanha(true)}>
               <Plus size={14} /> Nova campanha
-            </button>
+            </Button>
           </div>
           <div className="grid gap-2 md:grid-cols-3">
             {loading ? (
@@ -401,78 +399,69 @@ export function ClubePage() {
       )}
 
       {/* Modal Nova Recompensa */}
-      {modalRecompensa && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4">
-          <form
-            className="grid w-full max-w-lg gap-4 rounded-xl border border-zinc-700 bg-zinc-900 p-6"
-            onSubmit={(e) => void addRecompensa(e)}
-          >
-            <div className="flex justify-between">
-              <h2 className="text-xl font-bold text-zinc-100">Nova recompensa</h2>
-              <button type="button" onClick={() => setModalRecompensa(false)}>
-                <X className="text-zinc-400" size={20} />
-              </button>
-            </div>
-            {[
-              { name: 'nome', label: 'Nome', type: 'text' },
-              { name: 'descricao', label: 'Descrição', type: 'text' },
-              { name: 'categoria', label: 'Categoria', type: 'text' },
-              { name: 'pontos', label: 'Pontos necessários', type: 'number' },
-              { name: 'estoque', label: 'Estoque inicial', type: 'number' },
-            ].map(({ name, label, type }) => (
-              <label className="grid gap-1 text-sm text-zinc-300" key={name}>
-                {label}
-                <input
-                  className={inputClassName}
-                  min={type === 'number' ? 0 : undefined}
-                  name={name}
-                  required
-                  type={type}
-                />
-              </label>
-            ))}
-            <button className="h-11 rounded bg-brand-500 font-bold text-zinc-950">Salvar recompensa</button>
-          </form>
-        </div>
-      )}
+      <Modal
+        footer={
+          <Button form="clube-recompensa-form" type="submit">
+            Salvar recompensa
+          </Button>
+        }
+        isOpen={modalRecompensa}
+        onClose={() => setModalRecompensa(false)}
+        title="Nova recompensa"
+      >
+        <form className="grid gap-5 md:grid-cols-2" id="clube-recompensa-form" onSubmit={(e) => void addRecompensa(e)}>
+          <div className="md:col-span-2">
+            <FormField htmlFor="cr-nome" label="Nome">
+              <input className={inputClassName} id="cr-nome" name="nome" required type="text" />
+            </FormField>
+          </div>
+          <FormField htmlFor="cr-descricao" label="Descrição">
+            <input className={inputClassName} id="cr-descricao" name="descricao" type="text" />
+          </FormField>
+          <FormField htmlFor="cr-categoria" label="Categoria">
+            <input className={inputClassName} id="cr-categoria" name="categoria" required type="text" />
+          </FormField>
+          <FormField htmlFor="cr-pontos" label="Pontos necessários">
+            <input className={inputClassName} id="cr-pontos" min={0} name="pontos" required type="number" />
+          </FormField>
+          <FormField htmlFor="cr-estoque" label="Estoque inicial">
+            <input className={inputClassName} id="cr-estoque" min={0} name="estoque" required type="number" />
+          </FormField>
+        </form>
+      </Modal>
 
       {/* Modal Nova Campanha */}
-      {modalCampanha && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4">
-          <form
-            className="grid w-full max-w-lg gap-4 rounded-xl border border-zinc-700 bg-zinc-900 p-6"
-            onSubmit={(e) => void addCampanha(e)}
-          >
-            <div className="flex justify-between">
-              <h2 className="text-xl font-bold text-zinc-100">Nova campanha</h2>
-              <button type="button" onClick={() => setModalCampanha(false)}>
-                <X className="text-zinc-400" size={20} />
-              </button>
-            </div>
-            <label className="grid gap-1 text-sm text-zinc-300">
-              Nome
-              <input className={inputClassName} name="nome" required type="text" />
-            </label>
-            <label className="grid gap-1 text-sm text-zinc-300">
-              Descrição
-              <input className={inputClassName} name="descricao" type="text" />
-            </label>
-            <label className="grid gap-1 text-sm text-zinc-300">
-              Tipo
-              <select className={inputClassName} name="tipo">
-                <option value="bonus">Bônus fixo</option>
-                <option value="multiplicador">Multiplicador</option>
-                <option value="especial">Especial</option>
-              </select>
-            </label>
-            <label className="grid gap-1 text-sm text-zinc-300">
-              Multiplicador de pontos (ex: 2 para dobrar)
-              <input className={inputClassName} defaultValue="1" min={1} name="multiplicador" step="0.1" type="number" />
-            </label>
-            <button className="h-11 rounded bg-brand-500 font-bold text-zinc-950">Salvar campanha</button>
-          </form>
-        </div>
-      )}
+      <Modal
+        footer={
+          <Button form="clube-campanha-form" type="submit">
+            Salvar campanha
+          </Button>
+        }
+        isOpen={modalCampanha}
+        onClose={() => setModalCampanha(false)}
+        title="Nova campanha"
+      >
+        <form className="grid gap-5 md:grid-cols-2" id="clube-campanha-form" onSubmit={(e) => void addCampanha(e)}>
+          <div className="md:col-span-2">
+            <FormField htmlFor="cc-nome" label="Nome">
+              <input className={inputClassName} id="cc-nome" name="nome" required type="text" />
+            </FormField>
+          </div>
+          <FormField htmlFor="cc-descricao" label="Descrição">
+            <input className={inputClassName} id="cc-descricao" name="descricao" type="text" />
+          </FormField>
+          <FormField htmlFor="cc-tipo" label="Tipo">
+            <select className={inputClassName} id="cc-tipo" name="tipo">
+              <option value="bonus">Bônus fixo</option>
+              <option value="multiplicador">Multiplicador</option>
+              <option value="especial">Especial</option>
+            </select>
+          </FormField>
+          <FormField htmlFor="cc-multiplicador" label="Multiplicador de pontos (ex: 2 para dobrar)">
+            <input className={inputClassName} defaultValue="1" id="cc-multiplicador" min={1} name="multiplicador" step="0.1" type="number" />
+          </FormField>
+        </form>
+      </Modal>
     </section>
   );
 }

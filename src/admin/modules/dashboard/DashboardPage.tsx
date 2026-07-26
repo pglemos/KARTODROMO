@@ -5,6 +5,7 @@ import {
   Flag,
   LayoutDashboard,
   Monitor,
+  RefreshCw,
   ShieldCheck,
   Timer,
   Trophy,
@@ -14,6 +15,7 @@ import {
   BadgePercent,
   type LucideIcon,
 } from 'lucide-react';
+import { Button } from '../../ui/Button';
 import { adminModules, type AdminModuleKey } from '../../../../components/admin/navigation';
 import { useAuth } from '../../auth/AuthContext';
 import { apiGet } from '../../lib/api-client';
@@ -110,7 +112,13 @@ export const DashboardPage = () => {
   ];
 
   return (
-    <section className="grid gap-6 pb-10 font-['Rajdhani',sans-serif]">
+      <section className="grid gap-6 pb-10 font-['Rajdhani',sans-serif]">
+      <div className="flex items-center justify-end gap-3">
+        <Button onClick={() => void loadData()} variant="ghost" className="text-xs">
+          <RefreshCw aria-hidden="true" size={14} />
+          Atualizar
+        </Button>
+      </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {kpis.map((kpi) => (
           <article className="rounded-[14px] border border-zinc-800 bg-zinc-900 p-[18px]" key={kpi.label}>

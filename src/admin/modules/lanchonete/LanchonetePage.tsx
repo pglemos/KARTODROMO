@@ -19,18 +19,23 @@ import {
   createProduto,
   listEstoque,
   listProdutos,
+  listVendasPage,
   registrarVenda,
   removeProduto,
   updateProduto,
 } from './lanchonete.api';
+import {
+  Pagination,
+} from '../../ui/Pagination';
 import type {
   Estoque,
   Pagamento,
   Produto,
   ProdutoPayload,
+  Venda,
 } from './lanchonete.types';
 
-type Tab = 'pdv' | 'produtos' | 'estoque';
+type Tab = 'pdv' | 'produtos' | 'estoque' | 'vendas';
 
 type CartItem = {
   produto: Produto;
@@ -93,6 +98,7 @@ const tabs: readonly { id: Tab; label: string }[] = [
   { id: 'pdv', label: 'PDV' },
   { id: 'produtos', label: 'Produtos' },
   { id: 'estoque', label: 'Estoque' },
+  { id: 'vendas', label: 'Vendas' },
 ];
 
 const getErrorMessage = (error: unknown): string =>
@@ -150,6 +156,10 @@ export const LanchonetePage = () => {
   });
   const [estoqueErrors, setEstoqueErrors] = useState<EstoqueFormErrors>({});
   const [savingEstoque, setSavingEstoque] = useState(false);
+  const [vendas, setVendas] = useState<Venda[]>([]);
+  const [vendasTotal, setVendasTotal] = useState(0);
+  const [vendasPage, setVendasPage] = useState(0);
+  const [vendasLoading, setVendasLoading] = useState(false);
 
   const canWrite =
     canAccess(role, 'lanchonete') && ['owner', 'admin', 'lanchonete'].includes(role);
@@ -177,6 +187,45 @@ export const LanchonetePage = () => {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  const loadVendas = useCallback(async () => {
+    setVendasLoading(true);
+    try {
+      const result = await listVendasPage(vendasPage, 10);
+      setVendas(result.data);
+      setVendasTotal(result.total);
+    } catch {
+      // vendas is best-effort
+    } finally {
+      setVendasLoading(false);
+    }
+  }, [vendasPage]);
+
+  useEffect(() => {
+    if (activeTab === 'vendas') void loadVendas();
+  }, [activeTab, loadVendas]);
+
+  const vendasColumns = useMemo<readonly DataTableColumn<Venda>[]>(
+    () => [
+      { key: 'id', label: 'ID', render: (v) => v.id.slice(0, 8) },
+      {
+        key: 'total',
+        label: 'Total',
+        render: (v) => currencyFormatter.format(v.total),
+      },
+      {
+        key: 'pagamento',
+        label: 'Pagamento',
+        render: (v) => paymentLabels[v.pagamento] ?? v.pagamento,
+      },
+      {
+        key: 'created_at',
+        label: 'Data',
+        render: (v) => new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(v.created_at)),
+      },
+    ],
+    [],
+  );
 
   const stockByProduct = useMemo(
     () => new Map(estoque.map((item) => [item.produto_id, Number(item.quantidade)])),
@@ -657,6 +706,30 @@ export const LanchonetePage = () => {
               onEdit={canWrite ? openEstoqueModal : undefined}
               onRetry={() => void loadData()}
               rows={stockRows}
+            />
+          </div>
+        ) : null}
+
+        {activeTab === 'vendas' ? (
+          <div>
+            <div className="mb-5">
+              <h2 className="text-lg font-black text-white">Histórico de vendas</h2>
+              <p className="mt-1 text-sm text-zinc-400">
+                Vendas registradas no PDV em ordem cronológica.
+              </p>
+            </div>
+            <DataTable
+              columns={vendasColumns}
+              emptyLabel="Nenhuma venda registrada."
+              error={null}
+              loading={vendasLoading}
+              rows={vendas}
+            />
+            <Pagination
+              onPageChange={setVendasPage}
+              page={vendasPage}
+              pageSize={10}
+              total={vendasTotal}
             />
           </div>
         ) : null}

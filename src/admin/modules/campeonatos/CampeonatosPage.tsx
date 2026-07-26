@@ -212,7 +212,7 @@ const [activeTab, setActiveTab] = useState<Tab>('inscricoes');
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const canWrite = ['owner', 'admin', 'operador_telao'].includes(role);
+  const canWrite = ['owner', 'admin'].includes(role);
 
   const PAGE_SIZE_LOCAL = PAGE_SIZE;
 
@@ -298,8 +298,7 @@ const [activeTab, setActiveTab] = useState<Tab>('inscricoes');
   }, [classificacaoCampeonatoId, classificacaoSearch, classificacaoPage, PAGE_SIZE_LOCAL]);
 
   const reloadAll = useCallback(async () => {
-    await Promise.all([loadCampeonatosAll(), loadCampeonatosTab(), loadEtapasTab(), loadPilotosTab()]);
-    await loadClassificacao();
+    await Promise.all([loadCampeonatosAll(), loadCampeonatosTab(), loadEtapasTab(), loadPilotosTab(), loadClassificacao()]);
   }, [loadCampeonatosAll, loadCampeonatosTab, loadEtapasTab, loadPilotosTab, loadClassificacao]);
 
   useEffect(() => {

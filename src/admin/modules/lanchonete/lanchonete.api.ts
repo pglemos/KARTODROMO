@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiGetById, apiPatch, apiPost, apiPut } from '../../lib/api-client';
+import { apiDelete, apiGet, apiGetById, apiGetPage, apiPatch, apiPost, apiPut, type Page } from '../../lib/api-client';
 import type {
   AjusteEstoquePayload,
   Estoque,
@@ -6,6 +6,7 @@ import type {
   ProdutoPayload,
   ProdutoUpdate,
   RegistrarVendaPayload,
+  Venda,
 } from './lanchonete.types';
 
 export const listProdutos = async (): Promise<Produto[]> => apiGet<Produto[]>('lanchonete_produtos?order=nome');
@@ -27,6 +28,9 @@ export const listEstoque = async (): Promise<Estoque[]> =>
 
 export const ajustarEstoque = async (payload: AjusteEstoquePayload): Promise<Estoque> =>
   apiPut<Estoque>('lanchonete_estoque/upsert', payload);
+
+export const listVendasPage = async (page: number, pageSize: number): Promise<Page<Venda>> =>
+  apiGetPage<Venda>(`lanchonete_vendas?limit=${pageSize}&offset=${page * pageSize}`);
 
 /**
  * Registra uma venda de forma ATÔMICA via endpoint dedicado da API local

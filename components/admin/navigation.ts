@@ -90,7 +90,7 @@ export const adminModules: AdminModule[] = [
     key: 'telao',
     title: 'Telão',
     href: '/admin/telao',
-    group: 'Competição',
+    group: 'Operação',
     summary: 'Controle do painel LED, designer, ViPlex e páginas da TB50.',
     status: 'Operacional',
     features: ['Painel LED', 'Designer', 'ViPlex'],

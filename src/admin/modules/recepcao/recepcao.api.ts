@@ -24,8 +24,12 @@ const toRelations = (row: AtendimentoFullRow): AtendimentoWithRelations => ({
       : null,
 });
 
-export const listAtendimentos = async (): Promise<AtendimentoWithRelations[]> => {
-  const rows = await apiGet<AtendimentoFullRow[]>('recepcao_full');
+export const listAtendimentos = async (dateFrom?: string, dateTo?: string): Promise<AtendimentoWithRelations[]> => {
+  const params = new URLSearchParams();
+  if (dateFrom) params.set('from', dateFrom);
+  if (dateTo) params.set('to', dateTo);
+  const qs = params.toString();
+  const rows = await apiGet<AtendimentoFullRow[]>(`recepcao_full${qs ? `?${qs}` : ''}`);
   return rows.map(toRelations);
 };
 
