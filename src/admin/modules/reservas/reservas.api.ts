@@ -28,6 +28,7 @@ export type ReservasFilters = {
   q?: string;
   from?: string;
   to?: string;
+  dir?: 'asc' | 'desc';
 };
 
 export const listReservasPage = async (
@@ -41,6 +42,7 @@ export const listReservasPage = async (
   if (filters.q) params.set('q', filters.q);
   if (filters.from) params.set('from', filters.from);
   if (filters.to) params.set('to', filters.to);
+  if (filters.dir) params.set('dir', filters.dir);
   params.set('limit', String(pageSize));
   params.set('offset', String(page * pageSize));
 

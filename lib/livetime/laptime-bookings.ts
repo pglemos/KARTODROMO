@@ -140,7 +140,11 @@ export async function fetchLapTimeBookingsPage(
     const bind = (request: sql.Request) => {
       if (q) request.input('q', sql.NVarChar, `%${q}%`);
       if (filters.from) request.input('from', sql.DateTime, new Date(filters.from));
-      if (filters.to) request.input('to', sql.DateTime, new Date(filters.to));
+      if (filters.to) {
+        const endOfDay = new Date(filters.to);
+        endOfDay.setHours(23, 59, 59, 999);
+        request.input('to', sql.DateTime, endOfDay);
+      }
       return request;
     };
 

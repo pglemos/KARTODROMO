@@ -92,6 +92,11 @@ const currencyFormatter = new Intl.NumberFormat('pt-BR', {
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : 'Ocorreu um erro inesperado.';
 
+const todayLocal = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
 const toDateTimeLocal = (value: string | null): string => {
   if (!value) {
     return '';
@@ -147,7 +152,7 @@ export const ReservasPage = () => {
   const [bookingsTotal, setBookingsTotal] = useState(0);
   const [bookingsPage, setBookingsPage] = useState(0);
   const [bookingsSearchInput, setBookingsSearchInput] = useState('');
-  const [bookingsFilters, setBookingsFilters] = useState<LapTimeBookingsFilters>({ status: 'aberta' });
+  const [bookingsFilters, setBookingsFilters] = useState<LapTimeBookingsFilters>({ status: 'aberta', from: todayLocal(), to: todayLocal() });
   const [bookingsLoading, setBookingsLoading] = useState(true);
   const [bookingsError, setBookingsError] = useState<string | null>(null);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
@@ -158,7 +163,7 @@ export const ReservasPage = () => {
   const [reservas, setReservas] = useState<ReservaWithRelations[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
-  const [filters, setFilters] = useState<ReservasFilters>({ status: '', q: '' });
+  const [filters, setFilters] = useState<ReservasFilters>({ status: '', q: '', from: todayLocal(), to: todayLocal(), dir: 'asc' });
   const [searchInput, setSearchInput] = useState('');
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [pistas, setPistas] = useState<Pista[]>([]);

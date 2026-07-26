@@ -128,7 +128,7 @@ export async function fetchLapTimeRacingsPage(
   try {
     await pool.connect();
 
-    const conditions: string[] = [];
+    const conditions: string[] = ["r.ExpectedDateTime <= GETDATE()"];
     if (q) conditions.push('r.Name like @q');
     if (filters.status === 'finalizada') conditions.push('r.RacingState = 6');
     if (filters.status === 'aberta') conditions.push('r.RacingState <> 6');
@@ -139,7 +139,11 @@ export async function fetchLapTimeRacingsPage(
     const bind = (request: sql.Request) => {
       if (q) request.input('q', sql.NVarChar, `%${q}%`);
       if (filters.from) request.input('from', sql.DateTime, new Date(filters.from));
-      if (filters.to) request.input('to', sql.DateTime, new Date(filters.to));
+      if (filters.to) {
+        const endOfDay = new Date(filters.to);
+        endOfDay.setHours(23, 59, 59, 999);
+        request.input('to', sql.DateTime, endOfDay);
+      }
       return request;
     };
 

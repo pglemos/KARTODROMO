@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
   Activity,
   Download,
@@ -30,7 +23,6 @@ import { Modal } from '../../ui/Modal';
 import { PageHeader } from '../../ui/PageHeader';
 import { Pagination } from '../../ui/Pagination';
 import { StatCard } from '../../ui/StatCard';
-import { Tabs } from '../../ui/Tabs';
 import { useToast } from '../../ui/useToast';
 import {
   listLapTimeRacingCompetitors,
@@ -73,8 +65,18 @@ import {
   type VoltaUpdate,
 } from './cronometragem.types';
 
-type TabKey = 'ao-vivo' | 'historico' | 'sessoes' | 'voltas';
 const PAGE_SIZE = 10;
+
+type UnifiedItem = {
+  id: string;
+  nome: string;
+  tipo: string | null;
+  dataHora: string;
+  source: 'laptime' | 'manual';
+  participantes?: number;
+  finalizada?: boolean;
+  status?: SessaoStatus;
+};
 
 type SessaoFormState = {
   nome: string;
@@ -107,27 +109,12 @@ type DeleteTarget =
 const LIVE_URL_STORAGE_KEY = 'cronometragem_live_url';
 
 const emptySessaoForm: SessaoFormState = {
-  nome: '',
-  campeonato_id: '',
-  etapa_id: '',
-  tipo: 'treino',
-  data: '',
-  status: 'aberta',
-  fonte: 'manual',
+  nome: '', campeonato_id: '', etapa_id: '', tipo: 'treino', data: '', status: 'aberta', fonte: 'manual',
 };
 
 const emptyVoltaForm: VoltaFormState = {
-  piloto_id: '',
-  piloto_nome: '',
-  kart: '',
-  numero: '1',
-  tempo: '',
-  setor1: '',
-  setor2: '',
-  setor3: '',
-  posicao: '',
-  melhor: false,
-  valida: true,
+  piloto_id: '', piloto_nome: '', kart: '', numero: '1', tempo: '', setor1: '', setor2: '', setor3: '',
+  posicao: '', melhor: false, valida: true,
 };
 
 const inputClassName =
@@ -136,10 +123,13 @@ const inputClassName =
 const checkboxClassName =
   'h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-brand-500 focus:ring-brand-500/30';
 
-const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
-  dateStyle: 'short',
-  timeStyle: 'short',
-});
+const dateFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+
+const formatDateSafe = (value: unknown): string => {
+  if (!value) return '—';
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? '—' : dateFormatter.format(date);
+};
 
 const numberFormatter = new Intl.NumberFormat('pt-BR');
 
@@ -160,9 +150,7 @@ const textoParaMs = (value: string): number | null => {
   if (parts.length > 2) return null;
   const seconds = Number(parts[parts.length - 1]);
   const minutes = parts.length === 2 ? Number(parts[0]) : 0;
-  if (!Number.isFinite(seconds) || !Number.isFinite(minutes) || seconds < 0 || minutes < 0) {
-    return null;
-  }
+  if (!Number.isFinite(seconds) || !Number.isFinite(minutes) || seconds < 0 || minutes < 0) return null;
   return Math.round((minutes * 60 + seconds) * 1_000);
 };
 
@@ -176,16 +164,13 @@ const sessionPayload = (form: SessaoFormState): SessaoPayload => ({
   fonte: form.fonte.trim() || null,
 });
 
-const tipoLabel: Record<SessaoTipo, string> = {
-  treino: 'Treino',
-  classificacao: 'Classificação',
-  corrida: 'Corrida',
-};
+const tipoLabel: Record<SessaoTipo, string> = { treino: 'Treino', classificacao: 'Classificação', corrida: 'Corrida' };
+const tipoVariant: Record<SessaoTipo, 'zinc' | 'blue' | 'emerald'> = { treino: 'zinc', classificacao: 'blue', corrida: 'emerald' };
 
-const tipoVariant: Record<SessaoTipo, 'zinc' | 'blue' | 'emerald'> = {
-  treino: 'zinc',
-  classificacao: 'blue',
-  corrida: 'emerald',
+const FONTE_LABELS: Record<string, string> = { laptime: 'LapTime', manual: 'Manual' };
+const FONTE_COLORS: Record<string, string> = {
+  laptime: 'border-emerald-700 bg-emerald-950 text-emerald-200',
+  manual: 'border-zinc-600 bg-zinc-800 text-zinc-300',
 };
 
 export const CronometragemPage = () => {
@@ -194,50 +179,42 @@ export const CronometragemPage = () => {
   const canWrite =
     canAccess(role, 'cronometragem') && ['owner', 'admin', 'operador_telao'].includes(role);
 
-  const [activeTab, setActiveTab] = useState<TabKey>('ao-vivo');
+  const [unifiedData, setUnifiedData] = useState<UnifiedItem[]>([]);
+  const [unifiedTotal, setUnifiedTotal] = useState(0);
+  const [unifiedPage, setUnifiedPage] = useState(0);
+  const [unifiedLoading, setUnifiedLoading] = useState(true);
+  const [unifiedError, setUnifiedError] = useState<string | null>(null);
 
-  const [historico, setHistorico] = useState<LapTimeRacing[]>([]);
-  const [historicoTotal, setHistoricoTotal] = useState(0);
-  const [historicoPage, setHistoricoPage] = useState(0);
-  const [historicoSearchInput, setHistoricoSearchInput] = useState('');
-  const [historicoFilters, setHistoricoFilters] = useState<LapTimeRacingsFilters>({});
-  const [historicoLoading, setHistoricoLoading] = useState(true);
-  const [historicoError, setHistoricoError] = useState<string | null>(null);
-  const [selectedHistoricoId, setSelectedHistoricoId] = useState<string | null>(null);
-  const [historicoCompetitors, setHistoricoCompetitors] = useState<LapTimeRacingCompetitor[]>([]);
-  const [historicoCompetitorsLoading, setHistoricoCompetitorsLoading] = useState(false);
-  const [historicoCompetitorsError, setHistoricoCompetitorsError] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState('');
+  const [sourceFilter, setSourceFilter] = useState<string>('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [selectedSource, setSelectedSource] = useState<string | null>(null);
+
+  const [lapTimeCompetitors, setLapTimeCompetitors] = useState<LapTimeRacingCompetitor[]>([]);
+  const [lapTimeCompetitorsLoading, setLapTimeCompetitorsLoading] = useState(false);
+  const [lapTimeCompetitorsError, setLapTimeCompetitorsError] = useState<string | null>(null);
+
+  const [sessaoVoltas, setSessaoVoltas] = useState<Volta[]>([]);
+  const [sessaoVoltasLoading, setSessaoVoltasLoading] = useState(false);
+  const [sessaoVoltasError, setSessaoVoltasError] = useState<string | null>(null);
+
+  const [liveUrl, setLiveUrl] = useState(() => {
+    try { return localStorage.getItem(LIVE_URL_STORAGE_KEY) || DEFAULT_LIVE_URL; }
+    catch { return DEFAULT_LIVE_URL; }
+  });
+  const [connected, setConnected] = useState(false);
+  const [liveLoading, setLiveLoading] = useState(false);
+  const [snapshot, setSnapshot] = useState<LiveSnapshot>({ status: 'pausado', pilotos: [] });
+  const liveRequestInFlight = useRef(false);
 
   const [sessoes, setSessoes] = useState<SessaoWithCampeonato[]>([]);
-  const [sessoesRows, setSessoesRows] = useState<SessaoWithCampeonato[]>([]);
-  const [sessoesTotal, setSessoesTotal] = useState(0);
-  const [sessoesPage, setSessoesPage] = useState(0);
-  const [sessoesSearchInput, setSessoesSearchInput] = useState('');
-  const [sessoesFilters, setSessoesFilters] = useState<SessoesFilters>({});
-  const [sessoesTabLoading, setSessoesTabLoading] = useState(true);
-  const [sessoesTabError, setSessoesTabError] = useState<string | null>(null);
   const [campeonatos, setCampeonatos] = useState<CampeonatoOption[]>([]);
   const [etapas, setEtapas] = useState<EtapaOption[]>([]);
   const [pilotos, setPilotos] = useState<PilotoOption[]>([]);
   const [selectedSessaoId, setSelectedSessaoId] = useState('');
-  const [voltas, setVoltas] = useState<Volta[]>([]);
-  const [voltasLoading, setVoltasLoading] = useState(false);
-  const [voltasError, setVoltasError] = useState<string | null>(null);
-
-  const [liveUrl, setLiveUrl] = useState(() => {
-    try {
-      return localStorage.getItem(LIVE_URL_STORAGE_KEY) || DEFAULT_LIVE_URL;
-    } catch {
-      return DEFAULT_LIVE_URL;
-    }
-  });
-  const [connected, setConnected] = useState(false);
-  const [liveLoading, setLiveLoading] = useState(false);
-  const [snapshot, setSnapshot] = useState<LiveSnapshot>({
-    status: 'pausado',
-    pilotos: [],
-  });
-  const liveRequestInFlight = useRef(false);
 
   const [sessaoModalOpen, setSessaoModalOpen] = useState(false);
   const [editingSessao, setEditingSessao] = useState<SessaoWithCampeonato | null>(null);
@@ -256,194 +233,122 @@ export const CronometragemPage = () => {
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [generatedLink, setGeneratedLink] = useState<string | null>(null);
 
-  const selectedSessao = useMemo(
-    () => sessoes.find((sessao) => sessao.id === selectedSessaoId) ?? null,
-    [selectedSessaoId, sessoes],
-  );
+  const loadUnifiedData = useCallback(async () => {
+    setUnifiedLoading(true);
+    setUnifiedError(null);
+    try {
+      const promises: Promise<{ rows: UnifiedItem[] }>[] = [];
 
-  const etapasDaSessao = useMemo(
-    () => etapas.filter((etapa) => etapa.campeonato_id === sessaoForm.campeonato_id),
-    [etapas, sessaoForm.campeonato_id],
-  );
+      if (!sourceFilter || sourceFilter === 'laptime') {
+        promises.push(
+          listLapTimeRacingsPage(
+            { q: searchInput || undefined, from: dateFrom || undefined, to: dateTo || undefined },
+            0, 200,
+          ).then((r) => ({
+            rows: r.data.map((item) => ({
+              id: `lt_${item.id}`, nome: item.nome, tipo: item.tipo, dataHora: item.dataHora,
+              participantes: item.participantes, source: 'laptime' as const, finalizada: item.finalizada,
+            })),
+          })),
+        );
+      }
 
-  const etapasDaImportacao = useMemo(
-    () => etapas.filter((etapa) => etapa.campeonato_id === importSessaoForm.campeonato_id),
-    [etapas, importSessaoForm.campeonato_id],
-  );
+      if (!sourceFilter || sourceFilter === 'manual') {
+        promises.push(
+          listSessoesPage(
+            { q: searchInput || undefined, status: undefined, tipo: undefined },
+            0, 200,
+          ).then((r) => ({
+            rows: r.data.map((item) => ({
+              id: `d1_${item.id}`, nome: item.nome, tipo: tipoLabel[item.tipo],
+              dataHora: item.data, participantes: 0, source: 'manual' as const, status: item.status,
+            })),
+          })),
+        );
+      }
+
+      const results = await Promise.all(promises);
+      let all = results.flatMap((r) => r.rows);
+      all.sort((a, b) => new Date(b.dataHora).getTime() - new Date(a.dataHora).getTime());
+
+      const total = all.length;
+      const offset = unifiedPage * PAGE_SIZE;
+      const paged = all.slice(offset, offset + PAGE_SIZE);
+
+      setUnifiedData(paged);
+      setUnifiedTotal(total);
+    } catch (error: unknown) {
+      setUnifiedError(getErrorMessage(error));
+    } finally {
+      setUnifiedLoading(false);
+    }
+  }, [searchInput, sourceFilter, dateFrom, dateTo, unifiedPage]);
+
+  useEffect(() => { void loadUnifiedData(); }, [loadUnifiedData]);
+
+  useEffect(() => {
+    const handle = setTimeout(() => setUnifiedPage(0), 350);
+    return () => clearTimeout(handle);
+  }, [searchInput, sourceFilter, dateFrom, dateTo]);
+
+  const loadSessaoVoltas = useCallback(async () => {
+    setSessaoVoltasLoading(true);
+    setSessaoVoltasError(null);
+    try {
+      const prefix = selectedItemId?.split('_')[0];
+      if (prefix === 'd1') {
+        const sessaoId = selectedItemId!.slice(3);
+        setSessaoVoltas(await listVoltas(sessaoId));
+      } else {
+        setSessaoVoltas([]);
+      }
+    } catch (error: unknown) {
+      setSessaoVoltasError(getErrorMessage(error));
+    } finally {
+      setSessaoVoltasLoading(false);
+    }
+  }, [selectedItemId]);
+
+  useEffect(() => { void loadSessaoVoltas(); }, [loadSessaoVoltas]);
+
+  const loadLapTimeCompetitors = useCallback(async () => {
+    if (!selectedItemId || selectedItemId.split('_')[0] !== 'lt') {
+      setLapTimeCompetitors([]);
+      return;
+    }
+    setLapTimeCompetitorsLoading(true);
+    setLapTimeCompetitorsError(null);
+    try {
+      const racingId = selectedItemId.slice(3);
+      setLapTimeCompetitors(await listLapTimeRacingCompetitors(racingId));
+    } catch (error: unknown) {
+      setLapTimeCompetitorsError(getErrorMessage(error));
+    } finally {
+      setLapTimeCompetitorsLoading(false);
+    }
+  }, [selectedItemId]);
+
+  useEffect(() => { void loadLapTimeCompetitors(); }, [loadLapTimeCompetitors]);
 
   const loadData = useCallback(async () => {
     try {
       const [sessoesData, campeonatosData, etapasData, pilotosData] = await Promise.all([
-        listSessoes(),
-        listCampeonatos(),
-        listEtapas(),
-        listPilotos(),
+        listSessoes(), listCampeonatos(), listEtapas(), listPilotos(),
       ]);
       setSessoes(sessoesData);
       setCampeonatos(campeonatosData);
       setEtapas(etapasData);
       setPilotos(pilotosData);
       setSelectedSessaoId((current) =>
-        sessoesData.some((sessao) => sessao.id === current)
-          ? current
-          : (sessoesData[0]?.id ?? ''),
+        sessoesData.some((sessao) => sessao.id === current) ? current : (sessoesData[0]?.id ?? ''),
       );
       setImportSessaoId((current) =>
-        sessoesData.some((sessao) => sessao.id === current)
-          ? current
-          : (sessoesData[0]?.id ?? ''),
+        sessoesData.some((sessao) => sessao.id === current) ? current : (sessoesData[0]?.id ?? ''),
       );
     } catch (error: unknown) {
       toast.error(getErrorMessage(error));
     }
   }, [toast]);
-
-  const loadSessoesTab = useCallback(async () => {
-    setSessoesTabLoading(true);
-    setSessoesTabError(null);
-    try {
-      const page = await listSessoesPage(sessoesFilters, sessoesPage, PAGE_SIZE);
-      setSessoesRows(page.data);
-      setSessoesTotal(page.total);
-    } catch (error: unknown) {
-      setSessoesTabError(getErrorMessage(error));
-    } finally {
-      setSessoesTabLoading(false);
-    }
-  }, [sessoesFilters, sessoesPage]);
-
-  useEffect(() => {
-    void loadSessoesTab();
-  }, [loadSessoesTab]);
-
-  useEffect(() => {
-    const handle = setTimeout(() => {
-      setSessoesFilters((current) => ({ ...current, q: sessoesSearchInput || undefined }));
-      setSessoesPage(0);
-    }, 350);
-    return () => clearTimeout(handle);
-  }, [sessoesSearchInput]);
-
-  const updateSessoesStatusFilter = (status: SessaoStatus | '') => {
-    setSessoesFilters((current) => ({ ...current, status }));
-    setSessoesPage(0);
-  };
-
-  const updateSessoesTipoFilter = (tipo: SessaoTipo | '') => {
-    setSessoesFilters((current) => ({ ...current, tipo }));
-    setSessoesPage(0);
-  };
-
-  const loadHistorico = useCallback(async () => {
-    setHistoricoLoading(true);
-    setHistoricoError(null);
-    try {
-      const result = await listLapTimeRacingsPage(historicoFilters, historicoPage, PAGE_SIZE);
-      setHistorico(result.data);
-      setHistoricoTotal(result.total);
-      setSelectedHistoricoId((current) =>
-        current && result.data.some((racing) => racing.id === current) ? current : result.data[0]?.id ?? null,
-      );
-    } catch (error: unknown) {
-      setHistoricoError(getErrorMessage(error));
-    } finally {
-      setHistoricoLoading(false);
-    }
-  }, [historicoFilters, historicoPage]);
-
-  const loadHistoricoCompetitors = useCallback(async () => {
-    if (!selectedHistoricoId) {
-      setHistoricoCompetitors([]);
-      setHistoricoCompetitorsError(null);
-      return;
-    }
-    setHistoricoCompetitorsLoading(true);
-    setHistoricoCompetitorsError(null);
-    try {
-      setHistoricoCompetitors(await listLapTimeRacingCompetitors(selectedHistoricoId));
-    } catch (error: unknown) {
-      setHistoricoCompetitorsError(getErrorMessage(error));
-    } finally {
-      setHistoricoCompetitorsLoading(false);
-    }
-  }, [selectedHistoricoId]);
-
-  useEffect(() => {
-    if (activeTab === 'historico') void loadHistorico();
-  }, [activeTab, loadHistorico]);
-
-  useEffect(() => {
-    if (activeTab === 'historico') void loadHistoricoCompetitors();
-  }, [activeTab, loadHistoricoCompetitors]);
-
-  useEffect(() => {
-    const handle = setTimeout(() => {
-      setHistoricoFilters((current) => ({ ...current, q: historicoSearchInput || undefined }));
-      setHistoricoPage(0);
-    }, 350);
-    return () => clearTimeout(handle);
-  }, [historicoSearchInput]);
-
-  const selectedHistorico = useMemo(
-    () => historico.find((racing) => racing.id === selectedHistoricoId) ?? null,
-    [historico, selectedHistoricoId],
-  );
-
-  const historicoColumns = useMemo<readonly DataTableColumn<LapTimeRacing>[]>(
-    () => [
-      {
-        key: 'nome',
-        label: 'Corrida',
-        render: (racing) => (
-          <button
-            className={`text-left font-bold underline-offset-4 hover:underline ${
-              selectedHistoricoId === racing.id ? 'text-brand-300' : 'text-white'
-            }`}
-            onClick={() => setSelectedHistoricoId(racing.id)}
-            type="button"
-          >
-            {racing.nome}
-          </button>
-        ),
-      },
-      { key: 'tipo', label: 'Tipo', render: (racing) => racing.tipo ?? '—' },
-      {
-        key: 'dataHora',
-        label: 'Data/hora',
-        render: (racing) => dateFormatter.format(new Date(racing.dataHora)),
-      },
-      { key: 'participantes', label: 'Participantes' },
-    ],
-    [selectedHistoricoId],
-  );
-
-  const historicoCompetitorColumns = useMemo<readonly DataTableColumn<LapTimeRacingCompetitor>[]>(
-    () => [
-      { key: 'posicao', label: 'Pos.', render: (item) => item.posicao ?? '—' },
-      { key: 'numero', label: 'Kart', render: (item) => item.numero ?? '—' },
-      { key: 'nome', label: 'Piloto' },
-      { key: 'voltas', label: 'Voltas', render: (item) => item.voltas ?? '—' },
-      { key: 'melhorVolta', label: 'Melhor volta', render: (item) => item.melhorVolta ?? '—' },
-    ],
-    [],
-  );
-
-  const loadVoltas = useCallback(async () => {
-    if (!selectedSessaoId) {
-      setVoltas([]);
-      setVoltasError(null);
-      return;
-    }
-    setVoltasLoading(true);
-    setVoltasError(null);
-    try {
-      setVoltas(await listVoltas(selectedSessaoId));
-    } catch (error: unknown) {
-      setVoltasError(getErrorMessage(error));
-    } finally {
-      setVoltasLoading(false);
-    }
-  }, [selectedSessaoId]);
 
   const pollLive = useCallback(async () => {
     if (liveRequestInFlight.current) return;
@@ -457,24 +362,14 @@ export const CronometragemPage = () => {
     }
   }, [liveUrl]);
 
-  useEffect(() => {
-    void loadData();
-  }, [loadData]);
+  useEffect(() => { void loadData(); }, [loadData]);
 
   useEffect(() => {
-    void loadVoltas();
-  }, [loadVoltas]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(LIVE_URL_STORAGE_KEY, liveUrl);
-    } catch {
-      // O módulo continua funcional quando o armazenamento do navegador está bloqueado.
-    }
+    try { localStorage.setItem(LIVE_URL_STORAGE_KEY, liveUrl); } catch { /* ok */ }
   }, [liveUrl]);
 
   useEffect(() => {
-    if (!connected) return undefined;
+    if (!connected) return;
     void pollLive();
     const timer = window.setInterval(() => void pollLive(), 2_000);
     return () => window.clearInterval(timer);
@@ -484,12 +379,7 @@ export const CronometragemPage = () => {
     const campeonatoId = campeonatos[0]?.id ?? '';
     const etapaId = etapas.find((etapa) => etapa.campeonato_id === campeonatoId)?.id ?? '';
     setEditingSessao(null);
-    setSessaoForm({
-      ...emptySessaoForm,
-      campeonato_id: campeonatoId,
-      etapa_id: etapaId,
-      data: toDateTimeLocal(new Date().toISOString()),
-    });
+    setSessaoForm({ ...emptySessaoForm, campeonato_id: campeonatoId, etapa_id: etapaId, data: toDateTimeLocal(new Date().toISOString()) });
     setFormErrors({});
     setSessaoModalOpen(true);
   };
@@ -497,13 +387,8 @@ export const CronometragemPage = () => {
   const openEditSessao = (sessao: SessaoWithCampeonato) => {
     setEditingSessao(sessao);
     setSessaoForm({
-      nome: sessao.nome,
-      campeonato_id: sessao.campeonato_id ?? '',
-      etapa_id: sessao.etapa_id ?? '',
-      tipo: sessao.tipo,
-      data: toDateTimeLocal(sessao.data),
-      status: sessao.status,
-      fonte: sessao.fonte ?? '',
+      nome: sessao.nome, campeonato_id: sessao.campeonato_id ?? '', etapa_id: sessao.etapa_id ?? '',
+      tipo: sessao.tipo, data: toDateTimeLocal(sessao.data), status: sessao.status, fonte: sessao.fonte ?? '',
     });
     setFormErrors({});
     setSessaoModalOpen(true);
@@ -514,11 +399,8 @@ export const CronometragemPage = () => {
     const piloto = pilotos[0];
     setEditingVolta(null);
     setVoltaForm({
-      ...emptyVoltaForm,
-      piloto_id: piloto?.id ?? '',
-      piloto_nome: piloto?.nome ?? '',
-      kart: piloto?.numero ?? '',
-      numero: String((voltas[voltas.length - 1]?.numero ?? 0) + 1),
+      ...emptyVoltaForm, piloto_id: piloto?.id ?? '', piloto_nome: piloto?.nome ?? '',
+      kart: piloto?.numero ?? '', numero: '1',
     });
     setFormErrors({});
     setVoltaModalOpen(true);
@@ -527,17 +409,12 @@ export const CronometragemPage = () => {
   const openEditVolta = (volta: Volta) => {
     setEditingVolta(volta);
     setVoltaForm({
-      piloto_id: volta.piloto_id ?? '',
-      piloto_nome: volta.piloto_nome,
-      kart: volta.kart ?? '',
-      numero: String(volta.numero),
-      tempo: msParaTexto(volta.tempo_ms),
+      piloto_id: volta.piloto_id ?? '', piloto_nome: volta.piloto_nome, kart: volta.kart ?? '',
+      numero: String(volta.numero), tempo: msParaTexto(volta.tempo_ms),
       setor1: volta.setor1_ms === null ? '' : msParaTexto(volta.setor1_ms),
       setor2: volta.setor2_ms === null ? '' : msParaTexto(volta.setor2_ms),
       setor3: volta.setor3_ms === null ? '' : msParaTexto(volta.setor3_ms),
-      posicao: volta.posicao === null ? '' : String(volta.posicao),
-      melhor: volta.melhor,
-      valida: volta.valida,
+      posicao: volta.posicao === null ? '' : String(volta.posicao), melhor: volta.melhor, valida: volta.valida,
     });
     setFormErrors({});
     setVoltaModalOpen(true);
@@ -549,12 +426,8 @@ export const CronometragemPage = () => {
     setImportMode(sessoes.length ? 'existente' : 'nova');
     setImportSessaoId(selectedSessaoId || sessoes[0]?.id || '');
     setImportSessaoForm({
-      ...emptySessaoForm,
-      nome: `LiveTime ${dateFormatter.format(new Date())}`,
-      campeonato_id: campeonatoId,
-      etapa_id: etapaId,
-      data: toDateTimeLocal(new Date().toISOString()),
-      fonte: 'livetime',
+      ...emptySessaoForm, nome: `LiveTime ${dateFormatter.format(new Date())}`,
+      campeonato_id: campeonatoId, etapa_id: etapaId, data: toDateTimeLocal(new Date().toISOString()), fonte: 'livetime',
     });
     setFormErrors({});
     setImportModalOpen(true);
@@ -575,7 +448,6 @@ export const CronometragemPage = () => {
     const errors = validateSessao(sessaoForm);
     setFormErrors(errors);
     if (Object.keys(errors).length) return;
-
     setSubmitting(true);
     try {
       if (editingSessao) {
@@ -587,24 +459,20 @@ export const CronometragemPage = () => {
         toast.success('Sessão criada com sucesso.');
       }
       setSessaoModalOpen(false);
-      await Promise.all([loadData(), loadSessoesTab()]);
+      await Promise.all([loadData(), loadUnifiedData()]);
     } catch (error: unknown) {
       toast.error(getErrorMessage(error));
-    } finally {
-      setSubmitting(false);
-    }
+    } finally { setSubmitting(false); }
   };
 
   const validateVolta = (): Record<string, string> => {
     const errors: Record<string, string> = {};
     const numero = Number(voltaForm.numero);
-    const posicao = voltaForm.posicao ? Number(voltaForm.posicao) : null;
     if (!voltaForm.piloto_nome.trim()) errors.piloto_id = 'Selecione um piloto.';
     if (!Number.isInteger(numero) || numero < 1) errors.numero = 'Informe uma volta válida.';
     if (textoParaMs(voltaForm.tempo) === null) errors.tempo = 'Use o formato m:ss.mmm.';
-    if (posicao !== null && (!Number.isInteger(posicao) || posicao < 1)) {
-      errors.posicao = 'Informe uma posição válida.';
-    }
+    const posicao = voltaForm.posicao ? Number(voltaForm.posicao) : null;
+    if (posicao !== null && (!Number.isInteger(posicao) || posicao < 1)) errors.posicao = 'Informe uma posição válida.';
     return errors;
   };
 
@@ -614,53 +482,30 @@ export const CronometragemPage = () => {
     const errors = validateVolta();
     setFormErrors(errors);
     if (Object.keys(errors).length) return;
-
     const tempo = textoParaMs(voltaForm.tempo);
     if (tempo === null) return;
     const payload: VoltaPayload = {
-      sessao_id: selectedSessaoId,
-      piloto_id: voltaForm.piloto_id || null,
-      piloto_nome: voltaForm.piloto_nome.trim(),
-      kart: voltaForm.kart.trim() || null,
-      numero: Number(voltaForm.numero),
-      tempo_ms: tempo,
-      setor1_ms: textoParaMs(voltaForm.setor1),
-      setor2_ms: textoParaMs(voltaForm.setor2),
-      setor3_ms: textoParaMs(voltaForm.setor3),
-      posicao: voltaForm.posicao ? Number(voltaForm.posicao) : null,
-      melhor: voltaForm.melhor,
-      valida: voltaForm.valida,
+      sessao_id: selectedSessaoId, piloto_id: voltaForm.piloto_id || null,
+      piloto_nome: voltaForm.piloto_nome.trim(), kart: voltaForm.kart.trim() || null,
+      numero: Number(voltaForm.numero), tempo_ms: tempo,
+      setor1_ms: textoParaMs(voltaForm.setor1), setor2_ms: textoParaMs(voltaForm.setor2),
+      setor3_ms: textoParaMs(voltaForm.setor3), posicao: voltaForm.posicao ? Number(voltaForm.posicao) : null,
+      melhor: voltaForm.melhor, valida: voltaForm.valida,
     };
-
     setSubmitting(true);
     try {
       if (editingVolta) {
-        const updatePayload: VoltaUpdate = {
-          piloto_id: payload.piloto_id,
-          piloto_nome: payload.piloto_nome,
-          kart: payload.kart,
-          numero: payload.numero,
-          tempo_ms: payload.tempo_ms,
-          setor1_ms: payload.setor1_ms,
-          setor2_ms: payload.setor2_ms,
-          setor3_ms: payload.setor3_ms,
-          posicao: payload.posicao,
-          melhor: payload.melhor,
-          valida: payload.valida,
-        };
-        await updateVolta(editingVolta.id, updatePayload);
+        await updateVolta(editingVolta.id, payload);
         toast.success('Volta atualizada com sucesso.');
       } else {
         await createVolta(payload);
         toast.success('Volta criada com sucesso.');
       }
       setVoltaModalOpen(false);
-      await loadVoltas();
+      await loadSessaoVoltas();
     } catch (error: unknown) {
       toast.error(getErrorMessage(error));
-    } finally {
-      setSubmitting(false);
-    }
+    } finally { setSubmitting(false); }
   };
 
   const handleImport = async () => {
@@ -674,7 +519,6 @@ export const CronometragemPage = () => {
       setFormErrors(errors);
       if (Object.keys(errors).length) return;
     }
-
     setSubmitting(true);
     try {
       let targetId = importSessaoId;
@@ -686,13 +530,10 @@ export const CronometragemPage = () => {
       setSelectedSessaoId(targetId);
       setImportModalOpen(false);
       toast.success(`${numberFormatter.format(count)} pilotos importados para a sessão.`);
-      await Promise.all([loadData(), loadSessoesTab()]);
-      await listVoltas(targetId).then(setVoltas);
+      await Promise.all([loadData(), loadUnifiedData()]);
     } catch (error: unknown) {
       toast.error(getErrorMessage(error));
-    } finally {
-      setSubmitting(false);
-    }
+    } finally { setSubmitting(false); }
   };
 
   const handleDelete = async () => {
@@ -702,18 +543,16 @@ export const CronometragemPage = () => {
       if (deleteTarget.kind === 'sessao') {
         await removeSessao(deleteTarget.item.id);
         toast.success('Sessão excluída com sucesso.');
-        await Promise.all([loadData(), loadSessoesTab()]);
+        await Promise.all([loadData(), loadUnifiedData()]);
       } else {
         await removeVolta(deleteTarget.item.id);
         toast.success('Volta excluída com sucesso.');
-        await loadVoltas();
+        await loadSessaoVoltas();
       }
       setDeleteTarget(null);
     } catch (error: unknown) {
       toast.error(getErrorMessage(error));
-    } finally {
-      setDeleting(false);
-    }
+    } finally { setDeleting(false); }
   };
 
   const handleEncerrar = async (sessao: SessaoWithCampeonato) => {
@@ -721,10 +560,8 @@ export const CronometragemPage = () => {
     try {
       await updateSessao(sessao.id, { status: 'encerrada' });
       toast.success('Sessão encerrada.');
-      await Promise.all([loadData(), loadSessoesTab()]);
-    } catch (error: unknown) {
-      toast.error(getErrorMessage(error));
-    }
+      await Promise.all([loadData(), loadUnifiedData()]);
+    } catch (error: unknown) { toast.error(getErrorMessage(error)); }
   };
 
   const handleGerarResultados = async (sessao: SessaoWithCampeonato) => {
@@ -732,33 +569,23 @@ export const CronometragemPage = () => {
     setGeneratingId(sessao.id);
     try {
       const corridaId = await gerarResultados(sessao.id);
-      const link = `/admin/resultados?corrida=${encodeURIComponent(corridaId)}`;
-      setGeneratedLink(link);
-      toast.success(`Resultados gerados em ${link}`);
+      setGeneratedLink(`/admin/resultados?corrida=${encodeURIComponent(corridaId)}`);
+      toast.success('Resultados gerados com sucesso.');
     } catch (error: unknown) {
       toast.error(getErrorMessage(error));
-    } finally {
-      setGeneratingId(null);
-    }
-  };
-
-  const openVoltas = (sessao: SessaoWithCampeonato) => {
-    setSelectedSessaoId(sessao.id);
-    setActiveTab('voltas');
+    } finally { setGeneratingId(null); }
   };
 
   const handleSessaoCampeonato = (campeonatoId: string) => {
     setSessaoForm((current) => ({
-      ...current,
-      campeonato_id: campeonatoId,
+      ...current, campeonato_id: campeonatoId,
       etapa_id: etapas.find((etapa) => etapa.campeonato_id === campeonatoId)?.id ?? '',
     }));
   };
 
   const handleImportCampeonato = (campeonatoId: string) => {
     setImportSessaoForm((current) => ({
-      ...current,
-      campeonato_id: campeonatoId,
+      ...current, campeonato_id: campeonatoId,
       etapa_id: etapas.find((etapa) => etapa.campeonato_id === campeonatoId)?.id ?? '',
     }));
   };
@@ -766,203 +593,161 @@ export const CronometragemPage = () => {
   const handlePiloto = (pilotoId: string) => {
     const piloto = pilotos.find((item) => item.id === pilotoId);
     setVoltaForm((current) => ({
-      ...current,
-      piloto_id: pilotoId,
-      piloto_nome: piloto?.nome ?? '',
-      kart: piloto?.numero ?? current.kart,
+      ...current, piloto_id: pilotoId, piloto_nome: piloto?.nome ?? '', kart: piloto?.numero ?? current.kart,
     }));
   };
 
-  const sessaoColumns: readonly DataTableColumn<SessaoWithCampeonato>[] = [
+  const selectedItem = useMemo(
+    () => unifiedData.find((item) => item.id === selectedItemId) ?? null,
+    [unifiedData, selectedItemId],
+  );
+
+  const selectedSessaoForVoltas = useMemo(
+    () => {
+      if (!selectedItemId || selectedItemId.split('_')[0] !== 'd1') return null;
+      return sessoes.find((s) => s.id === selectedItemId.slice(3)) ?? null;
+    },
+    [selectedItemId, sessoes],
+  );
+
+  const etapasDaSessao = useMemo(
+    () => etapas.filter((etapa) => etapa.campeonato_id === sessaoForm.campeonato_id),
+    [etapas, sessaoForm.campeonato_id],
+  );
+
+  const etapasDaImportacao = useMemo(
+    () => etapas.filter((etapa) => etapa.campeonato_id === importSessaoForm.campeonato_id),
+    [etapas, importSessaoForm.campeonato_id],
+  );
+
+  const fastestLive = snapshot.pilotos.reduce<number | undefined>(
+    (fastest, piloto) =>
+      piloto.melhorVoltaMs !== undefined && (fastest === undefined || piloto.melhorVoltaMs < fastest)
+        ? piloto.melhorVoltaMs : fastest,
+    undefined,
+  );
+
+  const columns = useMemo<readonly DataTableColumn<UnifiedItem>[]>(
+    () => [
       {
-        key: 'nome',
-        label: 'Sessão',
-        render: (sessao) => (
+        key: 'nome', label: 'Corrida / Sessão',
+        render: (item) => (
           <button
-            className="font-medium text-zinc-100 underline-offset-4 hover:text-brand-300 hover:underline"
-            onClick={() => openVoltas(sessao)}
+            className={`text-left font-bold underline-offset-4 hover:underline ${selectedItemId === item.id ? 'text-brand-300' : 'text-white'}`}
+            onClick={() => { setSelectedItemId(item.id); setSelectedSource(item.source); }}
             type="button"
           >
-            {sessao.nome}
+            {item.nome}
           </button>
         ),
       },
+      { key: 'tipo', label: 'Tipo', render: (item) => item.tipo ?? '—' },
+      { key: 'dataHora', label: 'Data/hora', render: (item) => formatDateSafe(item.dataHora) },
+      { key: 'participantes', label: 'Pilotos', render: (item) => item.participantes || '—' },
       {
-        key: 'tipo',
-        label: 'Tipo',
-        render: (sessao) => <Badge variant={tipoVariant[sessao.tipo]}>{tipoLabel[sessao.tipo]}</Badge>,
+        key: 'source', label: 'Fonte',
+        render: (item) => (
+          <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${FONTE_COLORS[item.source]}`}>
+            {FONTE_LABELS[item.source]}
+          </span>
+        ),
       },
-      { key: 'data', label: 'Data', render: (sessao) => dateFormatter.format(new Date(sessao.data)) },
-      { key: 'status', label: 'Status', render: (sessao) => <StatusBadge status={sessao.status} /> },
       {
-        key: 'campeonato_id',
-        label: 'Campeonato',
-        render: (sessao) => sessao.campeonatos?.nome ?? 'Não vinculado',
-      },
-      {
-        key: 'id',
-        label: 'Operações',
-        render: (sessao) =>
-          canWrite ? (
-            <div className="flex items-center gap-2">
-              <Button
-                className="h-8 px-2.5 text-xs"
-                loading={generatingId === sessao.id}
-                onClick={() => void handleGerarResultados(sessao)}
-                variant="secondary"
-              >
-                <Trophy aria-hidden="true" size={14} />
-                Gerar resultados
-              </Button>
-              <Button
-                className="h-8 px-2.5 text-xs"
-                disabled={sessao.status === 'encerrada'}
-                onClick={() => void handleEncerrar(sessao)}
-                variant="ghost"
-              >
-                <Lock aria-hidden="true" size={14} />
-                Encerrar
-              </Button>
-            </div>
+        key: 'status', label: 'Status',
+        render: (item) =>
+          item.source === 'laptime' ? (
+            <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${item.finalizada ? 'border-brand-800 bg-brand-950 text-brand-100' : 'border-amber-800 bg-amber-950 text-amber-200'}`}>
+              {item.finalizada ? 'Finalizada' : 'Em andamento'}
+            </span>
           ) : (
-            '—'
+            <StatusBadge status={item.status ?? 'aberta'} />
           ),
       },
-    ];
+    ],
+    [selectedItemId],
+  );
 
-  const voltaColumns: readonly DataTableColumn<Volta>[] = [
+  const competitorColumns = useMemo<readonly DataTableColumn<LapTimeRacingCompetitor>[]>(
+    () => [
+      { key: 'posicao', label: 'Pos.', render: (item) => item.posicao ?? '—' },
+      { key: 'numero', label: 'Kart', render: (item) => item.numero ?? '—' },
+      { key: 'nome', label: 'Piloto' },
+      { key: 'voltas', label: 'Voltas', render: (item) => item.voltas ?? '—' },
+      { key: 'melhorVolta', label: 'Melhor volta', render: (item) => item.melhorVolta ?? '—' },
+    ],
+    [],
+  );
+
+  const voltaColumns = useMemo<readonly DataTableColumn<Volta>[]>(
+    () => [
       { key: 'posicao', label: 'Pos.' },
       { key: 'piloto_nome', label: 'Piloto' },
       { key: 'kart', label: 'Kart' },
       {
-        key: 'tempo_ms',
-        label: 'Tempo',
-        render: (volta) => (
-          <span className={volta.melhor ? 'font-semibold text-brand-300' : undefined}>
-            {msParaTexto(volta.tempo_ms)}
-          </span>
-        ),
+        key: 'tempo_ms', label: 'Tempo',
+        render: (volta) => <span className={volta.melhor ? 'font-semibold text-brand-300' : ''}>{msParaTexto(volta.tempo_ms)}</span>,
       },
       { key: 'setor1_ms', label: 'Setor 1', render: (volta) => msParaTexto(volta.setor1_ms) },
       { key: 'setor2_ms', label: 'Setor 2', render: (volta) => msParaTexto(volta.setor2_ms) },
       { key: 'setor3_ms', label: 'Setor 3', render: (volta) => msParaTexto(volta.setor3_ms) },
       {
-        key: 'valida',
-        label: 'Válida',
-        render: (volta) => (
-          <Badge variant={volta.valida ? 'emerald' : 'red'}>{volta.valida ? 'Sim' : 'Não'}</Badge>
-        ),
+        key: 'valida', label: 'Válida',
+        render: (volta) => <Badge variant={volta.valida ? 'emerald' : 'red'}>{volta.valida ? 'Sim' : 'Não'}</Badge>,
       },
-    ];
-
-  const fastestLive = snapshot.pilotos.reduce<number | undefined>(
-    (fastest, piloto) =>
-      piloto.melhorVoltaMs !== undefined &&
-      (fastest === undefined || piloto.melhorVoltaMs < fastest)
-        ? piloto.melhorVoltaMs
-        : fastest,
-    undefined,
+    ],
+    [],
   );
-
-  const headerAction =
-    activeTab === 'sessoes'
-      ? { label: 'Nova sessão', action: openCreateSessao }
-      : activeTab === 'voltas' && selectedSessaoId
-        ? { label: 'Nova volta', action: openCreateVolta }
-        : null;
 
   return (
     <section className="space-y-6">
       <PageHeader
-        actionLabel={canWrite ? headerAction?.label : undefined}
-        eyebrow="Competição"
-        onAction={canWrite ? headerAction?.action : undefined}
-        subtitle="Sessões, voltas, timing ao vivo e publicação integrada de resultados."
+        actionLabel={canWrite ? 'Nova sessão' : undefined}
+        onAction={canWrite ? openCreateSessao : undefined}
+        subtitle="Timing ao vivo, corridas em tempo real, histórico LapTime e sessões manuais."
         title="Cronometragem"
-      />
-
-      <Tabs
-        items={[
-          { key: 'ao-vivo', label: 'Ao Vivo' },
-          { key: 'historico', label: 'Histórico real (LapTime)' },
-          { key: 'sessoes', label: 'Sessões' },
-          { key: 'voltas', label: 'Voltas' },
-        ]}
-        onChange={(key) => setActiveTab(key as TabKey)}
-        value={activeTab}
       />
 
       {generatedLink ? (
         <Card className="flex flex-wrap items-center justify-between gap-3 border-brand-500/30 p-4">
           <p className="text-sm text-zinc-300">Resultados publicados e classificação recalculada.</p>
-          <a className="text-sm font-medium text-brand-400 hover:text-brand-300" href={generatedLink}>
-            Abrir resultados
-          </a>
+          <a className="text-sm font-medium text-brand-400 hover:text-brand-300" href={generatedLink}>Abrir resultados</a>
         </Card>
       ) : null}
 
-      {activeTab === 'ao-vivo' ? (
-        <div className="space-y-5">
-          <Card className="p-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
-              <FormField htmlFor="live-url" label="URL do snapshot">
-                <input
-                  className={inputClassName}
-                  id="live-url"
-                  onChange={(event) => setLiveUrl(event.target.value)}
-                  placeholder={DEFAULT_LIVE_URL}
-                  type="url"
-                  value={liveUrl}
-                />
-              </FormField>
-              <div className="flex shrink-0 gap-2">
-                <Button
-                  disabled={!liveUrl.trim()}
-                  onClick={() => {
-                    if (connected) {
-                      setConnected(false);
-                      setSnapshot((current) => ({ ...current, status: 'pausado' }));
-                    } else {
-                      setConnected(true);
-                    }
-                  }}
-                  variant={connected ? 'secondary' : 'primary'}
-                >
-                  {connected ? <Pause aria-hidden="true" size={16} /> : <Play aria-hidden="true" size={16} />}
-                  {connected ? 'Pausar' : 'Conectar'}
-                </Button>
-                {canWrite ? (
-                  <Button
-                    disabled={snapshot.status !== 'online' || snapshot.pilotos.length === 0}
-                    onClick={openImportModal}
-                    variant="ghost"
-                  >
-                    <Download aria-hidden="true" size={16} />
-                    Importar p/ sessão
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-          </Card>
+      {/* === AO VIVO === */}
+      <Card className="p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+          <FormField htmlFor="live-url" label="URL do snapshot">
+            <input className={inputClassName} id="live-url" onChange={(event) => setLiveUrl(event.target.value)}
+              placeholder={DEFAULT_LIVE_URL} type="url" value={liveUrl} />
+          </FormField>
+          <div className="flex shrink-0 gap-2">
+            <Button disabled={!liveUrl.trim()} onClick={() => {
+              if (connected) { setConnected(false); setSnapshot((current) => ({ ...current, status: 'pausado' })); }
+              else setConnected(true);
+            }} variant={connected ? 'secondary' : 'primary'}>
+              {connected ? <Pause aria-hidden="true" size={16} /> : <Play aria-hidden="true" size={16} />}
+              {connected ? 'Pausar' : 'Conectar'}
+            </Button>
+            {canWrite ? (
+              <Button disabled={snapshot.status !== 'online' || snapshot.pilotos.length === 0}
+                onClick={openImportModal} variant="ghost">
+                <Download aria-hidden="true" size={16} />Importar p/ sessão
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </Card>
 
+      {connected ? (
+        <div className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-3">
-            <StatCard
-              icon={Radio}
-              label="Conexão"
+            <StatCard icon={Radio} label="Conexão"
               loading={liveLoading && !snapshot.atualizadoEm}
               sub={snapshot.atualizadoEm ? `Atualizado ${dateFormatter.format(new Date(snapshot.atualizadoEm))}` : 'Aguardando conexão'}
-              value={snapshot.status === 'online' ? 'Online' : snapshot.status === 'offline' ? 'Offline' : 'Pausado'}
-            />
-            <StatCard
-              icon={Users}
-              label="Pilotos"
-              value={numberFormatter.format(snapshot.pilotos.length)}
-            />
-            <StatCard
-              icon={Timer}
-              label="Melhor volta"
-              value={msParaTexto(fastestLive)}
-            />
+              value={snapshot.status === 'online' ? 'Online' : snapshot.status === 'offline' ? 'Offline' : 'Pausado'} />
+            <StatCard icon={Users} label="Pilotos" value={numberFormatter.format(snapshot.pilotos.length)} />
+            <StatCard icon={Timer} label="Melhor volta" value={msParaTexto(fastestLive)} />
           </div>
 
           {snapshot.status === 'offline' ? (
@@ -975,36 +760,26 @@ export const CronometragemPage = () => {
                 {snapshot.erro ?? 'Não foi possível acessar o endpoint. O polling continuará tentando.'}
               </p>
             </Card>
-          ) : (
+          ) : snapshot.pilotos.length > 0 ? (
             <Card className="overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="min-w-full text-left">
                   <thead className="border-b border-zinc-800">
                     <tr>
                       {['Pos', 'Piloto', 'Kart', 'Melhor volta', 'Última', 'Voltas', 'Gap'].map((label) => (
-                        <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500" key={label}>
-                          {label}
-                        </th>
+                        <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500" key={label}>{label}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {snapshot.pilotos.map((piloto) => (
-                      <tr
-                        className={
-                          piloto.posicao === 1
-                            ? 'border-b border-brand-500/20 bg-brand-500/10'
-                            : 'border-b border-zinc-800/60 last:border-0'
-                        }
-                        key={`${piloto.posicao}-${piloto.nome}-${piloto.kart ?? ''}`}
-                      >
+                      <tr className={piloto.posicao === 1 ? 'border-b border-brand-500/20 bg-brand-500/10' : 'border-b border-zinc-800/60 last:border-0'}
+                        key={`${piloto.posicao}-${piloto.nome}-${piloto.kart ?? ''}`}>
                         <td className="px-4 py-3 text-sm font-semibold text-zinc-100">{piloto.posicao}</td>
                         <td className="px-4 py-3 text-sm text-zinc-200">{piloto.nome}</td>
                         <td className="px-4 py-3 text-sm text-zinc-300">{piloto.kart ?? '—'}</td>
                         <td className="px-4 py-3 text-sm font-medium text-brand-300">
-                          {piloto.melhorVoltaMs !== undefined
-                            ? msParaTexto(piloto.melhorVoltaMs)
-                            : (piloto.melhorVoltaTexto ?? '—')}
+                          {piloto.melhorVoltaMs !== undefined ? msParaTexto(piloto.melhorVoltaMs) : (piloto.melhorVoltaTexto ?? '—')}
                         </td>
                         <td className="px-4 py-3 text-sm text-zinc-300">{piloto.ultimaVolta ?? '—'}</td>
                         <td className="px-4 py-3 text-sm text-zinc-300">{piloto.voltas ?? '—'}</td>
@@ -1014,166 +789,105 @@ export const CronometragemPage = () => {
                   </tbody>
                 </table>
               </div>
-              {!snapshot.pilotos.length ? (
-                <div className="flex min-h-48 flex-col items-center justify-center p-8 text-center">
-                  <Activity aria-hidden="true" className="text-zinc-600" size={28} />
-                  <p className="mt-3 text-sm text-zinc-400">Conecte ao endpoint para acompanhar o timing.</p>
-                </div>
-              ) : null}
+            </Card>
+          ) : (
+            <Card className="flex min-h-48 flex-col items-center justify-center p-8 text-center">
+              <Activity aria-hidden="true" className="text-zinc-600" size={28} />
+              <p className="mt-3 text-sm text-zinc-400">Conectado, aguardando dados de cronometragem...</p>
             </Card>
           )}
         </div>
       ) : null}
 
-      {activeTab === 'historico' ? (
-        <div className="space-y-5">
-          <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
-            <input
-              className={`${inputClassName} sm:max-w-xs`}
-              onChange={(event) => setHistoricoSearchInput(event.target.value)}
-              placeholder="Buscar por nome da corrida..."
-              value={historicoSearchInput}
-            />
-            <input
-              className={`${inputClassName} sm:max-w-[180px]`}
-              onChange={(event) =>
-                setHistoricoFilters((current) => ({ ...current, from: event.target.value || undefined }))
-              }
-              type="date"
-              value={historicoFilters.from ?? ''}
-            />
-            <input
-              className={`${inputClassName} sm:max-w-[180px]`}
-              onChange={(event) =>
-                setHistoricoFilters((current) => ({ ...current, to: event.target.value || undefined }))
-              }
-              type="date"
-              value={historicoFilters.to ?? ''}
-            />
-          </Card>
-          <DataTable
-            columns={historicoColumns}
-            emptyLabel="Nenhuma corrida encontrada."
-            error={historicoError}
-            loading={historicoLoading}
-            onRetry={() => void loadHistorico()}
-            rows={historico}
-          />
-          <Pagination onPageChange={setHistoricoPage} page={historicoPage} pageSize={PAGE_SIZE} total={historicoTotal} />
+      {/* === HISTÓRICO / SESSÕES === */}
+      <div className="space-y-5">
+        <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+          <input className={`${inputClassName} sm:max-w-xs`}
+            onChange={(event) => setSearchInput(event.target.value)} placeholder="Buscar por nome..." value={searchInput} />
+          <select className={`${inputClassName} sm:max-w-[160px]`}
+            onChange={(event) => setSourceFilter(event.target.value)} value={sourceFilter}>
+            <option value="">Todas as fontes</option>
+            <option value="laptime">LapTime (ao vivo)</option>
+            <option value="manual">Manual</option>
+          </select>
+          <input className={`${inputClassName} sm:max-w-[160px]`}
+            onChange={(event) => setDateFrom(event.target.value)} type="date" value={dateFrom} />
+          <input className={`${inputClassName} sm:max-w-[160px]`}
+            onChange={(event) => setDateTo(event.target.value)} type="date" value={dateTo} />
+        </Card>
 
-          <div className="border-t border-zinc-800 pt-6">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-brand-300">Resultado da corrida</p>
-            <h2 className="mt-2 text-xl font-black text-white">{selectedHistorico?.nome ?? 'Selecione uma corrida'}</h2>
-            <div className="mt-4">
-              <DataTable
-                columns={historicoCompetitorColumns}
-                emptyLabel={selectedHistorico ? 'Nenhum participante registrado.' : 'Selecione uma corrida na tabela acima.'}
-                error={historicoCompetitorsError}
-                loading={historicoCompetitorsLoading}
-                onRetry={() => void loadHistoricoCompetitors()}
-                rows={historicoCompetitors}
-              />
-            </div>
+        <DataTable columns={columns} emptyLabel="Nenhuma corrida ou sessão encontrada."
+          error={unifiedError} loading={unifiedLoading} onRetry={() => void loadUnifiedData()} rows={unifiedData} />
+        <Pagination onPageChange={setUnifiedPage} page={unifiedPage} pageSize={PAGE_SIZE} total={unifiedTotal} />
+      </div>
+
+      {/* === DETALHE: competidores LapTime === */}
+      {selectedSource === 'laptime' && selectedItemId ? (
+        <div className="border-t border-zinc-800 pt-6">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-brand-300">Resultado</p>
+          <h2 className="mt-2 text-xl font-black text-white">{selectedItem?.nome ?? 'Selecione uma corrida'}</h2>
+          <div className="mt-4">
+            <DataTable columns={competitorColumns} emptyLabel="Nenhum participante registrado."
+              error={lapTimeCompetitorsError} loading={lapTimeCompetitorsLoading}
+              onRetry={() => void loadLapTimeCompetitors()} rows={lapTimeCompetitors} />
           </div>
         </div>
       ) : null}
 
-      {activeTab === 'sessoes' ? (
-        <div className="space-y-4">
-          <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
-            <input
-              className={`${inputClassName} sm:max-w-xs`}
-              onChange={(event) => setSessoesSearchInput(event.target.value)}
-              placeholder="Buscar por nome..."
-              value={sessoesSearchInput}
-            />
-            <select
-              className={`${inputClassName} sm:max-w-[180px]`}
-              onChange={(event) => updateSessoesTipoFilter(event.target.value as SessaoTipo | '')}
-              value={sessoesFilters.tipo ?? ''}
-            >
-              <option value="">Todos os tipos</option>
-              <option value="treino">Treino</option>
-              <option value="classificacao">Classificação</option>
-              <option value="corrida">Corrida</option>
-            </select>
-            <select
-              className={`${inputClassName} sm:max-w-[180px]`}
-              onChange={(event) => updateSessoesStatusFilter(event.target.value as SessaoStatus | '')}
-              value={sessoesFilters.status ?? ''}
-            >
-              <option value="">Todos os status</option>
-              <option value="aberta">Aberta</option>
-              <option value="encerrada">Encerrada</option>
-            </select>
-          </Card>
-          <DataTable
-            columns={sessaoColumns}
-            emptyLabel="Nenhuma sessão encontrada."
-            error={sessoesTabError}
-            loading={sessoesTabLoading}
-            onDelete={canWrite ? (sessao) => setDeleteTarget({ kind: 'sessao', item: sessao }) : undefined}
-            onEdit={canWrite ? openEditSessao : undefined}
-            onRetry={() => void loadSessoesTab()}
-            rows={sessoesRows}
-          />
-          <Pagination onPageChange={setSessoesPage} page={sessoesPage} pageSize={PAGE_SIZE} total={sessoesTotal} />
-        </div>
-      ) : null}
-
-      {activeTab === 'voltas' ? (
-        <div className="space-y-5">
-          <Card className="p-5">
-            <FormField htmlFor="voltas-sessao" label="Sessão selecionada">
-              <select
-                className={inputClassName}
-                id="voltas-sessao"
-                onChange={(event) => setSelectedSessaoId(event.target.value)}
-                value={selectedSessaoId}
-              >
-                <option value="">Selecione uma sessão</option>
-                {sessoes.map((sessao) => (
-                  <option key={sessao.id} value={sessao.id}>
-                    {sessao.nome} · {dateFormatter.format(new Date(sessao.data))}
-                  </option>
-                ))}
-              </select>
-            </FormField>
-            {selectedSessao ? (
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
-                <StatusBadge status={selectedSessao.status} />
-                <span>{selectedSessao.campeonatos?.nome ?? 'Sem campeonato'}</span>
+      {/* === DETALHE: voltas da sessão D1 === */}
+      {selectedSource === 'manual' && selectedItemId ? (
+        <div className="border-t border-zinc-800 pt-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-brand-300">Detalhe da sessão</p>
+              <h2 className="mt-2 text-xl font-black text-white">{selectedItem?.nome ?? 'Sessão'}</h2>
+              {selectedSessaoForVoltas ? (
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+                  <StatusBadge status={selectedSessaoForVoltas.status} />
+                  <span>{selectedSessaoForVoltas.campeonatos?.nome ?? 'Sem campeonato'}</span>
+                </div>
+              ) : null}
+            </div>
+            {canWrite && selectedSessaoForVoltas ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <Button className="h-8 px-2.5 text-xs" loading={generatingId === selectedSessaoForVoltas.id}
+                  onClick={() => void handleGerarResultados(selectedSessaoForVoltas)} variant="secondary">
+                  <Trophy aria-hidden="true" size={14} />Gerar resultados
+                </Button>
+                <Button className="h-8 px-2.5 text-xs"
+                  disabled={selectedSessaoForVoltas.status === 'encerrada'}
+                  onClick={() => void handleEncerrar(selectedSessaoForVoltas)} variant="ghost">
+                  <Lock aria-hidden="true" size={14} />Encerrar
+                </Button>
+                <Button className="h-8 px-2.5 text-xs"
+                  onClick={openCreateVolta} variant="primary">
+                  Nova volta
+                </Button>
+                <Button className="h-8 px-2.5 text-xs"
+                  onClick={() => { openEditSessao(selectedSessaoForVoltas); }} variant="ghost">
+                  Editar sessão
+                </Button>
               </div>
             ) : null}
-          </Card>
-          <DataTable
-            columns={voltaColumns}
-            emptyLabel={selectedSessaoId ? 'Nenhuma volta registrada.' : 'Selecione uma sessão.'}
-            error={voltasError}
-            loading={voltasLoading}
-            onDelete={canWrite ? (volta) => setDeleteTarget({ kind: 'volta', item: volta }) : undefined}
-            onEdit={canWrite ? openEditVolta : undefined}
-            onRetry={() => void loadVoltas()}
-            rows={voltas}
-          />
+          </div>
+          <div className="mt-4">
+            <DataTable columns={voltaColumns} emptyLabel="Nenhuma volta registrada para esta sessão."
+              error={sessaoVoltasLoading ? null : sessaoVoltasError} loading={sessaoVoltasLoading}
+              onDelete={canWrite ? (volta) => setDeleteTarget({ kind: 'volta', item: volta }) : undefined}
+              onEdit={canWrite ? openEditVolta : undefined}
+              onRetry={() => void loadSessaoVoltas()} rows={sessaoVoltas} />
+          </div>
         </div>
       ) : null}
 
-      <Modal
-        footer={
-          <>
-            <Button disabled={submitting} onClick={() => setSessaoModalOpen(false)} variant="ghost">
-              Cancelar
-            </Button>
-            <Button form="sessao-form" loading={submitting} type="submit">
-              Salvar sessão
-            </Button>
-          </>
-        }
-        isOpen={sessaoModalOpen}
-        onClose={submitting ? () => undefined : () => setSessaoModalOpen(false)}
-        title={editingSessao ? 'Editar sessão' : 'Nova sessão'}
-      >
+      {/* === MODAIS === */}
+      <Modal footer={
+        <>
+          <Button disabled={submitting} onClick={() => setSessaoModalOpen(false)} variant="ghost">Cancelar</Button>
+          <Button form="sessao-form" loading={submitting} type="submit">Salvar sessão</Button>
+        </>
+      } isOpen={sessaoModalOpen} onClose={submitting ? () => undefined : () => setSessaoModalOpen(false)}
+        title={editingSessao ? 'Editar sessão' : 'Nova sessão'}>
         <form className="grid gap-4 sm:grid-cols-2" id="sessao-form" onSubmit={(event) => void handleSessaoSubmit(event)}>
           <div className="sm:col-span-2">
             <FormField error={formErrors.nome} htmlFor="sessao-nome" label="Nome">
@@ -1211,17 +925,13 @@ export const CronometragemPage = () => {
         </form>
       </Modal>
 
-      <Modal
-        footer={
-          <>
-            <Button disabled={submitting} onClick={() => setVoltaModalOpen(false)} variant="ghost">Cancelar</Button>
-            <Button form="volta-form" loading={submitting} type="submit">Salvar volta</Button>
-          </>
-        }
-        isOpen={voltaModalOpen}
-        onClose={submitting ? () => undefined : () => setVoltaModalOpen(false)}
-        title={editingVolta ? 'Editar volta' : 'Nova volta'}
-      >
+      <Modal footer={
+        <>
+          <Button disabled={submitting} onClick={() => setVoltaModalOpen(false)} variant="ghost">Cancelar</Button>
+          <Button form="volta-form" loading={submitting} type="submit">Salvar volta</Button>
+        </>
+      } isOpen={voltaModalOpen} onClose={submitting ? () => undefined : () => setVoltaModalOpen(false)}
+        title={editingVolta ? 'Editar volta' : 'Nova volta'}>
         <form className="grid gap-4 sm:grid-cols-2" id="volta-form" onSubmit={(event) => void handleVoltaSubmit(event)}>
           <div className="sm:col-span-2">
             <FormField error={formErrors.piloto_id} htmlFor="volta-piloto" label="Piloto">
@@ -1255,17 +965,13 @@ export const CronometragemPage = () => {
         </form>
       </Modal>
 
-      <Modal
-        footer={
-          <>
-            <Button disabled={submitting} onClick={() => setImportModalOpen(false)} variant="ghost">Cancelar</Button>
-            <Button loading={submitting} onClick={() => void handleImport()}><Download aria-hidden="true" size={16} />Importar snapshot</Button>
-          </>
-        }
-        isOpen={importModalOpen}
-        onClose={submitting ? () => undefined : () => setImportModalOpen(false)}
-        title="Importar timing para sessão"
-      >
+      <Modal footer={
+        <>
+          <Button disabled={submitting} onClick={() => setImportModalOpen(false)} variant="ghost">Cancelar</Button>
+          <Button loading={submitting} onClick={() => void handleImport()}><Download aria-hidden="true" size={16} />Importar snapshot</Button>
+        </>
+      } isOpen={importModalOpen} onClose={submitting ? () => undefined : () => setImportModalOpen(false)}
+        title="Importar timing para sessão">
         <div className="space-y-4">
           <FormField htmlFor="import-mode" label="Destino">
             <select className={inputClassName} id="import-mode" onChange={(event) => setImportMode(event.target.value as 'existente' | 'nova')} value={importMode}>
@@ -1290,18 +996,13 @@ export const CronometragemPage = () => {
         </div>
       </Modal>
 
-      <ConfirmDialog
-        isOpen={Boolean(deleteTarget)}
-        loading={deleting}
-        message={
-          deleteTarget?.kind === 'sessao'
-            ? `A sessão ${deleteTarget.item.nome} e seus vínculos poderão ser removidos permanentemente.`
-            : `A volta de ${deleteTarget?.item.piloto_nome ?? 'este piloto'} será removida permanentemente.`
-        }
+      <ConfirmDialog isOpen={Boolean(deleteTarget)} loading={deleting}
+        message={deleteTarget?.kind === 'sessao'
+          ? `A sessão ${deleteTarget.item.nome} e seus vínculos poderão ser removidos permanentemente.`
+          : `A volta de ${deleteTarget?.item.piloto_nome ?? 'este piloto'} será removida permanentemente.`}
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => void handleDelete()}
-        title={deleteTarget?.kind === 'sessao' ? 'Excluir sessão' : 'Excluir volta'}
-      />
+        title={deleteTarget?.kind === 'sessao' ? 'Excluir sessão' : 'Excluir volta'} />
     </section>
   );
 };
