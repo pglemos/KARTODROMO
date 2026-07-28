@@ -11,7 +11,7 @@ import {
   ShieldCheck,
   Zap,
 } from 'lucide-react';
-import { SITE_BOOKING_ANCHOR, WHATSAPP_BOOKING_URL } from '../config/booking';
+import { MYLAPTIME_BOOKING_URL, WHATSAPP_BOOKING_URL } from '../config/booking';
 import AngledButton from './site-ui/AngledButton';
 import BigCTA from './site-ui/BigCTA';
 import GlassPanel from './site-ui/GlassPanel';
@@ -99,7 +99,7 @@ const KartLocacao = () => {
             </div>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <AngledButton href={SITE_BOOKING_ANCHOR}>
+              <AngledButton href={MYLAPTIME_BOOKING_URL} external>
                 <CalendarCheck className="h-4 w-4" aria-hidden="true" />
                 Reservar online
               </AngledButton>
@@ -133,7 +133,7 @@ const KartLocacao = () => {
                 <span className="text-xs leading-tight">Capacete e orientações de segurança.</span>
               </div>
             </div>
-            <AngledButton href={SITE_BOOKING_ANCHOR} className="w-full">
+            <AngledButton href={MYLAPTIME_BOOKING_URL} external className="w-full">
               Ver horários
             </AngledButton>
           </GlassPanel>
@@ -245,7 +245,7 @@ const KartLocacao = () => {
                 </p>
 
                 <div className="mt-7 grid gap-3">
-                  <AngledButton href={SITE_BOOKING_ANCHOR}>
+                  <AngledButton href={MYLAPTIME_BOOKING_URL} external>
                     <CalendarCheck className="h-4 w-4" aria-hidden="true" />
                     Abrir agenda online
                   </AngledButton>
@@ -310,7 +310,7 @@ const KartLocacao = () => {
               title={<>Entre no grid<br /><span className="text-primary-400">agora mesmo</span></>}
               text="Reserve online em poucos minutos ou fale com a equipe pelo WhatsApp para tirar dúvidas."
             >
-              <AngledButton href={SITE_BOOKING_ANCHOR}>Reservar online</AngledButton>
+              <AngledButton href={MYLAPTIME_BOOKING_URL} external>Reservar online</AngledButton>
               <AngledButton href={WHATSAPP_BOOKING_URL} variant="outline" external>
                 Falar no WhatsApp
               </AngledButton>
