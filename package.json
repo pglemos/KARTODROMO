@@ -20,6 +20,8 @@
     "preview:worker": "npm run preview",
     "deploy:worker": "npm run deploy",
     "scraper": "tsx services/livetime-scraper-server.ts",
+    "bridge": "tsx services/udk-bridge-server.ts",
+    "bridge:install-autostart": "powershell -ExecutionPolicy Bypass -File scripts/install-udk-bridge-autostart.ps1",
     "mirror": "tsx services/laptime-mirror-server.ts",
     "mirror:bootstrap": "tsx services/laptime-mirror-server.ts --bootstrap",
     "mirror:install-autostart": "powershell -ExecutionPolicy Bypass -File scripts/install-laptime-mirror-autostart.ps1",

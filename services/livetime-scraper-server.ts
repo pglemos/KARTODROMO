@@ -1,7 +1,6 @@
 import http from 'node:http';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { DEFAULT_UID } from '@/lib/livetime/demo-data';
 import { TELAO_LAYOUT_PRESETS } from '@/lib/telao-layout-config';
 import { readTelaoLayoutConfig, telaoLayoutStoreStatus, writeTelaoLayoutConfigToFile } from '@/lib/telao-layout-store';
 import { readTb50Page, tb50PageStoreStatus, writeTb50PageToFile } from '@/lib/tb50-page-store';
@@ -32,7 +31,6 @@ function loadLocalEnv() {
 
 loadLocalEnv();
 
-const uid = process.env.LIVETIME_UID || process.env.NEXT_PUBLIC_DEFAULT_UID || DEFAULT_UID;
 const port = Number(process.env.SCRAPER_PORT || process.env.PORT || '4010');
 
 const laptimeSqlOptions = process.env.LAPTIME_SQL_SERVER
@@ -89,13 +87,9 @@ function resolveLaptimeSqlOptions(feature: LaptimeReadSource) {
 }
 
 const scraper = new LiveTimeScraper({
-  uid,
-  sourceUrl: process.env.LIVETIME_SOURCE_URL,
   apiBaseUrl: process.env.LAPTIME_API_BASE_URL,
   apiToken: process.env.LAPTIME_API_TOKEN,
   apiTokenFile: process.env.LAPTIME_API_TOKEN_FILE,
-  sql: laptimeSqlOptions,
-  headless: process.env.LIVETIME_HEADLESS !== 'false',
   pollMs: Number(process.env.LIVETIME_SCRAPER_POLL_MS || '2000'),
 });
 
