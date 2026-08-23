@@ -88,6 +88,21 @@ type ApiEnvelope<T> = {
   data?: T;
 };
 
+function normalizeApiBaseUrl(value: string): string {
+  const url = new URL(value);
+  url.search = '';
+  url.hash = '';
+  const pathname = url.pathname.replace(/\/+$/, '');
+
+  if (!/(^|\/)api$/i.test(pathname)) {
+    url.pathname = `${pathname || ''}/api`;
+  } else {
+    url.pathname = pathname;
+  }
+
+  return url.toString().replace(/\/+$/, '');
+}
+
 export class LapTimeApiClient {
   private readonly baseUrl: string;
   private readonly origin: string;
@@ -103,7 +118,7 @@ export class LapTimeApiClient {
     options: LapTimeApiOptions,
     private readonly getServerNowUtc: () => Promise<Date>,
   ) {
-    this.baseUrl = options.baseUrl.replace(/\/+$/, '');
+    this.baseUrl = normalizeApiBaseUrl(options.baseUrl);
     this.origin = options.origin || 'LapTimeMirror';
     this.timeoutMs = options.timeoutMs || 15000;
   }

@@ -283,7 +283,7 @@ export const TelaoPage = () => {
               <div className="mt-3 flex flex-col gap-3 sm:flex-row lg:flex-col">
                 <a
                   className="inline-flex items-center gap-2 text-sm font-bold text-brand-300 hover:text-brand-200"
-                  href="http://localhost:3000/podio-live-tb50"
+                  href="/podio-live-tb50"
                   rel="noreferrer"
                   target="_blank"
                 >
@@ -292,7 +292,7 @@ export const TelaoPage = () => {
                 </a>
                 <a
                   className="inline-flex items-center gap-2 text-sm font-bold text-brand-300 hover:text-brand-200"
-                  href="http://localhost:3000/designer-telao"
+                  href="/designer-telao"
                   rel="noreferrer"
                   target="_blank"
                 >

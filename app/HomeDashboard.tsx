@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_TELAO_LAYOUT, type TelaoLayoutConfig } from '@/lib/telao-layout-config';
 import type { LiveTimingSnapshot } from '@/lib/livetime/types';
 import type { ViplexDeviceProgram } from '@/lib/viplex-programs';
@@ -35,6 +35,8 @@ type ViplexProgramsResponse = {
 
 type HealthState = 'loading' | 'ok' | 'warning' | 'error';
 type ActionMessage = { type: 'success' | 'error'; text: string };
+
+const SNAPSHOT_STALE_AFTER_MS = 15_000;
 
 type DashboardState = {
   snapshot: LiveTimingSnapshot | null;
@@ -147,9 +149,11 @@ function normalizedProgramName(program: ViplexDeviceProgram): string {
 }
 
 function programSlotLabel(program: ViplexDeviceProgram, index: number): string {
-  if (normalizedProgramName(program) === 'CRONOMETRAGEM') return 'Programa 01';
-  if (normalizedProgramName(program) === 'VIDEOS') return 'Programa 02';
   return `Programa ${String(index + 1).padStart(2, '0')}`;
+}
+
+function programKey(program: ViplexDeviceProgram): string {
+  return `${program.id}:${program.identifier}`;
 }
 
 function programActionLabel(program: ViplexDeviceProgram, busy: boolean): string {
@@ -160,11 +164,39 @@ function programActionLabel(program: ViplexDeviceProgram, busy: boolean): string
 
 function formatCheckedAt(value: string | null) {
   if (!value) return 'Aguardando leitura';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Leitura sem horário';
   return new Intl.DateTimeFormat('pt-BR', {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
-  }).format(new Date(value));
+  }).format(date);
+}
+
+function snapshotAgeMs(snapshot: LiveTimingSnapshot | null): number | null {
+  if (!snapshot?.updatedAt) return null;
+  const timestamp = Date.parse(snapshot.updatedAt);
+  return Number.isFinite(timestamp) ? Math.max(0, Date.now() - timestamp) : null;
+}
+
+function snapshotHealth(snapshot: LiveTimingSnapshot | null): HealthState {
+  if (!snapshot) return 'error';
+  if (snapshot.status === 'error') return 'error';
+  if (snapshot.status !== 'live') return 'warning';
+  const age = snapshotAgeMs(snapshot);
+  return age !== null && age > SNAPSHOT_STALE_AFTER_MS ? 'warning' : 'ok';
+}
+
+function snapshotStatusDetail(snapshot: LiveTimingSnapshot | null): string {
+  if (!snapshot) return 'Aguardando dados';
+  if (snapshot.status === 'live') {
+    const age = snapshotAgeMs(snapshot);
+    return age !== null && age > SNAPSHOT_STALE_AFTER_MS ? 'Leitura atrasada' : 'Corrida ao vivo';
+  }
+  if (snapshot.status === 'finished') return 'Sessão finalizada';
+  if (snapshot.status === 'error') return snapshot.message || 'Falha na fonte';
+  if (snapshot.status === 'demo') return 'Demonstração';
+  return snapshot.message || 'Aguardando corrida ou tomada de tempo';
 }
 
 function buildFiveByTwoLayout(base: TelaoLayoutConfig): TelaoLayoutConfig {
@@ -180,9 +212,28 @@ function buildFiveByTwoLayout(base: TelaoLayoutConfig): TelaoLayoutConfig {
 }
 
 async function readJson<T>(url: string): Promise<T> {
-  const response = await fetch(`${url}${url.includes('?') ? '&' : '?'}_ts=${Date.now()}`, { cache: 'no-store' });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.json() as Promise<T>;
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 12_000);
+  let response: Response;
+
+  try {
+    response = await fetch(`${url}${url.includes('?') ? '&' : '?'}_ts=${Date.now()}`, {
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw new Error('Tempo limite da leitura');
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message = data && typeof data === 'object' && 'error' in data ? String(data.error) : `HTTP ${response.status}`;
+    throw new Error(message);
+  }
+  return data as T;
 }
 
 export function HomeDashboard({ uid }: { uid: string }) {
@@ -190,16 +241,23 @@ export function HomeDashboard({ uid }: { uid: string }) {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<ActionMessage | null>(null);
+  const refreshingRef = useRef(false);
 
   const capacity = useMemo(() => (state.layout ? state.layout.columns * state.layout.rows : 0), [state.layout]);
   const activeDrivers = state.snapshot?.drivers.length || 0;
   const isStandardLayout = state.layout?.id === DEFAULT_TELAO_LAYOUT.id;
   const pageOffset = state.page?.offset || 0;
-  const previewUrl = `${LINKS.live}&uid=${encodeURIComponent(uid)}`;
-  const cronometragemProgram = state.viplexPrograms.find((program) => normalizedProgramName(program) === 'CRONOMETRAGEM');
+  const previewUrl = `${LINKS.live}?uid=${encodeURIComponent(uid)}`;
+  const cronometragemProgram = state.viplexPrograms.find((program) => normalizedProgramName(program) === 'CRONOMETRAGEM' && program.statusCode === 1)
+    || state.viplexPrograms.find((program) => normalizedProgramName(program) === 'CRONOMETRAGEM');
   const activeProgram = state.viplexPrograms.find((program) => program.statusCode === 1);
-  const isLiveReady = state.health.snapshot === 'ok' && state.health.layout === 'ok' && state.health.viplex === 'ok';
+  const isLiveReady = state.snapshot?.status === 'live'
+    && state.health.snapshot === 'ok'
+    && state.health.layout === 'ok'
+    && state.health.viplex === 'ok';
   const refresh = useCallback(async () => {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
     setState((current) => ({
       ...current,
       health: {
@@ -211,40 +269,44 @@ export function HomeDashboard({ uid }: { uid: string }) {
       error: null,
     }));
 
-    const [snapshotResult, layoutResult, modeResult, pageResult, viplexResult] = await Promise.allSettled([
-      readJson<LiveTimingSnapshot>(`${LINKS.snapshotApi}?uid=${encodeURIComponent(uid)}`),
-      readJson<LayoutResponse>(LINKS.layoutApi),
-      readJson<DisplayModeResponse>('/api/tb50-display-mode'),
-      readJson<PageResponse>(LINKS.pageApi),
-      readJson<ViplexProgramsResponse>(LINKS.viplexProgramsApi),
-    ]);
+    try {
+      const [snapshotResult, layoutResult, modeResult, pageResult, viplexResult] = await Promise.allSettled([
+        readJson<LiveTimingSnapshot>(`${LINKS.snapshotApi}?uid=${encodeURIComponent(uid)}`),
+        readJson<LayoutResponse>(LINKS.layoutApi),
+        readJson<DisplayModeResponse>('/api/tb50-display-mode'),
+        readJson<PageResponse>(LINKS.pageApi),
+        readJson<ViplexProgramsResponse>(LINKS.viplexProgramsApi),
+      ]);
 
-    const snapshot = snapshotResult.status === 'fulfilled' ? snapshotResult.value : null;
-    const layoutData = layoutResult.status === 'fulfilled' ? layoutResult.value : null;
-    const displayMode = modeResult.status === 'fulfilled' ? modeResult.value : null;
-    const page = pageResult.status === 'fulfilled' ? pageResult.value : null;
-    const viplex = viplexResult.status === 'fulfilled' ? viplexResult.value : null;
+      const snapshot = snapshotResult.status === 'fulfilled' ? snapshotResult.value : null;
+      const layoutData = layoutResult.status === 'fulfilled' ? layoutResult.value : null;
+      const displayMode = modeResult.status === 'fulfilled' ? modeResult.value : null;
+      const page = pageResult.status === 'fulfilled' ? pageResult.value : null;
+      const viplex = viplexResult.status === 'fulfilled' ? viplexResult.value : null;
 
-    const errors = [snapshotResult, layoutResult, modeResult, pageResult, viplexResult]
-      .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
-      .map((result) => result.reason instanceof Error ? result.reason.message : 'Falha ao carregar');
+      const errors = [snapshotResult, layoutResult, modeResult, pageResult, viplexResult]
+        .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+        .map((result) => result.reason instanceof Error ? result.reason.message : 'Falha ao carregar');
 
-    setState({
-      snapshot,
-      layout: layoutData?.layout || null,
-      displayMode,
-      page,
-      viplexPrograms: viplex?.programs || [],
-      store: layoutData?.store || null,
-      checkedAt: new Date().toISOString(),
-      health: {
-        snapshot: snapshot ? (snapshot.status === 'error' ? 'warning' : 'ok') : 'error',
-        layout: layoutData?.layout ? 'ok' : 'error',
-        mode: displayMode ? 'ok' : 'error',
-        viplex: viplex?.programs?.length ? 'ok' : 'warning',
-      },
-      error: [viplex?.error, ...errors].filter(Boolean).join(' · ') || null,
-    });
+      setState({
+        snapshot,
+        layout: layoutData?.layout || null,
+        displayMode,
+        page,
+        viplexPrograms: viplex?.programs || [],
+        store: layoutData?.store || null,
+        checkedAt: new Date().toISOString(),
+        health: {
+          snapshot: snapshotHealth(snapshot),
+          layout: layoutData?.layout ? 'ok' : 'error',
+          mode: displayMode ? 'ok' : 'error',
+          viplex: viplex?.programs?.length ? 'ok' : 'warning',
+        },
+        error: [viplex?.error, ...errors].filter(Boolean).join(' · ') || null,
+      });
+    } finally {
+      refreshingRef.current = false;
+    }
   }, [uid]);
 
   useEffect(() => {
@@ -280,23 +342,25 @@ export function HomeDashboard({ uid }: { uid: string }) {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
   }
 
-  async function runAction(actionId: string, action: () => Promise<void>, successText = 'Operacao concluida') {
+  async function runAction(actionId: string, action: () => Promise<void>, successText = 'Operacao concluida'): Promise<boolean> {
     setBusyAction(actionId);
     setActionMessage(null);
     try {
       await action();
       await refresh();
       setActionMessage({ type: 'success', text: successText });
+      return true;
     } catch (error) {
       setActionMessage({ type: 'error', text: error instanceof Error ? error.message : 'Falha na operacao' });
+      return false;
     } finally {
       setBusyAction(null);
     }
   }
 
   async function setDisplayMode(mode: 'live' | 'final-real') {
-    await runAction(mode, async () => writeDisplayMode(mode), mode === 'live' ? 'Placar ao vivo enviado' : 'Podio final enviado');
-    if (mode === 'final-real') window.location.assign(LINKS.podium);
+    const success = await runAction(mode, async () => writeDisplayMode(mode), mode === 'live' ? 'Placar ao vivo enviado' : 'Podio final enviado');
+    if (success && mode === 'final-real') window.location.assign(LINKS.podium);
   }
 
   async function setTb50Page(offset: number) {
@@ -322,7 +386,7 @@ export function HomeDashboard({ uid }: { uid: string }) {
   }
 
   async function publishViplexProgram(program: ViplexDeviceProgram) {
-    await runAction(`viplex-${program.identifier}`, async () => {
+    await runAction(`viplex-${programKey(program)}`, async () => {
       const response = await fetch(LINKS.viplexProgramsApi, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -355,7 +419,7 @@ export function HomeDashboard({ uid }: { uid: string }) {
               onClick={() => void publishViplexProgram(cronometragemProgram)}
               disabled={Boolean(busyAction)}
             >
-              {busyAction === `viplex-${cronometragemProgram.identifier}` ? 'Publicando...' : 'Publicar corrida na TB50'}
+              {busyAction === `viplex-${programKey(cronometragemProgram)}` ? 'Publicando...' : 'Publicar corrida na TB50'}
             </button>
           ) : null}
           <a className="home-button" href={LINKS.liveManual} target="_blank" rel="noreferrer">
@@ -373,8 +437,8 @@ export function HomeDashboard({ uid }: { uid: string }) {
       <section className="home-overview" aria-label="Resumo operacional">
         <article className={`home-live-card home-live-card-${isLiveReady ? 'ready' : 'attention'}`}>
           <span>{isLiveReady ? 'Sistema pronto' : 'Atencao operacional'}</span>
-          <strong>{state.snapshot?.eventName || 'Aguardando corrida'}</strong>
-          <em>Fonte {state.snapshot?.source || '--'} / {activeDrivers} pilotos / leitura {formatCheckedAt(state.checkedAt)}</em>
+          <strong>{state.snapshot?.eventName || snapshotStatusDetail(state.snapshot)}</strong>
+          <em>Fonte {state.snapshot?.source || '--'} / {activeDrivers} pilotos / leitura {formatCheckedAt(state.snapshot?.updatedAt || state.checkedAt)}</em>
         </article>
         <article className="home-live-card">
           <span>Agora na TB50</span>
@@ -387,7 +451,7 @@ export function HomeDashboard({ uid }: { uid: string }) {
         <article className={`home-status home-status-${state.health.snapshot}`}>
           <span>LiveTime</span>
           <strong>{statusLabel(state.health.snapshot)}</strong>
-          <em>{state.snapshot?.eventName || 'Aguardando dados'}</em>
+          <em>{snapshotStatusDetail(state.snapshot)}</em>
         </article>
         <article className={`home-status home-status-${state.health.layout}`}>
           <span>Layout</span>
@@ -424,10 +488,10 @@ export function HomeDashboard({ uid }: { uid: string }) {
         <div className="home-program-grid">
           {state.viplexPrograms.map((program, index) => {
             const isActive = program.statusCode === 1;
-            const isBusy = busyAction === `viplex-${program.identifier}`;
+            const isBusy = busyAction === `viplex-${programKey(program)}`;
 
             return (
-              <article className={`home-program ${isActive ? 'home-program-active' : ''}`} key={program.identifier}>
+              <article className={`home-program ${isActive ? 'home-program-active' : ''}`} key={programKey(program)}>
                 <div className="home-program-copy">
                   <span>{isActive ? `${programSlotLabel(program, index)} em execucao` : programSlotLabel(program, index)}</span>
                   <strong>{program.name}</strong>
@@ -437,8 +501,8 @@ export function HomeDashboard({ uid }: { uid: string }) {
                   <button type="button" onClick={() => void publishViplexProgram(program)} disabled={Boolean(busyAction)}>
                     {programActionLabel(program, isBusy)}
                   </button>
-                  <button type="button" onClick={() => void copyLink(program.name, `${LINKS.viplexProgramsApi}?program=${encodeURIComponent(program.identifier)}`)}>
-                    {copied === program.name ? 'Copiado' : 'Copiar ID'}
+                  <button type="button" onClick={() => void copyLink(programKey(program), `${LINKS.viplexProgramsApi}?program=${encodeURIComponent(program.identifier)}`)}>
+                    {copied === programKey(program) ? 'Copiado' : 'Copiar ID'}
                   </button>
                 </div>
               </article>

@@ -67,7 +67,9 @@ export function TelaoProgramacao() {
   const loadAuto = useCallback(async () => {
     try {
       const res = await fetch('/api/tb50-display-mode', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+      if (typeof data?.auto !== 'boolean') throw new Error('Resposta inválida');
       setAutoMode(data?.auto !== false);
     } catch {
       setAutoMode(null);
@@ -94,7 +96,9 @@ export function TelaoProgramacao() {
     setLoading(true);
     try {
       const res = await fetch('/api/telao-playlist', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+      if (!Array.isArray(data?.playlist?.items)) throw new Error('Resposta inválida');
       setItems(Array.isArray(data?.playlist?.items) ? data.playlist.items : []);
     } catch {
       setMessage({ type: 'err', text: 'Falha ao carregar a programação.' });
