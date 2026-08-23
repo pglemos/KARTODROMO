@@ -25,6 +25,7 @@ import {
 } from '@/lib/livetime/laptime-racings';
 import { fetchLapTimeKartHistory } from '@/lib/livetime/kart-history';
 import { fetchLapTimeKartFleet } from '@/lib/livetime/kart-fleet';
+import { fetchEqualizacaoLiveSnapshot } from '@/lib/equalizacao/equalizacao-live-source';
 import { LiveTimeScraper } from './livetime-scraper';
 
 function loadLocalEnv() {
@@ -665,6 +666,20 @@ async function handleLaptimeKartFleet(response: http.ServerResponse) {
   }
 }
 
+async function handleLaptimeEqualizacaoLive(response: http.ServerResponse) {
+  const sqlOptions = resolveLaptimeSqlOptions('racings');
+  if (!sqlOptions) {
+    sendJson(response, 503, { error: 'laptime_sql_not_configured' });
+    return;
+  }
+
+  try {
+    sendJson(response, 200, await fetchEqualizacaoLiveSnapshot(sqlOptions));
+  } catch (error) {
+    sendJson(response, 502, { error: error instanceof Error ? error.message : 'laptime_sql_query_failed' });
+  }
+}
+
 const server = http.createServer((request, response) => {
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
 
@@ -772,6 +787,11 @@ const server = http.createServer((request, response) => {
 
   if (url.pathname === '/api/laptime-kart-fleet') {
     void handleLaptimeKartFleet(response);
+    return;
+  }
+
+  if (url.pathname === '/api/laptime-equalizacao-live') {
+    void handleLaptimeEqualizacaoLive(response);
     return;
   }
 

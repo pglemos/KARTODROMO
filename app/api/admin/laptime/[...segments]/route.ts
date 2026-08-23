@@ -18,6 +18,7 @@ const ALLOWED_SLUGS = new Set([
   'racing-laps',
   'kart-history',
   'kart-fleet',
+  'equalizacao-live',
 ]);
 
 async function requireSession() {

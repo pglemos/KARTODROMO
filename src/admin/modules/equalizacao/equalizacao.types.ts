@@ -50,6 +50,66 @@ export type KartEqualization = {
   status: 'aprovada' | 'ajustar' | 'reteste' | 'cancelada' | string;
   observacoes: string | null;
   created_at: string;
+  sessao_id?: string | null;
+  captura_id?: string | null;
+  racing_id?: string | null;
+  racing_competitor_id?: string | null;
+  fonte?: 'cronometragem' | 'manual_legacy' | string | null;
+  tempo_antes_ms?: number | null;
+  tempo_depois_ms?: number | null;
+  media_antes_ms?: number | null;
+  media_depois_ms?: number | null;
+  voltas_antes?: number | null;
+  voltas_depois?: number | null;
+  volta_antes?: number | null;
+  volta_depois?: number | null;
+  capturado_em?: string | null;
+  responsavel?: string | null;
+};
+
+export type KartEqualizationSession = {
+  id: string;
+  racing_id: string;
+  racing_name: string;
+  racing_type: string | null;
+  track_name: string | null;
+  started_at: string;
+  ended_at: string | null;
+  status: 'aberta' | 'encerrada' | 'cancelada' | string;
+  fonte: string;
+  responsavel: string | null;
+  created_at: string;
+};
+
+export type KartEqualizationCapture = {
+  id: string;
+  sessao_id: string;
+  kart_id: string;
+  racing_id: string;
+  racing_competitor_id_antes: string;
+  racing_competitor_id_depois: string | null;
+  numero_kart: string;
+  piloto_antes: string;
+  piloto_depois: string | null;
+  transponder_antes: string | null;
+  transponder_depois: string | null;
+  tempo_antes_ms: number;
+  media_antes_ms: number | null;
+  desvio_antes_ms: number | null;
+  voltas_antes: number;
+  volta_antes: number | null;
+  capturado_antes_em: string;
+  tempo_depois_ms: number | null;
+  media_depois_ms: number | null;
+  desvio_depois_ms: number | null;
+  voltas_depois: number | null;
+  volta_depois: number | null;
+  capturado_depois_em: string | null;
+  status: 'antes' | 'completa' | string;
+  fonte: string;
+  responsavel: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type KartMaintenance = {

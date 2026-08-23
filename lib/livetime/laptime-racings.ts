@@ -34,6 +34,7 @@ export type LapTimeRacingCompetitor = {
   id: string;
   posicao: number | null;
   numero: string | null;
+  transponder: string | null;
   nome: string;
   voltas: number | null;
   melhorVolta: string | null;
@@ -130,6 +131,7 @@ type RacingCompetitorRow = {
   Id_RacingCompetitor: number | string;
   Pos: number | null;
   Number: string | null;
+  Transponder: string | number | null;
   Competitor: string | null;
   ShortName: string | null;
   Lap: number | null;
@@ -250,6 +252,7 @@ function toCompetitor(row: RacingCompetitorRow): LapTimeRacingCompetitor {
     id: String(row.Id_RacingCompetitor),
     posicao: row.Pos,
     numero: row.Number?.trim() || null,
+    transponder: row.Transponder === null || row.Transponder === undefined ? null : String(row.Transponder).trim() || null,
     nome: clean(row.Competitor) || clean(row.ShortName) || 'Sem nome',
     voltas: row.Lap,
     melhorVolta: formatSqlTime(row.BestLapTime),
@@ -362,7 +365,7 @@ export async function fetchLapTimeRacingCompetitors(
       .request()
       .input('racingId', sql.BigInt, Number(racingId))
       .query<RacingCompetitorRow>(`
-        select top 60 Id_RacingCompetitor, Pos, Number, Competitor, ShortName, Lap, BestLapTime, TotalTime, RacingStatus
+        select top 60 Id_RacingCompetitor, Pos, Number, Transponder, Competitor, ShortName, Lap, BestLapTime, TotalTime, RacingStatus
         from dbo.RacingCompetitor
         where Id_Racing = @racingId and (IsHidden = 0 or IsHidden is null)
         order by coalesce(Pos, 9999), Id_RacingCompetitor

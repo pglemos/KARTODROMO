@@ -40,17 +40,31 @@ const resources = {
   financeiro_categorias: { columns: ['id', 'nome', 'tipo'], search: ['nome', 'tipo'], defaultOrder: 'tipo' },
   financeiro_lancamentos: { columns: ['id', 'descricao', 'valor', 'tipo', 'categoria_id', 'data', 'origem', 'origem_ref', 'status', 'created_at'], search: ['descricao', 'origem'], defaultOrder: 'data', defaultDir: 'desc', dateColumn: 'data' },
   financeiro_full: { columns: ['id', 'descricao', 'valor', 'tipo', 'categoria_id', 'data', 'origem', 'origem_ref', 'status', 'created_at', 'categoria_nome', 'categoria_tipo'], search: ['descricao', 'origem', 'categoria_nome'], defaultOrder: 'data', defaultDir: 'desc', dateColumn: 'data', readOnly: true },
-  campeonatos: { columns: ['id', 'nome', 'slug', 'temporada', 'status'], search: ['nome', 'slug', 'temporada'], defaultOrder: 'nome' },
-  etapas: { columns: ['id', 'campeonato_id', 'nome', 'data', 'round', 'status'], search: ['nome'], defaultOrder: 'data', defaultDir: 'desc', dateColumn: 'data' },
-  etapas_full: { columns: ['id', 'campeonato_id', 'nome', 'data', 'round', 'status', 'campeonato_nome'], search: ['nome', 'campeonato_nome'], defaultOrder: 'data', defaultDir: 'desc', dateColumn: 'data', readOnly: true },
+  campeonatos: { columns: ['id', 'nome', 'slug', 'temporada', 'status', 'formato_id', 'pontos_json', 'desempate_json', 'bonus_pole', 'bonus_melhor_volta', 'descartes'], json: ['pontos_json', 'desempate_json'], search: ['nome', 'slug', 'temporada'], defaultOrder: 'nome' },
+  etapas: { columns: ['id', 'campeonato_id', 'nome', 'data', 'round', 'status', 'formato_id'], search: ['nome'], defaultOrder: 'data', defaultDir: 'desc', dateColumn: 'data' },
+  etapas_full: { columns: ['id', 'campeonato_id', 'nome', 'data', 'round', 'status', 'formato_id', 'campeonato_nome'], search: ['nome', 'campeonato_nome'], defaultOrder: 'data', defaultDir: 'desc', dateColumn: 'data', readOnly: true },
   pilotos: { columns: ['id', 'nome', 'numero', 'equipe', 'cliente_id'], search: ['nome', 'numero', 'equipe'], defaultOrder: 'nome' },
   classificacao: { columns: ['id', 'campeonato_id', 'piloto_id', 'pontos', 'posicao'], defaultOrder: 'posicao' },
   classificacao_full: { columns: ['id', 'campeonato_id', 'piloto_id', 'pontos', 'posicao', 'piloto_nome', 'piloto_numero', 'piloto_equipe'], search: ['piloto_nome', 'piloto_numero', 'piloto_equipe'], defaultOrder: 'posicao', readOnly: true },
-  sessoes: { columns: ['id', 'campeonato_id', 'etapa_id', 'nome', 'tipo', 'data', 'status', 'fonte', 'created_at'], search: ['nome', 'tipo', 'fonte'], defaultOrder: 'data', defaultDir: 'desc', dateColumn: 'data' },
-  sessoes_full: { columns: ['id', 'campeonato_id', 'etapa_id', 'nome', 'tipo', 'data', 'status', 'fonte', 'created_at', 'campeonato_nome'], search: ['nome', 'tipo', 'fonte', 'campeonato_nome'], defaultOrder: 'data', defaultDir: 'desc', dateColumn: 'data', readOnly: true },
+  sessoes: { columns: ['id', 'campeonato_id', 'etapa_id', 'nome', 'tipo', 'data', 'status', 'fonte', 'formato_id', 'created_at'], search: ['nome', 'tipo', 'fonte'], defaultOrder: 'data', defaultDir: 'desc', dateColumn: 'data' },
+  sessoes_full: { columns: ['id', 'campeonato_id', 'etapa_id', 'nome', 'tipo', 'data', 'status', 'fonte', 'formato_id', 'created_at', 'campeonato_nome'], search: ['nome', 'tipo', 'fonte', 'campeonato_nome'], defaultOrder: 'data', defaultDir: 'desc', dateColumn: 'data', readOnly: true },
   voltas: { columns: ['id', 'sessao_id', 'piloto_id', 'piloto_nome', 'kart', 'numero', 'tempo_ms', 'setor1_ms', 'setor2_ms', 'setor3_ms', 'posicao', 'melhor', 'valida', 'created_at'], booleans: ['melhor', 'valida'], search: ['piloto_nome', 'kart'], defaultOrder: 'posicao' },
-  corridas: { columns: ['id', 'etapa_id', 'campeonato_id', 'titulo', 'data', 'status', 'source'], search: ['titulo', 'source'], defaultOrder: 'data', defaultDir: 'desc', dateColumn: 'data' },
-  corridas_full: { columns: ['id', 'etapa_id', 'campeonato_id', 'titulo', 'data', 'status', 'source', 'campeonato_nome', 'etapa_nome'], search: ['titulo', 'source', 'campeonato_nome', 'etapa_nome'], defaultOrder: 'data', defaultDir: 'desc', dateColumn: 'data', readOnly: true },
+  corridas: { columns: ['id', 'etapa_id', 'campeonato_id', 'titulo', 'data', 'status', 'source', 'formato_id'], search: ['titulo', 'source'], defaultOrder: 'data', defaultDir: 'desc', dateColumn: 'data' },
+  corridas_full: { columns: ['id', 'etapa_id', 'campeonato_id', 'titulo', 'data', 'status', 'source', 'formato_id', 'campeonato_nome', 'etapa_nome'], search: ['titulo', 'source', 'campeonato_nome', 'etapa_nome'], defaultOrder: 'data', defaultDir: 'desc', dateColumn: 'data', readOnly: true },
+  formatos_corrida: {
+    columns: [
+      'id', 'nome', 'descricao',
+      'tt_habilitada', 'tt_duracao_min', 'tt_define_grid', 'tt_pontua',
+      'corrida_duracao_min',
+      'paradas_habilitadas', 'paradas_quantidade', 'parada_tempo_minimo_ms',
+      'boxes_abrem_apos_ms', 'boxes_fecham_apos_ms', 'paradas_adicionais_permitidas',
+      'punicoes_fonte', 'classificacao_fonte', 'desempate', 'is_default', 'created_at',
+    ],
+    booleans: ['tt_habilitada', 'tt_define_grid', 'tt_pontua', 'paradas_habilitadas', 'is_default'],
+    json: ['desempate'],
+    search: ['nome', 'descricao'],
+    defaultOrder: 'nome',
+  },
   resultados: { columns: ['id', 'corrida_id', 'piloto_id', 'piloto_nome', 'posicao', 'melhor_volta', 'voltas', 'pontos', 'gap'], search: ['piloto_nome'], defaultOrder: 'posicao' },
   resultados_full: { columns: ['id', 'corrida_id', 'piloto_id', 'piloto_nome', 'posicao', 'melhor_volta', 'voltas', 'pontos', 'gap', 'piloto_numero', 'piloto_equipe'], search: ['piloto_nome', 'piloto_numero', 'piloto_equipe'], defaultOrder: 'posicao', readOnly: true },
   cronometragem_live: { columns: ['id', 'payload', 'updated_at'], defaultOrder: 'id', readOnly: true },
@@ -58,8 +72,10 @@ const resources = {
   karts: { columns: ['id', 'numero', 'modelo', 'categoria', 'motor', 'status', 'km_total', 'ultima_manutencao', 'proxima_manutencao', 'notes', 'ativo', 'created_at', 'chassi_numero', 'sensor_numero', 'redutor_antigo', 'redutor_novo', 'ultimo_piloto_equalizacao', 'traco_equalizacao', 'media_equalizacao_ms', 'melhor_equalizacao_ms', 'desvio_equalizacao_ms', 'ultima_equalizacao', 'laptime_quantity', 'laptime_time_of_use_ms', 'laptime_status_control', 'laptime_updated_at', 'sensor_numero_fonte', 'sensor_fonte_atualizado_em', 'data_source'], booleans: ['ativo'], search: ['numero', 'modelo', 'categoria', 'motor', 'chassi_numero', 'sensor_numero', 'sensor_numero_fonte'], defaultOrder: 'numero' },
   karts_manutencao: { columns: ['id', 'kart_id', 'tipo', 'descricao', 'custo', 'data', 'responsavel', 'status', 'created_at'], search: ['tipo', 'descricao', 'responsavel'], defaultOrder: 'data', defaultDir: 'desc', dateColumn: 'data' },
   karts_full: { columns: ['id', 'numero', 'modelo', 'categoria', 'motor', 'status', 'km_total', 'ultima_manutencao', 'proxima_manutencao', 'notes', 'ativo', 'created_at', 'chassi_numero', 'sensor_numero', 'redutor_antigo', 'redutor_novo', 'ultimo_piloto_equalizacao', 'traco_equalizacao', 'media_equalizacao_ms', 'melhor_equalizacao_ms', 'desvio_equalizacao_ms', 'ultima_equalizacao', 'laptime_quantity', 'laptime_time_of_use_ms', 'laptime_status_control', 'laptime_updated_at', 'sensor_numero_fonte', 'sensor_fonte_atualizado_em', 'data_source', 'manutencoes_pendentes'], search: ['numero', 'modelo', 'categoria', 'chassi_numero', 'sensor_numero', 'sensor_numero_fonte'], defaultOrder: 'numero', readOnly: true },
-  karts_equalizacoes: { columns: ['id', 'kart_id', 'categoria', 'piloto', 'traco', 'data', 'voltas_validas', 'melhor_volta_ms', 'media_ms', 'desvio_ms', 'alvo_ms', 'status', 'observacoes', 'created_at'], search: ['piloto', 'traco', 'observacoes'], defaultOrder: 'data', defaultDir: 'desc', dateColumn: 'data' },
-  karts_equalizacoes_full: { columns: ['id', 'kart_id', 'categoria', 'piloto', 'traco', 'data', 'voltas_validas', 'melhor_volta_ms', 'media_ms', 'desvio_ms', 'alvo_ms', 'status', 'observacoes', 'created_at', 'kart_numero', 'chassi_numero', 'sensor_numero', 'modelo', 'kart_status'], search: ['piloto', 'traco', 'observacoes', 'kart_numero', 'chassi_numero', 'sensor_numero'], defaultOrder: 'data', defaultDir: 'desc', dateColumn: 'data', readOnly: true },
+  karts_equalizacoes: { columns: ['id', 'kart_id', 'categoria', 'piloto', 'traco', 'data', 'voltas_validas', 'melhor_volta_ms', 'media_ms', 'desvio_ms', 'alvo_ms', 'status', 'observacoes', 'created_at', 'sessao_id', 'captura_id', 'racing_id', 'racing_competitor_id', 'fonte', 'tempo_antes_ms', 'tempo_depois_ms', 'media_antes_ms', 'media_depois_ms', 'desvio_antes_ms', 'desvio_depois_ms', 'voltas_antes', 'voltas_depois', 'volta_antes', 'volta_depois', 'capturado_em', 'responsavel'], search: ['piloto', 'traco', 'observacoes', 'racing_id', 'fonte'], defaultOrder: 'data', defaultDir: 'desc', dateColumn: 'data', readOnly: true },
+  karts_equalizacoes_full: { columns: ['id', 'kart_id', 'categoria', 'piloto', 'traco', 'data', 'voltas_validas', 'melhor_volta_ms', 'media_ms', 'desvio_ms', 'alvo_ms', 'status', 'observacoes', 'created_at', 'kart_numero', 'chassi_numero', 'sensor_numero', 'modelo', 'kart_status', 'sessao_id', 'captura_id', 'racing_id', 'racing_competitor_id', 'fonte', 'tempo_antes_ms', 'tempo_depois_ms', 'media_antes_ms', 'media_depois_ms', 'desvio_antes_ms', 'desvio_depois_ms', 'voltas_antes', 'voltas_depois', 'volta_antes', 'volta_depois', 'capturado_em', 'responsavel'], search: ['piloto', 'traco', 'observacoes', 'kart_numero', 'chassi_numero', 'sensor_numero', 'racing_id', 'fonte'], defaultOrder: 'data', defaultDir: 'desc', dateColumn: 'data', readOnly: true },
+  karts_equalizacao_sessoes: { columns: ['id', 'racing_id', 'racing_name', 'racing_type', 'track_name', 'started_at', 'ended_at', 'status', 'fonte', 'responsavel', 'created_at'], search: ['racing_id', 'racing_name', 'racing_type', 'track_name', 'fonte'], defaultOrder: 'created_at', defaultDir: 'desc', readOnly: true },
+  karts_equalizacao_capturas: { columns: ['id', 'sessao_id', 'kart_id', 'racing_id', 'racing_competitor_id_antes', 'racing_competitor_id_depois', 'numero_kart', 'piloto_antes', 'piloto_depois', 'transponder_antes', 'transponder_depois', 'tempo_antes_ms', 'media_antes_ms', 'desvio_antes_ms', 'voltas_antes', 'volta_antes', 'capturado_antes_em', 'tempo_depois_ms', 'media_depois_ms', 'desvio_depois_ms', 'voltas_depois', 'volta_depois', 'capturado_depois_em', 'status', 'fonte', 'responsavel', 'created_at', 'updated_at'], search: ['numero_kart', 'piloto_antes', 'piloto_depois', 'racing_id', 'fonte'], defaultOrder: 'created_at', defaultDir: 'desc', readOnly: true },
   karts_identidade_historico: { columns: ['id', 'kart_id', 'data', 'acao', 'chassi_anterior', 'chassi_novo', 'placa_anterior', 'placa_nova', 'sensor_anterior', 'sensor_novo', 'observacoes', 'responsavel', 'created_at'], search: ['acao', 'chassi_anterior', 'chassi_novo', 'placa_anterior', 'placa_nova', 'sensor_anterior', 'sensor_novo', 'observacoes', 'responsavel'], defaultOrder: 'data', defaultDir: 'desc', dateColumn: 'data' },
   // Eventos
   eventos: { columns: ['id', 'titulo', 'descricao', 'tipo', 'cliente_id', 'pista_id', 'data_inicio', 'data_fim', 'qtd_participantes', 'valor', 'status', 'cor_tema', 'notes', 'created_at'], search: ['titulo', 'descricao', 'tipo'], defaultOrder: 'data_inicio', defaultDir: 'desc', dateColumn: 'data_inicio' },
@@ -204,6 +220,11 @@ async function list(db: AdminD1Database, resource: ResourceName, url: URL) {
   return { rows: result.results.map((row) => normalizeRow(resource, row)), total: Number(countResult?.total ?? 0) };
 }
 
+async function enforceFormatoDefaultUnico(db: AdminD1Database, resource: ResourceName, id: string) {
+  if (resource !== 'formatos_corrida') return;
+  await db.prepare('UPDATE formatos_corrida SET is_default = 0 WHERE id != ? AND is_default = 1').bind(id).run();
+}
+
 async function create(db: AdminD1Database, resource: ResourceName, body: unknown, actor: string) {
   const config = getConfig(resource);
   if (config.readOnly) throw new Error('read_only_resource');
@@ -212,6 +233,7 @@ async function create(db: AdminD1Database, resource: ResourceName, body: unknown
   const keys = Object.keys(payload);
   if (!keys.length) throw new Error('invalid_payload');
   await db.prepare(`INSERT INTO ${resource} (${keys.join(',')}) VALUES (${keys.map(() => '?').join(',')})`).bind(...keys.map((key) => payload[key])).run();
+  if (payload.is_default) await enforceFormatoDefaultUnico(db, resource, String(payload.id));
   await audit(db, actor, 'create', resource, String(payload.id), payload);
   const row = await db.prepare(`SELECT * FROM ${resource} WHERE id = ?`).bind(payload.id).first<Row>();
   return row ? normalizeRow(resource, row) : null;
@@ -226,6 +248,7 @@ async function update(db: AdminD1Database, resource: ResourceName, id: string, b
   const result = await db.prepare(`UPDATE ${resource} SET ${keys.map((key) => `${key} = ?`).join(',')} WHERE id = ?`)
     .bind(...keys.map((key) => payload[key]), id).run();
   if (!result.meta.changes) throw new Error('record_not_found');
+  if (payload.is_default) await enforceFormatoDefaultUnico(db, resource, id);
   await audit(db, actor, 'update', resource, id, payload);
   const row = await db.prepare(`SELECT * FROM ${resource} WHERE id = ?`).bind(id).first<Row>();
   return row ? normalizeRow(resource, row) : null;

@@ -3,11 +3,25 @@ import { buildKartHistoryWindows } from '@/lib/equalizacao/history';
 import type {
   Kart,
   KartEqualization,
+  KartEqualizationCapture,
+  KartEqualizationSession,
   KartHistoryItem,
   KartHistoryResponse,
   KartIdentityEvent,
   KartMaintenance,
 } from './equalizacao.types';
+import type { EqualizacaoLiveSnapshot } from '@/lib/equalizacao/equalizacao-live.types';
+
+export type EqualizacaoBeforeResponse = {
+  session: KartEqualizationSession;
+  capture: KartEqualizationCapture;
+  candidate: EqualizacaoLiveSnapshot['candidates'][number];
+  snapshot: EqualizacaoLiveSnapshot;
+};
+
+export type EqualizacaoAfterResponse = EqualizacaoBeforeResponse & {
+  measurement: KartEqualization;
+};
 
 const jsonRequest = async <T>(url: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(url, {
@@ -25,15 +39,58 @@ export const listKarts = async (): Promise<Kart[]> => {
   return rows.filter((kart) => kart.ativo);
 };
 
+export const getKart = async (id: string): Promise<Kart> => {
+  const rows = await apiGet<Kart[]>(`karts_full?eq_id=${encodeURIComponent(id)}&limit=1`);
+  if (!rows[0]) throw new Error('Kart não encontrado na frota real.');
+  return rows[0];
+};
+
 export const createKart = (payload: Partial<Kart>): Promise<Kart> => apiPost<Kart>('karts', payload);
 
 export const updateKart = (id: string, payload: Partial<Kart>): Promise<Kart> => apiPatch<Kart>(`karts/${encodeURIComponent(id)}`, payload);
+
+export const updateKartPhysicalData = (id: string, payload: Pick<Kart, 'chassi_numero' | 'redutor_antigo' | 'redutor_novo'>): Promise<Kart> =>
+  updateKart(id, payload);
 
 export const listKartEqualizations = (kartId: string): Promise<KartEqualization[]> =>
   apiGet<KartEqualization[]>(`karts_equalizacoes?eq_kart_id=${encodeURIComponent(kartId)}&limit=100&order=data&dir=desc`);
 
 export const createKartEqualization = (payload: Record<string, unknown>): Promise<KartEqualization> =>
   apiPost<KartEqualization>('karts_equalizacoes', payload);
+
+export const fetchEqualizacaoLive = (): Promise<EqualizacaoLiveSnapshot> =>
+  jsonRequest<EqualizacaoLiveSnapshot>('/api/admin/laptime/equalizacao-live');
+
+export const startEqualizacaoSession = (): Promise<{
+  session: KartEqualizationSession;
+  snapshot: EqualizacaoLiveSnapshot;
+  reused: boolean;
+}> => jsonRequest('/api/admin/equalizacao/sessions', { method: 'POST', body: JSON.stringify({}) });
+
+export const getEqualizacaoSession = (sessionId: string): Promise<{
+  session: KartEqualizationSession;
+  captures: KartEqualizationCapture[];
+}> => jsonRequest(`/api/admin/equalizacao/sessions/${encodeURIComponent(sessionId)}`);
+
+export const captureEqualizacaoBefore = (sessionId: string, kartId: string, competitorId?: string): Promise<EqualizacaoBeforeResponse> =>
+  jsonRequest<EqualizacaoBeforeResponse>(`/api/admin/equalizacao/sessions/${encodeURIComponent(sessionId)}/before`, {
+    method: 'POST',
+    body: JSON.stringify({ kartId, ...(competitorId ? { competitorId } : {}) }),
+  });
+
+export const captureEqualizacaoAfter = (sessionId: string, captureId: string): Promise<EqualizacaoAfterResponse> =>
+  jsonRequest<EqualizacaoAfterResponse>(`/api/admin/equalizacao/sessions/${encodeURIComponent(sessionId)}/after`, {
+    method: 'POST',
+    body: JSON.stringify({ captureId }),
+  });
+
+export const closeEqualizacaoSession = (sessionId: string): Promise<{
+  session: KartEqualizationSession;
+  captures: KartEqualizationCapture[];
+}> => jsonRequest(`/api/admin/equalizacao/sessions/${encodeURIComponent(sessionId)}/close`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
 
 export const listKartMaintenances = (kartId: string): Promise<KartMaintenance[]> =>
   apiGet<KartMaintenance[]>(`karts_manutencao?eq_kart_id=${encodeURIComponent(kartId)}&limit=100&order=data&dir=desc`);
