@@ -72,9 +72,9 @@ const INITIAL_STATE: DashboardState = {
 
 const LINKS = {
   designer: '/designer-telao',
-  live: '/placar-telao-tb50?layout=designer',
+  live: '/podio-live-tb50',
   liveManual: '/placar-telao-tb50?layout=designer&controls=true',
-  preview: '/placar-telao-tb50?layout=designer',
+  preview: '/podio-live-tb50',
   final: '/placar-telao-tb50?layout=designer&final=real&controls=true',
   podium: '/podio-final-tb50',
   layoutApi: '/api/telao-layout',

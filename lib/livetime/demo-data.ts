@@ -2,6 +2,8 @@ import type { LiveTimingDriver, LiveTimingSnapshot } from '@/lib/livetime/types'
 
 export const DEFAULT_UID = '58856059-c4fd-4626-aea7-42aefc048eec';
 
+const DEMO_TEAM_NAMES = ['GORILLAS TEAM RACING 1', 'ZERO27/AGUIA 2', 'FIREPIT/ APEX 2'];
+
 export const DEMO_DRIVERS: LiveTimingDriver[] = Array.from({ length: 30 }, (_, index) => {
   const position = index + 1;
   const seconds = 33 + (index % 26);
@@ -9,6 +11,7 @@ export const DEMO_DRIVERS: LiveTimingDriver[] = Array.from({ length: 30 }, (_, i
     position,
     kart: String(100 + position),
     name: `PILOTO ${String(position).padStart(2, '0')}`,
+    ...(position <= DEMO_TEAM_NAMES.length ? { team: DEMO_TEAM_NAMES[position - 1] } : {}),
     time: `00:${String(seconds).padStart(2, '0')}.${String(10 + position).padStart(3, '0')}`,
   };
 });

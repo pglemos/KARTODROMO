@@ -1,15 +1,23 @@
 status:
-  branch: feature/site-redesign-fase1
+  branch: main
   modifiedFiles:
-    - CLAUDE.md
-  modifiedFilesTotalCount: 1
+    - .aiox/project-status.yaml
+    - .env.example
+    - app/HomeDashboard.tsx
+    - lib/livetime/demo-data.ts
+    - lib/livetime/laptime-api-client.ts
+  modifiedFilesTotalCount: 41
   recentCommits:
-    - 'fix: hard text/column cutoff on KAC page mobile scroll bars'
-    - 'feat(events): add WhatsApp quote modal, matching draft''s lead form'
+    - >-
+      fix(kart-locacao): update booking buttons to point directly to MyLapTime
+      booking URL
+    - >-
+      feat: centralize all modules SQL data, fix schema mismatches, and enable
+      live sync
   currentEpic: null
   currentStory: null
-  lastUpdate: '2026-07-18T10:39:33.180Z'
+  lastUpdate: '2026-08-23T05:04:16.271Z'
   isGitRepo: true
-timestamp: 1784371173181
+timestamp: 1787461456274
 ttl: 60
-gitFingerprint: 1783922990107.7737:1783977224397.918
+gitFingerprint: 1785264856636.1414:1787461422627.536

@@ -11,6 +11,7 @@ import {
 } from '@/lib/livetime/dom-extractor';
 import { fetchLapTimeApiSnapshot } from '@/lib/livetime/laptime-api';
 import { fetchLapTimeSqlSnapshot, type LapTimeSqlOptions } from '@/lib/livetime/laptime-sql';
+import { mergeTeamRows, type LiveTimingTeamRow, normalizeKart } from '@/lib/livetime/team-enrichment';
 import type { LiveTimingDriver, LiveTimingSnapshot } from '@/lib/livetime/types';
 import { ensureWindowsSystemPath, resolvePreferredBrowserExecutablePath } from '@/lib/playwright-runtime';
 
@@ -18,6 +19,7 @@ const LIVETIME_BASE_URL = 'https://livetime.azurewebsites.net/';
 const ROW_SELECTORS = ['table.table-livetime tbody tr', '.table-livetime tbody tr', 'tr.tr-livetime', 'table tbody tr'];
 const HEADER_SELECTORS = ['table.table-livetime thead th', '.table-livetime thead th', '.th-livetime', 'table thead th'];
 const LAPTIME_CARD_SELECTOR = '.live-competitor-card-ctn';
+const TEAM_ROW_SELECTOR = '.conglomerate-1';
 const RESULT_CARD_SELECTOR = '.pilot-card-container';
 const PAGE_TIMEOUT_MS = Number(process.env.LIVETIME_PAGE_TIMEOUT_MS || '30000');
 const PAGE_RELOAD_MS = Number(process.env.LIVETIME_SCRAPER_RELOAD_MS || '15000');
@@ -47,6 +49,7 @@ export type ScraperOptions = {
   apiBaseUrl?: string;
   apiToken?: string;
   apiTokenFile?: string;
+  apiTokenProvider?: () => Promise<string>;
   sql?: LapTimeSqlOptions;
   headless?: boolean;
   pollMs?: number;
@@ -113,7 +116,11 @@ export class LiveTimeScraper {
   }
 
   private liveTimeUrl() {
-    if (this.options.sourceUrl) return this.options.sourceUrl;
+    if (this.options.sourceUrl) {
+      const url = new URL(this.options.sourceUrl);
+      if (!url.searchParams.has('uid')) url.searchParams.set('uid', this.options.uid);
+      return url.toString();
+    }
 
     const url = new URL(LIVETIME_BASE_URL);
     url.searchParams.set('uid', this.options.uid);
@@ -170,7 +177,7 @@ export class LiveTimeScraper {
       }
 
       if (await this.tickApi()) {
-        await this.closeDomBrowser();
+        if (!this.options.sourceUrl) await this.closeDomBrowser();
         return;
       }
 
@@ -186,13 +193,18 @@ export class LiveTimeScraper {
 
   private hasApiSource() {
     const token = this.readApiToken();
-    return Boolean(this.options.apiBaseUrl && token && !isExpiredJwt(token));
+    return Boolean(this.options.apiBaseUrl && (this.options.apiTokenProvider || (token && !isExpiredJwt(token))));
   }
 
   private readApiToken() {
     if (this.options.apiToken) return this.options.apiToken;
     if (!this.options.apiTokenFile || !existsSync(this.options.apiTokenFile)) return '';
     return readFileSync(this.options.apiTokenFile, 'utf8').trim();
+  }
+
+  private async resolveApiToken() {
+    if (this.options.apiTokenProvider) return this.options.apiTokenProvider();
+    return this.readApiToken();
   }
 
   private async tickSql() {
@@ -227,7 +239,7 @@ export class LiveTimeScraper {
   private async tickApi() {
     if (!this.options.apiBaseUrl) return false;
 
-    const token = this.readApiToken();
+    const token = await this.resolveApiToken();
     if (!token) return false;
     if (isExpiredJwt(token)) return false;
 
@@ -237,7 +249,7 @@ export class LiveTimeScraper {
         token,
         timeoutMs: Number(process.env.LAPTIME_API_TIMEOUT_MS || process.env.LIVETIME_TIMEOUT_MS || '3000'),
       });
-      this.snapshot = apiSnapshot;
+      this.snapshot = this.options.sourceUrl ? await this.enrichApiSnapshotWithDom(apiSnapshot) : apiSnapshot;
 
       if (this.options.sourceUrl && !apiSnapshot.drivers.some((driver) => driver.kart.trim())) {
         return false;
@@ -258,6 +270,30 @@ export class LiveTimeScraper {
       };
 
       return false;
+    }
+  }
+
+  private async enrichApiSnapshotWithDom(snapshot: LiveTimingSnapshot): Promise<LiveTimingSnapshot> {
+    if (!snapshot.drivers.some((driver) => driver.kart.trim())) return snapshot;
+
+    try {
+      if (
+        !this.page ||
+        this.page.isClosed() ||
+        (DOM_BROWSER_MAX_AGE_MS > 0 && this.domConnectedAt > 0 && Date.now() - this.domConnectedAt > DOM_BROWSER_MAX_AGE_MS)
+      ) {
+        await this.connect();
+      }
+
+      const page = this.page;
+      if (!page) return snapshot;
+
+      await this.reloadIfNeeded(page);
+      const rows = await this.readTeamRows(page);
+      return mergeTeamRows(snapshot, rows);
+    } catch {
+      // A falha visual não pode derrubar a fonte REST, que continua sendo a autoridade de posição/tempo.
+      return snapshot;
     }
   }
 
@@ -286,7 +322,16 @@ export class LiveTimeScraper {
           : resultRows.length > 0
             ? extractDriversFromResultCards(resultRows)
             : extractDriversFromTable(headers, rowTexts);
-      const drivers = this.hydrateMissingKarts(extractedDrivers);
+      const hydratedDrivers = this.hydrateMissingKarts(extractedDrivers);
+      const drivers = mergeTeamRows(
+        {
+          status: 'waiting',
+          source: 'dom-scraper',
+          updatedAt: new Date().toISOString(),
+          drivers: hydratedDrivers,
+        },
+        await this.readTeamRows(page),
+      ).drivers;
       const hasKartNumbers = drivers.some((driver) => driver.kart.trim());
       const names = extractEventNames(text);
       const inferredSessionType = inferSessionTypeFromText(text);
@@ -389,6 +434,29 @@ export class LiveTimeScraper {
         };
       }),
     );
+  }
+
+  private async readTeamRows(page: Page): Promise<LiveTimingTeamRow[]> {
+    const locator = page.locator(TEAM_ROW_SELECTOR);
+    const count = await locator.count().catch(() => 0);
+    if (count <= 0) return [];
+
+    const rows = await locator.evaluateAll((nodes) =>
+      nodes.map((node) => ({
+        position: Number((node.querySelector('.c-pos-ctn')?.textContent || '').replace(/\D/g, '')),
+        kart: (node.querySelector('.c-number')?.textContent || '').replace(/^\s*#/, '').trim(),
+        team: (node.querySelector('.name-encapsulated')?.textContent || '').replace(/\s+/g, ' ').trim().toUpperCase(),
+      })),
+    );
+
+    const unique = new Map<string, LiveTimingTeamRow>();
+    for (const row of rows) {
+      if (!row.team) continue;
+      const key = normalizeKart(row.kart) || String(row.position);
+      if (!unique.has(key)) unique.set(key, row);
+    }
+
+    return Array.from(unique.values());
   }
 
   private async readResultCards(page: Page) {

@@ -1,11 +1,13 @@
 import http from 'node:http';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import sql from 'mssql';
 import { DEFAULT_UID } from '@/lib/livetime/demo-data';
+import { LapTimeApiClient } from '@/lib/livetime/laptime-api-client';
 import { TELAO_LAYOUT_PRESETS } from '@/lib/telao-layout-config';
 import { readTelaoLayoutConfig, telaoLayoutStoreStatus, writeTelaoLayoutConfigToFile } from '@/lib/telao-layout-store';
 import { readTb50Page, tb50PageStoreStatus, writeTb50PageToFile } from '@/lib/tb50-page-store';
-import { listViplexPrograms, startViplexProgram } from '@/lib/viplex-programs';
+import { listViplexPrograms, provisionViplexHtmlProgram, startViplexProgram } from '@/lib/viplex-programs';
 import { fetchClientesPage } from '@/lib/livetime/cliente-unificado';
 import { fetchCalXProCreditosPage, fetchCalXProReceitasPage } from '@/lib/livetime/calxpro-receitas';
 import { fetchCalXProCorridaCompetidores, fetchCalXProCorridasPage } from '@/lib/livetime/calxpro-corridas';
@@ -31,6 +33,11 @@ function loadLocalEnv() {
 }
 
 loadLocalEnv();
+
+// The SRVKART deployment uses the TB50's internal HTML program. Do not let a
+// stale machine-level variable route the controller back to the legacy HLS
+// publisher, which would incorrectly make FFmpeg/MediaMTX a requirement.
+process.env.VIPLEX_LIVE_PROGRAM_MODE = 'html';
 
 const uid = process.env.LIVETIME_UID || process.env.NEXT_PUBLIC_DEFAULT_UID || DEFAULT_UID;
 const port = Number(process.env.SCRAPER_PORT || process.env.PORT || '4010');
@@ -88,13 +95,53 @@ function resolveLaptimeSqlOptions(feature: LaptimeReadSource) {
   return wantsMirror && mirrorSqlOptions ? mirrorSqlOptions : laptimeSqlOptions;
 }
 
+let lapTimeAuthPool: Promise<sql.ConnectionPool> | null = null;
+
+async function getLapTimeServerNowUtc() {
+  if (!laptimeSqlOptions) throw new Error('laptime_auth_sql_not_configured');
+
+  if (!lapTimeAuthPool) {
+    lapTimeAuthPool = sql.connect({
+      server: laptimeSqlOptions.server,
+      database: laptimeSqlOptions.database,
+      user: laptimeSqlOptions.user,
+      password: laptimeSqlOptions.password,
+      port: laptimeSqlOptions.port,
+      connectionTimeout: laptimeSqlOptions.timeoutMs,
+      requestTimeout: laptimeSqlOptions.timeoutMs,
+      options: {
+        instanceName: laptimeSqlOptions.instanceName,
+        encrypt: false,
+        trustServerCertificate: true,
+      },
+    });
+  }
+
+  const pool = await lapTimeAuthPool;
+  const result = await pool.request().query('SELECT GETUTCDATE() AS serverNowUtc');
+  return new Date(result.recordset[0].serverNowUtc);
+}
+
+const lapTimeApiAuthClient =
+  process.env.LAPTIME_API_BASE_URL && laptimeSqlOptions && process.env.LAPTIME_API_AUTO_AUTH !== 'false'
+    ? new LapTimeApiClient(
+        {
+          baseUrl: process.env.LAPTIME_API_BASE_URL,
+          origin: process.env.LAPTIME_API_ORIGIN || 'LapTimeMirror',
+          timeoutMs: Number(process.env.LAPTIME_API_TIMEOUT_MS || process.env.LIVETIME_TIMEOUT_MS || '15000'),
+        },
+        getLapTimeServerNowUtc,
+      )
+    : null;
+
 const scraper = new LiveTimeScraper({
   uid,
   sourceUrl: process.env.LIVETIME_SOURCE_URL,
   apiBaseUrl: process.env.LAPTIME_API_BASE_URL,
-  apiToken: process.env.LAPTIME_API_TOKEN,
+  apiToken: lapTimeApiAuthClient ? undefined : process.env.LAPTIME_API_TOKEN || process.env.LAPTIME_TOKEN,
   apiTokenFile: process.env.LAPTIME_API_TOKEN_FILE,
-  sql: laptimeSqlOptions,
+  apiTokenProvider: lapTimeApiAuthClient ? () => lapTimeApiAuthClient.getToken() : undefined,
+  sql: process.env.LIVETIME_USE_SQL === 'true' ? laptimeSqlOptions : undefined,
   headless: process.env.LIVETIME_HEADLESS !== 'false',
   pollMs: Number(process.env.LIVETIME_SCRAPER_POLL_MS || '2000'),
 });
@@ -214,6 +261,18 @@ async function handleViplexPrograms(request: http.IncomingMessage, response: htt
   if (request.method === 'PUT' || request.method === 'POST') {
     try {
       const body = JSON.parse(await readBody(request));
+      if (body?.action === 'provision-html' || body?.action === 'provision-cronometragem') {
+        const provisioned = await provisionViplexHtmlProgram(body?.name || 'CRONOMETRAGEM');
+        if (body?.activate === false) {
+          sendJson(response, 200, { ...provisioned, localEndpoint: true });
+          return;
+        }
+
+        const started = await startViplexProgram(provisioned.identifier);
+        sendJson(response, 200, { ...started, provisioned, localEndpoint: true });
+        return;
+      }
+
       const result = await startViplexProgram(body?.identifier);
       sendJson(response, 200, { ...result, localEndpoint: true });
     } catch (error) {

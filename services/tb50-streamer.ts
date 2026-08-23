@@ -12,7 +12,7 @@ const outputFps = Number(process.env.TB50_OUTPUT_FPS || '8');
 const bitrate = process.env.TB50_STREAM_BITRATE || '1400k';
 const bufferSize = process.env.TB50_STREAM_BUFSIZE || '2800k';
 const rtpPacketSize = process.env.TB50_RTP_PKT_SIZE || '1200';
-const scoreboardUrl = process.env.TB50_SCOREBOARD_URL || 'http://127.0.0.1:3000/placar-telao-tb50?layout=designer';
+const scoreboardUrl = process.env.TB50_SCOREBOARD_URL || 'http://127.0.0.1:3000/podio-live-tb50';
 const streamUrl = process.env.TB50_STREAM_URL || 'rtsp://192.168.20.13:8554/tb50';
 ensureWindowsSystemPath();
 const chromePath = resolvePreferredBrowserExecutablePath(process.env.TB50_CHROME_PATH);

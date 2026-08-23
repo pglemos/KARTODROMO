@@ -37,6 +37,10 @@ function Set-PlaywrightRuntime {
 
 Set-PlaywrightRuntime
 
+if (-not $env:LIVETIME_SNAPSHOT_ENDPOINT) {
+  $env:LIVETIME_SNAPSHOT_ENDPOINT = "http://127.0.0.1:4010/api/livetime-snapshot"
+}
+
 function Get-NodeProcessByPattern {
   param([string]$Pattern)
   Get-CimInstance Win32_Process -Filter "name = 'node.exe'" | Where-Object { $_.CommandLine -match $Pattern }
@@ -159,7 +163,7 @@ Stop-ProcessByPattern -Name "cmd.exe" -Pattern "tb50-streamer|npm(\.cmd)? run st
 Stop-ProcessByPattern -Name "ffmpeg.exe" -Pattern "rtsp://.*tb50|rtmp://.*tb50"
 
 & (Join-Path $PSScriptRoot "start-tb50-stream.ps1") `
-  -ScoreboardUrl "http://127.0.0.1:3000/placar-telao-tb50?layout=designer" `
+  -ScoreboardUrl "http://127.0.0.1:3000/podio-live-tb50" `
   -StreamUrl "rtsp://192.168.20.13:8554/tb50" | Out-Null
 
 Start-Sleep -Seconds 2

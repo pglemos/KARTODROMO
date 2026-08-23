@@ -56,6 +56,9 @@ const nextConfig: NextConfig = {
     NEXT_PUBLICSUPABASE_ANON_KEY: supabaseAnonKey,
   },
   reactStrictMode: true,
+  turbopack: {
+    root: process.cwd(),
+  },
   async redirects() {
     return [
       { source: '/valores', destination: '/kart-locacao', permanent: true },

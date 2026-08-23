@@ -17,6 +17,8 @@ type LapTimeRacing = Record<string, unknown> & {
   Id_Racing?: number;
   Name?: string;
   RacingState?: number;
+  StartDateTime?: string;
+  ExpectedDateTime?: string;
   racingtype?: { Name?: string };
   racingtrack?: { Name?: string };
   racinggroup?: { Name?: string };
@@ -41,10 +43,20 @@ const RACING_STATES_TO_SCAN = [1, 2, 3, 4, 5, 6, 0, 7, 8, 9, 10];
 const RACING_QUERY_LIMIT = 100;
 
 function apiUrl(baseUrl: string, path: string): string {
-  return new URL(path.replace(/^\/+/, ''), `${baseUrl.replace(/\/+$/, '')}/`).toString();
+  const normalizedBase = baseUrl.replace(/\/+$/, '');
+  const normalizedPath = path.replace(/^\/+/, '');
+  const apiPath = normalizedBase.toLowerCase().endsWith('/api')
+    ? normalizedPath.replace(/^api\//i, '')
+    : normalizedPath;
+  return new URL(apiPath, `${normalizedBase}/`).toString();
 }
 
-async function fetchJson<T>(url: string, token: string, timeoutMs: number): Promise<T> {
+type FetchJsonOptions = {
+  /** LapTime returns HTTP 400 with { success: false } when a state has no rows. */
+  allowEmptyHttp400?: boolean;
+};
+
+async function fetchJson<T>(url: string, token: string, timeoutMs: number, options: FetchJsonOptions = {}): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -55,7 +67,14 @@ async function fetchJson<T>(url: string, token: string, timeoutMs: number): Prom
       signal: controller.signal,
     });
 
-    if (!response.ok) throw new Error(`LapTime API HTTP ${response.status}`);
+    if (!response.ok) {
+      if (response.status === 400 && options.allowEmptyHttp400) {
+        const body = (await response.json().catch(() => null)) as LapTimeEnvelope<unknown> | null;
+        if (body?.success === false) return [] as T;
+      }
+
+      throw new Error(`LapTime API HTTP ${response.status}`);
+    }
     return (await response.json()) as T;
   } finally {
     clearTimeout(timeout);
@@ -90,8 +109,8 @@ export function formatLapTimeValue(value: unknown): string {
 
 function driverTime(competitor: LapTimeCompetitor): string {
   return (
-    formatLapTimeValue(competitor.LapTime) ||
     formatLapTimeValue(competitor.BestLapTime) ||
+    formatLapTimeValue(competitor.LapTime) ||
     formatLapTimeValue(competitor.TotalTime) ||
     formatLapTimeValue(competitor.Diff) ||
     formatLapTimeValue(competitor.DiffLeader)
@@ -99,10 +118,16 @@ function driverTime(competitor: LapTimeCompetitor): string {
 }
 
 function toDriver(competitor: LapTimeCompetitor, index: number): LiveTimingDriver {
+  const shortName = cell(competitor.ShortName);
+  const competitorName = cell(competitor.Competitor);
+  const name = shortName || competitorName;
+  const team = shortName && competitorName && shortName.toUpperCase() !== competitorName.toUpperCase() ? competitorName : '';
+
   return {
     position: Number(competitor.Pos) > 0 ? Number(competitor.Pos) : index + 1,
     kart: cell(competitor.Number || competitor.Transponder),
-    name: cell(competitor.ShortName || competitor.Competitor).replace(/\s+/g, ' ').toUpperCase(),
+    name: name.replace(/\s+/g, ' ').toUpperCase(),
+    ...(team ? { team: team.replace(/\s+/g, ' ') } : {}),
     time: driverTime(competitor),
   };
 }
@@ -134,6 +159,7 @@ async function fetchRacingsByState(options: LapTimeApiOptions, state: number, ti
     apiUrl(options.baseUrl, `/api/Racing/getByState/${state}?qtd=${RACING_QUERY_LIMIT}`),
     options.token,
     timeoutMs,
+    { allowEmptyHttp400: true },
   );
 
   return asArray<LapTimeRacing>(racingEnvelope.data);
@@ -159,11 +185,39 @@ function driverScore(drivers: LiveTimingDriver[]): number {
   return kartCount * 100 + drivers.length;
 }
 
+function racingSelectionType(racing: LapTimeRacing): LiveTimingSnapshot['sessionType'] {
+  return inferSessionTypeFromText(cell(racing.racingtype?.Name) || cell(racing.Name));
+}
+
+function racingStartTimestamp(racing: LapTimeRacing): number {
+  const value = cell(racing.StartDateTime) || cell(racing.ExpectedDateTime);
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+/**
+ * The LapTime API returns the current event's qualifying row before its race row.
+ * Prefer the running race, then the most recently started row, so an old
+ * qualifying grid cannot hide the event leaderboard (for example 637100 vs 637101).
+ */
+function prioritizeRacings(racings: LapTimeRacing[]): LapTimeRacing[] {
+  return [...racings].sort((left, right) => {
+    const leftIsRace = racingSelectionType(left) === 'race' ? 1 : 0;
+    const rightIsRace = racingSelectionType(right) === 'race' ? 1 : 0;
+    if (leftIsRace !== rightIsRace) return rightIsRace - leftIsRace;
+
+    const startDifference = racingStartTimestamp(right) - racingStartTimestamp(left);
+    if (startDifference !== 0) return startDifference;
+
+    return Number(right.Id_Racing || 0) - Number(left.Id_Racing || 0);
+  });
+}
+
 async function fetchRacingWithDrivers(options: LapTimeApiOptions, timeoutMs: number): Promise<{ racing: LapTimeRacing | null; drivers: LiveTimingDriver[] }> {
   let best: { racing: LapTimeRacing; drivers: LiveTimingDriver[] } | null = null;
 
   for (const state of RACING_STATES_TO_SCAN) {
-    const racings = await fetchRacingsByState(options, state, timeoutMs);
+    const racings = prioritizeRacings(await fetchRacingsByState(options, state, timeoutMs));
 
     for (const racing of racings) {
       if (!racing?.Id_Racing) continue;

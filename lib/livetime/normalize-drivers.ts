@@ -3,6 +3,7 @@ import type { LiveTimingDriver, RawDriver } from '@/lib/livetime/types';
 const POSITION_KEYS = ['position', 'pos', 'rank', 'place', 'Position', 'Pos'];
 const KART_KEYS = ['kart', 'kartNumber', 'kart_number', 'number', 'car', 'carNumber', 'transponder', 'Kart', 'Number', 'No', '#'];
 const NAME_KEYS = ['name', 'driver', 'driverName', 'pilot', 'piloto', 'competitor', 'racer', 'Name', 'Driver', 'Pilot'];
+const TEAM_KEYS = ['team', 'teamName', 'team_name', 'equipe', 'equipeName', 'Equipe', 'Team'];
 const TIME_KEYS = ['time', 'Time', 'totalTime', 'raceTime', 'lastTime', 'lapTime', 'bestLap', 'bestLapTime', 'gap', 'diff', 'interval'];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -49,12 +50,17 @@ function normalizeName(value: unknown): string {
 export function normalizeDrivers(raw: unknown): LiveTimingDriver[] {
   const normalized = extractArray(raw)
     .filter(isRecord)
-    .map((driver, index) => ({
-      position: toPosition(firstValue(driver, POSITION_KEYS), index + 1),
-      kart: toCellString(firstValue(driver, KART_KEYS)),
-      name: normalizeName(firstValue(driver, NAME_KEYS)),
-      time: toCellString(firstValue(driver, TIME_KEYS)),
-    }))
+    .map((driver, index) => {
+      const team = normalizeName(firstValue(driver, TEAM_KEYS));
+
+      return {
+        position: toPosition(firstValue(driver, POSITION_KEYS), index + 1),
+        kart: toCellString(firstValue(driver, KART_KEYS)),
+        name: normalizeName(firstValue(driver, NAME_KEYS)),
+        ...(team ? { team } : {}),
+        time: toCellString(firstValue(driver, TIME_KEYS)),
+      };
+    })
     .filter((driver) => driver.position > 0);
 
   const seenPositions = new Set<number>();

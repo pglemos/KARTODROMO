@@ -39,7 +39,7 @@ describe('fetchLapTimeApiSnapshot', () => {
         success: true,
         data: [
           { Pos: 2, Number: '119', Competitor: 'Jonathan Lincoln', LapTime: '2026-05-22T00:01:06.618-03:00' },
-          { Pos: 1, Number: '121', ShortName: 'Vanderson', LapTime: '2026-05-22T00:01:05.100-03:00' },
+          { Pos: 1, Number: '121', ShortName: 'FA2', Competitor: 'Firepit/ Apex 2', LapTime: '2026-05-22T00:01:05.100-03:00' },
         ],
       });
     });
@@ -57,7 +57,7 @@ describe('fetchLapTimeApiSnapshot', () => {
     expect(snapshot.eventName).toBe('Baterias 21/05/2026 - BATERIA 21:40 - Corrida');
     expect(snapshot.trackName).toBe('Tracado 1');
     expect(snapshot.drivers).toEqual([
-      { position: 1, kart: '121', name: 'VANDERSON', time: '1:05.100' },
+      { position: 1, kart: '121', name: 'FA2', team: 'Firepit/ Apex 2', time: '1:05.100' },
       { position: 2, kart: '119', name: 'JONATHAN LINCOLN', time: '1:06.618' },
     ]);
   });
@@ -153,5 +153,126 @@ describe('fetchLapTimeApiSnapshot', () => {
 
     expect(snapshot.status).toBe('live');
     expect(snapshot.drivers).toEqual([{ position: 1, kart: '59', name: 'PILOTO COM KART', time: '1:01.000' }]);
+  });
+
+  it('treats LapTime HTTP 400 no-result states as empty states', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/Racing/getByState/5')) {
+        return Response.json({
+          success: true,
+          data: [{
+            Id_Racing: 637101,
+            RacingState: 5,
+            Name: '500 MILHAS - TOMADA DE TEMPO',
+            racingtype: { Name: 'Corrida' },
+          }],
+        });
+      }
+
+      if (url.includes('/RacingCompetitor/ListResultByRacingId?idRacing=637101')) {
+        return Response.json({
+          success: true,
+          data: [{ Pos: 1, Number: '106', Competitor: 'FIREPIT/ APEX 1', LapTime: '2026-08-23T01:05:864Z' }],
+        });
+      }
+
+      if (url.includes('/Racing/getByState/')) {
+        return new Response(JSON.stringify({ success: false }), { status: 400 });
+      }
+
+      throw new Error(`unexpected fetch ${url}`);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const snapshot = await fetchLapTimeApiSnapshot({
+      baseUrl: 'http://192.168.20.254/laptime/api',
+      token: 'token',
+    });
+
+    expect(snapshot.status).toBe('live');
+    expect(snapshot.drivers[0]?.kart).toBe('106');
+  });
+
+  it('prefers the active race over the qualifying row returned first by LapTime', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/Racing/getByState/5')) {
+        return Response.json({
+          success: true,
+          data: [
+            {
+              Id_Racing: 637100,
+              RacingState: 5,
+              Name: '500 MILHAS - TOMADA DE TEMPO',
+              StartDateTime: '2026-08-21T21:28:16.393Z',
+              racingtype: { Name: 'Treino Classificatório' },
+            },
+            {
+              Id_Racing: 637101,
+              RacingState: 5,
+              Name: '500 MILHAS',
+              StartDateTime: '2026-08-22T09:52:17.875Z',
+              racingtype: { Name: 'Corrida' },
+            },
+          ],
+        });
+      }
+
+      if (url.includes('/RacingCompetitor/ListResultByRacingId?idRacing=637100')) {
+        return Response.json({
+          success: true,
+          data: [{ Pos: 1, Number: '101', Competitor: 'MINAS RACING 1', LapTime: '2026-08-22T00:01:05.062-03:00' }],
+        });
+      }
+
+      if (url.includes('/RacingCompetitor/ListResultByRacingId?idRacing=637101')) {
+        return Response.json({
+          success: true,
+          data: [
+            {
+              Pos: 3,
+              Number: '126',
+              Competitor: 'ZERO27/AGUIA 2',
+              LapTime: '2026-08-22T00:01:08.746-03:00',
+              BestLapTime: '2026-08-22T00:01:04.839-03:00',
+            },
+            {
+              Pos: 1,
+              Number: '106',
+              Competitor: 'FIREPIT/ APEX 1',
+              LapTime: '2026-08-22T00:01:05.864-03:00',
+              BestLapTime: '2026-08-22T00:01:04.589-03:00',
+            },
+            {
+              Pos: 2,
+              Number: '107',
+              Competitor: 'FIREPIT/ APEX 2',
+              LapTime: '2026-08-22T00:01:06.615-03:00',
+              BestLapTime: '2026-08-22T00:01:04.825-03:00',
+            },
+          ],
+        });
+      }
+
+      if (url.includes('/Racing/getByState/')) {
+        return new Response(JSON.stringify({ success: false }), { status: 400 });
+      }
+
+      throw new Error(`unexpected fetch ${url}`);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const snapshot = await fetchLapTimeApiSnapshot({
+      baseUrl: 'http://192.168.20.254/laptime/api',
+      token: 'token',
+    });
+
+    expect(snapshot.sessionType).toBe('race');
+    expect(snapshot.drivers.slice(0, 3).map((driver) => [driver.position, driver.kart, driver.time])).toEqual([
+      [1, '106', '1:04.589'],
+      [2, '107', '1:04.825'],
+      [3, '126', '1:04.839'],
+    ]);
   });
 });

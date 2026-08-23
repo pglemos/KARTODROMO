@@ -323,7 +323,7 @@ function Restart-Next {
 function Ensure-Next {
   $pageOk = $false
   try {
-    $response = Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:3000/placar-telao-tb50?layout=designer&_watchdog=$(Get-Date -Format FileDateTime)" -TimeoutSec 10
+    $response = Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:3000/podio-live-tb50?_watchdog=$(Get-Date -Format FileDateTime)" -TimeoutSec 10
     $pageOk = $response.StatusCode -eq 200
   } catch {
     $pageOk = $false
@@ -363,7 +363,7 @@ function Restart-Streamer {
   Stop-ProcessByPattern -Name "ffmpeg.exe" -Pattern "rtsp://.*tb50|rtmp://.*tb50"
 
   & (Join-Path $PSScriptRoot "start-tb50-stream.ps1") `
-    -ScoreboardUrl "http://localhost:3000/placar-telao-tb50?layout=designer" `
+    -ScoreboardUrl "http://localhost:3000/podio-live-tb50" `
     -StreamUrl "rtsp://192.168.20.13:8554/tb50" | Out-Null
 
   if (-not (Wait-HlsStream)) {

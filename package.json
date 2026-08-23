@@ -20,6 +20,7 @@
     "preview:worker": "npm run preview",
     "deploy:worker": "npm run deploy",
     "scraper": "tsx services/livetime-scraper-server.ts",
+    "tb50:configure": "tsx scripts/configure-tb50-podium.ts",
     "mirror": "tsx services/laptime-mirror-server.ts",
     "mirror:bootstrap": "tsx services/laptime-mirror-server.ts --bootstrap",
     "mirror:install-autostart": "powershell -ExecutionPolicy Bypass -File scripts/install-laptime-mirror-autostart.ps1",

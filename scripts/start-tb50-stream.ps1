@@ -1,5 +1,5 @@
 param(
-  [string]$ScoreboardUrl = "http://127.0.0.1:3000/placar-telao-tb50?layout=designer",
+  [string]$ScoreboardUrl = "http://127.0.0.1:3000/podio-live-tb50",
   [string]$StreamUrl = "rtsp://192.168.20.13:8554/tb50",
   [int]$Width = 2048,
   [int]$Height = 512,

@@ -5,6 +5,8 @@ export type LiveTimingDriver = {
   position: number;
   kart: string;
   name: string;
+  /** Nome completo da equipe quando a fonte de cronometragem o disponibiliza. */
+  team?: string;
   time: string;
 };
 

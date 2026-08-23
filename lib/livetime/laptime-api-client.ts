@@ -144,6 +144,10 @@ export class LapTimeApiClient {
     return this.token as string;
   }
 
+  async getToken(): Promise<string> {
+    return this.ensureToken();
+  }
+
   private async fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);

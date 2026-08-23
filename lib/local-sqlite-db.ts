@@ -35,7 +35,6 @@ function getDb(): NodeSqliteDb {
   }
 
   // Use Node.js built-in sqlite (Node 22.5+)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { DatabaseSync } = (eval('require')('node:sqlite')) as {
     DatabaseSync: new (path: string) => NodeSqliteDb;
   };
@@ -84,18 +83,6 @@ function initSchema(db: NodeSqliteDb) {
       console.error(`[local-sqlite] ✗ Failed to apply migration ${migName}:`, err);
     }
   }
-}
-
-function splitSqlStatements(sql: string): string[] {
-  // Split by semicolons but be careful about statements that span multiple lines
-  // Remove comments first
-  const withoutLineComments = sql.replace(/--[^\n]*/g, '');
-  const withoutBlockComments = withoutLineComments.replace(/\/\*[\s\S]*?\*\//g, '');
-
-  return withoutBlockComments
-    .split(';')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 3); // Filter out empty or tiny fragments
 }
 
 function createD1Statement(db: NodeSqliteDb, query: string, params: unknown[]): AdminD1Statement {
