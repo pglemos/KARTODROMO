@@ -2,7 +2,6 @@ import { DEFAULT_UID } from '@/lib/livetime/demo-data';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { requireAdminSession } from '@/lib/require-admin-session';
 import { HomeDashboard } from '../../HomeDashboard';
-import '../../home.css';
 
 export default async function AdminTelaoPage() {
   const session = await requireAdminSession('/admin/telao');

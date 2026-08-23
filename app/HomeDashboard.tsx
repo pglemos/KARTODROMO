@@ -1,9 +1,35 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clipboard,
+  Copy,
+  ExternalLink,
+  Gauge,
+  LayoutTemplate,
+  Maximize2,
+  Monitor,
+  Play,
+  RefreshCw,
+  Send,
+  Settings2,
+  SlidersHorizontal,
+  Timer,
+  Trophy,
+  Tv,
+  XCircle,
+  type LucideIcon,
+} from 'lucide-react';
+import Link from 'next/link';
 import { DEFAULT_TELAO_LAYOUT, type TelaoLayoutConfig } from '@/lib/telao-layout-config';
 import type { LiveTimingSnapshot } from '@/lib/livetime/types';
 import type { ViplexDeviceProgram } from '@/lib/viplex-programs';
+import { Badge } from '@/src/admin/ui/Badge';
+import { Button } from '@/src/admin/ui/Button';
 import { TelaoProgramacao } from './TelaoProgramacao';
 
 type LayoutResponse = {
@@ -197,6 +223,73 @@ function snapshotStatusDetail(snapshot: LiveTimingSnapshot | null): string {
   if (snapshot.status === 'error') return snapshot.message || 'Falha na fonte';
   if (snapshot.status === 'demo') return 'Demonstração';
   return snapshot.message || 'Aguardando corrida ou tomada de tempo';
+}
+
+const panelClass = 'rounded-xl border border-zinc-800 bg-zinc-900/60 shadow-card';
+const compactButtonClass = 'h-9';
+
+const healthMeta: Record<HealthState, { label: string; variant: 'emerald' | 'amber' | 'red' | 'zinc' }> = {
+  loading: { label: 'Carregando', variant: 'zinc' },
+  ok: { label: 'Online', variant: 'emerald' },
+  warning: { label: 'Atenção', variant: 'amber' },
+  error: { label: 'Erro', variant: 'red' },
+};
+
+function HealthBadge({ state }: { state: HealthState }) {
+  const meta = healthMeta[state];
+  return <Badge variant={meta.variant}>{meta.label}</Badge>;
+}
+
+function StatusTile({
+  detail,
+  icon: Icon,
+  label,
+  state,
+  value,
+}: {
+  detail: string;
+  icon: LucideIcon;
+  label: string;
+  state: HealthState;
+  value: string;
+}) {
+  return (
+    <article className={`${panelClass} min-w-0 p-4`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-[.12em] text-zinc-500">{label}</p>
+          <strong className="mt-2 block truncate text-base font-semibold text-zinc-50">{value}</strong>
+        </div>
+        <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-brand-500/10 text-brand-400">
+          <Icon aria-hidden="true" size={16} />
+        </span>
+      </div>
+      <div className="mt-3 flex min-w-0 items-center justify-between gap-2">
+        <span className="truncate text-xs text-zinc-500">{detail}</span>
+        <HealthBadge state={state} />
+      </div>
+    </article>
+  );
+}
+
+function PanelHeader({
+  eyebrow,
+  title,
+  action,
+}: {
+  eyebrow: string;
+  title: string;
+  action?: ReactNode;
+}) {
+  return (
+    <header className="flex min-w-0 items-start justify-between gap-3 border-b border-zinc-800 px-4 py-3.5 md:px-5">
+      <div className="min-w-0">
+        <p className="text-[10px] font-bold uppercase tracking-[.12em] text-zinc-500">{eyebrow}</p>
+        <h2 className="mt-1 truncate text-base font-semibold text-zinc-50">{title}</h2>
+      </div>
+      {action ? <div className="flex flex-none items-center gap-2">{action}</div> : null}
+    </header>
+  );
 }
 
 function buildFiveByTwoLayout(base: TelaoLayoutConfig): TelaoLayoutConfig {
@@ -403,189 +496,202 @@ export function HomeDashboard({ uid }: { uid: string }) {
   }
 
   return (
-    <main className="home-shell">
-      <section className="home-command">
-        <div className="home-title">
-          <span>Kartódromo de Betim · TB50</span>
-          <h1>Central do Telão</h1>
-          <p>{isLiveReady ? 'Tudo pronto para operar a corrida em tempo real.' : 'Revise os status antes de publicar no painel.'}</p>
+    <main className="grid gap-5 pb-10">
+      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase tracking-wider text-brand-400">Operação · TB50</p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight text-zinc-50">Central do telão</h2>
+          <p className="mt-1.5 max-w-2xl text-sm text-zinc-400">
+            {isLiveReady ? 'Sinal real conectado e pronto para publicação.' : 'Confira os estados antes de publicar conteúdo na TB50.'}
+          </p>
         </div>
-
-        <div className="home-primary-actions" aria-label="Ações principais">
+        <div className="flex flex-wrap gap-2">
           {cronometragemProgram ? (
-            <button
-              className="home-button home-button-strong"
-              type="button"
+            <Button
+              className={compactButtonClass}
               onClick={() => void publishViplexProgram(cronometragemProgram)}
               disabled={Boolean(busyAction)}
             >
-              {busyAction === `viplex-${programKey(cronometragemProgram)}` ? 'Publicando...' : 'Publicar corrida na TB50'}
-            </button>
+              <Send aria-hidden="true" size={15} />
+              {busyAction === `viplex-${programKey(cronometragemProgram)}` ? 'Publicando...' : 'Publicar na TB50'}
+            </Button>
           ) : null}
-          <a className="home-button" href={LINKS.liveManual} target="_blank" rel="noreferrer">
+          <a className="inline-flex h-9 items-center gap-2 rounded-lg border border-zinc-800 px-3.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800/70 hover:text-zinc-100" href={LINKS.liveManual} target="_blank" rel="noreferrer">
+            <ExternalLink aria-hidden="true" size={15} />
             Abrir telão
           </a>
-          <a className="home-button" href={LINKS.designer}>
+          <Link className="inline-flex h-9 items-center gap-2 rounded-lg border border-zinc-800 px-3.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800/70 hover:text-zinc-100" href={LINKS.designer}>
+            <LayoutTemplate aria-hidden="true" size={15} />
             Designer
-          </a>
-          <button className="home-button" type="button" onClick={() => void refresh()}>
+          </Link>
+          <Button className={compactButtonClass} onClick={() => void refresh()} variant="ghost">
+            <RefreshCw aria-hidden="true" size={15} />
             Atualizar
-          </button>
+          </Button>
         </div>
-      </section>
+      </header>
 
-      <section className="home-overview" aria-label="Resumo operacional">
-        <article className={`home-live-card home-live-card-${isLiveReady ? 'ready' : 'attention'}`}>
-          <span>{isLiveReady ? 'Sistema pronto' : 'Atencao operacional'}</span>
-          <strong>{state.snapshot?.eventName || snapshotStatusDetail(state.snapshot)}</strong>
-          <em>Fonte {state.snapshot?.source || '--'} / {activeDrivers} pilotos / leitura {formatCheckedAt(state.snapshot?.updatedAt || state.checkedAt)}</em>
-        </article>
-        <article className="home-live-card">
-          <span>Agora na TB50</span>
-          <strong>{activeProgram?.name || modeLabel(state.displayMode?.mode)}</strong>
-          <em>{layoutShort(state.layout)} / pagina {pageLabel(pageOffset)}</em>
-        </article>
-      </section>
-
-      <section className="home-status-grid" aria-label="Status operacional">
-        <article className={`home-status home-status-${state.health.snapshot}`}>
-          <span>LiveTime</span>
-          <strong>{statusLabel(state.health.snapshot)}</strong>
-          <em>{snapshotStatusDetail(state.snapshot)}</em>
-        </article>
-        <article className={`home-status home-status-${state.health.layout}`}>
-          <span>Layout</span>
-          <strong>{state.layout?.id || 'Indisponível'}</strong>
-          <em>{layoutShort(state.layout)}</em>
-        </article>
-        <article className={`home-status home-status-${state.health.mode}`}>
-          <span>Modo</span>
-          <strong>{modeLabel(state.displayMode?.mode)}</strong>
-          <em>{state.displayMode?.persistent ? 'Persistente' : 'Temporário'}</em>
-        </article>
-        <article className="home-status home-status-ok">
-          <span>Página</span>
-          <strong>{pageLabel(pageOffset)}</strong>
-          <em>{activeDrivers} pilotos · {capacity || '--'} posições</em>
-        </article>
-        <article className={`home-status home-status-${state.health.viplex}`}>
-          <span>Programas</span>
-          <strong>{statusLabel(state.health.viplex)}</strong>
-          <em>{state.viplexPrograms.length || '--'} disponíveis</em>
-        </article>
-      </section>
-
-      {state.error ? <div className="home-alert">{state.error}</div> : null}
-      {actionMessage ? <div className={`home-action-message home-action-message-${actionMessage.type}`}>{actionMessage.text}</div> : null}
-
-      <section className="home-program-library" aria-label="Biblioteca de programas ViPlex Express">
-        <header className="home-panel-header">
-          <div>
-            <span>ViPlex Express</span>
-            <strong>Escolha o que sai na TB50</strong>
+      <section className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,.65fr)]" aria-label="Resumo operacional">
+        <article className={`${panelClass} border-l-4 ${isLiveReady ? 'border-l-emerald-500' : 'border-l-amber-500'} p-5`}>
+          <div className="flex items-start gap-4">
+            <span className={`grid h-11 w-11 flex-none place-items-center rounded-xl ${isLiveReady ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+              {isLiveReady ? <CheckCircle2 aria-hidden="true" size={22} /> : <AlertTriangle aria-hidden="true" size={22} />}
+            </span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-[10px] font-bold uppercase tracking-[.12em] text-zinc-500">Sinal LiveTime</p>
+                <HealthBadge state={state.health.snapshot} />
+              </div>
+              <h2 className="mt-2 break-words text-lg font-semibold text-zinc-50">{state.snapshot?.eventName || snapshotStatusDetail(state.snapshot)}</h2>
+              <p className="mt-1.5 text-sm text-zinc-400">
+                Fonte {state.snapshot?.source || '--'} · {activeDrivers} pilotos · leitura {formatCheckedAt(state.snapshot?.updatedAt || state.checkedAt)}
+              </p>
+            </div>
           </div>
-        </header>
-        <div className="home-program-grid">
+        </article>
+        <article className={`${panelClass} p-5`}>
+          <div className="flex items-start gap-4">
+            <span className="grid h-11 w-11 flex-none place-items-center rounded-xl bg-blue-500/10 text-blue-400">
+              <Tv aria-hidden="true" size={22} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[.12em] text-zinc-500">Agora na TB50</p>
+              <h2 className="mt-2 truncate text-lg font-semibold text-zinc-50">{activeProgram?.name || modeLabel(state.displayMode?.mode)}</h2>
+              <p className="mt-1.5 text-sm text-zinc-400">{layoutShort(state.layout)} · página {pageLabel(pageOffset)}</p>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Status operacional">
+        <StatusTile detail={snapshotStatusDetail(state.snapshot)} icon={Gauge} label="LiveTime" state={state.health.snapshot} value={statusLabel(state.health.snapshot)} />
+        <StatusTile detail={layoutShort(state.layout)} icon={LayoutTemplate} label="Layout" state={state.health.layout} value={state.layout?.id || 'Indisponível'} />
+        <StatusTile detail={state.displayMode?.persistent ? 'Persistente' : 'Temporário'} icon={Settings2} label="Modo" state={state.health.mode} value={modeLabel(state.displayMode?.mode)} />
+        <StatusTile detail={`${activeDrivers} pilotos · ${capacity || '--'} posições`} icon={SlidersHorizontal} label="Página" state="ok" value={pageLabel(pageOffset)} />
+        <StatusTile detail={`${state.viplexPrograms.length || '--'} disponíveis`} icon={Monitor} label="Programas" state={state.health.viplex} value={statusLabel(state.health.viplex)} />
+      </section>
+
+      {state.error ? (
+        <div className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-200" role="alert">
+          <XCircle aria-hidden="true" className="mt-0.5 flex-none text-red-400" size={18} />
+          <span>{state.error}</span>
+        </div>
+      ) : null}
+      {actionMessage ? (
+        <div className={`flex items-start gap-3 rounded-xl border p-4 text-sm ${actionMessage.type === 'success' ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-200' : 'border-red-500/30 bg-red-500/5 text-red-200'}`} role="status">
+          {actionMessage.type === 'success' ? <CheckCircle2 aria-hidden="true" className="mt-0.5 flex-none text-emerald-400" size={18} /> : <XCircle aria-hidden="true" className="mt-0.5 flex-none text-red-400" size={18} />}
+          <span>{actionMessage.text}</span>
+        </div>
+      ) : null}
+
+      <section className={`${panelClass} overflow-hidden`} aria-label="Biblioteca de programas ViPlex Express">
+        <PanelHeader
+          action={<Badge variant={state.health.viplex === 'ok' ? 'emerald' : 'amber'}>{state.viplexPrograms.length || 0} disponíveis</Badge>}
+          eyebrow="ViPlex Express"
+          title="Programas disponíveis para a TB50"
+        />
+        <div className="grid gap-3 p-4 md:grid-cols-2 md:p-5">
           {state.viplexPrograms.map((program, index) => {
             const isActive = program.statusCode === 1;
             const isBusy = busyAction === `viplex-${programKey(program)}`;
 
             return (
-              <article className={`home-program ${isActive ? 'home-program-active' : ''}`} key={programKey(program)}>
-                <div className="home-program-copy">
-                  <span>{isActive ? `${programSlotLabel(program, index)} em execucao` : programSlotLabel(program, index)}</span>
-                  <strong>{program.name}</strong>
-                  <em>{programSummary(program)}</em>
+              <article className={`rounded-lg border p-4 ${isActive ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-zinc-800 bg-zinc-950/20'}`} key={programKey(program)}>
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-[.1em] text-zinc-500">{programSlotLabel(program, index)}</span>
+                      {isActive ? <Badge variant="emerald">Em execução</Badge> : null}
+                    </div>
+                    <h3 className="mt-2 truncate text-base font-semibold text-zinc-50">{program.name}</h3>
+                    <p className="mt-1 text-xs text-zinc-500">{programSummary(program)}</p>
+                  </div>
+                  <Play aria-hidden="true" className={isActive ? 'text-emerald-400' : 'text-zinc-500'} size={17} />
                 </div>
-                <div className="home-program-actions">
-                  <button type="button" onClick={() => void publishViplexProgram(program)} disabled={Boolean(busyAction)}>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button className={compactButtonClass} onClick={() => void publishViplexProgram(program)} disabled={Boolean(busyAction)}>
+                    <Send aria-hidden="true" size={14} />
                     {programActionLabel(program, isBusy)}
-                  </button>
-                  <button type="button" onClick={() => void copyLink(programKey(program), `${LINKS.viplexProgramsApi}?program=${encodeURIComponent(program.identifier)}`)}>
+                  </Button>
+                  <Button className={compactButtonClass} onClick={() => void copyLink(programKey(program), `${LINKS.viplexProgramsApi}?program=${encodeURIComponent(program.identifier)}`)} variant="ghost">
+                    <Copy aria-hidden="true" size={14} />
                     {copied === programKey(program) ? 'Copiado' : 'Copiar ID'}
-                  </button>
+                  </Button>
                 </div>
               </article>
             );
           })}
           {!state.viplexPrograms.length ? (
-            <article className="home-program">
-              <div className="home-program-copy">
-                <span>Sem conexao</span>
-                <strong>ViPlex indisponivel</strong>
-                <em>Confirme o scraper local, o ngrok fixo e a controladora TB50 na rede.</em>
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 md:col-span-2">
+              <div className="flex items-start gap-3">
+                <AlertTriangle aria-hidden="true" className="mt-0.5 flex-none text-amber-400" size={18} />
+                <div>
+                  <strong className="block text-sm font-semibold text-zinc-50">ViPlex indisponível</strong>
+                  <p className="mt-1 text-xs leading-5 text-zinc-400">Confirme o bridge local e a conexão da controladora TB50 antes de publicar.</p>
+                </div>
               </div>
-            </article>
+            </div>
           ) : null}
         </div>
       </section>
 
-      <section className="home-main-grid">
-        <article className="home-preview-panel">
-          <header className="home-panel-header">
-            <div>
-              <span>Preview</span>
-              <strong>{state.layout?.label || 'Telão'}</strong>
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <article className={`${panelClass} min-w-0 self-start overflow-hidden`}>
+          <PanelHeader
+            action={<a className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-800 px-2.5 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-800/70 hover:text-zinc-100" href={LINKS.preview} target="_blank" rel="noreferrer"><Maximize2 aria-hidden="true" size={14} />Tela cheia</a>}
+            eyebrow="Preview"
+            title={state.layout?.label || 'Telão'}
+          />
+          <div className="bg-zinc-950/40 p-3 md:p-4">
+            <div className="aspect-[4/1] min-h-[150px] overflow-hidden rounded-lg border border-zinc-800 bg-black">
+              <iframe className="h-full w-full border-0" title="Preview do telão" src={previewUrl} />
             </div>
-            <a href={LINKS.preview} target="_blank" rel="noreferrer">Tela cheia</a>
-          </header>
-          <div className="home-preview-frame">
-            <iframe title="Preview do telão" src={previewUrl} />
           </div>
         </article>
 
-        <aside className="home-operations">
-          <section className="home-panel">
-            <header className="home-panel-header">
-              <div>
-                <span>Operação</span>
-                <strong>Controle rápido</strong>
-              </div>
-            </header>
-            <div className="home-action-stack">
-              <button type="button" onClick={() => void setDisplayMode('live')} disabled={Boolean(busyAction)}>
+        <aside className="grid content-start gap-5">
+          <section className={`${panelClass} overflow-hidden`}>
+            <PanelHeader eyebrow="Operação" title="Controle rápido" />
+            <div className="grid gap-2 p-4">
+              <Button className="h-10 justify-start" onClick={() => void setDisplayMode('live')} disabled={Boolean(busyAction)}>
+                <Play aria-hidden="true" size={15} />
                 Enviar placar ao vivo
-              </button>
-              <button type="button" onClick={() => void setDisplayMode('final-real')} disabled={Boolean(busyAction)}>
+              </Button>
+              <Button className="h-10 justify-start" onClick={() => void setDisplayMode('final-real')} disabled={Boolean(busyAction)} variant="secondary">
+                <Trophy aria-hidden="true" size={15} />
                 Enviar pódio final
-              </button>
-              <button type="button" onClick={() => void standardizeLayout()} disabled={Boolean(busyAction) || isStandardLayout}>
+              </Button>
+              <Button className="h-10 justify-start" onClick={() => void standardizeLayout()} disabled={Boolean(busyAction) || isStandardLayout} variant="ghost">
+                <LayoutTemplate aria-hidden="true" size={15} />
                 {isStandardLayout ? 'Layout padronizado' : 'Padronizar layout'}
-              </button>
-              <button type="button" onClick={() => void applyFiveByTwoLayout()} disabled={Boolean(busyAction)}>
-                Layout 5x2 tomada
-              </button>
-              <div className="home-page-actions" aria-label="Paginar telão">
-                <button type="button" onClick={() => void setTb50Page(0)} disabled={Boolean(busyAction) || pageOffset === 0}>
-                  1-10
-                </button>
-                <button type="button" onClick={() => void setTb50Page(Math.max(0, pageOffset - PAGE_STEP))} disabled={Boolean(busyAction) || pageOffset === 0}>
-                  -10
-                </button>
-                <button type="button" onClick={() => void nextTb50Page()} disabled={Boolean(busyAction)}>
-                  Virar +10
-                </button>
+              </Button>
+              <Button className="h-10 justify-start" onClick={() => void applyFiveByTwoLayout()} disabled={Boolean(busyAction)} variant="ghost">
+                <SlidersHorizontal aria-hidden="true" size={15} />
+                Layout 5x2 para tomada
+              </Button>
+              <div className="mt-2 border-t border-zinc-800 pt-3" aria-label="Paginar telão">
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-[.1em] text-zinc-500">Página exibida</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <Button aria-label="Voltar para a primeira página" className="h-9 px-2" onClick={() => void setTb50Page(0)} disabled={Boolean(busyAction) || pageOffset === 0} variant="ghost"><ChevronLeft aria-hidden="true" size={15} />1–10</Button>
+                  <Button aria-label="Página anterior" className="h-9 px-2" onClick={() => void setTb50Page(Math.max(0, pageOffset - PAGE_STEP))} disabled={Boolean(busyAction) || pageOffset === 0} variant="ghost"><ChevronLeft aria-hidden="true" size={15} />-10</Button>
+                  <Button aria-label="Próxima página" className="h-9 px-2" onClick={() => void nextTb50Page()} disabled={Boolean(busyAction)} variant="ghost">+10<ChevronRight aria-hidden="true" size={15} /></Button>
+                </div>
               </div>
             </div>
           </section>
 
-          <section className="home-panel">
-            <header className="home-panel-header">
-              <div>
-                <span>Corrida</span>
-                <strong>{state.snapshot?.trackName || 'Cronometragem'}</strong>
-              </div>
-            </header>
-            <div className="home-race-list">
+          <section className={`${panelClass} overflow-hidden`}>
+            <PanelHeader eyebrow="Corrida atual" title={state.snapshot?.trackName || 'Cronometragem'} />
+            <div className="divide-y divide-zinc-800">
               {(state.snapshot?.drivers || []).slice(0, 5).map((driver) => (
-                <div key={`${driver.position}-${driver.kart}`}>
-                  <span>{driver.position}</span>
-                  <strong>{driver.kart}</strong>
-                  <em>{driver.name || 'Piloto'}</em>
-                  <small>{driver.time || '--'}</small>
+                <div className="grid grid-cols-[32px_48px_minmax(0,1fr)_72px] items-center gap-2 px-4 py-2.5" key={`${driver.position}-${driver.kart}`}>
+                  <span className="text-center text-sm font-semibold tabular-nums text-zinc-500">{driver.position}</span>
+                  <strong className="text-center text-sm font-semibold tabular-nums text-brand-400">{driver.kart}</strong>
+                  <span className="truncate text-sm text-zinc-200">{driver.name || 'Piloto'}</span>
+                  <span className="text-right text-xs font-medium tabular-nums text-zinc-500">{driver.time || '--'}</span>
                 </div>
               ))}
-              {!state.snapshot?.drivers.length ? <p>Sem pilotos no snapshot atual.</p> : null}
+              {!state.snapshot?.drivers.length ? <p className="px-4 py-5 text-sm text-zinc-500">Sem pilotos no snapshot atual.</p> : null}
             </div>
           </section>
         </aside>
@@ -593,19 +699,17 @@ export function HomeDashboard({ uid }: { uid: string }) {
 
       <TelaoProgramacao />
 
-      <section className="home-tools-grid" aria-label="Ferramentas">
-        <a href={LINKS.designer}>Designer do telão</a>
-        <a href={LINKS.live} target="_blank" rel="noreferrer">Placar ao vivo</a>
-        <a href={LINKS.final} target="_blank" rel="noreferrer">Pódio final</a>
-        <a href={LINKS.podium} target="_blank" rel="noreferrer">Página do pódio</a>
-        <a href={LINKS.layoutApi} target="_blank" rel="noreferrer">API layout</a>
-        <a href={`${LINKS.snapshotApi}?uid=${encodeURIComponent(uid)}`} target="_blank" rel="noreferrer">API LiveTime</a>
-        <button type="button" onClick={() => void copyLink('RTSP', '/placar-telao-tb50?layout=designer')}>
-          {copied === 'RTSP' ? 'Link copiado' : 'Copiar link telão'}
-        </button>
-        <button type="button" onClick={() => void copyLink('Designer', LINKS.designer)}>
-          {copied === 'Designer' ? 'Link copiado' : 'Copiar link designer'}
-        </button>
+      <section className={`${panelClass} overflow-hidden`} aria-label="Ferramentas">
+        <PanelHeader eyebrow="Acesso rápido" title="Ferramentas do telão" />
+        <div className="grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Link className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-zinc-800 px-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800/70 hover:text-zinc-100" href={LINKS.designer}><LayoutTemplate aria-hidden="true" size={15} />Designer</Link>
+          <a className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-zinc-800 px-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800/70 hover:text-zinc-100" href={LINKS.live} target="_blank" rel="noreferrer"><Monitor aria-hidden="true" size={15} />Placar ao vivo</a>
+          <a className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-zinc-800 px-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800/70 hover:text-zinc-100" href={LINKS.final} target="_blank" rel="noreferrer"><Trophy aria-hidden="true" size={15} />Pódio final</a>
+          <a className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-zinc-800 px-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800/70 hover:text-zinc-100" href={LINKS.layoutApi} target="_blank" rel="noreferrer"><Clipboard aria-hidden="true" size={15} />API layout</a>
+          <a className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-zinc-800 px-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800/70 hover:text-zinc-100" href={`${LINKS.snapshotApi}?uid=${encodeURIComponent(uid)}`} target="_blank" rel="noreferrer"><Timer aria-hidden="true" size={15} />API LiveTime</a>
+          <Button className="min-h-10" onClick={() => void copyLink('RTSP', '/placar-telao-tb50?layout=designer')} variant="ghost"><Copy aria-hidden="true" size={15} />{copied === 'RTSP' ? 'Link copiado' : 'Copiar link telão'}</Button>
+          <Button className="min-h-10" onClick={() => void copyLink('Designer', LINKS.designer)} variant="ghost"><Copy aria-hidden="true" size={15} />{copied === 'Designer' ? 'Link copiado' : 'Copiar link designer'}</Button>
+        </div>
       </section>
     </main>
   );
