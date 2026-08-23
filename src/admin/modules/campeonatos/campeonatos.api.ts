@@ -12,10 +12,28 @@ import type {
   EtapaStatus,
   EtapaUpdate,
   EtapaWithCampeonato,
+  FormatoCorridaRecord,
   Piloto,
   PilotoPayload,
   PilotoUpdate,
 } from './campeonatos.types';
+
+// ---------- Formatos de corrida (biblioteca de templates) ----------
+
+export const listFormatos = async (): Promise<FormatoCorridaRecord[]> =>
+  apiGet<FormatoCorridaRecord[]>('formatos_corrida?order=nome');
+
+export const createFormato = async (payload: Omit<FormatoCorridaRecord, 'id'>): Promise<FormatoCorridaRecord> =>
+  apiPost<FormatoCorridaRecord>('formatos_corrida', payload);
+
+export const updateFormato = async (id: string, payload: Partial<Omit<FormatoCorridaRecord, 'id'>>): Promise<FormatoCorridaRecord> =>
+  apiPatch<FormatoCorridaRecord>(`formatos_corrida/${id}`, payload);
+
+export const removeFormato = async (id: string): Promise<void> => {
+  await apiDelete(`formatos_corrida/${id}`);
+};
+
+// ---------- Campeonatos ----------
 
 export const listCampeonatos = async (): Promise<Campeonato[]> =>
   apiGet<Campeonato[]>('campeonatos?order=nome');

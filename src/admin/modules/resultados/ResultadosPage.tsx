@@ -13,11 +13,13 @@ import { useToast } from '../../ui/useToast';
 import {
   listCampeonatos,
   listEtapas,
+  listFormatos,
   listPilotos,
 } from '../campeonatos/campeonatos.api';
 import type {
   Campeonato,
   EtapaWithCampeonato,
+  FormatoCorridaRecord,
   Piloto,
 } from '../campeonatos/campeonatos.types';
 import {
@@ -61,6 +63,7 @@ type CorridaFormState = {
   data: string;
   status: CorridaStatus;
   source: string;
+  formato_id: string;
 };
 
 type ResultadoFormState = {
@@ -84,6 +87,7 @@ const emptyCorridaForm: CorridaFormState = {
   data: '',
   status: 'rascunho',
   source: '',
+  formato_id: '',
 };
 
 const emptyResultadoForm: ResultadoFormState = {
@@ -164,6 +168,7 @@ export const ResultadosPage = () => {
   const [campeonatos, setCampeonatos] = useState<Campeonato[]>([]);
   const [etapas, setEtapas] = useState<EtapaWithCampeonato[]>([]);
   const [pilotos, setPilotos] = useState<Piloto[]>([]);
+  const [formatos, setFormatos] = useState<FormatoCorridaRecord[]>([]);
   const [selectedCorridaId, setSelectedCorridaId] = useState('');
   const [resultados, setResultados] = useState<ResultadoWithPiloto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -214,17 +219,19 @@ export const ResultadosPage = () => {
     setLoadError(null);
 
     try {
-      const [corridasPageData, campeonatosData, etapasData, pilotosData] = await Promise.all([
+      const [corridasPageData, campeonatosData, etapasData, pilotosData, formatosData] = await Promise.all([
         listCorridasPage(corridasFilters, corridasPage, PAGE_SIZE),
         listCampeonatos(),
         listEtapas(),
         listPilotos(),
+        listFormatos(),
       ]);
       setCorridas(corridasPageData.data);
       setCorridasTotal(corridasPageData.total);
       setCampeonatos(campeonatosData);
       setEtapas(etapasData);
       setPilotos(pilotosData);
+      setFormatos(formatosData);
       setSelectedCorridaId((current) => {
         if (corridasPageData.data.some((corrida) => corrida.id === current)) return current;
         return corridasPageData.data[0]?.id ?? '';
@@ -527,6 +534,7 @@ export const ResultadosPage = () => {
       data: toDateTimeLocal(corrida.data),
       status: corrida.status,
       source: corrida.source ?? '',
+      formato_id: corrida.formato_id ?? '',
     });
     setFormErrors({});
     setCorridaFormOpen(true);
@@ -621,6 +629,7 @@ export const ResultadosPage = () => {
       data: new Date(corridaForm.data).toISOString(),
       status: corridaForm.status,
       source: corridaForm.source.trim() || null,
+      formato_id: corridaForm.formato_id || null,
     };
 
     setSubmitting(true);
@@ -1021,6 +1030,29 @@ export const ResultadosPage = () => {
                 }
                 value={corridaForm.source}
               />
+            </FormField>
+          </div>
+          <div className="md:col-span-2">
+            <FormField
+              hint="Deixe em branco para herdar o formato do campeonato."
+              htmlFor="corrida-formato"
+              label="Formato da corrida"
+            >
+              <select
+                className={inputClassName}
+                id="corrida-formato"
+                onChange={(event) =>
+                  setCorridaForm((current) => ({ ...current, formato_id: event.target.value }))
+                }
+                value={corridaForm.formato_id}
+              >
+                <option value="">Herdar do campeonato</option>
+                {formatos.map((formato) => (
+                  <option key={formato.id} value={formato.id}>
+                    {formato.nome}
+                  </option>
+                ))}
+              </select>
             </FormField>
           </div>
         </form>

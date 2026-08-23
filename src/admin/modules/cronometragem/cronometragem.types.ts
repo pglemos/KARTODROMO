@@ -12,6 +12,7 @@ export type Sessao = {
   data: string;
   status: SessaoStatus;
   fonte: string | null;
+  formato_id: string | null;
   created_at: string;
 };
 
@@ -46,12 +47,14 @@ export type CampeonatoOption = {
   id: string;
   nome: string;
   status: string;
+  formato_id?: string | null;
 };
 
 export type EtapaOption = {
   id: string;
   campeonato_id: string | null;
   nome: string;
+  formato_id?: string | null;
 };
 
 export type PilotoOption = {

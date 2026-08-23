@@ -63,6 +63,35 @@ export const PIT_RULES = {
   boxCloseAfterMs: (11 * 60 + 40) * 60 * 1_000,
 } as const;
 
+export type PitRules = {
+  requiredStops: number;
+  minimumStopMs: number;
+  additionalStopsAllowed: number;
+  candidateStopMinMs: number;
+  penaltyLapsPerStop: number;
+  boxOpenAfterMs: number;
+  boxCloseAfterMs: number;
+};
+
+const clampRule = (value: unknown, fallback: number): number => {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : fallback;
+};
+
+/** Normaliza regras vindas de um formato configurado (ou do snapshot do LapTime). */
+export function resolvePitRules(input: Partial<PitRules> | null | undefined): PitRules {
+  if (!input || typeof input !== 'object') return { ...PIT_RULES };
+  return {
+    requiredStops: clampRule(input.requiredStops, PIT_RULES.requiredStops),
+    minimumStopMs: clampRule(input.minimumStopMs, PIT_RULES.minimumStopMs),
+    additionalStopsAllowed: clampRule(input.additionalStopsAllowed, PIT_RULES.additionalStopsAllowed),
+    candidateStopMinMs: clampRule(input.candidateStopMinMs, Math.round(clampRule(input.minimumStopMs, PIT_RULES.minimumStopMs) * (4 / 7))),
+    penaltyLapsPerStop: clampRule(input.penaltyLapsPerStop, PIT_RULES.penaltyLapsPerStop),
+    boxOpenAfterMs: clampRule(input.boxOpenAfterMs, PIT_RULES.boxOpenAfterMs),
+    boxCloseAfterMs: clampRule(input.boxCloseAfterMs, PIT_RULES.boxCloseAfterMs),
+  };
+}
+
 function clean(value: unknown): string {
   if (value === undefined || value === null) return '';
   return String(value).replace(/\s+/g, ' ').trim();
@@ -96,12 +125,12 @@ export function pitStopEntryTimeMs(raceTimeMs: number | null, stopDurationMs: nu
   return raceTimeMs - stopDurationMs;
 }
 
-export function isPitStopInsideBoxWindow(raceTimeMs: number | null, stopDurationMs: number | null): boolean {
+export function isPitStopInsideBoxWindow(raceTimeMs: number | null, stopDurationMs: number | null, rules: PitRules = PIT_RULES): boolean {
   const entryTimeMs = pitStopEntryTimeMs(raceTimeMs, stopDurationMs);
 
   return (
     entryTimeMs === null ||
-    (entryTimeMs >= PIT_RULES.boxOpenAfterMs && entryTimeMs <= PIT_RULES.boxCloseAfterMs)
+    (entryTimeMs >= rules.boxOpenAfterMs && entryTimeMs <= rules.boxCloseAfterMs)
   );
 }
 
@@ -119,24 +148,24 @@ function sqlConfig(options: LapTimeSqlOptions): sql.config {
   };
 }
 
-function emptySummary(competitor: PitCompetitorRow): LapTimeRacingPitSummary {
+function emptySummary(competitor: PitCompetitorRow, rules: PitRules): LapTimeRacingPitSummary {
   return {
     competitorId: String(competitor.Id_RacingCompetitor),
     kart: clean(competitor.Number || competitor.Transponder) || null,
     name: clean(competitor.Competitor) || clean(competitor.ShortName) || 'Sem nome',
     position: competitor.Pos,
-    required: PIT_RULES.requiredStops,
-    minimumStopMs: PIT_RULES.minimumStopMs,
+    required: rules.requiredStops,
+    minimumStopMs: rules.minimumStopMs,
     currentLap: competitor.Lap,
     currentRaceTime: formatSqlTime(competitor.TotalTime),
     currentRaceTimeMs: parseTimeMs(competitor.TotalTime),
     mandatory: 0,
-    remaining: PIT_RULES.requiredStops,
+    remaining: rules.requiredStops,
     short: 0,
     total: 0,
     additional: 0,
     excess: 0,
-    penaltyLaps: PIT_RULES.requiredStops * PIT_RULES.penaltyLapsPerStop,
+    penaltyLaps: rules.requiredStops * rules.penaltyLapsPerStop,
     outsideWindow: 0,
     stops: [],
   };
@@ -145,12 +174,13 @@ function emptySummary(competitor: PitCompetitorRow): LapTimeRacingPitSummary {
 export function summarizePitStops(
   competitor: PitCompetitorRow,
   rows: PitPassingRow[],
+  rules: PitRules = PIT_RULES,
 ): LapTimeRacingPitSummary {
-  const summary = emptySummary(competitor);
+  const summary = emptySummary(competitor, rules);
   let mandatory = 0;
 
   const stops = rows
-    .filter((row) => (parseTimeMs(row.LapTime) ?? 0) >= PIT_RULES.candidateStopMinMs)
+    .filter((row) => (parseTimeMs(row.LapTime) ?? 0) >= rules.candidateStopMinMs)
     .sort((left, right) => {
       const lapDifference = (left.Lap ?? Number.MAX_SAFE_INTEGER) - (right.Lap ?? Number.MAX_SAFE_INTEGER);
       return lapDifference || Number(left.Id_Passing) - Number(right.Id_Passing);
@@ -158,7 +188,7 @@ export function summarizePitStops(
     .map<LiveTimingPitStop>((row) => {
       const stopMs = parseTimeMs(row.LapTime);
       const raceTimeMs = parseTimeMs(row.TotalTime);
-      const outsideWindow = !isPitStopInsideBoxWindow(raceTimeMs, stopMs);
+      const outsideWindow = !isPitStopInsideBoxWindow(raceTimeMs, stopMs, rules);
       const invalid = Boolean(row.InvalidLap || row.DeletedLap);
 
       if (outsideWindow) {
@@ -184,9 +214,9 @@ export function summarizePitStops(
         };
       }
 
-      if (stopMs >= PIT_RULES.minimumStopMs) {
+      if (stopMs >= rules.minimumStopMs) {
         mandatory += 1;
-        if (mandatory <= PIT_RULES.requiredStops) {
+        if (mandatory <= rules.requiredStops) {
           return {
             id: String(row.Id_Passing),
             lap: row.Lap,
@@ -221,18 +251,20 @@ export function summarizePitStops(
 
   const total = stops.filter((stop) => stop.status === 'mandatory' || stop.status === 'additional' || stop.status === 'short').length;
   summary.mandatory = mandatory;
-  summary.remaining = Math.max(0, PIT_RULES.requiredStops - mandatory);
+  summary.remaining = Math.max(0, rules.requiredStops - mandatory);
   summary.total = total;
-  summary.additional = Math.max(0, total - PIT_RULES.requiredStops);
-  summary.excess = Math.max(0, total - PIT_RULES.requiredStops - PIT_RULES.additionalStopsAllowed);
-  summary.penaltyLaps = (summary.remaining + summary.excess) * PIT_RULES.penaltyLapsPerStop;
+  summary.additional = Math.max(0, total - rules.requiredStops);
+  summary.excess = Math.max(0, total - rules.requiredStops - rules.additionalStopsAllowed);
+  summary.penaltyLaps = (summary.remaining + summary.excess) * rules.penaltyLapsPerStop;
   summary.stops = stops;
   return summary;
 }
 
 export async function fetchLapTimeCurrentPitData(
   options: LapTimeSqlOptions,
+  pitRules?: Partial<PitRules> | null,
 ): Promise<LapTimeRacingPitData | null> {
+  const rules = resolvePitRules(pitRules);
   const pool = new sql.ConnectionPool(sqlConfig(options));
 
   try {
@@ -320,7 +352,7 @@ export async function fetchLapTimeCurrentPitData(
     }
 
     const summaries = competitors
-      .map((competitor) => summarizePitStops(competitor, rowsByCompetitor.get(String(competitor.Id_RacingCompetitor)) || []))
+      .map((competitor) => summarizePitStops(competitor, rowsByCompetitor.get(String(competitor.Id_RacingCompetitor)) || [], rules))
       .sort((left, right) => (left.position ?? 9999) - (right.position ?? 9999));
 
     return {
@@ -330,7 +362,7 @@ export async function fetchLapTimeCurrentPitData(
         type: clean(race.RacingTypeName) || null,
         state: Number(race.RacingState),
         startedAt: isoDate(race.StartDateTime),
-        rules: PIT_RULES,
+        rules,
       },
       summaries,
     };

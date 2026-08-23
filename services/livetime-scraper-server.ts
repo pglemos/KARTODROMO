@@ -160,31 +160,36 @@ const scraper = new LiveTimeScraper({
 });
 
 const livePitCacheMs = Math.max(1_000, Number(process.env.LIVETIME_PIT_CACHE_MS || '3000'));
-let livePitCache: { data: LapTimeRacingPitData | null; expiresAt: number } | null = null;
+type PitRulesInput = Partial<import('@/lib/livetime/laptime-pit-stops').PitRules>;
+let livePitCache: { key: string; data: LapTimeRacingPitData | null; expiresAt: number } | null = null;
 let livePitRequest: Promise<LapTimeRacingPitData | null> | null = null;
+let livePitRequestKey = '';
 
-async function getCurrentPitData(): Promise<LapTimeRacingPitData | null> {
+async function getCurrentPitData(rules?: PitRulesInput): Promise<LapTimeRacingPitData | null> {
+  const cacheKey = rules ? JSON.stringify(rules) : 'default';
   const now = Date.now();
-  if (livePitCache && livePitCache.expiresAt > now) return livePitCache.data;
-  if (livePitRequest) return livePitRequest;
+  if (livePitCache && livePitCache.key === cacheKey && livePitCache.expiresAt > now) return livePitCache.data;
+  if (livePitRequest && livePitRequestKey === cacheKey) return livePitRequest;
 
   const sqlOptions = resolveLaptimeSqlOptions('racings');
   if (!sqlOptions) {
-    livePitCache = { data: null, expiresAt: now + livePitCacheMs };
+    livePitCache = { key: cacheKey, data: null, expiresAt: now + livePitCacheMs };
     return null;
   }
 
-  livePitRequest = fetchLapTimeCurrentPitData(sqlOptions)
+  livePitRequestKey = cacheKey;
+  livePitRequest = fetchLapTimeCurrentPitData(sqlOptions, rules)
     .catch((error: unknown) => {
       console.error('[livetime] pit stop query failed:', error instanceof Error ? error.message : error);
       return null;
     })
     .then((data) => {
-      livePitCache = { data, expiresAt: Date.now() + livePitCacheMs };
+      livePitCache = { key: cacheKey, data, expiresAt: Date.now() + livePitCacheMs };
       return data;
     })
     .finally(() => {
       livePitRequest = null;
+      livePitRequestKey = '';
     });
 
   return livePitRequest;
@@ -719,7 +724,22 @@ const server = http.createServer((request, response) => {
   }
 
   if (url.pathname === '/api/livetime-snapshot') {
-    void getCurrentPitData().then((pitData) => {
+    // Regras de pit stop podem ser sobrepostas via query (?rules=<JSON>) — vêm do
+    // formato configurado no admin (formatos_corrida). Sem query, usa o padrão.
+    let customRules: PitRulesInput | null = null;
+    const rulesParam = url.searchParams.get('rules');
+    if (rulesParam) {
+      try {
+        const parsed: unknown = JSON.parse(rulesParam);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          customRules = parsed as Partial<import('@/lib/livetime/laptime-pit-stops').PitRules>;
+        }
+      } catch {
+        // parâmetro inválido: segue com regras padrão
+      }
+    }
+
+    void getCurrentPitData(customRules ?? undefined).then((pitData) => {
       sendJson(response, 200, mergePitData(scraper.getSnapshot(), pitData));
     });
     return;

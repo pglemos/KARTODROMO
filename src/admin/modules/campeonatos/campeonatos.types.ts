@@ -1,3 +1,5 @@
+import type { ClassificacaoFonte } from '@/lib/race-formats';
+
 export type CampeonatoStatus = 'ativo' | 'encerrado' | 'rascunho';
 
 export type Campeonato = {
@@ -6,10 +8,44 @@ export type Campeonato = {
   slug: string | null;
   temporada: string | null;
   status: CampeonatoStatus;
+  formato_id: string | null;
+  /** Tabela de pontos customizada (objeto quando vem do D1, string JSON quando vem do bridge local). */
+  pontos_json: unknown;
+  desempate_json: unknown;
+  bonus_pole: number | null;
+  bonus_melhor_volta: number | null;
+  descartes: number | null;
 };
 
 export type CampeonatoPayload = Omit<Campeonato, 'id'>;
 export type CampeonatoUpdate = Partial<CampeonatoPayload>;
+
+export type FormatoCorridaRecord = {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  tt_habilitada: boolean;
+  tt_duracao_min: number | null;
+  tt_define_grid: boolean;
+  tt_pontua: boolean;
+  corrida_duracao_min: number | null;
+  paradas_habilitadas: boolean;
+  paradas_quantidade: number;
+  parada_tempo_minimo_ms: number | null;
+  boxes_abrem_apos_ms: number | null;
+  boxes_fecham_apos_ms: number | null;
+  paradas_adicionais_permitidas: number;
+  punicoes_fonte: 'cronometragem';
+  classificacao_fonte: ClassificacaoFonte;
+  desempate: unknown;
+  is_default: boolean;
+};
+
+export const FORMATO_CLASSIFICACAO_LABELS: Record<ClassificacaoFonte, string> = {
+  corrida: 'Posição na corrida',
+  melhor_tempo: 'Melhor tempo',
+  combinada: 'TT + Corrida (combinada)',
+};
 
 export type EtapaStatus = 'agendada' | 'realizada' | 'cancelada';
 
@@ -20,6 +56,7 @@ export type Etapa = {
   data: string | null;
   round: number | null;
   status: EtapaStatus;
+  formato_id: string | null;
 };
 
 export type EtapaWithCampeonato = Etapa & {

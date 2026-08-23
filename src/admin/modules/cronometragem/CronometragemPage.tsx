@@ -8,6 +8,7 @@ import {
 } from 'react';
 import {
   Activity,
+  AlertTriangle,
   Download,
   List,
   Lock,
@@ -60,6 +61,7 @@ import {
   updateVolta,
   type SessoesFilters,
 } from './cronometragem.api';
+import { listFormatos } from '../campeonatos/campeonatos.api';
 import {
   msParaTexto,
   type CampeonatoOption,
@@ -76,6 +78,8 @@ import {
   type VoltaPayload,
   type VoltaUpdate,
 } from './cronometragem.types';
+import type { FormatoCorridaRecord } from '../campeonatos/campeonatos.types';
+import { pitRulesDoFormato, resolverFormatoCorrida, normalizarFormato as normalizarFormatoRecord } from '@/lib/race-formats';
 
 type TabKey = 'ao-vivo' | 'historico' | 'sessoes' | 'voltas';
 const PAGE_SIZE = 10;
@@ -95,6 +99,7 @@ type SessaoFormState = {
   data: string;
   status: 'aberta' | 'encerrada';
   fonte: string;
+  formato_id: string;
 };
 
 type VoltaFormState = {
@@ -125,6 +130,7 @@ const emptySessaoForm: SessaoFormState = {
   data: '',
   status: 'aberta',
   fonte: 'manual',
+  formato_id: '',
 };
 
 const emptyVoltaForm: VoltaFormState = {
@@ -201,6 +207,7 @@ const sessionPayload = (form: SessaoFormState): SessaoPayload => ({
   data: new Date(form.data).toISOString(),
   status: form.status,
   fonte: form.fonte.trim() || null,
+  formato_id: form.formato_id || null,
 });
 
 const tipoLabel: Record<SessaoTipo, string> = {
@@ -246,6 +253,7 @@ export const CronometragemPage = () => {
   const [campeonatos, setCampeonatos] = useState<CampeonatoOption[]>([]);
   const [etapas, setEtapas] = useState<EtapaOption[]>([]);
   const [pilotos, setPilotos] = useState<PilotoOption[]>([]);
+  const [formatos, setFormatos] = useState<FormatoCorridaRecord[]>([]);
   const [selectedSessaoId, setSelectedSessaoId] = useState('');
   const [voltas, setVoltas] = useState<Volta[]>([]);
   const [voltasLoading, setVoltasLoading] = useState(false);
@@ -302,16 +310,18 @@ export const CronometragemPage = () => {
 
   const loadData = useCallback(async () => {
     try {
-      const [sessoesData, campeonatosData, etapasData, pilotosData] = await Promise.all([
+      const [sessoesData, campeonatosData, etapasData, pilotosData, formatosData] = await Promise.all([
         listSessoes(),
         listCampeonatos(),
         listEtapas(),
         listPilotos(),
+        listFormatos(),
       ]);
       setSessoes(sessoesData);
       setCampeonatos(campeonatosData);
       setEtapas(etapasData);
       setPilotos(pilotosData);
+      setFormatos(formatosData);
       setSelectedSessaoId((current) =>
         sessoesData.some((sessao) => sessao.id === current)
           ? current
@@ -474,17 +484,57 @@ export const CronometragemPage = () => {
     }
   }, [selectedSessaoId]);
 
+  // Formato efetivo da sessão vinculada ao painel Ao Vivo (herança sessão → etapa → campeonato → default).
+  const formatoAovivo = useMemo(() => {
+    const sessao = sessoes.find((item) => item.id === selectedSessaoId) ?? null;
+    const etapa = etapas.find((item) => item.id === sessao?.etapa_id) ?? null;
+    const campeonato = campeonatos.find((item) => item.id === sessao?.campeonato_id) ?? null;
+    return resolverFormatoCorrida({
+      formatoSessao: sessao?.formato_id ? formatos.map(normalizarFormatoRecord).find((f) => f.id === sessao.formato_id) ?? null : null,
+      formatoEtapa: etapa?.formato_id ? formatos.map(normalizarFormatoRecord).find((f) => f.id === etapa.formato_id) ?? null : null,
+      formatoCampeonato: campeonato?.formato_id ? formatos.map(normalizarFormatoRecord).find((f) => f.id === campeonato.formato_id) ?? null : null,
+      formatosDisponiveis: formatos.length ? formatos.map(normalizarFormatoRecord) : null,
+    });
+  }, [sessoes, selectedSessaoId, etapas, campeonatos, formatos]);
+
+  const regrasAovivo = useMemo(() => pitRulesDoFormato(formatoAovivo.formato), [formatoAovivo]);
+  const paradasHabilitadas = regrasAovivo !== null;
+
+  // Alerta quando o regulamento configurado diverge do que a cronometragem reporta.
+  const divergenciaRegras = useMemo(() => {
+    const recebidas = snapshot.corrida?.regras;
+    if (!recebidas || !regrasAovivo) return null;
+    const diferencas: string[] = [];
+    if (recebidas.paradasObrigatorias !== regrasAovivo.requiredStops) {
+      diferencas.push(`paradas obrigatórias: cronometragem ${recebidas.paradasObrigatorias} × regulamento ${regrasAovivo.requiredStops}`);
+    }
+    if (Math.abs(recebidas.minimoParadaMs - regrasAovivo.minimumStopMs) > 999) {
+      diferencas.push(`mínimo por parada: ${msParaTexto(recebidas.minimoParadaMs)} × ${msParaTexto(regrasAovivo.minimumStopMs)}`);
+    }
+    if (Math.abs(recebidas.boxesAbremAposMs - regrasAovivo.boxOpenAfterMs) > 59_999) {
+      diferencas.push('janela de abertura dos boxes');
+    }
+    if (Math.abs(recebidas.boxesFechamAposMs - regrasAovivo.boxCloseAfterMs) > 59_999) {
+      diferencas.push('janela de fechamento dos boxes');
+    }
+    return diferencas.length ? diferencas.join(' · ') : null;
+  }, [snapshot.corrida, regrasAovivo]);
+
   const pollLive = useCallback(async () => {
     if (liveRequestInFlight.current) return;
     liveRequestInFlight.current = true;
     setLiveLoading(true);
     try {
-      setSnapshot(await fetchLiveSnapshot(liveUrl));
+      let url = liveUrl;
+      if (url !== 'cloud' && regrasAovivo) {
+        url = `${url}${url.includes('?') ? '&' : '?'}rules=${encodeURIComponent(JSON.stringify(regrasAovivo))}`;
+      }
+      setSnapshot(await fetchLiveSnapshot(url));
     } finally {
       liveRequestInFlight.current = false;
       setLiveLoading(false);
     }
-  }, [liveUrl]);
+  }, [liveUrl, regrasAovivo]);
 
   useEffect(() => {
     void loadData();
@@ -533,6 +583,7 @@ export const CronometragemPage = () => {
       data: toDateTimeLocal(sessao.data),
       status: sessao.status,
       fonte: sessao.fonte ?? '',
+      formato_id: sessao.formato_id ?? '',
     });
     setFormErrors({});
     setSessaoModalOpen(true);
@@ -992,13 +1043,15 @@ export const CronometragemPage = () => {
                   {connected ? <Pause aria-hidden="true" size={16} /> : <Play aria-hidden="true" size={16} />}
                   {connected ? 'Pausar' : 'Conectar'}
                 </Button>
-                <Button
-                  onClick={() => setProjectionMode((current) => !current)}
-                  variant={projectionMode ? 'primary' : 'ghost'}
-                >
-                  <TrendingUp aria-hidden="true" size={16} />
-                  PROJEÇÃO FUTURA
-                </Button>
+                {paradasHabilitadas ? (
+                  <Button
+                    onClick={() => setProjectionMode((current) => !current)}
+                    variant={projectionMode ? 'primary' : 'ghost'}
+                  >
+                    <TrendingUp aria-hidden="true" size={16} />
+                    PROJEÇÃO FUTURA
+                  </Button>
+                ) : null}
                 {canWrite ? (
                   <Button
                     disabled={snapshot.status !== 'online' || snapshot.pilotos.length === 0}
@@ -1044,23 +1097,40 @@ export const CronometragemPage = () => {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2 text-xs text-zinc-300">
-                  <Badge variant="emerald">
-                    {snapshot.corrida.regras.paradasObrigatorias} paradas de{' '}
-                    {msParaTexto(snapshot.corrida.regras.minimoParadaMs)}
-                  </Badge>
-                  <Badge variant="blue">Boxes: 10 min - 11h40 de prova</Badge>
+                  {paradasHabilitadas && snapshot.corrida.regras ? (
+                    <>
+                      <Badge variant="emerald">
+                        {snapshot.corrida.regras.paradasObrigatorias} paradas de{' '}
+                        {msParaTexto(snapshot.corrida.regras.minimoParadaMs)}
+                      </Badge>
+                      <Badge variant="blue">
+                        Boxes: {msParaTexto(snapshot.corrida.regras.boxesAbremAposMs)} -{' '}
+                        {msParaTexto(snapshot.corrida.regras.boxesFechamAposMs)} de prova
+                      </Badge>
+                    </>
+                  ) : (
+                    <Badge variant="zinc">Corrida sem parada obrigatória · {formatoAovivo.formato.nome}</Badge>
+                  )}
                 </div>
               </div>
+              {divergenciaRegras ? (
+                <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-800/50 bg-amber-950/20 p-3 text-xs text-amber-200" role="alert">
+                  <AlertTriangle aria-hidden="true" className="mt-0.5 shrink-0" size={14} />
+                  <span>
+                    <strong>Divergência de regulamento</strong> entre o formato configurado e a cronometragem: {divergenciaRegras}.
+                  </span>
+                </div>
+              ) : null}
             </Card>
           ) : null}
 
-          {projectionMode ? (
+          {projectionMode && paradasHabilitadas ? (
             <Card aria-live="polite" className="border-blue-500/30 bg-blue-500/5 p-4">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-bold text-blue-200">PROJEÇÃO FUTURA</p>
                   <p className="mt-1 text-xs text-zinc-300">
-                    Simulação com todos os karts completando 11 paradas válidas. Cada parada faltante desconta o equivalente a 7:00 em voltas.
+                    Simulação com todos os karts completando as paradas obrigatórias do regulamento ({regrasAovivo?.requiredStops}× {msParaTexto(regrasAovivo?.minimumStopMs)}).
                   </p>
                 </div>
                 <Badge variant="blue">Classificação simulada</Badge>
@@ -1092,11 +1162,15 @@ export const CronometragemPage = () => {
                       {projectionMode ? (
                         <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500">Voltas projetadas</th>
                       ) : null}
-                      <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500">Paradas &gt;= 7:00</th>
-                      <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500">Faltam obrigatórias</th>
-                      <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500">4:00-6:59</th>
-                      <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500">Total</th>
-                      <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500">Punição</th>
+                      {paradasHabilitadas ? (
+                        <>
+                          <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500">Paradas &gt;= {msParaTexto(regrasAovivo?.minimumStopMs)}</th>
+                          <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500">Faltam obrigatórias</th>
+                          <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500">Curtas</th>
+                          <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500">Total</th>
+                          <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500">Punição</th>
+                        </>
+                      ) : null}
                     </tr>
                   </thead>
                   <tbody>
@@ -1125,31 +1199,35 @@ export const CronometragemPage = () => {
                             {voltasProjetadas !== null ? `${voltasProjetadas.toFixed(1)} v` : '—'}
                           </td>
                         ) : null}
-                        <td className="px-4 py-3 text-sm text-zinc-200">
-                          <button
-                            aria-label={`Ver paradas do kart ${piloto.kart ?? piloto.nome}`}
-                            className="inline-flex items-center gap-2 rounded-md px-2 py-1 font-semibold text-brand-300 transition-colors hover:bg-brand-500/10 hover:text-brand-200 disabled:cursor-not-allowed disabled:text-zinc-600"
-                            disabled={!piloto.paradas}
-                            onClick={() => setSelectedPitPiloto(piloto)}
-                            title="Ver paradas por volta e tempo de prova"
-                            type="button"
-                          >
-                            <List aria-hidden="true" size={15} />
-                            {piloto.paradas?.validas ?? '—'}
-                          </button>
-                        </td>
-                        <td className="px-4 py-3 text-sm font-semibold text-amber-300">{piloto.paradas?.faltam ?? '—'}</td>
-                        <td className="px-4 py-3 text-sm text-amber-300">{piloto.paradas?.curtas ?? '—'}</td>
-                        <td className="px-4 py-3 text-sm text-zinc-300">{piloto.paradas?.total ?? '—'}</td>
-                        <td className="px-4 py-3 text-sm">
-                          {piloto.paradas ? (
-                            <span className={piloto.paradas.penalidadeVoltas > 0 ? 'font-semibold text-red-300' : 'text-emerald-300'}>
-                              {piloto.paradas.penalidadeVoltas > 0 ? `+${piloto.paradas.penalidadeVoltas} voltas` : 'Nenhuma'}
-                            </span>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
+                        {paradasHabilitadas ? (
+                          <>
+                            <td className="px-4 py-3 text-sm text-zinc-200">
+                              <button
+                                aria-label={`Ver paradas do kart ${piloto.kart ?? piloto.nome}`}
+                                className="inline-flex items-center gap-2 rounded-md px-2 py-1 font-semibold text-brand-300 transition-colors hover:bg-brand-500/10 hover:text-brand-200 disabled:cursor-not-allowed disabled:text-zinc-600"
+                                disabled={!piloto.paradas}
+                                onClick={() => setSelectedPitPiloto(piloto)}
+                                title="Ver paradas por volta e tempo de prova"
+                                type="button"
+                              >
+                                <List aria-hidden="true" size={15} />
+                                {piloto.paradas?.validas ?? '—'}
+                              </button>
+                            </td>
+                            <td className="px-4 py-3 text-sm font-semibold text-amber-300">{piloto.paradas?.faltam ?? '—'}</td>
+                            <td className="px-4 py-3 text-sm text-amber-300">{piloto.paradas?.curtas ?? '—'}</td>
+                            <td className="px-4 py-3 text-sm text-zinc-300">{piloto.paradas?.total ?? '—'}</td>
+                            <td className="px-4 py-3 text-sm">
+                              {piloto.paradas ? (
+                                <span className={piloto.paradas.penalidadeVoltas > 0 ? 'font-semibold text-red-300' : 'text-emerald-300'}>
+                                  {piloto.paradas.penalidadeVoltas > 0 ? `+${piloto.paradas.penalidadeVoltas} voltas` : 'Nenhuma'}
+                                </span>
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                          </>
+                        ) : null}
                       </tr>
                     ))}
                   </tbody>
@@ -1318,7 +1396,7 @@ export const CronometragemPage = () => {
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
                 <p className="text-xs text-zinc-400">Obrigatórias válidas</p>
-                <p className="mt-1 text-xl font-bold text-emerald-300">{selectedPitPiloto.paradas.validas}/11</p>
+                <p className="mt-1 text-xl font-bold text-emerald-300">{selectedPitPiloto.paradas.validas}/{regrasAovivo?.requiredStops ?? 11}</p>
               </div>
               <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
                 <p className="text-xs text-zinc-400">Faltam obrigatórias</p>
@@ -1424,6 +1502,12 @@ export const CronometragemPage = () => {
           <FormField htmlFor="sessao-fonte" label="Fonte">
             <input className={inputClassName} id="sessao-fonte" onChange={(event) => setSessaoForm((current) => ({ ...current, fonte: event.target.value }))} value={sessaoForm.fonte} />
           </FormField>
+          <FormField hint="Deixe em branco para herdar do campeonato." htmlFor="sessao-formato" label="Formato (override da sessão)">
+            <select className={inputClassName} id="sessao-formato" onChange={(event) => setSessaoForm((current) => ({ ...current, formato_id: event.target.value }))} value={sessaoForm.formato_id}>
+              <option value="">Herdar do campeonato</option>
+              {formatos.map((formato) => <option key={formato.id} value={formato.id}>{formato.nome}</option>)}
+            </select>
+          </FormField>
         </form>
       </Modal>
 
@@ -1501,6 +1585,7 @@ export const CronometragemPage = () => {
               <FormField error={formErrors.etapa_id} htmlFor="import-etapa" label="Etapa"><select className={inputClassName} id="import-etapa" onChange={(event) => setImportSessaoForm((current) => ({ ...current, etapa_id: event.target.value }))} value={importSessaoForm.etapa_id}><option value="">Selecione</option>{etapasDaImportacao.map((etapa) => <option key={etapa.id} value={etapa.id}>{etapa.nome}</option>)}</select></FormField>
               <FormField htmlFor="import-tipo" label="Tipo"><select className={inputClassName} id="import-tipo" onChange={(event) => setImportSessaoForm((current) => ({ ...current, tipo: event.target.value as SessaoTipo }))} value={importSessaoForm.tipo}><option value="treino">Treino</option><option value="classificacao">Classificação</option><option value="corrida">Corrida</option></select></FormField>
               <FormField error={formErrors.data} htmlFor="import-data" label="Data e hora"><input className={inputClassName} id="import-data" onChange={(event) => setImportSessaoForm((current) => ({ ...current, data: event.target.value }))} type="datetime-local" value={importSessaoForm.data} /></FormField>
+              <FormField hint="Deixe em branco para herdar do campeonato." htmlFor="import-formato" label="Formato"><select className={inputClassName} id="import-formato" onChange={(event) => setImportSessaoForm((current) => ({ ...current, formato_id: event.target.value }))} value={importSessaoForm.formato_id}><option value="">Herdar do campeonato</option>{formatos.map((formato) => <option key={formato.id} value={formato.id}>{formato.nome}</option>)}</select></FormField>
             </div>
           )}
         </div>

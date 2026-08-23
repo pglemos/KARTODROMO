@@ -1,4 +1,12 @@
-import { apiDelete, apiGet, apiGetPage, apiPatch, apiPost, apiPut, type Page } from '../../lib/api-client';
+import { apiDelete, apiGet, apiGetById, apiGetPage, apiPatch, apiPost, apiPut, type Page } from '../../lib/api-client';
+import {
+  parsePontuacao,
+  pontosPorPosicao,
+  resolverFormatoCorrida,
+  normalizarFormato,
+  type FormatoCorrida,
+} from '@/lib/race-formats';
+import { listEtapas as listCampeonatoEtapas } from '../campeonatos/campeonatos.api';
 import type {
   CampeonatoOption,
   EtapaOption,
@@ -22,8 +30,6 @@ import type {
 import { msParaTexto } from './cronometragem.types';
 
 export const DEFAULT_LIVE_URL = '/api/livetime-snapshot';
-
-const POINTS_BY_POSITION = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1] as const;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -366,6 +372,31 @@ type ResultadoAggregate = {
   posicaoInformada: number | null;
 };
 
+async function resolverFormatoDaSessao(sessao: SessaoWithCampeonato): Promise<FormatoCorrida> {
+  const [formatosRows, campeonatoRow, etapasRows] = await Promise.all([
+    apiGet<Record<string, unknown>[]>('formatos_corrida'),
+    sessao.campeonato_id
+      ? apiGetById<Record<string, unknown>>('campeonatos', sessao.campeonato_id)
+      : Promise.resolve(null),
+    listCampeonatoEtapas(),
+  ]);
+
+  const formatos = formatosRows.map((row) => normalizarFormato(row as never));
+  const etapa = etapasRows.find((item) => item.id === sessao.etapa_id);
+
+  return resolverFormatoCorrida({
+    formatoSessao:
+      sessao.formato_id ? formatos.find((f) => f.id === sessao.formato_id) ?? null : null,
+    formatoEtapa:
+      etapa?.formato_id ? formatos.find((f) => f.id === etapa.formato_id) ?? null : null,
+    formatoCampeonato:
+      campeonatoRow && typeof campeonatoRow.formato_id === 'string'
+        ? formatos.find((f) => f.id === campeonatoRow.formato_id) ?? null
+        : null,
+    formatosDisponiveis: formatos,
+  }).formato;
+}
+
 export const gerarResultados = async (sessaoId: string): Promise<string> => {
   const sessoes = await listSessoes();
   const sessao = sessoes.find((s) => s.id === sessaoId);
@@ -373,6 +404,12 @@ export const gerarResultados = async (sessaoId: string): Promise<string> => {
   if (!sessao.campeonato_id || !sessao.etapa_id) {
     throw new Error('A sessão precisa estar vinculada a campeonato e etapa.');
   }
+
+  const formato = await resolverFormatoDaSessao(sessao);
+  const campeonatoRow = await apiGetById<Record<string, unknown>>('campeonatos', sessao.campeonato_id);
+  const pontuacao = parsePontuacao(campeonatoRow.pontos_json);
+  const bonusPole = Number(campeonatoRow.bonus_pole ?? 0) || 0;
+  const bonusMelhorVolta = Number(campeonatoRow.bonus_melhor_volta ?? 0) || 0;
 
   const voltas = await listVoltas(sessaoId);
   const validas = voltas.filter((volta) => volta.valida && volta.tempo_ms > 0);
@@ -399,12 +436,21 @@ export const gerarResultados = async (sessaoId: string): Promise<string> => {
     }
   });
 
+  // Critério de classificação definido pelo formato da corrida (não mais implícito):
+  // - 'melhor_tempo': tomada de tempo pura / TT da etapa;
+  // - 'corrida' (ou combinada na corrida em si): posição informada pela cronometragem,
+  //   caindo para o melhor tempo quando a prova não reporta posições.
+  const ordenarPorPosicaoInformada =
+    formato.classificacao_fonte === 'corrida' ||
+    (formato.classificacao_fonte === 'combinada' && sessao.tipo === 'corrida');
+
   const classificados = [...aggregates.values()].sort((left, right) => {
-    if (left.posicaoInformada !== null && right.posicaoInformada !== null) {
+    if (ordenarPorPosicaoInformada && left.posicaoInformada !== null && right.posicaoInformada !== null) {
       return left.posicaoInformada - right.posicaoInformada;
     }
     return left.melhorTempo - right.melhorTempo;
   });
+
   const leaderTime = classificados[0]?.melhorTempo ?? 0;
 
   const corrida = await apiPost<{ id: string }>('corridas', {
@@ -414,6 +460,7 @@ export const gerarResultados = async (sessaoId: string): Promise<string> => {
     data: sessao.data,
     status: 'publicada',
     source: 'cronometragem',
+    formato_id: sessao.formato_id || null,
   });
   const corridaId = corrida.id;
 
@@ -424,9 +471,17 @@ export const gerarResultados = async (sessaoId: string): Promise<string> => {
     posicao: index + 1,
     melhor_volta: msParaTexto(resultado.melhorTempo),
     voltas: resultado.voltas,
-    pontos: POINTS_BY_POSITION[index] ?? 0,
+    pontos: pontosPorPosicao(pontuacao, index + 1) + (index === 0 ? bonusPole : 0),
     gap: index === 0 ? 'Líder' : `+${((resultado.melhorTempo - leaderTime) / 1_000).toFixed(3)}`,
   }));
+
+  if (bonusMelhorVolta > 0 && classificados.length) {
+    const melhorGlobal = classificados.reduce((best, cur) =>
+      cur.melhorTempo < best.melhorTempo ? cur : best,
+    );
+    const indice = classificados.indexOf(melhorGlobal);
+    if (indice >= 0) resultados[indice].pontos += bonusMelhorVolta;
+  }
 
   try {
     for (const resultado of resultados) {
@@ -438,34 +493,71 @@ export const gerarResultados = async (sessaoId: string): Promise<string> => {
   }
 
   await recalcularClassificacao(sessao.campeonato_id);
+
+  // Regulamento "combinado": a tomada de tempo também pontua — publica o resultado da(s)
+  // sessão(ões) de classificação da mesma etapa que ainda não tenham corrida publicada.
+  if (formato.tt_pontua && formato.classificacao_fonte === 'combinada' && sessao.tipo === 'corrida') {
+    const ttsDaEtapa = sessoes.filter(
+      (item) =>
+        item.etapa_id === sessao.etapa_id &&
+        item.tipo === 'classificacao' &&
+        item.status === 'encerrada',
+    );
+    for (const tt of ttsDaEtapa) {
+      const jaPublicada = await apiGet<{ id: string }[]>(
+        `corridas?eq_etapa_id=${encodeURIComponent(tt.etapa_id ?? '')}&eq_titulo=${encodeURIComponent(tt.nome)}`,
+      );
+      if (jaPublicada.length) continue;
+      try {
+        await gerarResultados(tt.id);
+      } catch {
+        // TT sem voltas válidas ou já processada: não bloqueia o resultado principal.
+      }
+    }
+  }
+
   return corridaId;
 };
 
 export const recalcularClassificacao = async (campeonatoId: string): Promise<void> => {
+  const campeonatoRow = await apiGetById<Record<string, unknown>>('campeonatos', campeonatoId).catch(() => null);
+  const pontuacao = parsePontuacao(campeonatoRow?.pontos_json);
+  const descartes = Math.max(0, Math.trunc(Number(campeonatoRow?.descartes ?? 0)) || 0);
+
   const corridas = await apiGet<{ id: string }[]>(
     `corridas?eq_campeonato_id=${encodeURIComponent(campeonatoId)}&eq_status=publicada`,
   );
 
-  const totals = new Map<string, number>();
+  const scoresPorPiloto = new Map<string, number[]>();
   for (const corrida of corridas) {
     const resultados = await apiGet<{ piloto_id: string | null; posicao: number | null }[]>(
       `resultados?eq_corrida_id=${encodeURIComponent(corrida.id)}`,
     );
     resultados.forEach((resultado) => {
       if (!resultado.piloto_id || !resultado.posicao) return;
-      const points = POINTS_BY_POSITION[resultado.posicao - 1] ?? 0;
-      totals.set(resultado.piloto_id, (totals.get(resultado.piloto_id) ?? 0) + points);
+      const pontos = pontosPorPosicao(pontuacao, resultado.posicao);
+      const lista = scoresPorPiloto.get(resultado.piloto_id) ?? [];
+      lista.push(pontos);
+      scoresPorPiloto.set(resultado.piloto_id, lista);
     });
   }
 
-  const rows = [...totals.entries()]
-    .sort(([leftId, leftPoints], [rightId, rightPoints]) =>
-      rightPoints === leftPoints ? leftId.localeCompare(rightId) : rightPoints - leftPoints,
+  const rows = [...scoresPorPiloto.entries()]
+    .map(([pilotoId, pontosLista]) => {
+      const ordenados = [...pontosLista].sort((a, b) => b - a);
+      const considerados = descartes > 0 ? ordenados.slice(0, Math.max(0, ordenados.length - descartes)) : ordenados;
+      const total = considerados.reduce((soma, valor) => soma + valor, 0);
+      return { pilotoId, total };
+    })
+    .sort((left, right) =>
+      right.total === left.total
+        ? left.pilotoId.localeCompare(right.pilotoId)
+        : right.total - left.total,
     )
-    .map(([pilotoId, pontos], index) => ({
+    .map(({ pilotoId, total }, index) => ({
       campeonato_id: campeonatoId,
       piloto_id: pilotoId,
-      pontos,
+      pontos: total,
       posicao: index + 1,
     }));
 

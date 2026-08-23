@@ -10,6 +10,7 @@ export type Corrida = {
   data: string | null;
   status: CorridaStatus;
   source: string | null;
+  formato_id: string | null;
 };
 
 export type CorridaWithRelations = Corrida & {
