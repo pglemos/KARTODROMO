@@ -2,7 +2,7 @@ import sql from 'mssql';
 import { buildKartHistorySummary } from '@/lib/equalizacao/history';
 import { formatDurationMs, parseDurationMs } from '@/lib/livetime/time-format';
 import type { LapTimeSqlOptions } from '@/lib/livetime/laptime-sql';
-import type { KartHistoryItem, KartHistorySummary } from '@/src/admin/modules/equalizacao/equalizacao.types';
+import type { KartHistorySummary } from '@/src/admin/modules/equalizacao/equalizacao.types';
 
 export type KartHistoryQuery = {
   plate?: string | null;
@@ -23,6 +23,7 @@ export type KartHistoryItem = {
   bestLapMs: number | null;
   laps: number | null;
   averageLap: string | null;
+  averageLapMs?: number | null;
   matchedBy: 'sensor' | 'plate';
 };
 
@@ -141,9 +142,9 @@ export async function fetchLapTimeKartHistory(
         rc.Number,
         rc.Transponder,
         rc.Competitor,
-        coalesce(rc.BestLapTime, bestPassing.BestLapTime) as BestLapTime,
+        case when rc.BestLapTime > cast('00:00:00' as time) then rc.BestLapTime else bestPassing.BestLapTime end as BestLapTime,
         rc.Lap,
-        rc.AvgLapTime,
+        coalesce(passingStats.AverageLapTime, cast(datediff_big(millisecond, cast('00:00:00' as time), rc.AvgLapTime) as decimal(18, 3))) as AvgLapTime,
         '${matchBySensor ? 'sensor' : 'plate'}' as MatchedBy
       from dbo.Racing r with (nolock)
       left join dbo.RacingType rt with (nolock) on rt.Id_RacingType = r.Id_RacingType
@@ -171,12 +172,12 @@ export async function fetchLapTimeKartHistory(
             and p0.Id_RacingCompetitor = rc0.Id_RacingCompetitor
             and (p0.InvalidLap = 0 or p0.InvalidLap is null)
             and (p0.DeletedLap = 0 or p0.DeletedLap is null)
-            and p0.LapTime is not null
+            and p0.LapTime > cast('00:00:00' as time)
         ) bestPassing
         where rc0.Id_Racing = r.Id_Racing
           and (rc0.IsHidden = 0 or rc0.IsHidden is null)
           and ${matchBySensor ? 'convert(nvarchar(64), rc0.Transponder) = @sensor' : '(convert(nvarchar(64), rc0.Number) = @plate or convert(nvarchar(64), rc0.Number) = @plateNumeric)'}
-        order by coalesce(rc0.BestLapTime, bestPassing.BestLapTime), rc0.Id_RacingCompetitor
+        order by case when rc0.BestLapTime > cast('00:00:00' as time) then rc0.BestLapTime else bestPassing.BestLapTime end, rc0.Id_RacingCompetitor
       ) rc
       outer apply (
         select min(p1.LapTime) as BestLapTime
@@ -185,17 +186,28 @@ export async function fetchLapTimeKartHistory(
           and p1.Id_RacingCompetitor = rc.Id_RacingCompetitor
           and (p1.InvalidLap = 0 or p1.InvalidLap is null)
           and (p1.DeletedLap = 0 or p1.DeletedLap is null)
-          and p1.LapTime is not null
+          and p1.LapTime > cast('00:00:00' as time)
+          and datediff_big(millisecond, cast('00:00:00' as time), p1.LapTime) < 240000
       ) bestPassing
+      outer apply (
+        select avg(cast(datediff_big(millisecond, cast('00:00:00' as time), p2.LapTime) as decimal(18, 3))) as AverageLapTime
+        from dbo.Passing p2 with (nolock)
+        where p2.Id_Racing = r.Id_Racing
+          and p2.Id_RacingCompetitor = rc.Id_RacingCompetitor
+          and (p2.InvalidLap = 0 or p2.InvalidLap is null)
+          and (p2.DeletedLap = 0 or p2.DeletedLap is null)
+          and p2.LapTime > cast('00:00:00' as time)
+          and datediff_big(millisecond, cast('00:00:00' as time), p2.LapTime) < 240000
+      ) passingStats
       where ${finishedSql}
         and r.ExpectedDateTime <= getdate()
         and ${matchSql.replace(/\brc\./g, 'rc.')}
-        and coalesce(rc.BestLapTime, bestPassing.BestLapTime) is not null
+        and (rc.BestLapTime > cast('00:00:00' as time) or bestPassing.BestLapTime is not null)
       order by r.ExpectedDateTime desc, r.Id_Racing desc
       offset 0 rows fetch next @limit rows only
     `);
 
-    return result.recordset.map(toHistoryItem).filter((item) => item.bestLapMs !== null);
+    return result.recordset.map(toHistoryItem).filter((item) => item.bestLapMs !== null && item.bestLapMs > 0);
   } finally {
     await pool.close().catch(() => undefined);
   }
@@ -294,9 +306,9 @@ export async function fetchLapTimeKartHistorySummary(options: LapTimeSqlOptions)
           identity_matches.Number,
           identity_matches.Transponder,
           identity_matches.Competitor,
-          coalesce(identity_matches.BestLapTime, bestPassing.BestLapTime) as BestLapTime,
+          case when identity_matches.BestLapTime > cast('00:00:00' as time) then identity_matches.BestLapTime else bestPassing.BestLapTime end as BestLapTime,
           identity_matches.Lap,
-          identity_matches.AvgLapTime
+          coalesce(passingStats.AverageLapTime, cast(datediff_big(millisecond, cast('00:00:00' as time), identity_matches.AvgLapTime) as decimal(18, 3))) as AvgLapTime
         from identity_matches
         inner join dbo.Racing r with (nolock) on r.Id_Racing = identity_matches.Id_Racing
         left join dbo.RacingType racing_type with (nolock) on racing_type.Id_RacingType = r.Id_RacingType
@@ -314,12 +326,22 @@ export async function fetchLapTimeKartHistorySummary(options: LapTimeSqlOptions)
             and p.Id_RacingCompetitor = identity_matches.Id_RacingCompetitor
             and (p.InvalidLap = 0 or p.InvalidLap is null)
             and (p.DeletedLap = 0 or p.DeletedLap is null)
-            and p.LapTime is not null
-        ) bestPassing
+            and p.LapTime > cast('00:00:00' as time)
+            and datediff_big(millisecond, cast('00:00:00' as time), p.LapTime) < 240000
+          ) bestPassing
+        outer apply (
+          select avg(cast(datediff_big(millisecond, cast('00:00:00' as time), p2.LapTime) as decimal(18, 3))) as AverageLapTime
+          from dbo.Passing p2 with (nolock)
+          where p2.Id_Racing = r.Id_Racing
+            and p2.Id_RacingCompetitor = identity_matches.Id_RacingCompetitor
+            and (p2.InvalidLap = 0 or p2.InvalidLap is null)
+            and (p2.DeletedLap = 0 or p2.DeletedLap is null)
+            and p2.LapTime > cast('00:00:00' as time)
+            and datediff_big(millisecond, cast('00:00:00' as time), p2.LapTime) < 240000
+        ) passingStats
         where ${finishedSql}
           and r.ExpectedDateTime <= getdate()
-          and (identity_matches.BestLapTime is not null or bestPassing.BestLapTime is not null)
-          and (identity_matches.Number is null or identity_matches.Number not like '%test%')
+          and (identity_matches.BestLapTime > cast('00:00:00' as time) or bestPassing.BestLapTime is not null)
       ), chosen_identity as (
         select
           PlateKey,
@@ -361,7 +383,7 @@ export async function fetchLapTimeKartHistorySummary(options: LapTimeSqlOptions)
     const grouped = new Map<string, KartHistoryItem[]>();
     for (const row of result.recordset) {
       const item = toHistoryItem(row);
-      if (item.bestLapMs === null || !item.plate) continue;
+      if (item.bestLapMs === null || item.bestLapMs <= 0 || !item.plate) continue;
       const current = grouped.get(item.plate) || [];
       current.push(item);
       grouped.set(item.plate, current);

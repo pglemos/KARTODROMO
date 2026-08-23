@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
+  Database,
   Gauge,
   RefreshCw,
   Search,
@@ -16,9 +17,9 @@ import {
   EQUALIZATION_TOLERANCE_MS,
   KART_CATEGORY_LABELS,
   KART_CATEGORY_TARGETS_MS,
-  equalizationDeltaMs,
   equalizationState,
   kartCategoryFromPlate,
+  normalizedKartNumber,
   summarizeCategory,
   targetForKart,
   type KartCategory,
@@ -32,8 +33,8 @@ import { PageHeader } from '@/src/admin/ui/PageHeader';
 import { Pagination } from '@/src/admin/ui/Pagination';
 import { StatCard } from '@/src/admin/ui/StatCard';
 import { useToast } from '@/src/admin/ui/useToast';
-import { listKarts } from './equalizacao.api';
-import type { Kart } from './equalizacao.types';
+import { getKartHistorySummary, listKarts } from './equalizacao.api';
+import type { Kart, KartHistorySummary } from './equalizacao.types';
 
 type CategoryFilter = 'all' | KartCategory;
 type StateFilter = 'all' | ReturnType<typeof equalizationState>;
@@ -65,10 +66,13 @@ const categoryVariant: Record<KartCategory, BadgeVariant> = {
 const formatTime = (milliseconds: number | null | undefined): string =>
   milliseconds === null || milliseconds === undefined ? '—' : formatDurationMs(milliseconds) || '—';
 
-const formatDelta = (milliseconds: number | null | undefined): string => {
-  if (milliseconds === null || milliseconds === undefined) return 'Sem medição';
-  if (milliseconds === 0) return 'No alvo';
-  return `${milliseconds > 0 ? '+' : ''}${formatTime(Math.abs(milliseconds))}`;
+const historyKey = (value: unknown): string => String(normalizedKartNumber(value) ?? value ?? '').trim();
+
+const historyMetric = (summary: KartHistorySummary | undefined, value: number | null | undefined, loading: boolean): string => {
+  if (loading) return 'Consultando';
+  if (!summary) return 'Sem histórico';
+  if (value === null || value === undefined) return 'Sem registro';
+  return formatTime(value);
 };
 
 const formatDate = (value: string | null | undefined): string => {
@@ -104,23 +108,16 @@ function StateBadge({ kart }: { kart: Kart }) {
   return <Badge variant={stateVariant[state]}>{stateLabel[state]}</Badge>;
 }
 
-function Delta({ kart }: { kart: Kart }) {
-  const delta = equalizationDeltaMs(kart.media_equalizacao_ms, kart.numero);
-  if (delta === null) return <span className="text-xs text-zinc-500">Aguardando captura</span>;
-  return (
-    <span className={delta === 0 ? 'text-xs text-emerald-300' : delta > 0 ? 'text-xs text-amber-300' : 'text-xs text-sky-300'}>
-      {formatDelta(delta)} do alvo
-    </span>
-  );
-}
-
 export const EqualizacaoListPage = () => {
   useAuth();
   const toast = useToast();
   const [karts, setKarts] = useState<Kart[]>([]);
+  const [historySummary, setHistorySummary] = useState<KartHistorySummary[]>([]);
   const [fleetFreshness, setFleetFreshness] = useState<'live' | 'snapshot'>('live');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
@@ -130,11 +127,21 @@ export const EqualizacaoListPage = () => {
   const loadKarts = useCallback(async (background = false) => {
     if (background) setRefreshing(true);
     else setLoading(true);
+    setHistoryLoading(true);
     setError(null);
+    setHistoryError(null);
     try {
-      const result = await listKarts();
-      setKarts(result.rows);
-      setFleetFreshness(result.freshness);
+      const [fleetResult, historyResult] = await Promise.allSettled([listKarts(), getKartHistorySummary()]);
+      if (fleetResult.status === 'rejected') throw fleetResult.reason;
+
+      setKarts(fleetResult.value.rows);
+      setFleetFreshness(fleetResult.value.freshness);
+      if (historyResult.status === 'fulfilled') {
+        setHistorySummary(historyResult.value.rows);
+      } else {
+        const historyMessage = historyResult.reason instanceof Error ? historyResult.reason.message : 'Não foi possível consultar o histórico real.';
+        setHistoryError(historyMessage);
+      }
     } catch (loadError) {
       const message = loadError instanceof Error ? loadError.message : 'Não foi possível carregar a frota real.';
       setError(message);
@@ -142,6 +149,7 @@ export const EqualizacaoListPage = () => {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setHistoryLoading(false);
     }
   }, [toast]);
 
@@ -165,6 +173,11 @@ export const EqualizacaoListPage = () => {
   }, [categoryFilter, search, stateFilter]);
 
   const pageKarts = filteredKarts.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const historyByKart = useMemo(
+    () => new Map(historySummary.map((summary) => [historyKey(summary.plate), summary] as const)),
+    [historySummary],
+  );
+  const kartsWithHistory = karts.filter((kart) => historyByKart.has(historyKey(kart.numero))).length;
   const categorySummaries = useMemo(
     () => ({
       super: summarizeCategory(karts, 'super'),
@@ -211,6 +224,20 @@ export const EqualizacaoListPage = () => {
           </div>
         </div>
       ) : null}
+
+      <div className="flex items-start gap-3 rounded-xl border border-zinc-800 bg-zinc-950/30 p-4 text-sm text-zinc-200" role="status">
+        <Database aria-hidden="true" className="mt-0.5 flex-none text-brand-300" size={18} />
+        <div>
+          <strong className="block">Indicadores históricos reais</strong>
+          <span className="mt-1 block text-xs leading-5 text-zinc-500">
+            {historyLoading
+              ? 'Consultando médias e melhores voltas no LapTime...'
+              : historyError
+                ? `Histórico indisponível nesta atualização: ${historyError}`
+                : `${kartsWithHistory}/${karts.length} karts com corridas históricas. Onde não houver registro, a tela informa isso sem estimar tempo.`}
+          </span>
+        </div>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={Gauge} label="Frota real" value={String(karts.length)} sub={fleetFreshness === 'snapshot' ? 'Último snapshot real do LapTime' : 'Karts ativos no LapTime'} loading={loading} />
@@ -283,20 +310,21 @@ export const EqualizacaoListPage = () => {
         ) : null}
 
         <div className="overflow-x-auto">
-          <table className="min-w-[1100px] w-full text-left">
+          <table className="min-w-[1780px] w-full text-left">
             <thead className="border-b border-zinc-800 bg-zinc-950/40">
               <tr>
-                {['Kart / categoria', 'Chassi', 'Redutor', 'Última equalização', 'Melhor volta', 'Desvio do alvo', 'Ação', 'Abrir'].map((label) => (
+                {['Kart / categoria', 'Chassi', 'Redutor', 'Média histórica', 'Melhor volta', 'Melhor mês', 'Melhor 15 dias', 'Melhor 7 dias', 'Desvio', 'Última equalização', 'Ação', 'Abrir'].map((label) => (
                   <th className="whitespace-nowrap px-4 py-3 text-[10px] font-bold uppercase tracking-[.1em] text-zinc-500" key={label}>{label}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td className="px-4 py-12 text-center text-sm text-zinc-500" colSpan={8}>Carregando dados reais do LapTime...</td></tr>
+                <tr><td className="px-4 py-12 text-center text-sm text-zinc-500" colSpan={12}>Carregando dados reais do LapTime...</td></tr>
               ) : pageKarts.map((kart) => {
                 const physicalAlert = getPhysicalAlert(kart);
                 const state = equalizationState(kart.media_equalizacao_ms, kart.numero);
+                const summary = historyByKart.get(historyKey(kart.numero));
                 return (
                   <tr className="border-b border-zinc-800/70 last:border-0 hover:bg-zinc-800/20" key={kart.id}>
                     <td className="px-4 py-3">
@@ -307,15 +335,19 @@ export const EqualizacaoListPage = () => {
                     </td>
                     <td className="px-4 py-3 text-sm text-zinc-300">{kart.chassi_numero || <span className="text-zinc-600">Não informado</span>}</td>
                     <td className="px-4 py-3 text-xs text-zinc-400"><span className="block">Antigo: {kart.redutor_antigo || '—'}</span><span className="mt-1 block">Novo: {kart.redutor_novo || '—'}</span></td>
-                    <td className="px-4 py-3"><StateBadge kart={kart} /><span className="mt-1 block text-[11px] text-zinc-500">{formatDate(kart.ultima_equalizacao)}</span></td>
-                    <td className="px-4 py-3"><strong className="block text-sm tabular-nums text-zinc-100">{formatTime(kart.melhor_equalizacao_ms)}</strong><span className="mt-1 block text-[11px] text-zinc-500">Média {formatTime(kart.media_equalizacao_ms)}</span></td>
-                    <td className="px-4 py-3"><Delta kart={kart} /><span className="mt-1 block text-[11px] text-zinc-500">Alvo {formatTime(targetForKart(kart.numero))}</span></td>
+                    <td className="px-4 py-3"><strong className="block text-sm tabular-nums text-zinc-100">{historyMetric(summary, summary?.averageLapMs, historyLoading)}</strong><span className="mt-1 block text-[11px] text-zinc-500">{summary ? `${summary.raceCount} corrida(s) · ${summary.matchedBy === 'sensor' ? 'sensor' : 'placa'}` : 'Dados históricos do LapTime'}</span></td>
+                    <td className="px-4 py-3"><strong className="block text-sm tabular-nums text-zinc-100">{historyMetric(summary, summary?.bestLapMs, historyLoading)}</strong><span className="mt-1 block text-[11px] text-zinc-500">Melhor geral</span></td>
+                    <td className="px-4 py-3"><strong className="block text-sm tabular-nums text-zinc-100">{historyMetric(summary, summary?.bestMonthMs, historyLoading)}</strong><span className="mt-1 block text-[11px] text-zinc-500">Mês atual</span></td>
+                    <td className="px-4 py-3"><strong className="block text-sm tabular-nums text-zinc-100">{historyMetric(summary, summary?.best15DaysMs, historyLoading)}</strong><span className="mt-1 block text-[11px] text-zinc-500">Janela móvel</span></td>
+                    <td className="px-4 py-3"><strong className="block text-sm tabular-nums text-zinc-100">{historyMetric(summary, summary?.best7DaysMs, historyLoading)}</strong><span className="mt-1 block text-[11px] text-zinc-500">Janela móvel</span></td>
+                    <td className="px-4 py-3"><strong className="block text-sm tabular-nums text-zinc-100">{historyMetric(summary, summary?.deviationMs, historyLoading)}</strong><span className="mt-1 block text-[11px] text-zinc-500">Variação da média</span></td>
+                    <td className="px-4 py-3"><StateBadge kart={kart} /><span className="mt-1 block text-[11px] text-zinc-500">Alvo {formatTime(targetForKart(kart.numero))}</span><span className="mt-1 block text-[11px] text-zinc-500">{formatDate(kart.ultima_equalizacao)}</span></td>
                     <td className="px-4 py-3"><span className={state === 'equilibrado' ? 'text-xs text-emerald-300' : 'text-xs text-amber-300'}>{getAlertText(kart)}</span>{physicalAlert ? <span className="mt-1 block text-[11px] text-red-300">{physicalAlert}</span> : null}</td>
                     <td className="px-4 py-3"><Link aria-label={`Abrir painel do kart ${kart.numero}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-zinc-700 text-zinc-300 transition hover:border-brand-400 hover:text-brand-300" href={`/admin/equalizacao/${encodeURIComponent(kart.id)}`} title="Abrir painel"><ArrowRight aria-hidden="true" size={16} /></Link></td>
                   </tr>
                 );
               })}
-              {!loading && pageKarts.length === 0 ? <tr><td className="px-4 py-12 text-center text-sm text-zinc-500" colSpan={8}>Nenhum kart corresponde aos filtros atuais.</td></tr> : null}
+              {!loading && pageKarts.length === 0 ? <tr><td className="px-4 py-12 text-center text-sm text-zinc-500" colSpan={12}>Nenhum kart corresponde aos filtros atuais.</td></tr> : null}
             </tbody>
           </table>
         </div>
