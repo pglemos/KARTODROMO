@@ -118,6 +118,7 @@ export const EqualizacaoListPage = () => {
   useAuth();
   const toast = useToast();
   const [karts, setKarts] = useState<Kart[]>([]);
+  const [fleetFreshness, setFleetFreshness] = useState<'live' | 'snapshot'>('live');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -131,7 +132,9 @@ export const EqualizacaoListPage = () => {
     else setLoading(true);
     setError(null);
     try {
-      setKarts(await listKarts());
+      const result = await listKarts();
+      setKarts(result.rows);
+      setFleetFreshness(result.freshness);
     } catch (loadError) {
       const message = loadError instanceof Error ? loadError.message : 'Não foi possível carregar a frota real.';
       setError(message);
@@ -197,8 +200,20 @@ export const EqualizacaoListPage = () => {
         </Button>
       </div>
 
+      {fleetFreshness === 'snapshot' ? (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-900/60 bg-amber-950/20 p-4 text-sm text-amber-100" role="status">
+          <AlertTriangle aria-hidden="true" className="mt-0.5 flex-none text-amber-300" size={18} />
+          <div>
+            <strong className="block">Atualização ao vivo indisponível</strong>
+            <span className="mt-1 block text-xs leading-5 text-amber-100/70">
+              Exibindo o último snapshot real salvo no D1. Nenhum kart ou tempo foi criado; a atualização será tentada novamente ao recarregar.
+            </span>
+          </div>
+        </div>
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={Gauge} label="Frota real" value={String(karts.length)} sub="Karts ativos no LapTime" loading={loading} />
+        <StatCard icon={Gauge} label="Frota real" value={String(karts.length)} sub={fleetFreshness === 'snapshot' ? 'Último snapshot real do LapTime' : 'Karts ativos no LapTime'} loading={loading} />
         <StatCard icon={CheckCircle2} label="Dentro do alvo" value={String(balanced)} sub={`Tolerância de ±${formatTime(EQUALIZATION_TOLERANCE_MS)}`} loading={loading} />
         <StatCard icon={Timer} label="Com medição" value={`${measured}/${karts.length || 0}`} sub="Equalização automática registrada" loading={loading} />
         <StatCard icon={alerts ? AlertTriangle : CheckCircle2} label="Precisam de ação" value={String(alerts)} sub="Abrir o kart para decidir" loading={loading} />

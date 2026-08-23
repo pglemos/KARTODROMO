@@ -16,27 +16,31 @@ export const dynamic = 'force-dynamic';
 const TIMEOUT_MS = Number(process.env.KARTODROMO_LOCAL_API_TIMEOUT_MS || '8000');
 let liveFleetSyncInFlight: Promise<{ ok: boolean; count: number; error?: string }> | null = null;
 
+type LiveFleetSyncStatus = { ok: boolean; count: number; error?: string } | null;
+
 async function requireSession() {
   return requireAdminSession('/admin');
 }
 
-async function syncLiveKartFleetIfNeeded(request: NextRequest, path: string[], db: AdminD1Database) {
+async function syncLiveKartFleetIfNeeded(request: NextRequest, path: string[], db: AdminD1Database): Promise<LiveFleetSyncStatus> {
   if (request.method !== 'GET' || path[0] !== 'karts_full' || path.length !== 1) return null;
 
   try {
     liveFleetSyncInFlight ??= syncKartFleetFromLiveSource(db).finally(() => {
       liveFleetSyncInFlight = null;
     });
-    const result = await liveFleetSyncInFlight;
-    if (result.ok) return null;
-    return NextResponse.json(
-      { error: 'live_fleet_unavailable', detail: result.error || 'laptime_fleet_unavailable' },
-      { status: 503 },
-    );
+    return await liveFleetSyncInFlight;
   } catch (error) {
     console.error('[admin/db] live kart fleet sync failed', error);
-    return NextResponse.json({ error: 'live_fleet_sync_failed' }, { status: 503 });
+    return { ok: false, count: 0, error: error instanceof Error ? error.message : 'laptime_fleet_unavailable' };
   }
+}
+
+function markFleetSource(response: NextResponse, status: LiveFleetSyncStatus): NextResponse {
+  if (!status) return response;
+  response.headers.set('x-live-fleet-status', status.ok ? 'live' : 'stale');
+  if (!status.ok) response.headers.set('x-live-fleet-error', 'unavailable');
+  return response;
 }
 
 async function proxy(request: NextRequest, path: string[]) {
@@ -46,9 +50,8 @@ async function proxy(request: NextRequest, path: string[]) {
   if (isLocalSQLiteAvailable()) {
     const localDb = getLocalSQLiteDb();
     if (localDb) {
-      const syncResponse = await syncLiveKartFleetIfNeeded(request, path, localDb);
-      if (syncResponse) return syncResponse;
-      return handleAdminD1(request, path, localDb, session.email);
+      const syncStatus = await syncLiveKartFleetIfNeeded(request, path, localDb);
+      return markFleetSource(await handleAdminD1(request, path, localDb, session.email), syncStatus);
     }
   }
 
@@ -56,9 +59,8 @@ async function proxy(request: NextRequest, path: string[]) {
   try {
     const { env } = await getCloudflareContext({ async: true });
     if (env.KARTODROMO_ADMIN_DB) {
-      const syncResponse = await syncLiveKartFleetIfNeeded(request, path, env.KARTODROMO_ADMIN_DB);
-      if (syncResponse) return syncResponse;
-      return handleAdminD1(request, path, env.KARTODROMO_ADMIN_DB, session.email);
+      const syncStatus = await syncLiveKartFleetIfNeeded(request, path, env.KARTODROMO_ADMIN_DB);
+      return markFleetSource(await handleAdminD1(request, path, env.KARTODROMO_ADMIN_DB, session.email), syncStatus);
     }
   } catch {
     // `next dev` and conventional Node deployments do not expose Cloudflare bindings.

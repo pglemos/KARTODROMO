@@ -18,6 +18,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const apiGet = <T>(path: string): Promise<T> => request<T>(path);
 
+export async function apiGetWithMeta<T>(path: string): Promise<{ data: T; headers: Headers }> {
+  const response = await fetch(`${BASE}/${path}`, { headers: { 'content-type': 'application/json' } });
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : null;
+
+  if (!response.ok) {
+    throw new Error((data && data.error) || `HTTP ${response.status}`);
+  }
+
+  return { data: data as T, headers: response.headers };
+}
+
 export type Page<T> = { data: T[]; total: number };
 
 export async function apiGetPage<T>(path: string): Promise<Page<T>> {

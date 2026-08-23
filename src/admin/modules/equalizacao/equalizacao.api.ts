@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost } from '../../lib/api-client';
+import { apiGet, apiGetWithMeta, apiPatch, apiPost } from '../../lib/api-client';
 import { buildKartHistoryWindows } from '@/lib/equalizacao/history';
 import type {
   Kart,
@@ -34,9 +34,17 @@ const jsonRequest = async <T>(url: string, init?: RequestInit): Promise<T> => {
   return data as T;
 };
 
-export const listKarts = async (): Promise<Kart[]> => {
-  const rows = await apiGet<Kart[]>('karts_full?eq_ativo=1&limit=500&order=numero&dir=asc');
-  return rows.filter((kart) => kart.ativo);
+export type KartFleetList = {
+  rows: Kart[];
+  freshness: 'live' | 'snapshot';
+};
+
+export const listKarts = async (): Promise<KartFleetList> => {
+  const result = await apiGetWithMeta<Kart[]>('karts_full?eq_ativo=1&limit=500&order=numero&dir=asc');
+  return {
+    rows: result.data.filter((kart) => kart.ativo),
+    freshness: result.headers.get('x-live-fleet-status') === 'stale' ? 'snapshot' : 'live',
+  };
 };
 
 export const getKart = async (id: string): Promise<Kart> => {
