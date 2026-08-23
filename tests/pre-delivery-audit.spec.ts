@@ -49,7 +49,10 @@ const waitForRenderedPage = async (page: Page) => {
   await page.waitForFunction(() => {
     const hasInteractiveContent = Boolean(document.querySelector('a[href], button:not([disabled])'));
     const hasUnresolvedTemplate = /\{\{[^}]+\}\}/.test(document.documentElement.innerHTML);
-    return hasInteractiveContent && !hasUnresolvedTemplate;
+    const hasVisibleText = Boolean(document.body.innerText.trim());
+    const hasDesignRuntimeRoot = Boolean(document.querySelector('#dc-root'));
+    const isReactPage = !document.querySelector('x-dc');
+    return hasInteractiveContent && hasVisibleText && !hasUnresolvedTemplate && (hasDesignRuntimeRoot || isReactPage);
   }, undefined, { timeout: 10_000 });
 };
 
