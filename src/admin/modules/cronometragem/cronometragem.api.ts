@@ -1,9 +1,13 @@
 import { apiDelete, apiGet, apiGetById, apiGetPage, apiPatch, apiPost, apiPut, type Page } from '../../lib/api-client';
 import {
+  parseDesempatesCampeonato,
   parsePontuacao,
   pontosPorPosicao,
+  ordenarClassificadosPorFormato,
+  ordenarClassificacaoCampeonato,
   resolverFormatoCorrida,
   normalizarFormato,
+  type EstatisticasPiloto,
   type FormatoCorrida,
 } from '@/lib/race-formats';
 import { listEtapas as listCampeonatoEtapas } from '../campeonatos/campeonatos.api';
@@ -440,16 +444,11 @@ export const gerarResultados = async (sessaoId: string): Promise<string> => {
   // - 'melhor_tempo': tomada de tempo pura / TT da etapa;
   // - 'corrida' (ou combinada na corrida em si): posição informada pela cronometragem,
   //   caindo para o melhor tempo quando a prova não reporta posições.
-  const ordenarPorPosicaoInformada =
-    formato.classificacao_fonte === 'corrida' ||
-    (formato.classificacao_fonte === 'combinada' && sessao.tipo === 'corrida');
-
-  const classificados = [...aggregates.values()].sort((left, right) => {
-    if (ordenarPorPosicaoInformada && left.posicaoInformada !== null && right.posicaoInformada !== null) {
-      return left.posicaoInformada - right.posicaoInformada;
-    }
-    return left.melhorTempo - right.melhorTempo;
-  });
+  const classificados = ordenarClassificadosPorFormato(
+    [...aggregates.values()],
+    formato.classificacao_fonte,
+    sessao.tipo,
+  );
 
   const leaderTime = classificados[0]?.melhorTempo ?? 0;
 
@@ -519,47 +518,128 @@ export const gerarResultados = async (sessaoId: string): Promise<string> => {
   return corridaId;
 };
 
+type ResultadoLinha = { piloto_id: string | null; piloto_nome: string; posicao: number | null; melhor_volta: string | null };
+
 export const recalcularClassificacao = async (campeonatoId: string): Promise<void> => {
   const campeonatoRow = await apiGetById<Record<string, unknown>>('campeonatos', campeonatoId).catch(() => null);
   const pontuacao = parsePontuacao(campeonatoRow?.pontos_json);
   const descartes = Math.max(0, Math.trunc(Number(campeonatoRow?.descartes ?? 0)) || 0);
+  const desempates = parseDesempatesCampeonato(campeonatoRow?.desempate_json);
 
-  const corridas = await apiGet<{ id: string }[]>(
+  const corridas = await apiGet<{ id: string; data: string | null }[]>(
     `corridas?eq_campeonato_id=${encodeURIComponent(campeonatoId)}&eq_status=publicada`,
   );
 
-  const scoresPorPiloto = new Map<string, number[]>();
+  type Acumulo = {
+    pontosLista: number[];
+    vitorias: number;
+    segundos: number;
+    terceiros: number;
+    melhorPosicao: number | null;
+    melhorPosicaoUltima: number | null;
+    voltasMs: number[];
+    voltasRapidas: number;
+  };
+  const acumulos = new Map<string, Acumulo>();
+  const acumuloDe = (pilotoId: string): Acumulo => {
+    let atual = acumulos.get(pilotoId);
+    if (!atual) {
+      atual = {
+        pontosLista: [],
+        vitorias: 0,
+        segundos: 0,
+        terceiros: 0,
+        melhorPosicao: null,
+        melhorPosicaoUltima: null,
+        voltasMs: [],
+        voltasRapidas: 0,
+      };
+      acumulos.set(pilotoId, atual);
+    }
+    return atual;
+  };
+
+  const porCorrida: Array<{ data: string | null; linhas: ResultadoLinha[] }> = [];
   for (const corrida of corridas) {
-    const resultados = await apiGet<{ piloto_id: string | null; posicao: number | null }[]>(
+    const linhas = await apiGet<ResultadoLinha[]>(
       `resultados?eq_corrida_id=${encodeURIComponent(corrida.id)}`,
     );
-    resultados.forEach((resultado) => {
-      if (!resultado.piloto_id || !resultado.posicao) return;
-      const pontos = pontosPorPosicao(pontuacao, resultado.posicao);
-      const lista = scoresPorPiloto.get(resultado.piloto_id) ?? [];
-      lista.push(pontos);
-      scoresPorPiloto.set(resultado.piloto_id, lista);
-    });
+    porCorrida.push({ data: corrida.data ?? null, linhas });
+  }
+  const dataMaisRecente = porCorrida.reduce<string | null>((max, item) => {
+    if (!item.data) return max;
+    return !max || item.data > max ? item.data : max;
+  }, null);
+
+  for (const corrida of porCorrida) {
+    const ehUltimaEtapa = dataMaisRecente !== null && corrida.data === dataMaisRecente;
+
+    // Voltas rápidas da prova: quem cravou a melhor volta entre todos.
+    const temposDaCorrida = corrida.linhas
+      .filter((linha): linha is ResultadoLinha & { piloto_id: string } => Boolean(linha.piloto_id))
+      .map((linha) => ({
+        pilotoId: linha.piloto_id,
+        ms: linha.melhor_volta ? tempoTextoParaMs(linha.melhor_volta.replace(/^\+/, '')) : undefined,
+      }))
+      .filter((item): item is { pilotoId: string; ms: number } => item.ms !== undefined && item.ms > 0);
+    const recordeDaProva = temposDaCorrida.length ? Math.min(...temposDaCorrida.map((item) => item.ms)) : null;
+
+    for (const linha of corrida.linhas) {
+      if (!linha.piloto_id) continue;
+      const acumulo = acumuloDe(linha.piloto_id);
+
+      if (linha.posicao !== null && linha.posicao >= 1) {
+        acumulo.pontosLista.push(pontosPorPosicao(pontuacao, linha.posicao));
+        if (linha.posicao === 1) acumulo.vitorias += 1;
+        else if (linha.posicao === 2) acumulo.segundos += 1;
+        else if (linha.posicao === 3) acumulo.terceiros += 1;
+        if (acumulo.melhorPosicao === null || linha.posicao < acumulo.melhorPosicao) {
+          acumulo.melhorPosicao = linha.posicao;
+        }
+        if (ehUltimaEtapa && (acumulo.melhorPosicaoUltima === null || linha.posicao < acumulo.melhorPosicaoUltima)) {
+          acumulo.melhorPosicaoUltima = linha.posicao;
+        }
+      }
+
+      const voltaMs = linha.melhor_volta
+        ? tempoTextoParaMs(linha.melhor_volta.replace(/^\+/, ''))
+        : undefined;
+      if (voltaMs !== undefined && voltaMs > 0) acumulo.voltasMs.push(voltaMs);
+    }
+
+    if (recordeDaProva !== null) {
+      for (const tempo of temposDaCorrida) {
+        if (tempo.ms === recordeDaProva) acumuloDe(tempo.pilotoId).voltasRapidas += 1;
+      }
+    }
   }
 
-  const rows = [...scoresPorPiloto.entries()]
-    .map(([pilotoId, pontosLista]) => {
-      const ordenados = [...pontosLista].sort((a, b) => b - a);
-      const considerados = descartes > 0 ? ordenados.slice(0, Math.max(0, ordenados.length - descartes)) : ordenados;
-      const total = considerados.reduce((soma, valor) => soma + valor, 0);
-      return { pilotoId, total };
-    })
-    .sort((left, right) =>
-      right.total === left.total
-        ? left.pilotoId.localeCompare(right.pilotoId)
-        : right.total - left.total,
-    )
-    .map(({ pilotoId, total }, index) => ({
-      campeonato_id: campeonatoId,
-      piloto_id: pilotoId,
-      pontos: total,
-      posicao: index + 1,
-    }));
+  const estatisticas: EstatisticasPiloto[] = [...acumulos.entries()].map(([pilotoId, acumulo]) => {
+    const ordenados = [...acumulo.pontosLista].sort((a, b) => b - a);
+    const considerados = descartes > 0 ? ordenados.slice(0, Math.max(0, ordenados.length - descartes)) : ordenados;
+    const voltasOrdenadas = [...acumulo.voltasMs].sort((a, b) => a - b);
+    return {
+      pilotoId,
+      pontos: considerados.reduce((soma, valor) => soma + valor, 0),
+      vitorias: acumulo.vitorias,
+      segundosLugares: acumulo.segundos,
+      terceirosLugares: acumulo.terceiros,
+      melhorPosicao: acumulo.melhorPosicao,
+      melhorPosicaoUltimaEtapa: acumulo.melhorPosicaoUltima,
+      melhorVoltaMs: voltasOrdenadas[0] ?? null,
+      segundaMelhorVoltaMs: voltasOrdenadas[1] ?? null,
+      terceiraMelhorVoltaMs: voltasOrdenadas[2] ?? null,
+      voltasRapidas: acumulo.voltasRapidas,
+    };
+  });
+
+  const ordenada = ordenarClassificacaoCampeonato(estatisticas, desempates);
+  const rows = ordenada.map((estatistica, index) => ({
+    campeonato_id: campeonatoId,
+    piloto_id: estatistica.pilotoId,
+    pontos: estatistica.pontos,
+    posicao: index + 1,
+  }));
 
   if (!rows.length) return;
   await apiPut('classificacao/upsert', rows);

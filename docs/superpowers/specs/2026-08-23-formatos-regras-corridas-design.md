@@ -1,8 +1,13 @@
 # Spec — Formatos de Corrida & Regras Configuráveis (Cronometragem, Campeonatos, Resultados)
 
 Data: 2026-08-23
-Status: Proposta para validação
+Status: **Implementado** (commits `3e146b2` spec/migration, `575c1ee` feature, seguindo-se desempates)
 Relacionados: `2026-07-20-public-site-production-stabilization-design.md`, migration `0006_kart_equalizacao.sql`
+
+> **Desvios aceitos na implementação final:**
+> 1. Critérios de desempate `menos_punicoes` e `mais_poles` comparam neutros (dados não agregados localmente; punições vivem no LapTime).
+> 2. A página de detalhe LapTime (`/admin/resultados/[racingId]`) mantém renderização integral dos dados reais da cronometragem — o condicionamento por formato aplica-se aos painéis administrativos (Ao Vivo/Sessões), que são governados pelo regulamento local.
+> 3. Bônus de pole usa o vencedor quando o formato define grid via TT sem corrida de TT publicada; com corrida de TT publicada, pole = 1º colocado dela.
 
 ---
 

@@ -245,3 +245,118 @@ export function pitRulesDoFormato(formato: FormatoCorrida): PitRulesFromFormato 
     boxCloseAfterMs: formato.boxes_fecham_apos_ms ?? 42_000_000,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Classificação de campeonato — desempate configurável
+// ---------------------------------------------------------------------------
+
+/** Estatísticas agregadas por piloto, base para os critérios de desempate. */
+export type EstatisticasPiloto = {
+  pilotoId: string;
+  pontos: number;
+  vitorias: number;
+  segundosLugares: number;
+  terceirosLugares: number;
+  melhorPosicao: number | null;
+  melhorPosicaoUltimaEtapa: number | null;
+  melhorVoltaMs: number | null;
+  segundaMelhorVoltaMs: number | null;
+  terceiraMelhorVoltaMs: number | null;
+  voltasRapidas: number;
+};
+
+/**
+ * Ordena a classificação do campeonato: pontos decrescente e, em empates,
+ * a lista configurada de desempates (critérios sem dados disponíveis comparam iguais).
+ */
+export function ordenarClassificacaoCampeonato<T extends EstatisticasPiloto>(
+  pilotos: T[],
+  desempates: DesempateCriterio[] = [...DESEMPATE_CRITERIOS],
+): T[] {
+  const compara = (a: T, b: T, criterio: DesempateCriterio): number => {
+    switch (criterio) {
+      case 'total_vitorias':
+        return b.vitorias - a.vitorias;
+      case 'total_segundos_lugares':
+        return b.segundosLugares - a.segundosLugares;
+      case 'total_terceiros_lugares':
+        return b.terceirosLugares - a.terceirosLugares;
+      case 'melhor_posicao': {
+        const av = a.melhorPosicao ?? Number.MAX_SAFE_INTEGER;
+        const bv = b.melhorPosicao ?? Number.MAX_SAFE_INTEGER;
+        return av - bv;
+      }
+      case 'melhor_posicao_ultima_etapa': {
+        const av = a.melhorPosicaoUltimaEtapa ?? Number.MAX_SAFE_INTEGER;
+        const bv = b.melhorPosicaoUltimaEtapa ?? Number.MAX_SAFE_INTEGER;
+        return av - bv;
+      }
+      case 'melhor_volta': {
+        const av = a.melhorVoltaMs ?? Number.MAX_SAFE_INTEGER;
+        const bv = b.melhorVoltaMs ?? Number.MAX_SAFE_INTEGER;
+        return av - bv;
+      }
+      case 'menos_punicoes':
+        // Punições vivem no LapTime e não são agregadas localmente — critério neutro por ora.
+        return 0;
+      case 'mais_poles':
+        // Pole não é armazenada por corrida no banco local — critério neutro por ora.
+        return 0;
+      case 'mais_voltas_rapidas':
+        return b.voltasRapidas - a.voltasRapidas;
+      case 'segunda_melhor_volta': {
+        const av = a.segundaMelhorVoltaMs ?? Number.MAX_SAFE_INTEGER;
+        const bv = b.segundaMelhorVoltaMs ?? Number.MAX_SAFE_INTEGER;
+        return av - bv;
+      }
+      case 'terceira_melhor_volta': {
+        const av = a.terceiraMelhorVoltaMs ?? Number.MAX_SAFE_INTEGER;
+        const bv = b.terceiraMelhorVoltaMs ?? Number.MAX_SAFE_INTEGER;
+        return av - bv;
+      }
+      default:
+        return 0;
+    }
+  };
+
+  return [...pilotos].sort((left, right) => {
+    if (right.pontos !== left.pontos) return right.pontos - left.pontos;
+    for (const criterio of desempates) {
+      const resultado = compara(left, right, criterio);
+      if (resultado !== 0) return resultado;
+    }
+    return left.pilotoId.localeCompare(right.pilotoId);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Ordem de classificação de uma prova conforme o formato
+// ---------------------------------------------------------------------------
+
+export type LinhaClassificavel = {
+  melhorTempo: number;
+  posicaoInformada: number | null;
+};
+
+export type SessaoTipoParaOrdenacao = 'treino' | 'classificacao' | 'corrida';
+
+/**
+ * Ordenação explícita dos classificados de uma prova:
+ * - `melhor_tempo` (ou TT/combinada na sessão de classificação): melhor volta decide;
+ * - `corrida` (e combinada na corrida em si): posição informada pela cronometragem,
+ *   caindo para o melhor tempo quando a prova não reporta posições.
+ */
+export function ordenarClassificadosPorFormato<T extends LinhaClassificavel>(
+  linhas: T[],
+  fonte: ClassificacaoFonte,
+  tipoSessao: SessaoTipoParaOrdenacao,
+): T[] {
+  const usarPosicaoInformada =
+    fonte === 'corrida' || (fonte === 'combinada' && tipoSessao === 'corrida');
+  return [...linhas].sort((left, right) => {
+    if (usarPosicaoInformada && left.posicaoInformada !== null && right.posicaoInformada !== null) {
+      return left.posicaoInformada - right.posicaoInformada;
+    }
+    return left.melhorTempo - right.melhorTempo;
+  });
+}
