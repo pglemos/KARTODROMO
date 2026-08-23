@@ -61,6 +61,7 @@ function initSchema(db: NodeSqliteDb) {
     '0004_schema_fixes_and_clube.sql',
     '0005_championship_registrations.sql',
     '0006_kart_equalizacao.sql',
+    '0008_laptime_fleet_sync.sql',
   ].map((f) => path.join(process.cwd(), 'migrations', 'd1', f));
 
   // Track applied migrations

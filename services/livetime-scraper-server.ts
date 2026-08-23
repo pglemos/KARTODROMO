@@ -24,6 +24,7 @@ import {
   fetchLapTimeRacingsPage,
 } from '@/lib/livetime/laptime-racings';
 import { fetchLapTimeKartHistory } from '@/lib/livetime/kart-history';
+import { fetchLapTimeKartFleet } from '@/lib/livetime/kart-fleet';
 import { LiveTimeScraper } from './livetime-scraper';
 
 function loadLocalEnv() {
@@ -648,6 +649,22 @@ async function handleLaptimeKartHistory(url: URL, response: http.ServerResponse)
   }
 }
 
+async function handleLaptimeKartFleet(response: http.ServerResponse) {
+  const sqlOptions = resolveLaptimeSqlOptions('racings');
+  if (!sqlOptions) {
+    sendJson(response, 503, { error: 'laptime_sql_not_configured' });
+    return;
+  }
+
+  try {
+    const rows = await fetchLapTimeKartFleet(sqlOptions);
+    response.writeHead(200, { ...NO_CACHE_HEADERS, 'x-total-count': String(rows.length) });
+    response.end(JSON.stringify(rows));
+  } catch (error) {
+    sendJson(response, 502, { error: error instanceof Error ? error.message : 'laptime_sql_query_failed' });
+  }
+}
+
 const server = http.createServer((request, response) => {
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
 
@@ -753,14 +770,25 @@ const server = http.createServer((request, response) => {
     return;
   }
 
+  if (url.pathname === '/api/laptime-kart-fleet') {
+    void handleLaptimeKartFleet(response);
+    return;
+  }
+
   sendJson(response, 404, { error: 'not_found' });
 });
 
 async function main() {
-  await scraper.start();
   server.listen(port, () => {
     console.log(`LiveTime scraper listening on http://localhost:${port}/api/livetime-snapshot`);
   });
+  try {
+    await scraper.start();
+  } catch (error) {
+    // SQL-backed admin endpoints must remain available even when the optional
+    // live snapshot authenticator is temporarily unavailable.
+    console.error('LiveTime scraper start failed:', error instanceof Error ? error.message : error);
+  }
 }
 
 process.on('SIGINT', async () => {

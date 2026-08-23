@@ -20,7 +20,10 @@ const jsonRequest = async <T>(url: string, init?: RequestInit): Promise<T> => {
   return data as T;
 };
 
-export const listKarts = (): Promise<Kart[]> => apiGet<Kart[]>('karts_full?limit=500&order=numero&dir=asc');
+export const listKarts = async (): Promise<Kart[]> => {
+  const rows = await apiGet<Kart[]>('karts_full?eq_ativo=1&limit=500&order=numero&dir=asc');
+  return rows.filter((kart) => kart.ativo);
+};
 
 export const createKart = (payload: Partial<Kart>): Promise<Kart> => apiPost<Kart>('karts', payload);
 
@@ -44,9 +47,10 @@ export const listKartIdentityEvents = (kartId: string): Promise<KartIdentityEven
 export const createKartIdentityEvent = (payload: Record<string, unknown>): Promise<KartIdentityEvent> =>
   apiPost<KartIdentityEvent>('karts_identidade_historico', payload);
 
-export const getKartHistory = async (kart: Pick<Kart, 'numero' | 'sensor_numero'>): Promise<KartHistoryResponse> => {
+export const getKartHistory = async (kart: Pick<Kart, 'numero' | 'sensor_numero' | 'sensor_numero_fonte'>): Promise<KartHistoryResponse> => {
   const params = new URLSearchParams({ limit: '60' });
-  if (kart.sensor_numero?.trim()) params.set('sensor', kart.sensor_numero.trim());
+  const sensor = kart.sensor_numero?.trim() || kart.sensor_numero_fonte?.trim();
+  if (sensor) params.set('sensor', sensor);
   else params.set('plate', kart.numero);
   const rows = await jsonRequest<KartHistoryItem[]>(`/api/admin/laptime/kart-history?${params.toString()}`);
   return { rows, windows: buildKartHistoryWindows(rows) };

@@ -3,6 +3,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { requireAdminSession } from '@/lib/require-admin-session';
 import { handleAdminD1, type AdminD1Database } from '@/lib/admin-d1';
 import { getLocalSQLiteDb, isLocalSQLiteAvailable } from '@/lib/local-sqlite-db';
+import { syncKartFleetFromLiveSource } from '@/lib/kart-fleet-sync';
 
 declare global {
   interface CloudflareEnv {
@@ -18,6 +19,22 @@ async function requireSession() {
   return requireAdminSession('/admin');
 }
 
+async function syncLiveKartFleetIfNeeded(request: NextRequest, path: string[], db: AdminD1Database) {
+  if (request.method !== 'GET' || path[0] !== 'karts_full' || path.length !== 1) return null;
+
+  try {
+    const result = await syncKartFleetFromLiveSource(db);
+    if (result.ok) return null;
+    return NextResponse.json(
+      { error: 'live_fleet_unavailable', detail: result.error || 'laptime_fleet_unavailable' },
+      { status: 503 },
+    );
+  } catch (error) {
+    console.error('[admin/db] live kart fleet sync failed', error);
+    return NextResponse.json({ error: 'live_fleet_sync_failed' }, { status: 503 });
+  }
+}
+
 async function proxy(request: NextRequest, path: string[]) {
   const session = await requireSession();
 
@@ -25,6 +42,8 @@ async function proxy(request: NextRequest, path: string[]) {
   if (isLocalSQLiteAvailable()) {
     const localDb = getLocalSQLiteDb();
     if (localDb) {
+      const syncResponse = await syncLiveKartFleetIfNeeded(request, path, localDb);
+      if (syncResponse) return syncResponse;
       return handleAdminD1(request, path, localDb, session.email);
     }
   }
@@ -33,6 +52,8 @@ async function proxy(request: NextRequest, path: string[]) {
   try {
     const { env } = await getCloudflareContext({ async: true });
     if (env.KARTODROMO_ADMIN_DB) {
+      const syncResponse = await syncLiveKartFleetIfNeeded(request, path, env.KARTODROMO_ADMIN_DB);
+      if (syncResponse) return syncResponse;
       return handleAdminD1(request, path, env.KARTODROMO_ADMIN_DB, session.email);
     }
   } catch {

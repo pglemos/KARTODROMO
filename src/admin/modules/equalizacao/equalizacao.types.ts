@@ -25,6 +25,13 @@ export type Kart = {
   melhor_equalizacao_ms: number | null;
   desvio_equalizacao_ms: number | null;
   ultima_equalizacao: string | null;
+  laptime_quantity: number | null;
+  laptime_time_of_use_ms: number | null;
+  laptime_status_control: number | null;
+  laptime_updated_at: string | null;
+  sensor_numero_fonte: string | null;
+  sensor_fonte_atualizado_em: string | null;
+  data_source: string | null;
   manutencoes_pendentes: number;
 };
 
