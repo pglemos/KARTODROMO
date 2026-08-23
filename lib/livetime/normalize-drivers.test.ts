@@ -16,6 +16,12 @@ describe('normalizeDrivers', () => {
     expect(result).toEqual([{ position: 2, kart: '105', name: 'MATTEO', time: '00:33.012' }]);
   });
 
+  it('converts total times above one hour without losing the hour', () => {
+    expect(normalizeDrivers([{ position: 1, kart: 106, name: 'Equipe 106', time: '700:48.670' }])).toEqual([
+      { position: 1, kart: '106', name: 'EQUIPE 106', time: '11:40:48.670' },
+    ]);
+  });
+
   it('accepts classification data and limits to 30 drivers', () => {
     const payload = {
       classification: Array.from({ length: 35 }, (_, index) => ({

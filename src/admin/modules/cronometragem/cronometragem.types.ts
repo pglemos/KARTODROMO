@@ -1,3 +1,5 @@
+import { formatDurationMs } from '@/lib/livetime/time-format';
+
 export type SessaoTipo = 'treino' | 'classificacao' | 'corrida';
 export type SessaoStatus = 'aberta' | 'encerrada';
 
@@ -59,6 +61,51 @@ export type PilotoOption = {
   equipe: string | null;
 };
 
+export type LivePitStopStatus = 'mandatory' | 'additional' | 'short' | 'invalid' | 'outside-window';
+
+export type LivePitStop = {
+  id: string;
+  volta: number | null;
+  tempoParada: string | null;
+  tempoCorrida: string | null;
+  posicao: number | null;
+  status: LivePitStopStatus;
+  numeroObrigatoria?: number;
+};
+
+export type LivePitSummary = {
+  necessarias: number;
+  minimoMs: number;
+  voltaAtual: number | null;
+  tempoTotal: string | null;
+  tempoTotalMs: number | null;
+  validas: number;
+  faltam: number;
+  curtas: number;
+  total: number;
+  adicionais: number;
+  excedentes: number;
+  penalidadeVoltas: number;
+  foraJanela: number;
+  paradas: LivePitStop[];
+};
+
+export type LiveRaceInfo = {
+  id: string;
+  nome: string;
+  tipo: string | null;
+  inicio: string | null;
+  regras: {
+    paradasObrigatorias: number;
+    minimoParadaMs: number;
+    paradasAdicionaisPermitidas: number;
+    minimoRegistroMs: number;
+    voltasPenalidadePorParada: number;
+    boxesAbremAposMs: number;
+    boxesFechamAposMs: number;
+  };
+};
+
 export type LivePiloto = {
   posicao: number;
   nome: string;
@@ -68,11 +115,13 @@ export type LivePiloto = {
   ultimaVolta?: string;
   voltas?: number;
   gap?: string;
+  paradas?: LivePitSummary;
 };
 
 export type LiveSnapshot = {
   status: 'online' | 'offline' | 'pausado';
   pilotos: LivePiloto[];
+  corrida?: LiveRaceInfo;
   erro?: string;
   atualizadoEm?: string;
 };
@@ -82,9 +131,5 @@ export const msParaTexto = (milliseconds?: number | null): string => {
     return '—';
   }
 
-  const total = Math.round(milliseconds);
-  const minutes = Math.floor(total / 60_000);
-  const seconds = Math.floor((total % 60_000) / 1_000);
-  const millis = total % 1_000;
-  return `${minutes}:${String(seconds).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
+  return formatDurationMs(milliseconds) ?? '—';
 };

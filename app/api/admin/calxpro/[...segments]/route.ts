@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { adminCookieName, verifyAdminSession } from '@/lib/admin-auth';
+import { resolveBridgeBase, BRIDGE_FETCH_HEADERS } from '@/lib/bridge-base';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -12,12 +13,6 @@ const ALLOWED_SLUGS = new Set(['receitas', 'creditos', 'corridas', 'corrida-comp
 async function requireSession() {
   const cookieStore = await cookies();
   return verifyAdminSession(cookieStore.get(adminCookieName())?.value);
-}
-
-function resolveBridgeBase(): string | null {
-  const endpoint = process.env.LIVETIME_SNAPSHOT_ENDPOINT;
-  if (!endpoint) return null;
-  return endpoint.replace(/\/api\/livetime-snapshot.*$/, '').replace(/\/+$/, '');
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ segments: string[] }> }) {
@@ -42,7 +37,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   try {
     const response = await fetch(targetUrl, {
-      headers: { 'ngrok-skip-browser-warning': 'true' },
+      headers: BRIDGE_FETCH_HEADERS,
       signal: controller.signal,
       cache: 'no-store',
     });

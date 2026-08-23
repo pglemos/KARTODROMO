@@ -14,6 +14,10 @@ const adminFont = Rajdhani({
 export const metadata: Metadata = {
   title: 'Kartódromo Internacional de Betim',
   description: 'Site oficial e painel administrativo do Kartódromo Internacional de Betim',
+  icons: {
+    icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
+    shortcut: ['/icon.svg'],
+  },
 };
 
 export const viewport: Viewport = {

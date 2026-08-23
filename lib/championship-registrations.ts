@@ -1,5 +1,4 @@
 import crypto from 'node:crypto';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 export const championshipRegistrationsTable = 'kartodromo_campeonato_inscricoes';
 
@@ -112,48 +111,6 @@ export type ChampionshipRegistrationInput = Partial<{
   acceptedResponsibility: unknown;
   acceptedImage: unknown;
 }>;
-
-let serviceClient: SupabaseClient | null = null;
-
-const readEnv = (...keys: string[]) => {
-  for (const key of keys) {
-    const value = process.env[key];
-    if (value) return value;
-  }
-  return '';
-};
-
-export function getChampionshipServiceClient() {
-  if (serviceClient) return serviceClient;
-
-  const url = readEnv('SUPABASE_URL', 'NEXT_PUBLICSUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL');
-  const serviceKey = readEnv(
-    'SUPABASE_SERVICE_ROLE_KEY',
-    'SUPABASE_SERVICE_KEY',
-    'SUPABASE_ANON_KEY',
-    'NEXT_PUBLICSUPABASE_ANON_KEY',
-    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-  );
-
-  if (!url || !serviceKey) {
-    throw new Error('championship_registrations_storage_not_configured');
-  }
-
-  serviceClient = createClient(url, serviceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-
-  return serviceClient;
-}
-
-export function getChampionshipRegistrationsAdminKey() {
-  const key = readEnv('CHAMPIONSHIP_REGISTRATIONS_ADMIN_KEY');
-  if (!key) throw new Error('championship_registrations_admin_key_not_configured');
-  return key;
-}
 
 export function generateRegistrationProtocol() {
   const date = new Date();

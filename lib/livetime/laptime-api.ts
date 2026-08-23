@@ -1,4 +1,5 @@
 import { inferSessionTypeFromText } from '@/lib/livetime/session-type';
+import { formatDurationMs, parseDurationMs } from '@/lib/livetime/time-format';
 import type { LiveTimingDriver, LiveTimingSnapshot } from '@/lib/livetime/types';
 
 type LapTimeApiOptions = {
@@ -94,17 +95,10 @@ function cell(value: unknown): string {
 export function formatLapTimeValue(value: unknown): string {
   const raw = cell(value);
   if (!raw) return '';
-
-  const match = raw.match(/T(?<hours>\d{2}):(?<minutes>\d{2}):(?<seconds>\d{2})(?:\.(?<fraction>\d{1,6}))?/);
-  if (!match?.groups) return raw;
-
-  const hours = Number(match.groups.hours);
-  const minutes = Number(match.groups.minutes);
-  const seconds = match.groups.seconds;
-  const millis = (match.groups.fraction || '').padEnd(3, '0').slice(0, 3);
-  const totalMinutes = hours * 60 + minutes;
-
-  return `${totalMinutes}:${seconds}${millis ? `.${millis}` : ''}`;
+  const sign = raw.startsWith('+') ? '+' : '';
+  const milliseconds = parseDurationMs(raw);
+  if (milliseconds === null) return raw;
+  return `${sign}${formatDurationMs(milliseconds) ?? raw}`;
 }
 
 function driverTime(competitor: LapTimeCompetitor): string {

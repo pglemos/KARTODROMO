@@ -1,5 +1,6 @@
 import sql from 'mssql';
 import { inferSessionTypeFromText } from '@/lib/livetime/session-type';
+import { formatDurationMs, parseDurationMs } from '@/lib/livetime/time-format';
 import type { LiveTimingDriver, LiveTimingSnapshot } from '@/lib/livetime/types';
 
 export type LapTimeSqlOptions = {
@@ -45,26 +46,10 @@ function clean(value: unknown): string {
 
 function formatSqlTime(value: unknown, moduloHour = false): string {
   if (value === undefined || value === null) return '';
-
-  if (value instanceof Date) {
-    const hours = moduloHour ? 0 : value.getUTCHours();
-    const totalMinutes = hours * 60 + value.getUTCMinutes();
-    const seconds = String(value.getUTCSeconds()).padStart(2, '0');
-    const millis = String(value.getUTCMilliseconds()).padStart(3, '0');
-    return `${totalMinutes}:${seconds}.${millis}`;
-  }
-
   const raw = clean(value);
-  const match = raw.match(/(?:(?<hours>\d{1,2}):)?(?<minutes>\d{1,2}):(?<seconds>\d{2})(?:\.(?<fraction>\d{1,7}))?/);
-  if (!match?.groups) return raw;
-
-  const hours = moduloHour ? 0 : Number(match.groups.hours || 0);
-  const minutes = Number(match.groups.minutes || 0);
-  const seconds = match.groups.seconds;
-  const millis = (match.groups.fraction || '').padEnd(3, '0').slice(0, 3);
-  const totalMinutes = hours * 60 + minutes;
-
-  return `${totalMinutes}:${seconds}${millis ? `.${millis}` : ''}`;
+  const milliseconds = parseDurationMs(value);
+  if (milliseconds === null) return raw;
+  return formatDurationMs(milliseconds, { totalMinutes: moduloHour }) ?? raw;
 }
 
 function isZeroTime(value: unknown): boolean {
@@ -79,10 +64,12 @@ function driverTime(competitor: SqlCompetitorRow): string {
 }
 
 function toDriver(competitor: SqlCompetitorRow, index: number): LiveTimingDriver {
+  const registeredName = clean(competitor.Competitor) || clean(competitor.ShortName);
+
   return {
     position: Number(competitor.Pos) > 0 ? Number(competitor.Pos) : index + 1,
     kart: clean(competitor.Number || competitor.Transponder),
-    name: clean(competitor.ShortName || competitor.Competitor).toUpperCase(),
+    name: registeredName.toUpperCase(),
     time: driverTime(competitor),
   };
 }
@@ -181,7 +168,7 @@ async function fetchDrivers(pool: sql.ConnectionPool, racingId: number): Promise
     .map(toDriver)
     .filter((driver) => driver.position > 0 && driver.kart.trim() && driver.name.trim())
     .sort((a, b) => a.position - b.position)
-    .slice(0, 30);
+    .slice(0, 60);
 }
 
 async function fetchRacingWithDrivers(pool: sql.ConnectionPool): Promise<{ racing: SqlRacingRow | null; drivers: LiveTimingDriver[] }> {

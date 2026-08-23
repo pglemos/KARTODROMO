@@ -8,11 +8,21 @@ import { TELAO_LAYOUT_PRESETS } from '@/lib/telao-layout-config';
 import { readTelaoLayoutConfig, telaoLayoutStoreStatus, writeTelaoLayoutConfigToFile } from '@/lib/telao-layout-store';
 import { readTb50Page, tb50PageStoreStatus, writeTb50PageToFile } from '@/lib/tb50-page-store';
 import { listViplexPrograms, provisionViplexHtmlProgram, startViplexProgram } from '@/lib/viplex-programs';
+import { readTelaoPlaylistFromStore, telaoPlaylistStoreStatus, writeTelaoPlaylist } from '@/lib/telao-playlist-store';
 import { fetchClientesPage } from '@/lib/livetime/cliente-unificado';
 import { fetchCalXProCreditosPage, fetchCalXProReceitasPage } from '@/lib/livetime/calxpro-receitas';
 import { fetchCalXProCorridaCompetidores, fetchCalXProCorridasPage } from '@/lib/livetime/calxpro-corridas';
 import { fetchLapTimeBookingCustomers, fetchLapTimeBookingsPage } from '@/lib/livetime/laptime-bookings';
-import { fetchLapTimeRacingCompetitors, fetchLapTimeRacingsPage } from '@/lib/livetime/laptime-racings';
+import {
+  fetchLapTimeCurrentPitData,
+  type LapTimeRacingPitData,
+} from '@/lib/livetime/laptime-pit-stops';
+import {
+  fetchLapTimeRacingDetail,
+  fetchLapTimeRacingCompetitors,
+  fetchLapTimeRacingLaps,
+  fetchLapTimeRacingsPage,
+} from '@/lib/livetime/laptime-racings';
 import { LiveTimeScraper } from './livetime-scraper';
 
 function loadLocalEnv() {
@@ -146,6 +156,66 @@ const scraper = new LiveTimeScraper({
   pollMs: Number(process.env.LIVETIME_SCRAPER_POLL_MS || '2000'),
 });
 
+const livePitCacheMs = Math.max(1_000, Number(process.env.LIVETIME_PIT_CACHE_MS || '3000'));
+let livePitCache: { data: LapTimeRacingPitData | null; expiresAt: number } | null = null;
+let livePitRequest: Promise<LapTimeRacingPitData | null> | null = null;
+
+async function getCurrentPitData(): Promise<LapTimeRacingPitData | null> {
+  const now = Date.now();
+  if (livePitCache && livePitCache.expiresAt > now) return livePitCache.data;
+  if (livePitRequest) return livePitRequest;
+
+  const sqlOptions = resolveLaptimeSqlOptions('racings');
+  if (!sqlOptions) {
+    livePitCache = { data: null, expiresAt: now + livePitCacheMs };
+    return null;
+  }
+
+  livePitRequest = fetchLapTimeCurrentPitData(sqlOptions)
+    .catch((error: unknown) => {
+      console.error('[livetime] pit stop query failed:', error instanceof Error ? error.message : error);
+      return null;
+    })
+    .then((data) => {
+      livePitCache = { data, expiresAt: Date.now() + livePitCacheMs };
+      return data;
+    })
+    .finally(() => {
+      livePitRequest = null;
+    });
+
+  return livePitRequest;
+}
+
+function mergePitData(snapshot: ReturnType<typeof scraper.getSnapshot>, pitData: LapTimeRacingPitData | null) {
+  if (!pitData) return snapshot;
+
+  const summariesByKart = new Map(
+    pitData.summaries
+      .filter((summary) => summary.kart)
+      .map((summary) => [summary.kart, summary] as const),
+  );
+  const driversByKart = new Map(snapshot.drivers.map((driver) => [driver.kart, driver] as const));
+  const drivers = snapshot.drivers.map((driver) => ({
+    ...driver,
+    pitStops: driver.kart ? summariesByKart.get(driver.kart) : undefined,
+  }));
+
+  for (const summary of pitData.summaries) {
+    if (!summary.kart || driversByKart.has(summary.kart)) continue;
+    drivers.push({
+      position: summary.position || drivers.length + 1,
+      kart: summary.kart,
+      name: summary.name,
+      time: '',
+      pitStops: summary,
+    });
+  }
+
+  drivers.sort((left, right) => left.position - right.position);
+  return { ...snapshot, race: pitData.race, drivers };
+}
+
 const NO_CACHE_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
   'cache-control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
@@ -241,6 +311,33 @@ async function handlePage(request: http.IncomingMessage, response: http.ServerRe
       });
     } catch (error) {
       sendJson(response, 400, { error: error instanceof Error ? error.message : 'invalid_page' });
+    }
+    return;
+  }
+
+  sendJson(response, 405, { error: 'method_not_allowed' });
+}
+
+async function handlePlaylist(request: http.IncomingMessage, response: http.ServerResponse) {
+  if (request.method === 'GET') {
+    const playlist = await readTelaoPlaylistFromStore();
+    sendJson(response, 200, {
+      playlist,
+      store: { ...telaoPlaylistStoreStatus(), localEndpoint: true },
+    });
+    return;
+  }
+
+  if (request.method === 'PUT') {
+    try {
+      const body = JSON.parse(await readBody(request));
+      const playlist = await writeTelaoPlaylist(body?.items ?? body);
+      sendJson(response, 200, {
+        playlist,
+        store: { ...telaoPlaylistStoreStatus(), localEndpoint: true },
+      });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : 'invalid_playlist' });
     }
     return;
   }
@@ -472,6 +569,57 @@ async function handleLaptimeRacingCompetitors(url: URL, response: http.ServerRes
   }
 }
 
+async function handleLaptimeRacingDetail(url: URL, response: http.ServerResponse) {
+  const sqlOptions = resolveLaptimeSqlOptions('racings');
+  if (!sqlOptions) {
+    sendJson(response, 503, { error: 'laptime_sql_not_configured' });
+    return;
+  }
+
+  const racingId = url.searchParams.get('racingId');
+  if (!racingId) {
+    sendJson(response, 400, { error: 'racingId_required' });
+    return;
+  }
+
+  try {
+    const detail = await fetchLapTimeRacingDetail(sqlOptions, racingId);
+    if (!detail) {
+      sendJson(response, 404, { error: 'racing_not_found' });
+      return;
+    }
+    sendJson(response, 200, detail);
+  } catch (error) {
+    sendJson(response, 502, { error: error instanceof Error ? error.message : 'laptime_sql_query_failed' });
+  }
+}
+
+async function handleLaptimeRacingLaps(url: URL, response: http.ServerResponse) {
+  const sqlOptions = resolveLaptimeSqlOptions('racings');
+  if (!sqlOptions) {
+    sendJson(response, 503, { error: 'laptime_sql_not_configured' });
+    return;
+  }
+
+  const racingId = url.searchParams.get('racingId');
+  const racingCompetitorId = url.searchParams.get('racingCompetitorId');
+  if (!racingId || !racingCompetitorId) {
+    sendJson(response, 400, { error: 'racingId_and_racingCompetitorId_required' });
+    return;
+  }
+
+  try {
+    const { rows, total } = await fetchLapTimeRacingLaps(sqlOptions, racingId, racingCompetitorId, {
+      limit: url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : undefined,
+      offset: url.searchParams.get('offset') ? Number(url.searchParams.get('offset')) : undefined,
+    });
+    response.writeHead(200, { ...NO_CACHE_HEADERS, 'x-total-count': String(total) });
+    response.end(JSON.stringify(rows));
+  } catch (error) {
+    sendJson(response, 502, { error: error instanceof Error ? error.message : 'laptime_sql_query_failed' });
+  }
+}
+
 const server = http.createServer((request, response) => {
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
 
@@ -500,13 +648,20 @@ const server = http.createServer((request, response) => {
     return;
   }
 
+  if (url.pathname === '/api/telao-playlist-local' || url.pathname === '/api/telao-playlist') {
+    void handlePlaylist(request, response);
+    return;
+  }
+
   if (url.pathname === '/api/viplex-programs-local' || url.pathname === '/api/viplex-programs') {
     void handleViplexPrograms(request, response);
     return;
   }
 
   if (url.pathname === '/api/livetime-snapshot') {
-    sendJson(response, 200, scraper.getSnapshot());
+    void getCurrentPitData().then((pitData) => {
+      sendJson(response, 200, mergePitData(scraper.getSnapshot(), pitData));
+    });
     return;
   }
 
@@ -552,6 +707,16 @@ const server = http.createServer((request, response) => {
 
   if (url.pathname === '/api/laptime-racing-competitors') {
     void handleLaptimeRacingCompetitors(url, response);
+    return;
+  }
+
+  if (url.pathname === '/api/laptime-racing-detail') {
+    void handleLaptimeRacingDetail(url, response);
+    return;
+  }
+
+  if (url.pathname === '/api/laptime-racing-laps') {
+    void handleLaptimeRacingLaps(url, response);
     return;
   }
 

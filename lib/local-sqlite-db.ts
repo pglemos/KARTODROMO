@@ -59,6 +59,7 @@ function initSchema(db: NodeSqliteDb) {
     '0002_inventory_integrity.sql',
     '0003_comprehensive_seed.sql',
     '0004_schema_fixes_and_clube.sql',
+    '0005_championship_registrations.sql',
   ].map((f) => path.join(process.cwd(), 'migrations', 'd1', f));
 
   // Track applied migrations

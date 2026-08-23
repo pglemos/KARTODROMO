@@ -5,6 +5,12 @@ import type { LiveTimingSnapshot } from '@/lib/livetime/types';
 
 export const dynamic = 'force-dynamic';
 
+const NO_CACHE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+  Expires: '0',
+  Pragma: 'no-cache',
+};
+
 function withUid(endpoint: string, uid: string): string {
   if (endpoint.includes('{uid}')) return endpoint.split('{uid}').join(encodeURIComponent(uid));
   const url = new URL(endpoint);
@@ -31,11 +37,14 @@ export async function GET(request: NextRequest) {
   const endpoint = process.env.LIVETIME_ENDPOINT;
 
   if (!endpoint) {
-    return NextResponse.json(createDemoSnapshot('LIVETIME_ENDPOINT nao configurado'));
+    return NextResponse.json(createDemoSnapshot('LIVETIME_ENDPOINT nao configurado'), {
+      headers: NO_CACHE_HEADERS,
+    });
   }
 
   try {
-    const timeoutMs = Number(process.env.LIVETIME_TIMEOUT_MS || '3000');
+    const configuredTimeoutMs = Number(process.env.LIVETIME_TIMEOUT_MS || '10000');
+    const timeoutMs = Number.isFinite(configuredTimeoutMs) ? Math.max(configuredTimeoutMs, 10000) : 10000;
     const response = await fetchWithTimeout(withUid(endpoint, uid), timeoutMs);
 
     if (!response.ok) {
@@ -46,7 +55,7 @@ export async function GET(request: NextRequest) {
         message: `LiveTime HTTP ${response.status}`,
         drivers: [],
       };
-      return NextResponse.json(snapshot, { status: 502 });
+      return NextResponse.json(snapshot, { status: 502, headers: NO_CACHE_HEADERS });
     }
 
     const raw = await response.json();
@@ -58,7 +67,7 @@ export async function GET(request: NextRequest) {
       drivers,
     };
 
-    return NextResponse.json(snapshot);
+    return NextResponse.json(snapshot, { headers: NO_CACHE_HEADERS });
   } catch (error) {
     const snapshot: LiveTimingSnapshot = {
       status: 'error',
@@ -67,6 +76,6 @@ export async function GET(request: NextRequest) {
       message: error instanceof Error ? error.message : 'Erro ao consultar LiveTime',
       drivers: [],
     };
-    return NextResponse.json(snapshot, { status: 502 });
+    return NextResponse.json(snapshot, { status: 502, headers: NO_CACHE_HEADERS });
   }
 }

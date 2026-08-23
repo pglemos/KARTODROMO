@@ -5,6 +5,7 @@ describe('formatLapTimeValue', () => {
   it('formats LapTime SQL datetime values as timing cells', () => {
     expect(formatLapTimeValue('2026-05-22T00:01:06.618-03:00')).toBe('1:06.618');
     expect(formatLapTimeValue('2026-05-21T00:30:17.757796')).toBe('30:17.757');
+    expect(formatLapTimeValue('2026-05-21T11:40:48.670')).toBe('11:40:48.670');
   });
 });
 
