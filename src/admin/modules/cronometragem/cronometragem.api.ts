@@ -3,6 +3,10 @@ import type {
   CampeonatoOption,
   EtapaOption,
   LivePiloto,
+  LivePitStop,
+  LivePitStopStatus,
+  LivePitSummary,
+  LiveRaceInfo,
   LiveSnapshot,
   PilotoOption,
   Sessao,
@@ -67,6 +71,90 @@ const toMilliseconds = (value: unknown): number | undefined => {
   return undefined;
 };
 
+const pitStopStatuses: readonly LivePitStopStatus[] = [
+  'mandatory',
+  'additional',
+  'short',
+  'invalid',
+  'outside-window',
+];
+
+const normalizePitStop = (value: unknown, index: number): LivePitStop | null => {
+  if (!isRecord(value)) return null;
+  const rawStatus = toText(firstValue(value, ['status', 'situacao'])) as LivePitStopStatus | undefined;
+  const status = rawStatus && pitStopStatuses.includes(rawStatus) ? rawStatus : 'invalid';
+  const id = toText(firstValue(value, ['id', 'idPassing', 'id_passing'])) ?? `parada-${index + 1}`;
+
+  return {
+    id,
+    volta: toInteger(firstValue(value, ['lap', 'volta'] )) ?? null,
+    tempoParada: toText(firstValue(value, ['stopTime', 'tempoParada', 'tempo_parada'])) ?? null,
+    tempoCorrida: toText(firstValue(value, ['raceTime', 'tempoCorrida', 'tempo_corrida'])) ?? null,
+    posicao: toInteger(firstValue(value, ['position', 'posicao', 'pos'])) ?? null,
+    status,
+    ...(toInteger(firstValue(value, ['mandatoryNumber', 'numeroObrigatoria', 'numero_obrigatoria'])) !== undefined
+      ? { numeroObrigatoria: toInteger(firstValue(value, ['mandatoryNumber', 'numeroObrigatoria', 'numero_obrigatoria'])) }
+      : {}),
+  };
+};
+
+const normalizePitSummary = (value: unknown): LivePitSummary | undefined => {
+  if (!isRecord(value)) return undefined;
+  const stopsValue = firstValue(value, ['stops', 'paradas']);
+  const paradas = Array.isArray(stopsValue)
+    ? stopsValue.map(normalizePitStop).filter((stop): stop is LivePitStop => stop !== null)
+    : [];
+  const necessarias = toInteger(firstValue(value, ['required', 'necessarias', 'paradasObrigatorias'])) ?? 11;
+
+  return {
+    necessarias: Math.max(0, necessarias),
+    minimoMs: Math.max(0, toInteger(firstValue(value, ['minimumStopMs', 'minimoMs', 'minimoParadaMs'])) ?? 420_000),
+    voltaAtual: toInteger(firstValue(value, ['currentLap', 'voltaAtual', 'volta_atual'])) ?? null,
+    tempoTotal: toText(firstValue(value, ['currentRaceTime', 'tempoTotal', 'tempo_total'])) ?? null,
+    tempoTotalMs: toInteger(firstValue(value, ['currentRaceTimeMs', 'tempoTotalMs', 'tempo_total_ms'])) ?? null,
+    validas: Math.max(0, toInteger(firstValue(value, ['mandatory', 'validas', 'paradasValidas'])) ?? 0),
+    faltam: Math.max(0, toInteger(firstValue(value, ['remaining', 'faltam', 'faltamObrigatorias'])) ?? 0),
+    curtas: Math.max(0, toInteger(firstValue(value, ['short', 'curtas', 'paradasCurtas'])) ?? 0),
+    total: Math.max(0, toInteger(firstValue(value, ['total', 'totalStops', 'totalParadas'])) ?? 0),
+    adicionais: Math.max(0, toInteger(firstValue(value, ['additional', 'adicionais', 'paradasAdicionais'])) ?? 0),
+    excedentes: Math.max(0, toInteger(firstValue(value, ['excess', 'excedentes', 'paradasExcedentes'])) ?? 0),
+    penalidadeVoltas: Math.max(0, toInteger(firstValue(value, ['penaltyLaps', 'penalidadeVoltas', 'penalidade_voltas'])) ?? 0),
+    foraJanela: Math.max(0, toInteger(firstValue(value, ['outsideWindow', 'foraJanela', 'fora_janela'])) ?? 0),
+    paradas,
+  };
+};
+
+const normalizeLiveRace = (payload: unknown): LiveRaceInfo | undefined => {
+  if (!isRecord(payload)) return undefined;
+  const value = firstValue(payload, ['race', 'corrida', 'currentRace']);
+  if (!isRecord(value)) return undefined;
+
+  const id = toText(firstValue(value, ['id', 'raceId', 'idRacing']));
+  const nome = toText(firstValue(value, ['name', 'nome', 'eventName']));
+  if (!id && !nome) return undefined;
+
+  const rulesValue = firstValue(value, ['rules', 'regras']);
+  const rules = isRecord(rulesValue) ? rulesValue : {};
+  const ruleInteger = (keys: readonly string[], fallback: number) =>
+    Math.max(0, toInteger(firstValue(rules, keys)) ?? fallback);
+
+  return {
+    id: id ?? '',
+    nome: nome ?? 'Sessão ao vivo',
+    tipo: toText(firstValue(value, ['type', 'tipo'])) ?? null,
+    inicio: toText(firstValue(value, ['startedAt', 'inicio', 'startDateTime'])) ?? null,
+    regras: {
+      paradasObrigatorias: ruleInteger(['requiredStops', 'paradasObrigatorias'], 11),
+      minimoParadaMs: ruleInteger(['minimumStopMs', 'minimoParadaMs'], 420_000),
+      paradasAdicionaisPermitidas: ruleInteger(['additionalStopsAllowed', 'paradasAdicionaisPermitidas'], 4),
+      minimoRegistroMs: ruleInteger(['candidateStopMinMs', 'minimoRegistroMs'], 240_000),
+      voltasPenalidadePorParada: ruleInteger(['penaltyLapsPerStop', 'voltasPenalidadePorParada'], 7),
+      boxesAbremAposMs: ruleInteger(['boxOpenAfterMs', 'boxesAbremAposMs'], 600_000),
+      boxesFechamAposMs: ruleInteger(['boxCloseAfterMs', 'boxesFechamAposMs'], 42 * 60 * 60_000),
+    },
+  };
+};
+
 const findPilotoArray = (payload: unknown): unknown[] => {
   if (Array.isArray(payload)) return payload;
   if (!isRecord(payload)) return [];
@@ -103,6 +191,7 @@ const normalizeLivePiloto = (value: unknown, index: number): LivePiloto | null =
     'melhor_volta',
     'best_lap',
     'bestTime',
+    'time',
   ]);
   const melhorVoltaMs = toMilliseconds(melhorRaw);
   const melhorVoltaTexto = toText(melhorRaw);
@@ -113,6 +202,7 @@ const normalizeLivePiloto = (value: unknown, index: number): LivePiloto | null =
   );
   const voltas = toInteger(firstValue(value, ['voltas', 'laps', 'lapCount', 'lap_count']));
   const gap = toText(firstValue(value, ['gap', 'interval', 'diferenca', 'difference']));
+  const paradas = normalizePitSummary(firstValue(value, ['pitStops', 'paradas', 'pitSummary', 'pit_summary']));
 
   return {
     posicao: Math.max(1, posicao),
@@ -123,6 +213,7 @@ const normalizeLivePiloto = (value: unknown, index: number): LivePiloto | null =
     ...(ultimaVolta ? { ultimaVolta } : {}),
     ...(voltas !== undefined ? { voltas: Math.max(0, voltas) } : {}),
     ...(gap ? { gap } : {}),
+    ...(paradas ? { paradas } : {}),
   };
 };
 
@@ -218,7 +309,12 @@ export const fetchLiveSnapshot = async (url = DEFAULT_LIVE_URL): Promise<LiveSna
       .sort((left, right) => left.posicao - right.posicao);
 
     if (!pilotos.length) throw new Error('O endpoint não retornou pilotos reconhecíveis.');
-    return { status: 'online', pilotos, atualizadoEm: new Date().toISOString() };
+    return {
+      status: 'online',
+      pilotos,
+      corrida: normalizeLiveRace(payload),
+      atualizadoEm: new Date().toISOString(),
+    };
   } catch (error: unknown) {
     return {
       status: 'offline',

@@ -1,5 +1,6 @@
 import { createDemoSnapshot } from '@/lib/livetime/demo-data';
 import type { LiveTimingSnapshot } from '@/lib/livetime/types';
+import { resolveSnapshotEndpoint } from '@/lib/bridge-base';
 
 function resolveExternalUrl(endpoint: string, uid: string): string {
   if (endpoint.includes('{uid}')) return endpoint.split('{uid}').join(encodeURIComponent(uid));
@@ -9,10 +10,11 @@ function resolveExternalUrl(endpoint: string, uid: string): string {
 }
 
 export async function fetchExternalSnapshot(uid: string): Promise<LiveTimingSnapshot> {
-  const endpoint = process.env.LIVETIME_SNAPSHOT_ENDPOINT;
+  const endpoint = resolveSnapshotEndpoint();
   if (!endpoint) return createDemoSnapshot('LIVETIME_SNAPSHOT_ENDPOINT nao configurado');
 
-  const timeoutMs = Number(process.env.LIVETIME_TIMEOUT_MS || '3000');
+  const configuredTimeoutMs = Number(process.env.LIVETIME_TIMEOUT_MS || '10000');
+  const timeoutMs = Number.isFinite(configuredTimeoutMs) ? Math.max(configuredTimeoutMs, 10000) : 10000;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 

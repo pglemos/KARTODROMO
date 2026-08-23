@@ -2,6 +2,7 @@
 // Só expõe corridas que passaram no filtro isUltrasRacing e que terminaram.
 import sql from 'mssql';
 import { matchUltrasRacing, ultrasFilterSummary } from '@/lib/livetime/ultras-filter';
+import { racingTypeToSessionKind } from '@/lib/udk-bridge/transform';
 import type { UltrasFilterOptions } from '@/lib/livetime/ultras-filter';
 import type { LapTimeCompetitorRow, LapTimeRacingFull, LapTimeRacingRow } from '@/lib/udk-bridge/types';
 
@@ -97,8 +98,11 @@ async function fetchFinishedRacings(pool: sql.ConnectionPool, filterOptions: Ult
       eventName: racing.RacingEventName,
     };
     const match = matchUltrasRacing(candidate, filterOptions);
-    if (match.kind === 'id' || (match.kind === 'text' && filterOptions.allowTextOnly)) {
+    const isRace = racingTypeToSessionKind(racing.Id_RacingType, racing.RacingTypeName) === 'race';
+    if (isRace && (match.kind === 'id' || (match.kind === 'text' && filterOptions.allowTextOnly))) {
       accepted.push(racing);
+    } else if (!isRace) {
+      rejected.push(`#${racing.Id_Racing} (${racing.RacingGroupName || '-'}): sessão não é corrida (${racing.RacingTypeName || '?'})`);
     } else {
       rejected.push(`#${racing.Id_Racing} (${racing.RacingGroupName || '-'}): ${match.reason}`);
     }

@@ -45,6 +45,7 @@ const tick = async (): Promise<UdkBridgeSyncResult> => {
         seasonId: config.seasonId,
         categoryMapping: config.categoryMapping,
         stages: config.stages,
+        nameMatchMinScore: config.nameMatchMinScore,
       },
       udk,
       filter: { allowTextOnly: config.allowTextOnly },
@@ -72,6 +73,7 @@ function statusBody(): Record<string, unknown> {
     pollIntervalMs: config.pollIntervalMs,
     sqlSource: `${config.sqlSource.server}\\${config.sqlSource.instanceName || ''} ${config.sqlSource.database}`,
     allowTextOnly: config.allowTextOnly,
+    nameMatchMinScore: config.nameMatchMinScore,
     // Sempre DRAFT: garantia da missão (nunca publica automaticamente).
     writeMode: 'draft-only',
   };
@@ -114,7 +116,7 @@ server.listen(port, () => {
   console.log(`[udk-bridge] HTTP status em http://localhost:${port}/api/bridge/status`);
 });
 
-void tick();
+void tick().catch((error) => console.error('[udk-bridge] erro no ciclo inicial:', error instanceof Error ? error.message : String(error)));
 setInterval(() => void tick().catch((error) => console.error('[udk-bridge] erro no ciclo:', error.message)), config.pollIntervalMs);
 
 const shutdown = (): void => {

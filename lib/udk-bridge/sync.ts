@@ -26,8 +26,10 @@ export async function syncFinishedUltrasToUdk(options: {
   const races = await fetchFinishedUltrasRacings(sqlSource, filter);
   result.scanned = races.length;
 
-  const driverByNumber = await udk.listDrivers(config);
-  console.log(`[udk-bridge] pilotos UDK mapeados por kart: ${driverByNumber.size}`);
+  const drivers = await udk.listDrivers(config);
+  console.log(
+    `[udk-bridge] pilotos UDK: ${drivers.size} cadastrados (${drivers.byNumber.size} com kart) — fallback por nome com confiança mínima ${config.nameMatchMinScore ?? 0.8}`,
+  );
 
   for (const race of races) {
     const racingId = race.racing.Id_Racing;
@@ -51,18 +53,19 @@ export async function syncFinishedUltrasToUdk(options: {
       const entries = markFastestLap(buildEntriesDraft(race.competitors), race.competitors);
       const fastest = fastestLapMillis(race.competitors);
 
-      const synced = await udk.syncRace(racingId, { ...payload, fastest_lap_ms: fastest }, entries, driverByNumber, {
+      const synced = await udk.syncRace(racingId, { ...payload, fastest_lap_ms: fastest }, entries, drivers, {
         ...summary,
         endurance,
         syncedAt: new Date().toISOString(),
-      });
+      }, config.nameMatchMinScore ?? 0.8);
 
       console.log(
         `[udk-bridge] #${racingId} "${payload.title}": ${synced.result.kind}${synced.result.kind === 'updated' ? ` (${synced.result.entriesInserted} inseridas, ${synced.result.entriesUpdated} atualizadas)` : ''} batch=${synced.batchId || '-'}`,
       );
       result.imported += 1;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message =
+        error instanceof Error ? error.message : typeof error === 'object' && error !== null ? JSON.stringify(error) : String(error);
       console.error(`[udk-bridge] #${racingId} falhou: ${message}`);
       result.failures.push({ racingId, error: message });
     }

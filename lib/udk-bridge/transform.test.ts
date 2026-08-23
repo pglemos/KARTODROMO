@@ -173,11 +173,11 @@ describe('buildResultDraft', () => {
 });
 
 describe('competitorDisplayName', () => {
-  it('prefere ShortName ao nome completo', () => {
-    expect(competitorDisplayName(competitor())).toBe('CRM');
+  it('prefere o nome completo (Competitor) à sigla ShortName', () => {
+    expect(competitorDisplayName(competitor())).toBe('CRISTIANO MIRANDA');
   });
 
-  it('cai para Competitor quando não há ShortName', () => {
-    expect(competitorDisplayName(competitor({ ShortName: undefined }))).toBe('CRISTIANO MIRANDA');
+  it('cai para ShortName quando não há nome completo', () => {
+    expect(competitorDisplayName(competitor({ Competitor: undefined }))).toBe('CRM');
   });
 });

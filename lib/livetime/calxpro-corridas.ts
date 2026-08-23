@@ -1,5 +1,6 @@
 import sql from 'mssql';
 import type { LapTimeSqlOptions } from '@/lib/livetime/laptime-sql';
+import { formatDurationMs, parseDurationMs } from '@/lib/livetime/time-format';
 
 export type CalXProCorrida = {
   id: string;
@@ -51,14 +52,10 @@ function clean(value: unknown): string {
 
 function formatSqlTime(value: unknown): string | null {
   if (value === undefined || value === null) return null;
-  if (value instanceof Date) {
-    const totalMinutes = value.getUTCHours() * 60 + value.getUTCMinutes();
-    const seconds = String(value.getUTCSeconds()).padStart(2, '0');
-    const millis = String(value.getUTCMilliseconds()).padStart(3, '0');
-    return `${totalMinutes}:${seconds}.${millis}`;
-  }
   const raw = clean(value);
-  return raw || null;
+  if (!raw) return null;
+  const milliseconds = parseDurationMs(value);
+  return milliseconds === null ? raw : formatDurationMs(milliseconds);
 }
 
 function toCorrida(row: CorridaRow): CalXProCorrida {

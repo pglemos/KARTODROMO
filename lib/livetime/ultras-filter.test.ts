@@ -34,6 +34,12 @@ describe('matchUltrasRacing', () => {
     }
   });
 
+  it('reconhece o grupo ULTRAS - ENDURENCE (250347) criado pela operação', () => {
+    const match = matchUltrasRacing(racing({ racingGroupId: 250347, groupName: 'ULTRAS - ENDURENCE' }));
+    expect(match.kind).toBe('id');
+    expect(isUltrasRacing(racing({ racingGroupId: 250347 }))).toBe(true);
+  });
+
   it('rejeita corrida sem vínculo ULTRAS', () => {
     const match = matchUltrasRacing(racing());
     expect(match.kind).toBe('none');

@@ -82,6 +82,9 @@ export type UdkResultDraft = {
 
 export type UdkResultEntryDraft = {
   driver_id: string;
+  // Nome do competidor no LapTime, usado apenas para o fallback por nome
+  // (nunca é enviado ao banco).
+  driver_name?: string | null;
   position: number;
   kart_number?: number | null;
   laps: number;
@@ -113,6 +116,8 @@ export type UdkBridgeConfig = {
   categoryMapping: Record<number, string>;
   // Map para sessões UDK por etapa: stage_id -> { sessionId, name, kind }.
   stages: Record<string, { sessionId: string | null; name: string; kind: string }[]>;
+  // Confiança mínima (0..1) para o fallback por nome. Default 0.8.
+  nameMatchMinScore?: number;
   // Campos de tempo (horas) usados pelo LapTime como base para tempos.
   timeBaseHours?: number;
 };

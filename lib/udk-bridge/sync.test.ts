@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { syncFinishedUltrasToUdk } from '@/lib/udk-bridge/sync';
+import { DriverMatchIndex } from '@/lib/udk-bridge/driver-match';
 import type { UdkClient } from '@/lib/udk-bridge/client';
 import type { UdkBridgeConfig } from '@/lib/udk-bridge/types';
 
@@ -23,7 +24,9 @@ const sqlSource = {
 
 function makeUdkMock(overrides: Partial<UdkClient> = {}): UdkClient {
   return {
-    listDrivers: vi.fn(async () => new Map([[78, 'driver-78']])),
+    listDrivers: vi.fn(
+      async () => new DriverMatchIndex([{ id: 'driver-78', number: 78, name: 'Cristiano Miranda' }]),
+    ),
     syncRace: vi.fn(async () => ({
       racingId: 627099,
       result: { kind: 'created' as const, resultId: 'result-1' },
@@ -79,6 +82,10 @@ describe('syncFinishedUltrasToUdk', () => {
     expect(payload.status).toBe('draft');
     expect(payload.source_system).toBe('laptime');
     expect(payload.external_racing_id).toBe(627099);
+    const entries = vi.mocked(udk.syncRace).mock.calls[0][2];
+    expect(entries[0].driver_name).toBe('CRISTIANO MIRANDA');
+    expect(vi.mocked(udk.syncRace).mock.calls[0][3]).toBeInstanceOf(DriverMatchIndex);
+    expect(vi.mocked(udk.syncRace).mock.calls[0][5]).toBe(0.8);
   });
 
   it('registra falha sem abortar o ciclo', async () => {

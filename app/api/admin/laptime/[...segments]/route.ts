@@ -1,23 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { adminCookieName, verifyAdminSession } from '@/lib/admin-auth';
+import { resolveBridgeBase, BRIDGE_FETCH_HEADERS } from '@/lib/bridge-base';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const TIMEOUT_MS = Number(process.env.LAPTIME_BRIDGE_TIMEOUT_MS || '8000');
+const configuredTimeoutMs = Number(process.env.LAPTIME_BRIDGE_TIMEOUT_MS || '30000');
+const TIMEOUT_MS = Number.isFinite(configuredTimeoutMs) ? Math.max(configuredTimeoutMs, 30000) : 30000;
 
-const ALLOWED_SLUGS = new Set(['bookings', 'booking-customers', 'racings', 'racing-competitors']);
+const ALLOWED_SLUGS = new Set([
+  'bookings',
+  'booking-customers',
+  'racings',
+  'racing-competitors',
+  'racing-detail',
+  'racing-laps',
+]);
 
 async function requireSession() {
   const cookieStore = await cookies();
   return verifyAdminSession(cookieStore.get(adminCookieName())?.value);
-}
-
-function resolveBridgeBase(): string | null {
-  const endpoint = process.env.LIVETIME_SNAPSHOT_ENDPOINT;
-  if (!endpoint) return null;
-  return endpoint.replace(/\/api\/livetime-snapshot.*$/, '').replace(/\/+$/, '');
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ segments: string[] }> }) {
@@ -42,13 +45,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   try {
     const response = await fetch(targetUrl, {
-      headers: { 'ngrok-skip-browser-warning': 'true' },
+      headers: BRIDGE_FETCH_HEADERS,
       signal: controller.signal,
       cache: 'no-store',
     });
 
     const text = await response.text();
-    const headers: Record<string, string> = { 'content-type': 'application/json; charset=utf-8' };
+    const headers: Record<string, string> = {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+      expires: '0',
+      pragma: 'no-cache',
+    };
     const totalCount = response.headers.get('x-total-count');
     if (totalCount) headers['x-total-count'] = totalCount;
 

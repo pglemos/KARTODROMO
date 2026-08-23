@@ -1,10 +1,10 @@
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  getChampionshipRegistrationsAdminKey,
-  getChampionshipServiceClient,
   type ChampionshipRegistrationStatus,
 } from '@/lib/championship-registrations';
+import { getCloudflareAdminDb } from '@/lib/cloudflare-admin-db';
+import { updateChampionshipRegistration } from '@/lib/championship-registrations-d1';
 import { adminCookieName, verifyAdminSession } from '@/lib/admin-auth';
 
 export const dynamic = 'force-dynamic';
@@ -55,21 +55,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const supabase = getChampionshipServiceClient();
-    const { data, error } = await supabase.rpc('kartodromo_update_campeonato_inscricao', {
-      p_admin_key: getChampionshipRegistrationsAdminKey(),
-      p_admin_notes: update.admin_notes ?? null,
-      p_id: id,
-      p_status: update.status ?? null,
-    });
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json(data);
+    const db = await getCloudflareAdminDb();
+    if (!db) return NextResponse.json({ error: 'cloudflare_d1_not_configured' }, { status: 503 });
+    return NextResponse.json(await updateChampionshipRegistration(db, id, update));
   } catch (error) {
     const message = error instanceof Error ? error.message : 'championship_registration_update_failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: message.endsWith('_not_found') ? 404 : 500 });
   }
 }

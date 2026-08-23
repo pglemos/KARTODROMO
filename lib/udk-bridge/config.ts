@@ -18,6 +18,7 @@ export type BridgeEnv = {
   };
   pollIntervalMs: number;
   allowTextOnly: boolean;
+  nameMatchMinScore: number;
 };
 
 export function loadBridgeConfig(env: NodeJS.ProcessEnv = process.env): BridgeEnv {
@@ -76,5 +77,6 @@ export function loadBridgeConfig(env: NodeJS.ProcessEnv = process.env): BridgeEn
     },
     pollIntervalMs: Number(env.UDK_BRIDGE_POLL_MS || 15000),
     allowTextOnly: env.UDK_ALLOW_TEXT_ONLY === 'true',
+    nameMatchMinScore: Number(env.UDK_NAME_MATCH_MIN_SCORE || 0.8),
   };
 }

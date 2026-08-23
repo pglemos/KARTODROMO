@@ -21,10 +21,8 @@ import type {
   Piloto,
 } from '../campeonatos/campeonatos.types';
 import {
-  listLapTimeRacingCompetitors,
   listLapTimeRacingsPage,
   type LapTimeRacing,
-  type LapTimeRacingCompetitor,
   type LapTimeRacingsFilters,
 } from './laptime-racings.api';
 import {
@@ -157,10 +155,6 @@ export const ResultadosPage = () => {
   const [racingsFilters, setRacingsFilters] = useState<LapTimeRacingsFilters>({});
   const [racingsLoading, setRacingsLoading] = useState(true);
   const [racingsError, setRacingsError] = useState<string | null>(null);
-  const [selectedRacingId, setSelectedRacingId] = useState<string | null>(null);
-  const [racingCompetitors, setRacingCompetitors] = useState<LapTimeRacingCompetitor[]>([]);
-  const [racingCompetitorsLoading, setRacingCompetitorsLoading] = useState(false);
-  const [racingCompetitorsError, setRacingCompetitorsError] = useState<string | null>(null);
 
   const [corridas, setCorridas] = useState<CorridaWithRelations[]>([]);
   const [corridasTotal, setCorridasTotal] = useState(0);
@@ -262,9 +256,6 @@ export const ResultadosPage = () => {
       const result = await listLapTimeRacingsPage(racingsFilters, racingsPage, PAGE_SIZE);
       setRacings(result.data);
       setRacingsTotal(result.total);
-      setSelectedRacingId((current) =>
-        current && result.data.some((racing) => racing.id === current) ? current : result.data[0]?.id ?? null,
-      );
     } catch (error: unknown) {
       setRacingsError(getErrorMessage(error));
     } finally {
@@ -272,30 +263,9 @@ export const ResultadosPage = () => {
     }
   }, [racingsFilters, racingsPage]);
 
-  const loadRacingCompetitors = useCallback(async () => {
-    if (!selectedRacingId) {
-      setRacingCompetitors([]);
-      setRacingCompetitorsError(null);
-      return;
-    }
-    setRacingCompetitorsLoading(true);
-    setRacingCompetitorsError(null);
-    try {
-      setRacingCompetitors(await listLapTimeRacingCompetitors(selectedRacingId));
-    } catch (error: unknown) {
-      setRacingCompetitorsError(getErrorMessage(error));
-    } finally {
-      setRacingCompetitorsLoading(false);
-    }
-  }, [selectedRacingId]);
-
   useEffect(() => {
     if (activeTab === 'reais') void loadRacings();
   }, [activeTab, loadRacings]);
-
-  useEffect(() => {
-    if (activeTab === 'reais') void loadRacingCompetitors();
-  }, [activeTab, loadRacingCompetitors]);
 
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -360,26 +330,18 @@ export const ResultadosPage = () => {
     setRacingsPage(0);
   };
 
-  const selectedRacing = useMemo(
-    () => racings.find((racing) => racing.id === selectedRacingId) ?? null,
-    [racings, selectedRacingId],
-  );
-
   const racingColumns = useMemo<readonly DataTableColumn<LapTimeRacing>[]>(
     () => [
       {
         key: 'nome',
         label: 'Corrida',
         render: (racing) => (
-          <button
-            className={`text-left font-bold underline-offset-4 hover:underline ${
-              selectedRacingId === racing.id ? 'text-brand-300' : 'text-white'
-            }`}
-            onClick={() => setSelectedRacingId(racing.id)}
-            type="button"
+          <a
+            className="text-left font-bold text-white underline-offset-4 hover:text-brand-300 hover:underline"
+            href={`/admin/resultados/${encodeURIComponent(racing.id)}`}
           >
             {racing.nome}
-          </button>
+          </a>
         ),
       },
       { key: 'tipo', label: 'Tipo', render: (racing) => racing.tipo ?? '—' },
@@ -395,17 +357,23 @@ export const ResultadosPage = () => {
         render: (racing) => (
           <span
             className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${
-              racing.finalizada
+              racing.situacao === 'finalizada'
                 ? 'border-brand-800 bg-brand-950 text-brand-100'
-                : 'border-amber-800 bg-amber-950 text-amber-200'
+                : racing.situacao === 'agendada'
+                  ? 'border-zinc-700 bg-zinc-900 text-zinc-300'
+                  : 'border-amber-800 bg-amber-950 text-amber-200'
             }`}
           >
-            {racing.finalizada ? 'Finalizada' : 'Em andamento'}
+            {racing.situacao === 'finalizada'
+              ? 'Finalizada'
+              : racing.situacao === 'agendada'
+                ? 'Agendada'
+                : 'Em andamento'}
           </span>
         ),
       },
     ],
-    [selectedRacingId],
+    [],
   );
 
   const calxproCorridaColumns = useMemo<readonly DataTableColumn<CalXProCorrida>[]>(
@@ -440,18 +408,6 @@ export const ResultadosPage = () => {
       { key: 'posicao', label: 'Pos.', render: (item) => item.posicao ?? '—' },
       { key: 'nome', label: 'Piloto' },
       { key: 'cidade', label: 'Cidade', render: (item) => item.cidade ?? '—' },
-      { key: 'voltas', label: 'Voltas', render: (item) => item.voltas ?? '—' },
-      { key: 'melhorVolta', label: 'Melhor volta', render: (item) => item.melhorVolta ?? '—' },
-      { key: 'tempoTotal', label: 'Tempo total', render: (item) => item.tempoTotal ?? '—' },
-    ],
-    [],
-  );
-
-  const racingCompetitorColumns = useMemo<readonly DataTableColumn<LapTimeRacingCompetitor>[]>(
-    () => [
-      { key: 'posicao', label: 'Pos.', render: (item) => item.posicao ?? '—' },
-      { key: 'numero', label: 'Kart', render: (item) => item.numero ?? '—' },
-      { key: 'nome', label: 'Piloto' },
       { key: 'voltas', label: 'Voltas', render: (item) => item.voltas ?? '—' },
       { key: 'melhorVolta', label: 'Melhor volta', render: (item) => item.melhorVolta ?? '—' },
       { key: 'tempoTotal', label: 'Tempo total', render: (item) => item.tempoTotal ?? '—' },
@@ -814,23 +770,6 @@ export const ResultadosPage = () => {
             rows={racings}
           />
           <Pagination onPageChange={setRacingsPage} page={racingsPage} pageSize={PAGE_SIZE} total={racingsTotal} />
-
-          <div className="border-t border-zinc-800 pt-6">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-brand-300">
-              Resultado da corrida selecionada
-            </p>
-            <h2 className="mt-2 text-xl font-black text-white">{selectedRacing?.nome ?? 'Selecione uma corrida'}</h2>
-            <div className="mt-4">
-              <DataTable
-                columns={racingCompetitorColumns}
-                emptyLabel={selectedRacing ? 'Nenhum participante registrado.' : 'Selecione uma corrida na tabela acima.'}
-                error={racingCompetitorsError}
-                loading={racingCompetitorsLoading}
-                onRetry={() => void loadRacingCompetitors()}
-                rows={racingCompetitors}
-              />
-            </div>
-          </div>
         </div>
       ) : null}
 

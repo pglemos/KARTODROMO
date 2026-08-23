@@ -5,6 +5,7 @@ describe('formatLapTimeValue', () => {
   it('formats LapTime SQL datetime values as timing cells', () => {
     expect(formatLapTimeValue('2026-05-22T00:01:06.618-03:00')).toBe('1:06.618');
     expect(formatLapTimeValue('2026-05-21T00:30:17.757796')).toBe('30:17.757');
+    expect(formatLapTimeValue('2026-05-21T11:40:48.670')).toBe('11:40:48.670');
   });
 });
 
@@ -38,7 +39,7 @@ describe('fetchLapTimeApiSnapshot', () => {
       return Response.json({
         success: true,
         data: [
-          { Pos: 2, Number: '119', Competitor: 'Jonathan Lincoln', LapTime: '2026-05-22T00:01:06.618-03:00' },
+          { Pos: 2, Number: '119', Competitor: 'Jonathan Lincoln', ShortName: 'JL1', LapTime: '2026-05-22T00:01:06.618-03:00' },
           { Pos: 1, Number: '121', ShortName: 'Vanderson', LapTime: '2026-05-22T00:01:05.100-03:00' },
         ],
       });
@@ -153,5 +154,43 @@ describe('fetchLapTimeApiSnapshot', () => {
 
     expect(snapshot.status).toBe('live');
     expect(snapshot.drivers).toEqual([{ position: 1, kart: '59', name: 'PILOTO COM KART', time: '1:01.000' }]);
+  });
+
+  it('ignores HTTP 400 for empty states and keeps scanning the LapTime states', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/Racing/getByState/1?qtd=100')) {
+        return new Response(JSON.stringify({ success: false }), { status: 400 });
+      }
+
+      if (url.includes('/Racing/getByState/2?qtd=100') || url.includes('/Racing/getByState/3?qtd=100') || url.includes('/Racing/getByState/4?qtd=100')) {
+        return Response.json({ success: true, data: [] });
+      }
+
+      if (url.includes('/Racing/getByState/5?qtd=100')) {
+        return Response.json({
+          success: true,
+          data: [{ Id_Racing: 102, RacingState: 5, Name: 'corrida em andamento', racingtype: { Name: 'Corrida' } }],
+        });
+      }
+
+      if (url.includes('/RacingCompetitor/ListResultByRacingId?idRacing=102')) {
+        return Response.json({
+          success: true,
+          data: [{ Pos: 1, Number: '106', Competitor: 'Firepit/ Apex 1', LapTime: '2026-05-22T00:01:02.000-03:00' }],
+        });
+      }
+
+      throw new Error(`unexpected fetch ${url}`);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const snapshot = await fetchLapTimeApiSnapshot({
+      baseUrl: 'http://192.168.20.254/laptime',
+      token: 'token',
+    });
+
+    expect(snapshot.status).toBe('live');
+    expect(snapshot.drivers).toEqual([{ position: 1, kart: '106', name: 'FIREPIT/ APEX 1', time: '1:02.000' }]);
   });
 });

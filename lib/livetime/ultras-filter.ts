@@ -36,6 +36,7 @@ export const DEFAULT_ULTRAS_GROUP_IDS = [
   190252, // TREINO ULTRAS
   220296, // ULTRAS I - FINAL
   220297, // ULTRAS II - FINAL
+  250347, // ULTRAS - ENDURENCE
 ];
 
 // "ultra" cobre "ULTRAS", "ULTRÁS", "ULTRA FINAL" etc. "udk" é a sigla oficial.

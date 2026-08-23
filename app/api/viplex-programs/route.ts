@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { resolveViplexEndpoint, BRIDGE_FETCH_HEADERS } from '@/lib/bridge-base';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -9,19 +10,12 @@ const NO_CACHE_HEADERS = {
   Pragma: 'no-cache',
 };
 
-function viplexRemoteEndpoint() {
-  if (process.env.VIPLEX_PROGRAMS_REMOTE_ENDPOINT) return process.env.VIPLEX_PROGRAMS_REMOTE_ENDPOINT;
-  const layoutEndpoint = process.env.TELAO_LAYOUT_REMOTE_ENDPOINT;
-  if (!layoutEndpoint) return null;
-  return layoutEndpoint.replace(/\/api\/telao-layout-local\/?$/, '/api/viplex-programs-local');
-}
-
 function viplexRemoteTimeoutMs(method: string) {
   if (method !== 'GET') {
     return Number(process.env.VIPLEX_PROGRAMS_REMOTE_ACTION_TIMEOUT_MS || '90000');
   }
 
-  return Number(process.env.VIPLEX_PROGRAMS_REMOTE_TIMEOUT_MS || process.env.TELAO_LAYOUT_REMOTE_TIMEOUT_MS || '1500');
+  return Number(process.env.VIPLEX_PROGRAMS_REMOTE_TIMEOUT_MS || process.env.TELAO_LAYOUT_REMOTE_TIMEOUT_MS || '5000');
 }
 
 function remoteHttpError(status: number, error?: unknown) {
@@ -45,7 +39,7 @@ async function proxyRemote(request: NextRequest, endpoint: string) {
       method: request.method,
       headers: {
         'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
+        ...BRIDGE_FETCH_HEADERS,
       },
       body,
       cache: 'no-store',
@@ -78,7 +72,7 @@ async function proxyRemote(request: NextRequest, endpoint: string) {
 }
 
 export async function GET(request: NextRequest) {
-  const endpoint = viplexRemoteEndpoint();
+  const endpoint = resolveViplexEndpoint();
   if (endpoint) return proxyRemote(request, endpoint);
 
   return NextResponse.json(
@@ -88,7 +82,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const endpoint = viplexRemoteEndpoint();
+  const endpoint = resolveViplexEndpoint();
   if (endpoint) return proxyRemote(request, endpoint);
 
   return NextResponse.json(

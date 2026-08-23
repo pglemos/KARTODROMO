@@ -1,6 +1,7 @@
 // Cliente Supabase do UDK (service_role) para criar/atualizar resultados em
 // DRAFT com idempotência por source_system + external_racing_id.
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { DriverMatchIndex } from '@/lib/udk-bridge/driver-match';
 import type {
   UdkBridgeConfig,
   UdkImportBatchDraft,
@@ -65,25 +66,27 @@ export class UdkClient {
     if (error) throw error;
     const map = new Map<number, string>();
     for (const entry of data || []) {
-      if (entry.external_competitor_id != null) map.set(entry.external_competitor_id, entry.id);
+      if (entry.external_competitor_id != null) map.set(Number(entry.external_competitor_id), entry.id);
     }
     return map;
   }
 
-  async listDrivers(config: UdkBridgeConfig): Promise<Map<number, string>> {
+  async listDrivers(config: UdkBridgeConfig): Promise<DriverMatchIndex> {
     const { data, error } = await this.client
       .from('drivers')
-      .select('id, number')
+      .select('id, number, full_name, sport_name')
       .eq('season_id', config.seasonId)
       .is('deleted_at', null)
       .in('status', ['approved', 'pending']);
 
     if (error) throw error;
-    const map = new Map<number, string>();
-    for (const driver of data || []) {
-      if (driver.number != null) map.set(Number(driver.number), driver.id);
-    }
-    return map;
+    return new DriverMatchIndex(
+      (data || []).map((driver) => ({
+        id: driver.id,
+        number: driver.number != null ? Number(driver.number) : null,
+        name: driver.full_name || driver.sport_name || null,
+      })),
+    );
   }
 
   async upsertResultDraft(payload: UdkResultDraft): Promise<UpsertOutcome> {
@@ -127,7 +130,8 @@ export class UdkClient {
   async syncEntries(
     resultId: string,
     entries: UdkResultEntryDraft[],
-    driverByNumber: Map<number, string>,
+    drivers: DriverMatchIndex,
+    minScore = 0.8,
   ): Promise<{ inserted: number; updated: number; unmatched: number }> {
     const existing = await this.listEntries(resultId);
     let inserted = 0;
@@ -135,15 +139,25 @@ export class UdkClient {
     let unmatched = 0;
 
     for (const entry of entries) {
-      const driverId = entry.driver_id || (entry.kart_number != null ? driverByNumber.get(entry.kart_number) : undefined);
+      const resolved = entry.driver_id
+        ? { id: entry.driver_id, via: 'kart' as const, score: 1 }
+        : drivers.resolve(entry.kart_number, entry.driver_name, minScore);
 
-      if (!driverId) {
+      if (!resolved.id) {
         unmatched += 1;
         console.warn(
-          `[udk-bridge] piloto não mapeado: kart #${entry.kart_number ?? '?'} posição ${entry.position} (external_competitor_id=${entry.external_competitor_id})`,
+          `[udk-bridge] piloto não mapeado: kart #${entry.kart_number ?? '?'} nome "${entry.driver_name ?? ''}" posição ${entry.position} (external_competitor_id=${entry.external_competitor_id})`,
         );
         continue;
       }
+
+      if (resolved.via === 'name' && resolved.score < 1) {
+        console.warn(
+          `[udk-bridge] piloto vinculado por nome com confiança ${resolved.score.toFixed(2)}: "${entry.driver_name}" (kart #${entry.kart_number ?? '?'}) → ${resolved.id}`,
+        );
+      }
+
+      const driverId = resolved.id;
 
       const row = {
         driver_id: driverId,
@@ -152,14 +166,15 @@ export class UdkClient {
         laps: entry.laps,
         total_time_ms: entry.total_time_ms,
         best_lap_ms: entry.best_lap_ms,
-        penalty_ms: entry.penalty_ms,
+        penalty_ms: entry.penalty_ms ?? 0,
         status: entry.status,
         pole: entry.pole ?? false,
         fastest_lap: entry.fastest_lap ?? false,
         external_competitor_id: entry.external_competitor_id ?? null,
       };
 
-      const existingEntryId = entry.external_competitor_id != null ? existing.get(entry.external_competitor_id) : undefined;
+      const existingEntryId =
+        entry.external_competitor_id != null ? existing.get(Number(entry.external_competitor_id)) : undefined;
 
       if (existingEntryId) {
         const { error } = await this.client.from('result_entries').update(row).eq('id', existingEntryId);
@@ -185,13 +200,14 @@ export class UdkClient {
     racingId: number,
     payload: UdkResultDraft,
     entries: UdkResultEntryDraft[],
-    driverByNumber: Map<number, string>,
+    drivers: DriverMatchIndex,
     diagnostics: Record<string, unknown>,
+    minScore = 0.8,
   ): Promise<SyncRaceOutcome> {
     const result = await this.upsertResultDraft(payload);
 
     if (result.kind === 'created' || result.kind === 'updated') {
-      const sync = await this.syncEntries(result.resultId, entries, driverByNumber);
+      const sync = await this.syncEntries(result.resultId, entries, drivers, minScore);
       const batchId = await this.createImportBatch({
         stage_id: payload.stage_id,
         source: 'laptime',

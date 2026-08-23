@@ -1,4 +1,5 @@
 import type { LiveTimingDriver, RawDriver } from '@/lib/livetime/types';
+import { formatDurationMs, parseDurationMs } from '@/lib/livetime/time-format';
 
 const POSITION_KEYS = ['position', 'pos', 'rank', 'place', 'Position', 'Pos'];
 const KART_KEYS = ['kart', 'kartNumber', 'kart_number', 'number', 'car', 'carNumber', 'transponder', 'Kart', 'Number', 'No', '#'];
@@ -46,6 +47,14 @@ function normalizeName(value: unknown): string {
   return toCellString(value).replace(/\s+/g, ' ').toUpperCase();
 }
 
+function normalizeLongTime(value: unknown): string {
+  const raw = toCellString(value);
+  const milliseconds = parseDurationMs(raw);
+  if (milliseconds === null || milliseconds < 60 * 60 * 1_000) return raw;
+  const sign = raw.startsWith('+') ? '+' : '';
+  return `${sign}${formatDurationMs(milliseconds) ?? raw}`;
+}
+
 export function normalizeDrivers(raw: unknown): LiveTimingDriver[] {
   const normalized = extractArray(raw)
     .filter(isRecord)
@@ -53,7 +62,7 @@ export function normalizeDrivers(raw: unknown): LiveTimingDriver[] {
       position: toPosition(firstValue(driver, POSITION_KEYS), index + 1),
       kart: toCellString(firstValue(driver, KART_KEYS)),
       name: normalizeName(firstValue(driver, NAME_KEYS)),
-      time: toCellString(firstValue(driver, TIME_KEYS)),
+      time: normalizeLongTime(firstValue(driver, TIME_KEYS)),
     }))
     .filter((driver) => driver.position > 0);
 

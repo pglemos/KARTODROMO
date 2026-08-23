@@ -9,11 +9,13 @@ import {
 import {
   Activity,
   Download,
+  List,
   Lock,
   Pause,
   Play,
   Radio,
   Timer,
+  TrendingUp,
   Trophy,
   Users,
   WifiOff,
@@ -63,6 +65,8 @@ import {
   type CampeonatoOption,
   type EtapaOption,
   type LiveSnapshot,
+  type LivePitStopStatus,
+  type LivePiloto,
   type PilotoOption,
   type SessaoPayload,
   type SessaoStatus,
@@ -75,6 +79,13 @@ import {
 
 type TabKey = 'ao-vivo' | 'historico' | 'sessoes' | 'voltas';
 const PAGE_SIZE = 10;
+const MANDATORY_STOP_MS = 7 * 60 * 1_000;
+
+type LiveTableRow = {
+  piloto: LivePiloto;
+  posicao: number;
+  voltasProjetadas: number | null;
+};
 
 type SessaoFormState = {
   nome: string;
@@ -142,6 +153,22 @@ const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
 });
 
 const numberFormatter = new Intl.NumberFormat('pt-BR');
+
+const pitStopStatusLabel: Record<LivePitStopStatus, string> = {
+  mandatory: 'Obrigatória válida',
+  additional: 'Adicional',
+  short: 'Abaixo de 7 min',
+  invalid: 'Registro inválido',
+  'outside-window': 'Fora da janela dos boxes',
+};
+
+const pitStopStatusVariant: Record<LivePitStopStatus, 'emerald' | 'amber' | 'red' | 'blue' | 'zinc'> = {
+  mandatory: 'emerald',
+  additional: 'blue',
+  short: 'amber',
+  invalid: 'red',
+  'outside-window': 'red',
+};
 
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : 'Ocorreu um erro inesperado.';
@@ -231,13 +258,15 @@ export const CronometragemPage = () => {
       return DEFAULT_LIVE_URL;
     }
   });
-  const [connected, setConnected] = useState(false);
+  const [connected, setConnected] = useState(true);
+  const [projectionMode, setProjectionMode] = useState(false);
   const [liveLoading, setLiveLoading] = useState(false);
   const [snapshot, setSnapshot] = useState<LiveSnapshot>({
     status: 'pausado',
     pilotos: [],
   });
   const liveRequestInFlight = useRef(false);
+  const [selectedPitPiloto, setSelectedPitPiloto] = useState<LivePiloto | null>(null);
 
   const [sessaoModalOpen, setSessaoModalOpen] = useState(false);
   const [editingSessao, setEditingSessao] = useState<SessaoWithCampeonato | null>(null);
@@ -864,6 +893,38 @@ export const CronometragemPage = () => {
     undefined,
   );
 
+  const liveRows = useMemo<LiveTableRow[]>(() => {
+    if (!projectionMode) {
+      return snapshot.pilotos.map((piloto) => ({ piloto, posicao: piloto.posicao, voltasProjetadas: null }));
+    }
+
+    const lapTimes = snapshot.pilotos
+      .map((piloto) => piloto.melhorVoltaMs)
+      .filter((time): time is number => time !== undefined && time > 0)
+      .sort((left, right) => left - right);
+    const ritmoMedianoMs = lapTimes.length ? lapTimes[Math.floor(lapTimes.length / 2)] : 66_000;
+
+    return snapshot.pilotos
+      .map((piloto) => {
+        const paradasFaltantes = piloto.paradas?.faltam ?? 0;
+        const voltaAtual = piloto.paradas?.voltaAtual;
+        return {
+          piloto,
+          posicao: 0,
+          voltasProjetadas:
+            voltaAtual !== null && voltaAtual !== undefined
+              ? voltaAtual - (paradasFaltantes * MANDATORY_STOP_MS) / ritmoMedianoMs
+              : null,
+        };
+      })
+      .sort(
+        (left, right) =>
+          (right.voltasProjetadas ?? Number.MIN_SAFE_INTEGER) - (left.voltasProjetadas ?? Number.MIN_SAFE_INTEGER) ||
+          left.piloto.posicao - right.piloto.posicao,
+      )
+      .map((row, index) => ({ ...row, posicao: index + 1 }));
+  }, [projectionMode, snapshot.pilotos]);
+
   const headerAction =
     activeTab === 'sessoes'
       ? { label: 'Nova sessão', action: openCreateSessao }
@@ -931,6 +992,13 @@ export const CronometragemPage = () => {
                   {connected ? <Pause aria-hidden="true" size={16} /> : <Play aria-hidden="true" size={16} />}
                   {connected ? 'Pausar' : 'Conectar'}
                 </Button>
+                <Button
+                  onClick={() => setProjectionMode((current) => !current)}
+                  variant={projectionMode ? 'primary' : 'ghost'}
+                >
+                  <TrendingUp aria-hidden="true" size={16} />
+                  PROJEÇÃO FUTURA
+                </Button>
                 {canWrite ? (
                   <Button
                     disabled={snapshot.status !== 'online' || snapshot.pilotos.length === 0}
@@ -965,6 +1033,41 @@ export const CronometragemPage = () => {
             />
           </div>
 
+          {snapshot.corrida ? (
+            <Card aria-live="polite" className="border-brand-500/30 p-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-300">Sessão atual</p>
+                  <h2 className="mt-1 text-xl font-bold text-zinc-50">{snapshot.corrida.nome}</h2>
+                  <p className="mt-1 text-sm text-zinc-400">
+                    {snapshot.corrida.tipo ?? 'Timing LapTime'} · ID {snapshot.corrida.id}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs text-zinc-300">
+                  <Badge variant="emerald">
+                    {snapshot.corrida.regras.paradasObrigatorias} paradas de{' '}
+                    {msParaTexto(snapshot.corrida.regras.minimoParadaMs)}
+                  </Badge>
+                  <Badge variant="blue">Boxes: 10 min - 11h40 de prova</Badge>
+                </div>
+              </div>
+            </Card>
+          ) : null}
+
+          {projectionMode ? (
+            <Card aria-live="polite" className="border-blue-500/30 bg-blue-500/5 p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-blue-200">PROJEÇÃO FUTURA</p>
+                  <p className="mt-1 text-xs text-zinc-300">
+                    Simulação com todos os karts completando 11 paradas válidas. Cada parada faltante desconta o equivalente a 7:00 em voltas.
+                  </p>
+                </div>
+                <Badge variant="blue">Classificação simulada</Badge>
+              </div>
+            </Card>
+          ) : null}
+
           {snapshot.status === 'offline' ? (
             <Card className="flex min-h-56 flex-col items-center justify-center border-amber-900/50 p-8 text-center">
               <span className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10 text-amber-300">
@@ -978,27 +1081,35 @@ export const CronometragemPage = () => {
           ) : (
             <Card className="overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="min-w-full text-left">
+                <table className="min-w-[1280px] text-left">
                   <thead className="border-b border-zinc-800">
                     <tr>
-                      {['Pos', 'Piloto', 'Kart', 'Melhor volta', 'Última', 'Voltas', 'Gap'].map((label) => (
+                      {[projectionMode ? 'Pos. futura' : 'Pos', 'Piloto', 'Kart', 'Melhor volta', 'Última', 'Voltas', 'Gap'].map((label) => (
                         <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500" key={label}>
                           {label}
                         </th>
                       ))}
+                      {projectionMode ? (
+                        <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500">Voltas projetadas</th>
+                      ) : null}
+                      <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500">Paradas &gt;= 7:00</th>
+                      <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500">Faltam obrigatórias</th>
+                      <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500">4:00-6:59</th>
+                      <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500">Total</th>
+                      <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500">Punição</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {snapshot.pilotos.map((piloto) => (
+                    {liveRows.map(({ piloto, posicao, voltasProjetadas }) => (
                       <tr
                         className={
-                          piloto.posicao === 1
+                          posicao === 1
                             ? 'border-b border-brand-500/20 bg-brand-500/10'
                             : 'border-b border-zinc-800/60 last:border-0'
                         }
                         key={`${piloto.posicao}-${piloto.nome}-${piloto.kart ?? ''}`}
                       >
-                        <td className="px-4 py-3 text-sm font-semibold text-zinc-100">{piloto.posicao}</td>
+                        <td className="px-4 py-3 text-sm font-semibold text-zinc-100">{posicao}</td>
                         <td className="px-4 py-3 text-sm text-zinc-200">{piloto.nome}</td>
                         <td className="px-4 py-3 text-sm text-zinc-300">{piloto.kart ?? '—'}</td>
                         <td className="px-4 py-3 text-sm font-medium text-brand-300">
@@ -1007,8 +1118,38 @@ export const CronometragemPage = () => {
                             : (piloto.melhorVoltaTexto ?? '—')}
                         </td>
                         <td className="px-4 py-3 text-sm text-zinc-300">{piloto.ultimaVolta ?? '—'}</td>
-                        <td className="px-4 py-3 text-sm text-zinc-300">{piloto.voltas ?? '—'}</td>
-                        <td className="px-4 py-3 text-sm text-zinc-400">{piloto.gap ?? (piloto.posicao === 1 ? 'Líder' : '—')}</td>
+                        <td className="px-4 py-3 text-sm text-zinc-300">{piloto.voltas ?? piloto.paradas?.voltaAtual ?? '—'}</td>
+                        <td className="px-4 py-3 text-sm text-zinc-400">{piloto.gap ?? (posicao === 1 ? 'Líder' : '—')}</td>
+                        {projectionMode ? (
+                          <td className="px-4 py-3 text-sm font-semibold text-blue-200">
+                            {voltasProjetadas !== null ? `${voltasProjetadas.toFixed(1)} v` : '—'}
+                          </td>
+                        ) : null}
+                        <td className="px-4 py-3 text-sm text-zinc-200">
+                          <button
+                            aria-label={`Ver paradas do kart ${piloto.kart ?? piloto.nome}`}
+                            className="inline-flex items-center gap-2 rounded-md px-2 py-1 font-semibold text-brand-300 transition-colors hover:bg-brand-500/10 hover:text-brand-200 disabled:cursor-not-allowed disabled:text-zinc-600"
+                            disabled={!piloto.paradas}
+                            onClick={() => setSelectedPitPiloto(piloto)}
+                            title="Ver paradas por volta e tempo de prova"
+                            type="button"
+                          >
+                            <List aria-hidden="true" size={15} />
+                            {piloto.paradas?.validas ?? '—'}
+                          </button>
+                        </td>
+                        <td className="px-4 py-3 text-sm font-semibold text-amber-300">{piloto.paradas?.faltam ?? '—'}</td>
+                        <td className="px-4 py-3 text-sm text-amber-300">{piloto.paradas?.curtas ?? '—'}</td>
+                        <td className="px-4 py-3 text-sm text-zinc-300">{piloto.paradas?.total ?? '—'}</td>
+                        <td className="px-4 py-3 text-sm">
+                          {piloto.paradas ? (
+                            <span className={piloto.paradas.penalidadeVoltas > 0 ? 'font-semibold text-red-300' : 'text-emerald-300'}>
+                              {piloto.paradas.penalidadeVoltas > 0 ? `+${piloto.paradas.penalidadeVoltas} voltas` : 'Nenhuma'}
+                            </span>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -1017,7 +1158,7 @@ export const CronometragemPage = () => {
               {!snapshot.pilotos.length ? (
                 <div className="flex min-h-48 flex-col items-center justify-center p-8 text-center">
                   <Activity aria-hidden="true" className="text-zinc-600" size={28} />
-                  <p className="mt-3 text-sm text-zinc-400">Conecte ao endpoint para acompanhar o timing.</p>
+                  <p className="mt-3 text-sm text-zinc-400">Aguardando dados do timing em tempo real.</p>
                 </div>
               ) : null}
             </Card>
@@ -1158,6 +1299,81 @@ export const CronometragemPage = () => {
           />
         </div>
       ) : null}
+
+      <Modal
+        footer={<Button onClick={() => setSelectedPitPiloto(null)} variant="ghost">Fechar</Button>}
+        isOpen={Boolean(selectedPitPiloto)}
+        onClose={() => setSelectedPitPiloto(null)}
+        title={selectedPitPiloto ? `Paradas do kart ${selectedPitPiloto.kart ?? '—'}` : 'Paradas do kart'}
+      >
+        {selectedPitPiloto && selectedPitPiloto.paradas ? (
+          <div className="space-y-5">
+            <div>
+              <p className="text-sm font-semibold text-zinc-100">{selectedPitPiloto.nome}</p>
+              <p className="mt-1 text-xs text-zinc-400">
+                {snapshot.corrida?.nome ?? 'Sessão atual'} · parada registrada por passagem na cronometragem
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
+                <p className="text-xs text-zinc-400">Obrigatórias válidas</p>
+                <p className="mt-1 text-xl font-bold text-emerald-300">{selectedPitPiloto.paradas.validas}/11</p>
+              </div>
+              <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+                <p className="text-xs text-zinc-400">Faltam obrigatórias</p>
+                <p className="mt-1 text-xl font-bold text-amber-300">{selectedPitPiloto.paradas.faltam}</p>
+              </div>
+              <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3">
+                <p className="text-xs text-zinc-400">Punição calculada</p>
+                <p className="mt-1 text-xl font-bold text-red-300">+{selectedPitPiloto.paradas.penalidadeVoltas} voltas</p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto rounded-lg border border-zinc-800">
+              <table className="min-w-[640px] w-full text-left">
+                <thead className="border-b border-zinc-800 bg-zinc-950/40">
+                  <tr>
+                    {['Volta', 'Tempo da parada', 'Tempo de prova', 'Posição', 'Classificação'].map((label) => (
+                      <th className="px-3 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500" key={label}>
+                        {label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedPitPiloto.paradas.paradas.map((parada) => (
+                    <tr className="border-b border-zinc-800/60 last:border-0" key={parada.id}>
+                      <td className="px-3 py-3 text-sm font-semibold text-zinc-100">{parada.volta ?? '—'}</td>
+                      <td className="px-3 py-3 text-sm text-zinc-200">{parada.tempoParada ?? '—'}</td>
+                      <td className="px-3 py-3 text-sm text-zinc-300">{parada.tempoCorrida ?? '—'}</td>
+                      <td className="px-3 py-3 text-sm text-zinc-400">{parada.posicao ?? '—'}</td>
+                      <td className="px-3 py-3 text-sm">
+                        <Badge variant={pitStopStatusVariant[parada.status]}>
+                          {parada.status === 'mandatory' && parada.numeroObrigatoria
+                            ? `Obrigatória ${parada.numeroObrigatoria}`
+                            : pitStopStatusLabel[parada.status]}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-zinc-400">
+              <span>Paradas de 4:00-6:59: {selectedPitPiloto.paradas.curtas}</span>
+              <span>Total registrado: {selectedPitPiloto.paradas.total}</span>
+              <span>Excedentes acima de 15: {selectedPitPiloto.paradas.excedentes}</span>
+              {selectedPitPiloto.paradas.foraJanela > 0 ? (
+                <span className="text-red-300">Fora da janela dos boxes: {selectedPitPiloto.paradas.foraJanela}</span>
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-zinc-400">Nenhuma parada foi recebida para este kart.</p>
+        )}
+      </Modal>
 
       <Modal
         footer={

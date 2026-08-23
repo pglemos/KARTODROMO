@@ -110,7 +110,7 @@ export class LiveTimeScraper {
       const apiSnapshot = await fetchLapTimeApiSnapshot({
         baseUrl: this.options.apiBaseUrl,
         token,
-        timeoutMs: Number(process.env.LAPTIME_API_TIMEOUT_MS || process.env.LIVETIME_TIMEOUT_MS || '3000'),
+        timeoutMs: Number(process.env.LAPTIME_API_TIMEOUT_MS || process.env.LIVETIME_TIMEOUT_MS || '10000'),
       });
       this.snapshot = apiSnapshot;
     } catch (error) {

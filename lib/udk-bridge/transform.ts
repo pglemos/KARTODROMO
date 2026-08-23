@@ -43,7 +43,8 @@ export function entryStatusFromCompetitor(competitor: LapTimeCompetitorRow): Udk
 }
 
 export function competitorDisplayName(competitor: LapTimeCompetitorRow): string {
-  const name = competitor.ShortName?.trim() || competitor.Competitor?.trim();
+  // Prioriza o nome completo; ShortName (sigla) é só fallback.
+  const name = competitor.Competitor?.trim() || competitor.ShortName?.trim();
   return (name || `#${competitor.Number || competitor.Transponder || competitor.Id_RacingCompetitor}`).toUpperCase();
 }
 
@@ -113,6 +114,7 @@ export function buildEntriesDraft(competitors: LapTimeCompetitorRow[]): UdkResul
     .filter((competitor) => Number(competitor.Pos) > 0 || Number(competitor.Lap) > 0)
     .map((competitor) => ({
       driver_id: '',
+      driver_name: competitorDisplayName(competitor),
       position: Number(competitor.Pos),
       kart_number: competitor.Number ? Number(competitor.Number) || null : null,
       laps: Number(competitor.Lap) || 0,

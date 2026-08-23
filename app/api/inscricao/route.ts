@@ -1,10 +1,11 @@
 import {
   generateRegistrationProtocol,
-  getChampionshipServiceClient,
   normalizeChampionshipRegistration,
   validateChampionshipRegistration,
   type ChampionshipRegistrationInput,
 } from '@/lib/championship-registrations';
+import { createChampionshipRegistration } from '@/lib/championship-registrations-d1';
+import { getCloudflareAdminDb } from '@/lib/cloudflare-admin-db';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -64,17 +65,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const supabase = getChampionshipServiceClient();
+    const db = await getCloudflareAdminDb();
+    if (!db) return jsonResponse({ error: 'cloudflare_d1_not_configured' }, 503);
+
     const protocol = generateRegistrationProtocol();
-    const { data, error } = await supabase.rpc('kartodromo_create_campeonato_inscricao', {
-      p_payload: { ...payload, protocol },
-    });
-
-    if (error) {
-      return jsonResponse({ error: error.message }, 500);
-    }
-
-    const row = Array.isArray(data) ? data[0] : data;
+    const row = await createChampionshipRegistration(db, payload, protocol);
 
     await forwardToWebhook({ ...rawBody, protocol });
 

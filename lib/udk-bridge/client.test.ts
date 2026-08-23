@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { UdkClient } from '@/lib/udk-bridge/client';
+import { DriverMatchIndex } from '@/lib/udk-bridge/driver-match';
 import type { UdkResultDraft, UdkResultEntryDraft } from '@/lib/udk-bridge/types';
 
 type Row = Record<string, unknown>;
@@ -143,6 +144,16 @@ function makeUdk(client: never): UdkClient {
   return new UdkClient({ client });
 }
 
+function makeIndex(drivers: Array<{ id: string; number?: number | null; name?: string | null }> = []): DriverMatchIndex {
+  return new DriverMatchIndex(
+    drivers.map((driver) => ({
+      id: driver.id,
+      number: driver.number == null ? null : Number(driver.number),
+      name: driver.name ?? null,
+    })),
+  );
+}
+
 describe('UdkClient.upsertResultDraft', () => {
   it('cria resultado DRAFT quando não existe', async () => {
     const { client, state } = createMockSupabase();
@@ -176,7 +187,7 @@ describe('UdkClient.syncEntries', () => {
     const { client, state } = createMockSupabase();
     const udk = makeUdk(client);
 
-    const sync = await udk.syncEntries('result-1', [entry], new Map([[78, 'driver-78']]));
+    const sync = await udk.syncEntries('result-1', [entry], makeIndex([{ id: 'driver-78', number: 78, name: 'Cristiano Miranda' }]));
     expect(sync.inserted).toBe(1);
     expect(sync.updated).toBe(0);
     expect(sync.unmatched).toBe(0);
@@ -190,8 +201,35 @@ describe('UdkClient.syncEntries', () => {
     const { client, state } = createMockSupabase();
     const udk = makeUdk(client);
 
-    const sync = await udk.syncEntries('result-1', [{ ...entry, driver_id: '' }], new Map());
+    const sync = await udk.syncEntries('result-1', [{ ...entry, driver_id: '' }], makeIndex());
     expect(sync.inserted).toBe(0);
+    expect(sync.unmatched).toBe(1);
+    expect(state.result_entries).toHaveLength(0);
+  });
+
+  it('vincula por nome quando não há kart (fallback)', async () => {
+    const { client, state } = createMockSupabase();
+    const udk = makeUdk(client);
+
+    const sync = await udk.syncEntries(
+      'result-1',
+      [{ ...entry, driver_id: '', kart_number: null, driver_name: 'CRISTIANO MIRANDA' }],
+      makeIndex([{ id: 'driver-cm', number: null, name: 'Cristiano Miranda' }]),
+    );
+    expect(sync.unmatched).toBe(0);
+    expect(state.result_entries[0].driver_id).toBe('driver-cm');
+    expect(state.result_entries[0].kart_number).toBeNull();
+  });
+
+  it('não vincula por nome abaixo da confiança mínima', async () => {
+    const { client, state } = createMockSupabase();
+    const udk = makeUdk(client);
+
+    const sync = await udk.syncEntries(
+      'result-1',
+      [{ ...entry, driver_id: '', kart_number: null, driver_name: 'Zé Ninguém' }],
+      makeIndex([{ id: 'driver-cm', number: null, name: 'Cristiano Miranda' }]),
+    );
     expect(sync.unmatched).toBe(1);
     expect(state.result_entries).toHaveLength(0);
   });
@@ -199,9 +237,10 @@ describe('UdkClient.syncEntries', () => {
   it('atualiza entrada existente pelo external_competitor_id (idempotência)', async () => {
     const { client, state } = createMockSupabase();
     const udk = makeUdk(client);
+    const drivers = makeIndex([{ id: 'driver-78', number: 78, name: 'Cristiano Miranda' }]);
 
-    await udk.syncEntries('result-1', [entry], new Map([[78, 'driver-78']]));
-    await udk.syncEntries('result-1', [{ ...entry, laps: 15 }], new Map([[78, 'driver-78']]));
+    await udk.syncEntries('result-1', [entry], drivers);
+    await udk.syncEntries('result-1', [{ ...entry, laps: 15 }], drivers);
     expect(state.result_entries).toHaveLength(1);
     expect(state.result_entries[0].laps).toBe(15);
   });
@@ -225,20 +264,25 @@ describe('UdkClient.findResultByExternalRacing', () => {
 });
 
 describe('UdkClient.listDrivers', () => {
-  it('mapeia pilotos ativos por número do kart', async () => {
+  it('mapeia pilotos ativos por número do kart e nome', async () => {
     const { client, state } = createMockSupabase();
     const udk = makeUdk(client);
 
     state.drivers.push(
-      { id: 'd-7', number: 7, season_id: 'season', status: 'approved', deleted_at: null },
-      { id: 'd-44', number: 44, season_id: 'season', status: 'approved', deleted_at: null },
-      { id: 'd-arq', number: 56, season_id: 'season', status: 'approved', deleted_at: '2026-08-18T21:44:00Z' },
+      { id: 'd-7', number: 7, full_name: 'Walison Souza', sport_name: null, season_id: 'season', status: 'approved', deleted_at: null },
+      { id: 'd-44', number: 44, full_name: 'Aldo Alves', sport_name: null, season_id: 'season', status: 'approved', deleted_at: null },
+      { id: 'd-num', number: null, full_name: 'Lucas Rabelo', sport_name: null, season_id: 'season', status: 'pending', deleted_at: null },
+      { id: 'd-sport', number: null, full_name: null, sport_name: 'Mendinho', season_id: 'season', status: 'approved', deleted_at: null },
+      { id: 'd-arq', number: 56, full_name: 'Arthur Mendes', sport_name: null, season_id: 'season', status: 'approved', deleted_at: '2026-08-18T21:44:00Z' },
     );
 
-    const map = await udk.listDrivers({ championshipId: 'champ', seasonId: 'season', categoryMapping: {}, stages: {} });
-    expect(map.size).toBe(2);
-    expect(map.get(7)).toBe('d-7');
-    expect(map.get(44)).toBe('d-44');
+    const index = await udk.listDrivers({ championshipId: 'champ', seasonId: 'season', categoryMapping: {}, stages: {} });
+    expect(index.size).toBe(4);
+    expect(index.byNumber.size).toBe(2);
+    expect(index.byNumber.get(7)).toBe('d-7');
+    expect(index.byNumber.get(44)).toBe('d-44');
+    expect(index.resolve(null, 'Lucas Rabelo')).toMatchObject({ id: 'd-num', via: 'name' });
+    expect(index.resolve(null, 'Mendinho')).toMatchObject({ id: 'd-sport', via: 'name' });
   });
 });
 
@@ -261,11 +305,13 @@ describe('UdkClient.createImportBatch', () => {
 });
 
 describe('UdkClient.syncRace', () => {
+  const drivers = makeIndex([{ id: 'driver-78', number: 78, name: 'Cristiano Miranda' }]);
+
   it('cria resultado, entradas e batch no mesmo fluxo', async () => {
     const { client, state } = createMockSupabase();
     const udk = makeUdk(client);
 
-    const outcome = await udk.syncRace(627099, draftPayload, [entry], new Map([[78, 'driver-78']]), {
+    const outcome = await udk.syncRace(627099, draftPayload, [entry], drivers, {
       racingId: 627099,
       confidence: 1,
     });
@@ -279,8 +325,8 @@ describe('UdkClient.syncRace', () => {
     const { client, state } = createMockSupabase();
     const udk = makeUdk(client);
 
-    await udk.syncRace(627099, draftPayload, [entry], new Map([[78, 'driver-78']]), { racingId: 627099 });
-    const outcome = await udk.syncRace(627099, draftPayload, [entry], new Map([[78, 'driver-78']]), { racingId: 627099 });
+    await udk.syncRace(627099, draftPayload, [entry], drivers, { racingId: 627099 });
+    const outcome = await udk.syncRace(627099, draftPayload, [entry], drivers, { racingId: 627099 });
 
     expect(outcome.result.kind).toBe('updated');
     expect(state.results).toHaveLength(1);
