@@ -48,10 +48,11 @@ export const createKartIdentityEvent = (payload: Record<string, unknown>): Promi
   apiPost<KartIdentityEvent>('karts_identidade_historico', payload);
 
 export const getKartHistory = async (kart: Pick<Kart, 'numero' | 'sensor_numero' | 'sensor_numero_fonte'>): Promise<KartHistoryResponse> => {
-  const params = new URLSearchParams({ limit: '60' });
   const sensor = kart.sensor_numero?.trim() || kart.sensor_numero_fonte?.trim();
-  if (sensor) params.set('sensor', sensor);
-  else params.set('plate', kart.numero);
-  const rows = await jsonRequest<KartHistoryItem[]>(`/api/admin/laptime/kart-history?${params.toString()}`);
+  const fetchRows = (query: Record<string, string>) => jsonRequest<KartHistoryItem[]>(
+    `/api/admin/laptime/kart-history?${new URLSearchParams({ ...query, limit: '60' }).toString()}`,
+  );
+  const sensorRows = sensor ? await fetchRows({ sensor }) : [];
+  const rows = sensorRows.length ? sensorRows : await fetchRows({ plate: kart.numero });
   return { rows, windows: buildKartHistoryWindows(rows) };
 };

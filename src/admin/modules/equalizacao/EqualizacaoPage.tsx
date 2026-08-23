@@ -309,15 +309,21 @@ export const EqualizacaoPage = () => {
   const loadKarts = useCallback(async () => {
     setLoading(true);
     setError(null);
-    try {
-      const rows = await listKarts();
-      setKarts(rows);
-      setSelectedKartId((current) => (current && rows.some((kart) => kart.id === current) ? current : rows[0]?.id ?? null));
-    } catch (loadError) {
-      setError(getErrorMessage(loadError));
-    } finally {
-      setLoading(false);
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const rows = await listKarts();
+        setKarts(rows);
+        setSelectedKartId((current) => (current && rows.some((kart) => kart.id === current) ? current : rows[0]?.id ?? null));
+        setLoading(false);
+        return;
+      } catch (loadError) {
+        lastError = loadError;
+        if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
     }
+    setError(getErrorMessage(lastError));
+    setLoading(false);
   }, []);
 
   const loadDetails = useCallback(async (kart: Kart) => {

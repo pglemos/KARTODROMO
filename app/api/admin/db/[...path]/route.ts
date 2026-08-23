@@ -14,6 +14,7 @@ declare global {
 export const dynamic = 'force-dynamic';
 
 const TIMEOUT_MS = Number(process.env.KARTODROMO_LOCAL_API_TIMEOUT_MS || '8000');
+let liveFleetSyncInFlight: Promise<{ ok: boolean; count: number; error?: string }> | null = null;
 
 async function requireSession() {
   return requireAdminSession('/admin');
@@ -23,7 +24,10 @@ async function syncLiveKartFleetIfNeeded(request: NextRequest, path: string[], d
   if (request.method !== 'GET' || path[0] !== 'karts_full' || path.length !== 1) return null;
 
   try {
-    const result = await syncKartFleetFromLiveSource(db);
+    liveFleetSyncInFlight ??= syncKartFleetFromLiveSource(db).finally(() => {
+      liveFleetSyncInFlight = null;
+    });
+    const result = await liveFleetSyncInFlight;
     if (result.ok) return null;
     return NextResponse.json(
       { error: 'live_fleet_unavailable', detail: result.error || 'laptime_fleet_unavailable' },
