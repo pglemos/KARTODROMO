@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
-import { requireAdminSession } from '@/lib/require-admin-session';
+import { adminCookieName, readAdminSession } from '@/lib/admin-auth';
 import { handleAdminD1, type AdminD1Database } from '@/lib/admin-d1';
 import { getLocalSQLiteDb, isLocalSQLiteAvailable } from '@/lib/local-sqlite-db';
 import { syncKartFleetFromLiveSource } from '@/lib/kart-fleet-sync';
@@ -19,7 +20,8 @@ let liveFleetSyncInFlight: Promise<{ ok: boolean; count: number; error?: string 
 type LiveFleetSyncStatus = { ok: boolean; count: number; error?: string } | null;
 
 async function requireSession() {
-  return requireAdminSession('/admin');
+  const cookieStore = await cookies();
+  return readAdminSession(cookieStore.get(adminCookieName())?.value);
 }
 
 async function syncLiveKartFleetIfNeeded(request: NextRequest, path: string[], db: AdminD1Database): Promise<LiveFleetSyncStatus> {
@@ -45,6 +47,9 @@ function markFleetSource(response: NextResponse, status: LiveFleetSyncStatus): N
 
 async function proxy(request: NextRequest, path: string[]) {
   const session = await requireSession();
+  if (!session) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
 
   // 1. Try local SQLite (next dev mode)
   if (isLocalSQLiteAvailable()) {

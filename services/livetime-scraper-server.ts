@@ -23,7 +23,7 @@ import {
   fetchLapTimeRacingLaps,
   fetchLapTimeRacingsPage,
 } from '@/lib/livetime/laptime-racings';
-import { fetchLapTimeKartHistory } from '@/lib/livetime/kart-history';
+import { fetchLapTimeKartHistory, fetchLapTimeKartHistorySummary } from '@/lib/livetime/kart-history';
 import { fetchLapTimeKartFleet } from '@/lib/livetime/kart-fleet';
 import { fetchEqualizacaoLiveSnapshot } from '@/lib/equalizacao/equalizacao-live-source';
 import { LiveTimeScraper } from './livetime-scraper';
@@ -655,6 +655,22 @@ async function handleLaptimeKartHistory(url: URL, response: http.ServerResponse)
   }
 }
 
+async function handleLaptimeKartHistorySummary(response: http.ServerResponse) {
+  const sqlOptions = resolveLaptimeSqlOptions('racings');
+  if (!sqlOptions) {
+    sendJson(response, 503, { error: 'laptime_sql_not_configured' });
+    return;
+  }
+
+  try {
+    const rows = await fetchLapTimeKartHistorySummary(sqlOptions);
+    response.writeHead(200, { ...NO_CACHE_HEADERS, 'x-total-count': String(rows.length) });
+    response.end(JSON.stringify({ generatedAt: new Date().toISOString(), rows }));
+  } catch (error) {
+    sendJson(response, 502, { error: error instanceof Error ? error.message : 'laptime_sql_query_failed' });
+  }
+}
+
 async function handleLaptimeKartFleet(response: http.ServerResponse) {
   const sqlOptions = resolveLaptimeSqlOptions('racings');
   if (!sqlOptions) {
@@ -802,6 +818,11 @@ const server = http.createServer((request, response) => {
 
   if (url.pathname === '/api/laptime-kart-history') {
     void handleLaptimeKartHistory(url, response);
+    return;
+  }
+
+  if (url.pathname === '/api/laptime-kart-history-summary') {
+    void handleLaptimeKartHistorySummary(response);
     return;
   }
 

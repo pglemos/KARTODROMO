@@ -153,7 +153,26 @@ export type KartHistoryItem = {
   bestLapMs: number | null;
   laps: number | null;
   averageLap: string | null;
+  averageLapMs?: number | null;
   matchedBy: 'sensor' | 'plate';
+};
+
+export type KartHistorySummary = {
+  plate: string;
+  matchedBy: 'sensor' | 'plate';
+  raceCount: number;
+  bestLapMs: number | null;
+  averageLapMs: number | null;
+  deviationMs: number | null;
+  bestMonthMs: number | null;
+  best15DaysMs: number | null;
+  best7DaysMs: number | null;
+  lastRaceDate: string | null;
+};
+
+export type KartHistorySummaryResponse = {
+  generatedAt: string;
+  rows: KartHistorySummary[];
 };
 
 export type HistoryWindow = {
@@ -168,4 +187,5 @@ export type HistoryWindow = {
 export type KartHistoryResponse = {
   rows: KartHistoryItem[];
   windows: Record<'7' | '15' | '30' | '60', HistoryWindow>;
+  summary?: KartHistorySummary;
 };

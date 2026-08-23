@@ -1,5 +1,5 @@
 import { apiGet, apiGetWithMeta, apiPatch, apiPost } from '../../lib/api-client';
-import { buildKartHistoryWindows } from '@/lib/equalizacao/history';
+import { buildKartHistorySummary, buildKartHistoryWindows } from '@/lib/equalizacao/history';
 import type {
   Kart,
   KartEqualization,
@@ -7,6 +7,7 @@ import type {
   KartEqualizationSession,
   KartHistoryItem,
   KartHistoryResponse,
+  KartHistorySummaryResponse,
   KartIdentityEvent,
   KartMaintenance,
 } from './equalizacao.types';
@@ -119,5 +120,8 @@ export const getKartHistory = async (kart: Pick<Kart, 'numero' | 'sensor_numero'
   );
   const sensorRows = sensor ? await fetchRows({ sensor }) : [];
   const rows = sensorRows.length ? sensorRows : await fetchRows({ plate: kart.numero });
-  return { rows, windows: buildKartHistoryWindows(rows) };
+  return { rows, windows: buildKartHistoryWindows(rows), summary: buildKartHistorySummary(rows) || undefined };
 };
+
+export const getKartHistorySummary = (): Promise<KartHistorySummaryResponse> =>
+  jsonRequest<KartHistorySummaryResponse>('/api/admin/laptime/kart-history-summary');

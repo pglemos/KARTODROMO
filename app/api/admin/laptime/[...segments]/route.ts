@@ -17,6 +17,7 @@ const ALLOWED_SLUGS = new Set([
   'racing-detail',
   'racing-laps',
   'kart-history',
+  'kart-history-summary',
   'kart-fleet',
   'equalizacao-live',
 ]);
