@@ -109,6 +109,17 @@ const navClubeProto = "      { label: 'Clube', href: '/clube-vantagens', id: 'cl
  * prototype's.
  */
 const mobileFitStyle = `<style data-generated="mobile-fit">
+/* The prototypes use content-box sizing; keep responsive panels inside the viewport. */
+*, *::before, *::after { box-sizing: border-box; }
+[style*="color:#667067"], footer > div:last-child, footer > div:last-child span { color: #829083 !important; }
+@media (max-width: 1100px) {
+  [style*="grid-template-columns"][style*="1.05fr"],
+  [style*="grid-template-columns"][style*="1.2fr"],
+  [style*="grid-template-columns"][style*="1fr 1fr"] { grid-template-columns: 1fr !important; }
+  [style*="grid-template-columns"][style*="repeat(4"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  [role="dialog"] > div { width: 100% !important; max-width: 100% !important; box-sizing: border-box; }
+  [role="dialog"] form { grid-template-columns: 1fr !important; }
+}
 @media (max-width: 720px) {
   [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
   [style*="grid-auto-flow:column"], [style*="grid-auto-flow: column"] { grid-auto-flow: row !important; }
@@ -139,6 +150,8 @@ const mobileFitStyle = `<style data-generated="mobile-fit">
     flex: none;
   }
 
+  h1, h2, h3 { overflow-wrap: anywhere; }
+
   /* Legibilidade: nada abaixo de 11px no celular. */
   small { font-size: 11px !important; }
   [style*="font-size:9px"], [style*="font-size: 9px"],
@@ -153,6 +166,19 @@ const mobileFitStyle = `<style data-generated="mobile-fit">
   [style*="overflow-x:auto"], [style*="overflow-x: auto"] {
     -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
+  }
+}
+</style>
+`;
+
+/** Reduces all motion on public prototypes when the user asks for it. */
+const reducedMotionStyle = `<style data-generated="reduced-motion">
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 </style>
@@ -202,7 +228,7 @@ function build(page, source) {
     // A descrição canônica passa a ser a do registro de rotas, sem duplicar a do protótipo.
     html = html.replace(/\n\s*<meta name="description" content="(?:[^"\\]|\\.)*">(?=\n)/, '');
     html = html.replace('<base href="/">\n', `<base href="/">\n${seoHead(page)}`);
-    html = html.replace('</head>', `${mobileFitStyle}</head>`);
+    html = html.replace('</head>', `${mobileFitStyle}${reducedMotionStyle}</head>`);
     html = html.replace('</body>', `${cleanUrlScript()}</body>`);
 
     if (page.startsWith('clube-')) {

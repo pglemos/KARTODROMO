@@ -45,6 +45,14 @@ const unavailableClubPaths = new Set([
   '/clube-campanhas',
 ]);
 
+const waitForRenderedPage = async (page: Page) => {
+  await page.waitForFunction(() => {
+    const hasInteractiveContent = Boolean(document.querySelector('a[href], button:not([disabled])'));
+    const hasUnresolvedTemplate = /\{\{[^}]+\}\}/.test(document.documentElement.innerHTML);
+    return hasInteractiveContent && !hasUnresolvedTemplate;
+  }, undefined, { timeout: 10_000 });
+};
+
 const auditPage = async (page: Page) => page.evaluate(() => {
   const isVisible = (element: Element) => {
     const htmlElement = element as HTMLElement;
@@ -126,6 +134,11 @@ const auditPage = async (page: Page) => page.evaluate(() => {
     })
     .map((element) => {
       const style = window.getComputedStyle(element);
+      // Outlined display type uses a transparent fill intentionally; its visible
+      // foreground is the non-zero -webkit-text-stroke, not the fill color.
+      if (style.color === 'rgba(0, 0, 0, 0)' && style.webkitTextStrokeWidth !== '0px' && style.webkitTextStrokeWidth !== '') {
+        return null;
+      }
       const foreground = parseRgb(style.color);
       const background = effectiveBackground(element);
       if (!foreground || !background) return null;
@@ -174,11 +187,11 @@ test.describe('pre-delivery checklist', () => {
         if (route.request().resourceType() === 'media') await route.abort();
         else await route.continue();
       });
-      await page.setViewportSize(viewport);
+        await page.setViewportSize(viewport);
 
       for (const path of paths) {
         await page.goto(`${baseUrl}${path}`, { waitUntil: 'domcontentloaded' });
-        await page.waitForTimeout(100);
+        await waitForRenderedPage(page);
         const result = await auditPage(page);
         const expectedCanonical = new URL(path, canonicalOrigin).href;
 
@@ -204,6 +217,7 @@ test.describe('pre-delivery checklist', () => {
     await page.setViewportSize({ width: 1024, height: 768 });
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
+    await waitForRenderedPage(page);
     const result = await page.evaluate(() => {
       const maxDurationMs = (value: string) => Math.max(...value.split(',').map((part) => {
         const trimmed = part.trim();

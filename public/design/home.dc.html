@@ -18,6 +18,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="./support.js"></script>
 <style data-generated="mobile-fit">
+/* The prototypes use content-box sizing; keep responsive panels inside the viewport. */
+*, *::before, *::after { box-sizing: border-box; }
+[style*="color:#667067"], footer > div:last-child, footer > div:last-child span { color: #829083 !important; }
+@media (max-width: 1100px) {
+  [style*="grid-template-columns"][style*="1.05fr"],
+  [style*="grid-template-columns"][style*="1.2fr"],
+  [style*="grid-template-columns"][style*="1fr 1fr"] { grid-template-columns: 1fr !important; }
+  [style*="grid-template-columns"][style*="repeat(4"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  [role="dialog"] > div { width: 100% !important; max-width: 100% !important; box-sizing: border-box; }
+  [role="dialog"] form { grid-template-columns: 1fr !important; }
+}
 @media (max-width: 720px) {
   [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
   [style*="grid-auto-flow:column"], [style*="grid-auto-flow: column"] { grid-auto-flow: row !important; }
@@ -48,6 +59,8 @@
     flex: none;
   }
 
+  h1, h2, h3 { overflow-wrap: anywhere; }
+
   /* Legibilidade: nada abaixo de 11px no celular. */
   small { font-size: 11px !important; }
   [style*="font-size:9px"], [style*="font-size: 9px"],
@@ -62,6 +75,16 @@
   [style*="overflow-x:auto"], [style*="overflow-x: auto"] {
     -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
+  }
+}
+</style>
+<style data-generated="reduced-motion">
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 </style>
@@ -94,7 +117,7 @@
 <div data-screen-label="Home" style="min-height:100vh; background:#030504; color:#f7faf6;">
 
   <a href="#conteudo" style="{{ skipLinkStyle }}">Pular para o conteúdo</a>
-  <div id="progress" aria-hidden="true" style="position:fixed; top:0; left:0; width:100%; height:3px; z-index:520; transform:scaleX(0); transform-origin:left; background:linear-gradient(90deg,#00e676,#3ce396); box-shadow:0 0 22px rgba(0,230,118,.55); pointer-events:none;"></div>
+  <div id="progress" aria-hidden="true" style="position:fixed; top:0; left:0; width:100%; height:3px; z-index:520; transform:scaleX(0); transform-origin:left; background:linear-gradient(90deg,#00e676,#3ce396); box-shadow:0 1px 6px rgba(0,0,0,.35); pointer-events:none;"></div>
 
   <!-- HEADER -->
   <header style="{{ headerStyle }}">
@@ -105,7 +128,7 @@
           <a href="{{ link.href }}" aria-current="{{ link.current }}" style="{{ link.style }}" style-hover="color:#ffffff; border-bottom-color:#00e676;">{{ link.label }}</a>
         </sc-for>
       </nav>
-      <a href="https://tools.mylaptime.com.br/booking?uid=5729bbc1-572b-4e32-84ec-e9e93ab08ced" target="_blank" rel="noopener noreferrer" style="{{ reservaCtaStyle }}" style-hover="transform:translateY(-3px); box-shadow:0 22px 55px rgba(0,230,118,.4);">
+      <a href="https://tools.mylaptime.com.br/booking?uid=5729bbc1-572b-4e32-84ec-e9e93ab08ced" target="_blank" rel="noopener noreferrer" style="{{ reservaCtaStyle }}" style-hover="transform:translateY(-3px); box-shadow:0 14px 30px rgba(0,0,0,.32);">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="1"/><path d="M16 3v4M8 3v4M3 10h18"/></svg> Reservar agora
       </a>
       <button type="button" aria-label="{{ menuToggleLabel }}" aria-controls="mobile-navigation" aria-expanded="{{ mobileNavOpen }}" onClick="{{ toggleMobileNav }}" style="{{ hamburgerBtnStyle }}">
@@ -146,7 +169,7 @@
           Transforme aniversários e encontros de amigos em uma disputa cinematográfica, com kart, cronometragem, pódio e estrutura completa.
         </p>
         <div data-reveal style="display:flex; flex-wrap:wrap; gap:12px; margin-top:30px; opacity:0; transform:translateY(18px); transition:opacity .7s cubic-bezier(.16,1,.3,1) 240ms, transform .7s cubic-bezier(.16,1,.3,1) 240ms;">
-          <button type="button" onClick="{{ openModal }}" aria-haspopup="dialog" aria-controls="event-modal" style="appearance:none; border:0; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-weight:400; font-size:13px; letter-spacing:0.04em; box-shadow:0 18px 46px rgba(0,230,118,.2); transition:transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s;" style-hover="transform:translateY(-4px); box-shadow:0 24px 70px rgba(0,230,118,.4);">
+          <button type="button" onClick="{{ openModal }}" aria-haspopup="dialog" aria-controls="event-modal" style="appearance:none; border:0; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-weight:400; font-size:13px; letter-spacing:0.04em; box-shadow:0 12px 28px rgba(0,0,0,.28); transition:transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s;" style-hover="transform:translateY(-4px); box-shadow:0 18px 36px rgba(0,0,0,.32);">
             Reservar meu grupo <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg>
           </button>
           <a href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Gostaria%20de%20ajuda%20para%20reservar%20minha%20corrida%20no%20Kart%C3%B3dromo%20de%20Betim." target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-weight:400; font-size:13px; letter-spacing:0.04em; text-decoration:none; backdrop-filter:blur(12px); transition:border-color .25s, color .25s, transform .25s cubic-bezier(.16,1,.3,1);" style-hover="border-color:#00e676; color:#00e676; transform:translateY(-4px);">
@@ -171,7 +194,7 @@
             </div>
           </sc-for>
         </div>
-        <button type="button" onClick="{{ openModal }}" aria-haspopup="dialog" aria-controls="event-modal" style="width:100%; appearance:none; border:0; cursor:pointer; min-height:52px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; transition:transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s;" style-hover="transform:translateY(-3px); box-shadow:0 18px 44px rgba(0,230,118,.4);">Montar meu grupo</button>
+        <button type="button" onClick="{{ openModal }}" aria-haspopup="dialog" aria-controls="event-modal" style="width:100%; appearance:none; border:0; cursor:pointer; min-height:52px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; transition:transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s;" style-hover="transform:translateY(-3px); box-shadow:0 14px 30px rgba(0,0,0,.32);">Montar meu grupo</button>
       </aside>
     </div>
   </section>
@@ -215,7 +238,7 @@
               <h3 style="margin:0; max-width:8ch; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(32px,3.4vw,48px); line-height:0.82;">{{ opt.title }}</h3>
               <p style="margin:16px 0; color:#a8b2aa; font-size:15px; line-height:1.5;">{{ opt.text }}</p>
               <sc-if value="{{ opt.price }}"><div style="display:flex; gap:10px; align-items:flex-end; margin:18px 0;"><strong style="font-family:'Anton',sans-serif; font-weight:400; font-size:40px; color:#00e676; line-height:0.7;">{{ opt.price }}</strong><span style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#a8b2aa;">{{ opt.priceNote }}</span></div></sc-if>
-              <button type="button" onClick="{{ openModal }}" aria-haspopup="dialog" aria-controls="event-modal" style="appearance:none; border:0; cursor:pointer; min-height:46px; padding:0 20px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; letter-spacing:0.04em; transition:transform .25s, box-shadow .25s;" style-hover="transform:translateY(-3px); box-shadow:0 14px 34px rgba(0,230,118,.4);">{{ opt.cta }}</button>
+              <button type="button" onClick="{{ openModal }}" aria-haspopup="dialog" aria-controls="event-modal" style="appearance:none; border:0; cursor:pointer; min-height:46px; padding:0 20px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; letter-spacing:0.04em; transition:transform .25s, box-shadow .25s;" style-hover="transform:translateY(-3px); box-shadow:0 12px 26px rgba(0,0,0,.3);">{{ opt.cta }}</button>
             </div>
           </article>
         </sc-for>
@@ -276,7 +299,7 @@
       <div style="min-width:0; display:grid; grid-template-columns:1fr 1fr; gap:18px 28px;">
         <sc-for list="{{ features }}" as="f" hint-placeholder-count="6">
           <div style="display:grid; grid-template-columns:24px 1fr; gap:12px;">
-            <span aria-hidden="true" style="width:20px; height:20px; border:1px solid #00e676; border-radius:50%; display:grid; place-items:center; color:#00e676; font-size:11px;">✓</span>
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00e676" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px; border:1px solid #00e676; border-radius:50%; padding:3px; box-sizing:border-box;"><path d="m7 12 3 3 7-7"/></svg>
             <div><strong style="font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:14px;">{{ f.title }}</strong><p style="margin:4px 0 0; color:#a8b2aa; font-size:13px; line-height:1.4;">{{ f.text }}</p></div>
           </div>
         </sc-for>
@@ -293,7 +316,7 @@
           <p style="margin:14px 0 0; color:#a8b2aa; font-size:18px;">Reserve seu grupo e transforme a próxima comemoração em uma corrida inesquecível.</p>
         </div>
         <div style="display:grid; gap:12px; position:relative; z-index:2;">
-          <a href="https://tools.mylaptime.com.br/booking?uid=5729bbc1-572b-4e32-84ec-e9e93ab08ced" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none; transition:transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s;" style-hover="transform:translateY(-4px); box-shadow:0 22px 55px rgba(0,230,118,.4);">Reservar meu grupo <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></a>
+          <a href="https://tools.mylaptime.com.br/booking?uid=5729bbc1-572b-4e32-84ec-e9e93ab08ced" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none; transition:transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s;" style-hover="transform:translateY(-4px); box-shadow:0 14px 30px rgba(0,0,0,.32);">Reservar meu grupo <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></a>
           <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none; transition:border-color .25s, color .25s, transform .25s cubic-bezier(.16,1,.3,1);" style-hover="border-color:#00e676; color:#00e676; transform:translateY(-4px);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-11.9 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5Z"/><path d="M8.5 8.5c.5 3 2 4.5 5 5"/></svg> Falar no WhatsApp</a>
         </div>
       </div>
@@ -314,7 +337,7 @@
         <div style="display:grid; gap:7px;"><label for="lead-pessoas" style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#a8b2aa;">Quantidade de pessoas</label><input id="lead-pessoas" name="pessoas" inputmode="numeric" type="number" min="8" placeholder="Ex.: 25" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#070b08; color:#fff; padding:15px; outline:none;"></div>
         <div style="display:grid; gap:7px;"><label for="lead-data" style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#a8b2aa;">Data desejada</label><input id="lead-data" name="data" type="date" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#070b08; color:#fff; padding:15px; outline:none;"></div>
         <div style="grid-column:1/-1; display:grid; gap:7px;"><label for="lead-mensagem" style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#a8b2aa;">Mensagem</label><textarea id="lead-mensagem" name="mensagem" placeholder="Conte um pouco sobre o evento" style="width:100%; min-height:100px; border:1px solid rgba(255,255,255,.12); background:#070b08; color:#fff; padding:15px; outline:none; resize:vertical;"></textarea></div>
-        <div style="grid-column:1/-1;"><button type="submit" style="width:100%; appearance:none; border:0; cursor:pointer; min-height:56px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; transition:transform .25s, box-shadow .25s;" style-hover="transform:translateY(-3px); box-shadow:0 18px 44px rgba(0,230,118,.4);">Enviar pelo WhatsApp</button></div>
+        <div style="grid-column:1/-1;"><button type="submit" style="width:100%; appearance:none; border:0; cursor:pointer; min-height:56px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; transition:transform .25s, box-shadow .25s;" style-hover="transform:translateY(-3px); box-shadow:0 14px 30px rgba(0,0,0,.32);">Enviar pelo WhatsApp</button></div>
       </form>
     </div>
   </div>
@@ -347,7 +370,7 @@
     </div>
   </footer>
 
-  <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" style="position:fixed; right:20px; bottom:20px; z-index:250; width:58px; height:58px; border-radius:50%; display:grid; place-items:center; background:#20d466; color:#fff; box-shadow:0 18px 45px rgba(32,212,102,.35); text-decoration:none; transition:transform .25s;" style-hover="transform:translateY(-5px) scale(1.05);">
+  <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" style="position:fixed; right:20px; bottom:20px; z-index:250; width:58px; height:58px; border-radius:50%; display:grid; place-items:center; background:#20d466; color:#fff; box-shadow:0 12px 28px rgba(0,0,0,.3); text-decoration:none; transition:transform .25s;" style-hover="transform:translateY(-5px) scale(1.05);">
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-11.9 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5Z"/><path d="M8.5 8.5c.5 3 2 4.5 5 5"/></svg>
   </a>
 </div>

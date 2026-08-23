@@ -18,6 +18,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="./support.js"></script>
 <style data-generated="mobile-fit">
+/* The prototypes use content-box sizing; keep responsive panels inside the viewport. */
+*, *::before, *::after { box-sizing: border-box; }
+[style*="color:#667067"], footer > div:last-child, footer > div:last-child span { color: #829083 !important; }
+@media (max-width: 1100px) {
+  [style*="grid-template-columns"][style*="1.05fr"],
+  [style*="grid-template-columns"][style*="1.2fr"],
+  [style*="grid-template-columns"][style*="1fr 1fr"] { grid-template-columns: 1fr !important; }
+  [style*="grid-template-columns"][style*="repeat(4"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  [role="dialog"] > div { width: 100% !important; max-width: 100% !important; box-sizing: border-box; }
+  [role="dialog"] form { grid-template-columns: 1fr !important; }
+}
 @media (max-width: 720px) {
   [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
   [style*="grid-auto-flow:column"], [style*="grid-auto-flow: column"] { grid-auto-flow: row !important; }
@@ -48,6 +59,8 @@
     flex: none;
   }
 
+  h1, h2, h3 { overflow-wrap: anywhere; }
+
   /* Legibilidade: nada abaixo de 11px no celular. */
   small { font-size: 11px !important; }
   [style*="font-size:9px"], [style*="font-size: 9px"],
@@ -65,6 +78,16 @@
   }
 }
 </style>
+<style data-generated="reduced-motion">
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+</style>
 </head>
 <body>
 <x-dc>
@@ -78,99 +101,51 @@
     body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size: 17px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
     a { color: #00e676; }
     a:hover { color: #3ce396; }
-    a:focus-visible { outline: 2px solid #00e676; outline-offset: 2px; }
+    button, input, select, textarea { font: inherit; }
+    a:focus-visible { outline: 2px solid #00e676; outline-offset: 3px; }
     @view-transition { navigation: auto; }
-    ::view-transition-old(root) { animation: 260ms cubic-bezier(.16,1,.3,1) both kib-page-out; }
-    ::view-transition-new(root) { animation: 320ms cubic-bezier(.16,1,.3,1) both kib-page-in; }
-    @keyframes kib-page-out { to { opacity: 0; transform: translateY(-8px); } }
-    @keyframes kib-page-in { from { opacity: 0; transform: translateY(8px); } }
+    ::view-transition-old(root) { animation: 320ms cubic-bezier(.16,1,.3,1) both kib-page-out; }
+    ::view-transition-new(root) { animation: 420ms cubic-bezier(.16,1,.3,1) both kib-page-in; }
+    @keyframes kib-page-out { to { opacity: 0; transform: translateX(-24px); filter: blur(3px); } }
+    @keyframes kib-page-in { from { opacity: 0; transform: translateX(24px); filter: blur(3px); } }
     @media (prefers-reduced-motion: reduce) { ::view-transition-old(root), ::view-transition-new(root) { animation: none; } }
   </style>
 </helmet>
-<div data-screen-label="Clube — Campanhas" style="min-height:100vh; background:#030504; color:#f7faf6;">
+<div data-screen-label="Campanhas Especiais" style="min-height:100vh; background:#030504; color:#f7faf6;">
 
-  <header style="position:sticky; top:0; z-index:100; background:rgba(3,5,4,.92); backdrop-filter:blur(18px); border-bottom:1px solid rgba(255,255,255,.12);">
-    <div style="width:min(1200px,calc(100% - 40px)); margin:0 auto; min-height:74px; display:flex; align-items:center; justify-content:space-between; gap:16px;">
-      <a href="/clube-vantagens" style="width:150px; flex:none;"><img src="assets/brand/kib-logo.png" alt="Kartódromo Internacional de Betim" style="width:100%;"></a>
-      <div style="display:flex; align-items:center; gap:14px;">
-        <span style="{{ styles.pointsChip }}">{{ pontos }} pts</span>
-        <a href="/clube-vantagens" style="font-size:12.5px; font-weight:700; color:#a8b2aa; text-decoration:none;">Sair</a>
-      </div>
+  <header style="position:fixed; inset:0 0 auto; z-index:300; background:rgba(3,5,4,.92); backdrop-filter:blur(18px); border-bottom:1px solid rgba(255,255,255,.12);">
+    <div style="width:min(980px,calc(100% - 48px)); margin:0 auto; min-height:78px; display:flex; align-items:center; justify-content:space-between; gap:24px;">
+      <a href="/" style="width:160px; flex:none; cursor:pointer; transition:opacity .2s;"><img src="assets/brand/kib-logo.png" alt="Kartódromo Internacional de Betim" style="width:100%;"></a>
+      <a href="/clube-vantagens" style="font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; letter-spacing:0.04em; color:#e1e6e1; text-decoration:none; cursor:pointer; transition:color .2s;">← Clube de Vantagens</a>
     </div>
-    <nav aria-label="Menu do portal" style="width:min(1200px,calc(100% - 40px)); margin:0 auto; display:flex; gap:4px; overflow-x:auto; padding-bottom:2px;">
-      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="8"><a href="{{ t.href }}" style="{{ t.style }}">{{ t.label }}</a></sc-for>
-    </nav>
   </header>
 
-  <main style="width:min(1200px,calc(100% - 40px)); margin:0 auto; padding:36px 0 80px; display:grid; gap:22px;">
-    <div>
-      <p style="margin:0 0 4px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.14em; text-transform:uppercase;">Campanhas</p>
-      <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(30px,4vw,44px); line-height:0.9;">Bônus e promoções</h1>
-    </div>
-    <div style="{{ styles.grid }}">
-      <sc-for list="{{ campaigns }}" as="c" hint-placeholder-count="3">
-        <article style="{{ styles.card }}">
-          <div style="display:flex; align-items:center; justify-content:space-between;">
-            <strong style="font-size:16px;">{{ c.nome }}</strong>
-            <span style="{{ c.statusStyle }}">{{ c.statusLabel }}</span>
+  <main style="padding:148px 24px 86px; display:grid; justify-items:center;">
+    <section style="width:min(760px,100%); border:1px solid rgba(255,255,255,.12); background:#0b100c; padding:clamp(28px,6vw,64px);">
+      <div style="display:flex; align-items:flex-start; gap:18px;">
+        <span aria-hidden="true" style="display:grid; place-items:center; width:48px; height:48px; flex:none; border:1px solid rgba(0,230,118,.35); color:#00e676;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/></svg>
+        </span>
+        <div style="min-width:0;">
+          <p style="margin:2px 0 12px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Portal em implantação</p>
+          <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(34px,6vw,64px); line-height:0.88; overflow-wrap:anywhere;">Campanhas Especiais</h1>
+          <p style="margin:22px 0 0; color:#d7ded8; font-size:clamp(16px,2vw,19px); line-height:1.55;">As campanhas serão publicadas somente quando critérios, período, benefícios e regulamento estiverem definidos.</p>
+          <p style="margin:16px 0 0; color:#a8b2aa; font-size:15px; line-height:1.6;">Esta área será liberada somente depois da integração segura com o cadastro de pilotos, as corridas e a pontuação real. <strong style="color:#d7ded8;">Nenhum cadastro, saldo, alteração de perfil ou resgate é processado nesta página neste momento.</strong></p>
+          <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:30px;">
+            <a href="/clube-vantagens" style="display:inline-flex; align-items:center; justify-content:center; min-height:52px; padding:0 22px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none; cursor:pointer; transition:transform .2s,box-shadow .2s;">Conhecer o clube</a>
+            <a href="/clube-regulamento" style="display:inline-flex; align-items:center; justify-content:center; min-height:52px; padding:0 22px; border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none; cursor:pointer; transition:border-color .2s,color .2s;">Ver regulamento</a>
           </div>
-          <p style="margin:10px 0 0; color:#a8b2aa; font-size:13.5px; line-height:1.5;">{{ c.desc }}</p>
-        </article>
-      </sc-for>
-    </div>
+        </div>
+      </div>
+    </section>
   </main>
+
+  <footer style="border-top:1px solid rgba(255,255,255,.12); padding:24px; background:#020302;">
+    <div style="width:min(980px,100%); margin:0 auto; color:#829083; font-size:12px; letter-spacing:0.04em;">Clube de Vantagens · Kartódromo Internacional de Betim</div>
+  </footer>
 </div>
 
 </x-dc>
-<script type="text/x-dc" data-dc-script>
-class Component extends DCLogic {
-  currentTab = 'campanhas';
-  state = { customer: null, campaigns: [] };
-
-  componentDidMount() {
-    import('./clube-shared.js').then((m) => { this.setState({ customer: m.CUSTOMER, campaigns: m.CAMPAIGNS }); });
-  }
-
-  tabDefs() {
-    return [
-      { key: 'painel', label: 'Meu Painel', href: '/clube-painel' },
-      { key: 'pontuacao', label: 'Minha Pontuação', href: '/clube-pontuacao' },
-      { key: 'corridas', label: 'Histórico de Corridas', href: '/clube-corridas' },
-      { key: 'resgates', label: 'Histórico de Resgates', href: '/clube-resgates' },
-      { key: 'catalogo', label: 'Catálogo', href: '/clube-catalogo' },
-      { key: 'campanhas', label: 'Campanhas', href: '/clube-campanhas' },
-      { key: 'perfil', label: 'Meu Perfil', href: '/clube-perfil' },
-      { key: 'regulamento', label: 'Regulamento', href: '/clube-regulamento' },
-    ];
-  }
-
-  styles() {
-    return {
-      pointsChip: { fontSize: '12px', fontWeight: 700, padding: '7px 13px', borderRadius: '999px', background: 'rgba(0,230,118,.14)', color: '#00e676' },
-      grid: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '14px' },
-      card: { background: '#0b100c', border: '1px solid rgba(255,255,255,.12)', padding: '20px' },
-    };
-  }
-
-  renderVals() {
-    const { customer, campaigns } = this.state;
-    const s = this.styles();
-    const tabs = this.tabDefs().map((t) => ({
-      label: t.label, href: t.href,
-      style: { flex: 'none', padding: '10px 14px', fontSize: '12.5px', fontWeight: 700, textDecoration: 'none', borderBottom: '2px solid ' + (t.key === this.currentTab ? '#00e676' : 'transparent'), color: t.key === this.currentTab ? '#fff' : '#a8b2aa', whiteSpace: 'nowrap' },
-    }));
-    if (!customer) return { styles: s, tabs, pontos: 0, campaigns: [] };
-
-    const campaignsOut = campaigns.map((c) => ({
-      nome: c.nome, desc: c.desc,
-      statusLabel: c.ativa ? 'Ativa' : 'Em breve',
-      statusStyle: { fontSize: '10.5px', fontWeight: 700, padding: '4px 10px', borderRadius: '999px', background: c.ativa ? 'rgba(0,230,118,.14)' : 'rgba(255,255,255,.08)', color: c.ativa ? '#00e676' : '#a8b2aa' },
-    }));
-    return { styles: s, tabs, pontos: customer.pontos, campaigns: campaignsOut };
-  }
-}
-
-</script>
 <script>(function(){var n=location.pathname.split("/").pop();n=n.endsWith(".html")?n.slice(0,-5):n;n=n.endsWith(".dc")?n.slice(0,-3):n;var m={"home":"/","pista":"/pista","kart-locacao":"/kart-locacao","campeonatos":"/campeonatos","eventos":"/eventos","duvidas":"/duvidas","kac":"/kac","kac-super":"/kac-super","200-milhas":"/200-milhas","500-milhas":"/500-milhas","clube-vantagens":"/clube-vantagens","clube-cadastro":"/clube-cadastro","clube-consulta":"/clube-consulta","clube-painel":"/clube-painel","clube-corridas":"/clube-corridas","clube-pontuacao":"/clube-pontuacao","clube-catalogo":"/clube-catalogo","clube-resgates":"/clube-resgates","clube-perfil":"/clube-perfil","clube-regulamento":"/clube-regulamento","clube-campanhas":"/clube-campanhas"};if(m[n]&&location.pathname!==m[n])history.replaceState(null,"",m[n]+location.hash)})();</script>
 <script data-generated="club-tab-focus">(function(){function focusTab(){var nav=document.querySelector('nav[aria-label="Menu do portal"]');if(!nav)return false;var current=nav.querySelector('a[href="'+location.pathname+'"]');if(!current)return false;if(nav.scrollWidth>nav.clientWidth+1){var offset=current.offsetLeft-(nav.clientWidth-current.offsetWidth)/2;nav.scrollTo({left:Math.max(0,offset),behavior:'auto'})}current.setAttribute('aria-current','page');return true}if(!focusTab()){var tries=0;var timer=setInterval(function(){if(focusTab()||++tries>40)clearInterval(timer)},100)}})();</script>
 </body>

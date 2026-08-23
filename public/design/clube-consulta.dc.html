@@ -18,6 +18,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="./support.js"></script>
 <style data-generated="mobile-fit">
+/* The prototypes use content-box sizing; keep responsive panels inside the viewport. */
+*, *::before, *::after { box-sizing: border-box; }
+[style*="color:#667067"], footer > div:last-child, footer > div:last-child span { color: #829083 !important; }
+@media (max-width: 1100px) {
+  [style*="grid-template-columns"][style*="1.05fr"],
+  [style*="grid-template-columns"][style*="1.2fr"],
+  [style*="grid-template-columns"][style*="1fr 1fr"] { grid-template-columns: 1fr !important; }
+  [style*="grid-template-columns"][style*="repeat(4"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  [role="dialog"] > div { width: 100% !important; max-width: 100% !important; box-sizing: border-box; }
+  [role="dialog"] form { grid-template-columns: 1fr !important; }
+}
 @media (max-width: 720px) {
   [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
   [style*="grid-auto-flow:column"], [style*="grid-auto-flow: column"] { grid-auto-flow: row !important; }
@@ -48,6 +59,8 @@
     flex: none;
   }
 
+  h1, h2, h3 { overflow-wrap: anywhere; }
+
   /* Legibilidade: nada abaixo de 11px no celular. */
   small { font-size: 11px !important; }
   [style*="font-size:9px"], [style*="font-size: 9px"],
@@ -65,6 +78,16 @@
   }
 }
 </style>
+<style data-generated="reduced-motion">
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+</style>
 </head>
 <body>
 <x-dc>
@@ -78,8 +101,8 @@
     body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size: 17px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
     a { color: #00e676; }
     a:hover { color: #3ce396; }
-    button, input { font: inherit; }
-    input:focus, button:focus-visible, a:focus-visible { outline: 2px solid #00e676; outline-offset: 2px; }
+    button, input, select, textarea { font: inherit; }
+    a:focus-visible { outline: 2px solid #00e676; outline-offset: 3px; }
     @view-transition { navigation: auto; }
     ::view-transition-old(root) { animation: 320ms cubic-bezier(.16,1,.3,1) both kib-page-out; }
     ::view-transition-new(root) { animation: 420ms cubic-bezier(.16,1,.3,1) both kib-page-in; }
@@ -88,99 +111,41 @@
     @media (prefers-reduced-motion: reduce) { ::view-transition-old(root), ::view-transition-new(root) { animation: none; } }
   </style>
 </helmet>
-<div data-screen-label="Consultar Pontos" style="min-height:100vh; background:#030504; color:#f7faf6;">
+<div data-screen-label="Consulta de Pontos" style="min-height:100vh; background:#030504; color:#f7faf6;">
 
-  <header style="position:fixed; inset:0 0 auto; z-index:300; background:rgba(3,5,4,.9); backdrop-filter:blur(18px); border-bottom:1px solid rgba(255,255,255,.12);">
-    <div style="width:min(900px,calc(100% - 48px)); margin:0 auto; min-height:78px; display:flex; align-items:center; justify-content:space-between; gap:24px;">
-      <a href="/" style="width:160px; flex:none;"><img src="assets/brand/kib-logo.png" alt="Kartódromo Internacional de Betim" style="width:100%;"></a>
-      <a href="/clube-vantagens" style="font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; letter-spacing:0.04em; color:#e1e6e1; text-decoration:none;">← Clube de Vantagens</a>
+  <header style="position:fixed; inset:0 0 auto; z-index:300; background:rgba(3,5,4,.92); backdrop-filter:blur(18px); border-bottom:1px solid rgba(255,255,255,.12);">
+    <div style="width:min(980px,calc(100% - 48px)); margin:0 auto; min-height:78px; display:flex; align-items:center; justify-content:space-between; gap:24px;">
+      <a href="/" style="width:160px; flex:none; cursor:pointer; transition:opacity .2s;"><img src="assets/brand/kib-logo.png" alt="Kartódromo Internacional de Betim" style="width:100%;"></a>
+      <a href="/clube-vantagens" style="font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; letter-spacing:0.04em; color:#e1e6e1; text-decoration:none; cursor:pointer; transition:color .2s;">← Clube de Vantagens</a>
     </div>
   </header>
 
-  <main style="padding:150px 24px 90px; display:grid; justify-items:center;">
-    <div style="width:min(560px,100%);">
-      <p style="margin:0 0 12px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase; text-align:center;">Clube de Vantagens</p>
-      <h1 style="margin:0; text-align:center; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(34px,5vw,50px); line-height:0.9;">Consultar meus pontos</h1>
-      <p style="margin:16px 0 0; text-align:center; color:#a8b2aa; font-size:15px; line-height:1.5;">Digite seu CPF para ver seu saldo, histórico e recompensas disponíveis.</p>
-
-      <form onSubmit="{{ onSubmit }}" style="margin-top:34px; display:flex; gap:10px; flex-wrap:wrap;">
-        <input value="{{ cpfInput }}" onChange="{{ onCpfChange }}" inputmode="numeric" placeholder="000.000.000-00" aria-label="CPF" style="flex:1; min-width:220px; height:54px; border:1px solid rgba(255,255,255,.18); background:#0b100c; color:#fff; padding:0 16px; font-size:16px; outline:none;">
-        <button type="submit" style="min-height:54px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); border:0; cursor:pointer; background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em;">{{ submitLabel }}</button>
-      </form>
-      <sc-if value="{{ formError }}"><p style="margin:12px 0 0; color:#ff6b6b; font-size:13.5px;">{{ formError }}</p></sc-if>
-
-      <sc-if value="{{ result }}">
-        <div style="margin-top:34px; border:1px solid rgba(255,255,255,.18); background:#0b100c; padding:28px;">
-          <p style="margin:0 0 4px; color:#a8b2aa; font-size:13px;">{{ result.cpfMasked }}</p>
-          <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:26px;">{{ result.nome }}</h2>
-          <div style="display:flex; align-items:flex-end; gap:10px; margin-top:20px; padding:18px 0; border-block:1px solid rgba(255,255,255,.12);">
-            <strong style="font-family:'Anton',sans-serif; font-weight:400; font-size:56px; line-height:0.7; color:#00e676;">{{ result.pontos }}</strong>
-            <span style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; margin-bottom:4px; color:#a8b2aa;">pontos disponíveis</span>
+  <main style="padding:148px 24px 86px; display:grid; justify-items:center;">
+    <section style="width:min(760px,100%); border:1px solid rgba(255,255,255,.12); background:#0b100c; padding:clamp(28px,6vw,64px);">
+      <div style="display:flex; align-items:flex-start; gap:18px;">
+        <span aria-hidden="true" style="display:grid; place-items:center; width:48px; height:48px; flex:none; border:1px solid rgba(0,230,118,.35); color:#00e676;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/></svg>
+        </span>
+        <div style="min-width:0;">
+          <p style="margin:2px 0 12px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Portal em implantação</p>
+          <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(34px,6vw,64px); line-height:0.88; overflow-wrap:anywhere;">Consulta de Pontos</h1>
+          <p style="margin:22px 0 0; color:#d7ded8; font-size:clamp(16px,2vw,19px); line-height:1.55;">A consulta autenticada de pontos será liberada somente quando houver integração segura com cadastro, corridas e pontuação real.</p>
+          <p style="margin:16px 0 0; color:#a8b2aa; font-size:15px; line-height:1.6;">Esta área será liberada somente depois da integração segura com o cadastro de pilotos, as corridas e a pontuação real. <strong style="color:#d7ded8;">Nenhum cadastro, saldo, alteração de perfil ou resgate é processado nesta página neste momento.</strong></p>
+          <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:30px;">
+            <a href="/clube-vantagens" style="display:inline-flex; align-items:center; justify-content:center; min-height:52px; padding:0 22px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none; cursor:pointer; transition:transform .2s,box-shadow .2s;">Conhecer o clube</a>
+            <a href="/clube-regulamento" style="display:inline-flex; align-items:center; justify-content:center; min-height:52px; padding:0 22px; border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none; cursor:pointer; transition:border-color .2s,color .2s;">Ver regulamento</a>
           </div>
-          <div style="margin-top:16px;">
-            <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#a8b2aa; margin-bottom:8px;"><span>Próxima recompensa: {{ result.nextRewardName }}</span><span>{{ result.progressLabel }}</span></div>
-            <div style="height:8px; background:rgba(255,255,255,.1); overflow:hidden;"><div style="{{ result.progressBarStyle }}"></div></div>
-          </div>
-          <h3 style="margin:26px 0 12px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:14px; color:#a8b2aa;">Movimentações recentes</h3>
-          <div style="display:grid; gap:1px; background:rgba(255,255,255,.1);">
-            <sc-for list="{{ result.history }}" as="h" hint-placeholder-count="4">
-              <div style="display:flex; justify-content:space-between; background:#070b08; padding:12px 14px; font-size:13.5px;">
-                <span style="color:#d7ddd8;">{{ h.dataLabel }} · {{ h.descricao }}</span>
-                <strong style="{{ h.pontosStyle }}">{{ h.pontosLabel }}</strong>
-              </div>
-            </sc-for>
-          </div>
-          <a href="/clube-catalogo" style="display:block; margin-top:22px; text-align:center; min-height:50px; line-height:50px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12.5px; letter-spacing:0.04em; text-decoration:none;">Ver catálogo de recompensas</a>
         </div>
-      </sc-if>
-    </div>
+      </div>
+    </section>
   </main>
+
+  <footer style="border-top:1px solid rgba(255,255,255,.12); padding:24px; background:#020302;">
+    <div style="width:min(980px,100%); margin:0 auto; color:#829083; font-size:12px; letter-spacing:0.04em;">Clube de Vantagens · Kartódromo Internacional de Betim</div>
+  </footer>
 </div>
 
 </x-dc>
-<script type="text/x-dc" data-dc-script>
-class Component extends DCLogic {
-  state = { cpfInput: '', result: null, formError: null, loading: false };
-
-  onCpfChange = (e) => this.setState({ cpfInput: e.target.value, formError: null });
-
-  onSubmit = (e) => {
-    e.preventDefault();
-    const digits = this.state.cpfInput.replace(/\D/g, '');
-    if (digits.length !== 11) { this.setState({ formError: 'Informe um CPF válido com 11 dígitos.', result: null }); return; }
-    this.setState({ loading: true, formError: null });
-    import('./clube-shared.js').then((m) => {
-      const found = m.lookupByCpf(digits);
-      if (!found) { this.setState({ loading: false, formError: 'Nenhum cadastro encontrado para esse CPF.', result: null }); return; }
-      const next = m.nextReward(found.pontos);
-      const pct = Math.max(4, Math.min(100, Math.round((found.pontos / next.pontos) * 100)));
-      const history = found.history.map((h) => ({
-        dataLabel: m.formatDateBR(h.data), descricao: h.descricao,
-        pontosLabel: (h.pontos > 0 ? '+' : '') + h.pontos,
-        pontosStyle: { color: h.pontos > 0 ? '#00e676' : '#ff6b6b' },
-      }));
-      this.setState({
-        loading: false,
-        result: {
-          nome: found.nome, cpfMasked: found.cpfMasked, pontos: found.pontos,
-          nextRewardName: next.nome, progressLabel: found.pontos + ' / ' + next.pontos + ' pts',
-          progressBarStyle: { height: '100%', width: pct + '%', background: 'linear-gradient(90deg,#00e676,#3ce396)' },
-          history,
-        },
-      });
-    });
-  };
-
-  renderVals() {
-    const { cpfInput, result, formError, loading } = this.state;
-    return {
-      cpfInput, onCpfChange: this.onCpfChange, onSubmit: this.onSubmit,
-      submitLabel: loading ? 'Consultando…' : 'Consultar', formError, result,
-    };
-  }
-}
-
-</script>
 <script>(function(){var n=location.pathname.split("/").pop();n=n.endsWith(".html")?n.slice(0,-5):n;n=n.endsWith(".dc")?n.slice(0,-3):n;var m={"home":"/","pista":"/pista","kart-locacao":"/kart-locacao","campeonatos":"/campeonatos","eventos":"/eventos","duvidas":"/duvidas","kac":"/kac","kac-super":"/kac-super","200-milhas":"/200-milhas","500-milhas":"/500-milhas","clube-vantagens":"/clube-vantagens","clube-cadastro":"/clube-cadastro","clube-consulta":"/clube-consulta","clube-painel":"/clube-painel","clube-corridas":"/clube-corridas","clube-pontuacao":"/clube-pontuacao","clube-catalogo":"/clube-catalogo","clube-resgates":"/clube-resgates","clube-perfil":"/clube-perfil","clube-regulamento":"/clube-regulamento","clube-campanhas":"/clube-campanhas"};if(m[n]&&location.pathname!==m[n])history.replaceState(null,"",m[n]+location.hash)})();</script>
 <script data-generated="club-tab-focus">(function(){function focusTab(){var nav=document.querySelector('nav[aria-label="Menu do portal"]');if(!nav)return false;var current=nav.querySelector('a[href="'+location.pathname+'"]');if(!current)return false;if(nav.scrollWidth>nav.clientWidth+1){var offset=current.offsetLeft-(nav.clientWidth-current.offsetWidth)/2;nav.scrollTo({left:Math.max(0,offset),behavior:'auto'})}current.setAttribute('aria-current','page');return true}if(!focusTab()){var tries=0;var timer=setInterval(function(){if(focusTab()||++tries>40)clearInterval(timer)},100)}})();</script>
 </body>
