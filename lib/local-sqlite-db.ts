@@ -64,6 +64,7 @@ function initSchema(db: NodeSqliteDb) {
     '0007_race_formats.sql',
     '0008_laptime_fleet_sync.sql',
     '0009_equalizacao_automatica.sql',
+    '0010_limpa_dados_inventados.sql',
   ].map((f) => path.join(process.cwd(), 'migrations', 'd1', f));
 
   // Track applied migrations
