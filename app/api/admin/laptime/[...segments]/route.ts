@@ -16,6 +16,7 @@ const ALLOWED_SLUGS = new Set([
   'racing-competitors',
   'racing-detail',
   'racing-laps',
+  'kart-history',
 ]);
 
 async function requireSession() {

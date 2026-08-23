@@ -9,6 +9,7 @@ export type AdminModuleKey =
   | 'telao'
   | 'financeira'
   | 'clientes'
+  | 'equalizacao'
   | 'administrativa'
   | 'clube';
 
@@ -112,6 +113,15 @@ export const adminModules: AdminModule[] = [
     summary: 'Base unificada de clientes do sistema local (SRVKART) e do LapTime (CRONO1).',
     status: 'Módulo novo',
     features: ['Clientes locais', 'Clientes LapTime', 'Busca e paginação'],
+  },
+  {
+    key: 'equalizacao',
+    title: 'Equalização de Karts',
+    href: '/admin/equalizacao',
+    group: 'Gestão',
+    summary: 'Identidade física, manutenção e desempenho histórico por sensor e placa.',
+    status: 'Módulo novo',
+    features: ['Painel de equilíbrio', 'Histórico por sensor', 'Manutenção e redutores', 'Alertas de ajuste'],
   },
   {
     key: 'administrativa',

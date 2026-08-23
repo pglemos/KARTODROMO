@@ -23,6 +23,7 @@ import {
   fetchLapTimeRacingLaps,
   fetchLapTimeRacingsPage,
 } from '@/lib/livetime/laptime-racings';
+import { fetchLapTimeKartHistory } from '@/lib/livetime/kart-history';
 import { LiveTimeScraper } from './livetime-scraper';
 
 function loadLocalEnv() {
@@ -620,6 +621,33 @@ async function handleLaptimeRacingLaps(url: URL, response: http.ServerResponse) 
   }
 }
 
+async function handleLaptimeKartHistory(url: URL, response: http.ServerResponse) {
+  const sqlOptions = resolveLaptimeSqlOptions('racings');
+  if (!sqlOptions) {
+    sendJson(response, 503, { error: 'laptime_sql_not_configured' });
+    return;
+  }
+
+  const plate = url.searchParams.get('plate');
+  const sensor = url.searchParams.get('sensor');
+  if (!plate && !sensor) {
+    sendJson(response, 400, { error: 'plate_or_sensor_required' });
+    return;
+  }
+
+  try {
+    const rows = await fetchLapTimeKartHistory(sqlOptions, {
+      plate,
+      sensor,
+      limit: url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : undefined,
+    });
+    response.writeHead(200, { ...NO_CACHE_HEADERS, 'x-total-count': String(rows.length) });
+    response.end(JSON.stringify(rows));
+  } catch (error) {
+    sendJson(response, 502, { error: error instanceof Error ? error.message : 'laptime_sql_query_failed' });
+  }
+}
+
 const server = http.createServer((request, response) => {
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
 
@@ -717,6 +745,11 @@ const server = http.createServer((request, response) => {
 
   if (url.pathname === '/api/laptime-racing-laps') {
     void handleLaptimeRacingLaps(url, response);
+    return;
+  }
+
+  if (url.pathname === '/api/laptime-kart-history') {
+    void handleLaptimeKartHistory(url, response);
     return;
   }
 

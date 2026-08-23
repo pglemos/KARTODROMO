@@ -3,6 +3,7 @@ import {
   CalendarDays,
   ConciergeBell,
   Flag,
+  Gauge,
   LayoutDashboard,
   Monitor,
   ShieldCheck,
@@ -39,6 +40,7 @@ const iconMap: Record<AdminModuleKey, LucideIcon> = {
   telao: Monitor,
   financeira: WalletCards,
   clientes: Users,
+  equalizacao: Gauge,
   administrativa: ShieldCheck,
   clube: BadgePercent,
 };

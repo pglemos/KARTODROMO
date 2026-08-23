@@ -18,6 +18,7 @@ export type ModuleKey =
   | 'recepcao'
   | 'telao'
   | 'clientes'
+  | 'equalizacao'
   | 'administrativa'
   | 'clube';
 
@@ -42,6 +43,7 @@ const allModules: readonly ModuleKey[] = [
   'recepcao',
   'telao',
   'clientes',
+  'equalizacao',
   'administrativa',
   'clube',
 ];

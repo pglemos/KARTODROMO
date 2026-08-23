@@ -11,6 +11,7 @@ import { ClubePage } from '@/src/admin/modules/clube/ClubePage';
 import { CronometragemPage } from '@/src/admin/modules/cronometragem/CronometragemPage';
 import { DashboardPage } from '@/src/admin/modules/dashboard/DashboardPage';
 import { FinanceiraPage } from '@/src/admin/modules/financeira/FinanceiraPage';
+import { EqualizacaoPage } from '@/src/admin/modules/equalizacao/EqualizacaoPage';
 import { LanchonetePage } from '@/src/admin/modules/lanchonete/LanchonetePage';
 import { RecepcaoPage } from '@/src/admin/modules/recepcao/RecepcaoPage';
 import { ReservasPage } from '@/src/admin/modules/reservas/ReservasPage';
@@ -26,6 +27,7 @@ const legacyPages: Partial<Record<AdminModuleKey, ComponentType>> = {
   cronometragem: CronometragemPage,
   dashboard: DashboardPage,
   financeira: FinanceiraPage,
+  equalizacao: EqualizacaoPage,
   lanchonete: LanchonetePage,
   recepcao: RecepcaoPage,
   reservas: ReservasPage,
