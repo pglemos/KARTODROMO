@@ -183,7 +183,7 @@
       <div style="max-width:400px;">
         <p style="margin:0 0 14px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">A bateria</p>
         <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(30px,3.6vw,42px); line-height:0.95;">Trinta minutos dentro da pista.</h2>
-        <p style="margin:18px 0 0; font-size:14px; line-height:1.6; color:#a8b2aa;">Chegue com 1 hora de antecedência para cadastro, pesagem, retirada dos equipamentos e briefing. Depois, a sessão segue em três etapas simples.</p>
+        <p style="max-width:70ch; margin:18px 0 0; font-size:14px; line-height:1.6; color:#a8b2aa;">Chegue com 1 hora de antecedência para cadastro, pesagem, retirada dos equipamentos e briefing. Depois, a sessão segue em três etapas simples.</p>
       </div>
       <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.1);">
         <sc-for list="{{ sessionFlow }}" as="s" hint-placeholder-count="3">
@@ -191,7 +191,7 @@
             <span style="font-family:'Anton',sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:#8b948c;">{{ s.stepLabel }}</span>
             <strong style="display:block; margin-top:26px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:44px; line-height:0.9; color:#00e676;">{{ s.time }}</strong>
             <h3 style="margin:18px 0 0; font-family:'Anton',sans-serif; font-size:16px; font-weight:400;">{{ s.label }}</h3>
-            <p style="margin:8px 0 0; font-size:14px; line-height:1.5; color:#a8b2aa;">{{ s.text }}</p>
+            <p style="max-width:70ch; margin:8px 0 0; font-size:14px; line-height:1.5; color:#a8b2aa;">{{ s.text }}</p>
           </article>
         </sc-for>
       </div>
@@ -233,7 +233,7 @@
         <div style="border:1px solid rgba(0,230,118,.25); background:#0b100c; padding:28px;">
           <p style="margin:0; color:#00e676; font-family:'Anton',sans-serif; font-size:11px; letter-spacing:0.16em; text-transform:uppercase;">Reserva</p>
           <h2 style="margin:12px 0 0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(24px,2.6vw,30px); line-height:1;">Veja horários disponíveis agora.</h2>
-          <p style="margin:18px 0 0; font-size:14px; line-height:1.6; color:#a8b2aa;">Reserve online para garantir a bateria. Para grupos, aniversários ou dúvidas sobre horário, fale com a equipe pelo WhatsApp.</p>
+          <p style="max-width:70ch; margin:18px 0 0; font-size:14px; line-height:1.6; color:#a8b2aa;">Reserve online para garantir a bateria. Para grupos, aniversários ou dúvidas sobre horário, fale com a equipe pelo WhatsApp.</p>
           <div style="display:grid; gap:10px; margin-top:24px;">
             <a href="https://tools.mylaptime.com.br/booking?uid=5729bbc1-572b-4e32-84ec-e9e93ab08ced" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:52px; padding:0 22px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Abrir agenda online</a>
             <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:52px; padding:0 22px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Chamar no WhatsApp</a>
@@ -254,7 +254,7 @@
       <div>
         <p style="margin:0 0 12px; color:#00e676; font-family:'Anton',sans-serif; font-size:11px; letter-spacing:0.16em; text-transform:uppercase;">Grupos fechados</p>
         <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(26px,3vw,34px); line-height:1;">A pista inteira para sua turma</h2>
-        <p style="margin:18px 0 0; font-size:14px; line-height:1.6; color:#a8b2aa;">Terça a sexta: mínimo de 25 pilotos. Finais de semana e feriados: mínimo de 30 pilotos, conforme disponibilidade.</p>
+        <p style="max-width:70ch; margin:18px 0 0; font-size:14px; line-height:1.6; color:#a8b2aa;">Terça a sexta: mínimo de 25 pilotos. Finais de semana e feriados: mínimo de 30 pilotos, conforme disponibilidade.</p>
         <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:22px;">
           <a href="/eventos" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:50px; padding:0 22px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Conhecer eventos</a>
           <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:50px; padding:0 22px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Consultar grupo</a>
