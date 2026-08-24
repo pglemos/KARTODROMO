@@ -121,6 +121,7 @@ export default function FAQ() {
 
   return (
     <section className="border-t border-white/10 bg-ink-950 py-16 text-white/70 md:py-24">
+      <h1 className="sr-only">Perguntas Frequentes — Kartódromo Internacional de Betim</h1>
       <div className="container mx-auto px-4">
         <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center border border-primary-400/30 bg-white/5 text-primary-400">
           <HelpCircle className="h-8 w-8" />

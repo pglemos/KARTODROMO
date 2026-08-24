@@ -43,7 +43,7 @@ const stopStatusVariants: Record<LapTimeRacingPitStopStatus, BadgeVariant> = {
 };
 
 const inputClassName =
-  'rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-[var(--admin-text)] focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20';
+  'rounded-lg border border-zinc-700 bg-zinc-950 min-h-[44px] px-3 py-1.5 sm:min-h-0 sm:py-2 text-sm text-[var(--admin-text)] focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20';
 
 const formatDate = (value: string | null): string => {
   if (!value) return '—';

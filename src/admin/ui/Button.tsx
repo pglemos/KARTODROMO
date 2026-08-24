@@ -29,7 +29,7 @@ export const Button = ({
   <button
     aria-busy={loading}
     className={[
-      'inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3.5 text-sm font-medium transition-colors focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
+      'inline-flex h-11 items-center justify-center gap-2 rounded-lg px-3.5 text-sm font-medium transition-colors focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 sm:h-9',
       variantClasses[variant],
       className,
     ].join(' ')}

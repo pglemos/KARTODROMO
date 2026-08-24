@@ -234,6 +234,20 @@
   }
 }
 
+/* Acessibilidade de movimento: pausa apenas as animações decorativas contínuas,
+   preservando transições curtas e feedback de estado (WCAG 2.3.3 / 2.2.2). */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .home-speedline,
+  .track-dash,
+  [class*='animate-[ticker'] {
+    animation: none !important;
+  }
+}
+
 @media (max-width: 767px) {
   .home-hero-wash {
     background:

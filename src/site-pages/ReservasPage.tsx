@@ -8,6 +8,7 @@ const ReservasPage = () => {
       <Header />
 
       <main>
+        <h1 className="sr-only">Reserve sua bateria — Kartódromo Internacional de Betim</h1>
         <QuickBooking surface="page" />
       </main>
 

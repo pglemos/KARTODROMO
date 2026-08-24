@@ -87,6 +87,7 @@ const About = () => {
                 alt="Karts alinhados na pista do Kartódromo de Betim"
                 className="aspect-[4/3] w-full object-cover brightness-[0.85] contrast-[1.1]"
                 loading="lazy"
+                decoding="async"
               />
             </figure>
 

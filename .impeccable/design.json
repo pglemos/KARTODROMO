@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-23T21:30:00Z",
+  "title": "Design System: Kartódromo Internacional de Betim",
+  "extensions": {
+    "colorMeta": {
+      "preto-box": { "role": "neutral", "displayName": "Preto Box", "canonical": "#030504", "tonalRamp": ["#030504", "#070b08", "#0b100c", "#101711", "#151e16", "#27272a", "#52525b", "#a1a1aa"] },
+      "neon-cronometrico": { "role": "primary", "displayName": "Neon Cronométrico", "canonical": "#00e676", "tonalRamp": ["#022c12", "#056027", "#009e3e", "#00c853", "#00e676", "#3ce396", "#bbf7dd", "#e8fbf3"] },
+      "verde-podio": { "role": "secondary", "displayName": "Verde Pódio", "canonical": "#00c853", "tonalRamp": ["#052e16", "#14532d", "#15803d", "#16a34a", "#00c853", "#4ade80", "#dcfce7", "#f0fdf4"] },
+      "verde-institucional": { "role": "secondary", "displayName": "Verde Institucional (admin)", "canonical": "#007a3d", "tonalRamp": ["#04240f", "#07351a", "#0a4a26", "#007a3d", "#12a355", "#3cc47c", "#7fd8a8", "#d7f2e3"] },
+      "papel-admin": { "role": "neutral", "displayName": "Papel Admin", "canonical": "#f5f7f5", "tonalRamp": ["#14170f", "#3a403b", "#5d6660", "#8a938c", "#c0c7c1", "#e2e6e1", "#eef1ee", "#f5f7f5"] },
+      "alerta-racing": { "role": "tertiary", "displayName": "Alerta Racing", "canonical": "#d92d2d", "tonalRamp": ["#3d0b0b", "#6b1212", "#961a1a", "#d92d2d", "#e8584f", "#f2938c", "#f8c7c4", "#fdeceb"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display Anton", "purpose": "Hero e títulos de seção do público, sempre em caixa alta." },
+      "body": { "displayName": "Rajdhani", "purpose": "Todo texto corrente, tabelas, formulários e o admin inteiro." }
+    },
+    "shadows": [
+      { "name": "sombra-prancheta", "value": "0 12px 32px rgba(20,30,20,0.08)", "purpose": "Camada base de cartões/modais do admin." },
+      { "name": "elevacao-de-acao", "value": "0 24px 64px rgba(0,0,0,0.45)", "purpose": "Camadas dramáticas no escuro: modais, dropdowns e CTAs flutuantes sobre o asfalto." }
+    ],
+    "motion": [
+      { "name": "transicao-padrao", "value": "200ms ease", "purpose": "Duração padrão de estados (hover/focus) definida globalmente." },
+      { "name": "reveal-entrada", "value": "translateY(14px) -> 0 com fade 480ms", "purpose": "Entrada dos blocos data-reveal no site público." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "CTA Primário Público",
+      "kind": "button",
+      "refersTo": "cta-publico-primario",
+      "description": "Ação principal do site público sobre o asfalto: gradiente Neon Cronométrico → Verde Pódio com texto Preto Box.",
+      "html": "<a class=\"ds-cta-primary\" href=\"#\">RESERVAR MINHA BATERIA</a>",
+      "css": "@import url('https://fonts.googleapis.com/css2?family=Anton&display=swap');\n.ds-cta-primary{display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#00e676,#00c853);color:#030504;font-family:'Anton',sans-serif;font-size:1rem;letter-spacing:.04em;text-transform:uppercase;text-decoration:none;padding:14px 28px;border-radius:6px;box-shadow:0 24px 64px rgba(0,230,118,.28);transition:transform .2s ease,box-shadow .2s ease}\n.ds-cta-primary:hover{transform:translateY(-2px);box-shadow:0 28px 72px rgba(0,230,118,.38)}\n.ds-cta-primary:focus-visible{outline:3px solid rgba(0,200,83,.72);outline-offset:3px}"
+    },
+    {
+      "name": "Botão Admin Primário",
+      "kind": "button",
+      "refersTo": "botao-admin-primario",
+      "description": "Ação principal do painel: Verde Institucional com texto branco.",
+      "html": "<button class=\"ds-btn-admin-primary\">Salvar</button>",
+      "css": "@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&display=swap');\n.ds-btn-admin-primary{display:inline-flex;align-items:center;height:36px;padding:0 14px;border:none;border-radius:8px;background:#007a3d;color:#ffffff;font-family:'Rajdhani',sans-serif;font-size:.875rem;font-weight:700;letter-spacing:.01em;cursor:pointer;transition:background .2s ease,box-shadow .2s ease;box-shadow:0 12px 32px rgba(20,30,20,.08)}\n.ds-btn-admin-primary:hover{background:#12a355}\n.ds-btn-admin-primary:focus-visible{outline:3px solid rgba(0,200,83,.72);outline-offset:3px}"
+    },
+    {
+      "name": "Botão Admin Secundário",
+      "kind": "button",
+      "refersTo": "botao-admin-secundario",
+      "description": "Ações de apoio no escuro do shell administrativo.",
+      "html": "<button class=\"ds-btn-admin-secondary\">Cancelar</button>",
+      "css": "@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&display=swap');\n.ds-btn-admin-secondary{display:inline-flex;align-items:center;height:36px;padding:0 14px;border:none;border-radius:8px;background:#27272a;color:#f4f4f5;font-family:'Rajdhani',sans-serif;font-size:.875rem;font-weight:500;cursor:pointer;transition:background .2s ease}\n.ds-btn-admin-secondary:hover{background:#3f3f46}\n.ds-btn-admin-secondary:focus-visible{outline:3px solid rgba(0,200,83,.72);outline-offset:3px}"
+    },
+    {
+      "name": "Botão Admin Ghost",
+      "kind": "button",
+      "refersTo": "botao-admin-secundario",
+      "description": "Ação terciária silenciosa que acende no hover.",
+      "html": "<button class=\"ds-btn-admin-ghost\">Filtrar</button>",
+      "css": "@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500&display=swap');\n.ds-btn-admin-ghost{display:inline-flex;align-items:center;height:36px;padding:0 14px;border:1px solid #e2e6e1;border-radius:8px;background:transparent;color:#5d6660;font-family:'Rajdhani',sans-serif;font-size:.875rem;font-weight:500;cursor:pointer;transition:background .2s ease,color .2s ease}\n.ds-btn-admin-ghost:hover{background:rgba(0,122,61,0.10);color:#14170f}\n.ds-btn-admin-ghost:focus-visible{outline:3px solid rgba(0,200,83,.72);outline-offset:3px}"
+    },
+    {
+      "name": "Cartão Admin",
+      "kind": "card",
+      "refersTo": "card-admin",
+      "description": "Contêiner padrão do painel: superfície branca, borda técnica e Sombra de Prancheta.",
+      "html": "<div class=\"ds-card-admin\"><p class=\"ds-card-label\">MÉTRICA</p><h3 class=\"ds-card-value\">1:04.589</h3><p class=\"ds-card-hint\">Melhor volta da sessão</p></div>",
+      "css": "@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&display=swap');\n.ds-card-admin{max-width:260px;background:#ffffff;border:1px solid #e2e6e1;border-radius:12px;padding:24px;box-shadow:0 12px 32px rgba(20,30,20,.08);font-family:'Rajdhani',sans-serif}\n.ds-card-label{margin:0;font-size:.68rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#5d6660}\n.ds-card-value{margin:8px 0 0;font-size:1.75rem;line-height:1;color:#14170f}\n.ds-card-hint{margin:6px 0 0;font-size:.8rem;color:#5d6660}"
+    },
+    {
+      "name": "Campo Admin",
+      "kind": "input",
+      "refersTo": "card-admin",
+      "description": "Campo de formulário técnico com foco em verde institucional.",
+      "html": "<input class=\"ds-input-admin\" placeholder=\"Buscar por nome...\" />",
+      "css": "@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500&display=swap');\n.ds-input-admin{width:240px;height:36px;padding:0 12px;border:1px solid #e2e6e1;border-radius:8px;background:#ffffff;color:#14170f;font-family:'Rajdhani',sans-serif;font-size:.9rem;font-weight:500;transition:border-color .2s ease,box-shadow .2s ease}\n.ds-input-admin::placeholder{color:#8a938c}\n.ds-input-admin:focus{outline:none;border-color:#007a3d;box-shadow:0 0 0 3px rgba(0,122,61,.18)}"
+    },
+    {
+      "name": "Badge de Status",
+      "kind": "chip",
+      "refersTo": null,
+      "description": "Pílula semântica do admin/público: válida, atenção, punição ou neutro.",
+      "html": "<span class=\"ds-badge-ok\">Válida</span> <span class=\"ds-badge-warn\">Curta</span> <span class=\"ds-badge-bad\">Punição</span>",
+      "css": "@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@700&display=swap');\n[class^='ds-badge']{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;border:1px solid;font-family:'Rajdhani',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.02em}\n.ds-badge-ok{background:#022c12;border-color:rgba(0,230,118,.4);color:#3ce396}\n.ds-badge-warn{background:#2a1e02;border-color:rgba(234,179,8,.45);color:#facc15}\n.ds-badge-bad{background:#3d0b0b;border-color:rgba(217,45,45,.5);color:#f2938c}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Pit Lane Noturno",
+    "overview": "O sistema é a noite de prova antes das 500 Milhas: asfalto quase absoluto (#030504), dados cravados em verde neon cronométrico e tipografia de placar que grita a largada. O site público vive nesse mundo escuro; o painel administrativo é o contrapeso técnico claro; o telão é território próprio de transmissão. A partir daqui novos trabalhos elevam o conjunto para camadas dramáticas: profundidade pronunciada, superfícies empilhadas e sombras com intenção.",
+    "keyCharacteristics": [
+      "Asfalto primeiro: o escuro #030504 é a base do público; claro só no admin.",
+      "Verde com voz: neon para dados/ação, institucional para operação — sempre pela escala.",
+      "Duas vozes tipográficas: Anton grita títulos; Rajdhani mede todo o resto.",
+      "Bordas fantasma white/10 no público; profundidade dramática reservada ao admin."
+    ],
+    "rules": [
+      { "name": "A Regra da Fonte Única", "body": "Todo verde nasce da escala (primary-* / accent do admin). Hex de verde escrito à mão fora da escala é bug visual.", "section": "colors" },
+      { "name": "A Regra Asfalto Primeiro", "body": "O site público não tem tema claro. Superfície nova começa em #030504/#0b100c; branco é texto, não fundo.", "section": "colors" },
+      { "name": "A Regra do Grito Curto", "body": "Anton nunca passa de duas linhas; títulos maiores descem para Headline em Rajdhani bold.", "section": "typography" },
+      { "name": "A Regra da Camada com Intenção", "body": "Toda sombra responde a uma pergunta — isto está acima da pista? Se não, superfície plana.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do usar exclusivamente a escala de verdes e os nomes consagrados (Neon Cronométrico, Verde Pódio, Preto Box).",
+      "Do manter Anton em caixa alta com no máximo duas linhas e Rajdhani em todo texto corrente.",
+      "Do aplicar Linha Fantasma rgba(255,255,255,0.10) como divisor padrão no escuro.",
+      "Do dar contraste controlado à logo original com respiro mínimo definido.",
+      "Do tornar foco visível sempre (outline 3px rgba(0,200,83,.72) + offset 3px)."
+    ],
+    "donts": [
+      "Don't introduzir fundo claro no site público — o mundo vigente é Preto Box; claro pertence ao admin.",
+      "Don't aplicar gradiente, inclinação ou redesenho na logo (compromisso vinculante).",
+      "Don't escrever hex de verde fora da escala nem criar variantes novas de verde.",
+      "Don't vazar tokens do telão (teal/amarelo de posição) para site ou admin.",
+      "Don't usar sombra sem resposta à pergunta da Camada com Intenção."
+    ]
+  }
+}

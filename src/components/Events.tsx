@@ -110,6 +110,8 @@ const Events = () => {
                 <img
                   src={image.url}
                   alt={image.alt}
+                  loading="lazy"
+                  decoding="async"
                   className={`${index === 0 ? 'h-[360px]' : 'h-[170px]'} w-full object-cover brightness-[0.75] transition-transform duration-700 group-hover:scale-105 group-hover:brightness-100`}
                 />
                 <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink-950/90 to-transparent px-4 pb-4 pt-12 font-race text-xs italic font-bold uppercase tracking-[0.12em] text-white opacity-0 transition-opacity duration-300 group-hover:opacity-100">

@@ -26,7 +26,7 @@ const cardClassName =
   'rounded-xl border border-zinc-800 bg-zinc-900/70 p-5 shadow-lg shadow-black/10 md:p-6';
 
 const inputClassName =
-  'w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-60';
+  'w-full rounded-lg border border-zinc-700 bg-zinc-950 min-h-[44px] px-3 py-2 sm:min-h-0 sm:py-2.5 text-sm text-white placeholder:text-zinc-600 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-60';
 
 const updatedAtFormatter = new Intl.DateTimeFormat('pt-BR', {
   dateStyle: 'short',

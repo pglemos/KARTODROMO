@@ -4,6 +4,7 @@ import SectionHeading from './site-ui/SectionHeading';
 const History = () => {
   return (
     <section id="historia" className="border-t border-white/10 bg-ink-950 py-16 text-white/80 md:py-24">
+      <h1 className="sr-only">Nossa História — Kartódromo Internacional de Betim</h1>
       <div className="container mx-auto px-4">
         <div className="mx-auto mb-8 max-w-4xl">
           <a href="/" className="inline-flex min-h-[44px] items-center font-race text-sm italic font-bold text-white/60 transition-colors hover:text-primary-400">
