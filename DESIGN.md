@@ -214,7 +214,7 @@ O telão TB50 é superfície de transmissão com gramática própria e pode usar
 
 **A Regra do Eyebrow de Prova.** O eyebrow tracked-caps acima de títulos de página/hero é assinatura oficial do Pit Lane Noturno (decisão do dono, 2026-08-23) — exceção deliberada ao anti-padrão genérico de kickers.
 
-**UI densa intencional.** Painéis operacionais (admin, telão, designer) usam steps próximos de propósito para densidade informacional; `flat-type-hierarchy` não se aplica a essas superfícies.
+**UI densa intencional.** Painéis operacionais (admin, telão, designer) e os cards de traçado da pista usam steps próximos e hierarquia compacta de propósito — densidade informacional é a gramática dessas superfícies; `flat-type-hierarchy` e `heading-rhythm` não se aplicam a elas.
 
 ### Exceção Telão (ampliada)
 Telão TB50, placar e o designer de layouts podem usar famílias adicionais — dígitos monoespaçados (`ui-monospace`/Consolas) para tempos e fallbacks Arial em contexto broadcast — sem seguir as duas vozes acima. Essa exceção não se estende a site nem admin.

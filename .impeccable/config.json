@@ -4,7 +4,8 @@
       "gray-on-color",
       "hero-eyebrow-chip",
       "kicker-above-heading",
-      "flat-type-hierarchy"
+      "flat-type-hierarchy",
+      "heading-rhythm"
     ],
     "ignoreFiles": [
       "app/placar-telao-tb50/**",
