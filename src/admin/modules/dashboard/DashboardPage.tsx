@@ -131,7 +131,7 @@ export const DashboardPage = () => {
             Central administrativa
           </p>
           <h2 className="mt-2 text-2xl font-bold text-zinc-50">Visão geral da operação</h2>
-          <p className="mt-3 max-w-[52ch] text-[15px] leading-relaxed text-zinc-400">
+          <p className="mt-3 max-w-[52ch] text-[16px] leading-relaxed text-zinc-400">
             Acompanhe reservas, cronometragem, campeonatos e a gestão financeira do kartódromo em um só lugar. Use a
             barra lateral para navegar entre os módulos.
           </p>
@@ -175,7 +175,7 @@ export const DashboardPage = () => {
                       <Icon aria-hidden="true" size={19} strokeWidth={1.8} />
                     </span>
                     <span
-                      className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.04em] ${
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.04em] ${
                         isLive ? 'bg-blue-400/10 text-blue-300' : 'bg-primary-500/10 text-primary-300'
                       }`}
                     >
@@ -183,7 +183,7 @@ export const DashboardPage = () => {
                     </span>
                   </div>
                   <strong className="text-base font-bold group-hover:text-primary-300">{module.title}</strong>
-                  <p className="m-0 text-[13px] leading-relaxed text-zinc-400">{module.summary}</p>
+                  <p className="m-0 text-[12px] leading-relaxed text-zinc-400">{module.summary}</p>
                 </a>
               );
             })}

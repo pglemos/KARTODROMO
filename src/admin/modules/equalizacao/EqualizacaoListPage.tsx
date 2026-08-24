@@ -253,15 +253,15 @@ export const EqualizacaoListPage = () => {
             <Card className="p-4 md:p-5" key={category}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[.12em] text-zinc-500">Referência da categoria</p>
+                  <p className="text-[11px] font-bold uppercase tracking-[.12em] text-zinc-500">Referência da categoria</p>
                   <h2 className="mt-1 text-base font-semibold text-zinc-50">{KART_CATEGORY_LABELS[category]}</h2>
                 </div>
                 <Badge variant={categoryVariant[category]}>{summary.total} karts</Badge>
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <div><span className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500">Alvo</span><strong className="mt-1 block text-lg text-zinc-100">{formatTime(KART_CATEGORY_TARGETS_MS[category])}</strong></div>
-                <div><span className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500">Média da frota</span><strong className="mt-1 block text-lg text-zinc-100">{formatTime(summary.averageMs)}</strong></div>
-                <div><span className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500">Medições</span><strong className="mt-1 block text-lg text-zinc-100">{summary.measured}/{summary.total}</strong></div>
+                <div><span className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500">Alvo</span><strong className="mt-1 block text-lg text-zinc-100">{formatTime(KART_CATEGORY_TARGETS_MS[category])}</strong></div>
+                <div><span className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500">Média da frota</span><strong className="mt-1 block text-lg text-zinc-100">{formatTime(summary.averageMs)}</strong></div>
+                <div><span className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500">Medições</span><strong className="mt-1 block text-lg text-zinc-100">{summary.measured}/{summary.total}</strong></div>
               </div>
             </Card>
           );
@@ -314,7 +314,7 @@ export const EqualizacaoListPage = () => {
             <thead className="border-b border-zinc-800 bg-zinc-950/40">
               <tr>
                 {['Kart / categoria', 'Chassi', 'Redutor', 'Média histórica', 'Melhor volta', 'Melhor mês', 'Melhor 15 dias', 'Melhor 7 dias', 'Desvio', 'Última equalização', 'Ação', 'Abrir'].map((label) => (
-                  <th className="whitespace-nowrap px-4 py-3 text-[10px] font-bold uppercase tracking-[.1em] text-zinc-500" key={label}>{label}</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-[11px] font-bold uppercase tracking-[.1em] text-zinc-500" key={label}>{label}</th>
                 ))}
               </tr>
             </thead>

@@ -482,7 +482,7 @@ const [activeTab, setActiveTab] = useState<Tab>('inscricoes');
           <div>
             <strong className="block text-sm text-zinc-100">
               {formato.nome}
-              {formato.is_default ? <span className="ml-2 rounded-full border border-brand-800 bg-brand-950 px-2 py-0.5 text-[10px] font-bold text-brand-200">DEFAULT</span> : null}
+              {formato.is_default ? <span className="ml-2 rounded-full border border-brand-800 bg-brand-950 px-2 py-0.5 text-[11px] font-bold text-brand-200">DEFAULT</span> : null}
             </strong>
             <span className="text-xs text-zinc-500">{formato.descricao ?? '—'}</span>
           </div>
