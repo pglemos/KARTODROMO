@@ -159,7 +159,7 @@
           <h3 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; font-size:clamp(24px,3vw,32px); line-height:1;">Alterações de traçado são exclusivas para campeonatos.</h3>
           <p style="margin:16px 0 0; max-width:56ch; font-size:14px; line-height:1.6; color:#a8b2aa;">Nas baterias de lazer, treinos e eventos, é utilizado o traçado definido pelo Kartódromo. Configurações diferentes, incluindo opções com chicane ou sentido invertido, são adotadas somente em campeonatos conforme o calendário oficial.</p>
           <div style="margin-top:20px;">
-            <a href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Quero%20saber%20qual%20tra%C3%A7ado%20estar%C3%A1%20ativo%20na%20pista." target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:50px; padding:16px 22px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Perguntar no WhatsApp</a>
+            <a href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Quero%20saber%20qual%20tra%C3%A7ado%20estar%C3%A1%20ativo%20na%20pista." target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:50px; padding:22px 20px 18px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Perguntar no WhatsApp</a>
           </div>
         </div>
       </div>
@@ -289,7 +289,7 @@ class Component extends DCLogic {
     const badgeColor = (variant) => (variant === 'invertido' ? '#00e676' : variant === 'invertido-chicane' ? '#f5c518' : '#a8b2aa');
     const visibleTracks = visible.map((t) => ({
       ...t,
-      badgeStyle: { border: '1px solid ' + badgeColor(t.variant), color: badgeColor(t.variant), fontSize: '9.5px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', padding: '3px 7px', whiteSpace: 'nowrap' },
+      badgeStyle: { border: '1px solid ' + badgeColor(t.variant), color: badgeColor(t.variant), fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', padding: '3px 7px', whiteSpace: 'nowrap' },
     }));
 
     return {

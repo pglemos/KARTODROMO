@@ -26,8 +26,8 @@ export function getTokens(theme) {
     borderStrong: dark ? '#333c34' : '#d3d9d2',
     text: dark ? '#f2f5f1' : '#14170f',
     textMuted: dark ? '#8b988c' : '#5d6660',
-    textFaint: dark ? '#5a655c' : '#8a938a',
-    accent: dark ? '#00e676' : '#00a856',
+    textFaint: dark ? '#5a655c' : '#66716a',
+    accent: dark ? '#00e676' : '#007a3d',
     accentSoft: dark ? 'rgba(0,230,118,.14)' : 'rgba(0,168,86,.1)',
     accentBorder: dark ? 'rgba(0,230,118,.4)' : 'rgba(0,168,86,.35)',
     accentContrast: dark ? '#041a0d' : '#ffffff',
@@ -37,7 +37,7 @@ export function getTokens(theme) {
     warningSoft: dark ? 'rgba(242,178,59,.14)' : 'rgba(184,114,10,.1)',
     info: dark ? '#5eb6ff' : '#1868c2',
     infoSoft: dark ? 'rgba(94,182,255,.14)' : 'rgba(24,104,194,.08)',
-    shadow: dark ? '0 20px 60px rgba(0,0,0,.45)' : '0 12px 32px rgba(20,30,20,.08)',
+    shadow: dark ? '0 20px 44px rgba(0,0,0,.45)' : '0 12px 32px rgba(20,30,20,.08)',
     overlay: dark ? 'rgba(3,5,4,.72)' : 'rgba(10,14,10,.42)',
   };
 }

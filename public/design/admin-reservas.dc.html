@@ -236,13 +236,13 @@ class Component extends DCLogic {
     return {
       bg: dark ? '#0a0d0a' : '#f5f7f5', surface: dark ? '#121613' : '#ffffff', surface2: dark ? '#181d19' : '#eef1ee',
       surfaceHover: dark ? '#1e2420' : '#e8ebe8', border: dark ? '#242b25' : '#e2e6e1', borderStrong: dark ? '#333c34' : '#d3d9d2',
-      text: dark ? '#f2f5f1' : '#14170f', textMuted: dark ? '#8b988c' : '#5d6660', textFaint: dark ? '#5a655c' : '#8a938a',
-      accent: dark ? '#00e676' : '#00a856', accentSoft: dark ? 'rgba(0,230,118,.14)' : 'rgba(0,168,86,.1)',
+      text: dark ? '#f2f5f1' : '#14170f', textMuted: dark ? '#8b988c' : '#5d6660', textFaint: dark ? '#5a655c' : '#66716a',
+      accent: dark ? '#00e676' : '#007a3d', accentSoft: dark ? 'rgba(0,230,118,.14)' : 'rgba(0,168,86,.1)',
       accentBorder: dark ? 'rgba(0,230,118,.4)' : 'rgba(0,168,86,.35)', accentContrast: dark ? '#041a0d' : '#ffffff',
       danger: dark ? '#ff6b6b' : '#d92d2d', dangerSoft: dark ? 'rgba(255,107,107,.14)' : 'rgba(217,45,45,.08)',
       warning: dark ? '#f2b23b' : '#b8720a', warningSoft: dark ? 'rgba(242,178,59,.14)' : 'rgba(184,114,10,.1)',
       info: dark ? '#5eb6ff' : '#1868c2', infoSoft: dark ? 'rgba(94,182,255,.14)' : 'rgba(24,104,194,.08)',
-      shadow: dark ? '0 20px 60px rgba(0,0,0,.45)' : '0 12px 32px rgba(20,30,20,.08)', overlay: dark ? 'rgba(3,5,4,.72)' : 'rgba(10,14,10,.42)',
+      shadow: dark ? '0 20px 44px rgba(0,0,0,.45)' : '0 12px 32px rgba(20,30,20,.08)', overlay: dark ? 'rgba(3,5,4,.72)' : 'rgba(10,14,10,.42)',
     };
   }
 
@@ -251,9 +251,9 @@ class Component extends DCLogic {
       page: { minHeight: '100vh', background: t.bg, color: t.text, fontFamily: "'Rajdhani',sans-serif" },
       sidebar: { position: 'fixed', insetBlock: 0, left: 0, width: '260px', zIndex: 200, display: isMobile ? 'none' : 'flex', flexDirection: 'column', background: t.surface, borderRight: '1px solid ' + t.border },
       logoMark: { display: 'grid', placeItems: 'center', width: '34px', height: '34px', borderRadius: '9px', background: t.accent, color: t.accentContrast, flex: 'none' },
-      brandEyebrow: { margin: 0, fontSize: '10px', fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: t.accent },
+      brandEyebrow: { margin: 0, fontSize: '11px', fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: t.accent },
       brandName: { display: 'block', fontSize: '14px', fontWeight: 700, color: t.text },
-      navGroupLabel: { margin: '0 0 6px', padding: '0 10px', fontSize: '10.5px', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: t.textFaint },
+      navGroupLabel: { margin: '18px 0 6px', padding: '6px 10px', fontSize: '11px', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: t.textFaint },
       userEmail: { margin: '0 0 8px', fontSize: '12px', fontWeight: 600, color: t.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
       logoutLink: { fontSize: '12px', fontWeight: 700, color: t.danger, textDecoration: 'none' },
       mobileOverlay: { position: 'fixed', inset: 0, zIndex: 210, background: t.overlay, opacity: mobileNavOpen ? 1 : 0, visibility: isMobile && mobileNavOpen ? 'visible' : 'hidden', transition: '.25s', pointerEvents: isMobile && mobileNavOpen ? 'auto' : 'none' },
@@ -262,7 +262,7 @@ class Component extends DCLogic {
       menuToggleBtn: { width: '38px', height: '38px', display: isMobile ? 'grid' : 'none', placeItems: 'center', border: '1px solid ' + t.border, borderRadius: '9px', background: t.surface, color: t.text, cursor: 'pointer', flex: 'none' },
       contentWrap: { minHeight: '100vh', marginLeft: isMobile ? 0 : '260px' },
       header: { position: 'sticky', top: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', padding: '14px 20px', background: t.surface + 'f2', backdropFilter: 'blur(10px)', borderBottom: '1px solid ' + t.border },
-      headerEyebrow: { margin: '0 0 2px', fontSize: '10.5px', fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: t.accent },
+      headerEyebrow: { margin: '0 0 2px', fontSize: '11px', fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: t.accent },
       headerTitle: { margin: 0, fontSize: '22px', fontWeight: 700, color: t.text },
       primaryBtnSm: { height: '38px', padding: '0 16px', borderRadius: '9px', border: 0, background: t.accent, color: t.accentContrast, fontWeight: 700, fontSize: '13px', cursor: 'pointer' },
       main: { padding: '22px 20px 60px', display: 'grid', gap: '22px' },

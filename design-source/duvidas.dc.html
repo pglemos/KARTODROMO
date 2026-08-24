@@ -57,7 +57,7 @@
 
   <nav id="mobile-navigation" aria-label="Navegação móvel" aria-hidden="{{ mobileNavClosed }}" style="{{ mobileNavStyle }}">
     <sc-for list="{{ navLinks }}" as="link" hint-placeholder-count="6">
-      <a href="{{ link.href }}" onClick="{{ closeMobileNav }}" style="display:flex; align-items:center; min-height:58px; padding:13px 0; border-bottom:1px solid rgba(255,255,255,.12); font-family:'Anton',sans-serif; text-transform:uppercase; font-size:clamp(38px,11vw,60px); line-height:0.9; color:#f7faf6; text-decoration:none;">{{ link.label }}</a>
+      <a href="{{ link.href }}" onClick="{{ closeMobileNav }}" style="display:flex; align-items:center; min-height:58px; padding:13px 0; border-bottom:1px solid rgba(255,255,255,.12); font-family:'Anton',sans-serif; text-transform:none; font-size:clamp(38px,11vw,60px); line-height:0.9; color:#f7faf6; text-decoration:none;">{{ link.label }}</a>
     </sc-for>
   </nav>
 
@@ -96,7 +96,7 @@
           <sc-for list="{{ visibleItems }}" as="item" hint-placeholder-count="6">
             <article style="border-bottom:1px solid rgba(255,255,255,.12);">
               <button type="button" aria-expanded="{{ item.open }}" onClick="{{ item.onToggle }}" style="width:100%; min-height:48px; border:0; background:transparent; color:#fff; padding:25px 5px; display:grid; grid-template-columns:1fr 34px; gap:20px; text-align:left; cursor:pointer;">
-                <span style="font-family:'Anton',sans-serif; text-transform:uppercase; font-size:18px;">{{ item.q }}</span>
+                <span style="font-family:'Anton',sans-serif; text-transform:none; font-size:18px;">{{ item.q }}</span>
                 <b aria-hidden="true" style="{{ item.iconStyle }}">+</b>
               </button>
               <div style="{{ item.answerWrapStyle }}"><div style="overflow:hidden;"><p style="color:#a8b2aa; line-height:1.6; padding:0 60px 25px 5px; margin:0;">{{ item.a }}</p></div></div>
@@ -114,7 +114,7 @@
       <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:0.85;">Segurança também<br><span style="color:#00e676;">faz parte da corrida</span></h2>
       <div style="margin-top:50px; display:grid; grid-template-columns:repeat(3,1fr); gap:18px;">
         <sc-for list="{{ safetyRules }}" as="r" hint-placeholder-count="3">
-          <article style="padding:30px; background:#0b100c; border:1px solid rgba(255,255,255,.12); min-height:200px;"><h3 style="margin:0; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:16px;">{{ r.title }}</h3><p style="color:#a8b2aa; line-height:1.5; font-size:14px;">{{ r.text }}</p></article>
+          <article style="padding:30px; background:#0b100c; border:1px solid rgba(255,255,255,.12); min-height:200px;"><h3 style="margin:0; font-family:'Anton',sans-serif; text-transform:none; font-size:16px;">{{ r.title }}</h3><p style="color:#a8b2aa; line-height:1.5; font-size:14px;">{{ r.text }}</p></article>
         </sc-for>
       </div>
     </div>
