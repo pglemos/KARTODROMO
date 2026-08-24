@@ -1,0 +1,19 @@
+{
+  "detector": {
+    "ignoreRules": [
+      "gray-on-color",
+      "hero-eyebrow-chip",
+      "kicker-above-heading",
+      "flat-type-hierarchy"
+    ],
+    "ignoreFiles": [
+      "app/placar-telao-tb50/**",
+      "app/podio-final-tb50/**",
+      "app/podio-live-tb50/**",
+      "app/designer-telao/**"
+    ],
+    "ignoreValues": [
+      "#000000"
+    ]
+  }
+}

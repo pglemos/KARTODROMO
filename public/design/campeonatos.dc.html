@@ -98,7 +98,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     html { scroll-behavior: smooth; }
-    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size: 17px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size:18px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
     a { color: #00e676; }
     a:hover { color: #3ce396; }
     ::selection { background: #00e676; color: #041301; }
@@ -111,7 +111,7 @@
     @keyframes kib-page-in { from { opacity: 0; transform: translateX(24px); filter: blur(3px); } }
     @media (prefers-reduced-motion: reduce) { ::view-transition-old(root), ::view-transition-new(root) { animation: none; } }
     [style*="background:linear-gradient(135deg,#00e676,#00c853)"] { transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s; }
-    [style*="background:linear-gradient(135deg,#00e676,#00c853)"]:hover { transform: translateY(-4px); box-shadow: 0 22px 55px rgba(0,230,118,.4); }
+    [style*="background:linear-gradient(135deg,#00e676,#00c853)"]:hover { transform: translateY(-4px); box-shadow: 0 22px 55px rgba(3,5,4,.6); }
     [style*="background:rgba(255,255,255,.035)"][style*="border:1px solid rgba(255,255,255,.22)"] { transition: border-color .25s, color .25s, transform .25s cubic-bezier(.16,1,.3,1); }
     [style*="background:rgba(255,255,255,.035)"][style*="border:1px solid rgba(255,255,255,.22)"]:hover { border-color:#00e676; color:#00e676; transform: translateY(-4px); }
   </style>
@@ -119,7 +119,7 @@
 <div data-screen-label="Campeonatos" style="min-height:100vh; background:#030504; color:#f7faf6;">
 
   <a href="#conteudo" style="{{ skipLinkStyle }}">Pular para o conteúdo</a>
-  <div id="progress" aria-hidden="true" style="position:fixed; top:0; left:0; width:100%; height:3px; z-index:520; transform:scaleX(0); transform-origin:left; background:linear-gradient(90deg,#00e676,#3ce396); box-shadow:0 0 22px rgba(0,230,118,.55); pointer-events:none;"></div>
+  <div id="progress" aria-hidden="true" style="position:fixed; top:0; left:0; width:100%; height:3px; z-index:520; transform:scaleX(0); transform-origin:left; background:linear-gradient(90deg,#00e676,#3ce396);  pointer-events:none;"></div>
 
   <header style="{{ headerStyle }}">
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; min-height:84px; display:flex; align-items:center; justify-content:space-between; gap:24px;">
@@ -163,7 +163,7 @@
         <sc-for list="{{ topStats }}" as="s" hint-placeholder-count="4">
           <div style="display:flex; align-items:center; gap:12px; padding:20px; border-right:1px solid rgba(255,255,255,.08);">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00e676" stroke-width="1.8" aria-hidden="true"><path d="{{ s.icon }}"/></svg>
-            <div><strong style="display:block; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px;">{{ s.title }}</strong><span style="font-size:11px; color:#8b948c;">{{ s.text }}</span></div>
+            <div><strong style="display:block; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px;">{{ s.title }}</strong><span style="font-size:11px; color:#8b948c;">{{ s.text }}</span></div>
           </div>
         </sc-for>
       </div>
@@ -187,7 +187,7 @@
               <span>{{ c.dateLabel }}: {{ c.date }}</span>
             </div>
             <div style="border:1px solid rgba(255,255,255,.1); background:#030504; padding:18px;">
-              <h4 style="margin:0 0 10px; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; letter-spacing:0.08em;">Dados de inscrição necessários</h4>
+              <h3 style="margin:0 0 10px; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; letter-spacing:0.08em;">Dados de inscrição necessários</h3>
               <ul style="list-style:none; margin:0; padding:0; display:grid; gap:8px;">
                 <sc-for list="{{ c.requirements }}" as="req" hint-placeholder-count="4">
                   <li style="display:flex; gap:8px; font-size:12px; color:#a8b2aa;"><span style="color:#00e676;">›</span>{{ req }}</li>
@@ -217,7 +217,7 @@
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto;">
       <p style="margin:0 0 14px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Evolução competitiva</p>
       <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(30px,3.6vw,42px); line-height:0.95;">Do primeiro grid<br><span style="color:#00e676;">à longa duração</span></h2>
-      <p style="max-width:60ch; margin:16px 0 0; font-size:14.5px; color:#a8b2aa;">Comece no KAC Iniciantes, evolua para o Super Kart e descubra o trabalho de equipe nas provas de endurance.</p>
+      <p style="max-width:60ch; margin:16px 0 0; font-size:14px; color:#a8b2aa;">Comece no KAC Iniciantes, evolua para o Super Kart e descubra o trabalho de equipe nas provas de endurance.</p>
       <div style="margin-top:34px; display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.1);">
         <sc-for list="{{ evolutionSteps }}" as="e" hint-placeholder-count="3">
           <div style="background:#0b100c; padding:28px;"><span style="font-family:'Anton',sans-serif; font-size:28px; color:#00e676;">{{ e.num }}</span><h3 style="margin:14px 0 0; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:16px;">{{ e.title }}</h3><p style="margin:8px 0 0; color:#a8b2aa; font-size:14px; line-height:1.5;">{{ e.text }}</p></div>
@@ -232,8 +232,8 @@
       <div style="position:relative; overflow:hidden; border:1px solid rgba(255,255,255,.22); background:linear-gradient(135deg,#101711,#030504); padding:clamp(34px,5vw,72px); display:grid; grid-template-columns:1.2fr .8fr; gap:36px; align-items:center;">
         <div style="min-width:0;"><h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(38px,5.5vw,68px); line-height:0.85;">Escolha sua categoria<br><span style="color:#00e676;">e entre no grid</span></h2><p style="margin:14px 0 0; color:#a8b2aa; font-size:18px;">A organização orienta sobre inscrições, pesos, regras e vagas disponíveis.</p></div>
         <div style="display:grid; gap:12px;">
-          <a href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Gostaria%20de%20receber%20regulamentos%20e%20valores%20dos%20campeonatos%20do%20Kart%C3%B3dromo." target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;">Falar com a organização</a>
-          <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;">Falar no WhatsApp</a>
+          <a href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Gostaria%20de%20receber%20regulamentos%20e%20valores%20dos%20campeonatos%20do%20Kart%C3%B3dromo." target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Falar com a organização</a>
+          <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Falar no WhatsApp</a>
         </div>
       </div>
     </div>
@@ -249,25 +249,25 @@
       </div>
       <form onSubmit="{{ onSubmitRegistration }}" style="padding:24px; display:grid; gap:14px;">
         <sc-if value="{{ selectedIsTeam }}">
-          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">Nome da equipe *</label><input name="nome_equipe" type="text" required="" placeholder="Ex: Minas Racing Team" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
-          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">Nome do chefe de equipe *</label><input name="nome_chefe" type="text" required="" placeholder="Nome completo do responsável" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
-          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">Pilotos e pesos (um por linha) *</label><textarea name="pilotos" required="" placeholder="Ex: João Silva - 78kg" style="width:100%; min-height:90px; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none; resize:vertical;"></textarea></div>
-          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">Quantidade de karts *</label><input name="qtd_karts" type="number" min="1" max="50" required="" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Nome da equipe *</label><input name="nome_equipe" type="text" required="" placeholder="Ex: Minas Racing Team" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Nome do chefe de equipe *</label><input name="nome_chefe" type="text" required="" placeholder="Nome completo do responsável" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Pilotos e pesos (um por linha) *</label><textarea name="pilotos" required="" placeholder="Ex: João Silva - 78kg" style="width:100%; min-height:90px; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none; resize:vertical;"></textarea></div>
+          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Quantidade de karts *</label><input name="qtd_karts" type="number" min="1" max="50" required="" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
         </sc-if>
         <sc-if value="{{ selectedIsIndividual }}">
-          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">Nome completo *</label><input name="nome" type="text" required="" placeholder="Nome e sobrenome" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Nome completo *</label><input name="nome" type="text" required="" placeholder="Nome e sobrenome" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
-            <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">Idade</label><input name="idade" type="number" min="8" max="90" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
-            <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">Peso (kg)</label><input name="peso" type="number" min="30" max="180" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+            <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Idade</label><input name="idade" type="number" min="8" max="90" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+            <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Peso (kg)</label><input name="peso" type="number" min="30" max="180" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
           </div>
-          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">Cidade</label><input name="cidade" type="text" placeholder="Betim / MG" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Cidade</label><input name="cidade" type="text" placeholder="Betim / MG" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
         </sc-if>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
-          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">WhatsApp *</label><input name="whatsapp" type="tel" required="" placeholder="(31) 99999-9999" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
-          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">E-mail</label><input name="email" type="email" placeholder="voce@email.com" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">WhatsApp *</label><input name="whatsapp" type="tel" required="" placeholder="(31) 99999-9999" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">E-mail</label><input name="email" type="email" placeholder="voce@email.com" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
         </div>
         <div style="background:rgba(0,230,118,.08); border:1px solid rgba(0,230,118,.25); padding:14px; font-size:12px; line-height:1.5; color:#7fd9a8;"><strong>Nota sobre pagamento:</strong> após o envio, sua inscrição fica pendente até a validação do Pix ou boleto com o chefe de equipe via WhatsApp.</div>
-        <button type="submit" style="width:100%; appearance:none; border:0; cursor:pointer; min-height:52px; clip-path:polygon(3% 0,100% 0,97% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12.5px; letter-spacing:0.04em;">Confirmar e enviar inscrição</button>
+        <button type="submit" style="width:100%; appearance:none; border:0; cursor:pointer; min-height:52px; clip-path:polygon(3% 0,100% 0,97% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em;">Confirmar e enviar inscrição</button>
       </form>
     </div>
   </div>
@@ -299,7 +299,7 @@
     </div>
   </footer>
 
-  <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" style="position:fixed; right:20px; bottom:20px; z-index:250; width:58px; height:58px; border-radius:50%; display:grid; place-items:center; background:#20d466; color:#fff; box-shadow:0 18px 45px rgba(32,212,102,.35); text-decoration:none; transition:transform .25s;" style-hover="transform:translateY(-5px) scale(1.05);">
+  <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" style="position:fixed; right:20px; bottom:20px; z-index:250; width:58px; height:58px; border-radius:50%; display:grid; place-items:center; background:#20d466; color:#fff; box-shadow:0 18px 45px rgba(3,5,4,.55); text-decoration:none; transition:transform .25s;" style-hover="transform:translateY(-5px) scale(1.05);">
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-11.9 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5Z"/><path d="M8.5 8.5c.5 3 2 4.5 5 5"/></svg>
   </a>
 </div>

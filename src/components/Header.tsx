@@ -33,7 +33,7 @@ const Header = () => {
   return (
     <>
       <div className="border-b border-white/10 bg-ink-900 px-4 py-3 text-white">
-        <div className="container mx-auto flex flex-wrap items-center justify-between gap-x-7 gap-y-2.5 font-race text-[13px] italic leading-none md:text-sm">
+        <div className="container mx-auto flex flex-wrap items-center justify-between gap-x-7 gap-y-2.5 font-race text-[12px] italic leading-none md:text-sm">
           <div className="flex flex-wrap items-center gap-x-7 gap-y-2.5">
             <a href="tel:+553135112373" className="flex items-center space-x-2 text-white transition-colors hover:text-primary-400">
               <Phone className="h-[18px] w-[18px] text-primary-400" />

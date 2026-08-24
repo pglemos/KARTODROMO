@@ -5,7 +5,7 @@
   background: #0a0b0b;
   color: #f6f7f8;
   overflow: hidden;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-admin, 'Rajdhani'), 'Arial Narrow', Arial, sans-serif;
 }
 
 .designer-sidebar {
@@ -121,7 +121,7 @@
 .designer-output-grid span {
   min-height: 36px;
   border: 1px solid #354242;
-  border-radius: 7px;
+  border-radius: 8px;
   padding: 0 11px;
   color: #eef2f2;
   background: #181d1d;
@@ -166,8 +166,8 @@
   display: grid;
   gap: 5px;
   border: 1px solid #354242;
-  border-left-width: 5px;
-  border-radius: 7px;
+  border-left-width: 1px;
+  border-radius: 8px;
   padding: 10px 11px;
   background: #0b0e0e;
 }
@@ -337,7 +337,7 @@
   width: 100%;
   min-width: 0;
   border: 1px solid #354242;
-  border-radius: 7px;
+  border-radius: 8px;
   color: #ffffff;
   background: #050707;
 }
@@ -401,7 +401,7 @@
   align-items: center;
   padding: 7px;
   border: 1px solid #263030;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #0b0e0e;
 }
 
@@ -446,7 +446,7 @@
   width: 42px;
   height: 36px;
   border: 1px solid #354242;
-  border-radius: 7px;
+  border-radius: 8px;
   padding: 2px;
   background: #050707;
 }
@@ -455,7 +455,7 @@
   min-height: 260px;
   resize: vertical;
   padding: 11px;
-  font-family: Consolas, 'Courier New', monospace;
+  font-family: ui-monospace, Consolas, 'Courier New', monospace;
   font-size: 12px;
   line-height: 1.45;
 }
@@ -531,7 +531,7 @@
   justify-content: flex-start;
   overflow: hidden;
   color: #b9c6c6;
-  font-family: Consolas, 'Courier New', monospace;
+  font-family: ui-monospace, Consolas, 'Courier New', monospace;
   font-size: 11px;
   text-overflow: ellipsis;
 }
@@ -541,7 +541,7 @@
   justify-content: flex-start;
   overflow: hidden;
   color: #b9c6c6;
-  font-family: Consolas, 'Courier New', monospace;
+  font-family: ui-monospace, Consolas, 'Courier New', monospace;
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;

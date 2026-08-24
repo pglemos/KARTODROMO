@@ -261,7 +261,7 @@ pagamento: 'PENDENTE',
       soon: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/25',
     };
     return (
-      <span className={`inline-flex items-center whitespace-nowrap px-3 py-1 font-race text-[10px] italic font-bold uppercase tracking-wider ${styles[status] || styles.soon}`}>
+      <span className={`inline-flex items-center whitespace-nowrap px-3 py-1 font-race text-[11px] italic font-bold uppercase tracking-wider ${styles[status] || styles.soon}`}>
         {label}
       </span>
     );

@@ -13,6 +13,15 @@ colors:
   superficie-admin: "#ffffff"
   tinta-admin: "#14170f"
   alerta-racing: "#d92d2d"
+  sage-suave: "#a8b2aa"
+  tinta-cta: "#041301"
+  nevoa-clara: "#d7ded8"
+  ouro-podio: "#ffd24a"
+  verde-viplex: "#00ff66"
+  grafite-caixa: "#333c34"
+  teal-telao: "#03110f"
+  teal-header: "#007965"
+  amarelo-posicao: "#facc15"
 typography:
   display:
     fontFamily: "Anton, sans-serif"
@@ -28,24 +37,72 @@ typography:
     lineHeight: 1.08
   title:
     fontFamily: "Rajdhani, sans-serif"
-    fontSize: "1.25rem"
+    fontSize: "22px"
     fontWeight: 700
     lineHeight: 1.3
   body:
     fontFamily: "Rajdhani, sans-serif"
-    fontSize: "1rem"
+    fontSize: "16px"
     fontWeight: 500
     lineHeight: 1.55
   label:
     fontFamily: "Rajdhani, sans-serif"
-    fontSize: "0.72rem"
+    fontSize: "11px"
     fontWeight: 700
     letterSpacing: "0.16em"
+  ui-sm:
+    fontFamily: "Rajdhani, sans-serif"
+    fontSize: "12px"
+    fontWeight: 500
+  ui-md:
+    fontFamily: "Rajdhani, sans-serif"
+    fontSize: "14px"
+    fontWeight: 500
+  ui-lg:
+    fontFamily: "Rajdhani, sans-serif"
+    fontSize: "18px"
+    fontWeight: 600
+  mono-telao:
+    fontFamily: "ui-monospace, Consolas, 'Courier New', monospace"
+    fontSize: "12px"
+    fontWeight: 400
+  telao-xs:
+    fontFamily: "Rajdhani, sans-serif"
+    fontSize: "10px"
+    fontWeight: 700
+  ui-13:
+    fontFamily: "Rajdhani, sans-serif"
+    fontSize: "13px"
+    fontWeight: 500
+  ui-15:
+    fontFamily: "Rajdhani, sans-serif"
+    fontSize: "15px"
+    fontWeight: 500
+  ui-19:
+    fontFamily: "Rajdhani, sans-serif"
+    fontSize: "19px"
+    fontWeight: 700
+  display-sm:
+    fontFamily: "Anton, sans-serif"
+    fontSize: "34px"
+    fontWeight: 400
+    lineHeight: 1
+    fontVariation: "uppercase por padrão"
+  display-md:
+    fontFamily: "Anton, sans-serif"
+    fontSize: "38px"
+    fontWeight: 400
+    lineHeight: 1
+    fontVariation: "uppercase por padrão"
 rounded:
+  chip: "3px"
   sm: "6px"
+  designer: "7px"
   md: "8px"
+  tile: "9px"
   lg: "12px"
-  pill: "999px"
+  card-telao: "14px"
+  xl: "16px"
 spacing:
   xs: "4px"
   sm: "8px"
@@ -152,6 +209,15 @@ O telão TB50 é superfície de transmissão com gramática própria e pode usar
 
 ### Named Rules
 **A Regra do Grito Curto.** Anton nunca passa de duas linhas; se o título precisar de mais, virá Headline em Rajdhani bold.
+
+**A Regra dos Passos Oficiais.** A rampa operacional é {11 · 12 · 14 · 16 · 18 · 22}px (+ Display/Headline via clamp). Entre um passo e outro não existe meio-termo; tamanho novo exige atualizar esta seção antes de usar.
+
+**A Regra do Eyebrow de Prova.** O eyebrow tracked-caps acima de títulos de página/hero é assinatura oficial do Pit Lane Noturno (decisão do dono, 2026-08-23) — exceção deliberada ao anti-padrão genérico de kickers.
+
+**UI densa intencional.** Painéis operacionais (admin, telão, designer) usam steps próximos de propósito para densidade informacional; `flat-type-hierarchy` não se aplica a essas superfícies.
+
+### Exceção Telão (ampliada)
+Telão TB50, placar e o designer de layouts podem usar famílias adicionais — dígitos monoespaçados (`ui-monospace`/Consolas) para tempos e fallbacks Arial em contexto broadcast — sem seguir as duas vozes acima. Essa exceção não se estende a site nem admin.
 
 **A Regra dos Passos Oficiais.** Entre 0.68rem e o clamp do Display, só existe a escala operacional acima — nem um pixel inventado no meio do caminho.
 

@@ -16,7 +16,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     html { scroll-behavior: smooth; }
-    body { margin: 0; font-family: 'Rajdhani', sans-serif; font-size: 15px; -webkit-font-smoothing: antialiased; }
+    body { margin: 0; font-family: 'Rajdhani', sans-serif; font-size:16px; -webkit-font-smoothing: antialiased; }
     button, input { font: inherit; }
     input:focus, button:focus-visible, a:focus-visible { outline: 2px solid #00c853; outline-offset: 2px; }
   </style>
@@ -27,7 +27,7 @@
     <div style="position:relative; z-index:2;">
       <div style="display:flex; align-items:center; gap:10px;">
         <span style="{{ styles.logoMark }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h7v7H4zM13 4h7v4h-7zM13 11h7v9h-7zM4 14h7v6H4z"/></svg></span>
-        <strong style="font-size:15px; font-weight:700;">Kartódromo Betim</strong>
+        <strong style="font-size:16px; font-weight:700;">Kartódromo Betim</strong>
       </div>
       <h1 style="{{ styles.sideTitle }}">Sistema de gestão da operação</h1>
       <p style="{{ styles.sideText }}">Reservas, recepção, lanchonete, cronometragem, campeonatos, resultados, telão, financeiro, clientes e administração — tudo em um só painel.</p>
@@ -67,7 +67,7 @@
           <sc-if value="{{ passwordError }}"><span style="{{ styles.fieldError }}">{{ passwordError }}</span></sc-if>
         </div>
 
-        <label style="display:flex; align-items:center; gap:9px; font-size:13.5px; font-weight:600; color:{{ tokens.textMuted }}; cursor:pointer;">
+        <label style="display:flex; align-items:center; gap:9px; font-size:14px; font-weight:600; color:{{ tokens.textMuted }}; cursor:pointer;">
           <input type="checkbox" checked="{{ remember }}" onChange="{{ onRememberChange }}" style="width:16px; height:16px; accent-color:{{ tokens.accent }};">
           Manter conectado
         </label>

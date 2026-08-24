@@ -98,7 +98,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     html { scroll-behavior: smooth; }
-    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size: 17px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size:18px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
     a { color: #00e676; }
     a:hover { color: #3ce396; }
     ::selection { background: #00e676; color: #041301; }
@@ -111,7 +111,7 @@
     @keyframes kib-page-in { from { opacity: 0; transform: translateX(24px); filter: blur(3px); } }
     @media (prefers-reduced-motion: reduce) { ::view-transition-old(root), ::view-transition-new(root) { animation: none; } }
     [style*="background:linear-gradient(135deg,#00e676,#00c853)"] { transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s; }
-    [style*="background:linear-gradient(135deg,#00e676,#00c853)"]:hover { transform: translateY(-4px); box-shadow: 0 22px 55px rgba(0,230,118,.4); }
+    [style*="background:linear-gradient(135deg,#00e676,#00c853)"]:hover { transform: translateY(-4px); box-shadow: 0 22px 55px rgba(3,5,4,.6); }
     [style*="background:rgba(255,255,255,.035)"][style*="border:1px solid rgba(255,255,255,.22)"] { transition: border-color .25s, color .25s, transform .25s cubic-bezier(.16,1,.3,1); }
     [style*="background:rgba(255,255,255,.035)"][style*="border:1px solid rgba(255,255,255,.22)"]:hover { border-color:#00e676; color:#00e676; transform: translateY(-4px); }
   </style>
@@ -119,7 +119,7 @@
 <div data-screen-label="500 Milhas" style="min-height:100vh; background:#030504; color:#f7faf6;">
 
   <a href="#conteudo" style="{{ skipLinkStyle }}">Pular para o conteúdo</a>
-  <div id="progress" aria-hidden="true" style="position:fixed; top:0; left:0; width:100%; height:3px; z-index:520; transform:scaleX(0); transform-origin:left; background:linear-gradient(90deg,#00e676,#3ce396); box-shadow:0 0 22px rgba(0,230,118,.55); pointer-events:none;"></div>
+  <div id="progress" aria-hidden="true" style="position:fixed; top:0; left:0; width:100%; height:3px; z-index:520; transform:scaleX(0); transform-origin:left; background:linear-gradient(90deg,#00e676,#3ce396);  pointer-events:none;"></div>
 
   <header style="{{ headerStyle }}">
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; min-height:84px; display:flex; align-items:center; justify-content:space-between; gap:24px;">
@@ -158,11 +158,11 @@
         <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; line-height:0.78; letter-spacing:-0.01em; font-size:clamp(64px,10.5vw,160px);">500 <span style="color:#00e676;">Milhas</span><br><span style="color:transparent; -webkit-text-stroke:1px rgba(255,255,255,.7);">de Betim</span></h1>
         <p style="max-width:680px; margin:28px 0 0; font-size:clamp(18px,1.5vw,22px); line-height:1.5; color:#d7ded8;">A prova mais longa e intensa do calendário. Estratégia, resistência e operação de equipe durante horas de disputa.</p>
         <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:30px;">
-          <a href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Quero%20inscrever%20minha%20equipe%20nas%20500%20Milhas%20de%20Betim%202026." target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;">Inscrever equipe <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></a>
-          <a href="assets/regulamentos/500-milhas-de-betim-2026.pdf" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 21h14"/></svg> Regulamento</a>
+          <a href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Quero%20inscrever%20minha%20equipe%20nas%20500%20Milhas%20de%20Betim%202026." target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Inscrever equipe <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></a>
+          <a href="assets/regulamentos/500-milhas-de-betim-2026.pdf" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 21h14"/></svg> Regulamento</a>
         </div>
       </div>
-      <div style="text-align:right;"><img src="assets/championships/500-milhas-logo.png" alt="500 Milhas de Betim" style="width:100%; max-width:200px; margin-left:auto; filter:drop-shadow(0 20px 34px rgba(0,0,0,.45));"><div style="font-family:'Anton',sans-serif; font-size:clamp(40px,7vw,80px); line-height:0.68; color:transparent; -webkit-text-stroke:1px rgba(0,230,118,.4); margin-top:20px;">29 AGO<small style="display:block; font-family:'Rajdhani',sans-serif; font-weight:700; font-size:13px; letter-spacing:0.18em; color:#00e676; -webkit-text-stroke:0; text-transform:uppercase; margin-top:14px;">Inscrições abertas</small></div></div>
+      <div style="text-align:right;"><img src="assets/championships/500-milhas-logo.png" alt="500 Milhas de Betim" style="width:100%; max-width:200px; margin-left:auto; filter:drop-shadow(0 20px 34px rgba(0,0,0,.45));"><div style="font-family:'Anton',sans-serif; font-size:clamp(40px,7vw,80px); line-height:0.68; color:transparent; -webkit-text-stroke:1px rgba(0,230,118,.4); margin-top:20px;">29 AGO<small style="display:block; font-family:'Rajdhani',sans-serif; font-weight:700; font-size:12px; letter-spacing:0.18em; color:#00e676; -webkit-text-stroke:0; text-transform:uppercase; margin-top:14px;">Inscrições abertas</small></div></div>
     </div>
   </section>
 
@@ -172,7 +172,7 @@
         <sc-for list="{{ telemetry }}" as="t" hint-placeholder-count="4">
           <div style="padding:26px; border-right:1px solid rgba(255,255,255,.12); display:grid; grid-template-columns:auto 1fr; gap:15px; align-items:center;">
             <div style="width:48px; height:48px; border:1px solid rgba(0,230,118,.35); display:grid; place-items:center; color:#00e676; transform:skewX(-7deg);"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="{{ t.icon }}"/></svg></div>
-            <div><strong style="display:block; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; color:#00e676; font-size:15px;">{{ t.title }}</strong><span style="display:block; color:#a8b2aa; font-size:12px; margin-top:3px;">{{ t.text }}</span></div>
+            <div><strong style="display:block; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; color:#00e676; font-size:16px;">{{ t.title }}</strong><span style="display:block; color:#a8b2aa; font-size:12px; margin-top:3px;">{{ t.text }}</span></div>
           </div>
         </sc-for>
       </div>
@@ -190,7 +190,7 @@
       <aside style="min-width:0; background:linear-gradient(180deg,rgba(17,23,18,.95),rgba(7,10,8,.96)); border:1px solid rgba(255,255,255,.22); box-shadow:0 30px 90px rgba(0,0,0,.55); padding:30px; position:relative; overflow:hidden;">
         <div aria-hidden="true" style="position:absolute; inset:0 0 auto; height:3px; background:linear-gradient(90deg,#00e676,transparent);"></div>
         <h2 style="margin:0 0 16px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:22px;">Informação principal</h2>
-        <div style="padding:18px 0; border-block:1px solid rgba(255,255,255,.12);"><small style="display:block; font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#a8b2aa;">Evento</small><strong style="display:block; margin-top:8px; font-family:'Anton',sans-serif; font-weight:400; font-size:38px; color:#00e676;">R$ 6.800 / equipe</strong></div>
+        <div style="padding:18px 0; border-block:1px solid rgba(255,255,255,.12);"><small style="display:block; font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#a8b2aa;">Evento</small><strong style="display:block; margin-top:8px; font-family:'Anton',sans-serif; font-weight:400; font-size:38px; color:#00e676;">R$ 6.800 / equipe</strong></div>
         <div style="display:grid; gap:13px; margin:22px 0;">
           <div style="padding-left:18px; position:relative; color:#a8b2aa; font-size:14px; line-height:1.4;"><span aria-hidden="true" style="position:absolute; left:0; top:6px; width:7px; height:7px; border:2px solid #00e676; transform:rotate(45deg);"></span><strong style="display:block; color:#fff; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:12px;">Regulamento oficial</strong>Formato, punições e procedimentos detalhados.</div>
           <div style="padding-left:18px; position:relative; color:#a8b2aa; font-size:14px; line-height:1.4;"><span aria-hidden="true" style="position:absolute; left:0; top:6px; width:7px; height:7px; border:2px solid #00e676; transform:rotate(45deg);"></span><strong style="display:block; color:#fff; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:12px;">Equipe organizada</strong>Pilotos e estratégia definidos antes da largada.</div>
@@ -229,7 +229,7 @@
           <article style="padding:30px; background:#0b100c; border:1px solid rgba(255,255,255,.12); min-height:180px;"><h3 style="margin:0; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:16px;">{{ r.title }}</h3><p style="color:#a8b2aa; line-height:1.5; font-size:14px;">{{ r.text }}</p></article>
         </sc-for>
       </div>
-      <div style="margin-top:30px;"><a href="assets/regulamentos/500-milhas-de-betim-2026.pdf" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 21h14"/></svg> Baixar PDF oficial</a></div>
+      <div style="margin-top:30px;"><a href="assets/regulamentos/500-milhas-de-betim-2026.pdf" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 21h14"/></svg> Baixar PDF oficial</a></div>
     </div>
   </section>
 
@@ -250,8 +250,8 @@
       <div style="position:relative; overflow:hidden; border:1px solid rgba(255,255,255,.22); background:linear-gradient(135deg,#101711,#030504); padding:clamp(34px,5vw,72px); display:grid; grid-template-columns:1.2fr .8fr; gap:36px; align-items:center;">
         <div style="min-width:0;"><h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(44px,6vw,80px); line-height:0.82;">Inscrever equipe<br><span style="color:#00e676;">agora</span></h2><p style="margin:14px 0 0; color:#a8b2aa; font-size:18px;">Fale com a organização para confirmar vaga, documentos e próximos passos.</p></div>
         <div style="display:grid; gap:12px;">
-          <a href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Quero%20inscrever%20minha%20equipe%20nas%20500%20Milhas%20de%20Betim%202026." target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;">Inscrever equipe <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></a>
-          <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-11.9 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5Z"/><path d="M8.5 8.5c.5 3 2 4.5 5 5"/></svg> Falar no WhatsApp</a>
+          <a href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Quero%20inscrever%20minha%20equipe%20nas%20500%20Milhas%20de%20Betim%202026." target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Inscrever equipe <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></a>
+          <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-11.9 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5Z"/><path d="M8.5 8.5c.5 3 2 4.5 5 5"/></svg> Falar no WhatsApp</a>
         </div>
       </div>
     </div>
@@ -285,7 +285,7 @@
     </div>
   </footer>
 
-  <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" style="position:fixed; right:20px; bottom:20px; z-index:250; width:58px; height:58px; border-radius:50%; display:grid; place-items:center; background:#20d466; color:#fff; box-shadow:0 18px 45px rgba(32,212,102,.35); text-decoration:none; transition:transform .25s;" style-hover="transform:translateY(-5px) scale(1.05);">
+  <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" style="position:fixed; right:20px; bottom:20px; z-index:250; width:58px; height:58px; border-radius:50%; display:grid; place-items:center; background:#20d466; color:#fff; box-shadow:0 18px 45px rgba(3,5,4,.55); text-decoration:none; transition:transform .25s;" style-hover="transform:translateY(-5px) scale(1.05);">
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-11.9 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5Z"/><path d="M8.5 8.5c.5 3 2 4.5 5 5"/></svg>
   </a>
 </div>

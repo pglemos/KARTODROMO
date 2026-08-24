@@ -98,7 +98,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     html { scroll-behavior: smooth; }
-    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size: 17px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size:18px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
     a { color: #00e676; }
     a:hover { color: #3ce396; }
     a:focus-visible { outline: 2px solid #00e676; outline-offset: 2px; }
@@ -115,7 +115,7 @@
   <header style="position:sticky; top:0; z-index:100; background:rgba(3,5,4,.92); backdrop-filter:blur(18px); border-bottom:1px solid rgba(255,255,255,.12);">
     <div style="width:min(1200px,calc(100% - 40px)); margin:0 auto; min-height:74px; display:flex; align-items:center; justify-content:space-between; gap:16px;">
       <a href="/clube-vantagens" style="width:150px; flex:none;"><img src="assets/brand/kib-logo.png" alt="Kartódromo Internacional de Betim" style="width:100%;"></a>
-      <a href="/clube-vantagens" style="font-size:12.5px; font-weight:700; color:#a8b2aa; text-decoration:none;">Voltar ao clube</a>
+      <a href="/clube-vantagens" style="font-size:12px; font-weight:700; color:#a8b2aa; text-decoration:none;">Voltar ao clube</a>
     </div>
     <nav aria-label="Menu do portal" style="width:min(1200px,calc(100% - 40px)); margin:0 auto; display:flex; gap:4px; overflow-x:auto; padding-bottom:2px;">
       <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="8"><a href="{{ t.href }}" style="{{ t.style }}">{{ t.label }}</a></sc-for>
@@ -130,10 +130,10 @@
 
     <sc-for list="{{ sections }}" as="s" hint-placeholder-count="4">
       <section style="border-top:1px solid rgba(255,255,255,.12); padding-top:20px;">
-        <h2 style="margin:0 0 10px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:19px; color:#00e676;">{{ s.title }}</h2>
+        <h2 style="margin:0 0 10px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:18px; color:#00e676;">{{ s.title }}</h2>
         <div style="display:grid; gap:8px;">
           <sc-for list="{{ s.items }}" as="i" hint-placeholder-count="3">
-            <p style="margin:0; color:#c8d0c9; font-size:15px; line-height:1.6;">{{ i }}</p>
+            <p style="margin:0; color:#c8d0c9; font-size:16px; line-height:1.6;">{{ i }}</p>
           </sc-for>
         </div>
       </section>

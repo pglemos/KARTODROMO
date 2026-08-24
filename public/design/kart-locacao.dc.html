@@ -98,7 +98,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     html { scroll-behavior: smooth; }
-    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size: 17px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size:18px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
     a { color: #00e676; }
     a:hover { color: #3ce396; }
     ::selection { background: #00e676; color: #041301; }
@@ -156,8 +156,8 @@
         <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; line-height:0.82; letter-spacing:-0.01em; font-size:clamp(54px,8vw,96px);">Entre no <span style="color:#00e676;">grid hoje.</span></h1>
         <p style="max-width:60ch; margin:24px 0 0; font-size:clamp(16px,1.3vw,19px); line-height:1.6; color:#d7ded8;">Bateria de 30 minutos com kart de locação, cronometragem, equipamento incluso e equipe de pista em uma pista homologada de 1.110 metros.</p>
         <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:28px;">
-          <a href="https://tools.mylaptime.com.br/booking?uid=5729bbc1-572b-4e32-84ec-e9e93ab08ced" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:54px; padding:0 24px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12.5px; letter-spacing:0.04em; text-decoration:none;">Reservar online</a>
-          <a href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Gostaria%20de%20ajuda%20para%20reservar%20minha%20corrida%20no%20Kart%C3%B3dromo%20de%20Betim." target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:54px; padding:0 24px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12.5px; letter-spacing:0.04em; text-decoration:none;">Tirar dúvida</a>
+          <a href="https://tools.mylaptime.com.br/booking?uid=5729bbc1-572b-4e32-84ec-e9e93ab08ced" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:54px; padding:0 24px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Reservar online</a>
+          <a href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Gostaria%20de%20ajuda%20para%20reservar%20minha%20corrida%20no%20Kart%C3%B3dromo%20de%20Betim." target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:54px; padding:0 24px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Tirar dúvida</a>
         </div>
       </div>
       <aside style="background:linear-gradient(180deg,rgba(17,23,18,.95),rgba(7,10,8,.96)); border:1px solid rgba(255,255,255,.22); box-shadow:0 30px 90px rgba(0,0,0,.55); padding:30px; position:relative; overflow:hidden;">
@@ -183,7 +183,7 @@
       <div style="max-width:400px;">
         <p style="margin:0 0 14px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">A bateria</p>
         <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(30px,3.6vw,42px); line-height:0.95;">Trinta minutos dentro da pista.</h2>
-        <p style="margin:18px 0 0; font-size:14.5px; line-height:1.6; color:#a8b2aa;">Chegue com 1 hora de antecedência para cadastro, pesagem, retirada dos equipamentos e briefing. Depois, a sessão segue em três etapas simples.</p>
+        <p style="margin:18px 0 0; font-size:14px; line-height:1.6; color:#a8b2aa;">Chegue com 1 hora de antecedência para cadastro, pesagem, retirada dos equipamentos e briefing. Depois, a sessão segue em três etapas simples.</p>
       </div>
       <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.1);">
         <sc-for list="{{ sessionFlow }}" as="s" hint-placeholder-count="3">
@@ -191,7 +191,7 @@
             <span style="font-family:'Anton',sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:#8b948c;">{{ s.stepLabel }}</span>
             <strong style="display:block; margin-top:26px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:44px; line-height:0.9; color:#00e676;">{{ s.time }}</strong>
             <h3 style="margin:18px 0 0; font-family:'Anton',sans-serif; font-size:16px; font-weight:400;">{{ s.label }}</h3>
-            <p style="margin:8px 0 0; font-size:13.5px; line-height:1.5; color:#a8b2aa;">{{ s.text }}</p>
+            <p style="margin:8px 0 0; font-size:14px; line-height:1.5; color:#a8b2aa;">{{ s.text }}</p>
           </article>
         </sc-for>
       </div>
@@ -211,12 +211,12 @@
         </div>
         <div style="margin-top:26px; display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.1);">
           <sc-for list="{{ requirements }}" as="r" hint-placeholder-count="4">
-            <div style="background:#0b100c; padding:16px;"><strong style="display:block; font-size:20px; font-weight:800; color:#fff;">{{ r.value }}</strong><span style="display:block; margin-top:8px; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; color:#8b948c;">{{ r.label }}</span></div>
+            <div style="background:#0b100c; padding:16px;"><strong style="display:block; font-size:20px; font-weight:800; color:#fff;">{{ r.value }}</strong><span style="display:block; margin-top:8px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; color:#8b948c;">{{ r.label }}</span></div>
           </sc-for>
         </div>
         <ul style="list-style:none; margin:26px 0 0; padding:0; display:grid; gap:12px;">
           <sc-for list="{{ includedItems }}" as="item" hint-placeholder-count="3">
-            <li style="display:flex; gap:10px; font-size:13.5px; line-height:1.5; color:#c7cbc4;"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00e676" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none; margin-top:2px;"><path d="m5 12 4 4L19 6"/></svg>{{ item }}</li>
+            <li style="display:flex; gap:10px; font-size:14px; line-height:1.5; color:#c7cbc4;"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00e676" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none; margin-top:2px;"><path d="m5 12 4 4L19 6"/></svg>{{ item }}</li>
           </sc-for>
         </ul>
       </div>
@@ -244,17 +244,17 @@
 
     <div style="width:min(1480px,calc(100% - 48px)); margin:56px auto 0; display:grid; grid-template-columns:1fr 0.92fr; gap:32px;">
       <div style="border:1px solid rgba(255,255,255,.12); background:#0b100c; padding:32px;">
-        <h3 style="margin:0; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; color:#a8b2aa;">Economia antecipada</h3>
+        <h3 style="margin:0; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; color:#a8b2aa;">Economia antecipada</h3>
         <div style="margin-top:20px; font-family:'Anton',sans-serif; font-size:clamp(56px,7vw,88px); line-height:0.7; color:#00e676;">R$30</div>
         <div style="margin-top:26px; display:grid; grid-template-columns:1fr 1fr; gap:18px;">
-          <div><span style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:#8b948c;">Normal</span><strong style="display:block; margin-top:6px; font-family:'Anton',sans-serif; font-weight:400; color:#fff; font-size:34px;">175</strong><span style="color:#a8b2aa; font-size:12px;">Pagamento convencional.</span></div>
-          <div><span style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:#8b948c;">Online</span><strong style="display:block; margin-top:6px; font-family:'Anton',sans-serif; font-weight:400; color:#00e676; font-size:34px;">145</strong><span style="color:#a8b2aa; font-size:12px;">Pagamento antecipado.</span></div>
+          <div><span style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#8b948c;">Normal</span><strong style="display:block; margin-top:6px; font-family:'Anton',sans-serif; font-weight:400; color:#fff; font-size:34px;">175</strong><span style="color:#a8b2aa; font-size:12px;">Pagamento convencional.</span></div>
+          <div><span style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#8b948c;">Online</span><strong style="display:block; margin-top:6px; font-family:'Anton',sans-serif; font-weight:400; color:#00e676; font-size:34px;">145</strong><span style="color:#a8b2aa; font-size:12px;">Pagamento antecipado.</span></div>
         </div>
       </div>
       <div>
         <p style="margin:0 0 12px; color:#00e676; font-family:'Anton',sans-serif; font-size:11px; letter-spacing:0.16em; text-transform:uppercase;">Grupos fechados</p>
         <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(26px,3vw,34px); line-height:1;">A pista inteira para sua turma</h2>
-        <p style="margin:18px 0 0; font-size:14.5px; line-height:1.6; color:#a8b2aa;">Terça a sexta: mínimo de 25 pilotos. Finais de semana e feriados: mínimo de 30 pilotos, conforme disponibilidade.</p>
+        <p style="margin:18px 0 0; font-size:14px; line-height:1.6; color:#a8b2aa;">Terça a sexta: mínimo de 25 pilotos. Finais de semana e feriados: mínimo de 30 pilotos, conforme disponibilidade.</p>
         <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:22px;">
           <a href="/eventos" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:50px; padding:0 22px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Conhecer eventos</a>
           <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:50px; padding:0 22px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Consultar grupo</a>
@@ -275,8 +275,8 @@
       <div style="position:relative; overflow:hidden; border:1px solid rgba(255,255,255,.22); background:linear-gradient(135deg,#101711,#030504); padding:clamp(34px,5vw,72px); display:grid; grid-template-columns:1.2fr .8fr; gap:36px; align-items:center;">
         <div style="min-width:0;"><h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5.5vw,68px); line-height:0.85;">Entre no grid<br><span style="color:#00e676;">agora mesmo</span></h2><p style="margin:14px 0 0; color:#a8b2aa; font-size:18px;">Reserve online em poucos minutos ou fale com a equipe pelo WhatsApp para tirar dúvidas.</p></div>
         <div style="display:grid; gap:12px;">
-          <a href="https://tools.mylaptime.com.br/booking?uid=5729bbc1-572b-4e32-84ec-e9e93ab08ced" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;">Reservar online</a>
-          <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;">Falar no WhatsApp</a>
+          <a href="https://tools.mylaptime.com.br/booking?uid=5729bbc1-572b-4e32-84ec-e9e93ab08ced" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Reservar online</a>
+          <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Falar no WhatsApp</a>
         </div>
       </div>
     </div>

@@ -15,7 +15,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     html { scroll-behavior: smooth; }
-    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size: 17px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size:18px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
     a { color: #00e676; }
     a:hover { color: #3ce396; }
     ::selection { background: #00e676; color: #041301; }
@@ -72,8 +72,8 @@
         <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; line-height:0.85; letter-spacing:-0.01em; font-size:clamp(38px,5.6vw,66px);">Eventos com kart, pódio e espaço para receber seu grupo</h1>
         <p style="max-width:56ch; margin:22px 0 0; font-size:clamp(16px,1.3vw,19px); line-height:1.55; color:#d7ded8;">Organize confraternizações, aniversários e encontros corporativos com baterias de kart, ranking, pódio, gastronomia e apoio da equipe.</p>
         <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:26px;">
-          <button type="button" onClick="{{ openModal }}" style="appearance:none; border:0; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:54px; padding:0 24px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12.5px; letter-spacing:0.04em;">Solicitar orçamento</button>
-          <a href="tel:+553135112373" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:54px; padding:0 24px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12.5px; letter-spacing:0.04em; text-decoration:none;">Ligar agora</a>
+          <button type="button" onClick="{{ openModal }}" style="appearance:none; border:0; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:54px; padding:0 24px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em;">Solicitar orçamento</button>
+          <a href="tel:+553135112373" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:54px; padding:0 24px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Ligar agora</a>
         </div>
       </div>
       <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:10px;">
@@ -99,20 +99,20 @@
       <div style="max-width:400px;">
         <p style="margin:0 0 14px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Estrutura do evento</p>
         <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(28px,3.4vw,38px); line-height:0.95;">Escolha o espaço para o seu evento</h2>
-        <p style="margin:18px 0 0; font-size:14.5px; line-height:1.6; color:#a8b2aa;">Compare a capacidade, o uso indicado e a estrutura de cada ambiente antes de solicitar seu orçamento.</p>
+        <p style="margin:18px 0 0; font-size:14px; line-height:1.6; color:#a8b2aa;">Compare a capacidade, o uso indicado e a estrutura de cada ambiente antes de solicitar seu orçamento.</p>
       </div>
       <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:18px;">
         <sc-for list="{{ eventSpaces }}" as="sp" hint-placeholder-count="2">
           <article style="border:1px solid rgba(255,255,255,.12); background:#030504; padding:24px;">
             <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:20px;">
               <div style="width:46px; height:46px; display:flex; align-items:center; justify-content:center; border:1px solid rgba(0,230,118,.3); background:rgba(255,255,255,.05); color:#00e676;"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="{{ sp.icon }}"/></svg></div>
-              <span style="border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); padding:6px 12px; font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:#c7cbc4; white-space:nowrap;">{{ sp.capacity }}</span>
+              <span style="border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); padding:6px 12px; font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#c7cbc4; white-space:nowrap;">{{ sp.capacity }}</span>
             </div>
             <h3 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:22px;">{{ sp.title }}</h3>
             <p style="margin:14px 0 0; font-size:14px; line-height:1.6; color:#a8b2aa;">{{ sp.text }}</p>
             <ul style="list-style:none; margin:18px 0 0; padding:0; display:grid; gap:10px;">
               <sc-for list="{{ sp.points }}" as="pt" hint-placeholder-count="3">
-                <li style="display:flex; gap:8px; font-size:13.5px; font-weight:600; color:#c7cbc4;"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00e676" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none; margin-top:2px;"><path d="m5 12 4 4L19 6"/></svg>{{ pt }}</li>
+                <li style="display:flex; gap:8px; font-size:14px; font-weight:600; color:#c7cbc4;"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00e676" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none; margin-top:2px;"><path d="m5 12 4 4L19 6"/></svg>{{ pt }}</li>
               </sc-for>
             </ul>
           </article>
@@ -160,8 +160,8 @@
       <div style="position:relative; overflow:hidden; border:1px solid rgba(255,255,255,.22); background:linear-gradient(135deg,#101711,#030504); padding:clamp(34px,5vw,72px); display:grid; grid-template-columns:1.2fr .8fr; gap:36px; align-items:center;">
         <div style="min-width:0;"><h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(38px,5.5vw,68px); line-height:0.85;">Seu próximo evento<br><span style="color:#00e676;">merece velocidade</span></h2><p style="margin:14px 0 0; color:#a8b2aa; font-size:18px;">Envie data, quantidade de pessoas e tipo de evento. A equipe retorna com formato, disponibilidade e próximos passos.</p></div>
         <div style="display:grid; gap:12px;">
-          <button type="button" onClick="{{ openModal }}" style="appearance:none; border:0; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em;">Montar meu evento</button>
-          <a href="tel:+553135112373" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;">(31) 3511-2373</a>
+          <button type="button" onClick="{{ openModal }}" style="appearance:none; border:0; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em;">Montar meu evento</button>
+          <a href="tel:+553135112373" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">(31) 3511-2373</a>
         </div>
       </div>
     </div>
@@ -176,12 +176,12 @@
       <h2 id="event-modal-title" style="margin:8px 0 14px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:34px; line-height:0.9;">Crie sua experiência</h2>
       <p style="margin:0 0 20px; color:#a8b2aa; font-size:14px;">Os dados serão organizados em uma mensagem para a equipe no WhatsApp.</p>
       <form onSubmit="{{ onSubmitLead }}" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-        <div style="grid-column:1/-1; display:grid; gap:6px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">Nome</label><input name="nome" type="text" required="" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:12px; outline:none;"></div>
-        <div style="display:grid; gap:6px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">Tipo de evento</label><select name="tipo" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:12px; outline:none;"><option>Aniversário</option><option>Grupo de amigos</option><option>Evento corporativo</option></select></div>
-        <div style="display:grid; gap:6px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">Pessoas</label><input name="pessoas" inputmode="numeric" type="number" min="8" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:12px; outline:none;"></div>
-        <div style="grid-column:1/-1; display:grid; gap:6px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">Data</label><input name="data" type="date" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:12px; outline:none;"></div>
-        <div style="grid-column:1/-1; display:grid; gap:6px;"><label style="font-family:'Anton',sans-serif; font-size:10px; text-transform:uppercase; color:#8b948c;">Mensagem</label><textarea name="mensagem" style="width:100%; min-height:80px; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:12px; outline:none; resize:vertical;"></textarea></div>
-        <div style="grid-column:1/-1;"><button type="submit" style="width:100%; appearance:none; border:0; cursor:pointer; min-height:52px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12.5px; letter-spacing:0.04em;">Enviar pelo WhatsApp</button></div>
+        <div style="grid-column:1/-1; display:grid; gap:6px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Nome</label><input name="nome" type="text" required="" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:12px; outline:none;"></div>
+        <div style="display:grid; gap:6px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Tipo de evento</label><select name="tipo" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:12px; outline:none;"><option>Aniversário</option><option>Grupo de amigos</option><option>Evento corporativo</option></select></div>
+        <div style="display:grid; gap:6px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Pessoas</label><input name="pessoas" inputmode="numeric" type="number" min="8" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:12px; outline:none;"></div>
+        <div style="grid-column:1/-1; display:grid; gap:6px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Data</label><input name="data" type="date" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:12px; outline:none;"></div>
+        <div style="grid-column:1/-1; display:grid; gap:6px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Mensagem</label><textarea name="mensagem" style="width:100%; min-height:80px; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:12px; outline:none; resize:vertical;"></textarea></div>
+        <div style="grid-column:1/-1;"><button type="submit" style="width:100%; appearance:none; border:0; cursor:pointer; min-height:52px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em;">Enviar pelo WhatsApp</button></div>
       </form>
     </div>
   </div>

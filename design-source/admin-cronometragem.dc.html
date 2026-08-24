@@ -15,7 +15,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     html { scroll-behavior: smooth; }
-    body { margin: 0; font-family: 'Rajdhani', sans-serif; font-size: 15px; -webkit-font-smoothing: antialiased; }
+    body { margin: 0; font-family: 'Rajdhani', sans-serif; font-size:16px; -webkit-font-smoothing: antialiased; }
     button, input, select { font: inherit; }
     input:focus, select:focus, button:focus-visible, a:focus-visible { outline: 2px solid #00c853; outline-offset: 2px; }
     table { width: 100%; border-collapse: collapse; }
@@ -103,7 +103,7 @@
             <sc-for list="{{ sessions }}" as="sess" hint-placeholder-count="3">
               <button type="button" onClick="{{ sess.onSelect }}" style="{{ sess.cardStyle }}">
                 <div style="display:flex; align-items:center; justify-content:space-between;">
-                  <strong style="font-size:13.5px;">{{ sess.nome }}</strong>
+                  <strong style="font-size:14px;">{{ sess.nome }}</strong>
                   <span style="{{ sess.statusStyle }}">{{ sess.statusLabel }}</span>
                 </div>
                 <span style="{{ styles.sessionMeta }}">{{ sess.tipoLabel }} · {{ sess.dataLabel }}</span>
@@ -126,7 +126,7 @@
               <tbody>
                 <sc-for list="{{ leaderboard }}" as="row" hint-placeholder-count="8">
                   <tr>
-                    <td style="{{ styles.td }}"><strong style="color:{{ tokens.accent }}; font-size:15px;">{{ row.posicao }}</strong></td>
+                    <td style="{{ styles.td }}"><strong style="color:{{ tokens.accent }}; font-size:16px;">{{ row.posicao }}</strong></td>
                     <td style="{{ styles.td }}"><strong style="color:{{ tokens.text }};">{{ row.nome }}</strong></td>
                     <td style="{{ styles.td }}">{{ row.kart }}</td>
                     <td style="{{ styles.td }}">{{ row.melhorVoltaTexto }}</td>

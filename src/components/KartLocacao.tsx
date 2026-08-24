@@ -86,15 +86,15 @@ const KartLocacao = () => {
             <div className="mt-6 grid grid-cols-3 gap-px border border-white/15 bg-white/10 md:hidden">
               <div className="bg-ink-900 p-3">
                 <strong className="block text-xl font-black leading-none text-primary-400">R$ 145</strong>
-                <span className="mt-1 block text-[9px] font-black uppercase tracking-[0.12em] text-white/60">online</span>
+                <span className="mt-1 block text-[11px] font-black uppercase tracking-[0.12em] text-white/60">online</span>
               </div>
               <div className="bg-ink-900 p-3">
                 <strong className="block text-xl font-black leading-none text-white">30 min</strong>
-                <span className="mt-1 block text-[9px] font-black uppercase tracking-[0.12em] text-white/60">bateria</span>
+                <span className="mt-1 block text-[11px] font-black uppercase tracking-[0.12em] text-white/60">bateria</span>
               </div>
               <div className="bg-ink-900 p-3">
                 <strong className="block text-xl font-black leading-none text-white">14+</strong>
-                <span className="mt-1 block text-[9px] font-black uppercase tracking-[0.12em] text-white/60">idade</span>
+                <span className="mt-1 block text-[11px] font-black uppercase tracking-[0.12em] text-white/60">idade</span>
               </div>
             </div>
 
@@ -264,12 +264,12 @@ const KartLocacao = () => {
               <div className="mt-6 font-display text-6xl italic text-primary-400 md:text-7xl">R$30</div>
               <div className="mt-8 grid grid-cols-2 gap-4">
                 <div>
-                  <span className="font-race text-[10px] italic font-bold uppercase tracking-wider text-white/50">Normal</span>
+                  <span className="font-race text-[11px] italic font-bold uppercase tracking-wider text-white/50">Normal</span>
                   <strong className="mt-1 block font-display text-3xl italic text-white">175</strong>
                   <span className="text-xs text-white/55">Pagamento convencional.</span>
                 </div>
                 <div>
-                  <span className="font-race text-[10px] italic font-bold uppercase tracking-wider text-white/50">Online</span>
+                  <span className="font-race text-[11px] italic font-bold uppercase tracking-wider text-white/50">Online</span>
                   <strong className="mt-1 block font-display text-3xl italic text-primary-400">145</strong>
                   <span className="text-xs text-white/55">Pagamento antecipado.</span>
                 </div>

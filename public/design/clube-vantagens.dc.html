@@ -98,7 +98,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     html { scroll-behavior: smooth; }
-    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size: 17px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size:18px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
     a { color: #00e676; }
     a:hover { color: #3ce396; }
     ::selection { background: #00e676; color: #041301; }
@@ -152,8 +152,8 @@
           Mais do que um programa de pontos: reconhecemos e recompensamos quem faz parte da nossa história. A cada corrida você acumula pontos e troca por produtos, experiências e vantagens exclusivas. Quanto mais você corre, mais benefícios conquista.
         </p>
         <div data-reveal style="display:flex; flex-wrap:wrap; gap:12px; margin-top:30px; opacity:0; transform:translateY(18px); transition:opacity .7s cubic-bezier(.16,1,.3,1) 240ms, transform .7s cubic-bezier(.16,1,.3,1) 240ms;">
-          <a href="/clube-cadastro" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;">Fazer meu cadastro</a>
-          <a href="/clube-consulta" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none; backdrop-filter:blur(12px);">Consultar meus pontos</a>
+          <a href="/clube-cadastro" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Fazer meu cadastro</a>
+          <a href="/clube-consulta" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none; backdrop-filter:blur(12px);">Consultar meus pontos</a>
         </div>
       </div>
     </section>
@@ -166,7 +166,7 @@
           <sc-for list="{{ objectives }}" as="o" hint-placeholder-count="6">
             <div style="display:grid; grid-template-columns:24px 1fr; gap:12px;">
               <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00e676" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px; border:1px solid #00e676; border-radius:50%; padding:3px; box-sizing:border-box;"><path d="m7 12 3 3 7-7"/></svg>
-              <p style="margin:0; color:#d7ddd8; font-size:15px; line-height:1.5;">{{ o }}</p>
+              <p style="margin:0; color:#d7ddd8; font-size:16px; line-height:1.5;">{{ o }}</p>
             </div>
           </sc-for>
         </div>
@@ -181,7 +181,7 @@
           <sc-for list="{{ steps }}" as="step" hint-placeholder-count="3">
             <article style="background:#070b08; padding:30px; min-height:190px; position:relative; overflow:hidden;">
               <span aria-hidden="true" style="position:absolute; right:12px; bottom:-20px; font-family:'Anton',sans-serif; font-size:110px; color:rgba(255,255,255,.035);">{{ step.num }}</span>
-              <h3 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:17px;">{{ step.title }}</h3>
+              <h3 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:18px;">{{ step.title }}</h3>
               <p style="margin:10px 0 0; color:#a8b2aa; font-size:14px; line-height:1.5; max-width:34ch;">{{ step.text }}</p>
             </article>
           </sc-for>
@@ -193,12 +193,12 @@
       <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:clamp(28px,5vw,70px); align-items:start;">
         <div>
           <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Regras de pontuação</p>
-          <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(34px,4.4vw,54px); line-height:0.88;">Pontuação creditada automaticamente</h2>
-          <p style="max-width:48ch; margin:20px 0 0; color:#a8b2aa; font-size:15px; line-height:1.6;">Após a confirmação de cada corrida elegível, os pontos entram direto na sua conta do clube.</p>
+          <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; font-size:clamp(34px,4.4vw,54px); line-height:0.88;">Pontuação creditada automaticamente</h2>
+          <p style="max-width:48ch; margin:20px 0 0; color:#a8b2aa; font-size:16px; line-height:1.6;">Após a confirmação de cada corrida elegível, os pontos entram direto na sua conta do clube.</p>
           <div style="margin-top:28px; border:1px solid rgba(255,255,255,.12); background:#0b100c;">
             <sc-for list="{{ pointRules }}" as="rule" hint-placeholder-count="2">
               <div style="display:flex; align-items:center; justify-content:space-between; padding:20px 22px; border-bottom:1px solid rgba(255,255,255,.1);">
-                <span style="font-size:15px; color:#d7ddd8;">{{ rule.label }}</span>
+                <span style="font-size:16px; color:#d7ddd8;">{{ rule.label }}</span>
                 <strong style="font-family:'Anton',sans-serif; font-weight:400; color:#00e676; font-size:24px;">{{ rule.pontos }} pts</strong>
               </div>
             </sc-for>
@@ -210,7 +210,7 @@
           <div style="margin-top:28px; display:grid; gap:10px;">
             <sc-for list="{{ rewardsPreview }}" as="r" hint-placeholder-count="5">
               <div style="display:flex; align-items:center; justify-content:space-between; border:1px solid rgba(255,255,255,.12); background:#0b100c; padding:16px 18px;">
-                <span style="font-size:14.5px; font-weight:600;">{{ r.nome }}</span>
+                <span style="font-size:14px; font-weight:600;">{{ r.nome }}</span>
                 <strong style="font-family:'Anton',sans-serif; font-weight:400; color:#00e676; font-size:18px;">{{ r.pontos }} pts</strong>
               </div>
             </sc-for>
@@ -226,8 +226,8 @@
         <div style="margin-top:44px; display:grid; grid-template-columns:repeat(4,1fr); gap:12px;">
           <sc-for list="{{ portalLinks }}" as="p" hint-placeholder-count="8">
             <a href="{{ p.href }}" style="display:grid; gap:10px; border:1px solid rgba(255,255,255,.12); background:#0b100c; padding:20px; text-decoration:none; color:#fff;">
-              <strong style="font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:15px;">{{ p.title }}</strong>
-              <span style="font-size:12.5px; color:#a8b2aa; line-height:1.4;">{{ p.desc }}</span>
+              <strong style="font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:16px;">{{ p.title }}</strong>
+              <span style="font-size:12px; color:#a8b2aa; line-height:1.4;">{{ p.desc }}</span>
             </a>
           </sc-for>
         </div>
@@ -239,11 +239,11 @@
         <div style="position:relative; overflow:hidden; border:1px solid rgba(255,255,255,.22); background:linear-gradient(135deg,#101711,#030504); padding:clamp(34px,5vw,64px); display:grid; grid-template-columns:1.2fr .8fr; gap:36px; align-items:center;">
           <div>
             <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(38px,5.5vw,68px); line-height:0.82;">Pronto para entrar<br><span style="color:#00e676;">no clube?</span></h2>
-            <p style="margin:14px 0 0; color:#a8b2aa; font-size:17px;">Cadastro gratuito. Comece a acumular pontos na próxima corrida.</p>
+            <p style="margin:14px 0 0; color:#a8b2aa; font-size:18px;">Cadastro gratuito. Comece a acumular pontos na próxima corrida.</p>
           </div>
           <div style="display:grid; gap:12px;">
-            <a href="/clube-cadastro" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;">Fazer meu cadastro</a>
-            <a href="/clube-regulamento" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;">Ver regulamento</a>
+            <a href="/clube-cadastro" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Fazer meu cadastro</a>
+            <a href="/clube-regulamento" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Ver regulamento</a>
           </div>
         </div>
       </div>

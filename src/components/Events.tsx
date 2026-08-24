@@ -150,7 +150,7 @@ const Events = () => {
                   <div className="flex h-12 w-12 items-center justify-center border border-primary-400/30 bg-white/5 text-primary-400">
                     <space.icon className="h-6 w-6" />
                   </div>
-                  <span className="border border-white/15 bg-white/5 px-3 py-1.5 font-race text-[10px] italic font-bold uppercase tracking-[0.14em] text-white/60">
+                  <span className="border border-white/15 bg-white/5 px-3 py-1.5 font-race text-[11px] italic font-bold uppercase tracking-[0.14em] text-white/60">
                     {space.capacity}
                   </span>
                 </div>

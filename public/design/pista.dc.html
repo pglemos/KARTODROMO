@@ -98,7 +98,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     html { scroll-behavior: smooth; }
-    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size: 17px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size:18px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
     a { color: #00e676; }
     a:hover { color: #3ce396; }
     ::selection { background: #00e676; color: #041301; }
@@ -111,7 +111,7 @@
     @keyframes kib-page-in { from { opacity: 0; transform: translateX(24px); filter: blur(3px); } }
     @media (prefers-reduced-motion: reduce) { ::view-transition-old(root), ::view-transition-new(root) { animation: none; } }
     [style*="background:linear-gradient(135deg,#00e676,#00c853)"] { transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s; }
-    [style*="background:linear-gradient(135deg,#00e676,#00c853)"]:hover { transform: translateY(-4px); box-shadow: 0 22px 55px rgba(0,230,118,.4); }
+    [style*="background:linear-gradient(135deg,#00e676,#00c853)"]:hover { transform: translateY(-4px); box-shadow: 0 22px 55px rgba(3,5,4,.6); }
     [style*="background:rgba(255,255,255,.035)"][style*="border:1px solid rgba(255,255,255,.22)"] { transition: border-color .25s, color .25s, transform .25s cubic-bezier(.16,1,.3,1); }
     [style*="background:rgba(255,255,255,.035)"][style*="border:1px solid rgba(255,255,255,.22)"]:hover { border-color:#00e676; color:#00e676; transform: translateY(-4px); }
   </style>
@@ -119,7 +119,7 @@
 <div data-screen-label="A Pista" style="min-height:100vh; background:#030504; color:#f7faf6;">
 
   <a href="#conteudo" style="{{ skipLinkStyle }}">Pular para o conteúdo</a>
-  <div id="progress" aria-hidden="true" style="position:fixed; top:0; left:0; width:100%; height:3px; z-index:520; transform:scaleX(0); transform-origin:left; background:linear-gradient(90deg,#00e676,#3ce396); box-shadow:0 0 22px rgba(0,230,118,.55); pointer-events:none;"></div>
+  <div id="progress" aria-hidden="true" style="position:fixed; top:0; left:0; width:100%; height:3px; z-index:520; transform:scaleX(0); transform-origin:left; background:linear-gradient(90deg,#00e676,#3ce396);  pointer-events:none;"></div>
 
   <header style="{{ headerStyle }}">
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; min-height:84px; display:flex; align-items:center; justify-content:space-between; gap:24px;">
@@ -155,13 +155,13 @@
         <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; line-height:0.8; letter-spacing:-0.01em; font-size:clamp(50px,8vw,110px);">Pista homologada de <span style="color:#00e676;">1.110m</span></h1>
         <p style="max-width:640px; margin:26px 0 0; font-size:clamp(16px,1.3vw,19px); line-height:1.5; color:#d7ded8;">Conheça os mapas oficiais do Kartódromo de Betim e entenda as características de cada configuração. Alterações de traçado são realizadas exclusivamente em campeonatos, conforme o calendário oficial.</p>
         <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:28px;">
-          <a href="#tracados" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:54px; padding:0 24px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12.5px; letter-spacing:0.04em; text-decoration:none;">Ver traçados oficiais</a>
-          <a href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Quero%20saber%20qual%20tra%C3%A7ado%20estar%C3%A1%20ativo%20na%20pista." target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:54px; padding:0 24px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12.5px; letter-spacing:0.04em; text-decoration:none;">Consultar pista ativa</a>
+          <a href="#tracados" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:54px; padding:0 24px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Ver traçados oficiais</a>
+          <a href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Quero%20saber%20qual%20tra%C3%A7ado%20estar%C3%A1%20ativo%20na%20pista." target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:54px; padding:0 24px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Consultar pista ativa</a>
         </div>
       </div>
       <div style="text-align:right;">
         <span aria-hidden="true" style="display:block; font-family:'Anton',sans-serif; font-size:clamp(90px,13vw,190px); line-height:0.7; color:transparent; -webkit-text-stroke:1px rgba(0,230,118,.4);">1110</span>
-        <span style="display:block; margin-top:-6px; font-family:'Anton',sans-serif; font-size:13px; text-transform:uppercase; letter-spacing:0.18em; color:#00e676;">metros de desafio</span>
+        <span style="display:block; margin-top:-6px; font-family:'Anton',sans-serif; font-size:12px; text-transform:uppercase; letter-spacing:0.18em; color:#00e676;">metros de desafio</span>
       </div>
     </div>
   </section>
@@ -185,14 +185,13 @@
       <div style="max-width:480px;">
         <p style="margin:0 0 14px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Como ler a pista</p>
         <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(30px,3.6vw,42px); line-height:0.95;">Cada desenho muda o jeito de pilotar</h2>
-        <p style="margin:18px 0 0; font-size:14.5px; line-height:1.6; color:#a8b2aa;">Os mapas abaixo apresentam o sentido da volta e as diferenças entre as configurações Normal, Invertido e Invertido com chicane.</p>
+        <p style="margin:18px 0 0; font-size:14px; line-height:1.6; color:#a8b2aa;">Os mapas abaixo apresentam o sentido da volta e as diferenças entre as configurações Normal, Invertido e Invertido com chicane.</p>
       </div>
       <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px;">
         <sc-for list="{{ trackNotes }}" as="n" hint-placeholder-count="3">
           <article style="border:1px solid rgba(255,255,255,.12); background:#030504; padding:20px;">
-            <div style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:#00e676; color:#041301; margin-bottom:20px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="{{ n.icon }}"/></svg></div>
-            <h3 style="margin:0; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:15px;">{{ n.title }}</h3>
-            <p style="margin:10px 0 0; font-size:13px; line-height:1.55; color:#a8b2aa;">{{ n.text }}</p>
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;"><span aria-hidden="true" style="flex:none; display:inline-grid; place-items:center; background:#00e676; color:#041301;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="{{ n.icon }}"/></svg></span><h3 style="margin:0; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:16px;">{{ n.title }}</h3></div>
+            <p style="margin:10px 0 0; font-size:12px; line-height:1.55; color:#a8b2aa;">{{ n.text }}</p>
           </article>
         </sc-for>
       </div>
@@ -219,10 +218,10 @@
           <article style="border:1px solid rgba(255,255,255,.12); background:#0b100c; padding:10px;">
             <div style="position:relative; aspect-ratio:1/1; overflow:hidden; background:#fff;">
               <img src="{{ t.url }}" alt="{{ t.label }}" loading="lazy" style="width:100%; height:100%; object-fit:contain;">
-              <span style="position:absolute; left:10px; top:10px; background:#030504; padding:4px 8px; font-family:'Anton',sans-serif; font-size:10px; letter-spacing:0.14em; text-transform:uppercase;">#{{ t.number }}</span>
+              <span style="position:absolute; left:10px; top:10px; background:#030504; padding:4px 8px; font-family:'Anton',sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase;">#{{ t.number }}</span>
             </div>
             <div style="padding:12px 4px 2px; display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
-              <h3 style="margin:0; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px;">Traçado {{ t.number }}</h3>
+              <h3 style="margin:0; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px;">Traçado {{ t.number }}</h3>
               <span style="{{ t.badgeStyle }}">{{ t.variantLabel }}</span>
             </div>
           </article>
@@ -240,7 +239,7 @@
         <img src="assets/track/tracados/tracado-01-normal.jpg" alt="Traçado 1 Normal" loading="lazy" style="width:100%; aspect-ratio:1/1; object-fit:contain; background:#fff; border:1px solid rgba(255,255,255,.1);">
         <div style="display:flex; flex-direction:column; justify-content:center;">
           <span style="margin-bottom:12px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Informação importante</span>
-          <h3 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(24px,3vw,32px); line-height:1;">Alterações de traçado são exclusivas para campeonatos.</h3>
+          <h3 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; font-size:clamp(24px,3vw,32px); line-height:1;">Alterações de traçado são exclusivas para campeonatos.</h3>
           <p style="margin:16px 0 0; max-width:56ch; font-size:14px; line-height:1.6; color:#a8b2aa;">Nas baterias de lazer, treinos e eventos, é utilizado o traçado definido pelo Kartódromo. Configurações diferentes, incluindo opções com chicane ou sentido invertido, são adotadas somente em campeonatos conforme o calendário oficial.</p>
           <div style="margin-top:20px;">
             <a href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Quero%20saber%20qual%20tra%C3%A7ado%20estar%C3%A1%20ativo%20na%20pista." target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:50px; padding:0 22px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Perguntar no WhatsApp</a>
@@ -256,8 +255,8 @@
       <div style="position:relative; overflow:hidden; border:1px solid rgba(255,255,255,.22); background:linear-gradient(135deg,#101711,#030504); padding:clamp(34px,5vw,72px); display:grid; grid-template-columns:1.2fr .8fr; gap:36px; align-items:center;">
         <div style="min-width:0;"><h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(44px,6vw,80px); line-height:0.82;">Sua volta começa<br><span style="color:#00e676;">agora</span></h2><p style="margin:14px 0 0; color:#a8b2aa; font-size:18px;">Consulte os horários disponíveis e venha descobrir cada setor da pista.</p></div>
         <div style="display:grid; gap:12px;">
-          <a href="https://tools.mylaptime.com.br/booking?uid=5729bbc1-572b-4e32-84ec-e9e93ab08ced" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;">Reservar corrida</a>
-          <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;">Falar no WhatsApp</a>
+          <a href="https://tools.mylaptime.com.br/booking?uid=5729bbc1-572b-4e32-84ec-e9e93ab08ced" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Reservar corrida</a>
+          <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Falar no WhatsApp</a>
         </div>
       </div>
     </div>
@@ -291,7 +290,7 @@
     </div>
   </footer>
 
-  <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" style="position:fixed; right:20px; bottom:20px; z-index:250; width:58px; height:58px; border-radius:50%; display:grid; place-items:center; background:#20d466; color:#fff; box-shadow:0 18px 45px rgba(32,212,102,.35); text-decoration:none; transition:transform .25s;" style-hover="transform:translateY(-5px) scale(1.05);">
+  <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" style="position:fixed; right:20px; bottom:20px; z-index:250; width:58px; height:58px; border-radius:50%; display:grid; place-items:center; background:#20d466; color:#fff; box-shadow:0 18px 45px rgba(3,5,4,.55); text-decoration:none; transition:transform .25s;" style-hover="transform:translateY(-5px) scale(1.05);">
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-11.9 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5Z"/><path d="M8.5 8.5c.5 3 2 4.5 5 5"/></svg>
   </a>
 </div>

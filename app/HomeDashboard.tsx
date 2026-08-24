@@ -532,7 +532,7 @@ export function HomeDashboard({ uid }: { uid: string }) {
       </header>
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,.65fr)]" aria-label="Resumo operacional">
-        <article className={`${panelClass} border-l-4 ${isLiveReady ? 'border-l-emerald-500' : 'border-l-amber-500'} p-5`}>
+        <article className={`${panelClass} border-l ${isLiveReady ? 'border-l-emerald-500' : 'border-l-amber-500'} p-5`}>
           <div className="flex items-start gap-4">
             <span className={`grid h-11 w-11 flex-none place-items-center rounded-xl ${isLiveReady ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
               {isLiveReady ? <CheckCircle2 aria-hidden="true" size={22} /> : <AlertTriangle aria-hidden="true" size={22} />}

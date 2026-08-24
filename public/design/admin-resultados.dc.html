@@ -16,7 +16,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     html { scroll-behavior: smooth; }
-    body { margin: 0; font-family: 'Rajdhani', sans-serif; font-size: 15px; -webkit-font-smoothing: antialiased; }
+    body { margin: 0; font-family: 'Rajdhani', sans-serif; font-size:16px; -webkit-font-smoothing: antialiased; }
     button, input, select { font: inherit; }
     input:focus, select:focus, button:focus-visible, a:focus-visible { outline: 2px solid #00c853; outline-offset: 2px; }
     table { width: 100%; border-collapse: collapse; }
@@ -104,7 +104,7 @@
             <sc-for list="{{ corridas }}" as="c" hint-placeholder-count="3">
               <button type="button" onClick="{{ c.onSelect }}" style="{{ c.cardStyle }}">
                 <div style="display:flex; align-items:center; justify-content:space-between;">
-                  <strong style="font-size:13.5px;">{{ c.titulo }}</strong>
+                  <strong style="font-size:14px;">{{ c.titulo }}</strong>
                   <span style="{{ c.statusStyle }}">{{ c.statusLabel }}</span>
                 </div>
                 <span style="{{ styles.meta }}">{{ c.dataLabel }}</span>
@@ -128,7 +128,7 @@
               <tbody>
                 <sc-for list="{{ resultRows }}" as="row" hint-placeholder-count="6">
                   <tr>
-                    <td style="{{ styles.td }}"><strong style="color:{{ tokens.accent }}; font-size:15px;">{{ row.posicao }}</strong></td>
+                    <td style="{{ styles.td }}"><strong style="color:{{ tokens.accent }}; font-size:16px;">{{ row.posicao }}</strong></td>
                     <td style="{{ styles.td }}"><strong style="color:{{ tokens.text }};">{{ row.piloto_nome }}</strong></td>
                     <td style="{{ styles.td }}">{{ row.melhor_volta }}</td>
                     <td style="{{ styles.td }}">{{ row.voltas }}</td>

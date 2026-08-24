@@ -9,11 +9,15 @@
       "verde-podio": { "role": "secondary", "displayName": "Verde Pódio", "canonical": "#00c853", "tonalRamp": ["#052e16", "#14532d", "#15803d", "#16a34a", "#00c853", "#4ade80", "#dcfce7", "#f0fdf4"] },
       "verde-institucional": { "role": "secondary", "displayName": "Verde Institucional (admin)", "canonical": "#007a3d", "tonalRamp": ["#04240f", "#07351a", "#0a4a26", "#007a3d", "#12a355", "#3cc47c", "#7fd8a8", "#d7f2e3"] },
       "papel-admin": { "role": "neutral", "displayName": "Papel Admin", "canonical": "#f5f7f5", "tonalRamp": ["#14170f", "#3a403b", "#5d6660", "#8a938c", "#c0c7c1", "#e2e6e1", "#eef1ee", "#f5f7f5"] },
-      "alerta-racing": { "role": "tertiary", "displayName": "Alerta Racing", "canonical": "#d92d2d", "tonalRamp": ["#3d0b0b", "#6b1212", "#961a1a", "#d92d2d", "#e8584f", "#f2938c", "#f8c7c4", "#fdeceb"] }
+      "alerta-racing": { "role": "tertiary", "displayName": "Alerta Racing", "canonical": "#d92d2d", "tonalRamp": ["#3d0b0b", "#6b1212", "#961a1a", "#d92d2d", "#e8584f", "#f2938c", "#f8c7c4", "#fdeceb"] },
+      "teal-telao": { "role": "tertiary", "displayName": "Teal Telão (broadcast)", "canonical": "#03110f", "tonalRamp": ["#03110f", "#061a17", "#09231f", "#0b2a25", "#1a5148", "#004d43", "#007965", "#b8d4cf"] },
+      "amarelo-posicao": { "role": "tertiary", "displayName": "Amarelo de Posição (telão)", "canonical": "#facc15", "tonalRamp": ["#2a1e02", "#4a3603", "#715405", "#eab308", "#facc15", "#fde047", "#fef08a", "#fef9c3"] },
+      "grafite-designer": { "role": "neutral", "displayName": "Grafite Designer", "canonical": "#263030", "tonalRamp": ["#101616", "#182020", "#263030", "#374444", "#4d5c5c", "#6b7a7a", "#9aa8a8", "#cdd6d6"] }
     },
     "typographyMeta": {
       "display": { "displayName": "Display Anton", "purpose": "Hero e títulos de seção do público, sempre em caixa alta." },
-      "body": { "displayName": "Rajdhani", "purpose": "Todo texto corrente, tabelas, formulários e o admin inteiro." }
+      "body": { "displayName": "Rajdhani", "purpose": "Todo texto corrente, tabelas, formulários e o admin inteiro." },
+      "mono-telao": { "displayName": "Mono Telão (exceção broadcast)", "purpose": "Dígitos e dados técnicos no designer/placar TB50." }
     },
     "shadows": [
       { "name": "sombra-prancheta", "value": "0 12px 32px rgba(20,30,20,0.08)", "purpose": "Camada base de cartões/modais do admin." },

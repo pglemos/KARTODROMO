@@ -194,7 +194,7 @@ const Track = () => {
                   loading="lazy"
                   className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-[1.035]"
                 />
-                <span className="absolute left-3 top-3 bg-ink-950 px-2.5 py-1 font-race text-[10px] italic font-bold uppercase tracking-[0.16em] text-white">
+                <span className="absolute left-3 top-3 bg-ink-950 px-2.5 py-1 font-race text-[11px] italic font-bold uppercase tracking-[0.16em] text-white">
                   #{track.number}
                 </span>
               </div>
@@ -202,7 +202,7 @@ const Track = () => {
               <div className="px-1 pb-1 pt-4">
                 <div className="flex items-start justify-between gap-3">
                   <h3 className="font-race text-sm italic font-bold uppercase tracking-tight text-white">Traçado {track.number}</h3>
-                  <span className={`inline-flex items-center gap-1 border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${getVariantAccent(track.variant)}`}>
+                  <span className={`inline-flex items-center gap-1 border px-2 py-1 text-[11px] font-black uppercase tracking-[0.12em] ${getVariantAccent(track.variant)}`}>
                     {track.variant === 'invertido' ? <RotateCcw className="h-3 w-3" /> : <Route className="h-3 w-3" />}
                     {track.variantLabel}
                   </span>

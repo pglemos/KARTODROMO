@@ -106,7 +106,7 @@ const Contact = () => {
               href="https://maps.google.com/maps?q=Av.+Adutora+Várzea+das+Flores,+477+-+Itacolomi,+Betim+-+MG,+32672-586"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center border border-white/15 bg-white/5 px-4 py-2 font-race text-[10px] italic font-bold uppercase tracking-wider text-white transition-all hover:border-primary-400/40"
+              className="inline-flex items-center border border-white/15 bg-white/5 px-4 py-2 font-race text-[11px] italic font-bold uppercase tracking-wider text-white transition-all hover:border-primary-400/40"
             >
               <span>Traçar rota no Waze / Maps</span>
               <Compass className="ml-1.5 h-3.5 w-3.5 text-primary-400" />
