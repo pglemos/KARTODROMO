@@ -10,7 +10,7 @@ import '@/components/telao/telao.css';
 import './designer.css';
 
 const FIELDS: Array<{ id: TelaoField; label: string; short: string }> = [
-  { id: 'position', label: 'Posicao', short: 'P' },
+  { id: 'position', label: 'Posição', short: 'P' },
   { id: 'kart', label: 'Kart', short: '#' },
   { id: 'name', label: 'Nome', short: 'N' },
   { id: 'time', label: 'Tempo', short: 'T' },
@@ -19,14 +19,14 @@ const FIELDS: Array<{ id: TelaoField; label: string; short: string }> = [
 const NUMBER_FIELDS: Array<{ key: keyof Pick<TelaoLayoutConfig, 'columns' | 'rows' | 'cellGap' | 'borderWidth' | 'lineWidth' | 'positionFontSize' | 'kartFontSize' | 'nameFontSize' | 'timeFontSize' | 'headerFontSize'>; label: string; min: number; max: number; unit?: string }> = [
   { key: 'columns', label: 'Colunas', min: 1, max: 10 },
   { key: 'rows', label: 'Linhas', min: 1, max: 10 },
-  { key: 'cellGap', label: 'Espaco', min: 0, max: 18, unit: 'px' },
+  { key: 'cellGap', label: 'Espaço', min: 0, max: 18, unit: 'px' },
   { key: 'borderWidth', label: 'Borda', min: 0, max: 6, unit: 'px' },
   { key: 'lineWidth', label: 'Grade', min: 0, max: 8, unit: 'px' },
-  { key: 'positionFontSize', label: 'Posicao', min: 10, max: 250, unit: 'px' },
+  { key: 'positionFontSize', label: 'Posição', min: 10, max: 250, unit: 'px' },
   { key: 'kartFontSize', label: 'Kart', min: 10, max: 250, unit: 'px' },
   { key: 'nameFontSize', label: 'Nome', min: 10, max: 80, unit: 'px' },
   { key: 'timeFontSize', label: 'Tempo', min: 10, max: 80, unit: 'px' },
-  { key: 'headerFontSize', label: 'Cabecalho', min: 10, max: 48, unit: 'px' },
+  { key: 'headerFontSize', label: 'Cabeçalho', min: 10, max: 48, unit: 'px' },
 ];
 
 const COLOR_FIELDS: Array<{ key: keyof TelaoLayoutConfig['colors']; label: string }> = [
@@ -34,7 +34,7 @@ const COLOR_FIELDS: Array<{ key: keyof TelaoLayoutConfig['colors']; label: strin
   { key: 'grid', label: 'Grade' },
   { key: 'accent', label: 'Destaque' },
   { key: 'text', label: 'Texto' },
-  { key: 'position', label: 'Posicao' },
+  { key: 'position', label: 'Posição' },
   { key: 'time', label: 'Tempo' },
   { key: 'topCell', label: 'Linha 1' },
   { key: 'bottomCell', label: 'Linha 2' },
@@ -134,7 +134,7 @@ function hiddenFieldsLabel(fields: TelaoField[]): string {
 
 function verificationMessage(target: string, verification: TelaoPayloadVerification): string {
   if (verification.driverCount <= 0) {
-    return `Layout salvo no ${target}, mas o snapshot real ainda nao confirmou pilotos.`;
+    return `Layout salvo no ${target}, mas o snapshot real ainda não confirmou pilotos.`;
   }
 
   if (verification.hiddenFields.length > 0) {
@@ -191,10 +191,10 @@ export function DesignerTelaoClient() {
   const [layout, setLayout] = useState<TelaoLayoutConfig>(DEFAULT_TELAO_LAYOUT);
   const [savedLayout, setSavedLayout] = useState<TelaoLayoutConfig | null>(null);
   const [store, setStore] = useState<StoreStatus>({});
-  const [message, setMessage] = useState('Carregando configuracao...');
+  const [message, setMessage] = useState('Carregando configuração...');
   const [activePanel, setActivePanel] = useState<'layout' | 'fields' | 'colors' | 'json'>('layout');
   const [jsonText, setJsonText] = useState('');
-  const [previewScale, setPreviewScale] = useState(0.5);
+  const [previewScale, setPreviewScale] = useState(0.35);
   const [previewMode, setPreviewMode] = useState<PreviewMode>('race');
   const [history, setHistory] = useState<TelaoLayoutConfig[]>([]);
   const [future, setFuture] = useState<TelaoLayoutConfig[]>([]);
@@ -232,11 +232,11 @@ export function DesignerTelaoClient() {
       setHistory([]);
       setFuture([]);
       setJsonText(JSON.stringify(nextLayout, null, 2));
-      setMessage(data.store?.remoteEndpoint ? 'Configuracao carregada do servidor local' : data.store?.persistent ? 'Configuracao persistente carregada' : 'Configuracao temporaria carregada');
+      setMessage(data.store?.remoteEndpoint ? 'Configuração carregada do servidor local' : data.store?.persistent ? 'Configuração persistente carregada' : 'Configuração temporária carregada');
       setDelivery({
         state: 'idle',
         title: 'Layout carregado',
-        detail: data.store?.remoteEndpoint ? 'Fonte atual: servidor local conectado a TB50.' : 'Fonte atual carregada; envie novamente para confirmar no telao.',
+        detail: data.store?.remoteEndpoint ? 'Fonte atual: servidor local conectado à TB50.' : 'Fonte atual carregada; envie novamente para confirmar no telão.',
         checkedAt: deliveryTime(),
       });
     } catch (error) {
@@ -304,7 +304,7 @@ export function DesignerTelaoClient() {
       const previous = history[history.length - 1];
       setHistory((items) => items.slice(0, -1));
       setFuture((items) => [current, ...items].slice(0, 25));
-      setMessage('Alteracao desfeita');
+      setMessage('Alteração desfeita');
       return previous;
     });
   }
@@ -315,17 +315,17 @@ export function DesignerTelaoClient() {
       const [next, ...rest] = future;
       setFuture(rest);
       setHistory((items) => [...items.slice(-24), current]);
-      setMessage('Alteracao refeita');
+      setMessage('Alteração refeita');
       return next;
     });
   }
 
   async function verifyPublished() {
-    setMessage('Verificando publicacao...');
+    setMessage('Verificando publicação...');
     setDelivery({
       state: 'sending',
       title: 'Verificando TB50',
-      detail: 'Conferindo o layout salvo e o payload servido para o telao.',
+      detail: 'Conferindo o layout salvo e o payload servido para o telão.',
     });
     try {
       const response = await fetch(`/api/telao-layout?_ts=${Date.now()}`, { cache: 'no-store' });
@@ -338,7 +338,7 @@ export function DesignerTelaoClient() {
       const verified = sameLayout(layout, remoteLayout);
       const layoutOk = verified && verification.ok;
       const hasHiddenRealData = verification.hiddenFields.length > 0;
-      setMessage(layoutOk ? verificationMessage(target, verification) : `O ${target} ou o telao tem um layout diferente do preview atual`);
+      setMessage(layoutOk ? verificationMessage(target, verification) : `O ${target} ou o telão tem um layout diferente do preview atual`);
       setDelivery(
         layoutOk && !hasHiddenRealData
           ? {
@@ -356,13 +356,13 @@ export function DesignerTelaoClient() {
               }
           : {
               state: 'warning',
-              title: 'Envio nao confirmado',
-              detail: 'O layout salvo ou a rota do telao ainda nao bate com o preview.',
+              title: 'Envio não confirmado',
+              detail: 'O layout salvo ou a rota do telão ainda não bate com o preview.',
               checkedAt: deliveryTime(),
             },
       );
     } catch (error) {
-      setMessage(error instanceof Error ? `Falha na verificacao: ${error.message}` : 'Falha na verificacao');
+      setMessage(error instanceof Error ? `Falha na verificação: ${error.message}` : 'Falha na verificação');
       setDelivery({
         state: 'error',
         title: 'Falha ao verificar envio',
@@ -404,7 +404,7 @@ export function DesignerTelaoClient() {
     setDelivery({
       state: 'sending',
       title: 'Enviando para TB50',
-      detail: 'Salvando layout, voltando a rota para cronometragem ao vivo e conferindo o telao.',
+      detail: 'Salvando layout, voltando a rota para cronometragem ao vivo e conferindo o telão.',
     });
 
     try {
@@ -432,7 +432,7 @@ export function DesignerTelaoClient() {
       const target = data.store?.remoteEndpoint ? 'servidor local' : 'storage publicado';
       const layoutOk = data.persistent && verified && verification.ok;
       const hasHiddenRealData = verification.hiddenFields.length > 0;
-      setMessage(layoutOk ? verificationMessage(target, verification) : data.persistent ? `Configuracao salva no ${target}, mas a rota do telao nao confirmou ainda` : 'Configuracao temporaria enviada');
+      setMessage(layoutOk ? verificationMessage(target, verification) : data.persistent ? `Configuração salva no ${target}, mas a rota do telão ainda não confirmou` : 'Configuração temporária enviada');
       setDelivery(
         layoutOk && !hasHiddenRealData
           ? {
@@ -451,7 +451,7 @@ export function DesignerTelaoClient() {
           : {
               state: 'warning',
               title: 'Envio parcialmente confirmado',
-              detail: data.persistent ? 'Layout salvo, mas a rota do telao ainda nao confirmou esse ajuste.' : 'Layout nao ficou persistente no servidor.',
+              detail: data.persistent ? 'Layout salvo, mas a rota do telão ainda não confirmou esse ajuste.' : 'Layout não ficou persistente no servidor.',
               checkedAt: deliveryTime(),
             },
       );
@@ -459,7 +459,7 @@ export function DesignerTelaoClient() {
       setMessage(error instanceof Error ? `Falha ao salvar: ${error.message}` : 'Falha ao salvar');
       setDelivery({
         state: 'error',
-        title: 'Nao enviado para TB50',
+        title: 'Não enviado para TB50',
         detail: error instanceof Error ? error.message : 'Falha ao salvar layout.',
         checkedAt: deliveryTime(),
       });
@@ -490,11 +490,11 @@ export function DesignerTelaoClient() {
 
   async function sendDisplayMode(mode: 'live' | 'final-real', successTitle: string, successDetail: string) {
     setDisplaySending(true);
-    setMessage('Enviando modo do telao...');
+    setMessage('Enviando modo do telão...');
     setDelivery({
       state: 'sending',
       title: 'Enviando para TB50',
-      detail: 'Atualizando o modo manual servido pela rota do telao.',
+      detail: 'Atualizando o modo manual servido pela rota do telão.',
     });
 
     try {
@@ -504,15 +504,15 @@ export function DesignerTelaoClient() {
       setDelivery({
         state: data.persistent ? 'sent' : 'warning',
         title: successTitle,
-        detail: data.persistent ? successDetail : 'Modo aplicado em memoria; confirme no preview do telao.',
+        detail: data.persistent ? successDetail : 'Modo aplicado em memória; confirme no preview do telão.',
         checkedAt: deliveryTime(),
       });
     } catch (error) {
       setMessage(error instanceof Error ? `Falha ao enviar modo: ${error.message}` : 'Falha ao enviar modo');
       setDelivery({
         state: 'error',
-        title: 'Modo nao enviado',
-        detail: error instanceof Error ? error.message : 'Falha ao atualizar o modo do telao.',
+        title: 'Modo não enviado',
+        detail: error instanceof Error ? error.message : 'Falha ao atualizar o modo do telão.',
         checkedAt: deliveryTime(),
       });
     } finally {
@@ -568,7 +568,7 @@ export function DesignerTelaoClient() {
       setJsonText(JSON.stringify(nextLayout, null, 2));
       setMessage('JSON aplicado ao preview');
     } catch (error) {
-      setMessage(error instanceof Error ? `JSON invalido: ${error.message}` : 'JSON invalido');
+      setMessage(error instanceof Error ? `JSON inválido: ${error.message}` : 'JSON inválido');
     }
   }
 
@@ -581,13 +581,13 @@ export function DesignerTelaoClient() {
 
   return (
     <main className="designer-page">
-      <section className="designer-sidebar" aria-label="Controles do designer">
+      <section className="designer-controls" aria-label="Controles do designer">
         <header className="designer-hero">
           <div>
-            <span className="designer-kicker">TB50 / 2048 x 512</span>
-            <h1>Designer do Telao</h1>
+            <span className="designer-kicker">TB50 / 2048 × 512</span>
+            <h1>Designer do telão</h1>
           </div>
-          <div className={`designer-status ${dirty ? 'designer-status-dirty' : 'designer-status-saved'}`}>{dirty ? 'Nao enviado' : 'Publicado'}</div>
+          <div className={`designer-status ${dirty ? 'designer-status-dirty' : 'designer-status-saved'}`}>{dirty ? 'Não enviado' : 'Publicado'}</div>
         </header>
 
         <div className="designer-summary" aria-label="Resumo do layout">
@@ -601,8 +601,8 @@ export function DesignerTelaoClient() {
         </div>
 
         <div className="designer-actions">
-          <button className="designer-save" type="button" disabled={saving || loading} onClick={() => void save()}>
-            {saving ? 'Enviando...' : 'Enviar para o telao'}
+          <button className="designer-save" type="button" aria-busy={saving} disabled={saving || loading} onClick={() => void save()}>
+            {saving ? 'Enviando…' : 'Enviar para o telão'}
           </button>
           <button type="button" onClick={() => void standardizeDefaultLayout()} disabled={saving || loading}>
             Padronizar layout
@@ -623,12 +623,12 @@ export function DesignerTelaoClient() {
             Abrir preview
           </a>
           <a href={FINAL_REAL_PREVIEW_URL} target="_blank" rel="noreferrer">
-            Visualizacao podio final
+            Visualização pódio final
           </a>
-          <button type="button" onClick={() => void sendDisplayMode('final-real', 'Podio final enviado ao telao', 'A rota do telao foi alternada para o podio final da corrida com dados reais.')} disabled={saving || displaySending}>
-            Enviar podio final ao telao
+          <button type="button" onClick={() => void sendDisplayMode('final-real', 'Pódio final enviado ao telão', 'A rota do telão foi alternada para o pódio final da corrida com dados reais.')} disabled={saving || displaySending}>
+            Enviar pódio final ao telão
           </button>
-          <button type="button" onClick={() => void sendDisplayMode('live', 'Placar ao vivo enviado ao telao', 'A rota do telao voltou para a cronometragem ao vivo.')} disabled={saving || displaySending}>
+          <button type="button" onClick={() => void sendDisplayMode('live', 'Placar ao vivo enviado ao telão', 'A rota do telão voltou para a cronometragem ao vivo.')} disabled={saving || displaySending}>
             Voltar ao vivo
           </button>
         </div>
@@ -641,13 +641,13 @@ export function DesignerTelaoClient() {
         </div>
 
         <section className="designer-section">
-          <h2>Ajustes rapidos</h2>
+          <h2>Ajustes rápidos</h2>
           <div className="designer-quick-grid">
             <button type="button" onClick={() => applyLayout(TELAO_LAYOUT_PRESETS['tb50-live-21'], 'Preset TB50 aplicado ao preview')}>
               TB50 21
             </button>
-            <button type="button" onClick={() => applyLayout(DEFAULT_TELAO_LAYOUT, 'Padrao 20 pilotos aplicado ao preview')}>
-              Padrao 20
+            <button type="button" onClick={() => applyLayout(DEFAULT_TELAO_LAYOUT, 'Padrão 20 pilotos aplicado ao preview')}>
+              Padrão 20
             </button>
             <button type="button" onClick={() => adjustFonts(2)}>
               Fonte +2
@@ -714,7 +714,7 @@ export function DesignerTelaoClient() {
             ))}
             <label className="designer-check">
               <input type="checkbox" checked={layout.showHeader} onChange={(event) => patchLayout({ showHeader: event.target.checked })} />
-              <span>Cabecalho com logo</span>
+              <span>Cabeçalho com logo</span>
             </label>
           </section>
         ) : null}
@@ -745,9 +745,9 @@ export function DesignerTelaoClient() {
               })}
             </div>
             <label className="designer-field">
-              <span>Nome</span>
+              <span>Exibição do nome</span>
               <select value={layout.nameMode} onChange={(event) => patchLayout({ nameMode: event.target.value as TelaoLayoutConfig['nameMode'] })}>
-                <option value="hidden">Nao mostrar</option>
+                <option value="hidden">Não mostrar</option>
                 <option value="first">Primeiro nome</option>
                 <option value="full">Nome completo</option>
               </select>
@@ -807,7 +807,7 @@ export function DesignerTelaoClient() {
         ) : null}
       </section>
 
-      <section className="designer-preview-area" aria-label="Preview do telao">
+      <section className="designer-preview-area" aria-label="Preview do telão">
         <div className="designer-preview-toolbar">
           <div>
             <strong>{layout.label}</strong>
@@ -840,12 +840,12 @@ export function DesignerTelaoClient() {
               <div className={`telao-page telao-theme-dark ${layout.showHeader ? '' : 'telao-no-header'}`} style={previewStyle}>
                 {layout.showHeader ? (
                   <header className="telao-status" style={{ background: layout.colors.background }}>
-                    <div className="telao-brand" aria-label="Kartodromo de Betim">
-                      <img className="telao-logo" src="/brand/kartodromo-betim-logo.png" alt="Kartodromo Internacional de Betim" />
+                    <div className="telao-brand" aria-label="Kartódromo de Betim">
+                      <img className="telao-logo" src="/brand/kartodromo-betim-logo.png" alt="Kartódromo Internacional de Betim" />
                     </div>
                     <div className="telao-track">
                       <span>PREVIEW DO DESIGNER</span>
-                      <strong>TELAO LED 2048X512</strong>
+                      <strong>TELÃO LED 2048×512</strong>
                     </div>
                     <div className="telao-race-state">
                       <div className="telao-badge telao-badge-demo">DEMO</div>
@@ -866,10 +866,10 @@ export function DesignerTelaoClient() {
             API layout
           </a>
           <a href={DEMO_TELAO_PREVIEW_URL} target="_blank" rel="noreferrer">
-            Telao demo
+            Telão demo
           </a>
           <a href={FINAL_REAL_PREVIEW_URL} target="_blank" rel="noreferrer">
-            Podio final real
+            Pódio final real
           </a>
           <button type="button" onClick={() => void copyText(RTSP_URL, 'RTSP')}>
             RTSP: {RTSP_URL}
