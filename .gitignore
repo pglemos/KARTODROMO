@@ -47,3 +47,15 @@ Thumbs.db
 /KARTODROMO - SISTEMA/
 "KARTODROMO - SISTEMA.zip"
 KARTODROMO\ -\ SISTEMA.zip
+
+# Impeccable — tooling local de design (skills, hooks, agentes)
+.agents/skills/impeccable/
+.claude/skills/impeccable/
+.cursor/skills/
+.cursor/agents/
+.gemini/skills/
+.github/agents/
+.github/skills/
+.github/hooks/
+.codex/hooks.json
+.impeccable/live/
