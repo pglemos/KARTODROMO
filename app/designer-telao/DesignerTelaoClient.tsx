@@ -1,5 +1,6 @@
 'use client';
 
+import { CheckCircle2, Code2, ExternalLink, LayoutTemplate, Palette, Radio, Redo2, RefreshCw, Send, Settings2, SlidersHorizontal, Undo2 } from 'lucide-react';
 import { type CSSProperties, useEffect, useMemo, useState } from 'react';
 import { createDemoSnapshot } from '@/lib/livetime/demo-data';
 import type { LiveTimingDriver, LiveTimingSnapshot } from '@/lib/livetime/types';
@@ -581,303 +582,298 @@ export function DesignerTelaoClient() {
 
   return (
     <main className="designer-page">
-      <section className="designer-controls" aria-label="Controles do designer">
-        <header className="designer-hero">
-          <div>
-            <span className="designer-kicker">TB50 / 2048 × 512</span>
-            <h1>Designer do telão</h1>
-          </div>
-          <div className={`designer-status ${dirty ? 'designer-status-dirty' : 'designer-status-saved'}`}>{dirty ? 'Não enviado' : 'Publicado'}</div>
-        </header>
-
-        <div className="designer-summary" aria-label="Resumo do layout">
-          <span>{variantLabel(layout)}</span>
-          <strong>
-            {layout.columns} x {layout.rows}
-          </strong>
-          <span>{capacity} pilotos</span>
-          <span>{activePreset ? 'Preset' : 'Personalizado'}</span>
-          <span>{storageLabel}</span>
+      <header className="designer-page-header">
+        <div>
+          <p className="designer-eyebrow">Operação · TB50</p>
+          <h2>Designer do telão</h2>
+          <p className="designer-page-description">Configure a tela LED de 2048 × 512, confira o resultado e publique a versão que vai para a pista.</p>
         </div>
-
-        <div className="designer-actions">
-          <button className="designer-save" type="button" aria-busy={saving} disabled={saving || loading} onClick={() => void save()}>
-            {saving ? 'Enviando…' : 'Enviar para o telão'}
-          </button>
-          <button type="button" onClick={() => void standardizeDefaultLayout()} disabled={saving || loading}>
-            Padronizar layout
-          </button>
-          <button type="button" onClick={() => void load()} disabled={loading || saving}>
-            Recarregar
-          </button>
-          <button type="button" onClick={undo} disabled={!canUndo || saving}>
-            Desfazer
-          </button>
-          <button type="button" onClick={redo} disabled={!canRedo || saving}>
-            Refazer
-          </button>
-          <button type="button" onClick={() => void verifyPublished()} disabled={saving}>
-            Verificar
-          </button>
-          <a href={REAL_TELAO_PREVIEW_URL} target="_blank" rel="noreferrer">
+        <div className="designer-page-actions">
+          <a className="designer-button designer-button-ghost" href={REAL_TELAO_PREVIEW_URL} target="_blank" rel="noreferrer">
+            <ExternalLink aria-hidden="true" size={15} />
             Abrir preview
           </a>
-          <a href={FINAL_REAL_PREVIEW_URL} target="_blank" rel="noreferrer">
-            Visualização pódio final
-          </a>
-          <button type="button" onClick={() => void sendDisplayMode('final-real', 'Pódio final enviado ao telão', 'A rota do telão foi alternada para o pódio final da corrida com dados reais.')} disabled={saving || displaySending}>
-            Enviar pódio final ao telão
+          <button className="designer-button designer-button-ghost" type="button" onClick={() => void verifyPublished()} disabled={saving}>
+            <CheckCircle2 aria-hidden="true" size={15} />
+            Verificar
           </button>
-          <button type="button" onClick={() => void sendDisplayMode('live', 'Placar ao vivo enviado ao telão', 'A rota do telão voltou para a cronometragem ao vivo.')} disabled={saving || displaySending}>
-            Voltar ao vivo
+          <button className="designer-button designer-button-primary" type="button" aria-busy={saving} disabled={saving || loading} onClick={() => void save()}>
+            <Send aria-hidden="true" size={15} />
+            {saving ? 'Enviando…' : 'Enviar para o telão'}
           </button>
         </div>
+      </header>
 
-        <p className="designer-message">{message}</p>
-        <div className={`designer-delivery designer-delivery-${delivery.state}`} role="status" aria-live="polite">
-          <strong>{delivery.title}</strong>
-          <span>{delivery.detail}</span>
-          {delivery.checkedAt ? <em>{delivery.checkedAt}</em> : null}
-        </div>
-
-        <section className="designer-section">
-          <h2>Ajustes rápidos</h2>
-          <div className="designer-quick-grid">
-            <button type="button" onClick={() => applyLayout(TELAO_LAYOUT_PRESETS['tb50-live-21'], 'Preset TB50 aplicado ao preview')}>
-              TB50 21
-            </button>
-            <button type="button" onClick={() => applyLayout(DEFAULT_TELAO_LAYOUT, 'Padrão 20 pilotos aplicado ao preview')}>
-              Padrão 20
-            </button>
-            <button type="button" onClick={() => adjustFonts(2)}>
-              Fonte +2
-            </button>
-            <button type="button" onClick={() => adjustFonts(-2)}>
-              Fonte -2
-            </button>
-            <button type="button" onClick={compactLayout}>
-              Compactar
-            </button>
-            <button type="button" onClick={() => patchLayout({ showHeader: !layout.showHeader })}>
-              {layout.showHeader ? 'Sem logo' : 'Com logo'}
-            </button>
-            <button type="button" onClick={() => patchLayout({ nameMode: layout.nameMode === 'hidden' ? 'first' : 'hidden' })}>
-              {layout.nameMode === 'hidden' ? 'Mostrar nome' : 'Ocultar nome'}
-            </button>
-          </div>
-        </section>
-
-        <section className="designer-section">
-          <h2>Presets</h2>
-          <div className="designer-preset-grid">
-            {Object.values(TELAO_LAYOUT_PRESETS).map((preset) => (
-              <button className={presetMatches(layout, preset) ? 'active' : ''} key={preset.id} type="button" onClick={() => applyLayout(preset)}>
-                <strong>{preset.label}</strong>
-                <span>
-                  {preset.columns} x {preset.rows} / {variantLabel(preset)}
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <nav className="designer-tabs" aria-label="Paineis">
-          {[
-            ['layout', 'Layout'],
-            ['fields', 'Campos'],
-            ['colors', 'Cores'],
-            ['json', 'JSON'],
-          ].map(([id, label]) => (
-            <button className={activePanel === id ? 'active' : ''} key={id} type="button" onClick={() => setActivePanel(id as typeof activePanel)}>
-              {label}
-            </button>
-          ))}
-        </nav>
-
-        {activePanel === 'layout' ? (
-          <section className="designer-section">
-            <h2>Layout</h2>
-            <label className="designer-field designer-field-wide">
-              <span>Nome</span>
-              <input value={layout.label} onChange={(event) => patchLayout({ label: event.target.value })} />
-            </label>
-            <div className="designer-segment">
-              <button className={layout.variant === 'table' ? 'active' : ''} type="button" onClick={() => patchLayout({ variant: 'table' })}>
-                Tabela
-              </button>
-              <button className={layout.variant === 'cards' ? 'active' : ''} type="button" onClick={() => patchLayout({ variant: 'cards' })}>
-                Cards
-              </button>
-            </div>
-            {NUMBER_FIELDS.slice(0, 5).map((field) => (
-              <NumberControl field={field} key={field.key} layout={layout} onChange={patchLayout} />
-            ))}
-            <label className="designer-check">
-              <input type="checkbox" checked={layout.showHeader} onChange={(event) => patchLayout({ showHeader: event.target.checked })} />
-              <span>Cabeçalho com logo</span>
-            </label>
-          </section>
-        ) : null}
-
-        {activePanel === 'fields' ? (
-          <section className="designer-section">
-            <h2>Campos</h2>
-            <div className="designer-field-list">
-              {FIELDS.map((field) => {
-                const enabled = layout.fields.includes(field.id);
-                return (
-                  <div className={enabled ? 'enabled' : ''} key={field.id}>
-                    <label className="designer-check">
-                      <input type="checkbox" checked={enabled} onChange={() => toggleField(field.id)} />
-                      <span>
-                        <strong>{field.short}</strong>
-                        {field.label}
-                      </span>
-                    </label>
-                    <button type="button" disabled={!enabled} onClick={() => moveField(field.id, -1)}>
-                      Subir
-                    </button>
-                    <button type="button" disabled={!enabled} onClick={() => moveField(field.id, 1)}>
-                      Descer
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-            <label className="designer-field">
-              <span>Exibição do nome</span>
-              <select value={layout.nameMode} onChange={(event) => patchLayout({ nameMode: event.target.value as TelaoLayoutConfig['nameMode'] })}>
-                <option value="hidden">Não mostrar</option>
-                <option value="first">Primeiro nome</option>
-                <option value="full">Nome completo</option>
-              </select>
-            </label>
-            {NUMBER_FIELDS.slice(5).map((field) => (
-              <NumberControl field={field} key={field.key} layout={layout} onChange={patchLayout} />
-            ))}
-          </section>
-        ) : null}
-
-        {activePanel === 'colors' ? (
-          <section className="designer-section">
-            <h2>Cores</h2>
-            <div className="designer-palette-grid">
-              {PALETTES.map((palette) => (
-                <button key={palette.label} type="button" onClick={() => patchColors(palette.colors)}>
-                  <span className="designer-palette-swatch" style={{ background: palette.colors.accent }} />
-                  {palette.label}
-                </button>
-              ))}
-            </div>
-            <div className="designer-color-grid">
-              {COLOR_FIELDS.map((field) => {
-                const value = layout.colors[field.key] || '';
-                return (
-                  <label className="designer-color" key={field.key}>
-                    <span>{field.label}</span>
-                    <input type="color" value={colorValue(value)} onChange={(event) => patchColors({ [field.key]: event.target.value })} />
-                    <input value={value} onChange={(event) => patchColors({ [field.key]: event.target.value })} />
-                  </label>
-                );
-              })}
-            </div>
-            <label className="designer-field designer-field-wide">
-              <span>Vazio</span>
-              <input value={layout.colors.muted} onChange={(event) => patchColors({ muted: event.target.value })} />
-            </label>
-          </section>
-        ) : null}
-
-        {activePanel === 'json' ? (
-          <section className="designer-section">
-            <h2>JSON</h2>
-            <textarea className="designer-json" value={jsonText} spellCheck={false} onChange={(event) => setJsonText(event.target.value)} />
-            <div className="designer-actions">
-              <button type="button" onClick={() => void copyJson()}>
-                Exportar
-              </button>
-              <button type="button" onClick={applyJson}>
-                Aplicar
-              </button>
-              <button type="button" onClick={() => applyLayout(DEFAULT_TELAO_LAYOUT)}>
-                Padrao
-              </button>
-            </div>
-          </section>
-        ) : null}
+      <section className="designer-status-grid" aria-label="Resumo do layout">
+        <article className="designer-stat-card">
+          <span>Layout atual</span>
+          <strong>{layout.label}</strong>
+          <small>{variantLabel(layout)} · {capacity} posições</small>
+        </article>
+        <article className="designer-stat-card">
+          <span>Grade</span>
+          <strong>{layout.columns} × {layout.rows}</strong>
+          <small>{layout.fields.join(' + ')} · {activePreset ? 'Preset ativo' : 'Personalizado'}</small>
+        </article>
+        <article className="designer-stat-card">
+          <span>Fonte</span>
+          <strong>{storageLabel}</strong>
+          <small>Configuração carregada do sistema</small>
+        </article>
+        <article className="designer-stat-card">
+          <span>Publicação</span>
+          <strong className={dirty ? 'designer-stat-warning' : 'designer-stat-success'}>{dirty ? 'Ajuste pendente' : 'Publicado'}</strong>
+          <small>{delivery.title}</small>
+        </article>
       </section>
 
-      <section className="designer-preview-area" aria-label="Preview do telão">
-        <div className="designer-preview-toolbar">
-          <div>
-            <strong>{layout.label}</strong>
-            <span>
-              {layout.columns} x {layout.rows} / {capacity} pilotos / {layout.fields.join(' + ')}
-            </span>
-          </div>
-          <div className="designer-scale">
-            {[
-              ['race', 'Corrida'],
-              ['long', 'Nomes longos'],
-              ['empty', 'Vazio'],
-              ['full', 'Cheio'],
-            ].map(([mode, label]) => (
-              <button className={previewMode === mode ? 'active' : ''} key={mode} type="button" onClick={() => setPreviewMode(mode as PreviewMode)}>
-                {label}
-              </button>
-            ))}
-            {PREVIEW_SCALES.map((scale) => (
-              <button className={previewScale === scale ? 'active' : ''} key={scale} type="button" onClick={() => setPreviewScale(scale)}>
-                {Math.round(scale * 100)}%
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="designer-preview-scroll">
-          <div className="designer-preview-shell" style={{ width: 2048 * previewScale, height: 512 * previewScale }}>
-            <div className="designer-preview-scale" style={{ transform: `scale(${previewScale})` }}>
-              <div className={`telao-page telao-theme-dark ${layout.showHeader ? '' : 'telao-no-header'}`} style={previewStyle}>
-                {layout.showHeader ? (
-                  <header className="telao-status" style={{ background: layout.colors.background }}>
-                    <div className="telao-brand" aria-label="Kartódromo de Betim">
-                      <img className="telao-logo" src="/brand/kartodromo-betim-logo.png" alt="Kartódromo Internacional de Betim" />
-                    </div>
-                    <div className="telao-track">
-                      <span>PREVIEW DO DESIGNER</span>
-                      <strong>TELÃO LED 2048×512</strong>
-                    </div>
-                    <div className="telao-race-state">
-                      <div className="telao-badge telao-badge-demo">DEMO</div>
-                      <div className="telao-updated">00:00:00</div>
-                    </div>
-                  </header>
-                ) : null}
-                <section className="telao-table-wrap" style={{ background: layout.colors.background }}>
-                  <LiveTimingTable drivers={previewRows} layout={layout} />
-                </section>
+      <section className="designer-workspace">
+        <section className="designer-preview-area" aria-label="Preview do telão">
+          <div className="designer-preview-toolbar">
+            <div>
+              <p className="designer-eyebrow">Preview</p>
+              <h2>{layout.label}</h2>
+              <span>{layout.columns} × {layout.rows} · {capacity} posições · {layout.fields.join(' + ')}</span>
+            </div>
+            <div className="designer-scale">
+              <div className="designer-scale-group" aria-label="Cenário do preview">
+                <span>Cenário</span>
+                {[
+                  ['race', 'Corrida'],
+                  ['long', 'Nomes longos'],
+                  ['empty', 'Vazio'],
+                  ['full', 'Cheio'],
+                ].map(([mode, label]) => (
+                  <button className={previewMode === mode ? 'active' : ''} key={mode} type="button" onClick={() => setPreviewMode(mode as PreviewMode)}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="designer-scale-group" aria-label="Escala do preview">
+                <span>Escala</span>
+                {PREVIEW_SCALES.map((scale) => (
+                  <button className={previewScale === scale ? 'active' : ''} key={scale} type="button" onClick={() => setPreviewScale(scale)}>
+                    {Math.round(scale * 100)}%
+                  </button>
+                ))}
               </div>
             </div>
           </div>
-        </div>
 
-        <div className="designer-output-grid">
-          <a href="/api/telao-layout" target="_blank" rel="noreferrer">
-            API layout
-          </a>
-          <a href={DEMO_TELAO_PREVIEW_URL} target="_blank" rel="noreferrer">
-            Telão demo
-          </a>
-          <a href={FINAL_REAL_PREVIEW_URL} target="_blank" rel="noreferrer">
-            Pódio final real
-          </a>
-          <button type="button" onClick={() => void copyText(RTSP_URL, 'RTSP')}>
-            RTSP: {RTSP_URL}
-          </button>
-          <button type="button" onClick={() => void copyText(HLS_URL, 'HLS')}>
-            HLS: {HLS_URL}
-          </button>
-        </div>
+          <div className="designer-preview-scroll">
+            <div className="designer-preview-shell" style={{ width: 2048 * previewScale, height: 512 * previewScale }}>
+              <div className="designer-preview-scale" style={{ transform: `scale(${previewScale})` }}>
+                <div className={`telao-page telao-theme-dark ${layout.showHeader ? '' : 'telao-no-header'}`} style={previewStyle}>
+                  {layout.showHeader ? (
+                    <header className="telao-status" style={{ background: layout.colors.background }}>
+                      <div className="telao-brand" aria-label="Kartódromo de Betim">
+                        <img className="telao-logo" src="/brand/kartodromo-betim-logo.png" alt="Kartódromo Internacional de Betim" />
+                      </div>
+                      <div className="telao-track">
+                        <span>PREVIEW DO DESIGNER</span>
+                        <strong>TELÃO LED 2048×512</strong>
+                      </div>
+                      <div className="telao-race-state">
+                        <div className="telao-badge telao-badge-demo">DEMO</div>
+                        <div className="telao-updated">00:00:00</div>
+                      </div>
+                    </header>
+                  ) : null}
+                  <section className="telao-table-wrap" style={{ background: layout.colors.background }}>
+                    <LiveTimingTable drivers={previewRows} layout={layout} />
+                  </section>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="designer-output-grid">
+            <a href="/api/telao-layout" target="_blank" rel="noreferrer">API layout</a>
+            <a href={DEMO_TELAO_PREVIEW_URL} target="_blank" rel="noreferrer">Telão demo</a>
+            <a href={FINAL_REAL_PREVIEW_URL} target="_blank" rel="noreferrer">Pódio final real</a>
+            <button type="button" onClick={() => void copyText(RTSP_URL, 'RTSP')}>RTSP: {RTSP_URL}</button>
+            <button type="button" onClick={() => void copyText(HLS_URL, 'HLS')}>HLS: {HLS_URL}</button>
+          </div>
+        </section>
+
+        <aside className="designer-controls designer-inspector" aria-label="Controles do designer">
+          <header className="designer-inspector-header">
+            <div>
+              <p className="designer-eyebrow">Operação</p>
+              <h2>Controle do layout</h2>
+              <p>Use os atalhos para preparar a tela e os painéis abaixo para ajustar cada detalhe.</p>
+            </div>
+            <div className={`designer-status ${dirty ? 'designer-status-dirty' : 'designer-status-saved'}`}>{dirty ? 'Não enviado' : 'Publicado'}</div>
+          </header>
+
+          <div className="designer-actions">
+            <button type="button" onClick={() => void standardizeDefaultLayout()} disabled={saving || loading}>
+              <Settings2 aria-hidden="true" size={15} />
+              Padronizar layout
+            </button>
+            <button type="button" onClick={() => void load()} disabled={loading || saving}>
+              <RefreshCw aria-hidden="true" size={15} />
+              Recarregar
+            </button>
+            <button type="button" onClick={undo} disabled={!canUndo || saving}>
+              <Undo2 aria-hidden="true" size={15} />
+              Desfazer
+            </button>
+            <button type="button" onClick={redo} disabled={!canRedo || saving}>
+              <Redo2 aria-hidden="true" size={15} />
+              Refazer
+            </button>
+            <a href={FINAL_REAL_PREVIEW_URL} target="_blank" rel="noreferrer">
+              <LayoutTemplate aria-hidden="true" size={15} />
+              Visualização pódio final
+            </a>
+            <button type="button" onClick={() => void sendDisplayMode('final-real', 'Pódio final enviado ao telão', 'A rota do telão foi alternada para o pódio final da corrida com dados reais.')} disabled={saving || displaySending}>
+              <Send aria-hidden="true" size={15} />
+              Enviar pódio final
+            </button>
+            <button type="button" onClick={() => void sendDisplayMode('live', 'Placar ao vivo enviado ao telão', 'A rota do telão voltou para a cronometragem ao vivo.')} disabled={saving || displaySending}>
+              <Radio aria-hidden="true" size={15} />
+              Voltar ao vivo
+            </button>
+          </div>
+
+          <p className="designer-message">{message}</p>
+          <div className={`designer-delivery designer-delivery-${delivery.state}`} role="status" aria-live="polite">
+            <strong>{delivery.title}</strong>
+            <span>{delivery.detail}</span>
+            {delivery.checkedAt ? <em>{delivery.checkedAt}</em> : null}
+          </div>
+
+          <section className="designer-section">
+            <h2>Ajustes rápidos</h2>
+            <div className="designer-quick-grid">
+              <button type="button" onClick={() => applyLayout(TELAO_LAYOUT_PRESETS['tb50-live-21'], 'Preset TB50 aplicado ao preview')}>TB50 21</button>
+              <button type="button" onClick={() => applyLayout(DEFAULT_TELAO_LAYOUT, 'Padrão 20 pilotos aplicado ao preview')}>Padrão 20</button>
+              <button type="button" onClick={() => adjustFonts(2)}>Fonte +2</button>
+              <button type="button" onClick={() => adjustFonts(-2)}>Fonte -2</button>
+              <button type="button" onClick={compactLayout}>Compactar</button>
+              <button type="button" onClick={() => patchLayout({ showHeader: !layout.showHeader })}>{layout.showHeader ? 'Sem logo' : 'Com logo'}</button>
+              <button type="button" onClick={() => patchLayout({ nameMode: layout.nameMode === 'hidden' ? 'first' : 'hidden' })}>{layout.nameMode === 'hidden' ? 'Mostrar nome' : 'Ocultar nome'}</button>
+            </div>
+          </section>
+
+          <section className="designer-section">
+            <h2>Presets</h2>
+            <div className="designer-preset-grid">
+              {Object.values(TELAO_LAYOUT_PRESETS).map((preset) => (
+                <button className={presetMatches(layout, preset) ? 'active' : ''} key={preset.id} type="button" onClick={() => applyLayout(preset)}>
+                  <strong>{preset.label}</strong>
+                  <span>{preset.columns} × {preset.rows} / {variantLabel(preset)}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <nav className="designer-tabs" aria-label="Painéis" role="tablist">
+            {[
+              { id: 'layout', label: 'Layout', Icon: LayoutTemplate },
+              { id: 'fields', label: 'Campos', Icon: SlidersHorizontal },
+              { id: 'colors', label: 'Cores', Icon: Palette },
+              { id: 'json', label: 'JSON', Icon: Code2 },
+            ].map(({ id, label, Icon }) => (
+              <button aria-selected={activePanel === id} className={activePanel === id ? 'active' : ''} key={id} role="tab" type="button" onClick={() => setActivePanel(id as typeof activePanel)}>
+                <Icon aria-hidden="true" size={14} />
+                {label}
+              </button>
+            ))}
+          </nav>
+
+          {activePanel === 'layout' ? (
+            <section className="designer-section" id="designer-panel-layout" role="tabpanel">
+              <h2>Layout</h2>
+              <label className="designer-field designer-field-wide">
+                <span>Nome</span>
+                <input value={layout.label} onChange={(event) => patchLayout({ label: event.target.value })} />
+              </label>
+              <div className="designer-segment">
+                <button className={layout.variant === 'table' ? 'active' : ''} type="button" onClick={() => patchLayout({ variant: 'table' })}>Tabela</button>
+                <button className={layout.variant === 'cards' ? 'active' : ''} type="button" onClick={() => patchLayout({ variant: 'cards' })}>Cards</button>
+              </div>
+              {NUMBER_FIELDS.slice(0, 5).map((field) => <NumberControl field={field} key={field.key} layout={layout} onChange={patchLayout} />)}
+              <label className="designer-check">
+                <input type="checkbox" checked={layout.showHeader} onChange={(event) => patchLayout({ showHeader: event.target.checked })} />
+                <span>Cabeçalho com logo</span>
+              </label>
+            </section>
+          ) : null}
+
+          {activePanel === 'fields' ? (
+            <section className="designer-section" id="designer-panel-fields" role="tabpanel">
+              <h2>Campos</h2>
+              <div className="designer-field-list">
+                {FIELDS.map((field) => {
+                  const enabled = layout.fields.includes(field.id);
+                  return (
+                    <div className={enabled ? 'enabled' : ''} key={field.id}>
+                      <label className="designer-check">
+                        <input type="checkbox" checked={enabled} onChange={() => toggleField(field.id)} />
+                        <span><strong>{field.short}</strong>{field.label}</span>
+                      </label>
+                      <button type="button" disabled={!enabled} onClick={() => moveField(field.id, -1)}>Subir</button>
+                      <button type="button" disabled={!enabled} onClick={() => moveField(field.id, 1)}>Descer</button>
+                    </div>
+                  );
+                })}
+              </div>
+              <label className="designer-field">
+                <span>Exibição do nome</span>
+                <select value={layout.nameMode} onChange={(event) => patchLayout({ nameMode: event.target.value as TelaoLayoutConfig['nameMode'] })}>
+                  <option value="hidden">Não mostrar</option>
+                  <option value="first">Primeiro nome</option>
+                  <option value="full">Nome completo</option>
+                </select>
+              </label>
+              {NUMBER_FIELDS.slice(5).map((field) => <NumberControl field={field} key={field.key} layout={layout} onChange={patchLayout} />)}
+            </section>
+          ) : null}
+
+          {activePanel === 'colors' ? (
+            <section className="designer-section" id="designer-panel-colors" role="tabpanel">
+              <h2>Cores</h2>
+              <div className="designer-palette-grid">
+                {PALETTES.map((palette) => (
+                  <button key={palette.label} type="button" onClick={() => patchColors(palette.colors)}>
+                    <span className="designer-palette-swatch" style={{ background: palette.colors.accent }} />
+                    {palette.label}
+                  </button>
+                ))}
+              </div>
+              <div className="designer-color-grid">
+                {COLOR_FIELDS.map((field) => {
+                  const value = layout.colors[field.key] || '';
+                  return (
+                    <label className="designer-color" key={field.key}>
+                      <span>{field.label}</span>
+                      <input type="color" value={colorValue(value)} onChange={(event) => patchColors({ [field.key]: event.target.value })} />
+                      <input value={value} onChange={(event) => patchColors({ [field.key]: event.target.value })} />
+                    </label>
+                  );
+                })}
+              </div>
+              <label className="designer-field designer-field-wide">
+                <span>Vazio</span>
+                <input value={layout.colors.muted} onChange={(event) => patchColors({ muted: event.target.value })} />
+              </label>
+            </section>
+          ) : null}
+
+          {activePanel === 'json' ? (
+            <section className="designer-section" id="designer-panel-json" role="tabpanel">
+              <h2>JSON</h2>
+              <textarea className="designer-json" value={jsonText} spellCheck={false} onChange={(event) => setJsonText(event.target.value)} />
+              <div className="designer-actions designer-json-actions">
+                <button type="button" onClick={() => void copyJson()}>Exportar</button>
+                <button type="button" onClick={applyJson}>Aplicar</button>
+                <button type="button" onClick={() => applyLayout(DEFAULT_TELAO_LAYOUT)}>Padrão</button>
+              </div>
+            </section>
+          ) : null}
+        </aside>
       </section>
     </main>
   );
