@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveViplexEndpoint, BRIDGE_FETCH_HEADERS } from '@/lib/bridge-base';
+import { requireAdminPermission } from '@/lib/admin-api-guard';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -19,14 +20,14 @@ function viplexRemoteTimeoutMs(method: string) {
 }
 
 function remoteHttpError(status: number, error?: unknown) {
-  if (typeof error === 'string' && error) return error;
+  if (typeof error === 'string' && /^[a-z0-9_]+$/i.test(error)) return error;
   if (status === 524) return 'viplex_remote_timeout';
   return `viplex_remote_http_${status}`;
 }
 
 function remoteFailureError(error: unknown) {
   if (error instanceof Error && error.name === 'AbortError') return 'viplex_remote_timeout';
-  return error instanceof Error ? error.message : 'viplex_remote_failed';
+  return 'viplex_remote_failed';
 }
 
 async function proxyRemote(request: NextRequest, endpoint: string) {
@@ -82,6 +83,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const denied = await requireAdminPermission('telao', true, request);
+  if (denied) return denied;
+
   const endpoint = resolveViplexEndpoint();
   if (endpoint) return proxyRemote(request, endpoint);
 

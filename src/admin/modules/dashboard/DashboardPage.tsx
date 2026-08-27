@@ -1,21 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
-import {
-  CalendarDays,
-  ConciergeBell,
-  Flag,
-  Gauge,
-  LayoutDashboard,
-  Monitor,
-  ShieldCheck,
-  Timer,
-  Trophy,
-  Users,
-  UtensilsCrossed,
-  WalletCards,
-  BadgePercent,
-  type LucideIcon,
-} from 'lucide-react';
-import { adminModules, type AdminModuleKey } from '../../../../components/admin/navigation';
+import { Activity, CalendarDays, Monitor, Timer, WalletCards } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { adminModules } from '../../../../components/admin/navigation';
+import { humanizeAdminError } from '@/lib/admin-error-messages';
 import { useAuth } from '../../auth/AuthContext';
 import { apiGet } from '../../lib/api-client';
 import { canAccess } from '../../lib/rbac';
@@ -27,167 +14,137 @@ type Stats = {
   saldo: number | null;
   vendas: number | null;
   fila: number | null;
+  error: string | null;
 };
 
-const iconMap: Record<AdminModuleKey, LucideIcon> = {
-  dashboard: LayoutDashboard,
-  reservas: CalendarDays,
-  recepcao: ConciergeBell,
-  lanchonete: UtensilsCrossed,
-  cronometragem: Timer,
-  campeonatos: Trophy,
-  resultados: Flag,
-  telao: Monitor,
-  financeira: WalletCards,
-  clientes: Users,
-  equalizacao: Gauge,
-  administrativa: ShieldCheck,
-  clube: BadgePercent,
+type Kpi = {
+  label: string;
+  value: string;
+  detail: string;
+  icon: LucideIcon;
 };
 
-const liveModules = new Set<AdminModuleKey>(['cronometragem', 'telao']);
+const initialStats: Stats = { reservas: null, saldo: null, vendas: null, fila: null, error: null };
+
+const isFulfilled = <T,>(result: PromiseSettledResult<T>): result is PromiseFulfilledResult<T> => result.status === 'fulfilled';
+
+function formatKpiValue(
+  value: number | null,
+  loading: boolean,
+  formatter: (value: number) => string = String,
+) {
+  if (loading) return 'Carregando';
+  return value === null ? 'Indisponível' : formatter(value);
+}
 
 export const DashboardPage = () => {
   const { role } = useAuth();
-  const canFinance = canAccess(role, 'financeira');
+  const permissions = useMemo(() => ({
+    reservas: canAccess(role, 'reservas'),
+    recepcao: canAccess(role, 'recepcao'),
+    lanchonete: canAccess(role, 'lanchonete'),
+    financeira: canAccess(role, 'financeira'),
+  }), [role]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<Stats>({ reservas: null, saldo: null, vendas: null, fila: null });
+  const [stats, setStats] = useState<Stats>(initialStats);
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    try {
-      const [confirmadas, fila, vendas] = await Promise.all([
-        apiGet<{ id: string }[]>('reservas?eq_status=confirmada'),
-        apiGet<{ id: string }[]>('recepcao_atendimentos?in_status=aguardando,em_atendimento'),
-        apiGet<{ total: number }[]>('lanchonete_vendas'),
-      ]);
+    setStats((current) => ({ ...current, error: null }));
 
-      let saldo: number | null = null;
-      if (canFinance) {
-        const lancamentos = await apiGet<{ tipo: string; valor: number }[]>(
-          'financeiro_lancamentos?eq_status=confirmado',
-        );
-        saldo = lancamentos.reduce(
-          (total, item) => total + (item.tipo === 'receita' ? Number(item.valor) : -Number(item.valor)),
-          0,
-        );
-      }
+    const [reservasResult, filaResult, vendasResult, financeiroResult] = await Promise.allSettled([
+      permissions.reservas ? apiGet<{ id: string }[]>('reservas?eq_status=confirmada') : Promise.resolve(null),
+      permissions.recepcao ? apiGet<{ id: string }[]>('recepcao_atendimentos?in_status=aguardando,em_atendimento') : Promise.resolve(null),
+      permissions.lanchonete ? apiGet<{ total: number }[]>('lanchonete_vendas') : Promise.resolve(null),
+      permissions.financeira ? apiGet<{ tipo: string; valor: number }[]>('financeiro_lancamentos?eq_status=confirmado') : Promise.resolve(null),
+    ]);
 
-      setStats({
-        reservas: confirmadas.length,
-        saldo,
-        vendas: vendas.reduce((total, item) => total + Number(item.total ?? 0), 0),
-        fila: fila.length,
-      });
-    } catch {
-      setStats({ reservas: null, saldo: null, vendas: null, fila: null });
-    } finally {
-      setLoading(false);
-    }
-  }, [canFinance]);
+    const failures = [reservasResult, filaResult, vendasResult, financeiroResult]
+      .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+      .map((result) => humanizeAdminError(result.reason, 'Uma fonte não respondeu.'));
+
+    const financeiro = isFulfilled(financeiroResult) && financeiroResult.value
+      ? financeiroResult.value.reduce((total, item) => total + (item.tipo === 'receita' ? Number(item.valor) : -Number(item.valor)), 0)
+      : null;
+
+    setStats({
+      reservas: isFulfilled(reservasResult) && reservasResult.value ? reservasResult.value.length : null,
+      fila: isFulfilled(filaResult) && filaResult.value ? filaResult.value.length : null,
+      vendas: isFulfilled(vendasResult) && vendasResult.value
+        ? vendasResult.value.reduce((total, item) => total + Number(item.total ?? 0), 0)
+        : null,
+      saldo: financeiro,
+      error: failures.length ? [...new Set(failures)].join(' ') : null,
+    });
+    setLoading(false);
+  }, [permissions]);
 
   useEffect(() => {
     void loadData();
   }, [loadData]);
 
-  const kpis = [
-    {
-      label: 'Reservas confirmadas',
-      value: String(stats.reservas ?? 0),
-      detail: 'Total no sistema',
-    },
-    {
-      label: 'Fila da recepção',
-      value: String(stats.fila ?? 0),
-      detail: 'Aguardando ou em atendimento',
-    },
-    {
-      label: 'Vendas da lanchonete',
-      value: brl.format(stats.vendas ?? 0),
-      detail: 'Faturamento acumulado',
-    },
-    ...(canFinance
-      ? [{ label: 'Saldo financeiro', value: brl.format(stats.saldo ?? 0), detail: 'Lançamentos confirmados' }]
-      : [{ label: 'Módulos disponíveis', value: String(adminModules.length - 1), detail: 'Áreas operacionais' }]),
-  ];
+  const kpis = useMemo<Kpi[]>(() => {
+    const next: Kpi[] = [];
+    if (permissions.reservas) next.push({ label: 'Reservas confirmadas', value: formatKpiValue(stats.reservas, loading), detail: stats.reservas === null && !loading ? 'Fonte indisponível' : 'Total no sistema', icon: CalendarDays });
+    if (permissions.recepcao) next.push({ label: 'Fila da recepção', value: formatKpiValue(stats.fila, loading), detail: stats.fila === null && !loading ? 'Fonte indisponível' : 'Aguardando ou em atendimento', icon: Activity });
+    if (permissions.lanchonete) next.push({ label: 'Vendas da lanchonete', value: formatKpiValue(stats.vendas, loading, (value) => brl.format(value)), detail: stats.vendas === null && !loading ? 'Fonte indisponível' : 'Faturamento acumulado', icon: WalletCards });
+    if (permissions.financeira) next.push({ label: 'Saldo financeiro', value: formatKpiValue(stats.saldo, loading, (value) => brl.format(value)), detail: stats.saldo === null && !loading ? 'Fonte indisponível' : 'Lançamentos confirmados', icon: WalletCards });
+    if (!next.length) next.push({ label: 'Módulos disponíveis', value: String(adminModules.filter((module) => module.key !== 'dashboard' && canAccess(role, module.key)).length), detail: 'Áreas liberadas para o seu perfil', icon: Monitor });
+    return next;
+  }, [loading, permissions, role, stats.fila, stats.reservas, stats.saldo, stats.vendas]);
+
+  const quickLinks = useMemo(() => adminModules
+    .filter((module) => module.key !== 'dashboard' && canAccess(role, module.key))
+    .filter((module) => ['reservas', 'cronometragem', 'telao', 'financeira', 'lanchonete'].includes(module.key))
+    .slice(0, 2), [role]);
 
   return (
-    <section className="grid gap-6 pb-10 font-['Rajdhani',sans-serif]">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {kpis.map((kpi) => (
-          <article className="rounded-[14px] border border-zinc-800 bg-zinc-900 p-[18px]" key={kpi.label}>
-            <span className="block text-[11px] font-bold uppercase tracking-[0.06em] text-zinc-400">{kpi.label}</span>
-            <strong className="mt-2.5 block text-[28px] font-bold leading-tight text-zinc-50">
-              {loading ? <span className="inline-block h-8 w-24 animate-pulse rounded bg-zinc-800" /> : kpi.value}
-            </strong>
-            <span className="mt-1 block text-xs text-zinc-500">{kpi.detail}</span>
+    <section className="admin-dashboard grid gap-6 pb-10">
+      <header className="admin-dashboard-intro">
+        <div>
+          <h2>Visão geral da operação</h2>
+          <p>Resumo das áreas liberadas para o seu perfil. Use a navegação lateral para acessar cada rotina.</p>
+        </div>
+        <span className="admin-dashboard-role"><Activity aria-hidden="true" size={15} />{role === 'owner' ? 'Acesso completo' : 'Acesso por perfil'}</span>
+      </header>
+
+      {stats.error ? (
+        <div className="admin-inline-alert admin-inline-alert-error" role="alert">
+          <span>{stats.error}</span>
+          <button type="button" onClick={() => void loadData()}>Atualizar indicadores</button>
+        </div>
+      ) : null}
+
+      <div className="admin-dashboard-kpis" aria-label="Indicadores operacionais">
+        {kpis.map(({ detail, icon: Icon, label, value }) => (
+          <article className="admin-dashboard-kpi" key={label}>
+            <div className="admin-dashboard-kpi__top"><span>{label}</span><Icon aria-hidden="true" size={17} /></div>
+            <strong>{value}</strong>
+            <small>{detail}</small>
           </article>
         ))}
       </div>
 
-      <section className="grid items-center gap-[22px] rounded-2xl border border-zinc-800 bg-zinc-900 p-5 lg:grid-cols-[1.4fr_1fr] lg:p-[26px]">
+      <section className="admin-dashboard-workspace">
         <div>
-          <p className="m-0 text-[11px] font-bold uppercase tracking-[0.12em] text-primary-300">
-            Central administrativa
-          </p>
-          <h2 className="mt-2 text-2xl font-bold text-zinc-50">Visão geral da operação</h2>
-          <p className="mt-3 max-w-[52ch] text-[16px] leading-relaxed text-zinc-400">
-            Acompanhe reservas, cronometragem, campeonatos e a gestão financeira do kartódromo em um só lugar. Use a
-            barra lateral para navegar entre os módulos.
-          </p>
+          <div className="admin-section-heading">
+            <div><span>Próximo passo</span><h2>Acesso rápido</h2></div>
+            <Timer aria-hidden="true" size={18} />
+          </div>
+          <div className="admin-dashboard-links">
+            {quickLinks.length ? quickLinks.map((module) => (
+              <a href={module.href} key={module.key}>
+                <strong>{module.title}</strong>
+                <span>{module.summary}</span>
+                <em>Abrir</em>
+              </a>
+            )) : <p className="admin-dashboard-empty">Nenhum atalho operacional está liberado para este perfil.</p>}
+          </div>
         </div>
-        <div className="grid gap-2.5 rounded-xl border border-primary-400/40 bg-primary-500/10 p-[18px]">
-          <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-primary-300">Acesso rápido</span>
-          <a
-            className="flex h-11 items-center justify-center rounded-[9px] bg-primary-500 text-sm font-bold text-zinc-950 hover:bg-primary-400"
-            href="/admin/reservas"
-          >
-            Ver reservas
-          </a>
-          <a
-            className="flex h-11 items-center justify-center rounded-[9px] border border-zinc-700 text-sm font-bold text-zinc-100 hover:border-primary-400/60 hover:text-primary-300"
-            href="/admin/cronometragem"
-          >
-            Abrir cronometragem
-          </a>
-        </div>
-      </section>
-
-      <section>
-        <div className="mb-3.5 flex flex-wrap items-baseline justify-between gap-3">
-          <h2 className="text-xl font-bold text-zinc-50">Módulos do sistema</h2>
-          <span className="text-xs font-semibold text-zinc-500">{adminModules.length - 1} módulos operacionais</span>
-        </div>
-        <div className="grid gap-3.5 md:grid-cols-2 xl:grid-cols-3">
-          {adminModules
-            .filter((module) => module.key !== 'dashboard')
-            .map((module) => {
-              const Icon = iconMap[module.key];
-              const isLive = liveModules.has(module.key);
-              return (
-                <a
-                  className="group grid gap-2.5 rounded-[14px] border border-zinc-800 bg-zinc-900 p-[18px] text-zinc-100 transition hover:-translate-y-0.5 hover:border-primary-400/60"
-                  href={module.href}
-                  key={module.key}
-                >
-                  <div className="flex items-start justify-between gap-2.5">
-                    <span className="grid h-9 w-9 place-items-center rounded-[9px] bg-primary-500/10 text-primary-300">
-                      <Icon aria-hidden="true" size={19} strokeWidth={1.8} />
-                    </span>
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.04em] ${
-                        isLive ? 'bg-blue-400/10 text-blue-300' : 'bg-primary-500/10 text-primary-300'
-                      }`}
-                    >
-                      {isLive ? 'Ao vivo' : 'Ativo'}
-                    </span>
-                  </div>
-                  <strong className="text-base font-bold group-hover:text-primary-300">{module.title}</strong>
-                  <p className="m-0 text-[12px] leading-relaxed text-zinc-400">{module.summary}</p>
-                </a>
-              );
-            })}
-        </div>
+        <aside className="admin-dashboard-note">
+          <span className="admin-dashboard-note__icon"><Monitor aria-hidden="true" size={18} /></span>
+          <div><strong>Navegação por perfil</strong><p>Os módulos exibidos no menu respeitam o papel da sua conta. Se uma área não aparece, solicite a liberação à administração.</p></div>
+        </aside>
       </section>
     </section>
   );

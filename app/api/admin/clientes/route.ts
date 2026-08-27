@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { adminCookieName, verifyAdminSession } from '@/lib/admin-auth';
+import { adminCookieName, readAdminSession } from '@/lib/admin-auth';
 import { resolveBridgeBase, BRIDGE_FETCH_HEADERS } from '@/lib/bridge-base';
+import { canAccessAny } from '@/lib/admin-access';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -10,12 +11,16 @@ const TIMEOUT_MS = Number(process.env.CLIENTES_TIMEOUT_MS || '8000');
 
 async function requireSession() {
   const cookieStore = await cookies();
-  return verifyAdminSession(cookieStore.get(adminCookieName())?.value);
+  return readAdminSession(cookieStore.get(adminCookieName())?.value);
 }
 
 export async function GET(request: NextRequest) {
-  if (!(await requireSession())) {
+  const session = await requireSession();
+  if (!session) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+  if (!canAccessAny(session.role, ['clientes', 'recepcao', 'reservas'])) {
+    return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   }
 
   const base = resolveBridgeBase();
@@ -41,8 +46,9 @@ export async function GET(request: NextRequest) {
 
     return new NextResponse(text, { status: response.status, headers });
   } catch (error) {
+    console.error('[admin/clientes] bridge request failed', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'laptime_bridge_unreachable' },
+      { error: error instanceof Error && error.name === 'AbortError' ? 'laptime_bridge_timeout' : 'laptime_bridge_unreachable' },
       { status: 502 },
     );
   } finally {

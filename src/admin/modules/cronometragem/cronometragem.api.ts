@@ -1,4 +1,5 @@
 import { apiDelete, apiGet, apiGetById, apiGetPage, apiPatch, apiPost, apiPut, type Page } from '../../lib/api-client';
+import { humanizeAdminError, humanizeAdminResponseError } from '@/lib/admin-error-messages';
 import {
   parseDesempatesCampeonato,
   parsePontuacao,
@@ -309,7 +310,7 @@ export const fetchLiveSnapshot = async (url = DEFAULT_LIVE_URL): Promise<LiveSna
       payload = rows[0].payload ? JSON.parse(rows[0].payload) : null;
     } else {
       const response = await fetch(url, { headers: { Accept: 'application/json' } });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) throw new Error(humanizeAdminResponseError(response.status));
       payload = await response.json();
     }
 
@@ -329,7 +330,7 @@ export const fetchLiveSnapshot = async (url = DEFAULT_LIVE_URL): Promise<LiveSna
     return {
       status: 'offline',
       pilotos: [],
-      erro: error instanceof Error ? error.message : 'Endpoint indisponível.',
+      erro: humanizeAdminError(error, 'Endpoint indisponível.'),
       atualizadoEm: new Date().toISOString(),
     };
   }

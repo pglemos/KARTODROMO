@@ -323,6 +323,49 @@
   cursor: pointer;
 }
 
+.designer-technical-links,
+.designer-advanced-actions {
+  border-top: 1px solid var(--admin-border);
+  padding-top: 10px;
+}
+
+.designer-technical-links summary,
+.designer-advanced-actions summary {
+  cursor: pointer;
+  color: var(--admin-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.designer-technical-links summary:hover,
+.designer-advanced-actions summary:hover {
+  color: var(--admin-accent);
+}
+
+.designer-technical-links > div,
+.designer-advanced-actions > div {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.designer-technical-links a {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  color: var(--admin-muted);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.designer-technical-links a:hover {
+  border-color: var(--admin-accent-border);
+  color: var(--admin-accent);
+}
+
 .designer-scale button:hover,
 .designer-output-grid a:hover,
 .designer-output-grid button:hover,
@@ -780,6 +823,12 @@
 .designer-output-grid button:focus-visible {
   outline: 3px solid var(--admin-accent-border);
   outline-offset: 2px;
+}
+
+.designer-technical-links summary:focus-visible,
+.designer-advanced-actions summary:focus-visible {
+  outline: 3px solid var(--admin-accent-border);
+  outline-offset: 3px;
 }
 
 @media (max-width: 1200px) {

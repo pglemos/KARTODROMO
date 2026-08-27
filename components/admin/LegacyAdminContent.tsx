@@ -18,6 +18,7 @@ import { ReservasPage } from '@/src/admin/modules/reservas/ReservasPage';
 import { ResultadosPage } from '@/src/admin/modules/resultados/ResultadosPage';
 import { ToastProvider } from '@/src/admin/ui/useToast';
 import type { AdminModuleKey } from './navigation';
+import type { Role } from '@/src/admin/lib/rbac';
 
 const legacyPages: Partial<Record<AdminModuleKey, ComponentType>> = {
   administrativa: AdministrativaPage,
@@ -34,7 +35,7 @@ const legacyPages: Partial<Record<AdminModuleKey, ComponentType>> = {
   resultados: ResultadosPage,
 };
 
-export function LegacyAdminContent({ moduleKey, sessionEmail }: { moduleKey: AdminModuleKey; sessionEmail: string }) {
+export function LegacyAdminContent({ moduleKey, sessionEmail, sessionRole }: { moduleKey: AdminModuleKey; sessionEmail: string; sessionRole: Role }) {
   const Page = legacyPages[moduleKey];
   const [mounted, setMounted] = useState(false);
 
@@ -53,7 +54,7 @@ export function LegacyAdminContent({ moduleKey, sessionEmail }: { moduleKey: Adm
   }
 
   return (
-    <LegacyAuthProvider email={sessionEmail}>
+    <LegacyAuthProvider email={sessionEmail} role={sessionRole}>
       <ToastProvider>
         <BrowserRouter>
           <div className="mx-auto max-w-[1500px]">

@@ -5,6 +5,7 @@ import { adminCookieName, readAdminSession } from '@/lib/admin-auth';
 import { handleAdminD1, type AdminD1Database } from '@/lib/admin-d1';
 import { getLocalSQLiteDb, isLocalSQLiteAvailable } from '@/lib/local-sqlite-db';
 import { syncKartFleetFromLiveSource } from '@/lib/kart-fleet-sync';
+import { canAccessAny, canWriteAny, modulesForAdminResource } from '@/lib/admin-access';
 
 declare global {
   interface CloudflareEnv {
@@ -49,6 +50,16 @@ async function proxy(request: NextRequest, path: string[]) {
   const session = await requireSession();
   if (!session) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+
+  const resourceName = path[0] || '';
+  const resourceModules = modulesForAdminResource(resourceName);
+  const isWrite = request.method !== 'GET';
+  if (!resourceModules.length || !canAccessAny(session.role, resourceModules)) {
+    return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+  }
+  if (isWrite && !canWriteAny(session.role, resourceModules)) {
+    return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   }
 
   // 1. Try local SQLite (next dev mode)
@@ -113,8 +124,9 @@ async function proxy(request: NextRequest, path: string[]) {
 
     return new NextResponse(text, { status: response.status, headers });
   } catch (error) {
+    console.error('[admin/db] bridge request failed', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'local_api_unreachable' },
+      { error: error instanceof Error && error.name === 'AbortError' ? 'local_api_timeout' : 'local_api_unreachable' },
       { status: 502 },
     );
   } finally {

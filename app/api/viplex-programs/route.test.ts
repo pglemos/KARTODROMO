@@ -1,16 +1,41 @@
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { adminCookieName, createAdminSession } from '@/lib/admin-auth';
 import { GET, PUT } from './route';
+
+const adminEmail = 'admin@example.com';
+
+function authenticatedRequest(body: unknown) {
+  return new NextRequest('http://localhost/api/viplex-programs', {
+    method: 'PUT',
+    headers: { Cookie: `${adminCookieName()}=${createAdminSession(adminEmail)}` },
+    body: JSON.stringify(body),
+  });
+}
 
 describe('/api/viplex-programs', () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
+    vi.stubEnv('ADMIN_EMAIL', adminEmail);
+    vi.stubEnv('ADMIN_SESSION_SECRET', 'test-session-secret');
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
+  });
+
+  it('blocks remote control actions without an admin session', async () => {
+    const response = await PUT(
+      new NextRequest('http://localhost/api/viplex-programs', {
+        method: 'PUT',
+        body: JSON.stringify({ identifier: 'program-1' }),
+      }),
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'unauthorized' });
   });
 
   it('returns an empty operational payload when the remote ViPlex endpoint is unavailable', async () => {
@@ -23,7 +48,7 @@ describe('/api/viplex-programs', () => {
     expect(response.status).toBe(200);
     expect(payload).toEqual({
       programs: [],
-      error: 'fetch failed',
+      error: 'viplex_remote_failed',
     });
   });
 
@@ -86,12 +111,7 @@ describe('/api/viplex-programs', () => {
       ),
     );
 
-    const response = await PUT(
-      new NextRequest('http://localhost/api/viplex-programs', {
-        method: 'PUT',
-        body: JSON.stringify({ identifier: 'program-1' }),
-      }),
-    );
+    const response = await PUT(authenticatedRequest({ identifier: 'program-1' }));
     const payload = await response.json();
 
     expect(response.status).toBe(200);
@@ -107,12 +127,7 @@ describe('/api/viplex-programs', () => {
   });
 
   it('returns an explicit error when no remote endpoint is configured (PUT)', async () => {
-    const response = await PUT(
-      new NextRequest('http://localhost/api/viplex-programs', {
-        method: 'PUT',
-        body: JSON.stringify({ identifier: 'program-1' }),
-      }),
-    );
+    const response = await PUT(authenticatedRequest({ identifier: 'program-1' }));
     const payload = await response.json();
 
     expect(response.status).toBe(400);

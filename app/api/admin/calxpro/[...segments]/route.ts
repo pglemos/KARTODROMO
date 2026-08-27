@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { adminCookieName, verifyAdminSession } from '@/lib/admin-auth';
+import { adminCookieName, readAdminSession } from '@/lib/admin-auth';
 import { resolveBridgeBase, BRIDGE_FETCH_HEADERS } from '@/lib/bridge-base';
+import { canAccessAny } from '@/lib/admin-access';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -12,11 +13,12 @@ const ALLOWED_SLUGS = new Set(['receitas', 'creditos', 'corridas', 'corrida-comp
 
 async function requireSession() {
   const cookieStore = await cookies();
-  return verifyAdminSession(cookieStore.get(adminCookieName())?.value);
+  return readAdminSession(cookieStore.get(adminCookieName())?.value);
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ segments: string[] }> }) {
-  if (!(await requireSession())) {
+  const session = await requireSession();
+  if (!session) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
@@ -24,6 +26,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const slug = segments[0];
   if (!slug || !ALLOWED_SLUGS.has(slug)) {
     return NextResponse.json({ error: 'unknown_calxpro_path' }, { status: 404 });
+  }
+
+  const allowedModules = slug === 'receitas' || slug === 'creditos'
+    ? ['financeira'] as const
+    : ['resultados', 'campeonatos'] as const;
+  if (!canAccessAny(session.role, allowedModules)) {
+    return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   }
 
   const base = resolveBridgeBase();
@@ -49,8 +58,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     return new NextResponse(text, { status: response.status, headers });
   } catch (error) {
+    console.error('[admin/calxpro] bridge request failed', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'calxpro_bridge_unreachable' },
+      { error: error instanceof Error && error.name === 'AbortError' ? 'calxpro_bridge_timeout' : 'calxpro_bridge_unreachable' },
       { status: 502 },
     );
   } finally {

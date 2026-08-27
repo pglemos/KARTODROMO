@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { cookies } from 'next/headers';
 import { adminCookieName, readAdminSession } from '@/lib/admin-auth';
+import { canAccess, canWrite } from '@/src/admin/lib/rbac';
 import { resolveBridgeBase, BRIDGE_FETCH_HEADERS } from '@/lib/bridge-base';
 import { getLocalSQLiteDb, isLocalSQLiteAvailable } from '@/lib/local-sqlite-db';
 import type { AdminD1Database } from '@/lib/admin-d1';
@@ -319,9 +320,11 @@ function errorResponse(error: unknown) {
   return json({ error: 'equalizacao_request_failed' }, 500);
 }
 
-async function authorize() {
+async function authorize(write = false) {
   const session = await getActor();
   if (!session) throw new ApiError('unauthorized', 401);
+  if (!canAccess(session.role, 'equalizacao')) throw new ApiError('forbidden', 403);
+  if (write && !canWrite(session.role, 'equalizacao')) throw new ApiError('forbidden', 403);
   return session;
 }
 
@@ -338,7 +341,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ segments: string[] }> }) {
   try {
-    const actor = (await authorize()).email;
+    const actor = (await authorize(true)).email;
     const segments = (await params).segments;
     const db = await getDatabase();
     if (segments[0] !== 'sessions') return json({ error: 'equalizacao_path_not_found' }, 404);

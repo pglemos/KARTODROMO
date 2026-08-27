@@ -4,6 +4,7 @@ import {
   adminCookieName,
   adminSessionTtlSeconds,
   createAdminSession,
+  resolveAdminRole,
   validateAdminCredentials,
 } from '@/lib/admin-auth';
 
@@ -23,8 +24,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'invalid_credentials' }, { status: 401 });
   }
 
-  const response = NextResponse.json({ ok: true });
-  response.cookies.set(adminCookieName(), createAdminSession(email), {
+  const role = await resolveAdminRole(email);
+  const response = NextResponse.json({ ok: true, role });
+  response.cookies.set(adminCookieName(), createAdminSession(email, role), {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',

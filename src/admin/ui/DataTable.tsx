@@ -17,6 +17,8 @@ type DataTableProps<T extends { id: string | number }> = {
   onEdit?: (row: T) => void;
   onDelete?: (row: T) => void;
   onRetry?: () => void;
+  getRowLabel?: (row: T) => string;
+  ariaLabel?: string;
 };
 
 const getCellValue = <T,>(row: T, key: keyof T): ReactNode => {
@@ -31,21 +33,23 @@ export const DataTable = <T extends { id: string | number },>({
   columns,
   emptyLabel,
   error,
+  getRowLabel,
   loading,
   onDelete,
   onEdit,
   onRetry,
   rows,
+  ariaLabel = 'Dados da tabela',
 }: DataTableProps<T>) => {
   const hasActions = Boolean(onEdit || onDelete);
 
   if (error) {
     return (
-      <div className="flex min-h-52 flex-col items-center justify-center rounded-xl border border-red-900/60 bg-red-950/20 p-8 text-center">
+      <div className="admin-state-panel admin-state-panel-error flex min-h-52 flex-col items-center justify-center rounded-xl border p-8 text-center">
         <span className="flex h-11 w-11 items-center justify-center rounded-full bg-red-500/10 text-red-400">
           <AlertCircle aria-hidden="true" size={22} />
         </span>
-        <p className="mt-3 text-sm text-red-200" role="alert">
+        <p className="mt-3 text-sm" role="alert">
           {error}
         </p>
         {onRetry ? (
@@ -59,9 +63,9 @@ export const DataTable = <T extends { id: string | number },>({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60 shadow-card">
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-left">
+    <div aria-busy={loading} className="admin-table-shell overflow-hidden rounded-xl border bg-zinc-900/60 shadow-card">
+      <div className="admin-table-scroll overflow-x-auto" tabIndex={loading ? -1 : 0}>
+        <table aria-label={ariaLabel} className="admin-data-table min-w-full text-left">
           <thead className="border-b border-zinc-800">
             <tr>
               {columns.map((column) => (
@@ -103,18 +107,19 @@ export const DataTable = <T extends { id: string | number },>({
                   >
                     {columns.map((column) => (
                       <td
-                        className="whitespace-nowrap px-4 py-3.5 text-sm text-zinc-300"
+                        className="admin-data-table-cell whitespace-nowrap px-4 py-3.5 text-sm text-zinc-300"
+                        data-label={column.label}
                         key={String(column.key)}
                       >
                         {column.render ? column.render(row) : getCellValue(row, column.key)}
                       </td>
                     ))}
                     {hasActions ? (
-                      <td className="px-4 py-2.5">
+                      <td className="admin-data-table-cell px-4 py-2.5" data-label="Ações">
                         <div className="flex justify-end gap-1">
                           {onEdit ? (
                             <button
-                              aria-label="Editar registro"
+                              aria-label={`Editar ${getRowLabel?.(row) || String(row.id)}`}
                               className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
                               onClick={() => onEdit(row)}
                               type="button"
@@ -124,7 +129,7 @@ export const DataTable = <T extends { id: string | number },>({
                           ) : null}
                           {onDelete ? (
                             <button
-                              aria-label="Excluir registro"
+                              aria-label={`Excluir ${getRowLabel?.(row) || String(row.id)}`}
                               className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-red-500/10 hover:text-red-400"
                               onClick={() => onDelete(row)}
                               type="button"
@@ -142,7 +147,7 @@ export const DataTable = <T extends { id: string | number },>({
       </div>
 
       {!loading && rows.length === 0 ? (
-        <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+        <div className="admin-empty-state flex flex-col items-center justify-center px-6 py-16 text-center">
           <span className="flex h-11 w-11 items-center justify-center rounded-full bg-zinc-800/80 text-zinc-500">
             <Inbox aria-hidden="true" size={22} />
           </span>

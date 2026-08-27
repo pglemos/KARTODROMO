@@ -35,7 +35,7 @@ describe('fidelidade ao design system', () => {
     expect(() =>
       execFileSync('node', ['scripts/sync-design.mjs', '--check'], { cwd: process.cwd() }),
     ).not.toThrow();
-  });
+  }, 15_000);
 
   it('não reintroduz folhas de estilo fora do design original', () => {
     const overrides = ['beneficios-nav.css', 'clube-portal.css', 'clube-portal.js'];

@@ -1,4 +1,5 @@
 import { apiGet, apiGetWithMeta, apiPatch, apiPost } from '../../lib/api-client';
+import { humanizeAdminResponseError } from '@/lib/admin-error-messages';
 import { buildKartHistorySummary, buildKartHistoryWindows } from '@/lib/equalizacao/history';
 import type {
   Kart,
@@ -31,7 +32,9 @@ const jsonRequest = async <T>(url: string, init?: RequestInit): Promise<T> => {
   });
   const text = await response.text();
   const data = text ? JSON.parse(text) : null;
-  if (!response.ok) throw new Error((data && data.error) || `HTTP ${response.status}`);
+  if (!response.ok) {
+    throw new Error(humanizeAdminResponseError(response.status, data && typeof data === 'object' && 'error' in data ? data.error : undefined));
+  }
   return data as T;
 };
 

@@ -6,8 +6,8 @@ export default async function AdminPage() {
   const session = await requireAdminSession('/admin');
 
   return (
-    <AdminShell currentPath="/admin" sessionEmail={session.email} title="Dashboard">
-      <LegacyAdminContent moduleKey="dashboard" sessionEmail={session.email} />
+    <AdminShell currentPath="/admin" sessionEmail={session.email} sessionRole={session.role} title="Dashboard">
+      <LegacyAdminContent moduleKey="dashboard" sessionEmail={session.email} sessionRole={session.role} />
     </AdminShell>
   );
 }

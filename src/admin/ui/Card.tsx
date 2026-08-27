@@ -6,7 +6,7 @@ export const Card = ({
   ...props
 }: PropsWithChildren<HTMLAttributes<HTMLDivElement>>) => (
   <div
-    className={['rounded-xl border border-zinc-800 bg-zinc-900/60 shadow-card', className].join(' ')}
+    className={['admin-card', className].join(' ')}
     {...props}
   >
     {children}

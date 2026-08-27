@@ -11,10 +11,10 @@ type ButtonProps = PropsWithChildren<
 >;
 
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: 'bg-brand-500 text-zinc-950 hover:bg-brand-400 shadow-soft',
-  secondary: 'bg-zinc-800 text-zinc-100 hover:bg-zinc-700',
-  ghost: 'border border-zinc-800 bg-transparent text-zinc-300 hover:bg-zinc-800/70 hover:text-zinc-100',
-  danger: 'bg-red-500/90 text-white hover:bg-red-500',
+  primary: 'admin-button-primary',
+  secondary: 'admin-button-secondary',
+  ghost: 'admin-button-ghost',
+  danger: 'admin-button-danger',
 };
 
 export const Button = ({
@@ -29,7 +29,7 @@ export const Button = ({
   <button
     aria-busy={loading}
     className={[
-      'inline-flex h-11 items-center justify-center gap-2 rounded-lg px-3.5 text-sm font-medium transition-colors focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 sm:h-9',
+      'admin-button inline-flex h-11 items-center justify-center gap-2 rounded-lg px-3.5 text-sm font-semibold transition-colors focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 sm:h-9',
       variantClasses[variant],
       className,
     ].join(' ')}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Gift, Megaphone, Users, TrendingUp, Award, ChevronRight, Plus, X, CheckCircle, XCircle } from 'lucide-react';
+import { humanizeAdminError } from '@/lib/admin-error-messages';
 import { Card } from '../../ui/Card';
 import { PageHeader } from '../../ui/PageHeader';
 import { DataTable, type DataTableColumn } from '../../ui/DataTable';
@@ -101,7 +102,7 @@ export function ClubePage() {
       setResgates(re);
       setCampanhas(c);
     } catch (err) {
-      toastError(err instanceof Error ? err.message : 'Erro ao carregar dados');
+      toastError(humanizeAdminError(err, 'Não foi possível carregar os dados do clube.'));
     } finally {
       setLoading(false);
     }
@@ -114,8 +115,8 @@ export function ClubePage() {
       await apiPatch<Campanha>(`clube_campanhas/${campanha.id}`, { ativo: !campanha.ativo });
       setCampanhas((all) => all.map((c) => c.id === campanha.id ? { ...c, ativo: !c.ativo } : c));
       toastSuccess(`Campanha ${campanha.ativo ? 'desativada' : 'ativada'}!`);
-    } catch {
-      toastError('Erro ao alterar campanha');
+    } catch (error: unknown) {
+      toastError(humanizeAdminError(error, 'Não foi possível alterar a campanha.'));
     }
   }
 
@@ -124,8 +125,8 @@ export function ClubePage() {
       await apiPatch<Resgate>(`clube_resgates/${id}`, { status: 'aprovado' });
       setResgates((all) => all.map((r) => r.id === id ? { ...r, status: 'aprovado' as const } : r));
       toastSuccess('Resgate aprovado!');
-    } catch {
-      toastError('Erro ao aprovar resgate');
+    } catch (error: unknown) {
+      toastError(humanizeAdminError(error, 'Não foi possível aprovar o resgate.'));
     }
   }
 
@@ -134,8 +135,8 @@ export function ClubePage() {
       await apiPatch<Resgate>(`clube_resgates/${id}`, { status: 'recusado' });
       setResgates((all) => all.map((r) => r.id === id ? { ...r, status: 'recusado' as const } : r));
       toastSuccess('Resgate recusado.');
-    } catch {
-      toastError('Erro ao recusar resgate');
+    } catch (error: unknown) {
+      toastError(humanizeAdminError(error, 'Não foi possível recusar o resgate.'));
     }
   }
 
@@ -154,8 +155,8 @@ export function ClubePage() {
       setRecompensas((all) => [...all, nova]);
       setModalRecompensa(false);
       toastSuccess('Recompensa criada!');
-    } catch {
-      toastError('Erro ao criar recompensa');
+    } catch (error: unknown) {
+      toastError(humanizeAdminError(error, 'Não foi possível criar a recompensa.'));
     }
   }
 
@@ -173,8 +174,8 @@ export function ClubePage() {
       setCampanhas((all) => [...all, nova]);
       setModalCampanha(false);
       toastSuccess('Campanha criada!');
-    } catch {
-      toastError('Erro ao criar campanha');
+    } catch (error: unknown) {
+      toastError(humanizeAdminError(error, 'Não foi possível criar a campanha.'));
     }
   }
 

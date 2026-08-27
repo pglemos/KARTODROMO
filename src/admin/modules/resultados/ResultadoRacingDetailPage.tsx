@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { humanizeAdminError } from '@/lib/admin-error-messages';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -171,7 +172,7 @@ export function ResultadoRacingDetailPage({ racingId }: { racingId: string }) {
           : result.competitors[0]?.id ?? '',
       );
     } catch (cause: unknown) {
-      setError(cause instanceof Error ? cause.message : 'Não foi possível carregar o detalhe da corrida.');
+      setError(humanizeAdminError(cause, 'Não foi possível carregar o detalhe da corrida.'));
     } finally {
       setLoading(false);
     }

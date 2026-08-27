@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { humanizeAdminError } from '@/lib/admin-error-messages';
 import {
   EQUALIZATION_TOLERANCE_MS,
   KART_CATEGORY_LABELS,
@@ -139,11 +140,11 @@ export const EqualizacaoListPage = () => {
       if (historyResult.status === 'fulfilled') {
         setHistorySummary(historyResult.value.rows);
       } else {
-        const historyMessage = historyResult.reason instanceof Error ? historyResult.reason.message : 'Não foi possível consultar o histórico real.';
+        const historyMessage = humanizeAdminError(historyResult.reason, 'Não foi possível consultar o histórico real.');
         setHistoryError(historyMessage);
       }
     } catch (loadError) {
-      const message = loadError instanceof Error ? loadError.message : 'Não foi possível carregar a frota real.';
+      const message = humanizeAdminError(loadError, 'Não foi possível carregar a frota real.');
       setError(message);
       toast.error(message);
     } finally {

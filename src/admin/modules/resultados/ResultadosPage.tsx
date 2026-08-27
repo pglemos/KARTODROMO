@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { humanizeAdminError } from '@/lib/admin-error-messages';
 import { useAuth } from '../../auth/AuthContext';
 import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
@@ -130,7 +131,7 @@ const pointsFormatter = new Intl.NumberFormat('pt-BR', {
 });
 
 const getErrorMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : 'Ocorreu um erro inesperado.';
+  humanizeAdminError(error, 'Ocorreu um erro inesperado.');
 
 const toDateTimeLocal = (value: string | null): string => {
   if (!value) return '';

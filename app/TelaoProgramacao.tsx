@@ -19,6 +19,7 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { Badge } from '@/src/admin/ui/Badge';
 import { Button } from '@/src/admin/ui/Button';
+import { humanizeAdminError, humanizeAdminResponseError } from '@/lib/admin-error-messages';
 import type {
   TelaoPlaylistItem,
   TelaoPlaylistItemType,
@@ -67,9 +68,9 @@ export function TelaoProgramacao() {
   const loadAuto = useCallback(async () => {
     try {
       const res = await fetch('/api/tb50-display-mode', { cache: 'no-store' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(humanizeAdminResponseError(res.status));
       const data = await res.json();
-      if (typeof data?.auto !== 'boolean') throw new Error('Resposta inválida');
+      if (typeof data?.auto !== 'boolean') throw new Error(humanizeAdminError('Resposta inválida'));
       setAutoMode(data.auto);
     } catch {
       setAutoMode(null);
@@ -84,10 +85,10 @@ export function TelaoProgramacao() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ auto: next }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(humanizeAdminResponseError(res.status));
       setMessage({ type: 'ok', text: next ? 'Modo automático ligado.' : 'Modo automático desligado (controle manual).' });
-    } catch {
-      setMessage({ type: 'err', text: 'Falha ao alterar o modo automático.' });
+    } catch (error: unknown) {
+      setMessage({ type: 'err', text: humanizeAdminError(error, 'Não foi possível alterar o modo automático.') });
       void loadAuto();
     }
   }
@@ -96,12 +97,12 @@ export function TelaoProgramacao() {
     setLoading(true);
     try {
       const res = await fetch('/api/telao-playlist', { cache: 'no-store' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(humanizeAdminResponseError(res.status));
       const data = await res.json();
-      if (!Array.isArray(data?.playlist?.items)) throw new Error('Resposta inválida');
+      if (!Array.isArray(data?.playlist?.items)) throw new Error(humanizeAdminError('Resposta inválida'));
       setItems(data.playlist.items);
-    } catch {
-      setMessage({ type: 'err', text: 'Falha ao carregar a programação.' });
+    } catch (error: unknown) {
+      setMessage({ type: 'err', text: humanizeAdminError(error, 'Não foi possível carregar a programação.') });
     } finally {
       setLoading(false);
     }
@@ -154,12 +155,16 @@ export function TelaoProgramacao() {
     setMessage(null);
     try {
       const res = await fetch('/api/telao-upload', { method: 'POST', body: formData });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        const code = data && typeof data === 'object' && 'error' in data ? data.error : undefined;
+        throw new Error(humanizeAdminResponseError(res.status, code));
+      }
       const data = await res.json();
       if (data?.url) patch(id, { source: data.url });
-      else throw new Error('Resposta inválida');
-    } catch {
-      setMessage({ type: 'err', text: 'Upload exige o agente local (.250). Use uma URL por enquanto.' });
+      else throw new Error(humanizeAdminError('Resposta inválida'));
+    } catch (error: unknown) {
+      setMessage({ type: 'err', text: humanizeAdminError(error, 'Não foi possível enviar a mídia. Verifique o armazenamento e tente novamente.') });
     }
   }
 
@@ -172,12 +177,16 @@ export function TelaoProgramacao() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        const code = data && typeof data === 'object' && 'error' in data ? data.error : undefined;
+        throw new Error(humanizeAdminResponseError(res.status, code));
+      }
       const data = await res.json();
       setItems(Array.isArray(data?.playlist?.items) ? data.playlist.items : items);
       setMessage({ type: 'ok', text: 'Programação salva.' });
-    } catch {
-      setMessage({ type: 'err', text: 'Falha ao salvar a programação.' });
+    } catch (error: unknown) {
+      setMessage({ type: 'err', text: humanizeAdminError(error, 'Não foi possível salvar a programação.') });
     } finally {
       setSaving(false);
     }
@@ -359,7 +368,7 @@ export function TelaoProgramacao() {
         )}
         <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-zinc-500">
           <Clock3 aria-hidden="true" className="mt-0.5 flex-none" size={14} />
-          Sem horário definido, o conteúdo toca sempre. Upload de mídia usa o agente local (.250); fontes externas dependem de autorização e conexão.
+          Sem horário definido, o conteúdo toca sempre. Fontes externas dependem de autorização e conexão.
         </p>
       </div>
     </section>

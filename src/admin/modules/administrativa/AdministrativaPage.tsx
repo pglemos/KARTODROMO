@@ -1,5 +1,6 @@
 import { ShieldAlert } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { humanizeAdminError } from '@/lib/admin-error-messages';
 import { useAuth } from '../../auth/AuthContext';
 import { roles, type Role } from '../../lib/rbac';
 import { Button } from '../../ui/Button';
@@ -51,7 +52,7 @@ const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
 });
 
 const getErrorMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : 'Ocorreu um erro inesperado.';
+  humanizeAdminError(error, 'Ocorreu um erro inesperado.');
 
 const profileToForm = (profile: Profile): ProfileFormState => ({
   full_name: profile.full_name,

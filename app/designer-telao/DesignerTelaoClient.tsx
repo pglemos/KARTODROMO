@@ -1,11 +1,12 @@
 'use client';
 
 import { CheckCircle2, Code2, ExternalLink, LayoutTemplate, Palette, Radio, Redo2, RefreshCw, Send, Settings2, SlidersHorizontal, Undo2 } from 'lucide-react';
-import { type CSSProperties, useEffect, useMemo, useState } from 'react';
+import { type CSSProperties, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { createDemoSnapshot } from '@/lib/livetime/demo-data';
 import type { LiveTimingDriver, LiveTimingSnapshot } from '@/lib/livetime/types';
 import { DEFAULT_TELAO_LAYOUT, normalizeTelaoLayoutConfig, TELAO_LAYOUT_PRESETS, type TelaoField, type TelaoLayoutConfig } from '@/lib/telao-layout-config';
 import { hiddenRealDataFields, payloadMatchesTelaoLayout } from '@/lib/telao-layout-validation';
+import { humanizeAdminError, humanizeAdminResponseError } from '@/lib/admin-error-messages';
 import { LiveTimingTable } from '@/components/telao/LiveTimingTable';
 import '@/components/telao/telao.css';
 import './designer.css';
@@ -62,7 +63,6 @@ type StoreStatus = {
   storage?: string;
   persistent?: boolean;
   blobConfigured?: boolean;
-  remoteEndpoint?: string;
   lastBlobReadAt?: string | null;
   lastBlobWriteFailedAt?: string | null;
 };
@@ -75,6 +75,13 @@ type DeliveryStatus = {
   detail: string;
   checkedAt?: string;
 };
+
+const DESIGNER_PANELS = [
+  { id: 'layout', label: 'Layout', Icon: LayoutTemplate },
+  { id: 'fields', label: 'Campos', Icon: SlidersHorizontal },
+  { id: 'colors', label: 'Cores', Icon: Palette },
+  { id: 'json', label: 'JSON', Icon: Code2 },
+] as const;
 
 type TelaoPayloadVerification = {
   ok: boolean;
@@ -203,6 +210,7 @@ export function DesignerTelaoClient() {
   const [displaySending, setDisplaySending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [delivery, setDelivery] = useState<DeliveryStatus>(INITIAL_DELIVERY);
+  const panelRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const capacity = layout.columns * layout.rows;
   const previewRows = useMemo(() => makePreviewDrivers(previewMode, capacity), [previewMode, capacity]);
@@ -210,7 +218,7 @@ export function DesignerTelaoClient() {
   const dirty = !sameLayout(layout, savedLayout);
   const canUndo = history.length > 0;
   const canRedo = future.length > 0;
-  const storageLabel = store.remoteEndpoint ? 'Servidor local' : store.persistent ? 'Blob ativo' : store.storage || 'Storage';
+  const storageLabel = store.persistent ? 'Persistente' : store.storage || 'Temporário';
   const previewStyle = {
     '--header-bg': layout.colors.grid,
     '--border-strong': layout.colors.accent,
@@ -224,7 +232,7 @@ export function DesignerTelaoClient() {
     setLoading(true);
     try {
       const response = await fetch(`/api/telao-layout?_ts=${Date.now()}`, { cache: 'no-store' });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) throw new Error(humanizeAdminResponseError(response.status));
       const data = await response.json();
       const nextLayout = normalizeTelaoLayoutConfig(data.layout);
       setLayout(nextLayout);
@@ -233,15 +241,15 @@ export function DesignerTelaoClient() {
       setHistory([]);
       setFuture([]);
       setJsonText(JSON.stringify(nextLayout, null, 2));
-      setMessage(data.store?.remoteEndpoint ? 'Configuração carregada do servidor local' : data.store?.persistent ? 'Configuração persistente carregada' : 'Configuração temporária carregada');
+      setMessage(data.store?.persistent ? 'Configuração persistente carregada' : 'Configuração temporária carregada');
       setDelivery({
         state: 'idle',
         title: 'Layout carregado',
-        detail: data.store?.remoteEndpoint ? 'Fonte atual: servidor local conectado à TB50.' : 'Fonte atual carregada; envie novamente para confirmar no telão.',
+        detail: data.store?.persistent ? 'Fonte persistente carregada; verifique antes de publicar.' : 'Fonte temporária carregada; envie novamente para publicar.',
         checkedAt: deliveryTime(),
       });
     } catch (error) {
-      setMessage(error instanceof Error ? `Falha ao carregar: ${error.message}` : 'Falha ao carregar');
+      setMessage(`Falha ao carregar: ${humanizeAdminError(error)}`);
     } finally {
       setLoading(false);
     }
@@ -330,11 +338,11 @@ export function DesignerTelaoClient() {
     });
     try {
       const response = await fetch(`/api/telao-layout?_ts=${Date.now()}`, { cache: 'no-store' });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) throw new Error(humanizeAdminResponseError(response.status));
       const data = await response.json();
       const remoteLayout = normalizeTelaoLayoutConfig(data.layout);
       setStore(data.store || {});
-      const target = data.store?.remoteEndpoint ? 'servidor local' : 'storage publicado';
+      const target = data.store?.persistent ? 'armazenamento persistente' : 'armazenamento temporário';
       const verification = await verifyTelaoPayload(remoteLayout);
       const verified = sameLayout(layout, remoteLayout);
       const layoutOk = verified && verification.ok;
@@ -363,7 +371,7 @@ export function DesignerTelaoClient() {
             },
       );
     } catch (error) {
-      setMessage(error instanceof Error ? `Falha na verificação: ${error.message}` : 'Falha na verificação');
+      setMessage(`Falha na verificação: ${humanizeAdminError(error)}`);
       setDelivery({
         state: 'error',
         title: 'Falha ao verificar envio',
@@ -416,7 +424,7 @@ export function DesignerTelaoClient() {
       });
       const data = await response.json().catch(() => ({}));
 
-      if (!response.ok) throw new Error(data?.error ? `HTTP ${response.status}: ${data.error}` : `HTTP ${response.status}`);
+      if (!response.ok) throw new Error(humanizeAdminResponseError(response.status, data?.error));
 
       await writeDisplayMode('live');
       const nextLayout = normalizeTelaoLayoutConfig(data.layout);
@@ -430,7 +438,7 @@ export function DesignerTelaoClient() {
       const verifyData = verifyResponse.ok ? await verifyResponse.json() : null;
       const verified = verifyData ? sameLayout(nextLayout, normalizeTelaoLayoutConfig(verifyData.layout)) : false;
       const verification = verified ? await verifyTelaoPayload(nextLayout) : { ok: false, hiddenFields: [], driverCount: 0 };
-      const target = data.store?.remoteEndpoint ? 'servidor local' : 'storage publicado';
+      const target = data.store?.persistent ? 'armazenamento persistente' : 'armazenamento temporário';
       const layoutOk = data.persistent && verified && verification.ok;
       const hasHiddenRealData = verification.hiddenFields.length > 0;
       setMessage(layoutOk ? verificationMessage(target, verification) : data.persistent ? `Configuração salva no ${target}, mas a rota do telão ainda não confirmou` : 'Configuração temporária enviada');
@@ -457,11 +465,11 @@ export function DesignerTelaoClient() {
             },
       );
     } catch (error) {
-      setMessage(error instanceof Error ? `Falha ao salvar: ${error.message}` : 'Falha ao salvar');
+      setMessage(`Falha ao salvar: ${humanizeAdminError(error)}`);
       setDelivery({
         state: 'error',
         title: 'Não enviado para TB50',
-        detail: error instanceof Error ? error.message : 'Falha ao salvar layout.',
+        detail: humanizeAdminError(error, 'Não foi possível salvar o layout.'),
         checkedAt: deliveryTime(),
       });
     } finally {
@@ -484,7 +492,7 @@ export function DesignerTelaoClient() {
     });
     const data = (await response.json().catch(() => ({}))) as DisplayModeWriteResult & { error?: string };
 
-    if (!response.ok) throw new Error(data?.error ? `HTTP ${response.status}: ${data.error}` : `HTTP ${response.status}`);
+    if (!response.ok) throw new Error(humanizeAdminResponseError(response.status, data?.error));
 
     return data;
   }
@@ -509,11 +517,11 @@ export function DesignerTelaoClient() {
         checkedAt: deliveryTime(),
       });
     } catch (error) {
-      setMessage(error instanceof Error ? `Falha ao enviar modo: ${error.message}` : 'Falha ao enviar modo');
+      setMessage(`Falha ao enviar modo: ${humanizeAdminError(error)}`);
       setDelivery({
         state: 'error',
         title: 'Modo não enviado',
-        detail: error instanceof Error ? error.message : 'Falha ao atualizar o modo do telão.',
+        detail: humanizeAdminError(error, 'Não foi possível atualizar o modo do telão.'),
         checkedAt: deliveryTime(),
       });
     } finally {
@@ -559,6 +567,22 @@ export function DesignerTelaoClient() {
     const [removed] = fields.splice(index, 1);
     fields.splice(nextIndex, 0, removed);
     patchLayout({ fields });
+  }
+
+  function handlePanelKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? DESIGNER_PANELS.length - 1
+        : event.key === 'ArrowLeft' || event.key === 'ArrowUp'
+          ? (index - 1 + DESIGNER_PANELS.length) % DESIGNER_PANELS.length
+          : (index + 1) % DESIGNER_PANELS.length;
+    const next = DESIGNER_PANELS[nextIndex];
+    if (!next) return;
+    setActivePanel(next.id);
+    panelRefs.current[nextIndex]?.focus();
   }
 
   function applyJson() {
@@ -688,12 +712,18 @@ export function DesignerTelaoClient() {
           </div>
 
           <div className="designer-output-grid">
-            <a href="/api/telao-layout" target="_blank" rel="noreferrer">API layout</a>
             <a href={DEMO_TELAO_PREVIEW_URL} target="_blank" rel="noreferrer">Telão demo</a>
+            <a href={REAL_TELAO_PREVIEW_URL} target="_blank" rel="noreferrer">Telão ao vivo</a>
             <a href={FINAL_REAL_PREVIEW_URL} target="_blank" rel="noreferrer">Pódio final real</a>
-            <button type="button" onClick={() => void copyText(RTSP_URL, 'RTSP')}>RTSP: {RTSP_URL}</button>
-            <button type="button" onClick={() => void copyText(HLS_URL, 'HLS')}>HLS: {HLS_URL}</button>
           </div>
+          <details className="designer-technical-links">
+            <summary>Links técnicos</summary>
+            <div>
+              <a href="/api/telao-layout" target="_blank" rel="noreferrer">API de layout</a>
+              <button type="button" onClick={() => void copyText(RTSP_URL, 'RTSP')}>{RTSP_URL}</button>
+              <button type="button" onClick={() => void copyText(HLS_URL, 'HLS')}>{HLS_URL}</button>
+            </div>
+          </details>
         </section>
 
         <aside className="designer-controls designer-inspector" aria-label="Controles do designer">
@@ -715,18 +745,6 @@ export function DesignerTelaoClient() {
               <RefreshCw aria-hidden="true" size={15} />
               Recarregar
             </button>
-            <button type="button" onClick={undo} disabled={!canUndo || saving}>
-              <Undo2 aria-hidden="true" size={15} />
-              Desfazer
-            </button>
-            <button type="button" onClick={redo} disabled={!canRedo || saving}>
-              <Redo2 aria-hidden="true" size={15} />
-              Refazer
-            </button>
-            <a href={FINAL_REAL_PREVIEW_URL} target="_blank" rel="noreferrer">
-              <LayoutTemplate aria-hidden="true" size={15} />
-              Visualização pódio final
-            </a>
             <button type="button" onClick={() => void sendDisplayMode('final-real', 'Pódio final enviado ao telão', 'A rota do telão foi alternada para o pódio final da corrida com dados reais.')} disabled={saving || displaySending}>
               <Send aria-hidden="true" size={15} />
               Enviar pódio final
@@ -736,6 +754,23 @@ export function DesignerTelaoClient() {
               Voltar ao vivo
             </button>
           </div>
+          <details className="designer-advanced-actions">
+            <summary>Histórico e visualizações</summary>
+            <div className="designer-actions">
+              <button type="button" onClick={undo} disabled={!canUndo || saving}>
+                <Undo2 aria-hidden="true" size={15} />
+                Desfazer
+              </button>
+              <button type="button" onClick={redo} disabled={!canRedo || saving}>
+                <Redo2 aria-hidden="true" size={15} />
+                Refazer
+              </button>
+              <a href={FINAL_REAL_PREVIEW_URL} target="_blank" rel="noreferrer">
+                <LayoutTemplate aria-hidden="true" size={15} />
+                Visualização do pódio
+              </a>
+            </div>
+          </details>
 
           <p className="designer-message">{message}</p>
           <div className={`designer-delivery designer-delivery-${delivery.state}`} role="status" aria-live="polite">
@@ -770,13 +805,20 @@ export function DesignerTelaoClient() {
           </section>
 
           <nav className="designer-tabs" aria-label="Painéis" role="tablist">
-            {[
-              { id: 'layout', label: 'Layout', Icon: LayoutTemplate },
-              { id: 'fields', label: 'Campos', Icon: SlidersHorizontal },
-              { id: 'colors', label: 'Cores', Icon: Palette },
-              { id: 'json', label: 'JSON', Icon: Code2 },
-            ].map(({ id, label, Icon }) => (
-              <button aria-selected={activePanel === id} className={activePanel === id ? 'active' : ''} key={id} role="tab" type="button" onClick={() => setActivePanel(id as typeof activePanel)}>
+            {DESIGNER_PANELS.map(({ id, label, Icon }, index) => (
+              <button
+                aria-controls={`designer-panel-${id}`}
+                aria-selected={activePanel === id}
+                className={activePanel === id ? 'active' : ''}
+                id={`designer-tab-${id}`}
+                key={id}
+                onClick={() => setActivePanel(id)}
+                onKeyDown={(event) => handlePanelKeyDown(event, index)}
+                ref={(element) => { panelRefs.current[index] = element; }}
+                role="tab"
+                tabIndex={activePanel === id ? 0 : -1}
+                type="button"
+              >
                 <Icon aria-hidden="true" size={14} />
                 {label}
               </button>
@@ -784,7 +826,7 @@ export function DesignerTelaoClient() {
           </nav>
 
           {activePanel === 'layout' ? (
-            <section className="designer-section" id="designer-panel-layout" role="tabpanel">
+            <section aria-labelledby="designer-tab-layout" className="designer-section" id="designer-panel-layout" role="tabpanel" tabIndex={0}>
               <h2>Layout</h2>
               <label className="designer-field designer-field-wide">
                 <span>Nome</span>
@@ -803,7 +845,7 @@ export function DesignerTelaoClient() {
           ) : null}
 
           {activePanel === 'fields' ? (
-            <section className="designer-section" id="designer-panel-fields" role="tabpanel">
+            <section aria-labelledby="designer-tab-fields" className="designer-section" id="designer-panel-fields" role="tabpanel" tabIndex={0}>
               <h2>Campos</h2>
               <div className="designer-field-list">
                 {FIELDS.map((field) => {
@@ -833,7 +875,7 @@ export function DesignerTelaoClient() {
           ) : null}
 
           {activePanel === 'colors' ? (
-            <section className="designer-section" id="designer-panel-colors" role="tabpanel">
+            <section aria-labelledby="designer-tab-colors" className="designer-section" id="designer-panel-colors" role="tabpanel" tabIndex={0}>
               <h2>Cores</h2>
               <div className="designer-palette-grid">
                 {PALETTES.map((palette) => (
@@ -863,7 +905,7 @@ export function DesignerTelaoClient() {
           ) : null}
 
           {activePanel === 'json' ? (
-            <section className="designer-section" id="designer-panel-json" role="tabpanel">
+            <section aria-labelledby="designer-tab-json" className="designer-section" id="designer-panel-json" role="tabpanel" tabIndex={0}>
               <h2>JSON</h2>
               <textarea className="designer-json" value={jsonText} spellCheck={false} onChange={(event) => setJsonText(event.target.value)} />
               <div className="designer-actions designer-json-actions">

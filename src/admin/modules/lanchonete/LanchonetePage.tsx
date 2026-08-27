@@ -5,6 +5,7 @@ import {
   UtensilsCrossed,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { humanizeAdminError } from '@/lib/admin-error-messages';
 import { useAuth } from '../../auth/AuthContext';
 import { canAccess } from '../../lib/rbac';
 import { Button } from '../../ui/Button';
@@ -96,7 +97,7 @@ const tabs: readonly { id: Tab; label: string }[] = [
 ];
 
 const getErrorMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : 'Ocorreu um erro inesperado.';
+  humanizeAdminError(error, 'Ocorreu um erro inesperado.');
 
 const validateProduto = (form: ProdutoFormState): ProdutoFormErrors => {
   const errors: ProdutoFormErrors = {};

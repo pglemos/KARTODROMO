@@ -94,14 +94,14 @@ export async function writeTelaoLayoutConfig(input: unknown): Promise<TelaoLayou
 
       lastBlobReadAt = Date.now();
       return { layout: config, storage: 'blob', persistent: true };
-    } catch (error) {
+    } catch {
       lastBlobWriteFailedAt = Date.now();
       if (process.env.NODE_ENV === 'production') {
         return {
           layout: config,
           storage: 'memory',
           persistent: false,
-          error: error instanceof Error ? error.message : 'Blob write failed',
+          error: 'telao_layout_persistence_failed',
         };
       }
     }

@@ -91,7 +91,7 @@ export function LoginForm({ nextPath }: { nextPath: string }) {
         </button>
         <form onSubmit={onSubmit} className="admin-login__card" noValidate>
           <p className="m-0 text-[11px] font-bold uppercase tracking-[.12em] text-[var(--admin-accent)]">Área restrita</p>
-          <h2 className="mt-1.5 text-[26px] font-bold text-[var(--admin-text)]">Entrar no painel</h2>
+          <h2 className="mt-1.5 text-[22px] font-bold text-[var(--admin-text)]">Entrar no painel</h2>
           <p className="mt-2 text-sm text-[var(--admin-muted)]">Use suas credenciais de administrador.</p>
 
           <div className="mt-[26px] grid gap-4">

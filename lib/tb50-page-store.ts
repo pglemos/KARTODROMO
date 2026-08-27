@@ -176,7 +176,6 @@ export async function writeTb50PageRemote(offset: unknown): Promise<Tb50PageStat
 }
 
 export function tb50PageStoreStatus() {
-  const remoteEndpoint = pageRemoteEndpoint();
   const storage = hasBlobStore() ? 'blob' : existsSync(statePath) ? 'file' : 'memory';
 
   return {
@@ -187,6 +186,5 @@ export function tb50PageStoreStatus() {
     lastBlobReadAt: lastBlobReadAt ? new Date(lastBlobReadAt).toISOString() : null,
     lastBlobReadFailedAt: lastBlobReadFailedAt ? new Date(lastBlobReadFailedAt).toISOString() : null,
     lastBlobWriteFailedAt: lastBlobWriteFailedAt ? new Date(lastBlobWriteFailedAt).toISOString() : null,
-    ...(remoteEndpoint ? { remoteEndpoint } : {}),
   };
 }

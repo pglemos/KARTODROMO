@@ -233,7 +233,6 @@ export async function writeTelaoPlaylistRemote(value: unknown): Promise<TelaoPla
 }
 
 export function telaoPlaylistStoreStatus() {
-  const remoteEndpoint = playlistRemoteEndpoint();
   const storage = hasBlobStore() ? 'blob' : existsSync(statePath) ? 'file' : 'memory';
   return {
     storage,
@@ -243,7 +242,6 @@ export function telaoPlaylistStoreStatus() {
     lastBlobReadAt: lastBlobReadAt ? new Date(lastBlobReadAt).toISOString() : null,
     lastBlobReadFailedAt: lastBlobReadFailedAt ? new Date(lastBlobReadFailedAt).toISOString() : null,
     lastBlobWriteFailedAt: lastBlobWriteFailedAt ? new Date(lastBlobWriteFailedAt).toISOString() : null,
-    ...(remoteEndpoint ? { remoteEndpoint } : {}),
   };
 }
 

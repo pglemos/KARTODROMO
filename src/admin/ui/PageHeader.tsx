@@ -9,13 +9,10 @@ type PageHeaderProps = {
   onAction?: () => void;
 };
 
-export const PageHeader = ({ actionLabel, eyebrow, onAction, subtitle, title }: PageHeaderProps) => (
-  <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+export const PageHeader = ({ actionLabel, onAction, subtitle, title }: PageHeaderProps) => (
+  <header className="admin-page-header flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
     <div>
-      {eyebrow ? (
-        <p className="text-xs font-medium uppercase tracking-wider text-brand-400">{eyebrow}</p>
-      ) : null}
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight text-zinc-50">{title}</h1>
+      <h2 className="text-xl font-bold tracking-tight text-[var(--admin-text)]">{title}</h2>
       {subtitle ? <p className="mt-1.5 max-w-2xl text-sm text-zinc-400">{subtitle}</p> : null}
     </div>
     {actionLabel && onAction ? (

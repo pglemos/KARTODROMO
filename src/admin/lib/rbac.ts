@@ -58,8 +58,26 @@ export const roleModules: Readonly<Record<Role, readonly ModuleKey[]>> = {
   viewer: ['dashboard'],
 };
 
+/**
+ * Módulos em que cada papel pode alterar dados.
+ * A checagem visual no cliente é apenas conveniência; as rotas de API usam
+ * a mesma regra antes de executar qualquer mutação.
+ */
+export const roleWriteModules: Readonly<Record<Role, readonly ModuleKey[]>> = {
+  owner: allModules,
+  admin: allModules,
+  financeiro: ['financeira'],
+  recepcao: ['reservas', 'recepcao'],
+  lanchonete: ['lanchonete'],
+  operador_telao: ['cronometragem', 'resultados', 'telao'],
+  viewer: [],
+};
+
 export const isRole = (value: unknown): value is Role =>
   typeof value === 'string' && roles.some((role) => role === value);
 
 export const canAccess = (role: Role, moduleKey: ModuleKey): boolean =>
   roleModules[role].includes(moduleKey);
+
+export const canWrite = (role: Role, moduleKey: ModuleKey): boolean =>
+  roleWriteModules[role].includes(moduleKey);

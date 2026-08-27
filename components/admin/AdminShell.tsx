@@ -7,7 +7,6 @@ import {
   ConciergeBell,
   Flag,
   Gauge,
-  Grid2X2,
   LayoutDashboard,
   Menu,
   Monitor,
@@ -24,6 +23,8 @@ import {
 } from 'lucide-react';
 import { adminModules, adminNavigationGroups, type AdminModuleKey } from './navigation';
 import { LogoutButton } from './LogoutButton';
+import { canAccess, type Role } from '@/src/admin/lib/rbac';
+import Image from 'next/image';
 
 const iconMap: Record<AdminModuleKey, LucideIcon> = {
   dashboard: LayoutDashboard,
@@ -46,11 +47,12 @@ function isActive(currentPath: string, href: string) {
   return currentPath === href || currentPath.startsWith(`${href}/`);
 }
 
-function Navigation({ currentPath, onNavigate }: { currentPath: string; onNavigate?: () => void }) {
+function Navigation({ currentPath, onNavigate, role }: { currentPath: string; onNavigate?: () => void; role: Role }) {
   return (
     <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Módulos do sistema">
       {adminNavigationGroups.map((group) => {
-        const items = adminModules.filter((module) => module.group === group);
+        const items = adminModules.filter((module) => module.group === group && canAccess(role, module.key));
+        if (!items.length) return null;
         return (
           <section className="mb-[22px]" key={group}>
             <h2 className="mb-1.5 px-2.5 text-[10.5px] font-bold uppercase tracking-[.1em] text-[var(--admin-faint)]">{group}</h2>
@@ -82,12 +84,14 @@ function Navigation({ currentPath, onNavigate }: { currentPath: string; onNaviga
 export function AdminShell({
   children,
   currentPath,
+  sessionRole,
   sessionEmail,
   title,
 }: {
   children: ReactNode;
   currentPath: string;
   sessionEmail: string;
+  sessionRole: Role;
   title: string;
 }) {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -148,10 +152,12 @@ export function AdminShell({
 
   const Brand = () => (
     <a className="flex items-center gap-2.5 border-b border-[var(--admin-border)] px-[18px] py-5 no-underline" href="/admin">
-      <span className="admin-brand-mark"><Grid2X2 aria-hidden="true" size={18} /></span>
-      <span>
-        <span className="block text-[10px] font-bold uppercase tracking-[.12em] text-[var(--admin-accent)]">Sistema</span>
-        <strong className="block text-sm font-bold text-[var(--admin-text)]">Kartódromo Betim</strong>
+      <span className="admin-brand-lockup">
+        <Image alt="Kartódromo Internacional de Betim" className="admin-brand-logo" height={52} priority src="/brand/kib-logo.png" width={188} />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[10px] font-bold uppercase tracking-[.12em] text-[var(--admin-accent)]">Painel interno</span>
+        <strong className="block text-sm font-bold text-[var(--admin-text)]">Operação</strong>
       </span>
     </a>
   );
@@ -160,7 +166,7 @@ export function AdminShell({
     <main className="admin-root" data-theme={theme}>
       <aside className="admin-sidebar">
         <Brand />
-        <Navigation currentPath={currentPath} />
+        <Navigation currentPath={currentPath} role={sessionRole} />
         <div className="border-t border-[var(--admin-border)] px-[18px] py-3.5">
           <p className="mb-2 truncate text-xs font-semibold text-[var(--admin-muted)]">{sessionEmail}</p>
           <LogoutButton />
@@ -181,7 +187,7 @@ export function AdminShell({
             <X aria-hidden="true" size={18} />
           </button>
         </div>
-        <Navigation currentPath={currentPath} onNavigate={closeMobileNav} />
+        <Navigation currentPath={currentPath} onNavigate={closeMobileNav} role={sessionRole} />
         <div className="border-t border-[var(--admin-border)] px-[18px] py-3.5">
           <p className="mb-2 truncate text-xs font-semibold text-[var(--admin-muted)]">{sessionEmail}</p>
           <LogoutButton />

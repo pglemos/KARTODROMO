@@ -5,7 +5,8 @@ import {
 } from '@/lib/championship-registrations';
 import { getCloudflareAdminDb } from '@/lib/cloudflare-admin-db';
 import { updateChampionshipRegistration } from '@/lib/championship-registrations-d1';
-import { adminCookieName, verifyAdminSession } from '@/lib/admin-auth';
+import { adminCookieName, readAdminSession } from '@/lib/admin-auth';
+import { canAccess, canWrite } from '@/src/admin/lib/rbac';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -22,12 +23,16 @@ const statusValues: ChampionshipRegistrationStatus[] = [
 
 async function requireSession() {
   const cookieStore = await cookies();
-  return verifyAdminSession(cookieStore.get(adminCookieName())?.value);
+  return readAdminSession(cookieStore.get(adminCookieName())?.value);
 }
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
-  if (!(await requireSession())) {
+  const session = await requireSession();
+  if (!session) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+  if (!canAccess(session.role, 'campeonatos') || !canWrite(session.role, 'campeonatos')) {
+    return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   }
 
   const { id } = await context.params;
@@ -59,7 +64,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (!db) return NextResponse.json({ error: 'cloudflare_d1_not_configured' }, { status: 503 });
     return NextResponse.json(await updateChampionshipRegistration(db, id, update));
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'championship_registration_update_failed';
-    return NextResponse.json({ error: message }, { status: message.endsWith('_not_found') ? 404 : 500 });
+    console.error('[admin/championship-registrations] update failed', error);
+    const notFound = error instanceof Error && error.message === 'championship_registration_not_found';
+    return NextResponse.json(
+      { error: notFound ? 'championship_registration_not_found' : 'championship_registration_update_failed' },
+      { status: notFound ? 404 : 503 },
+    );
   }
 }

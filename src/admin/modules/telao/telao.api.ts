@@ -1,4 +1,5 @@
 import type { TelaoState, TelaoStateUpdate } from './telao.types';
+import { humanizeAdminResponseError } from '@/lib/admin-error-messages';
 
 type LayoutResponse = {
   layout?: TelaoState['layout'];
@@ -19,8 +20,8 @@ async function readJson<T>(url: string): Promise<T> {
   const response = await fetch(`${url}${url.includes('?') ? '&' : '?'}_ts=${Date.now()}`, { cache: 'no-store' });
   const data = await response.json().catch(() => null);
   if (!response.ok) {
-    const message = data && typeof data === 'object' && 'error' in data ? String(data.error) : `HTTP ${response.status}`;
-    throw new Error(message);
+    const value = data && typeof data === 'object' && 'error' in data ? data.error : undefined;
+    throw new Error(humanizeAdminResponseError(response.status, value));
   }
   return data as T;
 }
@@ -33,8 +34,8 @@ async function writeJson(url: string, body: unknown): Promise<void> {
   });
   const data = await response.json().catch(() => null);
   if (!response.ok) {
-    const message = data && typeof data === 'object' && 'error' in data ? String(data.error) : `HTTP ${response.status}`;
-    throw new Error(message);
+    const value = data && typeof data === 'object' && 'error' in data ? data.error : undefined;
+    throw new Error(humanizeAdminResponseError(response.status, value));
   }
 }
 

@@ -4,6 +4,7 @@ import {
   telaoPlaylistStoreStatus,
   writeTelaoPlaylistRemote,
 } from '@/lib/telao-playlist-store';
+import { requireAdminPermission } from '@/lib/admin-api-guard';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -30,6 +31,9 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
+  const denied = await requireAdminPermission('telao', true, request);
+  if (denied) return denied;
+
   const body = await request.json();
   const items = Array.isArray(body) ? body : body?.items;
   const result = await writeTelaoPlaylistRemote({ items });

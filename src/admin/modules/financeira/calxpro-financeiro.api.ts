@@ -1,4 +1,5 @@
 import type { Page } from '../../lib/api-client';
+import { humanizeAdminResponseError } from '@/lib/admin-error-messages';
 
 export type CalXProReceita = {
   id: string;
@@ -25,7 +26,7 @@ async function fetchCalXProJson<T>(path: string): Promise<{ data: T; total: numb
   const data = text ? JSON.parse(text) : null;
 
   if (!response.ok) {
-    throw new Error((data && data.error) || `HTTP ${response.status}`);
+    throw new Error(humanizeAdminResponseError(response.status, data && typeof data === 'object' && 'error' in data ? data.error : undefined));
   }
 
   const totalHeader = response.headers.get('x-total-count');

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { requireAdminPermission } from '@/lib/admin-api-guard';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -35,6 +36,9 @@ const ALLOWED_TYPES = [
 const MAX_SIZE = 50 * 1024 * 1024; // 50MB
 
 export async function POST(request: NextRequest) {
+  const denied = await requireAdminPermission('telao', true, request);
+  if (denied) return denied;
+
   if (!hasR2Store()) {
     return NextResponse.json(
       { error: 'R2 storage not configured' },

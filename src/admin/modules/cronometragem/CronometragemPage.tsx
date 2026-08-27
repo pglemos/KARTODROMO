@@ -6,6 +6,7 @@ import {
   useState,
   type FormEvent,
 } from 'react';
+import { humanizeAdminError } from '@/lib/admin-error-messages';
 import {
   Activity,
   AlertTriangle,
@@ -177,7 +178,7 @@ const pitStopStatusVariant: Record<LivePitStopStatus, 'emerald' | 'amber' | 'red
 };
 
 const getErrorMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : 'Ocorreu um erro inesperado.';
+  humanizeAdminError(error, 'Ocorreu um erro inesperado.');
 
 const toDateTimeLocal = (value?: string | null): string => {
   if (!value) return '';

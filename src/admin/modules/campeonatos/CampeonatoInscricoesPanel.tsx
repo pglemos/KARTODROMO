@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { humanizeAdminError } from '@/lib/admin-error-messages';
 import { Button } from '../../ui/Button';
 import { DataTable, type DataTableColumn } from '../../ui/DataTable';
 import { FormField } from '../../ui/FormField';
@@ -36,7 +37,7 @@ const statusClasses: Record<CampeonatoInscricaoStatus, string> = {
 const dateTimeFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
 const getErrorMessage = (error: unknown) =>
-  error instanceof Error ? error.message : 'Ocorreu um erro inesperado.';
+  humanizeAdminError(error, 'Ocorreu um erro inesperado.');
 
 const formatDateTime = (value: string | null) => (value ? dateTimeFormatter.format(new Date(value)) : '—');
 

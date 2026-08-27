@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Clipboard,
   Copy,
   ExternalLink,
   Gauge,
@@ -18,7 +17,6 @@ import {
   Send,
   Settings2,
   SlidersHorizontal,
-  Timer,
   Trophy,
   Tv,
   XCircle,
@@ -28,6 +26,7 @@ import Link from 'next/link';
 import { DEFAULT_TELAO_LAYOUT, type TelaoLayoutConfig } from '@/lib/telao-layout-config';
 import type { LiveTimingSnapshot } from '@/lib/livetime/types';
 import type { ViplexDeviceProgram } from '@/lib/viplex-programs';
+import { humanizeAdminError, humanizeAdminResponseError } from '@/lib/admin-error-messages';
 import { Badge } from '@/src/admin/ui/Badge';
 import { Button } from '@/src/admin/ui/Button';
 import { TelaoProgramacao } from './TelaoProgramacao';
@@ -37,7 +36,6 @@ type LayoutResponse = {
   store?: {
     storage?: string;
     persistent?: boolean;
-    remoteEndpoint?: string;
     localEndpoint?: boolean;
   };
 };
@@ -167,7 +165,7 @@ function pageLabel(offset?: number | null) {
 function programSummary(program: ViplexDeviceProgram) {
   const size = program.width && program.height ? `${program.width}x${program.height}` : 'Dimensao nao informada';
   const seconds = Math.round((program.duration || 0) / 1000);
-  return `${size} / ${seconds || '--'}s / ID ${program.identifier.slice(0, 8)}`;
+  return `${size} · ${seconds || '--'} s · ID ${program.identifier.slice(0, 8)}`;
 }
 
 function normalizedProgramName(program: ViplexDeviceProgram): string {
@@ -323,8 +321,8 @@ async function readJson<T>(url: string): Promise<T> {
 
   const data = await response.json().catch(() => null);
   if (!response.ok) {
-    const message = data && typeof data === 'object' && 'error' in data ? String(data.error) : `HTTP ${response.status}`;
-    throw new Error(message);
+    const message = data && typeof data === 'object' && 'error' in data ? String(data.error) : undefined;
+    throw new Error(humanizeAdminResponseError(response.status, message));
   }
   return data as T;
 }
@@ -395,7 +393,7 @@ export function HomeDashboard({ uid }: { uid: string }) {
           mode: displayMode ? 'ok' : 'error',
           viplex: viplex?.programs?.length ? 'ok' : 'warning',
         },
-        error: [viplex?.error, ...errors].filter(Boolean).join(' · ') || null,
+        error: [viplex?.error, ...errors].filter(Boolean).map((value) => humanizeAdminError(value)).join(' · ') || null,
       });
     } finally {
       refreshingRef.current = false;
@@ -444,7 +442,7 @@ export function HomeDashboard({ uid }: { uid: string }) {
       setActionMessage({ type: 'success', text: successText });
       return true;
     } catch (error) {
-      setActionMessage({ type: 'error', text: error instanceof Error ? error.message : 'Falha na operacao' });
+      setActionMessage({ type: 'error', text: humanizeAdminError(error, 'Não foi possível concluir a operação.') });
       return false;
     } finally {
       setBusyAction(null);
@@ -496,7 +494,7 @@ export function HomeDashboard({ uid }: { uid: string }) {
   }
 
   return (
-    <main className="grid gap-5 pb-10">
+    <section className="admin-telao-page grid gap-5 pb-10">
       <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
         <div className="min-w-0">
           <p className="text-xs font-medium uppercase tracking-wider text-brand-400">Operação · TB50</p>
@@ -574,7 +572,7 @@ export function HomeDashboard({ uid }: { uid: string }) {
       {state.error ? (
         <div className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-200" role="alert">
           <XCircle aria-hidden="true" className="mt-0.5 flex-none text-red-400" size={18} />
-          <span>{state.error}</span>
+          <span>{humanizeAdminError(state.error)}</span>
         </div>
       ) : null}
       {actionMessage ? (
@@ -626,8 +624,8 @@ export function HomeDashboard({ uid }: { uid: string }) {
               <div className="flex items-start gap-3">
                 <AlertTriangle aria-hidden="true" className="mt-0.5 flex-none text-amber-400" size={18} />
                 <div>
-                  <strong className="block text-sm font-semibold text-zinc-50">ViPlex indisponível</strong>
-                  <p className="mt-1 text-xs leading-5 text-zinc-400">Confirme o bridge local e a conexão da controladora TB50 antes de publicar.</p>
+                  <strong className="block text-sm font-semibold text-zinc-50">Controladora TB50 indisponível</strong>
+                  <p className="mt-1 text-xs leading-5 text-zinc-400">Confirme o bridge local e a conexão da controladora antes de publicar. Use Atualizar depois de corrigir a conexão.</p>
                 </div>
               </div>
             </div>
@@ -701,16 +699,21 @@ export function HomeDashboard({ uid }: { uid: string }) {
 
       <section className={`${panelClass} overflow-hidden`} aria-label="Ferramentas">
         <PanelHeader eyebrow="Acesso rápido" title="Ferramentas do telão" />
-        <div className="grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-3">
           <Link className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-zinc-800 px-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800/70 hover:text-zinc-100" href={LINKS.designer}><LayoutTemplate aria-hidden="true" size={15} />Designer</Link>
           <a className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-zinc-800 px-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800/70 hover:text-zinc-100" href={LINKS.live} target="_blank" rel="noreferrer"><Monitor aria-hidden="true" size={15} />Placar ao vivo</a>
           <a className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-zinc-800 px-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800/70 hover:text-zinc-100" href={LINKS.final} target="_blank" rel="noreferrer"><Trophy aria-hidden="true" size={15} />Pódio final</a>
-          <a className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-zinc-800 px-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800/70 hover:text-zinc-100" href={LINKS.layoutApi} target="_blank" rel="noreferrer"><Clipboard aria-hidden="true" size={15} />API layout</a>
-          <a className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-zinc-800 px-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800/70 hover:text-zinc-100" href={`${LINKS.snapshotApi}?uid=${encodeURIComponent(uid)}`} target="_blank" rel="noreferrer"><Timer aria-hidden="true" size={15} />API LiveTime</a>
-          <Button className="min-h-10" onClick={() => void copyLink('RTSP', '/placar-telao-tb50?layout=designer')} variant="ghost"><Copy aria-hidden="true" size={15} />{copied === 'RTSP' ? 'Link copiado' : 'Copiar link telão'}</Button>
-          <Button className="min-h-10" onClick={() => void copyLink('Designer', LINKS.designer)} variant="ghost"><Copy aria-hidden="true" size={15} />{copied === 'Designer' ? 'Link copiado' : 'Copiar link designer'}</Button>
         </div>
+        <details className="telao-technical-links mx-4 mb-4 md:mx-5">
+          <summary>Ferramentas técnicas</summary>
+          <div className="grid gap-2 pt-3 sm:grid-cols-2 lg:grid-cols-4">
+            <a href={LINKS.layoutApi} target="_blank" rel="noreferrer">API de layout</a>
+            <a href={`${LINKS.snapshotApi}?uid=${encodeURIComponent(uid)}`} target="_blank" rel="noreferrer">API LiveTime</a>
+            <Button className="min-h-10" onClick={() => void copyLink('RTSP', '/placar-telao-tb50?layout=designer')} variant="ghost"><Copy aria-hidden="true" size={15} />{copied === 'RTSP' ? 'Link copiado' : 'Copiar link do telão'}</Button>
+            <Button className="min-h-10" onClick={() => void copyLink('Designer', LINKS.designer)} variant="ghost"><Copy aria-hidden="true" size={15} />{copied === 'Designer' ? 'Link copiado' : 'Copiar link do Designer'}</Button>
+          </div>
+        </details>
       </section>
-    </main>
+    </section>
   );
 }

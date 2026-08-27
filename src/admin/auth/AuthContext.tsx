@@ -18,13 +18,13 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-export function LegacyAuthProvider({ children, email }: PropsWithChildren<{ email: string }>) {
+export function LegacyAuthProvider({ children, email, role }: PropsWithChildren<{ email: string; role: Role }>) {
   const user = useMemo<AdminUser>(() => ({ email }), [email]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       loading: false,
-      role: 'owner',
+      role,
       session: { user },
       signIn: async () => undefined,
       signOut: async () => {
@@ -33,7 +33,7 @@ export function LegacyAuthProvider({ children, email }: PropsWithChildren<{ emai
       },
       user,
     }),
-    [user],
+    [role, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

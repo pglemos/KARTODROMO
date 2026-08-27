@@ -24,6 +24,7 @@ import {
   targetForKart,
 } from '@/lib/equalizacao/kart';
 import { formatDurationMs } from '@/lib/livetime/time-format';
+import { humanizeAdminError } from '@/lib/admin-error-messages';
 import { useAuth } from '@/src/admin/auth/AuthContext';
 import { canAccess } from '@/src/admin/lib/rbac';
 import { Badge, type BadgeVariant } from '@/src/admin/ui/Badge';
@@ -93,7 +94,7 @@ const statusVariant: Record<string, BadgeVariant> = {
 };
 
 const errorMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : 'Não foi possível concluir a operação.';
+  humanizeAdminError(error, 'Não foi possível concluir a operação.');
 
 function Metric({ label, value, detail, icon: Icon }: { label: string; value: string; detail?: string; icon: typeof Timer }) {
   return (
@@ -314,7 +315,7 @@ export const EqualizacaoKartDetailPage = ({ kartId }: { kartId: string }) => {
       </div>
 
       <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div><p className="text-xs font-medium uppercase tracking-wider text-brand-400">Equalização · ficha do kart</p><h1 className="mt-1 text-2xl font-semibold text-zinc-50">Kart {kart.numero}</h1><p className="mt-1 text-sm text-zinc-400">{KART_CATEGORY_LABELS[category]} · chassi {kart.chassi_numero || 'não informado'}</p></div>
+        <div><p className="text-xs font-medium uppercase tracking-wider text-brand-400">Equalização · ficha do kart</p><h2 className="mt-1 text-2xl font-semibold text-zinc-50">Kart {kart.numero}</h2><p className="mt-1 text-sm text-zinc-400">{KART_CATEGORY_LABELS[category]} · chassi {kart.chassi_numero || 'não informado'}</p></div>
         <div className="flex flex-wrap items-center gap-2"><Badge variant={category === 'super' ? 'emerald' : category === 'indoor' ? 'blue' : 'red'}>{KART_CATEGORY_LABELS[category]}</Badge><Badge variant={state === 'equilibrado' ? 'emerald' : state === 'pendente' ? 'zinc' : 'amber'}>{state === 'equilibrado' ? 'Dentro do alvo' : state === 'pendente' ? 'Aguardando tomada' : 'Revisar equalização'}</Badge></div>
       </header>
 

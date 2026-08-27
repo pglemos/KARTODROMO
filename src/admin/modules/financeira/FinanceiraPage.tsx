@@ -1,5 +1,6 @@
 import { LockKeyhole } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { humanizeAdminError } from '@/lib/admin-error-messages';
 import { useAuth } from '../../auth/AuthContext';
 import { canAccess, type Role } from '../../lib/rbac';
 import { Button } from '../../ui/Button';
@@ -68,14 +69,14 @@ const getTodayInputValue = (): string => {
   return localDate.toISOString().slice(0, 10);
 };
 
-const emptyLancamentoForm: LancamentoFormState = {
+const createEmptyLancamentoForm = (): LancamentoFormState => ({
   descricao: '',
   valor: '',
   tipo: 'receita',
   categoria_id: '',
   data: getTodayInputValue(),
   status: 'previsto',
-};
+});
 
 const emptyCategoriaForm: CategoriaFormState = {
   nome: '',
@@ -126,7 +127,7 @@ const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
 const dateTimeFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' });
 
 const getErrorMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : 'Ocorreu um erro inesperado.';
+  humanizeAdminError(error, 'Ocorreu um erro inesperado.');
 
 const formatDate = (value: string): string =>
   dateFormatter.format(new Date(`${value}T00:00:00Z`));
@@ -175,7 +176,7 @@ export const FinanceiraPage = () => {
   const [editingLancamento, setEditingLancamento] = useState<LancamentoWithCategoria | null>(null);
   const [deletingLancamento, setDeletingLancamento] = useState<LancamentoWithCategoria | null>(null);
   const [isLancamentoFormOpen, setIsLancamentoFormOpen] = useState(false);
-  const [lancamentoForm, setLancamentoForm] = useState<LancamentoFormState>(emptyLancamentoForm);
+  const [lancamentoForm, setLancamentoForm] = useState<LancamentoFormState>(createEmptyLancamentoForm);
   const [lancamentoErrors, setLancamentoErrors] = useState<LancamentoFormErrors>({});
   const [editingCategoria, setEditingCategoria] = useState<Categoria | null>(null);
   const [deletingCategoria, setDeletingCategoria] = useState<Categoria | null>(null);
@@ -401,7 +402,7 @@ export const FinanceiraPage = () => {
 
   const openCreateLancamento = () => {
     setEditingLancamento(null);
-    setLancamentoForm({ ...emptyLancamentoForm, data: getTodayInputValue() });
+    setLancamentoForm(createEmptyLancamentoForm());
     setLancamentoErrors({});
     setIsLancamentoFormOpen(true);
   };
@@ -567,7 +568,7 @@ export const FinanceiraPage = () => {
         {[
           { label: 'Receitas', value: resumo.receitas, className: 'border-emerald-900/70 text-emerald-300' },
           { label: 'Despesas', value: resumo.despesas, className: 'border-red-900/70 text-red-300' },
-          { label: 'Saldo', value: resumo.saldo, className: 'border-zinc-700 text-white' },
+          { label: 'Saldo', value: resumo.saldo, className: 'border-zinc-700' },
         ].map((card) => (
           <article className={`rounded-xl border bg-zinc-900/80 p-5 ${card.className}`} key={card.label}>
             <p className="text-xs font-black uppercase tracking-[0.14em] text-zinc-400">{card.label}</p>

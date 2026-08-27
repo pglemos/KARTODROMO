@@ -5,7 +5,8 @@ import {
 } from '@/lib/championship-registrations';
 import { getCloudflareAdminDb } from '@/lib/cloudflare-admin-db';
 import { listChampionshipRegistrations } from '@/lib/championship-registrations-d1';
-import { adminCookieName, verifyAdminSession } from '@/lib/admin-auth';
+import { adminCookieName, readAdminSession } from '@/lib/admin-auth';
+import { canAccess } from '@/src/admin/lib/rbac';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -20,14 +21,18 @@ const statusValues: ChampionshipRegistrationStatus[] = [
 
 async function requireSession() {
   const cookieStore = await cookies();
-  return verifyAdminSession(cookieStore.get(adminCookieName())?.value);
+  return readAdminSession(cookieStore.get(adminCookieName())?.value);
 }
 
 const cleanSearch = (value: string | null) => value?.trim().replace(/[,%]/g, ' ') ?? '';
 
 export async function GET(request: NextRequest) {
-  if (!(await requireSession())) {
+  const session = await requireSession();
+  if (!session) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+  if (!canAccess(session.role, 'campeonatos')) {
+    return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   }
 
   const searchParams = request.nextUrl.searchParams;
@@ -53,7 +58,7 @@ export async function GET(request: NextRequest) {
       headers: { 'x-total-count': String(result.total) },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'championship_registrations_unavailable';
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error('[admin/championship-registrations] list failed', error);
+    return NextResponse.json({ error: 'championship_registrations_unavailable' }, { status: 503 });
   }
 }
