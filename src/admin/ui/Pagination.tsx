@@ -13,9 +13,9 @@ export const Pagination = ({ page, pageSize, total, onPageChange }: PaginationPr
   const end = Math.min(total, (page + 1) * pageSize);
 
   return (
-    <div className="flex flex-col items-center justify-between gap-3 border-t border-zinc-800 px-4 py-3 text-sm text-zinc-400 sm:flex-row">
+    <nav aria-label="Paginação" className="admin-pagination flex flex-col items-center justify-between gap-3 border-t border-zinc-800 px-4 py-3 text-sm text-zinc-400 sm:flex-row">
       <p>
-        {total === 0 ? 'Nenhum registro' : `${start}–${end} de ${total}`}
+        {total === 0 ? '0 resultados' : `${start}–${end} de ${total}`}
       </p>
       <div className="flex items-center gap-2">
         <button
@@ -40,6 +40,6 @@ export const Pagination = ({ page, pageSize, total, onPageChange }: PaginationPr
           <ChevronRight aria-hidden="true" size={16} />
         </button>
       </div>
-    </div>
+    </nav>
   );
 };

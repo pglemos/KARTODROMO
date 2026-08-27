@@ -35,6 +35,28 @@ const legacyPages: Partial<Record<AdminModuleKey, ComponentType>> = {
   resultados: ResultadosPage,
 };
 
+function ModuleLoadingState() {
+  return (
+    <div aria-busy="true" aria-label="Carregando módulo" className="admin-module-loading" role="status">
+      <div className="admin-module-loading__heading">
+        <span className="admin-skeleton admin-skeleton--title" />
+        <span className="admin-skeleton admin-skeleton--copy" />
+      </div>
+      <div className="admin-module-loading__cards" aria-hidden="true">
+        <span className="admin-skeleton admin-skeleton--card" />
+        <span className="admin-skeleton admin-skeleton--card" />
+        <span className="admin-skeleton admin-skeleton--card" />
+      </div>
+      <div aria-hidden="true" className="admin-module-loading__table">
+        <span className="admin-skeleton admin-skeleton--row" />
+        <span className="admin-skeleton admin-skeleton--row" />
+        <span className="admin-skeleton admin-skeleton--row" />
+        <span className="admin-skeleton admin-skeleton--row" />
+      </div>
+    </div>
+  );
+}
+
 export function LegacyAdminContent({ moduleKey, sessionEmail, sessionRole }: { moduleKey: AdminModuleKey; sessionEmail: string; sessionRole: Role }) {
   const Page = legacyPages[moduleKey];
   const [mounted, setMounted] = useState(false);
@@ -47,11 +69,7 @@ export function LegacyAdminContent({ moduleKey, sessionEmail, sessionRole }: { m
   if (!Page) return null;
 
   if (!mounted) {
-    return (
-      <div className="admin-card mx-auto max-w-[1500px] p-5 text-sm font-bold text-[var(--admin-muted)]">
-        Carregando módulo...
-      </div>
-    );
+    return <ModuleLoadingState />;
   }
 
   return (

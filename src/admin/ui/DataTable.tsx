@@ -65,7 +65,8 @@ export const DataTable = <T extends { id: string | number },>({
   return (
     <div aria-busy={loading} className="admin-table-shell overflow-hidden rounded-xl border bg-zinc-900/60 shadow-card">
       <div className="admin-table-scroll overflow-x-auto" tabIndex={loading ? -1 : 0}>
-        <table aria-label={ariaLabel} className="admin-data-table min-w-full text-left">
+        <p className="admin-table-scroll-hint" aria-hidden="true">Cada registro aparece em um cartão no celular.</p>
+        <table aria-busy={loading} aria-label={ariaLabel} className="admin-data-table min-w-full text-left" data-responsive="cards">
           <thead className="border-b border-zinc-800">
             <tr>
               {columns.map((column) => (
@@ -122,6 +123,7 @@ export const DataTable = <T extends { id: string | number },>({
                               aria-label={`Editar ${getRowLabel?.(row) || String(row.id)}`}
                               className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
                               onClick={() => onEdit(row)}
+                              title="Editar"
                               type="button"
                             >
                               <Pencil aria-hidden="true" size={15} />
@@ -132,6 +134,7 @@ export const DataTable = <T extends { id: string | number },>({
                               aria-label={`Excluir ${getRowLabel?.(row) || String(row.id)}`}
                               className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-red-500/10 hover:text-red-400"
                               onClick={() => onDelete(row)}
+                              title="Excluir"
                               type="button"
                             >
                               <Trash2 aria-hidden="true" size={15} />

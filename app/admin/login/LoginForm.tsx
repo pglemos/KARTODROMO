@@ -1,7 +1,8 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { Eye, EyeOff, Grid2X2, Moon, Sun } from 'lucide-react';
+import Image from 'next/image';
+import { Eye, EyeOff, Moon, Sun } from 'lucide-react';
 
 function normalizeNextPath(nextPath: string): string {
   if (!nextPath || !nextPath.startsWith('/') || nextPath.startsWith('//')) return '/admin';
@@ -64,9 +65,16 @@ export function LoginForm({ nextPath }: { nextPath: string }) {
     <main className="admin-login" data-theme={theme}>
       <section className="admin-login__showcase" aria-label="Recursos do sistema">
         <div className="relative z-[2] max-w-xl">
-          <div className="flex items-center gap-2.5">
-            <span className="admin-login__mark"><Grid2X2 aria-hidden="true" size={20} /></span>
-            <strong className="text-[15px] font-bold">Kartódromo Betim</strong>
+          <div className="admin-login__brand-lockup">
+            <Image
+              alt="Kartódromo Internacional de Betim"
+              className="admin-login__brand-logo"
+              height={78}
+              priority
+              src="/brand/kib-logo.png"
+              width={280}
+            />
+            <span>Painel interno</span>
           </div>
           <h1 className="mt-9 max-w-[13ch] text-[clamp(30px,3vw,42px)] font-bold leading-[1.1]">
             Sistema de gestão da operação
@@ -86,6 +94,17 @@ export function LoginForm({ nextPath }: { nextPath: string }) {
       </section>
 
       <section className="admin-login__form-side">
+        <div className="admin-login__mobile-brand">
+          <Image
+            alt="Kartódromo Internacional de Betim"
+            className="admin-login__brand-logo"
+            height={52}
+            priority
+            src="/brand/kib-logo.png"
+            width={188}
+          />
+          <span>Painel interno</span>
+        </div>
         <button className="admin-icon-button absolute right-5 top-5" type="button" onClick={toggleTheme} aria-label="Alternar tema">
           {theme === 'dark' ? <Sun aria-hidden="true" size={17} /> : <Moon aria-hidden="true" size={17} />}
         </button>
@@ -102,7 +121,7 @@ export function LoginForm({ nextPath }: { nextPath: string }) {
               className="admin-input"
               type="email"
               autoComplete="username"
-              placeholder="seu.usuario@kartodromodebetim.com.br"
+              placeholder="seu.email@kartodromo.com.br"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               required

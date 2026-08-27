@@ -206,7 +206,7 @@ export function AdminShell({
             </div>
           </div>
           <div className="flex items-center gap-2.5">
-            <button className="admin-icon-button" type="button" onClick={toggleTheme} aria-label="Alternar tema">
+            <button aria-label="Alternar tema" aria-pressed={theme === 'dark'} className="admin-icon-button" title={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'} type="button" onClick={toggleTheme}>
               {theme === 'dark' ? <Sun aria-hidden="true" size={17} /> : <Moon aria-hidden="true" size={17} />}
             </button>
             <a className="hidden h-[38px] items-center rounded-[9px] border border-[var(--admin-border)] px-3.5 text-xs font-bold text-[var(--admin-muted)] no-underline transition-colors hover:border-[var(--admin-accent-border)] hover:text-[var(--admin-accent)] sm:inline-flex" href="/">
