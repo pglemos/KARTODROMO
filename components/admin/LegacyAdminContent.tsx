@@ -40,7 +40,8 @@ export function LegacyAdminContent({ moduleKey, sessionEmail, sessionRole }: { m
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    const timer = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   if (!Page) return null;
