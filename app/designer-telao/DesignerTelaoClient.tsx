@@ -605,7 +605,7 @@ export function DesignerTelaoClient() {
   }
 
   return (
-    <main className="designer-page">
+    <section className="designer-page">
       <header className="designer-page-header">
         <div>
           <p className="designer-eyebrow">Operação · TB50</p>
@@ -917,6 +917,6 @@ export function DesignerTelaoClient() {
           ) : null}
         </aside>
       </section>
-    </main>
+    </section>
   );
 }
