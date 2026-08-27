@@ -402,7 +402,8 @@ export function HomeDashboard({ uid }: { uid: string }) {
   }, [uid]);
 
   useEffect(() => {
-    setMounted(true);
+    const timer = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
