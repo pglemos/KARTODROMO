@@ -152,7 +152,10 @@ function LivePodiumCard({ rank, driver }: { rank: number; driver: LiveTimingDriv
 export function LivePodiumClient({ uid, demo, initialSnapshot }: LivePodiumClientProps) {
   const [snapshot, setSnapshot] = useState<LiveTimingSnapshot | null>(initialSnapshot);
   const [pollError, setPollError] = useState(false);
-  const [now, setNow] = useState(() => Date.now());
+  // Keep the first render deterministic. The server can send a live snapshot,
+  // so using Date.now() here would make the freshness label differ during
+  // hydration by one or more seconds. The clock starts after hydration.
+  const [now, setNow] = useState(0);
   const scale = useScale();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const motionRef = useRef<HTMLImageElement | null>(null);
