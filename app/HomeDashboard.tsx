@@ -329,6 +329,7 @@ async function readJson<T>(url: string): Promise<T> {
 
 export function HomeDashboard({ uid }: { uid: string }) {
   const [state, setState] = useState<DashboardState>(INITIAL_STATE);
+  const [mounted, setMounted] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<ActionMessage | null>(null);
@@ -401,10 +402,15 @@ export function HomeDashboard({ uid }: { uid: string }) {
   }, [uid]);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return undefined;
     void refresh();
     const timer = window.setInterval(() => void refresh(), 10000);
     return () => window.clearInterval(timer);
-  }, [refresh]);
+  }, [mounted, refresh]);
 
   async function writeDisplayMode(mode: 'live' | 'final-real') {
     const response = await fetch('/api/tb50-display-mode', {
@@ -491,6 +497,16 @@ export function HomeDashboard({ uid }: { uid: string }) {
     await navigator.clipboard?.writeText(`${window.location.origin}${value}`).catch(() => undefined);
     setCopied(label);
     window.setTimeout(() => setCopied(null), 1600);
+  }
+
+  if (!mounted) {
+    return (
+      <section className="admin-telao-page grid gap-5 pb-10">
+        <div className={`${panelClass} flex min-h-40 items-center justify-center p-5 text-sm text-zinc-400`} role="status">
+          Carregando central do telão...
+        </div>
+      </section>
+    );
   }
 
   return (
