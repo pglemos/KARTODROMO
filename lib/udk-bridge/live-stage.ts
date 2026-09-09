@@ -119,6 +119,12 @@ function durationToMillis(value: Date | string | null | undefined): number | nul
   return parseDurationMs(value) ?? lapTimeToMillis(value);
 }
 
+function instantToMillis(value: Date | string | null | undefined): number | null {
+  if (value == null) return null;
+  const milliseconds = value instanceof Date ? value.getTime() : new Date(value).getTime();
+  return Number.isFinite(milliseconds) ? milliseconds : null;
+}
+
 function normalizedAliasMap(aliases: Record<string, string> = {}): Map<string, string> {
   return new Map(
     Object.entries(aliases)
@@ -178,11 +184,33 @@ function raceIsFinished(race: StageRace): boolean {
   // LapTime stores EndTime as the configured race duration (for example,
   // 00:17:00), so it is not a completion marker even after the start.
   const started = Boolean(race.startedAt);
+  const startedAtMs = instantToMillis(race.startedAt);
+  const configuredDurationMs = durationToMillis(race.endTime);
+  const durationElapsed =
+    started &&
+    startedAtMs !== null &&
+    configuredDurationMs !== null &&
+    configuredDurationMs > 0 &&
+    Date.now() - startedAtMs >= configuredDurationMs;
   return Boolean(
     race.isFinished ||
       [5, 6].includes(Number(race.state)) ||
+      durationElapsed ||
       (started && race.finishLap !== null && race.finishLap !== undefined && Number(race.finishLap) > 0) ||
       (started && race.lastPassingFlag !== null && race.lastPassingFlag !== undefined && FINISH_FLAG_IDS.has(Number(race.lastPassingFlag))),
+  );
+}
+
+function isEmptyLapTimeSlot(entry: StageCompetitor): boolean {
+  if (!/^competidor \d+$/.test(normalizeDriverName(entry.Competitor))) return false;
+  return (
+    Number(entry.Pos) <= 0 &&
+    Number(entry.Lap) <= 0 &&
+    Number(entry.StartPos) <= 0 &&
+    durationToMillis(entry.BestLapTime) === null &&
+    durationToMillis(entry.TotalTime) === null &&
+    durationToMillis(entry.PenaltyTotalTime) === null &&
+    Number(entry.RacingStatus) === 0
   );
 }
 
@@ -257,7 +285,7 @@ export function buildStageSnapshot(
       .map((entry) => {
         const driver = resolveStageDriver(entry.Competitor, drivers, aliases);
         if (!driver || !stageCategoryIds.has(driver.category_id)) {
-          unresolved.add(entry.Competitor);
+          if (!isEmptyLapTimeSlot(entry)) unresolved.add(entry.Competitor);
           return null;
         }
         if (seen.has(driver.id)) throw new Error(`Piloto duplicado na corrida ${race.racingId}: ${driver.id}`);

@@ -20,13 +20,25 @@ describe('duas corridas Ultras',()=>{
   expect(buildStageSnapshot(binding,source,drivers,categories,rule).heats[1].state).toBe('scheduled');
  });
  it('trata EndTime como duração programada durante uma corrida sem resultado',()=>{
-  const source=races();source[0].state=1;source[0].startedAt='2026-09-08T21:00:00.000Z';source[0].endTime='00:17:00.000';
+  const source=races();source[0].state=1;source[0].startedAt=new Date(Date.now()-1_000).toISOString();source[0].endTime='01:00:00.000';
   source[0].competitors.forEach(entry=>{entry.Pos=0;entry.Lap=0;});
   source[1].state=0;
   const snapshot=buildStageSnapshot(binding,source,drivers,categories,rule);
   expect(snapshot.heats[0].state).toBe('live');
   expect(snapshot.heats[0].entries.every(entry=>entry.points===null)).toBe(true);
   expect(snapshot.categories[0].rows.every(row=>row.total===null&&row.position===null)).toBe(true);
+ });
+ it('encerra por duração somente depois que o tempo programado passa',()=>{
+  const source=races();source[0].state=1;source[0].startedAt=new Date(Date.now()-61_000).toISOString();source[0].endTime='00:01:00.000';
+  expect(buildStageSnapshot(binding,source,drivers,categories,rule).heats[0].state).toBe('finished');
+ });
+ it('ignora vagas genéricas vazias e mantém desconhecidos ativos como pendência',()=>{
+  const source=races();
+  const emptySlot=competitor('Competidor 111',4);emptySlot.Pos=0;emptySlot.Lap=0;
+  source[1].competitors.push(emptySlot);
+  expect(buildStageSnapshot(binding,source,drivers,categories,rule).unresolved).toEqual([]);
+  source[0].competitors.push(competitor('Competidor 158',4));
+  expect(buildStageSnapshot(binding,source,drivers,categories,rule).unresolved).toEqual(['Competidor 158']);
  });
  it('sinaliza piloto sem vínculo e impede conclusão',()=>{
   const source=races();source[0].competitors.push(competitor('Outro Piloto',4));
