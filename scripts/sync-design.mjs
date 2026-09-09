@@ -17,7 +17,7 @@ const sourceDir = join(root, 'design-source');
 const designDir = join(root, 'public', 'design');
 const publicDir = join(root, 'public');
 
-/** Prototype file basename -> public route served by next.config.ts */
+/** Prototype file basename -> corresponding canonical route in the public registry. */
 const routes = {
   home: '/',
   pista: '/pista',

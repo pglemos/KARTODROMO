@@ -8,12 +8,14 @@ import { FormField } from '../../ui/FormField';
 import { PageHeader } from '../../ui/PageHeader';
 import { useToast } from '../../ui/useToast';
 import { getState, updateState } from './telao.api';
+import { listCampeonatos } from '../campeonatos/campeonatos.api';
 import type {
   JsonValue,
   TelaoDisplayMode,
   TelaoState,
   TelaoStateUpdate,
 } from './telao.types';
+import type { Campeonato } from '../campeonatos/campeonatos.types';
 
 type SavingKey = TelaoDisplayMode | 'pagination' | 'layout' | null;
 
@@ -21,6 +23,7 @@ const displayModes: readonly { label: string; value: TelaoDisplayMode }[] = [
   { label: 'Ao vivo', value: 'live' },
   { label: 'Pódio final real', value: 'final-real' },
   { label: 'Final', value: 'final' },
+  { label: 'Pódio do Campeonato', value: 'campeonato' },
 ];
 
 const cardClassName =
@@ -53,6 +56,9 @@ export const TelaoPage = () => {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [savingKey, setSavingKey] = useState<SavingKey>(null);
+  const [campeonatos, setCampeonatos] = useState<Campeonato[]>([]);
+  const [campeonatosLoading, setCampeonatosLoading] = useState(false);
+  const [campeonatosError, setCampeonatosError] = useState<string | null>(null);
 
   const canWrite =
     canAccess(role, 'telao') && ['owner', 'admin', 'operador_telao'].includes(role);
@@ -73,9 +79,26 @@ export const TelaoPage = () => {
     }
   }, []);
 
+  const loadCampeonatos = useCallback(async () => {
+    setCampeonatosLoading(true);
+    setCampeonatosError(null);
+    try {
+      const data = await listCampeonatos();
+      setCampeonatos(data);
+    } catch (error: unknown) {
+      setCampeonatosError(getErrorMessage(error));
+    } finally {
+      setCampeonatosLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadState();
   }, [loadState]);
+
+  useEffect(() => {
+    void loadCampeonatos();
+  }, [loadCampeonatos]);
 
   const savePatch = async (
     key: Exclude<SavingKey, null>,
@@ -99,6 +122,10 @@ export const TelaoPage = () => {
 
   const handleModeChange = async (displayMode: TelaoDisplayMode) => {
     await savePatch(displayMode, { display_mode: displayMode }, 'Modo atualizado.');
+  };
+
+  const handleCampeonatoChange = async (campeonatoId: string) => {
+    await savePatch('campeonato', { campeonato_id: campeonatoId || null }, 'Campeonato atualizado.');
   };
 
   const changePageOffset = (delta: number) => {
@@ -191,6 +218,34 @@ export const TelaoPage = () => {
                   </Button>
                 ))}
               </div>
+              {state.display_mode === 'campeonato' && (
+                <div className="mt-5">
+                  <FormField htmlFor="telao-campeonato" label="Campeonato para exibir no pódio">
+                    <select
+                      className={inputClassName}
+                      id="telao-campeonato"
+                      disabled={!canWrite || savingKey !== null || campeonatosLoading}
+                      onChange={(event) => void handleCampeonatoChange(event.target.value)}
+                      value={state.campeonato_id || ''}
+                    >
+                      <option value="">Selecione um campeonato</option>
+                      {campeonatosLoading ? (
+                        <option disabled>Carregando...</option>
+                      ) : (
+                        campeonatos.map((campeonato) => (
+                          <option key={campeonato.id} value={campeonato.id}>
+                            {campeonato.nome} — {campeonato.temporada ?? 'Sem temporada'} {campeonato.status === 'encerrado' ? '(Encerrado)' : ''}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                    {campeonatosError && <p className="mt-1 text-sm text-red-300">{campeonatosError}</p>}
+                    <p className="mt-1 text-sm text-zinc-400">
+                      Selecione o campeonato cujo pódio/classificação será exibido no telão.
+                    </p>
+                  </FormField>
+                </div>
+              )}
             </article>
 
             <article className={cardClassName}>
@@ -298,6 +353,15 @@ export const TelaoPage = () => {
                   target="_blank"
                 >
                   Abrir designer do telão
+                  <ExternalLink aria-hidden="true" size={15} />
+                </a>
+                <a
+                  className="inline-flex items-center gap-2 text-sm font-bold text-brand-300 hover:text-brand-200"
+                  href="/podio-ultras"
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  Abrir resultado Ultras ao vivo
                   <ExternalLink aria-hidden="true" size={15} />
                 </a>
               </div>

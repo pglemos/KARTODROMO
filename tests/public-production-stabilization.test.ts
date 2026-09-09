@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import nextConfig, { designRoutes } from '../next.config';
+import nextConfig from '../next.config';
 import { PUBLIC_ROUTES, getPublicRoute } from '../src/config/publicRoutes';
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8');
@@ -52,13 +52,22 @@ describe('public route registry', () => {
 });
 
 describe('production routing', () => {
-  it('serves every canonical design page from the approved prototypes', async () => {
+  it('keeps canonical public routes on the Next application', async () => {
     const redirects = (await nextConfig.redirects?.()) ?? [];
 
-    for (const [source, page] of Object.entries(designRoutes)) {
-      expect(redirects).toEqual(expect.arrayContaining([
-        expect.objectContaining({ source, destination: `/design/${page}.dc.html`, permanent: false }),
-      ]));
+    for (const route of canonicalPaths) {
+      expect(
+        redirects.some((redirect) => redirect.source === route && redirect.destination.includes('/design/')),
+        `${route} não pode apontar para um documento DC`,
+      ).toBe(false);
+    }
+  });
+
+  it('keeps the visual prototypes as references aligned with their generator', async () => {
+    const { routes } = await import('../scripts/sync-design.mjs');
+
+    for (const [page, path] of Object.entries(routes as Record<string, string>)) {
+      expect(canonicalPaths, `${page} precisa estar no registro público`).toContain(path);
       expect(existsSync(join(process.cwd(), 'public', 'design', `${page}.dc.html`))).toBe(true);
     }
   });
@@ -69,17 +78,28 @@ describe('production routing', () => {
       Object.entries(routes as Record<string, string>).map(([page, path]) => [path, page]),
     );
 
-    expect(generated).toEqual(designRoutes);
+    expect(Object.keys(generated)).toHaveLength(21);
+    expect(Object.values(generated)).toEqual(expect.arrayContaining([
+      'home',
+      'pista',
+      'kart-locacao',
+      'clube-vantagens',
+    ]));
   });
 
-  it('does not leave routes without an implementation', () => {
-    const reactOnly = PUBLIC_ROUTES.filter((route) => !(route.path in designRoutes)).map((route) => route.path);
+  it('resolves every canonical route through the React pathname resolver', () => {
+    const appSource = read('src/App.tsx');
 
-    expect(reactOnly).toEqual(['/reservas', '/historia']);
+    expect(appSource).toContain('const standardPages');
+    expect(appSource).toContain('findPublicRoute(pathname)');
+    expect(appSource).toContain("routeKey.startsWith('clube-')");
+    expect(read('app/[[...slug]]/page.tsx')).toContain('<PublicSiteClient />');
   });
 
-  it('injects canonical SEO metadata into every served prototype', () => {
-    for (const [path, page] of Object.entries(designRoutes)) {
+  it('injects canonical SEO metadata into every visual reference', async () => {
+    const { routes } = await import('../scripts/sync-design.mjs');
+
+    for (const [page, path] of Object.entries(routes as Record<string, string>)) {
       const html = read(join('public', 'design', `${page}.dc.html`));
       const route = getPublicRoute(path);
       const canonical = `https://kartodromodebetim.com.br${path === '/' ? '' : path}`;
@@ -92,8 +112,10 @@ describe('production routing', () => {
     }
   });
 
-  it('keeps the mobile layer on every served page', () => {
-    for (const [path, page] of Object.entries(designRoutes)) {
+  it('keeps the mobile layer on every visual reference', async () => {
+    const { routes } = await import('../scripts/sync-design.mjs');
+
+    for (const [page, path] of Object.entries(routes as Record<string, string>)) {
       const html = read(join('public', 'design', `${page}.dc.html`));
 
       expect(html, `${page}: camada mobile`).toContain('data-generated="mobile-fit"');

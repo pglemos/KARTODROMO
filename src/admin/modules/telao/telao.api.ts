@@ -12,7 +12,12 @@ type PageResponse = {
 };
 
 type DisplayModeResponse = {
-  mode?: 'live' | 'final-real' | 'final-demo';
+  mode?: 'live' | 'final-real' | 'final-demo' | 'campeonato';
+  updatedAt?: string | null;
+};
+
+type CampeonatoIdResponse = {
+  campeonato_id?: string | null;
   updatedAt?: string | null;
 };
 
@@ -40,7 +45,7 @@ async function writeJson(url: string, body: unknown): Promise<void> {
 }
 
 function displayModeForLegacyState(mode: DisplayModeResponse['mode']): TelaoState['display_mode'] {
-  return mode === 'final-real' ? 'final-real' : mode === 'final-demo' ? 'final' : 'live';
+  return mode === 'final-real' ? 'final-real' : mode === 'final-demo' ? 'final' : mode === 'campeonato' ? 'campeonato' : 'live';
 }
 
 function latestUpdatedAt(values: Array<string | null | undefined>): string {
@@ -49,10 +54,11 @@ function latestUpdatedAt(values: Array<string | null | undefined>): string {
 }
 
 export const getState = async (): Promise<TelaoState> => {
-  const [layout, page, displayMode] = await Promise.all([
+  const [layout, page, displayMode, campeonatoId] = await Promise.all([
     readJson<LayoutResponse>('/api/telao-layout'),
     readJson<PageResponse>('/api/tb50-page'),
     readJson<DisplayModeResponse>('/api/tb50-display-mode'),
+    readJson<CampeonatoIdResponse>('/api/tb50-campeonato'),
   ]);
 
   return {
@@ -60,7 +66,8 @@ export const getState = async (): Promise<TelaoState> => {
     layout: layout.layout ?? {},
     page_offset: typeof page.offset === 'number' && Number.isInteger(page.offset) ? page.offset : 0,
     display_mode: displayModeForLegacyState(displayMode.mode),
-    updated_at: latestUpdatedAt([layout.updatedAt, page.updatedAt, displayMode.updatedAt]),
+    campeonato_id: campeonatoId.campeonato_id ?? null,
+    updated_at: latestUpdatedAt([layout.updatedAt, page.updatedAt, displayMode.updatedAt, campeonatoId.updatedAt]),
   };
 };
 
@@ -71,8 +78,11 @@ export const updateState = async (patch: TelaoStateUpdate): Promise<TelaoState> 
   if (patch.page_offset !== undefined) writes.push(writeJson('/api/tb50-page', { offset: patch.page_offset }));
   if (patch.display_mode !== undefined) {
     writes.push(writeJson('/api/tb50-display-mode', {
-      mode: patch.display_mode === 'final' ? 'final-real' : patch.display_mode,
+      mode: patch.display_mode === 'final' ? 'final-real' : patch.display_mode === 'campeonato' ? 'campeonato' : patch.display_mode,
     }));
+  }
+  if (patch.campeonato_id !== undefined) {
+    writes.push(writeJson('/api/tb50-campeonato', { campeonato_id: patch.campeonato_id }));
   }
 
   await Promise.all(writes);

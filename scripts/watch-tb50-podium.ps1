@@ -11,6 +11,7 @@ $ErrorActionPreference = 'Stop'
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 $RuntimeDir = Join-Path $RepoRoot '.runtime'
 $LogPath = Join-Path $RuntimeDir 'tb50-podium-watchdog.log'
+$ProcessorStatePath = Join-Path $RuntimeDir 'tb50-processor-state.json'
 $StartupMarkerPath = Join-Path $RuntimeDir 'podium-starting.lock'
 $MutexName = 'Local\KartodromoTB50PodiumWatchdog'
 
@@ -66,6 +67,30 @@ function Test-TcpPort {
   }
 }
 
+function Read-ProcessorReachability {
+  if (-not (Test-Path -LiteralPath $ProcessorStatePath)) {
+    return $null
+  }
+
+  try {
+    $state = Get-Content -LiteralPath $ProcessorStatePath -Raw | ConvertFrom-Json
+    if ($null -eq $state.reachable) {
+      return $null
+    }
+    return [bool]$state.reachable
+  } catch {
+    return $null
+  }
+}
+
+function Write-ProcessorReachability {
+  param([bool]$Reachable)
+
+  @{ reachable = $Reachable; checkedAt = (Get-Date).ToString('o') } |
+    ConvertTo-Json -Compress |
+    Set-Content -LiteralPath $ProcessorStatePath -Encoding utf8
+}
+
 function Test-StartupInProgress {
   if (-not (Test-Path -LiteralPath $StartupMarkerPath)) {
     return $false
@@ -119,23 +144,45 @@ try {
     Restart-Runtime -Reason "next=$nextOk scraper=$scraperOk"
   }
 
-  if (-not $SkipViplexRepair -and (Test-TcpPort -HostName '192.168.20.253' -Port 16674)) {
-    $programPayload = Get-Json -Uri $programsUrl
-    if ($null -eq $programPayload) {
-      Write-Log 'TB50 API indisponivel; runtime HTML mantido sem alteracao'
-    } else {
-      $program = @($programPayload.programs) |
-        Where-Object { $_.name -and $_.name.Trim().ToUpperInvariant() -eq 'CRONOMETRAGEM' } |
-        Sort-Object @{ Expression = { [int]$_.statusCode }; Descending = $true } |
-        Select-Object -First 1
+  if (-not $SkipViplexRepair) {
+    $processorReachable = Test-TcpPort -HostName '192.168.20.253' -Port 16674
+    $previousProcessorReachable = Read-ProcessorReachability
+    $processorTransitionedOnline = $processorReachable -and $previousProcessorReachable -ne $true
 
-      if ($program -and $program.identifier -and [int]$program.statusCode -ne 1) {
-        $body = @{ identifier = $program.identifier } | ConvertTo-Json -Compress
-        Invoke-RestMethod -Method Put -Uri $programsUrl -ContentType 'application/json' -Body $body -TimeoutSec 180 | Out-Null
-        Write-Log 'CRONOMETRAGEM reativado na TB50'
-      } elseif (-not $program) {
-        Write-Log 'CRONOMETRAGEM nao encontrado na API da TB50'
+    if (-not $processorReachable) {
+      if ($previousProcessorReachable -ne $false) {
+        Write-Log 'TB50 API offline; aguardando a controladora responder em 192.168.20.253:16674'
       }
+      Write-ProcessorReachability -Reachable $false
+    } else {
+      if ($processorTransitionedOnline) {
+        Write-Log 'TB50 API online; iniciando verificacao do programa HTML ao vivo'
+      }
+
+      $programPayload = Get-Json -Uri $programsUrl
+      if ($null -eq $programPayload) {
+        Write-Log 'TB50 API indisponivel; runtime HTML mantido sem alteracao'
+      } else {
+        $program = @($programPayload.programs) |
+          Where-Object { $_.name -and $_.name.Trim().ToUpperInvariant() -eq 'CRONOMETRAGEM' } |
+          Sort-Object @{ Expression = { [int]$_.statusCode }; Descending = $true } |
+          Select-Object -First 1
+
+        if ($program -and $program.identifier -and (([int]$program.statusCode -ne 1) -or $processorTransitionedOnline)) {
+          $body = @{ identifier = $program.identifier } | ConvertTo-Json -Compress
+          Invoke-RestMethod -Method Put -Uri $programsUrl -ContentType 'application/json' -Body $body -TimeoutSec 180 | Out-Null
+          Write-Log 'CRONOMETRAGEM HTML reativado na TB50'
+        } elseif (-not $program) {
+          try {
+            $body = @{ action = 'provision-cronometragem'; name = 'CRONOMETRAGEM'; activate = $true } | ConvertTo-Json -Compress
+            Invoke-RestMethod -Method Post -Uri $programsUrl -ContentType 'application/json' -Body $body -TimeoutSec 180 | Out-Null
+            Write-Log 'CRONOMETRAGEM HTML provisionado e ativado na TB50'
+          } catch {
+            Write-Log "CRONOMETRAGEM provisioning failed: $($_.Exception.Message)"
+          }
+        }
+      }
+      Write-ProcessorReachability -Reachable $true
     }
   }
 } catch {

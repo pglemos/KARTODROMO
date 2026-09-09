@@ -1,0 +1,32 @@
+{
+  "stageId": "72ee40f8-8574-48db-852e-fce19bfd4ee4",
+  "seasonId": "35ccbcaa-8912-4af3-85d9-e60dff6200d4",
+  "title": "2ª etapa · Traçado 02 normal e invertido",
+  "categorySlugs": ["insanos", "rapidos"],
+  "races": [
+    { "racingId": 657330, "groupId": 270368, "sessionId": "ecd8f003-8417-4c6c-95f8-b47b26a9d830", "label": "Corrida 1 · Normal" },
+    { "racingId": 657332, "groupId": 270369, "sessionId": "fcab6da9-54b0-456b-87fa-c3de1ce8a02f", "label": "Corrida 2 · Invertido" }
+  ],
+  "aliases": {
+    "NEWTON RHOMEL BECK ANGELINI": "Newton",
+    "MAXMIILER FRANTIESCOLY DA CUNHA E SILVA": "Maxmiiler Frantiscoly",
+    "FAEL WERNER": "Raphael Werner",
+    "Lucas Gabriel Voieta Parreira": "Lucas Gabriel Voieta Parreira",
+    "ALEXANDRE KONOVALOFF JANNOTTI": "Alexandre Janotti",
+    "ARTHUR FERREIRA": "Arthur",
+    "BERNARDO FERREIRA DUARTE SANTOS": "Bernardo",
+    "LUCAS GODOI": "Lucas Godoy",
+    "AGENOR JÚNIOR": "Agenor Jr.",
+    "Rafael Soares - I": "Rafael Soares",
+    "Rafael Teodoro": "Rafael Teodoro",
+    "PEDRO HENRIQUE DE LIMA REBELLO HORTA": "Pedro Horta",
+    "MARCELO HENRIQUE AGUIAR MARQUES": "Marcelo Marques",
+    "FERNANDO MARCIEL GODOY": "Fernando Godoy",
+    "Gabriel Nogueira Fernandes": "Gabriel Fernandes",
+    "RAFAEL GONÇALVES DE MORAIS": "Rafael Morais",
+    "MARCOS FELIPE LOMANTO": "Marcos Felipe",
+    "WESLEY ALMEIDA CARDOSO": "Wesley Cardoso",
+    "RENATO DE OLIVEIRA RIBEIRO": "Renato Oliveira",
+    "Bernardo Thadeu Baya Andrade - I": "Bernardo Thadeu"
+  }
+}

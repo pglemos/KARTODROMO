@@ -20,6 +20,8 @@
     "preview:worker": "npm run preview",
     "deploy:worker": "npm run deploy",
     "scraper": "tsx services/livetime-scraper-server.ts",
+    "ultras:stage": "tsx services/ultras-stage-server.ts",
+    "ultras:stage:check": "tsx services/ultras-stage-server.ts --check",
     "tb50:configure": "tsx scripts/configure-tb50-podium.ts",
     "bridge": "tsx services/udk-bridge-server.ts",
     "bridge:install-autostart": "powershell -ExecutionPolicy Bypass -File scripts/install-udk-bridge-autostart.ps1",

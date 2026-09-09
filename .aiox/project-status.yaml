@@ -1,23 +1,19 @@
 status:
-  branch: main
+  branch: fix/designer-telao-admin-shell
   modifiedFiles:
-    - .aiox/project-status.yaml
-    - .env.example
-    - app/HomeDashboard.tsx
-    - lib/livetime/demo-data.ts
-    - lib/livetime/laptime-api-client.ts
-  modifiedFilesTotalCount: 41
+    - next.config.ts
+    - scripts/sync-design.mjs
+    - scripts/watch-tb50-podium.ps1
+    - src/admin/modules/telao/TelaoPage.tsx
+    - src/admin/modules/telao/telao.api.ts
+  modifiedFilesTotalCount: 18
   recentCommits:
-    - >-
-      fix(kart-locacao): update booking buttons to point directly to MyLapTime
-      booking URL
-    - >-
-      feat: centralize all modules SQL data, fix schema mismatches, and enable
-      live sync
+    - 'polish(admin): refine shared pages and responsive states'
+    - 'fix(admin): stabilize telão preview hydration'
   currentEpic: null
   currentStory: null
-  lastUpdate: '2026-08-23T05:04:16.271Z'
+  lastUpdate: '2026-09-09T00:16:40.175Z'
   isGitRepo: true
-timestamp: 1787461456274
+timestamp: 1788913000177
 ttl: 60
-gitFingerprint: 1785264856636.1414:1787461422627.536
+gitFingerprint: 1787694862444.5242:1788624030486.7935
