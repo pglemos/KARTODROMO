@@ -11,14 +11,18 @@ const FiveHundredMilesPage = () => {
       logo="/championships/1.png"
       logoAlt="Logo 500 Milhas de Betim"
       watermark="500"
-      watermarkCaption="inscrições abertas · 22/08/2026"
+      watermarkCaption="edição 29/08/2026 · inscrições encerradas"
       specs={[
-        ['Data', '22/08/2026'],
+        ['Data', '29/08/2026'],
         ['Duração', '12 horas'],
         ['Formato', 'Equipe'],
-        ['Valores', 'Via WhatsApp'],
+        ['Status', 'Realizada'],
       ]}
-      primaryAction={{ kind: 'form', championshipId: '500-milhas', label: 'Inscrever equipe' }}
+      primaryAction={{
+        kind: 'whatsapp',
+        text: 'Olá! Quero ser avisado sobre a próxima edição das 500 Milhas de Betim.',
+        label: 'Avisem-me da próxima edição',
+      }}
       rulesTitle="Dados necessários para inscrição"
       rules={[
         { icon: ClipboardList, title: 'Nome da equipe', text: 'Informe o nome oficial da equipe no ato da inscrição.' },
@@ -28,9 +32,9 @@ const FiveHundredMilesPage = () => {
         { icon: ShieldAlert, title: 'Regulamento', text: 'Valores, regras de boxes e critérios completos são enviados pela organização via WhatsApp.' },
         { icon: Trophy, title: 'Inscrição', text: 'Vaga confirmada conforme retorno da organização.' },
       ]}
-      ctaTitleLine1="Inscrever equipe"
-      ctaTitleLine2="agora"
-      ctaText="Fale com a organização para confirmar vaga, valores e próximos passos."
+      ctaTitleLine1="Edição 2026 encerrada"
+      ctaTitleLine2="vem aí a próxima"
+      ctaText="As 500 Milhas de Betim 2026 aconteceram em 29/08. Fale com a organização para ser avisado da próxima edição."
     />
   );
 };
