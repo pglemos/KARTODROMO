@@ -9,7 +9,7 @@
 <x-dc>
 
 <helmet>
-  <meta name="description" content="Conheça os campeonatos 500 Milhas, Desafio 2 Horas, 200 Milhas, KAC Super Kart e KAC Iniciantes de Betim.">
+  <meta name="description" content="Conheça os campeonatos KAC Iniciantes (Kart Light), KAC Super Kart, 100 Milhas Light, 500 Milhas, Desafio 2 Horas e 200 Milhas de Betim.">
   <link rel="icon" type="image/png" href="assets/brand/kib-logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -116,6 +116,9 @@
             <sc-if value="{{ c.canRegister }}">
               <button type="button" onClick="{{ c.onRegister }}" style="display:inline-flex; align-items:center; gap:8px; min-height:48px; padding:0 20px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; letter-spacing:0.04em; border:0; cursor:pointer;">{{ c.registerLabel }}</button>
             </sc-if>
+            <sc-if value="{{ c.registerHref }}">
+              <a href="{{ c.registerHref }}" style="display:inline-flex; align-items:center; gap:8px; min-height:48px; padding:0 20px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; letter-spacing:0.04em; text-decoration:none;">{{ c.registerLabel }}</a>
+            </sc-if>
             <sc-if value="{{ c.pageHref }}">
               <a href="{{ c.pageHref }}" style="display:inline-flex; align-items:center; gap:8px; min-height:48px; padding:0 20px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; letter-spacing:0.04em; text-decoration:none;">Página oficial</a>
             </sc-if>
@@ -181,7 +184,7 @@
         </sc-if>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
           <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">WhatsApp *</label><input name="whatsapp" type="tel" required="" placeholder="(31) 99999-9999" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
-          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">E-mail</label><input name="email" type="email" placeholder="voce@email.com" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">E-mail *</label><input name="email" type="email" required="" placeholder="voce@email.com" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
         </div>
         <div style="background:rgba(0,230,118,.08); border:1px solid rgba(0,230,118,.25); padding:14px; font-size:12px; line-height:1.5; color:#7fd9a8;"><strong>Nota sobre pagamento:</strong> após o envio, sua inscrição fica pendente até a validação do Pix ou boleto com o chefe de equipe via WhatsApp.</div>
         <button type="submit" style="width:100%; appearance:none; border:0; cursor:pointer; min-height:52px; clip-path:polygon(3% 0,100% 0,97% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em;">Confirmar e enviar inscrição</button>
@@ -224,13 +227,20 @@
 </x-dc>
 <script type="text/x-dc" data-dc-script>
 
+// Ordem de exibição: KAC Kart Light, KAC Super Kart, provas com inscrição aberta e, por fim, provas já realizadas.
 const CHAMPIONSHIPS_DATA = [
-  { id: '500-milhas', title: '500 Milhas de Betim', desc: 'O maior desafio do calendário, com alto nível de competitividade e emoção. Uma corrida com 12 horas de duração que exige preparo físico, mental e estratégia apurada das equipes.', date: '22/08/2026', status: 'open', statusLabel: 'INSCRIÇÕES ABERTAS', logo: 'assets/championships/500-milhas-logo.png', requiresTeamForm: true, pageHref: '500-milhas.dc.html' },
-  { id: 'desafio-2h', title: 'Desafio 2 Horas de Betim', desc: 'Prova dinâmica e estratégica, com duas horas de corrida intensa. Ideal para quem busca adrenalina, constância e trabalho em equipe em um formato competitivo e equilibrado.', date: '08/08/2026', status: 'soon', statusLabel: 'INSCRIÇÕES EM BREVE', logo: 'assets/championships/desafio-2h-logo.png', requiresTeamForm: true, pageHref: null },
-  { id: '200-milhas', title: '200 Milhas de Betim', desc: 'Prova com duração de 5 horas que desafia estratégia, resistência e trabalho em equipe. Uma das corridas mais tradicionais do kartismo regional, reunindo pilotos em uma disputa intensa do início ao fim.', date: '07/02/2026', status: 'past', statusLabel: 'JÁ ACONTECEU', logo: 'assets/championships/200-milhas-logo.png', requiresTeamForm: true, pageHref: '200-milhas.dc.html' },
+  { id: 'kac-iniciantes', title: 'KAC Iniciantes · Kart Light', desc: 'Um campeonato mensal disputado na categoria Kart Light para pilotos iniciantes, com 7 corridas no mês. As 4 melhores corridas entram no ranking, com regulamento, calendário, pontuação e premiação oficiais.', date: 'Mensal', status: 'open', statusLabel: 'INSCRIÇÕES ABERTAS', logo: 'assets/championships/kac-iniciantes-logo.png', requiresTeamForm: false, pageHref: 'kac.dc.html' },
   { id: 'kac-super-kart', title: 'KAC Super Kart', desc: 'Um campeonato anual disputado na categoria Super Kart com 9 etapas, sendo uma corrida por mês, para pilotos experientes.', date: 'Mensal', status: 'open', statusLabel: 'INSCRIÇÕES ABERTAS', logo: 'assets/championships/kac-super-kart-logo.png', requiresTeamForm: false, pageHref: 'kac-super.dc.html' },
-  { id: 'kac-iniciantes', title: 'KAC Iniciantes', desc: 'Um campeonato mensal disputado na categoria Kart Light para pilotos iniciantes, com 7 corridas no mês. As 4 melhores corridas entram no ranking, com regulamento, calendário, pontuação e premiação oficiais.', date: 'Mensal', status: 'open', statusLabel: 'INSCRIÇÕES ABERTAS', logo: 'assets/championships/kac-iniciantes-logo.png', requiresTeamForm: false, pageHref: 'kac.dc.html' },
+  { id: '100-milhas-light', title: '100 Milhas Light de Betim', desc: 'Endurance de 2,5 horas com os karts light de locação do kartódromo. Equipes de 1 a 3 pilotos por kart, até 5 karts por equipe, com 3 paradas obrigatórias. Inscrição de R$ 900 por kart, até 15/10/2026.', date: '25/10/2026', status: 'open', statusLabel: 'INSCRIÇÕES ABERTAS', logo: 'assets/championships/100-milhas-light-logo.png', requiresTeamForm: true, pageHref: '100-milhas-light.dc.html', registerHref: '/100-milhas-light#formulario', registrationDeadline: '2026-10-15T23:59:59-03:00' },
+  { id: '500-milhas', title: '500 Milhas de Betim', desc: 'O maior desafio do calendário, com alto nível de competitividade e emoção. Uma corrida com 12 horas de duração que exige preparo físico, mental e estratégia apurada das equipes.', date: '22/08/2026', status: 'past', statusLabel: 'JÁ ACONTECEU', logo: 'assets/championships/500-milhas-logo.png', requiresTeamForm: true, pageHref: '500-milhas.dc.html' },
+  { id: 'desafio-2h', title: 'Desafio 2 Horas de Betim', desc: 'Prova dinâmica e estratégica, com duas horas de corrida intensa. Ideal para quem busca adrenalina, constância e trabalho em equipe em um formato competitivo e equilibrado.', date: '08/08/2026', status: 'past', statusLabel: 'JÁ ACONTECEU', logo: 'assets/championships/desafio-2h-logo.png', requiresTeamForm: true, pageHref: null },
+  { id: '200-milhas', title: '200 Milhas de Betim', desc: 'Prova com duração de 5 horas que desafia estratégia, resistência e trabalho em equipe. Uma das corridas mais tradicionais do kartismo regional, reunindo pilotos em uma disputa intensa do início ao fim.', date: '07/02/2026', status: 'past', statusLabel: 'JÁ ACONTECEU', logo: 'assets/championships/200-milhas-logo.png', requiresTeamForm: true, pageHref: '200-milhas.dc.html' },
 ];
+
+const championshipStatus = (c) => {
+  if (c.status === 'open' && c.registrationDeadline && Date.now() > new Date(c.registrationDeadline).getTime()) return 'closed';
+  return c.status;
+};
 
 class Component extends DCLogic {
   state = { headerScrolled: false, mobileNavOpen: false, isMobile: typeof window !== 'undefined' && window.matchMedia('(max-width: 1100px)').matches, modalOpen: false, selectedId: null };
@@ -289,6 +299,28 @@ class Component extends DCLogic {
     }
     lines.push('WhatsApp: ' + (data.get('whatsapp') || ''));
     lines.push('E-mail: ' + (data.get('email') || ''));
+
+    // Registra a inscrição no painel administrativo sem atrasar a abertura do WhatsApp.
+    const payload = champ && champ.requiresTeamForm
+      ? {
+          campeonato_id: champ.id, evento: champ.title, modalidade: 'equipe',
+          nomeEquipe: data.get('nome_equipe'), nomeChefe: data.get('nome_chefe'),
+          pilotos: String(data.get('pilotos') || '').split('\n').map((line) => line.trim()).filter(Boolean).map((line) => {
+            const weight = line.match(/(\d+(?:[.,]\d+)?)\s*kg/i);
+            return { nome: line.replace(/[-–—]?\s*\d+(?:[.,]\d+)?\s*kg.*$/i, '').trim() || line, peso_kg: weight ? Number(weight[1].replace(',', '.')) : null };
+          }),
+          quantidadeKarts: Number(data.get('qtd_karts')) || null,
+          whatsapp: data.get('whatsapp'), email: data.get('email') || null, acceptedContact: true,
+        }
+      : {
+          campeonato_id: champ ? champ.id : null, evento: champ ? champ.title : 'Campeonato', modalidade: 'individual',
+          fullName: data.get('nome'), idade: data.get('idade') || null, peso_kg: data.get('peso') || null,
+          cidade: data.get('cidade') || null, whatsapp: data.get('whatsapp'), email: data.get('email'), acceptedContact: true,
+        };
+    try {
+      fetch('/api/inscricao', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(() => undefined);
+    } catch (error) { /* WhatsApp segue como canal principal */ }
+
     window.open('https://wa.me/5531998842898?text=' + encodeURIComponent(lines.join('\n')), '_blank', 'noopener,noreferrer');
     this.closeModal();
   };
@@ -313,22 +345,28 @@ class Component extends DCLogic {
     };
     const badgeBase = { display: 'inline-flex', whiteSpace: 'nowrap', padding: '5px 12px', fontFamily: "'Anton',sans-serif", fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' };
 
-    const championships = CHAMPIONSHIPS_DATA.map((c) => ({
-      id: c.id, title: c.title, desc: c.desc, date: c.date, statusLabel: c.statusLabel, logo: c.logo,
-      dateLabel: c.status === 'open' ? (c.date === 'Mensal' ? 'Formato' : 'Data') : 'Data',
-      cardStyle: { display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid rgba(255,255,255,.12)', background: '#0b100c', padding: '28px', opacity: c.status === 'past' ? 0.55 : 1 },
-      badgeStyle: { ...badgeBase, ...statusStyles[c.status] },
-      requirements: c.requiresTeamForm
-        ? ['Nome oficial da equipe', 'Nome do chefe de equipe', 'Nome dos pilotos e peso individual em kg', 'Quantidade de karts participantes']
-        : ['Taxa de inscrição única do campeonato', 'Pagamento individual de cada etapa corrida'],
-      canRegister: c.status === 'open',
-      registerLabel: c.requiresTeamForm ? 'Formulário de inscrição' : 'Inscrição do piloto',
-      onRegister: () => this.openModal(c.id),
-      pageHref: c.pageHref,
-      showWhatsapp: c.status === 'open',
-      whatsappHref: 'https://wa.me/5531998842898?text=' + encodeURIComponent('Olá! Gostaria de saber valores e regulamento para o campeonato ' + c.title),
-      closedLabel: c.status === 'past' ? 'Inscrições encerradas' : c.status === 'soon' ? 'Em breve / Pré-inscrições' : null,
-    }));
+    const championships = CHAMPIONSHIPS_DATA.map((c) => {
+      const status = championshipStatus(c);
+      const isOpen = status === 'open';
+      return {
+        id: c.id, title: c.title, desc: c.desc, date: c.date, logo: c.logo,
+        statusLabel: status === 'closed' ? 'INSCRIÇÕES ENCERRADAS' : c.statusLabel,
+        dateLabel: isOpen ? (c.date === 'Mensal' ? 'Formato' : 'Data') : 'Data',
+        cardStyle: { display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: isOpen ? '1px solid rgba(0,230,118,.22)' : '1px solid rgba(255,255,255,.12)', background: '#0b100c', padding: '28px', opacity: status === 'past' ? 0.55 : 1 },
+        badgeStyle: { ...badgeBase, ...(statusStyles[status] || statusStyles.past) },
+        requirements: c.requiresTeamForm
+          ? ['Nome oficial da equipe', 'Nome do chefe de equipe', 'Nome dos pilotos e peso individual em kg', 'Quantidade de karts participantes']
+          : ['Taxa de inscrição única do campeonato', 'Pagamento individual de cada etapa corrida'],
+        canRegister: isOpen && !c.registerHref,
+        registerHref: isOpen && c.registerHref ? c.registerHref : null,
+        registerLabel: c.requiresTeamForm ? 'Formulário de inscrição' : 'Inscrição do piloto',
+        onRegister: () => this.openModal(c.id),
+        pageHref: c.pageHref,
+        showWhatsapp: isOpen,
+        whatsappHref: 'https://wa.me/5531998842898?text=' + encodeURIComponent('Olá! Gostaria de saber valores e regulamento para o campeonato ' + c.title),
+        closedLabel: status === 'past' || status === 'closed' ? 'Inscrições encerradas' : status === 'soon' ? 'Em breve / Pré-inscrições' : null,
+      };
+    });
 
     const selected = CHAMPIONSHIPS_DATA.find((c) => c.id === selectedId);
 

@@ -84,6 +84,13 @@
     "availability": "active"
   },
   {
+    "key": "100-milhas-light",
+    "path": "/100-milhas-light",
+    "title": "100 Milhas Light de Betim 2026 | Endurance de Kart",
+    "description": "Regulamento, cronograma e inscrição de equipes das 100 Milhas Light de Betim, endurance de 2,5 horas em kart light no dia 25 de outubro de 2026.",
+    "availability": "active"
+  },
+  {
     "key": "clube-vantagens",
     "path": "/clube-vantagens",
     "title": "Clube de Vantagens | Kartódromo de Betim",

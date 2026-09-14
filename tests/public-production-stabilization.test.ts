@@ -19,6 +19,7 @@ const canonicalPaths = [
   '/kac-super',
   '/200-milhas',
   '/500-milhas',
+  '/100-milhas-light',
   '/clube-vantagens',
   '/clube-cadastro',
   '/clube-consulta',

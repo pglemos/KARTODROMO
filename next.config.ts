@@ -28,6 +28,7 @@ const designRoutes: Record<string, string> = {
   '/kac-super': 'kac-super',
   '/200-milhas': '200-milhas',
   '/500-milhas': '500-milhas',
+  '/100-milhas-light': '100-milhas-light',
   '/clube-vantagens': 'clube-vantagens',
   '/clube-cadastro': 'clube-cadastro',
   '/clube-consulta': 'clube-consulta',
@@ -66,6 +67,8 @@ const nextConfig: NextConfig = {
       { source: '/campeonatos/kac-super', destination: '/kac-super', permanent: true },
       { source: '/campeonatos/200-milhas', destination: '/200-milhas', permanent: true },
       { source: '/campeonatos/500-milhas', destination: '/500-milhas', permanent: true },
+      { source: '/campeonatos/100-milhas-light', destination: '/100-milhas-light', permanent: true },
+      { source: '/100-milhas', destination: '/100-milhas-light', permanent: true },
       ...Object.entries(designRoutes).map(([source, page]) => ({
         source,
         destination: `/design/${page}.dc.html`,

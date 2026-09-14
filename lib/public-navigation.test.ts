@@ -16,6 +16,7 @@ const publicPages = [
   'kac-super.dc.html',
   '200-milhas.dc.html',
   '500-milhas.dc.html',
+  '100-milhas-light.dc.html',
   'clube-vantagens.dc.html',
 ];
 

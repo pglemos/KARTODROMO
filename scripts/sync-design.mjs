@@ -29,6 +29,7 @@ const routes = {
   'kac-super': '/kac-super',
   '200-milhas': '/200-milhas',
   '500-milhas': '/500-milhas',
+  '100-milhas-light': '/100-milhas-light',
   'clube-vantagens': '/clube-vantagens',
   'clube-cadastro': '/clube-cadastro',
   'clube-consulta': '/clube-consulta',
@@ -54,6 +55,7 @@ const navPages = new Set([
   'kac-super',
   '200-milhas',
   '500-milhas',
+  '100-milhas-light',
   'clube-vantagens',
 ]);
 
