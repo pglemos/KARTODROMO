@@ -186,6 +186,46 @@ const reducedMotionStyle = `<style data-generated="reduced-motion">
 </style>
 `;
 
+/** Anel de foco visível para navegação por teclado; os protótipos zeram o outline dos campos. */
+const focusRingStyle = `<style data-generated="focus-ring">
+:focus-visible { outline: 2px solid #00e676; outline-offset: 3px; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible {
+  outline: 2px solid #00e676 !important;
+  outline-offset: 2px;
+}
+</style>
+`;
+
+/**
+ * Enquanto o runtime não monta a página, o navegador interpretaria o conteúdo de <x-dc>
+ * como HTML real e pediria URLs literais como "{{ c.logo }}" (404) e caminhos SVG
+ * inválidos. O template passa a viajar inerte dentro de um <script> e um shim recria o
+ * elemento com o mesmo innerHTML antes do DOMContentLoaded, que é quando o runtime inicia.
+ * O texto bruto continua tendo um único par x-dc, que é o que o runtime relê via fetch.
+ */
+function inertTemplate(html) {
+  const open = html.indexOf('<x-dc>');
+  const close = html.lastIndexOf('</x-dc>');
+  if (open === -1 || close === -1 || close < open) return html;
+
+  const shim =
+    '<script data-generated="dc-inert-template">(function(){' +
+    'var t=document.getElementById("dc-template");if(!t)return;' +
+    'var raw=t.textContent;var inner=raw.slice(raw.indexOf(">")+1,raw.lastIndexOf("<"));' +
+    'var x=document.createElement("x-dc");' +
+    'Object.defineProperty(x,"innerHTML",{configurable:true,get:function(){return inner}});' +
+    't.parentNode.insertBefore(x,t)})();</script>';
+
+  return (
+    html.slice(0, open) +
+    '<script type="text/x-dc-template" id="dc-template">' +
+    html.slice(open, close + '</x-dc>'.length) +
+    '</script>' +
+    shim +
+    html.slice(close + '</x-dc>'.length)
+  );
+}
+
 /** No celular a faixa de abas do portal rola: centraliza a aba da página atual. */
 const clubTabScript = `<script data-generated="club-tab-focus">(function(){function focusTab(){var nav=document.querySelector('nav[aria-label="Menu do portal"]');if(!nav)return false;var current=nav.querySelector('a[href="'+location.pathname+'"]');if(!current)return false;if(nav.scrollWidth>nav.clientWidth+1){var offset=current.offsetLeft-(nav.clientWidth-current.offsetWidth)/2;nav.scrollTo({left:Math.max(0,offset),behavior:'auto'})}current.setAttribute('aria-current','page');return true}if(!focusTab()){var tries=0;var timer=setInterval(function(){if(focusTab()||++tries>40)clearInterval(timer)},100)}})();</script>
 `;
@@ -230,7 +270,9 @@ function build(page, source) {
     // A descrição canônica passa a ser a do registro de rotas, sem duplicar a do protótipo.
     html = html.replace(/\n\s*<meta name="description" content="(?:[^"\\]|\\.)*">(?=\n)/, '');
     html = html.replace('<base href="/">\n', `<base href="/">\n${seoHead(page)}`);
-    html = html.replace('</head>', `${mobileFitStyle}${reducedMotionStyle}</head>`);
+    html = html.replace('<html>', '<html lang="pt-BR">');
+    html = html.replace('</head>', `${mobileFitStyle}${reducedMotionStyle}${focusRingStyle}</head>`);
+    html = inertTemplate(html);
     html = html.replace('</body>', `${cleanUrlScript()}</body>`);
 
     if (page.startsWith('clube-')) {

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
 <base href="/">
 <title>Kartódromo Internacional de Betim</title>
@@ -88,9 +88,16 @@
   }
 }
 </style>
+<style data-generated="focus-ring">
+:focus-visible { outline: 2px solid #00e676; outline-offset: 3px; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible {
+  outline: 2px solid #00e676 !important;
+  outline-offset: 2px;
+}
+</style>
 </head>
 <body>
-<x-dc>
+<script type="text/x-dc-template" id="dc-template"><x-dc>
 
 <helmet>
   <link rel="icon" type="image/png" href="assets/brand/kib-logo.png">
@@ -232,7 +239,7 @@
           <img src="assets/championships/100-milhas-light-logo.png" alt="100 Milhas Light de Betim" loading="lazy" style="width:100%; max-width:340px; margin:0 auto; filter:drop-shadow(0 24px 40px rgba(0,0,0,.5));">
         </div>
         <div style="min-width:0;">
-          <p style="display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;"><span style="{{ milhasBadgeStyle }}">{{ milhasBadge }}</span>Novo campeonato · Kart Light</p>
+          <p style="display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;"><span style="{{ milhasBadgeStyle }}">{{ milhasBadge }}</span>Endurance · Kart Light</p>
           <h2 id="milhas-light-title" style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(44px,6vw,84px); line-height:0.82;">100 Milhas Light<br><span style="color:#00e676;">de Betim</span></h2>
           <p style="max-width:58ch; margin:20px 0 0; color:#a8b2aa; font-size:clamp(16px,1.2vw,19px); line-height:1.6;">Endurance de 2,5 horas com os karts light de locação do kartódromo. Monte sua equipe de 1 a 3 pilotos por kart e dispute o pódio no domingo, 25 de outubro de 2026.</p>
           <div style="margin:26px 0 0; display:grid; grid-template-columns:repeat(4,1fr); border:1px solid rgba(255,255,255,.12); background:rgba(3,5,4,.6);">
@@ -244,7 +251,7 @@
             <sc-if value="{{ milhasRegistrationOpen }}">
               <a href="/100-milhas-light#formulario" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none; transition:transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s;" style-hover="transform:translateY(-4px); box-shadow:0 14px 30px rgba(0,0,0,.32);">Inscrever equipe <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></a>
             </sc-if>
-            <a href="/100-milhas-light" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none; transition:border-color .25s, color .25s, transform .25s cubic-bezier(.16,1,.3,1);" style-hover="border-color:#00e676; color:#00e676; transform:translateY(-4px);">Regulamento e cronograma</a>
+            <a href="/100-milhas-light" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none; transition:border-color .25s, color .25s, transform .25s cubic-bezier(.16,1,.3,1);" style-hover="border-color:#00e676; color:#00e676; transform:translateY(-4px);">Ver detalhes da prova</a>
           </div>
         </div>
       </div>
@@ -395,7 +402,7 @@
       </div>
     </div>
     <div style="width:min(1480px,calc(100% - 48px)); margin:46px auto 0; padding-top:22px; border-top:1px solid rgba(255,255,255,.12); display:flex; flex-wrap:wrap; justify-content:space-between; gap:20px; color:#667067; font-size:12px;">
-      <span>© 2026 Kartódromo Internacional de Betim</span><span>Motorsport editorial experience</span>
+      <span>© 2026 Kartódromo Internacional de Betim</span><span>Betim · Minas Gerais</span>
     </div>
   </footer>
 
@@ -404,7 +411,7 @@
   </a>
 </div>
 
-</x-dc>
+</x-dc></script><script data-generated="dc-inert-template">(function(){var t=document.getElementById("dc-template");if(!t)return;var raw=t.textContent;var inner=raw.slice(raw.indexOf(">")+1,raw.lastIndexOf("<"));var x=document.createElement("x-dc");Object.defineProperty(x,"innerHTML",{configurable:true,get:function(){return inner}});t.parentNode.insertBefore(x,t)})();</script>
 <script type="text/x-dc" data-dc-script>
 
 class Component extends DCLogic {

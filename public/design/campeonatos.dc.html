@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
 <base href="/">
 <title>Campeonatos de Kart | Kartódromo de Betim</title>
@@ -88,9 +88,16 @@
   }
 }
 </style>
+<style data-generated="focus-ring">
+:focus-visible { outline: 2px solid #00e676; outline-offset: 3px; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible {
+  outline: 2px solid #00e676 !important;
+  outline-offset: 2px;
+}
+</style>
 </head>
 <body>
-<x-dc>
+<script type="text/x-dc-template" id="dc-template"><x-dc>
 
 <helmet>
   <link rel="icon" type="image/png" href="assets/brand/kib-logo.png">
@@ -151,7 +158,7 @@
       <div style="max-width:640px;">
         <p style="margin:0 0 16px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase; display:flex; align-items:center; gap:12px;"><span style="width:38px; height:1px; background:#00e676;"></span>Calendário competitivo</p>
         <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; line-height:0.82; letter-spacing:-0.01em; font-size:clamp(44px,6.5vw,84px);">A temporada <span style="color:#00e676;">começa aqui</span></h1>
-        <p style="max-width:56ch; margin:22px 0 0; font-size:clamp(16px,1.3vw,19px); line-height:1.55; color:#d7ded8;">Faça parte da história do automobilismo mineiro. Inscreva sua equipe e acelere nas competições mais disputadas da região.</p>
+        <p style="max-width:56ch; margin:22px 0 0; font-size:clamp(16px,1.3vw,19px); line-height:1.55; color:#d7ded8;">Campeonatos mensais de KAC para quem está começando ou já compete, e provas de endurance em equipe, todas com cronometragem eletrônica na pista de Betim.</p>
       </div>
       <div style="text-align:right;">
         <span aria-hidden="true" style="display:block; font-family:'Anton',sans-serif; font-size:clamp(60px,9vw,120px); line-height:0.7; color:transparent; -webkit-text-stroke:1px rgba(0,230,118,.4);">2026</span>
@@ -163,7 +170,7 @@
         <sc-for list="{{ topStats }}" as="s" hint-placeholder-count="4">
           <div style="display:flex; align-items:center; gap:12px; padding:20px; border-right:1px solid rgba(255,255,255,.08);">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00e676" stroke-width="1.8" aria-hidden="true"><path d="{{ s.icon }}"/></svg>
-            <div><strong style="display:block; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px;">{{ s.title }}</strong><span style="font-size:11px; color:#8b948c;">{{ s.text }}</span></div>
+            <div><strong style="display:block; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:14px;">{{ s.title }}</strong><span style="font-size:14px; color:#a8b2aa;">{{ s.text }}</span></div>
           </div>
         </sc-for>
       </div>
@@ -173,7 +180,7 @@
   <!-- CARDS -->
   <section style="padding:clamp(56px,7vw,90px) 0;">
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:repeat(2,1fr); gap:20px;">
-      <sc-for list="{{ championships }}" as="c" hint-placeholder-count="5">
+      <sc-for list="{{ activeChampionships }}" as="c" hint-placeholder-count="3">
         <article style="{{ c.cardStyle }}">
           <div>
             <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:18px;">
@@ -213,6 +220,21 @@
         </article>
       </sc-for>
     </div>
+
+    <sc-if value="{{ hasPastChampionships }}">
+      <div style="width:min(1480px,calc(100% - 48px)); margin:clamp(48px,6vw,72px) auto 0;">
+        <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(26px,3vw,34px); line-height:1;">Já realizadas em 2026</h2>
+        <ul style="list-style:none; margin:20px 0 0; padding:0; display:grid; gap:1px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.1);">
+          <sc-for list="{{ pastChampionships }}" as="p" hint-placeholder-count="3">
+            <li style="display:grid; grid-template-columns:56px 1fr auto; gap:18px; align-items:center; padding:14px 20px; background:#070b08;">
+              <img src="{{ p.logo }}" alt="" width="56" height="56" loading="lazy" style="width:56px; height:56px; object-fit:contain; opacity:.8;">
+              <div style="min-width:0;"><strong style="display:block; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:18px; color:#d7ded8;">{{ p.title }}</strong><span style="color:#a8b2aa; font-size:15px;">Realizada em {{ p.date }}</span></div>
+              <sc-if value="{{ p.pageHref }}"><a href="{{ p.pageHref }}" aria-label="{{ p.linkAria }}" style="display:inline-flex; align-items:center; min-height:44px; padding:0 16px; border:1px solid rgba(255,255,255,.15); color:#f7faf6; font-size:15px; font-weight:700; text-decoration:none;">Ver página</a></sc-if>
+            </li>
+          </sc-for>
+        </ul>
+      </div>
+    </sc-if>
   </section>
 
   <!-- EVOLUÇÃO -->
@@ -244,33 +266,33 @@
   </main>
 
   <!-- MODAL INSCRIÇÃO -->
-  <div role="dialog" aria-modal="true" aria-hidden="{{ modalClosed }}" aria-labelledby="reg-modal-title" style="{{ modalOverlayStyle }}" onClick="{{ closeModal }}">
-    <div style="width:min(560px,100%); max-height:90vh; overflow:auto; background:#0b100c; border:1px solid rgba(255,255,255,.15); box-shadow:0 30px 90px rgba(0,0,0,.55); position:relative;" onClick="{{ stopPropagation }}">
-      <div style="position:sticky; top:0; z-index:2; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid rgba(255,255,255,.1); background:rgba(11,16,12,.97); padding:20px 24px;">
-        <div><h3 id="reg-modal-title" style="margin:0; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:16px;">Formulário de inscrição</h3><p style="margin:4px 0 0; color:#00e676; font-size:12px; font-weight:700;">{{ selectedTitle }}</p></div>
-        <button type="button" onClick="{{ closeModal }}" aria-label="Fechar formulário" style="width:32px; height:32px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#c7cbc4; cursor:pointer;">×</button>
+  <div id="reg-dialog" role="dialog" aria-modal="true" aria-hidden="{{ modalClosed }}" aria-labelledby="reg-modal-title" style="{{ modalOverlayStyle }}" onClick="{{ closeModal }}" onKeyDown="{{ onDialogKeyDown }}">
+    <div id="reg-panel" style="width:min(560px,100%); max-height:90vh; overflow:auto; overscroll-behavior:contain; background:#0b100c; border:1px solid rgba(255,255,255,.15); box-shadow:0 30px 90px rgba(0,0,0,.55); position:relative;" onClick="{{ stopPropagation }}">
+      <div style="position:sticky; top:0; z-index:2; display:flex; align-items:center; justify-content:space-between; gap:16px; border-bottom:1px solid rgba(255,255,255,.1); background:rgba(11,16,12,.97); padding:16px 24px;">
+        <div><h2 id="reg-modal-title" style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:20px;">{{ modalTitle }}</h2><p style="margin:2px 0 0; color:#00e676; font-size:14px; font-weight:700;">{{ selectedTitle }}</p></div>
+        <button type="button" onClick="{{ closeModal }}" aria-label="Fechar inscrição" style="flex:none; width:44px; height:44px; display:grid; place-items:center; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.05); color:#f7faf6; cursor:pointer;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
       </div>
       <form onSubmit="{{ onSubmitRegistration }}" style="padding:24px; display:grid; gap:14px;">
         <sc-if value="{{ selectedIsTeam }}">
-          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Nome da equipe *</label><input name="nome_equipe" type="text" required="" placeholder="Ex: Minas Racing Team" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
-          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Nome do chefe de equipe *</label><input name="nome_chefe" type="text" required="" placeholder="Nome completo do responsável" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
-          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Pilotos e pesos (um por linha) *</label><textarea name="pilotos" required="" placeholder="Ex: João Silva - 78kg" style="width:100%; min-height:90px; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none; resize:vertical;"></textarea></div>
-          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Quantidade de karts *</label><input name="qtd_karts" type="number" min="1" max="50" required="" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+          <div style="display:grid; gap:6px;"><label for="c-equipe" style="font-size:14px; font-weight:700; color:#d7ded8;">Nome da equipe *</label><input id="c-equipe" name="nome_equipe" type="text" required="" autocomplete="organization" placeholder="Ex.: Minas Racing Team" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"></div>
+          <div style="display:grid; gap:6px;"><label for="c-chefe" style="font-size:14px; font-weight:700; color:#d7ded8;">Nome do chefe de equipe *</label><input id="c-chefe" name="nome_chefe" type="text" required="" autocomplete="name" placeholder="Nome completo do responsável" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"></div>
+          <div style="display:grid; gap:6px;"><label for="c-pilotos" style="font-size:14px; font-weight:700; color:#d7ded8;">Pilotos e pesos, um por linha *</label><textarea id="c-pilotos" name="pilotos" required="" placeholder="Ex.: João Silva - 78 kg" style="width:100%; min-height:96px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none; resize:vertical;"></textarea></div>
+          <div style="display:grid; gap:6px;"><label for="c-karts" style="font-size:14px; font-weight:700; color:#d7ded8;">Quantidade de karts *</label><input id="c-karts" name="qtd_karts" type="number" inputmode="numeric" min="1" max="50" required="" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"></div>
         </sc-if>
         <sc-if value="{{ selectedIsIndividual }}">
-          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Nome completo *</label><input name="nome" type="text" required="" placeholder="Nome e sobrenome" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+          <div style="display:grid; gap:6px;"><label for="c-nome" style="font-size:14px; font-weight:700; color:#d7ded8;">Nome completo *</label><input id="c-nome" name="nome" type="text" required="" autocomplete="name" placeholder="Nome e sobrenome" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"></div>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
-            <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Idade</label><input name="idade" type="number" min="8" max="90" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
-            <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Peso (kg)</label><input name="peso" type="number" min="30" max="180" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+            <div style="display:grid; gap:6px;"><label for="c-idade" style="font-size:14px; font-weight:700; color:#d7ded8;">Idade</label><input id="c-idade" name="idade" type="number" inputmode="numeric" min="8" max="90" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"></div>
+            <div style="display:grid; gap:6px;"><label for="c-peso" style="font-size:14px; font-weight:700; color:#d7ded8;">Peso (kg)</label><input id="c-peso" name="peso" type="number" inputmode="decimal" min="30" max="180" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"></div>
           </div>
-          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Cidade</label><input name="cidade" type="text" placeholder="Betim / MG" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+          <div style="display:grid; gap:6px;"><label for="c-cidade" style="font-size:14px; font-weight:700; color:#d7ded8;">Cidade</label><input id="c-cidade" name="cidade" type="text" autocomplete="address-level2" placeholder="Betim / MG" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"></div>
         </sc-if>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
-          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">WhatsApp *</label><input name="whatsapp" type="tel" required="" placeholder="(31) 99999-9999" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
-          <div style="display:grid; gap:7px;"><label style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">E-mail *</label><input name="email" type="email" required="" placeholder="voce@email.com" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
+          <div style="display:grid; gap:6px;"><label for="c-whats" style="font-size:14px; font-weight:700; color:#d7ded8;">WhatsApp com DDD *</label><input id="c-whats" name="whatsapp" type="tel" inputmode="tel" required="" autocomplete="tel-national" placeholder="(31) 99999-9999" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"></div>
+          <div style="display:grid; gap:6px;"><label for="c-email" style="font-size:14px; font-weight:700; color:#d7ded8;">E-mail *</label><input id="c-email" name="email" type="email" required="" autocomplete="email" placeholder="voce@email.com" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"></div>
         </div>
-        <div style="background:rgba(0,230,118,.08); border:1px solid rgba(0,230,118,.25); padding:14px; font-size:12px; line-height:1.5; color:#7fd9a8;"><strong>Nota sobre pagamento:</strong> após o envio, sua inscrição fica pendente até a validação do Pix ou boleto com o chefe de equipe via WhatsApp.</div>
-        <button type="submit" style="width:100%; appearance:none; border:0; cursor:pointer; min-height:52px; clip-path:polygon(3% 0,100% 0,97% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em;">Confirmar e enviar inscrição</button>
+        <p style="margin:0; background:rgba(0,230,118,.08); border:1px solid rgba(0,230,118,.25); padding:14px; font-size:15px; line-height:1.5; color:#bfe9d0;"><strong style="color:#f7faf6;">Como funciona:</strong> ao enviar, abrimos o WhatsApp da organização com seus dados. A inscrição é confirmada lá, junto com os valores e a forma de pagamento (PIX, transferência ou cartão).</p>
+        <button type="submit" style="width:100%; appearance:none; border:0; cursor:pointer; min-height:56px; clip-path:polygon(3% 0,100% 0,97% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:14px; letter-spacing:0.04em;">Enviar inscrição pelo WhatsApp</button>
       </form>
     </div>
   </div>
@@ -298,7 +320,7 @@
       </div>
     </div>
     <div style="width:min(1480px,calc(100% - 48px)); margin:46px auto 0; padding-top:22px; border-top:1px solid rgba(255,255,255,.12); display:flex; flex-wrap:wrap; justify-content:space-between; gap:20px; color:#667067; font-size:12px;">
-      <span>© 2026 Kartódromo Internacional de Betim</span><span>Motorsport editorial experience</span>
+      <span>© 2026 Kartódromo Internacional de Betim</span><span>Betim · Minas Gerais</span>
     </div>
   </footer>
 
@@ -307,7 +329,7 @@
   </a>
 </div>
 
-</x-dc>
+</x-dc></script><script data-generated="dc-inert-template">(function(){var t=document.getElementById("dc-template");if(!t)return;var raw=t.textContent;var inner=raw.slice(raw.indexOf(">")+1,raw.lastIndexOf("<"));var x=document.createElement("x-dc");Object.defineProperty(x,"innerHTML",{configurable:true,get:function(){return inner}});t.parentNode.insertBefore(x,t)})();</script>
 <script type="text/x-dc" data-dc-script>
 
 // Ordem de exibição: KAC Kart Light, KAC Super Kart, provas com inscrição aberta e, por fim, provas já realizadas.
@@ -360,8 +382,41 @@ class Component extends DCLogic {
 
   toggleMobileNav = () => this.setState((s) => ({ mobileNavOpen: !s.mobileNavOpen }));
   closeMobileNav = () => this.setState({ mobileNavOpen: false });
-  openModal = (id) => { this._trigger = document.activeElement; this.setState({ modalOpen: true, selectedId: id }); };
-  closeModal = () => { this.setState({ modalOpen: false }); if (this._trigger && this._trigger.focus) this._trigger.focus(); };
+  // Janela de inscrição: fundo inerte, foco dentro da janela e retorno ao botão de origem.
+  setBackgroundInert(inert) {
+    const dialog = document.getElementById('reg-dialog');
+    if (!dialog || !dialog.parentElement) return;
+    Array.from(dialog.parentElement.children).forEach((el) => {
+      if (el === dialog) return;
+      if (inert) el.setAttribute('inert', ''); else el.removeAttribute('inert');
+    });
+    document.documentElement.style.overflow = inert ? 'hidden' : '';
+  }
+  openModal = (id) => {
+    this._trigger = document.activeElement;
+    this.setState({ modalOpen: true, selectedId: id });
+    this.setBackgroundInert(true);
+    setTimeout(() => requestAnimationFrame(() => {
+      const first = document.querySelector('#reg-panel form input');
+      if (first) first.focus();
+    }), 120);
+  };
+  closeModal = () => {
+    this.setState({ modalOpen: false });
+    this.setBackgroundInert(false);
+    if (this._trigger && this._trigger.focus) this._trigger.focus();
+  };
+  onDialogKeyDown = (e) => {
+    if (e.key !== 'Tab') return;
+    const panel = document.getElementById('reg-panel');
+    if (!panel) return;
+    const focusables = Array.from(panel.querySelectorAll('a[href], button:not([disabled]), input, select, textarea')).filter((el) => el.offsetParent !== null);
+    if (!focusables.length) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  };
   stopPropagation = (e) => e.stopPropagation();
 
   onSubmitRegistration = (e) => {
@@ -443,7 +498,9 @@ class Component extends DCLogic {
           : ['Taxa de inscrição única do campeonato', 'Pagamento individual de cada etapa corrida'],
         canRegister: isOpen && !c.registerHref,
         registerHref: isOpen && c.registerHref ? c.registerHref : null,
-        registerLabel: c.requiresTeamForm ? 'Formulário de inscrição' : 'Inscrição do piloto',
+        registerLabel: c.requiresTeamForm ? 'Inscrever equipe' : 'Inscrever piloto',
+        status,
+        linkAria: 'Ver página da ' + c.title,
         onRegister: () => this.openModal(c.id),
         pageHref: c.pageHref,
         showWhatsapp: isOpen,
@@ -477,7 +534,9 @@ class Component extends DCLogic {
         { icon: 'M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4ZM7 6H4v2a4 4 0 0 0 4 4M17 6h3v2a4 4 0 0 1-4 4', title: 'Premiação oficial', text: 'Troféus e classificação acumulada' },
         { icon: 'M5 21V4m0 1c5-3 9 3 14 0v9c-5 3-9-3-14 0', title: 'Regras publicadas', text: 'Regulamentos para download' },
       ],
-      championships,
+      activeChampionships: championships.filter((c) => c.status !== 'past'),
+      pastChampionships: championships.filter((c) => c.status === 'past'),
+      hasPastChampionships: championships.some((c) => c.status === 'past'),
       evolutionSteps: [
         { num: '01', title: 'KAC Iniciantes', text: 'Aprenda a competir com formato mensal e ambiente de evolução.' },
         { num: '02', title: 'KAC Super Kart', text: 'Dispute uma temporada anual com pilotos mais experientes.' },
@@ -485,6 +544,8 @@ class Component extends DCLogic {
       ],
 
       modalOpen, closeModal: this.closeModal, stopPropagation: this.stopPropagation, onSubmitRegistration: this.onSubmitRegistration,
+      onDialogKeyDown: this.onDialogKeyDown,
+      modalTitle: selected && selected.requiresTeamForm ? 'Inscrição de equipe' : 'Inscrição de piloto',
       modalClosed: !modalOpen,
       modalOverlayStyle: { position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(0,0,0,.78)', backdropFilter: 'blur(12px)', display: 'grid', placeItems: 'center', padding: '20px', opacity: modalOpen ? 1 : 0, visibility: modalOpen ? 'visible' : 'hidden', transition: '.3s', pointerEvents: modalOpen ? 'auto' : 'none' },
       selectedTitle: selected ? selected.title : '',

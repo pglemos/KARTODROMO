@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
 <base href="/">
 <title>100 Milhas Light de Betim 2026 | Endurance de Kart</title>
@@ -88,9 +88,16 @@
   }
 }
 </style>
+<style data-generated="focus-ring">
+:focus-visible { outline: 2px solid #00e676; outline-offset: 3px; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible {
+  outline: 2px solid #00e676 !important;
+  outline-offset: 2px;
+}
+</style>
 </head>
 <body>
-<x-dc>
+<script type="text/x-dc-template" id="dc-template"><x-dc>
 
 <helmet>
   <link rel="icon" type="image/png" href="assets/brand/kib-logo.png">
@@ -104,7 +111,10 @@
     ::selection { background: #00e676; color: #041301; }
     img, video { display: block; max-width: 100%; }
     button, input, select, textarea { font: inherit; }
+    select { color-scheme: dark; }
+    input::placeholder, textarea::placeholder { color: #7d877f; }
     input:focus, select:focus, textarea:focus { border-color: #00e676 !important; }
+    [aria-invalid="true"] { border-color: #ff6b6b !important; background: rgba(217,45,45,.07) !important; }
     @view-transition { navigation: auto; }
     ::view-transition-old(root) { animation: 320ms cubic-bezier(.16,1,.3,1) both kib-page-out; }
     ::view-transition-new(root) { animation: 420ms cubic-bezier(.16,1,.3,1) both kib-page-in; }
@@ -115,12 +125,13 @@
     [style*="background:linear-gradient(135deg,#00e676,#00c853)"]:hover { transform: translateY(-4px); box-shadow: 0 22px 55px rgba(3,5,4,.6); }
     [style*="background:rgba(255,255,255,.035)"][style*="border:1px solid rgba(255,255,255,.22)"] { transition: border-color .25s, color .25s, transform .25s cubic-bezier(.16,1,.3,1); }
     [style*="background:rgba(255,255,255,.035)"][style*="border:1px solid rgba(255,255,255,.22)"]:hover { border-color:#00e676; color:#00e676; transform: translateY(-4px); }
+    button[disabled] { cursor: progress !important; opacity: .75; }
   </style>
 </helmet>
 <div data-screen-label="100 Milhas Light" style="min-height:100vh; background:#030504; color:#f7faf6;">
 
   <a href="#conteudo" style="{{ skipLinkStyle }}">Pular para o conteúdo</a>
-  <div id="progress" aria-hidden="true" style="position:fixed; top:0; left:0; width:100%; height:3px; z-index:520; transform:scaleX(0); transform-origin:left; background:linear-gradient(90deg,#00e676,#3ce396);  pointer-events:none;"></div>
+  <div id="progress" aria-hidden="true" style="position:fixed; top:0; left:0; width:100%; height:3px; z-index:520; transform:scaleX(0); transform-origin:left; background:linear-gradient(90deg,#00e676,#3ce396); pointer-events:none;"></div>
 
   <header style="{{ headerStyle }}">
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; min-height:84px; display:flex; align-items:center; justify-content:space-between; gap:24px;">
@@ -157,18 +168,22 @@
       <div style="min-width:0;">
         <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Endurance · Kart Light</p>
         <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; line-height:0.78; letter-spacing:-0.01em; font-size:clamp(64px,10.5vw,160px);">100 <span style="color:#00e676;">Milhas</span><br><span style="color:transparent; -webkit-text-stroke:1px rgba(255,255,255,.7);">Light</span></h1>
-        <p style="max-width:680px; margin:28px 0 0; font-size:clamp(18px,1.5vw,22px); line-height:1.5; color:#d7ded8;">2,5 horas de corrida em equipe com os karts light de locação do kartódromo. Domingo, 25 de outubro de 2026, a partir das 08:30.</p>
+        <p style="max-width:58ch; margin:28px 0 0; font-size:clamp(18px,1.5vw,22px); line-height:1.5; color:#d7ded8;">2,5 horas de corrida em equipe com os karts light de locação do kartódromo. Domingo, 25 de outubro de 2026, a partir das 08:30.</p>
         <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:30px;">
           <sc-if value="{{ registrationOpen }}">
-            <button type="button" onClick="{{ openModal }}" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; border:0; cursor:pointer;">Inscrever equipe <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button>
+            <button type="button" onClick="{{ openModal }}" aria-haspopup="dialog" aria-controls="ml-dialog" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; border:0; cursor:pointer;">Inscrever equipe <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button>
           </sc-if>
           <sc-if value="{{ registrationClosed }}">
             <span style="display:inline-flex; align-items:center; min-height:56px; padding:0 26px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; color:#a8b2aa;">Inscrições encerradas</span>
           </sc-if>
-          <a href="assets/regulamentos/100-milhas-light-de-betim-2026.pdf" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 21h14"/></svg> Regulamento</a>
+          <a href="assets/regulamentos/100-milhas-light-de-betim-2026.pdf" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 21h14"/></svg> Regulamento (PDF)</a>
         </div>
       </div>
-      <div style="text-align:right;"><img src="assets/championships/100-milhas-light-logo.png" alt="100 Milhas Light de Betim" style="width:100%; max-width:240px; margin-left:auto; filter:drop-shadow(0 20px 34px rgba(0,0,0,.45));"><div style="font-family:'Anton',sans-serif; font-size:clamp(40px,7vw,80px); line-height:0.68; color:transparent; -webkit-text-stroke:1px rgba(0,230,118,.4); margin-top:20px;">25 OUT<small style="display:block; font-family:'Rajdhani',sans-serif; font-weight:700; font-size:13px; letter-spacing:0.18em; color:#00e676; -webkit-text-stroke:0; text-transform:uppercase; margin-top:14px;">Edição 2026 · domingo</small></div></div>
+      <div style="text-align:right;">
+        <img src="assets/championships/100-milhas-light-logo.png" alt="100 Milhas Light de Betim" style="width:100%; max-width:240px; margin-left:auto; filter:drop-shadow(0 20px 34px rgba(0,0,0,.45));">
+        <p style="margin:20px 0 0; font-family:'Anton',sans-serif; font-size:clamp(40px,7vw,80px); line-height:0.82; color:#f7faf6;">25 <span style="color:#00e676;">OUT</span></p>
+        <p style="margin:10px 0 0; font-family:'Rajdhani',sans-serif; font-weight:700; font-size:14px; letter-spacing:0.14em; color:#d7ded8; text-transform:uppercase;">Domingo · edição 2026</p>
+      </div>
     </div>
   </section>
 
@@ -178,7 +193,7 @@
         <sc-for list="{{ telemetry }}" as="t" hint-placeholder-count="4">
           <div style="padding:26px; border-right:1px solid rgba(255,255,255,.12); display:grid; grid-template-columns:auto 1fr; gap:15px; align-items:center;">
             <div style="width:48px; height:48px; border:1px solid rgba(0,230,118,.35); display:grid; place-items:center; color:#00e676; transform:skewX(-7deg);"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="{{ t.icon }}"/></svg></div>
-            <div><strong style="display:block; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; color:#00e676; font-size:16px;">{{ t.title }}</strong><span style="display:block; color:#a8b2aa; font-size:12px; margin-top:3px;">{{ t.text }}</span></div>
+            <div><strong style="display:block; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; color:#00e676; font-size:16px;">{{ t.title }}</strong><span style="display:block; color:#a8b2aa; font-size:14px; margin-top:3px;">{{ t.text }}</span></div>
           </div>
         </sc-for>
       </div>
@@ -191,82 +206,133 @@
       <div style="min-width:0;">
         <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Inscrição e valores</p>
         <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:0.85;">Monte a equipe<br><span style="color:#00e676;">e garanta o kart</span></h2>
-        <p style="max-width:56ch; margin:24px 0 0; color:#a8b2aa; font-size:clamp(16px,1.2vw,19px); line-height:1.6;">Preencha o formulário com os dados da equipe e dos pilotos. Ao enviar, você recebe um protocolo e é direcionado ao WhatsApp da organização para concluir a inscrição e combinar o pagamento.</p>
-        <div style="display:grid; gap:13px; margin:28px 0 0;">
+        <p style="max-width:58ch; margin:24px 0 0; color:#a8b2aa; font-size:clamp(16px,1.2vw,19px); line-height:1.6;">A inscrição é feita em quatro passos. O formulário registra a equipe no sistema do kartódromo e prepara a mensagem que conclui a inscrição no WhatsApp.</p>
+        <ol style="list-style:none; display:grid; gap:14px; margin:28px 0 0; padding:0; max-width:58ch;">
           <sc-for list="{{ steps }}" as="s" hint-placeholder-count="4">
-            <div style="padding-left:18px; position:relative; color:#a8b2aa; font-size:14px; line-height:1.4;"><span aria-hidden="true" style="position:absolute; left:0; top:6px; width:7px; height:7px; border:2px solid #00e676; transform:rotate(45deg);"></span><strong style="display:block; color:#fff; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:12px;">{{ s.title }}</strong>{{ s.text }}</div>
+            <li style="display:grid; grid-template-columns:34px 1fr; gap:14px; align-items:start; color:#a8b2aa; font-size:15px; line-height:1.45;"><span aria-hidden="true" style="display:grid; place-items:center; width:34px; height:34px; border:1px solid rgba(0,230,118,.45); color:#00e676; font-family:'Anton',sans-serif; font-size:15px; transform:skewX(-7deg);">{{ s.n }}</span><span><strong style="display:block; color:#f7faf6; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:14px; letter-spacing:0.02em;">{{ s.title }}</strong>{{ s.text }}</span></li>
           </sc-for>
-        </div>
+        </ol>
       </div>
-      <aside style="min-width:0; background:linear-gradient(180deg,rgba(17,23,18,.95),rgba(7,10,8,.96)); border:1px solid rgba(255,255,255,.22); box-shadow:0 30px 90px rgba(0,0,0,.55); padding:30px; position:relative; overflow:hidden;">
+      <aside aria-labelledby="valor-title" style="min-width:0; background:linear-gradient(180deg,rgba(17,23,18,.95),rgba(7,10,8,.96)); border:1px solid rgba(255,255,255,.22); box-shadow:0 30px 90px rgba(0,0,0,.55); padding:30px; position:relative; overflow:hidden;">
         <div aria-hidden="true" style="position:absolute; inset:0 0 auto; height:3px; background:linear-gradient(90deg,#00e676,transparent);"></div>
-        <h2 style="margin:0 0 16px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:22px;">Valor da inscrição</h2>
-        <div style="padding:18px 0; border-block:1px solid rgba(255,255,255,.12);"><small style="display:block; font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#a8b2aa;">Por equipe / kart</small><strong style="display:block; margin-top:8px; font-family:'Anton',sans-serif; font-weight:400; font-size:52px; color:#00e676;">R$ 900</strong><span style="color:#a8b2aa; font-size:13px;">Independente da quantidade de pilotos por kart.</span></div>
-        <div style="display:grid; gap:10px; margin:22px 0;">
+        <h2 id="valor-title" style="margin:0 0 16px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:22px;">Valor da inscrição</h2>
+        <div style="padding:18px 0; border-block:1px solid rgba(255,255,255,.12);"><strong style="display:block; font-family:'Anton',sans-serif; font-weight:400; font-size:56px; line-height:1; color:#00e676;">R$ 900 <span style="font-size:20px; color:#d7ded8;">por kart</span></strong><span style="display:block; margin-top:8px; color:#a8b2aa; font-size:15px;">Mesmo valor com 1, 2 ou 3 pilotos no kart.</span></div>
+        <ul style="list-style:none; display:grid; gap:10px; margin:22px 0; padding:0;">
           <sc-for list="{{ priceNotes }}" as="n" hint-placeholder-count="5">
-            <div style="display:flex; gap:10px; font-size:14px; color:#a8b2aa; line-height:1.45;"><span style="color:#00e676;">›</span><span>{{ n }}</span></div>
+            <li style="display:grid; grid-template-columns:14px 1fr; gap:10px; font-size:15px; color:#a8b2aa; line-height:1.45;"><span aria-hidden="true" style="width:7px; height:7px; margin-top:8px; border:2px solid #00e676; transform:rotate(45deg);"></span><span>{{ n }}</span></li>
           </sc-for>
-        </div>
+        </ul>
         <sc-if value="{{ registrationOpen }}">
-          <button type="button" onClick="{{ openModal }}" style="width:100%; display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(4% 0,100% 0,96% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; border:0; cursor:pointer;">Abrir formulário de inscrição</button>
+          <button type="button" onClick="{{ openModal }}" aria-haspopup="dialog" aria-controls="ml-dialog" style="width:100%; display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(4% 0,100% 0,96% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; border:0; cursor:pointer;">Inscrever equipe</button>
         </sc-if>
       </aside>
     </div>
   </section>
 
+  <!-- A CORRIDA: TRAÇADO E JANELA DE BOXES -->
+  <section aria-labelledby="corrida-title" style="background:#070b08; padding:clamp(88px,9vw,140px) 0; border-block:1px solid rgba(255,255,255,.08);">
+    <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:.95fr 1.05fr; gap:clamp(28px,5vw,80px); align-items:center;">
+      <figure style="margin:0; min-width:0; border:1px solid rgba(255,255,255,.22); background:#f7faf6; box-shadow:0 30px 90px rgba(0,0,0,.55);">
+        <picture>
+          <source srcset="assets/championships/100-milhas-light-tracado.webp" type="image/webp">
+          <img src="assets/championships/100-milhas-light-tracado.jpg" alt="Mapa do traçado 11 invertido chicane do Kartódromo Internacional de Betim, com 961 metros e seta indicando o sentido da corrida." width="960" height="960" loading="lazy" style="width:100%; height:auto; aspect-ratio:1/1;">
+        </picture>
+        <figcaption style="padding:14px 18px; background:#0b100c; color:#d7ded8; font-size:15px; border-top:1px solid rgba(255,255,255,.12);">Traçado oficial da prova: <strong style="color:#f7faf6;">11 invertido chicane, 961 m</strong>.</figcaption>
+      </figure>
+      <div style="min-width:0;">
+        <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">A corrida</p>
+        <h2 id="corrida-title" style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:0.85;">2h30 de prova,<br><span style="color:#00e676;">3 paradas no box</span></h2>
+        <p style="max-width:58ch; margin:24px 0 0; color:#a8b2aa; font-size:clamp(16px,1.2vw,19px); line-height:1.6;">Cada equipe faz 3 paradas obrigatórias de no mínimo 7 minutos, com troca de kart e de piloto, dentro da janela em que o box fica aberto. Quando parar é estratégia da equipe.</p>
+
+        <div style="margin-top:36px; max-width:640px;">
+          <div aria-hidden="true" style="position:relative; height:22px; font-family:'Anton',sans-serif; font-size:13px; color:#00e676;">
+            <span style="position:absolute; left:3.33%; bottom:0; transform:translateX(-10%); white-space:nowrap;">0:05 box abre</span>
+            <span style="position:absolute; right:13.33%; bottom:0; transform:translateX(50%); white-space:nowrap;">2:10 fecha</span>
+          </div>
+          <div role="img" aria-label="Linha do tempo da prova: largada em 0 minuto; o box abre aos 5 minutos e fecha com 2 horas e 10 minutos; bandeira branca com 2 horas e 30 minutos, seguida de uma volta final. As 3 paradas de 7 minutos acontecem dentro da janela de box, no momento escolhido pela equipe." style="position:relative; height:64px; margin-top:8px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.18);">
+            <div style="position:absolute; top:0; bottom:0; left:3.33%; width:83.34%; background:rgba(0,230,118,.12); border-inline:2px solid #00e676;"></div>
+            <div style="position:absolute; top:18px; bottom:18px; left:22%; width:3.9%; background:#00e676;"></div>
+            <div style="position:absolute; top:18px; bottom:18px; left:44%; width:3.9%; background:#00e676;"></div>
+            <div style="position:absolute; top:18px; bottom:18px; left:66%; width:3.9%; background:#00e676;"></div>
+            <div style="position:absolute; top:0; bottom:0; left:86.67%; right:0; background:repeating-linear-gradient(135deg, rgba(255,255,255,.10) 0 6px, transparent 6px 12px);"></div>
+          </div>
+          <div aria-hidden="true" style="position:relative; height:24px; margin-top:8px; font-family:'Anton',sans-serif; font-size:13px; color:#d7ded8;">
+            <span style="position:absolute; left:0; top:0;">0:00 largada</span>
+            <span style="position:absolute; right:0; top:0; text-align:right;">2:30 + 1 volta</span>
+          </div>
+          <ul style="list-style:none; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1px; margin:22px 0 0; padding:0; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.12);">
+            <li style="background:#0b100c; padding:16px 18px; color:#a8b2aa; font-size:14px; line-height:1.4;"><span style="display:inline-block; width:14px; height:14px; margin-right:8px; vertical-align:-2px; background:#00e676;" aria-hidden="true"></span><strong style="color:#f7faf6;">Parada obrigatória</strong><br>mínimo de 7 min</li>
+            <li style="background:#0b100c; padding:16px 18px; color:#a8b2aa; font-size:14px; line-height:1.4;"><span style="display:inline-block; width:14px; height:14px; margin-right:8px; vertical-align:-2px; background:rgba(0,230,118,.12); border:2px solid #00e676;" aria-hidden="true"></span><strong style="color:#f7faf6;">Box aberto</strong><br>até 2 paradas extras</li>
+            <li style="background:#0b100c; padding:16px 18px; color:#a8b2aa; font-size:14px; line-height:1.4;"><span style="display:inline-block; width:14px; height:14px; margin-right:8px; vertical-align:-2px; background:repeating-linear-gradient(135deg, rgba(255,255,255,.35) 0 3px, transparent 3px 6px); border:1px solid rgba(255,255,255,.3);" aria-hidden="true"></span><strong style="color:#f7faf6;">Box fechado</strong><br>últimos 20 min</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- CRONOGRAMA -->
-  <section style="background:#070b08; padding:clamp(88px,9vw,140px) 0;">
+  <section style="padding:clamp(88px,9vw,140px) 0;">
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(28px,5vw,80px);">
       <div style="min-width:0;">
         <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Cronograma · 25/10/2026</p>
         <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:0.85;">Da chegada<br><span style="color:#00e676;">à bandeirada</span></h2>
-        <p style="max-width:48ch; margin:24px 0 0; color:#a8b2aa; font-size:16px; line-height:1.6;">Traçado 11 invertido chicane (961 m). É obrigatória a presença de pelo menos um piloto de cada equipe no briefing. Proibido levar alimentos ou bebidas para o kartódromo.</p>
+        <p style="max-width:48ch; margin:24px 0 0; color:#a8b2aa; font-size:17px; line-height:1.6;">Pelo menos um piloto de cada equipe precisa estar no briefing. Não é permitido levar alimentos ou bebidas para o kartódromo.</p>
       </div>
-      <div style="min-width:0; border-left:1px solid rgba(255,255,255,.12); margin-left:18px;">
+      <ol style="list-style:none; min-width:0; border-left:1px solid rgba(255,255,255,.12); margin:0 0 0 18px; padding:0;">
         <sc-for list="{{ schedule }}" as="e" hint-placeholder-count="6">
-          <div style="display:grid; grid-template-columns:90px 1fr; gap:24px; padding:0 0 26px 30px; position:relative;">
-            <span aria-hidden="true" style="position:absolute; left:-7px; top:4px; width:13px; height:13px; background:#070b08; border:2px solid #00e676; transform:rotate(45deg);"></span>
+          <li style="display:grid; grid-template-columns:90px 1fr; gap:24px; padding:0 0 26px 30px; position:relative;">
+            <span aria-hidden="true" style="position:absolute; left:-7px; top:4px; width:13px; height:13px; background:#030504; border:2px solid #00e676; transform:rotate(45deg);"></span>
             <div style="font-family:'Anton',sans-serif; color:#00e676; font-size:24px; line-height:0.8;">{{ e.time }}</div>
-            <div style="padding-bottom:20px; border-bottom:1px solid rgba(255,255,255,.12);"><h3 style="margin:0; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:16px;">{{ e.title }}</h3><p style="color:#a8b2aa; margin:6px 0 0; line-height:1.5; font-size:14px;">{{ e.text }}</p></div>
-          </div>
+            <div style="padding-bottom:20px; border-bottom:1px solid rgba(255,255,255,.12);"><h3 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:17px;">{{ e.title }}</h3><p style="color:#a8b2aa; margin:6px 0 0; line-height:1.5; font-size:15px;">{{ e.text }}</p></div>
+          </li>
         </sc-for>
-      </div>
+      </ol>
     </div>
   </section>
 
   <!-- REGRAS -->
-  <section style="padding:clamp(88px,9vw,140px) 0;">
+  <section style="background:#070b08; padding:clamp(88px,9vw,140px) 0;">
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto;">
       <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Regras principais</p>
-      <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:0.85;">Controle, ritmo<br><span style="color:#00e676;">e disciplina</span></h2>
-      <div style="margin-top:50px; display:grid; grid-template-columns:repeat(3,1fr); gap:18px;">
-        <sc-for list="{{ ruleCards }}" as="r" hint-placeholder-count="9">
-          <article style="padding:30px; background:#0b100c; border:1px solid rgba(255,255,255,.12); min-height:180px;"><h3 style="margin:0; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:16px;">{{ r.title }}</h3><p style="color:#a8b2aa; line-height:1.5; font-size:14px;">{{ r.text }}</p></article>
+      <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:0.85;">O que sua equipe<br><span style="color:#00e676;">precisa saber</span></h2>
+      <div style="margin-top:50px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:clamp(24px,4vw,56px);">
+        <sc-for list="{{ ruleGroups }}" as="g" hint-placeholder-count="3">
+          <div style="min-width:0; border-top:2px solid #00e676; padding-top:22px;">
+            <h3 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:22px;">{{ g.title }}</h3>
+            <ul style="list-style:none; display:grid; gap:16px; margin:20px 0 0; padding:0;">
+              <sc-for list="{{ g.items }}" as="item" hint-placeholder-count="4">
+                <li style="color:#a8b2aa; font-size:16px; line-height:1.5;"><strong style="display:block; color:#f7faf6; font-weight:700;">{{ item.title }}</strong>{{ item.text }}</li>
+              </sc-for>
+            </ul>
+          </div>
         </sc-for>
       </div>
-      <div style="margin-top:30px;"><a href="assets/regulamentos/100-milhas-light-de-betim-2026.pdf" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 21h14"/></svg> Baixar regulamento completo (PDF)</a></div>
+      <div style="margin-top:44px;"><a href="assets/regulamentos/100-milhas-light-de-betim-2026.pdf" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 21h14"/></svg> Baixar regulamento completo (PDF)</a></div>
     </div>
   </section>
 
   <!-- PREMIAÇÃO -->
-  <section style="background:#070b08; padding:clamp(88px,9vw,140px) 0;">
-    <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto;">
-      <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Premiação</p>
-      <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:0.85;">Troféus para<br><span style="color:#00e676;">o top 5</span></h2>
-      <div style="margin-top:50px; display:grid; grid-template-columns:repeat(4,1fr); border:1px solid rgba(255,255,255,.12); background:#0b100c;">
-        <sc-for list="{{ legacy }}" as="l" hint-placeholder-count="4"><div style="padding:24px; border-right:1px solid rgba(255,255,255,.12);"><strong style="display:block; font-family:'Anton',sans-serif; font-weight:400; font-size:clamp(34px,4vw,50px); line-height:0.8; color:#00e676;">{{ l.value }}</strong><span style="display:block; color:#a8b2aa; font-size:12px; margin-top:8px; line-height:1.4;">{{ l.label }}</span></div></sc-for>
+  <section style="padding:clamp(88px,9vw,140px) 0;">
+    <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(28px,5vw,80px); align-items:end;">
+      <div style="min-width:0;">
+        <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Premiação</p>
+        <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:0.85;">Troféus para<br><span style="color:#00e676;">o top 5</span></h2>
       </div>
+      <dl style="margin:0; min-width:0; display:grid; gap:1px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.12);">
+        <div style="background:#0b100c; padding:24px 28px; display:grid; grid-template-columns:minmax(120px,auto) 1fr; gap:20px; align-items:center;"><dt style="font-family:'Anton',sans-serif; font-size:clamp(34px,4vw,48px); line-height:0.9; color:#00e676;">1º ao 5º</dt><dd style="margin:0; color:#d7ded8; font-size:17px; line-height:1.45;">Um troféu para cada uma das cinco melhores equipes.</dd></div>
+        <div style="background:#0b100c; padding:24px 28px; display:grid; grid-template-columns:minmax(120px,auto) 1fr; gap:20px; align-items:center;"><dt style="font-family:'Anton',sans-serif; font-size:clamp(34px,4vw,48px); line-height:0.9; color:#00e676;">Campeã</dt><dd style="margin:0; color:#d7ded8; font-size:17px; line-height:1.45;">Isenção da inscrição de 1 kart na próxima edição das 100 Milhas Light.</dd></div>
+      </dl>
     </div>
   </section>
 
   <!-- BIG CTA -->
-  <section style="padding:clamp(88px,9vw,140px) 0;">
+  <section style="padding:0 0 clamp(88px,9vw,140px);">
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto;">
       <div style="position:relative; overflow:hidden; border:1px solid rgba(255,255,255,.22); background:linear-gradient(135deg,#101711,#030504); padding:clamp(34px,5vw,72px); display:grid; grid-template-columns:1.2fr .8fr; gap:36px; align-items:center;">
-        <div style="min-width:0;"><h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5.5vw,72px); line-height:0.82;">Vagas limitadas<br><span style="color:#00e676;">inscreva sua equipe</span></h2><p style="margin:14px 0 0; color:#a8b2aa; font-size:18px;">Inscrições até 15/10/2026 ou enquanto houver vagas. A vaga só é garantida após a confirmação do pagamento.</p></div>
+        <div style="min-width:0;"><h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5.5vw,72px); line-height:0.82;">Vagas limitadas<br><span style="color:#00e676;">inscreva sua equipe</span></h2><p style="max-width:52ch; margin:14px 0 0; color:#a8b2aa; font-size:18px; line-height:1.5;">Inscrições até 15/10/2026 ou enquanto houver vagas. A vaga só é garantida após a confirmação do pagamento.</p></div>
         <div style="display:grid; gap:12px;">
           <sc-if value="{{ registrationOpen }}">
-            <button type="button" onClick="{{ openModal }}" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; border:0; cursor:pointer;">Inscrever equipe</button>
+            <button type="button" onClick="{{ openModal }}" aria-haspopup="dialog" aria-controls="ml-dialog" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; border:0; cursor:pointer;">Inscrever equipe</button>
           </sc-if>
           <a href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Tenho%20uma%20d%C3%BAvida%20sobre%20as%20100%20Milhas%20Light%20de%20Betim." target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; text-decoration:none;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-11.9 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5Z"/><path d="M8.5 8.5c.5 3 2 4.5 5 5"/></svg> Tirar dúvidas no WhatsApp</a>
         </div>
@@ -274,84 +340,6 @@
     </div>
   </section>
   </main>
-
-  <!-- MODAL INSCRIÇÃO -->
-  <div role="dialog" aria-modal="true" aria-hidden="{{ modalClosed }}" aria-labelledby="reg-modal-title" style="{{ modalOverlayStyle }}" onClick="{{ closeModal }}">
-    <div style="width:min(680px,100%); max-height:92vh; overflow:auto; background:#0b100c; border:1px solid rgba(255,255,255,.15); box-shadow:0 30px 90px rgba(0,0,0,.55); position:relative;" onClick="{{ stopPropagation }}">
-      <div style="position:sticky; top:0; z-index:2; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid rgba(255,255,255,.1); background:rgba(11,16,12,.97); padding:20px 24px;">
-        <div><h3 id="reg-modal-title" style="margin:0; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:16px;">Inscrição de equipe</h3><p style="margin:4px 0 0; color:#00e676; font-size:12px; font-weight:700;">100 Milhas Light de Betim · 25/10/2026</p></div>
-        <button type="button" onClick="{{ closeModal }}" aria-label="Fechar formulário" style="width:40px; height:40px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#c7cbc4; cursor:pointer; font-size:20px;">×</button>
-      </div>
-
-      <sc-if value="{{ showForm }}">
-        <form onSubmit="{{ onSubmit }}" style="padding:24px; display:grid; gap:16px;">
-          <p style="margin:0; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#00e676;">1 · Equipe e chefe de equipe</p>
-          <div style="display:grid; gap:7px;"><label for="f-equipe" style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Nome da equipe *</label><input id="f-equipe" name="nome_equipe" type="text" required="" maxlength="80" placeholder="Ex: Minas Racing Team" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
-            <div style="display:grid; gap:7px;"><label for="f-chefe" style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Chefe de equipe (nome completo) *</label><input id="f-chefe" name="nome_chefe" type="text" required="" maxlength="100" autocomplete="name" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
-            <div style="display:grid; gap:7px;"><label for="f-cpf" style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">CPF do chefe de equipe *</label><input id="f-cpf" name="cpf" type="text" required="" inputmode="numeric" maxlength="14" placeholder="000.000.000-00" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
-          </div>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
-            <div style="display:grid; gap:7px;"><label for="f-whats" style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">WhatsApp *</label><input id="f-whats" name="whatsapp" type="tel" required="" autocomplete="tel" placeholder="(31) 99999-9999" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
-            <div style="display:grid; gap:7px;"><label for="f-email" style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">E-mail *</label><input id="f-email" name="email" type="email" required="" autocomplete="email" placeholder="voce@email.com" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
-          </div>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
-            <div style="display:grid; gap:7px;"><label for="f-cidade" style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Cidade *</label><input id="f-cidade" name="cidade" type="text" required="" placeholder="Betim / MG" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"></div>
-            <div style="display:grid; gap:7px;"><label for="f-karts" style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Quantidade de karts * (máx. 5)</label><select id="f-karts" name="qtd_karts" required="" onChange="{{ onKartsChange }}" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"><option value="1">1 kart</option><option value="2">2 karts</option><option value="3">3 karts</option><option value="4">4 karts</option><option value="5">5 karts</option></select></div>
-          </div>
-
-          <p style="margin:8px 0 0; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#00e676;">2 · Pilotos ({{ pilotCountLabel }})</p>
-          <p style="margin:-8px 0 0; font-size:13px; color:#8b948c; line-height:1.45;">De 1 a 3 pilotos por kart. Requisitos: idade mínima de 14 anos, altura acima de 1,50 m e peso acima de 50 kg. Nenhum piloto pode correr por duas equipes.</p>
-          <sc-for list="{{ pilotRows }}" as="p" hint-placeholder-count="1">
-            <fieldset style="margin:0; border:1px solid rgba(255,255,255,.1); background:#030504; padding:14px; display:grid; gap:10px;">
-              <legend style="padding:0 6px; font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#d7ddd8;">{{ p.label }}</legend>
-              <div style="display:grid; grid-template-columns:2fr 1fr; gap:10px;">
-                <input name="{{ p.nomeField }}" type="text" required="" maxlength="100" placeholder="Nome completo do piloto" aria-label="{{ p.nomeAria }}" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#0b100c; color:#fff; padding:12px; outline:none;">
-                <input name="{{ p.kartField }}" type="number" min="1" max="5" placeholder="Kart nº (auto)" aria-label="{{ p.kartAria }}" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#0b100c; color:#fff; padding:12px; outline:none;">
-              </div>
-              <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
-                <input name="{{ p.idadeField }}" type="number" required="" min="14" max="90" placeholder="Idade" aria-label="{{ p.idadeAria }}" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#0b100c; color:#fff; padding:12px; outline:none;">
-                <input name="{{ p.alturaField }}" type="number" required="" min="1.51" max="2.30" step="0.01" placeholder="Altura (m)" aria-label="{{ p.alturaAria }}" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#0b100c; color:#fff; padding:12px; outline:none;">
-                <input name="{{ p.pesoField }}" type="number" required="" min="50.1" max="180" step="0.1" placeholder="Peso (kg)" aria-label="{{ p.pesoAria }}" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#0b100c; color:#fff; padding:12px; outline:none;">
-              </div>
-            </fieldset>
-          </sc-for>
-          <div style="display:flex; flex-wrap:wrap; gap:10px;">
-            <sc-if value="{{ canAddPilot }}"><button type="button" onClick="{{ addPilot }}" style="min-height:44px; padding:0 18px; border:1px solid rgba(0,230,118,.4); background:rgba(0,230,118,.08); color:#00e676; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; cursor:pointer;">+ Adicionar piloto</button></sc-if>
-            <sc-if value="{{ canRemovePilot }}"><button type="button" onClick="{{ removePilot }}" style="min-height:44px; padding:0 18px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#c7cbc4; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; cursor:pointer;">− Remover último</button></sc-if>
-          </div>
-
-          <p style="margin:8px 0 0; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#00e676;">3 · Pagamento</p>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:end;">
-            <div style="display:grid; gap:7px;"><label for="f-pag" style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Forma de pagamento *</label><select id="f-pag" name="pagamento" required="" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none;"><option value="">Selecione</option><option value="PIX">PIX</option><option value="Transferência bancária">Transferência bancária</option><option value="Cartão de crédito (até 3x)">Cartão de crédito (até 3x)</option></select></div>
-            <div style="border:1px solid rgba(0,230,118,.3); background:rgba(0,230,118,.06); padding:10px 14px;"><small style="display:block; font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Total</small><strong style="font-family:'Anton',sans-serif; font-weight:400; font-size:28px; color:#00e676;">{{ totalLabel }}</strong></div>
-          </div>
-          <div style="display:grid; gap:7px;"><label for="f-obs" style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#8b948c;">Observações</label><textarea id="f-obs" name="observacoes" maxlength="600" placeholder="Informação adicional para a organização" style="width:100%; min-height:70px; border:1px solid rgba(255,255,255,.12); background:#030504; color:#fff; padding:13px; outline:none; resize:vertical;"></textarea></div>
-
-          <p style="margin:8px 0 0; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#00e676;">4 · Confirmações</p>
-          <label style="display:flex; gap:10px; align-items:flex-start; font-size:14px; color:#d7ddd8; line-height:1.4; cursor:pointer;"><input name="aceite_regulamento" type="checkbox" required="" style="margin-top:3px; accent-color:#00e676;"><span>Li e aceito o <a href="assets/regulamentos/100-milhas-light-de-betim-2026.pdf" target="_blank" rel="noopener noreferrer">regulamento das 100 Milhas Light</a>. *</span></label>
-          <label style="display:flex; gap:10px; align-items:flex-start; font-size:14px; color:#d7ddd8; line-height:1.4; cursor:pointer;"><input name="aceite_requisitos" type="checkbox" required="" style="margin-top:3px; accent-color:#00e676;"><span>Todos os pilotos têm 14 anos ou mais, altura acima de 1,50 m e peso acima de 50 kg, e menores de 18 anos serão representados por um responsável adulto. *</span></label>
-          <label style="display:flex; gap:10px; align-items:flex-start; font-size:14px; color:#d7ddd8; line-height:1.4; cursor:pointer;"><input name="aceite_responsabilidade" type="checkbox" required="" style="margin-top:3px; accent-color:#00e676;"><span>Estou ciente de que o termo de responsabilidade deve ser assinado na recepção no dia do evento e de que a vaga só é garantida com o pagamento total até 15/10/2026. *</span></label>
-          <label style="display:flex; gap:10px; align-items:flex-start; font-size:14px; color:#d7ddd8; line-height:1.4; cursor:pointer;"><input name="aceite_imagem" type="checkbox" style="margin-top:3px; accent-color:#00e676;"><span>Autorizo o uso de imagem da equipe na divulgação do evento.</span></label>
-
-          <sc-if value="{{ errorMessage }}"><div role="alert" style="border:1px solid rgba(255,90,90,.4); background:rgba(255,90,90,.08); color:#ffb3b3; padding:12px 14px; font-size:14px;">{{ errorMessage }}</div></sc-if>
-          <div style="background:rgba(0,230,118,.08); border:1px solid rgba(0,230,118,.25); padding:14px; font-size:13px; line-height:1.5; color:#7fd9a8;"><strong>Próximo passo:</strong> após enviar, você recebe o protocolo e abre o WhatsApp da organização com todos os dados preenchidos para concluir a inscrição e receber os dados de pagamento.</div>
-          <button type="submit" disabled="{{ submitting }}" style="width:100%; appearance:none; border:0; cursor:pointer; min-height:54px; clip-path:polygon(3% 0,100% 0,97% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em;">{{ submitLabel }}</button>
-        </form>
-      </sc-if>
-
-      <sc-if value="{{ showSuccess }}">
-        <div style="padding:32px 24px; display:grid; gap:18px; text-align:center;">
-          <div style="width:64px; height:64px; margin:0 auto; border:2px solid #00e676; display:grid; place-items:center; color:#00e676; transform:rotate(45deg);"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true" style="transform:rotate(-45deg);"><path d="m5 12 5 5 9-10"/></svg></div>
-          <h4 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:26px;">{{ successTitle }}</h4>
-          <sc-if value="{{ protocol }}"><p style="margin:0; color:#a8b2aa;">Protocolo <strong style="font-family:'Anton',sans-serif; font-weight:400; color:#00e676; font-size:20px; letter-spacing:0.04em;">{{ protocol }}</strong></p></sc-if>
-          <p style="margin:0; color:#a8b2aa; line-height:1.55;">Para concluir, envie a mensagem pronta no WhatsApp da organização. Lá você recebe os dados para pagamento ({{ totalLabel }}) e a confirmação da vaga.</p>
-          <a href="{{ whatsappHref }}" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(4% 0,100% 0,96% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:14px; letter-spacing:0.04em; text-decoration:none;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-11.9 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5Z"/><path d="M8.5 8.5c.5 3 2 4.5 5 5"/></svg> Concluir inscrição no WhatsApp</a>
-          <button type="button" onClick="{{ closeModal }}" style="min-height:44px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#c7cbc4; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; cursor:pointer;">Fechar</button>
-        </div>
-      </sc-if>
-    </div>
-  </div>
 
   <footer style="border-top:1px solid rgba(255,255,255,.12); padding:64px 0 28px; background:#020302;">
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:1.2fr .7fr .7fr; gap:50px;">
@@ -375,17 +363,179 @@
         </div>
       </div>
     </div>
-    <div style="width:min(1480px,calc(100% - 48px)); margin:46px auto 0; padding-top:22px; border-top:1px solid rgba(255,255,255,.12); display:flex; flex-wrap:wrap; justify-content:space-between; gap:20px; color:#667067; font-size:12px;">
-      <span>© 2026 Kartódromo Internacional de Betim</span><span>Motorsport editorial experience</span>
+    <div style="width:min(1480px,calc(100% - 48px)); margin:46px auto 0; padding-top:22px; border-top:1px solid rgba(255,255,255,.12); display:flex; flex-wrap:wrap; justify-content:space-between; gap:20px; color:#829083; font-size:13px;">
+      <span>© 2026 Kartódromo Internacional de Betim</span><span>Betim · Minas Gerais</span>
     </div>
   </footer>
 
-  <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" style="position:fixed; right:20px; bottom:20px; z-index:250; width:58px; height:58px; border-radius:50%; display:grid; place-items:center; background:#20d466; color:#fff; box-shadow:0 18px 45px rgba(32,212,102,.35); text-decoration:none; transition:transform .25s;" style-hover="transform:translateY(-5px) scale(1.05);">
+  <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" style="position:fixed; right:20px; bottom:20px; z-index:250; width:58px; height:58px; border-radius:50%; display:grid; place-items:center; background:#20d466; color:#041301; box-shadow:0 14px 30px rgba(0,0,0,.45); text-decoration:none; transition:transform .25s;" style-hover="transform:translateY(-5px) scale(1.05);">
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-11.9 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5Z"/><path d="M8.5 8.5c.5 3 2 4.5 5 5"/></svg>
   </a>
+
+  <!-- MODAL INSCRIÇÃO -->
+  <div id="ml-dialog" role="dialog" aria-modal="true" aria-hidden="{{ modalClosed }}" aria-labelledby="ml-dialog-title" style="{{ modalOverlayStyle }}" onClick="{{ onOverlayClick }}" onKeyDown="{{ onDialogKeyDown }}">
+    <div id="ml-panel" style="width:min(720px,100%); max-height:92vh; overflow:auto; overscroll-behavior:contain; background:#0b100c; border:1px solid rgba(255,255,255,.15); box-shadow:0 30px 90px rgba(0,0,0,.55); position:relative;" onClick="{{ stopPropagation }}">
+      <div style="position:sticky; top:0; z-index:3; display:flex; align-items:center; justify-content:space-between; gap:16px; border-bottom:1px solid rgba(255,255,255,.1); background:rgba(11,16,12,.97); padding:16px 24px;">
+        <div style="min-width:0;"><h2 id="ml-dialog-title" style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:20px;">Inscrição de equipe</h2><p style="margin:2px 0 0; color:#00e676; font-size:14px; font-weight:700;">100 Milhas Light de Betim · 25/10/2026</p></div>
+        <button type="button" onClick="{{ closeModal }}" aria-label="Fechar inscrição" style="flex:none; width:44px; height:44px; display:grid; place-items:center; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.05); color:#f7faf6; cursor:pointer;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      </div>
+
+      <div style="{{ formWrapStyle }}">
+        <form id="ml-form" onSubmit="{{ onSubmit }}" onInput="{{ onFormInput }}" onChange="{{ onFormInput }}" style="padding:24px; display:grid; gap:18px;">
+          <sc-if value="{{ draftRestored }}">
+            <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; padding:10px 14px; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.04); color:#d7ded8; font-size:14px;"><span>Recuperamos o rascunho salvo neste aparelho (o CPF precisa ser digitado de novo).</span><button type="button" onClick="{{ clearForm }}" style="min-height:44px; padding:0 14px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#f7faf6; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; cursor:pointer;">Começar do zero</button></div>
+          </sc-if>
+
+          <fieldset style="margin:0; padding:0; border:0; display:grid; gap:14px; min-width:0;">
+            <legend style="padding:0; margin-bottom:6px; font-family:'Anton',sans-serif; font-size:15px; letter-spacing:0.06em; text-transform:uppercase; color:#00e676;">1 · Equipe e chefe de equipe</legend>
+            <div style="display:grid; gap:6px;">
+              <label for="f-equipe" style="font-size:14px; font-weight:700; color:#d7ded8;">Nome da equipe</label>
+              <input id="f-equipe" name="nome_equipe" type="text" maxlength="80" autocomplete="organization" aria-required="true" aria-invalid="{{ inv.nome_equipe }}" aria-describedby="err-nome_equipe" placeholder="Ex.: Minas Racing Team" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;">
+              <sc-if value="{{ e.nome_equipe }}"><p id="err-nome_equipe" style="margin:0; color:#ffb3b3; font-size:14px;">{{ e.nome_equipe }}</p></sc-if>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+              <div style="display:grid; gap:6px; align-content:start;">
+                <label for="f-chefe" style="font-size:14px; font-weight:700; color:#d7ded8;">Chefe de equipe (nome completo)</label>
+                <input id="f-chefe" name="nome_chefe" type="text" maxlength="100" autocomplete="name" aria-required="true" aria-invalid="{{ inv.nome_chefe }}" aria-describedby="err-nome_chefe" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;">
+                <sc-if value="{{ e.nome_chefe }}"><p id="err-nome_chefe" style="margin:0; color:#ffb3b3; font-size:14px;">{{ e.nome_chefe }}</p></sc-if>
+              </div>
+              <div style="display:grid; gap:6px; align-content:start;">
+                <label for="f-cpf" style="font-size:14px; font-weight:700; color:#d7ded8;">CPF do chefe de equipe</label>
+                <input id="f-cpf" name="cpf" type="text" inputmode="numeric" maxlength="14" autocomplete="off" aria-required="true" aria-invalid="{{ inv.cpf }}" aria-describedby="err-cpf" placeholder="000.000.000-00" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;">
+                <sc-if value="{{ e.cpf }}"><p id="err-cpf" style="margin:0; color:#ffb3b3; font-size:14px;">{{ e.cpf }}</p></sc-if>
+              </div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+              <div style="display:grid; gap:6px; align-content:start;">
+                <label for="f-whats" style="font-size:14px; font-weight:700; color:#d7ded8;">WhatsApp com DDD</label>
+                <input id="f-whats" name="whatsapp" type="tel" inputmode="tel" maxlength="15" autocomplete="tel-national" aria-required="true" aria-invalid="{{ inv.whatsapp }}" aria-describedby="err-whatsapp" placeholder="(31) 99999-9999" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;">
+                <sc-if value="{{ e.whatsapp }}"><p id="err-whatsapp" style="margin:0; color:#ffb3b3; font-size:14px;">{{ e.whatsapp }}</p></sc-if>
+              </div>
+              <div style="display:grid; gap:6px; align-content:start;">
+                <label for="f-email" style="font-size:14px; font-weight:700; color:#d7ded8;">E-mail</label>
+                <input id="f-email" name="email" type="email" inputmode="email" autocomplete="email" aria-required="true" aria-invalid="{{ inv.email }}" aria-describedby="err-email" placeholder="voce@email.com" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;">
+                <sc-if value="{{ e.email }}"><p id="err-email" style="margin:0; color:#ffb3b3; font-size:14px;">{{ e.email }}</p></sc-if>
+              </div>
+            </div>
+            <div style="display:grid; gap:6px;">
+              <label for="f-cidade" style="font-size:14px; font-weight:700; color:#d7ded8;">Cidade</label>
+              <input id="f-cidade" name="cidade" type="text" maxlength="80" autocomplete="address-level2" aria-required="true" aria-invalid="{{ inv.cidade }}" aria-describedby="err-cidade" placeholder="Betim / MG" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;">
+              <sc-if value="{{ e.cidade }}"><p id="err-cidade" style="margin:0; color:#ffb3b3; font-size:14px;">{{ e.cidade }}</p></sc-if>
+            </div>
+          </fieldset>
+
+          <fieldset style="margin:0; padding:0; border:0; display:grid; gap:14px; min-width:0;">
+            <legend style="padding:0; margin-bottom:6px; font-family:'Anton',sans-serif; font-size:15px; letter-spacing:0.06em; text-transform:uppercase; color:#00e676;">2 · Karts e pilotos</legend>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:end;">
+              <div style="display:grid; gap:6px;">
+                <label for="f-karts" style="font-size:14px; font-weight:700; color:#d7ded8;">Quantidade de karts (até 5)</label>
+                <select id="f-karts" name="qtd_karts" onChange="{{ onKartsChange }}" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"><option value="1">1 kart</option><option value="2">2 karts</option><option value="3">3 karts</option><option value="4">4 karts</option><option value="5">5 karts</option></select>
+              </div>
+              <p aria-live="polite" style="margin:0; padding:10px 14px; border:1px solid rgba(0,230,118,.3); background:rgba(0,230,118,.06); color:#d7ded8; font-size:15px;">Total: <strong style="font-family:'Anton',sans-serif; font-weight:400; font-size:24px; color:#00e676;">{{ totalLabel }}</strong><br><span style="font-size:13px;">{{ totalBreakdown }}</span></p>
+            </div>
+            <p style="margin:0; font-size:15px; color:#a8b2aa; line-height:1.45;">De 1 a 3 pilotos por kart. Cada piloto precisa ter 14 anos ou mais, altura acima de 1,50 m e peso acima de 50 kg, e só pode correr por uma equipe.</p>
+
+            <sc-for list="{{ kartBlocks }}" as="k" hint-placeholder-count="1">
+              <div role="group" aria-label="{{ k.groupLabel }}" style="border:1px solid rgba(255,255,255,.14); background:#030504; padding:16px; display:grid; gap:14px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;"><h3 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:18px;">{{ k.title }}</h3><span style="color:#a8b2aa; font-size:14px;">{{ k.countLabel }}</span></div>
+                <sc-for list="{{ k.pilots }}" as="p" hint-placeholder-count="1">
+                  <div style="display:grid; gap:10px; padding-top:14px; border-top:1px solid rgba(255,255,255,.08);">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                      <span style="font-size:14px; font-weight:700; color:#00e676;">{{ p.label }}</span>
+                      <sc-if value="{{ p.canRemove }}"><button type="button" onClick="{{ p.onRemove }}" aria-label="{{ p.removeAria }}" style="min-height:44px; padding:0 12px; border:1px solid rgba(255,255,255,.16); background:transparent; color:#d7ded8; font-size:14px; font-weight:700; cursor:pointer;">Remover</button></sc-if>
+                    </div>
+                    <div style="display:grid; gap:6px;">
+                      <label for="{{ p.nomeId }}" style="font-size:14px; font-weight:700; color:#d7ded8;">Nome completo</label>
+                      <input id="{{ p.nomeId }}" name="{{ p.nomeName }}" type="text" maxlength="100" aria-required="true" aria-invalid="{{ p.nomeInvalid }}" aria-describedby="{{ p.nomeErrId }}" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#0b100c; color:#fff; padding:12px; outline:none;">
+                      <sc-if value="{{ p.nomeError }}"><p id="{{ p.nomeErrId }}" style="margin:0; color:#ffb3b3; font-size:14px;">{{ p.nomeError }}</p></sc-if>
+                    </div>
+                    <div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px;">
+                      <div style="display:grid; gap:6px; align-content:start;">
+                        <label for="{{ p.idadeId }}" style="font-size:14px; font-weight:700; color:#d7ded8;">Idade</label>
+                        <input id="{{ p.idadeId }}" name="{{ p.idadeName }}" type="text" inputmode="numeric" maxlength="2" aria-required="true" aria-invalid="{{ p.idadeInvalid }}" aria-describedby="{{ p.idadeErrId }}" placeholder="anos" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#0b100c; color:#fff; padding:12px; outline:none;">
+                        <sc-if value="{{ p.idadeError }}"><p id="{{ p.idadeErrId }}" style="margin:0; color:#ffb3b3; font-size:14px;">{{ p.idadeError }}</p></sc-if>
+                      </div>
+                      <div style="display:grid; gap:6px; align-content:start;">
+                        <label for="{{ p.alturaId }}" style="font-size:14px; font-weight:700; color:#d7ded8;">Altura</label>
+                        <input id="{{ p.alturaId }}" name="{{ p.alturaName }}" type="text" inputmode="decimal" maxlength="4" aria-required="true" aria-invalid="{{ p.alturaInvalid }}" aria-describedby="{{ p.alturaErrId }}" placeholder="1,75" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#0b100c; color:#fff; padding:12px; outline:none;">
+                        <sc-if value="{{ p.alturaError }}"><p id="{{ p.alturaErrId }}" style="margin:0; color:#ffb3b3; font-size:14px;">{{ p.alturaError }}</p></sc-if>
+                      </div>
+                      <div style="display:grid; gap:6px; align-content:start;">
+                        <label for="{{ p.pesoId }}" style="font-size:14px; font-weight:700; color:#d7ded8;">Peso (kg)</label>
+                        <input id="{{ p.pesoId }}" name="{{ p.pesoName }}" type="text" inputmode="decimal" maxlength="5" aria-required="true" aria-invalid="{{ p.pesoInvalid }}" aria-describedby="{{ p.pesoErrId }}" placeholder="80" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#0b100c; color:#fff; padding:12px; outline:none;">
+                        <sc-if value="{{ p.pesoError }}"><p id="{{ p.pesoErrId }}" style="margin:0; color:#ffb3b3; font-size:14px;">{{ p.pesoError }}</p></sc-if>
+                      </div>
+                    </div>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ k.canAdd }}"><button type="button" onClick="{{ k.onAdd }}" style="justify-self:start; min-height:44px; padding:0 16px; border:1px solid rgba(0,230,118,.45); background:rgba(0,230,118,.08); color:#00e676; font-size:15px; font-weight:700; cursor:pointer;">{{ k.addLabel }}</button></sc-if>
+              </div>
+            </sc-for>
+          </fieldset>
+
+          <fieldset style="margin:0; padding:0; border:0; display:grid; gap:14px; min-width:0;">
+            <legend style="padding:0; margin-bottom:6px; font-family:'Anton',sans-serif; font-size:15px; letter-spacing:0.06em; text-transform:uppercase; color:#00e676;">3 · Pagamento</legend>
+            <div style="display:grid; gap:6px;">
+              <label for="f-pag" style="font-size:14px; font-weight:700; color:#d7ded8;">Forma de pagamento</label>
+              <select id="f-pag" name="pagamento" aria-required="true" aria-invalid="{{ inv.pagamento }}" aria-describedby="err-pagamento" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"><option value="">Selecione</option><option value="PIX">PIX</option><option value="Transferência bancária">Transferência bancária</option><option value="Cartão de crédito (até 3x)">Cartão de crédito (até 3x)</option></select>
+              <sc-if value="{{ e.pagamento }}"><p id="err-pagamento" style="margin:0; color:#ffb3b3; font-size:14px;">{{ e.pagamento }}</p></sc-if>
+            </div>
+            <div style="display:grid; gap:6px;">
+              <label for="f-obs" style="font-size:14px; font-weight:700; color:#d7ded8;">Observações <span style="font-weight:500; color:#a8b2aa;">(opcional)</span></label>
+              <textarea id="f-obs" name="observacoes" maxlength="600" style="width:100%; min-height:80px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none; resize:vertical;"></textarea>
+            </div>
+          </fieldset>
+
+          <fieldset style="margin:0; padding:0; border:0; display:grid; gap:4px; min-width:0;">
+            <legend style="padding:0; margin-bottom:10px; font-family:'Anton',sans-serif; font-size:15px; letter-spacing:0.06em; text-transform:uppercase; color:#00e676;">4 · Confirmações</legend>
+            <label style="display:grid; grid-template-columns:24px 1fr; gap:12px; align-items:start; min-height:44px; padding:10px 0; font-size:15px; color:#d7ded8; line-height:1.45; cursor:pointer;"><input name="aceite_regulamento" type="checkbox" aria-required="true" aria-invalid="{{ inv.aceite_regulamento }}" aria-describedby="err-aceite_regulamento" style="width:20px; height:20px; margin:2px 0 0; accent-color:#00e676;"><span>Li e aceito o <a href="assets/regulamentos/100-milhas-light-de-betim-2026.pdf" target="_blank" rel="noopener noreferrer" style="text-underline-offset:3px;">regulamento das 100 Milhas Light</a>.<sc-if value="{{ e.aceite_regulamento }}"><span id="err-aceite_regulamento" style="display:block; color:#ffb3b3; font-size:14px;">{{ e.aceite_regulamento }}</span></sc-if></span></label>
+            <label style="display:grid; grid-template-columns:24px 1fr; gap:12px; align-items:start; min-height:44px; padding:10px 0; font-size:15px; color:#d7ded8; line-height:1.45; cursor:pointer;"><input name="aceite_requisitos" type="checkbox" aria-required="true" aria-invalid="{{ inv.aceite_requisitos }}" aria-describedby="err-aceite_requisitos" style="width:20px; height:20px; margin:2px 0 0; accent-color:#00e676;"><span>Confirmo que todos os pilotos cumprem os requisitos e que menores de 18 anos terão um responsável adulto no dia.<sc-if value="{{ e.aceite_requisitos }}"><span id="err-aceite_requisitos" style="display:block; color:#ffb3b3; font-size:14px;">{{ e.aceite_requisitos }}</span></sc-if></span></label>
+            <label style="display:grid; grid-template-columns:24px 1fr; gap:12px; align-items:start; min-height:44px; padding:10px 0; font-size:15px; color:#d7ded8; line-height:1.45; cursor:pointer;"><input name="aceite_responsabilidade" type="checkbox" aria-required="true" aria-invalid="{{ inv.aceite_responsabilidade }}" aria-describedby="err-aceite_responsabilidade" style="width:20px; height:20px; margin:2px 0 0; accent-color:#00e676;"><span>Sei que o termo de responsabilidade é assinado na recepção no dia e que a vaga só é garantida com o pagamento total até 15/10/2026.<sc-if value="{{ e.aceite_responsabilidade }}"><span id="err-aceite_responsabilidade" style="display:block; color:#ffb3b3; font-size:14px;">{{ e.aceite_responsabilidade }}</span></sc-if></span></label>
+            <label style="display:grid; grid-template-columns:24px 1fr; gap:12px; align-items:start; min-height:44px; padding:10px 0; font-size:15px; color:#d7ded8; line-height:1.45; cursor:pointer;"><input name="aceite_imagem" type="checkbox" style="width:20px; height:20px; margin:2px 0 0; accent-color:#00e676;"><span>Autorizo o uso de imagem da equipe na divulgação do evento <span style="color:#a8b2aa;">(opcional)</span>.</span></label>
+          </fieldset>
+
+          <sc-if value="{{ errorCount }}">
+            <div id="ml-error-summary" role="alert" style="border:1px solid #d92d2d; background:rgba(217,45,45,.08); color:#ffd0d0; padding:14px 16px; font-size:15px; line-height:1.5;">
+              <strong style="display:block; color:#fff;">{{ errorTitle }}</strong>
+              <ul style="margin:8px 0 0; padding-left:18px;">
+                <sc-for list="{{ errorList }}" as="msg" hint-placeholder-count="2"><li>{{ msg }}</li></sc-for>
+              </ul>
+            </div>
+          </sc-if>
+          <p style="margin:0; padding:14px 16px; background:rgba(0,230,118,.08); border:1px solid rgba(0,230,118,.25); font-size:15px; line-height:1.5; color:#bfe9d0;"><strong style="color:#f7faf6;">Depois de enviar:</strong> você recebe o protocolo e envia a mensagem pronta no WhatsApp da organização, que responde com os dados de pagamento.</p>
+          <button type="submit" disabled="{{ submitting }}" aria-busy="{{ submitting }}" style="width:100%; appearance:none; border:0; cursor:pointer; min-height:56px; clip-path:polygon(3% 0,100% 0,97% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:14px; letter-spacing:0.04em;">{{ submitLabel }}</button>
+          <p aria-live="polite" style="margin:0; min-height:1px; color:#a8b2aa; font-size:14px; text-align:center;">{{ statusMessage }}</p>
+        </form>
+      </div>
+
+      <sc-if value="{{ resultSaved }}">
+        <div style="padding:32px 24px; display:grid; gap:18px;">
+          <div style="display:flex; align-items:center; gap:14px;"><span aria-hidden="true" style="flex:none; width:48px; height:48px; display:grid; place-items:center; border:2px solid #00e676; color:#00e676;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12 5 5 9-10"/></svg></span><h3 id="ml-result-title" tabindex="-1" style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:28px; line-height:1; outline:none;">Inscrição registrada</h3></div>
+          <div style="display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:14px 16px; border:1px solid rgba(255,255,255,.14); background:#030504;"><span style="color:#a8b2aa;">Protocolo</span><strong style="font-family:'Anton',sans-serif; font-weight:400; color:#00e676; font-size:24px; letter-spacing:0.04em;">{{ protocol }}</strong><button type="button" onClick="{{ copyProtocol }}" style="margin-left:auto; min-height:44px; padding:0 14px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#f7faf6; font-size:15px; font-weight:700; cursor:pointer;">{{ copyLabel }}</button></div>
+          <ol style="margin:0; padding-left:20px; display:grid; gap:8px; color:#d7ded8; font-size:16px; line-height:1.5;">
+            <li><strong style="color:#f7faf6;">Agora envie a mensagem no WhatsApp.</strong> É ela que conclui a inscrição.</li>
+            <li>A organização responde com os dados para pagamento de {{ totalLabel }}.</li>
+            <li>Pague até 15/10/2026 para garantir a vaga no grid.</li>
+          </ol>
+          <a href="{{ whatsappHref }}" target="_blank" rel="noopener noreferrer" style="display:flex; align-items:center; justify-content:center; gap:10px; min-height:60px; padding:0 26px; clip-path:polygon(3% 0,100% 0,97% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:16px; letter-spacing:0.04em; text-decoration:none;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-11.9 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5Z"/><path d="M8.5 8.5c.5 3 2 4.5 5 5"/></svg> Concluir inscrição no WhatsApp</a>
+          <button type="button" onClick="{{ closeModal }}" style="min-height:48px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#d7ded8; font-size:15px; font-weight:700; cursor:pointer;">Fechar e voltar para a página</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ resultFailed }}">
+        <div style="padding:32px 24px; display:grid; gap:18px;">
+          <div style="display:flex; align-items:center; gap:14px;"><span aria-hidden="true" style="flex:none; width:48px; height:48px; display:grid; place-items:center; border:2px solid #f5c518; color:#f5c518;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 7v6M12 17h.01"/></svg></span><h3 id="ml-result-title" tabindex="-1" style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:28px; line-height:1; outline:none;">Inscrição ainda não registrada</h3></div>
+          <p style="margin:0; color:#d7ded8; font-size:16px; line-height:1.55;">Não conseguimos salvar no sistema agora (conexão ou instabilidade). <strong style="color:#f7faf6;">Seus dados continuam preenchidos.</strong> Tente enviar de novo ou mande tudo pelo WhatsApp: a organização cadastra a equipe manualmente.</p>
+          <button type="button" onClick="{{ retrySubmit }}" disabled="{{ submitting }}" style="min-height:56px; border:0; clip-path:polygon(3% 0,100% 0,97% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:15px; letter-spacing:0.04em; cursor:pointer;">{{ retryLabel }}</button>
+          <a href="{{ whatsappHref }}" target="_blank" rel="noopener noreferrer" style="display:flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.035); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:14px; letter-spacing:0.04em; text-decoration:none;">Enviar inscrição pelo WhatsApp</a>
+          <button type="button" onClick="{{ backToForm }}" style="min-height:48px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#d7ded8; font-size:15px; font-weight:700; cursor:pointer;">Voltar e revisar os dados</button>
+        </div>
+      </sc-if>
+    </div>
+  </div>
 </div>
 
-</x-dc>
+</x-dc></script><script data-generated="dc-inert-template">(function(){var t=document.getElementById("dc-template");if(!t)return;var raw=t.textContent;var inner=raw.slice(raw.indexOf(">")+1,raw.lastIndexOf("<"));var x=document.createElement("x-dc");Object.defineProperty(x,"innerHTML",{configurable:true,get:function(){return inner}});t.parentNode.insertBefore(x,t)})();</script>
 <script type="text/x-dc" data-dc-script>
 
 const EVENT_NAME = '100 Milhas Light de Betim 2026';
@@ -395,11 +545,51 @@ const MAX_KARTS = 5;
 const PILOTS_PER_KART = 3;
 // Inscrições até 15/10/2026 (quinta-feira), horário de Brasília.
 const REGISTRATION_DEADLINE = new Date('2026-10-15T23:59:59-03:00');
+const DRAFT_KEY = 'kib-100-milhas-light-draft-v1';
 
 const formatBRL = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0 });
+const digits = (value) => String(value || '').replace(/\D/g, '');
+
+const formatCpf = (value) => {
+  const d = digits(value).slice(0, 11);
+  return d.replace(/^(\d{3})(\d)/, '$1.$2').replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d{1,2})$/, '.$1-$2');
+};
+const formatPhone = (value) => {
+  const d = digits(value).slice(0, 11);
+  if (d.length <= 2) return d.length ? '(' + d : '';
+  if (d.length <= 6) return '(' + d.slice(0, 2) + ') ' + d.slice(2);
+  if (d.length <= 10) return '(' + d.slice(0, 2) + ') ' + d.slice(2, 6) + '-' + d.slice(6);
+  return '(' + d.slice(0, 2) + ') ' + d.slice(2, 7) + '-' + d.slice(7);
+};
+const isValidCpf = (value) => {
+  const d = digits(value);
+  if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
+  const check = (len) => {
+    let sum = 0;
+    for (let i = 0; i < len; i += 1) sum += Number(d[i]) * (len + 1 - i);
+    const rest = (sum * 10) % 11;
+    return (rest === 10 ? 0 : rest) === Number(d[len]);
+  };
+  return check(9) && check(10);
+};
+// Aceita "1,75", "1.75" ou "175" (centímetros).
+const parseHeight = (value) => {
+  const n = Number(String(value || '').replace(',', '.').trim());
+  if (!Number.isFinite(n) || n <= 0) return NaN;
+  return n > 3 ? n / 100 : n;
+};
+const parseDecimal = (value) => Number(String(value || '').replace(',', '.').trim());
+const formatNumberBR = (value) => String(value).replace('.', ',');
 
 class Component extends DCLogic {
-  state = { headerScrolled: false, mobileNavOpen: false, isMobile: typeof window !== 'undefined' && window.matchMedia('(max-width: 1100px)').matches, modalOpen: false, karts: 1, pilots: 1, submitting: false, errorMessage: '', protocol: '', submitted: false, whatsappHref: '', savedOnline: false };
+  state = {
+    headerScrolled: false, mobileNavOpen: false,
+    isMobile: typeof window !== 'undefined' && window.matchMedia('(max-width: 1100px)').matches,
+    modalOpen: false,
+    kartPilots: [[1]], nextId: 2,
+    errors: {}, errorOrder: [],
+    submitting: false, result: null, protocol: '', whatsappHref: '', copied: false, draftRestored: false,
+  };
 
   componentDidMount() {
     this._onScroll = () => {
@@ -417,10 +607,10 @@ class Component extends DCLogic {
     this._onKeydown = (e) => {
       if (e.key !== 'Escape') return;
       if (this.state.modalOpen) this.closeModal();
-      if (this.state.mobileNavOpen) this.setState({ mobileNavOpen: false });
+      else if (this.state.mobileNavOpen) this.setState({ mobileNavOpen: false });
     };
     window.addEventListener('keydown', this._onKeydown);
-    if (location.hash === '#formulario' && Date.now() <= REGISTRATION_DEADLINE.getTime()) this.openModal();
+    if (location.hash === '#formulario' && Date.now() <= REGISTRATION_DEADLINE.getTime()) setTimeout(() => this.openModal(), 60);
     import('./motion.js').then((m) => { this._cleanup = m.initPageMotion({ progressBarSelector: '#progress' }); });
   }
 
@@ -433,139 +623,341 @@ class Component extends DCLogic {
 
   toggleMobileNav = () => this.setState((s) => ({ mobileNavOpen: !s.mobileNavOpen }));
   closeMobileNav = () => this.setState({ mobileNavOpen: false });
-  openModal = () => { this._trigger = document.activeElement; this.setState({ modalOpen: true }); };
+  stopPropagation = (e) => e.stopPropagation();
+  onOverlayClick = () => this.closeModal();
+
+  // ---------- Janela modal: foco, fundo inerte e rolagem ----------
+  setBackgroundInert(inert) {
+    const dialog = document.getElementById('ml-dialog');
+    if (!dialog || !dialog.parentElement) return;
+    Array.from(dialog.parentElement.children).forEach((el) => {
+      if (el === dialog) return;
+      if (inert) el.setAttribute('inert', ''); else el.removeAttribute('inert');
+    });
+    document.documentElement.style.overflow = inert ? 'hidden' : '';
+  }
+
+  later(fn, ms = 40) { setTimeout(() => requestAnimationFrame(fn), ms); }
+
+  openModal = () => {
+    this._trigger = document.activeElement;
+    this.setState({ modalOpen: true });
+    this.setBackgroundInert(true);
+    if (!this._draftChecked) {
+      this._draftChecked = true;
+      this.restoreDraft();
+    }
+    this.later(() => {
+      const target = this.state.result ? document.getElementById('ml-result-title') : document.getElementById('f-equipe');
+      if (target) target.focus();
+    }, 120);
+  };
+
   closeModal = () => {
-    const reset = this.state.submitted ? { submitted: false, protocol: '', whatsappHref: '', karts: 1, pilots: 1, errorMessage: '' } : {};
-    this.setState({ modalOpen: false, ...reset });
+    const saved = this.state.result === 'saved';
+    this.setState({ modalOpen: false });
+    this.setBackgroundInert(false);
+    if (saved) this.resetAll();
     if (this._trigger && this._trigger.focus) this._trigger.focus();
   };
-  stopPropagation = (e) => e.stopPropagation();
+
+  onDialogKeyDown = (e) => {
+    if (e.key !== 'Tab') return;
+    const panel = document.getElementById('ml-panel');
+    if (!panel) return;
+    const focusables = Array.from(panel.querySelectorAll('a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+      .filter((el) => el.offsetParent !== null);
+    if (!focusables.length) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  };
+
+  // ---------- Valores do formulário (campos não controlados) ----------
+  form() { return document.getElementById('ml-form'); }
+
+  snapshot() {
+    const form = this.form();
+    const values = {};
+    if (!form) return values;
+    Array.from(form.elements).forEach((el) => {
+      if (!el.name) return;
+      values[el.name] = el.type === 'checkbox' ? el.checked : el.value;
+    });
+    return values;
+  }
+
+  restoreValues(values) {
+    this.later(() => {
+      const form = this.form();
+      if (!form) return;
+      Array.from(form.elements).forEach((el) => {
+        if (!el.name || !(el.name in values)) return;
+        if (el.type === 'checkbox') el.checked = Boolean(values[el.name]);
+        else el.value = values[el.name];
+      });
+    });
+  }
+
+  // Muda a estrutura de karts/pilotos preservando o que já foi digitado.
+  changeStructure(updater) {
+    const values = this.snapshot();
+    this.setState(updater);
+    this.restoreValues(values);
+    this.scheduleDraftSave();
+  }
 
   onKartsChange = (e) => {
-    const karts = Math.min(MAX_KARTS, Math.max(1, Number(e.target.value) || 1));
-    this.setState((s) => ({ karts, pilots: Math.min(Math.max(s.pilots, karts), karts * PILOTS_PER_KART) }));
-  };
-  addPilot = () => this.setState((s) => ({ pilots: Math.min(s.pilots + 1, s.karts * PILOTS_PER_KART) }));
-  removePilot = () => this.setState((s) => ({ pilots: Math.max(s.pilots - 1, s.karts) }));
-
-  buildWhatsappMessage(data, pilots, protocol, savedOnline) {
-    const karts = Number(data.get('qtd_karts')) || 1;
-    const lines = [
-      'Olá! Quero concluir a inscrição da minha equipe nas *' + EVENT_NAME + '* (25/10/2026).',
-      '',
-    ];
-    if (protocol) lines.push('*Protocolo:* ' + protocol);
-    lines.push('*Equipe:* ' + data.get('nome_equipe'));
-    lines.push('*Chefe de equipe:* ' + data.get('nome_chefe'));
-    lines.push('*CPF:* ' + data.get('cpf'));
-    lines.push('*WhatsApp:* ' + data.get('whatsapp'));
-    lines.push('*E-mail:* ' + data.get('email'));
-    lines.push('*Cidade:* ' + data.get('cidade'));
-    lines.push('*Karts:* ' + karts);
-    lines.push('', '*Pilotos:*');
-    pilots.forEach((p, i) => {
-      lines.push((i + 1) + '. ' + p.nome + ' — Kart ' + p.kart + ' — ' + p.idade + ' anos, ' + p.altura + ' m, ' + p.peso + ' kg');
+    const count = Math.min(MAX_KARTS, Math.max(1, Number(e.target.value) || 1));
+    this.changeStructure((s) => {
+      const kartPilots = s.kartPilots.slice(0, count).map((list) => list.slice());
+      let nextId = s.nextId;
+      while (kartPilots.length < count) { kartPilots.push([nextId]); nextId += 1; }
+      return { kartPilots, nextId };
     });
-    lines.push('', '*Pagamento:* ' + data.get('pagamento'));
+  };
+
+  addPilot(kartIndex) {
+    this.changeStructure((s) => {
+      if (s.kartPilots[kartIndex].length >= PILOTS_PER_KART) return null;
+      const kartPilots = s.kartPilots.map((list, i) => (i === kartIndex ? list.concat(s.nextId) : list.slice()));
+      return { kartPilots, nextId: s.nextId + 1 };
+    });
+  }
+
+  removePilot(kartIndex, id) {
+    this.changeStructure((s) => {
+      if (s.kartPilots[kartIndex].length <= 1) return null;
+      const kartPilots = s.kartPilots.map((list, i) => (i === kartIndex ? list.filter((pid) => pid !== id) : list.slice()));
+      const errors = { ...s.errors };
+      ['nome', 'idade', 'altura', 'peso'].forEach((f) => { delete errors['p' + id + '_' + f]; });
+      return { kartPilots, errors, errorOrder: s.errorOrder.filter((n) => n in errors) };
+    });
+  }
+
+  onFormInput = (e) => {
+    const el = e.target;
+    if (!el || !el.name) return;
+    if (el.name === 'cpf') el.value = formatCpf(el.value);
+    if (el.name === 'whatsapp') el.value = formatPhone(el.value);
+    if (this.state.errors[el.name]) {
+      this.setState((s) => {
+        const errors = { ...s.errors };
+        delete errors[el.name];
+        return { errors, errorOrder: s.errorOrder.filter((n) => n !== el.name) };
+      });
+    }
+    this.scheduleDraftSave();
+  };
+
+  // ---------- Rascunho local (sem CPF) ----------
+  scheduleDraftSave() {
+    clearTimeout(this._draftTimer);
+    this._draftTimer = setTimeout(() => {
+      try {
+        const values = this.snapshot();
+        delete values.cpf;
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ kartPilots: this.state.kartPilots, nextId: this.state.nextId, values, savedAt: Date.now() }));
+      } catch (error) { /* armazenamento indisponível: segue sem rascunho */ }
+    }, 400);
+  }
+
+  restoreDraft() {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      const hasContent = draft && draft.values && Object.keys(draft.values).some((k) => draft.values[k] && k !== 'qtd_karts');
+      if (!hasContent || !Array.isArray(draft.kartPilots) || !draft.kartPilots.length) return;
+      this.setState({ kartPilots: draft.kartPilots.slice(0, MAX_KARTS), nextId: draft.nextId || 50, draftRestored: true });
+      this.restoreValues(draft.values);
+    } catch (error) { /* rascunho inválido: ignora */ }
+  }
+
+  clearDraft() { try { localStorage.removeItem(DRAFT_KEY); } catch (error) { /* ignora */ } }
+
+  resetAll() {
+    const form = this.form();
+    if (form) form.reset();
+    this.clearDraft();
+    this.setState({ kartPilots: [[1]], nextId: 2, errors: {}, errorOrder: [], result: null, protocol: '', whatsappHref: '', copied: false, draftRestored: false });
+  }
+
+  clearForm = () => {
+    this.resetAll();
+    this.later(() => { const el = document.getElementById('f-equipe'); if (el) el.focus(); });
+  };
+
+  // ---------- Validação ----------
+  collect() {
+    const v = this.snapshot();
+    const pilots = [];
+    this.state.kartPilots.forEach((list, kartIndex) => {
+      list.forEach((id) => {
+        pilots.push({
+          id, kart: kartIndex + 1,
+          nome: String(v['p' + id + '_nome'] || '').trim(),
+          idadeRaw: v['p' + id + '_idade'], alturaRaw: v['p' + id + '_altura'], pesoRaw: v['p' + id + '_peso'],
+          idade: Number(digits(v['p' + id + '_idade'])),
+          altura: parseHeight(v['p' + id + '_altura']),
+          peso: parseDecimal(v['p' + id + '_peso']),
+        });
+      });
+    });
+    return { v, pilots };
+  }
+
+  validate({ v, pilots }) {
+    const errors = {};
+    const need = (name, message) => { if (!String(v[name] || '').trim()) errors[name] = message; };
+    need('nome_equipe', 'Informe o nome da equipe.');
+    need('nome_chefe', 'Informe o nome completo do chefe de equipe.');
+    if (!isValidCpf(v.cpf)) errors.cpf = digits(v.cpf).length ? 'CPF inválido. Confira os 11 dígitos.' : 'Informe o CPF do chefe de equipe.';
+    const phone = digits(v.whatsapp);
+    if (phone.length < 10 || phone.length > 11) errors.whatsapp = 'Informe o WhatsApp com DDD, por exemplo (31) 99999-9999.';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v.email || '').trim())) errors.email = 'Informe um e-mail válido, por exemplo voce@email.com.';
+    need('cidade', 'Informe a cidade da equipe.');
+
+    const seen = new Map();
+    pilots.forEach((p) => {
+      const key = 'p' + p.id + '_';
+      if (!p.nome) errors[key + 'nome'] = 'Informe o nome do piloto.';
+      else if (seen.has(p.nome.toLowerCase())) errors[key + 'nome'] = 'Este piloto já está na inscrição. Cada piloto corre por um único kart.';
+      if (p.nome) seen.set(p.nome.toLowerCase(), p.id);
+      if (!String(p.idadeRaw || '').trim()) errors[key + 'idade'] = 'Informe a idade.';
+      else if (!(p.idade >= 14 && p.idade <= 90)) errors[key + 'idade'] = 'Idade mínima de 14 anos.';
+      if (!String(p.alturaRaw || '').trim()) errors[key + 'altura'] = 'Informe a altura.';
+      else if (!(p.altura > 1.5 && p.altura <= 2.3)) errors[key + 'altura'] = 'Precisa ser acima de 1,50 m.';
+      if (!String(p.pesoRaw || '').trim()) errors[key + 'peso'] = 'Informe o peso.';
+      else if (!(p.peso > 50 && p.peso <= 180)) errors[key + 'peso'] = 'Precisa ser acima de 50 kg.';
+    });
+
+    need('pagamento', 'Escolha a forma de pagamento.');
+    ['aceite_regulamento', 'aceite_requisitos', 'aceite_responsabilidade'].forEach((name) => {
+      if (!v[name]) errors[name] = 'Marque esta confirmação para continuar.';
+    });
+
+    // Ordem igual à do formulário, para o resumo e para o foco.
+    const form = this.form();
+    const order = form ? Array.from(form.elements).map((el) => el.name).filter((n, i, arr) => n && errors[n] && arr.indexOf(n) === i) : Object.keys(errors);
+    return { errors, order };
+  }
+
+  focusFirstError(order) {
+    this.later(() => {
+      const form = this.form();
+      const el = form && order.length ? form.querySelector('[name="' + order[0] + '"]') : null;
+      if (!el) return;
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      el.focus({ preventScroll: true });
+    }, 60);
+  }
+
+  // ---------- Envio ----------
+  buildWhatsappMessage(v, pilots, protocol) {
+    const karts = this.state.kartPilots.length;
+    const lines = ['Olá! Quero concluir a inscrição da minha equipe nas *' + EVENT_NAME + '* (25/10/2026).', ''];
+    if (protocol) lines.push('*Protocolo:* ' + protocol);
+    lines.push('*Equipe:* ' + v.nome_equipe);
+    lines.push('*Chefe de equipe:* ' + v.nome_chefe);
+    lines.push('*CPF:* ' + v.cpf);
+    lines.push('*WhatsApp:* ' + v.whatsapp);
+    lines.push('*E-mail:* ' + v.email);
+    lines.push('*Cidade:* ' + v.cidade);
+    for (let k = 1; k <= karts; k += 1) {
+      lines.push('', '*Kart ' + k + ':*');
+      pilots.filter((p) => p.kart === k).forEach((p, i) => {
+        lines.push((i + 1) + '. ' + p.nome + ' — ' + p.idade + ' anos, ' + formatNumberBR(p.altura.toFixed(2)) + ' m, ' + formatNumberBR(p.peso) + ' kg');
+      });
+    }
+    lines.push('', '*Pagamento:* ' + v.pagamento);
     lines.push('*Total:* ' + formatBRL(karts * PRICE_PER_KART) + ' (' + karts + ' × ' + formatBRL(PRICE_PER_KART) + ')');
-    const obs = String(data.get('observacoes') || '').trim();
+    const obs = String(v.observacoes || '').trim();
     if (obs) lines.push('*Observações:* ' + obs);
     lines.push('', 'Aceito o regulamento e confirmo os requisitos dos pilotos.');
-    if (!savedOnline) lines.push('(Formulário não registrado no sistema — favor cadastrar manualmente.)');
+    if (!protocol) lines.push('(Não consegui registrar pelo site — favor cadastrar manualmente.)');
     lines.push('Aguardo os dados para pagamento.');
     return 'https://wa.me/' + WHATSAPP_NUMBER + '?text=' + encodeURIComponent(lines.join('\n'));
   }
 
-  onSubmit = async (e) => {
-    e.preventDefault();
-    if (this.state.submitting) return;
-    const form = e.target;
-    const data = new FormData(form);
-    const karts = Number(data.get('qtd_karts')) || 1;
-
-    const pilots = [];
-    for (let i = 0; i < this.state.pilots; i += 1) {
-      pilots.push({
-        nome: String(data.get('piloto_nome_' + i) || '').trim(),
-        // Sem número informado, distribui os pilotos entre os karts em sequência.
-        kart: Number(data.get('piloto_kart_' + i)) || (i % karts) + 1,
-        idade: Number(data.get('piloto_idade_' + i)),
-        altura: Number(String(data.get('piloto_altura_' + i) || '').replace(',', '.')),
-        peso: Number(String(data.get('piloto_peso_' + i) || '').replace(',', '.')),
-      });
-    }
-
-    const problems = [];
-    const names = new Set();
-    pilots.forEach((p, i) => {
-      const who = p.nome || 'Piloto ' + (i + 1);
-      if (!p.nome) problems.push('Informe o nome do piloto ' + (i + 1) + '.');
-      if (!(p.idade >= 14)) problems.push(who + ': idade mínima de 14 anos.');
-      if (!(p.altura > 1.5)) problems.push(who + ': altura deve ser superior a 1,50 m.');
-      if (!(p.peso > 50)) problems.push(who + ': peso deve ser superior a 50 kg.');
-      if (p.kart < 1 || p.kart > karts) problems.push(who + ': número do kart deve estar entre 1 e ' + karts + '.');
-      const key = p.nome.toLowerCase();
-      if (key && names.has(key)) problems.push(who + ' está repetido.');
-      names.add(key);
-    });
-    for (let k = 1; k <= karts; k += 1) {
-      const count = pilots.filter((p) => p.kart === k).length;
-      if (count < 1) problems.push('O kart ' + k + ' precisa de pelo menos 1 piloto.');
-      if (count > PILOTS_PER_KART) problems.push('O kart ' + k + ' tem mais de 3 pilotos.');
-    }
-    const cpfDigits = String(data.get('cpf') || '').replace(/\D/g, '');
-    if (cpfDigits.length !== 11) problems.push('CPF deve ter 11 dígitos.');
-    const phoneDigits = String(data.get('whatsapp') || '').replace(/\D/g, '');
-    if (phoneDigits.length < 10) problems.push('Informe um WhatsApp válido com DDD.');
-
-    if (problems.length) {
-      this.setState({ errorMessage: problems.slice(0, 4).join(' ') });
-      return;
-    }
-
-    this.setState({ submitting: true, errorMessage: '' });
-
-    const payload = {
+  buildPayload(v, pilots) {
+    const karts = this.state.kartPilots.length;
+    return {
       campeonato_id: '100-milhas-light',
       evento: EVENT_NAME,
       modalidade: 'equipe',
-      nomeEquipe: data.get('nome_equipe'),
-      nomeChefe: data.get('nome_chefe'),
-      cpf: data.get('cpf'),
-      whatsapp: data.get('whatsapp'),
-      email: data.get('email'),
-      cidade: data.get('cidade'),
+      nomeEquipe: String(v.nome_equipe).trim(),
+      nomeChefe: String(v.nome_chefe).trim(),
+      cpf: v.cpf,
+      whatsapp: v.whatsapp,
+      email: String(v.email).trim(),
+      cidade: String(v.cidade).trim(),
       quantidadeKarts: karts,
       pilotos: pilots.map((p) => ({ nome: p.nome, peso_kg: p.peso })),
-      pagamento: data.get('pagamento') + ' — total ' + formatBRL(karts * PRICE_PER_KART),
+      pagamento: v.pagamento + ' — total ' + formatBRL(karts * PRICE_PER_KART),
       observacoes: [
-        pilots.map((p) => p.nome + ' (kart ' + p.kart + ', ' + p.idade + ' anos, ' + p.altura + ' m, ' + p.peso + ' kg)').join('; '),
-        String(data.get('observacoes') || '').trim(),
+        pilots.map((p) => p.nome + ' (kart ' + p.kart + ', ' + p.idade + ' anos, ' + formatNumberBR(p.altura.toFixed(2)) + ' m, ' + formatNumberBR(p.peso) + ' kg)').join('; '),
+        String(v.observacoes || '').trim(),
       ].filter(Boolean).join(' | '),
-      acceptedRules: data.get('aceite_regulamento') === 'on',
-      acceptedResponsibility: data.get('aceite_responsabilidade') === 'on',
-      acceptedImage: data.get('aceite_imagem') === 'on',
+      acceptedRules: Boolean(v.aceite_regulamento),
+      acceptedResponsibility: Boolean(v.aceite_responsabilidade),
+      acceptedImage: Boolean(v.aceite_imagem),
       acceptedContact: true,
     };
+  }
 
+  async send(collected) {
+    const { v, pilots } = collected;
+    this.setState({ submitting: true });
     let protocol = '';
     try {
-      const response = await fetch('/api/inscricao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const response = await fetch('/api/inscricao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.buildPayload(v, pilots)) });
       const body = await response.json().catch(() => ({}));
       if (response.ok && body.protocol) protocol = body.protocol;
     } catch (error) {
       protocol = '';
     }
+    const whatsappHref = this.buildWhatsappMessage(v, pilots, protocol);
+    this.setState({ submitting: false, result: protocol ? 'saved' : 'failed', protocol, whatsappHref, copied: false });
+    if (protocol) this.clearDraft();
+    this.later(() => {
+      const panel = document.getElementById('ml-panel');
+      if (panel) panel.scrollTop = 0;
+      const title = document.getElementById('ml-result-title');
+      if (title) title.focus();
+    }, 60);
+  }
 
-    const whatsappHref = this.buildWhatsappMessage(data, pilots, protocol, Boolean(protocol));
-    this.setState({ submitting: false, submitted: true, protocol, whatsappHref });
-    form.reset();
-    // Tenta abrir o WhatsApp direto; se o navegador bloquear, o botão da tela de sucesso resolve.
-    try { window.open(whatsappHref, '_blank', 'noopener,noreferrer'); } catch (error) { /* botão manual */ }
+  onSubmit = (e) => {
+    e.preventDefault();
+    if (this.state.submitting) return;
+    const collected = this.collect();
+    const { errors, order } = this.validate(collected);
+    this.setState({ errors, errorOrder: order });
+    if (order.length) { this.focusFirstError(order); return; }
+    this._lastCollected = collected;
+    this.send(collected);
+  };
+
+  retrySubmit = () => {
+    if (this.state.submitting) return;
+    this.send(this._lastCollected || this.collect());
+  };
+
+  backToForm = () => {
+    this.setState({ result: null });
+    this.later(() => { const el = document.getElementById('f-equipe'); if (el) el.focus(); });
+  };
+
+  copyProtocol = () => {
+    const text = this.state.protocol;
+    const done = () => this.setState({ copied: true });
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(() => undefined);
   };
 
   renderVals() {
-    const { headerScrolled, mobileNavOpen, isMobile, modalOpen, karts, pilots, submitting, errorMessage, protocol, submitted, whatsappHref } = this.state;
+    const { headerScrolled, mobileNavOpen, isMobile, modalOpen, kartPilots, errors, errorOrder, submitting, result, protocol, whatsappHref, copied, draftRestored } = this.state;
     const navBase = { fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.04em', padding: '10px 0', borderBottom: '2px solid transparent', textDecoration: 'none', transition: 'color .25s, border-color .25s' };
     const pages = [
       { label: 'Home', href: '/', id: 'home' },
@@ -578,15 +970,48 @@ class Component extends DCLogic {
     ];
     const navLinks = pages.map((p) => ({ label: p.label, href: p.href, current: p.id === 'campeonatos' ? 'page' : undefined, style: { ...navBase, color: p.id === 'campeonatos' ? '#fff' : '#e1e6e1' } }));
     const registrationOpen = Date.now() <= REGISTRATION_DEADLINE.getTime();
+    const karts = kartPilots.length;
+    const totalPilots = kartPilots.reduce((sum, list) => sum + list.length, 0);
 
-    const pilotRows = Array.from({ length: pilots }, (_, i) => ({
-      label: 'Piloto ' + (i + 1),
-      nomeField: 'piloto_nome_' + i, nomeAria: 'Nome do piloto ' + (i + 1),
-      kartField: 'piloto_kart_' + i, kartAria: 'Número do kart do piloto ' + (i + 1),
-      idadeField: 'piloto_idade_' + i, idadeAria: 'Idade do piloto ' + (i + 1),
-      alturaField: 'piloto_altura_' + i, alturaAria: 'Altura em metros do piloto ' + (i + 1),
-      pesoField: 'piloto_peso_' + i, pesoAria: 'Peso em kg do piloto ' + (i + 1),
+    const inv = {};
+    Object.keys(errors).forEach((k) => { inv[k] = true; });
+
+    let pilotNumber = 0;
+    const kartBlocks = kartPilots.map((list, kartIndex) => ({
+      title: 'Kart ' + (kartIndex + 1),
+      groupLabel: 'Kart ' + (kartIndex + 1) + ', ' + list.length + (list.length === 1 ? ' piloto' : ' pilotos'),
+      countLabel: list.length + ' de ' + PILOTS_PER_KART + ' pilotos',
+      canAdd: list.length < PILOTS_PER_KART,
+      addLabel: '+ Adicionar piloto ao kart ' + (kartIndex + 1),
+      onAdd: () => this.addPilot(kartIndex),
+      pilots: list.map((id, i) => {
+        pilotNumber += 1;
+        const base = 'p' + id + '_';
+        const field = (f) => ({
+          [f + 'Id']: 'f-p' + id + '-' + f,
+          [f + 'Name']: base + f,
+          [f + 'ErrId']: 'err-' + base + f,
+          [f + 'Error']: errors[base + f] || '',
+          [f + 'Invalid']: Boolean(errors[base + f]),
+        });
+        return {
+          label: 'Piloto ' + (i + 1),
+          canRemove: list.length > 1,
+          removeAria: 'Remover piloto ' + (i + 1) + ' do kart ' + (kartIndex + 1),
+          onRemove: () => this.removePilot(kartIndex, id),
+          ...field('nome'), ...field('idade'), ...field('altura'), ...field('peso'),
+        };
+      }),
     }));
+
+    const errorList = errorOrder.map((name) => {
+      const match = /^p(\d+)_(nome|idade|altura|peso)$/.exec(name);
+      if (!match) return errors[name];
+      const id = Number(match[1]);
+      const kartIndex = kartPilots.findIndex((list) => list.includes(id));
+      const position = kartIndex >= 0 ? kartPilots[kartIndex].indexOf(id) + 1 : 0;
+      return 'Kart ' + (kartIndex + 1) + ', piloto ' + position + ': ' + errors[name];
+    });
 
     return {
       skipLinkStyle: { position: 'fixed', left: '16px', top: '12px', zIndex: 1000, padding: '12px 16px', background: '#00e676', color: '#041301', fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '12px', transform: 'translateY(-180%)', transition: 'transform .2s' },
@@ -611,70 +1036,83 @@ class Component extends DCLogic {
 
       telemetry: [
         { icon: 'M3 5h18v16H3zM8 3v4M16 3v4M3 10h18', title: '25 OUT · 08:30', text: 'Domingo, largada às 10:00' },
-        { icon: 'M12 7v5l3 2M9 2h6M12 22a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z', title: '2,5 horas + 1 volta', text: 'Largada estilo Le Mans' },
+        { icon: 'M12 7v5l3 2M9 2h6M12 22a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z', title: '2h30 + 1 volta', text: 'Largada estilo Le Mans' },
         { icon: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75', title: '1 a 3 pilotos', text: 'Por kart · até 5 karts por equipe' },
         { icon: 'M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6', title: 'R$ 900 por kart', text: 'PIX, transferência ou cartão em 3x' },
       ],
       steps: [
-        { title: '1. Preencha o formulário', text: 'Equipe, chefe de equipe, quantidade de karts e dados de cada piloto.' },
-        { title: '2. Receba o protocolo', text: 'A inscrição fica registrada como pendente no sistema do kartódromo.' },
-        { title: '3. Conclua no WhatsApp', text: 'A mensagem abre pronta com todos os dados para a organização.' },
-        { title: '4. Pague e confirme a vaga', text: 'Pagamento total até 15/10/2026 para garantir o lugar no grid.' },
+        { n: '1', title: 'Preencha o formulário', text: 'Equipe, chefe de equipe, karts e dados de cada piloto.' },
+        { n: '2', title: 'Receba o protocolo', text: 'A inscrição fica registrada como pendente no sistema do kartódromo.' },
+        { n: '3', title: 'Envie a mensagem no WhatsApp', text: 'Ela já sai pronta, com todos os dados da equipe.' },
+        { n: '4', title: 'Pague e garanta a vaga', text: 'Pagamento total até 15/10/2026.' },
       ],
       priceNotes: [
-        'Inscrições de 01/09/2026 até 15/10/2026, ou enquanto houver vagas.',
-        'Pagamento por PIX, transferência bancária ou cartão de crédito em até 3x.',
-        'Sem pagamento total até 15/10/2026 a vaga pode ir para a fila de espera.',
-        'Nomes de todos os pilotos devem ser informados até 15/10/2026.',
-        'Desistência: reembolso em até 30 dias com retenção de R$ 200. Evento cancelado com menos de 20 equipes tem devolução integral.',
+        'Inscrições até 15/10/2026, ou enquanto houver vagas.',
+        'PIX, transferência bancária ou cartão de crédito em até 3x.',
+        'Sem pagamento total até 15/10/2026, a vaga pode ir para a fila de espera.',
+        'Nomes de todos os pilotos confirmados até 15/10/2026.',
+        'Com menos de 20 equipes o evento pode ser cancelado, com devolução integral. Desistência da equipe: reembolso em até 30 dias, com retenção de R$ 200.',
       ],
       schedule: [
-        { time: '08:30', title: 'Abertura', text: 'Recepção das equipes e assinatura obrigatória do termo de responsabilidade.' },
+        { time: '08:30', title: 'Abertura', text: 'Recepção das equipes e assinatura do termo de responsabilidade.' },
         { time: '09:00', title: 'Briefing e sorteio', text: 'Briefing com os chefes de equipe e sorteio dos karts.' },
-        { time: '09:50', title: 'Tomada de tempo', text: '5 minutos para definição do grid. Troca de kart só dentro deste período.' },
+        { time: '09:50', title: 'Tomada de tempo', text: '5 minutos para formar o grid. Trocar de kart só nesse período.' },
         { time: '10:00', title: 'Largada', text: 'Largada estilo Le Mans, com o piloto sentado no kart.' },
-        { time: '12:30', title: 'Encerramento', text: 'Bandeira quadriculada e parque fechado para pesagem.' },
-        { time: '13:00', title: 'Resultado e pódio', text: 'Divulgação do resultado oficial e premiação.' },
+        { time: '12:30', title: 'Bandeirada', text: 'Karts seguem para o parque fechado e para a pesagem.' },
+        { time: '13:00', title: 'Resultado e pódio', text: 'Resultado oficial e entrega dos troféus.' },
       ],
-      ruleCards: [
-        { title: 'Equipes', text: 'De 1 a 3 pilotos por kart e até 5 karts por equipe, com um chefe de equipe responsável. Nenhum piloto pode correr por duas equipes.' },
-        { title: 'Requisitos do piloto', text: 'Ambos os sexos, idade a partir de 14 anos, altura acima de 1,50 m e peso acima de 50 kg. Menores de 18 com responsável.' },
-        { title: 'Karts light sorteados', text: 'Karts de locação do kartódromo, abastecidos igualmente. Proibido qualquer ajuste além do banco.' },
-        { title: 'Peso mínimo 100 kg', text: 'Pilotos abaixo são lastreados (até 50 kg fornecidos). 1 minuto de punição a cada 500 g abaixo; abaixo de 98 kg o kart é desclassificado.' },
-        { title: '3 paradas obrigatórias', text: 'Mínimo de 7 minutos cada, com troca de kart e piloto. Até 2 paradas adicionais sem tempo mínimo.' },
-        { title: 'Boxes', text: 'Abrem aos 5 minutos e fecham aos 2h10 de prova. Entrada pela pista lateral de cimento, em baixa velocidade.' },
-        { title: 'Indumentária', text: 'Macacão, capacete integral com viseira, luvas e sapatilha. Recomendado protetor de costelas e colar cervical.' },
-        { title: 'Penalidades', text: 'Time penalty de 15 s, perda de voltas ou desclassificação, a critério da direção de prova.' },
-        { title: 'Bandeira vermelha', text: 'Tempo parado não é reposto. Relargada em fila indiana; prova pode ser encerrada com 75% do tempo.' },
-      ],
-      legacy: [
-        { value: '1º–5º', label: 'Troféu para as cinco melhores equipes' },
-        { value: '1 kart', label: 'Isenção de inscrição para a campeã na próxima edição' },
-        { value: '961 m', label: 'Traçado 11 invertido chicane' },
-        { value: '20', label: 'Equipes mínimas para realização do evento' },
+      ruleGroups: [
+        { title: 'Equipe e pilotos', items: [
+          { title: '1 a 3 pilotos por kart', text: 'Até 5 karts por equipe, com um chefe de equipe responsável.' },
+          { title: 'Requisitos', text: 'A partir de 14 anos, acima de 1,50 m e acima de 50 kg. Menores de 18 com responsável.' },
+          { title: 'Um piloto, uma equipe', text: 'Correr por duas equipes é falta grave e pode desclassificar.' },
+        ] },
+        { title: 'Karts e peso', items: [
+          { title: 'Karts light sorteados', text: 'Karts de locação do kartódromo, com a mesma quantidade de combustível.' },
+          { title: 'Sem ajustes', text: 'Só é permitido regular o banco. Mexer na mecânica gera punição.' },
+          { title: 'Peso mínimo de 100 kg', text: 'Quem pesa menos usa lastro (até 50 kg fornecidos). Abaixo de 98 kg o kart é desclassificado.' },
+          { title: 'Equipamento', text: 'Macacão, capacete integral com viseira, luvas e sapatilha.' },
+        ] },
+        { title: 'Na pista', items: [
+          { title: 'Paradas', text: '3 obrigatórias de 7 min, até 2 extras. Mais de 5 paradas desclassifica.' },
+          { title: 'Entrada do box', text: 'Pela pista lateral de cimento, em baixa velocidade e levantando a mão.' },
+          { title: 'Punições', text: 'Acréscimo de 15 s, perda de voltas ou desclassificação, conforme a direção de prova.' },
+          { title: 'Bandeira vermelha', text: 'O tempo parado não é reposto. A relargada é em fila indiana.' },
+        ] },
       ],
 
       modalClosed: !modalOpen,
-      modalOverlayStyle: { position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(0,0,0,.78)', backdropFilter: 'blur(12px)', display: 'grid', placeItems: 'center', padding: '20px', opacity: modalOpen ? 1 : 0, visibility: modalOpen ? 'visible' : 'hidden', transition: '.3s', pointerEvents: modalOpen ? 'auto' : 'none' },
+      modalOverlayStyle: { position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(0,0,0,.8)', backdropFilter: 'blur(10px)', display: 'grid', placeItems: 'center', padding: isMobile ? '0' : '20px', opacity: modalOpen ? 1 : 0, visibility: modalOpen ? 'visible' : 'hidden', transition: 'opacity .25s, visibility .25s', pointerEvents: modalOpen ? 'auto' : 'none' },
+      onOverlayClick: this.onOverlayClick,
+      onDialogKeyDown: this.onDialogKeyDown,
       closeModal: this.closeModal,
       stopPropagation: this.stopPropagation,
-      showForm: !submitted,
-      showSuccess: submitted,
+      formWrapStyle: { display: result ? 'none' : 'block' },
       onSubmit: this.onSubmit,
+      onFormInput: this.onFormInput,
       onKartsChange: this.onKartsChange,
-      pilotRows,
-      pilotCountLabel: pilots + (pilots === 1 ? ' piloto' : ' pilotos'),
-      canAddPilot: pilots < karts * PILOTS_PER_KART,
-      canRemovePilot: pilots > karts,
-      addPilot: this.addPilot,
-      removePilot: this.removePilot,
+      clearForm: this.clearForm,
+      draftRestored,
+      kartBlocks,
       totalLabel: formatBRL(karts * PRICE_PER_KART),
-      errorMessage,
+      totalBreakdown: karts + (karts === 1 ? ' kart' : ' karts') + ' × ' + formatBRL(PRICE_PER_KART) + ' · ' + totalPilots + (totalPilots === 1 ? ' piloto' : ' pilotos'),
+      e: errors,
+      inv,
+      errorCount: errorList.length,
+      errorTitle: errorList.length === 1 ? 'Falta corrigir 1 campo:' : 'Faltam corrigir ' + errorList.length + ' campos:',
+      errorList,
       submitting,
-      submitLabel: submitting ? 'Enviando…' : 'Enviar inscrição e abrir WhatsApp',
-      successTitle: protocol ? 'Inscrição registrada' : 'Falta só o WhatsApp',
+      submitLabel: submitting ? 'Enviando inscrição…' : 'Enviar inscrição',
+      statusMessage: submitting ? 'Enviando sua inscrição, aguarde.' : '',
+      resultSaved: result === 'saved',
+      resultFailed: result === 'failed',
       protocol,
       whatsappHref,
+      copyProtocol: this.copyProtocol,
+      copyLabel: copied ? 'Copiado' : 'Copiar',
+      retrySubmit: this.retrySubmit,
+      retryLabel: submitting ? 'Tentando de novo…' : 'Tentar enviar de novo',
+      backToForm: this.backToForm,
     };
   }
 }
