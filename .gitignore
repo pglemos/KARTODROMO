@@ -59,3 +59,9 @@ KARTODROMO\ -\ SISTEMA.zip
 .github/hooks/
 .codex/hooks.json
 .impeccable/live/
+# Artefatos locais (não versionar)
+"KARTODROMO - SISTEMA 2.zip"
+KARTODROMO\ -\ SISTEMA\ 2.zip
+miniflare-*/
+node-compile-cache/
+output/
