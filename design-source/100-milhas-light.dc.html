@@ -363,6 +363,26 @@
             </sc-if>
             <p style="margin:0; max-width:52ch; font-size:15px; color:#a8b2aa; line-height:1.45;">De 1 a 3 pilotos por kart. Cada piloto precisa ter 14 anos ou mais, altura acima de 1,50 m e peso acima de 50 kg, e só pode correr por uma equipe.</p>
 
+            <details style="border:1px dashed rgba(0,230,118,.45); background:rgba(0,230,118,.04); padding:4px 14px;">
+              <summary style="cursor:pointer; min-height:44px; display:flex; align-items:center; font-size:15px; font-weight:700; color:#00e676;">Colar lista de pilotos (planilha ou WhatsApp)</summary>
+              <div style="display:grid; gap:10px; padding:4px 0 14px;">
+                <p style="margin:0; max-width:52ch; color:#d7ded8; font-size:15px; line-height:1.5;">Um piloto por linha: <strong style="color:#f7faf6;">nome; idade; altura; peso</strong>. Deixe uma linha em branco para começar o próximo kart. Sem linhas em branco, distribuímos 3 pilotos por kart.</p>
+                <label for="f-paste" style="font-size:14px; font-weight:700; color:#d7ded8;">Lista de pilotos</label>
+                <textarea id="f-paste" name="lista_pilotos" rows="6" spellcheck="false" placeholder="João Silva; 16; 1,75; 70&#10;Maria Souza; 22; 1,62; 58&#10;&#10;Carlos Lima; 35; 1,80; 90" style="width:100%; min-height:132px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none; resize:vertical; font-size:15px; line-height:1.5;"></textarea>
+                <sc-if value="{{ pasteConfirming }}">
+                  <div role="alert" style="display:grid; gap:10px; padding:12px 14px; border:1px solid #f5c518; background:rgba(245,197,24,.08);">
+                    <p style="margin:0; color:#f7faf6; font-size:15px; line-height:1.45;">{{ pasteConfirmMessage }}</p>
+                    <div style="display:flex; flex-wrap:wrap; gap:10px;">
+                      <button id="ml-confirm-cancel-paste" type="button" onClick="{{ cancelConfirm }}" style="min-height:44px; padding:0 16px; border:1px solid rgba(255,255,255,.22); background:transparent; color:#f7faf6; font-size:15px; font-weight:700; cursor:pointer;">Cancelar</button>
+                      <button type="button" onClick="{{ acceptConfirm }}" style="min-height:44px; padding:0 16px; border:0; background:#f5c518; color:#041301; font-size:15px; font-weight:700; cursor:pointer;">Substituir pilotos</button>
+                    </div>
+                  </div>
+                </sc-if>
+                <button type="button" onClick="{{ applyPaste }}" style="justify-self:start; min-height:44px; padding:0 18px; border:1px solid rgba(0,230,118,.5); background:rgba(0,230,118,.1); color:#00e676; font-size:15px; font-weight:700; cursor:pointer;">Preencher karts com a lista</button>
+                <p aria-live="polite" style="margin:0; color:#bfe9d0; font-size:15px; line-height:1.45;">{{ pasteStatus }}</p>
+              </div>
+            </details>
+
             <sc-for list="{{ kartBlocks }}" as="k" hint-placeholder-count="1">
               <div role="group" aria-label="{{ k.groupLabel }}" style="border:1px solid rgba(255,255,255,.14); background:#030504; padding:16px; display:grid; gap:14px;">
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;"><h3 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:18px;">{{ k.title }}</h3><span style="color:#a8b2aa; font-size:14px;">{{ k.countLabel }}</span></div>
@@ -521,7 +541,7 @@ class Component extends DCLogic {
     kartPilots: [[1]], nextId: 2,
     errors: {}, errorOrder: [],
     submitting: false, result: null, protocol: '', whatsappHref: '', copied: false, draftRestored: false,
-    submitAttempted: false, pendingConfirm: null,
+    submitAttempted: false, pendingConfirm: null, pasteStatus: '',
   };
 
   componentDidMount() {
@@ -650,7 +670,8 @@ class Component extends DCLogic {
   requestConfirm(pending) {
     this.setState({ pendingConfirm: pending });
     this.later(() => {
-      const cancel = document.getElementById(pending.type === 'karts' ? 'ml-confirm-cancel-karts' : 'ml-confirm-cancel-' + pending.id);
+      const cancelIds = { karts: 'ml-confirm-cancel-karts', paste: 'ml-confirm-cancel-paste' };
+      const cancel = document.getElementById(cancelIds[pending.type] || 'ml-confirm-cancel-' + pending.id);
       if (cancel) cancel.focus();
     }, 40);
   }
@@ -659,7 +680,8 @@ class Component extends DCLogic {
     const pending = this.state.pendingConfirm;
     this.setState({ pendingConfirm: null });
     this.later(() => {
-      const el = pending && document.getElementById(pending.type === 'karts' ? 'f-karts' : 'ml-remove-' + pending.id);
+      const returnIds = { karts: 'f-karts', paste: 'f-paste' };
+      const el = pending && document.getElementById(returnIds[pending.type] || 'ml-remove-' + pending.id);
       if (el) el.focus();
     }, 40);
   };
@@ -671,10 +693,99 @@ class Component extends DCLogic {
     if (pending.type === 'karts') {
       this.applyKartCount(pending.count);
       this.later(() => { const el = document.getElementById('f-karts'); if (el) el.focus(); }, 90);
+    } else if (pending.type === 'paste') {
+      this.applyPastePlan(pending.plan);
     } else {
       this.applyRemovePilot(pending.kartIndex, pending.id);
     }
   };
+
+  // ---------- Colar lista de pilotos ----------
+  // Aceita linhas "nome; idade; altura; peso" (também tab, "|" ou " - " vindos de planilha/WhatsApp).
+  // Linha em branco inicia o próximo kart; sem linhas em branco, 3 pilotos por kart.
+  parsePilotList(raw) {
+    const groups = [[]];
+    let ignored = 0;
+    String(raw || '').split(/\r?\n/).forEach((line) => {
+      const text = line.trim();
+      if (!text) { if (groups[groups.length - 1].length) groups.push([]); return; }
+      const parts = text.split(/\t|;|\||\s-\s/).map((s) => s.trim()).filter(Boolean);
+      const nome = (parts[0] || '').replace(/^\d+[.)]\s*/, '').trim();
+      if (!nome || /^nome$/i.test(nome) || !/[a-zà-ú]/i.test(nome)) { if (!/^nome$/i.test(nome)) ignored += 1; return; }
+      groups[groups.length - 1].push({
+        nome,
+        idade: digits(parts[1] || '').slice(0, 2),
+        altura: String(parts[2] || '').replace(/\s*m$/i, '').trim(),
+        peso: String(parts[3] || '').replace(/\s*kg$/i, '').trim(),
+      });
+    });
+    const usedGroups = groups.filter((g) => g.length);
+    const explicitKarts = usedGroups.length > 1;
+    let karts = [];
+    if (explicitKarts) {
+      usedGroups.forEach((g) => { for (let i = 0; i < g.length; i += PILOTS_PER_KART) karts.push(g.slice(i, i + PILOTS_PER_KART)); });
+    } else {
+      const all = usedGroups[0] || [];
+      for (let i = 0; i < all.length; i += PILOTS_PER_KART) karts.push(all.slice(i, i + PILOTS_PER_KART));
+    }
+    const total = karts.reduce((n, k) => n + k.length, 0);
+    const overflowKarts = karts.slice(MAX_KARTS);
+    const overflow = overflowKarts.reduce((n, k) => n + k.length, 0);
+    karts = karts.slice(0, MAX_KARTS);
+    return { karts, total, overflow, ignored };
+  }
+
+  applyPaste = () => {
+    const field = document.getElementById('f-paste');
+    const { karts, total, overflow, ignored } = this.parsePilotList(field ? field.value : '');
+    if (!karts.length) {
+      this.setState({ pasteStatus: 'Não reconhecemos nenhum piloto. Use uma linha por piloto, por exemplo: João Silva; 16; 1,75; 70.' });
+      if (field) field.focus();
+      return;
+    }
+    let nextId = this.state.nextId;
+    const values = { qtd_karts: String(karts.length) };
+    const kartPilots = karts.map((list) => list.map((p) => {
+      const id = nextId;
+      nextId += 1;
+      values['p' + id + '_nome'] = p.nome;
+      values['p' + id + '_idade'] = p.idade;
+      values['p' + id + '_altura'] = p.altura;
+      values['p' + id + '_peso'] = p.peso;
+      return id;
+    }));
+    const placed = total - overflow;
+    const notes = [];
+    if (overflow) notes.push(overflow === 1 ? '1 piloto passou do limite de 5 karts e ficou de fora' : overflow + ' pilotos passaram do limite de 5 karts e ficaram de fora');
+    if (ignored) notes.push(ignored + (ignored === 1 ? ' linha não reconhecida' : ' linhas não reconhecidas'));
+    const status = placed + (placed === 1 ? ' piloto distribuído' : ' pilotos distribuídos') + ' em ' + karts.length + (karts.length === 1 ? ' kart' : ' karts') + '. Confira os dados abaixo.' + (notes.length ? ' Atenção: ' + notes.join('; ') + '.' : '');
+    const plan = { kartPilots, nextId, values, status };
+
+    const current = this.snapshot();
+    const hasFilled = this.state.kartPilots.flat().some((id) => ['nome', 'idade', 'altura', 'peso'].some((f) => String(current['p' + id + '_' + f] || '').trim()));
+    if (hasFilled) {
+      this.requestConfirm({ type: 'paste', plan, message: 'Substituir os pilotos já preenchidos pelos ' + placed + ' da lista? Os dados atuais dos pilotos serão apagados.' });
+      return;
+    }
+    this.applyPastePlan(plan);
+  };
+
+  applyPastePlan(plan) {
+    const values = this.snapshot();
+    Object.keys(values).forEach((k) => { if (/^p\d+_/.test(k)) delete values[k]; });
+    Object.assign(values, plan.values);
+    this.setState((s) => {
+      const errors = { ...s.errors };
+      Object.keys(errors).forEach((k) => { if (/^p\d+_/.test(k)) delete errors[k]; });
+      return { kartPilots: plan.kartPilots, nextId: plan.nextId, errors, errorOrder: s.errorOrder.filter((n) => n in errors), pasteStatus: plan.status };
+    });
+    this.restoreValues(values);
+    this.scheduleDraftSave();
+    this.later(() => {
+      const first = document.getElementById('f-p' + plan.kartPilots[0][0] + '-nome');
+      if (first) first.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 120);
+  }
 
   onKartsChange = (e) => {
     const select = e.target;
@@ -818,7 +929,7 @@ class Component extends DCLogic {
     const form = this.form();
     if (form) form.reset();
     this.clearDraft();
-    this.setState({ kartPilots: [[1]], nextId: 2, errors: {}, errorOrder: [], result: null, protocol: '', whatsappHref: '', copied: false, draftRestored: false, submitAttempted: false, pendingConfirm: null });
+    this.setState({ kartPilots: [[1]], nextId: 2, errors: {}, errorOrder: [], result: null, protocol: '', whatsappHref: '', copied: false, draftRestored: false, submitAttempted: false, pendingConfirm: null, pasteStatus: '' });
   }
 
   clearForm = () => {
@@ -1157,6 +1268,10 @@ class Component extends DCLogic {
       inv,
       showErrors,
       errorCount: errorList.length,
+      applyPaste: this.applyPaste,
+      pasteStatus: this.state.pasteStatus,
+      pasteConfirming: Boolean(pendingConfirm && pendingConfirm.type === 'paste'),
+      pasteConfirmMessage: pendingConfirm && pendingConfirm.type === 'paste' ? pendingConfirm.message : '',
       kartsConfirming: Boolean(pendingConfirm && pendingConfirm.type === 'karts'),
       kartsConfirmMessage: pendingConfirm && pendingConfirm.type === 'karts' ? pendingConfirm.message : '',
       cancelConfirm: this.cancelConfirm,
