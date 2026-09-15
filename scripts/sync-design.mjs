@@ -214,7 +214,9 @@ function inertTemplate(html) {
     'var raw=t.textContent;var inner=raw.slice(raw.indexOf(">")+1,raw.lastIndexOf("<"));' +
     'var x=document.createElement("x-dc");' +
     'Object.defineProperty(x,"innerHTML",{configurable:true,get:function(){return inner}});' +
-    't.parentNode.insertBefore(x,t)})();</script>';
+    // Remove o script do template do DOM: o runtime já recebeu o innerHTML e relê o
+    // HTML bruto via fetch, e o DOM final não deve carregar placeholders "{{ }}".
+    't.parentNode.insertBefore(x,t);t.parentNode.removeChild(t)})();</script>';
 
   return (
     html.slice(0, open) +
