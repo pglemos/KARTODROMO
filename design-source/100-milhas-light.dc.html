@@ -308,11 +308,17 @@
           </sc-if>
 
           <sc-if value="{{ showErrors }}">
-            <div id="ml-error-summary" role="alert" tabindex="-1" style="border:1px solid #d92d2d; background:rgba(217,45,45,.08); color:#ffd0d0; padding:14px 16px; font-size:15px; line-height:1.5;">
+            <div id="ml-error-summary" role="alert" tabindex="-1" style="scroll-margin-top:180px; border:1px solid #d92d2d; background:rgba(217,45,45,.08); color:#ffd0d0; padding:14px 16px; font-size:15px; line-height:1.5;">
               <strong style="display:block; color:#fff;">{{ errorTitle }}</strong>
-              <ul style="margin:8px 0 0; padding-left:18px;">
-                <sc-for list="{{ errorList }}" as="msg" hint-placeholder-count="2"><li style="margin:2px 0;"><button type="button" onClick="{{ msg.go }}" style="appearance:none; display:block; width:100%; border:0; background:none; padding:6px 0; color:#ffd0d0; font:inherit; line-height:1.4; text-align:left; text-decoration:underline; text-underline-offset:3px; cursor:pointer;">{{ msg.text }}</button></li></sc-for>
-              </ul>
+              <div style="display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 0;">
+                <sc-for list="{{ errorSections }}" as="sec" hint-placeholder-count="4"><button type="button" onClick="{{ sec.go }}" aria-label="{{ sec.aria }}" style="min-height:44px; padding:0 14px; border:1px solid #d92d2d; background:rgba(217,45,45,.14); color:#fff; font-size:15px; font-weight:700; cursor:pointer;">{{ sec.label }}</button></sc-for>
+              </div>
+              <details style="margin-top:8px;">
+                <summary style="cursor:pointer; min-height:44px; display:flex; align-items:center; color:#ffd0d0; font-weight:700; text-decoration:underline; text-underline-offset:3px;">{{ errorDetailsLabel }}</summary>
+                <ul style="margin:4px 0 0; padding-left:18px;">
+                  <sc-for list="{{ errorList }}" as="msg" hint-placeholder-count="2"><li style="margin:0;"><button type="button" onClick="{{ msg.go }}" style="appearance:none; display:block; width:100%; min-height:44px; border:0; background:none; padding:10px 0; color:#ffd0d0; font:inherit; line-height:1.4; text-align:left; text-decoration:underline; text-underline-offset:3px; cursor:pointer;">{{ msg.text }}</button></li></sc-for>
+                </ul>
+              </details>
             </div>
           </sc-if>
 
@@ -420,17 +426,17 @@
                     <div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px;">
                       <div style="display:grid; gap:6px; align-content:start;">
                         <label for="{{ p.idadeId }}" style="font-size:14px; font-weight:700; color:#d7ded8;">Idade</label>
-                        <input id="{{ p.idadeId }}" name="{{ p.idadeName }}" type="text" inputmode="numeric" maxlength="2" aria-required="true" aria-invalid="{{ p.idadeInvalid }}" aria-describedby="{{ p.idadeErrId }}" placeholder="anos" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#0b100c; color:#fff; padding:12px; outline:none;">
+                        <input id="{{ p.idadeId }}" name="{{ p.idadeName }}" type="text" inputmode="numeric" maxlength="2" aria-required="true" aria-invalid="{{ p.idadeInvalid }}" aria-describedby="{{ p.idadeErrId }}" placeholder="ex.: 16" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#0b100c; color:#fff; padding:12px; outline:none;">
                         <sc-if value="{{ p.idadeError }}"><p id="{{ p.idadeErrId }}" style="margin:0; color:#ffb3b3; font-size:14px;">{{ p.idadeError }}</p></sc-if>
                       </div>
                       <div style="display:grid; gap:6px; align-content:start;">
                         <label for="{{ p.alturaId }}" style="font-size:14px; font-weight:700; color:#d7ded8;">Altura (m)</label>
-                        <input id="{{ p.alturaId }}" name="{{ p.alturaName }}" type="text" inputmode="decimal" maxlength="4" aria-required="true" aria-invalid="{{ p.alturaInvalid }}" aria-describedby="{{ p.alturaErrId }}" placeholder="1,75" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#0b100c; color:#fff; padding:12px; outline:none;">
+                        <input id="{{ p.alturaId }}" name="{{ p.alturaName }}" type="text" inputmode="decimal" maxlength="4" aria-required="true" aria-invalid="{{ p.alturaInvalid }}" aria-describedby="{{ p.alturaErrId }}" placeholder="ex.: 1,75" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#0b100c; color:#fff; padding:12px; outline:none;">
                         <sc-if value="{{ p.alturaError }}"><p id="{{ p.alturaErrId }}" style="margin:0; color:#ffb3b3; font-size:14px;">{{ p.alturaError }}</p></sc-if>
                       </div>
                       <div style="display:grid; gap:6px; align-content:start;">
                         <label for="{{ p.pesoId }}" style="font-size:14px; font-weight:700; color:#d7ded8;">Peso (kg)</label>
-                        <input id="{{ p.pesoId }}" name="{{ p.pesoName }}" type="text" inputmode="decimal" maxlength="5" aria-required="true" aria-invalid="{{ p.pesoInvalid }}" aria-describedby="{{ p.pesoErrId }}" placeholder="80" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#0b100c; color:#fff; padding:12px; outline:none;">
+                        <input id="{{ p.pesoId }}" name="{{ p.pesoName }}" type="text" inputmode="decimal" maxlength="5" aria-required="true" aria-invalid="{{ p.pesoInvalid }}" aria-describedby="{{ p.pesoErrId }}" placeholder="ex.: 80" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#0b100c; color:#fff; padding:12px; outline:none;">
                         <sc-if value="{{ p.pesoError }}"><p id="{{ p.pesoErrId }}" style="margin:0; color:#ffb3b3; font-size:14px;">{{ p.pesoError }}</p></sc-if>
                       </div>
                     </div>
@@ -570,6 +576,8 @@ class Component extends DCLogic {
     if (this._mq.addEventListener) this._mq.addEventListener('change', this._onMqChange); else this._mq.addListener(this._onMqChange);
     this._onKeydown = (e) => {
       if (e.key !== 'Escape') return;
+      // Com uma confirmação aberta, o Esc só desiste dela; não fecha o formulário inteiro.
+      if (this.state.modalOpen && this.state.pendingConfirm) { e.preventDefault(); this.cancelConfirm(); return; }
       if (this.state.modalOpen) this.closeModal();
       else if (this.state.mobileNavOpen) this.setState({ mobileNavOpen: false });
     };
@@ -791,6 +799,18 @@ class Component extends DCLogic {
       const shown = incompleteNames.slice(0, 3).join(', ') + (incompleteNames.length > 3 ? ' e mais ' + (incompleteNames.length - 3) : '');
       notes.push('complete idade, altura ou peso de ' + shown);
     }
+    // Alerta (sem bloquear) quem está fora dos requisitos do regulamento.
+    const outOfRange = karts.flat().map((p) => {
+      const issues = [];
+      const idade = Number(p.idade);
+      const altura = parseHeight(p.altura);
+      const peso = parseDecimal(p.peso);
+      if (p.idade && idade < 14) issues.push('idade mínima 14 anos');
+      if (p.altura && Number.isFinite(altura) && altura <= 1.5) issues.push('altura acima de 1,50 m');
+      if (p.peso && Number.isFinite(peso) && peso <= 50) issues.push('peso acima de 50 kg');
+      return issues.length ? p.nome + ' (' + issues.join(', ') + ')' : null;
+    }).filter(Boolean);
+    if (outOfRange.length) notes.push('fora dos requisitos: ' + outOfRange.slice(0, 3).join('; ') + (outOfRange.length > 3 ? ' e mais ' + (outOfRange.length - 3) : ''));
     const breakdown = karts.map((k, i) => 'kart ' + (i + 1) + ' com ' + k.length).join(', ') + (explicitKarts ? ', separados pelas linhas em branco' : '');
     const status = placed + (placed === 1 ? ' piloto distribuído' : ' pilotos distribuídos') + ' em ' + karts.length + (karts.length === 1 ? ' kart' : ' karts') + ' (' + breakdown + '). Confira os dados abaixo.' + (notes.length ? ' Atenção: ' + notes.join('; ') + '.' : '');
     const plan = { kartPilots, nextId, values, status };
@@ -1085,8 +1105,10 @@ class Component extends DCLogic {
       const summary = document.getElementById('ml-error-summary');
       const panel = document.getElementById('ml-panel');
       if (summary && panel) {
-        panel.scrollTo({ top: 0, behavior: 'smooth' });
+        // Rolagem imediata (sem animação) para o título do resumo não ficar atrás da barra fixa.
         summary.focus({ preventScroll: true });
+        panel.scrollTop = 0;
+        requestAnimationFrame(() => { panel.scrollTop = 0; });
         return;
       }
       const form = this.form();
@@ -1286,7 +1308,7 @@ class Component extends DCLogic {
         aria: 'Ir para a seção ' + (i + 1) + ', ' + label + (count ? ', ' + count + (count === 1 ? ' campo a corrigir' : ' campos a corrigir') : ''),
         go: () => this.goToSection(i + 1),
         style: {
-          minHeight: '40px', padding: '0 12px', whiteSpace: 'nowrap', cursor: 'pointer', fontSize: '14px', fontWeight: 700,
+          minHeight: '44px', padding: '0 12px', whiteSpace: 'nowrap', cursor: 'pointer', fontSize: '14px', fontWeight: 700,
           background: count ? 'rgba(217,45,45,.12)' : isCurrent ? 'rgba(0,230,118,.1)' : 'transparent',
           border: count ? '1px solid #d92d2d' : isCurrent ? '1px solid #00e676' : '1px solid rgba(255,255,255,.18)',
           color: count ? '#ffd0d0' : isCurrent ? '#f7faf6' : '#d7ded8',
@@ -1386,6 +1408,13 @@ class Component extends DCLogic {
       errorCount: errorList.length,
       showFormNav: !result,
       sectionNav,
+      errorSections: ['Equipe', 'Karts', 'Pagamento', 'Confirmações'].map((label, i) => ({
+        count: sectionErrors[i],
+        label: label + ': ' + sectionErrors[i],
+        aria: 'Ir para ' + label + ', ' + sectionErrors[i] + (sectionErrors[i] === 1 ? ' campo a corrigir' : ' campos a corrigir'),
+        go: () => this.goToSection(i + 1),
+      })).filter((s) => s.count > 0),
+      errorDetailsLabel: errorList.length === 1 ? 'Ver o campo' : 'Ver os ' + errorList.length + ' campos',
       applyPaste: this.applyPaste,
       pasteStatus: this.state.pasteStatus,
       pasteConfirming: Boolean(pendingConfirm && pendingConfirm.type === 'paste'),
