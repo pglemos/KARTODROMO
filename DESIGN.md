@@ -22,6 +22,14 @@ colors:
   teal-telao: "#03110f"
   teal-header: "#007965"
   amarelo-posicao: "#facc15"
+  erro-texto: "#ffb3b3"
+  erro-resumo: "#ffd0d0"
+  erro-borda-campo: "#ff6b6b"
+  aviso-pendente: "#f5c518"
+  placeholder-escuro: "#7d877f"
+  rodape-legenda: "#829083"
+  nota-positiva: "#bfe9d0"
+  whatsapp-marca: "#20d466"
 typography:
   display:
     fontFamily: "Anton, sans-serif"

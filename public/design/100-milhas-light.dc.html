@@ -168,7 +168,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
       <div style="min-width:0;">
         <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Endurance · Kart Light</p>
         <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; line-height:0.78; letter-spacing:-0.01em; font-size:clamp(64px,10.5vw,160px);">100 <span style="color:#00e676;">Milhas</span><br><span style="color:transparent; -webkit-text-stroke:1px rgba(255,255,255,.7);">Light</span></h1>
-        <p style="max-width:58ch; margin:28px 0 0; font-size:clamp(18px,1.5vw,22px); line-height:1.5; color:#d7ded8;">2,5 horas de corrida em equipe com os karts light de locação do kartódromo. Domingo, 25 de outubro de 2026, a partir das 08:30.</p>
+        <p style="max-width:46ch; margin:28px 0 0; font-size:clamp(18px,1.5vw,22px); line-height:1.5; color:#d7ded8;">2,5 horas de corrida em equipe com os karts light de locação do kartódromo. Domingo, 25 de outubro de 2026, a partir das 08:30.</p>
         <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:30px;">
           <sc-if value="{{ registrationOpen }}">
             <button type="button" onClick="{{ openModal }}" aria-haspopup="dialog" aria-controls="ml-dialog" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; border:0; cursor:pointer;">Inscrever equipe <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button>
@@ -206,8 +206,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
       <div style="min-width:0;">
         <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Inscrição e valores</p>
         <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:0.85;">Monte a equipe<br><span style="color:#00e676;">e garanta o kart</span></h2>
-        <p style="max-width:58ch; margin:24px 0 0; color:#a8b2aa; font-size:clamp(16px,1.2vw,19px); line-height:1.6;">A inscrição é feita em quatro passos. O formulário registra a equipe no sistema do kartódromo e prepara a mensagem que conclui a inscrição no WhatsApp.</p>
-        <ol style="list-style:none; display:grid; gap:14px; margin:28px 0 0; padding:0; max-width:58ch;">
+        <p style="max-width:46ch; margin:24px 0 0; color:#a8b2aa; font-size:clamp(16px,1.2vw,19px); line-height:1.6;">A inscrição é feita em quatro passos. O formulário registra a equipe no sistema do kartódromo e prepara a mensagem que conclui a inscrição no WhatsApp.</p>
+        <ol style="list-style:none; display:grid; gap:14px; margin:28px 0 0; padding:0; max-width:46ch;">
           <sc-for list="{{ steps }}" as="s" hint-placeholder-count="4">
             <li style="display:grid; grid-template-columns:34px 1fr; gap:14px; align-items:start; color:#a8b2aa; font-size:15px; line-height:1.45;"><span aria-hidden="true" style="display:grid; place-items:center; width:34px; height:34px; border:1px solid rgba(0,230,118,.45); color:#00e676; font-family:'Anton',sans-serif; font-size:15px; transform:skewX(-7deg);">{{ s.n }}</span><span><strong style="display:block; color:#f7faf6; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:14px; letter-spacing:0.02em;">{{ s.title }}</strong>{{ s.text }}</span></li>
           </sc-for>
@@ -242,7 +242,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
       <div style="min-width:0;">
         <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">A corrida</p>
         <h2 id="corrida-title" style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:0.85;">2h30 de prova,<br><span style="color:#00e676;">3 paradas no box</span></h2>
-        <p style="max-width:58ch; margin:24px 0 0; color:#a8b2aa; font-size:clamp(16px,1.2vw,19px); line-height:1.6;">Cada equipe faz 3 paradas obrigatórias de no mínimo 7 minutos, com troca de kart e de piloto, dentro da janela em que o box fica aberto. Quando parar é estratégia da equipe.</p>
+        <p style="max-width:46ch; margin:24px 0 0; color:#a8b2aa; font-size:clamp(16px,1.2vw,19px); line-height:1.6;">Cada equipe faz 3 paradas obrigatórias de no mínimo 7 minutos, com troca de kart e de piloto, dentro da janela em que o box fica aberto. Quando parar é estratégia da equipe.</p>
 
         <div style="margin-top:36px; max-width:640px;">
           <div aria-hidden="true" style="position:relative; height:22px; font-family:'Anton',sans-serif; font-size:13px; color:#00e676;">
@@ -276,7 +276,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
       <div style="min-width:0;">
         <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Cronograma · 25/10/2026</p>
         <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:0.85;">Da chegada<br><span style="color:#00e676;">à bandeirada</span></h2>
-        <p style="max-width:48ch; margin:24px 0 0; color:#a8b2aa; font-size:17px; line-height:1.6;">Pelo menos um piloto de cada equipe precisa estar no briefing. Não é permitido levar alimentos ou bebidas para o kartódromo.</p>
+        <p style="max-width:42ch; margin:24px 0 0; color:#a8b2aa; font-size:17px; line-height:1.6;">Pelo menos um piloto de cada equipe precisa estar no briefing. Não é permitido levar alimentos ou bebidas para o kartódromo.</p>
       </div>
       <ol style="list-style:none; min-width:0; border-left:1px solid rgba(255,255,255,.12); margin:0 0 0 18px; padding:0;">
         <sc-for list="{{ schedule }}" as="e" hint-placeholder-count="6">
@@ -329,7 +329,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   <section style="padding:0 0 clamp(88px,9vw,140px);">
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto;">
       <div style="position:relative; overflow:hidden; border:1px solid rgba(255,255,255,.22); background:linear-gradient(135deg,#101711,#030504); padding:clamp(34px,5vw,72px); display:grid; grid-template-columns:1.2fr .8fr; gap:36px; align-items:center;">
-        <div style="min-width:0;"><h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5.5vw,72px); line-height:0.82;">Vagas limitadas<br><span style="color:#00e676;">inscreva sua equipe</span></h2><p style="max-width:52ch; margin:14px 0 0; color:#a8b2aa; font-size:18px; line-height:1.5;">Inscrições até 15/10/2026 ou enquanto houver vagas. A vaga só é garantida após a confirmação do pagamento.</p></div>
+        <div style="min-width:0;"><h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5.5vw,72px); line-height:0.82;">Vagas limitadas<br><span style="color:#00e676;">inscreva sua equipe</span></h2><p style="max-width:44ch; margin:14px 0 0; color:#a8b2aa; font-size:18px; line-height:1.5;">Inscrições até 15/10/2026 ou enquanto houver vagas. A vaga só é garantida após a confirmação do pagamento.</p></div>
         <div style="display:grid; gap:12px;">
           <sc-if value="{{ registrationOpen }}">
             <button type="button" onClick="{{ openModal }}" aria-haspopup="dialog" aria-controls="ml-dialog" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; border:0; cursor:pointer;">Inscrever equipe</button>
@@ -381,9 +381,18 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
       </div>
 
       <div style="{{ formWrapStyle }}">
-        <form id="ml-form" onSubmit="{{ onSubmit }}" onInput="{{ onFormInput }}" onChange="{{ onFormInput }}" style="padding:24px; display:grid; gap:18px;">
+        <form id="ml-form" onSubmit="{{ onSubmit }}" onInput="{{ onFormInput }}" onChange="{{ onFormInput }}" onBlur="{{ onFormBlur }}" style="padding:24px; display:grid; gap:18px;">
           <sc-if value="{{ draftRestored }}">
             <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; padding:10px 14px; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.04); color:#d7ded8; font-size:14px;"><span>Recuperamos o rascunho salvo neste aparelho (o CPF precisa ser digitado de novo).</span><button type="button" onClick="{{ clearForm }}" style="min-height:44px; padding:0 14px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#f7faf6; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; cursor:pointer;">Começar do zero</button></div>
+          </sc-if>
+
+          <sc-if value="{{ errorCount }}">
+            <div id="ml-error-summary" role="alert" style="border:1px solid #d92d2d; background:rgba(217,45,45,.08); color:#ffd0d0; padding:14px 16px; font-size:15px; line-height:1.5;">
+              <strong style="display:block; color:#fff;">{{ errorTitle }}</strong>
+              <ul style="margin:8px 0 0; padding-left:18px;">
+                <sc-for list="{{ errorList }}" as="msg" hint-placeholder-count="2"><li>{{ msg }}</li></sc-for>
+              </ul>
+            </div>
           </sc-if>
 
           <fieldset style="margin:0; padding:0; border:0; display:grid; gap:14px; min-width:0;">
@@ -456,7 +465,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
                         <sc-if value="{{ p.idadeError }}"><p id="{{ p.idadeErrId }}" style="margin:0; color:#ffb3b3; font-size:14px;">{{ p.idadeError }}</p></sc-if>
                       </div>
                       <div style="display:grid; gap:6px; align-content:start;">
-                        <label for="{{ p.alturaId }}" style="font-size:14px; font-weight:700; color:#d7ded8;">Altura</label>
+                        <label for="{{ p.alturaId }}" style="font-size:14px; font-weight:700; color:#d7ded8;">Altura (m)</label>
                         <input id="{{ p.alturaId }}" name="{{ p.alturaName }}" type="text" inputmode="decimal" maxlength="4" aria-required="true" aria-invalid="{{ p.alturaInvalid }}" aria-describedby="{{ p.alturaErrId }}" placeholder="1,75" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#0b100c; color:#fff; padding:12px; outline:none;">
                         <sc-if value="{{ p.alturaError }}"><p id="{{ p.alturaErrId }}" style="margin:0; color:#ffb3b3; font-size:14px;">{{ p.alturaError }}</p></sc-if>
                       </div>
@@ -495,12 +504,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
           </fieldset>
 
           <sc-if value="{{ errorCount }}">
-            <div id="ml-error-summary" role="alert" style="border:1px solid #d92d2d; background:rgba(217,45,45,.08); color:#ffd0d0; padding:14px 16px; font-size:15px; line-height:1.5;">
-              <strong style="display:block; color:#fff;">{{ errorTitle }}</strong>
-              <ul style="margin:8px 0 0; padding-left:18px;">
-                <sc-for list="{{ errorList }}" as="msg" hint-placeholder-count="2"><li>{{ msg }}</li></sc-for>
-              </ul>
-            </div>
+            <p style="margin:0; color:#ffd0d0; font-size:15px; line-height:1.45;">{{ errorShort }}</p>
           </sc-if>
           <p style="margin:0; padding:14px 16px; background:rgba(0,230,118,.08); border:1px solid rgba(0,230,118,.25); font-size:15px; line-height:1.5; color:#bfe9d0;"><strong style="color:#f7faf6;">Depois de enviar:</strong> você recebe o protocolo e envia a mensagem pronta no WhatsApp da organização, que responde com os dados de pagamento.</p>
           <button type="submit" disabled="{{ submitting }}" aria-busy="{{ submitting }}" style="width:100%; appearance:none; border:0; cursor:pointer; min-height:56px; clip-path:polygon(3% 0,100% 0,97% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:14px; letter-spacing:0.04em;">{{ submitLabel }}</button>
@@ -658,7 +662,12 @@ class Component extends DCLogic {
     this.setState({ modalOpen: false });
     this.setBackgroundInert(false);
     if (saved) this.resetAll();
-    if (this._trigger && this._trigger.focus) this._trigger.focus();
+    // Aberto pelo link #formulario: limpa o hash para recarregar a página não reabrir a janela.
+    if (location.hash === '#formulario') history.replaceState(null, '', location.pathname + location.search);
+    const trigger = this._trigger && this._trigger !== document.body && document.contains(this._trigger)
+      ? this._trigger
+      : document.querySelector('[aria-controls="ml-dialog"]');
+    if (trigger && trigger.focus) trigger.focus();
   };
 
   onDialogKeyDown = (e) => {
@@ -709,7 +718,24 @@ class Component extends DCLogic {
   }
 
   onKartsChange = (e) => {
-    const count = Math.min(MAX_KARTS, Math.max(1, Number(e.target.value) || 1));
+    const select = e.target;
+    const count = Math.min(MAX_KARTS, Math.max(1, Number(select.value) || 1));
+    const current = this.state.kartPilots.length;
+    if (count === current) return;
+    if (count < current) {
+      // Confirma antes de descartar karts que já têm pilotos preenchidos.
+      const values = this.snapshot();
+      const removed = this.state.kartPilots.slice(count);
+      const filled = removed.flat().filter((id) => ['nome', 'idade', 'altura', 'peso'].some((f) => String(values['p' + id + '_' + f] || '').trim()));
+      if (filled.length) {
+        const kartsLabel = removed.length === 1 ? 'o kart ' + (count + 1) : 'os karts ' + (count + 1) + ' a ' + current;
+        const pilotsLabel = filled.length === 1 ? '1 piloto já preenchido' : filled.length + ' pilotos já preenchidos';
+        if (!window.confirm('Remover ' + kartsLabel + ' e ' + pilotsLabel + '?')) {
+          select.value = String(current);
+          return;
+        }
+      }
+    }
     this.changeStructure((s) => {
       const kartPilots = s.kartPilots.slice(0, count).map((list) => list.slice());
       let nextId = s.nextId;
@@ -741,15 +767,35 @@ class Component extends DCLogic {
     if (!el || !el.name) return;
     if (el.name === 'cpf') el.value = formatCpf(el.value);
     if (el.name === 'whatsapp') el.value = formatPhone(el.value);
-    if (this.state.errors[el.name]) {
-      this.setState((s) => {
-        const errors = { ...s.errors };
-        delete errors[el.name];
-        return { errors, errorOrder: s.errorOrder.filter((n) => n !== el.name) };
-      });
-    }
+    // Campo com erro é revalidado a cada alteração: a mensagem só some quando o valor fica válido.
+    if (this.state.errors[el.name]) this.revalidateField(el.name);
     this.scheduleDraftSave();
   };
+
+  // Ao sair de um campo preenchido (ou que já tinha erro), confere o valor na hora.
+  onFormBlur = (e) => {
+    const el = e.target;
+    if (!el || !el.name || el.type === 'checkbox' || el.name === 'qtd_karts') return;
+    const filled = String(el.value || '').trim() !== '';
+    if (filled || this.state.errors[el.name]) this.revalidateField(el.name);
+  };
+
+  revalidateField(name) {
+    const next = this.validate(this.collect()).errors[name];
+    if (this.state.errors[name] === next) return;
+    this.setState((s) => {
+      const errors = { ...s.errors };
+      let errorOrder = s.errorOrder;
+      if (next) {
+        errors[name] = next;
+        if (!errorOrder.includes(name)) errorOrder = errorOrder.concat(name);
+      } else {
+        delete errors[name];
+        errorOrder = errorOrder.filter((n) => n !== name);
+      }
+      return { errors, errorOrder };
+    });
+  }
 
   // ---------- Rascunho local (sem CPF) ----------
   scheduleDraftSave() {
@@ -1090,7 +1136,9 @@ class Component extends DCLogic {
       formWrapStyle: { display: result ? 'none' : 'block' },
       onSubmit: this.onSubmit,
       onFormInput: this.onFormInput,
+      onFormBlur: this.onFormBlur,
       onKartsChange: this.onKartsChange,
+      errorShort: errorList.length === 1 ? 'Falta corrigir 1 campo destacado acima.' : 'Faltam corrigir ' + errorList.length + ' campos destacados acima.',
       clearForm: this.clearForm,
       draftRestored,
       kartBlocks,

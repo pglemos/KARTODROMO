@@ -189,33 +189,33 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
             </div>
             <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; line-height:0.9; font-size:26px;">{{ c.title }}</h2>
             <p style="margin:14px 0 0; font-size:14px; line-height:1.55; color:#a8b2aa;">{{ c.desc }}</p>
-            <div style="margin:18px 0; display:flex; align-items:center; gap:8px; font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#8b948c;">
+            <div style="margin:18px 0; display:flex; align-items:center; gap:8px; font-family:'Anton',sans-serif; font-size:14px; text-transform:uppercase; letter-spacing:0.04em; color:#d7ded8;">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="1"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
               <span>{{ c.dateLabel }}: {{ c.date }}</span>
             </div>
             <div style="border:1px solid rgba(255,255,255,.1); background:#030504; padding:18px;">
-              <h3 style="margin:0 0 10px; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; letter-spacing:0.08em;">Dados de inscrição necessários</h3>
+              <h3 style="margin:0 0 10px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:14px; letter-spacing:0.04em;">{{ c.requirementsTitle }}</h3>
               <ul style="list-style:none; margin:0; padding:0; display:grid; gap:8px;">
                 <sc-for list="{{ c.requirements }}" as="req" hint-placeholder-count="4">
-                  <li style="display:flex; gap:8px; font-size:12px; color:#a8b2aa;"><span style="color:#00e676;">›</span>{{ req }}</li>
+                  <li style="display:grid; grid-template-columns:12px 1fr; gap:8px; font-size:15px; line-height:1.4; color:#a8b2aa;"><span aria-hidden="true" style="width:6px; height:6px; margin-top:8px; border:2px solid #00e676; transform:rotate(45deg);"></span><span>{{ req }}</span></li>
                 </sc-for>
               </ul>
             </div>
           </div>
           <div style="display:flex; flex-wrap:wrap; gap:10px; border-top:1px solid rgba(255,255,255,.1); padding-top:22px; margin-top:22px;">
             <sc-if value="{{ c.canRegister }}">
-              <button type="button" onClick="{{ c.onRegister }}" style="display:inline-flex; align-items:center; gap:8px; min-height:48px; padding:0 20px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; letter-spacing:0.04em; border:0; cursor:pointer;">{{ c.registerLabel }}</button>
+              <button type="button" onClick="{{ c.onRegister }}" style="display:inline-flex; align-items:center; gap:8px; min-height:48px; padding:0 20px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:14px; letter-spacing:0.04em; border:0; cursor:pointer;">{{ c.registerLabel }}</button>
             </sc-if>
             <sc-if value="{{ c.registerHref }}">
-              <a href="{{ c.registerHref }}" style="display:inline-flex; align-items:center; gap:8px; min-height:48px; padding:0 20px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; letter-spacing:0.04em; text-decoration:none;">{{ c.registerLabel }}</a>
+              <a href="{{ c.registerHref }}" style="display:inline-flex; align-items:center; gap:8px; min-height:48px; padding:0 20px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:14px; letter-spacing:0.04em; text-decoration:none;">{{ c.registerLabel }}</a>
             </sc-if>
             <sc-if value="{{ c.pageHref }}">
-              <a href="{{ c.pageHref }}" style="display:inline-flex; align-items:center; gap:8px; min-height:48px; padding:0 20px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; letter-spacing:0.04em; text-decoration:none;">Página oficial</a>
+              <a href="{{ c.pageHref }}" style="display:inline-flex; align-items:center; gap:8px; min-height:48px; padding:0 20px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:14px; letter-spacing:0.04em; text-decoration:none;">Página oficial</a>
             </sc-if>
             <sc-if value="{{ c.showWhatsapp }}">
-              <a href="{{ c.whatsappHref }}" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:8px; min-height:48px; padding:0 20px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; letter-spacing:0.04em; text-decoration:none;">Valores via WhatsApp</a>
+              <a href="{{ c.whatsappHref }}" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:8px; min-height:48px; padding:0 20px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:14px; letter-spacing:0.04em; text-decoration:none;">Valores e dúvidas no WhatsApp</a>
             </sc-if>
-            <sc-if value="{{ c.closedLabel }}"><span style="border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.05); padding:14px 20px; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; color:#a8b2aa;">{{ c.closedLabel }}</span></sc-if>
+            <sc-if value="{{ c.closedLabel }}"><span style="border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.05); padding:14px 20px; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:14px; color:#d7ded8;">{{ c.closedLabel }}</span></sc-if>
           </div>
         </article>
       </sc-for>
@@ -272,28 +272,45 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
         <div><h2 id="reg-modal-title" style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:20px;">{{ modalTitle }}</h2><p style="margin:2px 0 0; color:#00e676; font-size:14px; font-weight:700;">{{ selectedTitle }}</p></div>
         <button type="button" onClick="{{ closeModal }}" aria-label="Fechar inscrição" style="flex:none; width:44px; height:44px; display:grid; place-items:center; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.05); color:#f7faf6; cursor:pointer;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
       </div>
-      <form onSubmit="{{ onSubmitRegistration }}" style="padding:24px; display:grid; gap:14px;">
+      <sc-if value="{{ showRegForm }}">
+      <form id="reg-form" onSubmit="{{ onSubmitRegistration }}" onInput="{{ onRegInput }}" onBlur="{{ onRegBlur }}" style="padding:24px; display:grid; gap:14px;">
+        <sc-if value="{{ regErrorCount }}">
+          <div role="alert" style="border:1px solid #d92d2d; background:rgba(217,45,45,.08); color:#ffd0d0; padding:14px 16px; font-size:15px; line-height:1.5;">
+            <strong style="display:block; color:#fff;">{{ regErrorTitle }}</strong>
+            <ul style="margin:8px 0 0; padding-left:18px;"><sc-for list="{{ regErrorList }}" as="msg" hint-placeholder-count="2"><li>{{ msg }}</li></sc-for></ul>
+          </div>
+        </sc-if>
+        <p style="margin:0; color:#a8b2aa; font-size:14px;">Todos os campos são obrigatórios, exceto os marcados como opcionais.</p>
         <sc-if value="{{ selectedIsTeam }}">
-          <div style="display:grid; gap:6px;"><label for="c-equipe" style="font-size:14px; font-weight:700; color:#d7ded8;">Nome da equipe *</label><input id="c-equipe" name="nome_equipe" type="text" required="" autocomplete="organization" placeholder="Ex.: Minas Racing Team" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"></div>
-          <div style="display:grid; gap:6px;"><label for="c-chefe" style="font-size:14px; font-weight:700; color:#d7ded8;">Nome do chefe de equipe *</label><input id="c-chefe" name="nome_chefe" type="text" required="" autocomplete="name" placeholder="Nome completo do responsável" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"></div>
-          <div style="display:grid; gap:6px;"><label for="c-pilotos" style="font-size:14px; font-weight:700; color:#d7ded8;">Pilotos e pesos, um por linha *</label><textarea id="c-pilotos" name="pilotos" required="" placeholder="Ex.: João Silva - 78 kg" style="width:100%; min-height:96px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none; resize:vertical;"></textarea></div>
-          <div style="display:grid; gap:6px;"><label for="c-karts" style="font-size:14px; font-weight:700; color:#d7ded8;">Quantidade de karts *</label><input id="c-karts" name="qtd_karts" type="number" inputmode="numeric" min="1" max="50" required="" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"></div>
+          <div style="display:grid; gap:6px;"><label for="c-equipe" style="font-size:14px; font-weight:700; color:#d7ded8;">Nome da equipe</label><input id="c-equipe" name="nome_equipe" type="text" aria-required="true" aria-invalid="{{ rinv.nome_equipe }}" aria-describedby="rerr-nome_equipe" autocomplete="organization" placeholder="Ex.: Minas Racing Team" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"><sc-if value="{{ re.nome_equipe }}"><p id="rerr-nome_equipe" style="margin:0; color:#ffb3b3; font-size:14px;">{{ re.nome_equipe }}</p></sc-if></div>
+          <div style="display:grid; gap:6px;"><label for="c-chefe" style="font-size:14px; font-weight:700; color:#d7ded8;">Nome do chefe de equipe</label><input id="c-chefe" name="nome_chefe" type="text" aria-required="true" aria-invalid="{{ rinv.nome_chefe }}" aria-describedby="rerr-nome_chefe" autocomplete="name" placeholder="Nome completo do responsável" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"><sc-if value="{{ re.nome_chefe }}"><p id="rerr-nome_chefe" style="margin:0; color:#ffb3b3; font-size:14px;">{{ re.nome_chefe }}</p></sc-if></div>
+          <div style="display:grid; gap:6px;"><label for="c-pilotos" style="font-size:14px; font-weight:700; color:#d7ded8;">Pilotos e pesos, um por linha</label><textarea id="c-pilotos" name="pilotos" aria-required="true" aria-invalid="{{ rinv.pilotos }}" aria-describedby="rerr-pilotos" placeholder="Ex.: João Silva - 78 kg" style="width:100%; min-height:96px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none; resize:vertical;"></textarea><sc-if value="{{ re.pilotos }}"><p id="rerr-pilotos" style="margin:0; color:#ffb3b3; font-size:14px;">{{ re.pilotos }}</p></sc-if></div>
+          <div style="display:grid; gap:6px;"><label for="c-karts" style="font-size:14px; font-weight:700; color:#d7ded8;">Quantidade de karts</label><input id="c-karts" name="qtd_karts" type="text" inputmode="numeric" maxlength="2" aria-required="true" aria-invalid="{{ rinv.qtd_karts }}" aria-describedby="rerr-qtd_karts" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"><sc-if value="{{ re.qtd_karts }}"><p id="rerr-qtd_karts" style="margin:0; color:#ffb3b3; font-size:14px;">{{ re.qtd_karts }}</p></sc-if></div>
         </sc-if>
         <sc-if value="{{ selectedIsIndividual }}">
-          <div style="display:grid; gap:6px;"><label for="c-nome" style="font-size:14px; font-weight:700; color:#d7ded8;">Nome completo *</label><input id="c-nome" name="nome" type="text" required="" autocomplete="name" placeholder="Nome e sobrenome" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"></div>
+          <div style="display:grid; gap:6px;"><label for="c-nome" style="font-size:14px; font-weight:700; color:#d7ded8;">Nome completo</label><input id="c-nome" name="nome" type="text" aria-required="true" aria-invalid="{{ rinv.nome }}" aria-describedby="rerr-nome" autocomplete="name" placeholder="Nome e sobrenome" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"><sc-if value="{{ re.nome }}"><p id="rerr-nome" style="margin:0; color:#ffb3b3; font-size:14px;">{{ re.nome }}</p></sc-if></div>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
-            <div style="display:grid; gap:6px;"><label for="c-idade" style="font-size:14px; font-weight:700; color:#d7ded8;">Idade</label><input id="c-idade" name="idade" type="number" inputmode="numeric" min="8" max="90" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"></div>
-            <div style="display:grid; gap:6px;"><label for="c-peso" style="font-size:14px; font-weight:700; color:#d7ded8;">Peso (kg)</label><input id="c-peso" name="peso" type="number" inputmode="decimal" min="30" max="180" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"></div>
+            <div style="display:grid; gap:6px; align-content:start;"><label for="c-idade" style="font-size:14px; font-weight:700; color:#d7ded8;">Idade <span style="font-weight:500; color:#a8b2aa;">(opcional)</span></label><input id="c-idade" name="idade" type="text" inputmode="numeric" maxlength="2" aria-invalid="{{ rinv.idade }}" aria-describedby="rerr-idade" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"><sc-if value="{{ re.idade }}"><p id="rerr-idade" style="margin:0; color:#ffb3b3; font-size:14px;">{{ re.idade }}</p></sc-if></div>
+            <div style="display:grid; gap:6px; align-content:start;"><label for="c-peso" style="font-size:14px; font-weight:700; color:#d7ded8;">Peso em kg <span style="font-weight:500; color:#a8b2aa;">(opcional)</span></label><input id="c-peso" name="peso" type="text" inputmode="decimal" maxlength="5" aria-invalid="{{ rinv.peso }}" aria-describedby="rerr-peso" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"><sc-if value="{{ re.peso }}"><p id="rerr-peso" style="margin:0; color:#ffb3b3; font-size:14px;">{{ re.peso }}</p></sc-if></div>
           </div>
-          <div style="display:grid; gap:6px;"><label for="c-cidade" style="font-size:14px; font-weight:700; color:#d7ded8;">Cidade</label><input id="c-cidade" name="cidade" type="text" autocomplete="address-level2" placeholder="Betim / MG" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"></div>
+          <div style="display:grid; gap:6px;"><label for="c-cidade" style="font-size:14px; font-weight:700; color:#d7ded8;">Cidade <span style="font-weight:500; color:#a8b2aa;">(opcional)</span></label><input id="c-cidade" name="cidade" type="text" autocomplete="address-level2" placeholder="Betim / MG" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"></div>
         </sc-if>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
-          <div style="display:grid; gap:6px;"><label for="c-whats" style="font-size:14px; font-weight:700; color:#d7ded8;">WhatsApp com DDD *</label><input id="c-whats" name="whatsapp" type="tel" inputmode="tel" required="" autocomplete="tel-national" placeholder="(31) 99999-9999" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"></div>
-          <div style="display:grid; gap:6px;"><label for="c-email" style="font-size:14px; font-weight:700; color:#d7ded8;">E-mail *</label><input id="c-email" name="email" type="email" required="" autocomplete="email" placeholder="voce@email.com" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"></div>
+          <div style="display:grid; gap:6px; align-content:start;"><label for="c-whats" style="font-size:14px; font-weight:700; color:#d7ded8;">WhatsApp com DDD</label><input id="c-whats" name="whatsapp" type="tel" inputmode="tel" maxlength="15" aria-required="true" aria-invalid="{{ rinv.whatsapp }}" aria-describedby="rerr-whatsapp" autocomplete="tel-national" placeholder="(31) 99999-9999" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"><sc-if value="{{ re.whatsapp }}"><p id="rerr-whatsapp" style="margin:0; color:#ffb3b3; font-size:14px;">{{ re.whatsapp }}</p></sc-if></div>
+          <div style="display:grid; gap:6px; align-content:start;"><label for="c-email" style="font-size:14px; font-weight:700; color:#d7ded8;">E-mail</label><input id="c-email" name="email" type="email" aria-required="true" aria-invalid="{{ rinv.email }}" aria-describedby="rerr-email" autocomplete="email" placeholder="voce@email.com" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"><sc-if value="{{ re.email }}"><p id="rerr-email" style="margin:0; color:#ffb3b3; font-size:14px;">{{ re.email }}</p></sc-if></div>
         </div>
         <p style="margin:0; background:rgba(0,230,118,.08); border:1px solid rgba(0,230,118,.25); padding:14px; font-size:15px; line-height:1.5; color:#bfe9d0;"><strong style="color:#f7faf6;">Como funciona:</strong> ao enviar, abrimos o WhatsApp da organização com seus dados. A inscrição é confirmada lá, junto com os valores e a forma de pagamento (PIX, transferência ou cartão).</p>
         <button type="submit" style="width:100%; appearance:none; border:0; cursor:pointer; min-height:56px; clip-path:polygon(3% 0,100% 0,97% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:14px; letter-spacing:0.04em;">Enviar inscrição pelo WhatsApp</button>
       </form>
+      </sc-if>
+      <sc-if value="{{ regSent }}">
+        <div style="padding:28px 24px; display:grid; gap:16px;">
+          <div style="display:flex; align-items:center; gap:14px;"><span aria-hidden="true" style="flex:none; width:44px; height:44px; display:grid; place-items:center; border:2px solid #00e676; color:#00e676;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12 5 5 9-10"/></svg></span><h3 id="reg-sent-title" tabindex="-1" style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:24px; line-height:1; outline:none;">Falta enviar no WhatsApp</h3></div>
+          <p style="margin:0; color:#d7ded8; font-size:16px; line-height:1.55;">Abrimos o WhatsApp da organização com seus dados preenchidos. <strong style="color:#f7faf6;">Envie a mensagem para concluir a inscrição.</strong> Se o WhatsApp não abriu, use o botão abaixo.</p>
+          <a href="{{ regWhatsappHref }}" target="_blank" rel="noopener noreferrer" style="display:flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 24px; clip-path:polygon(3% 0,100% 0,97% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:15px; letter-spacing:0.04em; text-decoration:none;">Abrir WhatsApp com a inscrição</a>
+          <button type="button" onClick="{{ closeModal }}" style="min-height:48px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#d7ded8; font-size:15px; font-weight:700; cursor:pointer;">Fechar</button>
+        </div>
+      </sc-if>
     </div>
   </div>
 
@@ -319,7 +336,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
         </div>
       </div>
     </div>
-    <div style="width:min(1480px,calc(100% - 48px)); margin:46px auto 0; padding-top:22px; border-top:1px solid rgba(255,255,255,.12); display:flex; flex-wrap:wrap; justify-content:space-between; gap:20px; color:#667067; font-size:12px;">
+    <div style="width:min(1480px,calc(100% - 48px)); margin:46px auto 0; padding-top:22px; border-top:1px solid rgba(255,255,255,.12); display:flex; flex-wrap:wrap; justify-content:space-between; gap:20px; color:#829083; font-size:13px;">
       <span>© 2026 Kartódromo Internacional de Betim</span><span>Betim · Minas Gerais</span>
     </div>
   </footer>
@@ -336,7 +353,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 const CHAMPIONSHIPS_DATA = [
   { id: 'kac-iniciantes', title: 'KAC Iniciantes · Kart Light', desc: 'Um campeonato mensal disputado na categoria Kart Light para pilotos iniciantes, com 7 corridas no mês. As 4 melhores corridas entram no ranking, com regulamento, calendário, pontuação e premiação oficiais.', date: 'Mensal', status: 'open', statusLabel: 'INSCRIÇÕES ABERTAS', logo: 'assets/championships/kac-iniciantes-logo.png', requiresTeamForm: false, pageHref: '/kac' },
   { id: 'kac-super-kart', title: 'KAC Super Kart', desc: 'Um campeonato anual disputado na categoria Super Kart com 9 etapas, sendo uma corrida por mês, para pilotos experientes.', date: 'Mensal', status: 'open', statusLabel: 'INSCRIÇÕES ABERTAS', logo: 'assets/championships/kac-super-kart-logo.png', requiresTeamForm: false, pageHref: '/kac-super' },
-  { id: '100-milhas-light', title: '100 Milhas Light de Betim', desc: 'Endurance de 2,5 horas com os karts light de locação do kartódromo. Equipes de 1 a 3 pilotos por kart, até 5 karts por equipe, com 3 paradas obrigatórias. Inscrição de R$ 900 por kart, até 15/10/2026.', date: '25/10/2026', status: 'open', statusLabel: 'INSCRIÇÕES ABERTAS', logo: 'assets/championships/100-milhas-light-logo.png', requiresTeamForm: true, pageHref: '/100-milhas-light', registerHref: '/100-milhas-light#formulario', registrationDeadline: '2026-10-15T23:59:59-03:00' },
+  { id: '100-milhas-light', title: '100 Milhas Light de Betim', desc: 'Endurance de 2,5 horas com os karts light de locação do kartódromo. Equipes de 1 a 3 pilotos por kart, até 5 karts por equipe, com 3 paradas obrigatórias. Inscrição de R$ 900 por kart, até 15/10/2026.', date: '25/10/2026', status: 'open', statusLabel: 'INSCRIÇÕES ABERTAS', logo: 'assets/championships/100-milhas-light-logo.png', requiresTeamForm: true, pageHref: '/100-milhas-light', registerHref: '/100-milhas-light#formulario', registrationDeadline: '2026-10-15T23:59:59-03:00', requirementsTitle: 'Resumo da inscrição', requirements: ['R$ 900 por kart, com até 5 karts por equipe', 'Chefe de equipe com CPF, WhatsApp e e-mail', 'Nome, idade, altura e peso de cada piloto', 'Inscrições e pagamento até 15/10/2026'] },
   { id: '500-milhas', title: '500 Milhas de Betim', desc: 'O maior desafio do calendário, com alto nível de competitividade e emoção. Uma corrida com 12 horas de duração que exige preparo físico, mental e estratégia apurada das equipes.', date: '29/08/2026', status: 'past', statusLabel: 'JÁ ACONTECEU', logo: 'assets/championships/500-milhas-logo.png', requiresTeamForm: true, pageHref: '/500-milhas' },
   { id: 'desafio-2h', title: 'Desafio 2 Horas de Betim', desc: 'Prova dinâmica e estratégica, com duas horas de corrida intensa. Ideal para quem busca adrenalina, constância e trabalho em equipe em um formato competitivo e equilibrado.', date: '08/08/2026', status: 'past', statusLabel: 'JÁ ACONTECEU', logo: 'assets/championships/desafio-2h-logo.png', requiresTeamForm: true, pageHref: null },
   { id: '200-milhas', title: '200 Milhas de Betim', desc: 'Prova com duração de 5 horas que desafia estratégia, resistência e trabalho em equipe. Uma das corridas mais tradicionais do kartismo regional, reunindo pilotos em uma disputa intensa do início ao fim.', date: '07/02/2026', status: 'past', statusLabel: 'JÁ ACONTECEU', logo: 'assets/championships/200-milhas-logo.png', requiresTeamForm: true, pageHref: '/200-milhas' },
@@ -348,7 +365,7 @@ const championshipStatus = (c) => {
 };
 
 class Component extends DCLogic {
-  state = { headerScrolled: false, mobileNavOpen: false, isMobile: typeof window !== 'undefined' && window.matchMedia('(max-width: 1100px)').matches, modalOpen: false, selectedId: null };
+  state = { headerScrolled: false, mobileNavOpen: false, isMobile: typeof window !== 'undefined' && window.matchMedia('(max-width: 1100px)').matches, modalOpen: false, selectedId: null, regErrors: {}, regSent: false, regWhatsappHref: '' };
 
   componentDidMount() {
     this._onScroll = () => {
@@ -402,7 +419,7 @@ class Component extends DCLogic {
     }), 120);
   };
   closeModal = () => {
-    this.setState({ modalOpen: false });
+    this.setState({ modalOpen: false, regErrors: {}, regSent: false, regWhatsappHref: '' });
     this.setBackgroundInert(false);
     if (this._trigger && this._trigger.focus) this._trigger.focus();
   };
@@ -419,8 +436,70 @@ class Component extends DCLogic {
   };
   stopPropagation = (e) => e.stopPropagation();
 
+  // Validação por campo, no mesmo padrão do formulário das 100 Milhas.
+  validateRegistration(form) {
+    const champ = CHAMPIONSHIPS_DATA.find((c) => c.id === this.state.selectedId);
+    const data = new FormData(form);
+    const val = (n) => String(data.get(n) || '').trim();
+    const errors = {};
+    if (champ && champ.requiresTeamForm) {
+      if (!val('nome_equipe')) errors.nome_equipe = 'Informe o nome da equipe.';
+      if (!val('nome_chefe')) errors.nome_chefe = 'Informe o nome do chefe de equipe.';
+      if (!val('pilotos')) errors.pilotos = 'Informe pelo menos um piloto, um por linha.';
+      const karts = Number(val('qtd_karts'));
+      if (!(karts >= 1 && karts <= 50)) errors.qtd_karts = 'Informe de 1 a 50 karts.';
+    } else {
+      if (!val('nome')) errors.nome = 'Informe seu nome completo.';
+      const idade = val('idade');
+      if (idade && !(Number(idade) >= 8 && Number(idade) <= 90)) errors.idade = 'A idade deve estar entre 8 e 90 anos.';
+      const peso = val('peso').replace(',', '.');
+      if (peso && !(Number(peso) >= 30 && Number(peso) <= 180)) errors.peso = 'O peso deve estar entre 30 e 180 kg.';
+    }
+    const phone = val('whatsapp').replace(/\D/g, '');
+    if (phone.length < 10 || phone.length > 11) errors.whatsapp = 'Informe o WhatsApp com DDD, por exemplo (31) 99999-9999.';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val('email'))) errors.email = 'Informe um e-mail válido, por exemplo voce@email.com.';
+    this._regOrder = Array.from(form.elements).map((el) => el.name).filter(Boolean);
+    return errors;
+  }
+
+  revalidateRegField(form, name) {
+    const next = this.validateRegistration(form)[name];
+    if (this.state.regErrors[name] === next) return;
+    this.setState((s) => {
+      const regErrors = { ...s.regErrors };
+      if (next) regErrors[name] = next; else delete regErrors[name];
+      return { regErrors };
+    });
+  }
+
+  onRegInput = (e) => {
+    const el = e.target;
+    if (!el || !el.name) return;
+    if (el.name === 'whatsapp') {
+      const d = el.value.replace(/\D/g, '').slice(0, 11);
+      el.value = d.length <= 2 ? (d.length ? '(' + d : '') : d.length <= 6 ? '(' + d.slice(0, 2) + ') ' + d.slice(2) : d.length <= 10 ? '(' + d.slice(0, 2) + ') ' + d.slice(2, 6) + '-' + d.slice(6) : '(' + d.slice(0, 2) + ') ' + d.slice(2, 7) + '-' + d.slice(7);
+    }
+    if (this.state.regErrors[el.name]) this.revalidateRegField(el.form, el.name);
+  };
+
+  onRegBlur = (e) => {
+    const el = e.target;
+    if (!el || !el.name || !el.form) return;
+    if (String(el.value || '').trim() || this.state.regErrors[el.name]) this.revalidateRegField(el.form, el.name);
+  };
+
   onSubmitRegistration = (e) => {
     e.preventDefault();
+    const errors = this.validateRegistration(e.target);
+    if (Object.keys(errors).length) {
+      this.setState({ regErrors: errors });
+      const first = this._regOrder.find((n) => errors[n]);
+      setTimeout(() => requestAnimationFrame(() => {
+        const el = e.target.querySelector('[name="' + first + '"]');
+        if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.focus({ preventScroll: true }); }
+      }), 60);
+      return;
+    }
     const champ = CHAMPIONSHIPS_DATA.find((c) => c.id === this.state.selectedId);
     const data = new FormData(e.target);
     const lines = ['Olá! Quero me inscrever no ' + (champ ? champ.title : 'campeonato') + '.', ''];
@@ -459,8 +538,14 @@ class Component extends DCLogic {
       fetch('/api/inscricao', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(() => undefined);
     } catch (error) { /* WhatsApp segue como canal principal */ }
 
-    window.open('https://wa.me/5531998842898?text=' + encodeURIComponent(lines.join('\n')), '_blank', 'noopener,noreferrer');
-    this.closeModal();
+    const whatsappHref = 'https://wa.me/5531998842898?text=' + encodeURIComponent(lines.join('\n'));
+    // Abre no mesmo gesto do clique (não é bloqueado); a tela seguinte oferece o link caso não abra.
+    window.open(whatsappHref, '_blank', 'noopener,noreferrer');
+    this.setState({ regSent: true, regErrors: {}, regWhatsappHref: whatsappHref });
+    setTimeout(() => requestAnimationFrame(() => {
+      const title = document.getElementById('reg-sent-title');
+      if (title) title.focus();
+    }), 80);
   };
 
   renderVals() {
@@ -493,9 +578,10 @@ class Component extends DCLogic {
         dateLabel: isOpen ? (c.date === 'Mensal' ? 'Formato' : 'Data') : 'Data',
         cardStyle: { display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: isOpen ? '1px solid rgba(0,230,118,.22)' : '1px solid rgba(255,255,255,.12)', background: '#0b100c', padding: '28px', opacity: status === 'past' ? 0.55 : 1 },
         badgeStyle: { ...badgeBase, ...(statusStyles[status] || statusStyles.past) },
-        requirements: c.requiresTeamForm
+        requirementsTitle: c.requirementsTitle || 'Como funciona a inscrição',
+        requirements: c.requirements || (c.requiresTeamForm
           ? ['Nome oficial da equipe', 'Nome do chefe de equipe', 'Nome dos pilotos e peso individual em kg', 'Quantidade de karts participantes']
-          : ['Taxa de inscrição única do campeonato', 'Pagamento individual de cada etapa corrida'],
+          : ['Taxa de inscrição única do campeonato', 'Pagamento individual de cada etapa corrida']),
         canRegister: isOpen && !c.registerHref,
         registerHref: isOpen && c.registerHref ? c.registerHref : null,
         registerLabel: c.requiresTeamForm ? 'Inscrever equipe' : 'Inscrever piloto',
@@ -503,13 +589,19 @@ class Component extends DCLogic {
         linkAria: 'Ver página da ' + c.title,
         onRegister: () => this.openModal(c.id),
         pageHref: c.pageHref,
-        showWhatsapp: isOpen,
+        showWhatsapp: isOpen && !c.registerHref,
         whatsappHref: 'https://wa.me/5531998842898?text=' + encodeURIComponent('Olá! Gostaria de saber valores e regulamento para o campeonato ' + c.title),
         closedLabel: status === 'past' || status === 'closed' ? 'Inscrições encerradas' : status === 'soon' ? 'Em breve / Pré-inscrições' : null,
       };
     });
 
     const selected = CHAMPIONSHIPS_DATA.find((c) => c.id === selectedId);
+    const openList = championships.filter((c) => c.status === 'open');
+    const openCount = openList.length;
+    const openTitles = openList.map((c) => c.title.replace(' · Kart Light', '').replace(' de Betim', '')).join(', ');
+    const nextRace = CHAMPIONSHIPS_DATA.find((c) => championshipStatus(c) === 'open' && /^\d{2}\/\d{2}\/\d{4}$/.test(c.date));
+    const { regErrors, regSent, regWhatsappHref } = this.state;
+    const regErrorNames = Object.keys(regErrors);
 
     return {
       skipLinkStyle: { position: 'fixed', left: '16px', top: '12px', zIndex: 1000, padding: '12px 16px', background: '#00e676', color: '#041301', fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '12px', transform: 'translateY(-180%)', transition: 'transform .2s' },
@@ -528,11 +620,12 @@ class Component extends DCLogic {
       reservaCtaStyle: { display: isMobile ? 'none' : 'inline-flex', flex: 'none', alignItems: 'center', gap: '8px', minHeight: '46px', padding: '0 20px', clipPath: 'polygon(7% 0,100% 0,93% 100%,0 100%)', background: 'linear-gradient(135deg,#00e676,#00c853)', color: '#041301', fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '12px', letterSpacing: '0.04em', textDecoration: 'none' },
       hamburgerBtnStyle: { display: isMobile ? 'block' : 'none', width: '48px', height: '48px', flex: 'none', border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)', cursor: 'pointer' },
 
+      // Faixa do topo com informação real, derivada do próprio calendário.
       topStats: [
-        { icon: 'M3 5h18v16H3zM8 3v4M16 3v4M3 10h18', title: 'Temporada 2026', text: 'Etapas ao longo do ano' },
-        { icon: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75', title: 'Pilotos e equipes', text: 'Categorias para diferentes níveis' },
-        { icon: 'M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4ZM7 6H4v2a4 4 0 0 0 4 4M17 6h3v2a4 4 0 0 1-4 4', title: 'Premiação oficial', text: 'Troféus e classificação acumulada' },
-        { icon: 'M5 21V4m0 1c5-3 9 3 14 0v9c-5 3-9-3-14 0', title: 'Regras publicadas', text: 'Regulamentos para download' },
+        { icon: 'M3 5h18v16H3zM8 3v4M16 3v4M3 10h18', title: openCount + (openCount === 1 ? ' inscrição aberta' : ' inscrições abertas'), text: openTitles },
+        { icon: 'M5 21V4m0 1c5-3 9 3 14 0v9c-5 3-9-3-14 0', title: nextRace ? 'Próxima prova: ' + nextRace.date.slice(0, 5) : 'Calendário 2026', text: nextRace ? nextRace.title : 'Novas datas em breve' },
+        { icon: 'M12 7v5l3 2M9 2h6M12 22a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z', title: 'Cronometragem eletrônica', text: 'Tempos e posições oficiais do LapTime' },
+        { icon: 'M12 3v12m-5-5 5 5 5-5M5 21h14', title: 'Regulamentos em PDF', text: 'Na página oficial de cada prova' },
       ],
       activeChampionships: championships.filter((c) => c.status !== 'past'),
       pastChampionships: championships.filter((c) => c.status === 'past'),
@@ -545,10 +638,20 @@ class Component extends DCLogic {
 
       modalOpen, closeModal: this.closeModal, stopPropagation: this.stopPropagation, onSubmitRegistration: this.onSubmitRegistration,
       onDialogKeyDown: this.onDialogKeyDown,
+      onRegInput: this.onRegInput,
+      onRegBlur: this.onRegBlur,
+      re: regErrors,
+      rinv: Object.fromEntries(regErrorNames.map((n) => [n, true])),
+      regErrorCount: regErrorNames.length,
+      regErrorTitle: regErrorNames.length === 1 ? 'Falta corrigir 1 campo:' : 'Faltam corrigir ' + regErrorNames.length + ' campos:',
+      regErrorList: this._regOrder ? this._regOrder.filter((n) => regErrors[n]).map((n) => regErrors[n]) : Object.values(regErrors),
+      showRegForm: !regSent,
+      regSent,
+      regWhatsappHref,
       modalTitle: selected && selected.requiresTeamForm ? 'Inscrição de equipe' : 'Inscrição de piloto',
       modalClosed: !modalOpen,
       modalOverlayStyle: { position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(0,0,0,.78)', backdropFilter: 'blur(12px)', display: 'grid', placeItems: 'center', padding: '20px', opacity: modalOpen ? 1 : 0, visibility: modalOpen ? 'visible' : 'hidden', transition: '.3s', pointerEvents: modalOpen ? 'auto' : 'none' },
-      selectedTitle: selected ? selected.title : '',
+      selectedTitle: selected ? selected.title : 'Campeonatos do Kartódromo de Betim',
       selectedIsTeam: !!(selected && selected.requiresTeamForm),
       selectedIsIndividual: !!(selected && !selected.requiresTeamForm),
     };
