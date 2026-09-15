@@ -84,8 +84,10 @@ const nextConfig: NextConfig = {
       },
       {
         // Os documentos de design são as páginas públicas servidas; indexáveis.
+        // Cache curto: o runtime relê o próprio HTML via fetch e, com cache de 1h, visitantes
+        // viam a versão anterior da página por até uma hora depois de cada deploy.
         source: '/design/:path*',
-        headers: [{ key: 'Cache-Control', value: 'public, max-age=3600, s-maxage=3600' }],
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=0, s-maxage=60, must-revalidate' }],
       },
       {
         // Protótipos administrativos ficam no repositório apenas como referência.

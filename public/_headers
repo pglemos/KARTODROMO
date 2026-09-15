@@ -24,4 +24,4 @@
 
 /design/*
   X-Robots-Tag: noindex, nofollow, noarchive
-  Cache-Control: public, max-age=3600
+  Cache-Control: public, max-age=0, s-maxage=60, must-revalidate
