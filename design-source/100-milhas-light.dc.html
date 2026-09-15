@@ -285,9 +285,16 @@
   <!-- MODAL INSCRIÇÃO -->
   <div id="ml-dialog" role="dialog" aria-modal="true" aria-hidden="{{ modalClosed }}" aria-labelledby="ml-dialog-title" style="{{ modalOverlayStyle }}" onClick="{{ onOverlayClick }}" onKeyDown="{{ onDialogKeyDown }}">
     <div id="ml-panel" style="width:min(720px,100%); max-height:92vh; overflow:auto; overscroll-behavior:contain; background:#0b100c; border:1px solid rgba(255,255,255,.15); box-shadow:0 30px 90px rgba(0,0,0,.55); position:relative;" onClick="{{ stopPropagation }}">
-      <div style="position:sticky; top:0; z-index:3; display:flex; align-items:center; justify-content:space-between; gap:16px; border-bottom:1px solid rgba(255,255,255,.1); background:rgba(11,16,12,.97); padding:16px 24px;">
+      <div id="ml-panel-header" style="position:sticky; top:0; z-index:3; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px 16px; border-bottom:1px solid rgba(255,255,255,.1); background:rgba(11,16,12,.97); padding:16px 24px 12px;">
         <div style="min-width:0;"><h2 id="ml-dialog-title" style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:20px;">Inscrição de equipe</h2><p style="margin:2px 0 0; color:#00e676; font-size:14px; font-weight:700;">100 Milhas Light de Betim · 25/10/2026</p></div>
         <button type="button" onClick="{{ closeModal }}" aria-label="Fechar inscrição" style="flex:none; width:44px; height:44px; display:grid; place-items:center; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.05); color:#f7faf6; cursor:pointer;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+        <sc-if value="{{ showFormNav }}">
+          <nav aria-label="Etapas da inscrição" style="flex-basis:100%; min-width:0; display:flex; flex-wrap:nowrap; gap:6px; overflow-x:auto; scrollbar-width:none; padding-bottom:2px;">
+            <sc-for list="{{ sectionNav }}" as="s" hint-placeholder-count="4">
+              <button type="button" onClick="{{ s.go }}" aria-label="{{ s.aria }}" style="{{ s.style }}">{{ s.label }}</button>
+            </sc-for>
+          </nav>
+        </sc-if>
       </div>
 
       <div style="{{ formWrapStyle }}">
@@ -300,13 +307,13 @@
             <div id="ml-error-summary" role="alert" style="border:1px solid #d92d2d; background:rgba(217,45,45,.08); color:#ffd0d0; padding:14px 16px; font-size:15px; line-height:1.5;">
               <strong style="display:block; color:#fff;">{{ errorTitle }}</strong>
               <ul style="margin:8px 0 0; padding-left:18px;">
-                <sc-for list="{{ errorList }}" as="msg" hint-placeholder-count="2"><li><button type="button" onClick="{{ msg.go }}" style="appearance:none; border:0; background:none; padding:4px 0; min-height:32px; color:#ffd0d0; font:inherit; text-align:left; text-decoration:underline; text-underline-offset:3px; cursor:pointer;">{{ msg.text }}</button></li></sc-for>
+                <sc-for list="{{ errorList }}" as="msg" hint-placeholder-count="2"><li style="margin:2px 0;"><button type="button" onClick="{{ msg.go }}" style="appearance:none; display:block; width:100%; border:0; background:none; padding:6px 0; color:#ffd0d0; font:inherit; line-height:1.4; text-align:left; text-decoration:underline; text-underline-offset:3px; cursor:pointer;">{{ msg.text }}</button></li></sc-for>
               </ul>
             </div>
           </sc-if>
 
           <fieldset style="margin:0; padding:0; border:0; display:grid; gap:14px; min-width:0;">
-            <legend style="padding:0; margin-bottom:6px; font-family:'Anton',sans-serif; font-size:15px; letter-spacing:0.06em; text-transform:uppercase; color:#00e676;">1 · Equipe e chefe de equipe</legend>
+            <legend style="padding:0; margin-bottom:6px; font-family:'Anton',sans-serif; font-size:15px; letter-spacing:0.06em; text-transform:uppercase; color:#00e676;" id="ml-sec-1">1 · Equipe e chefe de equipe</legend>
             <div style="display:grid; gap:6px;">
               <label for="f-equipe" style="font-size:14px; font-weight:700; color:#d7ded8;">Nome da equipe</label>
               <input id="f-equipe" name="nome_equipe" type="text" maxlength="80" autocomplete="organization" aria-required="true" aria-invalid="{{ inv.nome_equipe }}" aria-describedby="err-nome_equipe" placeholder="Ex.: Minas Racing Team" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;">
@@ -344,7 +351,7 @@
           </fieldset>
 
           <fieldset style="margin:0; padding:0; border:0; display:grid; gap:14px; min-width:0;">
-            <legend style="padding:0; margin-bottom:6px; font-family:'Anton',sans-serif; font-size:15px; letter-spacing:0.06em; text-transform:uppercase; color:#00e676;">2 · Karts e pilotos</legend>
+            <legend style="padding:0; margin-bottom:6px; font-family:'Anton',sans-serif; font-size:15px; letter-spacing:0.06em; text-transform:uppercase; color:#00e676;" id="ml-sec-2">2 · Karts e pilotos</legend>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:end;">
               <div style="display:grid; gap:6px;">
                 <label for="f-karts" style="font-size:14px; font-weight:700; color:#d7ded8;">Quantidade de karts (até 5)</label>
@@ -431,7 +438,7 @@
           </fieldset>
 
           <fieldset style="margin:0; padding:0; border:0; display:grid; gap:14px; min-width:0;">
-            <legend style="padding:0; margin-bottom:6px; font-family:'Anton',sans-serif; font-size:15px; letter-spacing:0.06em; text-transform:uppercase; color:#00e676;">3 · Pagamento</legend>
+            <legend style="padding:0; margin-bottom:6px; font-family:'Anton',sans-serif; font-size:15px; letter-spacing:0.06em; text-transform:uppercase; color:#00e676;" id="ml-sec-3">3 · Pagamento</legend>
             <div style="display:grid; gap:6px;">
               <label for="f-pag" style="font-size:14px; font-weight:700; color:#d7ded8;">Forma de pagamento</label>
               <select id="f-pag" name="pagamento" aria-required="true" aria-invalid="{{ inv.pagamento }}" aria-describedby="err-pagamento" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"><option value="">Selecione</option><option value="PIX">PIX</option><option value="Transferência bancária">Transferência bancária</option><option value="Cartão de crédito (até 3x)">Cartão de crédito (até 3x)</option></select>
@@ -444,7 +451,7 @@
           </fieldset>
 
           <fieldset style="margin:0; padding:0; border:0; display:grid; gap:4px; min-width:0;">
-            <legend style="padding:0; margin-bottom:10px; font-family:'Anton',sans-serif; font-size:15px; letter-spacing:0.06em; text-transform:uppercase; color:#00e676;">4 · Confirmações</legend>
+            <legend style="padding:0; margin-bottom:10px; font-family:'Anton',sans-serif; font-size:15px; letter-spacing:0.06em; text-transform:uppercase; color:#00e676;" id="ml-sec-4">4 · Confirmações</legend>
             <label style="display:grid; grid-template-columns:24px 1fr; gap:12px; align-items:start; min-height:44px; padding:10px 0; font-size:15px; color:#d7ded8; line-height:1.45; cursor:pointer;"><input name="aceite_regulamento" type="checkbox" aria-required="true" aria-invalid="{{ inv.aceite_regulamento }}" aria-describedby="err-aceite_regulamento" style="width:20px; height:20px; margin:2px 0 0; accent-color:#00e676;"><span>Li e aceito o <a href="assets/regulamentos/100-milhas-light-de-betim-2026.pdf" target="_blank" rel="noopener noreferrer" style="text-underline-offset:3px;">regulamento das 100 Milhas Light</a>.<sc-if value="{{ e.aceite_regulamento }}"><span id="err-aceite_regulamento" style="display:block; color:#ffb3b3; font-size:14px;">{{ e.aceite_regulamento }}</span></sc-if></span></label>
             <label style="display:grid; grid-template-columns:24px 1fr; gap:12px; align-items:start; min-height:44px; padding:10px 0; font-size:15px; color:#d7ded8; line-height:1.45; cursor:pointer;"><input name="aceite_requisitos" type="checkbox" aria-required="true" aria-invalid="{{ inv.aceite_requisitos }}" aria-describedby="err-aceite_requisitos" style="width:20px; height:20px; margin:2px 0 0; accent-color:#00e676;"><span>Confirmo que todos os pilotos cumprem os requisitos e que menores de 18 anos terão um responsável adulto no dia.<sc-if value="{{ e.aceite_requisitos }}"><span id="err-aceite_requisitos" style="display:block; color:#ffb3b3; font-size:14px;">{{ e.aceite_requisitos }}</span></sc-if></span></label>
             <label style="display:grid; grid-template-columns:24px 1fr; gap:12px; align-items:start; min-height:44px; padding:10px 0; font-size:15px; color:#d7ded8; line-height:1.45; cursor:pointer;"><input name="aceite_responsabilidade" type="checkbox" aria-required="true" aria-invalid="{{ inv.aceite_responsabilidade }}" aria-describedby="err-aceite_responsabilidade" style="width:20px; height:20px; margin:2px 0 0; accent-color:#00e676;"><span>Sei que o termo de responsabilidade é assinado na recepção no dia e que a vaga só é garantida com o pagamento total até 15/10/2026.<sc-if value="{{ e.aceite_responsabilidade }}"><span id="err-aceite_responsabilidade" style="display:block; color:#ffb3b3; font-size:14px;">{{ e.aceite_responsabilidade }}</span></sc-if></span></label>
@@ -856,6 +863,19 @@ class Component extends DCLogic {
     }, 90);
   }
 
+  // Atalhos de etapa: rola o painel até a seção (descontando o cabeçalho fixo) e foca o primeiro campo.
+  goToSection(n) {
+    const panel = document.getElementById('ml-panel');
+    const header = document.getElementById('ml-panel-header');
+    const legend = document.getElementById('ml-sec-' + n);
+    if (!panel || !legend) return;
+    const offset = legend.getBoundingClientRect().top - panel.getBoundingClientRect().top + panel.scrollTop - (header ? header.offsetHeight : 0) - 12;
+    panel.scrollTo({ top: Math.max(0, offset), behavior: 'smooth' });
+    const fieldset = legend.closest('fieldset');
+    const first = fieldset && fieldset.querySelector('input:not([type="hidden"]), select, textarea, summary');
+    if (first) setTimeout(() => first.focus({ preventScroll: true }), 350);
+  }
+
   focusField(name) {
     const form = this.form();
     const el = form ? form.querySelector('[name="' + name + '"]') : null;
@@ -988,8 +1008,13 @@ class Component extends DCLogic {
     });
 
     need('pagamento', 'Escolha a forma de pagamento.');
-    ['aceite_regulamento', 'aceite_requisitos', 'aceite_responsabilidade'].forEach((name) => {
-      if (!v[name]) errors[name] = 'Marque esta confirmação para continuar.';
+    const confirmations = {
+      aceite_regulamento: 'Marque que leu e aceita o regulamento.',
+      aceite_requisitos: 'Marque a confirmação dos requisitos dos pilotos.',
+      aceite_responsabilidade: 'Marque a ciência do termo de responsabilidade e do prazo de pagamento.',
+    };
+    Object.keys(confirmations).forEach((name) => {
+      if (!v[name]) errors[name] = confirmations[name];
     });
 
     // Ordem igual à do formulário, para o resumo e para o foco.
@@ -1179,6 +1204,29 @@ class Component extends DCLogic {
     });
     const showErrors = submitAttempted && errorList.length > 0;
 
+    const sectionOf = (name) => {
+      if (/^p\d+_/.test(name)) return 2;
+      if (name === 'pagamento') return 3;
+      if (/^aceite_/.test(name)) return 4;
+      return 1;
+    };
+    const sectionErrors = [0, 0, 0, 0];
+    if (submitAttempted) Object.keys(errors).forEach((name) => { sectionErrors[sectionOf(name) - 1] += 1; });
+    const sectionNav = ['Equipe', 'Karts', 'Pagamento', 'Confirmações'].map((label, i) => {
+      const count = sectionErrors[i];
+      return {
+        label: (i + 1) + ' ' + label + (count ? ' (' + count + ')' : ''),
+        aria: 'Ir para a etapa ' + (i + 1) + ', ' + label + (count ? ', ' + count + (count === 1 ? ' campo a corrigir' : ' campos a corrigir') : ''),
+        go: () => this.goToSection(i + 1),
+        style: {
+          minHeight: '40px', padding: '0 12px', whiteSpace: 'nowrap', cursor: 'pointer', fontSize: '14px', fontWeight: 700,
+          background: count ? 'rgba(217,45,45,.12)' : 'transparent',
+          border: count ? '1px solid #d92d2d' : '1px solid rgba(255,255,255,.18)',
+          color: count ? '#ffd0d0' : '#d7ded8',
+        },
+      };
+    });
+
     return {
       skipLinkStyle: { position: 'fixed', left: '16px', top: '12px', zIndex: 1000, padding: '12px 16px', background: '#00e676', color: '#041301', fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '12px', transform: 'translateY(-180%)', transition: 'transform .2s' },
       headerStyle: { position: 'fixed', insetInline: 0, top: 0, zIndex: 300, transition: '.28s', background: headerScrolled ? 'rgba(3,5,4,.86)' : 'transparent', backdropFilter: headerScrolled ? 'blur(18px)' : 'none', borderBottom: headerScrolled ? '1px solid rgba(255,255,255,.12)' : '1px solid transparent' },
@@ -1268,6 +1316,8 @@ class Component extends DCLogic {
       inv,
       showErrors,
       errorCount: errorList.length,
+      showFormNav: !result,
+      sectionNav,
       applyPaste: this.applyPaste,
       pasteStatus: this.state.pasteStatus,
       pasteConfirming: Boolean(pendingConfirm && pendingConfirm.type === 'paste'),
