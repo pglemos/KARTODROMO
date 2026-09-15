@@ -130,7 +130,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     button[disabled] { cursor: progress !important; opacity: .75; }
     nav[aria-label="Seções do formulário"]::-webkit-scrollbar { display: none; }
     @media (max-width: 720px) {
-      nav[aria-label="Seções do formulário"] { -webkit-mask-image: linear-gradient(90deg, #000 78%, transparent); mask-image: linear-gradient(90deg, #000 78%, transparent); }
+      nav[aria-label="Seções do formulário"] { -webkit-mask-image: linear-gradient(90deg, #000 62%, transparent 96%); mask-image: linear-gradient(90deg, #000 62%, transparent 96%); padding-right: 32px; }
     }
   </style>
 </helmet>
@@ -488,7 +488,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
                   </div>
                 </sc-if>
                 <button type="button" onClick="{{ applyPaste }}" style="justify-self:start; min-height:44px; padding:10px 18px; border:1px solid rgba(0,230,118,.5); background:rgba(0,230,118,.1); color:#00e676; font-size:15px; font-weight:700; cursor:pointer;">Preencher karts com a lista</button>
-                <p aria-live="polite" style="margin:0; color:#bfe9d0; font-size:15px; line-height:1.45;">{{ pasteStatus }}</p>
+                <p id="ml-paste-status" aria-live="polite" style="scroll-margin-top:200px; margin:0; color:#bfe9d0; font-size:15px; line-height:1.45;">{{ pasteStatus }}</p>
               </div>
             </details>
 
@@ -554,7 +554,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 
           <fieldset style="margin:0; padding:0; border:0; display:grid; gap:4px; min-width:0;">
             <legend style="padding:0; margin-bottom:10px; font-family:'Anton',sans-serif; font-size:15px; letter-spacing:0.06em; text-transform:uppercase; color:#00e676;" id="ml-sec-4">4 · Confirmações</legend>
-            <label style="display:grid; grid-template-columns:24px minmax(0,62ch); gap:12px; align-items:start; min-height:44px; padding:10px 0; font-size:15px; color:#d7ded8; line-height:1.45; cursor:pointer;"><input name="aceite_regulamento" type="checkbox" aria-required="true" aria-invalid="{{ inv.aceite_regulamento }}" aria-describedby="err-aceite_regulamento" style="width:20px; height:20px; margin:2px 0 0; accent-color:#00e676;"><span>Li e aceito o <a href="assets/regulamentos/100-milhas-light-de-betim-2026.pdf" target="_blank" rel="noopener noreferrer" style="text-underline-offset:3px;">regulamento das 100 Milhas Light</a>.<sc-if value="{{ e.aceite_regulamento }}"><span id="err-aceite_regulamento" style="display:block; color:#ffb3b3; font-size:14px;">{{ e.aceite_regulamento }}</span></sc-if></span></label>
+            <label style="display:grid; grid-template-columns:24px minmax(0,62ch); gap:12px; align-items:start; min-height:44px; padding:10px 0; font-size:15px; color:#d7ded8; line-height:1.45; cursor:pointer;"><input name="aceite_regulamento" type="checkbox" aria-required="true" aria-invalid="{{ inv.aceite_regulamento }}" aria-describedby="err-aceite_regulamento" style="width:20px; height:20px; margin:2px 0 0; accent-color:#00e676;"><span>Li e aceito o <a href="assets/regulamentos/100-milhas-light-de-betim-2026.pdf" target="_blank" rel="noopener noreferrer" style="display:inline-block; padding:12px 0; margin:-12px 0; text-underline-offset:3px;">regulamento das 100 Milhas Light</a>.<sc-if value="{{ e.aceite_regulamento }}"><span id="err-aceite_regulamento" style="display:block; color:#ffb3b3; font-size:14px;">{{ e.aceite_regulamento }}</span></sc-if></span></label>
             <label style="display:grid; grid-template-columns:24px minmax(0,62ch); gap:12px; align-items:start; min-height:44px; padding:10px 0; font-size:15px; color:#d7ded8; line-height:1.45; cursor:pointer;"><input name="aceite_requisitos" type="checkbox" aria-required="true" aria-invalid="{{ inv.aceite_requisitos }}" aria-describedby="err-aceite_requisitos" style="width:20px; height:20px; margin:2px 0 0; accent-color:#00e676;"><span>Confirmo que todos os pilotos cumprem os requisitos e que menores de 18 anos terão um responsável adulto no dia.<sc-if value="{{ e.aceite_requisitos }}"><span id="err-aceite_requisitos" style="display:block; color:#ffb3b3; font-size:14px;">{{ e.aceite_requisitos }}</span></sc-if></span></label>
             <label style="display:grid; grid-template-columns:24px minmax(0,62ch); gap:12px; align-items:start; min-height:44px; padding:10px 0; font-size:15px; color:#d7ded8; line-height:1.45; cursor:pointer;"><input name="aceite_responsabilidade" type="checkbox" aria-required="true" aria-invalid="{{ inv.aceite_responsabilidade }}" aria-describedby="err-aceite_responsabilidade" style="width:20px; height:20px; margin:2px 0 0; accent-color:#00e676;"><span>Sei que o termo de responsabilidade é assinado na recepção no dia e que a vaga só é garantida com o pagamento total até 15/10/2026.<sc-if value="{{ e.aceite_responsabilidade }}"><span id="err-aceite_responsabilidade" style="display:block; color:#ffb3b3; font-size:14px;">{{ e.aceite_responsabilidade }}</span></sc-if></span></label>
             <label style="display:grid; grid-template-columns:24px minmax(0,62ch); gap:12px; align-items:start; min-height:44px; padding:10px 0; font-size:15px; color:#d7ded8; line-height:1.45; cursor:pointer;"><input name="aceite_imagem" type="checkbox" style="width:20px; height:20px; margin:2px 0 0; accent-color:#00e676;"><span>Autorizo o uso de imagem da equipe na divulgação do evento <span style="color:#a8b2aa;">(opcional)</span>.</span></label>
@@ -928,12 +928,22 @@ class Component extends DCLogic {
     this.restoreValues(values);
     this.scheduleDraftSave();
     this.later(() => {
+      // Com envio já tentado, revalida os pilotos colados: abas e resumo passam a refletir a lista nova.
+      if (this.state.submitAttempted) {
+        const all = this.validate(this.collect()).errors;
+        this.setState((s) => {
+          const errors = { ...s.errors };
+          Object.keys(errors).forEach((k) => { if (/^p\d+_/.test(k)) delete errors[k]; });
+          Object.keys(all).forEach((k) => { if (/^p\d+_/.test(k)) errors[k] = all[k]; });
+          return { errors };
+        });
+      }
+      // Mostra o aviso da colagem (abaixo do cabeçalho fixo) e mantém o foco no primeiro piloto.
+      const status = document.getElementById('ml-paste-status');
+      if (status) status.scrollIntoView({ block: 'start', behavior: 'smooth' });
       const first = document.getElementById('f-p' + plan.kartPilots[0][0] + '-nome');
-      if (!first) return;
-      first.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      // O botão da confirmação saiu da tela: o foco segue para o primeiro piloto preenchido.
-      first.focus({ preventScroll: true });
-    }, 120);
+      if (first) first.focus({ preventScroll: true });
+    }, 160);
   }
 
   onKartsChange = (e) => {
