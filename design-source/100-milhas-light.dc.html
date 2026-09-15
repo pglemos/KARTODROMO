@@ -36,6 +36,10 @@
     [style*="background:rgba(255,255,255,.035)"][style*="border:1px solid rgba(255,255,255,.22)"] { transition: border-color .25s, color .25s, transform .25s cubic-bezier(.16,1,.3,1); }
     [style*="background:rgba(255,255,255,.035)"][style*="border:1px solid rgba(255,255,255,.22)"]:hover { border-color:#00e676; color:#00e676; transform: translateY(-4px); }
     button[disabled] { cursor: progress !important; opacity: .75; }
+    nav[aria-label="Etapas da inscrição"]::-webkit-scrollbar { display: none; }
+    @media (max-width: 720px) {
+      nav[aria-label="Etapas da inscrição"] { -webkit-mask-image: linear-gradient(90deg, #000 78%, transparent); mask-image: linear-gradient(90deg, #000 78%, transparent); }
+    }
   </style>
 </helmet>
 <div data-screen-label="100 Milhas Light" style="min-height:100vh; background:#030504; color:#f7faf6;">
@@ -284,14 +288,14 @@
 
   <!-- MODAL INSCRIÇÃO -->
   <div id="ml-dialog" role="dialog" aria-modal="true" aria-hidden="{{ modalClosed }}" aria-labelledby="ml-dialog-title" style="{{ modalOverlayStyle }}" onClick="{{ onOverlayClick }}" onKeyDown="{{ onDialogKeyDown }}">
-    <div id="ml-panel" style="width:min(720px,100%); max-height:92vh; overflow:auto; overscroll-behavior:contain; background:#0b100c; border:1px solid rgba(255,255,255,.15); box-shadow:0 30px 90px rgba(0,0,0,.55); position:relative;" onClick="{{ stopPropagation }}">
+    <div id="ml-panel" style="width:min(720px,100%); max-height:92vh; overflow:auto; overscroll-behavior:contain; background:#0b100c; border:1px solid rgba(255,255,255,.15); box-shadow:0 30px 90px rgba(0,0,0,.55); position:relative;" onClick="{{ stopPropagation }}" onScroll="{{ onPanelScroll }}">
       <div id="ml-panel-header" style="position:sticky; top:0; z-index:3; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px 16px; border-bottom:1px solid rgba(255,255,255,.1); background:rgba(11,16,12,.97); padding:16px 24px 12px;">
         <div style="min-width:0;"><h2 id="ml-dialog-title" style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:20px;">Inscrição de equipe</h2><p style="margin:2px 0 0; color:#00e676; font-size:14px; font-weight:700;">100 Milhas Light de Betim · 25/10/2026</p></div>
         <button type="button" onClick="{{ closeModal }}" aria-label="Fechar inscrição" style="flex:none; width:44px; height:44px; display:grid; place-items:center; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.05); color:#f7faf6; cursor:pointer;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
         <sc-if value="{{ showFormNav }}">
           <nav aria-label="Etapas da inscrição" style="flex-basis:100%; min-width:0; display:flex; flex-wrap:nowrap; gap:6px; overflow-x:auto; scrollbar-width:none; padding-bottom:2px;">
             <sc-for list="{{ sectionNav }}" as="s" hint-placeholder-count="4">
-              <button type="button" onClick="{{ s.go }}" aria-label="{{ s.aria }}" style="{{ s.style }}">{{ s.label }}</button>
+              <button type="button" onClick="{{ s.go }}" aria-label="{{ s.aria }}" aria-current="{{ s.current }}" style="{{ s.style }}">{{ s.label }}</button>
             </sc-for>
           </nav>
         </sc-if>
@@ -385,7 +389,7 @@
                     </div>
                   </div>
                 </sc-if>
-                <button type="button" onClick="{{ applyPaste }}" style="justify-self:start; min-height:44px; padding:0 18px; border:1px solid rgba(0,230,118,.5); background:rgba(0,230,118,.1); color:#00e676; font-size:15px; font-weight:700; cursor:pointer;">Preencher karts com a lista</button>
+                <button type="button" onClick="{{ applyPaste }}" style="justify-self:start; min-height:44px; padding:10px 18px; border:1px solid rgba(0,230,118,.5); background:rgba(0,230,118,.1); color:#00e676; font-size:15px; font-weight:700; cursor:pointer;">Preencher karts com a lista</button>
                 <p aria-live="polite" style="margin:0; color:#bfe9d0; font-size:15px; line-height:1.45;">{{ pasteStatus }}</p>
               </div>
             </details>
@@ -548,7 +552,7 @@ class Component extends DCLogic {
     kartPilots: [[1]], nextId: 2,
     errors: {}, errorOrder: [],
     submitting: false, result: null, protocol: '', whatsappHref: '', copied: false, draftRestored: false,
-    submitAttempted: false, pendingConfirm: null, pasteStatus: '',
+    submitAttempted: false, pendingConfirm: null, pasteStatus: '', currentSection: 1,
   };
 
   componentDidMount() {
@@ -610,6 +614,12 @@ class Component extends DCLogic {
     this.later(() => {
       const target = this.state.result ? document.getElementById('ml-result-title') : document.getElementById('f-equipe');
       if (target) target.focus();
+      // Ouvinte nativo: o runtime não repassa onScroll, e a barra de etapas depende da rolagem do painel.
+      const panel = document.getElementById('ml-panel');
+      if (panel && !panel.dataset.stepListener) {
+        panel.addEventListener('scroll', this.onPanelScroll, { passive: true });
+        panel.dataset.stepListener = '1';
+      }
     }, 120);
   };
 
@@ -716,7 +726,17 @@ class Component extends DCLogic {
     String(raw || '').split(/\r?\n/).forEach((line) => {
       const text = line.trim();
       if (!text) { if (groups[groups.length - 1].length) groups.push([]); return; }
-      const parts = text.split(/\t|;|\||\s-\s/).map((s) => s.trim()).filter(Boolean);
+      let parts = text.split(/\t|;|\||\s-\s/).map((s) => s.trim()).filter(Boolean);
+      // Listas de WhatsApp costumam vir com vírgula ("João Silva, 16, 1,75, 70"); a vírgula decimal
+      // da altura e do peso é preservada ao reconhecer os quatro campos.
+      // Números soltos no fim da linha ("João Silva 16 1,75 70" ou "João Silva 16 anos 1,75m 70kg").
+      if (parts.length === 1) {
+        const comma = /^(.*?[a-zà-ú][^,]*?)\s*,\s*(\d{1,2})\s*(?:anos)?\s*,\s*(\d(?:[.,]\d{1,2})?|\d{3})\s*m?\s*,\s*(\d{2,3}(?:[.,]\d)?)\s*(?:kg)?\s*$/i.exec(text);
+        const loose = /^(.*?[a-zà-ú].*?)\s+(\d{1,2})\s*(?:anos)?\s+(\d[.,]\d{1,2}|\d{3})\s*m?\s+(\d{2,3}(?:[.,]\d)?)\s*(?:kg)?$/i.exec(text);
+        if (comma) parts = [comma[1], comma[2], comma[3], comma[4]];
+        else if (loose) parts = [loose[1], loose[2], loose[3], loose[4]];
+        else if ((text.match(/,/g) || []).length >= 2) parts = text.split(/\s*,\s*/).filter(Boolean);
+      }
       const nome = (parts[0] || '').replace(/^\d+[.)]\s*/, '').trim();
       if (!nome || /^nome$/i.test(nome) || !/[a-zà-ú]/i.test(nome)) { if (!/^nome$/i.test(nome)) ignored += 1; return; }
       groups[groups.length - 1].push({
@@ -765,7 +785,10 @@ class Component extends DCLogic {
     const notes = [];
     if (overflow) notes.push(overflow === 1 ? '1 piloto passou do limite de 5 karts e ficou de fora' : overflow + ' pilotos passaram do limite de 5 karts e ficaram de fora');
     if (ignored) notes.push(ignored + (ignored === 1 ? ' linha não reconhecida' : ' linhas não reconhecidas'));
-    const status = placed + (placed === 1 ? ' piloto distribuído' : ' pilotos distribuídos') + ' em ' + karts.length + (karts.length === 1 ? ' kart' : ' karts') + '. Confira os dados abaixo.' + (notes.length ? ' Atenção: ' + notes.join('; ') + '.' : '');
+    const incomplete = karts.flat().filter((p) => !p.idade || !p.altura || !p.peso).length;
+    if (incomplete) notes.push(incomplete === 1 ? '1 piloto ficou sem idade, altura ou peso' : incomplete + ' pilotos ficaram sem idade, altura ou peso');
+    const breakdown = karts.map((k, i) => 'kart ' + (i + 1) + ' com ' + k.length).join(', ');
+    const status = placed + (placed === 1 ? ' piloto distribuído' : ' pilotos distribuídos') + ' em ' + karts.length + (karts.length === 1 ? ' kart' : ' karts') + ' (' + breakdown + '). Confira os dados abaixo.' + (notes.length ? ' Atenção: ' + notes.join('; ') + '.' : '');
     const plan = { kartPilots, nextId, values, status };
 
     const current = this.snapshot();
@@ -790,7 +813,10 @@ class Component extends DCLogic {
     this.scheduleDraftSave();
     this.later(() => {
       const first = document.getElementById('f-p' + plan.kartPilots[0][0] + '-nome');
-      if (first) first.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      if (!first) return;
+      first.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      // O botão da confirmação saiu da tela: o foco segue para o primeiro piloto preenchido.
+      first.focus({ preventScroll: true });
     }, 120);
   }
 
@@ -863,8 +889,33 @@ class Component extends DCLogic {
     }, 90);
   }
 
+  // Marca na barra a etapa visível conforme a rolagem do painel.
+  onPanelScroll = () => {
+    if (this._panelFrame) return;
+    this._panelFrame = requestAnimationFrame(() => {
+      this._panelFrame = 0;
+      const header = document.getElementById('ml-panel-header');
+      const limit = (header ? header.getBoundingClientRect().bottom : 0) + 48;
+      let current = 1;
+      for (let n = 1; n <= 4; n += 1) {
+        const legend = document.getElementById('ml-sec-' + n);
+        if (legend && legend.getBoundingClientRect().top <= limit) current = n;
+      }
+      // No fim do painel a última etapa não chega ao topo: marca-a quando a rolagem termina.
+      const panel = document.getElementById('ml-panel');
+      if (panel && panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 8) current = 4;
+      if (current !== this.state.currentSection) {
+        this.setState({ currentSection: current });
+        const nav = document.querySelector('nav[aria-label="Etapas da inscrição"]');
+        const button = nav && nav.querySelectorAll('button')[current - 1];
+        if (button && nav.scrollWidth > nav.clientWidth) nav.scrollTo({ left: Math.max(0, button.offsetLeft - 24), behavior: 'smooth' });
+      }
+    });
+  };
+
   // Atalhos de etapa: rola o painel até a seção (descontando o cabeçalho fixo) e foca o primeiro campo.
   goToSection(n) {
+    this.setState({ currentSection: n });
     const panel = document.getElementById('ml-panel');
     const header = document.getElementById('ml-panel-header');
     const legend = document.getElementById('ml-sec-' + n);
@@ -1040,7 +1091,8 @@ class Component extends DCLogic {
     if (protocol) lines.push('*Protocolo:* ' + protocol);
     lines.push('*Equipe:* ' + v.nome_equipe);
     lines.push('*Chefe de equipe:* ' + v.nome_chefe);
-    lines.push('*CPF:* ' + v.cpf);
+    // Com a inscrição registrada, o CPF já está no sistema e não precisa trafegar no link do WhatsApp.
+    if (!protocol) lines.push('*CPF:* ' + v.cpf);
     lines.push('*WhatsApp:* ' + v.whatsapp);
     lines.push('*E-mail:* ' + v.email);
     lines.push('*Cidade:* ' + v.cidade);
@@ -1214,15 +1266,18 @@ class Component extends DCLogic {
     if (submitAttempted) Object.keys(errors).forEach((name) => { sectionErrors[sectionOf(name) - 1] += 1; });
     const sectionNav = ['Equipe', 'Karts', 'Pagamento', 'Confirmações'].map((label, i) => {
       const count = sectionErrors[i];
+      const isCurrent = this.state.currentSection === i + 1;
       return {
+        current: isCurrent ? 'step' : undefined,
         label: (i + 1) + ' ' + label + (count ? ' (' + count + ')' : ''),
         aria: 'Ir para a etapa ' + (i + 1) + ', ' + label + (count ? ', ' + count + (count === 1 ? ' campo a corrigir' : ' campos a corrigir') : ''),
         go: () => this.goToSection(i + 1),
         style: {
           minHeight: '40px', padding: '0 12px', whiteSpace: 'nowrap', cursor: 'pointer', fontSize: '14px', fontWeight: 700,
-          background: count ? 'rgba(217,45,45,.12)' : 'transparent',
-          border: count ? '1px solid #d92d2d' : '1px solid rgba(255,255,255,.18)',
-          color: count ? '#ffd0d0' : '#d7ded8',
+          background: count ? 'rgba(217,45,45,.12)' : isCurrent ? 'rgba(0,230,118,.1)' : 'transparent',
+          border: count ? '1px solid #d92d2d' : isCurrent ? '1px solid #00e676' : '1px solid rgba(255,255,255,.18)',
+          color: count ? '#ffd0d0' : isCurrent ? '#f7faf6' : '#d7ded8',
+          boxShadow: isCurrent ? 'inset 0 -2px 0 #00e676' : 'none',
         },
       };
     });

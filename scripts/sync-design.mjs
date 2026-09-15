@@ -123,7 +123,9 @@ const mobileFitStyle = `<style data-generated="mobile-fit">
   [role="dialog"] form { grid-template-columns: 1fr !important; }
 }
 @media (max-width: 720px) {
-  [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+  /* Grades com primeira coluna estreita (marcador, checkbox, número) mantêm o texto ao lado. */
+  /* O runtime serializa o estilo com espaço após os dois-pontos; os seletores cobrem as duas formas. */
+  [style*="grid-template-columns"]:not([style*="grid-template-columns:12px"]):not([style*="grid-template-columns: 12px"]):not([style*="grid-template-columns:14px"]):not([style*="grid-template-columns: 14px"]):not([style*="grid-template-columns:24px"]):not([style*="grid-template-columns: 24px"]):not([style*="grid-template-columns:34px"]):not([style*="grid-template-columns: 34px"]) { grid-template-columns: 1fr !important; }
   [style*="grid-auto-flow:column"], [style*="grid-auto-flow: column"] { grid-auto-flow: row !important; }
   [style*="display:flex"]:not([style*="flex-wrap:nowrap"]) { flex-wrap: wrap; }
   img, video, iframe, canvas, svg, table { max-width: 100%; }

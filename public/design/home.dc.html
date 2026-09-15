@@ -30,7 +30,9 @@
   [role="dialog"] form { grid-template-columns: 1fr !important; }
 }
 @media (max-width: 720px) {
-  [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+  /* Grades com primeira coluna estreita (marcador, checkbox, número) mantêm o texto ao lado. */
+  /* O runtime serializa o estilo com espaço após os dois-pontos; os seletores cobrem as duas formas. */
+  [style*="grid-template-columns"]:not([style*="grid-template-columns:12px"]):not([style*="grid-template-columns: 12px"]):not([style*="grid-template-columns:14px"]):not([style*="grid-template-columns: 14px"]):not([style*="grid-template-columns:24px"]):not([style*="grid-template-columns: 24px"]):not([style*="grid-template-columns:34px"]):not([style*="grid-template-columns: 34px"]) { grid-template-columns: 1fr !important; }
   [style*="grid-auto-flow:column"], [style*="grid-auto-flow: column"] { grid-auto-flow: row !important; }
   [style*="display:flex"]:not([style*="flex-wrap:nowrap"]) { flex-wrap: wrap; }
   img, video, iframe, canvas, svg, table { max-width: 100%; }
@@ -251,7 +253,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
             <sc-if value="{{ milhasRegistrationOpen }}">
               <a href="/100-milhas-light#formulario" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none; transition:transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s;" style-hover="transform:translateY(-4px); box-shadow:0 14px 30px rgba(0,0,0,.32);">Inscrever equipe <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></a>
             </sc-if>
-            <a href="/100-milhas-light" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none; transition:border-color .25s, color .25s, transform .25s cubic-bezier(.16,1,.3,1);" style-hover="border-color:#00e676; color:#00e676; transform:translateY(-4px);">Ver detalhes da prova</a>
+            <a href="/100-milhas-light" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:14px 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none; transition:border-color .25s, color .25s, transform .25s cubic-bezier(.16,1,.3,1);" style-hover="border-color:#00e676; color:#00e676; transform:translateY(-4px);">Ver detalhes da prova</a>
           </div>
         </div>
       </div>
@@ -317,7 +319,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
         <sc-for list="{{ galleryItems }}" as="g" hint-placeholder-count="5">
           <figure data-reveal style="margin:0; position:relative; height:340px; overflow:hidden; clip-path:polygon(8% 0,100% 0,92% 100%,0 100%); border:1px solid rgba(255,255,255,.12); opacity:0; transform:translateY(24px); transition:opacity .6s cubic-bezier(.16,1,.3,1), transform .35s cubic-bezier(.16,1,.3,1), border-color .35s;" style-hover="border-color:rgba(0,230,118,.5);">
             <img src="{{ g.image }}" alt="{{ g.alt }}" style="width:100%; height:100%; object-fit:cover; filter:grayscale(.3) contrast(1.14) brightness(.62); transition:transform .55s cubic-bezier(.16,1,.3,1), filter .55s;" style-hover="transform:scale(1.07); filter:grayscale(0) contrast(1.12) brightness(.72);">
-            <figcaption style="position:absolute; inset:auto 0 0; padding:44px 18px 18px; background:linear-gradient(transparent,rgba(3,5,4,.96));"><strong style="display:block; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:12px;">{{ g.title }}</strong><span style="display:block; color:#a8b2aa; font-size:13px; margin-top:3px;">{{ g.subtitle }}</span></figcaption>
+            <figcaption style="position:absolute; inset:auto 0 0; padding:44px 18px 18px; background:linear-gradient(transparent,rgba(3,5,4,.96));"><strong style="display:block; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:13px;">{{ g.title }}</strong><span style="display:block; color:#a8b2aa; font-size:13px; margin-top:3px;">{{ g.subtitle }}</span></figcaption>
           </figure>
         </sc-for>
       </div>

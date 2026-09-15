@@ -114,16 +114,16 @@
           </div>
           <div style="display:flex; flex-wrap:wrap; gap:10px; border-top:1px solid rgba(255,255,255,.1); padding-top:22px; margin-top:22px;">
             <sc-if value="{{ c.canRegister }}">
-              <button type="button" onClick="{{ c.onRegister }}" style="display:inline-flex; align-items:center; gap:8px; min-height:48px; padding:0 20px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:14px; letter-spacing:0.04em; border:0; cursor:pointer;">{{ c.registerLabel }}</button>
+              <button type="button" onClick="{{ c.onRegister }}" style="display:inline-flex; align-items:center; gap:8px; min-height:48px; padding:12px 20px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:14px; letter-spacing:0.04em; border:0; cursor:pointer;">{{ c.registerLabel }}</button>
             </sc-if>
             <sc-if value="{{ c.registerHref }}">
-              <a href="{{ c.registerHref }}" style="display:inline-flex; align-items:center; gap:8px; min-height:48px; padding:0 20px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:14px; letter-spacing:0.04em; text-decoration:none;">{{ c.registerLabel }}</a>
+              <a href="{{ c.registerHref }}" style="display:inline-flex; align-items:center; gap:8px; min-height:48px; padding:12px 20px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:14px; letter-spacing:0.04em; text-decoration:none;">{{ c.registerLabel }}</a>
             </sc-if>
             <sc-if value="{{ c.pageHref }}">
-              <a href="{{ c.pageHref }}" style="display:inline-flex; align-items:center; gap:8px; min-height:48px; padding:0 20px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:14px; letter-spacing:0.04em; text-decoration:none;">Página oficial</a>
+              <a href="{{ c.pageHref }}" style="display:inline-flex; align-items:center; gap:8px; min-height:48px; padding:12px 20px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:14px; letter-spacing:0.04em; text-decoration:none;">Página oficial</a>
             </sc-if>
             <sc-if value="{{ c.showWhatsapp }}">
-              <a href="{{ c.whatsappHref }}" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:8px; min-height:48px; padding:0 20px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:14px; letter-spacing:0.04em; text-decoration:none;">Valores e dúvidas no WhatsApp</a>
+              <a href="{{ c.whatsappHref }}" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:8px; min-height:48px; padding:12px 20px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:14px; letter-spacing:0.04em; text-decoration:none;">Valores e dúvidas no WhatsApp</a>
             </sc-if>
             <sc-if value="{{ c.closedLabel }}"><span style="border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.05); padding:14px 20px; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:14px; color:#d7ded8;">{{ c.closedLabel }}</span></sc-if>
           </div>
@@ -183,10 +183,10 @@
       </div>
       <sc-if value="{{ showRegForm }}">
       <form id="reg-form" onSubmit="{{ onSubmitRegistration }}" onInput="{{ onRegInput }}" onBlur="{{ onRegBlur }}" style="padding:24px; display:grid; gap:14px;">
-        <sc-if value="{{ regErrorCount }}">
+        <sc-if value="{{ regShowErrors }}">
           <div role="alert" style="border:1px solid #d92d2d; background:rgba(217,45,45,.08); color:#ffd0d0; padding:14px 16px; font-size:15px; line-height:1.5;">
             <strong style="display:block; color:#fff;">{{ regErrorTitle }}</strong>
-            <ul style="margin:8px 0 0; padding-left:18px;"><sc-for list="{{ regErrorList }}" as="msg" hint-placeholder-count="2"><li>{{ msg }}</li></sc-for></ul>
+            <ul style="margin:8px 0 0; padding-left:18px;"><sc-for list="{{ regErrorList }}" as="msg" hint-placeholder-count="2"><li style="margin:2px 0;"><button type="button" onClick="{{ msg.go }}" style="appearance:none; display:block; width:100%; border:0; background:none; padding:6px 0; color:#ffd0d0; font:inherit; line-height:1.4; text-align:left; text-decoration:underline; text-underline-offset:3px; cursor:pointer;">{{ msg.text }}</button></li></sc-for></ul>
           </div>
         </sc-if>
         <p style="margin:0; color:#a8b2aa; font-size:14px;">Todos os campos são obrigatórios, exceto os marcados como opcionais.</p>
@@ -328,7 +328,7 @@ class Component extends DCLogic {
     }), 120);
   };
   closeModal = () => {
-    this.setState({ modalOpen: false, regErrors: {}, regSent: false, regWhatsappHref: '' });
+    this.setState({ modalOpen: false, regErrors: {}, regSent: false, regWhatsappHref: '', regSubmitAttempted: false });
     this.setBackgroundInert(false);
     if (this._trigger && this._trigger.focus) this._trigger.focus();
   };
@@ -360,9 +360,13 @@ class Component extends DCLogic {
     } else {
       if (!val('nome')) errors.nome = 'Informe seu nome completo.';
       const idade = val('idade');
-      if (idade && !(Number(idade) >= 8 && Number(idade) <= 90)) errors.idade = 'A idade deve estar entre 8 e 90 anos.';
+      if (idade && !Number.isFinite(Number(idade))) errors.idade = 'Use só números na idade, por exemplo 12.';
+      else if (idade && Number(idade) < 8) errors.idade = 'Idade mínima de 8 anos.';
+      else if (idade && Number(idade) > 90) errors.idade = 'Confira a idade: o limite é 90 anos.';
       const peso = val('peso').replace(',', '.');
-      if (peso && !(Number(peso) >= 30 && Number(peso) <= 180)) errors.peso = 'O peso deve estar entre 30 e 180 kg.';
+      if (peso && !Number.isFinite(Number(peso))) errors.peso = 'Use só números no peso, por exemplo 70.';
+      else if (peso && Number(peso) < 30) errors.peso = 'Confira o peso: o mínimo é 30 kg.';
+      else if (peso && Number(peso) > 180) errors.peso = 'Confira o peso: o limite é 180 kg.';
     }
     const phone = val('whatsapp').replace(/\D/g, '');
     if (phone.length < 10 || phone.length > 11) errors.whatsapp = 'Informe o WhatsApp com DDD, por exemplo (31) 99999-9999.';
@@ -401,7 +405,7 @@ class Component extends DCLogic {
     e.preventDefault();
     const errors = this.validateRegistration(e.target);
     if (Object.keys(errors).length) {
-      this.setState({ regErrors: errors });
+      this.setState({ regErrors: errors, regSubmitAttempted: true });
       const first = this._regOrder.find((n) => errors[n]);
       setTimeout(() => requestAnimationFrame(() => {
         const el = e.target.querySelector('[name="' + first + '"]');
@@ -508,7 +512,7 @@ class Component extends DCLogic {
     const openCount = openList.length;
     const openTitles = openList.map((c) => c.title.replace(' · Kart Light', '').replace(' de Betim', '')).join(', ');
     const nextRace = CHAMPIONSHIPS_DATA.find((c) => championshipStatus(c) === 'open' && /^\d{2}\/\d{2}\/\d{4}$/.test(c.date));
-    const { regErrors, regSent, regWhatsappHref } = this.state;
+    const { regErrors, regSent, regWhatsappHref, regSubmitAttempted } = this.state;
     const regErrorNames = Object.keys(regErrors);
 
     return {
@@ -552,7 +556,14 @@ class Component extends DCLogic {
       rinv: Object.fromEntries(regErrorNames.map((n) => [n, true])),
       regErrorCount: regErrorNames.length,
       regErrorTitle: regErrorNames.length === 1 ? 'Falta corrigir 1 campo:' : 'Faltam corrigir ' + regErrorNames.length + ' campos:',
-      regErrorList: this._regOrder ? this._regOrder.filter((n) => regErrors[n]).map((n) => regErrors[n]) : Object.values(regErrors),
+      regShowErrors: Boolean(regSubmitAttempted && regErrorNames.length),
+      regErrorList: (this._regOrder ? this._regOrder.filter((n) => regErrors[n]) : regErrorNames).map((n) => ({
+        text: regErrors[n],
+        go: () => {
+          const el = document.querySelector('#reg-form [name="' + n + '"]');
+          if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.focus({ preventScroll: true }); }
+        },
+      })),
       showRegForm: !regSent,
       regSent,
       regWhatsappHref,
