@@ -66,3 +66,9 @@ miniflare-*/
 node-compile-cache/
 output/
 playwright_chromiumdev_profile-*/
+
+# cronometragem propria (runtime, nao versionar)
+data/timing/sessions/
+data/timing/passagens/
+*.tmp
+data/timing/*.log
