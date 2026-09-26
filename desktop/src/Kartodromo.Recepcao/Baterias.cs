@@ -359,148 +359,337 @@ public class FormIncluirCliente : DialogoDesign
     }
 }
 
-/// <summary>"Agenda de Reservas de Bateria": calendario mensal + baterias do dia + reservar para cliente (Agenda.dc.html).</summary>
-public class FormAgenda : Janela
+/// <summary>Agenda (Agenda.dc.html, 1340×820): o mês em blocos (baterias e pilotos de cada dia, barra de ocupação,
+/// feriado/fechado) e, à direita, as baterias do dia escolhido. Duplo clique na bateria edita; botão direito mostra as ações
+/// (incluir cliente, lista de participantes, abrir/fechar para reservas, termos).</summary>
+public class FormAgenda : CartaoModal
 {
     static Api Api => Sessao.Api;
-    readonly MonthCalendar _cal = new() { MaxSelectionCount = 1, Dock = DockStyle.Top };
-    readonly ComboBox _bats = Campos.Combo();
-    readonly Button _bStatus = new() { Text = "Abrir Bateria", Height = 32, Enabled = false };
-    readonly Label _info = new() { Dock = DockStyle.Fill, Padding = new Padding(4) };
-    readonly TextBox _q = new(), _obs = Campos.Texto(400);
-    readonly RadioButton _rCpf = new() { Text = "CPF", Checked = true, AutoSize = true }, _rEmail = new() { Text = "E-mail", AutoSize = true }, _rNome = new() { Text = "Nome", AutoSize = true };
-    readonly Label _cli = new() { AutoSize = true, ForeColor = KitVisual.Verde, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold) };
-    readonly NumericUpDown _n = Campos.Num(1, 1, 100);
-    readonly Grade _g = new();
-    readonly Label _resumo = new() { Dock = DockStyle.Top, Height = 34, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 9.5F) };
-    List<JsonObject> _lista = [];
-    JsonObject _bat, _cliente;
+    DateTime _mes, _dia;
+    Dictionary<DateTime, JsonObject> _resumo = [];
+    List<JsonObject> _feriados = [];
+    List<JsonObject> _baterias = [];
+    readonly Label _titulo = new() { AutoSize = true, Font = new Font("Segoe UI", 19F, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, BackColor = DialogoDesign.Fundo };
+    readonly Label _ano = new() { AutoSize = true, Font = new Font("Segoe UI Semibold", 19F), ForeColor = PecasDesign.Cinza, BackColor = DialogoDesign.Fundo };
+    readonly CheckBox _soComReservas = new() { Text = "Só com reservas", Checked = true, AutoSize = true, Font = new Font("Segoe UI", 9.8F), BackColor = DialogoDesign.Fundo, Padding = new Padding(4, 0, 0, 0), Cursor = Cursors.Hand };
+    readonly CalendarioMes _cal = new();
+    readonly Label _semana = new() { AutoSize = true, Font = new Font("Segoe UI Semibold", 9F), ForeColor = DialogoDesign.VerdePrincipal, BackColor = Color.White };
+    readonly Label _data = new() { AutoSize = true, Font = new Font("Segoe UI", 16.5F, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, BackColor = Color.White };
+    readonly Label _resumoDia = new() { AutoSize = true, Font = new Font("Segoe UI", 9.4F), ForeColor = PecasDesign.Cinza, BackColor = Color.White };
+    readonly BateriasDia _lista = new();
 
-    public FormAgenda() : base("Agenda de Reservas de Bateria", 1340, 820)
+    public FormAgenda() : base(1340, 820)
     {
-        var esq = KitVisual.CartaoSecao("Calendário do Mês");
-        esq.AutoSize = false;
-        esq.Dock = DockStyle.Left; esq.Width = 290;
-        var bImprimir = KitVisual.Botao("Imprimir agenda mensal");
-        bImprimir.Dock = DockStyle.Bottom;
-        bImprimir.Click += (_, _) => Relatorio.Abrir(this, Api.UrlComToken("/relatorio/agenda?mes=" + _cal.SelectionStart.ToString("yyyy-MM")), "Agenda Mensal");
-        var gbInfo = new GroupBox { Text = "Informações da Bateria", Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9F) };
-        gbInfo.Controls.Add(_info);
-        esq.Controls.Add(gbInfo); esq.Controls.Add(_resumo); esq.Controls.Add(_cal); esq.Controls.Add(bImprimir);
+        Text = "Agenda";
+        BackColor = DialogoDesign.Fundo;
+        var area = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1920, 1080);
+        ClientSize = new Size(Math.Min(1340, area.Width - 24), Math.Min(820, area.Height - 24));
+        _mes = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1); _dia = DateTime.Today;
+        Forma.CheckVerde(_soComReservas);
 
-        var dir = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10, 0, 0, 0), BackColor = Color.Transparent };
-        var cBat = KitVisual.CartaoSecao("Baterias do Dia");
-        var linhaBat = Campos.Grade(3, 60, 20, 20);
-        var bEd = new Button { Text = "Editar Bateria", Height = 32 };
-        bEd.Click += (_, _) => { if (_bat != null && new FormBateria(_bat).ShowDialog(this) == DialogResult.OK) CarregaDia(); };
-        _bStatus.Click += (_, _) => Seguro.Rodar(this, async () =>
+        // ---------- lado direito (380, branco)
+        var lado = new Panel { Dock = DockStyle.Right, Width = 380, BackColor = Color.White };
+        lado.Paint += (_, e) => { using var p = new Pen(Color.FromArgb(237, 237, 237)); e.Graphics.DrawLine(p, 0, 0, 0, lado.Height); };
+        var topo = new Panel { Dock = DockStyle.Top, Height = 92, BackColor = Color.White };
+        _semana.Location = new Point(18, 18); _data.Location = new Point(15, 33); _resumoDia.Location = new Point(18, 66);
+        var x = Botao("✕", CinzaBotao, PecasDesign.CorTexto); x.Font = new Font("Segoe UI", 9.5F); x.Size = new Size(30, 30); x.Location = new Point(380 - 18 - 30, 18);
+        x.Resize += (_, _) => Forma.AplicarRaio(x, 8); Forma.AplicarRaio(x, 8); x.Click += (_, _) => Close();
+        topo.Controls.AddRange([_semana, _data, _resumoDia, x]);
+        var rod = new Panel { Dock = DockStyle.Bottom, Height = 67, BackColor = Color.White };
+        rod.Paint += (_, e) => { using var p = new Pen(Color.FromArgb(237, 237, 237)); e.Graphics.DrawLine(p, 0, 0, rod.Width, 0); };
+        var bLista = Botao("Lista de participantes", CinzaBotao, PecasDesign.CorTexto); bLista.Font = new Font("Segoe UI", 9.8F);
+        var bCriar = Botao("+ Criar reservas", DialogoDesign.VerdePrincipal, Color.White, true); bCriar.Font = new Font("Segoe UI", 9.8F, FontStyle.Bold);
+        bLista.SetBounds(16, 14, 170, 38); bCriar.SetBounds(194, 14, 170, 38);
+        foreach (var b in new[] { bLista, bCriar }) { b.Resize += (_, _) => Forma.AplicarRaio(b, 10); Forma.AplicarRaio(b, 10); }
+        bLista.Click += (_, _) => { if (_lista.Atual is { } bat) new FormListaParticipantes(bat).ShowDialog(this); else Msg.Aviso(this, "Escolha a bateria na lista."); };
+        bCriar.Click += (_, _) => { using var f = new FormCriarReservas(); if (f.ShowDialog(this) == DialogResult.OK) Recarregar(); };
+        rod.Controls.AddRange([bLista, bCriar]);
+        _lista.Dock = DockStyle.Fill;
+        _lista.Duplo += b => { using var f = new FormBateria(b); if (f.ShowDialog(this) == DialogResult.OK) Recarregar(); };
+        _lista.Menu += (b, onde) => MenuBateria(b, onde);
+        var meioLista = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12, 0, 12, 6), BackColor = Color.White };
+        meioLista.Controls.Add(_lista);
+        lado.Controls.Add(meioLista); lado.Controls.Add(rod); lado.Controls.Add(topo);
+        meioLista.BringToFront();
+
+        // ---------- lado esquerdo: cabeçalho do mês + dias da semana + blocos
+        var esq = new Panel { Dock = DockStyle.Fill, BackColor = DialogoDesign.Fundo, Padding = new Padding(20, 18, 20, 18) };
+        var cab = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = DialogoDesign.Fundo };
+        var ic = new PictureBox { Image = Forma.Tile("M7 3v3M17 3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z", "linear-gradient(180deg, #C08BFF, #8645D6)", 36, 19), SizeMode = PictureBoxSizeMode.Zoom, Size = new Size(36, 36), Location = new Point(0, 2), BackColor = Color.Transparent };
+        _titulo.Location = new Point(46, 0);
+        var nav = new SegmentoMes { Location = new Point(0, 6) };
+        nav.Anterior += () => Ir(_mes.AddMonths(-1)); nav.Proximo += () => Ir(_mes.AddMonths(1)); nav.Hoje += () => { _dia = DateTime.Today; Ir(new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1)); };
+        void Posicionar() { _ano.Location = new Point(_titulo.Right - 6, 0); nav.Left = _ano.Right + 6; }
+        _titulo.SizeChanged += (_, _) => Posicionar(); _ano.SizeChanged += (_, _) => Posicionar();
+        var imprimir = Botao("Imprimir agenda mensal", CinzaBotao, PecasDesign.CorTexto); imprimir.Font = new Font("Segoe UI", 9.8F);
+        imprimir.Size = new Size(TextRenderer.MeasureText(imprimir.Text, imprimir.Font).Width + 26, 32); imprimir.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        imprimir.Resize += (_, _) => Forma.AplicarRaio(imprimir, 8); Forma.AplicarRaio(imprimir, 8);
+        imprimir.Click += (_, _) => Relatorio.Abrir(this, Api.UrlComToken("/relatorio/agenda?mes=" + _mes.ToString("yyyy-MM")), "Agenda Mensal");
+        _soComReservas.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        _soComReservas.CheckedChanged += (_, _) => MostrarDia();
+        cab.Controls.AddRange([ic, _titulo, _ano, nav, _soComReservas, imprimir]);
+        cab.Resize += (_, _) => { imprimir.Location = new Point(cab.Width - imprimir.Width, 4); _soComReservas.Location = new Point(imprimir.Left - 10 - _soComReservas.Width, 10); };
+        var semana = new Panel { Dock = DockStyle.Top, Height = 34, BackColor = DialogoDesign.Fundo };
+        semana.Paint += (_, e) =>
         {
-            if (_bat == null) return;
-            var novo = _bat.S("status") == "aberta" ? "fechada" : "aberta";
-            await Api.Post($"/api/office/baterias/{_bat.S("id")}/status", new { status = novo });
-            Msg.Info(this, novo == "aberta" ? "Bateria aberta com sucesso!" : "Bateria fechada com sucesso!");
-            var manter = _bat.S("id");
-            await CarregaDiaAsync();
-            foreach (var o in _bats.Items) if (o is Campos.Item it && it.Id.ToString() == manter) _bats.SelectedItem = o;
-        });
-        Campos.Add(linhaBat, "Baterias disponíveis", _bats); Campos.Add(linhaBat, " ", bEd); Campos.Add(linhaBat, "  ", _bStatus);
-        cBat.Controls.Add(linhaBat);
+            var w = (semana.Width - 6 * 6) / 7f;
+            string[] n = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+            using var f = new Font("Segoe UI Semibold", 9F);
+            for (var i = 0; i < 7; i++) TextRenderer.DrawText(e.Graphics, n[i], f, new Rectangle((int)(i * (w + 6)) + 4, 14, (int)w, 18), PecasDesign.Cinza, TextFormatFlags.Left);
+        };
+        _cal.Dock = DockStyle.Fill;
+        _cal.Escolheu += d => { _dia = d; if (d.Month != _mes.Month || d.Year != _mes.Year) Ir(new DateTime(d.Year, d.Month, 1)); else { _cal.Dia = d; CarregarDia(); } };
+        esq.Controls.Add(_cal); esq.Controls.Add(semana); esq.Controls.Add(cab);
+        _cal.BringToFront();
 
-        var cCli = KitVisual.CartaoSecao("Pesquisar Cliente & Reservar");
-        var radios = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 28 };
-        radios.Controls.AddRange([_rCpf, _rEmail, _rNome]);
-        var busca = new TableLayoutPanel { Dock = DockStyle.Top, Height = 34, ColumnCount = 3 };
-        busca.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); busca.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); busca.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        var bS = new Button { Text = "Pesquisar", AutoSize = true, Height = 32 }; var bN = new Button { Text = "Novo cliente", AutoSize = true, Height = 32 };
-        _q.Dock = DockStyle.Fill;
-        busca.Controls.AddRange([_q, bS, bN]);
-        var linhaCli = new Panel { Dock = DockStyle.Top, Height = 24 }; linhaCli.Controls.Add(_cli);
-        var linhaRes = Campos.Grade(3, 18, 62, 20);
-        var bR = KitVisual.Botao("Reservar", true);
-        Campos.Add(linhaRes, "Participantes", _n); Campos.Add(linhaRes, "Observações", _obs); Campos.Add(linhaRes, " ", bR);
-        cCli.Controls.Add(linhaRes); cCli.Controls.Add(linhaCli); cCli.Controls.Add(busca); cCli.Controls.Add(radios);
+        Controls.Add(esq); Controls.Add(lado);
+        esq.BringToFront();
+        Load += (_, _) => Ir(_mes);
+    }
 
-        _g.Colunas(new("cliente", "Cliente", Largura: 230), new("pago", "Pago", TipoCol.Bool), new("aprovada", "Aprovada", TipoCol.Bool), new("produto", "Produto", Largura: 200), new("total", "Total", TipoCol.Dinheiro));
-        _g.MenuDe = sel => [
-            new ToolStripMenuItem("Aprovar / Receber", null, (_, _) => { Caixa.CheckoutDeReservas(this, sel); CarregaReservas(); }) { Enabled = sel.Count > 0 && !sel.Any(r => r.B("pago")) },
-            new ToolStripMenuItem("Imprimir Termo", null, (_, _) => Acoes.ImprimirTermo(this, sel.Select(r => r.S("id")))),
-            new ToolStripMenuItem("Excluir", null, (_, _) => Seguro.Rodar(this, async () =>
+    protected override void OnLoad(EventArgs e)
+    {
+        if (Owner is Form dono && dono.Visible && dono.WindowState != FormWindowState.Minimized)
+        {
+            var fundo = new Escurecer(dono);
+            fundo.Show();
+            FormClosed += (_, _) => fundo.Close();
+        }
+        base.OnLoad(e);
+    }
+
+    void Recarregar() => Ir(_mes);
+
+    void Ir(DateTime mes) => Seguro.Rodar(this, async () =>
+    {
+        _mes = mes;
+        if (_dia.Month != mes.Month || _dia.Year != mes.Year) _dia = mes.Year == DateTime.Today.Year && mes.Month == DateTime.Today.Month ? DateTime.Today : mes;
+        _titulo.Text = Fmt.Br.TextInfo.ToTitleCase(mes.ToString("MMMM", Fmt.Br)); _ano.Text = mes.Year.ToString();
+        var r = await Api.Lista("/api/office/agenda?mes=" + mes.ToString("yyyy-MM"));
+        if (_feriados.Count == 0) try { _feriados = await Api.Lista("/api/office/cad/feriados"); } catch { }
+        _resumo = r.Where(x => x.D("dia") != null).ToDictionary(x => x.D("dia")!.Value.Date, x => x);
+        _cal.Mostrar(mes, _dia, _resumo, d => _feriados.Any(f => f.D("data") is DateTime fd && (fd.Date == d || f.B("recorrente") && fd.Month == d.Month && fd.Day == d.Day)));
+        await CarregarDiaAsync();
+    });
+
+    void CarregarDia() => Seguro.Rodar(this, CarregarDiaAsync);
+
+    async Task CarregarDiaAsync()
+    {
+        _baterias = (await Api.Lista($"/api/office/baterias?status=todas&filtro=dia&data={Fmt.Iso(_dia)}")).Where(b => b.S("status") != "cancelada").OrderBy(b => b.S("dataHora")).ToList();
+        if (IsDisposed) return;
+        MostrarDia();
+    }
+
+    void MostrarDia()
+    {
+        _semana.Text = _dia.ToString("dddd", Fmt.Br).ToUpperInvariant();
+        _data.Text = _dia.ToString("d 'de' MMMM", Fmt.Br);
+        var visiveis = _soComReservas.Checked ? _baterias.Where(b => b.I("inscritos") > 0 || b.D("dataHora") >= DateTime.Now.AddMinutes(-40)).ToList() : _baterias;
+        var pil = _baterias.Sum(b => b.I("inscritos")); var pre = _baterias.Sum(b => b.I("preReservas"));
+        _resumoDia.Text = _baterias.Count == 0 ? "Nenhuma bateria neste dia" : $"{_baterias.Count} {(_baterias.Count == 1 ? "bateria" : "baterias")} · {pil} pilotos" + (pre > 0 ? $" · {pre} {(pre == 1 ? "pré-reserva" : "pré-reservas")}" : "");
+        _lista.Mostrar(visiveis);
+    }
+
+    void MenuBateria(JsonObject b, Point onde)
+    {
+        var m = new ContextMenuStrip { Font = new Font("Segoe UI", 9.5F) };
+        m.Items.Add("Incluir cliente", null, (_, _) => { using var f = new FormIncluirCliente(b); f.ShowDialog(this); CarregarDia(); });
+        m.Items.Add("Editar bateria", null, (_, _) => { using var f = new FormBateria(b); if (f.ShowDialog(this) == DialogResult.OK) Recarregar(); });
+        m.Items.Add("Lista de participantes", null, (_, _) => new FormListaParticipantes(b).ShowDialog(this));
+        m.Items.Add(new ToolStripSeparator());
+        var fechada = b.S("status") == "fechada";
+        m.Items.Add(fechada ? "Abrir bateria" : "Fechar bateria", null, (_, _) => Seguro.Rodar(this, async () =>
+        {
+            await Api.Post($"/api/office/baterias/{b.S("id")}/status", new { status = fechada ? "aberta" : "fechada" });
+            CarregarDia();
+        }));
+        m.Items.Add("Imprimir termos da bateria", null, (_, _) => Seguro.Rodar(this, async () =>
+        {
+            var res = (await Api.Lista($"/api/office/reservas?bateriaId={b.S("id")}")).Where(r => r.S("status") != "cancelada").Select(r => r.S("id")).ToList();
+            if (res.Count == 0) { Msg.Aviso(this, "A bateria não tem reservas."); return; }
+            Acoes.ImprimirTermo(this, res);
+        }));
+        m.Closed += (_, _) => BeginInvoke(() => m.Dispose());
+        m.Show(_lista, onde);
+    }
+}
+
+/// <summary>‹ Hoje › (segmentado cinza, "Hoje" branco).</summary>
+class SegmentoMes : Control
+{
+    public event Action Anterior, Proximo, Hoje;
+    public SegmentoMes()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+        Size = new Size(32 + 60 + 32 + 4, 32); Cursor = Cursors.Hand; BackColor = DialogoDesign.Fundo;
+    }
+    protected override void OnMouseClick(MouseEventArgs e)
+    {
+        base.OnMouseClick(e);
+        if (e.X < 34) Anterior?.Invoke(); else if (e.X > Width - 34) Proximo?.Invoke(); else Hoje?.Invoke();
+    }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics; g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        g.Clear(BackColor);
+        using (var p = Forma.Redondo(new Rectangle(0, 0, Width - 1, Height - 1), 9)) using (var b = new SolidBrush(Color.FromArgb(232, 232, 235))) g.FillPath(b, p);
+        var hoje = new Rectangle(34, 2, 60, 28);
+        using (var s = Forma.Redondo(new Rectangle(hoje.X, hoje.Y + 1, hoje.Width, hoje.Height), 7)) using (var bs = new SolidBrush(Color.FromArgb(30, 0, 0, 0))) g.FillPath(bs, s);
+        using (var p = Forma.Redondo(hoje, 7)) g.FillPath(Brushes.White, p);
+        using var f = new Font("Segoe UI", 11F); using var fb = new Font("Segoe UI Semibold", 9.6F);
+        TextRenderer.DrawText(g, "‹", f, new Rectangle(2, 0, 32, 30), PecasDesign.CorTexto, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+        TextRenderer.DrawText(g, "Hoje", fb, hoje, PecasDesign.CorTexto, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+        TextRenderer.DrawText(g, "›", f, new Rectangle(Width - 34, 0, 32, 30), PecasDesign.CorTexto, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+    }
+}
+
+/// <summary>Os blocos do mês: 7 colunas, espaço 6, raio 12. Hoje com anel verde; dia sem bateria = "Fechado"; feriado em vermelho.</summary>
+class CalendarioMes : Control
+{
+    DateTime _mes;
+    public DateTime Dia { get; set; }
+    Dictionary<DateTime, JsonObject> _resumo = [];
+    Func<DateTime, bool> _feriado = _ => false;
+    public event Action<DateTime> Escolheu;
+    DateTime _inicio;
+    int Semanas => (int)Math.Ceiling(((int)_mes.DayOfWeek + DateTime.DaysInMonth(_mes.Year, _mes.Month)) / 7.0);
+
+    public CalendarioMes()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        BackColor = DialogoDesign.Fundo; Cursor = Cursors.Hand;
+    }
+
+    public void Mostrar(DateTime mes, DateTime dia, Dictionary<DateTime, JsonObject> resumo, Func<DateTime, bool> feriado)
+    {
+        _mes = mes; Dia = dia; _resumo = resumo; _feriado = feriado;
+        _inicio = mes.AddDays(-(int)mes.DayOfWeek);
+        Invalidate();
+    }
+
+    RectangleF Celula(int i)
+    {
+        var sem = Math.Max(5, Semanas);
+        var w = (Width - 6 * 6) / 7f; var h = (Height - (sem - 1) * 6) / (float)sem;
+        return new RectangleF(i % 7 * (w + 6), i / 7 * (h + 6), w, h);
+    }
+
+    protected override void OnMouseClick(MouseEventArgs e)
+    {
+        base.OnMouseClick(e);
+        for (var i = 0; i < Math.Max(5, Semanas) * 7; i++) if (Celula(i).Contains(e.Location)) { Escolheu?.Invoke(_inicio.AddDays(i)); return; }
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics; g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; g.Clear(BackColor);
+        if (_mes == default) return;
+        using var fNum = new Font("Segoe UI", 9.8F, FontStyle.Bold); using var fTag = new Font("Segoe UI Semibold", 8.3F); using var fTxt = new Font("Segoe UI", 9F);
+        for (var i = 0; i < Math.Max(5, Semanas) * 7; i++)
+        {
+            var d = _inicio.AddDays(i); var r = Celula(i);
+            var doMes = d.Month == _mes.Month;
+            var hoje = d == DateTime.Today; var escolhido = d == Dia.Date;
+            _resumo.TryGetValue(d, out var res);
+            var bat = res?.I("baterias") ?? 0; var pil = res?.I("reservas") ?? 0; var vagas = res?.I("vagas") ?? 0;
+            var feriado = doMes && _feriado(d); var fechado = doMes && bat == 0;
+            using var p = Forma.Redondo(r, 12);
+            if (doMes)
             {
-                if (sel.Any(r => r.B("pago"))) { Msg.Aviso(this, "Não é permitido excluir reservas pagas!"); return; }
-                if (!Msg.Pergunta(this, "Deseja realmente excluir a reserva agendada?")) return;
-                foreach (var r in sel) await Api.Delete($"/api/office/reservas/{r.S("id")}");
-                CarregaDia();
-            })),
-        ];
+                if (fechado) { using var b = new SolidBrush(Color.FromArgb(239, 239, 241)); g.FillPath(b, p); }
+                else
+                {
+                    if (escolhido) { using var sombra = Forma.Redondo(new RectangleF(r.X + 4, r.Y + 8, r.Width - 8, r.Height - 4), 12); using var bs = new SolidBrush(Color.FromArgb(40, 11, 122, 83)); g.FillPath(bs, sombra); }
+                    g.FillPath(Brushes.White, p);
+                    using var borda = new Pen(escolhido ? DialogoDesign.VerdePrincipal : Color.FromArgb(232, 232, 234), escolhido ? 2f : 1f); g.DrawPath(borda, p);
+                }
+            }
+            // número (hoje em círculo verde)
+            var num = new RectangleF(r.X + 8, r.Y + 8, 26, 26);
+            if (hoje && doMes) { using var bv = new SolidBrush(DialogoDesign.VerdePrincipal); g.FillEllipse(bv, num); }
+            var corNum = !doMes ? Color.FromArgb(174, 174, 178) : hoje ? Color.White : d < DateTime.Today || fechado ? Color.FromArgb(142, 142, 147) : PecasDesign.CorTexto;
+            TextRenderer.DrawText(g, d.Day.ToString(), fNum, Rectangle.Round(num), corNum, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            if (!doMes) continue;
+            var tag = feriado ? "Feriado" : fechado ? "Fechado" : "";
+            if (tag.Length > 0) TextRenderer.DrawText(g, tag, fTag, Rectangle.Round(new RectangleF(r.X, r.Y + 8, r.Width - 9, 26)), feriado ? Color.FromArgb(196, 40, 28) : Color.FromArgb(142, 142, 147), TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
+            if (bat == 0) continue;
+            TextRenderer.DrawText(g, $"{bat} {(bat == 1 ? "bateria" : "baterias")} · {pil} pilotos", fTxt, Rectangle.Round(new RectangleF(r.X + 9, r.Y + 40, r.Width - 14, 34)), Color.FromArgb(58, 58, 60), TextFormatFlags.Left | TextFormatFlags.WordBreak);
+            var pct = vagas > 0 ? Math.Min(1f, pil / (float)vagas) : 0;
+            var barra = new RectangleF(r.X + 9, Math.Min(r.Bottom - 12, r.Y + 76), r.Width - 18, 5);
+            using (var fundo = Forma.Redondo(barra, 3)) using (var bf = new SolidBrush(Color.FromArgb(237, 237, 237))) g.FillPath(bf, fundo);
+            if (pct > 0) { using var cheio = Forma.Redondo(new RectangleF(barra.X, barra.Y, Math.Max(6, barra.Width * pct), barra.Height), 3); using var bc = new SolidBrush(pct > 0.8f ? Color.FromArgb(255, 159, 10) : Color.FromArgb(52, 199, 89)); g.FillPath(bc, cheio); }
+        }
+    }
+}
 
-        var cGrid = KitVisual.CartaoSecao("Reservas da Bateria");
-        cGrid.AutoSize = false;
-        cGrid.Height = 240;
-        _g.Dock = DockStyle.Fill;
-        var pGrid = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 8, 0, 0) };
-        pGrid.Controls.Add(_g);
-        cGrid.Controls.Add(pGrid);
+/// <summary>As baterias do dia: hora (mono), nome, barra de ocupação, n/vagas e a situação (Encerrada / Na pista / Aberta / Fechada).</summary>
+class BateriasDia : Control
+{
+    List<JsonObject> _itens = [];
+    int _sel = -1, _topo;
+    public JsonObject Atual => _sel >= 0 && _sel < _itens.Count ? _itens[_sel] : null;
+    public event Action<JsonObject> Duplo;
+    public event Action<JsonObject, Point> Menu;
+    const int Alt = 56, Esp = 6;
 
-        dir.Controls.Add(cGrid); dir.Controls.Add(cCli); dir.Controls.Add(cBat);
-
-        Controls.Add(dir); Controls.Add(esq);
-        Rodape(("Agenda Mensal", (_, _) => Relatorio.Abrir(this, Api.UrlComToken("/relatorio/agenda?mes=" + _cal.SelectionStart.ToString("yyyy-MM")), "Agenda Mensal"), false), ("Fechar", (_, _) => Close(), false));
-
-        _cal.DateSelected += (_, _) => CarregaDia();
-        _cal.DateChanged += (_, _) => CarregaMes();
-        _bats.SelectedIndexChanged += (_, _) => EscolheBateria();
-        void Pesquisa() { var c = FormPesquisarCliente.Escolher(this, "Pesquisar Cliente", _q.Text); if (c != null) { _cliente = c; _cli.Text = $"{c.S("nome")} · {c.S("documento")}"; } }
-        bS.Click += (_, _) => Pesquisa();
-        _q.KeyDown += (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; Pesquisa(); } };
-        bN.Click += (_, _) => Seguro.Rodar(this, async () => { var id = FormCliente.Novo(this, _q.Text); if (id != null) { _cliente = (await Api.Get($"/api/office/clientes/{id}")).AsObject(); _cli.Text = $"{_cliente.S("nome")} · {_cliente.S("documento")}"; } });
-        bR.Click += (_, _) => Seguro.Rodar(this, async () =>
-        {
-            if (_bat == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
-            if (_cliente == null) { Msg.Aviso(this, "Selecione um cliente."); return; }
-            var r = await Api.Post($"/api/office/baterias/{_bat.S("id")}/incluir", new { clienteId = _cliente.L("id"), participantes = (int)_n.Value, observacao = _obs.Text });
-            Msg.Info(this, r.S("mensagem"));
-            _cliente = null; _cli.Text = ""; _q.Text = ""; _n.Value = 1; _obs.Text = "";
-            var manter = _bat.S("id");
-            await CarregaDiaAsync();
-            foreach (var o in _bats.Items) if (o is Campos.Item it && it.Id.ToString() == manter) _bats.SelectedItem = o;
-        });
-        Load += (_, _) => { CarregaMes(); CarregaDia(); };
+    public BateriasDia()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
+        BackColor = Color.White;
     }
 
-    void CarregaMes() => Seguro.Rodar(this, async () =>
+    public void Mostrar(List<JsonObject> itens)
     {
-        var mes = _cal.SelectionStart.ToString("yyyy-MM");
-        var r = await Api.Lista("/api/office/agenda?mes=" + mes);
-        _cal.BoldedDates = r.Select(x => Fmt.ParseData(x.S("dia")) ?? DateTime.MinValue).Where(d => d != DateTime.MinValue).ToArray();
-        _resumo.Text = $"{r.Sum(x => x.I("baterias"))} baterias no mês · {r.Sum(x => x.I("reservas"))} reservas";
-    });
-
-    void CarregaDia() => Seguro.Rodar(this, CarregaDiaAsync);
-
-    async Task CarregaDiaAsync()
-    {
-        _lista = await Api.Lista($"/api/office/baterias?status=todas&filtro=dia&data={Fmt.Iso(_cal.SelectionStart)}");
-        _bats.Items.Clear();
-        _bats.Items.AddRange(_lista.Select(b => new Campos.Item(b.L("id") ?? 0, $"{Fmt.Hm(b.S("dataHora"))} · {b.S("nome")} · {b.I("disponiveis")} vagas{(b.S("status") != "aberta" ? " (fechada)" : "")}", b)).ToArray());
+        _itens = itens; _topo = 0;
         var agora = DateTime.Now;
-        var prox = _bats.Items.Cast<Campos.Item>().FirstOrDefault(i => (i.Dados.D("dataHora") ?? DateTime.MinValue) >= agora) ?? _bats.Items.Cast<Campos.Item>().FirstOrDefault();
-        if (prox != null) _bats.SelectedItem = prox; else { _bat = null; _info.Text = "Nenhuma bateria neste dia."; _g.Carregar([]); _bStatus.Enabled = false; }
+        _sel = itens.FindIndex(b => b.D("dataHora") is DateTime d && d.AddMinutes(35) >= agora);
+        Invalidate();
     }
 
-    void EscolheBateria()
+    int Em(Point p) { var i = (p.Y + _topo) / (Alt + Esp); return i >= 0 && i < _itens.Count && (p.Y + _topo) % (Alt + Esp) < Alt ? i : -1; }
+    protected override void OnMouseDown(MouseEventArgs e) { base.OnMouseDown(e); Focus(); var i = Em(e.Location); if (i >= 0) { _sel = i; Invalidate(); if (e.Button == MouseButtons.Right) Menu?.Invoke(_itens[i], e.Location); } }
+    protected override void OnMouseDoubleClick(MouseEventArgs e) { base.OnMouseDoubleClick(e); var i = Em(e.Location); if (i >= 0 && e.Button == MouseButtons.Left) Duplo?.Invoke(_itens[i]); }
+    protected override void OnMouseWheel(MouseEventArgs e) { base.OnMouseWheel(e); _topo = Math.Clamp(_topo - Math.Sign(e.Delta) * 60, 0, Math.Max(0, _itens.Count * (Alt + Esp) - Height)); Invalidate(); }
+    protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); Focus(); }
+
+    static (string texto, Color cor, bool pista, bool fim) Situacao(JsonObject b)
     {
-        _bat = (_bats.SelectedItem as Campos.Item)?.Dados;
-        if (_bat == null) { _bStatus.Enabled = false; return; }
-        _bStatus.Text = _bat.S("status") == "aberta" ? "Fechar Bateria" : "Abrir Bateria";
-        _bStatus.Enabled = true;
-        _info.Text = $"{_bat.S("nome")} — {Fmt.DmyHm(_bat.S("dataHora"))}\n\nPRODUTO: {_bat.S("produto")}\nTRAÇADO: {_bat.S("tracado")}\nTEMPO MÍNIMO POR VOLTA (segundos): {_bat.S("voltaMinimaSeg")}\n" +
-            $"COMPETIDORES: {_bat.I("inscritos")}/{_bat.I("vagas")} (disponíveis {_bat.I("disponiveis")})\nPAGOS: {_bat.I("pagos")}" + (_bat.S("observacao") is { Length: > 0 } o ? $"\n\nOBSERVAÇÕES: {o}" : "");
-        CarregaReservas();
+        var ini = b.D("dataHora") ?? DateTime.MinValue; var agora = DateTime.Now;
+        if (ini <= agora && agora < ini.AddMinutes(35)) return ("Na pista", Color.FromArgb(10, 79, 160), true, false);
+        if (ini.AddMinutes(35) <= agora) return ("Encerrada", Color.FromArgb(142, 142, 147), false, true);
+        if (b.S("status") == "fechada" || b.B("reservaFechada")) return ("Fechada", Color.FromArgb(196, 40, 28), false, false);
+        return ("Aberta", Color.FromArgb(28, 107, 53), false, false);
     }
 
-    void CarregaReservas() => Seguro.Rodar(this, async () =>
+    protected override void OnPaint(PaintEventArgs e)
     {
-        if (_bat == null) return;
-        _g.Carregar((await Api.Lista($"/api/office/reservas?status=todas&bateriaId={_bat.S("id")}")).Where(r => r.S("status") != "cancelada"));
-    });
+        var g = e.Graphics; g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; g.Clear(BackColor);
+        using var fHora = new Font("Consolas", 10.5F, FontStyle.Bold); using var fNome = new Font("Segoe UI Semibold", 9.8F); using var fOc = new Font("Segoe UI Semibold", 9.4F); using var fEst = new Font("Segoe UI Semibold", 8.3F);
+        if (_itens.Count == 0) { TextRenderer.DrawText(g, "Nenhuma bateria.", new Font("Segoe UI", 9.8F), new Rectangle(0, 20, Width, 30), PecasDesign.Cinza, TextFormatFlags.HorizontalCenter); return; }
+        for (var i = 0; i < _itens.Count; i++)
+        {
+            var y = i * (Alt + Esp) - _topo;
+            if (y > Height || y + Alt < 0) continue;
+            var b = _itens[i]; var r = new Rectangle(0, y, Width - 1, Alt);
+            var (texto, cor, pista, fim) = Situacao(b);
+            using var p = Forma.Redondo(r, 11);
+            using (var bg = new SolidBrush(pista ? Color.FromArgb(235, 244, 255) : Color.FromArgb(245, 245, 247))) g.FillPath(bg, p);
+            if (pista) { using var pe = new Pen(Color.FromArgb(191, 222, 255)); g.DrawPath(pe, p); }
+            if (i == _sel) { using var ps = new Pen(DialogoDesign.VerdePrincipal, 2f); g.DrawPath(ps, p); }
+            TextRenderer.DrawText(g, b.D("dataHora")?.ToString("HH:mm") ?? "", fHora, new Rectangle(10, y, 54, Alt), PecasDesign.CorTexto, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+            var ins = b.I("inscritos"); var vagas = Math.Max(1, b.I("vagas"));
+            var oc = $"{ins}/{b.I("vagas")}";
+            var wDir = Math.Max(TextRenderer.MeasureText(oc, fOc).Width, TextRenderer.MeasureText(texto, fEst).Width) + 4;
+            var nomeW = Width - 74 - wDir - 20;
+            var nome = b.S("nome") + (b.S("categoria") == "Super Kart" && !b.S("nome").Contains("Super", StringComparison.OrdinalIgnoreCase) ? " · Super Kart" : "");
+            TextRenderer.DrawText(g, nome, fNome, new Rectangle(74, y + 9, nomeW, 20), PecasDesign.CorTexto, TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            var barra = new RectangleF(74, y + 34, nomeW, 4);
+            using (var bf = Forma.Redondo(barra, 2)) using (var bb = new SolidBrush(Color.FromArgb(237, 237, 237))) g.FillPath(bb, bf);
+            var pct = Math.Min(1f, ins / (float)vagas);
+            if (pct > 0) { using var bc = Forma.Redondo(new RectangleF(barra.X, barra.Y, Math.Max(4, barra.Width * pct), 4), 2); using var cb = new SolidBrush(fim ? Color.FromArgb(199, 199, 204) : ins >= vagas ? Color.FromArgb(255, 159, 10) : Color.FromArgb(52, 199, 89)); g.FillPath(cb, bc); }
+            TextRenderer.DrawText(g, oc, fOc, new Rectangle(Width - wDir - 10, y + 9, wDir, 18), PecasDesign.CorTexto, TextFormatFlags.Right);
+            TextRenderer.DrawText(g, texto, fEst, new Rectangle(Width - wDir - 10, y + 29, wDir, 16), cor, TextFormatFlags.Right);
+        }
+    }
 }

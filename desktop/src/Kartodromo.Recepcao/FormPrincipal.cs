@@ -582,7 +582,7 @@ public class FormPrincipal : Form
             B("produtos", "Produtos", "Produtos e provas de cada locação", () => Cadastros.Abrir(this, "produtos")),
             VisualPrincipal.Separador(),
             B("reservas", "Reservas", "Criar reservas avulsas ou pelo padrão", () => { new FormCriarReservas().ShowDialog(this); Recarregar(); }),
-            B("agenda", "Agenda", "Agenda mensal de baterias", () => { new FormAgenda().ShowDialog(this); Recarregar(); }),
+            B("agenda", "Agenda", "Agenda mensal de baterias", () => { using (var f = new FormAgenda()) f.ShowDialog(this); Recarregar(); }),
             VisualPrincipal.Separador(),
             B("terminal", "Terminal", "Abrir ou fechar o caixa", () => Caixa.Terminal(this)),
             B("receita", "Receita Avulsa", "Cobrar reservas e produtos (checkout)", () => Caixa.Checkout(this, null, null, null)),
