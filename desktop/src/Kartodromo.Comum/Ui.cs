@@ -179,6 +179,7 @@ public class Grade : DataGridView
     public Func<List<JsonObject>, ToolStripItem[]> MenuDe { get; set; }
     public event Action<JsonObject> Duplo;
     public event Action FiltroMudou;
+    public event Action ItemMarcadoMudou;
     public bool ComMarcacao { get; }
 
     public Grade(bool comMarcacao = false)
@@ -225,6 +226,15 @@ public class Grade : DataGridView
             m.Show(this, e.Location);
         };
         DataError += (_, e) => e.ThrowException = false;
+        CurrentCellDirtyStateChanged += (_, _) =>
+        {
+            if (IsCurrentCellDirty) CommitEdit(DataGridViewDataErrorContexts.Commit);
+        };
+        CellValueChanged += (_, e) =>
+        {
+            if (ComMarcacao && e.RowIndex >= 0 && e.ColumnIndex >= 0 && Columns[e.ColumnIndex].Name == "__sel")
+                ItemMarcadoMudou?.Invoke();
+        };
 
         // funil de filtro no canto direito de cada cabeçalho
         CellPainting += (_, e) =>
