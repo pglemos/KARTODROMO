@@ -95,6 +95,7 @@ public class FormPrincipal : Form
             Relogio();
             await Ping();
             Selecionar("reservas:todas");
+            AgenteImpressao.Iniciar(this);
         };
         FormClosing += (_, e) => { if (ConfirmarSaida && !Msg.Pergunta(this, "Deseja sair do sistema?")) e.Cancel = true; };
     }

@@ -45,8 +45,12 @@ Start-Sleep -Milliseconds 800
 
 # ---------- copia
 New-Item -ItemType Directory -Force $destino | Out-Null
+# guarda ajustes feitos só nesta máquina (ex.: impressora dos termos do totem na recepção)
+$anterior = $null
+try { $anterior = Get-Content "$destino\appsettings.json" -Raw -ErrorAction Stop | ConvertFrom-Json } catch {}
 Copy-Item (Join-Path $Origem '*') $destino -Recurse -Force
 $cfg = [ordered]@{ ServidorUrl = $ServidorUrl; CronometragemUrl = $CronometragemUrl }
+if ($anterior -and $anterior.ImpressoraTermos) { $cfg.ImpressoraTermos = $anterior.ImpressoraTermos }
 if ($App -eq 'Autoatendimento') { $cfg.Impressora = $Impressora }
 if ($App -eq 'Cronometragem') { $cfg.TvModo = 'placar' }
 [IO.File]::WriteAllText("$destino\appsettings.json", ($cfg | ConvertTo-Json), (New-Object Text.UTF8Encoding $false))

@@ -614,7 +614,9 @@ public class FormTotem : Form, IMessageFilter
             });
             var qtd = r?["inscricoes"] is JsonArray ins ? ins.Count : 1;
             TelaSucesso(Fmt.Hm(r.S("inicio")), qtd);
-            if (r.S("termoUrl") is { Length: > 0 } termo) _ = Imprimir(_api.BaseUrl + termo);
+            // o termo sai na TM-T20 da recepção (fila do servidor); só imprime aqui se o servidor não enfileirou
+            if (r["termoNaRecepcao"]?.GetValue<bool>() == true) Program.Log("termo enviado para a impressora da recepção");
+            else if (r.S("termoUrl") is { Length: > 0 } termo) _ = Imprimir(_api.BaseUrl + termo);
         });
         voltar.BringToFront(); proximo.BringToFront();
         Mostrar("baterias", c, () => MontarBaterias(baterias, n));

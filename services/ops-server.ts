@@ -156,6 +156,39 @@ async function termoHtml(ids: number[], branco = false) {
     textoPersonalizado,
   });
 }
+// ---------------------------------------------------------------- fila de impressao da recepcao
+// O totem nao tem impressora: o termo entra nesta fila e o programa da Recepcao (com a TM-T20)
+// pega e imprime em segundos, como o LapTime fazia pelo servidor. Fica so em memoria: um
+// servidor reiniciado perde no maximo os termos das ultimas horas, que a recepcao reimprime.
+type Impressao = { id: number; url: string; titulo: string; origem: string; criadoEm: number; pegoEm?: number; feitaEm?: number; tentativas: number };
+const filaImpressao: Impressao[] = [];
+let seqImpressao = 0;
+const IMPRESSAO_VALIDADE_MS = 3 * 60 * 60 * 1000;
+const IMPRESSAO_REENTREGA_MS = 90 * 1000;
+
+function enfileirarImpressao(url: string, titulo: string, origem: string) {
+  const agora = Date.now();
+  for (let i = filaImpressao.length - 1; i >= 0; i--) if (agora - filaImpressao[i].criadoEm > IMPRESSAO_VALIDADE_MS) filaImpressao.splice(i, 1);
+  const job: Impressao = { id: ++seqImpressao, url, titulo, origem, criadoEm: agora, tentativas: 0 };
+  filaImpressao.push(job);
+  log(`impressao #${job.id} na fila (${titulo}, ${origem})`);
+  return job;
+}
+
+function proximaImpressao() {
+  const agora = Date.now();
+  const job = filaImpressao.find((j) => !j.feitaEm && agora - j.criadoEm <= IMPRESSAO_VALIDADE_MS && (!j.pegoEm || agora - j.pegoEm > IMPRESSAO_REENTREGA_MS));
+  if (!job) return null;
+  job.pegoEm = agora;
+  job.tentativas++;
+  return job;
+}
+
+function origemDe(req: http.IncomingMessage) {
+  const ip = String(req.socket.remoteAddress ?? '').replace(/^::ffff:/, '');
+  return ip === '192.168.20.161' ? 'Totem 1' : ip === '192.168.20.69' ? 'Totem 2' : ip || 'totem';
+}
+
 // ---------------------------------------------------------------- totem (publico)
 
 async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, path: string): Promise<boolean> {
@@ -275,7 +308,10 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     const primeira = await one<{ inicio: string }>(`SELECT TOP 1 CONVERT(varchar(16), Inicio, 126) inicio FROM dbo.Bateria WHERE Id IN (${baterias.map((_, n) => '@b' + n).join(',')}) ORDER BY Inicio`, Object.fromEntries(baterias.map((b, n) => ['b' + n, b])));
     const p = await parametros();
     log(`totem: ${ids.length} pre-reserva(s) em ${baterias.length} bateria(s)`);
-    send(res, 201, { inscricoes: ids, inicio: primeira?.inicio, termoUrl: p['totem.imprimirTermo'] !== 'false' ? termoLink(ids) : null });
+    const imprimir = p['totem.imprimirTermo'] !== 'false';
+    const naRecepcao = imprimir && p['totem.termoNaRecepcao'] !== 'false';
+    if (naRecepcao) enfileirarImpressao(termoLink(ids), 'Termo de responsabilidade', origemDe(req));
+    send(res, 201, { inscricoes: ids, inicio: primeira?.inicio, termoUrl: imprimir ? termoLink(ids) : null, termoNaRecepcao: naRecepcao });
     return true;
   }
 
@@ -342,6 +378,26 @@ const server = http.createServer(async (req, res) => {
       if (path === '/api/office/termo-link' && method === 'GET') {
         const ids = String(url.searchParams.get('ids') ?? '').split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0);
         return send(res, 200, { url: termoLink(ids) });
+      }
+      // agente de impressao do programa da Recepcao
+      if (path === '/api/office/impressao/proxima' && method === 'GET') {
+        const job = proximaImpressao();
+        return send(res, 200, job ? { id: job.id, url: job.url, titulo: job.titulo, origem: job.origem, tentativa: job.tentativas } : {});
+      }
+      if (path === '/api/office/impressao/teste' && method === 'POST') {
+        const token = String(req.headers.authorization ?? '').slice(7) || String(url.searchParams.get('t') ?? '');
+        const job = enfileirarImpressao(`/termo?branco=1&t=${encodeURIComponent(token)}`, 'Teste de impressão (termo em branco)', sessao.nome);
+        return send(res, 201, { id: job.id });
+      }
+      if (path === '/api/office/impressao/fila' && method === 'GET') {
+        return send(res, 200, filaImpressao.map(({ url: _u, ...j }) => j));
+      }
+      const mi = path.match(/^\/api\/office\/impressao\/(\d+)\/(feita|falhou)$/);
+      if (mi && method === 'POST') {
+        const job = filaImpressao.find((j) => j.id === Number(mi[1]));
+        if (job && mi[2] === 'feita') { job.feitaEm = Date.now(); log(`impressao #${job.id} impressa na recepcao (${sessao.nome})`); }
+        if (job && mi[2] === 'falhou') { job.pegoEm = undefined; log(`impressao #${job.id} falhou na recepcao, volta pra fila`); }
+        return send(res, 200, { ok: !!job });
       }
       const handled = await officeRoutes({ method, url, sessao, body: () => readBody(req) }, (status, body) => send(res, status, body));
       if (handled) return;
