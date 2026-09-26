@@ -26,6 +26,27 @@ sealed class PainelLed : IDisposable
     public bool Ativo => Porta.Length > 0;
     public string Situacao { get; private set; } = "desligado";
     public bool Ok { get; private set; }
+    /// <summary>Página do placar: 0 = 1º a 10º, 1 = 11º a 20º, 2 = 21º a 30º (para montar o grid depois da tomada de tempo).</summary>
+    public int Pagina { get; private set; }
+    /// <summary>Quantas páginas a bateria atual tem (1 a 3), pelo número de karts com volta.</summary>
+    public int Paginas { get; private set; } = 1;
+    public const int MaxPaginas = 3;
+    bool _limparAntes;
+
+    public void MudarPagina(int pagina)
+    {
+        var nova = Math.Clamp(pagina, 0, MaxPaginas - 1);
+        if (nova == Pagina) return;
+        Pagina = nova;
+        _assinatura = null; _limparAntes = true; // limpa o painel e manda a página nova já
+    }
+
+    /// <summary>Karts que aparecem no placar (os que já têm volta), na ordem da classificação.</summary>
+    public static List<JsonObject> Classificados(JsonObject sessao) => (sessao?["standings"] as JsonArray ?? [])
+        .OfType<JsonObject>()
+        .Where(r => r.I("position") > 0 && r["lastLapMs"] is not null)
+        .OrderBy(r => r.I("position"))
+        .ToList();
 
     SerialPort _serial;
     string _sessao, _assinatura;
@@ -95,9 +116,19 @@ sealed class PainelLed : IDisposable
                 var agora = DateTime.Now;
                 Escrever($"$I,\"{agora:HH:mm:ss.fff}\",\"{agora:ddMMyy}\"\r\n"); // nova bateria: limpa o painel
                 _sessao = id; _assinatura = null;
+                Pagina = 0; _limparAntes = false; // bateria nova volta para 1º a 10º
             }
             if (sessao == null) return;
-            var pacote = Montar(sessao, Linhas, DateTime.Now, out var assinatura);
+            Paginas = Math.Clamp((Classificados(sessao).Count + Linhas - 1) / Linhas, 1, MaxPaginas);
+            if (Pagina >= Paginas) MudarPagina(Paginas - 1);
+            if (_limparAntes)
+            {
+                // troca de página: apaga as linhas da página anterior antes de mandar a nova
+                var agora = DateTime.Now;
+                Escrever($"$I,\"{agora:HH:mm:ss.fff}\",\"{agora:ddMMyy}\"\r\n");
+                _limparAntes = false;
+            }
+            var pacote = Montar(sessao, Linhas, DateTime.Now, out var assinatura, Pagina);
             if (pacote.Length == 0) return;
             if (assinatura == _assinatura && DateTime.Now - _ultimoEnvio < TimeSpan.FromSeconds(5)) return;
             Escrever(pacote);
@@ -115,15 +146,11 @@ sealed class PainelLed : IDisposable
     static string Hora(long? ms) { var t = TimeSpan.FromMilliseconds(Math.Max(0, ms ?? 0)); return $"{(int)t.TotalHours % 24:00}:{t.Minutes:00}:{t.Seconds:00}.{t.Milliseconds:000}"; }
 
     /// <summary>Monta o quadro do LapTime (protocolo 1). Público para teste.</summary>
-    public static string Montar(JsonObject sessao, int linhas, DateTime agora, out string assinatura)
+    public static string Montar(JsonObject sessao, int linhas, DateTime agora, out string assinatura, int pagina = 0)
     {
         var corrida = sessao.S("type") == "corrida";
-        var standings = (sessao["standings"] as JsonArray ?? [])
-            .OfType<JsonObject>()
-            .Where(r => r.I("position") > 0 && r["lastLapMs"] is not null)
-            .OrderBy(r => r.I("position"))
-            .Take(linhas)
-            .ToList();
+        // o painel tem 10 linhas: a página 2 mostra o 11º ao 20º nas linhas 1 a 10, e assim por diante
+        var standings = Classificados(sessao).Skip(pagina * linhas).Take(linhas).ToList();
         var sb = new StringBuilder();
         var pos = 0;
         foreach (var r in standings)
@@ -148,9 +175,9 @@ sealed class PainelLed : IDisposable
                 sb.Append($"$H,{pos},\"{kart}\",{voltas},\"{ultima}\"\r\n");
             }
         }
-        assinatura = sb.ToString();
+        assinatura = $"p{pagina}|" + sb;
         if (sb.Length == 0) return "";
-        var lider = standings.FirstOrDefault()?.I("laps") ?? 0;
+        var lider = Classificados(sessao).FirstOrDefault()?.I("laps") ?? 0; // líder de verdade, não o 1º da página
         var voltasRestantes = sessao["maxLaps"] is JsonValue && sessao.I("maxLaps") > 0 ? Math.Max(0, sessao.I("maxLaps") - lider) : 0;
         sb.Append($"$F,{voltasRestantes},\"{Hora(sessao.L("remainingMs"))}\",\"{agora:HH:mm:ss.fff}\",\"{Hora(sessao.L("elapsedMs"))}\"\r\n");
         return sb.ToString();

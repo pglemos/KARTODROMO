@@ -61,7 +61,7 @@ public partial class FormCrono : Form
         BackColor = TemaCrono.Fundo;
         KeyPreview = true;
         if (autoteste == null) WindowState = FormWindowState.Maximized;
-        else { StartPosition = FormStartPosition.Manual; Location = Environment.GetEnvironmentVariable("KARTODROMO_TESTE") == "ordenacao" ? new Point(-4000, 0) : new Point(0, 0); ShowInTaskbar = Environment.GetEnvironmentVariable("KARTODROMO_TESTE") != "ordenacao"; Size = Environment.GetEnvironmentVariable("KARTODROMO_AUTOTESTE_TAMANHO") is string t && t.Split('x') is [var w, var h] ? new Size(int.Parse(w), int.Parse(h)) : new Size(1600, 960); }
+        else { StartPosition = FormStartPosition.Manual; Location = Environment.GetEnvironmentVariable("KARTODROMO_TESTE") is "ordenacao" or "placar" ? new Point(-4000, 0) : new Point(0, 0); ShowInTaskbar = Environment.GetEnvironmentVariable("KARTODROMO_TESTE") is not ("ordenacao" or "placar"); Size = Environment.GetEnvironmentVariable("KARTODROMO_AUTOTESTE_TAMANHO") is string t && t.Split('x') is [var w, var h] ? new Size(int.Parse(w), int.Parse(h)) : new Size(1600, 960); }
         MinimumSize = new Size(1100, 700);
 
         MainMenuStrip = Menu();
@@ -519,7 +519,7 @@ public partial class FormCrono : Form
         obsBar.Controls.Add(_txtObservacaoAoVivo); obsBar.Controls.Add(addObsLive);
         tabObservacoes.Controls.Add(_gObsAoVivo); tabObservacoes.Controls.Add(obsBar);
         _tabsResultado.TabPages.AddRange([tabOficial, tabCategoria, tabTransponder, tabObservacoes]);
-        resultCard.Controls.Add(_tabsResultado); resultCard.Controls.Add(resultBar);
+        resultCard.Controls.Add(_tabsResultado); resultCard.Controls.Add(MontarBarraPlacar()); resultCard.Controls.Add(resultBar);
         rightLayout.Controls.Add(resultCard, 0, 0); rightLayout.Controls.Add(_lVoltaFaixa, 1, 0);
         split.Panel2.Controls.Add(rightLayout);
 
@@ -577,6 +577,68 @@ public partial class FormCrono : Form
         if (string.IsNullOrEmpty(id)) return;
         _sel = id; _fixado = true;
         _ = Atualizar();
+    }
+
+    // ------------------------------------------------------------------ placar LED: páginas 1º–10º / 11º–20º / 21º–30º
+
+    readonly Label _lPlacar = new() { AutoSize = true, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = Color.FromArgb(10, 79, 160), Margin = new Padding(4, 11, 10, 0) };
+    readonly Button[] _bPaginas = new Button[PainelLed.MaxPaginas];
+
+    /// <summary>Faixa embaixo do resultado: o painel de LED só tem 10 linhas; no fim da tomada de tempo o operador
+    /// vira as páginas (11º a 20º, 21º a 30º) para chamar os karts e montar o grid da corrida.</summary>
+    Control MontarBarraPlacar()
+    {
+        var barra = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 46, WrapContents = false, Padding = new Padding(8, 4, 8, 4), BackColor = Color.FromArgb(239, 246, 255) };
+        barra.Controls.Add(new Label { Text = "▦  Placar LED", AutoSize = true, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = TemaCrono.Texto, Margin = new Padding(0, 11, 6, 0) });
+        barra.Controls.Add(_lPlacar);
+        var dica = new ToolTip();
+        for (var i = 0; i < _bPaginas.Length; i++)
+        {
+            var pagina = i;
+            var b = new Button
+            {
+                Text = $"{i * 10 + 1}º–{i * 10 + 10}º", Size = new Size(86, 32), FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand,
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Margin = new Padding(0, 3, 6, 0), BackColor = Color.White,
+            };
+            b.FlatAppearance.BorderColor = Color.FromArgb(199, 199, 204);
+            b.Click += (_, _) =>
+            {
+                _painel.MudarPagina(pagina);
+                if (_autoteste == null) _painel.Atualizar(_state?["focus"] as JsonObject); // manda na hora, sem esperar a próxima atualização
+                AtualizarPlacar();
+            };
+            dica.SetToolTip(b, $"Mostra no painel de LED do {i * 10 + 1}º ao {i * 10 + 10}º colocado (nas 10 linhas do painel).");
+            _bPaginas[i] = b;
+            barra.Controls.Add(b);
+        }
+        var ajuda = new Label { Text = "ⓘ para montar o grid", AutoSize = true, Font = TemaCrono.Pequena, ForeColor = TemaCrono.Secundario, Margin = new Padding(4, 13, 0, 0), Cursor = Cursors.Help };
+        dica.SetToolTip(ajuda, "O painel de LED tem 10 linhas. No fim da tomada de tempo, clique em 11º–20º e 21º–30º\npara mostrar os próximos colocados e chamar os karts para o grid da corrida.\nQuando começa uma bateria nova, o painel volta sozinho para 1º–10º.");
+        barra.Controls.Add(ajuda);
+        AtualizarPlacar();
+        return barra;
+    }
+
+    void AtualizarPlacar()
+    {
+        if (_bPaginas[0] == null) return;
+        var total = PainelLed.Classificados(_state?["focus"] as JsonObject).Count;
+        var paginas = Math.Clamp((total + 9) / 10, 1, PainelLed.MaxPaginas);
+        var atual = Math.Min(_painel.Pagina, paginas - 1);
+        for (var i = 0; i < _bPaginas.Length; i++)
+        {
+            var b = _bPaginas[i];
+            var existe = i < paginas && (i == 0 || total > i * 10);
+            b.Enabled = _painel.Ativo && existe;
+            var marcado = b.Enabled && i == atual;
+            b.BackColor = marcado ? TemaCrono.Verde : b.Enabled ? Color.White : Color.FromArgb(242, 242, 247);
+            b.ForeColor = marcado ? Color.White : b.Enabled ? TemaCrono.Texto : Color.FromArgb(174, 174, 178);
+            b.FlatAppearance.BorderColor = marcado ? TemaCrono.Verde : Color.FromArgb(199, 199, 204);
+        }
+        if (!_painel.Ativo) { _lPlacar.Text = "painel desligado (Ferramentas › Painel de LED)"; _lPlacar.ForeColor = TemaCrono.Secundario; return; }
+        var ini = atual * 10 + 1;
+        var fim = Math.Min(total, ini + 9);
+        _lPlacar.ForeColor = Color.FromArgb(10, 79, 160);
+        _lPlacar.Text = total == 0 ? "aguardando voltas" : $"mostrando {ini}º a {Math.Max(ini, fim)}º de {total}";
     }
 
     void ConfigurarPainel()
@@ -646,6 +708,7 @@ public partial class FormCrono : Form
         if (_autoteste == null) _painel.Atualizar(_state?["focus"] as JsonObject);
         _sPainel.Text = "PAINEL LED: " + (_painel.Ativo ? _painel.Situacao.ToUpperInvariant() : "DESLIGADO");
         _sPainel.ForeColor = !_painel.Ativo ? TemaCrono.Secundario : _painel.Ok ? TemaCrono.Verde : Color.Red;
+        AtualizarPlacar();
         _sPainel.Font = _sDecoder.Font;
 
         // transponder sem kart nos ultimos 2 minutos
@@ -908,10 +971,43 @@ public partial class FormCrono : Form
         finally { File.WriteAllLines(Path.Combine(_autoteste, "log.txt"), log); Close(); }
     }
 
+    /// <summary>Páginas do placar LED com uma tomada de tempo fictícia de 25 karts (não abre porta serial).</summary>
+    async Task TestePlacar()
+    {
+        var log = new List<string>();
+        try
+        {
+            var standings = new JsonArray();
+            for (var p = 1; p <= 25; p++) standings.Add(new JsonObject { ["position"] = p, ["kart"] = (100 + p).ToString(), ["laps"] = 5, ["lastLapMs"] = 60000 + p, ["bestLapMs"] = 59000 + p, ["totalMs"] = 300000 });
+            var sessao = new JsonObject { ["id"] = "teste", ["name"] = "TESTE TOMADA", ["type"] = "classificacao", ["state"] = "encerrada", ["standings"] = standings, ["remainingMs"] = 0, ["elapsedMs"] = 480000 };
+            for (var pg = 0; pg < 3; pg++)
+            {
+                var q = PainelLed.Montar(sessao, 10, DateTime.Now, out _, pg);
+                var linhas = q.Split('\n').Select(l => l.Trim()).Where(l => l.StartsWith("$SP")).ToList();
+                var karts = linhas.Select(l => l.Split(',')[2].Trim('"')).ToList();
+                var pos = linhas.Select(l => l.Split(',')[1]).ToList();
+                var esperado = Enumerable.Range(pg * 10 + 1, Math.Min(10, 25 - pg * 10)).Select(p => (100 + p).ToString("000")).ToList();
+                log.Add((karts.SequenceEqual(esperado) ? "OK" : "ERRO") + $" página {pg + 1}: linhas {string.Join(",", pos)} com karts {string.Join(" ", karts)}");
+            }
+            _state = new JsonObject { ["focus"] = sessao.DeepClone(), ["sessions"] = new JsonArray() };
+            _abas.SelectedIndex = 2;
+            AtualizarPlacar(); await Task.Delay(300);
+            void Foto(string nome) { Application.DoEvents(); using var bmp = new Bitmap(Width, Height); DrawToBitmap(bmp, new Rectangle(Point.Empty, Size)); bmp.Save(Path.Combine(_autoteste, nome + ".png")); }
+            Foto("placar-pagina1");
+            _bPaginas[1].PerformClick(); await Task.Delay(200); Foto("placar-pagina2");
+            log.Add((_painel.Pagina == 1 && _lPlacar.Text.Contains("11º a 20º") ? "OK" : "ERRO") + $" botão 11º–20º: {_lPlacar.Text}");
+            _bPaginas[2].PerformClick(); await Task.Delay(200);
+            log.Add((_painel.Pagina == 2 && _lPlacar.Text.Contains("21º a 25º") ? "OK" : "ERRO") + $" botão 21º–30º: {_lPlacar.Text}");
+        }
+        catch (Exception e) { log.Add("ERRO " + e); }
+        finally { File.WriteAllLines(Path.Combine(_autoteste, "log.txt"), log); Close(); }
+    }
+
     async Task AutoTeste()
     {
         Directory.CreateDirectory(_autoteste);
         if (Environment.GetEnvironmentVariable("KARTODROMO_TESTE") == "ordenacao") { await TesteOrdenacao(); return; }
+        if (Environment.GetEnvironmentVariable("KARTODROMO_TESTE") == "placar") { await TestePlacar(); return; }
         void Foto(Control c, string nome)
         {
             Application.DoEvents();
