@@ -2,39 +2,723 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Resultado</title>
+<title>Relatório de Cronometragem</title>
 <style>
-  body { font: 13px/1.3 system-ui, "Segoe UI", sans-serif; color:#000; background:#fff; margin:16px; }
-  h1 { font-size:18px; margin:0; } .sub { color:#444; margin:2px 0 12px; }
-  table { width:100%; border-collapse:collapse; }
-  th, td { padding:4px 6px; border-bottom:1px solid #ccc; text-align:left; font-variant-numeric:tabular-nums; }
-  th { font-size:11px; text-transform:uppercase; color:#555; }
-  .t { text-align:right; font-family: Consolas, monospace; }
-  .tools { margin-bottom:12px; } .tools button { font:inherit; padding:6px 12px; }
-  body.cupom { width:72mm; margin:0 2mm; font-size:11px; } body.cupom .wide { display:none; }
-  @media print { .tools { display:none; } }
+  :root {
+    --text: #1d1d1f;
+    --muted: #6e6e73;
+    --border: #d2d2d7;
+    --bg-header: #fbfbfd;
+    --primary: #0b7a53;
+    --purple: #7a2fc2;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--text);
+    background: #f5f5f7;
+    margin: 0;
+    padding: 20px;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+  .page-container {
+    max-width: 1040px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.06);
+    padding: 30px 36px;
+  }
+  .tools {
+    max-width: 1040px;
+    margin: 0 auto 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .tools label { font-weight: 600; font-size: 12px; color: var(--muted); }
+  .tools select {
+    padding: 6px 10px;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    background: #fff;
+    outline: none;
+    cursor: pointer;
+  }
+  .tools button {
+    padding: 6px 14px;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    background: #fff;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.15s;
+  }
+  .tools button:hover { background: #f0f0f2; border-color: #bcbcc0; }
+  .tools button.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .tools button.primary:hover { background: #085e40; }
+  .tools .right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+  /* Relatório Cabecalho Oficial */
+  .rep-header {
+    border-bottom: 2px solid #1d1d1f;
+    padding-bottom: 14px;
+    margin-bottom: 16px;
+  }
+  .rep-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .rep-logo {
+    height: 48px;
+    width: auto;
+    object-fit: contain;
+  }
+  .rep-title-block {
+    text-align: right;
+  }
+  .rep-title-org {
+    font-size: 16px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #111;
+  }
+  .rep-title-sub {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .rep-name {
+    margin-top: 10px;
+    font-size: 20px;
+    font-weight: 800;
+    color: #000;
+    text-transform: uppercase;
+  }
+  .rep-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px 16px;
+    margin-top: 10px;
+    background: #fafafc;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #e5e5ea;
+    font-size: 12px;
+  }
+  .rep-meta-item strong { color: var(--muted); font-size: 10.5px; text-transform: uppercase; display: block; margin-bottom: 1px; }
+
+  /* Tabelas */
+  table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 12px;
+  }
+  table.data-table th, table.data-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #e5e5ea;
+    text-align: left;
+    font-variant-numeric: tabular-nums;
+  }
+  table.data-table th {
+    background: #f4f4f7;
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #444;
+    border-top: 1px solid #d2d2d7;
+    border-bottom: 1px solid #b0b0b8;
+  }
+  table.data-table tr:nth-child(even) td { background: #fafafc; }
+  table.data-table tr:hover td { background: #f0f4fa; }
+  .pos-cell { font-weight: 800; width: 34px; text-align: center; }
+  .pos-1 { color: #b45309; }
+  .kart-cell { font-family: "Geist Mono", Consolas, monospace; font-weight: 800; font-size: 13px; text-align: center; width: 50px; }
+  .mono { font-family: "Geist Mono", Consolas, monospace; }
+  .t-right { text-align: right !important; }
+  .t-center { text-align: center !important; }
+  .best-lap { font-weight: 700; color: var(--purple); }
+  .overall-best { background: #f3e8ff !important; font-weight: 800; color: #581c87; border-radius: 4px; padding: 2px 4px; }
+
+  /* Destaque da Melhor Volta */
+  .best-lap-banner {
+    margin-top: 16px;
+    padding: 8px 14px;
+    border-radius: 6px;
+    background: #f9f5ff;
+    border: 1px solid #e9d5ff;
+    color: #581c87;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .best-lap-banner strong { font-weight: 700; }
+
+  /* Rodapé e Assinaturas */
+  .rep-footer {
+    margin-top: 36px;
+    padding-top: 14px;
+    border-top: 1px solid #e5e5ea;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .signatures {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 30px;
+    margin-top: 40px;
+    text-align: center;
+  }
+  .sign-line {
+    border-top: 1px solid #444;
+    padding-top: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #222;
+  }
+
+  /* Grid de Largada */
+  .grid-container {
+    margin: 20px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .grid-row-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  .grid-row-3col {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+  }
+  .grid-box {
+    border: 2px solid #2c2c2e;
+    border-radius: 8px;
+    padding: 10px 14px;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+  }
+  .grid-box.pole {
+    border-color: #0b7a53;
+    background: #f0fdf4;
+  }
+  .grid-pos {
+    font-size: 20px;
+    font-weight: 800;
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    background: #2c2c2e;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .grid-box.pole .grid-pos {
+    background: #0b7a53;
+  }
+  .grid-info { flex: 1; min-width: 0; }
+  .grid-kart { font-family: "Geist Mono", monospace; font-size: 18px; font-weight: 800; color: #111; }
+  .grid-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #1d1d1f; }
+  .grid-time { font-family: "Geist Mono", monospace; font-size: 11.5px; color: var(--muted); }
+
+  /* Volta a Volta */
+  .driver-laps-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+  .driver-laps-header {
+    background: #f4f4f7;
+    padding: 8px 12px;
+    font-weight: 700;
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+  .laps-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 4px;
+    padding: 8px 12px;
+    font-size: 11.5px;
+    background: #fff;
+  }
+  .lap-pill {
+    padding: 4px 6px;
+    border-radius: 4px;
+    background: #fafafc;
+    border: 1px solid #f0f0f2;
+    display: flex;
+    justify-content: space-between;
+  }
+  .lap-pill.best {
+    background: #f3e8ff;
+    border-color: #d8b4fe;
+    font-weight: 700;
+    color: #6b21a8;
+  }
+
+  /* Matrix Mapa de Voltas */
+  .matrix-wrapper {
+    overflow-x: auto;
+    margin-top: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  table.matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  table.matrix-table th, table.matrix-table td {
+    padding: 5px 6px;
+    border: 1px solid #e5e5ea;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  table.matrix-table th { background: #f4f4f7; font-weight: 700; }
+  table.matrix-table td.driver-col { text-align: left; font-weight: 600; background: #fff; position: sticky; left: 0; }
+
+  /* Modo Cupom Térmico */
+  body.cupom {
+    background: #fff;
+    padding: 0;
+    font-size: 11px;
+  }
+  body.cupom .tools { display: none !important; }
+  body.cupom .page-container {
+    max-width: 72mm;
+    width: 72mm;
+    padding: 2mm 2mm;
+    border-radius: 0;
+    box-shadow: none;
+    margin: 0;
+  }
+  body.cupom .rep-logo { height: 28px; }
+  body.cupom .rep-title-org { font-size: 11px; }
+  body.cupom .rep-name { font-size: 13px; }
+  body.cupom .rep-meta-grid { grid-template-columns: 1fr; font-size: 10px; gap: 2px; padding: 4px; }
+  body.cupom .wide-only { display: none !important; }
+  body.cupom .signatures { display: none; }
+  body.cupom table.data-table th, body.cupom table.data-table td { padding: 3px 2px; font-size: 9.5px; }
+
+  @media print {
+    body { background: #fff; padding: 0; }
+    .tools { display: none !important; }
+    .page-container { box-shadow: none; padding: 0; border: none; border-radius: 0; }
+    table.data-table tr:hover td { background: transparent; }
+  }
 </style>
 </head>
 <body>
-<div class="tools"><button onclick="print()">Imprimir A4</button> <button onclick="document.body.classList.add('cupom');print();document.body.classList.remove('cupom')">Imprimir cupom (térmica)</button></div>
-<h1 id="title">Resultado</h1>
-<div id="sub" class="sub"></div>
-<table><thead><tr><th>Pos</th><th>Kart</th><th>Piloto</th><th class="t">Voltas</th><th class="t">Melhor</th><th class="t wide">V. melhor</th><th class="t">Dif.</th></tr></thead><tbody id="rows"></tbody></table>
+
+<div class="tools" id="toolsBar">
+  <label for="tipoSelect">Relatório:</label>
+  <select id="tipoSelect" onchange="mudarTipo(this.value)">
+    <option value="resultados_oficiais">Resultados oficiais</option>
+    <option value="sem_velocidade">Resultados oficiais (sem velocidade média)</option>
+    <option value="com_tempo_medio">Resultados oficiais (com tempo médio)</option>
+    <option value="ordem_chegada">Resultados oficiais (ordem de chegada)</option>
+    <option value="ordem_chegada_categoria">Resultados oficiais (ordem de chegada com categoria)</option>
+    <option value="passagens">Relatório de passagens</option>
+    <option value="volta_a_volta">Volta a volta (todos)</option>
+    <option value="mapa_voltas">Mapa de voltas (todos)</option>
+    <option value="mapa_prova">Mapa de prova</option>
+    <option value="grid_2col_esq">Grid de largada · 2 colunas (líder à esquerda)</option>
+    <option value="grid_2col_dir">Grid de largada · 2 colunas (líder à direita)</option>
+    <option value="grid_3col_esq">Grid de largada · 3 colunas (líder à esquerda)</option>
+    <option value="grid_3col_dir">Grid de largada · 3 colunas (líder à direita)</option>
+  </select>
+
+  <button class="primary" onclick="window.print()">🖨 Imprimir A4</button>
+  <button onclick="imprimirCupom()">🧾 Imprimir cupom térmico</button>
+
+  <div class="right">
+    <span id="sessionStatusBadge" style="font-size: 11.5px; font-weight: 600; color: var(--muted);"></span>
+  </div>
+</div>
+
+<div class="page-container" id="pageContainer">
+  <div class="rep-header">
+    <div class="rep-header-top">
+      <img src="/kib-logo.png" alt="Kartódromo Internacional de Betim" class="rep-logo" onerror="this.style.display='none'">
+      <div class="rep-title-block">
+        <div class="rep-title-org">Kartódromo Internacional de Betim</div>
+        <div class="rep-title-sub">Sistema Oficial de Cronometragem</div>
+      </div>
+    </div>
+    <div class="rep-name" id="reportTitle">Resultados Oficiais</div>
+    <div class="rep-meta-grid" id="metaGrid">
+      <div class="rep-meta-item"><strong>Evento</strong><span id="metaEvento">—</span></div>
+      <div class="rep-meta-item"><strong>Bateria / Prova</strong><span id="metaBateria">—</span></div>
+      <div class="rep-meta-item"><strong>Data e Hora</strong><span id="metaDataHora">—</span></div>
+      <div class="rep-meta-item"><strong>Extensão / Pista</strong><span id="metaPista">1.110 m · Traçado Principal</span></div>
+    </div>
+  </div>
+
+  <div id="reportContent">
+    <div style="text-align: center; padding: 40px; color: var(--muted);">Carregando dados do relatório...</div>
+  </div>
+
+  <div id="bestLapContainer"></div>
+
+  <div class="rep-footer" id="repFooter">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span>Emitido pelo Sistema de Cronometragem em <strong id="timestampImpresso"></strong></span>
+      <span>Página 1 de 1</span>
+    </div>
+    <div class="signatures">
+      <div class="sign-line">Diretor de Prova</div>
+      <div class="sign-line">Comissários Desportivos</div>
+      <div class="sign-line">Cronometrista Responsável</div>
+    </div>
+  </div>
+</div>
+
 <script>
-const fmt = (ms) => { if (ms == null) return '--'; const s = ms/1000, m = Math.floor(s/60); const r = (s - m*60).toFixed(3); return m ? `${m}:${r.padStart(6,'0')}` : r; };
+const params = new URLSearchParams(location.search);
+let currentTipo = params.get('tipo') || 'resultados_oficiais';
+const sessionId = location.pathname.split('/').filter(Boolean).pop();
+
+document.getElementById('tipoSelect').value = currentTipo;
+
+const fmt = (ms) => {
+  if (ms == null || ms === 0) return '--';
+  const s = ms / 1000, m = Math.floor(s / 60);
+  const r = (s - m * 60).toFixed(3);
+  return m ? `${m}:${r.padStart(6, '0')}` : r;
+};
+
+const fmtHora = (ms) => {
+  if (!ms) return '--:--:--';
+  const d = new Date(ms);
+  return d.toTimeString().split(' ')[0] + '.' + String(d.getMilliseconds()).padStart(3, '0');
+};
+
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const id = location.pathname.split('/').pop();
-fetch('/api/sessions/' + id).then(r => r.json()).then(v => {
-  const TYPES = { treino:'Treino', classificacao:'Tomada de tempo', corrida:'Corrida' };
-  document.title = 'Resultado · ' + v.name;
-  document.getElementById('title').textContent = 'Kartódromo Internacional de Betim · ' + v.name;
-  const when = v.startedAt ? new Date(v.startedAt).toLocaleString('pt-BR') : '';
-  document.getElementById('sub').textContent = `${TYPES[v.type]} · ${when}${v.state !== 'encerrada' ? ' · (parcial: ' + v.state.replace('_',' ') + ')' : ''}`;
-  const race = v.type === 'corrida';
-  document.getElementById('rows').innerHTML = v.standings.map(r => `<tr><td>${r.position}</td><td><b>${esc(r.kart)}</b></td><td>${esc(r.name)}</td>
-    <td class="t">${r.laps}</td><td class="t">${fmt(r.bestLapMs)}</td><td class="t wide">${r.bestLapNumber ?? ''}</td>
-    <td class="t">${r.position === 1 ? '' : r.gapLaps ? '+' + r.gapLaps + 'V' : r.gapMs != null ? '+' + fmt(r.gapMs) : ''}</td></tr>`).join('');
-});
+
+let sessionData = null;
+let passingsData = [];
+let lapsData = [];
+
+function mudarTipo(novoTipo) {
+  currentTipo = novoTipo;
+  const newUrl = new URL(location.href);
+  newUrl.searchParams.set('tipo', novoTipo);
+  history.replaceState(null, '', newUrl.toString());
+  renderReport();
+}
+
+function imprimirCupom() {
+  document.body.classList.add('cupom');
+  window.print();
+  document.body.classList.remove('cupom');
+}
+
+async function carregarTudo() {
+  try {
+    const sRes = await fetch('/api/sessions/' + sessionId);
+    sessionData = await sRes.json();
+
+    try {
+      const pRes = await fetch(`/api/sessions/${sessionId}/passings`);
+      passingsData = await pRes.json();
+    } catch { passingsData = []; }
+
+    try {
+      const lRes = await fetch(`/api/sessions/${sessionId}/laps`);
+      lapsData = await lRes.json();
+    } catch { lapsData = []; }
+
+    document.getElementById('timestampImpresso').textContent = new Date().toLocaleString('pt-BR');
+    preencherCabecalho();
+    renderReport();
+  } catch (err) {
+    document.getElementById('reportContent').innerHTML = `<div style="color: red; padding: 20px;">Falha ao carregar sessão: ${esc(err.message)}</div>`;
+  }
+}
+
+function preencherCabecalho() {
+  const v = sessionData;
+  if (!v) return;
+  const TYPES = { treino: 'Treino', classificacao: 'Tomada de Tempo', corrida: 'Corrida' };
+  const dt = v.startedAt ? new Date(v.startedAt).toLocaleString('pt-BR') : new Date().toLocaleDateString('pt-BR');
+  document.getElementById('metaEvento').textContent = v.name.split('·')[0].trim() || 'Baterias do Dia';
+  document.getElementById('metaBateria').textContent = `${v.name} (${TYPES[v.type] || v.type})`;
+  document.getElementById('metaDataHora').textContent = dt;
+  document.getElementById('sessionStatusBadge').textContent = `Estado: ${v.state?.toUpperCase() || ''} · ${v.standings?.length || 0} competidores`;
+}
+
+function renderReport() {
+  if (!sessionData) return;
+  const v = sessionData;
+  const standings = v.standings || [];
+  const content = document.getElementById('reportContent');
+  const bestBox = document.getElementById('bestLapContainer');
+  const title = document.getElementById('reportTitle');
+  bestBox.innerHTML = '';
+
+  const TITULOS = {
+    resultados_oficiais: 'Resultados Oficiais',
+    sem_velocidade: 'Resultados Oficiais (Sem Velocidade Média)',
+    com_tempo_medio: 'Resultados Oficiais (Com Tempo Médio)',
+    ordem_chegada: 'Resultados Oficiais (Ordem de Chegada)',
+    ordem_chegada_categoria: 'Resultados Oficiais (Ordem de Chegada por Categoria)',
+    passagens: 'Relatório Completo de Passagens',
+    volta_a_volta: 'Relatório Volta a Volta (Todos os Pilotos)',
+    mapa_voltas: 'Mapa de Voltas (Todos os Pilotos)',
+    mapa_prova: 'Mapa de Prova (Evolução da Posição)',
+    grid_2col_esq: 'Grid de Largada · 2 Colunas (Líder à Esquerda)',
+    grid_2col_dir: 'Grid de Largada · 2 Colunas (Líder à Direita)',
+    grid_3col_esq: 'Grid de Largada · 3 Colunas (Líder à Esquerda)',
+    grid_3col_dir: 'Grid de Largada · 3 Colunas (Líder à Direita)',
+  };
+
+  title.textContent = TITULOS[currentTipo] || 'Resultados Oficiais';
+  document.title = `${title.textContent} · ${v.name}`;
+
+  // Melhores voltas gerais
+  let melhorGeral = null;
+  for (const s of standings) {
+    if (s.bestLapMs && (!melhorGeral || s.bestLapMs < melhorGeral.bestLapMs)) {
+      melhorGeral = s;
+    }
+  }
+
+  if (['resultados_oficiais', 'sem_velocidade', 'com_tempo_medio', 'ordem_chegada', 'ordem_chegada_categoria'].includes(currentTipo)) {
+    let list = [...standings];
+    if (currentTipo.includes('ordem_chegada')) {
+      list.sort((a, b) => (b.laps - a.laps) || ((a.totalMs || 0) - (b.totalMs || 0)));
+      list.forEach((r, idx) => r.chegadaPos = idx + 1);
+    }
+
+    const showSpeed = currentTipo === 'resultados_oficiais';
+    const showAvgTime = currentTipo === 'com_tempo_medio';
+    const showCat = currentTipo === 'ordem_chegada_categoria' || standings.some(s => s.category);
+
+    let html = `<table class="data-table"><thead><tr>
+      <th class="pos-cell">Pos</th>
+      <th class="kart-cell">Nº</th>
+      <th>Competidor</th>
+      ${showCat ? '<th>Cat.</th>' : ''}
+      <th class="t-right">Voltas</th>
+      <th class="t-right wide-only">Tempo Total</th>
+      <th class="t-right">Melhor Volta</th>
+      <th class="t-center wide-only">Na V.</th>
+      <th class="t-right">Dif. 1º</th>
+      <th class="t-right wide-only">Dif. Ant.</th>
+      ${showSpeed ? '<th class="t-right wide-only">Vel. Média</th>' : ''}
+      ${showAvgTime ? '<th class="t-right wide-only">T. Médio</th>' : ''}
+    </tr></thead><tbody>`;
+
+    list.forEach((r, i) => {
+      const pos = r.chegadaPos || r.position || (i + 1);
+      const isBest = melhorGeral && r.kart === melhorGeral.kart;
+      const speed = r.averageSpeedKmh ? Number(r.averageSpeedKmh).toFixed(1) + ' km/h' : '—';
+      const avgMs = r.laps > 0 && r.totalMs ? Math.round(r.totalMs / r.laps) : null;
+      const gapLider = pos === 1 ? '—' : r.gapLaps ? `+${r.gapLaps} V` : r.gapMs != null ? `+${fmt(r.gapMs)}` : '—';
+      const prev = list[i - 1];
+      const gapAnt = pos === 1 || !prev ? '—' : r.gapLaps && prev.gapLaps !== r.gapLaps ? `+${(r.gapLaps - (prev.gapLaps || 0))} V` : (r.totalMs && prev.totalMs) ? `+${fmt(r.totalMs - prev.totalMs)}` : '—';
+
+      html += `<tr>
+        <td class="pos-cell ${pos <= 3 ? 'pos-' + pos : ''}">${pos}º</td>
+        <td class="kart-cell">${esc(r.kart)}</td>
+        <td><strong>${esc(r.name)}</strong></td>
+        ${showCat ? `<td><span style="font-size: 11px; color: var(--muted);">${esc(r.category || 'Geral')}</span></td>` : ''}
+        <td class="t-right mono">${r.laps}</td>
+        <td class="t-right mono wide-only">${fmt(r.totalMs)}</td>
+        <td class="t-right mono ${isBest ? 'overall-best' : 'best-lap'}">${fmt(r.bestLapMs)}</td>
+        <td class="t-center mono wide-only">${r.bestLapNumber ?? '—'}</td>
+        <td class="t-right mono">${gapLider}</td>
+        <td class="t-right mono wide-only">${gapAnt}</td>
+        ${showSpeed ? `<td class="t-right mono wide-only">${speed}</td>` : ''}
+        ${showAvgTime ? `<td class="t-right mono wide-only">${fmt(avgMs)}</td>` : ''}
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+    content.innerHTML = html;
+
+    if (melhorGeral) {
+      bestBox.innerHTML = `
+        <div class="best-lap-banner">
+          <div>
+            <strong>MELHOR VOLTA DA PROVA:</strong> Kart <strong>#${esc(melhorGeral.kart)}</strong> · <strong>${esc(melhorGeral.name)}</strong>
+          </div>
+          <div>
+            Tempo: <strong class="mono">${fmt(melhorGeral.bestLapMs)}</strong> na volta <strong>${melhorGeral.bestLapNumber || '—'}</strong>
+            ${melhorGeral.averageSpeedKmh ? `· Média: <strong>${Number(melhorGeral.averageSpeedKmh).toFixed(1)} km/h</strong>` : ''}
+          </div>
+        </div>
+      `;
+    }
+  }
+  else if (currentTipo === 'passagens') {
+    if (!passingsData.length) {
+      content.innerHTML = `<div style="padding: 30px; text-align: center; color: var(--muted);">Nenhuma passagem registrada para esta bateria.</div>`;
+      return;
+    }
+    let html = `<table class="data-table"><thead><tr>
+      <th style="width: 40px;">#</th>
+      <th class="kart-cell">Kart</th>
+      <th>Competidor</th>
+      <th class="wide-only">Transponder</th>
+      <th class="t-right">Tempo Volta</th>
+      <th class="t-center">Volta</th>
+      <th class="t-right wide-only">Decorrido</th>
+      <th class="t-right wide-only">Hora Passagem</th>
+      <th class="wide-only">Situação</th>
+    </tr></thead><tbody>`;
+
+    passingsData.forEach((p, idx) => {
+      const situacao = p.deleted ? 'Excluída' : p.invalid ? 'Inválida' : p.rejected ? (p.reason || 'Rejeitada') : 'Válida';
+      const situacaoCor = p.invalid ? 'color: red;' : p.deleted ? 'color: gray;' : 'color: green;';
+      html += `<tr>
+        <td class="mono" style="color: var(--muted);">${p.sequence || (idx + 1)}</td>
+        <td class="kart-cell">${esc(p.kart)}</td>
+        <td><strong>${esc(p.name || '—')}</strong></td>
+        <td class="mono wide-only" style="color: var(--muted);">${esc(p.transponder || '—')}</td>
+        <td class="t-right mono font-weight-bold">${fmt(p.lapMs)}</td>
+        <td class="t-center mono">${p.lap || '—'}</td>
+        <td class="t-right mono wide-only">${fmt(p.wallMs)}</td>
+        <td class="t-right mono wide-only">${fmtHora(p.passingMs || p.wallMs)}</td>
+        <td class="wide-only" style="${situacaoCor} font-weight: 600;">${situacao}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+    content.innerHTML = html;
+  }
+  else if (currentTipo === 'volta_a_volta') {
+    if (!lapsData.length) {
+      content.innerHTML = `<div style="padding: 30px; text-align: center; color: var(--muted);">Nenhuma volta concluída registrada.</div>`;
+      return;
+    }
+    let html = `<div>`;
+    lapsData.forEach(d => {
+      const laps = d.laps || [];
+      const best = laps.filter(l => !l.invalid).reduce((min, l) => l.lapMs < min ? l.lapMs : min, Infinity);
+      html += `
+        <div class="driver-laps-card">
+          <div class="driver-laps-header">
+            <div>Kart <strong class="mono">#${esc(d.kart)}</strong> · <span>${esc(d.name)}</span></div>
+            <div style="font-size: 12px; color: var(--muted);">${laps.length} voltas completadas ${best !== Infinity ? `· Melhor: <strong class="mono best-lap">${fmt(best)}</strong>` : ''}</div>
+          </div>
+          <div class="laps-grid">
+            ${laps.map(l => {
+              const isBest = l.lapMs === best;
+              return `<div class="lap-pill ${isBest ? 'best' : ''}">
+                <span style="color: var(--muted);">V${l.lap}</span>
+                <span class="mono">${fmt(l.lapMs)}</span>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    });
+    html += `</div>`;
+    content.innerHTML = html;
+  }
+  else if (currentTipo === 'mapa_voltas' || currentTipo === 'mapa_prova') {
+    if (!lapsData.length) {
+      content.innerHTML = `<div style="padding: 30px; text-align: center; color: var(--muted);">Nenhuma volta concluída registrada.</div>`;
+      return;
+    }
+    const maxLaps = Math.max(...lapsData.map(d => (d.laps || []).length), 1);
+    let html = `<div class="matrix-wrapper"><table class="matrix-table"><thead><tr>
+      <th class="driver-col">Competidor</th>`;
+    for (let l = 1; l <= maxLaps; l++) html += `<th>V${l}</th>`;
+    html += `</tr></thead><tbody>`;
+
+    lapsData.forEach(d => {
+      const map = {};
+      (d.laps || []).forEach(l => map[l.lap] = l);
+      const best = (d.laps || []).filter(l => !l.invalid).reduce((min, l) => l.lapMs < min ? l.lapMs : min, Infinity);
+
+      html += `<tr><td class="driver-col">#<strong>${esc(d.kart)}</strong> ${esc(d.name)}</td>`;
+      for (let l = 1; l <= maxLaps; l++) {
+        const item = map[l];
+        if (!item) {
+          html += `<td>—</td>`;
+        } else if (currentTipo === 'mapa_voltas') {
+          const isBest = item.lapMs === best;
+          html += `<td class="mono ${isBest ? 'best-lap' : ''}">${fmt(item.lapMs)}</td>`;
+        } else {
+          // Mapa de prova: se tiver posicao, senao calcula ou tempo
+          html += `<td class="mono font-weight-bold">${item.pos || l}º</td>`;
+        }
+      }
+      html += `</tr>`;
+    });
+    html += `</tbody></table></div>`;
+    content.innerHTML = html;
+  }
+  else if (currentTipo.startsWith('grid_')) {
+    const is3Col = currentTipo.includes('3col');
+    const leaderRight = currentTipo.includes('dir');
+    const cols = is3Col ? 3 : 2;
+    const sorted = [...standings].sort((a, b) => (a.position || 0) - (b.position || 0));
+
+    let html = `<div class="grid-container">`;
+    for (let i = 0; i < sorted.length; i += cols) {
+      let rowDrivers = sorted.slice(i, i + cols);
+      if (leaderRight) rowDrivers.reverse();
+
+      html += `<div class="${is3Col ? 'grid-row-3col' : 'grid-row-2col'}">`;
+      rowDrivers.forEach(r => {
+        const pos = r.position || (sorted.indexOf(r) + 1);
+        const isPole = pos === 1;
+        html += `
+          <div class="grid-box ${isPole ? 'pole' : ''}">
+            <div class="grid-pos">${pos}º</div>
+            <div class="grid-info">
+              <div class="grid-kart">#${esc(r.kart)}</div>
+              <div class="grid-name">${esc(r.name)}</div>
+              <div class="grid-time">Melhor volta: ${fmt(r.bestLapMs)}</div>
+            </div>
+          </div>
+        `;
+      });
+      // preenche vazios da linha
+      for (let k = rowDrivers.length; k < cols; k++) {
+        html += `<div></div>`;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+    content.innerHTML = html;
+  }
+}
+
+carregarTudo();
 </script>
 </body>
 </html>

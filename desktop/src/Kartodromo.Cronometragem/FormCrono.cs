@@ -175,7 +175,7 @@ public partial class FormCrono : Form
         var rel = new ToolStripMenuItem("Relatórios");
         rel.DropDownItems.Add("Banner", null, (_, _) => JanelaCadastro("Banner"));
         rel.DropDownItems.Add("Ranking por peso", null, (_, _) => JanelaCadastro("RankingPeso"));
-        rel.DropDownItems.Add("Diversos (resultados, mapas, grids)", null, (_, _) => JanelaCadastro("RelatoriosCrono"));
+        rel.DropDownItems.Add("Diversos (resultados, mapas, grids)", null, (_, _) => AbrirRelatoriosCrono());
         var crono = new ToolStripMenuItem("Cronometragem");
         crono.DropDownItems.Add(new ToolStripMenuItem("Bandeira verde", null, (_, _) => Bandeira("verde")) { ShortcutKeyDisplayString = "F1" });
         crono.DropDownItems.Add(new ToolStripMenuItem("Bandeira amarela", null, (_, _) => Bandeira("amarela")) { ShortcutKeyDisplayString = "F2" });
@@ -439,7 +439,7 @@ public partial class FormCrono : Form
         _bCancelar = Band("Cancelar", Icone.Tile("×", Color.FromArgb(120, 120, 120), 26), "Cancelar a bateria", () => Acao("cancel"));
         _bandeiras.Items.AddRange([_bVerde, _bAmarela, _bVermelha, _bQuad, _bFinalizar, _bLimpar, _bBranca, _bCancelar, new ToolStripSeparator()]);
         _bandeiras.Items.Add(Band("Nova bateria", Icone.Tile("+", TemaCrono.Verde, 26), "Criar bateria", () => NovaBateria(null)));
-        _bandeiras.Items.Add(Band("Resultado", Icone.Tile("▤", Color.FromArgb(70, 70, 70), 26), "Abrir resultado oficial", Resultado));
+        _bandeiras.Items.Add(Band("Resultado", Icone.Tile("▤", Color.FromArgb(70, 70, 70), 26), "Relatórios de cronometragem (resultados, mapas, grids)", AbrirRelatoriosCrono));
         _bandeiras.Items.Add(Band("WhatsApp", Icone.Tile("W", Color.FromArgb(37, 211, 102), 26), "Enviar resultado", EnviarWhatsApp));
         _bandeiras.Items.Add(Band("E-mail", Icone.Tile("✉", Color.FromArgb(10, 132, 255), 26), "Enviar resultado por e-mail", EnviarEmail));
         _bandeiras.Items.Add(Band("Placar / TV", Icone.Tile("▣", Color.FromArgb(0, 99, 177), 26), "Abrir placar / telão (F11)", AbrirTV));
@@ -499,7 +499,7 @@ public partial class FormCrono : Form
         var rightLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Padding = new Padding(0, 0, 2, 0) };
         rightLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); rightLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 106));
         var resultCard = TemaCrono.Card("Resultado", "Classificação atualizada com cada passagem");
-        var resultBar = BarraAcoes(("Imprimir", Resultado), ("Telão / TV", AbrirTV), ("Transponders", Transponders), ("Por categoria", () => _tabsResultado.SelectedIndex = 1), ("Oficial", () => _tabsResultado.SelectedIndex = 0));
+        var resultBar = BarraAcoes(("Imprimir", AbrirRelatoriosCrono), ("Telão / TV", AbrirTV), ("Transponders", Transponders), ("Por categoria", () => _tabsResultado.SelectedIndex = 1), ("Oficial", () => _tabsResultado.SelectedIndex = 0));
         _tabsResultado.TabPages.Clear();
         var tabOficial = new TabPage("Oficial") { BackColor = Color.White }; tabOficial.Controls.Add(_gRes);
         var tabCategoria = new TabPage("Categoria") { BackColor = Color.White }; tabCategoria.Controls.Add(_gResCategoria);
@@ -1053,11 +1053,13 @@ public partial class FormCrono : Form
         _tv.Show();
     }
 
-    void Resultado()
+    void AbrirRelatoriosCrono()
     {
-        if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
-        Relatorio.Abrir(this, $"{Config.CronoUrl}/resultado/{_sess.S("id")}", "Resultado - " + _sess.S("name"));
+        using var f = new FormRelatoriosCrono(_state, _sess);
+        f.ShowDialog(this);
     }
+
+    void Resultado() => AbrirRelatoriosCrono();
 
     // ------------------------------------------------------------------ autoteste
 

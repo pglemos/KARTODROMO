@@ -15,7 +15,7 @@
 import http from 'node:http';
 import net from 'node:net';
 import { appendFileSync, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { extname, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { DecoderClient, type DecoderProtocol } from '../lib/timing/decoder-client';
 import { formatTrxPassing, type TrxPassing } from '../lib/timing/trx-parser';
@@ -452,7 +452,9 @@ function send(res: http.ServerResponse, status: number, body: unknown, headers: 
 function sendFile(res: http.ServerResponse, name: string) {
   const file = join(UI_DIR, name);
   if (!existsSync(file)) return send(res, 404, 'nao encontrado');
-  res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+  const ext = extname(name).toLowerCase();
+  const mime = ext === '.png' ? 'image/png' : ext === '.svg' ? 'image/svg+xml' : ext === '.css' ? 'text/css' : ext === '.js' ? 'application/javascript' : 'text/html; charset=utf-8';
+  res.writeHead(200, { 'content-type': mime, 'cache-control': 'no-store' });
   res.end(readFileSync(file));
 }
 
@@ -1003,6 +1005,7 @@ const server = http.createServer((req, res) => {
   if (['/admin', '/cadastros', '/ferramentas', '/configuracoes'].includes(url.pathname)) return sendFile(res, 'admin.html');
   if (url.pathname === '/tv') return sendFile(res, 'tv.html');
   if (url.pathname.startsWith('/resultado/')) return sendFile(res, 'resultado.html');
+  if (url.pathname === '/kib-logo.png' || url.pathname === '/assets/da264d01b784a13054e2da496b5f46ff.png' || url.pathname === '/assets/kib-logo.png') return sendFile(res, 'kib-logo.png');
   if (url.pathname.startsWith('/api/') || url.pathname === '/healthz') {
     handleApi(req, res, url).catch((err) => {
       log('erro na API', err);

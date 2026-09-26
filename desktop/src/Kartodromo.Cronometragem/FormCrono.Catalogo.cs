@@ -280,6 +280,7 @@ public partial class FormCrono
 
     void JanelaCadastro(string nome)
     {
+        if (nome == "RelatoriosCrono") { AbrirRelatoriosCrono(); return; }
         if (nome == "CadCategoria") { using var f = new FormCatalogoAux("categories"); f.ShowDialog(this); return; }
         if (nome == "CadTracado") { using var f = new FormCatalogoAux("tracks"); f.ShowDialog(this); return; }
         if (nome == "Competidor") { using var f = new FormCatalogoAux("competitors"); f.ShowDialog(this); return; }
