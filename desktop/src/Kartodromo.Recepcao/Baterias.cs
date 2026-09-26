@@ -114,7 +114,16 @@ public class FormBateria : Janela
     {
         var campos = new CamposBateria(b);
         Controls.Add(new Panel { Dock = DockStyle.Fill, Padding = new Padding(10), Controls = { campos } });
-        Rodape(("Cancelar", (_, _) => Close(), false), ("Salvar", (_, _) => Seguro.Rodar(this, async () =>
+        var status = b.S("status");
+        var textoStatus = status == "aberta" ? "Fechar Bateria" : "Abrir Bateria";
+        EventHandler acaoStatus = (_, _) => Seguro.Rodar(this, async () =>
+        {
+            var novo = status == "aberta" ? "fechada" : "aberta";
+            await Sessao.Api.Post($"/api/office/baterias/{b.S("id")}/status", new { status = novo });
+            Msg.Info(this, novo == "aberta" ? "Bateria aberta com sucesso!" : "Bateria fechada com sucesso!");
+            DialogResult = DialogResult.OK; Close();
+        });
+        Rodape(("Cancelar", (_, _) => Close(), false), (textoStatus, acaoStatus, false), ("Salvar", (_, _) => Seguro.Rodar(this, async () =>
         {
             if (string.IsNullOrWhiteSpace(campos.Nome.Text)) { Msg.Aviso(this, "Insira um nome."); return; }
             await Sessao.Api.Put($"/api/office/baterias/{b.S("id")}", campos.Corpo());
@@ -160,6 +169,7 @@ public class FormAgenda : Janela
     static Api Api => Sessao.Api;
     readonly MonthCalendar _cal = new() { MaxSelectionCount = 1, Dock = DockStyle.Top };
     readonly ComboBox _bats = Campos.Combo();
+    readonly Button _bStatus = new() { Text = "Abrir Bateria", Height = 24, Enabled = false };
     readonly Label _info = new() { Dock = DockStyle.Fill, Padding = new Padding(4) };
     readonly TextBox _q = new(), _obs = Campos.Texto(400);
     readonly RadioButton _rCpf = new() { Text = "CPF", Checked = true, AutoSize = true }, _rEmail = new() { Text = "E-mail", AutoSize = true }, _rNome = new() { Text = "Nome", AutoSize = true };
@@ -178,10 +188,20 @@ public class FormAgenda : Janela
         esq.Controls.Add(gbInfo); esq.Controls.Add(_resumo); esq.Controls.Add(_cal);
 
         var dir = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8) };
-        var linhaBat = Campos.Grade(2, 80, 20);
+        var linhaBat = Campos.Grade(3, 60, 20, 20);
         var bEd = new Button { Text = "Editar Bateria", Height = 24 };
         bEd.Click += (_, _) => { if (_bat != null && new FormBateria(_bat).ShowDialog(this) == DialogResult.OK) CarregaDia(); };
-        Campos.Add(linhaBat, "Baterias disponíveis", _bats); Campos.Add(linhaBat, " ", bEd);
+        _bStatus.Click += (_, _) => Seguro.Rodar(this, async () =>
+        {
+            if (_bat == null) return;
+            var novo = _bat.S("status") == "aberta" ? "fechada" : "aberta";
+            await Api.Post($"/api/office/baterias/{_bat.S("id")}/status", new { status = novo });
+            Msg.Info(this, novo == "aberta" ? "Bateria aberta com sucesso!" : "Bateria fechada com sucesso!");
+            var manter = _bat.S("id");
+            await CarregaDiaAsync();
+            foreach (var o in _bats.Items) if (o is Campos.Item it && it.Id.ToString() == manter) _bats.SelectedItem = o;
+        });
+        Campos.Add(linhaBat, "Baterias disponíveis", _bats); Campos.Add(linhaBat, " ", bEd); Campos.Add(linhaBat, "  ", _bStatus);
         var gbCli = new GroupBox { Text = "Pesquisar Cliente", Dock = DockStyle.Top, Height = 104, Padding = new Padding(8, 4, 8, 4) };
         var radios = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 26 };
         radios.Controls.AddRange([_rCpf, _rEmail, _rNome]);
@@ -252,13 +272,15 @@ public class FormAgenda : Janela
         _bats.Items.AddRange(_lista.Select(b => new Campos.Item(b.L("id") ?? 0, $"{Fmt.Hm(b.S("dataHora"))} · {b.S("nome")} · {b.I("disponiveis")} vagas{(b.S("status") != "aberta" ? " (fechada)" : "")}", b)).ToArray());
         var agora = DateTime.Now;
         var prox = _bats.Items.Cast<Campos.Item>().FirstOrDefault(i => (i.Dados.D("dataHora") ?? DateTime.MinValue) >= agora) ?? _bats.Items.Cast<Campos.Item>().FirstOrDefault();
-        if (prox != null) _bats.SelectedItem = prox; else { _bat = null; _info.Text = "Nenhuma bateria neste dia."; _g.Carregar([]); }
+        if (prox != null) _bats.SelectedItem = prox; else { _bat = null; _info.Text = "Nenhuma bateria neste dia."; _g.Carregar([]); _bStatus.Enabled = false; }
     }
 
     void EscolheBateria()
     {
         _bat = (_bats.SelectedItem as Campos.Item)?.Dados;
-        if (_bat == null) return;
+        if (_bat == null) { _bStatus.Enabled = false; return; }
+        _bStatus.Text = _bat.S("status") == "aberta" ? "Fechar Bateria" : "Abrir Bateria";
+        _bStatus.Enabled = true;
         _info.Text = $"{_bat.S("nome")} — {Fmt.DmyHm(_bat.S("dataHora"))}\n\nPRODUTO: {_bat.S("produto")}\nTRAÇADO: {_bat.S("tracado")}\nTEMPO MÍNIMO POR VOLTA (segundos): {_bat.S("voltaMinimaSeg")}\n" +
             $"COMPETIDORES: {_bat.I("inscritos")}/{_bat.I("vagas")} (disponíveis {_bat.I("disponiveis")})\nPAGOS: {_bat.I("pagos")}" + (_bat.S("observacao") is { Length: > 0 } o ? $"\n\nOBSERVAÇÕES: {o}" : "");
         CarregaReservas();

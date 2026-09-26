@@ -265,6 +265,7 @@ public class FormPrincipal : Form
     bool AcaoPrincipalDoMenu(string texto) => (_grupo, _status, texto) switch
     {
         ("reservas", _, "Aprovar (cobrar)") => true,
+        ("baterias", "fechadas", "Abrir bateria") => true,
         ("baterias", _, "Incluir cliente") => true,
         ("vendas", _, "Estornar pagamento") => true,
         ("fidelidade", _, "Criar voucher para a conta") => true,
@@ -1039,7 +1040,7 @@ public class FormPrincipal : Form
     {
         var umaSo = sel.Count == 1;
         return [
-            Item("Abrir bateria", () => Acoes.StatusBateria(this, sel, "aberta"), false),
+            Item("Abrir bateria", () => Acoes.StatusBateria(this, sel, "aberta"), sel.Any(b => b.S("status") != "aberta")),
             Item("Fechar bateria", () => Acoes.StatusBateria(this, sel, "fechada"), sel.Any(b => b.S("status") == "aberta")),
             new ToolStripSeparator(),
             Item("Editar bateria", () => { if (new FormBateria(sel[0]).ShowDialog(this) == DialogResult.OK) Recarregar(); }, umaSo, "Enter"),
