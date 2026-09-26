@@ -180,6 +180,17 @@ function origemDe(req: http.IncomingMessage) {
   return ip === '192.168.20.161' ? 'Totem 1' : ip === '192.168.20.69' ? 'Totem 2' : ip || 'totem';
 }
 
+/** Rua + número + complemento num texto só, como o totem mostra no campo Endereço. */
+function enderecoDoTotem(endereco: unknown, numero: unknown, complemento: unknown) {
+  const txt = (v: unknown) => (v == null ? '' : String(v).trim());
+  let e = txt(endereco);
+  const n = txt(numero);
+  const c = txt(complemento);
+  if (n && !e.includes(n)) e = e ? `${e}, ${n}` : n;
+  if (c && !e.includes(c)) e = e ? `${e} - ${c}` : c;
+  return e;
+}
+
 // ---------------------------------------------------------------- totem (publico)
 
 async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, path: string): Promise<boolean> {
@@ -216,15 +227,9 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     );
     // cadastro completo (pedido do dono em 26/09): o cliente confere e corrige todos os dados no totem
     const txt = (v: unknown) => (v == null ? '' : String(v).trim());
-    let enderecoCompleto = txt(c.endereco);
     const num = txt(c.numero);
     const comp = txt(c.complemento);
-    if (num && !enderecoCompleto.includes(num)) {
-      enderecoCompleto = enderecoCompleto ? `${enderecoCompleto}, ${num}` : num;
-    }
-    if (comp && !enderecoCompleto.includes(comp)) {
-      enderecoCompleto = enderecoCompleto ? `${enderecoCompleto} - ${comp}` : comp;
-    }
+    const enderecoCompleto = enderecoDoTotem(c.endereco, c.numero, c.complemento);
 
     send(res, 200, {
       cliente: {
@@ -265,7 +270,20 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     if (!responsavelId && !body.lgpd) throw new HttpError(400, 'É necessário aceitar o Termo de Consentimento para Tratamento de Dados Pessoais.');
     if (id) {
       if (String(body.token ?? '') !== sign(`cli:${id}`)) throw new HttpError(403, 'Sessão expirada, identifique-se de novo.');
+      // o totem mostra rua, número e complemento num campo só: se o cliente não mexeu, não regrava
+      // (senão o número e o complemento saíam repetidos no termo); se mexeu, o texto vira o endereço todo
+      let limparNumero = false;
+      if (dados.endereco !== undefined) {
+        const atual = await one<{ endereco: string | null; numero: string | null; complemento: string | null }>(
+          `SELECT Endereco endereco, Numero numero, Complemento complemento FROM dbo.Cliente WHERE Id = @id`,
+          { id },
+        );
+        const digitado = String(dados.endereco ?? '').trim();
+        if (!digitado || (atual && digitado === enderecoDoTotem(atual.endereco, atual.numero, atual.complemento))) delete dados.endereco;
+        else limparNumero = Boolean(atual?.numero || atual?.complemento);
+      }
       await updateCliente(id, { ...dados, lgpd: true }, true);
+      if (limparNumero) await query(`UPDATE dbo.Cliente SET Numero = NULL, Complemento = NULL WHERE Id = @id`, { id });
       log(`totem: cadastro atualizado ${id}`);
       return send(res, 200, { id, token: sign(`cli:${id}`) }), true;
     }
