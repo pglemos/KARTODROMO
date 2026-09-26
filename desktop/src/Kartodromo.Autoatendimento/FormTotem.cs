@@ -485,7 +485,6 @@ public class FormTotem : Form, IMessageFilter
         ok.Click += (_, _) => f.Close();
         c.Controls.Add(ok);
         f.KeyDown += (_, e) => { if (e.KeyCode == Keys.Escape) f.Close(); };
-        f.FormClosing += (_, _) => f.Dispose();
         return f;
     }
 

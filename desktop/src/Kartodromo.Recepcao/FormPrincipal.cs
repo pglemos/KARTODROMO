@@ -185,15 +185,27 @@ public class FormPrincipal : Form
         }
     }
 
+    ContextMenuStrip _menuAberto;
+
     void AbrirMenuContexto(MouseEventArgs e)
     {
         if (e.Button != MouseButtons.Right || _menuAtual == null) return;
         var hit = _grade.HitTest(e.X, e.Y);
         if (hit.RowIndex < 0) return;
+        MostrarMenuContexto(e.Location);
+    }
 
+    /// <summary>Abre o menu da seleção. O menu anterior só é descartado quando outro abre:
+    /// o Closed dispara no meio do clique do item e descartar ali dava
+    /// "Cannot access a disposed object (ContextMenuStrip)" em toda ação do menu.</summary>
+    internal ContextMenuStrip MostrarMenuContexto(Point onde, ToolStripItem extra = null)
+    {
+        _menuAberto?.Dispose();
         var menu = CriarMenuContextual(_grade.Selecionados);
-        menu.Closed += (_, _) => menu.Dispose();
-        menu.Show(_grade, e.Location);
+        if (extra != null) menu.Items.Add(extra);
+        _menuAberto = menu;
+        menu.Show(_grade, onde);
+        return menu;
     }
 
     /// <summary>Cria o menu da seleção atual para as capturas de contexto do autoteste.</summary>

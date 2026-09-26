@@ -72,6 +72,8 @@ public static class AutoTeste
 
         await CapturarMenus(principal, pasta);
 
+        await CliqueNoMenu(principal, "reservas:todas");
+
         var caixa = (await Sessao.Api.Get("/api/office/caixa")).AsObject();
         var aberto = caixa["aberto"] as JsonObject;
         var sumario = caixa["sumario"] as JsonObject;
@@ -210,6 +212,36 @@ public static class AutoTeste
         }
         catch (Exception e) { Log.Add($"ERRO {nome}: {e.Message}"); }
         finally { menu.Close(); menu.Dispose(); }
+    }
+
+    /// <summary>Clica de verdade num item do menu do botão direito (duas vezes seguidas),
+    /// pelo mesmo caminho do mouse. Pega o "disposed object" que só aparecia no clique.</summary>
+    static async Task CliqueNoMenu(FormPrincipal principal, string chave)
+    {
+        principal.Selecionar(chave);
+        await Esperar(700);
+        var grade = Descendentes(principal).OfType<DataGridView>().FirstOrDefault();
+        if (grade == null || grade.Rows.Count == 0) { Log.Add("pendente: clique no menu sem linhas em " + chave); return; }
+        grade.ClearSelection(); grade.Rows[0].Selected = true;
+        Exception erro = null;
+        ThreadExceptionEventHandler pega = (_, e) => erro ??= e.Exception;
+        Application.ThreadException += pega;
+        try
+        {
+            for (var vez = 1; vez <= 2 && erro == null; vez++)
+            {
+                var clicou = false;
+                var item = new ToolStripMenuItem("(teste)", null, (_, _) => clicou = true);
+                var menu = principal.MostrarMenuContexto(new Point(40, 30), item);
+                await Esperar(250);
+                try { item.PerformClick(); } catch (Exception e) { erro ??= e; }
+                await Esperar(250);
+                if (erro == null && !clicou) erro = new Exception("o clique não chegou na ação");
+                if (erro == null && menu.Visible) erro = new Exception("o menu não fechou depois do clique");
+            }
+        }
+        finally { Application.ThreadException -= pega; }
+        Log.Add(erro == null ? "OK clique-menu-contexto" : "ERRO clique-menu-contexto: " + erro.Message);
     }
 
     static async Task Janela(Form form, IWin32Window dono, string pasta, string nome)

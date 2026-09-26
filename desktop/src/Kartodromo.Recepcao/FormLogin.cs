@@ -65,7 +65,7 @@ public class FormLogin : Form
         var campoLogin = Campo("Usuário", _login, new Point(0, 0), new Size(400, 56));
         var campoSenha = Campo("Senha", _senha, new Point(0, 56), new Size(400, 56));
         campoLogin.Padding = new Padding(16, 5, 16, 4);
-        campoSenha.Padding = new Padding(16, 5, 16, 4);
+        campoSenha.Padding = new Padding(16, 5, 56, 4); // espaço do botão do olho à direita
         campoLogin.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = Color.FromArgb(238, 238, 241) });
         var credenciais = new Panel { Location = new Point(0, 94), Size = new Size(400, 112), BackColor = Color.White, Padding = new Padding(0) };
         credenciais.Paint += (_, e) =>
@@ -84,8 +84,9 @@ public class FormLogin : Form
         olho.FlatAppearance.BorderSize = 0;
         olho.Click += (_, _) => _senha.UseSystemPasswordChar = !_senha.UseSystemPasswordChar;
         campoSenha.Controls.Add(olho);
-        campoSenha.Resize += (_, _) => olho.Location = new Point(campoSenha.ClientSize.Width - 46, 28);
-        olho.Location = new Point(campoSenha.ClientSize.Width - 46, 16);
+        void PosOlho() { olho.Location = new Point(campoSenha.ClientSize.Width - olho.Width - 12, (campoSenha.ClientSize.Height - olho.Height) / 2); olho.BringToFront(); }
+        campoSenha.Resize += (_, _) => PosOlho();
+        PosOlho();
         KitVisual.AplicarRaio(olho, 8);
         card.Controls.Add(credenciais);
 
