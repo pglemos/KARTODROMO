@@ -1,0 +1,16 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <Company>Kartódromo Internacional de Betim</Company>
+    <Product>Kartódromo</Product>
+    <Version>1.0.0</Version>
+    <Copyright>Kartódromo Internacional de Betim</Copyright>
+    <ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
+    <SatelliteResourceLanguages>pt-BR</SatelliteResourceLanguages>
+    <NoWarn>$(NoWarn);CA1416;WFO1000;MSB3277</NoWarn>
+  </PropertyGroup>
+</Project>
