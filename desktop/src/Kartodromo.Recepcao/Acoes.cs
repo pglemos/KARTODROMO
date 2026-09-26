@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Nodes;
 using Kartodromo.Comum;
 
@@ -41,6 +42,21 @@ public static class Acoes
     {
         var lista = ids.ToList();
         if (lista.Count == 0) return;
+        // na recepção (TM-T20 configurada) vários termos vão um por trabalho de impressão:
+        // a térmica corta o papel no fim de cada trabalho, então juntos saíam emendados
+        if (lista.Count > 1 && Config.Get("ImpressoraTermos", "") is { Length: > 0 } impressora)
+        {
+            var feitos = 0;
+            foreach (var id in lista)
+            {
+                var link = await Api.Get("/api/office/termo-link?ids=" + id);
+                await Relatorio.ImprimirSilencioso(Api.BaseUrl + link.S("url"), impressora);
+                feitos++;
+            }
+            Msg.Info(dono, $"{feitos} termos enviados para a {impressora}, um de cada vez (a impressora corta entre eles).");
+            (dono as FormPrincipal)?.Recarregar();
+            return;
+        }
         var r = await Api.Get("/api/office/termo-link?ids=" + string.Join(",", lista));
         Relatorio.Abrir(dono, Api.BaseUrl + r.S("url"), "Termo de Responsabilidade");
         (dono as FormPrincipal)?.Recarregar();
@@ -171,153 +187,134 @@ public static class Relatorios
     });
 }
 
-/// <summary>Editar reserva (EditarReserva.dc.html).</summary>
-public class FormEditarReserva : Janela
+/// <summary>Editar reserva — igual ao design (EditarReserva.dc.html).</summary>
+public class FormEditarReserva : DialogoDesign
 {
-    public FormEditarReserva(JsonObject r) : base("Editar reserva", 960, 680)
+    public FormEditarReserva(JsonObject r) : base("Editar reserva",
+        $"{r.S("reserva")} · {r.S("cliente")}" + (r.B("aprovada") ? "" : " · pré-reserva") + (r.S("origem") is { Length: > 0 } o && o != "recepcao" ? $" do {(o == "totem" ? "totem" : o)}" : ""), PecasDesign.Tile(Color.FromArgb(255, 122, 107), Color.FromArgb(224, 52, 42), "bandeira"))
     {
-        Tag = $"{r.S("reserva")} · {r.S("cliente")} · pré-reserva";
         var pago = r.B("pago");
+        var termo = new CheckBox { Text = "Termo assinado", Checked = r.B("termo") };
 
-        var txtCliente = new TextBox { Text = r.S("cliente"), ReadOnly = true };
-        var bAltCli = new Button { Text = "Alterar", Dock = DockStyle.Right, Width = 84, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(238, 238, 241), Cursor = Cursors.Hand };
-        bAltCli.FlatAppearance.BorderSize = 0;
-        bAltCli.Click += (_, _) => Seguro.Rodar(this, async () =>
+        var cliente = new Label { Text = r.S("cliente"), AutoSize = false, Height = 22, Font = PecasDesign.FonteValor, ForeColor = PecasDesign.CorTexto, BackColor = Color.White, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
+        var alterar = AcaoCampo("Alterar");
+        alterar.Click += (_, _) => Seguro.Rodar(this, async () =>
         {
-            var c = FormPesquisarCliente.Escolher(this, $"Alterar Cliente — {r.S("cliente")}");
+            var c = FormPesquisarCliente.Escolher(this, $"Alterar cliente — {r.S("cliente")}");
             if (c == null) return;
             await Sessao.Api.Post($"/api/office/reservas/{r.S("id")}/alterar-cliente", new { clienteId = c.L("id") });
-            txtCliente.Text = c.S("nome");
+            cliente.Text = c.S("nome");
+            termo.Checked = false;
             Msg.Info(this, "Cliente alterado.");
         });
-        var pCli = new Panel { Dock = DockStyle.Fill, Height = 34 };
-        pCli.Controls.Add(txtCliente); pCli.Controls.Add(bAltCli);
+        var bateria = new Label { Text = $"{r.S("reserva")} · {PecasDesign.DiaMes(r.S("dataHora"))}", AutoSize = false, Height = 22, Font = PecasDesign.FonteValor, ForeColor = PecasDesign.CorTexto, BackColor = Color.White, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
+        var mover = AcaoCampo("Mover");
+        mover.Click += (_, _) => { using var f = new FormMoverCliente(r); if (f.ShowDialog(this) == DialogResult.OK) { DialogResult = DialogResult.OK; Close(); } };
 
-        var txtBat = new TextBox { Text = $"{r.S("reserva")} {Fmt.DmyHm(r.S("dataHora"))}", ReadOnly = true };
-        var bMover = new Button { Text = "Mover", Dock = DockStyle.Right, Width = 84, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(238, 238, 241), Cursor = Cursors.Hand };
-        bMover.FlatAppearance.BorderSize = 0;
-        bMover.Click += (_, _) =>
+        var prod = new ListaDesign { Enabled = !pago };
+        prod.Items.AddRange(Sessao.Lista("produtos").Select(p => (object)new Campos.Item(p.L("id") ?? 0, p.S("nome"), p)).ToArray());
+        Campos.Selecionar(prod, r.L("produtoId"));
+        var cat = new ListaDesign();
+        cat.Items.Add(r.S("categoria") is { Length: > 0 } c0 ? c0 : "Indoor"); cat.SelectedIndex = 0;
+        prod.SelectedIndexChanged += (_, _) => { if ((prod.SelectedItem as Campos.Item)?.Dados?.S("categoria") is { Length: > 0 } c) { cat.Items.Clear(); cat.Items.Add(c); cat.SelectedIndex = 0; } };
+        var produtoOriginalId = r.L("produtoId");
+        var kart = PecasDesign.Texto(r.S("kart"), 10);
+        var pesoInicial = decimal.TryParse(r.S("peso"), NumberStyles.Number, CultureInfo.InvariantCulture, out var kg) ? kg.ToString("0.#", Fmt.Br) : "";
+        var peso = PecasDesign.Texto(pesoInicial, 6);
+        peso.KeyPress += (_, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar) && e.KeyChar is not (',' or '.')) e.Handled = true; };
+        peso.Leave += (_, _) =>
         {
-            if (new FormMoverCliente(r).ShowDialog(this) == DialogResult.OK)
-            {
-                DialogResult = DialogResult.OK; Close();
-            }
+            var valor = peso.Text.Trim().Replace(',', '.');
+            if (decimal.TryParse(valor, NumberStyles.Number, CultureInfo.InvariantCulture, out var n) && n > 0 && n < 500)
+                peso.Text = n.ToString("0.#", Fmt.Br);
         };
-        var pBat = new Panel { Dock = DockStyle.Fill, Height = 34 };
-        pBat.Controls.Add(txtBat); pBat.Controls.Add(bMover);
+        TextBox SoLeitura(string v) { var t = PecasDesign.Texto(v); t.ReadOnly = true; t.BackColor = Color.White; t.TabStop = false; return t; }
+        var preco = SoLeitura(Fmt.Brl(r.L("preco") ?? 0).Replace("R$", "").Trim());
+        var desc = SoLeitura(Fmt.Brl(r.L("desconto") ?? 0).Replace("R$", "").Trim());
+        var total = SoLeitura(Fmt.Brl(r.L("total") ?? 0).Replace("R$", "").Trim());
+        prod.SelectedIndexChanged += (_, _) =>
+        {
+            if (prod.SelectedItem is not Campos.Item item || item.Dados == null) return;
+            var produtoSelecionado = item.Dados;
+            var mesmoProduto = item.Id == produtoOriginalId;
+            var precoCentavos = mesmoProduto ? r.L("preco") ?? produtoSelecionado.L("preco") ?? 0 : produtoSelecionado.L("preco") ?? 0;
+            var descontoCentavos = mesmoProduto ? Math.Min(r.L("desconto") ?? 0, precoCentavos) : 0;
+            preco.Text = Fmt.Brl(precoCentavos).Replace("R$", "").Trim();
+            desc.Text = Fmt.Brl(descontoCentavos).Replace("R$", "").Trim();
+            total.Text = Fmt.Brl(Math.Max(0, precoCentavos - descontoCentavos)).Replace("R$", "").Trim();
+            termo.Checked = false;
+        };
+        var obs = PecasDesign.Texto(r.S("observacao"), 400);
 
-        var prod = Campos.Combo(); prod.Items.AddRange(Sessao.Produtos(false)); Campos.Selecionar(prod, r.L("produtoId")); prod.Enabled = !pago;
-        var cat = new TextBox { Text = r.S("categoria") ?? "Indoor", ReadOnly = true };
-        var kart = Campos.Texto(10); kart.Text = r.S("kart");
-        var peso = Campos.Num(r.I("peso") > 0 ? r.I("peso") : 75, 0, 300);
+        var g = Secao("Reserva");
+        Campo(g, "Cliente", cliente, 3, alterar);
+        Campo(g, "Bateria", bateria, 3, mover);
+        Campo(g, "Produto", prod, 3);
+        Campo(g, "Categoria", cat, 1);
+        Campo(g, "Kart", kart, 1);
+        Campo(g, "Peso (kg)", peso, 1);
+        Campo(g, "Preço (R$)", preco, 2);
+        Campo(g, "Desconto (R$)", desc, 2);
+        Campo(g, "Total (R$)", total, 2);
+        Campo(g, "Observação", obs, 6);
 
-        var preco = new TextBox { Text = Fmt.Brl(r.L("preco") ?? 17500), ReadOnly = true };
-        var desc = new TextBox { Text = Fmt.Brl(r.L("desconto") ?? 0), ReadOnly = true };
-        var total = new TextBox { Text = Fmt.Brl(r.L("total") ?? 17500), ReadOnly = true };
-        var obs = Campos.Texto(400); obs.Text = r.S("observacao");
+        var aprovada = new CheckBox { Text = "Aprovada", Checked = r.B("aprovada"), Enabled = !r.B("aprovada") };
+        var paga = new CheckBox { Text = "Paga", Checked = pago, AutoCheck = false };
+        var s = Secao("Situação");
+        Marca(s, aprovada, 2); Marca(s, paga, 2); Marca(s, termo, 2);
+        foreach (var ck in new[] { aprovada, paga, termo }) ck.Margin = new Padding(0, 4, 14, 4);
 
-        var gRes = Campos.Grade(6);
-        Campos.Add(gRes, "Cliente", pCli, 3);
-        Campos.Add(gRes, "Bateria", pBat, 3);
-        Campos.Add(gRes, "Produto", prod, 3);
-        Campos.Add(gRes, "Categoria", cat, 1);
-        Campos.Add(gRes, "Kart", kart, 1);
-        Campos.Add(gRes, "Peso (kg)", peso, 1);
-        Campos.Add(gRes, "Preço (R$)", preco, 2);
-        Campos.Add(gRes, "Desconto (R$)", desc, 2);
-        Campos.Add(gRes, "Total (R$)", total, 2);
-        Campos.Add(gRes, "Observação", obs, 6);
-
-        var cartaoRes = KitVisual.CartaoSecao("Reserva");
-        cartaoRes.Controls.Add(gRes);
-
-        var ckAprov = Campos.Check("Aprovada", r.B("aprovada"));
-        var ckPago = Campos.Check("Paga", r.B("pago"));
-        var ckTermo = Campos.Check("Termo assinado", r.B("termo"));
-        var gSit = Campos.Grade(6);
-        Campos.Add(gSit, null, ckAprov, 2);
-        Campos.Add(gSit, null, ckPago, 2);
-        Campos.Add(gSit, null, ckTermo, 2);
-
-        var cartaoSit = KitVisual.CartaoSecao("Situação");
-        cartaoSit.Controls.Add(gSit);
-
-        Controls.Add(cartaoSit);
-        Controls.Add(cartaoRes);
-
-        Rodape(
-            ("Imprimir termo", (_, _) => Acoes.ImprimirTermo(this, [r.S("id")]), false),
-            ("Cancelar", (_, _) => Close(), false),
-            ("Salvar", (_, _) => Seguro.Rodar(this, async () =>
-            {
-                var body = new JsonObject { ["observacao"] = obs.Text, ["kart"] = kart.Text, ["peso"] = (int)peso.Value };
-                if (!pago && Campos.IdDe(prod) is long pid) body["produtoId"] = pid;
-                await Sessao.Api.Put($"/api/office/reservas/{r.S("id")}", body);
-                DialogResult = DialogResult.OK; Close();
-            }), true)
-        );
+        BotaoRodape("Salvar", true, () => Seguro.Rodar(this, async () =>
+        {
+            var pesoTexto = peso.Text.Trim();
+            if (pesoTexto.Length > 0 && (!decimal.TryParse(pesoTexto.Replace(',', '.'), NumberStyles.Number, CultureInfo.InvariantCulture, out var kgAtual) || kgAtual <= 0 || kgAtual >= 500))
+            { Msg.Aviso(this, "Peso inválido. Informe um valor entre 0 e 500 kg."); return; }
+            var body = new JsonObject { ["observacao"] = obs.Text.Trim(), ["kart"] = kart.Text.Trim(), ["peso"] = pesoTexto };
+            if (!pago && Campos.IdDe(prod) is long pid) body["produtoId"] = pid;
+            body["termo"] = termo.Checked;
+            await Sessao.Api.Put($"/api/office/reservas/{r.S("id")}", body);
+            if (aprovada.Checked && !r.B("aprovada")) await Sessao.Api.Post($"/api/office/reservas/{r.S("id")}/aprovar");
+            DialogResult = DialogResult.OK; Close();
+        }));
+        BotaoRodape("Cancelar", false, Close);
+        BotaoRodape("Imprimir termo", false, () => Acoes.ImprimirTermo(this, [r.S("id")]));
     }
 }
 
-/// <summary>Mover cliente para outra bateria (MoverCliente.dc.html).</summary>
-public class FormMoverCliente : Janela
+/// <summary>Mover cliente para outra bateria — igual ao design (MoverCliente.dc.html).</summary>
+public class FormMoverCliente : DialogoDesign
 {
-    readonly Grade _g = new();
-    public FormMoverCliente(JsonObject r) : base("Mover cliente para outra bateria", 960, 680)
+    readonly TabelaDesign _t;
+    List<JsonObject> _baterias = [];
+
+    public FormMoverCliente(JsonObject r) : base("Mover cliente para outra bateria", $"{r.S("cliente")} · hoje na {r.S("reserva")}",
+        PecasDesign.Tile(Color.FromArgb(255, 179, 64), Color.FromArgb(245, 124, 0), "seta"))
     {
-        Tag = $"{r.S("cliente")} · hoje na {r.S("reserva")}";
+        _t = SecaoTabelaDesign("Escolha a nova bateria");
+        _t.Selecionavel = true; _t.MaxLinhas = 8;
+        _t.Colunas(new("", 0.45f), new("Bateria", 4.2f), new("Produto", 3.6f), new("Vagas livres", 1.2f, Direita: true));
+        var paga = r.B("pago");
+        Nota(paga
+            ? "O pagamento segue junto. O termo será invalidado e precisa ser impresso/assinado novamente. Só baterias com o mesmo produto e preço."
+            : "Produto e preço seguem a bateria escolhida. O termo será invalidado; se o produto mudar, o desconto atual será removido.");
 
-        var cartaoTabela = KitVisual.CartaoSecao("Escolha a nova bateria");
-        cartaoTabela.AutoSize = false;
-        cartaoTabela.Height = 360;
-
-        _g.Colunas(
-            new("sel", "", TipoCol.Bool, 40),
-            new("bateria", "Bateria", Largura: 320),
-            new("produto", "Produto", Largura: 240),
-            new("vagas", "Vagas livres", TipoCol.Inteiro, 110)
-        );
-        _g.Dock = DockStyle.Fill;
-        var pGrid = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 8, 0, 0) };
-        pGrid.Controls.Add(_g);
-        cartaoTabela.Controls.Add(pGrid);
-
-        var nota = new Panel { Dock = DockStyle.Top, Height = 56, BackColor = Color.FromArgb(245, 245, 247), Padding = new Padding(14, 10, 14, 10), Margin = new Padding(0, 0, 0, 12) };
-        nota.Paint += (_, e) =>
+        BotaoRodape("Mover", true, () => Seguro.Rodar(this, async () =>
         {
-            using var pen = new Pen(Color.FromArgb(232, 232, 236));
-            e.Graphics.DrawRectangle(pen, 0, 0, nota.Width - 1, nota.Height - 1);
-        };
-        nota.Controls.Add(new Label { Text = "O pagamento e o termo vão junto. Se a nova bateria tiver outro preço, a diferença aparece para cobrar ou devolver.", Dock = DockStyle.Fill, ForeColor = Color.FromArgb(58, 58, 60), Font = new Font("Segoe UI", 9.2F) });
-
-        Controls.Add(nota);
-        Controls.Add(cartaoTabela);
-
-        Rodape(
-            ("Cancelar", (_, _) => Close(), false),
-            ("Mover", (_, _) => Seguro.Rodar(this, async () =>
-            {
-                if (_g.Atual == null) { Msg.Aviso(this, "Selecione a nova bateria."); return; }
-                var destino = _g.Atual.L("id");
-                var x = await Sessao.Api.Post($"/api/office/reservas/{r.S("id")}/mover", new { bateriaId = destino });
-                Msg.Info(this, x.S("mensagem"));
-                DialogResult = DialogResult.OK; Close();
-            }), true)
-        );
+            if (_t.Selecionada < 0 || _t.Selecionada >= _baterias.Count) { Msg.Aviso(this, "Selecione a nova bateria."); return; }
+            var x = await Sessao.Api.Post($"/api/office/reservas/{r.S("id")}/mover", new { bateriaId = _baterias[_t.Selecionada].L("id") });
+            Msg.Info(this, x.S("mensagem"));
+            DialogResult = DialogResult.OK; Close();
+        }));
+        BotaoRodape("Cancelar", false, Close);
 
         Load += (_, _) => Seguro.Rodar(this, async () =>
         {
             var lista = await Sessao.Api.Lista($"/api/office/baterias?status=abertas&filtro=apartir&data={Fmt.Iso(DateTime.Today)}");
-            var linhas = lista.Where(b => b.S("id") != r.S("bateriaId")).Select(b => new JsonObject
-            {
-                ["id"] = b.L("id"),
-                ["sel"] = false,
-                ["bateria"] = $"{b.S("nome")} · {Fmt.DmyHm(b.S("dataHora"))}",
-                ["produto"] = b.S("produto"),
-                ["vagas"] = b.I("disponiveis")
-            }).ToList();
-            if (linhas.Count > 0) linhas[0]["sel"] = true;
-            _g.Carregar(linhas);
+            _baterias = lista.Where(b => b.S("id") != r.S("bateriaId") && b.I("disponiveis") > 0
+                    && (!paga || (b.L("produtoId") == r.L("produtoId") && b.L("preco") == r.L("preco"))))
+                .OrderBy(b => b.S("dataHora")).ToList();
+            _t.Linhas(_baterias.Select(b => new[] { "", $"{b.S("nome")} · {PecasDesign.DiaMes(b.S("dataHora"))}", b.S("produto"), b.I("disponiveis").ToString() }));
+            if (_baterias.Count > 0) _t.Selecionar(0);
         });
     }
 }
@@ -368,13 +365,16 @@ public class FormListaParticipantes : Janela
         {
             var res = await Sessao.Api.Lista($"/api/office/reservas?bateriaId={batId}");
             participantes = res.Where(r => r.S("status") != "cancelada").ToList();
+            string Peso(JsonObject p) => decimal.TryParse(p.S("peso"), NumberStyles.Number, CultureInfo.InvariantCulture, out var kg) && kg > 0
+                ? kg.ToString("0.#", Fmt.Br)
+                : "—";
             var linhas = participantes.Select(p => new JsonObject
             {
                 ["id"] = p.S("id"),
                 ["kart"] = p.S("kart") ?? "—",
                 ["cliente"] = p.S("cliente"),
                 ["idade"] = p.I("idade") > 0 ? p.I("idade").ToString() : "—",
-                ["peso"] = p.I("peso") > 0 ? p.I("peso").ToString() : "—",
+                ["peso"] = Peso(p),
                 ["pago"] = p.B("pago"),
                 ["termo"] = p.B("termo")
             }).ToList();

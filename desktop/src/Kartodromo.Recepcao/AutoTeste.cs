@@ -300,6 +300,53 @@ public static class AutoTeste
     [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
     [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint flags);
 
+    /// <summary>Abre "Editar bateria" com uma bateria real de hoje, fora da tela, e fotografa (não salva nada).</summary>
+    public static async Task RodarBateria(string pasta, string login, string senha)
+    {
+        Directory.CreateDirectory(pasta);
+        Log.Clear();
+        var acesso = await Sessao.Api.Post("/api/login", new { login, senha, termos = true });
+        Sessao.Api.Token = acesso.S("token");
+        Sessao.Usuario = acesso["usuario"]!.AsObject();
+        await Sessao.CarregarApoio();
+        Msg.Registro = m => Log.Add(m);
+        var baterias = await Sessao.Api.Lista($"/api/office/baterias?status=todas&filtro=dia&data={Fmt.Iso(DateTime.Today)}");
+        var b = baterias.OrderByDescending(x => x.I("inscritos")).FirstOrDefault();
+        if (b == null) { Log.Add("pendente: sem bateria hoje"); File.WriteAllLines(Path.Combine(pasta, "log.txt"), Log); return; }
+        Log.Add("bateria: " + b.ToJsonString());
+        var antes = GetForegroundWindow();
+        var f = new FormBateria(b) { StartPosition = FormStartPosition.Manual, Location = new Point(-4000, 0), ShowInTaskbar = false };
+        f.Show();
+        SetForegroundWindow(antes);
+        await Esperar(1500);
+        f.Location = new Point(-4000, 0);
+        foreach (var c in Descendentes(f).OfType<NumericUpDown>()) Log.Add($"numérico valor={c.Value} min={c.Minimum} max={c.Maximum} enabled={c.Enabled} readonly={c.ReadOnly} visivel={c.Visible} tam={c.Width}x{c.Height}");
+        using (var bmp = new Bitmap(f.Width, f.Height))
+        {
+            using (var g = Graphics.FromImage(bmp)) { var hdc = g.GetHdc(); PrintWindow(f.Handle, hdc, 0); g.ReleaseHdc(hdc); }
+            bmp.Save(Path.Combine(pasta, "editar-bateria.png"));
+        }
+        f.Close();
+        FormIncluirCliente.AbrirPesquisaAoMostrar = false;
+        async Task Foto(Form janela, string nome)
+        {
+            janela.StartPosition = FormStartPosition.Manual; janela.Location = new Point(-4000, 0); janela.ShowInTaskbar = false;
+            janela.Show(); SetForegroundWindow(antes);
+            await Esperar(1600); janela.Location = new Point(-4000, 0);
+            using var bmp = new Bitmap(janela.Width, janela.Height);
+            using (var gr = Graphics.FromImage(bmp)) { var hdc = gr.GetHdc(); PrintWindow(janela.Handle, hdc, 0); gr.ReleaseHdc(hdc); }
+            bmp.Save(Path.Combine(pasta, nome + ".png"));
+            janela.Close();
+            Log.Add("OK " + nome);
+        }
+        await Foto(new FormIncluirCliente(b), "incluir-cliente");
+        var reservas = await Sessao.Api.Lista($"/api/office/reservas?status=todas&filtro=dia&data={Fmt.Iso(DateTime.Today)}");
+        var r = reservas.FirstOrDefault(x => !x.B("pago")) ?? reservas.FirstOrDefault();
+        if (r != null) { await Foto(new FormEditarReserva(r), "editar-reserva"); await Foto(new FormMoverCliente(r), "mover-cliente"); }
+        else Log.Add("pendente: sem reserva hoje");
+        File.WriteAllLines(Path.Combine(pasta, "log.txt"), Log);
+    }
+
     /// <summary>Teste do filtro de coluna (funil) fora da tela, sem roubar o foco. Fotos por PrintWindow.</summary>
     public static async Task RodarFiltro(string pasta, string login, string senha)
     {

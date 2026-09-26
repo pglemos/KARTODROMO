@@ -6,12 +6,14 @@ namespace Kartodromo.Recepcao;
 /// <summary>Troca de senha da sessão atual.</summary>
 public sealed class FormTrocarSenha : Janela
 {
-    public FormTrocarSenha() : base("Trocar minha senha", 480, 300)
+    public FormTrocarSenha() : base("Trocar minha senha", 480, 360)
     {
+        var atual = new TextBox { UseSystemPasswordChar = true, Width = 360 };
         var nova = new TextBox { UseSystemPasswordChar = true, Width = 360 };
         var confirmar = new TextBox { UseSystemPasswordChar = true, Width = 360 };
-        var dica = new Label { Text = "Use pelo menos 6 caracteres. A senha nova passa a valer no próximo acesso.", Dock = DockStyle.Top, Height = 34, ForeColor = KitVisual.Secundario };
+        var dica = new Label { Text = "Use pelo menos 8 caracteres. A senha nova passa a valer no próximo acesso.", Dock = DockStyle.Top, Height = 34, ForeColor = KitVisual.Secundario };
         var campos = Campos.Grade(1);
+        Campos.Add(campos, "Senha atual", atual);
         Campos.Add(campos, "Nova senha", nova);
         Campos.Add(campos, "Repita a nova senha", confirmar);
         var corpo = new Panel { Dock = DockStyle.Fill, Padding = new Padding(4, 8, 4, 0) };
@@ -20,14 +22,15 @@ public sealed class FormTrocarSenha : Janela
         Controls.Add(corpo);
         Rodape(("Cancelar", (_, _) => Close(), false), ("Salvar senha", (_, _) => Seguro.Rodar(this, async () =>
         {
-            if (nova.Text.Length < 6) { Msg.Aviso(this, "A senha precisa ter pelo menos 6 caracteres."); return; }
+            if (string.IsNullOrEmpty(atual.Text)) { Msg.Aviso(this, "Informe sua senha atual."); atual.Focus(); return; }
+            if (nova.Text.Length < 8) { Msg.Aviso(this, "A senha precisa ter pelo menos 8 caracteres."); return; }
             if (nova.Text != confirmar.Text) { Msg.Aviso(this, "As senhas não conferem."); confirmar.SelectAll(); confirmar.Focus(); return; }
-            var r = await Sessao.Api.Post("/api/office/senha", new { nova = nova.Text });
+            var r = await Sessao.Api.Post("/api/office/senha", new { senhaAtual = atual.Text, nova = nova.Text });
             Msg.Info(this, r.S("mensagem"));
             DialogResult = DialogResult.OK;
             Close();
         }), true));
-        Shown += (_, _) => nova.Focus();
+        Shown += (_, _) => atual.Focus();
     }
 }
 
