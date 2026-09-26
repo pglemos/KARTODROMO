@@ -131,7 +131,6 @@ function participanteHtml(
     .join(', ');
   const companyName = empresa.razaoSocial?.trim() || empresa.nome;
   const city = empresa.cidade?.trim() || 'Betim';
-  const blank = (label: string, field: string | null) => '<div>' + label + ' ' + value(field, branco) + '</div>';
 
   return (
     '<section class="page">' +
@@ -150,19 +149,11 @@ function participanteHtml(
     '<article class="legal">' +
     renderLegal(companyName, textoPersonalizado) +
     '</article>' +
-    '<div class="signature-fields">' +
-    '<div class="rule"></div>' +
-    '<div class="signature-grid">' +
-    blank('Nome:', participante.responsavelNome) +
-    blank('Tel.:', participante.responsavelTelefone) +
-    blank('Doc.:', participante.responsavelDocumento) +
-    '<div></div>' +
-    blank('E-mail:', participante.responsavelEmail) +
-    '<div></div>' +
-    '</div>' +
-    '<div class="rule"></div>' +
-    '</div>' +
+    // igual ao termo do LapTime: data e as duas linhas de assinatura logo depois do texto (sem posição fixa,
+    // que deixava o texto passar por cima quando era longo)
     '<div class="date">' + esc(dataImpressao(date, city)) + '</div>' +
+    '<div class="assinatura"><div class="linha"></div><div class="rotulo">PARTICIPANTE PILOTO</div></div>' +
+    '<div class="assinatura"><div class="linha"></div><div class="rotulo">RESPONSÁVEL LEGAL</div><div class="obs">(obrigatório para menores de 18 anos)</div></div>' +
     '</section>'
   );
 }
@@ -193,10 +184,11 @@ export function renderTermoResponsabilidade(options: RenderTermoOptions) {
     '.legal{font:8pt/1.1 Arial,Helvetica,sans-serif;text-align:justify;margin:1.52mm 0 0;flex:none}' +
     '.legal p{margin:0;orphans:2;widows:2}' +
     '.legal strong{font-weight:700}' +
-    '.signature-fields{position:absolute;top:203.96mm;left:5.7mm;right:5.7mm;font:8pt/1.45 Arial,Helvetica,sans-serif}' +
-    '.signature-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 2mm;padding:1.5mm 0}' +
-    '.signature-grid>div{min-height:3.81mm}' +
-    '.date{position:absolute;top:252mm;left:5.7mm;right:5.7mm;font:8pt/1.25 Arial,Helvetica,sans-serif;text-align:center;margin:0}' +
+    '.date{font:8pt/1.25 Arial,Helvetica,sans-serif;text-align:center;margin:5mm 0 0;flex:none}' +
+    '.assinatura{margin:16mm auto 0;width:50mm;text-align:center;flex:none;break-inside:avoid;page-break-inside:avoid}' +
+    '.assinatura .linha{border-top:.6pt solid #000}' +
+    '.assinatura .rotulo{font:bold 8pt/1.3 Arial,Helvetica,sans-serif;margin-top:.8mm}' +
+    '.assinatura .obs{font:6.5pt/1.2 Arial,Helvetica,sans-serif}' +
     '@media print{html,body{width:80mm}.page{margin:0;box-shadow:none}}' +
     '</style></head><body>' +
     (pages || '<p>Nada para imprimir.</p>') +
