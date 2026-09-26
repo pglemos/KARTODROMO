@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Nodes;
 using Kartodromo.Comum;
 
@@ -193,6 +194,7 @@ public class FormEditarReserva : DialogoDesign
         $"{r.S("reserva")} · {r.S("cliente")}" + (r.B("aprovada") ? "" : " · pré-reserva") + (r.S("origem") is { Length: > 0 } o && o != "recepcao" ? $" do {(o == "totem" ? "totem" : o)}" : ""), PecasDesign.Tile(Color.FromArgb(255, 122, 107), Color.FromArgb(224, 52, 42), "bandeira"))
     {
         var pago = r.B("pago");
+        var termo = new CheckBox { Text = "Termo assinado", Checked = r.B("termo") };
 
         var cliente = new Label { Text = r.S("cliente"), AutoSize = false, Height = 22, Font = PecasDesign.FonteValor, ForeColor = PecasDesign.CorTexto, BackColor = Color.White, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
         var alterar = AcaoCampo("Alterar");
@@ -202,6 +204,7 @@ public class FormEditarReserva : DialogoDesign
             if (c == null) return;
             await Sessao.Api.Post($"/api/office/reservas/{r.S("id")}/alterar-cliente", new { clienteId = c.L("id") });
             cliente.Text = c.S("nome");
+            termo.Checked = false;
             Msg.Info(this, "Cliente alterado.");
         });
         var bateria = new Label { Text = $"{r.S("reserva")} · {PecasDesign.DiaMes(r.S("dataHora"))}", AutoSize = false, Height = 22, Font = PecasDesign.FonteValor, ForeColor = PecasDesign.CorTexto, BackColor = Color.White, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
@@ -214,12 +217,33 @@ public class FormEditarReserva : DialogoDesign
         var cat = new ListaDesign();
         cat.Items.Add(r.S("categoria") is { Length: > 0 } c0 ? c0 : "Indoor"); cat.SelectedIndex = 0;
         prod.SelectedIndexChanged += (_, _) => { if ((prod.SelectedItem as Campos.Item)?.Dados?.S("categoria") is { Length: > 0 } c) { cat.Items.Clear(); cat.Items.Add(c); cat.SelectedIndex = 0; } };
+        var produtoOriginalId = r.L("produtoId");
         var kart = PecasDesign.Texto(r.S("kart"), 10);
-        var peso = PecasDesign.Numero(r.I("peso") > 0 ? r.I("peso") : 75, 3);
+        var pesoInicial = decimal.TryParse(r.S("peso"), NumberStyles.Number, CultureInfo.InvariantCulture, out var kg) ? kg.ToString("0.#", Fmt.Br) : "";
+        var peso = PecasDesign.Texto(pesoInicial, 6);
+        peso.KeyPress += (_, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar) && e.KeyChar is not (',' or '.')) e.Handled = true; };
+        peso.Leave += (_, _) =>
+        {
+            var valor = peso.Text.Trim().Replace(',', '.');
+            if (decimal.TryParse(valor, NumberStyles.Number, CultureInfo.InvariantCulture, out var n) && n > 0 && n < 500)
+                peso.Text = n.ToString("0.#", Fmt.Br);
+        };
         TextBox SoLeitura(string v) { var t = PecasDesign.Texto(v); t.ReadOnly = true; t.BackColor = Color.White; t.TabStop = false; return t; }
         var preco = SoLeitura(Fmt.Brl(r.L("preco") ?? 0).Replace("R$", "").Trim());
         var desc = SoLeitura(Fmt.Brl(r.L("desconto") ?? 0).Replace("R$", "").Trim());
         var total = SoLeitura(Fmt.Brl(r.L("total") ?? 0).Replace("R$", "").Trim());
+        prod.SelectedIndexChanged += (_, _) =>
+        {
+            if (prod.SelectedItem is not Campos.Item item || item.Dados == null) return;
+            var produtoSelecionado = item.Dados;
+            var mesmoProduto = item.Id == produtoOriginalId;
+            var precoCentavos = mesmoProduto ? r.L("preco") ?? produtoSelecionado.L("preco") ?? 0 : produtoSelecionado.L("preco") ?? 0;
+            var descontoCentavos = mesmoProduto ? Math.Min(r.L("desconto") ?? 0, precoCentavos) : 0;
+            preco.Text = Fmt.Brl(precoCentavos).Replace("R$", "").Trim();
+            desc.Text = Fmt.Brl(descontoCentavos).Replace("R$", "").Trim();
+            total.Text = Fmt.Brl(Math.Max(0, precoCentavos - descontoCentavos)).Replace("R$", "").Trim();
+            termo.Checked = false;
+        };
         var obs = PecasDesign.Texto(r.S("observacao"), 400);
 
         var g = Secao("Reserva");
@@ -236,15 +260,18 @@ public class FormEditarReserva : DialogoDesign
 
         var aprovada = new CheckBox { Text = "Aprovada", Checked = r.B("aprovada"), Enabled = !r.B("aprovada") };
         var paga = new CheckBox { Text = "Paga", Checked = pago, AutoCheck = false };
-        var termo = new CheckBox { Text = "Termo assinado", Checked = r.B("termo"), AutoCheck = false };
         var s = Secao("Situação");
         Marca(s, aprovada, 2); Marca(s, paga, 2); Marca(s, termo, 2);
         foreach (var ck in new[] { aprovada, paga, termo }) ck.Margin = new Padding(0, 4, 14, 4);
 
         BotaoRodape("Salvar", true, () => Seguro.Rodar(this, async () =>
         {
-            var body = new JsonObject { ["observacao"] = obs.Text.Trim(), ["kart"] = kart.Text.Trim(), ["peso"] = int.TryParse(peso.Text, out var pz) ? pz : 0 };
+            var pesoTexto = peso.Text.Trim();
+            if (pesoTexto.Length > 0 && (!decimal.TryParse(pesoTexto.Replace(',', '.'), NumberStyles.Number, CultureInfo.InvariantCulture, out var kgAtual) || kgAtual <= 0 || kgAtual >= 500))
+            { Msg.Aviso(this, "Peso inválido. Informe um valor entre 0 e 500 kg."); return; }
+            var body = new JsonObject { ["observacao"] = obs.Text.Trim(), ["kart"] = kart.Text.Trim(), ["peso"] = pesoTexto };
             if (!pago && Campos.IdDe(prod) is long pid) body["produtoId"] = pid;
+            body["termo"] = termo.Checked;
             await Sessao.Api.Put($"/api/office/reservas/{r.S("id")}", body);
             if (aprovada.Checked && !r.B("aprovada")) await Sessao.Api.Post($"/api/office/reservas/{r.S("id")}/aprovar");
             DialogResult = DialogResult.OK; Close();
@@ -266,7 +293,10 @@ public class FormMoverCliente : DialogoDesign
         _t = SecaoTabelaDesign("Escolha a nova bateria");
         _t.Selecionavel = true; _t.MaxLinhas = 8;
         _t.Colunas(new("", 0.45f), new("Bateria", 4.2f), new("Produto", 3.6f), new("Vagas livres", 1.2f, Direita: true));
-        Nota("O pagamento e o termo vão junto. Se a nova bateria tiver outro preço, a diferença aparece para cobrar ou devolver.");
+        var paga = r.B("pago");
+        Nota(paga
+            ? "O pagamento segue junto. O termo será invalidado e precisa ser impresso/assinado novamente. Só baterias com o mesmo produto e preço."
+            : "Produto e preço seguem a bateria escolhida. O termo será invalidado; se o produto mudar, o desconto atual será removido.");
 
         BotaoRodape("Mover", true, () => Seguro.Rodar(this, async () =>
         {
@@ -280,7 +310,9 @@ public class FormMoverCliente : DialogoDesign
         Load += (_, _) => Seguro.Rodar(this, async () =>
         {
             var lista = await Sessao.Api.Lista($"/api/office/baterias?status=abertas&filtro=apartir&data={Fmt.Iso(DateTime.Today)}");
-            _baterias = lista.Where(b => b.S("id") != r.S("bateriaId") && b.I("disponiveis") > 0).OrderBy(b => b.S("dataHora")).ToList();
+            _baterias = lista.Where(b => b.S("id") != r.S("bateriaId") && b.I("disponiveis") > 0
+                    && (!paga || (b.L("produtoId") == r.L("produtoId") && b.L("preco") == r.L("preco"))))
+                .OrderBy(b => b.S("dataHora")).ToList();
             _t.Linhas(_baterias.Select(b => new[] { "", $"{b.S("nome")} · {PecasDesign.DiaMes(b.S("dataHora"))}", b.S("produto"), b.I("disponiveis").ToString() }));
             if (_baterias.Count > 0) _t.Selecionar(0);
         });
@@ -331,13 +363,16 @@ public class FormListaParticipantes : Janela
         {
             var res = await Sessao.Api.Lista($"/api/office/reservas?bateriaId={batId}");
             participantes = res.Where(r => r.S("status") != "cancelada").ToList();
+            string Peso(JsonObject p) => decimal.TryParse(p.S("peso"), NumberStyles.Number, CultureInfo.InvariantCulture, out var kg) && kg > 0
+                ? kg.ToString("0.#", Fmt.Br)
+                : "—";
             var linhas = participantes.Select(p => new JsonObject
             {
                 ["id"] = p.S("id"),
                 ["kart"] = p.S("kart") ?? "—",
                 ["cliente"] = p.S("cliente"),
                 ["idade"] = p.I("idade") > 0 ? p.I("idade").ToString() : "—",
-                ["peso"] = p.I("peso") > 0 ? p.I("peso").ToString() : "—",
+                ["peso"] = Peso(p),
                 ["pago"] = p.B("pago"),
                 ["termo"] = p.B("termo")
             }).ToList();
