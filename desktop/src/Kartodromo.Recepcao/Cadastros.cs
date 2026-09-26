@@ -57,109 +57,180 @@ public static class Cadastros
         f.Show(dono);
     }
 
-    public static void Empresa(Form dono) => Seguro.Rodar(dono, async () =>
+    public static void Empresa(Form dono) { using var f = new FormEmpresa(); f.ShowDialog(dono); Seguro.Rodar(dono, Sessao.CarregarApoio); }
+
+    public static void Parametros(Form dono) { using var f = new FormParametros(); f.ShowDialog(dono); }
+}
+
+/// <summary>Parâmetros do sistema (OfficeParametros.dc.html): abas e a tabela Descrição / Valor; toque no valor para alterar.</summary>
+public class FormParametros : DialogoDesign
+{
+    static readonly string[] Abas_ = ["Cronometragem", "Office", "Autoatendimento", "Ranking/TV", "Lista de participantes", "Placar eletrônico", "API"];
+    static readonly HashSet<string> DaLista = ["office.exibirEmailLista", "office.exibirPesoLista"];
+    readonly Dictionary<string, string> _alterados = [];
+    List<JsonObject> _todos = [];
+    readonly TabelaDesign _tabela;
+    readonly Label _vazio;
+    int _aba = 1;
+
+    public FormParametros() : base("Parâmetros do sistema", "Ajustes da recepção · toque no valor para alterar",
+        "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1", "linear-gradient(180deg, #9A9AA0, #4A4A4F)")
     {
-        var e = await Sessao.Api.Get("/api/office/empresa");
-        using var j = new Janela("Registro de Empresa", 760, 420);
-        (string k, string r, int span)[] campos = [("nome", "Nome fantasia", 2), ("razaoSocial", "Razão social", 2), ("cnpj", "CNPJ", 1), ("telefone", "Telefone", 1), ("email", "E-mail", 2), ("cep", "CEP", 1),
-            ("endereco", "Endereço", 2), ("numero", "Nº", 1), ("complemento", "Complemento", 1), ("bairro", "Bairro", 1), ("cidade", "Cidade", 1), ("estado", "UF", 1)];
-        var g = Campos.Grade(4);
-        var tb = new Dictionary<string, TextBox>();
-        foreach (var (k, r, s) in campos) { var t = new TextBox { Text = e.S(k) }; tb[k] = t; Campos.Add(g, r, t, s); }
-        var pol = new TextBox { Multiline = true, Height = 90, Text = e.S("politicaReembolso"), ScrollBars = ScrollBars.Vertical };
-        Campos.Add(g, "Política de reembolso", pol, 4);
-        j.Controls.Add(new Panel { Dock = DockStyle.Fill, Padding = new Padding(10), Controls = { g } });
-        j.Rodape(("Cancelar", (_, _) => j.Close(), false), ("Salvar", (_, _) => Seguro.Rodar(j, async () =>
+        var g = Secao(null);
+        _vazio = new Label { AutoSize = true, MaximumSize = new Size(860, 0), Font = new Font("Segoe UI", 9.6F), ForeColor = Color.FromArgb(58, 58, 60), BackColor = Color.White, Visible = false, Margin = new Padding(0, 0, 0, 8) };
+        g.Controls.Add(_vazio); g.SetColumnSpan(_vazio, 6);
+        _tabela = new TabelaDesign { Dock = DockStyle.Fill, Height = 100, Margin = new Padding(0, 0, 14, 0), MaxLinhas = 11 };
+        _tabela.Colunas(new("Descrição", 700), new("Valor", 180, Direita: true, Editavel: true));
+        g.Controls.Add(_tabela); g.SetColumnSpan(_tabela, 6);
+        _tabela.CelulaMudou += (l, _, v) => { var p = Visiveis()[l]; _alterados[p.S("chave")] = v is "Sim" ? "true" : v is "Não" ? "false" : v; };
+        Abas(Abas_, i => { _aba = i; Mostrar(); }, 1);
+        BotaoRodape("Salvar", true, () => Seguro.Rodar(this, async () =>
         {
-            var body = new JsonObject(); foreach (var (k, t) in tb) body[k] = t.Text.Trim(); body["politicaReembolso"] = pol.Text;
-            await Sessao.Api.Put("/api/office/empresa", body);
-            Msg.Info(j, "Operação concluída com sucesso."); j.Close();
+            if (_alterados.Count == 0) { Close(); return; }
+            var body = new JsonObject(); foreach (var (k, v) in _alterados) body[k] = v;
+            await Sessao.Api.Put("/api/office/parametros", body);
             await Sessao.CarregarApoio();
-        }), true));
-        j.ShowDialog(dono);
-    });
+            Msg.Info(this, _alterados.Count == 1 ? "Parâmetro salvo." : $"{_alterados.Count} parâmetros salvos.");
+            DialogResult = DialogResult.OK; Close();
+        }));
+        BotaoRodape("Cancelar", false, Close);
+        Load += (_, _) => Seguro.Rodar(this, async () => { _todos = await Sessao.Api.Lista("/api/office/parametros"); Mostrar(); });
+    }
 
-    public static void Parametros(Form dono) => Seguro.Rodar(dono, async () =>
+    List<JsonObject> Visiveis() => _todos.Where(p =>
     {
-        var lista = await Sessao.Api.Lista("/api/office/parametros");
-        using var j = new Janela("Parâmetros do sistema", 960, 680);
-        j.Tag = "Ajustes da recepção · toque no valor para alterar";
-
-        var grade = new DataGridView
+        var k = p.S("chave");
+        return _aba switch
         {
-            Dock = DockStyle.Fill,
-            AllowUserToAddRows = false,
-            AllowUserToDeleteRows = false,
-            RowHeadersVisible = false,
-            SelectionMode = DataGridViewSelectionMode.CellSelect
+            1 => k.StartsWith("office.") && !DaLista.Contains(k),
+            2 => k.StartsWith("totem."),
+            4 => DaLista.Contains(k),
+            _ => false,
         };
-        KitVisual.EstilizarGrade(grade);
-        grade.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Descrição", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, ReadOnly = true });
-        grade.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Valor", Width = 220, DefaultCellStyle = { Alignment = DataGridViewContentAlignment.MiddleRight } });
+    }).ToList();
 
-        var cartao = KitVisual.CartaoSecao(null);
-        cartao.AutoSize = false;
-        cartao.Dock = DockStyle.Fill;
-        var pGrid = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 4, 0, 0) };
-        pGrid.Controls.Add(grade);
-        cartao.Controls.Add(pGrid);
-
-        var abasNomes = new[] { "Cronometragem", "Office", "Autoatendimento", "Ranking/TV", "Lista de participantes", "Placar eletrônico", "API" };
-        var dictValores = new Dictionary<string, string>();
-        foreach (var p in lista) dictValores[p.S("chave")] = p.S("valor");
-
-        void CarregarAba(int idx)
+    void Mostrar()
+    {
+        var itens = Visiveis();
+        string Valor(JsonObject p) { var v = _alterados.GetValueOrDefault(p.S("chave"), p.S("valor")); return v == "true" ? "Sim" : v == "false" ? "Não" : v; }
+        _tabela.Linhas(itens.Select(p => new[] { p.S("descricao"), Valor(p) }));
+        _tabela.Visible = itens.Count > 0;
+        _vazio.Visible = itens.Count == 0;
+        _vazio.Text = _aba switch
         {
-            grade.Rows.Clear();
-            var prefixo = idx switch
-            {
-                0 => "crono",
-                1 => "office",
-                2 => "totem",
-                3 => "ranking",
-                4 => "participantes",
-                5 => "placar",
-                6 => "api",
-                _ => ""
-            };
-            var filtrados = lista.Where(p => string.IsNullOrEmpty(prefixo) || p.S("chave").StartsWith(prefixo, StringComparison.OrdinalIgnoreCase)).ToList();
-            if (filtrados.Count == 0) filtrados = lista;
-            foreach (var p in filtrados)
-            {
-                var rowIdx = grade.Rows.Add(p.S("descricao"), dictValores.GetValueOrDefault(p.S("chave"), p.S("valor")));
-                grade.Rows[rowIdx].Tag = p.S("chave");
-            }
-        }
-
-        grade.CellEndEdit += (_, e) =>
-        {
-            if (e.RowIndex >= 0 && grade.Rows[e.RowIndex].Tag is string chave)
-            {
-                dictValores[chave] = grade.Rows[e.RowIndex].Cells[1].Value?.ToString() ?? "";
-            }
+            0 or 5 => "Os ajustes da cronometragem e do placar ficam no programa da Cronometragem (Ferramentas › Parâmetros da cronometragem).",
+            3 => "O ranking e o telão são configurados no programa da Cronometragem (Relatórios › Ranking e Placar).",
+            6 => "A API do servidor não tem ajustes pela recepção: o endereço e o acesso ficam na configuração do servidor.",
+            _ => "Nenhum parâmetro nesta aba.",
         };
+    }
+}
 
-        var abas = KitVisual.AbaSegmentada(abasNomes, 1, CarregarAba);
+/// <summary>Registro de empresa (Empresa.dc.html): dados gerais, informações adicionais e política de reembolso.</summary>
+public class FormEmpresa : DialogoDesign
+{
+    static readonly string[] Dias = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+    readonly Dictionary<string, TextBox> _t = [];
+    readonly TextBox[] _horas = new TextBox[7];
+    readonly ListaDesign _uf = new(), _pais = new();
+    readonly TextBox _politica = new() { Multiline = true, ScrollBars = ScrollBars.Vertical, BorderStyle = BorderStyle.None, Font = PecasDesign.FonteValor, Height = 330, AcceptsReturn = true };
+    string _logoNome = "", _logoBase64;
 
-        j.Controls.Add(cartao);
-        j.Controls.Add(abas);
+    TextBox T(string k, int max = 200) { var t = PecasDesign.Texto("", max); _t[k] = t; return t; }
 
-        j.Rodape(
-            ("Cancelar", (_, _) => j.Close(), false),
-            ("Salvar", (_, _) => Seguro.Rodar(j, async () =>
-            {
-                var body = new JsonObject();
-                foreach (var (k, v) in dictValores) body[k] = v;
-                await Sessao.Api.Put("/api/office/parametros", body);
-                await Sessao.CarregarApoio();
-                Msg.Info(j, "Parâmetros salvos.");
-                j.Close();
-            }), true)
-        );
+    public FormEmpresa() : base("Registro de empresa", "Aparece no cabeçalho dos resultados, termos e site",
+        "M4 21V5l8-2v18M12 7l8 2v12M8 9h.01M8 13h.01M8 17h.01M16 13h.01M16 17h.01", "linear-gradient(180deg, #5EDB7A, #1E9E4A)")
+    {
+        _uf.Items.AddRange("AC AL AM AP BA CE DF ES GO MA MG MS MT PA PB PE PI PR RJ RN RO RR RS SC SE SP TO".Split(' '));
+        _pais.Items.AddRange(["Brasil", "Argentina", "Paraguai", "Uruguai", "Outro"]);
+        // ---------- aba 1
+        var logo = PecasDesign.Texto("", 200); logo.ReadOnly = true; logo.BackColor = Color.White;
+        var trocar = AcaoCampo("Trocar");
+        trocar.Click += (_, _) =>
+        {
+            using var d = new OpenFileDialog { Filter = "Imagem (*.png;*.jpg)|*.png;*.jpg;*.jpeg", Title = "Logomarca da empresa" };
+            if (d.ShowDialog(this) != DialogResult.OK) return;
+            var bytes = File.ReadAllBytes(d.FileName);
+            if (bytes.Length > 1_500_000) { Msg.Aviso(this, "Use uma imagem de até 1,5 MB."); return; }
+            _logoBase64 = Convert.ToBase64String(bytes); _logoNome = Path.GetFileName(d.FileName); logo.Text = _logoNome;
+        };
+        var e1 = Secao("Empresa");
+        Campo(e1, "Nome", T("nome"), 3); Campo(e1, "CNPJ", T("cnpj", 20), 1); Campo(e1, "Telefone", T("telefone", 40), 1); Campo(e1, "Logomarca", logo, 1, trocar);
+        var cep = T("cep", 12);
+        var buscar = AcaoCampo("Buscar");
+        buscar.Click += (_, _) => Seguro.Rodar(this, BuscarCep);
+        var e2 = Secao("Endereço");
+        Campo(e2, "CEP", cep, 1, buscar); Campo(e2, "Endereço", T("endereco"), 3); Campo(e2, "Nº", T("numero", 20), 1); Campo(e2, "Bairro", T("bairro", 100), 1);
+        Campo(e2, "Cidade", T("cidade", 100), 2); Campo(e2, "Estado", _uf, 1); Campo(e2, "IBGE", T("ibge", 10), 1); Campo(e2, "País", _pais, 2);
+        var e3 = Secao("Horário de funcionamento");
+        for (var i = 0; i < 7; i++) { _horas[i] = PecasDesign.Texto("", 30); Campo(e3, Dias[i], _horas[i], i == 6 ? 1 : 1); }
+        Control[] aba1 = [e1.Parent, e2.Parent, e3.Parent];
+        // ---------- aba 2
+        var i1 = Secao("Informações adicionais");
+        Campo(i1, "Razão social", T("razaoSocial"), 4); Campo(i1, "Complemento", T("complemento", 100), 2);
+        Campo(i1, "E-mail", T("email"), 3); Campo(i1, "Site", T("site"), 3);
+        Control[] aba2 = [i1.Parent];
+        // ---------- aba 3
+        var p1 = Secao("Política de reembolso");
+        var caixa = new Panel { Dock = DockStyle.Fill, Height = 350, Margin = new Padding(0, 0, 14, 0), Padding = new Padding(10, 8, 6, 8), BackColor = Color.White };
+        caixa.Paint += (_, e) =>
+        {
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            using var path = Forma.Redondo(new Rectangle(0, 0, caixa.Width - 1, caixa.Height - 1), 8);
+            using var pen = new Pen(Color.FromArgb(219, 219, 219)); e.Graphics.DrawPath(pen, path);
+        };
+        _politica.Dock = DockStyle.Fill; caixa.Controls.Add(_politica);
+        p1.Controls.Add(caixa); p1.SetColumnSpan(caixa, 6);
+        var nota = Nota("A política aparece no termo de responsabilidade e no site.");
+        Control[] aba3 = [p1.Parent, nota];
+        foreach (var c in aba2.Concat(aba3)) c.Visible = false;
+        Abas(["Dados gerais", "Informações adicionais", "Política de reembolso"], i =>
+        {
+            foreach (var c in aba1) c.Visible = i == 0;
+            foreach (var c in aba2) c.Visible = i == 1;
+            foreach (var c in aba3) c.Visible = i == 2;
+        });
+        BotaoRodape("Salvar e fechar", true, () => Seguro.Rodar(this, Salvar));
+        BotaoRodape("Cancelar", false, Close);
+        Load += (_, _) => Seguro.Rodar(this, async () =>
+        {
+            var e = await Sessao.Api.Get("/api/office/empresa");
+            foreach (var (k, t) in _t) t.Text = e.S(k);
+            _uf.SelectedItem = _uf.Items.Contains(e.S("estado")) ? e.S("estado") : "MG";
+            _pais.SelectedItem = _pais.Items.Contains(e.S("pais")) ? e.S("pais") : "Brasil";
+            _politica.Text = e.S("politicaReembolso").Replace("\r\n", "\n").Replace("\n", "\r\n");
+            _logoNome = e.S("logoNome"); logo.Text = _logoNome.Length > 0 ? _logoNome : "(sem logomarca)";
+            var horas = e.S("horarios").Split('|');
+            for (var i = 0; i < 7; i++) _horas[i].Text = i < horas.Length ? horas[i] : "";
+        });
+    }
 
-        CarregarAba(1);
-        j.ShowDialog(dono);
-    });
+    async Task BuscarCep()
+    {
+        var cep = new string(_t["cep"].Text.Where(char.IsDigit).ToArray());
+        if (cep.Length != 8) { Msg.Aviso(this, "Informe o CEP com 8 números."); return; }
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(6) };
+        var r = System.Text.Json.Nodes.JsonNode.Parse(await http.GetStringAsync($"https://viacep.com.br/ws/{cep}/json/")) as JsonObject;
+        if (r == null || r.B("erro")) { Msg.Aviso(this, "CEP não encontrado."); return; }
+        _t["cep"].Text = $"{cep[..5]}-{cep[5..]}";
+        _t["endereco"].Text = r.S("logradouro"); _t["bairro"].Text = r.S("bairro"); _t["cidade"].Text = r.S("localidade"); _t["ibge"].Text = r.S("ibge");
+        _uf.SelectedItem = r.S("uf"); _pais.SelectedItem = "Brasil";
+        _t["numero"].Focus();
+    }
+
+    async Task Salvar()
+    {
+        if (string.IsNullOrWhiteSpace(_t["nome"].Text)) { Msg.Aviso(this, "Informe o nome da empresa."); return; }
+        var body = new JsonObject();
+        foreach (var (k, t) in _t) body[k] = t.Text.Trim();
+        body["estado"] = _uf.SelectedItem?.ToString(); body["pais"] = _pais.SelectedItem?.ToString();
+        body["politicaReembolso"] = _politica.Text;
+        body["horarios"] = string.Join("|", _horas.Select(h => h.Text.Trim()));
+        await Sessao.Api.Put("/api/office/empresa", body);
+        if (_logoBase64 != null) await Sessao.Api.Post("/api/office/empresa/logo", new { nome = _logoNome, base64 = _logoBase64 });
+        Msg.Info(this, "Dados da empresa salvos.");
+        DialogResult = DialogResult.OK; Close();
+    }
 }
 
 public class FormCadastro : Janela
@@ -671,146 +742,266 @@ public class FormCadastro : Janela
     }
 }
 
-/// <summary>"Criar Voucher por Fidelidade / Parceiro" — Voucher.dc.html (820x660, prévia de cartão dourado metálico à esquerda).</summary>
-public class FormVoucher : Janela
+/// <summary>Regras comuns dos vouchers (fidelidade, parceiro e avulso): lê os campos e grava.</summary>
+static class VoucherRegras
 {
-    public FormVoucher(string origem, JsonObject vinculo = null) : base(origem == "fidelidade" ? "Criar Voucher por Fidelidade" : origem == "parceiro" ? "Criar Voucher por Parceiro" : "Criar Voucher", 840, 660)
+    public static string NovoCodigo() => "KB" + Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
+
+    public static async Task<bool> Salvar(Form dono, string origem, long? vinculoId, string referencia, string codigo, bool percentual, string valor,
+        DateTime ini, DateTime fim, long? produtoId, string usoMax, bool unico, string minimo, string maximo)
     {
-        var nomeOrigem = origem == "fidelidade" ? "Criar voucher por fidelidade" : origem == "parceiro" ? "Criar voucher por parceiro" : "Criar voucher";
-        Tag = new KitVisual.ModalMeta
+        if (origem is "fidelidade" or "parceiro" && (vinculoId is not long vid || vid <= 0)) { Msg.Aviso(dono, origem == "fidelidade" ? "Escolha a conta de fidelidade." : "Escolha o parceiro."); return false; }
+        if (string.IsNullOrWhiteSpace(codigo)) { Msg.Aviso(dono, "Informe o código do voucher (ou toque em Gerar)."); return false; }
+        long v;
+        var txt = valor.Replace("%", "").Trim();
+        if (percentual) { if (!decimal.TryParse(txt, System.Globalization.NumberStyles.Number, Fmt.Br, out var p) || p <= 0 || p > 100 || p != Math.Floor(p)) { Msg.Aviso(dono, "Informe o percentual (1 a 100)."); return false; } v = (long)p; }
+        else { if (Fmt.Centavos(txt) is not long c || c <= 0) { Msg.Aviso(dono, "Informe o valor do desconto."); return false; } v = c; }
+        if (fim.Date < ini.Date) { Msg.Aviso(dono, "A data final deve ser igual ou depois da inicial."); return false; }
+        var uso = int.TryParse(usoMax, out var u) && u > 0 ? u : 1;
+        await Sessao.Api.Post("/api/office/vouchers", new
         {
-            Titulo = nomeOrigem,
-            Sub = "Prévia do voucher. O cliente usa o código no caixa (Receita avulsa → Aplicar voucher).",
-            Cor1 = Color.FromArgb(255, 181, 71),
-            Cor2 = Color.FromArgb(240, 122, 0),
-            Glifo = "\uE7C1",
-            Estado = "Voucher"
+            origem, referencia = origem is "fidelidade" or "parceiro" ? null : referencia?.Trim(),
+            fidelidadeContaId = origem == "fidelidade" ? vinculoId : null, parceiroId = origem == "parceiro" ? vinculoId : null,
+            codigo = codigo.Trim().ToUpperInvariant(), tipo = percentual ? "percentual" : "valor", valor = v, inicio = Fmt.Iso(ini), fim = Fmt.Iso(fim),
+            produtoId = produtoId is long pid && pid > 0 ? pid : (long?)null, usoMaxCliente = uso, usoUnico = unico,
+            pedidoMinimo = Fmt.Centavos(minimo) is long mn && mn > 0 ? mn : (long?)null, descontoMaximo = Fmt.Centavos(maximo) is long mx && mx > 0 ? mx : (long?)null,
+        });
+        Msg.Info(dono, "Voucher criado com sucesso.");
+        return true;
+    }
+
+    public static async Task CarregarVinculos(ListaDesign lista, string origem, JsonObject vinculo)
+    {
+        var rows = await Sessao.Api.Lista(origem == "fidelidade" ? "/api/office/fidelidade/contas" : "/api/office/parceiros");
+        var itens = rows.Where(r => r.B("ativo")).Select(r => new Campos.Item(r.L("id") ?? 0, origem == "fidelidade" ? $"{r.S("nome")} · {r.I("saldo"):N0} pontos" : r.S("nome"), r)).ToArray();
+        lista.Items.Clear();
+        if (itens.Length == 0) { lista.Items.Add(new Campos.Item(0, origem == "fidelidade" ? "Nenhuma conta ativa — abra em Fidelidade › Contas" : "Nenhum parceiro ativo — cadastre em Parceiros")); lista.SelectedIndex = 0; return; }
+        lista.Items.AddRange(itens);
+        if (vinculo != null) Campos.Selecionar(lista, vinculo.L("id") ?? 0);
+        if (lista.SelectedIndex < 0) lista.SelectedIndex = 0;
+    }
+
+    public static ListaDesign Produtos()
+    {
+        var prod = new ListaDesign();
+        prod.Items.Add(new Campos.Item(0, "Todos os produtos"));
+        prod.Items.AddRange(Sessao.Lista("produtos").Where(p => p.B("ativo")).Select(p => new Campos.Item(p.L("id") ?? 0, p.S("nome"), p)).ToArray());
+        prod.SelectedIndex = 0;
+        return prod;
+    }
+}
+
+/// <summary>Criar voucher por fidelidade / avulso (Voucher.dc.html, 820×660): prévia do cartão dourado à esquerda
+/// e o formulário em duas colunas à direita. O de parceiro abre FormVoucherParceiro (VoucherParceiro.dc.html).</summary>
+public class FormVoucher : CartaoModal
+{
+    public static Form Criar(string origem, JsonObject vinculo = null) => origem == "parceiro" ? new FormVoucherParceiro(vinculo) : new FormVoucher(origem, vinculo);
+
+    readonly Panel _cartao;
+    string _valorCartao = "10% OFF", _codigoCartao = "";
+    readonly string _selo;
+
+    public FormVoucher(string origem, JsonObject vinculo = null) : base(820, 660)
+    {
+        var fidelidade = origem == "fidelidade";
+        Text = fidelidade ? "Criar voucher por fidelidade" : "Criar voucher";
+        _selo = fidelidade ? "FIDELIDADE" : "AVULSO";
+        BackColor = DialogoDesign.Fundo;
+
+        // ---------- lateral escura (300 px) com o cartão dourado inclinado
+        var lado = new Panel { Dock = DockStyle.Left, Width = 300 };
+        lado.Paint += (_, e) =>
+        {
+            var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
+            using (var b = new LinearGradientBrush(lado.ClientRectangle, Color.FromArgb(28, 28, 30), Color.FromArgb(11, 11, 12), 90f)) g.FillRectangle(b, lado.ClientRectangle);
+            using var brilho = new GraphicsPath(); brilho.AddEllipse(-30, -10, 360, 300);
+            using var pb = new PathGradientBrush(brilho) { CenterColor = Color.FromArgb(90, 255, 216, 74), SurroundColors = [Color.FromArgb(0, 255, 216, 74)] };
+            g.FillPath(pb, brilho);
         };
+        _cartao = new Panel { Size = new Size(300, 195), Location = new Point(0, 187), BackColor = Color.Transparent };
+        _cartao.Paint += (_, e) => DesenharCartao(e.Graphics);
+        lado.Paint += (_, e) => { }; // o cartão desenha por cima do degradê (fundo transparente)
+        var prev = new Label { Text = "Prévia do voucher. O cliente usa o código no caixa (Receita avulsa → Aplicar voucher).", Location = new Point(28, 386), Size = new Size(244, 60), ForeColor = Color.FromArgb(174, 174, 178), Font = new Font("Segoe UI", 9.8F), TextAlign = ContentAlignment.TopCenter, BackColor = Color.Transparent };
+        lado.Controls.Add(_cartao); lado.Controls.Add(prev);
 
-        var refe = new TextBox();
-        var lista = Campos.Combo(); lista.DropDownStyle = ComboBoxStyle.DropDownList;
-        var vinculado = origem is "fidelidade" or "parceiro";
-        var cod = new TextBox { CharacterCasing = CharacterCasing.Upper, Text = "KB" + Guid.NewGuid().ToString("N")[..6].ToUpperInvariant() };
-        var bG = new Button { Text = "Gerar", Height = 28, AutoSize = true, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(242, 242, 245) };
-        bG.FlatAppearance.BorderSize = 0;
-        bG.Click += (_, _) => cod.Text = "KB" + Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
+        // ---------- cabeçalho (padding 16 20, título 17 px, ✕ 30 px)
+        var cab = new Panel { Dock = DockStyle.Top, Height = 63, BackColor = Color.White };
+        cab.Paint += (_, e) => { using var p = new Pen(Color.FromArgb(235, 235, 235)); e.Graphics.DrawLine(p, 0, cab.Height - 1, cab.Width, cab.Height - 1); };
+        cab.Controls.Add(new Label { Text = Text, AutoSize = true, Font = new Font("Segoe UI", 12.8F, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, Location = new Point(20, 18), BackColor = Color.Transparent });
+        var x = Botao("✕", CinzaBotao, PecasDesign.CorTexto); x.Font = new Font("Segoe UI", 9.5F); x.Size = new Size(30, 30); x.Location = new Point(520 - 20 - 30, 16);
+        x.Resize += (_, _) => Forma.AplicarRaio(x, 8); Forma.AplicarRaio(x, 8); x.Click += (_, _) => Close();
+        cab.Controls.Add(x);
 
-        var tipo = Campos.Combo("Percentual", "Valor (R$)");
-        var valor = new TextBox { Text = "10" };
-        var ini = Campos.Data(); var fim = Campos.Data(DateTime.Today.AddDays(30));
-        var prod = Campos.Combo(); prod.Items.Add(new Campos.Item(0, "(qualquer produto)")); prod.Items.AddRange(Sessao.Produtos()); prod.SelectedIndex = 0;
-        var uso = Campos.Num(1, 1, 999); var unico = Campos.Check("Uso único (vale uma vez só)", true);
-        var min = new TextBox(); var max = new TextBox();
-
-        // ---- Painel Esquerdo: Cartão Dourado 3D (Voucher.dc.html)
-        var esq = new Panel { Dock = DockStyle.Left, Width = 290, BackColor = Color.FromArgb(24, 24, 26), Padding = new Padding(20, 36, 20, 20) };
-        esq.Paint += (_, e) =>
+        // ---------- formulário: 2 colunas, espaço 12 × 14
+        var form = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, BackColor = DialogoDesign.Fundo, Padding = new Padding(20, 16, 6, 0), AutoScroll = false };
+        form.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); form.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        void Campo(string rotulo, Control ctl, int span, Button acao = null)
         {
-            using var b = new LinearGradientBrush(esq.ClientRectangle, Color.FromArgb(32, 32, 36), Color.FromArgb(12, 12, 14), 90f);
-            e.Graphics.FillRectangle(b, esq.ClientRectangle);
-        };
-
-        var cardBox = new Panel { Size = new Size(250, 156), Location = new Point(20, 48), BackColor = Color.Transparent };
-        var lblCardTipo = new Label { Text = "VOUCHER · " + (origem == "fidelidade" ? "FIDELIDADE" : origem == "parceiro" ? "PARCEIRO" : "AVULSO"), AutoSize = false, Size = new Size(220, 20), Location = new Point(16, 14), ForeColor = Color.FromArgb(58, 39, 0), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
-        var lblCardValor = new Label { Text = "10% OFF", AutoSize = false, Size = new Size(220, 46), Location = new Point(14, 44), ForeColor = Color.FromArgb(58, 39, 0), Font = new Font("Segoe UI", 26F, FontStyle.Bold) };
-        var lblCardCodigo = new Label { Text = cod.Text, AutoSize = false, Size = new Size(220, 26), Location = new Point(16, 114), ForeColor = Color.FromArgb(58, 39, 0), Font = new Font("Consolas", 12.5F, FontStyle.Bold) };
-
-        cardBox.Paint += (_, e) =>
-        {
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using var path = VisualPrincipal.Redondo(cardBox.ClientRectangle, 16);
-            using var bGold = new LinearGradientBrush(cardBox.ClientRectangle, Color.FromArgb(255, 226, 122), Color.FromArgb(201, 133, 0), 135f);
-            e.Graphics.FillPath(bGold, path);
-            using var pen = new Pen(Color.FromArgb(255, 245, 180), 1.5f);
-            e.Graphics.DrawPath(pen, path);
-        };
-        cardBox.Controls.AddRange([lblCardTipo, lblCardValor, lblCardCodigo]);
-
-        var lblExplicacao = new Label
-        {
-            Text = "Prévia do voucher.\nO cliente usa o código no caixa\n(Receita avulsa → Aplicar voucher).",
-            AutoSize = false,
-            Size = new Size(250, 80),
-            Location = new Point(20, 230),
-            ForeColor = Color.FromArgb(174, 174, 178),
-            Font = new Font("Segoe UI", 9.2F),
-            TextAlign = ContentAlignment.TopCenter
-        };
-        esq.Controls.AddRange([cardBox, lblExplicacao]);
-
-        void AtualizarPrevia()
-        {
-            lblCardTipo.Text = "VOUCHER · " + (origem == "fidelidade" ? "FIDELIDADE" : origem == "parceiro" ? "PARCEIRO" : "AVULSO");
-            var vTxt = valor.Text.Trim();
-            if (tipo.SelectedIndex == 0)
-                lblCardValor.Text = string.IsNullOrEmpty(vTxt) ? "0% OFF" : $"{vTxt}% OFF";
-            else
-                lblCardValor.Text = string.IsNullOrEmpty(vTxt) ? "R$ 0 OFF" : $"R$ {vTxt} OFF";
-            lblCardCodigo.Text = string.IsNullOrWhiteSpace(cod.Text) ? "—" : cod.Text.Trim().ToUpperInvariant();
+            var cel = new Panel { Height = 58, Dock = DockStyle.Fill, Margin = new Padding(0, 0, 14, 12), BackColor = DialogoDesign.Fundo };
+            cel.Controls.Add(new Label { Text = rotulo, Font = PecasDesign.FonteRotulo, ForeColor = PecasDesign.Cinza, Location = new Point(0, 0), AutoSize = true, BackColor = DialogoDesign.Fundo });
+            var caixa = new Panel { Location = new Point(0, 20), Height = 36, BackColor = DialogoDesign.Fundo, Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top };
+            caixa.Paint += (_, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using var p = Forma.Redondo(new Rectangle(0, 0, caixa.Width - 1, caixa.Height - 1), 9);
+                e.Graphics.FillPath(Brushes.White, p);
+                using var pen = new Pen(ctl.ContainsFocus ? DialogoDesign.VerdePrincipal : Color.FromArgb(219, 219, 219)); e.Graphics.DrawPath(pen, p);
+            };
+            ctl.GotFocus += (_, _) => caixa.Invalidate(); ctl.LostFocus += (_, _) => caixa.Invalidate();
+            if (ctl is TextBox tb) tb.BackColor = Color.White;
+            caixa.Controls.Add(ctl);
+            if (acao != null) { acao.Height = 26; caixa.Controls.Add(acao); }
+            void Ajustar()
+            {
+                var direita = acao != null ? acao.PreferredSize.Width + 16 : 10;
+                var h = ctl is TextBox ? ctl.Font.Height : ctl.Height;
+                ctl.SetBounds(10, (36 - h) / 2, caixa.Width - 10 - direita, h);
+                if (acao != null) acao.SetBounds(caixa.Width - acao.PreferredSize.Width - 6, 5, acao.PreferredSize.Width, 26);
+            }
+            caixa.Resize += (_, _) => Ajustar();
+            cel.Resize += (_, _) => caixa.Width = cel.Width;
+            cel.Controls.Add(caixa);
+            form.Controls.Add(cel); form.SetColumnSpan(cel, span);
         }
 
-        valor.TextChanged += (_, _) => AtualizarPrevia();
-        tipo.SelectedIndexChanged += (_, _) => AtualizarPrevia();
-        cod.TextChanged += (_, _) => AtualizarPrevia();
+        var lista = new ListaDesign();
+        var refe = PecasDesign.Texto("", 150);
+        var cod = PecasDesign.Texto(VoucherRegras.NovoCodigo(), 30); cod.CharacterCasing = CharacterCasing.Upper;
+        var gerar = DialogoDesign.AcaoCampo("Gerar"); gerar.Click += (_, _) => cod.Text = VoucherRegras.NovoCodigo();
+        var tipo = new ListaDesign(); tipo.Items.AddRange(["Percentual", "Valor (R$)"]); tipo.SelectedIndex = 0;
+        var valor = PecasDesign.Texto("10 %", 12);
+        var ini = new DataDesign(DateTime.Today); var fim = new DataDesign(DateTime.Today.AddDays(30));
+        var prod = VoucherRegras.Produtos();
+        var uso = PecasDesign.Numero(1, 4);
+        var min = PecasDesign.Texto("", 14); min.PlaceholderText = "Sem mínimo";
+        var max = PecasDesign.Texto("", 14); max.PlaceholderText = "Sem limite";
+        var unico = new CheckBox { Text = "Uso único (vale uma vez só)", Checked = true, AutoSize = true, Font = new Font("Segoe UI", 10.1F), BackColor = DialogoDesign.Fundo, Padding = new Padding(4, 0, 0, 0), Cursor = Cursors.Hand, Margin = new Padding(0, 0, 0, 0) };
+        Forma.CheckVerde(unico);
 
-        // ---- Painel Direito: Formulário
-        var g = Campos.Grade(4);
-        Campos.Add(g, origem == "fidelidade" ? "Conta fidelidade" : origem == "parceiro" ? "Parceiro" : "Referência (opcional)", vinculado ? lista : refe, 4);
-        if (vinculado)
-            Load += (_, _) => Seguro.Rodar(this, async () =>
-            {
-                var rows = await Sessao.Api.Lista(origem == "fidelidade" ? "/api/office/fidelidade/contas" : "/api/office/parceiros");
-                var itens = rows.Where(r => r.B("ativo")).Select(r => new Campos.Item(r.L("id") ?? 0, origem == "fidelidade" ? $"{r.S("nome")} · {r.S("saldo")} pontos" : r.S("nome"), r)).ToArray();
-                lista.Items.AddRange(itens);
-                if (itens.Length == 0) { lista.Items.Add(new Campos.Item(0, origem == "fidelidade" ? "Nenhuma conta ativa — abra a conta em Fidelidade › Contas" : "Nenhum parceiro ativo — cadastre em Parceiros")); lista.SelectedIndex = 0; return; }
-                if (vinculo != null) Campos.Selecionar(lista, vinculo.L("id") ?? 0);
-                if (lista.SelectedIndex < 0) lista.SelectedIndex = 0;
-            });
+        if (fidelidade)
+        {
+            var sel = DialogoDesign.AcaoCampo("Selecionar…"); sel.Click += (_, _) => { lista.Focus(); lista.DroppedDown = true; };
+            Campo("Conta fidelidade", lista, 2, sel);
+            Load += (_, _) => Seguro.Rodar(this, () => VoucherRegras.CarregarVinculos(lista, origem, vinculo));
+        }
+        else Campo("Referência (opcional)", refe, 2);
+        Campo("Código", cod, 2, gerar);
+        Campo("Tipo de desconto", tipo, 1); Campo("Valor", valor, 1);
+        Campo("Válido de", ini, 1); Campo("Válido até", fim, 1);
+        Campo("Produto", prod, 2);
+        Campo("Uso máximo por cliente", uso, 1); Campo("Pedido mínimo (R$)", min, 1);
+        Campo("Desconto máximo (R$)", max, 2);
+        form.Controls.Add(unico); form.SetColumnSpan(unico, 2);
 
-        var pCod = new Panel { Size = new Size(220, 32) };
-        cod.SetBounds(0, 2, 140, 26);
-        bG.SetBounds(146, 0, 70, 28);
-        pCod.Controls.AddRange([cod, bG]);
+        void Previa()
+        {
+            var t = valor.Text.Replace("%", "").Replace("R$", "").Trim();
+            _valorCartao = tipo.SelectedIndex == 0 ? $"{(t.Length == 0 ? "0" : t)}% OFF" : $"R$ {(t.Length == 0 ? "0" : t)} OFF";
+            _codigoCartao = cod.Text.Trim().ToUpperInvariant();
+            _cartao.Invalidate();
+        }
+        valor.TextChanged += (_, _) => Previa(); tipo.SelectedIndexChanged += (_, _) => { valor.Text = tipo.SelectedIndex == 0 ? "10 %" : "20,00"; Previa(); }; cod.TextChanged += (_, _) => Previa();
+        Previa();
 
-        Campos.Add(g, "Código", pCod, 2);
-        Campos.Add(g, "Tipo de desconto", tipo, 2);
-        Campos.Add(g, "Valor", valor, 2);
-        Campos.Add(g, "Uso único", unico, 2);
-        Campos.Add(g, "Válido de", ini, 2);
-        Campos.Add(g, "Válido até", fim, 2);
-        Campos.Add(g, "Produto", prod, 4);
-        Campos.Add(g, "Uso máx por cliente", uso, 2);
-        Campos.Add(g, "Pedido mínimo (R$)", min, 2);
-        Campos.Add(g, "Desconto máximo (R$)", max, 2);
+        // ---------- rodapé (padding 14 20, botões 38 px)
+        var rod = new Panel { Dock = DockStyle.Bottom, Height = 67, BackColor = Color.White };
+        rod.Paint += (_, e) => { using var p = new Pen(Color.FromArgb(235, 235, 235)); e.Graphics.DrawLine(p, 0, 0, rod.Width, 0); };
+        var salvar = Botao("Salvar e fechar", DialogoDesign.VerdePrincipal, Color.White, true); salvar.Font = new Font("Segoe UI", 10.1F, FontStyle.Bold);
+        salvar.Size = new Size(TextRenderer.MeasureText(salvar.Text, salvar.Font).Width + 36, 38); salvar.Location = new Point(520 - 20 - salvar.Width, 14);
+        var cancelar = Botao("Cancelar", CinzaBotao, PecasDesign.CorTexto); cancelar.Font = new Font("Segoe UI", 10.1F);
+        cancelar.Size = new Size(TextRenderer.MeasureText("Cancelar", cancelar.Font).Width + 32, 38); cancelar.Location = new Point(salvar.Left - 10 - cancelar.Width, 14);
+        foreach (var b in new[] { salvar, cancelar }) { b.Resize += (_, _) => Forma.AplicarRaio(b, 10); Forma.AplicarRaio(b, 10); }
+        cancelar.Click += (_, _) => Close();
+        salvar.Click += (_, _) => Seguro.Rodar(this, async () =>
+        {
+            if (await VoucherRegras.Salvar(this, origem, fidelidade ? Campos.IdDe(lista) : null, refe.Text, cod.Text, tipo.SelectedIndex == 0, valor.Text,
+                ini.Value, fim.Value, Campos.IdDe(prod), uso.Text, unico.Checked, min.Text, max.Text)) { DialogResult = DialogResult.OK; Close(); }
+        });
+        rod.Controls.AddRange([cancelar, salvar]);
 
-        var cForm = KitVisual.CartaoSecao("Regras de desconto e validade");
-        cForm.Controls.Add(g);
+        var direita = new Panel { Dock = DockStyle.Fill, BackColor = DialogoDesign.Fundo };
+        direita.Controls.Add(form); direita.Controls.Add(rod); direita.Controls.Add(cab);
+        form.BringToFront();
+        Controls.Add(direita); Controls.Add(lado);
+        direita.BringToFront();
+    }
 
-        var pDireito = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12, 10, 12, 10) };
-        pDireito.Controls.Add(cForm);
+    protected override void OnLoad(EventArgs e)
+    {
+        if (Owner is Form dono && dono.Visible && dono.WindowState != FormWindowState.Minimized)
+        {
+            var fundo = new Escurecer(dono);
+            fundo.Show();
+            FormClosed += (_, _) => fundo.Close();
+        }
+        base.OnLoad(e);
+    }
 
-        Controls.Add(pDireito);
-        Controls.Add(esq);
+    /// <summary>Cartão 240×150 dourado, raio 18, levemente girado (perspective rotateY(-14°) rotateX(8°) do design).</summary>
+    void DesenharCartao(Graphics g)
+    {
+        g.SmoothingMode = SmoothingMode.AntiAlias; g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+        var st = g.Save();
+        // 240×150 centrado em (150, 95) do painel; a inclinação imita a perspectiva
+        g.TranslateTransform(150, 102);
+        using (var m = new Matrix(0.96f, -0.05f, -0.06f, 0.97f, 0, 0)) g.MultiplyTransform(m);
+        var r = new RectangleF(-120, -75, 240, 150);
+        using (var sombra = Forma.Redondo(new RectangleF(r.X + 6, r.Y + 22, r.Width - 12, r.Height), 18))
+        using (var bs = new SolidBrush(Color.FromArgb(120, 0, 0, 0))) g.FillPath(bs, sombra);
+        using (var p = Forma.Redondo(r, 18))
+        {
+            using var lg = new LinearGradientBrush(r, Color.FromArgb(255, 226, 122), Color.FromArgb(201, 133, 0), 45f)
+            { InterpolationColors = new ColorBlend { Colors = [Color.FromArgb(255, 226, 122), Color.FromArgb(242, 169, 0), Color.FromArgb(201, 133, 0)], Positions = [0f, 0.6f, 1f] } };
+            g.FillPath(lg, p);
+            using var borda = new Pen(Color.FromArgb(150, 255, 255, 255), 1.2f); g.DrawLine(borda, r.X + 16, r.Y + 1, r.Right - 16, r.Y + 1);
+        }
+        var cor = Color.FromArgb(58, 39, 0);
+        using var br = new SolidBrush(cor);
+        using var f12 = new Font("Segoe UI", 9F, FontStyle.Bold);
+        g.DrawString("VOUCHER", f12, br, r.X + 18, r.Y + 14);
+        var sz = g.MeasureString(_selo, f12); g.DrawString(_selo, f12, br, r.Right - 18 - sz.Width, r.Y + 14);
+        using var f34 = new Font("Segoe UI", 25F, FontStyle.Bold);
+        g.DrawString(_valorCartao, f34, br, r.X + 14, r.Y + 44);
+        using var fm = new Font("Consolas", 10.5F, FontStyle.Bold);
+        g.DrawString(_codigoCartao.Length == 0 ? "—" : _codigoCartao, fm, br, r.X + 18, r.Bottom - 34);
+        g.Restore(st);
+    }
+}
 
-        Rodape("O cliente apresenta o código no caixa",
-            ("Cancelar", (_, _) => Close(), false),
-            ("Salvar e fechar", (_, _) => Seguro.Rodar(this, async () =>
-            {
-                if (vinculado && (Campos.IdDe(lista) is not long vid || vid <= 0)) { Msg.Aviso(this, origem == "fidelidade" ? "Escolha a conta de fidelidade." : "Escolha o parceiro."); return; }
-                var pct = tipo.SelectedIndex == 0;
-                long v;
-                if (pct) { if (!int.TryParse(valor.Text.Trim().TrimEnd('%'), out var p) || p <= 0 || p > 100) { Msg.Aviso(this, "Informe o percentual (1 a 100)."); return; } v = p; }
-                else { if (Fmt.Centavos(valor.Text) is not long c || c <= 0) { Msg.Aviso(this, "Informe o valor."); return; } v = c; }
-                await Sessao.Api.Post("/api/office/vouchers", new
-                {
-                    origem, referencia = vinculado ? null : refe.Text.Trim(),
-                    fidelidadeContaId = origem == "fidelidade" ? Campos.IdDe(lista) : null, parceiroId = origem == "parceiro" ? Campos.IdDe(lista) : null, codigo = cod.Text.Trim(), tipo = pct ? "percentual" : "valor", valor = v, inicio = Fmt.Iso(ini.Value), fim = Fmt.Iso(fim.Value),
-                    produtoId = Campos.IdDe(prod) is long pid && pid > 0 ? pid : (long?)null, usoMaxCliente = (int)uso.Value, usoUnico = unico.Checked,
-                    pedidoMinimo = Fmt.Centavos(min.Text) is long mn && mn > 0 ? mn : (long?)null, descontoMaximo = Fmt.Centavos(max.Text) is long mx && mx > 0 ? mx : (long?)null,
-                });
-                Msg.Info(this, "Voucher criado com sucesso.");
-                Close();
-            }), true)
-        );
+/// <summary>Criar voucher por parceiro (VoucherParceiro.dc.html).</summary>
+public class FormVoucherParceiro : DialogoDesign
+{
+    public FormVoucherParceiro(JsonObject vinculo = null) : base("Criar voucher por parceiro", "O parceiro divulga o código e ganha comissão nas vendas",
+        "M3 8a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2v-2a2 2 0 0 0 0-4zM10 6v12", "linear-gradient(180deg, #8C89FF, #4B47D6)")
+    {
+        var lista = new ListaDesign();
+        var sel = AcaoCampo("Selecionar…"); sel.Click += (_, _) => { lista.Focus(); lista.DroppedDown = true; };
+        var cod = PecasDesign.Texto(VoucherRegras.NovoCodigo(), 30); cod.CharacterCasing = CharacterCasing.Upper;
+        var gerar = AcaoCampo("Gerar");
+        gerar.Click += (_, _) => cod.Text = (lista.SelectedItem is Campos.Item { Id: > 0 } it ? new string(it.Texto.ToUpperInvariant().Where(char.IsLetterOrDigit).Take(8).ToArray()) + Random.Shared.Next(10, 99) : VoucherRegras.NovoCodigo());
+        var g = Secao("Parceiro");
+        Campo(g, "Parceiro", lista, 4, sel);
+        Campo(g, "Código", cod, 2, gerar);
+
+        var tipo = new ListaDesign(); tipo.Items.AddRange(["Percentual", "Valor (R$)"]); tipo.SelectedIndex = 0;
+        var valor = PecasDesign.Texto("10 %", 12);
+        tipo.SelectedIndexChanged += (_, _) => valor.Text = tipo.SelectedIndex == 0 ? "10 %" : "20,00";
+        var prod = VoucherRegras.Produtos();
+        var ini = new DataDesign(DateTime.Today); var fim = new DataDesign(DateTime.Today.AddMonths(3));
+        var uso = PecasDesign.Numero(1, 4);
+        var unico = new CheckBox { Text = "Uso único", Checked = true };
+        var min = PecasDesign.Texto("0,00", 14); var max = PecasDesign.Texto("0,00", 14);
+        var d = Secao("Desconto");
+        Campo(d, "Tipo de desconto", tipo, 2); Campo(d, "Valor do desconto", valor, 2); Campo(d, "Produto", prod, 2);
+        Campo(d, "Data inicial", ini, 2); Campo(d, "Data final", fim, 2); Campo(d, "Uso máx/cliente", uso, 1); Marca(d, unico, 1);
+        Campo(d, "Pedido mínimo (R$)", min, 3); Campo(d, "Desconto máximo (R$)", max, 3);
+
+        BotaoRodape("Salvar e fechar", true, () => Seguro.Rodar(this, async () =>
+        {
+            if (await VoucherRegras.Salvar(this, "parceiro", Campos.IdDe(lista), null, cod.Text, tipo.SelectedIndex == 0, valor.Text,
+                ini.Value, fim.Value, Campos.IdDe(prod), uso.Text, unico.Checked, min.Text, max.Text)) { DialogResult = DialogResult.OK; Close(); }
+        }));
+        BotaoRodape("Cancelar", false, Close);
+        Load += (_, _) => Seguro.Rodar(this, () => VoucherRegras.CarregarVinculos(lista, "parceiro", vinculo));
     }
 }

@@ -207,7 +207,7 @@ const VENDA_SELECT = `SELECT TOP 5000 v.Id id, CONVERT(varchar(16), v.CriadoEm, 
 // ---------------------------------------------------------------- cadastros genericos
 
 type ColType = 'text' | 'int' | 'money' | 'bool' | 'date' | 'time';
-type CadDef = { table: string; cols: Record<string, [string, ColType, number?]>; order: string; required?: string[]; adminOnly?: boolean; filter?: string };
+type CadDef = { table: string; cols: Record<string, [string, ColType, number?]>; order: string; required?: string[]; adminOnly?: boolean; filter?: string; extra?: string };
 
 const CAD: Record<string, CadDef> = {
   produtos: {
@@ -227,7 +227,10 @@ const CAD: Record<string, CadDef> = {
   tracados: { table: 'Tracado', cols: { nome: ['Nome', 'text', 100], comprimento: ['Comprimento', 'int'], ativo: ['Ativo', 'bool'] }, order: 'Nome', required: ['nome'] },
   feriados: { table: 'Feriado', cols: { data: ['Data', 'date'], descricao: ['Descricao', 'text', 100], recorrente: ['Recorrente', 'bool'] }, order: 'Data', required: ['data', 'descricao'] },
   turnos: { table: 'Turno', cols: { descricao: ['Descricao', 'text', 60], inicio: ['Inicio', 'time'], fim: ['Fim', 'time'], ativo: ['Ativo', 'bool'] }, order: 'Descricao', required: ['descricao'] },
-  terminais: { table: 'Terminal', cols: { codigo: ['Codigo', 'text', 10], nome: ['Nome', 'text', 60], ativo: ['Ativo', 'bool'] }, order: 'Nome', required: ['nome'] },
+  terminais: {
+    table: 'Terminal', cols: { codigo: ['Codigo', 'text', 10], nome: ['Nome', 'text', 60], ativo: ['Ativo', 'bool'] }, order: 'Nome', required: ['nome'],
+    extra: `(SELECT TOP 1 'Aberto · ' + u.Nome FROM dbo.Movimento m JOIN dbo.Usuario u ON u.Id = m.UsuarioId WHERE m.TerminalId = dbo.Terminal.Id AND m.FechadoEm IS NULL ORDER BY m.Id DESC) situacao`,
+  },
   formas: { table: 'FormaPagamento', cols: { codigo: ['Codigo', 'text', 10], nome: ['Nome', 'text', 60], tipo: ['Tipo', 'text', 12], ativo: ['Ativo', 'bool'] }, order: 'Codigo', required: ['nome'] },
   padroes: {
     table: 'PadraoReserva',
@@ -242,12 +245,15 @@ const CAD: Record<string, CadDef> = {
     table: 'ItemManutencao', cols: { codigo: ['Codigo', 'text', 20], nome: ['Nome', 'text', 100], controlaPorTempo: ['ControlaPorTempo', 'bool'], tempoHoras: ['TempoHoras', 'int'], ativo: ['Ativo', 'bool'] },
     order: 'Nome', required: ['nome'],
   },
-  usuarios: { table: 'Usuario', cols: { login: ['Login', 'text', 40], nome: ['Nome', 'text', 100], admin: ['Admin', 'bool'], ativo: ['Ativo', 'bool'] }, order: 'Nome', required: ['login', 'nome'], adminOnly: true },
+  usuarios: {
+    table: 'Usuario', cols: { login: ['Login', 'text', 40], nome: ['Nome', 'text', 100], admin: ['Admin', 'bool'], ativo: ['Ativo', 'bool'] }, order: 'Nome', required: ['login', 'nome'], adminOnly: true,
+    extra: `CONVERT(varchar(16), UltimoAcesso, 126) ultimoAcesso`,
+  },
 };
 
 function cadSelect(def: CadDef) {
   const cols = Object.entries(def.cols).map(([k, [c, t]]) => (t === 'date' ? `CONVERT(varchar(10), ${c}, 126) ${k}` : `${c} ${k}`));
-  return `SELECT Id id, ${cols.join(', ')} FROM dbo.${def.table}`;
+  return `SELECT Id id, ${cols.join(', ')}${def.extra ? ', ' + def.extra : ''} FROM dbo.${def.table}`;
 }
 
 function cadValues(def: CadDef, body: Record<string, unknown>, partial: boolean) {
@@ -1151,23 +1157,26 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     if (!dias.length) throw new HttpError(400, 'Selecione pelo menos um dia da semana antes de criar as reservas.');
     const feriados = new Set((await query<{ d: string; r: boolean }>(`SELECT CONVERT(varchar(10), Data, 126) d, Recorrente r FROM dbo.Feriado`)).flatMap((f) => [f.d, f.r ? f.d.slice(5) : '']));
     const [h0, m0] = String(padrao.PrimeiraHora).split(':').map(Number);
+    const pularFeriados = b.pularFeriados !== false;
+    const pularExistentes = b.pularExistentes !== false;
+    const fechada = b.ativo === false ? 1 : 0;
     let criadas = 0;
     for (let d = new Date(de); d <= ate; d.setDate(d.getDate() + 1)) {
       if (!dias.includes(d.getDay())) continue;
       const data = d.toISOString().slice(0, 10);
-      if (feriados.has(data) || feriados.has(data.slice(5))) continue;
+      if (pularFeriados && (feriados.has(data) || feriados.has(data.slice(5)))) continue;
       for (let k = 0; k < (padrao.Quantidade as number); k++) {
         const t = h0 * 60 + m0 + k * (padrao.IntervaloMin as number);
         if (t >= 24 * 60) break;
         const hhmm = `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
         const inicio = `${data}T${hhmm}:00`;
         const exists = await one(`SELECT 1 x FROM dbo.Bateria WHERE Inicio = @inicio AND ProdutoId = @p AND Status <> 'cancelada'`, { inicio, p: padrao.ProdutoId });
-        if (exists) continue;
+        if (exists && pularExistentes) continue;
         await query(
-          `INSERT INTO dbo.Bateria (Inicio, Nome, TipoKart, Vagas, ProdutoId, TracadoId, VoltaMinimaSeg, AutoAtendimento) VALUES (@inicio, @nome, @tipo, @vagas, @p, @t, @volta, @aa)`,
+          `INSERT INTO dbo.Bateria (Inicio, Nome, TipoKart, Vagas, ProdutoId, TracadoId, VoltaMinimaSeg, AutoAtendimento, ReservaFechada) VALUES (@inicio, @nome, @tipo, @vagas, @p, @t, @volta, @aa, @fechada)`,
           {
             inicio, nome: padrao.NumerarNome ? `${padrao.Nome} ${k + 1}` : `BATERIA ${hhmm}`, tipo: padrao.cat === 'Super Kart' ? 'super' : 'light', vagas: padrao.Vagas,
-            p: padrao.ProdutoId, t: padrao.TracadoId, volta: padrao.VoltaMinimaSeg, aa: padrao.Online ? 1 : 0,
+            p: padrao.ProdutoId, t: padrao.TracadoId, volta: padrao.VoltaMinimaSeg, aa: padrao.Online ? 1 : 0, fechada,
           },
         );
         criadas++;
@@ -1564,7 +1573,8 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   }
   if (path === '/empresa' && method === 'GET') {
     send(200, await one(`SELECT Nome nome, RazaoSocial razaoSocial, Cnpj cnpj, Cep cep, Endereco endereco, Numero numero, Complemento complemento, Bairro bairro,
-      Cidade cidade, Estado estado, Telefone telefone, Email email, PoliticaReembolso politicaReembolso FROM dbo.Empresa WHERE Id = 1`));
+      Cidade cidade, Estado estado, Telefone telefone, Email email, PoliticaReembolso politicaReembolso,
+      Ibge ibge, Pais pais, Site site, Horarios horarios, LogoNome logoNome FROM dbo.Empresa WHERE Id = 1`));
     return true;
   }
   if (path === '/empresa' && method === 'PUT') {
@@ -1573,11 +1583,21 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const campos: Record<string, [string, number]> = {
       nome: ['Nome', 200], razaoSocial: ['RazaoSocial', 200], cnpj: ['Cnpj', 20], cep: ['Cep', 12], endereco: ['Endereco', 200], numero: ['Numero', 20],
       complemento: ['Complemento', 100], bairro: ['Bairro', 100], cidade: ['Cidade', 100], estado: ['Estado', 4], telefone: ['Telefone', 40], email: ['Email', 200], politicaReembolso: ['PoliticaReembolso', 8000],
+      ibge: ['Ibge', 10], pais: ['Pais', 60], site: ['Site', 200], horarios: ['Horarios', 400],
     };
     const vals: Record<string, unknown> = {};
     for (const [k, [c, max]] of Object.entries(campos)) if (k in b) vals[c] = str(b[k], max);
     if (!vals.Nome && 'nome' in b) throw new HttpError(400, 'Informe o nome.');
     await query(`UPDATE dbo.Empresa SET ${Object.keys(vals).map((c) => `${c} = @${c}`).join(', ')} WHERE Id = 1`, vals);
+    send(200, { ok: true });
+    return true;
+  }
+  if (path === '/empresa/logo' && method === 'POST') {
+    if (!sessao.admin) throw new HttpError(403, 'Disponível apenas para administradores.');
+    const b = await req.body();
+    const bytes = Buffer.from(String(b.base64 ?? ''), 'base64');
+    if (!bytes.length || bytes.length > 1_500_000) throw new HttpError(400, 'Envie uma imagem de até 1,5 MB.');
+    await query(`UPDATE dbo.Empresa SET Logo = @logo, LogoNome = @nome WHERE Id = 1`, { logo: bytes, nome: str(b.nome, 200) });
     send(200, { ok: true });
     return true;
   }

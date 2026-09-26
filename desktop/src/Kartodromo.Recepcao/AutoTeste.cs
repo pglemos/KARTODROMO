@@ -114,7 +114,7 @@ public static class AutoTeste
         if (vendaIdTeste > 0) vendas = vendas.Where(r => r.L("id") == vendaIdTeste).ToList();
         if (ForaDaTela && vendas.Count == 0) vendas = vendasApi.Where(v => !v.B("cancelada")).Take(1).ToList(); // só abre para ver, nada é gravado
         var bateriaId = reservas.FirstOrDefault()?.L("bateriaId");
-        var bateria = baterias.FirstOrDefault(b => b.L("id") == bateriaId) ?? baterias.FirstOrDefault();
+        var bateria = baterias.FirstOrDefault(b => b.L("id") == bateriaId) ?? baterias.OrderByDescending(b => b.I("inscritos")).FirstOrDefault();
 
         await Janela(new FormCliente(null), principal, pasta, "24-cliente");
         await Janela(new FormCadastro("produtos", Cadastros.Defs["produtos"]), principal, pasta, "25-produto");
@@ -135,9 +135,9 @@ public static class AutoTeste
         }
         else Log.Add("pendente: telas Editar Bateria e Incluir Cliente requerem bateria cadastrada na data.");
         await Janela(new FormAgenda(), principal, pasta, "37-agenda");
-        await Janela(new FormVoucher("fidelidade"), principal, pasta, "38-voucher-fidelidade");
-        await Janela(new FormVoucher("parceiro"), principal, pasta, "39-voucher-parceiro");
-        await Janela(new FormVoucher("manual"), principal, pasta, "40-voucher-manual");
+        await Janela(FormVoucher.Criar("fidelidade"), principal, pasta, "38-voucher-fidelidade");
+        await Janela(FormVoucher.Criar("parceiro"), principal, pasta, "39-voucher-parceiro");
+        await Janela(FormVoucher.Criar("manual"), principal, pasta, "40-voucher-manual");
         var caixaTeste = caixa.DeepClone().AsObject();
         if (aberto != null && sumario != null)
         {
@@ -166,7 +166,7 @@ public static class AutoTeste
         await CapturarModal(principal, pasta, "51-office-parametros", () => Cadastros.Parametros(principal));
         await CapturarModal(principal, pasta, "52-pesquisar-cliente", () => FormPesquisarCliente.Escolher(principal, "Pesquisar cliente"));
         await CapturarModal(principal, pasta, "53-lista-participantes", () => Relatorios.Participantes(principal, null, DateTime.Today));
-        await CapturarModal(principal, pasta, "54-relatorios-office", () => Relatorios.Periodo(principal, "receitas", "forma"));
+        await CapturarModal(principal, pasta, "54-relatorios-office", () => Relatorios.Abrir(principal));
         await CapturarModal(principal, pasta, "55-relatorio-fechamento-lista", () => Relatorios.Fechamento(principal));
         await CapturarModal(principal, pasta, "56-agenda-mensal", () => Relatorios.AgendaMensal(principal));
         if (reservas.Count > 0)

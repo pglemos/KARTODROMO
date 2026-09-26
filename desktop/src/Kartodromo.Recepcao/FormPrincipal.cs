@@ -407,9 +407,9 @@ public class FormPrincipal : Form
             case "reservas": case "baterias": using (var f = new FormCriarReservas()) f.ShowDialog(this); Recarregar(); break;
             case "vendas": Caixa.Checkout(this, null, null, null); break;
             case "oficina": Cadastros.Abrir(this, "itensManutencao"); break;
-            case "vouchers": new FormVoucher("manual").ShowDialog(this); Recarregar(); break;
+            case "vouchers": FormVoucher.Criar("manual").ShowDialog(this); Recarregar(); break;
             case "parceiros": Cadastros.Abrir(this, "parceiros"); break;
-            case "fidelidade": if (_status == "contas") AbrirContaFidelidade(); else { new FormVoucher("fidelidade").ShowDialog(this); Recarregar(); } break;
+            case "fidelidade": if (_status == "contas") AbrirContaFidelidade(); else { FormVoucher.Criar("fidelidade").ShowDialog(this); Recarregar(); } break;
         }
     }
 
@@ -551,7 +551,7 @@ public class FormPrincipal : Form
             I("Métodos de pagamento", () => Cadastros.Abrir(this, "formas")), I("Terminal (abrir / fechar caixa)", () => Caixa.Terminal(this)),
             I("Suprimento", () => Caixa.Transacao(this, "suprimento")), I("Sangria", () => Caixa.Transacao(this, "sangria")), new ToolStripSeparator(),
             S("Programa de fidelidade", I("Contas", () => Selecionar("fidelidade:contas")), I("Transações", () => Selecionar("fidelidade:transacoes"))),
-            S("Vouchers", I("Cadastro de vouchers", () => Selecionar("vouchers:lista")), I("Histórico de consumo", () => Selecionar("vouchers:uso")), I("Criar voucher", () => new FormVoucher("manual").ShowDialog(this))),
+            S("Vouchers", I("Cadastro de vouchers", () => Selecionar("vouchers:lista")), I("Histórico de consumo", () => Selecionar("vouchers:uso")), I("Criar voucher", () => FormVoucher.Criar("manual").ShowDialog(this))),
             S("Parceiros", I("Cadastro de parceiros", () => Cadastros.Abrir(this, "parceiros")), I("Comissões", () => Selecionar("parceiros:comissoes")))));
         m.Items.Add(S("F&erramentas", I("Parâmetros do sistema", () => Cadastros.Parametros(this), adm), I("Padrões de reservas", () => Cadastros.Abrir(this, "padroes")),
             I("Criar reservas do mês", () => { new FormCriarReservas().ShowDialog(this); Recarregar(); }), new ToolStripSeparator(), I("Serviços online", () => new FormServicosOnline().ShowDialog(this))));
@@ -589,8 +589,8 @@ public class FormPrincipal : Form
             B("suprimento", "Suprimento", "Colocar dinheiro no caixa", () => Caixa.Transacao(this, "suprimento")),
             B("sangria", "Sangria", "Retirar dinheiro do caixa", () => Caixa.Transacao(this, "sangria")),
             VisualPrincipal.Separador(),
-            B("vfidelidade", "Voucher (Fidelidade)", "Criar voucher para conta fidelidade", () => new FormVoucher("fidelidade").ShowDialog(this)),
-            B("vparceiro", "Voucher (Parceiro)", "Criar voucher para parceiro", () => new FormVoucher("parceiro").ShowDialog(this)),
+            B("vfidelidade", "Voucher (Fidelidade)", "Criar voucher para conta fidelidade", () => FormVoucher.Criar("fidelidade").ShowDialog(this)),
+            B("vparceiro", "Voucher (Parceiro)", "Criar voucher para parceiro", () => FormVoucher.Criar("parceiro").ShowDialog(this)),
             VisualPrincipal.Separador(),
             B("online", "Serviços Online", "Site, WhatsApp e reservas online", () => new FormServicosOnline().ShowDialog(this)),
         ]);
@@ -834,7 +834,7 @@ public class FormPrincipal : Form
                         new("valor", "Valor", Largura: 90, Valor: r => r.S("tipo") == "percentual" ? r.S("valor") + "%" : Fmt.Brl(r.L("valor"))), new("inicio", "Data inicial", TipoCol.Data), new("fim", "Data final", TipoCol.Data),
                         new("produto", "Produto"), new("usoMaxCliente", "Uso máx/cliente", TipoCol.Inteiro, 100), new("usoUnico", "Uso único", TipoCol.Bool), new("usos", "Usos", TipoCol.Inteiro, 60)]);
                 _menuAtual = sel => [
-                    Item("Criar voucher", () => { new FormVoucher("manual").ShowDialog(this); Recarregar(); }),
+                    Item("Criar voucher", () => { FormVoucher.Criar("manual").ShowDialog(this); Recarregar(); }),
                     Item("Editar voucher", () => Msg.Aviso(this, "A API do servidor ainda não permite editar vouchers."), false, "Enter"),
                     Item("Desativar voucher", () => Msg.Aviso(this, "A API do servidor ainda não permite desativar vouchers."), false),
                     new ToolStripSeparator(), Exportar("vouchers")];
@@ -859,7 +859,7 @@ public class FormPrincipal : Form
                 }
                 _menuAtual = sel => _status == "contas" ? [
                     Item("+ Abrir conta para um cliente", AbrirContaFidelidade),
-                    Item("Criar voucher para a conta", () => { new FormVoucher("fidelidade", sel[0]).ShowDialog(this); Recarregar(); }, sel.Count == 1 && sel[0].B("ativo")),
+                    Item("Criar voucher para a conta", () => { FormVoucher.Criar("fidelidade", sel[0]).ShowDialog(this); Recarregar(); }, sel.Count == 1 && sel[0].B("ativo")),
                     Item("Ver transações da conta", () => Selecionar("fidelidade:transacoes", contaFidelidade: sel[0]), sel.Count == 1, "Enter"),
                     Item("Ajustar pontos manualmente", () => AjustarPontos(sel[0]), sel.Count == 1 && Sessao.Admin),
                     Item(sel.Count == 1 && !sel[0].B("ativo") ? "Reativar conta" : "Desativar conta", () => AtivarConta(sel[0]), sel.Count == 1 && Sessao.Admin),
@@ -888,7 +888,7 @@ public class FormPrincipal : Form
                 _menuAtual = _status == "lista" ? sel => [
                     Item("+ Novo parceiro", () => Cadastros.Abrir(this, "parceiros")),
                     Item("Editar parceiro", () => Cadastros.Abrir(this, "parceiros"), sel.Count == 1, "Enter"),
-                    Item("Criar voucher do parceiro", () => { new FormVoucher("parceiro", sel[0]).ShowDialog(this); Recarregar(); }, sel.Count == 1 && sel[0].B("ativo")),
+                    Item("Criar voucher do parceiro", () => { FormVoucher.Criar("parceiro", sel[0]).ShowDialog(this); Recarregar(); }, sel.Count == 1 && sel[0].B("ativo")),
                     Item("Ver comissões", () => Selecionar("parceiros:comissoes"), sel.Count == 1),
                     new ToolStripSeparator(), Exportar("parceiros")]
                     : sel => [

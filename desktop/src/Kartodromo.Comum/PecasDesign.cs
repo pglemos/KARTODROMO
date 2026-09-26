@@ -136,7 +136,10 @@ public class DataDesign : Panel
 /// <summary>Tabela simples do design: cabeçalho cinza claro, linhas de 32 px com separador fino, sem grade do Windows.</summary>
 public class TabelaDesign : Control
 {
-    public record Coluna(string Titulo, float Peso, bool Direita = false, bool Marca = false, bool Centro = false);
+    public record Coluna(string Titulo, float Peso, bool Direita = false, bool Marca = false, bool Centro = false, bool Editavel = false);
+    /// <summary>Coluna Editavel: "Sim"/"Não" alterna no clique; outro valor abre a caixa de edição na célula (Enter grava, Esc desiste).</summary>
+    public event Action<int, int, string> CelulaMudou;
+    TextBox _editor;
     /// <summary>Colunas de marca (Marca = true) podem ser clicadas: a célula alterna entre "1" e "0".</summary>
     public bool MarcasEditaveis { get; set; }
     public event Action<int, int> MarcaMudou;
@@ -157,7 +160,7 @@ public class TabelaDesign : Control
         _topo = Math.Clamp(_topo - Math.Sign(e.Delta) * 2, 0, max);
         Invalidate();
     }
-    protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); Focus(); }
+    protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); if (_editor == null && MaxLinhas > 0) Focus(); }
     public int Selecionada { get; private set; } = -1;
     public event Action SelecaoMudou;
     public void Selecionar(int i) { Selecionada = i; Invalidate(); SelecaoMudou?.Invoke(); }
@@ -167,6 +170,16 @@ public class TabelaDesign : Control
         base.OnMouseClick(e);
         if (e.Y < 32) return;
         var i = (e.Y - 32) / 33 + _topo;
+        if (i >= 0 && i < _linhas.Count && _cols.Any(c => c.Editavel))
+        {
+            var soma0 = _cols.Sum(c => c.Peso); var x0 = 12f; var util0 = Width - 24f;
+            for (var c = 0; c < _cols.Length; c++)
+            {
+                var larg = util0 * _cols[c].Peso / soma0;
+                if (_cols[c].Editavel && e.X >= x0 - 6 && e.X < x0 + larg && c < _linhas[i].Length) { Editar(i, c, new Rectangle((int)x0, 32 + (i - _topo) * 33 + 4, (int)larg - 8, 25)); return; }
+                x0 += larg;
+            }
+        }
         if (MarcasEditaveis && i >= 0 && i < _linhas.Count)
         {
             var soma = _cols.Sum(c => c.Peso); var x = 12f; var util = Width - 24f;
@@ -185,6 +198,24 @@ public class TabelaDesign : Control
     {
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
         BackColor = Color.White; Font = new Font("Segoe UI", 10F); Cursor = Cursors.Default;
+    }
+
+    void Editar(int linha, int col, Rectangle area)
+    {
+        var atual = _linhas[linha][col];
+        if (atual is "Sim" or "Não") { _linhas[linha][col] = atual == "Sim" ? "Não" : "Sim"; Invalidate(); CelulaMudou?.Invoke(linha, col, _linhas[linha][col]); return; }
+        _editor?.Dispose();
+        var t = _editor = new TextBox { Text = atual, Font = Font, BorderStyle = BorderStyle.FixedSingle, TextAlign = _cols[col].Direita ? HorizontalAlignment.Right : HorizontalAlignment.Left, Bounds = area };
+        var feito = false;
+        void Fim(bool gravar)
+        {
+            if (feito) return; feito = true;
+            if (gravar && t.Text != atual) { _linhas[linha][col] = t.Text; CelulaMudou?.Invoke(linha, col, t.Text); }
+            BeginInvoke(() => { t.Dispose(); if (_editor == t) _editor = null; Invalidate(); });
+        }
+        t.KeyDown += (_, k) => { if (k.KeyCode == Keys.Enter) { k.SuppressKeyPress = true; Fim(true); } else if (k.KeyCode == Keys.Escape) { k.SuppressKeyPress = true; Fim(false); } };
+        t.Leave += (_, _) => Fim(true);
+        Controls.Add(t); t.Focus(); t.SelectAll();
     }
 
     /// <summary>Marca do design: 18 px, raio 5, verde com ✓ quando marcada; branca com borda #C7C7CC quando não.</summary>

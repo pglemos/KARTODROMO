@@ -75,98 +75,135 @@ public class CamposBateria : Panel
 }
 
 /// <summary>Toolbar "Reservas": gerar pela configuracao padrao ou reserva avulsa (CriarReservas.dc.html).</summary>
-public class FormCriarReservas : Janela
+/// <summary>Criar reservas (CriarReservas.dc.html): pelo padrão (mês inteiro) com prévia, ou uma reserva avulsa.</summary>
+public class FormCriarReservas : DialogoDesign
 {
-    public FormCriarReservas() : base("Criar Reservas", 960, 680)
+    public FormCriarReservas() : base("Criar reservas", "Gere as baterias do mês pelo padrão, ou uma reserva avulsa", "M5 21V4M5 4h12l-2 4 2 4H5", "linear-gradient(180deg, #FF7A6B, #E0342A)")
     {
-        Tag = "Gere as baterias do mês pelo padrão, ou uma reserva avulsa";
-
-        var painelPadrao = new Panel { Dock = DockStyle.Fill, AutoSize = false, BackColor = Color.Transparent };
-        var painelAvulsa = new Panel { Dock = DockStyle.Fill, AutoSize = false, BackColor = Color.Transparent, Visible = false };
-
-        // --- Aba 1: Pelo padrão ---
-        var pad = Campos.Combo(); pad.Items.AddRange(Sessao.Padroes()); if (pad.Items.Count > 0) pad.SelectedIndex = 0;
-        var de = Campos.Data();
-        var ate = Campos.Data(new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(1).AddDays(-1));
-        var ckAtivo = Campos.Check("Ativo", true);
-
-        var gConfig = Campos.Grade(6);
-        Campos.Add(gConfig, "Configuração padrão", pad, 3);
-        Campos.Add(gConfig, "De", de, 1);
-        Campos.Add(gConfig, "Até", ate, 1);
-        Campos.Add(gConfig, " ", ckAtivo, 1);
-
-        var cartaoConfig = KitVisual.CartaoSecao("Usar configuração do sistema");
-        cartaoConfig.Controls.Add(gConfig);
-
-        string[] nomes = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
-        var cks = nomes.Select((n, i) => new CheckBox { Text = n, Tag = i, AutoSize = true, Checked = i is >= 2 and <= 6 }).ToArray();
-        var gDias = Campos.Grade(7);
-        for (var i = 0; i < 7; i++) Campos.Add(gDias, null, cks[i]);
-
-        var gFlags = Campos.Grade(6);
-        var ckFeriados = Campos.Check("Pular feriados cadastrados", true);
-        var ckExistentes = Campos.Check("Pular horários que já existem", true);
-        Campos.Add(gFlags, null, ckFeriados, 3);
-        Campos.Add(gFlags, null, ckExistentes, 3);
-
-        var cartaoDias = KitVisual.CartaoSecao("Dias da semana");
-        cartaoDias.Controls.Add(gFlags);
-        cartaoDias.Controls.Add(gDias);
-
-        var cartaoPrevia = KitVisual.CartaoSecao("Prévia");
-        cartaoPrevia.BackColor = Color.FromArgb(245, 245, 247);
-        var lPrevia = new Label { Text = "Baterias geradas conforme a configuração selecionada. Feriados cadastrados e horários já existentes são pulados automaticamente.", Dock = DockStyle.Fill, ForeColor = Color.FromArgb(58, 58, 60), Font = new Font("Segoe UI", 9.2F), Padding = new Padding(4) };
-        cartaoPrevia.Controls.Add(lPrevia);
-
-        painelPadrao.Controls.Add(cartaoPrevia);
-        painelPadrao.Controls.Add(cartaoDias);
-        painelPadrao.Controls.Add(cartaoConfig);
-
-        // --- Aba 2: Reserva avulsa ---
-        var campos = new CamposBateria();
-        var cartaoAvulsa = KitVisual.CartaoSecao("Reserva avulsa");
-        cartaoAvulsa.Controls.Add(campos);
-        painelAvulsa.Controls.Add(cartaoAvulsa);
-
-        Button btnAcao = null;
-        var botoesRodape = Rodape(
-            ("Cancelar", (_, _) => Close(), false),
-            ("Gerar Reservas do Mês", (_, _) => Seguro.Rodar(this, async () =>
-            {
-                if (painelAvulsa.Visible)
-                {
-                    if (string.IsNullOrWhiteSpace(campos.Nome.Text)) { Msg.Aviso(this, "Insira um nome para a reserva."); return; }
-                    await Sessao.Api.Post("/api/office/baterias", campos.Corpo());
-                    Msg.Info(this, "Reserva gerada com sucesso.");
-                    DialogResult = DialogResult.OK; Close();
-                    return;
-                }
-                var sel = cks.Where(c => c.Checked).Select(c => (int)c.Tag).ToArray();
-                if (sel.Length == 0) { Msg.Aviso(this, "Selecione pelo menos um dia da semana antes de criar as reservas."); return; }
-                if (Campos.IdDe(pad) is not long pid) { Msg.Aviso(this, "Selecione uma configuração padrão antes de criar as reservas."); return; }
-                var r = await Sessao.Api.Post("/api/office/baterias/gerar", new { padraoId = pid, de = Fmt.Iso(de.Value), ate = Fmt.Iso(ate.Value), diasSemana = sel });
-                Msg.Info(this, r.I("criadas") > 0 ? $"{r.I("criadas")} reservas geradas com sucesso." : "Nenhuma reserva gerada.");
-                DialogResult = DialogResult.OK; Close();
-            }), true)
-        );
-
-        if (botoesRodape is Panel pnl)
+        var br = Fmt.Br.TextInfo;
+        // ---------- aba 1: pelo padrão
+        var pad = new ListaDesign(); pad.Items.AddRange(Sessao.Padroes().Where(p => p.Dados?["ativo"] is null || p.Dados.B("ativo")).ToArray()); if (pad.Items.Count > 0) pad.SelectedIndex = 0;
+        var mes = new ListaDesign();
+        var hoje = DateTime.Today;
+        for (var i = 0; i < 13; i++)
         {
-            var flw = pnl.Controls.OfType<FlowLayoutPanel>().FirstOrDefault();
-            btnAcao = flw?.Controls.OfType<Button>().FirstOrDefault(b => b.Text.StartsWith("Gerar"));
+            var m = new DateTime(hoje.Year, hoje.Month, 1).AddMonths(i);
+            mes.Items.Add(new Campos.Item(m.Year * 100 + m.Month, br.ToTitleCase(m.ToString("MMMM yyyy", Fmt.Br))));
         }
+        mes.SelectedIndex = hoje.Day > 20 ? 1 : 0;
+        var ativo = new CheckBox { Text = "Ativo", Checked = true };
+        var g1 = Secao("Usar configuração do sistema");
+        Campo(g1, "Configuração padrão", pad, 3);
+        Campo(g1, "Mês", mes, 2);
+        Marca(g1, ativo, 1);
+        string[] nomes = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+        var dias = nomes.Select((n, i) => new CheckBox { Text = n, Checked = i is >= 2 and <= 6 }).ToArray();
+        var g2 = Secao("Dias da semana");
+        foreach (var d in dias) Marca(g2, d, 1, false);
+        var feriadosCk = new CheckBox { Text = "Pular feriados cadastrados", Checked = true };
+        var existentesCk = new CheckBox { Text = "Pular horários que já existem", Checked = true };
+        Marca(g2, feriadosCk, 3, false); Marca(g2, existentesCk, 3, false);
+        var g3 = Secao("Prévia");
+        var sec3 = (TableLayoutPanel)g3.Parent; sec3.BackColor = Fundo; g3.BackColor = Fundo; foreach (Control c in sec3.Controls) c.BackColor = Fundo;
+        var previa = new Label { AutoSize = true, MaximumSize = new Size(880, 0), Font = new Font("Segoe UI", 9.6F), ForeColor = Color.FromArgb(58, 58, 60), BackColor = Fundo, Margin = new Padding(0, 0, 0, 4) };
+        g3.Controls.Add(previa); g3.SetColumnSpan(previa, 6);
+        Control[] abaPadrao = [g1.Parent, g2.Parent, sec3];
 
-        var abas = KitVisual.AbaSegmentada(["Pelo padrão (mês inteiro)", "Reserva avulsa"], 0, idx =>
+        // ---------- aba 2: reserva avulsa
+        var nome = PecasDesign.Texto("", 100);
+        var data = new DataDesign(hoje); var hora = PecasDesign.Hora(hoje.AddHours(17));
+        var vagas = PecasDesign.Numero(12, 3); var volta = PecasDesign.Numero(40, 3);
+        var produto = new ListaDesign(); produto.Items.AddRange(Sessao.Lista("produtos").Where(p => p.B("ativo")).Select(p => (object)new Campos.Item(p.L("id") ?? 0, p.S("nome"), p)).ToArray()); if (produto.Items.Count > 0) produto.SelectedIndex = 0;
+        var tracado = new ListaDesign(); tracado.Items.AddRange(Sessao.Tracados()); if (tracado.Items.Count > 0) tracado.SelectedIndex = 0;
+        var categoria = FormCaixaTransacao.Leitura("");
+        void Cat() => categoria.Text = (produto.SelectedItem as Campos.Item)?.Dados?.S("categoria") ?? "";
+        produto.SelectedIndexChanged += (_, _) => Cat(); Cat();
+        long? respId = null;
+        var resp = FormCaixaTransacao.Leitura(""); resp.Cursor = Cursors.Hand;
+        var pesq = AcaoCampo("Pesquisar");
+        void Responsavel() { var c = FormPesquisarCliente.Escolher(this, "Responsável pela reserva"); if (c != null) { respId = c.L("id"); resp.Text = c.S("nome"); } }
+        pesq.Click += (_, _) => Responsavel(); resp.Click += (_, _) => Responsavel();
+        var aberta = new CheckBox { Text = "Aberta para reservas", Checked = true };
+        var totem = new CheckBox { Text = "Aparece no totem", Checked = true };
+        var obs = PecasDesign.Texto("", 400);
+        var a1 = Secao("Reserva avulsa");
+        Campo(a1, "Nome", nome, 2); Campo(a1, "Data", data, 1); Campo(a1, "Hora", hora, 1); Campo(a1, "Vagas (máx)", vagas, 1); Campo(a1, "Volta mínima (s)", volta, 1);
+        Campo(a1, "Produto", produto, 3); Campo(a1, "Traçado", tracado, 2); Campo(a1, "Categoria", categoria, 1);
+        Campo(a1, "Responsável", resp, 2, pesq); Marca(a1, aberta, 2); Marca(a1, totem, 2);
+        Campo(a1, "Observações", obs, 6);
+        Control[] abaAvulsa = [a1.Parent];
+        foreach (var c in abaAvulsa) c.Visible = false;
+
+        List<JsonObject> feriados = [];
+        (DateTime de, DateTime ate) Periodo()
         {
-            painelPadrao.Visible = idx == 0;
-            painelAvulsa.Visible = idx == 1;
-            if (btnAcao != null) btnAcao.Text = idx == 0 ? "Gerar Reservas do Mês" : "Gerar Reserva";
-        });
+            var id = (int)(Campos.IdDe(mes) ?? hoje.Year * 100 + hoje.Month);
+            var ini = new DateTime(id / 100, id % 100, 1);
+            var fim = ini.AddMonths(1).AddDays(-1);
+            return (ini < hoje ? hoje : ini, fim);
+        }
+        void Previa()
+        {
+            if ((pad.SelectedItem as Campos.Item)?.Dados is not JsonObject p) { previa.Text = "Cadastre um padrão em Ferramentas › Padrões de reservas."; return; }
+            var (de, ate) = Periodo();
+            var sel = dias.Select((d, i) => (d, i)).Where(x => x.d.Checked).Select(x => x.i).ToHashSet();
+            var pulados = new List<DateTime>(); var nDias = 0;
+            for (var d = de; d <= ate; d = d.AddDays(1))
+            {
+                if (!sel.Contains((int)d.DayOfWeek)) continue;
+                var feriado = feriados.Any(f => f.D("data") is DateTime fd && (fd.Date == d || f.B("recorrente") && fd.Month == d.Month && fd.Day == d.Day));
+                if (feriado && feriadosCk.Checked) { pulados.Add(d); continue; }
+                nDias++;
+            }
+            var q = Math.Max(1, p.I("quantidade"));
+            TimeSpan.TryParse(p.S("primeiraHora"), out var h0);
+            var ult = h0 + TimeSpan.FromMinutes((q - 1) * p.I("intervaloMin"));
+            var nomeMes = de.ToString("MMMM", Fmt.Br);
+            var txt = $"{q} {(q == 1 ? "bateria" : "baterias")} por dia · {h0:hh\\:mm}{(q > 1 ? $" às {ult:hh\\:mm}" : "")} · {p.I("vagas")} vagas cada · {nDias} dias em {nomeMes} → {q * nDias} baterias.";
+            if (pulados.Count > 0) txt += $" {(pulados.Count == 1 ? "Feriado de" : "Feriados de")} {string.Join(", ", pulados.Select(x => x.ToString("dd/MM")))} {(pulados.Count == 1 ? "será pulado" : "serão pulados")}.";
+            if (existentesCk.Checked) txt += " Horários que já existem não são duplicados.";
+            previa.Text = txt;
+        }
+        pad.SelectedIndexChanged += (_, _) => Previa(); mes.SelectedIndexChanged += (_, _) => Previa();
+        foreach (var d in dias) d.CheckedChanged += (_, _) => Previa();
+        feriadosCk.CheckedChanged += (_, _) => Previa(); existentesCk.CheckedChanged += (_, _) => Previa();
 
-        Controls.Add(painelAvulsa);
-        Controls.Add(painelPadrao);
-        Controls.Add(abas);
+        var aba = 0;
+        Button acao = null;
+        acao = BotaoRodape("Gerar reservas do mês", true, () => Seguro.Rodar(this, async () =>
+        {
+            if (aba == 1)
+            {
+                if (string.IsNullOrWhiteSpace(nome.Text)) { Msg.Aviso(this, "Informe o nome da reserva."); nome.Focus(); return; }
+                if (!data.Valida) { Msg.Aviso(this, "Data inválida."); return; }
+                if (!PecasDesign.LerHora(hora, out var hh)) { Msg.Aviso(this, "Hora inválida (use hh:mm)."); hora.Focus(); return; }
+                await Sessao.Api.Post("/api/office/baterias", new
+                {
+                    nome = nome.Text.Trim(), inicio = $"{Fmt.Iso(data.Value)}T{hh:hh\\:mm}", vagas = int.TryParse(vagas.Text, out var v) ? v : 12, produtoId = Campos.IdDe(produto), tracadoId = Campos.IdDe(tracado),
+                    voltaMinimaSeg = int.TryParse(volta.Text, out var vm) ? vm : 0, responsavelId = respId, reservaFechada = !aberta.Checked, autoAtendimento = totem.Checked, observacao = obs.Text.Trim(), categoria = categoria.Text,
+                });
+                Msg.Info(this, "Reserva criada com sucesso.");
+                DialogResult = DialogResult.OK; Close();
+                return;
+            }
+            var sel = dias.Select((d, i) => (d, i)).Where(x => x.d.Checked).Select(x => x.i).ToArray();
+            if (sel.Length == 0) { Msg.Aviso(this, "Marque pelo menos um dia da semana."); return; }
+            if (Campos.IdDe(pad) is not long pid) { Msg.Aviso(this, "Escolha a configuração padrão."); return; }
+            var (de, ate) = Periodo();
+            var r = await Sessao.Api.Post("/api/office/baterias/gerar", new { padraoId = pid, de = Fmt.Iso(de), ate = Fmt.Iso(ate), diasSemana = sel, pularFeriados = feriadosCk.Checked, pularExistentes = existentesCk.Checked, ativo = ativo.Checked });
+            Msg.Info(this, r.I("criadas") > 0 ? $"{r.I("criadas")} baterias criadas." : "Nenhuma bateria nova: os horários já existem ou os dias foram pulados.");
+            DialogResult = DialogResult.OK; Close();
+        }));
+        BotaoRodape("Cancelar", false, Close);
+        Abas(["Pelo padrão (mês inteiro)", "Reserva avulsa"], i =>
+        {
+            aba = i;
+            foreach (var c in abaPadrao) c.Visible = i == 0;
+            foreach (var c in abaAvulsa) c.Visible = i == 1;
+            acao.Text = i == 0 ? "Gerar reservas do mês" : "Criar reserva";
+        });
+        Load += (_, _) => Seguro.Rodar(this, async () => { feriados = await Sessao.Api.Lista("/api/office/cad/feriados"); Previa(); });
+        Previa();
     }
 }
 

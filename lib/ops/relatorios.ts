@@ -156,7 +156,9 @@ export async function relatorio(tipo: string, url: URL): Promise<string> {
       const de = p.get('de');
       const ate = p.get('ate');
       const agrupar = p.get('agrupar') || 'forma';
-      const base = `FROM dbo.Venda v WHERE v.Cancelada = 0 AND v.CriadoEm >= @de AND v.CriadoEm < DATEADD(day, 1, @ate)`;
+      const term = Number(p.get('terminal')) > 0 ? Number(p.get('terminal')) : null;
+      const fTerm = term ? ' AND v.TerminalId = @term' : '';
+      const base = `FROM dbo.Venda v WHERE v.Cancelada = 0 AND v.CriadoEm >= @de AND v.CriadoEm < DATEADD(day, 1, @ate)${fTerm}`;
       let rows: Record<string, unknown>[];
       let titulo: string;
       if (agrupar === 'produto') {
@@ -164,18 +166,18 @@ export async function relatorio(tipo: string, url: URL): Promise<string> {
         // agrupa pelo produto (nome do cadastro); item avulso sem produto cai pela descricao
         rows = await query(`SELECT ISNULL(pr.Nome, vi.Descricao) grupo, SUM(vi.Quantidade) qtd, SUM(vi.LiquidoCentavos) valor
           FROM dbo.VendaItem vi JOIN dbo.Venda v ON v.Id = vi.VendaId LEFT JOIN dbo.Produto pr ON pr.Id = vi.ProdutoId
-          WHERE v.Cancelada = 0 AND vi.Estornado = 0 AND v.CriadoEm >= @de AND v.CriadoEm < DATEADD(day, 1, @ate) GROUP BY ISNULL(pr.Nome, vi.Descricao)`, { de, ate });
+          WHERE v.Cancelada = 0 AND vi.Estornado = 0 AND v.CriadoEm >= @de AND v.CriadoEm < DATEADD(day, 1, @ate)${fTerm} GROUP BY ISNULL(pr.Nome, vi.Descricao)`, { de, ate, term });
       } else if (agrupar === 'cliente') {
         titulo = 'Receitas por Clientes';
-        rows = await query(`SELECT ISNULL(c.Nome, '(sem cliente)') grupo, COUNT(*) qtd, SUM(v.FinalCentavos) valor ${base.replace('FROM dbo.Venda v', 'FROM dbo.Venda v LEFT JOIN dbo.Cliente c ON c.Id = v.ClienteId')} GROUP BY c.Nome ORDER BY valor DESC`, { de, ate });
+        rows = await query(`SELECT ISNULL(c.Nome, '(sem cliente)') grupo, COUNT(*) qtd, SUM(v.FinalCentavos) valor ${base.replace('FROM dbo.Venda v', 'FROM dbo.Venda v LEFT JOIN dbo.Cliente c ON c.Id = v.ClienteId')} GROUP BY c.Nome ORDER BY valor DESC`, { de, ate, term });
       } else if (agrupar === 'dia') {
         titulo = 'Fluxo de Caixa (por dia)';
-        rows = await query(`SELECT CONVERT(varchar(10), v.CriadoEm, 103) grupo, COUNT(*) qtd, SUM(v.FinalCentavos) valor, MIN(v.CriadoEm) o ${base} GROUP BY CONVERT(varchar(10), v.CriadoEm, 103) ORDER BY o`, { de, ate });
+        rows = await query(`SELECT CONVERT(varchar(10), v.CriadoEm, 103) grupo, COUNT(*) qtd, SUM(v.FinalCentavos) valor, MIN(v.CriadoEm) o ${base} GROUP BY CONVERT(varchar(10), v.CriadoEm, 103) ORDER BY o`, { de, ate, term });
       } else {
         titulo = 'Receitas por Forma de Pagamento';
         rows = await query(`SELECT ISNULL(f.Nome, 'Outros') grupo, COUNT(*) qtd, SUM(vp.ValorCentavos - CASE WHEN f.Tipo = 'dinheiro' THEN v.TrocoCentavos ELSE 0 END) valor
           FROM dbo.VendaPagamento vp JOIN dbo.Venda v ON v.Id = vp.VendaId LEFT JOIN dbo.FormaPagamento f ON f.Id = vp.FormaPagamentoId
-          WHERE v.Cancelada = 0 AND vp.Cancelado = 0 AND v.CriadoEm >= @de AND v.CriadoEm < DATEADD(day, 1, @ate) GROUP BY f.Nome ORDER BY valor DESC`, { de, ate });
+          WHERE v.Cancelada = 0 AND vp.Cancelado = 0 AND v.CriadoEm >= @de AND v.CriadoEm < DATEADD(day, 1, @ate)${fTerm} GROUP BY f.Nome ORDER BY valor DESC`, { de, ate, term });
       }
       if (agrupar === 'produto') rows = rows.sort((a, b) => (b.valor as number) - (a.valor as number));
       const total = rows.reduce((s, r) => s + ((r.valor as number) ?? 0), 0);

@@ -35,7 +35,7 @@ public static class CadastrosDesign
             "terminais" => new("Registro de terminal", "Cada atendente tem o seu caixa",
                 "M4 5h16v10H4zM8 19h8M12 15v4", Cinza,
                 [new("codigo", "Código", 1), new("nome", "Descrição", 4), new("ativo", "Ativo", 1, "bool")],
-                [new("Código", 90, r => r.S("codigo")), new("Descrição", 0, r => r.S("nome")), new("Situação agora", 200, r => r.S("situacao")), Ativo],
+                [new("Código", 90, r => r.S("codigo")), new("Descrição", 0, r => r.S("nome")), new("Situação agora", 200, r => r.S("situacao") is { Length: > 0 } sit ? sit : "Fechado"), Ativo],
                 Cad("terminais")) { Nome = "terminal" },
 
             "formas" => new("Métodos de pagamento", "Aparecem no checkout e no fechamento de caixa",

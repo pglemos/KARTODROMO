@@ -103,87 +103,197 @@ public static class Acoes
 /// <summary>Dialogos de parametros dos relatorios (Relatorios &gt; ...).</summary>
 public static class Relatorios
 {
-    static Api Api => Sessao.Api;
+    public static void Periodo(Form dono, string tipo, string agrupar) => Abrir(dono, tipo == "clientes" ? "clientes" : "receitas-" + (agrupar ?? "forma"));
+    public static void ReservasDiaria(Form dono, DateTime data) => Abrir(dono, "reservas-diaria", data);
+    public static void AgendaMensal(Form dono) => Abrir(dono, "agenda");
+    public static void Fechamento(Form dono) => Abrir(dono, "fechamento");
 
-    public static void Periodo(Form dono, string tipo, string agrupar)
+    public static void Participantes(Form dono, JsonObject bateriaSelecionada, DateTime data)
     {
-        using var j = new Janela(tipo == "clientes" ? "Clientes por Período" : "Relatório Financeiro", 360, 90);
-        var de = Campos.Data(new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1));
-        var ate = Campos.Data();
-        var g = Campos.Grade(2);
-        Campos.Add(g, "De", de); Campos.Add(g, "Até", ate);
-        j.Controls.Add(new Panel { Dock = DockStyle.Fill, Padding = new Padding(10), Controls = { g } });
-        j.Rodape(("Cancelar", (_, _) => j.Close(), false), ("Gerar Relatório", (_, _) =>
+        if (bateriaSelecionada != null && bateriaSelecionada["id"] != null) { new FormListaParticipantes(bateriaSelecionada).ShowDialog(dono); return; }
+        Abrir(dono, "participantes", data);
+    }
+
+    public static void Abrir(Form dono, string relatorio = "fechamento", DateTime? data = null)
+    {
+        using var f = new FormRelatoriosOffice(relatorio, data);
+        f.ShowDialog(dono);
+    }
+}
+
+/// <summary>Relatórios da recepção (RelatoriosOffice.dc.html): período, terminal e o relatório escolhido.
+/// Os que dependem de uma escolha (caixa, bateria, sessão) mostram a lista para escolher no próprio diálogo.</summary>
+public class FormRelatoriosOffice : DialogoDesign
+{
+    static readonly (string chave, string nome)[] Tipos =
+    [
+        ("fechamento", "Fechamento de caixa"), ("reservas-diaria", "Reservas diária"),
+        ("clientes", "Clientes por período"), ("participantes", "Lista de participantes"),
+        ("agenda", "Agenda mensal"), ("termo", "Termo de responsabilidade (em branco)"),
+        ("receitas-forma", "Financeiro · Receitas por forma de pagamento"), ("receitas-cliente", "Financeiro · Receitas por clientes"),
+        ("receitas-produto", "Financeiro · Receitas por produto"), ("receitas-dia", "Financeiro · Fluxo de caixa"),
+        ("crono-resultados", "Cronometragem · Resultados"), ("crono-tv", "Cronometragem · Classificação ao vivo (TV)"),
+    ];
+
+    readonly DataDesign _de, _ate;
+    readonly ListaDesign _terminal = new();
+    readonly RadioButton[] _opcoes;
+    readonly TabelaDesign _escolha;
+    readonly Label _tituloEscolha;
+    readonly Control _secaoEscolha;
+    List<JsonObject> _itensEscolha = [];
+    Func<JsonObject, string> _urlEscolha;
+    string _tituloJanela;
+
+    string Tipo => Tipos[Array.FindIndex(_opcoes, o => o.Checked) is var i and >= 0 ? i : 0].chave;
+
+    public FormRelatoriosOffice(string relatorio = "fechamento", DateTime? data = null) : base("Relatórios da recepção", "Escolha o relatório e o período",
+        "M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7", "linear-gradient(180deg, #FFB547, #F07A00)")
+    {
+        var hoje = data ?? DateTime.Today;
+        _de = new DataDesign(relatorio is "reservas-diaria" or "participantes" ? hoje : new DateTime(hoje.Year, hoje.Month, 1));
+        _ate = new DataDesign(hoje);
+        _terminal.Items.Add(new Campos.Item(0, "Todos"));
+        _terminal.SelectedIndex = 0;
+        var p = Secao("Período");
+        Campo(p, "De", _de, 2); Campo(p, "Até", _ate, 2); Campo(p, "Terminal", _terminal, 2);
+
+        var r = Secao("Relatório");
+        _opcoes = Tipos.Select(t => new RadioButton { Text = t.nome, Tag = t.chave, Checked = t.chave == relatorio }).ToArray();
+        if (!_opcoes.Any(o => o.Checked)) _opcoes[0].Checked = true;
+        foreach (var o in _opcoes) { Opcao(r, o, 3); o.CheckedChanged += (_, _) => { if (((RadioButton)o).Checked) EsconderEscolha(); }; }
+
+        var e = Secao("Escolha");
+        _secaoEscolha = e.Parent;
+        _tituloEscolha = _secaoEscolha.Controls.OfType<Label>().First();
+        _escolha = new TabelaDesign { Dock = DockStyle.Fill, Height = 100, Margin = new Padding(0, 0, 14, 0), Selecionavel = true, MaxLinhas = 6 };
+        e.Controls.Add(_escolha); e.SetColumnSpan(_escolha, 6);
+        _secaoEscolha.Visible = false;
+        _escolha.DoubleClick += (_, _) => Gerar();
+
+        BotaoRodape("Gerar relatório", true, Gerar);
+        BotaoRodape("Exportar Excel", false, Exportar);
+        BotaoRodape("Cancelar", false, Close);
+        Load += (_, _) => Seguro.Rodar(this, async () =>
         {
-            Relatorio.Abrir(dono, Api.UrlComToken($"/relatorio/{tipo}?de={Fmt.Iso(de.Value)}&ate={Fmt.Iso(ate.Value)}" + (agrupar != null ? "&agrupar=" + agrupar : "")), j.Text);
-            j.Close();
-        }, true));
-        j.ShowDialog(dono);
+            var terms = await Sessao.Api.Lista("/api/office/cad/terminais");
+            _terminal.Items.AddRange(terms.Where(t => t.B("ativo")).Select(t => (object)new Campos.Item(t.L("id") ?? 0, t.S("nome"), t)).ToArray());
+        });
     }
 
-    public static void ReservasDiaria(Form dono, DateTime data)
+    void EsconderEscolha() { _secaoEscolha.Visible = false; _itensEscolha = []; _urlEscolha = null; }
+
+    void MostrarEscolha(string titulo, TabelaDesign.Coluna[] cols, List<JsonObject> itens, Func<JsonObject, string[]> linha, Func<JsonObject, string> url, int selecionar = 0)
     {
-        using var j = new Janela("Reservas Diária", 260, 90);
-        var d = Campos.Data(data);
-        var g = Campos.Grade(1); Campos.Add(g, "Data", d);
-        j.Controls.Add(new Panel { Dock = DockStyle.Fill, Padding = new Padding(10), Controls = { g } });
-        j.Rodape(("Cancelar", (_, _) => j.Close(), false), ("Gerar Relatório", (_, _) => { Relatorio.Abrir(dono, Api.UrlComToken("/relatorio/reservas-diaria?data=" + Fmt.Iso(d.Value)), "Reservas Diária"); j.Close(); }, true));
-        j.ShowDialog(dono);
+        _tituloEscolha.Text = titulo;
+        _escolha.Colunas([new("", 30), .. cols]);
+        _itensEscolha = itens; _urlEscolha = url;
+        _escolha.Linhas(itens.Select(i => new[] { "" }.Concat(linha(i)).ToArray()));
+        _escolha.Selecionar(Math.Clamp(selecionar, 0, Math.Max(0, itens.Count - 1)));
+        _secaoEscolha.Visible = true;
+        foreach (Control c in Controls) if (c is Panel { AutoScroll: true } pn) pn.ScrollControlIntoView(_secaoEscolha);
     }
 
-    public static void AgendaMensal(Form dono)
-    {
-        using var j = new Janela("Agenda Mensal", 260, 90);
-        var d = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "MMMM 'de' yyyy", ShowUpDown = true };
-        var g = Campos.Grade(1); Campos.Add(g, "Mês", d);
-        j.Controls.Add(new Panel { Dock = DockStyle.Fill, Padding = new Padding(10), Controls = { g } });
-        j.Rodape(("Cancelar", (_, _) => j.Close(), false), ("Gerar Relatório", (_, _) => { Relatorio.Abrir(dono, Api.UrlComToken("/relatorio/agenda?mes=" + d.Value.ToString("yyyy-MM")), "Agenda Mensal"); j.Close(); }, true));
-        j.ShowDialog(dono);
-    }
+    string Q => $"de={Fmt.Iso(_de.Value)}&ate={Fmt.Iso(_ate.Value)}" + (Campos.IdDe(_terminal) is long t && t > 0 ? $"&terminal={t}" : "");
 
-    public static void Participantes(Form dono, JsonObject bateriaSelecionada, DateTime data) => Seguro.Rodar(dono, async () =>
+    /// <summary>Endereço do relatório escolhido (null quando ainda falta escolher na lista).</summary>
+    async Task<string> Url()
     {
-        if (bateriaSelecionada != null && bateriaSelecionada["id"] != null)
+        if (!_de.Valida || !_ate.Valida) { Msg.Aviso(this, "Informe as datas do período (dd/mm/aaaa)."); return null; }
+        if (_ate.Value < _de.Value) { Msg.Aviso(this, "A data final deve ser igual ou depois da inicial."); return null; }
+        if (_secaoEscolha.Visible && _urlEscolha != null)
         {
-            new FormListaParticipantes(bateriaSelecionada).ShowDialog(dono);
+            if (_escolha.Selecionada < 0 || _escolha.Selecionada >= _itensEscolha.Count) { Msg.Aviso(this, "Escolha um item da lista."); return null; }
+            return _urlEscolha(_itensEscolha[_escolha.Selecionada]);
+        }
+        var api = Sessao.Api;
+        switch (Tipo)
+        {
+            case "reservas-diaria": _tituloJanela = "Reservas diária"; return api.UrlComToken("/relatorio/reservas-diaria?data=" + Fmt.Iso(_de.Value));
+            case "clientes": _tituloJanela = "Clientes por período"; return api.UrlComToken("/relatorio/clientes?" + Q);
+            case "agenda": _tituloJanela = "Agenda mensal"; return api.UrlComToken("/relatorio/agenda?mes=" + _de.Value.ToString("yyyy-MM"));
+            case "termo": _tituloJanela = "Termo de Responsabilidade"; return api.UrlComToken("/termo?branco=1");
+            case "receitas-forma" or "receitas-cliente" or "receitas-produto" or "receitas-dia":
+                _tituloJanela = Tipos.First(x => x.chave == Tipo).nome.Replace("Financeiro · ", "");
+                return api.UrlComToken($"/relatorio/receitas?{Q}&agrupar={Tipo[9..]}");
+            case "crono-tv": _tituloJanela = "Classificação ao vivo"; return Config.CronoUrl.TrimEnd('/') + "/tv";
+            case "fechamento":
+            {
+                _tituloJanela = "Fechamento de Caixa";
+                var movs = await api.Lista("/api/office/movimentos");
+                var term = (_terminal.SelectedItem as Campos.Item) is { Id: > 0 } ti ? ti.Texto : null;
+                var lista = movs.Where(m => m.D("abertoEm") is DateTime a && a.Date >= _de.Value.Date && a.Date <= _ate.Value.Date && (term == null || m.S("terminal") == term)).ToList();
+                if (lista.Count == 0) { Msg.Aviso(this, "Nenhum caixa aberto nesse período" + (term != null ? $" no terminal {term}." : ".")); return null; }
+                if (lista.Count == 1) return api.UrlComToken("/relatorio/fechamento?mov=" + lista[0].S("id"));
+                MostrarEscolha("Escolha o caixa", [new("Terminal", 130), new("Turno", 110), new("Usuário", 130), new("Abertura", 120), new("Fechamento", 120), new("Recebido", 110, Direita: true)], lista,
+                    m => [m.S("terminal"), m.S("turno"), m.S("usuario"), Fmt.DmyHm(m.S("abertoEm")), m.S("fechadoEm") is { Length: > 0 } fe ? Fmt.DmyHm(fe) : "aberto", Fmt.Dinheiro(m.L("recebido"))],
+                    m => api.UrlComToken("/relatorio/fechamento?mov=" + m.S("id")), Math.Max(0, lista.FindIndex(m => string.IsNullOrEmpty(m.S("fechadoEm")))));
+                return null;
+            }
+            case "participantes":
+            {
+                _tituloJanela = "Lista de Participantes";
+                var bats = await api.Lista($"/api/office/baterias?status=todas&filtro=dia&data={Fmt.Iso(_de.Value)}");
+                if (bats.Count == 0) { Msg.Aviso(this, $"Nenhuma bateria em {_de.Value:dd/MM/yyyy}."); return null; }
+                var agora = DateTime.Now;
+                MostrarEscolha($"Baterias de {_de.Value:dd/MM/yyyy}", [new("Hora", 80), new("Bateria", 360), new("Produto", 280), new("Inscritos", 90, Direita: true)], bats,
+                    b => [b.D("dataHora")?.ToString("HH:mm") ?? "", b.S("nome"), b.S("produto"), b.I("inscritos").ToString()],
+                    b => "participantes:" + b.S("id"), Math.Max(0, bats.FindIndex(b => b.D("dataHora") >= agora.AddMinutes(-20))));
+                return null;
+            }
+            case "crono-resultados":
+            {
+                _tituloJanela = "Resultado";
+                var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+                var js = System.Text.Json.Nodes.JsonNode.Parse(await http.GetStringAsync(Config.CronoUrl.TrimEnd('/') + "/api/sessions"))!.AsArray().OfType<JsonObject>()
+                    .Where(x => x.L("startedAt") is long st && DateTimeOffset.FromUnixTimeMilliseconds(st).LocalDateTime.Date >= _de.Value.Date && DateTimeOffset.FromUnixTimeMilliseconds(st).LocalDateTime.Date <= _ate.Value.Date).ToList();
+                if (js.Count == 0) { Msg.Aviso(this, "Nenhuma corrida cronometrada nesse período."); return null; }
+                MostrarEscolha("Escolha a prova", [new("Início", 120), new("Prova", 460), new("Situação", 120), new("Pilotos", 80, Direita: true)], js,
+                    x => [DateTimeOffset.FromUnixTimeMilliseconds(x.L("startedAt") ?? 0).LocalDateTime.ToString("dd/MM HH:mm"), x.S("name"), x.S("state") switch { "finalizada" => "Finalizada", "em_andamento" => "Em andamento", var st => st }, x.S("competitors")],
+                    x => Config.CronoUrl.TrimEnd('/') + "/resultado/" + Uri.EscapeDataString(x.S("id")));
+                return null;
+            }
+        }
+        return null;
+    }
+
+    void Gerar() => Seguro.Rodar(this, async () =>
+    {
+        var url = await Url();
+        if (url == null) return;
+        if (url.StartsWith("participantes:"))
+        {
+            var bat = _itensEscolha.First(b => b.S("id") == url[14..]);
+            var dono = Owner; Close();
+            new FormListaParticipantes(bat).ShowDialog(dono);
             return;
         }
-        var lista = await Api.Lista($"/api/office/baterias?status=todas&filtro=dia&data={Fmt.Iso(data)}");
-        if (lista.Count == 0) { Msg.Aviso(dono, "Nenhuma bateria nesta data."); return; }
-        if (lista.Count == 1) { new FormListaParticipantes(lista[0]).ShowDialog(dono); return; }
-        using var j = new Janela("Lista de Participantes", 480, 90);
-        var cb = Campos.Combo();
-        cb.Items.AddRange(lista.Select(b => new Campos.Item(b.L("id") ?? 0, $"{Fmt.DmyHm(b.S("dataHora"))} · {b.S("nome")} ({b.I("inscritos")})", b)).ToArray());
-        if (cb.Items.Count > 0) cb.SelectedIndex = 0;
-        var g = Campos.Grade(1); Campos.Add(g, "Bateria", cb);
-        j.Controls.Add(new Panel { Dock = DockStyle.Fill, Padding = new Padding(10), Controls = { g } });
-        j.Rodape(("Cancelar", (_, _) => j.Close(), false), ("Abrir Lista", (_, _) =>
-        {
-            if (cb.SelectedItem is Campos.Item it && it.Dados != null)
-            {
-                j.Close();
-                new FormListaParticipantes(it.Dados).ShowDialog(dono);
-            }
-        }, true));
-        j.ShowDialog(dono);
+        var janela = Owner ?? this; var titulo = _tituloJanela ?? "Relatório";
+        Close();
+        Relatorio.Abrir(janela, url, titulo);
     });
 
-    public static void Fechamento(Form dono) => Seguro.Rodar(dono, async () =>
+    /// <summary>Exportar Excel: baixa o relatório e transforma as tabelas dele numa planilha (CSV com ; e BOM).</summary>
+    void Exportar() => Seguro.Rodar(this, async () =>
     {
-        var cx = await Api.Get("/api/office/caixa");
-        var lista = await Api.Lista("/api/office/movimentos");
-        using var j = new Janela("Fechamento de Caixa", 760, 380);
-        var g = new Grade();
-        g.Colunas(new("terminal", "Terminal", Largura: 130), new("turno", "Turno", Largura: 120), new("usuario", "Usuário", Largura: 120), new("abertoEm", "Abertura", TipoCol.DataHora),
-            new("fechadoEm", "Fechamento", TipoCol.DataHora), new("recebido", "Recebido", TipoCol.Dinheiro));
-        g.Carregar(lista);
-        var aberto = cx["aberto"]?.S("id");
-        if (!string.IsNullOrEmpty(aberto)) g.Selecionar(r => r.S("id") == aberto);
-        void Gerar() { if (g.Atual is { } r) Relatorio.Abrir(dono, Api.UrlComToken("/relatorio/fechamento?mov=" + r.S("id")), "Fechamento de Caixa"); }
-        g.Duplo += _ => Gerar();
-        j.Controls.Add(new Panel { Dock = DockStyle.Fill, Padding = new Padding(8), Controls = { g } });
-        j.Rodape(("Cancelar", (_, _) => j.Close(), false), ("Gerar Relatório", (_, _) => Gerar(), true));
-        j.ShowDialog(dono);
+        var url = await Url();
+        if (url == null) return;
+        if (url.StartsWith("participantes:")) url = Sessao.Api.UrlComToken("/relatorio/participantes?bateria=" + url[14..]);
+        if (!url.StartsWith("http") || url.EndsWith("/tv")) { Msg.Aviso(this, "Este relatório não tem tabela para exportar."); return; }
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        var html = await http.GetStringAsync(url);
+        var csv = new System.Text.StringBuilder();
+        foreach (System.Text.RegularExpressions.Match tr in System.Text.RegularExpressions.Regex.Matches(html, "<tr[^>]*>(.*?)</tr>", System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+        {
+            var cels = System.Text.RegularExpressions.Regex.Matches(tr.Groups[1].Value, "<t[hd][^>]*>(.*?)</t[hd]>", System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+                .Select(c => System.Net.WebUtility.HtmlDecode(System.Text.RegularExpressions.Regex.Replace(c.Groups[1].Value, "<[^>]+>", " ")).Trim());
+            csv.AppendLine(string.Join(";", cels.Select(c => "\"" + System.Text.RegularExpressions.Regex.Replace(c, "\\s+", " ").Replace("\"", "\"\"") + "\"")));
+        }
+        if (csv.Length == 0) { Msg.Aviso(this, "O relatório não tem linhas para exportar."); return; }
+        using var d = new SaveFileDialog { FileName = $"{Tipo}-{DateTime.Now:yyyyMMdd-HHmm}.csv", Filter = "Planilha (*.csv)|*.csv" };
+        if (d.ShowDialog(this) != DialogResult.OK) return;
+        File.WriteAllText(d.FileName, csv.ToString(), new System.Text.UTF8Encoding(true));
+        Msg.Info(this, $"Planilha {Path.GetFileName(d.FileName)} salva.");
     });
 }
 
@@ -320,75 +430,39 @@ public class FormMoverCliente : DialogoDesign
 }
 
 /// <summary>Lista de participantes (ListaParticipantes.dc.html).</summary>
-public class FormListaParticipantes : Janela
+/// <summary>Lista de participantes da bateria (ListaParticipantes.dc.html): kart, participante, idade, peso, pago e termo.</summary>
+public class FormListaParticipantes : DialogoDesign
 {
-    readonly Grade _g = new();
-    public FormListaParticipantes(JsonObject bateria) : base("Lista de participantes", 960, 680)
+    public FormListaParticipantes(JsonObject bateria) : base("Lista de participantes", $"{bateria.S("nome")} · {Fmt.Dmy(bateria.S("dataHora"))} · para o briefing e a pista",
+        "M4 6h16M4 12h16M4 18h10", "linear-gradient(180deg, #6CB8FF, #1E6FE8)")
     {
         var batId = bateria.S("id");
-        var nomeBat = bateria.S("nome");
-        var dataHora = bateria.S("dataHora");
-        Tag = $"{nomeBat} · {Fmt.Dmy(dataHora)} · para o briefing e a pista";
-
-        var cartao = KitVisual.CartaoSecao(null);
-        cartao.AutoSize = false;
-        cartao.Dock = DockStyle.Fill;
-        cartao.Height = 480;
-
-        _g.Colunas(
-            new("kart", "Kart", Largura: 60),
-            new("cliente", "Participante", Largura: 340),
-            new("idade", "Idade", TipoCol.Inteiro, 60),
-            new("peso", "Peso", TipoCol.Inteiro, 70),
-            new("pago", "Pago", TipoCol.Bool, 60),
-            new("termo", "Termo", TipoCol.Bool, 60)
-        );
-        _g.Dock = DockStyle.Fill;
-        var pGrid = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 4, 0, 0) };
-        pGrid.Controls.Add(_g);
-        cartao.Controls.Add(pGrid);
-        Controls.Add(cartao);
-
+        var tabela = SecaoTabelaDesign(null);
+        tabela.Colunas(new("Kart", 60), new("Participante", 520), new("Idade", 60, Direita: true), new("Peso", 70, Direita: true), new("Pago", 60, Marca: true), new("Termo", 60, Marca: true));
+        tabela.MaxLinhas = 13;
+        tabela.Linhas([]);
+        var info = TextoRodape("Carregando…");
         List<JsonObject> participantes = [];
-        var rodapeCtrl = Rodape("0 participantes · 0 pagos · 0 termos assinados",
-            ("Imprimir termos pendentes", (_, _) =>
-            {
-                var pendentes = participantes.Where(p => !p.B("termo")).Select(p => p.S("id")).ToList();
-                if (pendentes.Count == 0) { Msg.Info(this, "Todos os termos já foram assinados!"); return; }
-                Acoes.ImprimirTermo(this, pendentes);
-            }, false),
-            ("Fechar", (_, _) => Close(), false),
-            ("Imprimir lista", (_, _) => Relatorio.Abrir(this, Sessao.Api.UrlComToken("/relatorio/participantes?bateria=" + batId), "Lista de Participantes"), true)
-        );
+        BotaoRodape("Imprimir lista", true, () => Relatorio.Abrir(this, Sessao.Api.UrlComToken("/relatorio/participantes?bateria=" + batId), "Lista de Participantes"));
+        BotaoRodape("Fechar", false, Close);
+        BotaoRodape("Imprimir termos pendentes", false, () =>
+        {
+            var pendentes = participantes.Where(p => !p.B("termo")).Select(p => p.S("id")).ToList();
+            if (pendentes.Count == 0) { Msg.Info(this, "Todos os termos já foram assinados."); return; }
+            Acoes.ImprimirTermo(this, pendentes);
+        });
 
         Load += (_, _) => Seguro.Rodar(this, async () =>
         {
             var res = await Sessao.Api.Lista($"/api/office/reservas?bateriaId={batId}");
-            participantes = res.Where(r => r.S("status") != "cancelada").ToList();
-            string Peso(JsonObject p) => decimal.TryParse(p.S("peso"), NumberStyles.Number, CultureInfo.InvariantCulture, out var kg) && kg > 0
-                ? kg.ToString("0.#", Fmt.Br)
-                : "—";
-            var linhas = participantes.Select(p => new JsonObject
+            participantes = res.Where(r => r.S("status") != "cancelada").OrderBy(r => int.TryParse(r.S("kart"), out var k) ? k : 999).ThenBy(r => r.S("cliente")).ToList();
+            static string Peso(JsonObject p) => decimal.TryParse(p.S("peso"), NumberStyles.Number, CultureInfo.InvariantCulture, out var kg) && kg > 0 ? kg.ToString("0.#", Fmt.Br) : "—";
+            tabela.Linhas(participantes.Select(p => new[]
             {
-                ["id"] = p.S("id"),
-                ["kart"] = p.S("kart") ?? "—",
-                ["cliente"] = p.S("cliente"),
-                ["idade"] = p.I("idade") > 0 ? p.I("idade").ToString() : "—",
-                ["peso"] = Peso(p),
-                ["pago"] = p.B("pago"),
-                ["termo"] = p.B("termo")
-            }).ToList();
-            _g.Carregar(linhas);
-
-            var total = participantes.Count;
-            var pagos = participantes.Count(p => p.B("pago"));
-            var termos = participantes.Count(p => p.B("termo"));
-            var txt = $"{total} participantes · {pagos} pagos · {termos} termos assinados";
-            if (rodapeCtrl is Panel pnl)
-            {
-                var lbl = pnl.Controls.Find("rodapeInfo", false).FirstOrDefault() as Label;
-                if (lbl != null) lbl.Text = txt;
-            }
+                p.S("kart") is { Length: > 0 } k ? k.PadLeft(2, '0') : "—", p.S("cliente") + (p.S("responsavel") is { Length: > 0 } rsp && p.I("idade") is > 0 and < 18 ? $" (menor · resp. {rsp.Split(' ')[0]})" : ""),
+                p.I("idade") > 0 ? p.I("idade").ToString() : "—", Peso(p), p.B("pago") ? "1" : "0", p.B("termo") ? "1" : "0",
+            }));
+            info.Text = $"{participantes.Count} participantes · {participantes.Count(p => p.B("pago"))} pagos · {participantes.Count(p => p.B("termo"))} termos assinados";
         });
     }
 }

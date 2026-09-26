@@ -369,6 +369,7 @@ async function loginRoute(req: http.IncomingMessage, res: http.ServerResponse) {
     throw new HttpError(401, 'Login ou senha inválidos.');
   }
   log(`login: ${login}`);
+  await query(`UPDATE dbo.Usuario SET UltimoAcesso = SYSDATETIME() WHERE Id = @id`, { id: u.id }).catch(() => undefined);
   send(res, 200, { token: emiteToken({ uid: u.id, nome: u.nome, admin: Boolean(u.admin) }), usuario: { id: u.id, nome: u.nome, admin: Boolean(u.admin) } });
 }
 

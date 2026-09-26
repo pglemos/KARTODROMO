@@ -113,13 +113,14 @@ public class DialogoDesign : CartaoModal
 
     /// <summary>Seção branca com título (opcional) e grade de 6 colunas; devolve a grade para receber os campos.</summary>
     /// <summary>Nota (seção cinza só com texto), como o aviso no fim de alguns diálogos do design.</summary>
-    public void Nota(string texto)
+    public Control Nota(string texto)
     {
         var g = Secao(null, texto);
         var s = (TableLayoutPanel)g.Parent;
         s.BackColor = Fundo; g.BackColor = Fundo;
         foreach (Control c in s.Controls) c.BackColor = Fundo;
         s.Padding = new Padding(16, 14, 16, 8);
+        return s;
     }
 
     public TableLayoutPanel Secao(string titulo, string texto = null)
@@ -233,7 +234,7 @@ public class DialogoDesign : CartaoModal
     /// <summary>Botão de opção verde ocupando <paramref name="span"/> colunas (linha só de opções: sem o espaço do rótulo).</summary>
     public void Opcao(TableLayoutPanel grade, RadioButton r, int span, bool alinharComCampo = false)
     {
-        r.AutoSize = true; r.Font = PecasDesign.FonteValor; r.Anchor = AnchorStyles.Left; r.Margin = new Padding(0, alinharComCampo ? 26 : 4, 14, 6); r.BackColor = Color.White; r.Padding = new Padding(4, 0, 0, 0); r.Cursor = Cursors.Hand;
+        r.AutoSize = true; r.Font = PecasDesign.FonteValor; r.Anchor = AnchorStyles.Left; r.Margin = new Padding(0, alinharComCampo ? 26 : 6, 14, 8); r.BackColor = Color.White; r.Padding = new Padding(4, 0, 0, 0); r.Cursor = Cursors.Hand;
         Forma.RadioVerde(r);
         grade.Controls.Add(r);
         grade.SetColumnSpan(r, span);
