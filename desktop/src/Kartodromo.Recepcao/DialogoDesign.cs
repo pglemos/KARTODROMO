@@ -14,7 +14,7 @@ public class DialogoDesign : CartaoModal
     public static readonly Color Fundo = Color.FromArgb(245, 245, 247);
     public static readonly Color VerdePrincipal = Color.FromArgb(11, 122, 83);
     static readonly Color Rotulo = Color.FromArgb(110, 110, 115);
-    static readonly Color Borda = Color.FromArgb(214, 214, 219);
+    static readonly Color Borda = Color.FromArgb(219, 219, 222); // rgba(0,0,0,0.14) sobre branco
 
     readonly TableLayoutPanel _secoes;
     /// <summary>largura útil das seções (a janela menos as margens e a barra de rolagem)</summary>
@@ -22,7 +22,9 @@ public class DialogoDesign : CartaoModal
     readonly FlowLayoutPanel _botoes;
     protected readonly Label Subtitulo;
 
-    public DialogoDesign(string titulo, string sub, string icone, int largura = 960, int altura = 680) : base(largura, altura)
+    public DialogoDesign(string titulo, string sub, string icone, int largura = 960, int altura = 680) : this(titulo, sub, VisualPrincipal.Icone(icone), largura, altura) { }
+
+    public DialogoDesign(string titulo, string sub, Image icone, int largura = 960, int altura = 680) : base(largura, altura)
     {
         Text = titulo;
         BackColor = Fundo;
@@ -30,9 +32,9 @@ public class DialogoDesign : CartaoModal
         // cabeçalho
         var cab = new Panel { Dock = DockStyle.Top, Height = 62, BackColor = Color.White };
         cab.Paint += (_, e) => { using var pen = new Pen(Color.FromArgb(230, 230, 234)); e.Graphics.DrawLine(pen, 0, cab.Height - 1, cab.Width, cab.Height - 1); };
-        var ic = Icone(icone, 36); ic.Location = new Point(18, 13);
-        var t = new Label { Text = titulo, AutoSize = true, Font = new Font("Segoe UI", 12.5F, FontStyle.Bold), ForeColor = KitVisual.Texto, Location = new Point(62, 10), BackColor = Color.Transparent };
-        Subtitulo = new Label { Text = sub, AutoSize = true, Font = new Font("Segoe UI", 9F), ForeColor = Rotulo, Location = new Point(63, 34), BackColor = Color.Transparent };
+        var ic = new PictureBox { Image = icone, SizeMode = PictureBoxSizeMode.Zoom, Size = new Size(36, 36), BackColor = Color.Transparent, Location = new Point(18, 13) };
+        var t = new Label { Text = titulo, AutoSize = true, Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = KitVisual.Texto, Location = new Point(62, 11), BackColor = Color.Transparent };
+        Subtitulo = new Label { Text = sub, AutoSize = true, Font = new Font("Segoe UI", 9F), ForeColor = Rotulo, Location = new Point(63, 33), BackColor = Color.Transparent };
         var fechar = Botao("✕", Color.FromArgb(235, 235, 239), KitVisual.Texto);
         fechar.Size = new Size(34, 32); fechar.Font = new Font("Segoe UI", 9.5F); fechar.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         fechar.Location = new Point(largura - 52, 15);
@@ -64,10 +66,38 @@ public class DialogoDesign : CartaoModal
         corpo.BringToFront(); // o Fill por último no encaixe: não fica por baixo do cabeçalho/rodapé
     }
 
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        foreach (Control c in Controls) if (c is Panel { AutoScroll: true } p) p.AutoScrollPosition = Point.Empty; // abre mostrando o topo
+    }
+
+    protected override void OnLoad(EventArgs e)
+    {
+        // escurece a tela principal por trás (design: rgba(28,28,30,0.30)); aparece antes da janela para ficar embaixo dela
+        if (Owner is Form dono && dono.Visible && dono.WindowState != FormWindowState.Minimized)
+        {
+            var fundo = new Escurecer(dono);
+            fundo.Show();
+            FormClosed += (_, _) => fundo.Close();
+        }
+        base.OnLoad(e);
+    }
+
     /// <summary>Seção branca com título (opcional) e grade de 6 colunas; devolve a grade para receber os campos.</summary>
+    /// <summary>Nota (seção cinza só com texto), como o aviso no fim de alguns diálogos do design.</summary>
+    public void Nota(string texto)
+    {
+        var g = Secao(null, texto);
+        var s = (TableLayoutPanel)g.Parent;
+        s.BackColor = Fundo; g.BackColor = Fundo;
+        foreach (Control c in s.Controls) c.BackColor = Fundo;
+        s.Padding = new Padding(16, 14, 16, 8);
+    }
+
     public TableLayoutPanel Secao(string titulo, string texto = null)
     {
-        var s = new TableLayoutPanel { MinimumSize = new Size(_larguraSecao, 0), MaximumSize = new Size(_larguraSecao, 0), Dock = DockStyle.Fill, ColumnCount = 1, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = Color.White, Padding = new Padding(16, 12, 16, 14), Margin = new Padding(0, 0, 0, 12) };
+        var s = new TableLayoutPanel { MinimumSize = new Size(_larguraSecao, 0), MaximumSize = new Size(_larguraSecao, 0), Dock = DockStyle.Fill, ColumnCount = 1, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = Color.White, Padding = new Padding(16, 12, 2, 14), Margin = new Padding(0, 0, 0, 12) }; // à direita a margem de 14 da última coluna completa os 16
         s.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         s.Paint += (_, e) =>
         {
@@ -78,12 +108,22 @@ public class DialogoDesign : CartaoModal
         };
         s.Resize += (_, _) => KitVisual.AplicarRaio(s, 14);
         if (!string.IsNullOrEmpty(titulo)) s.Controls.Add(new Label { Text = titulo, AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = KitVisual.Texto, Margin = new Padding(0, 0, 0, 8) });
-        if (!string.IsNullOrEmpty(texto)) s.Controls.Add(new Label { Text = texto, AutoSize = true, MaximumSize = new Size(Width - 90, 0), Font = new Font("Segoe UI", 9.2F), ForeColor = Color.FromArgb(58, 58, 60), Margin = new Padding(0, 0, 0, 6) });
-        var grade = new TableLayoutPanel { MinimumSize = new Size(_larguraSecao - 32, 0), MaximumSize = new Size(_larguraSecao - 32, 0), Dock = DockStyle.Fill, ColumnCount = 6, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = Color.White, Margin = Padding.Empty };
+        if (!string.IsNullOrEmpty(texto)) s.Controls.Add(new Label { Text = texto, AutoSize = true, MaximumSize = new Size(_larguraSecao - 40, 0), Font = new Font("Segoe UI", 9.6F), ForeColor = Color.FromArgb(58, 58, 60), Margin = new Padding(0, 0, 0, 6) });
+        var grade = new TableLayoutPanel { MinimumSize = new Size(_larguraSecao - 18, 0), MaximumSize = new Size(_larguraSecao - 18, 0), Dock = DockStyle.Fill, ColumnCount = 6, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = Color.White, Margin = Padding.Empty };
         for (var i = 0; i < 6; i++) grade.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / 6));
         s.Controls.Add(grade);
         _secoes.Controls.Add(s);
         return grade;
+    }
+
+    /// <summary>Seção com a tabela simples do design (cabeçalho claro, linhas finas).</summary>
+    public TabelaDesign SecaoTabelaDesign(string titulo)
+    {
+        var grade = Secao(titulo);
+        var t = new TabelaDesign { Dock = DockStyle.Fill, Height = 100, Margin = new Padding(0, 0, 14, 0) };
+        grade.Controls.Add(t);
+        grade.SetColumnSpan(t, 6);
+        return t;
     }
 
     /// <summary>Seção só com uma tabela (ex.: provas do produto).</summary>
@@ -97,12 +137,12 @@ public class DialogoDesign : CartaoModal
     }
 
     /// <summary>Campo: nome em cima e a caixa branca arredondada com o controle dentro (e um botão de ação opcional).</summary>
-    public void Campo(TableLayoutPanel grade, string rotulo, Control controle, int span, params Button[] acoes)
+    public void Campo(TableLayoutPanel grade, string rotulo, Control controle, int span, params Control[] acoes)
     {
         var cel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Height = 58, Margin = new Padding(0, 0, 14, 6), BackColor = Color.White };
         cel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); // largura = a da coluna da grade (automática estourava)
         cel.RowStyles.Add(new RowStyle(SizeType.Absolute, 20)); cel.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
-        cel.Controls.Add(new Label { Text = rotulo, Dock = DockStyle.Fill, Font = new Font("Segoe UI", 8.8F, FontStyle.Bold), ForeColor = Rotulo, Margin = Padding.Empty, TextAlign = ContentAlignment.BottomLeft }, 0, 0);
+        cel.Controls.Add(new Label { Text = rotulo, Dock = DockStyle.Fill, Font = PecasDesign.FonteRotulo, ForeColor = Rotulo, Margin = Padding.Empty, TextAlign = ContentAlignment.BottomLeft }, 0, 0);
         // o conteúdo fica 2 px para dentro para não cobrir a linha da borda
         var caixa = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Margin = new Padding(0, 2, 0, 0), Padding = controle is DateTimePicker ? new Padding(0, 2, 0, 2) : new Padding(9, 2, 6, 2) };
         caixa.Paint += (_, e) =>
@@ -114,7 +154,7 @@ public class DialogoDesign : CartaoModal
             e.Graphics.DrawPath(pen, path);
         };
         controle.GotFocus += (_, _) => caixa.Invalidate(); controle.LostFocus += (_, _) => caixa.Invalidate();
-        controle.Font = new Font("Segoe UI", 10F);
+        if (controle is not DataDesign) controle.Font = PecasDesign.FonteValor;
         switch (controle)
         {
             case TextBox tb: tb.BorderStyle = BorderStyle.None; break;
@@ -125,7 +165,7 @@ public class DialogoDesign : CartaoModal
         if (acoes.Length == 0)
         {
             // sem botão: o controle ocupa a largura da caixa, centralizado na vertical
-            var h = controle is TextBox ? controle.Font.Height : controle.PreferredSize.Height;
+            var h = controle is TextBox ? controle.Font.Height : controle is DataDesign or Label ? controle.Height : controle.PreferredSize.Height;
             var sobra = Math.Max(0, (34 - 4 - h) / 2);
             caixa.Padding = new Padding(caixa.Padding.Left, 2 + sobra, caixa.Padding.Right, 2);
             controle.Dock = DockStyle.Top; controle.Margin = Padding.Empty;
@@ -157,7 +197,7 @@ public class DialogoDesign : CartaoModal
     /// <summary>Caixa de marcar verde ocupando <paramref name="span"/> colunas.</summary>
     public void Marca(TableLayoutPanel grade, CheckBox c, int span)
     {
-        c.AutoSize = true; c.Font = new Font("Segoe UI", 10F); c.Anchor = AnchorStyles.Left; c.Margin = new Padding(0, 8, 14, 8); c.BackColor = Color.White;
+        c.AutoSize = true; c.Font = PecasDesign.FonteValor; c.Anchor = AnchorStyles.Left; c.Margin = new Padding(0, 26, 14, 6); c.BackColor = Color.White;
         KitVisual.CheckVerde(c);
         grade.Controls.Add(c);
         grade.SetColumnSpan(c, span);

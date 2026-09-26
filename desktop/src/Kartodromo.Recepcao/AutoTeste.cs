@@ -317,6 +317,23 @@ public static class AutoTeste
             bmp.Save(Path.Combine(pasta, "editar-bateria.png"));
         }
         f.Close();
+        FormIncluirCliente.AbrirPesquisaAoMostrar = false;
+        async Task Foto(Form janela, string nome)
+        {
+            janela.StartPosition = FormStartPosition.Manual; janela.Location = new Point(-4000, 0); janela.ShowInTaskbar = false;
+            janela.Show(); SetForegroundWindow(antes);
+            await Esperar(1600); janela.Location = new Point(-4000, 0);
+            using var bmp = new Bitmap(janela.Width, janela.Height);
+            using (var gr = Graphics.FromImage(bmp)) { var hdc = gr.GetHdc(); PrintWindow(janela.Handle, hdc, 0); gr.ReleaseHdc(hdc); }
+            bmp.Save(Path.Combine(pasta, nome + ".png"));
+            janela.Close();
+            Log.Add("OK " + nome);
+        }
+        await Foto(new FormIncluirCliente(b), "incluir-cliente");
+        var reservas = await Sessao.Api.Lista($"/api/office/reservas?status=todas&filtro=dia&data={Fmt.Iso(DateTime.Today)}");
+        var r = reservas.FirstOrDefault(x => !x.B("pago")) ?? reservas.FirstOrDefault();
+        if (r != null) { await Foto(new FormEditarReserva(r), "editar-reserva"); await Foto(new FormMoverCliente(r), "mover-cliente"); }
+        else Log.Add("pendente: sem reserva hoje");
         File.WriteAllLines(Path.Combine(pasta, "log.txt"), Log);
     }
 
