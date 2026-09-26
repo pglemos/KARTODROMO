@@ -623,7 +623,7 @@ public partial class FormCrono : Form
         {
             Dock = DockStyle.Left,
             AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndOnly,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
             WrapContents = false,
             FlowDirection = FlowDirection.LeftToRight,
             Padding = new Padding(0, 1, 0, 0)
@@ -660,7 +660,7 @@ public partial class FormCrono : Form
         {
             Dock = DockStyle.Right,
             AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndOnly,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
             WrapContents = false,
             FlowDirection = FlowDirection.LeftToRight,
             Padding = new Padding(0, 0, 0, 0)
