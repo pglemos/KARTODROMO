@@ -466,10 +466,28 @@
 
 <script>
 const params = new URLSearchParams(location.search);
-let currentTipo = params.get('tipo') || 'resultados_oficiais';
+const rawTipo = params.get('tipo') || params.get('type') || 'resultados_oficiais';
+const tipoAlias = {
+  'PassingReport': 'passagens',
+  'LapToLapReport': 'volta_a_volta',
+  'LapMapReport': 'mapa_voltas',
+  'RacingMapAllReport': 'mapa_prova',
+  'TimingOfficialReport': 'resultados_oficiais',
+  'TimingOfficialReportWithoutSpeed': 'sem_velocidade',
+  'TimingOfficialReportWithAvgTime': 'com_tempo_medio',
+  'TimingOfficialReportArrivalOrder': 'ordem_chegada',
+  'TimingOfficialReportArrivalOrderWithCategory': 'ordem_chegada_categoria',
+  'GridLeftReport': 'grid_2col_esq',
+  'GridRightReport': 'grid_2col_dir',
+  'GridLeftReport3': 'grid_3col_esq',
+  'GridRightReport3': 'grid_3col_dir'
+};
+let currentTipo = tipoAlias[rawTipo] || rawTipo;
 const sessionId = location.pathname.split('/').filter(Boolean).pop();
 
-document.getElementById('tipoSelect').value = currentTipo;
+if (document.getElementById('tipoSelect')) {
+  document.getElementById('tipoSelect').value = currentTipo;
+}
 
 const fmtMs = (ms) => {
   if (ms == null || isNaN(ms) || ms === 0) return '---';
