@@ -38,6 +38,34 @@ beforeEach(() => {
   db.tx.mockImplementation(async (work: (run: (sql: string, params?: Record<string, unknown>) => Promise<Record<string, unknown>[]>) => Promise<unknown>) => work(async () => []));
 });
 
+describe('Office: gravação de baterias com hora local', () => {
+  const bateria = { nome: 'TESTE CODEX', inicio: '2026-09-27T10:45', vagas: 30, produtoId: 1, tracadoId: 1 };
+
+  it('completa os segundos antes da consulta SQL ao criar uma bateria', async () => {
+    db.one.mockResolvedValueOnce(null).mockResolvedValueOnce({ c: 'Indoor' }).mockResolvedValueOnce({ id: 20 });
+    expect(await call('/baterias', 'POST', bateria)).toEqual({ status: 201, body: { id: 20 } });
+    expect(db.one.mock.calls[0][1].inicio).toBe('2026-09-27T10:45:00');
+    expect(db.one.mock.calls[2][1].inicio).toBe('2026-09-27T10:45:00');
+  });
+
+  it('grava uma edição com segundos sem converter o horário de Brasília para UTC', async () => {
+    db.one.mockResolvedValueOnce({ data: '2026-09-27', n: 0, pagas: 0 }).mockResolvedValueOnce({ c: 'Indoor' });
+    expect(await call('/baterias/20', 'PUT', bateria)).toEqual({ status: 200, body: { ok: true } });
+    expect(db.query).toHaveBeenCalledWith(expect.stringContaining('UPDATE dbo.Bateria'), expect.objectContaining({ inicio: '2026-09-27T10:45:00' }));
+  });
+
+  it.each(['2026-02-30T10:45', '2026-09-27T24:00', '2026-09-27T10:60'])('recusa data ou hora impossível: %s', async (inicio) => {
+    await expect(call('/baterias', 'POST', { ...bateria, inicio })).rejects.toMatchObject({ status: 400 });
+    expect(db.one).not.toHaveBeenCalled();
+  });
+
+  it('continua impedindo a mudança de dia de uma bateria com reservas pagas', async () => {
+    db.one.mockResolvedValueOnce({ data: '2026-09-26', n: 1, pagas: 1 });
+    await expect(call('/baterias/20', 'PUT', bateria)).rejects.toMatchObject({ status: 409 });
+    expect(db.query).not.toHaveBeenCalled();
+  });
+});
+
 describe('Office: fidelidade e parceiros', () => {
   it('cria conta de fidelidade idempotente por cliente', async () => {
     db.tx.mockImplementation(async (work) => work(async (sql: string) => {

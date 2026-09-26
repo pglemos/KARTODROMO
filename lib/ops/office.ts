@@ -28,7 +28,19 @@ const cents = (v: unknown, nome = 'Valor') => {
 const isoDate = (v: unknown) => {
   const s = String(v ?? '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) throw new HttpError(400, 'Data inválida.');
+  const date = new Date(`${s}T00:00:00Z`);
+  if (s.startsWith('0000') || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== s) throw new HttpError(400, 'Data inválida.');
   return s;
+};
+// SQL Server exige segundos no formato ISO de DATETIME2. Preserva a hora local,
+// sem converter o horário de Brasília para UTC.
+const localDateTime = (v: unknown) => {
+  const s = String(v ?? '');
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s) || Number(s.slice(11, 13)) > 23 || Number(s.slice(14, 16)) > 59) {
+    throw new HttpError(400, 'Data/hora inválida.');
+  }
+  isoDate(s.slice(0, 10));
+  return `${s}:00`;
 };
 const str = (v: unknown, max: number) => (v === null || v === undefined || String(v).trim() === '' ? null : String(v).trim().slice(0, max));
 const pontos = (v: unknown) => {
@@ -1097,8 +1109,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const b = await req.body();
     const nome = str(b.nome, 100);
     if (!nome) throw new HttpError(400, 'Insira um nome para a reserva.');
-    const inicio = String(b.inicio ?? '');
-    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(inicio)) throw new HttpError(400, 'Data/hora inválida.');
+    const inicio = localDateTime(b.inicio);
     const vagas = int(b.vagas, 'Quantidade máxima de competidores');
     const produtoId = int(b.produtoId, 'Produto');
     const exists = await one(`SELECT 1 x FROM dbo.Bateria WHERE Inicio = @inicio AND Status <> 'cancelada' AND ProdutoId = @produtoId`, { inicio, produtoId });
@@ -1161,8 +1172,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
       { id },
     );
     if (!atual) throw new HttpError(404, 'Bateria não encontrada.');
-    const inicio = String(b.inicio ?? '');
-    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(inicio)) throw new HttpError(400, 'Data/hora inválida.');
+    const inicio = localDateTime(b.inicio);
     if ((atual.pagas as number) > 0 && inicio.slice(0, 10) !== atual.data) throw new HttpError(409, 'Como há reservas pagas, não é possível alterar a data, apenas o horário.');
     const vagas = int(b.vagas, 'Vagas');
     if (vagas < (atual.n as number)) throw new HttpError(409, `O máximo de competidores deve ser maior ou igual ao número de reservas. Número de reservas: ${atual.n}.`);
