@@ -43,7 +43,7 @@ public sealed class FormRelatoriosCrono : Form
         ClientSize = new Size(960, 680);
         MinimumSize = new Size(880, 620);
         StartPosition = FormStartPosition.CenterParent;
-        FormBorderStyle = FormBorderStyle.FixedDialog;
+        FormBorderStyle = FormBorderStyle.None;
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
@@ -52,13 +52,19 @@ public sealed class FormRelatoriosCrono : Form
         KeyPreview = true;
         KeyDown += (_, e) => { if (e.KeyCode == Keys.Escape) Close(); };
 
+        Paint += (_, e) =>
+        {
+            using var pen = new Pen(Color.FromArgb(200, 200, 205), 1f);
+            e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
+        };
+
         ConstruirInterface();
         CarregarDados();
     }
 
     void ConstruirInterface()
     {
-        // 1. Cabeçalho (62px)
+        // 1. Cabeçalho (64px)
         var pnlHeader = new Panel
         {
             Dock = DockStyle.Top,
@@ -71,6 +77,11 @@ public sealed class FormRelatoriosCrono : Form
             using var pen = new Pen(Color.FromArgb(235, 235, 238), 1f);
             e.Graphics.DrawLine(pen, 0, pnlHeader.Height - 1, pnlHeader.Width, pnlHeader.Height - 1);
         };
+
+        // Arrastar janela pelo cabeçalho
+        Point arrasto = Point.Empty;
+        pnlHeader.MouseDown += (_, e) => { if (e.Button == MouseButtons.Left) arrasto = e.Location; };
+        pnlHeader.MouseMove += (_, e) => { if (e.Button == MouseButtons.Left && arrasto != Point.Empty) { Left += e.X - arrasto.X; Top += e.Y - arrasto.Y; } };
 
         // Ícone gradiente metálico (#9A9AA0 -> #4A4A4F)
         var pnlIcone = new Panel
@@ -86,7 +97,7 @@ public sealed class FormRelatoriosCrono : Form
             using var brush = new LinearGradientBrush(new Point(0, 0), new Point(0, 34), Color.FromArgb(154, 154, 160), Color.FromArgb(74, 74, 79));
             e.Graphics.FillPath(brush, path);
 
-            // Desenha símbolo de documento
+            // Símbolo de documento
             using var pen = new Pen(Color.White, 2f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
             e.Graphics.DrawRectangle(pen, 9, 8, 16, 18);
             e.Graphics.DrawLine(pen, 13, 14, 21, 14);
@@ -193,50 +204,44 @@ public sealed class FormRelatoriosCrono : Form
         };
 
         // --- Card 1: Filtros ---
-        var cardFiltros = CriarCard("Filtros");
-        cardFiltros.Dock = DockStyle.Top;
-        cardFiltros.Height = 110;
-
         var tableFiltros = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            ColumnCount = 6,
+            ColumnCount = 4,
             RowCount = 1,
-            Padding = new Padding(0, 6, 0, 0)
+            Padding = new Padding(0, 4, 0, 0)
         };
-        tableFiltros.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 16.66f)); // Data
-        tableFiltros.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.34f)); // Evento
-        tableFiltros.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 16.66f)); // Grupo
-        tableFiltros.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.34f)); // Prova
+        tableFiltros.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 17f)); // Data
+        tableFiltros.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33f)); // Evento
+        tableFiltros.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 17f)); // Grupo
+        tableFiltros.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33f)); // Prova
 
         tableFiltros.Controls.Add(CriarCampoFiltro("Data do evento", _cbData), 0, 0);
         tableFiltros.Controls.Add(CriarCampoFiltro("Evento", _cbEvento), 1, 0);
-        tableFiltros.SetColumnSpan(tableFiltros.GetControlFromPosition(1, 0), 1);
         tableFiltros.Controls.Add(CriarCampoFiltro("Grupo", _cbGrupo), 2, 0);
         tableFiltros.Controls.Add(CriarCampoFiltro("Corrida / prova", _cbProva), 3, 0);
-        tableFiltros.SetColumnSpan(tableFiltros.GetControlFromPosition(3, 0), 1);
 
-        cardFiltros.Controls.Add(tableFiltros);
+        var cardFiltros = CriarCard("Filtros", tableFiltros);
+        cardFiltros.Dock = DockStyle.Top;
+        cardFiltros.Height = 114;
         pnlCorpo.Controls.Add(cardFiltros);
 
-        // Espaço entre cards
-        var espacador = new Panel { Dock = DockStyle.Top, Height = 12 };
+        // Espaçador entre cards
+        var espacador = new Panel { Dock = DockStyle.Top, Height = 14 };
         pnlCorpo.Controls.Add(espacador);
 
         // --- Card 2: Tipo de relatório ---
-        var cardTipos = CriarCard("Tipo de relatório");
-        cardTipos.Dock = DockStyle.Top;
-        cardTipos.Height = 350;
-
         var tableTipos = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 2,
             RowCount = 7,
-            Padding = new Padding(4, 8, 4, 4)
+            Padding = new Padding(4, 6, 4, 4)
         };
         tableTipos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
         tableTipos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
+        for (var i = 0; i < 7; i++)
+            tableTipos.RowStyles.Add(new RowStyle(SizeType.Absolute, 34f));
 
         var radios = new[]
         {
@@ -263,7 +268,7 @@ public sealed class FormRelatoriosCrono : Form
             r.ForeColor = Color.FromArgb(29, 29, 31);
             r.Cursor = Cursors.Hand;
             r.Dock = DockStyle.Fill;
-            r.Margin = new Padding(4, 3, 4, 3);
+            r.Margin = new Padding(4, 2, 4, 2);
             tableTipos.Controls.Add(r, col, row);
 
             col++;
@@ -274,7 +279,9 @@ public sealed class FormRelatoriosCrono : Form
             }
         }
 
-        cardTipos.Controls.Add(tableTipos);
+        var cardTipos = CriarCard("Tipo de relatório", tableTipos);
+        cardTipos.Dock = DockStyle.Top;
+        cardTipos.Height = 295;
         pnlCorpo.Controls.Add(cardTipos);
 
         Controls.Add(pnlCorpo);
@@ -288,12 +295,12 @@ public sealed class FormRelatoriosCrono : Form
         AcceptButton = btnGerar;
     }
 
-    static Panel CriarCard(string titulo)
+    static Panel CriarCard(string titulo, Control conteudo)
     {
         var card = new Panel
         {
             BackColor = Color.White,
-            Padding = new Padding(14, 12, 14, 12)
+            Padding = new Padding(16, 12, 16, 12)
         };
         card.Paint += (_, e) =>
         {
@@ -308,9 +315,13 @@ public sealed class FormRelatoriosCrono : Form
             Font = new Font("Segoe UI", 10F, FontStyle.Bold),
             ForeColor = Color.FromArgb(29, 29, 31),
             Dock = DockStyle.Top,
-            Height = 22
+            Height = 26
         };
+        conteudo.Dock = DockStyle.Fill;
+        card.Controls.Add(conteudo);
         card.Controls.Add(lTitulo);
+        card.Controls.SetChildIndex(lTitulo, 0);
+        card.Controls.SetChildIndex(conteudo, 1);
         return card;
     }
 
