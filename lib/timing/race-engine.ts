@@ -184,20 +184,59 @@ function dedupeKarts<T extends { kart: string; name?: string }>(list: T[]): T[] 
   });
 }
 
+/**
+ * Troca a lista de competidores mantendo o histórico de cada PILOTO (não do número do kart):
+ * - o piloto é reconhecido pelo cliente, depois pelo nome e por último pelo kart;
+ * - troca de kart: as voltas do kart anterior continuam com o piloto no kart novo;
+ * - se o kart novo já estava na pista sem piloto ("Kart 12", entrou sozinho), as passagens dele
+ *   se juntam ao histórico do piloto;
+ * - dois pilotos que trocam de kart entre si levam cada um as próprias voltas.
+ */
 export function setCompetitors(session: Session, list: { kart: string; name: string; customerId?: string | null; category?: string | null }[]) {
-  const previous = new Map(session.competitors.map((c) => [c.kart, c]));
-  session.competitors = dedupeKarts(list).map((c) => {
-    const old = previous.get(c.kart);
-    return {
+  const previous = session.competitors;
+  const used = new Set<Competitor>();
+  const nome = (n: string | null | undefined) => String(n ?? '').trim().toLowerCase();
+  const semPiloto = (c: Competitor) => Boolean(c.autoAdded) || !nome(c.name) || nome(c.name) === `kart ${nome(c.kart)}`;
+  const novos = dedupeKarts(list);
+  const achar = (pred: (o: Competitor) => boolean) => previous.find((o) => !used.has(o) && pred(o));
+
+  // 1ª passada: reconhece cada piloto da lista nova na lista antiga
+  const matches = novos.map((c) => {
+    const cid = c.customerId ? String(c.customerId) : '';
+    const n = nome(c.name);
+    const old =
+      (cid ? achar((o) => String(o.customerId ?? '') === cid) : undefined) ??
+      (n && n !== `kart ${nome(c.kart)}` ? achar((o) => !semPiloto(o) && nome(o.name) === n) : undefined);
+    if (old) used.add(old);
+    return old;
+  });
+  // 2ª passada: quem não foi reconhecido pelo piloto herda pelo número do kart (ex.: só corrigiu o nome)
+  novos.forEach((c, i) => {
+    if (matches[i] || !c.kart) return;
+    const old = achar((o) => o.kart === c.kart);
+    if (old) { used.add(old); matches[i] = old; }
+  });
+
+  session.competitors = novos.map((c, i) => {
+    const old = matches[i];
+    const crossings = [...(old?.crossings ?? [])];
+    // trocou de kart: junta as passagens que o kart novo já tinha sem piloto
+    if (c.kart && old?.kart !== c.kart) {
+      const orfao = achar((o) => o.kart === c.kart && semPiloto(o));
+      if (orfao) { used.add(orfao); crossings.push(...orfao.crossings); }
+    }
+    const competitor: Competitor = {
       kart: c.kart,
       name: c.name.trim(),
       customerId: c.customerId ?? old?.customerId ?? null,
       category: c.category ?? old?.category ?? null,
       autoAdded: false,
       flag: old?.flag ?? 'none',
-      crossings: old?.crossings ?? [],
+      crossings,
       finished: old?.finished ?? false,
     };
+    if (crossings.length !== (old?.crossings.length ?? 0)) recalculate(competitor);
+    return competitor;
   });
 }
 

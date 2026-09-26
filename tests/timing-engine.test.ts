@@ -359,6 +359,53 @@ describe('race-engine', () => {
     expect(mesmoPrograma(a, c)).toBe(false);
   });
 
+  describe('troca de kart', () => {
+    const volta = (s: ReturnType<typeof race>, kart: string, seg: number) => applyPassing(s, { kart, decoderTimeMs: seg * 1000, wallMs: seg * 1000 + 500 });
+    const pilotos = (s: ReturnType<typeof race>) => Object.fromEntries(computeStandings(s).map((r) => [r.name, { kart: r.kart, laps: r.laps, best: r.bestLapMs }]));
+
+    it('as voltas do kart anterior continuam com o piloto no kart novo', () => {
+      const s = race('corrida', 20);
+      setCompetitors(s, [{ kart: '8', name: 'Ana', customerId: '10' }, { kart: '5', name: 'Bia', customerId: '11' }]);
+      volta(s, '8', 10); volta(s, '8', 70); volta(s, '8', 131); // 2 voltas no kart 8
+      volta(s, '5', 12); volta(s, '5', 73);
+      // o kart 8 quebrou: Ana vai pro kart 12
+      setCompetitors(s, [{ kart: '12', name: 'Ana', customerId: '10' }, { kart: '5', name: 'Bia', customerId: '11' }]);
+      expect(pilotos(s).Ana).toEqual({ kart: '12', laps: 2, best: 60_000 });
+      expect(volta(s, '12', 230)).toBe('counted'); // volta longa (troca nos boxes)
+      expect(volta(s, '12', 291)).toBe('counted');
+      expect(pilotos(s).Ana).toMatchObject({ kart: '12', laps: 4 });
+      expect(s.competitors.find((c) => c.kart === '8')).toBeUndefined();
+    });
+
+    it('junta as passagens que o kart novo já tinha feito sem piloto', () => {
+      const s = race('corrida', 20);
+      setCompetitors(s, [{ kart: '8', name: 'Ana', customerId: '10' }]);
+      volta(s, '8', 10); volta(s, '8', 70);
+      volta(s, '12', 150); volta(s, '12', 211); // kart 12 já na pista, entrou sozinho como 'Kart 12'
+      expect(s.competitors.find((c) => c.kart === '12')?.autoAdded).toBe(true);
+      setCompetitors(s, [{ kart: '12', name: 'Ana', customerId: '10' }]);
+      expect(s.competitors).toHaveLength(1);
+      expect(pilotos(s).Ana).toMatchObject({ kart: '12', laps: 3 });
+    });
+
+    it('dois pilotos que trocam de kart entre si levam cada um as próprias voltas', () => {
+      const s = race('classificacao', 10);
+      setCompetitors(s, [{ kart: '8', name: 'Ana', customerId: '10' }, { kart: '12', name: 'Bia', customerId: '11' }]);
+      volta(s, '8', 0); volta(s, '8', 58);   // Ana 58 s
+      volta(s, '12', 1); volta(s, '12', 64); // Bia 63 s
+      setCompetitors(s, [{ kart: '12', name: 'Ana', customerId: '10' }, { kart: '8', name: 'Bia', customerId: '11' }]);
+      expect(pilotos(s)).toMatchObject({ Ana: { kart: '12', best: 58_000 }, Bia: { kart: '8', best: 63_000 } });
+    });
+
+    it('corrigir só o nome mantém as voltas do kart', () => {
+      const s = race('corrida', 20);
+      setCompetitors(s, [{ kart: '8', name: 'Ana' }]);
+      volta(s, '8', 10); volta(s, '8', 70);
+      setCompetitors(s, [{ kart: '8', name: 'Ana Maria' }]);
+      expect(pilotos(s)['Ana Maria']).toMatchObject({ kart: '8', laps: 1 });
+    });
+  });
+
   it('formata tempo de volta', () => {
     expect(formatLap(64_062)).toBe('1:04.062');
     expect(formatLap(9_500)).toBe('9.500');
