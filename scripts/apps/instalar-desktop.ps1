@@ -49,6 +49,13 @@ New-Item -ItemType Directory -Force $destino | Out-Null
 $anterior = $null
 try { $anterior = Get-Content "$destino\appsettings.json" -Raw -ErrorAction Stop | ConvertFrom-Json } catch {}
 Copy-Item (Join-Path $Origem '*') $destino -Recurse -Force
+# permissões normais (herdadas de Program Files): arquivo copiado/movido com permissão própria
+# (só Administradores/SISTEMA) impedia o usuário da máquina de abrir o programa (0x80070005)
+foreach ($arq in Get-ChildItem $destino -Recurse -File) {
+  $acl = New-Object System.Security.AccessControl.FileSecurity
+  $acl.SetAccessRuleProtection($false, $false)
+  Set-Acl -Path $arq.FullName -AclObject $acl
+}
 $cfg = [ordered]@{ ServidorUrl = $ServidorUrl; CronometragemUrl = $CronometragemUrl }
 if ($anterior -and $anterior.ImpressoraTermos) { $cfg.ImpressoraTermos = $anterior.ImpressoraTermos }
 if ($App -eq 'Autoatendimento') { $cfg.Impressora = $Impressora }
