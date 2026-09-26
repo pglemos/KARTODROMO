@@ -17,7 +17,7 @@ import net from 'node:net';
 import { appendFileSync, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { DecoderClient } from '../lib/timing/decoder-client';
+import { DecoderClient, type DecoderProtocol } from '../lib/timing/decoder-client';
 import { formatTrxPassing, type TrxPassing } from '../lib/timing/trx-parser';
 import {
   acceptRejected,
@@ -75,7 +75,10 @@ const PORT = Number(process.env.TIMING_PORT || 4050);
 const SIMULATE = process.env.TIMING_SIMULATE === '1';
 const SIM_PORT = Number(process.env.TIMING_SIM_PORT || 5199);
 const DECODER_HOST = SIMULATE ? '127.0.0.1' : process.env.TIMING_DECODER_HOST || '192.168.20.171';
-const DECODER_PORT = SIMULATE ? SIM_PORT : Number(process.env.TIMING_DECODER_PORT || 5100);
+// P3 (porta 5403) é a mesma saída que o Orbits 4 usa: relógio absoluto do decoder, voltas idênticas às do Orbits.
+// TRX (porta 5100) é a saída texto que o LapTime usava; o simulador fala TRX.
+const DECODER_PROTOCOL: DecoderProtocol = SIMULATE ? 'trx' : process.env.TIMING_DECODER_PROTOCOL === 'trx' ? 'trx' : 'p3';
+const DECODER_PORT = SIMULATE ? SIM_PORT : Number(process.env.TIMING_DECODER_PORT || (DECODER_PROTOCOL === 'p3' ? 5403 : 5100));
 const DATA_DIR = resolve(process.env.TIMING_DATA_DIR || join(process.cwd(), 'data', 'timing'));
 const SESSIONS_DIR = join(DATA_DIR, 'sessions');
 const JOURNAL_DIR = join(DATA_DIR, 'passagens');
@@ -200,7 +203,7 @@ function remember(key: string) {
   if (seenOrder.length > 5000) seenPassings.delete(seenOrder.shift()!);
 }
 
-const decoder = new DecoderClient(DECODER_HOST, DECODER_PORT);
+const decoder = new DecoderClient(DECODER_HOST, DECODER_PORT, 20_000, DECODER_PROTOCOL);
 
 decoder.on('passing', (p: TrxPassing) => {
   const key = `${p.decoderId}:${p.sequence}:${p.transponder}:${p.decoderTimeMs}`;
@@ -867,6 +870,6 @@ function startSimulator() {
 if (SIMULATE) startSimulator();
 decoder.start();
 server.listen(PORT, '0.0.0.0', () => {
-  log(`Cronometragem em http://0.0.0.0:${PORT}  (decoder ${DECODER_HOST}:${DECODER_PORT}${SIMULATE ? ' SIMULADO' : ''})`);
+  log(`Cronometragem em http://0.0.0.0:${PORT}  (decoder ${DECODER_HOST}:${DECODER_PORT} ${DECODER_PROTOCOL.toUpperCase()}${SIMULATE ? ' SIMULADO' : ''})`);
   log(`dados em ${DATA_DIR}, ${sessions.size} baterias carregadas, ${Object.keys(transponderMap).length} transponders mapeados`);
 });

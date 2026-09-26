@@ -288,3 +288,40 @@ describe('leitura ignorada restaurada pelo operador', () => {
     expect(a.lastLapMs).toBe(57_000);
   });
 });
+
+describe('decoder P3 (porta 5403, a do Orbits)', () => {
+  function quadroPassagem(transponder: number, rtcUs: bigint) {
+    const campos = Buffer.concat([
+      Buffer.from([0x01, 4]), Buffer.from(Uint32Array.of(77).buffer),
+      Buffer.from([0x03, 4]), Buffer.from(Uint32Array.of(transponder).buffer),
+      Buffer.from([0x04, 8]), (() => { const b = Buffer.alloc(8); b.writeBigUInt64LE(rtcUs); return b; })(),
+      Buffer.from([0x05, 2, 0xb3, 0x00, 0x06, 2, 0xee, 0x00]),
+    ]);
+    const cab = Buffer.alloc(9); cab[0] = 2; cab.writeUInt16LE(campos.length + 11, 1); cab.writeUInt16LE(0x0001, 7);
+    // escapa 0x8A..0x8F como o decoder faz
+    const corpo: number[] = [];
+    for (const x of Buffer.concat([cab, campos])) { if (x >= 0x8a && x <= 0x8f) corpo.push(0x8d, x + 0x20); else corpo.push(x); }
+    return Buffer.from([0x8e, ...corpo, 0x8f]);
+  }
+
+  it('lê transponder e horário RTC (ms) igual ao Orbits', async () => {
+    const { P3FrameSplitter, parseP3Frame } = await import('../lib/timing/p3-parser');
+    const sp = new P3FrameSplitter();
+    // horário do Orbits de 26/09 (kart 8): 1790395454872000 µs; o transponder 5617602 tem byte 0x8F? não, mas testa escape com 0x8E no tempo
+    const a = quadroPassagem(5617602, 1790395454872000n);
+    const b = quadroPassagem(5617602, 1790395462580000n);
+    const frames = [...sp.push(a.subarray(0, 10)), ...sp.push(Buffer.concat([a.subarray(10), b]))];
+    const recs = frames.map(parseP3Frame);
+    expect(recs).toHaveLength(2);
+    expect(recs[0]).toMatchObject({ kind: 'passing', transponder: 5617602, sequence: 77, hits: 238, strength: 179 });
+    const volta = (recs[1] as { decoderTimeMs: number }).decoderTimeMs - (recs[0] as { decoderTimeMs: number }).decoderTimeMs;
+    expect(volta).toBe(7_708); // mesma volta que o Orbits mostrou
+  });
+
+  it('desfaz escape de bytes 0x8A..0x8F', async () => {
+    const { P3FrameSplitter, parseP3Frame } = await import('../lib/timing/p3-parser');
+    const q = quadroPassagem(0x8e8d8f, 0x8f8e8d8an * 1000n);
+    const [f] = new P3FrameSplitter().push(q);
+    expect(parseP3Frame(f)).toMatchObject({ transponder: 0x8e8d8f, decoderTimeMs: Number(0x8f8e8d8an) });
+  });
+});
