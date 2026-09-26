@@ -603,54 +603,152 @@ public class FormCheckout : Janela, ISemKit
 
 public class FormVenda : Janela
 {
-    public FormVenda(long id) : base("Visualizar Métodos de Pagamento", 780, 480)
+    public FormVenda(long id) : base("Visualizar métodos de pagamento", 960, 680)
     {
-        var info = new Label { Dock = DockStyle.Top, Height = 44, Padding = new Padding(4) };
-        var gi = new Grade(); gi.Colunas(new("item", "Item", TipoCol.Inteiro, 50), new("descricao", "Descrição", Largura: 280), new("quantidade", "Qtde", TipoCol.Inteiro, 50), new("unitario", "Unitário", TipoCol.Dinheiro),
-            new("desconto", "Desconto", TipoCol.Dinheiro), new("liquido", "Líquido", TipoCol.Dinheiro), new("estornado", "Estornado", TipoCol.Bool));
-        var gp = new Grade(); gp.Colunas(new("forma", "Método de Pagamento", Largura: 300), new("valor", "Valor (R$)", TipoCol.Dinheiro));
-        var rodapeInfo = new Label { Dock = DockStyle.Bottom, Height = 24, Font = Tema.Negrito };
-        var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterDistance = 220 };
-        split.Panel1.Controls.Add(gi); split.Panel2.Controls.Add(gp);
-        Controls.Add(new Panel { Dock = DockStyle.Fill, Padding = new Padding(8), Controls = { split, rodapeInfo, info } });
-        Rodape(("Imprimir Comprovante", (_, _) => Relatorio.Abrir(this, Sessao.Api.UrlComToken("/relatorio/venda?id=" + id), "Comprovante"), false), ("Fechar", (_, _) => Close(), true));
+        var gi = new Grade();
+        gi.Colunas(
+            new("item", "Item", TipoCol.Inteiro, 60),
+            new("descricao", "Descrição", Largura: 320),
+            new("quantidade", "Qtde", TipoCol.Inteiro, 60),
+            new("unitario", "Unitário", TipoCol.Dinheiro, 90),
+            new("desconto", "Desconto", TipoCol.Dinheiro, 90),
+            new("liquido", "Líquido", TipoCol.Dinheiro, 100),
+            new("estornado", "Estornado", TipoCol.Bool, 80)
+        );
+        gi.Dock = DockStyle.Fill;
+
+        var cartaoItens = KitVisual.CartaoSecao("Itens");
+        cartaoItens.Height = 220;
+        var pItens = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 8, 0, 0) };
+        pItens.Controls.Add(gi);
+        cartaoItens.Controls.Add(pItens);
+
+        var gp = new Grade();
+        gp.Colunas(
+            new("forma", "Método de pagamento", Largura: 400),
+            new("valor", "Valor (R$)", TipoCol.Dinheiro, 140)
+        );
+        gp.Dock = DockStyle.Fill;
+
+        var cartaoPags = KitVisual.CartaoSecao("Pagamentos");
+        cartaoPags.Height = 160;
+        var pPags = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 8, 0, 0) };
+        pPags.Controls.Add(gp);
+        cartaoPags.Controls.Add(pPags);
+
+        var nota = new Panel { Dock = DockStyle.Top, Height = 48, BackColor = Color.FromArgb(245, 245, 247), Padding = new Padding(14, 10, 14, 10), Margin = new Padding(0, 0, 0, 12) };
+        nota.Paint += (_, e) =>
+        {
+            using var pen = new Pen(Color.FromArgb(232, 232, 236));
+            e.Graphics.DrawRectangle(pen, 0, 0, nota.Width - 1, nota.Height - 1);
+        };
+        var lblTotais = new Label { Dock = DockStyle.Fill, ForeColor = Color.FromArgb(58, 58, 60), Font = new Font("Segoe UI", 9.2F) };
+        nota.Controls.Add(lblTotais);
+
+        Controls.Add(nota);
+        Controls.Add(cartaoPags);
+        Controls.Add(cartaoItens);
+
+        Rodape(
+            ("Imprimir comprovante", (_, _) => Relatorio.Abrir(this, Sessao.Api.UrlComToken("/relatorio/venda?id=" + id), "Comprovante"), false),
+            ("Fechar", (_, _) => Close(), true)
+        );
+
         Load += (_, _) => Seguro.Rodar(this, async () =>
         {
             var v = await Sessao.Api.Get($"/api/office/vendas/{id}");
-            info.Text = $"Venda nº {v.S("codigo")} · {Fmt.DmyHm(v.S("dataHora"))} · {v.S("terminal")} · {v.S("usuario")}\nCliente: {v.S("cliente")}";
+            Tag = $"Venda nº {v.S("codigo")} · {v.S("cliente")} · {Fmt.DmyHm(v.S("dataHora"))} · {v.S("usuario")} · {v.S("terminal")}";
             gi.Carregar(((JsonArray)v["itens"]).OfType<JsonObject>());
             gp.Carregar(((JsonArray)v["pagamentos"]).OfType<JsonObject>());
-            rodapeInfo.Text = $"Total {Fmt.Brl(v.L("final"))} · Recebido {Fmt.Brl(v.L("recebido"))} · Troco {Fmt.Brl(v.L("troco"))} · Estornos {Fmt.Brl(v.L("estorno"))}";
+            lblTotais.Text = $"Total {Fmt.Brl(v.L("final"))} · Desconto {Fmt.Brl(v.L("desconto"))} · Recebido {Fmt.Brl(v.L("recebido"))} · Troco {Fmt.Brl(v.L("troco"))} · Estornos {Fmt.Brl(v.L("estorno"))}";
         });
     }
 }
 
 public class FormEstorno : Janela
 {
-    public FormEstorno(long id) : base("Estornar Pagamento", 780, 440)
+    public FormEstorno(long id) : base("Estornar pagamento", 960, 680)
     {
-        var info = new Label { Dock = DockStyle.Top, Height = 58, Padding = new Padding(4) };
+        var txtRecebido = new TextBox { ReadOnly = true };
+        var txtDesconto = new TextBox { ReadOnly = true };
+        var txtTroco = new TextBox { ReadOnly = true };
+
+        var gResumo = Campos.Grade(6);
+        Campos.Add(gResumo, "Total recebido", txtRecebido, 2);
+        Campos.Add(gResumo, "Descontos", txtDesconto, 2);
+        Campos.Add(gResumo, "Troco", txtTroco, 2);
+
+        var cResumo = KitVisual.CartaoSecao("Resumo");
+        cResumo.Controls.Add(gResumo);
+
         var g = new Grade(true);
-        g.Colunas(new("descricao", "Item", Largura: 360), new("quantidade", "Qtde", TipoCol.Inteiro, 60), new("liquido", "Total Líquido", TipoCol.Dinheiro, 110));
+        g.Colunas(
+            new("descricao", "Item", Largura: 420),
+            new("quantidade", "Qtde", TipoCol.Inteiro, 70),
+            new("liquido", "Total líquido", TipoCol.Dinheiro, 130)
+        );
+        g.Dock = DockStyle.Fill;
+
+        var cItens = KitVisual.CartaoSecao("Marque os itens a estornar");
+        cItens.Height = 220;
+        var pGrid = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 8, 0, 0) };
+        pGrid.Controls.Add(g);
+        cItens.Controls.Add(pGrid);
+
         var motivo = Campos.Texto(400);
-        var gm = Campos.Grade(1); Campos.Add(gm, "Motivo", motivo);
-        gm.Dock = DockStyle.Bottom;
-        Controls.Add(new Panel { Dock = DockStyle.Fill, Padding = new Padding(8), Controls = { g, gm, new Label { Text = "Detalhes — marque os itens a estornar", Dock = DockStyle.Top, Height = 20, Font = Tema.Negrito }, info } });
-        Rodape(("Cancelar", (_, _) => Close(), false), ("Estornar", (_, _) => Seguro.Rodar(this, async () =>
+        var gMotivo = Campos.Grade(6);
+        Campos.Add(gMotivo, "Motivo do estorno", motivo, 6);
+
+        var cMotivo = KitVisual.CartaoSecao("Motivo (obrigatório)");
+        cMotivo.Controls.Add(gMotivo);
+
+        Controls.Add(cMotivo);
+        Controls.Add(cItens);
+        Controls.Add(cResumo);
+
+        Button btnEstornar = null;
+        void AtualizarBotao()
         {
             var sel = g.Marcados;
-            if (sel.Count == 0) { Msg.Aviso(this, "Selecione os itens a estornar."); return; }
-            if (string.IsNullOrWhiteSpace(motivo.Text)) { Msg.Aviso(this, "Informe o motivo do estorno."); return; }
-            if (!Msg.Pergunta(this, "Tem certeza que deseja estornar os produtos selecionados?")) return;
-            var r = await Sessao.Api.Post($"/api/office/vendas/{id}/estorno", new { itemIds = sel.Select(i => i.L("id")).ToArray(), motivo = motivo.Text.Trim() });
-            Msg.Info(this, $"Estorno de {Fmt.Brl(r.L("estornado"))} registrado. Devolva o valor ao cliente pela mesma forma de pagamento.");
-            DialogResult = DialogResult.OK; Close();
-        }), false));
+            var soma = sel.Sum(i => i.L("liquido") ?? 0);
+            if (btnEstornar != null) btnEstornar.Text = soma > 0 ? $"Estornar {Fmt.Brl(soma)}" : "Estornar";
+        }
+        g.ItemMarcadoMudou += () => AtualizarBotao();
+
+        var rodapeCtrl = Rodape("Devolva o valor pela mesma forma de pagamento.",
+            ("Cancelar", (_, _) => Close(), false),
+            ("Estornar", (_, _) => Seguro.Rodar(this, async () =>
+            {
+                var sel = g.Marcados;
+                if (sel.Count == 0) { Msg.Aviso(this, "Selecione os itens a estornar."); return; }
+                if (string.IsNullOrWhiteSpace(motivo.Text)) { Msg.Aviso(this, "Informe o motivo do estorno."); return; }
+                if (!Msg.Pergunta(this, "Tem certeza que deseja estornar os produtos selecionados?")) return;
+                var r = await Sessao.Api.Post($"/api/office/vendas/{id}/estorno", new { itemIds = sel.Select(i => i.L("id")).ToArray(), motivo = motivo.Text.Trim() });
+                Msg.Info(this, $"Estorno de {Fmt.Brl(r.L("estornado"))} registrado. Devolva o valor ao cliente pela mesma forma de pagamento.");
+                DialogResult = DialogResult.OK; Close();
+            }), true)
+        );
+
+        if (rodapeCtrl is Panel pnl)
+        {
+            var flw = pnl.Controls.OfType<FlowLayoutPanel>().FirstOrDefault();
+            btnEstornar = flw?.Controls.OfType<Button>().FirstOrDefault(b => b.Text.StartsWith("Estornar"));
+            if (btnEstornar != null)
+            {
+                btnEstornar.BackColor = Color.FromArgb(224, 52, 42);
+                btnEstornar.ForeColor = Color.White;
+            }
+        }
+
         Load += (_, _) => Seguro.Rodar(this, async () =>
         {
             var v = await Sessao.Api.Get($"/api/office/vendas/{id}");
-            info.Text = $"Cliente: {v.S("cliente")}    Data da Venda: {Fmt.DmyHm(v.S("dataHora"))}    Terminal: {v.S("terminal")}\nTotal Recebido: {Fmt.Brl(v.L("recebido"))}    Descontos: {Fmt.Brl(v.L("desconto"))}    Troco: {Fmt.Brl(v.L("troco"))}";
+            Tag = $"Venda nº {v.S("codigo")} · {v.S("cliente")} · {Fmt.DmyHm(v.S("dataHora"))} · terminal {v.S("terminal")}";
+            txtRecebido.Text = Fmt.Brl(v.L("recebido"));
+            txtDesconto.Text = Fmt.Brl(v.L("desconto"));
+            txtTroco.Text = Fmt.Brl(v.L("troco"));
             g.Carregar(((JsonArray)v["itens"]).OfType<JsonObject>().Where(i => !i.B("estornado")));
+            AtualizarBotao();
         });
     }
 }

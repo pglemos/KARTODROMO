@@ -6,8 +6,8 @@ namespace Kartodromo.Recepcao;
 /// <summary>Peças visuais da tela principal copiadas do design aprovado (Main.dc.html).</summary>
 static class VisualPrincipal
 {
-    public static readonly Color Lateral = Color.FromArgb(240, 240, 243);
-    public static readonly Color Selecao = Color.FromArgb(214, 230, 222);   // rgba(11,122,83,0.14) sobre a lateral
+    public static readonly Color Lateral = Color.FromArgb(236, 236, 240);
+    public static readonly Color Selecao = Color.FromArgb(218, 232, 225);   // rgba(11,122,83,0.14) sobre a lateral
     public static readonly Color TextoSel = Color.FromArgb(10, 94, 64);
     public static readonly Dictionary<string, Color> Pontos = new()
     {
@@ -36,19 +36,25 @@ static class VisualPrincipal
         return p;
     }
 
-    /// <summary>Botão da barra de ferramentas: bloco colorido 36px com o ícone + nome embaixo.</summary>
+    /// <summary>Botão da barra de ferramentas: bloco 36px com o ícone + nome embaixo (Main.dc.html).</summary>
     public static Control BotaoBarra(string icone, string texto, string dica, Action clique)
     {
-        var largura = Math.Max(60, TextRenderer.MeasureText(texto, new Font("Segoe UI", 8.4F)).Width + 12);
-        var b = new Panel { Size = new Size(largura, 70), Margin = new Padding(1, 4, 1, 4), Cursor = Cursors.Hand, BackColor = Color.White };
+        var largura = Math.Max(74, TextRenderer.MeasureText(texto, new Font("Segoe UI", 8.5F)).Width + 16);
+        var b = new Panel { Size = new Size(largura, 72), Margin = new Padding(1, 4, 1, 4), Cursor = Cursors.Hand, BackColor = Color.White };
         var dentro = false;
         b.Paint += (_, e) =>
         {
             var g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias; g.InterpolationMode = InterpolationMode.HighQualityBicubic; g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-            if (dentro) { using var f = new SolidBrush(Color.FromArgb(242, 242, 245)); using var p = Redondo(new Rectangle(0, 0, b.Width - 1, b.Height - 1), 10); g.FillPath(f, p); }
-            g.DrawImage(Icone(icone), new Rectangle((b.Width - 48) / 2, 0, 48, 48));
-            TextRenderer.DrawText(g, texto, new Font("Segoe UI", 8.4F), new Rectangle(0, 47, b.Width, 20), KitVisual.Texto, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+            if (dentro)
+            {
+                using var f = new SolidBrush(Color.FromArgb(242, 242, 245));
+                using var p = Redondo(new Rectangle(0, 0, b.Width - 1, b.Height - 1), 12);
+                g.FillPath(f, p);
+            }
+            var iconRect = new Rectangle((b.Width - 36) / 2, 7, 36, 36);
+            g.DrawImage(Icone(icone), iconRect);
+            TextRenderer.DrawText(g, texto, new Font("Segoe UI", 8.5F), new Rectangle(0, 48, b.Width, 18), KitVisual.Texto, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
         };
         b.MouseEnter += (_, _) => { dentro = true; b.Invalidate(); };
         b.MouseLeave += (_, _) => { dentro = false; b.Invalidate(); };
@@ -57,9 +63,9 @@ static class VisualPrincipal
         return b;
     }
 
-    public static Control Separador() => new Panel { Size = new Size(1, 44), Margin = new Padding(8, 16, 8, 0), BackColor = Color.FromArgb(229, 229, 234) };
+    public static Control Separador() => new Panel { Size = new Size(1, 44), Margin = new Padding(6, 14, 6, 0), BackColor = Color.FromArgb(229, 229, 234) };
 
-    /// <summary>Selo do caixa no fim da barra (verde quando há terminal aberto).</summary>
+    /// <summary>Selo do caixa no fim da barra (verde quando há terminal aberto, com halo e cores exatas do design).</summary>
     public sealed class SeloTerminal : Panel
     {
         public string Titulo = "Nenhum terminal aberto", Sub = "Clique para abrir o caixa";
@@ -71,17 +77,33 @@ static class VisualPrincipal
             {
                 var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
                 using var p = Redondo(new Rectangle(0, 0, Width - 1, Height - 1), 12);
-                using var f = new SolidBrush(Aberto ? Color.FromArgb(232, 247, 237) : Color.FromArgb(242, 242, 245)); g.FillPath(f, p);
-                using var dot = new SolidBrush(Aberto ? Color.FromArgb(52, 199, 89) : Color.FromArgb(174, 174, 178));
-                g.FillEllipse(dot, 14, Height / 2 - 5, 10, 10);
+                using var f = new SolidBrush(Aberto ? Color.FromArgb(232, 247, 237) : Color.FromArgb(242, 242, 245));
+                g.FillPath(f, p);
+                
+                var cy = Height / 2;
+                if (Aberto)
+                {
+                    // Outer ring glow: rgba(52, 199, 89, 0.25)
+                    using var glow = new SolidBrush(Color.FromArgb(64, 52, 199, 89));
+                    g.FillEllipse(glow, 11, cy - 7, 14, 14);
+                    // Core dot
+                    using var dot = new SolidBrush(Color.FromArgb(52, 199, 89));
+                    g.FillEllipse(dot, 14, cy - 4, 8, 8);
+                }
+                else
+                {
+                    using var dot = new SolidBrush(Color.FromArgb(174, 174, 178));
+                    g.FillEllipse(dot, 14, cy - 4, 8, 8);
+                }
+                
                 TextRenderer.DrawText(g, Titulo, new Font("Segoe UI", 9F, FontStyle.Bold), new Rectangle(32, 5, Width - 38, 18), Aberto ? Color.FromArgb(28, 107, 53) : KitVisual.Texto, TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
-                TextRenderer.DrawText(g, Sub, new Font("Segoe UI", 8F), new Rectangle(32, 23, Width - 38, 16), KitVisual.Secundario, TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
+                TextRenderer.DrawText(g, Sub, new Font("Segoe UI", 8F), new Rectangle(32, 23, Width - 38, 16), Aberto ? Color.FromArgb(58, 94, 69) : KitVisual.Secundario, TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
             };
         }
         public void Definir(bool aberto, string titulo, string sub)
         {
             Aberto = aberto; Titulo = titulo; Sub = sub;
-            Width = Math.Max(180, Math.Max(TextRenderer.MeasureText(titulo, new Font("Segoe UI", 9F, FontStyle.Bold)).Width, TextRenderer.MeasureText(sub, new Font("Segoe UI", 8F)).Width) + 46);
+            Width = Math.Max(190, Math.Max(TextRenderer.MeasureText(titulo, new Font("Segoe UI", 9F, FontStyle.Bold)).Width, TextRenderer.MeasureText(sub, new Font("Segoe UI", 8F)).Width) + 48);
             Invalidate();
         }
     }

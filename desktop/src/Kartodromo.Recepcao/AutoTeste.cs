@@ -102,6 +102,7 @@ public static class AutoTeste
         {
             await Janela(new FormBateria(bateria), principal, pasta, "35-editar-bateria");
             await Janela(new FormIncluirCliente(bateria), principal, pasta, "36-incluir-cliente");
+            await Janela(new FormListaParticipantes(bateria), principal, pasta, "36b-lista-participantes");
         }
         else Log.Add("pendente: telas Editar Bateria e Incluir Cliente requerem bateria cadastrada na data.");
         await Janela(new FormAgenda(), principal, pasta, "37-agenda");

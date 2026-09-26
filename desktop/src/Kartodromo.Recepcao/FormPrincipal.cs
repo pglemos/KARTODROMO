@@ -74,7 +74,7 @@ public class FormPrincipal : Form
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, BackColor = KitVisual.Fundo, Margin = new Padding(0), Padding = new Padding(0) };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 84));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         layout.Controls.Add(MontarCabecalho(), 0, 0);
@@ -418,7 +418,7 @@ public class FormPrincipal : Form
         var barra = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1, BackColor = Color.FromArgb(255, 255, 255), Padding = new Padding(14, 0, 14, 0), Margin = new Padding(0) };
         barra.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 292));
         barra.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        barra.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 240));
+        barra.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 310));
         barra.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 155));
         barra.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         var marca = new Panel { Dock = DockStyle.Fill };
@@ -432,7 +432,7 @@ public class FormPrincipal : Form
         menus.BackColor = Color.White;
         menus.Padding = new Padding(0, 8, 0, 0);
         var busca = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(242, 242, 245), Margin = new Padding(0, 10, 10, 10), Padding = new Padding(9, 3, 8, 0) };
-        KitVisual.AplicarRaio(busca, 8);
+        KitVisual.AplicarRaio(busca, 9);
         var q = _buscaGlobal;
         q.Dock = DockStyle.Fill;
         q.BackColor = busca.BackColor;
@@ -451,8 +451,15 @@ public class FormPrincipal : Form
         }
         q.KeyDown += (_, e) => { if (e.KeyCode == Keys.Enter) { Buscar(); e.Handled = true; e.SuppressKeyPress = true; } };
         var usuario = new Panel { Dock = DockStyle.Fill };
-        var circulo = new Label { Text = string.IsNullOrWhiteSpace(Sessao.Nome) ? "?" : Sessao.Nome[..1].ToUpperInvariant(), TextAlign = ContentAlignment.MiddleCenter, Size = new Size(30, 30), BackColor = Color.FromArgb(30, 111, 232), ForeColor = Color.White, Font = new Font("Segoe UI", 10F, FontStyle.Bold), Location = new Point(0, 11) };
-        KitVisual.AplicarRaio(circulo, 15);
+        var circulo = new Panel { Size = new Size(30, 30), Location = new Point(0, 11) };
+        var letra = string.IsNullOrWhiteSpace(Sessao.Nome) ? "?" : Sessao.Nome[..1].ToUpperInvariant();
+        circulo.Paint += (_, e) =>
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using var b = new LinearGradientBrush(circulo.ClientRectangle, Color.FromArgb(127, 184, 255), Color.FromArgb(30, 111, 232), 90f);
+            e.Graphics.FillEllipse(b, circulo.ClientRectangle);
+            TextRenderer.DrawText(e.Graphics, letra, new Font("Segoe UI", 10F, FontStyle.Bold), circulo.ClientRectangle, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+        };
         usuario.Controls.Add(circulo);
         usuario.Controls.Add(new Label { Text = Sessao.Nome, AutoSize = false, Width = 116, Height = 18, Font = new Font("Segoe UI", 8.8F, FontStyle.Bold), ForeColor = KitVisual.Texto, Location = new Point(38, 17), AutoEllipsis = true });
         barra.Controls.Add(marca, 0, 0); barra.Controls.Add(menus, 1, 0); barra.Controls.Add(busca, 2, 0); barra.Controls.Add(usuario, 3, 0);
@@ -587,7 +594,7 @@ public class FormPrincipal : Form
             VisualPrincipal.Separador(),
             B("online", "Serviços Online", "Site, WhatsApp e reservas online", () => new FormServicosOnline().ShowDialog(this)),
         ]);
-        _selo.Anchor = AnchorStyles.Right; _selo.Margin = new Padding(8, 17, 0, 0);
+        _selo.Anchor = AnchorStyles.Right; _selo.Margin = new Padding(8, 20, 0, 20);
         barra.Controls.Add(fluxo, 0, 0); barra.Controls.Add(_selo, 1, 0);
         barra.Paint += (_, e) => { using var pen = new Pen(KitVisual.Linha); e.Graphics.DrawLine(pen, 0, barra.Height - 1, barra.Width, barra.Height - 1); };
         return barra;
@@ -1057,7 +1064,7 @@ public class FormPrincipal : Form
             Item("Incluir cliente", () => { if (new FormIncluirCliente(sel[0]).ShowDialog(this) == DialogResult.OK) Recarregar(); }, umaSo, "Ins"),
             Item("Ver reservas", () => Selecionar("reservas:todas", sel[0]), umaSo),
             new ToolStripSeparator(),
-            Item("Lista de participantes", () => Relatorio.Abrir(this, Sessao.Api.UrlComToken("/relatorio/participantes?bateria=" + sel[0].S("id")), "Lista de Participantes"), umaSo, "Ctrl+P"),
+            Item("Lista de participantes", () => new FormListaParticipantes(sel[0]).ShowDialog(this), umaSo, "Ctrl+P"),
             new ToolStripSeparator(),
             Exportar("baterias"),
             new ToolStripSeparator(),
