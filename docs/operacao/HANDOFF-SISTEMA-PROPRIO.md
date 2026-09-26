@@ -19,10 +19,9 @@
     - **Autoatendimento**: os totens.
     - **Cronometragem**: o operador e o telão.
 - **Regra do dono:** os apps são **programas instalados** (como o LapTime), **nunca app web/Chrome**.
-- O código está em `C:\repos\KARTODROMO` no ORBITS, branch `main`, **14 commits à frente do
-  `origin/main`** (push pendente: o token do remoto no ORBITS só lê). A seção 3 explica como puxar para o Mac.
-- Há **alterações não commitadas na cronometragem feitas por outra sessão do Claude**. São 6 arquivos,
-  listados na seção 11. Não descartar.
+- O código está em `C:\repos\KARTODROMO` no ORBITS, branch `main`. O ORBITS só **lê** do GitHub;
+  **quem publica no GitHub é o Mac**, puxando do ORBITS por SSH (seção 3.2).
+- O Mac entra no ORBITS por **SSH** (`KARTODROMO@192.168.20.249`) e dali chega em todos os PCs (seção 3.4).
 
 ---
 
@@ -65,67 +64,105 @@ Relógios de .249/.13/.53/.69/.254 sincronizados com NTP.br. O Totem 1 não foi 
 
 ## 3. Como trabalhar a partir do MacBook
 
-### 3.1 Pegar o código (os 14 commits ainda só existem no ORBITS)
+Resumo: o **ORBITS (192.168.20.249) é a porta de entrada**. O Mac entra por **SSH** com a conta
+`KARTODROMO` (a mesma senha SEC-008 de todas as máquinas). De lá chega em todos os PCs por
+**WinRM**, puxa e empurra o código, compila e instala.
 
-**Opção A (recomendada): publicar no GitHub pelo ORBITS.** Alguém no ORBITS roda o comando abaixo
-e faz login do GitHub no navegador. O token gravado na URL do remoto só tem leitura.
+### 3.1 Primeira vez no Mac (uma vez só)
+
+```bash
+# 1) entrar no ORBITS (a senha é a SEC-008, que está no 00_INVENTARIO_SEGREDOS.md)
+ssh KARTODROMO@192.168.20.249        # cai no PowerShell do ORBITS
+
+# 2) (opcional, recomendado) entrar sem senha usando a chave do Mac:
+#    no Mac:
+ssh-keygen -t ed25519            # se ainda não tiver ~/.ssh/id_ed25519
+cat ~/.ssh/id_ed25519.pub | ssh KARTODROMO@192.168.20.249 "powershell -NoProfile -Command \"\$k = [Console]::In.ReadToEnd(); Add-Content -Encoding ascii C:\ProgramData\ssh\administrators_authorized_keys \$k\""
+#    (conta admin no Windows usa C:\ProgramData\ssh\administrators_authorized_keys)
+
+# 3) atalho no ~/.ssh/config do Mac:
+#   Host orbits
+#     HostName 192.168.20.249
+#     User KARTODROMO
+```
+
+Dentro do ORBITS (SSH), **uma vez**, salve a credencial WinRM para essa conta. A senha é
+digitada escondida, fica cifrada só para o usuário KARTODROMO e é conferida no SRVKART:
 
 ```powershell
 cd C:\repos\KARTODROMO
+powershell -ExecutionPolicy Bypass -File scripts\apps\salvar-credencial.ps1
+git config --global --add safe.directory C:/repos/KARTODROMO   # o repo pertence ao Administrador
+```
+
+### 3.2 Código-fonte
+
+- Repositório: `https://github.com/pglemos/KARTODROMO`, branch **`main`**.
+- **O ORBITS só consegue LER do GitHub** (não tem login com permissão de escrita). Quem publica é o **Mac**.
+- O clone de trabalho que roda a produção fica em **`C:\repos\KARTODROMO`** no ORBITS. A
+  cronometragem roda direto dessa pasta.
+
+Pegar o que está no ORBITS e publicar no GitHub **pelo Mac** (git por SSH):
+
+```bash
+git clone https://github.com/pglemos/KARTODROMO.git ~/PROJETOS/KARTODROMO   # se ainda não tiver
+cd ~/PROJETOS/KARTODROMO
+git remote add orbits "KARTODROMO@192.168.20.249:C:/repos/KARTODROMO"       # uma vez
+git fetch orbits main
+git checkout main && git merge --ff-only orbits/main
 git push origin main
 ```
 
-Depois, no Mac: `git clone https://github.com/pglemos/KARTODROMO.git`, ou `git pull` se já tiver o clone.
+Fluxo do dia a dia:
 
-**Opção B: puxar direto do disco do ORBITS pela rede (SMB).** No Finder, use `Cmd+K` para abrir
-`smb://192.168.20.249/C$` e entre com o usuário `KARTODROMO` (SEC-008). Depois, no Mac:
+1. Editar e commitar no Mac, depois `git push origin main`.
+2. `ssh orbits`, depois `cd C:\repos\KARTODROMO; git pull`.
+3. Compilar e instalar pelo ORBITS (seções 7 e 8).
+
+Se alguém commitar direto no ORBITS, puxe com `git fetch orbits` e publique com `git push origin main`.
+
+### 3.3 Levar os arquivos de senha para o Mac (fora do git)
+
+Os arquivos são `C:\KARTODROMO\00_INVENTARIO_SEGREDOS.md` e
+`C:\KARTODROMO\SENHAS_SISTEMA_PROPRIO.txt`. Copie-os para uma pasta **fora do repo**:
 
 ```bash
-cd ~/PROJETOS/KARTODROMO   # clone existente
-git fetch "/Volumes/C\$/repos/KARTODROMO" main:orbits-main
-git merge --ff-only orbits-main
+mkdir -p ~/KARTODROMO-SEGREDOS && chmod 700 ~/KARTODROMO-SEGREDOS
+scp "KARTODROMO@192.168.20.249:C:/KARTODROMO/00_INVENTARIO_SEGREDOS.md" "KARTODROMO@192.168.20.249:C:/KARTODROMO/SENHAS_SISTEMA_PROPRIO.txt" ~/KARTODROMO-SEGREDOS/
 ```
 
-### 3.2 Levar os arquivos de senha (fora do git)
+### 3.4 Acesso remoto a TODOS os computadores (do Mac, via ORBITS)
 
-Pelo mesmo SMB, copie `C:\KARTODROMO\00_INVENTARIO_SEGREDOS.md` e
-`C:\KARTODROMO\SENHAS_SISTEMA_PROPRIO.txt` para uma pasta **fora do repo** no Mac, por exemplo
-`~/KARTODROMO-SEGREDOS/`.
-
-### 3.3 Rodar comandos nas máquinas Windows
-
-O acesso remoto às máquinas é pelo **WinRM**, a partir do ORBITS. O WinRM a partir do macOS não é
-confiável. O ORBITS **não tem SSH** hoje (o OpenSSH Server está como `NotPresent`).
-
-**Recomendado:** o dono liga o OpenSSH no ORBITS **uma vez**, num PowerShell **como administrador**.
-É uma mudança de segurança; decida antes de rodar.
+```bash
+ssh orbits      # PowerShell do ORBITS
+```
 
 ```powershell
-Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
-Set-Service sshd -StartupType Automatic; Start-Service sshd
-New-NetFirewallRule -Name sshd-lan -DisplayName "OpenSSH (rede local)" -Protocol TCP -LocalPort 22 -RemoteAddress LocalSubnet -Action Allow
+. C:\repos\KARTODROMO\scripts\apps\credencial.ps1
+$c = Obter-CredencialKartodromo
+Enter-PSSession 192.168.20.53  -Credential $c   # Recepção
+Enter-PSSession 192.168.20.13  -Credential $c   # SRVKART
+Enter-PSSession 192.168.20.161 -Credential $c   # Totem 1
+Enter-PSSession 192.168.20.69  -Credential $c   # Totem 2
+Enter-PSSession 192.168.20.254 -Credential $c   # CRONO1
+Invoke-Command 192.168.20.53 -Credential $c { Get-Process Kartodromo* }   # um comando só
 ```
 
-Depois, no Mac: `ssh Administrador@192.168.20.249`. Para a sessão abrir no PowerShell, dá para
-trocar o shell padrão do sshd. De lá, os scripts de deploy da seção 8 rodam como hoje.
+- Para ver a **tela** de uma máquina, use o print do `implantar-remoto.ps1` (`-Print`).
+  Olhe também o bloco "screenshot" dentro dele: registra uma tarefa na sessão do usuário e roda
+  `conhost --headless`.
+- **AnyDesk/TeamViewer** também estão instalados nos PCs, para ver a tela ao vivo.
+- **Túnel SSH** para abrir no navegador do Mac algo que só o ORBITS enxerga:
+  `ssh -L 4050:127.0.0.1:4050 orbits`.
 
-**Fluxo sugerido para o Codex no Mac:**
-
-1. Editar e commitar no Mac, depois `git push`.
-2. `ssh` no ORBITS e rodar `cd C:\repos\KARTODROMO; git pull`.
-3. Rodar lá mesmo os comandos de build, teste e deploy (seções 7 e 8).
-
-Os apps **.NET WinForms** também compilam no Mac com `-p:EnableWindowsTargeting=true`, mas o
-deploy e os testes com janela precisam do Windows.
-
-### 3.4 O que o Mac acessa direto pela rede (sem ssh)
+### 3.5 O que o Mac acessa direto pela rede (sem ssh)
 
 - `http://192.168.20.13:4060/healthz`: servidor da operação.
 - `http://192.168.20.249:4050/healthz` e `/api/state`: cronometragem.
-- `http://192.168.20.249:4050/operador` e `/tv`: telas web antigas da cronometragem, só para
-  diagnóstico. A operação usa os apps nativos.
-- SQL Server `192.168.20.13,1433`, banco `KartodromoOps`, usuário `KartOpsSql`, com Azure Data
-  Studio ou `sqlcmd`. **Cuidado: é produção.**
+- `http://192.168.20.249:4050/operador` e `/tv`: telas web de diagnóstico da cronometragem.
+  A operação usa os apps nativos.
+- SQL Server `192.168.20.13,1433`, banco `KartodromoOps`, usuário `KartOpsSql` (senha no
+  `.env.local` do SRVKART). Use Azure Data Studio ou `sqlcmd`. **É produção.**
 
 ---
 
@@ -485,24 +522,18 @@ cd C:\repos\KARTODROMO
 | `a32fb5b` | **Termo do totem sai na TM-T20 da recepção** (fila no servidor + agente na Recepção) |
 | `21baa04` | Janela de impressão do termo espremida (kit × WebView2); termo direto na TMT20 |
 | `c3ab852` / `3e77789` | Termo com as assinaturas **PARTICIPANTE PILOTO** e **RESPONSÁVEL LEGAL**, sem o rodapé de dados |
+| `f5dd03d` | Este documento |
+| `d5c9a7c` | Cronometragem: catálogo com backups/competidores, teste do decoder e tela admin (trabalho de outra sessão do Claude, já em produção) |
+| (este) | SSH no ORBITS, conta KARTODROMO no ORBITS, credencial por usuário nos scripts de deploy, AGENTS.md |
 
-Tudo isso **já está instalado e rodando** nas máquinas. Falta só o `git push`.
+Tudo isso **já está instalado e rodando** nas máquinas.
 
 ---
 
 ## 11. Pendências e alertas
 
-1. **Push para o GitHub** dos 14 commits (seção 3.1).
-2. **Alterações não commitadas de outra sessão do Claude na cronometragem** (não descartar, não
-   sobrescrever; confirme com o dono quem vai concluir):
-   - `lib/timing/catalog.ts`
-   - `lib/timing/race-engine.ts`
-   - `lib/timing/trx-parser.ts`
-   - `services/timing-server.ts`
-   - `services/timing-ui/operador.html` + `services/timing-ui/admin.html` (novo)
-   - `tests/timing-engine.test.ts`
-
-   Revise a cronometragem quando ela terminar.
+1. **Publicar no GitHub pelo Mac** (seção 3.2), enquanto o ORBITS não tiver login com escrita.
+2. **Site institucional:** o teste `lib/public-navigation.test.ts` (sincronia `design-source` → `public/design`) falha desde 25/09. É fim de linha (CRLF) depois da reescrita da árvore. Rode `npm run sync:design` e confira. Não tem relação com a operação.
 3. **Teste completo do caixa na Recepção** ainda não foi feito. É preciso abrir o terminal, fazer
    uma venda, estornar e fechar, com dados "TESTE CODEX", desfazendo tudo depois.
 4. **Termo em bobina:** a página tem 297 mm fixos, então sobra papel em branco depois das

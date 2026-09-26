@@ -1,6 +1,6 @@
 ﻿<#
   Implanta um programa publicado (desktop\publish\<App>) numa máquina remota via WinRM, abre na sessão do usuário
-  logado e salva um print da tela. Credencial: C:\KARTODROMO\.winrm-cred.xml (fora do repositório).
+  logado e salva um print da tela. Credencial: a do usuário logado (salvar-credencial.ps1), fora do repositório.
     implantar-remoto.ps1 -Computador 192.168.20.69 -App Autoatendimento -Impressora "EPSON TM-T20 Receipt" -Print C:\temp\tela.png
 #>
 param(
@@ -12,7 +12,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $pub = Join-Path $PSScriptRoot "..\..\desktop\publish\$App"
 $inst = Join-Path $PSScriptRoot 'instalar-desktop.ps1'
-$cred = Import-Clixml 'C:\KARTODROMO\.winrm-cred.xml'
+. (Join-Path $PSScriptRoot 'credencial.ps1')
+$cred = Obter-CredencialKartodromo
 $d = "C:\Windows\Temp\kartodromo-pkg-$(Get-Date -Format yyyyMMddHHmmss)\$App"
 $s = New-PSSession -ComputerName $Computador -Credential $cred
 try {
