@@ -323,6 +323,8 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     const participantes = Array.isArray(body.participantes) ? body.participantes : [];
     if (!participantes.length) throw new HttpError(400, 'Selecione quem vai correr.');
     const ids: number[] = [];
+    // um termo por piloto (mesmo que ele corra em mais de uma bateria): a 1ª inscrição de cada um
+    const termoDoPiloto = new Map<number, number>();
     for (const bateriaId of baterias) {
       for (const p of participantes as { id: unknown; token: unknown }[]) {
         const cid = int(p.id, 'Participante');
@@ -330,10 +332,13 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
         const dup = await one<{ Id: number }>(`SELECT Id FROM dbo.Inscricao WHERE BateriaId = @b AND ClienteId = @c AND Status <> 'cancelada'`, { b: bateriaId, c: cid });
         if (dup) {
           ids.push(dup.Id);
+          if (!termoDoPiloto.has(cid)) termoDoPiloto.set(cid, dup.Id);
           continue;
         }
         // pre-reserva: aparece em Reservas > Aprovar na recepcao
-        ids.push(...(await inscreverN(bateriaId, cid, 1, 'totem', null, null, false)));
+        const novas = await inscreverN(bateriaId, cid, 1, 'totem', null, null, false);
+        ids.push(...novas);
+        if (!termoDoPiloto.has(cid) && novas.length) termoDoPiloto.set(cid, novas[0]);
       }
     }
     const primeira = await one<{ inicio: string }>(`SELECT TOP 1 CONVERT(varchar(16), Inicio, 126) inicio FROM dbo.Bateria WHERE Id IN (${baterias.map((_, n) => '@b' + n).join(',')}) ORDER BY Inicio`, Object.fromEntries(baterias.map((b, n) => ['b' + n, b])));
@@ -341,7 +346,9 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     log(`totem: ${ids.length} pre-reserva(s) em ${baterias.length} bateria(s)`);
     const imprimir = p['totem.imprimirTermo'] !== 'false';
     const naRecepcao = imprimir && p['totem.termoNaRecepcao'] !== 'false';
-    if (naRecepcao) enfileirarImpressao(termoLink(ids), 'Termo de responsabilidade', origemDe(req));
+    // cada termo é um trabalho de impressão separado: a TM-T20 corta o papel no fim de cada trabalho,
+    // então vários termos num trabalho só saíam emendados
+    if (naRecepcao) for (const idInscricao of termoDoPiloto.values()) enfileirarImpressao(termoLink([idInscricao]), 'Termo de responsabilidade', origemDe(req));
     send(res, 201, { inscricoes: ids, inicio: primeira?.inicio, termoUrl: imprimir ? termoLink(ids) : null, termoNaRecepcao: naRecepcao });
     return true;
   }

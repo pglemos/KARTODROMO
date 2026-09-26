@@ -41,6 +41,21 @@ public static class Acoes
     {
         var lista = ids.ToList();
         if (lista.Count == 0) return;
+        // na recepção (TM-T20 configurada) vários termos vão um por trabalho de impressão:
+        // a térmica corta o papel no fim de cada trabalho, então juntos saíam emendados
+        if (lista.Count > 1 && Config.Get("ImpressoraTermos", "") is { Length: > 0 } impressora)
+        {
+            var feitos = 0;
+            foreach (var id in lista)
+            {
+                var link = await Api.Get("/api/office/termo-link?ids=" + id);
+                await Relatorio.ImprimirSilencioso(Api.BaseUrl + link.S("url"), impressora);
+                feitos++;
+            }
+            Msg.Info(dono, $"{feitos} termos enviados para a {impressora}, um de cada vez (a impressora corta entre eles).");
+            (dono as FormPrincipal)?.Recarregar();
+            return;
+        }
         var r = await Api.Get("/api/office/termo-link?ids=" + string.Join(",", lista));
         Relatorio.Abrir(dono, Api.BaseUrl + r.S("url"), "Termo de Responsabilidade");
         (dono as FormPrincipal)?.Recarregar();
