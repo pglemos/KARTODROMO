@@ -370,8 +370,8 @@ public class FormListaParticipantes : Janela
                 ["id"] = p.S("id"),
                 ["kart"] = p.S("kart") ?? "—",
                 ["cliente"] = p.S("cliente"),
-                ["idade"] = p.I("idade") > 0 ? p.I("idade") : (object)"—",
-                ["peso"] = p.I("peso") > 0 ? p.I("peso") : (object)"—",
+                ["idade"] = p.I("idade") > 0 ? p.I("idade").ToString() : "—",
+                ["peso"] = p.I("peso") > 0 ? p.I("peso").ToString() : "—",
                 ["pago"] = p.B("pago"),
                 ["termo"] = p.B("termo")
             }).ToList();

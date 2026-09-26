@@ -593,6 +593,9 @@ public class FormPesquisarCliente : Janela
 {
     readonly TextBox _q = new();
     readonly CheckBox _soAtivos = Campos.Check("Só clientes ativos", true);
+    readonly Grade _g = new();
+    readonly Label _vazio;
+    public JsonObject Escolhido { get; private set; }
     readonly Label _lTotal = new() { Dock = DockStyle.Left, AutoSize = false, Width = 300, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(18, 0, 0, 0), Font = new Font("Segoe UI", 9F), ForeColor = KitVisual.Secundario };
 
     FormPesquisarCliente(string titulo, string inicial) : base("Pesquisar cliente", 1060, 680, true)
@@ -644,14 +647,18 @@ public class FormPesquisarCliente : Janela
         Controls.Add(cartaoGrade);
         Controls.Add(cBusca);
 
+        EventHandler fechar = (_, _) => Close();
+        EventHandler novo = (_, _) => Seguro.Rodar(this, async () =>
+        {
+            var id = FormCliente.Novo(this, _q.Text);
+            if (id != null) { Escolhido = (await Sessao.Api.Get($"/api/office/clientes/{id}")).AsObject(); DialogResult = DialogResult.OK; Close(); }
+        });
+        EventHandler selecionar = (_, _) => { if (_g.Atual != null) { Escolhido = _g.Atual; DialogResult = DialogResult.OK; Close(); } };
+
         var rodapeCtrl = Rodape("0 clientes encontrados",
-            ("Cancelar", (_, _) => Close(), false),
-            ("+ Novo cliente", (_, _) => Seguro.Rodar(this, async () =>
-            {
-                var id = FormCliente.Novo(this, _q.Text);
-                if (id != null) { Escolhido = (await Sessao.Api.Get($"/api/office/clientes/{id}")).AsObject(); DialogResult = DialogResult.OK; Close(); }
-            }), false),
-            ("Selecionar", (_, _) => { if (_g.Atual != null) { Escolhido = _g.Atual; DialogResult = DialogResult.OK; Close(); } }, true)
+            ("Cancelar", fechar, false),
+            ("+ Novo cliente", novo, false),
+            ("Selecionar", selecionar, true)
         );
 
         Shown += (_, _) => { _q.Focus(); if (!string.IsNullOrWhiteSpace(inicial)) Buscar(); };
