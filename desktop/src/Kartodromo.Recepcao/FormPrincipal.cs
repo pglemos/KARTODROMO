@@ -8,16 +8,16 @@ namespace Kartodromo.Recepcao;
 public class FormPrincipal : Form
 {
     public bool ConfirmarSaida { get; set; } = true;
-    readonly TreeView _arvore = new() { Dock = DockStyle.Fill, HideSelection = false, BorderStyle = BorderStyle.None, ItemHeight = 28, FullRowSelect = true, ShowLines = false, ShowPlusMinus = false, ShowRootLines = false, BackColor = KitVisual.Fundo, ForeColor = KitVisual.Texto, DrawMode = TreeViewDrawMode.OwnerDrawText, Font = new Font("Segoe UI", 9.5F) };
+    readonly TreeView _arvore = new() { Dock = DockStyle.Fill, HideSelection = false, BorderStyle = BorderStyle.None, ItemHeight = 26, FullRowSelect = true, ShowLines = false, ShowPlusMinus = false, ShowRootLines = false, Indent = 8, BackColor = VisualPrincipal.Lateral, ForeColor = KitVisual.Texto, DrawMode = TreeViewDrawMode.OwnerDrawText, Font = new Font("Segoe UI", 9.5F) };
     readonly DateTimePicker _data = Campos.Data();
-    readonly Label _total = new() { Dock = DockStyle.Bottom, Height = 34, Font = new Font("Segoe UI", 8.8F, FontStyle.Bold), BackColor = KitVisual.CabecalhoGrade, ForeColor = KitVisual.Texto, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(14, 0, 0, 0) };
-    readonly Panel _filtroBar = new() { Width = 490, Height = 38, BackColor = KitVisual.Fundo };
-    readonly Label _titulo = new() { AutoSize = true, Font = new Font("Segoe UI", 19F, FontStyle.Bold), ForeColor = KitVisual.Texto };
+    readonly Label _total = new() { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 8.8F), BackColor = Color.White, ForeColor = KitVisual.Secundario, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(14, 0, 0, 0), AutoEllipsis = true };
+    readonly Panel _filtroBar = new() { Width = 540, Height = 38, BackColor = KitVisual.Fundo };
+    readonly Label _titulo = new() { AutoSize = true, Font = new Font("Segoe UI", 18F, FontStyle.Bold), ForeColor = KitVisual.Texto };
     readonly Label _subtitulo = new() { AutoSize = true, Font = new Font("Segoe UI", 9.5F), ForeColor = KitVisual.Secundario };
     readonly TableLayoutPanel _resumo = new() { Dock = DockStyle.Top, Height = 82, ColumnCount = 4, RowCount = 1, BackColor = KitVisual.Fundo, Padding = new Padding(0, 0, 0, 4) };
-    readonly Panel _terminalCard = new() { Dock = DockStyle.Top, Height = 78, BackColor = Color.FromArgb(235, 249, 240), Margin = new Padding(0, 0, 0, 10), Cursor = Cursors.Hand };
-    readonly Label _terminalTitulo = new() { Dock = DockStyle.Top, Height = 25, Font = new Font("Segoe UI", 9.2F, FontStyle.Bold), ForeColor = Color.FromArgb(28, 107, 53), Padding = new Padding(12, 8, 2, 0) };
-    readonly Label _terminalSub = new() { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(58, 94, 69), Padding = new Padding(12, 2, 4, 2) };
+    readonly VisualPrincipal.SeloTerminal _selo = new();
+    readonly Label _dataTexto = new() { AutoSize = false, Size = new Size(96, 30), TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Cascadia Mono", 9F, FontStyle.Bold), ForeColor = KitVisual.Texto, Cursor = Cursors.Hand };
+    readonly Panel _dataCaixa = new() { Size = new Size(152, 34), BackColor = Color.White };
     readonly Button _acaoTopo = KitVisual.Botao("", true);
     readonly TextBox _buscaGlobal = new() { BorderStyle = BorderStyle.None, Font = new Font("Segoe UI", 9F), PlaceholderText = "Buscar cliente, CPF, reserva…" };
     readonly Grade _grade = new();
@@ -45,8 +45,9 @@ public class FormPrincipal : Form
         PrepararPeriodos();
         _grade.BorderStyle = BorderStyle.None;
         KitVisual.EstilizarGrade(_grade);
-        _grade.RowTemplate.Height = 34;
+        _grade.RowTemplate.Height = 38;
         _grade.ColumnHeadersHeight = 38;
+        VisualPrincipal.PintarCelulas(_grade);
         _grade.MultiSelect = true;
         _grade.DefaultCellStyle.Padding = new Padding(5, 0, 5, 0);
         _data.ValueChanged += (_, _) => { AtualizarTitulo(); Recarregar(); };
@@ -57,20 +58,15 @@ public class FormPrincipal : Form
         var direita = MontarAreaDados();
         _grade.FiltroMudou += Totais;
 
-        var split = new SplitContainer { Dock = DockStyle.Fill, FixedPanel = FixedPanel.Panel1, BackColor = KitVisual.Fundo, BorderStyle = BorderStyle.None, SplitterWidth = 1 };
-        Load += (_, _) => { split.Panel1MinSize = 226; split.SplitterDistance = 260; };
-        split.Panel1.Padding = new Padding(12, 12, 12, 12);
-        split.Panel2.Padding = new Padding(14, 12, 16, 12);
-        _terminalCard.Controls.Add(_terminalSub);
-        _terminalCard.Controls.Add(_terminalTitulo);
-        KitVisual.AplicarRaio(_terminalCard, 12);
-        _terminalCard.Click += (_, _) => Caixa.Terminal(this);
-        foreach (Control c in _terminalCard.Controls) c.Click += (_, _) => Caixa.Terminal(this);
-        var sidebar = new Panel { Dock = DockStyle.Fill, BackColor = KitVisual.Fundo };
-        var navTitulo = new Label { Text = "NAVEGAÇÃO", Dock = DockStyle.Top, Height = 28, Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = KitVisual.Secundario, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(6, 0, 0, 0) };
+        var split = new SplitContainer { Dock = DockStyle.Fill, FixedPanel = FixedPanel.Panel1, BackColor = Color.FromArgb(229, 229, 234), BorderStyle = BorderStyle.None, SplitterWidth = 1 };
+        Load += (_, _) => { split.Panel1MinSize = 220; split.SplitterDistance = 256; };
+        split.Panel1.BackColor = VisualPrincipal.Lateral;
+        split.Panel2.BackColor = KitVisual.Fundo;
+        split.Panel1.Padding = new Padding(8, 10, 8, 8);
+        split.Panel2.Padding = new Padding(22, 14, 22, 12);
+        _selo.Click += (_, _) => Caixa.Terminal(this);
+        var sidebar = new Panel { Dock = DockStyle.Fill, BackColor = VisualPrincipal.Lateral };
         sidebar.Controls.Add(_arvore);
-        sidebar.Controls.Add(navTitulo);
-        sidebar.Controls.Add(_terminalCard);
         split.Panel1.Controls.Add(sidebar);
         split.Panel2.Controls.Add(direita);
 
@@ -271,7 +267,7 @@ public class FormPrincipal : Form
     {
         _resumo.ColumnStyles.Clear();
         for (var i = 0; i < 4; i++) _resumo.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
-        for (var i = 0; i < 4; i++) _resumo.Controls.Add(KitVisual.CartaoResumo("—", "—"), i, 0);
+        for (var i = 0; i < 4; i++) { var c = KitVisual.CartaoResumo("—", "—"); c.Dock = DockStyle.Fill; c.Margin = new Padding(i == 0 ? 0 : 6, 0, i == 3 ? 0 : 6, 0); _resumo.Controls.Add(c, i, 0); }
     }
 
     void PrepararPeriodos()
@@ -293,10 +289,31 @@ public class FormPrincipal : Form
             x += largura;
         }
         bar.Controls.Add(segmento);
-        _data.Width = 108;
-        _data.Height = 30;
-        _data.Margin = new Padding(0, 3, 0, 0);
-        bar.Controls.Add(_data);
+        // data: "‹ 25/09/2026 ›" como no design; clicar no texto abre o calendário
+        Button Seta(string t, int dias)
+        {
+            var b = new Button { Text = t, Size = new Size(26, 30), FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 11F), Cursor = Cursors.Hand, TabStop = false, AccessibleDescription = "kit:ignorar" };
+            b.FlatAppearance.BorderSize = 0; b.FlatAppearance.MouseOverBackColor = Color.FromArgb(242, 242, 245);
+            b.Click += (_, _) => _data.Value = _data.Value.AddDays(dias);
+            return b;
+        }
+        var ant = Seta("‹", -1); var prox = Seta("›", 1);
+        ant.Location = new Point(2, 2); _dataTexto.Location = new Point(28, 2); prox.Location = new Point(124, 2);
+        _dataCaixa.Controls.AddRange([ant, _dataTexto, prox]);
+        _dataCaixa.Margin = new Padding(0, 1, 0, 0);
+        _dataCaixa.Paint += (_, e) => { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using var p = VisualPrincipal.Redondo(new Rectangle(0, 0, _dataCaixa.Width - 1, _dataCaixa.Height - 1), 9); using var pen = new Pen(Color.FromArgb(222, 222, 227)); e.Graphics.DrawPath(pen, p); };
+        _dataTexto.Text = _data.Value.ToString("dd/MM/yyyy");
+        _data.ValueChanged += (_, _) => _dataTexto.Text = _data.Value.ToString("dd/MM/yyyy");
+        _dataTexto.Click += (_, _) =>
+        {
+            var cal = new MonthCalendar { MaxSelectionCount = 1, SelectionStart = _data.Value };
+            var host = new ToolStripControlHost(cal) { Padding = Padding.Empty, Margin = Padding.Empty };
+            var drop = new ToolStripDropDown { Padding = Padding.Empty };
+            drop.Items.Add(host);
+            cal.DateSelected += (_, ev) => { _data.Value = ev.Start; drop.Close(); };
+            drop.Show(_dataCaixa, new Point(0, _dataCaixa.Height + 2));
+        };
+        bar.Controls.Add(_dataCaixa);
         _filtroBar.Controls.Add(bar);
     }
 
@@ -314,34 +331,53 @@ public class FormPrincipal : Form
                 b.Font = new Font("Segoe UI", 8.2F, ativo ? FontStyle.Bold : FontStyle.Regular);
             }
         }
-        _data.Visible = _periodo != "todas";
+        _dataCaixa.Visible = _periodo != "todas";
     }
 
     Control MontarAreaDados()
     {
         var area = new Panel { Dock = DockStyle.Fill, BackColor = KitVisual.Fundo };
-        var cab = new Panel { Dock = DockStyle.Top, Height = 78, BackColor = KitVisual.Fundo };
-        _titulo.Location = new Point(0, 2);
-        _subtitulo.Location = new Point(2, 38);
+        var cab = new Panel { Dock = DockStyle.Top, Height = 64, BackColor = KitVisual.Fundo };
+        _titulo.Location = new Point(0, 0);
+        _subtitulo.Location = new Point(2, 36);
         cab.Controls.Add(_titulo);
         cab.Controls.Add(_subtitulo);
         _acaoTopo.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        _acaoTopo.Location = new Point(cab.Width - _acaoTopo.Width, 8);
         _acaoTopo.Click += (_, _) => AcaoPrincipal();
         cab.Controls.Add(_acaoTopo);
         _filtroBar.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        _filtroBar.Location = new Point(cab.Width - _filtroBar.Width, 43);
         cab.Controls.Add(_filtroBar);
-        cab.Resize += (_, _) => { _acaoTopo.Left = cab.ClientSize.Width - _acaoTopo.Width; _filtroBar.Left = cab.ClientSize.Width - _filtroBar.Width; };
+        void Posicionar()
+        {
+            _acaoTopo.Location = new Point(cab.ClientSize.Width - _acaoTopo.Width, 6);
+            var x = _acaoTopo.Left - _filtroBar.Width - 10;
+            var cabe = x > Math.Max(_titulo.Right, _subtitulo.Right) + 24;
+            // tela estreita: filtros vão pra uma segunda linha, alinhados à direita
+            _filtroBar.Location = cabe ? new Point(x, 6) : new Point(Math.Max(0, cab.ClientSize.Width - _filtroBar.Width), 62);
+            var h = cabe ? 64 : 104;
+            if (cab.Height != h) cab.Height = h;
+        }
+        _titulo.SizeChanged += (_, _) => Posicionar(); _subtitulo.SizeChanged += (_, _) => Posicionar();
+        cab.Resize += (_, _) => Posicionar();
+        _acaoTopo.SizeChanged += (_, _) => Posicionar();
 
         var lista = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(0) };
-        KitVisual.AplicarRaio(lista, 14);
+        lista.Resize += (_, _) => KitVisual.AplicarRaio(lista, 14);
+        var rodape = new Panel { Dock = DockStyle.Bottom, Height = 36, BackColor = Color.White };
+        rodape.Paint += (_, e) => { using var pen = new Pen(Color.FromArgb(236, 236, 239)); e.Graphics.DrawLine(pen, 0, 0, rodape.Width, 0); };
+        var exportar = new LinkLabel { Text = "Exportar para Excel", AutoSize = true, Dock = DockStyle.Right, LinkColor = KitVisual.Verde, ActiveLinkColor = KitVisual.Verde, LinkBehavior = LinkBehavior.HoverUnderline, Font = new Font("Segoe UI", 8.8F, FontStyle.Bold), Padding = new Padding(0, 10, 16, 0), BackColor = Color.White };
+        exportar.LinkClicked += (_, _) => _grade.ExportarExcel(_grupo);
+        rodape.Controls.Add(_total); rodape.Controls.Add(exportar);
         lista.Controls.Add(_grade);
-        lista.Controls.Add(_total);
+        lista.Controls.Add(rodape);
+        _grade.BringToFront();
+        var espaco = new Panel { Dock = DockStyle.Top, Height = 12, BackColor = KitVisual.Fundo };
         _resumo.Dock = DockStyle.Top;
         area.Controls.Add(lista);
+        area.Controls.Add(espaco);
         area.Controls.Add(_resumo);
         area.Controls.Add(cab);
+        lista.BringToFront();
         return area;
     }
 
@@ -367,7 +403,8 @@ public class FormPrincipal : Form
         barra.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 155));
         barra.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         var marca = new Panel { Dock = DockStyle.Fill };
-        var logo = new PictureBox { Image = Icone.Logo(), SizeMode = PictureBoxSizeMode.Zoom, Size = new Size(36, 36), Location = new Point(0, 8) };
+        var logo = new PictureBox { Image = Icone.Logo(), SizeMode = PictureBoxSizeMode.Zoom, Size = new Size(36, 36), Location = new Point(0, 8), BackColor = Color.FromArgb(28, 28, 30), Padding = new Padding(3) };
+        logo.Resize += (_, _) => KitVisual.AplicarRaio(logo, 9); KitVisual.AplicarRaio(logo, 9);
         var marcaNome = new Label { Text = "Kartódromo Internacional de Betim", AutoSize = false, Width = 246, Height = 18, AutoEllipsis = true, Font = new Font("Segoe UI", 9.3F, FontStyle.Bold), ForeColor = KitVisual.Texto, Location = new Point(44, 9) };
         var marcaSub = new Label { Text = "Módulo Office", AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = KitVisual.Secundario, Location = new Point(45, 27) };
         marca.Controls.AddRange([logo, marcaNome, marcaSub]);
@@ -380,8 +417,13 @@ public class FormPrincipal : Form
         var q = _buscaGlobal;
         q.Dock = DockStyle.Fill;
         q.BackColor = busca.BackColor;
-        var atalho = new Label { Text = "F3", AutoSize = true, Dock = DockStyle.Right, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 8F), Padding = new Padding(4, 5, 0, 0) };
-        busca.Controls.Add(q); busca.Controls.Add(atalho);
+        var atalho = new Label { Text = "F3", AutoSize = true, Dock = DockStyle.Right, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 8F), Padding = new Padding(4, 7, 0, 0) };
+        var lupa = new Label { Text = "\uE721", AutoSize = false, Width = 22, Dock = DockStyle.Left, ForeColor = KitVisual.Secundario, Font = new Font("Segoe MDL2 Assets", 9F), TextAlign = ContentAlignment.MiddleLeft };
+        q.Margin = Padding.Empty;
+        var qBox = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 7, 0, 0), BackColor = busca.BackColor };
+        qBox.Controls.Add(q);
+        busca.Controls.Add(qBox); busca.Controls.Add(lupa); busca.Controls.Add(atalho);
+        qBox.BringToFront();
         void Buscar()
         {
             if (string.IsNullOrWhiteSpace(q.Text)) { q.Focus(); return; }
@@ -420,22 +462,17 @@ public class FormPrincipal : Form
             if (c["aberto"] is JsonObject ab)
             {
                 var dinheiro = c["sumario"]?.L("dinheiroEmCaixa") ?? 0;
-                _terminalTitulo.Text = $"Terminal {ab.S("terminal")} aberto";
-                _terminalSub.Text = $"Turno {ab.S("turno")} · caixa {Fmt.Brl(dinheiro)}";
-                _terminalCard.BackColor = Color.FromArgb(235, 249, 240);
+                _selo.Definir(true, $"Terminal {ab.S("terminal")} aberto", $"Turno {ab.S("turno")} · caixa {Fmt.Brl(dinheiro)}");
             }
             else
             {
-                _terminalTitulo.Text = "Nenhum terminal aberto";
-                _terminalSub.Text = "Clique aqui para abrir o caixa";
-                _terminalCard.BackColor = Color.FromArgb(250, 250, 252);
+                _selo.Definir(false, "Nenhum terminal aberto", "Clique para abrir o caixa");
             }
         }
         catch
         {
             _sbSrv.Text = "● Servidor · off-line"; _sbSrv.ForeColor = Color.FromArgb(196, 40, 28);
-            _terminalTitulo.Text = "Terminal indisponível"; _terminalSub.Text = "Não foi possível consultar o caixa";
-            _terminalCard.BackColor = Color.FromArgb(250, 250, 252);
+            _selo.Definir(false, "Terminal indisponível", "Não foi possível consultar o caixa");
         }
         await PingServico("crono", Config.CronoUrl, _sbCrono);
         await PingSite(_sbSite);
@@ -508,98 +545,83 @@ public class FormPrincipal : Form
     void TrocarSenha() { using var f = new FormTrocarSenha(); f.ShowDialog(this); }
 
     // ------------------------------------------------------------------ toolbar
-    ToolStrip MontarToolbar()
+    Control MontarToolbar()
     {
-        var tb = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden, ImageScalingSize = new Size(34, 34), Font = new Font("Segoe UI", 8.3F), Padding = new Padding(10, 1, 10, 1), BackColor = Color.White, RenderMode = ToolStripRenderMode.System, Dock = DockStyle.Fill, Stretch = true };
-        ToolStripButton B(string glifo, Color cor, string texto, Action a) => new(texto, Icone.Tile(glifo, cor), (_, _) => a()) { TextImageRelation = TextImageRelation.ImageAboveText, AutoSize = true, Margin = new Padding(2, 1, 2, 1) };
-        tb.Items.AddRange([
-            B("", Color.FromArgb(52, 120, 200), "Clientes", () => new FormCliente(null).Show(this)),
-            B("", Color.FromArgb(222, 140, 30), "Produtos", () => Cadastros.Abrir(this, "produtos")),
-            new ToolStripSeparator(),
-            B("", Color.FromArgb(200, 50, 45), "Reservas", () => { new FormCriarReservas().ShowDialog(this); Recarregar(); }),
-            B("", Color.FromArgb(110, 80, 190), "Agenda", () => { new FormAgenda().ShowDialog(this); Recarregar(); }),
-            new ToolStripSeparator(),
-            B("", Color.FromArgb(0, 140, 150), "Terminal", () => Caixa.Terminal(this)),
-            B("", Color.FromArgb(30, 150, 70), "Receita Avulsa", () => Caixa.Checkout(this, null, null, null)),
-            B("", Color.FromArgb(40, 130, 60), "Suprimento", () => Caixa.Transacao(this, "suprimento")),
-            B("", Color.FromArgb(200, 60, 50), "Sangria", () => Caixa.Transacao(this, "sangria")),
-            new ToolStripSeparator(),
-            B("", Color.FromArgb(210, 60, 120), "Voucher (Fidelidade)", () => new FormVoucher("fidelidade").ShowDialog(this)),
-            B("", Color.FromArgb(230, 120, 40), "Voucher (Parceiro)", () => new FormVoucher("parceiro").ShowDialog(this)),
-            new ToolStripSeparator(),
+        var barra = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, BackColor = Color.White, Padding = new Padding(12, 0, 16, 0), Margin = new Padding(0) };
+        barra.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); barra.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        var fluxo = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, BackColor = Color.White, Margin = new Padding(0) };
+        Control B(string icone, string texto, string dica, Action a) => VisualPrincipal.BotaoBarra(icone, texto, dica, a);
+        fluxo.Controls.AddRange([
+            B("clientes", "Clientes", "Cadastro de clientes (F2)", () => new FormCliente(null).Show(this)),
+            B("produtos", "Produtos", "Produtos e provas de cada locação", () => Cadastros.Abrir(this, "produtos")),
+            VisualPrincipal.Separador(),
+            B("reservas", "Reservas", "Criar reservas avulsas ou pelo padrão", () => { new FormCriarReservas().ShowDialog(this); Recarregar(); }),
+            B("agenda", "Agenda", "Agenda mensal de baterias", () => { new FormAgenda().ShowDialog(this); Recarregar(); }),
+            VisualPrincipal.Separador(),
+            B("terminal", "Terminal", "Abrir ou fechar o caixa", () => Caixa.Terminal(this)),
+            B("receita", "Receita Avulsa", "Cobrar reservas e produtos (checkout)", () => Caixa.Checkout(this, null, null, null)),
+            B("suprimento", "Suprimento", "Colocar dinheiro no caixa", () => Caixa.Transacao(this, "suprimento")),
+            B("sangria", "Sangria", "Retirar dinheiro do caixa", () => Caixa.Transacao(this, "sangria")),
+            VisualPrincipal.Separador(),
+            B("vfidelidade", "Voucher (Fidelidade)", "Criar voucher para conta fidelidade", () => new FormVoucher("fidelidade").ShowDialog(this)),
+            B("vparceiro", "Voucher (Parceiro)", "Criar voucher para parceiro", () => new FormVoucher("parceiro").ShowDialog(this)),
+            VisualPrincipal.Separador(),
+            B("online", "Serviços Online", "Site, WhatsApp e reservas online", () => new FormServicosOnline().ShowDialog(this)),
         ]);
-        var online = new ToolStripButton("Serviços Online", Icone.Tile("", Color.FromArgb(60, 60, 60)), (_, _) => new FormServicosOnline().ShowDialog(this)) { TextImageRelation = TextImageRelation.ImageAboveText, AutoSize = true, Margin = new Padding(2, 1, 2, 1) };
-        tb.Items.Add(online);
-        return tb;
+        _selo.Anchor = AnchorStyles.Right; _selo.Margin = new Padding(8, 17, 0, 0);
+        barra.Controls.Add(fluxo, 0, 0); barra.Controls.Add(_selo, 1, 0);
+        barra.Paint += (_, e) => { using var pen = new Pen(KitVisual.Linha); e.Graphics.DrawLine(pen, 0, barra.Height - 1, barra.Width, barra.Height - 1); };
+        return barra;
     }
 
     // ------------------------------------------------------------------ arvore
     void MontarArvore()
     {
-        var il = new ImageList { ImageSize = new Size(16, 16), ColorDepth = ColorDepth.Depth32Bit };
-        il.Images.Add("y", Icone.Bola(Color.FromArgb(240, 190, 0)));
-        il.Images.Add("g", Icone.Bola(Color.FromArgb(50, 180, 30)));
-        il.Images.Add("r", Icone.Bola(Color.FromArgb(220, 50, 40)));
-        il.Images.Add("b", Icone.Bola(Color.FromArgb(50, 110, 220)));
-        void G(string k, string gl, Color c) => il.Images.Add(k, Icone.Tile(gl, c, 16));
-        G("res", "", Color.FromArgb(120, 120, 120)); G("bat", "", Color.FromArgb(60, 110, 200)); G("fin", "", Color.FromArgb(200, 150, 20));
-        G("ven", "", Color.FromArgb(50, 160, 60)); G("ofi", "", Color.FromArgb(200, 50, 50)); G("fid", "", Color.FromArgb(230, 170, 0));
-        G("vou", "", Color.FromArgb(210, 60, 120)); G("par", "", Color.FromArgb(120, 90, 60));
-        _arvore.ImageList = il;
-        TreeNode N(string texto, string img, string chave, params TreeNode[] filhos)
-        {
-            var n = new TreeNode(texto, filhos) { ImageKey = img, SelectedImageKey = img, Tag = chave };
-            return n;
-        }
+        TreeNode N(string texto, string img, string chave, params TreeNode[] filhos) => new(texto, filhos) { ImageKey = img, SelectedImageKey = img, Tag = chave };
         _arvore.Nodes.AddRange([
-            N("Reservas", "res", "reservas:todas", N("Aprovar", "y", "reservas:aprovar"), N("Aprovadas", "g", "reservas:aprovadas"), N("Pagamento Pendente", "y", "reservas:pendentes"), N("Canceladas", "r", "reservas:canceladas"), N("Todas", "b", "reservas:todas")),
-            N("Baterias", "bat", "baterias:todas", N("Abertas", "g", "baterias:abertas"), N("Fechadas", "r", "baterias:fechadas"), N("Todas", "b", "baterias:todas")),
-            N("Vendas", "fin", null, N("Liquidadas", "g", "vendas:liquidadas"), N("Canceladas", "r", "vendas:canceladas"), N("Todas", "b", "vendas:todas")),
-            N("Oficina", "ofi", null, N("Manutenções", "ofi", "oficina:todas", N("A Realizar", "y", "oficina:arealizar"), N("Realizadas", "g", "oficina:realizadas"), N("Todas", "b", "oficina:todas"))),
-            N("Fidelidade", "fid", null, N("Contas", "fid", "fidelidade:contas"), N("Transações", "fin", "fidelidade:transacoes")),
-            N("Vouchers", "vou", null, N("Vouchers", "vou", "vouchers:lista"), N("Histórico de Uso", "bat", "vouchers:uso")),
-            N("Parceiros", "par", null, N("Parceiros", "par", "parceiros:lista"), N("Histórico de Comissões", "par", "parceiros:comissoes"), N("Comissões Pagas", "par", "parceiros:pagas")),
+            N("Reservas", "g-reservas", "reservas:todas", N("Aprovar", "y", "reservas:aprovar"), N("Aprovadas", "g", "reservas:aprovadas"), N("Pagamento pendente", "y", "reservas:pendentes"), N("Canceladas", "r", "reservas:canceladas"), N("Todas", "b", "reservas:todas")),
+            N("Baterias", "g-baterias", "baterias:todas", N("Abertas", "g", "baterias:abertas"), N("Fechadas", "r", "baterias:fechadas"), N("Todas", "b", "baterias:todas")),
+            N("Financeiro · Vendas", "g-vendas", "vendas:todas", N("Liquidadas", "g", "vendas:liquidadas"), N("Canceladas", "r", "vendas:canceladas"), N("Todas", "b", "vendas:todas")),
+            N("Oficina · Manutenções", "g-oficina", "oficina:todas", N("A realizar", "y", "oficina:arealizar"), N("Realizadas", "g", "oficina:realizadas"), N("Todas", "b", "oficina:todas")),
+            N("Fidelidade", "g-fidelidade", "fidelidade:contas", N("Contas", "b", "fidelidade:contas"), N("Transações", "b", "fidelidade:transacoes")),
+            N("Vouchers", "g-vouchers", "vouchers:lista", N("Vouchers", "b", "vouchers:lista"), N("Histórico de uso", "b", "vouchers:uso")),
+            N("Parceiros", "g-parceiros", "parceiros:lista", N("Parceiros", "b", "parceiros:lista"), N("Histórico de comissões", "b", "parceiros:comissoes"), N("Comissões pagas", "b", "parceiros:pagas")),
         ]);
         _arvore.ExpandAll();
+        _arvore.BeforeCollapse += (_, e) => e.Cancel = true;
+        var fonteGrupo = new Font("Segoe UI", 8.6F, FontStyle.Bold);
+        var fonteItem = new Font("Segoe UI", 9.6F);
+        var fonteItemSel = new Font("Segoe UI", 9.6F, FontStyle.Bold);
+        var fonteConta = new Font("Segoe UI", 8.4F, FontStyle.Bold);
         _arvore.DrawNode += (_, e) =>
         {
             e.DrawDefault = false;
-            var bounds = e.Bounds;
+            var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias; g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            var y = e.Bounds.Y;
+            var largura = _arvore.ClientSize.Width;
+            using (var fundo = new SolidBrush(VisualPrincipal.Lateral)) g.FillRectangle(fundo, 0, y, largura, e.Bounds.Height);
             var partes = e.Node.Text.Split('\t');
-            var rotulo = partes[0];
             if (e.Node.Level == 0)
             {
-                var imageIndex = _arvore.ImageList?.Images.IndexOfKey(e.Node.ImageKey) ?? -1;
-                if (imageIndex >= 0) _arvore.ImageList.Draw(e.Graphics, 7, bounds.Y + 4, imageIndex);
-                TextRenderer.DrawText(e.Graphics, rotulo.ToUpperInvariant(), new Font("Segoe UI", 8.2F, FontStyle.Bold), new Point(29, bounds.Y + 7), KitVisual.Secundario, TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
+                g.DrawImage(VisualPrincipal.Icone(e.Node.ImageKey), new Rectangle(8, y + 6, 18, 18));
+                TextRenderer.DrawText(g, partes[0], fonteGrupo, new Point(32, y + 8), KitVisual.Secundario, TextFormatFlags.NoPadding);
                 return;
             }
-            var selected = e.Node == _arvore.SelectedNode;
-            if (selected)
+            var sel = e.Node == _arvore.SelectedNode;
+            if (sel) { using var p = VisualPrincipal.Redondo(new Rectangle(2, y + 1, largura - 6, e.Bounds.Height - 2), 7); using var b = new SolidBrush(VisualPrincipal.Selecao); g.FillPath(b, p); }
+            using (var ponto = new SolidBrush(VisualPrincipal.Pontos.GetValueOrDefault(e.Node.ImageKey, KitVisual.Secundario))) g.FillEllipse(ponto, 14, y + 9, 8, 8);
+            TextRenderer.DrawText(g, partes[0], sel ? fonteItemSel : fonteItem, new Rectangle(30, y, largura - 76, e.Bounds.Height), sel ? VisualPrincipal.TextoSel : KitVisual.Texto, TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
+            if (partes.Length > 1 && int.TryParse(partes[1], out var n))
             {
-                var r = new Rectangle(bounds.X - 2, bounds.Y + 1, Math.Max(40, _arvore.ClientSize.Width - bounds.X - 10), bounds.Height - 2);
-                using var path = new System.Drawing.Drawing2D.GraphicsPath();
-                const int d = 12;
-                path.AddArc(r.Left, r.Top, d, d, 180, 90); path.AddArc(r.Right - d, r.Top, d, d, 270, 90);
-                path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90); path.AddArc(r.Left, r.Bottom - d, d, d, 90, 90); path.CloseFigure();
-                using var brush = new SolidBrush(KitVisual.VerdeClaro); e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.FillPath(brush, path);
-            }
-            var nodeImage = _arvore.ImageList?.Images.IndexOfKey(e.Node.ImageKey) ?? -1;
-            if (nodeImage >= 0) _arvore.ImageList.Draw(e.Graphics, bounds.X - 16, bounds.Y + 6, nodeImage);
-            var cor = selected ? Color.FromArgb(10, 94, 64) : KitVisual.Texto;
-            TextRenderer.DrawText(e.Graphics, rotulo, new Font("Segoe UI", 9.2F, selected ? FontStyle.Bold : FontStyle.Regular), new Point(bounds.X + 2, bounds.Y + 6), cor, TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
-            if (partes.Length > 1 && int.TryParse(partes[1], out var countValue))
-            {
-                var numero = partes[1];
-                var w = TextRenderer.MeasureText(numero, new Font("Segoe UI", 8F, FontStyle.Bold)).Width + 12;
-                var x = _arvore.ClientSize.Width - w - 8;
-                using var brush = new SolidBrush(selected ? KitVisual.Verde : Color.FromArgb(232, 232, 237));
-                var badge = new Rectangle(x, bounds.Y + 5, w, 18);
-                using var path = new System.Drawing.Drawing2D.GraphicsPath();
-                path.AddArc(badge.Left, badge.Top, 10, 10, 180, 90); path.AddArc(badge.Right - 10, badge.Top, 10, 10, 270, 90);
-                path.AddArc(badge.Right - 10, badge.Bottom - 10, 10, 10, 0, 90); path.AddArc(badge.Left, badge.Bottom - 10, 10, 10, 90, 90); path.CloseFigure();
-                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; e.Graphics.FillPath(brush, path);
-                TextRenderer.DrawText(e.Graphics, numero, new Font("Segoe UI", 8F, FontStyle.Bold), badge, selected ? Color.White : KitVisual.Secundario, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                var num = n.ToString();
+                if (e.Node.ImageKey == "y" && n > 0)
+                {
+                    var w = TextRenderer.MeasureText(num, fonteConta).Width + 12;
+                    var r = new Rectangle(largura - w - 10, y + 5, w, 17);
+                    using var p = VisualPrincipal.Redondo(r, 8); using var b = new SolidBrush(Color.FromArgb(255, 159, 10)); g.FillPath(b, p);
+                    TextRenderer.DrawText(g, num, fonteConta, r, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                }
+                else TextRenderer.DrawText(g, num, new Font("Segoe UI", 8.8F), new Rectangle(largura - 60, y, 50, e.Bounds.Height), KitVisual.Secundario, TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
             }
         };
         _arvore.AfterSelect += (_, e) => { if (e.Action is TreeViewAction.ByMouse or TreeViewAction.ByKeyboard) _filtroContaFidelidade = null; if (e.Node.Tag is string k) { _filtroBateria = null; Aplicar(k); } };
@@ -845,6 +867,7 @@ public class FormPrincipal : Form
                 break;
         }
         if (seq != _seqCarga || IsDisposed) return;
+        VisualPrincipal.AjustarColunas(_grade);
         _grade.Carregar(rows);
         AtualizarResumo(rows);
         Totais();
@@ -968,7 +991,7 @@ public class FormPrincipal : Form
             _ => "",
         };
         var bat = _filtroBateria != null ? $" · Bateria: {_filtroBateria.S("nome")} {Fmt.DmyHm(_filtroBateria.S("dataHora"))} (use a árvore para ver todas)" : "";
-        _total.Text = $"Total de registros: {v.Count}   ·   {extra}{bat}";
+        _total.Text = $"Total de registros: {v.Count}  ·  {extra}{bat}";
     }
 
     ToolStripMenuItem Item(string t, Action a, bool hab = true, string atalho = null) => new(t, null, (_, _) => a())

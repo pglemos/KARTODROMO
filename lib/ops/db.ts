@@ -72,7 +72,7 @@ export function isValidCpf(value: string): boolean {
 export const CLIENTE_COLS = `c.Id id, c.Nome nome, c.TipoDocumento tipoDocumento, c.Documento documento, c.Email email, c.Telefone telefone,
   CONVERT(varchar(10), c.Nascimento, 126) nascimento, c.Sexo sexo, c.Peso peso, c.Cep cep, c.Endereco endereco, c.Numero numero,
   c.Complemento complemento, c.Bairro bairro, c.Cidade cidade, c.Estado estado, c.ResponsavelId responsavelId,
-  CONVERT(varchar(19), c.LgpdAceiteEm, 126) lgpdAceiteEm, c.Bloqueado bloqueado, c.Observacao observacao, c.Origem origem,
+  CONVERT(varchar(19), c.LgpdAceiteEm, 126) lgpdAceiteEm, c.Bloqueado bloqueado, c.Observacao observacao, c.Origem origem, c.TipoSanguineo tipoSanguineo, c.Ibge ibge, c.Pais pais,
   CONVERT(varchar(19), c.CriadoEm, 126) criadoEm`;
 
 export type ClienteInput = {
@@ -95,6 +95,9 @@ export type ClienteInput = {
   lgpd?: boolean;
   bloqueado?: boolean;
   observacao?: string | null;
+  tipoSanguineo?: string | null;
+  ibge?: string | null;
+  pais?: string | null;
 };
 
 const FIELD_MAP: Record<string, [string, number]> = {
@@ -111,6 +114,9 @@ const FIELD_MAP: Record<string, [string, number]> = {
   cidade: ['Cidade', 100],
   estado: ['Estado', 4],
   observacao: ['Observacao', 400],
+  tipoSanguineo: ['TipoSanguineo', 3],
+  ibge: ['Ibge', 10],
+  pais: ['Pais', 60],
 };
 
 /**

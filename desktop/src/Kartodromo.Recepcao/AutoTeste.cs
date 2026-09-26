@@ -119,6 +119,9 @@ public static class AutoTeste
             // só visual: terminal fictício, nada é gravado (a tela só lê baterias/formas até alguém aprovar)
             var ficticio = new JsonObject { ["id"] = 0, ["terminal"] = "TESTE CODEX", ["caixaId"] = 0 };
             await Janela(new FormCheckout(ficticio, null, [], null), principal, pasta, "41-checkout-visual");
+            ficticio["abertoEm"] = "2026-09-25T16:02"; ficticio["turno"] = "Noite"; ficticio["terminal"] = "SUÊNIA";
+            var sumarioFicticio = new JsonObject { ["inicial"] = 15000, ["suprimento"] = 10000, ["sangria"] = 100000, ["vendasProdutos"] = 6000, ["vendas"] = 230250, ["desconto"] = 1750, ["acrescimos"] = 0, ["recebido"] = 238750, ["troco"] = 2500, ["cancelado"] = 0, ["final"] = 161250 };
+            await Janela(new FormTerminalFechar(ficticio, sumarioFicticio), principal, pasta, "43-terminal-fechar-visual");
             Log.Add("pendente: fechamento, suprimento e sangria requerem terminal aberto (checkout capturado com terminal fictício).");
         }
         await Janela(new FormTerminalAbrir(caixaTeste), principal, pasta, "42-terminal-abrir");

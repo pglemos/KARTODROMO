@@ -80,7 +80,7 @@ public class FormLogin : Form
         campoSenha.Dock = DockStyle.Fill;
         credenciais.Controls.Add(campoSenha);
         credenciais.Controls.Add(campoLogin);
-        var olho = new Button { Text = "◉", FlatStyle = FlatStyle.Flat, Size = new Size(32, 32), BackColor = Color.FromArgb(238, 238, 241), ForeColor = Color.FromArgb(58, 58, 60), Cursor = Cursors.Hand, Anchor = AnchorStyles.Top | AnchorStyles.Right };
+        var olho = new Button { Text = "", Font = new Font("Segoe MDL2 Assets", 10F), FlatStyle = FlatStyle.Flat, Size = new Size(32, 32), BackColor = Color.FromArgb(238, 238, 241), ForeColor = Color.FromArgb(58, 58, 60), Cursor = Cursors.Hand, Anchor = AnchorStyles.Top | AnchorStyles.Right };
         olho.FlatAppearance.BorderSize = 0;
         olho.Click += (_, _) => _senha.UseSystemPasswordChar = !_senha.UseSystemPasswordChar;
         campoSenha.Controls.Add(olho);
@@ -96,6 +96,8 @@ public class FormLogin : Form
         termosLink.LinkClicked += (_, _) => Msg.Info(this, "Uso restrito aos colaboradores do Kartódromo Internacional de Betim.\nOs dados dos clientes são tratados conforme a LGPD (Lei 13.709/2018) e só podem ser usados na operação do kartódromo.", "Termos de uso");
         _lembrar.Location = new Point(0, 259);
         card.Controls.AddRange([_termos, termosLink, _lembrar]);
+        KitVisual.CheckVerde(_termos); KitVisual.CheckVerde(_lembrar);
+        _termos.Padding = new Padding(4, 0, 0, 0); _lembrar.Padding = new Padding(4, 0, 0, 0);
 
         _msg.Location = new Point(0, 291);
         _msg.Height = 34;

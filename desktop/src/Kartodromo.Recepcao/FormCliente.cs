@@ -4,7 +4,7 @@ using Kartodromo.Comum;
 namespace Kartodromo.Recepcao;
 
 /// <summary>"Registro de Cliente" (REC-003): navegacao, incluir/editar/excluir, abas Principal e Financeiro.</summary>
-public class FormCliente : Janela
+public class FormCliente : Janela, ISemKit
 {
     static Api Api => Sessao.Api;
     JsonObject _atual;
@@ -20,7 +20,14 @@ public class FormCliente : Janela
     readonly ComboBox _tipoCli = Campos.Combo("Consumidor Final");
     readonly ComboBox _sexo = Campos.Combo("Não Informado", "Masculino", "Feminino");
     readonly MaskedTextBox _nasc = new() { Mask = "00/00/0000", ValidatingType = typeof(DateTime) };
-    readonly CheckBox _bloq = Campos.Check("Bloqueado"), _lgpd = Campos.Check("Concordo com os termos de uso dos meus dados");
+    readonly CheckBox _bloq = new ChaveLiga(), _lgpd = new ChaveLiga();
+    readonly ComboBox _tipoSang = Campos.Combo("Não informado", "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-");
+    readonly ComboBox _pais = Campos.Combo("Brasil", "Argentina", "Paraguai", "Uruguai", "Chile", "Portugal", "Estados Unidos", "Outro");
+    readonly TextBox _ibge = Campos.Texto(10);
+    readonly Label _sub = new() { AutoSize = true, Font = new Font("Segoe UI", 8.8F), ForeColor = KitVisual.Secundario, BackColor = Color.White, Text = "Os campos com * são obrigatórios" };
+    readonly Label _dicaDoc = new() { Height = 22, Dock = DockStyle.Fill, Font = new Font("Segoe UI", 8.3F), ForeColor = KitVisual.Secundario, BackColor = KitVisual.Cartao, Margin = new Padding(2, 0, 10, 0) };
+    readonly Label _dicaPeso = new() { Height = 22, Dock = DockStyle.Fill, Font = new Font("Segoe UI", 8.3F), ForeColor = KitVisual.Secundario, BackColor = KitVisual.Cartao, Margin = new Padding(2, 0, 10, 0) };
+    readonly ToolTip _dica = new();
     long? _respId;
     readonly Label _id = new() { Text = "0", AutoSize = true, Font = Tema.Negrito };
     readonly Label _pos = new() { AutoSize = true, ForeColor = Tema.Cinza, Anchor = AnchorStyles.Right };
@@ -31,54 +38,88 @@ public class FormCliente : Janela
     readonly Panel _principal = new() { Dock = DockStyle.Fill, BackColor = KitVisual.Fundo };
     readonly Panel _financeiro = new() { Dock = DockStyle.Fill, BackColor = KitVisual.Fundo, Visible = false };
 
-    public FormCliente(long? id, bool soNovo = false, string preenche = null) : base("Registro de Cliente", 1080, 720)
+    public FormCliente(long? id, bool soNovo = false, string preenche = null) : base("Registro de cliente", 1080, 726)
     {
         _soNovo = soNovo;
         ShowInTaskbar = !soNovo;
+        // janela-cartão do design: sem moldura do Windows, cantos arredondados, sombra
+        FormBorderStyle = FormBorderStyle.None;
+        BackColor = KitVisual.Fundo;
+        Font = new Font("Segoe UI", 9.5F);
+        ClientSize = new Size(1080, 726);
+        Resize += (_, _) => { using var p = VisualPrincipal.Redondo(new Rectangle(0, 0, Width, Height), 18); Region = new Region(p); };
         Campos.Mascara(_fone, Fmt.MascaraFone);
+        // combos ficam brancos mesmo só consultando; a troca de valor é que fica bloqueada
+        foreach (var cb in new[] { _tipoPessoa, _tipoDoc, _tipoCli, _sexo, _tipoSang, _pais })
+        {
+            var anterior = -1;
+            cb.DropDown += (_, _) => { if (_modo == "ver") BeginInvoke(() => cb.DroppedDown = false); };
+            cb.Enter += (_, _) => anterior = cb.SelectedIndex;
+            cb.SelectedIndexChanged += (_, _) => { if (_modo == "ver" && cb.Focused && anterior >= 0 && cb.SelectedIndex != anterior) cb.SelectedIndex = anterior; };
+            cb.BackColor = Color.White;
+        }
         Campos.Mascara(_cep, Fmt.MascaraCep);
         Campos.Mascara(_doc, s => _tipoDoc.Text == "CPF" ? Fmt.MascaraCpf(s) : s);
 
-        // ---- barra de ações em grupos (Pesquisar | Incluir Editar Excluir | Salvar Cancelar | « ‹ › »)
-        var barra = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 46, Padding = new Padding(0, 4, 0, 4), WrapContents = false, BackColor = KitVisual.Fundo };
+        // ---- cabeçalho único: ícone · título · selo · ações em ícones (Cliente.dc.html)
+        var cab = new Panel { Dock = DockStyle.Top, Height = 66, BackColor = Color.White };
+        cab.Paint += (_, e) => { using var pen = new Pen(KitVisual.Linha); e.Graphics.DrawLine(pen, 0, cab.Height - 1, cab.Width, cab.Height - 1); };
+        var ico = CartaoModal.Icone("clientes", 54); ico.Location = new Point(10, 6);
+        var tit = new Label { Text = "Registro de cliente", AutoSize = true, Font = new Font("Segoe UI", 13F, FontStyle.Bold), Location = new Point(64, 12), BackColor = Color.White };
+        _sub.Location = new Point(65, 37);
+        _status.Font = new Font("Segoe UI", 8.6F, FontStyle.Bold); _status.Padding = new Padding(8, 3, 8, 3); _status.AutoSize = true;
+        tit.SizeChanged += (_, _) => _status.Location = new Point(Math.Max(tit.Right, _sub.Right) + 12, 20);
+        _sub.SizeChanged += (_, _) => _status.Location = new Point(Math.Max(tit.Right, _sub.Right) + 12, 20);
+        _status.Resize += (_, _) => KitVisual.AplicarRaio(_status, 7);
+        var acoes = new FlowLayoutPanel { AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.LeftToRight, BackColor = Color.White, Anchor = AnchorStyles.Top | AnchorStyles.Right };
         FlowLayoutPanel Grupo()
         {
-            var g = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(2), Margin = new Padding(0, 0, 8, 0), BackColor = Color.FromArgb(232, 232, 236) };
-            g.Resize += (_, _) => KitVisual.AplicarRaio(g, 9);
-            barra.Controls.Add(g);
+            var g = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(2), Margin = new Padding(6, 0, 0, 0), BackColor = Color.FromArgb(242, 242, 245) };
+            g.Resize += (_, _) => KitVisual.AplicarRaio(g, 10);
+            acoes.Controls.Add(g);
             return g;
         }
-        Button B(FlowLayoutPanel g, string k, string t, Action a, bool principal = false, bool perigo = false)
+        Button Icone(FlowLayoutPanel g, string k, string glifo, string dica, Action a, bool perigo = false)
         {
-            var b = new Button
-            {
-                Text = t, AutoSize = true, MinimumSize = new Size(0, 30), Height = 30, FlatStyle = FlatStyle.Flat, Margin = new Padding(1), Padding = new Padding(8, 0, 8, 0),
-                BackColor = principal ? KitVisual.Verde : Color.FromArgb(232, 232, 236), ForeColor = principal ? Color.White : perigo ? Color.FromArgb(196, 40, 28) : KitVisual.Texto,
-                Font = new Font("Segoe UI", 9.3F, principal ? FontStyle.Bold : FontStyle.Regular), Cursor = Cursors.Hand, TabStop = false,
-            };
-            b.FlatAppearance.BorderSize = 0;
-            b.FlatAppearance.MouseOverBackColor = principal ? Color.FromArgb(9, 104, 71) : Color.White;
-            b.Click += (_, _) => a();
-            b.Resize += (_, _) => KitVisual.AplicarRaio(b, 7);
-            g.Controls.Add(b); _bt[k] = b;
-            return b;
+            var b = new Button { Text = glifo, Size = new Size(34, 32), FlatStyle = FlatStyle.Flat, BackColor = g.BackColor, ForeColor = perigo ? Color.FromArgb(196, 40, 28) : KitVisual.Texto, Font = new Font(glifo.Length == 1 && glifo[0] >= '' ? "Segoe MDL2 Assets" : "Segoe UI", glifo[0] >= '' ? 10F : 11F), Margin = new Padding(0), Cursor = Cursors.Hand, TabStop = false };
+            b.FlatAppearance.BorderSize = 0; b.FlatAppearance.MouseOverBackColor = Color.White;
+            b.Click += (_, _) => a(); _dica.SetToolTip(b, dica); b.Resize += (_, _) => KitVisual.AplicarRaio(b, 8);
+            g.Controls.Add(b); _bt[k] = b; return b;
         }
-        var g1 = Grupo(); B(g1, "pesq", "Pesquisar  F3", Pesquisar);
-        var g2 = Grupo(); B(g2, "novo", "+ Incluir", Novo); B(g2, "edit", "Editar", () => SetModo("edit")); B(g2, "del", "Excluir", Excluir, perigo: true);
-        var g3 = Grupo(); B(g3, "save", "Salvar", Salvar, principal: true); B(g3, "canc", "Cancelar", Cancelar);
-        var g4 = Grupo(); B(g4, "first", "«", () => Navegar("first")); B(g4, "prev", "‹", () => Navegar("prev")); B(g4, "next", "›", () => Navegar("next")); B(g4, "last", "»", () => Navegar("last"));
-        _status.Font = new Font("Segoe UI", 8.8F, FontStyle.Bold);
-        _status.Margin = new Padding(6, 9, 0, 0);
-        _status.Padding = new Padding(8, 3, 8, 3);
-        barra.Controls.Add(_status);
+        var gPesq = Grupo();
+        var pesq = new Button { Text = "Pesquisar", Image = Glifo('', KitVisual.Texto), ImageAlign = ContentAlignment.MiddleLeft, TextImageRelation = TextImageRelation.ImageBeforeText, AutoSize = true, Height = 32, MinimumSize = new Size(0, 32), FlatStyle = FlatStyle.Flat, BackColor = gPesq.BackColor, Font = new Font("Segoe UI", 9.5F), Padding = new Padding(8, 0, 10, 0), Margin = new Padding(0), Cursor = Cursors.Hand, TabStop = false };
+        pesq.FlatAppearance.BorderSize = 0; pesq.FlatAppearance.MouseOverBackColor = Color.White; pesq.Click += (_, _) => Pesquisar(); _dica.SetToolTip(pesq, "Pesquisar cliente (F3)");
+        gPesq.Controls.Add(pesq); _bt["pesq"] = pesq;
+        var gCrud = Grupo();
+        Icone(gCrud, "novo", "", "Incluir cliente", Novo);
+        Icone(gCrud, "edit", "", "Editar cliente", () => SetModo("edit"));
+        Icone(gCrud, "del", "", "Excluir cliente", Excluir, perigo: true);
+        var gSalvar = Grupo();
+        var salvarTopo = new Button { Text = "Salvar", Image = Glifo('', Color.White), TextImageRelation = TextImageRelation.ImageBeforeText, AutoSize = true, Height = 32, MinimumSize = new Size(0, 32), FlatStyle = FlatStyle.Flat, BackColor = KitVisual.Verde, ForeColor = Color.White, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Padding = new Padding(8, 0, 10, 0), Margin = new Padding(0), Cursor = Cursors.Hand, TabStop = false };
+        salvarTopo.FlatAppearance.BorderSize = 0; salvarTopo.Click += (_, _) => Salvar(); salvarTopo.Resize += (_, _) => KitVisual.AplicarRaio(salvarTopo, 8);
+        gSalvar.Controls.Add(salvarTopo); _bt["save"] = salvarTopo;
+        Icone(gSalvar, "canc", "", "Cancelar alterações (Esc)", Cancelar);
+        var gNav = Grupo();
+        Icone(gNav, "first", "«", "Primeiro", () => Navegar("first")); Icone(gNav, "prev", "‹", "Anterior", () => Navegar("prev"));
+        Icone(gNav, "next", "›", "Próximo", () => Navegar("next")); Icone(gNav, "last", "»", "Último", () => Navegar("last"));
+        var gExtra = Grupo();
+        Icone(gExtra, "termo", "", "Imprimir o termo de responsabilidade deste cliente", ImprimirTermo);
+        Icone(gExtra, "fechar", "", "Fechar", Close);
+        cab.Controls.AddRange([ico, tit, _sub, _status, acoes]);
+        cab.Resize += (_, _) => acoes.Location = new Point(cab.ClientSize.Width - acoes.Width - 14, 17);
+        acoes.SizeChanged += (_, _) => acoes.Location = new Point(cab.ClientSize.Width - acoes.Width - 14, 17);
+        Point? arrasto = null;
+        cab.MouseDown += (_, e) => { if (e.Button == MouseButtons.Left) arrasto = e.Location; };
+        cab.MouseMove += (_, e) => { if (arrasto is Point o && e.Button == MouseButtons.Left) Location = new Point(Location.X + e.X - o.X, Location.Y + e.Y - o.Y); };
+        cab.MouseUp += (_, _) => arrasto = null;
 
         // ---- abas segmentadas + id
-        var abasBar = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = KitVisual.Fundo };
-        var seg = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(2), BackColor = Color.FromArgb(232, 232, 236), Location = new Point(0, 4) };
+        var abasBar = new Panel { Dock = DockStyle.Top, Height = 44, BackColor = KitVisual.Fundo };
+        var seg = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(2), BackColor = Color.FromArgb(232, 232, 236), Location = new Point(0, 6) };
         seg.Resize += (_, _) => KitVisual.AplicarRaio(seg, 9);
         Button Aba(string t)
         {
-            var b = new Button { Text = t, AutoSize = true, MinimumSize = new Size(96, 28), Height = 28, FlatStyle = FlatStyle.Flat, Margin = new Padding(1), Font = new Font("Segoe UI", 9.3F), Cursor = Cursors.Hand, TabStop = false };
+            var b = new Button { Text = t, AutoSize = true, MinimumSize = new Size(86, 28), Height = 28, FlatStyle = FlatStyle.Flat, Margin = new Padding(1), Font = new Font("Segoe UI", 9.3F), Cursor = Cursors.Hand, TabStop = false };
             b.FlatAppearance.BorderSize = 0;
             b.Resize += (_, _) => KitVisual.AplicarRaio(b, 7);
             seg.Controls.Add(b);
@@ -93,46 +134,63 @@ public class FormCliente : Janela
         }
         aP.Click += (_, _) => Selecionar(true); aF.Click += (_, _) => Selecionar(false);
         Selecionar(true);
-        var idTxt = new Label { AutoSize = true, Font = new Font("Cascadia Mono", 8.8F), ForeColor = KitVisual.Secundario, Location = new Point(230, 11) };
-        _id.TextChanged += (_, _) => idTxt.Text = _id.Text == "0" ? "Id será gerado ao salvar" : "Id " + _id.Text;
+        var idTxt = new Label { AutoSize = true, Font = new Font("Cascadia Mono", 8.8F), ForeColor = KitVisual.Secundario, Location = new Point(206, 13) };
+        _id.TextChanged += (_, _) => idTxt.Text = _id.Text == "0" ? "Id 0 · será gerado ao salvar" : "Id " + _id.Text;
         _pos.AutoSize = true; _pos.ForeColor = KitVisual.Secundario; _pos.Font = new Font("Segoe UI", 8.8F);
         abasBar.Controls.AddRange([seg, idTxt, _pos]);
-        abasBar.Resize += (_, _) => _pos.Location = new Point(abasBar.Width - _pos.Width - 4, 11);
+        abasBar.Resize += (_, _) => _pos.Location = new Point(abasBar.Width - _pos.Width - 4, 13);
 
         // ---- Principal: 2 colunas de cartões
-        var bCep = KitVisual.Botao("Buscar CEP"); bCep.Font = new Font("Segoe UI", 8.8F, FontStyle.Bold);
-        bCep.BackColor = KitVisual.VerdeClaro; bCep.ForeColor = KitVisual.Verde; bCep.Click += (_, _) => BuscarCep();
+        var consultar = BotaoCampo("Consultar", ConsultarDocumento);
+        var buscarCep = BotaoCampo("Buscar", BuscarCep);
+        _dicaDoc.Text = "";
+        var docCampo = F("Nº do documento *", _doc, consultar);
         var ident = Grade6(
             (F("Tipo de pessoa", _tipoPessoa), 2), (F("Tipo de documento", _tipoDoc), 2), (F("Tipo de cliente", _tipoCli), 2),
-            (F("Nº do documento *", _doc), 3), (F("Sexo", _sexo), 3),
+            (docCampo, 3), (F("Sexo", _sexo), 3),
+            (_dicaDoc, 3), (new Panel { BackColor = KitVisual.Cartao, Height = 20 }, 3),
             (F("Nome completo *", _nome), 6),
-            (F("E-mail", _email), 3), (F("Telefone (WhatsApp)", _fone), 3),
-            (F("Aniversário", _nasc), 2), (F("Peso (kg)", _peso), 2), (F("País", new TextBox { Text = "Brasil", ReadOnly = true }), 2));
-        var bResp = KitVisual.Botao("Pesquisar"); bResp.Click += (_, _) => { if (_modo == "ver") return; var c = FormPesquisarCliente.Escolher(this, "Selecionar responsável"); if (c != null) { _respId = c.L("id"); _resp.Text = c.S("nome"); } };
-        var bRespX = KitVisual.Botao("Remover"); bRespX.Click += (_, _) => { if (_modo == "ver") return; _respId = null; _resp.Text = ""; };
+            (F("E-mail", _email), 3), (F("Telefone (WhatsApp) *", _fone), 3),
+            (F("Aniversário", _nasc), 2), (F("Peso (kg)", _peso), 2), (F("Tipo sanguíneo", _tipoSang), 2),
+            (new Panel { BackColor = KitVisual.Cartao, Height = 22 }, 2), (_dicaPeso, 2), (new Panel { BackColor = KitVisual.Cartao, Height = 22 }, 2));
+        _dicaPeso.Text = "Equilibra os karts";
+        var bResp = CartaoModal.Botao("Pesquisar", Color.FromArgb(238, 238, 242), KitVisual.Texto); bResp.Font = new Font("Segoe UI", 9.5F); bResp.Height = 34; bResp.Width = 96; bResp.Margin = new Padding(8, 5, 0, 5);
+        bResp.Click += (_, _) => { if (_modo == "ver") return; var c = FormPesquisarCliente.Escolher(this, "Selecionar responsável"); if (c != null) { _respId = c.L("id"); _resp.Text = c.S("nome"); } };
+        var bRespNovo = CartaoModal.Botao("+ Novo", Color.FromArgb(238, 238, 242), KitVisual.Texto); bRespNovo.Font = new Font("Segoe UI", 9.5F); bRespNovo.Height = 34; bRespNovo.Width = 80; bRespNovo.Margin = new Padding(8, 5, 0, 5);
+        bRespNovo.Click += (_, _) => Seguro.Rodar(this, async () =>
+        {
+            if (_modo == "ver") return;
+            var nid = Novo(this);
+            if (nid != null) { var c = (await Api.Get($"/api/office/clientes/{nid}")).AsObject(); _respId = nid; _resp.Text = c.S("nome"); }
+        });
         _resp.PlaceholderText = "Só para menores de idade — o responsável assina o termo";
+        _resp.ReadOnly = true;
+        var tirar = BotaoCampo("✕", () => { if (_modo == "ver") return; _respId = null; _resp.Text = ""; });
+        _dica.SetToolTip(tirar, "Remover o responsável");
         var respLinha = new TableLayoutPanel { Dock = DockStyle.Top, Height = 46, ColumnCount = 3, BackColor = KitVisual.Cartao };
         respLinha.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); respLinha.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); respLinha.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        respLinha.Controls.Add(Caixa(_resp), 0, 0); respLinha.Controls.Add(bResp, 1, 0); respLinha.Controls.Add(bRespX, 2, 0);
+        respLinha.Controls.Add(Caixa(_resp, tirar), 0, 0); respLinha.Controls.Add(bResp, 1, 0); respLinha.Controls.Add(bRespNovo, 2, 0);
         var ender = Grade6(
-            (F("CEP", _cep), 2), (Envolver(bCep), 2), (F("Estado", _uf), 2),
+            (F("CEP", _cep, buscarCep), 3), (F("País", _pais), 3),
             (F("Endereço", _end), 4), (F("Nº", _num), 2),
             (F("Complemento", _compl), 3), (F("Bairro", _bairro), 3),
-            (F("Cidade", _cidade), 6));
-        var dica = new Label { Text = "Digite o CEP e toque em Buscar CEP para preencher o endereço.", Dock = DockStyle.Top, Height = 20, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 8.5F) };
-        _lgpd.Text = "Concorda com o uso dos dados (LGPD) — obrigatório para correr";
-        _bloq.Text = "Cliente bloqueado — impede novas reservas e alerta no totem";
-        foreach (var ck in new[] { _lgpd, _bloq }) { ck.Font = new Font("Segoe UI", 9.3F); ck.Dock = DockStyle.Top; ck.Height = 30; ck.AutoSize = false; }
-        var situacao = new Panel { Dock = DockStyle.Top, Height = 122, BackColor = KitVisual.Cartao };
-        var obs = F("Observação", _obs); obs.Dock = DockStyle.Top;
-        situacao.Controls.Add(obs); situacao.Controls.Add(_bloq); situacao.Controls.Add(_lgpd);
+            (F("Cidade", _cidade), 3), (F("Estado", _uf), 1), (F("IBGE", _ibge), 2));
+        var dica = new Label { Text = "Digite o CEP que o endereço, bairro, cidade e estado se preenchem sozinhos.", Dock = DockStyle.Top, Height = 22, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 8.5F), BackColor = KitVisual.Cartao };
+        _cep.TextChanged += (_, _) => { if (_modo != "ver" && Fmt.Digitos(_cep.Text).Length == 8 && _cep.Focused) BuscarCep(); };
+        var situacao = new Panel { Dock = DockStyle.Top, Height = 110, BackColor = KitVisual.Cartao };
+        var lgpdLinha = LinhaChave("Concorda com o uso dos dados (LGPD)", "Obrigatório para correr. O cliente aceita no totem ou aqui.", _lgpd);
+        var bloqLinha = LinhaChave("Cliente bloqueado", "Impede novas reservas e aparece como alerta no totem.", _bloq);
+        bloqLinha.Top = 55;
+        situacao.Controls.Add(bloqLinha); situacao.Controls.Add(lgpdLinha);
+        situacao.Controls.Add(new Panel { BackColor = Color.FromArgb(238, 238, 241), Bounds = new Rectangle(0, 54, 2000, 1) });
+        var obsCaixa = Caixa(_obs); obsCaixa.Dock = DockStyle.Top; obsCaixa.Height = 38;
 
         var cols = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, BackColor = KitVisual.Fundo, Padding = new Padding(0, 6, 0, 0) };
         cols.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 54)); cols.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 46));
         var esq = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true, BackColor = KitVisual.Fundo, Margin = new Padding(0, 0, 8, 0) };
         var dir = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true, BackColor = KitVisual.Fundo, Margin = new Padding(8, 0, 0, 0) };
         esq.Controls.Add(Secao("Identificação", ident)); esq.Controls.Add(Secao("Responsável", respLinha));
-        dir.Controls.Add(Secao("Endereço", ender, dica)); dir.Controls.Add(Secao("Situação", situacao));
+        dir.Controls.Add(Secao("Endereço", ender, dica)); dir.Controls.Add(Secao(null, situacao)); dir.Controls.Add(Secao("Observação", obsCaixa));
         void Largura(FlowLayoutPanel f) { var w = f.ClientSize.Width - (f.VerticalScroll.Visible ? SystemInformation.VerticalScrollBarWidth : 0) - 2; foreach (Control c in f.Controls) if (w > 100 && c.Width != w) c.Width = w; }
         esq.SizeChanged += (_, _) => Largura(esq); dir.SizeChanged += (_, _) => Largura(dir);
         Shown += (_, _) => { Largura(esq); Largura(dir); };
@@ -142,6 +200,7 @@ public class FormCliente : Janela
         // ---- Financeiro
         _hist.Colunas(new("dataHora", "Data/Hora", TipoCol.DataHora), new("bateria", "Bateria", Largura: 140), new("produto", "Produto", Largura: 220), new("valor", "Valor", TipoCol.Dinheiro), new("pago", "Pago", TipoCol.Bool), new("status", "Situação"));
         KitVisual.EstilizarGrade(_hist);
+        VisualPrincipal.PintarCelulas(_hist);
         _fin.Font = new Font("Segoe UI", 10F, FontStyle.Bold); _fin.ForeColor = KitVisual.Texto; _fin.Height = 52;
         var cartFin = new Panel { Dock = DockStyle.Fill, BackColor = KitVisual.Cartao, Padding = new Padding(16, 12, 16, 12) };
         _hist.Dock = DockStyle.Fill;
@@ -150,20 +209,26 @@ public class FormCliente : Janela
         _financeiro.Padding = new Padding(0, 6, 0, 0);
         _financeiro.Controls.Add(cartFin);
 
-        // ---- rodapé
-        var rodape = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 52, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(0, 10, 0, 0), BackColor = KitVisual.Fundo };
-        var salvar = KitVisual.Botao("Salvar cliente", true, 140); salvar.Click += (_, _) => Salvar();
-        var cancelar = KitVisual.Botao("Cancelar", false, 100); cancelar.Click += (_, _) => Cancelar();
-        var atalhos = new Label { Text = "Enter salva · Esc cancela · F3 pesquisa", AutoSize = true, ForeColor = KitVisual.Secundario, Margin = new Padding(0, 10, 16, 0) };
-        rodape.Controls.Add(salvar); rodape.Controls.Add(cancelar); rodape.Controls.Add(atalhos);
+        // ---- rodapé branco (Enter salva · Esc cancela · F3 pesquisa | Cancelar | Salvar cliente)
+        var rodape = new Panel { Dock = DockStyle.Bottom, Height = 60, BackColor = Color.White };
+        rodape.Paint += (_, e) => { using var pen = new Pen(KitVisual.Linha); e.Graphics.DrawLine(pen, 0, 0, rodape.Width, 0); };
+        var salvar = CartaoModal.Botao("Salvar cliente", KitVisual.Verde, Color.White, true); salvar.Size = new Size(140, 38); salvar.Click += (_, _) => Salvar();
+        var cancelar = CartaoModal.Botao("Cancelar", Color.FromArgb(238, 238, 242), KitVisual.Texto); cancelar.Size = new Size(96, 38); cancelar.Click += (_, _) => Cancelar();
+        var atalhos = new Label { Text = "Enter salva · Esc cancela · F3 pesquisa", AutoSize = true, ForeColor = KitVisual.Secundario, Location = new Point(18, 21) };
+        rodape.Controls.AddRange([atalhos, cancelar, salvar]);
+        rodape.Resize += (_, _) => { salvar.Location = new Point(rodape.Width - salvar.Width - 18, 11); cancelar.Location = new Point(salvar.Left - cancelar.Width - 10, 11); };
         _bt["save2"] = salvar;
 
+        var corpo = new Panel { Dock = DockStyle.Fill, BackColor = KitVisual.Fundo, Padding = new Padding(16, 8, 16, 10) };
         var meio = new Panel { Dock = DockStyle.Fill, BackColor = KitVisual.Fundo };
         meio.Controls.Add(_principal); meio.Controls.Add(_financeiro);
-        Controls.Add(meio);
+        corpo.Controls.Add(meio);
+        corpo.Controls.Add(abasBar);
+        meio.BringToFront();
+        Controls.Add(corpo);
         Controls.Add(rodape);
-        Controls.Add(abasBar);
-        Controls.Add(barra);
+        Controls.Add(cab);
+        corpo.BringToFront();
         KeyDown += (_, e) =>
         {
             if (e.KeyCode == Keys.F3) { e.Handled = true; Pesquisar(); }
@@ -178,6 +243,81 @@ public class FormCliente : Janela
         };
     }
 
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        // Esc: em edição cancela as alterações; só consultando, fecha a janela
+        if (keyData == Keys.Escape) { if (_modo == "ver" || _soNovo) Close(); else Cancelar(); return true; }
+        return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    protected override CreateParams CreateParams
+    {
+        get { var cp = base.CreateParams; cp.ClassStyle |= 0x20000; return cp; } // sombra da janela-cartão
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        using var p = VisualPrincipal.Redondo(new Rectangle(0, 0, Width - 1, Height - 1), 18);
+        using var pen = new Pen(Color.FromArgb(215, 215, 220));
+        e.Graphics.DrawPath(pen, p);
+    }
+
+    /// <summary>Glifo MDL2 como imagem pequena (para botões com texto).</summary>
+    static Bitmap Glifo(char g, Color cor)
+    {
+        var bmp = new Bitmap(18, 18);
+        using var gr = Graphics.FromImage(bmp);
+        gr.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+        TextRenderer.DrawText(gr, g.ToString(), new Font("Segoe MDL2 Assets", 9.5F), new Rectangle(0, 0, 18, 18), cor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+        return bmp;
+    }
+
+    /// <summary>Botão verde claro dentro do campo (Consultar / Buscar / ✕).</summary>
+    static Button BotaoCampo(string texto, Action a)
+    {
+        var b = new Button { Text = texto, AutoSize = true, MinimumSize = new Size(26, 22), Height = 22, Dock = DockStyle.Right, FlatStyle = FlatStyle.Flat, BackColor = KitVisual.VerdeClaro, ForeColor = KitVisual.Verde, Font = new Font("Segoe UI", 8.4F, FontStyle.Bold), Padding = new Padding(4, 0, 4, 0), Cursor = Cursors.Hand, TabStop = false, Margin = new Padding(0) };
+        b.FlatAppearance.BorderSize = 0;
+        b.Click += (_, _) => a();
+        b.Resize += (_, _) => KitVisual.AplicarRaio(b, 6);
+        return b;
+    }
+
+    /// <summary>Linha "título + explicação | chave liga/desliga" do cartão Situação.</summary>
+    static Panel LinhaChave(string titulo, string texto, CheckBox chave)
+    {
+        var p = new Panel { Height = 54, Dock = DockStyle.Top, BackColor = KitVisual.Cartao };
+        p.Controls.Add(new Label { Text = titulo, AutoSize = true, Location = new Point(0, 7), Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = KitVisual.Texto });
+        p.Controls.Add(new Label { Text = texto, AutoSize = true, Location = new Point(0, 29), Font = new Font("Segoe UI", 8.8F), ForeColor = KitVisual.Secundario });
+        chave.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        p.Controls.Add(chave);
+        p.Resize += (_, _) => chave.Location = new Point(p.Width - chave.Width - 4, 12);
+        return p;
+    }
+
+    void ConsultarDocumento() => Seguro.Rodar(this, async () =>
+    {
+        var doc = Fmt.Digitos(_doc.Text);
+        if (doc.Length == 0) { _dicaDoc.Text = "Digite o documento para consultar."; return; }
+        var cpfOk = _tipoDoc.Text != "CPF" || Fmt.CpfValido(doc);
+        var achados = await Api.Lista($"/api/office/clientes?q={Uri.EscapeDataString(doc)}&campo=documento");
+        var outro = achados.FirstOrDefault(c => c.S("id") != _atual?.S("id"));
+        _dicaDoc.ForeColor = !cpfOk || outro != null ? Color.FromArgb(196, 40, 28) : KitVisual.Secundario;
+        _dicaDoc.Text = !cpfOk ? "CPF inválido. Confira os números."
+            : outro != null ? $"Já existe: {outro.S("nome")} (cliente {outro.S("id")})."
+            : (_tipoDoc.Text == "CPF" ? "CPF válido. " : "") + "Nenhum cliente com esse documento.";
+    });
+
+    void ImprimirTermo() => Seguro.Rodar(this, async () =>
+    {
+        // o termo sai por reserva: usa a reserva mais recente do cliente
+        var ultima = (_atual?["historico"] as JsonArray)?.OfType<JsonObject>().FirstOrDefault(h => h.L("id") is long);
+        if (ultima == null) { Msg.Aviso(this, "Este cliente ainda não tem reserva. O termo é impresso junto com a reserva."); return; }
+        var link = await Api.Get("/api/office/termo-link?ids=" + ultima.S("id"));
+        Relatorio.Abrir(this, Config.ServidorUrl.TrimEnd('/') + link.S("url"), "Termo de Responsabilidade");
+    });
+
     // ---------- blocos visuais do design (Cliente.dc.html)
     static System.Drawing.Drawing2D.GraphicsPath Arredondado(Rectangle r, int raio)
     {
@@ -188,10 +328,20 @@ public class FormCliente : Janela
         return gp;
     }
 
+    internal static Panel Caixa(Control c, Button dentro)
+    {
+        var box = Caixa(c);
+        box.Padding = new Padding(box.Padding.Left, 5, 5, 5);
+        dentro.Dock = DockStyle.Right;
+        box.Controls.Add(dentro);
+        c.BringToFront();
+        return box;
+    }
+
     internal static Panel Caixa(Control c)
     {
         var box = new Panel { Dock = DockStyle.Fill, Height = 34, BackColor = KitVisual.Cartao, Padding = new Padding(9, 8, 9, 4), Margin = new Padding(0, 4, 6, 4) };
-        if (c is TextBoxBase t) { t.BorderStyle = BorderStyle.None; t.Font = new Font("Segoe UI", 10F); }
+        if (c is TextBoxBase t) { t.BorderStyle = BorderStyle.None; t.Font = new Font("Segoe UI", 10F); t.BackColor = Color.White; }
         if (c is ComboBox cb) { cb.FlatStyle = FlatStyle.Flat; cb.Font = new Font("Segoe UI", 9.5F); box.Padding = new Padding(4, 4, 4, 2); }
         c.Dock = DockStyle.Fill;
         box.Controls.Add(c);
@@ -207,10 +357,10 @@ public class FormCliente : Janela
         return box;
     }
 
-    static Panel F(string rotulo, Control c)
+    static Panel F(string rotulo, Control c, Button dentro = null)
     {
         var p = new Panel { Height = 58, BackColor = KitVisual.Cartao, Margin = new Padding(0, 0, 10, 6), Dock = DockStyle.Fill };
-        p.Controls.Add(Caixa(c));
+        p.Controls.Add(dentro == null ? Caixa(c) : Caixa(c, dentro));
         p.Controls.Add(new Label { Text = rotulo, Dock = DockStyle.Top, Height = 18, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 8.4F, FontStyle.Bold), BackColor = KitVisual.Cartao });
         return p;
     }
@@ -235,19 +385,21 @@ public class FormCliente : Janela
             col += span;
         }
         t.RowCount = row + 1;
-        for (var i = 0; i <= row; i++) t.RowStyles.Add(new RowStyle(SizeType.Absolute, 64));
-        t.Height = (row + 1) * 64;
+        var alturas = new int[row + 1];
+        foreach (Control c in t.Controls) { var r = t.GetRow(c); alturas[r] = Math.Max(alturas[r], c.Height + c.Margin.Vertical); }
+        foreach (var h in alturas) t.RowStyles.Add(new RowStyle(SizeType.Absolute, h));
+        t.Height = alturas.Sum();
         return t;
     }
 
     static Panel Secao(string titulo, Control conteudo, Control extra = null)
     {
         var p = new Panel { BackColor = KitVisual.Cartao, Padding = new Padding(16, 8, 6, 8), Margin = new Padding(0, 0, 0, 10), Width = 400 };
-        p.Height = 8 + 28 + conteudo.Height + (extra?.Height ?? 0) + 10;
+        p.Height = 8 + (titulo == null ? 0 : 28) + conteudo.Height + (extra?.Height ?? 0) + 10;
         conteudo.Dock = DockStyle.Top;
         if (extra != null) { extra.Dock = DockStyle.Top; p.Controls.Add(extra); }
         p.Controls.Add(conteudo);
-        p.Controls.Add(new Label { Text = titulo, Dock = DockStyle.Top, Height = 28, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = KitVisual.Texto });
+        if (titulo != null) p.Controls.Add(new Label { Text = titulo, Dock = DockStyle.Top, Height = 28, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = KitVisual.Texto });
         p.Paint += (_, e) =>
         {
             e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
@@ -271,17 +423,19 @@ public class FormCliente : Janela
     {
         _modo = m;
         _status.Text = m == "novo" ? "Incluindo" : m == "edit" ? "Editando" : "";
+        _status.Visible = m != "ver";
+        if (m == "novo") _sub.Text = "Novo cadastro · os campos com * são obrigatórios";
         var ro = m == "ver";
-        foreach (var c in new Control[] { _tipoPessoa, _tipoDoc, _doc, _cep, _end, _tipoCli, _nome, _num, _compl, _bairro, _sexo, _email, _cidade, _uf, _peso, _nasc, _fone, _bloq, _lgpd, _obs })
+        foreach (var c in new Control[] { _tipoPessoa, _tipoDoc, _doc, _cep, _end, _tipoCli, _nome, _num, _compl, _bairro, _sexo, _email, _cidade, _uf, _peso, _nasc, _fone, _bloq, _lgpd, _obs, _tipoSang, _pais, _ibge })
         {
-            if (c is TextBoxBase t) t.ReadOnly = ro; else c.Enabled = !ro;
+            if (c is TextBoxBase t) t.ReadOnly = ro; else if (c is ComboBox) c.Enabled = true; else c.Enabled = !ro;
         }
         _bt["save"].Enabled = _bt["canc"].Enabled = _bt["save2"].Enabled = !ro;
         // botão verde desabilitado fica apagado (só consultando não há o que salvar)
         foreach (var k in new[] { "save", "save2" }) { _bt[k].BackColor = ro ? Color.FromArgb(196, 222, 210) : KitVisual.Verde; _bt[k].ForeColor = Color.White; }
         _status.BackColor = m == "novo" ? Color.FromArgb(225, 238, 255) : m == "edit" ? Color.FromArgb(255, 240, 214) : KitVisual.Fundo;
         _status.ForeColor = m == "novo" ? Color.FromArgb(10, 79, 160) : Color.FromArgb(138, 75, 0);
-        foreach (var k in new[] { "pesq", "novo", "edit", "del", "first", "prev", "next", "last" }) _bt[k].Enabled = ro && (!_soNovo);
+        foreach (var k in new[] { "pesq", "novo", "edit", "del", "first", "prev", "next", "last", "termo" }) _bt[k].Enabled = ro && (!_soNovo);
     }
 
     async Task Mostrar(long id)
@@ -293,6 +447,11 @@ public class FormCliente : Janela
         _doc.Text = c.S("documento"); _cep.Text = c.S("cep"); _end.Text = c.S("endereco"); _nome.Text = c.S("nome"); _num.Text = c.S("numero");
         _compl.Text = c.S("complemento"); _bairro.Text = c.S("bairro"); _email.Text = c.S("email"); _cidade.Text = c.S("cidade"); _uf.Text = c.S("estado");
         _peso.Text = c.S("peso"); _fone.Text = c.S("telefone"); _obs.Text = c.S("observacao");
+        _tipoSang.SelectedItem = _tipoSang.Items.Contains(c.S("tipoSanguineo")) ? c.S("tipoSanguineo") : "Não informado";
+        _pais.SelectedItem = _pais.Items.Contains(c.S("pais")) ? c.S("pais") : "Brasil";
+        _ibge.Text = c.S("ibge");
+        _sub.Text = $"Cliente desde {Fmt.Dmy(c.S("criadoEm"))} · origem {c.S("origem")}";
+        _dicaDoc.Text = "";
         _sexo.SelectedIndex = c.S("sexo") == "M" ? 1 : c.S("sexo") == "F" ? 2 : 0;
         _nasc.Text = Fmt.Dmy(c.S("nascimento"));
         _bloq.Checked = c.B("bloqueado"); _lgpd.Checked = !string.IsNullOrEmpty(c.S("lgpdAceiteEm"));
@@ -323,6 +482,7 @@ public class FormCliente : Janela
         _atual = null;
         foreach (var t in new[] { _doc, _cep, _end, _nome, _num, _compl, _bairro, _email, _cidade, _uf, _peso, _fone, _resp, _obs }) t.Text = "";
         _nasc.Text = ""; _sexo.SelectedIndex = 0; _tipoDoc.SelectedIndex = 0; _bloq.Checked = false; _lgpd.Checked = true; _respId = null;
+        _tipoSang.SelectedIndex = 0; _pais.SelectedIndex = 0; _ibge.Text = ""; _dicaDoc.Text = "";
         _id.Text = "0"; _pos.Text = "";
         SetModo("novo");
         _doc.Focus();
@@ -344,6 +504,7 @@ public class FormCliente : Janela
             ["nascimento"] = nascIso, ["sexo"] = _sexo.SelectedIndex == 1 ? "M" : _sexo.SelectedIndex == 2 ? "F" : null, ["peso"] = _peso.Text.Trim(), ["cep"] = _cep.Text.Trim(),
             ["endereco"] = _end.Text.Trim(), ["numero"] = _num.Text.Trim(), ["complemento"] = _compl.Text.Trim(), ["bairro"] = _bairro.Text.Trim(), ["cidade"] = _cidade.Text.Trim(),
             ["estado"] = _uf.Text.Trim().ToUpperInvariant(), ["responsavelId"] = _respId, ["lgpd"] = _lgpd.Checked, ["bloqueado"] = _bloq.Checked, ["observacao"] = _obs.Text.Trim(),
+            ["tipoSanguineo"] = _tipoSang.SelectedIndex > 0 ? _tipoSang.Text : null, ["pais"] = _pais.Text, ["ibge"] = _ibge.Text.Trim(),
         };
     }
 
@@ -384,7 +545,8 @@ public class FormCliente : Janela
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
             var r = JsonNode.Parse(await http.GetStringAsync($"https://viacep.com.br/ws/{cep}/json/"));
             if (r?["erro"] != null) { Msg.Aviso(this, "CEP não encontrado."); return; }
-            _end.Text = r.S("logradouro"); _bairro.Text = r.S("bairro"); _cidade.Text = r.S("localidade"); _uf.Text = r.S("uf");
+            _end.Text = r.S("logradouro"); _bairro.Text = r.S("bairro"); _cidade.Text = r.S("localidade"); _uf.Text = r.S("uf"); _ibge.Text = r.S("ibge");
+            if (string.IsNullOrEmpty(_num.Text)) _num.Focus();
         }
         catch { Msg.Aviso(this, "Não foi possível consultar o CEP (sem internet?)."); }
     }
@@ -395,6 +557,30 @@ public class FormCliente : Janela
         using var f = new FormCliente(null, true, preenche);
         return f.ShowDialog(dono) == DialogResult.OK ? f.CriadoId : null;
     }
+}
+
+/// <summary>Chave liga/desliga (verde) no lugar da caixa de seleção.</summary>
+public sealed class ChaveLiga : CheckBox
+{
+    public ChaveLiga()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
+        Size = new Size(44, 26); AutoSize = false; Cursor = Cursors.Hand; Text = ""; BackColor = Color.Transparent;
+    }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        g.Clear(Parent?.BackColor ?? Color.White);
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        var trilho = new Rectangle(0, 1, Width - 1, Height - 3);
+        using (var p = VisualPrincipal.Redondo(trilho, trilho.Height / 2))
+        using (var b = new SolidBrush(Checked ? Color.FromArgb(52, 199, 89) : Color.FromArgb(225, 225, 230))) g.FillPath(b, p);
+        var d = trilho.Height - 4;
+        var x = Checked ? trilho.Right - d - 2 : trilho.X + 2;
+        using (var sombra = new SolidBrush(Color.FromArgb(40, 0, 0, 0))) g.FillEllipse(sombra, x, trilho.Y + 3, d, d);
+        using (var bola = new SolidBrush(Enabled ? Color.White : Color.FromArgb(245, 245, 245))) g.FillEllipse(bola, x, trilho.Y + 2, d, d);
+    }
+    protected override void OnCheckedChanged(EventArgs e) { base.OnCheckedChanged(e); Invalidate(); }
 }
 
 public static class Extensoes

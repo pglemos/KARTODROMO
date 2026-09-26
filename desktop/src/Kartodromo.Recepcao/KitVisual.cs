@@ -50,7 +50,7 @@ public static class KitVisual
     static void Aplicar(Form f)
     {
         Aplicadas.Add(f, new object());
-        if (f is FormPrincipal or FormLogin) return;
+        if (f is FormPrincipal or FormLogin or ISemKit) return;
 
         f.SuspendLayout();
         f.BackColor = Fundo;
@@ -75,9 +75,10 @@ public static class KitVisual
 
             var corpo = new Panel { Dock = DockStyle.Fill, BackColor = Fundo, Padding = new Padding(12, 10, 12, 12) };
             corpo.Controls.AddRange(originais);
-            var cab = Cabecalho(f, f.Text);
             f.Controls.Add(corpo);
-            f.Controls.Add(cab);
+            // o Produto tem o próprio cabeçalho (design aprovado): sem a barra genérica
+            if (f is not FormCadastro { EhProduto: true }) f.Controls.Add(Cabecalho(f, f.Text));
+            else corpo.Padding = new Padding(0);
             AplicarRaio(corpo, 18);
             f.Resize += (_, _) => AplicarRaio(f, 18);
             AplicarRaio(f, 18);
@@ -142,7 +143,7 @@ public static class KitVisual
             if (c is Button b)
             {
                 var principal = ReferenceEquals(form.AcceptButton, b) || b.Text.Contains("Salvar", StringComparison.OrdinalIgnoreCase)
-                    || b.Text.Contains("Concluir", StringComparison.OrdinalIgnoreCase) || b.Text is "OK" or "Ok" || b.Text.StartsWith("Aprovar", StringComparison.OrdinalIgnoreCase);
+                    || b.Text.Contains("Concluir", StringComparison.OrdinalIgnoreCase) || b.Text.StartsWith("Gravar", StringComparison.OrdinalIgnoreCase) || b.Text is "OK" or "Ok" || b.Text.StartsWith("Aprovar", StringComparison.OrdinalIgnoreCase);
                 PrepararBotao(b, principal);
             }
             else if (c is TextBox t)
@@ -165,6 +166,10 @@ public static class KitVisual
                 dt.CalendarTitleBackColor = Verde;
                 dt.CalendarTitleForeColor = Color.White;
             }
+            else if (c is CheckBox ck && c is not ChaveLiga && ck.Appearance == Appearance.Normal)
+            {
+                CheckVerde(ck);
+            }
             else if (c is DataGridView g)
             {
                 EstilizarGrade(g);
@@ -179,6 +184,33 @@ public static class KitVisual
             }
             EstilizarArvore(c, form);
         }
+    }
+
+    /// <summary>Caixa de seleção do design: quadradinho arredondado verde com ✓ branco.</summary>
+    public static void CheckVerde(CheckBox ck)
+    {
+        if (ck.Tag as string == "check-verde") return;
+        ck.Tag ??= "check-verde";
+        ck.Paint += (_, e) =>
+        {
+            var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
+            var lado = (int)Math.Round(16 * ck.DeviceDpi / 96.0);
+            var y = ck.CheckAlign switch { ContentAlignment.TopLeft => 1, _ => (ck.Height - lado) / 2 };
+            var r = new Rectangle(0, y, lado, lado);
+            using (var fundo = new SolidBrush(ck.Parent?.BackColor ?? Color.White)) g.FillRectangle(fundo, new Rectangle(0, 0, lado + 2, ck.Height));
+            using var p = CaminhoArredondado(r, 4);
+            if (ck.Checked)
+            {
+                using var b = new SolidBrush(ck.Enabled ? Verde : Color.FromArgb(160, 196, 180)); g.FillPath(b, p);
+                using var pen = new Pen(Color.White, 2F) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
+                g.DrawLines(pen, [new PointF(r.X + lado * 0.26F, r.Y + lado * 0.52F), new PointF(r.X + lado * 0.44F, r.Y + lado * 0.70F), new PointF(r.X + lado * 0.76F, r.Y + lado * 0.32F)]);
+            }
+            else
+            {
+                using var b = new SolidBrush(Color.White); g.FillPath(b, p);
+                using var pen = new Pen(Color.FromArgb(199, 199, 204), 1.4F); g.DrawPath(pen, p);
+            }
+        };
     }
 
     static bool EhPainelDeCampo(Panel p) => p.Controls.OfType<Label>().Any() &&
