@@ -173,7 +173,7 @@ public class FormTransponders : Janela
     readonly List<string> _desconhecidos;
     Dictionary<string, string> _original = [];
 
-    public FormTransponders(List<string> desconhecidos) : base("Transponders", 520, 600, true)
+    public FormTransponders(List<string> desconhecidos, string titulo = "Transponders") : base(titulo, 520, 600, true)
     {
         _desconhecidos = desconhecidos;
         _g.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Transponder", Width = 200 });

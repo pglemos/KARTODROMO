@@ -1,26 +1,35 @@
-using System.Drawing.Drawing2D;
+﻿using System.Drawing.Drawing2D;
 using System.Drawing.Text;
+using Kartodromo.Comum;
 
 namespace Kartodromo.Autoatendimento;
 
-/// <summary>Visual do LapTime Autoatendimento: couro preto, cartao com borda vermelha, fonte condensada.</summary>
+/// <summary>Paleta Apple TV do totem.</summary>
 public static class Estilo
 {
-    public static readonly Color Fundo = Color.FromArgb(11, 11, 11);
-    public static readonly Color Cartao = Color.FromArgb(23, 25, 28);
-    public static readonly Color Vermelho = Color.FromArgb(226, 57, 63);
-    public static readonly Color Campo = Color.FromArgb(43, 46, 51);
-    public static readonly Color BordaCampo = Color.FromArgb(75, 79, 85);
-    public static readonly Color Texto = Color.FromArgb(228, 228, 228);
-    public static readonly Color Suave = Color.FromArgb(201, 201, 201);
-    public static readonly Color Amarelo = Color.FromArgb(240, 230, 140);
+    public static readonly Color Fundo = Color.Black;
+    public static readonly Color Cartao = Color.FromArgb(22, 255, 255, 255);
+    public static readonly Color Verde = Color.FromArgb(48, 209, 88);
+    public static readonly Color Texto = Color.FromArgb(245, 245, 247);
+    public static readonly Color Suave = Color.FromArgb(174, 174, 178);
+    public static readonly Color MuitoSuave = Color.FromArgb(142, 142, 147);
+    public static readonly Color Campo = Color.FromArgb(31, 31, 33);
+    public static readonly Color BordaCampo = Color.FromArgb(54, 54, 58);
+    public static readonly Color Amarelo = Color.FromArgb(255, 179, 64);
 
-    static readonly string Familia = new[] { "Bahnschrift SemiLight SemiConde", "Bahnschrift SemiLight SemiCondensed", "Bahnschrift SemiCondensed", "Segoe UI" }
+    static readonly string Familia = new[] { "Segoe UI Variable", "Segoe UI" }
         .First(f => { using var t = new Font(f, 10); return t.Name.Equals(f, StringComparison.OrdinalIgnoreCase); });
-    static readonly string FamiliaLeve = new[] { "Bahnschrift Light Condensed", "Bahnschrift Light SemiCondensed", "Bahnschrift SemiCondensed", "Segoe UI Light" }
+    static readonly string FamiliaMono = new[] { "Cascadia Mono", "Consolas" }
         .First(f => { using var t = new Font(f, 10); return t.Name.Equals(f, StringComparison.OrdinalIgnoreCase); });
 
-    public static Font F(float tam, bool leve = false, FontStyle st = FontStyle.Regular) => new(leve ? FamiliaLeve : Familia, tam, st, GraphicsUnit.Pixel);
+    public static Font F(float tam, bool leve = false, FontStyle st = FontStyle.Regular) => new(Familia, tam, st, GraphicsUnit.Pixel);
+    public static Font Mono(float tam, FontStyle st = FontStyle.Regular) => new(FamiliaMono, tam, st, GraphicsUnit.Pixel);
+
+    public static Image Logo()
+    {
+        using var original = Icone.Logo();
+        return original == null ? null : new Bitmap(original);
+    }
 
     public static GraphicsPath Arredondado(Rectangle r, int raio)
     {
@@ -48,25 +57,106 @@ public static class Estilo
     }
 }
 
-/// <summary>Cartao com borda vermelha arredondada (onde ficam os campos de cada tela).</summary>
+/// <summary>Superfície transparente dimensionada no quadro lógico do totem.</summary>
+public class TelaCanvas : Panel
+{
+    public int Etapa { get; set; }
+    public TelaCanvas()
+    {
+        SetStyle(ControlStyles.SupportsTransparentBackColor | ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.ResizeRedraw, true);
+        BackColor = Color.Transparent;
+    }
+}
+
+/// <summary>Cabeçalho do totem desenhado em uma camada superior estável.</summary>
+public class CabecalhoTotem : Control
+{
+    readonly Image _logo;
+    readonly bool _donoDaLogo;
+    float _escala;
+    int _etapa;
+    public CabecalhoTotem(Image logo, int etapa, float escala = 1f, bool donoDaLogo = false)
+    {
+        _logo = logo;
+        _etapa = etapa;
+        _escala = escala;
+        _donoDaLogo = donoDaLogo;
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Opaque, true);
+        BackColor = Estilo.Fundo;
+        TabStop = false;
+    }
+    public void Atualizar(int etapa, float escala)
+    {
+        _etapa = etapa;
+        _escala = escala;
+        Invalidate();
+    }
+    protected override void OnPaintBackground(PaintEventArgs e)
+    {
+        e.Graphics.Clear(Estilo.Fundo);
+        if (ClientSize.Width <= 0 || ClientSize.Height <= 0) return;
+        using var glow = new LinearGradientBrush(ClientRectangle, Color.FromArgb(30, 48, 209, 88), Color.Transparent, 90f);
+        e.Graphics.FillRectangle(glow, ClientRectangle);
+    }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+        if (_logo != null)
+        {
+            var altura = Math.Max(1, (int)Math.Round(40 * _escala));
+            var largura = Math.Max(1, (int)Math.Round(altura * _logo.Width / (float)_logo.Height));
+            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            g.DrawImage(_logo, new Rectangle((int)Math.Round(56 * _escala), (int)Math.Round(36 * _escala), largura, altura));
+        }
+        if (_etapa <= 0) return;
+        string[] nomes = ["1 Identificação", "2 Cadastro", "3 Bateria"];
+        var x = (int)Math.Round(760 * _escala);
+        var y = (int)Math.Round(36 * _escala);
+        var w = (int)Math.Round(164 * _escala);
+        var h = (int)Math.Round(34 * _escala);
+        for (var i = 0; i < nomes.Length; i++)
+        {
+            var concluida = i + 1 < _etapa;
+            var atual = i + 1 == _etapa;
+            var r = new Rectangle(x, y, w, h);
+            using var path = Estilo.Arredondado(new Rectangle(r.X, r.Y, r.Width - 1, r.Height - 1), h / 2);
+            var fundo = atual ? Color.White : concluida ? Color.FromArgb(48, 48, 209, 88) : Color.FromArgb(20, 255, 255, 255);
+            using (var brush = new SolidBrush(fundo)) g.FillPath(brush, path);
+            var cor = atual ? Color.Black : concluida ? Color.FromArgb(126, 227, 154) : Estilo.Suave;
+            using var font = Estilo.F(14 * _escala, false, atual ? FontStyle.Bold : FontStyle.Regular);
+            TextRenderer.DrawText(g, nomes[i] + (concluida ? "  ✓" : ""), font, r, cor,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+            x += (int)Math.Round(174 * _escala);
+        }
+    }
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing && _donoDaLogo) _logo?.Dispose();
+        base.Dispose(disposing);
+    }
+}
+
+/// <summary>Cartao translúcido arredondado para formulários e diálogos.</summary>
 public class Cartao : Panel
 {
     public Cartao()
     {
         DoubleBuffered = true;
         BackColor = Estilo.Cartao;
-        Padding = new Padding(42, 32, 42, 30);
+        Padding = new Padding(24);
         SetStyle(ControlStyles.SupportsTransparentBackColor | ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.ResizeRedraw, true);
     }
     protected override void OnPaintBackground(PaintEventArgs e)
     {
-        e.Graphics.Clear(Parent?.BackColor ?? Estilo.Fundo);
+        base.OnPaintBackground(e);
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         var r = new Rectangle(2, 2, Width - 5, Height - 5);
-        using var p = Estilo.Arredondado(r, 22);
+        using var p = Estilo.Arredondado(r, 28);
         using var fundo = new SolidBrush(Estilo.Cartao);
         e.Graphics.FillPath(fundo, p);
-        using var borda = new Pen(Estilo.Vermelho, 3);
+        using var borda = new Pen(Color.FromArgb(26, 255, 255, 255), 1);
         e.Graphics.DrawPath(borda, p);
     }
     protected override void OnResize(EventArgs e)
@@ -77,7 +167,7 @@ public class Cartao : Panel
     }
 }
 
-/// <summary>Botao em pilula (vermelho cheio ou contorno vermelho).</summary>
+/// <summary>Botão em pílula branco ou translúcido.</summary>
 public class Pilula : Control
 {
     public bool Principal { get; set; }
@@ -86,7 +176,7 @@ public class Pilula : Control
     {
         Text = texto; Principal = principal;
         Size = new Size(154, 48);
-        Font = Estilo.F(20);
+        Font = Estilo.F(19, false, principal ? FontStyle.Bold : FontStyle.Regular);
         Cursor = Cursors.Hand;
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
         BackColor = Color.Transparent;
@@ -101,14 +191,44 @@ public class Pilula : Control
         g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
         var r = new Rectangle(1, 1, Width - 3, Height - 3);
         using var p = Estilo.Arredondado(r, (Height - 3) / 2);
-        var cor = Enabled ? Estilo.Vermelho : Color.FromArgb(120, 40, 44);
-        if (Principal) { using var b = new SolidBrush(_sobre ? ControlPaint.Light(cor, .1f) : cor); g.FillPath(b, p); }
-        using (var pen = new Pen(cor, 2)) g.DrawPath(pen, p);
-        TextRenderer.DrawText(g, Text, Font, r, Principal ? Color.White : Estilo.Texto, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+        if (Principal)
+        {
+            using var b = new SolidBrush(Enabled ? (_sobre ? Color.FromArgb(232, 232, 236) : Color.White) : Color.FromArgb(130, 130, 134));
+            g.FillPath(b, p);
+        }
+        else
+        {
+            using var b = new SolidBrush(_sobre ? Color.FromArgb(42, 255, 255, 255) : Color.FromArgb(26, 255, 255, 255));
+            g.FillPath(b, p);
+            using var pen = new Pen(Color.FromArgb(38, 255, 255, 255), 1);
+            g.DrawPath(pen, p);
+        }
+        TextRenderer.DrawText(g, Text, Font, r, Principal ? Color.Black : Estilo.Texto, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
     }
 }
 
-/// <summary>Caixa de marcar quadrada que fica vermelha quando marcada.</summary>
+/// <summary>Ícone de confirmação verde com halo.</summary>
+public class IconeSucesso : Control
+{
+    public IconeSucesso()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
+        BackColor = Color.Transparent;
+    }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        var halo = new Rectangle(1, 1, Width - 3, Height - 3);
+        using (var b = new SolidBrush(Color.FromArgb(35, 48, 209, 88))) g.FillEllipse(b, halo);
+        var circ = new Rectangle(14, 14, Width - 29, Height - 29);
+        using (var grad = new LinearGradientBrush(circ, Color.FromArgb(76, 224, 122), Color.FromArgb(31, 166, 74), LinearGradientMode.Vertical)) g.FillEllipse(grad, circ);
+        using var check = new Pen(Color.White, Math.Max(3, Width * .027f)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+        g.DrawLines(check, [new PointF(Width * .31f, Height * .51f), new PointF(Width * .45f, Height * .65f), new PointF(Width * .72f, Height * .37f)]);
+    }
+}
+
+/// <summary>Marcador verde do tema.</summary>
 public class Marcador : Control
 {
     bool _marcado;
@@ -134,7 +254,7 @@ public class Marcador : Control
         using var p = Estilo.Arredondado(box, 5);
         if (_marcado)
         {
-            using var b = new SolidBrush(Estilo.Vermelho); g.FillPath(b, p);
+            using var b = new SolidBrush(Estilo.Verde); g.FillPath(b, p);
             using var pen = new Pen(Color.White, 2.4f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
             g.DrawLines(pen, new Point[] { new Point(box.X + 5, box.Y + 11), new Point(box.X + 9, box.Y + 16), new Point(box.X + 17, box.Y + 6) });
         }
@@ -143,31 +263,33 @@ public class Marcador : Control
     }
 }
 
-/// <summary>Campo de texto escuro com borda arredondada (TextBox sem borda dentro de um painel).</summary>
+/// <summary>Campo de texto escuro arredondado (TextBox sem borda dentro de um painel).</summary>
 public class CampoTexto : Panel
 {
-    public readonly TextBox Caixa = new() { BorderStyle = BorderStyle.None, BackColor = Estilo.Campo, ForeColor = Estilo.Texto };
+    public readonly TextBox Caixa = new() { BorderStyle = BorderStyle.None, BackColor = Estilo.Campo, ForeColor = Color.White };
     bool _foco;
     public CampoTexto()
     {
         DoubleBuffered = true;
-        Height = 48;
-        Caixa.Font = Estilo.F(20);
+        SetStyle(ControlStyles.SupportsTransparentBackColor | ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.ResizeRedraw, true);
+        BackColor = Color.Transparent;
+        Height = 58;
+        Caixa.Font = Estilo.F(19);
         Controls.Add(Caixa);
-        Padding = new Padding(14, 0, 12, 0);
+        Padding = new Padding(16, 0, 14, 0);
         Caixa.GotFocus += (_, _) => { _foco = true; Invalidate(); };
         Caixa.LostFocus += (_, _) => { _foco = false; Invalidate(); };
         Click += (_, _) => Caixa.Focus();
-        Resize += (_, _) => Caixa.SetBounds(14, (Height - Caixa.Height) / 2, Width - 28, Caixa.Height);
+        Resize += (_, _) => Caixa.SetBounds(Padding.Left, (Height - Caixa.Height) / 2, Width - Padding.Horizontal, Caixa.Height);
     }
     public override string Text { get => Caixa.Text; set => Caixa.Text = value; }
     protected override void OnPaintBackground(PaintEventArgs e)
     {
-        e.Graphics.Clear(Parent?.BackColor ?? Estilo.Cartao);
+        base.OnPaintBackground(e);
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        using var p = Estilo.Arredondado(new Rectangle(1, 1, Width - 3, Height - 3), 9);
+        using var p = Estilo.Arredondado(new Rectangle(1, 1, Width - 3, Height - 3), 16);
         using var b = new SolidBrush(Enabled ? Estilo.Campo : Color.FromArgb(34, 36, 40)); e.Graphics.FillPath(b, p);
-        using var pen = new Pen(_foco ? Color.FromArgb(150, 154, 160) : Estilo.BordaCampo, 2); e.Graphics.DrawPath(pen, p);
+        using var pen = new Pen(_foco ? Color.White : Color.FromArgb(26, 255, 255, 255), _foco ? 2 : 1); e.Graphics.DrawPath(pen, p);
     }
     protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Caixa.BackColor = Enabled ? Estilo.Campo : Color.FromArgb(34, 36, 40); Invalidate(); }
 }
@@ -184,7 +306,8 @@ public class CampoLista : Control
         Height = 48;
         ForeColor = Estilo.Texto;
         Cursor = Cursors.Hand;
-        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor, true);
+        BackColor = Color.Transparent;
         Click += (_, _) => Abrir();
     }
     public int SelectedIndex { get => _sel; set { if (value == _sel) return; _sel = value; Invalidate(); SelectedIndexChanged?.Invoke(this, EventArgs.Empty); } }
@@ -204,11 +327,11 @@ public class CampoLista : Control
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
-        g.Clear(Parent?.BackColor ?? Estilo.Cartao);
+        base.OnPaintBackground(e);
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        using var p = Estilo.Arredondado(new Rectangle(1, 1, Width - 3, Height - 3), 9);
+        using var p = Estilo.Arredondado(new Rectangle(1, 1, Width - 3, Height - 3), 16);
         using (var b = new SolidBrush(Enabled ? Estilo.Campo : Color.FromArgb(34, 36, 40))) g.FillPath(b, p);
-        using (var pen = new Pen(Estilo.BordaCampo, 2)) g.DrawPath(pen, p);
+        using (var pen = new Pen(Color.FromArgb(26, 255, 255, 255), 1)) g.DrawPath(pen, p);
         TextRenderer.DrawText(g, Text, Font, new Rectangle(12, 0, Width - 40, Height), Enabled ? ForeColor : Estilo.Suave, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
         var cx = Width - 22; var cy = Height / 2;
         using var seta = new Pen(Estilo.Suave, 1.6f);
@@ -226,23 +349,40 @@ public class CampoLista : Control
         public override Color CheckSelectedBackground => Color.FromArgb(70, 74, 80);
     }
 }
-/// <summary>Caixa "Alerta" branca com OK (igual ao WinUI do LapTime AA).</summary>
+/// <summary>Alerta escuro compatível com as telas do totem.</summary>
 public class Alerta : Form
 {
-    public Alerta(string msg)
+    public Alerta(string msg, int etapa = 1, Size? area = null)
     {
         FormBorderStyle = FormBorderStyle.None; StartPosition = FormStartPosition.CenterParent; ShowInTaskbar = false; TopMost = true;
-        BackColor = Color.White; Size = new Size(360, 200); KeyPreview = true;
-        var titulo = new Label { Text = "Alerta", Font = new Font("Segoe UI Semibold", 15F), Location = new Point(24, 22), AutoSize = true, ForeColor = Color.FromArgb(27, 27, 27) };
-        var texto = new Label { Text = msg, Font = new Font("Segoe UI", 10.5F), Location = new Point(24, 62), Size = new Size(312, 56), ForeColor = Color.FromArgb(27, 27, 27) };
-        var rod = new Panel { Dock = DockStyle.Bottom, Height = 72, BackColor = Color.FromArgb(243, 243, 243) };
-        var ok = new Button { Text = "OK", Size = new Size(130, 34), Location = new Point(206, 20), FlatStyle = FlatStyle.System, Font = new Font("Segoe UI", 10F) };
+        BackColor = Estilo.Fundo; ClientSize = area ?? new Size(1366, 768); KeyPreview = true;
+        var escala = Math.Min(ClientSize.Width / 1366f, ClientSize.Height / 768f);
+        int P(float valor) => (int)Math.Round(valor * escala);
+        Font F(float pixels, FontStyle estilo = FontStyle.Regular) => Estilo.F(pixels * escala, false, estilo);
+        var tela = new TelaCanvas { Size = ClientSize, Etapa = etapa };
+        Controls.Add(tela);
+        var cabecalho = new CabecalhoTotem(Estilo.Logo(), etapa, escala, donoDaLogo: true)
+        {
+            Bounds = new Rectangle(0, 0, ClientSize.Width, P(88))
+        };
+        Controls.Add(cabecalho);
+        var wCard = Math.Min(P(600), ClientSize.Width - P(80));
+        var hCard = P(300);
+        var cartao = new Cartao { Bounds = new Rectangle((ClientSize.Width - wCard) / 2, (ClientSize.Height - hCard) / 2, wCard, hCard), Padding = new Padding(P(36)), BackColor = Color.Transparent };
+        var titulo = new Label { Text = "Atenção", Font = F(28, FontStyle.Bold), Location = new Point(P(36), P(34)), AutoSize = true, ForeColor = Estilo.Texto, BackColor = Color.Transparent };
+        var texto = new Label { Text = msg, Font = F(18), Location = new Point(P(36), P(92)), Size = new Size(wCard - P(72), P(104)), ForeColor = Estilo.Suave, BackColor = Color.Transparent };
+        var ok = new Pilula("OK", true) { Size = new Size(P(160), P(56)), Location = new Point(wCard - P(36) - P(160), hCard - P(36) - P(56)), Font = F(18, FontStyle.Bold) };
         ok.Click += (_, _) => Close();
-        rod.Controls.Add(ok);
-        Controls.AddRange([titulo, texto, rod]);
-        AcceptButton = ok;
-        Paint += (_, e) => { using var pen = new Pen(Color.FromArgb(200, 200, 200)); e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1); };
-        KeyDown += (_, e) => { if (e.KeyCode == Keys.Escape) Close(); };
+        cartao.Controls.AddRange([titulo, texto, ok]);
+        tela.Controls.Add(cartao);
+        cabecalho.BringToFront();
+        KeyDown += (_, e) => { if (e.KeyCode == Keys.Escape) Close(); else if (e.KeyCode == Keys.Enter) ok.Clicar(); };
     }
-    public static void Mostrar(IWin32Window dono, string msg) { using var a = new Alerta(msg); a.ShowDialog(dono); }
+    public static void Mostrar(IWin32Window dono, string msg, int etapa = 1)
+    {
+        var area = dono is Form f ? f.ClientSize : new Size(1366, 768);
+        using var a = new Alerta(msg, etapa, area);
+        a.ShowDialog(dono);
+    }
 }
+

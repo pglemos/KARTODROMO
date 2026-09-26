@@ -8,7 +8,7 @@ namespace Kartodromo.Cronometragem;
 /// Cronometragem (substitui o LapTime Timing): baterias do dia, competidores, bandeiras,
 /// registro de passagens e resultado ao vivo, lidos do servico de cronometragem (ORBITS :4050).
 /// </summary>
-public class FormCrono : Form
+public partial class FormCrono : Form
 {
     readonly string _autoteste;
     readonly System.Windows.Forms.Timer _leitura = new() { Interval = 1000 };
@@ -17,6 +17,9 @@ public class FormCrono : Form
     JsonObject _sess;
     List<JsonObject> _laps = [];
     List<JsonObject> _agenda = [];
+    JsonObject _catalog;
+    JsonObject _selectedProof;
+    List<JsonObject> _events = [], _groups = [], _proofs = [];
     DateTime _lidoEm = DateTime.Now;
     string _sel;
     bool _fixado, _ocupado, _servidorOk, _pilotosSujos;
@@ -27,9 +30,18 @@ public class FormCrono : Form
     readonly Label _lEvento = Info(), _lTipo = Info(), _lEstado = Info(), _lCrono = new(), _lRestante = Info(), _lVoltasRest = Info(), _lMelhor = Info(), _lRuido = Info(), _lPassagens = new();
     readonly ComboBox _cbSessao = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 420, Font = new Font("Segoe UI", 9.5F) };
     readonly ToolStrip _bandeiras = new() { GripStyle = ToolStripGripStyle.Hidden, ImageScalingSize = new Size(34, 34), BackColor = Color.White, Padding = new Padding(4, 2, 4, 2) };
-    ToolStripButton _bVerde, _bQuad, _bEncerrar, _bCancelar;
+    ToolStripButton _bVerde, _bQuad, _bCancelar;
     readonly LiveGrid _gPass = new(), _gRes = new(), _gSessoes = new(), _gAgenda = new();
+    readonly LiveGrid _gEventos = new(), _gGrupos = new(), _gProvas = new(), _gObs = new(), _gResCategoria = new(), _gTransponderResultado = new();
+    readonly LiveGrid _gResultComp = new(), _gCategoriaComp = new(), _gObsAoVivo = new();
     readonly DataGridView _gPilotos = new();
+    readonly TreeView _arvore = new() { Dock = DockStyle.Fill, BorderStyle = BorderStyle.None, HideSelection = false, FullRowSelect = true, Font = new Font("Segoe UI", 9.5F) };
+    readonly TextBox _txtObservacao = new() { Width = 380, Height = 32, Font = new Font("Segoe UI", 9.5F), PlaceholderText = "Observação desta prova (sai no rodapé do resultado)" };
+    readonly TextBox _txtObservacaoAoVivo = new() { Width = 280, Height = 30, Font = new Font("Segoe UI", 9F), PlaceholderText = "Nova observação da prova" };
+    readonly Label _lVoltaFaixa = new() { Text = "VOLTA\nAGUARDANDO", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, BackColor = Color.FromArgb(29, 29, 31), ForeColor = Color.FromArgb(255, 214, 10), Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+    readonly TabControl _tabsResultado = new() { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 8.5F) };
+    readonly TabControl _tabsCompetidor = new() { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9F) };
+    ToolStripButton _bAmarela, _bVermelha, _bBranca, _bFinalizar, _bLimpar;
     readonly Label _lPilotosTitulo = new() { Dock = DockStyle.Top, Height = 34, Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = Color.FromArgb(200, 16, 46), TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(4, 0, 0, 0) };
     readonly TabControl _abas = new() { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9F) };
     readonly StatusStrip _status = new() { SizingGrip = false };
@@ -42,26 +54,35 @@ public class FormCrono : Form
         _autoteste = autoteste;
         Text = "Kartódromo - Cronometragem";
         Icon = Icone.App;
-        Font = new Font("Segoe UI", 9F);
-        BackColor = Color.FromArgb(244, 244, 244);
+        Font = TemaCrono.Normal;
+        BackColor = TemaCrono.Fundo;
         KeyPreview = true;
         if (autoteste == null) WindowState = FormWindowState.Maximized;
-        else { StartPosition = FormStartPosition.Manual; Location = new Point(0, 0); Size = new Size(1600, 900); }
+        else { StartPosition = FormStartPosition.Manual; Location = new Point(0, 0); Size = new Size(1600, 960); }
         MinimumSize = new Size(1100, 700);
 
         MainMenuStrip = Menu();
-        var empresa = new Label { Text = "KARTÓDROMO INTERNACIONAL DE BETIM — CRONOMETRAGEM", Dock = DockStyle.Top, Height = 30, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(4, 0, 0, 0) };
+        _abas.Appearance = TabAppearance.FlatButtons;
+        _abas.SizeMode = TabSizeMode.Fixed;
+        _abas.ItemSize = new Size(220, 36);
+        _abas.DrawMode = TabDrawMode.OwnerDrawFixed;
+        _abas.DrawItem += (_, e) => DesenharAba(e);
+        _abas.Padding = new Point(10, 4);
+        _abas.TabPages.Add(AbaEventos());
         _abas.TabPages.Add(AbaBaterias());
         _abas.TabPages.Add(AbaCronometragem());
-        _abas.SelectedIndex = 1;
-        _abas.SelectedIndexChanged += (_, _) => { if (_abas.SelectedIndex == 0) _ = CarregarAgenda(); };
+        _abas.SelectedIndex = 2;
+        _abas.SelectedIndexChanged += (_, _) =>
+        {
+            if (_abas.SelectedIndex == 0) { _ = CarregarAgenda(); _ = CarregarCatalogo(); }
+            else if (_abas.SelectedIndex == 1) { MontarArvore(); }
+        };
 
         _status.Items.AddRange([_sHora, Sep(), _sData, Sep(), _sServidor, Sep(), _sDecoder, Sep(), _sTv, Sep(), _sTransp]);
         _sTv.Text = "TV";
         _sTv.Click += (_, _) => AbrirTV();
         _sTransp.Click += (_, _) => Transponders();
         Controls.Add(_abas);
-        Controls.Add(empresa);
         Controls.Add(MainMenuStrip);
         Controls.Add(_status);
 
@@ -69,21 +90,36 @@ public class FormCrono : Form
         _relogio.Tick += (_, _) => Relogio();
         KeyDown += (_, e) =>
         {
-            if (e.KeyCode == Keys.F2) { e.Handled = true; NovaBateria(null); }
-            else if (e.KeyCode == Keys.F5) { e.Handled = true; Acao("start"); }
-            else if (e.KeyCode == Keys.F6) { e.Handled = true; Acao("checkered"); }
-            else if (e.KeyCode == Keys.F7) { e.Handled = true; Acao("close"); }
+            if (e.KeyCode == Keys.F1) { e.Handled = true; Bandeira("verde"); }
+            else if (e.KeyCode == Keys.F2) { e.Handled = true; Bandeira("amarela"); }
+            else if (e.KeyCode == Keys.F3) { e.Handled = true; Bandeira("vermelha"); }
+            else if (e.KeyCode == Keys.F4) { e.Handled = true; Bandeira("quadriculada"); }
+            else if (e.KeyCode == Keys.F5) { e.Handled = true; Acao("close"); }
+            else if (e.KeyCode == Keys.F6) { e.Handled = true; LimparPassagens(); }
+            else if (e.KeyCode == Keys.F7) { e.Handled = true; Bandeira("branca"); }
+            else if (e.KeyCode == Keys.Insert) { e.Handled = true; IncluirPassagem(); }
+            else if (e.KeyCode == Keys.Delete) { e.Handled = true; CorrigirPassagem("delete"); }
             else if (e.KeyCode == Keys.F11) { e.Handled = true; AbrirTV(); }
         };
         Shown += async (_, _) =>
         {
             await Atualizar();
             await CarregarAgenda();
+            await CarregarCatalogo();
             if (_autoteste != null) { await AutoTeste(); return; }
             _leitura.Start();
             _relogio.Start();
         };
         FormClosed += (_, _) => { _tv?.Close(); };
+    }
+
+    void DesenharAba(DrawItemEventArgs e)
+    {
+        var page = _abas.TabPages[e.Index];
+        var selected = e.Index == _abas.SelectedIndex;
+        using var brush = new SolidBrush(selected ? Color.White : TemaCrono.Fundo);
+        e.Graphics.FillRectangle(brush, e.Bounds);
+        TextRenderer.DrawText(e.Graphics, page.Text, new Font("Segoe UI", 9F, selected ? FontStyle.Bold : FontStyle.Regular), e.Bounds, selected ? TemaCrono.Texto : TemaCrono.Secundario, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
     }
 
     static ToolStripSeparator Sep() => new();
@@ -92,88 +128,233 @@ public class FormCrono : Form
     {
         var m = new MenuStrip { BackColor = Color.White, Padding = new Padding(6, 3, 0, 3) };
         var inicio = new ToolStripMenuItem("Início");
+        inicio.DropDownItems.Add("Configurações iniciais", null, (_, _) => JanelaCadastro("ConfigInicial"));
+        inicio.DropDownItems.Add(new ToolStripSeparator());
+        var seguranca = new ToolStripMenuItem("Segurança");
+        seguranca.DropDownItems.Add("Usuário", null, (_, _) => JanelaCadastro("SegUsuario"));
+        seguranca.DropDownItems.Add("Perfil de acesso", null, (_, _) => JanelaCadastro("SegPerfil"));
+        seguranca.DropDownItems.Add("Permissões de acesso", null, (_, _) => JanelaCadastro("Permissoes"));
+        inicio.DropDownItems.Add(seguranca);
+        inicio.DropDownItems.Add(new ToolStripSeparator());
         inicio.DropDownItems.Add("Sair", null, (_, _) => Close());
+        var cad = new ToolStripMenuItem("Cadastros");
+        cad.DropDownItems.Add("Empresa", null, (_, _) => JanelaCadastro("Empresa"));
+        cad.DropDownItems.Add(new ToolStripSeparator());
+        cad.DropDownItems.Add("Categoria", null, (_, _) => JanelaCadastro("CadCategoria"));
+        cad.DropDownItems.Add("Traçado", null, (_, _) => JanelaCadastro("CadTracado"));
+        cad.DropDownItems.Add("Grupo", null, (_, _) => JanelaCadastro("CadGrupo"));
+        cad.DropDownItems.Add("Corridas (provas)", null, (_, _) => JanelaCadastro("Prova"));
+        cad.DropDownItems.Add("Competidor", null, (_, _) => JanelaCadastro("Competidor"));
+        cad.DropDownItems.Add(new ToolStripSeparator());
+        cad.DropDownItems.Add("Decoder", null, (_, _) => JanelaCadastro("CadDecoder"));
+        cad.DropDownItems.Add("Placar", null, (_, _) => JanelaCadastro("PlacarConfig"));
+        cad.DropDownItems.Add("Transponder (De/Para)", null, (_, _) => Transponders());
+        cad.DropDownItems.Add("Transponder × Competidor", null, (_, _) => JanelaCadastro("CadTranspCompetidor"));
+        var ferr = new ToolStripMenuItem("Ferramentas");
+        ferr.DropDownItems.Add("Parâmetros do sistema", null, (_, _) => JanelaCadastro("ParamSistema"));
+        ferr.DropDownItems.Add("Parâmetros da cronometragem", null, (_, _) => JanelaCadastro("ParamCrono"));
+        ferr.DropDownItems.Add(new ToolStripSeparator());
+        ferr.DropDownItems.Add("Guardar backup de eventos", null, (_, _) => JanelaCadastro("Backup"));
+        ferr.DropDownItems.Add("Guardar backup por data", null, (_, _) => FazerBackup());
+        var rel = new ToolStripMenuItem("Relatórios");
+        rel.DropDownItems.Add("Banner", null, (_, _) => JanelaCadastro("Banner"));
+        rel.DropDownItems.Add("Ranking por peso", null, (_, _) => JanelaCadastro("RankingPeso"));
+        rel.DropDownItems.Add("Diversos (resultados, mapas, grids)", null, (_, _) => JanelaCadastro("RelatoriosCrono"));
         var crono = new ToolStripMenuItem("Cronometragem");
-        crono.DropDownItems.Add(new ToolStripMenuItem("Nova bateria...", null, (_, _) => NovaBateria(null), Keys.F2));
-        crono.DropDownItems.Add(new ToolStripSeparator());
-        crono.DropDownItems.Add(new ToolStripMenuItem("Bandeira verde (largada)", null, (_, _) => Acao("start")) { ShortcutKeyDisplayString = "F5" });
-        crono.DropDownItems.Add(new ToolStripMenuItem("Bandeira quadriculada", null, (_, _) => Acao("checkered")) { ShortcutKeyDisplayString = "F6" });
-        crono.DropDownItems.Add(new ToolStripMenuItem("Encerrar bateria", null, (_, _) => Acao("close")) { ShortcutKeyDisplayString = "F7" });
+        crono.DropDownItems.Add(new ToolStripMenuItem("Bandeira verde", null, (_, _) => Bandeira("verde")) { ShortcutKeyDisplayString = "F1" });
+        crono.DropDownItems.Add(new ToolStripMenuItem("Bandeira amarela", null, (_, _) => Bandeira("amarela")) { ShortcutKeyDisplayString = "F2" });
+        crono.DropDownItems.Add(new ToolStripMenuItem("Bandeira vermelha", null, (_, _) => Bandeira("vermelha")) { ShortcutKeyDisplayString = "F3" });
+        crono.DropDownItems.Add(new ToolStripMenuItem("Bandeira quadriculada", null, (_, _) => Bandeira("quadriculada")) { ShortcutKeyDisplayString = "F4" });
+        crono.DropDownItems.Add(new ToolStripMenuItem("Finalizar prova", null, (_, _) => Acao("close")) { ShortcutKeyDisplayString = "F5" });
+        crono.DropDownItems.Add(new ToolStripMenuItem("Limpar passagens", null, (_, _) => LimparPassagens()) { ShortcutKeyDisplayString = "F6" });
+        crono.DropDownItems.Add(new ToolStripMenuItem("Bandeira branca", null, (_, _) => Bandeira("branca")) { ShortcutKeyDisplayString = "F7" });
         crono.DropDownItems.Add(new ToolStripMenuItem("Cancelar bateria", null, (_, _) => Acao("cancel")));
         crono.DropDownItems.Add(new ToolStripSeparator());
+        crono.DropDownItems.Add(new ToolStripMenuItem("Mudar corrida em andamento", null, (_, _) => MudarCorrida()));
+        crono.DropDownItems.Add(new ToolStripMenuItem("Incluir passagem manual", null, (_, _) => IncluirPassagem()) { ShortcutKeyDisplayString = "Insert" });
+        crono.DropDownItems.Add(new ToolStripSeparator());
         crono.DropDownItems.Add("Seguir a bateria em andamento", null, (_, _) => { _fixado = false; _ = Atualizar(); });
-        var ferr = new ToolStripMenuItem("Ferramentas");
-        ferr.DropDownItems.Add("Transponders (kart ↔ transponder)...", null, (_, _) => Transponders());
-        ferr.DropDownItems.Add(new ToolStripMenuItem("Telão / TV", null, (_, _) => AbrirTV()) { ShortcutKeyDisplayString = "F11" });
-        ferr.DropDownItems.Add("Abrir operador no navegador", null, (_, _) => Process.Start(new ProcessStartInfo(Config.CronoUrl + "/operador") { UseShellExecute = true }));
-        var rel = new ToolStripMenuItem("Relatórios");
         rel.DropDownItems.Add("Resultado da bateria selecionada", null, (_, _) => Resultado());
+        rel.DropDownItems.Add("WhatsApp", null, (_, _) => EnviarWhatsApp());
+        rel.DropDownItems.Add("E-mail", null, (_, _) => EnviarEmail());
         var ajuda = new ToolStripMenuItem("Ajuda");
         ajuda.DropDownItems.Add("Sobre", null, (_, _) => Msg.Info(this, $"Kartódromo - Cronometragem\nVersão {Application.ProductVersion.Split('+')[0]}\n\nServiço de cronometragem: {Config.CronoUrl}\nServidor da operação: {Config.ServidorUrl}\n\nAtalhos: F2 nova bateria · F5 bandeira verde · F6 quadriculada · F7 encerrar · F11 telão", "Sobre"));
-        m.Items.AddRange([inicio, crono, ferr, rel, ajuda]);
+        m.Items.AddRange([inicio, cad, ferr, rel, crono, ajuda]);
         return m;
     }
 
-    // ------------------------------------------------------------------ aba 1: baterias e competidores
+    TabPage AbaEventos()
+    {
+        var page = new TabPage("1–3 · Eventos") { BackColor = TemaCrono.Fundo, Padding = new Padding(8) };
+        var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(10) };
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 58));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 42));
+        var intro = new Panel { Dock = DockStyle.Fill, BackColor = TemaCrono.Fundo };
+        intro.Controls.Add(new Label { Text = "Eventos e provas", Dock = DockStyle.Top, Height = 32, Font = TemaCrono.Titulo, ForeColor = TemaCrono.Texto });
+        intro.Controls.Add(new Label { Text = "Passos 1–3 · cadastre o evento, organize os grupos e configure cada prova.", Dock = DockStyle.Bottom, Height = 22, Font = TemaCrono.Pequena, ForeColor = TemaCrono.Secundario });
+        var iniciarAgenda = TemaCrono.Botao("Criar bateria da agenda", true);
+        iniciarAgenda.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        iniciarAgenda.Location = new Point(Width - 270, 4);
+        iniciarAgenda.Click += (_, _) => NovaBateria(_gAgenda.ChaveAtual as JsonObject);
+        intro.Controls.Add(iniciarAgenda);
+
+        TemaCrono.EstilizarGrade(_gEventos);
+        _gEventos.Col("Evento", 220, DataGridViewContentAlignment.MiddleLeft, true).Col("Data", 92).Col("Local", 135, DataGridViewContentAlignment.MiddleLeft);
+        TemaCrono.EstilizarGrade(_gGrupos);
+        _gGrupos.Col("Grupo", 180, DataGridViewContentAlignment.MiddleLeft, true).Col("Categoria", 105).Col("Provas", 62);
+        TemaCrono.EstilizarGrade(_gProvas);
+        _gProvas.Col("Prova", 180, DataGridViewContentAlignment.MiddleLeft, true).Col("Tipo", 90).Col("Duração", 72).Col("Voltas", 62);
+        TemaCrono.EstilizarGrade(_gAgenda);
+        if (_gAgenda.Columns.Count == 0) _gAgenda.Col("Hora", 64).Col("Bateria", 160, DataGridViewContentAlignment.MiddleLeft, true).Col("Kart", 70).Col("Inscritos", 72).Col("Pagos", 62);
+        TemaCrono.EstilizarGrade(_gSessoes);
+        if (_gSessoes.Columns.Count == 0) _gSessoes.Col("Hora", 64).Col("Bateria", 180, DataGridViewContentAlignment.MiddleLeft, true).Col("Tipo", 100).Col("Estado", 100).Col("Pilotos", 58);
+
+        _gEventos.CellClick += (_, e) => { if (e.RowIndex >= 0) _ = CarregarCatalogo(); };
+        _gGrupos.CellClick += (_, e) => { if (e.RowIndex >= 0) _ = CarregarCatalogo(); };
+        _gProvas.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) CriarBateriaDaProva(); };
+        _gAgenda.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) NovaBateria(_gAgenda.Chaves[e.RowIndex] as JsonObject); };
+        _gSessoes.CellClick += (_, e) => { if (e.RowIndex >= 0 && _gSessoes.Chaves[e.RowIndex] is JsonObject s) { Selecionar(s.S("id")); _abas.SelectedIndex = 2; } };
+
+        var top = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = new Padding(0, 6, 0, 8) };
+        top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33));
+        top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 31));
+        top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 36));
+        var evCard = TemaCrono.Card("1 · Eventos", "Eventos e etapas do calendário");
+        var evActions = BarraAcoes(("+ Novo", () => EditarCatalogo("events")), ("Editar", () => EditarCatalogo("events", true)), ("Excluir", () => ExcluirCatalogo("events")), ("Imprimir", () => ImprimirResumo("Eventos", _events.Select(x => x.S("name")).ToList())), ("Importar", () => ImportarCatalogo()), ("Exportar", () => ExportarCatalogo()), ("Duplicar", () => DuplicarEvento()));
+        evCard.Controls.Add(_gEventos); evCard.Controls.Add(evActions);
+        var grCard = TemaCrono.Card("2 · Grupos", "Organize as baterias por categoria");
+        var grActions = BarraAcoes(("+ Novo", () => EditarCatalogo("groups")), ("Editar", () => EditarCatalogo("groups", true)), ("Excluir", () => ExcluirCatalogo("groups")), ("Imprimir", () => ImprimirResumo("Grupos", _groups.Select(x => x.S("name")).ToList())));
+        grCard.Controls.Add(_gGrupos); grCard.Controls.Add(grActions);
+        var provaCard = TemaCrono.Card("3 · Provas", "Tomada de tempo, treinos e corridas");
+        var provaActions = BarraAcoes(("+ Nova prova", () => EditarCatalogo("provas")), ("Editar", () => EditarCatalogo("provas", true)), ("Excluir", () => ExcluirCatalogo("provas")), ("Distribuir", () => DistribuirProva()), ("Imprimir", () => ImprimirResumo("Provas", _proofs.Select(x => x.S("name")).ToList())), ("Criar bateria", () => CriarBateriaDaProva()));
+        provaCard.Controls.Add(_gProvas); provaCard.Controls.Add(provaActions);
+        top.Controls.Add(evCard, 0, 0); top.Controls.Add(grCard, 1, 0); top.Controls.Add(provaCard, 2, 0);
+
+        var bottom = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0, 4, 0, 0) };
+        bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 58)); bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42));
+        var agCard = TemaCrono.Card("Agenda da recepção", "Baterias e provas cadastradas no produto da recepção");
+        var agActions = BarraAcoes(("Atualizar", () => Seguro.Rodar(this, CarregarAgenda)), ("Criar bateria", () => NovaBateria(_gAgenda.ChaveAtual as JsonObject)));
+        agCard.Controls.Add(_gAgenda); agCard.Controls.Add(agActions);
+        var sessCard = TemaCrono.Card("Baterias da cronometragem", "Selecione para abrir competidores ou acompanhar ao vivo");
+        var sessActions = BarraAcoes(("Nova bateria", () => NovaBateria(null)), ("Cronometrar", () => { if (_gSessoes.ChaveAtual is JsonObject s) { Selecionar(s.S("id")); _abas.SelectedIndex = 2; } }));
+        sessCard.Controls.Add(_gSessoes); sessCard.Controls.Add(sessActions);
+        bottom.Controls.Add(agCard, 0, 0); bottom.Controls.Add(sessCard, 1, 0);
+
+        root.Controls.Add(intro, 0, 0); root.Controls.Add(top, 0, 1); root.Controls.Add(bottom, 0, 2);
+        page.Controls.Add(root);
+        page.Layout += (_, _) => { iniciarAgenda.Location = new Point(Math.Max(400, intro.ClientSize.Width - iniciarAgenda.Width - 12), 7); };
+        return page;
+    }
+
+    FlowLayoutPanel BarraAcoes(params (string Texto, Action Acao)[] acoes)
+    {
+        var quebrar = acoes.Length >= 6;
+        var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = quebrar ? 78 : 43, WrapContents = quebrar, AutoScroll = !quebrar, Padding = new Padding(2, 4, 2, 2), BackColor = Color.White };
+        foreach (var item in acoes)
+        {
+            var button = TemaCrono.Botao(item.Texto, item.Texto.StartsWith('+'));
+            button.Click += (_, _) => item.Acao();
+            bar.Controls.Add(button);
+        }
+        return bar;
+    }
+
+    // ------------------------------------------------------------------ passos 4–5: árvore, competidores e resultado
 
     TabPage AbaBaterias()
     {
-        var aba = new TabPage("Baterias e Competidores") { BackColor = Color.White, Padding = new Padding(4) };
-        var split = new SplitContainer { Dock = DockStyle.Fill, SplitterWidth = 6, FixedPanel = FixedPanel.Panel1 };
+        var page = new TabPage("4–5 · Competidores") { BackColor = TemaCrono.Fundo, Padding = new Padding(8) };
+        var split = new SplitContainer { Size = new Size(1200, 680), Dock = DockStyle.Fill, SplitterWidth = 10, FixedPanel = FixedPanel.Panel1, Panel1MinSize = 250, Panel2MinSize = 600 };
+        split.SplitterDistance = 330;
+        var arvoreCard = TemaCrono.Card("4 · Grupos e provas", "Selecione uma prova para abrir sua bateria");
+        _arvore.AfterSelect += (_, e) =>
+        {
+            if (e.Node?.Tag is not JsonObject tag) return;
+            if (tag.S("kind") == "session") Selecionar(tag.S("sessionId"));
+            else if (tag.S("kind") == "proof")
+            {
+                _selectedProof = _proofs.FirstOrDefault(p => p.S("id") == tag.S("proofId"));
+                var session = Crono.Arr(_state, "sessions").FirstOrDefault(s => s.S("proofId") == tag.S("proofId"));
+                if (session != null) Selecionar(session.S("id"));
+                else _lPilotosTitulo.Text = _selectedProof?.S("name") ?? "Selecione uma prova";
+            }
+        };
+        arvoreCard.Controls.Add(_arvore);
+        split.Panel1.Controls.Add(arvoreCard);
 
-        // esquerda: agenda do SRVKART + baterias da cronometragem
-        var esq = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterWidth = 6 };
-        _gAgenda.Col("Hora", 60).Col("Bateria", 150, DataGridViewContentAlignment.MiddleLeft, true).Col("Kart", 60).Col("Inscritos", 70).Col("Pagos", 60);
-        _gAgenda.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) NovaBateria(_gAgenda.Chaves[e.RowIndex] as JsonObject); };
-        var barraAg = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden, BackColor = Color.White, Dock = DockStyle.Bottom };
-        barraAg.Items.Add(new ToolStripButton("Criar bateria da agenda", Icone.Tile("", Color.FromArgb(16, 124, 16), 16), (_, _) => NovaBateria(_gAgenda.ChaveAtual as JsonObject)));
-        barraAg.Items.Add(new ToolStripButton("Atualizar", Icone.Tile("", Color.FromArgb(0, 99, 177), 16), async (_, _) => await CarregarAgenda()));
-        esq.Panel1.Controls.Add(_gAgenda);
-        esq.Panel1.Controls.Add(barraAg);
-        esq.Panel1.Controls.Add(new Faixa("PASSO 1: AGENDA DO DIA (RECEPÇÃO)", Color.FromArgb(200, 16, 46)));
-
-        _gSessoes.Col("Criada", 60).Col("Bateria", 200, DataGridViewContentAlignment.MiddleLeft, true).Col("Tipo", 100).Col("Estado", 100).Col("Pilotos", 55);
-        _gSessoes.CorTexto = (r, c) => c == 3 && r < _gSessoes.Chaves.Count && _gSessoes.Chaves[r] is JsonObject s ? Crono.CorEstado(s.S("state")) : null;
-        _gSessoes.CellClick += (_, e) => { if (e.RowIndex >= 0 && _gSessoes.Chaves[e.RowIndex] is JsonObject s) Selecionar(s.S("id")); };
-        var barraS = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden, BackColor = Color.White, Dock = DockStyle.Bottom };
-        barraS.Items.Add(new ToolStripButton("Nova bateria", Icone.Tile("", Color.FromArgb(16, 124, 16), 16), (_, _) => NovaBateria(null)));
-        barraS.Items.Add(new ToolStripButton("Cronometrar esta", Icone.Tile("", Color.FromArgb(0, 99, 177), 16), (_, _) => { if (_gSessoes.ChaveAtual is JsonObject s) { Selecionar(s.S("id")); _abas.SelectedIndex = 1; } }));
-        barraS.Items.Add(new ToolStripButton("Cancelar bateria", Icone.Tile("", Color.FromArgb(196, 43, 28), 16), (_, _) => Acao("cancel")));
-        esq.Panel2.Controls.Add(_gSessoes);
-        esq.Panel2.Controls.Add(barraS);
-        esq.Panel2.Controls.Add(new Faixa("PASSO 2: BATERIAS DA CRONOMETRAGEM", Color.FromArgb(200, 16, 46)));
-        split.Panel1.Controls.Add(esq);
-
-        // direita: competidores da bateria selecionada (editavel)
         _gPilotos.Dock = DockStyle.Fill;
-        _gPilotos.BackgroundColor = Color.White;
-        _gPilotos.BorderStyle = BorderStyle.None;
-        _gPilotos.RowHeadersWidth = 28;
-        _gPilotos.AllowUserToAddRows = true;
-        _gPilotos.AllowUserToResizeRows = false;
-        _gPilotos.EnableHeadersVisualStyles = false;
-        _gPilotos.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(249, 249, 249);
-        _gPilotos.ColumnHeadersHeight = 28;
-        _gPilotos.RowTemplate.Height = 25;
-        _gPilotos.Font = new Font("Segoe UI", 9.5F);
-        _gPilotos.Columns.Add(new DataGridViewTextBoxColumn { Name = "kart", HeaderText = "Nº (kart)", Width = 90 });
-        _gPilotos.Columns.Add(new DataGridViewTextBoxColumn { Name = "name", HeaderText = "Competidor", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
-        _gPilotos.Columns.Add(new DataGridViewTextBoxColumn { Name = "customerId", HeaderText = "Cliente", Width = 90, ReadOnly = true });
+        TemaCrono.EstilizarGrade(_gPilotos, editavel: true);
+        _gPilotos.Columns.Clear();
+        _gPilotos.Columns.Add(new DataGridViewTextBoxColumn { Name = "kart", HeaderText = "Nº", Width = 70 });
+        _gPilotos.Columns.Add(new DataGridViewTextBoxColumn { Name = "name", HeaderText = "Competidor", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, MinimumWidth = 150 });
+        _gPilotos.Columns.Add(new DataGridViewTextBoxColumn { Name = "customerId", HeaderText = "Cliente", Width = 92, ReadOnly = true });
+        _gPilotos.Columns.Add(new DataGridViewTextBoxColumn { Name = "category", HeaderText = "Categoria", Width = 125 });
         _gPilotos.CellValueChanged += (_, _) => _pilotosSujos = true;
         _gPilotos.UserDeletedRow += (_, _) => _pilotosSujos = true;
-        var barraP = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 62, Padding = new Padding(4, 8, 4, 4), BackColor = Color.White };
-        barraP.Controls.Add(BotaoGrande("Salvar\nCompetidores", "", Color.FromArgb(16, 124, 16), async () => await SalvarPilotos()));
-        barraP.Controls.Add(BotaoGrande("Puxar da\nAgenda", "", Color.FromArgb(0, 99, 177), async () => await PuxarAgenda()));
-        barraP.Controls.Add(BotaoGrande("Excluir\nCompetidor", "", Color.FromArgb(196, 43, 28), () => { foreach (DataGridViewRow r in _gPilotos.SelectedRows) if (!r.IsNewRow) _gPilotos.Rows.Remove(r); _pilotosSujos = true; return Task.CompletedTask; }));
-        barraP.Controls.Add(BotaoGrande("Transponders", "", Color.FromArgb(90, 90, 90), () => { Transponders(); return Task.CompletedTask; }));
-        split.Panel2.Controls.Add(_gPilotos);
-        split.Panel2.Controls.Add(_lPilotosTitulo);
-        split.Panel2.Controls.Add(barraP);
-        split.Panel2.Controls.Add(new Faixa("PASSO 3: LISTA DE COMPETIDORES", Color.FromArgb(200, 16, 46)));
-        aba.Controls.Add(split);
-        aba.Layout += (_, _) => { if (split.Width > 900 && split.SplitterDistance < 300) { split.Panel1MinSize = 300; split.SplitterDistance = Math.Min(560, split.Width / 2 - 100); esq.SplitterDistance = esq.Height / 2 - 20; } };
-        return aba;
+        var flagsPiloto = new ContextMenuStrip();
+        flagsPiloto.Items.Add("Bandeira verde para o piloto", null, (_, _) => BandeiraPiloto("green"));
+        flagsPiloto.Items.Add("Bandeira amarela para o piloto", null, (_, _) => BandeiraPiloto("yellow"));
+        flagsPiloto.Items.Add("Bandeira vermelha para o piloto", null, (_, _) => BandeiraPiloto("red"));
+        flagsPiloto.Items.Add("Bandeira branca para o piloto", null, (_, _) => BandeiraPiloto("white"));
+        _gPilotos.ContextMenuStrip = flagsPiloto;
+
+        SetupResultado(_gResultComp);
+        SetupResultado(_gCategoriaComp);
+        _gResultComp.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0 && _gResultComp.Chaves[e.RowIndex] is JsonObject s) Voltas(s.S("kart")); };
+        _gCategoriaComp.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0 && _gCategoriaComp.Chaves[e.RowIndex] is JsonObject s) Voltas(s.S("kart")); };
+        _gObs.Dock = DockStyle.Fill;
+        TemaCrono.EstilizarGrade(_gObs);
+        _gObs.Col("Hora", 94).Col("Observação", 440, DataGridViewContentAlignment.MiddleLeft, true).Col("Responsável", 130);
+
+        var details = _tabsCompetidor;
+        details.TabPages.Clear();
+        var tabComp = new TabPage("Competidores") { BackColor = Color.White };
+        var banner = new Panel { Dock = DockStyle.Top, Height = 42, BackColor = Color.FromArgb(239, 246, 255), Padding = new Padding(10, 5, 10, 5) };
+        banner.Controls.Add(new Label { Text = "Puxe os inscritos da recepção e revise categoria e kart antes da largada.", Dock = DockStyle.Fill, ForeColor = Color.FromArgb(10, 79, 160), Font = TemaCrono.Pequena, TextAlign = ContentAlignment.MiddleLeft });
+        var barraP = BarraAcoes(
+            ("+ Novo participante", () => { _gPilotos.Rows.Add("", "", "", ""); _pilotosSujos = true; }),
+            ("Salvar", () => Seguro.Rodar(this, SalvarPilotos)),
+            ("Puxar da recepção", () => Seguro.Rodar(this, PuxarAgenda)),
+            ("Excluir", () => { foreach (DataGridViewRow row in _gPilotos.SelectedRows) if (!row.IsNewRow) _gPilotos.Rows.Remove(row); _pilotosSujos = true; }),
+            ("Transponders", Transponders),
+            ("Imprimir", () => ImprimirResumo("Competidores", Crono.Arr(_sess, "competitors").Select(c => $"{c.S("kart")} · {c.S("name")}").ToList())));
+        tabComp.Controls.Add(_gPilotos); tabComp.Controls.Add(barraP); tabComp.Controls.Add(banner);
+
+        var tabOficial = new TabPage("Resultado oficial") { BackColor = Color.White }; tabOficial.Controls.Add(_gResultComp);
+        var tabCategoria = new TabPage("Por categoria") { BackColor = Color.White }; tabCategoria.Controls.Add(_gCategoriaComp);
+        var tabObs = new TabPage("Observações") { BackColor = Color.White };
+        _gObs.Dock = DockStyle.Fill;
+        var obsInput = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 48, WrapContents = false, Padding = new Padding(8, 6, 8, 4), BackColor = Color.White };
+        _txtObservacao.Width = 550;
+        var addObs = TemaCrono.Botao("Adicionar", true); addObs.Click += (_, _) => Seguro.Rodar(this, AdicionarObservacao);
+        obsInput.Controls.Add(_txtObservacao); obsInput.Controls.Add(addObs);
+        tabObs.Controls.Add(_gObs); tabObs.Controls.Add(obsInput);
+        details.TabPages.AddRange([tabComp, tabOficial, tabCategoria, tabObs]);
+        details.SelectedIndexChanged += (_, _) => { _abaCompetidores = details.SelectedTab?.Text ?? "Competidores"; AtualizarResultadoCompetidores(); };
+
+        var right = new Panel { Dock = DockStyle.Fill, BackColor = Color.White };
+        var header = new Panel { Dock = DockStyle.Top, Height = 68, Padding = new Padding(12, 8, 12, 8), BackColor = Color.White };
+        _lPilotosTitulo.Dock = DockStyle.Top; _lPilotosTitulo.Height = 31; _lPilotosTitulo.Font = new Font("Segoe UI", 14F, FontStyle.Bold); _lPilotosTitulo.ForeColor = TemaCrono.Texto;
+        var resumo = new Label { Text = "Passo 5 · competidores, resultados e observações da prova", Dock = DockStyle.Bottom, Height = 22, Font = TemaCrono.Pequena, ForeColor = TemaCrono.Secundario };
+        header.Controls.Add(_lPilotosTitulo); header.Controls.Add(resumo);
+        right.Controls.Add(details); right.Controls.Add(header);
+        split.Panel2.Controls.Add(right);
+        page.Controls.Add(split);
+        page.Layout += (_, _) => { if (split.Width > 1000 && split.SplitterDistance < 260) split.SplitterDistance = 330; };
+        return page;
     }
+
+    string _abaCompetidores = "Competidores";
+
+    void SetupResultado(LiveGrid grid)
+    {
+        TemaCrono.EstilizarGrade(grid);
+        if (grid.Columns.Count == 0)
+            grid.Col("Pos", 42).Col("Nº", 42).Col("Competidor", 160, DataGridViewContentAlignment.MiddleLeft, true).Col("M.V", 36).Col("T.M.V", 72).Col("Volta", 42).Col("T.U.V", 72).Col("T.T", 96).Col("D.L", 72).Col("D.A", 60).Col("V.Méd", 60);
+    }
+
+    static string Velocidade(JsonObject r) => double.TryParse(r["averageSpeedKmh"]?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var speed) ? speed.ToString("0.0", Fmt.Br) : "—";
 
     Button BotaoGrande(string texto, string glifo, Color cor, Func<Task> clique)
     {
@@ -183,94 +364,125 @@ public class FormCrono : Form
         return b;
     }
 
-    // ------------------------------------------------------------------ aba 2: cronometragem
+    // ------------------------------------------------------------------ cronômetro e operações ao vivo
 
     TabPage AbaCronometragem()
     {
-        var aba = new TabPage("Cronometragem") { BackColor = Color.FromArgb(244, 244, 244) };
+        var page = new TabPage("Cronometragem") { BackColor = TemaCrono.Fundo, Padding = new Padding(8) };
+        _lEvento.Text = "Selecione uma bateria";
+        _lCrono.Dock = DockStyle.Fill; _lCrono.Text = "00:00:00.000"; _lCrono.Font = new Font("Cascadia Mono", 25F, FontStyle.Bold); _lCrono.ForeColor = Color.White; _lCrono.TextAlign = ContentAlignment.MiddleCenter;
+        _lRestante.ForeColor = TemaCrono.Vermelho; _lVoltasRest.ForeColor = TemaCrono.Texto; _lRuido.ForeColor = TemaCrono.Verde; _lMelhor.ForeColor = Color.FromArgb(122, 47, 194);
+        _lEvento.Font = new Font("Segoe UI", 11F, FontStyle.Bold); _lTipo.Font = new Font("Segoe UI", 9F, FontStyle.Bold); _lEstado.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+        _lPassagens.Text = "0"; _lPassagens.Font = new Font("Cascadia Mono", 16F, FontStyle.Bold); _lPassagens.TextAlign = ContentAlignment.MiddleLeft; _lMelhor.AutoEllipsis = true; _lPassagens.ForeColor = TemaCrono.Texto;
 
-        // cabecalho: evento/prova | cronometro | tempos
-        var cab = new TableLayoutPanel { Dock = DockStyle.Top, Height = 64, ColumnCount = 3, BackColor = Color.FromArgb(244, 244, 244), Padding = new Padding(4, 2, 4, 0) };
-        cab.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42));
-        cab.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20));
-        cab.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38));
-        var esq = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 3, AutoSize = false };
-        esq.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 60));
-        void Linha(TableLayoutPanel t, string rot, Control c) { t.Controls.Add(new Label { Text = rot, AutoSize = true, Margin = new Padding(0, 2, 0, 0) }); c.Margin = new Padding(0, 2, 0, 0); t.Controls.Add(c); }
-        Linha(esq, "Bateria:", _lEvento);
-        Linha(esq, "Tipo:", _lTipo);
-        Linha(esq, "Estado:", _lEstado);
-        var meio = new Panel { Dock = DockStyle.Fill };
-        var rotCrono = new Label { Text = "Cronômetro:", Dock = DockStyle.Top, Height = 20, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), TextAlign = ContentAlignment.BottomCenter };
-        _lCrono.Dock = DockStyle.Fill; _lCrono.Font = new Font("Segoe UI", 17F, FontStyle.Bold); _lCrono.TextAlign = ContentAlignment.TopCenter; _lCrono.Text = "00:00:00.000";
-        meio.Controls.Add(_lCrono); meio.Controls.Add(rotCrono);
-        var dir = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 3 };
-        dir.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 125));
-        dir.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40));
-        dir.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 135));
-        dir.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60));
-        _lRestante.ForeColor = Color.Red; _lVoltasRest.ForeColor = Color.Red; _lRuido.ForeColor = Color.Red; _lMelhor.ForeColor = Color.FromArgb(16, 124, 16);
-        dir.Controls.Add(new Label { Text = "Tempo Restante:", AutoSize = true }); dir.Controls.Add(_lRestante);
-        dir.Controls.Add(new Label { Text = "Volta(s) Restante(s):", AutoSize = true }); dir.Controls.Add(_lVoltasRest);
-        dir.Controls.Add(new Label { Text = "Ruído (decoder):", AutoSize = true }); dir.Controls.Add(_lRuido);
-        dir.Controls.Add(new Label { Text = "", AutoSize = true }); dir.Controls.Add(new Label());
-        var lmv = new Label { Text = "Melhor Volta:", AutoSize = true };
-        dir.Controls.Add(lmv); dir.Controls.Add(_lMelhor);
-        dir.SetColumnSpan(_lMelhor, 3);
-        cab.Controls.Add(esq); cab.Controls.Add(meio); cab.Controls.Add(dir);
+        var metrics = new TableLayoutPanel { Dock = DockStyle.Top, Height = 128, ColumnCount = 3, Padding = new Padding(4, 4, 4, 8) };
+        metrics.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 31)); metrics.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 28)); metrics.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 41));
+        var metaCard = TemaCrono.Card("Prova selecionada");
+        var meta = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 3, Padding = new Padding(3) };
+        meta.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 82)); meta.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        void MetaLinha(string label, Control value) { meta.Controls.Add(TemaCrono.Rotulo(label, 9)); value.Margin = new Padding(2); meta.Controls.Add(value); }
+        MetaLinha("Bateria", _lEvento); MetaLinha("Tipo", _lTipo); MetaLinha("Estado", _lEstado); metaCard.Controls.Add(meta);
+        var clockCard = TemaCrono.Card(); clockCard.BackColor = Color.FromArgb(29, 29, 31); _lCrono.BackColor = Color.FromArgb(29, 29, 31); clockCard.Controls.Add(_lCrono);
+        clockCard.Controls.Add(new Label { Text = "CRONÔMETRO", Dock = DockStyle.Top, Height = 22, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(174, 174, 178), TextAlign = ContentAlignment.MiddleCenter, BackColor = Color.FromArgb(29, 29, 31) });
+        var timesCard = TemaCrono.Card("Ao vivo", "Tempo restante · voltas restantes · decoder · melhor volta");
+        var times = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 2, Padding = new Padding(5, 2, 2, 2) };
+        times.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); times.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38)); times.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); times.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 62));
+        times.Controls.Add(TemaCrono.Rotulo("Tempo restante")); times.Controls.Add(_lRestante);
+        times.Controls.Add(TemaCrono.Rotulo("Voltas restantes")); times.Controls.Add(_lVoltasRest);
+        times.Controls.Add(TemaCrono.Rotulo("Ruído / decoder")); times.Controls.Add(_lRuido);
+        times.Controls.Add(TemaCrono.Rotulo("Melhor volta")); times.Controls.Add(_lMelhor);
+        timesCard.Controls.Add(times);
+        metrics.Controls.Add(metaCard, 0, 0); metrics.Controls.Add(clockCard, 1, 0); metrics.Controls.Add(timesCard, 2, 0);
 
-        // bandeiras
-        _bVerde = Band("Largada", Bandeira(Color.FromArgb(40, 180, 40)), "Bandeira verde: inicia a bateria (F5)", () => Acao("start"));
-        _bQuad = Band("Quadriculada", Quadriculada(), "Bandeira quadriculada: cada kart termina ao passar (F6)", () => Acao("checkered"));
-        _bEncerrar = Band("Encerrar", Icone.Tile("", Color.FromArgb(220, 30, 30), 34), "Encerrar a bateria agora (F7)", () => Acao("close"));
-        _bCancelar = Band("Cancelar", Icone.Tile("", Color.FromArgb(120, 120, 120), 34), "Cancelar a bateria (descarta)", () => Acao("cancel"));
-        _bandeiras.Items.AddRange([_bVerde, _bQuad, _bEncerrar, _bCancelar, new ToolStripSeparator()]);
-        _bandeiras.Items.Add(Band("Nova", Icone.Tile("", Color.FromArgb(16, 124, 16), 34), "Nova bateria (F2)", () => NovaBateria(null)));
-        _bandeiras.Items.Add(Band("Telão", Icone.Tile("", Color.FromArgb(0, 99, 177), 34), "Abrir o telão / TV (F11)", AbrirTV));
-        _bandeiras.Items.Add(Band("Imprimir", Icone.Tile("", Color.FromArgb(70, 70, 70), 34), "Resultado da bateria", Resultado));
-        _bandeiras.Items.Add(Band("Transp.", Icone.Tile("", Color.FromArgb(90, 90, 90), 34), "Transponders", Transponders));
+        _bandeiras.Items.Clear(); _bandeiras.BackColor = Color.FromArgb(251, 251, 253); _bandeiras.Dock = DockStyle.Top; _bandeiras.GripStyle = ToolStripGripStyle.Hidden; _bandeiras.ImageScalingSize = new Size(26, 26); _bandeiras.Padding = new Padding(8, 3, 8, 3);
+        _bVerde = Band("Verde · F1", Bandeira(Color.FromArgb(52, 199, 89)), "Largada (F1)", () => Bandeira("verde"));
+        _bAmarela = Band("Amarela · F2", Bandeira(Color.FromArgb(255, 204, 0)), "Atenção (F2)", () => Bandeira("amarela"));
+        _bVermelha = Band("Vermelha · F3", Bandeira(Color.FromArgb(255, 59, 48)), "Prova interrompida (F3)", () => Bandeira("vermelha"));
+        _bQuad = Band("Quadriculada · F4", Quadriculada(), "Cada kart encerra na próxima passagem (F4)", () => Bandeira("quadriculada"));
+        _bFinalizar = Band("Finalizar · F5", Icone.Tile("■", TemaCrono.Vermelho, 26), "Finalizar a prova agora (F5)", () => Acao("close"));
+        _bLimpar = Band("Limpar · F6", Icone.Tile("↻", TemaCrono.Verde, 26), "Limpar passagens (F6)", LimparPassagens);
+        _bBranca = Band("Branca · F7", Bandeira(Color.White), "Última volta (F7)", () => Bandeira("branca"));
+        _bCancelar = Band("Cancelar", Icone.Tile("×", Color.FromArgb(120, 120, 120), 26), "Cancelar a bateria", () => Acao("cancel"));
+        _bandeiras.Items.AddRange([_bVerde, _bAmarela, _bVermelha, _bQuad, _bFinalizar, _bLimpar, _bBranca, _bCancelar, new ToolStripSeparator()]);
+        _bandeiras.Items.Add(Band("Nova bateria", Icone.Tile("+", TemaCrono.Verde, 26), "Criar bateria", () => NovaBateria(null)));
+        _bandeiras.Items.Add(Band("Resultado", Icone.Tile("▤", Color.FromArgb(70, 70, 70), 26), "Abrir resultado oficial", Resultado));
+        _bandeiras.Items.Add(Band("WhatsApp", Icone.Tile("W", Color.FromArgb(37, 211, 102), 26), "Enviar resultado", EnviarWhatsApp));
+        _bandeiras.Items.Add(Band("E-mail", Icone.Tile("✉", Color.FromArgb(10, 132, 255), 26), "Enviar resultado por e-mail", EnviarEmail));
+        _bandeiras.Items.Add(Band("Placar / TV", Icone.Tile("▣", Color.FromArgb(0, 99, 177), 26), "Abrir placar / telão (F11)", AbrirTV));
         _bandeiras.Items.Add(new ToolStripSeparator());
         _bandeiras.Items.Add(new ToolStripLabel("Bateria:"));
-        _bandeiras.Items.Add(new ToolStripControlHost(_cbSessao) { AutoSize = false, Width = 420 });
+        _cbSessao.Width = 310;
+        _bandeiras.Items.Add(new ToolStripControlHost(_cbSessao) { AutoSize = false, Width = 320 });
         _cbSessao.SelectionChangeCommitted += (_, _) => { if (_cbSessao.SelectedItem is Campos.Item it) Selecionar(it.Dados.S("id")); };
-        _lPassagens.Text = "0";
-        _lPassagens.Font = new Font("Segoe UI", 16F, FontStyle.Bold);
-        _bandeiras.Items.Add(new ToolStripLabel("Passagens:") { Alignment = ToolStripItemAlignment.Right, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold) });
-        var hostPass = new ToolStripControlHost(_lPassagens) { Alignment = ToolStripItemAlignment.Right, AutoSize = false, Width = 70 };
-        _bandeiras.Items.Insert(_bandeiras.Items.Count - 1, hostPass);
+        _bandeiras.Items.Add(new ToolStripControlHost(_lPassagens) { Alignment = ToolStripItemAlignment.Right, AutoSize = false, Width = 76, Height = 40 });
+        _bandeiras.Items.Add(new ToolStripLabel("Passagens:") { Alignment = ToolStripItemAlignment.Right, Font = new Font("Segoe UI", 9F, FontStyle.Bold) });
 
-        // grades
-        var split = new SplitContainer { Dock = DockStyle.Fill, SplitterWidth = 6, BackColor = Color.FromArgb(244, 244, 244) };
-        _gPass.Col("#", 44).Col("Nº", 46).Col("Competidor", 150, DataGridViewContentAlignment.MiddleCenter, true).Col("Tempo", 90).Col("Volta", 50).Col("Hora", 96);
-        _gPass.CorFundo = r => r < _gPass.Chaves.Count && _gPass.Chaves[r] is JsonObject p && p.B("invalid") ? Color.FromArgb(230, 20, 20) : null;
-        _gPass.CorFonteLinha = r => r < _gPass.Chaves.Count && _gPass.Chaves[r] is JsonObject p && p.B("invalid") ? Color.White : null;
-        _gPass.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0 && _gPass.Chaves[e.RowIndex] is JsonObject p) Voltas(p.S("kart")); };
-        var menuPass = new ContextMenuStrip();
-        menuPass.Items.Add("Invalidar / validar esta volta", null, async (_, _) => { if (_gPass.ChaveAtual is JsonObject p) await Invalidar(p.S("kart"), p.I("lap")); });
-        menuPass.Items.Add("Ver voltas deste kart", null, (_, _) => { if (_gPass.ChaveAtual is JsonObject p) Voltas(p.S("kart")); });
-        _gPass.ContextMenuStrip = menuPass;
-        split.Panel1.Controls.Add(_gPass);
-        split.Panel1.Controls.Add(new Faixa("REGISTRO DE PASSAGENS", Color.FromArgb(16, 150, 40)));
-
-        _gRes.Col("", 22).Col("Pos", 44).Col("Nº", 46).Col("Competidor", 170, DataGridViewContentAlignment.MiddleCenter, true).Col("Voltas", 56).Col("T.U.V", 86).Col("T.M.V", 86).Col("M.V", 44).Col("D.L", 90).Col("D.A", 86).Col("Situação", 90);
-        _gRes.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-        _gRes.CorTexto = (r, c) => c == 0 && r < _gRes.Chaves.Count && _gRes.Chaves[r] is JsonObject s ? CorAtraso(s) : null;
-        _gRes.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0 && _gRes.Chaves[e.RowIndex] is JsonObject s) Voltas(s.S("kart")); };
-        var legenda = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 26, BackColor = Color.White, Padding = new Padding(6, 4, 0, 0) };
-        foreach (var (cor, txt) in new[] { (Color.FromArgb(0, 190, 0), "NA MESMA VOLTA DO LÍDER"), (Color.Gold, "ATÉ 2 VOLTAS ATRÁS"), (Color.Red, "ATÉ 5 VOLTAS ATRÁS"), (Color.Black, "+ DE 5 VOLTAS ATRÁS") })
+        if (_gPass.Columns.Count == 0) _gPass.Col("#", 40).Col("Nº", 45).Col("Competidor", 160, DataGridViewContentAlignment.MiddleLeft, true).Col("Transp.", 70).Col("Tempo", 76).Col("Volta", 48).Col("Decorrido", 82);
+        TemaCrono.EstilizarGrade(_gPass);
+        _gPass.CorFundo = r =>
         {
-            legenda.Controls.Add(new Label { Text = "●", ForeColor = cor, AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold), Margin = new Padding(8, 0, 0, 0) });
-            legenda.Controls.Add(new Label { Text = txt, AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Margin = new Padding(0, 2, 14, 0) });
-        }
-        legenda.Controls.Add(new Label { Text = "(duplo clique: voltas do kart)", AutoSize = true, ForeColor = Color.Gray, Margin = new Padding(10, 2, 0, 0) });
-        split.Panel2.Controls.Add(_gRes);
-        split.Panel2.Controls.Add(legenda);
-        split.Panel2.Controls.Add(new Faixa("RESULTADO OFICIAL", Color.FromArgb(40, 40, 40)));
-        aba.Controls.Add(split);
-        aba.Controls.Add(_bandeiras);
-        aba.Controls.Add(cab);
-        aba.Layout += (_, _) => { if (split.Width > 900 && split.SplitterDistance != (int)(split.Width * .36)) { split.Panel1MinSize = 300; split.SplitterDistance = (int)(split.Width * .36); } };
-        return aba;
+            if (r >= 0 && r < _gPass.Chaves.Count && _gPass.Chaves[r] is JsonObject p)
+            {
+                if (p.B("invalid")) return Color.FromArgb(255, 59, 48);
+                if (p.B("deleted")) return Color.FromArgb(238, 238, 242);
+            }
+            return null;
+        };
+        _gPass.CorFonteLinha = r => r < _gPass.Chaves.Count && _gPass.Chaves[r] is JsonObject p && p.B("invalid") ? Color.White : null;
+        var menuPass = new ContextMenuStrip();
+        menuPass.Items.Add("Excluir passagem manualmente", null, (_, _) => CorrigirPassagem("delete"));
+        menuPass.Items.Add("Excluir passagens acima", null, (_, _) => CorrigirPassagem("delete", true));
+        menuPass.Items.Add(new ToolStripSeparator());
+        menuPass.Items.Add("Restaurar passagem manualmente", null, (_, _) => CorrigirPassagem("restore"));
+        menuPass.Items.Add("Restaurar passagens acima", null, (_, _) => CorrigirPassagem("restore", true));
+        menuPass.Items.Add(new ToolStripSeparator());
+        menuPass.Items.Add("Invalidar passagem manualmente", null, (_, _) => CorrigirPassagem("invalidate"));
+        menuPass.Items.Add("Invalidar passagens acima", null, (_, _) => CorrigirPassagem("invalidate", true));
+        menuPass.Items.Add("Validar passagem manualmente", null, (_, _) => CorrigirPassagem("validate"));
+        menuPass.Items.Add("Validar passagens acima", null, (_, _) => CorrigirPassagem("validate", true));
+        menuPass.Items.Add(new ToolStripSeparator());
+        menuPass.Items.Add("Incluir passagem manualmente · Insert", null, (_, _) => IncluirPassagem());
+        menuPass.Items.Add("Atribuir passagem a um competidor", null, (_, _) => AtribuirPassagem());
+        menuPass.Items.Add("Cancelar atribuição ao competidor", null, (_, _) => CancelarAtribuicao());
+        _gPass.ContextMenuStrip = menuPass;
+
+        SetupResultado(_gRes); SetupResultado(_gResCategoria);
+        _gRes.CorTexto = (row, col) => col == 0 && row < _gRes.Chaves.Count && _gRes.Chaves[row] is JsonObject standing ? CorAtraso(standing) : null;
+        _gRes.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0 && _gRes.Chaves[e.RowIndex] is JsonObject s) Voltas(s.S("kart")); };
+        _gResCategoria.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0 && _gResCategoria.Chaves[e.RowIndex] is JsonObject s) Voltas(s.S("kart")); };
+        _gTransponderResultado.Col("Transponder", 110).Col("Última volta", 110).Col("Tempo decorrido", 130).Col("Hora cronológica", 150).Col("Nº passagens", 110);
+        TemaCrono.EstilizarGrade(_gTransponderResultado);
+        _gObsAoVivo.Col("Hora", 95).Col("Observação", 400, DataGridViewContentAlignment.MiddleLeft, true).Col("Responsável", 140);
+        TemaCrono.EstilizarGrade(_gObsAoVivo);
+
+        var passCard = TemaCrono.Card("REGISTRO DE PASSAGENS", "Botão direito: corrigir · Insert: incluir");
+        passCard.Controls.Add(_gPass);
+        var split = new SplitContainer { Size = new Size(1200, 680), Dock = DockStyle.Fill, SplitterWidth = 10, BackColor = TemaCrono.Fundo, Panel1MinSize = 350, Panel2MinSize = 550 };
+        split.Panel1.Controls.Add(passCard);
+        var rightLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Padding = new Padding(0, 0, 2, 0) };
+        rightLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); rightLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 106));
+        var resultCard = TemaCrono.Card("Resultado", "Classificação atualizada com cada passagem");
+        var resultBar = BarraAcoes(("Imprimir", Resultado), ("Telão / TV", AbrirTV), ("Transponders", Transponders), ("Por categoria", () => _tabsResultado.SelectedIndex = 1), ("Oficial", () => _tabsResultado.SelectedIndex = 0));
+        _tabsResultado.TabPages.Clear();
+        var tabOficial = new TabPage("Oficial") { BackColor = Color.White }; tabOficial.Controls.Add(_gRes);
+        var tabCategoria = new TabPage("Categoria") { BackColor = Color.White }; tabCategoria.Controls.Add(_gResCategoria);
+        var tabTransponder = new TabPage("Transponder") { BackColor = Color.White }; tabTransponder.Controls.Add(_gTransponderResultado);
+        var tabObservacoes = new TabPage("Observações") { BackColor = Color.White };
+        var obsBar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 42, WrapContents = false, Padding = new Padding(3, 3, 3, 0), BackColor = Color.White };
+        var addObsLive = TemaCrono.Botao("Adicionar", true); addObsLive.Click += (_, _) => Seguro.Rodar(this, AdicionarObservacao);
+        obsBar.Controls.Add(_txtObservacaoAoVivo); obsBar.Controls.Add(addObsLive);
+        tabObservacoes.Controls.Add(_gObsAoVivo); tabObservacoes.Controls.Add(obsBar);
+        _tabsResultado.TabPages.AddRange([tabOficial, tabCategoria, tabTransponder, tabObservacoes]);
+        resultCard.Controls.Add(_tabsResultado); resultCard.Controls.Add(resultBar);
+        rightLayout.Controls.Add(resultCard, 0, 0); rightLayout.Controls.Add(_lVoltaFaixa, 1, 0);
+        split.Panel2.Controls.Add(rightLayout);
+
+        var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(6, 2, 6, 4) };
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 132)); root.RowStyles.Add(new RowStyle(SizeType.Absolute, 64)); root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        root.Controls.Add(metrics, 0, 0); root.Controls.Add(_bandeiras, 0, 1); root.Controls.Add(split, 0, 2);
+        page.Controls.Add(root);
+        page.Layout += (_, _) => { if (split.Width > 1000 && split.SplitterDistance != (int)(split.Width * .38)) split.SplitterDistance = (int)(split.Width * .38); };
+        return page;
     }
 
     ToolStripButton Band(string texto, Image img, string dica, Action clique)
@@ -334,7 +546,7 @@ public class FormCrono : Form
             if (_sel != null)
             {
                 _sess = focus != null && focus.S("id") == _sel ? focus : (await Crono.Api.Get("/api/sessions/" + _sel))?.AsObject();
-                _laps = await Crono.Api.Lista($"/api/sessions/{_sel}/laps");
+                _laps = await Crono.Api.Lista($"/api/sessions/{_sel}/passings");
             }
             else { _sess = null; _laps = []; }
             _servidorOk = true;
@@ -357,10 +569,10 @@ public class FormCrono : Form
     {
         var dec = _state?["decoder"] as JsonObject;
         _sServidor.Text = _servidorOk ? "CRONOMETRAGEM: ON-LINE" : "CRONOMETRAGEM: SEM CONEXÃO (" + Config.CronoUrl + ")";
-        _sServidor.ForeColor = _servidorOk ? Color.FromArgb(16, 124, 16) : Color.Red;
+        _sServidor.ForeColor = _servidorOk ? TemaCrono.Verde : Color.Red;
         var decOk = dec?.B("healthy") ?? false;
         _sDecoder.Text = "DECODER " + (dec == null ? "?" : decOk ? $"OK ({dec.S("host")})" : dec.B("connected") ? "SEM DADOS" : "DESCONECTADO");
-        _sDecoder.ForeColor = decOk ? Color.FromArgb(16, 124, 16) : Color.Red;
+        _sDecoder.ForeColor = decOk ? TemaCrono.Verde : Color.Red;
         _sDecoder.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
         _sServidor.Font = _sDecoder.Font;
         _lRuido.Text = dec?.S("noise") ?? "---";
@@ -386,13 +598,14 @@ public class FormCrono : Form
 
         var s0 = _sess;
         var estado = s0?.S("state") ?? "";
-        _lEvento.Text = s0?.S("name") ?? "(nenhuma bateria — F2 cria uma nova)";
+        _lEvento.Text = s0 == null ? "Selecione uma bateria" : s0.S("name");
         _lTipo.Text = s0 == null ? "" : Crono.Tipo(s0.S("type")) + (s0.L("maxLaps") is long ml && ml > 0 ? $" · {ml} voltas" : s0.L("durationMs") is long dm && dm > 0 ? $" · {dm / 60000} min" : "");
-        _lEstado.Text = Crono.Estado(estado);
+        _lEstado.Text = Crono.Estado(estado) + (s0?.S("currentFlag") is { Length: > 0 } flag && flag != "none" ? " · " + BandeiraNome(flag) : "");
         _lEstado.ForeColor = Crono.CorEstado(estado);
         _bVerde.Enabled = estado == "preparando";
-        _bQuad.Enabled = estado == "em_andamento";
-        _bEncerrar.Enabled = estado is "em_andamento" or "bandeira_final";
+        _bAmarela.Enabled = _bVermelha.Enabled = _bBranca.Enabled = _bQuad.Enabled = estado == "em_andamento";
+        _bFinalizar.Enabled = estado is "em_andamento" or "bandeira_final";
+        _bLimpar.Enabled = _laps.Any(p => !p.B("deleted"));
         _bCancelar.Enabled = estado is "preparando" or "em_andamento";
 
         var standings = Crono.Arr(s0, "standings");
@@ -417,37 +630,52 @@ public class FormCrono : Form
             gapAnterior = r.L("gapMs") ?? (r.I("position") == 1 ? 0 : null);
             voltasAnterior = r.I("laps");
             linhas.Add([
-                "●", r.I("position"), r.S("kart"), r.S("name").Length > 0 ? r.S("name") : "Kart " + r.S("kart"), r.I("laps"),
-                Crono.Volta(r.L("lastLapMs")), Crono.Volta(r.L("bestLapMs")), r.S("bestLapNumber"), dl, da,
-                r.B("finished") ? "🏁 Terminou" : r.B("autoAdded") ? "Sem inscrição" : "",
+                r.I("position"), r.S("kart"), r.S("name").Length > 0 ? r.S("name") : "Kart " + r.S("kart"), r.S("bestLapNumber"),
+                Crono.Volta(r.L("bestLapMs")), r.I("laps"), Crono.Volta(r.L("lastLapMs")), Crono.Relogio(r.L("totalMs")), dl, da,
+                Velocidade(r),
             ]);
         }
         _gRes.Preencher(linhas, standings.Cast<object>().ToList());
+        var categorized = standings.OrderBy(r => NomeCategoria(r.S("category"))).ThenBy(r => r.I("position")).ToList();
+        _gResCategoria.Preencher(categorized.Select(r => new object[] {
+            r.I("position"), r.S("kart"), string.IsNullOrEmpty(r.S("category")) ? r.S("name") : $"{NomeCategoria(r.S("category"))} · {r.S("name")}",
+            r.S("bestLapNumber"), Crono.Volta(r.L("bestLapMs")), r.I("laps"), Crono.Volta(r.L("lastLapMs")), Crono.Relogio(r.L("totalMs")),
+            r.I("position") == 1 ? "" : r.I("gapLaps") > 0 ? $"+{r.I("gapLaps")} voltas" : Crono.Volta(r.L("gapMs")), "", Velocidade(r),
+        }).ToList(), categorized.Cast<object>().ToList());
+        AtualizarResultadoCompetidores();
 
-        // passagens
-        var pass = _laps.SelectMany(c => Crono.Arr(c, "laps").Select(l => new JsonObject
-        {
-            ["kart"] = c.S("kart"), ["name"] = c.S("name"), ["lap"] = l.I("lap"), ["lapMs"] = l.L("lapMs"), ["wallMs"] = l.L("wallMs"), ["invalid"] = l.B("invalid"),
-        })).OrderByDescending(p => p.L("wallMs")).ToList();
-        _lPassagens.Text = pass.Count.ToString();
-        _gPass.Preencher(pass.Select((p, i) => new object[] { pass.Count - i, p.S("kart"), p.S("name"), Crono.Volta(p.L("lapMs")), p.I("lap"), Crono.Hora(p.L("wallMs")) }).ToList(), pass.Cast<object>().ToList());
+        // passagens — "Decorrido" é o tempo de prova desde a largada (não a hora do relógio)
+        var largada = _sess?.L("startedAt");
+        string Decorrido(long? wall) => largada is long l0 && wall is long w ? Crono.Relogio(w - l0) : Crono.Hora(wall);
+        var pass = _laps.OrderByDescending(p => p.L("wallMs")).ToList();
+        _lPassagens.Text = pass.Count(p => !p.B("deleted")).ToString();
+        _gPass.Preencher(pass.Select((p, i) => new object[] { pass.Count - i, p.S("kart"), p.S("name"), p.S("transponder"), Crono.Volta(p.L("lapMs")), p.L("lapMs") == null ? "—" : p.I("lap"), Decorrido(p.L("wallMs")) }).ToList(), pass.Cast<object>().ToList());
+        var passagemVisivel = pass.FirstOrDefault(p => !p.B("deleted"));
+        _lVoltaFaixa.Text = passagemVisivel == null ? "VOLTA\nAGUARDANDO" : $"VOLTA\n{passagemVisivel.I("lap")}\nAGUARDANDO";
 
         // competidores (aba 1): so recarrega se o operador nao estiver editando
         if (s0 != null && (_pilotosDe != s0.S("id") || !_pilotosSujos) && !_gPilotos.IsCurrentCellInEditMode)
         {
             var comps = Crono.Arr(s0, "competitors");
-            var atual = _gPilotos.Rows.Cast<DataGridViewRow>().Where(r => !r.IsNewRow).Select(r => $"{r.Cells[0].Value}|{r.Cells[1].Value}").ToList();
-            var novo = comps.Select(c => $"{c.S("kart")}|{c.S("name")}").ToList();
+            var atual = _gPilotos.Rows.Cast<DataGridViewRow>().Where(r => !r.IsNewRow).Select(r => $"{r.Cells[0].Value}|{r.Cells[1].Value}|{r.Cells[2].Value}|{r.Cells[3].Value}").ToList();
+            var novo = comps.Select(c => $"{c.S("kart")}|{c.S("name")}|{c.S("customerId")}|{NomeCategoria(c.S("category"))}").ToList();
             if (_pilotosDe != s0.S("id") || !atual.SequenceEqual(novo))
             {
                 _gPilotos.Rows.Clear();
-                foreach (var c in comps) _gPilotos.Rows.Add(c.S("kart"), c.S("name"), c.S("customerId"));
+                foreach (var c in comps) _gPilotos.Rows.Add(c.S("kart"), c.S("name"), c.S("customerId"), NomeCategoria(c.S("category")));
                 _pilotosSujos = false;
             }
             _pilotosDe = s0.S("id");
             _lPilotosTitulo.Text = $"{s0.S("name")} — {Crono.Tipo(s0.S("type")).ToUpperInvariant()} ({Crono.Estado(estado)})";
         }
         else if (s0 == null) _lPilotosTitulo.Text = "Selecione ou crie uma bateria";
+        var observations = Crono.Arr(s0, "observations");
+        var obsRows = observations.Select(o => new object[] { Crono.Hora(o.L("wallMs")), o.S("text"), o.S("author") }).ToList();
+        _gObs.Preencher(obsRows, observations.Cast<object>().ToList());
+        _gObsAoVivo.Preencher(obsRows, observations.Cast<object>().ToList());
+        var transponders = Crono.Arr(_state, "recentPassings").GroupBy(p => p.S("transponder")).Where(g => g.Key.Length > 0).Select(g => g.OrderByDescending(p => p.L("wallMs")).First()).OrderBy(p => p.L("wallMs")).ToList();
+        _gTransponderResultado.Preencher(transponders.Select(p => new object[] { p.S("transponder"), Crono.Volta(p.L("lapMs")), Crono.Relogio(p.L("lapMs")), Crono.Hora(p.L("wallMs")), Crono.Arr(_state, "recentPassings").Count(x => x.S("transponder") == p.S("transponder")) }).ToList(), transponders.Cast<object>().ToList());
+        if (_abas.SelectedIndex == 1) MontarArvore();
         Relogio();
     }
 
@@ -457,7 +685,7 @@ public class FormCrono : Form
         _sData.Text = DateTime.Now.ToString("dd/MM/yyyy");
         if (_sess == null) { _lCrono.Text = "00:00:00.000"; _lRestante.Text = "---"; return; }
         var andando = _sess.S("state") is "em_andamento" or "bandeira_final";
-        var delta = andando ? (long)(DateTime.Now - _lidoEm).TotalMilliseconds : 0;
+        var delta = andando && _sess.S("currentFlag") != "red" ? (long)(DateTime.Now - _lidoEm).TotalMilliseconds : 0;
         _lCrono.Text = Crono.Relogio((_sess.L("elapsedMs") ?? 0) + delta);
         _lRestante.Text = _sess.L("remainingMs") is long rest ? Crono.Relogio(Math.Max(0, rest - delta))[..8] : "---";
     }
@@ -505,7 +733,9 @@ public class FormCrono : Form
             if (kart.Length == 0 && nome.Length == 0) continue;
             if (kart.Length > 0 && !karts.Add(kart)) { Msg.Aviso(this, $"O kart {kart} está repetido."); return; }
             var cid = r.Cells[2].Value?.ToString();
-            comps.Add(new JsonObject { ["kart"] = kart, ["name"] = nome, ["customerId"] = string.IsNullOrEmpty(cid) ? null : cid });
+            var category = r.Cells.Count > 3 ? r.Cells[3].Value?.ToString() : null;
+            if (!string.IsNullOrWhiteSpace(category)) category = IdCategoria(category);
+            comps.Add(new JsonObject { ["kart"] = kart, ["name"] = nome, ["customerId"] = string.IsNullOrEmpty(cid) ? null : cid, ["category"] = string.IsNullOrEmpty(category) ? null : category });
         }
         await Crono.Api.Patch("/api/sessions/" + _sess.S("id"), new JsonObject { ["competitors"] = comps });
         _pilotosSujos = false;
@@ -521,7 +751,7 @@ public class FormCrono : Form
         var grid = await Crono.Api.Lista($"/api/agenda/{ag.S("id")}/grid");
         if (grid.Count == 0) { Msg.Aviso(this, "Essa bateria da agenda não tem inscritos."); return; }
         var existentes = _gPilotos.Rows.Cast<DataGridViewRow>().Where(r => !r.IsNewRow).Select(r => r.Cells[2].Value?.ToString()).ToHashSet();
-        foreach (var g in grid.Where(g => !existentes.Contains(g.S("clienteId")))) _gPilotos.Rows.Add(g.S("kart"), g.S("nome"), g.S("clienteId"));
+        foreach (var g in grid.Where(g => !existentes.Contains(g.S("clienteId")))) _gPilotos.Rows.Add(g.S("kart"), g.S("nome"), g.S("clienteId"), g.S("categoria"));
         _pilotosSujos = true;
         Msg.Info(this, $"{grid.Count} inscrito(s) da agenda. Confira os números dos karts e clique em Salvar Competidores.");
     }
@@ -576,17 +806,59 @@ public class FormCrono : Form
         }
         try
         {
-            await Task.Delay(300);
-            Foto(this, "1-cronometragem");
-            _abas.SelectedIndex = 0; await CarregarAgenda(); await Task.Delay(300);
-            Foto(this, "2-baterias-competidores");
-            using (var f = new FormNovaBateria(_agenda, _agenda.FirstOrDefault())) { f.Show(this); await Task.Delay(300); Foto(f, "3-nova-bateria"); f.Close(); }
-            using (var f = new FormTransponders(["9912345"])) { f.Show(this); await Task.Delay(1200); Foto(f, "4-transponders"); f.Close(); }
-            var tv = new FormTV(true) { StartPosition = FormStartPosition.Manual, Location = new Point(0, 0), Size = new Size(1280, 720) };
-            tv.Show(); await Task.Delay(1500); Foto(tv, "5-telao"); tv.Close();
+            await Task.Delay(600);
+            _abas.SelectedIndex = 0; await CarregarCatalogo(); await CarregarAgenda(); await Atualizar(); await Task.Delay(250); Foto(this, "01-eventos");
+            _abas.SelectedIndex = 1; MontarArvore(); await Task.Delay(250); Foto(this, "02-competidores");
+            for (var i = 0; i < _tabsCompetidor.TabPages.Count; i++)
+            {
+                _tabsCompetidor.SelectedIndex = i; await Task.Delay(160);
+                Foto(this, $"02-{i + 1}-{NomeArquivo(_tabsCompetidor.TabPages[i].Text)}");
+            }
+            _abas.SelectedIndex = 2;
+            for (var i = 0; i < _tabsResultado.TabPages.Count; i++)
+            {
+                _tabsResultado.SelectedIndex = i; await Task.Delay(160);
+                Foto(this, $"03-ao-vivo-{NomeArquivo(_tabsResultado.TabPages[i].Text)}");
+            }
+            var cronoMenu = MainMenuStrip.Items.OfType<ToolStripMenuItem>().FirstOrDefault(item => item.Text == "Cronometragem");
+            cronoMenu?.ShowDropDown(); await Task.Delay(180); Foto(this, "04-menus-cronometragem"); cronoMenu?.HideDropDown();
+            using (var f = new FormNovaBateria(_agenda, _agenda.FirstOrDefault())) { f.Show(this); await Task.Delay(240); Foto(f, "05-NovaBateria"); f.Close(); }
+            using (var f = new FormTransponders(["9912345"])) { f.Show(this); await Task.Delay(320); Foto(f, "06-Transponders"); f.Close(); }
+            using (var f = new FormCatalogoAux("categories")) { f.Show(this); await Task.Delay(240); Foto(f, "CadCategoria"); f.Close(); }
+            using (var f = new FormCatalogoAux("tracks")) { f.Show(this); await Task.Delay(240); Foto(f, "CadTracado"); f.Close(); }
+            var janelas = new (string Nome, (string, string, string)[] Campos)[]
+            {
+                ("IncluirPassagem", [("Número do kart", "kart", "07"), ("Competidor", "name", "Carlos Henrique Lima"), ("Tempo da volta (segundos)", "lapSeconds", "54.873")]),
+                ("MudarCorrida", [("Nome", "name", _sess?.S("name") ?? "CORRIDA"), ("Duração em minutos", "durationMin", "20"), ("Voltas máximas", "maxLaps", "")]),
+                ("Empresa", [("Razão social", "company", "Kartódromo Internacional de Betim"), ("CNPJ", "cnpj", ""), ("Telefone", "phone", ""), ("E-mail", "email", "")]),
+                ("CadGrupo", [("Nome do grupo", "name", "BATERIA 19:20"), ("Categoria", "categoryId", "Indoor")]),
+                ("Prova", [("Nome da prova", "name", "Corrida"), ("Tipo", "type", "corrida"), ("Duração em minutos", "durationMin", "20"), ("Voltas máximas", "maxLaps", "")]),
+                ("Competidor", [("Kart", "kart", "07"), ("Competidor", "name", "Carlos Henrique Lima"), ("Categoria", "category", "Indoor")]),
+                ("CadDecoder", [("Decoder", "decoder", "TranX"), ("Endereço", "decoderHost", "192.168.20.171"), ("Porta", "decoderPort", "5100")]),
+                ("PlacarConfig", [("Placar padrão", "scoreboard", "Placar CalXPro"), ("Atualizar a cada (s)", "scoreboardInterval", "1")]),
+                ("CadTranspDePara", [("Transponder", "raw", "4521873"), ("Kart", "kart", "07")]),
+                ("CadTranspCompetidor", [("Transponder", "raw", "4521873"), ("Competidor", "name", "Carlos Henrique Lima")]),
+                ("ParamSistema", [("Nome da pista", "trackName", "Kartódromo Internacional de Betim"), ("Serviço de cronometragem", "timingUrl", Config.CronoUrl)]),
+                ("ParamCrono", [("Extensão do traçado (m)", "defaultTrackLengthMeters", "1000"), ("Volta mínima (s)", "minLapSeconds", "5"), ("Bip de passagem", "beep", "ligado")]),
+                ("Backup", [("Destino", "destination", "Pasta de dados do serviço"), ("Diário", "journal", "Preservar passagens")]),
+                ("ConfigInicial", [("Empresa", "company", "Kartódromo Internacional de Betim"), ("Pista", "trackName", "Kartódromo Internacional de Betim"), ("Decoder", "decoder", "TranX")]),
+                ("SegUsuario", [("Usuário", "user", "cronometrista"), ("Nome", "name", "Cronometrista")]),
+                ("SegPerfil", [("Perfil", "name", "Cronometragem"), ("Descrição", "description", "Operação de pista")]),
+                ("Permissoes", [("Perfil", "profile", "Cronometragem"), ("Permissões", "permissions", "Bandeiras · resultados · passagens")]),
+                ("Banner", [("Título", "title", "Kartódromo Internacional de Betim"), ("Texto", "body", "Resultado ao vivo")]),
+                ("RankingPeso", [("Evento", "event", "Campeonato KAC"), ("Peso mínimo", "minWeight", "50"), ("Peso máximo", "maxWeight", "100")]),
+                ("RelatoriosCrono", [("Relatório", "report", "Resultado oficial"), ("Período", "period", DateTime.Today.ToString("dd/MM/yyyy"))]),
+            };
+            foreach (var (nome, campos) in janelas)
+            {
+                using var f = new DialogoDados(nome, "Cadastro · Cronometragem", campos, new Size(820, 500));
+                f.Show(this); await Task.Delay(150); Foto(f, nome); f.Close();
+            }
             File.WriteAllText(Path.Combine(_autoteste, "ok.txt"), "ok");
         }
         catch (Exception e) { File.WriteAllText(Path.Combine(_autoteste, "erro.txt"), e.ToString()); }
         Close();
     }
+
+    static string NomeArquivo(string nome) => string.Concat(nome.ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-')).Trim('-');
 }

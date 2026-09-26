@@ -26,9 +26,11 @@ public static class Tema
 public static class Msg
 {
     public const string App = "Kartódromo - Módulo Office";
-    public static void Info(IWin32Window dono, string texto, string titulo = App) => MessageBox.Show(dono, texto, titulo, MessageBoxButtons.OK, MessageBoxIcon.Information);
-    public static void Aviso(IWin32Window dono, string texto, string titulo = "Atenção!") => MessageBox.Show(dono, texto, titulo, MessageBoxButtons.OK, MessageBoxIcon.Warning);
-    public static void Erro(IWin32Window dono, string texto, string titulo = "Atenção!") => MessageBox.Show(dono, texto, titulo, MessageBoxButtons.OK, MessageBoxIcon.Error);
+    /// <summary>Só para autoteste: quando definido, as mensagens são registradas em vez de abrir caixa modal.</summary>
+    public static Action<string> Registro;
+    public static void Info(IWin32Window dono, string texto, string titulo = App) { if (Registro != null) { Registro("INFO: " + texto); return; } MessageBox.Show(dono, texto, titulo, MessageBoxButtons.OK, MessageBoxIcon.Information); }
+    public static void Aviso(IWin32Window dono, string texto, string titulo = "Atenção!") { if (Registro != null) { Registro("AVISO: " + texto); return; } MessageBox.Show(dono, texto, titulo, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+    public static void Erro(IWin32Window dono, string texto, string titulo = "Atenção!") { if (Registro != null) { Registro("ERRO: " + texto); return; } MessageBox.Show(dono, texto, titulo, MessageBoxButtons.OK, MessageBoxIcon.Error); }
     public static bool Pergunta(IWin32Window dono, string texto, string titulo = "Atenção!") =>
         MessageBox.Show(dono, texto, titulo, MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1) == DialogResult.Yes;
 }
@@ -383,6 +385,8 @@ public static class Icone
         var r = tam / 5;
         path.AddArc(0, 0, r, r, 180, 90); path.AddArc(tam - r - 1, 0, r, r, 270, 90); path.AddArc(tam - r - 1, tam - r - 1, r, r, 0, 90); path.AddArc(0, tam - r - 1, r, r, 90, 90); path.CloseFigure();
         using (var lg = new LinearGradientBrush(new Rectangle(0, 0, tam, tam), ControlPaint.Light(cor, .25f), ControlPaint.Dark(cor, .05f), 90f)) g.FillPath(lg, path);
+        // MDL2 só tem os ícones da área privada (U+E000–U+F8FF); letras e símbolos comuns (■ ↻ ✉ W) viravam quadradinho
+        if (fonte == "Segoe MDL2 Assets" && !string.IsNullOrEmpty(glifo) && (glifo[0] < 0xE000 || glifo[0] > 0xF8FF)) fonte = char.IsLetterOrDigit(glifo[0]) ? "Segoe UI Semibold" : "Segoe UI Symbol";
         using var f = new Font(fonte, tam * 0.5f, GraphicsUnit.Pixel);
         using var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
         g.DrawString(glifo, f, Brushes.White, new RectangleF(0, 1, tam, tam), sf);

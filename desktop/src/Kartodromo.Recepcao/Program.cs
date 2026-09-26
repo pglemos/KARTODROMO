@@ -9,6 +9,7 @@ static class Program
     static void Main()
     {
         ApplicationConfiguration.Initialize();
+        KitVisual.Instalar();
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
         Application.ThreadException += (_, e) => MessageBox.Show(e.Exception.Message, "Kartódromo - Módulo Office", MessageBoxButtons.OK, MessageBoxIcon.Error);
         Thread.CurrentThread.CurrentCulture = Fmt.Br;
@@ -21,7 +22,13 @@ static class Program
             async void Inicio(object s, EventArgs e)
             {
                 Application.Idle -= Inicio;
-                try { await AutoTeste.Rodar(args[2], args[3], args[4]); }
+                try
+                {
+                    long.TryParse(args.ElementAtOrDefault(5), out var reservaIdTeste);
+                    long.TryParse(args.ElementAtOrDefault(6), out var vendaIdTeste);
+                    long.TryParse(args.ElementAtOrDefault(7), out var movimentoIdTeste);
+                    await AutoTeste.Rodar(args[2], args[3], args[4], reservaIdTeste, vendaIdTeste, movimentoIdTeste);
+                }
                 catch (Exception ex) { File.WriteAllText(Path.Combine(args[2], "erro.txt"), ex.ToString()); }
                 ctx.ExitThread();
             }

@@ -3,7 +3,7 @@
  * Todas as rotas daqui exigem sessao de usuario (lib/ops/auth.ts).
  */
 import { CLIENTE_COLS, insertCliente, isValidCpf, one, onlyDigits, query, tx, updateCliente, type ClienteInput } from './db';
-import { hashSenha, type Sessao } from './auth';
+import { confereSenha, hashSenha, type Sessao } from './auth';
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
@@ -31,6 +31,118 @@ const isoDate = (v: unknown) => {
   return s;
 };
 const str = (v: unknown, max: number) => (v === null || v === undefined || String(v).trim() === '' ? null : String(v).trim().slice(0, max));
+const pontos = (v: unknown) => {
+  const n = Number(v);
+  if (!Number.isSafeInteger(n) || n === 0 || Math.abs(n) > 1_000_000) throw new HttpError(400, 'Informe uma quantidade de pontos inteira, diferente de zero e de até 1.000.000.');
+  return n;
+};
+const chaveIdempotencia = (v: unknown) => {
+  const key = str(v, 80);
+  if (!key || key.length < 8 || !/^[a-zA-Z0-9._:-]+$/.test(key)) throw new HttpError(400, 'Informe uma chave de idempotência válida (8 a 80 caracteres).');
+  return key;
+};
+const percentual = (v: unknown) => {
+  const n = Number(String(v ?? '').replace(',', '.'));
+  if (!Number.isFinite(n) || n < 0 || n > 100 || Math.round(n * 100) !== n * 100) throw new HttpError(400, 'A comissão deve estar entre 0 e 100, com até duas casas decimais.');
+  return n;
+};
+const bit = (v: unknown) => (v === true || v === 'true' || v === 1 || v === '1' ? 1 : 0);
+const duplicateSql = (e: unknown) => /UNIQUE|duplicate|2627|2601/i.test(e instanceof Error ? e.message : String(e));
+
+async function servicosOnline() {
+  const servicos: { id: string; nome: string; online: boolean | null; status: 'online' | 'offline' | 'indisponivel'; verificadoEm: string | null; detalhe?: string }[] = [
+    { id: 'office-api', nome: 'API da Recepção', online: true, status: 'online', verificadoEm: new Date().toISOString() },
+  ];
+  let bancoOnline = false;
+  let bancoVerificado: string | null = null;
+  try {
+    const db = await one<{ agora: string }>(`SELECT CONVERT(varchar(19), SYSDATETIME(), 126) agora`);
+    bancoOnline = Boolean(db);
+    bancoVerificado = db?.agora ?? null;
+    servicos.push({ id: 'ops-sql', nome: 'Banco operacional', online: bancoOnline, status: bancoOnline ? 'online' : 'offline', verificadoEm: bancoVerificado });
+  } catch {
+    servicos.push({ id: 'ops-sql', nome: 'Banco operacional', online: false, status: 'offline', verificadoEm: null });
+  }
+  servicos.push({ id: 'reservas-online', nome: 'Reservas online (totem)', online: bancoOnline, status: bancoOnline ? 'online' : 'offline', verificadoEm: bancoVerificado,
+    detalhe: 'Usa a API de operações e o banco operacional.' });
+  servicos.push(
+    { id: 'site', nome: 'Site kartodromodebetim.com.br', online: null, status: 'indisponivel', verificadoEm: null, detalhe: 'Sem endereço de verificação configurado no servidor.' },
+    { id: 'whatsapp', nome: 'WhatsApp (resultados e lembretes)', online: null, status: 'indisponivel', verificadoEm: null, detalhe: 'Não há provedor de WhatsApp configurado.' },
+    { id: 'timing-display', nome: 'Classificação ao vivo / telão', online: null, status: 'indisponivel', verificadoEm: null, detalhe: 'Sem endereço de verificação configurado no servidor.' },
+  );
+
+  // Serviços opcionais são declarados pela configuração do servidor; nomes e URLs não são
+  // derivados de entrada do usuário nem enviados de volta ao cliente.
+  type ServiceProbeConfig = { id?: string; nome: string; url: string };
+  let configurados: ServiceProbeConfig[] = [];
+  try {
+    const raw = JSON.parse(process.env.OPS_SERVICOS_ONLINE ?? '[]') as unknown;
+    if (Array.isArray(raw)) configurados = raw.filter((x): x is ServiceProbeConfig =>
+      Boolean(x) && typeof x === 'object' && typeof (x as { nome?: unknown }).nome === 'string' && typeof (x as { url?: unknown }).url === 'string',
+    ).slice(0, 12);
+  } catch { /* configuração opcional ausente ou inválida */ }
+  const probes = await Promise.all(configurados.map(async (x, i) => {
+    const nome = String(x.nome).trim().slice(0, 80) || `Serviço ${i + 1}`;
+    const id = typeof x.id === 'string' ? x.id.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || `configured-${i + 1}` : `configured-${i + 1}`;
+    let online = false;
+    try {
+      const url = new URL(x.url);
+      if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error('URL inválida');
+      const r = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(3000), redirect: 'manual' });
+      online = r.status >= 200 && r.status < 400;
+    } catch { online = false; }
+    return { id, nome, online, status: online ? 'online' as const : 'offline' as const, verificadoEm: new Date().toISOString() };
+  }));
+  for (const probe of probes) {
+    const existing = servicos.findIndex((service) => service.id === probe.id);
+    if (existing < 0) servicos.push(probe);
+    else servicos[existing] = probe;
+  }
+  return {
+    servicos,
+    acoes: {
+      publicarAgenda: { disponivel: false, motivo: 'Não há integração de publicação do calendário configurada.' },
+      enviarLembreteWhatsApp: { disponivel: false, motivo: 'Não há provedor de WhatsApp configurado.' },
+      sincronizarAgora: { disponivel: false, motivo: 'Não há destino ou rotina de sincronização configurado.' },
+    },
+  };
+}
+
+async function voucherLinks(origem: string, body: Record<string, unknown>, keep?: { parceiroId?: number | null; fidelidadeContaId?: number | null }) {
+  let parceiroId = body.parceiroId ? int(body.parceiroId, 'Parceiro') : keep?.parceiroId ?? null;
+  let fidelidadeContaId = body.fidelidadeContaId ? int(body.fidelidadeContaId, 'Conta de fidelidade') : keep?.fidelidadeContaId ?? null;
+  let referencia = str(body.referencia, 150);
+  if (origem === 'parceiro') {
+    fidelidadeContaId = null;
+    if (!parceiroId && referencia) {
+      const p = await one<{ id: number }>(`SELECT TOP 1 Id id FROM dbo.Parceiro WHERE Nome COLLATE Latin1_General_CI_AI = @nome AND Ativo = 1 ORDER BY Id`, { nome: referencia });
+      parceiroId = p?.id ?? null;
+    }
+    if (!parceiroId) throw new HttpError(400, 'Selecione um parceiro ativo para vincular o voucher.');
+    const p = await one<{ nome: string; ativo: boolean }>(`SELECT Nome nome, Ativo ativo FROM dbo.Parceiro WHERE Id = @id`, { id: parceiroId });
+    if (!p || !p.ativo) throw new HttpError(400, 'Parceiro não encontrado ou inativo.');
+    referencia = referencia ?? p.nome;
+  } else if (origem === 'fidelidade') {
+    parceiroId = null;
+    if (!fidelidadeContaId && referencia) {
+      const a = await one<{ id: number }>(
+        `SELECT TOP 1 f.Id id FROM dbo.FidelidadeConta f JOIN dbo.Cliente c ON c.Id = f.ClienteId
+         WHERE c.Nome COLLATE Latin1_General_CI_AI = @nome AND f.Ativo = 1 ORDER BY f.Id`, { nome: referencia },
+      );
+      fidelidadeContaId = a?.id ?? null;
+    }
+    if (!fidelidadeContaId) throw new HttpError(400, 'Selecione uma conta de fidelidade ativa para vincular o voucher.');
+    const a = await one<{ nome: string; ativo: boolean }>(
+      `SELECT c.Nome nome, f.Ativo ativo FROM dbo.FidelidadeConta f JOIN dbo.Cliente c ON c.Id = f.ClienteId WHERE f.Id = @id`, { id: fidelidadeContaId },
+    );
+    if (!a || !a.ativo) throw new HttpError(400, 'Conta de fidelidade não encontrada ou inativa.');
+    referencia = referencia ?? a.nome;
+  } else {
+    parceiroId = null;
+    fidelidadeContaId = null;
+  }
+  return { parceiroId, fidelidadeContaId, referencia };
+}
 
 /** Filtro "Exibir dados:" do LapTime aplicado a uma coluna de data. */
 function periodo(url: URL, col: string) {
@@ -336,8 +448,14 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
     let voucher: Record<string, unknown> | null = null;
     let voucherDesconto = 0;
     if (voucherCodigo) {
-      const [v] = await run(`SELECT * FROM dbo.Voucher WHERE Codigo = @c`, { c: voucherCodigo });
+      const [v] = await run(
+        `SELECT v.*, p.Ativo parceiroAtivo, fc.Ativo fidelidadeAtiva FROM dbo.Voucher v
+         LEFT JOIN dbo.Parceiro p ON p.Id = v.ParceiroId LEFT JOIN dbo.FidelidadeConta fc ON fc.Id = v.FidelidadeContaId WHERE v.Codigo = @c`,
+        { c: voucherCodigo },
+      );
       if (!v || !v.Ativo) throw new HttpError(400, 'Voucher não encontrado.');
+      if (v.ParceiroId && !v.parceiroAtivo) throw new HttpError(400, 'O parceiro vinculado ao voucher está inativo.');
+      if (v.FidelidadeContaId && !v.fidelidadeAtiva) throw new HttpError(400, 'A conta de fidelidade vinculada ao voucher está inativa.');
       const [hoje] = await run(`SELECT CAST(SYSDATETIME() AS date) d`);
       if ((hoje.d as Date) < (v.InicioEm as Date) || (hoje.d as Date) > (v.FimEm as Date)) throw new HttpError(400, 'Voucher expirado.');
       const [usos] = await run(`SELECT COUNT(*) n, SUM(CASE WHEN ClienteId = @cli THEN 1 ELSE 0 END) doCliente FROM dbo.VoucherUso WHERE VoucherId = @id AND Estornado = 0`, { id: v.Id, cli: clienteId });
@@ -404,6 +522,28 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
     }
     if (voucher) {
       await run(`INSERT INTO dbo.VoucherUso (VoucherId, VendaId, ClienteId, DescontoCentavos) VALUES (@v, @vendaId, @cli, @d)`, { v: voucher.Id, vendaId, cli: clienteId, d: voucherDesconto });
+      if (voucher.Origem === 'parceiro' && voucher.ParceiroId) {
+        const base = itens.filter((i) => i.voucherId === Number(voucher!.Id)).reduce((total, i) => total + i.liquido, 0);
+        if (base > 0) {
+          const [partner] = await run(`SELECT ComissaoPercentual percentual FROM dbo.Parceiro WITH (UPDLOCK, HOLDLOCK) WHERE Id = @id AND Ativo = 1`, { id: voucher.ParceiroId });
+          if (partner) {
+            const rate = Number(partner.percentual);
+            const commission = Math.round(base * rate / 100);
+            if (commission > 0) {
+            const [created] = await run(
+              `INSERT INTO dbo.ParceiroComissao (ParceiroId, VendaId, BaseCentavos, Percentual, ValorCentavos)
+               OUTPUT inserted.Id id VALUES (@parceiroId, @vendaId, @base, @rate, @valor)`,
+              { parceiroId: voucher.ParceiroId, vendaId, base, rate, valor: commission },
+            );
+            await run(
+              `INSERT INTO dbo.ParceiroComissaoTransacao (ComissaoId, Tipo, ValorCentavos, Motivo, UsuarioId)
+               VALUES (@id, 'acumulada', @valor, 'Comissão gerada pela venda', @uid)`,
+              { id: created.id, valor: commission, uid: sessao.uid },
+            );
+            }
+          }
+        }
+      }
     }
     return { id: vendaId, total, recebido, troco, inscricoes: itens.filter((i) => i.inscricaoId).map((i) => i.inscricaoId) };
   });
@@ -418,10 +558,12 @@ async function estornar(sessao: Sessao, vendaId: number, body: Record<string, un
     if (!v) throw new HttpError(404, 'Venda não encontrada.');
     if (!v.MovimentoId || v.FechadoEm) throw new HttpError(409, 'Não é possível realizar o estorno. Movimento fechado.');
     let soma = 0;
+    let estornouVoucherParceiro = false;
     for (const itemId of itemIds) {
-      const [it] = await run(`SELECT Id, LiquidoCentavos, InscricaoId, Estornado FROM dbo.VendaItem WHERE Id = @itemId AND VendaId = @vendaId`, { itemId, vendaId });
+      const [it] = await run(`SELECT Id, LiquidoCentavos, InscricaoId, VoucherId, Estornado FROM dbo.VendaItem WHERE Id = @itemId AND VendaId = @vendaId`, { itemId, vendaId });
       if (!it || it.Estornado) continue;
       soma += it.LiquidoCentavos as number;
+      estornouVoucherParceiro ||= Boolean(it.VoucherId);
       await run(`UPDATE dbo.VendaItem SET Estornado = 1, EstornadoEm = SYSDATETIME(), MotivoEstorno = @motivo WHERE Id = @itemId`, { itemId, motivo });
       if (it.InscricaoId) {
         await run(`UPDATE dbo.Inscricao SET Pago = 0, Status = 'reservada', ValorCentavos = NULL, VendaId = NULL, AtualizadoEm = SYSDATETIME() WHERE Id = @i`, { i: it.InscricaoId });
@@ -434,6 +576,17 @@ async function estornar(sessao: Sessao, vendaId: number, body: Record<string, un
          Cancelada = CASE WHEN @rest = 0 THEN 1 ELSE Cancelada END, MotivoCancelamento = CASE WHEN @rest = 0 THEN @motivo ELSE MotivoCancelamento END WHERE Id = @vendaId`,
       { soma, rest: rest.n, motivo: `${motivo} (${sessao.nome})`, vendaId },
     );
+    if (estornouVoucherParceiro) {
+      const [commission] = await run(`SELECT Id, ValorCentavos, Estado FROM dbo.ParceiroComissao WITH (UPDLOCK, HOLDLOCK) WHERE VendaId = @vendaId`, { vendaId });
+      if (commission && commission.Estado !== 'estornada') {
+        await run(
+          `INSERT INTO dbo.ParceiroComissaoTransacao (ComissaoId, Tipo, ValorCentavos, Motivo, UsuarioId)
+           VALUES (@id, 'cancelamento_venda', -@valor, @motivo, @uid)`,
+          { id: commission.Id, valor: commission.ValorCentavos, motivo: `Estorno da venda ${vendaId}: ${motivo}`.slice(0, 400), uid: sessao.uid },
+        );
+        await run(`UPDATE dbo.ParceiroComissao SET Estado = 'estornada', AtualizadaEm = SYSDATETIME() WHERE Id = @id`, { id: commission.Id });
+      }
+    }
     return { estornado: soma };
   });
 }
@@ -444,6 +597,289 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   const { method, url, sessao } = req;
   const path = url.pathname.replace(/^\/api\/office/, '');
   let m: RegExpMatchArray | null;
+
+  if (path === '/servicos-online' && method === 'GET') {
+    send(200, await servicosOnline());
+    return true;
+  }
+
+  // ---------- fidelidade
+  if (path === '/fidelidade/contas' && method === 'GET') {
+    const q = str(url.searchParams.get('q'), 100);
+    const rows = await query(
+      `SELECT TOP 2000 a.Id id, a.ClienteId clienteId, c.Nome nome, c.Documento documento, c.Email email, c.Telefone telefone,
+              a.SaldoPontos saldo, a.SaldoPontos saldoCentavos, a.Ativo ativo, CONVERT(varchar(16), a.CriadoEm, 126) criadaEm,
+              (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.ClienteId = a.ClienteId AND i.Pago = 1 AND i.Status <> 'cancelada') baterias,
+              (SELECT COUNT(*) FROM dbo.FidelidadeTransacao ft WHERE ft.ContaId = a.Id) transacoes
+       FROM dbo.FidelidadeConta a JOIN dbo.Cliente c ON c.Id = a.ClienteId
+       ${q ? 'WHERE c.Nome COLLATE Latin1_General_CI_AI LIKE @q OR c.Documento LIKE @q' : ''}
+       ORDER BY c.Nome, a.Id`, q ? { q: `%${q}%` } : {},
+    );
+    send(200, rows);
+    return true;
+  }
+  if (path === '/fidelidade/contas' && method === 'POST') {
+    const clienteId = int((await req.body()).clienteId, 'Cliente');
+    let contaId: number | null = null;
+    let criada = false;
+    try {
+      contaId = await tx(async (run) => {
+        const [cliente] = await run(`SELECT Id FROM dbo.Cliente WITH (UPDLOCK, HOLDLOCK) WHERE Id = @clienteId`, { clienteId });
+        if (!cliente) throw new HttpError(404, 'Cliente não encontrado.');
+        const [existente] = await run(`SELECT Id id FROM dbo.FidelidadeConta WITH (UPDLOCK, HOLDLOCK) WHERE ClienteId = @clienteId`, { clienteId });
+        if (existente) return Number(existente.id);
+        const [novo] = await run(`INSERT INTO dbo.FidelidadeConta (ClienteId) OUTPUT inserted.Id id VALUES (@clienteId)`, { clienteId });
+        criada = true;
+        return Number(novo.id);
+      });
+    } catch (e) {
+      if (!duplicateSql(e)) throw e;
+      const existente = await one<{ id: number }>(`SELECT Id id FROM dbo.FidelidadeConta WHERE ClienteId = @clienteId`, { clienteId });
+      if (!existente) throw e;
+      contaId = existente.id;
+      criada = false;
+    }
+    send(criada ? 201 : 200, { id: contaId, existente: !criada });
+    return true;
+  }
+  if ((m = path.match(/^\/fidelidade\/contas\/(\d+)$/)) && method === 'GET') {
+    const id = int(m[1], 'Conta');
+    const account = await one(
+      `SELECT a.Id id, a.ClienteId clienteId, c.Nome nome, c.Documento documento, c.Email email, c.Telefone telefone,
+              a.SaldoPontos saldo, a.SaldoPontos saldoCentavos, a.Ativo ativo, CONVERT(varchar(16), a.CriadoEm, 126) criadaEm,
+              (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.ClienteId = a.ClienteId AND i.Pago = 1 AND i.Status <> 'cancelada') baterias,
+              (SELECT COUNT(*) FROM dbo.FidelidadeTransacao ft WHERE ft.ContaId = a.Id) transacoes
+       FROM dbo.FidelidadeConta a JOIN dbo.Cliente c ON c.Id = a.ClienteId WHERE a.Id = @id`, { id },
+    );
+    if (!account) throw new HttpError(404, 'Conta de fidelidade não encontrada.');
+    send(200, account);
+    return true;
+  }
+  if ((m = path.match(/^\/fidelidade\/contas\/(\d+)$/)) && method === 'PUT') {
+    if (!sessao.admin) throw new HttpError(403, 'Disponível apenas para administradores.');
+    const id = int(m[1], 'Conta');
+    const b = await req.body();
+    if (!('ativo' in b)) throw new HttpError(400, 'Informe o estado ativo da conta.');
+    const exists = await one<{ id: number }>(`SELECT Id id FROM dbo.FidelidadeConta WHERE Id = @id`, { id });
+    if (!exists) throw new HttpError(404, 'Conta de fidelidade não encontrada.');
+    const ativo = bit(b.ativo);
+    await query(`UPDATE dbo.FidelidadeConta SET Ativo = @ativo, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { id, ativo });
+    if (!ativo) await query(`UPDATE dbo.Voucher SET Ativo = 0 WHERE FidelidadeContaId = @id`, { id });
+    send(200, { id, ativo: Boolean(ativo) });
+    return true;
+  }
+  if ((m = path.match(/^\/fidelidade\/contas\/(\d+)\/transacoes$/)) && method === 'GET') {
+    const id = int(m[1], 'Conta');
+    const filtro = periodo(url, 'ft.CriadoEm');
+    const conta = await one(`SELECT Id id FROM dbo.FidelidadeConta WHERE Id = @id`, { id });
+    if (!conta) throw new HttpError(404, 'Conta de fidelidade não encontrada.');
+    send(200, await query(
+      `SELECT ft.Id id, CONVERT(varchar(16), ft.CriadoEm, 126) dataHora, c.Nome conta, ft.Tipo tipo, ft.Pontos pontos,
+              ft.SaldoApos saldoApos, ft.Motivo motivo, u.Nome usuario
+       FROM dbo.FidelidadeTransacao ft JOIN dbo.FidelidadeConta a ON a.Id = ft.ContaId JOIN dbo.Cliente c ON c.Id = a.ClienteId
+       JOIN dbo.Usuario u ON u.Id = ft.UsuarioId WHERE ft.ContaId = @id AND ${filtro.where} ORDER BY ft.CriadoEm DESC, ft.Id DESC`,
+      { ...filtro.p, id },
+    ));
+    return true;
+  }
+  if (path === '/fidelidade/transacoes' && method === 'GET') {
+    const filtro = periodo(url, 'ft.CriadoEm');
+    send(200, await query(
+      `SELECT TOP 5000 ft.Id id, CONVERT(varchar(16), ft.CriadoEm, 126) dataHora, c.Nome conta, ft.Tipo tipo, ft.Pontos pontos,
+              ft.SaldoApos saldoApos, ft.Motivo motivo, u.Nome usuario
+       FROM dbo.FidelidadeTransacao ft JOIN dbo.FidelidadeConta a ON a.Id = ft.ContaId JOIN dbo.Cliente c ON c.Id = a.ClienteId
+       JOIN dbo.Usuario u ON u.Id = ft.UsuarioId WHERE ${filtro.where} ORDER BY ft.CriadoEm DESC, ft.Id DESC`, filtro.p,
+    ));
+    return true;
+  }
+  if ((m = path.match(/^\/fidelidade\/contas\/(\d+)\/ajustes$/)) && method === 'POST') {
+    if (!sessao.admin) throw new HttpError(403, 'Disponível apenas para administradores.');
+    const id = int(m[1], 'Conta');
+    const b = await req.body();
+    const delta = pontos(b.pontos);
+    const motivo = str(b.motivo, 400);
+    if (!motivo) throw new HttpError(400, 'Informe o motivo do ajuste de pontos.');
+    const key = chaveIdempotencia(b.idempotencyKey);
+    const result = await tx(async (run) => {
+      const [account] = await run(`SELECT Id, SaldoPontos FROM dbo.FidelidadeConta WITH (UPDLOCK, HOLDLOCK) WHERE Id = @id AND Ativo = 1`, { id });
+      if (!account) throw new HttpError(404, 'Conta de fidelidade não encontrada ou inativa.');
+      const [previous] = await run(`SELECT Id id, Pontos pontos, SaldoApos saldoApos, Motivo motivo FROM dbo.FidelidadeTransacao WHERE ContaId = @id AND IdempotencyKey = @key`, { id, key });
+      if (previous) {
+        if (Number(previous.pontos) !== delta || previous.motivo !== motivo) throw new HttpError(409, 'A chave de idempotência já foi usada para outro ajuste.');
+        return { ...previous, repetido: true };
+      }
+      const [updated] = await run(
+        `UPDATE dbo.FidelidadeConta SET SaldoPontos = SaldoPontos + @delta, AtualizadoEm = SYSDATETIME()
+         OUTPUT inserted.SaldoPontos saldoApos WHERE Id = @id AND SaldoPontos + @delta >= 0`, { id, delta },
+      );
+      if (!updated) throw new HttpError(409, 'O ajuste deixaria o saldo de pontos abaixo de zero.');
+      const [created] = await run(
+        `INSERT INTO dbo.FidelidadeTransacao (ContaId, Tipo, Pontos, SaldoApos, Motivo, IdempotencyKey, UsuarioId)
+         OUTPUT inserted.Id id VALUES (@id, 'ajuste', @delta, @saldo, @motivo, @key, @uid)`,
+        { id, delta, saldo: updated.saldoApos, motivo, key, uid: sessao.uid },
+      );
+      return { id: created.id, pontos: delta, saldoApos: updated.saldoApos, repetido: false };
+    });
+    send(result.repetido ? 200 : 201, result);
+    return true;
+  }
+
+  // ---------- parceiros e comissões
+  if (path === '/parceiros' && method === 'GET') {
+    const q = str(url.searchParams.get('q'), 100);
+    send(200, await query(
+      `SELECT TOP 2000 p.Id id, p.Nome nome, p.Documento documento, p.Contato contato, p.Telefone telefone, p.Email email,
+              p.ComissaoPercentual comissaoPercentual, p.Ativo ativo, CONVERT(varchar(16), p.CriadoEm, 126) criadoEm,
+              (SELECT COUNT(*) FROM dbo.ParceiroComissao pc WHERE pc.ParceiroId = p.Id) vendasIndicadas,
+              (SELECT TOP 1 v.Codigo FROM dbo.Voucher v WHERE v.ParceiroId = p.Id AND v.Ativo = 1 ORDER BY v.CriadoEm DESC, v.Id DESC) voucher,
+              ISNULL((SELECT SUM(CASE WHEN pc.Estado = 'pendente' THEN pc.ValorCentavos ELSE 0 END) FROM dbo.ParceiroComissao pc WHERE pc.ParceiroId = p.Id), 0) comissaoPendenteCentavos,
+              ISNULL((SELECT SUM(-pt.ValorCentavos) FROM dbo.ParceiroComissaoTransacao pt JOIN dbo.ParceiroComissao pc ON pc.Id = pt.ComissaoId WHERE pc.ParceiroId = p.Id AND pt.Tipo = 'pagamento'), 0) comissaoPagaCentavos,
+              ISNULL((SELECT SUM(pt.ValorCentavos) FROM dbo.ParceiroComissaoTransacao pt JOIN dbo.ParceiroComissao pc ON pc.Id = pt.ComissaoId WHERE pc.ParceiroId = p.Id), 0) comissaoSaldoCentavos
+       FROM dbo.Parceiro p ${q ? 'WHERE p.Nome COLLATE Latin1_General_CI_AI LIKE @q OR p.Documento LIKE @q' : ''} ORDER BY p.Nome`,
+      q ? { q: `%${q}%` } : {},
+    ));
+    return true;
+  }
+  if (path === '/parceiros' && method === 'POST') {
+    if (!sessao.admin) throw new HttpError(403, 'Disponível apenas para administradores.');
+    const b = await req.body();
+    const nome = str(b.nome, 150);
+    if (!nome) throw new HttpError(400, 'Informe o nome do parceiro.');
+    const rate = percentual(b.comissaoPercentual ?? b.comissao ?? 0);
+    const documento = str(b.documento, 30);
+    const fields = { nome, documento: documento ? (onlyDigits(documento) || documento).slice(0, 30) : null, contato: str(b.contato, 120), telefone: str(b.telefone, 40), email: str(b.email, 200), rate };
+    try {
+      const created = await one<{ id: number }>(
+        `INSERT INTO dbo.Parceiro (Nome, Documento, Contato, Telefone, Email, ComissaoPercentual)
+         OUTPUT inserted.Id id VALUES (@nome, @documento, @contato, @telefone, @email, @rate)`, fields,
+      );
+      send(201, { id: created!.id });
+    } catch (e) {
+      if (duplicateSql(e)) throw new HttpError(409, 'Já existe um parceiro com esse documento.');
+      throw e;
+    }
+    return true;
+  }
+  if ((m = path.match(/^\/parceiros\/(\d+)$/)) && method === 'GET') {
+    const id = int(m[1], 'Parceiro');
+    const p = await one(`SELECT Id id, Nome nome, Documento documento, Contato contato, Telefone telefone, Email email, ComissaoPercentual comissaoPercentual, Ativo ativo FROM dbo.Parceiro WHERE Id = @id`, { id });
+    if (!p) throw new HttpError(404, 'Parceiro não encontrado.');
+    send(200, p);
+    return true;
+  }
+  if ((m = path.match(/^\/parceiros\/(\d+)$/)) && method === 'PUT') {
+    if (!sessao.admin) throw new HttpError(403, 'Disponível apenas para administradores.');
+    const id = int(m[1], 'Parceiro');
+    const b = await req.body();
+    const vals: Record<string, unknown> = {};
+    if ('nome' in b) {
+      vals.Nome = str(b.nome, 150);
+      if (!vals.Nome) throw new HttpError(400, 'Informe o nome do parceiro.');
+    }
+    if ('documento' in b) { const d = str(b.documento, 30); vals.Documento = d ? (onlyDigits(d) || d).slice(0, 30) : null; }
+    if ('contato' in b) vals.Contato = str(b.contato, 120);
+    if ('telefone' in b) vals.Telefone = str(b.telefone, 40);
+    if ('email' in b) vals.Email = str(b.email, 200);
+    if ('comissaoPercentual' in b || 'comissao' in b) vals.ComissaoPercentual = percentual(b.comissaoPercentual ?? b.comissao);
+    if ('ativo' in b) vals.Ativo = bit(b.ativo);
+    if (!Object.keys(vals).length) throw new HttpError(400, 'Nenhum campo informado para alteração.');
+    try {
+      const changed = await query(`UPDATE dbo.Parceiro SET ${Object.keys(vals).map((c) => `${c} = @${c}`).join(', ')}, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { ...vals, id });
+      const found = await one<{ id: number }>(`SELECT Id id FROM dbo.Parceiro WHERE Id = @id`, { id });
+      if (!found) throw new HttpError(404, 'Parceiro não encontrado.');
+      if ('Ativo' in vals && vals.Ativo === 0) await query(`UPDATE dbo.Voucher SET Ativo = 0 WHERE ParceiroId = @id`, { id });
+      void changed;
+    } catch (e) {
+      if (e instanceof HttpError) throw e;
+      if (duplicateSql(e)) throw new HttpError(409, 'Já existe um parceiro com esse documento.');
+      throw e;
+    }
+    send(200, { id });
+    return true;
+  }
+  if ((m = path.match(/^\/parceiros\/(\d+)$/)) && method === 'DELETE') {
+    if (!sessao.admin) throw new HttpError(403, 'Disponível apenas para administradores.');
+    const id = int(m[1], 'Parceiro');
+    const changed = await query(`UPDATE dbo.Parceiro SET Ativo = 0, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { id });
+    const found = await one<{ id: number }>(`SELECT Id id FROM dbo.Parceiro WHERE Id = @id`, { id });
+    if (!found) throw new HttpError(404, 'Parceiro não encontrado.');
+    await query(`UPDATE dbo.Voucher SET Ativo = 0 WHERE ParceiroId = @id`, { id });
+    void changed;
+    send(200, { ok: true, desativado: true });
+    return true;
+  }
+  if (path === '/parceiros/comissoes' && method === 'GET') {
+    const status = url.searchParams.get('status') || 'todas';
+    if (!['todas', 'pendentes', 'pagas', 'estornadas'].includes(status)) throw new HttpError(400, 'Filtro de situação inválido.');
+    const where = status === 'todas' ? '' : `WHERE pc.Estado = @estado`;
+    const filtro = periodo(url, status === 'pagas' ? 'COALESCE(ultima.CriadaEm, pc.CriadaEm)' : 'pc.CriadaEm');
+    const whereSql = [where.replace(/^WHERE\s*/, ''), filtro.where].filter(Boolean).join(' AND ');
+    const partnerId = url.searchParams.get('parceiroId');
+    const params = { ...filtro.p, ...(status === 'todas' ? {} : { estado: status === 'pagas' ? 'paga' : status === 'estornadas' ? 'estornada' : 'pendente' }), ...(partnerId ? { parceiroId: int(partnerId, 'Parceiro') } : {}) };
+    send(200, await query(
+      `SELECT TOP 5000 pc.Id id, pc.ParceiroId parceiroId, p.Nome parceiro, pc.VendaId vendaId,
+              CONVERT(varchar(16), pc.CriadaEm, 126) data, c.Nome cliente, pc.BaseCentavos valorVendaCentavos,
+              pc.Percentual percentual, pc.ValorCentavos comissaoCentavos, pc.Estado situacao,
+              ISNULL((SELECT SUM(CASE WHEN t.Tipo = 'acumulada' THEN t.ValorCentavos ELSE 0 END) FROM dbo.ParceiroComissaoTransacao t WHERE t.ComissaoId = pc.Id), 0) acumuladoCentavos,
+              ISNULL((SELECT -SUM(CASE WHEN t.Tipo IN ('pagamento', 'estorno_pagamento') THEN t.ValorCentavos ELSE 0 END) FROM dbo.ParceiroComissaoTransacao t WHERE t.ComissaoId = pc.Id), 0) pagoCentavos,
+              ISNULL((SELECT SUM(t.ValorCentavos) FROM dbo.ParceiroComissaoTransacao t WHERE t.ComissaoId = pc.Id), 0) saldoCentavos,
+              ultima.FormaPagamentoId formaPagamentoId, ultima.formaPagamento metodoPagamento, ultima.dataHora pagoEm
+       FROM dbo.ParceiroComissao pc JOIN dbo.Parceiro p ON p.Id = pc.ParceiroId JOIN dbo.Venda v ON v.Id = pc.VendaId
+       LEFT JOIN dbo.Cliente c ON c.Id = v.ClienteId
+       OUTER APPLY (SELECT TOP 1 t.FormaPagamentoId, f.Nome formaPagamento, t.CriadaEm, CONVERT(varchar(16), t.CriadaEm, 126) dataHora
+                    FROM dbo.ParceiroComissaoTransacao t LEFT JOIN dbo.FormaPagamento f ON f.Id = t.FormaPagamentoId
+                    WHERE t.ComissaoId = pc.Id AND t.Tipo IN ('pagamento', 'estorno_pagamento') ORDER BY t.CriadaEm DESC, t.Id DESC) ultima
+       WHERE ${whereSql}${partnerId ? ' AND pc.ParceiroId = @parceiroId' : ''} ORDER BY pc.CriadaEm DESC, pc.Id DESC`, params,
+    ));
+    return true;
+  }
+  if ((m = path.match(/^\/parceiros\/comissoes\/(\d+)\/transacoes$/)) && method === 'GET') {
+    const id = int(m[1], 'Comissão');
+    const found = await one<{ id: number }>(`SELECT Id id FROM dbo.ParceiroComissao WHERE Id = @id`, { id });
+    if (!found) throw new HttpError(404, 'Comissão não encontrada.');
+    send(200, await query(
+      `SELECT t.Id id, CONVERT(varchar(16), t.CriadaEm, 126) dataHora, t.Tipo tipo, t.ValorCentavos valorCentavos,
+              t.Motivo motivo, f.Nome formaPagamento, u.Nome usuario
+       FROM dbo.ParceiroComissaoTransacao t LEFT JOIN dbo.FormaPagamento f ON f.Id = t.FormaPagamentoId
+       LEFT JOIN dbo.Usuario u ON u.Id = t.UsuarioId WHERE t.ComissaoId = @id ORDER BY t.CriadaEm DESC, t.Id DESC`, { id },
+    ));
+    return true;
+  }
+  if ((m = path.match(/^\/parceiros\/comissoes\/(\d+)\/(pagar|estornar)$/)) && method === 'POST') {
+    if (!sessao.admin) throw new HttpError(403, 'Disponível apenas para administradores.');
+    const id = int(m[1], 'Comissão');
+    const action = m[2];
+    const b = await req.body();
+    const key = chaveIdempotencia(b.idempotencyKey);
+    const formaPagamentoId = int(b.formaPagamentoId, 'Forma de pagamento');
+    const forma = await one<{ id: number }>(`SELECT Id id FROM dbo.FormaPagamento WHERE Id = @id AND Ativo = 1`, { id: formaPagamentoId });
+    if (!forma) throw new HttpError(400, 'Forma de pagamento inválida.');
+    const motivo = action === 'estornar' ? str(b.motivo, 400) : 'Pagamento de comissão';
+    if (!motivo) throw new HttpError(400, 'Informe o motivo do estorno da comissão.');
+    const result = await tx(async (run) => {
+      const [comissao] = await run(`SELECT Id, ValorCentavos, Estado FROM dbo.ParceiroComissao WITH (UPDLOCK, HOLDLOCK) WHERE Id = @id`, { id });
+      if (!comissao) throw new HttpError(404, 'Comissão não encontrada.');
+      const expectedType = action === 'pagar' ? 'pagamento' : 'estorno_pagamento';
+      const [previous] = await run(`SELECT Id id, Tipo tipo, Motivo motivo, FormaPagamentoId formaPagamentoId FROM dbo.ParceiroComissaoTransacao WHERE ComissaoId = @id AND IdempotencyKey = @key`, { id, key });
+      if (previous) {
+        if (previous.tipo !== expectedType || previous.motivo !== motivo || Number(previous.formaPagamentoId) !== formaPagamentoId) throw new HttpError(409, 'A chave de idempotência já foi usada para outra ação.');
+        return { id, estado: comissao.Estado, repetido: true };
+      }
+      if (action === 'pagar' && comissao.Estado !== 'pendente') throw new HttpError(409, 'Somente comissões pendentes podem ser pagas.');
+      if (action === 'estornar' && comissao.Estado !== 'paga') throw new HttpError(409, 'Somente pagamentos realizados podem ser estornados.');
+      const tipo = expectedType;
+      const valor = action === 'pagar' ? -Number(comissao.ValorCentavos) : Number(comissao.ValorCentavos);
+      await run(
+        `INSERT INTO dbo.ParceiroComissaoTransacao (ComissaoId, Tipo, ValorCentavos, Motivo, IdempotencyKey, FormaPagamentoId, UsuarioId)
+         VALUES (@id, @tipo, @valor, @motivo, @key, @formaPagamentoId, @uid)`, { id, tipo, valor, motivo, key, formaPagamentoId, uid: sessao.uid },
+      );
+      const estado = action === 'pagar' ? 'paga' : 'pendente';
+      await run(`UPDATE dbo.ParceiroComissao SET Estado = @estado, AtualizadaEm = SYSDATETIME() WHERE Id = @id`, { id, estado });
+      return { id, estado, repetido: false };
+    });
+    send(result.repetido ? 200 : 201, result);
+    return true;
+  }
 
   // ---------- listas da arvore
   if (path === '/reservas' && method === 'GET') {
@@ -533,10 +969,12 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     send(
       200,
       await query(
-        `SELECT v.Id id, v.Codigo codigo, v.Origem origem, v.Referencia referencia, v.Tipo tipo, v.Valor valor, CONVERT(varchar(10), v.InicioEm, 126) inicio,
+        `SELECT v.Id id, v.Codigo codigo, v.Origem origem, v.Referencia referencia, v.ParceiroId parceiroId, ppar.Nome parceiro,
+                v.FidelidadeContaId fidelidadeContaId, c.Nome conta, v.Tipo tipo, v.Valor valor, CONVERT(varchar(10), v.InicioEm, 126) inicio,
                 CONVERT(varchar(10), v.FimEm, 126) fim, p.Nome produto, v.UsoMaxCliente usoMaxCliente, v.UsoUnico usoUnico, v.PedidoMinimoCentavos pedidoMinimo,
                 v.DescontoMaximoCentavos descontoMaximo, v.Ativo ativo, (SELECT COUNT(*) FROM dbo.VoucherUso u WHERE u.VoucherId = v.Id AND u.Estornado = 0) usos
-         FROM dbo.Voucher v LEFT JOIN dbo.Produto p ON p.Id = v.ProdutoId ORDER BY v.Id DESC`,
+         FROM dbo.Voucher v LEFT JOIN dbo.Produto p ON p.Id = v.ProdutoId LEFT JOIN dbo.Parceiro ppar ON ppar.Id = v.ParceiroId
+         LEFT JOIN dbo.FidelidadeConta fc ON fc.Id = v.FidelidadeContaId LEFT JOIN dbo.Cliente c ON c.Id = fc.ClienteId ORDER BY v.Id DESC`,
       ),
     );
     return true;
@@ -551,31 +989,102 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     );
     return true;
   }
+  if ((m = path.match(/^\/vouchers\/(\d+)$/)) && method === 'GET') {
+    const id = int(m[1], 'Voucher');
+    const v = await one(
+      `SELECT v.Id id, v.Codigo codigo, v.Origem origem, v.Referencia referencia, v.ParceiroId parceiroId, v.FidelidadeContaId fidelidadeContaId,
+              v.Tipo tipo, v.Valor valor, CONVERT(varchar(10), v.InicioEm, 126) inicio, CONVERT(varchar(10), v.FimEm, 126) fim,
+              v.ProdutoId produtoId, v.UsoMaxCliente usoMaxCliente, v.UsoUnico usoUnico, v.PedidoMinimoCentavos pedidoMinimo,
+              v.DescontoMaximoCentavos descontoMaximo, v.Ativo ativo,
+              (SELECT COUNT(*) FROM dbo.VoucherUso u WHERE u.VoucherId = v.Id AND u.Estornado = 0) usos
+       FROM dbo.Voucher v WHERE v.Id = @id`, { id },
+    );
+    if (!v) throw new HttpError(404, 'Voucher não encontrado.');
+    send(200, v);
+    return true;
+  }
   if (path === '/vouchers' && method === 'POST') {
     const b = await req.body();
     const codigo = (str(b.codigo, 40) ?? '').toUpperCase();
     if (!codigo) throw new HttpError(400, 'Informe ou gere o código.');
+    const origem = ['fidelidade', 'parceiro'].includes(String(b.origem)) ? String(b.origem) : 'manual';
+    const links = await voucherLinks(origem, b);
     const tipo = b.tipo === 'valor' ? 'valor' : 'percentual';
     const valor = tipo === 'valor' ? cents(b.valor) : int(b.valor, 'Valor');
     if (tipo === 'percentual' && valor > 100) throw new HttpError(400, 'Percentual acima de 100.');
+    const inicio = isoDate(b.inicio);
+    const fim = isoDate(b.fim);
+    if (inicio > fim) throw new HttpError(400, 'A data final deve ser igual ou posterior à data inicial.');
     const r = await one<{ id: number }>(
-      `INSERT INTO dbo.Voucher (Codigo, Origem, Referencia, Tipo, Valor, InicioEm, FimEm, ProdutoId, UsoMaxCliente, UsoUnico, PedidoMinimoCentavos, DescontoMaximoCentavos)
-       OUTPUT inserted.Id id VALUES (@codigo, @origem, @ref, @tipo, @valor, @ini, @fim, @prod, @usoMax, @unico, @min, @max)`,
+      `INSERT INTO dbo.Voucher (Codigo, Origem, Referencia, ParceiroId, FidelidadeContaId, Tipo, Valor, InicioEm, FimEm, ProdutoId, UsoMaxCliente, UsoUnico, PedidoMinimoCentavos, DescontoMaximoCentavos)
+       OUTPUT inserted.Id id VALUES (@codigo, @origem, @ref, @parceiroId, @fidelidadeContaId, @tipo, @valor, @ini, @fim, @prod, @usoMax, @unico, @min, @max)`,
       {
-        codigo, origem: ['fidelidade', 'parceiro'].includes(String(b.origem)) ? b.origem : 'manual', ref: str(b.referencia, 150), tipo, valor,
-        ini: isoDate(b.inicio), fim: isoDate(b.fim), prod: b.produtoId ? int(b.produtoId, 'Produto') : null, usoMax: int(b.usoMaxCliente ?? 1, 'Uso máx/cliente'),
+        codigo, origem, ref: links.referencia, parceiroId: links.parceiroId, fidelidadeContaId: links.fidelidadeContaId, tipo, valor,
+        ini: inicio, fim, prod: b.produtoId ? int(b.produtoId, 'Produto') : null, usoMax: int(b.usoMaxCliente ?? 1, 'Uso máx/cliente'),
         unico: b.usoUnico ? 1 : 0, min: b.pedidoMinimo ? cents(b.pedidoMinimo) : null, max: b.descontoMaximo ? cents(b.descontoMaximo) : null,
       },
     ).catch((e: Error) => {
-      if (/UNIQUE|duplicate/i.test(e.message)) throw new HttpError(409, 'Já existe um voucher com esse código.');
+      if (duplicateSql(e)) throw new HttpError(409, 'Já existe um voucher com esse código.');
       throw e;
     });
     send(201, r);
     return true;
   }
+  if ((m = path.match(/^\/vouchers\/(\d+)$/)) && method === 'PUT') {
+    const id = int(m[1], 'Voucher');
+    const b = await req.body();
+    const current = await one<Record<string, unknown>>(
+      `SELECT Id, Origem, Referencia, ParceiroId, FidelidadeContaId, Tipo, Valor,
+              CONVERT(varchar(10), InicioEm, 126) InicioEm, CONVERT(varchar(10), FimEm, 126) FimEm
+       FROM dbo.Voucher WHERE Id = @id`, { id },
+    );
+    if (!current) throw new HttpError(404, 'Voucher não encontrado.');
+    const origem = 'origem' in b ? (['fidelidade', 'parceiro'].includes(String(b.origem)) ? String(b.origem) : 'manual') : String(current.Origem);
+    const links = await voucherLinks(origem, { ...b, referencia: 'referencia' in b ? b.referencia : current.Referencia },
+      { parceiroId: Number(current.ParceiroId) || null, fidelidadeContaId: Number(current.FidelidadeContaId) || null });
+    const vals: Record<string, unknown> = { Origem: origem, Referencia: links.referencia, ParceiroId: links.parceiroId, FidelidadeContaId: links.fidelidadeContaId };
+    if ('codigo' in b) { const codigo = str(b.codigo, 40); if (!codigo) throw new HttpError(400, 'Informe o código.'); vals.Codigo = codigo.toUpperCase(); }
+    if ('tipo' in b) vals.Tipo = b.tipo === 'valor' ? 'valor' : 'percentual';
+    if ('valor' in b || 'tipo' in b) {
+      const tipo = String(vals.Tipo ?? current.Tipo);
+      const valor = tipo === 'valor' ? cents(b.valor ?? current.Valor) : int(b.valor ?? current.Valor, 'Valor');
+      if (tipo === 'percentual' && valor > 100) throw new HttpError(400, 'Percentual acima de 100.');
+      vals.Valor = valor;
+    }
+    if ('inicio' in b) vals.InicioEm = isoDate(b.inicio);
+    if ('fim' in b) vals.FimEm = isoDate(b.fim);
+    if ('produtoId' in b) vals.ProdutoId = b.produtoId ? int(b.produtoId, 'Produto') : null;
+    if ('usoMaxCliente' in b) vals.UsoMaxCliente = int(b.usoMaxCliente, 'Uso máx/cliente');
+    if ('usoUnico' in b) vals.UsoUnico = bit(b.usoUnico);
+    if ('pedidoMinimo' in b) vals.PedidoMinimoCentavos = b.pedidoMinimo ? cents(b.pedidoMinimo) : null;
+    if ('descontoMaximo' in b) vals.DescontoMaximoCentavos = b.descontoMaximo ? cents(b.descontoMaximo) : null;
+    if ('ativo' in b) vals.Ativo = bit(b.ativo);
+    const inicio = String(vals.InicioEm ?? current.InicioEm);
+    const fim = String(vals.FimEm ?? current.FimEm);
+    if (inicio > fim) throw new HttpError(400, 'A data final deve ser igual ou posterior à data inicial.');
+    try {
+      await query(`UPDATE dbo.Voucher SET ${Object.keys(vals).map((c) => `${c} = @${c}`).join(', ')} WHERE Id = @id`, { ...vals, id });
+    } catch (e) {
+      if (duplicateSql(e)) throw new HttpError(409, 'Já existe um voucher com esse código.');
+      throw e;
+    }
+    send(200, { id, ok: true });
+    return true;
+  }
+  if ((m = path.match(/^\/vouchers\/(\d+)$/)) && method === 'DELETE') {
+    const id = int(m[1], 'Voucher');
+    const exists = await one<{ id: number }>(`SELECT Id id FROM dbo.Voucher WHERE Id = @id`, { id });
+    if (!exists) throw new HttpError(404, 'Voucher não encontrado.');
+    await query(`UPDATE dbo.Voucher SET Ativo = 0 WHERE Id = @id`, { id });
+    send(200, { id, ok: true, desativado: true });
+    return true;
+  }
   if (path === '/vouchers/validar' && method === 'GET') {
     const v = await one<Record<string, unknown>>(
-      `SELECT v.*, p.Nome produto FROM dbo.Voucher v LEFT JOIN dbo.Produto p ON p.Id = v.ProdutoId WHERE v.Codigo = @c AND v.Ativo = 1 AND CAST(SYSDATETIME() AS date) BETWEEN v.InicioEm AND v.FimEm`,
+      `SELECT v.*, p.Nome produto FROM dbo.Voucher v LEFT JOIN dbo.Produto p ON p.Id = v.ProdutoId
+       LEFT JOIN dbo.Parceiro pr ON pr.Id = v.ParceiroId LEFT JOIN dbo.FidelidadeConta fc ON fc.Id = v.FidelidadeContaId
+       WHERE v.Codigo = @c AND v.Ativo = 1 AND CAST(SYSDATETIME() AS date) BETWEEN v.InicioEm AND v.FimEm
+         AND (v.ParceiroId IS NULL OR pr.Ativo = 1) AND (v.FidelidadeContaId IS NULL OR fc.Ativo = 1)`,
       { c: (url.searchParams.get('codigo') || '').toUpperCase() },
     );
     if (!v) throw new HttpError(404, 'Voucher não encontrado ou expirado.');
@@ -760,22 +1269,25 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const destino = int((await req.body()).bateriaId, 'Bateria');
     await tx(async (run) => {
       const [r] = await run(
-        `SELECT i.ClienteId, i.BateriaId, i.Pago, ISNULL(i.PrecoCentavos, po.PrecoCentavos) preco FROM dbo.Inscricao i JOIN dbo.Bateria b ON b.Id = i.BateriaId
+        `SELECT i.ClienteId, i.BateriaId, i.Pago, i.Status, ISNULL(i.PrecoCentavos, po.PrecoCentavos) preco FROM dbo.Inscricao i WITH (UPDLOCK, HOLDLOCK) JOIN dbo.Bateria b ON b.Id = i.BateriaId
          LEFT JOIN dbo.Produto po ON po.Id = b.ProdutoId WHERE i.Id = @id`,
         { id },
       );
       if (!r) throw new HttpError(404, 'Reserva não encontrada.');
+      if (r.Status === 'cancelada') throw new HttpError(409, 'Cannot move a cancelled reservation.');
+      if (Number(r.BateriaId) === destino) return;
       const [d] = await run(
         `SELECT b.Status, b.Vagas, p.PrecoCentavos preco, (SELECT COUNT(*) FROM dbo.Inscricao x WITH (UPDLOCK, HOLDLOCK) WHERE x.BateriaId = b.Id AND x.Status <> 'cancelada') ocupadas
-         FROM dbo.Bateria b LEFT JOIN dbo.Produto p ON p.Id = b.ProdutoId WHERE b.Id = @destino`,
+         FROM dbo.Bateria b WITH (UPDLOCK, HOLDLOCK) LEFT JOIN dbo.Produto p ON p.Id = b.ProdutoId WHERE b.Id = @destino`,
         { destino },
       );
       if (!d || d.Status === 'cancelada') throw new HttpError(404, 'Bateria destino não encontrada.');
       if (r.Pago && d.preco !== r.preco) throw new HttpError(409, 'O preço das baterias deve ser igual.');
       if ((d.ocupadas as number) >= (d.Vagas as number)) throw new HttpError(409, 'Não há vagas disponíveis.');
+      if (d.Status !== 'aberta') throw new HttpError(409, 'Destination battery is unavailable.');
       const [dup] = await run(`SELECT 1 x FROM dbo.Inscricao WHERE BateriaId = @destino AND ClienteId = @c AND Status <> 'cancelada'`, { destino, c: r.ClienteId });
       if (dup) throw new HttpError(409, 'Já existe uma reserva para este cliente na bateria selecionada.');
-      await run(`UPDATE dbo.Inscricao SET BateriaId = @destino, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { destino, id });
+      await run(`UPDATE dbo.Inscricao SET BateriaId = @destino, TermoImpressoEm = NULL, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { destino, id });
     });
     send(200, { mensagem: 'Cliente movido com sucesso.' });
     return true;
@@ -998,8 +1510,13 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   }
   if ((m = path.match(/^\/senha$/)) && method === 'POST') {
     const b = await req.body();
+    const atual = String(b.senhaAtual ?? '');
     const nova = String(b.nova ?? '');
-    if (nova.length < 6) throw new HttpError(400, 'A senha precisa ter pelo menos 6 caracteres.');
+    if (nova.length < 8) throw new HttpError(400, 'A senha precisa ter pelo menos 8 caracteres.');
+    if (!atual) throw new HttpError(400, 'Informe sua senha atual.');
+    const u = await one<{ hash: string; ativo: boolean }>(`SELECT SenhaHash hash, Ativo ativo FROM dbo.Usuario WHERE Id = @id`, { id: sessao.uid });
+    if (!u || !u.ativo) throw new HttpError(401, 'Usuário não encontrado ou inativo.');
+    if (!confereSenha(atual, u.hash)) throw new HttpError(403, 'A senha atual está incorreta.');
     await query(`UPDATE dbo.Usuario SET SenhaHash = @h WHERE Id = @id`, { h: hashSenha(nova), id: sessao.uid });
     send(200, { mensagem: 'Senha alterada.' });
     return true;

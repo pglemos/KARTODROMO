@@ -1,3 +1,4 @@
+using System.Drawing.Drawing2D;
 using System.Text.Json.Nodes;
 using Kartodromo.Comum;
 
@@ -20,90 +21,26 @@ public static class Caixa
 
     static bool Abrir(IWin32Window dono, JsonObject c)
     {
-        using var j = new Janela("Terminal", 380, 170);
-        var turno = Campos.Combo(); turno.Items.AddRange(((JsonArray)c["turnos"]).OfType<JsonObject>().Select(t => new Campos.Item(t.L("id") ?? 0, t.S("descricao"))).ToArray());
-        var term = Campos.Combo(); term.Items.AddRange(((JsonArray)c["terminais"]).OfType<JsonObject>().Select(t => new Campos.Item(t.L("id") ?? 0, t.S("nome"))).ToArray());
-        if (turno.Items.Count == 1) turno.SelectedIndex = 0;
-        var sup = new TextBox { Text = "0" };
-        var t = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Padding = new Padding(10) };
-        t.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        void L(string r, Control ctl) { t.Controls.Add(new Label { Text = r, AutoSize = true, Margin = new Padding(3, 7, 3, 3) }); ctl.Dock = DockStyle.Fill; t.Controls.Add(ctl); }
-        L("Usuário:", new Label { Text = Sessao.Nome, Font = new Font("Segoe UI", 13F, FontStyle.Bold), AutoSize = true });
-        L("Turnos Disponíveis:", turno); L("Terminais Disponíveis:", term); L("Suprimento Inicial (R$):", sup);
-        j.Controls.Add(t);
-        var ok = false;
-        j.Rodape(("Abrir Terminal", (_, _) => Seguro.Rodar(j, async () =>
-        {
-            if (Campos.IdDe(turno) is not long tu) { Msg.Aviso(j, "Selecione o turno que será aberto o terminal."); return; }
-            if (Campos.IdDe(term) is not long te) { Msg.Aviso(j, "Selecione um terminal para abrir."); return; }
-            if (Fmt.Centavos(sup.Text) is not long v) { Msg.Aviso(j, "Valor inválido."); return; }
-            var r = await Api.Post("/api/office/caixa/abrir", new { turnoId = tu, terminalId = te, inicialCentavos = v });
-            Msg.Info(j, r.S("mensagem"));
-            ok = true; j.Close();
-        }), true));
+        using var j = new FormTerminalAbrir(c);
         j.ShowDialog(dono);
-        return ok;
+        return j.Concluido;
     }
 
     public static void Terminal(FormPrincipal f) => Seguro.Rodar(f, async () =>
     {
         var c = (await Api.Get("/api/office/caixa")).AsObject();
         if (c["aberto"] is not JsonObject ab) { if (Abrir(f, c)) f.Recarregar(); return; }
-        var s = c["sumario"];
-        using var j = new Janela("Terminal", 440, 520);
-        var t = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Padding = new Padding(12), AutoScroll = true };
-        t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60)); t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40));
-        void Linha(string r, string v, Color? cor = null, float tam = 12F) { t.Controls.Add(new Label { Text = r, AutoSize = true, Margin = new Padding(3, 6, 3, 2) }); t.Controls.Add(new Label { Text = v, AutoSize = true, Font = new Font("Segoe UI", tam, FontStyle.Bold), ForeColor = cor ?? Color.Black, Anchor = AnchorStyles.Right }); }
-        Linha("Usuário:", Sessao.Nome, null, 11F); Linha("Terminal:", ab.S("terminal"), null, 11F); Linha("Abertura:", Fmt.DmyHm(ab.S("abertoEm")), null, 11F);
-        t.Controls.Add(new Label { Text = "Sumário", Font = Tema.Negrito, AutoSize = true, Margin = new Padding(3, 12, 3, 2) }); t.Controls.Add(new Label());
-        foreach (var (r, k) in new[] { ("Total de Início do Turno:", "inicial"), ("Total de Suprimento:", "suprimento"), ("Total de Sangria:", "sangria"), ("Total de Vendas de Produtos:", "vendasProdutos"),
-            ("Total de Vendas:", "vendas"), ("Total de Desconto Fornecido:", "desconto"), ("Total de Acréscimos:", "acrescimos"), ("Total Recebido:", "recebido"), ("Total de Troco Fornecido:", "troco"), ("Total Cancelado:", "cancelado") })
-            Linha(r, Fmt.Brl(s.L(k)));
-        Linha("Total Final:", Fmt.Brl(s.L("final")), Tema.Verde);
-        Linha("Dinheiro em caixa (gaveta):", Fmt.Brl(s.L("dinheiroEmCaixa")), Tema.Cinza, 10F);
-        var prox = new TextBox { Text = "0", Width = 120 };
-        var gerar = new Button { Text = "Gerar Relatório", AutoSize = true };
-        gerar.Click += (_, _) => Relatorio.Abrir(f, Api.UrlComToken("/relatorio/fechamento?mov=" + ab.S("id")), "Fechamento de Caixa");
-        t.Controls.Add(new Label()); t.Controls.Add(gerar);
-        t.Controls.Add(new Label { Text = "Valor para o Próximo Turno:", AutoSize = true, Margin = new Padding(3, 8, 3, 2) }); t.Controls.Add(prox);
-        j.Controls.Add(t);
-        j.Rodape(("Cancelar", (_, _) => j.Close(), false), ("Fechar Terminal", (_, _) => Seguro.Rodar(j, async () =>
-        {
-            if (Fmt.Centavos(prox.Text) is not long v) { Msg.Aviso(j, "Valor inválido."); return; }
-            if (!Msg.Pergunta(j, "Deseja fechar o terminal?")) return;
-            var r = await Api.Post("/api/office/caixa/fechar", new { proximoTurnoCentavos = v });
-            Msg.Info(j, r.S("mensagem"));
-            j.Close();
-            Relatorio.Abrir(f, Api.UrlComToken("/relatorio/fechamento?mov=" + r.S("id")), "Fechamento de Caixa");
-        }), false));
+        var s = c["sumario"]?.AsObject() ?? new JsonObject();
+        using var j = new FormTerminalFechar(ab, s);
         j.ShowDialog(f);
+        if (j.Concluido) Relatorio.Abrir(f, Api.UrlComToken("/relatorio/fechamento?mov=" + j.MovimentoId), "Fechamento de Caixa");
     });
 
     public static void Transacao(Form f, string tipo) => Seguro.Rodar(f, async () =>
     {
         var c = await Garantir(f);
         if (c == null) return;
-        var ab = c["aberto"];
-        using var j = new Janela(tipo == "sangria" ? "Registrar Sangria" : "Registrar Suprimento", 320, 330);
-        var t = new TableLayoutPanel { Dock = DockStyle.Top, ColumnCount = 2, Padding = new Padding(10), AutoSize = true };
-        t.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110)); t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        void L(string r, string v, Color? cor = null) { t.Controls.Add(new Label { Text = r, AutoSize = true, Margin = new Padding(3, 7, 3, 3) }); t.Controls.Add(new Label { Text = v, AutoSize = true, Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = cor ?? Color.Black }); }
-        L("Usuário:", Sessao.Nome); L("Terminal ativo:", ab.S("terminal")); L("Quantia em caixa:", Fmt.Brl(c["sumario"].L("dinheiroEmCaixa")), Tema.Verde);
-        var gb = new GroupBox { Text = "Nova Transação", Dock = DockStyle.Fill, Padding = new Padding(8) };
-        var valor = new TextBox { Dock = DockStyle.Top };
-        var obs = new TextBox { Multiline = true, Dock = DockStyle.Fill };
-        gb.Controls.Add(obs); gb.Controls.Add(new Label { Text = "Observações:", Dock = DockStyle.Top, Height = 20 }); gb.Controls.Add(valor); gb.Controls.Add(new Label { Text = "Valor (R$):", Dock = DockStyle.Top, Height = 18 });
-        j.Controls.Add(new Panel { Dock = DockStyle.Fill, Padding = new Padding(10, 0, 10, 0), Controls = { gb } });
-        j.Controls.Add(t);
-        j.Rodape(("Cancelar", (_, _) => j.Close(), false), ("Registrar Transação", (_, _) => Seguro.Rodar(j, async () =>
-        {
-            if (Fmt.Centavos(valor.Text) is not long v || v <= 0) { Msg.Aviso(j, "Informe o valor."); return; }
-            if (string.IsNullOrWhiteSpace(obs.Text)) { Msg.Aviso(j, "Informe a justificativa desta transação.", "Aviso"); return; }
-            var r = await Api.Post("/api/office/caixa/transacao", new { tipo, valorCentavos = v, observacao = obs.Text.Trim() });
-            Msg.Info(j, r.S("mensagem"));
-            j.Close();
-        }), true));
-        j.Shown += (_, _) => valor.Focus();
+        using var j = new FormCaixaTransacao(tipo, c);
         j.ShowDialog(f);
     });
 
@@ -145,11 +82,11 @@ public class FormCheckout : Janela
     readonly TextBox _obs = new() { Multiline = true, Height = 44, Dock = DockStyle.Fill }, _valor = new() { Width = 110 }, _codVoucher = new() { Width = 140, PlaceholderText = "Codigo do Voucher" };
     readonly Grade _gDisp = new(true), _gCar = new(), _gPag = new();
     readonly Dictionary<string, Label> _tot = [];
+    readonly Label _falta = new() { AutoSize = true, ForeColor = Color.FromArgb(110, 110, 115) };
 
     public FormCheckout(JsonObject terminal, long? bateriaId, List<long> reservaIds, long? clienteId)
-        : base(reservaIds.Count > 0 ? "Aprovar Reserva" : "Receita Avulsa", 1340, 700, true)
+        : base(reservaIds.Count > 0 ? "Aprovar Reserva" : "Receita Avulsa", 1320, 812, true)
     {
-        WindowState = FormWindowState.Maximized;
         // ---------- direita: totais
         var dir = new Panel { Dock = DockStyle.Right, Width = 240, Padding = new Padding(8) };
         var totais = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
@@ -218,6 +155,7 @@ public class FormCheckout : Janela
 
         Controls.Add(esq);
         Controls.Add(dir);
+        MontarLayoutCartoes(terminal);
         _bat.SelectedIndexChanged += (_, _) => CarregarDisponiveis();
         Load += (_, _) => Seguro.Rodar(this, async () =>
         {
@@ -234,6 +172,197 @@ public class FormCheckout : Janela
             else _bat.SelectedIndex = 0;
             Atualizar();
         });
+    }
+
+    void MontarLayoutCartoes(JsonObject terminal)
+    {
+        var fundo = Color.FromArgb(245, 245, 247);
+        var texto = Color.FromArgb(29, 29, 31);
+        var secundario = Color.FromArgb(110, 110, 115);
+        var oldRoots = Controls.Cast<Control>().ToArray();
+        Controls.Clear(); BackColor = fundo;
+
+        var resumo = new Panel { Dock = DockStyle.Right, Width = 300, BackColor = Color.FromArgb(25, 25, 27), Padding = new Padding(18, 12, 18, 16) };
+        resumo.Paint += (_, e) =>
+        {
+            using var b = new LinearGradientBrush(resumo.ClientRectangle, Color.FromArgb(28, 28, 30), Color.FromArgb(11, 11, 12), 90f);
+            e.Graphics.FillRectangle(b, resumo.ClientRectangle);
+        };
+        var resumoLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, BackColor = Color.Transparent, Padding = new Padding(0) };
+        resumoLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36)); resumoLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        resumoLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 110)); resumoLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 112));
+        var fechar = new Label { Text = "Resumo da venda", Dock = DockStyle.Fill, ForeColor = Color.White, Font = new Font("Segoe UI", 11F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft, BackColor = Color.Transparent };
+        var rodapeResumo = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
+        var aprovar = new Button { Text = "Aprovar pagamento", Dock = DockStyle.Top, Height = 56, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(35, 176, 81), ForeColor = Color.White, Font = new Font("Segoe UI", 12F, FontStyle.Bold), Cursor = Cursors.Hand };
+        aprovar.FlatAppearance.BorderSize = 0; aprovar.Click += (_, _) => Aprovar();
+        rodapeResumo.Controls.Add(aprovar);
+        rodapeResumo.Controls.Add(new Label { Text = "F12 aprova e imprime o recibo se configurado", Dock = DockStyle.Bottom, Height = 42, ForeColor = Color.FromArgb(150, 150, 155), TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI", 8F) });
+        var trocoCard = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(31, 68, 45), Padding = new Padding(14, 12, 12, 10), Margin = new Padding(0, 0, 0, 10) };
+        Arredondar(trocoCard, 16);
+        trocoCard.Controls.Add(new Label { Text = "Troco", Dock = DockStyle.Top, Height = 22, ForeColor = Color.FromArgb(167, 240, 186), Font = new Font("Segoe UI", 9F) });
+        _tot["tro"].Dock = DockStyle.Fill; _tot["tro"].TextAlign = ContentAlignment.MiddleLeft; _tot["tro"].Font = new Font("Segoe UI", 24F, FontStyle.Bold); _tot["tro"].ForeColor = Color.White; _tot["tro"].BackColor = Color.Transparent;
+        trocoCard.Controls.Add(_tot["tro"]); _tot["tro"].BringToFront();
+        var linhasResumo = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, BackColor = Color.Transparent, Padding = new Padding(0, 12, 0, 10) };
+        for (var i = 0; i < 5; i++) linhasResumo.RowStyles.Add(new RowStyle(SizeType.Percent, 20));
+        var descricoes = new[] { ("tot", "Total"), ("des", "Desconto"), ("acr", "Acréscimo"), ("sub", "Subtotal"), ("rec", "Valor recebido") };
+        foreach (var (key, label) in descricoes)
+        {
+            var row = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
+            var l = new Label { Text = label, Dock = DockStyle.Left, Width = 112, ForeColor = Color.FromArgb(174, 174, 180), TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI", 9F) };
+            var value = _tot[key]; value.Dock = DockStyle.Fill; value.TextAlign = ContentAlignment.MiddleRight; value.Font = new Font("Segoe UI", 11F, FontStyle.Bold); value.ForeColor = key == "sub" ? Color.FromArgb(124, 234, 150) : Color.White; value.BackColor = Color.Transparent;
+            row.Controls.Add(value); row.Controls.Add(l); row.Paint += (_, e) => { using var p = new Pen(Color.FromArgb(45, 255, 255, 255)); e.Graphics.DrawLine(p, 0, row.Height - 1, row.Width, row.Height - 1); };
+            linhasResumo.Controls.Add(row);
+        }
+        resumoLayout.Controls.Add(fechar, 0, 0); resumoLayout.Controls.Add(linhasResumo, 0, 1); resumoLayout.Controls.Add(trocoCard, 0, 2); resumoLayout.Controls.Add(rodapeResumo, 0, 3);
+        resumo.Controls.Clear(); resumo.Controls.Add(resumoLayout);
+
+        var principal = new Panel { Dock = DockStyle.Fill, BackColor = fundo };
+        var cab = new Panel { Dock = DockStyle.Top, Height = 70, BackColor = Color.White, Padding = new Padding(14, 8, 14, 8) };
+        var linhaCab = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(0, 4, 0, 0), AutoScroll = false };
+        linhaCab.Controls.Add(InfoCheckout("Bateria", _bat, 280));
+        linhaCab.Controls.Add(InfoCheckout("Cliente", _cli, 250));
+        linhaCab.Controls.Add(InfoCheckout("Documento", _doc, 170));
+        var pesquisar = new Button { Text = "Pesquisar cliente  F3", Width = 170, Height = 40, Margin = new Padding(8, 4, 0, 0), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(238, 238, 241), ForeColor = texto, Cursor = Cursors.Hand };
+        pesquisar.FlatAppearance.BorderSize = 0; pesquisar.Click += (_, _) => { var cl = FormPesquisarCliente.Escolher(this); if (cl != null) { _cliente = cl; Atualizar(); } };
+        linhaCab.Controls.Add(pesquisar); cab.Controls.Add(linhaCab);
+
+        var conteudo = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, BackColor = fundo, Padding = new Padding(14, 12, 14, 14) };
+        conteudo.RowStyles.Add(new RowStyle(SizeType.Absolute, 52)); conteudo.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); conteudo.RowStyles.Add(new RowStyle(SizeType.Absolute, 222));
+        var obsCard = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(12, 3, 12, 3), Margin = new Padding(0, 0, 0, 10) };
+        Arredondar(obsCard, 10);
+        var obsTitulo = new Label { Text = "Observações", Dock = DockStyle.Left, Width = 98, ForeColor = secundario, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft };
+        _obs.BorderStyle = BorderStyle.None; _obs.Multiline = false; _obs.PlaceholderText = "Opcional · aparece no fechamento de caixa"; _obs.Dock = DockStyle.Fill;
+        obsCard.Controls.Add(_obs); obsCard.Controls.Add(obsTitulo);
+
+        _gDisp.Colunas(new("reserva", "Reserva", Largura: 74), new("cliente", "Cliente", Largura: 170), new("categoria", "Categoria", Largura: 90));
+        _gCar.Colunas(new("cliente", "Cliente", Largura: 112), new("produto", "Produto", Largura: 130), new("qtd", "Qtd.", TipoCol.Inteiro, 42), new("desc", "Desc.", TipoCol.Dinheiro, 60), new("acr", "Acrés.", TipoCol.Dinheiro, 60), new("unit", "Preço", TipoCol.Dinheiro, 66), new("total", "Total", TipoCol.Dinheiro, 72));
+        _gPag.Colunas(new("forma", "Método de pagamento", Largura: 180), new("valor", "Valor (R$)", TipoCol.Dinheiro, 100));
+        var meio = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, BackColor = fundo, Margin = new Padding(0, 0, 0, 10) };
+        meio.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 43)); meio.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48)); meio.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 57));
+        meio.Controls.Add(Caixinha("Reservas disponíveis", "Não pagas desta bateria", _gDisp), 0, 0);
+        var setas = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(5, 90, 5, 0) };
+        var bAdd = new Button { Text = "→", Width = 38, Height = 42, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(11, 122, 83), ForeColor = Color.White, Font = new Font("Segoe UI", 14F, FontStyle.Bold), AccessibleName = "Adicionar ao carrinho" };
+        var bBack = new Button { Text = "←", Width = 38, Height = 42, FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = texto, Font = new Font("Segoe UI", 14F), AccessibleName = "Voltar às reservas disponíveis" };
+        var bClear = new Button { Text = "×", Width = 38, Height = 42, FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = Color.FromArgb(196, 40, 28), Font = new Font("Segoe UI", 14F), AccessibleName = "Esvaziar carrinho" };
+        foreach (var b in new[] { bAdd, bBack, bClear }) b.FlatAppearance.BorderSize = 0;
+        bAdd.Click += (_, _) => Adicionar(_gDisp.Marcados.Count > 0 ? _gDisp.Marcados : _gDisp.Selecionados); bBack.Click += (_, _) => Remover(); bClear.Click += (_, _) => Remover();
+        _gDisp.Duplo += r => Adicionar([r]); setas.Controls.AddRange([bAdd, bBack, bClear]); meio.Controls.Add(setas, 1, 0);
+        var carrinho = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(0) };
+        Arredondar(carrinho, 14);
+        var titCarrinho = new Panel { Dock = DockStyle.Top, Height = 44, Padding = new Padding(12, 5, 12, 3), BackColor = Color.White };
+        titCarrinho.Controls.Add(new Label { Text = "Selecione uma linha para ajustar desconto ou acréscimo", Dock = DockStyle.Fill, ForeColor = secundario, TextAlign = ContentAlignment.MiddleRight, Font = new Font("Segoe UI", 8F) });
+        titCarrinho.Controls.Add(new Label { Text = "Carrinho", Dock = DockStyle.Left, Width = 110, Font = new Font("Segoe UI", 10F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft });
+        var barraCarrinho = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 44, WrapContents = false, Padding = new Padding(6, 4, 4, 2), FlowDirection = FlowDirection.LeftToRight, BackColor = Color.FromArgb(251, 251, 253) };
+        Button Acao(string caption, Action action, int width)
+        {
+            var b = new Button { Text = caption, Width = width, Height = 32, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(238, 238, 241), ForeColor = texto, Margin = new Padding(2), Cursor = Cursors.Hand, AccessibleName = caption };
+            b.FlatAppearance.BorderSize = 0; b.Click += (_, _) => action(); return b;
+        }
+        barraCarrinho.Controls.Add(Acao("+ Produtos", AdicionarProduto, 82));
+        barraCarrinho.Controls.Add(Acao("Desconto", () => Ajuste(true), 74));
+        barraCarrinho.Controls.Add(Acao("Acréscimo", () => Ajuste(false), 82));
+        _codVoucher.PlaceholderText = "Código do voucher"; _codVoucher.AccessibleName = "Código do voucher";
+        var caixaVoucher = FormCliente.Caixa(_codVoucher); caixaVoucher.Dock = DockStyle.None; caixaVoucher.Size = new Size(150, 32); caixaVoucher.Margin = new Padding(12, 2, 0, 0);
+        barraCarrinho.Controls.Add(caixaVoucher); barraCarrinho.Controls.Add(Acao("Aplicar", AplicarVoucher, 68));
+        var gradeCarrinho = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 0, 0, 0), BackColor = Color.White }; gradeCarrinho.Controls.Add(_gCar);
+        carrinho.Controls.Add(gradeCarrinho); carrinho.Controls.Add(barraCarrinho); carrinho.Controls.Add(titCarrinho); meio.Controls.Add(carrinho, 2, 0);
+
+        var pagamentos = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, BackColor = fundo };
+        pagamentos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60)); pagamentos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40));
+        var formasCard = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(12), Margin = new Padding(0, 0, 8, 0) };
+        var pagamentosCard = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(12), Margin = new Padding(8, 0, 0, 0) };
+        Arredondar(formasCard, 14); Arredondar(pagamentosCard, 14);
+        var tituloFormas = new Label { Text = "Forma de pagamento", Dock = DockStyle.Top, Height = 24, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = texto };
+        var formas = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 92, WrapContents = true, AutoScroll = false, Padding = new Padding(0, 3, 0, 0), FlowDirection = FlowDirection.LeftToRight };
+        var paymentItems = _forma.Items.OfType<Campos.Item>().ToArray();
+        foreach (var method in paymentItems)
+        {
+            var type = method.Dados?.S("tipo") ?? "outro";
+            var icon = type switch { "dinheiro" => "▣", "credito" => "▰", "debito" => "▱", "pix" => "◇", "voucher" => "◇", _ => "○" };
+            var nomeForma = System.Globalization.CultureInfo.GetCultureInfo("pt-BR").TextInfo.ToTitleCase(method.Texto.ToLowerInvariant());
+            var button = new Button { Text = icon + "  " + nomeForma, AutoSize = true, MinimumSize = new Size(96, 38), Height = 38, Margin = new Padding(0, 0, 7, 6), Padding = new Padding(8, 0, 8, 0), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Cursor = Cursors.Hand, Tag = method, AccessibleName = method.Texto, AccessibleDescription = "kit:ignorar" };
+            button.Resize += (_, _) => KitVisual.AplicarRaio(button, 10);
+            button.FlatAppearance.BorderSize = 0;
+            button.Click += (_, _) => { _forma.SelectedItem = method; MarcarForma(formas); };
+            formas.Controls.Add(button);
+        }
+        if (_forma.SelectedIndex >= 0) MarcarForma(formas);
+        var linhaValor = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, Padding = new Padding(0, 5, 0, 0), FlowDirection = FlowDirection.LeftToRight };
+        var recebido = new Panel { Width = 300, Height = 56, Padding = new Padding(10, 7, 8, 4), BackColor = Color.White };
+        var recebidoLabel = new Label { Text = "Valor recebido", Dock = DockStyle.Left, Width = 100, ForeColor = secundario, Font = new Font("Segoe UI", 8F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft };
+        _valor.Width = 140; _valor.BorderStyle = BorderStyle.None; _valor.TextAlign = HorizontalAlignment.Right; _valor.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+        _valor.Dock = DockStyle.Fill; _valor.PlaceholderText = "0,00";
+        recebido.Controls.Add(_valor); recebido.Controls.Add(recebidoLabel); _valor.BringToFront();
+        var bPagamento = AcaoPagamento("Adicionar", AdicionarPagamento, true);
+        var bRemoverPagamento = AcaoPagamento("Remover", () => { foreach (var r in _gPag.Selecionados) _pags.RemoveAt(r.I("i")); Atualizar(); }, false);
+        linhaValor.Controls.AddRange([recebido, bPagamento, bRemoverPagamento]);
+        formasCard.Controls.Add(linhaValor); formasCard.Controls.Add(formas); formasCard.Controls.Add(tituloFormas);
+        var tituloPagamentos = new Label { Text = "Pagamentos lançados", Dock = DockStyle.Top, Height = 24, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = texto };
+        var pagamentosGrid = new Panel { Dock = DockStyle.Fill, BackColor = Color.White }; pagamentosGrid.Controls.Add(_gPag);
+        _falta.Dock = DockStyle.Bottom; _falta.Height = 22; _falta.TextAlign = ContentAlignment.MiddleLeft;
+        pagamentosCard.Controls.Add(pagamentosGrid); pagamentosCard.Controls.Add(_falta); pagamentosCard.Controls.Add(tituloPagamentos);
+        pagamentos.Controls.Add(formasCard, 0, 0); pagamentos.Controls.Add(pagamentosCard, 1, 0);
+
+        conteudo.Controls.Add(obsCard, 0, 0); conteudo.Controls.Add(meio, 0, 1); conteudo.Controls.Add(pagamentos, 0, 2);
+        _forma.Visible = false; _forma.SetBounds(-10, -10, 1, 1); principal.Controls.Add(_forma);
+        principal.Controls.Add(conteudo); principal.Controls.Add(cab); Controls.Add(principal); Controls.Add(resumo);
+        foreach (var old in oldRoots) old.Dispose();
+
+        Button AcaoPagamento(string caption, Action action, bool principal)
+        {
+            var b = new Button { Text = caption, AutoSize = true, Height = 36, MinimumSize = new Size(88, 36), FlatStyle = FlatStyle.Flat, BackColor = principal ? Color.FromArgb(11, 122, 83) : Color.FromArgb(238, 238, 241), ForeColor = principal ? Color.White : texto, Font = new Font("Segoe UI", 8.5F, principal ? FontStyle.Bold : FontStyle.Regular), Margin = new Padding(5, 0, 0, 0), Cursor = Cursors.Hand };
+            b.FlatAppearance.BorderSize = 0; b.Click += (_, _) => action(); return b;
+        }
+    }
+
+    static Panel InfoCheckout(string titulo, Control valor, int largura)
+    {
+        var p = new Panel { Width = largura, Height = 48, BackColor = Color.FromArgb(250, 250, 252), Padding = new Padding(9, 4, 8, 3), Margin = new Padding(4, 0, 2, 0) };
+        Arredondar(p, 9);
+        p.Controls.Add(valor); p.Controls.Add(new Label { Text = titulo, Dock = DockStyle.Top, Height = 16, ForeColor = Color.FromArgb(110, 110, 115), Font = new Font("Segoe UI", 7.5F, FontStyle.Bold) });
+        if (valor is ComboBox cb) { cb.Dock = DockStyle.Fill; cb.Margin = new Padding(0); cb.FlatStyle = FlatStyle.Flat; }
+        if (valor is Label l) { l.Dock = DockStyle.Fill; l.AutoSize = false; l.TextAlign = ContentAlignment.MiddleLeft; l.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold); l.ForeColor = Color.FromArgb(29, 29, 31); l.AutoEllipsis = true; }
+        return p;
+    }
+
+    void MarcarForma(FlowLayoutPanel host)
+    {
+        foreach (var b in host.Controls.OfType<Button>())
+        {
+            var selecionado = b.Tag is Campos.Item it && _forma.SelectedItem is Campos.Item atual && atual.Id == it.Id;
+            b.BackColor = selecionado ? Color.FromArgb(11, 122, 83) : Color.FromArgb(245, 245, 247);
+            b.ForeColor = selecionado ? Color.White : Color.FromArgb(29, 29, 31);
+        }
+    }
+
+    static Panel Caixinha(string titulo, string subtitulo, Control c)
+    {
+        var p = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(0) };
+        Arredondar(p, 14);
+        var header = new Panel { Dock = DockStyle.Top, Height = 48, Padding = new Padding(12, 5, 10, 2), BackColor = Color.White };
+        header.Controls.Add(new Label { Text = titulo, Dock = DockStyle.Top, Height = 22, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = Color.FromArgb(29, 29, 31) });
+        header.Controls.Add(new Label { Text = subtitulo, Dock = DockStyle.Bottom, Height = 18, Font = new Font("Segoe UI", 7.8F), ForeColor = Color.FromArgb(110, 110, 115) });
+        var box = new Panel { Dock = DockStyle.Fill, Padding = new Padding(6, 0, 6, 6), BackColor = Color.White }; box.Controls.Add(c);
+        p.Controls.Add(box); p.Controls.Add(header); return p;
+    }
+
+    static void Arredondar(Panel painel, int raio)
+    {
+        void Ajustar()
+        {
+            if (painel.Width < raio * 2 || painel.Height < raio * 2) return;
+            using var path = new GraphicsPath(); var w = painel.Width - 1; var h = painel.Height - 1;
+            path.AddArc(0, 0, raio, raio, 180, 90); path.AddArc(w - raio, 0, raio, raio, 270, 90); path.AddArc(w - raio, h - raio, raio, raio, 0, 90); path.AddArc(0, h - raio, raio, raio, 90, 90); path.CloseFigure();
+            painel.Region = new Region(path);
+        }
+        painel.Resize += (_, _) => Ajustar(); painel.Paint += (_, e) =>
+        {
+            if (painel.Width < raio * 2 || painel.Height < raio * 2) return;
+            using var path = new GraphicsPath(); var w = painel.Width - 1; var h = painel.Height - 1;
+            path.AddArc(0, 0, raio, raio, 180, 90); path.AddArc(w - raio, 0, raio, raio, 270, 90); path.AddArc(w - raio, h - raio, raio, raio, 0, 90); path.AddArc(0, h - raio, raio, raio, 90, 90); path.CloseFigure();
+            using var pen = new Pen(Color.FromArgb(232, 232, 236)); e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; e.Graphics.DrawPath(pen, path);
+        };
+        Ajustar();
     }
 
     static Label Lbl(string t) => new() { Text = t, AutoSize = true, Margin = new Padding(3, 7, 3, 3) };
@@ -279,11 +408,12 @@ public class FormCheckout : Janela
     void Atualizar()
     {
         _gDisp.Carregar(_disp.Where(r => !_car.Any(c => c.InscricaoId == r.L("id"))));
-        _gCar.Carregar(_car.Select(c => new JsonObject { ["id"] = c.K, ["k"] = c.K, ["cliente"] = c.Cliente, ["produto"] = c.Produto, ["qtd"] = c.Qtd, ["unit"] = c.Unit, ["descPct"] = c.DescPct.ToString("0.##"), ["desc"] = c.Desc, ["acrPct"] = c.AcrPct.ToString("0.##"), ["acr"] = c.Acr }));
+        _gCar.Carregar(_car.Select(c => new JsonObject { ["id"] = c.K, ["k"] = c.K, ["cliente"] = c.Cliente, ["produto"] = c.Produto, ["qtd"] = c.Qtd, ["unit"] = c.Unit, ["descPct"] = c.DescPct.ToString("0.##"), ["desc"] = c.Desc, ["acrPct"] = c.AcrPct.ToString("0.##"), ["acr"] = c.Acr, ["total"] = c.Unit * c.Qtd - c.Desc + c.Acr }));
         _gPag.Carregar(_pags.Select((p, i) => new JsonObject { ["id"] = i, ["i"] = i, ["forma"] = p.nome, ["valor"] = p.valor }));
         var t = Totais();
         _tot["tot"].Text = Fmt.Dinheiro(t.tot); _tot["des"].Text = Fmt.Dinheiro(t.des); _tot["acr"].Text = Fmt.Dinheiro(t.acr);
         _tot["sub"].Text = Fmt.Dinheiro(t.sub); _tot["rec"].Text = Fmt.Dinheiro(t.rec); _tot["tro"].Text = Fmt.Dinheiro(t.troco);
+        _falta.Text = t.falta > 0 ? $"Falta lançar {Fmt.Brl(t.falta)}" : "Pagamento completo";
         _valor.Text = t.falta > 0 ? Fmt.Dinheiro(t.falta) : "";
         _cli.Text = _cliente?.S("nome") ?? ""; _doc.Text = _cliente?.S("documento") ?? "";
     }

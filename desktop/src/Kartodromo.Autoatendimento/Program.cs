@@ -16,7 +16,9 @@ static class Program
         Application.ThreadException += (_, e) => Log("erro: " + e.Exception);
         Thread.CurrentThread.CurrentCulture = Fmt.Br;
         Thread.CurrentThread.CurrentUICulture = Fmt.Br;
-        var form = new FormTotem(autoteste ? args[2] : null);
+        var urlTeste = autoteste ? Environment.GetEnvironmentVariable("KARTODROMO_AUTOATENDIMENTO_TEST_URL") : null;
+        var apiTeste = string.IsNullOrWhiteSpace(urlTeste) ? null : new Api(urlTeste);
+        var form = new FormTotem(autoteste ? args[2] : null, apiTeste);
         Application.Run(form);
     }
 

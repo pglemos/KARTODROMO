@@ -7,7 +7,8 @@
  *   /relatorio/:tipo relatorios imprimiveis da recepcao (?t=<token de sessao>)
  *   /api/totem/...   rotas publicas do totem
  *   /api/login       login da recepcao -> token de sessao
- *   /api/office/...  rotas da recepcao (Authorization: Bearer <token>)
+ *   /api/office/...  rotas da recepcao (Authorization: Bearer <token>), incluindo fidelidade,
+ *                    parceiros/comissoes, vouchers, troca de senha e diagnostico de servicos
  *   /api/crono/...   rotas da cronometragem (header x-ops-key)
  *
  * Banco: KartodromoOps (lib/ops/db.ts). So LAN: firewall do SRVKART libera a porta pra rede local.

@@ -14,27 +14,44 @@
  */
 import http from 'node:http';
 import net from 'node:net';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
+import { appendFileSync, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { DecoderClient } from '../lib/timing/decoder-client';
 import { formatTrxPassing, type TrxPassing } from '../lib/timing/trx-parser';
 import {
   applyPassing,
+  assignCrossing,
   cancelSession,
-  checkered,
+  clearCrossings,
   closeSession,
   computeStandings,
   createSession,
+  elapsedMs,
   formatLap,
+  includeManualPassing,
   remainingMs,
   setCompetitors,
+  setCrossingDeleted,
+  setCrossingInvalid,
+  setRaceFlag,
   startSession,
   tick,
   toggleLapInvalid,
   type Session,
   type SessionType,
 } from '../lib/timing/race-engine';
+import {
+  createCatalogRecord,
+  deleteCatalogRecord,
+  distributeProof,
+  duplicateEvent,
+  emptyCatalog,
+  normalizeCatalog,
+  updateCatalogRecord,
+  type CatalogEntity,
+  type TimingCatalog,
+} from '../lib/timing/catalog';
 
 // ---------------------------------------------------------------- config
 
@@ -62,6 +79,8 @@ const DATA_DIR = resolve(process.env.TIMING_DATA_DIR || join(process.cwd(), 'dat
 const SESSIONS_DIR = join(DATA_DIR, 'sessions');
 const JOURNAL_DIR = join(DATA_DIR, 'passagens');
 const TRANSPONDERS_FILE = join(DATA_DIR, 'transponders.json');
+const CATALOG_FILE = join(DATA_DIR, 'catalog.json');
+const SETTINGS_FILE = join(DATA_DIR, 'settings.json');
 const UI_DIR = resolve(process.cwd(), 'services', 'timing-ui');
 const TRACK_NAME = process.env.TIMING_TRACK_NAME || 'Kartodromo Internacional de Betim';
 
@@ -88,6 +107,16 @@ for (const f of readdirSync(SESSIONS_DIR).filter((f) => f.endsWith('.json'))) {
     log('sessao ilegivel ignorada', f, err);
   }
 }
+for (const session of sessions.values()) {
+  session.currentFlag ??= session.state === 'em_andamento' ? 'green' : session.state === 'bandeira_final' ? 'checkered' : 'none';
+  session.observations ??= [];
+  session.competitors ??= [];
+  for (const competitor of session.competitors) {
+    competitor.crossings ??= [];
+    competitor.flag ??= 'none';
+    competitor.crossings.forEach((crossing) => { crossing.id ??= randomUUID(); crossing.source ??= 'decoder'; });
+  }
+}
 
 function saveSession(s: Session) {
   writeJsonAtomic(join(SESSIONS_DIR, `${s.id}.json`), s);
@@ -99,6 +128,21 @@ function loadTransponders() {
   transponderMap = (JSON.parse(readFileSync(TRANSPONDERS_FILE, 'utf8')) as { map: Record<string, string> }).map ?? {};
 }
 loadTransponders();
+
+let catalog: TimingCatalog = emptyCatalog();
+if (existsSync(CATALOG_FILE)) {
+  try { catalog = normalizeCatalog(JSON.parse(readFileSync(CATALOG_FILE, 'utf8'))); }
+  catch (err) { log('cadastro de eventos ilegível; iniciando vazio', err); }
+}
+
+let timingSettings: Record<string, unknown> = {};
+if (existsSync(SETTINGS_FILE)) {
+  try { timingSettings = JSON.parse(readFileSync(SETTINGS_FILE, 'utf8')) as Record<string, unknown>; }
+  catch (err) { log('parâmetros de cronometragem ilegíveis', err); }
+}
+
+function saveCatalog() { writeJsonAtomic(CATALOG_FILE, catalog); }
+function saveTimingSettings() { writeJsonAtomic(SETTINGS_FILE, timingSettings); }
 
 function saveTransponders() {
   writeJsonAtomic(TRANSPONDERS_FILE, { updatedAt: new Date().toISOString(), map: transponderMap });
@@ -130,7 +174,14 @@ function sortedSessions() {
   return [...sessions.values()].sort((a, b) => b.createdAt - a.createdAt);
 }
 
+function trackLengthFor(s: Session) {
+  const event = catalog.events.find((item) => item.id === s.eventId);
+  const track = catalog.tracks.find((item) => item.id === event?.trackId);
+  return track?.lengthMeters ?? (Number(timingSettings.defaultTrackLengthMeters) || 1_000);
+}
+
 type RecentPassing = {
+  id: string;
   wallMs: number;
   transponder: number;
   kart: string | null;
@@ -158,11 +209,12 @@ decoder.on('passing', (p: TrxPassing) => {
   const wallMs = Date.now();
   const kart = kartFor(p.transponder);
   const session = runningSession();
+  const id = randomUUID();
   let result = kart ? 'sem-bateria' : 'transponder-desconhecido';
   let lapMs: number | null = null;
 
   if (session && kart) {
-    result = applyPassing(session, { kart, decoderTimeMs: p.decoderTimeMs, wallMs });
+    result = applyPassing(session, { id, kart, decoderTimeMs: p.decoderTimeMs, wallMs, transponder: p.transponder, source: 'decoder' });
     if (result === 'counted') {
       const comp = session.competitors.find((c) => c.kart === kart);
       lapMs = comp?.crossings[comp.crossings.length - 1]?.lapMs ?? null;
@@ -173,7 +225,7 @@ decoder.on('passing', (p: TrxPassing) => {
   // diario primeiro: e a fonte de verdade pra reconstruir qualquer bateria
   journal({ wallMs, raw: p.raw, transponder: p.transponder, kart, decoderTimeMs: p.decoderTimeMs, seq: p.sequence, sessionId: session?.id ?? null, result });
 
-  recentPassings.unshift({ wallMs, transponder: p.transponder, kart, result, lapMs, sessionId: session?.id ?? null });
+  recentPassings.unshift({ id, wallMs, transponder: p.transponder, kart, result, lapMs, sessionId: session?.id ?? null });
   recentPassings.length = Math.min(recentPassings.length, 60);
   broadcast('passing', recentPassings[0]);
   scheduleStateBroadcast();
@@ -211,9 +263,14 @@ function sessionView(s: Session) {
     checkeredAt: s.checkeredAt,
     finishedAt: s.finishedAt,
     remainingMs: remainingMs(s, now),
-    elapsedMs: s.startedAt ? (s.finishedAt ?? now) - s.startedAt : 0,
-    competitors: s.competitors.map((c) => ({ kart: c.kart, name: c.name, customerId: c.customerId ?? null, autoAdded: Boolean(c.autoAdded) })),
-    standings: computeStandings(s),
+    elapsedMs: elapsedMs(s, now),
+    currentFlag: s.currentFlag ?? 'none',
+    eventId: s.eventId ?? null,
+    groupId: s.groupId ?? null,
+    proofId: s.proofId ?? null,
+    observations: s.observations ?? [],
+    competitors: s.competitors.map((c) => ({ kart: c.kart, name: c.name, customerId: c.customerId ?? null, category: c.category ?? null, flag: c.flag ?? 'none', autoAdded: Boolean(c.autoAdded) })),
+    standings: computeStandings(s, trackLengthFor(s)),
   };
 }
 
@@ -226,6 +283,10 @@ function sessionSummary(s: Session) {
     createdAt: s.createdAt,
     startedAt: s.startedAt,
     finishedAt: s.finishedAt,
+    eventId: s.eventId ?? null,
+    groupId: s.groupId ?? null,
+    proofId: s.proofId ?? null,
+    currentFlag: s.currentFlag ?? 'none',
     competitors: s.competitors.length,
   };
 }
@@ -343,6 +404,7 @@ function parseCompetitors(value: unknown) {
       kart: String((c as Record<string, unknown>).kart ?? '').trim(),
       name: String((c as Record<string, unknown>).name ?? '').trim(),
       customerId: ((c as Record<string, unknown>).customerId as string | undefined) ?? null,
+      category: ((c as Record<string, unknown>).category as string | undefined) ?? null,
     }))
     .filter((c) => c.kart || c.name);
 }
@@ -359,10 +421,116 @@ async function opsGet(path: string) {
 }
 
 const SESSION_TYPES = new Set<SessionType>(['treino', 'classificacao', 'corrida']);
+const CATALOG_ENTITIES = new Set<CatalogEntity>(['events', 'groups', 'provas', 'categories', 'tracks']);
+
+function createTimingBackup() {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const target = join(DATA_DIR, 'backups', `timing-${stamp}`);
+  mkdirSync(target, { recursive: true });
+  for (const name of ['sessions', 'passagens']) {
+    const source = join(DATA_DIR, name);
+    if (existsSync(source)) cpSync(source, join(target, name), { recursive: true, errorOnExist: false });
+  }
+  for (const name of ['transponders.json', 'catalog.json', 'settings.json']) {
+    const source = join(DATA_DIR, name);
+    if (existsSync(source)) copyFileSync(source, join(target, name));
+  }
+  return { path: target, files: readdirSync(target) };
+}
+
+function crossingRows(s: Session) {
+  return s.competitors.flatMap((competitor) => competitor.crossings.map((crossing, index) => ({
+    id: crossing.id ?? `${s.id}-${competitor.kart}-${index}`,
+    kart: competitor.kart,
+    name: competitor.name,
+    category: competitor.category ?? null,
+    transponder: crossing.transponder ?? null,
+    lap: index,
+    lapMs: crossing.lapMs,
+    wallMs: crossing.wallMs,
+    decoderTimeMs: crossing.decoderTimeMs,
+    invalid: Boolean(crossing.invalid),
+    deleted: Boolean(crossing.deleted),
+    source: crossing.source ?? 'decoder',
+    assigned: Boolean(crossing.originalKart && crossing.originalKart !== competitor.kart),
+  }))).sort((a, b) => b.wallMs - a.wallMs);
+}
+
+function correctCrossings(s: Session, action: string, ids: string[], aboveId?: string) {
+  const rows = crossingRows(s);
+  const target = aboveId ? rows.find((row) => row.id === aboveId) : undefined;
+  const selected = rows.filter((row) => ids.includes(row.id) || (target && row.wallMs >= target.wallMs));
+  for (const row of selected) {
+    if (action === 'delete') setCrossingDeleted(s, row.id, true);
+    else if (action === 'restore') setCrossingDeleted(s, row.id, false);
+    else if (action === 'invalidate' && row.lapMs !== null) setCrossingInvalid(s, row.id, true);
+    else if (action === 'validate' && row.lapMs !== null) setCrossingInvalid(s, row.id, false);
+  }
+  return selected.length;
+}
 
 async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, url: URL) {
   const path = url.pathname;
   const method = req.method ?? 'GET';
+
+  if (path === '/api/catalog' && method === 'GET') return send(res, 200, catalog);
+  if (path === '/api/catalog/export' && method === 'GET') return send(res, 200, catalog, { 'content-disposition': 'attachment; filename="kartodromo-eventos.json"' });
+  if (path === '/api/catalog/import' && method === 'POST') {
+    try {
+      catalog = normalizeCatalog(await readBody(req));
+      saveCatalog();
+      scheduleStateBroadcast();
+      return send(res, 200, catalog);
+    } catch (err) { return send(res, 400, { error: (err as Error).message }); }
+  }
+  const catalogRoute = path.match(/^\/api\/catalog\/(events|groups|provas|categories|tracks)(?:\/([\w-]+)(?:\/(duplicate|distribute))?)?$/);
+  if (catalogRoute) {
+    const entity = catalogRoute[1] as CatalogEntity;
+    const id = catalogRoute[2];
+    const subAction = catalogRoute[3];
+    if (!CATALOG_ENTITIES.has(entity)) return send(res, 404, { error: 'Cadastro desconhecido.' });
+    try {
+      if (!id && method === 'GET') return send(res, 200, catalog[entity]);
+      if (!id && method === 'POST') {
+        const body = await readBody(req);
+        const item = createCatalogRecord(catalog, entity, body, randomUUID(), Date.now());
+        saveCatalog();
+        return send(res, 201, item);
+      }
+      if (id && entity === 'events' && subAction === 'duplicate' && method === 'POST') {
+        const item = duplicateEvent(catalog, id, randomUUID, Date.now());
+        saveCatalog();
+        return send(res, 201, item);
+      }
+      if (id && entity === 'provas' && subAction === 'distribute' && method === 'POST') {
+        const item = distributeProof(catalog, id, await readBody(req));
+        saveCatalog();
+        return send(res, 200, item);
+      }
+      if (id && !subAction && (method === 'PATCH' || method === 'PUT')) {
+        const item = updateCatalogRecord(catalog, entity, id, await readBody(req));
+        saveCatalog();
+        return send(res, 200, item);
+      }
+      if (id && !subAction && method === 'DELETE') {
+        deleteCatalogRecord(catalog, entity, id);
+        saveCatalog();
+        return send(res, 200, { ok: true });
+      }
+      return send(res, 405, { error: 'Método não permitido.' });
+    } catch (err) { return send(res, 400, { error: (err as Error).message }); }
+  }
+
+  if (path === '/api/settings' && method === 'GET') return send(res, 200, timingSettings);
+  if (path === '/api/settings' && method === 'PATCH') {
+    timingSettings = { ...timingSettings, ...(await readBody(req)) };
+    saveTimingSettings();
+    return send(res, 200, timingSettings);
+  }
+  if (path === '/api/backup' && method === 'POST') {
+    try { return send(res, 201, createTimingBackup()); }
+    catch (err) { return send(res, 500, { error: `Falha ao criar cópia: ${(err as Error).message}` }); }
+  }
 
   if (path === '/api/state') return send(res, 200, stateView());
   if (path === '/api/livetime-snapshot') return send(res, 200, liveSnapshot());
@@ -395,12 +563,35 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       minLapSec: body.minLapSec ? Number(body.minLapSec) : 5,
       now: Date.now(),
       competitors: parseCompetitors(body.competitors),
+      eventId: typeof body.eventId === 'string' ? body.eventId : null,
+      groupId: typeof body.groupId === 'string' ? body.groupId : null,
+      proofId: typeof body.proofId === 'string' ? body.proofId : null,
     });
     sessions.set(s.id, s);
     saveSession(s);
     log(`bateria criada ${s.name} (${s.type}) com ${s.competitors.length} pilotos`);
     scheduleStateBroadcast();
     return send(res, 201, sessionView(s));
+  }
+
+  const passageCorrection = path.match(/^\/api\/sessions\/([\w-]+)\/passings\/([\w-]+)\/(delete|restore|invalidate|validate|assign|unassign)$/);
+  if (passageCorrection && method === 'POST') {
+    const session = sessions.get(passageCorrection[1]);
+    if (!session) return send(res, 404, { error: 'Bateria não encontrada.' });
+    const [, , passageId, correction] = passageCorrection;
+    try {
+      if (correction === 'delete') setCrossingDeleted(session, passageId, true);
+      else if (correction === 'restore') setCrossingDeleted(session, passageId, false);
+      else if (correction === 'invalidate') setCrossingInvalid(session, passageId, true);
+      else if (correction === 'validate') setCrossingInvalid(session, passageId, false);
+      else {
+        const body = await readBody(req);
+        assignCrossing(session, passageId, correction === 'unassign' ? null : String(body.kart ?? ''), String(body.name ?? ''));
+      }
+      saveSession(session);
+      scheduleStateBroadcast();
+      return send(res, 200, { ok: true, session: sessionView(session) });
+    } catch (err) { return send(res, 400, { error: (err as Error).message }); }
   }
 
   const m = path.match(/^\/api\/sessions\/([\w-]+)(?:\/(\w+))?(?:\/(\w+))?$/);
@@ -422,6 +613,64 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
           })),
         );
       }
+      if (action === 'passings' && !m[3] && method === 'GET') return send(res, 200, crossingRows(s));
+      if (action === 'passings' && m[3] === 'manual' && method === 'POST') {
+        const body = await readBody(req);
+        const kart = String(body.kart ?? '').trim();
+        const passage = includeManualPassing(s, {
+          id: randomUUID(),
+          kart,
+          lapMs: Number(body.lapMs),
+          wallMs: now,
+          name: String(body.name ?? ''),
+          transponder: body.transponder == null ? null : Number(body.transponder),
+        });
+        journal({ wallMs: passage.wallMs, transponder: passage.transponder ?? null, kart, decoderTimeMs: passage.decoderTimeMs, sessionId: s.id, result: 'counted-manual', source: 'manual', passageId: passage.id });
+        saveSession(s);
+        scheduleStateBroadcast();
+        return send(res, 201, { ok: true, passages: crossingRows(s) });
+      }
+      if (action === 'passings' && m[3] === 'actions' && method === 'POST') {
+        const body = await readBody(req);
+        const correction = String(body.action ?? '');
+        if (!['delete', 'restore', 'invalidate', 'validate'].includes(correction)) return send(res, 400, { error: 'Correção desconhecida.' });
+        const count = correctCrossings(s, correction, Array.isArray(body.ids) ? body.ids.map(String) : [], typeof body.aboveId === 'string' ? body.aboveId : undefined);
+        saveSession(s);
+        scheduleStateBroadcast();
+        return send(res, 200, { ok: true, count, passages: crossingRows(s) });
+      }
+      if (action === 'passings' && m[3] === 'clear' && method === 'POST') {
+        clearCrossings(s);
+        saveSession(s);
+        scheduleStateBroadcast();
+        return send(res, 200, { ok: true, passages: crossingRows(s) });
+      }
+      if (action === 'flag' && !m[3] && method === 'POST') {
+        const body = await readBody(req);
+        const flags: Record<string, 'green' | 'yellow' | 'red' | 'white' | 'checkered'> = {
+          verde: 'green', green: 'green', amarela: 'yellow', yellow: 'yellow',
+          vermelha: 'red', red: 'red', branca: 'white', white: 'white',
+          quadriculada: 'checkered', checkered: 'checkered',
+        };
+        const flag = flags[String(body.flag ?? '')];
+        if (!flag) return send(res, 400, { error: 'Bandeira inválida.' });
+        setRaceFlag(s, flag, now);
+        saveSession(s);
+        scheduleStateBroadcast();
+        return send(res, 200, sessionView(s));
+      }
+      if (action === 'observations' && !m[3] && method === 'GET') return send(res, 200, s.observations ?? []);
+      if (action === 'observations' && !m[3] && method === 'POST') {
+        const body = await readBody(req);
+        const text = String(body.text ?? '').trim();
+        if (!text) return send(res, 400, { error: 'Escreva a observação.' });
+        s.observations ??= [];
+        const observation = { id: randomUUID(), text, wallMs: now, author: String(body.author ?? 'Cronometragem') };
+        s.observations.unshift(observation);
+        saveSession(s);
+        scheduleStateBroadcast();
+        return send(res, 201, observation);
+      }
       if (!action && method === 'PATCH') {
         const body = await readBody(req);
         if (typeof body.name === 'string') s.name = body.name.trim() || s.name;
@@ -433,17 +682,27 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
           s.durationMs = Math.round(Number(body.durationMin) * 60_000); // estender/encurtar prova em andamento
         }
         if (body.competitors) setCompetitors(s, parseCompetitors(body.competitors));
+        if (typeof body.eventId === 'string' || body.eventId === null) s.eventId = body.eventId as string | null;
+        if (typeof body.groupId === 'string' || body.groupId === null) s.groupId = body.groupId as string | null;
+        if (typeof body.proofId === 'string' || body.proofId === null) s.proofId = body.proofId as string | null;
       } else if (action === 'start' && method === 'POST') {
         const other = runningSession();
         if (other && other.id !== s.id) return send(res, 409, { error: `Ja existe bateria em andamento: ${other.name}. Encerre ela antes.` });
         startSession(s, now);
         log(`bateria ${s.name} INICIADA`);
       } else if (action === 'checkered' && method === 'POST') {
-        checkered(s, now);
+        setRaceFlag(s, 'checkered', now);
       } else if (action === 'close' && method === 'POST') {
         closeSession(s, now);
       } else if (action === 'cancel' && method === 'POST') {
         cancelSession(s, now);
+      } else if (action === 'flag' && m[3] && method === 'POST') {
+        const body = await readBody(req);
+        const competitor = s.competitors.find((item) => item.kart === m[3]);
+        if (!competitor) return send(res, 404, { error: 'Competidor não encontrado.' });
+        const flag = String(body.flag ?? '') as 'green' | 'yellow' | 'red' | 'white' | 'checkered';
+        if (!['green', 'yellow', 'red', 'white', 'checkered'].includes(flag)) return send(res, 400, { error: 'Bandeira inválida.' });
+        competitor.flag = flag;
       } else if (action === 'laps' && m[3] === 'invalidate' && method === 'POST') {
         const body = await readBody(req);
         toggleLapInvalid(s, String(body.kart), Number(body.lap));
