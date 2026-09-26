@@ -87,6 +87,8 @@ public class FormNovaBateria : Janela
             string Tipo(string t) => t is "treino" or "classificacao" or "corrida" ? t : "corrida";
             if (_programa.Visible && _programa.Checked && _prog.Count > 1)
             {
+                // liga as provas da mesma bateria: o número do kart digitado numa vale para as outras
+                var programaId = Guid.NewGuid().ToString("N");
                 foreach (var p in _prog)
                 {
                     var porVoltas = p.S("finalizacao") == "voltas";
@@ -94,6 +96,7 @@ public class FormNovaBateria : Janela
                     {
                         ["type"] = Tipo(p.S("tipo")), ["name"] = $"{nome} · {p.S("nome")}", ["durationMin"] = porVoltas ? 0 : p.I("tempoMin"),
                         ["maxLaps"] = porVoltas && p.I("voltasMax") > 0 ? p.I("voltasMax") : null, ["minLapSec"] = (int)_min.Value, ["competitors"] = comps.DeepClone(),
+                        ["programaId"] = programaId,
                     });
                     CriadaId ??= s.S("id");
                 }

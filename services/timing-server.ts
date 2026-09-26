@@ -29,6 +29,8 @@ import {
   computeStandings,
   createSession,
   aguardandoLargada,
+  copiarCompetidores,
+  mesmoPrograma,
   elapsedMs,
   formatLap,
   includeManualPassing,
@@ -779,6 +781,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       eventId: typeof body.eventId === 'string' ? body.eventId : null,
       groupId: typeof body.groupId === 'string' ? body.groupId : null,
       proofId: typeof body.proofId === 'string' ? body.proofId : null,
+      programaId: typeof body.programaId === 'string' && body.programaId ? body.programaId : null,
     });
     sessions.set(s.id, s);
     saveSession(s);
@@ -893,7 +896,17 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
           ...(body.maxLaps !== undefined ? { maxLaps: body.maxLaps === null ? null : Number(body.maxLaps) } : {}),
         }, now);
         if (s.state === 'preparando' && body.type && SESSION_TYPES.has(body.type as SessionType)) s.type = body.type as SessionType;
-        if (body.competitors) setCompetitors(s, parseCompetitors(body.competitors));
+        if (body.competitors) {
+          setCompetitors(s, parseCompetitors(body.competitors));
+          // o número do kart digitado na tomada de tempo vale para a corrida da mesma bateria (e vice-versa),
+          // enquanto a outra ainda não largou
+          for (const irma of sessions.values()) {
+            if (mesmoPrograma(s, irma) && copiarCompetidores(irma, s)) {
+              saveSession(irma);
+              log(`competidores de ${s.name} copiados para ${irma.name}`);
+            }
+          }
+        }
         if (typeof body.eventId === 'string' || body.eventId === null) s.eventId = body.eventId as string | null;
         if (typeof body.groupId === 'string' || body.groupId === null) s.groupId = body.groupId as string | null;
         if (typeof body.proofId === 'string' || body.proofId === null) s.proofId = body.proofId as string | null;

@@ -10,6 +10,9 @@ import {
   elapsedMs,
   formatLap,
   startSession,
+  mesmoPrograma,
+  copiarCompetidores,
+  setCompetitors,
   includeManualPassing,
   remainingMs,
   updateSessionParameters,
@@ -332,6 +335,28 @@ describe('race-engine', () => {
     const s = race('corrida', 1);
     includeManualPassing(s, { id: 'm1', kart: '4', lapMs: 60_000, wallMs: 30_000 });
     expect(s.startedAt).toBe(30_000);
+  });
+
+  it('número do kart digitado na tomada de tempo vai para a corrida da mesma bateria', () => {
+    const pilotos = [{ kart: '', name: 'Ana', customerId: '10' }, { kart: '', name: 'Bia', customerId: '11' }];
+    const tomada = createSession({ id: 'a', name: 'BATERIA 13:20 · TOMADA DE TEMPO', type: 'classificacao', durationMin: 8, now: 1_000, competitors: pilotos });
+    const corrida = createSession({ id: 'b', name: 'BATERIA 13:20 · CORRIDA', type: 'corrida', durationMin: 20, now: 1_002, competitors: pilotos });
+    const outra = createSession({ id: 'c', name: 'BATERIA 13:55 · CORRIDA', type: 'corrida', durationMin: 20, now: 1_004, competitors: pilotos });
+    expect(mesmoPrograma(tomada, corrida)).toBe(true);
+    expect(mesmoPrograma(tomada, outra)).toBe(false);
+    setCompetitors(tomada, [{ kart: '8', name: 'Ana', customerId: '10' }, { kart: '47', name: 'Bia', customerId: '11' }]);
+    expect(copiarCompetidores(corrida, tomada)).toBe(true);
+    expect(corrida.competitors.map((c) => `${c.kart}:${c.name}`)).toEqual(['8:Ana', '47:Bia']);
+    startSession(corrida, 5_000);
+    expect(copiarCompetidores(corrida, tomada)).toBe(false); // corrida já largou: não mexe
+  });
+
+  it('com programaId só liga as provas do mesmo programa', () => {
+    const a = createSession({ id: 'a', name: 'X · TOMADA', type: 'classificacao', durationMin: 5, now: 0, programaId: 'p1' });
+    const b = createSession({ id: 'b', name: 'X · CORRIDA', type: 'corrida', durationMin: 5, now: 0, programaId: 'p1' });
+    const c = createSession({ id: 'c', name: 'X · CORRIDA', type: 'corrida', durationMin: 5, now: 0, programaId: 'p2' });
+    expect(mesmoPrograma(a, b)).toBe(true);
+    expect(mesmoPrograma(a, c)).toBe(false);
   });
 
   it('formata tempo de volta', () => {

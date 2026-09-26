@@ -51,6 +51,8 @@ export type Session = {
   eventId?: string | null;
   groupId?: string | null;
   proofId?: string | null;
+  /** baterias criadas juntas do mesmo programa da agenda (ex.: Tomada de tempo + Corrida) */
+  programaId?: string | null;
   observations?: Observation[];
   competitors: Competitor[];
   /** Leituras do decoder que não viraram volta (volta mínima, kart encerrado, transponder desconhecido...). Só pra mostrar ao operador. */
@@ -96,6 +98,7 @@ export function createSession(input: {
   eventId?: string | null;
   groupId?: string | null;
   proofId?: string | null;
+  programaId?: string | null;
 }): Session {
   return {
     id: input.id,
@@ -116,6 +119,7 @@ export function createSession(input: {
     eventId: input.eventId ?? null,
     groupId: input.groupId ?? null,
     proofId: input.proofId ?? null,
+    programaId: input.programaId ?? null,
     observations: [],
     competitors: dedupeKarts(input.competitors ?? []).map((c) => ({
       kart: c.kart,
@@ -195,6 +199,23 @@ export function setCompetitors(session: Session, list: { kart: string; name: str
       finished: old?.finished ?? false,
     };
   });
+}
+
+/** Mesma bateria da agenda (Tomada de tempo + Corrida...). Baterias antigas sem programaId: mesmo nome
+ *  antes do " · " e criadas no mesmo minuto (é assim que o programa de provas cria). */
+export function mesmoPrograma(a: Session, b: Session) {
+  if (a.id === b.id) return false;
+  if (a.programaId || b.programaId) return Boolean(a.programaId) && a.programaId === b.programaId;
+  const base = (n: string) => { const i = n.lastIndexOf(' · '); return i > 0 ? n.slice(0, i).trim().toLowerCase() : null; };
+  const ba = base(a.name);
+  return ba !== null && ba === base(b.name) && Math.abs(a.createdAt - b.createdAt) <= 2 * 60_000;
+}
+
+/** Copia pilotos e números dos karts para outra bateria do mesmo programa que ainda não largou. */
+export function copiarCompetidores(destino: Session, origem: Session) {
+  if (destino.state !== 'preparando') return false;
+  setCompetitors(destino, origem.competitors.map((c) => ({ kart: c.kart, name: c.name, customerId: c.customerId ?? null, category: c.category ?? null })));
+  return true;
 }
 
 export function startSession(session: Session, now: number) {
