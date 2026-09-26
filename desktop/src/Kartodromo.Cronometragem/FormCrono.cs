@@ -61,7 +61,7 @@ public partial class FormCrono : Form
         BackColor = TemaCrono.Fundo;
         KeyPreview = true;
         if (autoteste == null) WindowState = FormWindowState.Maximized;
-        else { StartPosition = FormStartPosition.Manual; Location = new Point(0, 0); Size = Environment.GetEnvironmentVariable("KARTODROMO_AUTOTESTE_TAMANHO") is string t && t.Split('x') is [var w, var h] ? new Size(int.Parse(w), int.Parse(h)) : new Size(1600, 960); }
+        else { StartPosition = FormStartPosition.Manual; Location = Environment.GetEnvironmentVariable("KARTODROMO_TESTE") == "ordenacao" ? new Point(-4000, 0) : new Point(0, 0); ShowInTaskbar = Environment.GetEnvironmentVariable("KARTODROMO_TESTE") != "ordenacao"; Size = Environment.GetEnvironmentVariable("KARTODROMO_AUTOTESTE_TAMANHO") is string t && t.Split('x') is [var w, var h] ? new Size(int.Parse(w), int.Parse(h)) : new Size(1600, 960); }
         MinimumSize = new Size(1100, 700);
 
         MainMenuStrip = Menu();
@@ -296,6 +296,26 @@ public partial class FormCrono : Form
         _gPilotos.Columns.Add(new DataGridViewTextBoxColumn { Name = "name", HeaderText = "Competidor", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, MinimumWidth = 150 });
         _gPilotos.Columns.Add(new DataGridViewTextBoxColumn { Name = "customerId", HeaderText = "Cliente", Width = 92, ReadOnly = true });
         _gPilotos.Columns.Add(new DataGridViewTextBoxColumn { Name = "category", HeaderText = "Categoria", Width = 125 });
+        foreach (DataGridViewColumn col in _gPilotos.Columns) col.SortMode = DataGridViewColumnSortMode.Automatic;
+        // Nº em ordem numérica (5 antes de 10); nomes em ordem alfabética sem diferenciar maiúscula/acento
+        _gPilotos.SortCompare += (_, e) =>
+        {
+            var a = e.CellValue1?.ToString()?.Trim() ?? "";
+            var b = e.CellValue2?.ToString()?.Trim() ?? "";
+            if (e.Column.Name is "kart" or "customerId")
+            {
+                var na = long.TryParse(a, out var x); var nb = long.TryParse(b, out var y);
+                e.SortResult = na && nb ? x.CompareTo(y) : na ? -1 : nb ? 1 : string.Compare(a, b, StringComparison.CurrentCultureIgnoreCase);
+            }
+            else
+            {
+                // vazio vai para o fim
+                e.SortResult = a.Length == 0 && b.Length > 0 ? 1 : b.Length == 0 && a.Length > 0 ? -1
+                    : string.Compare(a, b, Fmt.Br, System.Globalization.CompareOptions.IgnoreCase | System.Globalization.CompareOptions.IgnoreNonSpace);
+            }
+            if (e.SortResult == 0) e.SortResult = e.RowIndex1.CompareTo(e.RowIndex2);
+            e.Handled = true;
+        };
         _gPilotos.CellValueChanged += (_, _) => _pilotosSujos = true;
         _gPilotos.UserDeletedRow += (_, _) => _pilotosSujos = true;
         var flagsPiloto = new ContextMenuStrip();
@@ -714,10 +734,15 @@ public partial class FormCrono : Form
             var comps = Crono.Arr(s0, "competitors");
             var atual = _gPilotos.Rows.Cast<DataGridViewRow>().Where(r => !r.IsNewRow).Select(r => $"{r.Cells[0].Value}|{r.Cells[1].Value}|{r.Cells[2].Value}|{r.Cells[3].Value}").ToList();
             var novo = comps.Select(c => $"{c.S("kart")}|{c.S("name")}|{c.S("customerId")}|{NomeCategoria(c.S("category"))}").ToList();
-            if (_pilotosDe != s0.S("id") || !atual.SequenceEqual(novo))
+            // compara o conteúdo, não a ordem: se o operador ordenou por Competidor/Nº, a ordem da tela fica
+            if (_pilotosDe != s0.S("id") || !atual.OrderBy(x => x, StringComparer.Ordinal).SequenceEqual(novo.OrderBy(x => x, StringComparer.Ordinal)))
             {
+                var ordenada = _gPilotos.SortedColumn;
+                var sentido = _gPilotos.SortOrder;
                 _gPilotos.Rows.Clear();
                 foreach (var c in comps) _gPilotos.Rows.Add(c.S("kart"), c.S("name"), c.S("customerId"), NomeCategoria(c.S("category")));
+                if (ordenada != null && sentido != SortOrder.None)
+                    _gPilotos.Sort(ordenada, sentido == SortOrder.Descending ? System.ComponentModel.ListSortDirection.Descending : System.ComponentModel.ListSortDirection.Ascending);
                 _pilotosSujos = false;
             }
             _pilotosDe = s0.S("id");
@@ -850,9 +875,43 @@ public partial class FormCrono : Form
 
     // ------------------------------------------------------------------ autoteste
 
+    /// <summary>Confere que a ordenação da aba 4–5 (Competidor e Nº) não é desfeita pelas atualizações ao vivo. Só lê do servidor.</summary>
+    async Task TesteOrdenacao()
+    {
+        var log = new List<string>();
+        try
+        {
+            await Atualizar();
+            var sessao = Crono.Arr(_state, "sessions").OrderByDescending(x => x.I("competitors")).FirstOrDefault();
+            if (sessao == null) { log.Add("pendente: nenhuma bateria"); return; }
+            Selecionar(sessao.S("id"));
+            _abas.SelectedIndex = 1; _tabsCompetidor.SelectedIndex = 0;
+            for (var i = 0; i < 10 && _gPilotos.Rows.Cast<DataGridViewRow>().Count(r => !r.IsNewRow) < 2; i++) { await Atualizar(); await Task.Delay(300); }
+            List<string> Coluna(int c) => _gPilotos.Rows.Cast<DataGridViewRow>().Where(r => !r.IsNewRow).Select(r => r.Cells[c].Value?.ToString() ?? "").ToList();
+            log.Add($"bateria {sessao.S("name")}: {Coluna(1).Count} competidores; ordem do servidor: {string.Join(" | ", Coluna(1).Take(6))}");
+            var cmp = StringComparer.Create(Fmt.Br, System.Globalization.CompareOptions.IgnoreCase | System.Globalization.CompareOptions.IgnoreNonSpace);
+            _gPilotos.Sort(_gPilotos.Columns["name"], System.ComponentModel.ListSortDirection.Ascending);
+            for (var i = 0; i < 5; i++) { await Atualizar(); await Task.Delay(700); }
+            var nomes = Coluna(1);
+            var esperado = nomes.Where(n => n.Length > 0).OrderBy(n => n, cmp).Concat(nomes.Where(n => n.Length == 0)).ToList();
+            log.Add((nomes.SequenceEqual(esperado) ? "OK" : "ERRO") + $" Competidor A-Z continua depois de 5 atualizações: {string.Join(" | ", nomes.Take(6))}");
+            _gPilotos.Sort(_gPilotos.Columns["name"], System.ComponentModel.ListSortDirection.Descending);
+            for (var i = 0; i < 3; i++) { await Atualizar(); await Task.Delay(700); }
+            nomes = Coluna(1);
+            log.Add((nomes.Where(n => n.Length > 0).SequenceEqual(nomes.Where(n => n.Length > 0).OrderByDescending(n => n, cmp)) ? "OK" : "ERRO") + $" Competidor Z-A: {string.Join(" | ", nomes.Take(4))}");
+            _gPilotos.Sort(_gPilotos.Columns["kart"], System.ComponentModel.ListSortDirection.Ascending);
+            for (var i = 0; i < 3; i++) { await Atualizar(); await Task.Delay(700); }
+            var karts = Coluna(0).Where(k => long.TryParse(k, out _)).Select(long.Parse).ToList();
+            log.Add((karts.SequenceEqual(karts.OrderBy(k => k)) ? "OK" : "ERRO") + $" Nº em ordem numérica: {string.Join(" ", karts.Take(12))}");
+        }
+        catch (Exception e) { log.Add("ERRO " + e); }
+        finally { File.WriteAllLines(Path.Combine(_autoteste, "log.txt"), log); Close(); }
+    }
+
     async Task AutoTeste()
     {
         Directory.CreateDirectory(_autoteste);
+        if (Environment.GetEnvironmentVariable("KARTODROMO_TESTE") == "ordenacao") { await TesteOrdenacao(); return; }
         void Foto(Control c, string nome)
         {
             Application.DoEvents();
