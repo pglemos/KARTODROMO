@@ -268,6 +268,7 @@ public class FormMoverCliente : Janela
         Tag = $"{r.S("cliente")} · hoje na {r.S("reserva")}";
 
         var cartaoTabela = KitVisual.CartaoSecao("Escolha a nova bateria");
+        cartaoTabela.AutoSize = false;
         cartaoTabela.Height = 360;
 
         _g.Colunas(
@@ -333,6 +334,8 @@ public class FormListaParticipantes : Janela
         Tag = $"{nomeBat} · {Fmt.Dmy(dataHora)} · para o briefing e a pista";
 
         var cartao = KitVisual.CartaoSecao(null);
+        cartao.AutoSize = false;
+        cartao.Dock = DockStyle.Fill;
         cartao.Height = 480;
 
         _g.Colunas(

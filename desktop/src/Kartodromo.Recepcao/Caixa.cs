@@ -618,6 +618,7 @@ public class FormVenda : Janela
         gi.Dock = DockStyle.Fill;
 
         var cartaoItens = KitVisual.CartaoSecao("Itens");
+        cartaoItens.AutoSize = false;
         cartaoItens.Height = 220;
         var pItens = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 8, 0, 0) };
         pItens.Controls.Add(gi);
@@ -631,6 +632,7 @@ public class FormVenda : Janela
         gp.Dock = DockStyle.Fill;
 
         var cartaoPags = KitVisual.CartaoSecao("Pagamentos");
+        cartaoPags.AutoSize = false;
         cartaoPags.Height = 160;
         var pPags = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 8, 0, 0) };
         pPags.Controls.Add(gp);
@@ -690,6 +692,7 @@ public class FormEstorno : Janela
         g.Dock = DockStyle.Fill;
 
         var cItens = KitVisual.CartaoSecao("Marque os itens a estornar");
+        cItens.AutoSize = false;
         cItens.Height = 220;
         var pGrid = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 8, 0, 0) };
         pGrid.Controls.Add(g);

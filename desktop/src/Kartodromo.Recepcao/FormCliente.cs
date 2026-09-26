@@ -638,7 +638,8 @@ public class FormPesquisarCliente : Janela
         _vazio = vazio;
 
         var cartaoGrade = KitVisual.CartaoSecao(null);
-        cartaoGrade.Height = 440;
+        cartaoGrade.AutoSize = false;
+        cartaoGrade.Dock = DockStyle.Fill;
         var pGrid = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 4, 0, 0) };
         pGrid.Controls.Add(_g);
         pGrid.Controls.Add(vazio);

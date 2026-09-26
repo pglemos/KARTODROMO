@@ -91,7 +91,8 @@ public static class Cadastros
         grade.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Valor", Width = 220, DefaultCellStyle = { Alignment = DataGridViewContentAlignment.MiddleRight } });
 
         var cartao = KitVisual.CartaoSecao(null);
-        cartao.Height = 490;
+        cartao.AutoSize = false;
+        cartao.Dock = DockStyle.Fill;
         var pGrid = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 4, 0, 0) };
         pGrid.Controls.Add(grade);
         cartao.Controls.Add(pGrid);

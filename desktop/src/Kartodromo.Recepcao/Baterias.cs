@@ -81,8 +81,8 @@ public class FormCriarReservas : Janela
     {
         Tag = "Gere as baterias do mês pelo padrão, ou uma reserva avulsa";
 
-        var painelPadrao = new Panel { Dock = DockStyle.Fill, AutoSize = true, BackColor = Color.Transparent };
-        var painelAvulsa = new Panel { Dock = DockStyle.Fill, AutoSize = true, BackColor = Color.Transparent, Visible = false };
+        var painelPadrao = new Panel { Dock = DockStyle.Fill, AutoSize = false, BackColor = Color.Transparent };
+        var painelAvulsa = new Panel { Dock = DockStyle.Fill, AutoSize = false, BackColor = Color.Transparent, Visible = false };
 
         // --- Aba 1: Pelo padrão ---
         var pad = Campos.Combo(); pad.Items.AddRange(Sessao.Padroes()); if (pad.Items.Count > 0) pad.SelectedIndex = 0;
@@ -182,6 +182,7 @@ public class FormBateria : Janela
         cartaoBateria.Controls.Add(campos);
 
         var cartaoProvas = KitVisual.CartaoSecao("Provas (vêm do produto)");
+        cartaoProvas.AutoSize = false;
         cartaoProvas.Height = 190;
         _gradeProvas.Colunas(
             new("ordem", "Ordem", TipoCol.Inteiro, 70),
@@ -337,6 +338,7 @@ public class FormAgenda : Janela
     public FormAgenda() : base("Agenda de Reservas de Bateria", 1340, 820)
     {
         var esq = KitVisual.CartaoSecao("Calendário do Mês");
+        esq.AutoSize = false;
         esq.Dock = DockStyle.Left; esq.Width = 290;
         var bImprimir = KitVisual.Botao("Imprimir agenda mensal");
         bImprimir.Dock = DockStyle.Bottom;
@@ -391,6 +393,7 @@ public class FormAgenda : Janela
         ];
 
         var cGrid = KitVisual.CartaoSecao("Reservas da Bateria");
+        cGrid.AutoSize = false;
         cGrid.Height = 240;
         _g.Dock = DockStyle.Fill;
         var pGrid = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 8, 0, 0) };

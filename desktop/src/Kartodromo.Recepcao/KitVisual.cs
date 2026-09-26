@@ -81,6 +81,16 @@ public static class KitVisual
 
             var corpo = new Panel { Dock = DockStyle.Fill, BackColor = Fundo, Padding = new Padding(18, 14, 18, 14), AutoScroll = true };
             corpo.Controls.AddRange(meio);
+
+            // No WinForms, docking é processado em ordem decrescente de índice na coleção Controls.
+            // Para Dock = DockStyle.Fill funcionar sem cobrir controles Dock = Top/Bottom/Left:
+            // O controle com Fill DEVE estar no índice 0 da coleção Controls.
+            foreach (Control c in corpo.Controls)
+            {
+                if (c.Dock == DockStyle.Fill)
+                    corpo.Controls.SetChildIndex(c, 0);
+            }
+
             f.Controls.Add(corpo);
 
             if (rodape != null)
@@ -96,15 +106,21 @@ public static class KitVisual
                 f.Controls.Add(rodape);
             }
 
-            // o Produto tem o próprio cabeçalho (design aprovado): sem a barra genérica
+            Control cab = null;
             if (f is not FormCadastro { EhProduto: true })
             {
-                var cab = Cabecalho(f, f.Text);
+                cab = Cabecalho(f, f.Text);
                 f.Controls.Add(cab);
             }
             else corpo.Padding = new Padding(0);
 
-            corpo.SendToBack();
+            // Regra crucial de docking do Windows Forms:
+            // O controle com Dock = Fill deve SEMPRE estar no índice 0 (fundo do z-order)
+            // Os controles com Dock = Bottom e Dock = Top devem ter índices maiores para fatiar as bordas.
+            f.Controls.SetChildIndex(corpo, 0);
+            if (rodape != null) f.Controls.SetChildIndex(rodape, 1);
+            if (cab != null) f.Controls.SetChildIndex(cab, rodape != null ? 2 : 1);
+
             f.Resize += (_, _) => AplicarRaio(f, 18);
             AplicarRaio(f, 18);
         }
@@ -450,8 +466,13 @@ public static class KitVisual
         AplicarRaio(p, 14);
         if (!string.IsNullOrEmpty(titulo))
         {
-            var l = new Label { Text = titulo, Dock = DockStyle.Top, Height = 24, Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Texto };
+            var l = new Label { Name = "tituloSecao", Text = titulo, Dock = DockStyle.Top, Height = 24, Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Texto };
             p.Controls.Add(l);
+            p.ControlAdded += (_, e) =>
+            {
+                if (e.Control != l && p.Controls.Contains(l))
+                    p.Controls.SetChildIndex(l, p.Controls.Count - 1);
+            };
         }
         return p;
     }
