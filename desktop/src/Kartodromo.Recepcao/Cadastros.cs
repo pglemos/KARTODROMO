@@ -45,6 +45,13 @@ public static class Cadastros
 
     public static void Abrir(Form dono, string ent)
     {
+        if (CadastrosDesign.Tem(ent))
+        {
+            var d = CadastrosDesign.Criar(ent);
+            d.FormClosed += (_, _) => { if (!dono.IsDisposed) dono.Activate(); };
+            d.ShowDialog(dono);
+            return;
+        }
         var f = new FormCadastro(ent, Defs[ent]);
         f.FormClosed += (_, _) => Seguro.Rodar(dono, Sessao.CarregarApoio);
         f.Show(dono);

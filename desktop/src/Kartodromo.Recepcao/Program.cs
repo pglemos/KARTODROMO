@@ -10,12 +10,13 @@ static class Program
     {
         ApplicationConfiguration.Initialize();
         KitVisual.Instalar();
+        Forma.Icones = VisualPrincipal.Icone;
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
         Application.ThreadException += (_, e) => MessageBox.Show(e.Exception.Message, "Kartódromo - Módulo Office", MessageBoxButtons.OK, MessageBoxIcon.Error);
         Thread.CurrentThread.CurrentCulture = Fmt.Br;
         Thread.CurrentThread.CurrentUICulture = Fmt.Br;
         var args = Environment.GetCommandLineArgs();
-        if (args.Length >= 5 && args[1] is "--autoteste" or "--teste-relatorio" or "--teste-filtro" or "--teste-bateria")
+        if (args.Length >= 5 && args[1] is "--autoteste" or "--teste-relatorio" or "--teste-filtro" or "--teste-bateria" or "--teste-telas")
         {
             var ctx = new ApplicationContext();
             Application.Idle += Inicio;
@@ -30,6 +31,7 @@ static class Program
                     if (args[1] == "--teste-relatorio") await AutoTeste.RodarRelatorios(args[2], args[3], args[4]);
                     else if (args[1] == "--teste-filtro") await AutoTeste.RodarFiltro(args[2], args[3], args[4]);
                     else if (args[1] == "--teste-bateria") await AutoTeste.RodarBateria(args[2], args[3], args[4]);
+                    else if (args[1] == "--teste-telas") await AutoTeste.RodarTelas(args[2], args[3], args[4]);
                     else
                         await AutoTeste.Rodar(args[2], args[3], args[4], reservaIdTeste, vendaIdTeste, movimentoIdTeste);
                 }

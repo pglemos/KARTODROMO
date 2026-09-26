@@ -1,88 +1,115 @@
+using System.Text.Json.Nodes;
 using System.Diagnostics;
 using Kartodromo.Comum;
 
 namespace Kartodromo.Recepcao;
 
-/// <summary>Troca de senha da sessão atual.</summary>
-public sealed class FormTrocarSenha : Janela
+/// <summary>Trocar minha senha (TrocarSenha.dc.html).</summary>
+public sealed class FormTrocarSenha : DialogoDesign
 {
-    public FormTrocarSenha() : base("Trocar minha senha", 480, 360)
+    public FormTrocarSenha() : base("Trocar minha senha", Sessao.Nome, "M14 7a4 4 0 1 1-3.9 5H4v3h3v3h3v-3.1", "linear-gradient(180deg, #9A9AA0, #4A4A4F)")
     {
-        var atual = new TextBox { UseSystemPasswordChar = true, Width = 360 };
-        var nova = new TextBox { UseSystemPasswordChar = true, Width = 360 };
-        var confirmar = new TextBox { UseSystemPasswordChar = true, Width = 360 };
-        var dica = new Label { Text = "Use pelo menos 8 caracteres. A senha nova passa a valer no próximo acesso.", Dock = DockStyle.Top, Height = 34, ForeColor = KitVisual.Secundario };
-        var campos = Campos.Grade(1);
-        Campos.Add(campos, "Senha atual", atual);
-        Campos.Add(campos, "Nova senha", nova);
-        Campos.Add(campos, "Repita a nova senha", confirmar);
-        var corpo = new Panel { Dock = DockStyle.Fill, Padding = new Padding(4, 8, 4, 0) };
-        corpo.Controls.Add(campos);
-        corpo.Controls.Add(dica);
-        Controls.Add(corpo);
-        Rodape(("Cancelar", (_, _) => Close(), false), ("Salvar senha", (_, _) => Seguro.Rodar(this, async () =>
+        TextBox Senha() { var t = PecasDesign.Texto("", 100); t.UseSystemPasswordChar = true; return t; }
+        var atual = Senha(); var nova = Senha(); var confirmar = Senha();
+        var g = Secao(null);
+        Campo(g, "Senha atual", atual, 6);
+        Campo(g, "Nova senha", nova, 3);
+        Campo(g, "Repetir a nova senha", confirmar, 3);
+        Nota("Use pelo menos 8 caracteres. A senha é só sua: o que você fizer no caixa fica registrado no seu nome.");
+        BotaoRodape("Trocar senha", true, () => Seguro.Rodar(this, async () =>
         {
             if (string.IsNullOrEmpty(atual.Text)) { Msg.Aviso(this, "Informe sua senha atual."); atual.Focus(); return; }
-            if (nova.Text.Length < 8) { Msg.Aviso(this, "A senha precisa ter pelo menos 8 caracteres."); return; }
+            if (nova.Text.Length < 8) { Msg.Aviso(this, "A senha precisa ter pelo menos 8 caracteres."); nova.Focus(); return; }
             if (nova.Text != confirmar.Text) { Msg.Aviso(this, "As senhas não conferem."); confirmar.SelectAll(); confirmar.Focus(); return; }
             var r = await Sessao.Api.Post("/api/office/senha", new { senhaAtual = atual.Text, nova = nova.Text });
             Msg.Info(this, r.S("mensagem"));
             DialogResult = DialogResult.OK;
             Close();
-        }), true));
+        }));
+        BotaoRodape("Cancelar", false, Close);
         Shown += (_, _) => atual.Focus();
     }
 }
 
-/// <summary>Estado de conectividade e atalhos para os serviços publicados do kartódromo.</summary>
-public sealed class FormServicosOnline : Janela
+/// <summary>Serviços online (ServicosOnline.dc.html): situação de cada serviço, ações e o QR code do check-in.
+/// A situação vem do servidor (/servicos-online) e das verificações feitas daqui (site e telão).</summary>
+public sealed class FormServicosOnline : DialogoDesign
 {
-    readonly Panel[] _cards;
-    public FormServicosOnline() : base("Serviços online", 700, 390)
+    readonly TabelaDesign _tabela;
+    readonly CheckBox _agenda = new() { Text = "Publicar agenda no site" };
+    readonly CheckBox _lembrete = new() { Text = "Enviar lembrete 2 h antes pelo WhatsApp" };
+    const string UrlCheckin = "kartodromodebetim.com.br/checkin";
+
+    public FormServicosOnline() : base("Serviços online", "Site, reservas online, WhatsApp e telão", "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2z", "linear-gradient(180deg, #6FD6FF, #0A84FF)")
     {
-        var titulo = new Label { Text = "Serviços online", Dock = DockStyle.Top, Height = 28, Font = new Font("Segoe UI", 15F, FontStyle.Bold) };
-        var sub = new Label { Text = "Conectividade do Módulo Office, cronometragem e site público.", Dock = DockStyle.Top, Height = 24, ForeColor = KitVisual.Secundario };
-        var cards = new TableLayoutPanel { Dock = DockStyle.Top, Height = 82, ColumnCount = 3, RowCount = 1, Padding = new Padding(0, 6, 0, 4) };
-        for (var i = 0; i < 3; i++) cards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.333F));
-        _cards = [KitVisual.CartaoResumo("Servidor da operação", "Verificando"), KitVisual.CartaoResumo("Cronometragem", "Verificando"), KitVisual.CartaoResumo("Site", "Verificando")];
-        for (var i = 0; i < _cards.Length; i++) cards.Controls.Add(_cards[i], i, 0);
-        var urls = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 96, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(4, 7, 4, 0) };
-        urls.Controls.Add(new Label { Text = "Servidor: " + Config.ServidorUrl, AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) });
-        urls.Controls.Add(new Label { Text = "Cronometragem: " + Config.CronoUrl, AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) });
-        var site = new LinkLabel { Text = "Abrir site do Kartódromo", AutoSize = true, LinkColor = KitVisual.Verde, Margin = new Padding(0, 4, 0, 0) };
-        site.LinkClicked += (_, _) => Process.Start(new ProcessStartInfo("https://www.kartodromodebetim.com.br") { UseShellExecute = true });
-        urls.Controls.Add(site);
-        var info = new Label { Text = "Cadastro e agenda online são publicados pelo site. O estado de conectividade não indica disponibilidade de pagamentos.", Dock = DockStyle.Fill, ForeColor = KitVisual.Secundario, Padding = new Padding(4, 0, 4, 0) };
-        var corpo = new Panel { Dock = DockStyle.Fill, Padding = new Padding(4, 4, 4, 0) };
-        corpo.Controls.Add(info); corpo.Controls.Add(urls); corpo.Controls.Add(cards); corpo.Controls.Add(sub); corpo.Controls.Add(titulo);
-        Controls.Add(corpo);
-        Rodape(("Fechar", (_, _) => Close(), true));
-        Shown += async (_, _) => await Atualizar();
+        _tabela = SecaoTabelaDesign("Situação");
+        _tabela.Colunas(new("Serviço", 5f), new("Situação", 1.6f), new("Última sincronização", 2f));
+        _tabela.Linhas([["Verificando…", "", ""]]);
+        var g = Secao("Ações");
+        Marca(g, _agenda, 3, false);
+        Marca(g, _lembrete, 3, false);
+        var qr = AcaoCampo("Imprimir QR");
+        qr.Click += (_, _) => ImprimirQr();
+        var url = PecasDesign.Texto(UrlCheckin); url.ReadOnly = true; url.BackColor = Color.White;
+        Campo(g, "QR code do check-in", url, 6, qr);
+        var dica = new ToolTip();
+        foreach (var ck in new[] { _agenda, _lembrete }) ck.Enabled = false;
+        BotaoRodape("Sincronizar agora", true, () => Seguro.Rodar(this, Atualizar));
+        BotaoRodape("Fechar", false, Close);
+        Shown += (_, _) => Seguro.Rodar(this, Atualizar);
+        Load += (_, _) => { dica.SetToolTip(_agenda, "Aguardando a situação do servidor"); };
     }
 
     async Task Atualizar()
     {
-        await Verificar("/healthz", _cards[0]);
-        await VerificarUrl(Config.CronoUrl.TrimEnd('/') + "/healthz", _cards[1]);
-        await VerificarUrl("https://www.kartodromodebetim.com.br", _cards[2]);
+        var agora = DateTime.Now.ToString("dd/MM HH:mm");
+        var linhas = new List<string[]>();
+        JsonObject resp = null;
+        try { resp = (await Sessao.Api.Get("/api/office/servicos-online")).AsObject(); } catch { }
+        string Sit(bool? on) => on == true ? "On-line" : on == false ? "Fora do ar" : "Não configurado";
+        var site = await Testar("https://www.kartodromodebetim.com.br");
+        linhas.Add(["Site kartodromodebetim.com.br", Sit(site), site != null ? agora : "—"]);
+        var reservas = resp?["servicos"]?.AsArray().OfType<JsonObject>().FirstOrDefault(x => x.S("id") == "reservas-online");
+        linhas.Add(["Reservas online (totem e site)", reservas == null ? "Fora do ar" : Sit(reservas["online"]?.GetValue<bool?>()), reservas?.D("verificadoEm") is DateTime dr ? dr.ToString("dd/MM HH:mm") : agora]);
+        var wpp = resp?["servicos"]?.AsArray().OfType<JsonObject>().FirstOrDefault(x => x.S("id") == "whatsapp");
+        linhas.Add(["WhatsApp (resultados e lembretes)", Sit(wpp?["online"]?.GetValue<bool?>()), wpp?.D("verificadoEm") is DateTime dw ? dw.ToString("dd/MM HH:mm") : "—"]);
+        var tv = await Testar(Config.CronoUrl.TrimEnd('/') + "/healthz");
+        linhas.Add(["Classificação ao vivo / telão", Sit(tv), tv != null ? "agora" : "—"]);
+        if (IsDisposed) return;
+        _tabela.Linhas(linhas);
+        var acoes = resp?["acoes"] as JsonObject;
+        var dica = new ToolTip();
+        void Acao(CheckBox ck, string chave)
+        {
+            var a = acoes?[chave] as JsonObject;
+            ck.Enabled = a?.B("disponivel") == true;
+            dica.SetToolTip(ck, ck.Enabled ? "" : a?.S("motivo") ?? "Indisponível");
+        }
+        Acao(_agenda, "publicarAgenda");
+        Acao(_lembrete, "enviarLembreteWhatsApp");
     }
 
-    static async Task Verificar(string path, Panel card)
-    {
-        try { await Sessao.Api.Get(path); KitVisual.ValorCartao(card, "On-line", Color.FromArgb(28, 107, 53)); }
-        catch { KitVisual.ValorCartao(card, "Off-line", Color.FromArgb(196, 40, 28)); }
-    }
-
-    static async Task VerificarUrl(string url, Panel card)
+    static async Task<bool?> Testar(string url)
     {
         try
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(4) };
-            using var resposta = await http.GetAsync(url);
-            var ok = resposta.IsSuccessStatusCode;
-            KitVisual.ValorCartao(card, ok ? "On-line" : "Off-line", ok ? Color.FromArgb(28, 107, 53) : Color.FromArgb(196, 40, 28));
+            using var r = await http.GetAsync(url);
+            return r.IsSuccessStatusCode;
         }
-        catch { KitVisual.ValorCartao(card, "Off-line", Color.FromArgb(196, 40, 28)); }
+        catch { return false; }
+    }
+
+    void ImprimirQr()
+    {
+        var html = "<!doctype html><html lang=pt-BR><meta charset=utf-8><title>QR code do check-in</title>" +
+            "<style>body{font-family:'Segoe UI',sans-serif;text-align:center;margin:40px;color:#1D1D1F}h1{font-size:26px;margin:0 0 6px}p{color:#6E6E73;font-size:16px}#qr{margin:28px auto;width:320px;height:320px}</style>" +
+            "<h1>Check-in do Kartódromo</h1><p>Aponte a câmera do celular para o código</p><div id=qr></div><p><b>https://" + UrlCheckin + "</b></p>" +
+            "<script src='https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js'></script>" +
+            "<script>try{var q=qrcode(0,'M');q.addData('https://" + UrlCheckin + "');q.make();document.getElementById('qr').innerHTML=q.createSvgTag({cellSize:8,margin:0,scalable:true});}catch(e){document.getElementById('qr').outerHTML='<p>Sem internet para gerar o QR code: use o endereço abaixo.</p>'}setTimeout(function(){print()},500)</script></html>";
+        var arq = Path.Combine(Path.GetTempPath(), "kartodromo-qr-checkin.html");
+        File.WriteAllText(arq, html, new System.Text.UTF8Encoding(false));
+        Relatorio.Abrir(this, new Uri(arq).AbsoluteUri, "QR code do check-in");
     }
 }
 

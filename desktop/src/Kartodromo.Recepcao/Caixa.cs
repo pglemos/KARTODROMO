@@ -601,157 +601,87 @@ public class FormCheckout : Janela, ISemKit
     });
 }
 
-public class FormVenda : Janela
+/// <summary>Visualizar métodos de pagamento da venda (MetodosPagamento.dc.html): itens, pagamentos e totais.</summary>
+public class FormVenda : DialogoDesign
 {
-    public FormVenda(long id) : base("Visualizar métodos de pagamento", 960, 680)
+    public FormVenda(long id) : base("Visualizar métodos de pagamento", "Carregando a venda…", "M2 5h20v14H2zM2 10h20M6 15h4", "linear-gradient(180deg, #5EDB7A, #1E9E4A)")
     {
-        var gi = new Grade();
-        gi.Colunas(
-            new("item", "Item", TipoCol.Inteiro, 60),
-            new("descricao", "Descrição", Largura: 320),
-            new("quantidade", "Qtde", TipoCol.Inteiro, 60),
-            new("unitario", "Unitário", TipoCol.Dinheiro, 90),
-            new("desconto", "Desconto", TipoCol.Dinheiro, 90),
-            new("liquido", "Líquido", TipoCol.Dinheiro, 100),
-            new("estornado", "Estornado", TipoCol.Bool, 80)
-        );
-        gi.Dock = DockStyle.Fill;
+        var itens = SecaoTabelaDesign("Itens");
+        itens.Colunas(new("Item", 60), new("Descrição", 330), new("Qtde", 60, Direita: true), new("Unitário", 90, Direita: true), new("Desconto", 90, Direita: true), new("Líquido", 100, Direita: true), new("Estornado", 80, Marca: true));
+        itens.MaxLinhas = 6;
+        var pags = SecaoTabelaDesign("Pagamentos");
+        pags.Colunas(new("Método de pagamento", 600), new("Valor (R$)", 140, Direita: true));
+        pags.MaxLinhas = 4;
+        var totais = new Label { AutoSize = true, Font = new Font("Segoe UI", 9.6F), ForeColor = Color.FromArgb(58, 58, 60) };
+        var gNota = Secao(null);
+        var nota = (TableLayoutPanel)gNota.Parent;
+        nota.BackColor = Fundo; gNota.BackColor = Fundo;
+        totais.BackColor = Fundo; totais.Margin = new Padding(0, 2, 0, 2);
+        gNota.Controls.Add(totais); gNota.SetColumnSpan(totais, 6);
 
-        var cartaoItens = KitVisual.CartaoSecao("Itens");
-        cartaoItens.AutoSize = false;
-        cartaoItens.Height = 220;
-        var pItens = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 8, 0, 0) };
-        pItens.Controls.Add(gi);
-        cartaoItens.Controls.Add(pItens);
-
-        var gp = new Grade();
-        gp.Colunas(
-            new("forma", "Método de pagamento", Largura: 400),
-            new("valor", "Valor (R$)", TipoCol.Dinheiro, 140)
-        );
-        gp.Dock = DockStyle.Fill;
-
-        var cartaoPags = KitVisual.CartaoSecao("Pagamentos");
-        cartaoPags.AutoSize = false;
-        cartaoPags.Height = 160;
-        var pPags = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 8, 0, 0) };
-        pPags.Controls.Add(gp);
-        cartaoPags.Controls.Add(pPags);
-
-        var nota = new Panel { Dock = DockStyle.Top, Height = 48, BackColor = Color.FromArgb(245, 245, 247), Padding = new Padding(14, 10, 14, 10), Margin = new Padding(0, 0, 0, 12) };
-        nota.Paint += (_, e) =>
-        {
-            using var pen = new Pen(Color.FromArgb(232, 232, 236));
-            e.Graphics.DrawRectangle(pen, 0, 0, nota.Width - 1, nota.Height - 1);
-        };
-        var lblTotais = new Label { Dock = DockStyle.Fill, ForeColor = Color.FromArgb(58, 58, 60), Font = new Font("Segoe UI", 9.2F) };
-        nota.Controls.Add(lblTotais);
-
-        Controls.Add(nota);
-        Controls.Add(cartaoPags);
-        Controls.Add(cartaoItens);
-
-        Rodape(
-            ("Imprimir comprovante", (_, _) => Relatorio.Abrir(this, Sessao.Api.UrlComToken("/relatorio/venda?id=" + id), "Comprovante"), false),
-            ("Fechar", (_, _) => Close(), true)
-        );
+        BotaoRodape("Fechar", true, Close);
+        BotaoRodape("Imprimir comprovante", false, () => Relatorio.Abrir(this, Sessao.Api.UrlComToken("/relatorio/venda?id=" + id), "Comprovante"));
 
         Load += (_, _) => Seguro.Rodar(this, async () =>
         {
             var v = await Sessao.Api.Get($"/api/office/vendas/{id}");
-            Tag = $"Venda nº {v.S("codigo")} · {v.S("cliente")} · {Fmt.DmyHm(v.S("dataHora"))} · {v.S("usuario")} · {v.S("terminal")}";
-            gi.Carregar(((JsonArray)v["itens"]).OfType<JsonObject>());
-            gp.Carregar(((JsonArray)v["pagamentos"]).OfType<JsonObject>());
-            lblTotais.Text = $"Total {Fmt.Brl(v.L("final"))} · Desconto {Fmt.Brl(v.L("desconto"))} · Recebido {Fmt.Brl(v.L("recebido"))} · Troco {Fmt.Brl(v.L("troco"))} · Estornos {Fmt.Brl(v.L("estorno"))}";
+            Subtitulo.Text = $"Venda {v.S("codigo")} · {v.S("cliente")} · {Fmt.DmyHm(v.S("dataHora"))} · {v.S("usuario")} · {v.S("terminal")}";
+            var lista = ((JsonArray)v["itens"]).OfType<JsonObject>().ToList();
+            itens.Linhas(lista.Select((i, n) => new[] { i.S("item") is { Length: > 0 } it ? it : (n + 1).ToString(), i.S("descricao"), i.S("quantidade"), Fmt.Dinheiro(i.L("unitario")), Fmt.Dinheiro(i.L("desconto")), Fmt.Dinheiro(i.L("liquido")), i.B("estornado") ? "1" : "0" }));
+            pags.Linhas(((JsonArray)v["pagamentos"]).OfType<JsonObject>().Select(p => new[] { p.S("forma"), Fmt.Dinheiro(p.L("valor")) }));
+            var voucher = v.S("voucher") is { Length: > 0 } cod ? $" (voucher {cod})" : "";
+            totais.Text = $"Total {Fmt.Brl(v.L("bruto"))} · Desconto {Fmt.Brl(v.L("desconto"))}{voucher} · Recebido {Fmt.Brl(v.L("recebido"))} · Troco {Fmt.Brl(v.L("troco"))} · Estornos {Fmt.Brl(v.L("estorno"))}";
         });
     }
 }
 
-public class FormEstorno : Janela
+/// <summary>Estornar pagamento (Estorno.dc.html): resumo, itens a estornar (marca) e o motivo obrigatório.</summary>
+public class FormEstorno : DialogoDesign
 {
-    public FormEstorno(long id) : base("Estornar pagamento", 960, 680)
+    public FormEstorno(long id) : base("Estornar pagamento", "Carregando a venda…", "M4 12a8 8 0 1 0 2.3-5.7M4 4v4h4", "linear-gradient(180deg, #FF7A6B, #E0342A)")
     {
-        var txtRecebido = new TextBox { ReadOnly = true };
-        var txtDesconto = new TextBox { ReadOnly = true };
-        var txtTroco = new TextBox { ReadOnly = true };
+        var recebido = FormCaixaTransacao.Leitura("—"); var desconto = FormCaixaTransacao.Leitura("—"); var troco = FormCaixaTransacao.Leitura("—");
+        var g = Secao("Resumo");
+        Campo(g, "Total recebido", recebido, 2);
+        Campo(g, "Descontos", desconto, 2);
+        Campo(g, "Troco", troco, 2);
+        var tabela = SecaoTabelaDesign("Marque os itens a estornar");
+        tabela.Colunas(new("", 40, Marca: true), new("Item", 600), new("Qtde", 70, Direita: true), new("Total líquido", 130, Direita: true));
+        tabela.MarcasEditaveis = true; tabela.MaxLinhas = 6;
+        var motivo = PecasDesign.Texto("", 400);
+        var gm = Secao("Motivo (obrigatório)");
+        Campo(gm, "Motivo do estorno", motivo, 6);
+        List<JsonObject> itens = [];
 
-        var gResumo = Campos.Grade(6);
-        Campos.Add(gResumo, "Total recebido", txtRecebido, 2);
-        Campos.Add(gResumo, "Descontos", txtDesconto, 2);
-        Campos.Add(gResumo, "Troco", txtTroco, 2);
-
-        var cResumo = KitVisual.CartaoSecao("Resumo");
-        cResumo.Controls.Add(gResumo);
-
-        var g = new Grade(true);
-        g.Colunas(
-            new("descricao", "Item", Largura: 420),
-            new("quantidade", "Qtde", TipoCol.Inteiro, 70),
-            new("liquido", "Total líquido", TipoCol.Dinheiro, 130)
-        );
-        g.Dock = DockStyle.Fill;
-
-        var cItens = KitVisual.CartaoSecao("Marque os itens a estornar");
-        cItens.AutoSize = false;
-        cItens.Height = 220;
-        var pGrid = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 8, 0, 0) };
-        pGrid.Controls.Add(g);
-        cItens.Controls.Add(pGrid);
-
-        var motivo = Campos.Texto(400);
-        var gMotivo = Campos.Grade(6);
-        Campos.Add(gMotivo, "Motivo do estorno", motivo, 6);
-
-        var cMotivo = KitVisual.CartaoSecao("Motivo (obrigatório)");
-        cMotivo.Controls.Add(gMotivo);
-
-        Controls.Add(cMotivo);
-        Controls.Add(cItens);
-        Controls.Add(cResumo);
-
-        Button btnEstornar = null;
-        void AtualizarBotao()
+        Button estornar = null;
+        List<JsonObject> Marcados() => itens.Where((_, i) => i < tabela.Dados.Count && tabela.Dados[i][0] == "1").ToList();
+        void Atualizar()
         {
-            var sel = g.Marcados;
-            var soma = sel.Sum(i => i.L("liquido") ?? 0);
-            if (btnEstornar != null) btnEstornar.Text = soma > 0 ? $"Estornar {Fmt.Brl(soma)}" : "Estornar";
+            var soma = Marcados().Sum(i => i.L("liquido") ?? 0);
+            estornar.Text = soma > 0 ? $"Estornar {Fmt.Brl(soma)}" : "Estornar";
         }
-        g.ItemMarcadoMudou += () => AtualizarBotao();
-
-        var rodapeCtrl = Rodape("Devolva o valor pela mesma forma de pagamento.",
-            ("Cancelar", (_, _) => Close(), false),
-            ("Estornar", (_, _) => Seguro.Rodar(this, async () =>
-            {
-                var sel = g.Marcados;
-                if (sel.Count == 0) { Msg.Aviso(this, "Selecione os itens a estornar."); return; }
-                if (string.IsNullOrWhiteSpace(motivo.Text)) { Msg.Aviso(this, "Informe o motivo do estorno."); return; }
-                if (!Msg.Pergunta(this, "Tem certeza que deseja estornar os produtos selecionados?")) return;
-                var r = await Sessao.Api.Post($"/api/office/vendas/{id}/estorno", new { itemIds = sel.Select(i => i.L("id")).ToArray(), motivo = motivo.Text.Trim() });
-                Msg.Info(this, $"Estorno de {Fmt.Brl(r.L("estornado"))} registrado. Devolva o valor ao cliente pela mesma forma de pagamento.");
-                DialogResult = DialogResult.OK; Close();
-            }), true)
-        );
-
-        if (rodapeCtrl is Panel pnl)
+        estornar = BotaoRodape("Estornar", true, () => Seguro.Rodar(this, async () =>
         {
-            var flw = pnl.Controls.OfType<FlowLayoutPanel>().FirstOrDefault();
-            btnEstornar = flw?.Controls.OfType<Button>().FirstOrDefault(b => b.Text.StartsWith("Estornar"));
-            if (btnEstornar != null)
-            {
-                btnEstornar.BackColor = Color.FromArgb(224, 52, 42);
-                btnEstornar.ForeColor = Color.White;
-            }
-        }
+            var sel = Marcados();
+            if (sel.Count == 0) { Msg.Aviso(this, "Marque os itens a estornar."); return; }
+            if (string.IsNullOrWhiteSpace(motivo.Text)) { Msg.Aviso(this, "Informe o motivo do estorno."); motivo.Focus(); return; }
+            if (!Msg.Pergunta(this, $"Estornar {Fmt.Brl(sel.Sum(i => i.L("liquido") ?? 0))} dos itens marcados?")) return;
+            var r = await Sessao.Api.Post($"/api/office/vendas/{id}/estorno", new { itemIds = sel.Select(i => i.L("id")).ToArray(), motivo = motivo.Text.Trim() });
+            Msg.Info(this, $"Estorno de {Fmt.Brl(r.L("estornado"))} registrado. Devolva o valor ao cliente pela mesma forma de pagamento.");
+            DialogResult = DialogResult.OK; Close();
+        }));
+        BotaoRodape("Cancelar", false, Close);
+        TextoRodape("Devolva o valor pela mesma forma de pagamento.");
+        tabela.MarcaMudou += (_, _) => Atualizar();
 
         Load += (_, _) => Seguro.Rodar(this, async () =>
         {
             var v = await Sessao.Api.Get($"/api/office/vendas/{id}");
-            Tag = $"Venda nº {v.S("codigo")} · {v.S("cliente")} · {Fmt.DmyHm(v.S("dataHora"))} · terminal {v.S("terminal")}";
-            txtRecebido.Text = Fmt.Brl(v.L("recebido"));
-            txtDesconto.Text = Fmt.Brl(v.L("desconto"));
-            txtTroco.Text = Fmt.Brl(v.L("troco"));
-            g.Carregar(((JsonArray)v["itens"]).OfType<JsonObject>().Where(i => !i.B("estornado")));
-            AtualizarBotao();
+            Subtitulo.Text = $"Venda {v.S("codigo")} · {v.S("cliente")} · {Fmt.DmyHm(v.S("dataHora"))} · terminal {v.S("terminal")}";
+            recebido.Text = Fmt.Brl(v.L("recebido")); desconto.Text = Fmt.Brl(v.L("desconto")); troco.Text = Fmt.Brl(v.L("troco"));
+            itens = ((JsonArray)v["itens"]).OfType<JsonObject>().Where(i => !i.B("estornado")).ToList();
+            tabela.Linhas(itens.Select(i => new[] { itens.Count == 1 ? "1" : "0", i.S("descricao"), i.S("quantidade"), Fmt.Dinheiro(i.L("liquido")) }));
+            Atualizar();
         });
     }
 }

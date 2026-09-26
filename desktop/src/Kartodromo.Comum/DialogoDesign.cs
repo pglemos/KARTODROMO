@@ -1,7 +1,6 @@
 using System.Drawing.Drawing2D;
-using Kartodromo.Comum;
 
-namespace Kartodromo.Recepcao;
+namespace Kartodromo.Comum;
 
 /// <summary>
 /// Janela de formulário do design aprovado (Dialogo.dc.html): cabeçalho com ícone, título, subtítulo e ✕;
@@ -20,9 +19,13 @@ public class DialogoDesign : CartaoModal
     /// <summary>largura útil das seções (a janela menos as margens e a barra de rolagem)</summary>
     readonly int _larguraSecao;
     readonly FlowLayoutPanel _botoes;
+    readonly Panel _cab, _rod, _corpo;
     protected readonly Label Subtitulo;
 
-    public DialogoDesign(string titulo, string sub, string icone, int largura = 960, int altura = 680) : this(titulo, sub, VisualPrincipal.Icone(icone), largura, altura) { }
+    public DialogoDesign(string titulo, string sub, string icone, int largura = 960, int altura = 680) : this(titulo, sub, Forma.Icone(icone), largura, altura) { }
+
+    /// <summary>Com o ícone do canvas: caminho SVG + degradê CSS (ex.: "linear-gradient(180deg, #9A9AA0, #4A4A4F)").</summary>
+    public DialogoDesign(string titulo, string sub, string svg, string corCss, int largura = 960, int altura = 680) : this(titulo, sub, Forma.Tile(svg, corCss), largura, altura) { }
 
     public DialogoDesign(string titulo, string sub, Image icone, int largura = 960, int altura = 680) : base(largura, altura)
     {
@@ -30,12 +33,12 @@ public class DialogoDesign : CartaoModal
         BackColor = Fundo;
 
         // cabeçalho
-        var cab = new Panel { Dock = DockStyle.Top, Height = 62, BackColor = Color.White };
+        var cab = _cab = new Panel { Dock = DockStyle.Top, Height = 62, BackColor = Color.White };
         cab.Paint += (_, e) => { using var pen = new Pen(Color.FromArgb(230, 230, 234)); e.Graphics.DrawLine(pen, 0, cab.Height - 1, cab.Width, cab.Height - 1); };
         var ic = new PictureBox { Image = icone, SizeMode = PictureBoxSizeMode.Zoom, Size = new Size(36, 36), BackColor = Color.Transparent, Location = new Point(18, 13) };
-        var t = new Label { Text = titulo, AutoSize = true, Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = KitVisual.Texto, Location = new Point(62, 11), BackColor = Color.Transparent };
+        var t = new Label { Text = titulo, AutoSize = true, Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, Location = new Point(62, 11), BackColor = Color.Transparent };
         Subtitulo = new Label { Text = sub, AutoSize = true, Font = new Font("Segoe UI", 9F), ForeColor = Rotulo, Location = new Point(63, 33), BackColor = Color.Transparent };
-        var fechar = Botao("✕", Color.FromArgb(235, 235, 239), KitVisual.Texto);
+        var fechar = Botao("✕", Color.FromArgb(235, 235, 239), PecasDesign.CorTexto);
         fechar.Size = new Size(34, 32); fechar.Font = new Font("Segoe UI", 9.5F); fechar.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         fechar.Location = new Point(largura - 52, 15);
         fechar.Click += (_, _) => Close();
@@ -50,13 +53,13 @@ public class DialogoDesign : CartaoModal
         }
 
         // rodapé
-        var rod = new Panel { Dock = DockStyle.Bottom, Height = 60, BackColor = Color.White };
+        var rod = _rod = new Panel { Dock = DockStyle.Bottom, Height = 60, BackColor = Color.White };
         rod.Paint += (_, e) => { using var pen = new Pen(Color.FromArgb(230, 230, 234)); e.Graphics.DrawLine(pen, 0, 0, rod.Width, 0); };
         _botoes = new FlowLayoutPanel { Dock = DockStyle.Right, FlowDirection = FlowDirection.RightToLeft, AutoSize = true, WrapContents = false, Padding = new Padding(0, 12, 14, 0), BackColor = Color.White };
         rod.Controls.Add(_botoes);
 
         // corpo: seções empilhadas, com rolagem se não couber
-        var corpo = new Panel { Dock = DockStyle.Fill, BackColor = Fundo, AutoScroll = true, Padding = new Padding(18, 14, 18, 14) };
+        var corpo = _corpo = new Panel { Dock = DockStyle.Fill, BackColor = Fundo, AutoScroll = true, Padding = new Padding(18, 14, 18, 14) };
         _larguraSecao = largura - 36 - SystemInformation.VerticalScrollBarWidth;
         _secoes = new TableLayoutPanel { MinimumSize = new Size(_larguraSecao, 0), MaximumSize = new Size(_larguraSecao, 0), Dock = DockStyle.Top, ColumnCount = 1, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = Fundo };
         _secoes.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -84,6 +87,30 @@ public class DialogoDesign : CartaoModal
         base.OnLoad(e);
     }
 
+    /// <summary>Abas segmentadas logo abaixo do cabeçalho (margem 12 18 0).</summary>
+    public SegmentoDesign Abas(string[] nomes, Action<int> mudou, int sel = 0)
+    {
+        var faixa = new Panel { Dock = DockStyle.Top, Height = 44, BackColor = Fundo };
+        var seg = new SegmentoDesign { Location = new Point(18, 12), BackColor = Fundo };
+        seg.Itens = nomes; seg.Selecionado = sel;
+        seg.Mudou += i => mudou(i);
+        faixa.Controls.Add(seg);
+        Controls.Add(faixa);
+        faixa.SendToBack(); _cab.SendToBack(); _corpo.BringToFront();
+        return seg;
+    }
+
+    /// <summary>Texto cinza à esquerda do rodapé.</summary>
+    public Label TextoRodape(string texto)
+    {
+        var l = new Label { Text = texto, AutoSize = false, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(18, 0, 0, 0), Font = new Font("Segoe UI", 9F), ForeColor = Rotulo, BackColor = Color.White };
+        _rod.Controls.Add(l); l.BringToFront();
+        return l;
+    }
+
+    /// <summary>Remove todas as seções (para trocar o conteúdo ao mudar de aba).</summary>
+    public void LimparSecoes() { foreach (Control c in _secoes.Controls.Cast<Control>().ToArray()) c.Dispose(); _secoes.Controls.Clear(); }
+
     /// <summary>Seção branca com título (opcional) e grade de 6 colunas; devolve a grade para receber os campos.</summary>
     /// <summary>Nota (seção cinza só com texto), como o aviso no fim de alguns diálogos do design.</summary>
     public void Nota(string texto)
@@ -102,12 +129,12 @@ public class DialogoDesign : CartaoModal
         s.Paint += (_, e) =>
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using var path = VisualPrincipal.Redondo(new Rectangle(0, 0, s.Width - 1, s.Height - 1), 14);
+            using var path = Forma.Redondo(new Rectangle(0, 0, s.Width - 1, s.Height - 1), 14);
             using var pen = new Pen(Color.FromArgb(226, 226, 230));
             e.Graphics.DrawPath(pen, path);
         };
-        s.Resize += (_, _) => KitVisual.AplicarRaio(s, 14);
-        if (!string.IsNullOrEmpty(titulo)) s.Controls.Add(new Label { Text = titulo, AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = KitVisual.Texto, Margin = new Padding(0, 0, 0, 8) });
+        s.Resize += (_, _) => Forma.AplicarRaio(s, 14);
+        if (!string.IsNullOrEmpty(titulo)) s.Controls.Add(new Label { Text = titulo, AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, Margin = new Padding(0, 0, 0, 8) });
         if (!string.IsNullOrEmpty(texto)) s.Controls.Add(new Label { Text = texto, AutoSize = true, MaximumSize = new Size(_larguraSecao - 40, 0), Font = new Font("Segoe UI", 9.6F), ForeColor = Color.FromArgb(58, 58, 60), Margin = new Padding(0, 0, 0, 6) });
         var grade = new TableLayoutPanel { MinimumSize = new Size(_larguraSecao - 18, 0), MaximumSize = new Size(_larguraSecao - 18, 0), Dock = DockStyle.Fill, ColumnCount = 6, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = Color.White, Margin = Padding.Empty };
         for (var i = 0; i < 6; i++) grade.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / 6));
@@ -149,7 +176,7 @@ public class DialogoDesign : CartaoModal
         {
             if (controle is DateTimePicker) return; // o campo de data já tem a própria borda
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using var path = VisualPrincipal.Redondo(new Rectangle(0, 0, caixa.Width - 1, caixa.Height - 1), 8);
+            using var path = Forma.Redondo(new Rectangle(0, 0, caixa.Width - 1, caixa.Height - 1), 8);
             using var pen = new Pen(controle.Focused ? VerdePrincipal : Borda);
             e.Graphics.DrawPath(pen, path);
         };
@@ -195,12 +222,21 @@ public class DialogoDesign : CartaoModal
     }
 
     /// <summary>Caixa de marcar verde ocupando <paramref name="span"/> colunas.</summary>
-    public void Marca(TableLayoutPanel grade, CheckBox c, int span)
+    public void Marca(TableLayoutPanel grade, CheckBox c, int span, bool alinharComCampo = true)
     {
-        c.AutoSize = true; c.Font = PecasDesign.FonteValor; c.Anchor = AnchorStyles.Left; c.Margin = new Padding(0, 26, 14, 6); c.BackColor = Color.White;
-        KitVisual.CheckVerde(c);
+        c.AutoSize = true; c.Font = PecasDesign.FonteValor; c.Anchor = AnchorStyles.Left; c.Margin = new Padding(0, alinharComCampo ? 26 : 4, 14, 6); c.BackColor = Color.White; c.Padding = new Padding(4, 0, 0, 0); c.Cursor = Cursors.Hand;
+        Forma.CheckVerde(c);
         grade.Controls.Add(c);
         grade.SetColumnSpan(c, span);
+    }
+
+    /// <summary>Botão de opção verde ocupando <paramref name="span"/> colunas (linha só de opções: sem o espaço do rótulo).</summary>
+    public void Opcao(TableLayoutPanel grade, RadioButton r, int span, bool alinharComCampo = false)
+    {
+        r.AutoSize = true; r.Font = PecasDesign.FonteValor; r.Anchor = AnchorStyles.Left; r.Margin = new Padding(0, alinharComCampo ? 26 : 4, 14, 6); r.BackColor = Color.White; r.Padding = new Padding(4, 0, 0, 0); r.Cursor = Cursors.Hand;
+        Forma.RadioVerde(r);
+        grade.Controls.Add(r);
+        grade.SetColumnSpan(r, span);
     }
 
     /// <summary>Botão pequeno dentro de uma caixa (ex.: "Pesquisar").</summary>
@@ -214,7 +250,7 @@ public class DialogoDesign : CartaoModal
     /// <summary>Botão do rodapé (da direita para a esquerda: chame o principal primeiro).</summary>
     public Button BotaoRodape(string texto, bool principal, Action clique)
     {
-        var b = Botao(texto, principal ? VerdePrincipal : Color.FromArgb(235, 235, 239), principal ? Color.White : KitVisual.Texto, principal);
+        var b = Botao(texto, principal ? VerdePrincipal : Color.FromArgb(235, 235, 239), principal ? Color.White : PecasDesign.CorTexto, principal);
         b.Height = 36; b.AutoSize = true; b.MinimumSize = new Size(96, 36); b.Padding = new Padding(10, 0, 10, 0); b.Margin = new Padding(8, 0, 0, 0);
         b.Click += (_, _) => clique();
         _botoes.Controls.Add(b);

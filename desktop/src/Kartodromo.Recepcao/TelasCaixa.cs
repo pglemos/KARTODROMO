@@ -172,55 +172,48 @@ public sealed class FormTerminalFechar : CartaoModal
     }
 }
 
-public sealed class FormCaixaTransacao : Janela
+/// <summary>Suprimento / Sangria (Suprimento.dc.html, Sangria.dc.html): terminal, nova transação e a nota.</summary>
+public sealed class FormCaixaTransacao : DialogoDesign
 {
     readonly string _tipo;
-    readonly TextBox _valor = new();
-    readonly TextBox _obs = Campos.Texto(400);
+    readonly TextBox _valor = PecasDesign.Texto("", 14);
+    readonly TextBox _obs = PecasDesign.Texto("", 400);
 
-    public FormCaixaTransacao(string tipo, JsonObject caixa) : base(tipo == "sangria" ? "Registrar sangria" : "Registrar suprimento", 960, 680)
+    public FormCaixaTransacao(string tipo, JsonObject caixa) : base(
+        tipo == "sangria" ? "Registrar sangria" : "Registrar suprimento",
+        tipo == "sangria" ? "Retirar dinheiro da gaveta (depósito, cofre)" : "Colocar dinheiro na gaveta (troco, fundo de caixa)",
+        tipo == "sangria" ? "M12 13V3M8 7l4-4 4 4M4 15v4h16v-4" : "M12 3v10M8 9l4 4 4-4M4 15v4h16v-4",
+        tipo == "sangria" ? "linear-gradient(180deg, #FF7A96, #D42A55)" : "linear-gradient(180deg, #48D6CC, #0E9C9C)")
     {
         _tipo = tipo == "sangria" ? "sangria" : "suprimento";
-        Tag = _tipo == "sangria" ? "Retirar dinheiro da gaveta (depósito, cofre)" : "Colocar dinheiro na gaveta (troco, fundo de caixa)";
         var aberto = caixa["aberto"]?.AsObject();
 
-        var gTerm = Campos.Grade(6);
-        Campos.Add(gTerm, "Usuário", new TextBox { Text = Sessao.Nome, ReadOnly = true }, 2);
-        Campos.Add(gTerm, "Terminal ativo", new TextBox { Text = aberto?.S("terminal") ?? "—", ReadOnly = true }, 2);
-        Campos.Add(gTerm, "Quantia em caixa agora", new TextBox { Text = Fmt.Brl(caixa["sumario"]?.L("dinheiroEmCaixa") ?? 0), ReadOnly = true }, 2);
+        var g = Secao("Terminal");
+        Campo(g, "Usuário", Leitura(Sessao.Nome), 2);
+        Campo(g, "Terminal ativo", Leitura(aberto?.S("terminal") ?? "—"), 2);
+        Campo(g, "Quantia em caixa agora", Leitura(Fmt.Brl(caixa["sumario"]?.L("dinheiroEmCaixa") ?? 0)), 2);
 
-        var cTerm = KitVisual.CartaoSecao("Terminal");
-        cTerm.Controls.Add(gTerm);
+        var t = Secao("Nova transação");
+        Campo(t, "Valor (R$)", _valor, 2);
+        Campo(t, "Observações", _obs, 4);
+        _valor.KeyPress += (_, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar) && e.KeyChar is not ',' and not '.') e.Handled = true; };
+        _valor.Leave += (_, _) => { if (Fmt.Centavos(_valor.Text) is long v) _valor.Text = Fmt.Dinheiro(v); };
 
-        var gTrans = Campos.Grade(6);
-        Campos.Add(gTrans, "Valor (R$)", _valor, 2);
-        Campos.Add(gTrans, "Observações", _obs, 4);
-
-        var cTrans = KitVisual.CartaoSecao("Nova transação");
-        cTrans.Controls.Add(gTrans);
-
-        var nota = new Panel { Dock = DockStyle.Top, Height = 56, BackColor = Color.FromArgb(245, 245, 247), Padding = new Padding(14, 10, 14, 10), Margin = new Padding(0, 0, 0, 12) };
-        nota.Paint += (_, e) =>
-        {
-            using var pen = new Pen(Color.FromArgb(232, 232, 236));
-            e.Graphics.DrawRectangle(pen, 0, 0, nota.Width - 1, nota.Height - 1);
-        };
-        var textoDica = _tipo == "sangria"
+        Nota(_tipo == "sangria"
             ? "O valor sai da gaveta e aparece no fechamento como \"Sangria\". Guarde o comprovante do depósito."
-            : "O valor entra no sumário do terminal como \"Suprimento\" e soma no total da gaveta.";
-        nota.Controls.Add(new Label { Text = textoDica, Dock = DockStyle.Fill, ForeColor = Color.FromArgb(58, 58, 60), Font = new Font("Segoe UI", 9.2F) });
+            : "O valor entra no sumário do terminal como \"Suprimento\" e soma no total da gaveta.");
 
-        Controls.Add(nota);
-        Controls.Add(cTrans);
-        Controls.Add(cTerm);
-
-        Rodape(("Cancelar", (_, _) => Close(), false), ("Registrar transação", (_, _) => Seguro.Rodar(this, async () =>
+        BotaoRodape("Registrar transação", true, () => Seguro.Rodar(this, async () =>
         {
-            if (Fmt.Centavos(_valor.Text) is not long valor || valor <= 0) { Msg.Aviso(this, "Informe um valor maior que zero."); return; }
-            if (string.IsNullOrWhiteSpace(_obs.Text)) { Msg.Aviso(this, "Informe a justificativa desta transação."); return; }
+            if (Fmt.Centavos(_valor.Text) is not long valor || valor <= 0) { Msg.Aviso(this, "Informe um valor maior que zero."); _valor.Focus(); return; }
+            if (string.IsNullOrWhiteSpace(_obs.Text)) { Msg.Aviso(this, "Informe a justificativa desta transação."); _obs.Focus(); return; }
             var r = await Sessao.Api.Post("/api/office/caixa/transacao", new { tipo = _tipo, valorCentavos = valor, observacao = _obs.Text.Trim() });
             Msg.Info(this, r.S("mensagem")); DialogResult = DialogResult.OK; Close();
-        }), true));
+        }));
+        BotaoRodape("Cancelar", false, Close);
         Shown += (_, _) => _valor.Focus();
     }
+
+    /// <summary>Valor só para ler, na mesma caixa branca dos campos.</summary>
+    internal static TextBox Leitura(string texto) { var t = PecasDesign.Texto(texto); t.ReadOnly = true; t.BackColor = Color.White; t.TabStop = false; return t; }
 }

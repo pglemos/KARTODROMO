@@ -11,6 +11,31 @@ public static class AutoTeste
 {
     static readonly List<string> Log = [];
 
+    static bool ForaDaTela;
+    static IntPtr FocoAntes;
+
+    /// <summary>Todas as telas, fora da área visível (não atrapalha quem está usando o PC): um timer joga
+    /// qualquer janela que abrir para x=-4000 e devolve o foco; as fotos saem por PrintWindow.</summary>
+    public static async Task RodarTelas(string pasta, string login, string senha)
+    {
+        ForaDaTela = true;
+        FocoAntes = GetForegroundWindow();
+        var vigia = new System.Windows.Forms.Timer { Interval = 15 };
+        vigia.Tick += (_, _) =>
+        {
+            foreach (Form f in Application.OpenForms)
+                if (f.Visible && f.Left > -3000)
+                {
+                    f.ShowInTaskbar = false;
+                    f.Location = new Point(-4000 + Math.Max(0, f.Left), Math.Max(0, f.Top));
+                    SetForegroundWindow(FocoAntes);
+                }
+        };
+        vigia.Start();
+        try { await Rodar(pasta, login, senha); }
+        finally { vigia.Stop(); }
+    }
+
     public static async Task Rodar(string pasta, string login, string senha, long reservaIdTeste = 0, long vendaIdTeste = 0, long movimentoIdTeste = 0)
     {
         Directory.CreateDirectory(pasta);
@@ -22,14 +47,14 @@ public static class AutoTeste
         await Sessao.CarregarApoio();
         Msg.Registro = m => Log.Add(m);
 
-        using (var telaLogin = new FormLogin { WindowState = FormWindowState.Normal, ClientSize = new Size(1440, 900), StartPosition = FormStartPosition.Manual, Location = new Point(0, 0) })
+        using (var telaLogin = new FormLogin { WindowState = FormWindowState.Normal, ClientSize = new Size(1440, 900), StartPosition = FormStartPosition.Manual, Location = new Point(ForaDaTela ? -4000 : 0, 0), ShowInTaskbar = !ForaDaTela })
         {
             telaLogin.Show();
             await Foto(telaLogin, pasta, "01-login");
             telaLogin.Close();
         }
 
-        var principal = new FormPrincipal { WindowState = FormWindowState.Normal, ClientSize = new Size(1440, 900), StartPosition = FormStartPosition.Manual, Location = new Point(0, 0), ConfirmarSaida = false };
+        var principal = new FormPrincipal { WindowState = FormWindowState.Normal, ClientSize = new Size(1440, 900), StartPosition = FormStartPosition.Manual, Location = new Point(ForaDaTela ? -4000 : 0, 0), ShowInTaskbar = !ForaDaTela, ConfirmarSaida = false };
         principal.Show();
         await Esperar(1200);
         await Foto(principal, pasta, "02-principal-reservas-todas");
@@ -66,13 +91,16 @@ public static class AutoTeste
             await Foto(principal, pasta, nome);
         }
 
-        await CapturarContexto(principal, pasta, "reservas:todas", "contexto-reservas");
-        await CapturarContexto(principal, pasta, "baterias:todas", "contexto-baterias");
-        await CapturarContexto(principal, pasta, "vendas:todas", "contexto-vendas");
+        if (!ForaDaTela)
+        {
+            await CapturarContexto(principal, pasta, "reservas:todas", "contexto-reservas");
+            await CapturarContexto(principal, pasta, "baterias:todas", "contexto-baterias");
+            await CapturarContexto(principal, pasta, "vendas:todas", "contexto-vendas");
 
-        await CapturarMenus(principal, pasta);
+            await CapturarMenus(principal, pasta);
 
-        await CliqueNoMenu(principal, "reservas:todas");
+            await CliqueNoMenu(principal, "reservas:todas");
+        }
 
         var caixa = (await Sessao.Api.Get("/api/office/caixa")).AsObject();
         var aberto = caixa["aberto"] as JsonObject;
@@ -84,19 +112,20 @@ public static class AutoTeste
         var vendas = vendasApi.Where(r => r.S("cliente").StartsWith("TESTE CODEX", StringComparison.OrdinalIgnoreCase)).ToList();
         if (reservaIdTeste > 0) reservas = reservas.Where(r => r.L("id") == reservaIdTeste).ToList();
         if (vendaIdTeste > 0) vendas = vendas.Where(r => r.L("id") == vendaIdTeste).ToList();
+        if (ForaDaTela && vendas.Count == 0) vendas = vendasApi.Where(v => !v.B("cancelada")).Take(1).ToList(); // só abre para ver, nada é gravado
         var bateriaId = reservas.FirstOrDefault()?.L("bateriaId");
         var bateria = baterias.FirstOrDefault(b => b.L("id") == bateriaId) ?? baterias.FirstOrDefault();
 
         await Janela(new FormCliente(null), principal, pasta, "24-cliente");
         await Janela(new FormCadastro("produtos", Cadastros.Defs["produtos"]), principal, pasta, "25-produto");
-        await Janela(new FormCadastro("tracados", Cadastros.Defs["tracados"]), principal, pasta, "26-cad-tracado");
-        await Janela(new FormCadastro("feriados", Cadastros.Defs["feriados"]), principal, pasta, "27-cad-feriados");
-        await Janela(new FormCadastro("turnos", Cadastros.Defs["turnos"]), principal, pasta, "28-cad-turno");
-        await Janela(new FormCadastro("terminais", Cadastros.Defs["terminais"]), principal, pasta, "29-cad-terminal");
-        await Janela(new FormCadastro("formas", Cadastros.Defs["formas"]), principal, pasta, "30-metodos-pagamento");
-        await Janela(new FormCadastro("itensManutencao", Cadastros.Defs["itensManutencao"]), principal, pasta, "31-cad-itens-manutencao");
-        await Janela(new FormCadastro("padroes", Cadastros.Defs["padroes"]), principal, pasta, "32-cad-padroes");
-        await Janela(new FormCadastro("usuarios", Cadastros.Defs["usuarios"]), principal, pasta, "33-office-usuario");
+        await CapturarModal(principal, pasta, "26-cad-tracado", () => Cadastros.Abrir(principal, "tracados"));
+        await CapturarModal(principal, pasta, "27-cad-feriados", () => Cadastros.Abrir(principal, "feriados"));
+        await CapturarModal(principal, pasta, "28-cad-turno", () => Cadastros.Abrir(principal, "turnos"));
+        await CapturarModal(principal, pasta, "29-cad-terminal", () => Cadastros.Abrir(principal, "terminais"));
+        await CapturarModal(principal, pasta, "30-metodos-pagamento", () => Cadastros.Abrir(principal, "formas"));
+        await CapturarModal(principal, pasta, "31-cad-itens-manutencao", () => Cadastros.Abrir(principal, "itensManutencao"));
+        await CapturarModal(principal, pasta, "32-cad-padroes", () => Cadastros.Abrir(principal, "padroes"));
+        await CapturarModal(principal, pasta, "33-office-usuario", () => Cadastros.Abrir(principal, "usuarios"));
         await Janela(new FormCriarReservas(), principal, pasta, "34-criar-reservas");
         if (bateria != null)
         {
@@ -129,7 +158,7 @@ public static class AutoTeste
         }
         await Janela(new FormTerminalAbrir(caixaTeste), principal, pasta, "42-terminal-abrir");
         await Janela(new FormServicosOnline(), principal, pasta, "46-servicos-online");
-        await Janela(new FormCadastro("parceiros", Cadastros.Defs["parceiros"]), principal, pasta, "47-cad-parceiro");
+        await CapturarModal(principal, pasta, "47-cad-parceiro", () => Cadastros.Abrir(principal, "parceiros"));
         await Janela(new FormTrocarSenha(), principal, pasta, "48-trocar-senha");
         await Janela(new FormAjuda("Atalhos do teclado"), principal, pasta, "49-ajuda-atalhos");
 
@@ -260,10 +289,11 @@ public static class AutoTeste
 
     static async Task Janela(Form form, IWin32Window dono, string pasta, string nome)
     {
+        if (Pular(nome)) { form.Dispose(); return; }
         try
         {
             form.StartPosition = FormStartPosition.Manual;
-            form.Location = new Point(24, 24);
+            form.Location = new Point(ForaDaTela ? -4000 : 24, 24);
             form.Show(dono);
             await Esperar(850);
             await Foto(form, pasta, nome);
@@ -272,18 +302,22 @@ public static class AutoTeste
         finally { if (!form.IsDisposed) form.Close(); }
     }
 
+    static bool Pular(string nome) => Environment.GetEnvironmentVariable("KARTODROMO_TELAS") is { Length: > 0 } f && !f.Split(",").Any(x => nome.Contains(x.Trim(), StringComparison.OrdinalIgnoreCase));
+
     static async Task CapturarModal(Form principal, string pasta, string nome, Action abrir)
     {
+        if (Pular(nome)) return;
         var completou = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var timer = new System.Windows.Forms.Timer { Interval = 140 };
         var tentou = false;
         timer.Tick += async (_, _) =>
         {
             if (tentou || completou.Task.IsCompleted) return;
-            var alvo = Application.OpenForms.Cast<Form>().FirstOrDefault(f => f != principal && f.Visible && f is not FormLogin);
+            var alvo = Application.OpenForms.Cast<Form>().FirstOrDefault(f => f != principal && f.Visible && f is not FormLogin && f is not Escurecer);
             if (alvo == null) return;
             tentou = true;
             timer.Stop();
+            await Esperar(1100);
             try { await Foto(alvo, pasta, nome); Log.Add("OK " + nome); }
             catch (Exception e) { Log.Add($"ERRO {nome}: {e.Message}"); }
             finally { try { alvo.Close(); } catch { } completou.TrySetResult(true); }
@@ -472,11 +506,17 @@ public static class AutoTeste
 
     static async Task Foto(Control c, string pasta, string nome)
     {
+        if (Pular(nome)) return;
         await Esperar(160);
         Application.DoEvents();
         if (c.Width <= 0 || c.Height <= 0) throw new InvalidOperationException("A tela não tem tamanho visível.");
         using var bmp = new Bitmap(c.Width, c.Height);
-        c.DrawToBitmap(bmp, new Rectangle(0, 0, c.Width, c.Height));
+        if (ForaDaTela && c is Form)
+        {
+            using var g = Graphics.FromImage(bmp);
+            var hdc = g.GetHdc(); PrintWindow(c.Handle, hdc, 2); g.ReleaseHdc(hdc);
+        }
+        else c.DrawToBitmap(bmp, new Rectangle(0, 0, c.Width, c.Height));
         bmp.Save(Path.Combine(pasta, nome + ".png"));
         Log.Add("OK " + nome);
     }
@@ -521,6 +561,7 @@ public static class AutoTeste
     static async Task FotoTela(Form f, string pasta, string nome)
     {
         await Esperar(100);
+        if (ForaDaTela) { await Foto(f, pasta, nome); return; }
         try
         {
             var tela = Screen.FromControl(f).Bounds;
