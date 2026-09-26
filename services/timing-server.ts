@@ -481,6 +481,14 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       return send(res, 502, { error: `Agenda indisponivel: ${(err as Error).message}` });
     }
   }
+  const pg = path.match(/^\/api\/agenda\/(\d+)\/programa$/);
+  if (pg && method === 'GET') {
+    try {
+      return send(res, 200, await opsGet(`/api/crono/baterias/${pg[1]}/programa`));
+    } catch {
+      return send(res, 200, []); // servidor antigo sem programa: bateria unica
+    }
+  }
   const ag = path.match(/^\/api\/agenda\/(\d+)\/grid$/);
   if (ag && method === 'GET') {
     try {

@@ -1,7 +1,7 @@
 ﻿<#
   Instala um app do Kartodromo num PC Windows (roda como administrador, local ou via Invoke-Command -FilePath).
 
-    instalar-app.ps1 -App Recepcao      -Url "http://192.168.20.13:4060/recepcao?k=CHAVE"
+    instalar-app.ps1 -App Recepcao      -Url "http://192.168.20.13:4060/recepcao"
     instalar-app.ps1 -App Autoatendimento -Url "http://192.168.20.13:4060/totem" -Impressora "EPSON TM-T20 Receipt"
     instalar-app.ps1 -App Cronometragem -Url "http://192.168.20.249:4050/"
     instalar-app.ps1 -App TV            -Url "http://192.168.20.249:4050/tv"

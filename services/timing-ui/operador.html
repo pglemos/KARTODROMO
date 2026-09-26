@@ -285,12 +285,26 @@ async function openNew() {
 function agendaPick() { const b = agenda.find(x => String(x.id) === $('nAgenda').value); if (b) { $('nName').value = b.nome; $('nAgendaInfo').textContent = `${b.inscritos} pilotos inscritos, ${b.pagos} pagos`; } }
 async function createSess() {
   const karts = $('nKarts').value.split(/[\s,;]+/).filter(Boolean);
-  const fromAgenda = $('nAgenda').value ? await api('/api/agenda/' + $('nAgenda').value + '/grid') : [];
-  const s = await api('/api/sessions', { method:'POST', body:{
-    type: $('nType').value, name: $('nName').value, durationMin: Number($('nDur').value), maxLaps: Number($('nLaps').value) || null,
-    competitors: [...fromAgenda.map((g, i) => ({ kart: g.kart || karts[i] || '', name: g.nome, customerId: String(g.clienteId) })),
-                  ...karts.slice(fromAgenda.length).map(k => ({ kart:k, name:'' }))] } });
-  newDlg.close(); sel = s.id; pinned = true; gridDirty = false;
+  const agendaId = $('nAgenda').value;
+  const fromAgenda = agendaId ? await api('/api/agenda/' + agendaId + '/grid') : [];
+  const competitors = [...fromAgenda.map((g, i) => ({ kart: g.kart || karts[i] || '', name: g.nome, customerId: String(g.clienteId) })),
+                       ...karts.slice(fromAgenda.length).map(k => ({ kart:k, name:'' }))];
+  // bateria da agenda: monta as provas do produto (ex.: Tomada de Tempo 5 min + Corrida 20 min)
+  const programa = agendaId ? await api('/api/agenda/' + agendaId + '/programa').catch(() => []) : [];
+  let primeira = null;
+  if (programa.length && confirm(`Montar as ${programa.length} prova(s) do produto?\n` + programa.map(p => `• ${p.nome} (${p.finalizacao === 'voltas' ? p.voltasMax + ' voltas' : p.tempoMin + ' min'})`).join('\n'))) {
+    for (const p of programa) {
+      const s = await api('/api/sessions', { method:'POST', body:{
+        type: ['treino', 'classificacao', 'corrida'].includes(p.tipo) ? p.tipo : 'corrida',
+        name: `${$('nName').value || 'Bateria'} · ${p.nome}`, durationMin: p.finalizacao === 'voltas' ? 0 : Number(p.tempoMin || 0),
+        maxLaps: p.finalizacao === 'voltas' ? Number(p.voltasMax || 0) || null : null, minLapSec: p.voltaMinimaSeg ?? 5, competitors } });
+      primeira ??= s;
+    }
+  } else {
+    primeira = await api('/api/sessions', { method:'POST', body:{
+      type: $('nType').value, name: $('nName').value, durationMin: Number($('nDur').value), maxLaps: Number($('nLaps').value) || null, competitors } });
+  }
+  newDlg.close(); sel = primeira.id; pinned = true; gridDirty = false;
 }
 
 async function showLaps(kart) {

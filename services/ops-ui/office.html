@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Kartódromo — Módulo Office</title>
+  <link rel="stylesheet" href="/ui/office.css">
+</head>
+<body>
+  <section id="login" aria-label="Login do sistema">
+    <div class="top">
+      <div>
+        <label for="lgLogin">Login</label>
+        <input id="lgLogin" name="username" autocomplete="username" autofocus>
+      </div>
+      <div>
+        <label for="lgSenha">Senha</label>
+        <input id="lgSenha" name="password" type="password" autocomplete="current-password">
+      </div>
+    </div>
+    <div class="terms">
+      <input id="lgTermos" type="checkbox">
+      <label for="lgTermos">Li e concordo com os termos de uso.</label>
+    </div>
+    <a class="terms-link" id="lgTermosLink" href="#termos">Termos de uso</a>
+    <div class="lock" aria-hidden="true">🔒</div>
+    <div class="brand">Kartódromo</div>
+    <div class="msg" id="lgMsg" role="alert" aria-live="polite"></div>
+    <div class="btns">
+      <button id="lgOk" type="button" class="pri">OK</button>
+      <button id="lgCancelar" type="button">Cancelar</button>
+    </div>
+  </section>
+
+  <div id="app" hidden>
+    <nav id="menubar" aria-label="Menu principal"></nav>
+    <div id="licenca"></div>
+    <div id="toolbar" aria-label="Atalhos"></div>
+    <main id="main">
+      <aside id="tree" aria-label="Módulos e filtros"></aside>
+      <section id="content" aria-label="Dados do módulo">
+        <div id="filterbar">
+          <label for="fFiltro">Exibir dados:</label>
+          <select id="fFiltro">
+            <option value="dia">Nesta data</option>
+            <option value="semana">Nesta semana</option>
+            <option value="mes">Neste mês</option>
+            <option value="apartir">A partir desta data</option>
+            <option value="todas">Todas</option>
+          </select>
+          <input id="fData" type="date" aria-label="Data de referência">
+        </div>
+        <div id="totalbar">Total de registros: 0</div>
+        <div id="gridwrap" role="region" aria-label="Lista de registros" tabindex="0"></div>
+      </section>
+    </main>
+    <footer id="statusbar" aria-label="Estado do sistema">
+      <span id="sbHora"></span>
+      <span id="sbData"></span>
+      <span id="sbUser"></span>
+      <span id="sbSrv"></span>
+    </footer>
+  </div>
+
+  <script src="/ui/office-core.js" defer></script>
+  <script src="/ui/office-app.js" defer></script>
+</body>
+</html>
