@@ -120,8 +120,8 @@ sealed class PainelLed : IDisposable
 
     void Escrever(string pacote)
     {
-        // o LapTime mandava o pacote + NewLine
-        _serial.Write(pacote + "\r\n");
+        if (string.IsNullOrEmpty(pacote)) return;
+        _serial.Write(pacote.EndsWith("\r\n") ? pacote : pacote + "\r\n");
     }
 
     /// <summary>
@@ -203,11 +203,12 @@ sealed class PainelLed : IDisposable
 
             // Se mudou a sessão ou mudou a página selecionada, manda $I para limpar o painel físico de LED
             var mudouSessao = id != _sessaoId;
+            if (mudouSessao) Pagina = 0;
             var mudouPagina = Pagina != _paginaAnterior;
             if (mudouSessao || mudouPagina)
             {
                 var agora = DateTime.Now;
-                Escrever($"$I,\"{agora:HH:mm:ss.fff}\",\"{agora:ddMMyy}\"\r\n");
+                Escrever($"$I,\"{agora:HH:mm:ss.fff}\",\"{agora:ddMMyy}\"");
                 _sessaoId = id;
                 _paginaAnterior = Pagina;
                 _assinatura = null;
