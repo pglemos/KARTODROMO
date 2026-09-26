@@ -131,8 +131,6 @@ sealed class PainelLed : IDisposable
     /// </summary>
     public void Atualizar(JsonObject sessaoFoco, JsonObject sessaoAlternativa = null)
     {
-        if (!Ativo) { Situacao = "desligado"; Ok = false; return; }
-        if (!Abrir()) return;
         try
         {
             if (sessaoAlternativa != null) DefinirSessaoClassificacao(sessaoAlternativa);
@@ -199,6 +197,9 @@ sealed class PainelLed : IDisposable
             }
 
             if (Pagina >= TotalPaginas) Pagina = Math.Max(0, TotalPaginas - 1);
+
+            if (!Ativo) { Situacao = "desligado"; Ok = false; return; }
+            if (!Abrir()) return;
 
             // Se mudou a sessão ou mudou a página selecionada, manda $I para limpar o painel físico de LED
             var mudouSessao = id != _sessaoId;
