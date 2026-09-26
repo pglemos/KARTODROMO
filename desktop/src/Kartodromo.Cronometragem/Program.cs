@@ -15,6 +15,7 @@ static class Program
         Thread.CurrentThread.CurrentCulture = Fmt.Br;
         Thread.CurrentThread.CurrentUICulture = Fmt.Br;
         var args = Environment.GetCommandLineArgs();
+        if (args.Length >= 2 && args[1] == "--test-painel") { TestesPainel.Executar(); return; }
         if (args.Length >= 3 && args[1] == "--autoteste") { Application.Run(new FormCrono(args[2])); return; }
         if (args.Length >= 2 && args[1] == "--tv") { Application.Run(FormTV.Sozinha()); return; }
         Application.Run(new FormCrono(null));
