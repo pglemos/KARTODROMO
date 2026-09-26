@@ -81,3 +81,4 @@ desktop/**/*.csproj.user
 
 # Mapeamento operacional local do decoder (nao publicar)
 data/timing/transponders.json
+scratch/

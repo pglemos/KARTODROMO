@@ -2,341 +2,383 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Relatório de Cronometragem</title>
+<title>Relatório Oficial de Cronometragem</title>
 <style>
   :root {
-    --text: #1d1d1f;
-    --muted: #6e6e73;
-    --border: #d2d2d7;
-    --bg-header: #fbfbfd;
-    --primary: #0b7a53;
-    --purple: #7a2fc2;
+    --text: #000000;
+    --border-dark: #333333;
+    --border-light: #cccccc;
+    --bg-th: #e6e6e6;
+    --bg-cat: #f0f0f0;
+    --bg-zebra: #fafafa;
   }
   * { box-sizing: border-box; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: Arial, "Segoe UI", sans-serif;
     color: var(--text);
-    background: #f5f5f7;
+    background: #525659;
     margin: 0;
-    padding: 20px;
-    font-size: 13px;
-    line-height: 1.35;
+    padding: 0;
+    font-size: 8pt;
+    line-height: 1.25;
   }
-  .page-container {
-    max-width: 1040px;
-    margin: 0 auto;
-    background: #fff;
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.06);
-    padding: 30px 36px;
-  }
+
+  /* Barra de ferramentas na tela */
   .tools {
-    max-width: 1040px;
-    margin: 0 auto 16px;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 10px 16px;
-    background: #fff;
-    border-radius: 10px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    padding: 8px 16px;
+    background: #2a2d32;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
   }
-  .tools label { font-weight: 600; font-size: 12px; color: var(--muted); }
+  .tools label { font-size: 11px; font-weight: bold; color: #ccc; }
   .tools select {
-    padding: 6px 10px;
-    border-radius: 7px;
-    border: 1px solid var(--border);
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid #555;
     font: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text);
-    background: #fff;
+    font-size: 12px;
+    font-weight: bold;
+    color: #fff;
+    background: #3b3e44;
     outline: none;
     cursor: pointer;
   }
   .tools button {
-    padding: 6px 14px;
-    border-radius: 7px;
-    border: 1px solid var(--border);
-    background: #fff;
+    padding: 5px 12px;
+    border-radius: 4px;
+    border: 1px solid #555;
+    background: #4a4d53;
+    color: #fff;
     font: inherit;
-    font-size: 12.5px;
-    font-weight: 600;
-    color: var(--text);
+    font-size: 11.5px;
+    font-weight: bold;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    transition: all 0.15s;
+    gap: 6px;
   }
-  .tools button:hover { background: #f0f0f2; border-color: #bcbcc0; }
-  .tools button.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .tools button:hover { background: #5a5d65; }
+  .tools button.primary { background: #0b7a53; border-color: #0b7a53; }
   .tools button.primary:hover { background: #085e40; }
-  .tools .right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .tools .right { margin-left: auto; font-size: 11px; color: #aaa; font-weight: bold; }
 
-  /* Relatório Cabecalho Oficial */
-  .rep-header {
-    border-bottom: 2px solid #1d1d1f;
-    padding-bottom: 14px;
-    margin-bottom: 16px;
+  /* Folha física A4 do Relatório LapTime (simulação fiel em tela) */
+  .sheet-page {
+    background: #ffffff;
+    margin: 15px auto;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    position: relative;
+    padding: 8mm 10mm;
   }
-  .rep-header-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
+  .sheet-page.portrait {
+    width: 210mm;
+    min-height: 297mm;
+  }
+  .sheet-page.landscape {
+    width: 297mm;
+    min-height: 210mm;
+  }
+
+  /* Cabeçalho Oficial RDLC LapTime */
+  .rep-header {
+    width: 100%;
+    margin-bottom: 2mm;
+  }
+  .rep-header-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .rep-header-table td {
+    vertical-align: top;
+    padding: 0;
+  }
+  .rep-logo-td {
+    width: 42mm;
+    text-align: left;
   }
   .rep-logo {
-    height: 48px;
-    width: auto;
+    max-height: 22mm;
+    max-width: 40mm;
     object-fit: contain;
   }
-  .rep-title-block {
-    text-align: right;
+  .rep-titles-td {
+    padding-left: 2mm;
+    text-align: left;
   }
-  .rep-title-org {
-    font-size: 16px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #111;
-  }
-  .rep-title-sub {
-    font-size: 12px;
-    color: var(--muted);
-    font-weight: 500;
-  }
-  .rep-name {
-    margin-top: 10px;
-    font-size: 20px;
-    font-weight: 800;
+  .rep-title-1 {
+    font-size: 12pt;
+    font-weight: bold;
+    line-height: 1.15;
     color: #000;
     text-transform: uppercase;
   }
-  .rep-meta-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 6px 16px;
-    margin-top: 10px;
-    background: #fafafc;
-    padding: 8px 12px;
-    border-radius: 6px;
-    border: 1px solid #e5e5ea;
-    font-size: 12px;
+  .rep-subtitle-1 {
+    font-size: 9pt;
+    font-weight: bold;
+    margin-top: 1mm;
+    color: #000;
   }
-  .rep-meta-item strong { color: var(--muted); font-size: 10.5px; text-transform: uppercase; display: block; margin-bottom: 1px; }
+  .rep-subtitle-2 {
+    font-size: 9pt;
+    font-weight: bold;
+    margin-top: 0.5mm;
+    color: #000;
+  }
+  .rep-subtitle-3 {
+    font-size: 8.5pt;
+    margin-top: 0.5mm;
+    color: #333;
+  }
+  .rep-soft-td {
+    width: 45mm;
+    text-align: right;
+  }
+  .rep-soft-logo {
+    max-height: 8mm;
+    max-width: 40mm;
+    object-fit: contain;
+  }
+  .rep-divider-line {
+    width: 100%;
+    height: 1px;
+    background: #000;
+    margin-top: 2mm;
+    margin-bottom: 0.8mm;
+  }
+  .rep-date-time {
+    font-size: 6.5pt;
+    font-weight: bold;
+    text-align: right;
+    color: #000;
+    margin-bottom: 2mm;
+  }
 
-  /* Tabelas */
-  table.data-table {
+  /* Tabelas de Dados (RDLC Tablix) */
+  table.rdlc-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 10px;
-    font-size: 12px;
+    font-size: 7.5pt;
   }
-  table.data-table th, table.data-table td {
-    padding: 6px 8px;
-    border-bottom: 1px solid #e5e5ea;
-    text-align: left;
+  table.rdlc-table th, table.rdlc-table td {
+    padding: 2px 3px;
+    border: 1px solid #b5b5b5;
     font-variant-numeric: tabular-nums;
   }
-  table.data-table th {
-    background: #f4f4f7;
-    font-size: 10.5px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: #444;
-    border-top: 1px solid #d2d2d7;
-    border-bottom: 1px solid #b0b0b8;
-  }
-  table.data-table tr:nth-child(even) td { background: #fafafc; }
-  table.data-table tr:hover td { background: #f0f4fa; }
-  .pos-cell { font-weight: 800; width: 34px; text-align: center; }
-  .pos-1 { color: #b45309; }
-  .kart-cell { font-family: "Geist Mono", Consolas, monospace; font-weight: 800; font-size: 13px; text-align: center; width: 50px; }
-  .mono { font-family: "Geist Mono", Consolas, monospace; }
-  .t-right { text-align: right !important; }
-  .t-center { text-align: center !important; }
-  .best-lap { font-weight: 700; color: var(--purple); }
-  .overall-best { background: #f3e8ff !important; font-weight: 800; color: #581c87; border-radius: 4px; padding: 2px 4px; }
-
-  /* Destaque da Melhor Volta */
-  .best-lap-banner {
-    margin-top: 16px;
-    padding: 8px 14px;
-    border-radius: 6px;
-    background: #f9f5ff;
-    border: 1px solid #e9d5ff;
-    color: #581c87;
-    font-size: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .best-lap-banner strong { font-weight: 700; }
-
-  /* Rodapé e Assinaturas */
-  .rep-footer {
-    margin-top: 36px;
-    padding-top: 14px;
-    border-top: 1px solid #e5e5ea;
-    font-size: 11px;
-    color: var(--muted);
-  }
-  .signatures {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 30px;
-    margin-top: 40px;
+  table.rdlc-table th {
+    background: #e6e6e6;
+    font-size: 7.5pt;
+    font-weight: bold;
+    color: #000;
     text-align: center;
+    border-top: 1px solid #666;
+    border-bottom: 1.5px solid #444;
+  }
+  table.rdlc-table tr.category-row td {
+    background: #f0f0f0;
+    font-weight: bold;
+    font-size: 8pt;
+    padding: 3px 5px;
+    border-top: 1.5px solid #666;
+    border-bottom: 1.5px solid #666;
+    text-align: left;
+  }
+  table.rdlc-table tr:nth-child(even) td {
+    background: #fcfcfc;
+  }
+  .c-center { text-align: center !important; }
+  .c-left { text-align: left !important; }
+  .c-right { text-align: right !important; }
+  .c-bold { font-weight: bold !important; }
+  .c-best { font-weight: bold; text-decoration: underline; }
+
+  /* Nota de Melhor Volta & Penalidades */
+  .rdlc-notes-box {
+    margin-top: 3mm;
+    font-size: 7.5pt;
+    border-top: 1px solid #000;
+    padding-top: 1mm;
+  }
+  .rdlc-bestlap-note {
+    font-weight: bold;
+    margin-bottom: 1mm;
+  }
+
+  /* Tabela de Legenda */
+  table.rdlc-legend {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 2mm;
+    font-size: 6.5pt;
+  }
+  table.rdlc-legend th {
+    background: #e6e6e6;
+    font-weight: bold;
+    border: 1px solid #b5b5b5;
+    padding: 1.5px 3px;
+    text-align: left;
+  }
+  table.rdlc-legend td {
+    border: 1px solid #b5b5b5;
+    padding: 1.5px 3px;
+    background: #fff;
+  }
+
+  /* Rodapé Oficial LapTime */
+  .rep-footer {
+    margin-top: 6mm;
+    width: 100%;
+  }
+  .signatures-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 3mm;
+  }
+  .signatures-table td {
+    width: 33.33%;
+    text-align: center;
+    vertical-align: top;
+    padding: 0 4mm;
   }
   .sign-line {
-    border-top: 1px solid #444;
-    padding-top: 6px;
-    font-size: 11px;
-    font-weight: 600;
-    color: #222;
+    border-top: 1px solid #000;
+    margin-top: 8mm;
+    padding-top: 1mm;
+    font-size: 8pt;
+    color: #000;
+  }
+  .sign-org {
+    font-weight: bold;
+    font-size: 8pt;
+    color: #000;
+    margin-top: 0.5mm;
+  }
+  .page-num-line {
+    text-align: right;
+    font-size: 7.5pt;
+    color: #333;
+    margin-bottom: 1mm;
+  }
+  .footer-divider-line {
+    width: 100%;
+    height: 1px;
+    background: #000;
+    margin-bottom: 1.5mm;
+  }
+  .footer-brand-1 {
+    font-size: 7.5pt;
+    font-weight: bold;
+    text-align: center;
+    color: #000;
+  }
+  .footer-brand-2 {
+    font-size: 7.5pt;
+    font-weight: bold;
+    text-align: center;
+    color: #000;
+    margin-top: 0.5mm;
   }
 
-  /* Grid de Largada */
-  .grid-container {
-    margin: 20px 0;
+  /* Grid de Largada (Tablix LapTime RDLC) */
+  .grid-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 5mm 3mm;
+    margin-top: 4mm;
+  }
+  .grid-slot {
+    width: 50%;
+    vertical-align: top;
+  }
+  .grid-slot-3col {
+    width: 33.33%;
+    vertical-align: top;
+  }
+  .grid-pos-box {
+    background: #d4d4d4;
+    border: 1px solid #777;
+    font-size: 8.5pt;
+    font-weight: bold;
+    text-align: center;
+    padding: 2px 0;
+  }
+  .grid-name-box {
+    background: #ffffff;
+    border: 1px solid #777;
+    border-top: none;
+    font-size: 8pt;
+    font-weight: bold;
+    text-align: center;
+    padding: 5px 2px;
+    min-height: 12mm;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-  }
-  .grid-row-2col {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-  }
-  .grid-row-3col {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 14px;
-  }
-  .grid-box {
-    border: 2px solid #2c2c2e;
-    border-radius: 8px;
-    padding: 10px 14px;
-    background: #fff;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
-  }
-  .grid-box.pole {
-    border-color: #0b7a53;
-    background: #f0fdf4;
-  }
-  .grid-pos {
-    font-size: 20px;
-    font-weight: 800;
-    width: 44px;
-    height: 44px;
-    border-radius: 8px;
-    background: #2c2c2e;
-    color: #fff;
-    display: flex;
     align-items: center;
     justify-content: center;
   }
-  .grid-box.pole .grid-pos {
-    background: #0b7a53;
-  }
-  .grid-info { flex: 1; min-width: 0; }
-  .grid-kart { font-family: "Geist Mono", monospace; font-size: 18px; font-weight: 800; color: #111; }
-  .grid-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #1d1d1f; }
-  .grid-time { font-family: "Geist Mono", monospace; font-size: 11.5px; color: var(--muted); }
-
-  /* Volta a Volta */
-  .driver-laps-card {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    margin-bottom: 14px;
-    overflow: hidden;
-  }
-  .driver-laps-header {
-    background: #f4f4f7;
-    padding: 8px 12px;
-    font-weight: 700;
-    display: flex;
-    justify-content: space-between;
-    border-bottom: 1px solid var(--border);
-  }
-  .laps-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 4px;
-    padding: 8px 12px;
-    font-size: 11.5px;
-    background: #fff;
-  }
-  .lap-pill {
-    padding: 4px 6px;
-    border-radius: 4px;
-    background: #fafafc;
-    border: 1px solid #f0f0f2;
-    display: flex;
-    justify-content: space-between;
-  }
-  .lap-pill.best {
-    background: #f3e8ff;
-    border-color: #d8b4fe;
-    font-weight: 700;
-    color: #6b21a8;
+  .grid-time-sub {
+    font-size: 6.5pt;
+    font-weight: normal;
+    color: #444;
+    margin-top: 1px;
   }
 
-  /* Matrix Mapa de Voltas */
-  .matrix-wrapper {
-    overflow-x: auto;
-    margin-top: 12px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
+  /* Volta a Volta (LapToLapReport.rdlc) */
+  .lap-to-lap-driver {
+    margin-bottom: 5mm;
+    page-break-inside: avoid;
   }
-  table.matrix-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 11px;
-    white-space: nowrap;
+  .lap-to-lap-header {
+    background: #e6e6e6;
+    border: 1px solid #777;
+    border-bottom: none;
+    font-size: 8pt;
+    font-weight: bold;
+    padding: 2.5px 5px;
   }
-  table.matrix-table th, table.matrix-table td {
-    padding: 5px 6px;
-    border: 1px solid #e5e5ea;
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-  }
-  table.matrix-table th { background: #f4f4f7; font-weight: 700; }
-  table.matrix-table td.driver-col { text-align: left; font-weight: 600; background: #fff; position: sticky; left: 0; }
 
-  /* Modo Cupom Térmico */
+  /* Modo Cupom Térmico TM-T20 */
   body.cupom {
     background: #fff;
     padding: 0;
-    font-size: 11px;
+    font-size: 9pt;
   }
   body.cupom .tools { display: none !important; }
-  body.cupom .page-container {
-    max-width: 72mm;
-    width: 72mm;
-    padding: 2mm 2mm;
-    border-radius: 0;
-    box-shadow: none;
-    margin: 0;
+  body.cupom .sheet-page {
+    width: 72mm !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding: 2mm !important;
+    box-shadow: none !important;
+    border: none !important;
   }
-  body.cupom .rep-logo { height: 28px; }
-  body.cupom .rep-title-org { font-size: 11px; }
-  body.cupom .rep-name { font-size: 13px; }
-  body.cupom .rep-meta-grid { grid-template-columns: 1fr; font-size: 10px; gap: 2px; padding: 4px; }
-  body.cupom .wide-only { display: none !important; }
-  body.cupom .signatures { display: none; }
-  body.cupom table.data-table th, body.cupom table.data-table td { padding: 3px 2px; font-size: 9.5px; }
+  body.cupom .rep-logo { max-height: 14mm; }
+  body.cupom .rep-title-1 { font-size: 9pt; }
+  body.cupom .rep-subtitle-1, body.cupom .rep-subtitle-2 { font-size: 8pt; }
+  body.cupom .rep-soft-td { display: none; }
+  body.cupom .signatures-table { display: none; }
+  body.cupom .hide-cupom { display: none !important; }
+  body.cupom table.rdlc-table { font-size: 7.5pt; }
 
   @media print {
-    body { background: #fff; padding: 0; }
+    body { background: #fff !important; }
     .tools { display: none !important; }
-    .page-container { box-shadow: none; padding: 0; border: none; border-radius: 0; }
-    table.data-table tr:hover td { background: transparent; }
+    .sheet-page {
+      box-shadow: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: none !important;
+      width: 100% !important;
+      min-height: auto !important;
+    }
+    @page {
+      margin: 6mm 8mm;
+    }
   }
 </style>
 </head>
@@ -364,44 +406,61 @@
   <button onclick="imprimirCupom()">🧾 Imprimir cupom térmico</button>
 
   <div class="right">
-    <span id="sessionStatusBadge" style="font-size: 11.5px; font-weight: 600; color: var(--muted);"></span>
+    <span id="sessionStatusBadge"></span>
   </div>
 </div>
 
-<div class="page-container" id="pageContainer">
+<div class="sheet-page portrait" id="sheetContainer">
+  <!-- Cabeçalho Oficial LapTime -->
   <div class="rep-header">
-    <div class="rep-header-top">
-      <img src="/kib-logo.png" alt="Kartódromo Internacional de Betim" class="rep-logo" onerror="this.style.display='none'">
-      <div class="rep-title-block">
-        <div class="rep-title-org">Kartódromo Internacional de Betim</div>
-        <div class="rep-title-sub">Sistema Oficial de Cronometragem</div>
-      </div>
-    </div>
-    <div class="rep-name" id="reportTitle">Resultados Oficiais</div>
-    <div class="rep-meta-grid" id="metaGrid">
-      <div class="rep-meta-item"><strong>Evento</strong><span id="metaEvento">—</span></div>
-      <div class="rep-meta-item"><strong>Bateria / Prova</strong><span id="metaBateria">—</span></div>
-      <div class="rep-meta-item"><strong>Data e Hora</strong><span id="metaDataHora">—</span></div>
-      <div class="rep-meta-item"><strong>Extensão / Pista</strong><span id="metaPista">1.110 m · Traçado Principal</span></div>
-    </div>
+    <table class="rep-header-table">
+      <tr>
+        <td class="rep-logo-td">
+          <img src="/kib-logo.png" alt="Logo" class="rep-logo" onerror="this.style.display='none'">
+        </td>
+        <td class="rep-titles-td">
+          <div class="rep-title-1" id="hdrTitle">KARTÓDROMO INTERNACIONAL DE BETIM</div>
+          <div class="rep-subtitle-1" id="hdrSub1">BATERIA</div>
+          <div class="rep-subtitle-2" id="hdrSub2">TOMADA DE TEMPO</div>
+          <div class="rep-subtitle-3" id="hdrSub3">TRAÇADO PRINCIPAL · 1.110 m</div>
+        </td>
+        <td class="rep-soft-td">
+          <img src="/laptime-logo.png" alt="LapTime" class="rep-soft-logo" onerror="this.src='/kib-logo.png'">
+        </td>
+      </tr>
+    </table>
+    <div class="rep-divider-line"></div>
+    <div class="rep-date-time" id="hdrDateTime">DATA/HORA: --/--/---- --:--:--</div>
   </div>
 
+  <!-- Conteúdo do Relatório RDLC -->
   <div id="reportContent">
-    <div style="text-align: center; padding: 40px; color: var(--muted);">Carregando dados do relatório...</div>
+    <div style="text-align: center; padding: 40px; font-size: 9pt; color: #555;">Carregando dados da cronometragem...</div>
   </div>
 
-  <div id="bestLapContainer"></div>
+  <!-- Bloco de Melhor Volta e Legenda -->
+  <div id="notesContainer"></div>
 
-  <div class="rep-footer" id="repFooter">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-      <span>Emitido pelo Sistema de Cronometragem em <strong id="timestampImpresso"></strong></span>
-      <span>Página 1 de 1</span>
-    </div>
-    <div class="signatures">
-      <div class="sign-line">Diretor de Prova</div>
-      <div class="sign-line">Comissários Desportivos</div>
-      <div class="sign-line">Cronometrista Responsável</div>
-    </div>
+  <!-- Rodapé Oficial LapTime -->
+  <div class="rep-footer">
+    <table class="signatures-table">
+      <tr>
+        <td>
+          <div class="sign-line">Diretor de Prova</div>
+        </td>
+        <td>
+          <div class="sign-line">Comissário Desportivo</div>
+        </td>
+        <td>
+          <div class="sign-line">Cronometragem</div>
+          <div class="sign-org">Kartódromo Internacional de Betim</div>
+        </td>
+      </tr>
+    </table>
+    <div class="page-num-line" id="pageNumLine">Página 1 de 1</div>
+    <div class="footer-divider-line"></div>
+    <div class="footer-brand-1">LapTime - Sistema de Cronometragem - www.laptime.com.br</div>
+    <div class="footer-brand-2">Desenvolvido por Sisecom Sistemas - sisecom.com.br</div>
   </div>
 </div>
 
@@ -412,20 +471,31 @@ const sessionId = location.pathname.split('/').filter(Boolean).pop();
 
 document.getElementById('tipoSelect').value = currentTipo;
 
-const fmt = (ms) => {
-  if (ms == null || ms === 0) return '--';
-  const s = ms / 1000, m = Math.floor(s / 60);
-  const r = (s - m * 60).toFixed(3);
-  return m ? `${m}:${r.padStart(6, '0')}` : r;
+const fmtMs = (ms) => {
+  if (ms == null || isNaN(ms) || ms === 0) return '---';
+  const totalSec = ms / 1000;
+  const m = Math.floor(totalSec / 60);
+  const s = (totalSec - m * 60).toFixed(3);
+  return `${String(m).padStart(2, '0')}:${s.padStart(6, '0')}`;
 };
 
-const fmtHora = (ms) => {
-  if (!ms) return '--:--:--';
-  const d = new Date(ms);
-  return d.toTimeString().split(' ')[0] + '.' + String(d.getMilliseconds()).padStart(3, '0');
+const fmtTotal = (ms) => {
+  if (ms == null || isNaN(ms) || ms === 0) return '---';
+  const totalSec = ms / 1000;
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec - h * 3600) / 60);
+  const s = (totalSec - h * 3600 - m * 60).toFixed(3);
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${s.padStart(6, '0')}`;
 };
 
-const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const cleanText = (s) => String(s ?? '').replace(/[�]/g, '').trim();
+
+const esc = (s) => cleanText(s).replace(/[&<>"]/g, c => ({
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;'
+}[c]));
 
 let sessionData = null;
 let passingsData = [];
@@ -436,6 +506,15 @@ function mudarTipo(novoTipo) {
   const newUrl = new URL(location.href);
   newUrl.searchParams.set('tipo', novoTipo);
   history.replaceState(null, '', newUrl.toString());
+
+  // Ajusta orientação da folha (Paisagem para Mapa de Voltas e Mapa de Prova)
+  const sheet = document.getElementById('sheetContainer');
+  if (['mapa_voltas', 'mapa_prova'].includes(novoTipo)) {
+    sheet.className = 'sheet-page landscape';
+  } else {
+    sheet.className = 'sheet-page portrait';
+  }
+
   renderReport();
 }
 
@@ -453,16 +532,28 @@ async function carregarTudo() {
     try {
       const pRes = await fetch(`/api/sessions/${sessionId}/passings`);
       passingsData = await pRes.json();
+      if (passingsData && passingsData.value && Array.isArray(passingsData.value)) passingsData = passingsData.value;
+      if (!Array.isArray(passingsData)) passingsData = [];
     } catch { passingsData = []; }
 
     try {
       const lRes = await fetch(`/api/sessions/${sessionId}/laps`);
       lapsData = await lRes.json();
+      if (lapsData && lapsData.value && Array.isArray(lapsData.value)) lapsData = lapsData.value;
+      if (!Array.isArray(lapsData)) lapsData = [];
     } catch { lapsData = []; }
 
-    document.getElementById('timestampImpresso').textContent = new Date().toLocaleString('pt-BR');
+    const now = new Date();
+    const dtStr = String(now.getDate()).padStart(2, '0') + '/' +
+                  String(now.getMonth() + 1).padStart(2, '0') + '/' +
+                  now.getFullYear() + ' ' +
+                  String(now.getHours()).padStart(2, '0') + ':' +
+                  String(now.getMinutes()).padStart(2, '0') + ':' +
+                  String(now.getSeconds()).padStart(2, '0');
+    document.getElementById('hdrDateTime').textContent = 'DATA/HORA: ' + dtStr;
+
     preencherCabecalho();
-    renderReport();
+    mudarTipo(currentTipo);
   } catch (err) {
     document.getElementById('reportContent').innerHTML = `<div style="color: red; padding: 20px;">Falha ao carregar sessão: ${esc(err.message)}</div>`;
   }
@@ -471,11 +562,32 @@ async function carregarTudo() {
 function preencherCabecalho() {
   const v = sessionData;
   if (!v) return;
-  const TYPES = { treino: 'Treino', classificacao: 'Tomada de Tempo', corrida: 'Corrida' };
-  const dt = v.startedAt ? new Date(v.startedAt).toLocaleString('pt-BR') : new Date().toLocaleDateString('pt-BR');
-  document.getElementById('metaEvento').textContent = v.name.split('·')[0].trim() || 'Baterias do Dia';
-  document.getElementById('metaBateria').textContent = `${v.name} (${TYPES[v.type] || v.type})`;
-  document.getElementById('metaDataHora').textContent = dt;
+  const TYPES = { treino: 'TREINO LIVRE', classificacao: 'TREINO CLASSIFICATÓRIO', corrida: 'CORRIDA' };
+
+  let evName = 'EVENTO OFICIAL';
+  let grpName = 'BATERIA';
+  let raceName = TYPES[v.type] || 'CORRIDA';
+
+  if (v.name) {
+    const raw = cleanText(v.name);
+    const parts = raw.split(/[·\-]/).map(p => cleanText(p)).filter(Boolean);
+    if (parts.length >= 2) {
+      grpName = parts[0];
+      raceName = parts[1];
+    } else {
+      grpName = raw;
+    }
+  }
+
+  if (v.startedAt) {
+    const d = new Date(v.startedAt);
+    evName = 'BATERIAS ' + String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+  }
+
+  document.getElementById('hdrTitle').textContent = evName;
+  document.getElementById('hdrSub1').textContent = grpName;
+  document.getElementById('hdrSub2').textContent = raceName;
+  document.getElementById('hdrSub3').textContent = 'TRAÇADO PRINCIPAL · 1.110 m';
   document.getElementById('sessionStatusBadge').textContent = `Estado: ${v.state?.toUpperCase() || ''} · ${v.standings?.length || 0} competidores`;
 }
 
@@ -484,236 +596,492 @@ function renderReport() {
   const v = sessionData;
   const standings = v.standings || [];
   const content = document.getElementById('reportContent');
-  const bestBox = document.getElementById('bestLapContainer');
-  const title = document.getElementById('reportTitle');
-  bestBox.innerHTML = '';
+  const notes = document.getElementById('notesContainer');
+  notes.innerHTML = '';
 
-  const TITULOS = {
-    resultados_oficiais: 'Resultados Oficiais',
-    sem_velocidade: 'Resultados Oficiais (Sem Velocidade Média)',
-    com_tempo_medio: 'Resultados Oficiais (Com Tempo Médio)',
-    ordem_chegada: 'Resultados Oficiais (Ordem de Chegada)',
-    ordem_chegada_categoria: 'Resultados Oficiais (Ordem de Chegada por Categoria)',
-    passagens: 'Relatório Completo de Passagens',
-    volta_a_volta: 'Relatório Volta a Volta (Todos os Pilotos)',
-    mapa_voltas: 'Mapa de Voltas (Todos os Pilotos)',
-    mapa_prova: 'Mapa de Prova (Evolução da Posição)',
-    grid_2col_esq: 'Grid de Largada · 2 Colunas (Líder à Esquerda)',
-    grid_2col_dir: 'Grid de Largada · 2 Colunas (Líder à Direita)',
-    grid_3col_esq: 'Grid de Largada · 3 Colunas (Líder à Esquerda)',
-    grid_3col_dir: 'Grid de Largada · 3 Colunas (Líder à Direita)',
-  };
+  // Processa estatísticas estendidas com voltas (2ª melhor volta, etc.)
+  const driverLapsMap = {};
+  lapsData.forEach(d => {
+    driverLapsMap[String(d.kart)] = d.laps || [];
+  });
 
-  title.textContent = TITULOS[currentTipo] || 'Resultados Oficiais';
-  document.title = `${title.textContent} · ${v.name}`;
+  const enriched = standings.map(s => {
+    const kLaps = driverLapsMap[String(s.kart)] || [];
+    const validLaps = kLaps.filter(l => !l.invalid && l.lapMs > 0).sort((a, b) => a.lapMs - b.lapMs);
+    const best1 = validLaps[0];
+    const best2 = validLaps[1];
 
-  // Melhores voltas gerais
+    const totalLaps = s.laps || kLaps.length || 0;
+    const avgMs = totalLaps > 0 && s.totalMs ? Math.round(s.totalMs / totalLaps) : null;
+
+    return {
+      ...s,
+      bestLap: s.bestLapNumber || (best1 ? best1.lap : null),
+      bestLapTime: s.bestLapMs || (best1 ? best1.lapMs : null),
+      bestLap2nd: best2 ? best2.lap : null,
+      bestLapTime2nd: best2 ? best2.lapMs : null,
+      lastLapTime: s.lastLapMs || (kLaps.length > 0 ? kLaps[kLaps.length - 1].lapMs : null),
+      avgLapTime: avgMs,
+      uf: s.startPos || s.position || '-',
+      status: s.racingStatus || 0
+    };
+  });
+
+  // Melhores voltas gerais da sessão
   let melhorGeral = null;
-  for (const s of standings) {
-    if (s.bestLapMs && (!melhorGeral || s.bestLapMs < melhorGeral.bestLapMs)) {
-      melhorGeral = s;
+  enriched.forEach(r => {
+    if (r.bestLapTime && (!melhorGeral || r.bestLapTime < melhorGeral.bestLapTime)) {
+      melhorGeral = r;
     }
-  }
+  });
 
+  // 1 a 5: RELATÓRIOS OFICIAIS DE CLASSIFICAÇÃO
   if (['resultados_oficiais', 'sem_velocidade', 'com_tempo_medio', 'ordem_chegada', 'ordem_chegada_categoria'].includes(currentTipo)) {
-    let list = [...standings];
+    let list = [...enriched];
+
+    const isArrival = currentTipo.includes('ordem_chegada') || v.type === 'corrida';
     if (currentTipo.includes('ordem_chegada')) {
+      // Ordem de chegada: Voltas decrescente, depois Tempo Total crescente
       list.sort((a, b) => (b.laps - a.laps) || ((a.totalMs || 0) - (b.totalMs || 0)));
-      list.forEach((r, idx) => r.chegadaPos = idx + 1);
+      list.forEach((r, idx) => r.pos = idx + 1);
+    } else {
+      // Treino/Qualificação: Melhor volta crescente, depois 2ª melhor volta
+      list.sort((a, b) => {
+        if (!a.bestLapTime) return 1;
+        if (!b.bestLapTime) return -1;
+        return a.bestLapTime - b.bestLapTime || ((a.bestLapTime2nd || 0) - (b.bestLapTime2nd || 0));
+      });
+      list.forEach((r, idx) => r.pos = idx + 1);
     }
 
-    const showSpeed = currentTipo === 'resultados_oficiais';
-    const showAvgTime = currentTipo === 'com_tempo_medio';
-    const showCat = currentTipo === 'ordem_chegada_categoria' || standings.some(s => s.category);
+    const leader = list[0];
 
-    let html = `<table class="data-table"><thead><tr>
-      <th class="pos-cell">Pos</th>
-      <th class="kart-cell">Nº</th>
-      <th>Competidor</th>
-      ${showCat ? '<th>Cat.</th>' : ''}
-      <th class="t-right">Voltas</th>
-      <th class="t-right wide-only">Tempo Total</th>
-      <th class="t-right">Melhor Volta</th>
-      <th class="t-center wide-only">Na V.</th>
-      <th class="t-right">Dif. 1º</th>
-      <th class="t-right wide-only">Dif. Ant.</th>
-      ${showSpeed ? '<th class="t-right wide-only">Vel. Média</th>' : ''}
-      ${showAvgTime ? '<th class="t-right wide-only">T. Médio</th>' : ''}
-    </tr></thead><tbody>`;
+    // Calcula diferenças para o líder e anterior exatamente como LapTime
+    list.forEach((r, idx) => {
+      if (idx === 0) {
+        r.diffLeaderStr = '---';
+        r.diffPrevStr = '---';
+      } else {
+        const prev = list[idx - 1];
+        if (isArrival) {
+          const lapsBehindLeader = (leader.laps || 0) - (r.laps || 0);
+          if (lapsBehindLeader > 1) r.diffLeaderStr = `-${lapsBehindLeader} voltas`;
+          else if (lapsBehindLeader === 1) r.diffLeaderStr = '-1 volta';
+          else if (r.totalMs && leader.totalMs) r.diffLeaderStr = fmtMs(r.totalMs - leader.totalMs);
+          else r.diffLeaderStr = '---';
 
-    list.forEach((r, i) => {
-      const pos = r.chegadaPos || r.position || (i + 1);
-      const isBest = melhorGeral && r.kart === melhorGeral.kart;
-      const speed = r.averageSpeedKmh ? Number(r.averageSpeedKmh).toFixed(1) + ' km/h' : '—';
-      const avgMs = r.laps > 0 && r.totalMs ? Math.round(r.totalMs / r.laps) : null;
-      const gapLider = pos === 1 ? '—' : r.gapLaps ? `+${r.gapLaps} V` : r.gapMs != null ? `+${fmt(r.gapMs)}` : '—';
-      const prev = list[i - 1];
-      const gapAnt = pos === 1 || !prev ? '—' : r.gapLaps && prev.gapLaps !== r.gapLaps ? `+${(r.gapLaps - (prev.gapLaps || 0))} V` : (r.totalMs && prev.totalMs) ? `+${fmt(r.totalMs - prev.totalMs)}` : '—';
-
-      html += `<tr>
-        <td class="pos-cell ${pos <= 3 ? 'pos-' + pos : ''}">${pos}º</td>
-        <td class="kart-cell">${esc(r.kart)}</td>
-        <td><strong>${esc(r.name)}</strong></td>
-        ${showCat ? `<td><span style="font-size: 11px; color: var(--muted);">${esc(r.category || 'Geral')}</span></td>` : ''}
-        <td class="t-right mono">${r.laps}</td>
-        <td class="t-right mono wide-only">${fmt(r.totalMs)}</td>
-        <td class="t-right mono ${isBest ? 'overall-best' : 'best-lap'}">${fmt(r.bestLapMs)}</td>
-        <td class="t-center mono wide-only">${r.bestLapNumber ?? '—'}</td>
-        <td class="t-right mono">${gapLider}</td>
-        <td class="t-right mono wide-only">${gapAnt}</td>
-        ${showSpeed ? `<td class="t-right mono wide-only">${speed}</td>` : ''}
-        ${showAvgTime ? `<td class="t-right mono wide-only">${fmt(avgMs)}</td>` : ''}
-      </tr>`;
+          const lapsBehindPrev = (prev.laps || 0) - (r.laps || 0);
+          if (lapsBehindPrev > 1) r.diffPrevStr = `-${lapsBehindPrev} voltas`;
+          else if (lapsBehindPrev === 1) r.diffPrevStr = '-1 volta';
+          else if (r.totalMs && prev.totalMs) r.diffPrevStr = fmtMs(r.totalMs - prev.totalMs);
+          else r.diffPrevStr = '---';
+        } else {
+          // Tomada de tempo / Melhor volta
+          r.diffLeaderStr = (r.bestLapTime && leader.bestLapTime) ? fmtMs(r.bestLapTime - leader.bestLapTime) : '---';
+          r.diffPrevStr = (r.bestLapTime && prev.bestLapTime) ? fmtMs(r.bestLapTime - prev.bestLapTime) : '---';
+        }
+      }
     });
-    html += `</tbody></table>`;
-    content.innerHTML = html;
 
-    if (melhorGeral) {
-      bestBox.innerHTML = `
-        <div class="best-lap-banner">
-          <div>
-            <strong>MELHOR VOLTA DA PROVA:</strong> Kart <strong>#${esc(melhorGeral.kart)}</strong> · <strong>${esc(melhorGeral.name)}</strong>
-          </div>
-          <div>
-            Tempo: <strong class="mono">${fmt(melhorGeral.bestLapMs)}</strong> na volta <strong>${melhorGeral.bestLapNumber || '—'}</strong>
-            ${melhorGeral.averageSpeedKmh ? `· Média: <strong>${Number(melhorGeral.averageSpeedKmh).toFixed(1)} km/h</strong>` : ''}
-          </div>
-        </div>
-      `;
-    }
-  }
-  else if (currentTipo === 'passagens') {
-    if (!passingsData.length) {
-      content.innerHTML = `<div style="padding: 30px; text-align: center; color: var(--muted);">Nenhuma passagem registrada para esta bateria.</div>`;
+    let html = '';
+
+    // Configuração de colunas de acordo com o template RDLC
+    if (currentTipo === 'com_tempo_medio') {
+      // TimingOfficialReportWithAvgTime.rdlc: POS | # | Nome | MV | TMV | DL | DA | TV | VM | TMED | TT
+      html = `<table class="rdlc-table"><thead><tr>
+        <th style="width: 28px;">POS</th>
+        <th style="width: 28px;">#</th>
+        <th class="c-left">Nome</th>
+        <th style="width: 28px;">MV</th>
+        <th class="c-right" style="width: 58px;">TMV</th>
+        <th class="c-right" style="width: 55px;">DL</th>
+        <th class="c-right hide-cupom" style="width: 55px;">DA</th>
+        <th style="width: 28px;">TV</th>
+        <th class="c-right hide-cupom" style="width: 42px;">VM</th>
+        <th class="c-right hide-cupom" style="width: 58px;">TMED</th>
+        <th class="c-right hide-cupom" style="width: 65px;">TT</th>
+      </tr></thead><tbody>`;
+
+      list.forEach(r => {
+        const posDisplay = r.status === 1 ? 'NC' : r.status === 2 ? 'EX' : r.status === 3 ? 'DC' : r.pos;
+        const isBest = melhorGeral && r.kart === melhorGeral.kart;
+        const speed = r.averageSpeedKmh ? Number(r.averageSpeedKmh).toFixed(2) : '---';
+
+        html += `<tr>
+          <td class="c-center c-bold">${posDisplay}</td>
+          <td class="c-center c-bold">${esc(r.kart)}</td>
+          <td class="c-left">${esc(r.name)}</td>
+          <td class="c-right">${r.bestLap || '---'}</td>
+          <td class="c-right ${isBest ? 'c-best' : ''}">${fmtMs(r.bestLapTime)}</td>
+          <td class="c-right">${r.diffLeaderStr}</td>
+          <td class="c-right hide-cupom">${r.diffPrevStr}</td>
+          <td class="c-right">${r.laps || 0}</td>
+          <td class="c-right hide-cupom">${speed}</td>
+          <td class="c-right hide-cupom">${fmtMs(r.avgLapTime)}</td>
+          <td class="c-right hide-cupom">${fmtTotal(r.totalMs)}</td>
+        </tr>`;
+      });
+      html += `</tbody></table>`;
+      content.innerHTML = html;
+
+      // Legenda específica para Com Tempo Médio
+      let notesHtml = `<div class="rdlc-notes-box">`;
+      if (melhorGeral && melhorGeral.bestLapTime) {
+        notesHtml += `<div class="rdlc-bestlap-note">Melhor volta: ${esc(melhorGeral.name)} (${fmtMs(melhorGeral.bestLapTime)})</div>`;
+      }
+      notesHtml += `
+        <table class="rdlc-legend">
+          <tr>
+            <th>Legenda:</th>
+            <td><strong>POS:</strong> Posição</td>
+            <td><strong>#:</strong> Nº Kart</td>
+            <td><strong>Nome:</strong> Nome Piloto</td>
+            <td><strong>MV:</strong> Melhor Volta</td>
+            <td><strong>TMV:</strong> Tempo Melhor Volta</td>
+            <td><strong>DL:</strong> Dif. Líder</td>
+            <td><strong>DA:</strong> Dif. Anterior</td>
+            <td><strong>TV:</strong> Total Voltas</td>
+            <td><strong>VM:</strong> Vel. Média (Km/h)</td>
+            <td><strong>TMED:</strong> Tempo Médio</td>
+            <td><strong>TT:</strong> Tempo Total</td>
+          </tr>
+        </table>
+      </div>`;
+      notes.innerHTML = notesHtml;
       return;
     }
-    let html = `<table class="data-table"><thead><tr>
-      <th style="width: 40px;">#</th>
-      <th class="kart-cell">Kart</th>
-      <th>Competidor</th>
-      <th class="wide-only">Transponder</th>
-      <th class="t-right">Tempo Volta</th>
-      <th class="t-center">Volta</th>
-      <th class="t-right wide-only">Decorrido</th>
-      <th class="t-right wide-only">Hora Passagem</th>
-      <th class="wide-only">Situação</th>
+
+    // Demais relatórios oficiais (Resultados oficiais, Sem velocidade, Ordem de chegada, Ordem com categoria)
+    const showSpeed = currentTipo !== 'sem_velocidade';
+    const showCatCol = currentTipo === 'ordem_chegada_categoria';
+
+    html = `<table class="rdlc-table"><thead><tr>
+      <th style="width: 28px;">POS</th>
+      <th style="width: 28px;">#</th>
+      <th class="c-left">Nome</th>
+      ${showCatCol ? '<th class="c-left" style="width: 75px;">Categoria</th>' : ''}
+      <th style="width: 28px;">MV</th>
+      <th class="c-right" style="width: 58px;">TMV</th>
+      <th class="c-right hide-cupom" style="width: 65px;">TT</th>
+      <th class="c-right" style="width: 55px;">DL</th>
+      <th class="c-right hide-cupom" style="width: 55px;">DA</th>
+      <th class="c-right hide-cupom" style="width: 58px;">TUV</th>
+      <th style="width: 28px;">TV</th>
+      ${showSpeed ? '<th class="c-right hide-cupom" style="width: 42px;">VM</th>' : ''}
+      <th class="hide-cupom" style="width: 28px;">MV 2</th>
+      <th class="c-right hide-cupom" style="width: 58px;">TMV 2</th>
+      <th class="hide-cupom" style="width: 28px;">UF</th>
     </tr></thead><tbody>`;
 
-    passingsData.forEach((p, idx) => {
-      const situacao = p.deleted ? 'Excluída' : p.invalid ? 'Inválida' : p.rejected ? (p.reason || 'Rejeitada') : 'Válida';
-      const situacaoCor = p.invalid ? 'color: red;' : p.deleted ? 'color: gray;' : 'color: green;';
+    list.forEach(r => {
+      const posDisplay = r.status === 1 ? 'NC' : r.status === 2 ? 'EX' : r.status === 3 ? 'DC' : r.pos;
+      const isBest = melhorGeral && r.kart === melhorGeral.kart;
+      const speed = r.averageSpeedKmh ? Number(r.averageSpeedKmh).toFixed(2) : '---';
+
       html += `<tr>
-        <td class="mono" style="color: var(--muted);">${p.sequence || (idx + 1)}</td>
-        <td class="kart-cell">${esc(p.kart)}</td>
-        <td><strong>${esc(p.name || '—')}</strong></td>
-        <td class="mono wide-only" style="color: var(--muted);">${esc(p.transponder || '—')}</td>
-        <td class="t-right mono font-weight-bold">${fmt(p.lapMs)}</td>
-        <td class="t-center mono">${p.lap || '—'}</td>
-        <td class="t-right mono wide-only">${fmt(p.wallMs)}</td>
-        <td class="t-right mono wide-only">${fmtHora(p.passingMs || p.wallMs)}</td>
-        <td class="wide-only" style="${situacaoCor} font-weight: 600;">${situacao}</td>
+        <td class="c-center c-bold">${posDisplay}</td>
+        <td class="c-center c-bold">${esc(r.kart)}</td>
+        <td class="c-left">${esc(r.name)}</td>
+        ${showCatCol ? `<td class="c-left">${esc(r.category || 'GERAL')}</td>` : ''}
+        <td class="c-right">${r.bestLap || '---'}</td>
+        <td class="c-right ${isBest ? 'c-best' : ''}">${fmtMs(r.bestLapTime)}</td>
+        <td class="c-right hide-cupom">${fmtTotal(r.totalMs)}</td>
+        <td class="c-right">${r.diffLeaderStr}</td>
+        <td class="c-right hide-cupom">${r.diffPrevStr}</td>
+        <td class="c-right hide-cupom">${fmtMs(r.lastLapTime)}</td>
+        <td class="c-right">${r.laps || 0}</td>
+        ${showSpeed ? `<td class="c-right hide-cupom">${speed}</td>` : ''}
+        <td class="c-right hide-cupom">${r.bestLap2nd || '---'}</td>
+        <td class="c-right hide-cupom">${fmtMs(r.bestLapTime2nd)}</td>
+        <td class="c-center hide-cupom">${esc(r.uf)}</td>
       </tr>`;
     });
     html += `</tbody></table>`;
     content.innerHTML = html;
+
+    // Observações e Legenda RDLC LapTime
+    let notesHtml = `<div class="rdlc-notes-box">`;
+    if (melhorGeral && melhorGeral.bestLapTime) {
+      notesHtml += `<div class="rdlc-bestlap-note">Melhor volta: ${esc(melhorGeral.name)} (${fmtMs(melhorGeral.bestLapTime)})</div>`;
+    }
+    notesHtml += `
+      <table class="rdlc-legend">
+        <tr>
+          <th>Legenda:</th>
+          <td><strong>POS:</strong> Posição</td>
+          <td><strong>#:</strong> Nº Kart</td>
+          <td><strong>Nome:</strong> Nome Piloto</td>
+          <td><strong>MV:</strong> Melhor Volta</td>
+          <td><strong>TMV:</strong> Tempo Melhor Volta</td>
+          <td><strong>TT:</strong> Tempo Total</td>
+          <td><strong>DL:</strong> Dif. Líder</td>
+          <td><strong>DA:</strong> Dif. Anterior</td>
+          <td><strong>TUV:</strong> Tempo Última Volta</td>
+          <td><strong>TV:</strong> Total Voltas</td>
+          ${showSpeed ? '<td><strong>VM:</strong> Vel. Média (Km/h)</td>' : ''}
+          <td><strong>MV 2:</strong> 2ª Melhor Volta</td>
+          <td><strong>TMV 2:</strong> Tempo 2ª MV</td>
+          <td><strong>UF:</strong> Última Foto</td>
+        </tr>
+      </table>
+    </div>`;
+    notes.innerHTML = notesHtml;
   }
+  // 6: RELATÓRIO DE PASSAGENS (PassingReport.rdlc)
+  else if (currentTipo === 'passagens') {
+    if (!passingsData.length) {
+      content.innerHTML = `<div style="padding: 20px; text-align: center; color: #555;">Nenhuma passagem registrada para esta sessão.</div>`;
+      return;
+    }
+    let html = `<table class="rdlc-table"><thead><tr>
+      <th style="width: 40px;">ID</th>
+      <th style="width: 35px;">#</th>
+      <th class="c-left">Competidor</th>
+      <th class="c-left" style="width: 80px;">Categoria</th>
+      <th style="width: 35px;">VLT</th>
+      <th class="c-right" style="width: 65px;">TV</th>
+      <th class="c-right" style="width: 75px;">TT</th>
+      <th style="width: 35px;">MV</th>
+      <th class="c-right" style="width: 65px;">TMV</th>
+      <th class="c-right" style="width: 50px;">Km/h</th>
+    </tr></thead><tbody>`;
+
+    // Mantém mapa de melhor volta do competidor até a passagem atual
+    const bestByKart = {};
+
+    passingsData.forEach((p, idx) => {
+      const k = String(p.kart);
+      const lapNum = p.lap && p.lap > 0 ? p.lap : null;
+      if (p.lapMs && p.lapMs > 0 && !p.invalid) {
+        if (!bestByKart[k] || p.lapMs < bestByKart[k].time) {
+          bestByKart[k] = { lap: lapNum || 1, time: p.lapMs };
+        }
+      }
+      const bInfo = bestByKart[k];
+      const speed = p.speed ? Number(p.speed).toFixed(2) : p.averageSpeedKmh ? Number(p.averageSpeedKmh).toFixed(2) : '---';
+
+      const elapsed = (p.wallMs && sessionData.startedAt) ? Math.max(0, p.wallMs - sessionData.startedAt) : (p.elapsedMs || 0);
+
+      html += `<tr>
+        <td class="c-center">${p.sequence || (idx + 1)}</td>
+        <td class="c-center c-bold">${esc(p.kart)}</td>
+        <td class="c-left">${esc(p.name || '---')}</td>
+        <td class="c-left">${esc(p.category || 'GERAL')}</td>
+        <td class="c-center">${lapNum || '---'}</td>
+        <td class="c-right c-bold">${fmtMs(p.lapMs)}</td>
+        <td class="c-right">${fmtTotal(elapsed)}</td>
+        <td class="c-center">${bInfo ? bInfo.lap : '---'}</td>
+        <td class="c-right">${bInfo ? fmtMs(bInfo.time) : '---'}</td>
+        <td class="c-right">${speed}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+    content.innerHTML = html;
+
+    notes.innerHTML = `
+      <div class="rdlc-notes-box">
+        <table class="rdlc-legend">
+          <tr>
+            <th>Legenda:</th>
+            <td><strong>ID:</strong> Sequencial Passagem</td>
+            <td><strong>#:</strong> Nº Kart</td>
+            <td><strong>Competidor:</strong> Nome Piloto</td>
+            <td><strong>Categoria:</strong> Categoria</td>
+            <td><strong>VLT:</strong> Volta da Passagem</td>
+            <td><strong>TV:</strong> Tempo da Volta</td>
+            <td><strong>TT:</strong> Tempo Total Decorrido</td>
+            <td><strong>MV:</strong> Melhor Volta do Piloto até ali</td>
+            <td><strong>TMV:</strong> Tempo da Melhor Volta</td>
+            <td><strong>Km/h:</strong> Velocidade Média</td>
+          </tr>
+        </table>
+      </div>`;
+  }
+  // 7: VOLTA A VOLTA - TODOS (LapToLapReport.rdlc)
   else if (currentTipo === 'volta_a_volta') {
     if (!lapsData.length) {
-      content.innerHTML = `<div style="padding: 30px; text-align: center; color: var(--muted);">Nenhuma volta concluída registrada.</div>`;
+      content.innerHTML = `<div style="padding: 20px; text-align: center; color: #555;">Nenhuma volta registrada para esta sessão.</div>`;
       return;
     }
     let html = `<div>`;
     lapsData.forEach(d => {
-      const laps = d.laps || [];
-      const best = laps.filter(l => !l.invalid).reduce((min, l) => l.lapMs < min ? l.lapMs : min, Infinity);
-      html += `
-        <div class="driver-laps-card">
-          <div class="driver-laps-header">
-            <div>Kart <strong class="mono">#${esc(d.kart)}</strong> · <span>${esc(d.name)}</span></div>
-            <div style="font-size: 12px; color: var(--muted);">${laps.length} voltas completadas ${best !== Infinity ? `· Melhor: <strong class="mono best-lap">${fmt(best)}</strong>` : ''}</div>
-          </div>
-          <div class="laps-grid">
-            ${laps.map(l => {
-              const isBest = l.lapMs === best;
-              return `<div class="lap-pill ${isBest ? 'best' : ''}">
-                <span style="color: var(--muted);">V${l.lap}</span>
-                <span class="mono">${fmt(l.lapMs)}</span>
-              </div>`;
-            }).join('')}
-          </div>
+      const kLaps = d.laps || [];
+      const validLaps = kLaps.filter(l => !l.invalid && l.lapMs > 0);
+      const minLap = validLaps.reduce((min, l) => l.lapMs < min ? l.lapMs : min, Infinity);
+
+      html += `<div class="lap-to-lap-driver">
+        <div class="lap-to-lap-header">
+          Competidor: <strong>${esc(d.name || '---')}</strong> &nbsp;&nbsp;|&nbsp;&nbsp; Kart: <strong>#${esc(d.kart)}</strong> &nbsp;&nbsp;|&nbsp;&nbsp; Categoria: <strong>${esc(d.category || 'GERAL')}</strong>
         </div>
-      `;
+        <table class="rdlc-table"><thead><tr>
+          <th style="width: 35px;">#</th>
+          <th style="width: 35px;">VLT</th>
+          <th class="c-right" style="width: 65px;">TV</th>
+          <th class="c-right" style="width: 65px;">DMV</th>
+          <th class="c-right" style="width: 65px;">DLCAT</th>
+          <th class="c-right" style="width: 75px;">TT</th>
+          <th class="c-right" style="width: 65px;">VM (Km/h)</th>
+          <th class="c-left">Penalidades:</th>
+        </tr></thead><tbody>`;
+
+      let cumMs = 0;
+      kLaps.forEach((l, idx) => {
+        cumMs += l.lapMs || 0;
+        const dmv = (l.lapMs && minLap !== Infinity) ? (l.lapMs === minLap ? '00:00.000' : '+' + fmtMs(l.lapMs - minLap)) : '---';
+        const dlcat = (melhorGeral && l.lapMs) ? (l.lapMs === melhorGeral.bestLapTime ? '00:00.000' : '+' + fmtMs(l.lapMs - melhorGeral.bestLapTime)) : '---';
+        const speed = l.speed ? Number(l.speed).toFixed(2) : l.averageSpeedKmh ? Number(l.averageSpeedKmh).toFixed(2) : '---';
+        const isBest = l.lapMs === minLap;
+
+        html += `<tr>
+          <td class="c-center">${esc(d.kart)}</td>
+          <td class="c-center">${l.lap || (idx + 1)}</td>
+          <td class="c-right ${isBest ? 'c-best' : ''}">${fmtMs(l.lapMs)}</td>
+          <td class="c-right">${dmv}</td>
+          <td class="c-right">${dlcat}</td>
+          <td class="c-right">${fmtTotal(l.elapsedMs || cumMs)}</td>
+          <td class="c-right">${speed}</td>
+          <td class="c-left">${esc(l.penalty || )}</td>
+        </tr>`;
+      });
+      html += `</tbody></table></div>`;
     });
     html += `</div>`;
     content.innerHTML = html;
   }
-  else if (currentTipo === 'mapa_voltas' || currentTipo === 'mapa_prova') {
+  // 8: MAPA DE VOLTAS - TODOS (LapMapReport.rdlc)
+  else if (currentTipo === 'mapa_voltas') {
     if (!lapsData.length) {
-      content.innerHTML = `<div style="padding: 30px; text-align: center; color: var(--muted);">Nenhuma volta concluída registrada.</div>`;
+      content.innerHTML = `<div style="padding: 20px; text-align: center; color: #555;">Nenhuma volta registrada.</div>`;
       return;
     }
     const maxLaps = Math.max(...lapsData.map(d => (d.laps || []).length), 1);
-    let html = `<div class="matrix-wrapper"><table class="matrix-table"><thead><tr>
-      <th class="driver-col">Competidor</th>`;
-    for (let l = 1; l <= maxLaps; l++) html += `<th>V${l}</th>`;
-    html += `</tr></thead><tbody>`;
+    let html = `<div style="overflow-x: auto;"><table class="rdlc-table"><thead><tr>
+      <th style="width: 35px;">#</th>
+      <th class="c-left" style="width: 140px;">Competidor</th>
+      <th class="c-left" style="width: 60px;">Cat</th>`;
+    for (let i = 1; i <= maxLaps; i++) html += `<th style="width: 55px;">V${i}</th>`;
+    html += `<th class="c-right" style="width: 60px;">TMV</th></tr></thead><tbody>`;
 
     lapsData.forEach(d => {
       const map = {};
       (d.laps || []).forEach(l => map[l.lap] = l);
-      const best = (d.laps || []).filter(l => !l.invalid).reduce((min, l) => l.lapMs < min ? l.lapMs : min, Infinity);
+      const minLap = (d.laps || []).filter(l => !l.invalid && l.lapMs > 0).reduce((min, l) => l.lapMs < min ? l.lapMs : min, Infinity);
 
-      html += `<tr><td class="driver-col">#<strong>${esc(d.kart)}</strong> ${esc(d.name)}</td>`;
-      for (let l = 1; l <= maxLaps; l++) {
-        const item = map[l];
-        if (!item) {
-          html += `<td>—</td>`;
-        } else if (currentTipo === 'mapa_voltas') {
-          const isBest = item.lapMs === best;
-          html += `<td class="mono ${isBest ? 'best-lap' : ''}">${fmt(item.lapMs)}</td>`;
+      html += `<tr>
+        <td class="c-center c-bold">${esc(d.kart)}</td>
+        <td class="c-left">${esc(d.name)}</td>
+        <td class="c-left">${esc(d.category || 'GERAL')}</td>`;
+      for (let i = 1; i <= maxLaps; i++) {
+        const item = map[i];
+        if (!item || !item.lapMs) {
+          html += `<td class="c-center">---</td>`;
         } else {
-          // Mapa de prova: se tiver posicao, senao calcula ou tempo
-          html += `<td class="mono font-weight-bold">${item.pos || l}º</td>`;
+          const isBest = item.lapMs === minLap;
+          html += `<td class="c-right ${isBest ? 'c-best' : ''}">${fmtMs(item.lapMs)}</td>`;
         }
       }
-      html += `</tr>`;
+      html += `<td class="c-right c-bold">${minLap !== Infinity ? fmtMs(minLap) : '---'}</td></tr>`;
     });
     html += `</tbody></table></div>`;
     content.innerHTML = html;
   }
+  // 9: MAPA DE PROVA (RacingMapAllReport.rdlc)
+  else if (currentTipo === 'mapa_prova') {
+    if (!lapsData.length) {
+      content.innerHTML = `<div style="padding: 20px; text-align: center; color: #555;">Nenhuma volta registrada para montar o mapa de prova.</div>`;
+      return;
+    }
+    const maxLaps = Math.max(...lapsData.map(d => (d.laps || []).length), 1);
+    const numDrivers = enriched.length;
+
+    let html = `<div style="font-size: 10pt; font-weight: bold; text-align: center; margin-bottom: 2mm;">MAPA DE PROVA</div>`;
+    html += `<div style="overflow-x: auto;"><table class="rdlc-table"><thead><tr>
+      <th style="width: 45px;">POS</th>
+      <th style="width: 45px;">LARGADA</th>`;
+    for (let i = 1; i <= maxLaps; i++) html += `<th style="width: 45px;">Volta ${i}</th>`;
+    html += `</tr></thead><tbody>`;
+
+    for (let pos = 1; pos <= numDrivers; pos++) {
+      html += `<tr><td class="c-center c-bold" style="background: #e6e6e6;">${pos}°</td>`;
+
+      // Posição no grid / largada
+      const atStart = enriched.find(d => (d.startPos || d.pos) === pos);
+      html += `<td class="c-center c-bold">${atStart ? esc(atStart.kart) : '---'}</td>`;
+
+      // Cada volta
+      for (let lap = 1; lap <= maxLaps; lap++) {
+        let kartAtPos = '---';
+        const atLap = lapsData.find(d => {
+          const lp = (d.laps || []).find(l => l.lap === lap);
+          return lp && lp.pos === pos;
+        });
+        if (atLap) kartAtPos = atLap.kart;
+        else {
+          // fallback se não tiver pos gravada na volta: pega da classificação
+          const fb = enriched[pos - 1];
+          if (fb && (fb.laps || 0) >= lap) kartAtPos = fb.kart;
+        }
+        html += `<td class="c-center c-bold">${esc(kartAtPos)}</td>`;
+      }
+      html += `</tr>`;
+    }
+    html += `</tbody></table></div>`;
+    content.innerHTML = html;
+  }
+  // 10 a 13: GRIDS DE LARGADA (GridLeftReport, GridRightReport, GridLeftReport3, GridRightReport3)
   else if (currentTipo.startsWith('grid_')) {
     const is3Col = currentTipo.includes('3col');
     const leaderRight = currentTipo.includes('dir');
     const cols = is3Col ? 3 : 2;
-    const sorted = [...standings].sort((a, b) => (a.position || 0) - (b.position || 0));
 
-    let html = `<div class="grid-container">`;
-    for (let i = 0; i < sorted.length; i += cols) {
-      let rowDrivers = sorted.slice(i, i + cols);
-      if (leaderRight) rowDrivers.reverse();
-
-      html += `<div class="${is3Col ? 'grid-row-3col' : 'grid-row-2col'}">`;
-      rowDrivers.forEach(r => {
-        const pos = r.position || (sorted.indexOf(r) + 1);
-        const isPole = pos === 1;
-        html += `
-          <div class="grid-box ${isPole ? 'pole' : ''}">
-            <div class="grid-pos">${pos}º</div>
-            <div class="grid-info">
-              <div class="grid-kart">#${esc(r.kart)}</div>
-              <div class="grid-name">${esc(r.name)}</div>
-              <div class="grid-time">Melhor volta: ${fmt(r.bestLapMs)}</div>
-            </div>
-          </div>
-        `;
+    // Ordenação do grid conforme LapTime reorderGrid:
+    let sorted = [...enriched];
+    if (v.type === 'corrida') {
+      // Corrida: Total voltas decrescente, tempo total crescente
+      sorted.sort((a, b) => (b.laps - a.laps) || ((a.totalMs || 0) - (b.totalMs || 0)));
+    } else {
+      // Qualificação/Treino: Melhor volta crescente, depois 2ª MV
+      sorted.sort((a, b) => {
+        if (!a.bestLapTime) return 1;
+        if (!b.bestLapTime) return -1;
+        return a.bestLapTime - b.bestLapTime || ((a.bestLapTime2nd || 0) - (b.bestLapTime2nd || 0));
       });
-      // preenche vazios da linha
-      for (let k = rowDrivers.length; k < cols; k++) {
-        html += `<div></div>`;
-      }
-      html += `</div>`;
     }
-    html += `</div>`;
+
+    let html = `<div style="font-size: 11pt; font-weight: bold; text-align: center; margin-bottom: 3mm;">GRID DE LARGADA</div>`;
+    html += `<table class="grid-table"><tbody>`;
+
+    for (let rowIdx = 0; rowIdx < sorted.length; rowIdx += cols) {
+      html += `<tr>`;
+      let rowDrivers = [];
+
+      for (let c = 0; c < cols; c++) {
+        const itemIndex = rowIdx + c;
+        rowDrivers.push(itemIndex < sorted.length ? { ...sorted[itemIndex], orderPos: itemIndex + 1 } : null);
+      }
+
+      // Se líder à direita, inverte as posições nesta linha
+      if (leaderRight) {
+        rowDrivers.reverse();
+      }
+
+      rowDrivers.forEach(r => {
+        const cellClass = is3Col ? 'grid-slot-3col' : 'grid-slot';
+        if (r) {
+          html += `<td class="${cellClass}">
+            <div class="grid-pos-box">${r.orderPos}º</div>
+            <div class="grid-name-box">
+              <div>#${esc(r.kart)} - ${esc(r.name)}</div>
+              ${r.bestLapTime ? `<div class="grid-time-sub">TMV: ${fmtMs(r.bestLapTime)}</div>` : ''}
+            </div>
+          </td>`;
+        } else {
+          html += `<td class="${cellClass}"></td>`;
+        }
+      });
+      html += `</tr>`;
+    }
+    html += `</tbody></table>`;
     content.innerHTML = html;
   }
 }
