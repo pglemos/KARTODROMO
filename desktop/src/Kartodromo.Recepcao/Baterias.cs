@@ -170,71 +170,77 @@ public class FormCriarReservas : Janela
     }
 }
 
-public class FormBateria : Janela
+/// <summary>Editar bateria (EditarBateria.dc.html): tudo o que o LapTime deixava editar — nome, data/hora, máx. de
+/// competidores (vagas), volta mínima, produto, traçado, responsável, código de reserva, aberta p/ reservas e totem.</summary>
+public class FormBateria : DialogoDesign
 {
-    readonly Grade _gradeProvas = new();
+    readonly Grade _gradeProvas;
 
-    public FormBateria(JsonObject b) : base("Editar Bateria", 960, 680)
+    public FormBateria(JsonObject b) : base("Editar bateria",
+        $"{b.S("nome")} · {Fmt.Dmy(b.S("dataHora"))} · {b.I("inscritos")} inscrito(s) · {Math.Max(0, b.I("vagas") - b.I("inscritos"))} vaga(s) livre(s)", "g-baterias")
     {
-        Tag = $"{b.S("nome")} · {Fmt.Dmy(b.S("dataHora"))}";
-        var campos = new CamposBateria(b);
-        var cartaoBateria = KitVisual.CartaoSecao("Bateria");
-        cartaoBateria.Controls.Add(campos);
+        var c = new CamposBateria(b); // só os controles e as regras; o layout é o do design
+        c.Categoria.Enabled = false;   // a categoria vem do produto
 
-        var cartaoProvas = KitVisual.CartaoSecao("Provas (vêm do produto)");
-        cartaoProvas.Height = 190;
+        var g = Secao("Bateria");
+        Campo(g, "Nome", c.Nome, 2);
+        Campo(g, "Data", c.Data, 1);
+        Campo(g, "Hora", c.Hora, 1);
+        Campo(g, "Máx. de pilotos", c.Vagas, 1);
+        Campo(g, "Volta mínima (s)", c.VoltaMin, 1);
+        Campo(g, "Produto", c.Produto, 3);
+        Campo(g, "Traçado", c.Tracado, 2);
+        Campo(g, "Categoria (do produto)", c.Categoria, 1);
+        var pesquisar = AcaoCampo("Pesquisar");
+        pesquisar.Click += (_, _) => { var cli = FormPesquisarCliente.Escolher(this, "Responsável pela reserva"); if (cli != null) { c.RespId = cli.L("id"); c.Resp.Text = cli.S("nome"); } };
+        var limparResp = AcaoCampo("✕");
+        limparResp.Click += (_, _) => { c.RespId = null; c.Resp.Text = ""; };
+        c.Resp.BackColor = Color.White;
+        Campo(g, "Responsável pela reserva", c.Resp, 4, pesquisar, limparResp);
+        Campo(g, "Código de reserva", c.CodReserva, 2);
+        Marca(g, c.Aberta, 3);
+        Marca(g, c.Totem, 3);
+        Campo(g, "Observações", c.Obs, 6);
+
+        _gradeProvas = SecaoTabela("Provas (vêm do produto)", 104);
         _gradeProvas.Colunas(
             new("ordem", "Ordem", TipoCol.Inteiro, 70),
-            new("prova", "Prova", Largura: 280),
+            new("prova", "Prova", Largura: 300),
             new("tipo", "Tipo", Largura: 160),
             new("tempo", "Tempo", Largura: 100)
         );
-        _gradeProvas.Dock = DockStyle.Fill;
-        var pGrid = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 8, 0, 0) };
-        pGrid.Controls.Add(_gradeProvas);
-        cartaoProvas.Controls.Add(pGrid);
 
         async Task CarregarProvas()
         {
-            if (Campos.IdDe(campos.Produto) is long pid)
+            if (Campos.IdDe(c.Produto) is not long pid) return;
+            var lista = await Sessao.Api.Lista($"/api/office/cad/provas?produtoId={pid}");
+            _gradeProvas.Carregar(lista.Select(p => new JsonObject
             {
-                var lista = await Sessao.Api.Lista($"/api/office/cad/provas?produtoId={pid}");
-                var linhas = lista.Select(p => new JsonObject
-                {
-                    ["ordem"] = p.I("ordem"),
-                    ["prova"] = p.S("nome"),
-                    ["tipo"] = p.S("tipo"),
-                    ["tempo"] = p.I("tempoMin") > 0 ? $"{p.I("tempoMin")} min" : "—"
-                }).ToList();
-                _gradeProvas.Carregar(linhas);
-            }
+                ["ordem"] = p.I("ordem"),
+                ["prova"] = p.S("nome"),
+                ["tipo"] = p.S("tipo") switch { "classificacao" => "Classificatório", "corrida" => "Corrida", "treino" => "Treino", var t => t },
+                ["tempo"] = p.I("tempoMin") > 0 ? $"{p.I("tempoMin")} min" : p.I("voltasMax") > 0 ? $"{p.I("voltasMax")} voltas" : "—",
+            }).ToList());
         }
-        campos.ProdutoMudou += () => Seguro.Rodar(this, CarregarProvas);
-
-        Controls.Add(cartaoProvas);
-        Controls.Add(cartaoBateria);
+        c.ProdutoMudou += () => Seguro.Rodar(this, CarregarProvas);
 
         var status = b.S("status");
-        var textoStatus = status == "aberta" ? "Fechar Bateria" : "Abrir Bateria";
-        EventHandler acaoStatus = (_, _) => Seguro.Rodar(this, async () =>
+        BotaoRodape("Salvar", true, () => Seguro.Rodar(this, async () =>
+        {
+            if (string.IsNullOrWhiteSpace(c.Nome.Text)) { Msg.Aviso(this, "Insira um nome."); return; }
+            if (c.Vagas.Value < b.I("inscritos")) { Msg.Aviso(this, $"A bateria já tem {b.I("inscritos")} inscrito(s). As vagas não podem ficar abaixo disso."); return; }
+            await Sessao.Api.Put($"/api/office/baterias/{b.S("id")}", c.Corpo());
+            Msg.Info(this, "Bateria editada com sucesso!");
+            DialogResult = DialogResult.OK; Close();
+        }));
+        BotaoRodape(status == "aberta" ? "Fechar bateria" : "Abrir bateria", false, () => Seguro.Rodar(this, async () =>
         {
             var novo = status == "aberta" ? "fechada" : "aberta";
             await Sessao.Api.Post($"/api/office/baterias/{b.S("id")}/status", new { status = novo });
             Msg.Info(this, novo == "aberta" ? "Bateria aberta com sucesso!" : "Bateria fechada com sucesso!");
             DialogResult = DialogResult.OK; Close();
-        });
-
-        Rodape(
-            ("Cancelar", (_, _) => Close(), false),
-            (textoStatus, acaoStatus, false),
-            ("Salvar", (_, _) => Seguro.Rodar(this, async () =>
-            {
-                if (string.IsNullOrWhiteSpace(campos.Nome.Text)) { Msg.Aviso(this, "Insira um nome."); return; }
-                await Sessao.Api.Put($"/api/office/baterias/{b.S("id")}", campos.Corpo());
-                Msg.Info(this, "Bateria editada com sucesso!");
-                DialogResult = DialogResult.OK; Close();
-            }), true)
-        );
+        }));
+        BotaoRodape("Cancelar", false, Close);
 
         Load += (_, _) => Seguro.Rodar(this, CarregarProvas);
     }
