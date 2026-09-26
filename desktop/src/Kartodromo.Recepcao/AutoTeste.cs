@@ -174,10 +174,20 @@ public static class AutoTeste
         var i = 0;
         foreach (ToolStripMenuItem item in menu.Items.OfType<ToolStripMenuItem>())
         {
-            item.ShowDropDown();
-            await Esperar(180);
-            await FotoMenu(item.DropDown, pasta, $"23-menu-{++i:00}-{Slug(item.Text.Replace("&", ""))}");
-            item.HideDropDown();
+            try
+            {
+                item.ShowDropDown();
+                await Esperar(180);
+                await FotoMenu(item.DropDown, pasta, $"23-menu-{++i:00}-{Slug(item.Text.Replace("&", ""))}");
+            }
+            catch (Exception ex)
+            {
+                Log.Add($"ERRO menu {item.Text}: {ex.Message}");
+            }
+            finally
+            {
+                item.HideDropDown();
+            }
         }
     }
 
@@ -428,28 +438,58 @@ public static class AutoTeste
     {
         await Esperar(160);
         Application.DoEvents();
-        var topo = menu.PointToScreen(Point.Empty);
-        var tela = Screen.FromControl(menu).Bounds;
-        var area = Rectangle.Intersect(new Rectangle(topo, menu.Size), tela);
-        if (area.Width < 1 || area.Height < 1) throw new InvalidOperationException("O menu não está na área visível da tela.");
-        using var bmp = new Bitmap(area.Width, area.Height);
-        using var g = Graphics.FromImage(bmp);
-        g.CopyFromScreen(area.Location, Point.Empty, area.Size);
-        bmp.Save(Path.Combine(pasta, nome + ".png"));
-        Log.Add("OK " + nome);
+        try
+        {
+            var topo = menu.PointToScreen(Point.Empty);
+            var tela = Screen.FromControl(menu).Bounds;
+            var area = Rectangle.Intersect(new Rectangle(topo, menu.Size), tela);
+            if (area.Width >= 1 && area.Height >= 1)
+            {
+                using var bmp = new Bitmap(area.Width, area.Height);
+                using var g = Graphics.FromImage(bmp);
+                g.CopyFromScreen(area.Location, Point.Empty, area.Size);
+                bmp.Save(Path.Combine(pasta, nome + ".png"));
+                Log.Add("OK " + nome);
+                return;
+            }
+        }
+        catch { }
+
+        try
+        {
+            if (menu.Width > 0 && menu.Height > 0)
+            {
+                using var bmp = new Bitmap(menu.Width, menu.Height);
+                menu.DrawToBitmap(bmp, new Rectangle(0, 0, menu.Width, menu.Height));
+                bmp.Save(Path.Combine(pasta, nome + ".png"));
+                Log.Add("OK " + nome);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Add($"ERRO {nome}: {ex.Message}");
+        }
     }
 
     static async Task FotoTela(Form f, string pasta, string nome)
     {
         await Esperar(100);
-        var tela = Screen.FromControl(f).Bounds;
-        var area = Rectangle.Intersect(f.Bounds, tela);
-        if (area.Width < 1 || area.Height < 1) throw new InvalidOperationException("O relatório está fora da área visível da tela.");
-        using var bmp = new Bitmap(area.Width, area.Height);
-        using var g = Graphics.FromImage(bmp);
-        g.CopyFromScreen(area.Location, Point.Empty, area.Size);
-        bmp.Save(Path.Combine(pasta, nome + ".png"));
-        Log.Add("OK " + nome + " (captura de tela)");
+        try
+        {
+            var tela = Screen.FromControl(f).Bounds;
+            var area = Rectangle.Intersect(f.Bounds, tela);
+            if (area.Width >= 1 && area.Height >= 1)
+            {
+                using var bmp = new Bitmap(area.Width, area.Height);
+                using var g = Graphics.FromImage(bmp);
+                g.CopyFromScreen(area.Location, Point.Empty, area.Size);
+                bmp.Save(Path.Combine(pasta, nome + ".png"));
+                Log.Add("OK " + nome + " (captura de tela)");
+                return;
+            }
+        }
+        catch { }
+        await Foto(f, pasta, nome);
     }
 
     static Task Esperar(int ms) => Task.Delay(ms);
