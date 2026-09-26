@@ -36,6 +36,8 @@ public partial class FormCrono : Form
     readonly LiveGrid _gResultComp = new(), _gCategoriaComp = new(), _gObsAoVivo = new();
     readonly DataGridView _gPilotos = new();
     readonly TreeView _arvore = new() { Dock = DockStyle.Fill, BorderStyle = BorderStyle.None, HideSelection = false, FullRowSelect = true, Font = new Font("Segoe UI", 9.5F) };
+    string _arvoreAssinatura = "";
+    bool _montandoArvore;
     readonly TextBox _txtObservacao = new() { Width = 380, Height = 32, Font = new Font("Segoe UI", 9.5F), PlaceholderText = "Observação desta prova (sai no rodapé do resultado)" };
     readonly TextBox _txtObservacaoAoVivo = new() { Width = 280, Height = 30, Font = new Font("Segoe UI", 9F), PlaceholderText = "Nova observação da prova" };
     readonly Label _lVoltaFaixa = new() { Text = "VOLTA\nAGUARDANDO", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, BackColor = Color.FromArgb(29, 29, 31), ForeColor = Color.FromArgb(255, 214, 10), Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
@@ -181,7 +183,7 @@ public partial class FormCrono : Form
         rel.DropDownItems.Add("WhatsApp", null, (_, _) => EnviarWhatsApp());
         rel.DropDownItems.Add("E-mail", null, (_, _) => EnviarEmail());
         var ajuda = new ToolStripMenuItem("Ajuda");
-        ajuda.DropDownItems.Add("Sobre", null, (_, _) => Msg.Info(this, $"Kartódromo - Cronometragem\nVersão {Application.ProductVersion.Split('+')[0]}\n\nServiço de cronometragem: {Config.CronoUrl}\nServidor da operação: {Config.ServidorUrl}\n\nAtalhos: F2 nova bateria · F5 bandeira verde · F6 quadriculada · F7 encerrar · F11 telão", "Sobre"));
+        ajuda.DropDownItems.Add("Sobre", null, (_, _) => Msg.Info(this, $"Kartódromo - Cronometragem\nVersão {Application.ProductVersion.Split('+')[0]}\n\nServiço de cronometragem: {Config.CronoUrl}\nServidor da operação: {Config.ServidorUrl}\n\nAtalhos: F1 verde · F2 amarela · F3 vermelha · F4 quadriculada · F5 finalizar · F6 limpar passagens · F7 branca · F11 telão", "Sobre"));
         m.Items.AddRange([inicio, cad, ferr, rel, crono, ajuda]);
         return m;
     }
@@ -217,7 +219,7 @@ public partial class FormCrono : Form
         _gGrupos.CellClick += (_, e) => { if (e.RowIndex >= 0) _ = CarregarCatalogo(); };
         _gProvas.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) CriarBateriaDaProva(); };
         _gAgenda.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) NovaBateria(_gAgenda.Chaves[e.RowIndex] as JsonObject); };
-        _gSessoes.CellClick += (_, e) => { if (e.RowIndex >= 0 && _gSessoes.Chaves[e.RowIndex] is JsonObject s) { Selecionar(s.S("id")); _abas.SelectedIndex = 2; } };
+        _gSessoes.CellClick += (_, e) => { if (e.RowIndex >= 0 && _gSessoes.Chaves[e.RowIndex] is JsonObject s) { Selecionar(s.S("id")); _abas.SelectedIndex = 1; } };
 
         var top = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = new Padding(0, 6, 0, 8) };
         top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33));
@@ -273,6 +275,7 @@ public partial class FormCrono : Form
         var arvoreCard = TemaCrono.Card("4 · Grupos e provas", "Selecione uma prova para abrir sua bateria");
         _arvore.AfterSelect += (_, e) =>
         {
+            if (_montandoArvore) return;
             if (e.Node?.Tag is not JsonObject tag) return;
             if (tag.S("kind") == "session") Selecionar(tag.S("sessionId"));
             else if (tag.S("kind") == "proof")

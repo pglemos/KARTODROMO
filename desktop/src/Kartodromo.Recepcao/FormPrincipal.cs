@@ -193,6 +193,11 @@ public class FormPrincipal : Form
         if (e.Button != MouseButtons.Right || _menuAtual == null) return;
         var hit = _grade.HitTest(e.X, e.Y);
         if (hit.RowIndex < 0) return;
+        if (!_grade.Rows[hit.RowIndex].Selected)
+        {
+            _grade.ClearSelection();
+            _grade.Rows[hit.RowIndex].Selected = true;
+        }
         MostrarMenuContexto(e.Location);
     }
 
@@ -563,7 +568,7 @@ public class FormPrincipal : Form
     {
         var barra = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, BackColor = Color.White, Padding = new Padding(12, 0, 16, 0), Margin = new Padding(0) };
         barra.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); barra.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        var fluxo = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, BackColor = Color.White, Margin = new Padding(0) };
+        var fluxo = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, AutoScroll = true, BackColor = Color.White, Margin = new Padding(0) };
         Control B(string icone, string texto, string dica, Action a) => VisualPrincipal.BotaoBarra(icone, texto, dica, a);
         fluxo.Controls.AddRange([
             B("clientes", "Clientes", "Cadastro de clientes (F2)", () => new FormCliente(null).Show(this)),
@@ -638,7 +643,12 @@ public class FormPrincipal : Form
                 else TextRenderer.DrawText(g, num, new Font("Segoe UI", 8.8F), new Rectangle(largura - 60, y, 50, e.Bounds.Height), KitVisual.Secundario, TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
             }
         };
-        _arvore.AfterSelect += (_, e) => { if (e.Action is TreeViewAction.ByMouse or TreeViewAction.ByKeyboard) _filtroContaFidelidade = null; if (e.Node.Tag is string k) { _filtroBateria = null; Aplicar(k); } };
+        _arvore.AfterSelect += (_, e) =>
+        {
+            if (e.Action is not (TreeViewAction.ByMouse or TreeViewAction.ByKeyboard)) return;
+            _filtroBateria = _filtroContaFidelidade = null;
+            if (e.Node.Tag is string k) Aplicar(k);
+        };
     }
 
     public void Selecionar(string chave, JsonObject bateria = null, JsonObject contaFidelidade = null)

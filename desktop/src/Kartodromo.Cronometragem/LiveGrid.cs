@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+
 namespace Kartodromo.Cronometragem;
 
 /// <summary>Grade somente-leitura atualizada "no lugar" (sem piscar nem perder rolagem/selecao) a cada leitura do servidor.</summary>
@@ -56,7 +58,8 @@ public class LiveGrid : DataGridView
     /// <summary>Troca o conteudo mantendo a rolagem; so escreve celulas que mudaram.</summary>
     public void Preencher(IList<object[]> linhas, IList<object> chaves = null)
     {
-        var sel = CurrentRow?.Index is int i && i < Chaves.Count ? Chaves[i] : null;
+        var sel = ChaveAtual;
+        var identidade = Identidade(sel);
         var topo = FirstDisplayedScrollingRowIndex;
         SuspendLayout();
         if (Rows.Count > linhas.Count) { while (Rows.Count > linhas.Count) Rows.RemoveAt(Rows.Count - 1); }
@@ -74,8 +77,12 @@ public class LiveGrid : DataGridView
         if (chaves != null) Chaves.AddRange(chaves);
         if (sel != null)
         {
-            var idx = Chaves.IndexOf(sel);
-            if (idx >= 0 && idx < Rows.Count && (CurrentRow == null || CurrentRow.Index != idx)) { try { CurrentCell = Rows[idx].Cells[0]; } catch { /* linha invisivel */ } }
+            var idx = Chaves.FindIndex(chave => ReferenceEquals(chave, sel) || identidade != null && Identidade(chave) == identidade);
+            ClearSelection();
+            if (idx >= 0 && idx < Rows.Count)
+            {
+                try { CurrentCell = Rows[idx].Cells[0]; Rows[idx].Selected = true; } catch { /* linha invisivel */ }
+            }
         }
         else ClearSelection();
         if (topo >= 0 && topo < Rows.Count) { try { FirstDisplayedScrollingRowIndex = topo; } catch { /* sem rolagem */ } }
@@ -84,6 +91,14 @@ public class LiveGrid : DataGridView
     }
 
     public object ChaveAtual => CurrentRow?.Index is int i && i < Chaves.Count && CurrentRow.Selected ? Chaves[i] : null;
+
+    static string Identidade(object chave)
+    {
+        if (chave is not JsonObject registro) return null;
+        foreach (var campo in new[] { "id", "kart", "transponder" })
+            if (registro[campo]?.ToString() is { Length: > 0 } valor) return campo + ":" + valor;
+        return null;
+    }
 }
 
 /// <summary>Faixa colorida de titulo (ex.: "REGISTRO DE PASSAGENS" em verde, como no LapTime).</summary>
