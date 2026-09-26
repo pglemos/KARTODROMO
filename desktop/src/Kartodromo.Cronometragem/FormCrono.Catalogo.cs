@@ -27,6 +27,7 @@ public partial class FormCrono
             var groupId = selectedGroup?.S("id") ?? "";
             var groupProofs = _proofs.Where(p => p.S("groupId") == groupId).OrderBy(p => p.I("order")).ToList();
             _gProvas.Preencher(groupProofs.Select(p => new object[] { p.S("name"), Crono.Tipo(p.S("type")), p.I("durationMin") > 0 ? $"{p.I("durationMin")} min" : "Por voltas", p.L("maxLaps") is long laps ? laps.ToString() : "—" }).ToList(), groupProofs.Cast<object>().ToList());
+            if (groupProofs.Count > 0 && _gProvas.ChaveAtual == null) SelecionarLinha(_gProvas, 0);
             MontarArvore();
         }
         catch (ApiException e) { _servidorOk = false; _gEventos.Preencher([new object[] { "Cadastros indisponíveis", e.Message, "" }]); }
@@ -60,43 +61,71 @@ public partial class FormCrono
     void MontarArvore()
     {
         if (_arvore.IsDisposed || _arvore.IsHandleCreated == false) return;
+        var sessoes = Crono.Arr(_state, "sessions");
+        var assinatura = string.Join("|", _events.Select(e => $"e:{e.S("id")}:{e.S("name")}:{e.S("date")}")) +
+            string.Join("|", _groups.Select(g => $"g:{g.S("id")}:{g.S("eventId")}:{g.S("name")}")) +
+            string.Join("|", _proofs.Select(p => $"p:{p.S("id")}:{p.S("groupId")}:{p.S("name")}:{p.I("order")}")) +
+            string.Join("|", sessoes.Select(s => $"s:{s.S("id")}:{s.S("proofId")}:{s.S("name")}:{s.S("state")}"));
+        if (assinatura == _arvoreAssinatura) return;
+        var tagSelecionada = _arvore.SelectedNode?.Tag as JsonObject;
+        var selecionado = tagSelecionada?.S(tagSelecionada.S("kind") == "session" ? "sessionId" : "proofId");
+        _montandoArvore = true;
         _arvore.BeginUpdate();
-        _arvore.Nodes.Clear();
-        foreach (var ev in _events)
+        try
         {
-            var eventNode = new TreeNode($"▣  {ev.S("name")}  ·  {DataLegivel(ev.S("date"))}");
-            foreach (var group in _groups.Where(g => g.S("eventId") == ev.S("id")))
+            _arvore.Nodes.Clear();
+            foreach (var ev in _events)
             {
-                var groupNode = new TreeNode($"▾  {group.S("name")}");
-                foreach (var proof in _proofs.Where(p => p.S("groupId") == group.S("id")).OrderBy(p => p.I("order")))
+                var eventNode = new TreeNode($"▣  {ev.S("name")}  ·  {DataLegivel(ev.S("date"))}");
+                foreach (var group in _groups.Where(g => g.S("eventId") == ev.S("id")))
                 {
-                    var proofNode = new TreeNode($"●  {proof.S("name")} · {Crono.Tipo(proof.S("type"))}");
-                    proofNode.Tag = new JsonObject { ["kind"] = "proof", ["proofId"] = proof.S("id") };
-                    var session = Crono.Arr(_state, "sessions").FirstOrDefault(s => s.S("proofId") == proof.S("id"));
-                    if (session != null)
+                    var groupNode = new TreeNode($"▾  {group.S("name")}");
+                    foreach (var proof in _proofs.Where(p => p.S("groupId") == group.S("id")).OrderBy(p => p.I("order")))
                     {
-                        proofNode.Text += $" · {Crono.Estado(session.S("state"))}";
-                        proofNode.Tag = new JsonObject { ["kind"] = "session", ["sessionId"] = session.S("id") };
+                        var proofNode = new TreeNode($"●  {proof.S("name")} · {Crono.Tipo(proof.S("type"))}");
+                        proofNode.Tag = new JsonObject { ["kind"] = "proof", ["proofId"] = proof.S("id") };
+                        var session = sessoes.FirstOrDefault(s => s.S("proofId") == proof.S("id"));
+                        if (session != null)
+                        {
+                            proofNode.Text += $" · {Crono.Estado(session.S("state"))}";
+                            proofNode.Tag = new JsonObject { ["kind"] = "session", ["sessionId"] = session.S("id"), ["proofId"] = proof.S("id") };
+                        }
+                        groupNode.Nodes.Add(proofNode);
                     }
-                    groupNode.Nodes.Add(proofNode);
+                    eventNode.Nodes.Add(groupNode);
                 }
-                eventNode.Nodes.Add(groupNode);
+                _arvore.Nodes.Add(eventNode);
             }
-            _arvore.Nodes.Add(eventNode);
-        }
-        var avulsas = Crono.Arr(_state, "sessions").Where(s => string.IsNullOrEmpty(s.S("proofId"))).ToList();
-        if (avulsas.Count > 0)
-        {
-            var loose = new TreeNode("Baterias avulsas");
-            foreach (var s in avulsas)
+            var avulsas = sessoes.Where(s => string.IsNullOrEmpty(s.S("proofId"))).ToList();
+            if (avulsas.Count > 0)
             {
-                var node = new TreeNode($"{s.S("name")} · {Crono.Estado(s.S("state"))}") { Tag = new JsonObject { ["kind"] = "session", ["sessionId"] = s.S("id") } };
-                loose.Nodes.Add(node);
+                var loose = new TreeNode("Baterias avulsas");
+                foreach (var s in avulsas)
+                {
+                    var node = new TreeNode($"{s.S("name")} · {Crono.Estado(s.S("state"))}") { Tag = new JsonObject { ["kind"] = "session", ["sessionId"] = s.S("id") } };
+                    loose.Nodes.Add(node);
+                }
+                _arvore.Nodes.Add(loose);
             }
-            _arvore.Nodes.Add(loose);
+            _arvore.ExpandAll();
+            if (!string.IsNullOrEmpty(selecionado))
+            {
+                TreeNode Achar(TreeNodeCollection nos)
+                {
+                    foreach (TreeNode no in nos)
+                    {
+                        var tag = no.Tag as JsonObject;
+                        if (tag?.S("sessionId") == selecionado || tag?.S("proofId") == selecionado) return no;
+                        var filho = Achar(no.Nodes);
+                        if (filho != null) return filho;
+                    }
+                    return null;
+                }
+                _arvore.SelectedNode = Achar(_arvore.Nodes);
+            }
         }
-        _arvore.ExpandAll();
-        _arvore.EndUpdate();
+        finally { _arvore.EndUpdate(); _montandoArvore = false; }
+        _arvoreAssinatura = assinatura;
     }
 
     void EditarCatalogo(string entity, bool editar = false, string tituloJanela = null)
@@ -253,6 +282,9 @@ public partial class FormCrono
     {
         if (nome == "CadCategoria") { using var f = new FormCatalogoAux("categories"); f.ShowDialog(this); return; }
         if (nome == "CadTracado") { using var f = new FormCatalogoAux("tracks"); f.ShowDialog(this); return; }
+        if (nome == "Competidor") { using var f = new FormCatalogoAux("competitors"); f.ShowDialog(this); return; }
+        if (nome == "CadDecoder") { Seguro.Rodar(this, ConfigurarDecoder); return; }
+        if (nome is "ParamCrono" or "ParamSistema" or "ConfigInicial") { Seguro.Rodar(this, () => ConfigurarParametros(nome)); return; }
         if (nome == "CadGrupo") { _abas.SelectedIndex = 0; EditarCatalogo("groups", false, nome); return; }
         if (nome == "Prova") { _abas.SelectedIndex = 0; EditarCatalogo("provas", false, nome); return; }
         if (nome == "Backup")
@@ -263,27 +295,12 @@ public partial class FormCrono
         }
         if (nome == "CadTranspDePara") { using var f = new FormTransponders([], "CadTranspDePara"); f.ShowDialog(this); return; }
         if (nome == "CadTranspCompetidor") { using var f = new FormTransponders([], "CadTranspCompetidor"); f.ShowDialog(this); return; }
-        if (nome == "Competidor")
-        {
-            using var competitor = new DialogoDados("Competidor", "Passo 5 · registro de competidores", new[] { ("Kart", "kart", ""), ("Competidor", "name", ""), ("Categoria", "category", "") }, new Size(720, 320));
-            if (competitor.ShowDialog(this) == DialogResult.OK && competitor.Confirmado && _sess != null)
-            {
-                _gPilotos.Rows.Add(competitor.Valor("kart"), competitor.Valor("name"), "", competitor.Valor("category"));
-                Seguro.Rodar(this, SalvarPilotos);
-            }
-            _abas.SelectedIndex = 1;
-            return;
-        }
         var fields = nome switch
         {
             "Empresa" => new[] { ("Razão social", "company", "Kartódromo Internacional de Betim"), ("CNPJ", "cnpj", ""), ("Telefone", "phone", ""), ("E-mail", "email", "") },
-            "CadDecoder" => new[] { ("Decoder", "decoder", "TranX"), ("Endereço", "decoderHost", "192.168.20.171"), ("Porta", "decoderPort", "5100") },
-            "ParamCrono" => new[] { ("Extensão do traçado (m)", "defaultTrackLengthMeters", "1000"), ("Volta mínima (s)", "minLapSeconds", "5"), ("Bip de passagem (ligado/desligado)", "beep", "ligado") },
-            "ParamSistema" => new[] { ("Nome da pista", "trackName", "Kartódromo Internacional de Betim"), ("Serviço de cronometragem", "timingUrl", Config.CronoUrl), ("Servidor da recepção", "opsUrl", Config.ServidorUrl) },
             "PlacarConfig" => new[] { ("Placar padrão", "scoreboard", "Placar CalXPro"), ("Atualizar a cada (s)", "scoreboardInterval", "1") },
-            "ConfigInicial" => new[] { ("Empresa", "company", "Kartódromo Internacional de Betim"), ("Pista", "trackName", "Kartódromo Internacional de Betim"), ("Decoder", "decoder", "TranX") },
             "MudarCorrida" => new[] { ("Nome", "name", _sess?.S("name") ?? ""), ("Duração em minutos", "durationMin", ((_sess?.I("durationMs") ?? 0) / 60000).ToString()), ("Voltas máximas", "maxLaps", _sess?.L("maxLaps")?.ToString() ?? "") },
-            "IncluirPassagem" => new[] { ("Kart", "kart", ""), ("Competidor", "name", ""), ("Tempo da volta (segundos)", "lapSeconds", "60.000") },
+            "IncluirPassagem" => new[] { ("Kart", "kart", ""), ("Competidor", "name", ""), ("Tempo da volta (segundos)", "lapSeconds", "60,000") },
             _ => new[] { ("Nome", "name", ""), ("Observação", "notes", "") },
         };
         using var dialog = new DialogoDados(nome, "Cadastro da cronometragem", fields, new Size(760, 420));
@@ -296,8 +313,8 @@ public partial class FormCrono
         else if (nome == "IncluirPassagem")
         {
             if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria primeiro."); return; }
-            if (decimal.TryParse(dialog.Valor("lapSeconds"), System.Globalization.NumberStyles.Number, Fmt.Br, out var seconds))
-                Seguro.Rodar(this, async () => { await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/passings/manual", new JsonObject { ["kart"] = dialog.Valor("kart"), ["name"] = dialog.Valor("name"), ["lapMs"] = (long)(seconds * 1000) }); await Atualizar(); });
+            if (!TentarSegundos(dialog.Valor("lapSeconds"), out var seconds)) { Msg.Aviso(this, "Informe um tempo positivo em segundos."); return; }
+            Seguro.Rodar(this, async () => { await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/passings/manual", new JsonObject { ["kart"] = dialog.Valor("kart"), ["name"] = dialog.Valor("name"), ["lapMs"] = (long)(seconds * 1000) }); await Atualizar(); });
         }
         else
         {
@@ -308,6 +325,66 @@ public partial class FormCrono
     }
 
     void MudarCorrida() => JanelaCadastro("MudarCorrida");
+
+    static bool TentarSegundos(string texto, out decimal segundos)
+    {
+        var cultura = texto.Contains(',') ? Fmt.Br : System.Globalization.CultureInfo.InvariantCulture;
+        return decimal.TryParse(texto, System.Globalization.NumberStyles.Number, cultura, out segundos) && segundos > 0;
+    }
+
+    async Task ConfigurarDecoder()
+    {
+        var settings = (await Crono.Api.Get("/api/settings"))?.AsObject() ?? new JsonObject();
+        var atual = settings["decoder"] as JsonObject ?? (await Crono.Api.Get("/api/state"))?["decoder"] as JsonObject ?? new JsonObject();
+        using var dialog = new DialogoDados("Registro de decoder", "Leitor de transponders da pista", new[] {
+            ("Nome", "name", atual.S("name") is { Length: > 0 } n ? n : "TranX (pista)"),
+            ("Modelo", "model", atual.S("model") is { Length: > 0 } m ? m : "TranX"),
+            ("Protocolo (p3 ou trx)", "protocol", atual.S("protocol") is { Length: > 0 } p ? p : "p3"),
+            ("Endereço IP", "host", atual.S("host")),
+            ("Porta IP", "port", atual.S("port")),
+        }, new Size(760, 430));
+        if (dialog.ShowDialog(this) != DialogResult.OK || !dialog.Confirmado) return;
+        if (!int.TryParse(dialog.Valor("port"), out var port) || port is < 1 or > 65535) { Msg.Aviso(this, "Informe uma porta entre 1 e 65535."); return; }
+        var protocol = dialog.Valor("protocol").Trim().ToLowerInvariant();
+        if (protocol is not ("p3" or "trx")) { Msg.Aviso(this, "Informe o protocolo p3 ou trx."); return; }
+        var body = new JsonObject { ["name"] = dialog.Valor("name").Trim(), ["model"] = dialog.Valor("model").Trim(),
+            ["protocol"] = protocol, ["host"] = dialog.Valor("host").Trim(), ["port"] = port };
+        await Crono.Api.Patch("/api/settings/decoder", body);
+        Msg.Info(this, "Conexão do decoder validada e salva.");
+    }
+
+    async Task ConfigurarParametros(string nome)
+    {
+        var settings = (await Crono.Api.Get("/api/settings"))?.AsObject() ?? new JsonObject();
+        var crono = nome == "ParamCrono";
+        var chave = crono ? "timing" : "system";
+        var secao = settings[chave]?.DeepClone().AsObject() ?? new JsonObject();
+        var campos = crono
+            ? new[] { ("Volta mínima (s)", "minimumLapSeconds", secao.S("minimumLapSeconds") is { Length: > 0 } v ? v : "5"),
+                ("Duração padrão (min)", "defaultDurationMin", secao.S("defaultDurationMin") is { Length: > 0 } d ? d : "20") }
+            : new[] { ("Nome da pista", "trackName", secao.S("trackName") is { Length: > 0 } n ? n : "Kartódromo Internacional de Betim"),
+                ("Extensão padrão do traçado (m)", "defaultTrackLengthMeters", secao.S("defaultTrackLengthMeters") is { Length: > 0 } l ? l : "1000") };
+        using var dialog = new DialogoDados(crono ? "Parâmetros da cronometragem" : "Parâmetros do sistema", "Configuração usada ao criar novas provas", campos, new Size(760, 350));
+        if (dialog.ShowDialog(this) != DialogResult.OK || !dialog.Confirmado) return;
+        if (crono)
+        {
+            if (!double.TryParse(dialog.Valor("minimumLapSeconds"), System.Globalization.NumberStyles.Number, Fmt.Br, out var minimo) || minimo is < 0.1 or > 60)
+            { Msg.Aviso(this, "A volta mínima deve ficar entre 0,1 e 60 segundos."); return; }
+            if (!int.TryParse(dialog.Valor("defaultDurationMin"), out var duracao) || duracao is < 1 or > 600)
+            { Msg.Aviso(this, "A duração deve ficar entre 1 e 600 minutos."); return; }
+            secao["minimumLapSeconds"] = minimo;
+            secao["defaultDurationMin"] = duracao;
+        }
+        else
+        {
+            if (!double.TryParse(dialog.Valor("defaultTrackLengthMeters"), System.Globalization.NumberStyles.Number, Fmt.Br, out var metros) || metros <= 0)
+            { Msg.Aviso(this, "Informe uma extensão de traçado maior que zero."); return; }
+            secao["trackName"] = dialog.Valor("trackName").Trim();
+            secao["defaultTrackLengthMeters"] = metros;
+        }
+        await Crono.Api.Patch("/api/settings", new JsonObject { [chave] = secao });
+        Msg.Info(this, "Parâmetros salvos.");
+    }
 }
 
 sealed class FormCatalogoAux : Form
@@ -315,21 +392,23 @@ sealed class FormCatalogoAux : Form
     readonly string _entity;
     readonly LiveGrid _grid = new();
     List<JsonObject> _records = [];
+    List<JsonObject> _categories = [];
 
     public FormCatalogoAux(string entity)
     {
         _entity = entity;
-        Text = entity == "categories" ? "Cadastro de categorias" : "Cadastro de traçados";
+        Text = entity switch { "categories" => "Cadastro de categorias", "competitors" => "Cadastro de competidores", _ => "Cadastro de traçados" };
         Icon = Icone.App;
         Font = TemaCrono.Normal;
         BackColor = TemaCrono.Fundo;
         StartPosition = FormStartPosition.CenterParent;
-        ClientSize = new Size(800, 560);
+        ClientSize = new Size(entity == "competitors" ? 1000 : 800, 560);
         MinimizeBox = false;
         MaximizeBox = false;
         ShowInTaskbar = false;
         TemaCrono.EstilizarGrade(_grid);
         if (entity == "categories") _grid.Col("Categoria", 250, DataGridViewContentAlignment.MiddleLeft, true).Col("Cor", 120);
+        else if (entity == "competitors") _grid.Col("Competidor", 280, DataGridViewContentAlignment.MiddleLeft, true).Col("Kart", 80).Col("Transponder", 135).Col("Categoria", 180).Col("Peso (kg)", 100);
         else _grid.Col("Traçado", 300, DataGridViewContentAlignment.MiddleLeft, true).Col("Extensão (m)", 130);
         var header = new Panel { Dock = DockStyle.Top, Height = 66, Padding = new Padding(18, 8, 18, 8), BackColor = Color.White };
         header.Controls.Add(new Label { Text = Text, Dock = DockStyle.Top, Height = 28, Font = TemaCrono.Titulo, ForeColor = TemaCrono.Texto });
@@ -340,15 +419,18 @@ sealed class FormCatalogoAux : Form
             var b = TemaCrono.Botao(label, primary); b.Click += (_, _) => action(); actions.Controls.Add(b);
         }
         Controls.Add(_grid); Controls.Add(actions); Controls.Add(header);
-        Shown += async (_, _) => await Carregar();
+        Shown += (_, _) => Seguro.Rodar(this, Carregar);
     }
 
     async Task Carregar()
     {
         _records = await Crono.Api.Lista($"/api/catalog/{_entity}");
+        if (_entity == "competitors") _categories = await Crono.Api.Lista("/api/catalog/categories");
         var rows = _entity == "categories"
             ? _records.Select(x => new object[] { x.S("name"), x.S("color") }).ToList()
-            : _records.Select(x => new object[] { x.S("name"), x.I("lengthMeters") }).ToList();
+            : _entity == "competitors"
+                ? _records.Select(x => new object[] { x.S("name"), x.S("kart"), x.S("transponder"), _categories.FirstOrDefault(c => c.S("id") == x.S("categoryId"))?.S("name") ?? "", x.S("weightKg") }).ToList()
+                : _records.Select(x => new object[] { x.S("name"), x.I("lengthMeters") }).ToList();
         _grid.Preencher(rows, _records.Cast<object>().ToList());
     }
 
@@ -358,13 +440,32 @@ sealed class FormCatalogoAux : Form
         if (editar && selected == null) { Msg.Aviso(this, "Selecione um cadastro."); return; }
         var fields = _entity == "categories"
             ? new[] { ("Nome", "name", selected?.S("name") ?? "Indoor"), ("Cor hexadecimal", "color", selected?.S("color") ?? "#0B7A53") }
-            : new[] { ("Nome", "name", selected?.S("name") ?? "Traçado principal"), ("Extensão em metros", "lengthMeters", (selected?.I("lengthMeters") ?? 1000).ToString()) };
-        using var form = new DialogoDados(Text, "Cadastro", fields, new Size(680, 330));
+            : _entity == "competitors"
+                ? new[] { ("Nome", "name", selected?.S("name") ?? ""), ("Kart", "kart", selected?.S("kart") ?? ""),
+                    ("Transponder", "transponder", selected?.S("transponder") ?? ""),
+                    ("Categoria", "categoryId", _categories.FirstOrDefault(c => c.S("id") == selected?.S("categoryId"))?.S("name") ?? ""),
+                    ("Peso (kg)", "weightKg", selected?.S("weightKg") ?? "") }
+                : new[] { ("Nome", "name", selected?.S("name") ?? "Traçado principal"), ("Extensão em metros", "lengthMeters", (selected?.I("lengthMeters") ?? 1000).ToString()) };
+        using var form = new DialogoDados(Text, "Cadastro", fields, new Size(680, _entity == "competitors" ? 420 : 330));
         if (form.ShowDialog(this) != DialogResult.OK || !form.Confirmado) return;
         Seguro.Rodar(this, async () =>
         {
             var body = new JsonObject { ["name"] = form.Valor("name") };
             if (_entity == "categories") body["color"] = form.Valor("color");
+            else if (_entity == "competitors")
+            {
+                body["kart"] = form.Valor("kart").Trim();
+                body["transponder"] = form.Valor("transponder").Trim();
+                var categoria = form.Valor("categoryId").Trim();
+                body["categoryId"] = _categories.FirstOrDefault(c => c.S("id") == categoria || c.S("name").Equals(categoria, StringComparison.OrdinalIgnoreCase))?.S("id") ?? categoria;
+                var peso = form.Valor("weightKg").Trim();
+                if (peso.Length > 0)
+                {
+                    if (!double.TryParse(peso, System.Globalization.NumberStyles.Number, Fmt.Br, out var kg) || kg <= 0) { Msg.Aviso(this, "Informe um peso maior que zero."); return; }
+                    body["weightKg"] = kg;
+                }
+                else body["weightKg"] = null;
+            }
             else body["lengthMeters"] = int.TryParse(form.Valor("lengthMeters"), out var meters) ? meters : 0;
             if (editar) await Crono.Api.Patch($"/api/catalog/{_entity}/{selected!.S("id")}", body);
             else await Crono.Api.Post($"/api/catalog/{_entity}", body);
