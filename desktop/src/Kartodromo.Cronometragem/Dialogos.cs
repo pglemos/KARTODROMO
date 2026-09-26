@@ -10,7 +10,7 @@ public class FormNovaBateria : Janela
     readonly ComboBox _agenda = Campos.Combo();
     readonly TextBox _nome = Campos.Texto(80);
     readonly ComboBox _tipo = Campos.Combo("Treino", "Tomada de tempo", "Corrida");
-    readonly NumericUpDown _dur = Campos.Num(10, 0, 600), _voltas = Campos.Num(0, 0, 999), _min = Campos.Num(20, 1, 600);
+    readonly NumericUpDown _dur = Campos.Num(10, 0, 600), _voltas = Campos.Num(0, 0, 999), _min = Campos.Num(5, 1, 600); // padrão do LapTime: 5 s
     readonly TextBox _karts = Campos.Texto(400);
     readonly CheckBox _programa = Campos.Check("Montar as provas do produto (ex.: Tomada de tempo + Corrida)", true);
     readonly Label _info = new() { AutoSize = false, Height = 60, Dock = DockStyle.Top, ForeColor = Color.FromArgb(90, 90, 90), Padding = new Padding(3, 4, 3, 0) };

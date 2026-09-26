@@ -448,6 +448,8 @@ public partial class FormCrono : Form
         };
         _gPass.CorFonteLinha = r => r < _gPass.Chaves.Count && _gPass.Chaves[r] is JsonObject p && p.B("invalid") ? Color.White : null;
         var menuPass = new ContextMenuStrip();
+        menuPass.Items.Add("Contar esta leitura como volta (ignorada)", null, (_, _) => CorrigirPassagem("restore"));
+        menuPass.Items.Add(new ToolStripSeparator());
         menuPass.Items.Add("Excluir passagem manualmente", null, (_, _) => CorrigirPassagem("delete"));
         menuPass.Items.Add("Excluir passagens acima", null, (_, _) => CorrigirPassagem("delete", true));
         menuPass.Items.Add(new ToolStripSeparator());

@@ -274,3 +274,17 @@ describe('decoder TranX formato decimal (linhas reais de 26/09)', () => {
     expect(parseTrxLine('\u0001@\t20\t2\t9993\t1.000\t1\t1\t2\tx0000').kind).toBe('other');
   });
 });
+
+describe('leitura ignorada restaurada pelo operador', () => {
+  it('volta a contar e recalcula as voltas em ordem', async () => {
+    const { acceptRejected } = await import('../lib/timing/race-engine');
+    const s = race();
+    applyPassing(s, { kart: '8', decoderTimeMs: 0, wallMs: 1_000 });
+    expect(applyPassing(s, { kart: '8', decoderTimeMs: 3_000, wallMs: 4_000 })).toBe('ignored-min-lap');
+    acceptRejected(s, { id: 'r1', kart: '8', transponder: 5617602, wallMs: 4_000, decoderTimeMs: 3_000, reason: 'ignored-min-lap', sinceLastMs: 3_000 });
+    applyPassing(s, { kart: '8', decoderTimeMs: 60_000, wallMs: 61_000 });
+    const [a] = computeStandings(s);
+    expect(a.laps).toBe(2);
+    expect(a.lastLapMs).toBe(57_000);
+  });
+});

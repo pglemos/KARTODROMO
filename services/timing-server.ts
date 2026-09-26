@@ -20,6 +20,7 @@ import { randomUUID } from 'node:crypto';
 import { DecoderClient } from '../lib/timing/decoder-client';
 import { formatTrxPassing, type TrxPassing } from '../lib/timing/trx-parser';
 import {
+  acceptRejected,
   applyPassing,
   assignCrossing,
   cancelSession,
@@ -497,6 +498,11 @@ function crossingRows(s: Session) {
 }
 
 function correctCrossings(s: Session, action: string, ids: string[], aboveId?: string) {
+  // restaurar/validar uma leitura ignorada faz ela contar como volta (igual ao LapTime)
+  let aceitas = 0;
+  if (action === 'restore' || action === 'validate') {
+    for (const r of [...(s.rejected ?? [])]) if (ids.includes(r.id) && r.kart) { acceptRejected(s, r); aceitas++; }
+  }
   const rows = crossingRows(s).filter((row) => !row.rejected);
   const target = aboveId ? rows.find((row) => row.id === aboveId) : undefined;
   const selected = rows.filter((row) => ids.includes(row.id) || (target && row.wallMs >= target.wallMs));
@@ -506,7 +512,7 @@ function correctCrossings(s: Session, action: string, ids: string[], aboveId?: s
     else if (action === 'invalidate' && row.lapMs !== null) setCrossingInvalid(s, row.id, true);
     else if (action === 'validate' && row.lapMs !== null) setCrossingInvalid(s, row.id, false);
   }
-  return selected.length;
+  return selected.length + aceitas;
 }
 
 async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, url: URL) {

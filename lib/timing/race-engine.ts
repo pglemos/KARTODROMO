@@ -459,3 +459,19 @@ export function formatLap(ms: number | null | undefined): string {
   const s = totalSec - m * 60;
   return m > 0 ? `${m}:${s.toFixed(3).padStart(6, '0')}` : s.toFixed(3);
 }
+
+/**
+ * Operador restaurou uma leitura que tinha sido ignorada (ex.: abaixo da volta mínima), como o
+ * "restaurar volta excluída" do LapTime: entra na ordem cronológica e as voltas são recalculadas.
+ */
+export function acceptRejected(session: Session, r: RejectedPassing) {
+  if (!r.kart) throw new Error('Transponder desconhecido: atribua a passagem a um kart antes.');
+  let comp = session.competitors.find((c) => c.kart === r.kart);
+  if (!comp) {
+    comp = { kart: r.kart, name: `Kart ${r.kart}`, autoAdded: true, flag: 'none', crossings: [], finished: false };
+    session.competitors.push(comp);
+  }
+  comp.crossings.push({ id: r.id, decoderTimeMs: r.decoderTimeMs, wallMs: r.wallMs, lapMs: null, source: 'decoder', transponder: r.transponder });
+  recalculate(comp);
+  session.rejected = (session.rejected ?? []).filter((x) => x.id !== r.id);
+}
