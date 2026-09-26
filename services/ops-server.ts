@@ -390,6 +390,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, 201, { id: job.id });
       }
       if (path === '/api/office/impressao/fila' && method === 'GET') {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars -- a URL assinada nao deve sair no diagnostico da fila
         return send(res, 200, filaImpressao.map(({ url: _u, ...j }) => j));
       }
       const mi = path.match(/^\/api\/office\/impressao\/(\d+)\/(feita|falhou)$/);
