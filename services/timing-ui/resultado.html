@@ -958,7 +958,7 @@ function renderReport() {
           <td class="c-right">${dlcat}</td>
           <td class="c-right">${fmtTotal(l.elapsedMs || cumMs)}</td>
           <td class="c-right">${speed}</td>
-          <td class="c-left">${esc(l.penalty || )}</td>
+          <td class="c-left">${esc(l.penalty || '')}</td>
         </tr>`;
       });
       html += `</tbody></table></div>`;
