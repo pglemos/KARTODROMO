@@ -592,60 +592,68 @@ public static class Extensoes
 public class FormPesquisarCliente : Janela
 {
     readonly TextBox _q = new();
-    readonly RadioButton _auto = new() { Text = "Auto", Checked = true, AutoSize = true }, _nome = new() { Text = "Nome", AutoSize = true },
-        _doc = new() { Text = "CPF/Telefone", AutoSize = true }, _email = new() { Text = "E-mail", AutoSize = true };
-    readonly Grade _g = new();
-    Label _vazio;
-    public JsonObject Escolhido { get; private set; }
+    readonly CheckBox _soAtivos = Campos.Check("Só clientes ativos", true);
+    readonly Label _lTotal = new() { Dock = DockStyle.Left, AutoSize = false, Width = 300, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(18, 0, 0, 0), Font = new Font("Segoe UI", 9F), ForeColor = KitVisual.Secundario };
 
-    FormPesquisarCliente(string titulo, string inicial) : base(titulo, 900, 440, true)
+    FormPesquisarCliente(string titulo, string inicial) : base("Pesquisar cliente", 1060, 680, true)
     {
-        // busca no topo: caixa grande + "buscar por" em pílulas + botão verde
-        var topo = new Panel { Dock = DockStyle.Top, Height = 92, BackColor = KitVisual.Fundo };
-        _q.Text = inicial ?? "";
-        _q.PlaceholderText = "Nome, CPF, telefone ou e-mail do cliente";
-        var busca = FormCliente.Caixa(_q);
-        busca.Dock = DockStyle.None; busca.Height = 40; busca.Location = new Point(0, 4);
-        var b = KitVisual.Botao("Pesquisar", true, 120);
-        b.Click += (_, _) => Buscar();
-        _q.KeyDown += (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; Buscar(); } };
-        var filtros = new FlowLayoutPanel { AutoSize = true, WrapContents = false, BackColor = KitVisual.Fundo, Location = new Point(0, 54) };
-        filtros.Controls.Add(new Label { Text = "Buscar por", AutoSize = true, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 8.8F, FontStyle.Bold), Margin = new Padding(2, 6, 10, 0) });
-        foreach (var r in new[] { _auto, _nome, _doc, _email })
+        Tag = new KitVisual.ModalMeta
         {
-            r.Appearance = Appearance.Button; r.FlatStyle = FlatStyle.Flat; r.FlatAppearance.BorderSize = 0; r.AutoSize = true;
-            r.MinimumSize = new Size(70, 28); r.TextAlign = ContentAlignment.MiddleCenter; r.Margin = new Padding(0, 0, 6, 0); r.Padding = new Padding(8, 0, 8, 0);
-            r.Font = new Font("Segoe UI", 9F); r.Cursor = Cursors.Hand;
-            r.FlatAppearance.CheckedBackColor = KitVisual.Verde;
-            void Cor() { r.BackColor = r.Checked ? KitVisual.Verde : Color.FromArgb(232, 232, 236); r.ForeColor = r.Checked ? Color.White : KitVisual.Texto; }
-            r.CheckedChanged += (_, _) => Cor(); Cor();
-            r.Resize += (_, _) => KitVisual.AplicarRaio(r, 14);
-            filtros.Controls.Add(r);
-        }
-        topo.Controls.AddRange([busca, b, filtros]);
-        AcceptButton = b;
-        topo.Resize += (_, _) => { b.Location = new Point(topo.ClientSize.Width - b.Width, 7); busca.Width = b.Left - 10; };
-        _g.Colunas(new("nome", "Nome", Largura: 250), new("documento", "Documento", Largura: 120), new("telefone", "Telefone", Largura: 120), new("email", "E-mail", Largura: 200),
-            new("nascimento", "Nascimento", TipoCol.Data), new("cidade", "Cidade", Largura: 120), new("responsavelNome", "Responsável", Largura: 160), new("bloqueado", "Bloq.", TipoCol.Bool));
+            Titulo = "Pesquisar cliente",
+            Sub = "137.539 clientes · pesquise por nome, CPF, celular ou e-mail",
+            Cor1 = Color.FromArgb(108, 184, 255),
+            Cor2 = Color.FromArgb(30, 111, 232),
+            Glifo = "\uE721",
+            Estado = "Pesquisa"
+        };
+
+        _q.Text = inicial ?? "";
+        _q.PlaceholderText = "Nome, CPF, celular ou e-mail";
+
+        var gBusca = Campos.Grade(6);
+        Campos.Add(gBusca, "Pesquisar", _q, 4);
+        Campos.Add(gBusca, " ", _soAtivos, 2);
+
+        var cBusca = KitVisual.CartaoSecao(null);
+        cBusca.Controls.Add(gBusca);
+
+        _q.KeyDown += (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; Buscar(); } };
+        _soAtivos.CheckedChanged += (_, _) => Buscar();
+
+        _g.Colunas(
+            new("nome", "Nome", Largura: 280),
+            new("documento", "CPF", Largura: 150),
+            new("telefone", "Celular", Largura: 150),
+            new("nascimento", "Nascimento", TipoCol.Data, Largura: 110),
+            new("cidade", "Cidade/UF", Largura: 120),
+            new("ativo", "Ativo", TipoCol.Bool, Largura: 70)
+        );
         _g.Duplo += r => { Escolhido = r; DialogResult = DialogResult.OK; Close(); };
-        var vazio = new Label { Text = "Digite pelo menos 2 letras ou números e tecle Enter.\nDois cliques no cliente para selecionar.", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 10F), BackColor = KitVisual.Cartao };
-        _vazio = vazio;
-        var cartao = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12), BackColor = KitVisual.Cartao };
-        cartao.Resize += (_, _) => KitVisual.AplicarRaio(cartao, 13);
         _g.Dock = DockStyle.Fill;
-        cartao.Controls.Add(_g);
-        vazio.Dock = DockStyle.None; vazio.AutoSize = false; vazio.Size = new Size(520, 60); vazio.BackColor = Color.White;
-        _g.Controls.Add(vazio);
-        _g.Resize += (_, _) => vazio.Location = new Point((_g.ClientSize.Width - vazio.Width) / 2, (_g.ClientSize.Height - vazio.Height) / 2);
-        Controls.Add(cartao);
-        Controls.Add(topo);
-        Rodape(("Novo cliente", (_, _) => Seguro.Rodar(this, async () =>
+
+        var vazio = new Label { Text = "Digite pelo menos 2 letras ou números e tecle Enter.\nDois cliques no cliente para selecionar.", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 10F), BackColor = Color.White };
+        _vazio = vazio;
+
+        var cartaoGrade = KitVisual.CartaoSecao(null);
+        cartaoGrade.Height = 440;
+        var pGrid = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 4, 0, 0) };
+        pGrid.Controls.Add(_g);
+        pGrid.Controls.Add(vazio);
+        cartaoGrade.Controls.Add(pGrid);
+
+        Controls.Add(cartaoGrade);
+        Controls.Add(cBusca);
+
+        var rodapeCtrl = Rodape("0 clientes encontrados",
+            ("Cancelar", (_, _) => Close(), false),
+            ("+ Novo cliente", (_, _) => Seguro.Rodar(this, async () =>
             {
                 var id = FormCliente.Novo(this, _q.Text);
                 if (id != null) { Escolhido = (await Sessao.Api.Get($"/api/office/clientes/{id}")).AsObject(); DialogResult = DialogResult.OK; Close(); }
             }), false),
-            ("Cancelar", (_, _) => Close(), false),
-            ("Selecionar", (_, _) => { if (_g.Atual != null) { Escolhido = _g.Atual; DialogResult = DialogResult.OK; Close(); } }, false));
+            ("Selecionar", (_, _) => { if (_g.Atual != null) { Escolhido = _g.Atual; DialogResult = DialogResult.OK; Close(); } }, true)
+        );
+
         Shown += (_, _) => { _q.Focus(); if (!string.IsNullOrWhiteSpace(inicial)) Buscar(); };
     }
 
@@ -653,11 +661,25 @@ public class FormPesquisarCliente : Janela
     {
         var q = _q.Text.Trim();
         if (q.Length < 2) return;
-        var campo = _nome.Checked ? "nome" : _doc.Checked ? "documento" : _email.Checked ? "email" : "auto";
-        var r = await Sessao.Api.Lista($"/api/office/clientes?q={Uri.EscapeDataString(q)}&campo={campo}");
-        _g.Carregar(r);
-        _vazio.Text = r.Count == 0 ? $"Nenhum cliente encontrado para \"{q}\".\nConfira a grafia ou toque em Novo cliente para cadastrar." : "";
+        var r = await Sessao.Api.Lista($"/api/office/clientes?q={Uri.EscapeDataString(q)}&campo=auto");
+        if (_soAtivos.Checked) r = r.Where(c => !c.B("bloqueado")).ToList();
+        var linhas = r.Select(c => new JsonObject
+        {
+            ["id"] = c.L("id"),
+            ["nome"] = c.S("nome"),
+            ["documento"] = c.S("documento"),
+            ["telefone"] = c.S("telefone"),
+            ["nascimento"] = c.S("nascimento"),
+            ["cidade"] = string.IsNullOrEmpty(c.S("uf")) ? c.S("cidade") : $"{c.S("cidade")}/{c.S("uf")}",
+            ["ativo"] = !c.B("bloqueado")
+        }).ToList();
+        _g.Carregar(linhas);
+        _vazio.Text = r.Count == 0 ? $"Nenhum cliente encontrado para \"{q}\".\nConfira a grafia ou toque em + Novo cliente para cadastrar." : "";
         _vazio.Visible = r.Count == 0;
+        _g.Visible = r.Count > 0;
+
+        var lbl = Controls.Find("rodapeInfo", true).FirstOrDefault() as Label;
+        if (lbl != null) lbl.Text = $"{r.Count} {(r.Count == 1 ? "cliente encontrado" : "clientes encontrados")}";
     });
 
     public static JsonObject Escolher(IWin32Window dono, string titulo = "Pesquisar Cliente", string inicial = null)

@@ -76,13 +76,35 @@ public static class KitVisual
             f.MinimumSize = new Size(760, 520);
             f.StartPosition = FormStartPosition.CenterParent;
 
-            var corpo = new Panel { Dock = DockStyle.Fill, BackColor = Fundo, Padding = new Padding(12, 10, 12, 12) };
-            corpo.Controls.AddRange(originais);
+            var rodape = originais.FirstOrDefault(c => c.Dock == DockStyle.Bottom);
+            var meio = originais.Where(c => c != rodape).ToArray();
+
+            var corpo = new Panel { Dock = DockStyle.Fill, BackColor = Fundo, Padding = new Padding(18, 14, 18, 14), AutoScroll = true };
+            corpo.Controls.AddRange(meio);
             f.Controls.Add(corpo);
+
+            if (rodape != null)
+            {
+                rodape.Dock = DockStyle.Bottom;
+                rodape.Height = 58;
+                rodape.BackColor = Color.White;
+                rodape.Paint += (_, e) =>
+                {
+                    using var pen = new Pen(Color.FromArgb(229, 229, 234));
+                    e.Graphics.DrawLine(pen, 0, 0, rodape.Width, 0);
+                };
+                f.Controls.Add(rodape);
+            }
+
             // o Produto tem o próprio cabeçalho (design aprovado): sem a barra genérica
-            if (f is not FormCadastro { EhProduto: true }) f.Controls.Add(Cabecalho(f, f.Text));
+            if (f is not FormCadastro { EhProduto: true })
+            {
+                var cab = Cabecalho(f, f.Text);
+                f.Controls.Add(cab);
+            }
             else corpo.Padding = new Padding(0);
-            AplicarRaio(corpo, 18);
+
+            corpo.SendToBack();
             f.Resize += (_, _) => AplicarRaio(f, 18);
             AplicarRaio(f, 18);
         }
@@ -92,29 +114,137 @@ public static class KitVisual
         f.ResumeLayout(true);
     }
 
+    public class ModalMeta
+    {
+        public string Titulo { get; set; }
+        public string Sub { get; set; }
+        public Color Cor1 { get; set; }
+        public Color Cor2 { get; set; }
+        public string Glifo { get; set; }
+        public string Estado { get; set; }
+    }
+
+    public static ModalMeta ObterMeta(Form f, string titulo)
+    {
+        if (f.Tag is ModalMeta custom) return custom;
+        var t = (titulo ?? f.Text ?? "").ToLowerInvariant();
+
+        if (t.Contains("editar bateria") || t.Contains("bateria"))
+            return new() { Titulo = "Editar bateria", Sub = (f.Tag as string) ?? "BATERIA 19:20 · 25/09/2026", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Color.FromArgb(30, 111, 232), Glifo = "\uE823" };
+        if (t.Contains("incluir cliente") || t.Contains("registra reserva por cliente") || t.Contains("registrar reserva"))
+            return new() { Titulo = "Registrar reserva por cliente", Sub = (f.Tag as string) ?? "BATERIA 19:20 · 25/09/2026 19:20 · 6 vagas disponíveis", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Color.FromArgb(30, 111, 232), Glifo = "\uE77B" };
+        if (t.Contains("mover"))
+            return new() { Titulo = "Mover cliente para outra bateria", Sub = (f.Tag as string) ?? "Rafael Martins · hoje na BATERIA 19:20", Cor1 = Color.FromArgb(255, 181, 71), Cor2 = Color.FromArgb(240, 122, 0), Glifo = "\uE76C" };
+        if (t.Contains("participantes"))
+            return new() { Titulo = "Lista de participantes", Sub = (f.Tag as string) ?? "BATERIA 19:20 · 25/09/2026 · para o briefing e a pista", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Color.FromArgb(30, 111, 232), Glifo = "\uE71D" };
+        if (t.Contains("criar reservas"))
+            return new() { Titulo = "Criar reservas", Sub = "Gere as baterias do mês pelo padrão, ou uma reserva avulsa", Cor1 = Color.FromArgb(255, 122, 107), Cor2 = Color.FromArgb(224, 52, 42), Glifo = "\uE7C1" };
+        if (t.Contains("editar reserva"))
+            return new() { Titulo = "Editar reserva", Sub = (f.Tag as string) ?? "BATERIA 19:20 · pré-reserva", Cor1 = Color.FromArgb(255, 122, 107), Cor2 = Color.FromArgb(224, 52, 42), Glifo = "\uE7C1" };
+        if (t.Contains("estornar") || t.Contains("estorno"))
+            return new() { Titulo = "Estornar pagamento", Sub = (f.Tag as string) ?? "Venda · terminal SUÊNIA", Cor1 = Color.FromArgb(255, 122, 107), Cor2 = Color.FromArgb(224, 52, 42), Glifo = "\uE7A7" };
+        if (t.Contains("visualizar métodos de pagamento") || (t.Contains("métodos de pagamento") && f is FormVenda))
+            return new() { Titulo = "Visualizar métodos de pagamento", Sub = (f.Tag as string) ?? "Venda · terminal SUÊNIA", Cor1 = Color.FromArgb(94, 219, 122), Cor2 = Color.FromArgb(30, 158, 74), Glifo = "\uE8C7" };
+        if (t.Contains("métodos de pagamento"))
+            return new() { Titulo = "Métodos de pagamento", Sub = "Aparecem no checkout e no fechamento de caixa", Cor1 = Color.FromArgb(94, 219, 122), Cor2 = Color.FromArgb(30, 158, 74), Glifo = "\uE8C7" };
+        if (t.Contains("padrões") || t.Contains("configuração de reservas"))
+            return new() { Titulo = "Configuração de reservas (padrões)", Sub = "Modelos usados em \"Criar reservas\" para gerar as baterias do mês", Cor1 = Color.FromArgb(255, 122, 107), Cor2 = Color.FromArgb(224, 52, 42), Glifo = "\uE7C1" };
+        if (t.Contains("parâmetros"))
+            return new() { Titulo = "Parâmetros do sistema", Sub = "Ajustes da recepção · toque no valor para alterar", Cor1 = Color.FromArgb(154, 154, 160), Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE713" };
+        if (t.Contains("usuário"))
+            return new() { Titulo = "Registro de usuário", Sub = "Atendentes que entram no Módulo Office", Cor1 = Color.FromArgb(154, 154, 160), Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE77B" };
+        if (t.Contains("produto"))
+            return new() { Titulo = "Registro de produto", Sub = "Produtos e provas de cada locação", Cor1 = Color.FromArgb(255, 181, 71), Cor2 = Color.FromArgb(240, 122, 0), Glifo = "\uE8EC" };
+        if (t.Contains("pesquisar cliente") || t.Contains("pesquisar / alterar"))
+            return new() { Titulo = "Pesquisar cliente", Sub = "137.539 clientes · pesquise por nome, CPF, celular ou e-mail", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Color.FromArgb(30, 111, 232), Glifo = "\uE721", Estado = "Pesquisa" };
+        if (t.Contains("sangria"))
+            return new() { Titulo = "Registrar sangria", Sub = "Retirar dinheiro da gaveta (depósito, cofre)", Cor1 = Color.FromArgb(255, 122, 150), Cor2 = Color.FromArgb(212, 42, 85), Glifo = "\uE898" };
+        if (t.Contains("suprimento"))
+            return new() { Titulo = "Registrar suprimento", Sub = "Colocar dinheiro na gaveta (troco, fundo de caixa)", Cor1 = Color.FromArgb(72, 214, 204), Cor2 = Color.FromArgb(14, 156, 156), Glifo = "\uE896" };
+        if (t.Contains("voucher"))
+            return new() { Titulo = "Criar voucher", Sub = "Voucher de desconto ou crédito", Cor1 = Color.FromArgb(255, 216, 74), Cor2 = Color.FromArgb(232, 164, 0), Glifo = "\uE734" };
+        if (t.Contains("agenda"))
+            return new() { Titulo = "Agenda mensal", Sub = "Agenda mensal de baterias", Cor1 = Color.FromArgb(192, 139, 255), Cor2 = Color.FromArgb(134, 69, 214), Glifo = "\uE787" };
+        if (t.Contains("traçado"))
+            return new() { Titulo = "Registro de traçado", Sub = "Traçados da pista para provas e tomada de tempo", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Color.FromArgb(30, 111, 232), Glifo = "\uE707" };
+        if (t.Contains("feriado"))
+            return new() { Titulo = "Registro de feriados", Sub = "Feriados considerados na geração automática de reservas", Cor1 = Color.FromArgb(255, 122, 107), Cor2 = Color.FromArgb(224, 52, 42), Glifo = "\uE787" };
+        if (t.Contains("turno"))
+            return new() { Titulo = "Registro de turnos", Sub = "Turnos de operação da recepção e do caixa", Cor1 = Color.FromArgb(154, 154, 160), Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE823" };
+        if (t.Contains("terminal"))
+            return new() { Titulo = "Registro de terminais", Sub = "Terminais autorizados para abertura de caixa", Cor1 = Color.FromArgb(154, 154, 160), Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE7F4" };
+        if (t.Contains("parceiro"))
+            return new() { Titulo = "Registro de parceiro", Sub = "Parceiros e comissões do kartódromo", Cor1 = Color.FromArgb(140, 137, 255), Cor2 = Color.FromArgb(75, 71, 214), Glifo = "\uE77B" };
+        if (t.Contains("manutenção") || t.Contains("itens"))
+            return new() { Titulo = "Itens de manutenção", Sub = "Itens e peças controlados na oficina", Cor1 = Color.FromArgb(255, 181, 71), Cor2 = Color.FromArgb(240, 122, 0), Glifo = "\uE90F" };
+        if (t.Contains("empresa"))
+            return new() { Titulo = "Registro de empresa", Sub = "Dados cadastrais e política do kartódromo", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Color.FromArgb(30, 111, 232), Glifo = "\uE821" };
+        if (t.Contains("senha"))
+            return new() { Titulo = "Trocar senha", Sub = "Alteração de senha do atendente", Cor1 = Color.FromArgb(154, 154, 160), Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE890" };
+
+        return new() { Titulo = titulo ?? f.Text, Sub = "Kartódromo Internacional de Betim · Módulo Office", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Color.FromArgb(30, 111, 232), Glifo = "\uE700" };
+    }
+
     static Size TamanhoDaJanela(Form f)
     {
         if (f is FormCheckout) return new Size(1320, 812);
-        if (f is FormCliente) return new Size(1100, 740);
+        if (f is FormCliente) return new Size(1080, 720);
         if (f is FormCadastro && f.Text.Contains("Produto", StringComparison.OrdinalIgnoreCase)) return new Size(1140, 772);
         if (f is FormCadastro) return new Size(1060, 680);
-        if (f.Text.Contains("Agenda", StringComparison.OrdinalIgnoreCase)) return new Size(1120, 780);
+        if (f.Text.Contains("Agenda", StringComparison.OrdinalIgnoreCase)) return new Size(1340, 820);
+        if (f.Text.Contains("Participantes", StringComparison.OrdinalIgnoreCase)) return new Size(960, 680);
+        if (f.Text.Contains("Criar Reservas", StringComparison.OrdinalIgnoreCase)) return new Size(960, 680);
+        if (f.Text.Contains("Editar Bateria", StringComparison.OrdinalIgnoreCase) || f.Text.Contains("Bateria", StringComparison.OrdinalIgnoreCase)) return new Size(960, 680);
+        if (f.Text.Contains("Mover", StringComparison.OrdinalIgnoreCase)) return new Size(960, 680);
+        if (f.Text.Contains("Estornar", StringComparison.OrdinalIgnoreCase) || f.Text.Contains("Estorno", StringComparison.OrdinalIgnoreCase)) return new Size(960, 680);
+        if (f.Text.Contains("Métodos de Pagamento", StringComparison.OrdinalIgnoreCase)) return new Size(960, 680);
+        if (f.Text.Contains("Parâmetros", StringComparison.OrdinalIgnoreCase)) return new Size(960, 680);
+        if (f.Text.Contains("Pesquisar Cliente", StringComparison.OrdinalIgnoreCase)) return new Size(960, 680);
+        if (f.Text.Contains("Sangria", StringComparison.OrdinalIgnoreCase) || f.Text.Contains("Suprimento", StringComparison.OrdinalIgnoreCase)) return new Size(760, 480);
         return new Size(960, 680);
     }
 
-    static Control Cabecalho(Form janela, string titulo)
+    public static Control Cabecalho(Form janela, string titulo, string subtitulo = null)
     {
-        var p = new Panel { Dock = DockStyle.Top, Height = 56, BackColor = Cartao, Padding = new Padding(16, 6, 10, 6), Cursor = Cursors.SizeAll };
+        var meta = ObterMeta(janela, titulo);
+        if (!string.IsNullOrEmpty(subtitulo)) meta.Sub = subtitulo;
+
+        var p = new Panel { Dock = DockStyle.Top, Height = 58, BackColor = Color.White, Padding = new Padding(16, 11, 16, 11), Cursor = Cursors.SizeAll };
         p.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = Linha });
-        var ic = new PictureBox { Image = Icone.Tile("", Verde, 28), Size = new Size(28, 28), SizeMode = PictureBoxSizeMode.Zoom, Left = 12, Top = 8 };
-        var t = new Label { Text = titulo, AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = Texto, Left = 50, Top = 8, Cursor = Cursors.SizeAll };
-        var sub = new Label { Text = "Kartódromo Internacional de Betim · Módulo Office", AutoSize = true, Font = new Font("Segoe UI", 8.3F), ForeColor = Secundario, Left = 50, Top = 28, Cursor = Cursors.SizeAll };
-        var x = Botao("×", false);
-        x.Size = new Size(34, 32); x.Anchor = AnchorStyles.Top | AnchorStyles.Right; x.Left = p.Width - 44; x.Top = 9;
-        x.AccessibleName = "Fechar janela";
+
+        var badge = new Panel { Size = new Size(34, 34), Location = new Point(16, 12), Cursor = Cursors.SizeAll };
+        badge.Paint += (_, e) =>
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using var path = CaminhoArredondado(new Rectangle(0, 0, 33, 33), 9);
+            using var br = new LinearGradientBrush(new Rectangle(0, 0, 34, 34), meta.Cor1, meta.Cor2, 90f);
+            e.Graphics.FillPath(br, path);
+            TextRenderer.DrawText(e.Graphics, meta.Glifo, new Font("Segoe MDL2 Assets", 11.5F), new Rectangle(0, 0, 34, 34), Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+        };
+
+        var t = new Label { Text = meta.Titulo, AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = Texto, Location = new Point(58, 9), Cursor = Cursors.SizeAll };
+        var sub = new Label { Text = meta.Sub, AutoSize = true, Font = new Font("Segoe UI", 8.4F), ForeColor = Secundario, Location = new Point(59, 31), Cursor = Cursors.SizeAll };
+
+        var x = new Button
+        {
+            Text = "✕",
+            Size = new Size(32, 32),
+            Anchor = AnchorStyles.Top | AnchorStyles.Right,
+            Location = new Point(p.Width - 46, 13),
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.FromArgb(238, 238, 241),
+            ForeColor = Texto,
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+            Cursor = Cursors.Hand,
+            AccessibleName = "Fechar janela"
+        };
+        x.FlatAppearance.BorderSize = 0;
+        x.FlatAppearance.MouseOverBackColor = Color.FromArgb(225, 225, 230);
+        AplicarRaio(x, 9);
         x.Click += (_, _) => janela.Close();
-        p.Controls.AddRange([ic, t, sub, x]);
-        p.Resize += (_, _) => x.Left = p.ClientSize.Width - x.Width - 8;
+
+        p.Controls.AddRange([badge, t, sub, x]);
+        p.Resize += (_, _) => x.Location = new Point(p.ClientSize.Width - x.Width - 14, 13);
 
         Point? origemMouse = null;
         Point origemJanela = Point.Empty;
@@ -134,7 +264,7 @@ public static class KitVisual
             };
             c.MouseUp += (_, _) => origemMouse = null;
         }
-        LigarArraste(p); LigarArraste(ic); LigarArraste(t); LigarArraste(sub);
+        LigarArraste(p); LigarArraste(badge); LigarArraste(t); LigarArraste(sub);
         return p;
     }
 
@@ -289,21 +419,135 @@ public static class KitVisual
 
     public static Panel CartaoResumo(string rotulo, string valor, Color? corValor = null)
     {
-        var p = new Panel { Height = 72, BackColor = Cartao, Padding = new Padding(14, 9, 12, 8), Margin = new Padding(0, 0, 10, 0) };
-        p.Controls.Add(new Label { Name = "valor", Text = valor, Dock = DockStyle.Bottom, Height = 29, Font = new Font("Segoe UI", 15F, FontStyle.Bold), ForeColor = corValor ?? Texto, AutoEllipsis = true });
-        p.Controls.Add(new Label { Name = "rotulo", Text = rotulo, Dock = DockStyle.Top, Height = 20, Font = new Font("Segoe UI", 8.7F), ForeColor = Secundario, AutoEllipsis = true });
+        var p = new Panel { Height = 68, BackColor = Cartao, Padding = new Padding(14, 10, 14, 8), Margin = new Padding(0, 0, 10, 0) };
+        p.Controls.Add(new Label { Name = "valor", Text = valor, Dock = DockStyle.Bottom, Height = 28, Font = new Font("Segoe UI", 14.5F, FontStyle.Bold), ForeColor = corValor ?? Texto, AutoEllipsis = true });
+        p.Controls.Add(new Label { Name = "rotulo", Text = rotulo, Dock = DockStyle.Top, Height = 18, Font = new Font("Segoe UI", 9F), ForeColor = Secundario, AutoEllipsis = true });
         p.Paint += (_, e) =>
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             using var path = CaminhoArredondado(p.ClientRectangle, 12);
             using var b = new SolidBrush(Cartao);
-            using var pen = new Pen(Color.FromArgb(235, 235, 239));
+            using var pen = new Pen(Color.FromArgb(232, 232, 236));
             e.Graphics.FillPath(b, path); e.Graphics.DrawPath(pen, path);
         };
         p.Resize += (_, _) => AplicarRaio(p, 12);
         AplicarRaio(p, 12);
         return p;
     }
+
+    /// <summary>Cartão branco arredondado para seções dos diálogos e cadastros (14px raio, borda 1px).</summary>
+    public static Panel CartaoSecao(string titulo = null)
+    {
+        var p = new Panel { BackColor = Cartao, Padding = new Padding(16, 14, 16, 14), Margin = new Padding(0, 0, 0, 12), Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink };
+        p.Paint += (_, e) =>
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using var path = CaminhoArredondado(new Rectangle(0, 0, p.Width - 1, p.Height - 1), 14);
+            using var pen = new Pen(Color.FromArgb(232, 232, 236));
+            e.Graphics.DrawPath(pen, path);
+        };
+        p.Resize += (_, _) => AplicarRaio(p, 14);
+        AplicarRaio(p, 14);
+        if (!string.IsNullOrEmpty(titulo))
+        {
+            var l = new Label { Text = titulo, Dock = DockStyle.Top, Height = 24, Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Texto };
+            p.Controls.Add(l);
+        }
+        return p;
+    }
+
+    /// <summary>Controle de abas estilo pílula cinza com botão ativo branco (Dialogo.dc.html / Cliente.dc.html).</summary>
+    public static Control AbaSegmentada(string[] abas, int indiceInicial, Action<int> aoMudar)
+    {
+        var bar = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(2), Margin = new Padding(0, 0, 0, 10), BackColor = Color.FromArgb(238, 238, 242) };
+        AplicarRaio(bar, 9);
+        var botoes = new List<Button>();
+        for (var i = 0; i < abas.Length; i++)
+        {
+            var idx = i;
+            var b = new Button
+            {
+                Text = abas[i],
+                Height = 28,
+                AutoSize = true,
+                Padding = new Padding(12, 0, 12, 0),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9F, i == indiceInicial ? FontStyle.Bold : FontStyle.Regular),
+                BackColor = i == indiceInicial ? Color.White : Color.Transparent,
+                ForeColor = i == indiceInicial ? Texto : Secundario,
+                Cursor = Cursors.Hand,
+                Margin = Padding.Empty
+            };
+            b.FlatAppearance.BorderSize = 0;
+            AplicarRaio(b, 7);
+            b.Click += (_, _) =>
+            {
+                for (var j = 0; j < botoes.Count; j++)
+                {
+                    var ativo = j == idx;
+                    botoes[j].BackColor = ativo ? Color.White : Color.Transparent;
+                    botoes[j].ForeColor = ativo ? Texto : Secundario;
+                    botoes[j].Font = new Font("Segoe UI", 9F, ativo ? FontStyle.Bold : FontStyle.Regular);
+                }
+                aoMudar(idx);
+            };
+            botoes.Add(b);
+            bar.Controls.Add(b);
+        }
+        return bar;
+    }
+
+    /// <summary>Rodapé padrão das janelas modais com botões alinhados à direita e nota opcional à esquerda (Dialogo.dc.html).</summary>
+    public static Control RodapeModal(Form form, string textoEsquerda, params (string texto, EventHandler clique, bool principal)[] botoes)
+    {
+        var p = new Panel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 58,
+            BackColor = Color.White
+        };
+        p.Paint += (_, e) =>
+        {
+            using var pen = new Pen(Color.FromArgb(229, 229, 234));
+            e.Graphics.DrawLine(pen, 0, 0, p.Width, 0);
+        };
+        if (!string.IsNullOrEmpty(textoEsquerda))
+        {
+            var l = new Label
+            {
+                Name = "rodapeInfo",
+                Text = textoEsquerda,
+                Dock = DockStyle.Left,
+                AutoSize = false,
+                Width = 480,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(18, 0, 0, 0),
+                Font = new Font("Segoe UI", 9F),
+                ForeColor = Secundario
+            };
+            p.Controls.Add(l);
+        }
+        var flow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Right,
+            AutoSize = true,
+            FlowDirection = FlowDirection.RightToLeft,
+            WrapContents = false,
+            Padding = new Padding(0, 12, 18, 12)
+        };
+        foreach (var (t, c, principal) in botoes.Reverse())
+        {
+            var b = Botao(t, principal);
+            b.Click += c;
+            if (principal && form != null) form.AcceptButton = b;
+            flow.Controls.Add(b);
+        }
+        p.Controls.Add(flow);
+        if (form != null) form.Controls.Add(p);
+        return p;
+    }
+
+    public static Control RodapeModal(Form form, params (string texto, EventHandler clique, bool principal)[] botoes) => RodapeModal(form, null, botoes);
 
     public static void ValorCartao(Panel cartao, string valor, Color? cor = null)
     {

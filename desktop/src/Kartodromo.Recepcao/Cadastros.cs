@@ -75,24 +75,81 @@ public static class Cadastros
     public static void Parametros(Form dono) => Seguro.Rodar(dono, async () =>
     {
         var lista = await Sessao.Api.Lista("/api/office/parametros");
-        using var j = new Janela("Parâmetros do Sistema", 820, 520);
-        var t = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, AutoScroll = true, Padding = new Padding(10) };
-        t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 65)); t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35));
-        var ctl = new Dictionary<string, Control>();
-        foreach (var p in lista)
+        using var j = new Janela("Parâmetros do sistema", 960, 680);
+        j.Tag = "Ajustes da recepção · toque no valor para alterar";
+
+        var grade = new DataGridView
         {
-            t.Controls.Add(new Label { Text = $"{p.S("descricao")}  ({p.S("chave")})", AutoSize = true, Margin = new Padding(3, 6, 3, 3) });
-            Control c = p.S("valor") is "true" or "false" ? new CheckBox { Text = "ativado", Checked = p.S("valor") == "true", AutoSize = true } : new TextBox { Text = p.S("valor"), Width = 260 };
-            ctl[p.S("chave")] = c; t.Controls.Add(c);
+            Dock = DockStyle.Fill,
+            AllowUserToAddRows = false,
+            AllowUserToDeleteRows = false,
+            RowHeadersVisible = false,
+            SelectionMode = DataGridViewSelectionMode.CellSelect
+        };
+        KitVisual.EstilizarGrade(grade);
+        grade.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Descrição", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, ReadOnly = true });
+        grade.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Valor", Width = 220, DefaultCellStyle = { Alignment = DataGridViewContentAlignment.MiddleRight } });
+
+        var cartao = KitVisual.CartaoSecao(null);
+        cartao.Height = 490;
+        var pGrid = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 4, 0, 0) };
+        pGrid.Controls.Add(grade);
+        cartao.Controls.Add(pGrid);
+
+        var abasNomes = new[] { "Cronometragem", "Office", "Autoatendimento", "Ranking/TV", "Lista de participantes", "Placar eletrônico", "API" };
+        var dictValores = new Dictionary<string, string>();
+        foreach (var p in lista) dictValores[p.S("chave")] = p.S("valor");
+
+        void CarregarAba(int idx)
+        {
+            grade.Rows.Clear();
+            var prefixo = idx switch
+            {
+                0 => "crono",
+                1 => "office",
+                2 => "totem",
+                3 => "ranking",
+                4 => "participantes",
+                5 => "placar",
+                6 => "api",
+                _ => ""
+            };
+            var filtrados = lista.Where(p => string.IsNullOrEmpty(prefixo) || p.S("chave").StartsWith(prefixo, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (filtrados.Count == 0) filtrados = lista;
+            foreach (var p in filtrados)
+            {
+                var rowIdx = grade.Rows.Add(p.S("descricao"), dictValores.GetValueOrDefault(p.S("chave"), p.S("valor")));
+                grade.Rows[rowIdx].Tag = p.S("chave");
+            }
         }
-        j.Controls.Add(t);
-        j.Rodape(("Cancelar", (_, _) => j.Close(), false), ("Salvar", (_, _) => Seguro.Rodar(j, async () =>
+
+        grade.CellEndEdit += (_, e) =>
         {
-            var body = new JsonObject(); foreach (var (k, c) in ctl) body[k] = c is CheckBox cb ? (cb.Checked ? "true" : "false") : c.Text;
-            await Sessao.Api.Put("/api/office/parametros", body);
-            await Sessao.CarregarApoio();
-            Msg.Info(j, "Parâmetros salvos."); j.Close();
-        }), true));
+            if (e.RowIndex >= 0 && grade.Rows[e.RowIndex].Tag is string chave)
+            {
+                dictValores[chave] = grade.Rows[e.RowIndex].Cells[1].Value?.ToString() ?? "";
+            }
+        };
+
+        var abas = KitVisual.AbaSegmentada(abasNomes, 1, CarregarAba);
+
+        j.Controls.Add(cartao);
+        j.Controls.Add(abas);
+
+        j.Rodape(
+            ("Cancelar", (_, _) => j.Close(), false),
+            ("Salvar", (_, _) => Seguro.Rodar(j, async () =>
+            {
+                var body = new JsonObject();
+                foreach (var (k, v) in dictValores) body[k] = v;
+                await Sessao.Api.Put("/api/office/parametros", body);
+                await Sessao.CarregarApoio();
+                Msg.Info(j, "Parâmetros salvos.");
+                j.Close();
+            }), true)
+        );
+
+        CarregarAba(1);
         j.ShowDialog(dono);
     });
 }

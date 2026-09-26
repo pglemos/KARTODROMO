@@ -176,22 +176,44 @@ public sealed class FormCaixaTransacao : Janela
 {
     readonly string _tipo;
     readonly TextBox _valor = new();
-    readonly TextBox _obs = new() { Multiline = true, Height = 74, ScrollBars = ScrollBars.Vertical };
-    public FormCaixaTransacao(string tipo, JsonObject caixa) : base(tipo == "sangria" ? "Registrar sangria" : "Registrar suprimento", 500, 380)
+    readonly TextBox _obs = Campos.Texto(400);
+
+    public FormCaixaTransacao(string tipo, JsonObject caixa) : base(tipo == "sangria" ? "Registrar sangria" : "Registrar suprimento", 960, 680)
     {
         _tipo = tipo == "sangria" ? "sangria" : "suprimento";
+        Tag = _tipo == "sangria" ? "Retirar dinheiro da gaveta (depósito, cofre)" : "Colocar dinheiro na gaveta (troco, fundo de caixa)";
         var aberto = caixa["aberto"]?.AsObject();
-        var resumo = new TableLayoutPanel { Dock = DockStyle.Top, Height = 84, ColumnCount = 3, Padding = new Padding(2, 4, 2, 8) };
-        for (var i = 0; i < 3; i++) resumo.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.333F));
-        resumo.Controls.Add(KitVisual.CartaoResumo("Atendente", Sessao.Nome), 0, 0);
-        resumo.Controls.Add(KitVisual.CartaoResumo("Terminal", aberto?.S("terminal") ?? "—"), 1, 0);
-        resumo.Controls.Add(KitVisual.CartaoResumo("Dinheiro em caixa", Fmt.Brl(caixa["sumario"]?.L("dinheiroEmCaixa") ?? 0)), 2, 0);
-        var campos = Campos.Grade(1);
-        Campos.Add(campos, "Valor (R$)", _valor);
-        Campos.Add(campos, "Justificativa", _obs);
-        var body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(4, 6, 4, 0) };
-        body.Controls.Add(campos); body.Controls.Add(resumo);
-        Controls.Add(body);
+
+        var gTerm = Campos.Grade(6);
+        Campos.Add(gTerm, "Usuário", new TextBox { Text = Sessao.Nome, ReadOnly = true }, 2);
+        Campos.Add(gTerm, "Terminal ativo", new TextBox { Text = aberto?.S("terminal") ?? "—", ReadOnly = true }, 2);
+        Campos.Add(gTerm, "Quantia em caixa agora", new TextBox { Text = Fmt.Brl(caixa["sumario"]?.L("dinheiroEmCaixa") ?? 0), ReadOnly = true }, 2);
+
+        var cTerm = KitVisual.CartaoSecao("Terminal");
+        cTerm.Controls.Add(gTerm);
+
+        var gTrans = Campos.Grade(6);
+        Campos.Add(gTrans, "Valor (R$)", _valor, 2);
+        Campos.Add(gTrans, "Observações", _obs, 4);
+
+        var cTrans = KitVisual.CartaoSecao("Nova transação");
+        cTrans.Controls.Add(gTrans);
+
+        var nota = new Panel { Dock = DockStyle.Top, Height = 56, BackColor = Color.FromArgb(245, 245, 247), Padding = new Padding(14, 10, 14, 10), Margin = new Padding(0, 0, 0, 12) };
+        nota.Paint += (_, e) =>
+        {
+            using var pen = new Pen(Color.FromArgb(232, 232, 236));
+            e.Graphics.DrawRectangle(pen, 0, 0, nota.Width - 1, nota.Height - 1);
+        };
+        var textoDica = _tipo == "sangria"
+            ? "O valor sai da gaveta e aparece no fechamento como \"Sangria\". Guarde o comprovante do depósito."
+            : "O valor entra no sumário do terminal como \"Suprimento\" e soma no total da gaveta.";
+        nota.Controls.Add(new Label { Text = textoDica, Dock = DockStyle.Fill, ForeColor = Color.FromArgb(58, 58, 60), Font = new Font("Segoe UI", 9.2F) });
+
+        Controls.Add(nota);
+        Controls.Add(cTrans);
+        Controls.Add(cTerm);
+
         Rodape(("Cancelar", (_, _) => Close(), false), ("Registrar transação", (_, _) => Seguro.Rodar(this, async () =>
         {
             if (Fmt.Centavos(_valor.Text) is not long valor || valor <= 0) { Msg.Aviso(this, "Informe um valor maior que zero."); return; }

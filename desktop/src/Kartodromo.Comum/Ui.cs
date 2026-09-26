@@ -73,20 +73,29 @@ public class Janela : Form
         KeyDown += (_, e) => { if (e.KeyCode == Keys.Escape && !e.Handled) { Close(); } };
     }
 
-    /// <summary>Barra de botoes no rodape (alinhada a direita), como os dialogos do LapTime.</summary>
-    public FlowLayoutPanel Rodape(params (string texto, EventHandler clique, bool principal)[] botoes)
+    /// <summary>Barra de botoes no rodape (alinhada a direita), com suporte a texto informativo à esquerda (Dialogo.dc.html).</summary>
+    public Control Rodape(string textoEsquerda, params (string texto, EventHandler clique, bool principal)[] botoes)
     {
-        var p = new FlowLayoutPanel { Dock = DockStyle.Bottom, FlowDirection = FlowDirection.RightToLeft, Height = 42, Padding = new Padding(8, 7, 8, 7) };
+        var p = new Panel { Dock = DockStyle.Bottom, Height = 58, BackColor = Color.White };
+        if (!string.IsNullOrEmpty(textoEsquerda))
+        {
+            var l = new Label { Name = "rodapeInfo", Text = textoEsquerda, Dock = DockStyle.Left, AutoSize = false, Width = 480, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(18, 0, 0, 0), Font = new Font("Segoe UI", 9F), ForeColor = Color.FromArgb(110, 110, 115) };
+            p.Controls.Add(l);
+        }
+        var flow = new FlowLayoutPanel { Dock = DockStyle.Right, AutoSize = true, FlowDirection = FlowDirection.RightToLeft, WrapContents = false, Padding = new Padding(0, 12, 18, 12) };
         foreach (var (t, c, principal) in botoes.Reverse())
         {
-            var b = new Button { Text = t, AutoSize = true, MinimumSize = new Size(96, 27), Margin = new Padding(4, 0, 0, 0) };
+            var b = new Button { Text = t, AutoSize = true, MinimumSize = new Size(92, 34), Height = 34, Margin = new Padding(4, 0, 0, 0) };
             b.Click += c;
             if (principal) AcceptButton = b;
-            p.Controls.Add(b);
+            flow.Controls.Add(b);
         }
+        p.Controls.Add(flow);
         Controls.Add(p);
         return p;
     }
+
+    public Control Rodape(params (string texto, EventHandler clique, bool principal)[] botoes) => Rodape(null, botoes);
 }
 
 /// <summary>Ajudantes pra montar formularios com rotulo em cima do campo.</summary>
