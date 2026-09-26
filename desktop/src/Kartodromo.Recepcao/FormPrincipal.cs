@@ -1039,7 +1039,7 @@ public class FormPrincipal : Form
     {
         var umaSo = sel.Count == 1;
         return [
-            Item("Abrir bateria", () => Acoes.StatusBateria(this, sel, "aberta"), false),
+            Item("Abrir bateria", () => Acoes.StatusBateria(this, sel, "aberta"), sel.Any(b => b.S("status") == "fechada")),
             Item("Fechar bateria", () => Acoes.StatusBateria(this, sel, "fechada"), sel.Any(b => b.S("status") == "aberta")),
             new ToolStripSeparator(),
             Item("Editar bateria", () => { if (new FormBateria(sel[0]).ShowDialog(this) == DialogResult.OK) Recarregar(); }, umaSo, "Enter"),
