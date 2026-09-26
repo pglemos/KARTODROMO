@@ -66,3 +66,18 @@ miniflare-*/
 node-compile-cache/
 output/
 playwright_chromiumdev_profile-*/
+
+# cronometragem propria (runtime, nao versionar)
+data/timing/sessions/
+data/timing/passagens/
+*.tmp
+data/timing/*.log
+
+# Aplicativos desktop .NET: versionar fonte e instaladores, nao artefatos de build
+desktop/**/bin/
+desktop/**/obj/
+desktop/publish/
+desktop/**/*.csproj.user
+
+# Mapeamento operacional local do decoder (nao publicar)
+data/timing/transponders.json

@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cronometragem · Operador</title>
+<style>
+  :root { --bg:#0e1210; --panel:#161c19; --line:#26302b; --text:#e9efe9; --muted:#8b978f; --green:#1db954; --red:#e5484d; --yellow:#f5c518; --blue:#4c9aff; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.35 system-ui, "Segoe UI", sans-serif; }
+  header { display:flex; align-items:center; gap:16px; padding:10px 16px; border-bottom:1px solid var(--line); background:#0b0f0d; position:sticky; top:0; z-index:5; }
+  header h1 { font-size:17px; margin:0; font-weight:700; }
+  .pill { padding:4px 10px; border-radius:999px; font-weight:700; font-size:13px; }
+  .ok { background:#12351f; color:#5ee08d; } .bad { background:#3b1618; color:#ff8a8d; } .warn { background:#3a3210; color:#ffd84d; }
+  header .spacer { flex:1; }
+  header a { color:var(--blue); text-decoration:none; font-weight:600; }
+  main { display:grid; grid-template-columns: 250px 1fr 320px; gap:12px; padding:12px; min-height:calc(100vh - 50px); }
+  @media (max-width: 1200px) { main { grid-template-columns: 1fr; } }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; min-width:0; }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0 0 10px; }
+  button { font:inherit; font-weight:700; border:0; border-radius:8px; padding:10px 14px; cursor:pointer; background:#2a3530; color:var(--text); }
+  button:hover { filter:brightness(1.15); } button:disabled { opacity:.35; cursor:not-allowed; }
+  .b-green { background:var(--green); color:#04160a; } .b-red { background:var(--red); color:#fff; } .b-check { background:#fff; color:#000; } .b-blue { background:var(--blue); color:#021024; }
+  input, select, textarea { font:inherit; background:#0e1411; color:var(--text); border:1px solid var(--line); border-radius:7px; padding:8px 10px; width:100%; }
+  label { display:block; font-size:12px; color:var(--muted); margin:8px 0 4px; }
+  .list .item { padding:8px 10px; border-radius:8px; cursor:pointer; border:1px solid transparent; margin-bottom:4px; }
+  .list .item:hover { background:#1c2420; } .list .item.sel { border-color:var(--green); background:#15261c; }
+  .list .item small { display:block; color:var(--muted); }
+  .st { font-size:11px; font-weight:800; padding:2px 7px; border-radius:6px; text-transform:uppercase; }
+  .st-preparando { background:#243040; color:#8fc1ff; } .st-em_andamento { background:#12351f; color:#5ee08d; }
+  .st-bandeira_final { background:#fff; color:#000; } .st-encerrada { background:#2a2f2c; color:#aab5ae; } .st-cancelada { background:#3b1618; color:#ff8a8d; }
+  .top { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .top .name { font-size:24px; font-weight:800; }
+  .timer { font:800 44px/1 ui-monospace, Consolas, monospace; letter-spacing:.02em; margin-left:auto; }
+  .controls { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; }
+  table { width:100%; border-collapse:collapse; }
+  th { text-align:left; font-size:12px; color:var(--muted); font-weight:600; padding:6px 8px; border-bottom:1px solid var(--line); }
+  td { padding:7px 8px; border-bottom:1px solid #1d2622; font-variant-numeric: tabular-nums; }
+  td.num { font:700 16px ui-monospace, Consolas, monospace; }
+  .pos { font-weight:800; width:40px; } .kart { font-weight:800; color:var(--yellow); width:60px; }
+  tr.fin td { opacity:.75; } tr.fin .pos::after { content:" 🏁"; }
+  .best { color:#c77dff; font-weight:800; }
+  .grid-row { display:grid; grid-template-columns: 70px 1fr 36px; gap:6px; margin-bottom:6px; }
+  .feed { font:13px ui-monospace, Consolas, monospace; max-height:60vh; overflow:auto; }
+  .feed div { padding:4px 2px; border-bottom:1px solid #1d2622; display:flex; gap:8px; align-items:center; }
+  .feed .unk { color:#ff8a8d; } .feed .lap { margin-left:auto; font-weight:700; }
+  .muted { color:var(--muted); } .row { display:flex; gap:8px; } .row > * { flex:1; }
+  dialog { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:12px; width:min(520px, 94vw); }
+  dialog::backdrop { background:rgba(0,0,0,.6); }
+  summary { cursor:pointer; margin-bottom:8px; }
+  .hint { font-size:12px; color:var(--muted); margin-top:6px; }
+  .laps span { display:inline-block; margin:3px; padding:4px 8px; border-radius:6px; background:#1d2622; cursor:pointer; font:13px ui-monospace, Consolas, monospace; }
+  .laps span.inv { text-decoration:line-through; color:var(--red); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏁 Cronometragem</h1>
+  <span id="dec" class="pill bad">Decoder…</span>
+  <span id="clock" class="muted"></span>
+  <span class="spacer"></span>
+  <a href="/tv" target="_blank">Abrir TV ↗</a>
+</header>
+<main>
+  <section>
+    <h2>Baterias</h2>
+    <button class="b-blue" style="width:100%;margin-bottom:10px" onclick="openNew()">+ Nova bateria</button>
+    <div id="list" class="list"></div>
+  </section>
+
+  <section id="main">
+    <div id="empty" class="muted">Nenhuma bateria. Clique em <b>+ Nova bateria</b>.</div>
+    <div id="sess" hidden>
+      <div class="top">
+        <span id="sName" class="name"></span>
+        <span id="sState" class="st"></span>
+        <span id="sType" class="muted"></span>
+        <span id="sTimer" class="timer">--:--</span>
+      </div>
+      <div class="controls">
+        <button id="bStart" class="b-green" onclick="act('start')">▶ Iniciar (bandeira verde)</button>
+        <button id="bPlus" onclick="plusMin()">+1 min</button>
+        <button id="bCheck" class="b-check" onclick="act('checkered')">🏁 Quadriculada agora</button>
+        <button id="bClose" onclick="act('close','Encerrar a bateria? Karts que ainda não passaram ficam com as voltas atuais.')">■ Encerrar</button>
+        <button id="bCancel" class="b-red" onclick="act('cancel','Cancelar esta bateria?')">Cancelar</button>
+        <button id="bPrint" onclick="window.open('/resultado/'+sel,'_blank')">🖨 Resultado</button>
+      </div>
+
+      <details id="gridBox" open>
+        <summary><h2 style="display:inline">Pilotos no grid</h2> <span class="muted">(clique para abrir/fechar)</span></summary>
+        <div id="gridRows"></div>
+        <div class="row" style="margin-top:6px">
+          <button onclick="addRow()">+ Piloto</button>
+          <button onclick="document.getElementById('pasteDlg').showModal()">Colar lista</button>
+          <button class="b-blue" onclick="saveGrid()">Salvar grid</button>
+        </div>
+        <div class="hint">Kart fora do grid que passar pela linha entra sozinho como "Kart N", nenhuma volta se perde.</div>
+      </details>
+
+      <h2 style="margin-top:16px">Classificação</h2>
+      <table>
+        <thead><tr><th>Pos</th><th>Kart</th><th>Piloto</th><th>Voltas</th><th>Última</th><th>Melhor</th><th>Dif.</th></tr></thead>
+        <tbody id="stand"></tbody>
+      </table>
+      <div class="hint">Clique num piloto para ver as voltas e anular uma volta (a volta anulada não vale como melhor volta).</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Passagens (decoder)</h2>
+    <div id="feed" class="feed"></div>
+  </section>
+</main>
+
+<dialog id="newDlg">
+  <h2>Nova bateria</h2>
+  <label>Tipo</label>
+  <select id="nType" onchange="typeDefaults()">
+    <option value="treino">Treino / Bateria livre (vale melhor volta)</option>
+    <option value="classificacao">Tomada de tempo (vale melhor volta)</option>
+    <option value="corrida">Corrida (vale voltas + tempo)</option>
+  </select>
+  <label>Nome</label><input id="nName" placeholder="Ex.: Bateria 14h">
+  <div class="row">
+    <div><label>Duração (min)</label><input id="nDur" type="number" min="0" step="1" value="10"></div>
+    <div><label>Nº de voltas (opcional)</label><input id="nLaps" type="number" min="0" placeholder="por tempo"></div>
+  </div>
+  <label>Pilotos da agenda (recepção/totem)</label><select id="nAgenda" onchange="agendaPick()"><option value="">— não puxar da agenda —</option></select>
+  <div id="nAgendaInfo" class="hint"></div>
+  <label>Karts (opcional agora; ex.: 4 5 8 16)</label><input id="nKarts" placeholder="números separados por espaço ou vírgula">
+  <div class="row" style="margin-top:14px"><button onclick="newDlg.close()">Voltar</button><button class="b-green" onclick="createSess()">Criar</button></div>
+</dialog>
+
+<dialog id="pasteDlg">
+  <h2>Colar lista de pilotos</h2>
+  <textarea id="pasteTxt" rows="10" placeholder="Uma linha por piloto: KART NOME&#10;12 João da Silva&#10;7 Maria Souza"></textarea>
+  <div class="row" style="margin-top:10px"><button onclick="pasteDlg.close()">Voltar</button><button class="b-blue" onclick="applyPaste()">Adicionar</button></div>
+</dialog>
+
+<dialog id="lapsDlg">
+  <h2 id="lapsTitle"></h2>
+  <div id="lapsBody" class="laps"></div>
+  <div class="hint">Clique numa volta para anular ou restaurar.</div>
+  <div class="row" style="margin-top:10px"><button onclick="lapsDlg.close()">Fechar</button></div>
+</dialog>
+
+<dialog id="mapDlg">
+  <h2>Transponder desconhecido</h2>
+  <p>Transponder <b id="mapRaw"></b> passou, mas não está ligado a nenhum kart.</p>
+  <label>Número do kart</label><input id="mapKart" type="text">
+  <div class="row" style="margin-top:10px"><button onclick="mapDlg.close()">Voltar</button><button class="b-blue" onclick="saveMap()">Salvar</button></div>
+</dialog>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let state = null, sel = null, view = null, gridDirty = false;
+
+const fmt = (ms) => { if (ms == null) return '--'; const s = ms/1000, m = Math.floor(s/60); const r = (s - m*60).toFixed(3); return m ? `${m}:${r.padStart(6,'0')}` : r; };
+const clockFmt = (ms) => { if (ms == null) return '--:--'; const t = Math.max(0, Math.ceil(ms/1000)); return `${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`; };
+const hhmm = (t) => t ? new Date(t).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '';
+const TYPES = { treino:'Treino', classificacao:'Tomada de tempo', corrida:'Corrida' };
+const STATES = { preparando:'Preparando', em_andamento:'Em andamento', bandeira_final:'Quadriculada', encerrada:'Encerrada', cancelada:'Cancelada' };
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { headers: {'content-type':'application/json'}, ...opts, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) { alert(data.error || 'Erro'); throw new Error(data.error); }
+  return data;
+}
+
+function connect() {
+  const es = new EventSource('/api/events');
+  es.addEventListener('state', (e) => { state = JSON.parse(e.data); render(); });
+  es.addEventListener('passing', () => {});
+  es.onerror = () => { $('dec').className = 'pill bad'; $('dec').textContent = 'Sem conexão com o serviço'; };
+}
+
+async function render() {
+  const d = state.decoder;
+  const decEl = $('dec');
+  if (d.healthy) { decEl.className = 'pill ok'; decEl.textContent = `Decoder OK${d.simulated ? ' (SIMULADOR)' : ''}`; }
+  else if (d.connected) { decEl.className = 'pill warn'; decEl.textContent = 'Decoder sem sinal'; }
+  else { decEl.className = 'pill bad'; decEl.textContent = 'DECODER DESCONECTADO'; }
+  decEl.title = `${d.host}:${d.port} ${d.lastError || ''}`;
+  $('clock').textContent = new Date(state.now).toLocaleTimeString('pt-BR');
+
+  $('list').innerHTML = state.sessions.map(s => `
+    <div class="item ${s.id === sel ? 'sel' : ''}" onclick="pick('${s.id}')">
+      <span class="st st-${s.state}">${STATES[s.state]}</span> <b>${esc(s.name)}</b>
+      <small>${TYPES[s.type]} · ${s.competitors} pilotos · ${hhmm(s.startedAt || s.createdAt)}</small>
+    </div>`).join('') || '<div class="muted">—</div>';
+
+  $('feed').innerHTML = state.recentPassings.map(p => {
+    const unk = p.result === 'transponder-desconhecido';
+    return `<div class="${unk ? 'unk' : ''}">
+      <span>${new Date(p.wallMs).toLocaleTimeString('pt-BR')}</span>
+      <b>${p.kart ? 'Kart ' + esc(p.kart) : 'T' + p.transponder}</b>
+      ${unk ? `<button style="padding:2px 8px" onclick="openMap(${p.transponder})">ligar a kart</button>` : `<span class="muted">${p.result === 'counted' ? '' : p.result === 'sem-bateria' ? 'sem bateria' : p.result.replace('ignored-','ignorada ')}</span>`}
+      <span class="lap">${p.lapMs ? fmt(p.lapMs) : ''}</span></div>`;
+  }).join('') || '<div class="muted">Aguardando passagens…</div>';
+
+  if (!sel || (state.runningId && sel !== state.runningId && view?.state !== 'preparando' && !pinned)) sel = state.runningId || state.focus?.id || null;
+  if (!sel) { $('empty').hidden = false; $('sess').hidden = true; return; }
+  view = (state.focus && state.focus.id === sel) ? state.focus : await api(`/api/sessions/${sel}`).catch(() => null);
+  if (!view) { sel = null; return; }
+  renderSession();
+}
+let pinned = false, lastShown = '';
+function pick(id) { sel = id; pinned = true; gridDirty = false; render(); }
+
+function renderSession() {
+  const v = view;
+  $('empty').hidden = true; $('sess').hidden = false;
+  $('sName').textContent = v.name;
+  $('sState').className = 'st st-' + v.state; $('sState').textContent = STATES[v.state];
+  $('sType').textContent = `${TYPES[v.type]} · ${v.maxLaps ? v.maxLaps + ' voltas' : (v.durationMs/60000) + ' min'}`;
+  $('sTimer').textContent = v.state === 'preparando' ? clockFmt(v.durationMs) : v.state === 'em_andamento' ? clockFmt(v.remainingMs) : v.state === 'bandeira_final' ? '🏁' : clockFmt(v.elapsedMs);
+  const prep = v.state === 'preparando', run = v.state === 'em_andamento', fin = v.state === 'bandeira_final';
+  $('bStart').disabled = !prep; $('bPlus').disabled = !run; $('bCheck').disabled = !run;
+  $('bClose').disabled = !(run || fin); $('bCancel').disabled = !(prep || run);
+  $('gridBox').hidden = !(prep || run);
+  if (lastShown !== v.id + v.state) { $('gridBox').open = prep; lastShown = v.id + v.state; }
+  if (!gridDirty) renderGrid(v.competitors);
+
+  const leaderBest = Math.min(...v.standings.filter(r => r.bestLapMs).map(r => r.bestLapMs));
+  $('stand').innerHTML = v.standings.map(r => `
+    <tr class="${r.finished ? 'fin' : ''}" onclick="showLaps('${esc(r.kart)}')" style="cursor:pointer">
+      <td class="pos">${r.position}</td><td class="kart">${esc(r.kart)}</td>
+      <td>${esc(r.name)}${r.autoAdded ? ' <span class="muted">(fora do grid)</span>' : ''}</td>
+      <td class="num">${r.laps}</td><td class="num">${fmt(r.lastLapMs)}</td>
+      <td class="num ${r.bestLapMs === leaderBest ? 'best' : ''}">${fmt(r.bestLapMs)}</td>
+      <td class="num">${r.position === 1 ? '' : r.gapLaps ? '+' + r.gapLaps + (r.gapLaps > 1 ? ' voltas' : ' volta') : r.gapMs != null ? '+' + fmt(r.gapMs) : ''}</td>
+    </tr>`).join('') || '<tr><td colspan="7" class="muted">Sem passagens ainda.</td></tr>';
+}
+
+function renderGrid(list) {
+  $('gridRows').innerHTML = '';
+  list.forEach(c => addRow(c.kart, c.name, true));
+  if (!list.length) addRow('', '', true);
+}
+function addRow(kart = '', name = '', silent) {
+  const div = document.createElement('div'); div.className = 'grid-row';
+  div.innerHTML = `<input placeholder="Kart" value="${esc(kart)}"><input placeholder="Nome do piloto" value="${esc(name)}"><button title="remover" onclick="this.parentNode.remove();gridDirty=true">✕</button>`;
+  div.querySelectorAll('input').forEach(i => i.addEventListener('input', () => gridDirty = true));
+  $('gridRows').appendChild(div);
+  if (!silent) { gridDirty = true; div.querySelector('input').focus(); }
+}
+function gridValue() {
+  return [...$('gridRows').children].map(r => { const [k, n] = r.querySelectorAll('input'); return { kart: k.value.trim(), name: n.value.trim() }; }).filter(c => c.kart || c.name);
+}
+async function saveGrid() { await api(`/api/sessions/${sel}`, { method:'PATCH', body:{ competitors: gridValue() } }); gridDirty = false; }
+function applyPaste() {
+  $('pasteTxt').value.split(/\n/).map(l => l.trim()).filter(Boolean).forEach(l => {
+    const m = l.match(/^#?(\w+)[\s;,\t-]+(.+)$/); if (m) addRow(m[1], m[2]); else addRow(l, '');
+  });
+  $('pasteTxt').value = ''; pasteDlg.close();
+}
+
+async function act(action, confirmMsg) {
+  if (confirmMsg && !confirm(confirmMsg)) return;
+  if (action === 'start') {
+    const semKart = gridValue().filter(c => !c.kart);
+    if (semKart.length && !confirm(`${semKart.length} piloto(s) sem número de kart: ${semKart.map(c => c.name).join(', ')}.\nLargar mesmo assim? (as voltas deles entram como "Kart N")`)) return;
+  }
+  if (action === 'start' && gridDirty) await saveGrid();
+  await api(`/api/sessions/${sel}/${action}`, { method:'POST' });
+  pinned = false;
+}
+async function plusMin() { await api(`/api/sessions/${sel}`, { method:'PATCH', body:{ durationMin: view.durationMs/60000 + 1 } }); }
+
+function typeDefaults() { $('nDur').value = { treino:10, classificacao:5, corrida:20 }[$('nType').value]; }
+let agenda = [];
+async function openNew() {
+  $('nName').value = ''; $('nKarts').value = ''; $('nLaps').value = ''; $('nAgendaInfo').textContent = ''; typeDefaults(); newDlg.showModal();
+  const sel = $('nAgenda'); sel.innerHTML = '<option value="">— não puxar da agenda —</option>';
+  try {
+    agenda = await fetch('/api/agenda').then(r => r.ok ? r.json() : Promise.reject(r));
+    const now = new Date().toTimeString().slice(0,5);
+    agenda.forEach(b => sel.insertAdjacentHTML('beforeend', `<option value="${b.id}">${b.inicio.slice(11,16)} · ${esc(b.nome)} · ${b.inscritos} inscritos</option>`));
+    const next = agenda.filter(b => b.inscritos > 0).find(b => b.inicio.slice(11,16) >= now);
+    if (next) { sel.value = next.id; agendaPick(); }
+  } catch { $('nAgendaInfo').textContent = 'Agenda indisponível (servidor da recepção fora do ar?). Dá pra montar o grid na mão.'; }
+}
+function agendaPick() { const b = agenda.find(x => String(x.id) === $('nAgenda').value); if (b) { $('nName').value = b.nome; $('nAgendaInfo').textContent = `${b.inscritos} pilotos inscritos, ${b.pagos} pagos`; } }
+async function createSess() {
+  const karts = $('nKarts').value.split(/[\s,;]+/).filter(Boolean);
+  const agendaId = $('nAgenda').value;
+  const fromAgenda = agendaId ? await api('/api/agenda/' + agendaId + '/grid') : [];
+  const competitors = [...fromAgenda.map((g, i) => ({ kart: g.kart || karts[i] || '', name: g.nome, customerId: String(g.clienteId) })),
+                       ...karts.slice(fromAgenda.length).map(k => ({ kart:k, name:'' }))];
+  // bateria da agenda: monta as provas do produto (ex.: Tomada de Tempo 5 min + Corrida 20 min)
+  const programa = agendaId ? await api('/api/agenda/' + agendaId + '/programa').catch(() => []) : [];
+  let primeira = null;
+  if (programa.length && confirm(`Montar as ${programa.length} prova(s) do produto?\n` + programa.map(p => `• ${p.nome} (${p.finalizacao === 'voltas' ? p.voltasMax + ' voltas' : p.tempoMin + ' min'})`).join('\n'))) {
+    for (const p of programa) {
+      const s = await api('/api/sessions', { method:'POST', body:{
+        type: ['treino', 'classificacao', 'corrida'].includes(p.tipo) ? p.tipo : 'corrida',
+        name: `${$('nName').value || 'Bateria'} · ${p.nome}`, durationMin: p.finalizacao === 'voltas' ? 0 : Number(p.tempoMin || 0),
+        maxLaps: p.finalizacao === 'voltas' ? Number(p.voltasMax || 0) || null : null, minLapSec: p.voltaMinimaSeg ?? 5, competitors } });
+      primeira ??= s;
+    }
+  } else {
+    primeira = await api('/api/sessions', { method:'POST', body:{
+      type: $('nType').value, name: $('nName').value, durationMin: Number($('nDur').value), maxLaps: Number($('nLaps').value) || null, competitors } });
+  }
+  newDlg.close(); sel = primeira.id; pinned = true; gridDirty = false;
+}
+
+async function showLaps(kart) {
+  const all = await api(`/api/sessions/${sel}/laps`);
+  const c = all.find(x => x.kart === kart);
+  $('lapsTitle').textContent = `Kart ${kart} · ${c?.name || ''}`;
+  $('lapsBody').innerHTML = (c?.laps || []).map(l =>
+    `<span class="${l.invalid ? 'inv' : ''}" onclick="toggleLap('${esc(kart)}', ${l.lap})">V${l.lap} ${fmt(l.lapMs)}</span>`).join('') || '<span class="muted">Nenhuma volta completa.</span>';
+  if (!lapsDlg.open) lapsDlg.showModal();
+}
+async function toggleLap(kart, lap) {
+  await api(`/api/sessions/${sel}/laps/invalidate`, { method:'POST', body:{ kart, lap } });
+  showLaps(kart);
+}
+function openMap(raw) { $('mapRaw').textContent = raw; $('mapKart').value = ''; mapDlg.showModal(); $('mapKart').focus(); }
+async function saveMap() { await api('/api/transponders', { method:'PUT', body:{ raw: $('mapRaw').textContent, kart: $('mapKart').value } }); mapDlg.close(); }
+
+setInterval(() => { if (state) $('clock').textContent = new Date().toLocaleTimeString('pt-BR'); }, 1000);
+connect();
+</script>
+</body>
+</html>

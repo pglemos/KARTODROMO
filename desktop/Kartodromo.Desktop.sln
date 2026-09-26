@@ -1,0 +1,48 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{147AF6D6-23CB-4177-AFB9-3220B582481D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kartodromo.Comum", "src\Kartodromo.Comum\Kartodromo.Comum.csproj", "{AF667494-1080-4AF1-8DE5-5354C87F6A70}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kartodromo.Recepcao", "src\Kartodromo.Recepcao\Kartodromo.Recepcao.csproj", "{E4330FF9-74E4-4B61-BA9B-D5354A5B57D7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kartodromo.Autoatendimento", "src\Kartodromo.Autoatendimento\Kartodromo.Autoatendimento.csproj", "{743746FF-9DC4-443A-9C2C-9308BFD7F68D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kartodromo.Cronometragem", "src\Kartodromo.Cronometragem\Kartodromo.Cronometragem.csproj", "{A638016C-CCE6-4276-A84F-E1D427A0D0AF}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{AF667494-1080-4AF1-8DE5-5354C87F6A70}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AF667494-1080-4AF1-8DE5-5354C87F6A70}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AF667494-1080-4AF1-8DE5-5354C87F6A70}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AF667494-1080-4AF1-8DE5-5354C87F6A70}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E4330FF9-74E4-4B61-BA9B-D5354A5B57D7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E4330FF9-74E4-4B61-BA9B-D5354A5B57D7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E4330FF9-74E4-4B61-BA9B-D5354A5B57D7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E4330FF9-74E4-4B61-BA9B-D5354A5B57D7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{743746FF-9DC4-443A-9C2C-9308BFD7F68D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{743746FF-9DC4-443A-9C2C-9308BFD7F68D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{743746FF-9DC4-443A-9C2C-9308BFD7F68D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{743746FF-9DC4-443A-9C2C-9308BFD7F68D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A638016C-CCE6-4276-A84F-E1D427A0D0AF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A638016C-CCE6-4276-A84F-E1D427A0D0AF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A638016C-CCE6-4276-A84F-E1D427A0D0AF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A638016C-CCE6-4276-A84F-E1D427A0D0AF}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{AF667494-1080-4AF1-8DE5-5354C87F6A70} = {147AF6D6-23CB-4177-AFB9-3220B582481D}
+		{E4330FF9-74E4-4B61-BA9B-D5354A5B57D7} = {147AF6D6-23CB-4177-AFB9-3220B582481D}
+		{743746FF-9DC4-443A-9C2C-9308BFD7F68D} = {147AF6D6-23CB-4177-AFB9-3220B582481D}
+		{A638016C-CCE6-4276-A84F-E1D427A0D0AF} = {147AF6D6-23CB-4177-AFB9-3220B582481D}
+	EndGlobalSection
+EndGlobal

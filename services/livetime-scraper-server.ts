@@ -739,6 +739,19 @@ const server = http.createServer((request, response) => {
     return;
   }
 
+  // Cronometragem propria (services/timing-server.ts) substitui a WebTV do LapTime, que foi
+  // desinstalado em 2026-09-23. Com a variavel setada, o site/telao/TB50 leem dela.
+  const timingSnapshotUrl = process.env.TIMING_SNAPSHOT_URL;
+  if (url.pathname === '/api/livetime-snapshot' && timingSnapshotUrl) {
+    void fetch(timingSnapshotUrl, { signal: AbortSignal.timeout(4000) })
+      .then((r) => r.json())
+      .then((snapshot) => sendJson(response, 200, snapshot))
+      .catch((error: Error) =>
+        sendJson(response, 200, { status: 'error', source: 'sql', updatedAt: new Date().toISOString(), message: `Cronometragem indisponivel: ${error.message}`, drivers: [] }),
+      );
+    return;
+  }
+
   if (url.pathname === '/api/livetime-snapshot') {
     // Regras de pit stop podem ser sobrepostas via query (?rules=<JSON>) — vêm do
     // formato configurado no admin (formatos_corrida). Sem query, usa o padrão.

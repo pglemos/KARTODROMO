@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Autoatendimento</title>
+<style>
+  /* visual do LapTime Autoatendimento: couro preto, cartao com borda vermelha, fonte condensada */
+  :root { --red:#e2393f; --red2:#b82b30; --card:#17191c; --field:#2b2e33; --fb:#4b4f55; --txt:#e4e4e4; --mut:#c9c9c9; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; height:100%; overflow:hidden; user-select:none; color:var(--txt);
+    font-family:"Bahnschrift SemiCondensed", "Bahnschrift", "Barlow Condensed", "Arial Narrow", sans-serif; font-size:17px;
+    background:#0a0a0a radial-gradient(ellipse at 50% 40%, #1b1b1b 0%, #0b0b0b 70%); }
+  body::before { content:""; position:fixed; inset:0; opacity:.55; pointer-events:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+  .wrap { position:relative; height:100%; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .card { position:relative; width:760px; max-width:100%; max-height:100%; overflow:auto; background:var(--card); border:3px solid var(--red); border-radius:24px; padding:34px 42px 32px; box-shadow:0 20px 60px rgba(0,0,0,.6); }
+  .card.wide { width:1000px; } .card.mid { width:800px; }
+  .head { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; margin-bottom:22px; }
+  h1 { margin:0; font-weight:300; font-size:44px; color:#d6d6d6; letter-spacing:.2px; }
+  .sub { color:var(--mut); margin-top:4px; font-size:17px; }
+  .logo { text-align:right; } .logo img { height:52px; display:block; } .logo small { color:#aaa; font-size:12px; }
+  label.l { display:block; color:var(--mut); font-size:16px; margin:0 0 6px 16px; }
+  input.t, select.t { width:100%; height:46px; background:var(--field); border:2px solid var(--fb); border-radius:10px; color:var(--txt); font:inherit; font-size:17px; padding:0 12px; outline:none; }
+  input.t:focus, select.t:focus { border-color:#8b8f95; }
+  select.t { appearance:none; background-image:linear-gradient(45deg, transparent 50%, #aaa 50%), linear-gradient(135deg, #aaa 50%, transparent 50%); background-position:calc(100% - 20px) 20px, calc(100% - 14px) 20px; background-size:6px 6px; background-repeat:no-repeat; }
+  .grid { display:grid; grid-template-columns: repeat(4, 1fr); gap:10px 12px; }
+  .row { display:flex; align-items:center; gap:14px; }
+  .actions { display:flex; justify-content:flex-end; align-items:center; gap:16px; margin-top:26px; }
+  .actions .grow { flex:1; }
+  button.b { font:inherit; font-size:18px; height:46px; min-width:130px; padding:0 34px; border-radius:26px; cursor:pointer; color:#e8e8e8; background:transparent; border:2px solid var(--red); }
+  button.b.pri { background:var(--red); border-color:var(--red); color:#fff; }
+  button.b:active { transform:translateY(1px); } button.b:disabled { opacity:.5; }
+  .ck { display:inline-flex; align-items:center; gap:10px; cursor:pointer; color:#dcdcdc; font-size:17px; }
+  .ck input { appearance:none; width:22px; height:22px; border:2px solid #d0d0d0; border-radius:5px; margin:0; display:inline-grid; place-content:center; background:transparent; }
+  .ck input:checked { background:var(--red); border-color:var(--red); }
+  .ck input:checked::after { content:"✓"; color:#fff; font-size:15px; line-height:1; }
+  .ck a { color:#f0e68c; text-decoration:none; }
+  .list { background:#000; border-radius:18px; padding:8px 16px; max-height:52vh; overflow:auto; }
+  .opt { display:flex; align-items:center; gap:22px; padding:14px 4px; border-bottom:1px solid #4d4d4d; cursor:pointer; }
+  .opt:last-child { border-bottom:0; }
+  .opt .i { flex:1; line-height:1.3; } .opt .v { color:#dcdcdc; }
+  .opt input { pointer-events:none; }
+  .msg p { font-size:20px; margin:0 0 14px; color:#e0e0e0; } .hl { color:#f0e68c; }
+  .busy { position:fixed; inset:0; z-index:40; cursor:progress; }
+  /* caixa "Alerta" igual ao WinUI do LapTime */
+  .alert-back { position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.35); }
+  .alert { width:318px; background:#fff; color:#1b1b1b; border-radius:8px; overflow:hidden; font-family:"Segoe UI", sans-serif; box-shadow:0 12px 40px rgba(0,0,0,.5); }
+  .alert h3 { margin:0; padding:26px 24px 8px; font-size:20px; font-weight:600; }
+  .alert p { margin:0; padding:0 24px 26px; font-size:14px; }
+  .alert .f { background:#f3f3f3; border-top:1px solid #e5e5e5; padding:24px 24px; display:flex; justify-content:flex-end; }
+  .alert .f button { width:130px; height:32px; border:1px solid #ccc; border-radius:4px; background:#fbfbfb; font:14px "Segoe UI", sans-serif; }
+  .modal { position:fixed; inset:0; z-index:45; background:rgba(0,0,0,.7); display:flex; align-items:center; justify-content:center; padding:30px; }
+  .modal .card p { color:#d9d9d9; font-size:17px; line-height:1.45; }
+</style>
+</head>
+<body>
+<div class="wrap"><div class="card" id="card"></div></div>
+<iframe id="printer" title="impressão do termo" style="position:absolute;width:0;height:0;border:0;visibility:hidden"></iframe>
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const dig = (s) => String(s || '').replace(/\D/g, '');
+const CFG = { empresa: 'KARTODROMO INTERNACIONAL DE BETIM', mensagem: 'Seja bem-vindo(a)!', consultarCep: true, imprimirTermo: true, permitirMenorSemResponsavel: true };
+fetch('/api/totem/config').then((r) => r.json()).then((c) => { Object.assign(CFG, c); if (S && S.tela === 'ident') telaIdent(); }).catch(() => {});
+
+let S;
+function reset() { clearTimeout(S?.fim); S = { tela: 'ident', ident: '', menor: false, cliente: null, token: null, dependentes: [], participantes: [], eu: true, baterias: [], sel: [] }; telaIdent(); }
+
+// ---------- infraestrutura
+let busyN = 0;
+function busy(on) { busyN += on ? 1 : -1; let el = document.querySelector('.busy'); if (busyN > 0 && !el) document.body.insertAdjacentHTML('beforeend', '<div class="busy"></div>'); if (busyN <= 0 && el) el.remove(); }
+async function api(path, body) {
+  busy(true);
+  try {
+    const r = await fetch(path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || 'Não foi possível concluir. Procure a recepção.');
+    return d;
+  } catch (e) { throw e.message === 'Failed to fetch' ? new Error('Sem conexão com o servidor. Procure a recepção.') : e; }
+  finally { busy(false); }
+}
+function alerta(texto) {
+  return new Promise((ok) => {
+    document.body.insertAdjacentHTML('beforeend', `<div class="alert-back"><div class="alert"><h3>Alerta</h3><p>${esc(texto)}</p><div class="f"><button>OK</button></div></div></div>`);
+    const back = document.querySelector('.alert-back'); const b = back.querySelector('button'); b.focus();
+    b.onclick = () => { back.remove(); ok(); };
+  });
+}
+function cartao(classe, titulo, sub, corpo, acoes) {
+  const c = $('card');
+  c.className = 'card ' + (classe || '');
+  c.innerHTML = `<div class="head"><div><h1>${titulo}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</div>
+    <div class="logo"><img src="/ui/kib-logo.png" alt="Kartódromo Internacional de Betim"><small>autoatendimento</small></div></div>${corpo}${acoes ? `<div class="actions">${acoes}</div>` : ''}`;
+  c.scrollTop = 0;
+}
+
+// ---------- 1. identificacao
+function telaIdent() {
+  S.tela = 'ident';
+  cartao('', 'Autoatendimento', esc(CFG.mensagem), `
+    <label class="l" for="ident">CPF, RG, passaporte, ou e-mail</label><input class="t" id="ident" value="${esc(S.ident)}" autocomplete="off" spellcheck="false">
+    <div style="margin-top:18px"><label class="ck"><input type="checkbox" id="menor" ${S.menor ? 'checked' : ''}> Responsável pelo menor de idade</label></div>`,
+    `<button class="b pri" id="go">Próximo</button>`);
+  const i = $('ident'); i.focus();
+  i.onkeydown = (e) => { if (e.key === 'Enter') ident(); };
+  $('go').onclick = ident;
+}
+async function ident() {
+  S.ident = $('ident').value.trim(); S.menor = $('menor').checked;
+  if (S.ident.length < 5) return alerta('Informe o CPF, RG, passaporte ou e-mail.');
+  try {
+    const r = await api('/api/totem/identificar', { identificador: S.ident });
+    if (!r.cliente) return telaCadastro('novo');
+    if (r.cliente.bloqueado) return alerta('Seu cadastro precisa de atenção. Por favor, procure a recepção.');
+    S.cliente = r.cliente; S.token = r.token; S.dependentes = r.dependentes || [];
+    if (!r.cliente.lgpd || !r.cliente.temNascimento) return telaCadastro('completar');
+    posCliente();
+  } catch (e) { alerta(e.message); }
+}
+function posCliente() { if (S.menor) return telaMenores(); S.participantes = [{ id: S.cliente.id, token: S.token }]; telaBaterias(); }
+
+// ---------- 2. cadastro (novo / completar) e cadastro de menor
+const MASK = {
+  cpf: (v) => { const d = dig(v).slice(0, 11); return d.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2'); },
+  fone: (v) => { const d = dig(v).slice(0, 11); if (!d) return ''; if (d.length <= 2) return `(${d}`; if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`; if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`; return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`; },
+  data: (v) => { const d = dig(v).slice(0, 8); return d.length > 4 ? `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}` : d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d; },
+  cep: (v) => { const d = dig(v).slice(0, 8); return d.length > 5 ? `${d.slice(0, 5)}-${d.slice(5)}` : d; },
+  peso: (v) => v.replace(/[^\d,.]/g, '').slice(0, 5),
+};
+function mascara(id, kind) { const el = $(id); if (el) el.addEventListener('input', () => { el.value = MASK[kind](el.value); }); }
+const campo = (id, rotulo, extra = '') => `<div><label class="l" for="${id}">${rotulo}</label><input class="t" id="${id}" autocomplete="off" spellcheck="false" ${extra}></div>`;
+
+function telaCadastro(modo) {
+  S.tela = 'cadastro'; S.modo = modo;
+  const email = S.ident.includes('@') ? S.ident : '';
+  const docNum = S.ident.includes('@') ? '' : S.ident;
+  const tipoInicial = /^\d{11}$/.test(dig(docNum)) || !docNum ? 'CPF' : 'RG';
+  const completar = modo === 'completar';
+  cartao('wide', 'Autoatendimento', completar ? `Olá, ${esc(S.cliente.nome.split(' ')[0])}! Complete seu cadastro para continuar. Campos em branco continuam como estão.` : 'Registre-se para continuar.', `
+    <div class="grid">
+      <div><label class="l">Tipo de Registro</label><select class="t" id="fReg"><option>Pessoa Física</option><option>Pessoa Jurídica</option></select></div>
+      <div><label class="l">Tipo de Documento</label><select class="t" id="fTipo"><option ${tipoInicial === 'CPF' ? 'selected' : ''}>CPF</option><option ${tipoInicial === 'RG' ? 'selected' : ''}>RG</option><option value="PASSAPORTE">Passaporte</option></select></div>
+      ${campo('fDoc', `<span id="lDoc">${tipoInicial}</span>`, completar ? 'disabled placeholder="(já cadastrado)"' : '')}
+      ${campo('fNome', 'Nome Completo', completar ? `value="${esc(S.cliente.nome)}" disabled` : '')}
+      ${campo('fEmail', 'E-mail', `value="${esc(email)}" inputmode="email"`)}
+      ${campo('fFone', 'Número de Telefone', 'inputmode="numeric"')}
+      ${campo('fNasc', 'Data de Nascimento', 'inputmode="numeric" placeholder="DD/MM/AAAA"')}
+      ${campo('fPeso', 'Peso', 'inputmode="decimal"')}
+      ${campo('fCep', 'CEP', 'inputmode="numeric"')}
+      ${campo('fEnd', 'Endereço')}
+      ${campo('fBairro', 'Bairro')}
+      ${campo('fCidade', 'Cidade')}
+    </div>`,
+    `<label class="ck grow"><input type="checkbox" id="fLgpd"> Eu li e concordo com o&nbsp;<a href="#" id="lgpdLink">Termo de Consentimento para Tratamento de Dados Pessoais</a></label>
+     <button class="b" id="voltar">Voltar</button><button class="b pri" id="go">Próximo</button>`);
+  if (!completar && docNum) $('fDoc').value = tipoInicial === 'CPF' ? MASK.cpf(docNum) : docNum;
+  $('fTipo').onchange = () => { $('lDoc').textContent = $('fTipo').selectedOptions[0].textContent; if ($('fTipo').value === 'CPF') $('fDoc').value = MASK.cpf($('fDoc').value); };
+  $('fDoc').addEventListener('input', () => { if ($('fTipo').value === 'CPF') $('fDoc').value = MASK.cpf($('fDoc').value); });
+  mascara('fFone', 'fone'); mascara('fNasc', 'data'); mascara('fCep', 'cep'); mascara('fPeso', 'peso');
+  $('fCep').addEventListener('input', buscaCep);
+  $('lgpdLink').onclick = (e) => { e.preventDefault(); termoLgpd(); };
+  $('voltar').onclick = reset;
+  $('go').onclick = salvarCadastro;
+  (completar ? $('fEmail') : $('fDoc').value ? $('fNome') : $('fDoc')).focus();
+}
+async function buscaCep() {
+  const cep = dig($('fCep').value);
+  if (cep.length !== 8 || !CFG.consultarCep) return;
+  try {
+    const r = await (await fetch(`https://viacep.com.br/ws/${cep}/json/`)).json();
+    if (r.erro) return;
+    if (!$('fEnd').value) $('fEnd').value = r.logradouro || '';
+    if (!$('fBairro').value) $('fBairro').value = r.bairro || '';
+    if (!$('fCidade').value) $('fCidade').value = r.localidade || '';
+    S.uf = r.uf;
+  } catch { /* sem internet: segue manual */ }
+}
+function isoData(v) { const m = String(v || '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if (!m) return null; const d = new Date(`${m[3]}-${m[2]}-${m[1]}T12:00:00`); return Number.isNaN(d.getTime()) || d.getDate() !== Number(m[1]) || d.getFullYear() < 1900 || d > new Date() ? null : `${m[3]}-${m[2]}-${m[1]}`; }
+function cpfOk(v) { const c = dig(v); if (c.length !== 11 || /^(\d)\1{10}$/.test(c)) return false; const dv = (n) => { let s = 0; for (let i = 0; i < n; i++) s += Number(c[i]) * (n + 1 - i); const r = (s * 10) % 11; return r === 10 ? 0 : r; }; return dv(9) === Number(c[9]) && dv(10) === Number(c[10]); }
+async function salvarCadastro() {
+  const completar = S.modo === 'completar';
+  const nasc = $('fNasc').value.trim();
+  const dados = {
+    tipoDocumento: $('fTipo').value, documento: $('fDoc').value.trim(), nome: $('fNome').value.trim().replace(/\s+/g, ' '), email: $('fEmail').value.trim(),
+    telefone: $('fFone').value.trim(), nascimento: nasc ? isoData(nasc) : '', peso: $('fPeso').value.trim(), cep: $('fCep').value.trim(),
+    endereco: $('fEnd').value.trim(), bairro: $('fBairro').value.trim(), cidade: $('fCidade').value.trim(), estado: S.uf || '',
+  };
+  if (!completar) {
+    if (!dados.documento) return alerta('O documento é obrigatório.');
+    if (dados.tipoDocumento === 'CPF' && !cpfOk(dados.documento)) return alerta('CPF inválido.');
+    if (!dados.nome || dados.nome.split(' ').length < 2) return alerta('Informe o nome completo.');
+    if (dig(dados.telefone).length < 10) return alerta('O número de telefone é obrigatório.');
+  }
+  if (nasc && !dados.nascimento) return alerta('Data de nascimento inválida.');
+  if (!completar && !dados.nascimento) return alerta('A data de nascimento é obrigatória.');
+  if (completar && !S.cliente.temNascimento && !dados.nascimento) return alerta('A data de nascimento é obrigatória.');
+  if (dados.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(dados.email)) return alerta('E-mail inválido.');
+  if (!$('fLgpd').checked) return alerta('É necessário aceitar o Termo de Consentimento para Tratamento de Dados Pessoais.');
+  if (completar) { delete dados.documento; delete dados.nome; delete dados.tipoDocumento; }
+  try {
+    if (completar) {
+      await api('/api/totem/cadastro', { id: S.cliente.id, token: S.token, dados, lgpd: true });
+      S.cliente.lgpd = true; if (dados.nascimento) S.cliente.temNascimento = true;
+    } else {
+      const r = await api('/api/totem/cadastro', { dados, lgpd: true });
+      S.cliente = { id: r.id, nome: dados.nome, lgpd: true, temNascimento: true }; S.token = r.token; S.dependentes = [];
+    }
+    posCliente();
+  } catch (e) { alerta(e.message); }
+}
+function termoLgpd() {
+  document.body.insertAdjacentHTML('beforeend', `<div class="modal" id="lgpdM"><div class="card mid"><h1 style="font-size:32px;margin-bottom:10px">Termo de Consentimento para Tratamento de Dados Pessoais</h1>
+    <p>Ao se cadastrar, você autoriza o ${esc(CFG.empresa)} a tratar seus dados pessoais (nome, documento, contato, data de nascimento, peso e endereço) para identificar você nas baterias e corridas, emitir o termo de responsabilidade, registrar tempos e resultados, cumprir obrigações legais e entrar em contato sobre suas reservas.</p>
+    <p>Os dados ficam armazenados nos sistemas do kartódromo e não são vendidos a terceiros. Você pode pedir a qualquer momento, na recepção, acesso, correção ou exclusão dos seus dados, nos termos da Lei nº 13.709/2018 (LGPD).</p>
+    <div class="actions"><button class="b pri" onclick="document.getElementById('lgpdM').remove()">Fechar</button></div></div></div>`);
+}
+
+// ---------- 3. menores (responsavel pelo menor de idade)
+function telaMenores() {
+  S.tela = 'menores';
+  const deps = S.dependentes;
+  const marcados = new Set(S.participantes.filter((p) => p.id !== S.cliente.id).map((p) => p.id));
+  cartao('mid', 'Autoatendimento', 'Selecione os menores de idade que irão participar.', `
+    <div class="list">${deps.map((d) => `<div class="opt" data-id="${d.id}"><label class="ck"><input type="checkbox" ${marcados.has(d.id) ? 'checked' : ''}></label><div class="i">${esc(d.nome)}</div><div class="v">${d.nascimento ? d.nascimento.split('-').reverse().join('/') : ''}</div></div>`).join('') || '<div class="opt" style="cursor:default"><div class="i">Nenhum menor cadastrado no seu nome. Toque em "Cadastrar menor".</div></div>'}</div>
+    <div style="margin-top:16px"><label class="ck"><input type="checkbox" id="eu" ${S.eu && S.participantes.some((p) => p.id === S.cliente.id) ? 'checked' : ''}> Eu também vou participar</label></div>`,
+    `<button class="b" id="novoMenor">Cadastrar menor</button><span class="grow"></span><button class="b" id="voltar">Voltar</button><button class="b pri" id="go">Próximo</button>`);
+  document.querySelectorAll('.opt[data-id]').forEach((o) => (o.onclick = () => { const c = o.querySelector('input'); c.checked = !c.checked; }));
+  $('novoMenor').onclick = telaCadastroMenor;
+  $('voltar').onclick = reset;
+  $('go').onclick = () => {
+    const ids = [...document.querySelectorAll('.opt[data-id]')].filter((o) => o.querySelector('input').checked).map((o) => Number(o.dataset.id));
+    S.eu = $('eu').checked;
+    S.participantes = [...(S.eu ? [{ id: S.cliente.id, token: S.token }] : []), ...ids.map((id) => ({ id, token: S.dependentes.find((d) => d.id === id).token }))];
+    if (!S.participantes.length) return alerta('Selecione pelo menos um participante.');
+    telaBaterias();
+  };
+}
+function telaCadastroMenor() {
+  S.tela = 'menor';
+  cartao('wide', 'Autoatendimento', 'Cadastro do menor de idade.', `
+    <div class="grid">
+      ${campo('mNome', 'Nome Completo').replace('<div>', '<div style="grid-column:span 2">')}
+      ${campo('mNasc', 'Data de Nascimento', 'inputmode="numeric" placeholder="DD/MM/AAAA"')}
+      <div><label class="l">Tipo de Documento</label><select class="t" id="mTipo"><option>CPF</option><option>RG</option><option value="PASSAPORTE">Passaporte</option></select></div>
+      ${campo('mDoc', 'Documento (opcional)')}
+    </div>`,
+    `<button class="b" id="voltar">Voltar</button><button class="b pri" id="go">Salvar</button>`);
+  mascara('mNasc', 'data');
+  $('mDoc').addEventListener('input', () => { if ($('mTipo').value === 'CPF') $('mDoc').value = MASK.cpf($('mDoc').value); });
+  $('mNome').focus();
+  $('voltar').onclick = telaMenores;
+  $('go').onclick = async () => {
+    const nome = $('mNome').value.trim().replace(/\s+/g, ' ');
+    const nasc = isoData($('mNasc').value.trim());
+    if (!nome || nome.split(' ').length < 2) return alerta('Informe o nome completo do menor.');
+    if (!nasc) return alerta('Informe a data de nascimento (DD/MM/AAAA).');
+    const doc = $('mDoc').value.trim();
+    if (doc && $('mTipo').value === 'CPF' && !cpfOk(doc)) return alerta('CPF inválido.');
+    try {
+      const r = await api('/api/totem/cadastro', { dados: { nome, nascimento: nasc, tipoDocumento: $('mTipo').value, documento: doc }, lgpd: true, responsavelId: S.cliente.id, responsavelToken: S.token });
+      S.dependentes.push({ id: r.id, nome, nascimento: nasc, token: r.token });
+      S.participantes = S.participantes.filter((p) => p.id !== r.id).concat([{ id: r.id, token: r.token }]);
+      telaMenores();
+    } catch (e) { alerta(e.message); }
+  };
+}
+
+// ---------- 4. baterias (varias podem ser marcadas)
+async function telaBaterias() {
+  S.tela = 'baterias';
+  let lista = [];
+  try { lista = await api('/api/totem/baterias'); } catch (e) { return alerta(e.message); }
+  const n = S.participantes.length;
+  lista = lista.filter((b) => b.livres >= n);
+  S.baterias = lista;
+  cartao('mid', 'Autoatendimento', `Selecione pelo menos uma das baterias listadas abaixo.${n > 1 ? ` (${n} participantes)` : ''}`, `
+    <div class="list">${lista.map((b) => `<div class="opt" data-id="${b.id}"><label class="ck"><input type="checkbox" ${S.sel.includes(b.id) ? 'checked' : ''}></label>
+      <div class="i">${esc(b.nome)}<br>Inicia às ${b.inicio.slice(11, 16)}${b.tipoKart === 'super' ? ' · Super kart' : ''}</div><div class="v">Vagas: ${b.livres}</div></div>`).join('')
+      || '<div class="opt" style="cursor:default"><div class="i">Não há baterias com vagas disponíveis hoje. Por favor, procure a recepção.</div></div>'}</div>`,
+    `<button class="b" id="voltar">Voltar</button><button class="b pri" id="go">Próximo</button>`);
+  document.querySelectorAll('.opt[data-id]').forEach((o) => (o.onclick = () => { const c = o.querySelector('input'); c.checked = !c.checked; }));
+  $('voltar').onclick = () => (S.menor ? telaMenores() : reset());
+  $('go').onclick = async () => {
+    S.sel = [...document.querySelectorAll('.opt[data-id]')].filter((o) => o.querySelector('input').checked).map((o) => Number(o.dataset.id));
+    if (!S.sel.length) return alerta('Selecione pelo menos uma bateria.');
+    try {
+      const r = await api('/api/totem/inscrever', { bateriaIds: S.sel, participantes: S.participantes });
+      if (r.termoUrl) $('printer').src = r.termoUrl; // imprime direto na termica do totem (--kiosk-printing)
+      telaSucesso(r.inicio ? r.inicio.slice(11, 16) : '', r.inscricoes.length);
+    } catch (e) { alerta(e.message); }
+  };
+}
+
+// ---------- 5. sucesso
+function telaSucesso(hora, n) {
+  S.tela = 'fim';
+  cartao('', 'Reserva realizada com sucesso!', '', `<div class="msg">
+    <p>Dirija-se até a recepção para concluir a reserva e assinar ${n > 1 ? 'os termos' : 'seu termo'} de responsabilidade</p>
+    <p>Sua bateria começa às <span class="hl">${esc(hora)}</span></p>
+    <p>Atenção às informações passadas no briefing e divirta-se!</p></div>`, `<button class="b pri" id="ok">Concluir</button>`);
+  $('ok').onclick = reset;
+  S.fim = setTimeout(reset, 15000);
+}
+
+// ---------- volta pro inicio se ninguem mexer (90s)
+let idle;
+const poke = () => { clearTimeout(idle); idle = setTimeout(() => { if (S.tela !== 'ident' || S.ident) { document.querySelectorAll('.alert-back,.modal').forEach((x) => x.remove()); reset(); } }, 90000); };
+['pointerdown', 'keydown'].forEach((ev) => document.addEventListener(ev, poke, true));
+document.addEventListener('contextmenu', (e) => e.preventDefault());
+reset(); poke();
+</script>
+</body>
+</html>
