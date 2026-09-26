@@ -58,8 +58,19 @@ describe('termo de responsabilidade em bobina', () => {
     });
 
     expect((html.match(/<section class="page">/g) ?? []).length).toBe(2);
-    expect(html.match(/Nome: ________________________/g)?.length).toBe(4);
+    // só o Nome do participante: o rodapé Nome/Tel./Doc./E-mail do responsável saiu
+    expect(html.match(/Nome: ________________________/g)?.length).toBe(2);
     expect(html).toContain('Nascimento: ____/____/________');
     expect(html).toContain('Doc.: ________________________');
+    expect(html).not.toContain('signature-grid');
+  });
+
+  it('traz as assinaturas do participante e do responsável legal, como no LapTime', () => {
+    const html = renderTermoResponsabilidade({ empresa, participantes: [participante], impressoEm });
+
+    expect(html).toContain('PARTICIPANTE PILOTO');
+    expect(html).toContain('RESPONSÁVEL LEGAL');
+    expect(html.indexOf('PARTICIPANTE PILOTO')).toBeGreaterThan(html.indexOf('Declaro ter lido'));
+    expect(html).not.toMatch(/position:absolute/);
   });
 });
