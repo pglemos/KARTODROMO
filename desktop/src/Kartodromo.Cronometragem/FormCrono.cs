@@ -45,7 +45,8 @@ public partial class FormCrono : Form
     readonly Label _lPilotosTitulo = new() { Dock = DockStyle.Top, Height = 34, Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = Color.FromArgb(200, 16, 46), TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(4, 0, 0, 0) };
     readonly TabControl _abas = new() { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9F) };
     readonly StatusStrip _status = new() { SizingGrip = false };
-    readonly ToolStripStatusLabel _sHora = new(), _sData = new(), _sServidor = new(), _sDecoder = new(), _sTransp = new() { IsLink = true, ForeColor = Color.Red }, _sTv = new() { IsLink = true };
+    readonly ToolStripStatusLabel _sHora = new(), _sData = new(), _sServidor = new(), _sDecoder = new(), _sTransp = new() { IsLink = true, ForeColor = Color.Red }, _sTv = new() { IsLink = true }, _sPainel = new() { IsLink = true };
+    readonly PainelLed _painel = new();
 
     static Label Info() => new() { AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
 
@@ -78,7 +79,8 @@ public partial class FormCrono : Form
             else if (_abas.SelectedIndex == 1) { MontarArvore(); }
         };
 
-        _status.Items.AddRange([_sHora, Sep(), _sData, Sep(), _sServidor, Sep(), _sDecoder, Sep(), _sTv, Sep(), _sTransp]);
+        _status.Items.AddRange([_sHora, Sep(), _sData, Sep(), _sServidor, Sep(), _sDecoder, Sep(), _sTv, Sep(), _sPainel, Sep(), _sTransp]);
+        _sPainel.Click += (_, _) => ConfigurarPainel();
         _sTv.Text = "TV";
         _sTv.Click += (_, _) => AbrirTV();
         _sTransp.Click += (_, _) => Transponders();
@@ -110,7 +112,7 @@ public partial class FormCrono : Form
             _leitura.Start();
             _relogio.Start();
         };
-        FormClosed += (_, _) => { _tv?.Close(); };
+        FormClosed += (_, _) => { _tv?.Close(); _painel.Dispose(); };
     }
 
     void DesenharAba(DrawItemEventArgs e)
@@ -153,6 +155,7 @@ public partial class FormCrono : Form
         var ferr = new ToolStripMenuItem("Ferramentas");
         ferr.DropDownItems.Add("Parâmetros do sistema", null, (_, _) => JanelaCadastro("ParamSistema"));
         ferr.DropDownItems.Add("Parâmetros da cronometragem", null, (_, _) => JanelaCadastro("ParamCrono"));
+        ferr.DropDownItems.Add("Painel de LED (porta serial)", null, (_, _) => ConfigurarPainel());
         ferr.DropDownItems.Add(new ToolStripSeparator());
         ferr.DropDownItems.Add("Guardar backup de eventos", null, (_, _) => JanelaCadastro("Backup"));
         ferr.DropDownItems.Add("Guardar backup por data", null, (_, _) => FazerBackup());
@@ -553,6 +556,24 @@ public partial class FormCrono : Form
         _ = Atualizar();
     }
 
+    void ConfigurarPainel()
+    {
+        var portas = System.IO.Ports.SerialPort.GetPortNames().OrderBy(p => p).ToArray();
+        var atual = _painel.Porta.Length > 0 ? _painel.Porta : "desligado";
+        using var d = new DialogoDados("Painel de LED", $"Painel antigo de posições 1 a 10 (9600 8N1, protocolo do LapTime). Portas neste computador: {(portas.Length == 0 ? "nenhuma" : string.Join(", ", portas))}. Escreva \"desligado\" para não usar.",
+            new[] { ("Porta serial (ex.: COM3)", "porta", atual) }, new Size(640, 300));
+        if (d.ShowDialog(this) != DialogResult.OK || !d.Confirmado) return;
+        var porta = d.Valor("porta").ToUpperInvariant();
+        try
+        {
+            if (porta is "" or "DESLIGADO") { if (File.Exists(PainelLed.ArquivoConfig)) File.Delete(PainelLed.ArquivoConfig); }
+            else PainelLed.SalvarConfig(porta);
+            _painel.Dispose();
+            _painel.LerConfig();
+        }
+        catch (Exception e) { Msg.Erro(this, "Não foi possível salvar a configuração do painel: " + e.Message); }
+    }
+
     async Task Atualizar()
     {
         if (_ocupado) return;
@@ -598,6 +619,11 @@ public partial class FormCrono : Form
         _lRuido.Text = dec?.S("noise") ?? "---";
         _sTv.ForeColor = _tv is { IsDisposed: false } ? Color.FromArgb(16, 124, 16) : Color.Red;
         _sTv.Font = _sDecoder.Font;
+        // painel de LED antigo (serial) segue a bateria em andamento, como no LapTime
+        if (_autoteste == null) _painel.Atualizar(_state?["focus"] as JsonObject);
+        _sPainel.Text = "PAINEL LED: " + (_painel.Ativo ? _painel.Situacao.ToUpperInvariant() : "DESLIGADO");
+        _sPainel.ForeColor = !_painel.Ativo ? TemaCrono.Secundario : _painel.Ok ? TemaCrono.Verde : Color.Red;
+        _sPainel.Font = _sDecoder.Font;
 
         // transponder sem kart nos ultimos 2 minutos
         var agora = DateTimeOffset.Now.ToUnixTimeMilliseconds();
@@ -878,6 +904,7 @@ public partial class FormCrono : Form
                 using var f = new DialogoDados(nome, "Cadastro · Cronometragem", campos, new Size(820, 500));
                 f.Show(this); await Task.Delay(150); Foto(f, nome); f.Close();
             }
+            if (_state?["focus"] is JsonObject foco) File.WriteAllText(Path.Combine(_autoteste, "painel-led.txt"), PainelLed.Montar(foco, 10, DateTime.Now, out _));
             File.WriteAllText(Path.Combine(_autoteste, "ok.txt"), "ok");
         }
         catch (Exception e) { File.WriteAllText(Path.Combine(_autoteste, "erro.txt"), e.ToString()); }
