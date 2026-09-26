@@ -153,6 +153,112 @@ describe('race-engine', () => {
     expect(cs[1]).toMatchObject({ gapLaps: 1 });
   });
 
+  it('corrida: kart que cruza a linha de chegada na frente na mesma volta é líder/P1 mesmo se kart atrás tiver tempo total menor', () => {
+    const s = createSession({
+      id: 'c1',
+      name: 'Corrida',
+      type: 'corrida',
+      durationMin: 20,
+      now: 0,
+      competitors: [{ kart: '70', name: 'Piloto 70' }, { kart: '63', name: 'Piloto 63' }],
+    });
+    startSession(s, 1_000);
+
+    // Kart 70 larga na frente (abre a volta no decoder em 10.000 ms)
+    applyPassing(s, { kart: '70', decoderTimeMs: 10_000, wallMs: 10_000 });
+    // Kart 63 larga atrás (abre a volta no decoder em 12.000 ms)
+    applyPassing(s, { kart: '63', decoderTimeMs: 12_000, wallMs: 12_000 });
+
+    // Fim da volta 1:
+    // Kart 70 cruza a linha na frente em 75.000 ms (tempo de volta 65s)
+    applyPassing(s, { kart: '70', decoderTimeMs: 75_000, wallMs: 75_000 });
+    // Kart 63 cruza a linha 1 segundo depois em 76.000 ms (tempo de volta 64s)
+    applyPassing(s, { kart: '63', decoderTimeMs: 76_000, wallMs: 76_000 });
+
+    // Na pista, Kart 70 cruzou antes de Kart 63. Kart 70 DEVE ser P1 e Kart 63 P2!
+    const standings = computeStandings(s);
+    expect(standings.map((r) => r.kart)).toEqual(['70', '63']);
+    expect(standings[0].position).toBe(1);
+    expect(standings[1].position).toBe(2);
+    expect(standings[1].gapMs).toBe(1_000);
+  });
+
+  it('corrida: ultrapassagem na pista inverte as posições imediatamente e atualiza o gap real', () => {
+    const s = createSession({
+      id: 'c2',
+      name: 'Corrida Overtake',
+      type: 'corrida',
+      durationMin: 20,
+      now: 0,
+      competitors: [{ kart: 'A', name: 'Piloto A' }, { kart: 'B', name: 'Piloto B' }],
+    });
+    startSession(s, 1_000);
+
+    applyPassing(s, { kart: 'A', decoderTimeMs: 10_000, wallMs: 10_000 });
+    applyPassing(s, { kart: 'B', decoderTimeMs: 11_000, wallMs: 11_000 });
+
+    // Volta 1: A lidera e cruza antes de B
+    applyPassing(s, { kart: 'A', decoderTimeMs: 70_000, wallMs: 70_000 });
+    applyPassing(s, { kart: 'B', decoderTimeMs: 72_000, wallMs: 72_000 });
+    expect(computeStandings(s).map((r) => r.kart)).toEqual(['A', 'B']);
+
+    // Volta 2: B ultrapassa A na pista e cruza antes!
+    applyPassing(s, { kart: 'B', decoderTimeMs: 130_000, wallMs: 130_000 });
+    applyPassing(s, { kart: 'A', decoderTimeMs: 132_500, wallMs: 132_500 });
+    const st2 = computeStandings(s);
+    expect(st2.map((r) => r.kart)).toEqual(['B', 'A']);
+    expect(st2[0].position).toBe(1);
+    expect(st2[1].position).toBe(2);
+    expect(st2[1].gapMs).toBe(2_500);
+  });
+
+  it('classificação: desempate por 2ª melhor volta, 3ª melhor volta e horário de conquista', () => {
+    const s = createSession({
+      id: 'q1',
+      name: 'Classificacao',
+      type: 'classificacao',
+      durationMin: 10,
+      now: 0,
+      competitors: [{ kart: 'A', name: 'Piloto A' }, { kart: 'B', name: 'Piloto B' }],
+    });
+    startSession(s, 1_000);
+
+    applyPassing(s, { kart: 'A', decoderTimeMs: 0, wallMs: 10_000 });
+    applyPassing(s, { kart: 'B', decoderTimeMs: 0, wallMs: 10_000 });
+
+    // Volta 1: ambos cravam exatamente 60.000s
+    applyPassing(s, { kart: 'A', decoderTimeMs: 60_000, wallMs: 70_000 });
+    applyPassing(s, { kart: 'B', decoderTimeMs: 60_000, wallMs: 70_000 });
+
+    // Volta 2: A faz 62.000s, B faz 61.000s (2ª melhor volta de B é melhor)
+    applyPassing(s, { kart: 'A', decoderTimeMs: 122_000, wallMs: 132_000 });
+    applyPassing(s, { kart: 'B', decoderTimeMs: 121_000, wallMs: 131_000 });
+
+    const st = computeStandings(s);
+    expect(st.map((r) => r.kart)).toEqual(['B', 'A']);
+    expect(st[0].position).toBe(1);
+    expect(st[1].position).toBe(2);
+    expect(st[1].gapMs).toBe(0); // mesma melhor volta
+  });
+
+  it('ordem de grid preservada para karts que ainda não abriram volta', () => {
+    const s = createSession({
+      id: 's1',
+      name: 'Grid Test',
+      type: 'corrida',
+      durationMin: 15,
+      now: 1_000,
+      competitors: [
+        { kart: '10', name: 'Piloto 1' },
+        { kart: '20', name: 'Piloto 2' },
+        { kart: '30', name: 'Piloto 3' },
+      ],
+    });
+    s.state = 'em_andamento';
+    const st = computeStandings(s);
+    expect(st.map((r) => r.kart)).toEqual(['10', '20', '30']);
+  });
+
   it('quadriculada por tempo: cada kart termina na proxima passagem e a bateria encerra', () => {
     const s = race('corrida', 1);
     applyPassing(s, { kart: '4', decoderTimeMs: 0, wallMs: 5_000 });

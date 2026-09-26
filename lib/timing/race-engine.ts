@@ -155,7 +155,7 @@ export function updateSessionParameters(
   if (maxLaps !== undefined) session.maxLaps = maxLaps;
 
   if (session.state === 'em_andamento' && session.maxLaps !== null) {
-    const leader = computeStandings(session, now)[0];
+    const leader = computeStandings(session)[0];
     if (leader && leader.laps >= session.maxLaps) setRaceFlag(session, 'checkered', now);
   }
 }
@@ -414,28 +414,67 @@ export function remainingMs(session: Session, now: number): number | null {
   return Math.max(0, session.durationMs - elapsedMs(session, now));
 }
 
+function compareCrossings(a?: Crossing | null, b?: Crossing | null): number {
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+
+  if (
+    a.source !== 'manual' &&
+    b.source !== 'manual' &&
+    typeof a.decoderTimeMs === 'number' &&
+    typeof b.decoderTimeMs === 'number'
+  ) {
+    let diff = a.decoderTimeMs - b.decoderTimeMs;
+    if (diff > DAY_MS / 2) diff -= DAY_MS;
+    else if (diff < -DAY_MS / 2) diff += DAY_MS;
+
+    const wallDiff = a.wallMs - b.wallMs;
+    if (wallDiff === 0 || Math.abs(diff - wallDiff) <= DECODER_CLOCK_TOLERANCE_MS) {
+      if (diff !== 0) return diff;
+    }
+  }
+  return a.wallMs - b.wallMs;
+}
+
 export function computeStandings(session: Session, trackLengthMeters = 1_000): Standing[] {
-  const rows = session.competitors.map((c) => {
+  const rows = session.competitors.map((c, gridIndex) => {
     const crossings = activeCrossings(c);
     const laps = Math.max(0, crossings.length - 1);
-    let best: number | null = null;
-    let bestN: number | null = null;
+    const firstCrossing = crossings[0] ?? null;
+    const lastCrossing = crossings[crossings.length - 1] ?? null;
+
+    const validLaps: { lapNumber: number; lapMs: number; wallMs: number }[] = [];
     crossings.forEach((x, i) => {
-      if (x.lapMs === null || x.invalid) return;
-      if (best === null || x.lapMs < best) {
-        best = x.lapMs;
-        bestN = i;
+      if (i > 0 && x.lapMs !== null && !x.invalid) {
+        validLaps.push({ lapNumber: i, lapMs: x.lapMs, wallMs: x.wallMs });
       }
     });
-    const lastCrossing = crossings[crossings.length - 1];
-    const first = crossings[0];
+
+    validLaps.sort((a, b) => a.lapMs - b.lapMs);
+    const best = validLaps[0]?.lapMs ?? null;
+    const bestN = validLaps[0]?.lapNumber ?? null;
+    const bestWall = validLaps[0]?.wallMs ?? null;
+    const best2nd = validLaps[1]?.lapMs ?? null;
+    const best3rd = validLaps[2]?.lapMs ?? null;
+
     let total: number | null = null;
-    if (first && lastCrossing && laps > 0) total = crossings.slice(1).reduce((sum, crossing) => sum + (crossing.lapMs ?? 0), 0);
+    if (firstCrossing && lastCrossing && laps > 0) {
+      total = crossings.slice(1).reduce((sum, crossing) => sum + (crossing.lapMs ?? 0), 0);
+    }
+
     return {
       c,
+      gridIndex,
+      crossings,
+      firstCrossing,
+      lastCrossing,
       laps,
-      best: best as number | null,
-      bestN: bestN as number | null,
+      best,
+      bestN,
+      bestWall,
+      best2nd,
+      best3rd,
       lastLap: lastCrossing?.lapMs ?? null,
       total,
       averageSpeed: total && total > 0 ? (laps * trackLengthMeters * 3_600) / total : null,
@@ -445,14 +484,77 @@ export function computeStandings(session: Session, trackLengthMeters = 1_000): S
 
   if (session.type === 'corrida') {
     rows.sort((a, b) => {
+      // 1. Mais voltas completadas vem na frente
       if (b.laps !== a.laps) return b.laps - a.laps;
-      if (a.total === null || b.total === null) return (a.total === null ? 1 : 0) - (b.total === null ? 1 : 0);
-      return a.total - b.total;
+
+      // 2. Na mesma volta (> 0): quem completou a volta primeiro na pista
+      if (a.laps > 0) {
+        const arrival = compareCrossings(a.lastCrossing, b.lastCrossing);
+        if (arrival !== 0) return arrival;
+      }
+
+      // 3. Nenhuma volta completada ainda (laps === 0):
+      // Quem já abriu volta na pista (passou no sensor na largada) vem antes de quem não passou
+      if (a.crossings.length !== b.crossings.length) {
+        return b.crossings.length - a.crossings.length;
+      }
+      if (a.crossings.length > 0) {
+        const arrival = compareCrossings(a.firstCrossing, b.firstCrossing);
+        if (arrival !== 0) return arrival;
+      }
+
+      // 4. Ordem inicial do grid
+      return a.gridIndex - b.gridIndex;
     });
   } else {
     rows.sort((a, b) => {
-      if (a.best === null || b.best === null) return (a.best === null ? 1 : 0) - (b.best === null ? 1 : 0) || b.laps - a.laps;
-      return a.best - b.best;
+      // 1. Quem tem volta válida vem na frente de quem não tem
+      if ((a.best === null) !== (b.best === null)) {
+        return a.best === null ? 1 : -1;
+      }
+
+      // 2. Ambos têm volta válida: menor tempo de volta
+      if (a.best !== null && b.best !== null) {
+        if (a.best !== b.best) return a.best - b.best;
+
+        // Desempate 1: 2ª melhor volta
+        if (a.best2nd !== null && b.best2nd !== null && a.best2nd !== b.best2nd) {
+          return a.best2nd - b.best2nd;
+        }
+        if ((a.best2nd === null) !== (b.best2nd === null)) {
+          return a.best2nd === null ? 1 : -1;
+        }
+
+        // Desempate 2: 3ª melhor volta
+        if (a.best3rd !== null && b.best3rd !== null && a.best3rd !== b.best3rd) {
+          return a.best3rd - b.best3rd;
+        }
+        if ((a.best3rd === null) !== (b.best3rd === null)) {
+          return a.best3rd === null ? 1 : -1;
+        }
+
+        // Desempate 3: quem marcou a melhor volta antes na cronologia
+        if (a.bestWall !== null && b.bestWall !== null && a.bestWall !== b.bestWall) {
+          return a.bestWall - b.bestWall;
+        }
+
+        return a.gridIndex - b.gridIndex;
+      }
+
+      // 3. Nenhum tem volta válida: mais voltas completadas (ex: voltas anuladas)
+      if (b.laps !== a.laps) return b.laps - a.laps;
+
+      // Quem já abriu volta na pista
+      if (a.crossings.length !== b.crossings.length) {
+        return b.crossings.length - a.crossings.length;
+      }
+      if (a.crossings.length > 0) {
+        const arrival = compareCrossings(a.firstCrossing, b.firstCrossing);
+        if (arrival !== 0) return arrival;
+      }
+
+      // Ordem inicial
+      return a.gridIndex - b.gridIndex;
     });
   }
 
@@ -463,7 +565,10 @@ export function computeStandings(session: Session, trackLengthMeters = 1_000): S
     if (i > 0 && leader) {
       if (session.type === 'corrida') {
         gapLaps = leader.laps - r.laps;
-        if (gapLaps === 0 && r.total !== null && leader.total !== null) gapMs = r.total - leader.total;
+        if (gapLaps === 0 && leader.laps > 0 && r.lastCrossing && leader.lastCrossing) {
+          const diff = compareCrossings(r.lastCrossing, leader.lastCrossing);
+          gapMs = Math.max(0, diff);
+        }
       } else if (r.best !== null && leader.best !== null) {
         gapMs = r.best - leader.best;
       }
