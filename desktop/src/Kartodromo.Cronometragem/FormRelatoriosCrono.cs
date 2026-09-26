@@ -40,8 +40,8 @@ public sealed class FormRelatoriosCrono : Form
         _sessaoInicial = sessaoAtual ?? (state?["focus"] as JsonObject);
 
         Text = "Relatórios de cronometragem";
-        ClientSize = new Size(960, 680);
-        MinimumSize = new Size(880, 620);
+        ClientSize = new Size(960, 600);
+        MinimumSize = new Size(880, 560);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.None;
         MaximizeBox = false;
@@ -209,7 +209,7 @@ public sealed class FormRelatoriosCrono : Form
             Dock = DockStyle.Fill,
             ColumnCount = 4,
             RowCount = 1,
-            Padding = new Padding(0, 4, 0, 0)
+            Padding = new Padding(0, 2, 0, 0)
         };
         tableFiltros.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 17f)); // Data
         tableFiltros.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33f)); // Evento
@@ -223,7 +223,7 @@ public sealed class FormRelatoriosCrono : Form
 
         var cardFiltros = CriarCard("Filtros", tableFiltros);
         cardFiltros.Dock = DockStyle.Top;
-        cardFiltros.Height = 114;
+        cardFiltros.Height = 112;
         pnlCorpo.Controls.Add(cardFiltros);
 
         // Espaçador entre cards
@@ -236,12 +236,12 @@ public sealed class FormRelatoriosCrono : Form
             Dock = DockStyle.Fill,
             ColumnCount = 2,
             RowCount = 7,
-            Padding = new Padding(4, 6, 4, 4)
+            Padding = new Padding(4, 4, 4, 2)
         };
         tableTipos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
         tableTipos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
         for (var i = 0; i < 7; i++)
-            tableTipos.RowStyles.Add(new RowStyle(SizeType.Absolute, 34f));
+            tableTipos.RowStyles.Add(new RowStyle(SizeType.Absolute, 33f));
 
         var radios = new[]
         {
@@ -268,7 +268,7 @@ public sealed class FormRelatoriosCrono : Form
             r.ForeColor = Color.FromArgb(29, 29, 31);
             r.Cursor = Cursors.Hand;
             r.Dock = DockStyle.Fill;
-            r.Margin = new Padding(4, 2, 4, 2);
+            r.Margin = new Padding(4, 1, 4, 1);
             tableTipos.Controls.Add(r, col, row);
 
             col++;
@@ -300,7 +300,7 @@ public sealed class FormRelatoriosCrono : Form
         var card = new Panel
         {
             BackColor = Color.White,
-            Padding = new Padding(16, 12, 16, 12)
+            Padding = new Padding(16, 10, 16, 10)
         };
         card.Paint += (_, e) =>
         {
@@ -309,25 +309,41 @@ public sealed class FormRelatoriosCrono : Form
             using var path = Arredondado(new Rectangle(0, 0, card.Width - 1, card.Height - 1), 12);
             e.Graphics.DrawPath(pen, path);
         };
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Padding = new Padding(0),
+            Margin = new Padding(0)
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28f));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+
         var lTitulo = new Label
         {
             Text = titulo,
-            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
             ForeColor = Color.FromArgb(29, 29, 31),
-            Dock = DockStyle.Top,
-            Height = 26
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = new Padding(0)
         };
+
         conteudo.Dock = DockStyle.Fill;
-        card.Controls.Add(conteudo);
-        card.Controls.Add(lTitulo);
-        card.Controls.SetChildIndex(lTitulo, 0);
-        card.Controls.SetChildIndex(conteudo, 1);
+        conteudo.Margin = new Padding(0);
+
+        layout.Controls.Add(lTitulo, 0, 0);
+        layout.Controls.Add(conteudo, 0, 1);
+
+        card.Controls.Add(layout);
         return card;
     }
 
     static Control CriarCampoFiltro(string rotulo, Control controle)
     {
-        var pnl = new Panel { Dock = DockStyle.Fill, Padding = new Padding(4, 2, 4, 2) };
+        var pnl = new Panel { Dock = DockStyle.Fill, Padding = new Padding(4, 1, 4, 1) };
         var lbl = new Label
         {
             Text = rotulo,
