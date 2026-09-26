@@ -19,10 +19,13 @@ static class TemaCrono
 
     public static Panel Card(string titulo = null, string subtitulo = null)
     {
-        var card = new PainelArredondado { Dock = DockStyle.Fill, BackColor = Cartao, Padding = new Padding(12), Raio = 14 };
+        var card = new PainelArredondado { Dock = DockStyle.Fill, BackColor = Cartao, Padding = new Padding(12, 8, 12, 8), Raio = 14 };
+        // o conteúdo "Fill" precisa ficar na frente da ordem de encaixe; senão ele ocupa o cartão inteiro
+        // e o cabeçalho do cartão fica por cima dos títulos das colunas (bug visto no CRONO1 em 1920x1080)
+        card.ControlAdded += (_, e) => { if (e.Control.Dock == DockStyle.Fill) e.Control.BringToFront(); };
         if (titulo != null)
         {
-            var cab = new Panel { Dock = DockStyle.Top, Height = subtitulo == null ? 30 : 48, Padding = new Padding(4, 1, 4, 4), BackColor = Cartao };
+            var cab = new Panel { Dock = DockStyle.Top, Height = subtitulo == null ? 28 : 46, Padding = new Padding(4, 1, 4, 4), BackColor = Cartao };
             cab.Controls.Add(new Label { Text = titulo, Dock = subtitulo == null ? DockStyle.Fill : DockStyle.Top, Height = 24, Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Texto, TextAlign = ContentAlignment.MiddleLeft });
             if (subtitulo != null) cab.Controls.Add(new Label { Text = subtitulo, Dock = DockStyle.Bottom, Height = 20, Font = Pequena, ForeColor = Secundario, TextAlign = ContentAlignment.MiddleLeft });
             card.Controls.Add(cab);

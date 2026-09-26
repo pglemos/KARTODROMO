@@ -58,7 +58,7 @@ public partial class FormCrono : Form
         BackColor = TemaCrono.Fundo;
         KeyPreview = true;
         if (autoteste == null) WindowState = FormWindowState.Maximized;
-        else { StartPosition = FormStartPosition.Manual; Location = new Point(0, 0); Size = new Size(1600, 960); }
+        else { StartPosition = FormStartPosition.Manual; Location = new Point(0, 0); Size = Environment.GetEnvironmentVariable("KARTODROMO_AUTOTESTE_TAMANHO") is string t && t.Split('x') is [var w, var h] ? new Size(int.Parse(w), int.Parse(h)) : new Size(1600, 960); }
         MinimumSize = new Size(1100, 700);
 
         MainMenuStrip = Menu();
@@ -354,6 +354,23 @@ public partial class FormCrono : Form
             grid.Col("Pos", 42).Col("Nº", 42).Col("Competidor", 160, DataGridViewContentAlignment.MiddleLeft, true).Col("M.V", 36).Col("T.M.V", 72).Col("Volta", 42).Col("T.U.V", 72).Col("T.T", 96).Col("D.L", 72).Col("D.A", 60).Col("V.Méd", 60);
     }
 
+    string SituacaoPassagem(JsonObject p)
+    {
+        if (p.B("deleted")) return "Excluída";
+        if (p.B("invalid")) return "Volta invalidada";
+        if (!p.B("rejected")) return p.L("lapMs") == null ? "Abriu a volta" : p.S("source") == "manual" ? "Manual" : "Volta";
+        var minimo = (_sess?.L("minLapMs") ?? 0) / 1000;
+        return p.S("reason") switch
+        {
+            "ignored-min-lap" => $"Ignorada · mín. {minimo}s",
+            "transponder-desconhecido" => "Transponder desconhecido",
+            "ignored-finished" => "Kart já encerrou",
+            "ignored-red-flag" => "Bandeira vermelha",
+            "ignored-state" => "Prova não está correndo",
+            _ => "Ignorada",
+        };
+    }
+
     static string Velocidade(JsonObject r) => double.TryParse(r["averageSpeedKmh"]?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var speed) ? speed.ToString("0.0", Fmt.Br) : "—";
 
     Button BotaoGrande(string texto, string glifo, Color cor, Func<Task> clique)
@@ -375,7 +392,7 @@ public partial class FormCrono : Form
         _lEvento.Font = new Font("Segoe UI", 11F, FontStyle.Bold); _lTipo.Font = new Font("Segoe UI", 9F, FontStyle.Bold); _lEstado.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
         _lPassagens.Text = "0"; _lPassagens.Font = new Font("Cascadia Mono", 16F, FontStyle.Bold); _lPassagens.TextAlign = ContentAlignment.MiddleLeft; _lMelhor.AutoEllipsis = true; _lPassagens.ForeColor = TemaCrono.Texto;
 
-        var metrics = new TableLayoutPanel { Dock = DockStyle.Top, Height = 128, ColumnCount = 3, Padding = new Padding(4, 4, 4, 8) };
+        var metrics = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, Padding = new Padding(4, 4, 4, 8) };
         metrics.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 31)); metrics.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 28)); metrics.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 41));
         var metaCard = TemaCrono.Card("Prova selecionada");
         var meta = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 3, Padding = new Padding(3) };
@@ -384,7 +401,7 @@ public partial class FormCrono : Form
         MetaLinha("Bateria", _lEvento); MetaLinha("Tipo", _lTipo); MetaLinha("Estado", _lEstado); metaCard.Controls.Add(meta);
         var clockCard = TemaCrono.Card(); clockCard.BackColor = Color.FromArgb(29, 29, 31); _lCrono.BackColor = Color.FromArgb(29, 29, 31); clockCard.Controls.Add(_lCrono);
         clockCard.Controls.Add(new Label { Text = "CRONÔMETRO", Dock = DockStyle.Top, Height = 22, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = Color.FromArgb(174, 174, 178), TextAlign = ContentAlignment.MiddleCenter, BackColor = Color.FromArgb(29, 29, 31) });
-        var timesCard = TemaCrono.Card("Ao vivo", "Tempo restante · voltas restantes · decoder · melhor volta");
+        var timesCard = TemaCrono.Card("Ao vivo");
         var times = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 2, Padding = new Padding(5, 2, 2, 2) };
         times.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); times.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38)); times.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); times.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 62));
         times.Controls.Add(TemaCrono.Rotulo("Tempo restante")); times.Controls.Add(_lRestante);
@@ -417,7 +434,7 @@ public partial class FormCrono : Form
         _bandeiras.Items.Add(new ToolStripControlHost(_lPassagens) { Alignment = ToolStripItemAlignment.Right, AutoSize = false, Width = 76, Height = 40 });
         _bandeiras.Items.Add(new ToolStripLabel("Passagens:") { Alignment = ToolStripItemAlignment.Right, Font = new Font("Segoe UI", 9F, FontStyle.Bold) });
 
-        if (_gPass.Columns.Count == 0) _gPass.Col("#", 40).Col("Nº", 45).Col("Competidor", 160, DataGridViewContentAlignment.MiddleLeft, true).Col("Transp.", 70).Col("Tempo", 76).Col("Volta", 48).Col("Decorrido", 82);
+        if (_gPass.Columns.Count == 0) _gPass.Col("#", 40).Col("Nº", 45).Col("Competidor", 130, DataGridViewContentAlignment.MiddleLeft, true).Col("Transp.", 72).Col("Tempo", 76).Col("Volta", 46).Col("Decorrido", 96).Col("Situação", 150, DataGridViewContentAlignment.MiddleLeft);
         TemaCrono.EstilizarGrade(_gPass);
         _gPass.CorFundo = r =>
         {
@@ -425,6 +442,7 @@ public partial class FormCrono : Form
             {
                 if (p.B("invalid")) return Color.FromArgb(255, 59, 48);
                 if (p.B("deleted")) return Color.FromArgb(238, 238, 242);
+                if (p.B("rejected")) return p.S("reason") == "transponder-desconhecido" ? Color.FromArgb(255, 236, 234) : Color.FromArgb(255, 248, 225);
             }
             return null;
         };
@@ -478,7 +496,7 @@ public partial class FormCrono : Form
         split.Panel2.Controls.Add(rightLayout);
 
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(6, 2, 6, 4) };
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 132)); root.RowStyles.Add(new RowStyle(SizeType.Absolute, 64)); root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 150)); root.RowStyles.Add(new RowStyle(SizeType.Absolute, 64)); root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         root.Controls.Add(metrics, 0, 0); root.Controls.Add(_bandeiras, 0, 1); root.Controls.Add(split, 0, 2);
         page.Controls.Add(root);
         page.Layout += (_, _) => { if (split.Width > 1000 && split.SplitterDistance != (int)(split.Width * .38)) split.SplitterDistance = (int)(split.Width * .38); };
@@ -648,9 +666,13 @@ public partial class FormCrono : Form
         var largada = _sess?.L("startedAt");
         string Decorrido(long? wall) => largada is long l0 && wall is long w ? Crono.Relogio(w - l0) : Crono.Hora(wall);
         var pass = _laps.OrderByDescending(p => p.L("wallMs")).ToList();
+        // toda leitura do decoder aparece; as que não viraram volta ficam amarelas com o motivo
         _lPassagens.Text = pass.Count(p => !p.B("deleted")).ToString();
-        _gPass.Preencher(pass.Select((p, i) => new object[] { pass.Count - i, p.S("kart"), p.S("name"), p.S("transponder"), Crono.Volta(p.L("lapMs")), p.L("lapMs") == null ? "—" : p.I("lap"), Decorrido(p.L("wallMs")) }).ToList(), pass.Cast<object>().ToList());
-        var passagemVisivel = pass.FirstOrDefault(p => !p.B("deleted"));
+        _gPass.Preencher(pass.Select((p, i) => new object[] {
+            pass.Count - i, p.S("kart"), p.S("name"), p.S("transponder"),
+            p.B("rejected") ? (p.L("sinceLastMs") is long gap ? "+" + Crono.Volta(gap) : "—") : Crono.Volta(p.L("lapMs")),
+            p.B("rejected") || p.L("lapMs") == null ? "—" : p.I("lap"), Decorrido(p.L("wallMs")), SituacaoPassagem(p) }).ToList(), pass.Cast<object>().ToList());
+        var passagemVisivel = pass.FirstOrDefault(p => !p.B("deleted") && !p.B("rejected"));
         _lVoltaFaixa.Text = passagemVisivel == null ? "VOLTA\nAGUARDANDO" : $"VOLTA\n{passagemVisivel.I("lap")}\nAGUARDANDO";
 
         // competidores (aba 1): so recarrega se o operador nao estiver editando

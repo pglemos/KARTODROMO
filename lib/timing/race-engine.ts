@@ -50,7 +50,11 @@ export type Session = {
   proofId?: string | null;
   observations?: Observation[];
   competitors: Competitor[];
+  /** Leituras do decoder que não viraram volta (volta mínima, kart encerrado, transponder desconhecido...). Só pra mostrar ao operador. */
+  rejected?: RejectedPassing[];
 };
+
+export type RejectedPassing = { id: string; kart: string | null; transponder: number | null; wallMs: number; decoderTimeMs: number; reason: string; sinceLastMs: number | null };
 
 export type Standing = {
   position: number;

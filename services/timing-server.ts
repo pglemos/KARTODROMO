@@ -219,8 +219,15 @@ decoder.on('passing', (p: TrxPassing) => {
       const comp = session.competitors.find((c) => c.kart === kart);
       lapMs = comp?.crossings[comp.crossings.length - 1]?.lapMs ?? null;
     }
-    saveSession(session);
   }
+  if (session && result !== 'counted') {
+    // toda leitura aparece pro operador, mesmo a que não virou volta
+    const vivos = session.competitors.find((c) => c.kart === kart)?.crossings.filter((x) => !x.deleted) ?? [];
+    const last = vivos[vivos.length - 1];
+    (session.rejected ??= []).push({ id, kart, transponder: p.transponder, wallMs, decoderTimeMs: p.decoderTimeMs, reason: result, sinceLastMs: last ? wallMs - last.wallMs : null });
+    if (session.rejected.length > 2000) session.rejected.splice(0, session.rejected.length - 2000);
+  }
+  if (session) saveSession(session);
 
   // diario primeiro: e a fonte de verdade pra reconstruir qualquer bateria
   journal({ wallMs, raw: p.raw, transponder: p.transponder, kart, decoderTimeMs: p.decoderTimeMs, seq: p.sequence, sessionId: session?.id ?? null, result });
@@ -466,11 +473,31 @@ function crossingRows(s: Session) {
     deleted: Boolean(crossing.deleted),
     source: crossing.source ?? 'decoder',
     assigned: Boolean(crossing.originalKart && crossing.originalKart !== competitor.kart),
+    rejected: false,
+    reason: null as string | null,
+    sinceLastMs: null as number | null,
+  }))).concat((s.rejected ?? []).map((r) => ({
+    id: r.id,
+    kart: r.kart ?? '?',
+    name: r.kart ? s.competitors.find((c) => c.kart === r.kart)?.name ?? 'Kart ' + r.kart : 'Transponder desconhecido',
+    category: null,
+    transponder: r.transponder,
+    lap: -1,
+    lapMs: null,
+    wallMs: r.wallMs,
+    decoderTimeMs: r.decoderTimeMs,
+    invalid: false,
+    deleted: false,
+    source: 'decoder',
+    assigned: false,
+    rejected: true,
+    reason: r.reason as string | null,
+    sinceLastMs: r.sinceLastMs,
   }))).sort((a, b) => b.wallMs - a.wallMs);
 }
 
 function correctCrossings(s: Session, action: string, ids: string[], aboveId?: string) {
-  const rows = crossingRows(s);
+  const rows = crossingRows(s).filter((row) => !row.rejected);
   const target = aboveId ? rows.find((row) => row.id === aboveId) : undefined;
   const selected = rows.filter((row) => ids.includes(row.id) || (target && row.wallMs >= target.wallMs));
   for (const row of selected) {
@@ -654,6 +681,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       }
       if (action === 'passings' && m[3] === 'clear' && method === 'POST') {
         clearCrossings(s);
+        s.rejected = [];
         saveSession(s);
         scheduleStateBroadcast();
         return send(res, 200, { ok: true, passages: crossingRows(s) });
