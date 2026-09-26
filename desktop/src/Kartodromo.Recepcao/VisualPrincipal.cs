@@ -108,6 +108,15 @@ static class VisualPrincipal
         }
     }
 
+    /// <summary>Fundo da célula sem as bordas do Windows (PaintBackground desenhava contornos cinza nas linhas).</summary>
+    internal static void Fundo(DataGridViewCellPaintingEventArgs e)
+    {
+        e.Graphics.SmoothingMode = SmoothingMode.None;
+        var sel = (e.State & DataGridViewElementStates.Selected) != 0;
+        using (var b = new SolidBrush(sel ? e.CellStyle.SelectionBackColor : e.CellStyle.BackColor)) e.Graphics.FillRectangle(b, e.CellBounds);
+        using (var p = new Pen(Color.FromArgb(240, 240, 242))) e.Graphics.DrawLine(p, e.CellBounds.Left, e.CellBounds.Bottom - 1, e.CellBounds.Right, e.CellBounds.Bottom - 1);
+    }
+
     /// <summary>Desenha "pago" como círculo (verde com check / contorno) e categoria como etiqueta colorida.</summary>
     public static void PintarCelulas(DataGridView grade)
     {
@@ -117,7 +126,7 @@ static class VisualPrincipal
             var col = grade.Columns[e.ColumnIndex];
             if (col is DataGridViewCheckBoxColumn && col.Name != "__sel")
             {
-                e.PaintBackground(e.CellBounds, true);
+                Fundo(e);
                 var ok = e.Value is true;
                 var r = new Rectangle(e.CellBounds.X + (e.CellBounds.Width - 18) / 2, e.CellBounds.Y + (e.CellBounds.Height - 18) / 2, 18, 18);
                 var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
@@ -130,9 +139,25 @@ static class VisualPrincipal
                 else { using var pen = new Pen(Color.FromArgb(199, 199, 204), 1.5F); g.DrawEllipse(pen, r); }
                 e.Handled = true;
             }
+            else if (col.Name == "cliente" && grade.Rows[e.RowIndex].Tag is System.Text.Json.Nodes.JsonObject o && o["aprovada"] != null && !o.B("aprovada") && o.S("status") != "cancelada")
+            {
+                // pré-reserva (ainda não aprovada): selo laranja antes do nome, como no design
+                Fundo(e);
+                var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
+                var origem = o.S("origem") is { Length: > 0 } og ? " · " + char.ToUpper(og[0]) + og[1..] : "";
+                var selo = "Pré-reserva" + origem;
+                var fonte = new Font("Segoe UI", 8.2F, FontStyle.Bold);
+                var w = Math.Min(TextRenderer.MeasureText(selo, fonte).Width + 12, e.CellBounds.Width - 8);
+                var r = new Rectangle(e.CellBounds.X + 6, e.CellBounds.Y + (e.CellBounds.Height - 20) / 2, w, 20);
+                using (var p = Redondo(r, 6)) using (var f = new SolidBrush(Color.FromArgb(255, 240, 219))) g.FillPath(f, p);
+                TextRenderer.DrawText(g, selo, fonte, r, Color.FromArgb(138, 75, 0), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
+                var resto = new Rectangle(r.Right + 6, e.CellBounds.Y, e.CellBounds.Right - r.Right - 8, e.CellBounds.Height);
+                if (resto.Width > 20) TextRenderer.DrawText(g, e.FormattedValue?.ToString(), e.CellStyle.Font, resto, e.CellStyle.ForeColor, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                e.Handled = true;
+            }
             else if (col.Name == "categoria" && e.Value is string cat && cat.Length > 0)
             {
-                e.PaintBackground(e.CellBounds, true);
+                Fundo(e);
                 var superKart = cat.Contains("super", StringComparison.OrdinalIgnoreCase);
                 var fundo = superKart ? Color.FromArgb(255, 236, 204) : Color.FromArgb(225, 238, 255);
                 var texto = superKart ? Color.FromArgb(138, 75, 0) : Color.FromArgb(10, 79, 160);

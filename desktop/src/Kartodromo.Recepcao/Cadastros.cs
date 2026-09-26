@@ -672,7 +672,7 @@ public class FormCadastro : Janela
         gp.CellPainting += (_, e) =>
         {
             if (e.RowIndex < 0 || gp.Columns[e.ColumnIndex].Name != "tipo" || e.Value is not string t || t.Length == 0) return;
-            e.PaintBackground(e.CellBounds, true);
+            VisualPrincipal.Fundo(e);
             var (fundo, texto) = t switch { "Corrida" => (Color.FromArgb(255, 226, 224), Color.FromArgb(161, 29, 20)), "Classificatório" => (Color.FromArgb(225, 238, 255), Color.FromArgb(10, 79, 160)), _ => (Color.FromArgb(234, 234, 238), Color.FromArgb(58, 58, 60)) };
             var fonte = new Font("Segoe UI", 8.2F, FontStyle.Bold);
             var w = TextRenderer.MeasureText(t, fonte).Width + 12;

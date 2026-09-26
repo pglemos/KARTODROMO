@@ -295,7 +295,7 @@ public class FormCheckout : Janela, ISemKit
         _gDisp.CellPainting += (_, e) =>
         {
             if (e.RowIndex < 0 || _gDisp.Columns[e.ColumnIndex].Name != "cliente" || e.RowIndex >= _gDisp.Rows.Count || _gDisp.Rows[e.RowIndex].Tag is not JsonObject r) return;
-            e.PaintBackground(e.CellBounds, true);
+            VisualPrincipal.Fundo(e);
             var cor = (e.State & DataGridViewElementStates.Selected) != 0 ? KitVisual.Texto : KitVisual.Texto;
             TextRenderer.DrawText(e.Graphics, r.S("cliente"), new Font("Segoe UI", 9.2F, FontStyle.Bold), new Rectangle(e.CellBounds.X + 4, e.CellBounds.Y + 3, e.CellBounds.Width - 8, 17), cor, TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
             TextRenderer.DrawText(e.Graphics, r.S("produto"), new Font("Segoe UI", 8F), new Rectangle(e.CellBounds.X + 4, e.CellBounds.Y + 20, e.CellBounds.Width - 8, 15), KitVisual.Secundario, TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);

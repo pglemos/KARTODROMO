@@ -19,10 +19,10 @@ public static class FiltroColuna
     public static bool NoFunil(Rectangle celula, Point p) => Area(celula).Contains(p);
 
     /// <summary>Desenha o funil (contorno cinza; azul preenchido quando a coluna está filtrada).</summary>
-    public static void Desenhar(Graphics g, Rectangle celula, bool ativo)
+    public static void Desenhar(Graphics g, Rectangle celula, bool ativo, bool pequeno = false)
     {
-        var a = Area(celula);
-        var w = 10f; var h = 11f;
+        var a = pequeno ? celula : Area(celula);
+        var w = pequeno ? 8f : 10f; var h = pequeno ? 9f : 11f;
         var x = a.X + (a.Width - w) / 2f; var y = a.Y + (a.Height - h) / 2f;
         using var path = new GraphicsPath();
         path.AddPolygon(new[]

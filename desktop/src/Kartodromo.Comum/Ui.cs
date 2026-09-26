@@ -236,29 +236,83 @@ public class Grade : DataGridView
                 ItemMarcadoMudou?.Invoke();
         };
 
-        // funil de filtro no canto direito de cada cabeçalho
+        // cabeçalho do design: sem divisórias, nome + seta da ordenação (verde) + funil logo depois do nome
+        CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+        ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
         CellPainting += (_, e) =>
         {
-            if (e.RowIndex != -1 || e.ColumnIndex < 0 || ColDe(e.ColumnIndex) is not Col c) return;
-            e.Paint(e.ClipBounds, DataGridViewPaintParts.All);
-            FiltroColuna.Desenhar(e.Graphics, e.CellBounds, Filtrada(c.Chave));
+            if (e.RowIndex >= 0 && e.ColumnIndex >= 0)
+            {
+                // linhas do design: sem contorno nas células, só a linha fina embaixo
+                // outro desenho (círculo do Pago, etiquetas) pode ter deixado o anti-serrilhado ligado: o fundo sairia com bordas cinza
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.None;
+                var sel = (e.State & DataGridViewElementStates.Selected) != 0;
+                using (var fundo = new SolidBrush(sel ? e.CellStyle.SelectionBackColor : e.CellStyle.BackColor)) e.Graphics.FillRectangle(fundo, e.CellBounds);
+                e.PaintContent(e.CellBounds);
+                using (var fina = new Pen(GridColor)) e.Graphics.DrawLine(fina, e.CellBounds.Left, e.CellBounds.Bottom - 1, e.CellBounds.Right, e.CellBounds.Bottom - 1);
+                e.Handled = true;
+                return;
+            }
+            if (e.RowIndex != -1 || e.ColumnIndex < 0) return;
+            var g = e.Graphics; var r = e.CellBounds;
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.None;
+            var estilo = Columns[e.ColumnIndex].HeaderCell.InheritedStyle;
+            using (var fundo = new SolidBrush(estilo.BackColor)) g.FillRectangle(fundo, r);
+            using (var linha = new Pen(Color.FromArgb(235, 235, 235))) g.DrawLine(linha, r.Left, r.Bottom - 1, r.Right, r.Bottom - 1);
+            var col = Columns[e.ColumnIndex];
+            var ordenada = SortedColumn == col && SortOrder != SortOrder.None;
+            var texto = col.HeaderText + (ordenada ? (SortOrder == SortOrder.Ascending ? " ↑" : " ↓") : "");
+            var cor = ordenada ? Color.FromArgb(11, 122, 83) : estilo.ForeColor;
+            var (txt, funil) = AreasCabecalho(e.ColumnIndex, r, texto, estilo);
+            TextRenderer.DrawText(g, texto, estilo.Font, txt, cor, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding |
+                (estilo.Alignment is DataGridViewContentAlignment.MiddleRight ? TextFormatFlags.Right : estilo.Alignment is DataGridViewContentAlignment.MiddleCenter ? TextFormatFlags.HorizontalCenter : TextFormatFlags.Left));
+            if (ColDe(e.ColumnIndex) is Col c && !funil.IsEmpty) FiltroColuna.Desenhar(g, funil, Filtrada(c.Chave), pequeno: true);
             e.Handled = true;
         };
         ColumnHeaderMouseClick += (_, e) =>
         {
             if (e.Button != MouseButtons.Left || ColDe(e.ColumnIndex) is not Col c) return;
             var col = Columns[e.ColumnIndex];
-            if (e.X >= col.Width - FiltroColuna.LarguraFunil) { AbrirFiltro(e.ColumnIndex); return; }
+            var cel = GetCellDisplayRectangle(e.ColumnIndex, -1, false);
+            if (NoFunil(e.ColumnIndex, new Point(cel.X + e.X, cel.Y + e.Y))) { AbrirFiltro(e.ColumnIndex); return; }
             var dir = SortedColumn == col && SortOrder == SortOrder.Ascending ? ListSortDirection.Descending : ListSortDirection.Ascending;
             Sort(col, dir);
         };
         MouseMove += (_, e) =>
         {
             var hit = HitTest(e.X, e.Y);
-            var noFunil = hit.Type == DataGridViewHitTestType.ColumnHeader && ColDe(hit.ColumnIndex) != null
-                && FiltroColuna.NoFunil(GetCellDisplayRectangle(hit.ColumnIndex, -1, false), e.Location);
+            var noFunil = hit.Type == DataGridViewHitTestType.ColumnHeader && ColDe(hit.ColumnIndex) != null && NoFunil(hit.ColumnIndex, e.Location);
             Cursor = noFunil ? Cursors.Hand : Cursors.Default;
         };
+    }
+
+    /// <summary>Onde fica o texto e o funil no cabeçalho: o funil logo depois do nome (ou antes, se a coluna é alinhada à direita).</summary>
+    (Rectangle texto, Rectangle funil) AreasCabecalho(int colIndex, Rectangle r, string titulo, DataGridViewCellStyle estilo)
+    {
+        var pad = estilo.Padding;
+        var util = new Rectangle(r.X + Math.Max(8, pad.Left), r.Y, Math.Max(0, r.Width - Math.Max(8, pad.Left) - Math.Max(8, pad.Right)), r.Height);
+        if (ColDe(colIndex) == null || util.Width < 30) return (util, Rectangle.Empty);
+        var w = Math.Min(util.Width - 16, TextRenderer.MeasureText(titulo, estilo.Font, Size.Empty, TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix).Width + 4);
+        const int f = 16;
+        if (estilo.Alignment == DataGridViewContentAlignment.MiddleRight)
+            return (new Rectangle(util.Right - w, util.Y, w, util.Height), new Rectangle(util.Right - w - f, util.Y, f, util.Height));
+        if (estilo.Alignment == DataGridViewContentAlignment.MiddleCenter)
+        {
+            var x0 = util.X + (util.Width - w - f) / 2;
+            return (new Rectangle(x0, util.Y, w, util.Height), new Rectangle(x0 + w, util.Y, f, util.Height));
+        }
+        return (new Rectangle(util.X, util.Y, w, util.Height), new Rectangle(util.X + w, util.Y, f, util.Height));
+    }
+
+    bool NoFunil(int colIndex, Point p)
+    {
+        if (colIndex < 0 || ColDe(colIndex) == null) return false;
+        var col = Columns[colIndex];
+        var r = GetCellDisplayRectangle(colIndex, -1, false);
+        var ordenada = SortedColumn == col && SortOrder != SortOrder.None;
+        var texto = col.HeaderText + (ordenada ? (SortOrder == SortOrder.Ascending ? " ↑" : " ↓") : "");
+        var (_, funil) = AreasCabecalho(colIndex, r, texto, col.HeaderCell.InheritedStyle);
+        return !funil.IsEmpty && Rectangle.Inflate(funil, 3, 0).Contains(p);
     }
 
     Col ColDe(int colIndex) => colIndex >= 0 && colIndex < Columns.Count ? _cols.FirstOrDefault(x => x.Chave == Columns[colIndex].Name) : null;

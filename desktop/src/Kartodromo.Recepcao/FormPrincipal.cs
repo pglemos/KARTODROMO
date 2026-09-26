@@ -788,7 +788,7 @@ public class FormPrincipal : Form
                     .. (Sessao.ParamSim("office.exibirColunaResponsavel", false) ? new Col[] { new("responsavel", "Responsável") } : []),
                     new("produto", "Produto", Largura: 220), new("categoria", "Categoria", Largura: 90), new("preco", "Preço (R$)", TipoCol.Dinheiro), new("desconto", "Desconto (R$)", TipoCol.Dinheiro),
                     new("total", "Total (R$)", TipoCol.Dinheiro), new("observacao", "Observação")]);
-                _grade.CorLinha = r => r.S("status") == "cancelada" ? Color.Silver : !r.B("aprovada") ? Color.FromArgb(150, 90, 0) : null;
+                _grade.CorLinha = r => r.S("status") == "cancelada" ? Color.Silver : null; // pré-reserva: selo laranja no cliente (VisualPrincipal)
                 _menuAtual = MenuReservas;
                 if (_status == "pendentes" && _filtroBateria == null)
                 {
