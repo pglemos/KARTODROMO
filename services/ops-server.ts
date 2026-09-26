@@ -223,14 +223,36 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
       `SELECT c.Id id, c.Nome nome, CONVERT(varchar(10), c.Nascimento, 126) nascimento FROM dbo.Cliente c WHERE c.ResponsavelId = @id AND c.Bloqueado = 0 ORDER BY c.Nome`,
       { id: c.id },
     );
-    // no totem so aparece o minimo: quem digita um CPF alheio nao ve os dados da pessoa
+    // cadastro completo (pedido do dono em 26/09): o cliente confere e corrige todos os dados no totem
+    const txt = (v: unknown) => (v == null ? '' : String(v).trim());
+    let enderecoCompleto = txt(c.endereco);
+    const num = txt(c.numero);
+    const comp = txt(c.complemento);
+    if (num && !enderecoCompleto.includes(num)) {
+      enderecoCompleto = enderecoCompleto ? `${enderecoCompleto}, ${num}` : num;
+    }
+    if (comp && !enderecoCompleto.includes(comp)) {
+      enderecoCompleto = enderecoCompleto ? `${enderecoCompleto} - ${comp}` : comp;
+    }
+
     send(res, 200, {
       cliente: {
         id: c.id,
         nome: c.nome,
-        email: mask(c.email as string),
-        telefone: mask(onlyDigits(c.telefone)),
+        tipoDocumento: txt(c.tipoDocumento) || 'CPF',
+        documento: txt(c.documento),
+        email: txt(c.email),
+        telefone: txt(c.telefone),
+        nascimento: txt(c.nascimento),
         temNascimento: Boolean(c.nascimento),
+        peso: c.peso == null ? '' : String(Number(c.peso)),
+        cep: txt(c.cep),
+        endereco: enderecoCompleto,
+        numero: num,
+        complemento: comp,
+        bairro: txt(c.bairro),
+        cidade: txt(c.cidade),
+        estado: txt(c.estado),
         lgpd: Boolean(c.lgpdAceiteEm),
         bloqueado: Boolean(c.bloqueado),
       },

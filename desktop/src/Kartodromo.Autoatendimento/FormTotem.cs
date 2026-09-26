@@ -1,4 +1,4 @@
-﻿using System.Drawing.Drawing2D;
+using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using System.Text.Json.Nodes;
 using Kartodromo.Comum;
@@ -344,9 +344,15 @@ public class FormTotem : Form, IMessageFilter
 
     void TelaCadastro(bool existente)
     {
-        var email = _ident.Contains('@') ? _ident : "";
-        var doc = _ident.Contains('@') ? "" : _ident;
-        var tipoIni = doc.Length == 0 || Fmt.Digitos(doc).Length == 11 && Fmt.Digitos(doc) == doc.Replace(".", "").Replace("-", "") ? "CPF" : "RG";
+        var email = existente && _cliente.S("email").Length > 0 ? _cliente.S("email") : (_ident.Contains('@') ? _ident : "");
+        var doc = existente && _cliente.S("documento").Length > 0 ? _cliente.S("documento") : (_ident.Contains('@') ? "" : _ident);
+        var tipoCliente = existente ? _cliente.S("tipoDocumento").ToUpperInvariant() : "";
+        var tipoIni = tipoCliente switch
+        {
+            "RG" => "RG",
+            "PASSAPORTE" => "Passaporte",
+            _ => (doc.Length == 0 || Fmt.Digitos(doc).Length == 11 && Fmt.Digitos(doc) == doc.Replace(".", "").Replace("-", "") ? "CPF" : "RG")
+        };
         var sub = existente
             ? $"Olá, {_cliente.S("nome").Split(' ')[0]}! Confira e atualize seus dados. Campos em branco continuam como estão."
             : "Primeira vez aqui. Leva menos de um minuto.";
@@ -358,28 +364,28 @@ public class FormTotem : Form, IMessageFilter
         const float cw = 274;
         var reg = Lista(campos, "Tipo de Registro", xs[0], 36, cw, "Pessoa Física", "Pessoa Jurídica");
         var tipo = Lista(campos, "Tipo de Documento", xs[1], 36, cw, "CPF", "RG", "Passaporte");
-        tipo.SelectedIndex = tipoIni == "CPF" ? 0 : 1;
-        var fDoc = Campo(campos, "CPF", xs[2], 36, cw, existente ? "" : tipoIni == "CPF" ? Fmt.MascaraCpf(doc) : doc, !existente && doc.Length == 0);
+        tipo.SelectedIndex = tipoIni switch { "Passaporte" => 2, "RG" => 1, _ => 0 };
+        var docVal = tipo.SelectedIndex == 0 ? Fmt.MascaraCpf(doc) : doc;
+        var fDoc = Campo(campos, "CPF", xs[2], 36, cw, docVal, !existente && doc.Length == 0);
         var lDoc = campos.Controls.OfType<Label>().Last(l => l.Text == "CPF");
+        lDoc.Text = tipo.Text;
         var fNome = Campo(campos, "Nome completo", xs[3], 36, cw, existente ? _cliente.S("nome") : "", !existente && doc.Length > 0);
-        var fEmail = Campo(campos, "E-mail", xs[0], 132, cw, existente ? "" : email, existente);
-        var fFone = Campo(campos, "Celular (WhatsApp)", xs[1], 132, cw);
-        var fNasc = Campo(campos, "Data de nascimento", xs[2], 132, cw);
-        var fPeso = Campo(campos, "Peso (kg)", xs[3], 132, cw);
-        var fCep = Campo(campos, "CEP", xs[0], 228, cw);
-        var fEnd = Campo(campos, "Endereço", xs[1], 228, cw);
-        var fBairro = Campo(campos, "Bairro", xs[2], 228, cw);
-        var fCidade = Campo(campos, "Cidade", xs[3], 228, cw);
+        var fEmail = Campo(campos, "E-mail", xs[0], 132, cw, email, existente);
+        var fFone = Campo(campos, "Celular (WhatsApp)", xs[1], 132, cw, existente ? Fmt.MascaraFone(_cliente.S("telefone")) : "");
+        var nascIni = existente && _cliente.S("nascimento").Length >= 10 ? Fmt.Dmy(_cliente.S("nascimento")) : "";
+        var fNasc = Campo(campos, "Data de nascimento", xs[2], 132, cw, nascIni);
+        var fPeso = Campo(campos, "Peso (kg)", xs[3], 132, cw, existente ? _cliente.S("peso") : "");
+        var fCep = Campo(campos, "CEP", xs[0], 228, cw, existente ? Fmt.MascaraCep(_cliente.S("cep")) : "");
+        var fEnd = Campo(campos, "Endereço", xs[1], 228, cw, existente ? _cliente.S("endereco") : "");
+        var fBairro = Campo(campos, "Bairro", xs[2], 228, cw, existente ? _cliente.S("bairro") : "");
+        var fCidade = Campo(campos, "Cidade", xs[3], 228, cw, existente ? _cliente.S("cidade") : "");
         if (existente)
         {
             reg.Enabled = tipo.Enabled = fDoc.Enabled = fNome.Enabled = false;
-            fDoc.Text = "(já cadastrado)";
-            if (_cliente.S("email").Length > 0) fEmail.Caixa.PlaceholderText = _cliente.S("email");
-            if (_cliente.S("telefone").Length > 0) fFone.Caixa.PlaceholderText = _cliente.S("telefone");
-            if (_cliente.B("temNascimento")) fNasc.Caixa.PlaceholderText = "(já informada)";
+            if (fDoc.Text.Length == 0) fDoc.Text = "(já cadastrado)";
         }
-        else fNasc.Caixa.PlaceholderText = "DD/MM/AAAA";
-        string uf = "";
+        fNasc.Caixa.PlaceholderText = "DD/MM/AAAA";
+        string uf = existente ? _cliente.S("estado") : "";
         tipo.SelectedIndexChanged += (_, _) => { lDoc.Text = tipo.Text; if (tipo.SelectedIndex == 0) fDoc.Text = Fmt.MascaraCpf(fDoc.Text); };
         Mascarar(fDoc.Caixa, v => !existente && tipo.SelectedIndex == 0 ? Fmt.MascaraCpf(v) : v);
         Mascarar(fFone.Caixa, Fmt.MascaraFone);
