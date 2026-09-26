@@ -103,15 +103,6 @@ const int = (v: unknown, name: string) => {
 };
 
 
-function mask(value: string | null | undefined, keepEnd = 4) {
-  if (!value) return null;
-  if (value.includes('@')) {
-    const [u, d] = value.split('@');
-    return `${u.slice(0, 2)}***@${d}`;
-  }
-  return value.length <= keepEnd ? value : `${'•'.repeat(Math.min(6, value.length - keepEnd))}${value.slice(-keepEnd)}`;
-}
-
 async function parametros() {
   return Object.fromEntries((await query<{ k: string; v: string }>(`SELECT Chave k, Valor v FROM dbo.Parametro`)).map((p) => [p.k, p.v]));
 }
