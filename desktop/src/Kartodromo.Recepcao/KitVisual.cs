@@ -145,7 +145,9 @@ public static class KitVisual
         if (f.Tag is ModalMeta custom) return custom;
         var t = (titulo ?? f.Text ?? "").ToLowerInvariant();
 
-        if (t.Contains("editar bateria") || t.Contains("bateria"))
+        if (t.Contains("agenda"))
+            return new() { Titulo = "Agenda de reservas", Sub = "Calendário mensal, baterias do dia e inclusão de clientes", Cor1 = Color.FromArgb(192, 139, 255), Cor2 = Color.FromArgb(134, 69, 214), Glifo = "\uE787" };
+        if (t.Contains("editar bateria") || t.StartsWith("bateria") || t == "bateria")
             return new() { Titulo = "Editar bateria", Sub = (f.Tag as string) ?? "BATERIA 19:20 · 25/09/2026", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Color.FromArgb(30, 111, 232), Glifo = "\uE823" };
         if (t.Contains("incluir cliente") || t.Contains("registra reserva por cliente") || t.Contains("registrar reserva"))
             return new() { Titulo = "Registrar reserva por cliente", Sub = (f.Tag as string) ?? "BATERIA 19:20 · 25/09/2026 19:20 · 6 vagas disponíveis", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Color.FromArgb(30, 111, 232), Glifo = "\uE77B" };
@@ -480,7 +482,8 @@ public static class KitVisual
     /// <summary>Controle de abas estilo pílula cinza com botão ativo branco (Dialogo.dc.html / Cliente.dc.html).</summary>
     public static Control AbaSegmentada(string[] abas, int indiceInicial, Action<int> aoMudar)
     {
-        var bar = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(2), Margin = new Padding(0, 0, 0, 10), BackColor = Color.FromArgb(238, 238, 242) };
+        var wrapper = new Panel { Dock = DockStyle.Top, Height = 42, BackColor = Color.Transparent, Padding = new Padding(0, 0, 0, 10) };
+        var bar = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(2), Margin = Padding.Empty, BackColor = Color.FromArgb(238, 238, 242) };
         AplicarRaio(bar, 9);
         var botoes = new List<Button>();
         for (var i = 0; i < abas.Length; i++)
@@ -515,7 +518,8 @@ public static class KitVisual
             botoes.Add(b);
             bar.Controls.Add(b);
         }
-        return bar;
+        wrapper.Controls.Add(bar);
+        return wrapper;
     }
 
     /// <summary>Rodapé padrão das janelas modais com botões alinhados à direita e nota opcional à esquerda (Dialogo.dc.html).</summary>
