@@ -39,7 +39,10 @@ export type Session = {
   minLapMs: number;
   state: SessionState;
   createdAt: number;
+  /** hora da largada = primeira passagem contada depois da bandeira verde (null até lá) */
   startedAt: number | null;
+  /** hora em que o operador deu a bandeira verde (a bateria fica armada esperando o 1º kart) */
+  greenAt?: number | null;
   checkeredAt: number | null;
   finishedAt: number | null;
   currentFlag?: RaceFlag;
@@ -104,6 +107,7 @@ export function createSession(input: {
     state: 'preparando',
     createdAt: input.now,
     startedAt: null,
+    greenAt: null,
     checkeredAt: null,
     finishedAt: null,
     currentFlag: 'none',
@@ -196,8 +200,19 @@ export function setCompetitors(session: Session, list: { kart: string; name: str
 export function startSession(session: Session, now: number) {
   if (session.state !== 'preparando') throw new Error('A bateria já foi iniciada.');
   session.state = 'em_andamento';
-  session.startedAt = now;
+  // o cronômetro só começa quando o primeiro kart cruzar a linha (igual ao LapTime)
+  session.greenAt = now;
+  session.startedAt = null;
   session.currentFlag = 'green';
+}
+
+/** Bateria com bandeira verde mas nenhum kart passou ainda: o cronômetro está parado em zero. */
+export function aguardandoLargada(session: Session) {
+  return session.state === 'em_andamento' && session.startedAt === null;
+}
+
+function largarNaPrimeiraPassagem(session: Session, wallMs: number) {
+  if (session.state === 'em_andamento' && session.startedAt === null) session.startedAt = wallMs;
 }
 
 export function elapsedMs(session: Session, now: number): number {
@@ -219,7 +234,8 @@ export function setRaceFlag(session: Session, flag: Exclude<RaceFlag, 'none'>, n
   }
   if (session.redFlagAt != null) {
     const frozenElapsed = session.redFlagElapsedMs ?? 0;
-    session.startedAt = now - frozenElapsed;
+    // vermelha antes do primeiro kart passar: continua esperando a largada
+    if (session.startedAt !== null) session.startedAt = now - frozenElapsed;
     session.redFlagAt = null;
     session.redFlagElapsedMs = null;
   }
@@ -301,6 +317,7 @@ export function applyPassing(session: Session, p: { id?: string; kart: string; d
   const lapMs = last ? lapDuration(last, { decoderTimeMs: p.decoderTimeMs, wallMs: p.wallMs, lapMs: null }) : null;
   if (lapMs !== null && lapMs < session.minLapMs) return 'ignored-min-lap';
 
+  largarNaPrimeiraPassagem(session, p.wallMs);
   comp.crossings.push({ id: p.id, decoderTimeMs: p.decoderTimeMs, wallMs: p.wallMs, lapMs, source: p.source ?? 'decoder', transponder: p.transponder ?? null });
   recalculate(comp);
 
@@ -325,6 +342,7 @@ export function includeManualPassing(session: Session, p: { id: string; kart: st
     competitor = { kart: p.kart, name: p.name?.trim() || `Kart ${p.kart}`, flag: 'none', crossings: [], finished: false };
     session.competitors.push(competitor);
   }
+  if (session.state === 'em_andamento') largarNaPrimeiraPassagem(session, p.wallMs);
   const active = activeCrossings(competitor);
   const previous = active[active.length - 1];
   const decoderTimeMs = previous ? (previous.decoderTimeMs + p.lapMs) % DAY_MS : (p.wallMs % DAY_MS);

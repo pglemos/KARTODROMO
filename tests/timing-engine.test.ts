@@ -263,11 +263,14 @@ describe('race-engine', () => {
     const s = race('corrida', 1);
     applyPassing(s, { kart: '4', decoderTimeMs: 0, wallMs: 5_000 });
     applyPassing(s, { kart: '5', decoderTimeMs: 500, wallMs: 5_500 });
-    tick(s, 61_000);
+    // o cronômetro começou na 1ª passagem (5 s): 1 min acaba em 65 s
+    tick(s, 64_000);
+    expect(s.state).toBe('em_andamento');
+    tick(s, 65_000);
     expect(s.state).toBe('bandeira_final');
-    applyPassing(s, { kart: '4', decoderTimeMs: 62_000, wallMs: 62_000 });
+    applyPassing(s, { kart: '4', decoderTimeMs: 62_000, wallMs: 66_000 });
     expect(applyPassing(s, { kart: '4', decoderTimeMs: 130_000, wallMs: 0 })).toBe('ignored-finished');
-    applyPassing(s, { kart: '5', decoderTimeMs: 63_000, wallMs: 63_000 });
+    applyPassing(s, { kart: '5', decoderTimeMs: 63_000, wallMs: 67_000 });
     expect(s.state).toBe('encerrada');
   });
 
@@ -294,6 +297,43 @@ describe('race-engine', () => {
     expect(s.state).toBe('cancelada');
   });
 
+  it('bandeira verde arma a bateria: o cronômetro só começa quando o primeiro kart passa na linha', () => {
+    for (const tipo of ['classificacao', 'corrida'] as const) {
+      const s = race(tipo, 1); // verde em 1 s
+      expect(s.state).toBe('em_andamento');
+      expect(s.startedAt).toBeNull();
+      expect(elapsedMs(s, 50_000)).toBe(0);
+      expect(remainingMs(s, 50_000)).toBe(60_000);
+      expect(tick(s, 500_000)).toBe(false); // parado esperando: não dá quadriculada
+      expect(applyPassing(s, { kart: '4', decoderTimeMs: 0, wallMs: 90_000 })).toBe('counted');
+      expect(s.startedAt).toBe(90_000);
+      expect(s.greenAt).toBe(1_000);
+      applyPassing(s, { kart: '5', decoderTimeMs: 2_000, wallMs: 92_000 }); // o segundo não mexe na largada
+      expect(s.startedAt).toBe(90_000);
+      expect(elapsedMs(s, 120_000)).toBe(30_000);
+      tick(s, 149_999);
+      expect(s.state).toBe('em_andamento');
+      tick(s, 150_000);
+      expect(s.state).toBe('bandeira_final');
+    }
+  });
+
+  it('vermelha antes do primeiro kart passar continua esperando a largada', () => {
+    const s = race('corrida', 1);
+    setRaceFlag(s, 'red', 5_000);
+    setRaceFlag(s, 'green', 20_000);
+    expect(s.startedAt).toBeNull();
+    expect(elapsedMs(s, 40_000)).toBe(0);
+    applyPassing(s, { kart: '4', decoderTimeMs: 0, wallMs: 45_000 });
+    expect(elapsedMs(s, 55_000)).toBe(10_000);
+  });
+
+  it('passagem manual também larga o cronômetro', () => {
+    const s = race('corrida', 1);
+    includeManualPassing(s, { id: 'm1', kart: '4', lapMs: 60_000, wallMs: 30_000 });
+    expect(s.startedAt).toBe(30_000);
+  });
+
   it('formata tempo de volta', () => {
     expect(formatLap(64_062)).toBe('1:04.062');
     expect(formatLap(9_500)).toBe('9.500');
@@ -302,6 +342,7 @@ describe('race-engine', () => {
 
   it('bandeira vermelha pausa o cronômetro e a verde retoma do tempo restante', () => {
     const s = race('corrida', 1);
+    applyPassing(s, { kart: '5', decoderTimeMs: 0, wallMs: 1_000 }); // largada
     expect(remainingMs(s, 31_000)).toBe(30_000);
     setRaceFlag(s, 'red', 31_000);
     expect(remainingMs(s, 200_000)).toBe(30_000);

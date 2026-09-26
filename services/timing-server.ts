@@ -28,6 +28,7 @@ import {
   closeSession,
   computeStandings,
   createSession,
+  aguardandoLargada,
   elapsedMs,
   formatLap,
   includeManualPassing,
@@ -246,7 +247,9 @@ function handleDecoderPassing(p: TrxPassing) {
   let lapMs: number | null = null;
 
   if (session && kart) {
+    const esperando = aguardandoLargada(session);
     result = applyPassing(session, { id, kart, decoderTimeMs: p.decoderTimeMs, wallMs, transponder: p.transponder, source: 'decoder' });
+    if (esperando && !aguardandoLargada(session)) log(`bateria ${session.name}: LARGADA com o kart ${kart} (cronômetro começou)`);
     if (result === 'counted') {
       const comp = session.competitors.find((c) => c.kart === kart);
       lapMs = comp?.crossings[comp.crossings.length - 1]?.lapMs ?? null;
@@ -317,6 +320,8 @@ function sessionView(s: Session) {
     minLapMs: s.minLapMs,
     createdAt: s.createdAt,
     startedAt: s.startedAt,
+    greenAt: s.greenAt ?? null,
+    aguardandoLargada: aguardandoLargada(s),
     checkeredAt: s.checkeredAt,
     finishedAt: s.finishedAt,
     remainingMs: remainingMs(s, now),
@@ -896,7 +901,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         const other = runningSession();
         if (other && other.id !== s.id) return send(res, 409, { error: `Ja existe bateria em andamento: ${other.name}. Encerre ela antes.` });
         startSession(s, now);
-        log(`bateria ${s.name} INICIADA`);
+        log(`bateria ${s.name}: BANDEIRA VERDE, aguardando o primeiro kart passar na linha`);
       } else if (action === 'checkered' && method === 'POST') {
         setRaceFlag(s, 'checkered', now);
       } else if (action === 'close' && method === 'POST') {

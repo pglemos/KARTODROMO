@@ -124,7 +124,7 @@ public class FormTV : Form
         var W = ClientSize.Width; var H = ClientSize.Height;
         var st = Crono.Arr(_sess, "standings");
         var estado = _sess?.S("state") ?? "";
-        var andando = estado is "em_andamento" or "bandeira_final";
+        var andando = estado is "em_andamento" or "bandeira_final" && _sess?.B("aguardandoLargada") != true;
         var delta = andando ? (long)(DateTime.Now - _lidoEm).TotalMilliseconds : 0;
         var cab = H * 0.12f;
         using var fTitulo = new Font("Segoe UI", cab * 0.34f, FontStyle.Bold, GraphicsUnit.Pixel);

@@ -649,7 +649,9 @@ public partial class FormCrono : Form
         var estado = s0?.S("state") ?? "";
         _lEvento.Text = s0 == null ? "Selecione uma bateria" : s0.S("name");
         _lTipo.Text = s0 == null ? "" : Crono.Tipo(s0.S("type")) + (s0.L("maxLaps") is long ml && ml > 0 ? $" · {ml} voltas" : s0.L("durationMs") is long dm && dm > 0 ? $" · {dm / 60000} min" : "");
-        _lEstado.Text = Crono.Estado(estado) + (s0?.S("currentFlag") is { Length: > 0 } flag && flag != "none" ? " · " + BandeiraNome(flag) : "");
+        _lEstado.Text = s0?.B("aguardandoLargada") == true
+            ? "Bandeira verde · aguardando o 1º kart passar na linha"
+            : Crono.Estado(estado) + (s0?.S("currentFlag") is { Length: > 0 } flag && flag != "none" ? " · " + BandeiraNome(flag) : "");
         _lEstado.ForeColor = Crono.CorEstado(estado);
         _bVerde.Enabled = estado == "preparando";
         _bAmarela.Enabled = _bVermelha.Enabled = _bBranca.Enabled = _bQuad.Enabled = estado == "em_andamento";
@@ -737,7 +739,8 @@ public partial class FormCrono : Form
         _sHora.Text = DateTime.Now.ToString("HH:mm:ss");
         _sData.Text = DateTime.Now.ToString("dd/MM/yyyy");
         if (_sess == null) { _lCrono.Text = "00:00:00.000"; _lRestante.Text = "---"; return; }
-        var andando = _sess.S("state") is "em_andamento" or "bandeira_final";
+        // com a verde dada mas nenhum kart na linha ainda, o cronômetro fica parado em zero
+        var andando = _sess.S("state") is "em_andamento" or "bandeira_final" && !_sess.B("aguardandoLargada");
         var delta = andando && _sess.S("currentFlag") != "red" ? (long)(DateTime.Now - _lidoEm).TotalMilliseconds : 0;
         _lCrono.Text = Crono.Relogio((_sess.L("elapsedMs") ?? 0) + delta);
         _lRestante.Text = _sess.L("remainingMs") is long rest ? Crono.Relogio(Math.Max(0, rest - delta))[..8] : "---";
@@ -751,7 +754,7 @@ public partial class FormCrono : Form
         var nome = _sess.S("name");
         var pergunta = acao switch
         {
-            "start" => $"Dar a BANDEIRA VERDE na bateria \"{nome}\"?\n\nO cronômetro começa agora e as passagens passam a contar.",
+            "start" => $"Dar a BANDEIRA VERDE na bateria \"{nome}\"?\n\nO cronômetro começa quando o primeiro kart passar na linha de largada.",
             "checkered" => $"Dar a BANDEIRA QUADRICULADA em \"{nome}\"?\n\nCada kart termina ao cruzar a linha.",
             "close" => $"ENCERRAR a bateria \"{nome}\" agora?\n\nPassagens depois disso não contam mais.",
             "cancel" => $"CANCELAR a bateria \"{nome}\"?\n\nEla sai da cronometragem (o diário de passagens continua guardado).",
