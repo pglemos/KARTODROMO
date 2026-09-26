@@ -440,7 +440,7 @@ public partial class FormCrono : Form
         _bandeiras.Items.Add(new ToolStripControlHost(_lPassagens) { Alignment = ToolStripItemAlignment.Right, AutoSize = false, Width = 76, Height = 40 });
         _bandeiras.Items.Add(new ToolStripLabel("Passagens:") { Alignment = ToolStripItemAlignment.Right, Font = new Font("Segoe UI", 9F, FontStyle.Bold) });
 
-        if (_gPass.Columns.Count == 0) _gPass.Col("#", 40).Col("Nº", 45).Col("Competidor", 130, DataGridViewContentAlignment.MiddleLeft, true).Col("Transp.", 72).Col("Tempo", 76).Col("Volta", 46).Col("Decorrido", 96).Col("Situação", 150, DataGridViewContentAlignment.MiddleLeft);
+        if (_gPass.Columns.Count == 0) _gPass.Col("#", 40).Col("Nº", 45, filtro: true).Col("Competidor", 130, DataGridViewContentAlignment.MiddleLeft, true, filtro: true).Col("Transp.", 72, filtro: true).Col("Tempo", 76).Col("Volta", 46, filtro: true).Col("Decorrido", 96).Col("Situação", 150, DataGridViewContentAlignment.MiddleLeft, filtro: true);
         TemaCrono.EstilizarGrade(_gPass);
         _gPass.CorFundo = r =>
         {

@@ -164,6 +164,8 @@ public class Grade : DataGridView
     Col[] _cols = [];
     List<JsonObject> _todos = [];
     readonly Dictionary<string, string> _filtros = [];
+    /// <summary>filtro por lista de valores (funil do cabeçalho, como no LapTime)</summary>
+    readonly Dictionary<string, HashSet<string>> _valores = [];
     public Func<JsonObject, Color?> CorLinha { get; set; }
     public Func<List<JsonObject>, ToolStripItem[]> MenuDe { get; set; }
     public event Action<JsonObject> Duplo;
@@ -214,10 +216,88 @@ public class Grade : DataGridView
             m.Show(this, e.Location);
         };
         DataError += (_, e) => e.ThrowException = false;
+
+        // funil de filtro no canto direito de cada cabeçalho
+        CellPainting += (_, e) =>
+        {
+            if (e.RowIndex != -1 || e.ColumnIndex < 0 || ColDe(e.ColumnIndex) is not Col c) return;
+            e.Paint(e.ClipBounds, DataGridViewPaintParts.All);
+            FiltroColuna.Desenhar(e.Graphics, e.CellBounds, Filtrada(c.Chave));
+            e.Handled = true;
+        };
+        ColumnHeaderMouseClick += (_, e) =>
+        {
+            if (e.Button != MouseButtons.Left || ColDe(e.ColumnIndex) is not Col c) return;
+            var col = Columns[e.ColumnIndex];
+            if (e.X >= col.Width - FiltroColuna.LarguraFunil) { AbrirFiltro(e.ColumnIndex); return; }
+            var dir = SortedColumn == col && SortOrder == SortOrder.Ascending ? ListSortDirection.Descending : ListSortDirection.Ascending;
+            Sort(col, dir);
+        };
+        MouseMove += (_, e) =>
+        {
+            var hit = HitTest(e.X, e.Y);
+            var noFunil = hit.Type == DataGridViewHitTestType.ColumnHeader && ColDe(hit.ColumnIndex) != null
+                && FiltroColuna.NoFunil(GetCellDisplayRectangle(hit.ColumnIndex, -1, false), e.Location);
+            Cursor = noFunil ? Cursors.Hand : Cursors.Default;
+        };
     }
+
+    Col ColDe(int colIndex) => colIndex >= 0 && colIndex < Columns.Count ? _cols.FirstOrDefault(x => x.Chave == Columns[colIndex].Name) : null;
+    bool Filtrada(string chave) => _filtros.ContainsKey(chave) || _valores.ContainsKey(chave);
+    public bool TemFiltro => _filtros.Count > 0 || _valores.Count > 0;
+
+    /// <summary>Texto da célula como aparece na tela (é o que a lista do filtro mostra).</summary>
+    string TextoFiltro(JsonObject o, Col c) => Valor(o, c) switch
+    {
+        null => "",
+        DateTime d => d.ToString(c.Tipo == TipoCol.Data ? "dd/MM/yyyy" : c.Tipo == TipoCol.Hora ? "HH:mm" : "dd/MM/yyyy HH:mm"),
+        decimal m => m.ToString("N2", Fmt.Br),
+        bool b => b ? "Sim" : "Não",
+        var v => v.ToString()?.Trim() ?? "",
+    };
+
+    void AbrirFiltro(int colIndex)
+    {
+        if (ColDe(colIndex) is not Col c) return;
+        // valores das linhas que passam nos OUTROS filtros (como no Excel)
+        var valores = _todos.Where(o => Passa(o, c.Chave)).Select(o => TextoFiltro(o, c));
+        var celula = GetCellDisplayRectangle(colIndex, -1, false);
+        FiltroColuna.Abrir(this, celula, c.Titulo, valores, _valores.GetValueOrDefault(c.Chave), escolha =>
+        {
+            if (escolha == null) _valores.Remove(c.Chave); else _valores[c.Chave] = escolha;
+            Redesenhar(); FiltroMudou?.Invoke();
+        });
+    }
+
+    /// <summary>Filtra a coluna pelos valores (texto como aparece na tela); null limpa.</summary>
+    public void Filtrar(string chave, IEnumerable<string> valores)
+    {
+        if (valores == null) _valores.Remove(chave); else _valores[chave] = valores.ToHashSet();
+        Redesenhar(); FiltroMudou?.Invoke();
+    }
+
+    public void AbrirFiltro(string chave) { for (var i = 0; i < Columns.Count; i++) if (Columns[i].Name == chave) { AbrirFiltro(i); return; } }
+
+    public void LimparFiltros()
+    {
+        _filtros.Clear(); _valores.Clear();
+        Redesenhar(); FiltroMudou?.Invoke();
+    }
+
+    bool Passa(JsonObject o, string exceto = null) =>
+        _valores.All(f => f.Key == exceto || _cols.FirstOrDefault(x => x.Chave == f.Key) is not Col c || f.Value.Contains(TextoFiltro(o, c)))
+        && _filtros.All(f =>
+        {
+            if (f.Key == exceto || _cols.FirstOrDefault(x => x.Chave == f.Key) is not Col c) return true;
+            var v = Valor(o, c);
+            var txt = v switch { DateTime d => d.ToString("dd/MM/yyyy HH:mm"), decimal m => m.ToString("N2", Fmt.Br), bool b => b ? "sim" : "nao", _ => v?.ToString() };
+            return Norm(txt).Contains(f.Value);
+        });
 
     public void Colunas(params Col[] cols)
     {
+        // trocou de lista: filtros da lista anterior não valem mais
+        _filtros.Clear(); _valores.Clear();
         _cols = cols;
         Columns.Clear();
         if (ComMarcacao) Columns.Add(new DataGridViewCheckBoxColumn { Name = "__sel", HeaderText = "", Width = 28, ReadOnly = false });
@@ -225,9 +305,10 @@ public class Grade : DataGridView
         {
             DataGridViewColumn dc = c.Tipo == TipoCol.Bool ? new DataGridViewCheckBoxColumn() : new DataGridViewTextBoxColumn();
             dc.Name = c.Chave;
-            dc.HeaderText = c.Titulo + "  ▽";
+            dc.HeaderText = c.Titulo;
+            dc.HeaderCell.Style.Padding = new Padding(4, 0, FiltroColuna.LarguraFunil, 0);
             dc.ReadOnly = true;
-            dc.SortMode = DataGridViewColumnSortMode.Automatic;
+            dc.SortMode = DataGridViewColumnSortMode.Programmatic;
             dc.Width = c.Largura > 0 ? c.Largura : c.Tipo switch { TipoCol.Bool => 55, TipoCol.Dinheiro => 100, TipoCol.DataHora => 118, TipoCol.Data => 90, TipoCol.Hora => 60, TipoCol.Inteiro => 80, _ => 150 };
             switch (c.Tipo)
             {
@@ -283,23 +364,13 @@ public class Grade : DataGridView
         if (sortCol != null && sortDir != SortOrder.None) Sort(sortCol, sortDir == SortOrder.Ascending ? ListSortDirection.Ascending : ListSortDirection.Descending);
         ClearSelection();
         if (selIds != null) foreach (DataGridViewRow r in Rows) if (selIds.Contains(((JsonObject)r.Tag).S("id"))) r.Selected = true;
-        foreach (DataGridViewColumn dc in Columns)
-        {
-            var c = _cols.FirstOrDefault(x => x.Chave == dc.Name);
-            if (c != null) dc.HeaderText = c.Titulo + (_filtros.ContainsKey(c.Chave) ? "  ▼" : "  ▽");
-        }
         ResumeLayout();
+        Invalidate();
     }
 
     static string Norm(string s) => new string((s ?? "").Normalize(NormalizationForm.FormD).Where(ch => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(ch) != System.Globalization.UnicodeCategory.NonSpacingMark).ToArray()).ToLowerInvariant();
 
-    public List<JsonObject> Visiveis => _todos.Where(o => _filtros.All(f =>
-    {
-        var c = _cols.First(x => x.Chave == f.Key);
-        var v = Valor(o, c);
-        var txt = v switch { DateTime d => d.ToString("dd/MM/yyyy HH:mm"), decimal m => m.ToString("N2", Fmt.Br), bool b => b ? "sim" : "nao", _ => v?.ToString() };
-        return Norm(txt).Contains(f.Value);
-    })).ToList();
+    public List<JsonObject> Visiveis => _todos.Where(o => Passa(o)).ToList();
 
     public List<JsonObject> Todos => _todos;
     public JsonObject Atual => CurrentRow?.Tag as JsonObject ?? (SelectedRows.Count > 0 ? SelectedRows[0].Tag as JsonObject : null);
@@ -320,14 +391,16 @@ public class Grade : DataGridView
         var c = _cols.FirstOrDefault(x => x.Chave == nome);
         if (c == null) return;
         var m = new ContextMenuStrip { Font = Tema.Normal };
-        m.Items.Add("Filtrar esta coluna...", null, (_, _) =>
+        m.Items.Add("Filtrar esta coluna...", null, (_, _) => BeginInvoke(() => AbrirFiltro(colIndex)));
+        m.Items.Add("Filtrar por texto (contém)...", null, (_, _) =>
         {
             var v = Prompt.Pedir(FindForm(), $"Mostrar só as linhas em que \"{c.Titulo}\" contém:", _filtros.GetValueOrDefault(c.Chave, ""), "Filtrar");
             if (v == null) return;
             if (string.IsNullOrWhiteSpace(v)) _filtros.Remove(c.Chave); else _filtros[c.Chave] = Norm(v.Trim());
             Redesenhar(); FiltroMudou?.Invoke();
         });
-        m.Items.Add("Limpar filtros", null, (_, _) => { _filtros.Clear(); Redesenhar(); FiltroMudou?.Invoke(); }).Enabled = _filtros.Count > 0;
+        m.Items.Add("Limpar filtro desta coluna", null, (_, _) => { _filtros.Remove(c.Chave); _valores.Remove(c.Chave); Redesenhar(); FiltroMudou?.Invoke(); }).Enabled = Filtrada(c.Chave);
+        m.Items.Add("Limpar todos os filtros", null, (_, _) => LimparFiltros()).Enabled = TemFiltro;
         m.Show(this, PointToClient(Cursor.Position));
     }
 

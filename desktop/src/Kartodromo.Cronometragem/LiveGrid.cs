@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Kartodromo.Comum;
 
 namespace Kartodromo.Cronometragem;
 
@@ -9,6 +10,11 @@ public class LiveGrid : DataGridView
     public Func<int, Color?> CorFundo { get; set; }
     public Func<int, Color?> CorFonteLinha { get; set; }
     public List<object> Chaves { get; } = [];
+    /// <summary>Colunas com funil de filtro (como o Nº e o Transponder no LapTime) e os valores escolhidos.</summary>
+    readonly HashSet<int> _filtraveis = [];
+    readonly Dictionary<int, HashSet<string>> _filtros = [];
+    IList<object[]> _linhas = [];
+    IList<object> _chavesTodas;
 
     public LiveGrid()
     {
@@ -44,12 +50,50 @@ public class LiveGrid : DataGridView
             var txt = CorTexto?.Invoke(e.RowIndex, e.ColumnIndex) ?? fonte;
             if (txt is Color t) { e.CellStyle.ForeColor = t; e.CellStyle.SelectionForeColor = t; }
         };
+        CellPainting += (_, e) =>
+        {
+            if (e.RowIndex != -1 || !_filtraveis.Contains(e.ColumnIndex)) return;
+            e.Paint(e.ClipBounds, DataGridViewPaintParts.All);
+            FiltroColuna.Desenhar(e.Graphics, e.CellBounds, _filtros.ContainsKey(e.ColumnIndex));
+            e.Handled = true;
+        };
+        ColumnHeaderMouseClick += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Left && _filtraveis.Contains(e.ColumnIndex)) AbrirFiltro(e.ColumnIndex);
+        };
+        MouseMove += (_, e) =>
+        {
+            var hit = HitTest(e.X, e.Y);
+            Cursor = hit.Type == DataGridViewHitTestType.ColumnHeader && _filtraveis.Contains(hit.ColumnIndex) ? Cursors.Hand : Cursors.Default;
+        };
     }
 
-    public LiveGrid Col(string titulo, int largura, DataGridViewContentAlignment alinhamento = DataGridViewContentAlignment.MiddleCenter, bool preenche = false)
+    public bool TemFiltro => _filtros.Count > 0;
+
+    void AbrirFiltro(int col)
+    {
+        var valores = Enumerable.Range(0, _linhas.Count).Where(i => Passa(_linhas[i], col)).Select(i => Texto(_linhas[i], col));
+        FiltroColuna.Abrir(this, GetCellDisplayRectangle(col, -1, false), Columns[col].HeaderText, valores, _filtros.GetValueOrDefault(col), escolha =>
+        {
+            if (escolha == null) _filtros.Remove(col); else _filtros[col] = escolha;
+            Preencher(_linhas, _chavesTodas);
+            Invalidate();
+        });
+    }
+
+    static string Texto(object[] linha, int col) => col < linha.Length ? linha[col]?.ToString()?.Trim() ?? "" : "";
+    bool Passa(object[] linha, int exceto = -1) => _filtros.All(f => f.Key == exceto || f.Value.Contains(Texto(linha, f.Key)));
+
+    public LiveGrid Col(string titulo, int largura, DataGridViewContentAlignment alinhamento = DataGridViewContentAlignment.MiddleCenter, bool preenche = false, bool filtro = false)
     {
         var c = new DataGridViewTextBoxColumn { HeaderText = titulo, SortMode = DataGridViewColumnSortMode.NotSortable, Width = largura };
         c.DefaultCellStyle.Alignment = alinhamento;
+        if (filtro)
+        {
+            _filtraveis.Add(Columns.Count);
+            c.HeaderCell.Style.Padding = new Padding(0, 0, FiltroColuna.LarguraFunil, 0);
+            c.Width += 14;
+        }
         if (preenche) { c.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill; c.MinimumWidth = largura; }
         Columns.Add(c);
         return this;
@@ -58,6 +102,13 @@ public class LiveGrid : DataGridView
     /// <summary>Troca o conteudo mantendo a rolagem; so escreve celulas que mudaram.</summary>
     public void Preencher(IList<object[]> linhas, IList<object> chaves = null)
     {
+        _linhas = linhas; _chavesTodas = chaves;
+        if (_filtros.Count > 0)
+        {
+            var manter = Enumerable.Range(0, linhas.Count).Where(i => Passa(linhas[i])).ToList();
+            linhas = manter.Select(i => linhas[i]).ToList();
+            if (chaves != null) chaves = manter.Where(i => i < chaves.Count).Select(i => chaves[i]).ToList();
+        }
         var sel = ChaveAtual;
         var identidade = Identidade(sel);
         var topo = FirstDisplayedScrollingRowIndex;

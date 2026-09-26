@@ -142,7 +142,7 @@ static class VisualPrincipal
             c.HeaderCell.Style.Alignment = dir ? DataGridViewContentAlignment.MiddleRight : c is DataGridViewCheckBoxColumn ? DataGridViewContentAlignment.MiddleCenter : DataGridViewContentAlignment.MiddleLeft;
             if (c.DefaultCellStyle.Format == "dd/MM/yyyy HH:mm") { c.DefaultCellStyle.Format = "dd/MM HH:mm"; c.DefaultCellStyle.Font = new Font("Cascadia Mono", 8.6F); c.Width = Math.Min(c.Width, 108); }
             if (c.Name is "reserva" or "total" or "final" or "nome") c.DefaultCellStyle.Font = new Font("Segoe UI", 9.2F, FontStyle.Bold);
-            if (c is DataGridViewCheckBoxColumn && c.Name != "__sel") c.Width = Math.Max(64, TextRenderer.MeasureText(c.HeaderText, grade.ColumnHeadersDefaultCellStyle.Font).Width + 26);
+            if (c is DataGridViewCheckBoxColumn && c.Name != "__sel") c.Width = Math.Max(64, TextRenderer.MeasureText(c.HeaderText, grade.ColumnHeadersDefaultCellStyle.Font).Width + 26 + FiltroColuna.LarguraFunil);
             c.MinimumWidth = 40;
         }
     }

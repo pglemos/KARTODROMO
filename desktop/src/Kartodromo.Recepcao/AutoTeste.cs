@@ -289,6 +289,55 @@ public static class AutoTeste
     [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
     [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint flags);
 
+    /// <summary>Teste do filtro de coluna (funil) fora da tela, sem roubar o foco. Fotos por PrintWindow.</summary>
+    public static async Task RodarFiltro(string pasta, string login, string senha)
+    {
+        Directory.CreateDirectory(pasta);
+        Log.Clear();
+        var acesso = await Sessao.Api.Post("/api/login", new { login, senha, termos = true });
+        Sessao.Api.Token = acesso.S("token");
+        Sessao.Usuario = acesso["usuario"]!.AsObject();
+        await Sessao.CarregarApoio();
+        Msg.Registro = m => Log.Add(m);
+        var antes = GetForegroundWindow();
+        var principal = new FormPrincipal { WindowState = FormWindowState.Normal, StartPosition = FormStartPosition.Manual, Location = new Point(-4000, 0), ClientSize = new Size(1440, 860), ConfirmarSaida = false, ShowInTaskbar = false };
+        principal.Show();
+        SetForegroundWindow(antes);
+        await Esperar(1500);
+        principal.Selecionar("reservas:todas");
+        await Esperar(1500);
+        var grade = Descendentes(principal).OfType<Grade>().First();
+        void Foto(Control c, string nome)
+        {
+            using var bmp = new Bitmap(c.Width, c.Height);
+            using (var g = Graphics.FromImage(bmp)) { var hdc = g.GetHdc(); PrintWindow(c.Handle, hdc, 0); g.ReleaseHdc(hdc); }
+            bmp.Save(Path.Combine(pasta, nome + ".png"));
+        }
+        Foto(principal, "1-reservas-cabecalhos");
+        var total = grade.Visiveis.Count;
+        Log.Add($"linhas sem filtro: {total}");
+        grade.AbrirFiltro("cliente");
+        await Esperar(600);
+        if (FiltroColuna.Aberto is { } pop) { Foto(pop, "2-filtro-cliente-aberto"); Log.Add("OK lista do filtro abriu"); pop.Close(); }
+        else Log.Add("ERRO lista do filtro não abriu");
+        SetForegroundWindow(antes);
+        var alvo = grade.Todos.Select(o => o.S("cliente")).FirstOrDefault(n => n.Length > 0);
+        if (alvo != null)
+        {
+            grade.Filtrar("cliente", [alvo]);
+            await Esperar(300);
+            var n = grade.Visiveis.Count;
+            var certo = grade.Visiveis.All(o => o.S("cliente") == alvo) && n > 0 && n <= total;
+            Log.Add($"{(certo ? "OK" : "ERRO")} filtro Cliente = '{alvo}': {n} de {total} linha(s), grade mostra {grade.Rows.Count}");
+            Foto(principal, "3-filtrado");
+            grade.LimparFiltros();
+            await Esperar(300);
+            Log.Add($"{(grade.Visiveis.Count == total ? "OK" : "ERRO")} limpar filtro volta {grade.Visiveis.Count} de {total}");
+        }
+        principal.Close();
+        File.WriteAllLines(Path.Combine(pasta, "log.txt"), Log);
+    }
+
     /// <summary>Teste só do visualizador de relatório/termo, fora da tela e sem roubar o foco de quem
     /// está usando o computador. A foto é da própria janela (PrintWindow), não da tela.</summary>
     public static async Task RodarRelatorios(string pasta, string login, string senha)
