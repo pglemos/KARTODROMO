@@ -93,6 +93,28 @@ export function parseTrxLine(line: string): TrxRecord {
     };
   }
 
+  // Formato decimal (o que o TranX do kartódromo manda depois do @RESET), igual ao LapTime:
+  //   SOH @ <decoder> <seq> <transponder decimal> <segundos.milésimos> <hits> <força> <bateria> x<crc>
+  if (type !== '$' && type !== '#' && fields.length >= 8 && /^\d+$/.test(fields[3] ?? '') && /^\d+(\.\d+)?$/.test(fields[4] ?? '')) {
+    const transponder = Number.parseInt(fields[3], 10);
+    if (SPECIAL_TRANSPONDERS.has(transponder)) return { kind: 'other', raw };
+    let [seg, frac = ''] = fields[4].split('.');
+    if (seg === '18446744073709') seg = '0'; // overflow do relógio que o LapTime também zera
+    const decoderTimeMs = Number.parseInt(seg, 10) * 1000 + Number.parseInt(frac.padEnd(3, '0').slice(0, 3), 10);
+    const seq = Number.parseInt(fields[2] ?? '', 10);
+    const dec = (v: string | undefined) => (v !== undefined && /^\d+$/.test(v) ? Number.parseInt(v, 10) : null);
+    return {
+      kind: 'passing',
+      decoderId,
+      sequence: Number.isFinite(seq) ? seq : null,
+      transponder,
+      decoderTimeMs,
+      hits: dec(fields[5]),
+      strength: dec(fields[6]),
+      raw,
+    };
+  }
+
   return { kind: 'other', raw };
 }
 

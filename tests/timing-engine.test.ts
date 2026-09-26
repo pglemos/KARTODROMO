@@ -261,3 +261,16 @@ describe('decoder TranX (conexão real)', () => {
     expect(a).toMatchObject({ laps: 1, lastLapMs: 62_500 });
   });
 });
+
+describe('decoder TranX formato decimal (linhas reais de 26/09)', () => {
+  it('lê kart 008 e 047 do formato @', () => {
+    expect(parseTrxLine('\u0001@\t20\t31\t5617602\t147.367\t178\t167\t2\txF7B9')).toMatchObject({ kind: 'passing', decoderId: '20', sequence: 31, transponder: 5617602, decoderTimeMs: 147_367, hits: 178, strength: 167 });
+    expect(parseTrxLine('\u0001@\t20\t32\t4202107\t148.146\t354\t183\t2\tx963D')).toMatchObject({ kind: 'passing', transponder: 4202107, decoderTimeMs: 148_146 });
+  });
+
+  it('milésimos curtos e confirmações de comando', () => {
+    expect(parseTrxLine('\u0001@\t20\t1\t5617602\t65.5\t10\t90\t2\tx0000')).toMatchObject({ decoderTimeMs: 65_500 });
+    expect(parseTrxLine('\u0001$\t20\t0\t0\t1\tx1F46').kind).toBe('other');
+    expect(parseTrxLine('\u0001@\t20\t2\t9993\t1.000\t1\t1\t2\tx0000').kind).toBe('other');
+  });
+});
