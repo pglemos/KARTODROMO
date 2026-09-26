@@ -49,6 +49,14 @@ public partial class FormCrono : Form
     readonly StatusStrip _status = new() { SizingGrip = false };
     readonly ToolStripStatusLabel _sHora = new(), _sData = new(), _sServidor = new(), _sDecoder = new(), _sTransp = new() { IsLink = true, ForeColor = Color.Red }, _sTv = new() { IsLink = true }, _sPainel = new() { IsLink = true };
     readonly PainelLed _painel = new();
+    readonly Panel _pnlPainelLed = new();
+    readonly Label _lPainelBadge = new();
+    readonly Label _lPainelStatus = new();
+    readonly Button _btnPag1 = new();
+    readonly Button _btnPag2 = new();
+    readonly Button _btnPag3 = new();
+    readonly CheckBox _chkPainelAuto = new();
+    readonly Button _btnPainelConfig = new();
 
     static Label Info() => new() { AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
 
@@ -101,6 +109,9 @@ public partial class FormCrono : Form
             else if (e.KeyCode == Keys.F5) { e.Handled = true; Acao("close"); }
             else if (e.KeyCode == Keys.F6) { e.Handled = true; LimparPassagens(); }
             else if (e.KeyCode == Keys.F7) { e.Handled = true; Bandeira("branca"); }
+            else if (e.KeyCode == Keys.F8) { e.Handled = true; _chkPainelAuto.Checked = false; _painel.AutoAvanco = false; _painel.DefinirPagina(0); AtualizarBotoesPainel(); }
+            else if (e.KeyCode == Keys.F9) { e.Handled = true; if (_painel.TotalPaginas >= 2) { _chkPainelAuto.Checked = false; _painel.AutoAvanco = false; _painel.DefinirPagina(1); AtualizarBotoesPainel(); } }
+            else if (e.KeyCode == Keys.F10) { e.Handled = true; if (_painel.TotalPaginas >= 3) { _chkPainelAuto.Checked = false; _painel.AutoAvanco = false; _painel.DefinirPagina(2); AtualizarBotoesPainel(); } }
             else if (e.KeyCode == Keys.Insert) { e.Handled = true; IncluirPassagem(); }
             else if (e.KeyCode == Keys.Delete) { e.Handled = true; CorrigirPassagem("delete"); }
             else if (e.KeyCode == Keys.F11) { e.Handled = true; AbrirTV(); }
@@ -503,9 +514,15 @@ public partial class FormCrono : Form
         rightLayout.Controls.Add(resultCard, 0, 0); rightLayout.Controls.Add(_lVoltaFaixa, 1, 0);
         split.Panel2.Controls.Add(rightLayout);
 
-        var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(6, 2, 6, 4) };
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 150)); root.RowStyles.Add(new RowStyle(SizeType.Absolute, 64)); root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        root.Controls.Add(metrics, 0, 0); root.Controls.Add(_bandeiras, 0, 1); root.Controls.Add(split, 0, 2);
+        var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(6, 2, 6, 4) };
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 140));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        root.Controls.Add(metrics, 0, 0);
+        root.Controls.Add(_bandeiras, 0, 1);
+        root.Controls.Add(CriarBarraPainelLed(), 0, 2);
+        root.Controls.Add(split, 0, 3);
         page.Controls.Add(root);
         page.Layout += (_, _) => { if (split.Width > 1000 && split.SplitterDistance != (int)(split.Width * .38)) split.SplitterDistance = (int)(split.Width * .38); };
         return page;
@@ -573,8 +590,196 @@ public partial class FormCrono : Form
             else PainelLed.SalvarConfig(porta);
             _painel.Dispose();
             _painel.LerConfig();
+            AtualizarBotoesPainel();
         }
         catch (Exception e) { Msg.Erro(this, "Não foi possível salvar a configuração do painel: " + e.Message); }
+    }
+
+    Control CriarBarraPainelLed()
+    {
+        _pnlPainelLed.Dock = DockStyle.Fill;
+        _pnlPainelLed.Height = 44;
+        _pnlPainelLed.BackColor = Color.FromArgb(248, 249, 252);
+        _pnlPainelLed.Padding = new Padding(8, 5, 8, 5);
+
+        // Badge [ PLACAR LED COM3 ]
+        _lPainelBadge.Text = "PLACAR LED";
+        _lPainelBadge.AutoSize = true;
+        _lPainelBadge.Font = new Font("Segoe UI", 8F, FontStyle.Bold);
+        _lPainelBadge.BackColor = Color.FromArgb(30, 41, 59);
+        _lPainelBadge.ForeColor = Color.White;
+        _lPainelBadge.Padding = new Padding(6, 4, 6, 4);
+        _lPainelBadge.TextAlign = ContentAlignment.MiddleCenter;
+
+        // Status
+        _lPainelStatus.AutoSize = true;
+        _lPainelStatus.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+        _lPainelStatus.ForeColor = TemaCrono.Texto;
+        _lPainelStatus.Text = "Aguardando bateria...";
+        _lPainelStatus.TextAlign = ContentAlignment.MiddleLeft;
+        _lPainelStatus.Margin = new Padding(6, 4, 0, 0);
+
+        var flowLeft = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Left,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndOnly,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Padding = new Padding(0, 1, 0, 0)
+        };
+        flowLeft.Controls.Add(_lPainelBadge);
+        flowLeft.Controls.Add(_lPainelStatus);
+
+        ConfigurarBotaoPagina(_btnPag1, "1º ao 10º (F8)", 0);
+        ConfigurarBotaoPagina(_btnPag2, "11º ao 20º (F9)", 1);
+        ConfigurarBotaoPagina(_btnPag3, "21º ao 30º (F10)", 2);
+
+        _chkPainelAuto.Text = "Alternar auto (5s)";
+        _chkPainelAuto.AutoSize = true;
+        _chkPainelAuto.Font = new Font("Segoe UI", 8.5F);
+        _chkPainelAuto.ForeColor = TemaCrono.Texto;
+        _chkPainelAuto.Margin = new Padding(8, 7, 4, 0);
+        _chkPainelAuto.CheckedChanged += (_, _) =>
+        {
+            _painel.AutoAvanco = _chkPainelAuto.Checked;
+            AtualizarBotoesPainel();
+        };
+
+        _btnPainelConfig.Text = "⚙ Config";
+        _btnPainelConfig.Size = new Size(68, 30);
+        _btnPainelConfig.Font = new Font("Segoe UI", 8F);
+        _btnPainelConfig.FlatStyle = FlatStyle.Flat;
+        _btnPainelConfig.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
+        _btnPainelConfig.BackColor = Color.White;
+        _btnPainelConfig.ForeColor = TemaCrono.Texto;
+        _btnPainelConfig.Margin = new Padding(6, 1, 0, 0);
+        _btnPainelConfig.Click += (_, _) => ConfigurarPainel();
+
+        var flowRight = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Right,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndOnly,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Padding = new Padding(0, 0, 0, 0)
+        };
+        var rotuloPag = new Label
+        {
+            Text = "Painel LED:",
+            AutoSize = true,
+            Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+            ForeColor = TemaCrono.Secundario,
+            Margin = new Padding(0, 7, 4, 0)
+        };
+        flowRight.Controls.Add(rotuloPag);
+        flowRight.Controls.Add(_btnPag1);
+        flowRight.Controls.Add(_btnPag2);
+        flowRight.Controls.Add(_btnPag3);
+        flowRight.Controls.Add(_chkPainelAuto);
+        flowRight.Controls.Add(_btnPainelConfig);
+
+        var pnlBarra = new Panel { Dock = DockStyle.Fill, Height = 36 };
+        pnlBarra.Controls.Add(flowLeft);
+        pnlBarra.Controls.Add(flowRight);
+        _pnlPainelLed.Controls.Add(pnlBarra);
+
+        _pnlPainelLed.Paint += (_, e) =>
+        {
+            using var pen = new Pen(Color.FromArgb(226, 232, 240), 1f);
+            e.Graphics.DrawLine(pen, 0, _pnlPainelLed.Height - 1, _pnlPainelLed.Width, _pnlPainelLed.Height - 1);
+        };
+
+        return _pnlPainelLed;
+    }
+
+    void ConfigurarBotaoPagina(Button btn, string texto, int pagina)
+    {
+        btn.Text = texto;
+        btn.Size = new Size(114, 30);
+        btn.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+        btn.FlatStyle = FlatStyle.Flat;
+        btn.Cursor = Cursors.Hand;
+        btn.Margin = new Padding(2, 1, 2, 0);
+        btn.Click += (_, _) =>
+        {
+            _chkPainelAuto.Checked = false;
+            _painel.AutoAvanco = false;
+            _painel.DefinirPagina(pagina);
+            AtualizarBotoesPainel();
+        };
+    }
+
+    void AtualizarBotoesPainel()
+    {
+        if (!_painel.Ativo)
+        {
+            _lPainelBadge.BackColor = Color.FromArgb(100, 116, 139);
+            _lPainelBadge.Text = "PAINEL LED DESLIGADO";
+            _lPainelStatus.Text = "Clique em \"Config\" para selecionar a porta serial (ex.: COM3)";
+            _lPainelStatus.ForeColor = TemaCrono.Secundario;
+            _btnPag1.Enabled = _btnPag2.Enabled = _btnPag3.Enabled = false;
+            _chkPainelAuto.Enabled = false;
+            EstilizarBotaoPag(_btnPag1, false);
+            EstilizarBotaoPag(_btnPag2, false);
+            EstilizarBotaoPag(_btnPag3, false);
+            return;
+        }
+
+        _lPainelBadge.BackColor = _painel.Ok ? (_painel.EmModoGrid ? Color.FromArgb(15, 118, 110) : Color.FromArgb(30, 41, 59)) : Color.FromArgb(185, 28, 28);
+        _lPainelBadge.Text = _painel.Porta + (_painel.EmModoGrid ? " · GRID" : "");
+
+        var totalPilotos = _painel.TotalPilotos;
+        var totalPaginas = _painel.TotalPaginas;
+        var paginaAtual = _painel.Pagina;
+
+        if (_painel.EmModoGrid)
+        {
+            _lPainelStatus.Text = $"{_painel.SessaoExibidaNome} (Finalizada) · {totalPilotos} pilotos · Montagem do Grid no Painel (Pág. {paginaAtual + 1} de {totalPaginas})";
+            _lPainelStatus.ForeColor = Color.FromArgb(15, 118, 110);
+        }
+        else if (_painel.SessaoExibidaNome.Length > 0)
+        {
+            _lPainelStatus.Text = $"{_painel.SessaoExibidaNome} · {totalPilotos} karts na pista · Pág. {paginaAtual + 1} de {totalPaginas}";
+            _lPainelStatus.ForeColor = TemaCrono.Texto;
+        }
+        else
+        {
+            _lPainelStatus.Text = "Painel conectado na porta " + _painel.Porta;
+            _lPainelStatus.ForeColor = TemaCrono.Secundario;
+        }
+
+        _btnPag1.Enabled = true;
+        _btnPag2.Enabled = totalPaginas >= 2;
+        _btnPag3.Enabled = totalPaginas >= 3;
+        _chkPainelAuto.Enabled = totalPaginas > 1;
+
+        EstilizarBotaoPag(_btnPag1, paginaAtual == 0);
+        EstilizarBotaoPag(_btnPag2, paginaAtual == 1 && _btnPag2.Enabled);
+        EstilizarBotaoPag(_btnPag3, paginaAtual == 2 && _btnPag3.Enabled);
+    }
+
+    static void EstilizarBotaoPag(Button btn, bool ativo)
+    {
+        if (!btn.Enabled)
+        {
+            btn.BackColor = Color.FromArgb(241, 245, 249);
+            btn.ForeColor = Color.FromArgb(148, 163, 184);
+            btn.FlatAppearance.BorderColor = Color.FromArgb(226, 232, 240);
+        }
+        else if (ativo)
+        {
+            btn.BackColor = Color.FromArgb(16, 185, 129); // Verde ativo
+            btn.ForeColor = Color.White;
+            btn.FlatAppearance.BorderColor = Color.FromArgb(5, 150, 105);
+        }
+        else
+        {
+            btn.BackColor = Color.White;
+            btn.ForeColor = Color.FromArgb(30, 41, 59);
+            btn.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
+        }
     }
 
     async Task Atualizar()
@@ -622,11 +827,17 @@ public partial class FormCrono : Form
         _lRuido.Text = dec?.S("noise") ?? "---";
         _sTv.ForeColor = _tv is { IsDisposed: false } ? Color.FromArgb(16, 124, 16) : Color.Red;
         _sTv.Font = _sDecoder.Font;
-        // painel de LED antigo (serial) segue a bateria em andamento, como no LapTime
-        if (_autoteste == null) _painel.Atualizar(_state?["focus"] as JsonObject);
+        // painel de LED antigo (serial) segue a bateria em andamento ou montagem do grid
+        if (_autoteste == null)
+        {
+            var foco = _state?["focus"] as JsonObject;
+            var qualif = _state?["lastQualifying"] as JsonObject ?? (_sess != null && _sess.S("type") != "corrida" && _sess.S("state") == "encerrada" ? _sess : null);
+            _painel.Atualizar(foco, qualif);
+        }
         _sPainel.Text = "PAINEL LED: " + (_painel.Ativo ? _painel.Situacao.ToUpperInvariant() : "DESLIGADO");
         _sPainel.ForeColor = !_painel.Ativo ? TemaCrono.Secundario : _painel.Ok ? TemaCrono.Verde : Color.Red;
         _sPainel.Font = _sDecoder.Font;
+        AtualizarBotoesPainel();
 
         // transponder sem kart nos ultimos 2 minutos
         var agora = DateTimeOffset.Now.ToUnixTimeMilliseconds();

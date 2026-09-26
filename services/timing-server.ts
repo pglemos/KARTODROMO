@@ -369,12 +369,14 @@ function stateView() {
     list.filter((s) => s.state === 'preparando').sort((a, b) => a.createdAt - b.createdAt)[0] ??
     list.find((s) => s.state === 'encerrada') ??
     null;
+  const lastQualifying = list.find((s) => s.state === 'encerrada' && s.type !== 'corrida');
   return {
     now: Date.now(),
     track: TRACK_NAME,
     decoder: decoderView(),
     runningId: running?.id ?? null,
     focus: focus ? sessionView(focus) : null,
+    lastQualifying: lastQualifying ? sessionView(lastQualifying) : null,
     sessions: list.slice(0, 40).map(sessionSummary),
     recentPassings,
   };
