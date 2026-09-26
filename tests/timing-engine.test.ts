@@ -236,3 +236,28 @@ describe('catalogo de eventos e provas', () => {
     expect(() => normalizeCatalog({ events: [], groups: [{ id: 'g', eventId: 'missing', name: 'Grupo' }], provas: [], categories: [], tracks: [] })).toThrow('evento inexistente');
   });
 });
+
+describe('decoder TranX (conexão real)', () => {
+  it('lê a linha de passagem do TranX como o LapTime (hex, TAB, SOH)', () => {
+    const r = parseTrxLine('\u0001$\t20\t7\t17C8C9\t0001D4C0\t0A\t3C\t01\tx1234');
+    expect(r).toMatchObject({ kind: 'passing', decoderId: '20', sequence: 7, transponder: 1558729, decoderTimeMs: 120_000, hits: 10, strength: 60 });
+  });
+
+  it('status do decoder não vira passagem', () => {
+    expect(parseTrxLine('\u0001#\t20\t0\t24\t0\tx2ADF').kind).toBe('status');
+  });
+
+  it('manda @RESET e SOH ?;;;11; ao conectar, igual ao LapTime', async () => {
+    const { TRX_INIT_COMMANDS } = await import('../lib/timing/decoder-client');
+    expect(TRX_INIT_COMMANDS).toEqual(['@RESET', '\u0001?;;;11;']);
+  });
+
+  it('relógio do decoder zerado no meio da prova (reconexão) usa o tempo real da volta', () => {
+    const s = race();
+    applyPassing(s, { kart: '4', decoderTimeMs: 600_000, wallMs: 1_000_000 });
+    // conexão caiu e voltou: decoder reiniciou o relógio perto de zero
+    applyPassing(s, { kart: '4', decoderTimeMs: 20_000, wallMs: 1_062_500 });
+    const [a] = computeStandings(s);
+    expect(a).toMatchObject({ laps: 1, lastLapMs: 62_500 });
+  });
+});

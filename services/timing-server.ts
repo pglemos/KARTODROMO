@@ -224,11 +224,24 @@ decoder.on('passing', (p: TrxPassing) => {
 
   // diario primeiro: e a fonte de verdade pra reconstruir qualquer bateria
   journal({ wallMs, raw: p.raw, transponder: p.transponder, kart, decoderTimeMs: p.decoderTimeMs, seq: p.sequence, sessionId: session?.id ?? null, result });
+  log(`passagem transponder ${p.transponder} -> kart ${kart ?? '?'} (${result})`);
 
   recentPassings.unshift({ id, wallMs, transponder: p.transponder, kart, result, lapMs, sessionId: session?.id ?? null });
   recentPassings.length = Math.min(recentPassings.length, 60);
   broadcast('passing', recentPassings[0]);
   scheduleStateBroadcast();
+});
+
+decoder.on('init', (cmds: string[]) => log('decoder inicializado', cmds.map((c) => JSON.stringify(c)).join(' ')));
+
+// linhas que não são status nem passagem: registra as primeiras de cada hora pra diagnóstico
+let outrasNaHora = 0;
+setInterval(() => { outrasNaHora = 0; }, 3_600_000).unref();
+decoder.on('other', (raw: string) => {
+  // "$ <decoder> <seq> <comando> <resultado>" (6 campos) = confirmação de comando (@RESET / ?;;;11;)
+  const campos = raw.split('\u0001').join('').trim().split('\t');
+  if (campos[0] === '$' && campos.length === 6) log('decoder confirmou comando', JSON.stringify(raw));
+  else if (outrasNaHora++ < 30) log('decoder linha não reconhecida', JSON.stringify(raw));
 });
 
 decoder.on('change', () => {

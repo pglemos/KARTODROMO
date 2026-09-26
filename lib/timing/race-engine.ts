@@ -72,6 +72,8 @@ export type Standing = {
 };
 
 const DAY_MS = 86_400_000;
+/** Diferença aceitável entre o relógio do decoder e o do servidor numa volta (atraso de rede). */
+const DECODER_CLOCK_TOLERANCE_MS = 3_000;
 /** após a quadriculada, encerra sozinho depois desse tempo mesmo que algum kart não passe */
 export const AUTO_CLOSE_AFTER_CHECKERED_MS = 3 * 60_000;
 
@@ -224,6 +226,10 @@ function lapDuration(previous: Crossing, current: Crossing) {
   if (previous.source === 'manual') return Math.max(0, current.wallMs - previous.wallMs);
   let ms = current.decoderTimeMs - previous.decoderTimeMs;
   if (ms < 0) ms += DAY_MS;
+  // O relógio do decoder é zerado a cada conexão (@RESET + ?;;;11;). Se a conexão caiu no
+  // meio da prova, a diferença pelo decoder deixa de fazer sentido: usa o intervalo real.
+  const wall = current.wallMs - previous.wallMs;
+  if (wall > 0 && Math.abs(ms - wall) > DECODER_CLOCK_TOLERANCE_MS) return wall;
   return ms;
 }
 

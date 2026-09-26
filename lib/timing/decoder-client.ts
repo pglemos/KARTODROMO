@@ -16,10 +16,14 @@ export type DecoderStatus = {
 };
 
 /**
- * Conexao TCP somente-leitura com o decoder TranX. Nunca envia comando pro decoder.
+ * Conexao TCP com o decoder TranX. Ao conectar manda os mesmos 2 comandos que o LapTime
+ * mandava (LapTime.Server StartMenu, protocolo TRX): `@RESET` e `SOH ?;;;11;` (reinicia o
+ * cronometro do decoder). Sem isso o TranX so manda status (#) e nunca as passagens ($).
  * Reconecta sozinho; se ficar 20s sem receber nada (o TranX manda status a cada ~5s),
  * derruba e reconecta.
  */
+export const TRX_INIT_COMMANDS = ['@RESET', '\u0001?;;;11;'];
+
 export class DecoderClient extends EventEmitter {
   readonly status: DecoderStatus;
   private socket: net.Socket | null = null;
@@ -28,7 +32,7 @@ export class DecoderClient extends EventEmitter {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private watchdog: NodeJS.Timeout | null = null;
 
-  constructor(host: string, port: number, private readonly silenceTimeoutMs = 20_000) {
+  constructor(host: string, port: number, private readonly silenceTimeoutMs = 20_000, private readonly initCommands: string[] = TRX_INIT_COMMANDS) {
     super();
     this.status = {
       host,
@@ -80,6 +84,9 @@ export class DecoderClient extends EventEmitter {
       s.lastDataAt = Date.now();
       s.lastError = null;
       socket.setTimeout(0);
+      // cada comando como o LapTime: texto + CRLF
+      for (const cmd of this.initCommands) socket.write(cmd + '\r\n', 'latin1');
+      if (this.initCommands.length) this.emit('init', this.initCommands);
       this.emit('change');
     });
 
