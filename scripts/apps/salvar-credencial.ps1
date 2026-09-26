@@ -7,7 +7,7 @@
 $pasta = Join-Path $env:USERPROFILE '.kartodromo'
 New-Item -ItemType Directory -Force $pasta | Out-Null
 $senha = Read-Host 'Senha da conta KARTODROMO (SEC-008)' -AsSecureString
-$cred = New-Object System.Management.Automation.PSCredential('KARTODROMO', $senha)
+$cred = New-Object System.Management.Automation.PSCredential('.\KARTODROMO', $senha)
 # confere a senha numa máquina antes de salvar
 try {
   Invoke-Command -ComputerName 192.168.20.13 -Credential $cred -ScriptBlock { $env:COMPUTERNAME } -ErrorAction Stop | ForEach-Object { "senha conferida no $_" }

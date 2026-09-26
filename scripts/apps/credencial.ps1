@@ -8,7 +8,10 @@
 function Obter-CredencialKartodromo {
   foreach ($arq in @((Join-Path $env:USERPROFILE '.kartodromo\winrm-cred.xml'), 'C:\KARTODROMO\.winrm-cred.xml')) {
     if (Test-Path $arq) {
-      try { return Import-Clixml $arq } catch { }
+      try {
+        $cred = Import-Clixml $arq
+        return New-Object System.Management.Automation.PSCredential('.\KARTODROMO', $cred.Password)
+      } catch { }
     }
   }
   $inv = 'C:\KARTODROMO\00_INVENTARIO_SEGREDOS.md'
@@ -16,7 +19,7 @@ function Obter-CredencialKartodromo {
     $line = (Get-Content $inv | Where-Object { $_ -match 'SEC-008' } | Select-Object -First 1)
     if ($line -match '`KARTODROMO` / `([^`]+)`') {
       $sec = ConvertTo-SecureString $matches[1] -AsPlainText -Force
-      return New-Object System.Management.Automation.PSCredential('KARTODROMO', $sec)
+      return New-Object System.Management.Automation.PSCredential('.\KARTODROMO', $sec)
     }
   }
   throw "Credencial KARTODROMO não encontrada para o usuário $env:USERNAME. Rode uma vez: scripts\apps\salvar-credencial.ps1"
