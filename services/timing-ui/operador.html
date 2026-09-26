@@ -14,6 +14,7 @@
   .ok { background:#12351f; color:#5ee08d; } .bad { background:#3b1618; color:#ff8a8d; } .warn { background:#3a3210; color:#ffd84d; }
   header .spacer { flex:1; }
   header a { color:var(--blue); text-decoration:none; font-weight:600; }
+  header nav { display:flex; gap:14px; align-items:center; }
   main { display:grid; grid-template-columns: 250px 1fr 320px; gap:12px; padding:12px; min-height:calc(100vh - 50px); }
   @media (max-width: 1200px) { main { grid-template-columns: 1fr; } }
   section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; min-width:0; }
@@ -33,6 +34,10 @@
   .top .name { font-size:24px; font-weight:800; }
   .timer { font:800 44px/1 ui-monospace, Consolas, monospace; letter-spacing:.02em; margin-left:auto; }
   .controls { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; }
+  .tabs { display:flex; gap:6px; flex-wrap:wrap; border-bottom:1px solid var(--line); margin:12px 0; }
+  .tabs button { background:transparent; border-radius:7px 7px 0 0; color:var(--muted); padding:8px 12px; }
+  .tabs button.active { background:#1c2922; color:var(--text); box-shadow:inset 0 -2px var(--green); }
+  .tab-content { min-height:160px; overflow:auto; }
   table { width:100%; border-collapse:collapse; }
   th { text-align:left; font-size:12px; color:var(--muted); font-weight:600; padding:6px 8px; border-bottom:1px solid var(--line); }
   td { padding:7px 8px; border-bottom:1px solid #1d2622; font-variant-numeric: tabular-nums; }
@@ -59,7 +64,7 @@
   <span id="dec" class="pill bad">Decoder…</span>
   <span id="clock" class="muted"></span>
   <span class="spacer"></span>
-  <a href="/tv" target="_blank">Abrir TV ↗</a>
+  <nav><a href="/admin">Cadastros e ferramentas</a><a href="/tv" target="_blank">Abrir TV ↗</a></nav>
 </header>
 <main>
   <section>
@@ -80,6 +85,8 @@
       <div class="controls">
         <button id="bStart" class="b-green" onclick="act('start')">▶ Iniciar (bandeira verde)</button>
         <button id="bPlus" onclick="plusMin()">+1 min</button>
+        <button id="bManual" onclick="openManual()">＋ Passagem manual</button>
+        <button id="bEdit" onclick="openEditSession()">Editar prova</button>
         <button id="bCheck" class="b-check" onclick="act('checkered')">🏁 Quadriculada agora</button>
         <button id="bClose" onclick="act('close','Encerrar a bateria? Karts que ainda não passaram ficam com as voltas atuais.')">■ Encerrar</button>
         <button id="bCancel" class="b-red" onclick="act('cancel','Cancelar esta bateria?')">Cancelar</button>
@@ -97,12 +104,14 @@
         <div class="hint">Kart fora do grid que passar pela linha entra sozinho como "Kart N", nenhuma volta se perde.</div>
       </details>
 
-      <h2 style="margin-top:16px">Classificação</h2>
-      <table>
-        <thead><tr><th>Pos</th><th>Kart</th><th>Piloto</th><th>Voltas</th><th>Última</th><th>Melhor</th><th>Dif.</th></tr></thead>
-        <tbody id="stand"></tbody>
-      </table>
-      <div class="hint">Clique num piloto para ver as voltas e anular uma volta (a volta anulada não vale como melhor volta).</div>
+      <h2 style="margin-top:16px">Resultado ao vivo</h2>
+      <div id="resultTabs" class="tabs" role="tablist" aria-label="Visões do resultado">
+        <button type="button" role="tab" data-tab="official" onclick="selectResultsTab('official')">Resultado Oficial</button>
+        <button type="button" role="tab" data-tab="category" onclick="selectResultsTab('category')">Por Categoria</button>
+        <button type="button" role="tab" data-tab="transponder" onclick="selectResultsTab('transponder')">Por Transponder</button>
+        <button type="button" role="tab" data-tab="observations" onclick="selectResultsTab('observations')">Observações</button>
+      </div>
+      <div id="resultsContent" class="tab-content"></div>
     </div>
   </section>
 
@@ -127,6 +136,10 @@
   </div>
   <label>Pilotos da agenda (recepção/totem)</label><select id="nAgenda" onchange="agendaPick()"><option value="">— não puxar da agenda —</option></select>
   <div id="nAgendaInfo" class="hint"></div>
+  <label>Evento / grupo / prova cadastrados</label>
+  <div class="row"><select id="nEvent" onchange="localEventPick()"><option value="">— evento —</option></select><select id="nGroup" onchange="localGroupPick()" disabled><option value="">— grupo —</option></select></div>
+  <select id="nProof" onchange="localProofPick()" disabled style="margin-top:6px"><option value="">— prova cadastrada —</option></select>
+  <div id="nCatalogInfo" class="hint">Selecione uma prova para carregar seus parâmetros e competidores cadastrados.</div>
   <label>Karts (opcional agora; ex.: 4 5 8 16)</label><input id="nKarts" placeholder="números separados por espaço ou vírgula">
   <div class="row" style="margin-top:14px"><button onclick="newDlg.close()">Voltar</button><button class="b-green" onclick="createSess()">Criar</button></div>
 </dialog>
@@ -151,9 +164,29 @@
   <div class="row" style="margin-top:10px"><button onclick="mapDlg.close()">Voltar</button><button class="b-blue" onclick="saveMap()">Salvar</button></div>
 </dialog>
 
+<dialog id="manualDlg">
+  <h2>Incluir passagem manualmente</h2>
+  <label>Competidor</label><select id="manualKart"></select>
+  <label>Tempo da volta</label><input id="manualLap" inputmode="decimal" placeholder="1:04.250">
+  <div class="hint">Informe o tempo no formato 1:04.250 ou 64.250 s. O mínimo desta prova é <span id="manualMin"></span>.</div>
+  <label>Transponder (opcional)</label><input id="manualTransponder" inputmode="numeric" placeholder="Número do transponder">
+  <div class="row" style="margin-top:14px"><button onclick="manualDlg.close()">Voltar</button><button class="b-green" onclick="saveManualPassing()">Registrar passagem</button></div>
+</dialog>
+
+<dialog id="editSessionDlg">
+  <h2>Mudar prova em andamento</h2>
+  <label>Nome da prova</label><input id="editName">
+  <div class="row">
+    <div><label>Duração (minutos)</label><input id="editDuration" type="number" min="0" step="1"></div>
+    <div><label>Limite de voltas</label><input id="editMaxLaps" type="number" min="0" step="1" placeholder="Sem limite"></div>
+  </div>
+  <div class="hint">O limite atualizado encerra a prova quando o líder atingir a volta configurada. Alterações ficam registradas na bateria.</div>
+  <div class="row" style="margin-top:14px"><button onclick="editSessionDlg.close()">Voltar</button><button class="b-blue" onclick="saveSessionParameters()">Salvar alterações</button></div>
+</dialog>
+
 <script>
 const $ = (id) => document.getElementById(id);
-let state = null, sel = null, view = null, gridDirty = false;
+let state = null, sel = null, view = null, gridDirty = false, activeResultsTab = 'official', passingRows = [];
 
 const fmt = (ms) => { if (ms == null) return '--'; const s = ms/1000, m = Math.floor(s/60); const r = (s - m*60).toFixed(3); return m ? `${m}:${r.padStart(6,'0')}` : r; };
 const clockFmt = (ms) => { if (ms == null) return '--:--'; const t = Math.max(0, Math.ceil(ms/1000)); return `${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`; };
@@ -218,20 +251,49 @@ function renderSession() {
   $('sTimer').textContent = v.state === 'preparando' ? clockFmt(v.durationMs) : v.state === 'em_andamento' ? clockFmt(v.remainingMs) : v.state === 'bandeira_final' ? '🏁' : clockFmt(v.elapsedMs);
   const prep = v.state === 'preparando', run = v.state === 'em_andamento', fin = v.state === 'bandeira_final';
   $('bStart').disabled = !prep; $('bPlus').disabled = !run; $('bCheck').disabled = !run;
+  $('bManual').disabled = !run; $('bEdit').disabled = !(prep || run || v.state === 'encerrada');
   $('bClose').disabled = !(run || fin); $('bCancel').disabled = !(prep || run);
   $('gridBox').hidden = !(prep || run);
   if (lastShown !== v.id + v.state) { $('gridBox').open = prep; lastShown = v.id + v.state; }
   if (!gridDirty) renderGrid(v.competitors);
 
   const leaderBest = Math.min(...v.standings.filter(r => r.bestLapMs).map(r => r.bestLapMs));
-  $('stand').innerHTML = v.standings.map(r => `
-    <tr class="${r.finished ? 'fin' : ''}" onclick="showLaps('${esc(r.kart)}')" style="cursor:pointer">
-      <td class="pos">${r.position}</td><td class="kart">${esc(r.kart)}</td>
-      <td>${esc(r.name)}${r.autoAdded ? ' <span class="muted">(fora do grid)</span>' : ''}</td>
-      <td class="num">${r.laps}</td><td class="num">${fmt(r.lastLapMs)}</td>
-      <td class="num ${r.bestLapMs === leaderBest ? 'best' : ''}">${fmt(r.bestLapMs)}</td>
-      <td class="num">${r.position === 1 ? '' : r.gapLaps ? '+' + r.gapLaps + (r.gapLaps > 1 ? ' voltas' : ' volta') : r.gapMs != null ? '+' + fmt(r.gapMs) : ''}</td>
-    </tr>`).join('') || '<tr><td colspan="7" class="muted">Sem passagens ainda.</td></tr>';
+  renderResultsTab();
+}
+
+function selectResultsTab(tab) {
+  activeResultsTab = tab;
+  if (tab === 'transponder' && sel) api(`/api/sessions/${sel}/passings`).then(rows => { passingRows = rows; renderResultsTab(); }).catch(() => {});
+  renderResultsTab();
+}
+
+function renderResultsTab() {
+  document.querySelectorAll('#resultTabs [role="tab"]').forEach(button => {
+    const selected = button.dataset.tab === activeResultsTab;
+    button.classList.toggle('active', selected);
+    button.setAttribute('aria-selected', String(selected));
+  });
+  const content = $('resultsContent');
+  if (!view) { content.innerHTML = ''; return; }
+  if (activeResultsTab === 'official') {
+    const leaderBest = Math.min(...view.standings.filter(r => r.bestLapMs).map(r => r.bestLapMs));
+    content.innerHTML = `<table><thead><tr><th>Pos</th><th>Kart</th><th>Piloto</th><th>Voltas</th><th>Última</th><th>Melhor</th><th>Dif.</th></tr></thead><tbody>${view.standings.map(r => `
+      <tr class="${r.finished ? 'fin' : ''}" onclick="showLaps('${esc(r.kart)}')" style="cursor:pointer">
+        <td class="pos">${r.position}</td><td class="kart">${esc(r.kart)}</td>
+        <td>${esc(r.name)}${r.autoAdded ? ' <span class="muted">(fora do grid)</span>' : ''}</td>
+        <td class="num">${r.laps}</td><td class="num">${fmt(r.lastLapMs)}</td>
+        <td class="num ${r.bestLapMs === leaderBest ? 'best' : ''}">${fmt(r.bestLapMs)}</td>
+        <td class="num">${r.position === 1 ? '' : r.gapLaps ? '+' + r.gapLaps + (r.gapLaps > 1 ? ' voltas' : ' volta') : r.gapMs != null ? '+' + fmt(r.gapMs) : ''}</td>
+      </tr>`).join('') || '<tr><td colspan="7" class="muted">Sem passagens ainda.</td></tr>'}</tbody></table><div class="hint">Clique num piloto para ver as voltas e anular ou restaurar uma volta.</div>`;
+  } else if (activeResultsTab === 'category') {
+    const rows = [...view.standings].sort((a, b) => String(a.category || 'Sem categoria').localeCompare(String(b.category || 'Sem categoria')) || a.position - b.position);
+    content.innerHTML = `<table><thead><tr><th>Categoria</th><th>Pos.</th><th>Kart</th><th>Piloto</th><th>Voltas</th><th>Melhor</th></tr></thead><tbody>${rows.map(r => `<tr><td>${esc(r.category || 'Sem categoria')}</td><td>${r.position}</td><td class="kart">${esc(r.kart)}</td><td>${esc(r.name)}</td><td>${r.laps}</td><td>${fmt(r.bestLapMs)}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Sem competidores.</td></tr>'}</tbody></table>`;
+  } else if (activeResultsTab === 'transponder') {
+    content.innerHTML = `<table><thead><tr><th>Hora</th><th>Transponder</th><th>Kart</th><th>Competidor</th><th>Volta</th><th>Tempo</th><th>Origem</th></tr></thead><tbody>${passingRows.map(p => `<tr><td>${new Date(p.wallMs).toLocaleTimeString('pt-BR')}</td><td>${p.transponder ?? '—'}</td><td class="kart">${esc(p.kart)}</td><td>${esc(p.name)}</td><td>${p.lap ?? '—'}</td><td>${fmt(p.lapMs)}</td><td>${p.source === 'manual' ? 'Manual' : 'Decoder'}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">Nenhuma passagem registrada.</td></tr>'}</tbody></table>`;
+  } else {
+    const observations = view.observations || [];
+    content.innerHTML = `<div class="row"><input id="observationText" placeholder="Registrar observação da prova"><button class="b-blue" onclick="addObservation()">Salvar observação</button></div><div style="margin-top:10px">${observations.map(item => `<div style="padding:8px 2px;border-bottom:1px solid var(--line)"><strong>${esc(new Date(item.wallMs).toLocaleTimeString('pt-BR'))}</strong> · ${esc(item.text)}</div>`).join('') || '<div class="muted">Nenhuma observação registrada.</div>'}</div>`;
+  }
 }
 
 function renderGrid(list) {
@@ -271,24 +333,52 @@ async function plusMin() { await api(`/api/sessions/${sel}`, { method:'PATCH', b
 
 function typeDefaults() { $('nDur').value = { treino:10, classificacao:5, corrida:20 }[$('nType').value]; }
 let agenda = [];
+let localCatalog = { events:[], groups:[], provas:[], competitors:[] }, localRoster = [], localCatalogSelected = false;
 async function openNew() {
   $('nName').value = ''; $('nKarts').value = ''; $('nLaps').value = ''; $('nAgendaInfo').textContent = ''; typeDefaults(); newDlg.showModal();
+  localCatalogSelected = false;
+  $('nCatalogInfo').textContent = 'Selecione uma prova para carregar seus parâmetros e competidores cadastrados.';
+  $('nEvent').innerHTML = '<option value="">— evento —</option>'; $('nGroup').innerHTML = '<option value="">— grupo —</option>'; $('nProof').innerHTML = '<option value="">— prova cadastrada —</option>';
+  $('nGroup').disabled = true; $('nProof').disabled = true; localRoster = [];
+  try { localCatalog = await fetch('/api/catalog').then(r => r.ok ? r.json() : Promise.reject(r)); localCatalog.competitors ||= []; $('nEvent').insertAdjacentHTML('beforeend', localCatalog.events.filter(e=>e.active!==false).map(e=>`<option value="${esc(e.id)}">${esc(e.name)}</option>`).join('')); } catch { $('nCatalogInfo').textContent = 'Cadastros locais indisponíveis.'; }
   const sel = $('nAgenda'); sel.innerHTML = '<option value="">— não puxar da agenda —</option>';
   try {
     agenda = await fetch('/api/agenda').then(r => r.ok ? r.json() : Promise.reject(r));
     const now = new Date().toTimeString().slice(0,5);
     agenda.forEach(b => sel.insertAdjacentHTML('beforeend', `<option value="${b.id}">${b.inicio.slice(11,16)} · ${esc(b.nome)} · ${b.inscritos} inscritos</option>`));
     const next = agenda.filter(b => b.inscritos > 0).find(b => b.inicio.slice(11,16) >= now);
-    if (next) { sel.value = next.id; agendaPick(); }
+    if (next && !$('nEvent').value && !localCatalogSelected) { sel.value = next.id; agendaPick(); }
   } catch { $('nAgendaInfo').textContent = 'Agenda indisponível (servidor da recepção fora do ar?). Dá pra montar o grid na mão.'; }
 }
 function agendaPick() { const b = agenda.find(x => String(x.id) === $('nAgenda').value); if (b) { $('nName').value = b.nome; $('nAgendaInfo').textContent = `${b.inscritos} pilotos inscritos, ${b.pagos} pagos`; } }
+function localEventPick() {
+  const eventId = $('nEvent').value;
+  localCatalogSelected = Boolean(eventId); if (eventId) $('nAgenda').value = '';
+  $('nGroup').innerHTML = '<option value="">— grupo —</option>' + localCatalog.groups.filter(g=>g.eventId===eventId).map(g=>`<option value="${esc(g.id)}">${esc(g.name)}</option>`).join('');
+  $('nGroup').disabled = !eventId; $('nProof').innerHTML = '<option value="">— prova cadastrada —</option>'; $('nProof').disabled = true; localRoster=[];
+}
+function localGroupPick() {
+  const groupId = $('nGroup').value;
+  $('nProof').innerHTML = '<option value="">— prova cadastrada —</option>' + localCatalog.provas.filter(p=>p.groupId===groupId).map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+  $('nProof').disabled = !groupId; localRoster=[];
+}
+function localProofPick() {
+  const proof = localCatalog.provas.find(p=>p.id===$('nProof').value); if (!proof) { localRoster=[]; return; }
+  localCatalogSelected = true; $('nAgenda').value = '';
+  const group = localCatalog.groups.find(g=>g.id===proof.groupId);
+  localRoster = localCatalog.competitors.filter(c=>c.active!==false && (!group?.categoryId || c.categoryId===group.categoryId));
+  $('nType').value = ['treino','classificacao','corrida'].includes(proof.type) ? proof.type : 'corrida';
+  $('nName').value = proof.name; $('nDur').value = proof.durationMin ?? 0; $('nLaps').value = proof.maxLaps ?? '';
+  $('nKarts').value = localRoster.map(c=>c.kart).join(' ');
+  $('nCatalogInfo').textContent = `${localRoster.length} competidor(es) ativo(s) carregado(s)${group?.categoryId ? ' da categoria do grupo' : ''}. Duração: ${proof.maxLaps ? `${proof.maxLaps} voltas` : `${proof.durationMin} min`}.`;
+}
 async function createSess() {
   const karts = $('nKarts').value.split(/[\s,;]+/).filter(Boolean);
   const agendaId = $('nAgenda').value;
   const fromAgenda = agendaId ? await api('/api/agenda/' + agendaId + '/grid') : [];
+  const rosterByKart = new Map(localRoster.map(c=>[c.kart,c]));
   const competitors = [...fromAgenda.map((g, i) => ({ kart: g.kart || karts[i] || '', name: g.nome, customerId: String(g.clienteId) })),
-                       ...karts.slice(fromAgenda.length).map(k => ({ kart:k, name:'' }))];
+                       ...karts.slice(fromAgenda.length).map(k => { const local=rosterByKart.get(k); const category=localCatalog.categories?.find(c=>c.id===local?.categoryId)?.name||null; return { kart:k, name:local?.name||'', category }; })];
   // bateria da agenda: monta as provas do produto (ex.: Tomada de Tempo 5 min + Corrida 20 min)
   const programa = agendaId ? await api('/api/agenda/' + agendaId + '/programa').catch(() => []) : [];
   let primeira = null;
@@ -301,8 +391,10 @@ async function createSess() {
       primeira ??= s;
     }
   } else {
+    const proof = localCatalog.provas.find(p=>p.id===$('nProof').value), group = localCatalog.groups.find(g=>g.id===proof?.groupId), event = localCatalog.events.find(e=>e.id===group?.eventId);
     primeira = await api('/api/sessions', { method:'POST', body:{
-      type: $('nType').value, name: $('nName').value, durationMin: Number($('nDur').value), maxLaps: Number($('nLaps').value) || null, competitors } });
+      type: $('nType').value, name: $('nName').value, durationMin: Number($('nDur').value), maxLaps: Number($('nLaps').value) || null, competitors,
+      eventId: event?.id ?? null, groupId: group?.id ?? null, proofId: proof?.id ?? null } });
   }
   newDlg.close(); sel = primeira.id; pinned = true; gridDirty = false;
 }
@@ -321,6 +413,53 @@ async function toggleLap(kart, lap) {
 }
 function openMap(raw) { $('mapRaw').textContent = raw; $('mapKart').value = ''; mapDlg.showModal(); $('mapKart').focus(); }
 async function saveMap() { await api('/api/transponders', { method:'PUT', body:{ raw: $('mapRaw').textContent, kart: $('mapKart').value } }); mapDlg.close(); }
+
+function openManual() {
+  if (!view) return;
+  $('manualKart').innerHTML = view.competitors.map(c => `<option value="${esc(c.kart)}">Kart ${esc(c.kart)} · ${esc(c.name)}</option>`).join('');
+  $('manualLap').value = ''; $('manualTransponder').value = '';
+  $('manualMin').textContent = fmt(view.minLapMs);
+  manualDlg.showModal();
+}
+function parseLapInput(value) {
+  const parts = String(value).trim().replace(',', '.').split(':');
+  if (parts.length > 2 || parts.some(part => !/^\d+(\.\d{1,3})?$/.test(part))) return null;
+  const seconds = Number(parts[parts.length - 1]) + (parts.length === 2 ? Number(parts[0]) * 60 : 0);
+  return Number.isFinite(seconds) ? Math.round(seconds * 1000) : null;
+}
+async function saveManualPassing() {
+  const lapMs = parseLapInput($('manualLap').value);
+  if (lapMs === null) { alert('Informe o tempo como 1:04.250 ou 64.250.'); return; }
+  const competitor = view.competitors.find(c => c.kart === $('manualKart').value);
+  if (!competitor) { alert('Selecione um competidor.'); return; }
+  await api(`/api/sessions/${sel}/passings/manual`, { method:'POST', body:{ kart:competitor.kart, name:competitor.name, lapMs, transponder:$('manualTransponder').value ? Number($('manualTransponder').value) : null } });
+  manualDlg.close();
+  if (activeResultsTab === 'transponder') selectResultsTab('transponder');
+}
+function openEditSession() {
+  if (!view) return;
+  $('editName').value = view.name;
+  $('editDuration').value = view.durationMs / 60000;
+  $('editMaxLaps').value = view.maxLaps || '';
+  editSessionDlg.showModal();
+}
+async function saveSessionParameters() {
+  const duration = Number($('editDuration').value);
+  const lapsText = $('editMaxLaps').value.trim();
+  const maxLaps = lapsText ? Number(lapsText) : null;
+  if (!Number.isFinite(duration) || duration < 0 || (maxLaps !== null && (!Number.isInteger(maxLaps) || maxLaps < 0))) {
+    alert('Confira a duração e o limite de voltas.'); return;
+  }
+  await api(`/api/sessions/${sel}`, { method:'PATCH', body:{ name:$('editName').value, durationMin:duration, maxLaps } });
+  editSessionDlg.close();
+}
+async function addObservation() {
+  const input = $('observationText');
+  if (!input?.value.trim()) return;
+  const saved = await api(`/api/sessions/${sel}/observations`, { method:'POST', body:{ text:input.value.trim() } });
+  view.observations = [saved, ...(view.observations || [])];
+  renderResultsTab();
+}
 
 setInterval(() => { if (state) $('clock').textContent = new Date().toLocaleTimeString('pt-BR'); }, 1000);
 connect();

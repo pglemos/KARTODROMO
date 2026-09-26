@@ -124,6 +124,42 @@ export function createSession(input: {
   };
 }
 
+export function updateSessionParameters(
+  session: Session,
+  parameters: { name?: string; durationMin?: number; maxLaps?: number | null },
+  now: number,
+) {
+  const updatesRules = parameters.durationMin !== undefined || parameters.maxLaps !== undefined;
+  if (updatesRules && !['preparando', 'em_andamento', 'encerrada'].includes(session.state)) {
+    throw new Error('Duração e limite de voltas não podem ser alterados neste estado da bateria.');
+  }
+
+  let durationMs: number | undefined;
+  if (parameters.durationMin !== undefined) {
+    if (!Number.isFinite(parameters.durationMin) || parameters.durationMin < 0) {
+      throw new Error('A duração deve ser um número igual ou maior que zero.');
+    }
+    durationMs = Math.round(parameters.durationMin * 60_000);
+  }
+
+  let maxLaps: number | null | undefined;
+  if (parameters.maxLaps !== undefined) {
+    if (parameters.maxLaps !== null && (!Number.isInteger(parameters.maxLaps) || parameters.maxLaps < 0)) {
+      throw new Error('O limite de voltas deve ser um número inteiro igual ou maior que zero.');
+    }
+    maxLaps = parameters.maxLaps && parameters.maxLaps > 0 ? parameters.maxLaps : null;
+  }
+
+  if (typeof parameters.name === 'string') session.name = parameters.name.trim() || session.name;
+  if (durationMs !== undefined) session.durationMs = durationMs;
+  if (maxLaps !== undefined) session.maxLaps = maxLaps;
+
+  if (session.state === 'em_andamento' && session.maxLaps !== null) {
+    const leader = computeStandings(session, now)[0];
+    if (leader && leader.laps >= session.maxLaps) setRaceFlag(session, 'checkered', now);
+  }
+}
+
 function defaultName(type: SessionType) {
   return type === 'corrida' ? 'Corrida' : type === 'classificacao' ? 'Tomada de Tempo' : 'Treino';
 }

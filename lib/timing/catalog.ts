@@ -5,11 +5,12 @@ export type TimingGroup = { id: string; eventId: string; name: string; categoryI
 export type TimingProof = { id: string; eventId: string; groupId: string; name: string; type: SessionType; durationMin: number; maxLaps: number | null; agendaId: string | null; order: number; heats: number; startAt: string; intervalMin: number };
 export type TimingCategory = { id: string; name: string; color: string };
 export type TimingTrack = { id: string; name: string; lengthMeters: number };
-export type TimingCatalog = { events: TimingEvent[]; groups: TimingGroup[]; provas: TimingProof[]; categories: TimingCategory[]; tracks: TimingTrack[] };
+export type TimingCompetitor = { id: string; name: string; kart: string; transponder: string | null; categoryId: string | null; weightKg: number | null; active: boolean };
+export type TimingCatalog = { events: TimingEvent[]; groups: TimingGroup[]; provas: TimingProof[]; categories: TimingCategory[]; tracks: TimingTrack[]; competitors: TimingCompetitor[] };
 export type CatalogEntity = keyof TimingCatalog;
 
 export function emptyCatalog(): TimingCatalog {
-  return { events: [], groups: [], provas: [], categories: [], tracks: [] };
+  return { events: [], groups: [], provas: [], categories: [], tracks: [], competitors: [] };
 }
 
 export function normalizeCatalog(value: unknown): TimingCatalog {
@@ -21,6 +22,7 @@ export function normalizeCatalog(value: unknown): TimingCatalog {
     provas: Array.isArray(source.provas) ? source.provas : [],
     categories: Array.isArray(source.categories) ? source.categories : [],
     tracks: Array.isArray(source.tracks) ? source.tracks : [],
+    competitors: Array.isArray(source.competitors) ? source.competitors : [],
   };
   const ids = new Set<string>();
   for (const collection of Object.values(catalog)) for (const item of collection) {
@@ -31,6 +33,16 @@ export function normalizeCatalog(value: unknown): TimingCatalog {
   for (const proof of catalog.provas) {
     const group = catalog.groups.find((g) => g.id === proof.groupId);
     if (!group || group.eventId !== proof.eventId) throw new Error(`A prova "${proof.name}" aponta para um grupo inexistente.`);
+  }
+  const transponders = new Set<string>();
+  for (const competitor of catalog.competitors) {
+    if (!competitor.name?.trim() || !competitor.kart?.trim()) throw new Error('Todo competidor precisa de nome e número de kart.');
+    if (competitor.categoryId && !catalog.categories.some((category) => category.id === competitor.categoryId)) throw new Error(`O competidor "${competitor.name}" aponta para uma categoria inexistente.`);
+    if (competitor.transponder) {
+      if (!/^\d+$/.test(competitor.transponder)) throw new Error(`O transponder do competidor "${competitor.name}" é inválido.`);
+      if (transponders.has(competitor.transponder)) throw new Error(`O transponder ${competitor.transponder} está vinculado a mais de um competidor.`);
+      transponders.add(competitor.transponder);
+    }
   }
   return catalog;
 }
@@ -71,6 +83,17 @@ export function createCatalogRecord(catalog: TimingCatalog, entity: CatalogEntit
     } satisfies TimingProof;
   } else if (entity === 'categories') {
     record = { id, name, color: text(input, 'color', '#0B7A53') } satisfies TimingCategory;
+  } else if (entity === 'competitors') {
+    const kart = text(input, 'kart');
+    const transponder = text(input, 'transponder') || null;
+    const categoryId = text(input, 'categoryId') || null;
+    const weightKg = input.weightKg === '' || input.weightKg == null ? null : Number(input.weightKg);
+    if (!kart) throw new Error('Informe o número do kart.');
+    if (transponder && !/^\d+$/.test(transponder)) throw new Error('O transponder deve conter apenas números.');
+    if (transponder && catalog.competitors.some((item) => item.transponder === transponder)) throw new Error('Este transponder já está vinculado a outro competidor.');
+    if (categoryId && !catalog.categories.some((item) => item.id === categoryId)) throw new Error('Selecione uma categoria existente.');
+    if (weightKg !== null && (!Number.isFinite(weightKg) || weightKg <= 0)) throw new Error('O peso deve ser maior que zero.');
+    record = { id, name, kart, transponder, categoryId, weightKg, active: input.active !== false } satisfies TimingCompetitor;
   } else {
     const lengthMeters = Number(input.lengthMeters ?? 0);
     if (!Number.isFinite(lengthMeters) || lengthMeters <= 0) throw new Error('Informe a extensão do traçado em metros.');
@@ -89,13 +112,25 @@ export function updateCatalogRecord(catalog: TimingCatalog, entity: CatalogEntit
   if (typeof next.name === 'string') next.name = next.name.trim();
   if (!next.name) throw new Error('Informe o nome.');
   if (entity === 'groups' && !catalog.events.some((event) => event.id === next.eventId)) throw new Error('Selecione um evento existente.');
+  if (entity === 'competitors') {
+    next.kart = String(next.kart ?? '').trim();
+    next.transponder = String(next.transponder ?? '').trim() || null;
+    next.categoryId = String(next.categoryId ?? '').trim() || null;
+    next.weightKg = next.weightKg === '' || next.weightKg == null ? null : Number(next.weightKg);
+    if (!next.kart) throw new Error('Informe o número do kart.');
+    if (next.transponder && !/^\d+$/.test(String(next.transponder))) throw new Error('O transponder deve conter apenas números.');
+    if (next.transponder && records.some((item) => item.id !== id && item.transponder === next.transponder)) throw new Error('Este transponder já está vinculado a outro competidor.');
+    if (next.categoryId && !catalog.categories.some((item) => item.id === next.categoryId)) throw new Error('Selecione uma categoria existente.');
+    if (next.weightKg !== null && (!Number.isFinite(Number(next.weightKg)) || Number(next.weightKg) <= 0)) throw new Error('O peso deve ser maior que zero.');
+    next.active = next.active !== false;
+  }
   if (entity === 'provas') {
     const group = catalog.groups.find((item) => item.id === next.groupId);
     if (!group) throw new Error('Selecione um grupo existente.');
     next.eventId = group.eventId;
     if (!['treino', 'classificacao', 'corrida'].includes(String(next.type))) throw new Error('Tipo de prova inválido.');
   }
-  if (entity === 'tracks' && Number(next.lengthMeters) <= 0) throw new Error('Informe a extensão do traçado em metros.');
+  if (entity === 'tracks' && (!Number.isFinite(Number(next.lengthMeters)) || Number(next.lengthMeters) <= 0)) throw new Error('Informe a extensão do traçado em metros.');
   records[index] = next as never;
   return records[index] as TimingCatalog[keyof TimingCatalog][number];
 }
@@ -111,6 +146,9 @@ export function deleteCatalogRecord(catalog: TimingCatalog, entity: CatalogEntit
     catalog.provas = catalog.provas.filter((proof) => proof.eventId !== id && !groupIds.includes(proof.groupId));
   } else if (entity === 'groups') {
     catalog.provas = catalog.provas.filter((proof) => proof.groupId !== id);
+  } else if (entity === 'categories') {
+    catalog.groups = catalog.groups.map((group) => group.categoryId === id ? { ...group, categoryId: null } : group);
+    catalog.competitors = catalog.competitors.map((competitor) => competitor.categoryId === id ? { ...competitor, categoryId: null } : competitor);
   }
   return catalog;
 }

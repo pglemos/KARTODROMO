@@ -12,6 +12,7 @@ import {
   startSession,
   includeManualPassing,
   remainingMs,
+  updateSessionParameters,
   setCrossingDeleted,
   setCrossingInvalid,
   setRaceFlag,
@@ -56,6 +57,53 @@ function race(type: 'treino' | 'corrida' = 'treino', durationMin = 5) {
 }
 
 describe('race-engine', () => {
+  it('salva duração e voltas ao editar uma corrida encerrada sem reabri-la', () => {
+    const s = race('corrida', 20);
+    closeSession(s, 80_000);
+    const finishedAt = s.finishedAt;
+    const resultBefore = computeStandings(s);
+
+    updateSessionParameters(s, { name: 'teste corrida editada', durationMin: 25, maxLaps: 18 }, 90_000);
+
+    expect(s).toMatchObject({
+      name: 'teste corrida editada', state: 'encerrada', durationMs: 25 * 60_000, maxLaps: 18, finishedAt,
+    });
+    expect(computeStandings(s)).toEqual(resultBefore);
+  });
+
+  it('aplica o limite de voltas alterado durante a corrida na próxima passagem', () => {
+    const s = race('corrida', 20);
+    applyPassing(s, { kart: '4', decoderTimeMs: 0, wallMs: 2_000 });
+    applyPassing(s, { kart: '4', decoderTimeMs: 60_000, wallMs: 62_000 });
+    applyPassing(s, { kart: '5', decoderTimeMs: 1_000, wallMs: 3_000 });
+
+    updateSessionParameters(s, { maxLaps: 2 }, 63_000);
+    applyPassing(s, { kart: '4', decoderTimeMs: 120_000, wallMs: 122_000 });
+
+    expect(s.state).toBe('bandeira_final');
+  });
+
+  it('bandeirada imediatamente se o novo limite já foi atingido pelo líder', () => {
+    const s = race('corrida', 20);
+    applyPassing(s, { kart: '4', decoderTimeMs: 0, wallMs: 2_000 });
+    applyPassing(s, { kart: '4', decoderTimeMs: 60_000, wallMs: 62_000 });
+
+    updateSessionParameters(s, { maxLaps: 1 }, 63_000);
+
+    expect(s.state).toBe('bandeira_final');
+    expect(s.checkeredAt).toBe(63_000);
+  });
+
+  it('recusa alterar duração ou voltas durante a quadriculada sem salvar parcialmente o nome', () => {
+    const s = race('corrida', 20);
+    setRaceFlag(s, 'checkered', 10_000);
+    const previousName = s.name;
+
+    expect(() => updateSessionParameters(s, { name: 'não salvar', durationMin: 25 }, 11_000))
+      .toThrow('Duração e limite de voltas não podem ser alterados neste estado da bateria.');
+    expect(s).toMatchObject({ state: 'bandeira_final', name: previousName, durationMs: 20 * 60_000 });
+  });
+
   it('primeira passagem abre a volta e as seguintes geram tempo', () => {
     const s = race();
     applyPassing(s, { kart: '4', decoderTimeMs: 10_000, wallMs: 10_000 });
@@ -234,6 +282,23 @@ describe('catalogo de eventos e provas', () => {
 
   it('recusa importação com referências quebradas', () => {
     expect(() => normalizeCatalog({ events: [], groups: [{ id: 'g', eventId: 'missing', name: 'Grupo' }], provas: [], categories: [], tracks: [] })).toThrow('evento inexistente');
+  });
+
+  it('cadastra competidor com categoria e impede transponder duplicado', () => {
+    const catalog = emptyCatalog();
+    const category = createCatalogRecord(catalog, 'categories', { name: 'Graduados', color: '#12ab34' }, 'c-1', 1) as { id: string };
+    const competitor = createCatalogRecord(catalog, 'competitors', { name: 'Piloto teste', kart: '42', transponder: '123456', categoryId: category.id, weightKg: 80 }, 'p-1', 1);
+    expect(competitor).toMatchObject({ name: 'Piloto teste', kart: '42', transponder: '123456', categoryId: category.id, weightKg: 80, active: true });
+    expect(() => createCatalogRecord(catalog, 'competitors', { name: 'Outro piloto', kart: '43', transponder: '123456' }, 'p-2', 1))
+      .toThrow('já está vinculado');
+  });
+
+  it('ao excluir uma categoria, remove o vínculo dos grupos e competidores', () => {
+    const catalog = emptyCatalog();
+    const category = createCatalogRecord(catalog, 'categories', { name: 'Graduados' }, 'c-1', 1) as { id: string };
+    createCatalogRecord(catalog, 'competitors', { name: 'Piloto teste', kart: '42', categoryId: category.id }, 'p-1', 1);
+    deleteCatalogRecord(catalog, 'categories', category.id);
+    expect(catalog.competitors[0].categoryId).toBeNull();
   });
 });
 

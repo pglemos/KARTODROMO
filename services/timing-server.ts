@@ -14,7 +14,7 @@
  */
 import http from 'node:http';
 import net from 'node:net';
-import { appendFileSync, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
+import { appendFileSync, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { DecoderClient, type DecoderProtocol } from '../lib/timing/decoder-client';
@@ -39,6 +39,7 @@ import {
   startSession,
   tick,
   toggleLapInvalid,
+  updateSessionParameters,
   type Session,
   type SessionType,
 } from '../lib/timing/race-engine';
@@ -74,11 +75,11 @@ loadLocalEnv();
 const PORT = Number(process.env.TIMING_PORT || 4050);
 const SIMULATE = process.env.TIMING_SIMULATE === '1';
 const SIM_PORT = Number(process.env.TIMING_SIM_PORT || 5199);
-const DECODER_HOST = SIMULATE ? '127.0.0.1' : process.env.TIMING_DECODER_HOST || '192.168.20.171';
+const ENV_DECODER_HOST = process.env.TIMING_DECODER_HOST || '192.168.20.171';
 // P3 (porta 5403) é a mesma saída que o Orbits 4 usa: relógio absoluto do decoder, voltas idênticas às do Orbits.
 // TRX (porta 5100) é a saída texto que o LapTime usava; o simulador fala TRX.
-const DECODER_PROTOCOL: DecoderProtocol = SIMULATE ? 'trx' : process.env.TIMING_DECODER_PROTOCOL === 'trx' ? 'trx' : 'p3';
-const DECODER_PORT = SIMULATE ? SIM_PORT : Number(process.env.TIMING_DECODER_PORT || (DECODER_PROTOCOL === 'p3' ? 5403 : 5100));
+const ENV_DECODER_PROTOCOL: DecoderProtocol = process.env.TIMING_DECODER_PROTOCOL === 'trx' ? 'trx' : 'p3';
+const ENV_DECODER_PORT = Number(process.env.TIMING_DECODER_PORT || (ENV_DECODER_PROTOCOL === 'p3' ? 5403 : 5100));
 const DATA_DIR = resolve(process.env.TIMING_DATA_DIR || join(process.cwd(), 'data', 'timing'));
 const SESSIONS_DIR = join(DATA_DIR, 'sessions');
 const JOURNAL_DIR = join(DATA_DIR, 'passagens');
@@ -145,11 +146,37 @@ if (existsSync(SETTINGS_FILE)) {
   catch (err) { log('parâmetros de cronometragem ilegíveis', err); }
 }
 
+type DecoderConfig = { name: string; model: string; protocol: DecoderProtocol; host: string; port: number };
+const configuredDecoder = (timingSettings.decoder && typeof timingSettings.decoder === 'object' ? timingSettings.decoder : {}) as Partial<DecoderConfig>;
+let activeDecoderConfig: DecoderConfig = {
+  name: configuredDecoder.name || 'TranX',
+  model: configuredDecoder.model || 'TranX',
+  protocol: SIMULATE ? 'trx' : configuredDecoder.protocol === 'trx' ? 'trx' : configuredDecoder.protocol === 'p3' ? 'p3' : ENV_DECODER_PROTOCOL,
+  host: SIMULATE ? '127.0.0.1' : configuredDecoder.host || ENV_DECODER_HOST,
+  port: SIMULATE ? SIM_PORT : Number(configuredDecoder.port || ENV_DECODER_PORT),
+};
+
 function saveCatalog() { writeJsonAtomic(CATALOG_FILE, catalog); }
 function saveTimingSettings() { writeJsonAtomic(SETTINGS_FILE, timingSettings); }
 
 function saveTransponders() {
   writeJsonAtomic(TRANSPONDERS_FILE, { updatedAt: new Date().toISOString(), map: transponderMap });
+}
+
+function unlinkCompetitorTransponder(competitor: TimingCatalog['competitors'][number] | undefined) {
+  if (competitor?.transponder && transponderMap[competitor.transponder] === competitor.kart) delete transponderMap[competitor.transponder];
+}
+
+function linkCompetitorTransponder(competitor: TimingCatalog['competitors'][number] | undefined) {
+  if (!competitor?.transponder) return;
+  for (const [raw, kart] of Object.entries(transponderMap)) if (kart === competitor.kart && raw !== competitor.transponder) delete transponderMap[raw];
+  transponderMap[competitor.transponder] = competitor.kart;
+}
+
+function syncCatalogTransponders(previous: TimingCatalog, next: TimingCatalog) {
+  for (const competitor of previous.competitors) unlinkCompetitorTransponder(competitor);
+  for (const competitor of next.competitors) linkCompetitorTransponder(competitor);
+  saveTransponders();
 }
 
 /** ID bruto do transponder -> numero do kart. Numeros pequenos sem mapa ja sao o kart. */
@@ -181,7 +208,8 @@ function sortedSessions() {
 function trackLengthFor(s: Session) {
   const event = catalog.events.find((item) => item.id === s.eventId);
   const track = catalog.tracks.find((item) => item.id === event?.trackId);
-  return track?.lengthMeters ?? (Number(timingSettings.defaultTrackLengthMeters) || 1_000);
+  const system = (timingSettings.system && typeof timingSettings.system === 'object' ? timingSettings.system : {}) as Record<string, unknown>;
+  return track?.lengthMeters ?? (Number(system.defaultTrackLengthMeters ?? timingSettings.defaultTrackLengthMeters) || 1_000);
 }
 
 type RecentPassing = {
@@ -203,9 +231,9 @@ function remember(key: string) {
   if (seenOrder.length > 5000) seenPassings.delete(seenOrder.shift()!);
 }
 
-const decoder = new DecoderClient(DECODER_HOST, DECODER_PORT, 20_000, DECODER_PROTOCOL);
+let decoder: DecoderClient;
 
-decoder.on('passing', (p: TrxPassing) => {
+function handleDecoderPassing(p: TrxPassing) {
   const key = `${p.decoderId}:${p.sequence}:${p.transponder}:${p.decoderTimeMs}`;
   if (seenPassings.has(key)) return; // reenvio do decoder apos reconexao
   remember(key);
@@ -241,24 +269,29 @@ decoder.on('passing', (p: TrxPassing) => {
   recentPassings.length = Math.min(recentPassings.length, 60);
   broadcast('passing', recentPassings[0]);
   scheduleStateBroadcast();
-});
+}
 
-decoder.on('init', (cmds: string[]) => log('decoder inicializado', cmds.map((c) => JSON.stringify(c)).join(' ')));
-
-// linhas que não são status nem passagem: registra as primeiras de cada hora pra diagnóstico
-let outrasNaHora = 0;
-setInterval(() => { outrasNaHora = 0; }, 3_600_000).unref();
-decoder.on('other', (raw: string) => {
+function createDecoderClient(config: DecoderConfig) {
+  const client = new DecoderClient(config.host, config.port, 20_000, config.protocol);
+  client.on('passing', handleDecoderPassing);
+  client.on('init', (cmds: string[]) => log('decoder inicializado', cmds.map((c) => JSON.stringify(c)).join(' ')));
+  client.on('other', (raw: string) => {
   // "$ <decoder> <seq> <comando> <resultado>" (6 campos) = confirmação de comando (@RESET / ?;;;11;)
   const campos = raw.split('\u0001').join('').trim().split('\t');
   if (campos[0] === '$' && campos.length === 6) log('decoder confirmou comando', JSON.stringify(raw));
   else if (outrasNaHora++ < 30) log('decoder linha não reconhecida', JSON.stringify(raw));
-});
+  });
+  client.on('change', () => {
+    log(client.status.connected ? 'decoder conectado' : 'decoder desconectado', `${client.status.host}:${client.status.port}`);
+    scheduleStateBroadcast();
+  });
+  return client;
+}
 
-decoder.on('change', () => {
-  log(decoder.status.connected ? 'decoder conectado' : 'decoder desconectado', `${DECODER_HOST}:${DECODER_PORT}`);
-  scheduleStateBroadcast();
-});
+// linhas que não são status nem passagem: registra as primeiras de cada hora pra diagnóstico
+let outrasNaHora = 0;
+setInterval(() => { outrasNaHora = 0; }, 3_600_000).unref();
+decoder = createDecoderClient(activeDecoderConfig);
 
 // relogio: quadriculada por tempo e auto-encerramento
 setInterval(() => {
@@ -445,7 +478,42 @@ async function opsGet(path: string) {
 }
 
 const SESSION_TYPES = new Set<SessionType>(['treino', 'classificacao', 'corrida']);
-const CATALOG_ENTITIES = new Set<CatalogEntity>(['events', 'groups', 'provas', 'categories', 'tracks']);
+const CATALOG_ENTITIES = new Set<CatalogEntity>(['events', 'groups', 'provas', 'categories', 'tracks', 'competitors']);
+
+function normalizeDecoderConfig(input: Record<string, unknown>): DecoderConfig {
+  const host = String(input.host ?? '').trim();
+  const port = Number(input.port);
+  const protocol = String(input.protocol ?? 'p3');
+  if (!host || /\s/.test(host)) throw new Error('Informe um endereço válido para o decoder.');
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Informe uma porta entre 1 e 65535.');
+  if (protocol !== 'p3' && protocol !== 'trx') throw new Error('Selecione o protocolo P3 ou TRX.');
+  return {
+    name: String(input.name ?? 'Decoder').trim() || 'Decoder',
+    model: String(input.model ?? 'TranX').trim() || 'TranX',
+    protocol,
+    host,
+    port,
+  };
+}
+
+function probeTcp(host: string, port: number) {
+  return new Promise<{ ok: boolean; error?: string }>((resolve) => {
+    const socket = net.createConnection({ host, port });
+    const timeout = setTimeout(() => {
+      socket.destroy();
+      resolve({ ok: false, error: 'Tempo esgotado ao testar a conexão.' });
+    }, 3_000);
+    socket.once('connect', () => {
+      clearTimeout(timeout);
+      socket.destroy();
+      resolve({ ok: true });
+    });
+    socket.once('error', (error) => {
+      clearTimeout(timeout);
+      resolve({ ok: false, error: error.message });
+    });
+  });
+}
 
 function createTimingBackup() {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -460,6 +528,44 @@ function createTimingBackup() {
     if (existsSync(source)) copyFileSync(source, join(target, name));
   }
   return { path: target, files: readdirSync(target) };
+}
+
+function eventBackupDir() {
+  return join(DATA_DIR, 'backups', 'events');
+}
+
+function listEventBackups() {
+  const dir = eventBackupDir();
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && /^[\w-]+$/.test(entry.name))
+    .map((entry) => {
+      const file = join(dir, entry.name, 'catalog.json');
+      const createdAt = existsSync(file) ? new Date(statSync(file).mtimeMs).toISOString() : null;
+      return { id: entry.name, createdAt };
+    })
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+}
+
+function createEventBackup() {
+  const id = new Date().toISOString().replace(/[:.]/g, '-');
+  const target = join(eventBackupDir(), id);
+  mkdirSync(target, { recursive: true });
+  writeJsonAtomic(join(target, 'catalog.json'), catalog);
+  return { id, createdAt: new Date().toISOString(), events: catalog.events.length, groups: catalog.groups.length, provas: catalog.provas.length };
+}
+
+function restoreEventBackup(id: string) {
+  if (!/^[\w-]+$/.test(id)) throw new Error('Cópia inválida.');
+  if (runningSession()) throw new Error('Encerre a bateria em andamento antes de restaurar eventos.');
+  const file = join(eventBackupDir(), id, 'catalog.json');
+  if (!existsSync(file)) throw new Error('Cópia de eventos não encontrada.');
+  const previousCatalog = catalog;
+  catalog = normalizeCatalog(JSON.parse(readFileSync(file, 'utf8')));
+  syncCatalogTransponders(previousCatalog, catalog);
+  saveCatalog();
+  scheduleStateBroadcast();
+  return catalog;
 }
 
 function crossingRows(s: Session) {
@@ -524,15 +630,25 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
 
   if (path === '/api/catalog' && method === 'GET') return send(res, 200, catalog);
   if (path === '/api/catalog/export' && method === 'GET') return send(res, 200, catalog, { 'content-disposition': 'attachment; filename="kartodromo-eventos.json"' });
+  if (path === '/api/catalog/backups' && method === 'GET') return send(res, 200, listEventBackups());
+  if (path === '/api/catalog/backups' && method === 'POST') return send(res, 201, createEventBackup());
+  const eventBackupRestore = path.match(/^\/api\/catalog\/backups\/([\w-]+)\/restore$/);
+  if (eventBackupRestore && method === 'POST') {
+    try { return send(res, 200, restoreEventBackup(eventBackupRestore[1])); }
+    catch (err) { return send(res, 400, { error: (err as Error).message }); }
+  }
   if (path === '/api/catalog/import' && method === 'POST') {
     try {
+      if (runningSession()) return send(res, 409, { error: 'Encerre a bateria em andamento antes de importar eventos.' });
+      const previousCatalog = catalog;
       catalog = normalizeCatalog(await readBody(req));
+      syncCatalogTransponders(previousCatalog, catalog);
       saveCatalog();
       scheduleStateBroadcast();
       return send(res, 200, catalog);
     } catch (err) { return send(res, 400, { error: (err as Error).message }); }
   }
-  const catalogRoute = path.match(/^\/api\/catalog\/(events|groups|provas|categories|tracks)(?:\/([\w-]+)(?:\/(duplicate|distribute))?)?$/);
+  const catalogRoute = path.match(/^\/api\/catalog\/(events|groups|provas|categories|tracks|competitors)(?:\/([\w-]+)(?:\/(duplicate|distribute))?)?$/);
   if (catalogRoute) {
     const entity = catalogRoute[1] as CatalogEntity;
     const id = catalogRoute[2];
@@ -543,6 +659,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       if (!id && method === 'POST') {
         const body = await readBody(req);
         const item = createCatalogRecord(catalog, entity, body, randomUUID(), Date.now());
+        if (entity === 'competitors') { linkCompetitorTransponder(item as TimingCatalog['competitors'][number]); saveTransponders(); }
         saveCatalog();
         return send(res, 201, item);
       }
@@ -557,12 +674,20 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         return send(res, 200, item);
       }
       if (id && !subAction && (method === 'PATCH' || method === 'PUT')) {
+        const previousCompetitor = entity === 'competitors' ? catalog.competitors.find((item) => item.id === id) : undefined;
         const item = updateCatalogRecord(catalog, entity, id, await readBody(req));
+        if (entity === 'competitors') {
+          unlinkCompetitorTransponder(previousCompetitor);
+          linkCompetitorTransponder(item as TimingCatalog['competitors'][number]);
+          saveTransponders();
+        }
         saveCatalog();
         return send(res, 200, item);
       }
       if (id && !subAction && method === 'DELETE') {
+        const previousCompetitor = entity === 'competitors' ? catalog.competitors.find((item) => item.id === id) : undefined;
         deleteCatalogRecord(catalog, entity, id);
+        if (entity === 'competitors') { unlinkCompetitorTransponder(previousCompetitor); saveTransponders(); }
         saveCatalog();
         return send(res, 200, { ok: true });
       }
@@ -570,9 +695,43 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     } catch (err) { return send(res, 400, { error: (err as Error).message }); }
   }
 
-  if (path === '/api/settings' && method === 'GET') return send(res, 200, timingSettings);
+  if (path === '/api/settings' && method === 'GET') return send(res, 200, { ...timingSettings, decoder: activeDecoderConfig });
+  if (path === '/api/settings/decoder/test' && method === 'POST') {
+    try {
+      const config = normalizeDecoderConfig(await readBody(req));
+      const result = await probeTcp(config.host, config.port);
+      return send(res, result.ok ? 200 : 502, { ...result, host: config.host, port: config.port, protocol: config.protocol });
+    } catch (err) { return send(res, 400, { error: (err as Error).message }); }
+  }
+  if (path === '/api/settings/decoder' && method === 'PATCH') {
+    try {
+      if (SIMULATE) return send(res, 409, { error: 'A conexão do decoder é fixa durante a simulação.' });
+      if (runningSession()) return send(res, 409, { error: 'Encerre a bateria em andamento antes de alterar o decoder.' });
+      const config = normalizeDecoderConfig(await readBody(req));
+      const probe = await probeTcp(config.host, config.port);
+      if (!probe.ok) return send(res, 502, { error: probe.error || 'Não foi possível conectar ao decoder.' });
+      decoder.stop();
+      activeDecoderConfig = config;
+      timingSettings = { ...timingSettings, decoder: config };
+      saveTimingSettings();
+      decoder = createDecoderClient(config);
+      decoder.start();
+      scheduleStateBroadcast();
+      return send(res, 200, { ok: true, decoder: activeDecoderConfig });
+    } catch (err) { return send(res, 400, { error: (err as Error).message }); }
+  }
   if (path === '/api/settings' && method === 'PATCH') {
-    timingSettings = { ...timingSettings, ...(await readBody(req)) };
+    const patch = await readBody(req);
+    if (Object.prototype.hasOwnProperty.call(patch, 'decoder')) return send(res, 400, { error: 'Use a tela do decoder para validar e aplicar a conexão.' });
+    const timing = patch.timing as Record<string, unknown> | undefined;
+    if (timing?.minimumLapSeconds !== undefined && (!Number.isFinite(Number(timing.minimumLapSeconds)) || Number(timing.minimumLapSeconds) < 0.1 || Number(timing.minimumLapSeconds) > 60)) {
+      return send(res, 400, { error: 'O tempo mínimo de volta deve ficar entre 0,1 e 60 segundos.' });
+    }
+    const system = patch.system as Record<string, unknown> | undefined;
+    if (system?.defaultTrackLengthMeters !== undefined && (!Number.isFinite(Number(system.defaultTrackLengthMeters)) || Number(system.defaultTrackLengthMeters) <= 0)) {
+      return send(res, 400, { error: 'A extensão padrão do traçado deve ser maior que zero.' });
+    }
+    timingSettings = { ...timingSettings, ...patch };
     saveTimingSettings();
     return send(res, 200, timingSettings);
   }
@@ -607,9 +766,9 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       id: `${new Date().toISOString().slice(0, 10)}-${randomUUID().slice(0, 8)}`,
       name: String(body.name ?? ''),
       type,
-      durationMin: Number(body.durationMin ?? (type === 'corrida' ? 20 : type === 'classificacao' ? 5 : 10)),
+      durationMin: Number(body.durationMin ?? ((timingSettings.timing as Record<string, unknown> | undefined)?.defaultDurationMin ?? (type === 'corrida' ? 20 : type === 'classificacao' ? 5 : 10))),
       maxLaps: body.maxLaps ? Number(body.maxLaps) : null,
-      minLapSec: body.minLapSec ? Number(body.minLapSec) : 5,
+      minLapSec: body.minLapSec ? Number(body.minLapSec) : Number((timingSettings.timing as Record<string, unknown> | undefined)?.minimumLapSeconds ?? 5),
       now: Date.now(),
       competitors: parseCompetitors(body.competitors),
       eventId: typeof body.eventId === 'string' ? body.eventId : null,
@@ -723,14 +882,12 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       }
       if (!action && method === 'PATCH') {
         const body = await readBody(req);
-        if (typeof body.name === 'string') s.name = body.name.trim() || s.name;
-        if (s.state === 'preparando') {
-          if (body.type && SESSION_TYPES.has(body.type as SessionType)) s.type = body.type as SessionType;
-          if (body.durationMin !== undefined) s.durationMs = Math.round(Number(body.durationMin) * 60_000);
-          if (body.maxLaps !== undefined) s.maxLaps = Number(body.maxLaps) > 0 ? Number(body.maxLaps) : null;
-        } else if (s.state === 'em_andamento' && body.durationMin !== undefined) {
-          s.durationMs = Math.round(Number(body.durationMin) * 60_000); // estender/encurtar prova em andamento
-        }
+        updateSessionParameters(s, {
+          ...(typeof body.name === 'string' ? { name: body.name } : {}),
+          ...(body.durationMin !== undefined ? { durationMin: Number(body.durationMin) } : {}),
+          ...(body.maxLaps !== undefined ? { maxLaps: body.maxLaps === null ? null : Number(body.maxLaps) } : {}),
+        }, now);
+        if (s.state === 'preparando' && body.type && SESSION_TYPES.has(body.type as SessionType)) s.type = body.type as SessionType;
         if (body.competitors) setCompetitors(s, parseCompetitors(body.competitors));
         if (typeof body.eventId === 'string' || body.eventId === null) s.eventId = body.eventId as string | null;
         if (typeof body.groupId === 'string' || body.groupId === null) s.groupId = body.groupId as string | null;
@@ -814,11 +971,16 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+  if (url.pathname === '/favicon.ico') {
+    res.writeHead(204);
+    return res.end();
+  }
   if (req.method === 'OPTIONS') {
     res.writeHead(204, { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET,POST,PUT,PATCH', 'access-control-allow-headers': 'content-type' });
     return res.end();
   }
   if (url.pathname === '/' || url.pathname === '/operador') return sendFile(res, 'operador.html');
+  if (['/admin', '/cadastros', '/ferramentas', '/configuracoes'].includes(url.pathname)) return sendFile(res, 'admin.html');
   if (url.pathname === '/tv') return sendFile(res, 'tv.html');
   if (url.pathname.startsWith('/resultado/')) return sendFile(res, 'resultado.html');
   if (url.pathname.startsWith('/api/') || url.pathname === '/healthz') {
@@ -870,6 +1032,6 @@ function startSimulator() {
 if (SIMULATE) startSimulator();
 decoder.start();
 server.listen(PORT, '0.0.0.0', () => {
-  log(`Cronometragem em http://0.0.0.0:${PORT}  (decoder ${DECODER_HOST}:${DECODER_PORT} ${DECODER_PROTOCOL.toUpperCase()}${SIMULATE ? ' SIMULADO' : ''})`);
+  log(`Cronometragem em http://0.0.0.0:${PORT}  (decoder ${decoder.status.host}:${decoder.status.port} ${decoder.protocol.toUpperCase()}${SIMULATE ? ' SIMULADO' : ''})`);
   log(`dados em ${DATA_DIR}, ${sessions.size} baterias carregadas, ${Object.keys(transponderMap).length} transponders mapeados`);
 });
