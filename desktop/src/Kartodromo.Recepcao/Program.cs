@@ -15,7 +15,7 @@ static class Program
         Thread.CurrentThread.CurrentCulture = Fmt.Br;
         Thread.CurrentThread.CurrentUICulture = Fmt.Br;
         var args = Environment.GetCommandLineArgs();
-        if (args.Length >= 5 && args[1] == "--autoteste")
+        if (args.Length >= 5 && args[1] is "--autoteste" or "--teste-relatorio")
         {
             var ctx = new ApplicationContext();
             Application.Idle += Inicio;
@@ -27,7 +27,9 @@ static class Program
                     long.TryParse(args.ElementAtOrDefault(5), out var reservaIdTeste);
                     long.TryParse(args.ElementAtOrDefault(6), out var vendaIdTeste);
                     long.TryParse(args.ElementAtOrDefault(7), out var movimentoIdTeste);
-                    await AutoTeste.Rodar(args[2], args[3], args[4], reservaIdTeste, vendaIdTeste, movimentoIdTeste);
+                    if (args[1] == "--teste-relatorio") await AutoTeste.RodarRelatorios(args[2], args[3], args[4]);
+                    else
+                        await AutoTeste.Rodar(args[2], args[3], args[4], reservaIdTeste, vendaIdTeste, movimentoIdTeste);
                 }
                 catch (Exception ex) { File.WriteAllText(Path.Combine(args[2], "erro.txt"), ex.ToString()); }
                 ctx.ExitThread();

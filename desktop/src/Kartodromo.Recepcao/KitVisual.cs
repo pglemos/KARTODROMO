@@ -51,6 +51,9 @@ public static class KitVisual
     {
         Aplicadas.Add(f, new object());
         if (f is FormPrincipal or FormLogin or ISemKit) return;
+        // o visualizador de relatório/termo tem WebView2: mover o controle para outro painel depois
+        // de aberto deixa a página e a pré-visualização de impressão espremidas num canto
+        if (f is Relatorio) return;
 
         f.SuspendLayout();
         f.BackColor = Fundo;

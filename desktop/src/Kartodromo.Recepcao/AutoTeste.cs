@@ -153,6 +153,9 @@ public static class AutoTeste
         }
         else Log.Add("pendente: telas MetodosPagamento e Estorno dependem da venda marcada TESTE CODEX informada para o autoteste.");
 
+        await CapturarRelatorio(principal, pasta, "62-termo-em-branco", Sessao.Api.UrlComToken("/termo?branco=1"), "Termo de Responsabilidade");
+        await CapturarRelatorio(principal, pasta, "63-relatorio-participantes", Sessao.Api.UrlComToken("/relatorio/participantes?data=" + Fmt.Iso(DateTime.Today)), "Participantes");
+
         if (movimentoIdTeste > 0)
             await CapturarRelatorio(principal, pasta, "61-relatorio-fechamento", Sessao.Api.UrlComToken("/relatorio/fechamento?mov=" + movimentoIdTeste), "Fechamento de Caixa");
         else Log.Add("pendente: relatório de fechamento requer o movimento de teste informado para o autoteste.");
@@ -282,6 +285,51 @@ public static class AutoTeste
         if (!completou.Task.IsCompleted) Log.Add("ERRO " + nome + ": nenhuma janela apareceu no período de captura.");
     }
 
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint flags);
+
+    /// <summary>Teste só do visualizador de relatório/termo, fora da tela e sem roubar o foco de quem
+    /// está usando o computador. A foto é da própria janela (PrintWindow), não da tela.</summary>
+    public static async Task RodarRelatorios(string pasta, string login, string senha)
+    {
+        Directory.CreateDirectory(pasta);
+        Log.Clear();
+        var acesso = await Sessao.Api.Post("/api/login", new { login, senha, termos = true });
+        Sessao.Api.Token = acesso.S("token");
+        Sessao.Usuario = acesso["usuario"]!.AsObject();
+        using var dono = new Form { ShowInTaskbar = false, StartPosition = FormStartPosition.Manual, Location = new Point(-4000, -4000), Size = new Size(10, 10) };
+        foreach (var (nome, url, titulo) in new[]
+        {
+            ("termo-em-branco", Sessao.Api.UrlComToken("/termo?branco=1"), "Termo de Responsabilidade"),
+            ("relatorio-participantes", Sessao.Api.UrlComToken("/relatorio/participantes?data=" + Fmt.Iso(DateTime.Today)), "Participantes"),
+        })
+        {
+            var antes = GetForegroundWindow();
+            Relatorio.Abrir(dono, url, titulo);
+            var alvo = Application.OpenForms.Cast<Form>().LastOrDefault(f => f is Relatorio);
+            SetForegroundWindow(antes);
+            if (alvo == null) { Log.Add("ERRO " + nome + ": não abriu"); continue; }
+            alvo.Location = new Point(-3000, 0);
+            await Esperar(900);
+            await Esperar(900);
+            await Esperar(900);
+            await Esperar(900);
+            var web = Descendentes(alvo).FirstOrDefault(c => c.GetType().Name == "WebView2");
+            Log.Add(web != null && web.Width >= alvo.ClientSize.Width * 0.9 && web.Height >= alvo.ClientSize.Height * 0.7
+                ? $"OK {nome} página {web.Width}x{web.Height} na janela {alvo.ClientSize.Width}x{alvo.ClientSize.Height} (kit: {alvo.FormBorderStyle})"
+                : $"ERRO {nome}: página espremida ({web?.Width}x{web?.Height})");
+            using (var bmp = new Bitmap(alvo.Width, alvo.Height))
+            {
+                using (var g = Graphics.FromImage(bmp)) { var hdc = g.GetHdc(); PrintWindow(alvo.Handle, hdc, 2); g.ReleaseHdc(hdc); }
+                bmp.Save(Path.Combine(pasta, nome + ".png"));
+            }
+            alvo.Close();
+            await Esperar(300);
+        }
+        File.WriteAllLines(Path.Combine(pasta, "log.txt"), Log);
+    }
+
     static async Task CapturarRelatorio(Form principal, string pasta, string nome, string url, string titulo)
     {
         try
@@ -297,6 +345,10 @@ public static class AutoTeste
             if (alvo == null) { Log.Add("ERRO " + nome + ": relatório não abriu."); return; }
             await Esperar(2200);
             await FotoTela(alvo, pasta, nome);
+            var web = Descendentes(alvo).FirstOrDefault(c => c.GetType().Name == "WebView2");
+            if (web == null || web.Width < alvo.ClientSize.Width * 0.9 || web.Height < alvo.ClientSize.Height * 0.7)
+                Log.Add($"ERRO {nome}: página espremida ({web?.Width}x{web?.Height} numa janela {alvo.ClientSize.Width}x{alvo.ClientSize.Height})");
+            else Log.Add($"OK {nome}-tamanho {web.Width}x{web.Height}");
             alvo.Close();
         }
         catch (Exception e) { Log.Add($"ERRO {nome}: {e.Message}"); }
