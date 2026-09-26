@@ -170,74 +170,95 @@ public class FormCriarReservas : Janela
     }
 }
 
-/// <summary>Editar bateria (EditarBateria.dc.html): tudo o que o LapTime deixava editar — nome, data/hora, máx. de
-/// competidores (vagas), volta mínima, produto, traçado, responsável, código de reserva, aberta p/ reservas e totem.</summary>
+/// <summary>Editar bateria — igual ao design aprovado (EditarBateria.dc.html): Nome, Data, Hora, Vagas (máx),
+/// Volta mínima (s) · Produto, Traçado, Categoria · Responsável, Aberta para reservas, Aparece no totem · Provas.</summary>
 public class FormBateria : DialogoDesign
 {
-    readonly Grade _gradeProvas;
-
-    public FormBateria(JsonObject b) : base("Editar bateria",
-        $"{b.S("nome")} · {Fmt.Dmy(b.S("dataHora"))} · {b.I("inscritos")} inscrito(s) · {Math.Max(0, b.I("vagas") - b.I("inscritos"))} vaga(s) livre(s)", "g-baterias")
+    public FormBateria(JsonObject b) : base("Editar bateria", $"{b.S("nome")} · {Fmt.Dmy(b.S("dataHora"))}", "g-baterias")
     {
-        var c = new CamposBateria(b); // só os controles e as regras; o layout é o do design
-        c.Categoria.Enabled = false;   // a categoria vem do produto
+        var inicio = b.D("dataHora") ?? DateTime.Today.AddHours(17);
+        var nome = PecasDesign.Texto(b.S("nome"), 100);
+        var data = new DataDesign(inicio.Date);
+        var hora = PecasDesign.Hora(inicio);
+        var vagas = PecasDesign.Numero(Math.Max(1, b.I("vagas")), 3);
+        var volta = PecasDesign.Numero(Math.Max(0, b.I("voltaMinimaSeg")), 3);
+        var produto = new ListaDesign();
+        produto.Items.AddRange(Sessao.Lista("produtos").Select(p => (object)new Campos.Item(p.L("id") ?? 0, p.S("nome"), p)).ToArray());
+        Campos.Selecionar(produto, b.L("produtoId"));
+        if (produto.SelectedIndex < 0 && produto.Items.Count > 0) produto.SelectedIndex = 0;
+        var tracado = new ListaDesign();
+        tracado.Items.AddRange(Sessao.Tracados());
+        Campos.Selecionar(tracado, b.L("tracadoId"));
+        if (tracado.SelectedIndex < 0 && tracado.Items.Count > 0) tracado.SelectedIndex = 0;
+        var categoria = new ListaDesign();
+        void CategoriaDoProduto()
+        {
+            // a categoria vem do produto escolhido
+            var cat = (produto.SelectedItem as Campos.Item)?.Dados?.S("categoria") is { Length: > 0 } c ? c : b.S("categoria");
+            categoria.Items.Clear(); categoria.Items.Add(cat.Length > 0 ? cat : "—"); categoria.SelectedIndex = 0;
+        }
+        CategoriaDoProduto();
+
+        long? respId = b.L("responsavelId");
+        var resp = new Label { Text = b.S("responsavel"), AutoSize = false, Height = 22, Font = PecasDesign.FonteValor, ForeColor = PecasDesign.CorTexto, BackColor = Color.White, TextAlign = ContentAlignment.MiddleLeft, Cursor = Cursors.Hand };
+        var setaResp = new Panel { Width = 20, Height = 22, BackColor = Color.White, Cursor = Cursors.Hand };
+        setaResp.Paint += (_, e) => PecasDesign.DesenharSeta(e.Graphics, setaResp.ClientRectangle);
+        void EscolherResponsavel()
+        {
+            var cli = FormPesquisarCliente.Escolher(this, "Responsável pela reserva");
+            if (cli != null) { respId = cli.L("id"); resp.Text = cli.S("nome"); }
+        }
+        resp.Click += (_, _) => EscolherResponsavel(); setaResp.Click += (_, _) => EscolherResponsavel();
+        var menuResp = new ContextMenuStrip();
+        menuResp.Items.Add("Tirar o responsável", null, (_, _) => { respId = null; resp.Text = ""; });
+        resp.ContextMenuStrip = menuResp;
+
+        var aberta = new CheckBox { Text = "Aberta para reservas", Checked = !b.B("reservaFechada") };
+        var totem = new CheckBox { Text = "Aparece no totem", Checked = b.B("autoAtendimento") };
 
         var g = Secao("Bateria");
-        Campo(g, "Nome", c.Nome, 2);
-        Campo(g, "Data", c.Data, 1);
-        Campo(g, "Hora", c.Hora, 1);
-        Campo(g, "Máx. de pilotos", c.Vagas, 1);
-        Campo(g, "Volta mínima (s)", c.VoltaMin, 1);
-        Campo(g, "Produto", c.Produto, 3);
-        Campo(g, "Traçado", c.Tracado, 2);
-        Campo(g, "Categoria (do produto)", c.Categoria, 1);
-        var pesquisar = AcaoCampo("Pesquisar");
-        pesquisar.Click += (_, _) => { var cli = FormPesquisarCliente.Escolher(this, "Responsável pela reserva"); if (cli != null) { c.RespId = cli.L("id"); c.Resp.Text = cli.S("nome"); } };
-        var limparResp = AcaoCampo("✕");
-        limparResp.Click += (_, _) => { c.RespId = null; c.Resp.Text = ""; };
-        c.Resp.BackColor = Color.White;
-        Campo(g, "Responsável pela reserva", c.Resp, 4, pesquisar, limparResp);
-        Campo(g, "Código de reserva", c.CodReserva, 2);
-        Marca(g, c.Aberta, 3);
-        Marca(g, c.Totem, 3);
-        Campo(g, "Observações", c.Obs, 6);
+        Campo(g, "Nome", nome, 2);
+        Campo(g, "Data", data, 1);
+        Campo(g, "Hora", hora, 1);
+        Campo(g, "Vagas (máx)", vagas, 1);
+        Campo(g, "Volta mínima (s)", volta, 1);
+        Campo(g, "Produto", produto, 3);
+        Campo(g, "Traçado", tracado, 2);
+        Campo(g, "Categoria", categoria, 1);
+        Campo(g, "Responsável", resp, 2, setaResp);
+        Marca(g, aberta, 2);
+        Marca(g, totem, 2);
 
-        _gradeProvas = SecaoTabela("Provas (vêm do produto)", 104);
-        _gradeProvas.Colunas(
-            new("ordem", "Ordem", TipoCol.Inteiro, 70),
-            new("prova", "Prova", Largura: 300),
-            new("tipo", "Tipo", Largura: 160),
-            new("tempo", "Tempo", Largura: 100)
-        );
-
+        var provas = SecaoTabelaDesign("Provas (vêm do produto)");
+        provas.Colunas(new("Ordem", 0.9f), new("Prova", 5.2f), new("Tipo", 2.6f), new("Tempo", 1.1f, Direita: true));
         async Task CarregarProvas()
         {
-            if (Campos.IdDe(c.Produto) is not long pid) return;
+            if (Campos.IdDe(produto) is not long pid) { provas.Linhas([]); return; }
             var lista = await Sessao.Api.Lista($"/api/office/cad/provas?produtoId={pid}");
-            _gradeProvas.Carregar(lista.Select(p => new JsonObject
+            provas.Linhas(lista.OrderBy(p => p.I("ordem")).Select(p => new[]
             {
-                ["ordem"] = p.I("ordem"),
-                ["prova"] = p.S("nome"),
-                ["tipo"] = p.S("tipo") switch { "classificacao" => "Classificatório", "corrida" => "Corrida", "treino" => "Treino", var t => t },
-                ["tempo"] = p.I("tempoMin") > 0 ? $"{p.I("tempoMin")} min" : p.I("voltasMax") > 0 ? $"{p.I("voltasMax")} voltas" : "—",
-            }).ToList());
+                p.I("ordem").ToString(), p.S("nome"),
+                p.S("tipo") switch { "classificacao" => "Classificatório", "corrida" => "Corrida", "treino" => "Treino", var t => t },
+                p.I("tempoMin") > 0 ? $"{p.I("tempoMin")} min" : p.I("voltasMax") > 0 ? $"{p.I("voltasMax")} voltas" : "—",
+            }));
         }
-        c.ProdutoMudou += () => Seguro.Rodar(this, CarregarProvas);
+        produto.SelectedIndexChanged += (_, _) => { CategoriaDoProduto(); Seguro.Rodar(this, CarregarProvas); };
 
-        var status = b.S("status");
         BotaoRodape("Salvar", true, () => Seguro.Rodar(this, async () =>
         {
-            if (string.IsNullOrWhiteSpace(c.Nome.Text)) { Msg.Aviso(this, "Insira um nome."); return; }
-            if (c.Vagas.Value < b.I("inscritos")) { Msg.Aviso(this, $"A bateria já tem {b.I("inscritos")} inscrito(s). As vagas não podem ficar abaixo disso."); return; }
-            await Sessao.Api.Put($"/api/office/baterias/{b.S("id")}", c.Corpo());
+            if (string.IsNullOrWhiteSpace(nome.Text)) { Msg.Aviso(this, "Insira um nome."); return; }
+            if (!data.Valida) { Msg.Aviso(this, "Data inválida. Use dd/mm/aaaa."); return; }
+            if (!PecasDesign.LerHora(hora, out var h)) { Msg.Aviso(this, "Hora inválida. Use hh:mm."); return; }
+            if (!int.TryParse(vagas.Text, out var nVagas) || nVagas < 1) { Msg.Aviso(this, "Informe as vagas (máximo de pilotos)."); return; }
+            if (nVagas < b.I("inscritos")) { Msg.Aviso(this, $"A bateria já tem {b.I("inscritos")} inscrito(s). As vagas não podem ficar abaixo disso."); return; }
+            int.TryParse(volta.Text, out var nVolta);
+            await Sessao.Api.Put($"/api/office/baterias/{b.S("id")}", new
+            {
+                nome = nome.Text.Trim(), inicio = $"{Fmt.Iso(data.Value)}T{h.Hours:00}:{h.Minutes:00}", vagas = nVagas, produtoId = Campos.IdDe(produto), tracadoId = Campos.IdDe(tracado),
+                voltaMinimaSeg = nVolta, responsavelId = respId, codigoReserva = b.S("codigoReserva"), reservaFechada = !aberta.Checked, autoAtendimento = totem.Checked,
+                observacao = b.S("observacao"), categoria = categoria.Text,
+            });
             Msg.Info(this, "Bateria editada com sucesso!");
-            DialogResult = DialogResult.OK; Close();
-        }));
-        BotaoRodape(status == "aberta" ? "Fechar bateria" : "Abrir bateria", false, () => Seguro.Rodar(this, async () =>
-        {
-            var novo = status == "aberta" ? "fechada" : "aberta";
-            await Sessao.Api.Post($"/api/office/baterias/{b.S("id")}/status", new { status = novo });
-            Msg.Info(this, novo == "aberta" ? "Bateria aberta com sucesso!" : "Bateria fechada com sucesso!");
             DialogResult = DialogResult.OK; Close();
         }));
         BotaoRodape("Cancelar", false, Close);
@@ -246,80 +267,58 @@ public class FormBateria : DialogoDesign
     }
 }
 
-/// <summary>"Registra Reserva por Cliente": cliente + numero de participantes (IncluirCliente.dc.html).</summary>
-public class FormIncluirCliente : Janela
+/// <summary>Registrar reserva por cliente — igual ao design (IncluirCliente.dc.html).</summary>
+public class FormIncluirCliente : DialogoDesign
 {
+    /// <summary>desligado só no autoteste (a pesquisa abriria na tela)</summary>
+    public static bool AbrirPesquisaAoMostrar = true;
     JsonObject _cli;
-    public FormIncluirCliente(JsonObject b) : base("Registrar reserva por cliente", 960, 680)
+    public FormIncluirCliente(JsonObject b) : base("Registrar reserva por cliente", $"{b.S("nome")} · {Fmt.DmyHm(b.S("dataHora"))} · {b.I("disponiveis")} vagas disponíveis", PecasDesign.Tile(Color.FromArgb(108, 184, 255), Color.FromArgb(30, 111, 232), "pessoa"))
     {
-        Tag = $"{b.S("nome")} · {Fmt.DmyHm(b.S("dataHora"))} · {b.I("disponiveis")} vagas disponíveis";
+        var cli = new Label { AutoSize = false, Height = 22, Font = PecasDesign.FonteValor, ForeColor = PecasDesign.CorTexto, BackColor = Color.White, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
+        var pesquisar = AcaoCampo("Pesquisar");
+        var n = PecasDesign.Numero(1, 3);
+        var novo = new CheckBox { Text = "Novo cliente" };
+        void Mostrar(JsonObject c) { _cli = c; cli.Text = c == null ? "" : $"{c.S("nome")} · {c.S("documento")}"; }
 
-        var cli = new TextBox { ReadOnly = true };
-        var bp = new Button { Text = "Pesquisar", Dock = DockStyle.Right, Width = 84, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(238, 238, 241), Cursor = Cursors.Hand };
-        bp.FlatAppearance.BorderSize = 0;
-        var pCli = new Panel { Dock = DockStyle.Fill, Height = 34 };
-        pCli.Controls.Add(cli); pCli.Controls.Add(bp);
+        var gCli = Secao("Cliente");
+        Campo(gCli, "Cliente", cli, 4, pesquisar);
+        Campo(gCli, "Participantes", n, 1);
+        Marca(gCli, novo, 1);
 
-        var n = Campos.Num(1, 1, Math.Max(1, b.I("disponiveis")));
-        var bNovo = new Button { Text = "+ Novo", Dock = DockStyle.Fill, Height = 34, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(238, 238, 241), Cursor = Cursors.Hand };
-        bNovo.FlatAppearance.BorderSize = 0;
-        bNovo.Click += (_, _) => Seguro.Rodar(this, async () =>
+        var prod = new ListaDesign();
+        prod.Items.AddRange(Sessao.Lista("produtos").Where(p => p.B("ativo")).Select(p => (object)new Campos.Item(p.L("id") ?? 0, $"{p.S("nome")} · {Fmt.Brl(p.L("preco"))}", p)).ToArray());
+        Campos.Selecionar(prod, b.L("produtoId"));
+        if (prod.SelectedIndex < 0 && prod.Items.Count > 0) prod.SelectedIndex = 0;
+        var pago = new CheckBox { Text = "Pago antecipado (site/WhatsApp)" };
+        var obs = PecasDesign.Texto("", 400); obs.PlaceholderText = "Opcional";
+
+        var gRes = Secao("Reserva");
+        Campo(gRes, "Produto", prod, 3);
+        Marca(gRes, pago, 3);
+        Campo(gRes, "Observação", obs, 6);
+
+        Nota("Com mais de 1 participante, as vagas ficam no nome do cliente; depois use \"Alterar cliente\" em cada reserva para colocar quem vai correr.");
+
+        pesquisar.Click += (_, _) => { var c = FormPesquisarCliente.Escolher(this); if (c != null) { Mostrar(c); novo.Checked = false; } };
+        novo.Click += (_, _) => Seguro.Rodar(this, async () =>
         {
+            if (!novo.Checked) return;
             var id = FormCliente.Novo(this);
-            if (id != null)
-            {
-                _cli = (await Sessao.Api.Get($"/api/office/clientes/{id}")).AsObject();
-                cli.Text = $"{_cli.S("nome")} — {_cli.S("documento")}";
-            }
+            if (id == null) { novo.Checked = false; return; }
+            Mostrar((await Sessao.Api.Get($"/api/office/clientes/{id}")).AsObject());
         });
 
-        var gCli = Campos.Grade(6);
-        Campos.Add(gCli, "Cliente", pCli, 4);
-        Campos.Add(gCli, "Participantes", n, 1);
-        Campos.Add(gCli, "Novo cliente", bNovo, 1);
-
-        var cartaoCli = KitVisual.CartaoSecao("Cliente");
-        cartaoCli.Controls.Add(gCli);
-
-        var prod = Campos.Combo();
-        prod.Items.AddRange(Sessao.Produtos(false));
-        if (prod.Items.Count > 0) prod.SelectedIndex = 0;
-        var ckPago = Campos.Check("Pago antecipado (site/WhatsApp)");
-        var obs = Campos.Texto(400);
-
-        var gRes = Campos.Grade(6);
-        Campos.Add(gRes, "Produto", prod, 3);
-        Campos.Add(gRes, " ", ckPago, 3);
-        Campos.Add(gRes, "Observação", obs, 6);
-
-        var cartaoRes = KitVisual.CartaoSecao("Reserva");
-        cartaoRes.Controls.Add(gRes);
-
-        var nota = new Panel { Dock = DockStyle.Top, Height = 56, BackColor = Color.FromArgb(245, 245, 247), Padding = new Padding(14, 10, 14, 10), Margin = new Padding(0, 0, 0, 12) };
-        nota.Paint += (_, e) =>
+        BotaoRodape("Reservar", true, () => Seguro.Rodar(this, async () =>
         {
-            using var pen = new Pen(Color.FromArgb(232, 232, 236));
-            e.Graphics.DrawRectangle(pen, 0, 0, nota.Width - 1, nota.Height - 1);
-        };
-        nota.Controls.Add(new Label { Text = "Com mais de 1 participante, as vagas ficam no nome do cliente; depois use \"Alterar cliente\" em cada reserva para colocar quem vai correr.", Dock = DockStyle.Fill, ForeColor = Color.FromArgb(58, 58, 60), Font = new Font("Segoe UI", 9.2F) });
-
-        Controls.Add(nota);
-        Controls.Add(cartaoRes);
-        Controls.Add(cartaoCli);
-
-        bp.Click += (_, _) => { var c = FormPesquisarCliente.Escolher(this); if (c != null) { _cli = c; cli.Text = $"{c.S("nome")} — {c.S("documento")}"; } };
-
-        Rodape(
-            ("Cancelar", (_, _) => Close(), false),
-            ("Reservar", (_, _) => Seguro.Rodar(this, async () =>
-            {
-                if (_cli == null) { Msg.Aviso(this, "Selecione um cliente."); return; }
-                var r = await Sessao.Api.Post($"/api/office/baterias/{b.S("id")}/incluir", new { clienteId = _cli.L("id"), participantes = (int)n.Value, observacao = obs.Text });
-                Msg.Info(this, r.S("mensagem"));
-                DialogResult = DialogResult.OK; Close();
-            }), true)
-        );
-        Shown += (_, _) => bp.PerformClick();
+            if (_cli == null) { Msg.Aviso(this, "Selecione um cliente."); return; }
+            if (!int.TryParse(n.Text, out var qtd) || qtd < 1) { Msg.Aviso(this, "Informe quantos participantes."); return; }
+            var r = await Sessao.Api.Post($"/api/office/baterias/{b.S("id")}/incluir", new { clienteId = _cli.L("id"), participantes = qtd, observacao = obs.Text.Trim(), produtoId = Campos.IdDe(prod), pagoAntecipado = pago.Checked });
+            Msg.Info(this, r.S("mensagem"));
+            DialogResult = DialogResult.OK; Close();
+        }));
+        BotaoRodape("Cancelar", false, Close);
+        Shown += (_, _) => { if (AbrirPesquisaAoMostrar) pesquisar.PerformClick(); };
     }
 }
 

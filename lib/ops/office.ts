@@ -374,7 +374,8 @@ export async function sumarioMovimento(movId: number) {
 
 // ---------------------------------------------------------------- inscricao (reserva)
 
-async function inscreverN(bateriaId: number, clienteId: number, n: number, origem: string, uid: number | null, observacao: string | null, aprovada = true) {
+/** opcoes.produtoId: produto escolhido na recepção (senão o da bateria); opcoes.pago: pago antecipado (site/WhatsApp), já entra paga e aprovada. */
+async function inscreverN(bateriaId: number, clienteId: number, n: number, origem: string, uid: number | null, observacao: string | null, aprovada = true, opcoes: { produtoId?: number | null; pago?: boolean } = {}) {
   return tx(async (run) => {
     const [b] = await run(
       `SELECT b.Id, b.Status, b.Vagas, b.Inicio, b.ProdutoId, p.PrecoCentavos preco,
@@ -396,12 +397,23 @@ async function inscreverN(bateriaId: number, clienteId: number, n: number, orige
     const [c] = await run(`SELECT Bloqueado FROM dbo.Cliente WHERE Id = @clienteId`, { clienteId });
     if (!c) throw new HttpError(404, 'Cliente não localizado.');
     if (c.Bloqueado) throw new HttpError(409, 'Cliente bloqueado.');
+    let produtoId = (b.ProdutoId as number | null) ?? null;
+    let preco = (b.preco as number | null) ?? null;
+    if (opcoes.produtoId) {
+      const [p] = await run(`SELECT Id, PrecoCentavos preco FROM dbo.Produto WHERE Id = @id`, { id: opcoes.produtoId });
+      if (!p) throw new HttpError(404, 'Produto não encontrado.');
+      produtoId = p.Id as number; preco = (p.preco as number | null) ?? null;
+    }
+    const pago = Boolean(opcoes.pago);
     const ids: number[] = [];
     for (let k = 0; k < n; k++) {
       const [row] = await run(
-        `INSERT INTO dbo.Inscricao (BateriaId, ClienteId, Origem, Observacao, ProdutoId, PrecoCentavos, Aprovada, ResponsavelId)
-         OUTPUT inserted.Id id VALUES (@bateriaId, @clienteId, @origem, @obs, @produtoId, @preco, @aprovada, @resp)`,
-        { bateriaId, clienteId, origem, obs: observacao, produtoId: b.ProdutoId ?? null, preco: b.preco ?? null, aprovada: aprovada ? 1 : 0, resp: n > 1 ? clienteId : null },
+        `INSERT INTO dbo.Inscricao (BateriaId, ClienteId, Origem, Observacao, ProdutoId, PrecoCentavos, Aprovada, ResponsavelId, Pago, ValorCentavos, Status)
+         OUTPUT inserted.Id id VALUES (@bateriaId, @clienteId, @origem, @obs, @produtoId, @preco, @aprovada, @resp, @pago, @valor, @status)`,
+        {
+          bateriaId, clienteId, origem, obs: observacao, produtoId, preco, aprovada: aprovada || pago ? 1 : 0, resp: n > 1 ? clienteId : null,
+          pago: pago ? 1 : 0, valor: pago ? preco : null, status: pago ? 'confirmada' : 'reservada',
+        },
       );
       ids.push(row.id as number);
     }
@@ -1211,7 +1223,10 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   if ((m = path.match(/^\/baterias\/(\d+)\/incluir$/)) && method === 'POST') {
     const b = await req.body();
     const n = int(b.participantes ?? 1, "Campo 'PARTICIPANTES'");
-    const ids = await inscreverN(Number(m[1]), int(b.clienteId, 'Cliente'), n, 'recepcao', sessao.uid, str(b.observacao, 400));
+    const ids = await inscreverN(Number(m[1]), int(b.clienteId, 'Cliente'), n, 'recepcao', sessao.uid, str(b.observacao, 400), true, {
+      produtoId: b.produtoId ? int(b.produtoId, 'Produto') : null,
+      pago: b.pagoAntecipado === true,
+    });
     send(201, { ids, mensagem: n > 1 ? 'Vagas reservadas com sucesso!' : 'Vaga reservada com sucesso!' });
     return true;
   }

@@ -174,10 +174,20 @@ public static class AutoTeste
         var i = 0;
         foreach (ToolStripMenuItem item in menu.Items.OfType<ToolStripMenuItem>())
         {
-            item.ShowDropDown();
-            await Esperar(180);
-            await FotoMenu(item.DropDown, pasta, $"23-menu-{++i:00}-{Slug(item.Text.Replace("&", ""))}");
-            item.HideDropDown();
+            try
+            {
+                item.ShowDropDown();
+                await Esperar(180);
+                await FotoMenu(item.DropDown, pasta, $"23-menu-{++i:00}-{Slug(item.Text.Replace("&", ""))}");
+            }
+            catch (Exception ex)
+            {
+                Log.Add($"ERRO menu {item.Text}: {ex.Message}");
+            }
+            finally
+            {
+                item.HideDropDown();
+            }
         }
     }
 
@@ -317,6 +327,23 @@ public static class AutoTeste
             bmp.Save(Path.Combine(pasta, "editar-bateria.png"));
         }
         f.Close();
+        FormIncluirCliente.AbrirPesquisaAoMostrar = false;
+        async Task Foto(Form janela, string nome)
+        {
+            janela.StartPosition = FormStartPosition.Manual; janela.Location = new Point(-4000, 0); janela.ShowInTaskbar = false;
+            janela.Show(); SetForegroundWindow(antes);
+            await Esperar(1600); janela.Location = new Point(-4000, 0);
+            using var bmp = new Bitmap(janela.Width, janela.Height);
+            using (var gr = Graphics.FromImage(bmp)) { var hdc = gr.GetHdc(); PrintWindow(janela.Handle, hdc, 0); gr.ReleaseHdc(hdc); }
+            bmp.Save(Path.Combine(pasta, nome + ".png"));
+            janela.Close();
+            Log.Add("OK " + nome);
+        }
+        await Foto(new FormIncluirCliente(b), "incluir-cliente");
+        var reservas = await Sessao.Api.Lista($"/api/office/reservas?status=todas&filtro=dia&data={Fmt.Iso(DateTime.Today)}");
+        var r = reservas.FirstOrDefault(x => !x.B("pago")) ?? reservas.FirstOrDefault();
+        if (r != null) { await Foto(new FormEditarReserva(r), "editar-reserva"); await Foto(new FormMoverCliente(r), "mover-cliente"); }
+        else Log.Add("pendente: sem reserva hoje");
         File.WriteAllLines(Path.Combine(pasta, "log.txt"), Log);
     }
 
@@ -458,28 +485,58 @@ public static class AutoTeste
     {
         await Esperar(160);
         Application.DoEvents();
-        var topo = menu.PointToScreen(Point.Empty);
-        var tela = Screen.FromControl(menu).Bounds;
-        var area = Rectangle.Intersect(new Rectangle(topo, menu.Size), tela);
-        if (area.Width < 1 || area.Height < 1) throw new InvalidOperationException("O menu não está na área visível da tela.");
-        using var bmp = new Bitmap(area.Width, area.Height);
-        using var g = Graphics.FromImage(bmp);
-        g.CopyFromScreen(area.Location, Point.Empty, area.Size);
-        bmp.Save(Path.Combine(pasta, nome + ".png"));
-        Log.Add("OK " + nome);
+        try
+        {
+            var topo = menu.PointToScreen(Point.Empty);
+            var tela = Screen.FromControl(menu).Bounds;
+            var area = Rectangle.Intersect(new Rectangle(topo, menu.Size), tela);
+            if (area.Width >= 1 && area.Height >= 1)
+            {
+                using var bmp = new Bitmap(area.Width, area.Height);
+                using var g = Graphics.FromImage(bmp);
+                g.CopyFromScreen(area.Location, Point.Empty, area.Size);
+                bmp.Save(Path.Combine(pasta, nome + ".png"));
+                Log.Add("OK " + nome);
+                return;
+            }
+        }
+        catch { }
+
+        try
+        {
+            if (menu.Width > 0 && menu.Height > 0)
+            {
+                using var bmp = new Bitmap(menu.Width, menu.Height);
+                menu.DrawToBitmap(bmp, new Rectangle(0, 0, menu.Width, menu.Height));
+                bmp.Save(Path.Combine(pasta, nome + ".png"));
+                Log.Add("OK " + nome);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Add($"ERRO {nome}: {ex.Message}");
+        }
     }
 
     static async Task FotoTela(Form f, string pasta, string nome)
     {
         await Esperar(100);
-        var tela = Screen.FromControl(f).Bounds;
-        var area = Rectangle.Intersect(f.Bounds, tela);
-        if (area.Width < 1 || area.Height < 1) throw new InvalidOperationException("O relatório está fora da área visível da tela.");
-        using var bmp = new Bitmap(area.Width, area.Height);
-        using var g = Graphics.FromImage(bmp);
-        g.CopyFromScreen(area.Location, Point.Empty, area.Size);
-        bmp.Save(Path.Combine(pasta, nome + ".png"));
-        Log.Add("OK " + nome + " (captura de tela)");
+        try
+        {
+            var tela = Screen.FromControl(f).Bounds;
+            var area = Rectangle.Intersect(f.Bounds, tela);
+            if (area.Width >= 1 && area.Height >= 1)
+            {
+                using var bmp = new Bitmap(area.Width, area.Height);
+                using var g = Graphics.FromImage(bmp);
+                g.CopyFromScreen(area.Location, Point.Empty, area.Size);
+                bmp.Save(Path.Combine(pasta, nome + ".png"));
+                Log.Add("OK " + nome + " (captura de tela)");
+                return;
+            }
+        }
+        catch { }
+        await Foto(f, pasta, nome);
     }
 
     static Task Esperar(int ms) => Task.Delay(ms);
