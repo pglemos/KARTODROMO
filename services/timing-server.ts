@@ -1006,7 +1006,6 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/tv') return sendFile(res, 'tv.html');
   if (url.pathname.startsWith('/resultado/')) return sendFile(res, 'resultado.html');
   if (url.pathname === '/kib-logo.png' || url.pathname === '/assets/da264d01b784a13054e2da496b5f46ff.png' || url.pathname === '/assets/kib-logo.png') return sendFile(res, 'kib-logo.png');
-  if (url.pathname === '/laptime-logo.png') return sendFile(res, 'laptime-logo.png');
   if (url.pathname.startsWith('/api/') || url.pathname === '/healthz') {
     handleApi(req, res, url).catch((err) => {
       log('erro na API', err);
