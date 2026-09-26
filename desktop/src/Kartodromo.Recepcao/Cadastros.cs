@@ -663,23 +663,91 @@ public class FormCadastro : Janela
     }
 }
 
-/// <summary>"Criar Voucher por Fidelidade / Parceiro".</summary>
+/// <summary>"Criar Voucher por Fidelidade / Parceiro" — Voucher.dc.html (820x660, prévia de cartão dourado metálico à esquerda).</summary>
 public class FormVoucher : Janela
 {
-    public FormVoucher(string origem, JsonObject vinculo = null) : base(origem == "fidelidade" ? "Criar Voucher por Fidelidade" : origem == "parceiro" ? "Criar Voucher por Parceiro" : "Criar Voucher", 560, 380)
+    public FormVoucher(string origem, JsonObject vinculo = null) : base(origem == "fidelidade" ? "Criar Voucher por Fidelidade" : origem == "parceiro" ? "Criar Voucher por Parceiro" : "Criar Voucher", 840, 660)
     {
+        var nomeOrigem = origem == "fidelidade" ? "Criar voucher por fidelidade" : origem == "parceiro" ? "Criar voucher por parceiro" : "Criar voucher";
+        Tag = new KitVisual.ModalMeta
+        {
+            Titulo = nomeOrigem,
+            Sub = "Prévia do voucher. O cliente usa o código no caixa (Receita avulsa → Aplicar voucher).",
+            Cor1 = Color.FromArgb(255, 181, 71),
+            Cor2 = Color.FromArgb(240, 122, 0),
+            Glifo = "\uE7C1",
+            Estado = "Voucher"
+        };
+
         var refe = new TextBox();
-        // fidelidade e parceiro: escolhe numa lista real (o servidor exige o vínculo)
         var lista = Campos.Combo(); lista.DropDownStyle = ComboBoxStyle.DropDownList;
         var vinculado = origem is "fidelidade" or "parceiro";
-        var cod = new TextBox { CharacterCasing = CharacterCasing.Upper }; var bG = new Button { Text = "Gerar", Height = 24 };
-        var tipo = Campos.Combo("Percentual", "Valor (R$)"); var valor = new TextBox();
+        var cod = new TextBox { CharacterCasing = CharacterCasing.Upper, Text = "KB" + Guid.NewGuid().ToString("N")[..6].ToUpperInvariant() };
+        var bG = new Button { Text = "Gerar", Height = 28, AutoSize = true, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(242, 242, 245) };
+        bG.FlatAppearance.BorderSize = 0;
+        bG.Click += (_, _) => cod.Text = "KB" + Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
+
+        var tipo = Campos.Combo("Percentual", "Valor (R$)");
+        var valor = new TextBox { Text = "10" };
         var ini = Campos.Data(); var fim = Campos.Data(DateTime.Today.AddDays(30));
         var prod = Campos.Combo(); prod.Items.Add(new Campos.Item(0, "(qualquer produto)")); prod.Items.AddRange(Sessao.Produtos()); prod.SelectedIndex = 0;
-        var uso = Campos.Num(1, 1, 999); var unico = Campos.Check("Uso unico", true); var min = new TextBox(); var max = new TextBox();
-        bG.Click += (_, _) => cod.Text = "KB" + Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
-        var g = Campos.Grade(3, 45, 35, 20);
-        Campos.Add(g, origem == "fidelidade" ? "Conta fidelidade" : origem == "parceiro" ? "Parceiro" : "Referência (opcional)", vinculado ? lista : refe, 3);
+        var uso = Campos.Num(1, 1, 999); var unico = Campos.Check("Uso único (vale uma vez só)", true);
+        var min = new TextBox(); var max = new TextBox();
+
+        // ---- Painel Esquerdo: Cartão Dourado 3D (Voucher.dc.html)
+        var esq = new Panel { Dock = DockStyle.Left, Width = 290, BackColor = Color.FromArgb(24, 24, 26), Padding = new Padding(20, 36, 20, 20) };
+        esq.Paint += (_, e) =>
+        {
+            using var b = new LinearGradientBrush(esq.ClientRectangle, Color.FromArgb(32, 32, 36), Color.FromArgb(12, 12, 14), 90f);
+            e.Graphics.FillRectangle(b, esq.ClientRectangle);
+        };
+
+        var cardBox = new Panel { Size = new Size(250, 156), Location = new Point(20, 48), BackColor = Color.Transparent };
+        var lblCardTipo = new Label { Text = "VOUCHER · " + (origem == "fidelidade" ? "FIDELIDADE" : origem == "parceiro" ? "PARCEIRO" : "AVULSO"), AutoSize = false, Size = new Size(220, 20), Location = new Point(16, 14), ForeColor = Color.FromArgb(58, 39, 0), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+        var lblCardValor = new Label { Text = "10% OFF", AutoSize = false, Size = new Size(220, 46), Location = new Point(14, 44), ForeColor = Color.FromArgb(58, 39, 0), Font = new Font("Segoe UI", 26F, FontStyle.Bold) };
+        var lblCardCodigo = new Label { Text = cod.Text, AutoSize = false, Size = new Size(220, 26), Location = new Point(16, 114), ForeColor = Color.FromArgb(58, 39, 0), Font = new Font("Consolas", 12.5F, FontStyle.Bold) };
+
+        cardBox.Paint += (_, e) =>
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using var path = VisualPrincipal.Redondo(cardBox.ClientRectangle, 16);
+            using var bGold = new LinearGradientBrush(cardBox.ClientRectangle, Color.FromArgb(255, 226, 122), Color.FromArgb(201, 133, 0), 135f);
+            e.Graphics.FillPath(bGold, path);
+            using var pen = new Pen(Color.FromArgb(255, 245, 180), 1.5f);
+            e.Graphics.DrawPath(pen, path);
+        };
+        cardBox.Controls.AddRange([lblCardTipo, lblCardValor, lblCardCodigo]);
+
+        var lblExplicacao = new Label
+        {
+            Text = "Prévia do voucher.\nO cliente usa o código no caixa\n(Receita avulsa → Aplicar voucher).",
+            AutoSize = false,
+            Size = new Size(250, 80),
+            Location = new Point(20, 230),
+            ForeColor = Color.FromArgb(174, 174, 178),
+            Font = new Font("Segoe UI", 9.2F),
+            TextAlign = ContentAlignment.TopCenter
+        };
+        esq.Controls.AddRange([cardBox, lblExplicacao]);
+
+        void AtualizarPrevia()
+        {
+            lblCardTipo.Text = "VOUCHER · " + (origem == "fidelidade" ? "FIDELIDADE" : origem == "parceiro" ? "PARCEIRO" : "AVULSO");
+            var vTxt = valor.Text.Trim();
+            if (tipo.SelectedIndex == 0)
+                lblCardValor.Text = string.IsNullOrEmpty(vTxt) ? "0% OFF" : $"{vTxt}% OFF";
+            else
+                lblCardValor.Text = string.IsNullOrEmpty(vTxt) ? "R$ 0 OFF" : $"R$ {vTxt} OFF";
+            lblCardCodigo.Text = string.IsNullOrWhiteSpace(cod.Text) ? "—" : cod.Text.Trim().ToUpperInvariant();
+        }
+
+        valor.TextChanged += (_, _) => AtualizarPrevia();
+        tipo.SelectedIndexChanged += (_, _) => AtualizarPrevia();
+        cod.TextChanged += (_, _) => AtualizarPrevia();
+
+        // ---- Painel Direito: Formulário
+        var g = Campos.Grade(4);
+        Campos.Add(g, origem == "fidelidade" ? "Conta fidelidade" : origem == "parceiro" ? "Parceiro" : "Referência (opcional)", vinculado ? lista : refe, 4);
         if (vinculado)
             Load += (_, _) => Seguro.Rodar(this, async () =>
             {
@@ -690,29 +758,51 @@ public class FormVoucher : Janela
                 if (vinculo != null) Campos.Selecionar(lista, vinculo.L("id") ?? 0);
                 if (lista.SelectedIndex < 0) lista.SelectedIndex = 0;
             });
-        Campos.Add(g, "Codigo", cod); Campos.Add(g, " ", bG); g.Controls.Add(new Label());
-        Campos.Add(g, "Tipo desconto", tipo); Campos.Add(g, "Valor", valor); g.Controls.Add(new Label());
-        Campos.Add(g, "Data inicial", ini); Campos.Add(g, "Data final", fim); g.Controls.Add(new Label());
-        Campos.Add(g, "Produto", prod, 3);
-        Campos.Add(g, "Uso max/cliente", uso); Campos.Add(g, null, unico); g.Controls.Add(new Label());
-        Campos.Add(g, "Pedido minimo", min); Campos.Add(g, "Desconto maximo", max);
-        Controls.Add(new Panel { Dock = DockStyle.Fill, Padding = new Padding(10), Controls = { g } });
-        Rodape(("Cancelar", (_, _) => Close(), false), ("Salvar e Fechar", (_, _) => Seguro.Rodar(this, async () =>
-        {
-            if (vinculado && (Campos.IdDe(lista) is not long vid || vid <= 0)) { Msg.Aviso(this, origem == "fidelidade" ? "Escolha a conta de fidelidade." : "Escolha o parceiro."); return; }
-            var pct = tipo.SelectedIndex == 0;
-            long v;
-            if (pct) { if (!int.TryParse(valor.Text.Trim().TrimEnd('%'), out var p) || p <= 0 || p > 100) { Msg.Aviso(this, "Informe o percentual (1 a 100)."); return; } v = p; }
-            else { if (Fmt.Centavos(valor.Text) is not long c || c <= 0) { Msg.Aviso(this, "Informe o valor."); return; } v = c; }
-            await Sessao.Api.Post("/api/office/vouchers", new
+
+        var pCod = new Panel { Size = new Size(220, 32) };
+        cod.SetBounds(0, 2, 140, 26);
+        bG.SetBounds(146, 0, 70, 28);
+        pCod.Controls.AddRange([cod, bG]);
+
+        Campos.Add(g, "Código", pCod, 2);
+        Campos.Add(g, "Tipo de desconto", tipo, 2);
+        Campos.Add(g, "Valor", valor, 2);
+        Campos.Add(g, "Uso único", unico, 2);
+        Campos.Add(g, "Válido de", ini, 2);
+        Campos.Add(g, "Válido até", fim, 2);
+        Campos.Add(g, "Produto", prod, 4);
+        Campos.Add(g, "Uso máx por cliente", uso, 2);
+        Campos.Add(g, "Pedido mínimo (R$)", min, 2);
+        Campos.Add(g, "Desconto máximo (R$)", max, 2);
+
+        var cForm = KitVisual.CartaoSecao("Regras de desconto e validade");
+        cForm.Controls.Add(g);
+
+        var pDireito = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12, 10, 12, 10) };
+        pDireito.Controls.Add(cForm);
+
+        Controls.Add(pDireito);
+        Controls.Add(esq);
+
+        Rodape("O cliente apresenta o código no caixa",
+            ("Cancelar", (_, _) => Close(), false),
+            ("Salvar e fechar", (_, _) => Seguro.Rodar(this, async () =>
             {
-                origem, referencia = vinculado ? null : refe.Text.Trim(),
-                fidelidadeContaId = origem == "fidelidade" ? Campos.IdDe(lista) : null, parceiroId = origem == "parceiro" ? Campos.IdDe(lista) : null, codigo = cod.Text.Trim(), tipo = pct ? "percentual" : "valor", valor = v, inicio = Fmt.Iso(ini.Value), fim = Fmt.Iso(fim.Value),
-                produtoId = Campos.IdDe(prod) is long pid && pid > 0 ? pid : (long?)null, usoMaxCliente = (int)uso.Value, usoUnico = unico.Checked,
-                pedidoMinimo = Fmt.Centavos(min.Text) is long mn && mn > 0 ? mn : (long?)null, descontoMaximo = Fmt.Centavos(max.Text) is long mx && mx > 0 ? mx : (long?)null,
-            });
-            Msg.Info(this, "Voucher criado.");
-            Close();
-        }), true));
+                if (vinculado && (Campos.IdDe(lista) is not long vid || vid <= 0)) { Msg.Aviso(this, origem == "fidelidade" ? "Escolha a conta de fidelidade." : "Escolha o parceiro."); return; }
+                var pct = tipo.SelectedIndex == 0;
+                long v;
+                if (pct) { if (!int.TryParse(valor.Text.Trim().TrimEnd('%'), out var p) || p <= 0 || p > 100) { Msg.Aviso(this, "Informe o percentual (1 a 100)."); return; } v = p; }
+                else { if (Fmt.Centavos(valor.Text) is not long c || c <= 0) { Msg.Aviso(this, "Informe o valor."); return; } v = c; }
+                await Sessao.Api.Post("/api/office/vouchers", new
+                {
+                    origem, referencia = vinculado ? null : refe.Text.Trim(),
+                    fidelidadeContaId = origem == "fidelidade" ? Campos.IdDe(lista) : null, parceiroId = origem == "parceiro" ? Campos.IdDe(lista) : null, codigo = cod.Text.Trim(), tipo = pct ? "percentual" : "valor", valor = v, inicio = Fmt.Iso(ini.Value), fim = Fmt.Iso(fim.Value),
+                    produtoId = Campos.IdDe(prod) is long pid && pid > 0 ? pid : (long?)null, usoMaxCliente = (int)uso.Value, usoUnico = unico.Checked,
+                    pedidoMinimo = Fmt.Centavos(min.Text) is long mn && mn > 0 ? mn : (long?)null, descontoMaximo = Fmt.Centavos(max.Text) is long mx && mx > 0 ? mx : (long?)null,
+                });
+                Msg.Info(this, "Voucher criado com sucesso.");
+                Close();
+            }), true)
+        );
     }
 }
