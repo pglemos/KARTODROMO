@@ -1120,8 +1120,16 @@ public partial class FormCrono : Form
             };
             foreach (var (nome, campos) in janelas)
             {
-                using var f = new DialogoDados(nome, "Cadastro · Cronometragem", campos, new Size(820, 500));
-                f.Show(this); await Task.Delay(150); Foto(f, nome); f.Close();
+                if (nome == "RelatoriosCrono")
+                {
+                    using var fRel = new FormRelatoriosCrono(_state, _sess);
+                    fRel.Show(this); await Task.Delay(200); Foto(fRel, nome); fRel.Close();
+                }
+                else
+                {
+                    using var f = new DialogoDados(nome, "Cadastro · Cronometragem", campos, new Size(820, 500));
+                    f.Show(this); await Task.Delay(150); Foto(f, nome); f.Close();
+                }
             }
             if (_state?["focus"] is JsonObject foco) File.WriteAllText(Path.Combine(_autoteste, "painel-led.txt"), PainelLed.Montar(foco, 10, DateTime.Now, out _));
             File.WriteAllText(Path.Combine(_autoteste, "ok.txt"), "ok");
