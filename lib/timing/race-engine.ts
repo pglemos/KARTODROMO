@@ -57,6 +57,8 @@ export type Session = {
   proofId?: string | null;
   /** baterias criadas juntas do mesmo programa da agenda (ex.: Tomada de tempo + Corrida) */
   programaId?: string | null;
+  /** bateria da agenda da recepção de onde a prova foi criada (tablet do sorteio) */
+  agendaId?: number | null;
   observations?: Observation[];
   competitors: Competitor[];
   /** Leituras do decoder que não viraram volta (volta mínima, kart encerrado, transponder desconhecido...). Só pra mostrar ao operador. */

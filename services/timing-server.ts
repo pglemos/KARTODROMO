@@ -58,6 +58,7 @@ import {
   type CatalogEntity,
   type TimingCatalog,
 } from '../lib/timing/catalog';
+import { competidoresComSorteio, pilotosDoSorteio, validarSorteio, type Atribuicao } from '../lib/timing/sorteio';
 
 // ---------------------------------------------------------------- config
 
@@ -354,6 +355,9 @@ function sessionSummary(s: Session) {
     proofId: s.proofId ?? null,
     currentFlag: s.currentFlag ?? 'none',
     competitors: s.competitors.length,
+    semKart: s.competitors.filter((c) => !c.kart && c.name?.trim()).length,
+    agendaId: s.agendaId ?? null,
+    programaId: s.programaId ?? null,
   };
 }
 
@@ -465,6 +469,25 @@ async function readBody(req: http.IncomingMessage): Promise<Record<string, unkno
   for await (const chunk of req) chunks.push(chunk as Buffer);
   if (!chunks.length) return {};
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+}
+
+/** Karts com transponder cadastrado (os que podem entrar no sorteio). */
+function kartsCadastrados() {
+  return [...new Set(Object.values(transponderMap).map((k) => String(k).trim()).filter((k) => /^\d+$/.test(k)))].sort((a, b) => Number(a) - Number(b));
+}
+
+/** Tipo de kart da bateria na agenda da recepção (light/super), achado pelo id ou pelo nome da bateria. */
+async function tipoKartDa(s: Session): Promise<string | null> {
+  try {
+    const data = new Date(s.createdAt).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+    const agenda = (await opsGet(`/api/baterias?data=${data}`)) as { id?: number; nome?: string; tipoKart?: string }[];
+    const i = s.name.lastIndexOf(' · ');
+    const base = (i > 0 ? s.name.slice(0, i) : s.name).trim().toLowerCase();
+    const achada = agenda.find((b) => s.agendaId != null && b.id === s.agendaId) ?? agenda.find((b) => String(b.nome ?? '').trim().toLowerCase() === base);
+    return achada?.tipoKart ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function parseCompetitors(value: unknown) {
@@ -816,6 +839,52 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     } catch (err) { return send(res, 400, { error: (err as Error).message }); }
   }
 
+  // ---------------------------------------------------------------- sorteio de karts (tablet)
+  const so = path.match(/^\/api\/sessions\/([\w-]+)\/sorteio$/);
+  if (so) {
+    const s = sessions.get(so[1]);
+    if (!s) return send(res, 404, { error: 'Bateria não encontrada.' });
+    if (method === 'GET') {
+      const pilotos = pilotosDoSorteio(s, sessions.values(), mesmoPrograma);
+      const pesos = new Map<string, number>();
+      const ids = pilotos.map((p) => p.customerId).filter(Boolean).join(',');
+      if (ids) {
+        try {
+          for (const c of (await opsGet(`/api/crono/clientes?ids=${encodeURIComponent(ids)}`)) as { id?: unknown; peso?: unknown }[]) {
+            const peso = Number(c.peso);
+            if (c.id != null && peso > 0) pesos.set(String(c.id), peso);
+          }
+        } catch { /* sem o servidor da operação o sorteio funciona sem o peso */ }
+      }
+      return send(res, 200, {
+        sessao: { id: s.id, name: s.name, type: s.type, state: s.state, createdAt: s.createdAt, eventId: s.eventId ?? null },
+        programa: [...sessions.values()].filter((x) => mesmoPrograma(s, x)).map((x) => ({ id: x.id, name: x.name, state: x.state })),
+        tipoKart: await tipoKartDa(s),
+        karts: kartsCadastrados(),
+        pilotos: pilotos.map((p) => ({ ...p, pesoKg: p.customerId ? pesos.get(p.customerId) ?? null : null })),
+      });
+    }
+    if (method === 'POST') {
+      const body = await readBody(req);
+      const atribuicoes = (Array.isArray(body.atribuicoes) ? body.atribuicoes : []) as Atribuicao[];
+      try {
+        validarSorteio(s, atribuicoes, new Set(kartsCadastrados()));
+      } catch (err) { return send(res, 400, { error: (err as Error).message }); }
+      const nomes = atribuicoes.map((a) => `${s.competitors[Number(a.indice)]?.name ?? '?'} → kart ${a.kart}`);
+      setCompetitors(s, competidoresComSorteio(s, atribuicoes));
+      const modo = String(body.modo ?? '') === 'um-a-um' ? 'um a um' : 'todos de uma vez';
+      const texto = `Sorteio de karts no tablet (${modo}): ` + nomes.join('; ');
+      (s.observations ??= []).push({ id: randomUUID(), text: texto, wallMs: Date.now(), author: 'Sorteio' });
+      saveSession(s);
+      log(`bateria ${s.name}: ${texto}`);
+      for (const irma of sessions.values()) {
+        if (mesmoPrograma(s, irma) && copiarCompetidores(irma, s)) { saveSession(irma); log(`competidores de ${s.name} copiados para ${irma.name}`); }
+      }
+      scheduleStateBroadcast();
+      return send(res, 200, sessionView(s));
+    }
+  }
+
   const m = path.match(/^\/api\/sessions\/([\w-]+)(?:\/(\w+))?(?:\/(\w+))?$/);
   if (m) {
     const s = sessions.get(m[1]);
@@ -979,6 +1048,50 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       return send(res, 200, []); // servidor antigo sem programa: bateria unica
     }
   }
+  const prep = path.match(/^\/api\/agenda\/(\d+)\/preparar$/);
+  if (prep && method === 'POST') {
+    const agendaId = Number(prep[1]);
+    const existentes = [...sessions.values()].filter((x) => x.agendaId === agendaId && x.state !== 'cancelada');
+    if (existentes.length) return send(res, 200, existentes.map(sessionSummary));
+    const body = await readBody(req);
+    let grade: { nome?: string; clienteId?: unknown; kart?: string }[];
+    let programa: { nome?: string; tipo?: string; tempoMin?: number; finalizacao?: string; voltasMax?: number; voltaMinimaSeg?: number }[] = [];
+    try {
+      grade = await opsGet(`/api/crono/baterias/${agendaId}/grid`);
+      try { programa = await opsGet(`/api/crono/baterias/${agendaId}/programa`); } catch { programa = []; }
+    } catch (err) { return send(res, 502, { error: `Agenda indisponível: ${(err as Error).message}` }); }
+    if (!Array.isArray(grade) || !grade.length) return send(res, 400, { error: 'Essa bateria da agenda não tem inscritos.' });
+    if (!Array.isArray(programa)) programa = [];
+    const nome = String(body.nome ?? '').trim() || 'Bateria';
+    const competitors = grade.map((g) => ({ kart: String(g.kart ?? '').trim(), name: String(g.nome ?? '').trim(), customerId: g.clienteId != null ? String(g.clienteId) : null, category: null }));
+    const cfg = (timingSettings.timing as Record<string, unknown> | undefined) ?? {};
+    const minimo = Number(cfg.minimumLapSeconds ?? 5);
+    const tipo = (t?: string): SessionType => (t === 'treino' || t === 'classificacao' || t === 'corrida' ? t : 'corrida');
+    const provas = programa.length > 1 ? programa : [programa[0] ?? { tipo: 'corrida', tempoMin: Number(cfg.defaultDurationMin ?? 20) }];
+    const programaId = provas.length > 1 ? randomUUID().replace(/-/g, '') : null;
+    const criadas = provas.map((p) => {
+      const porVoltas = p.finalizacao === 'voltas';
+      const s = createSession({
+        id: `${new Date().toISOString().slice(0, 10)}-${randomUUID().slice(0, 8)}`,
+        name: provas.length > 1 ? `${nome} · ${String(p.nome ?? '').trim() || tipo(p.tipo)}` : nome,
+        type: tipo(p.tipo),
+        durationMin: porVoltas ? 0 : Number(p.tempoMin ?? cfg.defaultDurationMin ?? 20),
+        maxLaps: porVoltas && Number(p.voltasMax) > 0 ? Number(p.voltasMax) : null,
+        minLapSec: Number(p.voltaMinimaSeg) > 0 ? Number(p.voltaMinimaSeg) : minimo,
+        now: Date.now(),
+        competitors,
+        programaId,
+      });
+      s.agendaId = agendaId;
+      sessions.set(s.id, s);
+      saveSession(s);
+      log(`bateria criada pelo tablet do sorteio: ${s.name} (${s.type}) com ${s.competitors.length} pilotos`);
+      return s;
+    });
+    scheduleStateBroadcast();
+    return send(res, 201, criadas.map(sessionSummary));
+  }
+
   if (path === '/api/clientes' && method === 'GET') {
     try {
       return send(res, 200, await opsGet(`/api/crono/clientes?ids=${encodeURIComponent(url.searchParams.get('ids') ?? '')}`));
