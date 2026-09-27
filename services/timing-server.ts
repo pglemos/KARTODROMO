@@ -386,7 +386,12 @@ function stateView() {
     lastQualifying: lastQualifying ? sessionView(lastQualifying) : null,
     sessions: list.slice(0, 40).map(sessionSummary),
     recentPassings,
-    tb50: { offset: tb50Page.offset, pageSize: TB50_PAGE_SIZE, updatedAt: tb50Page.updatedAt },
+    tb50: {
+      offset: tb50Page.offset,
+      pageSize: TB50_PAGE_SIZE,
+      updatedAt: tb50Page.updatedAt,
+      telas: [...tb50Pings.entries()].map(([ip, p]) => ({ ip, ultimoSinalMs: Date.now() - p.at, navegador: p.ua })),
+    },
   };
 }
 
@@ -396,6 +401,7 @@ function stateView() {
 
 const TB50_PAGE_FILE = join(DATA_DIR, 'tb50-page.json');
 const TB50_PAGE_SIZE = 20;
+const tb50Pings = new Map<string, { at: number; ua: string }>();
 let tb50Page: { offset: number; updatedAt: string | null } = { offset: 0, updatedAt: null };
 try {
   if (existsSync(TB50_PAGE_FILE)) tb50Page = { offset: 0, updatedAt: null, ...JSON.parse(readFileSync(TB50_PAGE_FILE, 'utf8')) };
@@ -818,6 +824,14 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
   if (path === '/api/state') return send(res, 200, stateView());
   if (path === '/api/livetime-snapshot') return send(res, 200, liveSnapshot(url.searchParams.get('painel') === 'tb50'));
   if (path === '/api/tb50-page' && method === 'GET') return send(res, 200, tb50Page);
+  if (path === '/api/tb50-ping') {
+    const ip = (req.socket.remoteAddress ?? '').replace(/^::ffff:/, '');
+    const ua = (url.searchParams.get('ua') ?? '').slice(0, 300);
+    const anterior = tb50Pings.get(ip);
+    if (!anterior || anterior.ua !== ua || Date.now() - anterior.at > 10 * 60_000) log(`telao TB50: pagina /tb50 viva em ${ip} (${url.searchParams.get('w')}x${url.searchParams.get('h')}) ${ua}`);
+    tb50Pings.set(ip, { at: Date.now(), ua });
+    return send(res, 200, { ok: true });
+  }
   if (path === '/api/tb50-page' && (method === 'PUT' || method === 'POST')) {
     const body = await readBody(req);
     const offset = body.pagina !== undefined ? Number(body.pagina) * TB50_PAGE_SIZE : body.offset;
@@ -1240,6 +1254,7 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/' || url.pathname === '/operador') return sendFile(res, 'operador.html');
   if (['/admin', '/cadastros', '/ferramentas', '/configuracoes'].includes(url.pathname)) return sendFile(res, 'admin.html');
   if (url.pathname === '/tv') return sendFile(res, 'tv.html');
+  if (url.pathname === '/tb50') return sendFile(res, 'tb50.html');
   if (url.pathname.startsWith('/resultado/')) return sendFile(res, 'resultado.html');
   if (url.pathname === '/kib-logo.png' || url.pathname === '/assets/da264d01b784a13054e2da496b5f46ff.png' || url.pathname === '/assets/kib-logo.png') return sendFile(res, 'kib-logo.png');
   if (url.pathname.startsWith('/api/') || url.pathname === '/healthz') {

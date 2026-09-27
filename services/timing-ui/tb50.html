@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=2048,height=512,initial-scale=1">
+<title>Telão TB50</title>
+<!--
+  Telão de LED da TB50 (programa HTML da processadora, 2048x512).
+  Uma página só, que nunca troca de endereço: placar 1-20 ao vivo, grid parado depois da tomada,
+  zera na bandeira verde e mostra o pódio 1-5 quando a corrida é encerrada.
+  JavaScript em ES5 + XMLHttpRequest de propósito: o navegador da TB50 é antigo.
+-->
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#000}
+body{font-family:Arial,Helvetica,sans-serif;color:#fff}
+#tela{position:absolute;left:0;top:0;width:2048px;height:512px;overflow:hidden;background:#000;-webkit-transform-origin:0 0;transform-origin:0 0}
+/* placar 10x2, igual ao layout "Modelo 20 Pilotos - posição e kart" do telão */
+#placar{position:absolute;left:12px;top:12px;width:2024px;height:488px;border:3px solid #fff;background:#fff}
+.casa{position:absolute;width:202.4px;height:244px;border-right:8px solid #fff;border-bottom:8px solid #fff;background:#050505;text-align:center;font-weight:900;overflow:hidden}
+.casa.b{background:#101010}
+.casa .p{display:block;font-size:80px;line-height:1;margin-top:34px;color:#fff}
+.casa .k{display:block;font-size:90px;line-height:1;margin-top:10px;color:#00ff11;white-space:nowrap}
+.casa.vazia .p{color:rgba(255,255,255,.35)}
+.casa.vazia .k{color:rgba(255,255,255,.35)}
+/* pódio */
+#podio{position:absolute;left:0;top:0;width:2048px;height:512px;display:none;background:#050505;background:radial-gradient(ellipse at 50% 30%,#2a2108 0%,#0b0a07 45%,#000 80%)}
+#podio .moldura{position:absolute;left:58px;top:22px;width:1932px;height:470px;border:1px solid rgba(255,196,0,.28)}
+#podio .titulo{position:absolute;left:644px;top:50px;width:760px;height:76px;background:#0d0d0d;border-top:5px solid #ffc400;-webkit-transform:skewX(-12deg);transform:skewX(-12deg);text-align:center}
+#podio .titulo span{display:block;-webkit-transform:skewX(12deg);transform:skewX(12deg);font-size:58px;line-height:72px;font-weight:900;font-style:italic;letter-spacing:1px;color:#fff}
+#podio .evento{position:absolute;left:0;width:2048px;top:130px;text-align:center;font-size:20px;font-weight:700;color:#ffc400;letter-spacing:3px;text-transform:uppercase}
+.linha{position:absolute;width:914px;height:96px;background:#111;border:1px solid #2b2b2b}
+.linha .n{position:absolute;left:0;top:0;width:96px;height:94px;background:#ffc400;background:linear-gradient(180deg,#ffe07a,#c88f00);color:#111;font-size:66px;line-height:94px;font-weight:900;font-style:italic;text-align:center}
+.linha .nome{position:absolute;left:120px;top:0;width:470px;height:94px;font-size:40px;line-height:94px;font-weight:900;white-space:nowrap;overflow:hidden;text-transform:uppercase;letter-spacing:1px}
+.linha .kart{position:absolute;left:600px;top:0;width:110px;height:94px;font-size:36px;line-height:94px;font-weight:900;color:#2bff7a;text-align:right}
+.linha .tempo{position:absolute;left:724px;top:0;width:188px;height:94px;border-left:1px solid #2b2b2b;font-size:34px;line-height:94px;font-weight:900;color:#ffd24a;text-align:center}
+/* destaque do vencedor antes da lista */
+#vencedor{position:absolute;left:0;top:0;width:2048px;height:512px;display:none;background:#000;background:radial-gradient(ellipse at 50% 55%,#3a2c05 0%,#0b0a07 50%,#000 85%);text-align:center}
+#vencedor .pos{display:inline-block;margin-top:70px;padding:0 60px;height:96px;border:3px solid #ffc400;background:#111;font-size:84px;line-height:92px;font-weight:900;font-style:italic;color:#ffc400}
+#vencedor .nome{display:block;margin-top:20px;font-size:120px;line-height:1.05;font-weight:900;font-style:italic;text-transform:uppercase;white-space:nowrap}
+#vencedor .tempo{display:block;margin-top:8px;font-size:90px;line-height:1;font-weight:900;font-style:italic;color:#ffd24a}
+</style>
+</head>
+<body>
+<div id="tela">
+  <div id="placar"></div>
+  <div id="podio">
+    <div class="moldura"></div>
+    <div class="titulo"><span>RESULTADO FINAL</span></div>
+    <div class="evento" id="podio-evento"></div>
+    <div id="podio-linhas"></div>
+  </div>
+  <div id="vencedor"><span class="pos">1º</span><span class="nome" id="v-nome"></span><span class="tempo" id="v-tempo"></span></div>
+</div>
+<script>
+(function () {
+  var CASAS = 20, COLUNAS = 10;
+  var tela = document.getElementById('tela');
+  var placar = document.getElementById('placar');
+  var podio = document.getElementById('podio');
+  var vencedor = document.getElementById('vencedor');
+  var casas = [];
+  var offset = 0;
+  var ultimo = null;
+  var podioChave = '';
+  var vencedorAte = 0;
+  var PARTICULAS = /^(DE|DA|DO|DOS|DAS|E)$/;
+
+  function escala() {
+    var w = window.innerWidth || document.documentElement.clientWidth || 2048;
+    var h = window.innerHeight || document.documentElement.clientHeight || 512;
+    var s = Math.min(w / 2048, h / 512);
+    if (!(s > 0)) s = 1;
+    var t = 'scale(' + s + ')';
+    tela.style.webkitTransform = t; tela.style.transform = t;
+    tela.style.left = Math.max(0, Math.floor((w - 2048 * s) / 2)) + 'px';
+    tela.style.top = Math.max(0, Math.floor((h - 512 * s) / 2)) + 'px';
+  }
+
+  function montarCasas() {
+    for (var i = 0; i < CASAS; i++) {
+      var d = document.createElement('div');
+      var linha = Math.floor(i / COLUNAS), col = i % COLUNAS;
+      d.className = 'casa vazia' + (linha ? ' b' : '');
+      d.style.left = (col * 202.4) + 'px';
+      d.style.top = (linha * 244) + 'px';
+      d.innerHTML = '<span class="p"></span><span class="k">-</span>';
+      placar.appendChild(d);
+      casas.push(d);
+    }
+  }
+
+  function texto(el, v) { if (el.textContent !== v) el.textContent = v; }
+
+  function nomeCurto(nome) {
+    var p = String(nome || '').replace(/^\s+|\s+$/g, '').toUpperCase().split(/\s+/);
+    if (p.length > 2 && p[p.length - 1].length <= 3) p = p.slice(0, -1);
+    var primeiro = p[0] || '';
+    for (var i = p.length - 1; i > 0; i--) if (!PARTICULAS.test(p[i])) return primeiro + ' ' + p[i];
+    return primeiro;
+  }
+
+  function mostrarPlacar(pilotos) {
+    podio.style.display = 'none'; vencedor.style.display = 'none'; placar.style.display = 'block';
+    podioChave = '';
+    var porPos = {}, temNaPagina = false;
+    for (var i = 0; i < pilotos.length; i++) {
+      porPos[pilotos[i].position] = pilotos[i];
+      if (pilotos[i].position > offset && pilotos[i].position <= offset + CASAS) temNaPagina = true;
+    }
+    var base = temNaPagina ? offset : 0;
+    for (var c = 0; c < CASAS; c++) {
+      var pos = base + c + 1, p = porPos[pos], el = casas[c];
+      var classe = 'casa' + (p ? '' : ' vazia') + (c >= COLUNAS ? ' b' : '');
+      if (el.className !== classe) el.className = classe;
+      texto(el.firstChild, String(pos));
+      texto(el.lastChild, p && p.kart ? String(p.kart) : '-');
+    }
+  }
+
+  function mostrarPodio(s) {
+    var top = [];
+    for (var i = 0; i < s.drivers.length; i++) if (s.drivers[i].position >= 1 && s.drivers[i].position <= 5) top.push(s.drivers[i]);
+    top.sort(function (a, b) { return a.position - b.position; });
+    var chave = (s.race && s.race.id || s.eventName || '') + '|' + top.map(function (d) { return d.kart + ':' + d.name + ':' + d.time; }).join(',');
+    placar.style.display = 'none';
+    if (chave !== podioChave) {
+      podioChave = chave;
+      var html = '';
+      for (var j = 0; j < top.length; j++) {
+        var col = j % 2, lin = Math.floor(j / 2);
+        html += '<div class="linha" style="left:' + (72 + col * 942) + 'px;top:' + (172 + lin * 110) + 'px">' +
+          '<span class="n">' + top[j].position + '</span>' +
+          '<span class="nome"></span><span class="kart">#' + String(top[j].kart || '-').replace(/[<>&"]/g, '') + '</span>' +
+          '<span class="tempo">' + String(top[j].time || '--:--.---').replace(/[<>&"]/g, '') + '</span></div>';
+      }
+      document.getElementById('podio-linhas').innerHTML = html;
+      var nomes = document.getElementById('podio-linhas').getElementsByTagName('div');
+      for (var k = 0; k < nomes.length; k++) nomes[k].childNodes[1].textContent = nomeCurto(top[k].name) || ('KART ' + top[k].kart);
+      texto(document.getElementById('podio-evento'), String(s.eventName || 'Corrida').replace(/\s*·\s*/g, ' · '));
+      if (top.length) {
+        texto(document.getElementById('v-nome'), nomeCurto(top[0].name) || ('KART ' + top[0].kart));
+        texto(document.getElementById('v-tempo'), top[0].time || '');
+        vencedorAte = new Date().getTime() + 7000;
+      }
+    }
+    var comVencedor = new Date().getTime() < vencedorAte;
+    vencedor.style.display = comVencedor ? 'block' : 'none';
+    podio.style.display = comVencedor ? 'none' : 'block';
+  }
+
+  function desenhar() {
+    var s = ultimo;
+    if (!s) return;
+    var pilotos = s.drivers || [];
+    var corridaEncerrada = s.status === 'finished' && s.sessionType === 'race';
+    var temTop = false;
+    for (var i = 0; i < pilotos.length; i++) if (pilotos[i].position >= 1 && pilotos[i].position <= 5) temTop = true;
+    if (corridaEncerrada && temTop) mostrarPodio(s); else mostrarPlacar(pilotos);
+  }
+
+  // um pedido de cada vez por endereço; se travar, libera em 4 s
+  var pendente = {};
+  function pegar(url, ok) {
+    if (pendente[url] && new Date().getTime() - pendente[url] < 4000) return;
+    pendente[url] = new Date().getTime();
+    var x = new XMLHttpRequest();
+    x.open('GET', url + (url.indexOf('?') >= 0 ? '&' : '?') + '_ts=' + new Date().getTime(), true);
+    x.onreadystatechange = function () {
+      if (x.readyState !== 4) return;
+      pendente[url] = 0;
+      if (x.status === 200) { try { ok(JSON.parse(x.responseText)); desenhar(); } catch (e) {} }
+    };
+    x.send(null);
+  }
+
+  function atualizar() {
+    pegar('/api/livetime-snapshot?painel=tb50', function (s) { if (s && s.drivers) ultimo = s; });
+    pegar('/api/tb50-page', function (p) { offset = p && p.offset > 0 ? p.offset : 0; });
+  }
+
+  // avisa o servidor que a página está viva na TB50 (e com qual navegador)
+  function ping() {
+    var x = new XMLHttpRequest();
+    x.open('GET', '/api/tb50-ping?ua=' + encodeURIComponent(navigator.userAgent || '') + '&w=' + (window.innerWidth || 0) + '&h=' + (window.innerHeight || 0) + '&_ts=' + new Date().getTime(), true);
+    x.send(null);
+  }
+
+  montarCasas();
+  escala();
+  window.onresize = escala;
+  atualizar();
+  setInterval(atualizar, 1000);
+  setInterval(desenhar, 500);
+  ping();
+  setInterval(ping, 30000);
+  // segurança: recarrega a página a cada 30 min
+  setTimeout(function () { location.reload(); }, 30 * 60 * 1000);
+})();
+</script>
+</body>
+</html>

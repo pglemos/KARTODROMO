@@ -104,7 +104,7 @@ function Restart-Runtime {
 }
 
 try {
-  $nextUrl = "http://127.0.0.1:$NextPort/podio-live-tb50?_watchdog=$(Get-Date -Format FileDateTimeUniversal)"
+  $nextUrl = "http://127.0.0.1:$NextPort/placar-telao-tb50?layout=designer&_watchdog=$(Get-Date -Format FileDateTimeUniversal)"
   $healthUrl = "http://127.0.0.1:$ScraperPort/healthz"
   $snapshotUrl = "http://127.0.0.1:$ScraperPort/api/livetime-snapshot?uid=tb50&_watchdog=$(Get-Date -Format FileDateTimeUniversal)"
   $programsUrl = "http://127.0.0.1:$ScraperPort/api/viplex-programs"
@@ -112,7 +112,9 @@ try {
   $nextOk = Test-Endpoint -Uri $nextUrl
   $health = Get-Json -Uri $healthUrl
   $snapshot = Get-Json -Uri $snapshotUrl
-  $scraperOk = $null -ne $health -and $null -ne $snapshot -and @($snapshot.drivers).Count -gt 0
+  # O LapTime foi desligado em 23/09/2026: a ponte 4011 nunca mais tem pilotos. Os dados vem do ORBITS (:4050),
+  # entao exigir pilotos aqui reiniciava o placar (e o programa da TB50) a cada minuto.
+  $scraperOk = $null -ne $health
 
   $startupInProgress = Test-StartupInProgress
   if ((-not $nextOk -or -not $scraperOk) -and -not $startupInProgress) {

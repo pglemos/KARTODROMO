@@ -127,7 +127,10 @@ try {
   # into both child processes so a stale .env.local cannot route this runtime
   # back to the legacy bridge on 4010.
   $env:SCRAPER_PORT = "$ScraperPort"
-  $env:LIVETIME_SNAPSHOT_ENDPOINT = "http://127.0.0.1:$ScraperPort/api/livetime-snapshot"
+  # Desde 27/09/2026 o placar le a cronometragem propria do ORBITS (LIVETIME_SNAPSHOT_ENDPOINT no .env.local);
+  # a ponte 4011 (LapTime) so vale se o .env.local nao disser outro endereco.
+  $snapEnv = Select-String -Path (Join-Path $RepoRoot '.env.local') -Pattern '^\s*LIVETIME_SNAPSHOT_ENDPOINT\s*=\s*(\S+)' -ErrorAction SilentlyContinue | Select-Object -Last 1
+  $env:LIVETIME_SNAPSHOT_ENDPOINT = if ($snapEnv) { $snapEnv.Matches[0].Groups[1].Value } else { "http://127.0.0.1:$ScraperPort/api/livetime-snapshot" }
   Write-Log "Starting TB50 podium runtime from $RepoRoot"
 
   if (-not (Test-ListeningPort $NextPort) -and -not (Test-RepoProcess 'next.*start')) {
