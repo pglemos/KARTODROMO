@@ -271,7 +271,7 @@ public partial class FormCrono
                 using (var sombra = Forma.Redondo(new RectangleF(q.X, q.Y + 1, q.Width, q.Height), 6)) using (var bs = new SolidBrush(Color.FromArgb(174, 174, 178))) gr.FillPath(bs, sombra);
                 using (var p = Forma.Redondo(q, 6)) using (var lg = new LinearGradientBrush(q, Color.White, Color.FromArgb(229, 229, 234), 90f)) gr.FillPath(lg, p);
                 using var f = new Font("Cascadia Mono", 8.8F, FontStyle.Bold);
-                TextRenderer.DrawText(gr, kart.PadLeft(2, '0'), f, Rectangle.Round(q), TemaCrono.Texto, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                TextRenderer.DrawText(gr, kart.Length == 0 ? "—" : kart.PadLeft(2, '0'), f, Rectangle.Round(q), TemaCrono.Texto, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
             }
             else
             {
@@ -367,7 +367,7 @@ public partial class FormCrono
         _faixa.Volta = standings.FirstOrDefault()?.I("laps") is int lv && lv > 0 ? lv.ToString() : ultima?.I("lap").ToString() ?? "—";
         _faixa.Situacao = s0 == null ? "SEM PROVA" : s0.B("aguardandoLargada") ? "AGUARDANDO" : estado switch { "em_andamento" => flag == "red" ? "PARADA" : "EM PROVA", "bandeira_final" => "FINAL", "encerrada" => "ENCERRADA", "preparando" => "AGUARDANDO", _ => Crono.Estado(estado).ToUpperInvariant() };
         var pag = Math.Max(0, _painel.Pagina);
-        _faixa.Karts = standings.Skip(pag * 10).Take(12).Select(r => (r.S("kart").PadLeft(2, '0'), r.I("gapLaps"))).ToList();
+        _faixa.Karts = standings.Skip(pag * 10).Take(12).Select(r => (r.S("kart").Length == 0 ? "—" : r.S("kart").PadLeft(2, '0'), r.I("gapLaps"))).ToList();
         _faixa.Paginas = Math.Max(1, (int)Math.Ceiling(standings.Count / 10.0));
         _faixa.Pagina = pag;
         _faixa.Auto = _chkPainelAuto.Checked;
@@ -378,7 +378,7 @@ public partial class FormCrono
         var decOk = dec?.B("healthy") ?? false;
         _rodTexto.Text = $"{DateTime.Now:HH:mm} · {DateTime.Now:dd/MM/yyyy}      {Environment.MachineName}      Decoder {dec?.S("protocol")?.ToUpperInvariant() switch { "TRX" => "TranX", "P3" => "P3", var p => p }} {dec?.S("host")}:{dec?.S("port")}      {Environment.UserName}      Versão {Application.ProductVersion.Split('+')[0]}" + (_servidorOk ? "" : "      SEM CONEXÃO COM A CRONOMETRAGEM");
         _pDecoder.Ok = decOk && _servidorOk; _pDecoder.Dica = _sDecoder.Text;
-        _pPlacar.Ok = _painel.Ativo && _painel.Ok; _pPlacar.Dica = _sPainel.Text;
+        _pPlacar.Desligado = !_painel.Ativo; _pPlacar.Ok = _painel.Ativo && _painel.Ok; _pPlacar.Dica = _painel.Ativo ? _sPainel.Text : "Painel de LED desligado neste computador (clique para configurar)";
         _pTv.Ok = _tv is { IsDisposed: false }; _pTv.Dica = _pTv.Ok ? "Telão aberto" : "Telão fechado (clique para abrir)";
         _pTransp.Visible = _sTransp.Text.Length > 0; _pTransp.Texto = "TRANSPONDER SEM KART"; _pTransp.Ok = false; _pTransp.Dica = _sTransp.Text;
         _passos.AoVivo = s0 != null && estado is "em_andamento" or "bandeira_final";
@@ -651,7 +651,8 @@ public class FaixaPlacar : Control
 /// <summary>Pílula do rodapé (PLACAR · DECODER · TV): verde quando está ok, vermelha quando não.</summary>
 public class PilulaStatus : Control
 {
-    bool _ok = true;
+    bool _ok = true, _desligado;
+    public bool Desligado { get => _desligado; set { if (_desligado == value) return; _desligado = value; Invalidate(); } }
     readonly ToolTip _dica = new();
     public string Texto { get => Text; set { Text = value; Width = TextRenderer.MeasureText(value, Fonte).Width + 30; Invalidate(); } }
     public bool Ok { get => _ok; set { if (_ok == value) return; _ok = value; Invalidate(); } }
@@ -668,7 +669,7 @@ public class PilulaStatus : Control
     {
         var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
         g.Clear(Parent?.BackColor ?? Color.White);
-        var (fundo, texto, bola) = _ok ? (Color.FromArgb(222, 246, 229), Color.FromArgb(28, 107, 53), Color.FromArgb(52, 199, 89)) : (Color.FromArgb(255, 226, 224), Color.FromArgb(161, 29, 20), Color.FromArgb(255, 59, 48));
+        var (fundo, texto, bola) = _desligado ? (Color.FromArgb(236, 236, 239), Color.FromArgb(110, 110, 115), Color.FromArgb(174, 174, 178)) : _ok ? (Color.FromArgb(222, 246, 229), Color.FromArgb(28, 107, 53), Color.FromArgb(52, 199, 89)) : (Color.FromArgb(255, 226, 224), Color.FromArgb(161, 29, 20), Color.FromArgb(255, 59, 48));
         using (var p = Forma.Redondo(new Rectangle(0, 0, Width - 1, Height - 1), 6)) using (var b = new SolidBrush(fundo)) g.FillPath(b, p);
         using (var b = new SolidBrush(bola)) g.FillEllipse(b, 8, (Height - 6) / 2f, 6, 6);
         TextRenderer.DrawText(g, Text, Fonte, new Rectangle(20, 0, Width - 22, Height), texto, TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
