@@ -22,6 +22,7 @@ import { confereSenha, emiteToken, validaToken } from '../lib/ops/auth';
 import { HttpError, inscreverN, officeRoutes } from '../lib/ops/office';
 import { relatorio } from '../lib/ops/relatorios';
 import { renderTermoResponsabilidade, type TermoParticipante } from '../lib/ops/termo';
+import { buscarPreCadastroAgora, preCadastroLigado, sincronizarPreCadastros } from '../lib/ops/pre-cadastro';
 
 function loadLocalEnv() {
   const envPath = join(process.cwd(), '.env.local');
@@ -216,10 +217,13 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     if (raw.length < 5) throw new HttpError(400, 'Informe o CPF, RG, passaporte ou e-mail.');
     const isEmail = raw.includes('@');
     const v = isEmail ? raw.toLowerCase() : onlyDigits(raw) || raw.toUpperCase();
-    const c = await one<Record<string, unknown>>(
+    const procurar = () => one<Record<string, unknown>>(
       `SELECT TOP 1 ${CLIENTE_COLS} FROM dbo.Cliente c WHERE ${isEmail ? 'c.Email = @v' : '(c.DocumentoNum = @v OR c.Documento = @v)'} ORDER BY CASE WHEN c.ResponsavelId IS NULL THEN 0 ELSE 1 END, c.AtualizadoEm DESC`,
       { v },
     );
+    let c = await procurar();
+    // não achou: pode ter feito o pré-cadastro pelo QR code há pouco (ainda não sincronizado)
+    if (!c && (await buscarPreCadastroAgora(raw, log))) c = await procurar();
     if (!c) return send(res, 200, { cliente: null }), true;
     const dependentes = await query<{ id: number; nome: string; nascimento: string }>(
       `SELECT c.Id id, c.Nome nome, CONVERT(varchar(10), c.Nascimento, 126) nascimento FROM dbo.Cliente c WHERE c.ResponsavelId = @id AND c.Bloqueado = 0 ORDER BY c.Nome`,
@@ -496,3 +500,23 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => log(`Servidor da operacao em http://0.0.0.0:${PORT} (recepcao /recepcao, totem /totem)`));
+
+// pré-cadastro online (QR code): traz os cadastros do site a cada 30 s
+if (preCadastroLigado()) {
+  let sincronizando = false;
+  const sincronizar = async () => {
+    if (sincronizando) return;
+    sincronizando = true;
+    try {
+      const n = await sincronizarPreCadastros(log);
+      if (n) log(`pré-cadastro: ${n} cadastro(s) do site gravado(s)`);
+    } catch (e) {
+      log(`pré-cadastro: sincronização falhou (${(e as Error).message})`);
+    } finally {
+      sincronizando = false;
+    }
+  };
+  setTimeout(sincronizar, 5_000);
+  setInterval(sincronizar, 30_000).unref();
+  log('pré-cadastro online ligado');
+}

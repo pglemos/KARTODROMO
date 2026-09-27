@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pré-cadastro · Kartódromo Internacional de Betim</title>
+<meta name="description" content="Faça seu cadastro antes de chegar. No kartódromo é só digitar o CPF no totem.">
+<meta name="theme-color" content="#0B7A53">
+<link rel="icon" href="/icone.png">
+<style>
+  :root {
+    --verde: #0B7A53; --verde-vivo: #12A36F; --verde-claro: #E2EFEA; --fundo: #F4F5F7; --cartao: #fff;
+    --texto: #14161A; --suave: #6B7280; --borda: #E3E5E8; --erro: #D92D20; --erro-claro: #FDECEA;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--fundo); color: var(--texto); font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-text-size-adjust: 100%; }
+  .topo { background: linear-gradient(160deg, #0F1A15 0%, #0B3D2A 55%, #0B7A53 100%); color: #fff; padding: 22px 18px 64px; }
+  .topo .logo { display: block; width: min(300px, 78vw); height: auto; margin: 4px auto 18px; background: #fff; border-radius: 16px; padding: 10px 14px; }
+  .topo h1 { font-size: clamp(24px, 6.4vw, 34px); line-height: 1.12; margin: 0 auto 8px; max-width: 640px; text-align: center; letter-spacing: -.02em; }
+  .topo p { margin: 0 auto; max-width: 560px; text-align: center; color: rgba(255,255,255,.82); font-size: 15.5px; }
+  .passos { display: flex; justify-content: center; gap: 8px; margin: 18px auto 0; flex-wrap: wrap; max-width: 640px; }
+  .passos span { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: 6px 12px; font-size: 13.5px; }
+  main { max-width: 680px; margin: -44px auto 0; padding: 0 14px 40px; }
+  .cartao { background: var(--cartao); border: 1px solid var(--borda); border-radius: 20px; padding: 20px 18px; margin-bottom: 14px; box-shadow: 0 6px 24px rgba(16,24,40,.06); }
+  .cartao h2 { font-size: 17px; margin: 0 0 2px; display: flex; align-items: center; gap: 10px; }
+  .cartao h2 .n { width: 26px; height: 26px; border-radius: 50%; background: var(--verde); color: #fff; font-size: 13.5px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+  .cartao .sub { color: var(--suave); font-size: 14px; margin: 0 0 14px 36px; }
+  .grade { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+  .grade > div { min-width: 0; }
+  .c6 { grid-column: span 6; } .c4 { grid-column: span 4; } .c3 { grid-column: span 3; } .c2 { grid-column: span 2; }
+  @media (max-width: 520px) { .c3, .c4 { grid-column: span 6; } .c2 { grid-column: span 3; } }
+  label { display: block; font-size: 13.5px; font-weight: 600; color: #3A3F47; margin: 0 0 6px; }
+  label .op { font-weight: 400; color: var(--suave); }
+  input, select { width: 100%; min-width: 0; height: 50px; border: 1.5px solid var(--borda); border-radius: 12px; padding: 0 14px; font: inherit; font-size: 16.5px; color: var(--texto); background: #fff; outline: none; transition: border-color .15s, box-shadow .15s; -webkit-appearance: none; appearance: none; }
+  input:focus, select:focus { border-color: var(--verde); box-shadow: 0 0 0 4px rgba(11,122,83,.14); }
+  input.invalido { border-color: var(--erro); box-shadow: 0 0 0 4px rgba(217,45,32,.1); }
+  .seg { display: flex; background: #EDEEF1; border-radius: 12px; padding: 4px; gap: 4px; }
+  .seg button { flex: 1; height: 42px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 15px; font-weight: 600; color: var(--suave); cursor: pointer; }
+  .seg button.sel { background: #fff; color: var(--texto); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .menor { border: 1px solid var(--borda); border-radius: 14px; padding: 14px; margin-bottom: 10px; position: relative; background: #FBFBFC; }
+  .menor .tirar { position: absolute; top: 8px; right: 8px; border: 0; background: none; color: var(--suave); font-size: 22px; line-height: 1; cursor: pointer; padding: 6px 10px; }
+  .btn2 { width: 100%; height: 48px; border: 1.5px dashed #BFC4CC; border-radius: 12px; background: #fff; font: inherit; font-weight: 600; color: var(--verde); cursor: pointer; }
+  .termo { display: flex; gap: 12px; align-items: flex-start; font-size: 15px; }
+  .termo input { width: 26px; height: 26px; flex: none; margin: 1px 0 0; accent-color: var(--verde); -webkit-appearance: checkbox; appearance: auto; }
+  details { margin-top: 10px; background: var(--fundo); border-radius: 12px; padding: 10px 14px; font-size: 14px; color: #3A3F47; }
+  summary { cursor: pointer; font-weight: 600; color: var(--verde); }
+  .enviar { width: 100%; height: 58px; border: 0; border-radius: 16px; background: linear-gradient(180deg, var(--verde-vivo), var(--verde)); color: #fff; font: inherit; font-size: 18px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 20px rgba(11,122,83,.3); }
+  .enviar:disabled { opacity: .6; }
+  .erro { display: none; background: var(--erro-claro); color: var(--erro); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; font-weight: 600; font-size: 15px; }
+  .rodape { text-align: center; color: var(--suave); font-size: 13px; margin-top: 18px; }
+  .oculto { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+  #pronto { display: none; text-align: center; padding: 34px 20px 28px; }
+  #pronto .ok { width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 16px; background: var(--verde-claro); display: flex; align-items: center; justify-content: center; }
+  #pronto h2 { font-size: 26px; margin: 0 0 8px; justify-content: center; }
+  #pronto p { color: #3A3F47; margin: 0 auto 8px; max-width: 460px; }
+  .totem { margin: 18px auto 0; max-width: 440px; text-align: left; background: var(--fundo); border-radius: 16px; padding: 16px 18px; }
+  .totem b { color: var(--verde); }
+</style>
+</head>
+<body>
+<header class="topo">
+  <img class="logo" src="/kib-logo.png" alt="Kartódromo Internacional de Betim" width="600" height="167">
+  <h1>Faça seu cadastro antes de chegar</h1>
+  <p>Preencha uma vez aqui. No kartódromo, é só digitar seu CPF no totem de autoatendimento e escolher a bateria.</p>
+  <div class="passos"><span>1 · Cadastro aqui</span><span>2 · CPF no totem</span><span>3 · Pista!</span></div>
+</header>
+
+<main>
+  <form id="form" novalidate autocomplete="on">
+    <div class="erro" id="erro" role="alert"></div>
+
+    <section class="cartao">
+      <h2><span class="n">1</span>Documento</h2>
+      <p class="sub">É com ele que o totem encontra seu cadastro.</p>
+      <div class="grade">
+        <div class="c6"><div class="seg" id="tipoDoc">
+          <button type="button" class="sel" data-v="CPF">CPF</button><button type="button" data-v="RG">RG</button><button type="button" data-v="Passaporte">Passaporte</button>
+        </div></div>
+        <div class="c6"><label for="documento" id="rotDoc">CPF</label><input id="documento" name="documento" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00" required></div>
+        <div class="c6"><label for="nome">Nome completo</label><input id="nome" name="name" autocomplete="name" autocapitalize="words" placeholder="Como no documento" required></div>
+      </div>
+    </section>
+
+    <section class="cartao">
+      <h2><span class="n">2</span>Contato</h2>
+      <p class="sub">Para avisos da sua reserva.</p>
+      <div class="grade">
+        <div class="c3"><label for="telefone">Celular (WhatsApp)</label><input id="telefone" name="tel" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="(31) 90000-0000" required></div>
+        <div class="c3"><label for="email">E-mail <span class="op">(opcional)</span></label><input id="email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="voce@email.com"></div>
+      </div>
+    </section>
+
+    <section class="cartao">
+      <h2><span class="n">3</span>Sobre você</h2>
+      <p class="sub">O peso ajuda a equilibrar os karts.</p>
+      <div class="grade">
+        <div class="c3"><label for="nascimento">Data de nascimento</label><input id="nascimento" inputmode="numeric" autocomplete="bday" placeholder="DD/MM/AAAA" required></div>
+        <div class="c3"><label for="peso">Peso (kg) <span class="op">(opcional)</span></label><input id="peso" inputmode="decimal" placeholder="Ex.: 72"></div>
+      </div>
+    </section>
+
+    <section class="cartao">
+      <h2><span class="n">4</span>Endereço</h2>
+      <p class="sub">Digite o CEP que o resto se preenche.</p>
+      <div class="grade">
+        <div class="c2"><label for="cep">CEP</label><input id="cep" inputmode="numeric" autocomplete="postal-code" placeholder="00000-000"></div>
+        <div class="c4"><label for="endereco">Rua</label><input id="endereco" autocomplete="address-line1"></div>
+        <div class="c2"><label for="numero">Número</label><input id="numero" inputmode="numeric"></div>
+        <div class="c4"><label for="complemento">Complemento <span class="op">(opcional)</span></label><input id="complemento" autocomplete="address-line2"></div>
+        <div class="c3"><label for="bairro">Bairro</label><input id="bairro"></div>
+        <div class="c2"><label for="cidade">Cidade</label><input id="cidade" autocomplete="address-level2"></div>
+        <div class="c1" style="grid-column: span 1"><label for="estado">UF</label><input id="estado" maxlength="2" autocapitalize="characters" autocomplete="address-level1"></div>
+      </div>
+    </section>
+
+    <section class="cartao">
+      <h2><span class="n">5</span>Menores que vão correr com você</h2>
+      <p class="sub">Opcional. Filhos ou menores sob sua responsabilidade.</p>
+      <div id="menores"></div>
+      <button type="button" class="btn2" id="addMenor">+ Adicionar menor</button>
+    </section>
+
+    <section class="cartao">
+      <label class="termo"><input type="checkbox" id="lgpd"><span>Li e concordo com o Termo de Consentimento para Tratamento de Dados Pessoais.</span></label>
+      <details><summary>Ler o termo</summary>
+        <p>Ao se cadastrar, você autoriza o Kartódromo Internacional de Betim a tratar seus dados pessoais (nome, documento, contato, data de nascimento, peso e endereço) para identificar você nas baterias e corridas, emitir o termo de responsabilidade, registrar tempos e resultados, cumprir obrigações legais e entrar em contato sobre suas reservas.</p>
+        <p>Os dados ficam armazenados nos sistemas do kartódromo e não são vendidos a terceiros. Você pode pedir a qualquer momento, na recepção, acesso, correção ou exclusão dos seus dados, nos termos da Lei nº 13.709/2018 (LGPD).</p>
+      </details>
+      <div class="oculto" aria-hidden="true"><label>Site<input id="site" tabindex="-1" autocomplete="off"></label></div>
+    </section>
+
+    <button class="enviar" id="enviar" type="submit">Concluir pré-cadastro</button>
+    <p class="rodape">O termo de responsabilidade é assinado no kartódromo, no dia da corrida.</p>
+  </form>
+
+  <section class="cartao" id="pronto" aria-live="polite">
+    <div class="ok"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#0B7A53" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+    <h2 id="prontoTitulo">Tudo certo!</h2>
+    <p>Seu pré-cadastro foi recebido.</p>
+    <div class="totem">
+      <p style="margin:0 0 6px"><b>Quando chegar ao kartódromo:</b></p>
+      <p style="margin:0">1. Vá ao totem de autoatendimento.<br>2. Digite seu <b id="prontoDoc">CPF</b> (ou e-mail).<br>3. Confira seus dados e escolha a bateria.</p>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const aberto = Date.now();
+  let tipo = 'CPF';
+  const dig = (v) => v.replace(/\D/g, '');
+  const mascaras = {
+    CPF: (v) => dig(v).slice(0, 11).replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2'),
+    fone: (v) => { const d = dig(v).slice(0, 11); return d.length <= 2 ? d.replace(/^(\d{1,2})/, '($1') : d.length <= 6 ? d.replace(/^(\d{2})(\d+)/, '($1) $2') : d.length <= 10 ? d.replace(/^(\d{2})(\d{4})(\d+)/, '($1) $2-$3') : d.replace(/^(\d{2})(\d{5})(\d+)/, '($1) $2-$3'); },
+    data: (v) => dig(v).slice(0, 8).replace(/(\d{2})(\d)/, '$1/$2').replace(/(\d{2})(\d)/, '$1/$2'),
+    cep: (v) => dig(v).slice(0, 8).replace(/(\d{5})(\d)/, '$1-$2'),
+  };
+  const mascarar = (el, f) => el.addEventListener('input', () => { el.value = f(el.value); el.classList.remove('invalido'); });
+
+  // tipo de documento
+  $('tipoDoc').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    tipo = b.dataset.v;
+    for (const x of $('tipoDoc').children) x.classList.toggle('sel', x === b);
+    $('rotDoc').textContent = tipo === 'Passaporte' ? 'Número do passaporte' : tipo;
+    const d = $('documento');
+    d.inputMode = tipo === 'CPF' ? 'numeric' : 'text';
+    d.placeholder = tipo === 'CPF' ? '000.000.000-00' : tipo === 'RG' ? 'MG-12.345.678' : 'AB123456';
+    d.value = tipo === 'CPF' ? mascaras.CPF(d.value) : d.value;
+    $('prontoDoc').textContent = tipo === 'Passaporte' ? 'passaporte' : tipo;
+  });
+  $('documento').addEventListener('input', (e) => { if (tipo === 'CPF') e.target.value = mascaras.CPF(e.target.value); e.target.classList.remove('invalido'); });
+  mascarar($('telefone'), mascaras.fone);
+  mascarar($('nascimento'), mascaras.data);
+  mascarar($('cep'), mascaras.cep);
+  $('peso').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/[^\d.,]/g, '').slice(0, 5); });
+  $('estado').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase(); });
+
+  // CEP → endereço (ViaCEP)
+  $('cep').addEventListener('input', async (e) => {
+    const c = dig(e.target.value); if (c.length !== 8) return;
+    try {
+      const r = await (await fetch(`https://viacep.com.br/ws/${c}/json/`)).json();
+      if (r.erro) return;
+      if (!$('endereco').value) $('endereco').value = r.logradouro || '';
+      if (!$('bairro').value) $('bairro').value = r.bairro || '';
+      $('cidade').value = r.localidade || $('cidade').value;
+      $('estado').value = r.uf || $('estado').value;
+      $('numero').focus();
+    } catch {}
+  });
+
+  // menores
+  const addMenor = () => {
+    const d = document.createElement('div');
+    d.className = 'menor';
+    d.innerHTML = `<button type="button" class="tirar" aria-label="Remover">×</button>
+      <div class="grade"><div class="c6"><label>Nome completo do menor</label><input class="mNome" autocapitalize="words"></div>
+      <div class="c3"><label>Data de nascimento</label><input class="mNasc" inputmode="numeric" placeholder="DD/MM/AAAA"></div>
+      <div class="c3"><label>Documento <span class="op">(opcional)</span></label><input class="mDoc"></div></div>`;
+    mascarar(d.querySelector('.mNasc'), mascaras.data);
+    d.querySelector('.tirar').onclick = () => d.remove();
+    $('menores').appendChild(d);
+    d.querySelector('.mNome').focus();
+  };
+  $('addMenor').onclick = addMenor;
+
+  const iso = (dmy) => { const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dmy.trim()); return m ? `${m[3]}-${m[2]}-${m[1]}` : ''; };
+  const erro = (msg, campo) => {
+    const e = $('erro'); e.textContent = msg; e.style.display = 'block';
+    if (campo) { campo.classList.add('invalido'); campo.focus({ preventScroll: true }); campo.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    else e.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+  const cpfOk = (v) => { const d = dig(v); if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false; for (const t of [9, 10]) { let s = 0; for (let i = 0; i < t; i++) s += +d[i] * (t + 1 - i); if (((s * 10) % 11) % 10 !== +d[t]) return false; } return true; };
+
+  $('form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    $('erro').style.display = 'none';
+    const doc = $('documento'), nome = $('nome'), fone = $('telefone'), nasc = $('nascimento'), email = $('email');
+    if (!doc.value.trim()) return erro(`Informe o ${tipo === 'Passaporte' ? 'passaporte' : tipo}.`, doc);
+    if (tipo === 'CPF' && !cpfOk(doc.value)) return erro('CPF inválido. Confira os números.', doc);
+    if (nome.value.trim().split(/\s+/).length < 2) return erro('Informe o nome completo.', nome);
+    if (dig(fone.value).length < 10) return erro('Informe o celular com DDD.', fone);
+    if (email.value && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.value.trim())) return erro('E-mail inválido.', email);
+    if (!iso(nasc.value)) return erro('Informe a data de nascimento (DD/MM/AAAA).', nasc);
+    const menores = [...document.querySelectorAll('.menor')].map((m) => ({ nome: m.querySelector('.mNome').value, nascimento: iso(m.querySelector('.mNasc').value), documento: m.querySelector('.mDoc').value, el: m }))
+      .filter((m) => m.nome.trim() || m.nascimento);
+    for (const m of menores) {
+      if (m.nome.trim().split(/\s+/).length < 2) return erro('Informe o nome completo de cada menor.', m.el.querySelector('.mNome'));
+      if (!m.nascimento) return erro(`Informe a data de nascimento de ${m.nome.trim()} (DD/MM/AAAA).`, m.el.querySelector('.mNasc'));
+    }
+    if (!$('lgpd').checked) return erro('Para continuar, aceite o Termo de Consentimento para Tratamento de Dados Pessoais.', null);
+
+    const btn = $('enviar'); btn.disabled = true; btn.textContent = 'Enviando…';
+    try {
+      const r = await fetch('/api/pre-cadastro', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          tipoDocumento: tipo, documento: doc.value, nome: nome.value, email: email.value, telefone: fone.value, nascimento: iso(nasc.value),
+          peso: $('peso').value, cep: $('cep').value, endereco: $('endereco').value, numero: $('numero').value, complemento: $('complemento').value,
+          bairro: $('bairro').value, cidade: $('cidade').value, estado: $('estado').value,
+          menores: menores.map(({ el, ...m }) => m), lgpd: true, site: $('site').value, t: aberto,
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.erro || 'Não foi possível enviar agora. Tente de novo.');
+      $('form').style.display = 'none';
+      $('prontoTitulo').textContent = `Tudo certo, ${j.nome || ''}!`.replace(', !', '!');
+      $('pronto').style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (e) {
+      erro(e.message, null);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Concluir pré-cadastro';
+    }
+  });
+})();
+</script>
+</body>
+</html>
