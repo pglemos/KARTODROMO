@@ -1028,9 +1028,18 @@ public partial class FormCrono : Form
             "cancel" => $"CANCELAR a bateria \"{nome}\"?\n\nEla sai da cronometragem (o diário de passagens continua guardado).",
             _ => null,
         };
+        // a bateria anterior só encerra pelo cronometrista: se ficou aberta, oferece encerrar antes da verde
+        var aberta = acao == "start" ? _state?.S("runningId") : null;
+        if (!string.IsNullOrEmpty(aberta) && aberta != _sess.S("id"))
+        {
+            var nomeAberta = Crono.Arr(_state, "sessions").FirstOrDefault(x => x.S("id") == aberta)?.S("name") ?? "anterior";
+            pergunta = $"A bateria \"{nomeAberta}\" ainda está aberta.\n\nENCERRAR \"{nomeAberta}\" e dar a BANDEIRA VERDE em \"{nome}\"?";
+        }
+        else aberta = null;
         if (pergunta == null || !Msg.Pergunta(this, pergunta)) return;
         Seguro.Rodar(this, async () =>
         {
+            if (aberta != null) await Crono.Api.Post($"/api/sessions/{aberta}/close");
             await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/{acao}");
             if (acao == "start") { _fixado = false; }
             await Atualizar();
