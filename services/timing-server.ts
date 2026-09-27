@@ -386,11 +386,36 @@ function stateView() {
     lastQualifying: lastQualifying ? sessionView(lastQualifying) : null,
     sessions: list.slice(0, 40).map(sessionSummary),
     recentPassings,
+    tb50: { offset: tb50Page.offset, pageSize: TB50_PAGE_SIZE, updatedAt: tb50Page.updatedAt },
   };
 }
 
+// ---------------------------------------------------------------- telao de LED (TB50, PC .250)
+// O placar do .250 mostra 20 posicoes por vez. A pagina (1-20, 21-40...) fica aqui para o
+// ORBITS e o CRONO1 mandarem a mesma coisa; volta para 1-20 na bandeira verde.
+
+const TB50_PAGE_FILE = join(DATA_DIR, 'tb50-page.json');
+const TB50_PAGE_SIZE = 20;
+let tb50Page: { offset: number; updatedAt: string | null } = { offset: 0, updatedAt: null };
+try {
+  if (existsSync(TB50_PAGE_FILE)) tb50Page = { offset: 0, updatedAt: null, ...JSON.parse(readFileSync(TB50_PAGE_FILE, 'utf8')) };
+} catch {
+  // arquivo ruim: comeca da primeira pagina
+}
+
+function setTb50Offset(value: unknown, motivo: string) {
+  const n = Number(value);
+  const offset = Number.isFinite(n) ? Math.min(Math.floor(Math.max(0, n) / TB50_PAGE_SIZE) * TB50_PAGE_SIZE, 80) : 0;
+  if (offset === tb50Page.offset && tb50Page.updatedAt) return tb50Page;
+  tb50Page = { offset, updatedAt: new Date().toISOString() };
+  try { writeJsonAtomic(TB50_PAGE_FILE, tb50Page); } catch { /* fica em memoria */ }
+  log(`telao TB50: posicoes ${offset + 1}-${offset + TB50_PAGE_SIZE} (${motivo})`);
+  scheduleStateBroadcast();
+  return tb50Page;
+}
+
 /** Formato LiveTimingSnapshot (lib/livetime/types.ts) consumido pelo site, telao e TB50. */
-function liveSnapshot() {
+function liveSnapshot(painelTb50 = false) {
   const list = sortedSessions();
   const s = runningSession() ?? list.find((x) => x.state === 'encerrada') ?? null;
   const updatedAt = new Date().toISOString();
@@ -411,10 +436,23 @@ function liveSnapshot() {
       startedAt: s.startedAt ? new Date(s.startedAt).toISOString() : null,
       rules: { requiredStops: 0, minimumStopMs: 0, additionalStopsAllowed: 0, candidateStopMinMs: 0, penaltyLapsPerStop: 0, boxOpenAfterMs: 0, boxCloseAfterMs: 0 },
     },
-    drivers: standings
-      .filter((r) => r.laps > 0 || !OPEN_STATES.has(s.state))
-      .map((r) => ({ position: r.position, kart: r.kart, name: r.name, time: formatLap(r.bestLapMs) })),
+    drivers: painelVazio(
+      painelTb50 && OPEN_STATES.has(s.state),
+      standings
+        .filter((r) => r.laps > 0 || !OPEN_STATES.has(s.state))
+        .map((r) => ({ position: r.position, kart: r.kart, name: r.name, time: formatLap(r.bestLapMs) })),
+    ),
   };
+}
+
+/**
+ * Na bandeira verde ninguem completou volta ainda e a lista vem vazia; o placar do .250
+ * trata lista vazia como "sem dados" e segura a tela anterior (o grid da tomada). Para ele
+ * zerar na largada, vai uma linha fora das 20 casas (posicao 999), que nao aparece.
+ */
+function painelVazio<T extends { position: number; kart: string; name: string; time: string }>(aoVivo: boolean, drivers: T[]) {
+  if (!aoVivo || drivers.length) return drivers;
+  return [{ position: 999, kart: '-', name: '-', time: '-' } as T];
 }
 
 // ---------------------------------------------------------------- SSE
@@ -778,7 +816,13 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
   }
 
   if (path === '/api/state') return send(res, 200, stateView());
-  if (path === '/api/livetime-snapshot') return send(res, 200, liveSnapshot());
+  if (path === '/api/livetime-snapshot') return send(res, 200, liveSnapshot(url.searchParams.get('painel') === 'tb50'));
+  if (path === '/api/tb50-page' && method === 'GET') return send(res, 200, tb50Page);
+  if (path === '/api/tb50-page' && (method === 'PUT' || method === 'POST')) {
+    const body = await readBody(req);
+    const offset = body.pagina !== undefined ? Number(body.pagina) * TB50_PAGE_SIZE : body.offset;
+    return send(res, 200, setTb50Offset(offset, String(body.origem ?? 'cronometragem')));
+  }
 
   if (path === '/api/events') {
     res.writeHead(200, {
@@ -1059,6 +1103,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         if (other && other.id !== s.id) return send(res, 409, { error: `Ja existe bateria em andamento: ${other.name}. Encerre ela antes.` });
         startSession(s, now);
         log(`bateria ${s.name}: BANDEIRA VERDE, aguardando o primeiro kart passar na linha`);
+        setTb50Offset(0, 'bandeira verde');
       } else if (action === 'checkered' && method === 'POST') {
         setRaceFlag(s, 'checkered', now);
       } else if (action === 'close' && method === 'POST') {

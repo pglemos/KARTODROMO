@@ -370,6 +370,8 @@ public partial class FormCrono
         _faixa.Karts = standings.Skip(pag * 10).Take(12).Select(r => (r.S("kart").Length == 0 ? "—" : r.S("kart").PadLeft(2, '0'), r.I("gapLaps"))).ToList();
         _faixa.Paginas = Math.Max(1, (int)Math.Ceiling(standings.Count / 10.0));
         _faixa.Pagina = pag;
+        _faixa.PaginaTelao = ((_state?["tb50"] as JsonObject)?.I("offset") ?? 0) / 20;
+        _faixa.PaginasTelao = Math.Max(1, (int)Math.Ceiling(standings.Count / 20.0));
         _faixa.Auto = _chkPainelAuto.Checked;
         _faixa.Invalidate();
 
@@ -574,7 +576,8 @@ public class BotaoQuadrado : Control
 }
 
 /// <summary>Faixa preta da direita (84 px): VOLTA, número em amarelo, situação e os karts na ordem do placar
-/// (preto = mesma volta, amarelo = até 2 voltas, vermelho = mais), com as páginas 1–10 / 11–20 / 21–30 do painel de LED.</summary>
+/// (preto = mesma volta, amarelo = até 2 voltas, vermelho = mais), com as páginas do telão de LED da TB50 (1–20 / 21–40 / 41–60,
+/// valem para o ORBITS e o CRONO1) e as páginas 1–10 / 11–20 / 21–30 do painel de números da COM3.</summary>
 public class FaixaPlacar : Control
 {
     public string Volta { get; set; } = "—";
@@ -583,21 +586,28 @@ public class FaixaPlacar : Control
     public int Paginas { get; set; } = 1;
     public int Pagina { get; set; }
     public bool Auto { get; set; }
+    public int PaginasTelao { get; set; } = 1;
+    public int PaginaTelao { get; set; }
     public event Action<int> EscolheuPagina;
+    public event Action<int> EscolheuPaginaTelao;
     public event Action AlternouAuto;
 
     public FaixaPlacar()
     {
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
         BackColor = Color.FromArgb(29, 29, 31); Cursor = Cursors.Default;
-        new ToolTip().SetToolTip(this, "Mesmas páginas do painel de LED: 1–10 (F8), 11–20 (F9), 21–30 (F10). Auto alterna a cada 5 s.");
+        new ToolTip().SetToolTip(this, "TELÃO (TB50): 1–20, 21–40, 41–60 (Shift+F8/F9/F10), igual no ORBITS e no CRONO1; volta para 1–20 na bandeira verde.\nPAINEL (COM3): 1–10 (F8), 11–20 (F9), 21–30 (F10). Auto alterna a cada 5 s.");
     }
 
     Rectangle Botao(int i) => new(6, Height - 34 - (3 - i) * 28, Width - 12, 24);
+    int TopoPainel => Height - 34 - 3 * 28 - 16;
+    Rectangle BotaoTelao(int i) => new(6, TopoPainel - 4 - (3 - i) * 28, Width - 12, 24);
+    int TopoTelao => BotaoTelao(0).Y - 16;
 
     protected override void OnMouseClick(MouseEventArgs e)
     {
         base.OnMouseClick(e);
+        for (var i = 0; i < 3; i++) if (BotaoTelao(i).Contains(e.Location) && i < PaginasTelao) { EscolheuPaginaTelao?.Invoke(i); return; }
         for (var i = 0; i < 3; i++) if (Botao(i).Contains(e.Location) && i < Paginas) { EscolheuPagina?.Invoke(i); return; }
         if (new Rectangle(6, Height - 30, Width - 12, 24).Contains(e.Location) && Paginas > 1) AlternouAuto?.Invoke();
     }
@@ -605,7 +615,7 @@ public class FaixaPlacar : Control
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
-        Cursor = e.Y > Height - 34 - 3 * 28 ? Cursors.Hand : Cursors.Default;
+        Cursor = e.Y > TopoTelao ? Cursors.Hand : Cursors.Default;
     }
 
     protected override void OnPaint(PaintEventArgs e)
@@ -623,7 +633,7 @@ public class FaixaPlacar : Control
         TextRenderer.DrawText(g, Volta, fVolta, new Rectangle(0, 23, Width, 30), Color.FromArgb(255, 214, 10), TextFormatFlags.HorizontalCenter);
         TextRenderer.DrawText(g, Situacao, new Font("Segoe UI", 7.2F, FontStyle.Bold), new Rectangle(0, 53, Width, 14), cinza, TextFormatFlags.HorizontalCenter);
         using (var sep = new Pen(Color.FromArgb(26, 255, 255, 255))) g.DrawLine(sep, 0, 73, Width, 73);
-        var y = 74; var limite = Height - 34 - 3 * 28 - 6;
+        var y = 74; var limite = TopoTelao - 6;
         foreach (var (kart, atras) in Karts)
         {
             if (y + 32 > limite) break;
@@ -633,7 +643,17 @@ public class FaixaPlacar : Control
             using (var sep = new Pen(Color.FromArgb(15, 255, 255, 255))) g.DrawLine(sep, 0, y + 31, Width, y + 31);
             y += 32;
         }
-        // páginas do painel
+        // páginas do telão da TB50 (azul) e do painel da COM3 (verde)
+        TextRenderer.DrawText(g, "TELÃO", fMini, new Rectangle(0, TopoTelao, Width, 14), cinza, TextFormatFlags.HorizontalCenter);
+        string[] nomesTelao = ["1–20", "21–40", "41–60"];
+        for (var i = 0; i < 3; i++)
+        {
+            var r = BotaoTelao(i); var ok = i < PaginasTelao; var sel = i == PaginaTelao;
+            using var pb = Forma.Redondo(r, 7);
+            using (var bb = new SolidBrush(sel ? Color.FromArgb(10, 132, 255) : Color.FromArgb(ok ? 40 : 18, 255, 255, 255))) g.FillPath(bb, pb);
+            TextRenderer.DrawText(g, nomesTelao[i], new Font("Segoe UI Semibold", 8F), r, sel ? Color.White : Color.FromArgb(ok ? 230 : 90, 255, 255, 255), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+        }
+        TextRenderer.DrawText(g, "PAINEL", fMini, new Rectangle(0, TopoPainel, Width, 14), cinza, TextFormatFlags.HorizontalCenter);
         string[] nomes = ["1–10", "11–20", "21–30"];
         for (var i = 0; i < 3; i++)
         {

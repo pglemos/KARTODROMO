@@ -106,6 +106,7 @@ public partial class FormCrono : Form
             else if (e.KeyCode == Keys.F5) { e.Handled = true; Acao("close"); }
             else if (e.KeyCode == Keys.F6) { e.Handled = true; LimparPassagens(); }
             else if (e.KeyCode == Keys.F7) { e.Handled = true; Bandeira("branca"); }
+            else if (e.Shift && e.KeyCode is Keys.F8 or Keys.F9 or Keys.F10) { e.Handled = true; PaginaTelao(e.KeyCode - Keys.F8); }
             else if (e.KeyCode == Keys.F8) { e.Handled = true; _chkPainelAuto.Checked = false; _painel.AutoAvanco = false; _painel.DefinirPagina(0); AtualizarBotoesPainel(); }
             else if (e.KeyCode == Keys.F9) { e.Handled = true; if (_painel.TotalPaginas >= 2) { _chkPainelAuto.Checked = false; _painel.AutoAvanco = false; _painel.DefinirPagina(1); AtualizarBotoesPainel(); } }
             else if (e.KeyCode == Keys.F10) { e.Handled = true; if (_painel.TotalPaginas >= 3) { _chkPainelAuto.Checked = false; _painel.AutoAvanco = false; _painel.DefinirPagina(2); AtualizarBotoesPainel(); } }
@@ -558,6 +559,7 @@ public partial class FormCrono : Form
 
         _faixa = new FaixaPlacar { Dock = DockStyle.Fill, Margin = Padding.Empty };
         _faixa.EscolheuPagina += p => { _chkPainelAuto.Checked = false; _painel.AutoAvanco = false; _painel.DefinirPagina(p); AtualizarBotoesPainel(); AtualizarDesign(); };
+        _faixa.EscolheuPaginaTelao += PaginaTelao;
         _faixa.AlternouAuto += () => { _chkPainelAuto.Checked = !_chkPainelAuto.Checked; AtualizarDesign(); };
 
         var main = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Padding = new Padding(18, 12, 18, 12), BackColor = TemaCrono.Fundo };
@@ -1058,6 +1060,17 @@ public partial class FormCrono : Form
             if (aberta != null) await Crono.Api.Post($"/api/sessions/{aberta}/close");
             await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/{acao}");
             if (acao == "start") { _fixado = false; }
+            await Atualizar();
+        });
+    }
+
+    /// <summary>Página do telão de LED da TB50 (PC .250): fica no servidor da cronometragem, então vale igual no ORBITS e no CRONO1.</summary>
+    void PaginaTelao(int pagina)
+    {
+        Seguro.Rodar(this, async () =>
+        {
+            await Crono.Api.Post("/api/tb50-page", new JsonObject { ["pagina"] = pagina, ["origem"] = Environment.MachineName });
+            _faixa.PaginaTelao = pagina; _faixa.Invalidate();
             await Atualizar();
         });
     }

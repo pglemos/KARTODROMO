@@ -379,6 +379,22 @@ Invoke-Command 192.168.20.53 -Credential $c { Get-Process Kartodromo* }   # um c
   - Protocolo do LapTime: `$I`, `$SP/$J/$H` (treino), `$SR/$J/$G` (corrida), `$F`, com CRLF, RTS ligado e DTR desligado.
   - A saída "Alimentador do painel" (RMonitor) do Orbits 4 foi **desligada**, com autorização do
     dono, para liberar a COM3.
+- **Telão de LED da TB50** (posições 1–20; PC **192.168.20.250**, `DESKTOP-UATKK4T`, usuário `laptime1`):
+  - O PC sai em HDMI 2048×600 para a processadora TB50 (`.253`). Chrome em kiosk (tarefa
+    "TB50 Kiosk Watchdog (EngRev)") abre `http://localhost:3000/placar-telao-tb50?layout=designer`,
+    servido por uma cópia antiga do Next em `C:\KARTODROMO\telao` (tarefas "TB50 Streaming Stack" e
+    "TB50 Watchdog"). Layout 10×2 posição+kart em `C:\KARTODROMO\telao\.runtime\telao-layout.json`.
+  - Desde 27/09 o `.env.local` dessa cópia lê a **cronometragem própria** (o scraper do LapTime em `:4010`
+    ficou sem dados):
+    `LIVETIME_SNAPSHOT_ENDPOINT=http://192.168.20.249:4050/api/livetime-snapshot?painel=tb50`,
+    `TB50_PAGE_REMOTE_ENDPOINT=http://192.168.20.249:4050/api/tb50-page` e
+    `RUNTIME_ENDPOINT_DISCOVERY_URL=http://127.0.0.1:9/sem-descoberta` (senão o código troca o endereço
+    pelo do gist/túnel da internet). Backup do arquivo antigo: `.env.local.bak-20260927-*`.
+  - Comportamento: tomada/corrida ao vivo → classificação; tomada encerrada → fica parada (grid);
+    bandeira verde → zera (o `?painel=tb50` manda uma linha na posição 999 para o placar limpar) e a
+    página volta para 1–20; corrida encerrada → pódio 1–5 (`/podio-final-tb50`), até a próxima largada.
+  - Páginas 1–20 / 21–40 / 41–60: guardadas no servidor da cronometragem (`GET/PUT /api/tb50-page`,
+    `{pagina}` ou `{offset}`), botões **TELÃO** na faixa preta do app (ORBITS e CRONO1) ou Shift+F8/F9/F10.
 - **Simulador (nunca crie sessão de teste no :4050 real):**
 
 ```bash
