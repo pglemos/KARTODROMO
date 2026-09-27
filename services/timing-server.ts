@@ -542,6 +542,20 @@ function kartsCadastrados() {
   return [...new Set(Object.values(transponderMap).map((k) => String(k).trim()).filter((k) => /^\d+$/.test(k)))].sort((a, b) => Number(a) - Number(b));
 }
 
+/** Id da bateria na agenda da recepção: o guardado na prova ou, nas criadas sem ele, pelo nome no mesmo dia. */
+async function agendaIdDa(s: Session): Promise<number | null> {
+  if (s.agendaId) return s.agendaId;
+  try {
+    const data = new Date(s.createdAt).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+    const agenda = (await opsGet(`/api/baterias?data=${data}`)) as { id?: number; nome?: string }[];
+    const i = s.name.lastIndexOf(' · ');
+    const base = (i > 0 ? s.name.slice(0, i) : s.name).trim().toLowerCase();
+    return agenda.find((b) => String(b.nome ?? '').trim().toLowerCase() === base)?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Tipo de kart da bateria na agenda da recepção (light/super), achado pelo id ou pelo nome da bateria. */
 async function tipoKartDa(s: Session): Promise<string | null> {
   try {
@@ -597,7 +611,8 @@ async function enviarUsoKarts(s: Session) {
     const r = await fetch(OPS_URL + '/api/crono/uso-karts', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-ops-key': process.env.OPS_RECEPCAO_KEY || '' },
-      body: JSON.stringify({ sessaoId: s.id, agendaId: s.agendaId ?? null, karts }),
+      // sem a bateria da agenda não se sabe a categoria (Indoor/Super Kart têm karts com o mesmo número)
+      body: JSON.stringify({ sessaoId: s.id, agendaId: await agendaIdDa(s), karts }),
       signal: AbortSignal.timeout(8000),
     });
     const d = (await r.json().catch(() => ({}))) as { somados?: number; criados?: number; ignorados?: number; categoria?: string | null; error?: string };
