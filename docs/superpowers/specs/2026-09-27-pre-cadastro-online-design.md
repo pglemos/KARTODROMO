@@ -10,7 +10,7 @@ O link permanente será `https://kartodromodebetim.com.br/pre-cadastro`. O QR co
 
 - O site público Next.js roda no Cloudflare Workers e usa D1 (`KARTODROMO_ADMIN_DB`).
 - O serviço operacional roda na LAN em `SRVKART:4060` e grava clientes no SQL Server `KartodromoOps`.
-- Os dois totens usam o mesmo serviço operacional. Há clientes WinForms e uma interface web de autoatendimento atendidos por esse serviço.
+- Os dois totens físicos usam o mesmo serviço operacional por meio dos aplicativos Windows nativos em `desktop/`. O serviço também mantém uma interface web legada, que não será usada como aplicativo dos totens nem receberá novas telas neste trabalho.
 - O serviço operacional não pode ser exposto diretamente à internet. A integração pública deve terminar no Worker/D1.
 - O autoatendimento coleta tipo de registro, tipo de documento, documento, nome, e-mail, telefone, nascimento, peso, CEP e endereço. O responsável também pode cadastrar menores com nome, nascimento e documento opcional.
 - A interface do totem mostra Pessoa Física/Pessoa Jurídica, mas atualmente o serviço não persiste essa escolha. O sistema da recepção também descarta `tipoPessoa`. Este trabalho persistirá o tipo de pessoa de ponta a ponta.
@@ -41,7 +41,7 @@ O site usa o mesmo texto de consentimento LGPD apresentado no totem e registra v
 2. O serviço procura primeiro um cliente operacional pelo documento normalizado. Se não houver, procura um pré-cadastro pendente. A normalização remove pontuação, converte letras em maiúsculas e preserva letras e números; um passaporte como `AB123` nunca vira apenas `123`. CPF/RG/passaporte com resultados múltiplos não escolhem arbitrariamente um cliente: o totem pede o tipo de documento. A identificação por e-mail só é usada quando encontra um único perfil; se o e-mail for compartilhado/ambíguo, o totem pede documento.
 3. O totem apresenta os campos preenchidos para conferência, sem bateria selecionada. O cliente pode corrigir os campos editáveis e segue para as etapas atuais de participantes e escolha da bateria.
 4. Ao confirmar, o servidor promove o cadastro pendente a `dbo.Cliente`, cria os menores vinculados e encerra a pendência numa transação idempotente.
-5. A mesma API atende os totens 1 e 2. A interface WinForms e a interface web de autoatendimento devem continuar compatíveis com o fluxo.
+5. A mesma API atende os aplicativos nativos do Totem 1 e 2. A interface web legada permanece sem mudanças funcionais; chamadas antigas continuam no fluxo manual existente.
 
 Se já houver um cliente no SQL com o mesmo documento, esse registro tem prioridade. O envio público nunca atualiza nem substitui automaticamente um cadastro operacional; o cliente usa o cadastro já existente e pode corrigi-lo pelo fluxo normal do totem.
 
@@ -71,7 +71,7 @@ Se já houver um cliente no SQL com o mesmo documento, esse registro tem priorid
 - A busca ativa em `dbo.Cliente` ganha coluna indexada de documento normalizado, preenchida para dados existentes. O resultado deixa de usar `TOP 1` para colisões de documento/e-mail: solicita tipo de documento/documento quando houver mais de um perfil possível.
 - A resposta distingue cadastro operacional de pré-cadastro e inclui um token assinado com escopo e expiração para impedir que o cliente confirme outro pedido.
 - Um endpoint de confirmação promove a pendência e seus dependentes de forma transacional; tentativas repetidas retornam o mesmo cliente criado, sem duplicar registros.
-- As interfaces WinForms e web exibem a origem “Pré-cadastro online”, preenchem os campos e mantêm as validações, revisão e seleção de bateria atuais.
+- O aplicativo WinForms nativo exibe a origem “Pré-cadastro online”, preenche os campos e mantém as validações, revisão e seleção de bateria atuais. Ele sinaliza suporte ao pré-cadastro por versão explícita da API; a interface web legada continua recebendo o comportamento compatível anterior.
 - `tipoPessoa` será persistido no SQL, incluído nos contratos operacionais e preservado pela recepção e pelos totens. A migração dá `Pessoa Física` como padrão aos cadastros antigos sem esse campo; os tipos de documento continuam CPF, RG e passaporte. Este escopo não adiciona CNPJ nem muda as regras de identificação solicitadas.
 
 ## Privacidade, segurança e retenção
@@ -99,7 +99,7 @@ Se já houver um cliente no SQL com o mesmo documento, esse registro tem priorid
 4. Repetir sincronização, leitura sob demanda ou confirmação não duplica cliente ou dependente. Cadastro operacional existente vence sem ser sobrescrito.
 5. CPF, RG, passaporte alfanumérico e e-mail único encontram o pré-cadastro tanto no Totem 1 quanto no Totem 2. Documentos com prefixo alfanumérico não colidem com seu sufixo numérico; documento/e-mail ambíguo pede desambiguação e nunca retorna um perfil arbitrário.
 6. O totem apresenta o perfil e dependentes, permite conferência/edição suportada, e só apresenta bateria nas etapas presenciais atuais.
-7. Formulário público, aplicações WinForms/web do totem e recepção preservam `tipoPessoa` após fechar e reabrir cadastro.
+7. Formulário público, aplicativos Windows nativos do totem e recepção preservam `tipoPessoa` após fechar e reabrir cadastro.
 8. Teste ponta a ponta usa registros claramente identificados como `TESTE CODEX`, valida fila, SQL, ambos os clientes de totem, reserva/bateria não selecionada no site e promoção no totem; ao final, remove os registros de teste de D1 e SQL.
 9. Migrações D1 e SQL são repetíveis; falha no deploy/Worker ou servidor local não perde pendências nem corrompe clientes existentes.
 
