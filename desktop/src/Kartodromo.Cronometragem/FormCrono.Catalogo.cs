@@ -137,6 +137,9 @@ public partial class FormCrono
 
     void EditarCatalogo(string entity, bool editar = false, string tituloJanela = null)
     {
+        if (entity == "events") { EditarEventoDesign(editar); return; }
+        if (entity == "groups") { EditarGrupoDesign(editar); return; }
+        if (entity == "provas") { EditarProvaDesign(editar); return; }
         var selected = entity switch { "events" => _gEventos.ChaveAtual as JsonObject, "groups" => _gGrupos.ChaveAtual as JsonObject, "provas" => _gProvas.ChaveAtual as JsonObject, _ => null };
         if (editar && selected == null) { Msg.Aviso(this, "Selecione um registro para editar."); return; }
         var eventRow = _gEventos.ChaveAtual as JsonObject ?? _events.FirstOrDefault();
@@ -188,18 +191,7 @@ public partial class FormCrono
 
     void DistribuirProva()
     {
-        if (_gProvas.ChaveAtual is not JsonObject proof) { Msg.Aviso(this, "Selecione uma prova para distribuir."); return; }
-        using var dialog = new DialogoDados("Distribuir prova", proof.S("name"), new[] { ("Número de baterias", "heats", proof.I("heats").ToString()), ("Horário inicial (HH:mm)", "startAt", proof.S("startAt")), ("Intervalo entre baterias (min)", "intervalMin", proof.I("intervalMin").ToString()) }, new Size(700, 320));
-        if (dialog.ShowDialog(this) != DialogResult.OK) return;
-        Seguro.Rodar(this, async () =>
-        {
-            await Crono.Api.Post($"/api/catalog/provas/{proof.S("id")}/distribute", new JsonObject {
-                ["heats"] = int.TryParse(dialog.Valor("heats"), out var heats) ? heats : 1,
-                ["startAt"] = dialog.Valor("startAt"),
-                ["intervalMin"] = int.TryParse(dialog.Valor("intervalMin"), out var interval) ? interval : 0,
-            });
-            await CarregarCatalogo();
-        });
+        DistribuirProvaDesign();
     }
 
     void ImportarCatalogo()
@@ -287,6 +279,12 @@ public partial class FormCrono
 
     void JanelaCadastro(string nome)
     {
+        // telas no visual do design
+        if (CadastroDesign(nome)) return;
+        if (nome is "Empresa" or "ParamCrono" or "ParamSistema" or "Backup" or "ConfigInicial" or "Banner") { Seguro.Rodar(this, () => DialogoConfiguracao(nome)); return; }
+        if (nome == "IncluirPassagem") { IncluirPassagemDesign(); return; }
+        if (nome == "MudarCorrida") { MudarCorridaDesign(); return; }
+        if (nome == "Prova") { _abas.SelectedIndex = 0; EditarProvaDesign(false); return; }
         if (nome == "RelatoriosCrono") { AbrirRelatoriosCrono(); return; }
         if (nome == "CadCategoria") { using var f = new FormCatalogoAux("categories"); f.ShowDialog(this); return; }
         if (nome == "CadTracado") { using var f = new FormCatalogoAux("tracks"); f.ShowDialog(this); return; }

@@ -155,7 +155,7 @@ public class RegistroDesign : CartaoModal
         FormClosing += (_, e) =>
         {
             if (!_sujo || DialogResult == DialogResult.OK) return;
-            var r = MessageBox.Show(this, "Gravar as alterações antes de fechar?", _titulo, MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+            var r = Perguntar("Gravar as alterações antes de fechar?", MessageBoxButtons.YesNoCancel);
             if (r == DialogResult.Cancel) e.Cancel = true;
             else if (r == DialogResult.Yes) { e.Cancel = true; Gravar(true); }
         };
@@ -170,6 +170,13 @@ public class RegistroDesign : CartaoModal
             FormClosed += (_, _) => fundo.Close();
         }
         base.OnLoad(e);
+    }
+
+    /// <summary>Pergunta ao operador; no teste automático (Msg.Registro) só registra e responde Sim sem abrir caixa.</summary>
+    DialogResult Perguntar(string texto, MessageBoxButtons botoes)
+    {
+        if (Msg.Registro != null) { Msg.Registro("PERGUNTA: " + texto); return botoes == MessageBoxButtons.YesNoCancel ? DialogResult.No : DialogResult.Yes; }
+        return MessageBox.Show(this, texto, _titulo, botoes, MessageBoxIcon.Question);
     }
 
     void Acao(string texto, Color fundo, Color frente, bool negrito, Action a)
@@ -323,7 +330,7 @@ public class RegistroDesign : CartaoModal
         if (_sujo && _atual != r && !_carregando)
         {
             // mudou de linha com alterações não gravadas
-            if (MessageBox.Show(this, "Descartar as alterações do registro atual?", _titulo, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+            if (Perguntar("Descartar as alterações do registro atual?", MessageBoxButtons.YesNo) != DialogResult.Yes)
             { var volta = _lista.Linhas.IndexOf(_atual); _carregando = true; if (volta >= 0) _lista.Selecionar(volta); _carregando = false; return; }
         }
         _carregando = true;
@@ -395,7 +402,7 @@ public class RegistroDesign : CartaoModal
     // ---------- ações
     void Novo()
     {
-        if (_sujo && MessageBox.Show(this, "Descartar as alterações do registro atual?", _titulo, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        if (_sujo && Perguntar("Descartar as alterações do registro atual?", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
         _carregando = true;
         _atual = null; _incluindo = true;
         _lista.Selecionar(-1);

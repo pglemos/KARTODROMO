@@ -46,15 +46,7 @@ public partial class FormCrono
 
     void IncluirPassagem()
     {
-        if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
-        using var dialog = new DialogoDados("Incluir passagem", "Passagem manual · o tempo precisa respeitar o mínimo da prova", new[] { ("Número do kart", "kart", ""), ("Competidor", "name", ""), ("Tempo da volta (segundos)", "lapSeconds", "60,000") }, new Size(700, 340));
-        if (dialog.ShowDialog(this) != DialogResult.OK || !dialog.Confirmado) return;
-        if (!TentarSegundos(dialog.Valor("lapSeconds"), out var seconds)) { Msg.Aviso(this, "Informe um tempo positivo em segundos, por exemplo 60,250."); return; }
-        Seguro.Rodar(this, async () =>
-        {
-            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/passings/manual", new JsonObject { ["kart"] = dialog.Valor("kart"), ["name"] = dialog.Valor("name"), ["lapMs"] = (long)(seconds * 1000) });
-            await Atualizar();
-        });
+        IncluirPassagemDesign();
     }
 
     void AtribuirPassagem()

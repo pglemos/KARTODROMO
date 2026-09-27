@@ -1172,6 +1172,7 @@ public partial class FormCrono : Form
         Directory.CreateDirectory(_autoteste);
         if (Environment.GetEnvironmentVariable("KARTODROMO_TESTE") == "ordenacao") { await TesteOrdenacao(); return; }
         var foraDaTela = Environment.GetEnvironmentVariable("KARTODROMO_TESTE") == "telas";
+        if (foraDaTela) Msg.Registro = m => File.AppendAllText(Path.Combine(_autoteste, "log.txt"), m + Environment.NewLine); // avisos no log, nenhuma caixa na tela
         var focoAntes = GetForegroundWindow();
         System.Windows.Forms.Timer vigia = null;
         if (foraDaTela)
@@ -1243,9 +1244,44 @@ public partial class FormCrono : Form
                 }
                 else
                 {
-                    using var f = new DialogoDados(nome, "Cadastro · Cronometragem", campos, new Size(820, 500));
-                    f.Show(this); await Task.Delay(150); Foto(f, nome); f.Close();
+                    // as telas do design abrem como diálogo (modal): um temporizador fotografa e fecha
+                    var feito = new TaskCompletionSource<bool>();
+                    var t = new System.Windows.Forms.Timer { Interval = 150 };
+                    var achou = false;
+                    t.Tick += async (_, _) =>
+                    {
+                        if (achou) return;
+                        var alvo = Application.OpenForms.Cast<Form>().FirstOrDefault(f => f != this && f.Visible && f is not Escurecer && f is not FormTV);
+                        if (alvo == null) return;
+                        achou = true; t.Stop();
+                        await Task.Delay(1000);
+                        try { Foto(alvo, nome); } catch { }
+                        alvo.Close(); feito.TrySetResult(true);
+                    };
+                    t.Start();
+                    File.AppendAllText(Path.Combine(_autoteste, "log.txt"), $"abrindo {nome}{Environment.NewLine}");
+                    try
+                    {
+                        switch (nome)
+                        {
+                            case "CadGrupo": CadastroDesign("CadGrupo"); break;
+                            case "Empresa" or "ParamCrono" or "ParamSistema" or "Backup" or "ConfigInicial" or "Banner": await DialogoConfiguracao(nome); break;
+                            case "Prova": EditarProvaDesign(true); break;
+                            case "Competidor": JanelaCadastro("Competidor"); break;
+                            default: JanelaCadastro(nome); break;
+                        }
+                    }
+                    catch (Exception ex) { File.AppendAllText(Path.Combine(_autoteste, "log.txt"), $"ERRO {nome}: {ex.Message}\r\n"); }
+                    await Task.WhenAny(feito.Task, Task.Delay(8000));
+                    t.Stop(); t.Dispose();
+                    if (!achou) File.AppendAllText(Path.Combine(_autoteste, "log.txt"), $"sem janela: {nome}\r\n");
                 }
+            }
+            foreach (var (nome, acao) in new (string, Action)[] { ("Evento", () => EditarEventoDesign(true)), ("GrupoEditar", () => EditarGrupoDesign(true)), ("Distribuir", DistribuirProvaDesign) })
+            {
+                var t = new System.Windows.Forms.Timer { Interval = 150 }; var achou = false; var feito = new TaskCompletionSource<bool>();
+                t.Tick += async (_, _) => { if (achou) return; var alvo = Application.OpenForms.Cast<Form>().FirstOrDefault(f => f != this && f.Visible && f is not Escurecer && f is not FormTV); if (alvo == null) return; achou = true; t.Stop(); await Task.Delay(900); try { Foto(alvo, nome); } catch { } alvo.Close(); feito.TrySetResult(true); };
+                t.Start(); acao(); await Task.WhenAny(feito.Task, Task.Delay(8000)); t.Stop(); t.Dispose();
             }
             if (_state?["focus"] is JsonObject foco) File.WriteAllText(Path.Combine(_autoteste, "painel-led.txt"), PainelLed.Montar(foco, 10, DateTime.Now, out _));
             File.WriteAllText(Path.Combine(_autoteste, "ok.txt"), "ok");

@@ -1,10 +1,10 @@
 import type { SessionType } from './race-engine';
 
 export type TimingEvent = { id: string; name: string; date: string; venue: string; trackId: string | null; active: boolean; createdAt: number };
-export type TimingGroup = { id: string; eventId: string; name: string; categoryId: string | null; order: number };
-export type TimingProof = { id: string; eventId: string; groupId: string; name: string; type: SessionType; durationMin: number; maxLaps: number | null; agendaId: string | null; order: number; heats: number; startAt: string; intervalMin: number };
-export type TimingCategory = { id: string; name: string; color: string };
-export type TimingTrack = { id: string; name: string; lengthMeters: number };
+export type TimingGroup = { id: string; eventId: string; name: string; categoryId: string | null; order: number; active?: boolean };
+export type TimingProof = { id: string; eventId: string; groupId: string; name: string; type: SessionType; durationMin: number; maxLaps: number | null; agendaId: string | null; order: number; heats: number; startAt: string; intervalMin: number; trackId?: string | null; minLapSec?: number | null };
+export type TimingCategory = { id: string; name: string; color: string; sport?: string; active?: boolean };
+export type TimingTrack = { id: string; name: string; lengthMeters: number; active?: boolean };
 export type TimingCompetitor = { id: string; name: string; kart: string; transponder: string | null; categoryId: string | null; weightKg: number | null; active: boolean };
 export type TimingCatalog = { events: TimingEvent[]; groups: TimingGroup[]; provas: TimingProof[]; categories: TimingCategory[]; tracks: TimingTrack[]; competitors: TimingCompetitor[] };
 export type CatalogEntity = keyof TimingCatalog;
@@ -66,7 +66,7 @@ export function createCatalogRecord(catalog: TimingCatalog, entity: CatalogEntit
   } else if (entity === 'groups') {
     const eventId = text(input, 'eventId');
     if (!catalog.events.some((event) => event.id === eventId)) throw new Error('Selecione um evento existente.');
-    record = { id, eventId, name, categoryId: text(input, 'categoryId') || null, order: Number(input.order ?? catalog.groups.filter((group) => group.eventId === eventId).length + 1) } satisfies TimingGroup;
+    record = { id, eventId, name, categoryId: text(input, 'categoryId') || null, order: Number(input.order ?? catalog.groups.filter((group) => group.eventId === eventId).length + 1), active: input.active !== false } satisfies TimingGroup;
   } else if (entity === 'provas') {
     const groupId = text(input, 'groupId');
     const group = catalog.groups.find((item) => item.id === groupId);
@@ -80,9 +80,10 @@ export function createCatalogRecord(catalog: TimingCatalog, entity: CatalogEntit
       agendaId: text(input, 'agendaId') || null,
       order: Number(input.order ?? catalog.provas.filter((proof) => proof.groupId === groupId).length + 1),
       heats: Math.max(1, Number(input.heats ?? 1)), startAt: text(input, 'startAt'), intervalMin: Math.max(0, Number(input.intervalMin ?? 0)),
+      trackId: text(input, 'trackId') || null, minLapSec: Number(input.minLapSec ?? 0) > 0 ? Number(input.minLapSec) : null,
     } satisfies TimingProof;
   } else if (entity === 'categories') {
-    record = { id, name, color: text(input, 'color', '#0B7A53') } satisfies TimingCategory;
+    record = { id, name, color: text(input, 'color', '#0B7A53'), sport: text(input, 'sport', 'Karting'), active: input.active !== false } satisfies TimingCategory;
   } else if (entity === 'competitors') {
     const kart = text(input, 'kart');
     const transponder = text(input, 'transponder') || null;
@@ -97,7 +98,7 @@ export function createCatalogRecord(catalog: TimingCatalog, entity: CatalogEntit
   } else {
     const lengthMeters = Number(input.lengthMeters ?? 0);
     if (!Number.isFinite(lengthMeters) || lengthMeters <= 0) throw new Error('Informe a extensão do traçado em metros.');
-    record = { id, name, lengthMeters } satisfies TimingTrack;
+    record = { id, name, lengthMeters, active: input.active !== false } satisfies TimingTrack;
   }
   entityList(catalog, entity).push(record as never);
   return record as TimingCatalog[keyof TimingCatalog][number];

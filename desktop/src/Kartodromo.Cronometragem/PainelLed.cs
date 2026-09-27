@@ -62,10 +62,10 @@ sealed class PainelLed : IDisposable
         catch (Exception e) { Porta = ""; Situacao = "configuração inválida: " + e.Message; }
     }
 
-    public static void SalvarConfig(string porta)
+    public static void SalvarConfig(string porta, int baud = 9600, int linhas = 10)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(ArquivoConfig)!);
-        File.WriteAllText(ArquivoConfig, JsonSerializer.Serialize(new { porta, baud = 9600, linhas = 10 }));
+        File.WriteAllText(ArquivoConfig, JsonSerializer.Serialize(new { porta, baud, linhas }));
     }
 
     public void DefinirPagina(int pagina)

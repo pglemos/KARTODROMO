@@ -20,7 +20,7 @@ public class DialogoDesign : CartaoModal
     readonly int _larguraSecao;
     readonly FlowLayoutPanel _botoes;
     readonly Panel _cab, _rod, _corpo;
-    protected readonly Label Subtitulo;
+    public readonly Label Subtitulo;
 
     public DialogoDesign(string titulo, string sub, string icone, int largura = 960, int altura = 680) : this(titulo, sub, Forma.Icone(icone), largura, altura) { }
 
