@@ -20,6 +20,7 @@ import { extname, join, normalize, resolve } from 'node:path';
 import { CLIENTE_COLS, insertCliente, isValidCpf, one, onlyDigits, query, updateCliente, type ClienteInput } from '../lib/ops/db';
 import { confereSenha, emiteToken, validaToken } from '../lib/ops/auth';
 import { HttpError, inscreverN, officeRoutes } from '../lib/ops/office';
+import { bateriaDisponivelNoTotem, type TotemBateriaCandidate, TOTEM_BATERIAS_SQL } from '../lib/ops/totem-baterias';
 import { relatorio } from '../lib/ops/relatorios';
 import { renderTermoResponsabilidade, type TermoParticipante } from '../lib/ops/termo';
 import { buscarPreCadastroAgora, preCadastroLigado, sincronizarPreCadastros } from '../lib/ops/pre-cadastro';
@@ -308,15 +309,19 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
   }
 
   if (path === '/api/totem/baterias' && method === 'GET') {
-    const rows = await query<{ id: number; nome: string; inicio: string; vagas: number; ocupadas: number; tipoKart: string }>(
-      `SELECT b.Id id, b.Nome nome, CONVERT(varchar(16), b.Inicio, 126) inicio, b.Vagas vagas, b.TipoKart tipoKart,
-              (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') ocupadas
-       FROM dbo.Bateria b
-       WHERE b.Status = 'aberta' AND b.AutoAtendimento = 1 AND b.ReservaFechada = 0
-         AND b.Inicio >= DATEADD(minute, -10, SYSDATETIME()) AND b.Inicio < DATEADD(day, 1, CAST(SYSDATETIME() AS date))
-       ORDER BY b.Inicio`,
-    );
-    send(res, 200, rows.map((r) => ({ ...r, livres: Math.max(0, r.vagas - r.ocupadas) })).filter((r) => r.livres > 0));
+    const rows = await query<TotemBateriaCandidate>(TOTEM_BATERIAS_SQL);
+    send(res, 200, rows
+      .map((r) => ({ ...r, livres: Math.max(0, r.vagas - r.ocupadas) }))
+      .filter((r) => bateriaDisponivelNoTotem(r, r.dataHoje))
+      .map((r) => ({
+        id: r.id,
+        nome: r.nome,
+        inicio: r.inicio,
+        vagas: r.vagas,
+        tipoKart: r.tipoKart,
+        ocupadas: r.ocupadas,
+        livres: r.livres,
+      })));
     return true;
   }
 
@@ -461,7 +466,7 @@ const server = http.createServer(async (req, res) => {
         // dados dos pilotos para a lista de competidores da cronometragem (só leitura)
         const ids = String(url.searchParams.get('ids') ?? '').split(',').map(Number).filter((n) => Number.isSafeInteger(n) && n > 0).slice(0, 200);
         if (!ids.length) return send(res, 200, []);
-        return send(res, 200, await query(`SELECT Id id, Email email, Cidade cidade, Estado uf, Peso peso FROM dbo.Cliente WHERE Id IN (${ids.join(',')})`));
+        return send(res, 200, await query(`SELECT Id id, Email email, Cidade cidade, Estado uf, Peso peso, Sexo sexo, Telefone telefone FROM dbo.Cliente WHERE Id IN (${ids.join(',')})`));
       }
       m = path.match(/^\/api\/crono\/baterias\/(\d+)\/programa$/);
       if (m) {

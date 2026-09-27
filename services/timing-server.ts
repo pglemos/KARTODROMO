@@ -58,7 +58,8 @@ import {
   type CatalogEntity,
   type TimingCatalog,
 } from '../lib/timing/catalog';
-import { competidoresComSorteio, pilotosDoSorteio, validarSorteio, type Atribuicao } from '../lib/timing/sorteio';
+import { rankingPorPeso, tituloFaixas, type DadosPiloto } from '../lib/timing/ranking-peso';
+import { competidoresComSorteio, descricaoModoSorteio, pilotosDoSorteio, validarSorteio, type Atribuicao } from '../lib/timing/sorteio';
 
 // ---------------------------------------------------------------- config
 
@@ -336,8 +337,8 @@ function sessionView(s: Session) {
     groupId: s.groupId ?? null,
     proofId: s.proofId ?? null,
     observations: s.observations ?? [],
-    competitors: s.competitors.map((c) => ({ kart: c.kart, name: c.name, customerId: c.customerId ?? null, category: c.category ?? null, flag: c.flag ?? 'none', autoAdded: Boolean(c.autoAdded) })),
-    standings: computeStandings(s, trackLengthFor(s)),
+    competitors: s.competitors.map((c) => ({ kart: c.kart, name: c.name, customerId: c.customerId ?? null, category: c.category ?? null, flag: c.flag ?? 'none', autoAdded: Boolean(c.autoAdded), detalhes: c.detalhes ?? null })),
+    standings: computeStandings(s, trackLengthFor(s)).filter((r) => !s.competitors.find((c) => c.kart === r.kart && c.name === r.name)?.detalhes?.oculto),
   };
 }
 
@@ -839,6 +840,74 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     } catch (err) { return send(res, 400, { error: (err as Error).message }); }
   }
 
+  // ---------------------------------------------------------------- registro de competidor (Competidor do canvas)
+  const rc = path.match(/^\/api\/sessions\/([\w-]+)\/competitors\/(\d+)$/);
+  if (rc && method === 'PUT') {
+    const s = sessions.get(rc[1]);
+    if (!s) return send(res, 404, { error: 'Bateria não encontrada.' });
+    const i = Number(rc[2]);
+    const atual = s.competitors[i];
+    if (!atual) return send(res, 404, { error: 'Competidor não encontrado nessa bateria.' });
+    const body = await readBody(req);
+    const num = (v: unknown) => (v === '' || v == null || !Number.isFinite(Number(String(v).replace(',', '.'))) ? null : Number(String(v).replace(',', '.')));
+    const txt = (v: unknown, max = 80) => String(v ?? '').trim().slice(0, max);
+    const d = (body.detalhes ?? {}) as Record<string, unknown>;
+    const detalhes = {
+      sexo: txt(d.sexo, 20), iniciais: txt(d.iniciais, 6).toUpperCase(), email: txt(d.email, 160), patrocinador: txt(d.patrocinador), clube: txt(d.clube),
+      cidade: txt(d.cidade), estado: txt(d.estado, 4).toUpperCase(), pais: txt(d.pais, 40), box: txt(d.box, 20),
+      peso: num(d.peso), pesoIndumentaria: num(d.pesoIndumentaria), pesoLastro: num(d.pesoLastro), pontuacao: num(d.pontuacao),
+      oculto: Boolean(d.oculto), equipe: Array.isArray(d.equipe) ? (d.equipe as unknown[]).map((x) => txt(x, 100)).slice(0, 6) : [],
+    };
+    const kart = typeof body.kart === 'string' ? body.kart.trim() : atual.kart;
+    if (kart && kart !== atual.kart && s.competitors.some((c, j) => j !== i && c.kart === kart)) return send(res, 400, { error: `O kart ${kart} já está com outro competidor nessa bateria.` });
+    const nome = typeof body.name === 'string' && body.name.trim() ? body.name.trim() : atual.name;
+    const categoria = body.category === undefined ? atual.category ?? null : (String(body.category ?? '').trim() || null);
+    setCompetitors(s, s.competitors.map((c, j) => j === i
+      ? { kart, name: nome, customerId: c.customerId ?? null, category: categoria, detalhes }
+      : { kart: c.kart, name: c.name, customerId: c.customerId ?? null, category: c.category ?? null, detalhes: c.detalhes }));
+    saveSession(s);
+    // "Aplicar alterações nas demais provas do grupo": o mesmo piloto nas outras provas do grupo/programa
+    let outras = 0;
+    if (body.aplicarGrupo) {
+      const mesmo = (c: { customerId?: string | null; name: string }) => (atual.customerId ? String(c.customerId ?? '') === String(atual.customerId) : c.name.trim().toLowerCase() === atual.name.trim().toLowerCase());
+      for (const x of sessions.values()) {
+        if (x.id === s.id || !(mesmoPrograma(s, x) || (s.groupId && x.groupId === s.groupId))) continue;
+        const k = x.competitors.findIndex(mesmo);
+        if (k < 0) continue;
+        setCompetitors(x, x.competitors.map((c, j) => j === k
+          ? { kart: x.state === 'preparando' ? kart : c.kart, name: nome, customerId: c.customerId ?? null, category: categoria, detalhes }
+          : { kart: c.kart, name: c.name, customerId: c.customerId ?? null, category: c.category ?? null, detalhes: c.detalhes }));
+        saveSession(x); outras++;
+      }
+    }
+    log(`competidor ${nome} (kart ${kart}) atualizado em ${s.name}${outras ? ` e em mais ${outras} prova(s)` : ''}`);
+    scheduleStateBroadcast();
+    return send(res, 200, { ok: true, outras, sessao: sessionView(s) });
+  }
+
+  // ---------------------------------------------------------------- ranking por peso (RankingPeso do canvas)
+  if (path === '/api/ranking-peso' && method === 'GET') {
+    const q = url.searchParams;
+    const faixas = String(q.get('faixas') ?? '75,90').split(/[;, ]+/).map(Number).filter((n) => n > 0 && n < 400);
+    const encerradas = [...sessions.values()].filter((x) => x.state === 'encerrada');
+    const ids = [...new Set(encerradas.flatMap((x) => x.competitors.map((c) => c.customerId).filter(Boolean)))] as string[];
+    const clientes = new Map<string, DadosPiloto>();
+    for (let i = 0; i < ids.length; i += 200) {
+      try {
+        for (const c of (await opsGet(`/api/crono/clientes?ids=${encodeURIComponent(ids.slice(i, i + 200).join(','))}`)) as { id?: unknown; peso?: unknown; sexo?: string; email?: string; telefone?: string }[])
+          clientes.set(String(c.id), { peso: Number(c.peso) > 0 ? Number(c.peso) : null, sexo: c.sexo ?? null, email: c.email ?? null, telefone: c.telefone ?? null });
+      } catch { /* sem o servidor da operação: usa o peso digitado no registro do competidor */ }
+    }
+    const trilha = (x: Session) => (x.proofId ? catalog.provas.find((p) => p.id === x.proofId)?.trackId ?? null : null);
+    const sexo = q.get('sexo');
+    const grupos = rankingPorPeso(encerradas, (cid) => (cid ? clientes.get(cid) ?? {} : {}), {
+      top: Number(q.get('top') ?? 10), mes: q.get('mes') || null, de: q.get('de') || null, ate: q.get('ate') || null,
+      minimoMs: Number(q.get('minimoMs') ?? 0) || null, sexo: sexo === 'M' || sexo === 'F' ? sexo : null, faixas,
+      trackId: q.get('trackId') || null, categoria: q.get('categoria') || null, ignorarSegunda: q.get('ignorarSegunda') === '1',
+    }, trilha);
+    return send(res, 200, { faixas: tituloFaixas(faixas), grupos, pilotosComPeso: [...clientes.values()].filter((c) => c.peso).length });
+  }
+
   // ---------------------------------------------------------------- sorteio de karts (tablet)
   const so = path.match(/^\/api\/sessions\/([\w-]+)\/sorteio$/);
   if (so) {
@@ -872,7 +941,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       } catch (err) { return send(res, 400, { error: (err as Error).message }); }
       const nomes = atribuicoes.map((a) => `${s.competitors[Number(a.indice)]?.name ?? '?'} → kart ${a.kart}`);
       setCompetitors(s, competidoresComSorteio(s, atribuicoes));
-      const modo = String(body.modo ?? '') === 'um-a-um' ? 'um a um' : 'todos de uma vez';
+      const modo = descricaoModoSorteio(String(body.modo ?? ''));
       const texto = `Sorteio de karts no tablet (${modo}): ` + nomes.join('; ');
       (s.observations ??= []).push({ id: randomUUID(), text: texto, wallMs: Date.now(), author: 'Sorteio' });
       saveSession(s);
@@ -881,7 +950,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         if (mesmoPrograma(s, irma) && copiarCompetidores(irma, s)) { saveSession(irma); log(`competidores de ${s.name} copiados para ${irma.name}`); }
       }
       scheduleStateBroadcast();
-      return send(res, 200, sessionView(s));
+      return send(res, 200, { ...sessionView(s), gravadoEm: Date.now() });
     }
   }
 

@@ -18,6 +18,9 @@ public partial class FormCrono
     static string SimNao(JsonObject r, string k) => r[k] is null || r.B(k) ? "Sim" : "Não";
 
     /// <summary>Abre o cadastro do design (true) ou devolve false para cair no antigo.</summary>
+    /// <summary>Transponders lidos sem kart (alerta do rodapé): aparecem na lista do De/Para.</summary>
+    List<string> _transpNovos = [];
+
     bool CadastroDesign(string nome)
     {
         RegistroDesign f = nome switch
@@ -42,8 +45,11 @@ public partial class FormCrono
                     Listar = async () =>
                     {
                         var mapa = (await Crono.Api.Get("/api/transponders"))?.AsObject() ?? [];
-                        return mapa.Select(kv => new JsonObject { ["id"] = kv.Key, ["raw"] = kv.Key, ["kart"] = kv.Value?.ToString(), ["decoder"] = NomeDecoder() })
+                        var lista = mapa.Select(kv => new JsonObject { ["id"] = kv.Key, ["raw"] = kv.Key, ["kart"] = kv.Value?.ToString(), ["decoder"] = NomeDecoder() })
                             .OrderBy(r => int.TryParse(r.S("kart"), out var k) ? k : 9999).ToList();
+                        // lidos na pista sem kart: aparecem primeiro, sem número, para digitar o kart
+                        foreach (var t in _transpNovos.Where(t => !mapa.ContainsKey(t)).Reverse()) lista.Insert(0, new JsonObject { ["id"] = t, ["raw"] = t, ["kart"] = "", ["decoder"] = NomeDecoder() });
+                        return lista;
                     },
                     Incluir = b => Crono.Api.Put("/api/transponders", new JsonObject { ["raw"] = b.S("raw"), ["kart"] = b.S("kart") }),
                     Alterar = async (r, b) =>
@@ -227,7 +233,7 @@ public partial class FormCrono
         var g = d.Secao("Prova");
         d.Campo(g, "Data/hora (previsão)", hora, 2); d.Campo(g, "Nome", nome, 2); d.Campo(g, "Tipo", tipo, 2);
         d.Campo(g, "Traçado", tracado, 3); d.Campo(g, "Tempo mínimo por volta (mm:ss)", minimo, 3);
-        var a = d.Secao("Autofinalizar", "A prova termina sozinha pelo tempo ou pelas voltas: ao atingir, sai a bandeira quadriculada e cada kart termina ao cruzar a linha.");
+        var a = d.Secao("Autofinalizar", "Por tempo: ao acabar o tempo a cronometragem avisa (ESGOTADO); a quadriculada e o encerramento são sempre do cronometrista. Por voltas: a quadriculada sai quando o líder completa as voltas.");
         d.Campo(a, "Tipo de finalização", fim, 2); d.Campo(a, "Finalizar por tempo (hh:mm)", tempo, 2); d.Campo(a, "Finalizar por nº de voltas", voltas, 2);
         d.Nota("Treino livre: sem classificação · Treino classificatório (tomada de tempo): classifica pela melhor volta · Corrida: classifica por voltas e tempo total.");
         d.Subtitulo.Text = $"{ev?.S("name")} · {grupo.S("name")}";

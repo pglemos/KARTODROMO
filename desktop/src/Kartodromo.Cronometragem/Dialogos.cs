@@ -3,43 +3,43 @@ using Kartodromo.Comum;
 
 namespace Kartodromo.Cronometragem;
 
-/// <summary>Nova bateria: avulsa ou a partir da agenda da recepcao (puxa inscritos e as provas do produto).</summary>
-public class FormNovaBateria : Janela
+/// <summary>Nova bateria (visual do canvas): avulsa ou a partir da agenda da recepção (puxa inscritos e as provas do produto).</summary>
+public class FormNovaBateria : DialogoDesign
 {
     public string CriadaId { get; private set; }
     readonly ComboBox _agenda = Campos.Combo();
-    readonly TextBox _nome = Campos.Texto(80);
+    readonly TextBox _nome = PecasDesign.Texto("", 80);
     readonly ComboBox _tipo = Campos.Combo("Treino", "Tomada de tempo", "Corrida");
-    readonly NumericUpDown _dur = Campos.Num(10, 0, 600), _voltas = Campos.Num(0, 0, 999), _min = Campos.Num(5, 1, 600); // padrão do LapTime: 5 s
-    readonly TextBox _karts = Campos.Texto(400);
-    readonly CheckBox _programa = Campos.Check("Montar as provas do produto (ex.: Tomada de tempo + Corrida)", true);
-    readonly Label _info = new() { AutoSize = false, Height = 60, Dock = DockStyle.Top, ForeColor = Color.FromArgb(90, 90, 90), Padding = new Padding(3, 4, 3, 0) };
+    readonly TextBox _durTxt = PecasDesign.Numero(10, 3), _voltasTxt = PecasDesign.Numero(0, 3), _minTxt = PecasDesign.Numero(5, 3); // volta mínima padrão do LapTime: 5 s
+    readonly TextBox _karts = PecasDesign.Texto("", 400);
+    readonly CheckBox _programa = new() { Text = "Montar as provas do produto (ex.: Tomada de tempo + Corrida)", Checked = true, AutoSize = true };
+    readonly Label _info;
     List<JsonObject> _prog = [];
+    int Dur { get => int.TryParse(_durTxt.Text, out var v) ? Math.Clamp(v, 0, 600) : 0; set => _durTxt.Text = value.ToString(); }
+    int Voltas { get => int.TryParse(_voltasTxt.Text, out var v) ? Math.Clamp(v, 0, 999) : 0; set => _voltasTxt.Text = value.ToString(); }
+    int Min { get => int.TryParse(_minTxt.Text, out var v) ? Math.Clamp(v, 1, 600) : 5; set => _minTxt.Text = value.ToString(); }
 
-    public FormNovaBateria(List<JsonObject> agenda, JsonObject pre) : base("Nova Bateria", 620, 400)
+    public FormNovaBateria(List<JsonObject> agenda, JsonObject pre)
+        : base("Nova bateria", "Os inscritos da recepção entram sozinhos como competidores", "M12 5v14M5 12h14", "linear-gradient(180deg, #34C759, #0B7A53)", 760, 560)
     {
         _agenda.Items.Add(new Campos.Item(0, "(bateria avulsa, sem agenda)"));
         foreach (var b in agenda) _agenda.Items.Add(new Campos.Item(b.L("id") ?? 0, $"{Fmt.Hm(b.S("inicio"))}  {b.S("nome")}  ({b.I("inscritos")} inscritos, {b.I("pagos")} pagos)", b));
         _agenda.SelectedIndex = 0;
         if (pre != null) Campos.Selecionar(_agenda, pre.L("id"));
         _tipo.SelectedIndex = 0;
-        _karts.PlaceholderText = "Números dos karts separados por espaço (opcional; os inscritos da agenda entram sozinhos)";
-        var g = Campos.Grade(4, 40, 20, 20, 20);
-        g.Padding = new Padding(8, 8, 8, 0);
-        Campos.Add(g, "Bateria da agenda (recepção)", _agenda, 4);
-        Campos.Add(g, "Nome", _nome, 4);
-        Campos.Add(g, "Tipo", _tipo);
-        Campos.Add(g, "Duração (min)", _dur);
-        Campos.Add(g, "Voltas (0 = por tempo)", _voltas);
-        Campos.Add(g, "Volta mínima (s)", _min);
-        Campos.Add(g, "Karts", _karts, 4);
-        Campos.Add(g, null, _programa, 4);
-        var corpo = new Panel { Dock = DockStyle.Fill };
-        corpo.Controls.Add(_info);
-        corpo.Controls.Add(g);
-        Controls.Add(corpo);
-        Rodape(("Criar", async (_, _) => await Criar(), true), ("Cancelar", (_, _) => Close(), false));
-        _tipo.SelectedIndexChanged += (_, _) => _dur.Value = _tipo.SelectedIndex switch { 1 => 5, 2 => 20, _ => 10 };
+        _karts.PlaceholderText = "Opcional · números separados por espaço";
+        var g = Secao("Bateria");
+        Campo(g, "Bateria da agenda (recepção)", _agenda, 6);
+        Campo(g, "Nome", _nome, 6);
+        Campo(g, "Tipo", _tipo, 2); Campo(g, "Duração (min)", _durTxt, 1); Campo(g, "Voltas (0 = por tempo)", _voltasTxt, 2); Campo(g, "Volta mínima (s)", _minTxt, 1);
+        Campo(g, "Karts", _karts, 6);
+        Marca(g, _programa, 6, false);
+        // a nota do design (texto cinza no rodapé do conteúdo) mostra as provas do produto
+        static IEnumerable<Control> Todos(Control r) { foreach (Control x in r.Controls) { yield return x; foreach (var y in Todos(x)) yield return y; } }
+        _info = Todos(Nota(" ")).OfType<Label>().LastOrDefault() ?? new Label();
+        BotaoRodape("Criar", true, async () => await Criar());
+        BotaoRodape("Cancelar", false, Close);
+        _tipo.SelectedIndexChanged += (_, _) => Dur = _tipo.SelectedIndex switch { 1 => 5, 2 => 20, _ => 10 };
         _agenda.SelectedIndexChanged += async (_, _) => await Escolheu();
         Load += async (_, _) => await Escolheu();
     }
@@ -61,9 +61,9 @@ public class FormNovaBateria : Janela
         {
             var p = _prog[0];
             _tipo.SelectedIndex = p.S("tipo") switch { "classificacao" => 1, "corrida" => 2, _ => 0 };
-            _dur.Value = Math.Clamp(p.I("tempoMin"), 0, 600);
-            _voltas.Value = p.S("finalizacao") == "voltas" ? Math.Clamp(p.I("voltasMax"), 0, 999) : 0;
-            if (p.L("voltaMinimaSeg") is long vm && vm > 0) _min.Value = Math.Clamp(vm, 1, 600);
+            Dur = Math.Clamp(p.I("tempoMin"), 0, 600);
+            Voltas = p.S("finalizacao") == "voltas" ? Math.Clamp(p.I("voltasMax"), 0, 999) : 0;
+            if (p.L("voltaMinimaSeg") is long vm && vm > 0) Min = (int)Math.Clamp(vm, 1, 600);
         }
     }
 
@@ -95,7 +95,7 @@ public class FormNovaBateria : Janela
                     var s = await Crono.Api.Post("/api/sessions", new JsonObject
                     {
                         ["type"] = Tipo(p.S("tipo")), ["name"] = $"{nome} · {p.S("nome")}", ["durationMin"] = porVoltas ? 0 : p.I("tempoMin"),
-                        ["maxLaps"] = porVoltas && p.I("voltasMax") > 0 ? p.I("voltasMax") : null, ["minLapSec"] = (int)_min.Value, ["competitors"] = comps.DeepClone(),
+                        ["maxLaps"] = porVoltas && p.I("voltasMax") > 0 ? p.I("voltasMax") : null, ["minLapSec"] = Min, ["competitors"] = comps.DeepClone(),
                         ["programaId"] = programaId,
                     });
                     CriadaId ??= s.S("id");
@@ -106,8 +106,8 @@ public class FormNovaBateria : Janela
                 var tipo = _tipo.SelectedIndex switch { 1 => "classificacao", 2 => "corrida", _ => "treino" };
                 var s = await Crono.Api.Post("/api/sessions", new JsonObject
                 {
-                    ["type"] = tipo, ["name"] = nome, ["durationMin"] = (int)_dur.Value, ["maxLaps"] = _voltas.Value > 0 ? (int)_voltas.Value : null,
-                    ["minLapSec"] = (int)_min.Value, ["competitors"] = comps,
+                    ["type"] = tipo, ["name"] = nome, ["durationMin"] = Dur, ["maxLaps"] = Voltas > 0 ? Voltas : null,
+                    ["minLapSec"] = Min, ["competitors"] = comps,
                 });
                 CriadaId = s.S("id");
             }

@@ -21,11 +21,22 @@ export type Crossing = {
 
 export type Observation = { id: string; text: string; wallMs: number; author?: string };
 
+/** Dados do "Registro de competidor" (Competidor do canvas). Não mexem na contagem de voltas. */
+export type CompetidorDetalhes = {
+  sexo?: string; iniciais?: string; email?: string; patrocinador?: string; clube?: string; cidade?: string; estado?: string; pais?: string;
+  box?: string; peso?: number | null; pesoIndumentaria?: number | null; pesoLastro?: number | null; pontuacao?: number | null;
+  /** some da classificação e dos relatórios (continua contando as voltas) */
+  oculto?: boolean;
+  /** provas de revezamento: nomes do 2º, 3º... piloto */
+  equipe?: string[];
+};
+
 export type Competitor = {
   kart: string;
   name: string;
   customerId?: string | null;
   category?: string | null;
+  detalhes?: CompetidorDetalhes;
   autoAdded?: boolean;
   flag?: RaceFlag | PilotFlag;
   crossings: Crossing[];
@@ -199,7 +210,7 @@ function dedupeKarts<T extends { kart: string; name?: string }>(list: T[]): T[] 
  *   se juntam ao histórico do piloto;
  * - dois pilotos que trocam de kart entre si levam cada um as próprias voltas.
  */
-export function setCompetitors(session: Session, list: { kart: string; name: string; customerId?: string | null; category?: string | null }[]) {
+export function setCompetitors(session: Session, list: { kart: string; name: string; customerId?: string | null; category?: string | null; detalhes?: CompetidorDetalhes }[]) {
   const previous = session.competitors;
   const used = new Set<Competitor>();
   const nome = (n: string | null | undefined) => String(n ?? '').trim().toLowerCase();
@@ -237,6 +248,7 @@ export function setCompetitors(session: Session, list: { kart: string; name: str
       name: c.name.trim(),
       customerId: c.customerId ?? old?.customerId ?? null,
       category: c.category ?? old?.category ?? null,
+      ...(c.detalhes ?? old?.detalhes ? { detalhes: c.detalhes ?? old?.detalhes } : {}),
       autoAdded: false,
       flag: old?.flag ?? 'none',
       crossings,
@@ -260,7 +272,7 @@ export function mesmoPrograma(a: Session, b: Session) {
 /** Copia pilotos e números dos karts para outra bateria do mesmo programa que ainda não largou. */
 export function copiarCompetidores(destino: Session, origem: Session) {
   if (destino.state !== 'preparando') return false;
-  setCompetitors(destino, origem.competitors.map((c) => ({ kart: c.kart, name: c.name, customerId: c.customerId ?? null, category: c.category ?? null })));
+  setCompetitors(destino, origem.competitors.map((c) => ({ kart: c.kart, name: c.name, customerId: c.customerId ?? null, category: c.category ?? null, detalhes: c.detalhes })));
   return true;
 }
 

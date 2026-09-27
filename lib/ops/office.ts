@@ -246,8 +246,12 @@ const CAD: Record<string, CadDef> = {
     order: 'Nome', required: ['nome'],
   },
   usuarios: {
-    table: 'Usuario', cols: { login: ['Login', 'text', 40], nome: ['Nome', 'text', 100], admin: ['Admin', 'bool'], ativo: ['Ativo', 'bool'] }, order: 'Nome', required: ['login', 'nome'], adminOnly: true,
-    extra: `CONVERT(varchar(16), UltimoAcesso, 126) ultimoAcesso`,
+    table: 'Usuario', cols: { login: ['Login', 'text', 40], nome: ['Nome', 'text', 100], admin: ['Admin', 'bool'], ativo: ['Ativo', 'bool'], perfilId: ['PerfilId', 'int'] }, order: 'Nome', required: ['login', 'nome'], adminOnly: true,
+    extra: `CONVERT(varchar(16), UltimoAcesso, 126) ultimoAcesso, (SELECT p.Descricao FROM dbo.Perfil p WHERE p.Id = PerfilId) perfil`,
+  },
+  // perfis de acesso (SegPerfil do canvas)
+  perfis: {
+    table: 'Perfil', cols: { descricao: ['Descricao', 'text', 60], acessoTotal: ['AcessoTotal', 'bool'], ativo: ['Ativo', 'bool'] }, order: 'Id', required: ['descricao'], adminOnly: true,
   },
 };
 
@@ -1623,6 +1627,37 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     if (!confereSenha(atual, u.hash)) throw new HttpError(403, 'A senha atual está incorreta.');
     await query(`UPDATE dbo.Usuario SET SenhaHash = @h WHERE Id = @id`, { h: hashSenha(nova), id: sessao.uid });
     send(200, { mensagem: 'Senha alterada.' });
+    return true;
+  }
+  // ---------- permissões por perfil (Permissoes do canvas): matriz funcionalidade × acessar/incluir/alterar/excluir/exportar/importar
+  if (path === '/permissoes' && method === 'GET') {
+    const perfilId = Number(url.searchParams.get('perfilId'));
+    if (!perfilId) throw new HttpError(400, 'Informe o perfil.');
+    const perfil = await one<{ id: number; descricao: string; acessoTotal: boolean }>(`SELECT Id id, Descricao descricao, AcessoTotal acessoTotal FROM dbo.Perfil WHERE Id = @perfilId`, { perfilId });
+    if (!perfil) throw new HttpError(404, 'Perfil não encontrado.');
+    const itens = await query(`SELECT Modulo modulo, Funcao funcao, Acessar acessar, Incluir incluir, Alterar alterar, Excluir excluir, Exportar exportar, Importar importar FROM dbo.PerfilPermissao WHERE PerfilId = @perfilId`, { perfilId });
+    send(200, { perfil, itens });
+    return true;
+  }
+  if (path === '/permissoes' && method === 'PUT') {
+    if (!sessao.admin) throw new HttpError(403, 'Disponível apenas para administradores.');
+    const b = await req.body();
+    const perfilId = Number(b.perfilId);
+    if (!perfilId) throw new HttpError(400, 'Informe o perfil.');
+    const itens = Array.isArray(b.itens) ? (b.itens as Record<string, unknown>[]) : [];
+    await query(`UPDATE dbo.Perfil SET AcessoTotal = @t WHERE Id = @perfilId`, { t: b.acessoTotal ? 1 : 0, perfilId });
+    for (const it of itens) {
+      const modulo = str(it.modulo, 30); const funcao = str(it.funcao, 60);
+      if (!modulo || !funcao) continue;
+      const v = (k: string) => (it[k] ? 1 : 0);
+      await query(
+        `MERGE dbo.PerfilPermissao AS t USING (SELECT @perfilId PerfilId, @modulo Modulo, @funcao Funcao) AS s ON t.PerfilId = s.PerfilId AND t.Modulo = s.Modulo AND t.Funcao = s.Funcao
+         WHEN MATCHED THEN UPDATE SET Acessar = @a, Incluir = @i, Alterar = @al, Excluir = @e, Exportar = @ex, Importar = @im
+         WHEN NOT MATCHED THEN INSERT (PerfilId, Modulo, Funcao, Acessar, Incluir, Alterar, Excluir, Exportar, Importar) VALUES (@perfilId, @modulo, @funcao, @a, @i, @al, @e, @ex, @im);`,
+        { perfilId, modulo, funcao, a: v('acessar'), i: v('incluir'), al: v('alterar'), e: v('excluir'), ex: v('exportar'), im: v('importar') },
+      );
+    }
+    send(200, { ok: true, gravados: itens.length });
     return true;
   }
   if ((m = path.match(/^\/cad\/(\w+)(?:\/(\d+))?$/))) {

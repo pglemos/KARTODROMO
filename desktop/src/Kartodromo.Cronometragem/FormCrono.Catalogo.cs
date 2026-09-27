@@ -286,9 +286,17 @@ public partial class FormCrono
         if (nome == "MudarCorrida") { MudarCorridaDesign(); return; }
         if (nome == "Prova") { _abas.SelectedIndex = 0; EditarProvaDesign(false); return; }
         if (nome == "RelatoriosCrono") { AbrirRelatoriosCrono(); return; }
-        if (nome == "CadCategoria") { using var f = new FormCatalogoAux("categories"); f.ShowDialog(this); return; }
-        if (nome == "CadTracado") { using var f = new FormCatalogoAux("tracks"); f.ShowDialog(this); return; }
-        if (nome == "Competidor") { using var f = new FormCatalogoAux("competitors"); f.ShowDialog(this); return; }
+        // telas do canvas que faltavam (FormCrono.Seguranca.cs)
+        if (nome == "Competidor")
+        {
+            if (_sess == null || Crono.Arr(_sess, "competitors").Count == 0) { Msg.Aviso(this, "Escolha a bateria e clique no competidor (passos 4–5 · Registro de competidores)."); return; }
+            if (_gPilotos.CurrentRow is { IsNewRow: false }) RegistroCompetidorSelecionado(); else RegistroCompetidor(0);
+            return;
+        }
+        if (nome == "RankingPeso") { RankingPesoDesign(); return; }
+        if (nome == "SegUsuario") { Seguro.Rodar(this, SegUsuario); return; }
+        if (nome == "SegPerfil") { Seguro.Rodar(this, SegPerfil); return; }
+        if (nome == "Permissoes") { Seguro.Rodar(this, Permissoes); return; }
         if (nome == "CadDecoder") { Seguro.Rodar(this, ConfigurarDecoder); return; }
         if (nome is "ParamCrono" or "ParamSistema" or "ConfigInicial") { Seguro.Rodar(this, () => ConfigurarParametros(nome)); return; }
         if (nome == "CadGrupo") { _abas.SelectedIndex = 0; EditarCatalogo("groups", false, nome); return; }
@@ -307,8 +315,9 @@ public partial class FormCrono
             "PlacarConfig" => new[] { ("Placar padrão", "scoreboard", "Placar CalXPro"), ("Atualizar a cada (s)", "scoreboardInterval", "1") },
             "MudarCorrida" => new[] { ("Nome", "name", _sess?.S("name") ?? ""), ("Duração em minutos", "durationMin", ((_sess?.I("durationMs") ?? 0) / 60000).ToString()), ("Voltas máximas", "maxLaps", _sess?.L("maxLaps")?.ToString() ?? "") },
             "IncluirPassagem" => new[] { ("Kart", "kart", ""), ("Competidor", "name", ""), ("Tempo da volta (segundos)", "lapSeconds", "60,000") },
-            _ => new[] { ("Nome", "name", ""), ("Observação", "notes", "") },
+            _ => null,
         };
+        if (fields == null) { Msg.Aviso(this, $"Tela \"{nome}\" não encontrada."); return; }
         using var dialog = new DialogoDados(nome, "Cadastro da cronometragem", fields, new Size(760, 420));
         if (dialog.ShowDialog(this) != DialogResult.OK || !dialog.Confirmado) return;
         if (nome == "MudarCorrida")

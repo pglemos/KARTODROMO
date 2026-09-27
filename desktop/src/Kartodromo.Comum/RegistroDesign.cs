@@ -134,6 +134,10 @@ public class RegistroDesign : CartaoModal
         gravar.Click += (_, _) => Gravar(true);
         fecharRod.Click += (_, _) => Close();
         _acoes.Width = fecharRod.Left - 8 - _acoes.Left;
+        // com botões extras (ex.: "Permissões") a fileira não pode passar por baixo do "Fechar": aperta o espaço de cada botão
+        var botoes = _acoes.Controls.OfType<Button>().ToList();
+        for (var folga = 24; folga > 10 && botoes.Sum(b => b.Width + b.Margin.Right) > _acoes.Width; folga -= 2)
+            foreach (var b in botoes) { b.Width = TextRenderer.MeasureText(b.Text, b.Font).Width + folga; b.Margin = new Padding(0, 1, folga >= 20 ? 8 : 5, 0); }
         rod.Controls.AddRange([nav, _acoes, fecharRod, gravar]);
 
         // ---------- lista em cartão: margem 12 18 0

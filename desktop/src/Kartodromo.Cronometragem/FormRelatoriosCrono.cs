@@ -352,9 +352,14 @@ public sealed class FormRelatoriosCrono : Form
             Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
             ForeColor = Color.FromArgb(110, 110, 115)
         };
-        controle.Dock = DockStyle.Top;
+        // caixa com borda arredondada, como os campos do canvas
+        var caixa = new Panel { Dock = DockStyle.Top, Height = 34, BackColor = Color.White, Padding = new Padding(8, 6, 6, 4), Margin = new Padding(0, 2, 0, 0) };
+        caixa.Paint += (_, e) => { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using var p = Arredondado(new Rectangle(0, 0, caixa.Width - 1, caixa.Height - 1), 7); using var pen = new Pen(Color.FromArgb(218, 218, 224)); e.Graphics.DrawPath(pen, p); };
+        caixa.Resize += (_, _) => caixa.Invalidate();
+        controle.Dock = DockStyle.Fill;
         controle.Font = new Font("Segoe UI", 9.5F);
-        pnl.Controls.Add(controle);
+        caixa.Controls.Add(controle);
+        pnl.Controls.Add(caixa);
         pnl.Controls.Add(lbl);
         return pnl;
     }

@@ -68,8 +68,8 @@ public static class CadastrosDesign
 
             "usuarios" => new("Registro de usuário", "Atendentes que entram no Módulo Office",
                 "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0", Cinza,
-                [new("login", "Login", 1), new("nome", "Nome", 2), new("senha", "Nova senha (em branco = manter)", 2, "password"), new("admin", "Administrador", 1, "bool")],
-                [new("Login", 140, r => r.S("login")), new("Nome", 0, r => r.S("nome")), new("Admin", 80, r => SimNao(r, "admin"), 'C'), Ativo,
+                [new("login", "Login", 1), new("nome", "Nome", 2), new("senha", "Nova senha (em branco = manter)", 1, "password"), new("perfilId", "Perfil de acesso", 1, "lista", Itens: Perfis), new("admin", "Administrador", 1, "bool")],
+                [new("Login", 140, r => r.S("login")), new("Nome", 0, r => r.S("nome")), new("Perfil de acesso", 150, r => r.S("perfil")), new("Admin", 80, r => SimNao(r, "admin"), 'C'), Ativo,
                  new("Último acesso", 160, r => r.D("ultimoAcesso") is DateTime d ? d.ToString("dd/MM HH:mm") : "")],
                 Cad("usuarios"), ("Trocar senha", r => TrocarSenha(r))) { Nome = "usuário" },
 
@@ -87,6 +87,13 @@ public static class CadastrosDesign
     }
 
     static string TipoForma(string t) => t switch { "dinheiro" => "Dinheiro", "credito" => "Crédito", "debito" => "Débito", "pix" => "Pix", "voucher" => "Voucher", "outro" => "Outro", _ => t };
+
+    /// <summary>Perfis de acesso (os mesmos da cronometragem: Segurança › Perfil de acesso).</summary>
+    static IEnumerable<Campos.Item> Perfis()
+    {
+        try { return Task.Run(() => Sessao.Api.Lista("/api/office/cad/perfis")).GetAwaiter().GetResult().Select(p => new Campos.Item(p.L("id") ?? 0, p.S("descricao"), p)).ToList(); }
+        catch { return []; }
+    }
 
     static void TrocarSenha(JsonObject usuario)
     {

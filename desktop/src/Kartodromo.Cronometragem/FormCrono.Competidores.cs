@@ -107,6 +107,8 @@ public partial class FormCrono
             e.Handled = true;
         };
         var flagsPiloto = new ContextMenuStrip();
+        flagsPiloto.Items.Add("Registro do competidor…", null, (_, _) => EditarCompetidor());
+        flagsPiloto.Items.Add(new ToolStripSeparator());
         flagsPiloto.Items.Add("Bandeira verde para o piloto", null, (_, _) => BandeiraPiloto("green"));
         flagsPiloto.Items.Add("Bandeira amarela para o piloto", null, (_, _) => BandeiraPiloto("yellow"));
         flagsPiloto.Items.Add("Bandeira vermelha para o piloto", null, (_, _) => BandeiraPiloto("red"));
@@ -161,7 +163,7 @@ public partial class FormCrono
         direitaRod.Size = direitaRod.PreferredSize;
         var comp = CartaoPasso(5, null, _subPilotos, abasNovas,
             [BotaoPeq("+ Novo participante", 1, () => { _gPilotos.Rows.Add("", "", "", ""); _pilotosSujos = true; _abaCompetidoresIr(0); _gPilotos.CurrentCell = _gPilotos.Rows[^1].Cells["kart"]; _gPilotos.BeginEdit(true); }),
-             BotaoPeq("Editar", 0, () => { if (_gPilotos.CurrentRow == null) { Msg.Aviso(this, "Clique no competidor."); return; } _gPilotos.CurrentCell = _gPilotos.CurrentRow.Cells["name"]; _gPilotos.BeginEdit(true); }),
+             BotaoPeq("Editar", 0, EditarCompetidor),
              BotaoPeq("Excluir", 2, () => { foreach (DataGridViewRow row in _gPilotos.SelectedRows) if (!row.IsNewRow) _gPilotos.Rows.Remove(row); _pilotosSujos = true; }),
              BotaoPeq("Excluir todos", 2, () => { if (_gPilotos.Rows.Count > 0 && Msg.Pergunta(this, "Tirar todos os competidores desta bateria? (só vale depois de Salvar)")) { _gPilotos.Rows.Clear(); _pilotosSujos = true; } }),
              BotaoPeq("Imprimir", 0, () => ImprimirResumo("Competidores", Crono.Arr(_sess, "competitors").Select(c => $"{c.S("kart")} · {c.S("name")}").ToList())),

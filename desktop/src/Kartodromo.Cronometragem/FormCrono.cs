@@ -1139,9 +1139,9 @@ public partial class FormCrono : Form
     void Transponders()
     {
         var agora = DateTimeOffset.Now.ToUnixTimeMilliseconds();
-        var desconhecidos = Crono.Arr(_state, "recentPassings").Where(p => p.S("result") == "transponder-desconhecido" && agora - (p.L("wallMs") ?? 0) < 600_000).Select(p => p.S("transponder")).Distinct().ToList();
-        using var f = new FormTransponders(desconhecidos);
-        f.ShowDialog(this);
+        // transponders lidos nos últimos 10 min sem kart: entram na lista do cadastro De/Para (canvas) sem número de kart
+        _transpNovos = Crono.Arr(_state, "recentPassings").Where(p => p.S("result") == "transponder-desconhecido" && agora - (p.L("wallMs") ?? 0) < 600_000).Select(p => p.S("transponder")).Where(t => t.Length > 0).Distinct().ToList();
+        try { CadastroDesign("CadTranspDePara"); } finally { _transpNovos = []; }
     }
 
     void AbrirTV()
@@ -1213,7 +1213,25 @@ public partial class FormCrono : Form
         {
             Application.DoEvents();
             using var bmp = new Bitmap(c.Width, c.Height);
-            if (foraDaTela && c is Form) { using var g = Graphics.FromImage(bmp); var hdc = g.GetHdc(); PrintWindow(c.Handle, hdc, 2); g.ReleaseHdc(hdc); }
+            if (foraDaTela && c is Form)
+            {
+                using var g = Graphics.FromImage(bmp); var hdc = g.GetHdc(); PrintWindow(c.Handle, hdc, 2); g.ReleaseHdc(hdc);
+                // fora da tela o PrintWindow devolve preto em botões/rótulos com região arredondada: redesenha cada um no lugar
+                IEnumerable<Control> Todos(Control r) { foreach (Control x in r.Controls) { yield return x; foreach (var y in Todos(x)) yield return y; } }
+                foreach (var filho in Todos(c).Where(x => x.Visible && x.Width > 0 && x.Height > 0 && x is ButtonBase or Label))
+                {
+                    try
+                    {
+                        var p = filho.PointToScreen(Point.Empty);
+                        using var parte = new Bitmap(filho.Width, filho.Height);
+                        filho.DrawToBitmap(parte, new Rectangle(0, 0, filho.Width, filho.Height));
+                        if (filho.Region != null) { g.SetClip(filho.Region, System.Drawing.Drawing2D.CombineMode.Replace); g.TranslateClip(p.X - c.Left, p.Y - c.Top); }
+                        g.DrawImage(parte, p.X - c.Left, p.Y - c.Top);
+                        g.ResetClip();
+                    }
+                    catch { }
+                }
+            }
             else c.DrawToBitmap(bmp, new Rectangle(Point.Empty, c.Size));
             bmp.Save(Path.Combine(_autoteste, nome + ".png"));
         }
@@ -1236,11 +1254,11 @@ public partial class FormCrono : Form
             var cronoMenu = MainMenuStrip.Items.OfType<ToolStripMenuItem>().FirstOrDefault(item => item.Text == "Cronometragem");
             cronoMenu?.ShowDropDown(); await Task.Delay(180); Foto(this, "04-menus-cronometragem"); cronoMenu?.HideDropDown();
             using (var f = new FormNovaBateria(_agenda, _agenda.FirstOrDefault())) { f.Show(this); await Task.Delay(240); Foto(f, "05-NovaBateria"); f.Close(); }
-            using (var f = new FormTransponders(["9912345"])) { f.Show(this); await Task.Delay(320); Foto(f, "06-Transponders"); f.Close(); }
-            using (var f = new FormCatalogoAux("categories")) { f.Show(this); await Task.Delay(240); Foto(f, "CadCategoria"); f.Close(); }
-            using (var f = new FormCatalogoAux("tracks")) { f.Show(this); await Task.Delay(240); Foto(f, "CadTracado"); f.Close(); }
+            // "06-Transponders" agora é o cadastro De/Para do canvas (foto CadTranspDePara)
+            // categoria e traçado abrem pelo mesmo caminho do menu (tela do canvas), não pela janela antiga
             var janelas = new (string Nome, (string, string, string)[] Campos)[]
             {
+                ("CadCategoria", []), ("CadTracado", []),
                 ("IncluirPassagem", [("Número do kart", "kart", "07"), ("Competidor", "name", "Carlos Henrique Lima"), ("Tempo da volta (segundos)", "lapSeconds", "54.873")]),
                 ("MudarCorrida", [("Nome", "name", _sess?.S("name") ?? "CORRIDA"), ("Duração em minutos", "durationMin", "20"), ("Voltas máximas", "maxLaps", "")]),
                 ("Empresa", [("Razão social", "company", "Kartódromo Internacional de Betim"), ("CNPJ", "cnpj", ""), ("Telefone", "phone", ""), ("E-mail", "email", "")]),
@@ -1295,6 +1313,10 @@ public partial class FormCrono : Form
                             case "Empresa" or "ParamCrono" or "ParamSistema" or "Backup" or "ConfigInicial" or "Banner": await DialogoConfiguracao(nome); break;
                             case "Prova": EditarProvaDesign(true); break;
                             case "Competidor": JanelaCadastro("Competidor"); break;
+                            case "SegUsuario": await SegUsuario(); break;
+                            case "SegPerfil": await SegPerfil(); break;
+                            case "Permissoes": await Permissoes(); break;
+                            case "RankingPeso": RankingPesoDesign(); break;
                             default: JanelaCadastro(nome); break;
                         }
                     }
