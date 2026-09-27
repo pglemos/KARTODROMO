@@ -39,8 +39,10 @@ public class DialogoDesign : CartaoModal
         var t = new Label { Text = titulo, AutoSize = true, Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, Location = new Point(62, 11), BackColor = Color.Transparent };
         Subtitulo = new Label { Text = sub, AutoSize = true, Font = new Font("Segoe UI", 9F), ForeColor = Rotulo, Location = new Point(63, 33), BackColor = Color.Transparent };
         var fechar = Botao("✕", Color.FromArgb(235, 235, 239), PecasDesign.CorTexto);
-        fechar.Size = new Size(34, 32); fechar.Font = new Font("Segoe UI", 9.5F); fechar.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        fechar.Size = new Size(34, 32); fechar.Font = new Font("Segoe UI", 9.5F);
+        // posição pelo tamanho real do cabeçalho (com âncora, criado antes de ter largura, o ✕ ficava fora da janela)
         fechar.Location = new Point(largura - 52, 15);
+        cab.Resize += (_, _) => fechar.Left = cab.ClientSize.Width - 52;
         fechar.Click += (_, _) => Close();
         cab.Controls.AddRange([ic, t, Subtitulo, fechar]);
         // arrasta a janela pelo cabeçalho

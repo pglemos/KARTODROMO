@@ -127,7 +127,8 @@ public static class Campos
     public static TextBox Texto(int max = 200) => new() { MaxLength = max };
     public static ComboBox Combo(params string[] itens)
     {
-        var c = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
+        // lista com a cara do design (fundo branco, seta fina, sem o botão cinza do Windows)
+        var c = new ListaDesign();
         c.Items.AddRange(itens);
         if (itens.Length > 0) c.SelectedIndex = 0;
         return c;
@@ -291,7 +292,7 @@ public class Grade : DataGridView
     {
         var pad = estilo.Padding;
         var util = new Rectangle(r.X + Math.Max(8, pad.Left), r.Y, Math.Max(0, r.Width - Math.Max(8, pad.Left) - Math.Max(8, pad.Right)), r.Height);
-        if (ColDe(colIndex) == null || util.Width < 30) return (util, Rectangle.Empty);
+        if (ColDe(colIndex) is not Col cc || !ComFunil(cc) || util.Width < 30) return (util, Rectangle.Empty);
         var w = Math.Min(util.Width - 16, TextRenderer.MeasureText(titulo, estilo.Font, Size.Empty, TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix).Width + 4);
         const int f = 16;
         if (estilo.Alignment == DataGridViewContentAlignment.MiddleRight)
@@ -314,6 +315,9 @@ public class Grade : DataGridView
         var (_, funil) = AreasCabecalho(colIndex, r, texto, col.HeaderCell.InheritedStyle);
         return !funil.IsEmpty && Rectangle.Inflate(funil, 3, 0).Contains(p);
     }
+
+    /// <summary>No design o funil só aparece nas colunas de texto e de data (Pago, valores e quantidades não têm).</summary>
+    static bool ComFunil(Col c) => c.Tipo is TipoCol.Texto or TipoCol.DataHora or TipoCol.Data or TipoCol.Hora;
 
     Col ColDe(int colIndex) => colIndex >= 0 && colIndex < Columns.Count ? _cols.FirstOrDefault(x => x.Chave == Columns[colIndex].Name) : null;
     bool Filtrada(string chave) => _filtros.ContainsKey(chave) || _valores.ContainsKey(chave);
@@ -379,13 +383,13 @@ public class Grade : DataGridView
             DataGridViewColumn dc = c.Tipo == TipoCol.Bool ? new DataGridViewCheckBoxColumn() : new DataGridViewTextBoxColumn();
             dc.Name = c.Chave;
             dc.HeaderText = c.Titulo;
-            dc.HeaderCell.Style.Padding = new Padding(4, 0, FiltroColuna.LarguraFunil, 0);
+            dc.HeaderCell.Style.Padding = new Padding(4, 0, ComFunil(c) ? FiltroColuna.LarguraFunil : 4, 0);
             dc.ReadOnly = true;
             dc.SortMode = DataGridViewColumnSortMode.Programmatic;
             dc.Width = c.Largura > 0 ? c.Largura : c.Tipo switch { TipoCol.Bool => 55, TipoCol.Dinheiro => 100, TipoCol.DataHora => 118, TipoCol.Data => 90, TipoCol.Hora => 60, TipoCol.Inteiro => 80, _ => 150 };
             switch (c.Tipo)
             {
-                case TipoCol.Dinheiro: dc.DefaultCellStyle.Format = "N2"; dc.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight; dc.ValueType = typeof(decimal); break;
+                case TipoCol.Dinheiro: dc.DefaultCellStyle.Format = "#,##0.00;-#,##0.00;—"; dc.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight; dc.ValueType = typeof(decimal); break;
                 case TipoCol.DataHora: dc.DefaultCellStyle.Format = "dd/MM/yyyy HH:mm"; dc.ValueType = typeof(DateTime); break;
                 case TipoCol.Data: dc.DefaultCellStyle.Format = "dd/MM/yyyy"; dc.ValueType = typeof(DateTime); break;
                 case TipoCol.Hora: dc.DefaultCellStyle.Format = "HH:mm"; dc.ValueType = typeof(DateTime); break;

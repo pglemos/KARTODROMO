@@ -207,9 +207,9 @@ public class FormCheckout : Janela, ISemKit
             using var b = new LinearGradientBrush(resumo.ClientRectangle, Color.FromArgb(28, 28, 30), Color.FromArgb(11, 11, 12), 90f);
             e.Graphics.FillRectangle(b, resumo.ClientRectangle);
         };
-        var resumoLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, BackColor = Color.Transparent, Padding = new Padding(0) };
-        resumoLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36)); resumoLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        resumoLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 110)); resumoLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 112));
+        var resumoLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, BackColor = Color.Transparent, Padding = new Padding(0) };
+        resumoLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36)); resumoLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 5 * 40 + 18));
+        resumoLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 104)); resumoLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); resumoLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 112));
         var fechar = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
         var botaoX = BotaoIcone("✕", Color.FromArgb(58, 58, 62), Color.White, 32, 10F); botaoX.Margin = Padding.Empty; botaoX.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         botaoX.Click += (_, _) => Close();
@@ -233,18 +233,18 @@ public class FormCheckout : Janela, ISemKit
         _tot["tro"].Dock = DockStyle.Fill; _tot["tro"].TextAlign = ContentAlignment.MiddleLeft; _tot["tro"].Font = new Font("Segoe UI", 28F, FontStyle.Bold); _tot["tro"].ForeColor = Color.White; _tot["tro"].BackColor = Color.Transparent;
         trocoCard.Controls.Add(_tot["tro"]); _tot["tro"].BringToFront();
         var linhasResumo = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, BackColor = Color.Transparent, Padding = new Padding(0, 12, 0, 10) };
-        for (var i = 0; i < 5; i++) linhasResumo.RowStyles.Add(new RowStyle(SizeType.Percent, 20));
+        for (var i = 0; i < 5; i++) linhasResumo.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
         var descricoes = new[] { ("tot", "Total"), ("des", "Desconto"), ("acr", "Acréscimo"), ("sub", "Subtotal"), ("rec", "Valor recebido") };
         foreach (var (key, label) in descricoes)
         {
             var row = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
             var l = new Label { Text = label, Dock = DockStyle.Left, Width = 120, ForeColor = Color.FromArgb(174, 174, 180), TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI", 10.5F) };
-            var value = _tot[key]; value.Dock = DockStyle.Fill; value.TextAlign = ContentAlignment.MiddleRight; value.Font = new Font("Segoe UI", 16F, FontStyle.Bold);
+            var value = _tot[key]; value.Dock = DockStyle.Fill; value.TextAlign = ContentAlignment.MiddleRight; value.Font = new Font("Segoe UI", 14F, FontStyle.Bold);
             value.ForeColor = key == "sub" ? Color.FromArgb(124, 234, 150) : key is "des" or "acr" ? Color.FromArgb(255, 105, 97) : Color.White; value.BackColor = Color.Transparent;
             row.Controls.Add(value); row.Controls.Add(l); row.Paint += (_, e) => { using var p = new Pen(Color.FromArgb(45, 255, 255, 255)); e.Graphics.DrawLine(p, 0, row.Height - 1, row.Width, row.Height - 1); };
             linhasResumo.Controls.Add(row);
         }
-        resumoLayout.Controls.Add(fechar, 0, 0); resumoLayout.Controls.Add(linhasResumo, 0, 1); resumoLayout.Controls.Add(trocoCard, 0, 2); resumoLayout.Controls.Add(rodapeResumo, 0, 3);
+        resumoLayout.Controls.Add(fechar, 0, 0); resumoLayout.Controls.Add(linhasResumo, 0, 1); resumoLayout.Controls.Add(trocoCard, 0, 2); resumoLayout.Controls.Add(rodapeResumo, 0, 4);
         resumo.Controls.Clear(); resumo.Controls.Add(resumoLayout);
 
         var principal = new Panel { Dock = DockStyle.Fill, BackColor = fundo };
@@ -368,7 +368,13 @@ public class FormCheckout : Janela, ISemKit
         {
             var bs = formas.Controls.OfType<Button>().ToList(); if (bs.Count == 0) return;
             var w = Math.Max(72, (formas.ClientSize.Width - 8 * bs.Count - 2) / bs.Count);
-            foreach (var b in bs) b.Width = w;
+            foreach (var b in bs)
+            {
+                b.Width = w;
+                var tam = 9F;
+                while (tam > 7F && TextRenderer.MeasureText(b.Text, new Font("Segoe UI", tam, FontStyle.Bold)).Width > w - 10) tam -= 0.5F;
+                b.Font = new Font("Segoe UI", tam, FontStyle.Bold);
+            }
         };
         formas.AutoScroll = false;
         var linhaValor = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, Padding = new Padding(0, 5, 0, 0), FlowDirection = FlowDirection.LeftToRight };

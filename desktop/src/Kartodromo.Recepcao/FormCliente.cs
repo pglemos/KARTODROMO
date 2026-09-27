@@ -138,7 +138,8 @@ public class FormCliente : Janela, ISemKit
         _id.TextChanged += (_, _) => idTxt.Text = _id.Text == "0" ? "Id 0 · será gerado ao salvar" : "Id " + _id.Text;
         _pos.AutoSize = true; _pos.ForeColor = KitVisual.Secundario; _pos.Font = new Font("Segoe UI", 8.8F);
         abasBar.Controls.AddRange([seg, idTxt, _pos]);
-        abasBar.Resize += (_, _) => _pos.Location = new Point(abasBar.Width - _pos.Width - 4, 13);
+        void PosicionarPos() => _pos.Location = new Point(abasBar.Width - _pos.Width - 4, 13);
+        abasBar.Resize += (_, _) => PosicionarPos(); _pos.SizeChanged += (_, _) => PosicionarPos(); // o texto chega depois e crescia para fora
 
         // ---- Principal: 2 colunas de cartões
         var consultar = BotaoCampo("Consultar", ConsultarDocumento);

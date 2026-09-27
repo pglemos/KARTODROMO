@@ -63,6 +63,13 @@ public static class PecasDesign
 /// <summary>Lista (ComboBox) com a cara do design: fundo branco, texto e a seta fina à direita, sem o botão do Windows.</summary>
 public class ListaDesign : ComboBox
 {
+    /// <summary>Valor encostado à direita, antes da seta (linhas "Turno … Noite ⌄" do design).</summary>
+    public bool Direita { get; set; }
+    /// <summary>Cor do valor escolhido (ex.: terminal em verde).</summary>
+    public Color? CorValor { get; set; }
+    /// <summary>Texto quando nada foi escolhido.</summary>
+    public string Vazio { get; set; } = "";
+
     public ListaDesign()
     {
         DropDownStyle = ComboBoxStyle.DropDownList;
@@ -90,8 +97,9 @@ public class ListaDesign : ComboBox
         using var g = Graphics.FromHwnd(Handle);
         var r = ClientRectangle;
         g.FillRectangle(Brushes.White, r);
-        var texto = SelectedIndex >= 0 ? GetItemText(SelectedItem) : Text;
-        TextRenderer.DrawText(g, texto, Font, new Rectangle(0, 0, r.Width - 22, r.Height), Enabled ? PecasDesign.CorTexto : PecasDesign.Cinza, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding);
+        var texto = SelectedIndex >= 0 ? GetItemText(SelectedItem) : (string.IsNullOrEmpty(Text) ? Vazio : Text);
+        var cor = !Enabled ? PecasDesign.Cinza : SelectedIndex < 0 ? PecasDesign.Cinza : CorValor ?? PecasDesign.CorTexto;
+        TextRenderer.DrawText(g, texto, Font, new Rectangle(0, 0, r.Width - 22, r.Height), cor, TextFormatFlags.VerticalCenter | (Direita ? TextFormatFlags.Right : TextFormatFlags.Left) | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding);
         PecasDesign.DesenharSeta(g, new Rectangle(r.Width - 20, 0, 18, r.Height));
     }
 }

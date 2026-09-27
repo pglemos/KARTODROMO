@@ -7,8 +7,8 @@ namespace Kartodromo.Recepcao;
 /// <summary>Abrir o caixa — TerminalAbrir.dc.html: cartão central com ícone, lista Usuário/Turno/Terminal/Suprimento e 2 botões.</summary>
 public sealed class FormTerminalAbrir : CartaoModal
 {
-    readonly ComboBox _turno = new() { DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, BackColor = Color.White, Font = new Font("Segoe UI", 10F, FontStyle.Bold), Width = 230 };
-    readonly ComboBox _terminal = new() { DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = KitVisual.Verde, Font = new Font("Segoe UI", 10F, FontStyle.Bold), Width = 230 };
+    readonly ListaDesign _turno = new() { Direita = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold), Width = 250, DropDownWidth = 250 };
+    readonly ListaDesign _terminal = new() { Direita = true, CorValor = KitVisual.Verde, Vazio = "Escolher…", Font = new Font("Segoe UI", 10F, FontStyle.Bold), Width = 250, DropDownWidth = 250 };
     readonly TextBox _inicial = new() { BorderStyle = BorderStyle.None, TextAlign = HorizontalAlignment.Right, Font = new Font("Segoe UI", 11F, FontStyle.Bold), Width = 140, Text = "0,00" };
     public bool Concluido { get; private set; }
 
@@ -20,6 +20,8 @@ public sealed class FormTerminalAbrir : CartaoModal
         if (caixa["terminais"] is JsonArray terminais) _terminal.Items.AddRange(terminais.OfType<JsonObject>().Select(t => new Campos.Item(t.L("id") ?? 0, t.S("nome"))).ToArray());
         if (_turno.Items.Count >= 1) _turno.SelectedIndex = SugerirTurno(caixa);
         if (_terminal.Items.Count == 1) _terminal.SelectedIndex = 0;
+        else if (Registro.Ler("UltimoTerminal") is { Length: > 0 } ultimo)
+            for (var i = 0; i < _terminal.Items.Count; i++) if (_terminal.Items[i] is Campos.Item it && it.Id.ToString() == ultimo) { _terminal.SelectedIndex = i; break; }
 
         var icone = Icone("terminal", 76); icone.Location = new Point((500 - 76) / 2, 18);
         var titulo = new Label { Text = "Abrir o caixa", Font = new Font("Segoe UI", 16F, FontStyle.Bold), AutoSize = false, Size = new Size(500, 34), Location = new Point(0, 94), TextAlign = ContentAlignment.MiddleCenter };
@@ -51,6 +53,7 @@ public sealed class FormTerminalAbrir : CartaoModal
             var texto = string.IsNullOrWhiteSpace(_inicial.Text) ? "0" : _inicial.Text;
             if (Fmt.Centavos(texto) is not long inicial) { Msg.Aviso(this, "Valor de suprimento inicial inválido."); return; }
             var r = await Sessao.Api.Post("/api/office/caixa/abrir", new { turnoId, terminalId, inicialCentavos = inicial });
+            Registro.Gravar("UltimoTerminal", terminalId.ToString());
             Msg.Info(this, r.S("mensagem"));
             Concluido = true; DialogResult = DialogResult.OK; Close();
         });
@@ -88,7 +91,7 @@ public sealed class FormTerminalFechar : CartaoModal
         var icone = Icone("terminal", 58); icone.Location = new Point(14, 10);
         var titulo = new Label { Text = $"Fechar terminal {aberto.S("terminal")}", AutoSize = true, Font = new Font("Segoe UI", 13.5F, FontStyle.Bold), Location = new Point(72, 16) };
         var aberturaTxt = DateTime.TryParse(aberto.S("abertoEm"), out var ab) ? $"aberto em {ab:dd/MM/yyyy} às {ab:HH:mm}" : "aberto";
-        var sub = new Label { Text = $"{Sessao.Nome} · {aberturaTxt} · Turno {aberto.S("turno")}", AutoSize = true, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 9.3F), Location = new Point(73, 44) };
+        var sub = new Label { Text = $"{Sessao.Nome} · {aberturaTxt} · {(aberto.S("turno").StartsWith("Turno", StringComparison.OrdinalIgnoreCase) ? aberto.S("turno") : "Turno " + aberto.S("turno"))}", AutoSize = true, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 9.3F), Location = new Point(73, 44) };
         var fechar = Botao("✕", Color.FromArgb(242, 242, 245), KitVisual.Secundario); fechar.SetBounds(L - 56, 22, 34, 34); fechar.Font = new Font("Segoe UI", 10F); fechar.Click += (_, _) => Close();
         var corpo = new Panel { BackColor = KitVisual.Fundo, Bounds = new Rectangle(1, 78, L - 2, 612) };
         var linhaTopo = new Panel { BackColor = Color.FromArgb(229, 229, 234), Bounds = new Rectangle(0, 77, L, 1) };

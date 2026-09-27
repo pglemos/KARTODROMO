@@ -91,6 +91,7 @@ public static class AutoTeste
             await Foto(principal, pasta, nome);
         }
 
+        if (ForaDaTela && !Pular("23-menu")) await CapturarMenusForaDaTela(principal, pasta);
         if (!ForaDaTela)
         {
             await CapturarContexto(principal, pasta, "reservas:todas", "contexto-reservas");
@@ -194,6 +195,30 @@ public static class AutoTeste
         principal.Dispose();
         File.WriteAllLines(Path.Combine(pasta, "log.txt"), Log);
         File.WriteAllLines(Path.Combine(pasta, "cobertura.txt"), Log.Where(x => x.StartsWith("OK ") || x.StartsWith("ERRO ") || x.StartsWith("pendente:")));
+    }
+
+    /// <summary>Menus do topo sem aparecer na tela: cada lista abre em -4000 e vira bitmap.</summary>
+    static async Task CapturarMenusForaDaTela(FormPrincipal principal, string pasta)
+    {
+        var menu = Descendentes(principal).OfType<MenuStrip>().FirstOrDefault();
+        if (menu == null) { Log.Add("ERRO menus-office: MenuStrip não encontrado."); return; }
+        var i = 0;
+        foreach (ToolStripMenuItem item in menu.Items.OfType<ToolStripMenuItem>())
+        {
+            var nome = $"23-menu-{++i:00}-{Slug(item.Text.Replace("&", ""))}";
+            try
+            {
+                var dd = item.DropDown;
+                dd.Show(new Point(-4000, 0));
+                await Esperar(200);
+                using var bmp = new Bitmap(dd.Width, dd.Height);
+                dd.DrawToBitmap(bmp, new Rectangle(0, 0, dd.Width, dd.Height));
+                bmp.Save(Path.Combine(pasta, nome + ".png"));
+                Log.Add("OK " + nome);
+            }
+            catch (Exception ex) { Log.Add($"ERRO {nome}: {ex.Message}"); }
+            finally { item.DropDown.Close(); }
+        }
     }
 
     static async Task CapturarMenus(FormPrincipal principal, string pasta)
@@ -515,6 +540,22 @@ public static class AutoTeste
         {
             using var g = Graphics.FromImage(bmp);
             var hdc = g.GetHdc(); PrintWindow(c.Handle, hdc, 2); g.ReleaseHdc(hdc);
+            // fora da tela, o PrintWindow devolve preto em botões/rótulos com região arredondada:
+            // redesenha esses controles por cima, cada um no seu lugar
+            var origem = c.Location;
+            foreach (var filho in Descendentes(c).Where(x => x.Visible && x.Width > 0 && x.Height > 0 && x is ButtonBase or Label))
+            {
+                try
+                {
+                    var p = filho.PointToScreen(Point.Empty);
+                    using var parte = new Bitmap(filho.Width, filho.Height);
+                    filho.DrawToBitmap(parte, new Rectangle(0, 0, filho.Width, filho.Height));
+                    if (filho.Region != null) { g.SetClip(filho.Region, System.Drawing.Drawing2D.CombineMode.Replace); g.TranslateClip(p.X - origem.X, p.Y - origem.Y); }
+                    g.DrawImage(parte, p.X - origem.X, p.Y - origem.Y);
+                    g.ResetClip();
+                }
+                catch { }
+            }
         }
         else c.DrawToBitmap(bmp, new Rectangle(0, 0, c.Width, c.Height));
         bmp.Save(Path.Combine(pasta, nome + ".png"));

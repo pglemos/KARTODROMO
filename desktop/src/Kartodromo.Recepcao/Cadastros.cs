@@ -416,11 +416,17 @@ public class FormCadastro : Janela
         campos.Dock = DockStyle.Top; campos.AutoSize = false; campos.Height = 116; campos.RowCount = 2; campos.RowStyles.Clear();
         campos.RowStyles.Add(new RowStyle(SizeType.Absolute, 58)); campos.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
         var wrappers = campos.Controls.Cast<Control>().ToArray();
-        Control Wrapper(string chave) => wrappers.First(p => p.Controls.Cast<Control>().Any(c => ReferenceEquals(c, _c[chave])));
+        Control Wrapper(string chave) => wrappers.First(p => p.Contains(_c[chave]));
+        var rotulos = wrappers.ToDictionary(w => w, w => w.Controls.OfType<Label>().FirstOrDefault()?.Text ?? "");
         campos.Controls.Clear();
         void Campo(string chave, int coluna, int linha, int span)
         {
-            var w = Wrapper(chave); campos.Controls.Add(w, coluna, linha); if (span > 1) campos.SetColumnSpan(w, span);
+            var w = Wrapper(chave);
+            _c[chave].Parent?.Controls.Remove(_c[chave]);
+            var novo = CampoProva(rotulos[w], _c[chave]);
+            novo.Margin = new Padding(0, 0, 10, 0);
+            _c[chave].Font = new Font("Segoe UI", 10F);
+            campos.Controls.Add(novo, coluna, linha); if (span > 1) campos.SetColumnSpan(novo, span);
         }
         Campo("classeContabil", 0, 0, 3); Campo("categoria", 3, 0, 3);
         Campo("codigo", 0, 1, 1); Campo("nome", 1, 1, 3); Campo("preco", 4, 1, 2);
@@ -654,14 +660,15 @@ public class FormCadastro : Janela
     {
         var lista = await Sessao.Api.Lista($"/api/office/cad/provas?produtoId={produto.S("id")}");
         _extra.Controls.Clear();
-        var ordem = Campos.Num(lista.Count + 1, 1, 20); var nome = new TextBox(); var tipo = Campos.Combo("classificacao", "corrida", "treino");
-        var fin = Campos.Combo("tempo", "voltas"); var tempo = Campos.Num(0, 0, 600); var voltas = Campos.Num(0, 0, 999);
+        var ordem = Campos.Num(lista.Count + 1, 1, 20); var nome = new TextBox(); var tipo = Campos.Combo(); tipo.Items.AddRange([new Campos.Item(0, "Classificatório", new JsonObject { ["v"] = "classificacao" }), new Campos.Item(1, "Corrida", new JsonObject { ["v"] = "corrida" }), new Campos.Item(2, "Treino", new JsonObject { ["v"] = "treino" })]); tipo.SelectedIndex = 0;
+        var fin = Campos.Combo(); fin.Items.AddRange([new Campos.Item(0, "Por tempo", new JsonObject { ["v"] = "tempo" }), new Campos.Item(1, "Por voltas", new JsonObject { ["v"] = "voltas" })]); fin.SelectedIndex = 0;
+        string Cod(ComboBox c) => (c.SelectedItem as Campos.Item)?.Dados?.S("v") ?? ""; var tempo = Campos.Num(0, 0, 600); var voltas = Campos.Num(0, 0, 999);
         var linhaCampos = new TableLayoutPanel { Dock = DockStyle.Top, Height = 72, ColumnCount = 7, RowCount = 1, Padding = new Padding(0), Margin = new Padding(0) };
-        foreach (var peso in new[] { 8f, 24f, 17f, 17f, 11f, 11f, 12f }) linhaCampos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, peso));
+        foreach (var peso in new[] { 8f, 22f, 16f, 15f, 11f, 11f, 17f }) linhaCampos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, peso));
         linhaCampos.Controls.Add(CampoProva("Ordem", ordem), 0, 0); linhaCampos.Controls.Add(CampoProva("Nome", nome), 1, 0);
-        linhaCampos.Controls.Add(CampoProva("Tipo", tipo), 2, 0); linhaCampos.Controls.Add(CampoProva("Finaliza por", fin), 3, 0);
+        linhaCampos.Controls.Add(CampoProva("Tipo", tipo), 2, 0); linhaCampos.Controls.Add(CampoProva("Autofinalizar", fin), 3, 0);
         linhaCampos.Controls.Add(CampoProva("Tempo (min)", tempo), 4, 0); linhaCampos.Controls.Add(CampoProva("Voltas (máx)", voltas), 5, 0);
-        var bIns = new Button { Text = "+", Height = 34, Width = 34, Dock = DockStyle.Bottom, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(11, 122, 83), ForeColor = Color.White, Font = new Font("Segoe UI", 11F, FontStyle.Bold), Margin = new Padding(2, 20, 2, 0), AccessibleName = "Inserir prova" };
+        var bIns = new Button { Text = "Inserir", Height = 34, Width = 72, Dock = DockStyle.Bottom, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(11, 122, 83), ForeColor = Color.White, Font = new Font("Segoe UI", 11F, FontStyle.Bold), Margin = new Padding(2, 20, 2, 0), AccessibleName = "Inserir prova" };
         var bDel = new Button { Text = "×", Height = 34, Width = 34, Dock = DockStyle.Bottom, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(238, 238, 241), ForeColor = Color.FromArgb(196, 40, 28), Font = new Font("Segoe UI", 11F, FontStyle.Bold), Margin = new Padding(2, 20, 2, 0), AccessibleName = "Excluir prova selecionada" };
         bIns.FlatAppearance.BorderSize = bDel.FlatAppearance.BorderSize = 0;
         var acoes = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(0), Margin = new Padding(0) };
@@ -692,7 +699,7 @@ public class FormCadastro : Janela
         bIns.Click += (_, _) => Seguro.Rodar(this, async () =>
         {
             if (string.IsNullOrWhiteSpace(nome.Text)) { Msg.Aviso(this, "Informe o nome da prova."); return; }
-            await Sessao.Api.Post("/api/office/cad/provas", new { produtoId = produto.L("id"), ordem = (int)ordem.Value, nome = nome.Text.Trim(), tipo = tipo.Text, finalizacao = fin.Text, tempoMin = (int)tempo.Value, voltasMax = (int)voltas.Value });
+            await Sessao.Api.Post("/api/office/cad/provas", new { produtoId = produto.L("id"), ordem = (int)ordem.Value, nome = nome.Text.Trim(), tipo = Cod(tipo), finalizacao = Cod(fin), tempoMin = (int)tempo.Value, voltasMax = (int)voltas.Value });
             Provas(produto);
         });
         bDel.Click += (_, _) => Seguro.Rodar(this, async () =>

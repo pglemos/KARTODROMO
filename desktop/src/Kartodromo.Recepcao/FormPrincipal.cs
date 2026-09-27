@@ -60,6 +60,8 @@ public class FormPrincipal : Form
 
         var split = new SplitContainer { Dock = DockStyle.Fill, FixedPanel = FixedPanel.Panel1, BackColor = Color.FromArgb(229, 229, 234), BorderStyle = BorderStyle.None, SplitterWidth = 1 };
         Load += (_, _) => { split.Panel1MinSize = 220; split.SplitterDistance = 256; };
+        // a busca não começa com o cursor (o design mostra o texto de ajuda "Buscar cliente, CPF, reserva…")
+        Shown += (_, _) => ActiveControl = _grade;
         split.Panel1.BackColor = VisualPrincipal.Lateral;
         split.Panel2.BackColor = KitVisual.Fundo;
         split.Panel1.Padding = new Padding(8, 10, 8, 8);
@@ -433,6 +435,7 @@ public class FormPrincipal : Form
         menus.Padding = new Padding(0, 8, 0, 0);
         var busca = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(242, 242, 245), Margin = new Padding(0, 10, 10, 10), Padding = new Padding(9, 3, 8, 0) };
         KitVisual.AplicarRaio(busca, 9);
+        busca.SizeChanged += (_, _) => KitVisual.AplicarRaio(busca, 9);
         var q = _buscaGlobal;
         q.Dock = DockStyle.Fill;
         q.BackColor = busca.BackColor;
@@ -473,22 +476,32 @@ public class FormPrincipal : Form
         var host = new Uri(Config.ServidorUrl).Host;
         _sbCrono.Text = "● Cronometragem · verificando"; _sbCrono.ForeColor = KitVisual.Secundario;
         _sbSite.Text = "● Site · verificando"; _sbSite.ForeColor = KitVisual.Secundario;
-        s.Items.AddRange([_sbHora, Sep(), _sbData, Sep(), new ToolStripStatusLabel(host + " · KartodromoOps"), Sep(), new ToolStripStatusLabel(Sessao.Nome), Sep(), new ToolStripStatusLabel("Versão " + Application.ProductVersion.Split('+')[0]), new ToolStripStatusLabel { Spring = true }, _sbSrv, Sep(), _sbCrono, Sep(), _sbSite]);
+        var servidor = host == "192.168.20.13" ? "SRVKART" : host;
+        var perfil = Sessao.Admin ? " (Administrador)" : "";
+        var versao = Application.ProductVersion.Split('+')[0];
+        if (versao.EndsWith(".0") && versao.Count(ch => ch == '.') == 2) versao = versao[..^2];
+        foreach (var item in new[] { _sbHora, _sbSrv, _sbCrono, _sbSite }) item.Margin = new Padding(0, 3, 14, 2);
+        _sbData.Visible = false;
+        s.Items.AddRange([_sbHora, _sbData, new ToolStripStatusLabel(servidor + " · KartodromoOps") { Margin = new Padding(0, 3, 14, 2) }, new ToolStripStatusLabel(Sessao.Nome + perfil) { Margin = new Padding(0, 3, 14, 2) },
+            new ToolStripStatusLabel("Versão " + versao) { Margin = new Padding(0, 3, 14, 2) }, new ToolStripStatusLabel { Spring = true }, _sbSrv, _sbCrono, _sbSite]);
         return s;
     }
 
-    void Relogio() { _sbHora.Text = DateTime.Now.ToString("HH:mm"); _sbData.Text = DateTime.Now.ToString("dd/MM/yyyy"); }
+    void Relogio() { _sbHora.Text = DateTime.Now.ToString("HH:mm · dd/MM/yyyy"); _sbData.Text = ""; }
     async Task Ping()
     {
         try
         {
             await Sessao.Api.Get("/healthz");
-            _sbSrv.Text = "● Servidor · on-line"; _sbSrv.ForeColor = Color.FromArgb(28, 107, 53);
+            _sbSrv.Text = "● Servidor on-line"; _sbSrv.ForeColor = Color.FromArgb(28, 107, 53);
             var c = (await Sessao.Api.Get("/api/office/caixa")).AsObject();
             if (c["aberto"] is JsonObject ab)
             {
                 var dinheiro = c["sumario"]?.L("dinheiroEmCaixa") ?? 0;
-                _selo.Definir(true, $"Terminal {ab.S("terminal")} aberto", $"Turno {ab.S("turno")} · caixa {Fmt.Brl(dinheiro)}");
+                var turno = ab.S("turno").Trim();
+                if (!turno.StartsWith("Turno", StringComparison.OrdinalIgnoreCase)) turno = "Turno " + turno;
+                var desde = ab.S("abertoEm") is { Length: >= 16 } ae ? " · desde " + ae.Substring(11, 5) : "";
+                _selo.Definir(true, $"Terminal {ab.S("terminal")} aberto", turno + desde);
             }
             else
             {
@@ -497,7 +510,7 @@ public class FormPrincipal : Form
         }
         catch
         {
-            _sbSrv.Text = "● Servidor · off-line"; _sbSrv.ForeColor = Color.FromArgb(196, 40, 28);
+            _sbSrv.Text = "● Servidor off-line"; _sbSrv.ForeColor = Color.FromArgb(196, 40, 28);
             _selo.Definir(false, "Terminal indisponível", "Não foi possível consultar o caixa");
         }
         await PingServico("crono", Config.CronoUrl, _sbCrono);
@@ -511,7 +524,7 @@ public class FormPrincipal : Form
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
             using var r = await http.GetAsync(baseUrl.TrimEnd('/') + "/healthz");
             var online = r.IsSuccessStatusCode;
-            label.Text = $"● Cronometragem · {(online ? "on-line" : "off-line")}";
+            label.Text = $"● Cronometragem {(online ? "on-line" : "off-line")}";
             label.ForeColor = online ? Color.FromArgb(28, 107, 53) : Color.FromArgb(196, 40, 28);
         }
         catch { label.Text = "● Cronometragem · off-line"; label.ForeColor = Color.FromArgb(196, 40, 28); }
@@ -524,7 +537,8 @@ public class FormPrincipal : Form
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(4) };
             using var r = await http.GetAsync("https://www.kartodromodebetim.com.br");
             var online = r.IsSuccessStatusCode;
-            label.Text = $"● Site · {(online ? "on-line" : "off-line")}";
+            label.Text = $"● Site {(online ? "on-line" : "off-line")}";
+            label.Visible = !online;
             label.ForeColor = online ? Color.FromArgb(28, 107, 53) : Color.FromArgb(196, 40, 28);
         }
         catch { label.Text = "● Site · off-line"; label.ForeColor = Color.FromArgb(196, 40, 28); }
@@ -536,34 +550,47 @@ public class FormPrincipal : Form
         var m = new MenuStrip { Font = new Font("Segoe UI", 9F), BackColor = Color.White, Renderer = KitVisual.RenderizadorMenu(), Padding = new Padding(0, 5, 0, 0), GripStyle = ToolStripGripStyle.Hidden };
         var adm = Sessao.Admin;
         ToolStripMenuItem I(string t, Action a, bool hab = true) { var it = new ToolStripMenuItem(t, null, (_, _) => a()) { Enabled = hab }; return it; }
-        ToolStripMenuItem S(string t, params ToolStripItem[] filhos) { var it = new ToolStripMenuItem(t); it.DropDownItems.AddRange(filhos); return it; }
+        ToolStripMenuItem S(string t, params object[] filhos)
+        {
+            var it = new ToolStripMenuItem(t);
+            foreach (var f in filhos) if (f is ToolStripItem[] grupo) it.DropDownItems.AddRange(grupo); else it.DropDownItems.Add((ToolStripItem)f);
+            return it;
+        }
+        // grupo do design (MenusOffice): título pequeno em negrito e os itens recuados logo abaixo, sem submenu
+        ToolStripItem[] G(string titulo, params ToolStripMenuItem[] itens)
+        {
+            var cab = new ToolStripLabel(titulo) { Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = KitVisual.Secundario, Margin = new Padding(0, 4, 0, 0) };
+            foreach (var i in itens) i.Text = "    " + i.Text;
+            return [cab, .. itens];
+        }
+        ToolStripMenuItem A(ToolStripMenuItem it, string atalho) { it.ShortcutKeyDisplayString = atalho; return it; }
 
         m.Items.Add(S("&Início",
             I("Config inicial (empresa)", () => Cadastros.Empresa(this), adm),
-            S("Segurança", I("Usuário", () => Cadastros.Abrir(this, "usuarios"), adm), I("Trocar minha senha", TrocarSenha)),
-            new ToolStripSeparator(), I("Sair / trocar de usuário", () => Application.Restart()), I("Fechar", Close)));
+            new ToolStripSeparator(), G("Segurança", I("Usuário", () => Cadastros.Abrir(this, "usuarios"), adm), I("Trocar minha senha", TrocarSenha)),
+            new ToolStripSeparator(), I("Sair / trocar de usuário", () => Application.Restart()), A(I("Fechar", Close), "Alt+F4")));
         m.Items.Add(S("&Cadastros",
             I("Empresa", () => Cadastros.Empresa(this), adm), I("Feriados", () => Cadastros.Abrir(this, "feriados")), new ToolStripSeparator(),
-            I("Cliente", () => new FormCliente(null).Show(this)), I("Produto", () => Cadastros.Abrir(this, "produtos")), I("Traçados", () => Cadastros.Abrir(this, "tracados")), new ToolStripSeparator(),
-            S("POS", I("Turno", () => Cadastros.Abrir(this, "turnos")), I("Terminal", () => Cadastros.Abrir(this, "terminais"))), new ToolStripSeparator(),
-            S("Oficina", I("Itens de manutenção", () => Cadastros.Abrir(this, "itensManutencao")), I("Registro de manutenções", () => Selecionar("oficina:arealizar")))));
+            A(I("Cliente", () => new FormCliente(null).Show(this)), "F2"), I("Produto", () => Cadastros.Abrir(this, "produtos")), I("Traçados", () => Cadastros.Abrir(this, "tracados")), new ToolStripSeparator(),
+            G("POS", I("Turno", () => Cadastros.Abrir(this, "turnos")), I("Terminal", () => Cadastros.Abrir(this, "terminais"))), new ToolStripSeparator(),
+            G("Oficina", I("Itens de manutenção", () => Cadastros.Abrir(this, "itensManutencao")), I("Registro de manutenções", () => Selecionar("oficina:arealizar")))));
         m.Items.Add(S("&Financeiro",
             I("Métodos de pagamento", () => Cadastros.Abrir(this, "formas")), I("Terminal (abrir / fechar caixa)", () => Caixa.Terminal(this)),
             I("Suprimento", () => Caixa.Transacao(this, "suprimento")), I("Sangria", () => Caixa.Transacao(this, "sangria")), new ToolStripSeparator(),
-            S("Programa de fidelidade", I("Contas", () => Selecionar("fidelidade:contas")), I("Transações", () => Selecionar("fidelidade:transacoes"))),
-            S("Vouchers", I("Cadastro de vouchers", () => Selecionar("vouchers:lista")), I("Histórico de consumo", () => Selecionar("vouchers:uso")), I("Criar voucher", () => FormVoucher.Criar("manual").ShowDialog(this))),
-            S("Parceiros", I("Cadastro de parceiros", () => Cadastros.Abrir(this, "parceiros")), I("Comissões", () => Selecionar("parceiros:comissoes")))));
+            G("Programa de fidelidade", I("Contas", () => Selecionar("fidelidade:contas")), I("Transações", () => Selecionar("fidelidade:transacoes"))), new ToolStripSeparator(),
+            G("Vouchers", I("Cadastro de vouchers", () => Selecionar("vouchers:lista")), I("Histórico de consumo", () => Selecionar("vouchers:uso")), I("Criar voucher", () => FormVoucher.Criar("manual").ShowDialog(this))), new ToolStripSeparator(),
+            G("Parceiros", I("Cadastro de parceiros", () => Cadastros.Abrir(this, "parceiros")), I("Comissões", () => Selecionar("parceiros:comissoes")))));
         m.Items.Add(S("F&erramentas", I("Parâmetros do sistema", () => Cadastros.Parametros(this), adm), I("Padrões de reservas", () => Cadastros.Abrir(this, "padroes")),
             I("Criar reservas do mês", () => { new FormCriarReservas().ShowDialog(this); Recarregar(); }), new ToolStripSeparator(), I("Serviços online", () => new FormServicosOnline().ShowDialog(this))));
         m.Items.Add(S("&Relatórios",
-            S("Cronometragem", I("Resultados da cronometragem", () => Relatorio.Abrir(this, Config.CronoUrl + "/", "Cronometragem")), I("Classificação ao vivo (TV)", () => Relatorio.Abrir(this, Config.CronoUrl + "/tv", "TV"))),
-            S("Financeiro", I("Receitas por forma de pagamento", () => Relatorios.Periodo(this, "receitas", "forma")), I("Receitas por clientes", () => Relatorios.Periodo(this, "receitas", "cliente")),
+            G("Cronometragem", I("Resultados da cronometragem", () => Relatorio.Abrir(this, Config.CronoUrl + "/", "Cronometragem")), I("Classificação ao vivo (TV)", () => Relatorio.Abrir(this, Config.CronoUrl + "/tv", "TV"))), new ToolStripSeparator(),
+            G("Financeiro", I("Receitas por forma de pagamento", () => Relatorios.Periodo(this, "receitas", "forma")), I("Receitas por clientes", () => Relatorios.Periodo(this, "receitas", "cliente")),
                 I("Receitas por produto", () => Relatorios.Periodo(this, "receitas", "produto")), I("Fluxo de caixa", () => Relatorios.Periodo(this, "receitas", "dia"))),
             new ToolStripSeparator(),
             I("Fechamento de caixa", () => Relatorios.Fechamento(this)), I("Reservas diária", () => Relatorios.ReservasDiaria(this, _data.Value)),
             I("Clientes por período", () => Relatorios.Periodo(this, "clientes", null)), I("Lista de participantes", () => Relatorios.Participantes(this, _grupo == "baterias" ? _grade.Atual : null, _data.Value)),
             I("Agenda mensal", () => Relatorios.AgendaMensal(this)), I("Termo de responsabilidade (em branco)", () => Relatorio.Abrir(this, Sessao.Api.UrlComToken("/termo?branco=1"), "Termo de Responsabilidade"))));
-        m.Items.Add(S("&Ajuda", I("Manual da recepção", () => new FormAjuda("Manual da recepção").ShowDialog(this)), I("Atalhos do teclado", () => new FormAjuda("Atalhos do teclado").ShowDialog(this)),
+        m.Items.Add(S("&Ajuda", I("Manual da recepção", () => new FormAjuda("Manual da recepção").ShowDialog(this)), A(I("Atalhos do teclado", () => new FormAjuda("Atalhos do teclado").ShowDialog(this)), "F1"),
             I("Suporte remoto", () => new FormAjuda("Suporte remoto").ShowDialog(this)), new ToolStripSeparator(), I("Sobre o sistema", () => Msg.Info(this, $"Kartódromo — Módulo Office\nVersão {Application.ProductVersion.Split('+')[0]}\nServidor: {Config.ServidorUrl}\nSistema próprio do Kartódromo Internacional de Betim."))));
         return m;
     }
@@ -693,7 +720,7 @@ public class FormPrincipal : Form
         _titulo.Text = titulo;
         _subtitulo.Text = _grupo switch
         {
-            "reservas" or "baterias" or "vendas" => _data.Value.ToString("dddd, d 'de' MMMM 'de' yyyy", Fmt.Br),
+            "reservas" or "baterias" or "vendas" => (_arvore.SelectedNode is { Level: > 0 } ns ? ns.Text.Split('\t')[0] + " · " : "") + (_periodo == "todas" ? "todas as datas" : _data.Value.ToString("dddd, d 'de' MMMM 'de' yyyy", Fmt.Br)),
             "oficina" => "Controle de manutenção por horas de uso de cada kart",
             "fidelidade" => "Programa de fidelidade · dados fornecidos pelo servidor da operação",
             "vouchers" => "Descontos por código · fidelidade, parceiros e vouchers manuais",
@@ -786,8 +813,8 @@ public class FormPrincipal : Form
                 _grade.Colunas([
                     new("pago", "Pago", TipoCol.Bool), new("dataHora", "Data/Hora", TipoCol.DataHora), new("reserva", "Reserva", Largura: 150), new("cliente", "Cliente", Largura: 240),
                     .. (Sessao.ParamSim("office.exibirColunaResponsavel", false) ? new Col[] { new("responsavel", "Responsável") } : []),
-                    new("produto", "Produto", Largura: 220), new("categoria", "Categoria", Largura: 90), new("preco", "Preço (R$)", TipoCol.Dinheiro), new("desconto", "Desconto (R$)", TipoCol.Dinheiro),
-                    new("total", "Total (R$)", TipoCol.Dinheiro), new("observacao", "Observação")]);
+                    new("produto", "Produto", Largura: 220), new("categoria", "Categoria", Largura: 110), new("preco", "Preço", TipoCol.Dinheiro, 90), new("desconto", "Desconto", TipoCol.Dinheiro, 90),
+                    new("total", "Total", TipoCol.Dinheiro, 90), new("observacao", "Observação")]);
                 _grade.CorLinha = r => r.S("status") == "cancelada" ? Color.Silver : null; // pré-reserva: selo laranja no cliente (VisualPrincipal)
                 _menuAtual = MenuReservas;
                 if (_status == "pendentes" && _filtroBateria == null)
@@ -908,7 +935,6 @@ public class FormPrincipal : Form
     async Task AtualizarContadores()
     {
         var queryData = Periodo();
-        if (_grupo == "reservas")
         {
             var all = await Sessao.Api.Lista("/api/office/reservas?status=todas&" + queryData);
             var ativas = all.Where(r => r.S("status") != "cancelada").ToList();
@@ -918,14 +944,19 @@ public class FormPrincipal : Form
             SetarContagem("reservas:canceladas", all.Count(r => r.S("status") == "cancelada"));
             SetarContagem("reservas:todas", all.Count);
         }
-        else if (_grupo == "baterias")
         {
             var all = await Sessao.Api.Lista("/api/office/baterias?status=todas&" + queryData);
             SetarContagem("baterias:abertas", all.Count(r => r.S("status") == "aberta"));
             SetarContagem("baterias:fechadas", all.Count(r => r.S("status") == "fechada"));
             SetarContagem("baterias:todas", all.Count);
         }
-        else if (_grupo == "vendas")
+        {
+            var man = await Sessao.Api.Lista("/api/office/manutencoes?status=todas");
+            SetarContagem("oficina:arealizar", man.Count(r => !r.B("realizada")));
+            SetarContagem("oficina:realizadas", man.Count(r => r.B("realizada")));
+            SetarContagem("oficina:todas", man.Count);
+        }
+        if (_grupo == "vendas")
         {
             var all = await Sessao.Api.Lista("/api/office/vendas?status=todas&" + queryData);
             SetarContagem("vendas:liquidadas", all.Count(r => !r.B("cancelada") && (r.L("estorno") ?? 0) == 0));

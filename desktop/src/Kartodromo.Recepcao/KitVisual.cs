@@ -432,14 +432,15 @@ public static class KitVisual
         };
         b.FlatAppearance.BorderSize = 0;
         AplicarRaio(b, 9);
+        b.SizeChanged += (_, _) => AplicarRaio(b, 9);
         return b;
     }
 
     public static Panel CartaoResumo(string rotulo, string valor, Color? corValor = null)
     {
         var p = new Panel { Height = 68, BackColor = Cartao, Padding = new Padding(14, 10, 14, 8), Margin = new Padding(0, 0, 10, 0) };
-        p.Controls.Add(new Label { Name = "valor", Text = valor, Dock = DockStyle.Bottom, Height = 28, Font = new Font("Segoe UI", 14.5F, FontStyle.Bold), ForeColor = corValor ?? Texto, AutoEllipsis = true });
-        p.Controls.Add(new Label { Name = "rotulo", Text = rotulo, Dock = DockStyle.Top, Height = 18, Font = new Font("Segoe UI", 9F), ForeColor = Secundario, AutoEllipsis = true });
+        p.Controls.Add(new Label { Name = "valor", Text = valor, Dock = DockStyle.Top, Height = 30, Font = new Font("Segoe UI", 14.5F, FontStyle.Bold), ForeColor = corValor ?? Texto, AutoEllipsis = true });
+        p.Controls.Add(new Label { Name = "rotulo", Text = rotulo, Dock = DockStyle.Top, Height = 19, Font = new Font("Segoe UI", 9F), ForeColor = Secundario, AutoEllipsis = true });
         p.Paint += (_, e) =>
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
@@ -593,8 +594,18 @@ public static class KitVisual
         return p;
     }
 
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Control, object> _raios = new();
+
     public static void AplicarRaio(Control c, int raio)
     {
+        // o arredondamento acompanha o tamanho: aplicado cedo (controle ainda pequeno) ele cortava o
+        // resto depois que o texto/layout crescia (ex.: "+ Criar reser", busca com o "F3" para fora)
+        if (!_raios.TryGetValue(c, out _))
+        {
+            _raios.Add(c, raio);
+            c.SizeChanged += (_, _) => { if (_raios.TryGetValue(c, out var r)) AplicarRaio(c, (int)r); };
+        }
+        else { _raios.Remove(c); _raios.Add(c, raio); }
         if (c.Width < 2 || c.Height < 2) return;
         using var path = CaminhoArredondado(new Rectangle(0, 0, c.Width, c.Height), Math.Min(raio, Math.Min(c.Width, c.Height) / 2));
         c.Region = new Region(path);

@@ -190,7 +190,12 @@ static class VisualPrincipal
             if (c.DefaultCellStyle.Format == "dd/MM/yyyy HH:mm") { c.DefaultCellStyle.Format = "dd/MM HH:mm"; c.DefaultCellStyle.Font = new Font("Cascadia Mono", 8.6F); c.Width = Math.Min(c.Width, 108); }
             if (c.Name is "reserva" or "total" or "final" or "nome") c.DefaultCellStyle.Font = new Font("Segoe UI", 9.2F, FontStyle.Bold);
             if (c is DataGridViewCheckBoxColumn && c.Name != "__sel") c.Width = Math.Max(64, TextRenderer.MeasureText(c.HeaderText, grade.ColumnHeadersDefaultCellStyle.Font).Width + 26 + FiltroColuna.LarguraFunil);
-            c.MinimumWidth = 40;
+            // como no design: as colunas ocupam a largura da lista, na proporção das larguras pensadas,
+            // e nenhuma fica menor que o próprio título (sem "Categ…", "Situ…" nem rolagem lateral à toa)
+            var funil = c.HeaderCell.Style.Padding.Right > 4 ? 18 : 0;
+            c.MinimumWidth = Math.Max(40, TextRenderer.MeasureText(c.HeaderText, grade.ColumnHeadersDefaultCellStyle.Font).Width + 22 + funil);
+            c.FillWeight = Math.Max(1, c.Width);
+            c.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
         }
     }
 }
