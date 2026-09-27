@@ -74,11 +74,26 @@ public partial class FormCrono
         grade.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 514)); grade.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 314)); grade.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         grade.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         ev.Margin = new Padding(0, 0, 14, 0); gr.Margin = new Padding(0, 0, 14, 0); pr.Margin = Padding.Empty;
-        grade.Controls.Add(ev, 0, 0); grade.Controls.Add(gr, 1, 0); grade.Controls.Add(pr, 2, 0);
-        page.Controls.Add(grade);
-        // as listas da agenda e das baterias continuam existindo (Nova bateria / Puxar da recepção usam)
+        // agenda da recepção (baterias de hoje com os pilotos inscritos) em cima dos eventos: é daqui que o
+        // cronometrista cria a bateria já com os pilotos
         TemaCrono.EstilizarGrade(_gAgenda);
         if (_gAgenda.Columns.Count == 0) _gAgenda.Col("Hora", 64).Col("Bateria", 160, DataGridViewContentAlignment.MiddleLeft, true).Col("Kart", 70).Col("Inscritos", 72).Col("Pagos", 62);
+        _gAgenda.RowTemplate.Height = 34;
+        _gAgenda.DefaultCellStyle.SelectionBackColor = Color.FromArgb(11, 122, 83); _gAgenda.DefaultCellStyle.SelectionForeColor = Color.White;
+        _gAgenda.Columns[1].DefaultCellStyle.Font = new Font("Segoe UI Semibold", 9.6F);
+        var ag = CartaoPasso(0, "Baterias de hoje · recepção", new Label { Text = "Os pilotos inscritos entram sozinhos · dois cliques cria a bateria" }, _gAgenda,
+            [BotaoPeq("Criar bateria com os inscritos", 1, () => NovaBateria(_gAgenda.ChaveAtual as JsonObject)), BotaoPeq("Atualizar", 0, () => Seguro.Rodar(this, CarregarAgenda))]);
+        var col1 = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = Padding.Empty, Margin = new Padding(0, 0, 14, 0), BackColor = TemaCrono.Fundo };
+        col1.RowStyles.Add(new RowStyle(SizeType.Percent, 58)); col1.RowStyles.Add(new RowStyle(SizeType.Percent, 42));
+        ag.Margin = new Padding(0, 0, 0, 14); ev.Margin = Padding.Empty;
+        col1.Controls.Add(ag, 0, 0); col1.Controls.Add(ev, 0, 1);
+        // a recepção vende o tempo todo: a lista se atualiza sozinha a cada 30 s enquanto a aba está aberta
+        var relogioAgenda = new System.Windows.Forms.Timer { Interval = 30_000 };
+        relogioAgenda.Tick += (_, _) => { if (_abas.SelectedIndex == 0 && Visible && WindowState != FormWindowState.Minimized) _ = CarregarAgenda(); };
+        relogioAgenda.Start();
+        page.Disposed += (_, _) => relogioAgenda.Dispose();
+        grade.Controls.Add(col1, 0, 0); grade.Controls.Add(gr, 1, 0); grade.Controls.Add(pr, 2, 0);
+        page.Controls.Add(grade);
         TemaCrono.EstilizarGrade(_gSessoes);
         if (_gSessoes.Columns.Count == 0) _gSessoes.Col("Hora", 64).Col("Bateria", 180, DataGridViewContentAlignment.MiddleLeft, true).Col("Tipo", 100).Col("Estado", 100).Col("Pilotos", 58);
         return page;
@@ -127,7 +142,8 @@ public partial class FormCrono
         {
             var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
             using (var b = new SolidBrush(Color.FromArgb(11, 122, 83))) g.FillEllipse(b, 16, 16, 24, 24);
-            TextRenderer.DrawText(g, numero.ToString(), new Font("Segoe UI", 8.8F, FontStyle.Bold), new Rectangle(16, 16, 24, 24), Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            // 0 = agenda da recepção (seta "chegando"), 1–3 = passos do design
+            TextRenderer.DrawText(g, numero > 0 ? numero.ToString() : "↓", new Font("Segoe UI", 8.8F, FontStyle.Bold), new Rectangle(16, 16, 24, 24), Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
         };
         var t = tituloVivo ?? new Label { Text = titulo };
         t.Dock = DockStyle.None; t.AutoSize = true; t.Padding = Padding.Empty; t.Font = new Font("Segoe UI", 11.2F, FontStyle.Bold); t.ForeColor = TemaCrono.Texto; t.Location = new Point(50, 11); t.BackColor = Color.White;

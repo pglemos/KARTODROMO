@@ -119,6 +119,8 @@ public partial class FormCrono : Form
             await CarregarAgenda();
             await CarregarCatalogo();
             if (_autoteste != null) { await AutoTeste(); return; }
+            // sem bateria na pista, abre na agenda da recepção (é de lá que se cria a próxima bateria com os pilotos)
+            if (string.IsNullOrEmpty(_state?.S("runningId"))) _abas.SelectedIndex = 0;
             _leitura.Start();
             _relogio.Start();
         };
@@ -861,6 +863,20 @@ public partial class FormCrono : Form
         try { _agenda = await Crono.Api.Lista("/api/agenda"); }
         catch (ApiException e) { _agenda = []; _gAgenda.Preencher([new object[] { "", "Agenda indisponível: " + e.Message, "", "", "" }]); return; }
         _gAgenda.Preencher(_agenda.Select(b => new object[] { Fmt.Hm(b.S("inicio")), b.S("nome"), b.S("tipoKart") == "super" ? "Super" : "Light", b.I("inscritos"), b.I("pagos") }).ToList(), _agenda.Cast<object>().ToList());
+        // sem nada escolhido: já deixa marcada a bateria da hora (a mais recente que já começou com inscritos, senão a próxima)
+        if (_gAgenda.ChaveAtual == null && _agenda.Count > 0)
+        {
+            var agora = DateTime.Now.AddMinutes(10).ToString("yyyy-MM-ddTHH:mm");
+            var com = _agenda.Select((b, i) => (b, i)).Where(x => x.b.I("inscritos") > 0).ToList();
+            var alvo = com.LastOrDefault(x => string.CompareOrdinal(x.b.S("inicio"), agora) <= 0);
+            if (alvo.b == null) alvo = com.FirstOrDefault();
+            if (alvo.b != null && alvo.i < _gAgenda.Rows.Count)
+            {
+                _gAgenda.ClearSelection();
+                _gAgenda.CurrentCell = _gAgenda.Rows[alvo.i].Cells[1];
+                _gAgenda.Rows[alvo.i].Selected = true;
+            }
+        }
     }
 
     void Desenhar()
