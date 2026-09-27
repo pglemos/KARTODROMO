@@ -977,6 +977,13 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       return send(res, 200, []); // servidor antigo sem programa: bateria unica
     }
   }
+  if (path === '/api/clientes' && method === 'GET') {
+    try {
+      return send(res, 200, await opsGet(`/api/crono/clientes?ids=${encodeURIComponent(url.searchParams.get('ids') ?? '')}`));
+    } catch {
+      return send(res, 200, []); // servidor antigo: a lista mostra só o que a cronometragem tem
+    }
+  }
   const ag = path.match(/^\/api\/agenda\/(\d+)\/grid$/);
   if (ag && method === 'GET') {
     try {

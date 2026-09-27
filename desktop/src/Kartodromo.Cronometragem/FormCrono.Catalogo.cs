@@ -16,17 +16,24 @@ public partial class FormCrono
             _proofs = Crono.Arr(_catalog, "provas");
             var selectedEventId = (_gEventos.ChaveAtual as JsonObject)?.S("id");
             var selectedEvent = _events.FirstOrDefault(e => e.S("id") == selectedEventId) ?? _events.FirstOrDefault();
-            _gEventos.Preencher(_events.Select(e => new object[] { e.S("name"), DataLegivel(e.S("date")), e.S("venue") }).ToList(), _events.Cast<object>().ToList());
-            if (selectedEvent != null && _gEventos.Rows.Count > 0 && _gEventos.ChaveAtual == null) SelecionarLinha(_gEventos, _events.IndexOf(selectedEvent));
+            var busca = _buscaEvento.Text.Trim();
+            var eventosVisiveis = _events.Where(e => busca.Length == 0 || e.S("name").Contains(busca, StringComparison.CurrentCultureIgnoreCase)).OrderByDescending(e => e.S("date")).ToList();
+            if (busca.Length > 0 && !eventosVisiveis.Contains(selectedEvent)) selectedEvent = eventosVisiveis.FirstOrDefault();
+            _gEventos.Preencher(eventosVisiveis.Select(e => new object[] { "Karting", e.S("name"), DataLegivel(e.S("date")) }).ToList(), eventosVisiveis.Cast<object>().ToList());
+            if (selectedEvent != null && _gEventos.Rows.Count > 0 && _gEventos.ChaveAtual == null) SelecionarLinha(_gEventos, eventosVisiveis.IndexOf(selectedEvent));
+            _subGrupos.Text = selectedEvent?.S("name") ?? "Selecione um evento";
+            var tracado = Crono.Arr(_catalog, "tracks").FirstOrDefault(t => t.S("id") == selectedEvent?.S("trackId"))?.S("name") ?? Crono.Arr(_catalog, "tracks").FirstOrDefault()?.S("name") ?? "—";
             var eventId = selectedEvent?.S("id") ?? "";
             var eventGroups = _groups.Where(g => g.S("eventId") == eventId).ToList();
             var selectedGroupId = (_gGrupos.ChaveAtual as JsonObject)?.S("id");
             var selectedGroup = eventGroups.FirstOrDefault(g => g.S("id") == selectedGroupId) ?? eventGroups.FirstOrDefault();
-            _gGrupos.Preencher(eventGroups.Select(g => new object[] { g.S("name"), NomeCategoria(g.S("categoryId")), _proofs.Count(p => p.S("groupId") == g.S("id")) }).ToList(), eventGroups.Cast<object>().ToList());
+            _gGrupos.Preencher(eventGroups.Select(g => new object[] { g.S("name"), tracado }).ToList(), eventGroups.Cast<object>().ToList());
             if (selectedGroup != null && _gGrupos.Rows.Count > 0 && _gGrupos.ChaveAtual == null) SelecionarLinha(_gGrupos, eventGroups.IndexOf(selectedGroup));
             var groupId = selectedGroup?.S("id") ?? "";
             var groupProofs = _proofs.Where(p => p.S("groupId") == groupId).OrderBy(p => p.I("order")).ToList();
-            _gProvas.Preencher(groupProofs.Select(p => new object[] { p.S("name"), Crono.Tipo(p.S("type")), p.I("durationMin") > 0 ? $"{p.I("durationMin")} min" : "Por voltas", p.L("maxLaps") is long laps ? laps.ToString() : "—" }).ToList(), groupProofs.Cast<object>().ToList());
+            _tituloProvas.Text = selectedGroup == null ? "Provas" : $"Provas da {selectedGroup.S("name")}";
+            string Previsao(JsonObject p) { var d = DateTime.TryParse(selectedEvent?.S("date"), out var dd) ? dd : DateTime.Today; var h = p.S("startAt") is { Length: >= 4 } sa ? sa : (selectedGroup?.S("name") is { } gn && System.Text.RegularExpressions.Regex.Match(gn, @"\d{1,2}:\d{2}") is { Success: true } m ? m.Value : ""); return $"{d:dd/MM} {h}".Trim(); }
+            _gProvas.Preencher(groupProofs.Select(p => new object[] { Previsao(p), Crono.Tipo(p.S("type")), p.S("name"), tracado, p.I("durationMin") > 0 ? "Por tempo" : "Por voltas", p.I("durationMin") > 0 ? TimeSpan.FromMinutes(p.I("durationMin")).ToString(@"hh\:mm\:ss") : "—", p.L("maxLaps") is long laps && laps > 0 ? laps.ToString() : "—" }).ToList(), groupProofs.Cast<object>().ToList());
             if (groupProofs.Count > 0 && _gProvas.ChaveAtual == null) SelecionarLinha(_gProvas, 0);
             MontarArvore();
         }
@@ -76,19 +83,19 @@ public partial class FormCrono
             _arvore.Nodes.Clear();
             foreach (var ev in _events)
             {
-                var eventNode = new TreeNode($"▣  {ev.S("name")}  ·  {DataLegivel(ev.S("date"))}");
+                var eventNode = new TreeNode($"▣  {ev.S("name")}  ·  {DataLegivel(ev.S("date"))}") { Tag = new JsonObject { ["kind"] = "event", ["name"] = $"{ev.S("name")}" } };
                 foreach (var group in _groups.Where(g => g.S("eventId") == ev.S("id")))
                 {
-                    var groupNode = new TreeNode($"▾  {group.S("name")}");
+                    var groupNode = new TreeNode($"▾  {group.S("name")}") { Tag = new JsonObject { ["kind"] = "group", ["name"] = group.S("name"), ["pilotos"] = sessoes.Where(s => s.S("groupId") == group.S("id")).Select(s => s.I("competitors")).DefaultIfEmpty(0).Max() } };
                     foreach (var proof in _proofs.Where(p => p.S("groupId") == group.S("id")).OrderBy(p => p.I("order")))
                     {
                         var proofNode = new TreeNode($"●  {proof.S("name")} · {Crono.Tipo(proof.S("type"))}");
-                        proofNode.Tag = new JsonObject { ["kind"] = "proof", ["proofId"] = proof.S("id") };
+                        proofNode.Tag = new JsonObject { ["kind"] = "proof", ["proofId"] = proof.S("id"), ["type"] = proof.S("type"), ["label"] = proof.S("name") is { Length: > 0 } pn ? pn : Crono.Tipo(proof.S("type")) };
                         var session = sessoes.FirstOrDefault(s => s.S("proofId") == proof.S("id"));
                         if (session != null)
                         {
                             proofNode.Text += $" · {Crono.Estado(session.S("state"))}";
-                            proofNode.Tag = new JsonObject { ["kind"] = "session", ["sessionId"] = session.S("id"), ["proofId"] = proof.S("id") };
+                            proofNode.Tag = new JsonObject { ["kind"] = "session", ["sessionId"] = session.S("id"), ["proofId"] = proof.S("id"), ["type"] = proof.S("type"), ["label"] = proof.S("name") is { Length: > 0 } pn2 ? pn2 : Crono.Tipo(proof.S("type")), ["state"] = session.S("state") };
                         }
                         groupNode.Nodes.Add(proofNode);
                     }
@@ -99,10 +106,10 @@ public partial class FormCrono
             var avulsas = sessoes.Where(s => string.IsNullOrEmpty(s.S("proofId"))).ToList();
             if (avulsas.Count > 0)
             {
-                var loose = new TreeNode("Baterias avulsas");
+                var loose = new TreeNode("Baterias avulsas") { Tag = new JsonObject { ["kind"] = "event", ["name"] = "Baterias avulsas" } };
                 foreach (var s in avulsas)
                 {
-                    var node = new TreeNode($"{s.S("name")} · {Crono.Estado(s.S("state"))}") { Tag = new JsonObject { ["kind"] = "session", ["sessionId"] = s.S("id") } };
+                    var node = new TreeNode($"{s.S("name")} · {Crono.Estado(s.S("state"))}") { Tag = new JsonObject { ["kind"] = "session", ["sessionId"] = s.S("id"), ["type"] = s.S("type"), ["label"] = s.S("name"), ["state"] = s.S("state") } };
                     loose.Nodes.Add(node);
                 }
                 _arvore.Nodes.Add(loose);

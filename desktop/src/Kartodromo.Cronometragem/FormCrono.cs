@@ -42,7 +42,7 @@ public partial class FormCrono : Form
     readonly TextBox _txtObservacaoAoVivo = new() { Width = 280, Height = 30, Font = new Font("Segoe UI", 9F), PlaceholderText = "Nova observação da prova" };
     readonly Label _lVoltaFaixa = new() { Text = "VOLTA\nAGUARDANDO", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, BackColor = Color.FromArgb(29, 29, 31), ForeColor = Color.FromArgb(255, 214, 10), Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
     readonly TabControl _tabsResultado = new AbasSemCabecalho { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 8.5F) };
-    readonly TabControl _tabsCompetidor = new() { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9F) };
+    readonly TabControl _tabsCompetidor = new AbasSemCabecalho { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9F) };
     ToolStripButton _bAmarela, _bVermelha, _bBranca, _bFinalizar, _bLimpar;
     readonly Label _lPilotosTitulo = new() { Dock = DockStyle.Top, Height = 34, Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = Color.FromArgb(200, 16, 46), TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(4, 0, 0, 0) };
     readonly TabControl _abas = new AbasSemCabecalho { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9F) };
@@ -73,8 +73,8 @@ public partial class FormCrono : Form
         MinimumSize = new Size(1100, 700);
 
         MainMenuStrip = Menu();
-        _abas.TabPages.Add(AbaEventos());
-        _abas.TabPages.Add(AbaBaterias());
+        _abas.TabPages.Add(AbaEventosDesign());
+        _abas.TabPages.Add(AbaBateriasDesign());
         _abas.TabPages.Add(AbaCronometragem());
         _abas.SelectedIndex = 2;
         _abas.SelectedIndexChanged += (_, _) =>
@@ -183,6 +183,8 @@ public partial class FormCrono : Form
         crono.DropDownItems.Add(new ToolStripMenuItem("Bandeira branca", null, (_, _) => Bandeira("branca")) { ShortcutKeyDisplayString = "F7" });
         crono.DropDownItems.Add(new ToolStripMenuItem("Cancelar bateria", null, (_, _) => Acao("cancel")));
         crono.DropDownItems.Add(new ToolStripSeparator());
+        crono.DropDownItems.Add(new ToolStripMenuItem("Nova bateria da agenda da recepção…", null, (_, _) => NovaBateria(null)));
+        crono.DropDownItems.Add(new ToolStripMenuItem("Criar bateria da prova selecionada", null, (_, _) => CriarBateriaDaProva()));
         crono.DropDownItems.Add(new ToolStripMenuItem("Mudar corrida em andamento", null, (_, _) => MudarCorrida()));
         crono.DropDownItems.Add(new ToolStripMenuItem("Incluir passagem manual", null, (_, _) => IncluirPassagem()) { ShortcutKeyDisplayString = "Insert" });
         crono.DropDownItems.Add(new ToolStripSeparator());
@@ -1066,14 +1068,30 @@ public partial class FormCrono : Form
     async Task PuxarAgenda()
     {
         if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
-        var ag = _gAgenda.ChaveAtual as JsonObject;
-        if (ag == null) { Msg.Aviso(this, "Selecione a bateria da agenda (à esquerda, em cima)."); return; }
+        var ag = AgendaDaBateria(_sess);
+        if (ag == null) { Msg.Aviso(this, "Não achei a bateria da recepção com o mesmo horário desta prova. Crie a bateria pela agenda (passos 1–3 › Da agenda…)."); return; }
         var grid = await Crono.Api.Lista($"/api/agenda/{ag.S("id")}/grid");
         if (grid.Count == 0) { Msg.Aviso(this, "Essa bateria da agenda não tem inscritos."); return; }
         var existentes = _gPilotos.Rows.Cast<DataGridViewRow>().Where(r => !r.IsNewRow).Select(r => r.Cells[2].Value?.ToString()).ToHashSet();
         foreach (var g in grid.Where(g => !existentes.Contains(g.S("clienteId")))) _gPilotos.Rows.Add(g.S("kart"), g.S("nome"), g.S("clienteId"), g.S("categoria"));
         _pilotosSujos = true;
         Msg.Info(this, $"{grid.Count} inscrito(s) da agenda. Confira os números dos karts e clique em Salvar Competidores.");
+    }
+
+    /// <summary>Bateria da agenda da recepção que corresponde à prova: mesmo horário no nome ("BATERIA 18:45") ou a do grupo.</summary>
+    JsonObject AgendaDaBateria(JsonObject sessao)
+    {
+        if (sessao == null || _agenda.Count == 0) return _gAgenda.ChaveAtual as JsonObject;
+        var grupo = _groups.FirstOrDefault(g => g.S("id") == sessao.S("groupId"))?.S("name") ?? "";
+        foreach (var texto in new[] { sessao.S("name"), grupo })
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(texto, @"(\d{1,2}):(\d{2})");
+            if (!m.Success) continue;
+            var hora = $"{int.Parse(m.Groups[1].Value):00}:{m.Groups[2].Value}";
+            var achou = _agenda.FirstOrDefault(a => Fmt.Hm(a.S("inicio")) == hora);
+            if (achou != null) return achou;
+        }
+        return _agenda.FirstOrDefault(a => a.S("nome").Equals(sessao.S("name").Split('·')[0].Trim(), StringComparison.OrdinalIgnoreCase)) ?? _gAgenda.ChaveAtual as JsonObject;
     }
 
     async Task Invalidar(string kart, int lap)

@@ -453,6 +453,12 @@ const server = http.createServer(async (req, res) => {
         );
         return send(res, 200, rows);
       }
+      if (path === '/api/crono/clientes' && method === 'GET') {
+        // dados dos pilotos para a lista de competidores da cronometragem (só leitura)
+        const ids = String(url.searchParams.get('ids') ?? '').split(',').map(Number).filter((n) => Number.isSafeInteger(n) && n > 0).slice(0, 200);
+        if (!ids.length) return send(res, 200, []);
+        return send(res, 200, await query(`SELECT Id id, Email email, Cidade cidade, Estado uf, Peso peso FROM dbo.Cliente WHERE Id IN (${ids.join(',')})`));
+      }
       m = path.match(/^\/api\/crono\/baterias\/(\d+)\/programa$/);
       if (m) {
         return send(res, 200, await query(`SELECT pp.Ordem ordem, pp.Nome nome, pp.Tipo tipo, pp.Finalizacao finalizacao, pp.TempoMin tempoMin, pp.VoltasMax voltasMax, b.VoltaMinimaSeg voltaMinimaSeg

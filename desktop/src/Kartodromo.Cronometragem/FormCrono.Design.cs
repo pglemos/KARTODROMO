@@ -382,6 +382,14 @@ public partial class FormCrono
         _pTv.Ok = _tv is { IsDisposed: false }; _pTv.Dica = _pTv.Ok ? "Telão aberto" : "Telão fechado (clique para abrir)";
         _pTransp.Visible = _sTransp.Text.Length > 0; _pTransp.Texto = "TRANSPONDER SEM KART"; _pTransp.Ok = false; _pTransp.Dica = _sTransp.Text;
         _passos.AoVivo = s0 != null && estado is "em_andamento" or "bandeira_final";
+        // passos 4–5: título e subtítulo do design
+        if (s0 != null)
+        {
+            _lPilotosTitulo.Text = s0.S("name");
+            _subPilotos.Text = $"{(evento?.S("name") ?? "Bateria avulsa")} · {Crono.Arr(s0, "competitors").Count} competidores · {Crono.Estado(estado)}";
+        }
+        _subArvore.Text = evento?.S("name") ?? _events.FirstOrDefault()?.S("name") ?? "Selecione uma prova";
+        AtualizarExtrasPilotos();
     }
 }
 
