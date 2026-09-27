@@ -24,6 +24,7 @@ import { bateriaDisponivelNoTotem, type TotemBateriaCandidate, TOTEM_BATERIAS_SQ
 import { relatorio } from '../lib/ops/relatorios';
 import { renderTermoResponsabilidade, type TermoParticipante } from '../lib/ops/termo';
 import { buscarPreCadastroAgora, preCadastroLigado, sincronizarPreCadastros } from '../lib/ops/pre-cadastro';
+import { selecionarSessoesParaRelatorio, type ReceptionTimingSession } from '../lib/timing/reception-crono-reports';
 
 function loadLocalEnv() {
   const envPath = join(process.cwd(), '.env.local');
@@ -44,6 +45,7 @@ const PORT = Number(process.env.OPS_PORT || 4060);
 const KEY = process.env.OPS_RECEPCAO_KEY || '';
 const UI_DIR = resolve(process.cwd(), 'services', 'ops-ui');
 const TERMO_FILE = process.env.OPS_TERMO_FILE ? resolve(process.cwd(), process.env.OPS_TERMO_FILE) : null;
+const TIMING_URL = (process.env.OPS_TIMING_URL || 'http://192.168.20.249:4050').replace(/\/$/, '');
 
 if (!KEY) console.warn('ATENCAO: OPS_RECEPCAO_KEY vazio, rotas da cronometragem ficam sem protecao');
 
@@ -103,6 +105,19 @@ const int = (v: unknown, name: string) => {
   if (!Number.isInteger(n) || n <= 0) throw new HttpError(400, `${name} inválido.`);
   return n;
 };
+
+async function sessoesDaCronometragem(de?: string, ate?: string): Promise<ReceptionTimingSession[]> {
+  let response: Response;
+  try {
+    response = await fetch(`${TIMING_URL}/api/sessions`, { signal: AbortSignal.timeout(6_000) });
+  } catch {
+    throw new HttpError(502, 'A cronometragem está indisponível no momento.');
+  }
+  if (!response.ok) throw new HttpError(502, `A cronometragem respondeu HTTP ${response.status}.`);
+  const payload: unknown = await response.json();
+  if (!Array.isArray(payload)) throw new HttpError(502, 'A cronometragem devolveu uma lista inválida de baterias.');
+  return selecionarSessoesParaRelatorio(payload as ReceptionTimingSession[], de, ate);
+}
 
 
 async function parametros() {
@@ -427,6 +442,11 @@ const server = http.createServer(async (req, res) => {
         const ids = String(url.searchParams.get('ids') ?? '').split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0);
         return send(res, 200, { url: termoLink(ids) });
       }
+      if (path === '/api/office/crono/sessoes' && method === 'GET') {
+        const de = String(url.searchParams.get('de') ?? '').match(/^\d{4}-\d{2}-\d{2}$/)?.[0];
+        const ate = String(url.searchParams.get('ate') ?? '').match(/^\d{4}-\d{2}-\d{2}$/)?.[0];
+        return send(res, 200, await sessoesDaCronometragem(de, ate));
+      }
       // agente de impressao do programa da Recepcao
       if (path === '/api/office/impressao/proxima' && method === 'GET') {
         const job = proximaImpressao();
@@ -461,6 +481,44 @@ const server = http.createServer(async (req, res) => {
           { id: Number(m[1]) },
         );
         return send(res, 200, rows);
+      }
+      if (path === '/api/crono/uso-karts' && method === 'POST') {
+        // Horas de uso dos karts (controle da oficina): a cronometragem manda, ao encerrar a bateria, quantos minutos
+        // cada kart ficou na pista. Era o LapTime que fazia isso; desde 23/09 o contador estava parado.
+        const b = (await readBody(req)) as { agendaId?: unknown; karts?: { kart?: unknown; minutos?: unknown }[] };
+        const agendaId = Number(b.agendaId);
+        const cat = agendaId > 0
+          ? (await one<{ c: string | null }>(`SELECT p.Categoria c FROM dbo.Bateria b JOIN dbo.Produto p ON p.Id = b.ProdutoId WHERE b.Id = @id`, { id: agendaId }))?.c ?? null
+          : null;
+        let somados = 0, criados = 0, ignorados = 0;
+        for (const k of Array.isArray(b.karts) ? b.karts : []) {
+          const numero = Number(String(k.kart ?? '').trim());
+          const minutos = Math.round(Number(k.minutos));
+          if (!Number.isSafeInteger(numero) || numero <= 0 || !(minutos > 0) || minutos > 600) { ignorados++; continue; }
+          const linhas = await query<{ id: number; categoria: string | null }>(
+            `SELECT Id id, Categoria categoria FROM dbo.Manutencao WHERE TRY_CAST(Kart AS int) = @n`, { n: numero });
+          const cats = [...new Set(linhas.map((l) => l.categoria ?? ''))];
+          const alvo = cat ? linhas.filter((l) => (l.categoria ?? '') === cat) : cats.length === 1 ? linhas : [];
+          if (!alvo.length && cat) {
+            // kart novo nessa categoria: abre o controle com os itens que contam por hora
+            const r = await query(`INSERT dbo.Manutencao (Kart, Categoria, ItemId, MinutosUso, Realizada, Data)
+              SELECT @k, @c, Id, @m, 0, SYSDATETIME() FROM dbo.ItemManutencao WHERE Ativo = 1 AND ControlaPorTempo = 1`, { k: String(numero), c: cat, m: minutos });
+            void r; criados++;
+            continue;
+          }
+          if (!alvo.length) { ignorados++; continue; }
+          for (const l of alvo) {
+            // somar uso depois de uma manutenção feita abre um ciclo novo (volta para "A realizar" contando do zero)
+            await query(`UPDATE dbo.Manutencao SET MinutosUso = MinutosUso + @m, Realizada = 0, Data = SYSDATETIME() WHERE Id = @id`, { m: minutos, id: l.id });
+            somados++;
+          }
+        }
+        return send(res, 200, { ok: true, categoria: cat, somados, criados, ignorados });
+      }
+      if (path === '/api/crono/empresa' && method === 'GET') {
+        // dados da empresa (Cadastros › Empresa da recepção) para o cabeçalho da cronometragem, só leitura
+        return send(res, 200, await one(`SELECT Nome nome, Cnpj cnpj, Telefone telefone, Email email, Endereco endereco, Numero numero, Bairro bairro, Cidade cidade, Estado estado
+          FROM dbo.Empresa WHERE Id = 1`) ?? {});
       }
       if (path === '/api/crono/clientes' && method === 'GET') {
         // dados dos pilotos para a lista de competidores da cronometragem (só leitura)

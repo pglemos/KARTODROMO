@@ -15,6 +15,7 @@ static class Program
         {
             // em teste automático nenhuma caixa pode aparecer na tela de quem está usando o PC
             if (Environment.GetEnvironmentVariable("KARTODROMO_TESTE") is { Length: > 0 }) { File.AppendAllText(Path.Combine(Path.GetTempPath(), "crono-teste-erro.txt"), DateTime.Now + " " + e.Exception + Environment.NewLine); Environment.Exit(3); }
+            Diagnostico.Registrar(Form.ActiveForm?.Text ?? "", e.Exception);
             MessageBox.Show(e.Exception.Message, "Kartódromo - Cronometragem", MessageBoxButtons.OK, MessageBoxIcon.Error);
         };
         Thread.CurrentThread.CurrentCulture = Fmt.Br;

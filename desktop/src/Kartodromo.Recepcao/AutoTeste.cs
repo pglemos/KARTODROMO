@@ -170,17 +170,18 @@ public static class AutoTeste
         await CapturarModal(principal, pasta, "54-relatorios-office", () => Relatorios.Abrir(principal));
         await CapturarModal(principal, pasta, "55-relatorio-fechamento-lista", () => Relatorios.Fechamento(principal));
         await CapturarModal(principal, pasta, "56-agenda-mensal", () => Relatorios.AgendaMensal(principal));
+        await CapturarModal(principal, pasta, "57-relatorios-cronometragem", () => Relatorios.Cronometragem(principal));
         if (reservas.Count > 0)
         {
             var r = reservas[0];
-            await CapturarModal(principal, pasta, "57-editar-reserva", () => Acoes.EditarReserva(principal, r));
-            await CapturarModal(principal, pasta, "58-mover-cliente", () => Acoes.MoverCliente(principal, r));
+            await CapturarModal(principal, pasta, "58-editar-reserva", () => Acoes.EditarReserva(principal, r));
+            await CapturarModal(principal, pasta, "59-mover-cliente", () => Acoes.MoverCliente(principal, r));
         }
         if (vendas.Count > 0)
         {
             var idVenda = vendas[0].L("id") ?? 0;
-            await Janela(new FormVenda(idVenda), principal, pasta, "59-metodos-venda");
-            await Janela(new FormEstorno(idVenda), principal, pasta, "60-estorno");
+            await Janela(new FormVenda(idVenda), principal, pasta, "60-metodos-venda");
+            await Janela(new FormEstorno(idVenda), principal, pasta, "61-estorno");
         }
         else Log.Add("pendente: telas MetodosPagamento e Estorno dependem da venda marcada TESTE CODEX informada para o autoteste.");
 
@@ -342,6 +343,13 @@ public static class AutoTeste
             if (alvo == null) return;
             tentou = true;
             timer.Stop();
+            if (ForaDaTela)
+            {
+                alvo.StartPosition = FormStartPosition.Manual;
+                alvo.Location = new Point(-4000, 0);
+                alvo.ShowInTaskbar = false;
+                SetForegroundWindow(FocoAntes);
+            }
             await Esperar(1100);
             try { await Foto(alvo, pasta, nome); Log.Add("OK " + nome); }
             catch (Exception e) { Log.Add($"ERRO {nome}: {e.Message}"); }
@@ -464,7 +472,13 @@ public static class AutoTeste
         var acesso = await Sessao.Api.Post("/api/login", new { login, senha, termos = true });
         Sessao.Api.Token = acesso.S("token");
         Sessao.Usuario = acesso["usuario"]!.AsObject();
+        var focoAntes = GetForegroundWindow();
+        var foraDaTelaAntes = ForaDaTela;
+        var focoAntesAnterior = FocoAntes;
+        ForaDaTela = true;
+        FocoAntes = focoAntes;
         using var dono = new Form { ShowInTaskbar = false, StartPosition = FormStartPosition.Manual, Location = new Point(-4000, -4000), Size = new Size(10, 10) };
+        dono.Show();
         foreach (var (nome, url, titulo) in new[]
         {
             ("termo-em-branco", Sessao.Api.UrlComToken("/termo?branco=1"), "Termo de Responsabilidade"),
@@ -493,6 +507,10 @@ public static class AutoTeste
             alvo.Close();
             await Esperar(300);
         }
+        await CapturarModal(dono, pasta, "relatorios-cronometragem", () => Relatorios.Cronometragem(dono));
+        dono.Close();
+        ForaDaTela = foraDaTelaAntes;
+        FocoAntes = focoAntesAnterior;
         File.WriteAllLines(Path.Combine(pasta, "log.txt"), Log);
     }
 

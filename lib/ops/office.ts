@@ -1568,7 +1568,9 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
       query(`SELECT Id id, Codigo codigo, Nome nome, PrecoCentavos preco, Categoria categoria, Ativo ativo FROM dbo.Produto ORDER BY Nome`),
       query(`SELECT Id id, Nome nome FROM dbo.Tracado WHERE Ativo = 1 ORDER BY Nome`),
       query(`SELECT Id id, Nome nome, Tipo tipo FROM dbo.FormaPagamento WHERE Ativo = 1 ORDER BY Codigo`),
-      query(`SELECT Id id, Nome nome FROM dbo.PadraoReserva WHERE Ativo = 1 ORDER BY Nome`),
+      // campos do padrão para a prévia de "Criar reservas" (hora como texto hh:mm)
+      query(`SELECT Id id, Nome nome, Quantidade quantidade, CONVERT(varchar(5), PrimeiraHora, 108) primeiraHora, IntervaloMin intervaloMin, Vagas vagas, Ativo ativo
+             FROM dbo.PadraoReserva WHERE Ativo = 1 ORDER BY Nome`),
       one(`SELECT Nome nome, RazaoSocial razaoSocial FROM dbo.Empresa WHERE Id = 1`),
       query(`SELECT Chave chave, Valor valor FROM dbo.Parametro`),
     ]);

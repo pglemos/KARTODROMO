@@ -55,6 +55,10 @@ public class FormPrincipal : Form
         // fica nulo: a janela monta o menu aqui para poder aplicar o kit visual.
         _grade.MenuDe = null;
         _grade.MouseUp += (_, e) => AbrirMenuContexto(e);
+        _grade.Duplo += bateria =>
+        {
+            if (_grupo == "baterias") Relatorios.Cronometragem(this, bateria, "resultados_oficiais", true);
+        };
         var direita = MontarAreaDados();
         _grade.FiltroMudou += Totais;
 
@@ -583,11 +587,11 @@ public class FormPrincipal : Form
         m.Items.Add(S("F&erramentas", I("Parâmetros do sistema", () => Cadastros.Parametros(this), adm), I("Padrões de reservas", () => Cadastros.Abrir(this, "padroes")),
             I("Criar reservas do mês", () => { new FormCriarReservas().ShowDialog(this); Recarregar(); }), new ToolStripSeparator(), I("Serviços online", () => new FormServicosOnline().ShowDialog(this))));
         m.Items.Add(S("&Relatórios",
-            G("Cronometragem", I("Resultados da cronometragem", () => Relatorio.Abrir(this, Config.CronoUrl + "/", "Cronometragem")), I("Classificação ao vivo (TV)", () => Relatorio.Abrir(this, Config.CronoUrl + "/tv", "TV"))), new ToolStripSeparator(),
+            G("Cronometragem", I("Resultados da cronometragem", () => Relatorios.Cronometragem(this)), I("Classificação ao vivo (TV)", () => Relatorio.Abrir(this, Config.CronoUrl + "/tv", "TV"))), new ToolStripSeparator(),
             G("Financeiro", I("Receitas por forma de pagamento", () => Relatorios.Periodo(this, "receitas", "forma")), I("Receitas por clientes", () => Relatorios.Periodo(this, "receitas", "cliente")),
                 I("Receitas por produto", () => Relatorios.Periodo(this, "receitas", "produto")), I("Fluxo de caixa", () => Relatorios.Periodo(this, "receitas", "dia"))),
             new ToolStripSeparator(),
-            I("Fechamento de caixa", () => Relatorios.Fechamento(this)), I("Reservas diária", () => Relatorios.ReservasDiaria(this, _data.Value)),
+            I("Fechamento de caixa", () => Relatorios.Fechamento(this)), I("Reservas do dia", () => Relatorios.ReservasDiaria(this, _data.Value)),
             I("Clientes por período", () => Relatorios.Periodo(this, "clientes", null)), I("Lista de participantes", () => Relatorios.Participantes(this, _grupo == "baterias" ? _grade.Atual : null, _data.Value)),
             I("Agenda mensal", () => Relatorios.AgendaMensal(this)), I("Termo de responsabilidade (em branco)", () => Relatorio.Abrir(this, Sessao.Api.UrlComToken("/termo?branco=1"), "Termo de Responsabilidade"))));
         m.Items.Add(S("&Ajuda", I("Manual da recepção", () => new FormAjuda("Manual da recepção").ShowDialog(this)), A(I("Atalhos do teclado", () => new FormAjuda("Atalhos do teclado").ShowDialog(this)), "F1"),
@@ -1088,6 +1092,9 @@ public class FormPrincipal : Form
     {
         var umaSo = sel.Count == 1;
         return [
+            Item("Imprimir resultado oficial", () => Relatorios.Cronometragem(this, sel[0], "resultados_oficiais", true), umaSo, "Ctrl+P"),
+            Item("Escolher outro relatório…", () => Relatorios.Cronometragem(this, sel[0]), umaSo),
+            new ToolStripSeparator(),
             Item("Abrir bateria", () => Acoes.StatusBateria(this, sel, "aberta"), sel.Any(b => b.S("status") == "fechada")),
             Item("Fechar bateria", () => Acoes.StatusBateria(this, sel, "fechada"), sel.Any(b => b.S("status") == "aberta")),
             new ToolStripSeparator(),
@@ -1095,7 +1102,7 @@ public class FormPrincipal : Form
             Item("Incluir cliente", () => { if (new FormIncluirCliente(sel[0]).ShowDialog(this) == DialogResult.OK) Recarregar(); }, umaSo, "Ins"),
             Item("Ver reservas", () => Selecionar("reservas:todas", sel[0]), umaSo),
             new ToolStripSeparator(),
-            Item("Lista de participantes", () => new FormListaParticipantes(sel[0]).ShowDialog(this), umaSo, "Ctrl+P"),
+            Item("Lista de participantes", () => new FormListaParticipantes(sel[0]).ShowDialog(this), umaSo),
             new ToolStripSeparator(),
             Exportar("baterias"),
             new ToolStripSeparator(),
@@ -1133,7 +1140,6 @@ public class FormPrincipal : Form
             switch (_grupo)
             {
                 case "reservas": if (r.B("pago") || r.S("status") == "cancelada") Acoes.EditarReserva(this, r); else Caixa.CheckoutDeReservas(this, [r]); break;
-                case "baterias": Selecionar("reservas:todas", r); break;
                 case "vendas": new FormVenda(r.L("id") ?? 0).ShowDialog(this); break;
             }
         };

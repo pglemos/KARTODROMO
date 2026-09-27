@@ -579,6 +579,41 @@ async function opsGet(path: string) {
   return data;
 }
 
+/**
+ * Horas de uso dos karts para a oficina (Manutenções no Módulo Office): ao encerrar a bateria manda quantos minutos
+ * cada kart ficou na pista (da primeira à última passagem). Uma vez por bateria; se o servidor da operação estiver
+ * fora, tenta de novo a cada 5 minutos (baterias dos últimos 2 dias).
+ */
+async function enviarUsoKarts(s: Session) {
+  if (s.usoKartsEnviado || s.state !== 'encerrada') return;
+  const karts = s.competitors
+    .map((c) => {
+      const t = c.crossings.filter((x) => !x.deleted).map((x) => x.wallMs).sort((a, b) => a - b);
+      return { kart: c.kart, minutos: t.length > 1 ? Math.round((t[t.length - 1] - t[0]) / 60_000) : 0 };
+    })
+    .filter((k) => k.kart && k.minutos > 0);
+  if (!karts.length) { s.usoKartsEnviado = true; saveSession(s); return; }
+  try {
+    const r = await fetch(OPS_URL + '/api/crono/uso-karts', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-ops-key': process.env.OPS_RECEPCAO_KEY || '' },
+      body: JSON.stringify({ sessaoId: s.id, agendaId: s.agendaId ?? null, karts }),
+      signal: AbortSignal.timeout(8000),
+    });
+    const d = (await r.json().catch(() => ({}))) as { somados?: number; criados?: number; ignorados?: number; categoria?: string | null; error?: string };
+    if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+    s.usoKartsEnviado = true;
+    saveSession(s);
+    log(`uso dos karts de ${s.name} enviado para a oficina: ${karts.length} karts, ${d.somados ?? 0} controles somados, ${d.criados ?? 0} novos, ${d.ignorados ?? 0} sem controle (${d.categoria ?? 'sem categoria'})`);
+  } catch (err) {
+    log(`uso dos karts de ${s.name} não foi enviado (tenta de novo): ${(err as Error).message}`);
+  }
+}
+setInterval(() => {
+  const limite = Date.now() - 2 * 86_400_000;
+  for (const s of sessions.values()) if (s.state === 'encerrada' && !s.usoKartsEnviado && (s.finishedAt ?? s.createdAt) > limite) void enviarUsoKarts(s);
+}, 5 * 60_000);
+
 const SESSION_TYPES = new Set<SessionType>(['treino', 'classificacao', 'corrida']);
 const CATALOG_ENTITIES = new Set<CatalogEntity>(['events', 'groups', 'provas', 'categories', 'tracks', 'competitors']);
 
@@ -892,9 +927,11 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       proofId: typeof body.proofId === 'string' ? body.proofId : null,
       programaId: typeof body.programaId === 'string' && body.programaId ? body.programaId : null,
     });
+    // bateria da agenda da recepção: guarda de qual horário veio (o app avisa antes de criar a mesma duas vezes)
+    if (Number(body.agendaId) > 0) s.agendaId = Number(body.agendaId);
     sessions.set(s.id, s);
     saveSession(s);
-    log(`bateria criada ${s.name} (${s.type}) com ${s.competitors.length} pilotos`);
+    log(`bateria criada ${s.name} (${s.type}) com ${s.competitors.length} pilotos${s.agendaId ? ` (agenda ${s.agendaId})` : ''}`);
     scheduleStateBroadcast();
     return send(res, 201, sessionView(s));
   }
@@ -1173,6 +1210,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         setRaceFlag(s, 'checkered', now);
       } else if (action === 'close' && method === 'POST') {
         closeSession(s, now);
+        void enviarUsoKarts(s);
       } else if (action === 'cancel' && method === 'POST') {
         cancelSession(s, now);
       } else if (action === 'flag' && m[3] && method === 'POST') {
@@ -1269,6 +1307,10 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     });
     scheduleStateBroadcast();
     return send(res, 201, criadas.map(sessionSummary));
+  }
+
+  if (path === '/api/empresa' && method === 'GET') {
+    try { return send(res, 200, await opsGet('/api/crono/empresa')); } catch (err) { return send(res, 502, { error: (err as Error).message }); }
   }
 
   if (path === '/api/clientes' && method === 'GET') {

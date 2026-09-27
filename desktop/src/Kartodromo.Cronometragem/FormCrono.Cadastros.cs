@@ -413,6 +413,18 @@ public partial class FormCrono
             case "Empresa":
             {
                 var e = Sec("company");
+                // campos vazios vêm do cadastro da empresa na recepção (mesmo CNPJ, telefone e endereço nos dois sistemas)
+                try
+                {
+                    if ((await Crono.Api.Get("/api/empresa")) is JsonObject rec)
+                    {
+                        foreach (var (k, kr) in new[] { ("name", "nome"), ("cnpj", "cnpj"), ("phone", "telefone"), ("email", "email"), ("city", "cidade"), ("state", "estado") })
+                            if (e.S(k).Length == 0 && rec.S(kr).Length > 0) e[k] = rec.S(kr);
+                        if (e.S("address").Length == 0 && rec.S("endereco").Length > 0)
+                            e["address"] = string.Join(", ", new[] { rec.S("endereco"), rec.S("numero"), rec.S("bairro") }.Where(x => x.Length > 0));
+                    }
+                }
+                catch { /* sem servidor da operação: fica o que está na cronometragem */ }
                 using var d = NovoDialogo("Registro de empresa", "Aparece no cabeçalho dos resultados, termos e site", "M4 21V5l8-2v18M12 7l8 2v12M8 9h.01M8 13h.01M8 17h.01M16 13h.01M16 17h.01", "linear-gradient(180deg, #5EDB7A, #1E9E4A)");
                 var t = new Dictionary<string, TextBox>();
                 TextBox C(string k, string padrao = "") { var x = Txt(e.S(k) is { Length: > 0 } v ? v : padrao); t[k] = x; return x; }

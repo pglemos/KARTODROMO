@@ -43,9 +43,17 @@ public partial class FormCrono
         busca.Paint += (_, e) => Forma.DesenharSvg(e.Graphics, "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5", new RectangleF(9, 8.5f, 13, 13), TemaCrono.Secundario, 2.2f);
         _buscaEvento.SetBounds(28, 7, 146, 18); busca.Controls.Add(_buscaEvento);
 
+        // 7 botões não cabem na largura do cartão (o "Duplicar" passava por cima do cartão Grupos): os menos usados vão no "Mais"
+        var menuEventos = new ContextMenuStrip();
+        menuEventos.Items.Add("Duplicar evento", null, (_, _) => DuplicarEvento());
+        menuEventos.Items.Add("Imprimir lista de eventos", null, (_, _) => ImprimirResumo("Eventos", _events.Select(x => x.S("name")).ToList()));
+        menuEventos.Items.Add(new ToolStripSeparator());
+        menuEventos.Items.Add("Importar eventos…", null, (_, _) => ImportarCatalogo());
+        menuEventos.Items.Add("Exportar eventos…", null, (_, _) => ExportarCatalogo());
+        Button maisEventos = null;
+        maisEventos = BotaoPeq("Mais ▾", 0, () => menuEventos.Show(maisEventos, new Point(0, maisEventos.Height)));
         var ev = CartaoPasso(1, "Eventos", new Label { Text = "Escolha o dia ou o campeonato" }, _gEventos,
-            [BotaoPeq("+ Novo", 1, () => EditarCatalogo("events")), BotaoPeq("Editar", 0, () => EditarCatalogo("events", true)), BotaoPeq("Excluir", 2, () => ExcluirCatalogo("events")),
-             BotaoPeq("Imprimir", 0, () => ImprimirResumo("Eventos", _events.Select(x => x.S("name")).ToList())), BotaoPeq("Importar", 0, ImportarCatalogo), BotaoPeq("Exportar", 0, ExportarCatalogo), BotaoPeq("Duplicar", 0, DuplicarEvento)], busca);
+            [BotaoPeq("+ Novo", 1, () => EditarCatalogo("events")), BotaoPeq("Editar", 0, () => EditarCatalogo("events", true)), BotaoPeq("Excluir", 2, () => ExcluirCatalogo("events")), maisEventos], busca);
         _subGrupos.Text = "Selecione um evento";
         var gr = CartaoPasso(2, "Grupos", _subGrupos, _gGrupos,
             [BotaoPeq("+ Novo", 1, () => EditarCatalogo("groups")), BotaoPeq("Editar", 0, () => EditarCatalogo("groups", true)), BotaoPeq("Excluir", 2, () => ExcluirCatalogo("groups"))]);

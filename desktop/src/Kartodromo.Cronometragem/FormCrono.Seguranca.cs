@@ -337,13 +337,14 @@ public partial class FormCrono
         void Mostrar()
         {
             var (m, funcoes) = ModulosPermissao[modulo];
-            tab.Linhas(funcoes.Select(f => { var v = estado.GetValueOrDefault(Chave(m, f)) ?? new bool[6]; return new[] { f }.Concat(v.Select(b => b ? "Sim" : "Não")).ToArray(); }));
+            // a TabelaDesign marca com "1"/"0" (com "Sim"/"Não" tudo aparecia desmarcado e o Salvar apagava as permissões)
+            tab.Linhas(funcoes.Select(f => { var v = estado.GetValueOrDefault(Chave(m, f)) ?? new bool[6]; return new[] { f }.Concat(v.Select(b => b ? "1" : "0")).ToArray(); }));
         }
         tab.MarcaMudou += (l, c) =>
         {
             var (m, funcoes) = ModulosPermissao[modulo];
             var v = estado.TryGetValue(Chave(m, funcoes[l]), out var a) ? a : estado[Chave(m, funcoes[l])] = new bool[6];
-            v[c - 1] = tab.Dados[l][c] == "Sim";
+            v[c - 1] = tab.Dados[l][c] == "1";
         };
         async Task Carregar()
         {

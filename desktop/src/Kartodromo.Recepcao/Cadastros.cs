@@ -664,7 +664,7 @@ public class FormCadastro : Janela
         var fin = Campos.Combo(); fin.Items.AddRange([new Campos.Item(0, "Por tempo", new JsonObject { ["v"] = "tempo" }), new Campos.Item(1, "Por voltas", new JsonObject { ["v"] = "voltas" })]); fin.SelectedIndex = 0;
         string Cod(ComboBox c) => (c.SelectedItem as Campos.Item)?.Dados?.S("v") ?? ""; var tempo = Campos.Num(0, 0, 600); var voltas = Campos.Num(0, 0, 999);
         var linhaCampos = new TableLayoutPanel { Dock = DockStyle.Top, Height = 72, ColumnCount = 7, RowCount = 1, Padding = new Padding(0), Margin = new Padding(0) };
-        foreach (var peso in new[] { 8f, 22f, 16f, 15f, 11f, 11f, 17f }) linhaCampos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, peso));
+        foreach (var peso in new[] { 9f, 15f, 21f, 19f, 9f, 9f, 18f }) linhaCampos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, peso));
         linhaCampos.Controls.Add(CampoProva("Ordem", ordem), 0, 0); linhaCampos.Controls.Add(CampoProva("Nome", nome), 1, 0);
         linhaCampos.Controls.Add(CampoProva("Tipo", tipo), 2, 0); linhaCampos.Controls.Add(CampoProva("Autofinalizar", fin), 3, 0);
         linhaCampos.Controls.Add(CampoProva("Tempo (min)", tempo), 4, 0); linhaCampos.Controls.Add(CampoProva("Voltas (máx)", voltas), 5, 0);
@@ -675,7 +675,7 @@ public class FormCadastro : Janela
         acoes.Controls.AddRange([bIns, bDel]); linhaCampos.Controls.Add(acoes, 6, 0);
         var gp = new Grade();
         gp.Colunas(new("ordem", "Ordem", TipoCol.Inteiro, 65), new("nome", "Nome", Largura: 150), new("tipo", "Tipo", Largura: 120, Valor: r => r.S("tipo") switch { "classificacao" => "Classificatório", "corrida" => "Corrida", "treino" => "Treino", var t => t }),
-            new("finalizacao", "Finaliza por", Largura: 105, Valor: r => r.S("finalizacao") switch { "tempo" => "Por tempo", "voltas" => "Por voltas", var t => t }), new("tempoMin", "Tempo (min)", TipoCol.Inteiro, 92), new("voltasMax", "Voltas (máx)", TipoCol.Inteiro, 92));
+            new("finalizacao", "Finaliza por", Largura: 118, Valor: r => r.S("finalizacao") switch { "tempo" => "Por tempo", "voltas" => "Por voltas", var t => t }), new("tempoMin", "Tempo (min)", TipoCol.Inteiro, 92), new("voltasMax", "Voltas (máx)", TipoCol.Inteiro, 92));
         gp.CellPainting += (_, e) =>
         {
             if (e.RowIndex < 0 || gp.Columns[e.ColumnIndex].Name != "tipo" || e.Value is not string t || t.Length == 0) return;

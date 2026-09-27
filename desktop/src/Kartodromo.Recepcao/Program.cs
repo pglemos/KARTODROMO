@@ -12,7 +12,8 @@ static class Program
         KitVisual.Instalar();
         Forma.Icones = VisualPrincipal.Icone;
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
-        Application.ThreadException += (_, e) => MessageBox.Show(e.Exception.Message, "Kartódromo - Módulo Office", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        Application.ThreadException += (_, e) => { Diagnostico.Registrar(Form.ActiveForm?.Text ?? "", e.Exception); MessageBox.Show(e.Exception.Message, "Kartódromo - Módulo Office", MessageBoxButtons.OK, MessageBoxIcon.Error); };
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => { if (e.ExceptionObject is Exception ex) Diagnostico.Registrar("fatal", ex); };
         Thread.CurrentThread.CurrentCulture = Fmt.Br;
         Thread.CurrentThread.CurrentUICulture = Fmt.Br;
         var args = Environment.GetCommandLineArgs();

@@ -85,6 +85,23 @@ public class FormNovaBateria : DialogoDesign
             foreach (var k in karts.Skip(grade.Count)) comps.Add(new JsonObject { ["kart"] = k, ["name"] = "" });
             var nome = _nome.Text.Trim().Length > 0 ? _nome.Text.Trim() : "Bateria " + DateTime.Now.ToString("HH:mm");
             string Tipo(string t) => t is "treino" or "classificacao" or "corrida" ? t : "corrida";
+            // a mesma bateria da agenda já foi criada? (acontecia de criar duas vezes e ficar TOMADA/CORRIDA repetidas)
+            if (id > 0)
+            {
+                var hoje = DateTimeOffset.Now.ToUnixTimeMilliseconds() - (long)DateTime.Now.TimeOfDay.TotalMilliseconds;
+                var jaTem = (await Crono.Api.Lista("/api/sessions")).Where(x => x.S("state") != "cancelada" &&
+                    (x.L("agendaId") == id || ((x.L("createdAt") ?? 0) >= hoje && (x.S("name") == nome || x.S("name").StartsWith(nome + " · "))))).ToList();
+                if (jaTem.Count > 0)
+                {
+                    var lista = string.Join("\n", jaTem.OrderBy(x => x.L("createdAt")).Select(x => $"• {x.S("name")} ({Crono.Estado(x.S("state"))})"));
+                    if (Msg.Pergunta(this, $"Essa bateria da agenda já foi criada:\n\n{lista}\n\nAbrir a que já existe?\n(Não = criar outra mesmo assim)"))
+                    {
+                        CriadaId = (jaTem.Where(x => x.S("state") is "preparando" or "em_andamento").OrderBy(x => x.L("createdAt")).FirstOrDefault() ?? jaTem[0]).S("id");
+                        DialogResult = DialogResult.OK;
+                        return;
+                    }
+                }
+            }
             if (_programa.Visible && _programa.Checked && _prog.Count > 1)
             {
                 // liga as provas da mesma bateria: o número do kart digitado numa vale para as outras
@@ -96,7 +113,7 @@ public class FormNovaBateria : DialogoDesign
                     {
                         ["type"] = Tipo(p.S("tipo")), ["name"] = $"{nome} · {p.S("nome")}", ["durationMin"] = porVoltas ? 0 : p.I("tempoMin"),
                         ["maxLaps"] = porVoltas && p.I("voltasMax") > 0 ? p.I("voltasMax") : null, ["minLapSec"] = Min, ["competitors"] = comps.DeepClone(),
-                        ["programaId"] = programaId,
+                        ["programaId"] = programaId, ["agendaId"] = id > 0 ? id : null,
                     });
                     CriadaId ??= s.S("id");
                 }
@@ -107,7 +124,7 @@ public class FormNovaBateria : DialogoDesign
                 var s = await Crono.Api.Post("/api/sessions", new JsonObject
                 {
                     ["type"] = tipo, ["name"] = nome, ["durationMin"] = Dur, ["maxLaps"] = Voltas > 0 ? Voltas : null,
-                    ["minLapSec"] = Min, ["competitors"] = comps,
+                    ["minLapSec"] = Min, ["competitors"] = comps, ["agendaId"] = id > 0 ? id : null,
                 });
                 CriadaId = s.S("id");
             }

@@ -107,13 +107,14 @@ public sealed class FormTerminalFechar : CartaoModal
             p.Controls.Add(new Label { Text = Fmt.Brl(valor), AutoSize = true, Location = new Point(12, 27), ForeColor = destaque ? KitVisual.Verde : KitVisual.Texto, Font = new Font("Segoe UI", 15F, FontStyle.Bold) });
             return p;
         }
+        // "gaveta" é só o dinheiro: cartão e Pix não ficam na gaveta (o servidor valida o próximo turno por esse valor)
         corpo.Controls.Add(Cartao("Vendas", V("vendas") + V("vendasProdutos"), 20, false));
-        corpo.Controls.Add(Cartao("Recebido", V("recebido"), 224, false));
-        corpo.Controls.Add(Cartao("Total final na gaveta", V("final"), 428, true));
+        corpo.Controls.Add(Cartao("Recebido (todas as formas)", V("recebido"), 224, false));
+        corpo.Controls.Add(Cartao("Dinheiro na gaveta", V("dinheiroEmCaixa"), 428, true));
 
-        // lista do movimento
+        // lista do movimento, com o recebido separado por forma de pagamento para conferir com a maquininha
         var lista = Lista(); lista.SetBounds(20, 92, 600, 430);
-        var linhas = new (string rotulo, Color ponto, long valor, bool negativo, bool final)[]
+        var linhas = new List<(string rotulo, Color ponto, long valor, bool negativo, bool final)>
         {
             ("Início do turno", Color.FromArgb(142, 142, 147), V("inicial"), false, false),
             ("Suprimento", Color.FromArgb(14, 156, 156), V("suprimento"), false, false),
@@ -122,25 +123,29 @@ public sealed class FormTerminalFechar : CartaoModal
             ("Vendas (baterias)", Color.FromArgb(52, 199, 89), V("vendas"), false, false),
             ("Desconto fornecido", Color.FromArgb(255, 159, 10), V("desconto"), true, false),
             ("Acréscimos", Color.FromArgb(142, 142, 147), V("acrescimos"), false, false),
-            ("Total recebido", Color.FromArgb(10, 132, 255), V("recebido"), false, false),
-            ("Troco fornecido", Color.FromArgb(142, 142, 147), V("troco"), true, false),
-            ("Cancelado", Color.FromArgb(255, 59, 48), V("cancelado"), false, false),
-            ("Total final", Color.FromArgb(52, 199, 89), V("final"), false, true),
         };
-        for (var i = 0; i < linhas.Length; i++)
+        foreach (var f in (sumario?["porForma"] as JsonArray)?.OfType<JsonObject>() ?? [])
+            linhas.Add(("   Recebido em " + f.S("forma"), Color.FromArgb(120, 170, 255), f.L("valor") ?? 0, false, false));
+        linhas.Add(("Total recebido", Color.FromArgb(10, 132, 255), V("recebido"), false, false));
+        linhas.Add(("Troco fornecido", Color.FromArgb(142, 142, 147), V("troco"), true, false));
+        linhas.Add(("Cancelado", Color.FromArgb(255, 59, 48), V("cancelado"), false, false));
+        linhas.Add(("Dinheiro na gaveta", Color.FromArgb(52, 199, 89), V("dinheiroEmCaixa"), false, true));
+        linhas.Add(("Total final (todas as formas)", Color.FromArgb(52, 199, 89), V("final"), false, false));
+        var alturaLinha = Math.Min(39, 430 / linhas.Count);
+        for (var i = 0; i < linhas.Count; i++)
         {
             var (rotulo, ponto, valor, negativo, final) = linhas[i];
-            var y = i * 39;
+            var y = i * alturaLinha;
             var cor = ponto;
-            var dot = new Panel { Bounds = new Rectangle(16, y + 16, 8, 8), BackColor = cor };
+            var dot = new Panel { Bounds = new Rectangle(16, y + alturaLinha / 2 - 4, 8, 8), BackColor = cor };
             dot.Resize += (_, _) => KitVisual.AplicarRaio(dot, 4); KitVisual.AplicarRaio(dot, 4);
             lista.Controls.Add(dot);
-            lista.Controls.Add(new Label { Text = rotulo, AutoSize = false, Bounds = new Rectangle(34, y, 300, 39), TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI", 9.8F), ForeColor = KitVisual.Texto });
+            lista.Controls.Add(new Label { Text = rotulo, AutoSize = false, Bounds = new Rectangle(34, y, 300, alturaLinha), TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI", final ? 10.4F : 9.8F, final ? FontStyle.Bold : FontStyle.Regular), ForeColor = KitVisual.Texto });
             var neg = negativo && valor != 0;
             var txt = (neg ? "– " : "") + Fmt.Brl(Math.Abs(valor));
             lista.Controls.Add(new Label
             {
-                Text = txt, AutoSize = false, Bounds = new Rectangle(340, y, 244, 39), TextAlign = ContentAlignment.MiddleRight,
+                Text = txt, AutoSize = false, Bounds = new Rectangle(340, y, 244, alturaLinha), TextAlign = ContentAlignment.MiddleRight,
                 Font = new Font("Segoe UI", final ? 11.5F : 10F, FontStyle.Bold), ForeColor = final ? KitVisual.Verde : neg ? Color.FromArgb(196, 40, 28) : KitVisual.Texto,
             });
             if (i > 0) lista.Controls.Add(new Panel { BackColor = Color.FromArgb(238, 238, 241), Bounds = new Rectangle(1, y, 598, 1) });

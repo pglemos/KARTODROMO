@@ -35,6 +35,34 @@ public static class Msg
         MessageBox.Show(dono, texto, titulo, MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1) == DialogResult.Yes;
 }
 
+/// <summary>
+/// Guarda os erros em %LOCALAPPDATA%Kartodromoerros.log (hora, programa, janela, mensagem e pilha).
+/// Antes os erros só apareciam na caixa de mensagem e sumiam: ninguém sabia depois o que tinha acontecido no balcão.
+/// </summary>
+public static class Diagnostico
+{
+    static readonly object Trava = new();
+    public static string Arquivo => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Kartodromo", "erros.log");
+
+    public static void Registrar(Control onde, Exception e) => Registrar(onde?.FindForm()?.Text ?? onde?.Name ?? "", e);
+
+    public static void Registrar(string onde, Exception e)
+    {
+        try
+        {
+            var linha = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [{AppDomain.CurrentDomain.FriendlyName}] {onde}: {e.GetType().Name}: {e.Message}{Environment.NewLine}{e.StackTrace}{Environment.NewLine}";
+            lock (Trava)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(Arquivo)!);
+                var info = new FileInfo(Arquivo);
+                if (info.Exists && info.Length > 5_000_000) File.Move(Arquivo, Arquivo + ".antigo", true);
+                File.AppendAllText(Arquivo, linha);
+            }
+        }
+        catch { /* registrar erro nunca pode derrubar o programa */ }
+    }
+}
+
 public static class Seguro
 {
     /// <summary>Roda uma acao async mostrando erro da API numa MessageBox (sem derrubar o app).</summary>
@@ -47,8 +75,8 @@ public static class Seguro
             if (form != null) form.Cursor = Cursors.WaitCursor;
             await acao();
         }
-        catch (ApiException e) { Msg.Erro(form, e.Message); }
-        catch (Exception e) { Msg.Erro(form, "Erro inesperado: " + e.Message); }
+        catch (ApiException e) { Diagnostico.Registrar(form, e); Msg.Erro(form, e.Message); }
+        catch (Exception e) { Diagnostico.Registrar(form, e); Msg.Erro(form, "Erro inesperado: " + e.Message); }
         finally { if (form != null && !form.IsDisposed) form.Cursor = cursor ?? Cursors.Default; }
     }
 }

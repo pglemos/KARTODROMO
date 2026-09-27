@@ -350,7 +350,8 @@ public class RegistroDesign : CartaoModal
         var ctl = _c[c.Chave];
         switch (ctl)
         {
-            case CheckBox ck: ck.Checked = r.B(c.Chave); break;
+            // "ativo" que não existe no registro vale como ativo (a lista já mostra "Sim"; salvar não pode desativar sem querer)
+            case CheckBox ck: ck.Checked = r[c.Chave] is null && c.Chave is "active" or "ativo" ? true : r.B(c.Chave); break;
             case ListaDesign l when c.Tipo == "select":
                 l.SelectedIndex = -1;
                 for (var i = 0; i < l.Items.Count; i++) if (((Campos.Item)l.Items[i]).Dados.S("v").Equals(r.S(c.Chave), StringComparison.OrdinalIgnoreCase)) { l.SelectedIndex = i; break; }

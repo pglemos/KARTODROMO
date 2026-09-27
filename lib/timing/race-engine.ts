@@ -70,6 +70,8 @@ export type Session = {
   programaId?: string | null;
   /** bateria da agenda da recepção de onde a prova foi criada (tablet do sorteio) */
   agendaId?: number | null;
+  /** minutos de pista de cada kart já enviados ao controle de manutenção da oficina (servidor da operação) */
+  usoKartsEnviado?: boolean;
   observations?: Observation[];
   competitors: Competitor[];
   /** Leituras do decoder que não viraram volta (volta mínima, kart encerrado, transponder desconhecido...). Só pra mostrar ao operador. */

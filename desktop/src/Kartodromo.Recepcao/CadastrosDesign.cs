@@ -46,7 +46,7 @@ public static class CadastrosDesign
 
             "itensManutencao" => new("Itens de manutenção", "O que é revisado em cada kart e de quanto em quanto tempo",
                 "M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z", Cinza,
-                [new("codigo", "Código", 1), new("nome", "Nome", 2), new("tempoHoras", "A cada (horas)", 1, "int"), new("controlaPorTempo", "Controla por tempo de uso", 1, "bool"), new("ativo", "Ativo", 1, "bool")],
+                [new("codigo", "Código", 1), new("nome", "Nome", 2), new("tempoHoras", "A cada (horas)", 1, "int"), new("controlaPorTempo", "Por horas de uso", 1, "bool"), new("ativo", "Ativo", 1, "bool")],
                 [new("Código", 90, r => r.S("codigo")), new("Nome", 0, r => r.S("nome")), new("A cada (h)", 120, r => r.S("tempoHoras"), 'D'), Ativo],
                 Cad("itensManutencao")) { Nome = "item" },
 
@@ -68,7 +68,7 @@ public static class CadastrosDesign
 
             "usuarios" => new("Registro de usuário", "Atendentes que entram no Módulo Office",
                 "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0", Cinza,
-                [new("login", "Login", 1), new("nome", "Nome", 2), new("senha", "Nova senha (em branco = manter)", 1, "password"), new("perfilId", "Perfil de acesso", 1, "lista", Itens: Perfis), new("admin", "Administrador", 1, "bool")],
+                [new("login", "Login", 1), new("nome", "Nome", 2), new("senha", "Nova senha (vazio = manter)", 1, "password"), new("perfilId", "Perfil de acesso", 1, "lista", Itens: Perfis), new("admin", "Administrador", 1, "bool")],
                 [new("Login", 140, r => r.S("login")), new("Nome", 0, r => r.S("nome")), new("Perfil de acesso", 150, r => r.S("perfil")), new("Admin", 80, r => SimNao(r, "admin"), 'C'), Ativo,
                  new("Último acesso", 160, r => r.D("ultimoAcesso") is DateTime d ? d.ToString("dd/MM HH:mm") : "")],
                 Cad("usuarios"), ("Trocar senha", r => TrocarSenha(r))) { Nome = "usuário" },

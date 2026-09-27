@@ -120,7 +120,7 @@ public sealed class FormAjuda : Janela
     {
         var texto = secao switch
         {
-            "Atalhos do teclado" => "F1  ·  Abrir esta ajuda\nF2  ·  Cadastro rápido de cliente\nF3  ·  Buscar cliente\nF9  ·  Cobrar reserva selecionada\nCtrl+A  ·  Aprovar pré-reserva\nEnter  ·  Abrir ou editar o registro selecionado\nIns  ·  Incluir cliente na bateria\nCtrl+P  ·  Imprimir termo ou lista de participantes\nDel  ·  Excluir o registro selecionado\nEsc  ·  Fechar a janela atual",
+            "Atalhos do teclado" => "F1  ·  Abrir esta ajuda\nF2  ·  Cadastro rápido de cliente\nF3  ·  Buscar cliente\nF9  ·  Cobrar reserva selecionada\nCtrl+A  ·  Aprovar pré-reserva\nEnter  ·  Abrir ou editar o registro selecionado\nIns  ·  Incluir cliente na bateria\nCtrl+P  ·  Imprimir o relatório da tela atual\nDel  ·  Excluir o registro selecionado\nEsc  ·  Fechar a janela atual",
             "Suporte remoto" => "Para suporte, informe ao responsável de TI o nome do computador, o usuário conectado e o horário do problema. Não compartilhe sua senha.",
             _ => "Use a árvore lateral para alternar entre reservas, baterias, vendas e listas.\nClique com o botão direito numa linha para ver as ações disponíveis.\nO caixa é individual por usuário, terminal e turno. Confira o nome do terminal antes de iniciar uma venda."
         };

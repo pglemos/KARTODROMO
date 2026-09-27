@@ -114,8 +114,16 @@ public static class Relatorios
         Abrir(dono, "participantes", data);
     }
 
+    /// <summary>Abre a lista rápida de baterias da Cronometragem, inclusive encerradas.</summary>
+    public static void Cronometragem(Form dono, JsonObject bateria = null, string tipo = "resultados_oficiais", bool abrirAutomaticamente = false)
+    {
+        using var f = new FormRelatoriosCronometragem(bateria, tipo, abrirAutomaticamente);
+        f.ShowDialog(dono);
+    }
+
     public static void Abrir(Form dono, string relatorio = "fechamento", DateTime? data = null)
     {
+        if (relatorio == "crono-resultados") { Cronometragem(dono); return; }
         using var f = new FormRelatoriosOffice(relatorio, data);
         f.ShowDialog(dono);
     }
@@ -127,7 +135,7 @@ public class FormRelatoriosOffice : DialogoDesign
 {
     static readonly (string chave, string nome)[] Tipos =
     [
-        ("fechamento", "Fechamento de caixa"), ("reservas-diaria", "Reservas diária"),
+        ("fechamento", "Fechamento de caixa"), ("reservas-diaria", "Reservas do dia"),
         ("clientes", "Clientes por período"), ("participantes", "Lista de participantes"),
         ("agenda", "Agenda mensal"), ("termo", "Termo de responsabilidade (em branco)"),
         ("receitas-forma", "Financeiro · Receitas por forma de pagamento"), ("receitas-cliente", "Financeiro · Receitas por clientes"),
@@ -209,7 +217,7 @@ public class FormRelatoriosOffice : DialogoDesign
         var api = Sessao.Api;
         switch (Tipo)
         {
-            case "reservas-diaria": _tituloJanela = "Reservas diária"; return api.UrlComToken("/relatorio/reservas-diaria?data=" + Fmt.Iso(_de.Value));
+            case "reservas-diaria": _tituloJanela = "Reservas do dia"; return api.UrlComToken("/relatorio/reservas-diaria?data=" + Fmt.Iso(_de.Value));
             case "clientes": _tituloJanela = "Clientes por período"; return api.UrlComToken("/relatorio/clientes?" + Q);
             case "agenda": _tituloJanela = "Agenda mensal"; return api.UrlComToken("/relatorio/agenda?mes=" + _de.Value.ToString("yyyy-MM"));
             case "termo": _tituloJanela = "Termo de Responsabilidade"; return api.UrlComToken("/termo?branco=1");
@@ -244,17 +252,21 @@ public class FormRelatoriosOffice : DialogoDesign
             case "crono-resultados":
             {
                 _tituloJanela = "Resultado";
-                var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-                var js = System.Text.Json.Nodes.JsonNode.Parse(await http.GetStringAsync(Config.CronoUrl.TrimEnd('/') + "/api/sessions"))!.AsArray().OfType<JsonObject>()
-                    .Where(x => x.L("startedAt") is long st && DateTimeOffset.FromUnixTimeMilliseconds(st).LocalDateTime.Date >= _de.Value.Date && DateTimeOffset.FromUnixTimeMilliseconds(st).LocalDateTime.Date <= _ate.Value.Date).ToList();
+                var js = await Sessao.Api.Lista($"/api/office/crono/sessoes?de={Fmt.Iso(_de.Value)}&ate={Fmt.Iso(_ate.Value)}");
                 if (js.Count == 0) { Msg.Aviso(this, "Nenhuma corrida cronometrada nesse período."); return null; }
                 MostrarEscolha("Escolha a prova", [new("Início", 120), new("Prova", 460), new("Situação", 120), new("Pilotos", 80, Direita: true)], js,
-                    x => [DateTimeOffset.FromUnixTimeMilliseconds(x.L("startedAt") ?? 0).LocalDateTime.ToString("dd/MM HH:mm"), x.S("name"), x.S("state") switch { "finalizada" => "Finalizada", "em_andamento" => "Em andamento", var st => st }, x.S("competitors")],
+                    x => [DataCrono(x).ToString("dd/MM HH:mm"), x.S("name"), x.S("state") switch { "encerrada" => "Encerrada", "em_andamento" => "Em andamento", var st => st }, x.S("competitors")],
                     x => Config.CronoUrl.TrimEnd('/') + "/resultado/" + Uri.EscapeDataString(x.S("id")));
                 return null;
             }
         }
         return null;
+    }
+
+    static DateTime DataCrono(JsonObject sessao)
+    {
+        var ms = sessao.L("startedAt") ?? sessao.L("finishedAt") ?? sessao.L("createdAt");
+        return ms is long n && n > 0 ? DateTimeOffset.FromUnixTimeMilliseconds(n).LocalDateTime : DateTime.MinValue;
     }
 
     void Gerar() => Seguro.Rodar(this, async () =>
