@@ -68,20 +68,21 @@ static class TemaCrono
         grid.Dock = DockStyle.Fill;
         grid.BackgroundColor = Cartao;
         grid.BorderStyle = BorderStyle.None;
-        grid.GridColor = Borda;
+        grid.GridColor = Color.FromArgb(240, 240, 242);
+        grid.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
         grid.EnableHeadersVisualStyles = false;
         grid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
         grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(251, 251, 253);
         grid.ColumnHeadersDefaultCellStyle.ForeColor = Secundario;
-        grid.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+        grid.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI Semibold", 9F);
         grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(251, 251, 253);
-        grid.ColumnHeadersHeight = 32;
+        grid.ColumnHeadersHeight = 30;
         grid.DefaultCellStyle.Font = Normal;
         grid.DefaultCellStyle.ForeColor = Texto;
-        grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(231, 245, 239);
+        grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(226, 239, 234);
         grid.DefaultCellStyle.SelectionForeColor = Texto;
         grid.RowHeadersVisible = false;
-        grid.RowTemplate.Height = 30;
+        grid.RowTemplate.Height = 33;
         grid.AllowUserToAddRows = editavel;
         grid.AllowUserToDeleteRows = editavel;
         grid.AllowUserToResizeRows = false;
@@ -103,7 +104,7 @@ static class TemaCrono
         });
     }
 
-    sealed class PainelArredondado : Panel
+    public sealed class PainelArredondado : Panel
     {
         public int Raio { get; set; } = 14;
         protected override void OnResize(EventArgs eventargs)

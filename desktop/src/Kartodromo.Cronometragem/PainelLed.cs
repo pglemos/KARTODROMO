@@ -51,6 +51,8 @@ sealed class PainelLed : IDisposable
     {
         try
         {
+            // testes automáticos nunca abrem a porta serial do placar (a COM3 é da pista)
+            if (Environment.GetEnvironmentVariable("KARTODROMO_SEM_PAINEL") == "1") { Porta = ""; return; }
             if (!File.Exists(ArquivoConfig)) { Porta = ""; return; }
             var j = JsonNode.Parse(File.ReadAllText(ArquivoConfig))?.AsObject();
             Porta = j?["porta"]?.GetValue<string>()?.Trim().ToUpperInvariant() ?? "";

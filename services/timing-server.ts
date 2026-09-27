@@ -929,8 +929,8 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         const body = await readBody(req);
         const competitor = s.competitors.find((item) => item.kart === m[3]);
         if (!competitor) return send(res, 404, { error: 'Competidor não encontrado.' });
-        const flag = String(body.flag ?? '') as 'green' | 'yellow' | 'red' | 'white' | 'checkered';
-        if (!['green', 'yellow', 'red', 'white', 'checkered'].includes(flag)) return send(res, 400, { error: 'Bandeira inválida.' });
+        const flag = String(body.flag ?? '') as NonNullable<(typeof competitor)['flag']>;
+        if (!['none', 'green', 'yellow', 'red', 'white', 'checkered', 'black', 'mechanical', 'warning', 'blue', 'penalty'].includes(flag)) return send(res, 400, { error: 'Bandeira inválida.' });
         competitor.flag = flag;
       } else if (action === 'laps' && m[3] === 'invalidate' && method === 'POST') {
         const body = await readBody(req);

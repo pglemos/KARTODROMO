@@ -3,6 +3,8 @@
 export type SessionType = 'treino' | 'classificacao' | 'corrida';
 export type SessionState = 'preparando' | 'em_andamento' | 'bandeira_final' | 'encerrada' | 'cancelada';
 export type RaceFlag = 'none' | 'green' | 'yellow' | 'red' | 'white' | 'checkered';
+/** Bandeiras só para um piloto (sinalização): preta, preta com círculo laranja (mecânico), preta e branca (advertência), azul (deixe passar), penalidade. */
+export type PilotFlag = 'black' | 'mechanical' | 'warning' | 'blue' | 'penalty';
 
 export type Crossing = {
   id?: string;
@@ -25,7 +27,7 @@ export type Competitor = {
   customerId?: string | null;
   category?: string | null;
   autoAdded?: boolean;
-  flag?: RaceFlag;
+  flag?: RaceFlag | PilotFlag;
   crossings: Crossing[];
   finished: boolean;
 };
