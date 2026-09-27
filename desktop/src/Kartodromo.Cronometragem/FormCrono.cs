@@ -1009,7 +1009,9 @@ public partial class FormCrono : Form
         var andando = _sess.S("state") is "em_andamento" or "bandeira_final" && !_sess.B("aguardandoLargada");
         var delta = andando && _sess.S("currentFlag") != "red" ? (long)(DateTime.Now - _lidoEm).TotalMilliseconds : 0;
         _lCrono.Text = Crono.Relogio((_sess.L("elapsedMs") ?? 0) + delta);
-        _lRestante.Text = _sess.L("remainingMs") is long rest ? Crono.Relogio(Math.Max(0, rest - delta))[..8] : "---";
+        // o tempo acabou: a prova continua até o cronometrista dar a quadriculada (nunca encerra sozinha)
+        var esgotado = _sess.S("state") == "em_andamento" && _sess.L("durationMs") > 0 && (_sess.B("tempoEsgotado") || _sess.L("remainingMs") is long r0 && r0 - delta <= 0);
+        _lRestante.Text = esgotado ? "ESGOTADO" : _sess.L("remainingMs") is long rest ? Crono.Relogio(Math.Max(0, rest - delta))[..8] : "---";
     }
 
     // ------------------------------------------------------------------ acoes

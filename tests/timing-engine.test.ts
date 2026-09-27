@@ -21,7 +21,7 @@ import {
   setRaceFlag,
   tick,
   toggleLapInvalid,
-  AUTO_CLOSE_AFTER_CHECKERED_MS,
+  timeIsUp,
 } from '../lib/timing/race-engine';
 import { createCatalogRecord, deleteCatalogRecord, distributeProof, duplicateEvent, emptyCatalog, normalizeCatalog } from '../lib/timing/catalog';
 
@@ -262,27 +262,46 @@ describe('race-engine', () => {
     expect(st.map((r) => r.kart)).toEqual(['10', '20', '30']);
   });
 
-  it('quadriculada por tempo: cada kart termina na proxima passagem e a bateria encerra', () => {
+  it('tempo esgotado so avisa: a prova segue contando voltas ate o cronometrista dar a quadriculada', () => {
     const s = race('corrida', 1);
     applyPassing(s, { kart: '4', decoderTimeMs: 0, wallMs: 5_000 });
     applyPassing(s, { kart: '5', decoderTimeMs: 500, wallMs: 5_500 });
     // o cronômetro começou na 1ª passagem (5 s): 1 min acaba em 65 s
-    tick(s, 64_000);
+    expect(tick(s, 64_000)).toBe(false);
+    expect(timeIsUp(s, 64_000)).toBe(false);
+    expect(tick(s, 65_000)).toBe(true); // avisa uma vez
+    expect(tick(s, 66_000)).toBe(false);
     expect(s.state).toBe('em_andamento');
-    tick(s, 65_000);
+    expect(timeIsUp(s, 65_000)).toBe(true);
+    expect(remainingMs(s, 90_000)).toBe(0);
+    // 20 minutos depois do fim do tempo a prova continua aberta
+    expect(tick(s, 65_000 + 20 * 60_000)).toBe(false);
+    expect(s.state).toBe('em_andamento');
+    expect(applyPassing(s, { kart: '4', decoderTimeMs: 62_000, wallMs: 66_000 })).toBe('counted');
+    expect(applyPassing(s, { kart: '4', decoderTimeMs: 124_000, wallMs: 128_000 })).toBe('counted');
+    // quadriculada do cronometrista: cada kart termina na próxima passagem
+    setRaceFlag(s, 'checkered', 130_000);
     expect(s.state).toBe('bandeira_final');
-    applyPassing(s, { kart: '4', decoderTimeMs: 62_000, wallMs: 66_000 });
-    expect(applyPassing(s, { kart: '4', decoderTimeMs: 130_000, wallMs: 0 })).toBe('ignored-finished');
-    applyPassing(s, { kart: '5', decoderTimeMs: 63_000, wallMs: 67_000 });
+    applyPassing(s, { kart: '4', decoderTimeMs: 186_000, wallMs: 190_000 });
+    expect(applyPassing(s, { kart: '4', decoderTimeMs: 250_000, wallMs: 254_000 })).toBe('ignored-finished');
+    applyPassing(s, { kart: '5', decoderTimeMs: 187_000, wallMs: 191_000 });
+    // todos terminaram, mas quem encerra é o cronometrista
+    expect(s.state).toBe('bandeira_final');
+    tick(s, 191_000 + 60 * 60_000);
+    expect(s.state).toBe('bandeira_final');
+    closeSession(s, 200_000);
     expect(s.state).toBe('encerrada');
   });
 
-  it('auto-encerra 3 min depois da quadriculada se algum kart nao passar', () => {
+  it('aumentar o tempo depois de esgotado volta a contar o restante', () => {
     const s = race('treino', 1);
     applyPassing(s, { kart: '4', decoderTimeMs: 0, wallMs: 0 });
-    tick(s, 61_000);
-    tick(s, 61_000 + AUTO_CLOSE_AFTER_CHECKERED_MS);
-    expect(s.state).toBe('encerrada');
+    expect(tick(s, 61_000)).toBe(true);
+    updateSessionParameters(s, { durationMin: 2 }, 61_000);
+    expect(timeIsUp(s, 61_000)).toBe(false);
+    expect(remainingMs(s, 61_000)).toBe(59_000);
+    expect(tick(s, 120_000)).toBe(true);
+    expect(s.state).toBe('em_andamento');
   });
 
   it('volta anulada nao conta como melhor volta', () => {
@@ -314,10 +333,10 @@ describe('race-engine', () => {
       applyPassing(s, { kart: '5', decoderTimeMs: 2_000, wallMs: 92_000 }); // o segundo não mexe na largada
       expect(s.startedAt).toBe(90_000);
       expect(elapsedMs(s, 120_000)).toBe(30_000);
-      tick(s, 149_999);
+      expect(tick(s, 149_999)).toBe(false);
+      expect(tick(s, 150_000)).toBe(true);
       expect(s.state).toBe('em_andamento');
-      tick(s, 150_000);
-      expect(s.state).toBe('bandeira_final');
+      expect(timeIsUp(s, 150_000)).toBe(true);
     }
   });
 
@@ -422,8 +441,9 @@ describe('race-engine', () => {
     expect(tick(s, 200_000)).toBe(false);
     setRaceFlag(s, 'green', 200_000);
     expect(elapsedMs(s, 200_000)).toBe(30_000);
-    tick(s, 230_001);
-    expect(s.state).toBe('bandeira_final');
+    expect(tick(s, 229_999)).toBe(false);
+    expect(tick(s, 230_001)).toBe(true);
+    expect(s.state).toBe('em_andamento');
   });
 
   it('inclui passagem manual e recalcula volta ao excluir e restaurar passagem', () => {

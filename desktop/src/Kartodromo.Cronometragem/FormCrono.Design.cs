@@ -365,7 +365,7 @@ public partial class FormCrono
         // faixa do placar (mesmas páginas do painel de LED)
         var ultima = _laps.Where(p => !p.B("deleted") && !p.B("rejected") && p.L("lapMs") != null).OrderByDescending(p => p.L("wallMs")).FirstOrDefault();
         _faixa.Volta = standings.FirstOrDefault()?.I("laps") is int lv && lv > 0 ? lv.ToString() : ultima?.I("lap").ToString() ?? "—";
-        _faixa.Situacao = s0 == null ? "SEM PROVA" : s0.B("aguardandoLargada") ? "AGUARDANDO" : estado switch { "em_andamento" => flag == "red" ? "PARADA" : "EM PROVA", "bandeira_final" => "FINAL", "encerrada" => "ENCERRADA", "preparando" => "AGUARDANDO", _ => Crono.Estado(estado).ToUpperInvariant() };
+        _faixa.Situacao = s0 == null ? "SEM PROVA" : s0.B("aguardandoLargada") ? "AGUARDANDO" : estado switch { "em_andamento" => flag == "red" ? "PARADA" : s0.B("tempoEsgotado") ? "ESGOTADO" : "EM PROVA", "bandeira_final" => "FINAL", "encerrada" => "ENCERRADA", "preparando" => "AGUARDANDO", _ => Crono.Estado(estado).ToUpperInvariant() };
         var pag = Math.Max(0, _painel.Pagina);
         _faixa.Karts = standings.Skip(pag * 10).Take(12).Select(r => (r.S("kart").Length == 0 ? "—" : r.S("kart").PadLeft(2, '0'), r.I("gapLaps"))).ToList();
         _faixa.Paginas = Math.Max(1, (int)Math.Ceiling(standings.Count / 10.0));

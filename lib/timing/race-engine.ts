@@ -47,6 +47,8 @@ export type Session = {
   greenAt?: number | null;
   checkeredAt: number | null;
   finishedAt: number | null;
+  /** hora em que o tempo programado acabou: só avisa, quem dá a quadriculada e encerra é o cronometrista */
+  timeUpAt?: number | null;
   currentFlag?: RaceFlag;
   redFlagAt?: number | null;
   redFlagElapsedMs?: number | null;
@@ -85,8 +87,6 @@ export type Standing = {
 const DAY_MS = 86_400_000;
 /** Diferença aceitável entre o relógio do decoder e o do servidor numa volta (atraso de rede). */
 const DECODER_CLOCK_TOLERANCE_MS = 3_000;
-/** após a quadriculada, encerra sozinho depois desse tempo mesmo que algum kart não passe */
-export const AUTO_CLOSE_AFTER_CHECKERED_MS = 3 * 60_000;
 
 export function createSession(input: {
   id: string;
@@ -161,7 +161,10 @@ export function updateSessionParameters(
   }
 
   if (typeof parameters.name === 'string') session.name = parameters.name.trim() || session.name;
-  if (durationMs !== undefined) session.durationMs = durationMs;
+  if (durationMs !== undefined && durationMs !== session.durationMs) {
+    session.durationMs = durationMs;
+    session.timeUpAt = null;
+  }
   if (maxLaps !== undefined) session.maxLaps = maxLaps;
 
   if (session.state === 'em_andamento' && session.maxLaps !== null) {
@@ -391,7 +394,6 @@ export function applyPassing(session: Session, p: { id?: string; kart: string; d
     checkered(session, p.wallMs);
   }
 
-  if (session.state === 'bandeira_final' && session.competitors.every((c) => c.finished || activeCrossings(c).length === 0)) closeSession(session, p.wallMs);
   return 'counted';
 }
 
@@ -469,16 +471,22 @@ export function clearCrossings(session: Session) {
   }
 }
 
-/** Chamado periodicamente: quadriculada por tempo e auto-encerramento. */
+/**
+ * Chamado periodicamente. Nunca dá a quadriculada nem encerra a bateria sozinho: quando o tempo
+ * programado acaba só marca timeUpAt (true = mudou, avisar as telas). A quadriculada e o
+ * encerramento são sempre do cronometrista.
+ */
 export function tick(session: Session, now: number): boolean {
-  const before = session.state;
-  if (session.state === 'em_andamento' && session.durationMs > 0 && session.startedAt !== null && session.redFlagAt == null) {
-    if (elapsedMs(session, now) >= session.durationMs) checkered(session, now);
-  }
-  if (session.state === 'bandeira_final' && session.checkeredAt !== null) {
-    if (now - session.checkeredAt >= AUTO_CLOSE_AFTER_CHECKERED_MS) closeSession(session, now);
-  }
-  return before !== session.state;
+  if (session.state !== 'em_andamento' || session.timeUpAt != null) return false;
+  if (session.durationMs <= 0 || session.startedAt === null || session.redFlagAt != null) return false;
+  if (elapsedMs(session, now) < session.durationMs) return false;
+  session.timeUpAt = now;
+  return true;
+}
+
+/** O tempo programado já acabou e a prova segue esperando a quadriculada do cronometrista. */
+export function timeIsUp(session: Session, now: number): boolean {
+  return session.state === 'em_andamento' && session.durationMs > 0 && session.startedAt !== null && elapsedMs(session, now) >= session.durationMs;
 }
 
 export function toggleLapInvalid(session: Session, kart: string, lapNumber: number) {

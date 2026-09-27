@@ -26,6 +26,7 @@ import {
   cancelSession,
   clearCrossings,
   closeSession,
+  timeIsUp,
   computeStandings,
   createSession,
   aguardandoLargada,
@@ -298,11 +299,11 @@ let outrasNaHora = 0;
 setInterval(() => { outrasNaHora = 0; }, 3_600_000).unref();
 decoder = createDecoderClient(activeDecoderConfig);
 
-// relogio: quadriculada por tempo e auto-encerramento
+// relógio: avisa quando o tempo programado acaba (a quadriculada e o encerramento são do cronometrista)
 setInterval(() => {
   const s = runningSession();
   if (s && tick(s, Date.now())) {
-    log(`bateria ${s.name} -> ${s.state}`);
+    log(`bateria ${s.name}: TEMPO ESGOTADO, aguardando a quadriculada do cronometrista`);
     saveSession(s);
     scheduleStateBroadcast();
   }
@@ -327,6 +328,7 @@ function sessionView(s: Session) {
     checkeredAt: s.checkeredAt,
     finishedAt: s.finishedAt,
     remainingMs: remainingMs(s, now),
+    tempoEsgotado: timeIsUp(s, now),
     elapsedMs: elapsedMs(s, now),
     currentFlag: s.currentFlag ?? 'none',
     eventId: s.eventId ?? null,
