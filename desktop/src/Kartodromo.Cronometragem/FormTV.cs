@@ -167,8 +167,8 @@ public class FormTV : Form
             var y = topo + hCab + i * hLin;
             using (var fundo = new SolidBrush(i % 2 == 0 ? Color.FromArgb(22, 22, 24) : Color.FromArgb(12, 12, 14))) g.FillRectangle(fundo, x0, y, lw, hLin - 1);
             var gapL = s.I("gapLaps");
-            var dif = i == 0 ? "" : gapL > 0 ? $"+{gapL}v" : Crono.Volta(s.L("gapMs"));
-            string[] v = [s.S("position"), s.S("kart"), s.S("name").Length > 0 ? s.S("name").ToUpperInvariant() : "KART " + s.S("kart"), s.S("laps"), Crono.Volta(s.L("lastLapMs")), Crono.Volta(s.L("bestLapMs")), dif];
+            var dif = i == 0 ? "" : gapL > 0 ? $"+{gapL}v" : Crono.VoltaTv(s.L("gapMs"));
+            string[] v = [s.S("position"), s.S("kart"), s.S("name").Length > 0 ? s.S("name").ToUpperInvariant() : "KART " + s.S("kart"), s.S("laps"), Crono.VoltaTv(s.L("lastLapMs")), Crono.VoltaTv(s.L("bestLapMs")), dif];
             x = x0;
             for (var c = 0; c < v.Length; c++)
             {

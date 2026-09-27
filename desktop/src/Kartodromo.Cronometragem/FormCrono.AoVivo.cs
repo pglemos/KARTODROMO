@@ -107,7 +107,7 @@ public partial class FormCrono
     {
         var dl = r.I("position") == 1 ? "" : r.I("gapLaps") > 0 ? $"+{r.I("gapLaps")} volta{(r.I("gapLaps") == 1 ? "" : "s")}" : Crono.Volta(r.L("gapMs"));
         var speed = double.TryParse(r["averageSpeedKmh"]?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var kmh) ? kmh.ToString("0.0", Fmt.Br) : "—";
-        return [r.I("position"), r.S("kart"), r.S("name"), r.S("bestLapNumber"), Crono.Volta(r.L("bestLapMs")), r.I("laps"), Crono.Volta(r.L("lastLapMs")), Crono.Relogio(r.L("totalMs")), dl, "", speed];
+        return [r.I("position"), r.S("kart"), r.S("name"), r.S("bestLapNumber"), Crono.Volta(r.L("bestLapMs")), r.I("laps"), Crono.Volta(r.L("lastLapMs")), Crono.Volta(r.L("totalMs")), dl, "", speed];
     }
 
     void EnviarWhatsApp()

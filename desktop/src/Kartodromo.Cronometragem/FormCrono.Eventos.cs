@@ -73,7 +73,9 @@ public partial class FormCrono
         como.Controls.Add(caixa);
         provas.Controls.Add(_gProvas); provas.Controls.Add(como); _gProvas.BringToFront();
         _tituloProvas.Text = "Provas";
-        var proximo = BotaoPeq("Próximo: competidores →", 3, () => _abas.SelectedIndex = 1);
+        // como no canvas: "Próximo" leva aos competidores da prova escolhida (cria a bateria com os inscritos da recepção,
+        // ou abre a que já existe)
+        var proximo = BotaoPeq("Próximo: competidores →", 3, () => { if (_gProvas.ChaveAtual is JsonObject) CriarBateriaDaProva(); else _abas.SelectedIndex = 1; });
         var pr = CartaoPasso(3, null, new Label { Text = "Vêm do produto vendido · podem ser ajustadas aqui" }, provas,
             [BotaoPeq("+ Nova prova", 1, () => EditarCatalogo("provas")), BotaoPeq("Editar", 0, () => EditarCatalogo("provas", true)), BotaoPeq("Excluir", 2, () => ExcluirCatalogo("provas")),
              BotaoPeq("Distribuir", 0, DistribuirProva), BotaoPeq("Imprimir", 0, () => ImprimirResumo("Provas", _proofs.Select(x => x.S("name")).ToList()))], null, _tituloProvas, proximo);
@@ -91,13 +93,13 @@ public partial class FormCrono
         _gAgenda.Columns[1].DefaultCellStyle.Font = new Font("Segoe UI Semibold", 9.6F);
         var ag = CartaoPasso(0, "Baterias de hoje · recepção", new Label { Text = "Os pilotos inscritos entram sozinhos · dois cliques cria a bateria" }, _gAgenda,
             [BotaoPeq("Criar bateria com os inscritos", 1, () => NovaBateria(_gAgenda.ChaveAtual as JsonObject)), BotaoPeq("Atualizar", 0, () => Seguro.Rodar(this, CarregarAgenda))]);
-        var col1 = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = Padding.Empty, Margin = new Padding(0, 0, 14, 0), BackColor = TemaCrono.Fundo };
-        col1.RowStyles.Add(new RowStyle(SizeType.Percent, 58)); col1.RowStyles.Add(new RowStyle(SizeType.Percent, 42));
-        ag.Margin = new Padding(0, 0, 0, 14); ev.Margin = Padding.Empty;
-        col1.Controls.Add(ag, 0, 0); col1.Controls.Add(ev, 0, 1);
+        // Eventos.dc.html: a coluna 1 é só Eventos. As baterias do dia chegam da recepção como o evento "Baterias dd/mm/aaaa"
+        // (grupos = baterias, provas = do produto), montado pelo servidor da cronometragem; o cartão da agenda saiu.
+        _ = ag;
+        var col1 = ev; ev.Margin = new Padding(0, 0, 14, 0);
         // a recepção vende o tempo todo: a lista se atualiza sozinha a cada 30 s enquanto a aba está aberta
         var relogioAgenda = new System.Windows.Forms.Timer { Interval = 30_000 };
-        relogioAgenda.Tick += (_, _) => { if (_abas.SelectedIndex == 0 && Visible && WindowState != FormWindowState.Minimized) _ = CarregarAgenda(); };
+        relogioAgenda.Tick += (_, _) => { if (_abas.SelectedIndex == 0 && Visible && WindowState != FormWindowState.Minimized) { _ = CarregarAgenda(); _ = CarregarCatalogo(); } };
         relogioAgenda.Start();
         page.Disposed += (_, _) => relogioAgenda.Dispose();
         grade.Controls.Add(col1, 0, 0); grade.Controls.Add(gr, 1, 0); grade.Controls.Add(pr, 2, 0);

@@ -36,9 +36,23 @@ public static class Crono
     public static string Volta(long? ms)
     {
         if (ms is not long v) return "";
+        // formato do canvas (AoVivo.dc.html): 55.214 · 1:02.470 · 12:57.041 · 1:02:03.456
+        var t = TimeSpan.FromMilliseconds(v);
+        return t.TotalHours >= 1 ? t.ToString(@"h\:mm\:ss\.fff", CultureInfo.InvariantCulture)
+            : t.TotalMinutes >= 1 ? $"{(int)t.TotalMinutes}:{t.Seconds:00}.{t.Milliseconds:000}"
+            : $"{t.Seconds}.{t.Milliseconds:000}";
+    }
+
+    /// <summary>Formato antigo (mm:ss.fff), só para o telão --tv, que não muda.</summary>
+    public static string VoltaTv(long? ms)
+    {
+        if (ms is not long v) return "";
         var t = TimeSpan.FromMilliseconds(v);
         return t.TotalHours >= 1 ? t.ToString(@"h\:mm\:ss\.fff", CultureInfo.InvariantCulture) : t.ToString(@"mm\:ss\.fff", CultureInfo.InvariantCulture);
     }
+
+    /// <summary>Hora da passagem como no canvas: 18:55:19.4 (décimo de segundo).</summary>
+    public static string HoraCurta(long? wallMs) => Hora(wallMs) is { Length: >= 10 } h ? h[..10] : Hora(wallMs);
 
     public static string Relogio(long? ms)
     {

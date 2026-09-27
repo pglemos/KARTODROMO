@@ -591,7 +591,7 @@ public class FormPrincipal : Form
             G("Financeiro", I("Receitas por forma de pagamento", () => Relatorios.Periodo(this, "receitas", "forma")), I("Receitas por clientes", () => Relatorios.Periodo(this, "receitas", "cliente")),
                 I("Receitas por produto", () => Relatorios.Periodo(this, "receitas", "produto")), I("Fluxo de caixa", () => Relatorios.Periodo(this, "receitas", "dia"))),
             new ToolStripSeparator(),
-            I("Fechamento de caixa", () => Relatorios.Fechamento(this)), I("Reservas do dia", () => Relatorios.ReservasDiaria(this, _data.Value)),
+            I("Fechamento de caixa", () => Relatorios.Fechamento(this)), I("Reservas diária", () => Relatorios.ReservasDiaria(this, _data.Value)),
             I("Clientes por período", () => Relatorios.Periodo(this, "clientes", null)), I("Lista de participantes", () => Relatorios.Participantes(this, _grupo == "baterias" ? _grade.Atual : null, _data.Value)),
             I("Agenda mensal", () => Relatorios.AgendaMensal(this)), I("Termo de responsabilidade (em branco)", () => Relatorio.Abrir(this, Sessao.Api.UrlComToken("/termo?branco=1"), "Termo de Responsabilidade"))));
         m.Items.Add(S("&Ajuda", I("Manual da recepção", () => new FormAjuda("Manual da recepção").ShowDialog(this)), A(I("Atalhos do teclado", () => new FormAjuda("Atalhos do teclado").ShowDialog(this)), "F1"),

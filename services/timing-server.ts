@@ -599,7 +599,8 @@ async function opsGet(path: string) {
  * fora, tenta de novo a cada 5 minutos (baterias dos últimos 2 dias).
  */
 async function enviarUsoKarts(s: Session) {
-  if (s.usoKartsEnviado || s.state !== 'encerrada') return;
+  // simulador (testes) nunca grava horas de uso de mentira no controle da oficina de verdade
+  if (SIMULATE || s.usoKartsEnviado || s.state !== 'encerrada') return;
   const karts = s.competitors
     .map((c) => {
       const t = c.crossings.filter((x) => !x.deleted).map((x) => x.wallMs).sort((a, b) => a - b);
@@ -628,6 +629,103 @@ setInterval(() => {
   const limite = Date.now() - 2 * 86_400_000;
   for (const s of sessions.values()) if (s.state === 'encerrada' && !s.usoKartsEnviado && (s.finishedAt ?? s.createdAt) > limite) void enviarUsoKarts(s);
 }, 5 * 60_000);
+
+// ---------------------------------------------------------------- agenda da recepção -> evento do dia (canvas Eventos.dc.html)
+// Como no canvas: cada dia vira o evento "Baterias dd/mm/aaaa", cada bateria da agenda da recepção vira um grupo e as
+// provas vêm do produto vendido (Tomada de tempo + Corrida...). As provas criadas aqui podem ser ajustadas pelo
+// cronometrista: a sincronização só cria o que falta, nunca sobrescreve.
+
+type BateriaAgenda = { id: number; nome?: string; inicio?: string; tipoKart?: string };
+type ProgramaAgenda = { ordem?: number; nome?: string; tipo?: string; finalizacao?: string; tempoMin?: number; voltasMax?: number; voltaMinimaSeg?: number };
+const programasAgenda = new Map<number, { em: number; provas: ProgramaAgenda[] }>();
+
+function hojeBrasilia() {
+  return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+}
+
+function inicioDoDia() {
+  const [a, m, d] = hojeBrasilia().split('-').map(Number);
+  return new Date(a, m - 1, d).getTime();
+}
+
+async function sincronizarAgendaDoDia() {
+  const hoje = hojeBrasilia();
+  let baterias: BateriaAgenda[];
+  try { baterias = (await opsGet(`/api/baterias?data=${hoje}`)) as BateriaAgenda[]; } catch { return false; }
+  if (!Array.isArray(baterias) || !baterias.length) return false;
+  let mudou = false;
+  const eventId = `agenda-${hoje}`;
+  const [a, m, d] = hoje.split('-');
+  if (!catalog.events.some((e) => e.id === eventId)) {
+    catalog.events.push({ id: eventId, name: `Baterias ${d}/${m}/${a}`, date: hoje, venue: TRACK_NAME, trackId: null, active: true, createdAt: Date.now() });
+    mudou = true;
+  }
+  // categorias do canvas (Indoor · Super Kart): separam os resultados "Por categoria"
+  const categoria = (nome: string) => {
+    let c = catalog.categories.find((x) => x.name.trim().toLowerCase() === nome.toLowerCase());
+    if (!c) { c = { id: `cat-${nome.toLowerCase().replace(/W+/g, '-')}`, name: nome, color: nome === 'Super Kart' ? '#B45309' : '#0B7A53', sport: 'Karting', active: true }; catalog.categories.push(c); mudou = true; }
+    return c.id;
+  };
+  for (const [i, b] of baterias.entries()) {
+    const groupId = `agenda-b${b.id}`;
+    const nome = String(b.nome ?? '').trim() || `Bateria ${b.id}`;
+    const grupo = catalog.groups.find((g) => g.id === groupId);
+    const catId = categoria(String(b.tipoKart ?? '').toLowerCase() === 'super' ? 'Super Kart' : 'Indoor');
+    if (!grupo) { catalog.groups.push({ id: groupId, eventId, name: nome, categoryId: catId, order: i + 1, active: true }); mudou = true; }
+    else if (!grupo.categoryId) { grupo.categoryId = catId; mudou = true; }
+    else if (grupo.name !== nome || grupo.order !== i + 1) { grupo.name = nome; grupo.order = i + 1; mudou = true; }
+    let prog = programasAgenda.get(b.id);
+    if (!prog || Date.now() - prog.em > 10 * 60_000) {
+      let provas: ProgramaAgenda[] = prog?.provas ?? [];
+      try { provas = (await opsGet(`/api/crono/baterias/${b.id}/programa`)) as ProgramaAgenda[]; } catch { /* fica o que já tinha */ }
+      prog = { em: Date.now(), provas: Array.isArray(provas) ? provas : [] };
+      programasAgenda.set(b.id, prog);
+    }
+    const lista = prog.provas.length ? prog.provas : [{ nome: 'CORRIDA', tipo: 'corrida', finalizacao: 'tempo', tempoMin: 20 }];
+    const hora = String(b.inicio ?? '').slice(11, 16);
+    let minutos = /^\d{2}:\d{2}$/.test(hora) ? Number(hora.slice(0, 2)) * 60 + Number(hora.slice(3, 5)) : null;
+    lista.forEach((p, k) => {
+      const id = `agenda-b${b.id}-${k + 1}`;
+      const porVoltas = p.finalizacao === 'voltas';
+      const tempo = porVoltas ? 0 : Number(p.tempoMin ?? 20);
+      if (!catalog.provas.some((x) => x.id === id)) {
+        const tipo: SessionType = p.tipo === 'treino' || p.tipo === 'classificacao' || p.tipo === 'corrida' ? p.tipo : 'corrida';
+        catalog.provas.push({
+          id, eventId, groupId, agendaId: String(b.id), order: k + 1, heats: 1, intervalMin: 0, trackId: null,
+          name: String(p.nome ?? '').trim() || (tipo === 'classificacao' ? 'TOMADA DE TEMPO' : tipo === 'treino' ? 'TREINO' : 'CORRIDA'),
+          type: tipo, durationMin: tempo, maxLaps: porVoltas && Number(p.voltasMax) > 0 ? Number(p.voltasMax) : null,
+          minLapSec: Number(p.voltaMinimaSeg) > 0 ? Number(p.voltaMinimaSeg) : null,
+          startAt: minutos == null ? '' : `${String(Math.floor(minutos / 60) % 24).padStart(2, '0')}:${String(minutos % 60).padStart(2, '0')}`,
+        });
+        mudou = true;
+      }
+      if (minutos != null) minutos += (tempo || 10) + 5;
+    });
+  }
+  // baterias de hoje já criadas (pelo "Criar bateria", pelo tablet ou antes desta versão) entram no grupo/prova certos
+  const usadas = new Set([...sessions.values()].filter((x) => x.proofId && x.state !== 'cancelada').map((x) => x.proofId));
+  for (const s of [...sessions.values()].sort((x, y) => x.createdAt - y.createdAt)) {
+    if (s.proofId || s.state === 'cancelada' || s.createdAt < inicioDoDia()) continue;
+    let aid = s.agendaId ?? null;
+    if (!aid) {
+      const k = s.name.lastIndexOf(' · ');
+      const base = (k > 0 ? s.name.slice(0, k) : s.name).trim().toLowerCase();
+      aid = baterias.find((b) => String(b.nome ?? '').trim().toLowerCase() === base)?.id ?? null;
+    }
+    if (!aid) continue;
+    const provas = catalog.provas.filter((p) => p.agendaId === String(aid)).sort((x, y) => x.order - y.order);
+    const alvo = provas.find((p) => p.type === s.type && !usadas.has(p.id)) ?? (provas.length === 1 && !usadas.has(provas[0].id) ? provas[0] : undefined);
+    if (!alvo) continue;
+    s.agendaId = aid; s.eventId = alvo.eventId; s.groupId = alvo.groupId; s.proofId = alvo.id;
+    usadas.add(alvo.id);
+    saveSession(s);
+    mudou = true;
+  }
+  if (mudou) { saveCatalog(); scheduleStateBroadcast(); log(`agenda de ${hoje} sincronizada: ${baterias.length} baterias no evento do dia`); }
+  return mudou;
+}
+setTimeout(() => void sincronizarAgendaDoDia(), 3_000);
+setInterval(() => void sincronizarAgendaDoDia(), 60_000);
 
 const SESSION_TYPES = new Set<SessionType>(['treino', 'classificacao', 'corrida']);
 const CATALOG_ENTITIES = new Set<CatalogEntity>(['events', 'groups', 'provas', 'categories', 'tracks', 'competitors']);
@@ -928,13 +1026,17 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     const body = await readBody(req);
     const type = String(body.type ?? 'treino') as SessionType;
     if (!SESSION_TYPES.has(type)) return send(res, 400, { error: 'Tipo invalido.' });
+    // prova do catálogo que já tem bateria: abre a que existe (não cria outra igual)
+    const prova = typeof body.proofId === 'string' && body.proofId ? catalog.provas.find((p) => p.id === body.proofId) : undefined;
+    const jaExiste = prova ? [...sessions.values()].find((x) => x.proofId === prova.id && x.state !== 'cancelada') : undefined;
+    if (jaExiste) return send(res, 200, sessionView(jaExiste));
     const s = createSession({
       id: `${new Date().toISOString().slice(0, 10)}-${randomUUID().slice(0, 8)}`,
       name: String(body.name ?? ''),
       type,
       durationMin: Number(body.durationMin ?? ((timingSettings.timing as Record<string, unknown> | undefined)?.defaultDurationMin ?? (type === 'corrida' ? 20 : type === 'classificacao' ? 5 : 10))),
       maxLaps: body.maxLaps ? Number(body.maxLaps) : null,
-      minLapSec: body.minLapSec ? Number(body.minLapSec) : Number((timingSettings.timing as Record<string, unknown> | undefined)?.minimumLapSeconds ?? 5),
+      minLapSec: body.minLapSec ? Number(body.minLapSec) : prova?.minLapSec ? prova.minLapSec : Number((timingSettings.timing as Record<string, unknown> | undefined)?.minimumLapSeconds ?? 5),
       now: Date.now(),
       competitors: parseCompetitors(body.competitors),
       eventId: typeof body.eventId === 'string' ? body.eventId : null,
@@ -944,6 +1046,13 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     });
     // bateria da agenda da recepção: guarda de qual horário veio (o app avisa antes de criar a mesma duas vezes)
     if (Number(body.agendaId) > 0) s.agendaId = Number(body.agendaId);
+    if (prova?.agendaId && Number(prova.agendaId) > 0) {
+      // prova do evento do dia (agenda da recepção): nome "BATERIA 18:00 · TOMADA DE TEMPO" e tomada/corrida ligadas
+      s.agendaId = Number(prova.agendaId);
+      s.programaId = `agenda-${prova.agendaId}`;
+      const grupo = catalog.groups.find((g) => g.id === prova.groupId);
+      if (grupo && (!s.name.trim() || s.name.trim() === prova.name)) s.name = `${grupo.name} · ${prova.name}`;
+    }
     sessions.set(s.id, s);
     saveSession(s);
     log(`bateria criada ${s.name} (${s.type}) com ${s.competitors.length} pilotos${s.agendaId ? ` (agenda ${s.agendaId})` : ''}`);

@@ -390,7 +390,7 @@ public partial class FormCrono
             _lPilotosTitulo.Text = s0.S("name");
             _subPilotos.Text = $"{(evento?.S("name") ?? "Bateria avulsa")} · {Crono.Arr(s0, "competitors").Count} competidores · {Crono.Estado(estado)}";
         }
-        _subArvore.Text = evento?.S("name") ?? _events.FirstOrDefault()?.S("name") ?? "Selecione uma prova";
+        _subArvore.Text = _events.FirstOrDefault(e => e.S("id") == _eventoArvore)?.S("name") ?? evento?.S("name") ?? "Selecione uma prova";
         AtualizarExtrasPilotos();
     }
 }

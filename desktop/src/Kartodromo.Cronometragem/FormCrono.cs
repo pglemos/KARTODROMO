@@ -151,7 +151,7 @@ public partial class FormCrono : Form
         seguranca.DropDownItems.Add("Permissões de acesso", null, (_, _) => JanelaCadastro("Permissoes"));
         inicio.DropDownItems.Add(seguranca);
         inicio.DropDownItems.Add(new ToolStripSeparator());
-        inicio.DropDownItems.Add("Sair", null, (_, _) => Close());
+        inicio.DropDownItems.Add(new ToolStripMenuItem("Fechar", null, (_, _) => Close()) { ShortcutKeyDisplayString = "Alt+F4" });
         var cad = new ToolStripMenuItem("Cadastros");
         cad.DropDownItems.Add("Empresa", null, (_, _) => JanelaCadastro("Empresa"));
         cad.DropDownItems.Add(new ToolStripSeparator());
@@ -170,8 +170,10 @@ public partial class FormCrono : Form
         ferr.DropDownItems.Add("Parâmetros da cronometragem", null, (_, _) => JanelaCadastro("ParamCrono"));
         ferr.DropDownItems.Add("Painel de LED (porta serial)", null, (_, _) => ConfigurarPainel());
         ferr.DropDownItems.Add(new ToolStripSeparator());
-        ferr.DropDownItems.Add("Guardar backup de eventos", null, (_, _) => JanelaCadastro("Backup"));
-        ferr.DropDownItems.Add("Guardar backup por data", null, (_, _) => FazerBackup());
+        var backup = new ToolStripMenuItem("Backup de eventos");
+        backup.DropDownItems.Add("Guardar o atual", null, (_, _) => JanelaCadastro("Backup"));
+        backup.DropDownItems.Add("Guardar por data", null, (_, _) => JanelaCadastro("Backup"));
+        ferr.DropDownItems.Add(backup);
         var rel = new ToolStripMenuItem("Relatórios");
         rel.DropDownItems.Add("Banner", null, (_, _) => JanelaCadastro("Banner"));
         rel.DropDownItems.Add("Ranking por peso", null, (_, _) => JanelaCadastro("RankingPeso"));
@@ -181,10 +183,12 @@ public partial class FormCrono : Form
         crono.DropDownItems.Add(new ToolStripMenuItem("Bandeira amarela", null, (_, _) => Bandeira("amarela")) { ShortcutKeyDisplayString = "F2" });
         crono.DropDownItems.Add(new ToolStripMenuItem("Bandeira vermelha", null, (_, _) => Bandeira("vermelha")) { ShortcutKeyDisplayString = "F3" });
         crono.DropDownItems.Add(new ToolStripMenuItem("Bandeira quadriculada", null, (_, _) => Bandeira("quadriculada")) { ShortcutKeyDisplayString = "F4" });
-        crono.DropDownItems.Add(new ToolStripMenuItem("Finalizar prova", null, (_, _) => Acao("close")) { ShortcutKeyDisplayString = "F5" });
-        crono.DropDownItems.Add(new ToolStripMenuItem("Limpar passagens", null, (_, _) => LimparPassagens()) { ShortcutKeyDisplayString = "F6" });
         crono.DropDownItems.Add(new ToolStripMenuItem("Bandeira branca", null, (_, _) => Bandeira("branca")) { ShortcutKeyDisplayString = "F7" });
-        crono.DropDownItems.Add(new ToolStripMenuItem("Cancelar bateria", null, (_, _) => Acao("cancel")));
+        crono.DropDownItems.Add(new ToolStripSeparator());
+        var vermelho = Color.FromArgb(196, 40, 28);
+        crono.DropDownItems.Add(new ToolStripMenuItem("Finalizar prova", null, (_, _) => Acao("close")) { ShortcutKeyDisplayString = "F5", ForeColor = vermelho });
+        crono.DropDownItems.Add(new ToolStripMenuItem("Limpar passagens", null, (_, _) => LimparPassagens()) { ShortcutKeyDisplayString = "F6", ForeColor = vermelho });
+        crono.DropDownItems.Add(new ToolStripMenuItem("Cancelar bateria", null, (_, _) => Acao("cancel")) { ForeColor = vermelho });
         crono.DropDownItems.Add(new ToolStripSeparator());
         crono.DropDownItems.Add(new ToolStripMenuItem("Nova bateria da agenda da recepção…", null, (_, _) => NovaBateria(null)));
         crono.DropDownItems.Add(new ToolStripMenuItem("Criar bateria da prova selecionada", null, (_, _) => CriarBateriaDaProva()));
@@ -196,6 +200,13 @@ public partial class FormCrono : Form
         rel.DropDownItems.Add("WhatsApp", null, (_, _) => EnviarWhatsApp());
         rel.DropDownItems.Add("E-mail", null, (_, _) => EnviarEmail());
         var ajuda = new ToolStripMenuItem("Ajuda");
+        ajuda.DropDownItems.Add("Suporte remoto (AnyDesk)", null, (_, _) =>
+        {
+            var anydesk = new[] { @"C:Program Files (x86)AnyDeskAnyDesk.exe", @"C:Program FilesAnyDeskAnyDesk.exe" }.FirstOrDefault(File.Exists);
+            if (anydesk != null) System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(anydesk) { UseShellExecute = true });
+            else Msg.Aviso(this, "O AnyDesk não está instalado neste computador.");
+        });
+        ajuda.DropDownItems.Add(new ToolStripSeparator());
         ajuda.DropDownItems.Add("Sobre", null, (_, _) => Msg.Info(this, $"Kartódromo - Cronometragem\nVersão {Application.ProductVersion.Split('+')[0]}\n\nServiço de cronometragem: {Config.CronoUrl}\nServidor da operação: {Config.ServidorUrl}\n\nAtalhos: F1 verde · F2 amarela · F3 vermelha · F4 quadriculada · F5 finalizar · F6 limpar passagens · F7 branca · F11 telão", "Sobre"));
         m.Items.AddRange([inicio, cad, ferr, rel, crono, ajuda]);
         return m;
@@ -473,7 +484,7 @@ public partial class FormCrono : Form
         _cbSessao.Width = 310;
         _cbSessao.SelectionChangeCommitted += (_, _) => { if (_cbSessao.SelectedItem is Campos.Item it) Selecionar(it.Dados.S("id")); };
 
-        if (_gPass.Columns.Count == 0) _gPass.Col("#", 40).Col("Nº", 45, filtro: true).Col("Competidor", 130, DataGridViewContentAlignment.MiddleLeft, true, filtro: true).Col("Transp.", 72, filtro: true).Col("Tempo", 76).Col("Volta", 46, filtro: true).Col("Decorrido", 96).Col("Situação", 150, DataGridViewContentAlignment.MiddleLeft, filtro: true);
+        if (_gPass.Columns.Count == 0) _gPass.Col("#", 40).Col("Nº", 45, filtro: true).Col("Competidor", 130, DataGridViewContentAlignment.MiddleLeft, true, filtro: true).Col("Transp.", 72, filtro: true).Col("Tempo", 76).Col("Volta", 46, filtro: true).Col("Hora", 96).Col("Situação", 150, DataGridViewContentAlignment.MiddleLeft, filtro: true);
         TemaCrono.EstilizarGrade(_gPass);
         _gPass.CorFundo = r =>
         {
@@ -523,7 +534,7 @@ public partial class FormCrono : Form
         _gPass.Columns[3].Visible = false; // transponder: fica no filtro/diálogo, fora da vista
         _gPass.Columns[7].Visible = false; // situação: vira cor da linha + dica ao parar o mouse
         _gPass.Columns[0].Width = 36; _gPass.Columns[1].Width = 44; _gPass.Columns[4].Width = 74; _gPass.Columns[5].Width = 54; _gPass.Columns[6].Width = 90;
-        _gPass.Columns[6].HeaderText = "Decorrido";
+        _gPass.Columns[6].HeaderText = "Hora";
         foreach (var c in new[] { 4, 6 }) _gPass.Columns[c].DefaultCellStyle.Font = new Font("Cascadia Mono", 8.4F);
         _gPass.Columns[1].DefaultCellStyle.Font = new Font("Cascadia Mono", 9.4F, FontStyle.Bold);
         foreach (var c in new[] { 4, 5, 6 }) _gPass.Columns[c].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
@@ -967,7 +978,7 @@ public partial class FormCrono : Form
             voltasAnterior = r.I("laps");
             linhas.Add([
                 r.I("position"), r.S("kart"), r.S("name").Length > 0 ? r.S("name") : "Kart " + r.S("kart"), r.S("bestLapNumber"),
-                Crono.Volta(r.L("bestLapMs")), r.I("laps"), Crono.Volta(r.L("lastLapMs")), Crono.Relogio(r.L("totalMs")), dl, da,
+                Crono.Volta(r.L("bestLapMs")), r.I("laps"), Crono.Volta(r.L("lastLapMs")), Crono.Volta(r.L("totalMs")), dl, da,
                 Velocidade(r),
             ]);
         }
@@ -975,21 +986,19 @@ public partial class FormCrono : Form
         var categorized = standings.OrderBy(r => NomeCategoria(r.S("category"))).ThenBy(r => r.I("position")).ToList();
         _gResCategoria.Preencher(categorized.Select(r => new object[] {
             r.I("position"), r.S("kart"), string.IsNullOrEmpty(r.S("category")) ? r.S("name") : $"{NomeCategoria(r.S("category"))} · {r.S("name")}",
-            r.S("bestLapNumber"), Crono.Volta(r.L("bestLapMs")), r.I("laps"), Crono.Volta(r.L("lastLapMs")), Crono.Relogio(r.L("totalMs")),
+            r.S("bestLapNumber"), Crono.Volta(r.L("bestLapMs")), r.I("laps"), Crono.Volta(r.L("lastLapMs")), Crono.Volta(r.L("totalMs")),
             r.I("position") == 1 ? "" : r.I("gapLaps") > 0 ? $"+{r.I("gapLaps")} voltas" : Crono.Volta(r.L("gapMs")), "", Velocidade(r),
         }).ToList(), categorized.Cast<object>().ToList());
         AtualizarResultadoCompetidores();
 
-        // passagens — "Decorrido" é o tempo de prova desde a largada (não a hora do relógio)
-        var largada = _sess?.L("startedAt");
-        string Decorrido(long? wall) => largada is long l0 && wall is long w ? Crono.Relogio(w - l0)[..10] : Crono.Hora(wall) is { Length: >= 10 } h ? h[..10] : Crono.Hora(wall);
+        // passagens — coluna "Hora" como no canvas (AoVivo.dc.html): hora do relógio da passagem, 18:55:19.4
         var pass = _laps.OrderByDescending(p => p.L("wallMs")).ToList();
         // toda leitura do decoder aparece; as que não viraram volta ficam amarelas com o motivo
         _lPassagens.Text = pass.Count(p => !p.B("deleted")).ToString();
         _gPass.Preencher(pass.Select((p, i) => new object[] {
             pass.Count - i, p.S("kart"), p.S("name"), p.S("transponder"),
             p.B("rejected") ? (p.L("sinceLastMs") is long gap ? "+" + Crono.Volta(gap) : "—") : Crono.Volta(p.L("lapMs")),
-            p.B("rejected") || p.L("lapMs") == null ? "—" : p.I("lap"), Decorrido(p.L("wallMs")), SituacaoPassagem(p) }).ToList(), pass.Cast<object>().ToList());
+            p.B("rejected") || p.L("lapMs") == null ? "—" : p.I("lap"), Crono.HoraCurta(p.L("wallMs")), SituacaoPassagem(p) }).ToList(), pass.Cast<object>().ToList());
         var passagemVisivel = pass.FirstOrDefault(p => !p.B("deleted") && !p.B("rejected"));
         _lVoltaFaixa.Text = passagemVisivel == null ? "VOLTA\nAGUARDANDO" : $"VOLTA\n{passagemVisivel.I("lap")}\nAGUARDANDO";
 

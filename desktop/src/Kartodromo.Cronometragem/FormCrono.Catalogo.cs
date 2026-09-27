@@ -6,6 +6,9 @@ namespace Kartodromo.Cronometragem;
 
 public partial class FormCrono
 {
+    /// <summary>Evento mostrado na árvore dos passos 4–5 (o escolhido no passo 1; hoje, por padrão).</summary>
+    string _eventoArvore;
+
     async Task CarregarCatalogo()
     {
         try
@@ -15,18 +18,30 @@ public partial class FormCrono
             _groups = Crono.Arr(_catalog, "groups");
             _proofs = Crono.Arr(_catalog, "provas");
             var selectedEventId = (_gEventos.ChaveAtual as JsonObject)?.S("id");
-            var selectedEvent = _events.FirstOrDefault(e => e.S("id") == selectedEventId) ?? _events.FirstOrDefault();
+            // sem escolha: o evento de hoje (as baterias da recepção), senão o mais recente
+            var hojeIso = DateTime.Today.ToString("yyyy-MM-dd");
+            var selectedEvent = _events.FirstOrDefault(e => e.S("id") == selectedEventId) ?? _events.FirstOrDefault(e => e.S("date") == hojeIso && e.S("id").StartsWith("agenda-")) ?? _events.FirstOrDefault(e => e.S("date") == hojeIso) ?? _events.OrderByDescending(e => e.S("date")).FirstOrDefault();
             var busca = _buscaEvento.Text.Trim();
             var eventosVisiveis = _events.Where(e => busca.Length == 0 || e.S("name").Contains(busca, StringComparison.CurrentCultureIgnoreCase)).OrderByDescending(e => e.S("date")).ToList();
             if (busca.Length > 0 && !eventosVisiveis.Contains(selectedEvent)) selectedEvent = eventosVisiveis.FirstOrDefault();
             _gEventos.Preencher(eventosVisiveis.Select(e => new object[] { "Karting", e.S("name"), DataLegivel(e.S("date")) }).ToList(), eventosVisiveis.Cast<object>().ToList());
             if (selectedEvent != null && _gEventos.Rows.Count > 0 && _gEventos.ChaveAtual == null) SelecionarLinha(_gEventos, eventosVisiveis.IndexOf(selectedEvent));
+            _eventoArvore = selectedEvent?.S("id");
             _subGrupos.Text = selectedEvent?.S("name") ?? "Selecione um evento";
             var tracado = Crono.Arr(_catalog, "tracks").FirstOrDefault(t => t.S("id") == selectedEvent?.S("trackId"))?.S("name") ?? Crono.Arr(_catalog, "tracks").FirstOrDefault()?.S("name") ?? "—";
             var eventId = selectedEvent?.S("id") ?? "";
             var eventGroups = _groups.Where(g => g.S("eventId") == eventId).ToList();
             var selectedGroupId = (_gGrupos.ChaveAtual as JsonObject)?.S("id");
-            var selectedGroup = eventGroups.FirstOrDefault(g => g.S("id") == selectedGroupId) ?? eventGroups.FirstOrDefault();
+            // no evento de hoje, sem escolha: já marca a bateria da hora (a mais recente que já começou com inscritos, senão a próxima)
+            JsonObject GrupoDaHora()
+            {
+                var agora = DateTime.Now.AddMinutes(10).ToString("yyyy-MM-ddTHH:mm");
+                var com = _agenda.Where(b => b.I("inscritos") > 0).ToList();
+                var alvo = com.LastOrDefault(b => string.CompareOrdinal(b.S("inicio"), agora) <= 0) ?? com.FirstOrDefault();
+                return alvo == null ? null : eventGroups.FirstOrDefault(g => g.S("id") == $"agenda-b{alvo.L("id")}");
+            }
+            eventGroups = eventGroups.OrderBy(g => g.I("order")).ToList();
+            var selectedGroup = eventGroups.FirstOrDefault(g => g.S("id") == selectedGroupId) ?? GrupoDaHora() ?? eventGroups.FirstOrDefault();
             _gGrupos.Preencher(eventGroups.Select(g => new object[] { g.S("name"), tracado }).ToList(), eventGroups.Cast<object>().ToList());
             if (selectedGroup != null && _gGrupos.Rows.Count > 0 && _gGrupos.ChaveAtual == null) SelecionarLinha(_gGrupos, eventGroups.IndexOf(selectedGroup));
             var groupId = selectedGroup?.S("id") ?? "";
@@ -69,7 +84,7 @@ public partial class FormCrono
     {
         if (_arvore.IsDisposed || _arvore.IsHandleCreated == false) return;
         var sessoes = Crono.Arr(_state, "sessions");
-        var assinatura = string.Join("|", _events.Select(e => $"e:{e.S("id")}:{e.S("name")}:{e.S("date")}")) +
+        var assinatura = $"sel:{_eventoArvore}|" + string.Join("|", _events.Select(e => $"e:{e.S("id")}:{e.S("name")}:{e.S("date")}")) +
             string.Join("|", _groups.Select(g => $"g:{g.S("id")}:{g.S("eventId")}:{g.S("name")}")) +
             string.Join("|", _proofs.Select(p => $"p:{p.S("id")}:{p.S("groupId")}:{p.S("name")}:{p.I("order")}")) +
             string.Join("|", sessoes.Select(s => $"s:{s.S("id")}:{s.S("proofId")}:{s.S("name")}:{s.S("state")}"));
@@ -81,7 +96,7 @@ public partial class FormCrono
         try
         {
             _arvore.Nodes.Clear();
-            foreach (var ev in _events)
+            foreach (var ev in _events.Where(e => _eventoArvore == null || e.S("id") == _eventoArvore))
             {
                 var eventNode = new TreeNode($"▣  {ev.S("name")}  ·  {DataLegivel(ev.S("date"))}") { Tag = new JsonObject { ["kind"] = "event", ["name"] = $"{ev.S("name")}" } };
                 foreach (var group in _groups.Where(g => g.S("eventId") == ev.S("id")))
@@ -103,7 +118,8 @@ public partial class FormCrono
                 }
                 _arvore.Nodes.Add(eventNode);
             }
-            var avulsas = sessoes.Where(s => string.IsNullOrEmpty(s.S("proofId"))).ToList();
+            var inicioHoje = new DateTimeOffset(DateTime.Today).ToUnixTimeMilliseconds();
+            var avulsas = sessoes.Where(s => string.IsNullOrEmpty(s.S("proofId")) && ((s.L("createdAt") ?? 0) >= inicioHoje || s.S("state") is "preparando" or "em_andamento" or "bandeira_final")).ToList();
             if (avulsas.Count > 0)
             {
                 var loose = new TreeNode("Baterias avulsas") { Tag = new JsonObject { ["kind"] = "event", ["name"] = "Baterias avulsas" } };

@@ -135,7 +135,7 @@ public class FormRelatoriosOffice : DialogoDesign
 {
     static readonly (string chave, string nome)[] Tipos =
     [
-        ("fechamento", "Fechamento de caixa"), ("reservas-diaria", "Reservas do dia"),
+        ("fechamento", "Fechamento de caixa"), ("reservas-diaria", "Reservas diária"),
         ("clientes", "Clientes por período"), ("participantes", "Lista de participantes"),
         ("agenda", "Agenda mensal"), ("termo", "Termo de responsabilidade (em branco)"),
         ("receitas-forma", "Financeiro · Receitas por forma de pagamento"), ("receitas-cliente", "Financeiro · Receitas por clientes"),
@@ -217,7 +217,7 @@ public class FormRelatoriosOffice : DialogoDesign
         var api = Sessao.Api;
         switch (Tipo)
         {
-            case "reservas-diaria": _tituloJanela = "Reservas do dia"; return api.UrlComToken("/relatorio/reservas-diaria?data=" + Fmt.Iso(_de.Value));
+            case "reservas-diaria": _tituloJanela = "Reservas diária"; return api.UrlComToken("/relatorio/reservas-diaria?data=" + Fmt.Iso(_de.Value));
             case "clientes": _tituloJanela = "Clientes por período"; return api.UrlComToken("/relatorio/clientes?" + Q);
             case "agenda": _tituloJanela = "Agenda mensal"; return api.UrlComToken("/relatorio/agenda?mes=" + _de.Value.ToString("yyyy-MM"));
             case "termo": _tituloJanela = "Termo de Responsabilidade"; return api.UrlComToken("/termo?branco=1");
