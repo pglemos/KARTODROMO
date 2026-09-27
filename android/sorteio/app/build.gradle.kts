@@ -20,8 +20,8 @@ android {
         applicationId = "br.com.kartodromobetim.sorteio"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
     }
 
     signingConfigs {
@@ -31,6 +31,10 @@ android {
                 storePassword = assinatura.getProperty("storePassword")
                 keyAlias = assinatura.getProperty("keyAlias")
                 keyPassword = assinatura.getProperty("keyPassword")
+                // v1 (JAR) também: alguns instaladores de fabricante (Xiaomi/HyperOS) recusam só v2/v3
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
             }
         }
     }
