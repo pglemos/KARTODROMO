@@ -332,6 +332,8 @@ public partial class FormCrono : Form
         _gPilotos.CellValueChanged += (_, _) => _pilotosSujos = true;
         _gPilotos.UserDeletedRow += (_, _) => _pilotosSujos = true;
         var flagsPiloto = new ContextMenuStrip();
+        flagsPiloto.Items.Add("Trocar kart do piloto… (leva as voltas)", null, (_, _) => TrocarKart());
+        flagsPiloto.Items.Add(new ToolStripSeparator());
         flagsPiloto.Items.Add("Bandeira verde para o piloto", null, (_, _) => BandeiraPiloto("green"));
         flagsPiloto.Items.Add("Bandeira amarela para o piloto", null, (_, _) => BandeiraPiloto("yellow"));
         flagsPiloto.Items.Add("Bandeira vermelha para o piloto", null, (_, _) => BandeiraPiloto("red"));
@@ -504,6 +506,11 @@ public partial class FormCrono : Form
         _gPass.ContextMenuStrip = menuPass;
 
         SetupResultado(_gRes); SetupResultado(_gResCategoria);
+        var menuRes = new ContextMenuStrip();
+        menuRes.Items.Add("Trocar kart do piloto… (leva as voltas)", null, (_, _) => TrocarKart());
+        menuRes.Items.Add("Registro do competidor…", null, (_, _) => RegistroCompetidorSelecionado());
+        _gRes.ContextMenuStrip = menuRes;
+        _gRes.CellMouseDown += (_, e) => { if (e.Button == MouseButtons.Right && e.RowIndex >= 0 && e.RowIndex < _gRes.Rows.Count) { _gRes.ClearSelection(); _gRes.Rows[e.RowIndex].Selected = true; _gRes.CurrentCell = _gRes.Rows[e.RowIndex].Cells[0]; } };
         _gRes.CorTexto = (row, col) => col == 0 && row < _gRes.Chaves.Count && _gRes.Chaves[row] is JsonObject standing ? CorAtraso(standing) : null;
         _gRes.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0 && _gRes.Chaves[e.RowIndex] is JsonObject s) Voltas(s.S("kart")); };
         _gResCategoria.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0 && _gResCategoria.Chaves[e.RowIndex] is JsonObject s) Voltas(s.S("kart")); };
@@ -1087,12 +1094,23 @@ public partial class FormCrono : Form
         _gPilotos.EndEdit();
         var comps = new JsonArray();
         var karts = new HashSet<string>();
+        // troca de kart: o kart novo costuma já estar na lista como "Kart 12" (passou na linha antes da troca).
+        // Essa linha sem piloto não conta como repetida; o servidor passa as voltas dela para o piloto.
+        static bool SemPiloto(string k, string n) => n.Length == 0 || string.Equals(n, $"Kart {k}", StringComparison.OrdinalIgnoreCase);
+        var comPiloto = new HashSet<string>();
+        foreach (DataGridViewRow r in _gPilotos.Rows)
+        {
+            if (r.IsNewRow) continue;
+            var k = r.Cells[0].Value?.ToString()?.Trim() ?? ""; var n = r.Cells[1].Value?.ToString()?.Trim() ?? "";
+            if (k.Length > 0 && !SemPiloto(k, n) && !comPiloto.Add(k)) { Msg.Aviso(this, $"O kart {k} está com dois pilotos na lista."); return; }
+        }
         foreach (DataGridViewRow r in _gPilotos.Rows)
         {
             if (r.IsNewRow) continue;
             var kart = r.Cells[0].Value?.ToString()?.Trim() ?? "";
             var nome = r.Cells[1].Value?.ToString()?.Trim() ?? "";
             if (kart.Length == 0 && nome.Length == 0) continue;
+            if (kart.Length > 0 && SemPiloto(kart, nome) && comPiloto.Contains(kart)) continue;
             if (kart.Length > 0 && !karts.Add(kart)) { Msg.Aviso(this, $"O kart {kart} está repetido."); return; }
             var cid = r.Cells[2].Value?.ToString();
             var category = r.Cells.Count > 3 ? r.Cells[3].Value?.ToString() : null;

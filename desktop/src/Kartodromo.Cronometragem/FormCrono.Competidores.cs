@@ -108,6 +108,7 @@ public partial class FormCrono
         };
         var flagsPiloto = new ContextMenuStrip();
         flagsPiloto.Items.Add("Registro do competidor…", null, (_, _) => EditarCompetidor());
+        flagsPiloto.Items.Add("Trocar kart do piloto… (leva as voltas)", null, (_, _) => TrocarKart());
         flagsPiloto.Items.Add(new ToolStripSeparator());
         flagsPiloto.Items.Add("Bandeira verde para o piloto", null, (_, _) => BandeiraPiloto("green"));
         flagsPiloto.Items.Add("Bandeira amarela para o piloto", null, (_, _) => BandeiraPiloto("yellow"));

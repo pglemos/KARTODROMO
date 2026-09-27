@@ -319,6 +319,66 @@ public partial class FormCrono
 
     string AtualizarTransp(string kart) => _transpPorKart.GetValueOrDefault(kart, "—");
 
+    /// <summary>
+    /// Troca de kart no meio da prova: o piloto vai para outro kart levando as voltas e o melhor tempo.
+    /// Se o kart novo já passou na linha sem piloto ("Kart 12"), essas passagens entram no histórico dele.
+    /// </summary>
+    void TrocarKart()
+    {
+        if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria primeiro."); return; }
+        if (_pilotosSujos) { Msg.Aviso(this, "Salve a lista de competidores antes de trocar o kart."); return; }
+        var comps = Crono.Arr(_sess, "competitors");
+        bool SemPiloto(JsonObject c) => c.B("autoAdded") || c.S("name").Trim().Length == 0 || string.Equals(c.S("name").Trim(), $"Kart {c.S("kart")}", StringComparison.OrdinalIgnoreCase);
+        var pilotos = comps.Where(c => !SemPiloto(c)).OrderBy(c => int.TryParse(c.S("kart"), out var k) ? k : 999).ToList();
+        if (pilotos.Count == 0) { Msg.Aviso(this, "Essa bateria não tem pilotos cadastrados."); return; }
+
+        var selKart = (_abas.SelectedIndex == 2 ? (_gRes.ChaveAtual as JsonObject)?.S("kart") : null)
+            ?? (_gPilotos.CurrentRow is { IsNewRow: false } r ? r.Cells[0].Value?.ToString() : null)
+            ?? (_gRes.ChaveAtual as JsonObject)?.S("kart");
+        using var d = NovoDialogo("Trocar kart do piloto", "O piloto continua com as voltas e o melhor tempo", "M4 8h13l-3-3M20 16H7l3 3", "linear-gradient(180deg, #FFB547, #F07A00)");
+        var comp = new ListaDesign();
+        foreach (var c in pilotos) comp.Items.Add(new Campos.Item(0, $"{c.S("kart").PadLeft(2, '0')} · {c.S("name")}", c));
+        comp.SelectedIndex = Math.Max(0, pilotos.FindIndex(c => c.S("kart") == selKart));
+        var atual = Leitura(""); var voltas = Leitura(""); var novo = Txt("", 6);
+        void Preencher()
+        {
+            var c = (comp.SelectedItem as Campos.Item)?.Dados;
+            atual.Text = c?.S("kart") ?? "";
+            var st = Crono.Arr(_sess, "standings").FirstOrDefault(s => s.S("kart") == c?.S("kart"));
+            voltas.Text = st == null ? "0" : $"{st.I("laps")}  (melhor {Crono.Volta(st.L("bestLapMs"))})";
+        }
+        comp.SelectedIndexChanged += (_, _) => Preencher();
+        var g = d.Secao("Troca");
+        d.Campo(g, "Piloto", comp, 6);
+        d.Campo(g, "Kart atual", atual, 2); d.Campo(g, "Voltas até agora", voltas, 2); d.Campo(g, "Kart novo", novo, 2);
+        d.Nota("As voltas do kart atual vão junto para o kart novo. Se o kart novo já passou na linha sem piloto (aparece como \"Kart 12\"), essas passagens também entram para o piloto e a linha \"Kart 12\" some.");
+        Preencher();
+        d.BotaoRodape("Trocar kart", true, () => Seguro.Rodar(d, async () =>
+        {
+            var c = (comp.SelectedItem as Campos.Item)?.Dados;
+            var kartNovo = novo.Text.Trim();
+            if (c == null) { Msg.Aviso(d, "Escolha o piloto."); return; }
+            if (kartNovo.Length == 0) { Msg.Aviso(d, "Digite o número do kart novo."); novo.Focus(); return; }
+            if (kartNovo == c.S("kart")) { Msg.Aviso(d, "O piloto já está nesse kart."); return; }
+            var kartAntigo = c.S("kart");
+            // A troca usa o kart atual + identidade do piloto, não o índice da grade. A grade
+            // pode estar ordenada ou receber um kart automático enquanto o diálogo está aberto.
+            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/swap-kart", new JsonObject
+            {
+                ["fromKart"] = kartAntigo, ["toKart"] = kartNovo, ["name"] = c.S("name"),
+                ["customerId"] = c["customerId"]?.DeepClone(), ["category"] = c.S("category").Length > 0 ? c.S("category") : null,
+                ["detalhes"] = c["detalhes"]?.DeepClone() ?? new JsonObject(),
+            });
+            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/observations", new JsonObject { ["text"] = $"Troca de kart · {c.S("name")} do kart {kartAntigo} para o {kartNovo}", ["author"] = Environment.UserName });
+            d.DialogResult = DialogResult.OK; d.Close();
+            await Atualizar();
+            var st = Crono.Arr(_sess, "standings").FirstOrDefault(s => s.S("kart") == kartNovo);
+            Msg.Info(this, $"{c.S("name")} agora está no kart {kartNovo}, com {st?.I("laps") ?? 0} volta(s) e melhor volta {Crono.Volta(st?.L("bestLapMs"))}.");
+        }));
+        d.BotaoRodape("Cancelar", false, d.Close);
+        d.ShowDialog(this);
+    }
+
     /// <summary>Mudar corrida em andamento (MudarCorrida.dc.html): mostra a prova de agora e ajusta nome, tempo e voltas.</summary>
     void MudarCorridaDesign()
     {

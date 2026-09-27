@@ -190,15 +190,29 @@ function defaultName(type: SessionType) {
   return type === 'corrida' ? 'Corrida' : type === 'classificacao' ? 'Tomada de Tempo' : 'Treino';
 }
 
-/** Um piloto por kart. Piloto sem kart ainda (veio da agenda) fica, desde que tenha nome. */
+/** Linha sem piloto de verdade: nome vazio ou o "Kart 12" que o sistema cria quando o kart entra sozinho. */
+export function semPilotoNome(kart: string, name: string | null | undefined) {
+  const n = String(name ?? '').trim().toLowerCase();
+  return !n || n === `kart ${String(kart).trim().toLowerCase()}`;
+}
+
+/**
+ * Um piloto por kart. Piloto sem kart ainda (veio da agenda) fica, desde que tenha nome.
+ * Kart repetido: fica a linha com piloto. Na troca de kart o kart novo quase sempre já passou na linha
+ * e virou "Kart 12"; quando o operador põe 12 no piloto, a linha "Kart 12" sai e as passagens dela vão
+ * para o piloto (setCompetitors).
+ */
 function dedupeKarts<T extends { kart: string; name?: string }>(list: T[]): T[] {
-  const seen = new Set<string>();
+  const porKart = new Map<string, T>();
+  for (const c of list) {
+    const k = String(c.kart).trim();
+    if (!k) continue;
+    const atual = porKart.get(k);
+    if (!atual || (semPilotoNome(k, atual.name) && !semPilotoNome(k, c.name))) porKart.set(k, c);
+  }
   return list.filter((c) => {
     const k = String(c.kart).trim();
-    if (!k) return Boolean(c.name?.trim());
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
+    return k ? porKart.get(k) === c : Boolean(c.name?.trim());
   });
 }
 
@@ -210,11 +224,14 @@ function dedupeKarts<T extends { kart: string; name?: string }>(list: T[]): T[] 
  *   se juntam ao histórico do piloto;
  * - dois pilotos que trocam de kart entre si levam cada um as próprias voltas.
  */
-export function setCompetitors(session: Session, list: { kart: string; name: string; customerId?: string | null; category?: string | null; detalhes?: CompetidorDetalhes }[]) {
+export type TrocaDeKart = { nome: string; de: string; para: string; voltasLevadas: number; passagensJuntadas: number };
+
+export function setCompetitors(session: Session, list: { kart: string; name: string; customerId?: string | null; category?: string | null; detalhes?: CompetidorDetalhes }[]): TrocaDeKart[] {
   const previous = session.competitors;
+  const trocas: TrocaDeKart[] = [];
   const used = new Set<Competitor>();
   const nome = (n: string | null | undefined) => String(n ?? '').trim().toLowerCase();
-  const semPiloto = (c: Competitor) => Boolean(c.autoAdded) || !nome(c.name) || nome(c.name) === `kart ${nome(c.kart)}`;
+  const semPiloto = (c: Competitor) => Boolean(c.autoAdded) || semPilotoNome(c.kart, c.name);
   const novos = dedupeKarts(list);
   const achar = (pred: (o: Competitor) => boolean) => previous.find((o) => !used.has(o) && pred(o));
 
@@ -237,12 +254,24 @@ export function setCompetitors(session: Session, list: { kart: string; name: str
 
   session.competitors = novos.map((c, i) => {
     const old = matches[i];
-    const crossings = [...(old?.crossings ?? [])];
+    const kartMudou = Boolean(old?.kart && old.kart !== c.kart);
+    // Clona as passagens ao mudar de kart. Além de evitar que uma referência antiga seja
+    // reaproveitada por engano, registra de qual kart veio cada leitura no histórico.
+    const crossings = (old?.crossings ?? []).map((x) => kartMudou && old?.kart && !x.originalKart
+      ? { ...x, originalKart: old.kart }
+      : { ...x });
     // trocou de kart: junta as passagens que o kart novo já tinha sem piloto
-    if (c.kart && old?.kart !== c.kart) {
+    let passagensJuntadas = 0;
+    if (c.kart && kartMudou) {
       const orfao = achar((o) => o.kart === c.kart && semPiloto(o));
-      if (orfao) { used.add(orfao); crossings.push(...orfao.crossings); }
+      if (orfao) {
+        used.add(orfao);
+        crossings.push(...orfao.crossings.map((x) => ({ ...x })));
+        passagensJuntadas = orfao.crossings.length;
+      }
+      if (old?.kart) trocas.push({ nome: c.name.trim(), de: old.kart, para: c.kart, voltasLevadas: Math.max(0, old.crossings.filter((x) => !x.deleted).length - 1), passagensJuntadas });
     }
+    crossings.sort((a, b) => a.wallMs - b.wallMs);
     const competitor: Competitor = {
       kart: c.kart,
       name: c.name.trim(),
@@ -254,9 +283,74 @@ export function setCompetitors(session: Session, list: { kart: string; name: str
       crossings,
       finished: old?.finished ?? false,
     };
-    if (crossings.length !== (old?.crossings.length ?? 0)) recalculate(competitor);
+    if (kartMudou || crossings.length !== (old?.crossings.length ?? 0)) recalculate(competitor);
+    // a volta que junta os dois karts tem a parada da troca dentro: conta como volta, mas não vale
+    // como melhor volta; idem qualquer volta curta demais criada pela junção
+    if (kartMudou && passagensJuntadas && old) {
+      const chave = (x: Crossing) => `${x.wallMs}|${x.decoderTimeMs}|${x.transponder ?? ''}`;
+      const antigos = new Set(old.crossings.map(chave));
+      const ativos = activeCrossings(competitor);
+      ativos.forEach((x, i) => {
+        if (i === 0 || antigos.has(chave(x))) return;
+        const juncao = antigos.has(chave(ativos[i - 1]));
+        if (juncao || (x.lapMs !== null && x.lapMs < session.minLapMs)) x.invalid = true;
+      });
+    }
     return competitor;
   });
+  // Leituras rejeitadas também fazem parte do histórico mostrado ao operador. Quando o
+  // piloto troca de kart, elas precisam seguir o mesmo vínculo das passagens contadas.
+  for (const troca of trocas) for (const rejeitada of session.rejected ?? []) if (rejeitada.kart === troca.de) rejeitada.kart = troca.para;
+  return trocas;
+}
+
+export type TrocaDeKartInput = {
+  fromKart: string;
+  toKart: string;
+  customerId?: string | null;
+  name?: string | null;
+  category?: string | null;
+  detalhes?: CompetidorDetalhes;
+};
+
+/** Troca atômica usada pelo operador. O vínculo é feito pelo piloto e pelo kart atual,
+ * nunca pelo índice visual da grade, que pode mudar com a ordenação ou com novas leituras. */
+export function swapKart(session: Session, input: TrocaDeKartInput): TrocaDeKart {
+  const fromKart = String(input.fromKart ?? '').trim();
+  const toKart = String(input.toKart ?? '').trim();
+  if (!fromKart || !toKart) throw new Error('Informe o kart atual e o kart novo.');
+  if (fromKart === toKart) throw new Error('O piloto já está nesse kart.');
+
+  const candidatos = session.competitors.filter((c) => c.kart === fromKart && !semPilotoNome(c.kart, c.name) && !c.autoAdded);
+  if (!candidatos.length) throw new Error(`Nenhum piloto real está no kart ${fromKart}.`);
+  const cid = input.customerId == null ? '' : String(input.customerId).trim();
+  const n = String(input.name ?? '').trim().toLowerCase();
+  const origem = (cid ? candidatos.find((c) => String(c.customerId ?? '') === cid) : undefined)
+    ?? (n ? candidatos.find((c) => c.name.trim().toLowerCase() === n) : undefined)
+    ?? candidatos[0];
+
+  const dono = session.competitors.find((c) => c !== origem && c.kart === toKart);
+  if (dono && !semPilotoNome(dono.kart, dono.name) && !dono.autoAdded)
+    throw new Error(`O kart ${toKart} já está com ${dono.name}.`);
+
+  const trocas = setCompetitors(session, session.competitors.filter((c) => c !== dono).map((c) => c === origem
+    ? {
+      kart: toKart,
+      name: String(input.name ?? '').trim() || c.name,
+      customerId: input.customerId === undefined ? c.customerId ?? null : input.customerId,
+      category: input.category === undefined ? c.category ?? null : input.category,
+      detalhes: input.detalhes ?? c.detalhes,
+    }
+    : {
+      kart: c.kart,
+      name: c.name,
+      customerId: c.customerId ?? null,
+      category: c.category ?? null,
+      detalhes: c.detalhes,
+    }));
+  const troca = trocas.find((t) => t.de === fromKart && t.para === toKart);
+  if (!troca) throw new Error('A troca não pôde ser aplicada ao histórico da bateria.');
+  return troca;
 }
 
 /** Mesma bateria da agenda (Tomada de tempo + Corrida...). Baterias antigas sem programaId: mesmo nome

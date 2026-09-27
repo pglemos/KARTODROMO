@@ -13,6 +13,7 @@ import {
   mesmoPrograma,
   copiarCompetidores,
   setCompetitors,
+  swapKart,
   includeManualPassing,
   remainingMs,
   updateSessionParameters,
@@ -53,7 +54,7 @@ describe('trx-parser', () => {
   });
 });
 
-function race(type: 'treino' | 'corrida' = 'treino', durationMin = 5) {
+function race(type: 'treino' | 'classificacao' | 'corrida' = 'treino', durationMin = 5) {
   const s = createSession({ id: 't', name: '', type, durationMin, now: 0, competitors: [{ kart: '4', name: 'Ana' }, { kart: '5', name: 'Bia' }] });
   startSession(s, 1_000);
   return s;
@@ -407,6 +408,45 @@ describe('race-engine', () => {
       expect(pilotos(s).Ana).toMatchObject({ kart: '12', laps: 3 });
     });
 
+    it('lista salva com o kart novo repetido ("Kart 12" ainda na grade): fica o piloto, com todas as voltas', () => {
+      const s = race('corrida', 20);
+      setCompetitors(s, [{ kart: '14', name: 'Walison', customerId: '7' }, { kart: '5', name: 'Bia', customerId: '11' }]);
+      volta(s, '14', 10); volta(s, '14', 70); volta(s, '14', 131); // 2 voltas no kart 14
+      volta(s, '12', 250); volta(s, '12', 311);                     // kart 12 sai dos boxes antes da troca no sistema
+      expect(s.competitors.find((c) => c.kart === '12')?.name).toBe('Kart 12');
+      // o operador troca 14 -> 12 na linha do Walison e salva sem apagar a linha "Kart 12"
+      const trocas = setCompetitors(s, [
+        { kart: '12', name: 'Walison', customerId: '7' },
+        { kart: '5', name: 'Bia', customerId: '11' },
+        { kart: '12', name: 'Kart 12' },
+      ]);
+      expect(s.competitors.map((c) => c.kart).sort()).toEqual(['12', '5']);
+      expect(pilotos(s).Walison).toMatchObject({ kart: '12', laps: 4 });
+      expect(trocas).toEqual([{ nome: 'Walison', de: '14', para: '12', voltasLevadas: 2, passagensJuntadas: 2 }]);
+    });
+
+    it('a volta da junção (parada da troca) conta como volta mas não vira melhor volta', () => {
+      const s = race('corrida', 20);
+      setCompetitors(s, [{ kart: '14', name: 'Walison', customerId: '7' }]);
+      volta(s, '14', 10); volta(s, '14', 70); volta(s, '14', 131); // 60 s e 61 s
+      volta(s, '20', 136); volta(s, '20', 190);                     // entrou 5 s depois (curta) e fez 54 s
+      setCompetitors(s, [{ kart: '20', name: 'Walison', customerId: '7' }]);
+      const p = computeStandings(s)[0];
+      expect(p).toMatchObject({ kart: '20', laps: 4, bestLapMs: 54_000 });
+      const curta = s.competitors[0].crossings.find((x) => x.wallMs === 136_500);
+      expect(curta?.invalid).toBe(true);
+    });
+
+    it('linha "Kart 12" vem antes do piloto na lista: mesmo assim fica o piloto', () => {
+      const s = race('corrida', 20);
+      setCompetitors(s, [{ kart: '14', name: 'Walison' }]);
+      volta(s, '14', 10); volta(s, '14', 70);
+      volta(s, '12', 150); volta(s, '12', 211);
+      setCompetitors(s, [{ kart: '12', name: 'Kart 12' }, { kart: '12', name: 'Walison' }]);
+      expect(s.competitors).toHaveLength(1);
+      expect(pilotos(s).Walison).toMatchObject({ kart: '12', laps: 3 });
+    });
+
     it('dois pilotos que trocam de kart entre si levam cada um as próprias voltas', () => {
       const s = race('classificacao', 10);
       setCompetitors(s, [{ kart: '8', name: 'Ana', customerId: '10' }, { kart: '12', name: 'Bia', customerId: '11' }]);
@@ -422,6 +462,30 @@ describe('race-engine', () => {
       volta(s, '8', 10); volta(s, '8', 70);
       setCompetitors(s, [{ kart: '8', name: 'Ana Maria' }]);
       expect(pilotos(s)['Ana Maria']).toMatchObject({ kart: '8', laps: 1 });
+    });
+
+    it('troca explícita leva o histórico, passagens rejeitadas e marca o kart original', () => {
+      const s = race('corrida', 20);
+      setCompetitors(s, [{ kart: '14', name: 'Walison', customerId: '7' }, { kart: '5', name: 'Bia', customerId: '11' }]);
+      volta(s, '14', 10); volta(s, '14', 70); volta(s, '14', 131);
+      volta(s, '20', 150); volta(s, '20', 211); // kart novo passou antes de ser atribuído
+      s.rejected = [{ id: 'r-1', kart: '14', transponder: 123, wallMs: 120_000, decoderTimeMs: 120_000, reason: 'ignored-min-lap', sinceLastMs: 2_000 }];
+
+      const troca = swapKart(s, { fromKart: '14', toKart: '20', customerId: '7' });
+      const walison = s.competitors.find((c) => c.name === 'Walison')!;
+      expect(troca).toMatchObject({ nome: 'Walison', de: '14', para: '20', passagensJuntadas: 2 });
+      expect(walison.kart).toBe('20');
+      expect(computeStandings(s).find((r) => r.name === 'Walison')).toMatchObject({ kart: '20', laps: 4 });
+      expect(walison.crossings.filter((x) => x.originalKart === '14')).toHaveLength(3);
+      expect(s.rejected?.[0].kart).toBe('20');
+      expect(walison.crossings.map((x) => x.wallMs)).toEqual([...walison.crossings].sort((a, b) => a.wallMs - b.wallMs).map((x) => x.wallMs));
+      expect(s.competitors.find((c) => c.kart === '14')).toBeUndefined();
+    });
+
+    it('recusa trocar para um kart que já pertence a outro piloto', () => {
+      const s = race('corrida', 20);
+      expect(() => swapKart(s, { fromKart: '4', toKart: '5' })).toThrow('já está com Bia');
+      expect(s.competitors.map((c) => `${c.kart}:${c.name}`)).toEqual(['4:Ana', '5:Bia']);
     });
   });
 

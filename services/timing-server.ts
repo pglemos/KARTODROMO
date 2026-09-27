@@ -40,12 +40,14 @@ import {
   setCrossingDeleted,
   setCrossingInvalid,
   setRaceFlag,
+  swapKart,
   startSession,
   tick,
   toggleLapInvalid,
   updateSessionParameters,
   type Session,
   type SessionType,
+  type TrocaDeKart,
 } from '../lib/timing/race-engine';
 import {
   createCatalogRecord,
@@ -99,6 +101,13 @@ for (const dir of [DATA_DIR, SESSIONS_DIR, JOURNAL_DIR]) mkdirSync(dir, { recurs
 
 function log(...args: unknown[]) {
   console.log(`[${new Date().toISOString()}]`, ...args);
+}
+
+function logTrocas(s: { name: string }, trocas: TrocaDeKart[]) {
+  for (const t of trocas) {
+    log(`bateria ${s.name}: TROCA DE KART ${t.nome} do kart ${t.de} para o ${t.para}, levou ${t.voltasLevadas} volta(s)` +
+      (t.passagensJuntadas ? ` e juntou ${t.passagensJuntadas} passagem(ns) que o kart ${t.para} ja tinha` : ''));
+  }
 }
 
 // ---------------------------------------------------------------- persistencia
@@ -230,6 +239,18 @@ type RecentPassing = {
 const recentPassings: RecentPassing[] = [];
 const seenPassings = new Set<string>();
 const seenOrder: string[] = [];
+
+/** Mantém a faixa ao vivo coerente depois de uma troca e grava um evento de auditoria.
+ * O diário das leituras continua imutável (ele registra o que o decoder enviou); este evento
+ * permite reconstruir o vínculo do piloto sem perder a informação do kart original. */
+function registrarTrocas(s: { id?: string; name: string }, trocas: TrocaDeKart[], source = 'operator') {
+  if (!trocas.length) return;
+  logTrocas(s, trocas);
+  for (const t of trocas) {
+    if (s.id) for (const passing of recentPassings) if (passing.sessionId === s.id && passing.kart === t.de) passing.kart = t.para;
+    journal({ type: 'kart-swap', wallMs: Date.now(), sessionId: s.id ?? null, fromKart: t.de, toKart: t.para, name: t.nome, source });
+  }
+}
 
 function remember(key: string) {
   seenPassings.add(key);
@@ -898,6 +919,28 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     } catch (err) { return send(res, 400, { error: (err as Error).message }); }
   }
 
+  // ---------------------------------------------------------------- troca explícita de kart
+  const swapRoute = path.match(/^\/api\/sessions\/([\w-]+)\/swap-kart$/);
+  if (swapRoute && method === 'POST') {
+    const s = sessions.get(swapRoute[1]);
+    if (!s) return send(res, 404, { error: 'Bateria não encontrada.' });
+    try {
+      const body = await readBody(req);
+      const troca = swapKart(s, {
+        fromKart: String(body.fromKart ?? body.kartAtual ?? '').trim(),
+        toKart: String(body.toKart ?? body.kartNovo ?? '').trim(),
+        customerId: body.customerId == null ? undefined : String(body.customerId),
+        name: body.name == null ? undefined : String(body.name),
+        category: body.category == null ? undefined : String(body.category),
+        detalhes: body.detalhes && typeof body.detalhes === 'object' ? body.detalhes as Record<string, unknown> : undefined,
+      });
+      registrarTrocas(s, [troca], 'explicit-swap');
+      saveSession(s);
+      scheduleStateBroadcast();
+      return send(res, 200, { ok: true, troca, session: sessionView(s) });
+    } catch (err) { return send(res, 400, { error: (err as Error).message }); }
+  }
+
   // ---------------------------------------------------------------- registro de competidor (Competidor do canvas)
   const rc = path.match(/^\/api\/sessions\/([\w-]+)\/competitors\/(\d+)$/);
   if (rc && method === 'PUT') {
@@ -917,12 +960,19 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       oculto: Boolean(d.oculto), equipe: Array.isArray(d.equipe) ? (d.equipe as unknown[]).map((x) => txt(x, 100)).slice(0, 6) : [],
     };
     const kart = typeof body.kart === 'string' ? body.kart.trim() : atual.kart;
-    if (kart && kart !== atual.kart && s.competitors.some((c, j) => j !== i && c.kart === kart)) return send(res, 400, { error: `O kart ${kart} já está com outro competidor nessa bateria.` });
+    // o kart novo pode já estar na lista como "Kart 12" (passou na linha antes da troca): esse não conta
+    // como outro piloto; as passagens dele vão para este competidor
     const nome = typeof body.name === 'string' && body.name.trim() ? body.name.trim() : atual.name;
     const categoria = body.category === undefined ? atual.category ?? null : (String(body.category ?? '').trim() || null);
-    setCompetitors(s, s.competitors.map((c, j) => j === i
-      ? { kart, name: nome, customerId: c.customerId ?? null, category: categoria, detalhes }
-      : { kart: c.kart, name: c.name, customerId: c.customerId ?? null, category: c.category ?? null, detalhes: c.detalhes }));
+    let trocas: TrocaDeKart[];
+    try {
+      trocas = kart !== atual.kart
+        ? [swapKart(s, { fromKart: atual.kart, toKart: kart, customerId: atual.customerId ?? null, name: nome, category: categoria, detalhes })]
+        : setCompetitors(s, s.competitors.map((c, j) => j === i
+          ? { kart, name: nome, customerId: c.customerId ?? null, category: categoria, detalhes }
+          : { kart: c.kart, name: c.name, customerId: c.customerId ?? null, category: c.category ?? null, detalhes: c.detalhes }));
+    } catch (err) { return send(res, 400, { error: (err as Error).message }); }
+    registrarTrocas(s, trocas, 'competitor-edit');
     saveSession(s);
     // "Aplicar alterações nas demais provas do grupo": o mesmo piloto nas outras provas do grupo/programa
     let outras = 0;
@@ -932,9 +982,10 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         if (x.id === s.id || !(mesmoPrograma(s, x) || (s.groupId && x.groupId === s.groupId))) continue;
         const k = x.competitors.findIndex(mesmo);
         if (k < 0) continue;
-        setCompetitors(x, x.competitors.map((c, j) => j === k
+        const trocasGrupo = setCompetitors(x, x.competitors.map((c, j) => j === k
           ? { kart: x.state === 'preparando' ? kart : c.kart, name: nome, customerId: c.customerId ?? null, category: categoria, detalhes }
           : { kart: c.kart, name: c.name, customerId: c.customerId ?? null, category: c.category ?? null, detalhes: c.detalhes }));
+        registrarTrocas(x, trocasGrupo, 'competitor-edit-group');
         saveSession(x); outras++;
       }
     }
@@ -1099,7 +1150,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         }, now);
         if (s.state === 'preparando' && body.type && SESSION_TYPES.has(body.type as SessionType)) s.type = body.type as SessionType;
         if (body.competitors) {
-          setCompetitors(s, parseCompetitors(body.competitors));
+          registrarTrocas(s, setCompetitors(s, parseCompetitors(body.competitors)), 'competitor-list');
           // o número do kart digitado na tomada de tempo vale para a corrida da mesma bateria (e vice-versa),
           // enquanto a outra ainda não largou
           for (const irma of sessions.values()) {
