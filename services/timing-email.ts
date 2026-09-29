@@ -176,7 +176,11 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
   });
   if (op.para) {
     if (!emailValido(op.para)) throw new Error('Endereço de e-mail inválido.');
-    alvos = [{ kart: '', nome: 'Resultado', email: op.para.trim().toLowerCase(), piloto: null }];
+    const para = op.para.trim().toLowerCase();
+    // com kart: o mesmo e-mail que aquele piloto recebe (resumo + volta a volta dele), entregue neste endereço
+    const c = op.kart ? s.competitors.find((x) => x.kart === op.kart && !x.autoAdded) ?? s.competitors.find((x) => x.kart === op.kart) : null;
+    if (op.kart && !c) throw new Error(`Kart ${op.kart} não está nesta prova.`);
+    alvos = [{ kart: c?.kart ?? '', nome: c?.name ?? 'Resultado', email: para, piloto: c ? piloto(c, para) : null }];
   } else {
     const jaForam = new Set(op.automatico ? anterior?.enviados ?? [] : []);
     alvos = todos
@@ -219,7 +223,7 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
         mkdirSync(pastaTeste, { recursive: true });
         writeFileSync(join(pastaTeste, `${s.id}-${nomeArquivo(a.kart || 'avulso')}.eml`), (info as unknown as { message: Buffer }).message);
       }
-      if (a.piloto) enviados.push(`${a.kart}|${a.email}`);
+      if (a.piloto && !op.para) enviados.push(`${a.kart}|${a.email}`);
     } catch (e) {
       falhas.push({ kart: a.kart, nome: a.nome, email: a.email, erro: (e as Error).message.slice(0, 200) });
     }
@@ -243,7 +247,7 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
     anterior.atualizadoEm = Date.now();
     dep.salvarSessao(s);
   }
-  const quem = op.para ? `para ${op.para}` : op.kart ? `para o kart ${op.kart}` : `${alvos.length - falhas.length} de ${alvos.length} pilotos`;
+  const quem = op.para ? `para ${op.para}${op.kart ? ` (como o kart ${op.kart} recebe)` : ''}` : op.kart ? `para o kart ${op.kart}` : `${alvos.length - falhas.length} de ${alvos.length} pilotos`;
   dep.log(`e-mail do resultado de ${s.name}: ${quem} enviado(s)${falhas.length ? `, ${falhas.length} falha(s): ${falhas.map((f) => f.erro).join(' / ').slice(0, 300)}` : ''}${semEmail.length && !op.kart && !op.para ? `, ${semEmail.length} sem e-mail` : ''}`);
   return resultado;
 }
