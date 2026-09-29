@@ -38,10 +38,10 @@ public class FonteReg
 /// </summary>
 public class RegistroDesign : CartaoModal
 {
-    public static readonly Color Fundo = Color.FromArgb(245, 245, 247);
-    static readonly Color Cinza = Color.FromArgb(110, 110, 115);
+    public static readonly Color Fundo = Tokens.Fundo;
+    static readonly Color Cinza = Tokens.TextoSecundario;
     static readonly Color BotaoCinza = Color.FromArgb(239, 239, 240); // rgba(118,118,128,0.12) sobre branco
-    static readonly Color Vermelho = Color.FromArgb(196, 40, 28);
+    static readonly Color Vermelho = Tokens.Vermelho;
     const int L = 1060, A = 680, M = 18;
 
     readonly string _titulo;
@@ -76,7 +76,7 @@ public class RegistroDesign : CartaoModal
 
         // ---------- cabeçalho: padding 14 18, ícone 34, título 16/sub 12, estado, pesquisa 240×32, ✕ 32
         var cab = new Panel { Dock = DockStyle.Top, Height = 63, BackColor = Color.White };
-        cab.Paint += (_, e) => { using var p = new Pen(Color.FromArgb(235, 235, 235)); e.Graphics.DrawLine(p, 0, cab.Height - 1, cab.Width, cab.Height - 1); };
+        cab.Paint += (_, e) => { using var p = new Pen(Tokens.Linha); e.Graphics.DrawLine(p, 0, cab.Height - 1, cab.Width, cab.Height - 1); };
         var ic = new PictureBox { Image = Forma.Tile(svg, corCss), SizeMode = PictureBoxSizeMode.Zoom, Size = new Size(34, 34), Location = new Point(M, 14), BackColor = Color.Transparent };
         var fT = new Font("Segoe UI", 12F, FontStyle.Bold); var fS = new Font("Segoe UI", 9F);
         var t = new Label { Text = titulo, AutoSize = true, Font = fT, ForeColor = PecasDesign.CorTexto, Location = new Point(M + 46, 11), BackColor = Color.Transparent };
@@ -102,7 +102,7 @@ public class RegistroDesign : CartaoModal
         }
 
         // ---------- faixa dos campos: padding 16 18 12, 6 colunas, espaço 12 (linhas) × 14 (colunas)
-        _faixa.Paint += (_, e) => { using var p = new Pen(Color.FromArgb(237, 237, 237)); e.Graphics.DrawLine(p, 0, _faixa.Height - 1, _faixa.Width, _faixa.Height - 1); };
+        _faixa.Paint += (_, e) => { using var p = new Pen(Tokens.Linha); e.Graphics.DrawLine(p, 0, _faixa.Height - 1, _faixa.Width, _faixa.Height - 1); };
         MontarCampos();
 
         // ---------- rodapé: padding 12 18
@@ -155,7 +155,7 @@ public class RegistroDesign : CartaoModal
             else if (e.Control && e.KeyCode == Keys.N) { e.SuppressKeyPress = true; Novo(); }
             else if (e.Control && e.KeyCode == Keys.F) { e.SuppressKeyPress = true; _busca.Focus(); }
         };
-        Load += async (_, _) => await Carregar(null);
+        Load += async (_, _) => await Carregar(IdInicial);
         FormClosing += (_, e) =>
         {
             if (!_sujo || DialogResult == DialogResult.OK) return;
@@ -224,7 +224,7 @@ public class RegistroDesign : CartaoModal
                 {
                     e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
                     using var path = Forma.Redondo(new Rectangle(0, 0, caixa.Width - 1, caixa.Height - 1), 8);
-                    using var pen = new Pen(foco.ContainsFocus ? Forma.Verde : Color.FromArgb(219, 219, 219));
+                    using var pen = new Pen(foco.ContainsFocus ? Forma.Verde : Tokens.BordaCampo);
                     e.Graphics.DrawPath(pen, path);
                 };
                 foreach (var f in new[] { ctl }.Concat(ctl.Controls.Cast<Control>())) { f.GotFocus += (_, _) => caixa.Invalidate(); f.LostFocus += (_, _) => caixa.Invalidate(); }
@@ -291,11 +291,14 @@ public class RegistroDesign : CartaoModal
     void Estado()
     {
         _estado.Text = _incluindo ? "Incluindo" : "Editando";
-        _estado.BackColor = _incluindo ? Color.FromArgb(225, 238, 255) : Color.FromArgb(255, 240, 219);
-        _estado.ForeColor = _incluindo ? Color.FromArgb(10, 79, 160) : Color.FromArgb(138, 75, 0);
+        _estado.BackColor = _incluindo ? Tokens.AzulSuave : Color.FromArgb(255, 240, 219);
+        _estado.ForeColor = _incluindo ? Tokens.AzulTexto : Tokens.LaranjaEscuro;
         _estado.Width = TextRenderer.MeasureText(_estado.Text, _estado.Font).Width + 18;
         _estado.Visible = _incluindo || _atual != null;
     }
+
+    /// <summary>Registro que já abre selecionado (ex.: "Editar parceiro" no botão direito abre nele, não no primeiro).</summary>
+    public string IdInicial { get; set; }
 
     // ---------- dados
     async Task Carregar(string idSel)
@@ -663,8 +666,8 @@ public class ListaReg : Control
         using var card = Forma.Redondo(r, 12);
         g.FillPath(Brushes.White, card);
         g.SetClip(card);
-        using (var cab = new SolidBrush(Color.FromArgb(251, 251, 253))) g.FillRectangle(cab, 0, 0, Width, Cab);
-        using var lin = new Pen(Color.FromArgb(237, 237, 237));
+        using (var cab = new SolidBrush(Tokens.SuperficieSuave)) g.FillRectangle(cab, 0, 0, Width, Cab);
+        using var lin = new Pen(Tokens.Linha);
         using var linFina = new Pen(Color.FromArgb(242, 242, 242));
         g.DrawLine(lin, 0, Cab - 1, Width, Cab - 1);
 
@@ -676,7 +679,7 @@ public class ListaReg : Control
         foreach (var c in _cols) { var w = c.Largura == 0 ? flex / nFlex : c.Largura; xs.Add((x, w)); x += w + 12; }
         TextFormatFlags Al(char a) => TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding | (a == 'D' ? TextFormatFlags.Right : a == 'C' ? TextFormatFlags.HorizontalCenter : TextFormatFlags.Left);
         for (var i = 0; i < _cols.Length; i++)
-            TextRenderer.DrawText(g, _cols[i].Titulo, FonteCab, new Rectangle(xs[i].x, 0, xs[i].w, Cab), Color.FromArgb(110, 110, 115), Al(_cols[i].Alinha));
+            TextRenderer.DrawText(g, _cols[i].Titulo, FonteCab, new Rectangle(xs[i].x, 0, xs[i].w, Cab), Tokens.TextoSecundario, Al(_cols[i].Alinha));
 
         var fim = Math.Min(Linhas.Count, _topo + Cabem);
         for (var l = _topo; l < fim; l++)
@@ -691,7 +694,7 @@ public class ListaReg : Control
             }
         }
         if (Linhas.Count == 0)
-            TextRenderer.DrawText(g, "Nenhum registro.", FonteLinha, new Rectangle(0, Cab + 10, Width, 30), Color.FromArgb(110, 110, 115), TextFormatFlags.HorizontalCenter);
+            TextRenderer.DrawText(g, "Nenhum registro.", FonteLinha, new Rectangle(0, Cab + 10, Width, 30), Tokens.TextoSecundario, TextFormatFlags.HorizontalCenter);
         // rolagem
         if (Linhas.Count > Cabem)
         {
@@ -703,9 +706,9 @@ public class ListaReg : Control
         }
         // total
         g.DrawLine(linFina, 0, Height - Rod, Width, Height - Rod);
-        TextRenderer.DrawText(g, _total, new Font("Segoe UI", 9F), new Rectangle(14, Height - Rod, Width - 28, Rod), Color.FromArgb(110, 110, 115), TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
+        TextRenderer.DrawText(g, _total, new Font("Segoe UI", 9F), new Rectangle(14, Height - Rod, Width - 28, Rod), Tokens.TextoSecundario, TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
         g.ResetClip();
-        using var borda = new Pen(Color.FromArgb(237, 237, 237));
+        using var borda = new Pen(Tokens.Linha);
         g.DrawPath(borda, card);
     }
 }

@@ -43,11 +43,12 @@ public static class Cadastros
             [new("login", "Login", Largura: 100), new("nome", "Nome", Largura: 220), new("admin", "Admin", TipoCol.Bool), new("ativo", "Ativo", TipoCol.Bool)]),
     };
 
-    public static void Abrir(Form dono, string ent)
+    public static void Abrir(Form dono, string ent, string idInicial = null)
     {
         if (CadastrosDesign.Tem(ent))
         {
             var d = CadastrosDesign.Criar(ent);
+            if (d is RegistroDesign registro) registro.IdInicial = idInicial;
             d.FormClosed += (_, _) => { if (!dono.IsDisposed) dono.Activate(); };
             d.ShowDialog(dono);
             return;
@@ -77,7 +78,7 @@ public class FormParametros : DialogoDesign
         "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1", "linear-gradient(180deg, #9A9AA0, #4A4A4F)")
     {
         var g = Secao(null);
-        _vazio = new Label { AutoSize = true, MaximumSize = new Size(860, 0), Font = new Font("Segoe UI", 9.6F), ForeColor = Color.FromArgb(58, 58, 60), BackColor = Color.White, Visible = false, Margin = new Padding(0, 0, 0, 8) };
+        _vazio = new Label { AutoSize = true, MaximumSize = new Size(860, 0), Font = new Font("Segoe UI", 9.6F), ForeColor = Tokens.Grafite, BackColor = Color.White, Visible = false, Margin = new Padding(0, 0, 0, 8) };
         g.Controls.Add(_vazio); g.SetColumnSpan(_vazio, 6);
         _tabela = new TabelaDesign { Dock = DockStyle.Fill, Height = 100, Margin = new Padding(0, 0, 14, 0), MaxLinhas = 11 };
         _tabela.Colunas(new("Descrição", 700), new("Valor", 180, Direita: true, Editavel: true));
@@ -155,12 +156,13 @@ public class FormEmpresa : DialogoDesign
             _logoBase64 = Convert.ToBase64String(bytes); _logoNome = Path.GetFileName(d.FileName); logo.Text = _logoNome;
         };
         var e1 = Secao("Empresa");
-        Campo(e1, "Nome", T("nome"), 3); Campo(e1, "CNPJ", T("cnpj", 20), 1); Campo(e1, "Telefone", T("telefone", 40), 1); Campo(e1, "Logomarca", logo, 1, trocar);
+        // larguras que cabem o conteúdo (antes o CNPJ, o CEP e a logomarca apareciam cortados)
+        Campo(e1, "Nome", T("nome"), 3); Campo(e1, "CNPJ", T("cnpj", 20), 2); Campo(e1, "Telefone", T("telefone", 40), 1); Campo(e1, "Logomarca", logo, 3, trocar);
         var cep = T("cep", 12);
         var buscar = AcaoCampo("Buscar");
         buscar.Click += (_, _) => Seguro.Rodar(this, BuscarCep);
         var e2 = Secao("Endereço");
-        Campo(e2, "CEP", cep, 1, buscar); Campo(e2, "Endereço", T("endereco"), 3); Campo(e2, "Nº", T("numero", 20), 1); Campo(e2, "Bairro", T("bairro", 100), 1);
+        Campo(e2, "CEP", cep, 2, buscar); Campo(e2, "Endereço", T("endereco"), 4); Campo(e2, "Nº", T("numero", 20), 1); Campo(e2, "Bairro", T("bairro", 100), 2);
         Campo(e2, "Cidade", T("cidade", 100), 2); Campo(e2, "Estado", _uf, 1); Campo(e2, "IBGE", T("ibge", 10), 1); Campo(e2, "País", _pais, 2);
         var e3 = Secao("Horário de funcionamento");
         for (var i = 0; i < 7; i++) { _horas[i] = PecasDesign.Texto("", 30); Campo(e3, Dias[i], _horas[i], i == 6 ? 1 : 1); }
@@ -177,7 +179,7 @@ public class FormEmpresa : DialogoDesign
         {
             e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             using var path = Forma.Redondo(new Rectangle(0, 0, caixa.Width - 1, caixa.Height - 1), 8);
-            using var pen = new Pen(Color.FromArgb(219, 219, 219)); e.Graphics.DrawPath(pen, path);
+            using var pen = new Pen(Tokens.BordaCampo); e.Graphics.DrawPath(pen, path);
         };
         _politica.Dock = DockStyle.Fill; caixa.Controls.Add(_politica);
         p1.Controls.Add(caixa); p1.SetColumnSpan(caixa, 6);
@@ -246,9 +248,9 @@ public class FormCadastro : Janela
     readonly ListBox _produtoLista = new() { Dock = DockStyle.Fill, DrawMode = DrawMode.OwnerDrawFixed, ItemHeight = 56, BorderStyle = BorderStyle.None, IntegralHeight = false };
     readonly TextBox _produtoBusca = new() { Dock = DockStyle.Fill, PlaceholderText = "Pesquisar por código ou nome", BorderStyle = BorderStyle.None };
     readonly ComboBox _produtoFiltro = new() { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList };
-    readonly Label _produtoTitulo = new() { AutoEllipsis = true, Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = Color.FromArgb(29, 29, 31) };
-    readonly Label _produtoSubtitulo = new() { AutoEllipsis = true, ForeColor = Color.FromArgb(110, 110, 115) };
-    readonly Label _produtoAtivo = new() { AutoSize = true, Padding = new Padding(8, 4, 8, 4), BackColor = Color.FromArgb(231, 245, 238), ForeColor = Color.FromArgb(10, 94, 64) };
+    readonly Label _produtoTitulo = new() { AutoEllipsis = true, Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = Tokens.Texto };
+    readonly Label _produtoSubtitulo = new() { AutoEllipsis = true, ForeColor = Tokens.TextoSecundario };
+    readonly Label _produtoAtivo = new() { AutoSize = true, Padding = new Padding(8, 4, 8, 4), BackColor = Tokens.VerdeSuave, ForeColor = Tokens.VerdeEscuro };
     readonly Label _estado = new() { AutoSize = true, Padding = new Padding(8, 3, 8, 3), Font = new Font("Segoe UI", 8.8F, FontStyle.Bold) };
     List<JsonObject> _lista = [];
     JsonObject _atual;
@@ -312,8 +314,8 @@ public class FormCadastro : Janela
     // Cadastro.dc.html: barra de ações no topo, cartão do formulário, lista em cartão e rodapé com navegação + Gravar
     void MontarLayoutGenerico(TableLayoutPanel campos)
     {
-        var fundo = Color.FromArgb(245, 245, 247);
-        var cinza = Color.FromArgb(232, 232, 236);
+        var fundo = Tokens.Fundo;
+        var cinza = Tokens.Linha;
         var oldRoots = Controls.Cast<Control>().ToArray();
         Controls.Clear();
         BackColor = fundo;
@@ -328,7 +330,7 @@ public class FormCadastro : Janela
         var acoes = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 46, WrapContents = false, BackColor = fundo, Padding = new Padding(0, 4, 0, 6) };
         acoes.Controls.AddRange([
             Estilo("novo", "+ Novo", KitVisual.Verde, Color.White, 92, true), Estilo("edit", "Editar", cinza, KitVisual.Texto, 84),
-            Estilo("del", "Excluir", cinza, Color.FromArgb(196, 40, 28), 84), Estilo("canc", "Cancelar", cinza, KitVisual.Texto, 90),
+            Estilo("del", "Excluir", cinza, Tokens.Vermelho, 84), Estilo("canc", "Cancelar", cinza, KitVisual.Texto, 90),
             Estilo("pesq", "Pesquisar", cinza, KitVisual.Texto, 94)]);
         _estado.Margin = new Padding(8, 8, 0, 0);
         acoes.Controls.Add(_estado);
@@ -366,43 +368,48 @@ public class FormCadastro : Janela
 
     void MontarLayoutProduto(TableLayoutPanel campos)
     {
-        var fundo = Color.FromArgb(245, 245, 247);
-        var linha = Color.FromArgb(229, 229, 234);
+        var fundo = Tokens.Fundo;
+        var linha = Tokens.Linha;
         var oldRoots = Controls.Cast<Control>().ToArray();
         Controls.Clear();
         BackColor = fundo;
-        var lateral = new Panel { Dock = DockStyle.Left, Width = 380, BackColor = Color.FromArgb(238, 238, 242), Padding = new Padding(10, 8, 10, 8) };
+        var lateral = new Panel { Dock = DockStyle.Left, Width = 380, BackColor = Tokens.BotaoSecundario, Padding = new Padding(10, 8, 10, 8) };
         var topoLista = new TableLayoutPanel { Dock = DockStyle.Top, Height = 48, ColumnCount = 2, RowCount = 1 };
         topoLista.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); topoLista.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         var tituloLista = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
         tituloLista.Controls.Add(new Label { Text = "Produtos", AutoSize = true, Font = new Font("Segoe UI", 12F, FontStyle.Bold), Location = new Point(40, 12), BackColor = Color.Transparent });
         tituloLista.Controls.Add(new PictureBox { Image = VisualPrincipal.Icone("produtos"), SizeMode = PictureBoxSizeMode.Zoom, Size = new Size(44, 44), Location = new Point(-4, 2), BackColor = Color.Transparent });
         topoLista.Controls.Add(tituloLista, 0, 0);
-        var novo = _b["novo"]; novo.Text = "+ Novo"; novo.Image = null; novo.TextImageRelation = TextImageRelation.Overlay; novo.Size = new Size(82, 32); novo.FlatStyle = FlatStyle.Flat; novo.BackColor = Color.FromArgb(11, 122, 83); novo.ForeColor = Color.White; novo.Font = new Font("Segoe UI", 9F, FontStyle.Bold); novo.Margin = new Padding(0, 7, 0, 7); novo.FlatAppearance.BorderSize = 0;
+        var novo = _b["novo"]; novo.Text = "+ Novo"; novo.Image = null; novo.TextImageRelation = TextImageRelation.Overlay; novo.Size = new Size(82, 32); novo.FlatStyle = FlatStyle.Flat; novo.BackColor = Tokens.Verde; novo.ForeColor = Color.White; novo.Font = new Font("Segoe UI", 9F, FontStyle.Bold); novo.Margin = new Padding(0, 7, 0, 7); novo.FlatAppearance.BorderSize = 0; novo.AccessibleDescription = "kit:ignorar"; novo.Resize += (_, _) => KitVisual.AplicarRaio(novo, 9); KitVisual.AplicarRaio(novo, 9);
         topoLista.Controls.Add(novo, 1, 0);
-        var busca = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = Color.White, Padding = new Padding(9, 8, 8, 5), Margin = new Padding(0, 2, 0, 6) };
-        Arredondar(busca, 8);
-        busca.Controls.Add(_produtoBusca);
-        busca.Controls.Add(new Label { Text = "\uE721", Dock = DockStyle.Left, Width = 22, Font = new Font("Segoe MDL2 Assets", 9F), ForeColor = Color.FromArgb(110, 110, 115), TextAlign = ContentAlignment.MiddleLeft });
-        _produtoBusca.BringToFront();
+        // busca do canvas: p\u00EDlula cinza com lupa; fora do kit visual (ele achava que era "campo com r\u00F3tulo", trocava a
+        // fonte da lupa \u2014 virava um "-" \u2014 e esticava a caixa)
+        var busca = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = Tokens.FundoCampo, Padding = new Padding(10, 0, 10, 0), Margin = new Padding(0, 2, 0, 6), AccessibleDescription = "kit:ignorar" };
+        Arredondar(busca, 10);
+        var lupa = new Label { Text = "\uE721", Dock = DockStyle.Left, Width = 24, Font = new Font("Segoe MDL2 Assets", 9.5F), ForeColor = Tokens.TextoSecundario, TextAlign = ContentAlignment.MiddleLeft, BackColor = Tokens.FundoCampo };
+        _produtoBusca.Dock = DockStyle.None; _produtoBusca.BackColor = Tokens.FundoCampo; _produtoBusca.ForeColor = Tokens.Texto; _produtoBusca.Font = new Font("Segoe UI", 10F);
+        busca.Controls.Add(_produtoBusca); busca.Controls.Add(lupa);
+        busca.Resize += (_, _) => _produtoBusca.SetBounds(lupa.Right + 2, (busca.Height - _produtoBusca.Height) / 2, busca.ClientSize.Width - lupa.Right - 12, _produtoBusca.Height);
         var filtros = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = Color.White, Padding = new Padding(8, 4, 8, 4), Margin = new Padding(0, 0, 0, 8) };
         Arredondar(filtros, 8);
         _produtoFiltro.FlatStyle = FlatStyle.Flat; filtros.Controls.Add(_produtoFiltro);
         var listaBox = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent, Padding = new Padding(0, 0, 0, 2) };
         listaBox.Controls.Add(_produtoLista);
-        _pos.Dock = DockStyle.Bottom; _pos.Height = 28; _pos.TextAlign = ContentAlignment.MiddleLeft; _pos.ForeColor = Color.FromArgb(110, 110, 115);
+        _pos.Dock = DockStyle.Bottom; _pos.Height = 28; _pos.TextAlign = ContentAlignment.MiddleLeft; _pos.ForeColor = Tokens.TextoSecundario;
         filtros.Visible = false; // o design não tem esse filtro: a busca já acha por código ou nome
         var respiro = new Panel { Dock = DockStyle.Top, Height = 8, BackColor = Color.Transparent };
         lateral.Controls.Add(listaBox); lateral.Controls.Add(_pos); lateral.Controls.Add(filtros); lateral.Controls.Add(respiro); lateral.Controls.Add(busca); lateral.Controls.Add(topoLista);
 
         var direito = new Panel { Dock = DockStyle.Fill, BackColor = fundo };
         var cab = new Panel { Dock = DockStyle.Top, Height = 68, BackColor = Color.White, Padding = new Padding(16, 8, 14, 8) };
-        _produtoTitulo.SetBounds(0, 4, 355, 28);
-        _produtoSubtitulo.SetBounds(0, 31, 355, 22);
-        _produtoAtivo.SetBounds(365, 18, 76, 27);
-        var editar = _b["edit"]; editar.Text = "Editar"; editar.Image = null; editar.TextImageRelation = TextImageRelation.Overlay; editar.Size = new Size(82, 34); editar.FlatStyle = FlatStyle.Flat; editar.BackColor = Color.FromArgb(238, 238, 241); editar.ForeColor = Color.FromArgb(29, 29, 31); editar.Anchor = AnchorStyles.Top | AnchorStyles.Right; editar.SetBounds(cab.Width - 194, 17, 82, 34); editar.FlatAppearance.BorderSize = 0;
-        var excluir = _b["del"]; excluir.Text = "Excluir"; excluir.Image = null; excluir.TextImageRelation = TextImageRelation.Overlay; excluir.Size = new Size(86, 34); excluir.FlatStyle = FlatStyle.Flat; excluir.BackColor = Color.FromArgb(238, 238, 241); excluir.ForeColor = Color.FromArgb(196, 40, 28); excluir.Anchor = AnchorStyles.Top | AnchorStyles.Right; excluir.SetBounds(cab.Width - 104, 17, 86, 34); excluir.FlatAppearance.BorderSize = 0;
-        var fecharX = new BotaoPlano { Text = "\uE711", Font = new Font("Segoe MDL2 Assets", 9F), Size = new Size(34, 34), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(238, 238, 241), ForeColor = Color.FromArgb(29, 29, 31), Anchor = AnchorStyles.Top | AnchorStyles.Right, Cursor = Cursors.Hand, AccessibleDescription = "kit:ignorar" };
+        // título/subtítulo dentro do respiro do cabeçalho (antes encostavam na borda esquerda); selo "Ativo" logo após o nome
+        _produtoTitulo.SetBounds(18, 12, 360, 26);
+        _produtoSubtitulo.SetBounds(18, 38, 360, 20);
+        _produtoAtivo.Location = new Point(380, 15);
+        _produtoTitulo.TextChanged += (_, _) => _produtoAtivo.Left = Math.Min(_produtoTitulo.Left + TextRenderer.MeasureText(_produtoTitulo.Text, _produtoTitulo.Font).Width + 10, _produtoTitulo.Right + 10);
+        var editar = _b["edit"]; editar.Text = "Editar"; editar.Image = null; editar.TextImageRelation = TextImageRelation.Overlay; editar.Size = new Size(82, 34); editar.FlatStyle = FlatStyle.Flat; editar.BackColor = Tokens.BotaoSecundario; editar.ForeColor = Tokens.Texto; editar.Anchor = AnchorStyles.Top | AnchorStyles.Right; editar.SetBounds(cab.Width - 194, 17, 82, 34); editar.FlatAppearance.BorderSize = 0; editar.AccessibleDescription = "kit:ignorar"; KitVisual.AplicarRaio(editar, 9);
+        var excluir = _b["del"]; excluir.Text = "Excluir"; excluir.Image = null; excluir.TextImageRelation = TextImageRelation.Overlay; excluir.Size = new Size(86, 34); excluir.FlatStyle = FlatStyle.Flat; excluir.BackColor = Tokens.BotaoSecundario; excluir.ForeColor = Tokens.Vermelho; excluir.Anchor = AnchorStyles.Top | AnchorStyles.Right; excluir.SetBounds(cab.Width - 104, 17, 86, 34); excluir.FlatAppearance.BorderSize = 0; excluir.AccessibleDescription = "kit:ignorar"; KitVisual.AplicarRaio(excluir, 9);
+        var fecharX = new BotaoPlano { Text = "\uE711", Font = new Font("Segoe MDL2 Assets", 9F), Size = new Size(34, 34), FlatStyle = FlatStyle.Flat, BackColor = Tokens.BotaoSecundario, ForeColor = Tokens.Texto, Anchor = AnchorStyles.Top | AnchorStyles.Right, Cursor = Cursors.Hand, AccessibleDescription = "kit:ignorar" };
         fecharX.FlatAppearance.BorderSize = 0; fecharX.Click += (_, _) => Close(); fecharX.Resize += (_, _) => KitVisual.AplicarRaio(fecharX, 9); KitVisual.AplicarRaio(fecharX, 9);
         cab.Controls.AddRange([_produtoTitulo, _produtoSubtitulo, _produtoAtivo, editar, excluir, fecharX]);
         cab.Resize += (_, _) => { fecharX.Location = new Point(cab.ClientSize.Width - fecharX.Width - 2, 17); excluir.Left = fecharX.Left - excluir.Width - 8; editar.Left = excluir.Left - editar.Width - 8; };
@@ -434,13 +441,13 @@ public class FormCadastro : Janela
         var opcoes = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 42, WrapContents = false, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(2, 8, 0, 0), Margin = new Padding(0) };
         foreach (var chave in new[] { "ativo", "servicoLocacao", "publicarNuvem", "requerDevolucao" })
         {
-            if (_c.TryGetValue(chave, out var c) && c is CheckBox cb) { cb.Margin = new Padding(0, 0, 15, 0); cb.ForeColor = Color.FromArgb(58, 58, 60); opcoes.Controls.Add(cb); }
+            if (_c.TryGetValue(chave, out var c) && c is CheckBox cb) { cb.Margin = new Padding(0, 0, 15, 0); cb.ForeColor = Tokens.Grafite; opcoes.Controls.Add(cb); }
         }
         cartao.Controls.Add(opcoes);
         var provas = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(12) };
         Arredondar(provas, 14);
-        var tituloProvas = new Label { Text = "Provas desta locação", Dock = DockStyle.Top, Height = 27, Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(29, 29, 31) };
-        var subtituloProvas = new Label { Text = "As provas da bateria são enviadas à cronometragem na ordem configurada.", Dock = DockStyle.Top, Height = 22, ForeColor = Color.FromArgb(110, 110, 115) };
+        var tituloProvas = new Label { Text = "Provas desta locação", Dock = DockStyle.Top, Height = 27, Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Tokens.Texto };
+        var subtituloProvas = new Label { Text = "As provas da bateria são enviadas à cronometragem na ordem configurada.", Dock = DockStyle.Top, Height = 22, ForeColor = Tokens.TextoSecundario };
         _extra.Dock = DockStyle.Fill; _extra.AutoSize = false; _extra.Padding = new Padding(0, 8, 0, 0);
         provas.Controls.Add(_extra); provas.Controls.Add(subtituloProvas); provas.Controls.Add(tituloProvas);
         corpo.Controls.Add(cartao, 0, 0); corpo.Controls.Add(provas, 0, 1); centro.Controls.Add(corpo);
@@ -449,11 +456,11 @@ public class FormCadastro : Janela
         var nav = new FlowLayoutPanel { Dock = DockStyle.Left, Width = 178, WrapContents = false, Padding = new Padding(0), FlowDirection = FlowDirection.LeftToRight };
         foreach (var key in new[] { "first", "prev", "next", "last" })
         {
-            var b = _b[key]; b.Text = key switch { "first" => "«", "prev" => "‹", "next" => "›", _ => "»" }; b.Image = null; b.Size = new Size(36, 34); b.FlatStyle = FlatStyle.Flat; b.BackColor = Color.FromArgb(238, 238, 241); b.FlatAppearance.BorderSize = 0; nav.Controls.Add(b);
+            var b = _b[key]; b.Text = key switch { "first" => "«", "prev" => "‹", "next" => "›", _ => "»" }; b.Image = null; b.Size = new Size(36, 34); b.FlatStyle = FlatStyle.Flat; b.BackColor = Tokens.BotaoSecundario; b.FlatAppearance.BorderSize = 0; b.AccessibleDescription = "kit:ignorar"; KitVisual.AplicarRaio(b, 8); nav.Controls.Add(b);
         }
         var acoes = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 250, WrapContents = false, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(0) };
-        var gravar = _b["gravar"]; gravar.Text = "Gravar produto"; gravar.Image = null; gravar.Size = new Size(142, 36); gravar.FlatStyle = FlatStyle.Flat; gravar.BackColor = Color.FromArgb(11, 122, 83); gravar.ForeColor = Color.White; gravar.Font = new Font("Segoe UI", 9F, FontStyle.Bold); gravar.FlatAppearance.BorderSize = 0;
-        var cancelar = _b["canc"]; cancelar.Image = null; cancelar.Size = new Size(96, 36); cancelar.FlatStyle = FlatStyle.Flat; cancelar.BackColor = Color.FromArgb(238, 238, 241); cancelar.ForeColor = Color.FromArgb(29, 29, 31); cancelar.FlatAppearance.BorderSize = 0;
+        var gravar = _b["gravar"]; gravar.Text = "Gravar produto"; gravar.Image = null; gravar.Size = new Size(142, 36); gravar.FlatStyle = FlatStyle.Flat; gravar.BackColor = Tokens.Verde; gravar.ForeColor = Color.White; gravar.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold); gravar.FlatAppearance.BorderSize = 0; gravar.AccessibleDescription = "kit:ignorar"; KitVisual.AplicarRaio(gravar, 10);
+        var cancelar = _b["canc"]; cancelar.Image = null; cancelar.Size = new Size(96, 36); cancelar.FlatStyle = FlatStyle.Flat; cancelar.BackColor = Tokens.BotaoSecundario; cancelar.ForeColor = Tokens.Texto; cancelar.FlatAppearance.BorderSize = 0; cancelar.AccessibleDescription = "kit:ignorar"; KitVisual.AplicarRaio(cancelar, 10);
         acoes.Controls.AddRange([gravar, cancelar]); rodape.Controls.Add(acoes); rodape.Controls.Add(nav);
         direito.Controls.Add(centro); direito.Controls.Add(rodape); direito.Controls.Add(cab);
         Controls.Add(direito); Controls.Add(lateral);
@@ -546,22 +553,30 @@ public class FormCadastro : Janela
         if (!Produto || e.Index < 0 || e.Index >= _produtoLista.Items.Count) return;
         var p = (JsonObject)_produtoLista.Items[e.Index];
         var selecionado = (e.State & DrawItemState.Selected) != 0;
-        var fundo = selecionado ? Color.FromArgb(11, 122, 83) : Color.Transparent;
-        var fg = selecionado ? Color.White : Color.FromArgb(29, 29, 31);
-        var sec = selecionado ? Color.FromArgb(220, 244, 232) : Color.FromArgb(110, 110, 115);
-        using (var b = new SolidBrush(fundo)) e.Graphics.FillRectangle(b, e.Bounds);
+        var fundo = selecionado ? Tokens.Verde : Color.Transparent;
+        var fg = selecionado ? Color.White : Tokens.Texto;
+        var sec = selecionado ? Color.FromArgb(220, 244, 232) : Tokens.TextoSecundario;
+        // linha selecionada = pílula verde arredondada (canvas); o nome usa todo o espaço até o preço (antes cortava cedo)
+        using (var lim = new SolidBrush(_produtoLista.BackColor)) e.Graphics.FillRectangle(lim, e.Bounds);
+        if (selecionado)
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using var pilula = Forma.Redondo(new Rectangle(e.Bounds.X + 2, e.Bounds.Y + 2, e.Bounds.Width - 5, e.Bounds.Height - 4), 10);
+            using var b = new SolidBrush(fundo); e.Graphics.FillPath(b, pilula);
+        }
         var r = e.Bounds; r.Inflate(-10, -4);
+        var fontePreco = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+        var larguraPreco = TextRenderer.MeasureText(Fmt.Dinheiro(p.L("preco")), fontePreco).Width + 4;
         var codeRect = new Rectangle(r.Left, r.Top + 8, 48, 20);
-        var textRect = new Rectangle(r.Left + 50, r.Top + 2, Math.Max(30, r.Width - 150), 23);
-        var subRect = new Rectangle(r.Left + 50, r.Top + 25, Math.Max(30, r.Width - 150), 19);
-        var priceRect = new Rectangle(r.Right - 92, r.Top + 8, 88, 22);
+        var textRect = new Rectangle(r.Left + 50, r.Top + 2, Math.Max(30, r.Width - 50 - larguraPreco - 8), 23);
+        var subRect = new Rectangle(r.Left + 50, r.Top + 25, Math.Max(30, r.Width - 50 - larguraPreco - 8), 19);
+        var priceRect = new Rectangle(r.Right - larguraPreco, r.Top + 8, larguraPreco, 22);
         TextRenderer.DrawText(e.Graphics, p.S("codigo"), new Font("Consolas", 8.5F), codeRect, sec, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
         TextRenderer.DrawText(e.Graphics, p.S("nome"), new Font("Segoe UI", 9F, FontStyle.Bold), textRect, fg, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
         TextRenderer.DrawText(e.Graphics, p.S("categoria"), new Font("Segoe UI", 8F), subRect, sec, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
-        TextRenderer.DrawText(e.Graphics, Fmt.Dinheiro(p.L("preco")), new Font("Segoe UI", 8.5F, FontStyle.Bold), priceRect, fg, TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+        TextRenderer.DrawText(e.Graphics, Fmt.Dinheiro(p.L("preco")), fontePreco, priceRect, fg, TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
         if (e.Index < _produtoLista.Items.Count - 1 && !selecionado)
-            using (var pen = new Pen(Color.FromArgb(232, 232, 236))) e.Graphics.DrawLine(pen, r.Left, e.Bounds.Bottom - 1, r.Right, e.Bounds.Bottom - 1);
-        e.DrawFocusRectangle();
+            using (var pen = new Pen(Tokens.Linha)) e.Graphics.DrawLine(pen, r.Left, e.Bounds.Bottom - 1, r.Right, e.Bounds.Bottom - 1);
     }
 
     void AtualizarCabecalhoProduto(JsonObject p)
@@ -588,8 +603,8 @@ public class FormCadastro : Janela
         }
         _estado.Text = m == "novo" ? "Incluindo" : m == "edit" ? "Editando" : "";
         _estado.Visible = m != "ver";
-        _estado.BackColor = m == "novo" ? Color.FromArgb(225, 238, 255) : Color.FromArgb(255, 240, 214);
-        _estado.ForeColor = m == "novo" ? Color.FromArgb(10, 79, 160) : Color.FromArgb(138, 75, 0);
+        _estado.BackColor = m == "novo" ? Tokens.AzulSuave : Color.FromArgb(255, 240, 214);
+        _estado.ForeColor = m == "novo" ? Tokens.AzulTexto : Tokens.LaranjaEscuro;
         // botões verdes apagados quando desabilitados
         foreach (var k in new[] { "gravar", "novo" }) if (_b.TryGetValue(k, out var bv) && bv.AccessibleDescription == "kit:ignorar") bv.BackColor = bv.Enabled ? KitVisual.Verde : Color.FromArgb(196, 222, 210);
     }
@@ -607,7 +622,7 @@ public class FormCadastro : Janela
             _produtoLista.ClearSelected();
             AtualizarCabecalhoProduto(null);
             _extra.Controls.Clear();
-            _extra.Controls.Add(new Label { Text = "Grave o produto para configurar suas provas de bateria.", Dock = DockStyle.Top, ForeColor = Color.FromArgb(110, 110, 115), Padding = new Padding(4, 8, 4, 4) });
+            _extra.Controls.Add(new Label { Text = "Grave o produto para configurar suas provas de bateria.", Dock = DockStyle.Top, ForeColor = Tokens.TextoSecundario, Padding = new Padding(4, 8, 4, 4) });
         }
         SetModo("novo");
         _c.Values.First().Focus();
@@ -663,13 +678,14 @@ public class FormCadastro : Janela
         var ordem = Campos.Num(lista.Count + 1, 1, 20); var nome = new TextBox(); var tipo = Campos.Combo(); tipo.Items.AddRange([new Campos.Item(0, "Classificatório", new JsonObject { ["v"] = "classificacao" }), new Campos.Item(1, "Corrida", new JsonObject { ["v"] = "corrida" }), new Campos.Item(2, "Treino", new JsonObject { ["v"] = "treino" })]); tipo.SelectedIndex = 0;
         var fin = Campos.Combo(); fin.Items.AddRange([new Campos.Item(0, "Por tempo", new JsonObject { ["v"] = "tempo" }), new Campos.Item(1, "Por voltas", new JsonObject { ["v"] = "voltas" })]); fin.SelectedIndex = 0;
         string Cod(ComboBox c) => (c.SelectedItem as Campos.Item)?.Dados?.S("v") ?? ""; var tempo = Campos.Num(0, 0, 600); var voltas = Campos.Num(0, 0, 999);
-        var linhaCampos = new TableLayoutPanel { Dock = DockStyle.Top, Height = 72, ColumnCount = 7, RowCount = 1, Padding = new Padding(0), Margin = new Padding(0) };
+        var linhaCampos = new TableLayoutPanel { Dock = DockStyle.Top, Height = 58, ColumnCount = 7, RowCount = 1, Padding = new Padding(0), Margin = new Padding(0) };
         foreach (var peso in new[] { 9f, 15f, 21f, 19f, 9f, 9f, 18f }) linhaCampos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, peso));
+        linhaCampos.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); // a linha ocupa exatamente os 58 px (sem isso crescia e cortava os campos)
         linhaCampos.Controls.Add(CampoProva("Ordem", ordem), 0, 0); linhaCampos.Controls.Add(CampoProva("Nome", nome), 1, 0);
         linhaCampos.Controls.Add(CampoProva("Tipo", tipo), 2, 0); linhaCampos.Controls.Add(CampoProva("Autofinalizar", fin), 3, 0);
         linhaCampos.Controls.Add(CampoProva("Tempo (min)", tempo), 4, 0); linhaCampos.Controls.Add(CampoProva("Voltas (máx)", voltas), 5, 0);
-        var bIns = new BotaoPlano { Text = "Inserir", Height = 34, Width = 72, Dock = DockStyle.Bottom, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(11, 122, 83), ForeColor = Color.White, Font = new Font("Segoe UI", 11F, FontStyle.Bold), Margin = new Padding(2, 20, 2, 0), AccessibleName = "Inserir prova" };
-        var bDel = new BotaoPlano { Text = "×", Height = 34, Width = 34, Dock = DockStyle.Bottom, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(238, 238, 241), ForeColor = Color.FromArgb(196, 40, 28), Font = new Font("Segoe UI", 11F, FontStyle.Bold), Margin = new Padding(2, 20, 2, 0), AccessibleName = "Excluir prova selecionada" };
+        var bIns = new BotaoPlano { Text = "Inserir", Height = 34, Width = 72, Dock = DockStyle.Bottom, FlatStyle = FlatStyle.Flat, BackColor = Tokens.Verde, ForeColor = Color.White, Font = new Font("Segoe UI", 11F, FontStyle.Bold), Margin = new Padding(2, 20, 2, 0), AccessibleName = "Inserir prova", AccessibleDescription = "kit:ignorar" };
+        var bDel = new BotaoPlano { Text = "×", Height = 34, Width = 34, Dock = DockStyle.Bottom, FlatStyle = FlatStyle.Flat, BackColor = Tokens.BotaoSecundario, ForeColor = Tokens.Vermelho, Font = new Font("Segoe UI", 11F, FontStyle.Bold), Margin = new Padding(2, 20, 2, 0), AccessibleName = "Excluir prova selecionada", AccessibleDescription = "kit:ignorar" };
         bIns.FlatAppearance.BorderSize = bDel.FlatAppearance.BorderSize = 0;
         var acoes = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(0), Margin = new Padding(0) };
         acoes.Controls.AddRange([bIns, bDel]); linhaCampos.Controls.Add(acoes, 6, 0);
@@ -680,7 +696,7 @@ public class FormCadastro : Janela
         {
             if (e.RowIndex < 0 || gp.Columns[e.ColumnIndex].Name != "tipo" || e.Value is not string t || t.Length == 0) return;
             VisualPrincipal.Fundo(e);
-            var (fundo, texto) = t switch { "Corrida" => (Color.FromArgb(255, 226, 224), Color.FromArgb(161, 29, 20)), "Classificatório" => (Color.FromArgb(225, 238, 255), Color.FromArgb(10, 79, 160)), _ => (Color.FromArgb(234, 234, 238), Color.FromArgb(58, 58, 60)) };
+            var (fundo, texto) = t switch { "Corrida" => (Color.FromArgb(255, 226, 224), Color.FromArgb(161, 29, 20)), "Classificatório" => (Tokens.AzulSuave, Tokens.AzulTexto), _ => (Tokens.Linha, Tokens.Grafite) };
             var fonte = new Font("Segoe UI", 8.2F, FontStyle.Bold);
             var w = TextRenderer.MeasureText(t, fonte).Width + 12;
             var r = new Rectangle(e.CellBounds.X + 6, e.CellBounds.Y + (e.CellBounds.Height - 20) / 2, Math.Min(w, e.CellBounds.Width - 10), 20);
@@ -713,18 +729,22 @@ public class FormCadastro : Janela
     static Panel CampoProva(string rotulo, Control campo)
     {
         var p = new Panel { Dock = DockStyle.Fill, Padding = new Padding(3, 0, 5, 0), Margin = new Padding(0) };
-        var label = new Label { Text = rotulo, Dock = DockStyle.Top, Height = 18, ForeColor = Color.FromArgb(110, 110, 115), Font = new Font("Segoe UI", 8F, FontStyle.Bold) };
-        campo.Dock = DockStyle.Fill;
+        var label = new Label { Text = rotulo, Dock = DockStyle.Top, Height = 18, ForeColor = Tokens.TextoSecundario, Font = new Font("Segoe UI", 8F, FontStyle.Bold) };
+        // centrado na vertical: caixa de uma linha, lista e número têm altura fixa (com Dock=Fill ficavam grudados no topo)
+        campo.Dock = DockStyle.None;
         if (campo is TextBox t) { t.BorderStyle = BorderStyle.None; t.BackColor = Color.White; }
         if (campo is ComboBox c) { c.FlatStyle = FlatStyle.Flat; c.BackColor = Color.White; }
-        var input = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0, 2, 0, 0), BackColor = Color.White, Padding = new Padding(6, 2, 5, 2) };
+        if (campo is NumericUpDown nu) { nu.BorderStyle = BorderStyle.None; nu.BackColor = Color.White; }
+        var input = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0, 2, 0, 0), BackColor = Color.White, Padding = new Padding(8, 2, 6, 2) };
         input.Controls.Add(campo);
+        void Centralizar() => campo.SetBounds(input.Padding.Left, Math.Max(1, (input.Height - campo.Height) / 2), Math.Max(10, input.Width - input.Padding.Horizontal), campo.Height);
+        input.Resize += (_, _) => Centralizar(); campo.SizeChanged += (_, _) => { if (campo.Top != Math.Max(1, (input.Height - campo.Height) / 2)) Centralizar(); };
         input.Paint += (_, e) =>
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             using var path = new GraphicsPath(); var r = 7; var w = input.Width - 1; var h = input.Height - 1;
             path.AddArc(0, 0, r, r, 180, 90); path.AddArc(w - r, 0, r, r, 270, 90); path.AddArc(w - r, h - r, r, r, 0, 90); path.AddArc(0, h - r, r, r, 90, 90); path.CloseFigure();
-            using var pen = new Pen(Color.FromArgb(218, 218, 224)); e.Graphics.DrawPath(pen, path);
+            using var pen = new Pen(Tokens.BordaCampo); e.Graphics.DrawPath(pen, path);
         };
         input.Resize += (_, _) => input.Invalidate(); p.Controls.Add(input); p.Controls.Add(label); return p;
     }
@@ -743,7 +763,7 @@ public class FormCadastro : Janela
             if (painel.Width < raio * 2 || painel.Height < raio * 2) return;
             using var path = new GraphicsPath(); var w = painel.Width - 1; var h = painel.Height - 1;
             path.AddArc(0, 0, raio, raio, 180, 90); path.AddArc(w - raio, 0, raio, raio, 270, 90); path.AddArc(w - raio, h - raio, raio, raio, 0, 90); path.AddArc(0, h - raio, raio, raio, 90, 90); path.CloseFigure();
-            using var pen = new Pen(Color.FromArgb(232, 232, 236)); e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; e.Graphics.DrawPath(pen, path);
+            using var pen = new Pen(Tokens.Linha); e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; e.Graphics.DrawPath(pen, path);
         };
         Ajustar();
     }
@@ -755,9 +775,9 @@ static class VoucherRegras
     public static string NovoCodigo() => "KB" + Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
 
     public static async Task<bool> Salvar(Form dono, string origem, long? vinculoId, string referencia, string codigo, bool percentual, string valor,
-        DateTime ini, DateTime fim, long? produtoId, string usoMax, bool unico, string minimo, string maximo)
+        DateTime ini, DateTime fim, long? produtoId, string usoMax, bool unico, string minimo, string maximo, long? editarId = null, bool? ativo = null)
     {
-        if (origem is "fidelidade" or "parceiro" && (vinculoId is not long vid || vid <= 0)) { Msg.Aviso(dono, origem == "fidelidade" ? "Escolha a conta de fidelidade." : "Escolha o parceiro."); return false; }
+        if (editarId == null && origem is "fidelidade" or "parceiro" && (vinculoId is not long vid || vid <= 0)) { Msg.Aviso(dono, origem == "fidelidade" ? "Escolha a conta de fidelidade." : "Escolha o parceiro."); return false; }
         if (string.IsNullOrWhiteSpace(codigo)) { Msg.Aviso(dono, "Informe o código do voucher (ou toque em Gerar)."); return false; }
         long v;
         var txt = valor.Replace("%", "").Trim();
@@ -765,6 +785,20 @@ static class VoucherRegras
         else { if (Fmt.Centavos(txt) is not long c || c <= 0) { Msg.Aviso(dono, "Informe o valor do desconto."); return false; } v = c; }
         if (fim.Date < ini.Date) { Msg.Aviso(dono, "A data final deve ser igual ou depois da inicial."); return false; }
         var uso = int.TryParse(usoMax, out var u) && u > 0 ? u : 1;
+        if (editarId is long idEd)
+        {
+            var corpo = new JsonObject
+            {
+                ["codigo"] = codigo.Trim().ToUpperInvariant(), ["tipo"] = percentual ? "percentual" : "valor", ["valor"] = v, ["inicio"] = Fmt.Iso(ini), ["fim"] = Fmt.Iso(fim),
+                ["produtoId"] = produtoId is long p2 && p2 > 0 ? p2 : null, ["usoMaxCliente"] = uso, ["usoUnico"] = unico,
+                ["pedidoMinimo"] = Fmt.Centavos(minimo) is long mn2 && mn2 > 0 ? mn2 : null, ["descontoMaximo"] = Fmt.Centavos(maximo) is long mx2 && mx2 > 0 ? mx2 : null,
+            };
+            if (origem is not ("fidelidade" or "parceiro")) corpo["referencia"] = string.IsNullOrWhiteSpace(referencia) ? null : referencia.Trim();
+            if (ativo is bool at) corpo["ativo"] = at;
+            await Sessao.Api.Put("/api/office/vouchers/" + idEd, corpo);
+            Msg.Info(dono, "Voucher alterado.");
+            return true;
+        }
         await Sessao.Api.Post("/api/office/vouchers", new
         {
             origem, referencia = origem is "fidelidade" or "parceiro" ? null : referencia?.Trim(),
@@ -804,15 +838,25 @@ public class FormVoucher : CartaoModal
 {
     public static Form Criar(string origem, JsonObject vinculo = null) => origem == "parceiro" ? new FormVoucherParceiro(vinculo) : new FormVoucher(origem, vinculo);
 
+    /// <summary>Editar um voucher da lista (qualquer origem): busca os dados completos e abre o mesmo cartão já preenchido.
+    /// O vínculo (conta/parceiro) fica como está; o resto muda, inclusive ativar/desativar.</summary>
+    public static async Task<bool> Editar(Form dono, JsonObject linha)
+    {
+        var v = (await Sessao.Api.Get("/api/office/vouchers/" + linha.S("id"))).AsObject();
+        v["vinculoNome"] = linha.S("parceiro") is { Length: > 0 } p ? p : linha.S("conta") is { Length: > 0 } c ? c : linha.S("referencia");
+        using var f = new FormVoucher(v.S("origem"), null, v);
+        return f.ShowDialog(dono) == DialogResult.OK;
+    }
+
     readonly Panel _cartao;
     string _valorCartao = "10% OFF", _codigoCartao = "";
     readonly string _selo;
 
-    public FormVoucher(string origem, JsonObject vinculo = null) : base(820, 660)
+    public FormVoucher(string origem, JsonObject vinculo = null, JsonObject editar = null) : base(820, 660)
     {
-        var fidelidade = origem == "fidelidade";
-        Text = fidelidade ? "Criar voucher por fidelidade" : "Criar voucher";
-        _selo = fidelidade ? "FIDELIDADE" : "AVULSO";
+        var fidelidade = origem == "fidelidade" && editar == null;
+        Text = editar != null ? "Editar voucher" : fidelidade ? "Criar voucher por fidelidade" : "Criar voucher";
+        _selo = origem switch { "fidelidade" => "FIDELIDADE", "parceiro" => "PARCEIRO", _ => "AVULSO" };
         BackColor = DialogoDesign.Fundo;
 
         // ---------- lateral escura (300 px) com o cartão dourado inclinado
@@ -820,7 +864,7 @@ public class FormVoucher : CartaoModal
         lado.Paint += (_, e) =>
         {
             var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
-            using (var b = new LinearGradientBrush(lado.ClientRectangle, Color.FromArgb(28, 28, 30), Color.FromArgb(11, 11, 12), 90f)) g.FillRectangle(b, lado.ClientRectangle);
+            using (var b = new LinearGradientBrush(lado.ClientRectangle, Tokens.Preto, Color.FromArgb(11, 11, 12), 90f)) g.FillRectangle(b, lado.ClientRectangle);
             using var brilho = new GraphicsPath(); brilho.AddEllipse(-30, -10, 360, 300);
             using var pb = new PathGradientBrush(brilho) { CenterColor = Color.FromArgb(90, 255, 216, 74), SurroundColors = [Color.FromArgb(0, 255, 216, 74)] };
             g.FillPath(pb, brilho);
@@ -833,7 +877,7 @@ public class FormVoucher : CartaoModal
 
         // ---------- cabeçalho (padding 16 20, título 17 px, ✕ 30 px)
         var cab = new Panel { Dock = DockStyle.Top, Height = 63, BackColor = Color.White };
-        cab.Paint += (_, e) => { using var p = new Pen(Color.FromArgb(235, 235, 235)); e.Graphics.DrawLine(p, 0, cab.Height - 1, cab.Width, cab.Height - 1); };
+        cab.Paint += (_, e) => { using var p = new Pen(Tokens.Linha); e.Graphics.DrawLine(p, 0, cab.Height - 1, cab.Width, cab.Height - 1); };
         cab.Controls.Add(new Label { Text = Text, AutoSize = true, Font = new Font("Segoe UI", 12.8F, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, Location = new Point(20, 18), BackColor = Color.Transparent });
         var x = Botao("✕", CinzaBotao, PecasDesign.CorTexto); x.Font = new Font("Segoe UI", 9.5F); x.Size = new Size(30, 30); x.Location = new Point(520 - 20 - 30, 16);
         x.Resize += (_, _) => Forma.AplicarRaio(x, 8); Forma.AplicarRaio(x, 8); x.Click += (_, _) => Close();
@@ -852,7 +896,7 @@ public class FormVoucher : CartaoModal
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 using var p = Forma.Redondo(new Rectangle(0, 0, caixa.Width - 1, caixa.Height - 1), 9);
                 e.Graphics.FillPath(Brushes.White, p);
-                using var pen = new Pen(ctl.ContainsFocus ? DialogoDesign.VerdePrincipal : Color.FromArgb(219, 219, 219)); e.Graphics.DrawPath(pen, p);
+                using var pen = new Pen(ctl.ContainsFocus ? DialogoDesign.VerdePrincipal : Tokens.BordaCampo); e.Graphics.DrawPath(pen, p);
             };
             ctl.GotFocus += (_, _) => caixa.Invalidate(); ctl.LostFocus += (_, _) => caixa.Invalidate();
             if (ctl is TextBox tb) tb.BackColor = Color.White;
@@ -885,7 +929,32 @@ public class FormVoucher : CartaoModal
         var unico = new CheckBox { Text = "Uso único (vale uma vez só)", Checked = true, AutoSize = true, Font = new Font("Segoe UI", 10.1F), BackColor = DialogoDesign.Fundo, Padding = new Padding(4, 0, 0, 0), Cursor = Cursors.Hand, Margin = new Padding(0, 0, 0, 0) };
         Forma.CheckVerde(unico);
 
-        if (fidelidade)
+        CheckBox ativo = null;
+        if (editar != null)
+        {
+            // edição: o vínculo (conta/parceiro) não muda; os demais campos vêm preenchidos
+            if (origem is "fidelidade" or "parceiro")
+            {
+                var vin = PecasDesign.Texto(editar.S("vinculoNome")); vin.ReadOnly = true;
+                Campo(origem == "parceiro" ? "Parceiro" : "Conta fidelidade", vin, 2);
+            }
+            else { refe.Text = editar.S("referencia"); Campo("Referência (opcional)", refe, 2); }
+            cod.Text = editar.S("codigo");
+            var pct = editar.S("tipo") != "valor";
+            tipo.SelectedIndex = pct ? 0 : 1;
+            valor.Text = pct ? $"{editar.L("valor") ?? 0} %" : Fmt.Brl(editar.L("valor") ?? 0).Replace("R$", "").Trim();
+            if (editar.D("inicio") is DateTime di) ini.Value = di;
+            if (editar.D("fim") is DateTime df) fim.Value = df;
+            Campos.Selecionar(prod, editar.L("produtoId") ?? 0);
+            if (prod.SelectedIndex < 0) prod.SelectedIndex = 0;
+            uso.Text = Math.Max(1, editar.I("usoMaxCliente")).ToString();
+            min.Text = editar.L("pedidoMinimo") is long mn and > 0 ? Fmt.Brl(mn).Replace("R$", "").Trim() : "";
+            max.Text = editar.L("descontoMaximo") is long mx and > 0 ? Fmt.Brl(mx).Replace("R$", "").Trim() : "";
+            unico.Checked = editar.B("usoUnico");
+            ativo = new CheckBox { Text = "Ativo (vale no caixa)", Checked = editar.B("ativo"), AutoSize = true, Font = unico.Font, BackColor = DialogoDesign.Fundo, Padding = unico.Padding, Cursor = Cursors.Hand, Margin = Padding.Empty };
+            Forma.CheckVerde(ativo);
+        }
+        else if (fidelidade)
         {
             var sel = DialogoDesign.AcaoCampo("Selecionar…"); sel.Click += (_, _) => { lista.Focus(); lista.DroppedDown = true; };
             Campo("Conta fidelidade", lista, 2, sel);
@@ -898,7 +967,8 @@ public class FormVoucher : CartaoModal
         Campo("Produto", prod, 2);
         Campo("Uso máximo por cliente", uso, 1); Campo("Pedido mínimo (R$)", min, 1);
         Campo("Desconto máximo (R$)", max, 2);
-        form.Controls.Add(unico); form.SetColumnSpan(unico, 2);
+        form.Controls.Add(unico); form.SetColumnSpan(unico, ativo == null ? 2 : 1);
+        if (ativo != null) form.Controls.Add(ativo);
 
         void Previa()
         {
@@ -912,7 +982,7 @@ public class FormVoucher : CartaoModal
 
         // ---------- rodapé (padding 14 20, botões 38 px)
         var rod = new Panel { Dock = DockStyle.Bottom, Height = 67, BackColor = Color.White };
-        rod.Paint += (_, e) => { using var p = new Pen(Color.FromArgb(235, 235, 235)); e.Graphics.DrawLine(p, 0, 0, rod.Width, 0); };
+        rod.Paint += (_, e) => { using var p = new Pen(Tokens.Linha); e.Graphics.DrawLine(p, 0, 0, rod.Width, 0); };
         var salvar = Botao("Salvar e fechar", DialogoDesign.VerdePrincipal, Color.White, true); salvar.Font = new Font("Segoe UI", 10.1F, FontStyle.Bold);
         salvar.Size = new Size(TextRenderer.MeasureText(salvar.Text, salvar.Font).Width + 36, 38); salvar.Location = new Point(520 - 20 - salvar.Width, 14);
         var cancelar = Botao("Cancelar", CinzaBotao, PecasDesign.CorTexto); cancelar.Font = new Font("Segoe UI", 10.1F);
@@ -922,7 +992,7 @@ public class FormVoucher : CartaoModal
         salvar.Click += (_, _) => Seguro.Rodar(this, async () =>
         {
             if (await VoucherRegras.Salvar(this, origem, fidelidade ? Campos.IdDe(lista) : null, refe.Text, cod.Text, tipo.SelectedIndex == 0, valor.Text,
-                ini.Value, fim.Value, Campos.IdDe(prod), uso.Text, unico.Checked, min.Text, max.Text)) { DialogResult = DialogResult.OK; Close(); }
+                ini.Value, fim.Value, Campos.IdDe(prod), uso.Text, unico.Checked, min.Text, max.Text, editar?.L("id"), ativo?.Checked)) { DialogResult = DialogResult.OK; Close(); }
         });
         rod.Controls.AddRange([cancelar, salvar]);
 

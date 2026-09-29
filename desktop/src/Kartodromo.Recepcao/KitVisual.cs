@@ -7,28 +7,28 @@ namespace Kartodromo.Recepcao;
 /// <summary>Kit visual local da Recepção: paleta, cartões, campos, botões e cabeçalho das janelas.</summary>
 public static class KitVisual
 {
-    public static readonly Color Fundo = Color.FromArgb(245, 245, 247);
+    public static readonly Color Fundo = Tokens.Fundo;
     public static readonly Color Cartao = Color.White;
-    public static readonly Color Texto = Color.FromArgb(29, 29, 31);
-    public static readonly Color Secundario = Color.FromArgb(110, 110, 115);
-    public static readonly Color Verde = Color.FromArgb(11, 122, 83);
-    public static readonly Color VerdeClaro = Color.FromArgb(231, 245, 238);
-    public static readonly Color Linha = Color.FromArgb(229, 229, 234);
-    public static readonly Color CabecalhoGrade = Color.FromArgb(251, 251, 253);
+    public static readonly Color Texto = Tokens.Texto;
+    public static readonly Color Secundario = Tokens.TextoSecundario;
+    public static readonly Color Verde = Tokens.Verde;
+    public static readonly Color VerdeClaro = Tokens.VerdeSuave;
+    public static readonly Color Linha = Tokens.Linha;
+    public static readonly Color CabecalhoGrade = Tokens.SuperficieSuave;
 
     sealed class PaletaMenu : ProfessionalColorTable
     {
         public override Color MenuStripGradientBegin => Color.White;
         public override Color MenuStripGradientEnd => Color.White;
-        public override Color ToolStripDropDownBackground => Color.FromArgb(250, 250, 252);
-        public override Color MenuBorder => Color.FromArgb(225, 225, 230);
-        public override Color MenuItemSelected => Color.FromArgb(232, 245, 238);
-        public override Color MenuItemSelectedGradientBegin => Color.FromArgb(232, 245, 238);
-        public override Color MenuItemSelectedGradientEnd => Color.FromArgb(232, 245, 238);
-        public override Color MenuItemPressedGradientBegin => Color.FromArgb(220, 238, 228);
-        public override Color MenuItemPressedGradientEnd => Color.FromArgb(220, 238, 228);
-        public override Color SeparatorDark => Color.FromArgb(228, 228, 233);
-        public override Color SeparatorLight => Color.FromArgb(228, 228, 233);
+        public override Color ToolStripDropDownBackground => Tokens.SuperficieSuave;
+        public override Color MenuBorder => Tokens.Linha;
+        public override Color MenuItemSelected => Tokens.VerdeSuave;
+        public override Color MenuItemSelectedGradientBegin => Tokens.VerdeSuave;
+        public override Color MenuItemSelectedGradientEnd => Tokens.VerdeSuave;
+        public override Color MenuItemPressedGradientBegin => Tokens.VerdeSuave;
+        public override Color MenuItemPressedGradientEnd => Tokens.VerdeSuave;
+        public override Color SeparatorDark => Tokens.Linha;
+        public override Color SeparatorLight => Tokens.Linha;
     }
 
     public static ToolStripRenderer RenderizadorMenu() => new ToolStripProfessionalRenderer(new PaletaMenu());
@@ -100,7 +100,7 @@ public static class KitVisual
                 rodape.BackColor = Color.White;
                 rodape.Paint += (_, e) =>
                 {
-                    using var pen = new Pen(Color.FromArgb(229, 229, 234));
+                    using var pen = new Pen(Tokens.Linha);
                     e.Graphics.DrawLine(pen, 0, 0, rodape.Width, 0);
                 };
                 f.Controls.Add(rodape);
@@ -148,13 +148,13 @@ public static class KitVisual
         if (t.Contains("agenda"))
             return new() { Titulo = "Agenda de reservas", Sub = "Calendário mensal, baterias do dia e inclusão de clientes", Cor1 = Color.FromArgb(192, 139, 255), Cor2 = Color.FromArgb(134, 69, 214), Glifo = "\uE787" };
         if (t.Contains("editar bateria") || t.StartsWith("bateria") || t == "bateria")
-            return new() { Titulo = "Editar bateria", Sub = (f.Tag as string) ?? "BATERIA 19:20 · 25/09/2026", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Color.FromArgb(30, 111, 232), Glifo = "\uE823" };
+            return new() { Titulo = "Editar bateria", Sub = (f.Tag as string) ?? "BATERIA 19:20 · 25/09/2026", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Tokens.Azul, Glifo = "\uE823" };
         if (t.Contains("incluir cliente") || t.Contains("registra reserva por cliente") || t.Contains("registrar reserva"))
-            return new() { Titulo = "Registrar reserva por cliente", Sub = (f.Tag as string) ?? "BATERIA 19:20 · 25/09/2026 19:20 · 6 vagas disponíveis", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Color.FromArgb(30, 111, 232), Glifo = "\uE77B" };
+            return new() { Titulo = "Registrar reserva por cliente", Sub = (f.Tag as string) ?? "BATERIA 19:20 · 25/09/2026 19:20 · 6 vagas disponíveis", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Tokens.Azul, Glifo = "\uE77B" };
         if (t.Contains("mover"))
             return new() { Titulo = "Mover cliente para outra bateria", Sub = (f.Tag as string) ?? "Rafael Martins · hoje na BATERIA 19:20", Cor1 = Color.FromArgb(255, 181, 71), Cor2 = Color.FromArgb(240, 122, 0), Glifo = "\uE76C" };
         if (t.Contains("participantes"))
-            return new() { Titulo = "Lista de participantes", Sub = (f.Tag as string) ?? "BATERIA 19:20 · 25/09/2026 · para o briefing e a pista", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Color.FromArgb(30, 111, 232), Glifo = "\uE71D" };
+            return new() { Titulo = "Lista de participantes", Sub = (f.Tag as string) ?? "BATERIA 19:20 · 25/09/2026 · para o briefing e a pista", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Tokens.Azul, Glifo = "\uE71D" };
         if (t.Contains("criar reservas"))
             return new() { Titulo = "Criar reservas", Sub = "Gere as baterias do mês pelo padrão, ou uma reserva avulsa", Cor1 = Color.FromArgb(255, 122, 107), Cor2 = Color.FromArgb(224, 52, 42), Glifo = "\uE7C1" };
         if (t.Contains("editar reserva"))
@@ -168,13 +168,13 @@ public static class KitVisual
         if (t.Contains("padrões") || t.Contains("configuração de reservas"))
             return new() { Titulo = "Configuração de reservas (padrões)", Sub = "Modelos usados em \"Criar reservas\" para gerar as baterias do mês", Cor1 = Color.FromArgb(255, 122, 107), Cor2 = Color.FromArgb(224, 52, 42), Glifo = "\uE7C1" };
         if (t.Contains("parâmetros"))
-            return new() { Titulo = "Parâmetros do sistema", Sub = "Ajustes da recepção · toque no valor para alterar", Cor1 = Color.FromArgb(154, 154, 160), Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE713" };
+            return new() { Titulo = "Parâmetros do sistema", Sub = "Ajustes da recepção · toque no valor para alterar", Cor1 = Tokens.TextoTerciario, Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE713" };
         if (t.Contains("usuário"))
-            return new() { Titulo = "Registro de usuário", Sub = "Atendentes que entram no Módulo Office", Cor1 = Color.FromArgb(154, 154, 160), Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE77B" };
+            return new() { Titulo = "Registro de usuário", Sub = "Atendentes que entram no Módulo Office", Cor1 = Tokens.TextoTerciario, Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE77B" };
         if (t.Contains("produto"))
             return new() { Titulo = "Registro de produto", Sub = "Produtos e provas de cada locação", Cor1 = Color.FromArgb(255, 181, 71), Cor2 = Color.FromArgb(240, 122, 0), Glifo = "\uE8EC" };
         if (t.Contains("pesquisar cliente") || t.Contains("pesquisar / alterar"))
-            return new() { Titulo = "Pesquisar cliente", Sub = "137.539 clientes · pesquise por nome, CPF, celular ou e-mail", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Color.FromArgb(30, 111, 232), Glifo = "\uE721", Estado = "Pesquisa" };
+            return new() { Titulo = "Pesquisar cliente", Sub = "137.539 clientes · pesquise por nome, CPF, celular ou e-mail", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Tokens.Azul, Glifo = "\uE721", Estado = "Pesquisa" };
         if (t.Contains("sangria"))
             return new() { Titulo = "Registrar sangria", Sub = "Retirar dinheiro da gaveta (depósito, cofre)", Cor1 = Color.FromArgb(255, 122, 150), Cor2 = Color.FromArgb(212, 42, 85), Glifo = "\uE898" };
         if (t.Contains("suprimento"))
@@ -184,23 +184,23 @@ public static class KitVisual
         if (t.Contains("agenda"))
             return new() { Titulo = "Agenda mensal", Sub = "Agenda mensal de baterias", Cor1 = Color.FromArgb(192, 139, 255), Cor2 = Color.FromArgb(134, 69, 214), Glifo = "\uE787" };
         if (t.Contains("traçado"))
-            return new() { Titulo = "Registro de traçado", Sub = "Traçados da pista para provas e tomada de tempo", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Color.FromArgb(30, 111, 232), Glifo = "\uE707" };
+            return new() { Titulo = "Registro de traçado", Sub = "Traçados da pista para provas e tomada de tempo", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Tokens.Azul, Glifo = "\uE707" };
         if (t.Contains("feriado"))
             return new() { Titulo = "Registro de feriados", Sub = "Feriados considerados na geração automática de reservas", Cor1 = Color.FromArgb(255, 122, 107), Cor2 = Color.FromArgb(224, 52, 42), Glifo = "\uE787" };
         if (t.Contains("turno"))
-            return new() { Titulo = "Registro de turnos", Sub = "Turnos de operação da recepção e do caixa", Cor1 = Color.FromArgb(154, 154, 160), Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE823" };
+            return new() { Titulo = "Registro de turnos", Sub = "Turnos de operação da recepção e do caixa", Cor1 = Tokens.TextoTerciario, Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE823" };
         if (t.Contains("terminal"))
-            return new() { Titulo = "Registro de terminais", Sub = "Terminais autorizados para abertura de caixa", Cor1 = Color.FromArgb(154, 154, 160), Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE7F4" };
+            return new() { Titulo = "Registro de terminais", Sub = "Terminais autorizados para abertura de caixa", Cor1 = Tokens.TextoTerciario, Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE7F4" };
         if (t.Contains("parceiro"))
             return new() { Titulo = "Registro de parceiro", Sub = "Parceiros e comissões do kartódromo", Cor1 = Color.FromArgb(140, 137, 255), Cor2 = Color.FromArgb(75, 71, 214), Glifo = "\uE77B" };
         if (t.Contains("manutenção") || t.Contains("itens"))
             return new() { Titulo = "Itens de manutenção", Sub = "Itens e peças controlados na oficina", Cor1 = Color.FromArgb(255, 181, 71), Cor2 = Color.FromArgb(240, 122, 0), Glifo = "\uE90F" };
         if (t.Contains("empresa"))
-            return new() { Titulo = "Registro de empresa", Sub = "Dados cadastrais e política do kartódromo", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Color.FromArgb(30, 111, 232), Glifo = "\uE821" };
+            return new() { Titulo = "Registro de empresa", Sub = "Dados cadastrais e política do kartódromo", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Tokens.Azul, Glifo = "\uE821" };
         if (t.Contains("senha"))
-            return new() { Titulo = "Trocar senha", Sub = "Alteração de senha do atendente", Cor1 = Color.FromArgb(154, 154, 160), Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE890" };
+            return new() { Titulo = "Trocar senha", Sub = "Alteração de senha do atendente", Cor1 = Tokens.TextoTerciario, Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE890" };
 
-        return new() { Titulo = titulo ?? f.Text, Sub = "Kartódromo Internacional de Betim · Módulo Office", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Color.FromArgb(30, 111, 232), Glifo = "\uE700" };
+        return new() { Titulo = titulo ?? f.Text, Sub = "Kartódromo Internacional de Betim · Módulo Office", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Tokens.Azul, Glifo = "\uE700" };
     }
 
     static Size TamanhoDaJanela(Form f)
@@ -250,14 +250,14 @@ public static class KitVisual
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
             Location = new Point(p.Width - 46, 13),
             FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(238, 238, 241),
+            BackColor = Tokens.BotaoSecundario,
             ForeColor = Texto,
             Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
             Cursor = Cursors.Hand,
             AccessibleName = "Fechar janela"
         };
         x.FlatAppearance.BorderSize = 0;
-        x.FlatAppearance.MouseOverBackColor = Color.FromArgb(225, 225, 230);
+        x.FlatAppearance.MouseOverBackColor = Tokens.Linha;
         AplicarRaio(x, 9);
         x.Click += (_, _) => janela.Close();
 
@@ -359,7 +359,7 @@ public static class KitVisual
             else
             {
                 using var b = new SolidBrush(Color.White); g.FillPath(b, p);
-                using var pen = new Pen(Color.FromArgb(199, 199, 204), 1.4F); g.DrawPath(pen, p);
+                using var pen = new Pen(Tokens.TextoDesabilitado, 1.4F); g.DrawPath(pen, p);
             }
         };
     }
@@ -387,7 +387,7 @@ public static class KitVisual
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             using var path = CaminhoArredondado(new Rectangle(0, 0, p.Width - 1, p.Height - 1), 8);
-            using var pen = new Pen(Color.FromArgb(218, 218, 224));
+            using var pen = new Pen(Tokens.BordaCampo);
             e.Graphics.DrawPath(pen, path);
         };
         p.Resize += (_, _) => AplicarRaio(p, 8);
@@ -423,7 +423,7 @@ public static class KitVisual
             MinimumSize = new Size(largura > 0 ? largura : 92, 34),
             Height = 34,
             FlatStyle = FlatStyle.Flat,
-            BackColor = principal ? Verde : Color.FromArgb(238, 238, 241),
+            BackColor = principal ? Verde : Tokens.BotaoSecundario,
             ForeColor = principal ? Color.White : Texto,
             Font = new Font("Segoe UI", 9.5F, principal ? FontStyle.Bold : FontStyle.Regular),
             Cursor = Cursors.Hand,
@@ -446,7 +446,7 @@ public static class KitVisual
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             using var path = CaminhoArredondado(p.ClientRectangle, 12);
             using var b = new SolidBrush(Cartao);
-            using var pen = new Pen(Color.FromArgb(232, 232, 236));
+            using var pen = new Pen(Tokens.Linha);
             e.Graphics.FillPath(b, path); e.Graphics.DrawPath(pen, path);
         };
         p.Resize += (_, _) => AplicarRaio(p, 12);
@@ -462,7 +462,7 @@ public static class KitVisual
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             using var path = CaminhoArredondado(new Rectangle(0, 0, p.Width - 1, p.Height - 1), 14);
-            using var pen = new Pen(Color.FromArgb(232, 232, 236));
+            using var pen = new Pen(Tokens.Linha);
             e.Graphics.DrawPath(pen, path);
         };
         p.Resize += (_, _) => AplicarRaio(p, 14);
@@ -484,7 +484,7 @@ public static class KitVisual
     public static Control AbaSegmentada(string[] abas, int indiceInicial, Action<int> aoMudar)
     {
         var wrapper = new Panel { Dock = DockStyle.Top, Height = 42, BackColor = Color.Transparent, Padding = new Padding(0, 0, 0, 10) };
-        var bar = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(2), Margin = Padding.Empty, BackColor = Color.FromArgb(238, 238, 242) };
+        var bar = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(2), Margin = Padding.Empty, BackColor = Tokens.BotaoSecundario };
         AplicarRaio(bar, 9);
         var botoes = new List<Button>();
         for (var i = 0; i < abas.Length; i++)
@@ -534,7 +534,7 @@ public static class KitVisual
         };
         p.Paint += (_, e) =>
         {
-            using var pen = new Pen(Color.FromArgb(229, 229, 234));
+            using var pen = new Pen(Tokens.Linha);
             e.Graphics.DrawLine(pen, 0, 0, p.Width, 0);
         };
         if (!string.IsNullOrEmpty(textoEsquerda))
@@ -626,7 +626,7 @@ public static class KitVisual
         b.FlatStyle = FlatStyle.Flat;
         b.FlatAppearance.BorderSize = 0;
         b.Font = new Font("Segoe UI", 9.3F, principal ? FontStyle.Bold : FontStyle.Regular);
-        b.BackColor = principal ? Verde : Color.FromArgb(238, 238, 241);
+        b.BackColor = principal ? Verde : Tokens.BotaoSecundario;
         b.ForeColor = principal ? Color.White : Texto;
         b.Cursor = Cursors.Hand;
         b.Resize += (_, _) => AplicarRaio(b, 8);

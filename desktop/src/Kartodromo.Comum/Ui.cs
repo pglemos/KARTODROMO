@@ -13,14 +13,14 @@ public static class Tema
     public static readonly Font Negrito = new("Segoe UI", 9F, FontStyle.Bold);
     public static readonly Font Grande = new("Segoe UI", 12F, FontStyle.Bold);
     public static readonly Font Titulo = new("Segoe UI", 16F, FontStyle.Bold);
-    public static readonly Color Fundo = Color.FromArgb(244, 244, 244);
+    public static readonly Color Fundo = Tokens.Fundo;
     public static readonly Color Janela = Color.FromArgb(240, 240, 240);
-    public static readonly Color Linha = Color.FromArgb(201, 201, 201);
+    public static readonly Color Linha = Tokens.Linha;
     public static readonly Color Selecao = Color.FromArgb(204, 228, 247);
     public static readonly Color Azul = Color.FromArgb(0, 99, 177);
-    public static readonly Color Verde = Color.FromArgb(16, 124, 16);
+    public static readonly Color Verde = Tokens.Verde;
     public static readonly Color Vermelho = Color.FromArgb(196, 43, 28);
-    public static readonly Color Cinza = Color.FromArgb(110, 110, 110);
+    public static readonly Color Cinza = Tokens.TextoSecundario;
 }
 
 public static class Msg
@@ -28,11 +28,13 @@ public static class Msg
     public const string App = "Kartódromo - Módulo Office";
     /// <summary>Só para autoteste: quando definido, as mensagens são registradas em vez de abrir caixa modal.</summary>
     public static Action<string> Registro;
+    /// <summary>No autoteste toda confirmação responde "Não" (nada é gravado) e fica registrada.</summary>
+    static bool Nao(string texto) { Registro("PERGUNTA (respondido Não): " + texto); return false; }
     public static void Info(IWin32Window dono, string texto, string titulo = App) { if (Registro != null) { Registro("INFO: " + texto); return; } MessageBox.Show(dono, texto, titulo, MessageBoxButtons.OK, MessageBoxIcon.Information); }
     public static void Aviso(IWin32Window dono, string texto, string titulo = "Atenção!") { if (Registro != null) { Registro("AVISO: " + texto); return; } MessageBox.Show(dono, texto, titulo, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
     public static void Erro(IWin32Window dono, string texto, string titulo = "Atenção!") { if (Registro != null) { Registro("ERRO: " + texto); return; } MessageBox.Show(dono, texto, titulo, MessageBoxButtons.OK, MessageBoxIcon.Error); }
     public static bool Pergunta(IWin32Window dono, string texto, string titulo = "Atenção!") =>
-        MessageBox.Show(dono, texto, titulo, MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1) == DialogResult.Yes;
+        Registro != null ? Nao(texto) : MessageBox.Show(dono, texto, titulo, MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1) == DialogResult.Yes;
 }
 
 /// <summary>
@@ -107,7 +109,7 @@ public class Janela : Form
         var p = new Panel { Dock = DockStyle.Bottom, Height = 58, BackColor = Color.White };
         if (!string.IsNullOrEmpty(textoEsquerda))
         {
-            var l = new Label { Name = "rodapeInfo", Text = textoEsquerda, Dock = DockStyle.Left, AutoSize = false, Width = 480, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(18, 0, 0, 0), Font = new Font("Segoe UI", 9F), ForeColor = Color.FromArgb(110, 110, 115) };
+            var l = new Label { Name = "rodapeInfo", Text = textoEsquerda, Dock = DockStyle.Left, AutoSize = false, Width = 480, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(18, 0, 0, 0), Font = new Font("Segoe UI", 9F), ForeColor = Tokens.TextoSecundario };
             p.Controls.Add(l);
         }
         var flow = new FlowLayoutPanel { Dock = DockStyle.Right, AutoSize = true, FlowDirection = FlowDirection.RightToLeft, WrapContents = false, Padding = new Padding(0, 12, 18, 12) };
@@ -205,6 +207,18 @@ public class Grade : DataGridView
     /// <summary>filtro por lista de valores (funil do cabeçalho, como no LapTime)</summary>
     readonly Dictionary<string, HashSet<string>> _valores = [];
     public Func<JsonObject, Color?> CorLinha { get; set; }
+    /// <summary>Mensagem no meio da lista quando não há linhas (antes: área branca que parecia travada).</summary>
+    public string Vazio { get; set; } = "Nenhum registro.";
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        if (Rows.Count > 0 || string.IsNullOrEmpty(Vazio)) return;
+        var topo = ColumnHeadersVisible ? ColumnHeadersHeight : 0;
+        var area = new Rectangle(0, topo + 24, ClientSize.Width, 44);
+        using var f = new Font("Segoe UI", 10F);
+        TextRenderer.DrawText(e.Graphics, Vazio, f, area, Tokens.TextoSecundario, TextFormatFlags.HorizontalCenter | TextFormatFlags.Top | TextFormatFlags.WordBreak);
+    }
     public Func<List<JsonObject>, ToolStripItem[]> MenuDe { get; set; }
     public event Action<JsonObject> Duplo;
     public event Action FiltroMudou;
@@ -234,7 +248,7 @@ public class Grade : DataGridView
         DefaultCellStyle.SelectionBackColor = Tema.Selecao;
         DefaultCellStyle.SelectionForeColor = Color.Black;
         AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(251, 251, 251);
-        GridColor = Color.FromArgb(237, 237, 237);
+        GridColor = Tokens.Linha;
         RowTemplate.Height = 23;
         Font = Tema.Normal;
         DoubleBuffered = true;
@@ -287,11 +301,11 @@ public class Grade : DataGridView
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.None;
             var estilo = Columns[e.ColumnIndex].HeaderCell.InheritedStyle;
             using (var fundo = new SolidBrush(estilo.BackColor)) g.FillRectangle(fundo, r);
-            using (var linha = new Pen(Color.FromArgb(235, 235, 235))) g.DrawLine(linha, r.Left, r.Bottom - 1, r.Right, r.Bottom - 1);
+            using (var linha = new Pen(Tokens.Linha)) g.DrawLine(linha, r.Left, r.Bottom - 1, r.Right, r.Bottom - 1);
             var col = Columns[e.ColumnIndex];
             var ordenada = SortedColumn == col && SortOrder != SortOrder.None;
             var texto = col.HeaderText + (ordenada ? (SortOrder == SortOrder.Ascending ? " ↑" : " ↓") : "");
-            var cor = ordenada ? Color.FromArgb(11, 122, 83) : estilo.ForeColor;
+            var cor = ordenada ? Tokens.Verde : estilo.ForeColor;
             var (txt, funil) = AreasCabecalho(e.ColumnIndex, r, texto, estilo);
             TextRenderer.DrawText(g, texto, estilo.Font, txt, cor, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding |
                 (estilo.Alignment is DataGridViewContentAlignment.MiddleRight ? TextFormatFlags.Right : estilo.Alignment is DataGridViewContentAlignment.MiddleCenter ? TextFormatFlags.HorizontalCenter : TextFormatFlags.Left));

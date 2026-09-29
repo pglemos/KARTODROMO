@@ -979,9 +979,9 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     send(
       200,
       await query(
-        `SELECT m.Id id, m.Kart kart, m.Categoria categoria, it.Nome item, m.MinutosUso minutosUso, it.TempoHoras limiteHoras,
+        `SELECT m.Id id, LTRIM(RTRIM(m.Kart)) kart, m.Categoria categoria, it.Nome item, m.MinutosUso minutosUso, it.TempoHoras limiteHoras,
                 CONVERT(varchar(16), m.UltimaManutencao, 126) ultimaManutencao, m.Realizada realizada, CONVERT(varchar(16), m.Data, 126) data
-         FROM dbo.Manutencao m LEFT JOIN dbo.ItemManutencao it ON it.Id = m.ItemId ${where} ORDER BY TRY_CAST(m.Kart AS int), m.Kart`,
+         FROM dbo.Manutencao m LEFT JOIN dbo.ItemManutencao it ON it.Id = m.ItemId ${where} ORDER BY TRY_CAST(LTRIM(RTRIM(m.Kart)) AS int), m.Kart`,
       ),
     );
     return true;

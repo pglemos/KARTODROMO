@@ -11,7 +11,7 @@ public class FormLogin : Form
     readonly TextBox _senha = new() { BorderStyle = BorderStyle.None, Font = new Font("Segoe UI", 12F), UseSystemPasswordChar = true, PlaceholderText = "Sua senha" };
     readonly CheckBox _termos = new() { Text = "Li e concordo com os", AutoSize = true, ForeColor = KitVisual.Texto, Font = new Font("Segoe UI", 9.5F) };
     readonly CheckBox _lembrar = new() { Text = "Lembrar meu usuário neste computador", AutoSize = true, ForeColor = KitVisual.Texto, Font = new Font("Segoe UI", 9.5F) };
-    readonly Label _msg = new() { AutoSize = true, ForeColor = Color.FromArgb(196, 40, 28), MaximumSize = new Size(380, 40) };
+    readonly Label _msg = new() { AutoSize = true, ForeColor = Tokens.Vermelho, MaximumSize = new Size(380, 40) };
     readonly Label _status = new() { AutoSize = true, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 8.8F) };
     readonly Button _entrar = KitVisual.Botao("Entrar", true, 250);
     readonly Button _cancelar = KitVisual.Botao("Cancelar", false, 120);
@@ -43,7 +43,7 @@ public class FormLogin : Form
         Controls.Add(layout);
 
         var logo = new PictureBox { Image = Icone.Logo(), SizeMode = PictureBoxSizeMode.Zoom, Size = new Size(300, 76), Location = new Point(56, 46), Anchor = AnchorStyles.Top | AnchorStyles.Left };
-        var titular = new Label { Text = "Recepção,\ncaixa e reservas.", AutoSize = true, Font = new Font("Segoe UI", 29F, FontStyle.Bold), ForeColor = Color.FromArgb(245, 245, 247), Location = new Point(52, 0), Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
+        var titular = new Label { Text = "Recepção,\ncaixa e reservas.", AutoSize = true, Font = new Font("Segoe UI", 29F, FontStyle.Bold), ForeColor = Tokens.Fundo, Location = new Point(52, 0), Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
         var detalhe = new Label { Text = "Cada atendente entra com o próprio usuário. Tudo o que você fizer fica registrado no seu nome e no seu terminal.", AutoSize = false, Width = 400, Height = 82, Font = new Font("Segoe UI", 11F), ForeColor = Color.FromArgb(174, 174, 178), Location = new Point(56, 0), Anchor = AnchorStyles.Left | AnchorStyles.Bottom };
         titular.BackColor = detalhe.BackColor = logo.BackColor = Color.Transparent;
         esquerda.Controls.AddRange([logo, titular, detalhe]);
@@ -66,7 +66,7 @@ public class FormLogin : Form
         var campoSenha = Campo("Senha", _senha, new Point(0, 56), new Size(400, 56));
         campoLogin.Padding = new Padding(16, 5, 16, 4);
         campoSenha.Padding = new Padding(16, 5, 56, 4); // espaço do botão do olho à direita
-        campoLogin.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = Color.FromArgb(238, 238, 241) });
+        campoLogin.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = Tokens.BotaoSecundario });
         var credenciais = new Panel { Location = new Point(0, 94), Size = new Size(400, 112), BackColor = Color.White, Padding = new Padding(0) };
         credenciais.Paint += (_, e) =>
         {
@@ -80,7 +80,7 @@ public class FormLogin : Form
         campoSenha.Dock = DockStyle.Fill;
         credenciais.Controls.Add(campoSenha);
         credenciais.Controls.Add(campoLogin);
-        var olho = new BotaoPlano { Text = "", Font = new Font("Segoe MDL2 Assets", 10F), FlatStyle = FlatStyle.Flat, Size = new Size(32, 32), BackColor = Color.FromArgb(238, 238, 241), ForeColor = Color.FromArgb(58, 58, 60), Cursor = Cursors.Hand, Anchor = AnchorStyles.Top | AnchorStyles.Right };
+        var olho = new BotaoPlano { Text = "", Font = new Font("Segoe MDL2 Assets", 10F), FlatStyle = FlatStyle.Flat, Size = new Size(32, 32), BackColor = Tokens.BotaoSecundario, ForeColor = Tokens.Grafite, Cursor = Cursors.Hand, Anchor = AnchorStyles.Top | AnchorStyles.Right };
         olho.FlatAppearance.BorderSize = 0;
         olho.Click += (_, _) => _senha.UseSystemPasswordChar = !_senha.UseSystemPasswordChar;
         campoSenha.Controls.Add(olho);
@@ -115,7 +115,7 @@ public class FormLogin : Form
         _cancelar.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
         card.Controls.AddRange([_entrar, _cancelar]);
 
-        var bolinha = new Panel { Size = new Size(8, 8), BackColor = Color.FromArgb(52, 199, 89), Location = new Point(2, 424) };
+        var bolinha = new Panel { Size = new Size(8, 8), BackColor = Tokens.VerdeStatus, Location = new Point(2, 424) };
         KitVisual.AplicarRaio(bolinha, 4);
         _status.Location = new Point(18, 418);
         var versao = new Label { Text = "Versão " + Application.ProductVersion.Split('+')[0], AutoSize = true, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 8.5F), Anchor = AnchorStyles.Bottom | AnchorStyles.Right };
@@ -149,7 +149,7 @@ public class FormLogin : Form
         var p = (Panel)sender;
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        using (var b = new LinearGradientBrush(p.ClientRectangle, Color.FromArgb(28, 28, 30), Color.FromArgb(10, 10, 11), 90f)) g.FillRectangle(b, p.ClientRectangle);
+        using (var b = new LinearGradientBrush(p.ClientRectangle, Tokens.Preto, Color.FromArgb(10, 10, 11), 90f)) g.FillRectangle(b, p.ClientRectangle);
         var y0 = (int)(p.Height * .72);
         using var linha = new Pen(Color.FromArgb(16, 255, 255, 255), 1);
         for (var i = -p.Width; i < p.Width * 2; i += 70)
@@ -174,12 +174,12 @@ public class FormLogin : Form
         {
             await Sessao.Api.Get("/healthz");
             _status.Text = "Servidor SRVKART conectado";
-            _status.ForeColor = Color.FromArgb(28, 107, 53);
+            _status.ForeColor = Tokens.VerdeTexto;
         }
         catch
         {
             _status.Text = "Servidor SRVKART indisponível";
-            _status.ForeColor = Color.FromArgb(196, 40, 28);
+            _status.ForeColor = Tokens.Vermelho;
         }
     }
 

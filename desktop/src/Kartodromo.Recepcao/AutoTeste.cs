@@ -19,6 +19,7 @@ public static class AutoTeste
     public static async Task RodarTelas(string pasta, string login, string senha)
     {
         ForaDaTela = true;
+        Relatorio.MostrarNaBarra = false;
         FocoAntes = GetForegroundWindow();
         var vigia = new System.Windows.Forms.Timer { Interval = 15 };
         vigia.Tick += (_, _) =>
@@ -26,7 +27,7 @@ public static class AutoTeste
             foreach (Form f in Application.OpenForms)
                 if (f.Visible && f.Left > -3000)
                 {
-                    f.ShowInTaskbar = false;
+                    if (f.ShowInTaskbar) f.ShowInTaskbar = false; // recria a janela: só quando precisa
                     f.Location = new Point(-4000 + Math.Max(0, f.Left), Math.Max(0, f.Top));
                     SetForegroundWindow(FocoAntes);
                 }
@@ -34,6 +35,146 @@ public static class AutoTeste
         vigia.Start();
         try { await Rodar(pasta, login, senha); }
         finally { vigia.Stop(); }
+    }
+
+    /// <summary>Clica em TODOS os itens do menu do topo, nos botões da barra, no botão de ação do topo e nos itens do botão
+    /// direito de cada lista (fora da tela). Confirmações respondem "Não"; janelas que abrirem são fotografadas e fechadas
+    /// sem salvar. Pula o que grava direto ou abre janela do Windows (excluir, marcar, estornar, exportar, termo, sair).
+    /// Resultado em cliques.txt: ABRIU (janela), NAVEGOU (trocou a lista), MENSAGEM, ERRO/EXCECAO ou NADA.</summary>
+    public static async Task RodarCliques(string pasta, string login, string senha)
+    {
+        ForaDaTela = true;
+        Relatorio.MostrarNaBarra = false;
+        FocoAntes = GetForegroundWindow();
+        var vigia = new System.Windows.Forms.Timer { Interval = 15 };
+        vigia.Tick += (_, _) =>
+        {
+            foreach (Form f in Application.OpenForms)
+                if (f.Visible && f.Left > -3000)
+                {
+                    if (f.ShowInTaskbar) f.ShowInTaskbar = false;
+                    f.Location = new Point(-4000 + Math.Max(0, f.Left), Math.Max(0, f.Top));
+                    SetForegroundWindow(FocoAntes);
+                }
+        };
+        vigia.Start();
+        Directory.CreateDirectory(pasta);
+        Log.Clear();
+        var resultado = new List<string>();
+        var eventos = new List<string>();
+        try
+        {
+            var acesso = await Sessao.Api.Post("/api/login", new { login, senha, termos = true });
+            Sessao.Api.Token = acesso.S("token");
+            Sessao.Usuario = acesso["usuario"]!.AsObject();
+            await Sessao.CarregarApoio();
+            Msg.Registro = m => eventos.Add(m);
+            Application.ThreadException += (_, e) => eventos.Add("EXCECAO: " + e.Exception.GetType().Name + ": " + e.Exception.Message);
+            var principal = new FormPrincipal { WindowState = FormWindowState.Normal, ClientSize = new Size(1920, 1009), StartPosition = FormStartPosition.Manual, Location = new Point(-4000, 0), ShowInTaskbar = false, ConfirmarSaida = false };
+            principal.Show();
+            await Esperar(1800);
+            var titulo = typeof(FormPrincipal).GetField("_titulo", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(principal) as Control;
+            string[] proibidos = ["sair", "fechar", "excluir", "aprovar pré", "abrir bateria", "marcar", "estornar", "registrar pagamento", "desativar", "reativar", "ajustar pontos", "exportar", "termo", "imprimir ticket", "imprimir comprovante"];
+            var n = 0;
+
+            async Task Clicar(string onde, Action acao)
+            {
+                var nome = $"{++n:000}-{Slug(onde)}";
+                if (proibidos.Any(p => onde.Contains(p, StringComparison.OrdinalIgnoreCase)) && !onde.Contains("Fechamento de caixa") && !onde.Contains("abrir / fechar"))
+                { resultado.Add($"PULADO   {onde}"); return; }
+                eventos.Clear();
+                var tituloAntes = titulo?.Text;
+                var abertas = Application.OpenForms.Cast<Form>().ToHashSet();
+                var abriu = new List<string>();
+                var timer = new System.Windows.Forms.Timer { Interval = 150 };
+                var ocupado = false;
+                timer.Tick += async (_, _) =>
+                {
+                    if (ocupado) return;
+                    var nova = Application.OpenForms.Cast<Form>().FirstOrDefault(f => !abertas.Contains(f) && f.Visible && f is not Escurecer);
+                    if (nova == null) return;
+                    ocupado = true;
+                    await Esperar(1300);
+                    try { await Foto(nova, pasta, nome + (abriu.Count > 0 ? "-" + abriu.Count : "")); } catch { }
+                    abriu.Add($"{nova.GetType().Name} \"{nova.Text}\" {nova.Width}x{nova.Height}");
+                    abertas.Add(nova);
+                    try { nova.Close(); } catch (Exception e) { eventos.Add("EXCECAO ao fechar: " + e.Message); }
+                    ocupado = false;
+                };
+                timer.Start();
+                var t0 = DateTime.Now;
+                try { acao(); } catch (Exception e) { eventos.Add("EXCECAO: " + e.GetType().Name + ": " + e.Message); }
+                // espera: janela aberta e fechada, ou 4 s sem nada
+                while ((DateTime.Now - t0).TotalSeconds < 4 || ocupado || Application.OpenForms.Cast<Form>().Any(f => !abertas.Contains(f) && f.Visible && f is not Escurecer))
+                {
+                    await Esperar(200);
+                    if ((DateTime.Now - t0).TotalSeconds > 25) { eventos.Add("TRAVOU: passou de 25 s"); break; }
+                    if (abriu.Count > 0 && !ocupado && (DateTime.Now - t0).TotalSeconds > 2.5) break;
+                }
+                timer.Stop(); timer.Dispose();
+                await Esperar(300);
+                var ruins = eventos.Where(e => e.StartsWith("ERRO") || e.StartsWith("EXCECAO") || e.StartsWith("TRAVOU")).ToList();
+                var tipo = ruins.Count > 0 ? "ERRO    " : abriu.Count > 0 ? "ABRIU   " : titulo?.Text != tituloAntes ? "NAVEGOU " : eventos.Count > 0 ? "MENSAGEM" : "NADA    ";
+                resultado.Add($"{tipo} {onde}" + (abriu.Count > 0 ? " → " + string.Join(" + ", abriu) : titulo?.Text != tituloAntes ? " → " + titulo?.Text : "") + (eventos.Count > 0 ? " | " + string.Join(" | ", eventos) : ""));
+            }
+
+            var menu = Descendentes(principal).OfType<MenuStrip>().First();
+            foreach (var topo in menu.Items.OfType<ToolStripMenuItem>())
+                foreach (var item in topo.DropDownItems.OfType<ToolStripMenuItem>().ToList())
+                {
+                    principal.Selecionar("reservas:todas"); await Esperar(300);
+                    await Clicar($"Menu {topo.Text.Replace("&", "")} › {item.Text.Trim()}", item.PerformClick);
+                }
+            foreach (var (texto, acao) in principal.AcoesBarra)
+            {
+                principal.Selecionar("reservas:todas"); await Esperar(300);
+                await Clicar($"Barra › {texto}", acao);
+            }
+            var campoAcao = typeof(FormPrincipal).GetField("_acaoTopo", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            // período "Todas" para as listas terem linhas (o botão direito precisa de uma linha selecionada)
+            typeof(FormPrincipal).GetField("_periodo", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.SetValue(principal, "todas");
+            foreach (var visao in new[] { "reservas:todas", "baterias:todas", "vendas:todas", "oficina:todas", "fidelidade:contas", "fidelidade:transacoes", "vouchers:lista", "vouchers:uso", "parceiros:lista", "parceiros:comissoes", "parceiros:pagas" })
+            {
+                principal.Selecionar(visao); await Esperar(1200);
+                if (campoAcao?.GetValue(principal) is Control topoBtn && topoBtn.Visible)
+                {
+                    await Clicar($"Lista {visao} › botão \"{topoBtn.Text}\"", () => topoBtn.GetType().GetMethod("OnClick", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.Invoke(topoBtn, [EventArgs.Empty]));
+                    principal.Selecionar(visao); await Esperar(900);
+                }
+                var grade = Descendentes(principal).OfType<DataGridView>().FirstOrDefault(g => g.Visible);
+                if (grade == null || grade.Rows.Count == 0) { resultado.Add($"SEM LINHAS Lista {visao} (botão direito não testado)"); continue; }
+                var itens = new List<string>();
+                using (var cm0 = SelecionarPrimeira(grade, principal)) itens = cm0?.Items.OfType<ToolStripMenuItem>().Select(i => i.Text).ToList() ?? [];
+                foreach (var txt in itens)
+                {
+                    principal.Selecionar(visao); await Esperar(900);
+                    var g2 = Descendentes(principal).OfType<DataGridView>().FirstOrDefault(g => g.Visible);
+                    if (g2 == null || g2.Rows.Count == 0) break;
+                    var cm = SelecionarPrimeira(g2, principal);
+                    var it = cm?.Items.OfType<ToolStripMenuItem>().FirstOrDefault(i => i.Text == txt);
+                    if (it == null) { cm?.Dispose(); continue; }
+                    if (!it.Enabled) { resultado.Add($"DESLIGADO Lista {visao} › {txt}"); cm.Dispose(); continue; }
+                    await Clicar($"Lista {visao} › {txt}", it.PerformClick);
+                    cm.Dispose();
+                }
+            }
+            principal.Close();
+        }
+        catch (Exception e) { resultado.Add("FALHOU O TESTE: " + e); }
+        finally { vigia.Stop(); }
+        File.WriteAllLines(Path.Combine(pasta, "cliques.txt"), resultado);
+
+        static ContextMenuStrip SelecionarPrimeira(DataGridView g, FormPrincipal p)
+        {
+            g.ClearSelection();
+            var row = g.Rows.Cast<DataGridViewRow>().FirstOrDefault(r => r.Visible && !r.IsNewRow);
+            if (row == null) return null;
+            row.Selected = true;
+            var cel = row.Cells.Cast<DataGridViewCell>().FirstOrDefault(c => c.Visible);
+            if (cel != null) g.CurrentCell = cel;
+            row.Selected = true;
+            return p.CriarMenuContextoParaAutoteste();
+        }
     }
 
     public static async Task Rodar(string pasta, string login, string senha, long reservaIdTeste = 0, long vendaIdTeste = 0, long movimentoIdTeste = 0)
@@ -71,7 +212,7 @@ public static class AutoTeste
             await Esperar(250);
             await Foto(principal, pasta, nome);
         }
-        principal.ClientSize = new Size(1440, 900);
+        principal.ClientSize = new Size(1920, 1009); // monitores da recepção e do ORBITS: 1920×1080, janela maximizada
 
         var visoes = new[]
         {

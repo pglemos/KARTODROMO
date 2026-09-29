@@ -34,7 +34,7 @@ public static partial class Forma
         c.Region = new Region(path);
     }
 
-    public static readonly Color Verde = Color.FromArgb(11, 122, 83);
+    public static readonly Color Verde = Tokens.Verde;
 
     /// <summary>Caixa de marcar verde arredondada do design (accent-color #0B7A53).</summary>
     public static void CheckVerde(CheckBox ck)
@@ -58,7 +58,7 @@ public static partial class Forma
             else
             {
                 using var b = new SolidBrush(Color.White); g.FillPath(b, p);
-                using var pen = new Pen(Color.FromArgb(199, 199, 204), 1.4F); g.DrawPath(pen, p);
+                using var pen = new Pen(Tokens.TextoDesabilitado, 1.4F); g.DrawPath(pen, p);
             }
         };
     }
@@ -67,7 +67,7 @@ public static partial class Forma
     public static (Color cima, Color baixo) Gradiente(string css)
     {
         var hex = Regex.Matches(css ?? "", "#([0-9A-Fa-f]{6})").Select(m => ColorTranslator.FromHtml(m.Value)).ToArray();
-        return hex.Length >= 2 ? (hex[0], hex[1]) : hex.Length == 1 ? (hex[0], hex[0]) : (Color.FromArgb(154, 154, 160), Color.FromArgb(74, 74, 79));
+        return hex.Length >= 2 ? (hex[0], hex[1]) : hex.Length == 1 ? (hex[0], hex[0]) : (Tokens.TextoTerciario, Color.FromArgb(74, 74, 79));
     }
 
     static readonly Dictionary<string, Image> _tiles = [];
@@ -237,7 +237,7 @@ public static partial class Forma
             else
             {
                 g.FillEllipse(Brushes.White, r);
-                using var pen = new Pen(Color.FromArgb(199, 199, 204), 1.4F); g.DrawEllipse(pen, r);
+                using var pen = new Pen(Tokens.TextoDesabilitado, 1.4F); g.DrawEllipse(pen, r);
             }
         };
     }

@@ -10,9 +10,9 @@ namespace Kartodromo.Comum;
 /// </summary>
 public class DialogoDesign : CartaoModal
 {
-    public static readonly Color Fundo = Color.FromArgb(245, 245, 247);
-    public static readonly Color VerdePrincipal = Color.FromArgb(11, 122, 83);
-    static readonly Color Rotulo = Color.FromArgb(110, 110, 115);
+    public static readonly Color Fundo = Tokens.Fundo;
+    public static readonly Color VerdePrincipal = Tokens.Verde;
+    static readonly Color Rotulo = Tokens.TextoSecundario;
     static readonly Color Borda = Color.FromArgb(219, 219, 222); // rgba(0,0,0,0.14) sobre branco
 
     readonly TableLayoutPanel _secoes;
@@ -34,11 +34,11 @@ public class DialogoDesign : CartaoModal
 
         // cabeçalho
         var cab = _cab = new Panel { Dock = DockStyle.Top, Height = 62, BackColor = Color.White };
-        cab.Paint += (_, e) => { using var pen = new Pen(Color.FromArgb(230, 230, 234)); e.Graphics.DrawLine(pen, 0, cab.Height - 1, cab.Width, cab.Height - 1); };
+        cab.Paint += (_, e) => { using var pen = new Pen(Tokens.Linha); e.Graphics.DrawLine(pen, 0, cab.Height - 1, cab.Width, cab.Height - 1); };
         var ic = new PictureBox { Image = icone, SizeMode = PictureBoxSizeMode.Zoom, Size = new Size(36, 36), BackColor = Color.Transparent, Location = new Point(18, 13) };
         var t = new Label { Text = titulo, AutoSize = true, Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, Location = new Point(62, 11), BackColor = Color.Transparent };
         Subtitulo = new Label { Text = sub, AutoSize = true, Font = new Font("Segoe UI", 9F), ForeColor = Rotulo, Location = new Point(63, 33), BackColor = Color.Transparent };
-        var fechar = Botao("✕", Color.FromArgb(235, 235, 239), PecasDesign.CorTexto);
+        var fechar = Botao("✕", Tokens.BotaoSecundario, PecasDesign.CorTexto);
         fechar.Size = new Size(34, 32); fechar.Font = new Font("Segoe UI", 9.5F);
         // posição pelo tamanho real do cabeçalho (com âncora, criado antes de ter largura, o ✕ ficava fora da janela)
         fechar.Location = new Point(largura - 52, 15);
@@ -56,7 +56,7 @@ public class DialogoDesign : CartaoModal
 
         // rodapé
         var rod = _rod = new Panel { Dock = DockStyle.Bottom, Height = 60, BackColor = Color.White };
-        rod.Paint += (_, e) => { using var pen = new Pen(Color.FromArgb(230, 230, 234)); e.Graphics.DrawLine(pen, 0, 0, rod.Width, 0); };
+        rod.Paint += (_, e) => { using var pen = new Pen(Tokens.Linha); e.Graphics.DrawLine(pen, 0, 0, rod.Width, 0); };
         _botoes = new FlowLayoutPanel { Dock = DockStyle.Right, FlowDirection = FlowDirection.RightToLeft, AutoSize = true, WrapContents = false, Padding = new Padding(0, 12, 14, 0), BackColor = Color.White };
         rod.Controls.Add(_botoes);
 
@@ -138,7 +138,7 @@ public class DialogoDesign : CartaoModal
         };
         s.Resize += (_, _) => Forma.AplicarRaio(s, 14);
         if (!string.IsNullOrEmpty(titulo)) s.Controls.Add(new Label { Text = titulo, AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, Margin = new Padding(0, 0, 0, 8) });
-        if (!string.IsNullOrEmpty(texto)) s.Controls.Add(new Label { Text = texto, AutoSize = true, MaximumSize = new Size(_larguraSecao - 40, 0), Font = new Font("Segoe UI", 9.6F), ForeColor = Color.FromArgb(58, 58, 60), Margin = new Padding(0, 0, 0, 6) });
+        if (!string.IsNullOrEmpty(texto)) s.Controls.Add(new Label { Text = texto, AutoSize = true, MaximumSize = new Size(_larguraSecao - 40, 0), Font = new Font("Segoe UI", 9.6F), ForeColor = Tokens.Grafite, Margin = new Padding(0, 0, 0, 6) });
         var grade = new TableLayoutPanel { MinimumSize = new Size(_larguraSecao - 18, 0), MaximumSize = new Size(_larguraSecao - 18, 0), Dock = DockStyle.Fill, ColumnCount = 6, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = Color.White, Margin = Padding.Empty };
         for (var i = 0; i < 6; i++) grade.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / 6));
         s.Controls.Add(grade);
@@ -245,7 +245,7 @@ public class DialogoDesign : CartaoModal
     /// <summary>Botão pequeno dentro de uma caixa (ex.: "Pesquisar").</summary>
     public static Button AcaoCampo(string texto)
     {
-        var b = new BotaoPlano { Text = texto, AutoSize = true, Height = 26, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(226, 241, 235), ForeColor = Color.FromArgb(10, 94, 64), Font = new Font("Segoe UI", 8.8F, FontStyle.Bold), Cursor = Cursors.Hand, Padding = new Padding(4, 0, 4, 0) };
+        var b = new BotaoPlano { Text = texto, AutoSize = true, Height = 26, FlatStyle = FlatStyle.Flat, BackColor = Tokens.VerdeSuave, ForeColor = Tokens.VerdeEscuro, Font = new Font("Segoe UI", 8.8F, FontStyle.Bold), Cursor = Cursors.Hand, Padding = new Padding(4, 0, 4, 0) };
         b.FlatAppearance.BorderSize = 0;
         return b;
     }
@@ -253,7 +253,7 @@ public class DialogoDesign : CartaoModal
     /// <summary>Botão do rodapé (da direita para a esquerda: chame o principal primeiro).</summary>
     public Button BotaoRodape(string texto, bool principal, Action clique)
     {
-        var b = Botao(texto, principal ? VerdePrincipal : Color.FromArgb(235, 235, 239), principal ? Color.White : PecasDesign.CorTexto, principal);
+        var b = Botao(texto, principal ? VerdePrincipal : Tokens.BotaoSecundario, principal ? Color.White : PecasDesign.CorTexto, principal);
         b.Height = 36; b.AutoSize = true; b.MinimumSize = new Size(96, 36); b.Padding = new Padding(10, 0, 10, 0); b.Margin = new Padding(8, 0, 0, 0);
         b.Click += (_, _) => clique();
         _botoes.Controls.Add(b);

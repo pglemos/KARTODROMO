@@ -495,10 +495,16 @@ const server = http.createServer(async (req, res) => {
           const numero = Number(String(k.kart ?? '').trim());
           const minutos = Math.round(Number(k.minutos));
           if (!Number.isSafeInteger(numero) || numero <= 0 || !(minutos > 0) || minutos > 600) { ignorados++; continue; }
-          const linhas = await query<{ id: number; categoria: string | null }>(
-            `SELECT Id id, Categoria categoria FROM dbo.Manutencao WHERE TRY_CAST(Kart AS int) = @n`, { n: numero });
+          const linhas = await query<{ id: number; categoria: string | null; item: number | null; minutos: number; ultima: string | null }>(
+            `SELECT Id id, Categoria categoria, ItemId item, MinutosUso minutos, CONVERT(varchar(19), UltimaManutencao, 126) ultima
+             FROM dbo.Manutencao WHERE TRY_CAST(LTRIM(RTRIM(Kart)) AS int) = @n`, { n: numero });
           const cats = [...new Set(linhas.map((l) => l.categoria ?? ''))];
-          const alvo = cat ? linhas.filter((l) => (l.categoria ?? '') === cat) : cats.length === 1 ? linhas : [];
+          const daCategoria = cat ? linhas.filter((l) => (l.categoria ?? '') === cat) : cats.length === 1 ? linhas : [];
+          // o LapTime deixou controles repetidos do mesmo kart ("01" e "1", "12" e "12 "): soma só em UM por item —
+          // o que já teve manutenção registrada mais recente, senão o de mais horas (antes somava em todos)
+          const porItem = new Map<string, typeof daCategoria>();
+          for (const l of daCategoria) porItem.set(String(l.item ?? ''), [...(porItem.get(String(l.item ?? '')) ?? []), l]);
+          const alvo = [...porItem.values()].map((g) => g.sort((a, x) => (x.ultima ?? '').localeCompare(a.ultima ?? '') || x.minutos - a.minutos || a.id - x.id)[0]);
           if (!alvo.length && cat) {
             // kart novo nessa categoria: abre o controle com os itens que contam por hora
             const r = await query(`INSERT dbo.Manutencao (Kart, Categoria, ItemId, MinutosUso, Realizada, Data)

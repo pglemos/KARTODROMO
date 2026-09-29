@@ -35,7 +35,7 @@ public class CamposBateria : Panel
         Campos.Add(g, "Categoria", Categoria, 1);
 
         var pResp = new Panel { Dock = DockStyle.Fill, Height = 34 };
-        var bP = new BotaoPlano { Text = "Pesquisar", Dock = DockStyle.Right, Width = 84, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(238, 238, 241), Cursor = Cursors.Hand };
+        var bP = new BotaoPlano { Text = "Pesquisar", Dock = DockStyle.Right, Width = 84, FlatStyle = FlatStyle.Flat, BackColor = Tokens.BotaoSecundario, Cursor = Cursors.Hand };
         bP.FlatAppearance.BorderSize = 0;
         Resp.Dock = DockStyle.Fill;
         bP.Click += (_, _) => { var c = FormPesquisarCliente.Escolher(FindForm(), "Responsável pela reserva"); if (c != null) { RespId = c.L("id"); Resp.Text = c.S("nome"); } };
@@ -105,7 +105,7 @@ public class FormCriarReservas : DialogoDesign
         Marca(g2, feriadosCk, 3, false); Marca(g2, existentesCk, 3, false);
         var g3 = Secao("Prévia");
         var sec3 = (TableLayoutPanel)g3.Parent; sec3.BackColor = Fundo; g3.BackColor = Fundo; foreach (Control c in sec3.Controls) c.BackColor = Fundo;
-        var previa = new Label { AutoSize = true, MaximumSize = new Size(880, 0), Font = new Font("Segoe UI", 9.6F), ForeColor = Color.FromArgb(58, 58, 60), BackColor = Fundo, Margin = new Padding(0, 0, 0, 4) };
+        var previa = new Label { AutoSize = true, MaximumSize = new Size(880, 0), Font = new Font("Segoe UI", 9.6F), ForeColor = Tokens.Grafite, BackColor = Fundo, Margin = new Padding(0, 0, 0, 4) };
         g3.Controls.Add(previa); g3.SetColumnSpan(previa, 6);
         Control[] abaPadrao = [g1.Parent, g2.Parent, sec3];
 
@@ -310,7 +310,7 @@ public class FormIncluirCliente : DialogoDesign
     /// <summary>desligado só no autoteste (a pesquisa abriria na tela)</summary>
     public static bool AbrirPesquisaAoMostrar = true;
     JsonObject _cli;
-    public FormIncluirCliente(JsonObject b) : base("Registrar reserva por cliente", $"{b.S("nome")} · {Fmt.DmyHm(b.S("dataHora"))} · {b.I("disponiveis")} vagas disponíveis", PecasDesign.Tile(Color.FromArgb(108, 184, 255), Color.FromArgb(30, 111, 232), "pessoa"))
+    public FormIncluirCliente(JsonObject b) : base("Registrar reserva por cliente", $"{b.S("nome")} · {Fmt.DmyHm(b.S("dataHora"))} · {b.I("disponiveis")} vagas disponíveis", PecasDesign.Tile(Color.FromArgb(108, 184, 255), Tokens.Azul, "pessoa"))
     {
         var cli = new Label { AutoSize = false, Height = 22, Font = PecasDesign.FonteValor, ForeColor = PecasDesign.CorTexto, BackColor = Color.White, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
         var pesquisar = AcaoCampo("Pesquisar");
@@ -389,14 +389,14 @@ public class FormAgenda : CartaoModal
 
         // ---------- lado direito (380, branco)
         var lado = new Panel { Dock = DockStyle.Right, Width = 380, BackColor = Color.White };
-        lado.Paint += (_, e) => { using var p = new Pen(Color.FromArgb(237, 237, 237)); e.Graphics.DrawLine(p, 0, 0, 0, lado.Height); };
+        lado.Paint += (_, e) => { using var p = new Pen(Tokens.Linha); e.Graphics.DrawLine(p, 0, 0, 0, lado.Height); };
         var topo = new Panel { Dock = DockStyle.Top, Height = 92, BackColor = Color.White };
         _semana.Location = new Point(18, 18); _data.Location = new Point(15, 33); _resumoDia.Location = new Point(18, 66);
         var x = Botao("✕", CinzaBotao, PecasDesign.CorTexto); x.Font = new Font("Segoe UI", 9.5F); x.Size = new Size(30, 30); x.Location = new Point(380 - 18 - 30, 18);
         x.Resize += (_, _) => Forma.AplicarRaio(x, 8); Forma.AplicarRaio(x, 8); x.Click += (_, _) => Close();
         topo.Controls.AddRange([_semana, _data, _resumoDia, x]);
         var rod = new Panel { Dock = DockStyle.Bottom, Height = 67, BackColor = Color.White };
-        rod.Paint += (_, e) => { using var p = new Pen(Color.FromArgb(237, 237, 237)); e.Graphics.DrawLine(p, 0, 0, rod.Width, 0); };
+        rod.Paint += (_, e) => { using var p = new Pen(Tokens.Linha); e.Graphics.DrawLine(p, 0, 0, rod.Width, 0); };
         var bLista = Botao("Lista de participantes", CinzaBotao, PecasDesign.CorTexto); bLista.Font = new Font("Segoe UI", 9.8F);
         var bCriar = Botao("+ Criar reservas", DialogoDesign.VerdePrincipal, Color.White, true); bCriar.Font = new Font("Segoe UI", 9.8F, FontStyle.Bold);
         bLista.SetBounds(16, 14, 170, 38); bCriar.SetBounds(194, 14, 170, 38);
@@ -533,7 +533,7 @@ class SegmentoMes : Control
     {
         var g = e.Graphics; g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
         g.Clear(BackColor);
-        using (var p = Forma.Redondo(new Rectangle(0, 0, Width - 1, Height - 1), 9)) using (var b = new SolidBrush(Color.FromArgb(232, 232, 235))) g.FillPath(b, p);
+        using (var p = Forma.Redondo(new Rectangle(0, 0, Width - 1, Height - 1), 9)) using (var b = new SolidBrush(Tokens.Linha)) g.FillPath(b, p);
         var hoje = new Rectangle(34, 2, 60, 28);
         using (var s = Forma.Redondo(new Rectangle(hoje.X, hoje.Y + 1, hoje.Width, hoje.Height), 7)) using (var bs = new SolidBrush(Color.FromArgb(30, 0, 0, 0))) g.FillPath(bs, s);
         using (var p = Forma.Redondo(hoje, 7)) g.FillPath(Brushes.White, p);
@@ -608,17 +608,17 @@ class CalendarioMes : Control
             // número (hoje em círculo verde)
             var num = new RectangleF(r.X + 8, r.Y + 8, 26, 26);
             if (hoje && doMes) { using var bv = new SolidBrush(DialogoDesign.VerdePrincipal); g.FillEllipse(bv, num); }
-            var corNum = !doMes ? Color.FromArgb(174, 174, 178) : hoje ? Color.White : d < DateTime.Today || fechado ? Color.FromArgb(142, 142, 147) : PecasDesign.CorTexto;
+            var corNum = !doMes ? Color.FromArgb(174, 174, 178) : hoje ? Color.White : d < DateTime.Today || fechado ? Tokens.TextoTerciario : PecasDesign.CorTexto;
             TextRenderer.DrawText(g, d.Day.ToString(), fNum, Rectangle.Round(num), corNum, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             if (!doMes) continue;
             var tag = feriado ? "Feriado" : fechado ? "Fechado" : "";
-            if (tag.Length > 0) TextRenderer.DrawText(g, tag, fTag, Rectangle.Round(new RectangleF(r.X, r.Y + 8, r.Width - 9, 26)), feriado ? Color.FromArgb(196, 40, 28) : Color.FromArgb(142, 142, 147), TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
+            if (tag.Length > 0) TextRenderer.DrawText(g, tag, fTag, Rectangle.Round(new RectangleF(r.X, r.Y + 8, r.Width - 9, 26)), feriado ? Tokens.Vermelho : Tokens.TextoTerciario, TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
             if (bat == 0) continue;
-            TextRenderer.DrawText(g, $"{bat} {(bat == 1 ? "bateria" : "baterias")} · {pil} pilotos", fTxt, Rectangle.Round(new RectangleF(r.X + 9, r.Y + 40, r.Width - 14, 34)), Color.FromArgb(58, 58, 60), TextFormatFlags.Left | TextFormatFlags.WordBreak);
+            TextRenderer.DrawText(g, $"{bat} {(bat == 1 ? "bateria" : "baterias")} · {pil} pilotos", fTxt, Rectangle.Round(new RectangleF(r.X + 9, r.Y + 40, r.Width - 14, 34)), Tokens.Grafite, TextFormatFlags.Left | TextFormatFlags.WordBreak);
             var pct = vagas > 0 ? Math.Min(1f, pil / (float)vagas) : 0;
             var barra = new RectangleF(r.X + 9, Math.Min(r.Bottom - 12, r.Y + 76), r.Width - 18, 5);
-            using (var fundo = Forma.Redondo(barra, 3)) using (var bf = new SolidBrush(Color.FromArgb(237, 237, 237))) g.FillPath(bf, fundo);
-            if (pct > 0) { using var cheio = Forma.Redondo(new RectangleF(barra.X, barra.Y, Math.Max(6, barra.Width * pct), barra.Height), 3); using var bc = new SolidBrush(pct > 0.8f ? Color.FromArgb(255, 159, 10) : Color.FromArgb(52, 199, 89)); g.FillPath(bc, cheio); }
+            using (var fundo = Forma.Redondo(barra, 3)) using (var bf = new SolidBrush(Tokens.Linha)) g.FillPath(bf, fundo);
+            if (pct > 0) { using var cheio = Forma.Redondo(new RectangleF(barra.X, barra.Y, Math.Max(6, barra.Width * pct), barra.Height), 3); using var bc = new SolidBrush(pct > 0.8f ? Tokens.LaranjaVivo : Tokens.VerdeStatus); g.FillPath(bc, cheio); }
         }
     }
 }
@@ -656,10 +656,10 @@ class BateriasDia : Control
     static (string texto, Color cor, bool pista, bool fim) Situacao(JsonObject b)
     {
         var ini = b.D("dataHora") ?? DateTime.MinValue; var agora = DateTime.Now;
-        if (ini <= agora && agora < ini.AddMinutes(35)) return ("Na pista", Color.FromArgb(10, 79, 160), true, false);
-        if (ini.AddMinutes(35) <= agora) return ("Encerrada", Color.FromArgb(142, 142, 147), false, true);
-        if (b.S("status") == "fechada" || b.B("reservaFechada")) return ("Fechada", Color.FromArgb(196, 40, 28), false, false);
-        return ("Aberta", Color.FromArgb(28, 107, 53), false, false);
+        if (ini <= agora && agora < ini.AddMinutes(35)) return ("Na pista", Tokens.AzulTexto, true, false);
+        if (ini.AddMinutes(35) <= agora) return ("Encerrada", Tokens.TextoTerciario, false, true);
+        if (b.S("status") == "fechada" || b.B("reservaFechada")) return ("Fechada", Tokens.Vermelho, false, false);
+        return ("Aberta", Tokens.VerdeTexto, false, false);
     }
 
     protected override void OnPaint(PaintEventArgs e)
@@ -674,7 +674,7 @@ class BateriasDia : Control
             var b = _itens[i]; var r = new Rectangle(0, y, Width - 1, Alt);
             var (texto, cor, pista, fim) = Situacao(b);
             using var p = Forma.Redondo(r, 11);
-            using (var bg = new SolidBrush(pista ? Color.FromArgb(235, 244, 255) : Color.FromArgb(245, 245, 247))) g.FillPath(bg, p);
+            using (var bg = new SolidBrush(pista ? Color.FromArgb(235, 244, 255) : Tokens.Fundo)) g.FillPath(bg, p);
             if (pista) { using var pe = new Pen(Color.FromArgb(191, 222, 255)); g.DrawPath(pe, p); }
             if (i == _sel) { using var ps = new Pen(DialogoDesign.VerdePrincipal, 2f); g.DrawPath(ps, p); }
             TextRenderer.DrawText(g, b.D("dataHora")?.ToString("HH:mm") ?? "", fHora, new Rectangle(10, y, 54, Alt), PecasDesign.CorTexto, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
@@ -685,9 +685,9 @@ class BateriasDia : Control
             var nome = b.S("nome") + (b.S("categoria") == "Super Kart" && !b.S("nome").Contains("Super", StringComparison.OrdinalIgnoreCase) ? " · Super Kart" : "");
             TextRenderer.DrawText(g, nome, fNome, new Rectangle(74, y + 9, nomeW, 20), PecasDesign.CorTexto, TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
             var barra = new RectangleF(74, y + 34, nomeW, 4);
-            using (var bf = Forma.Redondo(barra, 2)) using (var bb = new SolidBrush(Color.FromArgb(237, 237, 237))) g.FillPath(bb, bf);
+            using (var bf = Forma.Redondo(barra, 2)) using (var bb = new SolidBrush(Tokens.Linha)) g.FillPath(bb, bf);
             var pct = Math.Min(1f, ins / (float)vagas);
-            if (pct > 0) { using var bc = Forma.Redondo(new RectangleF(barra.X, barra.Y, Math.Max(4, barra.Width * pct), 4), 2); using var cb = new SolidBrush(fim ? Color.FromArgb(199, 199, 204) : ins >= vagas ? Color.FromArgb(255, 159, 10) : Color.FromArgb(52, 199, 89)); g.FillPath(cb, bc); }
+            if (pct > 0) { using var bc = Forma.Redondo(new RectangleF(barra.X, barra.Y, Math.Max(4, barra.Width * pct), 4), 2); using var cb = new SolidBrush(fim ? Tokens.TextoDesabilitado : ins >= vagas ? Tokens.LaranjaVivo : Tokens.VerdeStatus); g.FillPath(cb, bc); }
             TextRenderer.DrawText(g, oc, fOc, new Rectangle(Width - wDir - 10, y + 9, wDir, 18), PecasDesign.CorTexto, TextFormatFlags.Right);
             TextRenderer.DrawText(g, texto, fEst, new Rectangle(Width - wDir - 10, y + 29, wDir, 16), cor, TextFormatFlags.Right);
         }

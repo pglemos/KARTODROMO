@@ -58,7 +58,7 @@ public class CartaoModal : Form, ISemKit
         return b;
     }
 
-    public static readonly Color CinzaBotao = Color.FromArgb(232, 232, 237);
+    public static readonly Color CinzaBotao = Tokens.BotaoSecundario;
 
     /// <summary>Cartão branco arredondado com borda fina, para listas de linhas.</summary>
     public static Panel Lista()
@@ -68,7 +68,7 @@ public class CartaoModal : Form, ISemKit
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             using var path = Forma.Redondo(new Rectangle(0, 0, p.Width - 1, p.Height - 1), 14);
-            using var pen = new Pen(Color.FromArgb(229, 229, 234));
+            using var pen = new Pen(Tokens.Linha);
             e.Graphics.DrawPath(pen, path);
         };
         return p;

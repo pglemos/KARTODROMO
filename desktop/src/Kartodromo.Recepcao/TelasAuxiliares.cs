@@ -38,7 +38,7 @@ public sealed class FormServicosOnline : DialogoDesign
     readonly TabelaDesign _tabela;
     readonly CheckBox _agenda = new() { Text = "Publicar agenda no site" };
     readonly CheckBox _lembrete = new() { Text = "Enviar lembrete 2 h antes pelo WhatsApp" };
-    const string UrlCheckin = "kartodromodebetim.com.br/checkin";
+    const string UrlCheckin = "cadastro.kartodromodebetim.com.br"; // pré-cadastro (o /checkin do site dava 404)
 
     public FormServicosOnline() : base("Serviços online", "Site, reservas online, WhatsApp e telão", "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2z", "linear-gradient(180deg, #6FD6FF, #0A84FF)")
     {
@@ -51,7 +51,7 @@ public sealed class FormServicosOnline : DialogoDesign
         var qr = AcaoCampo("Imprimir QR");
         qr.Click += (_, _) => ImprimirQr();
         var url = PecasDesign.Texto(UrlCheckin); url.ReadOnly = true; url.BackColor = Color.White;
-        Campo(g, "QR code do check-in", url, 6, qr);
+        Campo(g, "QR code do pré-cadastro (o cliente se cadastra no celular antes do totem)", url, 6, qr);
         var dica = new ToolTip();
         foreach (var ck in new[] { _agenda, _lembrete }) ck.Enabled = false;
         BotaoRodape("Sincronizar agora", true, () => Seguro.Rodar(this, Atualizar));
@@ -102,14 +102,14 @@ public sealed class FormServicosOnline : DialogoDesign
 
     void ImprimirQr()
     {
-        var html = "<!doctype html><html lang=pt-BR><meta charset=utf-8><title>QR code do check-in</title>" +
+        var html = "<!doctype html><html lang=pt-BR><meta charset=utf-8><title>QR code do pré-cadastro</title>" +
             "<style>body{font-family:'Segoe UI',sans-serif;text-align:center;margin:40px;color:#1D1D1F}h1{font-size:26px;margin:0 0 6px}p{color:#6E6E73;font-size:16px}#qr{margin:28px auto;width:320px;height:320px}</style>" +
-            "<h1>Check-in do Kartódromo</h1><p>Aponte a câmera do celular para o código</p><div id=qr></div><p><b>https://" + UrlCheckin + "</b></p>" +
+            "<h1>Faça seu cadastro pelo celular</h1><p>Aponte a câmera para o código e depois é só digitar o CPF no totem</p><div id=qr></div><p><b>https://" + UrlCheckin + "</b></p>" +
             "<script src='https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js'></script>" +
             "<script>try{var q=qrcode(0,'M');q.addData('https://" + UrlCheckin + "');q.make();document.getElementById('qr').innerHTML=q.createSvgTag({cellSize:8,margin:0,scalable:true});}catch(e){document.getElementById('qr').outerHTML='<p>Sem internet para gerar o QR code: use o endereço abaixo.</p>'}setTimeout(function(){print()},500)</script></html>";
-        var arq = Path.Combine(Path.GetTempPath(), "kartodromo-qr-checkin.html");
+        var arq = Path.Combine(Path.GetTempPath(), "kartodromo-qr-precadastro.html");
         File.WriteAllText(arq, html, new System.Text.UTF8Encoding(false));
-        Relatorio.Abrir(this, new Uri(arq).AbsoluteUri, "QR code do check-in");
+        Relatorio.Abrir(this, new Uri(arq).AbsoluteUri, "QR code do pré-cadastro");
     }
 }
 

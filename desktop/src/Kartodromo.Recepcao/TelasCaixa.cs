@@ -9,7 +9,7 @@ public sealed class FormTerminalAbrir : CartaoModal
 {
     readonly ListaDesign _turno = new() { Direita = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold), Width = 250, DropDownWidth = 250 };
     readonly ListaDesign _terminal = new() { Direita = true, CorValor = KitVisual.Verde, Vazio = "Escolher…", Font = new Font("Segoe UI", 10F, FontStyle.Bold), Width = 250, DropDownWidth = 250 };
-    readonly TextBox _inicial = new() { BorderStyle = BorderStyle.None, TextAlign = HorizontalAlignment.Right, Font = new Font("Segoe UI", 11F, FontStyle.Bold), Width = 140, Text = "0,00" };
+    readonly TextBox _inicial = new() { BorderStyle = BorderStyle.None, BackColor = Color.White, TextAlign = HorizontalAlignment.Right, Font = new Font("Segoe UI", 11F, FontStyle.Bold), Width = 140, Text = "0,00" };
     public bool Concluido { get; private set; }
 
     public FormTerminalAbrir(JsonObject caixa) : base(500, 462)
@@ -24,16 +24,16 @@ public sealed class FormTerminalAbrir : CartaoModal
             for (var i = 0; i < _terminal.Items.Count; i++) if (_terminal.Items[i] is Campos.Item it && it.Id.ToString() == ultimo) { _terminal.SelectedIndex = i; break; }
 
         var icone = Icone("terminal", 76); icone.Location = new Point((500 - 76) / 2, 18);
-        var titulo = new Label { Text = "Abrir o caixa", Font = new Font("Segoe UI", 16F, FontStyle.Bold), AutoSize = false, Size = new Size(500, 34), Location = new Point(0, 94), TextAlign = ContentAlignment.MiddleCenter };
+        var titulo = new Label { Text = "Abrir o caixa", Font = new Font("Segoe UI", 16F, FontStyle.Bold), AutoSize = false, Size = new Size(496, 34), Location = new Point(2, 94), TextAlign = ContentAlignment.MiddleCenter };
         var desc = new Label { Text = "O terminal ainda não foi aberto. Escolha o turno, o seu terminal e quanto dinheiro tem na gaveta agora.", Font = new Font("Segoe UI", 9.8F), ForeColor = KitVisual.Secundario, AutoSize = false, Size = new Size(440, 44), Location = new Point(30, 130), TextAlign = ContentAlignment.TopCenter };
         var lista = Lista(); lista.SetBounds(20, 184, 460, 196);
         void Linha(int i, string rotulo, Control valor)
         {
             var y = i * 49;
-            lista.Controls.Add(new Label { Text = rotulo, AutoSize = false, Size = new Size(170, 48), Location = new Point(16, y), TextAlign = ContentAlignment.MiddleLeft, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 10F) });
+            lista.Controls.Add(new Label { Text = rotulo, AutoSize = false, Size = new Size(170, 46), Location = new Point(16, y + 1), TextAlign = ContentAlignment.MiddleLeft, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 10F), BackColor = Color.Transparent });
             valor.Location = new Point(460 - 16 - valor.Width, y + (48 - valor.Height) / 2);
             lista.Controls.Add(valor);
-            if (i > 0) lista.Controls.Add(new Panel { BackColor = Color.FromArgb(236, 236, 239), Bounds = new Rectangle(1, y, 458, 1) });
+            if (i > 0) { var sep = new Panel { BackColor = Tokens.Lateral, Bounds = new Rectangle(12, y, 436, 1) }; lista.Controls.Add(sep); sep.BringToFront(); } // na frente dos rótulos (antes sumia atrás deles)
         }
         var usuario = new Label { Text = Sessao.Nome, AutoSize = false, Size = new Size(230, 24), TextAlign = ContentAlignment.MiddleRight, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
         var suprimento = new Panel { Size = new Size(190, 30), BackColor = Color.White };
@@ -92,16 +92,16 @@ public sealed class FormTerminalFechar : CartaoModal
         var titulo = new Label { Text = $"Fechar terminal {aberto.S("terminal")}", AutoSize = true, Font = new Font("Segoe UI", 13.5F, FontStyle.Bold), Location = new Point(72, 16) };
         var aberturaTxt = DateTime.TryParse(aberto.S("abertoEm"), out var ab) ? $"aberto em {ab:dd/MM/yyyy} às {ab:HH:mm}" : "aberto";
         var sub = new Label { Text = $"{Sessao.Nome} · {aberturaTxt} · {(aberto.S("turno").StartsWith("Turno", StringComparison.OrdinalIgnoreCase) ? aberto.S("turno") : "Turno " + aberto.S("turno"))}", AutoSize = true, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 9.3F), Location = new Point(73, 44) };
-        var fechar = Botao("✕", Color.FromArgb(242, 242, 245), KitVisual.Secundario); fechar.SetBounds(L - 56, 22, 34, 34); fechar.Font = new Font("Segoe UI", 10F); fechar.Click += (_, _) => Close();
+        var fechar = Botao("✕", Tokens.FundoCampo, KitVisual.Secundario); fechar.SetBounds(L - 56, 22, 34, 34); fechar.Font = new Font("Segoe UI", 10F); fechar.Click += (_, _) => Close();
         var corpo = new Panel { BackColor = KitVisual.Fundo, Bounds = new Rectangle(1, 78, L - 2, 612) };
-        var linhaTopo = new Panel { BackColor = Color.FromArgb(229, 229, 234), Bounds = new Rectangle(0, 77, L, 1) };
+        var linhaTopo = new Panel { BackColor = Tokens.Linha, Bounds = new Rectangle(0, 77, L, 1) };
 
         // 3 cartões
         long V(string k) => sumario?.L(k) ?? 0;
         Panel Cartao(string rotulo, long valor, int x, bool destaque)
         {
-            var p = new Panel { Bounds = new Rectangle(x, 14, 192, 64), BackColor = destaque ? Color.FromArgb(232, 247, 237) : Color.White };
-            p.Paint += (_, e) => { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using var path = VisualPrincipal.Redondo(new Rectangle(0, 0, p.Width - 1, p.Height - 1), 12); using var pen = new Pen(destaque ? Color.FromArgb(180, 225, 196) : Color.FromArgb(229, 229, 234)); e.Graphics.DrawPath(pen, path); };
+            var p = new Panel { Bounds = new Rectangle(x, 14, 192, 64), BackColor = destaque ? Tokens.VerdeSuave : Color.White };
+            p.Paint += (_, e) => { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using var path = VisualPrincipal.Redondo(new Rectangle(0, 0, p.Width - 1, p.Height - 1), 12); using var pen = new Pen(destaque ? Color.FromArgb(180, 225, 196) : Tokens.Linha); e.Graphics.DrawPath(pen, path); };
             p.Resize += (_, _) => KitVisual.AplicarRaio(p, 12);
             p.Controls.Add(new Label { Text = rotulo, AutoSize = true, Location = new Point(14, 9), ForeColor = destaque ? KitVisual.Verde : KitVisual.Secundario, Font = new Font("Segoe UI", 8.8F) });
             p.Controls.Add(new Label { Text = Fmt.Brl(valor), AutoSize = true, Location = new Point(12, 27), ForeColor = destaque ? KitVisual.Verde : KitVisual.Texto, Font = new Font("Segoe UI", 15F, FontStyle.Bold) });
@@ -116,21 +116,21 @@ public sealed class FormTerminalFechar : CartaoModal
         var lista = Lista(); lista.SetBounds(20, 92, 600, 430);
         var linhas = new List<(string rotulo, Color ponto, long valor, bool negativo, bool final)>
         {
-            ("Início do turno", Color.FromArgb(142, 142, 147), V("inicial"), false, false),
+            ("Início do turno", Tokens.TextoTerciario, V("inicial"), false, false),
             ("Suprimento", Color.FromArgb(14, 156, 156), V("suprimento"), false, false),
             ("Sangria", Color.FromArgb(255, 59, 48), V("sangria"), true, false),
             ("Vendas de produtos", Color.FromArgb(255, 149, 0), V("vendasProdutos"), false, false),
-            ("Vendas (baterias)", Color.FromArgb(52, 199, 89), V("vendas"), false, false),
-            ("Desconto fornecido", Color.FromArgb(255, 159, 10), V("desconto"), true, false),
-            ("Acréscimos", Color.FromArgb(142, 142, 147), V("acrescimos"), false, false),
+            ("Vendas (baterias)", Tokens.VerdeStatus, V("vendas"), false, false),
+            ("Desconto fornecido", Tokens.LaranjaVivo, V("desconto"), true, false),
+            ("Acréscimos", Tokens.TextoTerciario, V("acrescimos"), false, false),
         };
         foreach (var f in (sumario?["porForma"] as JsonArray)?.OfType<JsonObject>() ?? [])
             linhas.Add(("   Recebido em " + f.S("forma"), Color.FromArgb(120, 170, 255), f.L("valor") ?? 0, false, false));
-        linhas.Add(("Total recebido", Color.FromArgb(10, 132, 255), V("recebido"), false, false));
-        linhas.Add(("Troco fornecido", Color.FromArgb(142, 142, 147), V("troco"), true, false));
+        linhas.Add(("Total recebido", Tokens.Azul, V("recebido"), false, false));
+        linhas.Add(("Troco fornecido", Tokens.TextoTerciario, V("troco"), true, false));
         linhas.Add(("Cancelado", Color.FromArgb(255, 59, 48), V("cancelado"), false, false));
-        linhas.Add(("Dinheiro na gaveta", Color.FromArgb(52, 199, 89), V("dinheiroEmCaixa"), false, true));
-        linhas.Add(("Total final (todas as formas)", Color.FromArgb(52, 199, 89), V("final"), false, false));
+        linhas.Add(("Dinheiro na gaveta", Tokens.VerdeStatus, V("dinheiroEmCaixa"), false, true));
+        linhas.Add(("Total final (todas as formas)", Tokens.VerdeStatus, V("final"), false, false));
         var alturaLinha = Math.Min(39, 430 / linhas.Count);
         for (var i = 0; i < linhas.Count; i++)
         {
@@ -146,9 +146,9 @@ public sealed class FormTerminalFechar : CartaoModal
             lista.Controls.Add(new Label
             {
                 Text = txt, AutoSize = false, Bounds = new Rectangle(340, y, 244, alturaLinha), TextAlign = ContentAlignment.MiddleRight,
-                Font = new Font("Segoe UI", final ? 11.5F : 10F, FontStyle.Bold), ForeColor = final ? KitVisual.Verde : neg ? Color.FromArgb(196, 40, 28) : KitVisual.Texto,
+                Font = new Font("Segoe UI", final ? 11.5F : 10F, FontStyle.Bold), ForeColor = final ? KitVisual.Verde : neg ? Tokens.Vermelho : KitVisual.Texto,
             });
-            if (i > 0) lista.Controls.Add(new Panel { BackColor = Color.FromArgb(238, 238, 241), Bounds = new Rectangle(1, y, 598, 1) });
+            if (i > 0) lista.Controls.Add(new Panel { BackColor = Tokens.BotaoSecundario, Bounds = new Rectangle(1, y, 598, 1) });
         }
 
         // próximo turno
@@ -163,11 +163,11 @@ public sealed class FormTerminalFechar : CartaoModal
         corpo.Controls.Add(lista); corpo.Controls.Add(prox);
 
         // rodapé
-        var relatorio = Botao("   Gerar relatório", Color.FromArgb(242, 242, 245), KitVisual.Texto); relatorio.SetBounds(22, 704, 150, 40); relatorio.Font = new Font("Segoe UI", 9.8F);
+        var relatorio = Botao("   Gerar relatório", Tokens.FundoCampo, KitVisual.Texto); relatorio.SetBounds(22, 704, 150, 40); relatorio.Font = new Font("Segoe UI", 9.8F);
         relatorio.Text = "Gerar relatório";
         relatorio.Click += (_, _) => Relatorio.Abrir(this, Sessao.Api.UrlComToken("/relatorio/fechamento?mov=" + _aberto.S("id")), "Fechamento de Caixa");
-        var cancelar = Botao("Cancelar", Color.FromArgb(242, 242, 245), KitVisual.Texto); cancelar.SetBounds(L - 22 - 136 - 10 - 90, 704, 90, 40); cancelar.Click += (_, _) => Close();
-        var fecharTerm = Botao("Fechar terminal", Color.FromArgb(29, 29, 31), Color.White, true); fecharTerm.SetBounds(L - 22 - 136, 704, 136, 40);
+        var cancelar = Botao("Cancelar", Tokens.FundoCampo, KitVisual.Texto); cancelar.SetBounds(L - 22 - 136 - 10 - 90, 704, 90, 40); cancelar.Click += (_, _) => Close();
+        var fecharTerm = Botao("Fechar terminal", Tokens.Texto, Color.White, true); fecharTerm.SetBounds(L - 22 - 136, 704, 136, 40);
         fecharTerm.Click += (_, _) => Seguro.Rodar(this, async () =>
         {
             if (Fmt.Centavos(string.IsNullOrWhiteSpace(_proximo.Text) ? "0" : _proximo.Text) is not long valor) { Msg.Aviso(this, "Valor para o próximo turno inválido."); return; }
@@ -175,7 +175,7 @@ public sealed class FormTerminalFechar : CartaoModal
             var r = await Sessao.Api.Post("/api/office/caixa/fechar", new { proximoTurnoCentavos = valor });
             Concluido = true; MovimentoId = r.S("id"); DialogResult = DialogResult.OK; Close();
         });
-        var linhaRodape = new Panel { BackColor = Color.FromArgb(229, 229, 234), Bounds = new Rectangle(0, 690, L, 1) };
+        var linhaRodape = new Panel { BackColor = Tokens.Linha, Bounds = new Rectangle(0, 690, L, 1) };
         Controls.AddRange([icone, titulo, sub, fechar, linhaTopo, corpo, linhaRodape, relatorio, cancelar, fecharTerm]);
     }
 }

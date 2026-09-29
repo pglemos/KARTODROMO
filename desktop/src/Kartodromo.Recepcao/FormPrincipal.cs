@@ -62,7 +62,7 @@ public class FormPrincipal : Form
         var direita = MontarAreaDados();
         _grade.FiltroMudou += Totais;
 
-        var split = new SplitContainer { Dock = DockStyle.Fill, FixedPanel = FixedPanel.Panel1, BackColor = Color.FromArgb(229, 229, 234), BorderStyle = BorderStyle.None, SplitterWidth = 1 };
+        var split = new SplitContainer { Dock = DockStyle.Fill, FixedPanel = FixedPanel.Panel1, BackColor = Tokens.Linha, BorderStyle = BorderStyle.None, SplitterWidth = 1 };
         Load += (_, _) => { split.Panel1MinSize = 220; split.SplitterDistance = 256; };
         // a busca não começa com o cursor (o design mostra o texto de ajuda "Buscar cliente, CPF, reserva…")
         Shown += (_, _) => ActiveControl = _grade;
@@ -221,6 +221,9 @@ public class FormPrincipal : Form
     }
 
     /// <summary>Cria o menu da seleção atual para as capturas de contexto do autoteste.</summary>
+    /// <summary>Ações dos botões da barra de ícones (o autoteste de cliques executa cada uma).</summary>
+    internal readonly List<(string Texto, Action Acao)> AcoesBarra = [];
+
     internal ContextMenuStrip CriarMenuContextoParaAutoteste()
         => _menuAtual == null ? null : CriarMenuContextual(_grade.Selecionados);
 
@@ -231,7 +234,7 @@ public class FormPrincipal : Form
             AutoSize = false,
             Size = new Size(290, 20),
             Padding = new Padding(6),
-            BackColor = Color.FromArgb(250, 250, 252),
+            BackColor = Tokens.SuperficieSuave,
             ForeColor = KitVisual.Texto,
             Font = new Font("Segoe UI", 9F),
             Renderer = new MenuRecepcaoRenderer(),
@@ -265,7 +268,7 @@ public class FormPrincipal : Form
                 }
                 else if (mi.Text.Equals("Excluir", StringComparison.OrdinalIgnoreCase)
                     || mi.Text.StartsWith("Estornar", StringComparison.OrdinalIgnoreCase))
-                    mi.ForeColor = Color.FromArgb(196, 40, 28);
+                    mi.ForeColor = Tokens.Vermelho;
             }
             altura += item.Height;
         }
@@ -299,14 +302,14 @@ public class FormPrincipal : Form
     {
         var bar = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(0), Margin = new Padding(0), BackColor = KitVisual.Fundo };
         bar.Controls.Add(new Label { Text = "Exibir dados", AutoSize = true, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 8.5F), Margin = new Padding(0, 9, 7, 0) });
-        var segmento = new Panel { Name = "periodos", Size = new Size(300, 32), BackColor = Color.FromArgb(232, 232, 237), Margin = new Padding(0, 2, 8, 0), Padding = new Padding(2) };
+        var segmento = new Panel { Name = "periodos", Size = new Size(300, 32), BackColor = Tokens.BotaoSecundario, Margin = new Padding(0, 2, 8, 0), Padding = new Padding(2) };
         KitVisual.AplicarRaio(segmento, 8);
         var defs = new[] { ("dia", "Nesta data", 78), ("mes", "Neste mês", 78), ("apartir", "A partir de", 82), ("todas", "Todas", 58) };
         var x = 2;
         foreach (var (chave, texto, largura) in defs)
         {
             var b = new BotaoPlano { Name = "periodo-" + chave, Text = texto, Size = new Size(largura, 28), Location = new Point(x, 2), FlatStyle = FlatStyle.Flat, BackColor = chave == _periodo ? Color.White : segmento.BackColor,
-                ForeColor = chave == _periodo ? KitVisual.Texto : Color.FromArgb(58, 58, 60), Font = new Font("Segoe UI", 8.2F, chave == _periodo ? FontStyle.Bold : FontStyle.Regular), Cursor = Cursors.Hand };
+                ForeColor = chave == _periodo ? KitVisual.Texto : Tokens.Grafite, Font = new Font("Segoe UI", 8.2F, chave == _periodo ? FontStyle.Bold : FontStyle.Regular), Cursor = Cursors.Hand };
             b.FlatAppearance.BorderSize = 0;
             KitVisual.AplicarRaio(b, 6);
             b.Click += (_, _) => { _periodo = chave; AtualizaPeriodos(); Recarregar(); };
@@ -318,7 +321,7 @@ public class FormPrincipal : Form
         Button Seta(string t, int dias)
         {
             var b = new BotaoPlano { Text = t, Size = new Size(26, 30), FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 11F), Cursor = Cursors.Hand, TabStop = false, AccessibleDescription = "kit:ignorar" };
-            b.FlatAppearance.BorderSize = 0; b.FlatAppearance.MouseOverBackColor = Color.FromArgb(242, 242, 245);
+            b.FlatAppearance.BorderSize = 0; b.FlatAppearance.MouseOverBackColor = Tokens.FundoCampo;
             b.Click += (_, _) => _data.Value = _data.Value.AddDays(dias);
             return b;
         }
@@ -326,7 +329,7 @@ public class FormPrincipal : Form
         ant.Location = new Point(2, 2); _dataTexto.Location = new Point(28, 2); prox.Location = new Point(124, 2);
         _dataCaixa.Controls.AddRange([ant, _dataTexto, prox]);
         _dataCaixa.Margin = new Padding(0, 1, 0, 0);
-        _dataCaixa.Paint += (_, e) => { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using var p = VisualPrincipal.Redondo(new Rectangle(0, 0, _dataCaixa.Width - 1, _dataCaixa.Height - 1), 9); using var pen = new Pen(Color.FromArgb(222, 222, 227)); e.Graphics.DrawPath(pen, p); };
+        _dataCaixa.Paint += (_, e) => { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using var p = VisualPrincipal.Redondo(new Rectangle(0, 0, _dataCaixa.Width - 1, _dataCaixa.Height - 1), 9); using var pen = new Pen(Tokens.Linha); e.Graphics.DrawPath(pen, p); };
         _dataTexto.Text = _data.Value.ToString("dd/MM/yyyy");
         _data.ValueChanged += (_, _) => _dataTexto.Text = _data.Value.ToString("dd/MM/yyyy");
         _dataTexto.Click += (_, _) =>
@@ -352,7 +355,7 @@ public class FormPrincipal : Form
             {
                 var ativo = b.Name == "periodo-" + _periodo;
                 b.BackColor = ativo ? Color.White : p.BackColor;
-                b.ForeColor = ativo ? KitVisual.Texto : Color.FromArgb(58, 58, 60);
+                b.ForeColor = ativo ? KitVisual.Texto : Tokens.Grafite;
                 b.Font = new Font("Segoe UI", 8.2F, ativo ? FontStyle.Bold : FontStyle.Regular);
             }
         }
@@ -389,7 +392,7 @@ public class FormPrincipal : Form
         var lista = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(0) };
         lista.Resize += (_, _) => KitVisual.AplicarRaio(lista, 14);
         var rodape = new Panel { Dock = DockStyle.Bottom, Height = 36, BackColor = Color.White };
-        rodape.Paint += (_, e) => { using var pen = new Pen(Color.FromArgb(236, 236, 239)); e.Graphics.DrawLine(pen, 0, 0, rodape.Width, 0); };
+        rodape.Paint += (_, e) => { using var pen = new Pen(Tokens.Lateral); e.Graphics.DrawLine(pen, 0, 0, rodape.Width, 0); };
         var exportar = new LinkLabel { Text = "Exportar para Excel", AutoSize = true, Dock = DockStyle.Right, LinkColor = KitVisual.Verde, ActiveLinkColor = KitVisual.Verde, LinkBehavior = LinkBehavior.HoverUnderline, Font = new Font("Segoe UI", 8.8F, FontStyle.Bold), Padding = new Padding(0, 10, 16, 0), BackColor = Color.White };
         exportar.LinkClicked += (_, _) => _grade.ExportarExcel(_grupo);
         rodape.Controls.Add(_total); rodape.Controls.Add(exportar);
@@ -428,7 +431,7 @@ public class FormPrincipal : Form
         barra.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 155));
         barra.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         var marca = new Panel { Dock = DockStyle.Fill };
-        var logo = new PictureBox { Image = Icone.Logo(), SizeMode = PictureBoxSizeMode.Zoom, Size = new Size(36, 36), Location = new Point(0, 8), BackColor = Color.FromArgb(28, 28, 30), Padding = new Padding(3) };
+        var logo = new PictureBox { Image = Icone.Logo(), SizeMode = PictureBoxSizeMode.Zoom, Size = new Size(36, 36), Location = new Point(0, 8), BackColor = Tokens.Preto, Padding = new Padding(3) };
         logo.Resize += (_, _) => KitVisual.AplicarRaio(logo, 9); KitVisual.AplicarRaio(logo, 9);
         var marcaNome = new Label { Text = "Kartódromo Internacional de Betim", AutoSize = false, Width = 246, Height = 18, AutoEllipsis = true, Font = new Font("Segoe UI", 9.3F, FontStyle.Bold), ForeColor = KitVisual.Texto, Location = new Point(44, 9) };
         var marcaSub = new Label { Text = "Módulo Office", AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = KitVisual.Secundario, Location = new Point(45, 27) };
@@ -437,7 +440,7 @@ public class FormPrincipal : Form
         menus.Dock = DockStyle.Fill;
         menus.BackColor = Color.White;
         menus.Padding = new Padding(0, 8, 0, 0);
-        var busca = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(242, 242, 245), Margin = new Padding(0, 10, 10, 10), Padding = new Padding(9, 3, 8, 0) };
+        var busca = new Panel { Dock = DockStyle.Fill, BackColor = Tokens.FundoCampo, Margin = new Padding(0, 10, 10, 10), Padding = new Padding(9, 3, 8, 0) };
         KitVisual.AplicarRaio(busca, 9);
         busca.SizeChanged += (_, _) => KitVisual.AplicarRaio(busca, 9);
         var q = _buscaGlobal;
@@ -463,7 +466,7 @@ public class FormPrincipal : Form
         circulo.Paint += (_, e) =>
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using var b = new LinearGradientBrush(circulo.ClientRectangle, Color.FromArgb(127, 184, 255), Color.FromArgb(30, 111, 232), 90f);
+            using var b = new LinearGradientBrush(circulo.ClientRectangle, Color.FromArgb(127, 184, 255), Tokens.Azul, 90f);
             e.Graphics.FillEllipse(b, circulo.ClientRectangle);
             TextRenderer.DrawText(e.Graphics, letra, new Font("Segoe UI", 10F, FontStyle.Bold), circulo.ClientRectangle, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
         };
@@ -497,7 +500,7 @@ public class FormPrincipal : Form
         try
         {
             await Sessao.Api.Get("/healthz");
-            _sbSrv.Text = "● Servidor on-line"; _sbSrv.ForeColor = Color.FromArgb(28, 107, 53);
+            _sbSrv.Text = "● Servidor on-line"; _sbSrv.ForeColor = Tokens.VerdeTexto;
             var c = (await Sessao.Api.Get("/api/office/caixa")).AsObject();
             if (c["aberto"] is JsonObject ab)
             {
@@ -514,7 +517,7 @@ public class FormPrincipal : Form
         }
         catch
         {
-            _sbSrv.Text = "● Servidor off-line"; _sbSrv.ForeColor = Color.FromArgb(196, 40, 28);
+            _sbSrv.Text = "● Servidor off-line"; _sbSrv.ForeColor = Tokens.Vermelho;
             _selo.Definir(false, "Terminal indisponível", "Não foi possível consultar o caixa");
         }
         await PingServico("crono", Config.CronoUrl, _sbCrono);
@@ -529,9 +532,9 @@ public class FormPrincipal : Form
             using var r = await http.GetAsync(baseUrl.TrimEnd('/') + "/healthz");
             var online = r.IsSuccessStatusCode;
             label.Text = $"● Cronometragem {(online ? "on-line" : "off-line")}";
-            label.ForeColor = online ? Color.FromArgb(28, 107, 53) : Color.FromArgb(196, 40, 28);
+            label.ForeColor = online ? Tokens.VerdeTexto : Tokens.Vermelho;
         }
-        catch { label.Text = "● Cronometragem · off-line"; label.ForeColor = Color.FromArgb(196, 40, 28); }
+        catch { label.Text = "● Cronometragem · off-line"; label.ForeColor = Tokens.Vermelho; }
     }
 
     static async Task PingSite(ToolStripStatusLabel label)
@@ -543,9 +546,9 @@ public class FormPrincipal : Form
             var online = r.IsSuccessStatusCode;
             label.Text = $"● Site {(online ? "on-line" : "off-line")}";
             label.Visible = !online;
-            label.ForeColor = online ? Color.FromArgb(28, 107, 53) : Color.FromArgb(196, 40, 28);
+            label.ForeColor = online ? Tokens.VerdeTexto : Tokens.Vermelho;
         }
-        catch { label.Text = "● Site · off-line"; label.ForeColor = Color.FromArgb(196, 40, 28); }
+        catch { label.Text = "● Site · off-line"; label.ForeColor = Tokens.Vermelho; }
     }
 
     // ------------------------------------------------------------------ menu
@@ -607,7 +610,7 @@ public class FormPrincipal : Form
         var barra = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, BackColor = Color.White, Padding = new Padding(12, 0, 16, 0), Margin = new Padding(0) };
         barra.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); barra.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         var fluxo = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, AutoScroll = true, BackColor = Color.White, Margin = new Padding(0) };
-        Control B(string icone, string texto, string dica, Action a) => VisualPrincipal.BotaoBarra(icone, texto, dica, a);
+        Control B(string icone, string texto, string dica, Action a) { AcoesBarra.Add((texto, a)); return VisualPrincipal.BotaoBarra(icone, texto, dica, a); }
         fluxo.Controls.AddRange([
             B("clientes", "Clientes", "Cadastro de clientes (F2)", () => new FormCliente(null).Show(this)),
             B("produtos", "Produtos", "Produtos e provas de cada locação", () => Cadastros.Abrir(this, "produtos")),
@@ -675,7 +678,7 @@ public class FormPrincipal : Form
                 {
                     var w = TextRenderer.MeasureText(num, fonteConta).Width + 12;
                     var r = new Rectangle(largura - w - 10, y + 5, w, 17);
-                    using var p = VisualPrincipal.Redondo(r, 8); using var b = new SolidBrush(Color.FromArgb(255, 159, 10)); g.FillPath(b, p);
+                    using var p = VisualPrincipal.Redondo(r, 8); using var b = new SolidBrush(Tokens.LaranjaVivo); g.FillPath(b, p);
                     TextRenderer.DrawText(g, num, fonteConta, r, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
                 }
                 else TextRenderer.DrawText(g, num, new Font("Segoe UI", 8.8F), new Rectangle(largura - 60, y, 50, e.Bounds.Height), KitVisual.Secundario, TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
@@ -770,6 +773,18 @@ public class FormPrincipal : Form
         Seguro.Rodar(this, async () => { await Sessao.Api.Put($"/api/office/fidelidade/contas/{conta.S("id")}", new { ativo = ativar }); Recarregar(); });
     }
 
+    void AtivarVoucher(JsonObject v)
+    {
+        var ativar = !v.B("ativo");
+        if (!Msg.Pergunta(this, ativar ? $"Reativar o voucher {v.S("codigo")}?" : $"Desativar o voucher {v.S("codigo")}?\nO código para de valer no caixa (o histórico de uso continua).")) return;
+        Seguro.Rodar(this, async () =>
+        {
+            if (ativar) await Sessao.Api.Put($"/api/office/vouchers/{v.S("id")}", new { ativo = true });
+            else await Sessao.Api.Enviar(HttpMethod.Delete, $"/api/office/vouchers/{v.S("id")}");
+            Recarregar();
+        });
+    }
+
     void Comissao(JsonObject c, string acao)
     {
         var formas = Sessao.Formas();
@@ -810,6 +825,18 @@ public class FormPrincipal : Form
         List<JsonObject> rows = [];
         _grade.CorLinha = null;
         _grade.MenuDe = null;
+        var usaPeriodo = _grupo is "reservas" or "baterias" or "vendas" || (_grupo == "fidelidade" && _status != "contas") || (_grupo == "parceiros" && _status != "lista");
+        _grade.Vazio = (_grupo, _status) switch
+        {
+            ("vouchers", "uso") => "Nenhum voucher foi usado ainda.",
+            ("vouchers", _) => "Nenhum voucher cadastrado. Use “+ Criar voucher”.",
+            ("parceiros", "lista") => "Nenhum parceiro cadastrado. Use “+ Novo parceiro”.",
+            ("fidelidade", "contas") => "Nenhuma conta de fidelidade. Use “+ Abrir conta”.",
+            ("oficina", _) => "Nenhuma manutenção nesta lista.",
+            _ when usaPeriodo && _periodo == "dia" => $"Nenhum registro em {_data.Value:dd/MM/yyyy}.\nPara ver outros dias, use “Neste mês” ou “Todas” em Exibir dados.",
+            _ when usaPeriodo && _periodo == "mes" => $"Nenhum registro em {_data.Value:MM/yyyy}.",
+            _ => "Nenhum registro.",
+        };
         _menuAtual = null;
         switch (_grupo)
         {
@@ -840,11 +867,13 @@ public class FormPrincipal : Form
                 break;
             case "vendas":
                 _grade.Colunas([
-                    new("dataHora", "Data/Hora", TipoCol.DataHora), new("codigo", "Código", Largura: 70), new("cliente", "Cliente", Largura: 200), new("documento", "Nº Documento", Largura: 110),
-                    new("usuario", "Usuário", Largura: 110), new("terminal", "Terminal", Largura: 100), new("bruto", "Vendas (R$)", TipoCol.Dinheiro), new("desconto", "Descontos (R$)", TipoCol.Dinheiro),
-                    new("acrescimo", "Acréscimos (R$)", TipoCol.Dinheiro), new("recebido", "Recebido (R$)", TipoCol.Dinheiro), new("troco", "Troco (R$)", TipoCol.Dinheiro),
-                    new("estorno", "Estornos (R$)", TipoCol.Dinheiro), new("final", "Final (R$)", TipoCol.Dinheiro), new("cancelada", "Cancelado", TipoCol.Bool),
-                    new("motivo", "Motivo do Cancelamento"), new("observacao", "Observação")]);
+                    // títulos curtos: a coluna não fica menor que o título, e os longos ("Motivo do Cancelamento",
+                    // "Acréscimos (R$)") empurravam a lista para fora da tela mesmo em 1920 (valores em R$)
+                    new("dataHora", "Data/Hora", TipoCol.DataHora), new("codigo", "Código", Largura: 70), new("cliente", "Cliente", Largura: 200), new("documento", "Documento", Largura: 110),
+                    new("usuario", "Usuário", Largura: 100), new("terminal", "Terminal", Largura: 90), new("bruto", "Vendas", TipoCol.Dinheiro), new("desconto", "Desconto", TipoCol.Dinheiro),
+                    new("acrescimo", "Acréscimo", TipoCol.Dinheiro), new("recebido", "Recebido", TipoCol.Dinheiro), new("troco", "Troco", TipoCol.Dinheiro),
+                    new("estorno", "Estorno", TipoCol.Dinheiro), new("final", "Final", TipoCol.Dinheiro), new("cancelada", "Cancelada", TipoCol.Bool),
+                    new("motivo", "Motivo"), new("observacao", "Observação")]);
                 _grade.CorLinha = r => r.B("cancelada") ? Color.Silver : null;
                 _menuAtual = MenuVendas;
                 rows = await Sessao.Api.Lista($"/api/office/vendas?status={_status}&{Periodo()}");
@@ -854,6 +883,13 @@ public class FormPrincipal : Form
                     new("kart", "Kart", Largura: 60), new("categoria", "Categoria", Largura: 100), new("item", "Item de Manutenção", Largura: 200),
                     new("minutosUso", "Tempo de Uso", Largura: 100, Valor: r => $"{r.I("minutosUso") / 60}h{r.I("minutosUso") % 60:00}"), new("limiteHoras", "Limite (h)", TipoCol.Inteiro),
                     new("ultimaManutencao", "Última Manutenção", TipoCol.DataHora, 130), new("data", "Atualizado em", TipoCol.DataHora), new("realizada", "Realizada", TipoCol.Bool)]);
+                // passou do limite de horas = vermelho; a 90% do limite = laranja (antes todas iguais, 400 h com limite de 100 h passava batido)
+                _grade.CorLinha = r =>
+                {
+                    if (r.B("realizada")) return null;
+                    var limite = (r.L("limiteHoras") ?? 0) * 60; var uso = r.L("minutosUso") ?? 0;
+                    return limite <= 0 ? null : uso >= limite ? Tokens.Vermelho : uso >= limite * 0.9 ? Tokens.Laranja : null;
+                };
                 _menuAtual = MenuOficina;
                 rows = await Sessao.Api.Lista($"/api/office/manutencoes?status={_status}");
                 break;
@@ -863,11 +899,13 @@ public class FormPrincipal : Form
                 else
                     _grade.Colunas([new("codigo", "Código"), new("origem", "Origem", Largura: 90), new("referencia", "Conta/Parceiro"), new("tipo", "Tipo desconto", Largura: 100),
                         new("valor", "Valor", Largura: 90, Valor: r => r.S("tipo") == "percentual" ? r.S("valor") + "%" : Fmt.Brl(r.L("valor"))), new("inicio", "Data inicial", TipoCol.Data), new("fim", "Data final", TipoCol.Data),
-                        new("produto", "Produto"), new("usoMaxCliente", "Uso máx/cliente", TipoCol.Inteiro, 100), new("usoUnico", "Uso único", TipoCol.Bool), new("usos", "Usos", TipoCol.Inteiro, 60)]);
-                _menuAtual = sel => [
+                        new("produto", "Produto"), new("usoMaxCliente", "Uso máx/cliente", TipoCol.Inteiro, 100), new("usoUnico", "Uso único", TipoCol.Bool), new("usos", "Usos", TipoCol.Inteiro, 60),
+                        new("ativo", "Ativo", TipoCol.Bool)]);
+                if (_status != "uso") _grade.CorLinha = r => r.B("ativo") ? null : Color.Gray;
+                _menuAtual = sel => _status == "uso" ? [Exportar("vouchers-uso")] : [
                     Item("Criar voucher", () => { FormVoucher.Criar("manual").ShowDialog(this); Recarregar(); }),
-                    Item("Editar voucher", () => Msg.Aviso(this, "A API do servidor ainda não permite editar vouchers."), false, "Enter"),
-                    Item("Desativar voucher", () => Msg.Aviso(this, "A API do servidor ainda não permite desativar vouchers."), false),
+                    Item("Editar voucher", () => Seguro.Rodar(this, async () => { if (await FormVoucher.Editar(this, sel[0])) Recarregar(); }), sel.Count == 1, "Enter"),
+                    Item(sel.Count == 1 && !sel[0].B("ativo") ? "Reativar voucher" : "Desativar voucher", () => AtivarVoucher(sel[0]), sel.Count == 1),
                     new ToolStripSeparator(), Exportar("vouchers")];
                 rows = await Sessao.Api.Lista(_status == "uso" ? "/api/office/vouchers/uso" : "/api/office/vouchers");
                 break;
@@ -883,7 +921,7 @@ public class FormPrincipal : Form
                 {
                     _grade.Colunas(new("dataHora", "Data/Hora", TipoCol.DataHora), new("conta", "Conta", Largura: 240), new("tipo", "Tipo", Largura: 90), new("motivo", "Descrição", Largura: 300),
                         new("pontos", "Pontos", TipoCol.Inteiro), new("saldoApos", "Saldo após", TipoCol.Inteiro), new("usuario", "Usuário", Largura: 120));
-                    _grade.CorLinha = r => (r.L("pontos") ?? 0) < 0 ? Color.FromArgb(196, 40, 28) : null;
+                    _grade.CorLinha = r => (r.L("pontos") ?? 0) < 0 ? Tokens.Vermelho : null;
                     rows = await Sessao.Api.Lista(_filtroContaFidelidade != null
                         ? $"/api/office/fidelidade/contas/{_filtroContaFidelidade.S("id")}/transacoes?{Periodo()}"
                         : $"/api/office/fidelidade/transacoes?{Periodo()}");
@@ -913,12 +951,12 @@ public class FormPrincipal : Form
                         new("valorVendaCentavos", "Valor venda (R$)", TipoCol.Dinheiro), new("percentual", "%", Largura: 55), new("comissaoCentavos", "Comissão (R$)", TipoCol.Dinheiro),
                         new("situacao", "Situação", Largura: 90, Valor: r => r.S("situacao") switch { "paga" => "Paga", "estornada" => "Estornada", _ => "Pendente" }),
                         new("metodoPagamento", "Pago com", Largura: 110), new("pagoEm", "Pago em", TipoCol.DataHora));
-                    _grade.CorLinha = r => r.S("situacao") == "estornada" ? Color.Gray : r.S("situacao") == "pendente" ? Color.FromArgb(178, 106, 0) : null;
+                    _grade.CorLinha = r => r.S("situacao") == "estornada" ? Color.Gray : r.S("situacao") == "pendente" ? Tokens.Laranja : null;
                     rows = await Sessao.Api.Lista($"/api/office/parceiros/comissoes?status={(_status == "pagas" ? "pagas" : "todas")}&{Periodo()}");
                 }
                 _menuAtual = _status == "lista" ? sel => [
                     Item("+ Novo parceiro", () => Cadastros.Abrir(this, "parceiros")),
-                    Item("Editar parceiro", () => Cadastros.Abrir(this, "parceiros"), sel.Count == 1, "Enter"),
+                    Item("Editar parceiro", () => { Cadastros.Abrir(this, "parceiros", sel[0].S("id")); Recarregar(); }, sel.Count == 1, "Enter"),
                     Item("Criar voucher do parceiro", () => { FormVoucher.Criar("parceiro", sel[0]).ShowDialog(this); Recarregar(); }, sel.Count == 1 && sel[0].B("ativo")),
                     Item("Ver comissões", () => Selecionar("parceiros:comissoes"), sel.Count == 1),
                     new ToolStripSeparator(), Exportar("parceiros")]
@@ -1007,32 +1045,32 @@ public class FormPrincipal : Form
         {
             "reservas" => [
                 ("Reservas", rows.Count.ToString(), null),
-                ("Pré-reservas para aprovar", rows.Count(r => !r.B("aprovada") && r.S("status") != "cancelada").ToString(), Color.FromArgb(178, 106, 0)),
-                ("Recebido", Fmt.Brl(rows.Where(r => r.B("pago")).Sum(r => r.L("total") ?? 0)), Color.FromArgb(28, 107, 53)),
+                ("Pré-reservas para aprovar", rows.Count(r => !r.B("aprovada") && r.S("status") != "cancelada").ToString(), Tokens.Laranja),
+                ("Recebido", Fmt.Brl(rows.Where(r => r.B("pago")).Sum(r => r.L("total") ?? 0)), Tokens.VerdeTexto),
                 ("A receber", Fmt.Brl(rows.Where(r => !r.B("pago") && r.S("status") != "cancelada").Sum(r => r.L("total") ?? 0)), null)],
             "baterias" => [
                 ("Baterias", rows.Count.ToString(), null), ("Vagas", rows.Sum(r => r.I("vagas")).ToString(), null),
-                ("Reservas", rows.Sum(r => r.I("inscritos")).ToString(), null), ("Pagos", rows.Sum(r => r.I("pagos")).ToString(), Color.FromArgb(28, 107, 53))],
+                ("Reservas", rows.Sum(r => r.I("inscritos")).ToString(), null), ("Pagos", rows.Sum(r => r.I("pagos")).ToString(), Tokens.VerdeTexto)],
             "vendas" => [
-                ("Vendas", rows.Count.ToString(), null), ("Descontos", Fmt.Brl(rows.Sum(r => r.L("desconto") ?? 0)), Color.FromArgb(196, 40, 28)),
-                ("Estornos", Fmt.Brl(rows.Sum(r => r.L("estorno") ?? 0)), Color.FromArgb(196, 40, 28)),
-                ("Total final", Fmt.Brl(rows.Where(r => !r.B("cancelada")).Sum(r => r.L("final") ?? 0)), Color.FromArgb(28, 107, 53))],
+                ("Vendas", rows.Count.ToString(), null), ("Descontos", Fmt.Brl(rows.Sum(r => r.L("desconto") ?? 0)), Tokens.Vermelho),
+                ("Estornos", Fmt.Brl(rows.Sum(r => r.L("estorno") ?? 0)), Tokens.Vermelho),
+                ("Total final", Fmt.Brl(rows.Where(r => !r.B("cancelada")).Sum(r => r.L("final") ?? 0)), Tokens.VerdeTexto)],
             "oficina" => [
-                ("A realizar", rows.Count(r => !r.B("realizada")).ToString(), Color.FromArgb(178, 106, 0)),
-                ("Realizadas", rows.Count(r => r.B("realizada")).ToString(), Color.FromArgb(28, 107, 53)),
-                ("Próximas do limite", rows.Count(r => !r.B("realizada") && r.I("limiteHoras") > 0 && r.I("minutosUso") >= r.I("limiteHoras") * 50).ToString(), Color.FromArgb(178, 106, 0)),
+                ("A realizar", rows.Count(r => !r.B("realizada")).ToString(), Tokens.Laranja),
+                ("Realizadas", rows.Count(r => r.B("realizada")).ToString(), Tokens.VerdeTexto),
+                ("Próximas do limite", rows.Count(r => !r.B("realizada") && r.I("limiteHoras") > 0 && r.I("minutosUso") >= r.I("limiteHoras") * 50).ToString(), Tokens.Laranja),
                 ("Registros", rows.Count.ToString(), null)],
             "vouchers" => [
-                ("Vouchers", rows.Count.ToString(), null), ("Ativos", rows.Count(r => r.B("ativo")).ToString(), Color.FromArgb(28, 107, 53)),
-                ("Usos", rows.Sum(r => r.I("usos")).ToString(), null), ("Vencem em 7 dias", rows.Count(r => r.D("fim") is DateTime d && d >= DateTime.Today && d <= DateTime.Today.AddDays(7)).ToString(), Color.FromArgb(178, 106, 0))],
-            "fidelidade" when _status == "contas" => [("Contas", rows.Count.ToString(), null), ("Ativas", rows.Count(r => r.B("ativo")).ToString(), Color.FromArgb(28, 107, 53)),
-                ("Pontos em aberto", rows.Sum(r => r.L("saldo") ?? 0).ToString("N0", Fmt.Br), Color.FromArgb(178, 106, 0)), ("Baterias pagas", rows.Sum(r => r.I("baterias")).ToString(), null)],
-            "fidelidade" => [("Transações", rows.Count.ToString(), null), ("Pontos creditados", rows.Where(r => (r.L("pontos") ?? 0) > 0).Sum(r => r.L("pontos") ?? 0).ToString("N0", Fmt.Br), Color.FromArgb(28, 107, 53)),
-                ("Pontos debitados", (-rows.Where(r => (r.L("pontos") ?? 0) < 0).Sum(r => r.L("pontos") ?? 0)).ToString("N0", Fmt.Br), Color.FromArgb(196, 40, 28)), ("Contas", rows.Select(r => r.S("conta")).Distinct().Count().ToString(), null)],
+                ("Vouchers", rows.Count.ToString(), null), ("Ativos", rows.Count(r => r.B("ativo")).ToString(), Tokens.VerdeTexto),
+                ("Usos", rows.Sum(r => r.I("usos")).ToString(), null), ("Vencem em 7 dias", rows.Count(r => r.D("fim") is DateTime d && d >= DateTime.Today && d <= DateTime.Today.AddDays(7)).ToString(), Tokens.Laranja)],
+            "fidelidade" when _status == "contas" => [("Contas", rows.Count.ToString(), null), ("Ativas", rows.Count(r => r.B("ativo")).ToString(), Tokens.VerdeTexto),
+                ("Pontos em aberto", rows.Sum(r => r.L("saldo") ?? 0).ToString("N0", Fmt.Br), Tokens.Laranja), ("Baterias pagas", rows.Sum(r => r.I("baterias")).ToString(), null)],
+            "fidelidade" => [("Transações", rows.Count.ToString(), null), ("Pontos creditados", rows.Where(r => (r.L("pontos") ?? 0) > 0).Sum(r => r.L("pontos") ?? 0).ToString("N0", Fmt.Br), Tokens.VerdeTexto),
+                ("Pontos debitados", (-rows.Where(r => (r.L("pontos") ?? 0) < 0).Sum(r => r.L("pontos") ?? 0)).ToString("N0", Fmt.Br), Tokens.Vermelho), ("Contas", rows.Select(r => r.S("conta")).Distinct().Count().ToString(), null)],
             "parceiros" when _status == "lista" => [("Parceiros", rows.Count(r => r.B("ativo")).ToString(), null), ("Vendas indicadas", rows.Sum(r => r.I("vendasIndicadas")).ToString(), null),
-                ("Comissão a pagar", Fmt.Brl(rows.Sum(r => r.L("comissaoPendenteCentavos") ?? 0)), Color.FromArgb(178, 106, 0)), ("Comissão paga", Fmt.Brl(rows.Sum(r => r.L("comissaoPagaCentavos") ?? 0)), Color.FromArgb(28, 107, 53))],
+                ("Comissão a pagar", Fmt.Brl(rows.Sum(r => r.L("comissaoPendenteCentavos") ?? 0)), Tokens.Laranja), ("Comissão paga", Fmt.Brl(rows.Sum(r => r.L("comissaoPagaCentavos") ?? 0)), Tokens.VerdeTexto)],
             "parceiros" => [("Comissões", rows.Count.ToString(), null), ("Vendas indicadas", Fmt.Brl(rows.Sum(r => r.L("valorVendaCentavos") ?? 0)), null),
-                ("A pagar", Fmt.Brl(rows.Where(r => r.S("situacao") == "pendente").Sum(r => r.L("comissaoCentavos") ?? 0)), Color.FromArgb(178, 106, 0)), ("Pagas", Fmt.Brl(rows.Where(r => r.S("situacao") == "paga").Sum(r => r.L("comissaoCentavos") ?? 0)), Color.FromArgb(28, 107, 53))],
+                ("A pagar", Fmt.Brl(rows.Where(r => r.S("situacao") == "pendente").Sum(r => r.L("comissaoCentavos") ?? 0)), Tokens.Laranja), ("Pagas", Fmt.Brl(rows.Where(r => r.S("situacao") == "paga").Sum(r => r.L("comissaoCentavos") ?? 0)), Tokens.VerdeTexto)],
             _ => [("Registros", rows.Count.ToString(), null), ("—", "—", null), ("—", "—", null), ("—", "—", null)]
         };
         for (var i = 0; i < Math.Min(cards.Length, _resumo.Controls.Count); i++)
@@ -1141,6 +1179,7 @@ public class FormPrincipal : Form
             {
                 case "reservas": if (r.B("pago") || r.S("status") == "cancelada") Acoes.EditarReserva(this, r); else Caixa.CheckoutDeReservas(this, [r]); break;
                 case "vendas": new FormVenda(r.L("id") ?? 0).ShowDialog(this); break;
+                case "vouchers" when _status != "uso": Seguro.Rodar(this, async () => { if (await FormVoucher.Editar(this, r)) Recarregar(); }); break;
             }
         };
     }
@@ -1150,15 +1189,15 @@ sealed class MenuRecepcaoRenderer : ToolStripProfessionalRenderer
 {
     sealed class Cores : ProfessionalColorTable
     {
-        public override Color ToolStripDropDownBackground => Color.FromArgb(250, 250, 252);
-        public override Color MenuBorder => Color.FromArgb(225, 225, 230);
-        public override Color MenuItemSelected => Color.FromArgb(232, 245, 238);
-        public override Color MenuItemSelectedGradientBegin => Color.FromArgb(232, 245, 238);
-        public override Color MenuItemSelectedGradientEnd => Color.FromArgb(232, 245, 238);
-        public override Color MenuItemPressedGradientBegin => Color.FromArgb(220, 238, 228);
-        public override Color MenuItemPressedGradientEnd => Color.FromArgb(220, 238, 228);
-        public override Color SeparatorDark => Color.FromArgb(228, 228, 233);
-        public override Color SeparatorLight => Color.FromArgb(228, 228, 233);
+        public override Color ToolStripDropDownBackground => Tokens.SuperficieSuave;
+        public override Color MenuBorder => Tokens.Linha;
+        public override Color MenuItemSelected => Tokens.VerdeSuave;
+        public override Color MenuItemSelectedGradientBegin => Tokens.VerdeSuave;
+        public override Color MenuItemSelectedGradientEnd => Tokens.VerdeSuave;
+        public override Color MenuItemPressedGradientBegin => Tokens.VerdeSuave;
+        public override Color MenuItemPressedGradientEnd => Tokens.VerdeSuave;
+        public override Color SeparatorDark => Tokens.Linha;
+        public override Color SeparatorLight => Tokens.Linha;
     }
 
     public MenuRecepcaoRenderer() : base(new Cores()) { }
@@ -1175,7 +1214,7 @@ sealed class MenuRecepcaoRenderer : ToolStripProfessionalRenderer
         if (bounds.Width < 4 || bounds.Height < 4) return;
         bounds.Inflate(-1, -1);
         using var path = RetanguloArredondado(bounds, 12);
-        using var brush = new SolidBrush(Color.FromArgb(250, 250, 252));
+        using var brush = new SolidBrush(Tokens.SuperficieSuave);
         var smoothing = e.Graphics.SmoothingMode;
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         e.Graphics.FillPath(brush, path);
@@ -1198,7 +1237,7 @@ sealed class MenuRecepcaoRenderer : ToolStripProfessionalRenderer
         var bounds = e.ToolStrip.ClientRectangle;
         bounds.Inflate(-1, -1);
         using var path = RetanguloArredondado(bounds, 12);
-        using var pen = new Pen(Color.FromArgb(225, 225, 230));
+        using var pen = new Pen(Tokens.Linha);
         var smoothing = e.Graphics.SmoothingMode;
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         e.Graphics.DrawPath(pen, path);
@@ -1214,8 +1253,8 @@ sealed class MenuRecepcaoRenderer : ToolStripProfessionalRenderer
             bounds.Inflate(-3, -1);
             using var path = RetanguloArredondado(bounds, 7);
             var cor = principal
-                ? e.Item.Selected ? Color.FromArgb(8, 85, 58) : Color.FromArgb(11, 122, 83)
-                : Color.FromArgb(232, 245, 238);
+                ? e.Item.Selected ? Color.FromArgb(8, 85, 58) : Tokens.Verde
+                : Tokens.VerdeSuave;
             using var brush = new SolidBrush(cor);
             var smoothing = e.Graphics.SmoothingMode;
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
@@ -1227,7 +1266,7 @@ sealed class MenuRecepcaoRenderer : ToolStripProfessionalRenderer
     protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
     {
         var y = e.Item.Height / 2;
-        using var pen = new Pen(Color.FromArgb(228, 228, 233));
+        using var pen = new Pen(Tokens.Linha);
         e.Graphics.DrawLine(pen, 9, y, e.Item.Width - 9, y);
     }
 

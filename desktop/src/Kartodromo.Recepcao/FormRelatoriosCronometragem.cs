@@ -32,12 +32,12 @@ public sealed class FormRelatoriosCronometragem : DialogoDesign
     readonly bool _abrirAutomaticamente;
     readonly Grade _lista = new();
     readonly ComboBox _tipo = Campos.Combo();
-    readonly Label _criterio = new() { AutoSize = true, Font = new Font("Segoe UI", 9.2F), ForeColor = Color.FromArgb(58, 58, 60), Margin = new Padding(0, 2, 0, 6) };
-    readonly Label _estado = new() { AutoSize = true, Font = new Font("Segoe UI", 9F), ForeColor = Color.FromArgb(110, 110, 115), Margin = new Padding(0, 0, 0, 4) };
+    readonly Label _criterio = new() { AutoSize = true, Font = new Font("Segoe UI", 9.2F), ForeColor = Tokens.Grafite, Margin = new Padding(0, 2, 0, 6) };
+    readonly Label _estado = new() { AutoSize = true, Font = new Font("Segoe UI", 9F), ForeColor = Tokens.TextoSecundario, Margin = new Padding(0, 0, 0, 4) };
     List<JsonObject> _sessoes = [];
 
     public FormRelatoriosCronometragem(JsonObject bateriaInicial = null, string tipoInicial = "resultados_oficiais", bool abrirAutomaticamente = false)
-        : base("Relatórios de cronometragem", "Escolha uma bateria e abra o resultado no mesmo padrão da Cronometragem", "M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7", "linear-gradient(180deg, #6CB8FF, #1E6FE8)", 1080, 720)
+        : base("Relatórios de cronometragem", "Escolha uma bateria e abra o resultado no mesmo padrão da Cronometragem", "M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7", "linear-gradient(180deg, #6CB8FF, #1E6FE8)", 1080, 800) // 720 cortava o "Formato do relatório" no rodapé
     {
         _bateriaInicial = bateriaInicial;
         _tipoInicial = Tipos.Any(t => t.slug == tipoInicial) ? tipoInicial : "resultados_oficiais";
@@ -50,8 +50,8 @@ public sealed class FormRelatoriosCronometragem : DialogoDesign
             new("tipo", "Tipo", Largura: 145, Valor: r => Tipo(r.S("type"))),
             new("state", "Situação", Largura: 120, Valor: r => Estado(r.S("state"))),
             new("competitors", "Pilotos", TipoCol.Inteiro, 78));
-        _lista.CorLinha = r => r.S("state") == "encerrada" ? Color.FromArgb(52, 52, 54) : Color.FromArgb(11, 122, 83);
-        _lista.Height = 350;
+        _lista.CorLinha = r => r.S("state") == "encerrada" ? Color.FromArgb(52, 52, 54) : Tokens.Verde;
+        _lista.Height = 330;
         _lista.MultiSelect = false;
         _lista.SelectionChanged += (_, _) => AtualizarCriterio();
         _lista.Duplo += _ => AbrirRelatorio();
@@ -121,7 +121,7 @@ public sealed class FormRelatoriosCronometragem : DialogoDesign
         }
         catch (Exception ex)
         {
-            _estado.ForeColor = Color.FromArgb(196, 40, 28);
+            _estado.ForeColor = Tokens.Vermelho;
             _estado.Text = "Não foi possível consultar a Cronometragem: " + ex.Message;
         }
     }

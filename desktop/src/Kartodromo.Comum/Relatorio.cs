@@ -9,9 +9,11 @@ namespace Kartodromo.Comum;
 public class Relatorio : CartaoModal
 {
     static CoreWebView2Environment _env;
-    static readonly Color FundoFolha = Color.FromArgb(242, 242, 245);
+    static readonly Color FundoFolha = Tokens.FundoCampo;
     readonly WebView2 _web = new() { Dock = DockStyle.Fill };
     readonly string _titulo;
+    /// <summary>Autoteste fora da tela: false antes de abrir (trocar ShowInTaskbar depois de aberto recria a janela e o WebView2 aborta).</summary>
+    public static bool MostrarNaBarra = true;
 
     /// <summary>WebView2 grava perfil numa pasta do usuario (Program Files nao e gravavel).</summary>
     public static async Task<CoreWebView2Environment> Ambiente()
@@ -28,24 +30,24 @@ public class Relatorio : CartaoModal
         Text = titulo;
         _titulo = titulo;
         Icon = Kartodromo.Comum.Icone.App;
-        ShowInTaskbar = true;
+        ShowInTaskbar = MostrarNaBarra;
         StartPosition = FormStartPosition.Manual;
         BackColor = FundoFolha;
         Padding = new Padding(1);
         _web.DefaultBackgroundColor = FundoFolha;
         // barra própria (o kit visual da Recepção não mexe nesta janela: mover o WebView2 depois de aberto quebra a página)
         var barra = new Panel { Dock = DockStyle.Top, Height = 60, BackColor = Color.White };
-        barra.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = Color.FromArgb(229, 229, 234) });
+        barra.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = Tokens.Linha });
         var titulo_ = new Label { Text = titulo, AutoSize = true, Font = new Font("Segoe UI", 11.5F, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, Location = new Point(16, 18) };
-        var pdf = BotaoBarra("Exportar PDF", Color.FromArgb(235, 235, 239), PecasDesign.CorTexto);
-        var excel = BotaoBarra("Exportar Excel", Color.FromArgb(235, 235, 239), PecasDesign.CorTexto);
-        var imprimir = BotaoBarra("Imprimir", Color.FromArgb(11, 122, 83), Color.White);
-        var fechar = BotaoBarra("✕", Color.FromArgb(235, 235, 239), PecasDesign.CorTexto);
+        var pdf = BotaoBarra("Exportar PDF", Tokens.BotaoSecundario, PecasDesign.CorTexto);
+        var excel = BotaoBarra("Exportar Excel", Tokens.BotaoSecundario, PecasDesign.CorTexto);
+        var imprimir = BotaoBarra("Imprimir", Tokens.Verde, Color.White);
+        var fechar = BotaoBarra("✕", Tokens.BotaoSecundario, PecasDesign.CorTexto);
         fechar.Font = new Font("Segoe UI", 10F); fechar.AutoSize = false; fechar.MinimumSize = Size.Empty; fechar.Padding = Padding.Empty; fechar.Size = new Size(34, 34);
         // termo com impressora de termos configurada (Recepção): vai direto na TM-T20, sem a janela do Chrome
         // (que lembra a última impressora usada e podia mandar o termo pra jato de tinta/laser)
         var impressoraTermo = url.Contains("/termo") ? Config.Get("ImpressoraTermos", "") : "";
-        _aviso = new Label { AutoSize = true, Font = new Font("Segoe UI", 9F), ForeColor = Color.FromArgb(21, 128, 61), BackColor = Color.White };
+        _aviso = new Label { AutoSize = true, Font = new Font("Segoe UI", 9F), ForeColor = Tokens.Verde, BackColor = Color.White };
         barra.Controls.Add(_aviso);
         imprimir.Click += async (_, _) =>
         {
@@ -113,7 +115,7 @@ public class Relatorio : CartaoModal
     {
         if (_imprimindo || _web.CoreWebView2 == null) return;
         _imprimindo = true;
-        _aviso.ForeColor = Color.FromArgb(110, 110, 115);
+        _aviso.ForeColor = Tokens.TextoSecundario;
         _aviso.Text = "Imprimindo na " + impressora + "…";
         try
         {
@@ -124,12 +126,12 @@ public class Relatorio : CartaoModal
             cfg.PrinterName = impressora;
             var st = await _web.CoreWebView2.PrintAsync(cfg);
             if (st != CoreWebView2PrintStatus.Succeeded) throw new Exception(st == CoreWebView2PrintStatus.PrinterUnavailable ? "impressora desligada ou desconectada" : st.ToString());
-            _aviso.ForeColor = Color.FromArgb(21, 128, 61);
+            _aviso.ForeColor = Tokens.Verde;
             _aviso.Text = $"Enviado para a {impressora} às {DateTime.Now:HH:mm}";
         }
         catch (Exception e)
         {
-            _aviso.ForeColor = Color.FromArgb(200, 40, 30);
+            _aviso.ForeColor = Tokens.Vermelho;
             _aviso.Text = $"Não imprimiu na {impressora}: {e.Message}";
         }
         finally { _imprimindo = false; }
@@ -160,7 +162,7 @@ public class Relatorio : CartaoModal
 
     void Avisar(string texto, bool erro = false)
     {
-        _aviso.ForeColor = erro ? Color.FromArgb(200, 40, 30) : Color.FromArgb(21, 128, 61);
+        _aviso.ForeColor = erro ? Tokens.Vermelho : Tokens.Verde;
         _aviso.Text = texto;
     }
 

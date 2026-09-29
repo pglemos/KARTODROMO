@@ -33,7 +33,7 @@ public static class FiltroColuna
         var modo = g.SmoothingMode;
         g.SmoothingMode = SmoothingMode.AntiAlias;
         if (ativo) { using var b = new SolidBrush(Azul); g.FillPath(b, path); }
-        using var pen = new Pen(ativo ? Azul : Color.FromArgb(142, 142, 147), 1.2f) { LineJoin = LineJoin.Round };
+        using var pen = new Pen(ativo ? Azul : Tokens.TextoTerciario, 1.2f) { LineJoin = LineJoin.Round };
         g.DrawPath(pen, path);
         g.SmoothingMode = modo;
     }
@@ -50,13 +50,13 @@ public static class FiltroColuna
 
         var fonte = new Font("Segoe UI", 9F);
         var painel = new Panel { Size = new Size(270, 340), BackColor = Color.White, Padding = new Padding(10), Font = fonte };
-        var cab = new Label { Text = "Filtrar · " + titulo.Trim(), Dock = DockStyle.Top, Height = 24, Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(29, 29, 31) };
+        var cab = new Label { Text = "Filtrar · " + titulo.Trim(), Dock = DockStyle.Top, Height = 24, Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Tokens.Texto };
         var busca = new TextBox { Dock = DockStyle.Top, PlaceholderText = "Pesquisar", BorderStyle = BorderStyle.FixedSingle, Font = fonte };
         var espaco = new Panel { Dock = DockStyle.Top, Height = 6 };
         var lista = new CheckedListBox { Dock = DockStyle.Fill, CheckOnClick = true, BorderStyle = BorderStyle.None, IntegralHeight = false, Font = fonte };
         var rodape = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 40, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(0, 8, 0, 0) };
-        var filtrar = new BotaoPlano { Text = "Filtrar", Size = new Size(88, 28), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(21, 128, 61), ForeColor = Color.White, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Cursor = Cursors.Hand };
-        var limpar = new BotaoPlano { Text = "Limpar", Size = new Size(80, 28), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(238, 238, 241), ForeColor = Color.FromArgb(29, 29, 31), Font = fonte, Cursor = Cursors.Hand };
+        var filtrar = new BotaoPlano { Text = "Filtrar", Size = new Size(88, 28), FlatStyle = FlatStyle.Flat, BackColor = Tokens.Verde, ForeColor = Color.White, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Cursor = Cursors.Hand };
+        var limpar = new BotaoPlano { Text = "Limpar", Size = new Size(80, 28), FlatStyle = FlatStyle.Flat, BackColor = Tokens.BotaoSecundario, ForeColor = Tokens.Texto, Font = fonte, Cursor = Cursors.Hand };
         filtrar.FlatAppearance.BorderSize = 0; limpar.FlatAppearance.BorderSize = 0;
         rodape.Controls.Add(filtrar); rodape.Controls.Add(limpar);
         painel.Controls.Add(lista); painel.Controls.Add(espaco); painel.Controls.Add(busca); painel.Controls.Add(cab); painel.Controls.Add(rodape);

@@ -452,6 +452,7 @@ public class FormListaParticipantes : DialogoDesign
         var tabela = SecaoTabelaDesign(null);
         tabela.Colunas(new("Kart", 60), new("Participante", 520), new("Idade", 60, Direita: true), new("Peso", 70, Direita: true), new("Pago", 60, Marca: true), new("Termo", 60, Marca: true));
         tabela.MaxLinhas = 13;
+        tabela.Vazio = "Nenhum participante nesta bateria ainda.";
         tabela.Linhas([]);
         var info = TextoRodape("Carregando…");
         List<JsonObject> participantes = [];

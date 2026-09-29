@@ -6,8 +6,8 @@ namespace Kartodromo.Comum;
 /// <summary>Peças de formulário desenhadas como no design aprovado (Dialogo.dc.html).</summary>
 public static class PecasDesign
 {
-    public static readonly Color CorTexto = Color.FromArgb(29, 29, 31);
-    public static readonly Color Cinza = Color.FromArgb(110, 110, 115);
+    public static readonly Color CorTexto = Tokens.Texto;
+    public static readonly Color Cinza = Tokens.TextoSecundario;
     public static readonly Font FonteValor = new("Segoe UI", 10.2F);
     public static readonly Font FonteRotulo = new("Segoe UI Semibold", 9F);
 
@@ -86,7 +86,7 @@ public class ListaDesign : ComboBox
     {
         if (e.Index < 0) return;
         var sel = (e.State & DrawItemState.Selected) != 0 && (e.State & DrawItemState.ComboBoxEdit) == 0;
-        using (var b = new SolidBrush(sel ? Color.FromArgb(226, 241, 235) : Color.White)) e.Graphics.FillRectangle(b, e.Bounds);
+        using (var b = new SolidBrush(sel ? Tokens.VerdeSuave : Color.White)) e.Graphics.FillRectangle(b, e.Bounds);
         TextRenderer.DrawText(e.Graphics, GetItemText(Items[e.Index]), Font, new Rectangle(e.Bounds.X + 4, e.Bounds.Y, e.Bounds.Width - 8, e.Bounds.Height), Enabled ? PecasDesign.CorTexto : PecasDesign.Cinza, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
     }
 
@@ -237,9 +237,11 @@ public class TabelaDesign : Control
             using var pen = new Pen(Color.White, 2.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
             g.DrawLines(pen, [new PointF(q.X + 4.5f, q.Y + 9.5f), new PointF(q.X + 7.8f, q.Y + 12.8f), new PointF(q.X + 13.5f, q.Y + 5.8f)]);
         }
-        else { g.FillPath(Brushes.White, p); using var pen = new Pen(Color.FromArgb(199, 199, 204), 1.5f); g.DrawPath(pen, p); }
+        else { g.FillPath(Brushes.White, p); using var pen = new Pen(Tokens.TextoDesabilitado, 1.5f); g.DrawPath(pen, p); }
     }
 
+    /// <summary>Mensagem quando a tabela está vazia (antes ficava só a faixa branca, parecendo que não carregou).</summary>
+    public string Vazio { get; set; } = "Nenhum registro.";
     public void Colunas(params Coluna[] cols) { _cols = cols; Invalidate(); }
     public void Linhas(IEnumerable<string[]> linhas) { _linhas = linhas.ToList(); _topo = 0; Height = 32 + Math.Max(1, Visiveis) * 33 + 2; Invalidate(); }
 
@@ -250,8 +252,8 @@ public class TabelaDesign : Control
         using (var path = Forma.Redondo(r, 10))
         {
             g.SetClip(path);
-            using (var cab = new SolidBrush(Color.FromArgb(251, 251, 253))) g.FillRectangle(cab, 0, 0, Width, 31);
-            using var linha = new Pen(Color.FromArgb(234, 234, 238));
+            using (var cab = new SolidBrush(Tokens.SuperficieSuave)) g.FillRectangle(cab, 0, 0, Width, 31);
+            using var linha = new Pen(Tokens.Linha);
             g.DrawLine(linha, 0, 31, Width, 31);
             var soma = _cols.Sum(c => c.Peso);
             var x = 12f; var util = Width - 24f;
@@ -269,17 +271,19 @@ public class TabelaDesign : Control
                     using var caixaPath = Forma.Redondo(new Rectangle((int)cx, cy, 17, 17), 5);
                     if (l == Selecionada)
                     {
-                        using var verde = new SolidBrush(Color.FromArgb(11, 122, 83)); g.FillPath(verde, caixaPath);
+                        using var verde = new SolidBrush(Tokens.Verde); g.FillPath(verde, caixaPath);
                         using var ck = new Pen(Color.White, 2.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
                         g.DrawLines(ck, [new PointF(cx + 4, cy + 9), new PointF(cx + 7.5f, cy + 12.5f), new PointF(cx + 13, cy + 5.5f)]);
                     }
-                    else { using var cinza = new Pen(Color.FromArgb(199, 199, 204), 1.5f); g.DrawPath(cinza, caixaPath); }
+                    else { using var cinza = new Pen(Tokens.TextoDesabilitado, 1.5f); g.DrawPath(cinza, caixaPath); }
                 }
                 for (var i = Selecionavel ? 1 : 0; i < _cols.Length && i < _linhas[l].Length; i++)
                     if (_cols[i].Marca) Marcar(g, new RectangleF(xs[i].ini, y, xs[i].larg - 8, 33), _linhas[l][i] == "1");
                     else TextRenderer.DrawText(g, _linhas[l][i], Font, Rectangle.Round(new RectangleF(xs[i].ini, y, xs[i].larg - 8, 33)), PecasDesign.CorTexto, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | (_cols[i].Direita ? TextFormatFlags.Right : _cols[i].Centro ? TextFormatFlags.HorizontalCenter : TextFormatFlags.Left));
                 if (l < _topo + Visiveis - 1) g.DrawLine(linha, 0, y + 33, Width, y + 33);
             }
+            if (_linhas.Count == 0 && !string.IsNullOrEmpty(Vazio))
+                TextRenderer.DrawText(g, Vazio, Font, new Rectangle(12, 32, Width - 24, 33), PecasDesign.Cinza, TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter | TextFormatFlags.EndEllipsis);
             if (Visiveis < _linhas.Count)
             {
                 // indicador de rolagem fino à direita
@@ -291,7 +295,7 @@ public class TabelaDesign : Control
             }
             g.ResetClip();
         }
-        using var borda = new Pen(Color.FromArgb(230, 230, 234));
+        using var borda = new Pen(Tokens.Linha);
         using var p2 = Forma.Redondo(r, 10);
         g.DrawPath(borda, p2);
     }
@@ -303,7 +307,7 @@ public sealed class Escurecer : Form
     public Escurecer(Form dono)
     {
         FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; StartPosition = FormStartPosition.Manual;
-        BackColor = Color.FromArgb(28, 28, 30); Opacity = 0.30; Bounds = dono.Bounds; Owner = dono;
+        BackColor = Tokens.Preto; Opacity = 0.30; Bounds = dono.Bounds; Owner = dono;
     }
     protected override bool ShowWithoutActivation => true;
     protected override CreateParams CreateParams { get { var cp = base.CreateParams; cp.ExStyle |= 0x08000000 | 0x80; return cp; } } // NOACTIVATE | TOOLWINDOW
@@ -341,7 +345,7 @@ public class SegmentoDesign : Control
         var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
         using (var fundo = new SolidBrush(Parent?.BackColor ?? Color.White)) g.FillRectangle(fundo, ClientRectangle);
         using (var p = Forma.Redondo(new Rectangle(0, 0, Width - 1, Height - 1), 9))
-        using (var b = new SolidBrush(Color.FromArgb(232, 232, 235))) g.FillPath(b, p);
+        using (var b = new SolidBrush(Tokens.Linha)) g.FillPath(b, p);
         var x = 2; var l = Larguras();
         for (var i = 0; i < _itens.Length; i++)
         {
@@ -352,7 +356,7 @@ public class SegmentoDesign : Control
                 using (var bs = new SolidBrush(Color.FromArgb(30, 0, 0, 0))) g.FillPath(bs, sombra);
                 using var p = Forma.Redondo(r, 7); g.FillPath(Brushes.White, p);
             }
-            TextRenderer.DrawText(g, _itens[i], i == _sel ? FonteSel : FonteNormal, r, i == _sel ? PecasDesign.CorTexto : Color.FromArgb(58, 58, 60), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+            TextRenderer.DrawText(g, _itens[i], i == _sel ? FonteSel : FonteNormal, r, i == _sel ? PecasDesign.CorTexto : Tokens.Grafite, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
             x += l[i];
         }
     }
