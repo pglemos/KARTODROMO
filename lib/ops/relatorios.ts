@@ -8,30 +8,43 @@ const dmy = (s: unknown) => (s ? String(s).slice(0, 10).split('-').reverse().joi
 const hm = (s: unknown) => (s ? String(s).slice(11, 16) : '');
 const agora = () => new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 
-async function page(titulo: string, subtitulo: string, corpo: string, opts: { cupom?: boolean; paisagem?: boolean } = {}) {
+/** Folha do relatorio no modelo do canvas (RelatorioFechamento.dc.html): na tela, folha branca sobre fundo cinza;
+ *  cabecalho com o logo num bloco escuro a esquerda e titulo/subtitulo a direita; empresa no rodape. */
+async function page(titulo: string, subtitulo: string, corpo: string, opts: { cupom?: boolean; paisagem?: boolean; janela?: string } = {}) {
   const emp = await one<{ nome: string; razao: string; cnpj: string; tel: string; end: string }>(
     `SELECT Nome nome, RazaoSocial razao, Cnpj cnpj, Telefone tel, CONCAT(Endereco, ', ', Numero, ' - ', Bairro, ' - ', Cidade, '/', Estado) [end] FROM dbo.Empresa WHERE Id = 1`,
   );
   const size = opts.cupom ? '80mm auto' : opts.paisagem ? 'A4 landscape' : 'A4';
-  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(titulo)}</title><style>
+  const largura = opts.cupom ? '74mm' : opts.paisagem ? '1040px' : '720px';
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(opts.janela ?? titulo)}</title><style>
     @page { size: ${size}; margin: ${opts.cupom ? '3mm' : '12mm'}; }
-    body { font: ${opts.cupom ? '11px' : '12px'}/1.35 Arial, sans-serif; color:#000; margin:0; ${opts.cupom ? 'width:74mm;' : ''} }
-    header { border-bottom:2px solid #000; margin-bottom:10px; padding-bottom:6px; ${opts.cupom ? 'text-align:center;' : 'display:flex; justify-content:space-between; align-items:flex-end;'} }
-    header h1 { font-size:${opts.cupom ? '13px' : '16px'}; margin:0; } header .emp { font-size:10px; color:#333; }
-    h2 { font-size:${opts.cupom ? '12px' : '14px'}; margin:8px 0 4px; }
-    table { width:100%; border-collapse:collapse; margin-bottom:10px; }
-    th, td { border-bottom:1px solid #bbb; padding:3px 5px; text-align:left; vertical-align:top; }
-    th { background:#eee; font-size:10px; text-transform:uppercase; }
-    .r { text-align:right; white-space:nowrap; } .tot td { font-weight:bold; border-top:2px solid #000; }
-    .kv td:first-child { color:#333; } .kv td:last-child { text-align:right; font-weight:bold; }
-    .muted { color:#555; font-size:10px; } .sig { margin-top:30px; border-top:1px solid #000; text-align:center; font-size:10px; padding-top:2px; }
-    .tools { position:fixed; top:6px; right:6px; } @media print { .tools { display:none; } }
+    html { background:#f2f2f5; }
+    body { font: ${opts.cupom ? '11px' : '12.5px'}/1.4 "Segoe UI", Arial, sans-serif; color:#1d1d1f; margin:0; padding:24px 16px; }
+    .folha { background:#fff; max-width:${largura}; margin:0 auto; padding:${opts.cupom ? '12px' : '40px'}; box-shadow:0 1px 3px rgba(0,0,0,.08), 0 8px 24px rgba(0,0,0,.06); }
+    header { border-bottom:2px solid #1d1d1f; margin-bottom:6px; padding-bottom:12px; ${opts.cupom ? 'text-align:center;' : 'display:flex; justify-content:space-between; align-items:center; gap:16px;'} }
+    header .logo { background:#1d1d1f; border-radius:6px; padding:7px 14px; display:inline-flex; align-items:center; }
+    header .logo img { height:${opts.cupom ? '22px' : '28px'}; display:block; }
+    header .tit { ${opts.cupom ? 'margin-top:6px;' : 'text-align:right;'} }
+    header h1 { font-size:${opts.cupom ? '13px' : '15px'}; margin:0 0 2px; font-weight:700; } header .sub { font-size:12px; color:#3a3a3c; }
+    h2 { font-size:${opts.cupom ? '12px' : '13px'}; margin:18px 0 4px; font-weight:700; }
+    table { width:100%; border-collapse:collapse; margin-bottom:8px; }
+    th, td { border-bottom:1px solid #e5e5ea; padding:${opts.cupom ? '3px 4px' : '9px 0 9px 6px'}; text-align:left; vertical-align:top; }
+    th { font-size:10.5px; color:#6e6e73; font-weight:600; padding-top:6px; padding-bottom:6px; }
+    th:first-child, td:first-child { padding-left:0; }
+    .r { text-align:right; white-space:nowrap; } .tot td { font-weight:bold; border-top:2px solid #1d1d1f; }
+    .kv td:last-child { text-align:right; font-weight:700; white-space:nowrap; } .kv tr.forte td { font-size:14px; }
+    .muted { color:#6e6e73; font-size:10.5px; } .sig { margin-top:40px; border-top:1px solid #1d1d1f; text-align:center; font-size:10.5px; padding-top:3px; }
+    footer { margin-top:18px; color:#6e6e73; font-size:10px; }
+    .tools { position:fixed; top:10px; right:12px; } .tools button { font:600 13px "Segoe UI", Arial; background:#0b7a53; color:#fff; border:0; border-radius:8px; padding:8px 16px; cursor:pointer; }
+    @media print { html { background:#fff; } body { padding:0; } .folha { max-width:none; padding:0; box-shadow:none; } .tools { display:none; } }
   </style></head><body>
-  <div class="tools"><button onclick="print()">Imprimir</button></div>
-  <header><div><h1>${esc(titulo)}</h1><div>${subtitulo}</div></div>
-  <div class="emp"><b>${esc(emp?.nome)}</b><br>${esc(emp?.razao)} · CNPJ ${esc(emp?.cnpj)}<br>${esc(emp?.end)} · ${esc(emp?.tel)}</div></header>
+  <div class="tools" id="tools"><button onclick="print()">Imprimir</button></div>
+  <script>if (window.chrome && window.chrome.webview) document.getElementById('tools').remove();</script>
+  <div class="folha">
+  <header><div class="logo"><img src="/ui/kib-logo.png" alt="${esc(emp?.nome ?? 'Kartódromo')}"></div>
+  <div class="tit"><h1>${esc(titulo)}</h1><div class="sub">${subtitulo}</div></div></header>
   ${corpo}
-  <p class="muted">Emitido em ${agora()}</p></body></html>`;
+  <footer>${esc(emp?.razao || emp?.nome)}${emp?.cnpj ? ` · CNPJ ${esc(emp.cnpj)}` : ''}${emp?.tel ? ` · ${esc(emp.tel)}` : ''} · Emitido em ${agora()}</footer></div></body></html>`;
 }
 
 export async function relatorio(tipo: string, url: URL): Promise<string> {
@@ -54,20 +67,24 @@ export async function relatorio(tipo: string, url: URL): Promise<string> {
         { movId },
       );
       const trans = await query(`SELECT CONVERT(varchar(16), CriadoEm, 126) dh, Tipo tipo, ValorCentavos valor, Observacao obs FROM dbo.MovimentoTransacao WHERE MovimentoId = @movId ORDER BY Id`, { movId });
-      const kv = (k: string, v: number, strong = false) => `<tr><td>${k}</td><td${strong ? ' style="font-size:14px"' : ''}>${brl(v)}</td></tr>`;
+      // linhas no modelo do canvas; saidas com "– R$"; "Vendas (baterias)" = vendas brutas menos os produtos
+      const kv = (k: string, v: number, o: { menos?: boolean; forte?: boolean } = {}) =>
+        `<tr${o.forte ? ' class="forte"' : ''}><td>${k}</td><td>${o.menos && v ? '– ' : ''}${brl(v)}</td></tr>`;
+      const fim = mov.fechado ? hm(mov.fechado) : 'aberto';
       return page(
-        'Fechamento de Caixa',
-        `Terminal <b>${esc(mov.terminal)}</b> · ${esc(mov.turno)} · ${esc(mov.usuario)}<br>Abertura ${dmy(mov.aberto)} ${hm(mov.aberto)}${mov.fechado ? ` · Fechamento ${dmy(mov.fechado)} ${hm(mov.fechado)}` : ' · <b>terminal aberto</b>'}`,
-        `<h2>Sumário</h2><table class="kv">${kv('Total de Início do Turno', s.inicial)}${kv('Total de Suprimento', s.suprimento)}${kv('Total de Sangria', s.sangria)}
-          ${kv('Total de Vendas de Produtos', s.vendasProdutos)}${kv('Total de Vendas', s.vendas)}${kv('Total de Desconto Fornecido', s.desconto)}${kv('Total de Acréscimos', s.acrescimos)}
-          ${kv('Total Recebido', s.recebido)}${kv('Total de Troco Fornecido', s.troco)}${kv('Total Cancelado', s.cancelado)}${kv('Total Final', s.final, true)}
-          ${kv('Dinheiro em caixa (gaveta)', s.dinheiroEmCaixa)}${mov.prox !== null && mov.prox !== undefined ? kv('Valor para o próximo turno', Number(mov.prox)) : ''}</table>
-         <h2>Por forma de pagamento</h2><table>${(s.porForma as { forma: string; valor: number }[]).map((f) => `<tr><td>${esc(f.forma)}</td><td class="r">${brl(f.valor)}</td></tr>`).join('') || '<tr><td>Nenhum recebimento.</td></tr>'}</table>
+        'Fechamento de caixa',
+        `Terminal ${esc(mov.terminal)}${mov.turno ? ` · ${esc(mov.turno)}` : ''} · ${esc(mov.usuario)}<br>${dmy(mov.aberto)} ${hm(mov.aberto)} → ${mov.fechado && dmy(mov.fechado) !== dmy(mov.aberto) ? dmy(mov.fechado) + ' ' : ''}${fim}`,
+        `<table class="kv">${kv('Início do turno', s.inicial)}${kv('Suprimento', s.suprimento)}${kv('Sangria', s.sangria, { menos: true })}
+          ${kv('Vendas de produtos', s.vendasProdutos)}${kv('Vendas (baterias)', s.vendas - s.vendasProdutos)}${kv('Desconto fornecido', s.desconto, { menos: true })}${s.acrescimos ? kv('Acréscimos', s.acrescimos) : ''}
+          ${kv('Total recebido', s.recebido)}${kv('Troco fornecido', s.troco, { menos: true })}${kv('Cancelado', s.cancelado, { menos: true })}${kv('Total final (todas as formas)', s.final, { forte: true })}
+          ${kv('Dinheiro na gaveta', s.dinheiroEmCaixa, { forte: true })}${mov.prox !== null && mov.prox !== undefined ? kv('Valor para o próximo turno', Number(mov.prox)) : ''}</table>
+         <h2>Por forma de pagamento</h2><table class="kv">${(s.porForma as { forma: string; valor: number }[]).map((f) => `<tr><td>${esc(f.forma)}</td><td>${brl(f.valor)}</td></tr>`).join('') || '<tr><td>Nenhum recebimento.</td><td></td></tr>'}</table>
          <h2>Suprimentos e sangrias</h2><table><tr><th>Hora</th><th>Tipo</th><th>Observação</th><th class="r">Valor</th></tr>
          ${trans.map((t) => `<tr><td>${hm(t.dh)}</td><td>${esc(t.tipo)}</td><td>${esc(t.obs)}</td><td class="r">${brl(t.valor as number)}</td></tr>`).join('') || '<tr><td colspan="4">—</td></tr>'}</table>
          <h2>Vendas (${vendas.length})</h2><table><tr><th>Hora</th><th>Nº</th><th>Cliente</th><th>Pagamento</th><th class="r">Total</th><th class="r">Troco</th><th class="r">Estorno</th></tr>
          ${vendas.map((v) => `<tr><td>${hm(v.dh)}</td><td>${v.id}</td><td>${esc(v.cliente)}</td><td>${esc(v.formas)}</td><td class="r">${brl(v.final as number)}</td><td class="r">${brl(v.troco as number)}</td><td class="r">${v.estorno ? brl(v.estorno as number) : ''}</td></tr>`).join('')}</table>
          <div class="sig">Assinatura do operador</div>`,
+        { janela: `Fechamento de caixa · ${dmy(mov.aberto)}` },
       );
     }
     case 'participantes': {

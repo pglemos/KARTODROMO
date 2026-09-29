@@ -2,6 +2,14 @@ using System.Drawing.Drawing2D;
 
 namespace Kartodromo.Comum;
 
+/// <summary>Botão chato (flat) sem a moldura preta que o Windows desenha no botão com foco ou "padrão"
+/// (aparecia no primeiro botão de cada janela e depois de qualquer clique; o canvas não tem).</summary>
+public class BotaoPlano : Button
+{
+    protected override bool ShowFocusCues => false;
+    public override void NotifyDefault(bool value) => base.NotifyDefault(false);
+}
+
 /// <summary>Janela em forma de cartão: sem moldura do Windows, cantos arredondados, sombra, arrasta pelo fundo, Esc fecha.</summary>
 public class CartaoModal : Form, ISemKit
 {
@@ -43,7 +51,7 @@ public class CartaoModal : Form, ISemKit
     // ---------- peças do design
     public static Button Botao(string texto, Color fundo, Color frente, bool negrito = false)
     {
-        var b = new Button { Text = texto, FlatStyle = FlatStyle.Flat, BackColor = fundo, ForeColor = frente, Font = new Font("Segoe UI", 10F, negrito ? FontStyle.Bold : FontStyle.Regular), Cursor = Cursors.Hand, Height = 42 };
+        var b = new BotaoPlano { Text = texto, FlatStyle = FlatStyle.Flat, BackColor = fundo, ForeColor = frente, Font = new Font("Segoe UI", 10F, negrito ? FontStyle.Bold : FontStyle.Regular), Cursor = Cursors.Hand, Height = 42 };
         b.FlatAppearance.BorderSize = 0;
         b.FlatAppearance.MouseOverBackColor = ControlPaint.Light(fundo, 0.12f);
         b.Resize += (_, _) => Forma.AplicarRaio(b, 12);

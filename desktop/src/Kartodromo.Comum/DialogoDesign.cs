@@ -245,7 +245,7 @@ public class DialogoDesign : CartaoModal
     /// <summary>Botão pequeno dentro de uma caixa (ex.: "Pesquisar").</summary>
     public static Button AcaoCampo(string texto)
     {
-        var b = new Button { Text = texto, AutoSize = true, Height = 26, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(226, 241, 235), ForeColor = Color.FromArgb(10, 94, 64), Font = new Font("Segoe UI", 8.8F, FontStyle.Bold), Cursor = Cursors.Hand, Padding = new Padding(4, 0, 4, 0) };
+        var b = new BotaoPlano { Text = texto, AutoSize = true, Height = 26, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(226, 241, 235), ForeColor = Color.FromArgb(10, 94, 64), Font = new Font("Segoe UI", 8.8F, FontStyle.Bold), Cursor = Cursors.Hand, Padding = new Padding(4, 0, 4, 0) };
         b.FlatAppearance.BorderSize = 0;
         return b;
     }

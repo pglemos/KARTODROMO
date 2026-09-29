@@ -121,7 +121,7 @@ public sealed class FormRelatoriosCrono : Form
             Location = new Point(63, 36)
         };
 
-        var btnFechar = new Button
+        var btnFechar = new BotaoPlano
         {
             Text = "✕",
             Size = new Size(32, 32),
@@ -163,7 +163,7 @@ public sealed class FormRelatoriosCrono : Form
             Padding = new Padding(0)
         };
 
-        var btnCancelar = new Button
+        var btnCancelar = new BotaoPlano
         {
             Text = "Cancelar",
             Size = new Size(96, 34),
@@ -177,7 +177,7 @@ public sealed class FormRelatoriosCrono : Form
         btnCancelar.FlatAppearance.BorderSize = 0;
         btnCancelar.Click += (_, _) => Close();
 
-        var btnGerar = new Button
+        var btnGerar = new BotaoPlano
         {
             Text = "Gerar relatório",
             Size = new Size(130, 34),

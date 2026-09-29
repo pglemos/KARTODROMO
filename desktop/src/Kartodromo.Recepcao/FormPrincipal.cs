@@ -305,7 +305,7 @@ public class FormPrincipal : Form
         var x = 2;
         foreach (var (chave, texto, largura) in defs)
         {
-            var b = new Button { Name = "periodo-" + chave, Text = texto, Size = new Size(largura, 28), Location = new Point(x, 2), FlatStyle = FlatStyle.Flat, BackColor = chave == _periodo ? Color.White : segmento.BackColor,
+            var b = new BotaoPlano { Name = "periodo-" + chave, Text = texto, Size = new Size(largura, 28), Location = new Point(x, 2), FlatStyle = FlatStyle.Flat, BackColor = chave == _periodo ? Color.White : segmento.BackColor,
                 ForeColor = chave == _periodo ? KitVisual.Texto : Color.FromArgb(58, 58, 60), Font = new Font("Segoe UI", 8.2F, chave == _periodo ? FontStyle.Bold : FontStyle.Regular), Cursor = Cursors.Hand };
             b.FlatAppearance.BorderSize = 0;
             KitVisual.AplicarRaio(b, 6);
@@ -317,7 +317,7 @@ public class FormPrincipal : Form
         // data: "‹ 25/09/2026 ›" como no design; clicar no texto abre o calendário
         Button Seta(string t, int dias)
         {
-            var b = new Button { Text = t, Size = new Size(26, 30), FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 11F), Cursor = Cursors.Hand, TabStop = false, AccessibleDescription = "kit:ignorar" };
+            var b = new BotaoPlano { Text = t, Size = new Size(26, 30), FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 11F), Cursor = Cursors.Hand, TabStop = false, AccessibleDescription = "kit:ignorar" };
             b.FlatAppearance.BorderSize = 0; b.FlatAppearance.MouseOverBackColor = Color.FromArgb(242, 242, 245);
             b.Click += (_, _) => _data.Value = _data.Value.AddDays(dias);
             return b;

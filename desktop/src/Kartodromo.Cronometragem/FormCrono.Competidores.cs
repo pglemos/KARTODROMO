@@ -129,7 +129,7 @@ public partial class FormCrono
         var banner = new Panel { Dock = DockStyle.Top, Height = 58, BackColor = Color.White, Padding = new Padding(12, 10, 12, 6) };
         var caixa = new TemaCrono.PainelArredondado { Dock = DockStyle.Fill, BackColor = Color.FromArgb(235, 244, 255), Raio = 10 };
         var textoBanner = new Label { AutoSize = false, Font = new Font("Segoe UI", 9.4F), ForeColor = Color.FromArgb(10, 79, 160), BackColor = Color.FromArgb(235, 244, 255), TextAlign = ContentAlignment.MiddleLeft };
-        var puxar = new Button { Text = "Puxar da recepção agora", FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(10, 132, 255), ForeColor = Color.White, Font = new Font("Segoe UI Semibold", 9F), Cursor = Cursors.Hand, Height = 28 };
+        var puxar = new BotaoPlano { Text = "Puxar da recepção agora", FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(10, 132, 255), ForeColor = Color.White, Font = new Font("Segoe UI Semibold", 9F), Cursor = Cursors.Hand, Height = 28 };
         puxar.Width = TextRenderer.MeasureText(puxar.Text, puxar.Font).Width + 22; puxar.FlatAppearance.BorderSize = 0;
         puxar.Resize += (_, _) => Forma.AplicarRaio(puxar, 7); Forma.AplicarRaio(puxar, 7);
         puxar.Click += (_, _) => Seguro.Rodar(this, PuxarAgenda);

@@ -80,7 +80,7 @@ public class FormLogin : Form
         campoSenha.Dock = DockStyle.Fill;
         credenciais.Controls.Add(campoSenha);
         credenciais.Controls.Add(campoLogin);
-        var olho = new Button { Text = "", Font = new Font("Segoe MDL2 Assets", 10F), FlatStyle = FlatStyle.Flat, Size = new Size(32, 32), BackColor = Color.FromArgb(238, 238, 241), ForeColor = Color.FromArgb(58, 58, 60), Cursor = Cursors.Hand, Anchor = AnchorStyles.Top | AnchorStyles.Right };
+        var olho = new BotaoPlano { Text = "", Font = new Font("Segoe MDL2 Assets", 10F), FlatStyle = FlatStyle.Flat, Size = new Size(32, 32), BackColor = Color.FromArgb(238, 238, 241), ForeColor = Color.FromArgb(58, 58, 60), Cursor = Cursors.Hand, Anchor = AnchorStyles.Top | AnchorStyles.Right };
         olho.FlatAppearance.BorderSize = 0;
         olho.Click += (_, _) => _senha.UseSystemPasswordChar = !_senha.UseSystemPasswordChar;
         campoSenha.Controls.Add(olho);

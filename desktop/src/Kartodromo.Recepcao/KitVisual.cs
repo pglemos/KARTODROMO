@@ -243,7 +243,7 @@ public static class KitVisual
         var t = new Label { Text = meta.Titulo, AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = Texto, Location = new Point(58, 9), Cursor = Cursors.SizeAll };
         var sub = new Label { Text = meta.Sub, AutoSize = true, Font = new Font("Segoe UI", 8.4F), ForeColor = Secundario, Location = new Point(59, 31), Cursor = Cursors.SizeAll };
 
-        var x = new Button
+        var x = new BotaoPlano
         {
             Text = "✕",
             Size = new Size(32, 32),
@@ -416,7 +416,7 @@ public static class KitVisual
 
     public static Button Botao(string texto, bool principal = false, int largura = 0)
     {
-        var b = new Button
+        var b = new BotaoPlano
         {
             Text = texto,
             AutoSize = largura <= 0,
@@ -490,7 +490,7 @@ public static class KitVisual
         for (var i = 0; i < abas.Length; i++)
         {
             var idx = i;
-            var b = new Button
+            var b = new BotaoPlano
             {
                 Text = abas[i],
                 Height = 28,

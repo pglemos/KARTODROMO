@@ -429,7 +429,7 @@ public partial class FormCrono : Form
 
     Button BotaoGrande(string texto, string glifo, Color cor, Func<Task> clique)
     {
-        var b = new Button { Text = texto, Image = Icone.Tile(glifo, cor, 18), TextImageRelation = TextImageRelation.ImageAboveText, Size = new Size(92, 48), FlatStyle = FlatStyle.System, Font = new Font("Segoe UI", 8F), Margin = new Padding(0, 0, 8, 0) };
+        var b = new BotaoPlano { Text = texto, Image = Icone.Tile(glifo, cor, 18), TextImageRelation = TextImageRelation.ImageAboveText, Size = new Size(92, 48), FlatStyle = FlatStyle.System, Font = new Font("Segoe UI", 8F), Margin = new Padding(0, 0, 8, 0) };
         b.FlatStyle = FlatStyle.Standard;
         b.Click += (_, _) => Seguro.Rodar(this, clique);
         return b;

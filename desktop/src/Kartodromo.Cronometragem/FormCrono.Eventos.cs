@@ -135,7 +135,7 @@ public partial class FormCrono
     static Button BotaoPeq(string texto, int tipo, Action clique)
     {
         var (fundo, frente) = tipo switch { 1 => (Color.FromArgb(11, 122, 83), Color.White), 2 => (Color.FromArgb(232, 232, 235), TemaCrono.Vermelho), 3 => (Color.FromArgb(29, 29, 31), Color.White), _ => (Color.FromArgb(232, 232, 235), TemaCrono.Texto) };
-        var b = new Button { Text = texto, FlatStyle = FlatStyle.Flat, BackColor = fundo, ForeColor = frente, Font = new Font("Segoe UI", 9.4F, tipo is 1 or 3 ? FontStyle.Bold : FontStyle.Regular), Cursor = Cursors.Hand, Height = 30, Margin = new Padding(0, 0, 6, 0) };
+        var b = new BotaoPlano { Text = texto, FlatStyle = FlatStyle.Flat, BackColor = fundo, ForeColor = frente, Font = new Font("Segoe UI", 9.4F, tipo is 1 or 3 ? FontStyle.Bold : FontStyle.Regular), Cursor = Cursors.Hand, Height = 30, Margin = new Padding(0, 0, 6, 0) };
         b.Width = TextRenderer.MeasureText(texto, b.Font).Width + 22;
         b.FlatAppearance.BorderSize = 0; b.FlatAppearance.MouseOverBackColor = ControlPaint.Light(fundo, .1f);
         b.Resize += (_, _) => Forma.AplicarRaio(b, 8); Forma.AplicarRaio(b, 8);

@@ -36,7 +36,7 @@ static class TemaCrono
     public static Button Botao(string texto, bool primario = false, Color? cor = null)
     {
         var color = cor ?? (primario ? Verde : Color.FromArgb(242, 242, 247));
-        var b = new Button
+        var b = new Kartodromo.Comum.BotaoPlano
         {
             Text = texto,
             AutoSize = true,

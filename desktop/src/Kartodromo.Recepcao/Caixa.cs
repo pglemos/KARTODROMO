@@ -71,7 +71,7 @@ public class FormCheckout : Janela, ISemKit
 
     static Button BotaoIcone(string texto, Color fundo, Color frente, int tam, float fonte, string fonteNome = "Segoe UI")
     {
-        var b = new Button { Text = texto, Size = new Size(tam, tam), FlatStyle = FlatStyle.Flat, BackColor = fundo, ForeColor = frente, Font = new Font(fonteNome, fonte, FontStyle.Bold), Cursor = Cursors.Hand, Margin = new Padding(0, 0, 0, 10), TabStop = false };
+        var b = new BotaoPlano { Text = texto, Size = new Size(tam, tam), FlatStyle = FlatStyle.Flat, BackColor = fundo, ForeColor = frente, Font = new Font(fonteNome, fonte, FontStyle.Bold), Cursor = Cursors.Hand, Margin = new Padding(0, 0, 0, 10), TabStop = false };
         b.FlatAppearance.BorderSize = 0; b.FlatAppearance.MouseOverBackColor = ControlPaint.Light(fundo, 0.1f);
         b.Resize += (_, _) => KitVisual.AplicarRaio(b, 14);
         return b;
@@ -112,7 +112,7 @@ public class FormCheckout : Janela, ISemKit
             _tot[k] = v;
             totais.Controls.Add(box);
         }
-        var aprovar = new Button { Text = "Aprovar", Width = 218, Height = 64, Font = new Font("Segoe UI", 15F, FontStyle.Bold), BackColor = Color.White, FlatStyle = FlatStyle.Flat };
+        var aprovar = new BotaoPlano { Text = "Aprovar", Width = 218, Height = 64, Font = new Font("Segoe UI", 15F, FontStyle.Bold), BackColor = Color.White, FlatStyle = FlatStyle.Flat };
         aprovar.FlatAppearance.BorderColor = Tema.Azul;
         aprovar.Click += (_, _) => Aprovar();
         totais.Controls.Add(aprovar);
@@ -126,7 +126,7 @@ public class FormCheckout : Janela, ISemKit
         esq.RowStyles.Add(new RowStyle(SizeType.Percent, 40)); esq.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
         var linha1 = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
         _bat.Width = 260;
-        var bPesq = new Button { Text = "🔍 Pesquisar Cliente", AutoSize = true };
+        var bPesq = new BotaoPlano { Text = "🔍 Pesquisar Cliente", AutoSize = true };
         bPesq.Click += (_, _) => { var cl = FormPesquisarCliente.Escolher(this); if (cl != null) { _cliente = cl; Atualizar(); } };
         linha1.Controls.AddRange([Lbl("Bateria"), _bat, Lbl("   Cliente:"), _cli, Lbl("   Documento:"), _doc, bPesq]);
         esq.Controls.Add(linha1, 0, 0); esq.SetColumnSpan(linha1, 3);
@@ -137,7 +137,7 @@ public class FormCheckout : Janela, ISemKit
         _gDisp.Duplo += r => Adicionar([r]);
         esq.Controls.Add(Caixinha("Reservas disponíveis", _gDisp, ContentAlignment.MiddleRight), 0, 2);
         var setas = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, Padding = new Padding(2, 80, 0, 0) };
-        var bAdd = new Button { Text = "→", Width = 36, Height = 30 }; var bRem = new Button { Text = "←", Width = 36, Height = 30 }; var bDel = new Button { Text = "🗑", Width = 36, Height = 30 };
+        var bAdd = new BotaoPlano { Text = "→", Width = 36, Height = 30 }; var bRem = new BotaoPlano { Text = "←", Width = 36, Height = 30 }; var bDel = new BotaoPlano { Text = "🗑", Width = 36, Height = 30 };
         bAdd.Click += (_, _) => Adicionar(_gDisp.Marcados.Count > 0 ? _gDisp.Marcados : _gDisp.Selecionados);
         bRem.Click += (_, _) => Remover(); bDel.Click += (_, _) => Remover();
         setas.Controls.AddRange([bAdd, bRem, bDel]);
@@ -151,7 +151,7 @@ public class FormCheckout : Janela, ISemKit
         _forma.Items.AddRange(Sessao.Formas()); if (_forma.Items.Count > 0) _forma.SelectedIndex = 0;
         var gck = Campos.Grade(2, 65, 35);
         Campos.Add(gck, "Forma de pagamento", _forma); Campos.Add(gck, "Valor", _valor);
-        var bPA = new Button { Text = "Adicionar", AutoSize = true }; var bPR = new Button { Text = "Remover", AutoSize = true };
+        var bPA = new BotaoPlano { Text = "Adicionar", AutoSize = true }; var bPR = new BotaoPlano { Text = "Remover", AutoSize = true };
         bPA.Click += (_, _) => AdicionarPagamento(); bPR.Click += (_, _) => { foreach (var r in _gPag.Selecionados) _pags.RemoveAt(r.I("i")); Atualizar(); };
         var fb = new FlowLayoutPanel { Dock = DockStyle.Top, FlowDirection = FlowDirection.RightToLeft, Height = 32 }; fb.Controls.AddRange([bPA, bPR]);
         ck.Controls.Add(fb); ck.Controls.Add(gck); ck.Controls.Add(new Label { Text = "Checkout", Font = Tema.Negrito, Dock = DockStyle.Top, Height = 40, TextAlign = ContentAlignment.TopLeft });
@@ -160,8 +160,8 @@ public class FormCheckout : Janela, ISemKit
         esq.Controls.Add(new Panel { Dock = DockStyle.Fill, BorderStyle = BorderStyle.FixedSingle, Controls = { _gPag } }, 2, 3);
 
         var rod = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
-        var bProd = new Button { Text = "Adicionar Produtos", AutoSize = true }; var bDesc = new Button { Text = "Aplicar Desconto", AutoSize = true };
-        var bAcr = new Button { Text = "Aplicar Acréscimo", AutoSize = true }; var bVou = new Button { Text = "Aplicar Voucher", AutoSize = true };
+        var bProd = new BotaoPlano { Text = "Adicionar Produtos", AutoSize = true }; var bDesc = new BotaoPlano { Text = "Aplicar Desconto", AutoSize = true };
+        var bAcr = new BotaoPlano { Text = "Aplicar Acréscimo", AutoSize = true }; var bVou = new BotaoPlano { Text = "Aplicar Voucher", AutoSize = true };
         bProd.Click += (_, _) => AdicionarProduto(); bDesc.Click += (_, _) => Ajuste(true); bAcr.Click += (_, _) => Ajuste(false); bVou.Click += (_, _) => AplicarVoucher();
         rod.Controls.AddRange([bProd, new Label { Width = 200 }, bDesc, bAcr, _codVoucher, bVou]);
         esq.Controls.Add(rod, 0, 4); esq.SetColumnSpan(rod, 3);
@@ -215,7 +215,7 @@ public class FormCheckout : Janela, ISemKit
         botaoX.Click += (_, _) => Close();
         fechar.Controls.Add(botaoX); fechar.Resize += (_, _) => botaoX.Location = new Point(fechar.Width - botaoX.Width, 2);
         var rodapeResumo = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
-        var aprovar = new Button { Text = "Aprovar pagamento", Dock = DockStyle.Top, Height = 56, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(52, 199, 89), ForeColor = Color.White, Font = new Font("Segoe UI", 13.5F, FontStyle.Bold), Cursor = Cursors.Hand };
+        var aprovar = new BotaoPlano { Text = "Aprovar pagamento", Dock = DockStyle.Top, Height = 56, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(52, 199, 89), ForeColor = Color.White, Font = new Font("Segoe UI", 13.5F, FontStyle.Bold), Cursor = Cursors.Hand };
         aprovar.FlatAppearance.BorderSize = 0; aprovar.FlatAppearance.MouseOverBackColor = Color.FromArgb(76, 217, 100); aprovar.Click += (_, _) => Aprovar();
         aprovar.Paint += (_, e) =>
         {
@@ -260,7 +260,7 @@ public class FormCheckout : Janela, ISemKit
         var blocoCli = InfoCheckout("Cliente", _cli, 190);
         var blocoDoc = InfoCheckout("Documento", _doc, 150);
         linhaCab.Controls.Add(blocoBat); linhaCab.Controls.Add(blocoCli); linhaCab.Controls.Add(blocoDoc);
-        var pesquisar = new Button { Text = "  Pesquisar cliente", Image = LupaBmp(), ImageAlign = ContentAlignment.MiddleLeft, TextImageRelation = TextImageRelation.ImageBeforeText, AutoSize = true, Height = 36, MinimumSize = new Size(0, 36), Padding = new Padding(8, 0, 10, 0), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(238, 238, 241), ForeColor = texto, Font = new Font("Segoe UI", 9.5F), Cursor = Cursors.Hand, Anchor = AnchorStyles.Top | AnchorStyles.Right };
+        var pesquisar = new BotaoPlano { Text = "  Pesquisar cliente", Image = LupaBmp(), ImageAlign = ContentAlignment.MiddleLeft, TextImageRelation = TextImageRelation.ImageBeforeText, AutoSize = true, Height = 36, MinimumSize = new Size(0, 36), Padding = new Padding(8, 0, 10, 0), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(238, 238, 241), ForeColor = texto, Font = new Font("Segoe UI", 9.5F), Cursor = Cursors.Hand, Anchor = AnchorStyles.Top | AnchorStyles.Right };
         pesquisar.FlatAppearance.BorderSize = 0; pesquisar.Click += (_, _) => { var cl = FormPesquisarCliente.Escolher(this); if (cl != null) { _cliente = cl; Atualizar(); } };
         pesquisar.Resize += (_, _) => KitVisual.AplicarRaio(pesquisar, 10);
         cab.Controls.Add(linhaCab); cab.Controls.Add(pesquisar); pesquisar.BringToFront();
@@ -333,7 +333,7 @@ public class FormCheckout : Janela, ISemKit
         var barraCarrinho = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 92, WrapContents = true, Padding = new Padding(12, 8, 12, 4), FlowDirection = FlowDirection.LeftToRight, BackColor = Color.FromArgb(251, 251, 253) };
         Button Acao(string caption, Action action, int width)
         {
-            var b = new Button { Text = caption, AutoSize = true, MinimumSize = new Size(width, 34), Height = 34, Padding = new Padding(8, 0, 8, 0), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(238, 238, 241), ForeColor = texto, Font = new Font("Segoe UI", 9.3F), Margin = new Padding(0, 0, 8, 6), Cursor = Cursors.Hand, AccessibleName = caption };
+            var b = new BotaoPlano { Text = caption, AutoSize = true, MinimumSize = new Size(width, 34), Height = 34, Padding = new Padding(8, 0, 8, 0), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(238, 238, 241), ForeColor = texto, Font = new Font("Segoe UI", 9.3F), Margin = new Padding(0, 0, 8, 6), Cursor = Cursors.Hand, AccessibleName = caption };
             b.FlatAppearance.BorderSize = 0; b.Click += (_, _) => action(); b.Resize += (_, _) => KitVisual.AplicarRaio(b, 9); return b;
         }
         barraCarrinho.Controls.Add(Acao("+ Adicionar produtos", AdicionarProduto, 120));
@@ -342,7 +342,7 @@ public class FormCheckout : Janela, ISemKit
         barraCarrinho.SetFlowBreak(barraCarrinho.Controls[^1], true);
         _codVoucher.PlaceholderText = "Código do voucher"; _codVoucher.AccessibleName = "Código do voucher";
         _codVoucher.Font = new Font("Cascadia Mono", 9.5F);
-        var aplicarVoucher = new Button { Text = "Aplicar", AutoSize = true, Dock = DockStyle.Right, FlatStyle = FlatStyle.Flat, BackColor = KitVisual.VerdeClaro, ForeColor = KitVisual.Verde, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Cursor = Cursors.Hand, TabStop = false };
+        var aplicarVoucher = new BotaoPlano { Text = "Aplicar", AutoSize = true, Dock = DockStyle.Right, FlatStyle = FlatStyle.Flat, BackColor = KitVisual.VerdeClaro, ForeColor = KitVisual.Verde, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Cursor = Cursors.Hand, TabStop = false };
         aplicarVoucher.FlatAppearance.BorderSize = 0; aplicarVoucher.Click += (_, _) => AplicarVoucher();
         var caixaVoucher = FormCliente.Caixa(_codVoucher, aplicarVoucher); caixaVoucher.Dock = DockStyle.None; caixaVoucher.Size = new Size(200, 34); caixaVoucher.Margin = new Padding(0, 0, 0, 0);
         barraCarrinho.Controls.Add(caixaVoucher);
@@ -363,7 +363,7 @@ public class FormCheckout : Janela, ISemKit
             var type = method.Dados?.S("tipo") ?? "outro";
             var chave = type is "dinheiro" or "credito" or "debito" or "pix" or "voucher" ? "pg-" + type : "pg-outro";
             var nomeForma = System.Globalization.CultureInfo.GetCultureInfo("pt-BR").TextInfo.ToTitleCase(method.Texto.ToLowerInvariant());
-            var button = new Button { Text = nomeForma, Image = new Bitmap(VisualPrincipal.Icone(chave), 20, 20), TextImageRelation = TextImageRelation.ImageAboveText, ImageAlign = ContentAlignment.BottomCenter, TextAlign = ContentAlignment.TopCenter, AutoSize = false, Size = new Size(98, 58), Margin = new Padding(0, 0, 8, 8), Padding = new Padding(0, 6, 0, 4), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Cursor = Cursors.Hand, Tag = (method, chave), AccessibleName = method.Texto, AccessibleDescription = "kit:ignorar" };
+            var button = new BotaoPlano { Text = nomeForma, Image = new Bitmap(VisualPrincipal.Icone(chave), 20, 20), TextImageRelation = TextImageRelation.ImageAboveText, ImageAlign = ContentAlignment.BottomCenter, TextAlign = ContentAlignment.TopCenter, AutoSize = false, Size = new Size(98, 58), Margin = new Padding(0, 0, 8, 8), Padding = new Padding(0, 6, 0, 4), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Cursor = Cursors.Hand, Tag = (method, chave), AccessibleName = method.Texto, AccessibleDescription = "kit:ignorar" };
             button.Resize += (_, _) => KitVisual.AplicarRaio(button, 10);
             button.FlatAppearance.BorderSize = 0;
             button.Click += (_, _) => { _forma.SelectedItem = method; MarcarForma(formas); };
@@ -414,7 +414,7 @@ public class FormCheckout : Janela, ISemKit
 
         Button AcaoPagamento(string caption, Action action, bool principal)
         {
-            var b = new Button { Text = caption, AutoSize = true, Height = 42, MinimumSize = new Size(88, 42), FlatStyle = FlatStyle.Flat, BackColor = principal ? Color.FromArgb(11, 122, 83) : Color.FromArgb(238, 238, 241), ForeColor = principal ? Color.White : texto, Font = new Font("Segoe UI", 9.5F, principal ? FontStyle.Bold : FontStyle.Regular), Margin = new Padding(0, 0, 8, 0), Cursor = Cursors.Hand };
+            var b = new BotaoPlano { Text = caption, AutoSize = true, Height = 42, MinimumSize = new Size(88, 42), FlatStyle = FlatStyle.Flat, BackColor = principal ? Color.FromArgb(11, 122, 83) : Color.FromArgb(238, 238, 241), ForeColor = principal ? Color.White : texto, Font = new Font("Segoe UI", 9.5F, principal ? FontStyle.Bold : FontStyle.Regular), Margin = new Padding(0, 0, 8, 0), Cursor = Cursors.Hand };
             b.FlatAppearance.BorderSize = 0; b.Click += (_, _) => action(); b.Resize += (_, _) => KitVisual.AplicarRaio(b, 10); return b;
         }
     }
@@ -459,7 +459,7 @@ public class FormCheckout : Janela, ISemKit
         if (adicionarTodos == null) header.Controls.Add(new Label { Text = subtitulo, Dock = DockStyle.Fill, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(110, 110, 115), TextAlign = ContentAlignment.MiddleRight });
         if (adicionarTodos != null)
         {
-            var todos = new Button { Text = "Adicionar todos", Dock = DockStyle.Right, Width = 112, Height = 30, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(232, 248, 238), ForeColor = Color.FromArgb(11, 122, 83), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand, AccessibleName = "Adicionar todas as reservas disponíveis ao carrinho" };
+            var todos = new BotaoPlano { Text = "Adicionar todos", Dock = DockStyle.Right, Width = 112, Height = 30, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(232, 248, 238), ForeColor = Color.FromArgb(11, 122, 83), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Cursor = Cursors.Hand, AccessibleName = "Adicionar todas as reservas disponíveis ao carrinho" };
             todos.FlatAppearance.BorderSize = 0;
             todos.Click += (_, _) => adicionarTodos();
             header.Controls.Add(todos);

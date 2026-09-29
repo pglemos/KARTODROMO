@@ -35,7 +35,7 @@ public class CamposBateria : Panel
         Campos.Add(g, "Categoria", Categoria, 1);
 
         var pResp = new Panel { Dock = DockStyle.Fill, Height = 34 };
-        var bP = new Button { Text = "Pesquisar", Dock = DockStyle.Right, Width = 84, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(238, 238, 241), Cursor = Cursors.Hand };
+        var bP = new BotaoPlano { Text = "Pesquisar", Dock = DockStyle.Right, Width = 84, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(238, 238, 241), Cursor = Cursors.Hand };
         bP.FlatAppearance.BorderSize = 0;
         Resp.Dock = DockStyle.Fill;
         bP.Click += (_, _) => { var c = FormPesquisarCliente.Escolher(FindForm(), "Responsável pela reserva"); if (c != null) { RespId = c.L("id"); Resp.Text = c.S("nome"); } };

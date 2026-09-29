@@ -114,6 +114,13 @@ public static class AutoTeste
         if (reservaIdTeste > 0) reservas = reservas.Where(r => r.L("id") == reservaIdTeste).ToList();
         if (vendaIdTeste > 0) vendas = vendas.Where(r => r.L("id") == vendaIdTeste).ToList();
         if (ForaDaTela && vendas.Count == 0) vendas = vendasApi.Where(v => !v.B("cancelada")).Take(1).ToList(); // só abre para ver, nada é gravado
+        if (ForaDaTela && reservas.Count == 0) // idem: Editar reserva e Mover cliente só abrem e fecham
+        {
+            var hoje = await Sessao.Api.Lista($"/api/office/reservas?status=todas&filtro=dia&data={Fmt.Iso(DateTime.Today)}");
+            reservas = (hoje.Count > 0 ? hoje : reservasApi).Where(r => r.S("status") != "cancelada").OrderBy(r => r.B("pago")).Take(1).ToList();
+        }
+        if (ForaDaTela && movimentoIdTeste == 0) // relatório de fechamento do último caixa (só leitura)
+            movimentoIdTeste = (await Sessao.Api.Lista("/api/office/movimentos")).OrderByDescending(m => m.S("abertoEm")).FirstOrDefault()?.L("id") ?? 0;
         var bateriaId = reservas.FirstOrDefault()?.L("bateriaId");
         var bateria = baterias.FirstOrDefault(b => b.L("id") == bateriaId) ?? baterias.OrderByDescending(b => b.I("inscritos")).FirstOrDefault();
 

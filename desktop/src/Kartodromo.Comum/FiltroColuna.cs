@@ -55,8 +55,8 @@ public static class FiltroColuna
         var espaco = new Panel { Dock = DockStyle.Top, Height = 6 };
         var lista = new CheckedListBox { Dock = DockStyle.Fill, CheckOnClick = true, BorderStyle = BorderStyle.None, IntegralHeight = false, Font = fonte };
         var rodape = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 40, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(0, 8, 0, 0) };
-        var filtrar = new Button { Text = "Filtrar", Size = new Size(88, 28), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(21, 128, 61), ForeColor = Color.White, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Cursor = Cursors.Hand };
-        var limpar = new Button { Text = "Limpar", Size = new Size(80, 28), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(238, 238, 241), ForeColor = Color.FromArgb(29, 29, 31), Font = fonte, Cursor = Cursors.Hand };
+        var filtrar = new BotaoPlano { Text = "Filtrar", Size = new Size(88, 28), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(21, 128, 61), ForeColor = Color.White, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Cursor = Cursors.Hand };
+        var limpar = new BotaoPlano { Text = "Limpar", Size = new Size(80, 28), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(238, 238, 241), ForeColor = Color.FromArgb(29, 29, 31), Font = fonte, Cursor = Cursors.Hand };
         filtrar.FlatAppearance.BorderSize = 0; limpar.FlatAppearance.BorderSize = 0;
         rodape.Controls.Add(filtrar); rodape.Controls.Add(limpar);
         painel.Controls.Add(lista); painel.Controls.Add(espaco); painel.Controls.Add(busca); painel.Controls.Add(cab); painel.Controls.Add(rodape);

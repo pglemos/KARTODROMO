@@ -409,7 +409,7 @@ public class FormMoverCliente : DialogoDesign
     readonly TabelaDesign _t;
     List<JsonObject> _baterias = [];
 
-    public FormMoverCliente(JsonObject r) : base("Mover cliente para outra bateria", $"{r.S("cliente")} · hoje na {r.S("reserva")}",
+    public FormMoverCliente(JsonObject r) : base("Mover cliente para outra bateria", $"{r.S("cliente")} · " + (r.D("dataHora")?.Date == DateTime.Today ? $"hoje na {r.S("reserva")}" : $"na {r.S("reserva")} · {PecasDesign.DiaMes(r.S("dataHora"))}"),
         PecasDesign.Tile(Color.FromArgb(255, 179, 64), Color.FromArgb(245, 124, 0), "seta"))
     {
         _t = SecaoTabelaDesign("Escolha a nova bateria");

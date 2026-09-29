@@ -295,7 +295,7 @@ public class FormCadastro : Janela
         var nav = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 52, Padding = new Padding(4) };
         Button B(string k, string t, string gl, Color cor, Action a)
         {
-            var b = new Button { Text = t, Image = Icone.Tile(gl, cor, 18), TextImageRelation = TextImageRelation.ImageAboveText, Size = new Size(t.Length > 2 ? 66 : 38, 44) };
+            var b = new BotaoPlano { Text = t, Image = Icone.Tile(gl, cor, 18), TextImageRelation = TextImageRelation.ImageAboveText, Size = new Size(t.Length > 2 ? 66 : 38, 44) };
             b.Click += (_, _) => a(); _b[k] = b; return b;
         }
         nav.Controls.AddRange([B("first", "", "", Color.DimGray, () => Ir(0)), B("prev", "", "", Color.DimGray, () => Ir(Indice() - 1)), B("next", "", "", Color.DimGray, () => Ir(Indice() + 1)),
@@ -402,7 +402,7 @@ public class FormCadastro : Janela
         _produtoAtivo.SetBounds(365, 18, 76, 27);
         var editar = _b["edit"]; editar.Text = "Editar"; editar.Image = null; editar.TextImageRelation = TextImageRelation.Overlay; editar.Size = new Size(82, 34); editar.FlatStyle = FlatStyle.Flat; editar.BackColor = Color.FromArgb(238, 238, 241); editar.ForeColor = Color.FromArgb(29, 29, 31); editar.Anchor = AnchorStyles.Top | AnchorStyles.Right; editar.SetBounds(cab.Width - 194, 17, 82, 34); editar.FlatAppearance.BorderSize = 0;
         var excluir = _b["del"]; excluir.Text = "Excluir"; excluir.Image = null; excluir.TextImageRelation = TextImageRelation.Overlay; excluir.Size = new Size(86, 34); excluir.FlatStyle = FlatStyle.Flat; excluir.BackColor = Color.FromArgb(238, 238, 241); excluir.ForeColor = Color.FromArgb(196, 40, 28); excluir.Anchor = AnchorStyles.Top | AnchorStyles.Right; excluir.SetBounds(cab.Width - 104, 17, 86, 34); excluir.FlatAppearance.BorderSize = 0;
-        var fecharX = new Button { Text = "\uE711", Font = new Font("Segoe MDL2 Assets", 9F), Size = new Size(34, 34), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(238, 238, 241), ForeColor = Color.FromArgb(29, 29, 31), Anchor = AnchorStyles.Top | AnchorStyles.Right, Cursor = Cursors.Hand, AccessibleDescription = "kit:ignorar" };
+        var fecharX = new BotaoPlano { Text = "\uE711", Font = new Font("Segoe MDL2 Assets", 9F), Size = new Size(34, 34), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(238, 238, 241), ForeColor = Color.FromArgb(29, 29, 31), Anchor = AnchorStyles.Top | AnchorStyles.Right, Cursor = Cursors.Hand, AccessibleDescription = "kit:ignorar" };
         fecharX.FlatAppearance.BorderSize = 0; fecharX.Click += (_, _) => Close(); fecharX.Resize += (_, _) => KitVisual.AplicarRaio(fecharX, 9); KitVisual.AplicarRaio(fecharX, 9);
         cab.Controls.AddRange([_produtoTitulo, _produtoSubtitulo, _produtoAtivo, editar, excluir, fecharX]);
         cab.Resize += (_, _) => { fecharX.Location = new Point(cab.ClientSize.Width - fecharX.Width - 2, 17); excluir.Left = fecharX.Left - excluir.Width - 8; editar.Left = excluir.Left - editar.Width - 8; };
@@ -668,8 +668,8 @@ public class FormCadastro : Janela
         linhaCampos.Controls.Add(CampoProva("Ordem", ordem), 0, 0); linhaCampos.Controls.Add(CampoProva("Nome", nome), 1, 0);
         linhaCampos.Controls.Add(CampoProva("Tipo", tipo), 2, 0); linhaCampos.Controls.Add(CampoProva("Autofinalizar", fin), 3, 0);
         linhaCampos.Controls.Add(CampoProva("Tempo (min)", tempo), 4, 0); linhaCampos.Controls.Add(CampoProva("Voltas (máx)", voltas), 5, 0);
-        var bIns = new Button { Text = "Inserir", Height = 34, Width = 72, Dock = DockStyle.Bottom, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(11, 122, 83), ForeColor = Color.White, Font = new Font("Segoe UI", 11F, FontStyle.Bold), Margin = new Padding(2, 20, 2, 0), AccessibleName = "Inserir prova" };
-        var bDel = new Button { Text = "×", Height = 34, Width = 34, Dock = DockStyle.Bottom, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(238, 238, 241), ForeColor = Color.FromArgb(196, 40, 28), Font = new Font("Segoe UI", 11F, FontStyle.Bold), Margin = new Padding(2, 20, 2, 0), AccessibleName = "Excluir prova selecionada" };
+        var bIns = new BotaoPlano { Text = "Inserir", Height = 34, Width = 72, Dock = DockStyle.Bottom, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(11, 122, 83), ForeColor = Color.White, Font = new Font("Segoe UI", 11F, FontStyle.Bold), Margin = new Padding(2, 20, 2, 0), AccessibleName = "Inserir prova" };
+        var bDel = new BotaoPlano { Text = "×", Height = 34, Width = 34, Dock = DockStyle.Bottom, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(238, 238, 241), ForeColor = Color.FromArgb(196, 40, 28), Font = new Font("Segoe UI", 11F, FontStyle.Bold), Margin = new Padding(2, 20, 2, 0), AccessibleName = "Excluir prova selecionada" };
         bIns.FlatAppearance.BorderSize = bDel.FlatAppearance.BorderSize = 0;
         var acoes = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(0), Margin = new Padding(0) };
         acoes.Controls.AddRange([bIns, bDel]); linhaCampos.Controls.Add(acoes, 6, 0);

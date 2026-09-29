@@ -113,7 +113,7 @@ public class Janela : Form
         var flow = new FlowLayoutPanel { Dock = DockStyle.Right, AutoSize = true, FlowDirection = FlowDirection.RightToLeft, WrapContents = false, Padding = new Padding(0, 12, 18, 12) };
         foreach (var (t, c, principal) in botoes.Reverse())
         {
-            var b = new Button { Text = t, AutoSize = true, MinimumSize = new Size(92, 34), Height = 34, Margin = new Padding(4, 0, 0, 0) };
+            var b = new BotaoPlano { Text = t, AutoSize = true, MinimumSize = new Size(92, 34), Height = 34, Margin = new Padding(4, 0, 0, 0) };
             b.Click += c;
             if (principal) AcceptButton = b;
             flow.Controls.Add(b);

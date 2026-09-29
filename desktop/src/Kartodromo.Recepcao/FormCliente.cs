@@ -81,13 +81,13 @@ public class FormCliente : Janela, ISemKit
         }
         Button Icone(FlowLayoutPanel g, string k, string glifo, string dica, Action a, bool perigo = false)
         {
-            var b = new Button { Text = glifo, Size = new Size(34, 32), FlatStyle = FlatStyle.Flat, BackColor = g.BackColor, ForeColor = perigo ? Color.FromArgb(196, 40, 28) : KitVisual.Texto, Font = new Font(glifo.Length == 1 && glifo[0] >= '' ? "Segoe MDL2 Assets" : "Segoe UI", glifo[0] >= '' ? 10F : 11F), Margin = new Padding(0), Cursor = Cursors.Hand, TabStop = false };
+            var b = new BotaoPlano { Text = glifo, Size = new Size(34, 32), FlatStyle = FlatStyle.Flat, BackColor = g.BackColor, ForeColor = perigo ? Color.FromArgb(196, 40, 28) : KitVisual.Texto, Font = new Font(glifo.Length == 1 && glifo[0] >= '' ? "Segoe MDL2 Assets" : "Segoe UI", glifo[0] >= '' ? 10F : 11F), Margin = new Padding(0), Cursor = Cursors.Hand, TabStop = false };
             b.FlatAppearance.BorderSize = 0; b.FlatAppearance.MouseOverBackColor = Color.White;
             b.Click += (_, _) => a(); _dica.SetToolTip(b, dica); b.Resize += (_, _) => KitVisual.AplicarRaio(b, 8);
             g.Controls.Add(b); _bt[k] = b; return b;
         }
         var gPesq = Grupo();
-        var pesq = new Button { Text = "Pesquisar", Image = Glifo('', KitVisual.Texto), ImageAlign = ContentAlignment.MiddleLeft, TextImageRelation = TextImageRelation.ImageBeforeText, AutoSize = true, Height = 32, MinimumSize = new Size(0, 32), FlatStyle = FlatStyle.Flat, BackColor = gPesq.BackColor, Font = new Font("Segoe UI", 9.5F), Padding = new Padding(8, 0, 10, 0), Margin = new Padding(0), Cursor = Cursors.Hand, TabStop = false };
+        var pesq = new BotaoPlano { Text = "Pesquisar", Image = Glifo('', KitVisual.Texto), ImageAlign = ContentAlignment.MiddleLeft, TextImageRelation = TextImageRelation.ImageBeforeText, AutoSize = true, Height = 32, MinimumSize = new Size(0, 32), FlatStyle = FlatStyle.Flat, BackColor = gPesq.BackColor, Font = new Font("Segoe UI", 9.5F), Padding = new Padding(8, 0, 10, 0), Margin = new Padding(0), Cursor = Cursors.Hand, TabStop = false };
         pesq.FlatAppearance.BorderSize = 0; pesq.FlatAppearance.MouseOverBackColor = Color.White; pesq.Click += (_, _) => Pesquisar(); _dica.SetToolTip(pesq, "Pesquisar cliente (F3)");
         gPesq.Controls.Add(pesq); _bt["pesq"] = pesq;
         var gCrud = Grupo();
@@ -95,7 +95,7 @@ public class FormCliente : Janela, ISemKit
         Icone(gCrud, "edit", "", "Editar cliente", () => SetModo("edit"));
         Icone(gCrud, "del", "", "Excluir cliente", Excluir, perigo: true);
         var gSalvar = Grupo();
-        var salvarTopo = new Button { Text = "Salvar", Image = Glifo('', Color.White), TextImageRelation = TextImageRelation.ImageBeforeText, AutoSize = true, Height = 32, MinimumSize = new Size(0, 32), FlatStyle = FlatStyle.Flat, BackColor = KitVisual.Verde, ForeColor = Color.White, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Padding = new Padding(8, 0, 10, 0), Margin = new Padding(0), Cursor = Cursors.Hand, TabStop = false };
+        var salvarTopo = new BotaoPlano { Text = "Salvar", Image = Glifo('', Color.White), TextImageRelation = TextImageRelation.ImageBeforeText, AutoSize = true, Height = 32, MinimumSize = new Size(0, 32), FlatStyle = FlatStyle.Flat, BackColor = KitVisual.Verde, ForeColor = Color.White, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Padding = new Padding(8, 0, 10, 0), Margin = new Padding(0), Cursor = Cursors.Hand, TabStop = false };
         salvarTopo.FlatAppearance.BorderSize = 0; salvarTopo.Click += (_, _) => Salvar(); salvarTopo.Resize += (_, _) => KitVisual.AplicarRaio(salvarTopo, 8);
         gSalvar.Controls.Add(salvarTopo); _bt["save"] = salvarTopo;
         Icone(gSalvar, "canc", "", "Cancelar alterações (Esc)", Cancelar);
@@ -119,7 +119,7 @@ public class FormCliente : Janela, ISemKit
         seg.Resize += (_, _) => KitVisual.AplicarRaio(seg, 9);
         Button Aba(string t)
         {
-            var b = new Button { Text = t, AutoSize = true, MinimumSize = new Size(86, 28), Height = 28, FlatStyle = FlatStyle.Flat, Margin = new Padding(1), Font = new Font("Segoe UI", 9.3F), Cursor = Cursors.Hand, TabStop = false };
+            var b = new BotaoPlano { Text = t, AutoSize = true, MinimumSize = new Size(86, 28), Height = 28, FlatStyle = FlatStyle.Flat, Margin = new Padding(1), Font = new Font("Segoe UI", 9.3F), Cursor = Cursors.Hand, TabStop = false };
             b.FlatAppearance.BorderSize = 0;
             b.Resize += (_, _) => KitVisual.AplicarRaio(b, 7);
             seg.Controls.Add(b);
@@ -278,7 +278,7 @@ public class FormCliente : Janela, ISemKit
     /// <summary>Botão verde claro dentro do campo (Consultar / Buscar / ✕).</summary>
     static Button BotaoCampo(string texto, Action a)
     {
-        var b = new Button { Text = texto, AutoSize = true, MinimumSize = new Size(26, 22), Height = 22, Dock = DockStyle.Right, FlatStyle = FlatStyle.Flat, BackColor = KitVisual.VerdeClaro, ForeColor = KitVisual.Verde, Font = new Font("Segoe UI", 8.4F, FontStyle.Bold), Padding = new Padding(4, 0, 4, 0), Cursor = Cursors.Hand, TabStop = false, Margin = new Padding(0) };
+        var b = new BotaoPlano { Text = texto, AutoSize = true, MinimumSize = new Size(26, 22), Height = 22, Dock = DockStyle.Right, FlatStyle = FlatStyle.Flat, BackColor = KitVisual.VerdeClaro, ForeColor = KitVisual.Verde, Font = new Font("Segoe UI", 8.4F, FontStyle.Bold), Padding = new Padding(4, 0, 4, 0), Cursor = Cursors.Hand, TabStop = false, Margin = new Padding(0) };
         b.FlatAppearance.BorderSize = 0;
         b.Click += (_, _) => a();
         b.Resize += (_, _) => KitVisual.AplicarRaio(b, 6);
