@@ -61,6 +61,8 @@ import {
   type TimingCatalog,
 } from '../lib/timing/catalog';
 import { rankingPorPeso, tituloFaixas, type DadosPiloto } from '../lib/timing/ranking-peso';
+import { configPublica, enviarResultado, enviarTeste, lerConfig, salvarConfig, type Dependencias } from './timing-email';
+import type { ContextoProva, EmpresaEmail } from '../lib/timing/email-resultado';
 import { competidoresComSorteio, descricaoModoSorteio, pilotosDoSorteio, validarSorteio, type Atribuicao } from '../lib/timing/sorteio';
 
 // ---------------------------------------------------------------- config
@@ -360,6 +362,7 @@ function sessionView(s: Session) {
     observations: s.observations ?? [],
     competitors: s.competitors.map((c) => ({ kart: c.kart, name: c.name, customerId: c.customerId ?? null, category: c.category ?? null, flag: c.flag ?? 'none', autoAdded: Boolean(c.autoAdded), detalhes: c.detalhes ?? null })),
     standings: computeStandings(s, trackLengthFor(s)).filter((r) => !s.competitors.find((c) => c.kart === r.kart && c.name === r.name)?.detalhes?.oculto),
+    emailsResultado: s.emailsResultado ?? null,
   };
 }
 
@@ -628,6 +631,87 @@ async function enviarUsoKarts(s: Session) {
 setInterval(() => {
   const limite = Date.now() - 2 * 86_400_000;
   for (const s of sessions.values()) if (s.state === 'encerrada' && !s.usoKartsEnviado && (s.finishedAt ?? s.createdAt) > limite) void enviarUsoKarts(s);
+}, 5 * 60_000);
+
+// ---------------------------------------------------------------- e-mail do resultado para os pilotos (como o LapTime)
+// Ao encerrar cada TOMADA DE TEMPO e cada CORRIDA: um e-mail por piloto com o resumo dele, a classificação e os PDFs
+// (resultado oficial + volta a volta). Conta de e-mail do kartódromo em data/timing/email.json (tela na Cronometragem).
+
+const EMAIL_FILE = join(DATA_DIR, 'email.json');
+const LOGO_EMAIL = (() => {
+  // versão pequena (360 px, 35 KB): o logo original (263 KB) ia 3 vezes por e-mail e deixava cada um com 1,1 MB
+  try { return readFileSync(resolve(process.cwd(), 'services', 'timing-ui', 'logo-email.png')); } catch { return null; }
+})();
+let empresaCache: { em: number; dados: EmpresaEmail } | null = null;
+
+async function empresaParaEmail(): Promise<EmpresaEmail> {
+  if (empresaCache && Date.now() - empresaCache.em < 3_600_000) return empresaCache.dados;
+  try {
+    const e = (await opsGet('/api/crono/empresa')) as Record<string, string | null>;
+    const dados: EmpresaEmail = { nome: e.nome || TRACK_NAME, telefone: e.telefone, email: e.email, cidade: e.cidade, estado: e.estado, site: 'www.kartodromodebetim.com.br' };
+    empresaCache = { em: Date.now(), dados };
+    return dados;
+  } catch {
+    return { nome: 'Kartódromo Internacional de Betim', site: 'www.kartodromodebetim.com.br' };
+  }
+}
+
+async function contextoDaProva(s: Session): Promise<ContextoProva> {
+  const prova = catalog.provas.find((p) => p.id === s.proofId);
+  const grupo = catalog.groups.find((g) => g.id === (s.groupId ?? prova?.groupId));
+  const evento = catalog.events.find((e) => e.id === (s.eventId ?? prova?.eventId));
+  const pista = catalog.tracks.find((t) => t.id === (prova?.trackId ?? evento?.trackId));
+  // sem o programa do catálogo, o nome da bateria já vem "BATERIA 17:00 · CORRIDA"
+  const i = s.name.lastIndexOf(' · ');
+  return {
+    empresa: await empresaParaEmail(),
+    evento: evento?.name ?? null,
+    grupo: grupo?.name ?? (i > 0 ? s.name.slice(0, i) : null),
+    prova: prova?.name ?? (i > 0 ? s.name.slice(i + 3) : s.name),
+    tipo: s.type,
+    tracado: pista?.name ?? null,
+    quando: s.startedAt ?? s.finishedAt ?? s.createdAt,
+    classificacao: computeStandings(s, trackLengthFor(s)).filter((r) => !r.autoAdded || r.laps > 0).filter((r) => !s.competitors.find((c) => c.kart === r.kart && c.name === r.name)?.detalhes?.oculto),
+  };
+}
+
+const depEmail: Dependencias = {
+  dataDir: DATA_DIR,
+  simulador: SIMULATE,
+  log: (t) => log(t),
+  salvarSessao: (s) => saveSession(s),
+  contexto: contextoDaProva,
+  emailsDosClientes: async (ids) => {
+    const mapa = new Map<string, string>();
+    for (let i = 0; i < ids.length; i += 150) {
+      const rows = (await opsGet(`/api/crono/clientes?ids=${ids.slice(i, i + 150).join(',')}`)) as { id: number; email?: string | null }[];
+      for (const r of rows) if (r.email) mapa.set(String(r.id), r.email);
+    }
+    return mapa;
+  },
+  logoPng: LOGO_EMAIL,
+};
+
+/** Disparo do encerramento: só tomada de tempo e corrida, com voltas; nunca derruba o servidor. */
+async function emailsAoEncerrar(s: Session) {
+  if (s.state !== 'encerrada' || !['classificacao', 'corrida'].includes(s.type)) return;
+  if (!s.competitors.some((c) => c.crossings.some((x) => !x.deleted && x.lapMs != null))) return; // bateria sem volta nenhuma
+  try {
+    await enviarResultado(s, EMAIL_FILE, depEmail, { automatico: true });
+  } catch (err) {
+    const erro = (err as Error).message;
+    s.emailsResultado = { status: 'falhou', atualizadoEm: Date.now(), tentativas: (s.emailsResultado?.tentativas ?? 0) + 1, enviados: s.emailsResultado?.enviados ?? [], falhas: [{ kart: '', nome: '', email: '', erro }], semEmail: s.emailsResultado?.semEmail ?? [] };
+    saveSession(s);
+    log(`e-mail do resultado de ${s.name} não foi enviado (tenta de novo): ${erro}`);
+  }
+}
+// nova tentativa a cada 5 min só para quem falhou (servidor de e-mail fora, internet caiu), até 6 h depois do encerramento
+setInterval(() => {
+  const limite = Date.now() - 6 * 3_600_000;
+  for (const s of sessions.values()) {
+    const e = s.emailsResultado;
+    if (s.state === 'encerrada' && e && (e.status === 'parcial' || e.status === 'falhou') && e.tentativas < 12 && (s.finishedAt ?? s.createdAt) > limite) void emailsAoEncerrar(s);
+  }
 }, 5 * 60_000);
 
 // ---------------------------------------------------------------- agenda da recepção -> evento do dia (canvas Eventos.dc.html)
@@ -945,6 +1029,16 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     } catch (err) { return send(res, 400, { error: (err as Error).message }); }
   }
 
+  // conta de e-mail dos resultados (a senha nunca volta; vazia no PUT = mantém)
+  if (path === '/api/email-config' && method === 'GET') return send(res, 200, configPublica(lerConfig(EMAIL_FILE)));
+  if (path === '/api/email-config' && method === 'PUT') {
+    try { return send(res, 200, configPublica(salvarConfig(EMAIL_FILE, await readBody(req)))); } catch (e) { return send(res, 400, { error: (e as Error).message }); }
+  }
+  if (path === '/api/email-config/teste' && method === 'POST') {
+    const body = await readBody(req);
+    try { await enviarTeste(EMAIL_FILE, String(body.para ?? ''), SIMULATE); log(`e-mail de teste enviado para ${String(body.para ?? '')}`); return send(res, 200, { ok: true }); }
+    catch (e) { return send(res, 400, { error: `Não enviou: ${(e as Error).message}` }); }
+  }
   if (path === '/api/settings' && method === 'GET') return send(res, 200, { ...timingSettings, decoder: activeDecoderConfig });
   if (path === '/api/settings/decoder/test' && method === 'POST') {
     try {
@@ -1232,6 +1326,21 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     const now = Date.now();
     try {
       if (!action && method === 'GET') return send(res, 200, sessionView(s));
+      if (action === 'emails' && !m[3] && method === 'GET') return send(res, 200, s.emailsResultado ?? null);
+      if (action === 'emails' && !m[3] && method === 'POST') {
+        // reenvio manual (menu da cronometragem): todos, só um kart, ou o resultado oficial para outro endereço
+        const body = await readBody(req);
+        if (s.state !== 'encerrada' && s.state !== 'bandeira_final') return send(res, 409, { error: 'Encerre a bateria antes de enviar o resultado.' });
+        const kart = body.kart ? String(body.kart) : null;
+        const para = body.para ? String(body.para) : null;
+        if (!kart && !para) {
+          // todos: um PDF + um e-mail por piloto pode passar de 1 min — vai em segundo plano, a tela acompanha pelo GET
+          if (!lerConfig(EMAIL_FILE).senha && !SIMULATE) return send(res, 400, { error: 'E-mail não configurado: preencha a conta de e-mail do kartódromo em Ferramentas › E-mail dos resultados.' });
+          void enviarResultado(s, EMAIL_FILE, depEmail, { automatico: false }).catch((e) => log(`e-mail do resultado de ${s.name}: ${(e as Error).message}`));
+          return send(res, 202, { emSegundoPlano: true });
+        }
+        return send(res, 200, await enviarResultado(s, EMAIL_FILE, depEmail, { automatico: false, kart, para }));
+      }
       if (action === 'laps' && !m[3] && method === 'GET') {
         return send(
           res,
@@ -1335,6 +1444,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       } else if (action === 'close' && method === 'POST') {
         closeSession(s, now);
         void enviarUsoKarts(s);
+        void emailsAoEncerrar(s);
       } else if (action === 'cancel' && method === 'POST') {
         cancelSession(s, now);
       } else if (action === 'flag' && m[3] && method === 'POST') {

@@ -82,3 +82,7 @@ desktop/**/*.csproj.user
 # Mapeamento operacional local do decoder (nao publicar)
 data/timing/transponders.json
 scratch/
+# conta de e-mail dos resultados (tem a senha) e arquivos temporarios dos PDFs
+data/timing/email.json
+data/timing/emails-tmp/
+data/timing/emails-simulador/

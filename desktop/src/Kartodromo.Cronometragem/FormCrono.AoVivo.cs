@@ -117,11 +117,5 @@ public partial class FormCrono
         Process.Start(new ProcessStartInfo("https://wa.me/?text=" + text) { UseShellExecute = true });
     }
 
-    void EnviarEmail()
-    {
-        if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
-        var subject = Uri.EscapeDataString("Resultado da prova · " + _sess.S("name"));
-        var body = Uri.EscapeDataString(string.Join("\r\n", _gRes.Rows.Cast<DataGridViewRow>().Where(r => !r.IsNewRow).Select(r => $"{r.Cells[0].Value}. {r.Cells[2].Value} · kart {r.Cells[1].Value}")));
-        Process.Start(new ProcessStartInfo($"mailto:?subject={subject}&body={body}") { UseShellExecute = true });
-    }
+    // EnviarEmail(): FormCrono.Email.cs (o servidor manda pela conta do kartódromo; antes abria o mailto do PC)
 }

@@ -72,10 +72,24 @@ export type Session = {
   agendaId?: number | null;
   /** minutos de pista de cada kart já enviados ao controle de manutenção da oficina (servidor da operação) */
   usoKartsEnviado?: boolean;
+  /** e-mail do resultado para os pilotos (automático ao encerrar tomada de tempo/corrida, ou reenvio manual) */
+  emailsResultado?: EnvioEmailsResultado;
   observations?: Observation[];
   competitors: Competitor[];
   /** Leituras do decoder que não viraram volta (volta mínima, kart encerrado, transponder desconhecido...). Só pra mostrar ao operador. */
   rejected?: RejectedPassing[];
+};
+
+export type EnvioEmailsResultado = {
+  /** enviado = todos com e-mail receberam; parcial = alguns falharam (tenta de novo); falhou = nenhum foi (tenta de novo);
+   *  sem-destinatarios = ninguém da prova tem e-mail cadastrado; desligado = envio automático desativado quando encerrou */
+  status: 'enviado' | 'parcial' | 'falhou' | 'sem-destinatarios' | 'desligado';
+  atualizadoEm: number;
+  tentativas: number;
+  /** "kart|email" de quem já recebeu (não manda de novo na nova tentativa) */
+  enviados: string[];
+  falhas: { kart: string; nome: string; email: string; erro: string }[];
+  semEmail: { kart: string; nome: string }[];
 };
 
 export type RejectedPassing = { id: string; kart: string | null; transponder: number | null; wallMs: number; decoderTimeMs: number; reason: string; sinceLastMs: number | null };

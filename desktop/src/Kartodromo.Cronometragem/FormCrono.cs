@@ -169,6 +169,7 @@ public partial class FormCrono : Form
         ferr.DropDownItems.Add("Parâmetros do sistema", null, (_, _) => JanelaCadastro("ParamSistema"));
         ferr.DropDownItems.Add("Parâmetros da cronometragem", null, (_, _) => JanelaCadastro("ParamCrono"));
         ferr.DropDownItems.Add("Painel de LED (porta serial)", null, (_, _) => ConfigurarPainel());
+        ferr.DropDownItems.Add("E-mail dos resultados (pilotos)", null, (_, _) => ConfigurarEmail());
         ferr.DropDownItems.Add(new ToolStripSeparator());
         var backup = new ToolStripMenuItem("Backup de eventos");
         backup.DropDownItems.Add("Guardar o atual", null, (_, _) => JanelaCadastro("Backup"));
@@ -198,7 +199,7 @@ public partial class FormCrono : Form
         crono.DropDownItems.Add("Seguir a bateria em andamento", null, (_, _) => { _fixado = false; _ = Atualizar(); });
         rel.DropDownItems.Add("Resultado da bateria selecionada", null, (_, _) => Resultado());
         rel.DropDownItems.Add("WhatsApp", null, (_, _) => EnviarWhatsApp());
-        rel.DropDownItems.Add("E-mail", null, (_, _) => EnviarEmail());
+        rel.DropDownItems.Add("Enviar resultado por e-mail", null, (_, _) => EnviarEmail());
         var ajuda = new ToolStripMenuItem("Ajuda");
         ajuda.DropDownItems.Add("Suporte remoto (AnyDesk)", null, (_, _) =>
         {
@@ -1366,11 +1367,15 @@ public partial class FormCrono : Form
                     if (!achou) File.AppendAllText(Path.Combine(_autoteste, "log.txt"), $"sem janela: {nome}\r\n");
                 }
             }
-            foreach (var (nome, acao) in new (string, Action)[] { ("Evento", () => EditarEventoDesign(true)), ("GrupoEditar", () => EditarGrupoDesign(true)), ("Distribuir", DistribuirProvaDesign) })
+            // título esperado: a configuração do e-mail abre depois de buscar os dados (assíncrona) e não pode ser
+            // confundida com a janela do passo seguinte
+            foreach (var (nome, acao, titulo) in new (string, Action, string)[] { ("Evento", () => EditarEventoDesign(true), null), ("GrupoEditar", () => EditarGrupoDesign(true), null), ("Distribuir", DistribuirProvaDesign, null), ("EmailConfig", ConfigurarEmail, "E-mail dos resultados"), ("EmailEnviar", EnviarEmail, "Enviar resultado") })
             {
                 var t = new System.Windows.Forms.Timer { Interval = 150 }; var achou = false; var feito = new TaskCompletionSource<bool>();
-                t.Tick += async (_, _) => { if (achou) return; var alvo = Application.OpenForms.Cast<Form>().FirstOrDefault(f => f != this && f.Visible && f is not Escurecer && f is not FormTV); if (alvo == null) return; achou = true; t.Stop(); await Task.Delay(900); try { Foto(alvo, nome); } catch { } alvo.Close(); feito.TrySetResult(true); };
-                t.Start(); acao(); await Task.WhenAny(feito.Task, Task.Delay(8000)); t.Stop(); t.Dispose();
+                t.Tick += async (_, _) => { if (achou) return; var alvo = Application.OpenForms.Cast<Form>().FirstOrDefault(f => f != this && f.Visible && f is not Escurecer && f is not FormTV && (titulo == null || f.Text.Contains(titulo))); if (alvo == null) return; achou = true; t.Stop(); await Task.Delay(900); try { Foto(alvo, nome); } catch { } alvo.Close(); feito.TrySetResult(true); };
+                t.Start(); acao(); File.AppendAllText(Path.Combine(_autoteste, "log.txt"), $"voltou de {nome}\r\n");
+                await Task.WhenAny(feito.Task, Task.Delay(8000)); t.Stop(); t.Dispose();
+                File.AppendAllText(Path.Combine(_autoteste, "log.txt"), $"fim de {nome}\r\n");
             }
             if (_state?["focus"] is JsonObject foco) File.WriteAllText(Path.Combine(_autoteste, "painel-led.txt"), PainelLed.Montar(foco, 10, DateTime.Now, out _));
             File.WriteAllText(Path.Combine(_autoteste, "ok.txt"), "ok");
