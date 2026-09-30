@@ -61,7 +61,7 @@ import {
   type TimingCatalog,
 } from '../lib/timing/catalog';
 import { rankingPorPeso, tituloFaixas, type DadosPiloto } from '../lib/timing/ranking-peso';
-import { configPublica, enviarResultado, enviarTeste, lerConfig, salvarConfig, type Dependencias } from './timing-email';
+import { configPublica, enviarResultado, enviarTeste, lerConfig, salvarConfig, traduzirErro, type Dependencias } from './timing-email';
 import type { ContextoProva, EmpresaEmail } from '../lib/timing/email-resultado';
 import { competidoresComSorteio, descricaoModoSorteio, pilotosDoSorteio, validarSorteio, type Atribuicao } from '../lib/timing/sorteio';
 
@@ -1037,7 +1037,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
   if (path === '/api/email-config/teste' && method === 'POST') {
     const body = await readBody(req);
     try { await enviarTeste(EMAIL_FILE, String(body.para ?? ''), SIMULATE); log(`e-mail de teste enviado para ${String(body.para ?? '')}`); return send(res, 200, { ok: true }); }
-    catch (e) { return send(res, 400, { error: `Não enviou: ${(e as Error).message}` }); }
+    catch (e) { return send(res, 400, { error: `Não enviou: ${traduzirErro(e)}` }); }
   }
   if (path === '/api/settings' && method === 'GET') return send(res, 200, { ...timingSettings, decoder: activeDecoderConfig });
   if (path === '/api/settings/decoder/test' && method === 'POST') {

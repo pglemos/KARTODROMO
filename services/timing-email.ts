@@ -7,6 +7,7 @@
 import { execFile } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import tls from 'node:tls';
 import nodemailer from 'nodemailer';
 import type { EnvioEmailsResultado, Session } from '../lib/timing/race-engine';
 import {
@@ -106,6 +107,14 @@ function transporte(cfg: ConfigEmail, simulador: boolean) {
     secure: cfg.porta === 465,
     requireTLS: cfg.porta === 587,
     auth: { user: cfg.usuario, pass: cfg.senha },
+    // hospedagem compartilhada (HostGator): mail.<domínio> entrega o certificado da própria HostGator (*.hostgator.com.br).
+    // A cadeia continua sendo verificada; só o nome aceita também o da HostGator.
+    tls: {
+      checkServerIdentity: (host: string, cert: tls.PeerCertificate) => {
+        const erro = tls.checkServerIdentity(host, cert);
+        return erro && /(^|,\s*)DNS:\*\.hostgator\.com\.br(,|$)/.test(cert.subjectaltname ?? '') ? undefined : erro;
+      },
+    },
     connectionTimeout: 15_000,
     greetingTimeout: 15_000,
     socketTimeout: 30_000,
@@ -225,7 +234,7 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
       }
       if (a.piloto && !op.para) enviados.push(`${a.kart}|${a.email}`);
     } catch (e) {
-      falhas.push({ kart: a.kart, nome: a.nome, email: a.email, erro: (e as Error).message.slice(0, 200) });
+      falhas.push({ kart: a.kart, nome: a.nome, email: a.email, erro: traduzirErro(e).slice(0, 200) });
     }
   }
   t.close();
@@ -250,6 +259,17 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
   const quem = op.para ? `para ${op.para}${op.kart ? ` (como o kart ${op.kart} recebe)` : ''}` : op.kart ? `para o kart ${op.kart}` : `${alvos.length - falhas.length} de ${alvos.length} pilotos`;
   dep.log(`e-mail do resultado de ${s.name}: ${quem} enviado(s)${falhas.length ? `, ${falhas.length} falha(s): ${falhas.map((f) => f.erro).join(' / ').slice(0, 300)}` : ''}${semEmail.length && !op.kart && !op.para ? `, ${semEmail.length} sem e-mail` : ''}`);
   return resultado;
+}
+
+/** Erros do servidor de e-mail em português (a tela e o registro mostram isso para o operador). */
+export function traduzirErro(e: unknown): string {
+  const m = e instanceof Error ? e.message : String(e);
+  if (/\b535\b|Invalid login|authentication/i.test(m)) return 'o servidor de e-mail recusou o usuário/senha (confira se a caixa existe na hospedagem e se a senha está certa)';
+  if (/certificate|altname|self.signed/i.test(m)) return 'certificado de segurança do servidor de e-mail não confere com o endereço';
+  if (/ENOTFOUND|EAI_AGAIN/i.test(m)) return 'endereço do servidor de e-mail não encontrado (confira o "Servidor de saída")';
+  if (/ETIMEDOUT|ECONNREFUSED|ECONNRESET|timeout/i.test(m)) return 'sem conexão com o servidor de e-mail (internet ou porta bloqueada)';
+  if (/\b550\b|relay/i.test(m)) return 'o servidor de e-mail não aceitou o destinatário';
+  return m;
 }
 
 /** E-mail de teste da tela de configuração (confere servidor, porta, usuário e senha). */
