@@ -121,27 +121,32 @@ function transporte(cfg: ConfigEmail, simulador: boolean) {
   });
 }
 
-const EDGE = [process.env.TIMING_EDGE_PATH, 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', 'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'].filter(Boolean) as string[];
+// o serviço roda como SISTEMA (sessão 0): o Edge se recusa (sai com 1002); o Chrome com --no-sandbox funciona.
+const EDGE = [process.env.TIMING_EDGE_PATH, 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+  'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', 'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'].filter(Boolean) as string[];
 
 /** HTML → PDF pelo Edge headless (perfil próprio, não mexe no Edge de quem usa o PC). null se não conseguir. */
 export async function gerarPdf(html: string, pasta: string, base: string, log: (t: string) => void): Promise<Buffer | null> {
   const edge = EDGE.find((p) => existsSync(p));
-  if (!edge) { log('e-mail: Edge não encontrado, resultado vai sem PDF'); return null; }
+  if (!edge) { log('e-mail: Chrome/Edge não encontrado, resultado vai sem PDF'); return null; }
   mkdirSync(pasta, { recursive: true });
   const htmlArq = join(pasta, `${base}.html`);
   const pdfArq = join(pasta, `${base}.pdf`);
   writeFileSync(htmlArq, html, 'utf8');
+  // perfil próprio a cada PDF: com um só, o 2º envio seguido falhava enquanto o Edge do 1º ainda fechava
+  const perfil = join(pasta, `perfil-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  const rodar = () => new Promise<void>((ok, falha) =>
+    execFile(edge, ['--headless=new', '--no-sandbox', '--disable-gpu', '--no-first-run', '--disable-crash-reporter', '--no-pdf-header-footer', `--user-data-dir=${perfil}`,
+      `--print-to-pdf=${pdfArq}`, 'file:///' + htmlArq.replace(/\\/g, '/')], { timeout: 45_000, windowsHide: true }, (err) => (err && !existsSync(pdfArq) ? falha(err) : ok())));
   try {
-    await new Promise<void>((ok, falha) =>
-      execFile(edge, ['--headless=new', '--disable-gpu', '--no-first-run', '--no-pdf-header-footer', `--user-data-dir=${join(pasta, 'perfil-edge')}`,
-        `--print-to-pdf=${pdfArq}`, 'file:///' + htmlArq.replace(/\\/g, '/')], { timeout: 45_000, windowsHide: true }, (err) => (err && !existsSync(pdfArq) ? falha(err) : ok())),
-    );
+    try { await rodar(); } catch { await new Promise((r) => setTimeout(r, 1500)); await rodar(); } // uma nova tentativa
     return existsSync(pdfArq) ? readFileSync(pdfArq) : null;
   } catch (e) {
-    log(`e-mail: PDF ${base} não foi gerado (${(e as Error).message}); envia sem ele`);
+    log(`e-mail: PDF ${base} não foi gerado (${(e as Error).message.split('\n')[0].slice(0, 160)}); envia sem ele`);
     return null;
   } finally {
     for (const a of [htmlArq, pdfArq]) try { rmSync(a, { force: true }); } catch { /* arquivo em uso */ }
+    setTimeout(() => { try { rmSync(perfil, { recursive: true, force: true }); } catch { /* Edge ainda fechando */ } }, 10_000);
   }
 }
 
