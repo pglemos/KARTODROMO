@@ -46,7 +46,7 @@ const Hero = () => {
 
       <div className="container relative z-20 mx-auto grid w-full gap-10 px-4 py-14 lg:grid-cols-[1.25fr_0.62fr] lg:items-end">
         <div className="max-w-6xl">
-          <div className="mb-6 inline-flex items-center gap-2 border border-primary-400/30 bg-white/5 px-4 py-2 font-race text-[11px] italic font-bold uppercase tracking-[0.18em] text-primary-400 backdrop-blur-md">
+          <div className="mb-6 inline-flex items-center gap-2 border border-primary-400/30 bg-white/5 px-4 py-2 font-race text-xs italic font-bold uppercase tracking-[0.18em] text-primary-400 backdrop-blur-md">
             <Zap className="h-3.5 w-3.5" aria-hidden="true" />
             <span>Pista padrão internacional</span>
           </div>
@@ -84,7 +84,7 @@ const Hero = () => {
           <h2 className="mb-4 font-race text-xl italic uppercase text-white">Reserve sua corrida</h2>
           <div className="flex items-end gap-2 border-y border-white/10 py-4">
             <span className="font-display text-5xl italic text-primary-400">R$145</span>
-            <span className="mb-1 font-race text-[11px] italic uppercase text-white/55">por pessoa online</span>
+            <span className="mb-1 font-race text-xs italic uppercase text-white/55">por pessoa online</span>
           </div>
           <div className="my-5 grid gap-3">
             {panelBullets.map((bullet) => (

@@ -77,7 +77,7 @@ const Header = () => {
               />
             </a>
 
-            <nav aria-label="Navegação principal" className="hidden items-center gap-4 font-race text-[11px] italic font-bold uppercase tracking-wide lg:flex xl:gap-6 xl:text-xs">
+            <nav aria-label="Navegação principal" className="hidden items-center gap-4 font-race text-xs italic font-bold uppercase tracking-wide lg:flex xl:gap-6 xl:text-xs">
               {navLinks.map((link) => (
                 <a
                   key={link.href}
@@ -91,7 +91,7 @@ const Header = () => {
             </nav>
 
             <button
-              className="p-1.5 text-white transition-colors hover:text-primary-400 focus:outline-none lg:hidden"
+              className="-mr-2 inline-flex h-11 w-11 items-center justify-center text-white transition-colors hover:text-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 lg:hidden"
               onClick={() => setIsMenuOpen((open) => !open)}
               aria-label={isMenuOpen ? 'Fechar menu' : 'Abrir menu'}
               aria-expanded={isMenuOpen}

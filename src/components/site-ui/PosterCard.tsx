@@ -32,7 +32,7 @@ const PosterCard = ({ number, image, alt, title, description, ctaLabel, onCtaCli
         {href ? (
           <a
             href={href}
-            className="mt-5 inline-flex min-h-[44px] items-center gap-2 bg-gradient-to-br from-primary-400 to-primary-600 px-5 font-race text-[11px] italic font-bold uppercase tracking-wide text-ink-950 [clip-path:polygon(7%_0,100%_0,93%_100%,0_100%)]"
+            className="mt-5 inline-flex min-h-[44px] items-center gap-2 bg-gradient-to-br from-primary-400 to-primary-600 px-5 font-race text-xs italic font-bold uppercase tracking-wide text-ink-950 [clip-path:polygon(7%_0,100%_0,93%_100%,0_100%)]"
           >
             {ctaLabel}
           </a>
@@ -40,7 +40,7 @@ const PosterCard = ({ number, image, alt, title, description, ctaLabel, onCtaCli
           <button
             type="button"
             onClick={onCtaClick}
-            className="mt-5 inline-flex min-h-[44px] items-center gap-2 bg-gradient-to-br from-primary-400 to-primary-600 px-5 font-race text-[11px] italic font-bold uppercase tracking-wide text-ink-950 [clip-path:polygon(7%_0,100%_0,93%_100%,0_100%)]"
+            className="mt-5 inline-flex min-h-[44px] items-center gap-2 bg-gradient-to-br from-primary-400 to-primary-600 px-5 font-race text-xs italic font-bold uppercase tracking-wide text-ink-950 [clip-path:polygon(7%_0,100%_0,93%_100%,0_100%)]"
           >
             {ctaLabel}
           </button>

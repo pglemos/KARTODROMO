@@ -61,14 +61,18 @@
     flex: none;
   }
 
-  h1, h2, h3 { overflow-wrap: anywhere; }
+  /* break-word (não "anywhere"): só corta palavra que sozinha não cabe — "anywhere" partia
+     "CORPORATIVO" em "CORPORAT/IVO" mesmo havendo espaço para a palavra inteira na linha de baixo */
+  h1, h2, h3 { overflow-wrap: break-word; text-wrap: balance; }
 
-  /* Legibilidade: nada abaixo de 11px no celular. */
-  small { font-size: 11px !important; }
+  /* Legibilidade: nada abaixo de 12px no celular. */
+  small { font-size: 12px !important; }
   [style*="font-size:9px"], [style*="font-size: 9px"],
   [style*="font-size:9.5px"], [style*="font-size: 9.5px"],
   [style*="font-size:10px"], [style*="font-size: 10px"],
-  [style*="font-size:10.5px"], [style*="font-size: 10.5px"] { font-size: 11px !important; }
+  [style*="font-size:10.5px"], [style*="font-size: 10.5px"],
+  [style*="font-size:11px"], [style*="font-size: 11px"],
+  [style*="font-size:11.5px"], [style*="font-size: 11.5px"] { font-size: 12px !important; }
 
   /* Evita o zoom automático do iOS ao focar um campo. */
   input, select, textarea { font-size: 16px !important; }
@@ -80,8 +84,10 @@
   }
 }
 </style>
+<noscript><style data-generated="sem-js">[data-reveal] { opacity: 1 !important; transform: none !important; }</style></noscript>
 <style data-generated="reduced-motion">
 @media (prefers-reduced-motion: reduce) {
+  [data-reveal] { opacity: 1 !important; transform: none !important; }
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
@@ -98,6 +104,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 }
 </style>
 <style data-generated="nav-legible">
+/* a Anton só tem peso 400: título sem peso definido (h3) saía com negrito "engordado" pelo navegador, borrado.
+   O itálico sintético continua (o "KART" do título usa). */
+* { font-synthesis-weight: none; }
 @media (min-width: 721px) {
   header nav a, header nav a * { font-size: 13px !important; }
 }
@@ -112,7 +121,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     html { scroll-behavior: smooth; }
-    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size:18px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size:18px; -webkit-font-smoothing: antialiased; overflow-x: clip; }
     a { color: #00e676; }
     a:hover { color: #3ce396; }
     ::selection { background: #00e676; color: #041301; }
@@ -166,7 +175,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     <div style="position:relative; z-index:2; width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:1fr minmax(280px,.7fr); gap:48px; align-items:center; padding:110px 0 70px; min-height:600px;">
       <div style="min-width:0; max-width:760px;">
         <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase; display:flex; align-items:center; gap:12px;"><span style="width:38px; height:1px; background:#00e676;"></span>Circuito internacional de Betim</p>
-        <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; line-height:0.8; letter-spacing:-0.01em; font-size:clamp(50px,8vw,110px);">Pista homologada de <span style="color:#00e676;">1.110m</span></h1>
+        <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; line-height:1; letter-spacing:-0.01em; font-size:clamp(50px,8vw,110px);">Pista homologada de <span style="color:#00e676;">1.110m</span></h1>
         <p style="max-width:640px; margin:26px 0 0; font-size:clamp(16px,1.3vw,19px); line-height:1.5; color:#d7ded8;">Conheça os mapas oficiais do Kartódromo de Betim e entenda as características de cada configuração. Alterações de traçado são realizadas exclusivamente em campeonatos, conforme o calendário oficial.</p>
         <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:28px;">
           <a href="#tracados" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:54px; padding:16px 24px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Ver traçados oficiais</a>
@@ -185,7 +194,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:repeat(3,1fr); gap:16px;">
       <sc-for list="{{ highlights }}" as="h" hint-placeholder-count="3">
         <div style="border:1px solid rgba(255,255,255,.12); background:#0b100c; padding:24px;">
-          <span style="font-family:'Anton',sans-serif; font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:#a8b2aa;">{{ h.label }}</span>
+          <span style="font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#a8b2aa;">{{ h.label }}</span>
           <strong style="display:block; margin-top:10px; font-family:'Anton',sans-serif; font-weight:400; font-size:clamp(32px,4vw,44px); color:#00e676;">{{ h.value }}</strong>
           <p style="margin:8px 0 0; font-size:14px; line-height:1.5; color:#a8b2aa;">{{ h.detail }}</p>
         </div>
@@ -198,7 +207,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:0.9fr 1.1fr; gap:40px;">
       <div style="max-width:480px;">
         <p style="margin:0 0 14px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Como ler a pista</p>
-        <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(30px,3.6vw,42px); line-height:0.95;">Cada desenho muda o jeito de pilotar</h2>
+        <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(30px,3.6vw,42px); line-height:1;">Cada desenho muda o jeito de pilotar</h2>
         <p style="margin:18px 0 0; font-size:14px; line-height:1.6; color:#a8b2aa;">Os mapas abaixo apresentam o sentido da volta e as diferenças entre as configurações Normal, Invertido e Invertido com chicane.</p>
       </div>
       <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px;">
@@ -218,7 +227,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
       <div style="display:flex; flex-wrap:wrap; gap:24px; align-items:flex-end; justify-content:space-between; border-bottom:1px solid rgba(255,255,255,.1); padding-bottom:24px; margin-bottom:34px;">
         <div>
           <p style="margin:0 0 10px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Catálogo oficial</p>
-          <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(28px,4vw,44px); line-height:0.9;">Traçados oficiais do circuito</h2>
+          <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(28px,4vw,44px); line-height:1;">Traçados oficiais do circuito</h2>
         </div>
         <div style="display:flex; flex-wrap:wrap; gap:8px;">
           <sc-for list="{{ filters }}" as="f" hint-placeholder-count="4">
@@ -232,7 +241,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
           <article style="border:1px solid rgba(255,255,255,.12); background:#0b100c; padding:10px;">
             <div style="position:relative; aspect-ratio:1/1; overflow:hidden; background:#fff;">
               <img src="{{ t.url }}" alt="{{ t.label }}" loading="lazy" style="width:100%; height:100%; object-fit:contain;">
-              <span style="position:absolute; left:10px; top:10px; background:#030504; padding:4px 8px; font-family:'Anton',sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase;">#{{ t.number }}</span>
+              <span style="position:absolute; left:10px; top:10px; background:#030504; padding:4px 8px; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.14em; text-transform:uppercase;">#{{ t.number }}</span>
             </div>
             <div style="padding:12px 4px 2px; display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
               <h3 style="margin:0; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px;">Traçado {{ t.number }}</h3>
@@ -267,7 +276,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   <section style="padding:0 0 clamp(88px,9vw,140px);">
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto;">
       <div style="position:relative; overflow:hidden; border:1px solid rgba(255,255,255,.22); background:linear-gradient(135deg,#101711,#030504); padding:clamp(34px,5vw,72px); display:grid; grid-template-columns:1.2fr .8fr; gap:36px; align-items:center;">
-        <div style="min-width:0;"><h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(44px,6vw,80px); line-height:0.82;">Sua volta começa<br><span style="color:#00e676;">agora</span></h2><p style="margin:14px 0 0; color:#a8b2aa; font-size:18px;">Consulte os horários disponíveis e venha descobrir cada setor da pista.</p></div>
+        <div style="min-width:0;"><h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(44px,6vw,80px); line-height:1;">Sua volta começa<br><span style="color:#00e676;">agora</span></h2><p style="margin:14px 0 0; color:#a8b2aa; font-size:18px;">Consulte os horários disponíveis e venha descobrir cada setor da pista.</p></div>
         <div style="display:grid; gap:12px;">
           <a href="https://reservas.kartodromodebetim.com.br" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:16px 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Reservar corrida</a>
           <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:16px 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Falar no WhatsApp</a>
@@ -359,7 +368,7 @@ class Component extends DCLogic {
 
   renderVals() {
     const { headerScrolled, mobileNavOpen, isMobile, filter, showAll } = this.state;
-    const navBase = { fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.04em', padding: '10px 0', borderBottom: '2px solid transparent', textDecoration: 'none', transition: 'color .25s, border-color .25s' };
+    const navBase = { fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '12px', letterSpacing: '0.04em', padding: '10px 0', borderBottom: '2px solid transparent', textDecoration: 'none', transition: 'color .25s, border-color .25s' };
     const pages = [
       { label: 'Home', href: '/', id: 'home' },
       { label: 'A Pista', href: '/pista', id: 'pista' },
@@ -379,7 +388,7 @@ class Component extends DCLogic {
     ];
     const filters = filterDefs.map((f) => ({
       label: f.label, onSelect: () => this.setFilter(f.key),
-      style: { border: '1px solid rgba(255,255,255,.15)', background: filter === f.key ? '#00e676' : 'rgba(255,255,255,.05)', color: filter === f.key ? '#041301' : '#c7cbc4', padding: '11px 16px', fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.06em', cursor: 'pointer', minHeight: '44px' },
+      style: { border: '1px solid rgba(255,255,255,.15)', background: filter === f.key ? '#00e676' : 'rgba(255,255,255,.05)', color: filter === f.key ? '#041301' : '#c7cbc4', padding: '11px 16px', fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '12px', letterSpacing: '0.06em', cursor: 'pointer', minHeight: '44px' },
     }));
 
     const filtered = filter === 'all' ? ALL_TRACKS : ALL_TRACKS.filter((t) => t.variant === filter);
@@ -387,7 +396,7 @@ class Component extends DCLogic {
     const badgeColor = (variant) => (variant === 'invertido' ? '#00e676' : variant === 'invertido-chicane' ? '#f5c518' : '#a8b2aa');
     const visibleTracks = visible.map((t) => ({
       ...t,
-      badgeStyle: { border: '1px solid ' + badgeColor(t.variant), color: badgeColor(t.variant), fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', padding: '3px 7px', whiteSpace: 'nowrap' },
+      badgeStyle: { border: '1px solid ' + badgeColor(t.variant), color: badgeColor(t.variant), fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', padding: '3px 7px', whiteSpace: 'nowrap' },
     }));
 
     return {

@@ -46,7 +46,7 @@ const About = () => {
                   <strong className="block font-display text-2xl italic leading-none text-primary-400">
                     {fact.value}
                   </strong>
-                  <span className="mt-2 block font-race text-[11px] italic font-bold uppercase leading-snug tracking-[0.08em] text-white/60">
+                  <span className="mt-2 block font-race text-xs italic font-bold uppercase leading-snug tracking-[0.08em] text-white/60">
                     {fact.label}
                   </span>
                 </div>

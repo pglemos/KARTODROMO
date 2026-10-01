@@ -5,64 +5,80 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Pré-cadastro · Kartódromo Internacional de Betim</title>
 <meta name="description" content="Faça seu cadastro antes de chegar. No kartódromo é só digitar o CPF no totem.">
-<meta name="theme-color" content="#0B7A53">
+<meta name="theme-color" content="#030504">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@500;600;700&display=swap">
 <link rel="icon" href="/icone.png">
 <style>
+  /* Tokens da marca (os mesmos do site e da reserva online): fundo preto, verde neon, Anton nos títulos. */
   :root {
-    --verde: #0B7A53; --verde-vivo: #12A36F; --verde-claro: #E2EFEA; --fundo: #F4F5F7; --cartao: #fff;
-    --texto: #14161A; --suave: #6B7280; --borda: #E3E5E8; --erro: #D92D20; --erro-claro: #FDECEA;
+    color-scheme: dark;
+    --fundo: #030504; --fundo-2: #070b08; --cartao: #0b100c; --cartao-2: #111712;
+    --linha: rgba(255,255,255,.12); --linha-forte: rgba(255,255,255,.24);
+    --texto: #f7faf6; --suave: #a8b2aa; --apagado: #6b746d;
+    --verde: #00e676; --verde-fundo: rgba(0,230,118,.10); --tinta: #03140b;
+    --erro: #ff7a6b; --erro-fundo: rgba(255,122,107,.12);
+    --titulo: 'Anton', Impact, 'Arial Narrow', sans-serif; --corpo: 'Rajdhani', 'Segoe UI', Roboto, Arial, sans-serif;
+    --raio: 4px; --foco: 0 0 0 2px var(--fundo), 0 0 0 4px var(--verde);
+    --chanfro: polygon(5% 0, 100% 0, 95% 100%, 0 100%);
   }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; background: var(--fundo); color: var(--texto); font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-text-size-adjust: 100%; }
-  .topo { background: linear-gradient(160deg, #0F1A15 0%, #0B3D2A 55%, #0B7A53 100%); color: #fff; padding: 22px 18px 64px; }
-  .topo .logo { display: block; width: min(300px, 78vw); height: auto; margin: 4px auto 18px; background: #fff; border-radius: 16px; padding: 10px 14px; }
-  .topo h1 { font-size: clamp(24px, 6.4vw, 34px); line-height: 1.12; margin: 0 auto 8px; max-width: 640px; text-align: center; letter-spacing: -.02em; }
-  .topo p { margin: 0 auto; max-width: 560px; text-align: center; color: rgba(255,255,255,.82); font-size: 15.5px; }
+  * { box-sizing: border-box; font-synthesis-weight: none; }
+  html, body { margin: 0; background: var(--fundo); color: var(--texto); font: 500 17px/1.5 var(--corpo); -webkit-text-size-adjust: 100%; -webkit-font-smoothing: antialiased; }
+  :focus-visible { outline: none; box-shadow: var(--foco); }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+  .topo { background: radial-gradient(120% 90% at 50% 0%, rgba(0,230,118,.16) 0%, rgba(0,230,118,0) 60%), var(--fundo-2); border-bottom: 1px solid var(--linha); color: var(--texto); padding: 26px 18px 70px; }
+  .topo .logo { display: block; width: min(300px, 76vw); height: auto; margin: 0 auto 20px; }
+  .topo h1 { font: 400 clamp(30px, 8.4vw, 50px)/1 var(--titulo); text-transform: uppercase; margin: 0 auto 10px; max-width: 640px; text-align: center; text-wrap: balance; }
+  .topo h1 em { font-style: normal; color: var(--verde); }
+  .topo p { margin: 0 auto; max-width: 560px; text-align: center; color: var(--suave); font-size: 17px; text-wrap: balance; }
   .passos { display: flex; justify-content: center; gap: 8px; margin: 18px auto 0; flex-wrap: wrap; max-width: 640px; }
-  /* passos como sequência (antes eram "pílulas" com borda e pareciam botões clicáveis) */
-  .passos span { color: rgba(255,255,255,.9); font-size: 14px; font-weight: 600; }
-  .passos span + span::before { content: "›"; margin: 0 10px 0 2px; color: rgba(255,255,255,.55); }
-  main { max-width: 680px; margin: -44px auto 0; padding: 0 14px 40px; }
-  .cartao { background: var(--cartao); border: 1px solid var(--borda); border-radius: 20px; padding: 20px 18px; margin-bottom: 14px; box-shadow: 0 6px 24px rgba(16,24,40,.06); }
-  .cartao h2 { font-size: 17px; margin: 0 0 2px; display: flex; align-items: center; gap: 10px; }
-  .cartao h2 .n { width: 26px; height: 26px; border-radius: 50%; background: var(--verde); color: #fff; font-size: 13.5px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
-  .cartao .sub { color: var(--suave); font-size: 14px; margin: 0 0 14px 36px; }
-  .grade { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+  .passos span { font: 400 13px/1 var(--titulo); text-transform: uppercase; letter-spacing: .06em; color: var(--texto); }
+  .passos span + span::before { content: "›"; margin: 0 10px 0 2px; color: var(--verde); }
+  main { max-width: 680px; margin: -46px auto 0; padding: 0 14px 44px; }
+  .cartao { background: linear-gradient(180deg, var(--cartao-2), var(--cartao)); border: 1px solid var(--linha); border-radius: var(--raio); padding: 22px 18px; margin-bottom: 14px; }
+  .cartao h2 { font: 400 20px/1.05 var(--titulo); text-transform: uppercase; letter-spacing: .02em; margin: 0 0 4px; display: flex; align-items: center; gap: 12px; }
+  .cartao h2 .op { font-family: var(--corpo); text-transform: none; font-size: 15px; color: var(--apagado); letter-spacing: 0; }
+  .cartao h2 .n { width: 28px; height: 28px; background: var(--verde); color: var(--tinta); font: 400 15px/1 var(--titulo); display: inline-flex; align-items: center; justify-content: center; flex: none; clip-path: var(--chanfro); }
+  .cartao .sub { color: var(--suave); font-size: 15.5px; margin: 0 0 16px 40px; }
+  .grade { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px 12px; }
   .grade > div { min-width: 0; }
   .c6 { grid-column: span 6; } .c4 { grid-column: span 4; } .c3 { grid-column: span 3; } .c2 { grid-column: span 2; }
   @media (max-width: 520px) { .c3, .c4 { grid-column: span 6; } .c2 { grid-column: span 3; } }
-  label { display: block; font-size: 13.5px; font-weight: 600; color: #3A3F47; margin: 0 0 6px; }
-  label .op { font-weight: 400; color: var(--suave); }
-  input, select { width: 100%; min-width: 0; height: 50px; border: 1.5px solid var(--borda); border-radius: 12px; padding: 0 14px; font: inherit; font-size: 16.5px; color: var(--texto); background: #fff; outline: none; transition: border-color .15s, box-shadow .15s; -webkit-appearance: none; appearance: none; }
-  input:focus, select:focus { border-color: var(--verde); box-shadow: 0 0 0 4px rgba(11,122,83,.14); }
-  input.invalido { border-color: var(--erro); box-shadow: 0 0 0 4px rgba(217,45,32,.1); }
-  .seg { display: flex; background: #EDEEF1; border-radius: 12px; padding: 4px; gap: 4px; }
-  .seg button { flex: 1; height: 42px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 15px; font-weight: 600; color: var(--suave); cursor: pointer; }
-  .seg button.sel { background: #fff; color: var(--texto); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
-  .menor { border: 1px solid var(--borda); border-radius: 14px; padding: 14px; margin-bottom: 10px; position: relative; background: #FBFBFC; }
-  .menor .tirar { position: absolute; top: 8px; right: 8px; border: 0; background: none; color: var(--suave); font-size: 22px; line-height: 1; cursor: pointer; padding: 6px 10px; }
-  .btn2 { width: 100%; height: 48px; border: 1.5px dashed #BFC4CC; border-radius: 12px; background: #fff; font: inherit; font-weight: 600; color: var(--verde); cursor: pointer; }
-  .termo { display: flex; gap: 12px; align-items: flex-start; font-size: 15px; }
-  .termo input { width: 26px; height: 26px; flex: none; margin: 1px 0 0; accent-color: var(--verde); -webkit-appearance: checkbox; appearance: auto; }
-  details { margin-top: 10px; background: var(--fundo); border-radius: 12px; padding: 10px 14px; font-size: 14px; color: #3A3F47; }
-  summary { cursor: pointer; font-weight: 600; color: var(--verde); }
-  .enviar { width: 100%; height: 58px; border: 0; border-radius: 16px; background: linear-gradient(180deg, var(--verde-vivo), var(--verde)); color: #fff; font: inherit; font-size: 18px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 20px rgba(11,122,83,.3); }
-  .enviar:disabled { opacity: .6; }
-  .erro { display: none; background: var(--erro-claro); color: var(--erro); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; font-weight: 600; font-size: 15px; }
-  .rodape { text-align: center; color: var(--suave); font-size: 13px; margin-top: 18px; }
+  label { display: block; font: 400 13px/1.2 var(--titulo); text-transform: uppercase; letter-spacing: .06em; color: var(--suave); margin: 0 0 7px; }
+  label .op { font-family: var(--corpo); text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--apagado); }
+  input, select { width: 100%; min-width: 0; height: 50px; border: 1px solid var(--linha-forte); border-radius: var(--raio); padding: 0 14px; font: 500 17px var(--corpo); color: var(--texto); background: var(--fundo); outline: none; transition: border-color .15s, box-shadow .15s; -webkit-appearance: none; appearance: none; }
+  input::placeholder { color: var(--apagado); }
+  input:focus, select:focus { border-color: var(--verde); box-shadow: 0 0 0 3px rgba(0,230,118,.18); }
+  input.invalido { border-color: var(--erro); box-shadow: 0 0 0 3px rgba(255,122,107,.16); }
+  .seg { display: flex; border: 1px solid var(--linha-forte); border-radius: var(--raio); padding: 4px; gap: 4px; background: var(--fundo); }
+  .seg button { flex: 1; min-height: 42px; border: 0; border-radius: 2px; background: transparent; font: 400 15px/1 var(--titulo); text-transform: uppercase; letter-spacing: .05em; color: var(--suave); cursor: pointer; }
+  .seg button.sel { background: var(--verde); color: var(--tinta); }
+  .menor { border: 1px solid var(--linha); border-radius: var(--raio); padding: 14px; margin-bottom: 10px; position: relative; background: var(--fundo); }
+  .menor .tirar { position: absolute; top: 4px; right: 4px; width: 44px; height: 44px; border: 0; background: none; color: var(--suave); font-size: 24px; line-height: 1; cursor: pointer; }
+  .btn2 { width: 100%; min-height: 50px; border: 1px dashed var(--linha-forte); border-radius: var(--raio); background: transparent; font: 400 15px/1 var(--titulo); text-transform: uppercase; letter-spacing: .05em; color: var(--verde); cursor: pointer; }
+  .termo { display: flex; gap: 12px; align-items: flex-start; font: 500 16px/1.45 var(--corpo); text-transform: none; letter-spacing: 0; color: var(--texto); }
+  .termo input { width: 24px; height: 24px; flex: none; margin: 1px 0 0; accent-color: var(--verde); -webkit-appearance: checkbox; appearance: auto; }
+  details { margin-top: 10px; background: var(--fundo); border: 1px solid var(--linha); border-radius: var(--raio); padding: 11px 14px; font-size: 15.5px; color: var(--suave); }
+  summary { cursor: pointer; font: 400 14px/1.3 var(--titulo); text-transform: uppercase; letter-spacing: .05em; color: var(--verde); }
+  .enviar { width: 100%; min-height: 60px; border: 0; background: var(--verde); color: var(--tinta); font: 400 20px/1.1 var(--titulo); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; padding: 12px 34px; clip-path: var(--chanfro); }
+  .enviar:hover:not(:disabled) { background: #33ff99; }
+  .enviar:disabled { background: #1b3a29; color: #7fa68f; }
+  .erro { display: none; background: var(--erro-fundo); border: 1px solid rgba(255,122,107,.4); color: var(--erro); border-radius: var(--raio); padding: 12px 14px; margin-bottom: 14px; font-weight: 600; }
+  .rodape { text-align: center; color: var(--apagado); font-size: 14.5px; margin-top: 18px; }
   .oculto { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
   #pronto { display: none; text-align: center; padding: 34px 20px 28px; }
-  #pronto .ok { width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 16px; background: var(--verde-claro); display: flex; align-items: center; justify-content: center; }
-  #pronto h2 { font-size: 26px; margin: 0 0 8px; justify-content: center; }
-  #pronto p { color: #3A3F47; margin: 0 auto 8px; max-width: 460px; }
-  .totem { margin: 18px auto 0; max-width: 440px; text-align: left; background: var(--fundo); border-radius: 16px; padding: 16px 18px; }
+  #pronto .ok { width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 16px; background: var(--verde-fundo); border: 1px solid rgba(0,230,118,.4); display: flex; align-items: center; justify-content: center; }
+  #pronto .ok svg { stroke: var(--verde); }
+  #pronto h2 { font: 400 32px/1.05 var(--titulo); margin: 0 0 8px; justify-content: center; }
+  #pronto p { color: var(--suave); margin: 0 auto 8px; max-width: 460px; }
+  .totem { margin: 18px auto 0; max-width: 440px; text-align: left; background: var(--fundo); border: 1px solid var(--linha); border-radius: var(--raio); padding: 16px 18px; color: var(--suave); }
   .totem b { color: var(--verde); }
 </style>
 </head>
 <body>
 <header class="topo">
-  <img class="logo" src="/kib-logo.png" alt="Kartódromo Internacional de Betim" width="600" height="167">
-  <h1>Faça seu cadastro antes de chegar</h1>
+  <img class="logo" src="/kib-logo-escuro.png" alt="Kartódromo Internacional de Betim" width="720" height="200">
+  <h1>Faça seu cadastro <em>antes de chegar</em></h1>
   <p>Preencha uma vez aqui. No kartódromo, é só digitar seu CPF no totem de autoatendimento e escolher a bateria.</p>
   <div class="passos"><span>1 · Cadastro aqui</span><span>2 · CPF no totem</span><span>3 · Pista!</span></div>
 </header>
@@ -136,7 +152,7 @@
   </form>
 
   <section class="cartao" id="pronto" aria-live="polite">
-    <div class="ok"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#0B7A53" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+    <div class="ok"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#00e676" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
     <h2 id="prontoTitulo">Tudo certo!</h2>
     <p>Seu pré-cadastro foi recebido.</p>
     <div class="totem">

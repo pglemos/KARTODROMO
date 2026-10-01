@@ -25,7 +25,7 @@ const Contact = () => {
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center border border-primary-400/30 bg-white/5 text-primary-400 transition-transform group-hover:scale-110">
                 <Phone className="h-5 w-5" />
               </div>
-              <h4 className="mb-2 font-race text-sm italic font-bold uppercase tracking-wider text-white">Telefone / Fixo</h4>
+              <h3 className="mb-2 font-race text-sm italic font-bold uppercase tracking-wider text-white">Telefone / Fixo</h3>
               <p className="mb-1 text-xs font-light text-white/60">(31) 3511-2373</p>
               <a href="tel:+553135112373" className="mt-2 flex items-center justify-center text-xs font-semibold text-primary-400 hover:underline">
                 Ligar agora
@@ -37,7 +37,7 @@ const Contact = () => {
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center border border-primary-400/30 bg-white/5 text-primary-400 transition-transform group-hover:scale-110">
                 <MessageCircle className="h-5 w-5" />
               </div>
-              <h4 className="mb-2 font-race text-sm italic font-bold uppercase tracking-wider text-white">WhatsApp</h4>
+              <h3 className="mb-2 font-race text-sm italic font-bold uppercase tracking-wider text-white">WhatsApp</h3>
               <p className="mb-1 text-xs font-light text-white/60">(31) 3511-2373</p>
               <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" className="mt-2 flex items-center justify-center text-xs font-semibold text-primary-400 hover:underline">
                 Enviar mensagem
@@ -49,7 +49,7 @@ const Contact = () => {
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center border border-primary-400/30 bg-white/5 text-primary-400 transition-transform group-hover:scale-110">
                 <Mail className="h-5 w-5" />
               </div>
-              <h4 className="mb-2 font-race text-sm italic font-bold uppercase tracking-wider text-white">E-mail Oficial</h4>
+              <h3 className="mb-2 font-race text-sm italic font-bold uppercase tracking-wider text-white">E-mail Oficial</h3>
               <p className="truncate text-xs font-light text-white/60">contato@kartodromodebetim.com.br</p>
               <a href="mailto:contato@kartodromodebetim.com.br" className="mt-2 flex items-center justify-center text-xs font-semibold text-primary-400 hover:underline">
                 Escrever e-mail
@@ -61,7 +61,7 @@ const Contact = () => {
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center border border-primary-400/30 bg-white/5 text-primary-400 transition-transform group-hover:scale-110">
                 <Clock className="h-5 w-5" />
               </div>
-              <h4 className="mb-2 font-race text-sm italic font-bold uppercase tracking-wider text-white">Atendimento</h4>
+              <h3 className="mb-2 font-race text-sm italic font-bold uppercase tracking-wider text-white">Atendimento</h3>
               <p className="text-xs font-light text-white/60">Ter-Sex: 16h às 22h</p>
               <p className="text-xs font-light text-white/60">Sáb-Dom: 08h às 19h</p>
             </div>
@@ -106,7 +106,7 @@ const Contact = () => {
               href="https://maps.google.com/maps?q=Av.+Adutora+Várzea+das+Flores,+477+-+Itacolomi,+Betim+-+MG,+32672-586"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center border border-white/15 bg-white/5 px-4 py-2 font-race text-[11px] italic font-bold uppercase tracking-wider text-white transition-all hover:border-primary-400/40"
+              className="inline-flex items-center border border-white/15 bg-white/5 px-4 py-2 font-race text-xs italic font-bold uppercase tracking-wider text-white transition-all hover:border-primary-400/40"
             >
               <span>Traçar rota no Waze / Maps</span>
               <Compass className="ml-1.5 h-3.5 w-3.5 text-primary-400" />

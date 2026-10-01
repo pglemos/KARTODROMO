@@ -15,7 +15,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     html { scroll-behavior: smooth; }
-    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size:18px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size:18px; -webkit-font-smoothing: antialiased; overflow-x: clip; }
     a { color: #00e676; }
     a:hover { color: #3ce396; }
     ::selection { background: #00e676; color: #041301; }
@@ -69,8 +69,8 @@
     <div aria-hidden="true" style="position:absolute; inset-inline:0; bottom:0; z-index:1; height:160px; background:linear-gradient(0deg,#030504,transparent);"></div>
     <div style="position:relative; z-index:2; width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:0.96fr 1.04fr; gap:32px; align-items:end; min-height:78vh; padding:40px 0;">
       <div style="max-width:640px;">
-        <div style="display:inline-flex; align-items:center; gap:8px; margin-bottom:20px; border:1px solid rgba(0,230,118,.3); background:rgba(255,255,255,.05); padding:8px 16px; font-family:'Anton',sans-serif; font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:#00e676;">Kart de locação</div>
-        <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; line-height:0.82; letter-spacing:-0.01em; font-size:clamp(54px,8vw,96px);">Entre no <span style="color:#00e676;">grid hoje.</span></h1>
+        <div style="display:inline-flex; align-items:center; gap:8px; margin-bottom:20px; border:1px solid rgba(0,230,118,.3); background:rgba(255,255,255,.05); padding:8px 16px; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#00e676;">Kart de locação</div>
+        <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; line-height:1; letter-spacing:-0.01em; font-size:clamp(54px,8vw,96px);">Entre no <span style="color:#00e676;">grid hoje.</span></h1>
         <p style="max-width:60ch; margin:24px 0 0; font-size:clamp(16px,1.3vw,19px); line-height:1.6; color:#d7ded8;">Bateria de 30 minutos com kart de locação, cronometragem, equipamento incluso e equipe de pista em uma pista homologada de 1.110 metros.</p>
         <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:28px;">
           <a href="https://reservas.kartodromodebetim.com.br" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:54px; padding:0 24px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Reservar online</a>
@@ -82,7 +82,7 @@
         <h2 style="margin:0 0 16px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:22px;">Valor da bateria</h2>
         <div style="display:flex; align-items:flex-end; gap:10px; padding:18px 0; border-block:1px solid rgba(255,255,255,.12);">
           <strong style="font-family:'Anton',sans-serif; font-weight:400; font-size:clamp(60px,6vw,88px); line-height:0.72; color:#00e676;">R$145</strong>
-          <span style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; margin-bottom:5px; color:#a8b2aa;">por piloto antecipado</span>
+          <span style="font-family:'Anton',sans-serif; font-size:12px; text-transform:uppercase; margin-bottom:5px; color:#a8b2aa;">por piloto antecipado</span>
         </div>
         <div style="display:grid; gap:13px; margin:22px 0;">
           <div style="padding-left:18px; position:relative; color:#a8b2aa; font-size:14px; line-height:1.4;"><span aria-hidden="true" style="position:absolute; left:0; top:6px; width:7px; height:7px; border:2px solid #00e676; transform:rotate(45deg);"></span><strong style="display:block; color:#fff; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:12px;">Preço normal R$175</strong>Desconto no pagamento antecipado.</div>
@@ -99,13 +99,13 @@
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:0.74fr 1.26fr; gap:40px; align-items:flex-start;">
       <div style="max-width:400px;">
         <p style="margin:0 0 14px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">A bateria</p>
-        <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(30px,3.6vw,42px); line-height:0.95;">Trinta minutos dentro da pista.</h2>
+        <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(30px,3.6vw,42px); line-height:1;">Trinta minutos dentro da pista.</h2>
         <p style="max-width:70ch; margin:18px 0 0; font-size:14px; line-height:1.6; color:#a8b2aa;">Chegue com 1 hora de antecedência para cadastro, pesagem, retirada dos equipamentos e briefing. Depois, a sessão segue em três etapas simples.</p>
       </div>
       <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.1);">
         <sc-for list="{{ sessionFlow }}" as="s" hint-placeholder-count="3">
           <article style="background:#0b100c; padding:26px; min-height:230px;">
-            <span style="font-family:'Anton',sans-serif; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:#8b948c;">{{ s.stepLabel }}</span>
+            <span style="font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.14em; text-transform:uppercase; color:#8b948c;">{{ s.stepLabel }}</span>
             <strong style="display:block; margin-top:26px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:44px; line-height:0.9; color:#00e676;">{{ s.time }}</strong>
             <h3 style="margin:18px 0 0; font-family:'Anton',sans-serif; font-size:16px; font-weight:400;">{{ s.label }}</h3>
             <p style="max-width:70ch; margin:8px 0 0; font-size:14px; line-height:1.5; color:#a8b2aa;">{{ s.text }}</p>
@@ -122,13 +122,13 @@
         <div style="display:flex; align-items:flex-start; gap:16px;">
           <div style="width:44px; height:44px; flex:none; display:flex; align-items:center; justify-content:center; border:1px solid rgba(0,230,118,.3); background:rgba(255,255,255,.05); color:#00e676;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 12l2 2 4-4M12 22a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"/></svg></div>
           <div>
-            <p style="margin:0; color:#00e676; font-family:'Anton',sans-serif; font-size:11px; letter-spacing:0.16em; text-transform:uppercase;">Para pilotar</p>
+            <p style="margin:0; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.16em; text-transform:uppercase;">Para pilotar</p>
             <h2 style="margin:8px 0 0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:24px;">Requisitos rápidos</h2>
           </div>
         </div>
         <div style="margin-top:26px; display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.1);">
           <sc-for list="{{ requirements }}" as="r" hint-placeholder-count="4">
-            <div style="background:#0b100c; padding:16px;"><strong style="display:block; font-size:20px; font-weight:800; color:#fff;">{{ r.value }}</strong><span style="display:block; margin-top:8px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; color:#8b948c;">{{ r.label }}</span></div>
+            <div style="background:#0b100c; padding:16px;"><strong style="display:block; font-size:20px; font-weight:800; color:#fff;">{{ r.value }}</strong><span style="display:block; margin-top:8px; font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; color:#8b948c;">{{ r.label }}</span></div>
           </sc-for>
         </div>
         <ul style="list-style:none; margin:26px 0 0; padding:0; display:grid; gap:12px;">
@@ -139,16 +139,16 @@
       </div>
       <div style="display:grid; gap:28px;">
         <div style="border:1px solid rgba(255,255,255,.12); background:#0b100c; padding:28px;">
-          <p style="margin:0; color:#00e676; font-family:'Anton',sans-serif; font-size:11px; letter-spacing:0.16em; text-transform:uppercase;">Pagamento</p>
+          <p style="margin:0; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.16em; text-transform:uppercase;">Pagamento</p>
           <h2 style="margin:8px 0 0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:24px;">Escolha como pagar</h2>
           <div style="margin-top:22px; display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.1);">
             <sc-for list="{{ paymentMethods }}" as="p" hint-placeholder-count="3">
-              <div style="background:#0b100c; padding:16px; text-align:center;"><span style="display:block; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:#c7cbc4;">{{ p }}</span></div>
+              <div style="background:#0b100c; padding:16px; text-align:center;"><span style="display:block; font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:#c7cbc4;">{{ p }}</span></div>
             </sc-for>
           </div>
         </div>
         <div style="border:1px solid rgba(0,230,118,.25); background:#0b100c; padding:28px;">
-          <p style="margin:0; color:#00e676; font-family:'Anton',sans-serif; font-size:11px; letter-spacing:0.16em; text-transform:uppercase;">Reserva</p>
+          <p style="margin:0; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.16em; text-transform:uppercase;">Reserva</p>
           <h2 style="margin:12px 0 0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(24px,2.6vw,30px); line-height:1;">Veja horários disponíveis agora.</h2>
           <p style="max-width:70ch; margin:18px 0 0; font-size:14px; line-height:1.6; color:#a8b2aa;">Reserve online para garantir a bateria. Para grupos, aniversários ou dúvidas sobre horário, fale com a equipe pelo WhatsApp.</p>
           <div style="display:grid; gap:10px; margin-top:24px;">
@@ -164,12 +164,12 @@
         <h3 style="margin:0; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; color:#a8b2aa;">Economia antecipada</h3>
         <div style="margin-top:20px; font-family:'Anton',sans-serif; font-size:clamp(56px,7vw,88px); line-height:0.7; color:#00e676;">R$30</div>
         <div style="margin-top:26px; display:grid; grid-template-columns:1fr 1fr; gap:18px;">
-          <div><span style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#8b948c;">Normal</span><strong style="display:block; margin-top:6px; font-family:'Anton',sans-serif; font-weight:400; color:#fff; font-size:34px;">175</strong><span style="color:#a8b2aa; font-size:12px;">Pagamento convencional.</span></div>
-          <div><span style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#8b948c;">Online</span><strong style="display:block; margin-top:6px; font-family:'Anton',sans-serif; font-weight:400; color:#00e676; font-size:34px;">145</strong><span style="color:#a8b2aa; font-size:12px;">Pagamento antecipado.</span></div>
+          <div><span style="font-family:'Anton',sans-serif; font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:#8b948c;">Normal</span><strong style="display:block; margin-top:6px; font-family:'Anton',sans-serif; font-weight:400; color:#fff; font-size:34px;">R$ 175</strong><span style="color:#a8b2aa; font-size:12px;">Pagamento convencional.</span></div>
+          <div><span style="font-family:'Anton',sans-serif; font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:#8b948c;">Online</span><strong style="display:block; margin-top:6px; font-family:'Anton',sans-serif; font-weight:400; color:#00e676; font-size:34px;">R$ 145</strong><span style="color:#a8b2aa; font-size:12px;">Pagamento antecipado.</span></div>
         </div>
       </div>
       <div>
-        <p style="margin:0 0 12px; color:#00e676; font-family:'Anton',sans-serif; font-size:11px; letter-spacing:0.16em; text-transform:uppercase;">Grupos fechados</p>
+        <p style="margin:0 0 12px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.16em; text-transform:uppercase;">Grupos fechados</p>
         <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(26px,3vw,34px); line-height:1;">A pista inteira para sua turma</h2>
         <p style="max-width:70ch; margin:18px 0 0; font-size:14px; line-height:1.6; color:#a8b2aa;">Terça a sexta: mínimo de 25 pilotos. Finais de semana e feriados: mínimo de 30 pilotos, conforme disponibilidade.</p>
         <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:22px;">
@@ -190,7 +190,7 @@
   <section style="padding:clamp(56px,7vw,90px) 0;">
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto;">
       <div style="position:relative; overflow:hidden; border:1px solid rgba(255,255,255,.22); background:linear-gradient(135deg,#101711,#030504); padding:clamp(34px,5vw,72px); display:grid; grid-template-columns:1.2fr .8fr; gap:36px; align-items:center;">
-        <div style="min-width:0;"><h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5.5vw,68px); line-height:0.85;">Entre no grid<br><span style="color:#00e676;">agora mesmo</span></h2><p style="margin:14px 0 0; color:#a8b2aa; font-size:18px;">Reserve online em poucos minutos ou fale com a equipe pelo WhatsApp para tirar dúvidas.</p></div>
+        <div style="min-width:0;"><h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5.5vw,68px); line-height:1;">Entre no grid<br><span style="color:#00e676;">agora mesmo</span></h2><p style="margin:14px 0 0; color:#a8b2aa; font-size:18px;">Reserve online em poucos minutos ou fale com a equipe pelo WhatsApp para tirar dúvidas.</p></div>
         <div style="display:grid; gap:12px;">
           <a href="https://reservas.kartodromodebetim.com.br" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Reservar online</a>
           <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Falar no WhatsApp</a>
@@ -268,7 +268,7 @@ class Component extends DCLogic {
 
   renderVals() {
     const { headerScrolled, mobileNavOpen, isMobile } = this.state;
-    const navBase = { fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.04em', padding: '10px 0', borderBottom: '2px solid transparent', textDecoration: 'none', transition: 'color .25s, border-color .25s' };
+    const navBase = { fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '12px', letterSpacing: '0.04em', padding: '10px 0', borderBottom: '2px solid transparent', textDecoration: 'none', transition: 'color .25s, border-color .25s' };
     const pages = [
       { label: 'Home', href: 'home.dc.html', id: 'home' },
       { label: 'A Pista', href: 'pista.dc.html', id: 'pista' },

@@ -154,14 +154,18 @@ const mobileFitStyle = `<style data-generated="mobile-fit">
     flex: none;
   }
 
-  h1, h2, h3 { overflow-wrap: anywhere; }
+  /* break-word (não "anywhere"): só corta palavra que sozinha não cabe — "anywhere" partia
+     "CORPORATIVO" em "CORPORAT/IVO" mesmo havendo espaço para a palavra inteira na linha de baixo */
+  h1, h2, h3 { overflow-wrap: break-word; text-wrap: balance; }
 
-  /* Legibilidade: nada abaixo de 11px no celular. */
-  small { font-size: 11px !important; }
+  /* Legibilidade: nada abaixo de 12px no celular. */
+  small { font-size: 12px !important; }
   [style*="font-size:9px"], [style*="font-size: 9px"],
   [style*="font-size:9.5px"], [style*="font-size: 9.5px"],
   [style*="font-size:10px"], [style*="font-size: 10px"],
-  [style*="font-size:10.5px"], [style*="font-size: 10.5px"] { font-size: 11px !important; }
+  [style*="font-size:10.5px"], [style*="font-size: 10.5px"],
+  [style*="font-size:11px"], [style*="font-size: 11px"],
+  [style*="font-size:11.5px"], [style*="font-size: 11.5px"] { font-size: 12px !important; }
 
   /* Evita o zoom automático do iOS ao focar um campo. */
   input, select, textarea { font-size: 16px !important; }
@@ -176,8 +180,10 @@ const mobileFitStyle = `<style data-generated="mobile-fit">
 `;
 
 /** Reduces all motion on public prototypes when the user asks for it. */
-const reducedMotionStyle = `<style data-generated="reduced-motion">
+const reducedMotionStyle = `<noscript><style data-generated="sem-js">[data-reveal] { opacity: 1 !important; transform: none !important; }</style></noscript>
+<style data-generated="reduced-motion">
 @media (prefers-reduced-motion: reduce) {
+  [data-reveal] { opacity: 1 !important; transform: none !important; }
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
@@ -191,6 +197,9 @@ const reducedMotionStyle = `<style data-generated="reduced-motion">
 /** Anel de foco visível para navegação por teclado; os protótipos zeram o outline dos campos. */
 /** Menu do topo vinha com 11px (auditoria de 01/10/2026): 13px no computador, sem mudar o layout do protótipo. */
 const navLegibleStyle = `<style data-generated="nav-legible">
+/* a Anton só tem peso 400: título sem peso definido (h3) saía com negrito "engordado" pelo navegador, borrado.
+   O itálico sintético continua (o "KART" do título usa). */
+* { font-synthesis-weight: none; }
 @media (min-width: 721px) {
   header nav a, header nav a * { font-size: 13px !important; }
 }

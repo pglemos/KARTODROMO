@@ -38,7 +38,7 @@ const Footer = () => {
           </div>
 
           <div className="space-y-4">
-            <h4 className="font-race text-sm italic font-bold uppercase tracking-wider text-white">Canais de Contato</h4>
+            <h2 className="font-race text-sm italic font-bold uppercase tracking-wider text-white">Canais de Contato</h2>
             <div className="space-y-3 text-xs font-light">
               <div className="flex items-center space-x-2.5">
                 <Mail className="h-4 w-4 flex-shrink-0 text-primary-400" />
@@ -64,7 +64,7 @@ const Footer = () => {
           </div>
 
           <div className="space-y-4">
-            <h4 className="font-race text-sm italic font-bold uppercase tracking-wider text-white">Horários da Pista</h4>
+            <h2 className="font-race text-sm italic font-bold uppercase tracking-wider text-white">Horários da Pista</h2>
             <div className="flex items-start space-x-2.5 text-xs font-light text-white/70">
               <Clock className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary-400" />
               <div>

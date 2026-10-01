@@ -261,7 +261,7 @@ pagamento: 'PENDENTE',
       soon: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/25',
     };
     return (
-      <span className={`inline-flex items-center whitespace-nowrap px-3 py-1 font-race text-[11px] italic font-bold uppercase tracking-wider ${styles[status] || styles.soon}`}>
+      <span className={`inline-flex items-center whitespace-nowrap px-3 py-1 font-race text-xs italic font-bold uppercase tracking-wider ${styles[status] || styles.soon}`}>
         {label}
       </span>
     );
@@ -512,7 +512,7 @@ pagamento: 'PENDENTE',
                 type="button"
                 onClick={closeModal}
                 aria-label="Fechar formulário de inscrição"
-                className="flex h-8 w-8 items-center justify-center border border-white/15 bg-white/5 text-white/60 transition-all hover:border-red-500/50 hover:text-red-500 focus:outline-none"
+                className="flex h-11 w-11 items-center justify-center border border-white/15 bg-white/5 text-white/60 transition-all hover:border-red-500/50 hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
               >
                 <X className="w-4 h-4" />
               </button>

@@ -15,7 +15,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     html { scroll-behavior: smooth; }
-    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size:18px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size:18px; -webkit-font-smoothing: antialiased; overflow-x: clip; }
     a { color: #00e676; }
     a:hover { color: #3ce396; }
     a:focus-visible { outline: 2px solid #00e676; outline-offset: 2px; }
@@ -42,7 +42,7 @@
   <main style="width:min(840px,calc(100% - 40px)); margin:0 auto; padding:36px 0 80px; display:grid; gap:22px;">
     <div>
       <p style="margin:0 0 4px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.14em; text-transform:uppercase;">Termos</p>
-      <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(30px,4vw,44px); line-height:0.9;">Regulamento do clube</h1>
+      <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(30px,4vw,44px); line-height:1;">Regulamento do clube</h1>
     </div>
 
     <sc-for list="{{ sections }}" as="s" hint-placeholder-count="4">

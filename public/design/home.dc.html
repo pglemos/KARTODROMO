@@ -61,14 +61,18 @@
     flex: none;
   }
 
-  h1, h2, h3 { overflow-wrap: anywhere; }
+  /* break-word (não "anywhere"): só corta palavra que sozinha não cabe — "anywhere" partia
+     "CORPORATIVO" em "CORPORAT/IVO" mesmo havendo espaço para a palavra inteira na linha de baixo */
+  h1, h2, h3 { overflow-wrap: break-word; text-wrap: balance; }
 
-  /* Legibilidade: nada abaixo de 11px no celular. */
-  small { font-size: 11px !important; }
+  /* Legibilidade: nada abaixo de 12px no celular. */
+  small { font-size: 12px !important; }
   [style*="font-size:9px"], [style*="font-size: 9px"],
   [style*="font-size:9.5px"], [style*="font-size: 9.5px"],
   [style*="font-size:10px"], [style*="font-size: 10px"],
-  [style*="font-size:10.5px"], [style*="font-size: 10.5px"] { font-size: 11px !important; }
+  [style*="font-size:10.5px"], [style*="font-size: 10.5px"],
+  [style*="font-size:11px"], [style*="font-size: 11px"],
+  [style*="font-size:11.5px"], [style*="font-size: 11.5px"] { font-size: 12px !important; }
 
   /* Evita o zoom automático do iOS ao focar um campo. */
   input, select, textarea { font-size: 16px !important; }
@@ -80,8 +84,10 @@
   }
 }
 </style>
+<noscript><style data-generated="sem-js">[data-reveal] { opacity: 1 !important; transform: none !important; }</style></noscript>
 <style data-generated="reduced-motion">
 @media (prefers-reduced-motion: reduce) {
+  [data-reveal] { opacity: 1 !important; transform: none !important; }
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
@@ -98,6 +104,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 }
 </style>
 <style data-generated="nav-legible">
+/* a Anton só tem peso 400: título sem peso definido (h3) saía com negrito "engordado" pelo navegador, borrado.
+   O itálico sintético continua (o "KART" do título usa). */
+* { font-synthesis-weight: none; }
 @media (min-width: 721px) {
   header nav a, header nav a * { font-size: 13px !important; }
 }
@@ -112,7 +121,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     html { scroll-behavior: smooth; }
-    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size:18px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size:18px; -webkit-font-smoothing: antialiased; overflow-x: clip; }
     a { color: #00e676; }
     a:hover { color: #3ce396; }
     ::selection { background: #00e676; color: #041301; }
@@ -176,7 +185,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     <div style="position:relative; z-index:5; width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:minmax(0,1.25fr) minmax(300px,.62fr); gap:clamp(32px,5vw,78px); align-items:end; padding:clamp(150px,18vh,220px) 0 56px;">
       <div style="min-width:0;">
         <p data-reveal style="display:flex; align-items:center; gap:12px; margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; font-weight:400; letter-spacing:0.17em; text-transform:uppercase; opacity:0; transform:translateY(16px); transition:opacity .6s cubic-bezier(.16,1,.3,1), transform .6s cubic-bezier(.16,1,.3,1);">A comemoração mais rápida de Betim</p>
-        <h1 data-reveal style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; line-height:0.8; letter-spacing:-0.01em; transform-origin:left; font-size:clamp(58px,9.4vw,148px); text-shadow:0 14px 46px rgba(0,0,0,.65); opacity:0; transition:opacity .8s cubic-bezier(.16,1,.3,1) 60ms, transform .8s cubic-bezier(.16,1,.3,1) 60ms;">
+        <h1 data-reveal style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; line-height:1; letter-spacing:-0.01em; transform-origin:left; font-size:clamp(58px,9.4vw,148px); text-shadow:0 14px 46px rgba(0,0,0,.65); opacity:0; transition:opacity .8s cubic-bezier(.16,1,.3,1) 60ms, transform .8s cubic-bezier(.16,1,.3,1) 60ms;">
           <span style="display:block;">Aniversário no</span><span style="display:block; font-size:1.18em; color:#00e676; display:inline-block; transform:skewX(-6deg);">Kart</span><span style="display:block;">mais incrível</span><span style="display:block;">de Betim</span>
         </h1>
         <p data-reveal style="max-width:680px; margin:28px 0 0; font-size:clamp(17px,1.4vw,21px); line-height:1.55; color:#d5ddd6; opacity:0; transform:translateY(18px); transition:opacity .7s cubic-bezier(.16,1,.3,1) 160ms, transform .7s cubic-bezier(.16,1,.3,1) 160ms;">
@@ -247,7 +256,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
         </div>
         <div style="min-width:0;">
           <p style="display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;"><span style="{{ milhasBadgeStyle }}">{{ milhasBadge }}</span>Endurance · Kart Light</p>
-          <h2 id="milhas-light-title" style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(38px,6vw,84px); line-height:0.9;">100 Milhas Light<br><span style="color:#00e676;">de Betim</span></h2>
+          <h2 id="milhas-light-title" style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(38px,6vw,84px); line-height:1;">100 Milhas Light<br><span style="color:#00e676;">de Betim</span></h2>
           <p style="max-width:58ch; margin:20px 0 0; color:#a8b2aa; font-size:clamp(16px,1.2vw,19px); line-height:1.6;">Endurance de 2h30 com os karts light de locação do kartódromo. Monte sua equipe de 1 a 3 pilotos por kart e dispute o pódio no domingo, 25 de outubro de 2026.</p>
           <div style="margin:26px 0 0; display:flex; flex-wrap:wrap; gap:1px; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.12);">
             <sc-for list="{{ milhasFacts }}" as="fact" hint-placeholder-count="4">
@@ -271,7 +280,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto;">
       <div data-reveal style="opacity:0; transform:translateY(24px); transition:opacity .6s cubic-bezier(.16,1,.3,1), transform .6s cubic-bezier(.16,1,.3,1);">
         <p style="display:flex; align-items:center; gap:12px; margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Escolha seu formato</p>
-        <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(46px,6vw,84px); line-height:0.82;">Opções para grupos<br><span style="color:#00e676;">e comemorações</span></h2>
+        <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(46px,6vw,84px); line-height:1;">Opções para grupos<br><span style="color:#00e676;">e comemorações</span></h2>
       </div>
       <div style="margin-top:60px; display:grid; grid-template-columns:repeat(12,1fr); gap:18px;">
         <sc-for list="{{ groupOptions }}" as="opt" hint-placeholder-count="3">
@@ -279,10 +288,10 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
             <img src="{{ opt.image }}" alt="{{ opt.alt }}" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:-2; filter:grayscale(.2) contrast(1.14) brightness(.5); transition:transform .6s cubic-bezier(.16,1,.3,1), filter .6s;" style-hover="transform:scale(1.06); filter:grayscale(0) contrast(1.12) brightness(.58);">
             <div aria-hidden="true" style="position:absolute; inset:0; z-index:-1; background:linear-gradient(0deg,rgba(3,5,4,.99) 8%,rgba(3,5,4,.78) 52%,transparent 100%); pointer-events:none;"></div>
             <div style="position:absolute; inset:auto 0 0; padding:32px;">
-              <h3 style="margin:0; max-width:8ch; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(32px,3.4vw,48px); line-height:0.82;">{{ opt.title }}</h3>
+              <h3 style="margin:0; max-width:none; text-wrap:balance; overflow-wrap:normal; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(32px,3.4vw,48px); line-height:1;">{{ opt.title }}</h3>
               <p style="margin:16px 0; color:#a8b2aa; font-size:16px; line-height:1.5;">{{ opt.text }}</p>
-              <sc-if value="{{ opt.price }}"><div style="display:flex; gap:10px; align-items:flex-end; margin:18px 0;"><strong style="font-family:'Anton',sans-serif; font-weight:400; font-size:40px; color:#00e676; line-height:0.7;">{{ opt.price }}</strong><span style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#a8b2aa;">{{ opt.priceNote }}</span></div></sc-if>
-              <button type="button" onClick="{{ openModal }}" aria-haspopup="dialog" aria-controls="event-modal" style="appearance:none; border:0; cursor:pointer; min-height:46px; padding:0 20px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; letter-spacing:0.04em; transition:transform .25s, box-shadow .25s;" style-hover="transform:translateY(-3px); box-shadow:0 12px 26px rgba(0,0,0,.3);">{{ opt.cta }}</button>
+              <sc-if value="{{ opt.price }}"><div style="display:flex; gap:10px; align-items:flex-end; margin:18px 0;"><strong style="font-family:'Anton',sans-serif; font-weight:400; font-size:40px; color:#00e676; line-height:0.7;">{{ opt.price }}</strong><span style="font-family:'Anton',sans-serif; font-size:12px; text-transform:uppercase; color:#a8b2aa;">{{ opt.priceNote }}</span></div></sc-if>
+              <button type="button" onClick="{{ openModal }}" aria-haspopup="dialog" aria-controls="event-modal" style="appearance:none; border:0; cursor:pointer; min-height:46px; padding:0 20px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; transition:transform .25s, box-shadow .25s;" style-hover="transform:translateY(-3px); box-shadow:0 12px 26px rgba(0,0,0,.3);">{{ opt.cta }}</button>
             </div>
           </article>
         </sc-for>
@@ -295,12 +304,12 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(28px,5vw,80px); align-items:center;">
       <div data-reveal style="min-width:0; opacity:0; transform:translateY(24px); transition:opacity .6s cubic-bezier(.16,1,.3,1), transform .6s cubic-bezier(.16,1,.3,1);">
         <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Como funciona</p>
-        <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:0.85;">Simples, rápido<br><span style="color:#00e676;">e cheio de adrenalina</span></h2>
+        <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:1;">Simples, rápido<br><span style="color:#00e676;">e cheio de adrenalina</span></h2>
         <p style="max-width:56ch; margin:24px 0 0; color:#a8b2aa; font-size:clamp(16px,1.2vw,19px); line-height:1.6;">Do primeiro contato ao pódio, a equipe organiza cada etapa para seu grupo aproveitar o que importa: a corrida e a comemoração.</p>
       </div>
       <div data-reveal style="min-width:0; display:grid; grid-template-columns:repeat(4,1fr); border:1px solid rgba(255,255,255,.12); background:#0b100c; opacity:0; transform:translateY(24px); transition:opacity .6s cubic-bezier(.16,1,.3,1), transform .6s cubic-bezier(.16,1,.3,1);">
         <sc-for list="{{ statBlocks }}" as="s" hint-placeholder-count="4">
-          <div style="padding:24px; border-right:1px solid rgba(255,255,255,.12);"><strong style="display:block; font-family:'Anton',sans-serif; font-weight:400; font-size:clamp(38px,4vw,58px); line-height:0.8; color:#00e676;">{{ s.value }}</strong><span style="display:block; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; color:#a8b2aa; margin-top:8px;">{{ s.label }}</span></div>
+          <div style="padding:24px; border-right:1px solid rgba(255,255,255,.12);"><strong style="display:block; font-family:'Anton',sans-serif; font-weight:400; font-size:clamp(38px,4vw,58px); line-height:0.8; color:#00e676;">{{ s.value }}</strong><span style="display:block; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; color:#a8b2aa; margin-top:8px;">{{ s.label }}</span></div>
         </sc-for>
       </div>
     </div>
@@ -319,7 +328,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   <section style="padding:clamp(88px,9vw,140px) 0;">
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto;">
       <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Viva essa experiência</p>
-      <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:0.85;">Adrenalina que<br><span style="color:#00e676;">conecta</span></h2>
+      <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:1;">Adrenalina que<br><span style="color:#00e676;">conecta</span></h2>
       <div style="margin-top:48px; display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; align-items:center;">
         <sc-for list="{{ galleryItems }}" as="g" hint-placeholder-count="5">
           <figure data-reveal style="margin:0; position:relative; height:340px; overflow:hidden; clip-path:polygon(8% 0,100% 0,92% 100%,0 100%); border:1px solid rgba(255,255,255,.12); opacity:0; transform:translateY(24px); transition:opacity .6s cubic-bezier(.16,1,.3,1), transform .35s cubic-bezier(.16,1,.3,1), border-color .35s;" style-hover="border-color:rgba(0,230,118,.5);">
@@ -336,7 +345,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(28px,5vw,80px); align-items:center;">
       <div data-reveal style="min-width:0; opacity:0; transform:translateY(24px); transition:opacity .6s cubic-bezier(.16,1,.3,1), transform .6s cubic-bezier(.16,1,.3,1);">
         <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Por que Betim</p>
-        <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:0.85;">Seu evento sai<br><span style="color:#00e676;">do comum</span></h2>
+        <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:1;">Seu evento sai<br><span style="color:#00e676;">do comum</span></h2>
         <p style="max-width:56ch; margin:24px 0 0; color:#a8b2aa; font-size:clamp(16px,1.2vw,19px); line-height:1.6;">Velocidade, disputa e comemoração em um dos espaços mais marcantes da região.</p>
       </div>
       <div style="min-width:0; display:grid; grid-template-columns:1fr 1fr; gap:18px 28px;">
@@ -355,7 +364,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto;">
       <div data-reveal style="position:relative; overflow:hidden; border:1px solid rgba(255,255,255,.22); background:linear-gradient(135deg,#101711,#030504); padding:clamp(34px,5vw,72px); display:grid; grid-template-columns:1.2fr .8fr; gap:36px; align-items:center; opacity:0; transform:translateY(24px); transition:opacity .6s cubic-bezier(.16,1,.3,1), transform .6s cubic-bezier(.16,1,.3,1);">
         <div style="min-width:0;">
-          <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(44px,6vw,80px); line-height:0.82;">Pronto para acelerar<br><span style="color:#00e676;">emoções?</span></h2>
+          <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(44px,6vw,80px); line-height:1;">Pronto para acelerar<br><span style="color:#00e676;">emoções?</span></h2>
           <p style="margin:14px 0 0; color:#a8b2aa; font-size:18px;">Reserve seu grupo e transforme a próxima comemoração em uma corrida inesquecível.</p>
         </div>
         <div style="display:grid; gap:12px; position:relative; z-index:2;">
@@ -372,14 +381,14 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     <div style="width:min(740px,100%); max-height:90vh; overflow:auto; background:#0b100c; border:1px solid rgba(255,255,255,.22); box-shadow:0 30px 90px rgba(0,0,0,.55); padding:34px; position:relative;" onClick="{{ stopPropagation }}">
       <button type="button" onClick="{{ closeModal }}" aria-label="Fechar formulário" style="position:absolute; right:16px; top:16px; width:40px; height:40px; border:1px solid rgba(255,255,255,.12); background:#070b08; color:#fff; cursor:pointer; font-size:18px; transition:transform .25s, border-color .25s;" style-hover="transform:rotate(90deg); border-color:#00e676; color:#00e676;">×</button>
       <p style="margin:0 0 8px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Orçamento rápido</p>
-      <h2 id="event-modal-title" style="margin:10px 0 14px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:44px; line-height:0.85;">Monte seu grid</h2>
+      <h2 id="event-modal-title" style="margin:10px 0 14px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:44px; line-height:1;">Monte seu grid</h2>
       <p style="margin:0 0 22px; color:#a8b2aa;">Preencha os dados. Ao enviar, a conversa abre no WhatsApp com tudo organizado.</p>
       <form onSubmit="{{ onSubmitLead }}" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
-        <div style="display:grid; gap:7px;"><label for="lead-nome" style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#a8b2aa;">Nome</label><input id="lead-nome" name="nome" type="text" autocomplete="name" required="" placeholder="Seu nome" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#070b08; color:#fff; padding:15px; outline:none;"></div>
-        <div style="display:grid; gap:7px;"><label for="lead-tipo" style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#a8b2aa;">Tipo de evento</label><select id="lead-tipo" name="tipo" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#070b08; color:#fff; padding:15px; outline:none;"><option>Aniversário</option><option>Grupo de amigos</option><option>Evento corporativo</option></select></div>
-        <div style="display:grid; gap:7px;"><label for="lead-pessoas" style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#a8b2aa;">Quantidade de pessoas</label><input id="lead-pessoas" name="pessoas" inputmode="numeric" type="number" min="8" placeholder="Ex.: 25" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#070b08; color:#fff; padding:15px; outline:none;"></div>
-        <div style="display:grid; gap:7px;"><label for="lead-data" style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#a8b2aa;">Data desejada</label><input id="lead-data" name="data" type="date" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#070b08; color:#fff; padding:15px; outline:none;"></div>
-        <div style="grid-column:1/-1; display:grid; gap:7px;"><label for="lead-mensagem" style="font-family:'Anton',sans-serif; font-size:11px; text-transform:uppercase; color:#a8b2aa;">Mensagem</label><textarea id="lead-mensagem" name="mensagem" placeholder="Conte um pouco sobre o evento" style="width:100%; min-height:100px; border:1px solid rgba(255,255,255,.12); background:#070b08; color:#fff; padding:15px; outline:none; resize:vertical;"></textarea></div>
+        <div style="display:grid; gap:7px;"><label for="lead-nome" style="font-family:'Anton',sans-serif; font-size:12px; text-transform:uppercase; color:#a8b2aa;">Nome</label><input id="lead-nome" name="nome" type="text" autocomplete="name" required="" placeholder="Seu nome" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#070b08; color:#fff; padding:15px; outline:none;"></div>
+        <div style="display:grid; gap:7px;"><label for="lead-tipo" style="font-family:'Anton',sans-serif; font-size:12px; text-transform:uppercase; color:#a8b2aa;">Tipo de evento</label><select id="lead-tipo" name="tipo" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#070b08; color:#fff; padding:15px; outline:none;"><option>Aniversário</option><option>Grupo de amigos</option><option>Evento corporativo</option></select></div>
+        <div style="display:grid; gap:7px;"><label for="lead-pessoas" style="font-family:'Anton',sans-serif; font-size:12px; text-transform:uppercase; color:#a8b2aa;">Quantidade de pessoas</label><input id="lead-pessoas" name="pessoas" inputmode="numeric" type="number" min="8" placeholder="Ex.: 25" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#070b08; color:#fff; padding:15px; outline:none;"></div>
+        <div style="display:grid; gap:7px;"><label for="lead-data" style="font-family:'Anton',sans-serif; font-size:12px; text-transform:uppercase; color:#a8b2aa;">Data desejada</label><input id="lead-data" name="data" type="date" style="width:100%; border:1px solid rgba(255,255,255,.12); background:#070b08; color:#fff; padding:15px; outline:none;"></div>
+        <div style="grid-column:1/-1; display:grid; gap:7px;"><label for="lead-mensagem" style="font-family:'Anton',sans-serif; font-size:12px; text-transform:uppercase; color:#a8b2aa;">Mensagem</label><textarea id="lead-mensagem" name="mensagem" placeholder="Conte um pouco sobre o evento" style="width:100%; min-height:100px; border:1px solid rgba(255,255,255,.12); background:#070b08; color:#fff; padding:15px; outline:none; resize:vertical;"></textarea></div>
         <div style="grid-column:1/-1;"><button type="submit" style="width:100%; appearance:none; border:0; cursor:pointer; min-height:56px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; transition:transform .25s, box-shadow .25s;" style-hover="transform:translateY(-3px); box-shadow:0 14px 30px rgba(0,0,0,.32);">Enviar pelo WhatsApp</button></div>
       </form>
     </div>
@@ -488,8 +497,8 @@ class Component extends DCLogic {
     const now = Date.now();
     const milhasRegistrationOpen = now <= new Date('2026-10-15T23:59:59-03:00').getTime();
     const showMilhasPromo = now <= new Date('2026-10-25T23:59:59-03:00').getTime();
-    const milhasBadgeBase = { display: 'inline-flex', whiteSpace: 'nowrap', padding: '5px 12px', fontFamily: "'Anton',sans-serif", fontSize: '11px', letterSpacing: '0.06em' };
-    const navBase = { fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.04em', padding: '10px 0', borderBottom: '2px solid transparent', textDecoration: 'none', transition: 'color .25s, border-color .25s' };
+    const milhasBadgeBase = { display: 'inline-flex', whiteSpace: 'nowrap', padding: '5px 12px', fontFamily: "'Anton',sans-serif", fontSize: '12px', letterSpacing: '0.06em' };
+    const navBase = { fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '12px', letterSpacing: '0.04em', padding: '10px 0', borderBottom: '2px solid transparent', textDecoration: 'none', transition: 'color .25s, border-color .25s' };
     const pages = [
       { label: 'Home', href: '/', id: 'home' },
       { label: 'A Pista', href: '/pista', id: 'pista' },

@@ -5,118 +5,149 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Reservar bateria · Kartódromo Internacional de Betim</title>
 <meta name="description" content="Escolha o dia e o horário, pague no Pix ou no cartão e garanta sua vaga no kart indoor.">
-<meta name="theme-color" content="#0B7A53">
+<meta name="theme-color" content="#030504">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@500;600;700&display=swap">
 <link rel="icon" href="/icone.png">
 <style>
+  /* Tokens da marca (os mesmos do site kartodromodebetim.com.br): fundo preto, verde neon, Anton nos títulos. */
   :root {
-    --verde: #0B7A53; --verde-vivo: #12A36F; --verde-claro: #E2EFEA; --fundo: #F4F5F7; --cartao: #fff;
-    --texto: #14161A; --suave: #6B7280; --borda: #E3E5E8; --erro: #D92D20; --erro-claro: #FDECEA; --laranja: #C2410C;
+    color-scheme: dark;
+    --fundo: #030504; --fundo-2: #070b08; --cartao: #0b100c; --cartao-2: #111712;
+    --linha: rgba(255,255,255,.12); --linha-forte: rgba(255,255,255,.24);
+    --texto: #f7faf6; --suave: #a8b2aa; --apagado: #6b746d;
+    --verde: #00e676; --verde-escuro: #00b85e; --verde-fundo: rgba(0,230,118,.10); --tinta: #03140b;
+    --erro: #ff7a6b; --erro-fundo: rgba(255,122,107,.12); --laranja: #ffb547;
+    --titulo: 'Anton', Impact, 'Arial Narrow', sans-serif; --corpo: 'Rajdhani', 'Segoe UI', Roboto, Arial, sans-serif;
+    --raio: 4px; --foco: 0 0 0 2px var(--fundo), 0 0 0 4px var(--verde);
+    --chanfro: polygon(5% 0, 100% 0, 95% 100%, 0 100%);
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; background: var(--fundo); color: var(--texto); font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-text-size-adjust: 100%; }
-  .topo { background: linear-gradient(160deg, #0F1A15 0%, #0B3D2A 55%, #0B7A53 100%); color: #fff; padding: 22px 18px 64px; }
-  .topo .logo { display: block; width: min(300px, 78vw); height: auto; margin: 4px auto 18px; background: #fff; border-radius: 16px; padding: 10px 14px; }
-  .topo h1 { font-size: clamp(25px, 6.6vw, 36px); line-height: 1.12; margin: 0 auto 8px; max-width: 640px; text-align: center; letter-spacing: -.02em; }
-  .topo p { margin: 0 auto; max-width: 560px; text-align: center; color: rgba(255,255,255,.84); font-size: 15.5px; }
-  .fatos { display: flex; justify-content: center; gap: 8px 16px; margin: 16px auto 0; flex-wrap: wrap; max-width: 640px; font-size: 14px; font-weight: 600; color: rgba(255,255,255,.92); }
-  main { max-width: 720px; margin: -44px auto 0; padding: 0 14px 40px; }
-  .cartao { background: var(--cartao); border: 1px solid var(--borda); border-radius: 20px; padding: 20px 18px; margin-bottom: 14px; box-shadow: 0 6px 24px rgba(16,24,40,.06); }
-  .cartao h2 { font-size: 17px; margin: 0 0 2px; display: flex; align-items: center; gap: 10px; }
-  .cartao h2 .n { width: 26px; height: 26px; border-radius: 50%; background: var(--verde); color: #fff; font-size: 13.5px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
-  .cartao .sub { color: var(--suave); font-size: 14px; margin: 0 0 14px 36px; }
-  .desligado { opacity: .45; pointer-events: none; }
+  html, body { margin: 0; background: var(--fundo); color: var(--texto); font: 500 17px/1.5 var(--corpo); -webkit-text-size-adjust: 100%; -webkit-font-smoothing: antialiased; }
+  * { font-synthesis-weight: none; }
+  :focus-visible { outline: none; box-shadow: var(--foco); }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
+  .topo { background: radial-gradient(120% 90% at 50% 0%, rgba(0,230,118,.16) 0%, rgba(0,230,118,0) 60%), var(--fundo-2); border-bottom: 1px solid var(--linha); color: var(--texto); padding: 26px 18px 70px; }
+  .topo .logo { display: block; width: min(300px, 76vw); height: auto; margin: 0 auto 20px; }
+  .topo h1 { font: 400 clamp(32px, 9vw, 54px)/1 var(--titulo); text-transform: uppercase; margin: 0 auto 10px; max-width: 640px; text-align: center; letter-spacing: .005em; text-wrap: balance; }
+  .topo h1 em { font-style: normal; color: var(--verde); }
+  .topo p { margin: 0 auto; max-width: 560px; text-align: center; color: var(--suave); font-size: 17px; text-wrap: balance; }
+  .fatos { display: flex; justify-content: center; gap: 8px; margin: 18px auto 0; flex-wrap: wrap; max-width: 640px; }
+  .fatos span { font: 400 13px/1 var(--titulo); text-transform: uppercase; letter-spacing: .06em; color: var(--texto); border: 1px solid var(--linha-forte); padding: 9px 12px; }
+  .fatos span:nth-child(2) { color: var(--verde); border-color: rgba(0,230,118,.45); }
+  main { max-width: 720px; margin: -46px auto 0; padding: 0 14px 44px; }
+  .cartao { background: linear-gradient(180deg, var(--cartao-2), var(--cartao)); border: 1px solid var(--linha); border-radius: var(--raio); padding: 22px 18px; margin-bottom: 14px; }
+  .cartao h2 { font: 400 20px/1.05 var(--titulo); text-transform: uppercase; letter-spacing: .02em; margin: 0 0 4px; display: flex; align-items: center; gap: 12px; }
+  .cartao h2 .n { width: 28px; height: 28px; background: var(--verde); color: var(--tinta); font: 400 15px/1 var(--titulo); display: inline-flex; align-items: center; justify-content: center; flex: none; clip-path: var(--chanfro); }
+  .cartao .sub { color: var(--suave); font-size: 15.5px; margin: 0 0 16px 40px; }
+  .desligado { opacity: .4; pointer-events: none; }
   /* dias */
-  .mes { font-weight: 700; font-size: 15px; margin: 4px 0 8px 2px; }
-  .meses { display: flex; gap: 6px; overflow-x: auto; padding: 0 2px 10px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-  .meses button { flex: none; height: 36px; padding: 0 14px; border-radius: 999px; border: 1.5px solid var(--borda); background: #fff; font: inherit; font-size: 14px; font-weight: 600; color: #3A3F47; cursor: pointer; text-transform: capitalize; }
-  .meses button.sel { background: var(--texto); border-color: var(--texto); color: #fff; }
-  .meses button:disabled { color: #B4B8BF; cursor: default; }
-  .dias { display: flex; gap: 8px; overflow-x: auto; padding: 6px 6px 18px; margin: -4px -6px 0; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
-  .dia { flex: none; width: 62px; height: 76px; border: 1.5px solid var(--borda); border-radius: 14px; background: #fff; font: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; scroll-snap-align: start; color: var(--texto); }
-  .dia small { font-size: 11.5px; font-weight: 700; color: var(--suave); text-transform: uppercase; letter-spacing: .03em; }
-  .dia b { font-size: 22px; line-height: 1.1; }
-  .dia i { font-style: normal; font-size: 10.5px; color: var(--suave); }
-  .dia:disabled { background: #F7F7F8; color: #B4B8BF; cursor: default; }
-  .dia:disabled small, .dia:disabled i { color: #C3C7CD; }
-  .dia.sel { border-color: var(--verde); background: var(--verde); color: #fff; box-shadow: 0 4px 10px rgba(11,122,83,.25); }
-  .dia.sel small, .dia.sel i { color: rgba(255,255,255,.85); }
+  .mes { font: 400 17px/1.1 var(--titulo); text-transform: uppercase; letter-spacing: .03em; margin: 2px 0 10px; color: var(--verde); }
+  .meses { display: flex; gap: 6px; overflow-x: auto; padding: 0 2px 12px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .meses::-webkit-scrollbar { display: none; }
+  .meses button { flex: none; min-height: 40px; padding: 0 14px; border: 1px solid var(--linha-forte); background: transparent; font: 400 14px/1 var(--titulo); letter-spacing: .04em; text-transform: uppercase; color: var(--suave); cursor: pointer; border-radius: var(--raio); }
+  .meses button.sel { background: var(--texto); border-color: var(--texto); color: var(--fundo); }
+  .meses button:disabled { color: var(--apagado); border-color: var(--linha); cursor: default; }
+  /* a faixa rola para o lado: as pontas esmaecem para mostrar que há mais dias */
+  .dias { display: flex; gap: 8px; overflow-x: auto; padding: 6px 6px 16px; margin: -4px -6px 0; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; scrollbar-width: thin; scrollbar-color: var(--linha-forte) transparent;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 28px), transparent 100%); mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 28px), transparent 100%); }
+  .dia { flex: none; width: 64px; height: 78px; border: 1px solid var(--linha-forte); border-radius: var(--raio); background: var(--fundo-2); font: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; scroll-snap-align: start; color: var(--texto); }
+  .dia small { font: 400 12px/1 var(--titulo); color: var(--suave); text-transform: uppercase; letter-spacing: .06em; }
+  .dia b { font: 400 26px/1 var(--titulo); }
+  .dia i { font-style: normal; font-size: 12px; line-height: 1; color: var(--suave); }
+  .dia:disabled { background: transparent; border-color: var(--linha); color: var(--apagado); cursor: default; }
+  .dia:disabled small, .dia:disabled i { color: var(--apagado); }
+  .dia.sel { border-color: var(--verde); background: var(--verde); color: var(--tinta); }
+  .dia.sel small, .dia.sel i { color: var(--tinta); }
   /* horários */
-  .horas { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px; }
-  .hora { border: 1.5px solid var(--borda); border-radius: 14px; background: #fff; padding: 12px 14px; text-align: left; font: inherit; cursor: pointer; color: var(--texto); }
-  .hora b { display: block; font-size: 21px; letter-spacing: -.01em; }
-  .hora span { display: block; font-size: 13px; color: var(--suave); }
-  .hora .vagas { margin-top: 6px; font-weight: 700; color: var(--verde); font-size: 13px; }
+  .horas { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; }
+  .hora { border: 1px solid var(--linha-forte); border-radius: var(--raio); background: var(--fundo-2); padding: 12px 14px; text-align: left; font: inherit; cursor: pointer; color: var(--texto); transition: border-color .15s, background-color .15s; }
+  .hora:hover:not(:disabled) { border-color: rgba(0,230,118,.6); }
+  .hora b { display: block; font: 400 26px/1 var(--titulo); letter-spacing: .01em; }
+  .hora span { display: block; font-size: 14.5px; color: var(--suave); margin-top: 4px; }
+  .hora .vagas { margin-top: 6px; font-weight: 700; color: var(--verde); }
   .hora .vagas.poucas { color: var(--laranja); }
-  .hora:disabled { background: #F7F7F8; color: #9CA1A8; cursor: default; }
-  .hora:disabled .vagas { color: #9CA1A8; }
-  .hora.sel { border-color: var(--verde); box-shadow: 0 0 0 4px rgba(11,122,83,.16); }
-  .vazio { color: var(--suave); text-align: center; padding: 18px 8px; font-size: 15px; }
+  .hora:disabled { background: transparent; border-color: var(--linha); color: var(--apagado); cursor: default; }
+  .hora:disabled span, .hora:disabled .vagas { color: var(--apagado); }
+  .hora.sel { border-color: var(--verde); background: var(--verde-fundo); box-shadow: inset 0 0 0 1px var(--verde); }
+  .vazio { color: var(--suave); text-align: center; padding: 18px 8px; }
   /* quantidade */
   .qtd { display: flex; align-items: center; gap: 14px; }
-  .qtd button { width: 54px; height: 54px; border-radius: 16px; border: 1.5px solid var(--borda); background: #fff; font-size: 26px; font-weight: 600; color: var(--verde); cursor: pointer; }
-  .qtd button:disabled { color: #C3C7CD; cursor: default; }
-  .qtd output { font-size: 34px; font-weight: 800; min-width: 44px; text-align: center; }
+  .qtd button { width: 52px; height: 52px; border-radius: var(--raio); border: 1px solid var(--linha-forte); background: var(--fundo-2); font: 600 34px/1 var(--corpo); color: var(--verde); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0 0 3px; }
+  .qtd button:disabled { color: var(--apagado); cursor: default; }
+  .qtd output { font: 400 40px/1 var(--titulo); min-width: 44px; text-align: center; }
   .total { margin-left: auto; text-align: right; }
-  .total small { display: block; color: var(--suave); font-size: 13px; }
-  .total b { font-size: 24px; }
+  .total small { display: block; color: var(--suave); font: 400 13px/1 var(--titulo); text-transform: uppercase; letter-spacing: .08em; }
+  .total b { font: 400 30px/1.1 var(--titulo); color: var(--verde); }
   /* campos */
-  .grade { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+  .grade { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px 12px; }
   .grade > div { min-width: 0; }
   .c6 { grid-column: span 6; } .c3 { grid-column: span 3; }
   @media (max-width: 520px) { .c3 { grid-column: span 6; } }
-  label { display: block; font-size: 13.5px; font-weight: 600; color: #3A3F47; margin: 0 0 6px; }
-  label .op { font-weight: 400; color: var(--suave); }
-  input { width: 100%; min-width: 0; height: 50px; border: 1.5px solid var(--borda); border-radius: 12px; padding: 0 14px; font: inherit; font-size: 16.5px; color: var(--texto); background: #fff; outline: none; -webkit-appearance: none; appearance: none; }
-  input:focus { border-color: var(--verde); box-shadow: 0 0 0 4px rgba(11,122,83,.14); }
-  input.invalido { border-color: var(--erro); box-shadow: 0 0 0 4px rgba(217,45,32,.1); }
+  label { display: block; font: 400 13px/1.2 var(--titulo); text-transform: uppercase; letter-spacing: .06em; color: var(--suave); margin: 0 0 7px; }
+  label .op { font-family: var(--corpo); text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--apagado); }
+  input { width: 100%; min-width: 0; height: 50px; border: 1px solid var(--linha-forte); border-radius: var(--raio); padding: 0 14px; font: 500 17px var(--corpo); color: var(--texto); background: var(--fundo); outline: none; -webkit-appearance: none; appearance: none; transition: border-color .15s, box-shadow .15s; }
+  input::placeholder { color: var(--apagado); }
+  input:focus { border-color: var(--verde); box-shadow: 0 0 0 3px rgba(0,230,118,.18); }
+  input.invalido { border-color: var(--erro); box-shadow: 0 0 0 3px rgba(255,122,107,.16); }
   .pilotos { display: grid; gap: 10px; margin-top: 12px; }
   /* pagamento */
   .formas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .forma { border: 1.5px solid var(--borda); border-radius: 14px; background: #fff; padding: 14px; text-align: left; font: inherit; cursor: pointer; color: var(--texto); display: flex; flex-direction: column; justify-content: flex-start; gap: 2px; }
-  .forma b { display: block; font-size: 17px; }
-  .forma span { font-size: 13px; color: var(--suave); }
-  .forma.sel { border-color: var(--verde); box-shadow: 0 0 0 4px rgba(11,122,83,.16); }
-  .termo { display: flex; gap: 12px; align-items: flex-start; font-size: 15px; margin-top: 12px; }
-  .termo input { width: 26px; height: 26px; flex: none; margin: 1px 0 0; accent-color: var(--verde); -webkit-appearance: checkbox; appearance: auto; }
-  details { margin-top: 10px; background: var(--fundo); border-radius: 12px; padding: 10px 14px; font-size: 14px; color: #3A3F47; }
-  summary { cursor: pointer; font-weight: 600; color: var(--verde); }
-  ul.req { margin: 6px 0 0; padding-left: 20px; font-size: 14.5px; color: #3A3F47; }
-  .enviar { width: 100%; min-height: 58px; border: 0; border-radius: 16px; background: linear-gradient(180deg, var(--verde-vivo), var(--verde)); color: #fff; font: inherit; font-size: 18px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 20px rgba(11,122,83,.3); padding: 10px 16px; }
-  .enviar:disabled { opacity: .55; box-shadow: none; }
-  .btn2 { display: inline-flex; align-items: center; justify-content: center; width: 100%; min-height: 50px; border: 1.5px solid var(--borda); border-radius: 14px; background: #fff; font: inherit; font-weight: 700; color: var(--verde); cursor: pointer; text-decoration: none; margin-top: 10px; }
-  .erro { display: none; background: var(--erro-claro); color: var(--erro); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; font-weight: 600; font-size: 15px; }
-  .rodape { text-align: center; color: var(--suave); font-size: 13px; margin-top: 18px; }
+  .forma { border: 1px solid var(--linha-forte); border-radius: var(--raio); background: var(--fundo-2); padding: 14px; text-align: left; font: inherit; cursor: pointer; color: var(--texto); display: flex; flex-direction: column; justify-content: flex-start; gap: 4px; }
+  .forma b { display: block; font: 400 20px/1 var(--titulo); text-transform: uppercase; letter-spacing: .02em; }
+  .forma span { font-size: 14.5px; color: var(--suave); line-height: 1.35; }
+  .forma.sel { border-color: var(--verde); background: var(--verde-fundo); box-shadow: inset 0 0 0 1px var(--verde); }
+  .termo { display: flex; gap: 12px; align-items: flex-start; font-size: 16px; margin-top: 14px; text-transform: none; letter-spacing: 0; font-family: var(--corpo); font-weight: 500; color: var(--texto); }
+  .termo input { width: 24px; height: 24px; flex: none; margin: 1px 0 0; accent-color: var(--verde); -webkit-appearance: checkbox; appearance: auto; }
+  details { margin-top: 10px; background: var(--fundo); border: 1px solid var(--linha); border-radius: var(--raio); padding: 11px 14px; font-size: 15.5px; color: var(--suave); }
+  summary { cursor: pointer; font: 400 14px/1.3 var(--titulo); text-transform: uppercase; letter-spacing: .05em; color: var(--verde); }
+  details p { margin: 10px 0 0; }
+  ul.req { margin: 8px 0 0; padding-left: 20px; }
+  .enviar { width: 100%; min-height: 60px; border: 0; background: var(--verde); color: var(--tinta); font: 400 20px/1.1 var(--titulo); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; padding: 12px 34px; clip-path: var(--chanfro); transition: background-color .15s, transform .15s; }
+  .enviar:hover:not(:disabled) { background: #33ff99; }
+  .enviar:active:not(:disabled) { transform: translateY(1px); }
+  .enviar:disabled { background: #1b3a29; color: #7fa68f; cursor: default; }
+  .btn2 { display: inline-flex; align-items: center; justify-content: center; width: 100%; min-height: 52px; border: 1px solid var(--linha-forte); border-radius: var(--raio); background: transparent; font: 400 16px/1.1 var(--titulo); text-transform: uppercase; letter-spacing: .05em; color: var(--texto); cursor: pointer; text-decoration: none; margin-top: 10px; padding: 0 16px; }
+  .btn2:hover { border-color: var(--verde); color: var(--verde); }
+  .erro { display: none; background: var(--erro-fundo); border: 1px solid rgba(255,122,107,.4); color: var(--erro); border-radius: var(--raio); padding: 12px 14px; margin-bottom: 14px; font-weight: 600; }
+  .rodape { text-align: center; color: var(--apagado); font-size: 14.5px; margin-top: 18px; }
+  .rodape a { color: var(--verde); }
   .oculto { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
-  .resumo { background: var(--fundo); border-radius: 14px; padding: 12px 14px; font-size: 15px; margin-top: 12px; display: none; }
+  .resumo { background: var(--verde-fundo); border: 1px solid rgba(0,230,118,.3); border-radius: var(--raio); padding: 12px 14px; font-size: 16px; margin-top: 14px; display: none; }
+  .resumo b { color: var(--verde); }
   /* acompanhamento */
-  #acomp { display: none; text-align: center; padding: 28px 20px; }
-  #acomp h2 { font-size: 24px; margin: 6px 0 8px; justify-content: center; }
-  #acomp p { color: #3A3F47; margin: 0 auto 8px; max-width: 470px; }
-  .roda { width: 46px; height: 46px; border-radius: 50%; border: 4px solid var(--verde-claro); border-top-color: var(--verde); margin: 6px auto 12px; animation: gira 0.9s linear infinite; }
+  #acomp { display: none; text-align: center; padding: 30px 20px; }
+  #acomp h2 { font: 400 30px/1.05 var(--titulo); text-transform: uppercase; margin: 6px 0 10px; justify-content: center; }
+  #acomp p { color: var(--suave); margin: 0 auto 8px; max-width: 470px; }
+  #acomp a:not(.btn2):not(.enviar) { color: var(--verde); }
+  .roda { width: 46px; height: 46px; border-radius: 50%; border: 4px solid rgba(0,230,118,.18); border-top-color: var(--verde); margin: 6px auto 14px; animation: gira 0.9s linear infinite; }
   @keyframes gira { to { transform: rotate(360deg); } }
-  .ok { width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 12px; background: var(--verde-claro); display: flex; align-items: center; justify-content: center; }
-  .qr { image-rendering: pixelated; width: min(260px, 70vw); height: auto; border: 1px solid var(--borda); border-radius: 14px; padding: 8px; background: #fff; margin: 8px auto; display: block; }
+  .ok { width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 12px; background: var(--verde-fundo); border: 1px solid rgba(0,230,118,.4); display: flex; align-items: center; justify-content: center; }
+  .ok svg { stroke: var(--verde); }
+  /* QR em fundo branco: leitores de Pix precisam de contraste claro */
+  .qr { image-rendering: pixelated; width: min(260px, 70vw); height: auto; border-radius: var(--raio); padding: 10px; background: #fff; margin: 10px auto; display: block; }
   .copia { display: flex; gap: 8px; max-width: 470px; margin: 8px auto 0; }
-  .copia input { font-size: 13px; font-family: ui-monospace, Menlo, Consolas, monospace; height: 46px; }
-  .copia button { flex: none; height: 46px; border: 0; border-radius: 12px; background: var(--verde); color: #fff; font: inherit; font-weight: 700; padding: 0 16px; cursor: pointer; }
-  .relogio { display: inline-block; margin-top: 12px; background: #FFF4E5; color: var(--laranja); border-radius: 999px; padding: 6px 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .codigo { font-size: 30px; font-weight: 800; letter-spacing: .12em; color: var(--verde); margin: 6px 0; font-family: ui-monospace, Menlo, Consolas, monospace; }
-  .caixa { margin: 16px auto 0; max-width: 470px; text-align: left; background: var(--fundo); border-radius: 16px; padding: 14px 16px; font-size: 15px; }
-  .caixa b { color: var(--verde); }
-  #fechado { display: none; text-align: center; padding: 28px 20px; }
+  .copia input { font-size: 13px; font-family: ui-monospace, Menlo, Consolas, monospace; height: 48px; }
+  .copia button { flex: none; height: 48px; border: 0; border-radius: var(--raio); background: var(--verde); color: var(--tinta); font: 400 16px/1 var(--titulo); text-transform: uppercase; letter-spacing: .04em; padding: 0 18px; cursor: pointer; }
+  .relogio { display: inline-block; margin-top: 12px; border: 1px solid rgba(255,181,71,.45); background: rgba(255,181,71,.10); color: var(--laranja); padding: 7px 14px; font: 400 15px/1 var(--titulo); letter-spacing: .05em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+  .codigo { font: 400 40px/1 var(--titulo); letter-spacing: .14em; color: var(--verde); margin: 8px 0; }
+  .caixa { margin: 16px auto 0; max-width: 470px; text-align: left; background: var(--fundo); border: 1px solid var(--linha); border-radius: var(--raio); padding: 14px 16px; color: var(--suave); }
+  .caixa b { color: var(--texto); }
+  #fechado { display: none; text-align: center; padding: 30px 20px; }
+  #fechado h2 { justify-content: center; }
   /* o formulário só aparece com a agenda carregada (antes piscava inteiro e virava "indisponível") */
   #form { display: none; }
   #carregando { text-align: center; padding: 34px 20px; color: var(--suave); }
   /* pagando: cabeçalho enxuto para o QR caber na tela do celular sem rolar */
-  body.pagando .topo { padding-bottom: 54px; }
-  body.pagando .topo .logo { width: min(200px, 56vw); margin-bottom: 8px; }
+  body.pagando .topo { padding-bottom: 58px; }
+  body.pagando .topo .logo { width: min(200px, 56vw); margin-bottom: 0; }
   body.pagando .topo h1, body.pagando .topo p, body.pagando .fatos { display: none; }
 </style>
 </head>
 <body>
 <header class="topo">
-  <img class="logo" src="/kib-logo.png" alt="Kartódromo Internacional de Betim" width="600" height="167">
-  <h1>Reserve sua bateria de kart</h1>
+  <img class="logo" src="/kib-logo-escuro.png" alt="Kartódromo Internacional de Betim" width="720" height="200">
+  <h1>Reserve sua bateria de <em>kart</em></h1>
   <p>Escolha o dia e o horário, pague no Pix ou no cartão e garanta sua vaga.</p>
   <div class="fatos"><span>30 min por bateria</span><span id="fatoPreco">R$ 145 por piloto</span><span>Chegue 1 h antes</span></div>
 </header>
@@ -124,7 +155,7 @@
 <main>
   <section class="cartao" id="fechado" aria-live="polite">
     <h2 style="justify-content:center">Reserva online indisponível agora</h2>
-    <p id="fechadoMsg" style="color:#3A3F47">Fale com a recepção pelo WhatsApp para reservar.</p>
+    <p id="fechadoMsg" style="color:var(--suave)">Fale com a recepção pelo WhatsApp para reservar.</p>
     <a class="btn2" href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Quero%20reservar%20uma%20bateria." target="_blank" rel="noopener">Reservar pelo WhatsApp</a>
   </section>
 
@@ -457,7 +488,7 @@
     }
     if (p.status === 'pago') { a.innerHTML = '<div class="roda"></div><h2>Pagamento recebido!</h2><p>Confirmando a reserva no sistema do kartódromo…</p>' + info(p); return; }
     if (p.status === 'confirmado') {
-      a.innerHTML = `<div class="ok"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#0B7A53" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+      a.innerHTML = `<div class="ok"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#00e676" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
         <h2>Reserva confirmada${p.nome ? ', ' + p.nome : ''}!</h2><p>Código da reserva</p><div class="codigo">${p.codigo}</div>` + info(p) + `
         <div class="caixa"><b>No dia:</b><br>1. Chegue 1 hora antes da largada.<br>2. No totem, digite o CPF de quem reservou e confirme os dados.<br>3. Cada piloto assina o termo de responsabilidade.<br><br>Av. Adutora Várzea das Flores, 477 · Itacolomi · Betim/MG<br><a href="https://maps.google.com/maps?q=Av.+Adutora+V%C3%A1rzea+das+Flores,+477+-+Itacolomi,+Betim+-+MG" target="_blank" rel="noopener">Ver no mapa</a></div>
         <p class="rodape">Guarde o código. Dúvidas ou cancelamento: <a href="${WHATS}" target="_blank" rel="noopener">WhatsApp da recepção</a>.</p>`;

@@ -61,14 +61,18 @@
     flex: none;
   }
 
-  h1, h2, h3 { overflow-wrap: anywhere; }
+  /* break-word (não "anywhere"): só corta palavra que sozinha não cabe — "anywhere" partia
+     "CORPORATIVO" em "CORPORAT/IVO" mesmo havendo espaço para a palavra inteira na linha de baixo */
+  h1, h2, h3 { overflow-wrap: break-word; text-wrap: balance; }
 
-  /* Legibilidade: nada abaixo de 11px no celular. */
-  small { font-size: 11px !important; }
+  /* Legibilidade: nada abaixo de 12px no celular. */
+  small { font-size: 12px !important; }
   [style*="font-size:9px"], [style*="font-size: 9px"],
   [style*="font-size:9.5px"], [style*="font-size: 9.5px"],
   [style*="font-size:10px"], [style*="font-size: 10px"],
-  [style*="font-size:10.5px"], [style*="font-size: 10.5px"] { font-size: 11px !important; }
+  [style*="font-size:10.5px"], [style*="font-size: 10.5px"],
+  [style*="font-size:11px"], [style*="font-size: 11px"],
+  [style*="font-size:11.5px"], [style*="font-size: 11.5px"] { font-size: 12px !important; }
 
   /* Evita o zoom automático do iOS ao focar um campo. */
   input, select, textarea { font-size: 16px !important; }
@@ -80,8 +84,10 @@
   }
 }
 </style>
+<noscript><style data-generated="sem-js">[data-reveal] { opacity: 1 !important; transform: none !important; }</style></noscript>
 <style data-generated="reduced-motion">
 @media (prefers-reduced-motion: reduce) {
+  [data-reveal] { opacity: 1 !important; transform: none !important; }
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
@@ -98,6 +104,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 }
 </style>
 <style data-generated="nav-legible">
+/* a Anton só tem peso 400: título sem peso definido (h3) saía com negrito "engordado" pelo navegador, borrado.
+   O itálico sintético continua (o "KART" do título usa). */
+* { font-synthesis-weight: none; }
 @media (min-width: 721px) {
   header nav a, header nav a * { font-size: 13px !important; }
 }
@@ -112,7 +121,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     html { scroll-behavior: smooth; }
-    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size:18px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size:18px; -webkit-font-smoothing: antialiased; overflow-x: clip; }
     a { color: #00e676; }
     a:hover { color: #3ce396; }
     button, input, select, textarea { font: inherit; }
@@ -130,7 +139,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   <header style="position:fixed; inset:0 0 auto; z-index:300; background:rgba(3,5,4,.92); backdrop-filter:blur(18px); border-bottom:1px solid rgba(255,255,255,.12);">
     <div style="width:min(980px,calc(100% - 48px)); margin:0 auto; min-height:78px; display:flex; align-items:center; justify-content:space-between; gap:24px;">
       <a href="/" style="width:160px; flex:none; cursor:pointer; transition:opacity .2s;"><img src="assets/brand/kib-logo.png" alt="Kartódromo Internacional de Betim" style="width:100%;"></a>
-      <a href="/clube-vantagens" style="font-family:'Anton',sans-serif; text-transform:uppercase; font-size:11px; letter-spacing:0.04em; color:#e1e6e1; text-decoration:none; cursor:pointer; transition:color .2s;">← Clube de Vantagens</a>
+      <a href="/clube-vantagens" style="font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; color:#e1e6e1; text-decoration:none; cursor:pointer; transition:color .2s;">← Clube de Vantagens</a>
     </div>
   </header>
 
@@ -142,7 +151,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
         </span>
         <div style="min-width:0;">
           <p style="margin:2px 0 12px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Portal em implantação</p>
-          <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(34px,6vw,64px); line-height:0.88; overflow-wrap:anywhere;">Cadastro no Clube de Vantagens</h1>
+          <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(34px,6vw,64px); line-height:1; overflow-wrap:anywhere;">Cadastro no Clube de Vantagens</h1>
           <p style="margin:22px 0 0; color:#d7ded8; font-size:clamp(16px,2vw,19px); line-height:1.55;">O cadastro do Clube de Vantagens será liberado somente após a integração segura com o sistema de corridas.</p>
           <p style="margin:16px 0 0; color:#a8b2aa; font-size:16px; line-height:1.6;">Esta área será liberada somente depois da integração segura com o cadastro de pilotos, as corridas e a pontuação real. <strong style="color:#d7ded8;">Nenhum cadastro, saldo, alteração de perfil ou resgate é processado nesta página neste momento.</strong></p>
           <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:30px;">

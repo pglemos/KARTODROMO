@@ -174,7 +174,7 @@ export default function FAQ() {
                     type="button"
                     onClick={() => toggleFAQ(index)}
                     aria-expanded={isOpen}
-                    className="flex w-full items-center justify-between px-6 py-5 text-left focus:outline-none"
+                    className="flex w-full items-center justify-between px-6 py-5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-400"
                   >
                     <span className="pr-4 font-race text-sm italic font-bold uppercase tracking-wide text-white md:text-base">
                       {item.question}

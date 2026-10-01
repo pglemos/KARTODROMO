@@ -33,7 +33,8 @@ body {
 }
 
 body {
-  overflow-x: hidden;
+  /* clip, não hidden: hidden transforma o body em área de rolagem própria e quebra sticky/âncoras */
+  overflow-x: clip;
 }
 
 button,

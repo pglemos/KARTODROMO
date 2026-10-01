@@ -61,14 +61,18 @@
     flex: none;
   }
 
-  h1, h2, h3 { overflow-wrap: anywhere; }
+  /* break-word (não "anywhere"): só corta palavra que sozinha não cabe — "anywhere" partia
+     "CORPORATIVO" em "CORPORAT/IVO" mesmo havendo espaço para a palavra inteira na linha de baixo */
+  h1, h2, h3 { overflow-wrap: break-word; text-wrap: balance; }
 
-  /* Legibilidade: nada abaixo de 11px no celular. */
-  small { font-size: 11px !important; }
+  /* Legibilidade: nada abaixo de 12px no celular. */
+  small { font-size: 12px !important; }
   [style*="font-size:9px"], [style*="font-size: 9px"],
   [style*="font-size:9.5px"], [style*="font-size: 9.5px"],
   [style*="font-size:10px"], [style*="font-size: 10px"],
-  [style*="font-size:10.5px"], [style*="font-size: 10.5px"] { font-size: 11px !important; }
+  [style*="font-size:10.5px"], [style*="font-size: 10.5px"],
+  [style*="font-size:11px"], [style*="font-size: 11px"],
+  [style*="font-size:11.5px"], [style*="font-size: 11.5px"] { font-size: 12px !important; }
 
   /* Evita o zoom automático do iOS ao focar um campo. */
   input, select, textarea { font-size: 16px !important; }
@@ -80,8 +84,10 @@
   }
 }
 </style>
+<noscript><style data-generated="sem-js">[data-reveal] { opacity: 1 !important; transform: none !important; }</style></noscript>
 <style data-generated="reduced-motion">
 @media (prefers-reduced-motion: reduce) {
+  [data-reveal] { opacity: 1 !important; transform: none !important; }
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
@@ -98,6 +104,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 }
 </style>
 <style data-generated="nav-legible">
+/* a Anton só tem peso 400: título sem peso definido (h3) saía com negrito "engordado" pelo navegador, borrado.
+   O itálico sintético continua (o "KART" do título usa). */
+* { font-synthesis-weight: none; }
 @media (min-width: 721px) {
   header nav a, header nav a * { font-size: 13px !important; }
 }
@@ -112,7 +121,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     html { scroll-behavior: smooth; }
-    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size:18px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size:18px; -webkit-font-smoothing: antialiased; overflow-x: clip; }
     a { color: #00e676; }
     a:hover { color: #3ce396; }
     ::selection { background: #00e676; color: #041301; }
@@ -216,7 +225,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(28px,5vw,80px); align-items:center;">
       <div style="min-width:0;">
         <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Inscrição e valores</p>
-        <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:0.85;">Monte a equipe<br><span style="color:#00e676;">e garanta o kart</span></h2>
+        <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:1;">Monte a equipe<br><span style="color:#00e676;">e garanta o kart</span></h2>
         <p style="max-width:46ch; margin:24px 0 0; color:#a8b2aa; font-size:clamp(16px,1.2vw,19px); line-height:1.6;">Do formulário ao pagamento, são quatro passos. O formulário registra a equipe no sistema do kartódromo e prepara a mensagem que conclui a inscrição no WhatsApp.</p>
         <ol style="list-style:none; display:grid; gap:14px; margin:28px 0 0; padding:0; max-width:46ch;">
           <sc-for list="{{ steps }}" as="s" hint-placeholder-count="4">
@@ -252,7 +261,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
       </figure>
       <div style="min-width:0;">
         <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">A corrida</p>
-        <h2 id="corrida-title" style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:0.85;">2h30 de prova,<br><span style="color:#00e676;">3 paradas no box</span></h2>
+        <h2 id="corrida-title" style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:1;">2h30 de prova,<br><span style="color:#00e676;">3 paradas no box</span></h2>
         <p style="max-width:46ch; margin:24px 0 0; color:#a8b2aa; font-size:clamp(16px,1.2vw,19px); line-height:1.6;">Cada equipe faz 3 paradas obrigatórias de no mínimo 7 minutos, com troca de kart e de piloto, dentro da janela em que o box fica aberto. Quando parar é estratégia da equipe.</p>
 
         <div style="margin-top:36px; max-width:640px;">
@@ -286,7 +295,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(28px,5vw,80px);">
       <div style="min-width:0;">
         <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Cronograma · 25/10/2026</p>
-        <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:0.85;">Da chegada<br><span style="color:#00e676;">à bandeirada</span></h2>
+        <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:1;">Da chegada<br><span style="color:#00e676;">à bandeirada</span></h2>
         <p style="max-width:42ch; margin:24px 0 0; color:#a8b2aa; font-size:17px; line-height:1.6;">Pelo menos um piloto de cada equipe precisa estar no briefing. Não é permitido levar alimentos ou bebidas para o kartódromo.</p>
       </div>
       <ol style="list-style:none; min-width:0; border-left:1px solid rgba(255,255,255,.12); margin:0 0 0 18px; padding:0;">
@@ -305,7 +314,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   <section style="background:#070b08; padding:clamp(88px,9vw,140px) 0;">
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto;">
       <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Regras principais</p>
-      <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:0.85;">O que sua equipe<br><span style="color:#00e676;">precisa saber</span></h2>
+      <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:1;">O que sua equipe<br><span style="color:#00e676;">precisa saber</span></h2>
       <div style="margin-top:50px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:clamp(24px,4vw,56px);">
         <sc-for list="{{ ruleGroups }}" as="g" hint-placeholder-count="3">
           <div style="min-width:0; border-top:2px solid #00e676; padding-top:22px;">
@@ -327,7 +336,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(28px,5vw,80px); align-items:end;">
       <div style="min-width:0;">
         <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Premiação</p>
-        <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:0.85;">Troféus para<br><span style="color:#00e676;">o top 5</span></h2>
+        <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:1;">Troféus para<br><span style="color:#00e676;">o top 5</span></h2>
       </div>
       <dl style="margin:0; min-width:0; display:grid; gap:1px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.12);">
         <div style="background:#0b100c; padding:24px 28px; display:grid; grid-template-columns:minmax(120px,auto) 1fr; gap:20px; align-items:center;"><dt style="font-family:'Anton',sans-serif; font-size:clamp(34px,4vw,48px); line-height:0.9; color:#00e676;">1º ao 5º</dt><dd style="margin:0; color:#d7ded8; font-size:17px; line-height:1.45;">Um troféu para cada uma das cinco melhores equipes.</dd></div>
@@ -340,7 +349,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   <section style="padding:0 0 clamp(88px,9vw,140px);">
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto;">
       <div style="position:relative; overflow:hidden; border:1px solid rgba(255,255,255,.22); background:linear-gradient(135deg,#101711,#030504); padding:clamp(34px,5vw,72px); display:grid; grid-template-columns:1.2fr .8fr; gap:36px; align-items:center;">
-        <div style="min-width:0;"><h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5.5vw,72px); line-height:0.82;">Vagas limitadas<br><span style="color:#00e676;">inscreva sua equipe</span></h2><p style="max-width:44ch; margin:14px 0 0; color:#a8b2aa; font-size:18px; line-height:1.5;">Inscrições até 15/10/2026 ou enquanto houver vagas. A vaga só é garantida após a confirmação do pagamento.</p></div>
+        <div style="min-width:0;"><h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5.5vw,72px); line-height:1;">Vagas limitadas<br><span style="color:#00e676;">inscreva sua equipe</span></h2><p style="max-width:44ch; margin:14px 0 0; color:#a8b2aa; font-size:18px; line-height:1.5;">Inscrições até 15/10/2026 ou enquanto houver vagas. A vaga só é garantida após a confirmação do pagamento.</p></div>
         <div style="display:grid; gap:12px;">
           <sc-if value="{{ registrationOpen }}">
             <button type="button" onClick="{{ openModal }}" aria-haspopup="dialog" aria-controls="ml-dialog" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:13px; letter-spacing:0.04em; border:0; cursor:pointer;">Inscrever equipe</button>
@@ -1355,7 +1364,7 @@ class Component extends DCLogic {
 
   renderVals() {
     const { headerScrolled, mobileNavOpen, isMobile, modalOpen, kartPilots, errors, submitting, result, protocol, whatsappHref, copied, draftRestored, submitAttempted, pendingConfirm } = this.state;
-    const navBase = { fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.04em', padding: '10px 0', borderBottom: '2px solid transparent', textDecoration: 'none', transition: 'color .25s, border-color .25s' };
+    const navBase = { fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '12px', letterSpacing: '0.04em', padding: '10px 0', borderBottom: '2px solid transparent', textDecoration: 'none', transition: 'color .25s, border-color .25s' };
     const pages = [
       { label: 'Home', href: '/', id: 'home' },
       { label: 'A Pista', href: '/pista', id: 'pista' },

@@ -28,7 +28,7 @@ const Services = () => {
                   <div className="flex h-12 w-12 items-center justify-center border border-primary-400/30 bg-white/5">
                     <Gauge className="h-7 w-7 text-primary-400" aria-hidden="true" />
                   </div>
-                  <span className="border border-primary-400/40 bg-primary-400/10 px-3 py-1 font-race text-[11px] italic font-bold uppercase tracking-widest text-primary-400">
+                  <span className="border border-primary-400/40 bg-primary-400/10 px-3 py-1 font-race text-xs italic font-bold uppercase tracking-widest text-primary-400">
                     Aberto ao Público
                   </span>
                 </div>
@@ -101,7 +101,7 @@ const Services = () => {
                   <div className="flex h-12 w-12 items-center justify-center border border-yellow-500/30 bg-yellow-500/10">
                     <Zap className="h-7 w-7 text-yellow-400" aria-hidden="true" />
                   </div>
-                  <span className="border border-yellow-500/40 bg-yellow-500/10 px-3 py-1 font-race text-[11px] italic font-bold uppercase tracking-widest text-yellow-400">
+                  <span className="border border-yellow-500/40 bg-yellow-500/10 px-3 py-1 font-race text-xs italic font-bold uppercase tracking-widest text-yellow-400">
                     Pilotos Experientes
                   </span>
                 </div>

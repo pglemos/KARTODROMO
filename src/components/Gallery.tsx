@@ -39,7 +39,7 @@ const Gallery = () => {
               />
               <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink-950/95 to-transparent p-4">
                 <strong className="block font-race text-xs italic font-bold uppercase tracking-wide text-white">{item.title}</strong>
-                <span className="mt-0.5 block text-[11px] text-white/60">{item.caption}</span>
+                <span className="mt-0.5 block text-xs text-white/60">{item.caption}</span>
               </figcaption>
             </figure>
           ))}

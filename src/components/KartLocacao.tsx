@@ -69,7 +69,7 @@ const KartLocacao = () => {
 
         <div className="container mx-auto grid min-h-[72svh] gap-8 px-4 pb-7 pt-10 md:min-h-[78vh] md:grid-cols-[0.96fr_1.04fr] md:items-end md:pb-10 md:pt-14">
           <div className="max-w-3xl">
-            <div className="mb-5 inline-flex items-center gap-2 border border-primary-400/30 bg-white/5 px-4 py-2 font-race text-[11px] italic font-bold uppercase tracking-[0.18em] text-primary-400 backdrop-blur-md">
+            <div className="mb-5 inline-flex items-center gap-2 border border-primary-400/30 bg-white/5 px-4 py-2 font-race text-xs italic font-bold uppercase tracking-[0.18em] text-primary-400 backdrop-blur-md">
               <Zap className="h-3.5 w-3.5" aria-hidden="true" />
               Kart de locação
             </div>
@@ -86,15 +86,15 @@ const KartLocacao = () => {
             <div className="mt-6 grid grid-cols-3 gap-px border border-white/15 bg-white/10 md:hidden">
               <div className="bg-ink-900 p-3">
                 <strong className="block text-xl font-black leading-none text-primary-400">R$ 145</strong>
-                <span className="mt-1 block text-[11px] font-black uppercase tracking-[0.12em] text-white/60">online</span>
+                <span className="mt-1 block text-xs font-black uppercase tracking-[0.12em] text-white/60">online</span>
               </div>
               <div className="bg-ink-900 p-3">
                 <strong className="block text-xl font-black leading-none text-white">30 min</strong>
-                <span className="mt-1 block text-[11px] font-black uppercase tracking-[0.12em] text-white/60">bateria</span>
+                <span className="mt-1 block text-xs font-black uppercase tracking-[0.12em] text-white/60">bateria</span>
               </div>
               <div className="bg-ink-900 p-3">
                 <strong className="block text-xl font-black leading-none text-white">14+</strong>
-                <span className="mt-1 block text-[11px] font-black uppercase tracking-[0.12em] text-white/60">idade</span>
+                <span className="mt-1 block text-xs font-black uppercase tracking-[0.12em] text-white/60">idade</span>
               </div>
             </div>
 
@@ -114,7 +114,7 @@ const KartLocacao = () => {
             <h2 className="mb-4 font-race text-xl italic uppercase text-white">Valor da bateria</h2>
             <div className="flex items-end gap-2 border-y border-white/10 py-4">
               <span className="font-display text-5xl italic text-primary-400">R$145</span>
-              <span className="mb-1 font-race text-[11px] italic uppercase text-white/55">por piloto antecipado</span>
+              <span className="mb-1 font-race text-xs italic uppercase text-white/55">por piloto antecipado</span>
             </div>
             <div className="my-5 grid gap-3">
               <div className="relative pl-4 text-white/70">
@@ -154,7 +154,7 @@ const KartLocacao = () => {
             <div className="grid overflow-hidden border border-white/10 bg-white/10 md:grid-cols-3">
               {sessionFlow.map((step, index) => (
                 <article key={step.label} className="bg-ink-900 p-6 md:min-h-64">
-                  <span className="font-race text-[11px] italic font-bold uppercase tracking-[0.14em] text-white/50">
+                  <span className="font-race text-xs italic font-bold uppercase tracking-[0.14em] text-white/50">
                     Etapa {index + 1}
                   </span>
                   <strong className="mt-7 block font-display text-5xl italic uppercase leading-none text-primary-400">
@@ -191,7 +191,7 @@ const KartLocacao = () => {
                 {requirements.map(([value, label]) => (
                   <div key={label} className="bg-ink-900 p-4">
                     <strong className="block text-2xl font-black text-white">{value}</strong>
-                    <span className="mt-2 block text-[11px] font-black uppercase tracking-[0.12em] text-white/50">
+                    <span className="mt-2 block text-xs font-black uppercase tracking-[0.12em] text-white/50">
                       {label}
                     </span>
                   </div>
@@ -264,12 +264,12 @@ const KartLocacao = () => {
               <div className="mt-6 font-display text-6xl italic text-primary-400 md:text-7xl">R$30</div>
               <div className="mt-8 grid grid-cols-2 gap-4">
                 <div>
-                  <span className="font-race text-[11px] italic font-bold uppercase tracking-wider text-white/50">Normal</span>
+                  <span className="font-race text-xs italic font-bold uppercase tracking-wider text-white/50">Normal</span>
                   <strong className="mt-1 block font-display text-3xl italic text-white">175</strong>
                   <span className="text-xs text-white/55">Pagamento convencional.</span>
                 </div>
                 <div>
-                  <span className="font-race text-[11px] italic font-bold uppercase tracking-wider text-white/50">Online</span>
+                  <span className="font-race text-xs italic font-bold uppercase tracking-wider text-white/50">Online</span>
                   <strong className="mt-1 block font-display text-3xl italic text-primary-400">145</strong>
                   <span className="text-xs text-white/55">Pagamento antecipado.</span>
                 </div>

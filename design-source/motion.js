@@ -4,12 +4,15 @@
 function setupReveal() {
   const nodes = Array.from(document.querySelectorAll('[data-reveal]'));
   if (!nodes.length) return () => {};
+  const mostrar = (node) => {
+    node.style.opacity = '1';
+    node.style.transform = 'translate3d(0,0,0) scale(1)';
+  };
+  const naTela = (node) => node.getBoundingClientRect().top < window.innerHeight;
 
-  if (!('IntersectionObserver' in window)) {
-    nodes.forEach((node) => {
-      node.style.opacity = '1';
-      node.style.transform = 'none';
-    });
+  // sem IntersectionObserver ou com "reduzir movimento": tudo visível, sem esperar rolagem
+  if (!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    nodes.forEach(mostrar);
     return () => {};
   }
 
@@ -17,8 +20,7 @@ function setupReveal() {
     (entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
-          entry.target.style.opacity = '1';
-          entry.target.style.transform = 'translate3d(0,0,0) scale(1)';
+          mostrar(entry.target);
           observer.unobserve(entry.target);
         }
       });
@@ -26,7 +28,11 @@ function setupReveal() {
     { threshold: 0.14, rootMargin: '0px 0px -8% 0px' },
   );
   nodes.forEach((node) => observer.observe(node));
-  return () => observer.disconnect();
+  // a primeira tela (título principal, chamada) não depende do observador: entra logo, com a mesma animação,
+  // e uma garantia revela o que ainda estiver invisível na tela (aba em segundo plano, observador atrasado)
+  const primeira = setTimeout(() => nodes.filter(naTela).forEach(mostrar), 60);
+  const garantia = setTimeout(() => nodes.filter((n) => naTela(n) && getComputedStyle(n).opacity === '0').forEach(mostrar), 2500);
+  return () => { observer.disconnect(); clearTimeout(primeira); clearTimeout(garantia); };
 }
 
 function animateCount(node) {

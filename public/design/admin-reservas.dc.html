@@ -251,9 +251,9 @@ class Component extends DCLogic {
       page: { minHeight: '100vh', background: t.bg, color: t.text, fontFamily: "'Rajdhani',sans-serif" },
       sidebar: { position: 'fixed', insetBlock: 0, left: 0, width: '260px', zIndex: 200, display: isMobile ? 'none' : 'flex', flexDirection: 'column', background: t.surface, borderRight: '1px solid ' + t.border },
       logoMark: { display: 'grid', placeItems: 'center', width: '34px', height: '34px', borderRadius: '9px', background: t.accent, color: t.accentContrast, flex: 'none' },
-      brandEyebrow: { margin: 0, fontSize: '11px', fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: t.accent },
+      brandEyebrow: { margin: 0, fontSize: '12px', fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: t.accent },
       brandName: { display: 'block', fontSize: '14px', fontWeight: 700, color: t.text },
-      navGroupLabel: { margin: '18px 0 6px', padding: '6px 10px', fontSize: '11px', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: t.textFaint },
+      navGroupLabel: { margin: '18px 0 6px', padding: '6px 10px', fontSize: '12px', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: t.textFaint },
       userEmail: { margin: '0 0 8px', fontSize: '12px', fontWeight: 600, color: t.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
       logoutLink: { fontSize: '12px', fontWeight: 700, color: t.danger, textDecoration: 'none' },
       mobileOverlay: { position: 'fixed', inset: 0, zIndex: 210, background: t.overlay, opacity: mobileNavOpen ? 1 : 0, visibility: isMobile && mobileNavOpen ? 'visible' : 'hidden', transition: '.25s', pointerEvents: isMobile && mobileNavOpen ? 'auto' : 'none' },
@@ -262,25 +262,25 @@ class Component extends DCLogic {
       menuToggleBtn: { width: '38px', height: '38px', display: isMobile ? 'grid' : 'none', placeItems: 'center', border: '1px solid ' + t.border, borderRadius: '9px', background: t.surface, color: t.text, cursor: 'pointer', flex: 'none' },
       contentWrap: { minHeight: '100vh', marginLeft: isMobile ? 0 : '260px' },
       header: { position: 'sticky', top: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', padding: '14px 20px', background: t.surface + 'f2', backdropFilter: 'blur(10px)', borderBottom: '1px solid ' + t.border },
-      headerEyebrow: { margin: '0 0 2px', fontSize: '11px', fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: t.accent },
+      headerEyebrow: { margin: '0 0 2px', fontSize: '12px', fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: t.accent },
       headerTitle: { margin: 0, fontSize: '22px', fontWeight: 700, color: t.text },
       primaryBtnSm: { height: '38px', padding: '0 16px', borderRadius: '9px', border: 0, background: t.accent, color: t.accentContrast, fontWeight: 700, fontSize: '13px', cursor: 'pointer' },
       main: { padding: '22px 20px 60px', display: 'grid', gap: '22px' },
       kpiGrid: { display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: '14px' },
       kpiCard: { background: t.surface, border: '1px solid ' + t.border, borderRadius: '14px', padding: '16px' },
-      kpiLabel: { display: 'block', fontSize: '11.5px', fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: t.textMuted },
+      kpiLabel: { display: 'block', fontSize: '12px', fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: t.textMuted },
       kpiValue: { display: 'block', marginTop: '8px', fontSize: '24px', fontWeight: 700, color: t.text },
       card: { background: t.surface, border: '1px solid ' + t.border, borderRadius: '16px', padding: isMobile ? '16px' : '22px' },
       searchInput: { height: '38px', minWidth: '220px', borderRadius: '9px', border: '1px solid ' + t.border, background: t.surface2, color: t.text, padding: '0 12px', outline: 'none' },
-      th: { textAlign: 'left', padding: '10px 12px', fontSize: '11px', fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: t.textFaint, borderBottom: '1px solid ' + t.border, whiteSpace: 'nowrap' },
+      th: { textAlign: 'left', padding: '10px 12px', fontSize: '12px', fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: t.textFaint, borderBottom: '1px solid ' + t.border, whiteSpace: 'nowrap' },
       td: { padding: '13px 12px', fontSize: '13.5px', color: t.textMuted, borderBottom: '1px solid ' + t.border, whiteSpace: 'nowrap' },
-      rowActionAccent: { border: '1px solid ' + t.accentBorder, background: t.accentSoft, color: t.accent, borderRadius: '7px', padding: '6px 10px', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer' },
-      rowActionDanger: { border: '1px solid transparent', background: t.dangerSoft, color: t.danger, borderRadius: '7px', padding: '6px 10px', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer' },
+      rowActionAccent: { border: '1px solid ' + t.accentBorder, background: t.accentSoft, color: t.accent, borderRadius: '7px', padding: '6px 10px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' },
+      rowActionDanger: { border: '1px solid transparent', background: t.dangerSoft, color: t.danger, borderRadius: '7px', padding: '6px 10px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' },
       emptyState: { textAlign: 'center', padding: '30px 0 6px', color: t.textFaint, fontSize: '13.5px' },
       modalOverlay: { position: 'fixed', inset: 0, zIndex: 400, background: t.overlay, display: 'grid', placeItems: 'center', padding: '20px' },
       modalDialog: { width: 'min(560px,100%)', maxHeight: '90vh', overflow: 'auto', background: t.surface, border: '1px solid ' + t.border, borderRadius: '16px', padding: '26px', boxShadow: t.shadow },
       modalTitle: { margin: 0, fontSize: '20px', fontWeight: 700, color: t.text },
-      label: { fontSize: '11.5px', fontWeight: 700, letterSpacing: '.03em', textTransform: 'uppercase', color: t.textMuted },
+      label: { fontSize: '12px', fontWeight: 700, letterSpacing: '.03em', textTransform: 'uppercase', color: t.textMuted },
       input: { width: '100%', height: '42px', borderRadius: '8px', border: '1px solid ' + t.border, background: t.surface2, color: t.text, padding: '0 12px', outline: 'none' },
       textarea: { width: '100%', minHeight: '80px', borderRadius: '8px', border: '1px solid ' + t.border, background: t.surface2, color: t.text, padding: '10px 12px', outline: 'none', resize: 'vertical' },
       submitBtn: { marginTop: '20px', width: '100%', height: '46px', borderRadius: '9px', border: 0, background: t.accent, color: t.accentContrast, fontWeight: 700, fontSize: '14px', cursor: 'pointer' },
@@ -295,7 +295,7 @@ class Component extends DCLogic {
       concluida: { label: 'Concluída', bg: t.infoSoft, fg: t.info },
     };
     const m = map[status] || map.pendente;
-    return { label: m.label, style: { fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '999px', background: m.bg, color: m.fg } };
+    return { label: m.label, style: { fontSize: '12px', fontWeight: 700, padding: '4px 10px', borderRadius: '999px', background: m.bg, color: m.fg } };
   }
 
   renderVals() {

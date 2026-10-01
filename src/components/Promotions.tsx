@@ -46,10 +46,10 @@ const Promotions = () => {
               </div>
 
               <div className="space-y-3">
-                <h4 className="mb-2 flex items-center font-race text-xs italic font-bold uppercase tracking-wider text-white">
+                <h3 className="mb-2 flex items-center font-race text-xs italic font-bold uppercase tracking-wider text-white">
                   <AlertTriangle className="mr-1 h-4 w-4 text-primary-400" />
                   Regras e Condições
-                </h4>
+                </h3>
                 <ul className="space-y-2 text-xs font-light text-white/65">
                   <li className="flex items-start">
                     <Check className="mr-2 mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-primary-400" />
@@ -111,10 +111,10 @@ const Promotions = () => {
               </div>
 
               <div className="space-y-3">
-                <h4 className="mb-2 flex items-center font-race text-xs italic font-bold uppercase tracking-wider text-white">
+                <h3 className="mb-2 flex items-center font-race text-xs italic font-bold uppercase tracking-wider text-white">
                   <AlertTriangle className="mr-1 h-4 w-4 text-yellow-400" />
                   Regras e Condições
-                </h4>
+                </h3>
                 <ul className="space-y-2 text-xs font-light text-white/65">
                   <li className="flex items-start">
                     <Check className="mr-2 mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-yellow-400" />
@@ -153,7 +153,7 @@ const Promotions = () => {
         <div className="mx-auto max-w-5xl border border-white/10 bg-ink-950 p-6 md:p-8">
           <div className="mb-4 flex items-center space-x-3">
             <AlertTriangle className="h-6 w-6 flex-shrink-0 text-primary-400" />
-            <h4 className="font-race text-base italic font-bold uppercase tracking-wider text-white">Atenção ao Reservar Exclusividade</h4>
+            <h3 className="font-race text-base italic font-bold uppercase tracking-wider text-white">Atenção ao Reservar Exclusividade</h3>
           </div>
           <div className="grid grid-cols-1 gap-6 text-xs font-light text-white/65 md:grid-cols-2">
             <div className="space-y-2">
