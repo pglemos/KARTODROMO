@@ -107,7 +107,17 @@ public class FormCriarReservas : DialogoDesign
         foreach (var d in dias) Marca(g2, d, 1, false);
         var feriadosCk = new CheckBox { Text = "Pular feriados cadastrados", Checked = true };
         var existentesCk = new CheckBox { Text = "Pular horários que já existem", Checked = true };
-        Marca(g2, feriadosCk, 3, false); Marca(g2, existentesCk, 3, false);
+        // "Indoor - Feriado": só nos feriados cadastrados com "Abre" (qualquer dia da semana); os outros padrões pulam esses dias
+        var soFeriadosCk = new CheckBox { Text = "Só nos feriados que abrem", Checked = false };
+        Marca(g2, feriadosCk, 3, false); Marca(g2, existentesCk, 3, false); Marca(g2, soFeriadosCk, 3, false);
+        void ModoFeriado()
+        {
+            // feriado abre em qualquer dia em que o kartódromo funciona (segunda continua fechada, mesmo feriado)
+            if (soFeriadosCk.Checked) for (var i = 0; i < dias.Length; i++) dias[i].Checked = i != 1;
+            feriadosCk.Enabled = !soFeriadosCk.Checked;
+        }
+        soFeriadosCk.CheckedChanged += (_, _) => ModoFeriado();
+        pad.SelectedIndexChanged += (_, _) => soFeriadosCk.Checked = pad.Text.Contains("Feriado", StringComparison.OrdinalIgnoreCase);
         var g3 = Secao("Prévia");
         var sec3 = (TableLayoutPanel)g3.Parent; sec3.BackColor = Fundo; g3.BackColor = Fundo; foreach (Control c in sec3.Controls) c.BackColor = Fundo;
         var previa = new Label { AutoSize = true, MaximumSize = new Size(880, 0), Font = new Font("Segoe UI", 9.6F), ForeColor = Tokens.Grafite, BackColor = Fundo, Margin = new Padding(0, 0, 0, 4) };
@@ -158,25 +168,28 @@ public class FormCriarReservas : DialogoDesign
             if ((pad.SelectedItem as Campos.Item)?.Dados is not JsonObject p) { previa.Text = pad.Items.Count == 0 ? "Cadastre um padrão em Ferramentas › Padrões de reservas." : "Escolha a configuração padrão acima para ver quantas baterias serão criadas."; return; }
             var (de, ate) = Periodo();
             var sel = dias.Select((d, i) => (d, i)).Where(x => x.d.Checked).Select(x => x.i).ToHashSet();
-            var pulados = new List<DateTime>(); var nDias = 0;
+            var pulados = new List<DateTime>(); var nDias = 0; var nosFeriados = new List<DateTime>();
+            bool Cai(JsonObject f, DateTime d) => f.D("data") is DateTime fd && (fd.Date == d || f.B("recorrente") && fd.Month == d.Month && fd.Day == d.Day);
             for (var d = de; d <= ate; d = d.AddDays(1))
             {
                 if (!sel.Contains((int)d.DayOfWeek)) continue;
-                var feriado = feriados.Any(f => f.D("data") is DateTime fd && (fd.Date == d || f.B("recorrente") && fd.Month == d.Month && fd.Day == d.Day));
-                if (feriado && feriadosCk.Checked) { pulados.Add(d); continue; }
+                if (soFeriadosCk.Checked) { if (feriados.Any(f => f.B("abre") && Cai(f, d))) { nosFeriados.Add(d); nDias++; } continue; }
+                if (feriados.Any(f => Cai(f, d)) && feriadosCk.Checked) { pulados.Add(d); continue; }
                 nDias++;
             }
+            if (soFeriadosCk.Checked && nDias == 0) { previa.Text = $"Nenhum feriado marcado \"Abre\" em {NomePeriodo()}. Cadastre em Cadastros › Feriados e marque \"Abre (horário de feriado)\"."; return; }
             var q = Math.Max(1, p.I("quantidade"));
             TimeSpan.TryParse(p.S("primeiraHora"), out var h0);
             var ult = h0 + TimeSpan.FromMinutes((q - 1) * p.I("intervaloMin"));
             var txt = $"{q} {(q == 1 ? "bateria" : "baterias")} por dia · {h0:hh\\:mm}{(q > 1 ? $" às {ult:hh\\:mm}" : "")} · {p.I("vagas")} vagas cada · {nDias} dias em {NomePeriodo()} → {q * nDias} baterias.";
+            if (nosFeriados.Count > 0) txt += $" Feriados: {string.Join(", ", nosFeriados.Select(x => x.ToString(de.Year == ate.Year ? "dd/MM" : "dd/MM/yy")))}.";
             if (pulados.Count > 0) txt += $" {(pulados.Count == 1 ? "Feriado de" : "Feriados de")} {string.Join(", ", pulados.Select(x => x.ToString(de.Year == ate.Year ? "dd/MM" : "dd/MM/yy")))} {(pulados.Count == 1 ? "será pulado" : "serão pulados")}.";
             if (existentesCk.Checked) txt += " Horários que já existem não são duplicados.";
             previa.Text = txt;
         }
         pad.SelectedIndexChanged += (_, _) => Previa(); mes.SelectedIndexChanged += (_, _) => Previa(); ateMes.SelectedIndexChanged += (_, _) => Previa();
         foreach (var d in dias) d.CheckedChanged += (_, _) => Previa();
-        feriadosCk.CheckedChanged += (_, _) => Previa(); existentesCk.CheckedChanged += (_, _) => Previa();
+        feriadosCk.CheckedChanged += (_, _) => Previa(); existentesCk.CheckedChanged += (_, _) => Previa(); soFeriadosCk.CheckedChanged += (_, _) => Previa();
 
         var aba = 0;
         Button acao = null;
@@ -211,7 +224,7 @@ public class FormCriarReservas : DialogoDesign
                     var fim = new DateTime(ini.Year, ini.Month, 1).AddMonths(1).AddDays(-1);
                     if (fim > ate) fim = ate;
                     acao.Text = $"Gerando {ini.ToString("MMM/yy", Fmt.Br).Replace(".", "")}…";
-                    var r = await Sessao.Api.Post("/api/office/baterias/gerar", new { padraoId = pid, de = Fmt.Iso(ini), ate = Fmt.Iso(fim), diasSemana = sel, pularFeriados = feriadosCk.Checked, pularExistentes = existentesCk.Checked, ativo = ativo.Checked });
+                    var r = await Sessao.Api.Post("/api/office/baterias/gerar", new { padraoId = pid, de = Fmt.Iso(ini), ate = Fmt.Iso(fim), diasSemana = sel, pularFeriados = feriadosCk.Checked, pularExistentes = existentesCk.Checked, ativo = ativo.Checked, soFeriados = soFeriadosCk.Checked });
                     criadas += r.I("criadas");
                 }
             }

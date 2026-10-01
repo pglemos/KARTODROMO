@@ -225,7 +225,7 @@ const CAD: Record<string, CadDef> = {
     order: 'ProdutoId, Ordem', required: ['produtoId', 'nome'], filter: 'produtoId',
   },
   tracados: { table: 'Tracado', cols: { nome: ['Nome', 'text', 100], comprimento: ['Comprimento', 'int'], ativo: ['Ativo', 'bool'] }, order: 'LEN(Nome), Nome', required: ['nome'] }, // "Traçado 2" antes de "Traçado 10"
-  feriados: { table: 'Feriado', cols: { data: ['Data', 'date'], descricao: ['Descricao', 'text', 100], recorrente: ['Recorrente', 'bool'] }, order: 'Data', required: ['data', 'descricao'] },
+  feriados: { table: 'Feriado', cols: { data: ['Data', 'date'], descricao: ['Descricao', 'text', 100], recorrente: ['Recorrente', 'bool'], abre: ['Abre', 'bool'] }, order: 'Data', required: ['data', 'descricao'] },
   turnos: { table: 'Turno', cols: { descricao: ['Descricao', 'text', 60], inicio: ['Inicio', 'time'], fim: ['Fim', 'time'], ativo: ['Ativo', 'bool'] }, order: 'Descricao', required: ['descricao'] },
   terminais: {
     table: 'Terminal', cols: { codigo: ['Codigo', 'text', 10], nome: ['Nome', 'text', 60], ativo: ['Ativo', 'bool'] }, order: 'Nome', required: ['nome'],
@@ -1161,18 +1161,25 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     if (!padrao) throw new HttpError(400, 'Selecione uma configuração padrão antes de criar as reservas.');
     const de = new Date(isoDate(b.de) + 'T12:00:00');
     const ate = new Date(isoDate(b.ate) + 'T12:00:00');
+    // soFeriados: o "Horário de Feriado" só nos feriados marcados "Abre", nos dias da semana escolhidos
+    // (feriado na segunda continua fechado: a tela manda todos os dias menos segunda)
+    const soFeriados = b.soFeriados === true;
     const dias = (Array.isArray(b.diasSemana) ? b.diasSemana : []).map(Number);
     if (!dias.length) throw new HttpError(400, 'Selecione pelo menos um dia da semana antes de criar as reservas.');
-    const feriados = new Set((await query<{ d: string; r: boolean }>(`SELECT CONVERT(varchar(10), Data, 126) d, Recorrente r FROM dbo.Feriado`)).flatMap((f) => [f.d, f.r ? f.d.slice(5) : '']));
+    const cad = await query<{ d: string; r: boolean; a: boolean }>(`SELECT CONVERT(varchar(10), Data, 126) d, Recorrente r, Abre a FROM dbo.Feriado`);
+    const chaves = (f: { d: string; r: boolean }) => (f.r ? [f.d, f.d.slice(5)] : [f.d]);
+    const feriados = new Set(cad.flatMap(chaves));
+    const abertos = new Set(cad.filter((f) => f.a).flatMap(chaves));
     const [h0, m0] = String(padrao.PrimeiraHora).split(':').map(Number);
     const pularFeriados = b.pularFeriados !== false;
     const pularExistentes = b.pularExistentes !== false;
     const fechada = b.ativo === false ? 1 : 0;
     let criadas = 0;
     for (let d = new Date(de); d <= ate; d.setDate(d.getDate() + 1)) {
-      if (!dias.includes(d.getDay())) continue;
       const data = d.toISOString().slice(0, 10);
-      if (pularFeriados && (feriados.has(data) || feriados.has(data.slice(5)))) continue;
+      if (!dias.includes(d.getDay())) continue;
+      if (soFeriados) { if (!abertos.has(data) && !abertos.has(data.slice(5))) continue; }
+      else if (pularFeriados && (feriados.has(data) || feriados.has(data.slice(5)))) continue;
       for (let k = 0; k < (padrao.Quantidade as number); k++) {
         const t = h0 * 60 + m0 + k * (padrao.IntervaloMin as number);
         if (t >= 24 * 60) break;
