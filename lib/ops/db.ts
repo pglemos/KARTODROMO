@@ -6,6 +6,7 @@
  * CONVERT(...,126) e entra como texto, e "agora" e sempre SYSDATETIME() do servidor SQL.
  */
 import sql from 'mssql';
+import { corrigeEmail } from './email-dominio';
 
 let pool: sql.ConnectionPool | null = null;
 
@@ -133,7 +134,7 @@ export function clienteColumns(input: ClienteInput, partial: boolean): Record<st
     if (!(key in input)) continue;
     let v = (input as Record<string, unknown>)[key];
     if (typeof v === 'string') v = v.trim().slice(0, max);
-    if (key === 'email' && typeof v === 'string') v = v.toLowerCase();
+    if (key === 'email' && typeof v === 'string') v = corrigeEmail(v); // minúsculo + "gmal.com" → "gmail.com"
     if (key === 'estado' && typeof v === 'string') v = v.toUpperCase();
     set(col, v);
   }

@@ -19,6 +19,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { extname, join, normalize, resolve } from 'node:path';
 import { CLIENTE_COLS, insertCliente, isValidCpf, one, onlyDigits, query, updateCliente, type ClienteInput } from '../lib/ops/db';
 import { confereSenha, emiteToken, renovaToken, validaToken } from '../lib/ops/auth';
+import { corrigeEmail } from '../lib/ops/email-dominio';
 import { HttpError, inscreverN, officeRoutes } from '../lib/ops/office';
 import { bateriaDisponivelNoTotem, type TotemBateriaCandidate, TOTEM_BATERIAS_SQL } from '../lib/ops/totem-baterias';
 import { relatorio } from '../lib/ops/relatorios';
@@ -233,9 +234,11 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     if (raw.length < 5) throw new HttpError(400, 'Informe o CPF, RG, passaporte ou e-mail.');
     const isEmail = raw.includes('@');
     const v = isEmail ? raw.toLowerCase() : onlyDigits(raw) || raw.toUpperCase();
+    // e-mail digitado com o domínio errado ("gmal.com") acha o cadastro já corrigido, e vice-versa
+    const v2 = isEmail ? corrigeEmail(raw) : v;
     const procurar = () => one<Record<string, unknown>>(
-      `SELECT TOP 1 ${CLIENTE_COLS} FROM dbo.Cliente c WHERE ${isEmail ? 'c.Email = @v' : '(c.DocumentoNum = @v OR c.Documento = @v)'} ORDER BY CASE WHEN c.ResponsavelId IS NULL THEN 0 ELSE 1 END, c.AtualizadoEm DESC`,
-      { v },
+      `SELECT TOP 1 ${CLIENTE_COLS} FROM dbo.Cliente c WHERE ${isEmail ? 'c.Email IN (@v, @v2)' : '(c.DocumentoNum = @v OR c.Documento = @v)'} ORDER BY CASE WHEN c.ResponsavelId IS NULL THEN 0 ELSE 1 END, c.AtualizadoEm DESC`,
+      { v, v2 },
     );
     let c = await procurar();
     // não achou: pode ter feito o pré-cadastro pelo QR code há pouco (ainda não sincronizado)
