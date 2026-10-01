@@ -224,6 +224,33 @@ function runningSession(): Session | null {
   return null;
 }
 
+/**
+ * Outras provas da MESMA bateria (tomada de tempo + corrida): mesmo programa, mesma bateria da agenda ou o mesmo
+ * grupo do evento com outra prova (baterias repetidas da mesma prova não contam: têm pilotos diferentes).
+ */
+function irmasDe(s: Session) {
+  return [...sessions.values()].filter((x) => x.id !== s.id && x.state !== 'cancelada' && (
+    mesmoPrograma(s, x)
+    || (s.agendaId != null && x.agendaId === s.agendaId)
+    || (Boolean(s.groupId) && x.groupId === s.groupId && x.eventId === s.eventId && x.proofId !== s.proofId)));
+}
+
+/**
+ * Bateria nova sem pilotos (ou com pilotos sem número de kart, quando não teve sorteio) herda a lista da outra prova
+ * da mesma bateria: os nomes e karts digitados à mão na tomada vão para a corrida. Devolve de quem copiou.
+ */
+function herdarCompetidores(s: Session): Session | null {
+  if (s.state !== 'preparando') return null;
+  const temKart = s.competitors.some((c) => String(c.kart ?? '').trim());
+  if (s.competitors.length && temKart) return null;
+  const fonte = irmasDe(s)
+    .filter((x) => x.competitors.some((c) => !c.autoAdded && String(c.kart ?? '').trim()))
+    .sort((a, b) => b.createdAt - a.createdAt)[0];
+  if (!fonte) return null;
+  setCompetitors(s, fonte.competitors.filter((c) => !c.autoAdded).map((c) => ({ kart: c.kart, name: c.name, customerId: c.customerId ?? null, category: c.category ?? null, detalhes: c.detalhes })));
+  return fonte;
+}
+
 function registrarObservacao(s: Session, text: string, author: string) {
   (s.observations ??= []).unshift({ id: randomUUID(), text, wallMs: Date.now(), author });
   log(`bateria ${s.name}: ${text}`);
@@ -1196,6 +1223,9 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       const grupo = catalog.groups.find((g) => g.id === prova.groupId);
       if (grupo && (!s.name.trim() || s.name.trim() === prova.name)) s.name = `${grupo.name} · ${prova.name}`;
     }
+    // sem sorteio no tablet a recepção não manda karts: a corrida herda os pilotos e karts digitados na tomada
+    const herdada = herdarCompetidores(s);
+    if (herdada) log(`${s.name}: ${s.competitors.length} pilotos e karts copiados de ${herdada.name}`);
     sessions.set(s.id, s);
     saveSession(s);
     log(`bateria criada ${s.name} (${s.type}) com ${s.competitors.length} pilotos${s.agendaId ? ` (agenda ${s.agendaId})` : ''}`);
@@ -1527,8 +1557,8 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
           registrarTrocas(s, setCompetitors(s, parseCompetitors(body.competitors)), 'competitor-list');
           // o número do kart digitado na tomada de tempo vale para a corrida da mesma bateria (e vice-versa),
           // enquanto a outra ainda não largou
-          for (const irma of sessions.values()) {
-            if (mesmoPrograma(s, irma) && copiarCompetidores(irma, s)) {
+          for (const irma of irmasDe(s)) {
+            if (copiarCompetidores(irma, s)) {
               saveSession(irma);
               log(`competidores de ${s.name} copiados para ${irma.name}`);
             }
