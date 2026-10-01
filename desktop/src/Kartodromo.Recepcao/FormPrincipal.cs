@@ -882,13 +882,15 @@ public class FormPrincipal : Form
                 _grade.Colunas([
                     new("kart", "Kart", Largura: 60), new("categoria", "Categoria", Largura: 100), new("item", "Item de Manutenção", Largura: 200),
                     new("minutosUso", "Tempo de Uso", Largura: 100, Valor: r => $"{r.I("minutosUso") / 60}h{r.I("minutosUso") % 60:00}"), new("limiteHoras", "Limite (h)", TipoCol.Inteiro),
-                    new("ultimaManutencao", "Última Manutenção", TipoCol.DataHora, 130), new("data", "Atualizado em", TipoCol.DataHora), new("realizada", "Realizada", TipoCol.Bool)]);
+                    new("ultimaManutencao", "Última Manutenção", TipoCol.DataHora, 130), new("data", "Atualizado em", TipoCol.DataHora),
+                    // situação escrita (antes uma bolinha vazia "Realizada" que não dizia nada); marcar = botão direito
+                    new("realizada", "Situação (botão direito marca)", Largura: 190, Valor: r => r.B("realizada") ? "Feita" : (r.L("limiteHoras") ?? 0) <= 0 ? "Sem limite" : (r.L("minutosUso") ?? 0) >= (r.L("limiteHoras") ?? 0) * 60 ? "Vencida" : (r.L("minutosUso") ?? 0) >= (r.L("limiteHoras") ?? 0) * 48 ? "Perto do limite" : "Em dia")]);
                 // passou do limite de horas = vermelho; a 90% do limite = laranja (antes todas iguais, 400 h com limite de 100 h passava batido)
                 _grade.CorLinha = r =>
                 {
                     if (r.B("realizada")) return null;
                     var limite = (r.L("limiteHoras") ?? 0) * 60; var uso = r.L("minutosUso") ?? 0;
-                    return limite <= 0 ? null : uso >= limite ? Tokens.Vermelho : uso >= limite * 0.9 ? Tokens.Laranja : null;
+                    return limite <= 0 ? null : uso >= limite ? Tokens.Vermelho : uso >= limite * 0.8 ? Tokens.Laranja : null; // 80%, igual ao "A realizar"
                 };
                 _menuAtual = MenuOficina;
                 rows = await Sessao.Api.Lista($"/api/office/manutencoes?status={_status}");

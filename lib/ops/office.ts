@@ -224,7 +224,7 @@ const CAD: Record<string, CadDef> = {
     cols: { produtoId: ['ProdutoId', 'int'], ordem: ['Ordem', 'int'], nome: ['Nome', 'text', 60], tipo: ['Tipo', 'text', 14], finalizacao: ['Finalizacao', 'text', 10], tempoMin: ['TempoMin', 'int'], voltasMax: ['VoltasMax', 'int'] },
     order: 'ProdutoId, Ordem', required: ['produtoId', 'nome'], filter: 'produtoId',
   },
-  tracados: { table: 'Tracado', cols: { nome: ['Nome', 'text', 100], comprimento: ['Comprimento', 'int'], ativo: ['Ativo', 'bool'] }, order: 'Nome', required: ['nome'] },
+  tracados: { table: 'Tracado', cols: { nome: ['Nome', 'text', 100], comprimento: ['Comprimento', 'int'], ativo: ['Ativo', 'bool'] }, order: 'LEN(Nome), Nome', required: ['nome'] }, // "Traçado 2" antes de "Traçado 10"
   feriados: { table: 'Feriado', cols: { data: ['Data', 'date'], descricao: ['Descricao', 'text', 100], recorrente: ['Recorrente', 'bool'] }, order: 'Data', required: ['data', 'descricao'] },
   turnos: { table: 'Turno', cols: { descricao: ['Descricao', 'text', 60], inicio: ['Inicio', 'time'], fim: ['Fim', 'time'], ativo: ['Ativo', 'bool'] }, order: 'Descricao', required: ['descricao'] },
   terminais: {
@@ -1570,7 +1570,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   if (path === '/apoio' && method === 'GET') {
     const [produtos, tracados, formas, padroes, empresa, parametros] = await Promise.all([
       query(`SELECT Id id, Codigo codigo, Nome nome, PrecoCentavos preco, Categoria categoria, Ativo ativo FROM dbo.Produto ORDER BY Nome`),
-      query(`SELECT Id id, Nome nome FROM dbo.Tracado WHERE Ativo = 1 ORDER BY Nome`),
+      query(`SELECT Id id, Nome nome FROM dbo.Tracado WHERE Ativo = 1 ORDER BY LEN(Nome), Nome`),
       query(`SELECT Id id, Nome nome, Tipo tipo FROM dbo.FormaPagamento WHERE Ativo = 1 ORDER BY Codigo`),
       // campos do padrão para a prévia de "Criar reservas" (hora como texto hh:mm)
       query(`SELECT Id id, Nome nome, Quantidade quantidade, CONVERT(varchar(5), PrimeiraHora, 108) primeiraHora, IntervaloMin intervaloMin, Vagas vagas, Ativo ativo

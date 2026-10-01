@@ -266,16 +266,14 @@ public class TabelaDesign : Control
                 var y = 32 + (l - _topo) * 33;
                 if (Selecionavel)
                 {
-                    // caixa de marcar da linha (verde com check na escolhida)
+                    // escolha ÚNICA da linha: bolinha (opção), não caixa de marcar — a caixa sugeria poder marcar várias
                     var cx = xs[0].ini + 6; var cy = y + 8;
-                    using var caixaPath = Forma.Redondo(new Rectangle((int)cx, cy, 17, 17), 5);
                     if (l == Selecionada)
                     {
-                        using var verde = new SolidBrush(Tokens.Verde); g.FillPath(verde, caixaPath);
-                        using var ck = new Pen(Color.White, 2.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
-                        g.DrawLines(ck, [new PointF(cx + 4, cy + 9), new PointF(cx + 7.5f, cy + 12.5f), new PointF(cx + 13, cy + 5.5f)]);
+                        using var verde = new SolidBrush(Tokens.Verde); g.FillEllipse(verde, cx, cy, 17, 17);
+                        using var miolo = new SolidBrush(Color.White); g.FillEllipse(miolo, cx + 5.5f, cy + 5.5f, 6, 6);
                     }
-                    else { using var cinza = new Pen(Tokens.TextoDesabilitado, 1.5f); g.DrawPath(cinza, caixaPath); }
+                    else { using var cinza = new Pen(Tokens.TextoDesabilitado, 1.5f); g.DrawEllipse(cinza, cx + .75f, cy + .75f, 15.5f, 15.5f); }
                 }
                 for (var i = Selecionavel ? 1 : 0; i < _cols.Length && i < _linhas[l].Length; i++)
                     if (_cols[i].Marca) Marcar(g, new RectangleF(xs[i].ini, y, xs[i].larg - 8, 33), _linhas[l][i] == "1");

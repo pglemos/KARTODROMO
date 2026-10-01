@@ -436,7 +436,7 @@ public class FormMoverCliente : DialogoDesign
                     && (!paga || (b.L("produtoId") == r.L("produtoId") && b.L("preco") == r.L("preco"))))
                 .OrderBy(b => b.S("dataHora")).ToList();
             _t.Linhas(_baterias.Select(b => new[] { "", $"{b.S("nome")} · {PecasDesign.DiaMes(b.S("dataHora"))}", b.S("produto"), b.I("disponiveis").ToString() }));
-            if (_baterias.Count > 0) _t.Selecionar(0);
+            _t.Selecionar(-1); // sem escolha pronta: "Mover" com a 1ª já marcada levava o cliente para a bateria errada
         });
     }
 }
