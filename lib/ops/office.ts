@@ -159,7 +159,7 @@ async function voucherLinks(origem: string, body: Record<string, unknown>, keep?
 /** Filtro "Exibir dados:" do LapTime aplicado a uma coluna de data. */
 function periodo(url: URL, col: string) {
   const filtro = url.searchParams.get('filtro') || 'dia';
-  const data = url.searchParams.get('data') || new Date().toISOString().slice(0, 10);
+  const data = url.searchParams.get('data') || new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
   isoDate(data);
   const ate = url.searchParams.get('ate');
   switch (filtro) {

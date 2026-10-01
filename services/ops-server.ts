@@ -18,7 +18,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { extname, join, normalize, resolve } from 'node:path';
 import { CLIENTE_COLS, insertCliente, isValidCpf, one, onlyDigits, query, updateCliente, type ClienteInput } from '../lib/ops/db';
-import { confereSenha, emiteToken, validaToken } from '../lib/ops/auth';
+import { confereSenha, emiteToken, renovaToken, validaToken } from '../lib/ops/auth';
 import { HttpError, inscreverN, officeRoutes } from '../lib/ops/office';
 import { bateriaDisponivelNoTotem, type TotemBateriaCandidate, TOTEM_BATERIAS_SQL } from '../lib/ops/totem-baterias';
 import { relatorio } from '../lib/ops/relatorios';
@@ -438,6 +438,8 @@ const server = http.createServer(async (req, res) => {
     }
     if (path.startsWith('/api/office/')) {
       const sessao = sessaoDe(req, url);
+      const novo = renovaToken(sessao);
+      if (novo) res.setHeader('X-Novo-Token', novo);
       if (path === '/api/office/termo-link' && method === 'GET') {
         const ids = String(url.searchParams.get('ids') ?? '').split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0);
         return send(res, 200, { url: termoLink(ids) });
@@ -544,7 +546,7 @@ const server = http.createServer(async (req, res) => {
                   (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') inscritos,
                   (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada' AND i.Pago = 1) pagos
            FROM dbo.Bateria b WHERE b.Status <> 'cancelada' AND b.Inicio >= @d AND b.Inicio < DATEADD(day, 1, @d) ORDER BY b.Inicio`,
-          { d: /^\d{4}-\d{2}-\d{2}$/.test(data) ? data : new Date().toISOString().slice(0, 10) },
+          { d: /^\d{4}-\d{2}-\d{2}$/.test(data) ? data : new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }) },
         ));
       }
     }
@@ -557,7 +559,7 @@ const server = http.createServer(async (req, res) => {
                 (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') inscritos,
                 (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada' AND i.Pago = 1) pagos
          FROM dbo.Bateria b WHERE b.Status <> 'cancelada' AND b.Inicio >= @d AND b.Inicio < DATEADD(day, 1, @d) ORDER BY b.Inicio`,
-        { d: /^\d{4}-\d{2}-\d{2}$/.test(data) ? data : new Date().toISOString().slice(0, 10) },
+        { d: /^\d{4}-\d{2}-\d{2}$/.test(data) ? data : new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }) },
       ));
     }
     send(res, 404, { error: 'Rota desconhecida.' });

@@ -36,6 +36,7 @@ public static class AgenteImpressao
         try
         {
             var job = await Sessao.Api.Get("/api/office/impressao/proxima") as JsonObject;
+            if (_ultimoErro != null) { Situacao = "Termos do totem: " + _impressora; Log("agente voltou a falar com o servidor"); }
             _ultimoErro = null;
             if (job?.L("id") is not long id) return;
             try
@@ -53,7 +54,18 @@ public static class AgenteImpressao
                 try { await Sessao.Api.Post($"/api/office/impressao/{id}/falhou"); } catch { }
             }
         }
-        catch (Exception e) { if (e.Message != _ultimoErro) Log("sem contato com o servidor: " + e.Message); _ultimoErro = e.Message; }
+        catch (Exception e)
+        {
+            if (e.Message != _ultimoErro)
+            {
+                Log("sem contato com o servidor: " + e.Message);
+                Situacao = "Termos do totem PARADOS: " + e.Message;
+                // antes ficava só no registro e os termos paravam em silêncio (30/09: 1h40 sem imprimir)
+                if (e is ApiException { Status: 401 })
+                    dono.BeginInvoke(() => Msg.Info(dono, "O login venceu e os termos do totem pararam de imprimir.\nFeche e abra a Recepção e entre de novo.", "Termos do totem parados"));
+            }
+            _ultimoErro = e.Message;
+        }
         finally { _ocupado = false; }
     }
 

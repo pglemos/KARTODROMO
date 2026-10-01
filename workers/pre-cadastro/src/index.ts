@@ -54,7 +54,7 @@ async function receber(req: Request, env: Env) {
 
 async function listar(env: Env) {
   const lista = await env.PRE.list({ prefix: 'pendentes/', limit: 50 });
-  const itens = [];
+  const itens: Record<string, unknown>[] = [];
   for (const o of lista.objects) {
     const obj = await env.PRE.get(o.key);
     if (obj) itens.push({ key: o.key, ...(await obj.json<Record<string, unknown>>()) });

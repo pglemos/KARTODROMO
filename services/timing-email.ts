@@ -6,6 +6,7 @@
  */
 import { execFile } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import https from 'node:https';
 import { join } from 'node:path';
 import tls from 'node:tls';
 import nodemailer from 'nodemailer';
@@ -99,6 +100,72 @@ export type Dependencias = {
   logoPng: Buffer | null;
 };
 
+// hospedagem compartilhada (HostGator): mail.<domínio> entrega o certificado da própria HostGator (*.hostgator.com.br).
+// A cadeia continua sendo verificada; só o nome aceita também o da HostGator.
+function aceitaNomeHostgator(host: string, cert: tls.PeerCertificate) {
+  const erro = tls.checkServerIdentity(host, cert);
+  return erro && /(^|,\s*)DNS:\*\.hostgator\.com\.br(,|$)/.test(cert.subjectaltname ?? '') ? undefined : erro;
+}
+
+export type Entrega = { tipo: string; motivo: string };
+
+function motivoEntrega(tipo: string, mensagem: string) {
+  if (tipo === 'filtered') return 'descartado pelo antispam de saída da hospedagem (HostGator) — peça a liberação do envio da conta';
+  if (tipo === 'defer') return `adiado pelo destino (a hospedagem tenta de novo): ${mensagem}`.slice(0, 200);
+  return `recusado: ${mensagem || tipo}`.slice(0, 200);
+}
+
+/**
+ * O SMTP da hospedagem responde "250 OK" mesmo quando o antispam de saída joga a mensagem fora (30/09: o fightspamHG
+ * da HostGator descartou todos os resultados e a tela dizia "enviado"). O rastreio de entrega do webmail (cPanel,
+ * porta 2096, mesma conta) mostra o destino real. null = não deu para consultar (outra hospedagem, sem rede…).
+ */
+export async function conferirEntrega(cfg: ConfigEmail, desdeMs: number): Promise<Map<string, Entrega & { t: number }> | null> {
+  const caminho = '/json-api/cpanel?cpanel_jsonapi_module=EmailTrack&cpanel_jsonapi_func=search&cpanel_jsonapi_apiversion=2&success=1&defer=1&failure=1&inprogress=1&deliverytype=all';
+  const corpo = await new Promise<string | null>((ok) => {
+    const req = https.request({
+      host: cfg.host, port: 2096, path: caminho, method: 'GET', timeout: 15_000, checkServerIdentity: aceitaNomeHostgator,
+      headers: { authorization: 'Basic ' + Buffer.from(`${cfg.usuario}:${cfg.senha}`).toString('base64') },
+    }, (res) => {
+      let d = '';
+      res.setEncoding('utf8');
+      res.on('data', (c) => { d += c; });
+      res.on('end', () => ok(res.statusCode === 200 ? d : null));
+    });
+    req.on('error', () => ok(null));
+    req.on('timeout', () => { req.destroy(); ok(null); });
+    req.end();
+  });
+  if (!corpo) return null;
+  type Linha = { type?: string; recipient?: string; sender?: string; email?: string; message?: string; sendunixtime?: number };
+  let lista: Linha[];
+  try { const j = JSON.parse(corpo); lista = j.cpanelresult?.data ?? j.data; } catch { return null; }
+  if (!Array.isArray(lista)) return null;
+  const r = new Map<string, Entrega & { t: number }>();
+  for (const x of lista) {
+    const t = Number(x.sendunixtime ?? 0) * 1000;
+    if (t < desdeMs - 60_000) continue;
+    if (String(x.sender ?? x.email ?? '').toLowerCase() !== cfg.usuario.toLowerCase()) continue;
+    const dest = String(x.recipient ?? '').toLowerCase();
+    if (!dest || (r.get(dest)?.t ?? 0) > t) continue;
+    r.set(dest, { tipo: String(x.type ?? ''), motivo: motivoEntrega(String(x.type ?? ''), String(x.message ?? '')), t });
+  }
+  return r;
+}
+
+/** Espera o rastreio registrar os destinatários (costuma levar segundos). */
+async function conferirComEspera(cfg: ConfigEmail, desdeMs: number, enderecos: string[]) {
+  let r: Awaited<ReturnType<typeof conferirEntrega>> = null;
+  for (let i = 0; i < 3; i++) {
+    await new Promise((ok) => setTimeout(ok, 4_000));
+    r = await conferirEntrega(cfg, desdeMs);
+    if (!r || enderecos.every((e) => r!.has(e.toLowerCase()))) break;
+  }
+  return r;
+}
+
+const ENTREGA_RUIM = new Set(['filtered', 'failure', 'rejected']);
+
 function transporte(cfg: ConfigEmail, simulador: boolean) {
   if (simulador) return nodemailer.createTransport({ streamTransport: true, buffer: true, newline: 'windows' });
   return nodemailer.createTransport({
@@ -107,14 +174,7 @@ function transporte(cfg: ConfigEmail, simulador: boolean) {
     secure: cfg.porta === 465,
     requireTLS: cfg.porta === 587,
     auth: { user: cfg.usuario, pass: cfg.senha },
-    // hospedagem compartilhada (HostGator): mail.<domínio> entrega o certificado da própria HostGator (*.hostgator.com.br).
-    // A cadeia continua sendo verificada; só o nome aceita também o da HostGator.
-    tls: {
-      checkServerIdentity: (host: string, cert: tls.PeerCertificate) => {
-        const erro = tls.checkServerIdentity(host, cert);
-        return erro && /(^|,\s*)DNS:\*\.hostgator\.com\.br(,|$)/.test(cert.subjectaltname ?? '') ? undefined : erro;
-      },
-    },
+    tls: { checkServerIdentity: aceitaNomeHostgator },
     connectionTimeout: 15_000,
     greetingTimeout: 15_000,
     socketTimeout: 30_000,
@@ -213,6 +273,7 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
   const enviados = op.automatico ? [...(anterior?.enviados ?? [])] : [];
   const falhas: EnvioEmailsResultado['falhas'] = [];
   const pastaTeste = join(dep.dataDir, 'emails-simulador');
+  const inicioEnvio = Date.now();
 
   for (const a of alvos) {
     try {
@@ -243,6 +304,20 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
     }
   }
   t.close();
+
+  // "250 OK" do SMTP não é entrega: confere no rastreio da hospedagem e devolve para falhas o que foi descartado
+  const aceitos = alvos.filter((a) => !falhas.some((f) => f.kart === a.kart && f.email === a.email));
+  if (!dep.simulador && aceitos.length) {
+    const entrega = await conferirComEspera(cfg, inicioEnvio, aceitos.map((a) => a.email));
+    if (!entrega) dep.log('e-mail: não deu para conferir a entrega no rastreio da hospedagem (fica como aceito pelo servidor)');
+    for (const a of aceitos) {
+      const e = entrega?.get(a.email.toLowerCase());
+      if (!e || !ENTREGA_RUIM.has(e.tipo)) continue;
+      falhas.push({ kart: a.kart, nome: a.nome, email: a.email, erro: e.motivo });
+      const chave = `${a.kart}|${a.email}`;
+      for (let i = enviados.indexOf(chave); i >= 0; i = enviados.indexOf(chave)) enviados.splice(i, 1);
+    }
+  }
 
   const resultado: EnvioEmailsResultado = {
     status: !todos.length && !op.para ? 'sem-destinatarios' : falhas.length === 0 ? 'enviado' : falhas.length < alvos.length ? 'parcial' : 'falhou',
@@ -283,6 +358,7 @@ export async function enviarTeste(cfgArquivo: string, para: string, simulador: b
   if (!emailValido(para)) throw new Error('Informe um e-mail válido para o teste.');
   if (!simulador && !(cfg.host && cfg.usuario && cfg.senha)) throw new Error('Preencha servidor, usuário e senha antes do teste.');
   const t = transporte(cfg, simulador);
+  const inicio = Date.now();
   try {
     if (!simulador) await t.verify();
     await t.sendMail({
@@ -295,4 +371,7 @@ export async function enviarTeste(cfgArquivo: string, para: string, simulador: b
   } finally {
     t.close();
   }
+  if (simulador) return;
+  const e = (await conferirComEspera(cfg, inicio, [para]))?.get(para.trim().toLowerCase());
+  if (e && ENTREGA_RUIM.has(e.tipo)) throw new Error(`o servidor aceitou, mas a mensagem não saiu: ${e.motivo}`);
 }

@@ -394,10 +394,11 @@ function decoderView() {
 function stateView() {
   const running = runningSession();
   const list = sortedSessions();
-  // a bateria em foco: a que esta correndo, senao a proxima preparada, senao a ultima encerrada
+  // a bateria em foco: a que esta correndo, senao a proxima preparada HOJE, senao a ultima encerrada
+  // (uma preparada esquecida de outro dia prendia o telao: em 30/09 o foco era o "Clube da Insonia" de 27/09)
   const focus =
     running ??
-    list.filter((s) => s.state === 'preparando').sort((a, b) => a.createdAt - b.createdAt)[0] ??
+    list.filter((s) => s.state === 'preparando' && s.createdAt >= inicioDoDia()).sort((a, b) => a.createdAt - b.createdAt)[0] ??
     list.find((s) => s.state === 'encerrada') ??
     null;
   const lastQualifying = list.find((s) => s.state === 'encerrada' && s.type !== 'corrida');
@@ -1125,7 +1126,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     const jaExiste = prova ? [...sessions.values()].find((x) => x.proofId === prova.id && x.state !== 'cancelada') : undefined;
     if (jaExiste) return send(res, 200, sessionView(jaExiste));
     const s = createSession({
-      id: `${new Date().toISOString().slice(0, 10)}-${randomUUID().slice(0, 8)}`,
+      id: `${hojeBrasilia()}-${randomUUID().slice(0, 8)}`,
       name: String(body.name ?? ''),
       type,
       durationMin: Number(body.durationMin ?? ((timingSettings.timing as Record<string, unknown> | undefined)?.defaultDurationMin ?? (type === 'corrida' ? 20 : type === 'classificacao' ? 5 : 10))),
@@ -1523,7 +1524,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     const criadas = provas.map((p) => {
       const porVoltas = p.finalizacao === 'voltas';
       const s = createSession({
-        id: `${new Date().toISOString().slice(0, 10)}-${randomUUID().slice(0, 8)}`,
+        id: `${hojeBrasilia()}-${randomUUID().slice(0, 8)}`,
         name: provas.length > 1 ? `${nome} · ${String(p.nome ?? '').trim() || tipo(p.tipo)}` : nome,
         type: tipo(p.tipo),
         durationMin: porVoltas ? 0 : Number(p.tempoMin ?? cfg.defaultDurationMin ?? 20),

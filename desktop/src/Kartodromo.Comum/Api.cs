@@ -63,6 +63,8 @@ public class Api
         {
             throw new ApiException("Não foi possível falar com o servidor. Verifique a rede e se o servidor está ligado.", 0);
         }
+        // o servidor manda um login novo antes do atual vencer (a Recepção fica aberta dias seguidos)
+        if (resp.Headers.TryGetValues("X-Novo-Token", out var novos) && novos.FirstOrDefault() is { Length: > 0 } novo) Token = novo;
         var texto = await resp.Content.ReadAsStringAsync();
         JsonNode dados = null;
         try { dados = string.IsNullOrWhiteSpace(texto) ? null : JsonNode.Parse(texto); } catch { /* html / vazio */ }

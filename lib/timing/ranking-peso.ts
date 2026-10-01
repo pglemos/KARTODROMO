@@ -85,7 +85,11 @@ export function rankingPorPeso(sessoes: Iterable<Session>, dados: (customerId: s
   const top = Math.max(1, Math.min(500, o.top || 10));
   for (const g of [...grupos, semPeso]) {
     g.linhas.sort((a, b) => a.melhorMs - b.melhorMs);
-    g.linhas = g.linhas.slice(0, top).map((l, i) => { const { chave: _, ...resto } = l as LinhaRanking & { chave?: string }; return { ...resto, posicao: i + 1 }; });
+    g.linhas = g.linhas.slice(0, top).map((l, i) => {
+      const resto = { ...(l as LinhaRanking & { chave?: string }) };
+      delete resto.chave;
+      return { ...resto, posicao: i + 1 };
+    });
   }
   return semPeso.linhas.length ? [...grupos, semPeso] : grupos;
 }

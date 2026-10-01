@@ -25,6 +25,15 @@ export function emiteToken(s: Omit<Sessao, 'exp'>, horas = 16): string {
   return `${payload}.${sig}`;
 }
 
+/**
+ * Login novo para quem está usando: a Recepção fica aberta dias seguidos e o token de 16 h vencia no meio do
+ * expediente (o agente de termos do totem parou 1h40 em 30/09). Renova quando faltam menos de 12 h.
+ */
+export function renovaToken(s: Sessao): string | null {
+  if (s.exp - Date.now() > 12 * 3_600_000) return null;
+  return emiteToken({ uid: s.uid, nome: s.nome, admin: s.admin });
+}
+
 export function validaToken(token: string | null | undefined): Sessao | null {
   if (!token) return null;
   const [payload, sig] = token.split('.');
