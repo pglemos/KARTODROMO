@@ -12,6 +12,10 @@ public partial class FormCrono
     {
         if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
         if (cor == "verde" && _sess.S("state") == "preparando") { Acao("start"); return; }
+        if (cor == "verde" && _sess.S("state") is "encerrada" or "cancelada") { Msg.Aviso(this, "A prova está finalizada. Para correr de novo, use Reiniciar bateria."); return; }
+        if (cor == "verde" && _sess.B("aguardandoLargada")) { Msg.Info(this, "A bandeira verde já foi dada: o cronômetro começa quando o 1º kart passar na linha."); return; }
+        // verde com a prova correndo: relargada (zera o tempo até o 1º kart passar) ou só pista liberada
+        if (cor == "verde" && _sess.S("state") is "em_andamento" or "bandeira_final") { VerdeComProvaCorrendo(); return; }
         var flag = cor switch { "verde" => "verde", "amarela" => "amarela", "vermelha" => "vermelha", "branca" => "branca", "quadriculada" => "quadriculada", _ => "" };
         if (flag.Length == 0) return;
         if (_sess.S("state") is not ("em_andamento" or "bandeira_final")) { Msg.Aviso(this, "A prova precisa estar em andamento para receber uma bandeira."); return; }

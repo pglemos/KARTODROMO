@@ -21,6 +21,13 @@ export type Crossing = {
 
 export type Observation = { id: string; text: string; wallMs: number; author?: string };
 
+/**
+ * Advertência (bandeira preta e branca) ou penalidade de tempo dada pelo cronometrista. Um piloto pode receber
+ * várias: cada uma é um registro. A de tempo soma segundos ao tempo oficial (corrida: na chegada; tomada de
+ * tempo e treino: na melhor volta).
+ */
+export type Penalidade = { id: string; tipo: 'advertencia' | 'tempo'; segundos?: number; motivo?: string; wallMs: number; autor?: string };
+
 /** Dados do "Registro de competidor" (Competidor do canvas). Não mexem na contagem de voltas. */
 export type CompetidorDetalhes = {
   sexo?: string; iniciais?: string; email?: string; patrocinador?: string; clube?: string; cidade?: string; estado?: string; pais?: string;
@@ -39,6 +46,8 @@ export type Competitor = {
   detalhes?: CompetidorDetalhes;
   autoAdded?: boolean;
   flag?: RaceFlag | PilotFlag;
+  /** advertências e penalidades de tempo (pode haver várias) */
+  penalidades?: Penalidade[];
   crossings: Crossing[];
   finished: boolean;
 };
@@ -60,6 +69,10 @@ export type Session = {
   finishedAt: number | null;
   /** hora em que o tempo programado acabou: só avisa, quem dá a quadriculada e encerra é o cronometrista */
   timeUpAt?: number | null;
+  /** prova por nº de voltas: hora em que o líder completou as voltas (só avisa, igual ao tempo esgotado) */
+  lapsReachedAt?: number | null;
+  /** traçado escolhido para esta bateria (vale mais que o da prova e o do evento) */
+  trackId?: string | null;
   currentFlag?: RaceFlag;
   redFlagAt?: number | null;
   redFlagElapsedMs?: number | null;
@@ -111,6 +124,14 @@ export type Standing = {
   finished: boolean;
   autoAdded: boolean;
   lastCrossingWallMs: number | null;
+  /** soma das penalidades de tempo (ms) — já incluída no totalMs e na ordem */
+  penaltyMs?: number;
+  /** quantas advertências o piloto recebeu */
+  advertencias?: number;
+  /** bandeira preta: desclassificado, vai para o fim da classificação */
+  desclassificado?: boolean;
+  /** 0 classificado · 3 desclassificado (mesmos códigos do LapTime: NC 1, EX 2, DC 3) */
+  racingStatus?: number;
 };
 
 const DAY_MS = 86_400_000;
@@ -196,10 +217,21 @@ export function updateSessionParameters(
   }
   if (maxLaps !== undefined) session.maxLaps = maxLaps;
 
-  if (session.state === 'em_andamento' && session.maxLaps !== null) {
-    const leader = computeStandings(session)[0];
-    if (leader && leader.laps >= session.maxLaps) setRaceFlag(session, 'checkered', now);
-  }
+  // mudou o limite de voltas: o aviso de "voltas completas" é refeito (a quadriculada continua do cronometrista)
+  if (maxLaps !== undefined) session.lapsReachedAt = null;
+  if (session.state === 'em_andamento') marcarVoltasCompletas(session, now);
+}
+
+/** Prova por nº de voltas: marca quando o líder completou as voltas. Só avisa — nunca dá a quadriculada sozinho. */
+function marcarVoltasCompletas(session: Session, now: number) {
+  if (!session.maxLaps || session.lapsReachedAt != null) return;
+  const lider = computeStandings(session)[0];
+  if (lider && lider.laps >= session.maxLaps) session.lapsReachedAt = now;
+}
+
+/** O líder já completou as voltas programadas e a prova segue esperando a quadriculada do cronometrista. */
+export function voltasCompletas(session: Session) {
+  return session.state === 'em_andamento' && session.lapsReachedAt != null;
 }
 
 function defaultName(type: SessionType) {
@@ -452,6 +484,57 @@ export function closeSession(session: Session, now: number) {
   session.redFlagAt = null;
 }
 
+/**
+ * Reiniciar a bateria: volta para "preparando" como se não tivesse largado. As passagens ficam excluídas
+ * (continuam no diário e podem ser restauradas), bandeiras dos pilotos, advertências e penalidades saem e as
+ * linhas "Kart 12" que entraram sozinhas somem. Os pilotos e os números dos karts continuam.
+ */
+export function restartSession(session: Session) {
+  session.competitors = session.competitors.filter((c) => !c.autoAdded);
+  for (const c of session.competitors) {
+    for (const x of c.crossings) x.deleted = true;
+    c.finished = false;
+    c.flag = 'none';
+    c.penalidades = [];
+  }
+  session.rejected = [];
+  session.state = 'preparando';
+  session.startedAt = null;
+  session.greenAt = null;
+  session.checkeredAt = null;
+  session.finishedAt = null;
+  session.timeUpAt = null;
+  session.lapsReachedAt = null;
+  session.currentFlag = 'none';
+  session.redFlagAt = null;
+  session.redFlagElapsedMs = null;
+  delete session.emailsResultado;
+}
+
+/** Advertência ou penalidade de tempo para um piloto (pode receber quantas forem precisas). */
+export function addPenalty(session: Session, kart: string, p: Penalidade) {
+  const c = session.competitors.find((x) => x.kart === kart);
+  if (!c) throw new Error('Competidor não encontrado.');
+  if (p.tipo !== 'advertencia' && p.tipo !== 'tempo') throw new Error('Tipo de penalidade inválido.');
+  const segundos = Number(p.segundos);
+  if (p.tipo === 'tempo' && (!Number.isFinite(segundos) || segundos <= 0 || segundos > 3600)) throw new Error('Informe os segundos da penalidade (entre 1 e 3600).');
+  const registro: Penalidade = { id: p.id, tipo: p.tipo, wallMs: p.wallMs, ...(p.tipo === 'tempo' ? { segundos } : {}), ...(p.motivo?.trim() ? { motivo: p.motivo.trim().slice(0, 160) } : {}), ...(p.autor ? { autor: p.autor } : {}) };
+  (c.penalidades ??= []).push(registro);
+  return { competitor: c, penalidade: registro };
+}
+
+export function removePenalty(session: Session, kart: string, id: string) {
+  const c = session.competitors.find((x) => x.kart === kart);
+  const p = c?.penalidades?.find((x) => x.id === id);
+  if (!c || !p) throw new Error('Penalidade não encontrada.');
+  c.penalidades = c.penalidades!.filter((x) => x !== p);
+  return { competitor: c, penalidade: p };
+}
+
+export function penaltyMsOf(c: Competitor) {
+  return (c.penalidades ?? []).reduce((s, p) => s + (p.tipo === 'tempo' ? Math.round((p.segundos ?? 0) * 1000) : 0), 0);
+}
+
 export function cancelSession(session: Session, now: number) {
   session.state = 'cancelada';
   session.finishedAt = now;
@@ -510,13 +593,9 @@ export function applyPassing(session: Session, p: { id?: string; kart: string; d
   comp.crossings.push({ id: p.id, decoderTimeMs: p.decoderTimeMs, wallMs: p.wallMs, lapMs, source: p.source ?? 'decoder', transponder: p.transponder ?? null });
   recalculate(comp);
 
-  const laps = activeCrossings(comp).length - 1;
-  if (session.state === 'bandeira_final' && lapMs !== null) {
-    comp.finished = true;
-  } else if (session.state === 'em_andamento' && session.maxLaps && laps >= session.maxLaps) {
-    comp.finished = true;
-    checkered(session, p.wallMs);
-  }
+  if (session.state === 'bandeira_final' && lapMs !== null) comp.finished = true;
+  // prova por voltas: quando o líder completa as voltas a tela avisa; a quadriculada é do cronometrista
+  else if (session.state === 'em_andamento') marcarVoltasCompletas(session, p.wallMs);
 
   return 'counted';
 }
@@ -674,9 +753,14 @@ export function computeStandings(session: Session, trackLengthMeters = 1_000): S
     if (firstCrossing && lastCrossing && laps > 0) {
       total = crossings.slice(1).reduce((sum, crossing) => sum + (crossing.lapMs ?? 0), 0);
     }
+    const penalty = penaltyMsOf(c);
 
     return {
       c,
+      penalty,
+      // tomada de tempo/treino: a penalidade de tempo soma na melhor volta
+      bestOficial: best === null ? null : best + penalty,
+      dq: c.flag === 'black',
       gridIndex,
       crossings,
       firstCrossing,
@@ -688,7 +772,7 @@ export function computeStandings(session: Session, trackLengthMeters = 1_000): S
       best2nd,
       best3rd,
       lastLap: lastCrossing?.lapMs ?? null,
-      total,
+      total: total === null ? null : total + penalty,
       averageSpeed: total && total > 0 ? (laps * trackLengthMeters * 3_600) / total : null,
       lastWall: lastCrossing?.wallMs ?? null,
     };
@@ -696,12 +780,15 @@ export function computeStandings(session: Session, trackLengthMeters = 1_000): S
 
   if (session.type === 'corrida') {
     rows.sort((a, b) => {
+      // 0. Bandeira preta (desclassificado) vai para o fim
+      if (a.dq !== b.dq) return a.dq ? 1 : -1;
+
       // 1. Mais voltas completadas vem na frente
       if (b.laps !== a.laps) return b.laps - a.laps;
 
-      // 2. Na mesma volta (> 0): quem completou a volta primeiro na pista
+      // 2. Na mesma volta (> 0): quem completou a volta primeiro na pista, somando as penalidades de tempo
       if (a.laps > 0) {
-        const arrival = compareCrossings(a.lastCrossing, b.lastCrossing);
+        const arrival = compareCrossings(a.lastCrossing, b.lastCrossing) + (a.penalty - b.penalty);
         if (arrival !== 0) return arrival;
       }
 
@@ -720,14 +807,17 @@ export function computeStandings(session: Session, trackLengthMeters = 1_000): S
     });
   } else {
     rows.sort((a, b) => {
+      // 0. Bandeira preta (desclassificado) vai para o fim
+      if (a.dq !== b.dq) return a.dq ? 1 : -1;
+
       // 1. Quem tem volta válida vem na frente de quem não tem
       if ((a.best === null) !== (b.best === null)) {
         return a.best === null ? 1 : -1;
       }
 
-      // 2. Ambos têm volta válida: menor tempo de volta
-      if (a.best !== null && b.best !== null) {
-        if (a.best !== b.best) return a.best - b.best;
+      // 2. Ambos têm volta válida: menor tempo de volta (com a penalidade de tempo somada)
+      if (a.bestOficial !== null && b.bestOficial !== null) {
+        if (a.bestOficial !== b.bestOficial) return a.bestOficial - b.bestOficial;
 
         // Desempate 1: 2ª melhor volta
         if (a.best2nd !== null && b.best2nd !== null && a.best2nd !== b.best2nd) {
@@ -778,11 +868,11 @@ export function computeStandings(session: Session, trackLengthMeters = 1_000): S
       if (session.type === 'corrida') {
         gapLaps = leader.laps - r.laps;
         if (gapLaps === 0 && leader.laps > 0 && r.lastCrossing && leader.lastCrossing) {
-          const diff = compareCrossings(r.lastCrossing, leader.lastCrossing);
+          const diff = compareCrossings(r.lastCrossing, leader.lastCrossing) + (r.penalty - leader.penalty);
           gapMs = Math.max(0, diff);
         }
-      } else if (r.best !== null && leader.best !== null) {
-        gapMs = r.best - leader.best;
+      } else if (r.bestOficial !== null && leader.bestOficial !== null) {
+        gapMs = r.bestOficial - leader.bestOficial;
       }
     }
     return {
@@ -801,6 +891,10 @@ export function computeStandings(session: Session, trackLengthMeters = 1_000): S
       finished: r.c.finished,
       autoAdded: Boolean(r.c.autoAdded),
       lastCrossingWallMs: r.lastWall,
+      penaltyMs: r.penalty,
+      advertencias: (r.c.penalidades ?? []).filter((p) => p.tipo === 'advertencia').length,
+      desclassificado: r.dq,
+      racingStatus: r.dq ? 3 : 0,
     };
   });
 }

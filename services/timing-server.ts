@@ -21,6 +21,10 @@ import { DecoderClient, type DecoderProtocol } from '../lib/timing/decoder-clien
 import { formatTrxPassing, type TrxPassing } from '../lib/timing/trx-parser';
 import {
   acceptRejected,
+  addPenalty,
+  removePenalty,
+  restartSession,
+  voltasCompletas,
   applyPassing,
   assignCrossing,
   cancelSession,
@@ -61,6 +65,7 @@ import {
   type TimingCatalog,
 } from '../lib/timing/catalog';
 import { rankingPorPeso, tituloFaixas, type DadosPiloto } from '../lib/timing/ranking-peso';
+import { historicoDoKart, rankingKarts } from '../lib/timing/ranking-karts';
 import { nomeProprio } from '../lib/nomes';
 import { configPublica, enviarResultado, enviarTeste, lerConfig, salvarConfig, traduzirErro, type Dependencias } from './timing-email';
 import type { ContextoProva, EmpresaEmail } from '../lib/timing/email-resultado';
@@ -219,15 +224,48 @@ function runningSession(): Session | null {
   return null;
 }
 
+function registrarObservacao(s: Session, text: string, author: string) {
+  (s.observations ??= []).unshift({ id: randomUUID(), text, wallMs: Date.now(), author });
+  log(`bateria ${s.name}: ${text}`);
+}
+
+function textoPenalidade(p: { tipo: string; segundos?: number }) {
+  return p.tipo === 'tempo' ? `Penalidade de +${String(p.segundos ?? 0).replace('.', ',')} s` : 'Advertência';
+}
+
+/** Bandeira verde de novo (relargada): zera a bateria e arma o cronômetro para o próximo kart que passar na linha. */
+function relargar(s: Session, now: number, autor: string) {
+  restartSession(s);
+  startSession(s, now);
+  registrarObservacao(s, 'Relargada: bandeira verde de novo, o cronômetro recomeça no primeiro kart que passar na linha (passagens anteriores continuam no diário)', autor);
+  setTb50Offset(0, 'relargada');
+}
+
 function sortedSessions() {
   return [...sessions.values()].sort((a, b) => b.createdAt - a.createdAt);
 }
 
-function trackLengthFor(s: Session) {
-  const event = catalog.events.find((item) => item.id === s.eventId);
-  const track = catalog.tracks.find((item) => item.id === event?.trackId);
+/** Traçado da bateria: o escolhido nela (Editar bateria) › o da prova › o do evento. null = traçado padrão. */
+function trackIdDa(s: Session): string | null {
+  if (s.trackId && catalog.tracks.some((t) => t.id === s.trackId)) return s.trackId;
+  const prova = catalog.provas.find((p) => p.id === s.proofId);
+  if (prova?.trackId) return prova.trackId;
+  return catalog.events.find((e) => e.id === (s.eventId ?? prova?.eventId))?.trackId ?? null;
+}
+
+function defaultTrackLength() {
   const system = (timingSettings.system && typeof timingSettings.system === 'object' ? timingSettings.system : {}) as Record<string, unknown>;
-  return track?.lengthMeters ?? (Number(system.defaultTrackLengthMeters ?? timingSettings.defaultTrackLengthMeters) || 1_000);
+  return Number(system.defaultTrackLengthMeters ?? timingSettings.defaultTrackLengthMeters) || 1_000;
+}
+
+function trackDa(s: Session) {
+  const id = trackIdDa(s);
+  const t = id ? catalog.tracks.find((item) => item.id === id) : undefined;
+  return { id: t?.id ?? null, name: t?.name ?? 'Traçado principal', lengthMeters: t?.lengthMeters ?? defaultTrackLength() };
+}
+
+function trackLengthFor(s: Session) {
+  return trackDa(s).lengthMeters;
 }
 
 type RecentPassing = {
@@ -355,6 +393,9 @@ function sessionView(s: Session) {
     finishedAt: s.finishedAt,
     remainingMs: remainingMs(s, now),
     tempoEsgotado: timeIsUp(s, now),
+    voltasCompletas: voltasCompletas(s),
+    trackId: s.trackId ?? null,
+    track: trackDa(s),
     elapsedMs: elapsedMs(s, now),
     currentFlag: s.currentFlag ?? 'none',
     eventId: s.eventId ?? null,
@@ -362,7 +403,12 @@ function sessionView(s: Session) {
     proofId: s.proofId ?? null,
     observations: s.observations ?? [],
     // nome próprio só na exibição (telão, resultado, operador): o cadastro vinha TUDO MAIÚSCULO ou tudo minúsculo
-    competitors: s.competitors.map((c) => ({ kart: c.kart, name: nomeProprio(c.name), customerId: c.customerId ?? null, category: c.category ?? null, flag: c.flag ?? 'none', autoAdded: Boolean(c.autoAdded), detalhes: c.detalhes ?? null })),
+    competitors: s.competitors.map((c) => ({
+      kart: c.kart, name: nomeProprio(c.name), customerId: c.customerId ?? null, category: c.category ?? null, flag: c.flag ?? 'none', autoAdded: Boolean(c.autoAdded), detalhes: c.detalhes ?? null,
+      // já passou na linha nesta bateria (a lista de competidores fica amarela até o kart passar)
+      passou: c.crossings.some((x) => !x.deleted),
+      penalidades: c.penalidades ?? [],
+    })),
     standings: computeStandings(s, trackLengthFor(s)).filter((r) => !s.competitors.find((c) => c.kart === r.kart && c.name === r.name)?.detalhes?.oculto).map((r) => ({ ...r, name: nomeProprio(r.name) })),
     emailsResultado: s.emailsResultado ?? null,
   };
@@ -663,7 +709,7 @@ async function contextoDaProva(s: Session): Promise<ContextoProva> {
   const prova = catalog.provas.find((p) => p.id === s.proofId);
   const grupo = catalog.groups.find((g) => g.id === (s.groupId ?? prova?.groupId));
   const evento = catalog.events.find((e) => e.id === (s.eventId ?? prova?.eventId));
-  const pista = catalog.tracks.find((t) => t.id === (prova?.trackId ?? evento?.trackId));
+  const pista = catalog.tracks.find((t) => t.id === trackIdDa(s));
   // sem o programa do catálogo, o nome da bateria já vem "BATERIA 17:00 · CORRIDA"
   const i = s.name.lastIndexOf(' · ');
   return {
@@ -1265,7 +1311,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
           clientes.set(String(c.id), { peso: Number(c.peso) > 0 ? Number(c.peso) : null, sexo: c.sexo ?? null, email: c.email ?? null, telefone: c.telefone ?? null });
       } catch { /* sem o servidor da operação: usa o peso digitado no registro do competidor */ }
     }
-    const trilha = (x: Session) => (x.proofId ? catalog.provas.find((p) => p.id === x.proofId)?.trackId ?? null : null);
+    const trilha = (x: Session) => trackIdDa(x);
     const sexo = q.get('sexo');
     const grupos = rankingPorPeso(encerradas, (cid) => (cid ? clientes.get(cid) ?? {} : {}), {
       top: Number(q.get('top') ?? 10), mes: q.get('mes') || null, de: q.get('de') || null, ate: q.get('ate') || null,
@@ -1273,6 +1319,19 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       trackId: q.get('trackId') || null, categoria: q.get('categoria') || null, ignorarSegunda: q.get('ignorarSegunda') === '1',
     }, trilha);
     return send(res, 200, { faixas: tituloFaixas(faixas), grupos, pilotosComPeso: [...clientes.values()].filter((c) => c.peso).length });
+  }
+
+  // ---------------------------------------------------------------- ranking dos karts (histórico de tempo de cada kart)
+  if (path === '/api/ranking-karts' && method === 'GET') {
+    const q = url.searchParams;
+    const data = (v: string | null) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
+    const tipos = String(q.get('tipos') ?? '').split(',').filter((t): t is SessionType => SESSION_TYPES.has(t as SessionType));
+    const opcoes = { de: data(q.get('de')), ate: data(q.get('ate')), trackId: q.get('trackId') || null, tipos: tipos.length ? tipos : null, extensaoM: trackLengthFor };
+    // a volta é do kart físico: pelo transponder (troca de kart) e, sem ele, pelo número na bateria
+    const kartDaPassagem = (kart: string, transponder: number | null | undefined) => (transponder != null && transponderMap[String(transponder)]) || kart;
+    const kart = q.get('kart');
+    if (kart) return send(res, 200, historicoDoKart(sessions.values(), kart, opcoes, trackIdDa, kartDaPassagem).map((h) => ({ ...h, piloto: nomeProprio(h.piloto) })));
+    return send(res, 200, rankingKarts(sessions.values(), opcoes, trackIdDa, kartDaPassagem).map((r) => ({ ...r, melhorPiloto: nomeProprio(r.melhorPiloto) })));
   }
 
   // ---------------------------------------------------------------- sorteio de karts (tablet)
@@ -1321,6 +1380,35 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     }
   }
 
+  // ---------------------------------------------------------------- advertências e penalidades de tempo (várias por piloto)
+  const pen = path.match(/^\/api\/sessions\/([\w-]+)\/penalties\/([^/]+)(?:\/([\w-]+))?$/);
+  if (pen && (method === 'POST' || method === 'DELETE')) {
+    const s = sessions.get(pen[1]);
+    if (!s) return send(res, 404, { error: 'Bateria não encontrada.' });
+    const kart = decodeURIComponent(pen[2]);
+    try {
+      if (method === 'POST') {
+        const body = await readBody(req);
+        const tipo = String(body.tipo ?? '') === 'tempo' ? 'tempo' : String(body.tipo ?? '') === 'advertencia' ? 'advertencia' : null;
+        if (!tipo) return send(res, 400, { error: 'Tipo de penalidade inválido.' });
+        const autor = String(body.autor ?? 'Cronometragem').slice(0, 60);
+        const { competitor, penalidade } = addPenalty(s, kart, {
+          id: randomUUID(), tipo, segundos: body.segundos == null ? undefined : Number(String(body.segundos).replace(',', '.')),
+          motivo: body.motivo == null ? undefined : String(body.motivo), wallMs: Date.now(), autor,
+        });
+        const motivo = penalidade.motivo ? ` · ${penalidade.motivo}` : '';
+        registrarObservacao(s, `${textoPenalidade(penalidade)} · ${competitor.name} (kart ${competitor.kart})${motivo}`, autor);
+      } else {
+        if (!pen[3]) return send(res, 400, { error: 'Informe a penalidade.' });
+        const { competitor, penalidade } = removePenalty(s, kart, pen[3]);
+        registrarObservacao(s, `Retirada: ${textoPenalidade(penalidade).toLowerCase()} · ${competitor.name} (kart ${competitor.kart})`, 'Cronometragem');
+      }
+    } catch (err) { return send(res, 400, { error: (err as Error).message }); }
+    saveSession(s);
+    scheduleStateBroadcast();
+    return send(res, 200, sessionView(s));
+  }
+
   const m = path.match(/^\/api\/sessions\/([\w-]+)(?:\/(\w+))?(?:\/(\w+))?$/);
   if (m) {
     const s = sessions.get(m[1]);
@@ -1348,11 +1436,17 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         return send(
           res,
           200,
-          s.competitors.map((c) => ({
-            kart: c.kart,
-            name: c.name,
-            laps: c.crossings.map((x, i) => ({ lap: i, lapMs: x.lapMs, invalid: Boolean(x.invalid), wallMs: x.wallMs })).filter((x) => x.lapMs !== null),
-          })),
+          s.competitors.map((c) => {
+            const ativas = c.crossings.filter((x) => !x.deleted).sort((a, b) => a.wallMs - b.wallMs);
+            const laps = ativas.map((x, i) => ({ lap: i, lapMs: x.lapMs, invalid: Boolean(x.invalid), wallMs: x.wallMs, penalty: '' })).filter((x) => x.lapMs !== null);
+            // advertência/penalidade aparece na volta em que foi dada (a primeira que fechou depois dela)
+            for (const p of c.penalidades ?? []) {
+              const volta = laps.find((l) => l.wallMs >= p.wallMs) ?? laps[laps.length - 1];
+              const texto = textoPenalidade(p) + (p.motivo ? ` (${p.motivo})` : '');
+              if (volta) volta.penalty = volta.penalty ? `${volta.penalty} · ${texto}` : texto;
+            }
+            return { kart: c.kart, name: c.name, laps };
+          }),
         );
       }
       if (action === 'passings' && !m[3] && method === 'GET') return send(res, 200, crossingRows(s));
@@ -1397,6 +1491,13 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         };
         const flag = flags[String(body.flag ?? '')];
         if (!flag) return send(res, 400, { error: 'Bandeira inválida.' });
+        if (flag === 'green' && body.relargar && s.state !== 'preparando') {
+          // relargada: as passagens de antes não contam e o cronômetro volta a zero até o 1º kart passar na linha
+          relargar(s, now, String(body.autor ?? 'Cronometragem'));
+          saveSession(s);
+          scheduleStateBroadcast();
+          return send(res, 200, sessionView(s));
+        }
         setRaceFlag(s, flag, now);
         saveSession(s);
         scheduleStateBroadcast();
@@ -1436,6 +1537,22 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         if (typeof body.eventId === 'string' || body.eventId === null) s.eventId = body.eventId as string | null;
         if (typeof body.groupId === 'string' || body.groupId === null) s.groupId = body.groupId as string | null;
         if (typeof body.proofId === 'string' || body.proofId === null) s.proofId = body.proofId as string | null;
+        if (body.trackId !== undefined) {
+          const tid = body.trackId ? String(body.trackId) : null;
+          if (tid && !catalog.tracks.some((t) => t.id === tid)) return send(res, 400, { error: 'Traçado não encontrado.' });
+          s.trackId = tid;
+          log(`bateria ${s.name}: traçado ${trackDa(s).name} (${trackDa(s).lengthMeters} m)`);
+        }
+      } else if (action === 'restart' && method === 'POST') {
+        const body = await readBody(req);
+        if (body.largar) {
+          const other = runningSession();
+          if (other && other.id !== s.id) return send(res, 409, { error: `Já existe bateria em andamento: ${other.name}. Encerre ela antes.` });
+          relargar(s, now, String(body.autor ?? 'Cronometragem'));
+        } else {
+          restartSession(s);
+          registrarObservacao(s, 'Bateria reiniciada: passagens, bandeiras e penalidades zeradas (as passagens continuam no diário)', String(body.autor ?? 'Cronometragem'));
+        }
       } else if (action === 'start' && method === 'POST') {
         const other = runningSession();
         if (other && other.id !== s.id) return send(res, 409, { error: `Ja existe bateria em andamento: ${other.name}. Encerre ela antes.` });
@@ -1456,7 +1573,11 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         if (!competitor) return send(res, 404, { error: 'Competidor não encontrado.' });
         const flag = String(body.flag ?? '') as NonNullable<(typeof competitor)['flag']>;
         if (!['none', 'green', 'yellow', 'red', 'white', 'checkered', 'black', 'mechanical', 'warning', 'blue', 'penalty'].includes(flag)) return send(res, 400, { error: 'Bandeira inválida.' });
+        const antes = competitor.flag ?? 'none';
         competitor.flag = flag;
+        const quem = `${competitor.name} (kart ${competitor.kart})`;
+        if (flag === 'black' && antes !== 'black') registrarObservacao(s, `Bandeira preta · ${quem} desclassificado, vai para o último lugar`, String(body.autor ?? 'Cronometragem'));
+        else if (antes === 'black' && flag !== 'black') registrarObservacao(s, `Bandeira preta retirada · ${quem} volta à classificação`, String(body.autor ?? 'Cronometragem'));
       } else if (action === 'laps' && m[3] === 'invalidate' && method === 'POST') {
         const body = await readBody(req);
         toggleLapInvalid(s, String(body.kart), Number(body.lap));

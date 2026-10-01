@@ -76,11 +76,13 @@ public partial class FormCrono : Form
         _abas.TabPages.Add(AbaEventosDesign());
         _abas.TabPages.Add(AbaBateriasDesign());
         _abas.TabPages.Add(AbaCronometragem());
+        _abas.TabPages.Add(AbaRankingKarts());
         _abas.SelectedIndex = 2;
         _abas.SelectedIndexChanged += (_, _) =>
         {
             if (_abas.SelectedIndex == 0) { _ = CarregarAgenda(); _ = CarregarCatalogo(); }
             else if (_abas.SelectedIndex == 1) { MontarArvore(); }
+            else if (_abas.SelectedIndex == 3) { _ = CarregarRankingKarts(); }
         };
 
         _status.Items.AddRange([_sHora, Sep(), _sData, Sep(), _sServidor, Sep(), _sDecoder, Sep(), _sTv, Sep(), _sPainel, Sep(), _sTransp]);
@@ -190,10 +192,15 @@ public partial class FormCrono : Form
         crono.DropDownItems.Add(new ToolStripMenuItem("Finalizar prova", null, (_, _) => Acao("close")) { ShortcutKeyDisplayString = "F5", ForeColor = vermelho });
         crono.DropDownItems.Add(new ToolStripMenuItem("Limpar passagens", null, (_, _) => LimparPassagens()) { ShortcutKeyDisplayString = "F6", ForeColor = vermelho });
         crono.DropDownItems.Add(new ToolStripMenuItem("Cancelar bateria", null, (_, _) => Acao("cancel")) { ForeColor = vermelho });
+        crono.DropDownItems.Add(new ToolStripMenuItem("Reiniciar bateria…", null, (_, _) => ReiniciarBateria()) { ForeColor = vermelho });
+        crono.DropDownItems.Add(new ToolStripSeparator());
+        crono.DropDownItems.Add(new ToolStripMenuItem("Advertência para o piloto…", null, (_, _) => AplicarPenalidade("advertencia")));
+        crono.DropDownItems.Add(new ToolStripMenuItem("Penalidade de tempo para o piloto…", null, (_, _) => AplicarPenalidade("tempo")));
+        crono.DropDownItems.Add(new ToolStripMenuItem("Bandeira preta (desclassificar)…", null, (_, _) => BandeiraPreta()));
         crono.DropDownItems.Add(new ToolStripSeparator());
         crono.DropDownItems.Add(new ToolStripMenuItem("Nova bateria da agenda da recepção…", null, (_, _) => NovaBateria(null)));
         crono.DropDownItems.Add(new ToolStripMenuItem("Criar bateria da prova selecionada", null, (_, _) => CriarBateriaDaProva()));
-        crono.DropDownItems.Add(new ToolStripMenuItem("Mudar corrida em andamento", null, (_, _) => MudarCorrida()));
+        crono.DropDownItems.Add(new ToolStripMenuItem("Editar bateria (nome, tempo, voltas, traçado)…", null, (_, _) => MudarCorrida()));
         crono.DropDownItems.Add(new ToolStripMenuItem("Incluir passagem manual", null, (_, _) => IncluirPassagem()) { ShortcutKeyDisplayString = "Insert" });
         crono.DropDownItems.Add(new ToolStripSeparator());
         crono.DropDownItems.Add("Seguir a bateria em andamento", null, (_, _) => { _fixado = false; _ = Atualizar(); });
@@ -203,7 +210,7 @@ public partial class FormCrono : Form
         var ajuda = new ToolStripMenuItem("Ajuda");
         ajuda.DropDownItems.Add("Suporte remoto (AnyDesk)", null, (_, _) =>
         {
-            var anydesk = new[] { @"C:Program Files (x86)AnyDeskAnyDesk.exe", @"C:Program FilesAnyDeskAnyDesk.exe" }.FirstOrDefault(File.Exists);
+            var anydesk = new[] { @"C:\Program Files (x86)\AnyDesk\AnyDesk.exe", @"C:\Program Files\AnyDesk\AnyDesk.exe" }.FirstOrDefault(File.Exists);
             if (anydesk != null) System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(anydesk) { UseShellExecute = true });
             else Msg.Aviso(this, "O AnyDesk não está instalado neste computador.");
         });
@@ -1293,6 +1300,22 @@ public partial class FormCrono : Form
                 _tabsResultado.SelectedIndex = i; await Task.Delay(160);
                 Foto(this, $"03-ao-vivo-{NomeArquivo(_tabsResultado.TabPages[i].Text)}");
             }
+            _segPeriodo.Selecionado = 3; _rankDe.Value = new DateTime(2026, 9, 1); _rankAte.Value = DateTime.Today;
+            _abas.SelectedIndex = 3; await CarregarRankingKarts(); await Task.Delay(300); Foto(this, "03-ranking-karts");
+            _abas.SelectedIndex = 1; await Task.Delay(200); _abaCompetidoresIr(0); await Task.Delay(200); Foto(this, "02-competidores-amarelo");
+            if (_gPilotos.Rows.Count > 2)
+            {
+                // copiar a Categoria de uma linha e colar na outra: só a célula muda (antes colava a linha inteira)
+                var cat = _gPilotos.Columns["category"].Index;
+                var nomeAntes = _gPilotos.Rows[1].Cells["name"].Value?.ToString();
+                _gPilotos.Rows[0].Cells[cat].Value = "SUPER";
+                _gPilotos.ClearSelection(); _gPilotos.CurrentCell = _gPilotos.Rows[0].Cells[cat]; CopiarColuna(_gPilotos);
+                _gPilotos.ClearSelection(); _gPilotos.CurrentCell = _gPilotos.Rows[1].Cells[cat]; ColarNaColuna(_gPilotos);
+                var ok = _gPilotos.Rows[1].Cells[cat].Value?.ToString() == "SUPER" && _gPilotos.Rows[1].Cells["name"].Value?.ToString() == nomeAntes;
+                File.AppendAllText(Path.Combine(_autoteste, "log.txt"), $"copiar/colar categoria: {(ok ? "OK" : "FALHOU")} (área de transferência: {Clipboard.GetText()})\r\n");
+                _pilotosSujos = false; _pilotosDe = null; await Atualizar();
+            }
+            _abas.SelectedIndex = 2; await Task.Delay(200);
             var cronoMenu = MainMenuStrip.Items.OfType<ToolStripMenuItem>().FirstOrDefault(item => item.Text == "Cronometragem");
             cronoMenu?.ShowDropDown(); await Task.Delay(180); Foto(this, "04-menus-cronometragem"); cronoMenu?.HideDropDown();
             using (var f = new FormNovaBateria(_agenda, _agenda.FirstOrDefault())) { f.Show(this); await Task.Delay(240); Foto(f, "05-NovaBateria"); f.Close(); }
@@ -1370,7 +1393,11 @@ public partial class FormCrono : Form
             }
             // título esperado: a configuração do e-mail abre depois de buscar os dados (assíncrona) e não pode ser
             // confundida com a janela do passo seguinte
-            foreach (var (nome, acao, titulo) in new (string, Action, string)[] { ("Evento", () => EditarEventoDesign(true), null), ("GrupoEditar", () => EditarGrupoDesign(true), null), ("Distribuir", DistribuirProvaDesign, null), ("EmailConfig", ConfigurarEmail, "E-mail dos resultados"), ("EmailEnviar", EnviarEmail, "Enviar resultado") })
+            var kartTeste = Crono.Arr(_sess, "competitors").FirstOrDefault()?.S("kart");
+            foreach (var (nome, acao, titulo) in new (string, Action, string)[] {
+                ("Penalidade", () => AplicarPenalidade("tempo", kartTeste), "Penalidade"), ("Advertencia", () => AplicarPenalidade("advertencia", kartTeste), "Advertência"),
+                ("Reiniciar", ReiniciarBateria, "Reiniciar"), ("VerdeCorrendo", VerdeComProvaCorrendo, "Bandeira verde"), ("EditarBateria", MudarCorridaDesign, "Editar bateria"),
+                ("Evento", () => EditarEventoDesign(true), null), ("GrupoEditar", () => EditarGrupoDesign(true), null), ("Distribuir", DistribuirProvaDesign, null), ("EmailConfig", ConfigurarEmail, "E-mail dos resultados"), ("EmailEnviar", EnviarEmail, "Enviar resultado") })
             {
                 var t = new System.Windows.Forms.Timer { Interval = 150 }; var achou = false; var feito = new TaskCompletionSource<bool>();
                 t.Tick += async (_, _) => { if (achou) return; var alvo = Application.OpenForms.Cast<Form>().FirstOrDefault(f => f != this && f.Visible && f is not Escurecer && f is not FormTV && (titulo == null || f.Text.Contains(titulo))); if (alvo == null) return; achou = true; t.Stop(); await Task.Delay(900); try { Foto(alvo, nome); } catch { } alvo.Close(); feito.TrySetResult(true); };

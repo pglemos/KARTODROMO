@@ -158,6 +158,7 @@ public partial class FormCrono
     // ------------------------------------------------------------------ diálogos (componente Dialogo do canvas)
 
     DialogoDesign NovoDialogo(string titulo, string sub, string svg, string cor) => new(titulo, sub, svg, cor);
+    DialogoDesign NovoDialogo(string titulo, string sub, string svg, string cor, int largura, int altura) => new(titulo, sub, svg, cor, largura, altura);
 
     static TextBox Txt(string v, int max = 200) => PecasDesign.Texto(v ?? "", max);
     static TextBox Leitura(string v) { var t = PecasDesign.Texto(v ?? ""); t.ReadOnly = true; t.BackColor = Color.White; t.TabStop = false; return t; }
@@ -379,11 +380,12 @@ public partial class FormCrono
         d.ShowDialog(this);
     }
 
-    /// <summary>Mudar corrida em andamento (MudarCorrida.dc.html): mostra a prova de agora e ajusta nome, tempo e voltas.</summary>
+    /// <summary>Editar bateria (MudarCorrida.dc.html): nome, tempo, voltas e o traçado — vale para baterias já criadas,
+    /// em andamento ou finalizadas (o traçado muda a velocidade média, o relatório e o ranking dos karts).</summary>
     void MudarCorridaDesign()
     {
         if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
-        using var d = NovoDialogo("Mudar corrida em andamento", "Ajusta a prova que está sendo cronometrada", "M4 8h13l-3-3M20 16H7l3 3", "linear-gradient(180deg, #FFB547, #F07A00)");
+        using var d = NovoDialogo("Editar bateria", "Nome, tempo, voltas e traçado da bateria selecionada", "M4 8h13l-3-3M20 16H7l3 3", "linear-gradient(180deg, #FFB547, #F07A00)");
         var ev = _events.FirstOrDefault(e => e.S("id") == _sess.S("eventId"));
         var inicio = _sess.L("startedAt") is long st ? DateTimeOffset.FromUnixTimeMilliseconds(st).LocalDateTime : (DateTime?)null;
         var agora = d.Secao("Agora", $"{ev?.S("name") ?? "Bateria avulsa"} · {_sess.S("name")} — {Crono.Estado(_sess.S("state")).ToLowerInvariant()}{(inicio is DateTime i ? $" há {(int)(DateTime.Now - i).TotalMinutes} min" : "")}, {_laps.Count(p => !p.B("deleted"))} passagens.");
@@ -391,12 +393,30 @@ public partial class FormCrono
         var nome = Txt(_sess.S("name"));
         var dur = PecasDesign.Numero((int)((_sess.L("durationMs") ?? 0) / 60000), 3);
         var voltas = PecasDesign.Numero(_sess.I("maxLaps"), 3); if (_sess.I("maxLaps") == 0) voltas.Text = "";
-        var g = d.Secao("Mudar para");
+        // traçado: o escolhido na bateria vale mais que o da prova/evento; "Padrão" volta a usar o da prova/evento
+        var tracado = new ListaDesign();
+        var trilhas = Crono.Arr(_catalog, "tracks").Where(t => !t.ContainsKey("active") || t.B("active")).ToList();
+        var padrao = _sess["track"] is JsonObject tr0 && string.IsNullOrEmpty(_sess.S("trackId")) ? $"{tr0.S("name")} · {tr0.I("lengthMeters")} m" : "o da prova / do evento";
+        tracado.Items.Add(new Campos.Item(0, $"Padrão ({padrao})"));
+        foreach (var t in trilhas) tracado.Items.Add(new Campos.Item(0, $"{t.S("name")} · {t.I("lengthMeters")} m", t));
+        tracado.SelectedIndex = Math.Max(0, trilhas.FindIndex(t => t.S("id") == _sess.S("trackId")) + 1);
+        var g = d.Secao("Bateria");
         d.Campo(g, "Nome da prova", nome, 3); d.Campo(g, "Tempo (min)", dur, 1); d.Campo(g, "Voltas (máx)", voltas, 2);
-        d.Nota("As passagens já registradas continuam na prova. Para cronometrar outra bateria, escolha-a no seletor da barra (ao lado das bandeiras).");
-        d.BotaoRodape("Mudar corrida", true, () => Seguro.Rodar(d, async () =>
+        d.Campo(g, "Traçado", tracado, 6);
+        var podeRegras = _sess.S("state") is "preparando" or "em_andamento" or "encerrada";
+        if (!podeRegras) { dur.Enabled = false; voltas.Enabled = false; }
+        d.Nota("As passagens já registradas continuam na prova. O traçado define a extensão usada na velocidade média, no relatório e no ranking dos karts. Para cronometrar outra bateria, escolha-a no seletor da barra (ao lado das bandeiras).");
+        var durAntes = dur.Text; var voltasAntes = voltas.Text;
+        d.BotaoRodape("Salvar", true, () => Seguro.Rodar(d, async () =>
         {
-            await Crono.Api.Patch($"/api/sessions/{_sess.S("id")}", new JsonObject { ["name"] = nome.Text.Trim(), ["durationMin"] = int.TryParse(dur.Text, out var x) ? x : 20, ["maxLaps"] = int.TryParse(voltas.Text, out var l) ? l : 0 });
+            var corpo = new JsonObject { ["name"] = nome.Text.Trim(), ["trackId"] = (tracado.SelectedItem as Campos.Item)?.Dados?.S("id") };
+            // tempo e voltas só vão se mudaram (durante a quadriculada o serviço não aceita mudar)
+            if (podeRegras && (dur.Text != durAntes || voltas.Text != voltasAntes))
+            {
+                corpo["durationMin"] = int.TryParse(dur.Text, out var x) ? x : 20;
+                corpo["maxLaps"] = int.TryParse(voltas.Text, out var l) ? l : 0;
+            }
+            await Crono.Api.Patch($"/api/sessions/{_sess.S("id")}", corpo);
             d.DialogResult = DialogResult.OK; d.Close(); await Atualizar();
         }));
         d.BotaoRodape("Cancelar", false, d.Close);

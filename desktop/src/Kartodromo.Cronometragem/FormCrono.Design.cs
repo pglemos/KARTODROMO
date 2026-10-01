@@ -10,7 +10,7 @@ public partial class FormCrono
 {
     PassosSegmento _passos;
     readonly Label _lEvNome = Info(), _lGrupoNome = Info(), _lProvaNome = Info(), _lMinimo = Info();
-    BotaoBandeira _fVerde, _fAmarela, _fVermelha, _fBranca, _fQuad, _fParar;
+    BotaoBandeira _fVerde, _fAmarela, _fVermelha, _fBranca, _fQuad, _fParar, _fReiniciar;
     FaixaPlacar _faixa;
     readonly Label _rodTexto = new() { AutoSize = true, Font = new Font("Segoe UI", 8.6F), ForeColor = TemaCrono.Secundario, BackColor = Color.Transparent };
     PilulaStatus _pPlacar, _pDecoder, _pTv, _pTransp;
@@ -41,13 +41,17 @@ public partial class FormCrono
         menu.Renderer = new MenuDesignRenderer(Color.FromArgb(251, 251, 252));
         menu.Padding = new Padding(0); menu.Font = new Font("Segoe UI", 9.8F);
         foreach (ToolStripMenuItem it in menu.Items) { it.Padding = new Padding(8, 4, 8, 4); it.Margin = new Padding(1, 0, 1, 0); }
-        _passos = new PassosSegmento(["1–3 · Configuração de eventos", "4–5 · Registro de competidores", "Cronometragem"]) { Anchor = AnchorStyles.Top | AnchorStyles.Right };
+        _passos = new PassosSegmento(["1–3 · Configuração de eventos", "4–5 · Registro de competidores", "Cronometragem", "Ranking dos karts"],
+            ["1–3 · Eventos", "4–5 · Competidores", "Cronometragem", "Ranking"]) { Anchor = AnchorStyles.Top | AnchorStyles.Right, IndiceAoVivo = 2 };
         _passos.Mudou += i => { if (_abas.SelectedIndex != i) _abas.SelectedIndex = i; };
         _abas.SelectedIndexChanged += (_, _) => _passos.Selecionado = _abas.SelectedIndex;
         cab.Controls.AddRange([logo, t, s, menu, _passos]);
         void Posicionar()
         {
             menu.Location = new Point(Math.Max(t.Right, s.Right) + 18, (52 - menu.Height) / 2);
+            // tela estreita (1366): nomes curtos nos passos para não cobrir o menu
+            _passos.Compacto = false;
+            if (cab.Width - 18 - _passos.Width < menu.Right + 12) _passos.Compacto = true;
             _passos.Location = new Point(cab.Width - 18 - _passos.Width, (52 - _passos.Height) / 2);
         }
         cab.Resize += (_, _) => Posicionar(); menu.SizeChanged += (_, _) => Posicionar();
@@ -154,15 +158,17 @@ public partial class FormCrono
         _fBranca = new BotaoBandeira("Branca", Color.White) { Dica = "Última volta (F7)" };
         _fQuad = new BotaoBandeira("Quadriculada", Color.Black) { Xadrez = true, Dica = "Fim: cada kart termina ao cruzar a linha (F4)" };
         _fParar = new BotaoBandeira("Parar", TemaCrono.Vermelho) { Parar = true, Dica = "Finalizar a prova agora (F5)" };
+        _fReiniciar = new BotaoBandeira("Reiniciar", Color.FromArgb(255, 149, 0)) { Reiniciar = true, Dica = "Reiniciar a bateria: zera passagens, bandeiras e penalidades (os pilotos continuam)" };
         _fVerde.Click += (_, _) => Bandeira("verde"); _fAmarela.Click += (_, _) => Bandeira("amarela"); _fVermelha.Click += (_, _) => Bandeira("vermelha");
         _fBranca.Click += (_, _) => Bandeira("branca"); _fQuad.Click += (_, _) => Bandeira("quadriculada"); _fParar.Click += (_, _) => Acao("close");
+        _fReiniciar.Click += (_, _) => ReiniciarBateria();
         var x = 20;
-        foreach (var b in new[] { _fVerde, _fAmarela, _fVermelha, _fBranca, _fQuad, _fParar }) { b.Location = new Point(x, 10); x += b.Width + 6; barra.Controls.Add(b); }
+        foreach (var b in new[] { _fVerde, _fAmarela, _fVermelha, _fBranca, _fQuad, _fParar, _fReiniciar }) { b.Location = new Point(x, 10); x += b.Width + 6; barra.Controls.Add(b); }
         var sep = new Panel { Location = new Point(x + 8, 19), Size = new Size(1, 40), BackColor = Color.FromArgb(225, 225, 225) };
         barra.Controls.Add(sep); x += 8 + 1 + 14;
         var pilotos = new (string flag, string dica, Action<Graphics, RectangleF> pano)[]
         {
-            ("black", "Preta · desclassificado", (g, r) => { using var b = new SolidBrush(Color.FromArgb(29, 29, 31)); g.FillRectangle(b, r); }),
+            ("black", "Preta · desclassificado, vai para o último lugar", (g, r) => { using var b = new SolidBrush(Color.FromArgb(29, 29, 31)); g.FillRectangle(b, r); }),
             ("mechanical", "Preta com círculo laranja · problema mecânico", (g, r) => { using var b = new SolidBrush(Color.FromArgb(29, 29, 31)); g.FillRectangle(b, r); using var o = new SolidBrush(Color.FromArgb(255, 149, 0)); var d = r.Height * 0.7f; g.FillEllipse(o, r.X + (r.Width - d) / 2, r.Y + (r.Height - d) / 2, d, d); }),
             ("warning", "Preta e branca · advertência", (g, r) => { g.FillRectangle(Brushes.White, r); using var b = new SolidBrush(Color.FromArgb(29, 29, 31)); g.FillPolygon(b, [new PointF(r.Left, r.Top), new PointF(r.Right, r.Top), new PointF(r.Left, r.Bottom)]); }),
             ("blue", "Azul · deixe passar", (g, r) => { using var b = new SolidBrush(Color.FromArgb(10, 132, 255)); g.FillRectangle(b, r); }),
@@ -170,8 +176,19 @@ public partial class FormCrono
         };
         foreach (var (flag, dica, pano) in pilotos)
         {
-            var b = new BotaoQuadrado { Location = new Point(x, 16), Pano = pano, Dica = dica + " — para o piloto selecionado (clique de novo para tirar)" };
-            b.Click += (_, _) => BandeiraPilotoAoVivo(flag);
+            // advertência e penalidade: cada clique é uma nova (o piloto pode receber várias); preta pede confirmação
+            var b = new BotaoQuadrado
+            {
+                Location = new Point(x, 16), Pano = pano,
+                Dica = flag is "warning" or "penalty" ? dica + " — para o piloto selecionado (pode dar mais de uma; a janela mostra as que ele já tem)" : dica + " — para o piloto selecionado (clique de novo para tirar)",
+            };
+            b.Click += (_, _) =>
+            {
+                if (flag == "warning") AplicarPenalidade("advertencia");
+                else if (flag == "penalty") AplicarPenalidade("tempo");
+                else if (flag == "black") BandeiraPreta();
+                else BandeiraPilotoAoVivo(flag);
+            };
             barra.Controls.Add(b); x += 46 + 6;
         }
         // bateria em foco (troca rápida)
@@ -258,7 +275,7 @@ public partial class FormCrono
                 var cor = atras <= 0 ? Color.FromArgb(52, 199, 89) : atras <= 2 ? Color.FromArgb(255, 204, 0) : atras <= 5 ? Color.FromArgb(255, 59, 48) : Color.FromArgb(29, 29, 31);
                 using (var b = new SolidBrush(cor)) gr.FillEllipse(b, cb.X + 8, cb.Y + (cb.Height - 8) / 2f, 8, 8);
                 using var f = new Font("Segoe UI", 9.6F, FontStyle.Bold);
-                var pos = r.I("position").ToString();
+                var pos = r.B("desclassificado") ? "DC" : r.I("position").ToString();
                 var w = TextRenderer.MeasureText(pos, f, Size.Empty, TextFormatFlags.NoPadding).Width;
                 TextRenderer.DrawText(gr, pos, f, new Rectangle(cb.X + 21, cb.Y, w + 2, cb.Height), TemaCrono.Texto, TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
                 if (_setas.TryGetValue(r.S("kart"), out var d) && d != 0)
@@ -281,8 +298,24 @@ public partial class FormCrono
                     var pr = new RectangleF(x0, cb.Y + (cb.Height - 12) / 2f, 18, 12);
                     PanoPiloto(gr, bp, pr); x0 += 24;
                 }
+                // selos à direita do nome: advertências, penalidade de tempo e desclassificado (bandeira preta)
+                var selos = new List<(string texto, Color fundo, Color letra)>();
+                if (r.I("advertencias") > 0) selos.Add(($"ADV {r.I("advertencias")}", Color.FromArgb(232, 232, 235), TemaCrono.Texto));
+                if (r.L("penaltyMs") is long pm && pm > 0) selos.Add(($"+{(pm / 1000.0).ToString("0.###", Fmt.Br)} s", Color.FromArgb(255, 229, 227), TemaCrono.Vermelho));
+                if (r.B("desclassificado")) selos.Add(("DESCLASSIFICADO", Color.FromArgb(29, 29, 31), Color.White));
+                var xr = cb.Right - 6;
+                using (var fs = new Font("Segoe UI", 7.8F, FontStyle.Bold))
+                    for (var i = selos.Count - 1; i >= 0; i--)
+                    {
+                        var w = TextRenderer.MeasureText(selos[i].texto, fs, Size.Empty, TextFormatFlags.NoPadding).Width + 10;
+                        if (xr - w < x0 + 60) break;
+                        var pr = new Rectangle(xr - w, cb.Y + (cb.Height - 18) / 2, w, 18);
+                        using (var pp = Forma.Redondo(pr, 6)) using (var pb = new SolidBrush(selos[i].fundo)) gr.FillPath(pb, pp);
+                        TextRenderer.DrawText(gr, selos[i].texto, fs, pr, selos[i].letra, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                        xr -= w + 4;
+                    }
                 using var f = new Font("Segoe UI Semibold", 9.8F);
-                TextRenderer.DrawText(gr, e.FormattedValue?.ToString(), f, new Rectangle(x0, cb.Y, cb.Right - x0 - 4, cb.Height), sel ? e.CellStyle.SelectionForeColor : TemaCrono.Texto, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                TextRenderer.DrawText(gr, e.FormattedValue?.ToString(), f, new Rectangle(x0, cb.Y, xr - x0 - 2, cb.Height), sel ? e.CellStyle.SelectionForeColor : TemaCrono.Texto, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
             }
             gr.SmoothingMode = SmoothingMode.None; // a próxima célula é pintada pelo Windows: sem anti-serrilhado ela não ganha contorno cinza
             e.Handled = true;
@@ -340,8 +373,10 @@ public partial class FormCrono
         // bandeiras da prova
         var flag = s0?.S("currentFlag") ?? "none";
         var correndo = estado == "em_andamento";
-        _fVerde.Estado = estado == "preparando" ? EstadoBotao.Normal : correndo && flag == "green" ? EstadoBotao.Ativo : EstadoBotao.Apagado;
+        // com a prova correndo a verde continua clicável: relargada ou pista liberada depois da amarela/vermelha
+        _fVerde.Estado = estado == "preparando" ? EstadoBotao.Normal : estado is "em_andamento" or "bandeira_final" ? (correndo && flag == "green" ? EstadoBotao.Ativo : EstadoBotao.Normal) : EstadoBotao.Apagado;
         if (s0?.B("aguardandoLargada") == true) _fVerde.Estado = EstadoBotao.Ativo;
+        _fReiniciar.Estado = s0 != null && (estado != "preparando" || _laps.Any(p => !p.B("deleted") && !p.B("rejected"))) ? EstadoBotao.Normal : EstadoBotao.Apagado;
         foreach (var (b, f) in new[] { (_fAmarela, "yellow"), (_fVermelha, "red"), (_fBranca, "white"), (_fQuad, "checkered") })
             b.Estado = !correndo ? EstadoBotao.Apagado : flag == f ? EstadoBotao.Ativo : EstadoBotao.Normal;
         _fParar.Estado = estado is "em_andamento" or "bandeira_final" ? EstadoBotao.Normal : EstadoBotao.Apagado;
@@ -365,7 +400,7 @@ public partial class FormCrono
         // faixa do placar (mesmas páginas do painel de LED)
         var ultima = _laps.Where(p => !p.B("deleted") && !p.B("rejected") && p.L("lapMs") != null).OrderByDescending(p => p.L("wallMs")).FirstOrDefault();
         _faixa.Volta = standings.FirstOrDefault()?.I("laps") is int lv && lv > 0 ? lv.ToString() : ultima?.I("lap").ToString() ?? "—";
-        _faixa.Situacao = s0 == null ? "SEM PROVA" : s0.B("aguardandoLargada") ? "AGUARDANDO" : estado switch { "em_andamento" => flag == "red" ? "PARADA" : s0.B("tempoEsgotado") ? "ESGOTADO" : "EM PROVA", "bandeira_final" => "FINAL", "encerrada" => "ENCERRADA", "preparando" => "AGUARDANDO", _ => Crono.Estado(estado).ToUpperInvariant() };
+        _faixa.Situacao = s0 == null ? "SEM PROVA" : s0.B("aguardandoLargada") ? "AGUARDANDO" : estado switch { "em_andamento" => flag == "red" ? "PARADA" : s0.B("tempoEsgotado") ? "ESGOTADO" : s0.B("voltasCompletas") ? "COMPLETO" : "EM PROVA", "bandeira_final" => "FINAL", "encerrada" => "ENCERRADA", "preparando" => "AGUARDANDO", _ => Crono.Estado(estado).ToUpperInvariant() };
         var pag = Math.Max(0, _painel.Pagina);
         _faixa.Karts = standings.Skip(pag * 10).Take(12).Select(r => (r.S("kart").Length == 0 ? "—" : r.S("kart").PadLeft(2, '0'), r.I("gapLaps"))).ToList();
         _faixa.Paginas = Math.Max(1, (int)Math.Ceiling(standings.Count / 10.0));
@@ -408,7 +443,13 @@ public class AbasSemCabecalho : TabControl
 /// <summary>Passos do cabeçalho (1–3 · 4–5 · Cronometragem) com a bolinha vermelha quando há prova correndo.</summary>
 public class PassosSegmento : Control
 {
-    readonly string[] _itens;
+    readonly string[] _completos, _curtos;
+    string[] _itens;
+    bool _compacto;
+    /// <summary>Passo que ganha a bolinha vermelha quando há prova correndo (Cronometragem).</summary>
+    public int IndiceAoVivo { get; init; } = -1;
+    /// <summary>Nomes curtos (tela estreita).</summary>
+    public bool Compacto { get => _compacto; set { if (_compacto == value || _curtos == null) return; _compacto = value; _itens = value ? _curtos : _completos; Width = Larguras().Sum() + 6; Invalidate(); } }
     int _sel;
     bool _aoVivo;
     public event Action<int> Mudou;
@@ -416,14 +457,15 @@ public class PassosSegmento : Control
     public int Selecionado { get => _sel; set { if (_sel == value) return; _sel = value; Invalidate(); } }
     public bool AoVivo { get => _aoVivo; set { if (_aoVivo == value) return; _aoVivo = value; Invalidate(); } }
 
-    public PassosSegmento(string[] itens)
+    public PassosSegmento(string[] itens, string[] curtos = null)
     {
-        _itens = itens;
+        _itens = _completos = itens; _curtos = curtos;
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
         Cursor = Cursors.Hand; Height = 36; Width = Larguras().Sum() + 6;
     }
 
-    int[] Larguras() => _itens.Select((t, i) => TextRenderer.MeasureText(t, FonteS).Width + 28 + (i == _itens.Length - 1 ? 13 : 0)).ToArray();
+    int AoVivoIdx => IndiceAoVivo >= 0 ? IndiceAoVivo : _itens.Length - 1;
+    int[] Larguras() => _itens.Select((t, i) => TextRenderer.MeasureText(t, FonteS).Width + 28 + (i == AoVivoIdx ? 13 : 0)).ToArray();
 
     protected override void OnMouseClick(MouseEventArgs e)
     {
@@ -447,7 +489,7 @@ public class PassosSegmento : Control
                 using var p = Forma.Redondo(r, 8); g.FillPath(Brushes.White, p);
             }
             var tr = r;
-            if (i == _itens.Length - 1)
+            if (i == AoVivoIdx)
             {
                 var cor = _aoVivo ? Color.FromArgb(255, 59, 48) : Color.FromArgb(174, 174, 178);
                 var cx = r.X + 14; var cy = r.Y + r.Height / 2;
@@ -471,6 +513,8 @@ public class BotaoBandeira : Control
     bool _sobre;
     public bool Xadrez { get; init; }
     public bool Parar { get; init; }
+    /// <summary>Seta circular laranja (reiniciar a bateria) no lugar do pano.</summary>
+    public bool Reiniciar { get; init; }
     public string Dica { set => new ToolTip().SetToolTip(this, value); }
     public EstadoBotao Estado { get => _estado; set { if (_estado == value) return; _estado = value; Cursor = value == EstadoBotao.Apagado ? Cursors.Default : Cursors.Hand; Invalidate(); } }
 
@@ -512,6 +556,10 @@ public class BotaoBandeira : Control
             using var pq = Forma.Redondo(q, 7);
             using var lg = new LinearGradientBrush(q, Color.FromArgb(alfa, 255, 107, 94), Color.FromArgb(alfa, 216, 54, 43), 90f); g.FillPath(lg, pq);
         }
+        else if (Reiniciar)
+        {
+            Forma.DesenharSvg(g, "M4 12a8 8 0 1 0 2.3-5.7M4 4v4.5h4.5", new RectangleF((Width - 24) / 2f, 9, 24, 24), Color.FromArgb(alfa, _pano), 2.4f);
+        }
         else
         {
             var x0 = (Width - 30) / 2f; var y0 = 10f;
@@ -525,7 +573,7 @@ public class BotaoBandeira : Control
             else using (var b = new SolidBrush(Color.FromArgb(alfa, _pano))) using (var pp = Forma.Redondo(pano, 2)) g.FillPath(b, pp);
             using var borda = new Pen(Color.FromArgb(apagado ? 20 : 38, 0, 0, 0)); g.DrawRectangle(borda, pano.X, pano.Y, pano.Width, pano.Height);
         }
-        var cor = apagado ? Color.FromArgb(142, 142, 147) : _estado == EstadoBotao.Ativo ? Color.FromArgb(28, 107, 53) : Parar ? TemaCrono.Vermelho : TemaCrono.Texto;
+        var cor = apagado ? Color.FromArgb(142, 142, 147) : _estado == EstadoBotao.Ativo ? Color.FromArgb(28, 107, 53) : Parar ? TemaCrono.Vermelho : Reiniciar ? Color.FromArgb(176, 92, 0) : TemaCrono.Texto;
         using var f = new Font("Segoe UI Semibold", 8.3F);
         TextRenderer.DrawText(g, Text, f, new Rectangle(0, 36, Width, 16), cor, TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPadding);
     }

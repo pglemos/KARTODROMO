@@ -761,6 +761,9 @@
   .legend-details .legend-grid span { white-space: nowrap; }
   .legend-details .legend-grid span + span::before { content: " · "; white-space: normal; }
   .legend-details .criterion-note { margin: 4px 0 0; }
+  .penalidades-bloco { color: var(--ink); font-size: 12px; }
+  .penalidades-bloco ul { margin: 4px 0 0; padding-left: 18px; }
+  .penalidades-bloco li { margin: 2px 0; }
 
   /* Assinaturas iguais, com nome e data */
   .signatures-table td { text-align: left; }
@@ -852,6 +855,7 @@
     .rdlc-bestlap-note { font-size: 8.5pt; }
     .nota-rotulo { font-size: 7pt; margin-right: 2mm; }
     .legend-details { font-size: 7.5pt; line-height: 1.45; break-inside: avoid; color: #333; }
+    .penalidades-bloco { font-size: 8pt; break-inside: avoid; }
     .rep-footer { margin-top: 6mm; break-inside: avoid; }
     .signatures-table { margin-bottom: 0; }
     .signatures-table td { padding: 0 5mm; }
@@ -1328,7 +1332,10 @@ function preencherCabecalho() {
 
   document.getElementById('hdrTitle').textContent = grpName;
   document.getElementById('hdrSub2').textContent = quando;
-  document.getElementById('hdrSub3').textContent = `Traçado principal · 1.110 m · ${pilotos} ${pilotos === 1 ? 'piloto' : 'pilotos'}`;
+  // traçado da bateria (Editar bateria › traçado), senão o da prova/evento, senão o padrão
+  const trac = v.track || {};
+  const metros = Number(trac.lengthMeters) > 0 ? `${Number(trac.lengthMeters).toLocaleString('pt-BR')} m` : '1.110 m';
+  document.getElementById('hdrSub3').textContent = `${cleanText(trac.name) || 'Traçado principal'} · ${metros} · ${pilotos} ${pilotos === 1 ? 'piloto' : 'pilotos'}`;
   const agora = new Date();
   document.getElementById('hdrDateTime').textContent = `Emitido em ${fmtData(agora)} às ${fmtHora(agora)}`;
   atualizarRegraVisual(v.type);
@@ -1336,6 +1343,23 @@ function preencherCabecalho() {
 
   const state = v.state === 'encerrada' ? 'closed' : v.state === 'em_andamento' ? 'active' : 'active';
   setStatusBadge(`${v.state?.toUpperCase() || 'SEM ESTADO'} · ${pilotos} competidores`, state);
+}
+
+// Lista de advertências, penalidades e bandeiras pretas da bateria (com motivo e hora), embaixo da classificação.
+function blocoPenalidades() {
+  const itens = [];
+  const hora = (ms) => new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(ms));
+  for (const c of sessionData?.competitors || []) {
+    const quem = `<strong>Kart ${esc(c.kart)}</strong> · ${esc(c.name)}`;
+    if (c.flag === 'black') itens.push({ ms: Number.MAX_SAFE_INTEGER, html: `${quem} — bandeira preta: desclassificado (último lugar)` });
+    for (const p of c.penalidades || []) {
+      const oque = p.tipo === 'tempo' ? `penalidade de +${String(p.segundos).replace('.', ',')} s` : 'advertência';
+      itens.push({ ms: p.wallMs, html: `${quem} — ${oque}${p.motivo ? ` (${esc(p.motivo)})` : ''} · ${hora(p.wallMs)}` });
+    }
+  }
+  if (!itens.length) return '';
+  itens.sort((a, b) => a.ms - b.ms);
+  return `<div class="penalidades-bloco"><span class="nota-rotulo">Advertências e penalidades</span><ul>${itens.map(i => `<li>${i.html}</li>`).join('')}</ul></div>`;
 }
 
 function dataValida(value) {
@@ -1360,13 +1384,17 @@ function ordenarResultadoOficial(rows, tipo, sessionType) {
       return (a.lastCrossingWallMs ?? Number.MAX_SAFE_INTEGER) - (b.lastCrossingWallMs ?? Number.MAX_SAFE_INTEGER);
     });
   } else if (ordemChegada) {
-    list.sort((a, b) => (b.laps - a.laps) || ((a.totalMs || 0) - (b.totalMs || 0)));
+    // totalMs do motor já inclui as penalidades de tempo
+    list.sort((a, b) => (Boolean(a.desclassificado) - Boolean(b.desclassificado)) || (b.laps - a.laps) || ((a.totalMs || 0) - (b.totalMs || 0)));
   } else {
-    // Tomada de tempo/treino: a melhor volta é o critério oficial.
+    // Tomada de tempo/treino: a melhor volta (somada às penalidades de tempo) é o critério oficial;
+    // bandeira preta (desclassificado) vai para o fim.
+    const oficial = (r) => r.bestLapTime ? r.bestLapTime + (Number(r.penaltyMs) || 0) : null;
     list.sort((a, b) => {
-      if (!a.bestLapTime) return 1;
-      if (!b.bestLapTime) return -1;
-      return a.bestLapTime - b.bestLapTime || ((a.bestLapTime2nd || 0) - (b.bestLapTime2nd || 0));
+      if (Boolean(a.desclassificado) !== Boolean(b.desclassificado)) return a.desclassificado ? 1 : -1;
+      if (!oficial(a)) return 1;
+      if (!oficial(b)) return -1;
+      return oficial(a) - oficial(b) || ((a.bestLapTime2nd || 0) - (b.bestLapTime2nd || 0));
     });
   }
 
@@ -1433,7 +1461,7 @@ function renderReport() {
     // Diferenças para o líder e para o anterior, sempre com sinal ("+0.002", "+1 volta")
     const voltasAtras = (n) => (n === 1 ? '+1 volta' : `+${n} voltas`);
     list.forEach((r, idx) => {
-      if (idx === 0) {
+      if (idx === 0 || r.desclassificado) {
         r.diffLeaderStr = VAZIO;
         r.diffPrevStr = VAZIO;
       } else {
@@ -1455,8 +1483,10 @@ function renderReport() {
           else r.diffPrevStr = VAZIO;
         } else {
           // Tomada de tempo / Melhor volta
-          r.diffLeaderStr = (r.bestLapTime && leader.bestLapTime) ? fmtDiff(r.bestLapTime - leader.bestLapTime) : VAZIO;
-          r.diffPrevStr = (r.bestLapTime && prev.bestLapTime) ? fmtDiff(r.bestLapTime - prev.bestLapTime) : VAZIO;
+          // tempo oficial = melhor volta + penalidades de tempo
+          const of = (x) => x.bestLapTime ? x.bestLapTime + (Number(x.penaltyMs) || 0) : null;
+          r.diffLeaderStr = (of(r) && of(leader)) ? fmtDiff(of(r) - of(leader)) : VAZIO;
+          r.diffPrevStr = (of(r) && of(prev)) ? fmtDiff(of(r) - of(prev)) : VAZIO;
         }
       }
     });
@@ -1467,6 +1497,9 @@ function renderReport() {
     const showCatCol = currentTipo === 'ordem_chegada_categoria';
     const showAvg = currentTipo === 'com_tempo_medio';
     const showFoto = list.some(r => r.uf !== VAZIO);
+    // advertências e penalidades de tempo: colunas só aparecem quando alguém recebeu
+    const showAdv = list.some(r => Number(r.advertencias) > 0);
+    const showPen = list.some(r => Number(r.penaltyMs) > 0);
     const resultSecondary = isArrival ? 'result-secondary' : '';
     const posDisplay = (r) => r.status === 1 ? 'NC' : r.status === 2 ? 'EX' : r.status === 3 ? 'DC' : r.pos;
     const melhorCelula = (r) => {
@@ -1492,7 +1525,9 @@ function renderReport() {
       naVolta2: { h: 'Na<br>volta', cls: 'col-num col-curta hide-cupom screen-secondary', td: r => r.bestLap2nd || VAZIO },
       media: { h: 'Tempo<br>médio', cls: 'col-num hide-cupom screen-secondary', td: r => fmtMs(r.avgLapTime) },
       vel: { h: 'Vel.<br>km/h', cls: 'col-num hide-cupom screen-secondary', td: r => fmtVel(r.averageSpeedKmh) },
-      foto: { h: 'Última<br>foto', cls: 'col-num hide-cupom screen-secondary', td: r => esc(r.uf) }
+      foto: { h: 'Última<br>foto', cls: 'col-num hide-cupom screen-secondary', td: r => esc(r.uf) },
+      adv: { h: 'Adver-<br>tências', cls: 'col-num col-curta', td: r => Number(r.advertencias) > 0 ? r.advertencias : VAZIO },
+      pen: { h: 'Penali-<br>dade', cls: 'col-num', td: r => Number(r.penaltyMs) > 0 ? '+' + tempoCompacto(r.penaltyMs) : VAZIO }
     };
     const cols = [C.pos, C.kart, C.nome];
     if (showCatCol) cols.push(C.cat);
@@ -1501,6 +1536,8 @@ function renderReport() {
     if (showAvg) cols.push(C.media);
     if (showSpeed) cols.push(C.vel);
     if (showFoto) cols.push(C.foto);
+    if (showAdv) cols.push(C.adv);
+    if (showPen) cols.push(C.pen);
 
     let html = `<table class="rdlc-table rdlc-resultado"><thead><tr>`;
     cols.forEach(c => { html += `<th class="${c.cls}">${c.h}</th>`; });
@@ -1528,7 +1565,9 @@ function renderReport() {
       ...(isArrival ? [] : [['2ª melhor', 'segundo melhor tempo do piloto']]),
       ...(showAvg ? [['Tempo médio', 'média das voltas do piloto']] : []),
       ...(showSpeed ? [['Vel.', 'velocidade média do piloto na sessão, em km/h']] : []),
-      ['NC / EX / DC', 'não classificado / excluído / desclassificado']
+      ...(showAdv ? [['Advertências', 'bandeiras preta e branca recebidas']] : []),
+      ...(showPen ? [['Penalidade', isArrival ? 'segundos somados ao tempo de chegada (já contam na posição e no tempo total)' : 'segundos somados à melhor volta (já contam na posição)']] : []),
+      ['NC / EX / DC', 'não classificado / excluído / desclassificado (bandeira preta: vai para o último lugar)']
     ];
     notesHtml += `
       <div class="legend-details">
@@ -1536,6 +1575,7 @@ function renderReport() {
         <span class="legend-grid">${comoLer.map(([k, d]) => `<span><strong>${k}</strong> ${d}</span>`).join('')}</span>
         ${isArrival ? '<div class="criterion-note">Critério: ordem de chegada; a melhor volta é apenas informativa.</div>' : ''}
       </div>
+      ${blocoPenalidades()}
     </div>`;
     notes.innerHTML = notesHtml;
   }

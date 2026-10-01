@@ -23,6 +23,11 @@ import {
   tick,
   toggleLapInvalid,
   timeIsUp,
+  voltasCompletas,
+  addPenalty,
+  removePenalty,
+  restartSession,
+  aguardandoLargada,
 } from '../lib/timing/race-engine';
 import { createCatalogRecord, deleteCatalogRecord, distributeProof, duplicateEvent, emptyCatalog, normalizeCatalog } from '../lib/timing/catalog';
 
@@ -75,7 +80,7 @@ describe('race-engine', () => {
     expect(computeStandings(s)).toEqual(resultBefore);
   });
 
-  it('aplica o limite de voltas alterado durante a corrida na próxima passagem', () => {
+  it('limite de voltas alterado durante a corrida só avisa: a quadriculada é do cronometrista', () => {
     const s = race('corrida', 20);
     applyPassing(s, { kart: '4', decoderTimeMs: 0, wallMs: 2_000 });
     applyPassing(s, { kart: '4', decoderTimeMs: 60_000, wallMs: 62_000 });
@@ -84,18 +89,97 @@ describe('race-engine', () => {
     updateSessionParameters(s, { maxLaps: 2 }, 63_000);
     applyPassing(s, { kart: '4', decoderTimeMs: 120_000, wallMs: 122_000 });
 
-    expect(s.state).toBe('bandeira_final');
+    expect(s.state).toBe('em_andamento');
+    expect(voltasCompletas(s)).toBe(true);
+    expect(s.lapsReachedAt).toBe(122_000);
+    // continua contando voltas até a quadriculada manual
+    applyPassing(s, { kart: '4', decoderTimeMs: 180_000, wallMs: 182_000 });
+    expect(computeStandings(s)[0].laps).toBe(3);
   });
 
-  it('bandeirada imediatamente se o novo limite já foi atingido pelo líder', () => {
+  it('novo limite já atingido pelo líder marca voltas completas sem bandeirar', () => {
     const s = race('corrida', 20);
     applyPassing(s, { kart: '4', decoderTimeMs: 0, wallMs: 2_000 });
     applyPassing(s, { kart: '4', decoderTimeMs: 60_000, wallMs: 62_000 });
 
     updateSessionParameters(s, { maxLaps: 1 }, 63_000);
 
-    expect(s.state).toBe('bandeira_final');
-    expect(s.checkeredAt).toBe(63_000);
+    expect(s.state).toBe('em_andamento');
+    expect(s.checkeredAt).toBeNull();
+    expect(voltasCompletas(s)).toBe(true);
+  });
+
+  describe('advertências, penalidades, bandeira preta e reiniciar', () => {
+    function corridaCom3() {
+      const s = race('corrida', 20);
+      // 3 karts, 2 voltas cada; chegada: 4, 5, 6 com 1 s de diferença
+      for (const [k, base] of [['4', 0], ['5', 1_000], ['6', 2_000]] as const) {
+        applyPassing(s, { kart: k, decoderTimeMs: base, wallMs: 2_000 + base });
+        applyPassing(s, { kart: k, decoderTimeMs: 60_000 + base, wallMs: 62_000 + base });
+        applyPassing(s, { kart: k, decoderTimeMs: 120_000 + base, wallMs: 122_000 + base });
+      }
+      return s;
+    }
+
+    it('aceita várias advertências e penalidades para o mesmo piloto', () => {
+      const s = corridaCom3();
+      addPenalty(s, '4', { id: 'a1', tipo: 'advertencia', wallMs: 1, motivo: 'fechou' });
+      addPenalty(s, '4', { id: 'a2', tipo: 'advertencia', wallMs: 2 });
+      addPenalty(s, '4', { id: 't1', tipo: 'tempo', segundos: 1.5, wallMs: 3 });
+      addPenalty(s, '4', { id: 't2', tipo: 'tempo', segundos: 1, wallMs: 4 });
+      const r = computeStandings(s).find((x) => x.kart === '4')!;
+      expect(r.advertencias).toBe(2);
+      expect(r.penaltyMs).toBe(2_500);
+      removePenalty(s, '4', 't2');
+      expect(computeStandings(s).find((x) => x.kart === '4')!.penaltyMs).toBe(1_500);
+    });
+
+    it('penalidade de tempo soma na chegada da corrida e muda a ordem', () => {
+      const s = corridaCom3();
+      addPenalty(s, '4', { id: 't1', tipo: 'tempo', segundos: 1.5, wallMs: 3 });
+      const st = computeStandings(s);
+      expect(st.map((x) => x.kart)).toEqual(['5', '4', '6']);
+      expect(st[1].gapMs).toBe(500);
+      expect(st[1].totalMs).toBe(120_000 + 1_500);
+    });
+
+    it('penalidade de tempo na tomada soma na melhor volta', () => {
+      const s = race('classificacao', 20);
+      applyPassing(s, { kart: '4', decoderTimeMs: 0, wallMs: 2_000 });
+      applyPassing(s, { kart: '4', decoderTimeMs: 60_000, wallMs: 62_000 });
+      applyPassing(s, { kart: '5', decoderTimeMs: 1_000, wallMs: 3_000 });
+      applyPassing(s, { kart: '5', decoderTimeMs: 61_500, wallMs: 63_500 });
+      addPenalty(s, '4', { id: 't1', tipo: 'tempo', segundos: 1, wallMs: 3 });
+      const st = computeStandings(s);
+      expect(st.map((x) => x.kart)).toEqual(['5', '4']);
+      expect(st[1].bestLapMs).toBe(60_000);
+      expect(st[1].gapMs).toBe(500);
+    });
+
+    it('bandeira preta manda o piloto para o último lugar', () => {
+      const s = corridaCom3();
+      s.competitors.find((c) => c.kart === '4')!.flag = 'black';
+      const st = computeStandings(s);
+      expect(st.map((x) => x.kart)).toEqual(['5', '6', '4']);
+      expect(st[2]).toMatchObject({ desclassificado: true, racingStatus: 3, position: 3 });
+      s.competitors.find((c) => c.kart === '4')!.flag = 'none';
+      expect(computeStandings(s)[0].kart).toBe('4');
+    });
+
+    it('reiniciar volta a bateria para preparando sem perder os pilotos', () => {
+      const s = corridaCom3();
+      addPenalty(s, '4', { id: 't1', tipo: 'tempo', segundos: 1, wallMs: 3 });
+      applyPassing(s, { kart: '77', decoderTimeMs: 125_000, wallMs: 127_000 });
+      setRaceFlag(s, 'checkered', 130_000);
+      restartSession(s);
+      expect(s).toMatchObject({ state: 'preparando', startedAt: null, greenAt: null, checkeredAt: null, currentFlag: 'none' });
+      expect(s.competitors.map((c) => c.kart)).toEqual(['4', '5']); // o 6 e o 77 entraram sozinhos
+      expect(computeStandings(s).every((x) => x.laps === 0 && !x.penaltyMs)).toBe(true);
+      startSession(s, 200_000);
+      expect(aguardandoLargada(s)).toBe(true);
+      applyPassing(s, { kart: '5', decoderTimeMs: 300_000, wallMs: 302_000 });
+      expect(s.startedAt).toBe(302_000);
+    });
   });
 
   it('recusa alterar duração ou voltas durante a quadriculada sem salvar parcialmente o nome', () => {

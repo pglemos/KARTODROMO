@@ -151,13 +151,14 @@ public partial class FormCrono
         topo.Paint += (_, e) =>
         {
             var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
+            if (numero < 0) return; // -1 = cartão sem bolinha (ex.: ranking dos karts)
             using (var b = new SolidBrush(Color.FromArgb(11, 122, 83))) g.FillEllipse(b, 16, 16, 24, 24);
             // 0 = agenda da recepção (seta "chegando"), 1–3 = passos do design
             TextRenderer.DrawText(g, numero > 0 ? numero.ToString() : "↓", new Font("Segoe UI", 8.8F, FontStyle.Bold), new Rectangle(16, 16, 24, 24), Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
         };
         var t = tituloVivo ?? new Label { Text = titulo };
-        t.Dock = DockStyle.None; t.AutoSize = true; t.Padding = Padding.Empty; t.Font = new Font("Segoe UI", 11.2F, FontStyle.Bold); t.ForeColor = TemaCrono.Texto; t.Location = new Point(50, 11); t.BackColor = Color.White;
-        sub.AutoSize = true; sub.Font = new Font("Segoe UI", 9F); sub.ForeColor = TemaCrono.Secundario; sub.Location = new Point(51, 31); sub.BackColor = Color.White;
+        t.Dock = DockStyle.None; t.AutoSize = true; t.Padding = Padding.Empty; t.Font = new Font("Segoe UI", 11.2F, FontStyle.Bold); t.ForeColor = TemaCrono.Texto; t.Location = new Point(numero < 0 ? 18 : 50, 11); t.BackColor = Color.White;
+        sub.AutoSize = true; sub.Font = new Font("Segoe UI", 9F); sub.ForeColor = TemaCrono.Secundario; sub.Location = new Point(numero < 0 ? 19 : 51, 31); sub.BackColor = Color.White;
         topo.Controls.Add(t); topo.Controls.Add(sub);
         if (direitaTopo != null) { topo.Controls.Add(direitaTopo); topo.Resize += (_, _) => direitaTopo.Location = new Point(topo.Width - 16 - direitaTopo.Width, 14); }
         var rod = new Panel { Dock = DockStyle.Bottom, Height = 50, BackColor = Color.FromArgb(251, 251, 253) };

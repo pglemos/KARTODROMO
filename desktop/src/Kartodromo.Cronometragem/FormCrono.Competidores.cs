@@ -37,6 +37,17 @@ public partial class FormCrono
             }
             _arvore.Invalidate();
         };
+        // clique direito numa bateria: editar (nome, tempo, voltas, traçado) ou reiniciar
+        var menuBateria = new ContextMenuStrip();
+        menuBateria.Items.Add("Editar bateria (nome, tempo, voltas, traçado)…", null, (_, _) => MudarCorridaDesign());
+        menuBateria.Items.Add("Reiniciar bateria…", null, (_, _) => ReiniciarBateria());
+        _arvore.NodeMouseClick += (_, e) =>
+        {
+            if (e.Button != MouseButtons.Right || e.Node?.Tag is not JsonObject tag) return;
+            _arvore.SelectedNode = e.Node;
+            var temBateria = tag.S("kind") == "session" || tag.S("kind") == "proof" && Crono.Arr(_state, "sessions").Any(s => s.S("proofId") == tag.S("proofId"));
+            if (temBateria) menuBateria.Show(_arvore, e.Location);
+        };
         var arvoreBox = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8, 4, 8, 8), BackColor = Color.White };
         arvoreBox.Controls.Add(_arvore);
         _subArvore.Text = "Selecione uma prova";
@@ -47,6 +58,7 @@ public partial class FormCrono
         // ---- lista de competidores
         _gPilotos.Dock = DockStyle.Fill;
         TemaCrono.EstilizarGrade(_gPilotos, editavel: true);
+        ConfigurarCopiarColar(_gPilotos);
         _gPilotos.Columns.Clear();
         _gPilotos.Columns.Add(new DataGridViewTextBoxColumn { Name = "kart", HeaderText = "Nº", Width = 56 });
         _gPilotos.Columns.Add(new DataGridViewTextBoxColumn { Name = "name", HeaderText = "Competidor", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, MinimumWidth = 160 });
@@ -119,11 +131,21 @@ public partial class FormCrono
         flagsPiloto.Items.Add("Registro do competidor…", null, (_, _) => EditarCompetidor());
         flagsPiloto.Items.Add("Trocar kart do piloto… (leva as voltas)", null, (_, _) => TrocarKart());
         flagsPiloto.Items.Add(new ToolStripSeparator());
+        flagsPiloto.Items.Add("Advertência (preta e branca)…", null, (_, _) => AplicarPenalidade("advertencia", _gPilotos.CurrentRow?.Cells["kart"].Value?.ToString()));
+        flagsPiloto.Items.Add("Penalidade de tempo…", null, (_, _) => AplicarPenalidade("tempo", _gPilotos.CurrentRow?.Cells["kart"].Value?.ToString()));
+        flagsPiloto.Items.Add("Bandeira preta (desclassificar)…", null, (_, _) => BandeiraPreta(_gPilotos.CurrentRow?.Cells["kart"].Value?.ToString()));
+        flagsPiloto.Items.Add(new ToolStripSeparator());
         flagsPiloto.Items.Add("Bandeira verde para o piloto", null, (_, _) => BandeiraPiloto("green"));
         flagsPiloto.Items.Add("Bandeira amarela para o piloto", null, (_, _) => BandeiraPiloto("yellow"));
         flagsPiloto.Items.Add("Bandeira vermelha para o piloto", null, (_, _) => BandeiraPiloto("red"));
         flagsPiloto.Items.Add("Bandeira branca para o piloto", null, (_, _) => BandeiraPiloto("white"));
         _gPilotos.ContextMenuStrip = flagsPiloto;
+        // clique direito escolhe a linha (o menu age no piloto clicado, não no que estava selecionado)
+        _gPilotos.CellMouseDown += (_, e) =>
+        {
+            if (e.Button != MouseButtons.Right || e.RowIndex < 0 || e.ColumnIndex < 0 || _gPilotos.Rows[e.RowIndex].IsNewRow) return;
+            _gPilotos.CurrentCell = _gPilotos.Rows[e.RowIndex].Cells[e.ColumnIndex];
+        };
 
         SetupResultado(_gResultComp); SetupResultado(_gCategoriaComp);
         EstilizarResultado(_gResultComp); EstilizarResultado(_gCategoriaComp);
@@ -289,11 +311,14 @@ public partial class FormCrono
             }
         }
         finally { _preenchendoExtras = false; }
+        PintarPassagemPilotos();
         var total = _gPilotos.Rows.Cast<DataGridViewRow>().Count(r => !r.IsNewRow);
         _totalPilotos.Text = $"Total: {total}";
         if (_textoBannerPilotos != null)
             _textoBannerPilotos.Text = _sess == null ? "Selecione uma bateria à esquerda." : _pilotosSujos ? "Há alterações nesta lista: confira os números e clique em Salvar." :
-                $"Os {total} pilotos desta bateria {(Crono.Arr(_sess, "competitors").Any(c => c.S("customerId").Length > 0) ? "vieram da recepção" : "estão na cronometragem")}. Novos pagamentos entram sozinhos até a largada.";
+                $"Os {total} pilotos desta bateria {(Crono.Arr(_sess, "competitors").Any(c => c.S("customerId").Length > 0) ? "vieram da recepção" : "estão na cronometragem")}. " +
+                (_sess.S("state") == "preparando" ? "Novos pagamentos entram sozinhos até a largada. " : "") +
+                $"Em amarelo: ainda não passou na linha ({Crono.Arr(_sess, "competitors").Count(c => !c.B("passou"))}).";
     }
 
     void ExportarPilotos()
