@@ -93,3 +93,45 @@ export function validar(entrada: Record<string, unknown>, hoje = new Date()): { 
     },
   };
 }
+
+// ---------------------------------------------------------------- reserva online
+
+export type Horario = { id: number; inicio: string; nome: string; livres: number };
+export type Agenda = { atualizadoEm: string; precoCentavos: number; maxPilotos: number; prazoMin: number; antecedenciaMin: number; horarios: Horario[] };
+export type Reserva = { cliente: PreCadastro; bateriaId: number; quantidade: number; forma: 'pix' | 'cartao'; pilotos: string[] };
+
+/** Anos completos em `hoje` para quem nasceu em AAAA-MM-DD. */
+export function idade(nascimento: string, hoje = new Date()) {
+  const [a, m, d] = nascimento.split('-').map(Number);
+  let anos = hoje.getUTCFullYear() - a;
+  if (hoje.getUTCMonth() + 1 < m || (hoje.getUTCMonth() + 1 === m && hoje.getUTCDate() < d)) anos--;
+  return anos;
+}
+
+/**
+ * Pedido de reserva do site: os dados de quem compra (as regras do pré-cadastro, com CPF obrigatório — a Asaas
+ * exige — e maior de 18), o horário escolhido na agenda publicada, quantos pilotos e a forma de pagamento.
+ * A vaga de verdade é conferida pelo servidor da recepção; aqui só evita pedido impossível.
+ */
+export function validarReserva(entrada: Record<string, unknown>, agenda: Agenda | null, hoje = new Date()): { ok: true; dados: Reserva } | { ok: false; erro: string } {
+  if (!agenda) return { ok: false, erro: 'A agenda está sendo atualizada. Tente de novo em instantes.' };
+  const horario = agenda.horarios.find((h) => h.id === Number(entrada.bateriaId));
+  if (!horario) return { ok: false, erro: 'Esse horário não está mais disponível. Escolha outro.' };
+  const quantidade = Math.trunc(Number(entrada.quantidade));
+  if (!(quantidade >= 1 && quantidade <= agenda.maxPilotos)) return { ok: false, erro: `Escolha de 1 a ${agenda.maxPilotos} pilotos.` };
+  if (quantidade > horario.livres) return { ok: false, erro: horario.livres ? `Esse horário tem só ${horario.livres} ${horario.livres === 1 ? 'vaga' : 'vagas'}.` : 'Esse horário lotou. Escolha outro.' };
+  const forma = entrada.forma === 'pix' || entrada.forma === 'cartao' ? entrada.forma : null;
+  if (!forma) return { ok: false, erro: 'Escolha Pix ou cartão.' };
+  if (entrada.politica !== true) return { ok: false, erro: 'É preciso aceitar a política de cancelamento.' };
+  const v = validar({ ...entrada, tipoDocumento: 'CPF' }, hoje);
+  if (!v.ok) return v;
+  if (idade(v.dados.nascimento, hoje) < 18) return { ok: false, erro: 'A reserva precisa ser feita por um adulto (18 anos ou mais), que é o responsável pelo pagamento.' };
+  const pilotos = (Array.isArray(entrada.pilotos) ? entrada.pilotos : []).map((p) => txt(p, 80)).filter(Boolean).slice(0, quantidade);
+  return { ok: true, dados: { cliente: v.dados, bateriaId: horario.id, quantidade, forma, pilotos } };
+}
+
+/** Código curto da reserva, sem letras que se confundem (0/O, 1/I/L). */
+export function codigoReserva(aleatorio: (n: number) => Uint8Array = (n) => crypto.getRandomValues(new Uint8Array(n))) {
+  const alfabeto = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  return Array.from(aleatorio(6), (b) => alfabeto[b % alfabeto.length]).join('');
+}

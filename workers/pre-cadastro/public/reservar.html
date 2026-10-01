@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Reservar bateria · Kartódromo Internacional de Betim</title>
+<meta name="description" content="Escolha o dia e o horário, pague no Pix ou no cartão e garanta sua vaga no kart indoor.">
+<meta name="theme-color" content="#0B7A53">
+<link rel="icon" href="/icone.png">
+<style>
+  :root {
+    --verde: #0B7A53; --verde-vivo: #12A36F; --verde-claro: #E2EFEA; --fundo: #F4F5F7; --cartao: #fff;
+    --texto: #14161A; --suave: #6B7280; --borda: #E3E5E8; --erro: #D92D20; --erro-claro: #FDECEA; --laranja: #C2410C;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--fundo); color: var(--texto); font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-text-size-adjust: 100%; }
+  .topo { background: linear-gradient(160deg, #0F1A15 0%, #0B3D2A 55%, #0B7A53 100%); color: #fff; padding: 22px 18px 64px; }
+  .topo .logo { display: block; width: min(300px, 78vw); height: auto; margin: 4px auto 18px; background: #fff; border-radius: 16px; padding: 10px 14px; }
+  .topo h1 { font-size: clamp(25px, 6.6vw, 36px); line-height: 1.12; margin: 0 auto 8px; max-width: 640px; text-align: center; letter-spacing: -.02em; }
+  .topo p { margin: 0 auto; max-width: 560px; text-align: center; color: rgba(255,255,255,.84); font-size: 15.5px; }
+  .fatos { display: flex; justify-content: center; gap: 8px 16px; margin: 16px auto 0; flex-wrap: wrap; max-width: 640px; font-size: 14px; font-weight: 600; color: rgba(255,255,255,.92); }
+  main { max-width: 720px; margin: -44px auto 0; padding: 0 14px 40px; }
+  .cartao { background: var(--cartao); border: 1px solid var(--borda); border-radius: 20px; padding: 20px 18px; margin-bottom: 14px; box-shadow: 0 6px 24px rgba(16,24,40,.06); }
+  .cartao h2 { font-size: 17px; margin: 0 0 2px; display: flex; align-items: center; gap: 10px; }
+  .cartao h2 .n { width: 26px; height: 26px; border-radius: 50%; background: var(--verde); color: #fff; font-size: 13.5px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+  .cartao .sub { color: var(--suave); font-size: 14px; margin: 0 0 14px 36px; }
+  .desligado { opacity: .45; pointer-events: none; }
+  /* dias */
+  .mes { font-weight: 700; font-size: 15px; margin: 0 0 8px 2px; text-transform: capitalize; }
+  .dias { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 10px; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
+  .dia { flex: none; width: 62px; height: 76px; border: 1.5px solid var(--borda); border-radius: 14px; background: #fff; font: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; scroll-snap-align: start; color: var(--texto); }
+  .dia small { font-size: 11.5px; font-weight: 700; color: var(--suave); text-transform: uppercase; letter-spacing: .03em; }
+  .dia b { font-size: 22px; line-height: 1.1; }
+  .dia i { font-style: normal; font-size: 10.5px; color: var(--suave); }
+  .dia:disabled { background: #F7F7F8; color: #B4B8BF; cursor: default; }
+  .dia:disabled small, .dia:disabled i { color: #C3C7CD; }
+  .dia.sel { border-color: var(--verde); background: var(--verde); color: #fff; box-shadow: 0 6px 16px rgba(11,122,83,.28); }
+  .dia.sel small, .dia.sel i { color: rgba(255,255,255,.85); }
+  /* horários */
+  .horas { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .hora { border: 1.5px solid var(--borda); border-radius: 14px; background: #fff; padding: 12px 14px; text-align: left; font: inherit; cursor: pointer; color: var(--texto); }
+  .hora b { display: block; font-size: 21px; letter-spacing: -.01em; }
+  .hora span { display: block; font-size: 13px; color: var(--suave); }
+  .hora .vagas { margin-top: 6px; font-weight: 700; color: var(--verde); font-size: 13px; }
+  .hora .vagas.poucas { color: var(--laranja); }
+  .hora:disabled { background: #F7F7F8; color: #9CA1A8; cursor: default; }
+  .hora:disabled .vagas { color: #9CA1A8; }
+  .hora.sel { border-color: var(--verde); box-shadow: 0 0 0 4px rgba(11,122,83,.16); }
+  .vazio { color: var(--suave); text-align: center; padding: 18px 8px; font-size: 15px; }
+  /* quantidade */
+  .qtd { display: flex; align-items: center; gap: 14px; }
+  .qtd button { width: 54px; height: 54px; border-radius: 16px; border: 1.5px solid var(--borda); background: #fff; font-size: 26px; font-weight: 600; color: var(--verde); cursor: pointer; }
+  .qtd button:disabled { color: #C3C7CD; cursor: default; }
+  .qtd output { font-size: 34px; font-weight: 800; min-width: 44px; text-align: center; }
+  .total { margin-left: auto; text-align: right; }
+  .total small { display: block; color: var(--suave); font-size: 13px; }
+  .total b { font-size: 24px; }
+  /* campos */
+  .grade { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+  .grade > div { min-width: 0; }
+  .c6 { grid-column: span 6; } .c3 { grid-column: span 3; }
+  @media (max-width: 520px) { .c3 { grid-column: span 6; } }
+  label { display: block; font-size: 13.5px; font-weight: 600; color: #3A3F47; margin: 0 0 6px; }
+  label .op { font-weight: 400; color: var(--suave); }
+  input { width: 100%; min-width: 0; height: 50px; border: 1.5px solid var(--borda); border-radius: 12px; padding: 0 14px; font: inherit; font-size: 16.5px; color: var(--texto); background: #fff; outline: none; -webkit-appearance: none; appearance: none; }
+  input:focus { border-color: var(--verde); box-shadow: 0 0 0 4px rgba(11,122,83,.14); }
+  input.invalido { border-color: var(--erro); box-shadow: 0 0 0 4px rgba(217,45,32,.1); }
+  .pilotos { display: grid; gap: 10px; margin-top: 12px; }
+  /* pagamento */
+  .formas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .forma { border: 1.5px solid var(--borda); border-radius: 14px; background: #fff; padding: 14px; text-align: left; font: inherit; cursor: pointer; color: var(--texto); }
+  .forma b { display: block; font-size: 17px; }
+  .forma span { font-size: 13px; color: var(--suave); }
+  .forma.sel { border-color: var(--verde); box-shadow: 0 0 0 4px rgba(11,122,83,.16); }
+  .termo { display: flex; gap: 12px; align-items: flex-start; font-size: 15px; margin-top: 12px; }
+  .termo input { width: 26px; height: 26px; flex: none; margin: 1px 0 0; accent-color: var(--verde); -webkit-appearance: checkbox; appearance: auto; }
+  details { margin-top: 10px; background: var(--fundo); border-radius: 12px; padding: 10px 14px; font-size: 14px; color: #3A3F47; }
+  summary { cursor: pointer; font-weight: 600; color: var(--verde); }
+  ul.req { margin: 6px 0 0; padding-left: 20px; font-size: 14.5px; color: #3A3F47; }
+  .enviar { width: 100%; min-height: 58px; border: 0; border-radius: 16px; background: linear-gradient(180deg, var(--verde-vivo), var(--verde)); color: #fff; font: inherit; font-size: 18px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 20px rgba(11,122,83,.3); padding: 10px 16px; }
+  .enviar:disabled { opacity: .55; box-shadow: none; }
+  .btn2 { display: inline-flex; align-items: center; justify-content: center; width: 100%; min-height: 50px; border: 1.5px solid var(--borda); border-radius: 14px; background: #fff; font: inherit; font-weight: 700; color: var(--verde); cursor: pointer; text-decoration: none; margin-top: 10px; }
+  .erro { display: none; background: var(--erro-claro); color: var(--erro); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; font-weight: 600; font-size: 15px; }
+  .rodape { text-align: center; color: var(--suave); font-size: 13px; margin-top: 18px; }
+  .oculto { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+  .resumo { background: var(--fundo); border-radius: 14px; padding: 12px 14px; font-size: 15px; margin-top: 12px; display: none; }
+  /* acompanhamento */
+  #acomp { display: none; text-align: center; padding: 28px 20px; }
+  #acomp h2 { font-size: 24px; margin: 6px 0 8px; justify-content: center; }
+  #acomp p { color: #3A3F47; margin: 0 auto 8px; max-width: 470px; }
+  .roda { width: 46px; height: 46px; border-radius: 50%; border: 4px solid var(--verde-claro); border-top-color: var(--verde); margin: 6px auto 12px; animation: gira 0.9s linear infinite; }
+  @keyframes gira { to { transform: rotate(360deg); } }
+  .ok { width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 12px; background: var(--verde-claro); display: flex; align-items: center; justify-content: center; }
+  .qr { width: min(260px, 70vw); height: auto; border: 1px solid var(--borda); border-radius: 14px; padding: 8px; background: #fff; margin: 8px auto; display: block; }
+  .copia { display: flex; gap: 8px; max-width: 470px; margin: 8px auto 0; }
+  .copia input { font-size: 13px; font-family: ui-monospace, Menlo, Consolas, monospace; height: 46px; }
+  .copia button { flex: none; height: 46px; border: 0; border-radius: 12px; background: var(--verde); color: #fff; font: inherit; font-weight: 700; padding: 0 16px; cursor: pointer; }
+  .relogio { display: inline-block; margin-top: 12px; background: #FFF4E5; color: var(--laranja); border-radius: 999px; padding: 6px 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .codigo { font-size: 30px; font-weight: 800; letter-spacing: .12em; color: var(--verde); margin: 6px 0; font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .caixa { margin: 16px auto 0; max-width: 470px; text-align: left; background: var(--fundo); border-radius: 16px; padding: 14px 16px; font-size: 15px; }
+  .caixa b { color: var(--verde); }
+  #fechado { display: none; text-align: center; padding: 28px 20px; }
+</style>
+</head>
+<body>
+<header class="topo">
+  <img class="logo" src="/kib-logo.png" alt="Kartódromo Internacional de Betim" width="600" height="167">
+  <h1>Reserve sua bateria de kart</h1>
+  <p>Escolha o dia e o horário, pague no Pix ou no cartão e garanta sua vaga.</p>
+  <div class="fatos"><span>30 min por bateria</span><span id="fatoPreco">R$ 145 por piloto</span><span>Chegue 1 h antes</span></div>
+</header>
+
+<main>
+  <section class="cartao" id="fechado" aria-live="polite">
+    <h2 style="justify-content:center">Reserva online indisponível agora</h2>
+    <p id="fechadoMsg" style="color:#3A3F47">Fale com a recepção pelo WhatsApp para reservar.</p>
+    <a class="btn2" href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Quero%20reservar%20uma%20bateria." target="_blank" rel="noopener">Reservar pelo WhatsApp</a>
+  </section>
+
+  <form id="form" novalidate autocomplete="on">
+    <div class="erro" id="erro" role="alert"></div>
+
+    <section class="cartao">
+      <h2><span class="n">1</span>Dia</h2>
+      <p class="sub">Dias em cinza não têm horário livre.</p>
+      <p class="mes" id="mes"></p>
+      <div class="dias" id="dias"><div class="vazio">Carregando a agenda…</div></div>
+    </section>
+
+    <section class="cartao desligado" id="secHora">
+      <h2><span class="n">2</span>Horário da largada</h2>
+      <p class="sub">A chegada é 1 hora antes, para cadastro, equipamento e briefing.</p>
+      <div class="horas" id="horas"><div class="vazio">Escolha o dia acima.</div></div>
+    </section>
+
+    <section class="cartao desligado" id="secQtd">
+      <h2><span class="n">3</span>Quantos pilotos</h2>
+      <p class="sub">Grupos maiores ou eventos: fale com a recepção.</p>
+      <div class="qtd">
+        <button type="button" id="menos" aria-label="Menos um piloto">−</button>
+        <output id="qtd">1</output>
+        <button type="button" id="mais" aria-label="Mais um piloto">+</button>
+        <div class="total"><small>Total</small><b id="total">R$ 145,00</b></div>
+      </div>
+      <details><summary>Informar o nome dos pilotos (opcional)</summary>
+        <div class="pilotos" id="pilotos"></div>
+      </details>
+    </section>
+
+    <section class="cartao desligado" id="secDados">
+      <h2><span class="n">4</span>Quem está reservando</h2>
+      <p class="sub">Adulto responsável pelo pagamento. No kartódromo, é só digitar o CPF no totem.</p>
+      <div class="grade">
+        <div class="c6"><label for="documento">CPF</label><input id="documento" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00"></div>
+        <div class="c6"><label for="nome">Nome completo</label><input id="nome" autocomplete="name" autocapitalize="words" placeholder="Como no documento"></div>
+        <div class="c3"><label for="telefone">Celular (WhatsApp)</label><input id="telefone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="(31) 90000-0000"></div>
+        <div class="c3"><label for="email">E-mail <span class="op">(recibo e resultado)</span></label><input id="email" type="email" inputmode="email" autocomplete="email" placeholder="voce@email.com"></div>
+        <div class="c3"><label for="nascimento">Data de nascimento</label><input id="nascimento" inputmode="numeric" autocomplete="bday" placeholder="DD/MM/AAAA"></div>
+        <div class="c3"><label for="peso">Peso (kg) <span class="op">(opcional)</span></label><input id="peso" inputmode="decimal" placeholder="Ex.: 72"></div>
+      </div>
+    </section>
+
+    <section class="cartao desligado" id="secPag">
+      <h2><span class="n">5</span>Pagamento</h2>
+      <p class="sub">A vaga fica guardada por <b id="prazoTxt">15 minutos</b> enquanto você paga.</p>
+      <div class="formas" id="formas">
+        <button type="button" class="forma" data-v="pix"><b>Pix</b><span>QR code ou copia e cola, confirma na hora</span></button>
+        <button type="button" class="forma" data-v="cartao"><b>Cartão</b><span>Crédito ou débito, à vista</span></button>
+      </div>
+      <details><summary>Quem pode pilotar</summary>
+        <ul class="req"><li>14 anos completos ou mais, 1,50 m de altura e de 50 kg a 120 kg</li><li>Calçado fechado; gestantes não podem correr</li><li>Menores de 18 anos precisam do responsável no dia para assinar o termo</li><li>Não precisa de experiência nem equipamento próprio</li></ul>
+      </details>
+      <details><summary>Política de cancelamento e reembolso</summary>
+        <p>Cancelamento com até 48 horas de antecedência: reembolso do valor pago com desconto de 5% de taxa administrativa (cartão: estorno pedido em até 7 dias úteis; Pix: devolução em até 7 dias úteis, só para conta do titular).</p>
+        <p>Com menos de 48 horas, ou não comparecimento, não há reembolso; em casos excepcionais pode ser concedido voucher para outra data. Reagendamento sem custo com 48 horas de antecedência, conforme disponibilidade.</p>
+        <p>Se o kartódromo cancelar por motivo operacional ou de força maior, o reembolso é integral. Cancelamentos pelo WhatsApp da recepção.</p>
+      </details>
+      <label class="termo"><input type="checkbox" id="politica"><span>Li e aceito a política de cancelamento e os requisitos para pilotar.</span></label>
+      <label class="termo"><input type="checkbox" id="lgpd"><span>Concordo com o tratamento dos meus dados para a reserva e o termo de responsabilidade (LGPD).</span></label>
+      <div class="resumo" id="resumo"></div>
+      <div class="oculto" aria-hidden="true"><label>Site<input id="site" tabindex="-1" autocomplete="off"></label></div>
+    </section>
+
+    <button class="enviar" id="enviar" type="submit" disabled>Escolha o dia e o horário</button>
+    <p class="rodape">Pagamento processado pela Asaas. O termo de responsabilidade é assinado no kartódromo, no dia da corrida.</p>
+  </form>
+
+  <section class="cartao" id="acomp" aria-live="polite"></section>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const aberto = Date.now();
+  const previa = new URLSearchParams(location.search).get('previa') || '';
+  const hdr = previa ? { 'x-previa': previa } : {};
+  const dig = (v) => String(v || '').replace(/\D/g, '');
+  const brl = (c) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  const WHATS = 'https://wa.me/5531998842898';
+  let agenda = null, dia = null, horario = null, qtd = 1, forma = null;
+
+  const mascaras = {
+    CPF: (v) => dig(v).slice(0, 11).replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2'),
+    fone: (v) => { const d = dig(v).slice(0, 11); return d.length <= 2 ? d.replace(/^(\d{1,2})/, '($1') : d.length <= 6 ? d.replace(/^(\d{2})(\d+)/, '($1) $2') : d.length <= 10 ? d.replace(/^(\d{2})(\d{4})(\d+)/, '($1) $2-$3') : d.replace(/^(\d{2})(\d{5})(\d+)/, '($1) $2-$3'); },
+    data: (v) => dig(v).slice(0, 8).replace(/(\d{2})(\d)/, '$1/$2').replace(/(\d{2})(\d)/, '$1/$2'),
+  };
+  const mascarar = (el, f) => el.addEventListener('input', () => { el.value = f(el.value); el.classList.remove('invalido'); });
+  mascarar($('documento'), mascaras.CPF); mascarar($('telefone'), mascaras.fone); mascarar($('nascimento'), mascaras.data);
+  $('peso').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/[^\d.,]/g, '').slice(0, 5); });
+  for (const id of ['nome', 'email']) $(id).addEventListener('input', (e) => e.target.classList.remove('invalido'));
+
+  const hhmm = (iso) => iso.slice(11, 16);
+  const chegada = (iso) => { const [h, m] = hhmm(iso).split(':').map(Number); const t = h * 60 + m - 60; return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };
+  const dataLonga = (d) => { const [a, m, x] = d.split('-').map(Number); const dt = new Date(Date.UTC(a, m - 1, x)); return `${['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'][dt.getUTCDay()]}, ${x} de ${MESES[m - 1]}`; };
+
+  function erro(msg, campo) {
+    const e = $('erro'); e.textContent = msg; e.style.display = 'block';
+    if (campo) { campo.classList.add('invalido'); campo.focus({ preventScroll: true }); campo.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    else e.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function fechado(msg) {
+    $('form').style.display = 'none'; $('fechado').style.display = 'block';
+    if (msg) $('fechadoMsg').textContent = msg;
+  }
+
+  // ---------------- agenda
+  async function carregar() {
+    try {
+      const r = await fetch('/api/agenda' + (previa ? '?previa=' + encodeURIComponent(previa) : ''), { headers: hdr });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) return fechado(j.erro ? j.erro + ' Fale com a recepção pelo WhatsApp para reservar.' : null);
+      if (!j.pagamentoOnline) return fechado('O pagamento online está em manutenção. Fale com a recepção pelo WhatsApp para reservar.');
+      agenda = j;
+      $('fatoPreco').textContent = `${brl(j.precoCentavos).replace(',00', '')} por piloto`;
+      $('prazoTxt').textContent = `${j.prazoMin} minutos`;
+      desenharDias();
+    } catch { fechado('Sem conexão com a agenda agora. Fale com a recepção pelo WhatsApp para reservar.'); }
+  }
+
+  function desenharDias() {
+    const porDia = {};
+    for (const h of agenda.horarios) (porDia[h.inicio.slice(0, 10)] ??= []).push(h);
+    const hoje = new Date(Date.now() - 3 * 3600e3);
+    const lista = [];
+    for (let i = 0; i < 60; i++) { const d = new Date(hoje.getTime() + i * 86400e3); lista.push(d.toISOString().slice(0, 10)); }
+    const dias = $('dias'); dias.innerHTML = '';
+    const primeiro = lista.find((d) => (porDia[d] || []).some((h) => h.livres > 0));
+    for (const d of lista) {
+      const hs = porDia[d] || [], livres = hs.reduce((s, h) => s + h.livres, 0);
+      const [a, m, x] = d.split('-').map(Number), dt = new Date(Date.UTC(a, m - 1, x));
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'dia'; b.dataset.d = d; b.disabled = !livres;
+      b.innerHTML = `<small>${DIAS[dt.getUTCDay()]}</small><b>${x}</b><i>${livres ? (x === 1 || d === lista[0] ? MESES[m - 1].slice(0, 3) : '&nbsp;') : 'fechado'}</i>`;
+      b.onclick = () => escolherDia(d);
+      dias.appendChild(b);
+    }
+    if (!primeiro) { dias.innerHTML = '<div class="vazio">Nenhum horário livre nos próximos dias. Fale com a recepção pelo WhatsApp.</div>'; return; }
+    escolherDia(primeiro);
+  }
+
+  function escolherDia(d) {
+    dia = d; horario = null;
+    for (const b of $('dias').children) b.classList?.toggle('sel', b.dataset.d === d);
+    $('dias').querySelector('.sel')?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    $('mes').textContent = dataLonga(d);
+    const hs = agenda.horarios.filter((h) => h.inicio.startsWith(d));
+    const box = $('horas'); box.innerHTML = '';
+    $('secHora').classList.remove('desligado');
+    for (const h of hs) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'hora'; b.disabled = h.livres <= 0;
+      b.innerHTML = `<b>${hhmm(h.inicio)}</b><span>chegada ${chegada(h.inicio)}</span><span class="vagas${h.livres <= 4 ? ' poucas' : ''}">${h.livres <= 0 ? 'lotado' : h.livres === 1 ? '1 vaga' : h.livres + ' vagas'}</span>`;
+      b.onclick = () => { horario = h; for (const x of box.children) x.classList.toggle('sel', x === b); ajustarQtd(); habilitar(); setTimeout(() => $('secQtd').scrollIntoView({ behavior: 'smooth', block: 'center' }), 60); };
+      box.appendChild(b);
+    }
+    if (!hs.length) box.innerHTML = '<div class="vazio">Sem horários neste dia.</div>';
+    habilitar();
+  }
+
+  // ---------------- quantidade e pilotos
+  const maxQtd = () => Math.max(1, Math.min(agenda?.maxPilotos || 10, horario?.livres || 1));
+  function ajustarQtd() {
+    qtd = Math.min(Math.max(1, qtd), maxQtd());
+    $('qtd').textContent = qtd;
+    $('menos').disabled = qtd <= 1; $('mais').disabled = qtd >= maxQtd();
+    $('total').textContent = brl((agenda?.precoCentavos || 0) * qtd);
+    const box = $('pilotos'), atuais = [...box.querySelectorAll('input')].map((i) => i.value);
+    box.innerHTML = '';
+    for (let i = 0; i < qtd; i++) {
+      const d = document.createElement('div');
+      d.innerHTML = `<label>Piloto ${i + 1}${i === 0 ? ' <span class="op">(pode ser você)</span>' : ''}</label><input class="piloto" autocapitalize="words" placeholder="Nome do piloto">`;
+      d.querySelector('input').value = atuais[i] || '';
+      box.appendChild(d);
+    }
+    habilitar();
+  }
+  $('menos').onclick = () => { qtd--; ajustarQtd(); };
+  $('mais').onclick = () => { qtd++; ajustarQtd(); };
+
+  $('formas').addEventListener('click', (e) => {
+    const b = e.target.closest('.forma'); if (!b) return;
+    forma = b.dataset.v;
+    for (const x of $('formas').children) x.classList.toggle('sel', x === b);
+    habilitar();
+  });
+
+  function habilitar() {
+    const pronto = Boolean(horario);
+    for (const id of ['secQtd', 'secDados', 'secPag']) $(id).classList.toggle('desligado', !pronto);
+    const btn = $('enviar');
+    btn.disabled = !pronto;
+    btn.textContent = !pronto ? 'Escolha o dia e o horário' : `Reservar e pagar ${brl((agenda?.precoCentavos || 0) * qtd)}`;
+    const r = $('resumo');
+    if (pronto) { r.style.display = 'block'; r.innerHTML = `<b>${dataLonga(dia)}</b> · largada ${hhmm(horario.inicio)} (chegada ${chegada(horario.inicio)}) · ${qtd} ${qtd === 1 ? 'piloto' : 'pilotos'} · <b>${brl(agenda.precoCentavos * qtd)}</b>`; }
+    else r.style.display = 'none';
+  }
+
+  // ---------------- envio
+  const iso = (dmy) => { const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dmy.trim()); return m ? `${m[3]}-${m[2]}-${m[1]}` : ''; };
+  const cpfOk = (v) => { const d = dig(v); if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false; for (const t of [9, 10]) { let s = 0; for (let i = 0; i < t; i++) s += +d[i] * (t + 1 - i); if (((s * 10) % 11) % 10 !== +d[t]) return false; } return true; };
+  const idade = (n) => { const [a, m, d] = n.split('-').map(Number), h = new Date(); let x = h.getFullYear() - a; if (h.getMonth() + 1 < m || (h.getMonth() + 1 === m && h.getDate() < d)) x--; return x; };
+
+  $('form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    $('erro').style.display = 'none';
+    if (!horario) return erro('Escolha o dia e o horário.', null);
+    const doc = $('documento'), nome = $('nome'), fone = $('telefone'), nasc = $('nascimento'), email = $('email');
+    if (!cpfOk(doc.value)) return erro('CPF inválido. Confira os números.', doc);
+    if (nome.value.trim().split(/\s+/).length < 2) return erro('Informe o nome completo.', nome);
+    if (dig(fone.value).length < 10) return erro('Informe o celular com DDD.', fone);
+    if (email.value && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.value.trim())) return erro('E-mail inválido.', email);
+    if (!iso(nasc.value)) return erro('Informe a data de nascimento (DD/MM/AAAA).', nasc);
+    if (idade(iso(nasc.value)) < 18) return erro('A reserva precisa ser feita por um adulto (18 anos ou mais).', nasc);
+    if (!forma) return erro('Escolha Pix ou cartão.', null);
+    if (!$('politica').checked) return erro('Para continuar, aceite a política de cancelamento e os requisitos.', null);
+    if (!$('lgpd').checked) return erro('Para continuar, aceite o tratamento dos dados (LGPD).', null);
+
+    const btn = $('enviar'); btn.disabled = true; btn.textContent = 'Enviando…';
+    try {
+      const r = await fetch('/api/reservas' + (previa ? '?previa=' + encodeURIComponent(previa) : ''), {
+        method: 'POST', headers: { 'content-type': 'application/json', ...hdr },
+        body: JSON.stringify({
+          bateriaId: horario.id, quantidade: qtd, forma, politica: true, lgpd: true,
+          documento: doc.value, nome: nome.value, email: email.value, telefone: fone.value, nascimento: iso(nasc.value), peso: $('peso').value,
+          pilotos: [...document.querySelectorAll('.piloto')].map((i) => i.value), site: $('site').value, t: aberto,
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.erro || 'Não foi possível enviar agora. Tente de novo.');
+      try { localStorage.setItem('kib-reserva', j.id); } catch {}
+      history.replaceState(null, '', location.pathname + location.search + '#p=' + j.id);
+      acompanhar(j.id);
+    } catch (e) {
+      erro(e.message, null);
+      btn.disabled = false; habilitar();
+    }
+  });
+
+  // ---------------- acompanhamento (consulta a cada 2,5 s)
+  let timer = null, relogio = null, ultimoEstado = '';
+  function acompanhar(id) {
+    $('form').style.display = 'none'; $('fechado').style.display = 'none';
+    const a = $('acomp'); a.style.display = 'block';
+    a.innerHTML = '<div class="roda"></div><h2>Confirmando sua vaga…</h2><p>Leva só alguns segundos.</p>';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const passo = async () => {
+      try {
+        const r = await fetch('/api/reservas/' + id, { headers: hdr });
+        if (r.status === 404) { limpar(); return mostrar({ status: 'nao_encontrada' }); }
+        const p = await r.json();
+        mostrar(p);
+        if (['confirmado', 'recusado', 'expirado', 'pago_sem_vaga', 'erro_pagamento'].includes(p.status)) { limpar(); return; }
+      } catch {}
+      timer = setTimeout(passo, 2500);
+    };
+    passo();
+  }
+  function limpar() { clearTimeout(timer); clearInterval(relogio); try { localStorage.removeItem('kib-reserva'); } catch {} }
+
+  function contagem(expiraEm) {
+    clearInterval(relogio);
+    const el = document.getElementById('relogio'); if (!el || !expiraEm) return;
+    const fim = Date.parse(expiraEm);
+    const tic = () => { const s = Math.max(0, Math.round((fim - Date.now()) / 1000)); el.textContent = s ? `Vaga guardada por ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : 'Prazo encerrado'; };
+    tic(); relogio = setInterval(tic, 1000);
+  }
+
+  function info(p) {
+    if (!p.inicio) return '';
+    return `<div class="caixa"><b>${dataLonga(p.inicio.slice(0, 10))}</b><br>Largada ${hhmm(p.inicio)} · <b>chegue às ${chegada(p.inicio)}</b><br>${p.quantidade} ${p.quantidade === 1 ? 'piloto' : 'pilotos'}${p.valorCentavos ? ' · ' + brl(p.valorCentavos) : ''}</div>`;
+  }
+
+  function mostrar(p) {
+    const a = $('acomp');
+    const chave = p.status + (p.pix ? 'pix' : '') + (p.invoiceUrl ? 'url' : '') + (p.preparandoPagamento ? 'prep' : '');
+    if (chave === ultimoEstado) return;
+    ultimoEstado = chave;
+    const outra = `<button class="btn2" type="button" onclick="location.href=location.pathname+location.search">Escolher outro horário</button><a class="btn2" href="${WHATS}" target="_blank" rel="noopener">Falar com a recepção</a>`;
+    if (p.status === 'novo') return;
+    if (p.status === 'aguardando_pagamento' && (p.preparandoPagamento || (!p.pix && !p.invoiceUrl))) {
+      a.innerHTML = '<div class="roda"></div><h2>Vaga garantida!</h2><p>Gerando o pagamento…</p>' + info(p);
+      return;
+    }
+    if (p.status === 'aguardando_pagamento' && p.pix) {
+      a.innerHTML = `<h2>Pague com Pix</h2><p>Abra o app do seu banco e leia o QR code, ou use o copia e cola.</p>
+        <img class="qr" alt="QR code do Pix" src="data:image/png;base64,${p.pix.imagem}">
+        <div class="copia"><input id="pixCopia" readonly value="${p.pix.payload.replace(/"/g, '&quot;')}"><button type="button" id="copiar">Copiar</button></div>
+        <div class="relogio" id="relogio"></div>
+        <p style="margin-top:12px">Assim que o Pix cair, esta tela confirma sozinha.</p>` + info(p);
+      $('copiar').onclick = async () => { const i = $('pixCopia'); i.select(); try { await navigator.clipboard.writeText(i.value); } catch { document.execCommand('copy'); } $('copiar').textContent = 'Copiado!'; };
+      return contagem(p.expiraEm);
+    }
+    if (p.status === 'aguardando_pagamento' && p.invoiceUrl) {
+      a.innerHTML = `<h2>Pague com cartão</h2><p>Crédito ou débito, à vista, na página segura da Asaas. Depois de pagar, volte para esta tela.</p>
+        <a class="enviar" style="display:flex;align-items:center;justify-content:center;text-decoration:none;margin-top:12px" href="${p.invoiceUrl}" target="_blank" rel="noopener">Pagar ${p.valorCentavos ? brl(p.valorCentavos) : ''} com cartão</a>
+        <div class="relogio" id="relogio"></div><p style="margin-top:12px">Esta tela confirma sozinha quando o pagamento for aprovado.</p>` + info(p);
+      return contagem(p.expiraEm);
+    }
+    if (p.status === 'pago') { a.innerHTML = '<div class="roda"></div><h2>Pagamento recebido!</h2><p>Confirmando a reserva no sistema do kartódromo…</p>' + info(p); return; }
+    if (p.status === 'confirmado') {
+      a.innerHTML = `<div class="ok"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#0B7A53" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+        <h2>Reserva confirmada${p.nome ? ', ' + p.nome : ''}!</h2><p>Código da reserva</p><div class="codigo">${p.codigo}</div>` + info(p) + `
+        <div class="caixa"><b>No dia:</b><br>1. Chegue 1 hora antes da largada.<br>2. No totem, digite o CPF de quem reservou e confirme os dados.<br>3. Cada piloto assina o termo de responsabilidade.<br><br>Av. Adutora Várzea das Flores, 477 · Itacolomi · Betim/MG<br><a href="https://maps.google.com/maps?q=Av.+Adutora+V%C3%A1rzea+das+Flores,+477+-+Itacolomi,+Betim+-+MG" target="_blank" rel="noopener">Ver no mapa</a></div>
+        <p class="rodape">Guarde o código. Dúvidas ou cancelamento: <a href="${WHATS}" target="_blank" rel="noopener">WhatsApp da recepção</a>.</p>`;
+      return;
+    }
+    if (p.status === 'recusado') { a.innerHTML = `<h2>Não deu para reservar</h2><p>${p.erro || 'Esse horário não está mais disponível.'}</p>` + outra; return; }
+    if (p.status === 'expirado') { a.innerHTML = `<h2>O prazo para pagar acabou</h2><p>A vaga voltou para a agenda e nenhum valor foi cobrado. Você pode fazer a reserva de novo.</p>` + outra; return; }
+    if (p.status === 'erro_pagamento') { a.innerHTML = `<h2>Pagamento indisponível</h2><p>${p.erro}</p>` + outra; return; }
+    if (p.status === 'pago_sem_vaga') { a.innerHTML = `<h2>Pagamento recebido</h2><p>${p.erro || 'A recepção vai entrar em contato.'}</p><p>Código: <b>${p.codigo}</b></p><a class="btn2" href="${WHATS}" target="_blank" rel="noopener">Falar com a recepção</a>`; return; }
+    a.innerHTML = '<h2>Reserva não encontrada</h2>' + outra;
+  }
+
+  // retoma uma reserva em andamento (recarregou a página ou voltou da fatura do cartão)
+  const salvo = (/#p=([a-f0-9-]{36})/.exec(location.hash) || [])[1] || (() => { try { return localStorage.getItem('kib-reserva'); } catch { return null; } })();
+  if (salvo) acompanhar(salvo); else carregar();
+})();
+</script>
+</body>
+</html>

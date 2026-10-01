@@ -5,8 +5,9 @@
  * No totem o cliente digita CPF, RG, passaporte ou e-mail e os dados já aparecem.
  */
 import { chaveDocumento, validar } from './validar';
+import { agendaPublica, criarPedido, situacaoPedido, syncAgenda, syncPedidos, syncResultado, webhookAsaas, type EnvReservas } from './reservas';
 
-export interface Env {
+export interface Env extends EnvReservas {
   ASSETS: Fetcher;
   PRE: R2Bucket;
   SYNC_KEY: string;
@@ -24,10 +25,10 @@ function autorizado(req: Request, env: Env) {
   return dif === 0;
 }
 
-/** Limite simples por IP (por data center): 6 envios a cada 10 minutos. */
-async function excedeuLimite(ip: string) {
+/** Limite simples por IP (por data center): 6 envios a cada 10 minutos (cada tipo de envio conta separado). */
+async function excedeuLimite(ip: string, tipo = 'cadastro') {
   const cache = caches.default;
-  const chave = new Request(`https://limite.cadastro/${encodeURIComponent(ip)}`);
+  const chave = new Request(`https://limite.cadastro/${tipo}/${encodeURIComponent(ip)}`);
   const atual = Number((await (await cache.match(chave))?.text()) ?? 0);
   if (atual >= 6) return true;
   await cache.put(chave, new Response(String(atual + 1), { headers: { 'cache-control': 'max-age=600' } }));
@@ -78,11 +79,16 @@ async function buscar(env: Env, q: string) {
 }
 
 export default {
-  async fetch(req: Request, env: Env): Promise<Response> {
+  async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
     const p = url.pathname;
     try {
       if (p === '/api/pre-cadastro' && req.method === 'POST') return await receber(req, env);
+      // reserva online (reservas.kartodromodebetim.com.br)
+      if (p === '/api/agenda' && req.method === 'GET') return await agendaPublica(req, env);
+      if (p === '/api/reservas' && req.method === 'POST') return await criarPedido(req, env, (ip) => excedeuLimite(ip, 'reserva'));
+      if (p.startsWith('/api/reservas/') && req.method === 'GET') return await situacaoPedido(env, p.slice('/api/reservas/'.length), ctx);
+      if (p === '/api/asaas/webhook' && req.method === 'POST') return await webhookAsaas(req, env);
       if (p.startsWith('/api/sync/')) {
         if (!autorizado(req, env)) return json(401, { erro: 'Não autorizado.' });
         if (p === '/api/sync/pendentes' && req.method === 'GET') return json(200, await listar(env));
@@ -93,8 +99,13 @@ export default {
           if (validas.length) await env.PRE.delete(validas);
           return json(200, { apagados: validas.length });
         }
+        if (p === '/api/sync/agenda' && req.method === 'PUT') return await syncAgenda(req, env);
+        if (p === '/api/sync/pedidos' && req.method === 'GET') return await syncPedidos(env);
+        if (p === '/api/sync/pedido' && req.method === 'POST') return await syncResultado(req, env, ctx);
       }
       if (p.startsWith('/api/')) return json(404, { erro: 'Rota desconhecida.' });
+      // reservas.kartodromodebetim.com.br abre direto a página de reserva
+      if (p === '/' && url.hostname.startsWith('reservas.')) return env.ASSETS.fetch(new Request(new URL('/reservar', url), req));
       return env.ASSETS.fetch(req);
     } catch (e) {
       console.error('pre-cadastro', (e as Error).message);

@@ -28,6 +28,10 @@ interface CacheStorage {
   readonly default: Cache;
 }
 
+interface ExecutionContext {
+  waitUntil(promise: Promise<unknown>): void;
+}
+
 interface ExportedHandler<E = unknown> {
-  fetch?(req: Request, env: E): Promise<Response>;
+  fetch?(req: Request, env: E, ctx: ExecutionContext): Promise<Response>;
 }

@@ -25,6 +25,7 @@ import { bateriaDisponivelNoTotem, type TotemBateriaCandidate, TOTEM_BATERIAS_SQ
 import { relatorio } from '../lib/ops/relatorios';
 import { renderTermoResponsabilidade, type TermoParticipante } from '../lib/ops/termo';
 import { buscarPreCadastroAgora, preCadastroLigado, sincronizarPreCadastros } from '../lib/ops/pre-cadastro';
+import { publicarAgenda, sincronizarReservasOnline } from '../lib/ops/reserva-online';
 import { selecionarSessoesParaRelatorio, type ReceptionTimingSession } from '../lib/timing/reception-crono-reports';
 
 function loadLocalEnv() {
@@ -610,4 +611,21 @@ if (preCadastroLigado()) {
   setTimeout(sincronizar, 5_000);
   setInterval(sincronizar, 30_000).unref();
   log('pré-cadastro online ligado');
+}
+
+// reserva online (reservas.kartodromodebetim.com.br): agenda a cada 30 s, pedidos/pagamentos/prazos a cada 5 s.
+// Liga com OPS_RESERVA_ONLINE=1 no .env.local (usa a mesma chave do pré-cadastro).
+if (preCadastroLigado() && process.env.OPS_RESERVA_ONLINE === '1') {
+  let ocupado = false, ultimoErro = 0;
+  const falhou = (o: string, e: unknown) => { if (Date.now() - ultimoErro > 60_000) { ultimoErro = Date.now(); log(`reserva online: ${o} falhou (${(e as Error).message})`); } };
+  const pedidos = async () => {
+    if (ocupado) return;
+    ocupado = true;
+    try { await sincronizarReservasOnline(log); } catch (e) { falhou('pedidos', e); } finally { ocupado = false; }
+  };
+  const agenda = async () => { try { await publicarAgenda(); } catch (e) { falhou('agenda', e); } };
+  setTimeout(agenda, 3_000);
+  setInterval(agenda, 30_000).unref();
+  setInterval(pedidos, 5_000).unref();
+  log('reserva online ligada');
 }
