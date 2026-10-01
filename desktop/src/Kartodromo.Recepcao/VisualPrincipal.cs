@@ -183,11 +183,12 @@ static class VisualPrincipal
         grade.ColumnHeadersHeight = 38;
         grade.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
         grade.GridColor = Tokens.FundoCampo;
+        if (ComAnoForaDoAtual.Add(grade)) grade.CellFormatting += DataComAno;
         foreach (DataGridViewColumn c in grade.Columns)
         {
             var dir = c.DefaultCellStyle.Alignment == DataGridViewContentAlignment.MiddleRight;
             c.HeaderCell.Style.Alignment = dir ? DataGridViewContentAlignment.MiddleRight : c is DataGridViewCheckBoxColumn ? DataGridViewContentAlignment.MiddleCenter : DataGridViewContentAlignment.MiddleLeft;
-            if (c.DefaultCellStyle.Format == "dd/MM/yyyy HH:mm") { c.DefaultCellStyle.Format = "dd/MM HH:mm"; c.DefaultCellStyle.Font = new Font("Cascadia Mono", 8.6F); c.Width = Math.Min(c.Width, 108); }
+            if (c.DefaultCellStyle.Format == "dd/MM/yyyy HH:mm") { c.DefaultCellStyle.Format = "dd/MM HH:mm"; c.DefaultCellStyle.Font = new Font("Cascadia Mono", 8.6F); c.Width = Math.Min(c.Width, 126); }
             if (c.Name is "reserva" or "total" or "final" or "nome") c.DefaultCellStyle.Font = new Font("Segoe UI", 9.2F, FontStyle.Bold);
             if (c is DataGridViewCheckBoxColumn && c.Name != "__sel") c.Width = Math.Max(64, TextRenderer.MeasureText(c.HeaderText, grade.ColumnHeadersDefaultCellStyle.Font).Width + 26 + FiltroColuna.LarguraFunil);
             // como no design: as colunas ocupam a largura da lista, na proporção das larguras pensadas,
@@ -197,5 +198,16 @@ static class VisualPrincipal
             c.FillWeight = Math.Max(1, c.Width);
             c.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
         }
+    }
+
+    static readonly HashSet<DataGridView> ComAnoForaDoAtual = [];
+
+    /// <summary>Data curta (dd/MM) só no ano corrente: "17/10" de 2025 parecia uma data futura na Oficina.</summary>
+    static void DataComAno(object sender, DataGridViewCellFormattingEventArgs e)
+    {
+        if (sender is not DataGridView g || e.ColumnIndex < 0 || e.Value is not DateTime d || d.Year == DateTime.Today.Year) return;
+        if (g.Columns[e.ColumnIndex].DefaultCellStyle.Format != "dd/MM HH:mm") return;
+        e.Value = d.ToString("dd/MM/yy HH:mm");
+        e.FormattingApplied = true;
     }
 }
