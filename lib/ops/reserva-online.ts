@@ -104,7 +104,7 @@ type Resultado =
 type Linha = { Id: number; Status: string; InscricaoIds: string; ValorCentavos: number; expira: string; BateriaId: number; Quantidade: number; ClienteId: number; Codigo: string };
 const LINHA = `SELECT *, CONVERT(varchar(19), ExpiraEm, 126) expira FROM dbo.ReservaOnline`;
 /** O banco grava no horário de Brasília (SYSDATETIME); o site recebe com o fuso explícito. */
-const brasilia = (local: string) => `-03:00`;
+const brasilia = (local: string) => `${String(local ?? '').slice(0, 19)}-03:00`;
 
 const ids = (s: string) => s.split(',').map(Number).filter((n) => n > 0);
 
@@ -151,12 +151,13 @@ export async function reservarPedido(p: PedidoSite, log: Log): Promise<Resultado
   } catch (e) {
     return { id: p.id, acao: 'recusado', erro: (e as Error).message };
   }
-  const nova = await one<{ expira: string }>(
+  await query(
     `INSERT INTO dbo.ReservaOnline (PedidoId, Codigo, ClienteId, BateriaId, Quantidade, ValorCentavos, Status, Forma, InscricaoIds, Pilotos, ExpiraEm)
-     OUTPUT CONVERT(varchar(19), inserted.ExpiraEm, 126) expira
      VALUES (@pedido, @codigo, @cliente, @bateria, @n, @valor, 'aguardando', @forma, @insc, @pilotos, DATEADD(minute, @prazo, SYSDATETIME()))`,
     { pedido: p.id, codigo: p.codigo, cliente: clienteId, bateria: Number(p.bateriaId), n, valor: preco * n, forma: p.forma, insc: inscricoes.join(','), pilotos: (p.pilotos ?? []).join(', ').slice(0, 600) || null, prazo: c.prazoMin },
   );
+  // lido de volta do banco (o OUTPUT CONVERT do INSERT chegava vazio pelo driver)
+  const nova = await one<{ expira: string }>(`SELECT CONVERT(varchar(19), ExpiraEm, 126) expira FROM dbo.ReservaOnline WHERE PedidoId = @p`, { p: p.id });
   const expiraEm = brasilia(nova!.expira);
   log(`reserva online ${p.codigo}: ${n} vaga(s) seguradas na bateria ${p.bateriaId} para o cliente ${clienteId} até ${nova!.expira.slice(11, 16)}`);
   return { id: p.id, acao: 'reservado', valorCentavos: preco * n, expiraEm, descricao: descricaoPedido(bat.nome, bat.inicio, n), inicio: bat.inicio };

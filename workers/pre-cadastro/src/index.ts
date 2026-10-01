@@ -5,6 +5,7 @@
  * No totem o cliente digita CPF, RG, passaporte ou e-mail e os dados já aparecem.
  */
 import { chaveDocumento, validar } from './validar';
+import { diagnostico } from './asaas';
 import { agendaPublica, criarPedido, situacaoPedido, syncAgenda, syncPedidos, syncResultado, webhookAsaas, type EnvReservas } from './reservas';
 
 export interface Env extends EnvReservas {
@@ -100,6 +101,7 @@ export default {
           return json(200, { apagados: validas.length });
         }
         if (p === '/api/sync/agenda' && req.method === 'PUT') return await syncAgenda(req, env);
+        if (p === '/api/sync/asaas' && req.method === 'GET') return json(200, await diagnostico(env));
         if (p === '/api/sync/pedidos' && req.method === 'GET') return await syncPedidos(env);
         if (p === '/api/sync/pedido' && req.method === 'POST') return await syncResultado(req, env, ctx);
       }

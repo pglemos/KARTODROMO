@@ -1,5 +1,6 @@
-export const MYLAPTIME_BOOKING_URL =
-  'https://tools.mylaptime.com.br/booking?uid=5729bbc1-572b-4e32-84ec-e9e93ab08ced';
+/** Reserva online própria (pagamento Asaas, Pix ou cartão). Até 01/10/2026 era o MyLapTime, que ficou sem horários
+ * quando o LapTime foi desligado. */
+export const RESERVA_ONLINE_URL = 'https://reservas.kartodromodebetim.com.br';
 
 export const SITE_BOOKING_ANCHOR = '/#agendamento';
 

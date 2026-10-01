@@ -14,5 +14,5 @@
     { "pattern": "reservas.kartodromodebetim.com.br", "custom_domain": true }
   ],
   // RESERVAS_ATIVAS=1 abre ao público; ASAAS_URL = https://api-sandbox.asaas.com/v3 para testar no ambiente de testes
-  "vars": { "RESERVAS_ATIVAS": "0", "ASAAS_URL": "https://api.asaas.com/v3" }
+  "vars": { "RESERVAS_ATIVAS": "1", "ASAAS_URL": "https://api.asaas.com/v3" }
 }

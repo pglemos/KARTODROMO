@@ -1,4 +1,4 @@
-import { MYLAPTIME_BOOKING_URL } from '../config/booking';
+import { RESERVA_ONLINE_URL } from '../config/booking';
 import AngledButton from './site-ui/AngledButton';
 import SectionHeading from './site-ui/SectionHeading';
 
@@ -7,8 +7,8 @@ type QuickBookingProps = {
 };
 
 /**
- * Agendamento oficial via MyLapTime — link direto (nova aba), sem clonar a interface deles sob
- * nosso dominio.
+ * Agendamento: desde 01/10/2026 abre a reserva online propria (reservas.kartodromodebetim.com.br, worker
+ * workers/pre-cadastro, pagamento Asaas). Antes linkava o MyLapTime, que ficou sem horarios com o LapTime desligado.
  *
  * Ate 2026-07-02 esse widget carregava `tools.mylaptime.com.br` num iframe proxeado pelo nosso
  * servidor (`lib/mylaptime-proxy.ts`), reescrevendo os headers/JS deles pra burlar a protecao
@@ -51,15 +51,15 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
 
         <div className="mx-auto mt-12 max-w-2xl border border-white/10 bg-ink-950 px-6 py-12 md:px-16 md:py-16">
           <p className="text-lg font-medium text-white/75 md:text-xl">
-            A consulta de horários e a reserva são feitas na plataforma oficial de agendamento.
+            Escolha o dia e o horário, pague no Pix ou no cartão e receba a confirmação na hora.
           </p>
           <div className="mt-8 flex justify-center">
-            <AngledButton href={MYLAPTIME_BOOKING_URL} external>
+            <AngledButton href={RESERVA_ONLINE_URL} external>
               Consultar horários e agendar
             </AngledButton>
           </div>
           <p className="mt-4 text-sm text-white/50">
-            Abre em uma nova aba, no site oficial de reservas.
+            Abre em uma nova aba a página de reservas do kartódromo.
           </p>
         </div>
       </div>

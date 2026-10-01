@@ -143,7 +143,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
           <a href="{{ link.href }}" aria-current="{{ link.current }}" style="{{ link.style }}" style-hover="color:#ffffff; border-bottom-color:#00e676;">{{ link.label }}</a>
         </sc-for>
       </nav>
-      <a href="https://tools.mylaptime.com.br/booking?uid=5729bbc1-572b-4e32-84ec-e9e93ab08ced" target="_blank" rel="noopener noreferrer" style="{{ reservaCtaStyle }}">
+      <a href="https://reservas.kartodromodebetim.com.br" target="_blank" rel="noopener noreferrer" style="{{ reservaCtaStyle }}">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="1"/><path d="M16 3v4M8 3v4M3 10h18"/></svg> Reservar agora
       </a>
       <button type="button" aria-label="{{ menuToggleLabel }}" aria-controls="mobile-navigation" aria-expanded="{{ mobileNavOpen }}" onClick="{{ toggleMobileNav }}" style="{{ hamburgerBtnStyle }}">
@@ -330,7 +330,7 @@ class Component extends DCLogic {
       { cat: 'locacao', q: 'Preciso ter experiência para correr?', a: 'Não. A categoria de locação atende iniciantes e pilotos habituais. Todos recebem briefing antes da entrada na pista.' },
       { cat: 'locacao', q: 'Quanto tempo dura a bateria?', a: 'A experiência de pista soma 30 minutos: treino, tomada de tempo e corrida. Reserve também tempo para cadastro, pesagem, equipamento e briefing.' },
       { cat: 'seguranca', q: 'O kartódromo fornece equipamento?', a: 'O capacete é fornecido. Recomenda-se usar calça comprida, camisa e calçado fechado, sem acessórios soltos.' },
-      { cat: 'reserva', q: 'Como faço a reserva?', a: 'A reserva individual é realizada pela plataforma oficial. Grupos, aniversários e eventos devem consultar a equipe pelo WhatsApp.' },
+      { cat: 'reserva', q: 'Como faço a reserva?', a: 'A reserva individual é feita online em reservas.kartodromodebetim.com.br: escolha o dia e o horário e pague no Pix ou no cartão. Grupos, aniversários e eventos devem consultar a equipe pelo WhatsApp.' },
       { cat: 'reserva', q: 'Qual é o valor da corrida?', a: 'O preço normal informado é R$ 175,00. No pagamento antecipado pela reserva online, o valor promocional é R$ 145,00.' },
       { cat: 'grupos', q: 'Posso fechar uma bateria para meu grupo?', a: 'Sim. Terça a sexta-feira, o mínimo é de 25 pilotos. Em fins de semana e feriados, o mínimo é de 30, sempre conforme disponibilidade.' },
       { cat: 'seguranca', q: 'Existe limite de peso ou altura?', a: 'Os critérios podem variar conforme categoria, kart e campeonato. Consulte a equipe antes de reservar quando houver qualquer dúvida.' },

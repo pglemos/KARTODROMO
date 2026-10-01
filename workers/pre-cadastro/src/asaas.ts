@@ -61,6 +61,16 @@ export const qrPix = (env: AsaasEnv, id: string) => chamar<{ encodedImage: strin
 export const consultar = (env: AsaasEnv, id: string) => chamar<Cobranca>(env, `/payments/${encodeURIComponent(id)}`);
 export const cancelar = (env: AsaasEnv, id: string) => chamar<{ deleted: boolean }>(env, `/payments/${encodeURIComponent(id)}`, { method: 'DELETE' });
 
+/** Diagnóstico sem segredos: webhooks cadastrados (endereço, eventos, ativo, interrompido) e chaves Pix ativas. */
+export async function diagnostico(env: AsaasEnv) {
+  const w = await chamar<{ data: { url: string; enabled: boolean; interrupted: boolean; apiVersion: number; events?: string[]; sendType?: string }[] }>(env, '/webhooks?limit=20');
+  const pix = await chamar<{ totalCount?: number; data?: unknown[] }>(env, '/pix/addressKeys?status=ACTIVE&limit=5').catch((e: Error) => ({ erro: e.message }));
+  return {
+    webhooks: (w.data ?? []).map((x) => ({ url: x.url, ativo: x.enabled, interrompido: x.interrupted, versao: x.apiVersion, envio: x.sendType, eventos: x.events })),
+    chavesPix: 'erro' in pix ? pix.erro : pix.totalCount ?? pix.data?.length ?? 0,
+  };
+}
+
 /** Status da Asaas que valem como pago (Pix recebido; cartão confirmado/recebido). */
 export const PAGO = new Set(['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH']);
 export const EVENTOS_PAGO = new Set(['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED']);

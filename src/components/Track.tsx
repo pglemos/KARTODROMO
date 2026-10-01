@@ -4,6 +4,7 @@ import { trackLayouts, type TrackVariantKey } from '../data/trackLayouts';
 import AngledButton from './site-ui/AngledButton';
 import BigCTA from './site-ui/BigCTA';
 import SectionHeading from './site-ui/SectionHeading';
+import { RESERVA_ONLINE_URL } from '../config/booking';
 
 type TrackFilter = 'all' | TrackVariantKey;
 
@@ -254,7 +255,7 @@ const Track = () => {
             title={<>Sua volta começa<br /><span className="text-primary-400">agora</span></>}
             text="Consulte os horários disponíveis e venha descobrir cada setor da pista."
           >
-            <AngledButton href="https://tools.mylaptime.com.br/booking?uid=5729bbc1-572b-4e32-84ec-e9e93ab08ced" external>
+            <AngledButton href={RESERVA_ONLINE_URL} external>
               Reservar corrida
             </AngledButton>
             <AngledButton href="https://wa.me/5531998842898" variant="outline" external>
