@@ -78,24 +78,29 @@ public class CamposBateria : Panel
 /// <summary>Criar reservas (CriarReservas.dc.html): pelo padrão (mês inteiro) com prévia, ou uma reserva avulsa.</summary>
 public class FormCriarReservas : DialogoDesign
 {
-    public FormCriarReservas() : base("Criar reservas", "Gere as baterias do mês pelo padrão, ou uma reserva avulsa", "M5 21V4M5 4h12l-2 4 2 4H5", "linear-gradient(180deg, #FF7A6B, #E0342A)")
+    public FormCriarReservas() : base("Criar reservas", "Gere as baterias de um ou vários meses pelo padrão, ou uma reserva avulsa", "M5 21V4M5 4h12l-2 4 2 4H5", "linear-gradient(180deg, #FF7A6B, #E0342A)")
     {
         var br = Fmt.Br.TextInfo;
         // ---------- aba 1: pelo padrão
         var pad = new ListaDesign(); pad.Items.AddRange(Sessao.Padroes().Where(p => p.Dados?["ativo"] is null || p.Dados.B("ativo")).ToArray()); // sem escolha pronta: abria com "200 MILHAS" e um clique gerava 23 baterias erradas
-        var mes = new ListaDesign();
+        // De/Até: em outubro o kartódromo abre a agenda do ano seguinte inteiro (antes era um mês por vez, 36 gerações)
+        var mes = new ListaDesign(); var ateMes = new ListaDesign();
         var hoje = DateTime.Today;
-        for (var i = 0; i < 13; i++)
+        for (var i = 0; i < 25; i++)
         {
             var m = new DateTime(hoje.Year, hoje.Month, 1).AddMonths(i);
-            mes.Items.Add(new Campos.Item(m.Year * 100 + m.Month, br.ToTitleCase(m.ToString("MMMM yyyy", Fmt.Br))));
+            var item = new Campos.Item(m.Year * 100 + m.Month, br.ToTitleCase(m.ToString("MMMM yyyy", Fmt.Br)));
+            mes.Items.Add(item); ateMes.Items.Add(item);
         }
-        mes.SelectedIndex = hoje.Day > 20 ? 1 : 0;
+        mes.SelectedIndex = hoje.Day > 20 ? 1 : 0; ateMes.SelectedIndex = mes.SelectedIndex;
+        mes.SelectedIndexChanged += (_, _) => { if (ateMes.SelectedIndex < mes.SelectedIndex) ateMes.SelectedIndex = mes.SelectedIndex; };
+        ateMes.SelectedIndexChanged += (_, _) => { if (ateMes.SelectedIndex < mes.SelectedIndex) mes.SelectedIndex = ateMes.SelectedIndex; };
         var ativo = new CheckBox { Text = "Ativo", Checked = true };
         var g1 = Secao("Usar configuração do sistema");
-        Campo(g1, "Configuração padrão", pad, 3);
-        Campo(g1, "Mês", mes, 2);
-        Marca(g1, ativo, 1);
+        Campo(g1, "Configuração padrão", pad, 4);
+        Marca(g1, ativo, 2);
+        Campo(g1, "Do mês", mes, 3);
+        Campo(g1, "Até o mês", ateMes, 3);
         string[] nomes = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
         var dias = nomes.Select((n, i) => new CheckBox { Text = n, Checked = i is >= 2 and <= 6 }).ToArray();
         var g2 = Secao("Dias da semana");
@@ -135,12 +140,18 @@ public class FormCriarReservas : DialogoDesign
         foreach (var c in abaAvulsa) c.Visible = false;
 
         List<JsonObject> feriados = [];
+        static DateTime Mes(ListaDesign l) { var id = (int)(Campos.IdDe(l) ?? DateTime.Today.Year * 100 + DateTime.Today.Month); return new DateTime(id / 100, id % 100, 1); }
         (DateTime de, DateTime ate) Periodo()
         {
-            var id = (int)(Campos.IdDe(mes) ?? hoje.Year * 100 + hoje.Month);
-            var ini = new DateTime(id / 100, id % 100, 1);
-            var fim = ini.AddMonths(1).AddDays(-1);
+            var ini = Mes(mes);
+            var fim = Mes(ateMes).AddMonths(1).AddDays(-1);
             return (ini < hoje ? hoje : ini, fim);
+        }
+        string NomePeriodo()
+        {
+            var (a, b) = (Mes(mes), Mes(ateMes));
+            if (a == b) return a.ToString("MMMM", Fmt.Br);
+            return $"{a.ToString("MMM/yy", Fmt.Br).Replace(".", "")} a {b.ToString("MMM/yy", Fmt.Br).Replace(".", "")}";
         }
         void Previa()
         {
@@ -158,19 +169,18 @@ public class FormCriarReservas : DialogoDesign
             var q = Math.Max(1, p.I("quantidade"));
             TimeSpan.TryParse(p.S("primeiraHora"), out var h0);
             var ult = h0 + TimeSpan.FromMinutes((q - 1) * p.I("intervaloMin"));
-            var nomeMes = de.ToString("MMMM", Fmt.Br);
-            var txt = $"{q} {(q == 1 ? "bateria" : "baterias")} por dia · {h0:hh\\:mm}{(q > 1 ? $" às {ult:hh\\:mm}" : "")} · {p.I("vagas")} vagas cada · {nDias} dias em {nomeMes} → {q * nDias} baterias.";
-            if (pulados.Count > 0) txt += $" {(pulados.Count == 1 ? "Feriado de" : "Feriados de")} {string.Join(", ", pulados.Select(x => x.ToString("dd/MM")))} {(pulados.Count == 1 ? "será pulado" : "serão pulados")}.";
+            var txt = $"{q} {(q == 1 ? "bateria" : "baterias")} por dia · {h0:hh\\:mm}{(q > 1 ? $" às {ult:hh\\:mm}" : "")} · {p.I("vagas")} vagas cada · {nDias} dias em {NomePeriodo()} → {q * nDias} baterias.";
+            if (pulados.Count > 0) txt += $" {(pulados.Count == 1 ? "Feriado de" : "Feriados de")} {string.Join(", ", pulados.Select(x => x.ToString(de.Year == ate.Year ? "dd/MM" : "dd/MM/yy")))} {(pulados.Count == 1 ? "será pulado" : "serão pulados")}.";
             if (existentesCk.Checked) txt += " Horários que já existem não são duplicados.";
             previa.Text = txt;
         }
-        pad.SelectedIndexChanged += (_, _) => Previa(); mes.SelectedIndexChanged += (_, _) => Previa();
+        pad.SelectedIndexChanged += (_, _) => Previa(); mes.SelectedIndexChanged += (_, _) => Previa(); ateMes.SelectedIndexChanged += (_, _) => Previa();
         foreach (var d in dias) d.CheckedChanged += (_, _) => Previa();
         feriadosCk.CheckedChanged += (_, _) => Previa(); existentesCk.CheckedChanged += (_, _) => Previa();
 
         var aba = 0;
         Button acao = null;
-        acao = BotaoRodape("Gerar reservas do mês", true, () => Seguro.Rodar(this, async () =>
+        acao = BotaoRodape("Gerar reservas", true, () => Seguro.Rodar(this, async () =>
         {
             if (aba == 1)
             {
@@ -189,19 +199,39 @@ public class FormCriarReservas : DialogoDesign
             var sel = dias.Select((d, i) => (d, i)).Where(x => x.d.Checked).Select(x => x.i).ToArray();
             if (sel.Length == 0) { Msg.Aviso(this, "Marque pelo menos um dia da semana."); return; }
             if (Campos.IdDe(pad) is not long pid) { Msg.Aviso(this, "Escolha a configuração padrão."); return; }
-            if (!Msg.Pergunta(this, $"Gerar as baterias de \"{pad.Text}\" em {mes.Text}?\n\n{previa.Text}")) return;
+            var periodo = mes.SelectedIndex == ateMes.SelectedIndex ? mes.Text : $"{mes.Text} até {ateMes.Text}";
+            if (!Msg.Pergunta(this, $"Gerar as baterias de \"{pad.Text}\" em {periodo}?\n\n{previa.Text}")) return;
             var (de, ate) = Periodo();
-            var r = await Sessao.Api.Post("/api/office/baterias/gerar", new { padraoId = pid, de = Fmt.Iso(de), ate = Fmt.Iso(ate), diasSemana = sel, pularFeriados = feriadosCk.Checked, pularExistentes = existentesCk.Checked, ativo = ativo.Checked });
-            Msg.Info(this, r.I("criadas") > 0 ? $"{r.I("criadas")} baterias criadas." : "Nenhuma bateria nova: os horários já existem ou os dias foram pulados.");
+            // um pedido por mês: o ano inteiro num pedido só passava do tempo limite da conexão (30 s)
+            var criadas = 0;
+            try
+            {
+                for (var ini = de; ini <= ate; ini = new DateTime(ini.Year, ini.Month, 1).AddMonths(1))
+                {
+                    var fim = new DateTime(ini.Year, ini.Month, 1).AddMonths(1).AddDays(-1);
+                    if (fim > ate) fim = ate;
+                    acao.Text = $"Gerando {ini.ToString("MMM/yy", Fmt.Br).Replace(".", "")}…";
+                    var r = await Sessao.Api.Post("/api/office/baterias/gerar", new { padraoId = pid, de = Fmt.Iso(ini), ate = Fmt.Iso(fim), diasSemana = sel, pularFeriados = feriadosCk.Checked, pularExistentes = existentesCk.Checked, ativo = ativo.Checked });
+                    criadas += r.I("criadas");
+                }
+            }
+            catch when (criadas > 0)
+            {
+                // parte já foi criada: avisar o número para não gerar de novo às cegas ("Pular horários que já existem" evita duplicar)
+                Msg.Aviso(this, $"{criadas} baterias foram criadas, mas a geração parou no meio. Gere de novo o mesmo período: os horários que já existem são pulados.");
+                throw;
+            }
+            finally { acao.Text = "Gerar reservas"; }
+            Msg.Info(this, criadas > 0 ? $"{criadas} baterias criadas." : "Nenhuma bateria nova: os horários já existem ou os dias foram pulados.");
             DialogResult = DialogResult.OK; Close();
         }));
         BotaoRodape("Cancelar", false, Close);
-        Abas(["Pelo padrão (mês inteiro)", "Reserva avulsa"], i =>
+        Abas(["Pelo padrão", "Reserva avulsa"], i =>
         {
             aba = i;
             foreach (var c in abaPadrao) c.Visible = i == 0;
             foreach (var c in abaAvulsa) c.Visible = i == 1;
-            acao.Text = i == 0 ? "Gerar reservas do mês" : "Criar reserva";
+            acao.Text = i == 0 ? "Gerar reservas" : "Criar reserva";
         });
         Load += (_, _) => Seguro.Rodar(this, async () => { feriados = await Sessao.Api.Lista("/api/office/cad/feriados"); Previa(); });
         Previa();

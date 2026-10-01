@@ -588,7 +588,7 @@ public class FormPrincipal : Form
             G("Vouchers", I("Cadastro de vouchers", () => Selecionar("vouchers:lista")), I("Histórico de consumo", () => Selecionar("vouchers:uso")), I("Criar voucher", () => FormVoucher.Criar("manual").ShowDialog(this))), new ToolStripSeparator(),
             G("Parceiros", I("Cadastro de parceiros", () => Cadastros.Abrir(this, "parceiros")), I("Comissões", () => Selecionar("parceiros:comissoes")))));
         m.Items.Add(S("F&erramentas", I("Parâmetros do sistema", () => Cadastros.Parametros(this), adm), I("Padrões de reservas", () => Cadastros.Abrir(this, "padroes")),
-            I("Criar reservas do mês", () => { new FormCriarReservas().ShowDialog(this); Recarregar(); }), new ToolStripSeparator(), I("Serviços online", () => new FormServicosOnline().ShowDialog(this))));
+            I("Criar reservas (mês ou ano)", () => { new FormCriarReservas().ShowDialog(this); Recarregar(); }), new ToolStripSeparator(), I("Serviços online", () => new FormServicosOnline().ShowDialog(this))));
         m.Items.Add(S("&Relatórios",
             G("Cronometragem", I("Resultados da cronometragem", () => Relatorios.Cronometragem(this)), I("Classificação ao vivo (TV)", () => Relatorio.Abrir(this, Config.CronoUrl + "/tv", "TV"))), new ToolStripSeparator(),
             G("Financeiro", I("Receitas por forma de pagamento", () => Relatorios.Periodo(this, "receitas", "forma")), I("Receitas por clientes", () => Relatorios.Periodo(this, "receitas", "cliente")),
