@@ -242,7 +242,7 @@ const KACPage = () => {
             <CalendarDays className="h-12 w-12 flex-shrink-0 text-primary-400" />
           </div>
 
-          <p className="mb-2 font-race text-[11px] italic font-bold uppercase tracking-wide text-white/40 sm:hidden">
+          <p className="mb-2 font-race text-xs italic font-bold uppercase tracking-wide text-white/40 sm:hidden">
             Arraste para o lado para ver todas as colunas →
           </p>
           <div className="overflow-x-auto border border-white/10 bg-ink-900 [mask-image:linear-gradient(to_right,black_94%,transparent)] [-webkit-mask-image:linear-gradient(to_right,black_94%,transparent)] sm:[mask-image:none] sm:[-webkit-mask-image:none]">
@@ -250,7 +250,7 @@ const KACPage = () => {
               <thead>
                 <tr>
                   {['Corrida', 'Data', 'Mês', 'Horário de chegada', 'Horário da corrida'].map((head) => (
-                    <th key={head} className="border-b border-white/10 bg-ink-950 px-5 py-4 font-race text-[11px] italic font-bold uppercase text-primary-400">
+                    <th key={head} className="border-b border-white/10 bg-ink-950 px-5 py-4 font-race text-xs italic font-bold uppercase text-primary-400">
                       {head}
                     </th>
                   ))}
