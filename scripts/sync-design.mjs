@@ -295,6 +295,10 @@ if (!process.argv[1]?.endsWith('sync-design.mjs')) {
   run();
 }
 
+function lf(texto) {
+  return texto.replace(/\r\n/g, '\n');
+}
+
 function run() {
 const pages = readdirSync(sourceDir).filter((file) => file.endsWith('.dc.html'));
 const check = process.argv.includes('--check');
@@ -302,11 +306,13 @@ const stale = [];
 
 for (const file of pages) {
   const page = file.replace('.dc.html', '');
-  const expected = build(page, readFileSync(join(sourceDir, file), 'utf8'));
+  // Sempre em LF: com core.autocrlf=true (Windows) os arquivos chegam com CRLF e as trocas que procuram
+  // '<head>\n', '</head>' etc. falhavam em silêncio — o gerador "apagava" SEO, <base> e o menu BENEFÍCIOS.
+  const expected = build(page, lf(readFileSync(join(sourceDir, file), 'utf8')));
   const target = join(designDir, file);
   const current = (() => {
     try {
-      return readFileSync(target, 'utf8');
+      return lf(readFileSync(target, 'utf8'));
     } catch {
       return null;
     }
@@ -321,16 +327,16 @@ for (const file of pages) {
 }
 
 for (const script of sharedScripts) {
-  const expected = readFileSync(join(sourceDir, script));
+  const expected = lf(readFileSync(join(sourceDir, script), 'utf8'));
   const target = join(publicDir, script);
   if (check) {
     let current = null;
     try {
-      current = readFileSync(target);
+      current = lf(readFileSync(target, 'utf8'));
     } catch {
       current = null;
     }
-    if (current === null || !current.equals(expected)) stale.push(script);
+    if (current === null || current !== expected) stale.push(script);
     continue;
   }
   copyFileSync(join(sourceDir, script), target);
