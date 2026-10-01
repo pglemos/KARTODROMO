@@ -787,6 +787,101 @@ public static class AutoTeste
         await Foto(f, pasta, nome);
     }
 
+    /// <summary>Roteiro "abrir a agenda do ano" (o passo a passo mandado à gerente), fora da tela: Feriados, Padrões,
+    /// Criar reservas com De/Até para cada geração e a Agenda do primeiro mês. Sem "--gravar" só fotografa e lê a prévia;
+    /// com "--gravar" confirma a geração. Uso: --roteiro-agenda &lt;pasta&gt; &lt;login&gt; &lt;senha&gt; AAAA-MM AAAA-MM [--gravar]
+    /// e a variável KARTODROMO_GERACOES = "Padrão:dias;Padrão:dias" (dias 0=dom..6=sáb, ex. "Indoor - Semana:2345").</summary>
+    public static async Task RodarRoteiroAgenda(string pasta, string login, string senha, string de, string ate, bool gravar)
+    {
+        ForaDaTela = true;
+        Relatorio.MostrarNaBarra = false;
+        FocoAntes = GetForegroundWindow();
+        var vigia = new System.Windows.Forms.Timer { Interval = 15 };
+        vigia.Tick += (_, _) =>
+        {
+            foreach (Form f in Application.OpenForms)
+                if (f.Visible && f.Left > -3000)
+                {
+                    if (f.ShowInTaskbar) f.ShowInTaskbar = false;
+                    f.Location = new Point(-4000 + Math.Max(0, f.Left), Math.Max(0, f.Top));
+                    SetForegroundWindow(FocoAntes);
+                }
+        };
+        vigia.Start();
+        Directory.CreateDirectory(pasta);
+        Log.Clear();
+        try
+        {
+            var acesso = await Sessao.Api.Post("/api/login", new { login, senha, termos = true });
+            Sessao.Api.Token = acesso.S("token");
+            Sessao.Usuario = acesso["usuario"]!.AsObject();
+            await Sessao.CarregarApoio();
+            Msg.Registro = m => Log.Add(m);
+            Msg.Responder = t => gravar && t.StartsWith("Gerar as baterias", StringComparison.Ordinal);
+            Application.ThreadException += (_, e) => Log.Add("EXCECAO: " + e.Exception.GetType().Name + ": " + e.Exception.Message);
+            var principal = new FormPrincipal { WindowState = FormWindowState.Normal, ClientSize = new Size(1920, 1009), StartPosition = FormStartPosition.Manual, Location = new Point(-4000, 0), ShowInTaskbar = false, ConfirmarSaida = false };
+            principal.Show();
+            await Esperar(1500);
+
+            // passo 1: Cadastros › Feriados (só olha; a gerente decide os dias)
+            await CapturarModal(principal, pasta, "r01-feriados", () => Cadastros.Abrir(principal, "feriados"));
+            // padrões de reservas (domingo)
+            await CapturarModal(principal, pasta, "r02-padroes", () => Cadastros.Abrir(principal, "padroes"));
+
+            // passo 2: Ferramentas › Criar reservas, uma geração por padrão
+            var n = 2;
+            var geracoes = (Environment.GetEnvironmentVariable("KARTODROMO_GERACOES") ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var g in geracoes)
+            {
+                var partes = g.Split(':'); var padrao = partes[0].Trim(); var dias = partes.ElementAtOrDefault(1) ?? "";
+                var nome = $"r{++n:00}-criar-{Slug(padrao)}-{dias}";
+                var f = new FormCriarReservas { StartPosition = FormStartPosition.Manual, Location = new Point(-4000, 0), ShowInTaskbar = false };
+                f.Show(principal);
+                await Esperar(1500);
+                var listas = Descendentes(f).OfType<ListaDesign>().ToList();
+                var pad = listas.First(l => l.Items.Cast<object>().Any(i => i is Campos.Item ci && ci.Dados?["quantidade"] != null));
+                var meses = listas.Where(l => l.Items.Count >= 13 && l.Items.Cast<object>().All(i => i is Campos.Item ci && ci.Id >= 200000)).ToList();
+                var alvo = pad.Items.Cast<Campos.Item>().FirstOrDefault(i => i.Texto == padrao);
+                if (alvo == null) { Log.Add($"ERRO {nome}: padrão \"{padrao}\" não existe"); f.Close(); continue; }
+                pad.SelectedItem = alvo;
+                static void Mes(ListaDesign l, string ym) { var id = int.Parse(ym.Replace("-", "")); l.SelectedItem = l.Items.Cast<Campos.Item>().First(i => i.Id == id); }
+                Mes(meses[0], de); Mes(meses[1], ate);
+                string[] nomesDias = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+                foreach (var ck in Descendentes(f).OfType<CheckBox>())
+                {
+                    var i = Array.IndexOf(nomesDias, ck.Text);
+                    if (i >= 0) ck.Checked = dias.Contains((char)('0' + i));
+                }
+                await Esperar(600);
+                var previa = Descendentes(f).OfType<Label>().FirstOrDefault(l => l.Text.Contains(" por dia ·") || l.Text.StartsWith("Escolha") || l.Text.StartsWith("Cadastre"));
+                Log.Add($"PREVIA {nome}: {previa?.Text}");
+                await Foto(f, pasta, nome);
+                if (gravar)
+                {
+                    var botao = Descendentes(f).OfType<Button>().First(b => b.Text == "Gerar reservas");
+                    var t0 = DateTime.Now;
+                    botao.PerformClick();
+                    while (!f.IsDisposed && f.Visible && (DateTime.Now - t0).TotalMinutes < 10) await Esperar(500);
+                    Log.Add($"GERADO {nome} em {(DateTime.Now - t0).TotalSeconds:0} s");
+                }
+                if (!f.IsDisposed) f.Close();
+            }
+
+            // depois: a Agenda no primeiro mês do período
+            var agenda = new FormAgenda { StartPosition = FormStartPosition.Manual, Location = new Point(-4000, 0), ShowInTaskbar = false };
+            agenda.Show(principal);
+            await Esperar(2000);
+            var y = int.Parse(de[..4]); var mm = int.Parse(de[5..7]);
+            typeof(FormAgenda).GetMethod("Ir", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.Invoke(agenda, [new DateTime(y, mm, 1)]);
+            await Esperar(3000);
+            await Foto(agenda, pasta, $"r{++n:00}-agenda-{de}");
+            agenda.Close();
+            principal.Close();
+        }
+        catch (Exception e) { Log.Add("FALHOU O ROTEIRO: " + e); }
+        finally { vigia.Stop(); Msg.Responder = null; File.WriteAllLines(Path.Combine(pasta, "roteiro.txt"), Log); }
+    }
+
     static Task Esperar(int ms) => Task.Delay(ms);
     static string Slug(string valor) => string.Concat(valor.ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-')).Trim('-');
 }

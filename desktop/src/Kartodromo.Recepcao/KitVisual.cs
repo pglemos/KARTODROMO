@@ -156,7 +156,7 @@ public static class KitVisual
         if (t.Contains("participantes"))
             return new() { Titulo = "Lista de participantes", Sub = (f.Tag as string) ?? "BATERIA 19:20 · 25/09/2026 · para o briefing e a pista", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Tokens.Azul, Glifo = "\uE71D" };
         if (t.Contains("criar reservas"))
-            return new() { Titulo = "Criar reservas", Sub = "Gere as baterias do mês pelo padrão, ou uma reserva avulsa", Cor1 = Color.FromArgb(255, 122, 107), Cor2 = Color.FromArgb(224, 52, 42), Glifo = "\uE7C1" };
+            return new() { Titulo = "Criar reservas", Sub = "Gere as baterias de um ou vários meses pelo padrão, ou uma reserva avulsa", Cor1 = Color.FromArgb(255, 122, 107), Cor2 = Color.FromArgb(224, 52, 42), Glifo = "\uE7C1" };
         if (t.Contains("editar reserva"))
             return new() { Titulo = "Editar reserva", Sub = (f.Tag as string) ?? "BATERIA 19:20 · pré-reserva", Cor1 = Color.FromArgb(255, 122, 107), Cor2 = Color.FromArgb(224, 52, 42), Glifo = "\uE7C1" };
         if (t.Contains("estornar") || t.Contains("estorno"))
@@ -166,7 +166,7 @@ public static class KitVisual
         if (t.Contains("métodos de pagamento"))
             return new() { Titulo = "Métodos de pagamento", Sub = "Aparecem no checkout e no fechamento de caixa", Cor1 = Color.FromArgb(94, 219, 122), Cor2 = Color.FromArgb(30, 158, 74), Glifo = "\uE8C7" };
         if (t.Contains("padrões") || t.Contains("configuração de reservas"))
-            return new() { Titulo = "Configuração de reservas (padrões)", Sub = "Modelos usados em \"Criar reservas\" para gerar as baterias do mês", Cor1 = Color.FromArgb(255, 122, 107), Cor2 = Color.FromArgb(224, 52, 42), Glifo = "\uE7C1" };
+            return new() { Titulo = "Configuração de reservas (padrões)", Sub = "Modelos usados em \"Criar reservas\" para gerar as baterias de um ou vários meses", Cor1 = Color.FromArgb(255, 122, 107), Cor2 = Color.FromArgb(224, 52, 42), Glifo = "\uE7C1" };
         if (t.Contains("parâmetros"))
             return new() { Titulo = "Parâmetros do sistema", Sub = "Ajustes da recepção · toque no valor para alterar", Cor1 = Tokens.TextoTerciario, Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE713" };
         if (t.Contains("usuário"))

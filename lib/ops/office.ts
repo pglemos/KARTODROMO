@@ -1238,6 +1238,23 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     send(200, { ok: true });
     return true;
   }
+  if (path === '/baterias/fechar-dia' && method === 'POST') {
+    // feriado decidido depois de abrir a agenda: cancela de uma vez as baterias do dia que não têm ninguém inscrito
+    const b = await req.body();
+    const data = isoDate(b.data);
+    const r = await one<{ canceladas: number; mantidas: number }>(
+      `DECLARE @c TABLE (Id int);
+       UPDATE b SET Status = 'cancelada' OUTPUT inserted.Id INTO @c
+         FROM dbo.Bateria b
+        WHERE b.Inicio >= @d AND b.Inicio < DATEADD(day, 1, @d) AND b.Status <> 'cancelada'
+          AND NOT EXISTS (SELECT 1 FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada');
+       SELECT (SELECT COUNT(*) FROM @c) canceladas,
+              (SELECT COUNT(*) FROM dbo.Bateria WHERE Inicio >= @d AND Inicio < DATEADD(day, 1, @d) AND Status <> 'cancelada') mantidas`,
+      { d: data },
+    );
+    send(200, r ?? { canceladas: 0, mantidas: 0 });
+    return true;
+  }
   if ((m = path.match(/^\/baterias\/(\d+)\/incluir$/)) && method === 'POST') {
     const b = await req.body();
     const n = int(b.participantes ?? 1, "Campo 'PARTICIPANTES'");

@@ -470,6 +470,15 @@ public class FormAgenda : CartaoModal
         };
         _cal.Dock = DockStyle.Fill;
         _cal.Escolheu += d => { _dia = d; if (d.Month != _mes.Month || d.Year != _mes.Year) Ir(new DateTime(d.Year, d.Month, 1)); else { _cal.Dia = d; CarregarDia(); } };
+        _cal.MenuDia += (d, onde) =>
+        {
+            if (d.Month != _mes.Month || d.Year != _mes.Year) return;
+            _dia = d; _cal.Dia = d; _cal.Invalidate(); CarregarDia();
+            var m = new ContextMenuStrip { Font = new Font("Segoe UI", 9.5F) };
+            m.Items.Add("Fechar o dia inteiro (feriado)…", null, (_, _) => FecharDia(d));
+            m.Closed += (_, _) => BeginInvoke(() => m.Dispose());
+            m.Show(_cal, onde);
+        };
         esq.Controls.Add(_cal); esq.Controls.Add(semana); esq.Controls.Add(cab);
         _cal.BringToFront();
 
@@ -541,9 +550,27 @@ public class FormAgenda : CartaoModal
             if (res.Count == 0) { Msg.Aviso(this, "A bateria não tem reservas."); return; }
             Acoes.ImprimirTermo(this, res);
         }));
+        m.Items.Add(new ToolStripSeparator());
+        m.Items.Add("Fechar o dia inteiro (feriado)…", null, (_, _) => FecharDia(_dia));
         m.Closed += (_, _) => BeginInvoke(() => m.Dispose());
         m.Show(_lista, onde);
     }
+
+    /// <summary>Feriado decidido depois de abrir a agenda: cancela as baterias do dia sem ninguém inscrito
+    /// (as que já têm reserva ficam, para a recepção avisar os clientes).</summary>
+    void FecharDia(DateTime dia) => Seguro.Rodar(this, async () =>
+    {
+        var lista = (await Api.Lista($"/api/office/baterias?status=todas&filtro=dia&data={Fmt.Iso(dia)}")).Where(b => b.S("status") != "cancelada").ToList();
+        if (lista.Count == 0) { Msg.Info(this, $"{dia:dd/MM/yyyy} já não tem baterias."); return; }
+        var comReserva = lista.Count(b => b.I("inscritos") + b.I("preReservas") > 0);
+        var texto = $"Fechar {dia.ToString("dddd, dd/MM/yyyy", Fmt.Br)}?\n\n{lista.Count - comReserva} de {lista.Count} baterias serão canceladas (as que não têm ninguém inscrito)."
+            + (comReserva > 0 ? $"\n\n{comReserva} {(comReserva == 1 ? "bateria tem reserva e continua" : "baterias têm reserva e continuam")}: avise os clientes e mova-os antes de cancelar." : "")
+            + "\n\nPara não gerar de novo nesse dia, cadastre-o em Cadastros › Feriados.";
+        if (!Msg.Pergunta(this, texto)) return;
+        var r = await Api.Post("/api/office/baterias/fechar-dia", new { data = Fmt.Iso(dia) });
+        Msg.Info(this, $"{r.I("canceladas")} baterias canceladas." + (r.I("mantidas") > 0 ? $" {r.I("mantidas")} com reserva continuam." : ""));
+        Recarregar();
+    });
 }
 
 /// <summary>‹ Hoje › (segmentado cinza, "Hoje" branco).</summary>
@@ -583,6 +610,7 @@ class CalendarioMes : Control
     Dictionary<DateTime, JsonObject> _resumo = [];
     Func<DateTime, bool> _feriado = _ => false;
     public event Action<DateTime> Escolheu;
+    public event Action<DateTime, Point> MenuDia;
     DateTime _inicio;
     int Semanas => (int)Math.Ceiling(((int)_mes.DayOfWeek + DateTime.DaysInMonth(_mes.Year, _mes.Month)) / 7.0);
 
@@ -609,7 +637,13 @@ class CalendarioMes : Control
     protected override void OnMouseClick(MouseEventArgs e)
     {
         base.OnMouseClick(e);
-        for (var i = 0; i < Math.Max(5, Semanas) * 7; i++) if (Celula(i).Contains(e.Location)) { Escolheu?.Invoke(_inicio.AddDays(i)); return; }
+        for (var i = 0; i < Math.Max(5, Semanas) * 7; i++)
+            if (Celula(i).Contains(e.Location))
+            {
+                if (e.Button == MouseButtons.Right) MenuDia?.Invoke(_inicio.AddDays(i), e.Location);
+                else Escolheu?.Invoke(_inicio.AddDays(i));
+                return;
+            }
     }
 
     protected override void OnPaint(PaintEventArgs e)
@@ -617,6 +651,8 @@ class CalendarioMes : Control
         var g = e.Graphics; g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; g.Clear(BackColor);
         if (_mes == default) return;
         using var fNum = new Font("Segoe UI", 9.8F, FontStyle.Bold); using var fTag = new Font("Segoe UI Semibold", 8.3F); using var fTxt = new Font("Segoe UI", 9F);
+        // mês sem nenhuma bateria = agenda ainda não aberta (ex.: o ano seguinte em outubro), não "Fechado" em todos os dias
+        var mesVazio = _mes >= new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1) && !_resumo.Any(x => x.Key.Month == _mes.Month && x.Key.Year == _mes.Year && x.Value.I("baterias") > 0);
         for (var i = 0; i < Math.Max(5, Semanas) * 7; i++)
         {
             var d = _inicio.AddDays(i); var r = Celula(i);
@@ -642,14 +678,29 @@ class CalendarioMes : Control
             var corNum = !doMes ? Color.FromArgb(174, 174, 178) : hoje ? Color.White : d < DateTime.Today || fechado ? Tokens.TextoTerciario : PecasDesign.CorTexto;
             TextRenderer.DrawText(g, d.Day.ToString(), fNum, Rectangle.Round(num), corNum, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             if (!doMes) continue;
-            var tag = feriado ? "Feriado" : fechado ? "Fechado" : "";
+            var tag = feriado ? "Feriado" : fechado && !mesVazio ? "Fechado" : "";
             if (tag.Length > 0) TextRenderer.DrawText(g, tag, fTag, Rectangle.Round(new RectangleF(r.X, r.Y + 8, r.Width - 9, 26)), feriado ? Tokens.Vermelho : Tokens.TextoTerciario, TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
             if (bat == 0) continue;
-            TextRenderer.DrawText(g, $"{bat} {(bat == 1 ? "bateria" : "baterias")} · {pil} pilotos", fTxt, Rectangle.Round(new RectangleF(r.X + 9, r.Y + 40, r.Width - 14, 34)), Tokens.Grafite, TextFormatFlags.Left | TextFormatFlags.WordBreak);
+            // "17 baterias · 0" + "pilotos" quebrava no meio: se não couber numa linha, pilotos vai inteiro para a de baixo
+            var resumo = $"{bat} {(bat == 1 ? "bateria" : "baterias")} · {pil} {(pil == 1 ? "piloto" : "pilotos")}";
+            if (TextRenderer.MeasureText(resumo, fTxt).Width > r.Width - 14) resumo = resumo.Replace(" · ", "\n");
+            TextRenderer.DrawText(g, resumo, fTxt, Rectangle.Round(new RectangleF(r.X + 9, r.Y + 40, r.Width - 14, 34)), Tokens.Grafite, TextFormatFlags.Left | TextFormatFlags.WordBreak);
             var pct = vagas > 0 ? Math.Min(1f, pil / (float)vagas) : 0;
             var barra = new RectangleF(r.X + 9, Math.Min(r.Bottom - 12, r.Y + 76), r.Width - 18, 5);
             using (var fundo = Forma.Redondo(barra, 3)) using (var bf = new SolidBrush(Tokens.Linha)) g.FillPath(bf, fundo);
             if (pct > 0) { using var cheio = Forma.Redondo(new RectangleF(barra.X, barra.Y, Math.Max(6, barra.Width * pct), barra.Height), 3); using var bc = new SolidBrush(pct > 0.8f ? Tokens.LaranjaVivo : Tokens.VerdeStatus); g.FillPath(bc, cheio); }
+        }
+        if (mesVazio)
+        {
+            using var fT = new Font("Segoe UI", 12.5F, FontStyle.Bold); using var fS = new Font("Segoe UI", 9.8F);
+            var titulo = $"A agenda de {_mes.ToString("MMMM 'de' yyyy", Fmt.Br)} ainda não foi aberta";
+            const string sub = "Gere as baterias em “+ Criar reservas” (pode escolher vários meses de uma vez).";
+            var w = Math.Max(TextRenderer.MeasureText(titulo, fT).Width, TextRenderer.MeasureText(sub, fS).Width) + 56;
+            var caixa = new RectangleF((Width - w) / 2f, Height / 2f - 46, w, 92);
+            using (var sombra = Forma.Redondo(new RectangleF(caixa.X + 2, caixa.Y + 6, caixa.Width - 4, caixa.Height), 14)) using (var bs = new SolidBrush(Color.FromArgb(28, 0, 0, 0))) g.FillPath(bs, sombra);
+            using (var p = Forma.Redondo(caixa, 14)) { g.FillPath(Brushes.White, p); using var borda = new Pen(Color.FromArgb(232, 232, 234)); g.DrawPath(borda, p); }
+            TextRenderer.DrawText(g, titulo, fT, Rectangle.Round(new RectangleF(caixa.X, caixa.Y + 18, caixa.Width, 28)), PecasDesign.CorTexto, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            TextRenderer.DrawText(g, sub, fS, Rectangle.Round(new RectangleF(caixa.X, caixa.Y + 50, caixa.Width, 24)), PecasDesign.Cinza, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
         }
     }
 }

@@ -20,7 +20,7 @@ public static class CadastrosDesign
         FonteReg Cad(string e) => FonteReg.Rest(api, $"/api/office/cad/{e}");
         RegistroDesign f = ent switch
         {
-            "feriados" => new("Registro de feriado", "Feriados são pulados ao gerar as reservas do mês",
+            "feriados" => new("Registro de feriado", "Dias fechados: são pulados ao gerar as baterias em Criar reservas",
                 "M7 3v3M17 3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z", "linear-gradient(180deg, #C08BFF, #8645D6)",
                 [new("data", "Data", 2, "date"), new("descricao", "Descrição", 3), new("recorrente", "Repete todo ano", 1, "bool")],
                 [new("Data", 140, r => Fmt.Dmy(r.S("data"))), new("Descrição", 0, r => r.S("descricao")), new("Repete", 90, r => SimNao(r, "recorrente"), 'C')],
@@ -50,7 +50,7 @@ public static class CadastrosDesign
                 [new("Código", 90, r => r.S("codigo")), new("Nome", 0, r => r.S("nome")), new("A cada (h)", 120, r => r.S("tempoHoras"), 'D'), Ativo],
                 Cad("itensManutencao")) { Nome = "item" },
 
-            "padroes" => new("Configuração de reservas (padrões)", "Modelos usados em \"Criar reservas\" para gerar as baterias do mês",
+            "padroes" => new("Configuração de reservas (padrões)", "Modelos usados em \"Criar reservas\" para gerar as baterias de um ou vários meses",
                 "M5 21V4M5 4h12l-2 4 2 4H5", "linear-gradient(180deg, #FF7A6B, #E0342A)",
                 [new("nome", "Nome", 2), new("produtoId", "Produto (padrão)", 2, "lista", Itens: () => Sessao.Lista("produtos").Select(p => new Campos.Item(p.L("id") ?? 0, p.S("nome"), p))),
                  new("tracadoId", "Traçado", 1, "lista", Itens: () => Sessao.Tracados()), new("categoria", "Categoria", 1, "select", Categorias),

@@ -29,7 +29,14 @@ public static class Msg
     /// <summary>Só para autoteste: quando definido, as mensagens são registradas em vez de abrir caixa modal.</summary>
     public static Action<string> Registro;
     /// <summary>No autoteste toda confirmação responde "Não" (nada é gravado) e fica registrada.</summary>
-    static bool Nao(string texto) { Registro("PERGUNTA (respondido Não): " + texto); return false; }
+    static bool Nao(string texto)
+    {
+        var sim = Responder?.Invoke(texto) == true;
+        Registro($"PERGUNTA (respondido {(sim ? "Sim" : "Não")}): " + texto);
+        return sim;
+    }
+    /// <summary>Só para roteiros do autoteste que gravam de propósito: decide a resposta de cada confirmação.</summary>
+    public static Func<string, bool> Responder;
     public static void Info(IWin32Window dono, string texto, string titulo = App) { if (Registro != null) { Registro("INFO: " + texto); return; } MessageBox.Show(dono, texto, titulo, MessageBoxButtons.OK, MessageBoxIcon.Information); }
     public static void Aviso(IWin32Window dono, string texto, string titulo = "Atenção!") { if (Registro != null) { Registro("AVISO: " + texto); return; } MessageBox.Show(dono, texto, titulo, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
     public static void Erro(IWin32Window dono, string texto, string titulo = "Atenção!") { if (Registro != null) { Registro("ERRO: " + texto); return; } MessageBox.Show(dono, texto, titulo, MessageBoxButtons.OK, MessageBoxIcon.Error); }
