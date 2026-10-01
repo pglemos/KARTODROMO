@@ -22,8 +22,8 @@ public static class CadastrosDesign
         {
             "feriados" => new("Registro de feriado", "Os padrões normais pulam esses dias; marque \"Abre\" para gerar o Horário de Feriado",
                 "M7 3v3M17 3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z", "linear-gradient(180deg, #C08BFF, #8645D6)",
-                [new("data", "Data", 2, "date"), new("descricao", "Descrição", 2), new("recorrente", "Repete todo ano", 1, "bool"), new("abre", "Abre (horário de feriado)", 1, "bool")],
-                [new("Data", 140, r => Fmt.Dmy(r.S("data"))), new("Descrição", 0, r => r.S("descricao")), new("Repete", 90, r => SimNao(r, "recorrente"), 'C'), new("Kartódromo", 190, r => r.B("abre") ? "Abre · horário de feriado" : "Fechado")],
+                [new("data", "Data", 1, "date"), new("descricao", "Descrição", 2), new("recorrente", "Repete todo ano", 1, "bool"), new("abre", "Abre (horário de feriado)", 2, "bool")],
+                [new("Data", 140, r => r.B("recorrente") && r.S("data").Length >= 10 ? $"{r.S("data")[8..10]}/{r.S("data")[5..7]} · todo ano" : Fmt.Dmy(r.S("data"))), new("Descrição", 0, r => r.S("descricao")), new("Repete", 90, r => SimNao(r, "recorrente"), 'C'), new("Kartódromo", 190, r => r.B("abre") ? "Abre · horário de feriado" : "Fechado")],
                 Cad("feriados")) { Nome = "feriado", Padrao = () => new JsonObject { ["data"] = Fmt.Iso(DateTime.Today), ["recorrente"] = true } },
 
             "turnos" => new("Registro de turno", "Turnos de trabalho do caixa",
