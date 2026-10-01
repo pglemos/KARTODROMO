@@ -640,6 +640,8 @@ public class FormPrincipal : Form
         TreeNode N(string texto, string img, string chave, params TreeNode[] filhos) => new(texto, filhos) { ImageKey = img, SelectedImageKey = img, Tag = chave };
         _arvore.Nodes.AddRange([
             N("Reservas", "g-reservas", "reservas:todas", N("Aprovar", "y", "reservas:aprovar"), N("Aprovadas", "g", "reservas:aprovadas"), N("Pagamento pendente", "y", "reservas:pendentes"), N("Canceladas", "r", "reservas:canceladas"), N("Todas", "b", "reservas:todas")),
+            // pedidos do site (reservas.kartodromodebetim.com.br, Pix/cartão pela Asaas)
+            N("Reservas online", "g-reservas", "online:todas", N("Pagas", "g", "online:pagas"), N("Precisa de atenção", "y", "online:atencao"), N("Todas", "b", "online:todas")),
             N("Baterias", "g-baterias", "baterias:todas", N("Abertas", "g", "baterias:abertas"), N("Fechadas", "r", "baterias:fechadas"), N("Todas", "b", "baterias:todas")),
             N("Financeiro · Vendas", "g-vendas", "vendas:todas", N("Liquidadas", "g", "vendas:liquidadas"), N("Canceladas", "r", "vendas:canceladas"), N("Todas", "b", "vendas:todas")),
             N("Oficina · Manutenções", "g-oficina", "oficina:todas", N("A realizar", "y", "oficina:arealizar"), N("Realizadas", "g", "oficina:realizadas"), N("Todas", "b", "oficina:todas")),
@@ -707,7 +709,7 @@ public class FormPrincipal : Form
         var p = chave.Split(':');
         _grupo = p[0]; _status = p[1];
         AtualizarTitulo();
-        _filtroBar.Visible = _grupo is "reservas" or "baterias" or "vendas" || _grupo == "fidelidade" && _status == "transacoes" || _grupo == "vouchers" && _status == "uso" || _grupo == "parceiros" && _status != "lista";
+        _filtroBar.Visible = _grupo is "reservas" or "baterias" or "vendas" || _grupo == "fidelidade" && _status == "transacoes" || _grupo == "vouchers" && _status == "uso" || _grupo == "parceiros" && _status != "lista" || _grupo == "online" && _status != "atencao";
         Recarregar();
     }
 
@@ -722,6 +724,7 @@ public class FormPrincipal : Form
             "fidelidade" => _status == "contas" ? "Fidelidade · Contas" : "Fidelidade · Transações",
             "vouchers" => _status == "uso" ? "Vouchers · Histórico de uso" : "Vouchers",
             "parceiros" => _status == "comissoes" ? "Parceiros · Histórico de comissões" : _status == "pagas" ? "Parceiros · Comissões pagas" : "Parceiros",
+            "online" => _status == "pagas" ? "Reservas online · Pagas" : _status == "atencao" ? "Reservas online · Precisa de atenção" : "Reservas online",
             _ => "Recepção"
         };
         _titulo.Text = titulo;
@@ -732,6 +735,7 @@ public class FormPrincipal : Form
             "fidelidade" => "Programa de fidelidade · dados fornecidos pelo servidor da operação",
             "vouchers" => "Descontos por código · fidelidade, parceiros e vouchers manuais",
             "parceiros" => "Empresas que indicam clientes e recebem comissão",
+            "online" => _status == "atencao" ? "Pagaram depois dos 15 minutos e o horário lotou: devolva o valor ou remarque e marque como resolvido" : "Pedidos do site reservas.kartodromodebetim.com.br (Pix ou cartão) · " + (_periodo == "todas" ? "todas as datas" : _data.Value.ToString("d 'de' MMMM", Fmt.Br)),
             _ => "Módulo Office"
         };
         _acaoTopo.Text = _grupo switch { "reservas" or "baterias" => "+ Criar reservas", "vendas" => "Receita avulsa", "oficina" => "Itens de manutenção", "vouchers" => "+ Criar voucher", "parceiros" => "+ Novo parceiro", "fidelidade" => _status == "contas" ? "+ Abrir conta" : "+ Voucher com pontos", _ => "" };
@@ -825,7 +829,7 @@ public class FormPrincipal : Form
         List<JsonObject> rows = [];
         _grade.CorLinha = null;
         _grade.MenuDe = null;
-        var usaPeriodo = _grupo is "reservas" or "baterias" or "vendas" || (_grupo == "fidelidade" && _status != "contas") || (_grupo == "parceiros" && _status != "lista");
+        var usaPeriodo = _grupo is "reservas" or "baterias" or "vendas" || (_grupo == "fidelidade" && _status != "contas") || (_grupo == "parceiros" && _status != "lista") || (_grupo == "online" && _status != "atencao");
         _grade.Vazio = (_grupo, _status) switch
         {
             ("vouchers", "uso") => "Nenhum voucher foi usado ainda.",
@@ -833,6 +837,7 @@ public class FormPrincipal : Form
             ("parceiros", "lista") => "Nenhum parceiro cadastrado. Use “+ Novo parceiro”.",
             ("fidelidade", "contas") => "Nenhuma conta de fidelidade. Use “+ Abrir conta”.",
             ("oficina", _) => "Nenhuma manutenção nesta lista.",
+            ("online", "atencao") => "Nenhum pedido precisa de atenção.",
             _ when usaPeriodo && _periodo == "dia" => $"Nenhum registro em {_data.Value:dd/MM/yyyy}.\nPara ver outros dias, use “Neste mês” ou “Todas” em Exibir dados.",
             _ when usaPeriodo && _periodo == "mes" => $"Nenhum registro em {_data.Value:MM/yyyy}.",
             _ => "Nenhum registro.",
@@ -937,6 +942,25 @@ public class FormPrincipal : Form
                     new ToolStripSeparator(), Exportar("fidelidade")]
                     : [Item("Ver todas as transações", () => Selecionar("fidelidade:transacoes")), new ToolStripSeparator(), Exportar("fidelidade-transacoes")];
                 break;
+            case "online":
+                _grade.Colunas([
+                    new("dataHora", "Pedido em", TipoCol.DataHora), new("codigo", "Código", Largura: 80), new("cliente", "Quem reservou", Largura: 210), new("telefone", "Telefone", Largura: 120),
+                    new("inicio", "Bateria", Largura: 150, Valor: r => r.D("inicio") is DateTime i ? $"{i:dd/MM HH:mm} · {r.S("bateria")}" : r.S("bateria")),
+                    new("quantidade", "Pilotos", TipoCol.Inteiro, 60), new("valor", "Valor", TipoCol.Dinheiro, 90),
+                    new("forma", "Pagamento", Largura: 90, Valor: r => r.S("forma") == "pix" ? "Pix" : r.S("forma") == "cartao" ? "Cartão" : ""),
+                    new("status", "Situação", Largura: 200, Valor: r => SituacaoOnline(r.S("status"))), new("pilotos", "Pilotos informados")]);
+                _grade.CorLinha = r => r.S("status") switch { "pago_sem_vaga" => Tokens.Vermelho, "expirado" => Color.Silver, "aguardando" => Tokens.Laranja, _ => null };
+                _menuAtual = sel => [
+                    Item("Ver as reservas desta bateria", () => Selecionar("reservas:todas", new JsonObject { ["id"] = sel[0].L("bateriaId"), ["nome"] = sel[0].S("bateria"), ["dataHora"] = sel[0].S("inicio") }), sel.Count == 1),
+                    Item("Marcar como resolvido (valor devolvido ou remarcado)", () => Seguro.Rodar(this, async () =>
+                    {
+                        if (!Msg.Pergunta(this, $"Marcar o pedido {sel[0].S("codigo")} de {sel[0].S("cliente")} como resolvido?\n\nUse depois de devolver o valor pela Asaas ou remarcar o cliente.")) return;
+                        await Sessao.Api.Post($"/api/office/reservas-online/{sel[0].S("id")}/resolver", new { });
+                        Recarregar();
+                    }), sel.Count == 1 && sel[0].S("status") == "pago_sem_vaga"),
+                    new ToolStripSeparator(), Exportar("reservas-online")];
+                rows = await Sessao.Api.Lista($"/api/office/reservas-online?status={_status}" + (_status == "atencao" ? "" : "&" + Periodo()));
+                break;
             case "parceiros":
                 if (_status == "lista")
                 {
@@ -995,6 +1019,14 @@ public class FormPrincipal : Form
             SetarContagem("baterias:todas", all.Count);
         }
         {
+            // reservas online: "Precisa de atenção" sempre visível (pago sem vaga não pode passar batido)
+            var atencao = await Sessao.Api.Lista("/api/office/reservas-online?status=atencao");
+            SetarContagem("online:atencao", atencao.Count);
+            var online = await Sessao.Api.Lista("/api/office/reservas-online?status=todas&" + queryData);
+            SetarContagem("online:pagas", online.Count(r => r.S("status") is "pago" or "resolvido"));
+            SetarContagem("online:todas", online.Count);
+        }
+        {
             var man = await Sessao.Api.Lista("/api/office/manutencoes?status=todas");
             SetarContagem("oficina:arealizar", man.Count(PrecisaManutencao));
             SetarContagem("oficina:realizadas", man.Count(r => r.B("realizada")));
@@ -1021,6 +1053,16 @@ public class FormPrincipal : Form
             SetarContagem("vouchers:uso", all.Count);
         }
     }
+
+    static string SituacaoOnline(string s) => s switch
+    {
+        "aguardando" => "Aguardando pagamento (15 min)",
+        "pago" => "Pago",
+        "expirado" => "Não pagou (vaga liberada)",
+        "pago_sem_vaga" => "PAGO SEM VAGA: devolver ou remarcar",
+        "resolvido" => "Pago · resolvido pela recepção",
+        _ => s,
+    };
 
     /// <summary>Vermelho só quando há algo a ver: "R$ 0,00" em vermelho parecia problema.</summary>
     static Color? Alerta(long valor) => valor > 0 ? Tokens.Vermelho : null;
@@ -1076,6 +1118,11 @@ public class FormPrincipal : Form
                 ("Pontos em aberto", rows.Sum(r => r.L("saldo") ?? 0).ToString("N0", Fmt.Br), Tokens.Laranja), ("Baterias pagas", rows.Sum(r => r.I("baterias")).ToString(), null)],
             "fidelidade" => [("Transações", rows.Count.ToString(), null), ("Pontos creditados", rows.Where(r => (r.L("pontos") ?? 0) > 0).Sum(r => r.L("pontos") ?? 0).ToString("N0", Fmt.Br), Tokens.VerdeTexto),
                 ("Pontos debitados", (-rows.Where(r => (r.L("pontos") ?? 0) < 0).Sum(r => r.L("pontos") ?? 0)).ToString("N0", Fmt.Br), Alerta(-rows.Where(r => (r.L("pontos") ?? 0) < 0).Sum(r => r.L("pontos") ?? 0))), ("Contas", rows.Select(r => r.S("conta")).Distinct().Count().ToString(), null)],
+            "online" => [
+                ("Pedidos", rows.Count.ToString(), null),
+                ("Pilotos pagos", rows.Where(r => r.S("status") is "pago" or "resolvido").Sum(r => r.I("quantidade")).ToString(), Tokens.VerdeTexto),
+                ("Recebido online", Fmt.Brl(rows.Where(r => r.S("status") is "pago" or "resolvido").Sum(r => r.L("valor") ?? 0)), Tokens.VerdeTexto),
+                ("Precisa de atenção", rows.Count(r => r.S("status") == "pago_sem_vaga").ToString(), Alerta(rows.Count(r => r.S("status") == "pago_sem_vaga")))],
             "parceiros" when _status == "lista" => [("Parceiros", rows.Count(r => r.B("ativo")).ToString(), null), ("Vendas indicadas", rows.Sum(r => r.I("vendasIndicadas")).ToString(), null),
                 ("Comissão a pagar", Fmt.Brl(rows.Sum(r => r.L("comissaoPendenteCentavos") ?? 0)), Tokens.Laranja), ("Comissão paga", Fmt.Brl(rows.Sum(r => r.L("comissaoPagaCentavos") ?? 0)), Tokens.VerdeTexto)],
             "parceiros" => [("Comissões", rows.Count.ToString(), null), ("Vendas indicadas", Fmt.Brl(rows.Sum(r => r.L("valorVendaCentavos") ?? 0)), null),
@@ -1101,6 +1148,7 @@ public class FormPrincipal : Form
             "vendas" => $"Total final: {Fmt.Brl(v.Where(r => !r.B("cancelada")).Sum(r => r.L("final") ?? 0))}",
             "fidelidade" => _filtroContaFidelidade != null ? $"Conta: {_filtroContaFidelidade.S("nome")} (use a árvore para ver todas)" : "",
             "parceiros" => _status == "lista" ? $"Ativos: {v.Count(r => r.B("ativo"))}" : $"Comissão no filtro: {Fmt.Brl(v.Sum(r => r.L("comissaoCentavos") ?? 0))}",
+            "online" => $"Pilotos pagos: {v.Where(r => r.S("status") is "pago" or "resolvido").Sum(r => r.I("quantidade"))} · Recebido: {Fmt.Brl(v.Where(r => r.S("status") is "pago" or "resolvido").Sum(r => r.L("valor") ?? 0))}",
             _ => "",
         };
         var bat = _filtroBateria != null ? $" · Bateria: {_filtroBateria.S("nome")} {Fmt.DmyHm(_filtroBateria.S("dataHora"))} (use a árvore para ver todas)" : "";

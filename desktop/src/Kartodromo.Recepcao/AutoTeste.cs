@@ -224,6 +224,7 @@ public static class AutoTeste
             ("fidelidade:contas", "16-fidelidade-contas"), ("fidelidade:transacoes", "17-fidelidade-transacoes"),
             ("vouchers:lista", "18-vouchers"), ("vouchers:uso", "19-vouchers-historico"),
             ("parceiros:lista", "20-parceiros"), ("parceiros:comissoes", "21-parceiros-comissoes"), ("parceiros:pagas", "22-parceiros-comissoes-pagas"),
+            ("online:todas", "22b-reservas-online"), ("online:atencao", "22c-reservas-online-atencao"),
         };
         foreach (var (chave, nome) in visoes)
         {

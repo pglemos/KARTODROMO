@@ -918,6 +918,37 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   }
 
   // ---------- listas da arvore
+  // reserva online (reservas.kartodromodebetim.com.br): pedidos do site, para a recepção acompanhar.
+  // "atencao" = pagou depois dos 15 min e o horário lotou: a recepção devolve o valor ou remarca e marca como resolvido.
+  if (path === '/reservas-online' && method === 'GET') {
+    const st = url.searchParams.get('status') || 'todas';
+    const where: string[] = [];
+    let p: Record<string, unknown> = {};
+    if (st === 'atencao') where.push("r.Status = 'pago_sem_vaga'");
+    else {
+      const per = periodo(url, 'r.CriadoEm');
+      where.push(per.where); p = per.p;
+      if (st === 'pagas') where.push("r.Status IN ('pago', 'resolvido')");
+    }
+    send(200, await query(
+      `SELECT r.Id id, r.Codigo codigo, CONVERT(varchar(19), r.CriadoEm, 126) dataHora, r.ClienteId clienteId, c.Nome cliente, c.Telefone telefone,
+              b.Id bateriaId, b.Nome bateria, CONVERT(varchar(19), b.Inicio, 126) inicio, r.Quantidade quantidade, r.ValorCentavos valor,
+              r.Forma forma, r.Status status, r.Pilotos pilotos, CONVERT(varchar(19), r.PagoEm, 126) pagoEm, r.AsaasPagamentoId asaas
+         FROM dbo.ReservaOnline r JOIN dbo.Cliente c ON c.Id = r.ClienteId JOIN dbo.Bateria b ON b.Id = r.BateriaId
+        WHERE ${where.join(' AND ')} ORDER BY r.CriadoEm DESC`,
+      p,
+    ));
+    return true;
+  }
+  if ((m = path.match(/^\/reservas-online\/(\d+)\/resolver$/)) && method === 'POST') {
+    const r = await one<{ Codigo: string }>(
+      `UPDATE dbo.ReservaOnline SET Status = 'resolvido' OUTPUT inserted.Codigo WHERE Id = @id AND Status = 'pago_sem_vaga'`,
+      { id: Number(m[1]) },
+    );
+    if (!r) throw new HttpError(409, 'Este pedido não está mais pendente.');
+    send(200, { ok: true });
+    return true;
+  }
   if (path === '/reservas' && method === 'GET') {
     const st = url.searchParams.get('status') || 'todas';
     const where = ["b.Status <> 'cancelada'"];
