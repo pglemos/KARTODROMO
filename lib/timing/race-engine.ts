@@ -83,6 +83,8 @@ export type Session = {
   programaId?: string | null;
   /** bateria da agenda da recepção de onde a prova foi criada (tablet do sorteio) */
   agendaId?: number | null;
+  /** clientes (ou nomes) da agenda já trazidos para esta bateria: quem o cronometrista tirou não volta sozinho */
+  agendaPuxados?: string[];
   /** minutos de pista de cada kart já enviados ao controle de manutenção da oficina (servidor da operação) */
   usoKartsEnviado?: boolean;
   /** e-mail do resultado para os pilotos (automático ao encerrar tomada de tempo/corrida, ou reenvio manual) */

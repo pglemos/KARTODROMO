@@ -268,6 +268,13 @@ function relargar(s: Session, now: number, autor: string) {
   setTb50Offset(0, 'relargada');
 }
 
+/** "19:55" da prova da agenda (ordem do dia); sem prova, a hora de criação. */
+function horaDaProva(s: Session) {
+  const p = s.proofId ? catalog.provas.find((x) => x.id === s.proofId) : undefined;
+  if (p?.startAt) return `${p.startAt}|${p.order}`;
+  return new Date(s.createdAt).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
+}
+
 function sortedSessions() {
   return [...sessions.values()].sort((a, b) => b.createdAt - a.createdAt);
 }
@@ -473,7 +480,8 @@ function stateView() {
   // (uma preparada esquecida de outro dia prendia o telao: em 30/09 o foco era o "Clube da Insonia" de 27/09)
   const focus =
     running ??
-    list.filter((s) => s.state === 'preparando' && s.createdAt >= inicioDoDia()).sort((a, b) => a.createdAt - b.createdAt)[0] ??
+    // ordem do horário da agenda (as baterias que a agenda cria sozinha não podem pular na frente da próxima)
+    list.filter((s) => s.state === 'preparando' && s.createdAt >= inicioDoDia()).sort((a, b) => horaDaProva(a).localeCompare(horaDaProva(b)) || a.createdAt - b.createdAt)[0] ??
     list.find((s) => s.state === 'encerrada') ??
     null;
   const lastQualifying = list.find((s) => s.state === 'encerrada' && s.type !== 'corrida');
@@ -795,7 +803,7 @@ setInterval(() => {
 // provas vêm do produto vendido (Tomada de tempo + Corrida...). As provas criadas aqui podem ser ajustadas pelo
 // cronometrista: a sincronização só cria o que falta, nunca sobrescreve.
 
-type BateriaAgenda = { id: number; nome?: string; inicio?: string; tipoKart?: string };
+type BateriaAgenda = { id: number; nome?: string; inicio?: string; tipoKart?: string; pagos?: number; inscritos?: number };
 type ProgramaAgenda = { ordem?: number; nome?: string; tipo?: string; finalizacao?: string; tempoMin?: number; voltasMax?: number; voltaMinimaSeg?: number };
 const programasAgenda = new Map<number, { em: number; provas: ProgramaAgenda[] }>();
 
@@ -882,7 +890,86 @@ async function sincronizarAgendaDoDia() {
     mudou = true;
   }
   if (mudou) { saveCatalog(); scheduleStateBroadcast(); log(`agenda de ${hoje} sincronizada: ${baterias.length} baterias no evento do dia`); }
+  // bateria da agenda com piloto pago vira bateria da cronometragem sozinha (sem depender do tablet do sorteio)
+  // e quem pagar depois entra na lista até a largada
+  let criou = false;
+  for (const b of baterias) {
+    try { if (await prepararBateriaDaAgenda(b)) criou = true; } catch (err) { log(`agenda ${b.id}: não consegui preparar a bateria (${(err as Error).message})`); }
+  }
+  if (criou) scheduleStateBroadcast();
+  return mudou || criou;
+}
+
+type InscritoAgenda = { nome?: string; kart?: string | null; clienteId?: unknown; pago?: boolean; aprovada?: boolean };
+
+/**
+ * Cria (se faltar) uma bateria da cronometragem para cada prova da bateria da agenda que tem piloto pago, já com os
+ * pilotos da recepção; nas que ainda não largaram, acrescenta quem pagou depois. Quem o cronometrista tirou da lista não
+ * volta (fica em agendaPuxados). Sem número de kart da recepção, herda os karts da outra prova da mesma bateria.
+ */
+async function prepararBateriaDaAgenda(b: BateriaAgenda): Promise<boolean> {
+  if (!(Number(b.pagos) > 0)) return false;
+  const provas = catalog.provas.filter((p) => p.agendaId === String(b.id)).sort((x, y) => x.order - y.order);
+  if (!provas.length) return false;
+  const daBateria = [...sessions.values()].filter((s) => s.state !== 'cancelada' && (s.agendaId === b.id || provas.some((p) => p.id === s.proofId)));
+  const abertas = daBateria.filter((s) => s.state === 'preparando');
+  const faltam = provas.filter((p) => !daBateria.some((s) => s.proofId === p.id));
+  // bateria que já passou há mais de 3 h não ganha prova nova
+  const inicio = b.inicio ? new Date(`${b.inicio}:00-03:00`).getTime() : NaN;
+  const antiga = Number.isFinite(inicio) && Date.now() - inicio > 3 * 3_600_000;
+  if (!abertas.length && (!faltam.length || antiga)) return false;
+  const grade = (await opsGet(`/api/crono/baterias/${b.id}/grid`)) as InscritoAgenda[];
+  const pagos = (Array.isArray(grade) ? grade : []).filter((g) => g.pago !== false && String(g.nome ?? '').trim());
+  if (!pagos.length) return false;
+  const grupo = catalog.groups.find((g) => g.id === provas[0].groupId);
+  const doGrid = (g: InscritoAgenda) => ({ kart: String(g.kart ?? '').trim(), name: String(g.nome ?? '').trim(), customerId: g.clienteId != null ? String(g.clienteId) : null, category: grupo?.categoryId ?? null });
+  const cfg = (timingSettings.timing as Record<string, unknown> | undefined) ?? {};
+  let mudou = false;
+  if (!antiga) for (const p of faltam) {
+    const s = createSession({
+      id: `${hojeBrasilia()}-${randomUUID().slice(0, 8)}`,
+      name: `${grupo?.name ?? b.nome ?? 'Bateria'} · ${p.name}`,
+      type: p.type, durationMin: p.durationMin, maxLaps: p.maxLaps,
+      minLapSec: p.minLapSec ?? Number(cfg.minimumLapSeconds ?? 5),
+      now: Date.now(), competitors: pagos.map(doGrid),
+      eventId: p.eventId, groupId: p.groupId, proofId: p.id, programaId: `agenda-${b.id}`,
+    });
+    s.agendaId = b.id;
+    const herdada = herdarCompetidores(s);
+    s.agendaPuxados = pagos.map((g) => (g.clienteId != null ? String(g.clienteId) : String(g.nome).trim().toLowerCase()));
+    // quem pagou e não estava na outra prova (de onde vieram os karts) entra também
+    if (herdada) acrescentarPilotos(s, pagos.map(doGrid));
+    sessions.set(s.id, s);
+    saveSession(s);
+    abertas.push(s);
+    log(`bateria criada sozinha pela agenda: ${s.name} com ${s.competitors.length} pilotos pagos${herdada ? ` (karts de ${herdada.name})` : ''}`);
+    mudou = true;
+  }
+  for (const s of abertas) {
+    if (s.state !== 'preparando') continue;
+    const puxados = new Set(s.agendaPuxados ?? s.competitors.map((c) => String(c.customerId ?? c.name.trim().toLowerCase())));
+    const novos = pagos.filter((g) => !puxados.has(g.clienteId != null ? String(g.clienteId) : String(g.nome).trim().toLowerCase()));
+    if (!s.agendaPuxados) { s.agendaPuxados = [...puxados]; mudou = true; saveSession(s); }
+    if (!novos.length) continue;
+    const entraram = acrescentarPilotos(s, novos.map(doGrid));
+    s.agendaPuxados = [...puxados, ...novos.map((g) => (g.clienteId != null ? String(g.clienteId) : String(g.nome).trim().toLowerCase()))];
+    saveSession(s);
+    if (entraram) log(`${s.name}: ${entraram} piloto(s) que pagaram depois entraram na lista`);
+    mudou = true;
+  }
   return mudou;
+}
+
+/** Acrescenta pilotos que ainda não estão na bateria (pelo cliente ou pelo nome), sem mexer em quem já está. */
+function acrescentarPilotos(s: Session, lista: { kart: string; name: string; customerId: string | null; category: string | null }[]) {
+  const ids = new Set(s.competitors.map((c) => String(c.customerId ?? '')).filter(Boolean));
+  const nomes = new Set(s.competitors.map((c) => c.name.trim().toLowerCase()));
+  const usados = new Set(s.competitors.map((c) => c.kart).filter(Boolean));
+  const novos = lista.filter((p) => (p.customerId ? !ids.has(p.customerId) : !nomes.has(p.name.toLowerCase())))
+    .map((p) => ({ ...p, kart: p.kart && !usados.has(p.kart) ? p.kart : '' }));
+  if (!novos.length) return 0;
+  setCompetitors(s, [...s.competitors.map((c) => ({ kart: c.kart, name: c.name, customerId: c.customerId ?? null, category: c.category ?? null, detalhes: c.detalhes })), ...novos]);
+  return novos.length;
 }
 setTimeout(() => void sincronizarAgendaDoDia(), 3_000);
 setInterval(() => void sincronizarAgendaDoDia(), 60_000);
