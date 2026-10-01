@@ -14,7 +14,7 @@
   }
   * { box-sizing: border-box; }
   body {
-    font-family: Arial, "Segoe UI", sans-serif;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     color: var(--text);
     background: #525659;
     margin: 0;
@@ -36,7 +36,7 @@
     color: #fff;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
   }
-  .tools label { font-size: 11px; font-weight: bold; color: #ccc; }
+  .tools label { font-size: 12px; font-weight: bold; color: #ccc; }
   .tools select {
     padding: 4px 8px;
     border-radius: 4px;
@@ -56,7 +56,7 @@
     background: #4a4d53;
     color: #fff;
     font: inherit;
-    font-size: 11.5px;
+    font-size: 12px;
     font-weight: bold;
     cursor: pointer;
     display: inline-flex;
@@ -66,7 +66,7 @@
   .tools button:hover { background: #5a5d65; }
   .tools button.primary { background: #0b7a53; border-color: #0b7a53; }
   .tools button.primary:hover { background: #085e40; }
-  .tools .right { margin-left: auto; font-size: 11px; color: #aaa; font-weight: bold; }
+  .tools .right { margin-left: auto; font-size: 12px; color: #aaa; font-weight: bold; }
 
   /* Folha física A4 do Relatório LapTime (simulação fiel em tela) */
   .sheet-page {
@@ -352,60 +352,427 @@
       margin: 6mm 8mm;
     }
   }
+
+  /* Refinamento visual Impeccable: tela operacional clara, papel reservado para impressão. */
+  :root {
+    --page-bg: #e8eee9;
+    --surface: #ffffff;
+    --surface-subtle: #f4f7f5;
+    --ink: #15201a;
+    --muted: #526057;
+    --line: #cbd5ce;
+    --line-strong: #78867d;
+    --accent: #087f48;
+    --accent-strong: #065d35;
+    --accent-soft: #e5f4eb;
+    --warning: #8a5200;
+    --warning-soft: #fff5d9;
+    --danger: #a62b24;
+    --danger-soft: #fff0ee;
+    --focus: #00a86b;
+  }
+
+  html { min-width: 320px; }
+  [hidden] { display: none !important; }
+  body {
+    background: var(--page-bg);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  button, select { font: inherit; }
+  button:focus-visible, select:focus-visible, summary:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .tools {
+    min-height: 58px;
+    padding: 10px clamp(16px, 3vw, 32px);
+    gap: 12px;
+    flex-wrap: wrap;
+    background: #070a08;
+    border-bottom: 1px solid #27352c;
+    box-shadow: 0 3px 14px rgba(8, 16, 11, 0.22);
+  }
+  .tool-context {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .tool-context label,
+  .tools label {
+    color: #d4ded7;
+    font-size: 12px;
+    font-weight: 750;
+    letter-spacing: 0.02em;
+  }
+  .tools select {
+    min-height: 38px;
+    min-width: min(360px, 42vw);
+    padding: 7px 34px 7px 11px;
+    border: 1px solid #526157;
+    border-radius: 8px;
+    color: #f3faf5;
+    background: #151d18;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .tools button {
+    min-height: 38px;
+    padding: 8px 13px;
+    border: 1px solid #526157;
+    border-radius: 8px;
+    color: #f6fbf7;
+    background: #1d2821;
+    font-size: 13px;
+    font-weight: 750;
+    transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
+  }
+  .tools button:hover { background: #29382e; border-color: #78917f; transform: translateY(-1px); }
+  .tools button.primary { background: var(--accent); border-color: var(--accent); }
+  .tools button.primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+  .tool-icon { width: 17px; height: 17px; flex: 0 0 17px; fill: currentColor; }
+  .tools .right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+    color: #b6c5bb;
+    font-size: 12px;
+    font-weight: 650;
+  }
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 5px 10px;
+    border: 1px solid #526157;
+    border-radius: 999px;
+    background: #151d18;
+    color: #dce8df;
+    white-space: nowrap;
+  }
+  .status-badge--closed { border-color: #3a8f5a; background: #10271a; color: #a8edbc; }
+  .status-badge--active { border-color: #a77a25; background: #2a2110; color: #ffe5a1; }
+  .status-badge--error { border-color: #a85a51; background: #321614; color: #ffc1bb; }
+
+  .sheet-page {
+    width: min(calc(100% - 32px), 1240px);
+    min-height: 0;
+    margin: 32px auto 48px;
+    padding: clamp(24px, 4vw, 48px);
+    border: 1px solid #d7e0d9;
+    border-radius: 3px;
+    background: var(--surface);
+    box-shadow: 0 12px 28px rgba(28, 47, 34, 0.14);
+  }
+  .sheet-page.portrait,
+  .sheet-page.landscape { width: min(calc(100% - 32px), 1240px); min-height: 0; }
+  .rep-header { margin-bottom: 22px; }
+  .rep-header-table { table-layout: fixed; }
+  .rep-logo-td { width: 180px; }
+  .rep-logo-wrap { min-height: 72px; display: flex; align-items: center; }
+  .rep-logo { max-width: 170px; max-height: 72px; }
+  .rep-logo-fallback {
+    display: inline-flex;
+    align-items: center;
+    min-height: 48px;
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--muted);
+    background: var(--surface-subtle);
+    font-size: 12px;
+    font-weight: 750;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .rep-titles-td { padding: 0 20px; }
+  .rep-title-1 {
+    margin: 0;
+    color: var(--ink);
+    font-size: clamp(20px, 2.2vw, 29px);
+    letter-spacing: -0.02em;
+    line-height: 1.08;
+  }
+  .rep-subtitle-1, .rep-subtitle-2 { margin-top: 6px; color: #26372c; font-size: 15px; }
+  .rep-subtitle-3 { margin-top: 5px; color: var(--muted); font-size: 13px; }
+  .classification-rule {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 12px;
+    color: var(--accent-strong);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-align: center;
+    text-transform: uppercase;
+  }
+  .classification-rule strong { font-size: 13px; }
+  .classification-rule span { color: var(--muted); font-weight: 650; letter-spacing: 0.02em; text-transform: none; }
+  .rep-divider-line { height: 2px; margin-top: 18px; margin-bottom: 9px; background: var(--accent); }
+  .rep-date-time {
+    margin-bottom: 0;
+    color: var(--muted);
+    font-size: 12px;
+    letter-spacing: 0.03em;
+  }
+
+  #reportContent { min-width: 0; overflow-x: auto; }
+  #reportContent > table.rdlc-table,
+  #reportContent > div > table.rdlc-table { min-width: 850px; }
+  table.rdlc-table {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--ink);
+    font-size: 12px;
+    overflow: hidden;
+  }
+  table.rdlc-table th,
+  table.rdlc-table td { padding: 8px 9px; border-color: var(--line); }
+  table.rdlc-table th {
+    background: #e8f0eb;
+    border-top-color: var(--line-strong);
+    border-bottom: 2px solid var(--line-strong);
+    color: #1d3024;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  table.rdlc-table tr:nth-child(even) td { background: #f7faf8; }
+  table.rdlc-table tr:hover td { background: #eef8f1; }
+  table.rdlc-table td.c-bold { color: #0b5e35; }
+  .result-secondary { color: var(--muted); font-weight: 550; }
+  .screen-secondary { color: var(--muted); }
+  .report-caption { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
+  .criterion-note { margin: 0 0 12px; color: var(--muted); font-size: 12px; }
+  .criterion-note strong { color: var(--ink); }
+  .report-loading,
+  .report-empty {
+    display: grid;
+    place-items: center;
+    min-height: 150px;
+    padding: 32px;
+    border: 1px dashed var(--line-strong);
+    border-radius: 10px;
+    color: var(--muted);
+    background: var(--surface-subtle);
+    text-align: center;
+  }
+  .report-alert {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 16px;
+    padding: 14px 16px;
+    border: 1px solid #d8b56b;
+    border-left: 4px solid var(--warning);
+    border-radius: 8px;
+    background: var(--warning-soft);
+    color: #5d3c00;
+  }
+  .report-alert--error { border-color: #e4a49e; border-left-color: var(--danger); background: var(--danger-soft); color: #651a15; }
+  .report-alert h2 { margin: 0 0 3px; color: inherit; font-size: 15px; }
+  .report-alert p { margin: 0; font-size: 13px; }
+  .retry-button {
+    flex: 0 0 auto;
+    min-height: 36px;
+    padding: 7px 12px;
+    border: 1px solid currentColor;
+    border-radius: 7px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 750;
+  }
+  .retry-button:hover { background: rgba(255, 255, 255, 0.55); }
+
+  .rdlc-notes-box { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line-strong); color: var(--muted); font-size: 12px; }
+  .rdlc-bestlap-note { margin-bottom: 12px; color: var(--ink); font-size: 13px; }
+  table.rdlc-legend { margin-top: 12px; font-size: 12px; }
+  table.rdlc-legend th { background: #e8f0eb; color: #1d3024; }
+  table.rdlc-legend td { color: var(--muted); white-space: normal; }
+  .legend-details {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface-subtle);
+  }
+  .legend-details summary { padding: 10px 12px; color: var(--ink); cursor: pointer; font-weight: 750; }
+  .legend-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px 14px; padding: 0 12px 12px; }
+  .legend-grid span { color: var(--muted); font-size: 12px; }
+  .legend-grid strong { color: var(--ink); }
+  .rep-footer { margin-top: 38px; }
+  .signatures-table { margin-bottom: 24px; }
+  .sign-line { margin-top: 24px; padding-top: 8px; border-color: var(--line-strong); color: var(--ink); font-size: 12px; }
+  .sign-org { color: var(--muted); font-size: 12px; }
+  .page-num-line { color: var(--muted); font-size: 12px; }
+
+  @media screen and (max-width: 900px) {
+    .tools .right { width: 100%; margin-left: 0; }
+    .tools select { min-width: min(100%, 360px); }
+    .sheet-page,
+    .sheet-page.portrait,
+    .sheet-page.landscape { width: calc(100% - 20px); margin-top: 20px; padding: 22px 18px; }
+    .rep-logo-td { width: 112px; }
+    .rep-logo { max-width: 102px; max-height: 54px; }
+    .rep-titles-td { padding: 0 10px; }
+    .rep-title-1 { font-size: 20px; }
+    .rep-subtitle-1, .rep-subtitle-2 { font-size: 13px; }
+    .rep-subtitle-3 { font-size: 12px; }
+  }
+  @media screen and (max-width: 760px) {
+    .tool-context { width: 100%; align-items: flex-start; flex-direction: column; gap: 5px; }
+    .tools select { width: 100%; }
+    .tools button { flex: 1 1 auto; justify-content: center; }
+    .classification-rule { align-items: center; flex-direction: column; gap: 2px; }
+    .rep-header-table, .rep-header-table tbody, .rep-header-table tr, .rep-header-table td { display: block; width: 100%; }
+    .rep-logo-td { min-height: 0; text-align: center !important; }
+    .rep-logo-wrap { justify-content: center; min-height: 0; margin-bottom: 14px; }
+    .rep-titles-td { padding: 0; }
+    .screen-secondary { display: none !important; }
+    #reportContent > table.rdlc-table { min-width: 0; width: 100%; }
+    #reportContent > table.rdlc-table .result-secondary { display: none; }
+    #reportContent > table.rdlc-table th,
+    #reportContent > table.rdlc-table td { padding: 8px 5px; }
+    table.rdlc-table { min-width: 650px; }
+    .report-alert { flex-direction: column; }
+    .retry-button { width: 100%; }
+  }
+
+  @page portrait { size: A4 portrait; margin: 8mm 10mm; }
+  @page landscape { size: A4 landscape; margin: 8mm 10mm; }
+  @page thermal { size: 72mm auto; margin: 0; }
+  @media print {
+    body { background: #fff !important; color: #000 !important; font-size: 8pt; }
+    .tools, .report-alert, #loadStatus { display: none !important; }
+    .sheet-page,
+    .sheet-page.portrait,
+    .sheet-page.landscape {
+      width: 100% !important;
+      min-height: auto !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+    }
+    .sheet-page.portrait { page: portrait; }
+    .sheet-page.landscape { page: landscape; }
+    .rep-header { margin-bottom: 3mm; }
+    .rep-logo { max-height: 16mm; }
+    .rep-title-1 { font-size: 11pt; }
+    .rep-subtitle-1, .rep-subtitle-2 { font-size: 9pt; }
+    .rep-subtitle-3 { font-size: 8.5pt; }
+    .classification-rule { font-size: 7pt; }
+    .rep-divider-line { margin-top: 1mm; margin-bottom: 0.5mm; }
+    .rep-date-time { font-size: 7pt; }
+    #reportContent { overflow: visible; }
+    table.rdlc-table { min-width: 0 !important; font-size: 7pt; line-height: 1.1; }
+    table.rdlc-table th, table.rdlc-table td { padding: 1px 2px; }
+    .screen-secondary { display: table-cell !important; }
+    .report-loading, .report-empty { min-height: 0; padding: 12px; }
+    .rdlc-notes-box { margin-top: 2mm; padding-top: 1mm; font-size: 7pt; }
+    .rdlc-bestlap-note, .criterion-note { margin-bottom: 1mm; font-size: 7.5pt; }
+    .legend-details { break-inside: avoid; }
+    .legend-details summary { padding: 3px 5px; font-size: 7.5pt; }
+    .legend-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px 6px; padding: 0 5px 4px; }
+    .legend-grid span { font-size: 6.5pt; line-height: 1.1; }
+    .rep-footer { margin-top: 4mm; break-inside: avoid; }
+    .signatures-table { margin-bottom: 2mm; }
+    .sign-line { margin-top: 4mm; padding-top: 1mm; font-size: 7.5pt; }
+    .sign-org, .page-num-line { font-size: 7pt; }
+    body.cupom .sheet-page { page: thermal; }
+  }
 </style>
 </head>
 <body>
 
-<div class="tools" id="toolsBar">
-  <label for="tipoSelect">Relatório:</label>
-  <select id="tipoSelect" onchange="mudarTipo(this.value)">
-    <option value="resultados_oficiais">Resultados oficiais</option>
-    <option value="sem_velocidade">Resultados oficiais (sem velocidade média)</option>
-    <option value="com_tempo_medio">Resultados oficiais (com tempo médio)</option>
-    <option value="ordem_chegada">Resultados oficiais (ordem de chegada)</option>
-    <option value="ordem_chegada_categoria">Resultados oficiais (ordem de chegada com categoria)</option>
-    <option value="passagens">Relatório de passagens</option>
-    <option value="volta_a_volta">Volta a volta (todos)</option>
-    <option value="mapa_voltas">Mapa de voltas (todos)</option>
-    <option value="mapa_prova">Mapa de prova</option>
-    <option value="grid_2col_esq">Grid de largada · 2 colunas (líder à esquerda)</option>
-    <option value="grid_2col_dir">Grid de largada · 2 colunas (líder à direita)</option>
-    <option value="grid_3col_esq">Grid de largada · 3 colunas (líder à esquerda)</option>
-    <option value="grid_3col_dir">Grid de largada · 3 colunas (líder à direita)</option>
-  </select>
+<div class="tools" id="toolsBar" role="toolbar" aria-label="Ações do relatório">
+  <div class="tool-context">
+    <label for="tipoSelect">Relatório</label>
+    <select id="tipoSelect" aria-label="Tipo de relatório" onchange="mudarTipo(this.value)">
+      <optgroup label="Classificação e chegada">
+        <option value="resultados_oficiais">Resultados oficiais</option>
+        <option value="sem_velocidade">Resultados oficiais · sem velocidade média</option>
+        <option value="com_tempo_medio">Resultados oficiais · com tempo médio</option>
+        <option value="ordem_chegada">Resultados oficiais · ordem de chegada</option>
+        <option value="ordem_chegada_categoria">Resultados oficiais · chegada por categoria</option>
+      </optgroup>
+      <optgroup label="Passagens e voltas">
+        <option value="passagens">Relatório de passagens</option>
+        <option value="volta_a_volta">Volta a volta · todos</option>
+        <option value="mapa_voltas">Mapa de voltas · todos</option>
+        <option value="mapa_prova">Mapa de prova</option>
+      </optgroup>
+      <optgroup label="Grid de largada">
+        <option value="grid_2col_esq">Grid · 2 colunas · líder à esquerda</option>
+        <option value="grid_2col_dir">Grid · 2 colunas · líder à direita</option>
+        <option value="grid_3col_esq">Grid · 3 colunas · líder à esquerda</option>
+        <option value="grid_3col_dir">Grid · 3 colunas · líder à direita</option>
+      </optgroup>
+    </select>
+  </div>
 
-  <button class="primary" onclick="window.print()">🖨 Imprimir A4</button>
-  <button onclick="imprimirCupom()">🧾 Imprimir cupom térmico</button>
+  <button type="button" class="primary" onclick="window.print()">
+    <svg class="tool-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M6 9V3h12v6h1a3 3 0 0 1 3 3v5h-4v4H6v-4H2v-5a3 3 0 0 1 3-3h1Zm2-4v4h8V5H8Zm8 14v-5H8v5h8Zm2-5h2v-2a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v2h2v-2h12v2Z"/></svg>
+    <span>Imprimir A4</span>
+  </button>
+  <button type="button" onclick="imprimirCupom()">
+    <svg class="tool-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 3h14a2 2 0 0 1 2 2v16l-3-2-3 2-3-2-3 2-3-2-3 2V5a2 2 0 0 1 2-2Zm0 3v11.26l1-.67 3 2 3-2 3 2 3-2 1 .67V6H5Zm2 2h10v2H7V8Zm0 4h10v2H7v-2Zm0 4h6v2H7v-2Z"/></svg>
+    <span>Cupom térmico</span>
+  </button>
 
   <div class="right">
-    <span id="sessionStatusBadge"></span>
+    <span id="sessionStatusBadge" class="status-badge" role="status" aria-live="polite">Carregando sessão…</span>
   </div>
 </div>
 
-<div class="sheet-page portrait" id="sheetContainer">
+<main class="sheet-page portrait" id="sheetContainer">
   <!-- Cabeçalho Oficial -->
   <div class="rep-header">
     <table class="rep-header-table">
       <tr>
         <td class="rep-logo-td">
-          <img src="/kib-logo.png" alt="Kartódromo Internacional de Betim" class="rep-logo" onerror="this.style.display='none'">
+          <div class="rep-logo-wrap" id="reportLogoWrap">
+            <img id="reportLogo" src="/kib-logo.png" alt="Kartódromo Internacional de Betim" class="rep-logo">
+          </div>
         </td>
         <td class="rep-titles-td">
-          <div class="rep-title-1" id="hdrTitle">KARTÓDROMO INTERNACIONAL DE BETIM</div>
+          <h1 class="rep-title-1" id="hdrTitle">KARTÓDROMO INTERNACIONAL DE BETIM</h1>
           <div class="rep-subtitle-1" id="hdrSub1">BATERIA</div>
           <div class="rep-subtitle-2" id="hdrSub2">TOMADA DE TEMPO</div>
           <div class="rep-subtitle-3" id="hdrSub3">TRAÇADO PRINCIPAL · 1.110 m</div>
+          <div class="classification-rule" id="classificationRule" aria-live="polite">
+            <strong>TOMADA DE TEMPO</strong><span>melhor volta</span>
+          </div>
         </td>
         <td class="rep-logo-td" style="text-align: right;"></td>
       </tr>
     </table>
     <div class="rep-divider-line"></div>
-    <div class="rep-date-time" id="hdrDateTime">DATA/HORA: --/--/---- --:--:--</div>
+    <div class="rep-date-time" id="hdrDateTime">Horário da sessão: aguardando dados</div>
   </div>
 
   <!-- Conteúdo do Relatório RDLC -->
-  <div id="reportContent">
-    <div style="text-align: center; padding: 40px; font-size: 9pt; color: #555;">Carregando dados da cronometragem...</div>
+  <div id="loadStatus" class="report-loading" role="status" aria-live="polite">Carregando dados da cronometragem…</div>
+  <div id="reportContent" aria-live="polite">
+    <div class="report-loading">O resultado será exibido aqui.</div>
   </div>
 
   <!-- Bloco de Melhor Volta e Legenda -->
@@ -427,9 +794,9 @@
         </td>
       </tr>
     </table>
-    <div class="page-num-line" id="pageNumLine">Página 1 de 1</div>
+    <div class="page-num-line" id="pageNumLine">Paginação automática na impressão</div>
   </div>
-</div>
+</main>
 
 <script>
 const params = new URLSearchParams(location.search);
@@ -485,6 +852,138 @@ const esc = (s) => cleanText(s).replace(/[&<>"]/g, c => ({
 let sessionData = null;
 let passingsData = [];
 let lapsData = [];
+const dataState = { session: 'loading', passings: 'loading', laps: 'loading' };
+const dataErrors = {};
+
+function getResultadoCriterio(sessionType) {
+  if (sessionType === 'corrida') return { label: 'CLASSIFICAÇÃO OFICIAL', detail: 'ordem de chegada' };
+  if (sessionType === 'classificacao') return { label: 'TOMADA DE TEMPO', detail: 'melhor volta' };
+  return { label: 'TREINO', detail: 'melhor volta' };
+}
+
+function calcularPaginasRelatorio(contentHeight, pageHeight) {
+  const height = Number(contentHeight);
+  const page = Number(pageHeight);
+  if (!Number.isFinite(height) || height <= 0 || !Number.isFinite(page) || page <= 0) return 1;
+  return Math.max(1, Math.ceil(height / page));
+}
+
+function obterUltimaFoto(row) {
+  const value = row?.lastPhoto ?? row?.lastPhotoNumber;
+  return Number.isFinite(Number(value)) ? Number(value) : null;
+}
+
+function formatarDataHora(value) {
+  const date = new Date(value);
+  if (!value || Number.isNaN(date.getTime())) return '---';
+  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'medium' }).format(date);
+}
+
+function normalizarColecao(payload, label) {
+  if (Array.isArray(payload)) return payload;
+  if (payload && Array.isArray(payload.value)) return payload.value;
+  throw new Error(`Resposta inválida para ${label}.`);
+}
+
+function erroTexto(error) {
+  return error instanceof Error ? error.message : String(error || 'erro desconhecido');
+}
+
+function setLoadStatus(message, state = 'loading') {
+  const status = document.getElementById('loadStatus');
+  if (!status) return;
+  status.textContent = message;
+  status.className = `report-loading report-loading--${state}`;
+  status.hidden = state === 'ready';
+}
+
+function setStatusBadge(text, state = 'active') {
+  const badge = document.getElementById('sessionStatusBadge');
+  if (!badge) return;
+  badge.textContent = text;
+  badge.className = `status-badge status-badge--${state}`;
+}
+
+function atualizarRegraVisual(sessionType = sessionData?.type) {
+  const rule = document.getElementById('classificationRule');
+  if (!rule) return;
+  const criterio = getResultadoCriterio(sessionType);
+  rule.innerHTML = `<strong>${esc(criterio.label)}</strong><span>${esc(criterio.detail)}</span>`;
+}
+
+function atualizarOrientacao(tipo) {
+  const sheet = document.getElementById('sheetContainer');
+  if (!sheet) return;
+  const landscape = ['mapa_voltas', 'mapa_prova'].includes(tipo);
+  sheet.className = `sheet-page ${landscape ? 'landscape' : 'portrait'}`;
+}
+
+function bindRetryButton() {
+  const button = document.getElementById('retryReportButton');
+  if (button) button.onclick = () => carregarTudo();
+}
+
+function renderReportLoadError(error) {
+  const content = document.getElementById('reportContent');
+  const notes = document.getElementById('notesContainer');
+  if (!content) return;
+  if (notes) notes.innerHTML = '';
+  content.innerHTML = `<section class="report-alert report-alert--error" role="alert">
+    <div><h2>Não foi possível carregar o relatório</h2><p>${esc(erroTexto(error))}</p></div>
+    <button type="button" class="retry-button" id="retryReportButton">Tentar novamente</button>
+  </section>`;
+  bindRetryButton();
+}
+
+function renderDataWarnings() {
+  const content = document.getElementById('reportContent');
+  if (!content) return;
+  content.querySelector('#dataWarnings')?.remove();
+  const sourceLabels = { passings: 'Passagens', laps: 'Voltas', session: 'Sessão' };
+  const failures = Object.entries(dataErrors)
+    .filter(([, message]) => message)
+    .map(([source, message]) => `${sourceLabels[source] || source}: ${message}`);
+  if (!failures.length) return;
+
+  content.insertAdjacentHTML('afterbegin', `<div class="report-alert" id="dataWarnings" role="alert">
+    <div><h2>Dados técnicos indisponíveis</h2><p>${esc(failures.join(' '))} Os campos dependentes foram marcados como indisponíveis.</p></div>
+    <button type="button" class="retry-button" id="retryReportButton">Tentar novamente</button>
+  </div>`);
+  bindRetryButton();
+}
+
+function aprimorarTabelas() {
+  document.querySelectorAll('#reportContent table.rdlc-table').forEach((table, index) => {
+    table.querySelectorAll('thead th').forEach(th => th.setAttribute('scope', 'col'));
+    if (!table.querySelector('caption')) {
+      const caption = document.createElement('caption');
+      caption.className = 'sr-only';
+      caption.textContent = `Tabela de resultados ${index + 1}`;
+      table.prepend(caption);
+    }
+  });
+}
+
+function atualizarPaginacao(printMode = false) {
+  const sheet = document.getElementById('sheetContainer');
+  const line = document.getElementById('pageNumLine');
+  if (!sheet || !line) return;
+  if (!printMode) {
+    line.textContent = 'Paginação automática na impressão';
+    return;
+  }
+  const pageHeight = sheet.classList.contains('landscape') ? 730 : 1050;
+  const pages = calcularPaginasRelatorio(sheet.scrollHeight, pageHeight);
+  line.textContent = pages === 1
+    ? ['Página', 1, 'de', pages].join(' ')
+    : `Páginas 1–${pages} (estimadas)`;
+}
+
+function finalizarRenderReport() {
+  renderDataWarnings();
+  aprimorarTabelas();
+  atualizarPaginacao();
+}
 
 function mudarTipo(novoTipo) {
   currentTipo = novoTipo;
@@ -492,14 +991,8 @@ function mudarTipo(novoTipo) {
   newUrl.searchParams.set('tipo', novoTipo);
   history.replaceState(null, '', newUrl.toString());
 
-  // Ajusta orientação da folha (Paisagem para Mapa de Voltas e Mapa de Prova)
-  const sheet = document.getElementById('sheetContainer');
-  if (['mapa_voltas', 'mapa_prova'].includes(novoTipo)) {
-    sheet.className = 'sheet-page landscape';
-  } else {
-    sheet.className = 'sheet-page portrait';
-  }
-
+  atualizarOrientacao(novoTipo);
+  atualizarRegraVisual();
   renderReport();
 }
 
@@ -509,45 +1002,80 @@ function imprimirCupom() {
   document.body.classList.remove('cupom');
 }
 
+async function fetchJson(url, label) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`${label} indisponível (HTTP ${response.status}).`);
+  return response.json();
+}
+
 async function carregarTudo() {
+  setLoadStatus('Carregando sessão e dados da cronometragem…');
+  setStatusBadge('Carregando sessão…', 'active');
+  dataState.session = 'loading';
+  dataState.passings = 'loading';
+  dataState.laps = 'loading';
+  delete dataErrors.session;
+  delete dataErrors.passings;
+  delete dataErrors.laps;
+
   try {
-    const sRes = await fetch('/api/sessions/' + sessionId);
-    sessionData = await sRes.json();
+    const session = await fetchJson('/api/sessions/' + sessionId, 'Sessão');
+    if (!session || !Array.isArray(session.standings)) throw new Error('A sessão não trouxe a classificação oficial.');
+    sessionData = session;
+    dataState.session = 'ready';
 
-    try {
-      const pRes = await fetch(`/api/sessions/${sessionId}/passings`);
-      passingsData = await pRes.json();
-      if (passingsData && passingsData.value && Array.isArray(passingsData.value)) passingsData = passingsData.value;
-      if (!Array.isArray(passingsData)) passingsData = [];
-    } catch { passingsData = []; }
+    const auxiliary = await Promise.allSettled([
+      fetchJson(`/api/sessions/${sessionId}/passings`, 'Passagens'),
+      fetchJson(`/api/sessions/${sessionId}/laps`, 'Voltas')
+    ]);
+    const [passingsResult, lapsResult] = auxiliary;
 
-    try {
-      const lRes = await fetch(`/api/sessions/${sessionId}/laps`);
-      lapsData = await lRes.json();
-      if (lapsData && lapsData.value && Array.isArray(lapsData.value)) lapsData = lapsData.value;
-      if (!Array.isArray(lapsData)) lapsData = [];
-    } catch { lapsData = []; }
-
-    const now = new Date();
-    const dtStr = String(now.getDate()).padStart(2, '0') + '/' +
-                  String(now.getMonth() + 1).padStart(2, '0') + '/' +
-                  now.getFullYear() + ' ' +
-                  String(now.getHours()).padStart(2, '0') + ':' +
-                  String(now.getMinutes()).padStart(2, '0') + ':' +
-                  String(now.getSeconds()).padStart(2, '0');
-    document.getElementById('hdrDateTime').textContent = 'DATA/HORA: ' + dtStr;
+    if (passingsResult.status === 'fulfilled') {
+      try {
+        passingsData = normalizarColecao(passingsResult.value, 'passagens');
+        dataState.passings = 'ready';
+      } catch (error) {
+        passingsData = [];
+        dataState.passings = 'error';
+        dataErrors.passings = erroTexto(error);
+      }
+    } else {
+      passingsData = [];
+      dataState.passings = 'error';
+      dataErrors.passings = erroTexto(passingsResult.reason);
+    }
+    if (lapsResult.status === 'fulfilled') {
+      try {
+        lapsData = normalizarColecao(lapsResult.value, 'voltas');
+        dataState.laps = 'ready';
+      } catch (error) {
+        lapsData = [];
+        dataState.laps = 'error';
+        dataErrors.laps = erroTexto(error);
+      }
+    } else {
+      lapsData = [];
+      dataState.laps = 'error';
+      dataErrors.laps = erroTexto(lapsResult.reason);
+    }
 
     preencherCabecalho();
     mudarTipo(currentTipo);
-  } catch (err) {
-    document.getElementById('reportContent').innerHTML = `<div style="color: red; padding: 20px;">Falha ao carregar sessão: ${esc(err.message)}</div>`;
+    setLoadStatus('Dados atualizados.', 'ready');
+  } catch (error) {
+    sessionData = null;
+    dataState.session = 'error';
+    dataErrors.session = erroTexto(error);
+    setLoadStatus('Falha ao carregar a sessão.', 'error');
+    setStatusBadge('Falha ao carregar', 'error');
+    renderReportLoadError(error);
   }
 }
 
 function preencherCabecalho() {
   const v = sessionData;
   if (!v) return;
-  const TYPES = { treino: 'TREINO LIVRE', classificacao: 'TREINO CLASSIFICATÓRIO', corrida: 'CORRIDA' };
+  const TYPES = { treino: 'TREINO LIVRE', classificacao: 'TOMADA DE TEMPO', corrida: 'CORRIDA' };
 
   let evName = 'EVENTO OFICIAL';
   let grpName = 'BATERIA';
@@ -564,16 +1092,54 @@ function preencherCabecalho() {
     }
   }
 
-  if (v.startedAt) {
-    const d = new Date(v.startedAt);
-    evName = 'BATERIAS ' + String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+  if (v.startedAt || v.createdAt) {
+    const d = new Date(v.startedAt || v.createdAt);
+    evName = 'BATERIA ' + String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
   }
 
+  const criterio = getResultadoCriterio(v.type);
   document.getElementById('hdrTitle').textContent = evName;
   document.getElementById('hdrSub1').textContent = grpName;
   document.getElementById('hdrSub2').textContent = raceName;
   document.getElementById('hdrSub3').textContent = 'TRAÇADO PRINCIPAL · 1.110 m';
-  document.getElementById('sessionStatusBadge').textContent = `Estado: ${v.state?.toUpperCase() || ''} · ${v.standings?.length || 0} competidores`;
+  document.getElementById('hdrDateTime').textContent = `Início: ${formatarDataHora(v.startedAt)} · Encerramento: ${formatarDataHora(v.finishedAt || v.checkeredAt)}`;
+  atualizarRegraVisual(v.type);
+
+  const state = v.state === 'encerrada' ? 'closed' : v.state === 'em_andamento' ? 'active' : 'active';
+  setStatusBadge(`${v.state?.toUpperCase() || 'SEM ESTADO'} · ${v.standings?.length || 0} competidores`, state);
+  document.title = `${criterio.label} · ${grpName} · ${sessionId}`;
+}
+
+function ordenarResultadoOficial(rows, tipo, sessionType) {
+  const list = [...rows];
+  const corrida = sessionType === 'corrida';
+  const ordemChegada = tipo.includes('ordem_chegada');
+
+  if (corrida) {
+    // O motor já entregou a posição oficial da corrida (voltas + chegada na linha).
+    // O relatório não pode recalcular essa posição pela melhor volta nem pelo tempo total.
+    list.sort((a, b) => {
+      const posA = Number(a.position);
+      const posB = Number(b.position);
+      if (Number.isFinite(posA) && Number.isFinite(posB) && posA !== posB) return posA - posB;
+      if (b.laps !== a.laps) return b.laps - a.laps;
+      return (a.lastCrossingWallMs ?? Number.MAX_SAFE_INTEGER) - (b.lastCrossingWallMs ?? Number.MAX_SAFE_INTEGER);
+    });
+  } else if (ordemChegada) {
+    list.sort((a, b) => (b.laps - a.laps) || ((a.totalMs || 0) - (b.totalMs || 0)));
+  } else {
+    // Tomada de tempo/treino: a melhor volta é o critério oficial.
+    list.sort((a, b) => {
+      if (!a.bestLapTime) return 1;
+      if (!b.bestLapTime) return -1;
+      return a.bestLapTime - b.bestLapTime || ((a.bestLapTime2nd || 0) - (b.bestLapTime2nd || 0));
+    });
+  }
+
+  list.forEach((row, index) => {
+    row.pos = corrida && Number.isFinite(Number(row.position)) ? Number(row.position) : index + 1;
+  });
+  return list;
 }
 
 function renderReport() {
@@ -583,6 +1149,8 @@ function renderReport() {
   const content = document.getElementById('reportContent');
   const notes = document.getElementById('notesContainer');
   notes.innerHTML = '';
+
+  try {
 
   // Processa estatísticas estendidas com voltas (2ª melhor volta, etc.)
   const driverLapsMap = {};
@@ -607,7 +1175,8 @@ function renderReport() {
       bestLapTime2nd: best2 ? best2.lapMs : null,
       lastLapTime: s.lastLapMs || (kLaps.length > 0 ? kLaps[kLaps.length - 1].lapMs : null),
       avgLapTime: avgMs,
-      uf: s.startPos || s.position || '-',
+      // UF só pode exibir uma foto real fornecida pelo cronômetro; posição não é foto.
+      uf: obterUltimaFoto(s) ?? '---',
       status: s.racingStatus || 0
     };
   });
@@ -622,22 +1191,8 @@ function renderReport() {
 
   // 1 a 5: RELATÓRIOS OFICIAIS DE CLASSIFICAÇÃO
   if (['resultados_oficiais', 'sem_velocidade', 'com_tempo_medio', 'ordem_chegada', 'ordem_chegada_categoria'].includes(currentTipo)) {
-    let list = [...enriched];
-
     const isArrival = currentTipo.includes('ordem_chegada') || v.type === 'corrida';
-    if (currentTipo.includes('ordem_chegada')) {
-      // Ordem de chegada: Voltas decrescente, depois Tempo Total crescente
-      list.sort((a, b) => (b.laps - a.laps) || ((a.totalMs || 0) - (b.totalMs || 0)));
-      list.forEach((r, idx) => r.pos = idx + 1);
-    } else {
-      // Treino/Qualificação: Melhor volta crescente, depois 2ª melhor volta
-      list.sort((a, b) => {
-        if (!a.bestLapTime) return 1;
-        if (!b.bestLapTime) return -1;
-        return a.bestLapTime - b.bestLapTime || ((a.bestLapTime2nd || 0) - (b.bestLapTime2nd || 0));
-      });
-      list.forEach((r, idx) => r.pos = idx + 1);
-    }
+    const list = ordenarResultadoOficial(enriched, currentTipo, v.type);
 
     const leader = list[0];
 
@@ -680,11 +1235,11 @@ function renderReport() {
         <th style="width: 28px;">MV</th>
         <th class="c-right" style="width: 58px;">TMV</th>
         <th class="c-right" style="width: 55px;">DL</th>
-        <th class="c-right hide-cupom" style="width: 55px;">DA</th>
+        <th class="c-right hide-cupom screen-secondary" style="width: 55px;">DA</th>
         <th style="width: 28px;">TV</th>
-        <th class="c-right hide-cupom" style="width: 42px;">VM</th>
-        <th class="c-right hide-cupom" style="width: 58px;">TMED</th>
-        <th class="c-right hide-cupom" style="width: 65px;">TT</th>
+        <th class="c-right hide-cupom screen-secondary" style="width: 42px;">VM</th>
+        <th class="c-right hide-cupom screen-secondary" style="width: 58px;">TMED</th>
+        <th class="c-right hide-cupom screen-secondary" style="width: 65px;">TT</th>
       </tr></thead><tbody>`;
 
       list.forEach(r => {
@@ -699,11 +1254,11 @@ function renderReport() {
           <td class="c-right">${r.bestLap || '---'}</td>
           <td class="c-right ${isBest ? 'c-best' : ''}">${fmtMs(r.bestLapTime)}</td>
           <td class="c-right">${r.diffLeaderStr}</td>
-          <td class="c-right hide-cupom">${r.diffPrevStr}</td>
+          <td class="c-right hide-cupom screen-secondary">${r.diffPrevStr}</td>
           <td class="c-right">${r.laps || 0}</td>
-          <td class="c-right hide-cupom">${speed}</td>
-          <td class="c-right hide-cupom">${fmtMs(r.avgLapTime)}</td>
-          <td class="c-right hide-cupom">${fmtTotal(r.totalMs)}</td>
+          <td class="c-right hide-cupom screen-secondary">${speed}</td>
+          <td class="c-right hide-cupom screen-secondary">${fmtMs(r.avgLapTime)}</td>
+          <td class="c-right hide-cupom screen-secondary">${fmtTotal(r.totalMs)}</td>
         </tr>`;
       });
       html += `</tbody></table>`;
@@ -715,22 +1270,23 @@ function renderReport() {
         notesHtml += `<div class="rdlc-bestlap-note">Melhor volta: ${esc(melhorGeral.name)} (${fmtMs(melhorGeral.bestLapTime)})</div>`;
       }
       notesHtml += `
-        <table class="rdlc-legend">
-          <tr>
-            <th>Legenda:</th>
-            <td><strong>POS:</strong> Posição</td>
-            <td><strong>#:</strong> Nº Kart</td>
-            <td><strong>Nome:</strong> Nome Piloto</td>
-            <td><strong>MV:</strong> Melhor Volta</td>
-            <td><strong>TMV:</strong> Tempo Melhor Volta</td>
-            <td><strong>DL:</strong> Dif. Líder</td>
-            <td><strong>DA:</strong> Dif. Anterior</td>
-            <td><strong>TV:</strong> Total Voltas</td>
-            <td><strong>VM:</strong> Vel. Média (Km/h)</td>
-            <td><strong>TMED:</strong> Tempo Médio</td>
-            <td><strong>TT:</strong> Tempo Total</td>
-          </tr>
-        </table>
+        <div class="criterion-note"><strong>Critério:</strong> ${v.type === 'corrida' ? 'ordem de chegada; a melhor volta é apenas informativa.' : 'melhor volta; a posição é ordenada pelo menor tempo.'}</div>
+        <details class="legend-details" open>
+          <summary>Legenda do relatório</summary>
+          <div class="legend-grid">
+            <span><strong>POS</strong> Posição</span>
+            <span><strong>#</strong> Número do kart</span>
+            <span><strong>Nome</strong> Piloto</span>
+            <span><strong>MV</strong> Melhor volta</span>
+            <span><strong>TMV</strong> Tempo da melhor volta</span>
+            <span><strong>DL</strong> Diferença para o líder</span>
+            <span><strong>DA</strong> Diferença para o anterior</span>
+            <span><strong>TV</strong> Total de voltas</span>
+            <span><strong>VM</strong> Velocidade média (km/h)</span>
+            <span><strong>TMED</strong> Tempo médio</span>
+            <span><strong>TT</strong> Tempo total</span>
+          </div>
+        </details>
       </div>`;
       notes.innerHTML = notesHtml;
       return;
@@ -739,23 +1295,24 @@ function renderReport() {
     // Demais relatórios oficiais (Resultados oficiais, Sem velocidade, Ordem de chegada, Ordem com categoria)
     const showSpeed = currentTipo !== 'sem_velocidade';
     const showCatCol = currentTipo === 'ordem_chegada_categoria';
+    const resultSecondary = isArrival ? 'result-secondary' : '';
 
     html = `<table class="rdlc-table"><thead><tr>
       <th style="width: 28px;">POS</th>
       <th style="width: 28px;">#</th>
       <th class="c-left">Nome</th>
       ${showCatCol ? '<th class="c-left" style="width: 75px;">Categoria</th>' : ''}
-      <th style="width: 28px;">MV</th>
-      <th class="c-right" style="width: 58px;">TMV</th>
+      <th class="${resultSecondary}" style="width: 28px;">MV</th>
+      <th class="c-right ${resultSecondary}" style="width: 58px;">TMV</th>
       <th class="c-right hide-cupom" style="width: 65px;">TT</th>
       <th class="c-right" style="width: 55px;">DL</th>
-      <th class="c-right hide-cupom" style="width: 55px;">DA</th>
-      <th class="c-right hide-cupom" style="width: 58px;">TUV</th>
+      <th class="c-right hide-cupom screen-secondary" style="width: 55px;">DA</th>
+      <th class="c-right hide-cupom screen-secondary" style="width: 58px;">TUV</th>
       <th style="width: 28px;">TV</th>
-      ${showSpeed ? '<th class="c-right hide-cupom" style="width: 42px;">VM</th>' : ''}
-      <th class="hide-cupom" style="width: 28px;">MV 2</th>
-      <th class="c-right hide-cupom" style="width: 58px;">TMV 2</th>
-      <th class="hide-cupom" style="width: 28px;">UF</th>
+      ${showSpeed ? '<th class="c-right hide-cupom screen-secondary" style="width: 42px;">VM</th>' : ''}
+      <th class="hide-cupom screen-secondary" style="width: 28px;">MV 2</th>
+      <th class="c-right hide-cupom screen-secondary" style="width: 58px;">TMV 2</th>
+      <th class="hide-cupom screen-secondary" style="width: 28px;">UF</th>
     </tr></thead><tbody>`;
 
     list.forEach(r => {
@@ -768,17 +1325,17 @@ function renderReport() {
         <td class="c-center c-bold">${esc(r.kart)}</td>
         <td class="c-left">${esc(r.name)}</td>
         ${showCatCol ? `<td class="c-left">${esc(r.category || 'GERAL')}</td>` : ''}
-        <td class="c-right">${r.bestLap || '---'}</td>
-        <td class="c-right ${isBest ? 'c-best' : ''}">${fmtMs(r.bestLapTime)}</td>
+        <td class="c-right ${resultSecondary}">${r.bestLap || '---'}</td>
+        <td class="c-right ${resultSecondary} ${isBest ? 'c-best' : ''}">${fmtMs(r.bestLapTime)}</td>
         <td class="c-right hide-cupom">${fmtTotal(r.totalMs)}</td>
         <td class="c-right">${r.diffLeaderStr}</td>
-        <td class="c-right hide-cupom">${r.diffPrevStr}</td>
-        <td class="c-right hide-cupom">${fmtMs(r.lastLapTime)}</td>
+        <td class="c-right hide-cupom screen-secondary">${r.diffPrevStr}</td>
+        <td class="c-right hide-cupom screen-secondary">${fmtMs(r.lastLapTime)}</td>
         <td class="c-right">${r.laps || 0}</td>
-        ${showSpeed ? `<td class="c-right hide-cupom">${speed}</td>` : ''}
-        <td class="c-right hide-cupom">${r.bestLap2nd || '---'}</td>
-        <td class="c-right hide-cupom">${fmtMs(r.bestLapTime2nd)}</td>
-        <td class="c-center hide-cupom">${esc(r.uf)}</td>
+        ${showSpeed ? `<td class="c-right hide-cupom screen-secondary">${speed}</td>` : ''}
+        <td class="c-right hide-cupom screen-secondary">${r.bestLap2nd || '---'}</td>
+        <td class="c-right hide-cupom screen-secondary">${fmtMs(r.bestLapTime2nd)}</td>
+        <td class="c-center hide-cupom screen-secondary">${esc(r.uf)}</td>
       </tr>`;
     });
     html += `</tbody></table>`;
@@ -790,32 +1347,36 @@ function renderReport() {
       notesHtml += `<div class="rdlc-bestlap-note">Melhor volta: ${esc(melhorGeral.name)} (${fmtMs(melhorGeral.bestLapTime)})</div>`;
     }
     notesHtml += `
-      <table class="rdlc-legend">
-        <tr>
-          <th>Legenda:</th>
-          <td><strong>POS:</strong> Posição</td>
-          <td><strong>#:</strong> Nº Kart</td>
-          <td><strong>Nome:</strong> Nome Piloto</td>
-          <td><strong>MV:</strong> Melhor Volta</td>
-          <td><strong>TMV:</strong> Tempo Melhor Volta</td>
-          <td><strong>TT:</strong> Tempo Total</td>
-          <td><strong>DL:</strong> Dif. Líder</td>
-          <td><strong>DA:</strong> Dif. Anterior</td>
-          <td><strong>TUV:</strong> Tempo Última Volta</td>
-          <td><strong>TV:</strong> Total Voltas</td>
-          ${showSpeed ? '<td><strong>VM:</strong> Vel. Média (Km/h)</td>' : ''}
-          <td><strong>MV 2:</strong> 2ª Melhor Volta</td>
-          <td><strong>TMV 2:</strong> Tempo 2ª MV</td>
-          <td><strong>UF:</strong> Última Foto</td>
-        </tr>
-      </table>
+      <div class="criterion-note"><strong>Critério:</strong> ${isArrival ? 'ordem de chegada; a melhor volta é apenas informativa.' : 'melhor volta; a posição é ordenada pelo menor tempo.'}</div>
+      <details class="legend-details" open>
+        <summary>Legenda do relatório</summary>
+        <div class="legend-grid">
+          <span><strong>POS</strong> Posição</span>
+          <span><strong>#</strong> Número do kart</span>
+          <span><strong>Nome</strong> Piloto</span>
+          <span><strong>MV</strong> Melhor volta</span>
+          <span><strong>TMV</strong> Tempo da melhor volta</span>
+          <span><strong>TT</strong> Tempo total</span>
+          <span><strong>DL</strong> Diferença para o líder</span>
+          <span><strong>DA</strong> Diferença para o anterior</span>
+          <span><strong>TUV</strong> Tempo da última volta</span>
+          <span><strong>TV</strong> Total de voltas</span>
+          ${showSpeed ? '<span><strong>VM</strong> Velocidade média (km/h)</span>' : ''}
+          <span><strong>MV 2</strong> Segunda melhor volta</span>
+          <span><strong>TMV 2</strong> Tempo da segunda melhor volta</span>
+          <span><strong>UF</strong> Última foto (quando fornecida)</span>
+        </div>
+      </details>
     </div>`;
     notes.innerHTML = notesHtml;
   }
   // 6: RELATÓRIO DE PASSAGENS (PassingReport.rdlc)
   else if (currentTipo === 'passagens') {
     if (!passingsData.length) {
-      content.innerHTML = `<div style="padding: 20px; text-align: center; color: #555;">Nenhuma passagem registrada para esta sessão.</div>`;
+      const message = dataState.passings === 'error'
+        ? 'Dados de passagens indisponíveis no momento.'
+        : 'Nenhuma passagem registrada para esta sessão.';
+      content.innerHTML = `<div class="report-empty">${message}</div>`;
       return;
     }
     let html = `<table class="rdlc-table"><thead><tr>
@@ -885,7 +1446,10 @@ function renderReport() {
   // 7: VOLTA A VOLTA - TODOS (LapToLapReport.rdlc)
   else if (currentTipo === 'volta_a_volta') {
     if (!lapsData.length) {
-      content.innerHTML = `<div style="padding: 20px; text-align: center; color: #555;">Nenhuma volta registrada para esta sessão.</div>`;
+      const message = dataState.laps === 'error'
+        ? 'Dados de voltas indisponíveis no momento.'
+        : 'Nenhuma volta registrada para esta sessão.';
+      content.innerHTML = `<div class="report-empty">${message}</div>`;
       return;
     }
     let html = `<div>`;
@@ -936,7 +1500,10 @@ function renderReport() {
   // 8: MAPA DE VOLTAS - TODOS (LapMapReport.rdlc)
   else if (currentTipo === 'mapa_voltas') {
     if (!lapsData.length) {
-      content.innerHTML = `<div style="padding: 20px; text-align: center; color: #555;">Nenhuma volta registrada.</div>`;
+      const message = dataState.laps === 'error'
+        ? 'Dados de voltas indisponíveis no momento.'
+        : 'Nenhuma volta registrada.';
+      content.innerHTML = `<div class="report-empty">${message}</div>`;
       return;
     }
     const maxLaps = Math.max(...lapsData.map(d => (d.laps || []).length), 1);
@@ -973,7 +1540,10 @@ function renderReport() {
   // 9: MAPA DE PROVA (RacingMapAllReport.rdlc)
   else if (currentTipo === 'mapa_prova') {
     if (!lapsData.length) {
-      content.innerHTML = `<div style="padding: 20px; text-align: center; color: #555;">Nenhuma volta registrada para montar o mapa de prova.</div>`;
+      const message = dataState.laps === 'error'
+        ? 'Dados de voltas indisponíveis no momento.'
+        : 'Nenhuma volta registrada para montar o mapa de prova.';
+      content.innerHTML = `<div class="report-empty">${message}</div>`;
       return;
     }
     const maxLaps = Math.max(...lapsData.map(d => (d.laps || []).length), 1);
@@ -1069,8 +1639,22 @@ function renderReport() {
     html += `</tbody></table>`;
     content.innerHTML = html;
   }
+  } finally {
+    finalizarRenderReport();
+  }
 }
 
+const reportLogo = document.getElementById('reportLogo');
+if (reportLogo) {
+  reportLogo.addEventListener('error', () => {
+    const wrap = document.getElementById('reportLogoWrap');
+    if (wrap) wrap.innerHTML = '<span class="rep-logo-fallback">Kartódromo Internacional de Betim</span>';
+  }, { once: true });
+}
+
+window.addEventListener('beforeprint', () => atualizarPaginacao(true));
+window.addEventListener('afterprint', () => atualizarPaginacao(false));
+atualizarRegraVisual();
 carregarTudo();
 </script>
 </body>

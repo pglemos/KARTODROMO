@@ -86,6 +86,7 @@
         <button id="bStart" class="b-green" onclick="act('start')">▶ Iniciar (bandeira verde)</button>
         <button id="bPlus" onclick="plusMin()">+1 min</button>
         <button id="bManual" onclick="openManual()">＋ Passagem manual</button>
+        <button id="bSwap" class="b-blue" onclick="openSwap()">↔ Trocar kart (leva voltas)</button>
         <button id="bEdit" onclick="openEditSession()">Editar prova</button>
         <button id="bCheck" class="b-check" onclick="act('checkered')">🏁 Quadriculada agora</button>
         <button id="bClose" onclick="act('close','Encerrar a bateria? Karts que ainda não passaram ficam com as voltas atuais.')">■ Encerrar</button>
@@ -173,6 +174,14 @@
   <div class="row" style="margin-top:14px"><button onclick="manualDlg.close()">Voltar</button><button class="b-green" onclick="saveManualPassing()">Registrar passagem</button></div>
 </dialog>
 
+<dialog id="swapDlg">
+  <h2>Trocar kart do piloto</h2>
+  <label>Piloto</label><select id="swapPilot"></select>
+  <label>Kart novo</label><input id="swapTo" inputmode="numeric" placeholder="Número do kart">
+  <div class="hint">As voltas e o melhor tempo do kart atual serão levados para o kart novo. Se o kart novo já tiver passado sem piloto, as passagens dele também serão juntadas.</div>
+  <div class="row" style="margin-top:14px"><button onclick="swapDlg.close()">Voltar</button><button class="b-blue" onclick="saveSwap()">Trocar kart</button></div>
+</dialog>
+
 <dialog id="editSessionDlg">
   <h2>Mudar prova em andamento</h2>
   <label>Nome da prova</label><input id="editName">
@@ -252,6 +261,7 @@ function renderSession() {
   const prep = v.state === 'preparando', run = v.state === 'em_andamento', fin = v.state === 'bandeira_final';
   $('bStart').disabled = !prep; $('bPlus').disabled = !run; $('bCheck').disabled = !run;
   $('bManual').disabled = !run; $('bEdit').disabled = !(prep || run || v.state === 'encerrada');
+  $('bSwap').disabled = !(prep || run || v.state === 'encerrada');
   $('bClose').disabled = !(run || fin); $('bCancel').disabled = !(prep || run);
   $('gridBox').hidden = !(prep || run);
   if (lastShown !== v.id + v.state) { $('gridBox').open = prep; lastShown = v.id + v.state; }
@@ -312,6 +322,23 @@ function gridValue() {
   return [...$('gridRows').children].map(r => { const [k, n] = r.querySelectorAll('input'); return { kart: k.value.trim(), name: n.value.trim() }; }).filter(c => c.kart || c.name);
 }
 async function saveGrid() { await api(`/api/sessions/${sel}`, { method:'PATCH', body:{ competitors: gridValue() } }); gridDirty = false; }
+function pilotoReal(c) { return c && !c.autoAdded && c.name && c.name.trim().toLowerCase() !== `kart ${String(c.kart).trim().toLowerCase()}`; }
+function openSwap() {
+  if (!view) return;
+  const pilotos = view.competitors.filter(pilotoReal);
+  $('swapPilot').innerHTML = pilotos.map((c, i) => `<option value="${i}">${esc(c.kart)} · ${esc(c.name)}</option>`).join('');
+  $('swapTo').value = '';
+  if (!pilotos.length) { alert('Essa bateria não tem piloto real no grid.'); return; }
+  $('swapDlg').showModal(); $('swapTo').focus();
+}
+async function saveSwap() {
+  const pilotos = view?.competitors.filter(pilotoReal) || [];
+  const c = pilotos[Number($('swapPilot').value)];
+  const toKart = $('swapTo').value.trim();
+  if (!c || !toKart) { alert('Escolha o piloto e informe o kart novo.'); return; }
+  await api(`/api/sessions/${sel}/swap-kart`, { method:'POST', body:{ fromKart:c.kart, toKart, customerId:c.customerId, name:c.name } });
+  gridDirty = false; swapDlg.close(); pinned = true; await render();
+}
 function applyPaste() {
   $('pasteTxt').value.split(/\n/).map(l => l.trim()).filter(Boolean).forEach(l => {
     const m = l.match(/^#?(\w+)[\s;,\t-]+(.+)$/); if (m) addRow(m[1], m[2]); else addRow(l, '');

@@ -14,7 +14,7 @@ data class Piloto(
     val pesoKg: Double?,
 )
 
-data class Sorteado(val piloto: Piloto, val kart: String, val repetiu: Boolean)
+data class Sorteado(val piloto: Piloto, val kart: String, val repetiu: Boolean, val planoLastro: PlanoLastro? = null)
 
 /**
  * Sorteio justo (SecureRandom) de um kart diferente para cada piloto, evitando os karts que o
@@ -66,10 +66,10 @@ class Sorteador(private val rnd: Random = SecureRandom().asKotlinRandom()) {
 }
 
 /** Frotas do kartódromo: light usa os karts 1–99 e super os karts 100 em diante. */
-enum class Frota(val titulo: String, val contem: (Int) -> Boolean) {
-    LIGHT("Light · 1 a 99", { it in 1..99 }),
-    SUPER("Super · 100+", { it >= 100 }),
-    TODOS("Todos", { true });
+enum class Frota(val titulo: String, val contem: (Int) -> Boolean, val alvoKg: Double?) {
+    LIGHT("Light · 1 a 99", { it in 1..99 }, 90.0),
+    SUPER("Super · 100+", { it >= 100 }, 100.0),
+    TODOS("Todos", { true }, null);
 
     companion object {
         fun da(tipoKart: String?) = when (tipoKart?.lowercase()) {

@@ -4,6 +4,12 @@ import type { Session } from './race-engine';
 export type PilotoSorteio = { indice: number; nome: string; customerId: string | null; kartAtual: string; excecoes: string[] };
 export type Atribuicao = { indice: number; kart: string };
 
+export function descricaoModoSorteio(modo: string): string {
+  if (modo === 'um-a-um') return 'um a um';
+  if (modo === 'fiscal') return 'fiscal escolhe';
+  return 'todos de uma vez';
+}
+
 const nome = (n: string | null | undefined) => String(n ?? '').trim().toLowerCase();
 const dia = (ms: number) => new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
 

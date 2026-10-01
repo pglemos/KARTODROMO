@@ -5,8 +5,7 @@
         <item name="android:statusBarColor">@color/fundo</item>
         <item name="android:navigationBarColor">@color/fundo</item>
         <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
         <item name="android:windowNoTitle">true</item>
     </style>
-    <color name="fundo">#FF0C1115</color>
-    <color name="verde">#FF0B7A53</color>
 </resources>

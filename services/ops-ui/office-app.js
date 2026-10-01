@@ -794,7 +794,7 @@ async function checkout({ bateriaId = null, reservaIds = [], clienteId = null })
       <label>Cliente:</label><b id="coC"></b><label>Documento:</label><b id="coD"></b><button id="coPC">🔍 Pesquisar Cliente</button></div>
     <label style="display:block;margin-top:6px">Observações</label><textarea id="coO" rows="2" style="width:100%"></textarea>
     <div style="display:grid;grid-template-columns: minmax(0,1fr) 34px minmax(0,1.5fr);gap:6px;margin-top:6px">
-      <div><div style="text-align:right;font-weight:700">Reservas disponíveis</div><div id="coRD" style="height:250px;overflow:auto;border:1px solid #999;background:#fff"></div></div>
+      <div><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:700"><span>Reservas disponíveis</span><button id="coAll" type="button" title="Adicionar todas as reservas disponíveis ao carrinho">Adicionar todos</button></div><div id="coRD" style="height:250px;overflow:auto;border:1px solid #999;background:#fff"></div></div>
       <div style="display:flex;flex-direction:column;justify-content:center;gap:10px"><button id="coAdd" title="Adicionar ao carrinho">→</button><button id="coRem" title="Voltar para disponíveis">←</button><button id="coDel" title="Remover do carrinho">🗑</button></div>
       <div><div style="font-weight:700">Carrinho</div><div id="coCar" style="height:250px;overflow:auto;border:1px solid #999;background:#fff"></div></div></div>
     <div style="display:grid;grid-template-columns: minmax(0,1fr) minmax(0,1.5fr);gap:6px;margin-top:8px">
@@ -827,6 +827,9 @@ async function checkout({ bateriaId = null, reservaIds = [], clienteId = null })
     $('#tSub', corpo).textContent = fmt.money(t.sub); $('#tRec', corpo).textContent = fmt.money(t.rec); $('#tTro', corpo).textContent = fmt.money(t.troco);
     $('#coV', corpo).value = t.falta ? fmt.money(t.falta) : '';
     $('#coC', corpo).textContent = cliente?.nome || ''; $('#coD', corpo).textContent = cliente?.documento || '';
+    const idsNoCarrinho = new Set(carrinho.filter((item) => item.inscricaoId != null).map((item) => item.inscricaoId));
+    const adicionarTodos = $('#coAll', corpo);
+    if (adicionarTodos) adicionarTodos.disabled = !KartodromoCheckout.paraAdicionar(disponiveis, idsNoCarrinho).length;
   };
   let seq = 1;
   const add = (rs) => {
@@ -842,6 +845,12 @@ async function checkout({ bateriaId = null, reservaIds = [], clienteId = null })
   $('#coB', corpo).onchange = carregaDisp;
   $('#coPC', corpo).onclick = async () => { const c = await selecionarCliente(); if (c) { cliente = c; refresh(); } };
   $('#coAdd', corpo).onclick = () => add(gD.sel());
+  $('#coAll', corpo).onclick = () => {
+    const idsNoCarrinho = new Set(carrinho.filter((item) => item.inscricaoId != null).map((item) => item.inscricaoId));
+    const itens = KartodromoCheckout.paraAdicionar(disponiveis, idsNoCarrinho);
+    if (!itens.length) return info(disponiveis.length ? 'Todas as reservas disponíveis já estão no carrinho.' : 'Nenhuma reserva disponível para adicionar.');
+    add(itens);
+  };
   $('#coRem', corpo).onclick = $('#coDel', corpo).onclick = () => { for (const s of gC.sel()) carrinho.splice(carrinho.findIndex((c) => c.k === s.id), 1); if (!carrinho.some((c) => c.voucher)) voucher = null; refresh(); };
   $('#coPA', corpo).onclick = () => {
     const v = toCents($('#coV', corpo).value); if (!(v > 0)) return info('Informe o valor.');

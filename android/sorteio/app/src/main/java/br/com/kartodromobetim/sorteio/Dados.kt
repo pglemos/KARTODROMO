@@ -37,6 +37,84 @@ class ErroServidor(msg: String) : Exception(msg)
 class Preferencias(ctx: Context) {
     private val p = ctx.getSharedPreferences("sorteio", Context.MODE_PRIVATE)
 
+    /** Últimos dados válidos para que a operação continue legível quando a rede cair. */
+    var cacheBaterias: List<Bateria>?
+        get() = p.getString("cacheBaterias", null)?.let { texto ->
+            runCatching {
+                val arr = JSONArray(texto)
+                (0 until arr.length()).map { n ->
+                    val item = arr.getJSONObject(n)
+                    val irmas = item.optJSONArray("programaIrmas")?.let { lista ->
+                        (0 until lista.length()).map { lista.getString(it) }
+                    }.orEmpty()
+                    Bateria(
+                        id = item.optString("id"),
+                        nome = item.optString("nome"),
+                        tipo = item.optString("tipo"),
+                        criadaEm = item.optLong("criadaEm"),
+                        pilotos = item.optInt("pilotos"),
+                        programaIrmas = irmas,
+                        agendaId = if (item.isNull("agendaId")) null else item.optLong("agendaId"),
+                        semKart = item.optInt("semKart", -1),
+                    )
+                }
+            }.getOrNull()
+        }
+        set(valor) {
+            if (valor == null) {
+                p.edit().remove("cacheBaterias").apply()
+            } else {
+                val arr = JSONArray()
+                valor.forEach { bateria ->
+                    arr.put(JSONObject().apply {
+                        put("id", bateria.id)
+                        put("nome", bateria.nome)
+                        put("tipo", bateria.tipo)
+                        put("criadaEm", bateria.criadaEm)
+                        put("pilotos", bateria.pilotos)
+                        put("programaIrmas", JSONArray(bateria.programaIrmas))
+                        if (bateria.agendaId == null) put("agendaId", JSONObject.NULL) else put("agendaId", bateria.agendaId)
+                        put("semKart", bateria.semKart)
+                    })
+                }
+                p.edit().putString("cacheBaterias", arr.toString()).apply()
+            }
+        }
+
+    var cacheAgenda: List<BateriaAgenda>?
+        get() = p.getString("cacheAgenda", null)?.let { texto ->
+            runCatching {
+                val arr = JSONArray(texto)
+                (0 until arr.length()).map { n ->
+                    val item = arr.getJSONObject(n)
+                    BateriaAgenda(
+                        id = item.optLong("id"),
+                        nome = item.optString("nome"),
+                        inicio = item.optString("inicio"),
+                        inscritos = item.optInt("inscritos"),
+                        tipoKart = item.optString("tipoKart").takeIf { it.isNotBlank() },
+                    )
+                }
+            }.getOrNull()
+        }
+        set(valor) {
+            if (valor == null) {
+                p.edit().remove("cacheAgenda").apply()
+            } else {
+                val arr = JSONArray()
+                valor.forEach { bateria ->
+                    arr.put(JSONObject().apply {
+                        put("id", bateria.id)
+                        put("nome", bateria.nome)
+                        put("inicio", bateria.inicio)
+                        put("inscritos", bateria.inscritos)
+                        if (bateria.tipoKart == null) put("tipoKart", JSONObject.NULL) else put("tipoKart", bateria.tipoKart)
+                    })
+                }
+                p.edit().putString("cacheAgenda", arr.toString()).apply()
+            }
+        }
+
     var servidor: String
         get() = p.getString("servidor", null) ?: "http://192.168.20.249:4050"
         set(v) = p.edit().putString("servidor", v.trim().trimEnd('/')).apply()
@@ -62,13 +140,26 @@ class Preferencias(ctx: Context) {
     var animacao: Boolean
         get() = p.getBoolean("animacao", true)
         set(v) = p.edit().putBoolean("animacao", v).apply()
+
+    var ultimaSincronizacao: Long?
+        get() = p.getLong("ultimaSincronizacao", 0L).takeIf { it > 0L }
+        set(v) {
+            if (v == null) p.edit().remove("ultimaSincronizacao").apply()
+            else p.edit().putLong("ultimaSincronizacao", v).apply()
+        }
 }
 
 /** Serviço de cronometragem (ORBITS :4050). */
 class Api(private val base: () -> String) {
 
     private suspend fun chamar(metodo: String, caminho: String, corpo: JSONObject? = null): String = withContext(Dispatchers.IO) {
-        val url = URL(base() + caminho)
+        val endereco = base().trim().trimEnd('/')
+        val raiz = try { URL(endereco) } catch (e: Exception) {
+            throw ErroServidor("Informe um endereço válido, como http://192.168.20.249:4050.")
+        }
+        if (raiz.protocol !in listOf("http", "https") || raiz.host.isBlank())
+            throw ErroServidor("Use um endereço HTTP ou HTTPS com o nome ou IP do servidor.")
+        val url = URL(endereco + caminho)
         val c = url.openConnection() as HttpURLConnection
         try {
             c.requestMethod = metodo
@@ -161,9 +252,14 @@ class Api(private val base: () -> String) {
         )
     }
 
-    suspend fun gravar(id: String, resultado: List<Sorteado>, umAUm: Boolean) {
+    suspend fun gravar(id: String, resultado: List<Sorteado>, umAUm: Boolean, modo: String? = null): Long? {
         val atr = JSONArray()
-        resultado.forEach { atr.put(JSONObject().put("indice", it.piloto.indice).put("kart", it.kart)) }
-        chamar("POST", "/api/sessions/$id/sorteio", JSONObject().put("atribuicoes", atr).put("modo", if (umAUm) "um-a-um" else "todos"))
+        resultado.forEach {
+            val atribuicao = JSONObject().put("indice", it.piloto.indice).put("kart", it.kart)
+            it.planoLastro?.let { plano -> atribuicao.put("lastroKg", plano.lastroKg).put("pecas5Kg", plano.pecas5Kg).put("pecas2_5Kg", plano.pecas2_5Kg) }
+            atr.put(atribuicao)
+        }
+        val resposta = JSONObject(chamar("POST", "/api/sessions/$id/sorteio", JSONObject().put("atribuicoes", atr).put("modo", modo ?: if (umAUm) "um-a-um" else "todos")))
+        return resposta.optLong("gravadoEm").takeIf { it > 0 }
     }
 }

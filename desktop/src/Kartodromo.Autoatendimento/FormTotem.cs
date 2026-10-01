@@ -23,6 +23,7 @@ public class FormTotem : Form, IMessageFilter
     bool _eu = true;
     HashSet<long> _sel = [];
     string _tela = "ident";
+    bool _cadastroExistente;
 
     JsonObject _cfg = new() { ["empresa"] = "Kartódromo", ["mensagem"] = "Seja bem-vindo(a)!", ["imprimirTermo"] = true, ["consultarCep"] = true };
     readonly Api _api;
@@ -33,6 +34,7 @@ public class FormTotem : Form, IMessageFilter
     readonly string _versao = "v" + (typeof(FormTotem).Assembly.GetName().Version?.ToString(3) ?? "1.0.0");
     readonly CabecalhoTotem _cabecalho;
     Panel _cartao;
+    Cartao _aguarde;
     float _k = 1f;
     bool _liberadoFechar;
     int _alertasNoAutoteste;
@@ -82,10 +84,11 @@ public class FormTotem : Form, IMessageFilter
         Shown += async (_, _) =>
         {
             _k = Math.Min(ClientSize.Width / 1366f, ClientSize.Height / 768f);
+            Reiniciar();
+            if (_autoteste == null) _ocioso.Start();
             await CarregarConfig();
             if (_autoteste != null) { await AutoTeste(); return; }
-            Reiniciar();
-            _ocioso.Start();
+            if (_tela == "ident" && _ident.Length == 0) TelaIdent();
         };
     }
 
@@ -109,7 +112,7 @@ public class FormTotem : Form, IMessageFilter
         }))
         {
             glow.CenterPoint = new PointF(ox + w * .5f, oy + h * .06f);
-            glow.CenterColor = Color.FromArgb(38, 48, 209, 88);
+            glow.CenterColor = Color.FromArgb(38, Estilo.Verde.R, Estilo.Verde.G, Estilo.Verde.B);
             glow.SurroundColors = [Color.Transparent, Color.Transparent, Color.Transparent, Color.Transparent];
             g.FillRectangle(glow, ox, oy, w, h * .55f);
         }
@@ -170,19 +173,31 @@ public class FormTotem : Form, IMessageFilter
         SuspendLayout();
         var velho = _cartao;
         _cartao = c;
+        _cabecalho.Parent?.Controls.Remove(_cabecalho);
+        c.Controls.Add(_cabecalho);
         Controls.Add(c);
         Centralizar();
         AtualizarCabecalho();
         foreach (var botao in c.Controls.OfType<Pilula>().ToArray()) botao.BringToFront();
         if (velho != null) { Controls.Remove(velho); velho.Dispose(); }
         ResumeLayout();
+        GarantirCabecalhoNoTopo();
         c.Controls.OfType<CampoTexto>().FirstOrDefault(x => x.Enabled && x.Tag as string == "foco")?.Caixa.Focus();
+    }
+
+    void GarantirCabecalhoNoTopo()
+    {
+        if (_cabecalho == null || _cabecalho.IsDisposed || _cabecalho.Parent == null || !_cabecalho.Parent.Controls.Contains(_cabecalho)) return;
+        _cabecalho.BringToFront();
+        _cabecalho.Parent.Controls.SetChildIndex(_cabecalho, 0);
+        _cabecalho.Invalidate();
     }
 
     void AtualizarCabecalho()
     {
         if (_cabecalho == null || _cabecalho.IsDisposed) return;
-        _cabecalho.Bounds = new Rectangle(0, 0, ClientSize.Width, P(88));
+        Control dono = _cartao is Control panel ? panel : this;
+        _cabecalho.Bounds = new Rectangle(0, 0, dono.ClientSize.Width, P(88));
         _cabecalho.Atualizar((_cartao as TelaCanvas)?.Etapa ?? 1, _k);
         _cabecalho.BringToFront();
     }
@@ -212,6 +227,8 @@ public class FormTotem : Form, IMessageFilter
     {
         dono.Controls.Add(Rot(rotulo, x + 4, y - 23, F(14, false, FontStyle.Bold), Estilo.Suave));
         var c = new CampoTexto { Bounds = new Rectangle(P(x), P(y), P(w), P(altura)), Tag = foco ? "foco" : null };
+        c.AccessibleName = rotulo;
+        c.Caixa.AccessibleName = rotulo;
         c.Caixa.Font = F(19);
         c.Text = valor ?? "";
         dono.Controls.Add(c);
@@ -222,6 +239,7 @@ public class FormTotem : Form, IMessageFilter
     {
         dono.Controls.Add(Rot(rotulo, x + 4, y - 23, F(14, false, FontStyle.Bold), Estilo.Suave));
         var c = new CampoLista(itens) { Bounds = new Rectangle(P(x), P(y), P(w), P(58)) };
+        c.AccessibleName = rotulo;
         c.Font = F(19);
         dono.Controls.Add(c);
         return c;
@@ -241,6 +259,7 @@ public class FormTotem : Form, IMessageFilter
         if (telaAnterior == null || telaAnterior.IsDisposed) return false;
         telaAnterior.Enabled = false;
         Cursor = Cursors.WaitCursor;
+        MostrarAguarde();
         try { await clique(); return true; }
         catch (Exception e)
         {
@@ -252,8 +271,41 @@ public class FormTotem : Form, IMessageFilter
         {
             if (!telaAnterior.IsDisposed) telaAnterior.Enabled = true;
             if (_cartao != null && !_cartao.IsDisposed) _cartao.Enabled = true;
+            OcultarAguarde();
             Cursor = Cursors.Default;
         }
+    }
+
+    void MostrarAguarde()
+    {
+        if (_autoteste != null || _aguarde != null) return;
+        _aguarde = new Cartao
+        {
+            Bounds = new Rectangle((ClientSize.Width - P(420)) / 2, (ClientSize.Height - P(92)) / 2, P(420), P(92)),
+            Padding = new Padding(P(24)),
+            AccessibleRole = AccessibleRole.StatusBar,
+            AccessibleName = "Aguarde. Processando sua solicitação.",
+        };
+        _aguarde.Controls.Add(new Label
+        {
+            Text = "Aguarde…",
+            Dock = DockStyle.Fill,
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleCenter,
+            Font = F(21, false, FontStyle.Bold),
+            ForeColor = Estilo.Texto,
+            BackColor = Color.Transparent,
+        });
+        Controls.Add(_aguarde);
+        _aguarde.BringToFront();
+    }
+
+    void OcultarAguarde()
+    {
+        if (_aguarde == null) return;
+        Controls.Remove(_aguarde);
+        _aguarde.Dispose();
+        _aguarde = null;
     }
 
     Marcador Marca(Control dono, string texto, float x, float y, bool marcado, float altura = 34)
@@ -344,9 +396,10 @@ public class FormTotem : Form, IMessageFilter
 
     void TelaCadastro(bool existente)
     {
-        var email = existente && _cliente.S("email").Length > 0 ? _cliente.S("email") : (_ident.Contains('@') ? _ident : "");
-        var doc = existente && _cliente.S("documento").Length > 0 ? _cliente.S("documento") : (_ident.Contains('@') ? "" : _ident);
-        var tipoCliente = existente ? _cliente.S("tipoDocumento").ToUpperInvariant() : "";
+        _cadastroExistente = existente;
+        var email = _cliente.S("email").Length > 0 ? _cliente.S("email") : (_ident.Contains('@') ? _ident : "");
+        var doc = _cliente.S("documento").Length > 0 ? _cliente.S("documento") : (_ident.Contains('@') ? "" : _ident);
+        var tipoCliente = _cliente.S("tipoDocumento").ToUpperInvariant();
         var tipoIni = tipoCliente switch
         {
             "RG" => "RG",
@@ -357,7 +410,7 @@ public class FormTotem : Form, IMessageFilter
             ? $"Olá, {_cliente.S("nome").Split(' ')[0]}! Confira e atualize seus dados. Campos em branco continuam como estão."
             : "Primeira vez aqui. Leva menos de um minuto.";
         var c = NovaTela(etapa: 2);
-        c.Controls.Add(Rot("Registre-se para continuar", 90, 108, F(44, false, FontStyle.Bold), Estilo.Texto));
+        c.Controls.Add(Rot(existente ? "Confira seus dados" : "Registre-se para continuar", 90, 108, F(44, false, FontStyle.Bold), Estilo.Texto));
         c.Controls.Add(Rot(sub, 90, 163, F(19), Estilo.Suave));
         var campos = CartaoEm(c, 90, 204, 1186, 338);
         float[] xs = [24, 312, 600, 888];
@@ -369,24 +422,36 @@ public class FormTotem : Form, IMessageFilter
         var fDoc = Campo(campos, "CPF", xs[2], 36, cw, docVal, !existente && doc.Length == 0);
         var lDoc = campos.Controls.OfType<Label>().Last(l => l.Text == "CPF");
         lDoc.Text = tipo.Text;
-        var fNome = Campo(campos, "Nome completo", xs[3], 36, cw, existente ? _cliente.S("nome") : "", !existente && doc.Length > 0);
+        var fNome = Campo(campos, "Nome completo", xs[3], 36, cw, _cliente.S("nome"), !existente && doc.Length > 0);
         var fEmail = Campo(campos, "E-mail", xs[0], 132, cw, email, existente);
-        var fFone = Campo(campos, "Celular (WhatsApp)", xs[1], 132, cw, existente ? Fmt.MascaraFone(_cliente.S("telefone")) : "");
-        var nascIni = existente && _cliente.S("nascimento").Length >= 10 ? Fmt.Dmy(_cliente.S("nascimento")) : "";
+        var fFone = Campo(campos, "Celular (WhatsApp)", xs[1], 132, cw, Fmt.MascaraFone(_cliente.S("telefone")));
+        var nascIni = _cliente.S("nascimento").Length >= 10 ? Fmt.Dmy(_cliente.S("nascimento")) : "";
         var fNasc = Campo(campos, "Data de nascimento", xs[2], 132, cw, nascIni);
-        var fPeso = Campo(campos, "Peso (kg)", xs[3], 132, cw, existente ? _cliente.S("peso") : "");
-        var fCep = Campo(campos, "CEP", xs[0], 228, cw, existente ? Fmt.MascaraCep(_cliente.S("cep")) : "");
-        var fEnd = Campo(campos, "Endereço", xs[1], 228, cw, existente ? _cliente.S("endereco") : "");
-        var fBairro = Campo(campos, "Bairro", xs[2], 228, cw, existente ? _cliente.S("bairro") : "");
-        var fCidade = Campo(campos, "Cidade", xs[3], 228, cw, existente ? _cliente.S("cidade") : "");
+        var fPeso = Campo(campos, "Peso (kg)", xs[3], 132, cw, _cliente.S("peso"));
+        var fCep = Campo(campos, "CEP", xs[0], 228, cw, Fmt.MascaraCep(_cliente.S("cep")));
+        var fEnd = Campo(campos, "Endereço", xs[1], 228, cw, _cliente.S("endereco"));
+        var fBairro = Campo(campos, "Bairro", xs[2], 228, cw, _cliente.S("bairro"));
+        var fCidade = Campo(campos, "Cidade", xs[3], 228, cw, _cliente.S("cidade"));
+        if (!existente)
+        {
+            lDoc.Text += " *";
+            var nomeLabel = campos.Controls.OfType<Label>().FirstOrDefault(l => l.Text == "Nome completo");
+            if (nomeLabel != null) nomeLabel.Text += " *";
+            var telefoneLabel = campos.Controls.OfType<Label>().FirstOrDefault(l => l.Text == "Celular (WhatsApp)");
+            if (telefoneLabel != null) telefoneLabel.Text += " *";
+        }
+        var nascimentoLabel = campos.Controls.OfType<Label>().FirstOrDefault(l => l.Text == "Data de nascimento");
+        if (!existente || !_cliente.B("temNascimento"))
+            if (nascimentoLabel != null) nascimentoLabel.Text += " *";
+        c.Controls.Add(Rot("* Campos obrigatórios", 90, 548, F(14), Estilo.MuitoSuave));
         if (existente)
         {
             reg.Enabled = tipo.Enabled = fDoc.Enabled = fNome.Enabled = false;
             if (fDoc.Text.Length == 0) fDoc.Text = "(já cadastrado)";
         }
         fNasc.Caixa.PlaceholderText = "DD/MM/AAAA";
-        string uf = existente ? _cliente.S("estado") : "";
-        tipo.SelectedIndexChanged += (_, _) => { lDoc.Text = tipo.Text; if (tipo.SelectedIndex == 0) fDoc.Text = Fmt.MascaraCpf(fDoc.Text); };
+        string uf = _cliente.S("estado");
+        tipo.SelectedIndexChanged += (_, _) => { lDoc.Text = tipo.Text + (!existente ? " *" : ""); if (tipo.SelectedIndex == 0) fDoc.Text = Fmt.MascaraCpf(fDoc.Text); };
         Mascarar(fDoc.Caixa, v => !existente && tipo.SelectedIndex == 0 ? Fmt.MascaraCpf(v) : v);
         Mascarar(fFone.Caixa, Fmt.MascaraFone);
         Mascarar(fNasc.Caixa, Fmt.MascaraData);
@@ -404,11 +469,11 @@ public class FormTotem : Form, IMessageFilter
             uf = r.S("uf");
         };
 
-        var lgpd = Marca(c, "Li e concordo com o", 90, 659, existente && _cliente.B("lgpd"), 34);
+        var lgpd = Marca(c, "Li e concordo com o *", 90, 659, existente && _cliente.B("lgpd"), 34);
         var link = new LinkLabel
         {
             Text = "Termo de Consentimento para Tratamento de Dados Pessoais", Font = F(16), AutoSize = true, BackColor = Color.Transparent,
-            LinkColor = Color.White, ActiveLinkColor = Estilo.Suave, VisitedLinkColor = Color.White, LinkBehavior = LinkBehavior.AlwaysUnderline,
+            LinkColor = Estilo.Texto, ActiveLinkColor = Estilo.Suave, VisitedLinkColor = Estilo.Texto, LinkBehavior = LinkBehavior.AlwaysUnderline,
         };
         link.Location = new Point(lgpd.Right + P(8), lgpd.Top + (lgpd.Height - link.PreferredHeight) / 2);
         link.LinkClicked += (_, _) => TermoLgpd();
@@ -448,16 +513,24 @@ public class FormTotem : Form, IMessageFilter
                 _token = r.S("token") is { Length: > 0 } t ? t : _token;
                 _cliente["lgpd"] = true;
                 if (nasc != "") _cliente["temNascimento"] = true;
+                MesclarDadosCliente(dados);
             }
             else
             {
                 var r = await _api.Post("/api/totem/cadastro", new JsonObject { ["dados"] = dados, ["lgpd"] = true });
                 _cliente = new JsonObject { ["id"] = r.L("id"), ["nome"] = dados.S("nome"), ["lgpd"] = true, ["temNascimento"] = true };
+                MesclarDadosCliente(dados);
                 _token = r.S("token"); _dependentes = [];
             }
             await PosClienteAsync();
         });
         Mostrar("cadastro", c, () => TelaCadastro(existente));
+    }
+
+    void MesclarDadosCliente(JsonObject dados)
+    {
+        foreach (var item in dados)
+            _cliente[item.Key] = item.Value?.DeepClone();
     }
 
     static async Task<JsonObject> ViaCep(string cep)
@@ -480,7 +553,7 @@ public class FormTotem : Form, IMessageFilter
         {
             Bounds = new Rectangle(0, 0, f.ClientSize.Width, P(88))
         };
-        f.Controls.Add(cabecalho);
+        tela.Controls.Add(cabecalho);
         cabecalho.BringToFront();
         var c = CartaoEm(tela, 253, 172, 860, 494);
         c.Controls.Add(Rot("Termo de Consentimento para Tratamento de Dados Pessoais", 36, 34, F(30, false, FontStyle.Bold), Estilo.Texto, 760, 74));
@@ -517,7 +590,7 @@ public class FormTotem : Form, IMessageFilter
         painel.Controls.Add(lista);
         var eu = Marca(c, "Eu também vou participar", 150, 600, _eu && (_participantes.Count == 0 || _participantes.Any(p => p.Id == idCli)), 36);
         Botao(c, "Cadastrar menor", 150, 660, 205, false, () => { TelaCadastroMenor(); return Task.CompletedTask; });
-        Botao(c, "Voltar", 914, 660, 140, false, () => { Reiniciar(); return Task.CompletedTask; });
+        Botao(c, "Voltar", 914, 660, 140, false, () => { TelaCadastro(_cadastroExistente); return Task.CompletedTask; });
         Botao(c, "Próximo", 1070, 660, 146, true, () =>
         {
             _eu = eu.Marcado;
@@ -579,20 +652,23 @@ public class FormTotem : Form, IMessageFilter
     {
         var c = NovaTela(etapa: 3);
         c.Controls.Add(Rot("Escolha sua bateria", 150, 108, F(44, false, FontStyle.Bold), Estilo.Texto));
-        c.Controls.Add(Rot("Selecione pelo menos uma. Só aparecem baterias de hoje com vaga." + (n > 1 ? $" ({n} participantes)" : ""), 150, 164, F(19), Estilo.Suave));
-        var selecionadas = Rot("0 selecionadas", 1000, 164, F(17, false, FontStyle.Bold), Color.FromArgb(126, 227, 154), 216, 28, ContentAlignment.MiddleRight);
+        c.Controls.Add(Rot("Selecione uma ou mais. A lista mostra as baterias abertas de hoje com vaga." + (n > 1 ? $" ({n} participantes)" : ""), 150, 164, F(19), Estilo.Suave));
+        var selecionadas = Rot("Nenhuma selecionada", 1000, 164, F(17, false, FontStyle.Bold), Estilo.VerdeSuave, 216, 28, ContentAlignment.MiddleRight);
         c.Controls.Add(selecionadas);
+        Botao(c, "Atualizar", 820, 154, 150, false, TelaBaterias, 42, 16);
         var painel = CartaoEm(c, 150, 215, 1066, 426);
         var lista = new ListaOpcoes(_k) { Bounds = new Rectangle(0, 0, P(1066), P(426)) };
         var totalMarcadas = 0;
+        Pilula proximo = null;
         foreach (var b in baterias)
         {
             var inicio = Fmt.Hm(b.S("inicio"));
             var tipoSuper = b.S("tipoKart") == "super";
+            var iniciou = DateTime.TryParse(b.S("inicio"), out var horario) && horario <= DateTime.Now;
             var item = new OpcaoLinha(_k)
             {
                 Height = P(84), Id = b.L("id") ?? 0, Linha1 = b.S("nome").ToUpperInvariant(),
-                Linha2 = $"Inicia às {inicio} · chegue 10 min antes",
+                Linha2 = iniciou ? $"Horário iniciado às {inicio} · confirme na recepção" : $"Começa às {inicio} · chegue 10 min antes",
                 Direita = b.I("livres") + (b.I("livres") == 1 ? " vaga" : " vagas"),
                 Tipo = tipoSuper ? "Super Kart" : "Kart Light", Livres = b.I("livres"), Total = b.I("vagas"),
                 Marcado = _sel.Contains(b.L("id") ?? 0),
@@ -601,15 +677,16 @@ public class FormTotem : Form, IMessageFilter
             item.Mudou += () =>
             {
                 totalMarcadas = lista.Marcados().Count();
-                selecionadas.Text = totalMarcadas + (totalMarcadas == 1 ? " selecionada" : " selecionadas");
+                selecionadas.Text = totalMarcadas == 0 ? "Nenhuma selecionada" : totalMarcadas + (totalMarcadas == 1 ? " selecionada" : " selecionadas");
+                if (proximo != null) proximo.Enabled = totalMarcadas > 0;
             };
             lista.Adicionar(item);
         }
-        selecionadas.Text = totalMarcadas + (totalMarcadas == 1 ? " selecionada" : " selecionadas");
-        if (baterias.Count == 0) lista.Vazio("Não há baterias com vagas disponíveis hoje. Por favor, procure a recepção.");
+        selecionadas.Text = totalMarcadas == 0 ? "Nenhuma selecionada" : totalMarcadas + (totalMarcadas == 1 ? " selecionada" : " selecionadas");
+        if (baterias.Count == 0) lista.Vazio("Nenhuma bateria com vaga disponível agora.\r\nToque em Atualizar ou procure a recepção.");
         painel.Controls.Add(lista);
-        var voltar = Botao(c, "Voltar", 914, 660, 140, false, () => { if (_menor) TelaMenores(); else Reiniciar(); return Task.CompletedTask; });
-        var proximo = Botao(c, "Próximo", 1070, 660, 146, true, async () =>
+        var voltar = Botao(c, "Voltar", 914, 660, 140, false, () => { if (_menor) TelaMenores(); else TelaCadastro(_cadastroExistente); return Task.CompletedTask; });
+        proximo = Botao(c, "Próximo", 1070, 660, 146, true, async () =>
         {
             _sel = lista.Marcados().ToHashSet();
             if (_sel.Count == 0) { Alertar("Selecione pelo menos uma bateria."); return; }
@@ -624,6 +701,7 @@ public class FormTotem : Form, IMessageFilter
             if (r["termoNaRecepcao"]?.GetValue<bool>() == true) Program.Log("termo enviado para a impressora da recepção");
             else if (r.S("termoUrl") is { Length: > 0 } termo) _ = Imprimir(_api.BaseUrl + termo);
         });
+        proximo.Enabled = totalMarcadas > 0;
         voltar.BringToFront(); proximo.BringToFront();
         Mostrar("baterias", c, () => MontarBaterias(baterias, n));
     }
@@ -641,10 +719,10 @@ public class FormTotem : Form, IMessageFilter
         var c = NovaTela(etapa: 3);
         var icone = new IconeSucesso { Bounds = new Rectangle(P(631), P(130), P(104), P(104)) };
         c.Controls.Add(icone);
-        c.Controls.Add(Rot("Reserva realizada com sucesso!", 100, 292, F(58, false, FontStyle.Bold), Estilo.Texto, 1166, 72, ContentAlignment.MiddleCenter));
-        c.Controls.Add(Rot($"Dirija-se até a recepção para concluir a reserva e assinar {(n > 1 ? "os termos" : "seu termo")} de responsabilidade.", 120, 384, F(22), Color.FromArgb(209, 209, 214), 1126, 40, ContentAlignment.MiddleCenter));
-        c.Controls.Add(Rot("Sua bateria começa às", 440, 438, F(22), Color.FromArgb(209, 209, 214), 340, 36, ContentAlignment.MiddleRight));
-        c.Controls.Add(Rot(hora, 786, 434, Estilo.Mono(P(28), FontStyle.Bold), Color.White, 140, 40, ContentAlignment.MiddleLeft));
+        c.Controls.Add(Rot("Inscrição na bateria confirmada", 100, 292, F(54, false, FontStyle.Bold), Estilo.Texto, 1166, 72, ContentAlignment.MiddleCenter));
+        c.Controls.Add(Rot($"Dirija-se até a recepção para concluir o atendimento e assinar {(n > 1 ? "os termos" : "seu termo")} de responsabilidade.", 120, 384, F(22), Estilo.Suave, 1126, 40, ContentAlignment.MiddleCenter));
+        c.Controls.Add(Rot("Sua bateria começa às", 440, 438, F(22), Estilo.Suave, 340, 36, ContentAlignment.MiddleRight));
+        c.Controls.Add(Rot(hora, 786, 434, Estilo.Mono(P(28), FontStyle.Bold), Estilo.Texto, 140, 40, ContentAlignment.MiddleLeft));
         c.Controls.Add(Rot("Atenção às informações passadas no briefing e divirta-se!", 170, 494, F(19), Estilo.Suave, 1026, 34, ContentAlignment.MiddleCenter));
         Botao(c, "Concluir", 500, 560, 180, true, () => { Reiniciar(); return Task.CompletedTask; }, 64, 19);
         c.Controls.Add(Rot("Volta para o início após 90 segundos sem interação", 700, 560, F(16), Estilo.MuitoSuave, 380, 64, ContentAlignment.MiddleLeft));
@@ -771,7 +849,12 @@ public class ListaOpcoes : Panel
         Controls.Add(l);
         l.BringToFront(); // Dock=Top empilha na ordem inversa; traz pra frente para manter a ordem
     }
-    public void Vazio(string msg) => Controls.Add(new Label { Text = msg, Dock = DockStyle.Top, Height = (int)(70 * _k), ForeColor = Estilo.Suave, Font = Estilo.F(17 * _k), BackColor = Color.Transparent, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding((int)(10 * _k), 0, 0, 0) });
+    public void Vazio(string msg) => Controls.Add(new Label
+    {
+        Text = msg, Dock = DockStyle.Top, AutoSize = false, Height = (int)(96 * _k), ForeColor = Estilo.Suave,
+        Font = Estilo.F(17 * _k), BackColor = Color.Transparent, TextAlign = ContentAlignment.MiddleCenter,
+        Padding = new Padding((int)(24 * _k), 0, (int)(24 * _k), 0), AccessibleRole = AccessibleRole.StaticText, AccessibleName = msg,
+    });
     public IEnumerable<long> Marcados() => Controls.OfType<OpcaoLinha>().Where(o => o.Marcado).Select(o => o.Id);
     protected override void OnResize(EventArgs e)
     {
@@ -786,6 +869,7 @@ public class OpcaoLinha : Control
     readonly float _k;
     bool _marcado;
     bool _sobre;
+    bool _foco;
     public long Id { get; set; }
     public string Linha1 { get; set; } = "";
     public string Linha2 { get; set; } = "";
@@ -794,17 +878,48 @@ public class OpcaoLinha : Control
     public int Livres { get; set; }
     public int Total { get; set; }
     public event Action Mudou;
-    public bool Marcado { get => _marcado; set { if (_marcado == value) return; _marcado = value; Invalidate(); Mudou?.Invoke(); } }
+    public bool Marcado
+    {
+        get => _marcado;
+        set
+        {
+            if (_marcado == value) return;
+            _marcado = value;
+            AtualizarAcessibilidade();
+            Invalidate();
+            Mudou?.Invoke();
+        }
+    }
     public OpcaoLinha(float k)
     {
         _k = k;
         Height = (int)(84 * k);
         Cursor = Cursors.Hand;
-        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor, true);
+        TabStop = true;
+        AccessibleRole = AccessibleRole.CheckButton;
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor | ControlStyles.Selectable, true);
         BackColor = Color.Transparent;
         Click += (_, _) => Marcado = !Marcado;
         MouseEnter += (_, _) => { _sobre = true; Invalidate(); };
         MouseLeave += (_, _) => { _sobre = false; Invalidate(); };
+        GotFocus += (_, _) => { _foco = true; Invalidate(); };
+        LostFocus += (_, _) => { _foco = false; Invalidate(); };
+    }
+    protected override void OnCreateControl()
+    {
+        base.OnCreateControl();
+        AtualizarAcessibilidade();
+    }
+    void AtualizarAcessibilidade() => AccessibleName = $"{Linha1}. {Direita}. {(Marcado ? "Selecionada" : "Não selecionada")}";
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.KeyCode is Keys.Enter or Keys.Space)
+        {
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+            Marcado = !Marcado;
+        }
     }
     protected override void OnPaint(PaintEventArgs e)
     {
@@ -813,7 +928,7 @@ public class OpcaoLinha : Control
         var bounds = new Rectangle(0, 0, Width, Height);
         if (_marcado || _sobre)
         {
-            using var row = new SolidBrush(_marcado ? Color.FromArgb(25, 48, 209, 88) : Color.FromArgb(12, 255, 255, 255));
+            using var row = new SolidBrush(_marcado ? Color.FromArgb(30, Estilo.Verde.R, Estilo.Verde.G, Estilo.Verde.B) : Color.FromArgb(12, 255, 255, 255));
             g.FillRectangle(row, bounds);
         }
         var s = (int)(30 * _k);
@@ -839,8 +954,8 @@ public class OpcaoLinha : Control
         {
             var tipoRect = new Rectangle(Width - (int)(292 * _k), centro - (int)(16 * _k), (int)(132 * _k), (int)(32 * _k));
             var super = Tipo.Contains("Super", StringComparison.OrdinalIgnoreCase);
-            var cor = super ? Color.FromArgb(42, 255, 159, 10) : Color.FromArgb(42, 10, 132, 255);
-            var texto = super ? Color.FromArgb(255, 179, 64) : Color.FromArgb(100, 181, 255);
+            var cor = super ? Estilo.SuperFundo : Estilo.InformativoFundo;
+            var texto = super ? Estilo.SuperTexto : Estilo.InformativoTexto;
             using var badge = Estilo.Arredondado(tipoRect, (int)(16 * _k));
             using (var fill = new SolidBrush(cor)) g.FillPath(fill, badge);
             using var badgeFont = Estilo.F(14 * _k, false, FontStyle.Bold);
@@ -848,14 +963,14 @@ public class OpcaoLinha : Control
 
             var vagas = new Rectangle(Width - (int)(154 * _k), centro - (int)(23 * _k), (int)(132 * _k), (int)(26 * _k));
             using var vagasFont = Estilo.F(18 * _k, false, FontStyle.Bold);
-            TextRenderer.DrawText(g, Direita, vagasFont, vagas, Livres <= 3 ? Estilo.Amarelo : Color.White, TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+        TextRenderer.DrawText(g, Direita, vagasFont, vagas, Livres <= 3 ? Estilo.Amarelo : Estilo.Texto, TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
             var trilho = new Rectangle(Width - (int)(142 * _k), centro + (int)(12 * _k), (int)(120 * _k), (int)(5 * _k));
             using var fundo = new SolidBrush(Color.FromArgb(45, 255, 255, 255)); g.FillRectangle(fundo, trilho);
             if (Total > 0)
             {
                 var ocupadas = Math.Clamp(Total - Livres, 0, Total);
                 var barra = new Rectangle(trilho.X, trilho.Y, (int)Math.Round(trilho.Width * (double)ocupadas / Total), trilho.Height);
-                using var ocupacao = new SolidBrush(Livres <= 3 ? Color.FromArgb(255, 159, 10) : Estilo.Verde);
+                using var ocupacao = new SolidBrush(Livres <= 3 ? Estilo.Amarelo : Estilo.Verde);
                 g.FillRectangle(ocupacao, barra);
             }
         }
@@ -866,6 +981,11 @@ public class OpcaoLinha : Control
         }
         using var linha = new Pen(Color.FromArgb(20, 255, 255, 255));
         g.DrawLine(linha, 0, Height - 1, Width, Height - 1);
+        if (_foco)
+        {
+            using var foco = new Pen(Estilo.Foco, 2);
+            g.DrawRectangle(foco, new Rectangle(1, 1, Width - 3, Height - 3));
+        }
     }
 }
 

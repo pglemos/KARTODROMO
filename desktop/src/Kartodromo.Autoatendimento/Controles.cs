@@ -4,20 +4,27 @@ using Kartodromo.Comum;
 
 namespace Kartodromo.Autoatendimento;
 
-/// <summary>Paleta Apple TV do totem.</summary>
+/// <summary>Paleta operacional do totem: Pit Lane Noturno.</summary>
 public static class Estilo
 {
-    public static readonly Color Fundo = Color.Black;
-    public static readonly Color Cartao = Color.FromArgb(22, 255, 255, 255);
-    public static readonly Color Verde = Color.FromArgb(48, 209, 88);
-    public static readonly Color Texto = Color.FromArgb(245, 245, 247);
-    public static readonly Color Suave = Color.FromArgb(174, 174, 178);
-    public static readonly Color MuitoSuave = Color.FromArgb(142, 142, 147);
-    public static readonly Color Campo = Color.FromArgb(31, 31, 33);
-    public static readonly Color BordaCampo = Color.FromArgb(54, 54, 58);
-    public static readonly Color Amarelo = Color.FromArgb(255, 179, 64);
+    public static readonly Color Fundo = Color.FromArgb(3, 5, 4);
+    public static readonly Color Cartao = Color.FromArgb(18, 255, 255, 255);
+    public static readonly Color Verde = Color.FromArgb(0, 230, 118);
+    public static readonly Color VerdeEscuro = Color.FromArgb(0, 122, 61);
+    public static readonly Color VerdeSuave = Color.FromArgb(191, 239, 210);
+    public static readonly Color Texto = Color.FromArgb(247, 250, 246);
+    public static readonly Color Suave = Color.FromArgb(183, 194, 186);
+    public static readonly Color MuitoSuave = Color.FromArgb(130, 147, 136);
+    public static readonly Color Campo = Color.FromArgb(11, 16, 12);
+    public static readonly Color BordaCampo = Color.FromArgb(65, 80, 68);
+    public static readonly Color Amarelo = Color.FromArgb(250, 204, 21);
+    public static readonly Color InformativoFundo = Color.FromArgb(24, 64, 48);
+    public static readonly Color InformativoTexto = Color.FromArgb(151, 247, 194);
+    public static readonly Color SuperFundo = Color.FromArgb(76, 57, 12);
+    public static readonly Color SuperTexto = Color.FromArgb(255, 210, 74);
+    public static readonly Color Foco = Color.FromArgb(0, 230, 118);
 
-    static readonly string Familia = new[] { "Segoe UI Variable", "Segoe UI" }
+    static readonly string Familia = new[] { "Rajdhani", "Bahnschrift SemiCondensed", "Segoe UI Variable Text", "Segoe UI" }
         .First(f => { using var t = new Font(f, 10); return t.Name.Equals(f, StringComparison.OrdinalIgnoreCase); });
     static readonly string FamiliaMono = new[] { "Cascadia Mono", "Consolas" }
         .First(f => { using var t = new Font(f, 10); return t.Name.Equals(f, StringComparison.OrdinalIgnoreCase); });
@@ -84,6 +91,8 @@ public class CabecalhoTotem : Control
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Opaque, true);
         BackColor = Estilo.Fundo;
         TabStop = false;
+        AccessibleRole = AccessibleRole.StatusBar;
+        AccessibleName = "Progresso do autoatendimento";
     }
     public void Atualizar(int etapa, float escala)
     {
@@ -95,7 +104,7 @@ public class CabecalhoTotem : Control
     {
         e.Graphics.Clear(Estilo.Fundo);
         if (ClientSize.Width <= 0 || ClientSize.Height <= 0) return;
-        using var glow = new LinearGradientBrush(ClientRectangle, Color.FromArgb(30, 48, 209, 88), Color.Transparent, 90f);
+        using var glow = new LinearGradientBrush(ClientRectangle, Color.FromArgb(30, Estilo.Verde.R, Estilo.Verde.G, Estilo.Verde.B), Color.Transparent, 90f);
         e.Graphics.FillRectangle(glow, ClientRectangle);
     }
     protected override void OnPaint(PaintEventArgs e)
@@ -111,7 +120,7 @@ public class CabecalhoTotem : Control
             g.DrawImage(_logo, new Rectangle((int)Math.Round(56 * _escala), (int)Math.Round(36 * _escala), largura, altura));
         }
         if (_etapa <= 0) return;
-        string[] nomes = ["1 Identificação", "2 Cadastro", "3 Bateria"];
+        string[] nomes = ["1 Identificação", "2 Cadastro", "3 Baterias"];
         var x = (int)Math.Round(760 * _escala);
         var y = (int)Math.Round(36 * _escala);
         var w = (int)Math.Round(164 * _escala);
@@ -122,14 +131,16 @@ public class CabecalhoTotem : Control
             var atual = i + 1 == _etapa;
             var r = new Rectangle(x, y, w, h);
             using var path = Estilo.Arredondado(new Rectangle(r.X, r.Y, r.Width - 1, r.Height - 1), h / 2);
-            var fundo = atual ? Color.White : concluida ? Color.FromArgb(48, 48, 209, 88) : Color.FromArgb(20, 255, 255, 255);
+            var fundo = atual ? Estilo.Texto : concluida ? Color.FromArgb(48, Estilo.Verde.R, Estilo.Verde.G, Estilo.Verde.B) : Color.FromArgb(20, 255, 255, 255);
             using (var brush = new SolidBrush(fundo)) g.FillPath(brush, path);
-            var cor = atual ? Color.Black : concluida ? Color.FromArgb(126, 227, 154) : Estilo.Suave;
+            var cor = atual ? Estilo.Fundo : concluida ? Estilo.VerdeSuave : Estilo.Suave;
             using var font = Estilo.F(14 * _escala, false, atual ? FontStyle.Bold : FontStyle.Regular);
             TextRenderer.DrawText(g, nomes[i] + (concluida ? "  ✓" : ""), font, r, cor,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
             x += (int)Math.Round(174 * _escala);
         }
+        using var divisor = new Pen(Color.FromArgb(24, 255, 255, 255), Math.Max(1, _escala));
+        g.DrawLine(divisor, 56 * _escala, Height - Math.Max(1, _escala), Width - 56 * _escala, Height - Math.Max(1, _escala));
     }
     protected override void Dispose(bool disposing)
     {
@@ -172,16 +183,22 @@ public class Pilula : Control
 {
     public bool Principal { get; set; }
     bool _sobre;
+    bool _foco;
     public Pilula(string texto, bool principal = false)
     {
         Text = texto; Principal = principal;
         Size = new Size(154, 48);
         Font = Estilo.F(19, false, principal ? FontStyle.Bold : FontStyle.Regular);
         Cursor = Cursors.Hand;
-        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
+        TabStop = true;
+        AccessibleRole = AccessibleRole.PushButton;
+        AccessibleName = texto;
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor | ControlStyles.Selectable, true);
         BackColor = Color.Transparent;
         MouseEnter += (_, _) => { _sobre = true; Invalidate(); };
         MouseLeave += (_, _) => { _sobre = false; Invalidate(); };
+        GotFocus += (_, _) => { _foco = true; Invalidate(); };
+        LostFocus += (_, _) => { _foco = false; Invalidate(); };
     }
     public void Clicar() => OnClick(EventArgs.Empty);
     protected override void OnPaint(PaintEventArgs e)
@@ -193,7 +210,7 @@ public class Pilula : Control
         using var p = Estilo.Arredondado(r, (Height - 3) / 2);
         if (Principal)
         {
-            using var b = new SolidBrush(Enabled ? (_sobre ? Color.FromArgb(232, 232, 236) : Color.White) : Color.FromArgb(130, 130, 134));
+            using var b = new SolidBrush(Enabled ? (_sobre ? Color.FromArgb(232, 236, 232) : Estilo.Texto) : Color.FromArgb(130, 147, 136));
             g.FillPath(b, p);
         }
         else
@@ -203,8 +220,25 @@ public class Pilula : Control
             using var pen = new Pen(Color.FromArgb(38, 255, 255, 255), 1);
             g.DrawPath(pen, p);
         }
-        TextRenderer.DrawText(g, Text, Font, r, Principal ? Color.Black : Estilo.Texto, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+        TextRenderer.DrawText(g, Text, Font, r, Principal ? Estilo.Fundo : Estilo.Texto, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+        if (_foco && Enabled)
+        {
+            using var foco = new Pen(Estilo.Foco, 2);
+            using var anel = Estilo.Arredondado(new Rectangle(0, 0, Width - 1, Height - 1), Math.Max(1, (Height - 1) / 2));
+            g.DrawPath(foco, anel);
+        }
     }
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.KeyCode is Keys.Enter or Keys.Space)
+        {
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+            Clicar();
+        }
+    }
+    protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Invalidate(); }
 }
 
 /// <summary>Ícone de confirmação verde com halo.</summary>
@@ -220,10 +254,10 @@ public class IconeSucesso : Control
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
         var halo = new Rectangle(1, 1, Width - 3, Height - 3);
-        using (var b = new SolidBrush(Color.FromArgb(35, 48, 209, 88))) g.FillEllipse(b, halo);
+        using (var b = new SolidBrush(Color.FromArgb(35, Estilo.Verde.R, Estilo.Verde.G, Estilo.Verde.B))) g.FillEllipse(b, halo);
         var circ = new Rectangle(14, 14, Width - 29, Height - 29);
         using (var grad = new LinearGradientBrush(circ, Color.FromArgb(76, 224, 122), Color.FromArgb(31, 166, 74), LinearGradientMode.Vertical)) g.FillEllipse(grad, circ);
-        using var check = new Pen(Color.White, Math.Max(3, Width * .027f)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+        using var check = new Pen(Estilo.Texto, Math.Max(3, Width * .027f)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
         g.DrawLines(check, [new PointF(Width * .31f, Height * .51f), new PointF(Width * .45f, Height * .65f), new PointF(Width * .72f, Height * .37f)]);
     }
 }
@@ -232,6 +266,7 @@ public class IconeSucesso : Control
 public class Marcador : Control
 {
     bool _marcado;
+    bool _foco;
     public bool Marcado { get => _marcado; set { _marcado = value; Invalidate(); Mudou?.Invoke(); } }
     public event Action Mudou;
     public Marcador(string texto = "", bool marcado = false)
@@ -240,11 +275,16 @@ public class Marcador : Control
         Font = Estilo.F(18);
         ForeColor = Estilo.Texto;
         Cursor = Cursors.Hand;
-        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
+        TabStop = true;
+        AccessibleRole = AccessibleRole.CheckButton;
+        AccessibleName = texto;
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor | ControlStyles.Selectable, true);
         BackColor = Color.Transparent;
         Height = 34;
         Width = 30 + TextRenderer.MeasureText(texto, Font).Width + 8;
         Click += (_, _) => Marcado = !Marcado;
+        GotFocus += (_, _) => { _foco = true; Invalidate(); };
+        LostFocus += (_, _) => { _foco = false; Invalidate(); };
     }
     protected override void OnPaint(PaintEventArgs e)
     {
@@ -255,18 +295,33 @@ public class Marcador : Control
         if (_marcado)
         {
             using var b = new SolidBrush(Estilo.Verde); g.FillPath(b, p);
-            using var pen = new Pen(Color.White, 2.4f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            using var pen = new Pen(Estilo.Texto, 2.4f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
             g.DrawLines(pen, new Point[] { new Point(box.X + 5, box.Y + 11), new Point(box.X + 9, box.Y + 16), new Point(box.X + 17, box.Y + 6) });
         }
         else { using var pen = new Pen(Color.FromArgb(208, 208, 208), 2); g.DrawPath(pen, p); }
         if (Text.Length > 0) TextRenderer.DrawText(g, Text, Font, new Point(32, (Height - Font.Height) / 2), ForeColor);
+        if (_foco)
+        {
+            using var foco = new Pen(Estilo.Foco, 2);
+            g.DrawRectangle(foco, new Rectangle(0, 0, Width - 1, Height - 1));
+        }
+    }
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.KeyCode is Keys.Enter or Keys.Space)
+        {
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+            Marcado = !Marcado;
+        }
     }
 }
 
 /// <summary>Campo de texto escuro arredondado (TextBox sem borda dentro de um painel).</summary>
 public class CampoTexto : Panel
 {
-    public readonly TextBox Caixa = new() { BorderStyle = BorderStyle.None, BackColor = Estilo.Campo, ForeColor = Color.White };
+    public readonly TextBox Caixa = new() { BorderStyle = BorderStyle.None, BackColor = Estilo.Campo, ForeColor = Estilo.Texto };
     bool _foco;
     public CampoTexto()
     {
@@ -289,7 +344,7 @@ public class CampoTexto : Panel
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         using var p = Estilo.Arredondado(new Rectangle(1, 1, Width - 3, Height - 3), 16);
         using var b = new SolidBrush(Enabled ? Estilo.Campo : Color.FromArgb(34, 36, 40)); e.Graphics.FillPath(b, p);
-        using var pen = new Pen(_foco ? Color.White : Color.FromArgb(26, 255, 255, 255), _foco ? 2 : 1); e.Graphics.DrawPath(pen, p);
+        using var pen = new Pen(_foco ? Estilo.Foco : Color.FromArgb(26, 255, 255, 255), _foco ? 2 : 1); e.Graphics.DrawPath(pen, p);
     }
     protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Caixa.BackColor = Enabled ? Estilo.Campo : Color.FromArgb(34, 36, 40); Invalidate(); }
 }
@@ -306,7 +361,10 @@ public class CampoLista : Control
         Height = 48;
         ForeColor = Estilo.Texto;
         Cursor = Cursors.Hand;
-        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor, true);
+        TabStop = true;
+        AccessibleRole = AccessibleRole.ComboBox;
+        AccessibleName = "Lista de opções";
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor | ControlStyles.Selectable, true);
         BackColor = Color.Transparent;
         Click += (_, _) => Abrir();
     }
@@ -331,13 +389,20 @@ public class CampoLista : Control
         g.SmoothingMode = SmoothingMode.AntiAlias;
         using var p = Estilo.Arredondado(new Rectangle(1, 1, Width - 3, Height - 3), 16);
         using (var b = new SolidBrush(Enabled ? Estilo.Campo : Color.FromArgb(34, 36, 40))) g.FillPath(b, p);
-        using (var pen = new Pen(Color.FromArgb(26, 255, 255, 255), 1)) g.DrawPath(pen, p);
+        using (var pen = new Pen(Focused ? Estilo.Foco : Color.FromArgb(26, 255, 255, 255), Focused ? 2 : 1)) g.DrawPath(pen, p);
         TextRenderer.DrawText(g, Text, Font, new Rectangle(12, 0, Width - 40, Height), Enabled ? ForeColor : Estilo.Suave, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
         var cx = Width - 22; var cy = Height / 2;
         using var seta = new Pen(Estilo.Suave, 1.6f);
         g.DrawLines(seta, new PointF[] { new(cx - 5, cy - 2), new(cx, cy + 3), new(cx + 5, cy - 2) });
     }
     protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Invalidate(); }
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.KeyCode is Keys.Down or Keys.Right) { SelectedIndex = Math.Min(_itens.Length - 1, _sel + 1); e.Handled = true; e.SuppressKeyPress = true; }
+        else if (e.KeyCode is Keys.Up or Keys.Left) { SelectedIndex = Math.Max(0, _sel - 1); e.Handled = true; e.SuppressKeyPress = true; }
+        else if (e.KeyCode is Keys.Enter or Keys.Space) { Abrir(); e.Handled = true; e.SuppressKeyPress = true; }
+    }
 
     class CoresMenu : ProfessionalColorTable
     {
@@ -365,7 +430,7 @@ public class Alerta : Form
         {
             Bounds = new Rectangle(0, 0, ClientSize.Width, P(88))
         };
-        Controls.Add(cabecalho);
+        tela.Controls.Add(cabecalho);
         var wCard = Math.Min(P(600), ClientSize.Width - P(80));
         var hCard = P(300);
         var cartao = new Cartao { Bounds = new Rectangle((ClientSize.Width - wCard) / 2, (ClientSize.Height - hCard) / 2, wCard, hCard), Padding = new Padding(P(36)), BackColor = Color.Transparent };

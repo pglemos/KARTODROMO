@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createSession, mesmoPrograma, setCompetitors, type Session } from '../lib/timing/race-engine';
-import { competidoresComSorteio, pilotosDoSorteio, validarSorteio } from '../lib/timing/sorteio';
+import { competidoresComSorteio, descricaoModoSorteio, pilotosDoSorteio, validarSorteio } from '../lib/timing/sorteio';
 
 const DIA = Date.UTC(2026, 8, 27, 15, 0, 0);
 
@@ -10,6 +10,12 @@ function bateria(id: string, competitors: { kart: string; name: string; customer
 }
 
 describe('sorteio de karts', () => {
+  it('descreve no historico quando o fiscal montou o grid', () => {
+    expect(descricaoModoSorteio('fiscal')).toBe('fiscal escolhe');
+    expect(descricaoModoSorteio('um-a-um')).toBe('um a um');
+    expect(descricaoModoSorteio('')).toBe('todos de uma vez');
+  });
+
   it('lista os pilotos com os karts que já usaram hoje (locação) e ignora karts sem piloto', () => {
     const antes = bateria('b1', [{ kart: '12', name: 'Ana', customerId: '10' }, { kart: '7', name: 'Bruno' }], { state: 'encerrada' });
     const outroDia = bateria('b0', [{ kart: '30', name: 'Ana', customerId: '10' }], { state: 'encerrada', createdAt: DIA - 86_400_000 });
