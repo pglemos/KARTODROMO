@@ -734,7 +734,7 @@ public class FormPrincipal : Form
             "parceiros" => "Empresas que indicam clientes e recebem comissão",
             _ => "Módulo Office"
         };
-        _acaoTopo.Text = _grupo switch { "reservas" or "baterias" => "+ Criar reservas", "vendas" => "Receita avulsa", "oficina" => "Itens de manutenção", "vouchers" => "+ Criar voucher", "parceiros" => "+ Novo parceiro", "fidelidade" => _status == "contas" ? "+ Abrir conta" : "Criar voucher", _ => "" };
+        _acaoTopo.Text = _grupo switch { "reservas" or "baterias" => "+ Criar reservas", "vendas" => "Receita avulsa", "oficina" => "Itens de manutenção", "vouchers" => "+ Criar voucher", "parceiros" => "+ Novo parceiro", "fidelidade" => _status == "contas" ? "+ Abrir conta" : "+ Voucher com pontos", _ => "" };
         _acaoTopo.Visible = _grupo is "reservas" or "baterias" or "vendas" or "oficina" or "vouchers" or "parceiros" or "fidelidade";
         AtualizaPeriodos();
     }
@@ -994,7 +994,7 @@ public class FormPrincipal : Form
         }
         {
             var man = await Sessao.Api.Lista("/api/office/manutencoes?status=todas");
-            SetarContagem("oficina:arealizar", man.Count(r => !r.B("realizada")));
+            SetarContagem("oficina:arealizar", man.Count(PrecisaManutencao));
             SetarContagem("oficina:realizadas", man.Count(r => r.B("realizada")));
             SetarContagem("oficina:todas", man.Count);
         }
@@ -1008,7 +1008,7 @@ public class FormPrincipal : Form
         else if (_grupo == "oficina")
         {
             var all = await Sessao.Api.Lista("/api/office/manutencoes?status=todas");
-            SetarContagem("oficina:arealizar", all.Count(r => !r.B("realizada")));
+            SetarContagem("oficina:arealizar", all.Count(PrecisaManutencao));
             SetarContagem("oficina:realizadas", all.Count(r => r.B("realizada")));
             SetarContagem("oficina:todas", all.Count);
         }
@@ -1019,6 +1019,13 @@ public class FormPrincipal : Form
             SetarContagem("vouchers:uso", all.Count);
         }
     }
+
+    /// <summary>Vermelho só quando há algo a ver: "R$ 0,00" em vermelho parecia problema.</summary>
+    static Color? Alerta(long valor) => valor > 0 ? Tokens.Vermelho : null;
+
+    /// <summary>Controle da oficina que pede atenção: não realizado e vencido ou com 80% do limite de horas.</summary>
+    static bool PrecisaManutencao(JsonObject r) =>
+        !r.B("realizada") && (r.I("limiteHoras") <= 0 || r.I("minutosUso") >= r.I("limiteHoras") * 48);
 
     void SetarContagem(string chave, int valor)
     {
@@ -1052,13 +1059,13 @@ public class FormPrincipal : Form
                 ("Baterias", rows.Count.ToString(), null), ("Vagas", rows.Sum(r => r.I("vagas")).ToString(), null),
                 ("Reservas", rows.Sum(r => r.I("inscritos")).ToString(), null), ("Pagos", rows.Sum(r => r.I("pagos")).ToString(), Tokens.VerdeTexto)],
             "vendas" => [
-                ("Vendas", rows.Count.ToString(), null), ("Descontos", Fmt.Brl(rows.Sum(r => r.L("desconto") ?? 0)), Tokens.Vermelho),
-                ("Estornos", Fmt.Brl(rows.Sum(r => r.L("estorno") ?? 0)), Tokens.Vermelho),
+                ("Vendas", rows.Count.ToString(), null), ("Descontos", Fmt.Brl(rows.Sum(r => r.L("desconto") ?? 0)), Alerta(rows.Sum(r => r.L("desconto") ?? 0))),
+                ("Estornos", Fmt.Brl(rows.Sum(r => r.L("estorno") ?? 0)), Alerta(rows.Sum(r => r.L("estorno") ?? 0))),
                 ("Total final", Fmt.Brl(rows.Where(r => !r.B("cancelada")).Sum(r => r.L("final") ?? 0)), Tokens.VerdeTexto)],
             "oficina" => [
-                ("A realizar", rows.Count(r => !r.B("realizada")).ToString(), Tokens.Laranja),
+                ("Vencidas", rows.Count(r => !r.B("realizada") && r.I("limiteHoras") > 0 && r.I("minutosUso") >= r.I("limiteHoras") * 60).ToString(), Alerta(rows.Count(r => !r.B("realizada") && r.I("limiteHoras") > 0 && r.I("minutosUso") >= r.I("limiteHoras") * 60))),
+                ("Perto do limite (80%)", rows.Count(r => !r.B("realizada") && r.I("limiteHoras") > 0 && r.I("minutosUso") >= r.I("limiteHoras") * 48 && r.I("minutosUso") < r.I("limiteHoras") * 60).ToString(), Tokens.Laranja),
                 ("Realizadas", rows.Count(r => r.B("realizada")).ToString(), Tokens.VerdeTexto),
-                ("Próximas do limite", rows.Count(r => !r.B("realizada") && r.I("limiteHoras") > 0 && r.I("minutosUso") >= r.I("limiteHoras") * 50).ToString(), Tokens.Laranja),
                 ("Registros", rows.Count.ToString(), null)],
             "vouchers" => [
                 ("Vouchers", rows.Count.ToString(), null), ("Ativos", rows.Count(r => r.B("ativo")).ToString(), Tokens.VerdeTexto),
@@ -1066,7 +1073,7 @@ public class FormPrincipal : Form
             "fidelidade" when _status == "contas" => [("Contas", rows.Count.ToString(), null), ("Ativas", rows.Count(r => r.B("ativo")).ToString(), Tokens.VerdeTexto),
                 ("Pontos em aberto", rows.Sum(r => r.L("saldo") ?? 0).ToString("N0", Fmt.Br), Tokens.Laranja), ("Baterias pagas", rows.Sum(r => r.I("baterias")).ToString(), null)],
             "fidelidade" => [("Transações", rows.Count.ToString(), null), ("Pontos creditados", rows.Where(r => (r.L("pontos") ?? 0) > 0).Sum(r => r.L("pontos") ?? 0).ToString("N0", Fmt.Br), Tokens.VerdeTexto),
-                ("Pontos debitados", (-rows.Where(r => (r.L("pontos") ?? 0) < 0).Sum(r => r.L("pontos") ?? 0)).ToString("N0", Fmt.Br), Tokens.Vermelho), ("Contas", rows.Select(r => r.S("conta")).Distinct().Count().ToString(), null)],
+                ("Pontos debitados", (-rows.Where(r => (r.L("pontos") ?? 0) < 0).Sum(r => r.L("pontos") ?? 0)).ToString("N0", Fmt.Br), Alerta(-rows.Where(r => (r.L("pontos") ?? 0) < 0).Sum(r => r.L("pontos") ?? 0))), ("Contas", rows.Select(r => r.S("conta")).Distinct().Count().ToString(), null)],
             "parceiros" when _status == "lista" => [("Parceiros", rows.Count(r => r.B("ativo")).ToString(), null), ("Vendas indicadas", rows.Sum(r => r.I("vendasIndicadas")).ToString(), null),
                 ("Comissão a pagar", Fmt.Brl(rows.Sum(r => r.L("comissaoPendenteCentavos") ?? 0)), Tokens.Laranja), ("Comissão paga", Fmt.Brl(rows.Sum(r => r.L("comissaoPagaCentavos") ?? 0)), Tokens.VerdeTexto)],
             "parceiros" => [("Comissões", rows.Count.ToString(), null), ("Vendas indicadas", Fmt.Brl(rows.Sum(r => r.L("valorVendaCentavos") ?? 0)), null),

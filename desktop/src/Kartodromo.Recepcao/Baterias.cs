@@ -82,7 +82,7 @@ public class FormCriarReservas : DialogoDesign
     {
         var br = Fmt.Br.TextInfo;
         // ---------- aba 1: pelo padrão
-        var pad = new ListaDesign(); pad.Items.AddRange(Sessao.Padroes().Where(p => p.Dados?["ativo"] is null || p.Dados.B("ativo")).ToArray()); if (pad.Items.Count > 0) pad.SelectedIndex = 0;
+        var pad = new ListaDesign(); pad.Items.AddRange(Sessao.Padroes().Where(p => p.Dados?["ativo"] is null || p.Dados.B("ativo")).ToArray()); // sem escolha pronta: abria com "200 MILHAS" e um clique gerava 23 baterias erradas
         var mes = new ListaDesign();
         var hoje = DateTime.Today;
         for (var i = 0; i < 13; i++)
@@ -144,7 +144,7 @@ public class FormCriarReservas : DialogoDesign
         }
         void Previa()
         {
-            if ((pad.SelectedItem as Campos.Item)?.Dados is not JsonObject p) { previa.Text = "Cadastre um padrão em Ferramentas › Padrões de reservas."; return; }
+            if ((pad.SelectedItem as Campos.Item)?.Dados is not JsonObject p) { previa.Text = pad.Items.Count == 0 ? "Cadastre um padrão em Ferramentas › Padrões de reservas." : "Escolha a configuração padrão acima para ver quantas baterias serão criadas."; return; }
             var (de, ate) = Periodo();
             var sel = dias.Select((d, i) => (d, i)).Where(x => x.d.Checked).Select(x => x.i).ToHashSet();
             var pulados = new List<DateTime>(); var nDias = 0;
@@ -189,6 +189,7 @@ public class FormCriarReservas : DialogoDesign
             var sel = dias.Select((d, i) => (d, i)).Where(x => x.d.Checked).Select(x => x.i).ToArray();
             if (sel.Length == 0) { Msg.Aviso(this, "Marque pelo menos um dia da semana."); return; }
             if (Campos.IdDe(pad) is not long pid) { Msg.Aviso(this, "Escolha a configuração padrão."); return; }
+            if (!Msg.Pergunta(this, $"Gerar as baterias de \"{pad.Text}\" em {mes.Text}?\n\n{previa.Text}")) return;
             var (de, ate) = Periodo();
             var r = await Sessao.Api.Post("/api/office/baterias/gerar", new { padraoId = pid, de = Fmt.Iso(de), ate = Fmt.Iso(ate), diasSemana = sel, pularFeriados = feriadosCk.Checked, pularExistentes = existentesCk.Checked, ativo = ativo.Checked });
             Msg.Info(this, r.I("criadas") > 0 ? $"{r.I("criadas")} baterias criadas." : "Nenhuma bateria nova: os horários já existem ou os dias foram pulados.");

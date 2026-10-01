@@ -4,6 +4,7 @@
  * Só monta textos/HTML (sem IO); quem envia é o servidor da cronometragem.
  */
 import type { Competitor, Session, SessionType, Standing } from './race-engine';
+import { nomeProprio } from '../nomes';
 
 export type EmpresaEmail = { nome: string; telefone?: string | null; email?: string | null; cidade?: string | null; estado?: string | null; site?: string | null };
 
@@ -122,7 +123,7 @@ function tabelaClassificacao(ctx: ContextoProva, destaqueKart: string | null, es
       const eu = destaqueKart != null && r.kart === destaqueKart;
       const fundo = eu ? (estiloEmail ? 'background:#E8F5EE;font-weight:700;' : '') : '';
       return `<tr${eu && !estiloEmail ? ' class="eu"' : ''}>
-        <td style="${cel}${fundo}">${r.position}º</td><td style="${cel}${fundo}">${esc(r.kart)}</td><td style="${cel}${fundo}">${esc(r.name)}</td>
+        <td style="${cel}${fundo}">${r.position}º</td><td style="${cel}${fundo}">${esc(r.kart)}</td><td style="${cel}${fundo}">${esc(nomeProprio(r.name))}</td>
         <td style="${cel}${fundo}${dir}" class="r">${r.laps}</td><td style="${cel}${fundo}${dir}" class="r">${tempo(r.bestLapMs)}</td>
         ${ctx.tipo === 'corrida' ? `<td style="${cel}${fundo}${dir}" class="r">${tempo(r.totalMs)}</td>` : ''}<td style="${cel}${fundo}${dir}" class="r">${diferenca(r, ctx.tipo)}</td></tr>`;
     })
@@ -156,7 +157,7 @@ export function htmlEmail(ctx: ContextoProva, p: PilotoEmail, logoCid: string | 
   <tr><td style="background:#1D1D1F;padding:18px 24px;">${logoCid ? `<img src="cid:${logoCid}" alt="${esc(ctx.empresa.nome)}" height="36" style="display:block;height:36px;">` : `<span style="color:#fff;font-weight:700;font-size:16px;">${esc(ctx.empresa.nome)}</span>`}</td></tr>
   <tr><td style="padding:26px 24px 8px;">
     <div style="font-size:12px;color:#0B7A53;font-weight:700;letter-spacing:.04em;text-transform:uppercase;">Resultado oficial · ${esc(nomeTipo(ctx.tipo))}</div>
-    <h1 style="margin:6px 0 10px;font-size:22px;">Olá, ${esc(primeiroNome(p.nome))}!</h1>
+    <h1 style="margin:6px 0 10px;font-size:22px;">Olá, ${esc(primeiroNome(nomeProprio(p.nome)))}!</h1>
     <p style="margin:0 0 6px;font-size:14px;line-height:1.5;">Obrigado por correr com a gente${ctx.evento ? ` no evento <b>${esc(ctx.evento)}</b>` : ''}. O resultado oficial da prova e o seu volta a volta estão em PDF, anexados neste e-mail.</p>
   </td></tr>
   <tr><td style="padding:10px 24px 4px;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>${cartoes}</tr></table></td></tr>
@@ -173,13 +174,13 @@ export function htmlEmail(ctx: ContextoProva, p: PilotoEmail, logoCid: string | 
 export function textoEmail(ctx: ContextoProva, p: PilotoEmail) {
   const s = p.standing;
   return [
-    `Olá, ${primeiroNome(p.nome)}!`,
+    `Olá, ${primeiroNome(nomeProprio(p.nome))}!`,
     '',
     `Resultado oficial — ${nomeTipo(ctx.tipo)}: ${[ctx.grupo, ctx.prova].filter(Boolean).join(' · ')}`,
     s ? `Posição: ${s.position}º de ${ctx.classificacao.length} · Melhor volta: ${tempo(s.bestLapMs)} · Voltas: ${s.laps} · Kart ${p.kart}` : `Kart ${p.kart}`,
     ...ficha(ctx).map(([k, v]) => `${k}: ${v}`),
     '',
-    ...ctx.classificacao.map((r) => `${r.position}º  kart ${r.kart}  ${r.name}  ${r.laps} voltas  melhor ${tempo(r.bestLapMs)}  ${diferenca(r, ctx.tipo)}`),
+    ...ctx.classificacao.map((r) => `${r.position}º  kart ${r.kart}  ${nomeProprio(r.name)}  ${r.laps} voltas  melhor ${tempo(r.bestLapMs)}  ${diferenca(r, ctx.tipo)}`),
     '',
     'O resultado oficial e o seu volta a volta estão em PDF anexados.',
     `${ctx.empresa.nome} — envio automático, não responda.`,
@@ -219,7 +220,7 @@ export function htmlPdfVoltaAVolta(ctx: ContextoProva, p: PilotoEmail, logoDataU
   const s = p.standing;
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Volta a volta</title><style>${cssPdf}</style></head><body>
     ${cabecalhoPdf(ctx, 'Volta a volta', logoDataUri)}
-    <h2>${esc(p.nome)} · kart ${esc(p.kart)}${s ? ` · ${s.position}º lugar` : ''}</h2>
+    <h2>${esc(nomeProprio(p.nome))} · kart ${esc(p.kart)}${s ? ` · ${s.position}º lugar` : ''}</h2>
     <table><thead><tr><th>Volta</th><th class="r">Tempo</th><th class="r">Diferença para a melhor</th><th class="r">Hora</th></tr></thead><tbody>${linhas || '<tr><td colspan="4">Nenhuma volta registrada.</td></tr>'}</tbody></table>
     <p class="muted">Emitido automaticamente pela cronometragem · ${esc(ctx.empresa.nome)}</p></body></html>`;
 }

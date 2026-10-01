@@ -28,7 +28,8 @@ public partial class FormCrono
             if (selectedEvent != null && _gEventos.Rows.Count > 0 && _gEventos.ChaveAtual == null) SelecionarLinha(_gEventos, eventosVisiveis.IndexOf(selectedEvent));
             _eventoArvore = selectedEvent?.S("id");
             _subGrupos.Text = selectedEvent?.S("name") ?? "Selecione um evento";
-            var tracado = Crono.Arr(_catalog, "tracks").FirstOrDefault(t => t.S("id") == selectedEvent?.S("trackId"))?.S("name") ?? Crono.Arr(_catalog, "tracks").FirstOrDefault()?.S("name") ?? "—";
+            // evento sem traçado (o do dia, vindo da agenda) usa o comprimento padrão — antes mostrava o 1º da lista ("Traçado 11 Invertido")
+            var tracado = Crono.Arr(_catalog, "tracks").FirstOrDefault(t => t.S("id") == selectedEvent?.S("trackId"))?.S("name") ?? "Padrão (1.110 m)";
             var eventId = selectedEvent?.S("id") ?? "";
             var eventGroups = _groups.Where(g => g.S("eventId") == eventId).ToList();
             var selectedGroupId = (_gGrupos.ChaveAtual as JsonObject)?.S("id");

@@ -975,7 +975,11 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   }
   if (path === '/manutencoes' && method === 'GET') {
     const st = url.searchParams.get('status') || 'arealizar';
-    const where = st === 'arealizar' ? 'WHERE m.Realizada = 0' : st === 'realizadas' ? 'WHERE m.Realizada = 1' : '';
+    // "A realizar" = o que precisa de atenção: vencido ou com 80% do limite. Antes listava os 294 controles
+    // (até kart com 5 min de uso) e o selo laranja ficava sempre aceso; "Todas" continua mostrando tudo.
+    const where = st === 'arealizar'
+      ? 'WHERE m.Realizada = 0 AND (ISNULL(it.TempoHoras, 0) = 0 OR m.MinutosUso >= it.TempoHoras * 48)'
+      : st === 'realizadas' ? 'WHERE m.Realizada = 1' : '';
     send(
       200,
       await query(

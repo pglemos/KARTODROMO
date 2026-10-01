@@ -537,6 +537,9 @@ public class FormCheckout : Janela, ISemKit
         _gPag.Carregar(_pags.Select((p, i) => new JsonObject { ["id"] = i, ["i"] = i, ["forma"] = p.nome, ["valor"] = p.valor }));
         var t = Totais();
         _tot["tot"].Text = Fmt.Brl(t.tot); _tot["des"].Text = Fmt.Brl(t.des); _tot["acr"].Text = Fmt.Brl(t.acr);
+        // desconto/acréscimo zerados ficam neutros: vermelho só quando há valor
+        foreach (var (k, v) in new[] { ("des", t.des), ("acr", t.acr) })
+            _tot[k].ForeColor = v != 0 ? Color.FromArgb(255, 105, 97) : Color.FromArgb(174, 174, 178);
         _tot["sub"].Text = Fmt.Brl(t.sub); _tot["rec"].Text = Fmt.Brl(t.rec); _tot["tro"].Text = Fmt.Brl(t.troco);
         _falta.Text = t.falta > 0 ? $"Falta lançar {Fmt.Brl(t.falta)}" : "Pagamento completo";
         _valor.Text = t.falta > 0 ? Fmt.Dinheiro(t.falta) : "";

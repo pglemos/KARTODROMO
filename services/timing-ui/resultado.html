@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Relatório Oficial de Cronometragem</title>
 <style>
   :root {
@@ -755,12 +756,10 @@
         </td>
         <td class="rep-titles-td">
           <h1 class="rep-title-1" id="hdrTitle">KARTÓDROMO INTERNACIONAL DE BETIM</h1>
-          <div class="rep-subtitle-1" id="hdrSub1">BATERIA</div>
-          <div class="rep-subtitle-2" id="hdrSub2">TOMADA DE TEMPO</div>
-          <div class="rep-subtitle-3" id="hdrSub3">TRAÇADO PRINCIPAL · 1.110 m</div>
-          <div class="classification-rule" id="classificationRule" aria-live="polite">
-            <strong>TOMADA DE TEMPO</strong><span>melhor volta</span>
-          </div>
+          <div class="rep-subtitle-1" id="hdrSub1">&nbsp;</div>
+          <div class="rep-subtitle-2" id="hdrSub2">Carregando o resultado…</div>
+          <div class="rep-subtitle-3" id="hdrSub3">&nbsp;</div>
+          <div class="classification-rule" id="classificationRule" aria-live="polite"></div>
         </td>
         <td class="rep-logo-td" style="text-align: right;"></td>
       </tr>
@@ -907,6 +906,7 @@ function setStatusBadge(text, state = 'active') {
 function atualizarRegraVisual(sessionType = sessionData?.type) {
   const rule = document.getElementById('classificationRule');
   if (!rule) return;
+  if (!sessionType) { rule.innerHTML = ''; return; } // sem sessão carregada não inventa "TREINO · melhor volta"
   const criterio = getResultadoCriterio(sessionType);
   rule.innerHTML = `<strong>${esc(criterio.label)}</strong><span>${esc(criterio.detail)}</span>`;
 }
@@ -928,6 +928,11 @@ function renderReportLoadError(error) {
   const notes = document.getElementById('notesContainer');
   if (!content) return;
   if (notes) notes.innerHTML = '';
+  // sem sessão, o cabeçalho não pode ficar com textos de exemplo ("TOMADA DE TEMPO", "TREINO melhor volta")
+  for (const [id, txt] of [['hdrSub1', ''], ['hdrSub2', 'Resultado indisponível'], ['hdrSub3', ''], ['classificationRule', '']]) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = txt;
+  }
   content.innerHTML = `<section class="report-alert report-alert--error" role="alert">
     <div><h2>Não foi possível carregar o relatório</h2><p>${esc(erroTexto(error))}</p></div>
     <button type="button" class="retry-button" id="retryReportButton">Tentar novamente</button>
@@ -1204,16 +1209,21 @@ function renderReport() {
       } else {
         const prev = list[idx - 1];
         if (isArrival) {
+          // Diferença medida NA LINHA DE CHEGADA (gapMs do servidor). O tempo total de cada kart conta da largada
+          // dele, então totalMs - totalMs do anterior dava valores negativos (ex.: "-1:59.824" em 30/09).
+          const gapLider = (x) => (x === leader ? 0 : (x.gapMs ?? null));
           const lapsBehindLeader = (leader.laps || 0) - (r.laps || 0);
           if (lapsBehindLeader > 1) r.diffLeaderStr = `-${lapsBehindLeader} voltas`;
           else if (lapsBehindLeader === 1) r.diffLeaderStr = '-1 volta';
-          else if (r.totalMs && leader.totalMs) r.diffLeaderStr = fmtMs(r.totalMs - leader.totalMs);
+          else if (gapLider(r) !== null) r.diffLeaderStr = fmtMs(Math.max(0, gapLider(r)));
+          else if (r.totalMs && leader.totalMs) r.diffLeaderStr = fmtMs(Math.max(0, r.totalMs - leader.totalMs));
           else r.diffLeaderStr = '---';
 
           const lapsBehindPrev = (prev.laps || 0) - (r.laps || 0);
           if (lapsBehindPrev > 1) r.diffPrevStr = `-${lapsBehindPrev} voltas`;
           else if (lapsBehindPrev === 1) r.diffPrevStr = '-1 volta';
-          else if (r.totalMs && prev.totalMs) r.diffPrevStr = fmtMs(r.totalMs - prev.totalMs);
+          else if (gapLider(r) !== null && gapLider(prev) !== null) r.diffPrevStr = fmtMs(Math.max(0, gapLider(r) - gapLider(prev)));
+          else if (r.totalMs && prev.totalMs) r.diffPrevStr = fmtMs(Math.max(0, r.totalMs - prev.totalMs));
           else r.diffPrevStr = '---';
         } else {
           // Tomada de tempo / Melhor volta

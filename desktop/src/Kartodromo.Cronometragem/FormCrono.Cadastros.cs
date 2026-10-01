@@ -232,9 +232,9 @@ public partial class FormCrono
         var voltas = PecasDesign.Numero(sel?.I("maxLaps") ?? 0, 3); if ((sel?.I("maxLaps") ?? 0) == 0) voltas.Text = "";
         var g = d.Secao("Prova");
         d.Campo(g, "Data/hora (previsão)", hora, 2); d.Campo(g, "Nome", nome, 2); d.Campo(g, "Tipo", tipo, 2);
-        d.Campo(g, "Traçado", tracado, 3); d.Campo(g, "Tempo mínimo por volta (mm:ss)", minimo, 3);
+        d.Campo(g, "Traçado", tracado, 3); d.Campo(g, "Volta mínima (min:seg)", minimo, 3);
         var a = d.Secao("Autofinalizar", "Por tempo: ao acabar o tempo a cronometragem avisa (ESGOTADO); a quadriculada e o encerramento são sempre do cronometrista. Por voltas: a quadriculada sai quando o líder completa as voltas.");
-        d.Campo(a, "Tipo de finalização", fim, 2); d.Campo(a, "Finalizar por tempo (hh:mm)", tempo, 2); d.Campo(a, "Finalizar por nº de voltas", voltas, 2);
+        d.Campo(a, "Tipo de finalização", fim, 2); d.Campo(a, "Duração (h:min)", tempo, 2); d.Campo(a, "Finalizar por nº de voltas", voltas, 2);
         d.Nota("Treino livre: sem classificação · Treino classificatório (tomada de tempo): classifica pela melhor volta · Corrida: classifica por voltas e tempo total.");
         d.Subtitulo.Text = $"{ev?.S("name")} · {grupo.S("name")}";
         d.BotaoRodape("Salvar e fechar", true, () => Seguro.Rodar(d, async () =>
@@ -429,7 +429,7 @@ public partial class FormCrono
                 var t = new Dictionary<string, TextBox>();
                 TextBox C(string k, string padrao = "") { var x = Txt(e.S(k) is { Length: > 0 } v ? v : padrao); t[k] = x; return x; }
                 var g = d.Secao("Empresa");
-                d.Campo(g, "Nome", C("name", "KARTODROMO INTERNACIONAL DE BETIM"), 3); d.Campo(g, "CNPJ", C("cnpj"), 1); d.Campo(g, "Telefone", C("phone"), 1); d.Campo(g, "E-mail", C("email"), 1);
+                d.Campo(g, "Nome", C("name", "KARTODROMO INTERNACIONAL DE BETIM"), 6); d.Campo(g, "CNPJ", C("cnpj"), 2); d.Campo(g, "Telefone", C("phone"), 2); d.Campo(g, "E-mail", C("email"), 2); // CNPJ e e-mail saíam cortados com 1 coluna
                 var en = d.Secao("Endereço");
                 d.Campo(en, "Endereço", C("address"), 3); d.Campo(en, "Cidade", C("city", "Betim"), 2); d.Campo(en, "Estado", C("state", "MG"), 1);
                 d.BotaoRodape("Salvar", true, () => Seguro.Rodar(d, async () =>

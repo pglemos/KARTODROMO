@@ -189,6 +189,14 @@ const reducedMotionStyle = `<style data-generated="reduced-motion">
 `;
 
 /** Anel de foco visível para navegação por teclado; os protótipos zeram o outline dos campos. */
+/** Menu do topo vinha com 11px (auditoria de 01/10/2026): 13px no computador, sem mudar o layout do protótipo. */
+const navLegibleStyle = `<style data-generated="nav-legible">
+@media (min-width: 721px) {
+  header nav a, header nav a * { font-size: 13px !important; }
+}
+</style>
+`;
+
 const focusRingStyle = `<style data-generated="focus-ring">
 :focus-visible { outline: 2px solid #00e676; outline-offset: 3px; }
 a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible {
@@ -275,7 +283,7 @@ function build(page, source) {
     html = html.replace(/\n\s*<meta name="description" content="(?:[^"\\]|\\.)*">(?=\n)/, '');
     html = html.replace('<base href="/">\n', `<base href="/">\n${seoHead(page)}`);
     html = html.replace('<html>', '<html lang="pt-BR">');
-    html = html.replace('</head>', `${mobileFitStyle}${reducedMotionStyle}${focusRingStyle}</head>`);
+    html = html.replace('</head>', `${mobileFitStyle}${reducedMotionStyle}${focusRingStyle}${navLegibleStyle}</head>`);
     html = inertTemplate(html);
     html = html.replace('</body>', `${cleanUrlScript()}</body>`);
 

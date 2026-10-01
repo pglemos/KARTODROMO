@@ -12,12 +12,14 @@
   .bar .state { font-size:2.4vh; font-weight:800; padding:.4vh 1vw; border-radius:.6vh; background:#1db954; color:#000; }
   .bar .state.fin { background:#fff; }
   .bar .timer { margin-left:auto; font:900 6vh/1 ui-monospace, Consolas, monospace; }
-  table { width:100%; border-collapse:collapse; }
+  /* larguras fixas: a letra cresce pela altura (vh) e em 16:9 a última coluna (Dif.) saía cortada da tela */
+  table { width:100%; border-collapse:collapse; table-layout:fixed; }
   th { font-size:2.2vh; color:#8b978f; text-align:left; padding:.8vh 1.2vw; font-weight:700; text-transform:uppercase; }
-  td { font-size:var(--fs, 4.2vh); padding:.35vh 1.2vw; font-weight:800; font-variant-numeric:tabular-nums; border-top:1px solid #1a1a1a; white-space:nowrap; }
+  td { font-size:var(--fs, 4.2vh); padding:.35vh .8vw; font-weight:800; font-variant-numeric:tabular-nums; border-top:1px solid #1a1a1a; white-space:nowrap; }
   tr:nth-child(even) td { background:#0c0c0c; }
-  .pos { width:6vw; color:#f5c518; } .kart { width:8vw; } .kart b { background:#fff; color:#000; border-radius:.5vh; padding:0 .6vw; }
-  .nm { overflow:hidden; text-overflow:ellipsis; max-width:40vw; }
+  .pos { color:#f5c518; } .kart b { background:#fff; color:#000; border-radius:.5vh; padding:0 .6vw; }
+  .nm { overflow:hidden; text-overflow:ellipsis; }
+  th { padding:.8vh .8vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .t { font-family: ui-monospace, Consolas, monospace; text-align:right; }
   .best { color:#c77dff; }
   .flash td { animation: fl 1.2s ease-out; }
@@ -33,6 +35,8 @@ const fmt = (ms) => { if (ms == null) return '--'; const s = ms/1000, m = Math.f
 const clockFmt = (ms) => { const t = Math.max(0, Math.ceil((ms||0)/1000)); return `${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`; };
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const lastSeen = {};
+// no telão, nome longo vira primeiro nome + último sobrenome ("Kleimons Valadares Machado" → "Kleimons Machado")
+const curto = (n) => { const p = String(n || '').trim().split(/\s+/); return p.join(' ').length <= 20 || p.length < 3 ? p.join(' ') : p[0] + ' ' + p[p.length - 1]; };
 
 function render(st) {
   const v = st.focus;
@@ -48,14 +52,14 @@ function render(st) {
   const rows = v.state === 'preparando' ? v.competitors.map((c, i) => ({ position: i+1, kart: c.kart, name: c.name, laps: 0 })) : v.standings;
   const best = Math.min(...rows.filter(r => r.bestLapMs).map(r => r.bestLapMs));
   const n = Math.max(rows.length, 8);
-  document.body.style.setProperty('--fs', Math.min(5.2, 78 / (n + 1)).toFixed(2) + 'vh');
-  document.getElementById('body').innerHTML = `<table><thead><tr><th>Pos</th><th>Kart</th><th>Piloto</th>
+  document.body.style.setProperty('--fs', `min(${Math.min(5.2, 78 / (n + 1)).toFixed(2)}vh, ${race ? 2.6 : 2.9}vw)`);
+  document.getElementById('body').innerHTML = `<table><colgroup><col style="width:6vw"><col style="width:9vw"><col><col style="width:7vw"><col style="width:13vw"><col style="width:13vw">${race ? '<col style="width:16vw">' : ''}</colgroup><thead><tr><th>Pos</th><th>Kart</th><th>Piloto</th>
     <th class="t">Voltas</th><th class="t">Última</th><th class="t">Melhor</th>${race ? '<th class="t">Dif.</th>' : ''}</tr></thead><tbody>` +
     rows.map(r => {
       const flash = r.lastCrossingWallMs && lastSeen[r.kart] !== r.lastCrossingWallMs && lastSeen[r.kart] !== undefined;
       lastSeen[r.kart] = r.lastCrossingWallMs;
       return `<tr class="${flash ? 'flash' : ''}"><td class="pos">${r.position}</td><td class="kart"><b>${esc(r.kart)}</b></td>
-      <td class="nm">${esc(r.name || 'Kart ' + r.kart)}${r.finished ? ' 🏁' : ''}</td><td class="t">${r.laps ?? ''}</td>
+      <td class="nm">${esc(curto(r.name) || 'Kart ' + r.kart)}${r.finished ? ' 🏁' : ''}</td><td class="t">${r.laps ?? ''}</td>
       <td class="t">${fmt(r.lastLapMs)}</td><td class="t ${r.bestLapMs === best ? 'best' : ''}">${fmt(r.bestLapMs)}</td>
       ${race ? `<td class="t">${r.position === 1 ? '' : r.gapLaps ? '+' + r.gapLaps + 'V' : r.gapMs != null ? '+' + fmt(r.gapMs) : ''}</td>` : ''}</tr>`;
     }).join('') + '</tbody></table>';

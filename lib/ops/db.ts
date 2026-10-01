@@ -7,6 +7,7 @@
  */
 import sql from 'mssql';
 import { corrigeEmail } from './email-dominio';
+import { nomeProprio } from '../nomes';
 
 let pool: sql.ConnectionPool | null = null;
 
@@ -135,6 +136,7 @@ export function clienteColumns(input: ClienteInput, partial: boolean): Record<st
     let v = (input as Record<string, unknown>)[key];
     if (typeof v === 'string') v = v.trim().slice(0, max);
     if (key === 'email' && typeof v === 'string') v = corrigeEmail(v); // minúsculo + "gmal.com" → "gmail.com"
+    if (key === 'nome' && typeof v === 'string') v = nomeProprio(v); // "joao victor" / "JOAO VICTOR" → "Joao Victor"
     if (key === 'estado' && typeof v === 'string') v = v.toUpperCase();
     set(col, v);
   }

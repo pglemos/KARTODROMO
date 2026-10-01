@@ -61,6 +61,7 @@ import {
   type TimingCatalog,
 } from '../lib/timing/catalog';
 import { rankingPorPeso, tituloFaixas, type DadosPiloto } from '../lib/timing/ranking-peso';
+import { nomeProprio } from '../lib/nomes';
 import { configPublica, enviarResultado, enviarTeste, lerConfig, salvarConfig, traduzirErro, type Dependencias } from './timing-email';
 import type { ContextoProva, EmpresaEmail } from '../lib/timing/email-resultado';
 import { competidoresComSorteio, descricaoModoSorteio, pilotosDoSorteio, validarSorteio, type Atribuicao } from '../lib/timing/sorteio';
@@ -360,8 +361,9 @@ function sessionView(s: Session) {
     groupId: s.groupId ?? null,
     proofId: s.proofId ?? null,
     observations: s.observations ?? [],
-    competitors: s.competitors.map((c) => ({ kart: c.kart, name: c.name, customerId: c.customerId ?? null, category: c.category ?? null, flag: c.flag ?? 'none', autoAdded: Boolean(c.autoAdded), detalhes: c.detalhes ?? null })),
-    standings: computeStandings(s, trackLengthFor(s)).filter((r) => !s.competitors.find((c) => c.kart === r.kart && c.name === r.name)?.detalhes?.oculto),
+    // nome próprio só na exibição (telão, resultado, operador): o cadastro vinha TUDO MAIÚSCULO ou tudo minúsculo
+    competitors: s.competitors.map((c) => ({ kart: c.kart, name: nomeProprio(c.name), customerId: c.customerId ?? null, category: c.category ?? null, flag: c.flag ?? 'none', autoAdded: Boolean(c.autoAdded), detalhes: c.detalhes ?? null })),
+    standings: computeStandings(s, trackLengthFor(s)).filter((r) => !s.competitors.find((c) => c.kart === r.kart && c.name === r.name)?.detalhes?.oculto).map((r) => ({ ...r, name: nomeProprio(r.name) })),
     emailsResultado: s.emailsResultado ?? null,
   };
 }

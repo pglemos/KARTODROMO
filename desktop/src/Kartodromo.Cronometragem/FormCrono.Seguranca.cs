@@ -152,7 +152,7 @@ public partial class FormCrono
         faixas.SelectedIndex = 0;
         var tracado = new ListaDesign(); tracado.Items.Add(new Campos.Item(0, "Todos os traçados"));
         foreach (var t in Crono.Arr(_catalog, "tracks")) tracado.Items.Add(new Campos.Item(tracado.Items.Count, t.S("name"), t));
-        tracado.SelectedIndex = tracado.Items.Count > 1 ? 1 : 0;
+        tracado.SelectedIndex = 0; // "Todos os traçados": o 1º da lista ("Traçado 11 Invertido") não é o usado nas baterias do dia
         var categoria = new ListaDesign(); categoria.Items.Add(new Campos.Item(0, "Todas as categorias"));
         foreach (var c in Crono.Arr(_catalog, "categories")) categoria.Items.Add(new Campos.Item(categoria.Items.Count, c.S("name"), c));
         categoria.SelectedIndex = categoria.Items.Count > 1 ? 1 : 0;

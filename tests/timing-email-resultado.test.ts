@@ -59,7 +59,7 @@ describe('e-mail do resultado', () => {
     expect(html).toContain('55.214');
     expect(html).toContain('BATERIA 17:00');
     expect(html).toContain('Traçado 1');
-    expect(html).toContain('JOÃO &lt;SILVA&gt;');
+    expect(html).toContain('João &lt;Silva&gt;'); // nome próprio na exibição (lib/nomes)
     expect(html).toContain('+1 volta');
     expect(html).toContain('cid:logo-kartodromo');
     expect(textoEmail(ctx, p)).toContain('Posição: 1º de 2');
@@ -69,7 +69,7 @@ describe('e-mail do resultado', () => {
   it('PDF do volta a volta traz o piloto e as voltas', () => {
     const p = { nome: 'MARIA SOUZA', kart: '07', email: 'm@e.com', standing: ctx.classificacao[0], voltas: [{ numero: 1, ms: 56_000, anulada: false, melhor: false, hora: 0 }, { numero: 2, ms: 55_214, anulada: false, melhor: true, hora: 0 }] };
     const html = htmlPdfVoltaAVolta(ctx, p, null);
-    expect(html).toContain('MARIA SOUZA · kart 07 · 1º lugar');
+    expect(html).toContain('Maria Souza · kart 07 · 1º lugar');
     expect(html).toContain('melhor volta');
     expect(html).toContain('+0.786');
     expect(nomeArquivo('Volta a volta João kart 07')).toBe('Volta-a-volta-Joao-kart-07');

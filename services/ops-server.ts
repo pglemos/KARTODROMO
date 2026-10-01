@@ -567,11 +567,28 @@ const server = http.createServer(async (req, res) => {
     }
     send(res, 404, { error: 'Rota desconhecida.' });
   } catch (err) {
+    // relatórios e termos abrem dentro do visualizador da Recepção: erro vira página legível, não JSON cru
+    // (ex.: "Participantes" sem bateria mostrava {"error":"Bateria não encontrada."})
+    if ((path.startsWith('/relatorio/') || path === '/termo') && !res.headersSent) {
+      const msg = err instanceof HttpError ? err.message : 'Não foi possível montar este relatório agora. Tente de novo.';
+      if (!(err instanceof HttpError)) log('erro', method, path, err);
+      res.writeHead(err instanceof HttpError ? err.status : 500, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+      return res.end(paginaDeErro(msg));
+    }
     if (err instanceof HttpError) return send(res, err.status, { error: err.message });
     log('erro', method, path, err);
     if (!res.headersSent) send(res, 500, { error: 'Erro interno. Tente de novo.' });
   }
 });
+
+function paginaDeErro(msg: string) {
+  const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Relatório indisponível</title>
+<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#F5F5F7;font-family:"Segoe UI",system-ui,sans-serif;color:#1D1D1F}
+.c{max-width:460px;margin:24px;padding:28px 32px;background:#fff;border:1px solid #E5E5EA;border-radius:14px;text-align:center}
+.i{width:44px;height:44px;margin:0 auto 12px;border-radius:50%;background:#FFF4E5;color:#C2410C;font:700 24px/44px "Segoe UI"}h1{margin:0 0 6px;font-size:18px}p{margin:0;color:#6E6E73;font-size:14px;line-height:1.45}</style></head>
+<body><div class="c"><div class="i">!</div><h1>Relatório indisponível</h1><p>${esc(msg)}</p></div></body></html>`;
+}
 
 server.listen(PORT, '0.0.0.0', () => log(`Servidor da operacao em http://0.0.0.0:${PORT} (recepcao /recepcao, totem /totem)`));
 
