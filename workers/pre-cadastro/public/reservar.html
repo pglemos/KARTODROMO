@@ -104,6 +104,9 @@
   .caixa { margin: 16px auto 0; max-width: 470px; text-align: left; background: var(--fundo); border-radius: 16px; padding: 14px 16px; font-size: 15px; }
   .caixa b { color: var(--verde); }
   #fechado { display: none; text-align: center; padding: 28px 20px; }
+  /* o formulário só aparece com a agenda carregada (antes piscava inteiro e virava "indisponível") */
+  #form { display: none; }
+  #carregando { text-align: center; padding: 34px 20px; color: var(--suave); }
   /* pagando: cabeçalho enxuto para o QR caber na tela do celular sem rolar */
   body.pagando .topo { padding-bottom: 54px; }
   body.pagando .topo .logo { width: min(200px, 56vw); margin-bottom: 8px; }
@@ -124,6 +127,8 @@
     <p id="fechadoMsg" style="color:#3A3F47">Fale com a recepção pelo WhatsApp para reservar.</p>
     <a class="btn2" href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Quero%20reservar%20uma%20bateria." target="_blank" rel="noopener">Reservar pelo WhatsApp</a>
   </section>
+
+  <section class="cartao" id="carregando"><div class="roda"></div>Carregando os horários…</section>
 
   <form id="form" novalidate autocomplete="on">
     <div class="erro" id="erro" role="alert"></div>
@@ -231,7 +236,7 @@
   }
 
   function fechado(msg) {
-    $('form').style.display = 'none'; $('fechado').style.display = 'block';
+    $('carregando').style.display = 'none'; $('form').style.display = 'none'; $('fechado').style.display = 'block';
     if (msg) $('fechadoMsg').textContent = msg;
   }
 
@@ -243,6 +248,7 @@
       if (!r.ok) return fechado(j.erro ? j.erro + ' Fale com a recepção pelo WhatsApp para reservar.' : null);
       if (!j.pagamentoOnline) return fechado('O pagamento online está em manutenção. Fale com a recepção pelo WhatsApp para reservar.');
       agenda = j;
+      $('carregando').style.display = 'none'; $('form').style.display = 'block';
       $('fatoPreco').textContent = `${brl(j.precoCentavos).replace(',00', '')} por piloto`;
       $('prazoTxt').textContent = `${j.prazoMin} minutos`;
       desenharDias();
@@ -391,7 +397,7 @@
   // ---------------- acompanhamento (consulta a cada 2,5 s)
   let timer = null, relogio = null, ultimoEstado = '';
   function acompanhar(id) {
-    $('form').style.display = 'none'; $('fechado').style.display = 'none';
+    $('form').style.display = 'none'; $('fechado').style.display = 'none'; $('carregando').style.display = 'none';
     document.body.classList.add('pagando');
     const a = $('acomp'); a.style.display = 'block';
     a.innerHTML = '<div class="roda"></div><h2>Confirmando sua vaga…</h2><p>Leva só alguns segundos.</p>';
