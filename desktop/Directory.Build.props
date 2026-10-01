@@ -9,7 +9,10 @@
     <Product>Kartódromo</Product>
     <Version>1.0.0</Version>
     <Copyright>Kartódromo Internacional de Betim</Copyright>
-    <ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
+    <!-- As telas são desenhadas em pixels de 96 dpi. Com SystemAware, num PC em 125% (Recepção 2, .239) só as fontes
+         cresciam e tudo se sobrepunha; DpiUnawareGdiScaled faz o Windows ampliar a tela inteira por igual (texto nítido).
+         Em 100% não muda nada. -->
+    <ApplicationHighDpiMode>DpiUnawareGdiScaled</ApplicationHighDpiMode>
     <SatelliteResourceLanguages>pt-BR</SatelliteResourceLanguages>
     <NoWarn>$(NoWarn);CA1416;WFO1000;MSB3277</NoWarn>
   </PropertyGroup>
