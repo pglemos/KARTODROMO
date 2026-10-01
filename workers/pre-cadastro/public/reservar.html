@@ -26,18 +26,22 @@
   .cartao .sub { color: var(--suave); font-size: 14px; margin: 0 0 14px 36px; }
   .desligado { opacity: .45; pointer-events: none; }
   /* dias */
-  .mes { font-weight: 700; font-size: 15px; margin: 0 0 8px 2px; text-transform: capitalize; }
-  .dias { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 10px; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
+  .mes { font-weight: 700; font-size: 15px; margin: 4px 0 8px 2px; }
+  .meses { display: flex; gap: 6px; overflow-x: auto; padding: 0 2px 10px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .meses button { flex: none; height: 36px; padding: 0 14px; border-radius: 999px; border: 1.5px solid var(--borda); background: #fff; font: inherit; font-size: 14px; font-weight: 600; color: #3A3F47; cursor: pointer; text-transform: capitalize; }
+  .meses button.sel { background: var(--texto); border-color: var(--texto); color: #fff; }
+  .meses button:disabled { color: #B4B8BF; cursor: default; }
+  .dias { display: flex; gap: 8px; overflow-x: auto; padding: 6px 6px 18px; margin: -4px -6px 0; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
   .dia { flex: none; width: 62px; height: 76px; border: 1.5px solid var(--borda); border-radius: 14px; background: #fff; font: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; scroll-snap-align: start; color: var(--texto); }
   .dia small { font-size: 11.5px; font-weight: 700; color: var(--suave); text-transform: uppercase; letter-spacing: .03em; }
   .dia b { font-size: 22px; line-height: 1.1; }
   .dia i { font-style: normal; font-size: 10.5px; color: var(--suave); }
   .dia:disabled { background: #F7F7F8; color: #B4B8BF; cursor: default; }
   .dia:disabled small, .dia:disabled i { color: #C3C7CD; }
-  .dia.sel { border-color: var(--verde); background: var(--verde); color: #fff; box-shadow: 0 6px 16px rgba(11,122,83,.28); }
+  .dia.sel { border-color: var(--verde); background: var(--verde); color: #fff; box-shadow: 0 4px 10px rgba(11,122,83,.25); }
   .dia.sel small, .dia.sel i { color: rgba(255,255,255,.85); }
   /* horários */
-  .horas { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .horas { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px; }
   .hora { border: 1.5px solid var(--borda); border-radius: 14px; background: #fff; padding: 12px 14px; text-align: left; font: inherit; cursor: pointer; color: var(--texto); }
   .hora b { display: block; font-size: 21px; letter-spacing: -.01em; }
   .hora span { display: block; font-size: 13px; color: var(--suave); }
@@ -68,7 +72,7 @@
   .pilotos { display: grid; gap: 10px; margin-top: 12px; }
   /* pagamento */
   .formas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .forma { border: 1.5px solid var(--borda); border-radius: 14px; background: #fff; padding: 14px; text-align: left; font: inherit; cursor: pointer; color: var(--texto); }
+  .forma { border: 1.5px solid var(--borda); border-radius: 14px; background: #fff; padding: 14px; text-align: left; font: inherit; cursor: pointer; color: var(--texto); display: flex; flex-direction: column; justify-content: flex-start; gap: 2px; }
   .forma b { display: block; font-size: 17px; }
   .forma span { font-size: 13px; color: var(--suave); }
   .forma.sel { border-color: var(--verde); box-shadow: 0 0 0 4px rgba(11,122,83,.16); }
@@ -91,7 +95,7 @@
   .roda { width: 46px; height: 46px; border-radius: 50%; border: 4px solid var(--verde-claro); border-top-color: var(--verde); margin: 6px auto 12px; animation: gira 0.9s linear infinite; }
   @keyframes gira { to { transform: rotate(360deg); } }
   .ok { width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 12px; background: var(--verde-claro); display: flex; align-items: center; justify-content: center; }
-  .qr { width: min(260px, 70vw); height: auto; border: 1px solid var(--borda); border-radius: 14px; padding: 8px; background: #fff; margin: 8px auto; display: block; }
+  .qr { image-rendering: pixelated; width: min(260px, 70vw); height: auto; border: 1px solid var(--borda); border-radius: 14px; padding: 8px; background: #fff; margin: 8px auto; display: block; }
   .copia { display: flex; gap: 8px; max-width: 470px; margin: 8px auto 0; }
   .copia input { font-size: 13px; font-family: ui-monospace, Menlo, Consolas, monospace; height: 46px; }
   .copia button { flex: none; height: 46px; border: 0; border-radius: 12px; background: var(--verde); color: #fff; font: inherit; font-weight: 700; padding: 0 16px; cursor: pointer; }
@@ -100,6 +104,10 @@
   .caixa { margin: 16px auto 0; max-width: 470px; text-align: left; background: var(--fundo); border-radius: 16px; padding: 14px 16px; font-size: 15px; }
   .caixa b { color: var(--verde); }
   #fechado { display: none; text-align: center; padding: 28px 20px; }
+  /* pagando: cabeçalho enxuto para o QR caber na tela do celular sem rolar */
+  body.pagando .topo { padding-bottom: 54px; }
+  body.pagando .topo .logo { width: min(200px, 56vw); margin-bottom: 8px; }
+  body.pagando .topo h1, body.pagando .topo p, body.pagando .fatos { display: none; }
 </style>
 </head>
 <body>
@@ -123,13 +131,14 @@
     <section class="cartao">
       <h2><span class="n">1</span>Dia</h2>
       <p class="sub">Dias em cinza não têm horário livre.</p>
-      <p class="mes" id="mes"></p>
+      <div class="meses" id="meses"></div>
       <div class="dias" id="dias"><div class="vazio">Carregando a agenda…</div></div>
     </section>
 
     <section class="cartao desligado" id="secHora">
       <h2><span class="n">2</span>Horário da largada</h2>
       <p class="sub">A chegada é 1 hora antes, para cadastro, equipamento e briefing.</p>
+      <p class="mes" id="mes"></p>
       <div class="horas" id="horas"><div class="vazio">Escolha o dia acima.</div></div>
     </section>
 
@@ -240,28 +249,48 @@
     } catch { fechado('Sem conexão com a agenda agora. Fale com a recepção pelo WhatsApp para reservar.'); }
   }
 
+  // meses (a agenda do ano seguinte abre em outubro) e os dias do mês escolhido
+  let porDia = {}, mesSel = null;
+  const livresNoDia = (d) => (porDia[d] || []).reduce((s, h) => s + h.livres, 0);
   function desenharDias() {
-    const porDia = {};
+    porDia = {};
     for (const h of agenda.horarios) (porDia[h.inicio.slice(0, 10)] ??= []).push(h);
-    const hoje = new Date(Date.now() - 3 * 3600e3);
-    const lista = [];
-    for (let i = 0; i < 60; i++) { const d = new Date(hoje.getTime() + i * 86400e3); lista.push(d.toISOString().slice(0, 10)); }
+    const comVaga = Object.keys(porDia).filter((d) => livresNoDia(d) > 0).sort();
+    if (!comVaga.length) { $('dias').innerHTML = '<div class="vazio">Nenhum horário livre nos próximos dias. Fale com a recepção pelo WhatsApp.</div>'; return; }
+    const meses = [...new Set(Object.keys(porDia).map((d) => d.slice(0, 7)))].sort();
+    const box = $('meses'); box.innerHTML = '';
+    for (const ym of meses) {
+      const [a, m] = ym.split('-').map(Number);
+      const b = document.createElement('button');
+      b.type = 'button'; b.dataset.m = ym; b.textContent = `${MESES[m - 1]}${a !== new Date().getFullYear() ? ' ' + a : ''}`;
+      b.disabled = !comVaga.some((d) => d.startsWith(ym));
+      b.onclick = () => escolherMes(ym);
+      box.appendChild(b);
+    }
+    escolherMes(comVaga[0].slice(0, 7), comVaga[0]);
+  }
+
+  function escolherMes(ym, diaInicial) {
+    mesSel = ym;
+    for (const b of $('meses').children) b.classList.toggle('sel', b.dataset.m === ym);
+    $('meses').querySelector('.sel')?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    const [a, m] = ym.split('-').map(Number), hoje = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);
     const dias = $('dias'); dias.innerHTML = '';
-    const primeiro = lista.find((d) => (porDia[d] || []).some((h) => h.livres > 0));
-    for (const d of lista) {
-      const hs = porDia[d] || [], livres = hs.reduce((s, h) => s + h.livres, 0);
-      const [a, m, x] = d.split('-').map(Number), dt = new Date(Date.UTC(a, m - 1, x));
+    for (let x = 1; x <= new Date(Date.UTC(a, m, 0)).getUTCDate(); x++) {
+      const d = `${ym}-${String(x).padStart(2, '0')}`;
+      if (d < hoje) continue;
+      const dt = new Date(Date.UTC(a, m - 1, x)), livres = livresNoDia(d);
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'dia'; b.dataset.d = d; b.disabled = !livres;
-      b.innerHTML = `<small>${DIAS[dt.getUTCDay()]}</small><b>${x}</b><i>${livres ? (x === 1 || d === lista[0] ? MESES[m - 1].slice(0, 3) : '&nbsp;') : 'fechado'}</i>`;
+      b.innerHTML = `<small>${DIAS[dt.getUTCDay()]}</small><b>${x}</b><i>${livres ? '&nbsp;' : porDia[d] ? 'lotado' : 'fechado'}</i>`;
       b.onclick = () => escolherDia(d);
       dias.appendChild(b);
     }
-    if (!primeiro) { dias.innerHTML = '<div class="vazio">Nenhum horário livre nos próximos dias. Fale com a recepção pelo WhatsApp.</div>'; return; }
-    escolherDia(primeiro);
+    escolherDia(diaInicial || Object.keys(porDia).filter((d) => d.startsWith(ym) && livresNoDia(d) > 0).sort()[0]);
   }
 
   function escolherDia(d) {
+    if (!d) return;
     dia = d; horario = null;
     for (const b of $('dias').children) b.classList?.toggle('sel', b.dataset.d === d);
     $('dias').querySelector('.sel')?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
@@ -363,6 +392,7 @@
   let timer = null, relogio = null, ultimoEstado = '';
   function acompanhar(id) {
     $('form').style.display = 'none'; $('fechado').style.display = 'none';
+    document.body.classList.add('pagando');
     const a = $('acomp'); a.style.display = 'block';
     a.innerHTML = '<div class="roda"></div><h2>Confirmando sua vaga…</h2><p>Leva só alguns segundos.</p>';
     window.scrollTo({ top: 0, behavior: 'smooth' });

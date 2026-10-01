@@ -24,7 +24,7 @@ export const configOnline = () => {
     antecedenciaMin: Number(e.OPS_ONLINE_ANTECEDENCIA_MIN || 120),
     maxPilotos: Number(e.OPS_ONLINE_MAX || 10),
     prazoMin: Number(e.OPS_ONLINE_PRAZO_MIN || 15),
-    diasAgenda: Number(e.OPS_ONLINE_DIAS || 90),
+    diasAgenda: Number(e.OPS_ONLINE_DIAS || 500), // a agenda do ano seguinte inteiro abre em outubro
   };
 };
 
@@ -68,9 +68,14 @@ export async function agendaOnline() {
   };
 }
 
+// só manda quando muda (ou a cada 10 min): cada envio é uma gravação no R2 da Cloudflare
+let ultimaAgenda = '', ultimoEnvio = 0;
 export async function publicarAgenda() {
   const agenda = await agendaOnline();
+  const assinatura = JSON.stringify({ ...agenda, atualizadoEm: '' });
+  if (assinatura === ultimaAgenda && Date.now() - ultimoEnvio < 10 * 60_000) return 0;
   await chamar('/api/sync/agenda', { method: 'PUT', body: JSON.stringify(agenda) });
+  ultimaAgenda = assinatura; ultimoEnvio = Date.now();
   return agenda.horarios.length;
 }
 
@@ -198,6 +203,42 @@ export async function expirarVencidos(log: Log) {
     res.push({ id: v.PedidoId, acao: 'expirado' });
   }
   return res;
+}
+
+// ---------------------------------------------------------------- no totem
+
+/**
+ * A reserva online fica toda no nome de quem comprou (N vagas pagas). Quando o grupo se identifica no totem, cada
+ * piloto que ainda não tem vaga na bateria fica com uma dessas vagas pagas (do comprador, se ele estiver no grupo ou
+ * for o responsável pelos menores) em vez de virar uma pré-reserva nova — senão as vagas eram contadas em dobro.
+ * Devolve o id da inscrição que passou para o piloto, ou null.
+ */
+export async function vagaOnlineDoGrupo(bateriaId: number, clienteId: number, participantes: number[], log: Log, quemSeIdentificou: number | null = null) {
+  const grupo = [...new Set(participantes.filter((n) => n > 0))];
+  if (!grupo.length) return null;
+  const lista = grupo.join(',');
+  const resp = await query<{ r: number }>(`SELECT DISTINCT ResponsavelId r FROM dbo.Cliente WHERE Id IN (${lista}) AND ResponsavelId IS NOT NULL`);
+  // quem se identificou no totem pagou pelo grupo mesmo sem correr (não está na lista de participantes)
+  const donos = [...new Set([...grupo, ...resp.map((x) => x.r), ...(quemSeIdentificou ? [quemSeIdentificou] : [])])].join(',');
+  const vaga = await one<{ Id: number; dono: number; nome: string }>(
+    `SELECT TOP 1 i.Id, i.ClienteId dono, c.Nome nome FROM dbo.Inscricao i JOIN dbo.Cliente c ON c.Id = i.ClienteId
+      WHERE i.BateriaId = @b AND i.Origem = 'site' AND i.Pago = 1 AND i.Status <> 'cancelada'
+        AND i.ClienteId IN (${donos}) AND i.ClienteId <> @c
+        -- o comprador que também vai correr fica com uma vaga dele: só as que sobram passam para o grupo
+        AND (i.ClienteId NOT IN (${lista})
+             OR (SELECT COUNT(*) FROM dbo.Inscricao j WHERE j.BateriaId = @b AND j.ClienteId = i.ClienteId AND j.Status <> 'cancelada') > 1)
+      ORDER BY i.Id DESC`,
+    { b: bateriaId, c: clienteId },
+  );
+  if (!vaga) return null;
+  const r = await one<{ n: number }>(
+    `UPDATE dbo.Inscricao SET ClienteId = @c, Observacao = LEFT(ISNULL(Observacao + ' · ', '') + @obs, 400), AtualizadoEm = SYSDATETIME()
+      OUTPUT 1 n WHERE Id = @id AND ClienteId = @dono`,
+    { c: clienteId, id: vaga.Id, dono: vaga.dono, obs: `vaga paga online por ${vaga.nome}` },
+  );
+  if (!r) return null;
+  log(`totem: vaga paga online (inscrição ${vaga.Id}, de ${vaga.nome}) passou para o cliente ${clienteId}`);
+  return vaga.Id;
 }
 
 /** Ciclo de 5 s: pedidos novos, pagos e vencidos. */

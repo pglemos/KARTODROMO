@@ -1,1 +1,3 @@
 public/app/*.apk
+.dev.vars
+.wrangler/

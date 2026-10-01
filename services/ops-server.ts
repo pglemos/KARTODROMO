@@ -25,7 +25,7 @@ import { bateriaDisponivelNoTotem, type TotemBateriaCandidate, TOTEM_BATERIAS_SQ
 import { relatorio } from '../lib/ops/relatorios';
 import { renderTermoResponsabilidade, type TermoParticipante } from '../lib/ops/termo';
 import { buscarPreCadastroAgora, preCadastroLigado, sincronizarPreCadastros } from '../lib/ops/pre-cadastro';
-import { publicarAgenda, sincronizarReservasOnline } from '../lib/ops/reserva-online';
+import { publicarAgenda, sincronizarReservasOnline, vagaOnlineDoGrupo } from '../lib/ops/reserva-online';
 import { selecionarSessoesParaRelatorio, type ReceptionTimingSession } from '../lib/timing/reception-crono-reports';
 
 function loadLocalEnv() {
@@ -194,6 +194,18 @@ function proximaImpressao() {
   return job;
 }
 
+/**
+ * Quem se identificou por último em cada totem (vale 15 min). É o "dono" das vagas pagas pela reserva online do grupo
+ * que está no totem: a lista de baterias soma essas vagas e, na inscrição, elas passam para os pilotos do grupo
+ * (mesmo que quem pagou não vá correr). Fica só no servidor: o app do totem aprovado não muda.
+ */
+const identificadoNoTotem = new Map<string, { id: number; em: number }>();
+const ipDe = (req: http.IncomingMessage) => String(req.socket.remoteAddress ?? '').replace(/^::ffff:/, '');
+function donoNoTotem(req: http.IncomingMessage) {
+  const x = identificadoNoTotem.get(ipDe(req));
+  return x && Date.now() - x.em < 15 * 60_000 ? x.id : null;
+}
+
 function origemDe(req: http.IncomingMessage) {
   const ip = String(req.socket.remoteAddress ?? '').replace(/^::ffff:/, '');
   return ip === '192.168.20.161' ? 'Totem 1' : ip === '192.168.20.69' ? 'Totem 2' : ip || 'totem';
@@ -244,7 +256,9 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     let c = await procurar();
     // não achou: pode ter feito o pré-cadastro pelo QR code há pouco (ainda não sincronizado)
     if (!c && (await buscarPreCadastroAgora(raw, log))) c = await procurar();
-    if (!c) return send(res, 200, { cliente: null }), true;
+    // outro cliente no totem: o anterior deixa de ser o dono das vagas pagas (não passam para um estranho)
+    if (!c) return identificadoNoTotem.delete(ipDe(req)), send(res, 200, { cliente: null }), true;
+    identificadoNoTotem.set(ipDe(req), { id: Number(c.id), em: Date.now() });
     const dependentes = await query<{ id: number; nome: string; nascimento: string }>(
       `SELECT c.Id id, c.Nome nome, CONVERT(varchar(10), c.Nascimento, 126) nascimento FROM dbo.Cliente c WHERE c.ResponsavelId = @id AND c.Bloqueado = 0 ORDER BY c.Nome`,
       { id: c.id },
@@ -322,6 +336,7 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     }
     if (!dados.nascimento) throw new HttpError(400, 'A data de nascimento é obrigatória.');
     const newId = await insertCliente({ ...dados, responsavelId, lgpd: true }, 'totem');
+    if (!responsavelId) identificadoNoTotem.set(ipDe(req), { id: newId, em: Date.now() });
     log(`totem: cliente novo ${newId}${responsavelId ? ` (menor de ${responsavelId})` : ''}`);
     send(res, 201, { id: newId, token: sign(`cli:${newId}`) });
     return true;
@@ -329,8 +344,24 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
 
   if (path === '/api/totem/baterias' && method === 'GET') {
     const rows = await query<TotemBateriaCandidate>(TOTEM_BATERIAS_SQL);
+    // ?grupo=id.token,id.token: vagas que o grupo já tem na bateria (as dele e as pagas online pelo responsável)
+    // contam como livres para ele — senão uma bateria lotada pela reserva online sumia do totem para quem pagou
+    const grupo = String(new URL(req.url ?? '/', 'http://totem').searchParams.get('grupo') ?? '').split(',').map((x) => x.split('.')).filter(([id, tk]) => Number(id) > 0 && tk === sign(`cli:${Number(id)}`)).map(([id]) => Number(id));
+    const dono = donoNoTotem(req);
+    if (dono && !grupo.includes(dono)) grupo.push(dono);
+    const doGrupo = new Map<number, number>();
+    if (grupo.length && rows.length) {
+      const lista = grupo.join(',');
+      for (const g of await query<{ b: number; n: number }>(
+        `SELECT i.BateriaId b, COUNT(*) n FROM dbo.Inscricao i
+          WHERE i.BateriaId IN (${rows.map((r) => Number(r.id)).join(',')}) AND i.Status <> 'cancelada'
+            AND (i.ClienteId IN (${lista})
+                 OR (i.Origem = 'site' AND i.Pago = 1 AND i.ClienteId IN (SELECT ResponsavelId FROM dbo.Cliente WHERE Id IN (${lista}) AND ResponsavelId IS NOT NULL)))
+          GROUP BY i.BateriaId`,
+      )) doGrupo.set(g.b, g.n);
+    }
     send(res, 200, rows
-      .map((r) => ({ ...r, livres: Math.max(0, r.vagas - r.ocupadas) }))
+      .map((r) => ({ ...r, livres: Math.max(0, r.vagas - r.ocupadas) + (doGrupo.get(Number(r.id)) ?? 0) }))
       .filter((r) => bateriaDisponivelNoTotem(r, r.dataHoje))
       .map((r) => ({
         id: r.id,
@@ -353,14 +384,30 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     const ids: number[] = [];
     // um termo por piloto (mesmo que ele corra em mais de uma bateria): a 1ª inscrição de cada um
     const termoDoPiloto = new Map<number, number>();
+    const grupo: number[] = [];
+    for (const p of participantes as { id: unknown; token: unknown }[]) {
+      const cid = int(p.id, 'Participante');
+      if (String(p.token ?? '') !== sign(`cli:${cid}`)) throw new HttpError(403, 'Sessão expirada, identifique-se de novo.');
+      grupo.push(cid);
+    }
     for (const bateriaId of baterias) {
-      for (const p of participantes as { id: unknown; token: unknown }[]) {
-        const cid = int(p.id, 'Participante');
-        if (String(p.token ?? '') !== sign(`cli:${cid}`)) throw new HttpError(403, 'Sessão expirada, identifique-se de novo.');
-        const dup = await one<{ Id: number }>(`SELECT Id FROM dbo.Inscricao WHERE BateriaId = @b AND ClienteId = @c AND Status <> 'cancelada'`, { b: bateriaId, c: cid });
+      // quem já tem vaga na bateria primeiro (o comprador da reserva online fica com a dele; as outras vão para o grupo)
+      const existentes = new Map<number, number>();
+      for (const cid of grupo) {
+        const dup = await one<{ Id: number }>(`SELECT TOP 1 Id FROM dbo.Inscricao WHERE BateriaId = @b AND ClienteId = @c AND Status <> 'cancelada' ORDER BY Id`, { b: bateriaId, c: cid });
+        if (dup) existentes.set(cid, dup.Id);
+      }
+      for (const cid of [...grupo].sort((a, b) => Number(existentes.has(b)) - Number(existentes.has(a)))) {
+        const dup = existentes.get(cid);
         if (dup) {
-          ids.push(dup.Id);
-          if (!termoDoPiloto.has(cid)) termoDoPiloto.set(cid, dup.Id);
+          ids.push(dup);
+          if (!termoDoPiloto.has(cid)) termoDoPiloto.set(cid, dup);
+          continue;
+        }
+        const paga = await vagaOnlineDoGrupo(bateriaId, cid, grupo, log, donoNoTotem(req));
+        if (paga) {
+          ids.push(paga);
+          if (!termoDoPiloto.has(cid)) termoDoPiloto.set(cid, paga);
           continue;
         }
         // pre-reserva: aparece em Reservas > Aprovar na recepcao

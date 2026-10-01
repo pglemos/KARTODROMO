@@ -401,7 +401,8 @@ async function inscreverN(bateriaId: number, clienteId: number, n: number, orige
     const livres = (b.Vagas as number) - (b.ocupadas as number);
     if (livres <= 0) throw new HttpError(409, 'Não há vagas para a bateria selecionada.');
     if (n > livres) throw new HttpError(409, `Não há vagas o suficiente para a quantidade de participantes selecionada. Vagas disponíveis: ${livres}.`);
-    if (n === 1) {
+    // no site quem compra nem sempre pilota: pode reservar de novo para mais alguém na mesma bateria
+    if (n === 1 && origem !== 'site') {
       const [dup] = await run(`SELECT Id FROM dbo.Inscricao WHERE BateriaId = @bateriaId AND ClienteId = @clienteId AND Status <> 'cancelada'`, { bateriaId, clienteId });
       if (dup) throw new HttpError(409, 'Já existe uma reserva em nome deste cliente.');
     }
