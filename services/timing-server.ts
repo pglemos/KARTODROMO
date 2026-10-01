@@ -909,7 +909,7 @@ function crossingRows(s: Session) {
   return s.competitors.flatMap((competitor) => competitor.crossings.map((crossing, index) => ({
     id: crossing.id ?? `${s.id}-${competitor.kart}-${index}`,
     kart: competitor.kart,
-    name: competitor.name,
+    name: nomeProprio(competitor.name), // como no resultado ao lado (TUDO MAIÚSCULO cortava no registro de passagens)
     category: competitor.category ?? null,
     transponder: crossing.transponder ?? null,
     lap: index,
@@ -926,7 +926,7 @@ function crossingRows(s: Session) {
   }))).concat((s.rejected ?? []).map((r) => ({
     id: r.id,
     kart: r.kart ?? '?',
-    name: r.kart ? s.competitors.find((c) => c.kart === r.kart)?.name ?? 'Kart ' + r.kart : 'Transponder desconhecido',
+    name: r.kart ? nomeProprio(s.competitors.find((c) => c.kart === r.kart)?.name ?? 'Kart ' + r.kart) : 'Transponder desconhecido',
     category: null,
     transponder: r.transponder,
     lap: -1,

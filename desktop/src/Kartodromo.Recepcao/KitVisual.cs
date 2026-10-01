@@ -206,7 +206,7 @@ public static class KitVisual
     static Size TamanhoDaJanela(Form f)
     {
         if (f is FormCheckout) return new Size(1320, 812);
-        if (f is FormCliente) return new Size(1080, 720);
+        if (f is FormCliente) return new Size(1080, 790); // 720 cortava a Observação no rodapé da coluna da direita
         if (f is FormCadastro && f.Text.Contains("Produto", StringComparison.OrdinalIgnoreCase)) return new Size(1140, 772);
         if (f is FormCadastro) return new Size(1060, 680);
         if (f.Text.Contains("Agenda", StringComparison.OrdinalIgnoreCase)) return new Size(1340, 820);

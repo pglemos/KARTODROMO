@@ -344,14 +344,14 @@ public class FormCheckout : Janela, ISemKit
         _codVoucher.Font = new Font("Cascadia Mono", 9.5F);
         var aplicarVoucher = new BotaoPlano { Text = "Aplicar", AutoSize = true, Dock = DockStyle.Right, FlatStyle = FlatStyle.Flat, BackColor = KitVisual.VerdeClaro, ForeColor = KitVisual.Verde, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Cursor = Cursors.Hand, TabStop = false };
         aplicarVoucher.FlatAppearance.BorderSize = 0; aplicarVoucher.Click += (_, _) => AplicarVoucher();
-        var caixaVoucher = FormCliente.Caixa(_codVoucher, aplicarVoucher); caixaVoucher.Dock = DockStyle.None; caixaVoucher.Size = new Size(200, 34); caixaVoucher.Margin = new Padding(0, 0, 0, 0);
+        var caixaVoucher = FormCliente.Caixa(_codVoucher, aplicarVoucher); caixaVoucher.Dock = DockStyle.None; caixaVoucher.Size = new Size(236, 34); caixaVoucher.Margin = new Padding(0, 0, 0, 0);
         barraCarrinho.Controls.Add(caixaVoucher);
         barraCarrinho.Resize += (_, _) => caixaVoucher.Margin = new Padding(Math.Max(0, barraCarrinho.ClientSize.Width - 24 - caixaVoucher.Width), 0, 0, 0);
         var gradeCarrinho = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 0, 0, 0), BackColor = Color.White }; gradeCarrinho.Controls.Add(_gCar);
         carrinho.Controls.Add(gradeCarrinho); carrinho.Controls.Add(barraCarrinho); carrinho.Controls.Add(titCarrinho); meio.Controls.Add(carrinho, 2, 0);
 
         var pagamentos = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, BackColor = fundo };
-        pagamentos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60)); pagamentos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40));
+        pagamentos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 64)); pagamentos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 36));
         var formasCard = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(12), Margin = new Padding(0, 0, 8, 0) };
         var pagamentosCard = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(12), Margin = new Padding(8, 0, 0, 0) };
         Arredondar(formasCard, 14); Arredondar(pagamentosCard, 14);
@@ -381,19 +381,16 @@ public class FormCheckout : Janela, ISemKit
         {
             var bs = formas.Controls.OfType<Button>().ToList(); if (bs.Count == 0) return;
             var w = Math.Max(72, (formas.ClientSize.Width - 8 * bs.Count - 2) / bs.Count);
-            foreach (var b in bs)
-            {
-                b.Width = w;
-                var tam = 9F;
-                while (tam > 7F && TextRenderer.MeasureText(b.Text, new Font("Segoe UI", tam, FontStyle.Bold)).Width > w - 10) tam -= 0.5F;
-                b.Font = new Font("Segoe UI", tam, FontStyle.Bold);
-            }
+            // uma letra só para todas (antes "Aniversariante" saía menor que as outras)
+            var tam = 9F;
+            while (tam > 7.5F && bs.Any(b => TextRenderer.MeasureText(b.Text, new Font("Segoe UI", tam, FontStyle.Bold)).Width > w - 8)) tam -= 0.5F;
+            foreach (var b in bs) { b.Width = w; b.Font = new Font("Segoe UI", tam, FontStyle.Bold); }
         };
         formas.AutoScroll = false;
         var linhaValor = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, Padding = new Padding(0, 5, 0, 0), FlowDirection = FlowDirection.LeftToRight };
         var recebido = new Panel { Width = 330, Height = 42, Padding = new Padding(12, 9, 12, 4), BackColor = Color.White, Margin = new Padding(0, 0, 8, 0) };
         recebido.Paint += (_, e) => { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using var p = VisualPrincipal.Redondo(new Rectangle(1, 1, recebido.Width - 3, recebido.Height - 3), 10); using var pen = new Pen(Tokens.Texto, 1.6F); e.Graphics.DrawPath(pen, p); };
-        var recebidoLabel = new Label { Text = "Valor recebido", Dock = DockStyle.Left, Width = 70, ForeColor = secundario, Font = new Font("Segoe UI", 8F), TextAlign = ContentAlignment.MiddleLeft };
+        var recebidoLabel = new Label { Text = "Valor recebido", Dock = DockStyle.Left, Width = 104, ForeColor = secundario, Font = new Font("Segoe UI", 9F), TextAlign = ContentAlignment.MiddleLeft };
         _valor.Width = 140; _valor.BorderStyle = BorderStyle.None; _valor.TextAlign = HorizontalAlignment.Right; _valor.Font = new Font("Segoe UI", 13.5F, FontStyle.Bold);
         _valor.Dock = DockStyle.Fill; _valor.PlaceholderText = "0,00";
         recebido.Controls.Add(_valor); recebido.Controls.Add(recebidoLabel); _valor.BringToFront();

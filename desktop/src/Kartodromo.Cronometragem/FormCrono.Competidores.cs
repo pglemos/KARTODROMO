@@ -52,8 +52,17 @@ public partial class FormCrono
         _gPilotos.Columns.Add(new DataGridViewTextBoxColumn { Name = "name", HeaderText = "Competidor", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, MinimumWidth = 160 });
         _gPilotos.Columns.Add(new DataGridViewTextBoxColumn { Name = "customerId", HeaderText = "Cliente", Width = 70, ReadOnly = true, Visible = false });
         _gPilotos.Columns.Add(new DataGridViewTextBoxColumn { Name = "category", HeaderText = "Categoria", Width = 104 });
-        foreach (var (n, t, w) in new[] { ("transponder", "Transponder", 104), ("iniciais", "Iniciais", 62), ("email", "E-mail", 200), ("cidade", "Cidade", 120), ("uf", "UF", 40), ("pais", "País", 48), ("peso", "Peso", 64) })
+        foreach (var (n, t, w) in new[] { ("transponder", "Transponder", 104), ("iniciais", "Iniciais", 62), ("email", "E-mail", 170), ("cidade", "Cidade", 120), ("uf", "UF", 40), ("pais", "País", 48), ("peso", "Peso", 64) })
             _gPilotos.Columns.Add(new DataGridViewTextBoxColumn { Name = n, HeaderText = t, Width = w, ReadOnly = true });
+        // e-mail é dado pessoal que não serve para cronometrar: na tela só "jo•••@gmail.com" (mostra que tem e-mail
+        // para o resultado); o valor completo continua na célula (envio e exportação)
+        _gPilotos.CellFormatting += (_, e) =>
+        {
+            if (e.ColumnIndex < 0 || _gPilotos.Columns[e.ColumnIndex].Name != "email" || e.Value is not string em || em.Length == 0) return;
+            var arroba = em.IndexOf('@');
+            e.Value = arroba > 0 ? em[..Math.Min(2, arroba)] + "•••" + em[arroba..] : "•••";
+            e.FormattingApplied = true;
+        };
         var ordem = new[] { "category", "kart", "transponder", "name", "iniciais", "email", "cidade", "uf", "pais", "peso", "customerId" };
         for (var i = 0; i < ordem.Length; i++) _gPilotos.Columns[ordem[i]].DisplayIndex = i;
         _gPilotos.Columns["name"].DefaultCellStyle.Font = new Font("Segoe UI Semibold", 9.6F);

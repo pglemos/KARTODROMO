@@ -46,7 +46,7 @@ public class FormCliente : Janela, ISemKit
         FormBorderStyle = FormBorderStyle.None;
         BackColor = KitVisual.Fundo;
         Font = new Font("Segoe UI", 9.5F);
-        ClientSize = new Size(1080, 726);
+        ClientSize = new Size(1080, 790);
         Resize += (_, _) => { using var p = VisualPrincipal.Redondo(new Rectangle(0, 0, Width, Height), 18); Region = new Region(p); };
         Campos.Mascara(_fone, Fmt.MascaraFone);
         // combos ficam brancos mesmo só consultando; a troca de valor é que fica bloqueada
@@ -164,10 +164,13 @@ public class FormCliente : Janela, ISemKit
             var nid = Novo(this);
             if (nid != null) { var c = (await Api.Get($"/api/office/clientes/{nid}")).AsObject(); _respId = nid; _resp.Text = c.S("nome"); }
         });
-        _resp.PlaceholderText = "Só para menores de idade — o responsável assina o termo";
+        _resp.PlaceholderText = "Só para menor de 18 anos";
         _resp.ReadOnly = true;
         var tirar = BotaoCampo("✕", () => { if (_modo == "ver") return; _respId = null; _resp.Text = ""; });
         _dica.SetToolTip(tirar, "Remover o responsável");
+        _dica.SetToolTip(_resp, "Menor de 18 anos: o responsável assina o termo por ele");
+        // o ✕ só aparece com um responsável escolhido (vazio, parecia um botão verde solto dentro do campo)
+        tirar.Visible = false; _resp.TextChanged += (_, _) => tirar.Visible = _resp.Text.Length > 0;
         var respLinha = new TableLayoutPanel { Dock = DockStyle.Top, Height = 46, ColumnCount = 3, BackColor = KitVisual.Cartao };
         respLinha.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); respLinha.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); respLinha.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         respLinha.Controls.Add(Caixa(_resp, tirar), 0, 0); respLinha.Controls.Add(bResp, 1, 0); respLinha.Controls.Add(bRespNovo, 2, 0);

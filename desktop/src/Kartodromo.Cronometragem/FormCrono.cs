@@ -485,7 +485,7 @@ public partial class FormCrono : Form
         _cbSessao.Width = 310;
         _cbSessao.SelectionChangeCommitted += (_, _) => { if (_cbSessao.SelectedItem is Campos.Item it) Selecionar(it.Dados.S("id")); };
 
-        if (_gPass.Columns.Count == 0) _gPass.Col("#", 40).Col("Nº", 45, filtro: true).Col("Competidor", 130, DataGridViewContentAlignment.MiddleLeft, true, filtro: true).Col("Transp.", 72, filtro: true).Col("Tempo", 76).Col("Volta", 46, filtro: true).Col("Hora", 96).Col("Situação", 150, DataGridViewContentAlignment.MiddleLeft, filtro: true);
+        if (_gPass.Columns.Count == 0) _gPass.Col("#", 36).Col("Nº", 42, filtro: true).Col("Competidor", 130, DataGridViewContentAlignment.MiddleLeft, true, filtro: true).Col("Transp.", 72, filtro: true).Col("Tempo", 76).Col("Volta", 44, filtro: true).Col("Hora", 84).Col("Situação", 150, DataGridViewContentAlignment.MiddleLeft, filtro: true);
         TemaCrono.EstilizarGrade(_gPass);
         _gPass.CorFundo = r =>
         {
@@ -531,10 +531,11 @@ public partial class FormCrono : Form
         _gObsAoVivo.Col("Hora", 95).Col("Observação", 400, DataGridViewContentAlignment.MiddleLeft, true).Col("Responsável", 140);
         TemaCrono.EstilizarGrade(_gObsAoVivo);
 
-        // ---- design (AoVivo.dc.html): passagens 430 px · resultado · faixa do placar 84 px
+        // ---- design (AoVivo.dc.html): passagens 470 px · resultado · faixa do placar 84 px
         _gPass.Columns[3].Visible = false; // transponder: fica no filtro/diálogo, fora da vista
         _gPass.Columns[7].Visible = false; // situação: vira cor da linha + dica ao parar o mouse
-        _gPass.Columns[0].Width = 36; _gPass.Columns[1].Width = 44; _gPass.Columns[4].Width = 74; _gPass.Columns[5].Width = 54; _gPass.Columns[6].Width = 90;
+        _gPass.Columns[0].Width = 36; _gPass.Columns[1].Width = 44; _gPass.Columns[4].Width = 70; _gPass.Columns[5].Width = 50; _gPass.Columns[6].Width = 90;
+        _gPass.Columns[2].MinimumWidth = 100; // o nome ocupa o que sobra, sem barra de rolagem lateral
         _gPass.Columns[6].HeaderText = "Hora";
         foreach (var c in new[] { 4, 6 }) _gPass.Columns[c].DefaultCellStyle.Font = new Font("Cascadia Mono", 8.4F);
         _gPass.Columns[1].DefaultCellStyle.Font = new Font("Cascadia Mono", 9.4F, FontStyle.Bold);
@@ -582,7 +583,7 @@ public partial class FormCrono : Form
         _faixa.AlternouAuto += () => { _chkPainelAuto.Checked = !_chkPainelAuto.Checked; AtualizarDesign(); };
 
         var main = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Padding = new Padding(18, 12, 18, 12), BackColor = TemaCrono.Fundo };
-        main.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 442)); main.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); main.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 84));
+        main.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 482)); main.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); main.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 84)); // passagens 442 → 482: cortava nome e hora
         main.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         main.Controls.Add(passCard, 0, 0); main.Controls.Add(resultCard, 1, 0); main.Controls.Add(_faixa, 2, 0);
         page.Padding = Padding.Empty;
