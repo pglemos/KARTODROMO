@@ -35,7 +35,10 @@ $exe = Join-Path $destino $exeNome
 if (-not (Test-Path (Join-Path $Origem $exeNome))) { throw "Nao achei $exeNome em $Origem" }
 
 # ---------- fecha versao aberta e o lancador antigo do Chrome
-Get-Process -Name "Kartodromo.$App" -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process -Name "Kartodromo.$App" -ErrorAction SilentlyContinue | ForEach-Object {
+  Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+  $null = $_.WaitForExit(15000) # sem esperar, a copia pegava o .exe ainda preso ("usado por outro processo")
+}
 $antigos = @($App) + $(if ($App -eq 'Cronometragem') { 'TV' } else { @() })
 foreach ($a in $antigos) {
   Get-CimInstance Win32_Process -Filter "Name='wscript.exe'" | Where-Object { $_.CommandLine -like "*KartodromoApps\$a\*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
@@ -48,7 +51,10 @@ New-Item -ItemType Directory -Force $destino | Out-Null
 # guarda ajustes feitos só nesta máquina (ex.: impressora dos termos do totem na recepção)
 $anterior = $null
 try { $anterior = Get-Content "$destino\appsettings.json" -Raw -ErrorAction Stop | ConvertFrom-Json } catch {}
-Copy-Item (Join-Path $Origem '*') $destino -Recurse -Force
+for ($tentativa = 1; ; $tentativa++) {
+  try { Copy-Item (Join-Path $Origem '*') $destino -Recurse -Force -ErrorAction Stop; break }
+  catch { if ($tentativa -ge 5) { throw }; Start-Sleep -Seconds 2 } # .exe ainda preso pelo antivirus/processo fechando
+}
 # permissões normais (herdadas de Program Files): arquivo copiado/movido com permissão própria
 # (só Administradores/SISTEMA) impedia o usuário da máquina de abrir o programa (0x80070005)
 foreach ($arq in Get-ChildItem $destino -Recurse -File) {
