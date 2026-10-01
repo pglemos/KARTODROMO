@@ -34,7 +34,8 @@ public class Relatorio : CartaoModal
         StartPosition = FormStartPosition.Manual;
         BackColor = FundoFolha;
         Padding = new Padding(1);
-        _web.DefaultBackgroundColor = FundoFolha;
+        // branco: o fundo padrão do WebView2 aparece nas margens do papel ao imprimir/exportar (antes saía cinza)
+        _web.DefaultBackgroundColor = Color.White;
         // barra própria (o kit visual da Recepção não mexe nesta janela: mover o WebView2 depois de aberto quebra a página)
         var barra = new Panel { Dock = DockStyle.Top, Height = 60, BackColor = Color.White };
         barra.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = Tokens.Linha });
@@ -148,15 +149,26 @@ public class Relatorio : CartaoModal
         return b;
     }
 
-    string NomeArquivo(string ext)
+    /// <summary>Nome sugerido: o relatório da cronometragem informa o próprio (window.nomeArquivoRelatorio, com a
+    /// data da prova); os demais usam o título da janela com " - " no lugar de "·" e a data de emissão.</summary>
+    async Task<string> NomeArquivo(string ext)
     {
-        var nome = string.Concat(_titulo.Split(Path.GetInvalidFileNameChars())).Trim();
-        return $"{nome} {DateTime.Now:yyyy-MM-dd HH-mm}.{ext}";
+        string daPagina = null;
+        try
+        {
+            var json = await _web.CoreWebView2.ExecuteScriptAsync("window.nomeArquivoRelatorio || ''");
+            daPagina = System.Text.Json.JsonSerializer.Deserialize<string>(json);
+        }
+        catch { /* página sem o nome */ }
+        var nome = !string.IsNullOrWhiteSpace(daPagina) ? daPagina : $"{_titulo} {DateTime.Now:yyyy-MM-dd HH-mm}";
+        nome = string.Concat(nome.Replace("·", "-").Split(Path.GetInvalidFileNameChars()));
+        nome = System.Text.RegularExpressions.Regex.Replace(nome, @"\s+", " ").Trim();
+        return $"{nome}.{ext}";
     }
 
-    string EscolherArquivo(string ext, string filtro)
+    async Task<string> EscolherArquivo(string ext, string filtro)
     {
-        using var d = new SaveFileDialog { FileName = NomeArquivo(ext), Filter = filtro, InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), OverwritePrompt = true };
+        using var d = new SaveFileDialog { FileName = await NomeArquivo(ext), Filter = filtro, InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), OverwritePrompt = true };
         return d.ShowDialog(this) == DialogResult.OK ? d.FileName : null;
     }
 
@@ -174,13 +186,24 @@ public class Relatorio : CartaoModal
     async Task ExportarPdf()
     {
         if (_web.CoreWebView2 == null) return;
-        var arq = EscolherArquivo("pdf", "PDF (*.pdf)|*.pdf");
+        var arq = await EscolherArquivo("pdf", "PDF (*.pdf)|*.pdf");
         if (arq == null) return;
         try
         {
+            // Folha A4 (o padrão do WebView2 é Carta, 8,5 × 11 pol.)
+            string orientacao = "p";
+            try { orientacao = System.Text.Json.JsonSerializer.Deserialize<string>(await _web.CoreWebView2.ExecuteScriptAsync("document.querySelector('.sheet-page.landscape') ? 'l' : 'p'")); } catch { }
+            var paisagem = orientacao == "l";
             var cfg = _web.CoreWebView2.Environment.CreatePrintSettings();
             cfg.ShouldPrintBackgrounds = true;
             cfg.ShouldPrintHeaderAndFooter = false;
+            cfg.Orientation = paisagem ? CoreWebView2PrintOrientation.Landscape : CoreWebView2PrintOrientation.Portrait;
+            cfg.PageWidth = paisagem ? 11.69 : 8.27;
+            cfg.PageHeight = paisagem ? 8.27 : 11.69;
+            // mesmas margens do @page do relatório (10 mm em cima, 14 mm embaixo para o "Página X de Y", 12 mm dos lados)
+            cfg.MarginTop = 10 / 25.4;
+            cfg.MarginBottom = 14 / 25.4;
+            cfg.MarginLeft = cfg.MarginRight = 12 / 25.4;
             if (!await _web.CoreWebView2.PrintToPdfAsync(arq, cfg)) throw new Exception("o navegador não gerou o arquivo");
             Avisar("PDF salvo: " + Path.GetFileName(arq));
             AbrirArquivo(arq);
@@ -196,7 +219,7 @@ public class Relatorio : CartaoModal
         const string js = """
             (() => { const out = [];
               document.querySelectorAll('h1, h2, table').forEach(el => {
-                if (el.tagName === 'TABLE') { el.querySelectorAll('tr').forEach(tr => out.push([...tr.children].map(td => td.innerText.trim()))); out.push([]); }
+                if (el.tagName === 'TABLE') { el.querySelectorAll('tr').forEach(tr => out.push([...tr.children].map(td => td.innerText.replace(/\s+/g, ' ').trim()))); out.push([]); }
                 else out.push([el.innerText.trim()]);
               });
               return out; })()
@@ -206,13 +229,16 @@ public class Relatorio : CartaoModal
             var json = await _web.CoreWebView2.ExecuteScriptAsync(js);
             var linhas = System.Text.Json.JsonSerializer.Deserialize<List<List<string>>>(json) ?? [];
             if (!linhas.Any(l => l.Count > 1)) { Avisar("Este relatório não tem tabela para exportar.", true); return; }
-            var arq = EscolherArquivo("csv", "Planilha do Excel (*.csv)|*.csv");
+            var arq = await EscolherArquivo("csv", "Planilha do Excel (*.csv)|*.csv");
             if (arq == null) return;
             var dinheiro = new System.Text.RegularExpressions.Regex(@"^([–-])?\s*R\$\s*([\d.]+,\d{2})$");
+            var tempo = new System.Text.RegularExpressions.Regex(@"^\+?(\d+:)?\d{1,2}(:\d{2})?\.\d{3}$");
             string Celula(string v)
             {
                 var m = dinheiro.Match(v.Replace(' ', ' '));
                 if (m.Success) return (m.Groups[1].Success ? "-" : "") + m.Groups[2].Value.Replace(".", "");
+                // tempo de volta/diferença ("53.550", "1:01.166", "+0.002"): o Excel em português leria "53.550" como 53550
+                if (tempo.IsMatch(v)) return "\"=\"\"" + v + "\"\"\"";
                 return v.IndexOfAny([';', '"', '\n', '\r']) >= 0 ? "\"" + v.Replace("\"", "\"\"") + "\"" : v;
             }
             var texto = string.Join("\r\n", linhas.Select(l => string.Join(";", l.Select(Celula))));
