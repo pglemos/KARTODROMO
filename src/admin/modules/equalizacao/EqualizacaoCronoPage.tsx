@@ -42,12 +42,13 @@ const sistemaNome: Record<string, string> = { ok: 'OK', atencao: 'Atenção', cr
 
 const tempo = (ms: number | null | undefined) => {
   if (ms == null || !(ms > 0)) return '–';
-  const t = Math.round(ms); const m = Math.floor(t / 60000); const s = ((t % 60000) / 1000).toFixed(3);
-  return m > 0 ? `${m}:${s.padStart(6, '0')}` : s;
+  // MM:SS:mmm (01:14:000), como na cronometragem: há traçado de mais de um minuto
+  const t = Math.round(ms); const p = (n: number, d: number) => String(n).padStart(d, '0');
+  return `${p(Math.floor(t / 60000), 2)}:${p(Math.floor((t % 60000) / 1000), 2)}:${p(t % 1000, 3)}`;
 };
 const delta = (ms: number | null) => (ms == null ? '' : `${ms > 0 ? '+' : ms < 0 ? '−' : '±'}${(Math.abs(ms) / 1000).toFixed(3)}`);
 const dataHora = (ms: number | null) => (ms ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(ms)) : '–');
-// milímetros do redutor e segundos em texto corrido com vírgula; os tempos de volta seguem com ponto
+// milímetros do redutor e segundos em texto corrido com vírgula; os tempos de volta saem como MM:SS:mmm
 const mm = (x: number) => Math.abs(x).toFixed(2).replace(/0$/, '').replace('.', ',');
 const segs = (ms: number) => (ms / 1000).toFixed(3).replace('.', ',');
 const ajuste = (x: number | null) => (x == null ? '' : x === 0 ? 'equalizado' : `${x > 0 ? 'abrir' : 'fechar'} ${mm(x)} mm`);

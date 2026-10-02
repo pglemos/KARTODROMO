@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyPassing, closeSession, createSession, startSession, type Session } from '../lib/timing/race-engine';
-import { ajusteRedutorMm, calcularEqualizacao, faixasDaRegra, textoAjuste, ultimaEqualizacaoPorKart, voltasNasBaterias } from '../lib/timing/equalizacao';
+import { ajusteRedutorMm, calcularEqualizacao, faixasDaRegra, fmtTempoVolta, tempoVoltaParaMs, textoAjuste, ultimaEqualizacaoPorKart, voltasNasBaterias } from '../lib/timing/equalizacao';
 import { rankingKarts } from '../lib/timing/ranking-karts';
 
 const BASE = Date.UTC(2026, 8, 3, 12, 30, 0); // 03/09/2026 09:30 em Brasília
@@ -44,6 +44,14 @@ describe('equalização dos karts', () => {
     // a faixa e o passo são editáveis: equalizado até 0,150 s; a cada 0,100 s, 0,05 mm
     const outra = { toleranciaMs: 150, faixaMs: 100, passoMm: 0.05 };
     expect([150, 151, 260, -360].map((d) => ajusteRedutorMm(d, outra))).toEqual([0, 0.05, 0.1, -0.15]);
+  });
+
+  it('a meta é digitada e mostrada como minutos:segundos:milésimos (há traçado de mais de um minuto)', () => {
+    expect([74_000, 52_395, 61_005, 600_000].map(fmtTempoVolta)).toEqual(['01:14:000', '00:52:395', '01:01:005', '10:00:000']);
+    expect(['01:14:000', '1:14:000', '00:52:395', '01:14:5', '1:14.250', '1:14,25', '74,000', '52.395'].map(tempoVoltaParaMs))
+      .toEqual([74_000, 74_000, 52_395, 74_500, 74_250, 74_250, 74_000, 52_395]);
+    expect(['', 'abc', '01:60:000', '1:2:3:4', '01:14:0000', '0', '00:00:000', '1:-5'].map(tempoVoltaParaMs)).toEqual([null, null, null, null, null, null, null, null]);
+    expect(tempoVoltaParaMs(fmtTempoVolta(83_417))).toBe(83_417);
   });
 
   it('guarda os tempos de 2 em 2 voltas; cada bloco é o redutor sugerido no anterior e vale o último bloco', () => {

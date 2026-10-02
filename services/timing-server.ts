@@ -67,7 +67,7 @@ import {
 } from '../lib/timing/catalog';
 import { rankingPorPeso, tituloFaixas, type DadosPiloto } from '../lib/timing/ranking-peso';
 import { dataBrasilia, historicoDoKart, rankingKarts } from '../lib/timing/ranking-karts';
-import { calcularEqualizacao, faixasDaRegra, REGRA_PADRAO, regraDa, SISTEMAS_KART, TOLERANCIA_PADRAO_MS, ultimaEqualizacaoPorKart, voltasNasBaterias, type ChecklistKart, type ConfigEqualizacao } from '../lib/timing/equalizacao';
+import { calcularEqualizacao, faixasDaRegra, REGRA_PADRAO, regraDa, SISTEMAS_KART, tempoVoltaParaMs, TOLERANCIA_PADRAO_MS, ultimaEqualizacaoPorKart, voltasNasBaterias, type ChecklistKart, type ConfigEqualizacao } from '../lib/timing/equalizacao';
 import { nomeProprio } from '../lib/nomes';
 import { configPublica, enviarResultado, enviarTeste, lerConfig, salvarConfig, traduzirErro, type Dependencias } from './timing-email';
 import type { ContextoProva, EmpresaEmail } from '../lib/timing/email-resultado';
@@ -772,6 +772,8 @@ function segundosParaMs(v: unknown) {
   const n = Number(String(v ?? '').trim().replace(',', '.'));
   return Number.isFinite(n) && n > 0 ? Math.round(n * 1000) : null;
 }
+
+const META_INVALIDA = 'Digite a meta de tempo como minutos:segundos:milésimos (ex.: 01:14:000).';
 
 /** "0,1", "+0,3" ou "−0,2" (mm) → número com 2 casas; null se não for número. */
 function milimetros(v: unknown) {
@@ -1632,8 +1634,8 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
   if (path === '/api/equalizacao/metas' && method === 'POST') {
     // meta de tempo escolhida para um traçado (vale para as próximas equalizações no modo "meta fixa")
     const body = await readBody(req);
-    const metaMs = segundosParaMs(body.metaSeg) ?? (Number(body.metaMs) > 0 ? Math.round(Number(body.metaMs)) : null);
-    if (!metaMs) return send(res, 400, { error: 'Digite a meta de tempo do traçado em segundos (ex.: 52,395).' });
+    const metaMs = tempoVoltaParaMs(body.metaSeg) ?? (Number(body.metaMs) > 0 ? Math.round(Number(body.metaMs)) : null);
+    if (!metaMs) return send(res, 400, { error: META_INVALIDA });
     const tid = body.trackId ? String(body.trackId) : null;
     if (tid && !catalog.tracks.some((t) => t.id === tid)) return send(res, 400, { error: 'Traçado não encontrado.' });
     const meta: MetaTracado = { id: randomUUID(), trackId: tid, metaMs, toleranciaMs: segundosParaMs(body.toleranciaSeg) ?? TOLERANCIA_PADRAO_MS, quando: Date.now(), origem: 'manual', autor: String(body.autor ?? 'Cronometragem').slice(0, 60) };
@@ -1687,6 +1689,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     if (tid && !catalog.tracks.some((t) => t.id === tid)) return send(res, 400, { error: 'Traçado não encontrado.' });
     const referencias = [...new Set((Array.isArray(body.referencias) ? body.referencias : String(body.referencias ?? '').split(/[;, ]+/)).map((k: unknown) => String(k).trim().replace(/^0+(?=\d)/, '')).filter(Boolean))];
     if (referencias.length > 3) return send(res, 400, { error: 'Use 2 ou 3 karts referência.' });
+    if (String(body.metaSeg ?? '').trim() && !tempoVoltaParaMs(body.metaSeg)) return send(res, 400, { error: META_INVALIDA });
     let regra: ReturnType<typeof regraDoPedido>;
     try { regra = regraDoPedido(body); } catch (err) { return send(res, 400, { error: (err as Error).message }); }
     const agora = new Date();
@@ -1699,7 +1702,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     });
     s.trackId = tid;
     s.equalizacao = {
-      referencias, metaModo: body.metaModo === 'fixa' ? 'fixa' : 'referencia', metaFixaMs: segundosParaMs(body.metaSeg),
+      referencias, metaModo: body.metaModo === 'fixa' ? 'fixa' : 'referencia', metaFixaMs: tempoVoltaParaMs(body.metaSeg),
       ...regra, mecanico: String(body.mecanico ?? '').trim().slice(0, 80), checklist: {}, aberturas: {}, redutorInicialMm: {},
     };
     sessions.set(s.id, s);
@@ -1732,7 +1735,10 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
           if (faltam.length) setCompetitors(s, [...s.competitors.map((c) => ({ kart: c.kart, name: c.name, customerId: c.customerId ?? null, category: c.category ?? null, detalhes: c.detalhes })), ...faltam.map((k) => ({ kart: k, name: `Kart ${k} (referência)` }))]);
         }
         if (body.metaModo !== undefined) cfg.metaModo = body.metaModo === 'fixa' ? 'fixa' : 'referencia';
-        if (body.metaSeg !== undefined) cfg.metaFixaMs = segundosParaMs(body.metaSeg);
+        if (body.metaSeg !== undefined) {
+          if (String(body.metaSeg ?? '').trim() && !tempoVoltaParaMs(body.metaSeg)) return send(res, 400, { error: META_INVALIDA });
+          cfg.metaFixaMs = tempoVoltaParaMs(body.metaSeg);
+        }
         if (body.regra !== undefined || body.toleranciaSeg !== undefined || body.faixaSeg !== undefined || body.passoMm !== undefined) Object.assign(cfg, regraDoPedido(body, cfg));
         if (typeof body.mecanico === 'string') cfg.mecanico = body.mecanico.trim().slice(0, 80);
         if (body.abertura && typeof body.abertura === 'object') {

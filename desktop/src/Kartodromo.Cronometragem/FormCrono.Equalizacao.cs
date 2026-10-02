@@ -44,7 +44,7 @@ public partial class FormCrono
         _gEq.RowTemplate.Height = 44;
         _gEq.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells; // a ação recomendada pode ocupar 2 ou 3 linhas
         _gEq.Col("Kart", 58).Col("Mecânico / piloto", 150, DataGridViewContentAlignment.MiddleLeft, true);
-        for (var i = 0; i < BlocosNaTela; i++) _gEq.Col(i == 0 ? "Bloco 1 · redutor inicial" : $"Bloco {i + 1} · redutor trocado", 178, DataGridViewContentAlignment.MiddleRight);
+        for (var i = 0; i < BlocosNaTela; i++) _gEq.Col(i == 0 ? "Bloco 1 · redutor inicial" : $"Bloco {i + 1} · redutor trocado", 186, DataGridViewContentAlignment.MiddleRight);
         _gEq.Col("Redutor sugerido", 112).Col("Status", 104).Col("Ação recomendada", 250, DataGridViewContentAlignment.MiddleLeft, true).Col("Voltas desde a última", 118, DataGridViewContentAlignment.MiddleRight);
         _gEq.Columns[0].DefaultCellStyle.Font = new Font("Cascadia Mono", 9.6F, FontStyle.Bold);
         for (var i = 2; i < 2 + BlocosNaTela; i++) _gEq.Columns[i].DefaultCellStyle.Font = new Font("Cascadia Mono", 8.8F);
@@ -75,6 +75,36 @@ public partial class FormCrono
     // tempos com ponto, como no resto da cronometragem (53.550)
     static readonly System.Globalization.CultureInfo Ponto = System.Globalization.CultureInfo.InvariantCulture;
     static string Seg(long? ms) => ms is long v && v > 0 ? (v / 1000.0).ToString("0.000", Ponto) : "";
+    /// <summary>Tempo de volta como MM:SS:mmm (01:14:000): há traçado de mais de um minuto. Diferenças e tolerâncias seguem em segundos (Seg).</summary>
+    static string Tempo(long? ms) => ms is long v && v > 0 ? $"{v / 60000:00}:{v % 60000 / 1000:00}:{v % 1000:000}" : "";
+    /// <summary>Lê "01:14:000", "1:14.000", "1:14,5", "74,000" ou "52.395". Milésimos incompletos valem como fração.</summary>
+    static bool TentarTempo(string texto, out long ms)
+    {
+        ms = 0;
+        var partes = (texto ?? "").Trim().Split(':').Select(x => x.Trim()).ToArray();
+        if (partes.Length is 0 or > 3 || partes.Any(x => x.Length == 0)) return false;
+        if (partes.Length == 1)
+        {
+            if (!TentarSegundos(partes[0], out var s)) return false;
+            ms = (long)Math.Round(s * 1000);
+            return ms > 0;
+        }
+        if (!int.TryParse(partes[0], out var min) || min < 0 || min > 999) return false;
+        long segMs;
+        if (partes.Length == 3)
+        {
+            if (partes[1].Length > 2 || partes[2].Length > 3 || !int.TryParse(partes[1], out var sg) || sg < 0 || !partes[2].All(char.IsDigit)) return false;
+            segMs = sg * 1000L + int.Parse(partes[2].PadRight(3, '0'));
+        }
+        else
+        {
+            if (!decimal.TryParse(partes[1].Replace(',', '.'), System.Globalization.NumberStyles.AllowDecimalPoint, Ponto, out var s)) return false;
+            segMs = (long)Math.Round(s * 1000);
+        }
+        if (segMs >= 60_000) return false;
+        ms = min * 60_000L + segMs;
+        return ms > 0;
+    }
     static string Delta(long? ms) => ms is not long v ? "" : (v > 0 ? "+" : v < 0 ? "−" : "±") + (Math.Abs(v) / 1000.0).ToString("0.000", Ponto);
     static double? Dec(JsonNode o, string k) => o?[k] is JsonValue v && v.GetValueKind() == System.Text.Json.JsonValueKind.Number ? v.GetValue<double>() : null;
     // milímetros do redutor com vírgula (0,1 · 0,25 · 17,0), sem sinal
@@ -136,8 +166,8 @@ public partial class FormCrono
         var origem = _eq.S("metaOrigem") switch { "fixa" => "meta fixa do traçado", "referencia" => "média das referências", _ => "defina as referências ou a meta" };
         var refs = Crono.Arr(r, "referencias");
         _tituloEq.Text = _eq.S("name");
-        _subEq.Text = $"{trilha?.S("name")} · {trilha?.I("lengthMeters")} m  ·  Meta {(meta is long m ? Seg(m) : "—")} ± {Seg(tol)} s ({origem})" +
-            (refs.Count > 0 ? "  ·  Referências: " + string.Join(", ", refs.Select(x => $"#{x.S("kart")} {(x.L("melhorMs") is long b ? Seg(b) : "sem volta")}")) : "  ·  Sem karts referência") +
+        _subEq.Text = $"{trilha?.S("name")} · {trilha?.I("lengthMeters")} m  ·  Meta {(meta is long m ? Tempo(m) : "—")} ± {Seg(tol)} s ({origem})" +
+            (refs.Count > 0 ? "  ·  Referências: " + string.Join(", ", refs.Select(x => $"#{x.S("kart")} {(x.L("melhorMs") is long b ? Tempo(b) : "sem volta")}")) : "  ·  Sem karts referência") +
             (regra == null ? "" : $"  ·  {regra.S("nome")}: a cada {Seg(regra.L("faixaMs"))} s, {Mm(Dec(regra, "passoMm") ?? 0.1)} mm");
         var karts = Crono.Arr(r, "karts");
         var voltas = _eq["voltasDesdeUltima"] as JsonObject;
@@ -147,18 +177,19 @@ public partial class FormCrono
             var linha = new object[2 + BlocosNaTela + 4];
             linha[0] = k.S("kart").PadLeft(2, '0'); linha[1] = k.S("piloto");
             var blocos = Crono.Arr(k, "blocos");
-            if (k.B("referencia")) linha[2] = $"Melhor {Seg(k.L("melhorMs"))}\nmédia {Seg(k.L("mediaMs"))} · {k.I("voltas")} voltas";
+            if (k.B("referencia")) linha[2] = $"Melhor {Tempo(k.L("melhorMs"))}\nmédia {Tempo(k.L("mediaMs"))}
+{k.I("voltas")} voltas";
             for (var i = 0; i < BlocosNaTela && !k.B("referencia"); i++)
             {
                 // quando há mais blocos que colunas, mostram-se os últimos (o redutor que está no kart agora)
                 var b = blocos.Count > BlocosNaTela ? blocos[blocos.Count - BlocosNaTela + i] : i < blocos.Count ? blocos[i] : null;
                 if (b == null) { linha[2 + i] = ""; continue; }
-                var tempos = string.Join(" / ", (b["voltasMs"] as JsonArray ?? []).Select(v => Seg(v?.GetValue<long>())));
+                var tempos = string.Join(" / ", (b["voltasMs"] as JsonArray ?? []).Select(v => Tempo(v?.GetValue<long>())));
                 // 3ª linha: o redutor deste bloco e o que a regra manda fazer depois dele; com mais blocos que colunas, a 1ª diz qual é
                 var qual = b.S("rotulo");
                 var sugestao = Ajuste(Dec(b, "ajusteMm"));
                 linha[2 + i] = (blocos.Count > BlocosNaTela ? $"bloco {b.I("bloco")}: " : "") + tempos + (b.B("completo")
-                    ? $"\nmédia {Seg(b.L("mediaMs"))}{(b.L("deltaMs") is long dl ? $" ({Delta(dl)})" : "")}\n{qual}{(sugestao.Length > 0 ? " → " + sugestao : "")}"
+                    ? $"\nmédia {Tempo(b.L("mediaMs"))}{(b.L("deltaMs") is long dl ? $" ({Delta(dl)})" : "")}\n{qual}{(sugestao.Length > 0 ? " → " + sugestao : "")}"
                     : $" / …\nfalta 1 volta\n{qual}");
             }
             var v0 = voltas?[k.S("kart")] as JsonObject;
@@ -215,7 +246,7 @@ public partial class FormCrono
         var mecanico = Txt(cfg?.S("mecanico") ?? "", 80);
         var modoRef = new RadioButton { Text = "Média das melhores voltas dos karts referência", Checked = cfg == null || cfg.S("metaModo") != "fixa" };
         var modoFixa = new RadioButton { Text = "Meta fixa do traçado (digitada ou a última registrada)", Checked = cfg?.S("metaModo") == "fixa" };
-        var metaFixa = Txt(Seg(cfg?.L("metaFixaMs")), 10);
+        var metaFixa = Txt(Tempo(cfg?.L("metaFixaMs")), 12);
         // regra do redutor: a do tipo de kart escolhido, que pode ser ajustada só para esta equalização
         var regras = RegrasDoRedutor();
         var atual = cfg != null ? cfg : regras[0];
@@ -235,7 +266,7 @@ public partial class FormCrono
         d.Campo(g, "Karts referência (2 ou 3, separados por vírgula)", refs, 3); d.Campo(g, "Mecânico / responsável", mecanico, 3);
         var m = d.Secao("Meta de tempo", "A meta não é fixa: vale para o traçado escolhido e fica no histórico por data.");
         d.Opcao(m, modoRef, 3); d.Opcao(m, modoFixa, 3);
-        d.Campo(m, "Meta fixa (segundos, ex.: 52,395)", metaFixa, 3);
+        d.Campo(m, "Meta fixa (minutos:segundos:milésimos, ex.: 01:14:000)", metaFixa, 3);
         var rg = d.Secao("Regra do redutor", "A diferença para o kart referência sugere o redutor: mais lento = abrir, mais rápido = fechar. Os valores vêm do tipo de kart e podem ser mudados só para esta equalização.");
         d.Campo(rg, "Tipo de kart", tipo, 6);
         d.Campo(rg, "Equalizado até ± (segundos)", tolerancia, 2); d.Campo(rg, "Depois, a cada (segundos)", faixa, 2); d.Campo(rg, "Abrir ou fechar (mm)", passo, 2);
@@ -245,6 +276,8 @@ public partial class FormCrono
             var lista = refs.Text.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).Distinct().ToList();
             if (lista.Count > 3) { Msg.Aviso(d, "Use 2 ou 3 karts referência."); refs.Focus(); return; }
             if (modoRef.Checked && lista.Count == 0 && !Msg.Pergunta(d, "Nenhum kart referência foi informado: a meta fica sem valor até você definir.\n\nContinuar assim?")) return;
+            if (metaFixa.Text.Trim().Length > 0 && !TentarTempo(metaFixa.Text, out _)) { Msg.Aviso(d, "Digite a meta como minutos:segundos:milésimos (ex.: 01:14:000)."); metaFixa.Focus(); return; }
+            if (modoFixa.Checked && metaFixa.Text.Trim().Length == 0 && !Msg.Pergunta(d, "A meta fixa está em branco: vale a última meta registrada para este traçado, se houver.\n\nContinuar assim?")) return;
             if (!TentarSegundos(tolerancia.Text.Trim(), out _)) { Msg.Aviso(d, "Digite até quantos segundos de diferença o kart está equalizado (ex.: 0,200)."); tolerancia.Focus(); return; }
             if (!TentarSegundos(faixa.Text.Trim(), out _)) { Msg.Aviso(d, "Digite de quantos em quantos segundos muda o redutor (ex.: 0,200)."); faixa.Focus(); return; }
             if (!TentarMm(passo.Text, out var passoMm) || passoMm <= 0) { Msg.Aviso(d, "Digite quantos milímetros abrir ou fechar a cada faixa (ex.: 0,1)."); passo.Focus(); return; }
@@ -275,14 +308,14 @@ public partial class FormCrono
         tracado.Items.Add(new Campos.Item(0, "Traçado principal (padrão)"));
         foreach (var t in trilhas) tracado.Items.Add(new Campos.Item(0, $"{t.S("name")} · {t.I("lengthMeters")} m", t));
         tracado.SelectedIndex = Math.Max(0, trilhas.FindIndex(t => t.S("id") == (_eq?["config"] as JsonObject)?.S("trackId")) + 1);
-        var meta = Txt("", 10); var tol = Txt(Seg(RegrasDoRedutor()[0].L("toleranciaMs") ?? 200), 8);
+        var meta = Txt("", 12); var tol = Txt(Seg(RegrasDoRedutor()[0].L("toleranciaMs") ?? 200), 8);
         var g = d.Secao("Nova meta");
         d.Campo(g, "Traçado", tracado, 6);
-        d.Campo(g, "Meta (segundos, ex.: 52,395)", meta, 3); d.Campo(g, "Tolerância ± (segundos)", tol, 3);
+        d.Campo(g, "Meta (minutos:segundos:milésimos, ex.: 01:14:000)", meta, 3); d.Campo(g, "Tolerância ± (segundos)", tol, 3);
         d.Nota("As metas anteriores não se apagam: veja em Histórico e metas, filtrando pelo traçado.");
         d.BotaoRodape("Salvar meta", true, () => Seguro.Rodar(d, async () =>
         {
-            if (!TentarSegundos(meta.Text.Trim(), out _)) { Msg.Aviso(d, "Digite a meta em segundos (ex.: 52,395)."); meta.Focus(); return; }
+            if (!TentarTempo(meta.Text, out _)) { Msg.Aviso(d, "Digite a meta como minutos:segundos:milésimos (ex.: 01:14:000)."); meta.Focus(); return; }
             await Crono.Api.Post("/api/equalizacao/metas", new JsonObject { ["trackId"] = (tracado.SelectedItem as Campos.Item)?.Dados?.S("id"), ["metaSeg"] = meta.Text.Trim(), ["toleranciaSeg"] = tol.Text.Trim(), ["autor"] = Environment.UserName });
             d.DialogResult = DialogResult.OK; d.Close();
             await CarregarEqualizacao(true);
@@ -392,7 +425,7 @@ public partial class FormCrono
         {
             var texto = Abertura(Dec(b, "aberturaMm") ?? 0);
             var caixa = Txt(texto, 6);
-            d.Campo(g3, $"Bloco {b.I("bloco")} · {string.Join(" / ", (b["voltasMs"] as JsonArray ?? []).Select(v => Seg(v?.GetValue<long>())))}", caixa, 2);
+            d.Campo(g3, $"Bloco {b.I("bloco")} · {string.Join(" / ", (b["voltasMs"] as JsonArray ?? []).Select(v => Tempo(v?.GetValue<long>())))}", caixa, 2);
             redutores.Add((b.I("bloco"), texto, caixa));
         }
         var nomes = new (string id, string titulo)[] { ("chassi", "Chassi / direção"), ("pneu", "Pneus / calibragem"), ("motor", "Motor / carburação"), ("embreagem", "Transmissão / embreagem"), ("freio", "Freios") };

@@ -106,6 +106,45 @@ const mm2 = (x: number) => Math.round(x * 100) / 100;
 /** 0.1 → "0,1" · 0.25 → "0,25" · 17 → "17,0" (sem sinal) */
 export const fmtMm = (x: number) => Math.abs(x).toFixed(2).replace(/0$/, '').replace('.', ',');
 
+/** Tempo de volta como MM:SS:mmm (01:14:000) — o formato da equalização, porque há traçado de mais de um minuto. */
+export function fmtTempoVolta(ms: number | null | undefined) {
+  if (ms == null || !(ms > 0)) return '';
+  const t = Math.round(ms);
+  const p = (n: number, d: number) => String(n).padStart(d, '0');
+  return `${p(Math.floor(t / 60000), 2)}:${p(Math.floor((t % 60000) / 1000), 2)}:${p(t % 1000, 3)}`;
+}
+
+/**
+ * Tempo de volta digitado → ms: "01:14:000" (minutos:segundos:milésimos), "1:14.000", "1:14,5", "74,000" ou "52.395".
+ * null se não for um tempo. Os milésimos incompletos valem como fração ("01:14:5" = 1 min 14,5 s).
+ */
+export function tempoVoltaParaMs(v: unknown): number | null {
+  const txt = String(v ?? '').trim();
+  if (!txt) return null;
+  const partes = txt.split(':').map((x) => x.trim());
+  if (partes.length > 3) return null;
+  let ms: number;
+  if (partes.length === 1) {
+    const s = Number(txt.replace(',', '.'));
+    if (!Number.isFinite(s)) return null;
+    ms = Math.round(s * 1000);
+  } else {
+    if (!/^\d{1,3}$/.test(partes[0])) return null;
+    let segundosMs: number;
+    if (partes.length === 3) {
+      if (!/^\d{1,2}$/.test(partes[1]) || !/^\d{1,3}$/.test(partes[2])) return null;
+      segundosMs = Number(partes[1]) * 1000 + Number(partes[2].padEnd(3, '0'));
+    } else {
+      const s = Number(partes[1].replace(',', '.'));
+      if (!/^\d{1,2}([.,]\d{1,3})?$/.test(partes[1]) || !Number.isFinite(s)) return null;
+      segundosMs = Math.round(s * 1000);
+    }
+    if (segundosMs >= 60_000) return null;
+    ms = Number(partes[0]) * 60_000 + segundosMs;
+  }
+  return ms > 0 ? ms : null;
+}
+
 /** Regra do redutor em uso: a da equalização, completada pelo padrão (Kart Indoor). */
 export function regraDa(cfg: ConfigEqualizacao | RegraRedutor | null | undefined): Required<RegraRedutor> {
   const c = (cfg ?? {}) as Partial<RegraRedutor> & { regraNome?: string };
