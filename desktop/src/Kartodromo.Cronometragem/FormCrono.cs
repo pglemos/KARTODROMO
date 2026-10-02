@@ -195,6 +195,7 @@ public partial class FormCrono : Form
         crono.DropDownItems.Add(new ToolStripMenuItem("Limpar passagens", null, (_, _) => LimparPassagens()) { ShortcutKeyDisplayString = "F6", ForeColor = vermelho });
         crono.DropDownItems.Add(new ToolStripMenuItem("Cancelar bateria", null, (_, _) => Acao("cancel")) { ForeColor = vermelho });
         crono.DropDownItems.Add(new ToolStripMenuItem("Reiniciar bateria…", null, (_, _) => ReiniciarBateria()) { ForeColor = vermelho });
+        crono.DropDownItems.Add(new ToolStripMenuItem("Remontar pelo diário (prova que correu sem a bateria aberta)…", null, (_, _) => RemontarPeloDiario()));
         crono.DropDownItems.Add(new ToolStripSeparator());
         crono.DropDownItems.Add(new ToolStripMenuItem("Advertência para o piloto…", null, (_, _) => AplicarPenalidade("advertencia")));
         crono.DropDownItems.Add(new ToolStripMenuItem("Penalidade de tempo para o piloto…", null, (_, _) => AplicarPenalidade("tempo")));
@@ -1409,7 +1410,7 @@ public partial class FormCrono : Form
             foreach (var (nome, acao, titulo) in new (string, Action, string)[] {
                 ("Penalidade", () => AplicarPenalidade("tempo", kartTeste), "Penalidade"), ("Advertencia", () => AplicarPenalidade("advertencia", kartTeste), "Advertência"),
                 ("EqConfigurar", () => ConfigurarEqualizacao(false), "Configurar equalização"), ("EqApontamentos", ApontamentosDoKart, "Apontamentos do kart"), ("EqMeta", MetaDoTracado, "Meta do traçado"),
-                ("Reiniciar", ReiniciarBateria, "Reiniciar"), ("VerdeCorrendo", VerdeComProvaCorrendo, "Bandeira verde"), ("EditarBateria", MudarCorridaDesign, "Editar bateria"),
+                ("Remontar", RemontarPeloDiario, "Remontar pelo diário"), ("Reiniciar", ReiniciarBateria, "Reiniciar"), ("VerdeCorrendo", VerdeComProvaCorrendo, "Bandeira verde"), ("EditarBateria", MudarCorridaDesign, "Editar bateria"),
                 ("Evento", () => EditarEventoDesign(true), null), ("GrupoEditar", () => EditarGrupoDesign(true), null), ("Distribuir", DistribuirProvaDesign, null), ("EmailConfig", ConfigurarEmail, "E-mail dos resultados"), ("EmailEnviar", EnviarEmail, "Enviar resultado") })
             {
                 var t = new System.Windows.Forms.Timer { Interval = 150 }; var achou = false; var feito = new TaskCompletionSource<bool>();

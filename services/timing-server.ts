@@ -217,6 +217,75 @@ function journal(entry: Record<string, unknown>) {
   appendFileSync(join(JOURNAL_DIR, `${day}.jsonl`), JSON.stringify(entry) + '\n');
 }
 
+type EntradaDiario = { wallMs: number; kart: string | null; transponder: number | null; decoderTimeMs: number; result: string };
+
+/** Passagens do diário que caíram como "sem bateria" (kart conhecido, nenhuma bateria aberta) num intervalo. */
+function passagensSemBateria(deMs: number, ateMs: number): EntradaDiario[] {
+  const out: EntradaDiario[] = [];
+  for (let t = deMs - 86_400_000; t <= ateMs + 86_400_000; t += 86_400_000) {
+    const arq = join(JOURNAL_DIR, `${new Date(t).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })}.jsonl`);
+    if (!existsSync(arq)) continue;
+    for (const linha of readFileSync(arq, 'utf8').split('\n')) {
+      if (!linha.includes('"sem-bateria"')) continue;
+      try {
+        const e = JSON.parse(linha) as EntradaDiario;
+        if (e.result === 'sem-bateria' && e.kart && e.wallMs >= deMs && e.wallMs <= ateMs) out.push(e);
+      } catch { /* linha cortada */ }
+    }
+  }
+  const vistos = new Set<string>();
+  return out.sort((a, b) => a.wallMs - b.wallMs).filter((e) => { const k = `${e.wallMs}|${e.kart}`; if (vistos.has(k)) return false; vistos.add(k); return true; });
+}
+
+/** Resumo por kart das passagens "sem bateria" do intervalo (para o cronometrista conferir antes de remontar). */
+function resumoSemBateria(s: Session, deMs: number, ateMs: number) {
+  const daLista = new Set(s.competitors.map((c) => c.kart));
+  const todas = passagensSemBateria(deMs, ateMs);
+  const porKart = new Map<string, EntradaDiario[]>();
+  for (const e of todas) { if (!porKart.has(e.kart!)) porKart.set(e.kart!, []); porKart.get(e.kart!)!.push(e); }
+  return {
+    de: deMs, ate: ateMs, passagens: todas.length,
+    karts: [...porKart].map(([kart, v]) => ({ kart, naLista: daLista.has(kart), piloto: s.competitors.find((c) => c.kart === kart)?.name ?? null, passagens: v.length, primeira: v[0].wallMs, ultima: v[v.length - 1].wallMs }))
+      .sort((a, b) => Number(b.naLista) - Number(a.naLista) || a.kart.localeCompare(b.kart, 'pt-BR', { numeric: true })),
+  };
+}
+
+/**
+ * Remonta a bateria que correu sem estar aberta: aplica, na ordem, as passagens "sem bateria" do intervalo como se a
+ * verde tivesse sido dada antes da primeira. A quadriculada entra quando o tempo da prova acaba (cada kart termina na
+ * passagem seguinte) e a bateria fica encerrada na última passagem. Só os karts da lista, salvo incluirOutros.
+ */
+function remontarPeloDiario(s: Session, deMs: number, ateMs: number, incluirOutros: boolean, autor: string) {
+  if (s.state === 'em_andamento' || s.state === 'bandeira_final') throw new Error('A bateria está aberta: encerre antes de remontar.');
+  if (s.competitors.some((c) => c.crossings.some((x) => !x.deleted))) throw new Error('Esta bateria já tem passagens. Use Reiniciar bateria antes de remontar pelo diário.');
+  const daLista = new Set(s.competitors.map((c) => c.kart));
+  const entradas = passagensSemBateria(deMs, ateMs).filter((e) => incluirOutros || daLista.has(e.kart!));
+  if (!entradas.length) throw new Error('Não há passagens sem bateria dos karts desta lista nesse horário.');
+  restartSession(s);
+  startSession(s, entradas[0].wallMs - 1_000);
+  let contadas = 0;
+  for (const e of entradas) {
+    const correndo = (s.state as Session['state']) === 'em_andamento'; // startSession acabou de abrir
+    const tempoAcabou = correndo && s.durationMs > 0 && s.startedAt !== null && e.wallMs - s.startedAt >= s.durationMs;
+    // corrida: a quadriculada é do LÍDER — a prova acaba quando ele cruza a linha depois do tempo e os outros terminam
+    // na passagem seguinte. Tomada/treino: a bandeira sai quando o tempo acaba e cada kart fecha a volta que estava fazendo.
+    if (tempoAcabou && s.type !== 'corrida') setRaceFlag(s, 'checkered', s.startedAt! + s.durationMs);
+    if (applyPassing(s, { id: randomUUID(), kart: e.kart!, decoderTimeMs: e.decoderTimeMs, wallMs: e.wallMs, transponder: e.transponder, source: 'decoder' }) === 'counted') contadas++;
+    // líder DEPOIS desta passagem (quem cruzou na frente nesta volta, mesmo que tenha ultrapassado agora)
+    const liderFechando = tempoAcabou && s.type === 'corrida' && computeStandings(s)[0]?.kart === e.kart;
+    if (liderFechando) {
+      setRaceFlag(s, 'checkered', e.wallMs);
+      const lider = s.competitors.find((c) => c.kart === e.kart);
+      if (lider) lider.finished = true;
+    }
+  }
+  closeSession(s, entradas[entradas.length - 1].wallMs + 1_000);
+  s.usoKartsEnviado = false; // agora há voltas: os minutos de pista vão para a oficina
+  const hora = (ms: number) => new Date(ms).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  registrarObservacao(s, `Resultado remontado pelo diário de passagens (${contadas} passagens de ${hora(entradas[0].wallMs)} a ${hora(entradas[entradas.length - 1].wallMs)}): a bateria não estava aberta durante a prova`, autor);
+  return contadas;
+}
+
 // ---------------------------------------------------------------- estado vivo
 
 const OPEN_STATES = new Set(['em_andamento', 'bandeira_final']);
@@ -1874,6 +1943,20 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
           s.trackId = tid;
           log(`bateria ${s.name}: traçado ${trackDa(s).name} (${trackDa(s).lengthMeters} m)`);
         }
+      } else if (action === 'diario' && method === 'GET') {
+        // passagens "sem bateria" de um horário (padrão: do fim da prova anterior da mesma bateria até o fim desta ou agora)
+        const q = url.searchParams;
+        const anterior = irmasDe(s).map((x) => x.finishedAt ?? 0).filter((t) => t > 0 && t <= (s.finishedAt ?? now)).sort((a, b) => b - a)[0];
+        const de = Number(q.get('de')) || anterior || (s.createdAt - 3_600_000);
+        const ate = Number(q.get('ate')) || s.finishedAt || now;
+        return send(res, 200, resumoSemBateria(s, de, ate));
+      } else if (action === 'remontar' && method === 'POST') {
+        const body = await readBody(req);
+        const de = Number(body.de); const ate = Number(body.ate);
+        if (!(de > 0) || !(ate > de) || ate - de > 6 * 3_600_000) return send(res, 400, { error: 'Informe o horário de início e de fim da prova (até 6 horas).' });
+        const contadas = remontarPeloDiario(s, de, ate, Boolean(body.incluirOutros), String(body.autor ?? 'Cronometragem'));
+        void enviarUsoKarts(s);
+        log(`bateria ${s.name}: REMONTADA pelo diário (${contadas} passagens)`);
       } else if (action === 'restart' && method === 'POST') {
         const body = await readBody(req);
         if (body.largar) {
