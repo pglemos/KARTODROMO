@@ -12,15 +12,24 @@ public sealed class FormTerminalAbrir : CartaoModal
     readonly TextBox _inicial = new() { BorderStyle = BorderStyle.None, BackColor = Color.White, TextAlign = HorizontalAlignment.Right, Font = new Font("Segoe UI", 11F, FontStyle.Bold), Width = 140, Text = "0,00" };
     public bool Concluido { get; private set; }
 
-    public FormTerminalAbrir(JsonObject caixa) : base(500, 462)
+    /// <param name="emUso">Terminais com caixa ainda aberto (não entram na lista): nome, quem abriu e desde quando.</param>
+    public FormTerminalAbrir(JsonObject caixa, IReadOnlyList<(string Terminal, string Usuario, string Desde)> emUso = null) : base(500, 462 + (emUso is { Count: > 0 } ? 70 : 0))
     {
+        // com terminais em uso, o cartão cresce para explicar por que eles não estão na lista
+        var extra = emUso is { Count: > 0 } ? 70 : 0;
         Text = "Abrir o caixa";
         if (caixa["turnos"] is JsonArray turnos)
             _turno.Items.AddRange(turnos.OfType<JsonObject>().Select(t => new Campos.Item(t.L("id") ?? 0, string.IsNullOrEmpty(t.S("inicio")) ? t.S("descricao") : $"{t.S("descricao")} ({t.S("inicio")} – {t.S("fim")})")).ToArray());
         if (caixa["terminais"] is JsonArray terminais) _terminal.Items.AddRange(terminais.OfType<JsonObject>().Select(t => new Campos.Item(t.L("id") ?? 0, t.S("nome"))).ToArray());
         if (_turno.Items.Count >= 1) _turno.SelectedIndex = SugerirTurno(caixa);
-        if (_terminal.Items.Count == 1) _terminal.SelectedIndex = 0;
-        else if (Registro.Ler("UltimoTerminal") is { Length: > 0 } ultimo)
+        // sugere o terminal com o nome de quem entrou (cada operadora tem o seu); sem ele, o último usado neste PC.
+        // Com um só terminal livre NÃO escolhe sozinho quando há outros em uso: era assim que se abria o terminal da colega.
+        var iguala = System.Globalization.CultureInfo.GetCultureInfo("pt-BR").CompareInfo;
+        var opcoes = System.Globalization.CompareOptions.IgnoreCase | System.Globalization.CompareOptions.IgnoreNonSpace;
+        for (var i = 0; i < _terminal.Items.Count; i++)
+            if (_terminal.Items[i] is Campos.Item meu && iguala.Compare(meu.Texto.Trim(), (Sessao.Nome ?? "").Trim(), opcoes) == 0) { _terminal.SelectedIndex = i; break; }
+        if (_terminal.SelectedIndex < 0 && _terminal.Items.Count == 1 && extra == 0) _terminal.SelectedIndex = 0;
+        else if (_terminal.SelectedIndex < 0 && Registro.Ler("UltimoTerminal") is { Length: > 0 } ultimo)
             for (var i = 0; i < _terminal.Items.Count; i++) if (_terminal.Items[i] is Campos.Item it && it.Id.ToString() == ultimo) { _terminal.SelectedIndex = i; break; }
 
         var icone = Icone("terminal", 76); icone.Location = new Point((500 - 76) / 2, 18);
@@ -44,12 +53,22 @@ public sealed class FormTerminalAbrir : CartaoModal
         Linha(2, "Terminal", _terminal);
         Linha(3, "Suprimento inicial", suprimento);
 
-        var agora = Botao("Agora não", CinzaBotao, KitVisual.Texto); agora.SetBounds(20, 398, 190, 44); agora.Click += (_, _) => Close();
-        var abrir = Botao("Abrir terminal", KitVisual.Verde, Color.White, true); abrir.SetBounds(222, 398, 258, 44);
+        var aviso = new Label
+        {
+            Visible = extra > 0, AutoSize = false, Bounds = new Rectangle(24, 386, 452, 64), Font = new Font("Segoe UI", 9F), ForeColor = KitVisual.Secundario, TextAlign = ContentAlignment.TopLeft,
+            Text = extra == 0 ? "" : "Em uso (fora da lista): " + string.Join("; ", emUso.Select(x => $"{x.Terminal} — aberto por {x.Usuario}, {x.Desde}")) + ". O terminal volta para a lista quando quem abriu fechar o caixa.",
+        };
+        var agora = Botao("Agora não", CinzaBotao, KitVisual.Texto); agora.SetBounds(20, 398 + extra, 190, 44); agora.Click += (_, _) => Close();
+        var abrir = Botao("Abrir terminal", KitVisual.Verde, Color.White, true); abrir.SetBounds(222, 398 + extra, 258, 44);
         abrir.Click += (_, _) => Seguro.Rodar(this, async () =>
         {
             if (Campos.IdDe(_turno) is not long turnoId) { Msg.Aviso(this, "Selecione o turno que será aberto."); return; }
             if (Campos.IdDe(_terminal) is not long terminalId) { Msg.Aviso(this, "Selecione o seu terminal."); return; }
+            // terminal com o nome de outra pessoa: confirma, para ninguém abrir o caixa da colega sem querer
+            var escolhido = (_terminal.SelectedItem as Campos.Item)?.Texto?.Trim() ?? "";
+            var deOutra = iguala.Compare(escolhido, (Sessao.Nome ?? "").Trim(), opcoes) != 0
+                && _terminal.Items.OfType<Campos.Item>().Select(x => x.Texto).Concat(emUso?.Select(x => x.Terminal) ?? []).Any(n => iguala.Compare(n.Trim(), (Sessao.Nome ?? "").Trim(), opcoes) == 0);
+            if (deOutra && !Msg.Pergunta(this, $"Você entrou como {Sessao.Nome} e escolheu o terminal {escolhido}.\n\nEnquanto o seu caixa estiver aberto nele, {escolhido} não aparece para mais ninguém.\n\nAbrir mesmo assim?")) return;
             var texto = string.IsNullOrWhiteSpace(_inicial.Text) ? "0" : _inicial.Text;
             if (Fmt.Centavos(texto) is not long inicial) { Msg.Aviso(this, "Valor de suprimento inicial inválido."); return; }
             var r = await Sessao.Api.Post("/api/office/caixa/abrir", new { turnoId, terminalId, inicialCentavos = inicial });
@@ -58,7 +77,7 @@ public sealed class FormTerminalAbrir : CartaoModal
             Concluido = true; DialogResult = DialogResult.OK; Close();
         });
         AcceptButton = abrir;
-        Controls.AddRange([icone, titulo, desc, lista, agora, abrir]);
+        Controls.AddRange([icone, titulo, desc, lista, aviso, agora, abrir]);
         Shown += (_, _) => ActiveControl = _terminal.SelectedIndex < 0 ? _terminal : _inicial;
         _inicial.Enter += (_, _) => BeginInvoke(_inicial.SelectAll);
     }
