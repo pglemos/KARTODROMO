@@ -74,7 +74,7 @@ public static class Crono
         _ => s,
     };
 
-    public static string Tipo(string s) => s switch { "treino" => "Treino", "classificacao" => "Tomada de tempo", "corrida" => "Corrida", _ => s };
+    public static string Tipo(string s) => s switch { "treino" => "Treino", "classificacao" => "Tomada de tempo", "corrida" => "Corrida", "equalizacao" => "Equalização", _ => s };
 
     public static Color CorEstado(string s) => s switch
     {

@@ -74,6 +74,8 @@ function voltasDoPeriodo(sessions: Iterable<Session>, o: RankingKartsOpcoes, tra
     if (o.ate && dia > o.ate) continue;
     if (o.trackId && trackDe(s) !== o.trackId) continue;
     if (o.tipos?.length && !o.tipos.includes(s.type)) continue;
+    // os tempos da equalização ficam separados dos da cronometragem: só entram se pedidos
+    if (s.type === 'equalizacao' && !o.tipos?.includes('equalizacao')) continue;
     const minimo = o.extensaoM ? voltaMinimaPlausivelMs(o.extensaoM(s)) : 0;
     for (const c of s.competitors) {
       const ativas = c.crossings.filter((x) => !x.deleted).sort((a, b) => a.wallMs - b.wallMs);

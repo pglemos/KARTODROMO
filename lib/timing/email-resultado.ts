@@ -43,7 +43,7 @@ const dataHora = (ms: number) => new Date(ms).toLocaleString('pt-BR', { timeZone
 const hora = (ms: number) => new Date(ms).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
 export function nomeTipo(tipo: SessionType) {
-  return tipo === 'corrida' ? 'Corrida' : tipo === 'classificacao' ? 'Tomada de tempo' : 'Treino';
+  return tipo === 'corrida' ? 'Corrida' : tipo === 'classificacao' ? 'Tomada de tempo' : tipo === 'equalizacao' ? 'Equalização' : 'Treino';
 }
 
 /** corrida = ordem de chegada; tomada de tempo/treino = melhor volta */

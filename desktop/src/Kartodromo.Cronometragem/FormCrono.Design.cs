@@ -41,8 +41,9 @@ public partial class FormCrono
         menu.Renderer = new MenuDesignRenderer(Color.FromArgb(251, 251, 252));
         menu.Padding = new Padding(0); menu.Font = new Font("Segoe UI", 9.8F);
         foreach (ToolStripMenuItem it in menu.Items) { it.Padding = new Padding(8, 4, 8, 4); it.Margin = new Padding(1, 0, 1, 0); }
-        _passos = new PassosSegmento(["1–3 · Configuração de eventos", "4–5 · Registro de competidores", "Cronometragem", "Ranking dos karts"],
-            ["1–3 · Eventos", "4–5 · Competidores", "Cronometragem", "Ranking"]) { Anchor = AnchorStyles.Top | AnchorStyles.Right, IndiceAoVivo = 2 };
+        _passos = new PassosSegmento(["1–3 · Configuração de eventos", "4–5 · Registro de competidores", "Cronometragem", "Ranking dos karts", "Equalização"],
+            ["1–3 · Eventos", "4–5 · Competidores", "Cronometragem", "Ranking", "Equalização"],
+            ["1–3", "4–5", "Cronometragem", "Ranking", "Equalização"]) { Anchor = AnchorStyles.Top | AnchorStyles.Right, IndiceAoVivo = 2 };
         _passos.Mudou += i => { if (_abas.SelectedIndex != i) _abas.SelectedIndex = i; };
         _abas.SelectedIndexChanged += (_, _) => _passos.Selecionado = _abas.SelectedIndex;
         cab.Controls.AddRange([logo, t, s, menu, _passos]);
@@ -50,8 +51,8 @@ public partial class FormCrono
         {
             menu.Location = new Point(Math.Max(t.Right, s.Right) + 18, (52 - menu.Height) / 2);
             // tela estreita (1366): nomes curtos nos passos para não cobrir o menu
-            _passos.Compacto = false;
-            if (cab.Width - 18 - _passos.Width < menu.Right + 12) _passos.Compacto = true;
+            _passos.Nivel = 0;
+            while (_passos.Nivel < 2 && cab.Width - 18 - _passos.Width < menu.Right + 12) _passos.Nivel++;
             _passos.Location = new Point(cab.Width - 18 - _passos.Width, (52 - _passos.Height) / 2);
         }
         cab.Resize += (_, _) => Posicionar(); menu.SizeChanged += (_, _) => Posicionar();
@@ -427,6 +428,8 @@ public partial class FormCrono
         }
         _subArvore.Text = _events.FirstOrDefault(e => e.S("id") == _eventoArvore)?.S("name") ?? evento?.S("name") ?? "Selecione uma prova";
         AtualizarExtrasPilotos();
+        // aba Equalização aberta: acompanha as voltas ao vivo
+        if (_abas.SelectedIndex == 4) _ = CarregarEqualizacao();
     }
 }
 
@@ -443,13 +446,13 @@ public class AbasSemCabecalho : TabControl
 /// <summary>Passos do cabeçalho (1–3 · 4–5 · Cronometragem) com a bolinha vermelha quando há prova correndo.</summary>
 public class PassosSegmento : Control
 {
-    readonly string[] _completos, _curtos;
+    readonly string[][] _niveis;
     string[] _itens;
-    bool _compacto;
+    int _nivel;
     /// <summary>Passo que ganha a bolinha vermelha quando há prova correndo (Cronometragem).</summary>
     public int IndiceAoVivo { get; init; } = -1;
-    /// <summary>Nomes curtos (tela estreita).</summary>
-    public bool Compacto { get => _compacto; set { if (_compacto == value || _curtos == null) return; _compacto = value; _itens = value ? _curtos : _completos; Width = Larguras().Sum() + 6; Invalidate(); } }
+    /// <summary>0 = nomes completos; 1 e 2 = nomes cada vez mais curtos (tela estreita).</summary>
+    public int Nivel { get => _nivel; set { var v = Math.Clamp(value, 0, _niveis.Length - 1); if (_nivel == v) return; _nivel = v; _itens = _niveis[v]; Width = Larguras().Sum() + 6; Invalidate(); } }
     int _sel;
     bool _aoVivo;
     public event Action<int> Mudou;
@@ -457,9 +460,9 @@ public class PassosSegmento : Control
     public int Selecionado { get => _sel; set { if (_sel == value) return; _sel = value; Invalidate(); } }
     public bool AoVivo { get => _aoVivo; set { if (_aoVivo == value) return; _aoVivo = value; Invalidate(); } }
 
-    public PassosSegmento(string[] itens, string[] curtos = null)
+    public PassosSegmento(string[] itens, params string[][] curtos)
     {
-        _itens = _completos = itens; _curtos = curtos;
+        _niveis = [itens, .. curtos]; _itens = itens;
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
         Cursor = Cursors.Hand; Height = 36; Width = Larguras().Sum() + 6;
     }

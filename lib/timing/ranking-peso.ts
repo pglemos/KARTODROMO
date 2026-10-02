@@ -49,7 +49,7 @@ function faixaDo(peso: number | null, faixas: number[]) {
 export function rankingPorPeso(sessoes: Iterable<Session>, dados: (customerId: string | null, nome: string) => DadosPiloto, o: OpcoesRanking, trackDe: (s: Session) => string | null = () => null): FaixaRanking[] {
   const melhores = new Map<string, LinhaRanking & { chave: string }>();
   for (const s of sessoes) {
-    if (s.state !== 'encerrada') continue;
+    if (s.state !== 'encerrada' || s.type === 'equalizacao') continue; // equalização é acerto de kart, não entra em ranking
     const quando = s.startedAt ?? s.createdAt;
     const d = dia(quando);
     if (o.mes && d.slice(0, 7) !== o.mes) continue;

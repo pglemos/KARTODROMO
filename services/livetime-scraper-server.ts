@@ -752,6 +752,16 @@ const server = http.createServer((request, response) => {
     return;
   }
 
+  // Equalização dos karts (cronometragem própria): o admin do site LÊ o histórico, as metas por traçado e o relatório.
+  // Só GET: criar/editar equalização é no programa da Cronometragem, dentro da rede do kartódromo.
+  if (timingSnapshotUrl && request.method === 'GET' && /^\/api\/equalizacao(\/[\w-]+)?$/.test(url.pathname)) {
+    const base = new URL(timingSnapshotUrl).origin;
+    void fetch(`${base}${url.pathname}${url.search}`, { signal: AbortSignal.timeout(6000) })
+      .then(async (r) => sendJson(response, r.status, await r.json()))
+      .catch((error: Error) => sendJson(response, 502, { error: `Cronometragem indisponível: ${error.message}` }));
+    return;
+  }
+
   if (url.pathname === '/api/livetime-snapshot') {
     // Regras de pit stop podem ser sobrepostas via query (?rules=<JSON>) — vêm do
     // formato configurado no admin (formatos_corrida). Sem query, usa o padrão.

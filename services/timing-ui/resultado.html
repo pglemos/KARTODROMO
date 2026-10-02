@@ -990,6 +990,8 @@ const tipoAlias = {
 };
 let currentTipo = tipoAlias[rawTipo] || rawTipo;
 const sessionId = location.pathname.split('/').filter(Boolean).pop();
+// ?kart=110: volta a volta só do piloto escolhido (botão "Imprimir volta a volta do piloto" da Cronometragem)
+const kartFiltro = (params.get('kart') || '').trim();
 
 if (document.getElementById('tipoSelect')) {
   document.getElementById('tipoSelect').value = currentTipo;
@@ -1047,6 +1049,7 @@ const dataErrors = {};
 function getResultadoCriterio(sessionType) {
   if (sessionType === 'corrida') return { label: 'CLASSIFICAÇÃO OFICIAL', detail: 'ordem de chegada' };
   if (sessionType === 'classificacao') return { label: 'TOMADA DE TEMPO', detail: 'melhor volta' };
+  if (sessionType === 'equalizacao') return { label: 'EQUALIZAÇÃO', detail: 'melhor volta' };
   return { label: 'TREINO', detail: 'melhor volta' };
 }
 
@@ -1129,7 +1132,9 @@ function atualizarIdentificacao() {
   if (kicker) kicker.textContent = [relatorio, cabecalho.prova].filter(Boolean).join(' · ');
   document.title = [relatorio, cabecalho.evento, cabecalho.prova].filter(Boolean).join(' · ');
   // a Recepção/Cronometragem usam este nome ao exportar o PDF: data da prova, não a de emissão
-  window.nomeArquivoRelatorio = [relatorio, cabecalho.evento, cabecalho.prova, cabecalho.data]
+  const doKart = kartFiltro && currentTipo === 'volta_a_volta' ? `kart ${kartFiltro}` : '';
+  if (doKart && kicker) kicker.textContent += ` · ${doKart}`;
+  window.nomeArquivoRelatorio = [relatorio, doKart, cabecalho.evento, cabecalho.prova, cabecalho.data]
     .filter(Boolean).join(' - ').replace(/[\\/:*?"<>|·]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
@@ -1295,7 +1300,7 @@ async function carregarTudo() {
 function preencherCabecalho() {
   const v = sessionData;
   if (!v) return;
-  const TYPES = { treino: 'TREINO LIVRE', classificacao: 'TOMADA DE TEMPO', corrida: 'CORRIDA' };
+  const TYPES = { treino: 'TREINO LIVRE', classificacao: 'TOMADA DE TEMPO', corrida: 'CORRIDA', equalizacao: 'EQUALIZAÇÃO' };
 
   // "LEGENDS I · Tomada de Tempo": o evento é o título; a prova vai no topo, junto do tipo de relatório
   let grpName = 'Bateria';
@@ -1662,7 +1667,9 @@ function renderReport() {
       return;
     }
     let html = `<div>`;
-    lapsData.forEach(d => {
+    const pilotos = kartFiltro ? lapsData.filter(d => String(d.kart) === kartFiltro) : lapsData;
+    if (!pilotos.length) { content.innerHTML = `<div class="report-empty">O kart ${esc(kartFiltro)} não tem voltas nesta sessão.</div>`; return; }
+    pilotos.forEach(d => {
       const kLaps = d.laps || [];
       const validLaps = kLaps.filter(l => !l.invalid && l.lapMs > 0);
       const minLap = validLaps.reduce((min, l) => l.lapMs < min ? l.lapMs : min, Infinity);

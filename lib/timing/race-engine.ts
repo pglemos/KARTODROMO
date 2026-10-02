@@ -1,6 +1,9 @@
 /** Motor de cronometragem sem IO: passagens, bandeiras, correcoes e classificacao. */
 
-export type SessionType = 'treino' | 'classificacao' | 'corrida';
+import type { ConfigEqualizacao } from './equalizacao';
+
+/** equalizacao: sessão de acerto dos karts (meta, redutores), separada das baterias normais */
+export type SessionType = 'treino' | 'classificacao' | 'corrida' | 'equalizacao';
 export type SessionState = 'preparando' | 'em_andamento' | 'bandeira_final' | 'encerrada' | 'cancelada';
 export type RaceFlag = 'none' | 'green' | 'yellow' | 'red' | 'white' | 'checkered';
 /** Bandeiras só para um piloto (sinalização): preta, preta com círculo laranja (mecânico), preta e branca (advertência), azul (deixe passar), penalidade. */
@@ -85,6 +88,8 @@ export type Session = {
   agendaId?: number | null;
   /** clientes (ou nomes) da agenda já trazidos para esta bateria: quem o cronometrista tirou não volta sozinho */
   agendaPuxados?: string[];
+  /** só nas sessões do tipo equalizacao: referências, meta, tolerância, redutores e apontamentos da oficina */
+  equalizacao?: ConfigEqualizacao;
   /** minutos de pista de cada kart já enviados ao controle de manutenção da oficina (servidor da operação) */
   usoKartsEnviado?: boolean;
   /** e-mail do resultado para os pilotos (automático ao encerrar tomada de tempo/corrida, ou reenvio manual) */
@@ -237,7 +242,7 @@ export function voltasCompletas(session: Session) {
 }
 
 function defaultName(type: SessionType) {
-  return type === 'corrida' ? 'Corrida' : type === 'classificacao' ? 'Tomada de Tempo' : 'Treino';
+  return type === 'corrida' ? 'Corrida' : type === 'classificacao' ? 'Tomada de Tempo' : type === 'equalizacao' ? 'Equalização' : 'Treino';
 }
 
 /** Linha sem piloto de verdade: nome vazio ou o "Kart 12" que o sistema cria quando o kart entra sozinho. */

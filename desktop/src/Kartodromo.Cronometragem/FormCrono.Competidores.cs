@@ -131,6 +131,7 @@ public partial class FormCrono
         flagsPiloto.Items.Add("Registro do competidor…", null, (_, _) => EditarCompetidor());
         flagsPiloto.Items.Add("Trocar kart do piloto… (leva as voltas)", null, (_, _) => TrocarKart());
         flagsPiloto.Items.Add(new ToolStripSeparator());
+        flagsPiloto.Items.Add("Imprimir volta a volta deste piloto", null, (_, _) => ImprimirVoltaAVoltaDoPiloto(_gPilotos.CurrentRow?.Cells["kart"].Value?.ToString()));
         flagsPiloto.Items.Add("Advertência (preta e branca)…", null, (_, _) => AplicarPenalidade("advertencia", _gPilotos.CurrentRow?.Cells["kart"].Value?.ToString()));
         flagsPiloto.Items.Add("Penalidade de tempo…", null, (_, _) => AplicarPenalidade("tempo", _gPilotos.CurrentRow?.Cells["kart"].Value?.ToString()));
         flagsPiloto.Items.Add("Bandeira preta (desclassificar)…", null, (_, _) => BandeiraPreta(_gPilotos.CurrentRow?.Cells["kart"].Value?.ToString()));

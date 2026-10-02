@@ -65,7 +65,8 @@ import {
   type TimingCatalog,
 } from '../lib/timing/catalog';
 import { rankingPorPeso, tituloFaixas, type DadosPiloto } from '../lib/timing/ranking-peso';
-import { historicoDoKart, rankingKarts } from '../lib/timing/ranking-karts';
+import { dataBrasilia, historicoDoKart, rankingKarts } from '../lib/timing/ranking-karts';
+import { calcularEqualizacao, SISTEMAS_KART, TOLERANCIA_PADRAO_MS, ultimaEqualizacaoPorKart, voltasNasBaterias, type ChecklistKart, type ConfigEqualizacao } from '../lib/timing/equalizacao';
 import { nomeProprio } from '../lib/nomes';
 import { configPublica, enviarResultado, enviarTeste, lerConfig, salvarConfig, traduzirErro, type Dependencias } from './timing-email';
 import type { ContextoProva, EmpresaEmail } from '../lib/timing/email-resultado';
@@ -669,6 +670,82 @@ function parseCompetitors(value: unknown) {
     .filter((c) => c.kart || c.name);
 }
 
+// ---------------------------------------------------------------- equalização dos karts
+// A equalização é uma bateria do tipo "equalizacao" (voltas do decoder, separadas das baterias normais). Aqui ficam o
+// histórico de metas por traçado e as contas que a tela e o relatório da oficina mostram.
+
+type MetaTracado = {
+  id: string; trackId: string | null; metaMs: number; toleranciaMs: number; quando: number;
+  /** manual = definida para o traçado; equalizacao = a meta que saiu de uma equalização finalizada */
+  origem: 'manual' | 'equalizacao'; sessionId?: string | null; referencias?: string[]; autor?: string;
+};
+const METAS_FILE = join(DATA_DIR, 'equalizacao-metas.json');
+let metasTracado: MetaTracado[] = (() => {
+  try { const j = JSON.parse(readFileSync(METAS_FILE, 'utf8')) as unknown; return Array.isArray(j) ? (j as MetaTracado[]) : []; } catch { return []; }
+})();
+function saveMetas() { writeFileSync(METAS_FILE, JSON.stringify(metasTracado, null, 2)); }
+
+/** Última meta registrada para o traçado até a data dada. */
+function metaVigente(trackId: string | null, ate = Date.now()) {
+  return metasTracado.filter((m) => (m.trackId ?? null) === (trackId ?? null) && m.quando <= ate).sort((a, b) => b.quando - a.quando)[0] ?? null;
+}
+
+/** Volta do kart físico: pelo transponder (troca de kart) e, sem ele, pelo número na bateria. */
+function kartDaPassagem(kart: string, transponder: number | null | undefined) {
+  return (transponder != null && transponderMap[String(transponder)]) || kart;
+}
+
+/** "52,395" ou 52.395 (segundos) → ms. */
+function segundosParaMs(v: unknown) {
+  const n = Number(String(v ?? '').trim().replace(',', '.'));
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 1000) : null;
+}
+
+/** Configuração usada na conta: no modo "meta fixa" sem valor digitado vale a última meta do traçado. */
+function configEqualizacao(s: Session): ConfigEqualizacao {
+  const cfg = s.equalizacao ?? {};
+  if (cfg.metaModo === 'fixa' && !(Number(cfg.metaFixaMs) > 0)) return { ...cfg, metaFixaMs: metaVigente(trackIdDa(s), s.startedAt ?? s.createdAt)?.metaMs ?? null };
+  return cfg;
+}
+
+function equalizacaoResumo(s: Session) {
+  const r = calcularEqualizacao(s, configEqualizacao(s));
+  const testados = r.karts.filter((k) => !k.referencia);
+  return {
+    id: s.id, name: s.name, state: s.state, createdAt: s.createdAt, startedAt: s.startedAt, finishedAt: s.finishedAt,
+    finalizadaEm: s.equalizacao?.finalizadaEm ?? null, track: trackDa(s), mecanico: s.equalizacao?.mecanico ?? '',
+    metaMs: r.metaMs, metaOrigem: r.metaOrigem, toleranciaMs: r.toleranciaMs, referencias: s.equalizacao?.referencias ?? [],
+    karts: testados.length, equalizados: testados.filter((k) => k.status === 'EQUALIZADO').length,
+    ajustando: testados.filter((k) => k.status === 'AJUSTANDO').length, revisar: testados.filter((k) => k.status === 'REVISAR').length,
+  };
+}
+
+/** Voltas de cada kart nas baterias normais desde a última equalização dele até o começo desta. */
+function voltasDesdeUltimaEqualizacao(s: Session) {
+  const ate = s.startedAt ?? s.createdAt;
+  const ultima = ultimaEqualizacaoPorKart(sessions.values(), ate);
+  const out: Record<string, { voltas: number; baterias: number; desde: number | null }> = {};
+  for (const c of s.competitors) {
+    const desde = ultima.get(c.kart) ?? null;
+    const v = voltasNasBaterias(sessions.values(), desde, ate, kartDaPassagem).get(c.kart);
+    out[c.kart] = { voltas: v?.voltas ?? 0, baterias: v?.baterias ?? 0, desde };
+  }
+  return out;
+}
+
+function equalizacaoDetalhe(s: Session) {
+  const cfg = s.equalizacao ?? {};
+  return {
+    ...equalizacaoResumo(s),
+    config: { metaModo: cfg.metaModo ?? 'referencia', metaFixaMs: cfg.metaFixaMs ?? null, toleranciaMs: cfg.toleranciaMs ?? TOLERANCIA_PADRAO_MS, referencias: cfg.referencias ?? [], redutores: cfg.redutores ?? {}, mecanico: cfg.mecanico ?? '', trackId: s.trackId ?? null },
+    metaDoTracado: metaVigente(trackIdDa(s), s.startedAt ?? s.createdAt),
+    resultado: (() => { const r = calcularEqualizacao(s, configEqualizacao(s)); return { ...r, karts: r.karts.map((k) => ({ ...k, piloto: nomeProprio(k.piloto) })) }; })(),
+    voltasDesdeUltima: voltasDesdeUltimaEqualizacao(s),
+    observations: s.observations ?? [],
+    sistemas: SISTEMAS_KART,
+  };
+}
+
 // ---------------------------------------------------------------- agenda (servidor da operacao no SRVKART)
 
 const OPS_URL = process.env.OPS_URL || 'http://192.168.20.13:4060';
@@ -974,7 +1051,7 @@ function acrescentarPilotos(s: Session, lista: { kart: string; name: string; cus
 setTimeout(() => void sincronizarAgendaDoDia(), 3_000);
 setInterval(() => void sincronizarAgendaDoDia(), 60_000);
 
-const SESSION_TYPES = new Set<SessionType>(['treino', 'classificacao', 'corrida']);
+const SESSION_TYPES = new Set<SessionType>(['treino', 'classificacao', 'corrida', 'equalizacao']);
 const CATALOG_ENTITIES = new Set<CatalogEntity>(['events', 'groups', 'provas', 'categories', 'tracks', 'competitors']);
 
 function normalizeDecoderConfig(input: Record<string, unknown>): DecoderConfig {
@@ -1438,14 +1515,145 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     return send(res, 200, { faixas: tituloFaixas(faixas), grupos, pilotosComPeso: [...clientes.values()].filter((c) => c.peso).length });
   }
 
+  // ---------------------------------------------------------------- equalização dos karts
+  if (path === '/api/equalizacao/metas' && method === 'GET') {
+    const tid = url.searchParams.get('trackId');
+    const lista = metasTracado.filter((m) => tid === null || (m.trackId ?? '') === tid).sort((a, b) => b.quando - a.quando)
+      .map((m) => ({ ...m, track: m.trackId ? catalog.tracks.find((t) => t.id === m.trackId)?.name ?? 'Traçado removido' : 'Traçado principal' }));
+    return send(res, 200, { metas: lista, tracks: catalog.tracks });
+  }
+  if (path === '/api/equalizacao/metas' && method === 'POST') {
+    // meta de tempo escolhida para um traçado (vale para as próximas equalizações no modo "meta fixa")
+    const body = await readBody(req);
+    const metaMs = segundosParaMs(body.metaSeg) ?? (Number(body.metaMs) > 0 ? Math.round(Number(body.metaMs)) : null);
+    if (!metaMs) return send(res, 400, { error: 'Digite a meta de tempo do traçado em segundos (ex.: 52,395).' });
+    const tid = body.trackId ? String(body.trackId) : null;
+    if (tid && !catalog.tracks.some((t) => t.id === tid)) return send(res, 400, { error: 'Traçado não encontrado.' });
+    const meta: MetaTracado = { id: randomUUID(), trackId: tid, metaMs, toleranciaMs: segundosParaMs(body.toleranciaSeg) ?? TOLERANCIA_PADRAO_MS, quando: Date.now(), origem: 'manual', autor: String(body.autor ?? 'Cronometragem').slice(0, 60) };
+    metasTracado.push(meta); saveMetas();
+    log(`equalização: meta de ${formatLap(metaMs)} para o traçado ${tid ? catalog.tracks.find((t) => t.id === tid)?.name : 'principal'}`);
+    return send(res, 201, meta);
+  }
+  if (path === '/api/equalizacao' && method === 'GET') {
+    const q = url.searchParams;
+    const lista = [...sessions.values()].filter((s) => s.type === 'equalizacao' && s.state !== 'cancelada')
+      .filter((s) => {
+        const dia = dataBrasilia(s.startedAt ?? s.createdAt);
+        if (q.get('de') && dia < String(q.get('de'))) return false;
+        if (q.get('ate') && dia > String(q.get('ate'))) return false;
+        if (q.get('trackId') && (trackIdDa(s) ?? '') !== q.get('trackId')) return false;
+        return true;
+      })
+      .sort((a, b) => b.createdAt - a.createdAt).map(equalizacaoResumo);
+    return send(res, 200, { equalizacoes: lista, tracks: catalog.tracks, trackPadrao: { name: 'Traçado principal', lengthMeters: defaultTrackLength() } });
+  }
+  if (path === '/api/equalizacao' && method === 'POST') {
+    const body = await readBody(req);
+    const tid = body.trackId ? String(body.trackId) : null;
+    if (tid && !catalog.tracks.some((t) => t.id === tid)) return send(res, 400, { error: 'Traçado não encontrado.' });
+    const referencias = [...new Set((Array.isArray(body.referencias) ? body.referencias : String(body.referencias ?? '').split(/[;, ]+/)).map((k: unknown) => String(k).trim().replace(/^0+(?=\d)/, '')).filter(Boolean))];
+    if (referencias.length > 3) return send(res, 400, { error: 'Use 2 ou 3 karts referência.' });
+    const agora = new Date();
+    const quando = agora.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(',', '');
+    const cfgT = (timingSettings.timing as Record<string, unknown> | undefined) ?? {};
+    const s = createSession({
+      id: `${hojeBrasilia()}-${randomUUID().slice(0, 8)}`, name: String(body.nome ?? '').trim() || `Equalização ${quando}`, type: 'equalizacao',
+      durationMin: 0, minLapSec: Number(cfgT.minimumLapSeconds ?? 5), now: Date.now(),
+      competitors: [...referencias.map((k) => ({ kart: k, name: `Kart ${k} (referência)` })), ...parseCompetitors(body.karts).filter((c) => c.kart && !referencias.includes(c.kart))],
+    });
+    s.trackId = tid;
+    s.equalizacao = {
+      referencias, metaModo: body.metaModo === 'fixa' ? 'fixa' : 'referencia', metaFixaMs: segundosParaMs(body.metaSeg),
+      toleranciaMs: segundosParaMs(body.toleranciaSeg) ?? TOLERANCIA_PADRAO_MS, mecanico: String(body.mecanico ?? '').trim().slice(0, 80), checklist: {}, redutores: {},
+    };
+    sessions.set(s.id, s);
+    saveSession(s);
+    log(`equalização criada: ${s.name} · ${trackDa(s).name} · referências ${referencias.join(', ') || '(nenhuma)'}`);
+    scheduleStateBroadcast();
+    return send(res, 201, equalizacaoDetalhe(s));
+  }
+  const eq = path.match(/^\/api\/equalizacao\/([\w-]+)(?:\/(karts|finalizar|reabrir)(?:\/([^/]+))?)?$/);
+  if (eq) {
+    const s = sessions.get(eq[1]);
+    if (!s || s.type !== 'equalizacao') return send(res, 404, { error: 'Equalização não encontrada.' });
+    const cfg = (s.equalizacao ??= {});
+    try {
+      if (!eq[2] && method === 'GET') return send(res, 200, equalizacaoDetalhe(s));
+      if (!eq[2] && method === 'PATCH') {
+        const body = await readBody(req);
+        if (typeof body.nome === 'string' && body.nome.trim()) s.name = body.nome.trim();
+        if (body.trackId !== undefined) {
+          const tid = body.trackId ? String(body.trackId) : null;
+          if (tid && !catalog.tracks.some((t) => t.id === tid)) return send(res, 400, { error: 'Traçado não encontrado.' });
+          s.trackId = tid;
+        }
+        if (body.referencias !== undefined) {
+          const refs = [...new Set((Array.isArray(body.referencias) ? body.referencias : String(body.referencias ?? '').split(/[;, ]+/)).map((k: unknown) => String(k).trim().replace(/^0+(?=\d)/, '')).filter(Boolean))];
+          if (refs.length > 3) return send(res, 400, { error: 'Use 2 ou 3 karts referência.' });
+          cfg.referencias = refs;
+          // referência que ainda não está na lista entra (o kart aparece mesmo antes de passar na linha)
+          const faltam = refs.filter((k) => !s.competitors.some((c) => c.kart === k));
+          if (faltam.length) setCompetitors(s, [...s.competitors.map((c) => ({ kart: c.kart, name: c.name, customerId: c.customerId ?? null, category: c.category ?? null, detalhes: c.detalhes })), ...faltam.map((k) => ({ kart: k, name: `Kart ${k} (referência)` }))]);
+        }
+        if (body.metaModo !== undefined) cfg.metaModo = body.metaModo === 'fixa' ? 'fixa' : 'referencia';
+        if (body.metaSeg !== undefined) cfg.metaFixaMs = segundosParaMs(body.metaSeg);
+        if (body.toleranciaSeg !== undefined) cfg.toleranciaMs = segundosParaMs(body.toleranciaSeg) ?? TOLERANCIA_PADRAO_MS;
+        if (typeof body.mecanico === 'string') cfg.mecanico = body.mecanico.trim().slice(0, 80);
+        if (body.redutor && typeof body.redutor === 'object') {
+          // correção do redutor de um bloco (null volta para o automático: bloco 1 = sem redutor, bloco 2 = redutor 1...)
+          const r = body.redutor as { kart?: unknown; bloco?: unknown; redutor?: unknown };
+          const kart = String(r.kart ?? ''); const bloco = String(Number(r.bloco));
+          if (!kart || !(Number(r.bloco) >= 1)) return send(res, 400, { error: 'Informe o kart e o bloco.' });
+          const doKart = ((cfg.redutores ??= {})[kart] ??= {});
+          if (r.redutor === null || r.redutor === '' || r.redutor === undefined) delete doKart[bloco];
+          else if (Number.isInteger(Number(r.redutor)) && Number(r.redutor) >= 0 && Number(r.redutor) <= 20) doKart[bloco] = Number(r.redutor);
+          else return send(res, 400, { error: 'Redutor inválido (use 0 para sem redutor).' });
+        }
+      } else if (eq[2] === 'karts' && eq[3] && method === 'PUT') {
+        // apontamentos da oficina para o kart: chassi, pneu, motor, embreagem, freio, observações e ação
+        const kart = decodeURIComponent(eq[3]);
+        const comp = s.competitors.find((c) => c.kart === kart);
+        if (!comp) return send(res, 404, { error: 'Kart não encontrado nesta equalização.' });
+        const body = await readBody(req);
+        const entrada = (body.sistemas ?? {}) as Record<string, { status?: string; nota?: string }>;
+        const sistemas: NonNullable<ChecklistKart['sistemas']> = {};
+        for (const nome of SISTEMAS_KART) {
+          const e = entrada[nome];
+          if (!e) continue;
+          const status = e.status === 'atencao' || e.status === 'critico' ? e.status : 'ok';
+          sistemas[nome] = { status, ...(String(e.nota ?? '').trim() ? { nota: String(e.nota).trim().slice(0, 160) } : {}) };
+        }
+        (cfg.checklist ??= {})[kart] = {
+          sistemas, observacoes: String(body.observacoes ?? '').trim().slice(0, 500), acaoOficina: String(body.acaoOficina ?? '').trim().slice(0, 200),
+          atualizadoEm: Date.now(), autor: String(body.autor ?? 'Cronometragem').slice(0, 60),
+        };
+        if (typeof body.piloto === 'string' && body.piloto.trim()) comp.name = body.piloto.trim().slice(0, 80);
+      } else if (eq[2] === 'finalizar' && method === 'POST') {
+        if (s.state === 'preparando') return send(res, 409, { error: 'Esta equalização ainda não largou (dê a bandeira verde na Cronometragem).' });
+        const agora = Date.now();
+        if (s.state === 'em_andamento' || s.state === 'bandeira_final') { closeSession(s, agora); void enviarUsoKarts(s); }
+        cfg.finalizadaEm = agora;
+        // a meta que saiu desta equalização fica no histórico do traçado
+        const r = calcularEqualizacao(s, configEqualizacao(s));
+        metasTracado = metasTracado.filter((m) => m.sessionId !== s.id);
+        if (r.metaMs) metasTracado.push({ id: randomUUID(), trackId: trackIdDa(s), metaMs: r.metaMs, toleranciaMs: r.toleranciaMs, quando: s.startedAt ?? agora, origem: 'equalizacao', sessionId: s.id, referencias: cfg.referencias ?? [] });
+        saveMetas();
+        registrarObservacao(s, `Equalização finalizada: meta ${r.metaMs ? formatLap(r.metaMs) : 'não definida'}, ${r.karts.filter((k) => k.status === 'EQUALIZADO').length} equalizado(s), ${r.karts.filter((k) => k.status === 'REVISAR').length} para revisar`, 'Cronometragem');
+      } else if (eq[2] === 'reabrir' && method === 'POST') {
+        cfg.finalizadaEm = null;
+      } else return send(res, 404, { error: 'Ação desconhecida.' });
+    } catch (err) { return send(res, 400, { error: (err as Error).message }); }
+    saveSession(s);
+    scheduleStateBroadcast();
+    return send(res, 200, equalizacaoDetalhe(s));
+  }
+
   // ---------------------------------------------------------------- ranking dos karts (histórico de tempo de cada kart)
   if (path === '/api/ranking-karts' && method === 'GET') {
     const q = url.searchParams;
     const data = (v: string | null) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
     const tipos = String(q.get('tipos') ?? '').split(',').filter((t): t is SessionType => SESSION_TYPES.has(t as SessionType));
     const opcoes = { de: data(q.get('de')), ate: data(q.get('ate')), trackId: q.get('trackId') || null, tipos: tipos.length ? tipos : null, extensaoM: trackLengthFor };
-    // a volta é do kart físico: pelo transponder (troca de kart) e, sem ele, pelo número na bateria
-    const kartDaPassagem = (kart: string, transponder: number | null | undefined) => (transponder != null && transponderMap[String(transponder)]) || kart;
     const kart = q.get('kart');
     if (kart) return send(res, 200, historicoDoKart(sessions.values(), kart, opcoes, trackIdDa, kartDaPassagem).map((h) => ({ ...h, piloto: nomeProprio(h.piloto) })));
     return send(res, 200, rankingKarts(sessions.values(), opcoes, trackIdDa, kartDaPassagem).map((r) => ({ ...r, melhorPiloto: nomeProprio(r.melhorPiloto) })));
@@ -1824,6 +2032,7 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/tv') return sendFile(res, 'tv.html');
   if (url.pathname === '/tb50') return sendFile(res, 'tb50.html');
   if (url.pathname.startsWith('/resultado/')) return sendFile(res, 'resultado.html');
+  if (url.pathname === '/equalizacao' || url.pathname.startsWith('/equalizacao/')) return sendFile(res, 'equalizacao.html');
   if (url.pathname === '/kib-logo.png' || url.pathname === '/assets/da264d01b784a13054e2da496b5f46ff.png' || url.pathname === '/assets/kib-logo.png') return sendFile(res, 'kib-logo.png');
   if (url.pathname.startsWith('/api/') || url.pathname === '/healthz') {
     handleApi(req, res, url).catch((err) => {

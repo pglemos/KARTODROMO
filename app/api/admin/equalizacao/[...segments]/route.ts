@@ -319,6 +319,22 @@ function errorResponse(error: unknown) {
   return json({ error: 'equalizacao_request_failed' }, 500);
 }
 
+async function cronoEqualizacao(resto: string[], busca: string) {
+  const base = resolveBridgeBase();
+  if (!base) throw new ApiError('Ponte com o kartódromo não configurada.', 503);
+  if (resto.length > 1 || (resto[0] && !/^[\w-]+$/.test(resto[0]))) throw new ApiError('equalizacao_path_not_found', 404);
+  const caminho = `/api/equalizacao${resto[0] ? `/${resto[0]}` : ''}${busca || ''}`;
+  let resposta: Response;
+  try {
+    resposta = await fetch(`${base}${caminho}`, { headers: BRIDGE_FETCH_HEADERS, signal: AbortSignal.timeout(BRIDGE_TIMEOUT_MS), cache: 'no-store' });
+  } catch {
+    throw new ApiError('Não foi possível falar com a cronometragem do kartódromo agora (ponte fora do ar).', 502);
+  }
+  const corpo = (await resposta.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!resposta.ok || !corpo) throw new ApiError(String(corpo?.error ?? 'A cronometragem não respondeu.'), resposta.status === 404 ? 404 : 502);
+  return corpo;
+}
+
 async function authorize() {
   const session = await getActor();
   if (!session) throw new ApiError('unauthorized', 401);
@@ -329,6 +345,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   try {
     await authorize();
     const segments = (await params).segments;
+    // equalização da cronometragem própria (ORBITS): histórico, metas por traçado e detalhe — só leitura, pela ponte
+    if (segments[0] === 'crono') return json(await cronoEqualizacao(segments.slice(1), _request.nextUrl.search));
     if (segments[0] !== 'sessions' || !segments[1] || segments.length !== 2) return json({ error: 'equalizacao_path_not_found' }, 404);
     return json(await sessionDetail(await getDatabase(), segments[1]));
   } catch (error) {

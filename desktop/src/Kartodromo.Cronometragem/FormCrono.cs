@@ -77,12 +77,14 @@ public partial class FormCrono : Form
         _abas.TabPages.Add(AbaBateriasDesign());
         _abas.TabPages.Add(AbaCronometragem());
         _abas.TabPages.Add(AbaRankingKarts());
+        _abas.TabPages.Add(AbaEqualizacao());
         _abas.SelectedIndex = 2;
         _abas.SelectedIndexChanged += (_, _) =>
         {
             if (_abas.SelectedIndex == 0) { _ = CarregarAgenda(); _ = CarregarCatalogo(); }
             else if (_abas.SelectedIndex == 1) { MontarArvore(); }
             else if (_abas.SelectedIndex == 3) { _ = CarregarRankingKarts(); }
+            else if (_abas.SelectedIndex == 4) { _ = CarregarEqualizacao(true); }
         };
 
         _status.Items.AddRange([_sHora, Sep(), _sData, Sep(), _sServidor, Sep(), _sDecoder, Sep(), _sTv, Sep(), _sPainel, Sep(), _sTransp]);
@@ -582,6 +584,13 @@ public partial class FormCrono : Form
         segRes.Mudou += i => _tabsResultado.SelectedIndex = i;
         _tabsResultado.SelectedIndexChanged += (_, _) => segRes.Selecionado = _tabsResultado.SelectedIndex;
         resTopo.Controls.Add(segRes);
+        // imprimir o volta a volta só do piloto selecionado na lista
+        var imprimirVoltas = BotaoPeq("Imprimir volta a volta do piloto", 0, () => ImprimirVoltaAVoltaDoPiloto());
+        imprimirVoltas.Margin = Padding.Empty; imprimirVoltas.Height = 28;
+        new ToolTip().SetToolTip(imprimirVoltas, "Clique no piloto no resultado e depois aqui: abre o volta a volta só dele para imprimir ou salvar em PDF");
+        resTopo.Controls.Add(imprimirVoltas);
+        void PosicionarImprimir() { imprimirVoltas.Location = new Point(resTopo.Width - imprimirVoltas.Width - 10, 5); imprimirVoltas.Visible = imprimirVoltas.Left > segRes.Right + 8; }
+        resTopo.Resize += (_, _) => PosicionarImprimir(); PosicionarImprimir();
         resultCard.Controls.Add(_tabsResultado); resultCard.Controls.Add(Legenda()); resultCard.Controls.Add(resTopo); _tabsResultado.BringToFront();
 
         _faixa = new FaixaPlacar { Dock = DockStyle.Fill, Margin = Padding.Empty };
@@ -1302,6 +1311,9 @@ public partial class FormCrono : Form
             }
             _segPeriodo.Selecionado = 3; _rankDe.Value = new DateTime(2026, 9, 1); _rankAte.Value = DateTime.Today;
             _abas.SelectedIndex = 3; await CarregarRankingKarts(); await Task.Delay(300); Foto(this, "03-ranking-karts");
+            _abas.SelectedIndex = 4; await CarregarEqualizacao(true); await Task.Delay(300);
+            if (_gEq.Rows.Count > 2) { _gEq.CurrentCell = _gEq.Rows[2].Cells[0]; _gEq.Rows[2].Selected = true; }
+            Foto(this, "03-equalizacao");
             _abas.SelectedIndex = 1; await Task.Delay(200); _abaCompetidoresIr(0); await Task.Delay(200); Foto(this, "02-competidores-amarelo");
             if (_gPilotos.Rows.Count > 2)
             {
@@ -1396,6 +1408,7 @@ public partial class FormCrono : Form
             var kartTeste = Crono.Arr(_sess, "competitors").FirstOrDefault()?.S("kart");
             foreach (var (nome, acao, titulo) in new (string, Action, string)[] {
                 ("Penalidade", () => AplicarPenalidade("tempo", kartTeste), "Penalidade"), ("Advertencia", () => AplicarPenalidade("advertencia", kartTeste), "Advertência"),
+                ("EqConfigurar", () => ConfigurarEqualizacao(false), "Configurar equalização"), ("EqApontamentos", ApontamentosDoKart, "Apontamentos do kart"), ("EqMeta", MetaDoTracado, "Meta do traçado"),
                 ("Reiniciar", ReiniciarBateria, "Reiniciar"), ("VerdeCorrendo", VerdeComProvaCorrendo, "Bandeira verde"), ("EditarBateria", MudarCorridaDesign, "Editar bateria"),
                 ("Evento", () => EditarEventoDesign(true), null), ("GrupoEditar", () => EditarGrupoDesign(true), null), ("Distribuir", DistribuirProvaDesign, null), ("EmailConfig", ConfigurarEmail, "E-mail dos resultados"), ("EmailEnviar", EnviarEmail, "Enviar resultado") })
             {

@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Equalização dos karts</title>
+<style>
+  :root {
+    --page-bg: #e8eee9; --surface: #fff; --ink: #15201a; --muted: #526057; --line: #cbd5ce; --line-strong: #78867d;
+    --accent: #087f48; --accent-strong: #065d35; --accent-soft: #e5f4eb;
+    --ok: #087f48; --ok-soft: #e5f4eb; --warn: #8a5200; --warn-soft: #fff5d9; --bad: #a62b24; --bad-soft: #fff0ee; --ref: #0a4fa0; --ref-soft: #e6f0fb;
+  }
+  * { box-sizing: border-box; }
+  html { min-width: 320px; }
+  body { margin: 0; background: var(--page-bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  [hidden] { display: none !important; }
+  .tools { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-height: 58px; padding: 10px clamp(16px, 3vw, 32px); background: #070a08; border-bottom: 1px solid #27352c; color: #f3faf5; }
+  .tools a, .tools button, .tools select { min-height: 38px; padding: 8px 13px; border: 1px solid #526157; border-radius: 8px; background: #1d2821; color: #f6fbf7; font: inherit; font-size: 13px; font-weight: 700; text-decoration: none; cursor: pointer; }
+  .tools button.primary { background: var(--accent); border-color: var(--accent); }
+  .tools .right { margin-left: auto; color: #b6c5bb; font-size: 12px; font-weight: 650; }
+  .sheet-page { width: min(calc(100% - 32px), 1380px); margin: 28px auto 48px; padding: clamp(20px, 3vw, 40px); border: 1px solid #d7e0d9; border-radius: 3px; background: var(--surface); box-shadow: 0 12px 28px rgba(28, 47, 34, .14); }
+  .rep-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 24px; }
+  .rep-logo { display: block; max-width: 160px; max-height: 64px; }
+  .rep-kicker { color: var(--accent-strong); font-size: 12px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+  h1 { margin: 2px 0 4px; font-size: clamp(22px, 2.4vw, 30px); letter-spacing: -.02em; line-height: 1.08; }
+  .sub2 { font-weight: 500; }
+  .sub3 { margin-top: 2px; color: var(--muted); font-size: 13px; }
+  .rep-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; text-align: right; color: var(--muted); font-size: 12px; }
+  .pill { display: inline-flex; gap: 4px; padding: 4px 10px; border: 1px solid #b9dcc6; border-radius: 999px; background: var(--accent-soft); color: var(--accent-strong); font-size: 12px; white-space: nowrap; }
+  .divider { height: 2px; margin: 16px 0 16px; background: var(--accent); }
+  .resumo { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px 22px; margin-bottom: 18px; }
+  .resumo div span { display: block; color: var(--accent-strong); font-size: 11px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+  .resumo div b { font-size: 16px; font-variant-numeric: tabular-nums; }
+  .resumo div small { display: block; color: var(--muted); font-size: 12px; }
+  h2 { margin: 22px 0 8px; color: var(--accent-strong); font-size: 12px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+  .wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+  th { background: #f1f5f2; border-bottom: 1.5px solid var(--ink); color: #33433a; font-size: 11px; font-weight: 750; letter-spacing: .03em; text-transform: uppercase; vertical-align: bottom; white-space: nowrap; }
+  tbody tr:nth-child(even) td { background: #f7faf8; }
+  .num { text-align: right; white-space: nowrap; }
+  .c { text-align: center; }
+  .kart { display: inline-block; min-width: 2.7em; padding: 0 4px; border: 1px solid var(--line-strong); border-radius: 4px; background: #fff; font-weight: 700; text-align: center; }
+  .bloco { white-space: nowrap; }
+  .bloco small { display: block; color: var(--muted); font-size: 10.5px; }
+  .bloco.dentro { background: var(--ok-soft) !important; color: var(--accent-strong); font-weight: 700; }
+  .st { display: inline-block; padding: 1px 7px; border-radius: 4px; font-size: 11px; font-weight: 750; white-space: nowrap; }
+  .st-REF { background: var(--ref-soft); color: var(--ref); }
+  .st-EQUALIZADO { background: var(--ok); color: #fff; }
+  .st-AJUSTANDO { background: var(--warn-soft); color: var(--warn); }
+  .st-REVISAR { background: var(--bad); color: #fff; }
+  .st-SEM { background: #eef0ef; color: var(--muted); }
+  .sis-ok { color: var(--ok); font-weight: 700; }
+  .sis-atencao { color: var(--warn); font-weight: 750; }
+  .sis-critico { color: var(--bad); font-weight: 750; }
+  .sis small { display: block; color: var(--ink); font-weight: 400; }
+  .nota { margin-top: 10px; color: var(--muted); font-size: 12px; }
+  .vazio { padding: 32px; border: 1px dashed var(--line-strong); border-radius: 10px; color: var(--muted); background: #f4f7f5; text-align: center; }
+  .assin { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin-top: 46px; }
+  .assin div { padding-top: 6px; border-top: 1px solid var(--ink); font-size: 12px; font-weight: 650; text-align: center; }
+  .lista a { color: var(--accent-strong); font-weight: 700; }
+  .rodape-tela { margin-top: 24px; color: var(--muted); font-size: 12px; }
+  @media screen and (max-width: 760px) { .rep-head { grid-template-columns: 1fr; gap: 12px; text-align: center; } .rep-logo { margin: 0 auto; } .rep-side { align-items: center; text-align: center; } .assin { grid-template-columns: 1fr; gap: 28px; } }
+
+  @page { size: A4 landscape; margin: 10mm 12mm 14mm;
+    @bottom-left { content: "Kartódromo Internacional de Betim · equalização dos karts"; font: 7pt system-ui, "Segoe UI", sans-serif; color: #555; }
+    @bottom-right { content: "Página " counter(page) " de " counter(pages); font: 7pt system-ui, "Segoe UI", sans-serif; color: #555; } }
+  @media print {
+    html, body { background: #fff !important; }
+    body { font-size: 8.5pt; line-height: 1.3; }
+    .tools, .rodape-tela { display: none !important; }
+    .sheet-page { width: 100% !important; margin: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; }
+    .rep-head { grid-template-columns: 36mm minmax(0, 1fr) auto; gap: 5mm; }
+    .rep-logo { max-width: 36mm; max-height: 15mm; }
+    .rep-kicker { font-size: 7.5pt; } h1 { font-size: 16pt; margin: .5mm 0 1mm; } .sub2 { font-size: 9pt; } .sub3 { font-size: 8pt; color: #333; }
+    .rep-side, .pill { font-size: 7.5pt; } .divider { height: .6mm; margin: 3mm 0; }
+    .resumo { gap: 2mm 6mm; margin-bottom: 3mm; } .resumo div span { font-size: 6.8pt; } .resumo div b { font-size: 10.5pt; } .resumo div small { font-size: 7.5pt; color: #333; }
+    h2 { margin: 4mm 0 1.5mm; font-size: 7.5pt; break-after: avoid; }
+    .wrap { overflow: visible; }
+    table { font-size: 8pt; } th, td { padding: 1mm 1.4mm; } th { font-size: 6.6pt; background: #eef2ef; border-bottom: .4mm solid #000; } td { border-bottom: .2mm solid #d3dad5; }
+    thead { display: table-header-group; } tr { break-inside: avoid; }
+    .bloco small { font-size: 6.6pt; } .st { font-size: 7pt; }
+    .nota { font-size: 7.5pt; color: #333; margin-top: 2mm; }
+    .assin { margin-top: 14mm; gap: 14mm; break-inside: avoid; } .assin div { font-size: 8pt; }
+  }
+</style>
+</head>
+<body>
+<div class="tools" role="toolbar" aria-label="Ações">
+  <a href="/equalizacao" id="lnkLista">← Histórico</a>
+  <button type="button" class="primary" id="btnImprimir" onclick="window.print()">Imprimir / PDF</button>
+  <select id="filtroTracado" aria-label="Traçado" hidden></select>
+  <span class="right" id="estado" role="status" aria-live="polite">Carregando…</span>
+</div>
+<main class="sheet-page landscape" id="sheet">
+  <div class="rep-head">
+    <div><img class="rep-logo" src="/kib-logo.png" alt="Kartódromo Internacional de Betim" onerror="this.style.display='none'"></div>
+    <div>
+      <div class="rep-kicker" id="kicker">Equalização dos karts</div>
+      <h1 id="titulo">Carregando…</h1>
+      <div class="sub2" id="sub2"></div>
+      <div class="sub3" id="sub3"></div>
+    </div>
+    <div class="rep-side"><span class="pill" id="pill" hidden></span><span id="emitido"></span></div>
+  </div>
+  <div class="divider"></div>
+  <div id="conteudo" aria-live="polite"></div>
+</main>
+<script>
+const id = decodeURIComponent(location.pathname.split('/').filter(Boolean)[1] || '');
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const VAZIO = '–';
+const tempo = (ms) => {
+  if (ms == null || !(ms > 0)) return VAZIO;
+  const t = Math.round(ms); const m = Math.floor(t / 60000); const s = ((t % 60000) / 1000).toFixed(3);
+  return m > 0 ? `${m}:${s.padStart(6, '0')}` : s;
+};
+const delta = (ms) => (ms == null ? '' : `${ms > 0 ? '+' : ms < 0 ? '−' : '±'}${(Math.abs(ms) / 1000).toFixed(3)}`);
+const dataHora = (ms) => (ms ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(ms)).replace(',', ' ·') : VAZIO);
+const dia = (ms) => (ms ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(ms)) : VAZIO);
+const nomeRedutor = (r) => (r === 0 ? 'Sem redutor' : `Redutor ${r}`);
+const ESTADOS = { preparando: 'Preparando', em_andamento: 'Em andamento', bandeira_final: 'Bandeira final', encerrada: 'Encerrada' };
+const SISTEMAS = { chassi: 'Chassi / direção', pneu: 'Pneus / calibragem', motor: 'Motor / carburação', embreagem: 'Transmissão / embreagem', freio: 'Freios' };
+const NOME_STATUS = { ok: 'OK', atencao: 'ATENÇÃO', critico: 'CRÍTICO' };
+const el = (i) => document.getElementById(i);
+const agora = () => { const d = new Date(); return `Emitido em ${dia(d.getTime())} às ${new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(d)}`; };
+
+async function api(caminho) {
+  const r = await fetch(caminho);
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`);
+  return r.json();
+}
+
+function metaTexto(e) {
+  if (!e.metaMs) return 'Meta ainda não definida';
+  return `${tempo(e.metaMs)} ± ${(e.toleranciaMs / 1000).toFixed(3)} s`;
+}
+
+// ------------------------------------------------------------------ relatório de uma equalização (para a oficina)
+function relatorio(e) {
+  const r = e.resultado;
+  document.title = `Equalização · ${e.name}`;
+  const quando = e.startedAt || e.createdAt;
+  window.nomeArquivoRelatorio = `Equalizacao - ${e.track.name} - ${new Date(quando).toLocaleDateString('sv-SE')}`.replace(/[\\/:*?"<>|·]+/g, ' ').replace(/\s+/g, ' ').trim();
+  el('titulo').textContent = e.name;
+  el('sub2').textContent = `${dataHora(quando)}${e.finishedAt ? ` às ${new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(e.finishedAt))}` : ''} · ${e.finalizadaEm ? 'finalizada' : (ESTADOS[e.state] || e.state).toLowerCase()}`;
+  el('sub3').textContent = `${e.track.name} · ${Number(e.track.lengthMeters).toLocaleString('pt-BR')} m${e.mecanico ? ` · responsável: ${e.mecanico}` : ''}`;
+  el('pill').hidden = false; el('pill').innerHTML = `Meta <strong>${esc(metaTexto(e))}</strong>`;
+  el('emitido').textContent = agora();
+
+  const testados = r.karts.filter((k) => !k.referencia);
+  const refs = r.referencias;
+  const origem = r.metaOrigem === 'fixa' ? 'meta fixa do traçado' : r.metaOrigem === 'referencia' ? `média das melhores voltas dos karts referência` : 'sem karts referência com volta';
+  let h = `<div class="resumo">
+    <div><span>Meta de tempo</span><b>${tempo(r.metaMs)}</b><small>${esc(origem)}</small></div>
+    <div><span>Tolerância</span><b>± ${(r.toleranciaMs / 1000).toFixed(3)} s</b><small>${r.metaMs ? `${tempo(r.metaMs - r.toleranciaMs)} a ${tempo(r.metaMs + r.toleranciaMs)}` : ''}</small></div>
+    ${refs.map((x, i) => `<div><span>Kart referência ${i + 1}</span><b>#${esc(x.kart)} · ${tempo(x.melhorMs)}</b><small>${x.voltas} volta(s) · média ${tempo(x.mediaMs)}</small></div>`).join('')}
+    <div><span>Resultado</span><b>${testados.filter((k) => k.status === 'EQUALIZADO').length} de ${testados.length} equalizados</b><small>${testados.filter((k) => k.status === 'REVISAR').length} para a oficina · ${testados.filter((k) => k.status === 'AJUSTANDO').length} ajustando</small></div>
+  </div>`;
+
+  // matriz por bloco de 2 voltas (regra das 2 voltas por redutor)
+  const maxBlocos = Math.max(4, ...testados.map((k) => k.blocos.length));
+  h += `<h2>Matriz de testes por bloco de 2 voltas (um redutor por bloco)</h2><div class="wrap"><table><thead><tr>
+    <th>Kart</th><th>Mecânico / piloto</th>
+    ${Array.from({ length: maxBlocos }, (_, i) => `<th class="num">Bloco ${i + 1}<br>${i === 0 ? 'sem redutor' : `redutor ${i}`}</th>`).join('')}
+    <th>Redutor<br>final</th><th>Status</th><th>Ação recomendada</th><th class="num">Voltas nas baterias<br>desde a última equalização</th>
+  </tr></thead><tbody>`;
+  for (const k of r.karts) {
+    const v = e.voltasDesdeUltima[k.kart] || { voltas: 0, baterias: 0, desde: null };
+    const voltasTxt = `${v.voltas}<small style="display:block;color:var(--muted)">${v.baterias} bateria(s)${v.desde ? ` desde ${dia(v.desde)}` : ' (1ª equalização)'}</small>`;
+    h += `<tr><td class="c"><span class="kart">${esc(k.kart)}</span></td><td>${esc(k.piloto)}</td>`;
+    if (k.referencia) {
+      h += `<td class="num bloco" colspan="${maxBlocos}" style="text-align:left">Melhor <strong>${tempo(k.melhorMs)}</strong> · média ${tempo(k.mediaMs)} · ${k.voltas} volta(s) — base de comparação</td>`;
+    } else {
+      for (let i = 0; i < maxBlocos; i++) {
+        const b = k.blocos[i];
+        if (!b) { h += `<td class="num">${VAZIO}</td>`; continue; }
+        const outro = b.redutor !== i ? `${nomeRedutor(b.redutor).toLowerCase()} · ` : '';
+        h += `<td class="num bloco${b.dentro && b.completo ? ' dentro' : ''}">${b.voltasMs.map(tempo).join(' / ')}${b.completo ? '' : ' / …'}<small>${outro}${b.completo && b.deltaMs != null ? `média ${tempo(b.mediaMs)} (${delta(b.deltaMs)})` : 'falta 1 volta'}</small></td>`;
+      }
+    }
+    const cls = k.status === 'SEM VOLTAS' ? 'SEM' : k.status;
+    h += `<td>${k.redutorFinal == null ? VAZIO : esc(nomeRedutor(k.redutorFinal))}</td><td><span class="st st-${cls}">${esc(k.status)}</span></td><td>${esc(k.acao)}</td><td class="num">${voltasTxt}</td></tr>`;
+  }
+  if (!r.karts.length) h += `<tr><td colspan="${maxBlocos + 6}" class="c" style="padding:18px;color:var(--muted)">Nenhum kart nesta equalização ainda.</td></tr>`;
+  h += `</tbody></table></div>`;
+
+  // apontamentos técnicos (checklist da oficina)
+  const comApontamento = r.karts.filter((k) => k.checklist && (Object.keys(k.checklist.sistemas || {}).length || k.checklist.observacoes || k.checklist.acaoOficina));
+  h += `<h2>Apontamentos técnicos · checklist da oficina</h2>`;
+  if (!comApontamento.length) h += `<p class="nota">Nenhum apontamento registrado para os karts desta equalização.</p>`;
+  else {
+    h += `<div class="wrap"><table><thead><tr><th>Kart</th>${Object.values(SISTEMAS).map((n) => `<th>${n}</th>`).join('')}<th>Observações</th><th>Ação da oficina / peças</th></tr></thead><tbody>`;
+    for (const k of comApontamento) {
+      h += `<tr><td class="c"><span class="kart">${esc(k.kart)}</span></td>`;
+      for (const s of Object.keys(SISTEMAS)) {
+        const x = (k.checklist.sistemas || {})[s];
+        h += x ? `<td class="sis sis-${x.status}">${NOME_STATUS[x.status]}${x.nota ? `<small>${esc(x.nota)}</small>` : ''}</td>` : `<td>${VAZIO}</td>`;
+      }
+      h += `<td>${esc(k.checklist.observacoes) || VAZIO}</td><td>${esc(k.checklist.acaoOficina) || VAZIO}</td></tr>`;
+    }
+    h += `</tbody></table></div>`;
+  }
+  h += `<p class="nota"><strong>Como ler:</strong> cada bloco são 2 voltas com um redutor (bloco 1 sem redutor, bloco 2 com o redutor 1…). Vale o último bloco: média dentro da meta ± tolerância = equalizado com aquele redutor. Os karts referência passam várias vezes e servem só de comparação. As voltas da equalização ficam separadas das baterias normais.</p>
+    <div class="assin"><div>Cronometragem</div><div>Oficina · mecânico responsável</div><div>Data</div></div>`;
+  el('conteudo').innerHTML = h;
+  el('estado').textContent = `${ESTADOS[e.state] || e.state}${e.finalizadaEm ? ' · finalizada' : ''} · ${r.karts.length} karts`;
+}
+
+// ------------------------------------------------------------------ histórico: equalizações por data e metas por traçado
+async function historico() {
+  el('lnkLista').hidden = true;
+  const sel = el('filtroTracado'); sel.hidden = false;
+  const q = new URLSearchParams(location.search);
+  const tid = q.get('trackId');
+  const [lista, metas] = await Promise.all([api('/api/equalizacao' + (tid ? `?trackId=${encodeURIComponent(tid)}` : '')), api('/api/equalizacao/metas' + (tid !== null ? `?trackId=${encodeURIComponent(tid)}` : ''))]);
+  sel.innerHTML = `<option value="*">Todos os traçados</option>` + lista.tracks.map((t) => `<option value="${esc(t.id)}">${esc(t.name)} · ${t.lengthMeters} m</option>`).join('');
+  sel.value = tid ?? '*';
+  sel.onchange = () => { location.search = sel.value === '*' ? '' : `?trackId=${encodeURIComponent(sel.value)}`; };
+  document.title = 'Equalização dos karts · histórico';
+  window.nomeArquivoRelatorio = 'Equalizacao - historico';
+  el('titulo').textContent = 'Histórico das equalizações';
+  el('sub2').textContent = tid ? (lista.tracks.find((t) => t.id === tid)?.name || 'Traçado') : 'Todos os traçados';
+  el('sub3').textContent = `${lista.equalizacoes.length} equalização(ões) · ${metas.metas.length} meta(s) registrada(s)`;
+  el('emitido').textContent = agora();
+  let h = `<h2>Equalizações por data</h2>`;
+  if (!lista.equalizacoes.length) h += `<div class="vazio">Nenhuma equalização registrada${tid ? ' neste traçado' : ''}.</div>`;
+  else {
+    h += `<div class="wrap"><table class="lista"><thead><tr><th>Data</th><th>Equalização</th><th>Traçado</th><th class="num">Meta</th><th class="num">Tolerância</th><th>Referências</th><th class="num">Karts</th><th class="num">Equalizados</th><th class="num">Oficina</th><th>Situação</th></tr></thead><tbody>`;
+    for (const e of lista.equalizacoes) {
+      h += `<tr><td>${dataHora(e.startedAt || e.createdAt)}</td><td><a href="/equalizacao/${encodeURIComponent(e.id)}">${esc(e.name)}</a></td><td>${esc(e.track.name)}</td>
+        <td class="num"><strong>${tempo(e.metaMs)}</strong></td><td class="num">± ${(e.toleranciaMs / 1000).toFixed(3)}</td><td>${e.referencias.map((k) => `#${esc(k)}`).join(', ') || VAZIO}</td>
+        <td class="num">${e.karts}</td><td class="num">${e.equalizados}</td><td class="num">${e.revisar}</td><td>${e.finalizadaEm ? 'Finalizada' : esc(ESTADOS[e.state] || e.state)}</td></tr>`;
+    }
+    h += `</tbody></table></div>`;
+  }
+  h += `<h2>Meta de tempo por traçado (histórico)</h2>`;
+  if (!metas.metas.length) h += `<p class="nota">Nenhuma meta registrada ainda. A meta de cada equalização finalizada entra aqui; também dá para definir uma meta fixa do traçado na Cronometragem.</p>`;
+  else {
+    h += `<div class="wrap"><table><thead><tr><th>Data</th><th>Traçado</th><th class="num">Meta</th><th class="num">Tolerância</th><th>Origem</th><th>Referências</th></tr></thead><tbody>`;
+    for (const m of metas.metas) h += `<tr><td>${dataHora(m.quando)}</td><td>${esc(m.track)}</td><td class="num"><strong>${tempo(m.metaMs)}</strong></td><td class="num">± ${(m.toleranciaMs / 1000).toFixed(3)}</td><td>${m.origem === 'manual' ? 'Meta fixa definida' : 'Equalização'}</td><td>${(m.referencias || []).map((k) => `#${esc(k)}`).join(', ') || VAZIO}</td></tr>`;
+    h += `</tbody></table></div>`;
+  }
+  h += `<p class="rodape-tela">Para criar ou editar uma equalização use a aba Equalização do programa da Cronometragem.</p>`;
+  el('conteudo').innerHTML = h;
+  el('estado').textContent = 'Histórico';
+}
+
+async function carregar() {
+  try {
+    if (id) relatorio(await api('/api/equalizacao/' + encodeURIComponent(id)));
+    else await historico();
+  } catch (erro) {
+    el('titulo').textContent = 'Não foi possível carregar';
+    el('conteudo').innerHTML = `<div class="vazio">${esc(erro.message)}</div>`;
+    el('estado').textContent = 'Falha ao carregar';
+  }
+}
+carregar();
+// equalização aberta: atualiza sozinha a cada 5 s (na tela; a impressão usa o que está na tela)
+if (id) setInterval(() => { if (document.visibilityState === 'visible' && !window.matchMedia('print').matches) carregar(); }, 5000);
+</script>
+</body>
+</html>
