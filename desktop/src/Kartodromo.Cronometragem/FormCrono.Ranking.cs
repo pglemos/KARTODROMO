@@ -63,10 +63,11 @@ public partial class FormCrono
 
         // ranking
         TemaCrono.EstilizarGrade(_gRankKarts);
-        _gRankKarts.Col("Pos", 48).Col("Kart", 58).Col("Melhor volta", 96, DataGridViewContentAlignment.MiddleRight).Col("Piloto da melhor", 150, DataGridViewContentAlignment.MiddleLeft, true)
-            .Col("Dia", 82).Col("Média 10 melhores", 120, DataGridViewContentAlignment.MiddleRight).Col("Mediana", 82, DataGridViewContentAlignment.MiddleRight)
+        // a melhor volta fica junto dos outros tempos: depois do Dia e antes da Média 10 melhores
+        _gRankKarts.Col("Pos", 48).Col("Kart", 58).Col("Piloto da melhor", 150, DataGridViewContentAlignment.MiddleLeft, true)
+            .Col("Dia", 82).Col("Melhor volta", 96, DataGridViewContentAlignment.MiddleRight).Col("Média 10 melhores", 120, DataGridViewContentAlignment.MiddleRight).Col("Mediana", 82, DataGridViewContentAlignment.MiddleRight)
             .Col("Voltas", 64, DataGridViewContentAlignment.MiddleRight).Col("Baterias", 70, DataGridViewContentAlignment.MiddleRight).Col("Pilotos", 64, DataGridViewContentAlignment.MiddleRight).Col("Última vez", 86);
-        foreach (var c in new[] { 2, 5, 6 }) _gRankKarts.Columns[c].DefaultCellStyle.Font = new Font("Cascadia Mono", 9F);
+        foreach (var c in new[] { 4, 5, 6 }) _gRankKarts.Columns[c].DefaultCellStyle.Font = new Font("Cascadia Mono", 9F);
         _gRankKarts.Columns[1].DefaultCellStyle.Font = new Font("Cascadia Mono", 9.4F, FontStyle.Bold);
         _gRankKarts.SelectionChanged += (_, _) => { if (_gRankKarts.ChaveAtual is JsonObject k) _ = CarregarHistoricoKart(k.S("kart")); };
         _subRanking.Text = "Melhor volta de cada kart no período";
@@ -126,7 +127,7 @@ public partial class FormCrono
             var lista = await Crono.Api.Lista("/api/ranking-karts?" + FiltroRanking());
             var kartAntes = (_gRankKarts.ChaveAtual as JsonObject)?.S("kart");
             _gRankKarts.Preencher(lista.Select(r => new object[] {
-                r.I("posicao"), r.S("kart").PadLeft(2, '0'), Crono.Volta(r.L("melhorMs")), r.S("melhorPiloto"), DiaBr(r.S("melhorData")),
+                r.I("posicao"), r.S("kart").PadLeft(2, '0'), r.S("melhorPiloto"), DiaBr(r.S("melhorData")), Crono.Volta(r.L("melhorMs")),
                 Crono.Volta(r.L("media10Ms")), Crono.Volta(r.L("medianaMs")), r.I("voltas"), r.I("baterias"), r.I("pilotos"), DiaBr(r.S("ultimaVez")) }).ToList(), lista.Cast<object>().ToList());
             _subRanking.Text = lista.Count == 0
                 ? $"Nenhuma bateria finalizada em {DescricaoPeriodo()}"
@@ -182,7 +183,7 @@ public partial class FormCrono
         if (_gRankKarts.Rows.Count == 0) { Msg.Aviso(this, "Não há karts no período para imprimir."); return; }
         static string H(object v) => System.Net.WebUtility.HtmlEncode(v?.ToString() ?? "");
         var cab = string.Concat(_gRankKarts.Columns.Cast<DataGridViewColumn>().Select(c => $"<th>{H(c.HeaderText)}</th>"));
-        var linhas = string.Concat(_gRankKarts.Rows.Cast<DataGridViewRow>().Select(r => "<tr>" + string.Concat(r.Cells.Cast<DataGridViewCell>().Select((c, i) => $"<td class=\"{(i is 2 or 5 or 6 ? "t" : i == 3 ? "n" : "")}\">{H(c.FormattedValue)}</td>")) + "</tr>"));
+        var linhas = string.Concat(_gRankKarts.Rows.Cast<DataGridViewRow>().Select(r => "<tr>" + string.Concat(r.Cells.Cast<DataGridViewCell>().Select((c, i) => $"<td class=\"{(i is 4 or 5 or 6 ? "t" : i == 2 ? "n" : "")}\">{H(c.FormattedValue)}</td>")) + "</tr>"));
         var tracado = (_rankTracado.SelectedItem as Campos.Item)?.Texto ?? "Todos os traçados";
         var tipo = (_rankTipo.SelectedItem as Campos.Item)?.Texto ?? "Todas as provas";
         var html = "<!doctype html><meta charset=utf-8><title>Ranking dos karts</title><style>@page{size:A4;margin:12mm}body{font:12px 'Segoe UI',Arial;margin:0;color:#1d1d1f}h1{margin:0 0 2px;font-size:20px}.v{color:#555;margin-bottom:10px}table{border-collapse:collapse;width:100%}th,td{padding:5px 6px;border-bottom:1px solid #e5e5ea;text-align:right;white-space:nowrap}th{font-size:10px;color:#333;background:#f1f5f2;text-transform:uppercase;border-bottom:1.5px solid #000}td.n,th:nth-child(4){text-align:left;white-space:normal}.t{font-family:Consolas,monospace}</style>"
