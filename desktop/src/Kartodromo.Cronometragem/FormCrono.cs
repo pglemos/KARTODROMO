@@ -128,6 +128,7 @@ public partial class FormCrono : Form
             if (string.IsNullOrEmpty(_state?.S("runningId"))) _abas.SelectedIndex = 0;
             _leitura.Start();
             _relogio.Start();
+            IniciarAtualizacaoAoVivo();
         };
         FormClosed += (_, _) => { _tv?.Close(); _painel.Dispose(); };
     }
@@ -1207,7 +1208,10 @@ public partial class FormCrono : Form
     {
         if (_tv is { IsDisposed: false }) { _tv.Activate(); return; }
         _tv = new FormTV();
+        // fechado pelo operador, não reabre; fechado junto com o programa, volta na próxima abertura
+        _tv.FormClosed += (_, _) => { if (!_fechandoPrograma) MarcarTv(false); };
         _tv.Show();
+        if (_autoteste == null) MarcarTv(true);
     }
 
     void AbrirRelatoriosCrono()

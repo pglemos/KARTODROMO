@@ -73,18 +73,20 @@ public partial class FormCrono
         _pPlacar.Click += (_, _) => ConfigurarPainel();
         _pDecoder.Click += (_, _) => JanelaCadastro("CadDecoder");
         _pTv.Click += (_, _) => AbrirTV();
-        rod.Controls.AddRange([_rodTexto, _pTransp, _pPlacar, _pDecoder, _pTv]);
+        _pAtualizar = new PilulaStatus { Visible = false, Cursor = Cursors.Hand };
+        _pAtualizar.Click += (_, _) => AtualizarAgora();
+        rod.Controls.AddRange([_rodTexto, _pAtualizar, _pTransp, _pPlacar, _pDecoder, _pTv]);
         void Posicionar()
         {
             var x = rod.Width - 16;
-            foreach (var p in new[] { _pTv, _pDecoder, _pPlacar, _pTransp })
+            foreach (var p in new[] { _pTv, _pDecoder, _pPlacar, _pTransp, _pAtualizar })
             {
                 if (!p.Visible) continue;
                 x -= p.Width; p.Location = new Point(x, 5); x -= 8;
             }
         }
         rod.Resize += (_, _) => Posicionar();
-        foreach (var p in new[] { _pTv, _pDecoder, _pPlacar, _pTransp }) { p.SizeChanged += (_, _) => Posicionar(); p.VisibleChanged += (_, _) => Posicionar(); }
+        foreach (var p in new[] { _pTv, _pDecoder, _pPlacar, _pTransp, _pAtualizar }) { p.SizeChanged += (_, _) => Posicionar(); p.VisibleChanged += (_, _) => Posicionar(); }
         return rod;
     }
 
