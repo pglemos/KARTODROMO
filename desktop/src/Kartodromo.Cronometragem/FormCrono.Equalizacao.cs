@@ -35,6 +35,7 @@ public partial class FormCrono
         barra.Controls.Add(BotaoPeq("+ Nova equalização", 1, () => ConfigurarEqualizacao(true)));
         barra.Controls.Add(BotaoPeq("Meta do traçado…", 0, MetaDoTracado));
         barra.Controls.Add(BotaoPeq("Regra do redutor…", 0, RegraDoRedutor));
+        barra.Controls.Add(BotaoPeq("Trazer karts de outra bateria…", 0, TrazerKartsDeOutraBateria));
         barra.Controls.Add(BotaoPeq("Histórico e metas", 0, () => Relatorio.Abrir(this, $"{Config.CronoUrl.TrimEnd('/')}/equalizacao", "Equalização · histórico e metas por traçado")));
         var cartaoBarra = new TemaCrono.PainelArredondado { Dock = DockStyle.Fill, BackColor = Color.White, Raio = 16, Margin = new Padding(0, 0, 0, 14) };
         cartaoBarra.Controls.Add(barra);
@@ -466,6 +467,42 @@ public partial class FormCrono
             { ["sistemas"] = sistemas, ["observacoes"] = obs.Text.Trim(), ["acaoOficina"] = acao.Text.Trim(), ["piloto"] = piloto.Text.Trim(), ["autor"] = Environment.UserName });
             d.DialogResult = DialogResult.OK; d.Close();
             await CarregarEqualizacao(true);
+        }));
+        d.BotaoRodape("Cancelar", false, d.Close);
+        d.ShowDialog(this);
+    }
+
+    /// <summary>Traz para a equalização karts que andaram em outra bateria (as voltas foram cronometradas fora da
+    /// equalização). As passagens são copiadas; a bateria de origem não muda.</summary>
+    void TrazerKartsDeOutraBateria()
+    {
+        if (_eq == null) { Msg.Aviso(this, "Crie ou escolha uma equalização."); return; }
+        if (_eq.L("finalizadaEm") != null) { Msg.Aviso(this, "Esta equalização já foi finalizada."); return; }
+        var sessoes = Crono.Arr(_state, "sessions").Where(s => s.S("type") != "equalizacao" && s.L("startedAt") != null && s.I("competitors") > 0)
+            .OrderByDescending(s => s.L("startedAt")).Take(40).ToList();
+        if (sessoes.Count == 0) { Msg.Aviso(this, "Não há bateria com voltas para trazer."); return; }
+        using var d = NovoDialogo("Trazer karts de outra bateria", $"{_eq.S("name")} · voltas cronometradas fora da equalização", SvgEqualizacao, CorEqualizacao, 820, 470);
+        var origem = new ListaDesign();
+        foreach (var s in sessoes) origem.Items.Add(new Campos.Item(0, $"{DiaHora(s.L("startedAt"))}  ·  {s.S("name")}  ·  {Crono.Tipo(s.S("type"))}  ·  {s.I("competitors")} karts", s));
+        origem.SelectedIndex = 0;
+        var karts = Txt("", 120);
+        var g = d.Secao("De onde vêm as voltas");
+        d.Campo(g, "Bateria", origem, 6);
+        d.Campo(g, "Karts (números separados por vírgula)", karts, 6);
+        d.Nota("As voltas são copiadas para a equalização; a bateria de origem não muda. Kart que já tem voltas nesta equalização fica como está.");
+        d.BotaoRodape("Trazer karts", true, () => Seguro.Rodar(d, async () =>
+        {
+            var lista = karts.Text.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).Distinct().ToList();
+            if (lista.Count == 0) { Msg.Aviso(d, "Digite os números dos karts."); karts.Focus(); return; }
+            var r = (await Crono.Api.Post($"/api/equalizacao/{_eq.S("id")}/importar", new JsonObject
+            {
+                ["sessionId"] = (origem.SelectedItem as Campos.Item)?.Dados?.S("id"),
+                ["karts"] = new JsonArray(lista.Select(x => (JsonNode)JsonValue.Create(x)).ToArray()), ["autor"] = Environment.UserName,
+            }))?.AsObject();
+            d.DialogResult = DialogResult.OK; d.Close();
+            await CarregarEqualizacao(true);
+            var fora = Crono.Arr(r, "ignorados");
+            Msg.Info(this, $"{Crono.Arr(r, "importados").Count} kart(s) trazido(s) para a equalização." + (fora.Count > 0 ? "\n\nFicaram de fora: " + string.Join(", ", fora.Select(x => $"{x.S("kart")} ({x.S("motivo")})")) : ""));
         }));
         d.BotaoRodape("Cancelar", false, d.Close);
         d.ShowDialog(this);
