@@ -18,13 +18,14 @@ type Tracado = { id: string | null; name: string; lengthMeters: number };
 type Resumo = {
   id: string; name: string; state: string; createdAt: number; startedAt: number | null; finishedAt: number | null; finalizadaEm: number | null;
   track: Tracado; mecanico: string; metaMs: number | null; metaOrigem: string; toleranciaMs: number; referencias: string[];
-  karts: number; equalizados: number; ajustando: number; revisar: number;
+  karts: number; equalizados: number; ajustando: number; revisar: number; regra?: Regra;
 };
-type Bloco = { bloco: number; redutor: number; voltasMs: number[]; mediaMs: number | null; deltaMs: number | null; dentro: boolean; completo: boolean };
+type Regra = { nome: string; toleranciaMs: number; faixaMs: number; passoMm: number };
+type Bloco = { bloco: number; rotulo: string; aberturaMm: number; voltasMs: number[]; mediaMs: number | null; deltaMs: number | null; dentro: boolean; completo: boolean; ajusteMm: number | null };
 type Sistema = { status: 'ok' | 'atencao' | 'critico'; nota?: string };
 type KartEq = {
   kart: string; piloto: string; referencia: boolean; voltas: number; melhorMs: number | null; mediaMs: number | null; blocos: Bloco[];
-  redutorFinal: number | null; status: string; acao: string;
+  redutorSugerido: string | null; status: string; acao: string;
   checklist: { sistemas?: Record<string, Sistema>; observacoes?: string; acaoOficina?: string } | null;
 };
 type Detalhe = Resumo & {
@@ -46,7 +47,10 @@ const tempo = (ms: number | null | undefined) => {
 };
 const delta = (ms: number | null) => (ms == null ? '' : `${ms > 0 ? '+' : ms < 0 ? '−' : '±'}${(Math.abs(ms) / 1000).toFixed(3)}`);
 const dataHora = (ms: number | null) => (ms ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(ms)) : '–');
-const nomeRedutor = (r: number) => (r === 0 ? 'Sem redutor' : `Redutor ${r}`);
+// milímetros do redutor e segundos em texto corrido com vírgula; os tempos de volta seguem com ponto
+const mm = (x: number) => Math.abs(x).toFixed(2).replace(/0$/, '').replace('.', ',');
+const segs = (ms: number) => (ms / 1000).toFixed(3).replace('.', ',');
+const ajuste = (x: number | null) => (x == null ? '' : x === 0 ? 'equalizado' : `${x > 0 ? 'abrir' : 'fechar'} ${mm(x)} mm`);
 
 async function ler<T>(caminho: string): Promise<T> {
   const r = await fetch(`/api/admin/equalizacao/crono${caminho}`, { cache: 'no-store' });
@@ -195,6 +199,7 @@ function DetalheEqualizacao({ e, fechar }: { e: Detalhe; fechar: () => void }) {
             {r.referencias.length ? ` · referências: ${r.referencias.map((x) => `#${x.kart} ${tempo(x.melhorMs)}`).join(', ')}` : ''}
             {e.mecanico ? ` · responsável: ${e.mecanico}` : ''}
           </p>
+          {e.regra ? <p className="mt-1 text-xs text-zinc-500">Regra do redutor ({e.regra.nome}): equalizado até ±{segs(e.regra.toleranciaMs)} s; depois, a cada {segs(e.regra.faixaMs)} s, {mm(e.regra.passoMm)} mm. Mais lento que a referência = abrir; mais rápido = fechar.</p> : null}
         </div>
         <Button onClick={fechar} variant="ghost">Fechar</Button>
       </div>
@@ -203,8 +208,8 @@ function DetalheEqualizacao({ e, fechar }: { e: Detalhe; fechar: () => void }) {
           <thead className="text-xs uppercase tracking-wider text-zinc-500">
             <tr>
               <th className="py-2 pr-3">Kart</th><th className="py-2 pr-3">Mecânico / piloto</th>
-              {Array.from({ length: maxBlocos }, (_, i) => <th className="py-2 pr-3 text-right" key={i}>Bloco {i + 1}<span className="block font-normal normal-case tracking-normal">{i === 0 ? 'sem redutor' : `redutor ${i}`}</span></th>)}
-              <th className="py-2 pr-3">Redutor final</th><th className="py-2 pr-3">Status</th><th className="py-2 pr-3">Ação recomendada</th><th className="py-2 text-right">Voltas desde a última</th>
+              {Array.from({ length: maxBlocos }, (_, i) => <th className="py-2 pr-3 text-right" key={i}>Bloco {i + 1}<span className="block font-normal normal-case tracking-normal">{i === 0 ? 'redutor inicial' : 'redutor trocado'}</span></th>)}
+              <th className="py-2 pr-3">Redutor sugerido</th><th className="py-2 pr-3">Status</th><th className="py-2 pr-3">Ação recomendada</th><th className="py-2 text-right">Voltas desde a última</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800 text-zinc-200">
@@ -222,11 +227,12 @@ function DetalheEqualizacao({ e, fechar }: { e: Detalhe; fechar: () => void }) {
                     return (
                       <td className={`py-2.5 pr-3 text-right tabular-nums ${b.dentro && b.completo ? 'font-semibold text-emerald-400' : ''}`} key={i}>
                         {b.voltasMs.map(tempo).join(' / ')}{b.completo ? '' : ' / …'}
-                        <span className="block text-xs font-normal text-zinc-500">{b.redutor !== i ? `${nomeRedutor(b.redutor).toLowerCase()} · ` : ''}{b.completo ? `média ${tempo(b.mediaMs)} (${delta(b.deltaMs)})` : 'falta 1 volta'}</span>
+                        <span className="block text-xs font-normal text-zinc-500">{b.completo ? `média ${tempo(b.mediaMs)} (${delta(b.deltaMs)})` : 'falta 1 volta'}</span>
+                        <span className="block text-xs font-normal text-zinc-400">{b.rotulo}{b.ajusteMm != null ? ` → ${ajuste(b.ajusteMm)}` : ''}</span>
                       </td>
                     );
                   })}
-                  <td className="py-2.5 pr-3">{k.redutorFinal == null ? '–' : nomeRedutor(k.redutorFinal)}</td>
+                  <td className="py-2.5 pr-3">{k.redutorSugerido ?? '–'}</td>
                   <td className="py-2.5 pr-3"><Badge variant={statusVariant[k.status] ?? 'zinc'}>{k.status}</Badge></td>
                   <td className="py-2.5 pr-3 text-zinc-300">{k.acao}</td>
                   <td className="py-2.5 text-right tabular-nums">{v ? v.voltas : 0}<span className="block text-xs text-zinc-500">{v ? `${v.baterias} bateria(s)` : ''}</span></td>
@@ -257,7 +263,7 @@ function DetalheEqualizacao({ e, fechar }: { e: Detalhe; fechar: () => void }) {
           </table>
         </div>
       )}
-      <p className="mt-4 text-xs leading-5 text-zinc-500">Cada bloco são 2 voltas com um redutor. Vale o último bloco: média dentro da meta ± tolerância = equalizado com aquele redutor. O PDF para a oficina sai pela Cronometragem (Equalização › Relatório para a oficina).</p>
+      <p className="mt-4 text-xs leading-5 text-zinc-500">Cada bloco são 2 voltas com um redutor: o bloco 1 é com o redutor que estava no kart e a diferença para a meta diz quanto abrir ou fechar para o bloco seguinte. Vale o último bloco: dentro da faixa de equalizado, o kart é liberado com aquele redutor. O PDF para a oficina sai pela Cronometragem (Equalização › Relatório para a oficina).</p>
     </Card>
   );
 }

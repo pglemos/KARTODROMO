@@ -1409,7 +1409,7 @@ public partial class FormCrono : Form
             var kartTeste = Crono.Arr(_sess, "competitors").FirstOrDefault()?.S("kart");
             foreach (var (nome, acao, titulo) in new (string, Action, string)[] {
                 ("Penalidade", () => AplicarPenalidade("tempo", kartTeste), "Penalidade"), ("Advertencia", () => AplicarPenalidade("advertencia", kartTeste), "Advertência"),
-                ("EqConfigurar", () => ConfigurarEqualizacao(false), "Configurar equalização"), ("EqApontamentos", ApontamentosDoKart, "Apontamentos do kart"), ("EqMeta", MetaDoTracado, "Meta do traçado"),
+                ("EqConfigurar", () => ConfigurarEqualizacao(false), "Configurar equalização"), ("EqApontamentos", ApontamentosDoKart, "Apontamentos do kart"), ("EqMeta", MetaDoTracado, "Meta do traçado"), ("EqRegra", RegraDoRedutor, "Regra do redutor"),
                 ("Remontar", RemontarPeloDiario, "Remontar pelo diário"), ("Reiniciar", ReiniciarBateria, "Reiniciar"), ("VerdeCorrendo", VerdeComProvaCorrendo, "Bandeira verde"), ("EditarBateria", MudarCorridaDesign, "Editar bateria"),
                 ("Evento", () => EditarEventoDesign(true), null), ("GrupoEditar", () => EditarGrupoDesign(true), null), ("Distribuir", DistribuirProvaDesign, null), ("EmailConfig", ConfigurarEmail, "E-mail dos resultados"), ("EmailEnviar", EnviarEmail, "Enviar resultado") })
             {

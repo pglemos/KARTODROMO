@@ -7,16 +7,23 @@
  * Regras:
  * - Karts referência (2 ou 3): todas as voltas valem; a meta é a média das melhores voltas deles (ou a meta fixa
  *   do traçado, se o cronometrista escolher).
- * - Demais karts: as voltas válidas formam blocos de 2. Cada bloco é um redutor: bloco 1 = sem redutor, bloco 2 =
- *   redutor 1... (a cada 2 voltas o kart troca de redutor para chegar perto da meta). O redutor de um bloco pode ser
- *   corrigido à mão.
- * - Vale o ÚLTIMO bloco completo (o redutor que está no kart agora): média dentro de meta ± tolerância (padrão
- *   0,080 s) = EQUALIZADO com aquele redutor. Fora: AJUSTANDO enquanto a equalização está aberta e REVISAR (oficina)
- *   depois de finalizada. O redutor pode deixar o kart mais rápido ou mais lento: não se presume o sentido.
+ * - Demais karts: as voltas válidas formam blocos de 2. O bloco 1 é com o redutor que está no kart (o "inicial"); a
+ *   cada 2 voltas o redutor é trocado para chegar perto da meta.
+ * - Regra do redutor (por tipo de kart, editável): a diferença da média do bloco para a meta diz quanto mexer.
+ *   Kart Indoor: até ±0,200 s = equalizado; de 0,200 a 0,400 s mais lento = abrir 0,1 mm; de 0,400 a 0,600 = abrir
+ *   0,2 mm; e assim por diante (a cada 0,200 s, mais 0,1 mm). Mais rápido que a meta: o mesmo, com "fechar".
+ * - O redutor de cada bloco é guardado como abertura em mm em relação ao inicial (+ aberto, − fechado). Presume-se
+ *   que a oficina fez o ajuste sugerido no bloco anterior; dá para corrigir à mão. Com a medida do redutor inicial
+ *   informada, tudo aparece na medida real (17,3 mm).
+ * - Vale o ÚLTIMO bloco completo (o redutor que está no kart agora): dentro da tolerância = EQUALIZADO. Fora:
+ *   AJUSTANDO enquanto a equalização está aberta e REVISAR (oficina) depois de finalizada.
  */
 import type { Competitor, Session } from './race-engine';
 
-export const TOLERANCIA_PADRAO_MS = 80;
+/** Regra do redutor: até toleranciaMs = equalizado; depois, a cada faixaMs de diferença, passoMm de abertura. */
+export type RegraRedutor = { nome?: string; toleranciaMs: number; faixaMs: number; passoMm: number };
+export const REGRA_PADRAO = { nome: 'Kart Indoor', toleranciaMs: 200, faixaMs: 200, passoMm: 0.1 } as const;
+export const TOLERANCIA_PADRAO_MS = REGRA_PADRAO.toleranciaMs;
 export const SISTEMAS_KART = ['chassi', 'pneu', 'motor', 'embreagem', 'freio'] as const;
 export type SistemaKart = (typeof SISTEMAS_KART)[number];
 export type StatusSistema = 'ok' | 'atencao' | 'critico';
@@ -35,17 +42,35 @@ export type ConfigEqualizacao = {
   /** referencia = média das melhores voltas dos karts referência; fixa = meta escolhida para o traçado */
   metaModo?: 'referencia' | 'fixa';
   metaFixaMs?: number | null;
+  /** até quanto de diferença para a meta o kart está equalizado (a primeira faixa da regra do redutor) */
   toleranciaMs?: number;
+  /** regra do redutor desta equalização (copiada do tipo de kart ao criar, pode ser ajustada) */
+  regraNome?: string;
+  faixaMs?: number;
+  passoMm?: number;
   /** números dos karts referência (2 ou 3) */
   referencias?: string[];
-  /** correção manual do redutor de um bloco: { "08": { "2": 3 } } = bloco 2 do kart 08 foi com o redutor 3 */
-  redutores?: Record<string, Record<string, number>>;
+  /** medida (mm) do redutor que estava no kart no bloco 1, quando conhecida: { "08": 17.2 } */
+  redutorInicialMm?: Record<string, number>;
+  /** correção manual: abertura do redutor de um bloco em relação ao inicial, em mm: { "08": { "2": 0.3 } } */
+  aberturas?: Record<string, Record<string, number>>;
   checklist?: Record<string, ChecklistKart>;
   finalizadaEm?: number | null;
   mecanico?: string;
 };
 
-export type BlocoEqualizacao = { bloco: number; redutor: number; voltasMs: number[]; mediaMs: number | null; deltaMs: number | null; dentro: boolean; completo: boolean };
+export type BlocoEqualizacao = {
+  bloco: number;
+  /** abertura do redutor deste bloco em relação ao inicial (mm; + aberto, − fechado) */
+  aberturaMm: number;
+  /** medida real do redutor (mm), quando a do inicial foi informada */
+  redutorMm: number | null;
+  /** "inicial", "+0,3 mm" ou "17,3 mm" */
+  rotulo: string;
+  voltasMs: number[]; mediaMs: number | null; deltaMs: number | null; dentro: boolean; completo: boolean;
+  /** o que a regra manda fazer depois deste bloco (mm; + abrir, − fechar, 0 = equalizado); null sem meta ou incompleto */
+  ajusteMm: number | null;
+};
 export type StatusKart = 'REF' | 'EQUALIZADO' | 'AJUSTANDO' | 'REVISAR' | 'SEM VOLTAS';
 
 export type KartEqualizacao = {
@@ -56,7 +81,13 @@ export type KartEqualizacao = {
   melhorMs: number | null;
   mediaMs: number | null;
   blocos: BlocoEqualizacao[];
-  redutorFinal: number | null;
+  /** quanto mexer no redutor agora (mm; + abrir, − fechar, 0 = equalizado) */
+  ajusteMm: number | null;
+  /** abertura do redutor sugerido em relação ao inicial (mm) e a medida real, quando conhecida */
+  aberturaMm: number | null;
+  redutorMm: number | null;
+  /** redutor a usar: "inicial", "inicial + 0,3 mm" ou "17,3 mm" */
+  redutorSugerido: string | null;
   status: StatusKart;
   acao: string;
   checklist: ChecklistKart | null;
@@ -66,11 +97,51 @@ export type ResultadoEqualizacao = {
   metaMs: number | null;
   metaOrigem: 'referencia' | 'fixa' | 'sem-meta';
   toleranciaMs: number;
+  regra: Required<RegraRedutor>;
   referencias: { kart: string; melhorMs: number | null; mediaMs: number | null; voltas: number }[];
   karts: KartEqualizacao[];
 };
 
-const nomeRedutor = (r: number) => (r === 0 ? 'sem redutor' : `redutor ${r}`);
+const mm2 = (x: number) => Math.round(x * 100) / 100;
+/** 0.1 → "0,1" · 0.25 → "0,25" · 17 → "17,0" (sem sinal) */
+export const fmtMm = (x: number) => Math.abs(x).toFixed(2).replace(/0$/, '').replace('.', ',');
+
+/** Regra do redutor em uso: a da equalização, completada pelo padrão (Kart Indoor). */
+export function regraDa(cfg: ConfigEqualizacao | RegraRedutor | null | undefined): Required<RegraRedutor> {
+  const c = (cfg ?? {}) as Partial<RegraRedutor> & { regraNome?: string };
+  const pos = (v: unknown, padrao: number) => (Number(v) > 0 ? Number(v) : padrao);
+  return { nome: String(c.regraNome ?? c.nome ?? REGRA_PADRAO.nome), toleranciaMs: pos(c.toleranciaMs, REGRA_PADRAO.toleranciaMs), faixaMs: pos(c.faixaMs, REGRA_PADRAO.faixaMs), passoMm: pos(c.passoMm, REGRA_PADRAO.passoMm) };
+}
+
+/**
+ * Quanto mexer no redutor pela diferença para a meta: + abrir (kart mais lento), − fechar (mais rápido), 0 = equalizado.
+ * O limite de cima de cada faixa ainda pertence a ela (0,400 s = abrir 0,1 mm; 0,401 s = abrir 0,2 mm).
+ */
+export function ajusteRedutorMm(deltaMs: number, regra: RegraRedutor): number {
+  const a = Math.abs(deltaMs);
+  if (a <= regra.toleranciaMs) return 0;
+  return mm2(Math.sign(deltaMs) * Math.ceil((a - regra.toleranciaMs) / regra.faixaMs) * regra.passoMm);
+}
+
+/** "abrir 0,2 mm", "fechar 0,1 mm" ou "manter o redutor". */
+export const textoAjuste = (mm: number) => (mm === 0 ? 'manter o redutor' : `${mm > 0 ? 'abrir' : 'fechar'} ${fmtMm(mm)} mm`);
+
+/** As primeiras faixas da regra, para mostrar na tela e no relatório (depois da última, segue no mesmo passo). */
+export function faixasDaRegra(regra: RegraRedutor, linhas = 4) {
+  return Array.from({ length: linhas }, (_, i) => ({
+    deMs: i === 0 ? 0 : regra.toleranciaMs + (i - 1) * regra.faixaMs,
+    ateMs: regra.toleranciaMs + i * regra.faixaMs,
+    mm: mm2(i * regra.passoMm),
+  }));
+}
+
+/** Nome do redutor pela abertura em relação ao inicial; com a medida do inicial, a medida real. */
+export function rotuloRedutor(aberturaMm: number, inicialMm: number | null, curto = false) {
+  if (inicialMm != null) return `${fmtMm(inicialMm + aberturaMm)} mm`;
+  if (aberturaMm === 0) return 'inicial';
+  const sinal = aberturaMm > 0 ? '+' : '−';
+  return curto ? `${sinal}${fmtMm(aberturaMm)} mm` : `inicial ${sinal} ${fmtMm(aberturaMm)} mm`;
+}
 
 function voltasValidas(c: Competitor) {
   const ativas = c.crossings.filter((x) => !x.deleted).sort((a, b) => a.wallMs - b.wallMs);
@@ -83,7 +154,8 @@ const seg = (ms: number) => (Math.abs(ms) / 1000).toFixed(3).replace('.', ',');
 
 export function calcularEqualizacao(s: Session, cfg: ConfigEqualizacao = s.equalizacao ?? {}): ResultadoEqualizacao {
   const finalizada = cfg.finalizadaEm != null || s.state === 'encerrada' || s.state === 'cancelada';
-  const tol = Number(cfg.toleranciaMs) > 0 ? Number(cfg.toleranciaMs) : TOLERANCIA_PADRAO_MS;
+  const regra = regraDa(cfg);
+  const tol = regra.toleranciaMs;
   const refs = new Set((cfg.referencias ?? []).map((k) => String(k).trim()).filter(Boolean));
   const competidores = s.competitors.filter((c) => !c.detalhes?.oculto);
   const referencias = competidores.filter((c) => refs.has(c.kart)).map((c) => {
@@ -100,44 +172,64 @@ export function calcularEqualizacao(s: Session, cfg: ConfigEqualizacao = s.equal
   const karts = competidores.map((c): KartEqualizacao => {
     const v = voltasValidas(c);
     const base = { kart: c.kart, piloto: c.name, voltas: v.length, melhorMs: v.length ? Math.min(...v) : null, mediaMs: media(v), checklist: cfg.checklist?.[c.kart] ?? null };
-    if (refs.has(c.kart)) return { ...base, referencia: true, blocos: [], redutorFinal: 0, status: 'REF', acao: 'Mantido como base de comparação' };
+    if (refs.has(c.kart)) return { ...base, referencia: true, blocos: [], ajusteMm: null, aberturaMm: null, redutorMm: null, redutorSugerido: null, status: 'REF', acao: 'Mantido como base de comparação' };
+    const inicial = Number(cfg.redutorInicialMm?.[c.kart]) > 0 ? Number(cfg.redutorInicialMm?.[c.kart]) : null;
     const blocos: BlocoEqualizacao[] = [];
     for (let i = 0; i < v.length; i += 2) {
       const n = i / 2 + 1;
       const voltasMs = v.slice(i, i + 2);
-      const redutor = cfg.redutores?.[c.kart]?.[String(n)] ?? n - 1;
+      // o bloco 1 é o redutor inicial; os seguintes presumem o ajuste sugerido no bloco anterior, salvo correção à mão
+      const antes = blocos[blocos.length - 1];
+      const manual = cfg.aberturas?.[c.kart]?.[String(n)];
+      const aberturaMm = !antes ? 0 : manual != null && Number.isFinite(Number(manual)) ? mm2(Number(manual)) : mm2(antes.aberturaMm + (antes.ajusteMm ?? 0));
       const m = media(voltasMs);
+      const completo = voltasMs.length === 2;
       const delta = m != null && metaMs != null ? m - metaMs : null;
-      blocos.push({ bloco: n, redutor, voltasMs, mediaMs: m, deltaMs: delta, dentro: delta != null && Math.abs(delta) <= tol, completo: voltasMs.length === 2 });
+      blocos.push({
+        bloco: n, aberturaMm, redutorMm: inicial != null ? mm2(inicial + aberturaMm) : null, rotulo: rotuloRedutor(aberturaMm, inicial, true),
+        voltasMs, mediaMs: m, deltaMs: delta, dentro: delta != null && Math.abs(delta) <= tol, completo,
+        ajusteMm: completo && delta != null ? ajusteRedutorMm(delta, regra) : null,
+      });
     }
     const completos = blocos.filter((b) => b.completo);
     let status: StatusKart = 'SEM VOLTAS';
     let acao = 'Aguardando 2 voltas';
-    let redutorFinal: number | null = null;
+    let ajusteMm: number | null = null;
+    let aberturaMm: number | null = null;
     const ultimo = completos[completos.length - 1];
     const anterior = completos[completos.length - 2];
-    if (metaMs == null && completos.length) { status = 'AJUSTANDO'; redutorFinal = ultimo.redutor; acao = 'Defina os karts referência ou a meta do traçado'; }
+    if (metaMs == null && completos.length) { status = 'AJUSTANDO'; aberturaMm = ultimo.aberturaMm; acao = 'Defina os karts referência ou a meta do traçado'; }
     else if (ultimo?.dentro) {
-      status = 'EQUALIZADO'; redutorFinal = ultimo.redutor;
-      acao = ultimo.redutor === 0 ? 'Liberado sem redutor' : `Instalar o ${nomeRedutor(ultimo.redutor)} e liberar`;
+      status = 'EQUALIZADO'; ajusteMm = 0; aberturaMm = ultimo.aberturaMm;
+      acao = inicial != null ? `Equalizado com o redutor ${fmtMm(inicial + aberturaMm)} mm: liberar`
+        : aberturaMm === 0 ? 'Equalizado com o redutor inicial: liberar'
+        : `Equalizado com o redutor ${aberturaMm > 0 ? 'aberto' : 'fechado'} ${fmtMm(aberturaMm)} mm em relação ao inicial: liberar`;
     } else if (ultimo) {
       const d = ultimo.deltaMs ?? 0;
-      const quanto = `${seg(d)} s ${d > 0 ? 'mais lento' : 'mais rápido'} que a meta`;
-      // piorou em relação ao bloco anterior: o redutor não trouxe ganho
-      const semGanho = anterior != null && Math.abs(d) >= Math.abs(anterior.deltaMs ?? 0);
-      const perto = [...completos].sort((a, b) => Math.abs(a.deltaMs ?? 1e9) - Math.abs(b.deltaMs ?? 1e9))[0];
-      redutorFinal = finalizada ? perto.redutor : ultimo.redutor;
-      if (finalizada) { status = 'REVISAR'; acao = `Não chegou na meta (${quanto}; o mais perto foi o ${nomeRedutor(perto.redutor)}): encaminhar para a oficina`; }
-      else { status = 'AJUSTANDO'; acao = semGanho ? `Sem ganho com o ${nomeRedutor(ultimo.redutor)} (${quanto}): voltar ao anterior ou encaminhar para a oficina` : `${quanto}: trocar o redutor e dar mais 2 voltas`; }
+      const quanto = `${seg(d)} s ${d > 0 ? 'mais lento' : 'mais rápido'} que ${metaOrigem === 'fixa' ? 'a meta' : 'a referência'}`;
+      ajusteMm = ultimo.ajusteMm ?? 0;
+      aberturaMm = mm2(ultimo.aberturaMm + ajusteMm);
+      const alvo = inicial != null ? ` (redutor ${fmtMm(inicial + aberturaMm)} mm)` : '';
+      // o redutor foi trocado depois do bloco anterior e a diferença não diminuiu
+      const semGanho = anterior != null && anterior.ajusteMm !== 0 && ultimo.aberturaMm !== anterior.aberturaMm && Math.abs(d) >= Math.abs(anterior.deltaMs ?? 0);
+      if (finalizada) { status = 'REVISAR'; acao = `Não chegou na meta: ${quanto} (faltou ${textoAjuste(ajusteMm)}${alvo}). Encaminhar para a oficina`; }
+      else {
+        status = 'AJUSTANDO';
+        const t = textoAjuste(ajusteMm);
+        acao = `${t[0].toUpperCase()}${t.slice(1)}${alvo}: ${quanto}. Dar mais 2 voltas${semGanho ? ' (o último ajuste não trouxe ganho: se repetir, encaminhar para a oficina)' : ''}`;
+      }
     } else if (blocos.length) acao = 'Falta 1 volta para fechar o bloco';
     if (status === 'SEM VOLTAS' && finalizada) acao = 'Não andou nesta equalização';
     // o que a oficina escreveu vale mais que a sugestão automática
     const daOficina = cfg.checklist?.[c.kart]?.acaoOficina?.trim();
     if (daOficina) acao = daOficina;
-    return { ...base, referencia: false, blocos, redutorFinal, status, acao };
+    return {
+      ...base, referencia: false, blocos, ajusteMm, aberturaMm, redutorMm: inicial != null && aberturaMm != null ? mm2(inicial + aberturaMm) : null,
+      redutorSugerido: aberturaMm == null ? null : rotuloRedutor(aberturaMm, inicial), status, acao,
+    };
   });
   karts.sort((a, b) => Number(b.referencia) - Number(a.referencia) || a.kart.localeCompare(b.kart, 'pt-BR', { numeric: true }));
-  return { metaMs, metaOrigem, toleranciaMs: tol, referencias, karts };
+  return { metaMs, metaOrigem, toleranciaMs: tol, regra, referencias, karts };
 }
 
 /**

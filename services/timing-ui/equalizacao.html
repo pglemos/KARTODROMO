@@ -118,7 +118,11 @@ const tempo = (ms) => {
 const delta = (ms) => (ms == null ? '' : `${ms > 0 ? '+' : ms < 0 ? '−' : '±'}${(Math.abs(ms) / 1000).toFixed(3)}`);
 const dataHora = (ms) => (ms ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(ms)).replace(',', ' ·') : VAZIO);
 const dia = (ms) => (ms ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(ms)) : VAZIO);
-const nomeRedutor = (r) => (r === 0 ? 'Sem redutor' : `Redutor ${r}`);
+// milímetros do redutor e segundos em texto corrido usam vírgula; os tempos de volta seguem com ponto, como na cronometragem
+const mm = (x) => Math.abs(x).toFixed(2).replace(/0$/, '').replace('.', ',');
+const segs = (ms) => (ms / 1000).toFixed(3).replace('.', ',');
+const ajuste = (x) => (x == null ? '' : x === 0 ? 'equalizado' : `${x > 0 ? 'abrir' : 'fechar'} ${mm(x)} mm`);
+const regraTexto = (g) => `até ±${segs(g.toleranciaMs)} s equalizado; depois, a cada ${segs(g.faixaMs)} s, ${mm(g.passoMm)} mm`;
 const ESTADOS = { preparando: 'Preparando', em_andamento: 'Em andamento', bandeira_final: 'Bandeira final', encerrada: 'Encerrada' };
 const SISTEMAS = { chassi: 'Chassi / direção', pneu: 'Pneus / calibragem', motor: 'Motor / carburação', embreagem: 'Transmissão / embreagem', freio: 'Freios' };
 const NOME_STATUS = { ok: 'OK', atencao: 'ATENÇÃO', critico: 'CRÍTICO' };
@@ -153,34 +157,41 @@ function relatorio(e) {
   const origem = r.metaOrigem === 'fixa' ? 'meta fixa do traçado' : r.metaOrigem === 'referencia' ? `média das melhores voltas dos karts referência` : 'sem karts referência com volta';
   let h = `<div class="resumo">
     <div><span>Meta de tempo</span><b>${tempo(r.metaMs)}</b><small>${esc(origem)}</small></div>
-    <div><span>Tolerância</span><b>± ${(r.toleranciaMs / 1000).toFixed(3)} s</b><small>${r.metaMs ? `${tempo(r.metaMs - r.toleranciaMs)} a ${tempo(r.metaMs + r.toleranciaMs)}` : ''}</small></div>
+    <div><span>Equalizado até</span><b>± ${(r.toleranciaMs / 1000).toFixed(3)} s</b><small>${r.metaMs ? `${tempo(r.metaMs - r.toleranciaMs)} a ${tempo(r.metaMs + r.toleranciaMs)}` : ''}</small></div>
+    <div><span>Regra do redutor</span><b>${esc(r.regra.nome)}</b><small>a cada ${segs(r.regra.faixaMs)} s, ${mm(r.regra.passoMm)} mm</small></div>
     ${refs.map((x, i) => `<div><span>Kart referência ${i + 1}</span><b>#${esc(x.kart)} · ${tempo(x.melhorMs)}</b><small>${x.voltas} volta(s) · média ${tempo(x.mediaMs)}</small></div>`).join('')}
     <div><span>Resultado</span><b>${testados.filter((k) => k.status === 'EQUALIZADO').length} de ${testados.length} equalizados</b><small>${testados.filter((k) => k.status === 'REVISAR').length} para a oficina · ${testados.filter((k) => k.status === 'AJUSTANDO').length} ajustando</small></div>
   </div>`;
 
-  // matriz por bloco de 2 voltas (regra das 2 voltas por redutor)
-  const maxBlocos = Math.max(4, ...testados.map((k) => k.blocos.length));
+  // matriz por bloco de 2 voltas (um redutor por bloco; a diferença para a meta diz quanto abrir ou fechar)
+  // cabem 5 blocos na folha deitada: de quem andou mais, ficam os 5 últimos (o redutor que está no kart agora)
+  const LIMITE_BLOCOS = 5;
+  const maisBlocos = Math.max(0, ...testados.map((k) => k.blocos.length));
+  const cortado = maisBlocos > LIMITE_BLOCOS;
+  const maxBlocos = Math.min(LIMITE_BLOCOS, Math.max(4, maisBlocos));
   h += `<h2>Matriz de testes por bloco de 2 voltas (um redutor por bloco)</h2><div class="wrap"><table><thead><tr>
     <th>Kart</th><th>Mecânico / piloto</th>
-    ${Array.from({ length: maxBlocos }, (_, i) => `<th class="num">Bloco ${i + 1}<br>${i === 0 ? 'sem redutor' : `redutor ${i}`}</th>`).join('')}
-    <th>Redutor<br>final</th><th>Status</th><th>Ação recomendada</th><th class="num">Voltas nas baterias<br>desde a última equalização</th>
+    ${cortado ? `<th class="num" colspan="${maxBlocos}">Blocos de 2 voltas (os ${maxBlocos} últimos de cada kart)</th>`
+      : Array.from({ length: maxBlocos }, (_, i) => `<th class="num">Bloco ${i + 1}<br>${i === 0 ? 'redutor inicial' : 'redutor trocado'}</th>`).join('')}
+    <th>Redutor<br>sugerido</th><th>Status</th><th>Ação recomendada</th><th class="num">Voltas nas baterias<br>desde a última</th>
   </tr></thead><tbody>`;
   for (const k of r.karts) {
     const v = e.voltasDesdeUltima[k.kart] || { voltas: 0, baterias: 0, desde: null };
-    const voltasTxt = `${v.voltas}<small style="display:block;color:var(--muted)">${v.baterias} bateria(s)${v.desde ? ` desde ${dia(v.desde)}` : ' (1ª equalização)'}</small>`;
+    const voltasTxt = `${v.voltas}<small style="display:block;color:var(--muted)">${v.baterias} bateria(s)</small><small style="display:block;color:var(--muted)">${v.desde ? `desde ${dia(v.desde)}` : '1ª equalização'}</small>`;
     h += `<tr><td class="c"><span class="kart">${esc(k.kart)}</span></td><td>${esc(k.piloto)}</td>`;
     if (k.referencia) {
       h += `<td class="num bloco" colspan="${maxBlocos}" style="text-align:left">Melhor <strong>${tempo(k.melhorMs)}</strong> · média ${tempo(k.mediaMs)} · ${k.voltas} volta(s) — base de comparação</td>`;
     } else {
+      const visiveis = k.blocos.slice(-maxBlocos);
       for (let i = 0; i < maxBlocos; i++) {
-        const b = k.blocos[i];
+        const b = visiveis[i];
         if (!b) { h += `<td class="num">${VAZIO}</td>`; continue; }
-        const outro = b.redutor !== i ? `${nomeRedutor(b.redutor).toLowerCase()} · ` : '';
-        h += `<td class="num bloco${b.dentro && b.completo ? ' dentro' : ''}">${b.voltasMs.map(tempo).join(' / ')}${b.completo ? '' : ' / …'}<small>${outro}${b.completo && b.deltaMs != null ? `média ${tempo(b.mediaMs)} (${delta(b.deltaMs)})` : 'falta 1 volta'}</small></td>`;
+        const media = !b.completo ? 'falta 1 volta' : b.deltaMs != null ? `média ${tempo(b.mediaMs)} (${delta(b.deltaMs)})` : `média ${tempo(b.mediaMs)}`;
+        h += `<td class="num bloco${b.dentro && b.completo ? ' dentro' : ''}">${cortado ? `<small>bloco ${b.bloco}</small>` : ''}${b.voltasMs.map(tempo).join(' / ')}${b.completo ? '' : ' / …'}<small>${media}</small><small>${esc(b.rotulo)}${b.ajusteMm != null ? ` → ${ajuste(b.ajusteMm)}` : ''}</small></td>`;
       }
     }
     const cls = k.status === 'SEM VOLTAS' ? 'SEM' : k.status;
-    h += `<td>${k.redutorFinal == null ? VAZIO : esc(nomeRedutor(k.redutorFinal))}</td><td><span class="st st-${cls}">${esc(k.status)}</span></td><td>${esc(k.acao)}</td><td class="num">${voltasTxt}</td></tr>`;
+    h += `<td>${k.redutorSugerido == null ? VAZIO : esc(k.redutorSugerido)}</td><td><span class="st st-${cls}">${esc(k.status)}</span></td><td>${esc(k.acao)}</td><td class="num">${voltasTxt}</td></tr>`;
   }
   if (!r.karts.length) h += `<tr><td colspan="${maxBlocos + 6}" class="c" style="padding:18px;color:var(--muted)">Nenhum kart nesta equalização ainda.</td></tr>`;
   h += `</tbody></table></div>`;
@@ -201,7 +212,9 @@ function relatorio(e) {
     }
     h += `</tbody></table></div>`;
   }
-  h += `<p class="nota"><strong>Como ler:</strong> cada bloco são 2 voltas com um redutor (bloco 1 sem redutor, bloco 2 com o redutor 1…). Vale o último bloco: média dentro da meta ± tolerância = equalizado com aquele redutor. Os karts referência passam várias vezes e servem só de comparação. As voltas da equalização ficam separadas das baterias normais.</p>
+  const fx = e.regra.faixas || [];
+  h += `<p class="nota"><strong>Regra do redutor (${esc(r.regra.nome)}):</strong> ${fx.map((f, i) => (i === 0 ? `diferença até ${segs(f.ateMs)} s = equalizado` : `de ${segs(f.deMs)} a ${segs(f.ateMs)} s = ${mm(f.mm)} mm`)).join(' · ')} · e assim por diante (a cada ${segs(r.regra.faixaMs)} s, mais ${mm(r.regra.passoMm)} mm). Kart mais lento que a referência: <strong>abrir</strong>; mais rápido: <strong>fechar</strong>.</p>
+    <p class="nota"><strong>Como ler:</strong> cada bloco são 2 voltas com um redutor. O bloco 1 é com o redutor que estava no kart (o inicial); a diferença da média para a meta diz quanto abrir ou fechar, e o bloco seguinte já é com o redutor trocado. Vale o último bloco: dentro da faixa de equalizado, o kart é liberado com aquele redutor. Os karts referência passam várias vezes e servem só de comparação. As voltas da equalização ficam separadas das baterias normais.</p>
     <div class="assin"><div>Cronometragem</div><div>Oficina · mecânico responsável</div><div>Data</div></div>`;
   el('conteudo').innerHTML = h;
   el('estado').textContent = `${ESTADOS[e.state] || e.state}${e.finalizadaEm ? ' · finalizada' : ''} · ${r.karts.length} karts`;

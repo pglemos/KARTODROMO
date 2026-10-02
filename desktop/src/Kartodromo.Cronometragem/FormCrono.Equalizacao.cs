@@ -5,7 +5,8 @@ namespace Kartodromo.Cronometragem;
 
 /// <summary>Aba Equalização (Planilha de Gestão de Frota, Oficina e Equalização): traçado e meta por traçado,
 /// karts referência, tempos de 2 em 2 voltas por redutor, apontamentos da oficina, histórico e PDF para a oficina.
-/// A equalização é uma bateria do tipo "equalizacao": as voltas vêm do decoder e ficam separadas das baterias normais.</summary>
+/// A equalização é uma bateria do tipo "equalizacao": as voltas vêm do decoder e ficam separadas das baterias normais.
+/// Regra do redutor (por tipo de kart, editável): a diferença para a referência diz quanto abrir ou fechar, em mm.</summary>
 public partial class FormCrono
 {
     const string SvgEqualizacao = "M4 6h16M4 12h10M4 18h16M17 9v6";
@@ -15,6 +16,7 @@ public partial class FormCrono
     readonly Label _subEq = new(), _tituloEq = new() { Text = "Equalização dos karts" }, _eqSituacao = new();
     ListaDesign _eqLista;
     JsonObject _eq;
+    List<JsonObject> _eqRegras;
     DateTime _eqLidaEm = DateTime.MinValue;
     bool _eqCarregando, _eqMontandoLista;
 
@@ -32,6 +34,7 @@ public partial class FormCrono
         barra.Controls.Add(caixa);
         barra.Controls.Add(BotaoPeq("+ Nova equalização", 1, () => ConfigurarEqualizacao(true)));
         barra.Controls.Add(BotaoPeq("Meta do traçado…", 0, MetaDoTracado));
+        barra.Controls.Add(BotaoPeq("Regra do redutor…", 0, RegraDoRedutor));
         barra.Controls.Add(BotaoPeq("Histórico e metas", 0, () => Relatorio.Abrir(this, $"{Config.CronoUrl.TrimEnd('/')}/equalizacao", "Equalização · histórico e metas por traçado")));
         var cartaoBarra = new TemaCrono.PainelArredondado { Dock = DockStyle.Fill, BackColor = Color.White, Raio = 16, Margin = new Padding(0, 0, 0, 14) };
         cartaoBarra.Controls.Add(barra);
@@ -41,8 +44,8 @@ public partial class FormCrono
         _gEq.RowTemplate.Height = 44;
         _gEq.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells; // a ação recomendada pode ocupar 2 ou 3 linhas
         _gEq.Col("Kart", 58).Col("Mecânico / piloto", 150, DataGridViewContentAlignment.MiddleLeft, true);
-        for (var i = 0; i < BlocosNaTela; i++) _gEq.Col(i == 0 ? "Bloco 1 · sem redutor" : $"Bloco {i + 1} · redutor {i}", 172, DataGridViewContentAlignment.MiddleRight);
-        _gEq.Col("Redutor final", 96).Col("Status", 104).Col("Ação recomendada", 250, DataGridViewContentAlignment.MiddleLeft, true).Col("Voltas desde a última", 132, DataGridViewContentAlignment.MiddleRight);
+        for (var i = 0; i < BlocosNaTela; i++) _gEq.Col(i == 0 ? "Bloco 1 · redutor inicial" : $"Bloco {i + 1} · redutor trocado", 178, DataGridViewContentAlignment.MiddleRight);
+        _gEq.Col("Redutor sugerido", 112).Col("Status", 104).Col("Ação recomendada", 250, DataGridViewContentAlignment.MiddleLeft, true).Col("Voltas desde a última", 118, DataGridViewContentAlignment.MiddleRight);
         _gEq.Columns[0].DefaultCellStyle.Font = new Font("Cascadia Mono", 9.6F, FontStyle.Bold);
         for (var i = 2; i < 2 + BlocosNaTela; i++) _gEq.Columns[i].DefaultCellStyle.Font = new Font("Cascadia Mono", 8.8F);
         _gEq.DefaultCellStyle.WrapMode = DataGridViewTriState.True;
@@ -73,7 +76,15 @@ public partial class FormCrono
     static readonly System.Globalization.CultureInfo Ponto = System.Globalization.CultureInfo.InvariantCulture;
     static string Seg(long? ms) => ms is long v && v > 0 ? (v / 1000.0).ToString("0.000", Ponto) : "";
     static string Delta(long? ms) => ms is not long v ? "" : (v > 0 ? "+" : v < 0 ? "−" : "±") + (Math.Abs(v) / 1000.0).ToString("0.000", Ponto);
-    static string NomeRedutor(int r) => r == 0 ? "Sem redutor" : $"Redutor {r}";
+    static double? Dec(JsonNode o, string k) => o?[k] is JsonValue v && v.GetValueKind() == System.Text.Json.JsonValueKind.Number ? v.GetValue<double>() : null;
+    // milímetros do redutor com vírgula (0,1 · 0,25 · 17,0), sem sinal
+    static string Mm(double mm) => Math.Abs(mm).ToString("0.0#", Fmt.Br);
+    /// <summary>O que a regra manda fazer com o redutor: "abrir 0,2 mm", "fechar 0,1 mm" ou "equalizado".</summary>
+    static string Ajuste(double? mm) => mm is not double v ? "" : v == 0 ? "equalizado" : $"{(v > 0 ? "abrir" : "fechar")} {Mm(v)} mm";
+    /// <summary>Abertura em relação ao redutor inicial, como se digita: +0,3 · -0,1 · 0.</summary>
+    static string Abertura(double mm) => mm == 0 ? "0" : (mm > 0 ? "+" : "-") + Mm(mm);
+    static bool TentarMm(string texto, out double mm) => double.TryParse(texto.Trim().Replace('−', '-').Replace(',', '.'), System.Globalization.NumberStyles.Float, Ponto, out mm);
+    static string TextoRegra(long tolMs, long faixaMs, double passoMm) => $"equalizado até ±{Seg(tolMs)} s · a cada {Seg(faixaMs)} s, {Mm(passoMm)} mm";
     static string DiaHora(long? ms) => ms is long w ? DateTimeOffset.FromUnixTimeMilliseconds(w).ToLocalTime().ToString("dd/MM/yyyy HH:mm") : "";
 
     /// <summary>Lista de equalizações (mais recente primeiro) e a escolhida. forcar = recarrega mesmo sem ter passado o intervalo.</summary>
@@ -84,6 +95,7 @@ public partial class FormCrono
         _eqCarregando = true;
         try
         {
+            if (_eqRegras == null || forcar) await CarregarRegrasDoRedutor();
             var resposta = (await Crono.Api.Get("/api/equalizacao"))?.AsObject();
             var lista = Crono.Arr(resposta, "equalizacoes");
             var escolhida = (_eqLista.SelectedItem as Campos.Item)?.Dados?.S("id") ?? _eq?.S("id");
@@ -119,12 +131,14 @@ public partial class FormCrono
         var r = _eq["resultado"] as JsonObject;
         var trilha = _eq["track"] as JsonObject;
         var meta = _eq.L("metaMs");
-        var tol = _eq.L("toleranciaMs") ?? 80;
+        var tol = _eq.L("toleranciaMs") ?? 200;
+        var regra = _eq["regra"] as JsonObject;
         var origem = _eq.S("metaOrigem") switch { "fixa" => "meta fixa do traçado", "referencia" => "média das referências", _ => "defina as referências ou a meta" };
         var refs = Crono.Arr(r, "referencias");
         _tituloEq.Text = _eq.S("name");
         _subEq.Text = $"{trilha?.S("name")} · {trilha?.I("lengthMeters")} m  ·  Meta {(meta is long m ? Seg(m) : "—")} ± {Seg(tol)} s ({origem})" +
-            (refs.Count > 0 ? "  ·  Referências: " + string.Join(", ", refs.Select(x => $"#{x.S("kart")} {(x.L("melhorMs") is long b ? Seg(b) : "sem volta")}")) : "  ·  Sem karts referência");
+            (refs.Count > 0 ? "  ·  Referências: " + string.Join(", ", refs.Select(x => $"#{x.S("kart")} {(x.L("melhorMs") is long b ? Seg(b) : "sem volta")}")) : "  ·  Sem karts referência") +
+            (regra == null ? "" : $"  ·  {regra.S("nome")}: a cada {Seg(regra.L("faixaMs"))} s, {Mm(Dec(regra, "passoMm") ?? 0.1)} mm");
         var karts = Crono.Arr(r, "karts");
         var voltas = _eq["voltasDesdeUltima"] as JsonObject;
         var linhas = new List<object[]>();
@@ -140,11 +154,15 @@ public partial class FormCrono
                 var b = blocos.Count > BlocosNaTela ? blocos[blocos.Count - BlocosNaTela + i] : i < blocos.Count ? blocos[i] : null;
                 if (b == null) { linha[2 + i] = ""; continue; }
                 var tempos = string.Join(" / ", (b["voltasMs"] as JsonArray ?? []).Select(v => Seg(v?.GetValue<long>())));
-                var outro = b.I("redutor") != (blocos.Count > BlocosNaTela ? blocos.Count - BlocosNaTela + i : i) || blocos.Count > BlocosNaTela ? NomeRedutor(b.I("redutor")).ToLowerInvariant() + " · " : "";
-                linha[2 + i] = tempos + (b.B("completo") ? $"\n{outro}média {Seg(b.L("mediaMs"))} ({Delta(b.L("deltaMs"))})" : $" / …\n{outro}falta 1 volta");
+                // 3ª linha: o redutor deste bloco e o que a regra manda fazer depois dele; com mais blocos que colunas, a 1ª diz qual é
+                var qual = b.S("rotulo");
+                var sugestao = Ajuste(Dec(b, "ajusteMm"));
+                linha[2 + i] = (blocos.Count > BlocosNaTela ? $"bloco {b.I("bloco")}: " : "") + tempos + (b.B("completo")
+                    ? $"\nmédia {Seg(b.L("mediaMs"))}{(b.L("deltaMs") is long dl ? $" ({Delta(dl)})" : "")}\n{qual}{(sugestao.Length > 0 ? " → " + sugestao : "")}"
+                    : $" / …\nfalta 1 volta\n{qual}");
             }
             var v0 = voltas?[k.S("kart")] as JsonObject;
-            linha[2 + BlocosNaTela] = k["redutorFinal"] == null ? "—" : NomeRedutor(k.I("redutorFinal"));
+            linha[2 + BlocosNaTela] = k.B("referencia") ? "referência" : k.S("redutorSugerido") is { Length: > 0 } sug ? sug : "—";
             linha[3 + BlocosNaTela] = k.S("status");
             linha[4 + BlocosNaTela] = k.S("acao");
             linha[5 + BlocosNaTela] = v0 == null ? "" : $"{v0.I("voltas")} voltas\n{v0.I("baterias")} bateria(s)";
@@ -186,7 +204,7 @@ public partial class FormCrono
     {
         if (!nova && _eq == null) { Msg.Aviso(this, "Escolha uma equalização na lista ou crie uma nova."); return; }
         var cfg = nova ? null : _eq["config"] as JsonObject;
-        using var d = NovoDialogo(nova ? "Nova equalização" : "Configurar equalização", nova ? "Traçado, karts referência e meta de tempo" : _eq.S("name"), SvgEqualizacao, CorEqualizacao, 900, 600);
+        using var d = NovoDialogo(nova ? "Nova equalização" : "Configurar equalização", nova ? "Traçado, karts referência, meta de tempo e regra do redutor" : _eq.S("name"), SvgEqualizacao, CorEqualizacao, 900, 840);
         var nome = Txt(nova ? "" : _eq.S("name"));
         var tracado = new ListaDesign();
         var trilhas = Crono.Arr(_catalog, "tracks").Where(t => !t.ContainsKey("active") || t.B("active")).ToList();
@@ -198,24 +216,44 @@ public partial class FormCrono
         var modoRef = new RadioButton { Text = "Média das melhores voltas dos karts referência", Checked = cfg == null || cfg.S("metaModo") != "fixa" };
         var modoFixa = new RadioButton { Text = "Meta fixa do traçado (digitada ou a última registrada)", Checked = cfg?.S("metaModo") == "fixa" };
         var metaFixa = Txt(Seg(cfg?.L("metaFixaMs")), 10);
-        var tolerancia = Txt(Seg(cfg?.L("toleranciaMs") ?? 80), 8);
+        // regra do redutor: a do tipo de kart escolhido, que pode ser ajustada só para esta equalização
+        var regras = RegrasDoRedutor();
+        var atual = cfg != null ? cfg : regras[0];
+        var tipo = new ListaDesign();
+        foreach (var x in regras) tipo.Items.Add(new Campos.Item(0, $"{x.S("nome")}  ·  {TextoRegra(x.L("toleranciaMs") ?? 200, x.L("faixaMs") ?? 200, Dec(x, "passoMm") ?? 0.1)}", x));
+        tipo.SelectedIndex = Math.Max(0, regras.FindIndex(x => string.Equals(x.S("nome"), cfg?.S("regraNome"), StringComparison.OrdinalIgnoreCase)));
+        var tolerancia = Txt(Seg(atual.L("toleranciaMs") ?? 200), 8);
+        var faixa = Txt(Seg(atual.L("faixaMs") ?? 200), 8);
+        var passo = Txt(Mm(Dec(atual, "passoMm") ?? 0.1), 6);
+        tipo.SelectedIndexChanged += (_, _) =>
+        {
+            if ((tipo.SelectedItem as Campos.Item)?.Dados is not JsonObject x) return;
+            tolerancia.Text = Seg(x.L("toleranciaMs") ?? 200); faixa.Text = Seg(x.L("faixaMs") ?? 200); passo.Text = Mm(Dec(x, "passoMm") ?? 0.1);
+        };
         var g = d.Secao("Sessão");
         d.Campo(g, "Nome (opcional)", nome, 3); d.Campo(g, "Traçado", tracado, 3);
         d.Campo(g, "Karts referência (2 ou 3, separados por vírgula)", refs, 3); d.Campo(g, "Mecânico / responsável", mecanico, 3);
         var m = d.Secao("Meta de tempo", "A meta não é fixa: vale para o traçado escolhido e fica no histórico por data.");
-        d.Opcao(m, modoRef, 6); d.Opcao(m, modoFixa, 6);
-        d.Campo(m, "Meta fixa (segundos, ex.: 52,395)", metaFixa, 3); d.Campo(m, "Tolerância ± (segundos)", tolerancia, 3);
+        d.Opcao(m, modoRef, 3); d.Opcao(m, modoFixa, 3);
+        d.Campo(m, "Meta fixa (segundos, ex.: 52,395)", metaFixa, 3);
+        var rg = d.Secao("Regra do redutor", "A diferença para o kart referência sugere o redutor: mais lento = abrir, mais rápido = fechar. Os valores vêm do tipo de kart e podem ser mudados só para esta equalização.");
+        d.Campo(rg, "Tipo de kart", tipo, 6);
+        d.Campo(rg, "Equalizado até ± (segundos)", tolerancia, 2); d.Campo(rg, "Depois, a cada (segundos)", faixa, 2); d.Campo(rg, "Abrir ou fechar (mm)", passo, 2);
         d.Nota("Karts referência passam várias vezes e servem de comparação: todas as voltas valem. Os outros karts guardam os tempos de 2 em 2 voltas, um redutor por bloco.");
         d.BotaoRodape(nova ? "Criar equalização" : "Salvar", true, () => Seguro.Rodar(d, async () =>
         {
             var lista = refs.Text.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).Distinct().ToList();
             if (lista.Count > 3) { Msg.Aviso(d, "Use 2 ou 3 karts referência."); refs.Focus(); return; }
             if (modoRef.Checked && lista.Count == 0 && !Msg.Pergunta(d, "Nenhum kart referência foi informado: a meta fica sem valor até você definir.\n\nContinuar assim?")) return;
+            if (!TentarSegundos(tolerancia.Text.Trim(), out _)) { Msg.Aviso(d, "Digite até quantos segundos de diferença o kart está equalizado (ex.: 0,200)."); tolerancia.Focus(); return; }
+            if (!TentarSegundos(faixa.Text.Trim(), out _)) { Msg.Aviso(d, "Digite de quantos em quantos segundos muda o redutor (ex.: 0,200)."); faixa.Focus(); return; }
+            if (!TentarMm(passo.Text, out var passoMm) || passoMm <= 0) { Msg.Aviso(d, "Digite quantos milímetros abrir ou fechar a cada faixa (ex.: 0,1)."); passo.Focus(); return; }
             var corpo = new JsonObject
             {
                 ["nome"] = nome.Text.Trim(), ["trackId"] = (tracado.SelectedItem as Campos.Item)?.Dados?.S("id"),
                 ["referencias"] = new JsonArray(lista.Select(x => (JsonNode)JsonValue.Create(x)).ToArray()), ["mecanico"] = mecanico.Text.Trim(),
-                ["metaModo"] = modoFixa.Checked ? "fixa" : "referencia", ["metaSeg"] = metaFixa.Text.Trim(), ["toleranciaSeg"] = tolerancia.Text.Trim(),
+                ["metaModo"] = modoFixa.Checked ? "fixa" : "referencia", ["metaSeg"] = metaFixa.Text.Trim(),
+                ["regra"] = (tipo.SelectedItem as Campos.Item)?.Dados?.S("nome"), ["toleranciaSeg"] = tolerancia.Text.Trim(), ["faixaSeg"] = faixa.Text.Trim(), ["passoMm"] = passo.Text.Trim(),
             };
             var salvo = nova ? await Crono.Api.Post("/api/equalizacao", corpo) : await Crono.Api.Patch($"/api/equalizacao/{_eq.S("id")}", corpo);
             _eq = salvo?.AsObject();
@@ -237,7 +275,7 @@ public partial class FormCrono
         tracado.Items.Add(new Campos.Item(0, "Traçado principal (padrão)"));
         foreach (var t in trilhas) tracado.Items.Add(new Campos.Item(0, $"{t.S("name")} · {t.I("lengthMeters")} m", t));
         tracado.SelectedIndex = Math.Max(0, trilhas.FindIndex(t => t.S("id") == (_eq?["config"] as JsonObject)?.S("trackId")) + 1);
-        var meta = Txt("", 10); var tol = Txt("0,080", 8);
+        var meta = Txt("", 10); var tol = Txt(Seg(RegrasDoRedutor()[0].L("toleranciaMs") ?? 200), 8);
         var g = d.Secao("Nova meta");
         d.Campo(g, "Traçado", tracado, 6);
         d.Campo(g, "Meta (segundos, ex.: 52,395)", meta, 3); d.Campo(g, "Tolerância ± (segundos)", tol, 3);
@@ -253,6 +291,85 @@ public partial class FormCrono
         d.ShowDialog(this);
     }
 
+    /// <summary>Regras do redutor por tipo de kart (a primeira é a padrão); sem resposta do serviço vale a do Kart Indoor.</summary>
+    List<JsonObject> RegrasDoRedutor() => _eqRegras is { Count: > 0 } ? _eqRegras
+        : [new JsonObject { ["id"] = "kart-indoor", ["nome"] = "Kart Indoor", ["toleranciaMs"] = 200, ["faixaMs"] = 200, ["passoMm"] = 0.1 }];
+
+    async Task CarregarRegrasDoRedutor()
+    {
+        try { _eqRegras = Crono.Arr((await Crono.Api.Get("/api/equalizacao/regras"))?.AsObject(), "regras"); }
+        catch { /* serviço antigo ou fora do ar: segue com a regra padrão */ }
+    }
+
+    /// <summary>Regra do redutor por tipo de kart: até quanto de diferença para a referência o kart está equalizado e,
+    /// depois disso, de quantos em quantos segundos se abre (mais lento) ou fecha (mais rápido) o redutor, e quanto.</summary>
+    void RegraDoRedutor()
+    {
+        using var d = NovoDialogo("Regra do redutor", "A diferença para o kart referência sugere quanto abrir ou fechar", SvgEqualizacao, CorEqualizacao, 860, 680);
+        var regras = RegrasDoRedutor();
+        var tipo = new ListaDesign();
+        foreach (var x in regras) tipo.Items.Add(new Campos.Item(0, x.S("nome"), x));
+        tipo.Items.Add(new Campos.Item(0, "+ Novo tipo de kart"));
+        var nome = Txt("", 60); var tol = Txt("", 8); var faixa = Txt("", 8); var passo = Txt("", 6);
+        var previa = new Label { AutoSize = true, MaximumSize = new Size(780, 0), Font = new Font("Cascadia Mono", 9.4F), ForeColor = PecasDesign.CorTexto, BackColor = Color.White, Margin = new Padding(0, 0, 14, 8) };
+        var g = d.Secao("Tipo de kart", "Cada tipo de kart tem a sua regra. Escolha um para alterar ou crie um novo.");
+        d.Campo(g, "Regra", tipo, 3); d.Campo(g, "Nome do tipo de kart", nome, 3);
+        var g2 = d.Secao("Faixas de tempo e redutor");
+        d.Campo(g2, "Equalizado até ± (segundos)", tol, 2); d.Campo(g2, "Depois, a cada (segundos)", faixa, 2); d.Campo(g2, "Abrir ou fechar (mm)", passo, 2);
+        var g3 = d.Secao("Como fica");
+        g3.Controls.Add(previa); g3.SetColumnSpan(previa, 6);
+        d.Nota("Kart mais lento que a referência: abrir o redutor. Mais rápido: fechar. A regra vale para as próximas equalizações; numa que já existe, mude em Configurar.");
+
+        JsonObject Escolhida() => (tipo.SelectedItem as Campos.Item)?.Dados as JsonObject;
+        void Previa()
+        {
+            if (!TentarSegundos(tol.Text.Trim(), out var t) || !TentarSegundos(faixa.Text.Trim(), out var f) || !TentarMm(passo.Text, out var p) || p <= 0) { previa.Text = "Preencha os três valores para ver as faixas."; return; }
+            static string S(decimal s) => s.ToString("0.000", Ponto);
+            var linhas = new List<string> { $"diferença de 0.000 a {S(t)} s   equalizado" };
+            for (var i = 1; i <= 4; i++) linhas.Add($"diferença de {S(t + (i - 1) * f)} a {S(t + i * f)} s   abrir (ou fechar) {Mm(i * p)} mm");
+            linhas.Add($"e assim por diante: a cada {S(f)} s, mais {Mm(p)} mm");
+            previa.Text = string.Join("\n", linhas);
+        }
+        void Preencher()
+        {
+            var x = Escolhida();
+            nome.Text = x?.S("nome") ?? "";
+            var b = x ?? regras[0];
+            tol.Text = Seg(b.L("toleranciaMs") ?? 200); faixa.Text = Seg(b.L("faixaMs") ?? 200); passo.Text = Mm(Dec(b, "passoMm") ?? 0.1);
+            Previa();
+            if (x == null) nome.Focus();
+        }
+        tipo.SelectedIndexChanged += (_, _) => Preencher();
+        foreach (var c in new[] { tol, faixa, passo }) c.TextChanged += (_, _) => Previa();
+        tipo.SelectedIndex = Math.Max(0, regras.FindIndex(x => string.Equals(x.S("nome"), (_eq?["regra"] as JsonObject)?.S("nome"), StringComparison.OrdinalIgnoreCase)));
+        Preencher();
+
+        d.BotaoRodape("Salvar regra", true, () => Seguro.Rodar(d, async () =>
+        {
+            if (nome.Text.Trim().Length == 0) { Msg.Aviso(d, "Digite o tipo de kart (ex.: Kart Indoor)."); nome.Focus(); return; }
+            if (!TentarSegundos(tol.Text.Trim(), out _)) { Msg.Aviso(d, "Digite até quantos segundos de diferença o kart está equalizado (ex.: 0,200)."); tol.Focus(); return; }
+            if (!TentarSegundos(faixa.Text.Trim(), out _)) { Msg.Aviso(d, "Digite de quantos em quantos segundos muda o redutor (ex.: 0,200)."); faixa.Focus(); return; }
+            if (!TentarMm(passo.Text, out var p) || p <= 0) { Msg.Aviso(d, "Digite quantos milímetros abrir ou fechar a cada faixa (ex.: 0,1)."); passo.Focus(); return; }
+            await Crono.Api.Post("/api/equalizacao/regras", new JsonObject { ["id"] = Escolhida()?.S("id"), ["nome"] = nome.Text.Trim(), ["toleranciaSeg"] = tol.Text.Trim(), ["faixaSeg"] = faixa.Text.Trim(), ["passoMm"] = passo.Text.Trim(), ["autor"] = Environment.UserName });
+            await CarregarRegrasDoRedutor();
+            // a equalização que está na tela e ainda não foi finalizada pode passar a usar a regra nova
+            if (_eq != null && _eq.L("finalizadaEm") == null && Msg.Pergunta(d, $"Regra salva.\n\nUsar também na equalização \"{_eq.S("name")}\", que está na tela?"))
+                await Crono.Api.Patch($"/api/equalizacao/{_eq.S("id")}", new JsonObject { ["regra"] = nome.Text.Trim() });
+            d.DialogResult = DialogResult.OK; d.Close();
+            await CarregarEqualizacao(true);
+        }));
+        d.BotaoRodape("Excluir", false, () => Seguro.Rodar(d, async () =>
+        {
+            if (Escolhida() is not JsonObject x) { Msg.Aviso(d, "Escolha a regra que vai ser excluída."); return; }
+            if (!Msg.Pergunta(d, $"Excluir a regra \"{x.S("nome")}\"?\n\nAs equalizações que já usaram continuam com os valores gravados.")) return;
+            await Crono.Api.Delete($"/api/equalizacao/regras/{Uri.EscapeDataString(x.S("id"))}");
+            await CarregarRegrasDoRedutor();
+            d.DialogResult = DialogResult.OK; d.Close();
+        }));
+        d.BotaoRodape("Fechar", false, d.Close);
+        d.ShowDialog(this);
+    }
+
     /// <summary>Apontamentos da oficina para o kart: chassi, pneu, motor, embreagem, freio, observações, ação e o redutor de cada bloco.</summary>
     void ApontamentosDoKart()
     {
@@ -263,7 +380,21 @@ public partial class FormCrono
         using var d = NovoDialogo($"Apontamentos do kart {kart.PadLeft(2, '0')}", $"{_eq.S("name")} · pontos de melhoria para a oficina", SvgEqualizacao, CorEqualizacao, 940, 700);
         var piloto = Txt(k.S("piloto"), 80);
         var g0 = d.Secao("Kart");
-        d.Campo(g0, "Mecânico / piloto", piloto, 3); d.Campo(g0, "Situação na equalização", Leitura($"{k.S("status")} · {(k["redutorFinal"] == null ? "sem redutor definido" : NomeRedutor(k.I("redutorFinal")))}"), 3);
+        d.Campo(g0, "Mecânico / piloto", piloto, 3); d.Campo(g0, "Situação na equalização", Leitura($"{k.S("status")} · {(k.S("redutorSugerido") is { Length: > 0 } sug ? "redutor " + sug : "sem redutor definido")}"), 3);
+        // redutor: a medida do inicial (opcional) e, em cada bloco seguinte, quanto estava aberto ou fechado em relação a ele
+        var blocos = Crono.Arr(k, "blocos");
+        var redutores = new List<(int bloco, string antes, TextBox caixa)>();
+        var inicialAntes = Dec((_eq["config"] as JsonObject)?["redutorInicialMm"], kart) is double mi ? Mm(mi) : "";
+        var inicial = Txt(inicialAntes, 6);
+        var g3 = d.Secao("Redutor", "O programa presume que a oficina fez o ajuste sugerido depois de cada bloco. Corrija só se a troca foi outra: mm em relação ao redutor inicial (+0,3 = aberto 0,3 mm; -0,1 = fechado 0,1 mm). Em branco volta para o sugerido.");
+        d.Campo(g3, "Medida do redutor inicial (mm, opcional)", inicial, 2);
+        foreach (var b in blocos.Where(b => b.I("bloco") >= 2))
+        {
+            var texto = Abertura(Dec(b, "aberturaMm") ?? 0);
+            var caixa = Txt(texto, 6);
+            d.Campo(g3, $"Bloco {b.I("bloco")} · {string.Join(" / ", (b["voltasMs"] as JsonArray ?? []).Select(v => Seg(v?.GetValue<long>())))}", caixa, 2);
+            redutores.Add((b.I("bloco"), texto, caixa));
+        }
         var nomes = new (string id, string titulo)[] { ("chassi", "Chassi / direção"), ("pneu", "Pneus / calibragem"), ("motor", "Motor / carburação"), ("embreagem", "Transmissão / embreagem"), ("freio", "Freios") };
         var campos = new Dictionary<string, (ListaDesign st, TextBox nota)>();
         var g = d.Secao("Possíveis pontos de melhoria");
@@ -282,19 +413,6 @@ public partial class FormCrono
         var g2 = d.Secao("Observações e ação");
         d.Campo(g2, "Observações", obs, 6);
         d.Campo(g2, "Ação da oficina / peças (substitui a ação recomendada)", acao, 6);
-        // redutor de cada bloco: por padrão bloco 1 = sem redutor, bloco 2 = redutor 1...
-        var blocos = Crono.Arr(k, "blocos");
-        var redutores = new List<(int bloco, int antes, TextBox caixa)>();
-        if (blocos.Count > 0)
-        {
-            var g3 = d.Secao("Redutor usado em cada bloco de 2 voltas", "Corrija só se o kart não trocou de redutor na ordem (0 = sem redutor).");
-            foreach (var b in blocos)
-            {
-                var caixa = PecasDesign.Numero(b.I("redutor"), 2);
-                d.Campo(g3, $"Bloco {b.I("bloco")} · {string.Join(" / ", (b["voltasMs"] as JsonArray ?? []).Select(v => Seg(v?.GetValue<long>())))}", caixa, 2);
-                redutores.Add((b.I("bloco"), b.I("redutor"), caixa));
-            }
-        }
         d.BotaoRodape("Salvar apontamentos", true, () => Seguro.Rodar(d, async () =>
         {
             var sistemas = new JsonObject();
@@ -304,9 +422,14 @@ public partial class FormCrono
                 if (v.Length > 0 || nota.Text.Trim().Length > 0) sistemas[id] = new JsonObject { ["status"] = v.Length > 0 ? v : "atencao", ["nota"] = nota.Text.Trim() };
             }
             var id0 = _eq.S("id");
+            if (inicial.Text.Trim().Length > 0 && (!TentarMm(inicial.Text, out var medida) || medida <= 0)) { Msg.Aviso(d, "Digite a medida do redutor inicial em milímetros (ex.: 17,2) ou deixe em branco."); inicial.Focus(); return; }
+            foreach (var (bloco, _, caixa) in redutores)
+                if (caixa.Text.Trim().Length > 0 && !TentarMm(caixa.Text, out _)) { Msg.Aviso(d, $"Bloco {bloco}: digite os milímetros em relação ao redutor inicial (ex.: 0,3 ou -0,1) ou deixe em branco."); caixa.Focus(); return; }
+            if (inicial.Text.Trim() != inicialAntes)
+                await Crono.Api.Patch($"/api/equalizacao/{id0}", new JsonObject { ["redutorInicial"] = new JsonObject { ["kart"] = kart, ["mm"] = inicial.Text.Trim() } });
             foreach (var (bloco, antes, caixa) in redutores)
-                if (int.TryParse(caixa.Text, out var novo) && novo != antes)
-                    await Crono.Api.Patch($"/api/equalizacao/{id0}", new JsonObject { ["redutor"] = new JsonObject { ["kart"] = kart, ["bloco"] = bloco, ["redutor"] = novo } });
+                if (caixa.Text.Trim() != antes)
+                    await Crono.Api.Patch($"/api/equalizacao/{id0}", new JsonObject { ["abertura"] = new JsonObject { ["kart"] = kart, ["bloco"] = bloco, ["mm"] = caixa.Text.Trim() } });
             await Crono.Api.Put($"/api/equalizacao/{id0}/karts/{Uri.EscapeDataString(kart)}", new JsonObject
             { ["sistemas"] = sistemas, ["observacoes"] = obs.Text.Trim(), ["acaoOficina"] = acao.Text.Trim(), ["piloto"] = piloto.Text.Trim(), ["autor"] = Environment.UserName });
             d.DialogResult = DialogResult.OK; d.Close();

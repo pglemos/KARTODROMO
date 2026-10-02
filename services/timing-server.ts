@@ -67,7 +67,7 @@ import {
 } from '../lib/timing/catalog';
 import { rankingPorPeso, tituloFaixas, type DadosPiloto } from '../lib/timing/ranking-peso';
 import { dataBrasilia, historicoDoKart, rankingKarts } from '../lib/timing/ranking-karts';
-import { calcularEqualizacao, SISTEMAS_KART, TOLERANCIA_PADRAO_MS, ultimaEqualizacaoPorKart, voltasNasBaterias, type ChecklistKart, type ConfigEqualizacao } from '../lib/timing/equalizacao';
+import { calcularEqualizacao, faixasDaRegra, REGRA_PADRAO, regraDa, SISTEMAS_KART, TOLERANCIA_PADRAO_MS, ultimaEqualizacaoPorKart, voltasNasBaterias, type ChecklistKart, type ConfigEqualizacao } from '../lib/timing/equalizacao';
 import { nomeProprio } from '../lib/nomes';
 import { configPublica, enviarResultado, enviarTeste, lerConfig, salvarConfig, traduzirErro, type Dependencias } from './timing-email';
 import type { ContextoProva, EmpresaEmail } from '../lib/timing/email-resultado';
@@ -773,6 +773,38 @@ function segundosParaMs(v: unknown) {
   return Number.isFinite(n) && n > 0 ? Math.round(n * 1000) : null;
 }
 
+/** "0,1", "+0,3" ou "−0,2" (mm) → número com 2 casas; null se não for número. */
+function milimetros(v: unknown) {
+  const n = Number(String(v ?? '').trim().replace(',', '.').replace('−', '-'));
+  return String(v ?? '').trim() !== '' && Number.isFinite(n) ? Math.round(n * 100) / 100 : null;
+}
+
+// Regra do redutor por tipo de kart (editável): até a tolerância = equalizado; a cada faixa de diferença, um passo em mm.
+type RegraSalva = { id: string; nome: string; toleranciaMs: number; faixaMs: number; passoMm: number; atualizadoEm?: number; autor?: string };
+const REGRAS_FILE = join(DATA_DIR, 'equalizacao-regras.json');
+let regrasRedutor: RegraSalva[] = (() => {
+  try { const j = JSON.parse(readFileSync(REGRAS_FILE, 'utf8')) as unknown; if (Array.isArray(j) && j.length) return j as RegraSalva[]; } catch { /* primeira vez: vale a regra padrão */ }
+  return [{ id: 'kart-indoor', ...REGRA_PADRAO }];
+})();
+function saveRegras() { writeFileSync(REGRAS_FILE, JSON.stringify(regrasRedutor, null, 2)); }
+const regraView = (r: RegraSalva) => ({ ...r, faixas: faixasDaRegra(r, 5) });
+/** Regra pelo id ou pelo nome do tipo de kart; sem achar, a primeira (Kart Indoor). */
+function regraSalva(chave: unknown) {
+  const k = String(chave ?? '').trim().toLowerCase();
+  return regrasRedutor.find((r) => r.id === k || r.nome.toLowerCase() === k) ?? regrasRedutor[0];
+}
+
+/** Tolerância, faixa e passo vindos da tela (segundos e mm); o que faltar vem da regra do tipo de kart. */
+function regraDoPedido(body: Record<string, unknown>, atual?: ConfigEqualizacao) {
+  const base = body.regra !== undefined || !atual ? regraSalva(body.regra) : null;
+  const faixaMs = segundosParaMs(body.faixaSeg) ?? base?.faixaMs ?? atual?.faixaMs ?? REGRA_PADRAO.faixaMs;
+  const passoMm = milimetros(body.passoMm) ?? base?.passoMm ?? atual?.passoMm ?? REGRA_PADRAO.passoMm;
+  const toleranciaMs = segundosParaMs(body.toleranciaSeg) ?? base?.toleranciaMs ?? atual?.toleranciaMs ?? REGRA_PADRAO.toleranciaMs;
+  if (faixaMs < 10 || faixaMs > 10_000) throw new Error('A faixa de tempo da regra do redutor deve ficar entre 0,010 e 10 segundos.');
+  if (!(passoMm > 0) || passoMm > 5) throw new Error('O passo do redutor deve ficar entre 0,01 e 5 mm.');
+  return { regraNome: base?.nome ?? atual?.regraNome ?? REGRA_PADRAO.nome, toleranciaMs, faixaMs, passoMm };
+}
+
 /** Configuração usada na conta: no modo "meta fixa" sem valor digitado vale a última meta do traçado. */
 function configEqualizacao(s: Session): ConfigEqualizacao {
   const cfg = s.equalizacao ?? {};
@@ -786,7 +818,7 @@ function equalizacaoResumo(s: Session) {
   return {
     id: s.id, name: s.name, state: s.state, createdAt: s.createdAt, startedAt: s.startedAt, finishedAt: s.finishedAt,
     finalizadaEm: s.equalizacao?.finalizadaEm ?? null, track: trackDa(s), mecanico: s.equalizacao?.mecanico ?? '',
-    metaMs: r.metaMs, metaOrigem: r.metaOrigem, toleranciaMs: r.toleranciaMs, referencias: s.equalizacao?.referencias ?? [],
+    metaMs: r.metaMs, metaOrigem: r.metaOrigem, toleranciaMs: r.toleranciaMs, regra: { ...r.regra, faixas: faixasDaRegra(r.regra, 5) }, referencias: s.equalizacao?.referencias ?? [],
     karts: testados.length, equalizados: testados.filter((k) => k.status === 'EQUALIZADO').length,
     ajustando: testados.filter((k) => k.status === 'AJUSTANDO').length, revisar: testados.filter((k) => k.status === 'REVISAR').length,
   };
@@ -809,7 +841,10 @@ function equalizacaoDetalhe(s: Session) {
   const cfg = s.equalizacao ?? {};
   return {
     ...equalizacaoResumo(s),
-    config: { metaModo: cfg.metaModo ?? 'referencia', metaFixaMs: cfg.metaFixaMs ?? null, toleranciaMs: cfg.toleranciaMs ?? TOLERANCIA_PADRAO_MS, referencias: cfg.referencias ?? [], redutores: cfg.redutores ?? {}, mecanico: cfg.mecanico ?? '', trackId: s.trackId ?? null },
+    config: {
+      metaModo: cfg.metaModo ?? 'referencia', metaFixaMs: cfg.metaFixaMs ?? null, referencias: cfg.referencias ?? [], mecanico: cfg.mecanico ?? '', trackId: s.trackId ?? null,
+      ...(({ nome, ...r }) => ({ regraNome: nome, ...r }))(regraDa(cfg)), aberturas: cfg.aberturas ?? {}, redutorInicialMm: cfg.redutorInicialMm ?? {},
+    },
     metaDoTracado: metaVigente(trackIdDa(s), s.startedAt ?? s.createdAt),
     resultado: (() => { const r = calcularEqualizacao(s, configEqualizacao(s)); return { ...r, karts: r.karts.map((k) => ({ ...k, piloto: nomeProprio(k.piloto) })) }; })(),
     voltasDesdeUltima: voltasDesdeUltimaEqualizacao(s),
@@ -1606,6 +1641,33 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     log(`equalização: meta de ${formatLap(metaMs)} para o traçado ${tid ? catalog.tracks.find((t) => t.id === tid)?.name : 'principal'}`);
     return send(res, 201, meta);
   }
+  if (path === '/api/equalizacao/regras' && method === 'GET') return send(res, 200, { regras: regrasRedutor.map(regraView) });
+  if (path === '/api/equalizacao/regras' && method === 'POST') {
+    // regra do redutor de um tipo de kart: cria ou altera (pelo id ou pelo nome)
+    const body = await readBody(req);
+    const nome = String(body.nome ?? '').trim().slice(0, 60);
+    if (!nome) return send(res, 400, { error: 'Digite o tipo de kart (ex.: Kart Indoor).' });
+    const toleranciaMs = segundosParaMs(body.toleranciaSeg); const faixaMs = segundosParaMs(body.faixaSeg); const passoMm = milimetros(body.passoMm);
+    if (!toleranciaMs || toleranciaMs > 10_000) return send(res, 400, { error: 'Digite até quantos segundos de diferença o kart está equalizado (ex.: 0,200).' });
+    if (!faixaMs || faixaMs < 10 || faixaMs > 10_000) return send(res, 400, { error: 'Digite de quantos em quantos segundos muda o redutor (ex.: 0,200).' });
+    if (!passoMm || passoMm <= 0 || passoMm > 5) return send(res, 400, { error: 'Digite quantos milímetros abrir ou fechar a cada faixa (ex.: 0,1).' });
+    const outra = regrasRedutor.find((r) => r.nome.toLowerCase() === nome.toLowerCase());
+    const atual = (body.id ? regrasRedutor.find((r) => r.id === String(body.id)) : null) ?? outra;
+    if (atual && outra && outra !== atual) return send(res, 409, { error: `Já existe a regra "${outra.nome}".` });
+    const regra: RegraSalva = { id: atual?.id ?? randomUUID().slice(0, 8), nome, toleranciaMs, faixaMs, passoMm, atualizadoEm: Date.now(), autor: String(body.autor ?? 'Cronometragem').slice(0, 60) };
+    regrasRedutor = atual ? regrasRedutor.map((r) => (r === atual ? regra : r)) : [...regrasRedutor, regra];
+    saveRegras();
+    log(`equalização: regra do redutor "${nome}" — equalizado até ${toleranciaMs} ms; a cada ${faixaMs} ms, ${passoMm} mm`);
+    return send(res, atual ? 200 : 201, { regra: regraView(regra), regras: regrasRedutor.map(regraView) });
+  }
+  const regraId = path.match(/^\/api\/equalizacao\/regras\/([\w-]+)$/);
+  if (regraId && method === 'DELETE') {
+    if (!regrasRedutor.some((r) => r.id === regraId[1])) return send(res, 404, { error: 'Regra não encontrada.' });
+    if (regrasRedutor.length === 1) return send(res, 409, { error: 'Precisa ficar pelo menos uma regra do redutor.' });
+    regrasRedutor = regrasRedutor.filter((r) => r.id !== regraId[1]);
+    saveRegras();
+    return send(res, 200, { regras: regrasRedutor.map(regraView) });
+  }
   if (path === '/api/equalizacao' && method === 'GET') {
     const q = url.searchParams;
     const lista = [...sessions.values()].filter((s) => s.type === 'equalizacao' && s.state !== 'cancelada')
@@ -1625,6 +1687,8 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     if (tid && !catalog.tracks.some((t) => t.id === tid)) return send(res, 400, { error: 'Traçado não encontrado.' });
     const referencias = [...new Set((Array.isArray(body.referencias) ? body.referencias : String(body.referencias ?? '').split(/[;, ]+/)).map((k: unknown) => String(k).trim().replace(/^0+(?=\d)/, '')).filter(Boolean))];
     if (referencias.length > 3) return send(res, 400, { error: 'Use 2 ou 3 karts referência.' });
+    let regra: ReturnType<typeof regraDoPedido>;
+    try { regra = regraDoPedido(body); } catch (err) { return send(res, 400, { error: (err as Error).message }); }
     const agora = new Date();
     const quando = agora.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(',', '');
     const cfgT = (timingSettings.timing as Record<string, unknown> | undefined) ?? {};
@@ -1636,7 +1700,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     s.trackId = tid;
     s.equalizacao = {
       referencias, metaModo: body.metaModo === 'fixa' ? 'fixa' : 'referencia', metaFixaMs: segundosParaMs(body.metaSeg),
-      toleranciaMs: segundosParaMs(body.toleranciaSeg) ?? TOLERANCIA_PADRAO_MS, mecanico: String(body.mecanico ?? '').trim().slice(0, 80), checklist: {}, redutores: {},
+      ...regra, mecanico: String(body.mecanico ?? '').trim().slice(0, 80), checklist: {}, aberturas: {}, redutorInicialMm: {},
     };
     sessions.set(s.id, s);
     saveSession(s);
@@ -1669,17 +1733,28 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         }
         if (body.metaModo !== undefined) cfg.metaModo = body.metaModo === 'fixa' ? 'fixa' : 'referencia';
         if (body.metaSeg !== undefined) cfg.metaFixaMs = segundosParaMs(body.metaSeg);
-        if (body.toleranciaSeg !== undefined) cfg.toleranciaMs = segundosParaMs(body.toleranciaSeg) ?? TOLERANCIA_PADRAO_MS;
+        if (body.regra !== undefined || body.toleranciaSeg !== undefined || body.faixaSeg !== undefined || body.passoMm !== undefined) Object.assign(cfg, regraDoPedido(body, cfg));
         if (typeof body.mecanico === 'string') cfg.mecanico = body.mecanico.trim().slice(0, 80);
-        if (body.redutor && typeof body.redutor === 'object') {
-          // correção do redutor de um bloco (null volta para o automático: bloco 1 = sem redutor, bloco 2 = redutor 1...)
-          const r = body.redutor as { kart?: unknown; bloco?: unknown; redutor?: unknown };
+        if (body.abertura && typeof body.abertura === 'object') {
+          // correção do redutor de um bloco: abertura em mm em relação ao inicial (vazio volta para o ajuste sugerido)
+          const r = body.abertura as { kart?: unknown; bloco?: unknown; mm?: unknown };
           const kart = String(r.kart ?? ''); const bloco = String(Number(r.bloco));
-          if (!kart || !(Number(r.bloco) >= 1)) return send(res, 400, { error: 'Informe o kart e o bloco.' });
-          const doKart = ((cfg.redutores ??= {})[kart] ??= {});
-          if (r.redutor === null || r.redutor === '' || r.redutor === undefined) delete doKart[bloco];
-          else if (Number.isInteger(Number(r.redutor)) && Number(r.redutor) >= 0 && Number(r.redutor) <= 20) doKart[bloco] = Number(r.redutor);
-          else return send(res, 400, { error: 'Redutor inválido (use 0 para sem redutor).' });
+          if (!kart || !(Number(r.bloco) >= 2)) return send(res, 400, { error: 'Informe o kart e o bloco (o bloco 1 é sempre o redutor inicial).' });
+          const doKart = ((cfg.aberturas ??= {})[kart] ??= {});
+          const mm = milimetros(r.mm);
+          if (r.mm === null || r.mm === '' || r.mm === undefined) delete doKart[bloco];
+          else if (mm != null && Math.abs(mm) <= 20) doKart[bloco] = mm;
+          else return send(res, 400, { error: 'Abertura inválida: digite os milímetros em relação ao redutor inicial (ex.: 0,3 ou -0,1).' });
+        }
+        if (body.redutorInicial && typeof body.redutorInicial === 'object') {
+          // medida do redutor que estava no kart no bloco 1 (vazio = não informada)
+          const r = body.redutorInicial as { kart?: unknown; mm?: unknown };
+          const kart = String(r.kart ?? '');
+          if (!kart) return send(res, 400, { error: 'Informe o kart.' });
+          const mm = milimetros(r.mm);
+          if (r.mm === null || r.mm === '' || r.mm === undefined) delete (cfg.redutorInicialMm ??= {})[kart];
+          else if (mm != null && mm > 0 && mm <= 99) (cfg.redutorInicialMm ??= {})[kart] = mm;
+          else return send(res, 400, { error: 'Medida do redutor inválida: digite em milímetros (ex.: 17,2).' });
         }
       } else if (eq[2] === 'karts' && eq[3] && method === 'PUT') {
         // apontamentos da oficina para o kart: chassi, pneu, motor, embreagem, freio, observações e ação

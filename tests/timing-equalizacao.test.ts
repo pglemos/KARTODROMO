@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyPassing, closeSession, createSession, startSession, type Session } from '../lib/timing/race-engine';
-import { calcularEqualizacao, ultimaEqualizacaoPorKart, voltasNasBaterias } from '../lib/timing/equalizacao';
+import { ajusteRedutorMm, calcularEqualizacao, faixasDaRegra, textoAjuste, ultimaEqualizacaoPorKart, voltasNasBaterias } from '../lib/timing/equalizacao';
 import { rankingKarts } from '../lib/timing/ranking-karts';
 
 const BASE = Date.UTC(2026, 8, 3, 12, 30, 0); // 03/09/2026 09:30 em Brasília
@@ -27,27 +27,47 @@ const PLANILHA = {
 };
 
 describe('equalização dos karts', () => {
-  it('a meta é a média das melhores voltas dos karts referência, com tolerância de 0,080 s', () => {
+  it('a meta é a média das melhores voltas dos karts referência; a regra padrão é a do Kart Indoor', () => {
     const s = sessao('equalizacao', BASE, PLANILHA);
     s.equalizacao = { referencias: ['05', '12'] };
     const r = calcularEqualizacao(s);
-    expect(r).toMatchObject({ metaMs: 52_395, metaOrigem: 'referencia', toleranciaMs: 80 });
+    expect(r).toMatchObject({ metaMs: 52_395, metaOrigem: 'referencia', toleranciaMs: 200, regra: { nome: 'Kart Indoor', toleranciaMs: 200, faixaMs: 200, passoMm: 0.1 } });
     expect(r.karts.slice(0, 2).map((k) => [k.kart, k.status])).toEqual([['05', 'REF'], ['12', 'REF']]);
   });
 
-  it('guarda os tempos de 2 em 2 voltas por redutor e vale o último bloco (como na planilha)', () => {
+  it('a diferença para a referência diz quanto abrir ou fechar o redutor (a cada 0,2 s, 0,1 mm)', () => {
+    const indoor = { toleranciaMs: 200, faixaMs: 200, passoMm: 0.1 };
+    expect([0, 100, 200, 300, 400, 500, 700, 900].map((d) => ajusteRedutorMm(d, indoor))).toEqual([0, 0, 0, 0.1, 0.1, 0.2, 0.3, 0.4]);
+    expect([-150, -300, -500, -1_100].map((d) => ajusteRedutorMm(d, indoor))).toEqual([0, -0.1, -0.2, -0.5]);
+    expect([0, 0.2, -0.1].map(textoAjuste)).toEqual(['manter o redutor', 'abrir 0,2 mm', 'fechar 0,1 mm']);
+    expect(faixasDaRegra(indoor, 4)).toEqual([{ deMs: 0, ateMs: 200, mm: 0 }, { deMs: 200, ateMs: 400, mm: 0.1 }, { deMs: 400, ateMs: 600, mm: 0.2 }, { deMs: 600, ateMs: 800, mm: 0.3 }]);
+    // a faixa e o passo são editáveis: equalizado até 0,150 s; a cada 0,100 s, 0,05 mm
+    const outra = { toleranciaMs: 150, faixaMs: 100, passoMm: 0.05 };
+    expect([150, 151, 260, -360].map((d) => ajusteRedutorMm(d, outra))).toEqual([0, 0.05, 0.1, -0.15]);
+  });
+
+  it('guarda os tempos de 2 em 2 voltas; cada bloco é o redutor sugerido no anterior e vale o último bloco', () => {
     const s = sessao('equalizacao', BASE, PLANILHA);
     s.equalizacao = { referencias: ['05', '12'] };
     const k = Object.fromEntries(calcularEqualizacao(s).karts.map((x) => [x.kart, x]));
-    expect(k['08'].blocos.map((b) => [b.redutor, b.voltasMs])).toEqual([[0, [53_120, 52_950]], [1, [52_680, 52_550]], [2, [52_435, 52_440]]]);
-    expect(k['08']).toMatchObject({ status: 'EQUALIZADO', redutorFinal: 2, acao: 'Instalar o redutor 2 e liberar' });
-    expect(k['23']).toMatchObject({ status: 'EQUALIZADO', redutorFinal: 1 });
-    // o 31 passou do ponto com os redutores 1 e 2 e só fechou com o 3
-    expect(k['31'].blocos.map((b) => b.dentro)).toEqual([false, true, false, true]);
-    expect(k['31']).toMatchObject({ status: 'EQUALIZADO', redutorFinal: 3 });
-    // o 19 não chegou: enquanto aberta segue ajustando; a volta solta do 3º bloco ainda não conta
-    expect(k['19']).toMatchObject({ status: 'AJUSTANDO', redutorFinal: 1 });
-    expect(k['19'].blocos[2]).toMatchObject({ completo: false, voltasMs: [52_890] });
+    // 08: +0,640 s → abrir 0,3 mm; com 0,3 mm aberto ficou +0,220 s → abrir mais 0,1 mm; com 0,4 mm fechou
+    expect(k['08'].blocos.map((b) => [b.rotulo, b.voltasMs, b.ajusteMm])).toEqual([['inicial', [53_120, 52_950], 0.3], ['+0,3 mm', [52_680, 52_550], 0.1], ['+0,4 mm', [52_435, 52_440], 0]]);
+    expect(k['08']).toMatchObject({ status: 'EQUALIZADO', ajusteMm: 0, aberturaMm: 0.4, redutorSugerido: 'inicial + 0,4 mm', acao: 'Equalizado com o redutor aberto 0,4 mm em relação ao inicial: liberar' });
+    expect(k['23']).toMatchObject({ status: 'EQUALIZADO', aberturaMm: 0.1 });
+    // o 31 já estava dentro de 0,200 s com o redutor que tinha
+    expect(k['31'].blocos.map((b) => b.dentro)).toEqual([true, true, true, true]);
+    expect(k['31']).toMatchObject({ status: 'EQUALIZADO', aberturaMm: 0, redutorSugerido: 'inicial', acao: 'Equalizado com o redutor inicial: liberar' });
+    // o 19 não chegou: abriu 0,4 mm e ainda está 0,650 s mais lento; a volta solta do 3º bloco ainda não conta
+    expect(k['19']).toMatchObject({ status: 'AJUSTANDO', ajusteMm: 0.3, aberturaMm: 0.7, redutorSugerido: 'inicial + 0,7 mm', acao: 'Abrir 0,3 mm: 0,650 s mais lento que a referência. Dar mais 2 voltas' });
+    expect(k['19'].blocos[2]).toMatchObject({ completo: false, voltasMs: [52_890], aberturaMm: 0.7, ajusteMm: null });
+  });
+
+  it('kart mais rápido que a referência: a sugestão é fechar o redutor', () => {
+    const s = sessao('equalizacao', BASE, { '05': [52_380], '12': [52_410], '08': [52_000, 52_010, 52_150, 52_170] });
+    s.equalizacao = { referencias: ['05', '12'] };
+    const k = calcularEqualizacao(s).karts.find((x) => x.kart === '08')!;
+    expect(k.blocos.map((b) => [b.rotulo, b.deltaMs, b.ajusteMm])).toEqual([['inicial', -390, -0.1], ['−0,1 mm', -235, -0.1]]);
+    expect(k).toMatchObject({ status: 'AJUSTANDO', ajusteMm: -0.1, aberturaMm: -0.2, redutorSugerido: 'inicial − 0,2 mm', acao: 'Fechar 0,1 mm: 0,235 s mais rápido que a referência. Dar mais 2 voltas' });
   });
 
   it('depois de finalizada, quem ficou fora da tolerância vai para revisão na oficina', () => {
@@ -55,7 +75,7 @@ describe('equalização dos karts', () => {
     s.equalizacao = { referencias: ['05', '12'], finalizadaEm: BASE + 3_600_000 };
     const k19 = calcularEqualizacao(s).karts.find((x) => x.kart === '19')!;
     expect(k19.status).toBe('REVISAR');
-    expect(k19.acao).toContain('encaminhar para a oficina');
+    expect(k19.acao).toBe('Não chegou na meta: 0,650 s mais lento que a referência (faltou abrir 0,3 mm). Encaminhar para a oficina');
   });
 
   it('kart referência não entra na regra das 2 voltas: todas as voltas valem para a meta', () => {
@@ -64,16 +84,23 @@ describe('equalização dos karts', () => {
     const r = calcularEqualizacao(s);
     expect(r.referencias).toEqual([{ kart: '05', melhorMs: 52_380, mediaMs: 52_424, voltas: 5 }, { kart: '12', melhorMs: 52_410, mediaMs: 52_505, voltas: 2 }]);
     expect(r.karts.find((x) => x.kart === '05')!.blocos).toEqual([]);
-    expect(r.karts.find((x) => x.kart === '08')).toMatchObject({ status: 'EQUALIZADO', redutorFinal: 0, acao: 'Liberado sem redutor' });
+    expect(r.karts.find((x) => x.kart === '08')).toMatchObject({ status: 'EQUALIZADO', aberturaMm: 0, acao: 'Equalizado com o redutor inicial: liberar' });
   });
 
-  it('meta fixa do traçado, tolerância própria, redutor corrigido à mão e ação escrita pela oficina', () => {
-    const s = sessao('equalizacao', BASE, { '08': [52_900, 52_880, 52_610, 52_590] });
-    s.equalizacao = { metaModo: 'fixa', metaFixaMs: 52_500, toleranciaMs: 120, redutores: { '08': { '2': 3 } }, checklist: { '08': { acaoOficina: 'Trocar pneu DE', sistemas: { pneu: { status: 'atencao', nota: 'desgaste' } } } } };
+  it('meta fixa do traçado, tolerância própria, redutor corrigido à mão, medida do inicial e ação escrita pela oficina', () => {
+    const s = sessao('equalizacao', BASE, { '08': [52_900, 52_880, 52_610, 52_590], '09': [52_900, 52_880] });
+    s.equalizacao = {
+      metaModo: 'fixa', metaFixaMs: 52_500, toleranciaMs: 120, regraNome: 'Kart Pro', aberturas: { '08': { '2': 0.3 } }, redutorInicialMm: { '08': 17, '09': 17.5 },
+      checklist: { '08': { acaoOficina: 'Trocar pneu DE', sistemas: { pneu: { status: 'atencao', nota: 'desgaste' } } } },
+    };
     const r = calcularEqualizacao(s);
-    expect(r).toMatchObject({ metaMs: 52_500, metaOrigem: 'fixa', toleranciaMs: 120 });
-    expect(r.karts[0]).toMatchObject({ status: 'EQUALIZADO', redutorFinal: 3, acao: 'Trocar pneu DE' });
-    expect(r.karts[0].blocos[1]).toMatchObject({ redutor: 3, mediaMs: 52_600, deltaMs: 100, dentro: true });
+    expect(r).toMatchObject({ metaMs: 52_500, metaOrigem: 'fixa', toleranciaMs: 120, regra: { nome: 'Kart Pro', faixaMs: 200, passoMm: 0.1 } });
+    // a regra mandava abrir 0,2 mm (+0,390 s com tolerância de 0,120); a oficina abriu 0,3 mm e anotou
+    expect(r.karts[0].blocos.map((b) => [b.rotulo, b.redutorMm, b.ajusteMm])).toEqual([['17,0 mm', 17, 0.2], ['17,3 mm', 17.3, 0]]);
+    expect(r.karts[0]).toMatchObject({ status: 'EQUALIZADO', aberturaMm: 0.3, redutorMm: 17.3, redutorSugerido: '17,3 mm', acao: 'Trocar pneu DE' });
+    expect(r.karts[0].blocos[1]).toMatchObject({ aberturaMm: 0.3, mediaMs: 52_600, deltaMs: 100, dentro: true });
+    // com a medida do redutor inicial, a sugestão já sai na medida real
+    expect(r.karts[1]).toMatchObject({ status: 'AJUSTANDO', redutorSugerido: '17,7 mm', acao: 'Abrir 0,2 mm (redutor 17,7 mm): 0,390 s mais lento que a meta. Dar mais 2 voltas' });
   });
 
   it('volta invalidada (saída de box) não entra nos blocos', () => {
