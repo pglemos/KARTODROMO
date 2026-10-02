@@ -278,6 +278,27 @@ export function calcularEqualizacao(s: Session, cfg: ConfigEqualizacao = s.equal
 }
 
 /**
+ * Traz para a equalização karts que andaram em outra bateria (as voltas foram cronometradas fora da equalização).
+ * Copia as passagens como estão; a bateria de origem não muda. Kart que já tem voltas na equalização fica como está.
+ */
+export function importarKarts(destino: Session, origem: Session, karts: string[]) {
+  const importados: { kart: string; piloto: string; voltas: number }[] = [];
+  const ignorados: { kart: string; motivo: string }[] = [];
+  for (const kart of [...new Set(karts.map((k) => String(k).trim().replace(/^0+(?=\d)/, '')).filter(Boolean))]) {
+    const de = origem.competitors.find((c) => c.kart === kart);
+    const ativas = de?.crossings.filter((x) => !x.deleted) ?? [];
+    if (!de || ativas.length < 2) { ignorados.push({ kart, motivo: 'sem volta nesta bateria' }); continue; }
+    const ja = destino.competitors.find((c) => c.kart === kart);
+    if (ja?.crossings.some((x) => !x.deleted)) { ignorados.push({ kart, motivo: 'já tem voltas na equalização' }); continue; }
+    const passagens = de.crossings.map((x) => ({ ...x }));
+    if (ja) { ja.crossings = passagens; ja.name = de.name || ja.name; ja.finished = false; }
+    else destino.competitors.push({ kart, name: de.name, customerId: de.customerId ?? null, category: de.category ?? null, flag: 'none', crossings: passagens, finished: false });
+    importados.push({ kart, piloto: de.name, voltas: ativas.length - 1 });
+  }
+  return { importados, ignorados };
+}
+
+/**
  * Voltas que cada kart deu nas baterias normais (não equalização, finalizadas) num intervalo — "entre uma equalização e
  * outra". kartDaPassagem: o kart físico (transponder) de cada passagem.
  */

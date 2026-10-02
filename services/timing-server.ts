@@ -67,7 +67,7 @@ import {
 } from '../lib/timing/catalog';
 import { rankingPorPeso, tituloFaixas, type DadosPiloto } from '../lib/timing/ranking-peso';
 import { dataBrasilia, historicoDoKart, rankingKarts } from '../lib/timing/ranking-karts';
-import { calcularEqualizacao, faixasDaRegra, REGRA_PADRAO, regraDa, SISTEMAS_KART, tempoVoltaParaMs, TOLERANCIA_PADRAO_MS, ultimaEqualizacaoPorKart, voltasNasBaterias, type ChecklistKart, type ConfigEqualizacao } from '../lib/timing/equalizacao';
+import { calcularEqualizacao, faixasDaRegra, importarKarts, REGRA_PADRAO, regraDa, SISTEMAS_KART, tempoVoltaParaMs, TOLERANCIA_PADRAO_MS, ultimaEqualizacaoPorKart, voltasNasBaterias, type ChecklistKart, type ConfigEqualizacao } from '../lib/timing/equalizacao';
 import { nomeProprio } from '../lib/nomes';
 import { configPublica, enviarResultado, enviarTeste, lerConfig, salvarConfig, traduzirErro, type Dependencias } from './timing-email';
 import type { ContextoProva, EmpresaEmail } from '../lib/timing/email-resultado';
@@ -1711,7 +1711,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     scheduleStateBroadcast();
     return send(res, 201, equalizacaoDetalhe(s));
   }
-  const eq = path.match(/^\/api\/equalizacao\/([\w-]+)(?:\/(karts|finalizar|reabrir)(?:\/([^/]+))?)?$/);
+  const eq = path.match(/^\/api\/equalizacao\/([\w-]+)(?:\/(karts|finalizar|reabrir|importar)(?:\/([^/]+))?)?$/);
   if (eq) {
     const s = sessions.get(eq[1]);
     if (!s || s.type !== 'equalizacao') return send(res, 404, { error: 'Equalização não encontrada.' });
@@ -1781,6 +1781,20 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
           atualizadoEm: Date.now(), autor: String(body.autor ?? 'Cronometragem').slice(0, 60),
         };
         if (typeof body.piloto === 'string' && body.piloto.trim()) comp.name = body.piloto.trim().slice(0, 80);
+      } else if (eq[2] === 'importar' && !eq[3] && method === 'POST') {
+        // karts que andaram em outra bateria (as voltas foram cronometradas fora da equalização): copia as passagens
+        const body = await readBody(req);
+        const origem = sessions.get(String(body.sessionId ?? ''));
+        if (!origem || origem.id === s.id) return send(res, 400, { error: 'Escolha a bateria de onde vêm os karts.' });
+        const lista = (Array.isArray(body.karts) ? body.karts : String(body.karts ?? '').split(/[;, ]+/)).map((k: unknown) => String(k));
+        if (!lista.some((k) => k.trim())) return send(res, 400, { error: 'Digite os números dos karts.' });
+        const r = importarKarts(s, origem, lista);
+        if (r.importados.length === 0) return send(res, 409, { error: `Nenhum kart foi trazido: ${r.ignorados.map((x) => `${x.kart} (${x.motivo})`).join(', ')}.` });
+        registrarObservacao(s, `Karts trazidos de "${origem.name}" (${new Date(origem.startedAt ?? origem.createdAt).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}): ${r.importados.map((x) => x.kart).join(', ')}`, String(body.autor ?? 'Cronometragem').slice(0, 60));
+        log(`equalização ${s.name}: karts ${r.importados.map((x) => x.kart).join(', ')} trazidos de ${origem.name}${r.ignorados.length ? `; ficaram de fora ${r.ignorados.map((x) => `${x.kart} (${x.motivo})`).join(', ')}` : ''}`);
+        saveSession(s);
+        scheduleStateBroadcast();
+        return send(res, 200, { ...equalizacaoDetalhe(s), importados: r.importados, ignorados: r.ignorados });
       } else if (eq[2] === 'finalizar' && method === 'POST') {
         if (s.state === 'preparando') return send(res, 409, { error: 'Esta equalização ainda não largou (dê a bandeira verde na Cronometragem).' });
         const agora = Date.now();

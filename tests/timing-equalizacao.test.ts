@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyPassing, closeSession, createSession, startSession, type Session } from '../lib/timing/race-engine';
-import { ajusteRedutorMm, calcularEqualizacao, faixasDaRegra, fmtTempoVolta, tempoVoltaParaMs, textoAjuste, ultimaEqualizacaoPorKart, voltasNasBaterias } from '../lib/timing/equalizacao';
+import { ajusteRedutorMm, calcularEqualizacao, faixasDaRegra, fmtTempoVolta, importarKarts, tempoVoltaParaMs, textoAjuste, ultimaEqualizacaoPorKart, voltasNasBaterias } from '../lib/timing/equalizacao';
 import { rankingKarts } from '../lib/timing/ranking-karts';
 
 const BASE = Date.UTC(2026, 8, 3, 12, 30, 0); // 03/09/2026 09:30 em Brasília
@@ -81,6 +81,24 @@ describe('equalização dos karts', () => {
     expect(k['35'].acao).toBe('Abrir 0,3 mm: 0,543 s mais lento que a referência. Dar mais 2 voltas');
     expect(k['46'].blocos[0]).toMatchObject({ melhorMs: 61_049, deltaMs: -2_378, ajusteMm: -1.2 });
     expect(k['46'].acao).toBe('Fechar 1,2 mm: 2,378 s mais rápido que a referência. Dar mais 2 voltas');
+  });
+
+  it('traz para a equalização os karts que andaram em outra bateria, sem mexer na origem nem em quem já tem voltas', () => {
+    const origem = sessao('classificacao', BASE - 3_600_000, { '21': [63_861, 63_468], '60': [62_995, 62_493], '36': [67_420, 67_518], '99': [] }, 'origem');
+    origem.competitors.find((c) => c.kart === '36')!.name = 'CHASSI 26';
+    const eq = sessao('equalizacao', BASE, { '21': [63_690, 63_427] }, 'eq');
+    eq.equalizacao = { referencias: ['21'], toleranciaMs: 100 };
+    const r = importarKarts(eq, origem, ['60', '036', '21', '99', '77']);
+    expect(r.importados).toEqual([{ kart: '60', piloto: 'Piloto 60', voltas: 2 }, { kart: '36', piloto: 'CHASSI 26', voltas: 2 }]);
+    expect(r.ignorados).toEqual([{ kart: '21', motivo: 'já tem voltas na equalização' }, { kart: '99', motivo: 'sem volta nesta bateria' }, { kart: '77', motivo: 'sem volta nesta bateria' }]);
+    expect(origem.competitors.find((c) => c.kart === '60')!.crossings).toHaveLength(3);
+    const k = Object.fromEntries(calcularEqualizacao(eq).karts.map((x) => [x.kart, x]));
+    expect(k['60'].blocos[0]).toMatchObject({ voltasMs: [62_995, 62_493], melhorMs: 62_493, deltaMs: -934 });
+    expect(k['36']).toMatchObject({ piloto: 'CHASSI 26', status: 'AJUSTANDO' });
+    expect(k['36'].blocos[0]).toMatchObject({ melhorMs: 67_420, deltaMs: 3_993 });
+    // mexer na cópia não muda a bateria de origem
+    eq.competitors.find((c) => c.kart === '60')!.crossings[1].deleted = true;
+    expect(origem.competitors.find((c) => c.kart === '60')!.crossings[1].deleted).toBeUndefined();
   });
 
   it('kart mais rápido que a referência: a sugestão é fechar o redutor', () => {
