@@ -10,7 +10,9 @@
  *   do traçado, se o cronometrista escolher).
  * - Demais karts: as voltas válidas formam blocos de 2. O bloco 1 é com o redutor que está no kart (o "inicial"); a
  *   cada 2 voltas o redutor é trocado para chegar perto da meta.
- * - Regra do redutor (por tipo de kart, editável): a diferença da média do bloco para a meta diz quanto mexer.
+ * - O que se compara com a meta é a MELHOR volta do bloco, não a média das 2: uma volta lenta (tráfego, erro, saída
+ *   de box) não pode virar "abrir 16 mm".
+ * - Regra do redutor (por tipo de kart, editável): a diferença da melhor volta do bloco para a meta diz quanto mexer.
  *   Kart Indoor: até ±0,200 s = equalizado; de 0,200 a 0,400 s mais lento = abrir 0,1 mm; de 0,400 a 0,600 = abrir
  *   0,2 mm; e assim por diante (a cada 0,200 s, mais 0,1 mm). Mais rápido que a meta: o mesmo, com "fechar".
  * - O redutor de cada bloco é guardado como abertura em mm em relação ao inicial (+ aberto, − fechado). Presume-se
@@ -68,7 +70,10 @@ export type BlocoEqualizacao = {
   redutorMm: number | null;
   /** "inicial", "+0,3 mm" ou "17,3 mm" */
   rotulo: string;
-  voltasMs: number[]; mediaMs: number | null; deltaMs: number | null; dentro: boolean; completo: boolean;
+  voltasMs: number[];
+  /** a melhor volta do bloco — é ela que se compara com a meta (deltaMs = melhorMs − meta) */
+  melhorMs: number | null;
+  mediaMs: number | null; deltaMs: number | null; dentro: boolean; completo: boolean;
   /** o que a regra manda fazer depois deste bloco (mm; + abrir, − fechar, 0 = equalizado); null sem meta ou incompleto */
   ajusteMm: number | null;
 };
@@ -222,12 +227,12 @@ export function calcularEqualizacao(s: Session, cfg: ConfigEqualizacao = s.equal
       const antes = blocos[blocos.length - 1];
       const manual = cfg.aberturas?.[c.kart]?.[String(n)];
       const aberturaMm = !antes ? 0 : manual != null && Number.isFinite(Number(manual)) ? mm2(Number(manual)) : mm2(antes.aberturaMm + (antes.ajusteMm ?? 0));
-      const m = media(voltasMs);
+      const melhor = voltasMs.length ? Math.min(...voltasMs) : null;
       const completo = voltasMs.length === 2;
-      const delta = m != null && metaMs != null ? m - metaMs : null;
+      const delta = melhor != null && metaMs != null ? melhor - metaMs : null;
       blocos.push({
         bloco: n, aberturaMm, redutorMm: inicial != null ? mm2(inicial + aberturaMm) : null, rotulo: rotuloRedutor(aberturaMm, inicial, true),
-        voltasMs, mediaMs: m, deltaMs: delta, dentro: delta != null && Math.abs(delta) <= tol, completo,
+        voltasMs, melhorMs: melhor, mediaMs: media(voltasMs), deltaMs: delta, dentro: delta != null && Math.abs(delta) <= tol, completo,
         ajusteMm: completo && delta != null ? ajusteRedutorMm(delta, regra) : null,
       });
     }

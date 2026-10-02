@@ -188,7 +188,7 @@ public partial class FormCrono
                 var qual = b.S("rotulo");
                 var sugestao = Ajuste(Dec(b, "ajusteMm"));
                 linha[2 + i] = (blocos.Count > BlocosNaTela ? $"bloco {b.I("bloco")}: " : "") + tempos + (b.B("completo")
-                    ? $"\nmédia {Tempo(b.L("mediaMs"))}{(b.L("deltaMs") is long dl ? $" ({Delta(dl)})" : "")}\n{qual}{(sugestao.Length > 0 ? " → " + sugestao : "")}"
+                    ? $"\nmelhor {Tempo(b.L("melhorMs") ?? (b["voltasMs"] as JsonArray ?? []).Select(v => v?.GetValue<long>()).Min())}{(b.L("deltaMs") is long dl ? $" ({Delta(dl)})" : "")}\n{qual}{(sugestao.Length > 0 ? " → " + sugestao : "")}"
                     : $" / …\nfalta 1 volta\n{qual}");
             }
             var v0 = voltas?[k.S("kart")] as JsonObject;
@@ -269,7 +269,7 @@ public partial class FormCrono
         var rg = d.Secao("Regra do redutor", "A diferença para o kart referência sugere o redutor: mais lento = abrir, mais rápido = fechar. Os valores vêm do tipo de kart e podem ser mudados só para esta equalização.");
         d.Campo(rg, "Tipo de kart", tipo, 6);
         d.Campo(rg, "Equalizado até ± (segundos)", tolerancia, 2); d.Campo(rg, "Depois, a cada (segundos)", faixa, 2); d.Campo(rg, "Abrir ou fechar (mm)", passo, 2);
-        d.Nota("Karts referência passam várias vezes e servem de comparação: a meta é a melhor volta entre eles, então volta ruim (motor falhando, primeiras voltas) não atrapalha. Os outros karts guardam os tempos de 2 em 2 voltas, um redutor por bloco.");
+        d.Nota("Karts referência passam várias vezes e servem de comparação: a meta é a melhor volta entre eles, então volta ruim (motor falhando, primeiras voltas) não atrapalha. Os outros karts guardam os tempos de 2 em 2 voltas, um redutor por bloco, e vale a melhor das 2 (volta lenta não conta).");
         d.BotaoRodape(nova ? "Criar equalização" : "Salvar", true, () => Seguro.Rodar(d, async () =>
         {
             var lista = refs.Text.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).Distinct().ToList();

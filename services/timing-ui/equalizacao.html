@@ -187,7 +187,7 @@ function relatorio(e) {
       for (let i = 0; i < maxBlocos; i++) {
         const b = visiveis[i];
         if (!b) { h += `<td class="num">${VAZIO}</td>`; continue; }
-        const media = !b.completo ? 'falta 1 volta' : b.deltaMs != null ? `média ${tempo(b.mediaMs)} (${delta(b.deltaMs)})` : `média ${tempo(b.mediaMs)}`;
+        const media = !b.completo ? 'falta 1 volta' : b.deltaMs != null ? `melhor ${tempo(b.melhorMs)} (${delta(b.deltaMs)})` : `melhor ${tempo(b.melhorMs)}`;
         h += `<td class="num bloco${b.dentro && b.completo ? ' dentro' : ''}">${cortado ? `<small>bloco ${b.bloco}</small>` : ''}${b.voltasMs.map(tempo).join(' / ')}${b.completo ? '' : ' / …'}<small>${media}</small><small>${esc(b.rotulo)}${b.ajusteMm != null ? ` → ${ajuste(b.ajusteMm)}` : ''}</small></td>`;
       }
     }
@@ -215,7 +215,7 @@ function relatorio(e) {
   }
   const fx = e.regra.faixas || [];
   h += `<p class="nota"><strong>Regra do redutor (${esc(r.regra.nome)}):</strong> ${fx.map((f, i) => (i === 0 ? `diferença até ${segs(f.ateMs)} s = equalizado` : `de ${segs(f.deMs)} a ${segs(f.ateMs)} s = ${mm(f.mm)} mm`)).join(' · ')} · e assim por diante (a cada ${segs(r.regra.faixaMs)} s, mais ${mm(r.regra.passoMm)} mm). Kart mais lento que a referência: <strong>abrir</strong>; mais rápido: <strong>fechar</strong>.</p>
-    <p class="nota"><strong>Como ler:</strong> cada bloco são 2 voltas com um redutor. O bloco 1 é com o redutor que estava no kart (o inicial); a diferença da média para a meta diz quanto abrir ou fechar, e o bloco seguinte já é com o redutor trocado. Vale o último bloco: dentro da faixa de equalizado, o kart é liberado com aquele redutor. Os karts referência passam várias vezes e servem só de comparação: a meta é a melhor volta entre eles. As voltas da equalização ficam separadas das baterias normais.</p>
+    <p class="nota"><strong>Como ler:</strong> cada bloco são 2 voltas com um redutor. O bloco 1 é com o redutor que estava no kart (o inicial); a diferença da melhor volta do bloco para a meta diz quanto abrir ou fechar, e o bloco seguinte já é com o redutor trocado. Vale o último bloco: dentro da faixa de equalizado, o kart é liberado com aquele redutor. Os karts referência passam várias vezes e servem só de comparação: a meta é a melhor volta entre eles. As voltas da equalização ficam separadas das baterias normais.</p>
     <div class="assin"><div>Cronometragem</div><div>Oficina · mecânico responsável</div><div>Data</div></div>`;
   el('conteudo').innerHTML = h;
   el('estado').textContent = `${ESTADOS[e.state] || e.state}${e.finalizadaEm ? ' · finalizada' : ''} · ${r.karts.length} karts`;

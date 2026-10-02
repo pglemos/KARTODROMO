@@ -21,7 +21,7 @@ type Resumo = {
   karts: number; equalizados: number; ajustando: number; revisar: number; regra?: Regra;
 };
 type Regra = { nome: string; toleranciaMs: number; faixaMs: number; passoMm: number };
-type Bloco = { bloco: number; rotulo: string; aberturaMm: number; voltasMs: number[]; mediaMs: number | null; deltaMs: number | null; dentro: boolean; completo: boolean; ajusteMm: number | null };
+type Bloco = { bloco: number; rotulo: string; aberturaMm: number; voltasMs: number[]; melhorMs?: number | null; mediaMs: number | null; deltaMs: number | null; dentro: boolean; completo: boolean; ajusteMm: number | null };
 type Sistema = { status: 'ok' | 'atencao' | 'critico'; nota?: string };
 type KartEq = {
   kart: string; piloto: string; referencia: boolean; voltas: number; melhorMs: number | null; mediaMs: number | null; blocos: Bloco[];
@@ -228,7 +228,7 @@ function DetalheEqualizacao({ e, fechar }: { e: Detalhe; fechar: () => void }) {
                     return (
                       <td className={`py-2.5 pr-3 text-right tabular-nums ${b.dentro && b.completo ? 'font-semibold text-emerald-400' : ''}`} key={i}>
                         {b.voltasMs.map(tempo).join(' / ')}{b.completo ? '' : ' / …'}
-                        <span className="block text-xs font-normal text-zinc-500">{b.completo ? `média ${tempo(b.mediaMs)} (${delta(b.deltaMs)})` : 'falta 1 volta'}</span>
+                        <span className="block text-xs font-normal text-zinc-500">{b.completo ? `melhor ${tempo(b.melhorMs ?? Math.min(...b.voltasMs))} (${delta(b.deltaMs)})` : 'falta 1 volta'}</span>
                         <span className="block text-xs font-normal text-zinc-400">{b.rotulo}{b.ajusteMm != null ? ` → ${ajuste(b.ajusteMm)}` : ''}</span>
                       </td>
                     );
@@ -264,7 +264,7 @@ function DetalheEqualizacao({ e, fechar }: { e: Detalhe; fechar: () => void }) {
           </table>
         </div>
       )}
-      <p className="mt-4 text-xs leading-5 text-zinc-500">Cada bloco são 2 voltas com um redutor: o bloco 1 é com o redutor que estava no kart e a diferença para a meta diz quanto abrir ou fechar para o bloco seguinte. Vale o último bloco: dentro da faixa de equalizado, o kart é liberado com aquele redutor. O PDF para a oficina sai pela Cronometragem (Equalização › Relatório para a oficina).</p>
+      <p className="mt-4 text-xs leading-5 text-zinc-500">Cada bloco são 2 voltas com um redutor: o bloco 1 é com o redutor que estava no kart e a diferença da melhor volta do bloco para a meta diz quanto abrir ou fechar para o bloco seguinte. Vale o último bloco: dentro da faixa de equalizado, o kart é liberado com aquele redutor. O PDF para a oficina sai pela Cronometragem (Equalização › Relatório para a oficina).</p>
     </Card>
   );
 }
