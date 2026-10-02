@@ -5,7 +5,8 @@
  * separadas das baterias normais (não entram no ranking, nos resultados nem no e-mail dos pilotos).
  *
  * Regras:
- * - Karts referência (2 ou 3): todas as voltas valem; a meta é a média das melhores voltas deles (ou a meta fixa
+ * - Karts referência (2 ou 3): todas as voltas valem; a meta é a MELHOR volta entre eles — não a média: o motor
+ *   falha às vezes e as primeiras voltas são descartadas, então só a melhor volta serve de comparação (ou a meta fixa
  *   do traçado, se o cronometrista escolher).
  * - Demais karts: as voltas válidas formam blocos de 2. O bloco 1 é com o redutor que está no kart (o "inicial"); a
  *   cada 2 voltas o redutor é trocado para chegar perto da meta.
@@ -39,7 +40,7 @@ export type ChecklistKart = {
 
 export type ConfigEqualizacao = {
   trackId?: string | null;
-  /** referencia = média das melhores voltas dos karts referência; fixa = meta escolhida para o traçado */
+  /** referencia = a melhor volta entre os karts referência; fixa = meta escolhida para o traçado */
   metaModo?: 'referencia' | 'fixa';
   metaFixaMs?: number | null;
   /** até quanto de diferença para a meta o kart está equalizado (a primeira faixa da regra do redutor) */
@@ -206,7 +207,7 @@ export function calcularEqualizacao(s: Session, cfg: ConfigEqualizacao = s.equal
   let metaMs: number | null = null;
   let metaOrigem: ResultadoEqualizacao['metaOrigem'] = 'sem-meta';
   if (cfg.metaModo === 'fixa' && Number(cfg.metaFixaMs) > 0) { metaMs = Math.round(Number(cfg.metaFixaMs)); metaOrigem = 'fixa'; }
-  else if (melhoresRefs.length) { metaMs = media(melhoresRefs); metaOrigem = 'referencia'; }
+  else if (melhoresRefs.length) { metaMs = Math.min(...melhoresRefs); metaOrigem = 'referencia'; }
 
   const karts = competidores.map((c): KartEqualizacao => {
     const v = voltasValidas(c);

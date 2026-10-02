@@ -163,7 +163,7 @@ public partial class FormCrono
         var meta = _eq.L("metaMs");
         var tol = _eq.L("toleranciaMs") ?? 200;
         var regra = _eq["regra"] as JsonObject;
-        var origem = _eq.S("metaOrigem") switch { "fixa" => "meta fixa do traçado", "referencia" => "média das referências", _ => "defina as referências ou a meta" };
+        var origem = _eq.S("metaOrigem") switch { "fixa" => "meta fixa do traçado", "referencia" => "melhor volta das referências", _ => "defina as referências ou a meta" };
         var refs = Crono.Arr(r, "referencias");
         _tituloEq.Text = _eq.S("name");
         _subEq.Text = $"{trilha?.S("name")} · {trilha?.I("lengthMeters")} m  ·  Meta {(meta is long m ? Tempo(m) : "—")} ± {Seg(tol)} s ({origem})" +
@@ -243,7 +243,7 @@ public partial class FormCrono
         tracado.SelectedIndex = Math.Max(0, trilhas.FindIndex(t => t.S("id") == (cfg?.S("trackId") ?? "")) + 1);
         var refs = Txt(cfg == null ? "" : string.Join(", ", (cfg["referencias"] as JsonArray ?? []).Select(x => x?.ToString())), 40);
         var mecanico = Txt(cfg?.S("mecanico") ?? "", 80);
-        var modoRef = new RadioButton { Text = "Média das melhores voltas dos karts referência", Checked = cfg == null || cfg.S("metaModo") != "fixa" };
+        var modoRef = new RadioButton { Text = "Melhor volta dos karts referência", Checked = cfg == null || cfg.S("metaModo") != "fixa" };
         var modoFixa = new RadioButton { Text = "Meta fixa do traçado (digitada ou a última registrada)", Checked = cfg?.S("metaModo") == "fixa" };
         var metaFixa = Txt(Tempo(cfg?.L("metaFixaMs")), 12);
         // regra do redutor: a do tipo de kart escolhido, que pode ser ajustada só para esta equalização
@@ -269,7 +269,7 @@ public partial class FormCrono
         var rg = d.Secao("Regra do redutor", "A diferença para o kart referência sugere o redutor: mais lento = abrir, mais rápido = fechar. Os valores vêm do tipo de kart e podem ser mudados só para esta equalização.");
         d.Campo(rg, "Tipo de kart", tipo, 6);
         d.Campo(rg, "Equalizado até ± (segundos)", tolerancia, 2); d.Campo(rg, "Depois, a cada (segundos)", faixa, 2); d.Campo(rg, "Abrir ou fechar (mm)", passo, 2);
-        d.Nota("Karts referência passam várias vezes e servem de comparação: todas as voltas valem. Os outros karts guardam os tempos de 2 em 2 voltas, um redutor por bloco.");
+        d.Nota("Karts referência passam várias vezes e servem de comparação: a meta é a melhor volta entre eles, então volta ruim (motor falhando, primeiras voltas) não atrapalha. Os outros karts guardam os tempos de 2 em 2 voltas, um redutor por bloco.");
         d.BotaoRodape(nova ? "Criar equalização" : "Salvar", true, () => Seguro.Rodar(d, async () =>
         {
             var lista = refs.Text.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).Distinct().ToList();
