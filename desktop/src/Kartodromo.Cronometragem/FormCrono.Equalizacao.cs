@@ -177,8 +177,7 @@ public partial class FormCrono
             var linha = new object[2 + BlocosNaTela + 4];
             linha[0] = k.S("kart").PadLeft(2, '0'); linha[1] = k.S("piloto");
             var blocos = Crono.Arr(k, "blocos");
-            if (k.B("referencia")) linha[2] = $"Melhor {Tempo(k.L("melhorMs"))}\nmédia {Tempo(k.L("mediaMs"))}
-{k.I("voltas")} voltas";
+            if (k.B("referencia")) linha[2] = $"Melhor {Tempo(k.L("melhorMs"))}\nmédia {Tempo(k.L("mediaMs"))}\n{k.I("voltas")} voltas";
             for (var i = 0; i < BlocosNaTela && !k.B("referencia"); i++)
             {
                 // quando há mais blocos que colunas, mostram-se os últimos (o redutor que está no kart agora)
