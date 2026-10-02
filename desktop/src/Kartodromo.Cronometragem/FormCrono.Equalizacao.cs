@@ -178,7 +178,7 @@ public partial class FormCrono
             var linha = new object[2 + BlocosNaTela + 4];
             linha[0] = k.S("kart").PadLeft(2, '0'); linha[1] = k.S("piloto");
             var blocos = Crono.Arr(k, "blocos");
-            if (k.B("referencia")) linha[2] = $"Melhor {Tempo(k.L("melhorMs"))}\nmédia {Tempo(k.L("mediaMs"))}\n{k.I("voltas")} voltas";
+            if (k.B("referencia")) linha[2] = k.I("voltas") == 0 ? "sem volta ainda" : $"Melhor {Tempo(k.L("melhorMs"))}\nmédia {Tempo(k.L("mediaMs"))}\n{k.I("voltas")} voltas";
             for (var i = 0; i < BlocosNaTela && !k.B("referencia"); i++)
             {
                 // quando há mais blocos que colunas, mostram-se os últimos (o redutor que está no kart agora)
@@ -188,7 +188,9 @@ public partial class FormCrono
                 // 3ª linha: o redutor deste bloco e o que a regra manda fazer depois dele; com mais blocos que colunas, a 1ª diz qual é
                 var qual = b.S("rotulo");
                 var sugestao = Ajuste(Dec(b, "ajusteMm"));
-                linha[2 + i] = (blocos.Count > BlocosNaTela ? $"bloco {b.I("bloco")}: " : "") + tempos + (b.B("completo")
+                // bloco trazido de uma equalização anterior (o kart ficou para revisar): a 1ª linha diz de quando é
+                var deOutra = b.L("anteriorEm") is long ae ? $"equalização de {DateTimeOffset.FromUnixTimeMilliseconds(ae).ToLocalTime():dd/MM}\n" : "";
+                linha[2 + i] = deOutra + (blocos.Count > BlocosNaTela ? $"bloco {b.I("bloco")}: " : "") + tempos + (b.B("completo")
                     ? $"\nmelhor {Tempo(b.L("melhorMs") ?? (b["voltasMs"] as JsonArray ?? []).Select(v => v?.GetValue<long>()).Min())}{(b.L("deltaMs") is long dl ? $" ({Delta(dl)})" : "")}\n{qual}{(sugestao.Length > 0 ? " → " + sugestao : "")}"
                     : $" / …\nfalta 1 volta\n{qual}");
             }
@@ -210,7 +212,8 @@ public partial class FormCrono
                 var b = blocos.Count > BlocosNaTela ? blocos[blocos.Count - BlocosNaTela + c] : c < blocos.Count ? blocos[c] : null;
                 var dentro = b != null && b.B("dentro") && b.B("completo");
                 _gEq.Rows[i].Cells[2 + c].Style.BackColor = dentro ? Color.FromArgb(225, 247, 231) : Color.Empty;
-                _gEq.Rows[i].Cells[2 + c].Style.ForeColor = dentro ? Color.FromArgb(28, 107, 53) : Color.Empty;
+                // bloco de equalização anterior fica apagado: é histórico, as voltas de hoje vêm no bloco seguinte
+                _gEq.Rows[i].Cells[2 + c].Style.ForeColor = dentro ? Color.FromArgb(28, 107, 53) : b?.L("anteriorEm") != null ? TemaCrono.Secundario : Color.Empty;
             }
             var (fundo, letra) = karts[i].S("status") switch
             {

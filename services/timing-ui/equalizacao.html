@@ -43,6 +43,7 @@
   .kart { display: inline-block; min-width: 2.7em; padding: 0 4px; border: 1px solid var(--line-strong); border-radius: 4px; background: #fff; font-weight: 700; text-align: center; }
   .bloco { white-space: nowrap; }
   .bloco small { display: block; color: var(--muted); font-size: 10.5px; }
+  .bloco.anterior { color: var(--muted); }
   .bloco.dentro { background: var(--ok-soft) !important; color: var(--accent-strong); font-weight: 700; }
   .st { display: inline-block; padding: 1px 7px; border-radius: 4px; font-size: 11px; font-weight: 750; white-space: nowrap; }
   .st-REF { background: var(--ref-soft); color: var(--ref); }
@@ -188,7 +189,7 @@ function relatorio(e) {
         const b = visiveis[i];
         if (!b) { h += `<td class="num">${VAZIO}</td>`; continue; }
         const media = !b.completo ? 'falta 1 volta' : b.deltaMs != null ? `melhor ${tempo(b.melhorMs)} (${delta(b.deltaMs)})` : `melhor ${tempo(b.melhorMs)}`;
-        h += `<td class="num bloco${b.dentro && b.completo ? ' dentro' : ''}">${cortado ? `<small>bloco ${b.bloco}</small>` : ''}${b.voltasMs.map(tempo).join(' / ')}${b.completo ? '' : ' / …'}<small>${media}</small><small>${esc(b.rotulo)}${b.ajusteMm != null ? ` → ${ajuste(b.ajusteMm)}` : ''}</small></td>`;
+        h += `<td class="num bloco${b.dentro && b.completo ? ' dentro' : ''}${b.anteriorEm ? ' anterior' : ''}">${b.anteriorEm ? `<small>equalização de ${dia(b.anteriorEm).slice(0, 5)}</small>` : ''}${cortado ? `<small>bloco ${b.bloco}</small>` : ''}${b.voltasMs.map(tempo).join(' / ')}${b.completo ? '' : ' / …'}<small>${media}</small><small>${esc(b.rotulo)}${b.ajusteMm != null ? ` → ${ajuste(b.ajusteMm)}` : ''}</small></td>`;
       }
     }
     const cls = k.status === 'SEM VOLTAS' ? 'SEM' : k.status;
@@ -215,7 +216,7 @@ function relatorio(e) {
   }
   const fx = e.regra.faixas || [];
   h += `<p class="nota"><strong>Regra do redutor (${esc(r.regra.nome)}):</strong> ${fx.map((f, i) => (i === 0 ? `diferença até ${segs(f.ateMs)} s = equalizado` : `de ${segs(f.deMs)} a ${segs(f.ateMs)} s = ${mm(f.mm)} mm`)).join(' · ')} · e assim por diante (a cada ${segs(r.regra.faixaMs)} s, mais ${mm(r.regra.passoMm)} mm). Kart mais lento que a referência: <strong>abrir</strong>; mais rápido: <strong>fechar</strong>.</p>
-    <p class="nota"><strong>Como ler:</strong> cada bloco são 2 voltas com um redutor. O bloco 1 é com o redutor que estava no kart (o inicial); a diferença da melhor volta do bloco para a meta diz quanto abrir ou fechar, e o bloco seguinte já é com o redutor trocado. Vale o último bloco: dentro da faixa de equalizado, o kart é liberado com aquele redutor. Os karts referência passam várias vezes e servem só de comparação: a meta é a melhor volta entre eles. As voltas da equalização ficam separadas das baterias normais.</p>
+    <p class="nota"><strong>Como ler:</strong> cada bloco são 2 voltas com um redutor. O bloco 1 é com o redutor que estava no kart (o inicial); a diferença da melhor volta do bloco para a meta diz quanto abrir ou fechar, e o bloco seguinte já é com o redutor trocado. Vale o último bloco: dentro da faixa de equalizado, o kart é liberado com aquele redutor. Kart que ficou para revisar continua na equalização seguinte: os blocos anteriores aparecem com a data e as voltas novas entram no bloco seguinte. Os karts referência passam várias vezes e servem só de comparação: a meta é a melhor volta entre eles. As voltas da equalização ficam separadas das baterias normais.</p>
     <div class="assin"><div>Cronometragem</div><div>Oficina · mecânico responsável</div><div>Data</div></div>`;
   el('conteudo').innerHTML = h;
   el('estado').textContent = `${ESTADOS[e.state] || e.state}${e.finalizadaEm ? ' · finalizada' : ''} · ${r.karts.length} karts`;

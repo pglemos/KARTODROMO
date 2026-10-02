@@ -67,7 +67,7 @@ import {
 } from '../lib/timing/catalog';
 import { rankingPorPeso, tituloFaixas, type DadosPiloto } from '../lib/timing/ranking-peso';
 import { dataBrasilia, historicoDoKart, rankingKarts } from '../lib/timing/ranking-karts';
-import { calcularEqualizacao, faixasDaRegra, importarKarts, REGRA_PADRAO, regraDa, SISTEMAS_KART, tempoVoltaParaMs, TOLERANCIA_PADRAO_MS, ultimaEqualizacaoPorKart, voltasNasBaterias, type ChecklistKart, type ConfigEqualizacao } from '../lib/timing/equalizacao';
+import { calcularComAnteriores, faixasDaRegra, importarKarts, REGRA_PADRAO, regraDa, SISTEMAS_KART, tempoVoltaParaMs, TOLERANCIA_PADRAO_MS, ultimaEqualizacaoPorKart, voltasNasBaterias, type ChecklistKart, type ConfigEqualizacao } from '../lib/timing/equalizacao';
 import { nomeProprio } from '../lib/nomes';
 import { configPublica, enviarResultado, enviarTeste, lerConfig, salvarConfig, traduzirErro, type Dependencias } from './timing-email';
 import type { ContextoProva, EmpresaEmail } from '../lib/timing/email-resultado';
@@ -814,8 +814,11 @@ function configEqualizacao(s: Session): ConfigEqualizacao {
   return cfg;
 }
 
+/** Resultado da equalização já com o que ficou pendente (REVISAR) nas anteriores. */
+const resultadoEqualizacao = (s: Session) => calcularComAnteriores(s, sessions.values(), configEqualizacao);
+
 function equalizacaoResumo(s: Session) {
-  const r = calcularEqualizacao(s, configEqualizacao(s));
+  const r = resultadoEqualizacao(s);
   const testados = r.karts.filter((k) => !k.referencia);
   return {
     id: s.id, name: s.name, state: s.state, createdAt: s.createdAt, startedAt: s.startedAt, finishedAt: s.finishedAt,
@@ -848,7 +851,7 @@ function equalizacaoDetalhe(s: Session) {
       ...(({ nome, ...r }) => ({ regraNome: nome, ...r }))(regraDa(cfg)), aberturas: cfg.aberturas ?? {}, redutorInicialMm: cfg.redutorInicialMm ?? {},
     },
     metaDoTracado: metaVigente(trackIdDa(s), s.startedAt ?? s.createdAt),
-    resultado: (() => { const r = calcularEqualizacao(s, configEqualizacao(s)); return { ...r, karts: r.karts.map((k) => ({ ...k, piloto: nomeProprio(k.piloto) })) }; })(),
+    resultado: (() => { const r = resultadoEqualizacao(s); return { ...r, karts: r.karts.map((k) => ({ ...k, piloto: nomeProprio(k.piloto) })) }; })(),
     voltasDesdeUltima: voltasDesdeUltimaEqualizacao(s),
     observations: s.observations ?? [],
     sistemas: SISTEMAS_KART,
@@ -1765,8 +1768,14 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       } else if (eq[2] === 'karts' && eq[3] && method === 'PUT') {
         // apontamentos da oficina para o kart: chassi, pneu, motor, embreagem, freio, observações e ação
         const kart = decodeURIComponent(eq[3]);
-        const comp = s.competitors.find((c) => c.kart === kart);
-        if (!comp) return send(res, 404, { error: 'Kart não encontrado nesta equalização.' });
+        let comp = s.competitors.find((c) => c.kart === kart);
+        if (!comp) {
+          // kart pendente de uma equalização anterior que ainda não andou nesta: entra na lista ao receber apontamento
+          const pendente = resultadoEqualizacao(s).karts.find((k) => k.kart === kart && k.pendenteDe != null);
+          if (!pendente) return send(res, 404, { error: 'Kart não encontrado nesta equalização.' });
+          comp = { kart, name: pendente.piloto, flag: 'none', crossings: [], finished: false };
+          s.competitors.push(comp);
+        }
         const body = await readBody(req);
         const entrada = (body.sistemas ?? {}) as Record<string, { status?: string; nota?: string }>;
         const sistemas: NonNullable<ChecklistKart['sistemas']> = {};
@@ -1801,7 +1810,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         if (s.state === 'em_andamento' || s.state === 'bandeira_final') { closeSession(s, agora); void enviarUsoKarts(s); }
         cfg.finalizadaEm = agora;
         // a meta que saiu desta equalização fica no histórico do traçado
-        const r = calcularEqualizacao(s, configEqualizacao(s));
+        const r = resultadoEqualizacao(s);
         metasTracado = metasTracado.filter((m) => m.sessionId !== s.id);
         if (r.metaMs) metasTracado.push({ id: randomUUID(), trackId: trackIdDa(s), metaMs: r.metaMs, toleranciaMs: r.toleranciaMs, quando: s.startedAt ?? agora, origem: 'equalizacao', sessionId: s.id, referencias: cfg.referencias ?? [] });
         saveMetas();

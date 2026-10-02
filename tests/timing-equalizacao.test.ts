@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyPassing, closeSession, createSession, startSession, type Session } from '../lib/timing/race-engine';
-import { ajusteRedutorMm, calcularEqualizacao, faixasDaRegra, fmtTempoVolta, importarKarts, tempoVoltaParaMs, textoAjuste, ultimaEqualizacaoPorKart, voltasNasBaterias } from '../lib/timing/equalizacao';
+import { ajusteRedutorMm, calcularComAnteriores, calcularEqualizacao, faixasDaRegra, fmtTempoVolta, importarKarts, tempoVoltaParaMs, textoAjuste, ultimaEqualizacaoPorKart, voltasNasBaterias } from '../lib/timing/equalizacao';
 import { rankingKarts } from '../lib/timing/ranking-karts';
 
 const BASE = Date.UTC(2026, 8, 3, 12, 30, 0); // 03/09/2026 09:30 em Brasília
@@ -99,6 +99,48 @@ describe('equalização dos karts', () => {
     // mexer na cópia não muda a bateria de origem
     eq.competitors.find((c) => c.kart === '60')!.crossings[1].deleted = true;
     expect(origem.competitors.find((c) => c.kart === '60')!.crossings[1].deleted).toBeUndefined();
+  });
+
+  it('kart que ficou para revisar continua no bloco 2 na equalização seguinte; referência e kart novo começam no bloco 1', () => {
+    const DIA = 86_400_000;
+    // 1ª equalização (03/09): o 35 fica 0,543 s acima da meta (abrir 0,3 mm) e o 60 equaliza; é finalizada
+    const eq1 = sessao('equalizacao', BASE, { '21': [63_690, 63_427], '35': [64_161, 63_970], '60': [63_500, 63_450] }, 'eq1');
+    eq1.equalizacao = { referencias: ['21'], toleranciaMs: 100, checklist: { '35': { sistemas: { motor: { status: 'atencao', nota: 'falha em alta' } } } } };
+    closeSession(eq1, BASE + 3_600_000);
+    const T1 = eq1.startedAt!; // a sessão começa na primeira passagem
+    const r1 = Object.fromEntries(calcularComAnteriores(eq1, [eq1]).karts.map((x) => [x.kart, x]));
+    expect([r1['35'].status, r1['60'].status]).toEqual(['REVISAR', 'EQUALIZADO']);
+
+    // 2ª equalização (04/09), aberta: o 35 ainda não andou e aparece pendente com o bloco 1 da anterior
+    const eq2 = sessao('equalizacao', BASE + DIA, { '21': [63_600, 63_500], '60': [63_480, 63_520], '77': [] }, 'eq2');
+    eq2.equalizacao = { referencias: ['21'], toleranciaMs: 100 };
+    let r2 = Object.fromEntries(calcularComAnteriores(eq2, [eq2, eq1]).karts.map((x) => [x.kart, x]));
+    expect(r2['35']).toMatchObject({ status: 'REVISAR', ajusteMm: 0.3, aberturaMm: 0.3, pendenteDe: T1, acao: 'Pendente da equalização de 03/09: abrir 0,3 mm e dar 2 voltas' });
+    expect(r2['35'].blocos.map((b) => [b.bloco, b.voltasMs, b.anteriorEm])).toEqual([[1, [64_161, 63_970], T1]]);
+    expect(r2['35'].checklist?.sistemas?.motor?.nota).toBe('falha em alta');
+    // quem equalizou na anterior, a referência e o kart novo começam do zero, no bloco 1
+    expect(r2['60'].blocos.map((b) => [b.bloco, b.anteriorEm])).toEqual([[1, undefined]]);
+    expect(r2['60'].pendenteDe).toBeNull();
+    expect(r2['21'].status).toBe('REF');
+    expect(r2['77']).toMatchObject({ status: 'SEM VOLTAS', blocos: [] });
+
+    // o 35 anda na 2ª: as voltas entram no bloco 2, já com o redutor aberto 0,3 mm, e ele equaliza
+    const com35 = sessao('equalizacao', BASE + DIA, { '21': [63_600, 63_500], '35': [63_700, 63_560] }, 'eq2');
+    com35.equalizacao = { referencias: ['21'], toleranciaMs: 100 };
+    r2 = Object.fromEntries(calcularComAnteriores(com35, [eq1, com35]).karts.map((x) => [x.kart, x]));
+    expect(r2['35'].blocos.map((b) => [b.bloco, b.rotulo, b.melhorMs, b.anteriorEm])).toEqual([[1, 'inicial', 63_970, T1], [2, '+0,3 mm', 63_560, undefined]]);
+    expect(r2['35']).toMatchObject({ status: 'EQUALIZADO', aberturaMm: 0.3, acao: 'Equalizado com o redutor aberto 0,3 mm em relação ao inicial: liberar' });
+
+    // na 3ª equalização o 35 já não está pendente; se a 2ª tivesse terminado sem ele andar, continuaria
+    closeSession(com35, BASE + DIA + 3_600_000);
+    const eq3 = sessao('equalizacao', BASE + 2 * DIA, { '21': [63_600, 63_500] }, 'eq3');
+    eq3.equalizacao = { referencias: ['21'], toleranciaMs: 100 };
+    expect(calcularComAnteriores(eq3, [eq1, com35, eq3]).karts.map((x) => x.kart)).toEqual(['21']);
+    closeSession(eq2, BASE + DIA + 3_600_000);
+    const r3 = calcularComAnteriores(eq3, [eq1, eq2, eq3]).karts.find((x) => x.kart === '35')!;
+    expect(r3).toMatchObject({ status: 'REVISAR', pendenteDe: T1, acao: 'Pendente da equalização de 03/09: abrir 0,3 mm e dar 2 voltas' });
+    // equalização finalizada não ganha linha de kart que não andou nela
+    expect(calcularComAnteriores(eq2, [eq1, eq2]).karts.map((x) => x.kart)).toEqual(['21', '60', '77']);
   });
 
   it('kart mais rápido que a referência: a sugestão é fechar o redutor', () => {

@@ -20,6 +20,9 @@
  *   informada, tudo aparece na medida real (17,3 mm).
  * - Vale o ÚLTIMO bloco completo (o redutor que está no kart agora): dentro da tolerância = EQUALIZADO. Fora:
  *   AJUSTANDO enquanto a equalização está aberta e REVISAR (oficina) depois de finalizada.
+ * - Kart que ficou em REVISAR continua de onde parou na equalização seguinte (calcularComAnteriores): os blocos que
+ *   ele já fez aparecem primeiro, com a data, e as voltas novas entram no bloco seguinte (bloco 2 em diante), já com
+ *   o redutor sugerido. Kart referência e kart que ainda não andou começam no bloco 1.
  */
 import type { Competitor, Session } from './race-engine';
 
@@ -76,7 +79,12 @@ export type BlocoEqualizacao = {
   mediaMs: number | null; deltaMs: number | null; dentro: boolean; completo: boolean;
   /** o que a regra manda fazer depois deste bloco (mm; + abrir, − fechar, 0 = equalizado); null sem meta ou incompleto */
   ajusteMm: number | null;
+  /** bloco feito numa equalização anterior (início dela), trazido porque o kart ficou para revisar */
+  anteriorEm?: number;
 };
+
+/** O que um kart traz da equalização anterior quando ficou para revisar (não equalizou). */
+export type PendenciaKart = { blocos: BlocoEqualizacao[]; inicialMm: number | null; quando: number; piloto: string; checklist: ChecklistKart | null };
 export type StatusKart = 'REF' | 'EQUALIZADO' | 'AJUSTANDO' | 'REVISAR' | 'SEM VOLTAS';
 
 export type KartEqualizacao = {
@@ -94,6 +102,10 @@ export type KartEqualizacao = {
   redutorMm: number | null;
   /** redutor a usar: "inicial", "inicial + 0,3 mm" ou "17,3 mm" */
   redutorSugerido: string | null;
+  /** medida (mm) do redutor do bloco 1, quando informada */
+  redutorInicialMm?: number | null;
+  /** início da equalização de onde vêm os blocos anteriores (kart que ficou para revisar) */
+  pendenteDe?: number | null;
   status: StatusKart;
   acao: string;
   checklist: ChecklistKart | null;
@@ -197,7 +209,9 @@ const media = (v: number[]) => (v.length ? Math.round(v.reduce((s, x) => s + x, 
 
 const seg = (ms: number) => (Math.abs(ms) / 1000).toFixed(3).replace('.', ',');
 
-export function calcularEqualizacao(s: Session, cfg: ConfigEqualizacao = s.equalizacao ?? {}): ResultadoEqualizacao {
+const diaMes = (ms: number) => new Date(ms).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' });
+
+export function calcularEqualizacao(s: Session, cfg: ConfigEqualizacao = s.equalizacao ?? {}, pendencias?: Map<string, PendenciaKart>): ResultadoEqualizacao {
   const finalizada = cfg.finalizadaEm != null || s.state === 'encerrada' || s.state === 'cancelada';
   const regra = regraDa(cfg);
   const tol = regra.toleranciaMs;
@@ -218,10 +232,17 @@ export function calcularEqualizacao(s: Session, cfg: ConfigEqualizacao = s.equal
     const v = voltasValidas(c);
     const base = { kart: c.kart, piloto: c.name, voltas: v.length, melhorMs: v.length ? Math.min(...v) : null, mediaMs: media(v), checklist: cfg.checklist?.[c.kart] ?? null };
     if (refs.has(c.kart)) return { ...base, referencia: true, blocos: [], ajusteMm: null, aberturaMm: null, redutorMm: null, redutorSugerido: null, status: 'REF', acao: 'Mantido como base de comparação' };
-    const inicial = Number(cfg.redutorInicialMm?.[c.kart]) > 0 ? Number(cfg.redutorInicialMm?.[c.kart]) : null;
-    const blocos: BlocoEqualizacao[] = [];
+    // kart que ficou para revisar: os blocos da equalização anterior vêm primeiro e as voltas novas continuam depois deles
+    const pend = pendencias?.get(c.kart) ?? null;
+    if (pend && !base.checklist) base.checklist = pend.checklist;
+    const inicial = Number(cfg.redutorInicialMm?.[c.kart]) > 0 ? Number(cfg.redutorInicialMm?.[c.kart]) : pend?.inicialMm ?? null;
+    const blocos: BlocoEqualizacao[] = (pend?.blocos ?? []).map((b, i) => ({
+      ...b, bloco: i + 1, anteriorEm: b.anteriorEm ?? pend!.quando,
+      redutorMm: inicial != null ? mm2(inicial + b.aberturaMm) : null, rotulo: rotuloRedutor(b.aberturaMm, inicial, true),
+    }));
+    const herdados = blocos.length;
     for (let i = 0; i < v.length; i += 2) {
-      const n = i / 2 + 1;
+      const n = herdados + i / 2 + 1;
       const voltasMs = v.slice(i, i + 2);
       // o bloco 1 é o redutor inicial; os seguintes presumem o ajuste sugerido no bloco anterior, salvo correção à mão
       const antes = blocos[blocos.length - 1];
@@ -243,7 +264,15 @@ export function calcularEqualizacao(s: Session, cfg: ConfigEqualizacao = s.equal
     let aberturaMm: number | null = null;
     const ultimo = completos[completos.length - 1];
     const anterior = completos[completos.length - 2];
-    if (metaMs == null && completos.length) { status = 'AJUSTANDO'; aberturaMm = ultimo.aberturaMm; acao = 'Defina os karts referência ou a meta do traçado'; }
+    // ficou para revisar e ainda não fechou um bloco novo nesta equalização: segue pendente, com o ajuste que faltou
+    const pendente = pend != null && herdados > 0 && completos.length === herdados;
+    if (pendente) {
+      status = 'REVISAR'; ajusteMm = ultimo.ajusteMm ?? 0; aberturaMm = mm2(ultimo.aberturaMm + ajusteMm);
+      const alvo = inicial != null ? ` (redutor ${fmtMm(inicial + aberturaMm)} mm)` : '';
+      const de = diaMes(ultimo.anteriorEm ?? pend.quando);
+      acao = finalizada ? `Não andou nesta equalização: segue para revisar desde ${de} (${textoAjuste(ajusteMm)}${alvo})`
+        : `Pendente da equalização de ${de}: ${textoAjuste(ajusteMm)}${alvo} e dar 2 voltas${blocos.length > herdados ? ' (falta 1 volta para fechar o bloco)' : ''}`;
+    } else if (metaMs == null && completos.length) { status = 'AJUSTANDO'; aberturaMm = ultimo.aberturaMm; acao = 'Defina os karts referência ou a meta do traçado'; }
     else if (ultimo?.dentro) {
       status = 'EQUALIZADO'; ajusteMm = 0; aberturaMm = ultimo.aberturaMm;
       acao = inicial != null ? `Equalizado com o redutor ${fmtMm(inicial + aberturaMm)} mm: liberar`
@@ -266,15 +295,42 @@ export function calcularEqualizacao(s: Session, cfg: ConfigEqualizacao = s.equal
     } else if (blocos.length) acao = 'Falta 1 volta para fechar o bloco';
     if (status === 'SEM VOLTAS' && finalizada) acao = 'Não andou nesta equalização';
     // o que a oficina escreveu vale mais que a sugestão automática
-    const daOficina = cfg.checklist?.[c.kart]?.acaoOficina?.trim();
+    const daOficina = base.checklist?.acaoOficina?.trim();
     if (daOficina) acao = daOficina;
     return {
       ...base, referencia: false, blocos, ajusteMm, aberturaMm, redutorMm: inicial != null && aberturaMm != null ? mm2(inicial + aberturaMm) : null,
-      redutorSugerido: aberturaMm == null ? null : rotuloRedutor(aberturaMm, inicial), status, acao,
+      redutorSugerido: aberturaMm == null ? null : rotuloRedutor(aberturaMm, inicial), redutorInicialMm: inicial,
+      pendenteDe: herdados > 0 ? blocos[herdados - 1].anteriorEm ?? null : null, status, acao,
     };
   });
   karts.sort((a, b) => Number(b.referencia) - Number(a.referencia) || a.kart.localeCompare(b.kart, 'pt-BR', { numeric: true }));
   return { metaMs, metaOrigem, toleranciaMs: tol, regra, referencias, karts };
+}
+
+/**
+ * Resultado de uma equalização levando em conta o que ficou pendente nas anteriores: kart que terminou em REVISAR
+ * continua de onde parou (os blocos dele vêm primeiro e as voltas novas entram a partir do bloco seguinte); quando
+ * equaliza, deixa de estar pendente. Enquanto a equalização está aberta, os karts pendentes que ainda não andaram
+ * nela também aparecem, para a oficina ver o que falta.
+ */
+export function calcularComAnteriores(s: Session, todas: Iterable<Session>, cfgDe: (x: Session) => ConfigEqualizacao = (x) => x.equalizacao ?? {}): ResultadoEqualizacao {
+  const inicio = (x: Session) => x.startedAt ?? x.createdAt;
+  const antes = [...todas].filter((x) => x.type === 'equalizacao' && x.state !== 'cancelada' && x.id !== s.id && inicio(x) < inicio(s)).sort((a, b) => inicio(a) - inicio(b));
+  const pend = new Map<string, PendenciaKart>();
+  for (const x of antes) {
+    const r = calcularEqualizacao(x, cfgDe(x), pend);
+    for (const k of r.karts) {
+      if (k.referencia) continue;
+      if (k.status === 'EQUALIZADO') pend.delete(k.kart);
+      else if (k.status === 'REVISAR') pend.set(k.kart, { blocos: k.blocos.filter((b) => b.completo), inicialMm: k.redutorInicialMm ?? null, quando: inicio(x), piloto: k.piloto, checklist: k.checklist });
+    }
+  }
+  const cfg = cfgDe(s);
+  const aberta = cfg.finalizadaEm == null && s.state !== 'encerrada' && s.state !== 'cancelada';
+  const faltam = aberta ? [...pend.keys()].filter((k) => !s.competitors.some((c) => c.kart === k)) : [];
+  const comPendentes: Session = faltam.length === 0 ? s
+    : { ...s, competitors: [...s.competitors, ...faltam.map((k) => ({ kart: k, name: pend.get(k)!.piloto, flag: 'none' as const, crossings: [], finished: false }))] };
+  return calcularEqualizacao(comPendentes, cfg, pend);
 }
 
 /**
