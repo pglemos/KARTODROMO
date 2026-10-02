@@ -23,6 +23,7 @@ import {
   acceptRejected,
   addPenalty,
   removePenalty,
+  voltaAtualDoKart,
   restartSession,
   voltasCompletas,
   applyPassing,
@@ -442,6 +443,8 @@ function sessionView(s: Session) {
       kart: c.kart, name: nomeProprio(c.name), customerId: c.customerId ?? null, category: c.category ?? null, flag: c.flag ?? 'none', autoAdded: Boolean(c.autoAdded), detalhes: c.detalhes ?? null,
       // já passou na linha nesta bateria (a lista de competidores fica amarela até o kart passar)
       passou: c.crossings.some((x) => !x.deleted),
+      // volta em que o kart está agora (vai no texto padrão da advertência/penalidade)
+      voltaAtual: voltaAtualDoKart(s, c),
       penalidades: c.penalidades ?? [],
     })),
     standings: computeStandings(s, trackLengthFor(s)).filter((r) => !s.competitors.find((c) => c.kart === r.kart && c.name === r.name)?.detalhes?.oculto).map((r) => ({ ...r, name: nomeProprio(r.name) })),
@@ -1720,13 +1723,16 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         const { competitor, penalidade } = addPenalty(s, kart, {
           id: randomUUID(), tipo, segundos: body.segundos == null ? undefined : Number(String(body.segundos).replace(',', '.')),
           motivo: body.motivo == null ? undefined : String(body.motivo), wallMs: Date.now(), autor,
+          // texto padrão: o cronometrista informa só o kart atingido e a curva; a volta é a que o kart está agora
+          kartAtingido: body.kartAtingido == null ? undefined : String(body.kartAtingido),
+          curva: body.curva == null ? undefined : String(body.curva),
+          volta: body.volta == null || body.volta === '' ? undefined : Number(body.volta),
         });
-        const motivo = penalidade.motivo ? ` · ${penalidade.motivo}` : '';
-        registrarObservacao(s, `${textoPenalidade(penalidade)} · ${competitor.name} (kart ${competitor.kart})${motivo}`, autor);
+        registrarObservacao(s, `${penalidade.texto} (${competitor.name})`, autor);
       } else {
         if (!pen[3]) return send(res, 400, { error: 'Informe a penalidade.' });
         const { competitor, penalidade } = removePenalty(s, kart, pen[3]);
-        registrarObservacao(s, `Retirada: ${textoPenalidade(penalidade).toLowerCase()} · ${competitor.name} (kart ${competitor.kart})`, 'Cronometragem');
+        registrarObservacao(s, `Retirada de ${competitor.name}: ${penalidade.texto ?? textoPenalidade(penalidade)}`, 'Cronometragem');
       }
     } catch (err) { return send(res, 400, { error: (err as Error).message }); }
     saveSession(s);
@@ -1766,8 +1772,8 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
             const laps = ativas.map((x, i) => ({ lap: i, lapMs: x.lapMs, invalid: Boolean(x.invalid), wallMs: x.wallMs, penalty: '' })).filter((x) => x.lapMs !== null);
             // advertência/penalidade aparece na volta em que foi dada (a primeira que fechou depois dela)
             for (const p of c.penalidades ?? []) {
-              const volta = laps.find((l) => l.wallMs >= p.wallMs) ?? laps[laps.length - 1];
-              const texto = textoPenalidade(p) + (p.motivo ? ` (${p.motivo})` : '');
+              const volta = (p.volta ? laps.find((l) => l.lap === p.volta) : undefined) ?? laps.find((l) => l.wallMs >= p.wallMs) ?? laps[laps.length - 1];
+              const texto = p.texto ?? textoPenalidade(p) + (p.motivo ? ` (${p.motivo})` : '');
               if (volta) volta.penalty = volta.penalty ? `${volta.penalty} · ${texto}` : texto;
             }
             return { kart: c.kart, name: c.name, laps };

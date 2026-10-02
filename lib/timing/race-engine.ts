@@ -29,7 +29,43 @@ export type Observation = { id: string; text: string; wallMs: number; author?: s
  * várias: cada uma é um registro. A de tempo soma segundos ao tempo oficial (corrida: na chegada; tomada de
  * tempo e treino: na melhor volta).
  */
-export type Penalidade = { id: string; tipo: 'advertencia' | 'tempo'; segundos?: number; motivo?: string; wallMs: number; autor?: string };
+export type Penalidade = {
+  id: string; tipo: 'advertencia' | 'tempo'; segundos?: number; wallMs: number; autor?: string;
+  /** kart que sofreu o incidente (quebrou ou rodou por causa da colisão) */
+  kartAtingido?: string;
+  /** curva do incidente */
+  curva?: string;
+  /** volta em que o kart estava quando recebeu a advertência/penalidade */
+  volta?: number;
+  /** complemento livre (opcional) */
+  motivo?: string;
+  /** texto padrão gravado: "ADV: Kart 40 causou o incidente frente ao kart 20, na curva 1, volta 5." */
+  texto?: string;
+};
+
+/**
+ * Texto padrão da advertência/penalidade. O cronometrista só informa o kart atingido e a curva; o kart penalizado,
+ * a volta e o resto da frase saem sozinhos.
+ */
+export function textoPadraoPenalidade(kart: string, p: Pick<Penalidade, 'tipo' | 'segundos' | 'kartAtingido' | 'curva' | 'volta' | 'motivo'>) {
+  const prefixo = p.tipo === 'tempo' ? `PEN +${String(p.segundos ?? 0).replace('.', ',')} s` : 'ADV';
+  const partes: string[] = [];
+  if (p.kartAtingido || p.curva) {
+    let frase = `Kart ${kart} causou o incidente`;
+    if (p.kartAtingido) frase += ` frente ao kart ${p.kartAtingido}`;
+    partes.push(frase);
+    if (p.curva) partes.push(`na curva ${p.curva}`);
+  } else partes.push(`Kart ${kart}`);
+  if (p.volta && p.volta > 0) partes.push(`volta ${p.volta}`);
+  return `${prefixo}: ${partes.join(', ')}.${p.motivo ? ` ${p.motivo}` : ''}`;
+}
+
+/** Volta em que o kart está agora: as completadas + a que está correndo (bateria aberta e kart ainda na pista). */
+export function voltaAtualDoKart(session: Session, c: Competitor) {
+  const completas = Math.max(0, c.crossings.filter((x) => !x.deleted).length - 1);
+  const correndo = (session.state === 'em_andamento' || session.state === 'bandeira_final') && !c.finished && c.crossings.some((x) => !x.deleted);
+  return correndo ? completas + 1 : completas;
+}
 
 /** Dados do "Registro de competidor" (Competidor do canvas). Não mexem na contagem de voltas. */
 export type CompetidorDetalhes = {
@@ -525,7 +561,17 @@ export function addPenalty(session: Session, kart: string, p: Penalidade) {
   if (p.tipo !== 'advertencia' && p.tipo !== 'tempo') throw new Error('Tipo de penalidade inválido.');
   const segundos = Number(p.segundos);
   if (p.tipo === 'tempo' && (!Number.isFinite(segundos) || segundos <= 0 || segundos > 3600)) throw new Error('Informe os segundos da penalidade (entre 1 e 3600).');
-  const registro: Penalidade = { id: p.id, tipo: p.tipo, wallMs: p.wallMs, ...(p.tipo === 'tempo' ? { segundos } : {}), ...(p.motivo?.trim() ? { motivo: p.motivo.trim().slice(0, 160) } : {}), ...(p.autor ? { autor: p.autor } : {}) };
+  // "kart 20" / "curva 1" digitados com a palavra na frente ficam só com o valor
+  const limpo = (v: string | undefined, palavra: RegExp) => String(v ?? '').trim().replace(palavra, '').trim().slice(0, 40);
+  const kartAtingido = limpo(p.kartAtingido, /^karts?\s*(n[ºo°.]?\s*)?/i).replace(/^0+(?=\d)/, '');
+  const curva = limpo(p.curva, /^(na\s+)?curva\s*/i);
+  const volta = Number.isInteger(Number(p.volta)) && Number(p.volta) > 0 ? Number(p.volta) : voltaAtualDoKart(session, c);
+  const registro: Penalidade = {
+    id: p.id, tipo: p.tipo, wallMs: p.wallMs, ...(p.tipo === 'tempo' ? { segundos } : {}),
+    ...(kartAtingido ? { kartAtingido } : {}), ...(curva ? { curva } : {}), ...(volta > 0 ? { volta } : {}),
+    ...(p.motivo?.trim() ? { motivo: p.motivo.trim().slice(0, 160) } : {}), ...(p.autor ? { autor: p.autor } : {}),
+  };
+  registro.texto = textoPadraoPenalidade(c.kart, registro);
   (c.penalidades ??= []).push(registro);
   return { competitor: c, penalidade: registro };
 }

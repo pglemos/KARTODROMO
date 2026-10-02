@@ -32,14 +32,44 @@ public partial class FormCrono
         var comp = Crono.Arr(_sess, "competitors").FirstOrDefault(c => c.S("kart") == kart);
         if (comp == null) { Msg.Aviso(this, $"O kart {kart} não está nesta bateria."); return; }
         var tempo = tipo == "tempo";
-        using var d = NovoDialogo(tempo ? "Penalidade de tempo" : "Advertência", $"{comp.S("name")} · kart {kart} · {_sess.S("name")}", SvgPenalidade, CorPenalidade, 900, 560);
+        using var d = NovoDialogo(tempo ? "Penalidade de tempo" : "Advertência", $"{comp.S("name")} · kart {kart} · {_sess.S("name")}", SvgPenalidade, CorPenalidade, 900, 660);
         var g = d.Secao(tempo ? "Nova penalidade" : "Nova advertência", tempo
             ? "Os segundos somam no tempo oficial: na corrida, no tempo de chegada; na tomada de tempo e no treino, na melhor volta. A posição muda na hora."
             : "Bandeira preta e branca. Fica registrada no resultado e no relatório; não muda a posição.");
+        // texto padrão: só o kart atingido e a curva são digitados; o kart penalizado e a volta já vêm prontos
         var segundos = Txt("5", 6);
+        var atingido = Txt("", 6);
+        var curva = Txt("", 20);
+        var voltaAgora = comp.I("voltaAtual");
+        var volta = Txt(voltaAgora > 0 ? voltaAgora.ToString() : "", 4);
         var motivo = Txt("", 160);
-        if (tempo) { d.Campo(g, "Segundos", segundos, 1); d.Campo(g, "Motivo (opcional)", motivo, 5); }
-        else d.Campo(g, "Motivo (opcional)", motivo, 6);
+        if (tempo) d.Campo(g, "Segundos", segundos, 1);
+        d.Campo(g, "Kart atingido (quebrou ou rodou)", atingido, 2); d.Campo(g, "Curva do incidente", curva, tempo ? 2 : 3); d.Campo(g, "Volta", volta, 1);
+        d.Campo(g, "Complemento (opcional)", motivo, 6);
+        var previa = new Label { AutoSize = true, MaximumSize = new Size(820, 0), Font = new Font("Segoe UI Semibold", 10.4F), ForeColor = PecasDesign.CorTexto, BackColor = Color.White, Margin = new Padding(0, 4, 14, 2) };
+        g.Controls.Add(new Label { Text = "Texto que fica gravado no resultado e no relatório", AutoSize = true, Font = PecasDesign.FonteRotulo, ForeColor = Tokens.TextoSecundario, BackColor = Color.White, Margin = new Padding(0, 6, 0, 0) });
+        g.SetColumnSpan(g.Controls[^1], 6);
+        g.Controls.Add(previa); g.SetColumnSpan(previa, 6);
+        string TextoPadrao()
+        {
+            // mesma frase que o serviço grava (lib/timing/race-engine.ts › textoPadraoPenalidade)
+            var a = System.Text.RegularExpressions.Regex.Replace(atingido.Text.Trim(), @"^karts?\s*(n[ºo°.]?\s*)?", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase).TrimStart('0').Trim();
+            var c = System.Text.RegularExpressions.Regex.Replace(curva.Text.Trim(), @"^(na\s+)?curva\s*", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
+            var prefixo = tempo ? $"PEN +{segundos.Text.Trim().Replace('.', ',')} s" : "ADV";
+            var partes = new List<string>();
+            if (a.Length > 0 || c.Length > 0)
+            {
+                partes.Add($"Kart {kart} causou o incidente" + (a.Length > 0 ? $" frente ao kart {a}" : ""));
+                if (c.Length > 0) partes.Add($"na curva {c}");
+            }
+            else partes.Add($"Kart {kart}");
+            if (int.TryParse(volta.Text.Trim(), out var v) && v > 0) partes.Add($"volta {v}");
+            return $"{prefixo}: {string.Join(", ", partes)}." + (motivo.Text.Trim().Length > 0 ? " " + motivo.Text.Trim() : "");
+        }
+        void AtualizarPrevia() => previa.Text = TextoPadrao();
+        foreach (var caixa in new[] { segundos, atingido, curva, volta, motivo }) caixa.TextChanged += (_, _) => AtualizarPrevia();
+        AtualizarPrevia();
+        d.Shown += (_, _) => atingido.Focus();
 
         // as que o piloto já tem (pode retirar uma)
         var lista = new ListBox { Height = 110, BorderStyle = BorderStyle.None, IntegralHeight = false };
@@ -50,7 +80,8 @@ public partial class FormCrono
             tem = Crono.Arr(atual, "penalidades");
             lista.Items.Clear();
             foreach (var p in tem)
-                lista.Items.Add($"{DateTimeOffset.FromUnixTimeMilliseconds(p.L("wallMs") ?? 0).LocalDateTime:HH:mm}  ·  {(p.S("tipo") == "tempo" ? $"+{p.S("segundos").Replace('.', ',')} s" : "Advertência")}{(p.S("motivo").Length > 0 ? "  ·  " + p.S("motivo") : "")}");
+                lista.Items.Add($"{DateTimeOffset.FromUnixTimeMilliseconds(p.L("wallMs") ?? 0).LocalDateTime:HH:mm}  ·  " +
+                    (p.S("texto").Length > 0 ? p.S("texto") : $"{(p.S("tipo") == "tempo" ? $"+{p.S("segundos").Replace('.', ',')} s" : "Advertência")}{(p.S("motivo").Length > 0 ? "  ·  " + p.S("motivo") : "")}"));
             if (tem.Count == 0) lista.Items.Add("Nenhuma até agora.");
         }
         Recarregar();
@@ -71,7 +102,12 @@ public partial class FormCrono
 
         d.BotaoRodape(tempo ? "Aplicar penalidade" : "Dar advertência", true, () => Seguro.Rodar(d, async () =>
         {
-            var corpo = new JsonObject { ["tipo"] = tipo, ["motivo"] = motivo.Text.Trim(), ["autor"] = Environment.UserName };
+            var corpo = new JsonObject
+            {
+                ["tipo"] = tipo, ["motivo"] = motivo.Text.Trim(), ["autor"] = Environment.UserName,
+                ["kartAtingido"] = atingido.Text.Trim(), ["curva"] = curva.Text.Trim(), ["volta"] = int.TryParse(volta.Text.Trim(), out var vv) && vv > 0 ? vv : null,
+            };
+            if (atingido.Text.Trim().TrimStart('0') == kart.TrimStart('0') && atingido.Text.Trim().Length > 0) { Msg.Aviso(d, "O kart atingido não pode ser o mesmo que recebe a advertência."); atingido.Focus(); return; }
             if (tempo)
             {
                 if (!decimal.TryParse(segundos.Text.Trim().Replace('.', ','), System.Globalization.NumberStyles.Number, Fmt.Br, out var seg) || seg <= 0 || seg > 3600)

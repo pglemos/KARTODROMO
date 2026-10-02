@@ -28,6 +28,7 @@ import {
   removePenalty,
   restartSession,
   aguardandoLargada,
+  voltaAtualDoKart,
 } from '../lib/timing/race-engine';
 import { createCatalogRecord, deleteCatalogRecord, distributeProof, duplicateEvent, emptyCatalog, normalizeCatalog } from '../lib/timing/catalog';
 
@@ -164,6 +165,22 @@ describe('race-engine', () => {
       expect(st[2]).toMatchObject({ desclassificado: true, racingStatus: 3, position: 3 });
       s.competitors.find((c) => c.kart === '4')!.flag = 'none';
       expect(computeStandings(s)[0].kart).toBe('4');
+    });
+
+    it('grava o texto padrão: só o kart atingido e a curva são digitados; a volta é a que o kart está', () => {
+      const s = corridaCom3(); // cada kart completou 2 voltas e está na 3ª
+      const adv = addPenalty(s, '4', { id: 'a1', tipo: 'advertencia', wallMs: 1, kartAtingido: 'kart 20', curva: 'curva 1' }).penalidade;
+      expect(adv).toMatchObject({ kartAtingido: '20', curva: '1', volta: 3 });
+      expect(adv.texto).toBe('ADV: Kart 4 causou o incidente frente ao kart 20, na curva 1, volta 3.');
+      // volta corrigida à mão e penalidade de tempo
+      const pen = addPenalty(s, '5', { id: 't1', tipo: 'tempo', segundos: 5, wallMs: 2, kartAtingido: '06', curva: '3', volta: 2 }).penalidade;
+      expect(pen.texto).toBe('PEN +5 s: Kart 5 causou o incidente frente ao kart 6, na curva 3, volta 2.');
+      // sem kart atingido nem curva: só o kart e a volta (com o complemento, se houver)
+      expect(addPenalty(s, '6', { id: 'a2', tipo: 'advertencia', wallMs: 3, motivo: 'Queimou a largada' }).penalidade.texto).toBe('ADV: Kart 6, volta 3. Queimou a largada');
+      expect(addPenalty(s, '6', { id: 'a3', tipo: 'advertencia', wallMs: 4, curva: '2' }).penalidade.texto).toBe('ADV: Kart 6 causou o incidente, na curva 2, volta 3.');
+      expect(voltaAtualDoKart(s, s.competitors[0])).toBe(3);
+      closeSession(s, 200_000);
+      expect(voltaAtualDoKart(s, s.competitors[0])).toBe(2); // bateria encerrada: a última volta completada
     });
 
     it('reiniciar volta a bateria para preparando sem perder os pilotos', () => {

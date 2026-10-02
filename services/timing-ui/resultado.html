@@ -764,6 +764,7 @@
   .penalidades-bloco { color: var(--ink); font-size: 12px; }
   .penalidades-bloco ul { margin: 4px 0 0; padding-left: 18px; }
   .penalidades-bloco li { margin: 2px 0; }
+  .pen-quem { color: var(--muted); }
 
   /* Assinaturas iguais, com nome e data */
   .signatures-table td { text-align: left; }
@@ -1359,7 +1360,8 @@ function blocoPenalidades() {
     if (c.flag === 'black') itens.push({ ms: Number.MAX_SAFE_INTEGER, html: `${quem} — bandeira preta: desclassificado (último lugar)` });
     for (const p of c.penalidades || []) {
       const oque = p.tipo === 'tempo' ? `penalidade de +${String(p.segundos).replace('.', ',')} s` : 'advertência';
-      itens.push({ ms: p.wallMs, html: `${quem} — ${oque}${p.motivo ? ` (${esc(p.motivo)})` : ''} · ${hora(p.wallMs)}` });
+      // texto padrão gravado pela cronometragem: "ADV: Kart 40 causou o incidente frente ao kart 20, na curva 1, volta 5."
+      itens.push({ ms: p.wallMs, html: p.texto ? `${esc(p.texto)} <span class="pen-quem">${esc(c.name)} · ${hora(p.wallMs)}</span>` : `${quem} — ${oque}${p.motivo ? ` (${esc(p.motivo)})` : ''} · ${hora(p.wallMs)}` });
     }
   }
   if (!itens.length) return '';
