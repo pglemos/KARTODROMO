@@ -935,7 +935,9 @@ public partial class FormCrono : Form
         // painel de LED antigo (serial) segue a bateria em andamento ou montagem do grid
         if (_autoteste == null)
         {
-            var foco = _state?["focus"] as JsonObject;
+            // com kart na pista, a bateria que está correndo; sem, a última que TERMINOU (tomada = grid, corrida = resultado).
+            // O "focus" do serviço sem bateria correndo é a próxima preparada, que não tem o que mostrar no painel.
+            var foco = !string.IsNullOrEmpty(_state?.S("runningId")) ? _state?["focus"] as JsonObject : _state?["lastFinished"] as JsonObject ?? _state?["focus"] as JsonObject;
             // equalização é da oficina: nunca vira a "última tomada" do painel (em 02/10 o painel voltava sempre para ela)
             var qualif = _state?["lastQualifying"] as JsonObject ?? (_sess != null && _sess.S("type") is not ("corrida" or "equalizacao") && _sess.S("state") == "encerrada" ? _sess : null);
             _painel.Atualizar(foco, qualif);

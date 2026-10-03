@@ -161,6 +161,12 @@ sealed class PainelLed : IDisposable
                 sessaoExibir = _sessaoClassificacao ?? sessaoFoco;
                 EmModoGrid = true;
             }
+            else if (sessaoFoco != null && sessaoFoco.S("type") == "corrida" && sessaoFoco.S("state") == "encerrada")
+            {
+                // Corrida encerrada: o painel segue com o resultado da corrida (o pódio sai no TB50) até a próxima largada
+                EmModoGrid = false;
+                sessaoExibir = sessaoFoco;
+            }
             else
             {
                 // Bateria em preparação (ou nula): mantém a classificação da tomada de tempo para montagem do grid

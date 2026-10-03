@@ -575,6 +575,8 @@ function stateView() {
     runningId: running?.id ?? null,
     focus: focus ? sessionView(focus) : null,
     lastQualifying: lastQualifying ? sessionView(lastQualifying) : null,
+    // painel de LED sem kart na pista: tomada encerrada = grid; corrida encerrada = segue com o resultado da corrida
+    lastFinished: !running && encerradas[0] ? sessionView(encerradas[0]) : null,
     sessions: list.slice(0, 40).map(sessionSummary),
     recentPassings,
     tb50: {
@@ -612,9 +614,18 @@ function setTb50Offset(value: unknown, motivo: string) {
 }
 
 /** Formato LiveTimingSnapshot (lib/livetime/types.ts) consumido pelo site, telao e TB50. */
+/**
+ * A última bateria que TERMINOU (pela hora do fim; equalização fica de fora). É o que o placar e o painel mostram
+ * sem kart na pista: tomada encerrada = classificação para montar o grid; corrida encerrada = pódio (TB50) e o
+ * resultado final (painel). Antes era a última CRIADA, e em 02/10 voltava sempre para a equalização do Edu.
+ */
+function ultimaEncerrada() {
+  const fimDe = (s: Session) => s.finishedAt ?? s.startedAt ?? s.createdAt;
+  return [...sessions.values()].filter((s) => s.state === 'encerrada' && s.type !== 'equalizacao').sort((a, b) => fimDe(b) - fimDe(a))[0] ?? null;
+}
+
 function liveSnapshot(painelTb50 = false) {
-  const list = sortedSessions();
-  const s = runningSession() ?? list.find((x) => x.state === 'encerrada') ?? null;
+  const s = runningSession() ?? ultimaEncerrada();
   const updatedAt = new Date().toISOString();
   if (!s) return { status: 'empty', source: 'sql', updatedAt, trackName: TRACK_NAME, drivers: [] };
   const standings = computeStandings(s);
