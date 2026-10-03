@@ -936,7 +936,8 @@ public partial class FormCrono : Form
         if (_autoteste == null)
         {
             var foco = _state?["focus"] as JsonObject;
-            var qualif = _state?["lastQualifying"] as JsonObject ?? (_sess != null && _sess.S("type") != "corrida" && _sess.S("state") == "encerrada" ? _sess : null);
+            // equalização é da oficina: nunca vira a "última tomada" do painel (em 02/10 o painel voltava sempre para ela)
+            var qualif = _state?["lastQualifying"] as JsonObject ?? (_sess != null && _sess.S("type") is not ("corrida" or "equalizacao") && _sess.S("state") == "encerrada" ? _sess : null);
             _painel.Atualizar(foco, qualif);
         }
         _sPainel.Text = "PAINEL LED: " + (_painel.Ativo ? _painel.Situacao.ToUpperInvariant() : "DESLIGADO");

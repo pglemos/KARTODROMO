@@ -551,13 +551,23 @@ function stateView() {
   const list = sortedSessions();
   // a bateria em foco: a que esta correndo, senao a proxima preparada HOJE, senao a ultima encerrada
   // (uma preparada esquecida de outro dia prendia o telao: em 30/09 o foco era o "Clube da Insonia" de 27/09)
+  // Encerradas pela hora em que TERMINARAM (não pela criação): em 02/10 as baterias da noite foram criadas às 12:53 e
+  // as equalizações depois, e o painel de LED voltava sempre para a equalização ao fim de cada bateria. Equalização é
+  // interna da oficina: não vai para o telão nem para a montagem do grid.
+  const fimDe = (s: Session) => s.finishedAt ?? s.startedAt ?? s.createdAt;
+  const encerradas = list.filter((s) => s.state === 'encerrada' && s.type !== 'equalizacao').sort((a, b) => fimDe(b) - fimDe(a));
+  // a próxima da agenda é a primeira preparada de hoje que não ficou para trás da última que já largou
+  // (baterias preparadas e não usadas de manhã — ou de outro dia da agenda — prendiam o telão no 17:00)
+  const preparadasHoje = list.filter((s) => s.state === 'preparando' && s.createdAt >= inicioDoDia()).sort((a, b) => horaDaProva(a).localeCompare(horaDaProva(b)) || a.createdAt - b.createdAt);
+  const ultimaLargada = list.filter((s) => s.startedAt != null && s.startedAt >= inicioDoDia() && s.type !== 'equalizacao').sort((a, b) => b.startedAt! - a.startedAt!)[0];
   const focus =
     running ??
     // ordem do horário da agenda (as baterias que a agenda cria sozinha não podem pular na frente da próxima)
-    list.filter((s) => s.state === 'preparando' && s.createdAt >= inicioDoDia()).sort((a, b) => horaDaProva(a).localeCompare(horaDaProva(b)) || a.createdAt - b.createdAt)[0] ??
-    list.find((s) => s.state === 'encerrada') ??
+    (ultimaLargada ? preparadasHoje.find((s) => horaDaProva(s).localeCompare(horaDaProva(ultimaLargada)) > 0) : undefined) ??
+    preparadasHoje[0] ??
+    encerradas[0] ??
     null;
-  const lastQualifying = list.find((s) => s.state === 'encerrada' && s.type !== 'corrida');
+  const lastQualifying = encerradas.find((s) => s.type !== 'corrida');
   return {
     now: Date.now(),
     track: TRACK_NAME,
