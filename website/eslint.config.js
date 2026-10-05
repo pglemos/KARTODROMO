@@ -3,11 +3,21 @@ import globals from "globals";
 import react from "eslint-plugin-react";
 import hooks from "eslint-plugin-react-hooks";
 export default [
-  { ignores: ["dist/**", ".build/**", "node_modules/**"] },
+  {
+    ignores: [
+      "dist/**",
+      ".build/**",
+      "node_modules/**",
+      "reservations/dist/**",
+    ],
+  },
   js.configs.recommended,
   {
     files: [
       "src/**/*.{js,jsx,mjs}",
+      "reservations/src/**/*.{js,jsx,mjs}",
+      "reservations/worker.js",
+      "reservations/vite.config.js",
       "worker.js",
       "scripts/*.mjs",
       "vite.config.js",
@@ -33,5 +43,8 @@ export default [
       ],
     },
   },
-  { files: ["tests/*.mjs"], languageOptions: { globals: globals.node } },
+  {
+    files: ["tests/*.mjs", "reservations/tests/*.mjs"],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
 ];

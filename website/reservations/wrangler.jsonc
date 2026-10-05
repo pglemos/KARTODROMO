@@ -1,0 +1,16 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "kartodromo-reservas-2026",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "not_found_handling": "none",
+    "html_handling": "none",
+  },
+  "services": [{ "binding": "LEGACY", "service": "kartodromo-cadastro" }],
+}

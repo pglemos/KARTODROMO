@@ -9,7 +9,13 @@
     "preview": "node scripts/preview.mjs",
     "test": "node --test tests/*.test.mjs",
     "deploy": "wrangler deploy",
-    "lint": "eslint . --max-warnings=0"
+    "lint": "eslint . --max-warnings=0",
+    "dev:reservations": "vite --config reservations/vite.config.js",
+    "build:reservations": "vite build --config reservations/vite.config.js",
+    "deploy:reservations": "wrangler deploy --config reservations/wrangler.jsonc",
+    "test:reservations": "node --test reservations/tests/*.test.mjs",
+    "qa:reservations": "node reservations/tests/browser.mjs && node reservations/tests/edges.mjs",
+    "preview:reservations": "vite preview --config reservations/vite.config.js --port 5174 --host 0.0.0.0"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

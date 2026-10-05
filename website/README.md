@@ -47,3 +47,7 @@ O domínio de prévia é `https://kartodromo-site-2026.kartodromo.workers.dev`. 
 Os testes em `tests` verificam regras de inscrição, formato ICS e delegação do Worker. A validação de navegador percorre todas as rotas em 1440, 768, 390 e 320px, audita WCAG AA em páginas representativas e verifica filtros, mapas, FAQ, menu, orçamento e os estados de sucesso/falha da inscrição. Escritas de inscrição são simuladas no navegador para não criar dados em produção.
 
 Veja [a direção visual](docs/design.md) e [a verificação da entrega](docs/verification.md).
+
+## Plataforma de reservas
+
+A aplicação do subdomínio `reservas.kartodromodebetim.com.br` fica em [`reservations/`](reservations/README.md), com build, testes e publicação independentes. A interface usa a agenda e o serviço de pagamento já implantados, mantendo o backend no Worker `kartodromo-cadastro`.
