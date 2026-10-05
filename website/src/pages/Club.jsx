@@ -198,6 +198,139 @@ export function ClubLanding() {
     </>
   );
 }
+const portalGuides = {
+  painel: [
+    "Seu programa, de perto.",
+    "Conheça as regras de pontuação e os critérios previstos para o lançamento do clube.",
+    [
+      [
+        "Pontuação",
+        "20 pontos de terça a sexta; 10 em finais de semana e feriados.",
+      ],
+      ["Adesão", "Gratuita, após a liberação do cadastro."],
+      [
+        "Recompensas",
+        "Catálogo e condições serão publicados com o lançamento.",
+      ],
+    ],
+  ],
+  consulta: [
+    "Como os pontos vão funcionar.",
+    "A consulta será ligada às corridas elegíveis confirmadas, com acesso ao saldo real do participante.",
+    [
+      ["Durante a semana", "20 pontos por corrida de terça a sexta."],
+      ["Finais de semana e feriados", "10 pontos por corrida."],
+      [
+        "Quando consultar",
+        "Após a liberação do programa e a integração das corridas.",
+      ],
+    ],
+  ],
+  pontuacao: [
+    "Corridas que vão contar.",
+    "As regras previstas distinguem o dia da corrida. O crédito depende da confirmação da bateria elegível.",
+    [
+      ["Terça a sexta", "20 pontos por corrida."],
+      ["Sábado, domingo e feriado", "10 pontos por corrida."],
+      ["Confirmação", "Crédito após a confirmação da corrida no sistema."],
+    ],
+  ],
+  corridas: [
+    "A memória das suas voltas.",
+    "O histórico depende da identificação do piloto e da integração com a cronometragem. Para uma corrida já realizada, consulte a equipe.",
+    [
+      ["Suas corridas", "O histórico será conectado ao cadastro do piloto."],
+      ["Dados da pista", "Informações confirmadas pela cronometragem."],
+      [
+        "Precisa de um resultado?",
+        "A organização pode orientar a consulta pelos canais oficiais.",
+      ],
+    ],
+  ],
+  catalogo: [
+    "As recompensas terão regras claras.",
+    "O catálogo será publicado com produtos, experiências e benefícios disponíveis. Os pontos necessários serão informados no lançamento.",
+    [
+      ["Disponibilidade", "Catálogo sujeito ao estoque e às campanhas."],
+      ["Condições", "Cada recompensa terá critérios e forma de retirada."],
+      [
+        "Publicação",
+        "Nenhum produto ou resgate está disponível nesta página ainda.",
+      ],
+    ],
+  ],
+  resgates: [
+    "Do saldo à próxima experiência.",
+    "O resgate estará disponível junto com o catálogo. Confira desde já as condições previstas no regulamento.",
+    [
+      ["Escolha", "Consulte o catálogo publicado e a disponibilidade."],
+      ["Confirmação", "A solicitação segue as condições da recompensa."],
+      [
+        "Atenção",
+        "Resgates aprovados não poderão ser cancelados ou convertidos de volta em pontos.",
+      ],
+    ],
+  ],
+  campanhas: [
+    "Novos motivos para voltar.",
+    "O regulamento prevê ações especiais. As condições de cada campanha serão publicadas quando o programa for liberado.",
+    [
+      ["Aniversário", "Bônus de aniversário previsto no regulamento."],
+      ["Indicações", "Campanhas de indicação previstas para o programa."],
+      ["Datas especiais", "Promoções com período e critérios próprios."],
+    ],
+  ],
+  perfil: [
+    "Sua conta conectada à pista.",
+    "O perfil depende da liberação do acesso autenticado. Se você precisa atualizar seu cadastro atual de piloto, fale com a equipe.",
+    [
+      ["Identificação", "A conta será ligada ao cadastro do participante."],
+      ["Acesso", "Edição de dados após a liberação do perfil autenticado."],
+      [
+        "Atendimento",
+        "Atualizações no cadastro atual devem ser tratadas com a equipe.",
+      ],
+    ],
+  ],
+  cadastro: [
+    "Antes de entrar para o clube.",
+    "A adesão prevista é gratuita. O lançamento depende da integração com o sistema de corridas; a equipe pode orientar você.",
+    [
+      [
+        "Adesão gratuita",
+        "Não há cadastro ou cobrança sendo processados nesta tela.",
+      ],
+      [
+        "Regras previstas",
+        "Leia os critérios de pontuação e as condições de resgate.",
+      ],
+      [
+        "Lançamento",
+        "Consulte a equipe para acompanhar a liberação do programa.",
+      ],
+    ],
+  ],
+};
+function PortalGuide({ section }) {
+  const guide = portalGuides[section] || portalGuides.painel;
+  return (
+    <section className="portal-guide">
+      <h2>{guide[0]}</h2>
+      <p>{guide[1]}</p>
+      <dl>
+        {guide[2].map(([title, text]) => (
+          <div key={title}>
+            <dt>{title}</dt>
+            <dd>{text}</dd>
+          </div>
+        ))}
+      </dl>
+      <TextLink to="/clube-regulamento">
+        Conferir as regras do programa
+      </TextLink>
+    </section>
+  );
+}
 export function ClubPortal({ section = "painel" }) {
   const s = states[section] || states.painel;
   const regulation = section === "regulamento";
@@ -238,9 +371,9 @@ export function ClubPortal({ section = "painel" }) {
         />
         <div className="club-page-hero">
           <h1>
-            {regulation ? "As regras do" : "Sua história"}
+            {regulation ? "As regras do" : s[0]}
             <br />
-            <em>{regulation ? "seu clube." : "na pista continua."}</em>
+            <em>{regulation ? "seu clube." : "Clube de Vantagens."}</em>
           </h1>
         </div>
         {regulation ? (
@@ -286,15 +419,7 @@ export function ClubPortal({ section = "painel" }) {
                 <TextLink to="/clube-vantagens">Conhecer o programa</TextLink>
               </div>
             </section>
-            <section className="club-planned">
-              <h2>Regras previstas do programa</h2>
-              <p>
-                O Clube de Vantagens ainda não foi lançado. Confira as regras
-                previstas de pontuação, sujeitas às condições do regulamento.
-              </p>
-              <PointRules />
-              <TextLink to="/clube-regulamento">Ler o regulamento</TextLink>
-            </section>
+            <PortalGuide section={section} />
           </>
         )}
       </div>

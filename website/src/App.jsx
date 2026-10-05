@@ -4,6 +4,7 @@ import { Header, Footer, WhatsApp } from "./components/Shell.jsx";
 import { Button } from "./components/UI.jsx";
 import Home from "./pages/Home.jsx";
 import Rental from "./pages/Rental.jsx";
+import Booking from "./pages/Booking.jsx";
 import Track from "./pages/Track.jsx";
 import Events from "./pages/Events.jsx";
 import FAQ from "./pages/FAQ.jsx";
@@ -48,13 +49,12 @@ function NavigationEffects() {
           : "index, follow";
     }
     if (location.hash) {
-      setTimeout(
-        () =>
-          document
-            .getElementById(location.hash.slice(1))
-            ?.scrollIntoView({ behavior: "auto" }),
-        0,
-      );
+      setTimeout(() => {
+        const target = document.getElementById(location.hash.slice(1));
+        target?.scrollIntoView({ behavior: "auto" });
+        if (target?.hasAttribute("tabindex"))
+          target.focus({ preventScroll: true });
+      }, 0);
     } else if (previous.current !== location.pathname) {
       window.scrollTo(0, 0);
       document.getElementById("conteudo")?.focus({ preventScroll: true });
@@ -73,7 +73,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/pista" element={<Track />} />
           <Route path="/kart-locacao" element={<Rental />} />
-          <Route path="/reservas" element={<Rental booking />} />
+          <Route path="/reservas" element={<Booking />} />
           <Route path="/eventos" element={<Events />} />
           <Route path="/duvidas" element={<FAQ />} />
           <Route path="/historia" element={<History />} />

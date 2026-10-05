@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Search, Maximize2 } from "lucide-react";
+import { Search, Maximize2, ChevronLeft, ChevronRight } from "lucide-react";
 import { trackNumbers, trackVariants, BOOKING, whatsapp } from "../data.js";
 import {
   PageHero,
@@ -10,6 +10,7 @@ import {
   Breadcrumb,
 } from "../components/UI.jsx";
 import Dialog from "../components/Dialog.jsx";
+import Gallery from "../components/Gallery.jsx";
 export default function Track() {
   const [variant, setVariant] = useState("normal");
   const [selected, setSelected] = useState(null);
@@ -128,6 +129,16 @@ export default function Track() {
           </p>
         </div>
       </section>
+      <Gallery
+        items={[
+          ["aerial", "O circuito visto de cima"],
+          ["sunset", "O pôr do sol na pista"],
+          ["night", "O circuito iluminado"],
+          ["action", "A disputa em cada curva"],
+          ["grid", "A bandeirada"],
+        ]}
+        title="Um circuito. Muitos olhares."
+      />
       <CallToAction title="Sua próxima volta começa aqui." />
       {selected && (
         <Dialog
@@ -139,6 +150,42 @@ export default function Track() {
             src={selected.url}
             alt={`Mapa ampliado do traçado ${selected.n} ${selected.label}`}
           />
+          <div className="gallery-controls">
+            <button
+              className="icon-button"
+              aria-label="Traçado anterior"
+              onClick={() =>
+                setSelected(
+                  tracks[
+                    (tracks.findIndex((t) => t.id === selected.id) +
+                      tracks.length -
+                      1) %
+                      tracks.length
+                  ],
+                )
+              }
+            >
+              <ChevronLeft />
+            </button>
+            <span aria-live="polite">
+              {tracks.findIndex((t) => t.id === selected.id) + 1} /{" "}
+              {tracks.length} · {selected.label}
+            </span>
+            <button
+              className="icon-button"
+              aria-label="Próximo traçado"
+              onClick={() =>
+                setSelected(
+                  tracks[
+                    (tracks.findIndex((t) => t.id === selected.id) + 1) %
+                      tracks.length
+                  ],
+                )
+              }
+            >
+              <ChevronRight />
+            </button>
+          </div>
           <p className="muted small">
             Mapa oficial do Kartódromo Internacional de Betim. Configurações
             diferentes são exclusivas para campeonatos.

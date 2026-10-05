@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { Menu, X, MessageCircle, MapPin, ArrowUpRight } from "lucide-react";
-import { BOOKING, WA } from "../data.js";
+import {
+  Menu,
+  X,
+  MessageCircle,
+  MapPin,
+  ArrowUpRight,
+  Clock,
+  Phone,
+} from "lucide-react";
+import { WA } from "../data.js";
 import { Button } from "./UI.jsx";
 const nav = [
   ["/pista", "A pista"],
@@ -59,6 +67,26 @@ export function Header() {
       <a className="skip-link" href="#conteudo">
         Pular para o conteúdo
       </a>
+      <div className="utility-bar">
+        <div className="container">
+          <a
+            href="https://www.google.com/maps/search/?api=1&query=Kartodromo+Internacional+de+Betim"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <MapPin size={13} />
+            Betim, Minas Gerais
+          </a>
+          <span>
+            <Clock size={13} />
+            Ter–Sex 16h–22h · Sáb–Dom 08h–19h
+          </span>
+          <a href={WA}>
+            <Phone size={13} />
+            (31) 99884-2898
+          </a>
+        </div>
+      </div>
       <header className="header">
         <div className="container header-inner">
           <Link
@@ -100,7 +128,7 @@ export function Header() {
           </nav>
           <Button
             className="header-book"
-            href={BOOKING}
+            to="/reservas#planejar"
             aria-label="Reservar corrida"
           >
             <span>
@@ -134,7 +162,7 @@ export function Header() {
               <ArrowUpRight size={24} />
             </NavLink>
           ))}
-          <Button href={BOOKING}>Reservar minha corrida</Button>
+          <Button to="/reservas">Planejar minha corrida</Button>
           <a className="mobile-contact" href={WA}>
             Falar com a equipe no WhatsApp
           </a>
@@ -147,6 +175,14 @@ export function Footer() {
   return (
     <footer className="footer">
       <div className="container">
+        <div className="footer-promise">
+          <span>Kartódromo Internacional de Betim</span>
+          <strong>A vida acontece. A pista fica.</strong>
+          <a href={WA}>
+            Vamos conversar
+            <ArrowUpRight size={22} />
+          </a>
+        </div>
         <div className="footer-top">
           <div className="footer-brand">
             <Link to="/">

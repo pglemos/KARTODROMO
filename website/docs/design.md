@@ -13,3 +13,15 @@ Infraestrutura: React/Vite isolado em website; Worker com assets e binding LEGAC
 Validação: build; testes de regras de inscrição/data e delegação do Worker; navegador Chromium via Playwright (nenhum Browser/IAB disponível); 24 rotas em desktop/mobile, overflow, carregamento de imagens, navegação, filtros, FAQ, teclado, formulários e resposta real de validação da API. Testes de gravação apenas simulados localmente para não produzir inscrições reais. Inspeção direta entre screenshots e conceitos, com desvios registrados.
 
 Entrega: publicação verificada em workers.dev, ativação das rotas públicas na Cloudflare depois da validação, reversão para o Worker original disponível. Código em branch dedicada no GitHub.
+
+## Segunda revisão — 05/10/2026
+
+A revisão aprofunda o sistema editorial existente. Mantém logo, fotos, cores, famílias tipográficas, preços oficiais, regulamentos e a separação da operação. A primeira dobra tem fotografia mais presente, título em até 96px, localização e ação clara. A faixa de reserva substitui as métricas genéricas da home. A composição muda entre seletor de experiências, circuito, prova em destaque, agenda, clube, dúvidas e visita.
+
+A página `/reservas` passa a ser uma superfície própria de planejamento: bateria aberta/exclusiva, quantidade de pilotos e estimativa explícita a R$145 por piloto. Valores, vagas e pagamento continuam confirmados pela agenda oficial. No celular, o planejador vem antes da fotografia; o botão de reserva do cabeçalho leva diretamente a essa seção e move o foco para ela.
+
+Interações novas: seletor de experiências com setas/Home/End e semântica de tabs; galerias com ampliação, anterior/próxima, Escape e retorno de foco; navegação entre mapas ampliados; data de prova em arquivo ICS de dia inteiro, sem inventar um horário; guia de visita com Google Maps, horários e contato. A animação de entrada do hero é o movimento principal e respeita movimento reduzido.
+
+As páginas do clube recebem títulos e guias específicos para cada função. Nenhum saldo, corrida, perfil, recompensa ou campanha ativa é inventado. As informações publicadas vêm do regulamento previsto e conservam o estado de implantação.
+
+O CSS da revisão está em `src/refinement.css`, carregado após a base. A versão inicial continua registrada no histórico da branch para comparação e reversão.

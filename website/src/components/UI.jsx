@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArrowUpRight, ArrowRight, MapPin } from "lucide-react";
-import { BOOKING, whatsapp } from "../data.js";
+import { whatsapp } from "../data.js";
 export function Button({
   to,
   href,
@@ -77,7 +77,7 @@ export function PageHero({
   compact = false,
 }) {
   return (
-    <section className={`page-hero ${compact ? "compact" : ""}`}>
+    <section className={`page-hero scene-${image} ${compact ? "compact" : ""}`}>
       <img className="page-hero-image" src={`/media/${image}.webp`} alt="" />
       <div className="container page-hero-inner">
         <h1>
@@ -118,7 +118,7 @@ export function CallToAction({ title = "Nos vemos no grid.", text, children }) {
           {text && <p>{text}</p>}
         </div>
         {children || (
-          <Button href={BOOKING} variant="dark">
+          <Button to="/reservas" variant="dark">
             Reservar corrida
           </Button>
         )}

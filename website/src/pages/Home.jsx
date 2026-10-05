@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState } from "react";
-import { Pause, Play, ArrowUpRight } from "lucide-react";
-import { Link } from "react-router-dom";
-import { BOOKING, championships } from "../data.js";
-import { useRegistrationStatus } from "../hooks.js";
 import {
-  Button,
-  TextLink,
-  SectionTitle,
-  Stats,
-  CallToAction,
-  Location,
-} from "../components/UI.jsx";
+  Pause,
+  Play,
+  ArrowUpRight,
+  ArrowDown,
+  Clock,
+  Flag,
+  CalendarDays,
+} from "lucide-react";
+import { Link } from "react-router-dom";
+import { championships, money } from "../data.js";
+import { useRegistrationStatus } from "../hooks.js";
+import { Button, TextLink, CallToAction, Location } from "../components/UI.jsx";
+import ExperienceFinder from "../components/ExperienceFinder.jsx";
+import QuickFAQ from "../components/QuickFAQ.jsx";
+import Visit from "../components/Visit.jsx";
 export default function Home() {
   const video = useRef(null);
   const [playing, setPlaying] = useState(false);
@@ -29,23 +33,24 @@ export default function Home() {
     if (playing) {
       video.current.pause();
       setPlaying(false);
-    } else {
+    } else
       video.current
         .play()
         .then(() => setPlaying(true))
         .catch(() => {});
-    }
   };
   const c = championships[0];
   const status = useRegistrationStatus(c);
   return (
     <>
-      <section className="home-hero">
+      <section className="home-hero home-hero-v2">
         <img
           className="hero-poster"
           src="/media/action.webp"
           fetchPriority="high"
-          alt="Pilotos em uma corrida no Kartódromo de Betim"
+          alt="Pilotos disputando uma corrida no Kartódromo Internacional de Betim"
+          width="1800"
+          height="1000"
         />
         <video
           className={`hero-video ${playing ? "playing" : ""}`}
@@ -61,30 +66,28 @@ export default function Home() {
         </video>
         <div className="hero-shade" />
         <div className="container home-hero-content">
+          <div className="hero-location">
+            <Location />
+            <span>Desde 1996</span>
+          </div>
           <h1>
             A vida é melhor
             <br />
             <em>na pista.</em>
           </h1>
           <p>
-            Troque a rotina por adrenalina. Viva a experiência
-            <br className="desktop-break" /> de pilotar no Kartódromo
-            Internacional de Betim.
+            O coração acelera. A rotina fica para trás.
+            <br />
+            Viva sua próxima grande história em Betim.
           </p>
           <div className="actions">
-            <Button href={BOOKING}>Reservar minha corrida</Button>
-            <Button to="/pista" variant="outline">
-              Conhecer a pista
-            </Button>
+            <Button to="/reservas">Quero correr</Button>
+            <a className="hero-discover" href="#experiencias">
+              Encontrar minha experiência
+              <ArrowDown size={18} />
+            </a>
           </div>
-          <div className="hero-bottom">
-            <Location />
-            <div className="hero-price">
-              <span>30 min de corrida</span>
-              <span>
-                A partir de <strong>R$ 145</strong>
-              </span>
-            </div>
+          <div className="hero-film">
             <button
               className="video-control"
               onClick={toggle}
@@ -92,144 +95,210 @@ export default function Home() {
                 playing ? "Pausar vídeo de fundo" : "Reproduzir vídeo de fundo"
               }
             >
-              {playing ? <Pause size={16} /> : <Play size={16} />}
+              {playing ? <Pause size={17} /> : <Play size={17} />}
             </button>
+            <span>{playing ? "Pausar o filme" : "Sinta o ritmo da pista"}</span>
+          </div>
+        </div>
+        <div className="hero-photo-caption" aria-hidden="true">
+          KARTÓDROMO INTERNACIONAL DE BETIM
+          <br />A EXPERIÊNCIA É REAL.
+        </div>
+      </section>
+      <div className="home-reservation-strip">
+        <div className="container">
+          <span>
+            <Flag size={20} />
+            <strong>Kart de locação</strong>
+          </span>
+          <span>
+            <Clock size={20} />
+            30 minutos de bateria
+          </span>
+          <span>
+            Pagamento antecipado
+            <strong>
+              R$ 145 <small>/ piloto</small>
+            </strong>
+          </span>
+          <Link to="/reservas">
+            Planejar minha corrida
+            <ArrowUpRight size={21} />
+          </Link>
+        </div>
+      </div>
+      <div id="experiencias">
+        <ExperienceFinder />
+      </div>
+      <section className="home-circuit">
+        <div className="container circuit-layout">
+          <div className="circuit-photo">
+            <img
+              src="/media/aerial.webp"
+              alt="Vista aérea real do circuito de Betim, com suas curvas, retas e boxes"
+              loading="lazy"
+              width="900"
+              height="1600"
+            />
+            <span>
+              O mesmo lugar.
+              <br />
+              Uma emoção diferente a cada volta.
+            </span>
+          </div>
+          <div className="circuit-story">
+            <h2>
+              Aqui, a próxima
+              <br />
+              curva é <em>sua.</em>
+            </h2>
+            <p>
+              Um circuito técnico. Uma estrutura que recebe iniciantes, grupos e
+              pilotos de competição. E muita história para fazer parte.
+            </p>
+            <dl className="circuit-facts">
+              <div>
+                <dt>Extensão do circuito</dt>
+                <dd>
+                  1.110 <span>metros</span>
+                </dd>
+              </div>
+              <div>
+                <dt>Largura da pista</dt>
+                <dd>
+                  8 <span>metros</span>
+                </dd>
+              </div>
+              <div>
+                <dt>Mapas para explorar</dt>
+                <dd>
+                  30 <span>configurações</span>
+                </dd>
+              </div>
+            </dl>
+            <TextLink to="/pista">Explore o circuito e os traçados</TextLink>
+            <TextLink to="/historia">Uma história que começou em 1996</TextLink>
           </div>
         </div>
       </section>
-      <Stats
-        items={[
-          ["1.110 m", "de pista homologada"],
-          ["13 HP", "de pura adrenalina"],
-          ["30 min", "para sair da rotina"],
-        ]}
-      />
-      <section className="container section experiences">
-        <SectionTitle description="Da primeira volta ao próximo pódio.">
-          Escolha como <em>acelerar.</em>
-        </SectionTitle>
-        <div className="experience-grid">
-          {[
-            {
-              image: "action",
-              title: "Kart de locação",
-              text: "Sua primeira volta começa aqui.",
-              cta: "Reservar corrida",
-              to: "/kart-locacao",
-            },
-            {
-              image: "grid",
-              title: "Campeonatos",
-              text: "Para quem quer ir além.",
-              cta: "Ver calendário",
-              to: "/campeonatos",
-            },
-            {
-              image: "gourmet",
-              title: "Eventos",
-              text: "Momentos que ficam na memória.",
-              cta: "Montar meu evento",
-              to: "/eventos",
-            },
-          ].map((e) => (
-            <Link className="experience" to={e.to} key={e.title}>
-              <div className="experience-image">
-                <img
-                  src={`/media/${e.image}.webp`}
-                  alt={
-                    e.title === "Eventos"
-                      ? "Espaço de eventos com vista para a pista"
-                      : e.title === "Campeonatos"
-                        ? "Piloto recebendo a bandeira quadriculada"
-                        : "Pilotos disputando posição"
-                  }
-                  loading="lazy"
-                />
+      <section className="container section home-racing">
+        <div className="section-title">
+          <h2>
+            O próximo
+            <br />
+            <em>desafio é seu.</em>
+          </h2>
+          <TextLink to="/campeonatos">Ver todos os campeonatos</TextLink>
+        </div>
+        <div className="race-feature">
+          <Link
+            to="/100-milhas-light"
+            className="race-feature-photo"
+            aria-label="Conhecer a prova 100 Milhas Light"
+          >
+            <img
+              src="/media/grid.webp"
+              alt="Piloto de kart recebe a bandeira quadriculada"
+              loading="lazy"
+              width="1000"
+              height="700"
+            />
+            <div>
+              <span>25 de outubro</span>
+              <strong>2026</strong>
+            </div>
+          </Link>
+          <div className="race-feature-story">
+            <div className="race-status">
+              <CalendarDays size={17} />
+              {status === "open"
+                ? "Inscrições até 15 de outubro"
+                : status === "closed"
+                  ? "Inscrições encerradas"
+                  : "Confira esta edição"}
+            </div>
+            <h3>
+              100 Milhas
+              <br />
+              <em>Light.</em>
+            </h3>
+            <p>
+              Estratégia, resistência e um objetivo compartilhado. Monte sua
+              equipe para 2h30 de disputa.
+            </p>
+            <dl>
+              <div>
+                <dt>Equipe</dt>
+                <dd>1 a 3 pilotos por kart</dd>
               </div>
-              <h3>{e.title}</h3>
-              <p>{e.text}</p>
-              <span className="text-link">
-                {e.cta}
-                <ArrowUpRight size={19} />
-              </span>
+              <div>
+                <dt>Inscrição</dt>
+                <dd>{money(c.price)} por kart</dd>
+              </div>
+            </dl>
+            <Button to="/100-milhas-light">Conhecer a prova</Button>
+          </div>
+        </div>
+        <div className="next-races">
+          {championships.slice(1, 4).map((r) => (
+            <Link to={`/${r.id}`} key={r.id}>
+              <img
+                src={`/media/championships/${r.logo}`}
+                alt=""
+                loading="lazy"
+                width="90"
+                height="60"
+              />
+              <div>
+                <span>{r.date}</span>
+                <strong>{r.name}</strong>
+              </div>
+              <ArrowUpRight size={20} />
             </Link>
           ))}
         </div>
       </section>
-      <section className="race-highlight container">
-        <div className="race-highlight-date">
-          <strong>25</strong>
-          <span>OUT · 2026</span>
-        </div>
-        <div>
-          <span className="section-label">O próximo desafio</span>
-          <h2>
-            100 Milhas <em>Light.</em>
-          </h2>
-          <p>
-            2h30 de corrida. De 1 a 3 pilotos por kart. Um time, um objetivo.
-          </p>
-        </div>
-        <div className="race-highlight-action">
-          <span>
-            {status === "open"
-              ? "Inscrições até 15 de outubro"
-              : status === "closed"
-                ? "Inscrições encerradas"
-                : "Confira a edição"}
-          </span>
-          <Button to="/100-milhas-light" variant="outline">
-            Conhecer a prova
-          </Button>
-        </div>
-      </section>
-      <section className="container section track-feature">
+      <section className="home-club container">
         <div>
           <h2>
-            Cada curva,
+            A pista aproxima.
             <br />
-            uma nova <em>emoção.</em>
+            <em>A história continua.</em>
           </h2>
           <p>
-            1.110 metros de pista homologada, traçados técnicos e estrutura
-            completa em Betim. Aqui, cada volta tem uma história.
+            Estamos preparando o Clube de Vantagens para quem sempre encontra um
+            motivo para voltar.
           </p>
-          <TextLink to="/pista">Conhecer a pista</TextLink>
+          <TextLink to="/clube-vantagens">Conhecer o programa</TextLink>
         </div>
-        <Link
-          to="/pista"
-          className="track-feature-image"
-          aria-label="Conhecer a pista do Kartódromo de Betim"
+        <div
+          className="club-membership"
+          aria-label="Clube de Vantagens, programa em implantação"
         >
           <img
-            src="/media/aerial.webp"
-            alt="Vista aérea do circuito real do Kartódromo Internacional de Betim"
+            src="/media/logo.png"
+            alt=""
+            width="155"
+            height="44"
             loading="lazy"
           />
-          <span>
-            O seu próximo destino <ArrowUpRight size={21} />
-          </span>
-        </Link>
-      </section>
-      <section className="container club-teaser">
-        <div>
-          <span className="section-label">Clube de Vantagens</span>
-          <h2>
-            A paixão pela pista
+          <strong>
+            CLUBE
             <br />
-            merece <em>mais.</em>
-          </h2>
-        </div>
-        <div>
-          <p>
-            Conheça o programa de relacionamento para quem faz parte da nossa
-            história. Pontos e benefícios previstos para as suas próximas
-            corridas.
-          </p>
-          <TextLink to="/clube-vantagens">Conhecer o clube</TextLink>
+            DE VANTAGENS.
+          </strong>
+          <span>
+            Programa em implantação
+            <ArrowUpRight size={20} />
+          </span>
         </div>
       </section>
-      <CallToAction />
+      <QuickFAQ />
+      <Visit />
+      <CallToAction
+        title="A próxima volta é sua."
+        text="Comece pela reserva. O resto vira história."
+      />
     </>
   );
 }

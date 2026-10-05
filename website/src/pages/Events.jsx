@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Check, CheckCircle2, ArrowLeft } from "lucide-react";
 import { whatsapp } from "../data.js";
+import Gallery from "../components/Gallery.jsx";
 import {
   PageHero,
   Button,
@@ -14,13 +15,11 @@ export default function Events() {
   const result = useRef(null);
   const choose = (value) => {
     setKind(value);
-    document
-      .querySelector("#orcamento")
-      ?.scrollIntoView({
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-          ? "auto"
-          : "smooth",
-      });
+    document.querySelector("#orcamento")?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth",
+    });
   };
   const submit = (e) => {
     e.preventDefault();
@@ -74,9 +73,16 @@ export default function Events() {
               "Conexões fora do escritório.",
               "Integração, desafio e confraternização com apoio para organizar o encontro da sua equipe.",
             ],
-          ].map(([k, t, d], i) => (
+          ].map(([k, t, d]) => (
             <button className="event-type" key={k} onClick={() => choose(k)}>
-              <span className="step-number">0{i + 1}</span>
+              <img
+                className="event-type-photo"
+                src={`/media/${k === "Aniversário" ? "evento" : k === "Grupo de amigos" ? "action" : "gourmet"}.webp`}
+                alt=""
+                loading="lazy"
+                width="900"
+                height="650"
+              />
               <h3>{k}</h3>
               <strong>{t}</strong>
               <p>{d}</p>
@@ -119,6 +125,16 @@ export default function Events() {
           </div>
         </div>
       </section>
+      <Gallery
+        items={[
+          ["gourmet", "Espaço Gourmet"],
+          ["salao", "Salão Inferior"],
+          ["evento", "O encontro da turma"],
+          ["sunset", "A vista do circuito"],
+          ["action", "A disputa na pista"],
+        ]}
+        title="Imagine sua turma aqui."
+      />
       <section className="container section quote-section" id="orcamento">
         <div>
           <span className="section-label">Vamos organizar juntos</span>

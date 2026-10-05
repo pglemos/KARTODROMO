@@ -47,3 +47,19 @@ A conferência do texto do primeiro viewport preservou título, descrição, ró
 ## Limites práticos
 
 Cadastro, saldos e resgates do Clube de Vantagens continuam em implantação, conforme o sistema original. As telas estão redesenhadas e comunicam esse estado. A reserva individual usa a plataforma oficial existente. Não foram efetuados pagamentos, enviadas mensagens ou criadas inscrições reais para teste. A auditoria automática de acessibilidade complementa, mas não substitui, uma auditoria humana completa com leitores de tela.
+
+## Segunda revisão — 05/10/2026
+
+Versão Cloudflare: `3413292f-ad46-4770-ae59-466cbea3c851`.
+
+- 96 verificações das 24 rotas em 1440, 768, 390 e 320px: título, conteúdo, responsividade e ausência de overflow horizontal.
+- Dez auditorias automatizadas WCAG A/AA, agora incluindo a nova página de reservas: zero violações.
+- 14 testes aprovados. Quatro testes adicionais cobrem o formato ICS: dias inteiros, término exclusivo, virada de ano, caracteres escapados, UTF-8 e limite de 75 bytes por linha.
+- Onze fluxos de navegador aprovados: filtros de calendário, mapas, FAQ, orçamento, inscrições, menu, seletor de experiências, estimativas, galerias, navegação dos mapas e download do calendário.
+- Reserva: três pilotos resultam em R$435; dois em R$290. Trocar entre bateria aberta e exclusiva preserva a quantidade. A estimativa é indicada como tal, com valores, pagamento e vagas confirmados na plataforma oficial.
+- Seletor de experiências: setas/Home/End, foco e conteúdo correspondente à aba selecionada.
+- Galeria: ampliação, anterior/próxima, Escape e retorno ao controle de origem.
+- Inscrições de teste continuam simuladas somente no navegador. Nenhuma mensagem, inscrição ou pagamento real foi enviado.
+- A prévia local agora serve o HTML correto de cada rota, evitando os avisos de hidratação provocados pelo fallback da prévia SPA do Vite. Na execução completa com os HTML corretos, não houve erros de runtime.
+
+A revisão visual comparou capturas desktop e mobile com a primeira versão, conferindo ritmo entre seções, hierarquia tipográfica, cores, imagens, espaçamento, conteúdo e controles. Os ajustes finais priorizaram o planejador antes da foto no celular e alinharam o menu à altura do cabeçalho. A logo original e a identidade editorial foram preservadas; a home passou a alternar composições de seletor, circuito, prova, agenda, clube e visita.

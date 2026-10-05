@@ -13,6 +13,7 @@ import {
 } from "../components/UI.jsx";
 import { useRegistrationStatus } from "../hooks.js";
 import Registration from "../components/Registration.jsx";
+import { downloadCalendar } from "../calendar.mjs";
 export function Championships() {
   const [filter, setFilter] = useState("Todos");
   const events = championships.filter(
@@ -30,6 +31,23 @@ export function Championships() {
         image="grid"
         compact
       />
+      <section className="container featured-championship">
+        <img
+          src="/media/championships/100-milhas-light-logo.png"
+          alt="Logo oficial 100 Milhas Light"
+          width="180"
+          height="110"
+        />
+        <div>
+          <span>25 OUTUBRO · 2026</span>
+          <h2>O desafio das 100 Milhas Light.</h2>
+          <p>
+            Monte sua equipe. 2h30 de prova, três paradas e uma estratégia até a
+            bandeirada.
+          </p>
+        </div>
+        <Button to="/100-milhas-light">Conhecer a prova</Button>
+      </section>
       <section className="container championship-list-section">
         <div className="tabs" aria-label="Filtrar campeonatos">
           {["Todos", "Kart Light", "Super Kart", "Endurance"].map((t) => (
@@ -148,6 +166,17 @@ export function Championship({ id }) {
           Regulamento oficial
         </Button>
       </PageHero>
+      {c.month && !c.past && (
+        <div className="container calendar-download">
+          <span>
+            {c.date} · {c.name}
+          </span>
+          <button onClick={() => downloadCalendar(c)}>
+            <Download size={17} />
+            Adicionar a data ao meu calendário
+          </button>
+        </div>
+      )}
       <Stats
         items={[
           [c.date, "data / temporada"],

@@ -1,5 +1,7 @@
 import { Check, Clock, ShieldCheck, Flag } from "lucide-react";
-import { BOOKING, whatsapp } from "../data.js";
+import { whatsapp } from "../data.js";
+import Gallery from "../components/Gallery.jsx";
+import QuickFAQ from "../components/QuickFAQ.jsx";
 import {
   PageHero,
   Button,
@@ -9,20 +11,18 @@ import {
   CallToAction,
   Breadcrumb,
 } from "../components/UI.jsx";
-export default function Rental({ booking = false }) {
+export default function Rental() {
   return (
     <>
       <div className="container">
-        <Breadcrumb current={booking ? "Reservas" : "Kart de locação"} />
+        <Breadcrumb current={"Kart de locação"} />
       </div>
       <PageHero
-        title={booking ? "A sua próxima corrida" : "Entre no grid."}
-        accent={booking ? "começa aqui." : "Saia da rotina."}
+        title={"Entre no grid."}
+        accent={"Saia da rotina."}
         description="30 minutos de adrenalina, cronometragem e disputa em uma pista de 1.110 metros. Você só precisa chegar com vontade de acelerar."
       >
-        <Button href={BOOKING}>
-          {booking ? "Escolher dia e horário" : "Reservar minha corrida"}
-        </Button>
+        <Button to="/reservas">Reservar minha corrida</Button>
         <Button
           href={whatsapp(
             "Olá! Quero tirar uma dúvida sobre o kart de locação.",
@@ -91,7 +91,7 @@ export default function Rental({ booking = false }) {
               Cronometragem
             </span>
           </div>
-          <Button href={BOOKING}>Ver horários disponíveis</Button>
+          <Button to="/reservas">Ver horários disponíveis</Button>
           <span className="price-note">
             A disponibilidade e a confirmação são feitas na agenda oficial.
           </span>
@@ -165,6 +165,17 @@ export default function Rental({ booking = false }) {
         </div>
         <TextLink to="/eventos">Organizar meu grupo</TextLink>
       </section>
+      <Gallery
+        items={[
+          ["karts", "A frota de karts"],
+          ["action", "A experiência na pista"],
+          ["grid", "A bandeirada"],
+          ["night", "Corrida à noite"],
+          ["driver", "O piloto e a pista"],
+        ]}
+        title="Essa emoção tem endereço."
+      />
+      <QuickFAQ />
       <CallToAction title="Seu lugar é na pista." />
     </>
   );
