@@ -204,9 +204,91 @@ public class TabelaDesign : Control
 
     public TabelaDesign()
     {
-        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
+        TabStop = true;
+        AccessibleRole = AccessibleRole.Table;
         BackColor = Color.White; Font = new Font("Segoe UI", 10F); Cursor = Cursors.Default;
     }
+
+    protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
+    protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (_linhas.Count == 0) return;
+
+        if (e.KeyCode == Keys.Down)
+        {
+            e.Handled = true;
+            var novo = Math.Min(_linhas.Count - 1, Selecionada + 1);
+            if (novo != Selecionada) Selecionar(novo);
+        }
+        else if (e.KeyCode == Keys.Up)
+        {
+            e.Handled = true;
+            var novo = Math.Max(0, Selecionada - 1);
+            if (novo != Selecionada) Selecionar(novo);
+        }
+        else if (e.KeyCode == Keys.Space)
+        {
+            if (MarcasEditaveis && Selecionada >= 0 && Selecionada < _linhas.Count)
+            {
+                e.Handled = true;
+                for (var c = 0; c < _cols.Length; c++)
+                {
+                    if (_cols[c].Marca && c < _linhas[Selecionada].Length)
+                    {
+                        _linhas[Selecionada][c] = _linhas[Selecionada][c] == "1" ? "0" : "1";
+                        Invalidate();
+                        MarcaMudou?.Invoke(Selecionada, c);
+                        break;
+                    }
+                }
+            }
+        }
+        else if (e.KeyCode == Keys.Enter)
+        {
+            if (Selecionada >= 0 && Selecionada < _linhas.Count)
+            {
+                var soma0 = _cols.Sum(c => c.Peso); var x0 = 12f; var util0 = Width - 24f;
+                for (var c = 0; c < _cols.Length; c++)
+                {
+                    var larg = util0 * _cols[c].Peso / soma0;
+                    if (_cols[c].Editavel && c < _linhas[Selecionada].Length)
+                    {
+                        e.Handled = true;
+                        Editar(Selecionada, c, new Rectangle((int)x0, 32 + (Selecionada - _topo) * 33 + 4, (int)larg - 8, 25));
+                        break;
+                    }
+                    x0 += larg;
+                }
+            }
+        }
+    }
+
+    public class TabelaDesignAccessibleObject : ControlAccessibleObject
+    {
+        readonly TabelaDesign _tabela;
+        public TabelaDesignAccessibleObject(TabelaDesign tabela) : base(tabela) { _tabela = tabela; }
+        public override AccessibleRole Role => AccessibleRole.Table;
+        public override string Name => _tabela.AccessibleName ?? "Tabela";
+        public override AccessibleStates State => AccessibleStates.Focusable | (_tabela.Focused ? AccessibleStates.Focused : AccessibleStates.None);
+        public override int GetChildCount() => _tabela.Dados.Count;
+        public override AccessibleObject GetChild(int index) => new LinhaAccessibleObject(_tabela, index);
+    }
+
+    public class LinhaAccessibleObject : AccessibleObject
+    {
+        readonly TabelaDesign _tabela;
+        readonly int _indice;
+        public LinhaAccessibleObject(TabelaDesign tabela, int indice) { _tabela = tabela; _indice = indice; }
+        public override AccessibleRole Role => AccessibleRole.Row;
+        public override string Name => _indice >= 0 && _indice < _tabela.Dados.Count ? string.Join(" · ", _tabela.Dados[_indice]) : "";
+        public override AccessibleStates State => AccessibleStates.Selectable | (_tabela.Selecionada == _indice ? AccessibleStates.Selected : AccessibleStates.None);
+    }
+
+    protected override AccessibleObject CreateAccessibilityInstance() => new TabelaDesignAccessibleObject(this);
 
     void Editar(int linha, int col, Rectangle area)
     {
@@ -278,6 +360,11 @@ public class TabelaDesign : Control
                 for (var i = Selecionavel ? 1 : 0; i < _cols.Length && i < _linhas[l].Length; i++)
                     if (_cols[i].Marca) Marcar(g, new RectangleF(xs[i].ini, y, xs[i].larg - 8, 33), _linhas[l][i] == "1");
                     else TextRenderer.DrawText(g, _linhas[l][i], Font, Rectangle.Round(new RectangleF(xs[i].ini, y, xs[i].larg - 8, 33)), PecasDesign.CorTexto, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | (_cols[i].Direita ? TextFormatFlags.Right : _cols[i].Centro ? TextFormatFlags.HorizontalCenter : TextFormatFlags.Left));
+                if (Focused && l == Selecionada)
+                {
+                    using var penFoco = new Pen(Color.FromArgb(11, 122, 83), 1.5f);
+                    g.DrawRectangle(penFoco, 2, y + 1, Width - 5, 31);
+                }
                 if (l < _topo + Visiveis - 1) g.DrawLine(linha, 0, y + 33, Width, y + 33);
             }
             if (_linhas.Count == 0 && !string.IsNullOrEmpty(Vazio))

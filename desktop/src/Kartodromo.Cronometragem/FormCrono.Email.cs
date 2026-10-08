@@ -50,9 +50,7 @@ public partial class FormCrono
         {
             var para = Prompt.Pedir(d, "Mandar um e-mail de teste para qual endereço?", usuario.Text.Trim(), "E-mail de teste");
             if (string.IsNullOrWhiteSpace(para)) return;
-            await Crono.Api.Put("/api/email-config", Corpo()); // testa exatamente o que está na tela
-            senha.Text = ""; senha.PlaceholderText = "(deixe em branco para manter a senha atual)";
-            await Crono.Api.Post("/api/email-config/teste", new { para = para.Trim() });
+            await Crono.Api.Post("/api/email-config/teste", new { config = Corpo(), para = para.Trim() });
             Msg.Info(d, $"E-mail de teste enviado para {para.Trim()}. Confira a caixa de entrada (e o spam).");
         }));
         d.ShowDialog(this);
@@ -99,25 +97,36 @@ public partial class FormCrono
                 "falhou" => $"Não foi enviado ({quando}) — o servidor tenta de novo a cada 5 min",
                 "sem-destinatarios" => "Nenhum piloto desta prova tem e-mail no cadastro",
                 "desligado" => "Envio automático estava desligado quando a prova foi finalizada",
+                "enviando" => "Enviando e-mails...",
                 _ => "",
             };
         }
         string NomeDoKart(string kart) => _sess?["competitors"]?.AsArray().OfType<JsonObject>().FirstOrDefault(c => c.S("kart") == kart)?.S("name") ?? "";
 
+        var reenviando = false;
         d.BotaoRodape("Reenviar para todos", true, () => Seguro.Rodar(d, async () =>
         {
+            if (reenviando) return;
             if (!encerrada) { Msg.Aviso(d, "Finalize a prova antes de enviar o resultado."); return; }
             if (!Msg.Pergunta(d, $"Mandar o resultado de novo para todos os pilotos de {nomeBateria} que têm e-mail?")) return;
-            var antes = ((await Crono.Api.Get($"/api/sessions/{id}/emails")) as JsonObject)?.L("atualizadoEm") ?? 0;
-            await Crono.Api.Post($"/api/sessions/{id}/emails", new { });
-            info.Text = "Enviando… (um e-mail com PDF por piloto)";
-            for (var i = 0; i < 90 && !d.IsDisposed; i++)
+            reenviando = true;
+            try
             {
-                await Task.Delay(2000);
-                var e = (await Crono.Api.Get($"/api/sessions/{id}/emails")) as JsonObject;
-                if ((e?.L("atualizadoEm") ?? 0) > antes) break;
+                var antes = ((await Crono.Api.Get($"/api/sessions/{id}/emails")) as JsonObject)?.L("atualizadoEm") ?? 0;
+                await Crono.Api.Post($"/api/sessions/{id}/emails", new { });
+                info.Text = "Enviando… (um e-mail com PDF por piloto)";
+                for (var i = 0; i < 90 && !d.IsDisposed; i++)
+                {
+                    await Task.Delay(2000);
+                    var e = (await Crono.Api.Get($"/api/sessions/{id}/emails")) as JsonObject;
+                    if ((e?.L("atualizadoEm") ?? 0) > antes && e?.S("status") != "enviando") break;
+                }
+                await Carregar();
             }
-            await Carregar();
+            finally
+            {
+                reenviando = false;
+            }
         }));
         if (kartSel != null)
             d.BotaoRodape($"Só o kart {kartSel}", false, () => Seguro.Rodar(d, async () =>

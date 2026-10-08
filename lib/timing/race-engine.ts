@@ -75,7 +75,51 @@ export type CompetidorDetalhes = {
   oculto?: boolean;
   /** provas de revezamento: nomes do 2º, 3º... piloto */
   equipe?: string[];
+  /** transponders individuais dos pilotos de revezamento correspondentes */
+  equipeTransponders?: (string | null)[];
 };
+
+/** Validação rigorosa de campos numéricos de competidor (F21). Vazio/null aceito como null; texto e negativos proibidos se !permiteNegativo. */
+export function parseNumeroOpcional(v: unknown, rotulo: string, permiteNegativo = false): number | null {
+  if (v === '' || v == null) return null;
+  const num = Number(String(v).replace(',', '.'));
+  if (!Number.isFinite(num)) {
+    throw new Error(`Valor inválido no campo ${rotulo}.`);
+  }
+  if (!permiteNegativo && num < 0) {
+    throw new Error(`O campo ${rotulo} não pode ser negativo.`);
+  }
+  return num;
+}
+
+/** Sanitiza detalhes do competidor com validação numérica e suporte a equipeTransponders (F20, F21). */
+export function sanitizarCompetidorDetalhes(d: Record<string, unknown> | undefined): CompetidorDetalhes | undefined {
+  if (!d || typeof d !== 'object') return undefined;
+  const txt = (v: unknown, max = 80) => String(v ?? '').trim().slice(0, max);
+  const equipe = Array.isArray(d.equipe) ? (d.equipe as unknown[]).map((x) => txt(x, 100)).slice(0, 6) : undefined;
+  const equipeTransponders = Array.isArray(d.equipeTransponders)
+    ? (d.equipeTransponders as unknown[]).map((x) => (x == null || String(x).trim() === '' ? null : txt(x, 20))).slice(0, 6)
+    : undefined;
+
+  return {
+    sexo: txt(d.sexo, 20),
+    iniciais: txt(d.iniciais, 6).toUpperCase(),
+    email: txt(d.email, 160),
+    patrocinador: txt(d.patrocinador),
+    clube: txt(d.clube),
+    cidade: txt(d.cidade),
+    estado: txt(d.estado, 4).toUpperCase(),
+    pais: txt(d.pais, 40),
+    box: txt(d.box, 20),
+    peso: parseNumeroOpcional(d.peso, 'peso'),
+    pesoIndumentaria: parseNumeroOpcional(d.pesoIndumentaria, 'pesoIndumentaria'),
+    pesoLastro: parseNumeroOpcional(d.pesoLastro, 'pesoLastro'),
+    pontuacao: parseNumeroOpcional(d.pontuacao, 'pontuacao', true),
+    oculto: Boolean(d.oculto),
+    equipe: equipe ?? [],
+    ...(equipeTransponders !== undefined ? { equipeTransponders } : {}),
+  };
+}
 
 export type Competitor = {
   kart: string;
@@ -139,7 +183,7 @@ export type Session = {
 export type EnvioEmailsResultado = {
   /** enviado = todos com e-mail receberam; parcial = alguns falharam (tenta de novo); falhou = nenhum foi (tenta de novo);
    *  sem-destinatarios = ninguém da prova tem e-mail cadastrado; desligado = envio automático desativado quando encerrou */
-  status: 'enviado' | 'parcial' | 'falhou' | 'sem-destinatarios' | 'desligado';
+  status: 'enviado' | 'parcial' | 'falhou' | 'sem-destinatarios' | 'desligado' | 'enviando';
   atualizadoEm: number;
   tentativas: number;
   /** "kart|email" de quem já recebeu (não manda de novo na nova tentativa) */
@@ -327,7 +371,7 @@ export function setCompetitors(session: Session, list: { kart: string; name: str
   const achar = (pred: (o: Competitor) => boolean) => previous.find((o) => !used.has(o) && pred(o));
 
   // 1ª passada: reconhece cada piloto da lista nova na lista antiga
-  const matches = novos.map((c) => {
+  const pilotoMatches = novos.map((c) => {
     const cid = c.customerId ? String(c.customerId) : '';
     const n = nome(c.name);
     const old =
@@ -337,6 +381,7 @@ export function setCompetitors(session: Session, list: { kart: string; name: str
     return old;
   });
   // 2ª passada: quem não foi reconhecido pelo piloto herda pelo número do kart (ex.: só corrigiu o nome)
+  const matches = [...pilotoMatches];
   novos.forEach((c, i) => {
     if (matches[i] || !c.kart) return;
     const old = achar((o) => o.kart === c.kart);
@@ -345,6 +390,7 @@ export function setCompetitors(session: Session, list: { kart: string; name: str
 
   session.competitors = novos.map((c, i) => {
     const old = matches[i];
+    const mesmoPiloto = Boolean(pilotoMatches[i]);
     const kartMudou = Boolean(old?.kart && old.kart !== c.kart);
     // Clona as passagens ao mudar de kart. Além de evitar que uma referência antiga seja
     // reaproveitada por engano, registra de qual kart veio cada leitura no histórico.
@@ -370,7 +416,10 @@ export function setCompetitors(session: Session, list: { kart: string; name: str
       category: c.category ?? old?.category ?? null,
       ...(c.detalhes ?? old?.detalhes ? { detalhes: c.detalhes ?? old?.detalhes } : {}),
       autoAdded: false,
-      flag: old?.flag ?? 'none',
+      flag: mesmoPiloto ? (old?.flag ?? 'none') : 'none',
+      ...(mesmoPiloto && old?.penalidades?.length
+        ? { penalidades: old.penalidades.map((p) => ({ ...p })) }
+        : {}),
       crossings,
       finished: old?.finished ?? false,
     };
@@ -391,7 +440,15 @@ export function setCompetitors(session: Session, list: { kart: string; name: str
   });
   // Leituras rejeitadas também fazem parte do histórico mostrado ao operador. Quando o
   // piloto troca de kart, elas precisam seguir o mesmo vínculo das passagens contadas.
-  for (const troca of trocas) for (const rejeitada of session.rejected ?? []) if (rejeitada.kart === troca.de) rejeitada.kart = troca.para;
+  if (trocas.length && session.rejected?.length) {
+    const mapaTrocas = new Map<string, string>();
+    for (const troca of trocas) if (troca.de && troca.para) mapaTrocas.set(troca.de, troca.para);
+    for (const rejeitada of session.rejected) {
+      if (rejeitada.kart && mapaTrocas.has(rejeitada.kart)) {
+        rejeitada.kart = mapaTrocas.get(rejeitada.kart)!;
+      }
+    }
+  }
   return trocas;
 }
 
@@ -522,6 +579,12 @@ export function closeSession(session: Session, now: number) {
     session.state = 'encerrada';
     session.checkeredAt ??= now;
     session.currentFlag = 'checkered';
+  }
+  if (session.redFlagAt != null) {
+    const frozenElapsed = session.redFlagElapsedMs ?? (session.startedAt !== null ? Math.max(0, session.redFlagAt - session.startedAt) : 0);
+    if (session.startedAt !== null) session.startedAt = now - frozenElapsed;
+    session.redFlagAt = null;
+    session.redFlagElapsedMs = null;
   }
   session.finishedAt = now;
   session.redFlagAt = null;
@@ -668,6 +731,10 @@ export function includeManualPassing(session: Session, p: { id: string; kart: st
   const decoderTimeMs = previous ? (previous.decoderTimeMs + p.lapMs) % DAY_MS : (p.wallMs % DAY_MS);
   competitor.crossings.push({ id: p.id, decoderTimeMs, wallMs: p.wallMs, lapMs: previous ? p.lapMs : null, source: 'manual', transponder: p.transponder ?? null });
   recalculate(competitor);
+
+  if (session.state === 'bandeira_final' && previous) competitor.finished = true;
+  else if (session.state === 'em_andamento') marcarVoltasCompletas(session, p.wallMs);
+
   return competitor.crossings.find((x) => x.id === p.id)!;
 }
 

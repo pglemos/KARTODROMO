@@ -15,8 +15,22 @@ public class CartaoModal : Form, ISemKit
 {
     protected const int Raio = 18;
 
+    public static Size CalcularTamanhoUtil(int larguraDesejada, int alturaDesejada, Rectangle? areaTrabalho = null)
+    {
+        var area = areaTrabalho ?? (Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1366, 768));
+        var margemX = 32;
+        var margemY = 32;
+        var maxW = Math.Max(400, area.Width - margemX);
+        var maxH = Math.Max(300, area.Height - margemY);
+        return new Size(Math.Min(larguraDesejada, maxW), Math.Min(alturaDesejada, maxH));
+    }
+
     public CartaoModal(int largura, int altura)
     {
+        var tam = CalcularTamanhoUtil(largura, altura);
+        largura = tam.Width;
+        altura = tam.Height;
+
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.CenterParent;
         ShowInTaskbar = false;

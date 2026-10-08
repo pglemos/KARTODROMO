@@ -31,14 +31,35 @@ public partial class FormCrono
         d.Nota("A bandeira quadriculada entra quando o líder cruza a linha depois do tempo da prova (na tomada de tempo, quando o tempo acaba). As passagens continuam no diário: se o resultado não ficar certo, use Reiniciar bateria e remonte de novo.");
 
         static string Hora(long ms) => DateTimeOffset.FromUnixTimeMilliseconds(ms).LocalDateTime.ToString("HH:mm:ss");
-        long ParaMs(string texto, long padrao)
+        bool ValidarHorario(TextBox campo, string rotulo, out long ms)
         {
-            if (!TimeSpan.TryParse(texto.Trim(), out var t)) return padrao;
-            return new DateTimeOffset(dia.Add(t)).ToUnixTimeMilliseconds();
+            ms = 0;
+            var txt = campo.Text.Trim();
+            if (string.IsNullOrWhiteSpace(txt))
+            {
+                Msg.Aviso(d, $"Informe o horário de {rotulo}.");
+                campo.Focus();
+                return false;
+            }
+            if (!TimeSpan.TryParse(txt, out var t) || t.TotalDays >= 1 || t.TotalSeconds < 0)
+            {
+                Msg.Aviso(d, $"Horário de {rotulo} inválido. Use o formato hh:mm:ss.");
+                campo.Focus();
+                return false;
+            }
+            ms = new DateTimeOffset(dia.Add(t)).ToUnixTimeMilliseconds();
+            return true;
         }
         async Task Carregar(bool usarDigitado)
         {
-            var q = usarDigitado ? $"?de={ParaMs(inicio.Text, de)}&ate={ParaMs(fim.Text, ate)}" : "";
+            long a = de, b = ate;
+            if (usarDigitado)
+            {
+                if (!ValidarHorario(inicio, "início", out a)) return;
+                if (!ValidarHorario(fim, "fim", out b)) return;
+                if (b <= a) { Msg.Aviso(d, "O fim precisa ser depois do início."); fim.Focus(); return; }
+            }
+            var q = usarDigitado ? $"?de={a}&ate={b}" : "";
             var r = (await Crono.Api.Get($"/api/sessions/{id}/diario{q}"))?.AsObject();
             de = r?.L("de") ?? 0; ate = r?.L("ate") ?? 0;
             if (!usarDigitado)
@@ -61,7 +82,8 @@ public partial class FormCrono
         d.Shown += (_, _) => Seguro.Rodar(d, () => Carregar(false));
         d.BotaoRodape("Remontar resultado", true, () => Seguro.Rodar(d, async () =>
         {
-            var a = ParaMs(inicio.Text, de); var b = ParaMs(fim.Text, ate);
+            if (!ValidarHorario(inicio, "início", out var a)) return;
+            if (!ValidarHorario(fim, "fim", out var b)) return;
             if (b <= a) { Msg.Aviso(d, "O fim precisa ser depois do início."); fim.Focus(); return; }
             if (!Msg.Pergunta(d, $"Remontar \"{_sess.S("name")}\" com as passagens de {Hora(a)} a {Hora(b)}?\n\nO resultado passa a valer como oficial (fica registrado nas observações).")) return;
             await Crono.Api.Post($"/api/sessions/{id}/remontar", new JsonObject { ["de"] = a, ["ate"] = b, ["incluirOutros"] = outros.Checked, ["autor"] = Environment.UserName });

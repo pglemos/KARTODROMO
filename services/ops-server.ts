@@ -27,6 +27,7 @@ import { renderTermoResponsabilidade, type TermoParticipante } from '../lib/ops/
 import { buscarPreCadastroAgora, preCadastroLigado, sincronizarPreCadastros } from '../lib/ops/pre-cadastro';
 import { publicarAgenda, sincronizarReservasOnline, vagaOnlineDoGrupo } from '../lib/ops/reserva-online';
 import { selecionarSessoesParaRelatorio, type ReceptionTimingSession } from '../lib/timing/reception-crono-reports';
+import { registrarUsoKarts, type UsoKartsPayload } from '../lib/ops/uso-karts';
 
 function loadLocalEnv() {
   const envPath = join(process.cwd(), '.env.local');
@@ -537,42 +538,10 @@ const server = http.createServer(async (req, res) => {
       }
       if (path === '/api/crono/uso-karts' && method === 'POST') {
         // Horas de uso dos karts (controle da oficina): a cronometragem manda, ao encerrar a bateria, quantos minutos
-        // cada kart ficou na pista. Era o LapTime que fazia isso; desde 23/09 o contador estava parado.
-        const b = (await readBody(req)) as { agendaId?: unknown; karts?: { kart?: unknown; minutos?: unknown }[] };
-        const agendaId = Number(b.agendaId);
-        const cat = agendaId > 0
-          ? (await one<{ c: string | null }>(`SELECT p.Categoria c FROM dbo.Bateria b JOIN dbo.Produto p ON p.Id = b.ProdutoId WHERE b.Id = @id`, { id: agendaId }))?.c ?? null
-          : null;
-        let somados = 0, criados = 0, ignorados = 0;
-        for (const k of Array.isArray(b.karts) ? b.karts : []) {
-          const numero = Number(String(k.kart ?? '').trim());
-          const minutos = Math.round(Number(k.minutos));
-          if (!Number.isSafeInteger(numero) || numero <= 0 || !(minutos > 0) || minutos > 600) { ignorados++; continue; }
-          const linhas = await query<{ id: number; categoria: string | null; item: number | null; minutos: number; ultima: string | null }>(
-            `SELECT Id id, Categoria categoria, ItemId item, MinutosUso minutos, CONVERT(varchar(19), UltimaManutencao, 126) ultima
-             FROM dbo.Manutencao WHERE TRY_CAST(LTRIM(RTRIM(Kart)) AS int) = @n`, { n: numero });
-          const cats = [...new Set(linhas.map((l) => l.categoria ?? ''))];
-          const daCategoria = cat ? linhas.filter((l) => (l.categoria ?? '') === cat) : cats.length === 1 ? linhas : [];
-          // o LapTime deixou controles repetidos do mesmo kart ("01" e "1", "12" e "12 "): soma só em UM por item —
-          // o que já teve manutenção registrada mais recente, senão o de mais horas (antes somava em todos)
-          const porItem = new Map<string, typeof daCategoria>();
-          for (const l of daCategoria) porItem.set(String(l.item ?? ''), [...(porItem.get(String(l.item ?? '')) ?? []), l]);
-          const alvo = [...porItem.values()].map((g) => g.sort((a, x) => (x.ultima ?? '').localeCompare(a.ultima ?? '') || x.minutos - a.minutos || a.id - x.id)[0]);
-          if (!alvo.length && cat) {
-            // kart novo nessa categoria: abre o controle com os itens que contam por hora
-            const r = await query(`INSERT dbo.Manutencao (Kart, Categoria, ItemId, MinutosUso, Realizada, Data)
-              SELECT @k, @c, Id, @m, 0, SYSDATETIME() FROM dbo.ItemManutencao WHERE Ativo = 1 AND ControlaPorTempo = 1`, { k: String(numero), c: cat, m: minutos });
-            void r; criados++;
-            continue;
-          }
-          if (!alvo.length) { ignorados++; continue; }
-          for (const l of alvo) {
-            // somar uso depois de uma manutenção feita abre um ciclo novo (volta para "A realizar" contando do zero)
-            await query(`UPDATE dbo.Manutencao SET MinutosUso = MinutosUso + @m, Realizada = 0, Data = SYSDATETIME() WHERE Id = @id`, { m: minutos, id: l.id });
-            somados++;
-          }
-        }
-        return send(res, 200, { ok: true, categoria: cat, somados, criados, ignorados });
+        // cada kart ficou na pista. Processamento transacional e idempotente por sessão/kart/categoria.
+        const b = (await readBody(req)) as UsoKartsPayload;
+        const resPayload = await registrarUsoKarts(b);
+        return send(res, 200, resPayload);
       }
       if (path === '/api/crono/empresa' && method === 'GET') {
         // dados da empresa (Cadastros › Empresa da recepção) para o cabeçalho da cronometragem, só leitura

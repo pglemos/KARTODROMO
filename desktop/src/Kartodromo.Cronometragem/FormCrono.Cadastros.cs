@@ -413,8 +413,10 @@ public partial class FormCrono
             // tempo e voltas só vão se mudaram (durante a quadriculada o serviço não aceita mudar)
             if (podeRegras && (dur.Text != durAntes || voltas.Text != voltasAntes))
             {
-                corpo["durationMin"] = int.TryParse(dur.Text, out var x) ? x : 20;
-                corpo["maxLaps"] = int.TryParse(voltas.Text, out var l) ? l : 0;
+                var l = int.TryParse(voltas.Text, out var vl) ? vl : 0;
+                var x = int.TryParse(dur.Text, out var vx) ? vx : (l > 0 ? 0 : 20);
+                corpo["durationMin"] = x;
+                corpo["maxLaps"] = l;
             }
             await Crono.Api.Patch($"/api/sessions/{_sess.S("id")}", corpo);
             d.DialogResult = DialogResult.OK; d.Close(); await Atualizar();
@@ -473,15 +475,19 @@ public partial class FormCrono
                 var minimo = Txt(tm.S("minimumLapSeconds") is { Length: > 0 } m ? m : "5", 6);
                 var duracao = PecasDesign.Numero(tm.I("defaultDurationMin") > 0 ? tm.I("defaultDurationMin") : 20, 3);
                 var completa = PecasDesign.Numero(tm.I("completePercent") > 0 ? tm.I("completePercent") : 75, 3);
+                completa.Enabled = false;
                 var auto = new CheckBox { Text = "Criar competidor automaticamente (transponder de kart que não está na lista vira competidor)", Checked = true, Enabled = false };
                 var reinicia = new CheckBox { Text = "Reiniciar o cronômetro na primeira passagem (bandeira verde espera o 1º kart cruzar a linha)", Checked = true, Enabled = false };
                 var r = d.Secao("Regras");
-                d.Campo(r, "Volta mínima (s)", minimo, 2); d.Campo(r, "Duração padrão (min)", duracao, 2); d.Campo(r, "% para considerar a prova completa", completa, 2);
+                d.Campo(r, "Volta mínima (s)", minimo, 2); d.Campo(r, "Duração padrão (min)", duracao, 2); d.Campo(r, "% para considerar a prova completa (legado)", completa, 2);
                 d.Marca(r, auto, 6, false); d.Marca(r, reinicia, 6, false);
+                d.Nota("O percentual de prova completa (75%) é mantido para compatibilidade e não é aplicado automaticamente.");
                 d.BotaoRodape("Salvar", true, () => Seguro.Rodar(d, async () =>
                 {
                     if (!double.TryParse(minimo.Text.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var mn) || mn is < 0.1 or > 60) { Msg.Aviso(d, "A volta mínima deve ficar entre 0,1 e 60 segundos."); return; }
-                    tm["minimumLapSeconds"] = mn; tm["defaultDurationMin"] = int.TryParse(duracao.Text, out var du) && du > 0 ? du : 20; tm["completePercent"] = int.TryParse(completa.Text, out var cp) ? Math.Clamp(cp, 1, 100) : 75;
+                    tm["minimumLapSeconds"] = mn;
+                    tm["defaultDurationMin"] = int.TryParse(duracao.Text, out var du) && du > 0 ? du : 20;
+                    tm["completePercent"] = tm.I("completePercent") > 0 ? tm.I("completePercent") : 75;
                     await Crono.Api.Patch("/api/settings", new JsonObject { ["timing"] = tm });
                     d.DialogResult = DialogResult.OK; d.Close();
                 }));

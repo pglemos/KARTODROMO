@@ -8,9 +8,14 @@ public partial class FormCrono
 {
     /// <summary>Evento mostrado na árvore dos passos 4–5 (o escolhido no passo 1; hoje, por padrão).</summary>
     string _eventoArvore;
+    bool _carregandoCatalogo;
+    string _ultimoEventoId;
+    string _ultimoGrupoId;
 
     async Task CarregarCatalogo()
     {
+        if (_carregandoCatalogo) return;
+        _carregandoCatalogo = true;
         try
         {
             _catalog = (await Crono.Api.Get("/api/catalog"))?.AsObject() ?? new JsonObject();
@@ -27,6 +32,7 @@ public partial class FormCrono
             _gEventos.Preencher(eventosVisiveis.Select(e => new object[] { "Karting", e.S("name"), DataLegivel(e.S("date")) }).ToList(), eventosVisiveis.Cast<object>().ToList());
             if (selectedEvent != null && _gEventos.Rows.Count > 0 && _gEventos.ChaveAtual == null) SelecionarLinha(_gEventos, eventosVisiveis.IndexOf(selectedEvent));
             _eventoArvore = selectedEvent?.S("id");
+            _ultimoEventoId = selectedEvent?.S("id");
             _subGrupos.Text = selectedEvent?.S("name") ?? "Selecione um evento";
             // evento sem traçado (o do dia, vindo da agenda) usa o comprimento padrão — antes mostrava o 1º da lista ("Traçado 11 Invertido")
             var tracado = Crono.Arr(_catalog, "tracks").FirstOrDefault(t => t.S("id") == selectedEvent?.S("trackId"))?.S("name") ?? "Padrão (1.110 m)";
@@ -46,6 +52,7 @@ public partial class FormCrono
             _gGrupos.Preencher(eventGroups.Select(g => new object[] { g.S("name"), tracado }).ToList(), eventGroups.Cast<object>().ToList());
             if (selectedGroup != null && _gGrupos.Rows.Count > 0 && _gGrupos.ChaveAtual == null) SelecionarLinha(_gGrupos, eventGroups.IndexOf(selectedGroup));
             var groupId = selectedGroup?.S("id") ?? "";
+            _ultimoGrupoId = groupId;
             var groupProofs = _proofs.Where(p => p.S("groupId") == groupId).OrderBy(p => p.I("order")).ToList();
             _tituloProvas.Text = selectedGroup == null ? "Provas" : $"Provas da {selectedGroup.S("name")}";
             string Previsao(JsonObject p) { var d = DateTime.TryParse(selectedEvent?.S("date"), out var dd) ? dd : DateTime.Today; var h = p.S("startAt") is { Length: >= 4 } sa ? sa : (selectedGroup?.S("name") is { } gn && System.Text.RegularExpressions.Regex.Match(gn, @"\d{1,2}:\d{2}") is { Success: true } m ? m.Value : ""); return $"{d:dd/MM} {h}".Trim(); }
@@ -54,6 +61,7 @@ public partial class FormCrono
             MontarArvore();
         }
         catch (ApiException e) { _servidorOk = false; _gEventos.Preencher([new object[] { "Cadastros indisponíveis", e.Message, "" }]); }
+        finally { _carregandoCatalogo = false; }
     }
 
     static string DataLegivel(string data)
@@ -307,7 +315,7 @@ public partial class FormCrono
         if (nome == "Competidor")
         {
             if (_sess == null || Crono.Arr(_sess, "competitors").Count == 0) { Msg.Aviso(this, "Escolha a bateria e clique no competidor (passos 4–5 · Registro de competidores)."); return; }
-            if (_gPilotos.CurrentRow is { IsNewRow: false }) RegistroCompetidorSelecionado(); else RegistroCompetidor(0);
+            if (_gPilotos.CurrentRow is { IsNewRow: false }) RegistroCompetidorSelecionado("pilotos"); else RegistroCompetidor(0);
             return;
         }
         if (nome == "RankingPeso") { RankingPesoDesign(); return; }
@@ -340,7 +348,12 @@ public partial class FormCrono
         if (nome == "MudarCorrida")
         {
             if (_sess == null) return;
-            Seguro.Rodar(this, async () => { await Crono.Api.Patch($"/api/sessions/{_sess.S("id")}", new JsonObject { ["name"] = dialog.Valor("name"), ["durationMin"] = int.TryParse(dialog.Valor("durationMin"), out var d) ? d : 20, ["maxLaps"] = int.TryParse(dialog.Valor("maxLaps"), out var l) ? l : 0 }); await Atualizar(); });
+            Seguro.Rodar(this, async () => {
+                var l = int.TryParse(dialog.Valor("maxLaps"), out var vl) ? vl : 0;
+                var d = int.TryParse(dialog.Valor("durationMin"), out var vd) ? vd : (l > 0 ? 0 : 20);
+                await Crono.Api.Patch($"/api/sessions/{_sess.S("id")}", new JsonObject { ["name"] = dialog.Valor("name"), ["durationMin"] = d, ["maxLaps"] = l });
+                await Atualizar();
+            });
         }
         else if (nome == "IncluirPassagem")
         {

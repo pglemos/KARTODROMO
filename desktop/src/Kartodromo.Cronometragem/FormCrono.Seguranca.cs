@@ -17,16 +17,30 @@ public partial class FormCrono
     {
         if (_gPilotos.CurrentRow == null || _gPilotos.CurrentRow.IsNewRow) { Msg.Aviso(this, "Clique no competidor."); return; }
         if (_pilotosSujos) { Msg.Aviso(this, "Salve a lista de competidores antes de abrir o registro do competidor."); return; }
-        RegistroCompetidorSelecionado();
+        RegistroCompetidorSelecionado("pilotos");
     }
 
     /// <summary>Competidor selecionado na lista de pilotos (passos 4–5) ou no resultado ao vivo.</summary>
-    void RegistroCompetidorSelecionado()
+    void RegistroCompetidorSelecionado(string origem = null)
     {
         if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
         var comps = Crono.Arr(_sess, "competitors");
-        var kart = _gPilotos.CurrentRow is { Index: >= 0 } r && !r.IsNewRow ? r.Cells[0].Value?.ToString() : _gRes.ChaveAtual is JsonObject st ? st.S("kart") : null;
-        var nome = _gPilotos.CurrentRow is { Index: >= 0 } r2 && !r2.IsNewRow ? r2.Cells[1].Value?.ToString() : null;
+        string kart = null, nome = null;
+        if (origem == "resultado" || (origem == null && _abas.SelectedIndex == 0))
+        {
+            kart = (_gRes.ChaveAtual as JsonObject)?.S("kart");
+            nome = (_gRes.ChaveAtual as JsonObject)?.S("name");
+        }
+        else
+        {
+            kart = _gPilotos.CurrentRow is { Index: >= 0 } r && !r.IsNewRow ? r.Cells[0].Value?.ToString() : null;
+            nome = _gPilotos.CurrentRow is { Index: >= 0 } r2 && !r2.IsNewRow ? r2.Cells[1].Value?.ToString() : null;
+        }
+        if (string.IsNullOrEmpty(kart) && string.IsNullOrEmpty(nome))
+        {
+            kart = (_gRes.ChaveAtual as JsonObject)?.S("kart") ?? (_gPilotos.CurrentRow is { Index: >= 0 } r3 && !r3.IsNewRow ? r3.Cells[0].Value?.ToString() : null);
+            nome = (_gRes.ChaveAtual as JsonObject)?.S("name") ?? (_gPilotos.CurrentRow is { Index: >= 0 } r4 && !r4.IsNewRow ? r4.Cells[1].Value?.ToString() : null);
+        }
         var i = comps.FindIndex(c => (kart != null && c.S("kart") == kart && kart.Length > 0) || (nome != null && c.S("name") == nome));
         if (i < 0) { Msg.Aviso(this, "Selecione o competidor na lista."); return; }
         RegistroCompetidor(i);
@@ -35,11 +49,14 @@ public partial class FormCrono
     void RegistroCompetidor(int indice)
     {
         if (_sess == null) return;
+        var sessId = _sess.S("id");
         var comps = Crono.Arr(_sess, "competitors");
         if (indice < 0 || indice >= comps.Count) return;
         var c = comps[indice];
+        var kartOriginal = c.S("kart");
+        var nomeOriginal = c.S("name");
         var det = c["detalhes"] as JsonObject ?? new JsonObject();
-        using var d = NovoDialogo("Registro de competidor", $"Piloto dentro da prova · {c.S("name")} (kart {c.S("kart")})", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0", "linear-gradient(180deg, #6CB8FF, #1E6FE8)");
+        using var d = NovoDialogo("Registro de competidor", $"Piloto dentro da prova · {nomeOriginal} (kart {kartOriginal})", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0", "linear-gradient(180deg, #6CB8FF, #1E6FE8)");
         string Num(string k) => det[k] is JsonNode n && double.TryParse(n.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v.ToString("0.00", Fmt.Br) : "";
         var categoria = new ListaDesign();
         categoria.Items.Add(new Campos.Item(0, "(sem categoria)"));
@@ -73,7 +90,13 @@ public partial class FormCrono
         var tab = new TabelaDesign { Dock = DockStyle.Fill, Height = 100, MaxLinhas = 4 };
         tab.Colunas(new("Piloto", 120), new("Transponder", 200, Editavel: true), new("Competidor", 600, Editavel: true));
         var equipe = det["equipe"] as JsonArray;
-        tab.Linhas(Enumerable.Range(2, 2).Select(n => new[] { $"{n}º", "", equipe != null && equipe.Count > n - 2 ? equipe[n - 2]?.ToString() ?? "" : "" }));
+        var equipeTransp = det["equipeTransponders"] as JsonArray;
+        tab.Linhas(Enumerable.Range(2, 2).Select(n => new[]
+        {
+            $"{n}º",
+            equipeTransp != null && equipeTransp.Count > n - 2 ? equipeTransp[n - 2]?.ToString() ?? "" : "",
+            equipe != null && equipe.Count > n - 2 ? equipe[n - 2]?.ToString() ?? "" : ""
+        }));
         eq.Controls.Add(tab); eq.SetColumnSpan(tab, 6);
         // peso do cadastro da recepção quando a cronometragem ainda não tem
         if (peso.Text.Length == 0 && c.S("customerId") is { Length: > 0 } cid)
@@ -91,8 +114,45 @@ public partial class FormCrono
         d.BotaoRodape("Gravar", true, () => Seguro.Rodar(d, async () =>
         {
             if (nome.Text.Trim().Length == 0) { Msg.Aviso(d, "Informe o nome do competidor."); return; }
-            double? N(TextBox t) => double.TryParse(t.Text.Trim().Replace(".", ","), System.Globalization.NumberStyles.Any, Fmt.Br, out var v) ? v : null;
-            var eqArr = new JsonArray(); foreach (var l in tab.Dados) if (l[2].Trim().Length > 0) eqArr.Add(l[2].Trim());
+            bool ValidarNumeroOpcional(TextBox t, string rotulo, out double? valor, bool permiteNegativo = false)
+            {
+                var s = t.Text.Trim();
+                if (s.Length == 0) { valor = null; return true; }
+                if (!double.TryParse(s.Replace(".", ","), System.Globalization.NumberStyles.Any, Fmt.Br, out var v))
+                {
+                    Msg.Aviso(d, $"Valor inválido no campo '{rotulo}'.");
+                    t.Focus();
+                    valor = null;
+                    return false;
+                }
+                if (!permiteNegativo && v < 0)
+                {
+                    Msg.Aviso(d, $"O campo '{rotulo}' não pode ser negativo.");
+                    t.Focus();
+                    valor = null;
+                    return false;
+                }
+                valor = v;
+                return true;
+            }
+
+            if (!ValidarNumeroOpcional(peso, "Peso (kg)", out var vPeso)) return;
+            if (!ValidarNumeroOpcional(pesoInd, "Peso indumentária", out var vPesoInd)) return;
+            if (!ValidarNumeroOpcional(pesoLastro, "Peso lastro", out var vPesoLastro)) return;
+            if (!ValidarNumeroOpcional(pontuacao, "Pontuação", out var vPontuacao, permiteNegativo: true)) return;
+
+            var eqArr = new JsonArray();
+            var eqTrArr = new JsonArray();
+            foreach (var l in tab.Dados)
+            {
+                var comp = l[2].Trim();
+                var transpEquipe = l[1].Trim();
+                if (comp.Length > 0 || transpEquipe.Length > 0)
+                {
+                    eqArr.Add(comp);
+                    eqTrArr.Add(transpEquipe.Length > 0 ? transpEquipe : null);
+                }
+            }
             var body = new JsonObject
             {
                 ["kart"] = kart.Text.Trim(), ["name"] = nome.Text.Trim(),
@@ -102,11 +162,11 @@ public partial class FormCrono
                 {
                     ["sexo"] = sexo.SelectedIndex switch { 1 => "Masculino", 2 => "Feminino", _ => "" }, ["iniciais"] = iniciais.Text.Trim(), ["email"] = email.Text.Trim(),
                     ["patrocinador"] = patrocinador.Text.Trim(), ["clube"] = clube.Text.Trim(), ["cidade"] = cidade.Text.Trim(), ["estado"] = estado.SelectedItem?.ToString() ?? "",
-                    ["pais"] = pais.SelectedItem?.ToString() ?? "", ["box"] = box.Text.Trim(), ["peso"] = N(peso), ["pesoIndumentaria"] = N(pesoInd), ["pesoLastro"] = N(pesoLastro),
-                    ["pontuacao"] = N(pontuacao), ["oculto"] = oculto.Checked, ["equipe"] = eqArr,
+                    ["pais"] = pais.SelectedItem?.ToString() ?? "", ["box"] = box.Text.Trim(), ["peso"] = vPeso, ["pesoIndumentaria"] = vPesoInd, ["pesoLastro"] = vPesoLastro,
+                    ["pontuacao"] = vPontuacao, ["oculto"] = oculto.Checked, ["equipe"] = eqArr, ["equipeTransponders"] = eqTrArr,
                 },
             };
-            var r = await Crono.Api.Put($"/api/sessions/{_sess.S("id")}/competitors/{indice}", body);
+            var r = await Crono.Api.Put($"/api/sessions/{sessId}/competitors/{indice}", body);
             // transponder digitado aqui vale para o kart (tabela De/Para)
             var tr = new string(transp.Text.Where(char.IsDigit).ToArray());
             if (tr.Length > 0 && tr != TransponderDoKart(kart.Text.Trim()) && kart.Text.Trim().Length > 0)
@@ -118,10 +178,14 @@ public partial class FormCrono
         d.BotaoRodape("Cancelar", false, d.Close);
         d.BotaoRodape("Excluir", false, () => Seguro.Rodar(d, async () =>
         {
-            if (!Msg.Pergunta(d, $"Tirar {c.S("name")} desta bateria?\n\nAs voltas já registradas desse kart deixam de ter piloto.")) return;
+            if (!Msg.Pergunta(d, $"Tirar {nomeOriginal} desta bateria?\n\nAs voltas já registradas desse kart deixam de ter piloto.")) return;
+            var sessaoAtual = (await Crono.Api.Get($"/api/sessions/{sessId}"))?.AsObject() ?? _sess;
+            var compsAtual = Crono.Arr(sessaoAtual, "competitors");
             var lista = new JsonArray();
-            for (var i = 0; i < comps.Count; i++) if (i != indice) lista.Add(new JsonObject { ["kart"] = comps[i].S("kart"), ["name"] = comps[i].S("name"), ["customerId"] = comps[i]["customerId"]?.DeepClone(), ["category"] = comps[i]["category"]?.DeepClone() });
-            await Crono.Api.Patch("/api/sessions/" + _sess.S("id"), new JsonObject { ["competitors"] = lista });
+            for (var i = 0; i < compsAtual.Count; i++)
+                if (i != indice && compsAtual[i].S("kart") != kartOriginal)
+                    lista.Add(new JsonObject { ["kart"] = compsAtual[i].S("kart"), ["name"] = compsAtual[i].S("name"), ["customerId"] = compsAtual[i]["customerId"]?.DeepClone(), ["category"] = compsAtual[i]["category"]?.DeepClone() });
+            await Crono.Api.Patch($"/api/sessions/{sessId}", new JsonObject { ["competitors"] = lista });
             d.DialogResult = DialogResult.OK; d.Close(); await Atualizar();
         }));
         d.BotaoRodape("Imprimir", false, () => ImprimirResumo($"Competidor · {nome.Text.Trim()}", [
@@ -210,7 +274,7 @@ public partial class FormCrono
             var html = await Montar();
             var arq = Path.Combine(Path.GetTempPath(), $"ranking-peso-{DateTime.Now:yyyyMMddHHmmss}.html");
             await File.WriteAllTextAsync(arq, html);
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(arq) { UseShellExecute = true });
+            Relatorio.Abrir(this, arq, "Ranking por peso");
         }));
         d.BotaoRodape("Gerar post (Instagram)", false, () => Seguro.Rodar(d, async () =>
         {
@@ -222,17 +286,33 @@ public partial class FormCrono
                 gr.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; gr.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
                 using (var fundo = new System.Drawing.Drawing2D.LinearGradientBrush(new Rectangle(0, 0, 1080, 1080), Color.FromArgb(15, 26, 21), Color.FromArgb(11, 122, 83), 60f)) gr.FillRectangle(fundo, 0, 0, 1080, 1080);
                 gr.DrawString("RANKING POR PESO", new Font("Segoe UI", 44F, FontStyle.Bold), Brushes.White, 60, 50);
-                gr.DrawString($"Kartódromo Internacional de Betim · {(usarPeriodo.Checked ? $"{de.Value:dd/MM} a {ate.Value:dd/MM}" : mes.Text)}", new Font("Segoe UI", 20F), new SolidBrush(Color.FromArgb(200, 255, 255, 255)), 64, 125);
+                var rotuloPeriodo = usarPeriodo.Checked
+                    ? $"{de.Value:dd/MM} a {ate.Value:dd/MM}"
+                    : todos.Checked
+                        ? "todos os tempos"
+                        : mes.Text;
+                gr.DrawString($"Kartódromo Internacional de Betim · {rotuloPeriodo}", new Font("Segoe UI", 20F), new SolidBrush(Color.FromArgb(200, 255, 255, 255)), 64, 125);
                 var y = 200f;
-                foreach (var grp in Crono.Arr(r, "grupos").Where(x => Crono.Arr(x, "linhas").Count > 0).Take(3))
+                var gruposComLinhas = Crono.Arr(r, "grupos").Where(x => Crono.Arr(x, "linhas").Count > 0).ToList();
+                float espacoFaixa = gruposComLinhas.Count > 3 ? 36f : 44f;
+                float espacoLinha = gruposComLinhas.Count > 3 ? 32f : 38f;
+                float tamFonte = gruposComLinhas.Count > 3 ? 17f : 20f;
+                float tamFonteTit = gruposComLinhas.Count > 3 ? 19f : 22f;
+                using var fontTit = new Font("Segoe UI", tamFonteTit, FontStyle.Bold);
+                using var fontLinha = new Font("Segoe UI", tamFonte);
+                using var fontTempo = new Font("Consolas", tamFonte, FontStyle.Bold);
+
+                foreach (var grp in gruposComLinhas)
                 {
-                    gr.DrawString(grp.S("titulo").ToUpperInvariant(), new Font("Segoe UI", 22F, FontStyle.Bold), new SolidBrush(Color.FromArgb(124, 234, 150)), 60, y); y += 44;
+                    gr.DrawString(grp.S("titulo").ToUpperInvariant(), fontTit, new SolidBrush(Color.FromArgb(124, 234, 150)), 60, y);
+                    y += espacoFaixa;
                     foreach (var l in Crono.Arr(grp, "linhas").Take(5))
                     {
-                        gr.DrawString($"{l.I("posicao")}º  {l.S("nome")}", new Font("Segoe UI", 20F), Brushes.White, 70, y);
-                        gr.DrawString(Crono.Relogio(l.L("melhorMs") ?? 0)[3..], new Font("Consolas", 20F, FontStyle.Bold), Brushes.White, 840, y); y += 38;
+                        gr.DrawString($"{l.I("posicao")}º  {l.S("nome")}", fontLinha, Brushes.White, 70, y);
+                        gr.DrawString(Crono.Relogio(l.L("melhorMs") ?? 0)[3..], fontTempo, Brushes.White, 840, y);
+                        y += espacoLinha;
                     }
-                    y += 18;
+                    y += (gruposComLinhas.Count > 3 ? 12 : 18);
                 }
             }
             var arq = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), $"ranking-peso-{DateTime.Now:yyyyMMdd-HHmm}.png");
@@ -346,20 +426,43 @@ public partial class FormCrono
             var v = estado.TryGetValue(Chave(m, funcoes[l]), out var a) ? a : estado[Chave(m, funcoes[l])] = new bool[6];
             v[c - 1] = tab.Dados[l][c] == "1";
         };
+        var versaoCarga = 0;
+        long? perfilCarregadoId = null;
+        var carregando = false;
+        Button btnSalvar = null;
+
         async Task Carregar()
         {
+            var item = perfil.SelectedItem as Campos.Item;
+            if (item == null) return;
+            var perfilIdAlvo = item.Id;
+            var versaoAtual = ++versaoCarga;
+            carregando = true;
+            if (btnSalvar != null) btnSalvar.Enabled = false;
+
+            var r = (await Api.Servidor.Get($"/api/office/permissoes?perfilId={perfilIdAlvo}"))?.AsObject();
+            if (versaoAtual != versaoCarga || (perfil.SelectedItem as Campos.Item)?.Id != perfilIdAlvo) return;
+
             estado.Clear();
-            var r = (await Api.Servidor.Get($"/api/office/permissoes?perfilId={(perfil.SelectedItem as Campos.Item)?.Id}"))?.AsObject();
             total.Checked = r?["perfil"]?.AsObject().B("acessoTotal") ?? false;
             foreach (var it in Crono.Arr(r, "itens"))
                 estado[Chave(it.S("modulo"), it.S("funcao"))] = [it.B("acessar"), it.B("incluir"), it.B("alterar"), it.B("excluir"), it.B("exportar"), it.B("importar")];
+            perfilCarregadoId = perfilIdAlvo;
+            carregando = false;
+            if (btnSalvar != null) btnSalvar.Enabled = true;
             Mostrar();
         }
         d.Abas(ModulosPermissao.Select(x => x.Modulo).ToArray(), i => { modulo = i; Mostrar(); }, modulo);
         perfil.SelectedIndexChanged += (_, _) => Seguro.Rodar(d, Carregar);
         d.Shown += (_, _) => Seguro.Rodar(d, Carregar);
-        d.BotaoRodape("Salvar e fechar", true, () => Seguro.Rodar(d, async () =>
+        btnSalvar = d.BotaoRodape("Salvar e fechar", true, () => Seguro.Rodar(d, async () =>
         {
+            var item = perfil.SelectedItem as Campos.Item;
+            if (item == null || carregando || perfilCarregadoId != item.Id)
+            {
+                Msg.Aviso(d, "Aguarde o carregamento das permissões do perfil selecionado antes de salvar.");
+                return;
+            }
             var itens = new JsonArray();
             foreach (var (m, funcoes) in ModulosPermissao)
                 foreach (var f in funcoes)
@@ -367,7 +470,7 @@ public partial class FormCrono
                     var v = estado.GetValueOrDefault(Chave(m, f)) ?? new bool[6];
                     itens.Add(new JsonObject { ["modulo"] = m, ["funcao"] = f, ["acessar"] = v[0], ["incluir"] = v[1], ["alterar"] = v[2], ["excluir"] = v[3], ["exportar"] = v[4], ["importar"] = v[5] });
                 }
-            await Api.Servidor.Put("/api/office/permissoes", new JsonObject { ["perfilId"] = (perfil.SelectedItem as Campos.Item)?.Id, ["acessoTotal"] = total.Checked, ["itens"] = itens });
+            await Api.Servidor.Put("/api/office/permissoes", new JsonObject { ["perfilId"] = item.Id, ["acessoTotal"] = total.Checked, ["itens"] = itens });
             d.Close();
         }));
         d.BotaoRodape("Cancelar", false, d.Close);

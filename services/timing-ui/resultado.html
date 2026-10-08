@@ -87,6 +87,17 @@
   }
 
   /* Cabeçalho Oficial RDLC LapTime */
+  .rep-banner-wrap {
+    width: 100%;
+    margin-bottom: 3mm;
+    text-align: center;
+  }
+  .rep-banner-img {
+    max-width: 100%;
+    max-height: 32mm;
+    object-fit: contain;
+    border-radius: 4px;
+  }
   .rep-header {
     width: 100%;
     margin-bottom: 2mm;
@@ -915,6 +926,11 @@
 </div>
 
 <main class="sheet-page portrait" id="sheetContainer">
+  <!-- Banner Opcional -->
+  <div class="rep-banner-wrap" id="repBannerWrap" style="display: none;">
+    <img id="repBannerImg" class="rep-banner-img" alt="Banner oficial">
+  </div>
+
   <!-- Cabeçalho Oficial -->
   <!-- logo | evento (título) + prova, data e traçado | critério e emissão -->
   <div class="rep-header">
@@ -1226,6 +1242,12 @@ function imprimirCupom() {
   document.body.classList.add('cupom');
   window.print();
   document.body.classList.remove('cupom');
+let catalogCategories = [];
+function resolverNomeCategoria(catIdOrName) {
+  if (!catIdOrName) return 'Geral';
+  const raw = String(catIdOrName).trim();
+  const encontrada = catalogCategories.find(c => String(c.id).trim() === raw || String(c.name).trim().toLowerCase() === raw.toLowerCase());
+  return encontrada ? encontrada.name : raw;
 }
 
 async function fetchJson(url, label) {
@@ -1252,9 +1274,35 @@ async function carregarTudo() {
 
     const auxiliary = await Promise.allSettled([
       fetchJson(`/api/sessions/${sessionId}/passings`, 'Passagens'),
-      fetchJson(`/api/sessions/${sessionId}/laps`, 'Voltas')
+      fetchJson(`/api/sessions/${sessionId}/laps`, 'Voltas'),
+      fetchJson('/api/settings', 'Configurações'),
+      fetchJson('/api/catalog/categories', 'Categorias')
     ]);
-    const [passingsResult, lapsResult] = auxiliary;
+    const [passingsResult, lapsResult, settingsResult, categoriesResult] = auxiliary;
+
+    if (categoriesResult.status === 'fulfilled') {
+      catalogCategories = Array.isArray(categoriesResult.value) ? categoriesResult.value : [];
+    }
+
+    if (settingsResult.status === 'fulfilled') {
+      const settings = settingsResult.value;
+      const banner = settings?.banner;
+      const bannerWrap = document.getElementById('repBannerWrap');
+      const bannerImg = document.getElementById('repBannerImg');
+      if (bannerWrap && bannerImg) {
+        const useOnReports = banner && (banner.useOnReports === true || banner.useOnReports === 'true');
+        if (useOnReports && banner.image && typeof banner.image === 'string' && banner.image.length < 2_500_000) {
+          const src = banner.image.startsWith('data:') || banner.image.startsWith('http')
+            ? banner.image
+            : `data:image/jpeg;base64,${banner.image}`;
+          bannerImg.src = src;
+          bannerWrap.style.display = 'block';
+        } else {
+          bannerWrap.style.display = 'none';
+          bannerImg.src = '';
+        }
+      }
+    }
 
     if (passingsResult.status === 'fulfilled') {
       try {
@@ -1520,7 +1568,7 @@ function renderReport() {
       pos: { h: 'Pos.', cls: 'col-pos', td: posDisplay },
       kart: { h: 'Kart', cls: 'col-kart', td: r => `<span class="kart-num">${esc(r.kart)}</span>` },
       nome: { h: 'Piloto', cls: 'col-nome', td: r => esc(r.name) },
-      cat: { h: 'Categoria', cls: 'col-cat', td: r => esc(r.category || 'Geral') },
+      cat: { h: 'Categoria', cls: 'col-cat', td: r => esc(resolverNomeCategoria(r.category)) },
       melhor: { h: 'Melhor<br>volta', cls: `col-num ${resultSecondary}`, td: melhorCelula },
       naVolta: { h: 'Na<br>volta', cls: `col-num col-curta ${resultSecondary}`, td: r => r.bestLap || VAZIO },
       difLider: { h: 'Dif.<br>líder', cls: 'col-num', td: r => r.diffLeaderStr },
@@ -1628,7 +1676,7 @@ function renderReport() {
         <td class="c-center">${p.sequence || (idx + 1)}</td>
         <td class="c-center c-bold">${esc(p.kart)}</td>
         <td class="c-left">${esc(p.name || VAZIO)}</td>
-        <td class="c-left">${esc(p.category || 'GERAL')}</td>
+        <td class="c-left">${esc(resolverNomeCategoria(p.category))}</td>
         <td class="c-center">${lapNum || VAZIO}</td>
         <td class="c-right c-bold">${fmtMs(p.lapMs)}</td>
         <td class="c-right">${fmtTotal(elapsed)}</td>
@@ -1678,7 +1726,7 @@ function renderReport() {
 
       html += `<div class="lap-to-lap-driver">
         <div class="lap-to-lap-header">
-          Competidor: <strong>${esc(d.name || VAZIO)}</strong> &nbsp;&nbsp;|&nbsp;&nbsp; Kart: <strong>#${esc(d.kart)}</strong> &nbsp;&nbsp;|&nbsp;&nbsp; Categoria: <strong>${esc(d.category || 'GERAL')}</strong>
+          Competidor: <strong>${esc(d.name || VAZIO)}</strong> &nbsp;&nbsp;|&nbsp;&nbsp; Kart: <strong>#${esc(d.kart)}</strong> &nbsp;&nbsp;|&nbsp;&nbsp; Categoria: <strong>${esc(resolverNomeCategoria(d.category))}</strong>
         </div>
         <table class="rdlc-table"><thead><tr>
           <th style="width: 35px;">#</th>
@@ -1740,7 +1788,7 @@ function renderReport() {
       html += `<tr>
         <td class="c-center c-bold">${esc(d.kart)}</td>
         <td class="c-left">${esc(d.name)}</td>
-        <td class="c-left">${esc(d.category || 'GERAL')}</td>`;
+        <td class="c-left">${esc(resolverNomeCategoria(d.category))}</td>`;
       for (let i = 1; i <= maxLaps; i++) {
         const item = map[i];
         if (!item || !item.lapMs) {

@@ -73,7 +73,7 @@ fun TelaResultado(
         gravando = true
         erro = null
         escopo.launch {
-            try { onGravado(api.gravar(info.bateria.id, resultado, umAUm, modo)) } catch (e: ErroServidor) { erro = e.message } finally { gravando = false }
+            try { onGravado(api.gravar(info.bateria.id, resultado, umAUm, modo, info.revisaoLista)) } catch (e: ErroServidor) { erro = e.message } finally { gravando = false }
         }
     }
 

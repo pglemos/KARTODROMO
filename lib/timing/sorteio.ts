@@ -1,4 +1,5 @@
 /** Sorteio de karts para os pilotos de uma bateria (substitui o "LapTime Sorteio"). Sem IO. */
+import { createHash } from 'node:crypto';
 import type { Session } from './race-engine';
 
 export type PilotoSorteio = { indice: number; nome: string; customerId: string | null; kartAtual: string; excecoes: string[] };
@@ -39,8 +40,38 @@ export function pilotosDoSorteio(sessao: Session, todas: Iterable<Session>, mesm
     });
 }
 
+export class SorteioConflictError extends Error {
+  readonly status = 409;
+  constructor(message = 'A lista de competidores foi alterada. Recarregue o sorteio antes de gravar.') {
+    super(message);
+    this.name = 'SorteioConflictError';
+  }
+}
+
+/**
+ * Hash determinístico da lista de competidores (ordem, identidade, nome, kart e categoria).
+ * Não depende do relógio: duas consultas idênticas geram a mesma revisão.
+ */
+export function revisaoListaSorteio(sessao: Session): string {
+  const payload = sessao.competitors
+    .map((c, i) => `${i}:${c.customerId ?? ''}:${String(c.name ?? '').trim().toLowerCase()}:${String(c.kart ?? '').trim()}:${c.category ?? ''}`)
+    .join('|');
+  return createHash('sha256').update(payload).digest('hex').slice(0, 16);
+}
+
 /** Confere o resultado vindo do tablet antes de gravar: um kart por piloto, sem repetir, só karts cadastrados. */
-export function validarSorteio(sessao: Session, atribuicoes: Atribuicao[], kartsCadastrados: Set<string>) {
+export function validarSorteio(
+  sessao: Session,
+  atribuicoes: Atribuicao[],
+  kartsCadastrados: Set<string>,
+  revisaoEnviada?: string | null,
+) {
+  if (revisaoEnviada !== undefined) {
+    const atual = revisaoListaSorteio(sessao);
+    if (!revisaoEnviada || revisaoEnviada.trim() !== atual) {
+      throw new SorteioConflictError('A lista de competidores foi alterada. Recarregue o sorteio antes de gravar.');
+    }
+  }
   if (sessao.state !== 'preparando') throw new Error('Essa bateria já largou: o sorteio só vale antes da bandeira verde.');
   if (!Array.isArray(atribuicoes) || atribuicoes.length === 0) throw new Error('O sorteio veio vazio.');
   const vistos = new Set<string>();

@@ -31,6 +31,8 @@ public class DialogoDesign : CartaoModal
     {
         Text = titulo;
         BackColor = Fundo;
+        largura = ClientSize.Width;
+        altura = ClientSize.Height;
 
         // cabeçalho
         var cab = _cab = new Panel { Dock = DockStyle.Top, Height = 62, BackColor = Color.White };
@@ -66,6 +68,13 @@ public class DialogoDesign : CartaoModal
         _secoes = new TableLayoutPanel { MinimumSize = new Size(_larguraSecao, 0), MaximumSize = new Size(_larguraSecao, 0), Dock = DockStyle.Top, ColumnCount = 1, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = Fundo };
         _secoes.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         corpo.Controls.Add(_secoes);
+        corpo.Resize += (_, _) =>
+        {
+            var w = Math.Max(300, corpo.ClientSize.Width - 36 - (corpo.VerticalScroll.Visible ? SystemInformation.VerticalScrollBarWidth : 0));
+            _secoes.MinimumSize = new Size(w, 0);
+            _secoes.MaximumSize = new Size(w, 0);
+            _secoes.Width = w;
+        };
 
         Controls.Add(corpo); Controls.Add(rod); Controls.Add(cab);
         corpo.BringToFront(); // o Fill por último no encaixe: não fica por baixo do cabeçalho/rodapé

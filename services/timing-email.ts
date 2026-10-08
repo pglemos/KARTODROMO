@@ -61,16 +61,23 @@ export function lerConfig(arquivo: string): ConfigEmail {
   }
 }
 
-/** Grava o que veio da tela; senha vazia = mantém a atual. */
-export function salvarConfig(arquivo: string, entrada: Record<string, unknown>): ConfigEmail {
-  const atual = lerConfig(arquivo);
+/** Resolve uma configuração em memória mesclando valores fornecidos com a configuração base sem gravar em disco. */
+export function resolverConfigTemporaria(cfgOrigem: string | ConfigEmail, entrada?: Record<string, unknown> | null): ConfigEmail {
+  const atual = typeof cfgOrigem === 'string' ? lerConfig(cfgOrigem) : cfgOrigem;
+  if (!entrada) return atual;
   const texto = (k: keyof ConfigEmail, max = 200) => (typeof entrada[k] === 'string' ? String(entrada[k]).trim().slice(0, max) : (atual[k] as string));
+  const novoHost = texto('host');
+  const mudouHost = novoHost !== atual.host;
+  const novaSenha = typeof entrada.senha === 'string' && entrada.senha.length > 0
+    ? entrada.senha
+    : (mudouHost ? '' : atual.senha);
+
   const novo: ConfigEmail = {
     automatico: typeof entrada.automatico === 'boolean' ? entrada.automatico : atual.automatico,
-    host: texto('host'),
+    host: novoHost,
     porta: Number.isInteger(Number(entrada.porta)) && Number(entrada.porta) > 0 ? Number(entrada.porta) : atual.porta,
     usuario: texto('usuario'),
-    senha: typeof entrada.senha === 'string' && entrada.senha.length > 0 ? entrada.senha : atual.senha,
+    senha: novaSenha,
     remetenteNome: texto('remetenteNome'),
     remetenteEmail: texto('remetenteEmail'),
     copiaOculta: texto('copiaOculta'),
@@ -79,6 +86,12 @@ export function salvarConfig(arquivo: string, entrada: Record<string, unknown>):
   if (novo.usuario && !emailValido(novo.usuario)) throw new Error('Usuário deve ser o e-mail completo da caixa (ex.: resultados@kartodromodebetim.com.br).');
   if (novo.remetenteEmail && !emailValido(novo.remetenteEmail)) throw new Error('E-mail do remetente inválido.');
   if (novo.copiaOculta && !emailValido(novo.copiaOculta)) throw new Error('E-mail da cópia oculta inválido.');
+  return novo;
+}
+
+/** Grava o que veio da tela; senha vazia = mantém a atual (exceto se o host mudar). */
+export function salvarConfig(arquivo: string, entrada: Record<string, unknown>): ConfigEmail {
+  const novo = resolverConfigTemporaria(arquivo, entrada);
   writeFileSync(arquivo, JSON.stringify(novo, null, 2));
   return novo;
 }
@@ -219,11 +232,34 @@ export type OpcoesEnvio = {
   para?: string | null;
 };
 
+const jobsEmAndamento = new Map<string, Promise<EnvioEmailsResultado>>();
+
+function chaveDoJob(s: Session, op: OpcoesEnvio): string {
+  if (op.para) return `${s.id}:para:${op.para.trim().toLowerCase()}:${op.kart ?? ''}`;
+  if (op.kart) return `${s.id}:kart:${op.kart}`;
+  return `${s.id}:todos`;
+}
+
 /**
  * Manda o resultado da prova. Um e-mail por piloto (resumo dele + classificação) com os PDFs anexos.
  * Guarda em s.emailsResultado quem recebeu, quem falhou e quem está sem e-mail; falhas tentam de novo depois.
+ * Chamadas simultâneas para a mesma sessão/alvo compartilham a mesma execução para evitar envios duplicados.
  */
 export async function enviarResultado(s: Session, cfgArquivo: string, dep: Dependencias, op: OpcoesEnvio): Promise<EnvioEmailsResultado> {
+  const chave = chaveDoJob(s, op);
+  const emAndamento = jobsEmAndamento.get(chave);
+  if (emAndamento) return emAndamento;
+
+  const job = executarEnvioResultado(s, cfgArquivo, dep, op);
+  jobsEmAndamento.set(chave, job);
+  try {
+    return await job;
+  } finally {
+    jobsEmAndamento.delete(chave);
+  }
+}
+
+async function executarEnvioResultado(s: Session, cfgArquivo: string, dep: Dependencias, op: OpcoesEnvio): Promise<EnvioEmailsResultado> {
   const cfg = lerConfig(cfgArquivo);
   const anterior = s.emailsResultado;
   const agora = Date.now();
@@ -264,10 +300,13 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
     if (op.kart && !alvos.length) throw new Error(`O piloto do kart ${op.kart} não tem e-mail no cadastro.`);
   }
 
-  const pasta = join(dep.dataDir, 'emails-tmp');
+  // Diretório temporário exclusivo por job: evita colisão de arquivos HTML e PDF entre envios concorrentes
+  const jobId = `job-${s.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const pasta = join(dep.dataDir, 'emails-tmp', jobId);
+  mkdirSync(pasta, { recursive: true });
+
   const logoDataUri = dep.logoPng ? `data:image/png;base64,${dep.logoPng.toString('base64')}` : null;
   const base = nomeArquivo(`Resultado ${[ctx.grupo, ctx.prova].filter(Boolean).join(' ')}`);
-  const pdfResultado = cfg.anexarPdf ? await gerarPdf(htmlPdfResultado(ctx, logoDataUri), pasta, `${s.id}-resultado`, dep.log) : null;
   const t = transporte(cfg, dep.simulador);
   const remetente = { name: cfg.remetenteNome || ctx.empresa.nome, address: cfg.remetenteEmail || cfg.usuario || 'resultados@kartodromodebetim.com.br' };
   const enviados = op.automatico ? [...(anterior?.enviados ?? [])] : [];
@@ -275,35 +314,65 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
   const pastaTeste = join(dep.dataDir, 'emails-simulador');
   const inicioEnvio = Date.now();
 
-  for (const a of alvos) {
-    try {
-      const p: PilotoEmail = a.piloto ?? { nome: 'amigo(a)', kart: '', email: a.email, standing: null, voltas: [] };
-      const anexos: { filename: string; content: Buffer; contentType?: string; cid?: string }[] = [];
-      if (dep.logoPng) anexos.push({ filename: 'logo.png', content: dep.logoPng, contentType: 'image/png', cid: 'logo-kartodromo' });
-      if (pdfResultado) anexos.push({ filename: `${base}.pdf`, content: pdfResultado, contentType: 'application/pdf' });
-      if (cfg.anexarPdf && a.piloto) {
-        const vv = await gerarPdf(htmlPdfVoltaAVolta(ctx, a.piloto, logoDataUri), pasta, `${s.id}-${nomeArquivo(a.kart)}`, dep.log);
-        if (vv) anexos.push({ filename: nomeArquivo(`Volta a volta ${a.nome} kart ${a.kart}`) + '.pdf', content: vv, contentType: 'application/pdf' });
+  try {
+    const pdfResultado = cfg.anexarPdf ? await gerarPdf(htmlPdfResultado(ctx, logoDataUri), pasta, `${s.id}-resultado`, dep.log) : null;
+
+    for (const a of alvos) {
+      try {
+        const p: PilotoEmail = a.piloto ?? { nome: 'amigo(a)', kart: '', email: a.email, standing: null, voltas: [] };
+        const anexos: { filename: string; content: Buffer; contentType?: string; cid?: string }[] = [];
+        if (dep.logoPng) anexos.push({ filename: 'logo.png', content: dep.logoPng, contentType: 'image/png', cid: 'logo-kartodromo' });
+        if (pdfResultado) anexos.push({ filename: `${base}.pdf`, content: pdfResultado, contentType: 'application/pdf' });
+        if (cfg.anexarPdf && a.piloto) {
+          const vv = await gerarPdf(htmlPdfVoltaAVolta(ctx, a.piloto, logoDataUri), pasta, `${s.id}-${nomeArquivo(a.kart)}`, dep.log);
+          if (vv) anexos.push({ filename: nomeArquivo(`Volta a volta ${a.nome} kart ${a.kart}`) + '.pdf', content: vv, contentType: 'application/pdf' });
+        }
+        const info = await t.sendMail({
+          from: remetente,
+          to: a.piloto ? { name: a.nome, address: a.email } : a.email,
+          bcc: cfg.copiaOculta || undefined,
+          subject: assunto(ctx),
+          html: htmlEmail(ctx, p, dep.logoPng ? 'logo-kartodromo' : null),
+          text: textoEmail(ctx, p),
+          attachments: anexos,
+        });
+        if (dep.simulador) {
+          mkdirSync(pastaTeste, { recursive: true });
+          writeFileSync(join(pastaTeste, `${s.id}-${nomeArquivo(a.kart || 'avulso')}.eml`), (info as unknown as { message: Buffer }).message);
+        }
+        if (a.piloto && !op.para) {
+          enviados.push(`${a.kart}|${a.email}`);
+          if (!op.kart) {
+            s.emailsResultado = {
+              status: 'enviando',
+              atualizadoEm: Date.now(),
+              tentativas: (anterior?.tentativas ?? 0) + 1,
+              enviados: [...new Set(enviados)],
+              falhas: [...falhas],
+              semEmail,
+            };
+            dep.salvarSessao(s);
+          }
+        }
+      } catch (e) {
+        falhas.push({ kart: a.kart, nome: a.nome, email: a.email, erro: traduzirErro(e).slice(0, 200) });
+        if (!op.kart && !op.para) {
+          s.emailsResultado = {
+            status: 'enviando',
+            atualizadoEm: Date.now(),
+            tentativas: (anterior?.tentativas ?? 0) + 1,
+            enviados: [...new Set(enviados)],
+            falhas: [...falhas],
+            semEmail,
+          };
+          dep.salvarSessao(s);
+        }
       }
-      const info = await t.sendMail({
-        from: remetente,
-        to: a.piloto ? { name: a.nome, address: a.email } : a.email,
-        bcc: cfg.copiaOculta || undefined,
-        subject: assunto(ctx),
-        html: htmlEmail(ctx, p, dep.logoPng ? 'logo-kartodromo' : null),
-        text: textoEmail(ctx, p),
-        attachments: anexos,
-      });
-      if (dep.simulador) {
-        mkdirSync(pastaTeste, { recursive: true });
-        writeFileSync(join(pastaTeste, `${s.id}-${nomeArquivo(a.kart || 'avulso')}.eml`), (info as unknown as { message: Buffer }).message);
-      }
-      if (a.piloto && !op.para) enviados.push(`${a.kart}|${a.email}`);
-    } catch (e) {
-      falhas.push({ kart: a.kart, nome: a.nome, email: a.email, erro: traduzirErro(e).slice(0, 200) });
     }
+  } finally {
+    t.close();
+    try { rmSync(pasta, { recursive: true, force: true }); } catch { /* ignore */ }
   }
-  t.close();
 
   // "250 OK" do SMTP não é entrega: confere no rastreio da hospedagem e devolve para falhas o que foi descartado
   const aceitos = alvos.filter((a) => !falhas.some((f) => f.kart === a.kart && f.email === a.email));
@@ -353,8 +422,17 @@ export function traduzirErro(e: unknown): string {
 }
 
 /** E-mail de teste da tela de configuração (confere servidor, porta, usuário e senha). */
-export async function enviarTeste(cfgArquivo: string, para: string, simulador: boolean) {
-  const cfg = lerConfig(cfgArquivo);
+export async function enviarTeste(
+  cfgOrigem: string | ConfigEmail,
+  para: string,
+  simulador: boolean,
+  configEfêmera?: Record<string, unknown> | null,
+) {
+  const cfg = configEfêmera
+    ? resolverConfigTemporaria(cfgOrigem, configEfêmera)
+    : typeof cfgOrigem === 'string'
+      ? lerConfig(cfgOrigem)
+      : cfgOrigem;
   if (!emailValido(para)) throw new Error('Informe um e-mail válido para o teste.');
   if (!simulador && !(cfg.host && cfg.usuario && cfg.senha)) throw new Error('Preencha servidor, usuário e senha antes do teste.');
   const t = transporte(cfg, simulador);

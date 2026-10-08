@@ -5,6 +5,7 @@ import {
   assignCrossing,
   clearCrossings,
   closeSession,
+  checkered,
   computeStandings,
   createSession,
   elapsedMs,
@@ -27,6 +28,7 @@ import {
   addPenalty,
   removePenalty,
   restartSession,
+  acceptRejected,
   aguardandoLargada,
   voltaAtualDoKart,
 } from '../lib/timing/race-engine';
@@ -588,6 +590,121 @@ describe('race-engine', () => {
       expect(() => swapKart(s, { fromKart: '4', toKart: '5' })).toThrow('já está com Bia');
       expect(s.competitors.map((c) => `${c.kart}:${c.name}`)).toEqual(['4:Ana', '5:Bia']);
     });
+
+    it('troca_cruzada_preserva_dono_das_rejeitadas', () => {
+      const s = race('corrida', 20);
+      setCompetitors(s, [
+        { kart: '4', name: 'Ana', customerId: '10' },
+        { kart: '5', name: 'Bia', customerId: '11' },
+      ]);
+      s.rejected = [
+        { id: 'r4', kart: '4', transponder: 104, wallMs: 10_000, decoderTimeMs: 10_000, reason: 'ignored-min-lap', sinceLastMs: null },
+        { id: 'r5', kart: '5', transponder: 105, wallMs: 12_000, decoderTimeMs: 12_000, reason: 'ignored-min-lap', sinceLastMs: null },
+      ];
+
+      // Troca cruzada: Ana 4->5, Bia 5->4
+      setCompetitors(s, [
+        { kart: '5', name: 'Ana', customerId: '10' },
+        { kart: '4', name: 'Bia', customerId: '11' },
+      ]);
+
+      expect(s.rejected.find((r) => r.id === 'r4')!.kart).toBe('5');
+      expect(s.rejected.find((r) => r.id === 'r5')!.kart).toBe('4');
+
+      // Ao restaurar a leitura rejeitada r4, ela pertence ao piloto original (Ana, agora no kart 5)
+      acceptRejected(s, s.rejected.find((r) => r.id === 'r4')!);
+      const ana = s.competitors.find((c) => c.customerId === '10')!;
+      expect(ana.kart).toBe('5');
+      expect(ana.crossings.some((x) => x.id === 'r4')).toBe(true);
+
+      // Ao restaurar r5, pertence a Bia (agora no kart 4)
+      acceptRejected(s, s.rejected.find((r) => r.id === 'r5')!);
+      const bia = s.competitors.find((c) => c.customerId === '11')!;
+      expect(bia.kart).toBe('4');
+      expect(bia.crossings.some((x) => x.id === 'r5')).toBe(true);
+    });
+
+    it('salvar_lista_identica_preserva_penalidades_e_classificacao', () => {
+      const s = race('corrida', 20);
+      setCompetitors(s, [
+        { kart: '4', name: 'Ana', customerId: '10' },
+        { kart: '5', name: 'Bia', customerId: '11' },
+        { kart: '6', name: 'Caio', customerId: '12' },
+      ]);
+      volta(s, '4', 0); volta(s, '4', 60); // Ana chega 1s antes
+      volta(s, '5', 0); volta(s, '5', 61); // Bia chega aos 61s
+      volta(s, '6', 0); volta(s, '6', 65); // Caio chega aos 65s
+
+      addPenalty(s, '4', { id: 'p1', wallMs: 60_000, tipo: 'tempo', segundos: 5, motivo: 'queima de largada' });
+      addPenalty(s, '5', { id: 'p2', wallMs: 61_000, tipo: 'advertencia', motivo: 'toque' });
+
+      let st = computeStandings(s);
+      expect(st[0].name).toBe('Bia');
+      expect(st[1].name).toBe('Ana');
+      expect(st[1].penaltyMs).toBe(5_000);
+      expect(st[0].advertencias).toBe(1);
+
+      // 1. Salvar lista idêntica: deve preservar penalidades e classificação
+      setCompetitors(s, [
+        { kart: '4', name: 'Ana', customerId: '10' },
+        { kart: '5', name: 'Bia', customerId: '11' },
+        { kart: '6', name: 'Caio', customerId: '12' },
+      ]);
+      st = computeStandings(s);
+      expect(st[0].name).toBe('Bia');
+      expect(st[1].name).toBe('Ana');
+      expect(st[1].penaltyMs).toBe(5_000);
+      expect(st[0].advertencias).toBe(1);
+
+      // 2. Editar nome/detalhes do piloto
+      setCompetitors(s, [
+        { kart: '4', name: 'Ana Paula', customerId: '10', detalhes: { peso: 65 } },
+        { kart: '5', name: 'Beatriz', customerId: '11' },
+        { kart: '6', name: 'Caio', customerId: '12' },
+      ]);
+      st = computeStandings(s);
+      expect(st[0].name).toBe('Beatriz');
+      expect(st[1].name).toBe('Ana Paula');
+      expect(st[1].penaltyMs).toBe(5_000);
+      expect(st[0].advertencias).toBe(1);
+
+      // 3. Troca 4 <-> 5: as punições pertencem aos pilotos, não aos karts
+      setCompetitors(s, [
+        { kart: '5', name: 'Ana Paula', customerId: '10' },
+        { kart: '4', name: 'Beatriz', customerId: '11' },
+        { kart: '6', name: 'Caio', customerId: '12' },
+      ]);
+      st = computeStandings(s);
+      expect(st[0].name).toBe('Beatriz');
+      expect(st[0].kart).toBe('4');
+      expect(st[0].advertencias).toBe(1);
+      expect(st[1].name).toBe('Ana Paula');
+      expect(st[1].kart).toBe('5');
+      expect(st[1].penaltyMs).toBe(5_000);
+
+      // 4. Excluir terceiro piloto (Caio)
+      setCompetitors(s, [
+        { kart: '5', name: 'Ana Paula', customerId: '10' },
+        { kart: '4', name: 'Beatriz', customerId: '11' },
+      ]);
+      st = computeStandings(s);
+      expect(st).toHaveLength(2);
+      expect(st[0].name).toBe('Beatriz');
+      expect(st[0].advertencias).toBe(1);
+      expect(st[1].name).toBe('Ana Paula');
+      expect(st[1].penaltyMs).toBe(5_000);
+
+      // 5. Piloto novo no kart 5 (não é Ana): não deve herdar a punição de 5s da Ana
+      setCompetitors(s, [
+        { kart: '4', name: 'Beatriz', customerId: '11' },
+        { kart: '5', name: 'Daniel' }, // novo competidor sem relação com Ana
+      ]);
+      st = computeStandings(s);
+      const daniel = st.find((x) => x.name === 'Daniel');
+      expect(daniel).toBeDefined();
+      expect(daniel?.penaltyMs).toBe(0);
+      expect(daniel?.advertencias).toBe(0);
+    });
   });
 
   it('formata tempo de volta', () => {
@@ -609,6 +726,51 @@ describe('race-engine', () => {
     expect(tick(s, 229_999)).toBe(false);
     expect(tick(s, 230_001)).toBe(true);
     expect(s.state).toBe('em_andamento');
+  });
+
+  it('chegada_manual_na_quadriculada_finaliza_piloto', () => {
+    const s = race('corrida', 20);
+    setCompetitors(s, [{ kart: '4', name: 'Ana' }]);
+    applyPassing(s, { kart: '4', decoderTimeMs: 1_000, wallMs: 1_000 }); // abre volta
+    checkered(s, 70_000);
+    expect(s.state).toBe('bandeira_final');
+
+    includeManualPassing(s, { id: 'manual-fim', kart: '4', lapMs: 65_000, wallMs: 75_000 });
+    const comp = s.competitors.find((c) => c.kart === '4')!;
+    expect(comp.finished).toBe(true);
+
+    const res = applyPassing(s, { kart: '4', decoderTimeMs: 80_000, wallMs: 80_000 });
+    expect(res).toBe('ignored-finished');
+    const standings = computeStandings(s);
+    expect(standings[0].laps).toBe(1);
+    expect(standings[0].finished).toBe(true);
+  });
+
+  it('encerrar_na_vermelha_preserva_tempo_congelado', () => {
+    // Caso principal: verde/primeira passagem aos 2000 ms, vermelha aos 64000, close aos 124000 -> duração 62000
+    const s1 = race('corrida', 20);
+    setCompetitors(s1, [{ kart: '4', name: 'Ana' }]);
+    applyPassing(s1, { kart: '4', decoderTimeMs: 2_000, wallMs: 2_000 }); // startedAt = 2000
+    setRaceFlag(s1, 'red', 64_000); // 62000 decorridos
+    closeSession(s1, 124_000);
+    expect(elapsedMs(s1, 124_000)).toBe(62_000);
+    expect(elapsedMs(s1, 200_000)).toBe(62_000);
+
+    // Contraprova 1: retomada verde e encerramento normal
+    const s2 = race('corrida', 20);
+    setCompetitors(s2, [{ kart: '4', name: 'Ana' }]);
+    applyPassing(s2, { kart: '4', decoderTimeMs: 2_000, wallMs: 2_000 });
+    setRaceFlag(s2, 'red', 64_000); // 62s decorridos
+    setRaceFlag(s2, 'green', 100_000); // retoma com 62s já decorridos
+    closeSession(s2, 124_000); // mais 24s rodando = 86s total
+    expect(elapsedMs(s2, 124_000)).toBe(86_000);
+
+    // Contraprova 2: encerramento sem pausa na vermelha
+    const s3 = race('corrida', 20);
+    setCompetitors(s3, [{ kart: '4', name: 'Ana' }]);
+    applyPassing(s3, { kart: '4', decoderTimeMs: 2_000, wallMs: 2_000 });
+    closeSession(s3, 124_000); // 124000 - 2000 = 122000
+    expect(elapsedMs(s3, 124_000)).toBe(122_000);
   });
 
   it('inclui passagem manual e recalcula volta ao excluir e restaurar passagem', () => {

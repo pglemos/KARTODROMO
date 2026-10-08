@@ -36,6 +36,18 @@ public partial class FormCrono
 
         _gEventos.CellClick += (_, e) => { if (e.RowIndex >= 0) _ = CarregarCatalogo(); };
         _gGrupos.CellClick += (_, e) => { if (e.RowIndex >= 0) _ = CarregarCatalogo(); };
+        _gEventos.SelectionChanged += (_, _) =>
+        {
+            if (_carregandoCatalogo) return;
+            var id = (_gEventos.ChaveAtual as JsonObject)?.S("id");
+            if (!string.IsNullOrEmpty(id) && id != _ultimoEventoId) _ = CarregarCatalogo();
+        };
+        _gGrupos.SelectionChanged += (_, _) =>
+        {
+            if (_carregandoCatalogo) return;
+            var id = (_gGrupos.ChaveAtual as JsonObject)?.S("id");
+            if (!string.IsNullOrEmpty(id) && id != _ultimoGrupoId) _ = CarregarCatalogo();
+        };
         _gProvas.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) CriarBateriaDaProva(); };
         _buscaEvento.TextChanged += (_, _) => _ = CarregarCatalogo();
 
@@ -81,7 +93,9 @@ public partial class FormCrono
              BotaoPeq("Distribuir", 0, DistribuirProva), BotaoPeq("Imprimir", 0, () => ImprimirResumo("Provas", _proofs.Select(x => x.S("name")).ToList()))], null, _tituloProvas, proximo);
 
         var grade = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Padding = new Padding(18, 16, 18, 16), BackColor = TemaCrono.Fundo };
-        grade.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 514)); grade.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 314)); grade.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        grade.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35f));
+        grade.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
+        grade.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40f));
         grade.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         ev.Margin = new Padding(0, 0, 14, 0); gr.Margin = new Padding(0, 0, 14, 0); pr.Margin = Padding.Empty;
         // agenda da recepção (baterias de hoje com os pilotos inscritos) em cima dos eventos: é daqui que o
@@ -163,14 +177,15 @@ public partial class FormCrono
         if (direitaTopo != null) { topo.Controls.Add(direitaTopo); topo.Resize += (_, _) => direitaTopo.Location = new Point(topo.Width - 16 - direitaTopo.Width, 14); }
         var rod = new Panel { Dock = DockStyle.Bottom, Height = 50, BackColor = Color.FromArgb(251, 251, 253) };
         rod.Paint += (_, e) => { using var p = new Pen(Color.FromArgb(237, 237, 237)); e.Graphics.DrawLine(p, 0, 0, rod.Width, 0); };
-        var fluxo = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, Padding = new Padding(12, 10, 0, 0), BackColor = Color.FromArgb(251, 251, 253), AutoScroll = false };
-        fluxo.Controls.AddRange(acoes);
-        rod.Controls.Add(fluxo);
         if (direitaRodape != null)
         {
             var dir = new Panel { Dock = DockStyle.Right, Width = direitaRodape.Width + 24, BackColor = Color.FromArgb(251, 251, 253) };
             direitaRodape.Location = new Point(12, 10); dir.Controls.Add(direitaRodape); rod.Controls.Add(dir);
         }
+        var fluxo = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, Padding = new Padding(12, 10, 0, 0), BackColor = Color.FromArgb(251, 251, 253), AutoScroll = true };
+        fluxo.Controls.AddRange(acoes);
+        rod.Controls.Add(fluxo);
+        fluxo.BringToFront();
         conteudo.Dock = DockStyle.Fill;
         card.Controls.Add(conteudo); card.Controls.Add(rod); card.Controls.Add(topo);
         conteudo.BringToFront();

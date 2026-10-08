@@ -38,6 +38,7 @@ public class Api
     public string BaseUrl { get; }
     public string Token { get; set; }
     public string Chave { get; set; }
+    public string ChaveTiming { get; set; }
 
     public Api(string baseUrl, TimeSpan? timeout = null)
     {
@@ -52,6 +53,7 @@ public class Api
         using var req = new HttpRequestMessage(metodo, BaseUrl + caminho);
         if (!string.IsNullOrEmpty(Token)) req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Token);
         if (!string.IsNullOrEmpty(Chave)) req.Headers.Add("x-ops-key", Chave);
+        if (!string.IsNullOrEmpty(ChaveTiming)) req.Headers.Add("x-timing-key", ChaveTiming);
         if (corpo != null)
         {
             var json = corpo is JsonNode n ? n.ToJsonString() : JsonSerializer.Serialize(corpo);

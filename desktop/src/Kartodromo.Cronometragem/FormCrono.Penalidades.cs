@@ -27,12 +27,14 @@ public partial class FormCrono
     void AplicarPenalidade(string tipo, string kart = null)
     {
         if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
+        var sessId = _sess.S("id");
+        var nomeBateria = _sess.S("name");
         kart ??= KartSelecionado();
         if (string.IsNullOrEmpty(kart)) { Msg.Aviso(this, "Clique no piloto (no resultado, nas passagens ou na lista de competidores) e depois na advertência ou na penalidade."); return; }
         var comp = Crono.Arr(_sess, "competitors").FirstOrDefault(c => c.S("kart") == kart);
         if (comp == null) { Msg.Aviso(this, $"O kart {kart} não está nesta bateria."); return; }
         var tempo = tipo == "tempo";
-        using var d = NovoDialogo(tempo ? "Penalidade de tempo" : "Advertência", $"{comp.S("name")} · kart {kart} · {_sess.S("name")}", SvgPenalidade, CorPenalidade, 900, 660);
+        using var d = NovoDialogo(tempo ? "Penalidade de tempo" : "Advertência", $"{comp.S("name")} · kart {kart} · {nomeBateria}", SvgPenalidade, CorPenalidade, 900, 660);
         var g = d.Secao(tempo ? "Nova penalidade" : "Nova advertência", tempo
             ? "Os segundos somam no tempo oficial: na corrida, no tempo de chegada; na tomada de tempo e no treino, na melhor volta. A posição muda na hora."
             : "Bandeira preta e branca. Fica registrada no resultado e no relatório; não muda a posição.");
@@ -91,7 +93,7 @@ public partial class FormCrono
             if (lista.SelectedIndex < 0 || lista.SelectedIndex >= tem.Count) { Msg.Aviso(d, "Escolha na lista a advertência ou penalidade a retirar."); return; }
             var p = tem[lista.SelectedIndex];
             if (!Msg.Pergunta(d, $"Retirar \"{lista.SelectedItem}\" de {comp.S("name")}?")) return;
-            await Crono.Api.Delete($"/api/sessions/{_sess.S("id")}/penalties/{Uri.EscapeDataString(kart)}/{p.S("id")}");
+            await Crono.Api.Delete($"/api/sessions/{sessId}/penalties/{Uri.EscapeDataString(kart)}/{p.S("id")}");
             await Atualizar(); Recarregar();
         });
         var g2 = d.Secao("Já recebeu nesta bateria");
@@ -114,7 +116,7 @@ public partial class FormCrono
                 { Msg.Aviso(d, "Digite os segundos da penalidade (ex.: 5 ou 2,5)."); segundos.Focus(); return; }
                 corpo["segundos"] = seg;
             }
-            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/penalties/{Uri.EscapeDataString(kart)}", corpo);
+            await Crono.Api.Post($"/api/sessions/{sessId}/penalties/{Uri.EscapeDataString(kart)}", corpo);
             d.DialogResult = DialogResult.OK; d.Close();
             await Atualizar();
         }));
@@ -126,6 +128,7 @@ public partial class FormCrono
     void BandeiraPreta(string kart = null)
     {
         if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
+        var sessId = _sess.S("id");
         kart ??= KartSelecionado();
         if (string.IsNullOrEmpty(kart)) { Msg.Aviso(this, "Clique no piloto e depois na bandeira preta."); return; }
         var comp = Crono.Arr(_sess, "competitors").FirstOrDefault(c => c.S("kart") == kart);
@@ -136,7 +139,7 @@ public partial class FormCrono
             : $"Bandeira preta para {comp.S("name")} (kart {kart})?\n\nEle fica DESCLASSIFICADO e vai para o último lugar no resultado e no relatório.")) return;
         Seguro.Rodar(this, async () =>
         {
-            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/flag/{Uri.EscapeDataString(kart)}", new JsonObject { ["flag"] = tem ? "none" : "black", ["autor"] = Environment.UserName });
+            await Crono.Api.Post($"/api/sessions/{sessId}/flag/{Uri.EscapeDataString(kart)}", new JsonObject { ["flag"] = tem ? "none" : "black", ["autor"] = Environment.UserName });
             await Atualizar();
         });
     }

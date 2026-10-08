@@ -115,7 +115,7 @@ public partial class FormCrono : Form
             else if (e.KeyCode == Keys.F9) { e.Handled = true; if (_painel.TotalPaginas >= 2) { _chkPainelAuto.Checked = false; _painel.AutoAvanco = false; _painel.DefinirPagina(1); AtualizarBotoesPainel(); } }
             else if (e.KeyCode == Keys.F10) { e.Handled = true; if (_painel.TotalPaginas >= 3) { _chkPainelAuto.Checked = false; _painel.AutoAvanco = false; _painel.DefinirPagina(2); AtualizarBotoesPainel(); } }
             else if (e.KeyCode == Keys.Insert) { e.Handled = true; IncluirPassagem(); }
-            else if (e.KeyCode == Keys.Delete) { e.Handled = true; CorrigirPassagem("delete"); }
+            else if (e.KeyCode == Keys.Delete && !FocoEmEdicaoDeTexto(ActiveControl)) { e.Handled = true; CorrigirPassagem("delete"); }
             else if (e.KeyCode == Keys.F11) { e.Handled = true; AbrirTV(); }
         };
         Shown += async (_, _) =>
@@ -131,6 +131,22 @@ public partial class FormCrono : Form
             IniciarAtualizacaoAoVivo();
         };
         FormClosed += (_, _) => { _tv?.Close(); _painel.Dispose(); };
+    }
+
+    static bool FocoEmEdicaoDeTexto(Control c)
+    {
+        while (c != null)
+        {
+            if (c is TextBoxBase or ComboBox) return true;
+            if (c is IDataGridViewEditingControl) return true;
+            if (c is ContainerControl cc && cc.ActiveControl != null && cc.ActiveControl != c)
+            {
+                c = cc.ActiveControl;
+                continue;
+            }
+            break;
+        }
+        return false;
     }
 
     void DesenharAba(DrawItemEventArgs e)
@@ -313,6 +329,24 @@ public partial class FormCrono : Form
         {
             if (_montandoArvore) return;
             if (e.Node?.Tag is not JsonObject tag) return;
+            var novoId = tag.S("kind") == "session" ? tag.S("sessionId")
+                : tag.S("kind") == "proof" ? Crono.Arr(_state, "sessions").FirstOrDefault(s => s.S("proofId") == tag.S("proofId"))?.S("id")
+                : null;
+            if (_pilotosSujos && novoId != null && novoId != _pilotosDe)
+            {
+                Seguro.Rodar(this, async () =>
+                {
+                    if (!await ConfirmarDescarteOuSalvarPilotos("trocar de bateria")) return;
+                    if (tag.S("kind") == "session") Selecionar(tag.S("sessionId"));
+                    else if (tag.S("kind") == "proof")
+                    {
+                        _selectedProof = _proofs.FirstOrDefault(p => p.S("id") == tag.S("proofId"));
+                        if (novoId != null) Selecionar(novoId);
+                        else _lPilotosTitulo.Text = _selectedProof?.S("name") ?? "Selecione uma prova";
+                    }
+                });
+                return;
+            }
             if (tag.S("kind") == "session") Selecionar(tag.S("sessionId"));
             else if (tag.S("kind") == "proof")
             {
@@ -414,6 +448,7 @@ public partial class FormCrono : Form
     void SetupResultado(LiveGrid grid)
     {
         TemaCrono.EstilizarGrade(grid);
+        grid.ScrollBars = ScrollBars.Both;
         if (grid.Columns.Count == 0)
             grid.Col("Pos", 60, DataGridViewContentAlignment.MiddleLeft).Col("Nº", 46).Col("Competidor", 160, DataGridViewContentAlignment.MiddleLeft, true).Col("M.V", 38).Col("T.M.V", 74, DataGridViewContentAlignment.MiddleRight).Col("Volta", 44, DataGridViewContentAlignment.MiddleRight).Col("T.U.V", 74, DataGridViewContentAlignment.MiddleRight).Col("T.T", 94, DataGridViewContentAlignment.MiddleRight).Col("D.L", 72, DataGridViewContentAlignment.MiddleRight).Col("D.A", 66, DataGridViewContentAlignment.MiddleRight).Col("V.Méd", 58, DataGridViewContentAlignment.MiddleRight);
         foreach (var c in new[] { 4, 6, 7, 8, 9 }) grid.Columns[c].DefaultCellStyle.Font = new Font("Cascadia Mono", 9F);
@@ -531,7 +566,7 @@ public partial class FormCrono : Form
         SetupResultado(_gRes); SetupResultado(_gResCategoria);
         var menuRes = new ContextMenuStrip();
         menuRes.Items.Add("Trocar kart do piloto… (leva as voltas)", null, (_, _) => TrocarKart());
-        menuRes.Items.Add("Registro do competidor…", null, (_, _) => RegistroCompetidorSelecionado());
+        menuRes.Items.Add("Registro do competidor…", null, (_, _) => RegistroCompetidorSelecionado("resultado"));
         _gRes.ContextMenuStrip = menuRes;
         _gRes.CellMouseDown += (_, e) => { if (e.Button == MouseButtons.Right && e.RowIndex >= 0 && e.RowIndex < _gRes.Rows.Count) { _gRes.ClearSelection(); _gRes.Rows[e.RowIndex].Selected = true; _gRes.CurrentCell = _gRes.Rows[e.RowIndex].Cells[0]; } };
         _gRes.CorTexto = (row, col) => col == 0 && row < _gRes.Chaves.Count && _gRes.Chaves[row] is JsonObject standing ? CorAtraso(standing) : null;
@@ -659,9 +694,40 @@ public partial class FormCrono : Form
 
     // ------------------------------------------------------------------ leitura
 
+    async Task<bool> ConfirmarDescarteOuSalvarPilotos(string motivo = "trocar de bateria")
+    {
+        if (!_pilotosSujos || string.IsNullOrEmpty(_pilotosDe)) return true;
+        var nomeBateria = _sess?.S("name") ?? "a bateria atual";
+        var res = MessageBox.Show(
+            this,
+            $"Há alterações não salvas na lista de competidores de {nomeBateria}.\n\nDeseja salvar antes de {motivo}?",
+            "Alterações não salvas",
+            MessageBoxButtons.YesNoCancel,
+            MessageBoxIcon.Question
+        );
+        if (res == DialogResult.Cancel) return false;
+        if (res == DialogResult.Yes)
+        {
+            await SalvarPilotos();
+            return !_pilotosSujos;
+        }
+        _pilotosSujos = false;
+        return true;
+    }
+
     void Selecionar(string id)
     {
         if (string.IsNullOrEmpty(id)) return;
+        if (_pilotosSujos && id != _pilotosDe)
+        {
+            Seguro.Rodar(this, async () =>
+            {
+                if (!await ConfirmarDescarteOuSalvarPilotos("trocar de bateria")) return;
+                _sel = id; _fixado = true;
+                await Atualizar();
+            });
+            return;
+        }
         _sel = id; _fixado = true;
         _ = Atualizar();
     }
@@ -890,11 +956,11 @@ public partial class FormCrono : Form
             }
             else { _sess = null; _laps = []; }
             _servidorOk = true;
+            _lidoEm = DateTime.Now;
         }
         catch (ApiException e) when (e.Status == 404) { _fixado = false; _sel = null; }
         catch (ApiException) { _servidorOk = false; }
         finally { _ocupado = false; }
-        _lidoEm = DateTime.Now;
         Desenhar();
     }
 
@@ -1026,7 +1092,7 @@ public partial class FormCrono : Form
         _lVoltaFaixa.Text = passagemVisivel == null ? "VOLTA\nAGUARDANDO" : $"VOLTA\n{passagemVisivel.I("lap")}\nAGUARDANDO";
 
         // competidores (aba 1): so recarrega se o operador nao estiver editando
-        if (s0 != null && (_pilotosDe != s0.S("id") || !_pilotosSujos) && !_gPilotos.IsCurrentCellInEditMode)
+        if (s0 != null && !_pilotosSujos && !_gPilotos.IsCurrentCellInEditMode)
         {
             var comps = Crono.Arr(s0, "competitors");
             var atual = _gPilotos.Rows.Cast<DataGridViewRow>().Where(r => !r.IsNewRow).Select(r => $"{r.Cells[0].Value}|{r.Cells[1].Value}|{r.Cells[2].Value}|{r.Cells[3].Value}").ToList();
@@ -1065,7 +1131,8 @@ public partial class FormCrono : Form
         // com a verde dada mas nenhum kart na linha ainda, o cronômetro fica parado em zero
         var andando = _sess.S("state") is "em_andamento" or "bandeira_final" && !_sess.B("aguardandoLargada");
         var delta = andando && _sess.S("currentFlag") != "red" ? (long)(DateTime.Now - _lidoEm).TotalMilliseconds : 0;
-        _lCrono.Text = Crono.Relogio((_sess.L("elapsedMs") ?? 0) + delta);
+        var sufOffline = _servidorOk ? "" : " [OFFLINE]";
+        _lCrono.Text = Crono.Relogio((_sess.L("elapsedMs") ?? 0) + delta) + sufOffline;
         // o tempo acabou: a prova continua até o cronometrista dar a quadriculada (nunca encerra sozinha)
         var esgotado = _sess.S("state") == "em_andamento" && _sess.L("durationMs") > 0 && (_sess.B("tempoEsgotado") || _sess.L("remainingMs") is long r0 && r0 - delta <= 0);
         _lRestante.Text = esgotado ? "ESGOTADO" : _sess.L("remainingMs") is long rest ? Crono.Relogio(Math.Max(0, rest - delta))[..8] : "---";
@@ -1149,7 +1216,8 @@ public partial class FormCrono : Form
             if (!string.IsNullOrWhiteSpace(category)) category = IdCategoria(category);
             comps.Add(new JsonObject { ["kart"] = kart, ["name"] = nome, ["customerId"] = string.IsNullOrEmpty(cid) ? null : cid, ["category"] = string.IsNullOrEmpty(category) ? null : category });
         }
-        await Crono.Api.Patch("/api/sessions/" + _sess.S("id"), new JsonObject { ["competitors"] = comps });
+        var targetId = _pilotosDe ?? _sess.S("id");
+        await Crono.Api.Patch("/api/sessions/" + targetId, new JsonObject { ["competitors"] = comps });
         _pilotosSujos = false;
         await Atualizar();
         Msg.Info(this, "Competidores salvos.");

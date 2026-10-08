@@ -1,4 +1,4 @@
-﻿<#
+<#
   Instala um programa do Kartodromo (Windows, .NET self-contained) num PC. Roda como administrador,
   local ou via Invoke-Command. Substitui os antigos atalhos do Chrome (--app) de instalar-app.ps1.
 
@@ -19,6 +19,7 @@ param(
   [string]$ServidorUrl = 'http://192.168.20.13:4060',
   [string]$CronometragemUrl = 'http://192.168.20.249:4050',
   [string]$Impressora = '',
+  [string]$ChaveCronometragem = '',
   [switch]$IniciarNoLogon,
   [switch]$TvNoLogon
 )
@@ -64,6 +65,8 @@ foreach ($arq in Get-ChildItem $destino -Recurse -File) {
 }
 $cfg = [ordered]@{ ServidorUrl = $ServidorUrl; CronometragemUrl = $CronometragemUrl }
 if ($anterior -and $anterior.ImpressoraTermos) { $cfg.ImpressoraTermos = $anterior.ImpressoraTermos }
+if ($anterior -and $anterior.ChaveCronometragem) { $cfg.ChaveCronometragem = $anterior.ChaveCronometragem }
+elseif ($ChaveCronometragem) { $cfg.ChaveCronometragem = $ChaveCronometragem }
 if ($App -eq 'Autoatendimento') { $cfg.Impressora = $Impressora }
 if ($App -eq 'Cronometragem') { $cfg.TvModo = 'placar' }
 [IO.File]::WriteAllText("$destino\appsettings.json", ($cfg | ConvertTo-Json), (New-Object Text.UTF8Encoding $false))

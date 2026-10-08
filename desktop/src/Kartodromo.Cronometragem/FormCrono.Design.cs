@@ -227,9 +227,22 @@ public partial class FormCrono
             for (var i = botoesSaida.Count - 1; i >= 0; i--) { xr -= 46; botoesSaida[i].Location = new Point(xr, 16); xr -= 6; }
             xr -= 14;
             var w = Math.Max(passTitulo.Width, _lPassagens.Width);
-            passTitulo.Location = new Point(xr - w + (w - passTitulo.Width) / 2, 13);
-            _lPassagens.Location = new Point(xr - w + (w - _lPassagens.Width) / 2, 29);
-            cbCaixa.Width = Math.Clamp(xr - w - 20 - cbCaixa.Left, 120, 330); _cbSessao.Width = cbCaixa.Width - 16;
+            var xContador = xr - w;
+            passTitulo.Location = new Point(xContador + (w - passTitulo.Width) / 2, 13);
+            _lPassagens.Location = new Point(xContador + (w - _lPassagens.Width) / 2, 29);
+
+            var espacoLivre = xContador - 16 - cbCaixa.Left;
+            if (espacoLivre >= 80)
+            {
+                cbCaixa.Visible = true;
+                cbCaixa.Width = Math.Min(espacoLivre, 330);
+                _cbSessao.Width = cbCaixa.Width - 16;
+            }
+            else
+            {
+                cbCaixa.Width = Math.Max(60, espacoLivre);
+                _cbSessao.Width = Math.Max(44, cbCaixa.Width - 16);
+            }
         }
         barra.Resize += (_, _) => Posicionar(); _lPassagens.SizeChanged += (_, _) => Posicionar();
         return barra;
@@ -340,22 +353,43 @@ public partial class FormCrono
 
     Control Legenda()
     {
-        var l = new Panel { Dock = DockStyle.Bottom, Height = 34, BackColor = Color.FromArgb(251, 251, 253) };
+        var l = new Panel { Dock = DockStyle.Bottom, Height = 48, BackColor = Color.FromArgb(251, 251, 253) };
         l.Paint += (_, e) =>
         {
             var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
             using (var p = new Pen(Color.FromArgb(237, 237, 237))) g.DrawLine(p, 0, 0, l.Width, 0);
-            using var f = new Font("Segoe UI", 8.6F); using var fb = new Font("Segoe UI Semibold", 8.6F);
+            using var f = new Font("Segoe UI", 8.4F);
+            using var fb = new Font("Segoe UI Semibold", 8.4F);
+
+            bool duasLinhas = l.Width < 860;
+            if (l.Height != (duasLinhas ? 48 : 32)) l.Height = duasLinhas ? 48 : 32;
+
             var x = 12;
-            void Bola(Color c, string t)
+            var y1 = duasLinhas ? 6 : 8;
+            var y2 = duasLinhas ? 26 : 8;
+
+            void Bola(Color c, string t, int cy)
             {
-                using (var b = new SolidBrush(c)) g.FillEllipse(b, x, 13, 8, 8);
-                x += 14; TextRenderer.DrawText(g, t, f, new Point(x, 9), Color.FromArgb(58, 58, 60)); x += TextRenderer.MeasureText(t, f).Width + 10;
+                using var b = new SolidBrush(c); g.FillEllipse(b, x, cy + 3, 8, 8);
+                x += 13; TextRenderer.DrawText(g, t, f, new Point(x, cy), Color.FromArgb(58, 58, 60)); x += TextRenderer.MeasureText(t, f).Width + 8;
             }
-            void Txt(string t, Color c, Font fo) { TextRenderer.DrawText(g, t, fo, new Point(x, 9), c); x += TextRenderer.MeasureText(t, fo).Width + 10; }
-            Bola(Color.FromArgb(52, 199, 89), "Mesma volta do líder"); Bola(Color.FromArgb(255, 204, 0), "Até 2 voltas atrás"); Bola(Color.FromArgb(255, 59, 48), "Até 5 voltas atrás"); Bola(Color.FromArgb(29, 29, 31), "Mais de 5 voltas");
-            Txt("▲ ganhou posição", Color.FromArgb(28, 107, 53), f); Txt("▼ perdeu posição", TemaCrono.Vermelho, f); Txt("■ melhor volta da prova", Color.FromArgb(122, 47, 194), fb);
+            void Txt(string t, Color c, Font fo, int cy)
+            {
+                TextRenderer.DrawText(g, t, fo, new Point(x, cy), c); x += TextRenderer.MeasureText(t, fo).Width + 8;
+            }
+
+            Bola(Color.FromArgb(52, 199, 89), "Mesma volta", y1);
+            Bola(Color.FromArgb(255, 204, 0), "Até 2 voltas", y1);
+            Bola(Color.FromArgb(255, 59, 48), "Até 5 voltas", y1);
+            Bola(Color.FromArgb(29, 29, 31), "> 5 voltas", y1);
+
+            if (duasLinhas) { x = 12; }
+
+            Txt("▲ subiu", Color.FromArgb(28, 107, 53), f, duasLinhas ? y2 : y1);
+            Txt("▼ caiu", TemaCrono.Vermelho, f, duasLinhas ? y2 : y1);
+            Txt("■ melhor volta da prova", Color.FromArgb(122, 47, 194), fb, duasLinhas ? y2 : y1);
         };
+        l.Resize += (_, _) => l.Invalidate();
         return l;
     }
 
@@ -591,15 +625,38 @@ public class BotaoQuadrado : Control
     public Action<Graphics, RectangleF> Pano { get; init; }
     public string Cor { get; init; }
     public string Svg { get; init; }
-    public string Dica { set => new ToolTip().SetToolTip(this, value); }
+    public string Dica
+    {
+        get => AccessibleDescription;
+        set
+        {
+            AccessibleDescription = value;
+            if (string.IsNullOrEmpty(AccessibleName)) AccessibleName = value;
+            new ToolTip().SetToolTip(this, value);
+        }
+    }
 
     public BotaoQuadrado()
     {
-        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
+        TabStop = true;
+        AccessibleRole = AccessibleRole.PushButton;
         Size = new Size(46, 46); Cursor = Cursors.Hand;
     }
     protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); _sobre = true; Invalidate(); }
     protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); _sobre = false; Invalidate(); }
+    protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
+    protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.KeyCode is Keys.Enter or Keys.Space)
+        {
+            e.Handled = true;
+            OnClick(EventArgs.Empty);
+        }
+    }
 
     protected override void OnPaint(PaintEventArgs e)
     {
@@ -624,6 +681,13 @@ public class BotaoQuadrado : Control
             g.SmoothingMode = SmoothingMode.None;
             Pano?.Invoke(g, q);
             using var borda = new Pen(Color.FromArgb(50, 0, 0, 0)); g.DrawRectangle(borda, q.X, q.Y, q.Width, q.Height);
+        }
+
+        if (Focused)
+        {
+            using var pFoco = new Pen(Color.FromArgb(11, 122, 83), 2f);
+            using var pathFoco = Forma.Redondo(new RectangleF(r.X - 1, r.Y - 1, r.Width + 2, r.Height + 2), 12);
+            g.DrawPath(pFoco, pathFoco);
         }
     }
 }

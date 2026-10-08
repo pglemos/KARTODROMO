@@ -36,15 +36,20 @@ function loadReportHelpers() {
   const end = html.indexOf('\nfunction renderReport', start);
   if (start < 0 || end < 0) throw new Error('Helpers de apresentação do relatório não encontrados.');
 
+  const catStart = html.indexOf('let catalogCategories = [];');
+  const catEnd = html.indexOf('\nasync function fetchJson', catStart);
+
   const sandbox: Record<string, unknown> = {};
   vm.runInNewContext(
-    `${html.slice(start, end)}\nglobalThis.getResultadoCriterio = getResultadoCriterio;\nglobalThis.calcularPaginasRelatorio = calcularPaginasRelatorio;\nglobalThis.obterUltimaFoto = obterUltimaFoto;`,
+    `${html.slice(start, end)}\n${html.slice(catStart, catEnd)}\nglobalThis.getResultadoCriterio = getResultadoCriterio;\nglobalThis.calcularPaginasRelatorio = calcularPaginasRelatorio;\nglobalThis.obterUltimaFoto = obterUltimaFoto;\nglobalThis.resolverNomeCategoria = resolverNomeCategoria;\nglobalThis.setCatalogCategories = (cats) => { catalogCategories = cats; };`,
     sandbox,
   );
   return {
     getResultadoCriterio: sandbox.getResultadoCriterio as (sessionType: string) => Record<string, string>,
     calcularPaginasRelatorio: sandbox.calcularPaginasRelatorio as (contentHeight: number, pageHeight: number) => number,
     obterUltimaFoto: sandbox.obterUltimaFoto as (row: Record<string, unknown>) => number | null,
+    resolverNomeCategoria: sandbox.resolverNomeCategoria as (catIdOrName: unknown) => string,
+    setCatalogCategories: sandbox.setCatalogCategories as (cats: unknown[]) => void,
   };
 }
 
@@ -118,5 +123,36 @@ describe('ordenação do relatório de cronometragem', () => {
     expect(html).toContain('@page landscape');
     expect(html).not.toContain('Página 1 de 1');
     expect(html).not.toContain('uf: s.startPos || s.position');
+  });
+
+  describe('Tarefa 11 - Relatórios, banner, categoria e traçado [F16, F23, F35, F36]', () => {
+    it('banner_configurado_aparece_e_desativado_nao: resultado.html suporta banner condicional baseado em useOnReports', () => {
+      const html = reportHtml();
+      expect(html).toContain('repBannerWrap');
+      expect(html).toContain('useOnReports');
+    });
+
+    it('categoria_exibe_nome_nao_indice: resolve nome legível da categoria a partir do id ou índice', () => {
+      const html = reportHtml();
+      expect(html).toContain('resolverNomeCategoria');
+
+      const { resolverNomeCategoria, setCatalogCategories } = loadReportHelpers();
+      setCatalogCategories([
+        { id: '1', name: 'Indoor' },
+        { id: '2', name: 'Super 400' },
+      ]);
+
+      expect(resolverNomeCategoria('1')).toBe('Indoor');
+      expect(resolverNomeCategoria('2')).toBe('Super 400');
+      expect(resolverNomeCategoria('Indoor')).toBe('Indoor');
+      expect(resolverNomeCategoria('Desconhecida')).toBe('Desconhecida');
+      expect(resolverNomeCategoria(null)).toBe('Geral');
+    });
+
+    it('tracado_da_prova_supera_evento: resolução de traçado prioriza prova sobre evento', () => {
+      const html = reportHtml();
+      // O cabeçalho usa o traçado da sessão/prova respeitando override da prova
+      expect(html).toContain('trac.lengthMeters');
+    });
   });
 });

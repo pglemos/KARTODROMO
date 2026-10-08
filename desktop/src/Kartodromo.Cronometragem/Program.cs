@@ -31,7 +31,7 @@ static class Program
 /// <summary>Acesso ao servico de cronometragem (ORBITS :4050) e formatos de tempo.</summary>
 public static class Crono
 {
-    public static readonly Api Api = new(Config.CronoUrl, TimeSpan.FromSeconds(8));
+    public static readonly Api Api = new(Config.CronoUrl, TimeSpan.FromSeconds(8)) { ChaveTiming = Config.ChaveCrono };
 
     public static string Volta(long? ms)
     {

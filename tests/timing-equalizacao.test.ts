@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyPassing, closeSession, createSession, startSession, type Session } from '../lib/timing/race-engine';
+import { applyPassing, closeSession, createSession, startSession, setCompetitors, type Session } from '../lib/timing/race-engine';
 import { ajusteRedutorMm, calcularComAnteriores, calcularEqualizacao, faixasDaRegra, fmtTempoVolta, importarKarts, tempoVoltaParaMs, textoAjuste, ultimaEqualizacaoPorKart, voltasNasBaterias } from '../lib/timing/equalizacao';
 import { rankingKarts } from '../lib/timing/ranking-karts';
 
@@ -99,6 +99,43 @@ describe('equalização dos karts', () => {
     // mexer na cópia não muda a bateria de origem
     eq.competitors.find((c) => c.kart === '60')!.crossings[1].deleted = true;
     expect(origem.competitors.find((c) => c.kart === '60')!.crossings[1].deleted).toBeUndefined();
+  });
+
+  it('equalizacao_importa_apenas_voltas_do_kart_fisico: 60000 ms no kart4, 90000/90000 no kart5; importar5/meta90000; assert bloco contém somente [90000,90000] e não sugere −14,9 mm', () => {
+    const origem = createSession({ id: 'bateria-1', name: 'Treino', type: 'treino', durationMin: 20, now: BASE });
+    startSession(origem, BASE);
+    setCompetitors(origem, [{ kart: '4', name: 'Piloto A', customerId: '10' }]);
+
+    // Piloto A dá volta de 60s no kart 4
+    applyPassing(origem, { kart: '4', decoderTimeMs: 0, wallMs: BASE });
+    applyPassing(origem, { kart: '4', decoderTimeMs: 60_000, wallMs: BASE + 60_000 }); // volta de 60s
+
+    // Troca para o kart 5
+    setCompetitors(origem, [{ kart: '5', name: 'Piloto A', customerId: '10' }]);
+
+    // No kart 5, Piloto A dá duas voltas de 90s
+    applyPassing(origem, { kart: '5', decoderTimeMs: 150_000, wallMs: BASE + 150_000 });
+    applyPassing(origem, { kart: '5', decoderTimeMs: 240_000, wallMs: BASE + 240_000 }); // volta 1 no kart 5 = 90s
+    applyPassing(origem, { kart: '5', decoderTimeMs: 330_000, wallMs: BASE + 330_000 }); // volta 2 no kart 5 = 90s
+
+    // Sessão de equalização com meta de 90s fixa
+    const eq = createSession({ id: 'eq-1', name: 'Equalização', type: 'equalizacao', durationMin: 0, now: BASE + 400_000 });
+    eq.equalizacao = { metaModo: 'fixa', metaFixaMs: 90_000, toleranciaMs: 200 };
+
+    // Importa kart 5
+    const resImport = importarKarts(eq, origem, ['5']);
+    expect(resImport.importados).toHaveLength(1);
+    expect(resImport.importados[0].kart).toBe('5');
+
+    const r = calcularEqualizacao(eq);
+    const k5 = r.karts.find((k) => k.kart === '5')!;
+    expect(k5).toBeDefined();
+    expect(k5.blocos[0].voltasMs).toEqual([90_000, 90_000]);
+    expect(k5.blocos[0].melhorMs).toBe(90_000);
+    expect(k5.blocos[0].ajusteMm).toBe(0);
+    expect(k5.status).toBe('EQUALIZADO');
+    // Não sugere fechar redutor excessivo (-14,9 mm)!
+    expect(k5.ajusteMm).not.toBeLessThan(-1);
   });
 
   it('kart que ficou para revisar continua no bloco 2 na equalização seguinte; referência e kart novo começam no bloco 1', () => {

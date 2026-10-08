@@ -376,6 +376,11 @@ public sealed class FormRelatoriosCrono : Form
         return path;
     }
 
+    static string DataDaSessao(JsonObject s) =>
+        s.L("createdAt") is long ms && ms > 0
+            ? DateTimeOffset.FromUnixTimeMilliseconds(ms).LocalDateTime.ToString("dd/MM/yyyy")
+            : DateTime.Today.ToString("dd/MM/yyyy");
+
     void CarregarDados()
     {
         _sessoes = Crono.Arr(_state, "sessions");
@@ -383,14 +388,24 @@ public sealed class FormRelatoriosCrono : Form
 
         // Preenche datas distintas
         var datas = _sessoes
-            .Select(s => s.L("createdAt") is long ms && ms > 0 ? DateTimeOffset.FromUnixTimeMilliseconds(ms).LocalDateTime.ToString("dd/MM/yyyy") : DateTime.Today.ToString("dd/MM/yyyy"))
+            .Select(DataDaSessao)
             .Distinct()
             .ToList();
         if (datas.Count == 0) datas.Add(DateTime.Today.ToString("dd/MM/yyyy"));
 
         _cbData.Items.Clear();
         foreach (var d in datas) _cbData.Items.Add(d);
-        _cbData.SelectedIndex = 0;
+
+        if (_sessaoInicial != null)
+        {
+            var dataInicial = DataDaSessao(_sessaoInicial);
+            var idxData = datas.IndexOf(dataInicial);
+            _cbData.SelectedIndex = idxData >= 0 ? idxData : 0;
+        }
+        else
+        {
+            _cbData.SelectedIndex = 0;
+        }
 
         // Preenche eventos
         _cbEvento.Items.Clear();
@@ -400,19 +415,29 @@ public sealed class FormRelatoriosCrono : Form
         // Preenche grupos
         AtualizarGrupos();
 
-        _cbData.SelectedIndexChanged += (_, _) => { AtualizarGrupos(); };
+        _cbData.SelectedIndexChanged += (_, _) =>
+        {
+            _cbEvento.Items.Clear();
+            _cbEvento.Items.Add("Baterias " + _cbData.SelectedItem);
+            _cbEvento.SelectedIndex = 0;
+            AtualizarGrupos();
+        };
         _cbGrupo.SelectedIndexChanged += (_, _) => { AtualizarProvas(); };
     }
 
     void AtualizarGrupos()
     {
-        var grupos = _sessoes.Select(s => ExtrairGrupo(s.S("name"))).Distinct().ToList();
+        var dataSel = _cbData.SelectedItem?.ToString() ?? "";
+        var sessoesDoDia = _sessoes.Where(s => DataDaSessao(s) == dataSel).ToList();
+        if (sessoesDoDia.Count == 0) sessoesDoDia = _sessoes;
+
+        var grupos = sessoesDoDia.Select(s => ExtrairGrupo(s.S("name"))).Distinct().ToList();
         if (grupos.Count == 0) grupos.Add("BATERIA " + DateTime.Now.ToString("HH:mm"));
 
         _cbGrupo.Items.Clear();
         foreach (var g in grupos) _cbGrupo.Items.Add(g);
 
-        if (_sessaoInicial != null)
+        if (_sessaoInicial != null && DataDaSessao(_sessaoInicial) == dataSel)
         {
             var grupoInicial = ExtrairGrupo(_sessaoInicial.S("name"));
             var idx = grupos.IndexOf(grupoInicial);
@@ -425,8 +450,10 @@ public sealed class FormRelatoriosCrono : Form
 
     void AtualizarProvas()
     {
+        var dataSel = _cbData.SelectedItem?.ToString() ?? "";
         var grupoSel = _cbGrupo.SelectedItem?.ToString() ?? "";
-        var candidatas = _sessoes.Where(s => ExtrairGrupo(s.S("name")) == grupoSel).ToList();
+        var candidatas = _sessoes.Where(s => DataDaSessao(s) == dataSel && ExtrairGrupo(s.S("name")) == grupoSel).ToList();
+        if (candidatas.Count == 0) candidatas = _sessoes.Where(s => DataDaSessao(s) == dataSel).ToList();
         if (candidatas.Count == 0) candidatas = _sessoes;
 
         _cbProva.Items.Clear();

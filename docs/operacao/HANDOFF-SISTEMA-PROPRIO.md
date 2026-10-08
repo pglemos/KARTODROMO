@@ -546,6 +546,16 @@ Tudo isso **já está instalado e rodando** nas máquinas.
 
 ---
 
+## 10.1 Correções da Auditoria de Cronometragem (06/10/2026)
+
+Implementação e validação integral dos 43 achados da auditoria esportiva e técnica (F01–F43):
+- **Motor e Integridade:** Preservação estrita de punições na edição de baterias (F02); chegada manual após bandeira quadriculada (F08); congelamento de tempo em bandeira vermelha (F26); rastreamento de karts físicos em trocas cruzadas para equalização e oficina (F09, F11, F12); normalização do catálogo e proteção contra concorrência no sorteio via `revisaoLista` (F03, F10).
+- **Segurança e Integrações:** Criação da credencial `TIMING_API_KEY` (`x-timing-key`) para autenticação de rotas de mutação sem vazar dados de clientes em leituras públicas (F01, F05); deduplicação e controle transacional no SQL Server via tabela `dbo.CronoUsoKarts` (F04); diário bruto desacoplado com tolerância a falhas de disco (F13, F14); envio de e-mail de resultados com jobs serializados e teste SMTP efêmero (F15, F22).
+- **Interface e Acessibilidade WinForms:** Associação bidirecional de equipes e transponders (F19); robustez em campos numéricos e preservação de duração em provas por voltas (F20, F21); layout adaptativo para resoluções de 1366×768 e escalas de DPI (F28, F29, F30, F31, F32, F43); acessibilidade nativa completa em `TabelaDesign` e `BotaoQuadrado` com suporte a teclado (Enter, Espaço, Setas) e prevenção de recursão na seleção de catálogo (F33, F34, F37); relatórios nativos com filtros em cascata, 4 faixas de peso e rótulos precisos (F16, F23, F35, F36, F39, F40, F41).
+- **Roteiro de Implantação:** Documentado em `docs/operacao/CHECKLIST-IMPLANTACAO-CRONOMETRAGEM.md` com os gates obrigatórios (Migration SQL, chaves de API, reinício de serviços e testes com hardware real).
+
+---
+
 ## 11. Pendências e alertas
 
 1. **Publicar no GitHub pelo Mac** (seção 3.2), enquanto o ORBITS não tiver login com escrita.

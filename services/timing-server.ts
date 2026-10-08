@@ -50,6 +50,7 @@ import {
   tick,
   toggleLapInvalid,
   updateSessionParameters,
+  sanitizarCompetidorDetalhes,
   type Session,
   type SessionType,
   type TrocaDeKart,
@@ -71,7 +72,20 @@ import { calcularComAnteriores, faixasDaRegra, importarKarts, REGRA_PADRAO, regr
 import { nomeProprio } from '../lib/nomes';
 import { configPublica, enviarResultado, enviarTeste, lerConfig, salvarConfig, traduzirErro, type Dependencias } from './timing-email';
 import type { ContextoProva, EmpresaEmail } from '../lib/timing/email-resultado';
-import { competidoresComSorteio, descricaoModoSorteio, pilotosDoSorteio, validarSorteio, type Atribuicao } from '../lib/timing/sorteio';
+import { competidoresComSorteio, descricaoModoSorteio, pilotosDoSorteio, validarSorteio, revisaoListaSorteio, type Atribuicao } from '../lib/timing/sorteio';
+import { usoKartsDaSessao } from '../lib/timing/kart-fisico';
+import {
+  corsHeaders,
+  rotaExigeChave,
+  sanitizarCompetidoresPublicos,
+  validarChaveTiming,
+} from '../lib/timing/api-access';
+import {
+  createTimingBackup as persistenceBackup,
+  loadCatalogSafely,
+  processarPassagemSegura,
+  saveCatalogSafely,
+} from '../lib/timing/persistence';
 
 // ---------------------------------------------------------------- config
 
@@ -89,6 +103,10 @@ function loadLocalEnv() {
   }
 }
 loadLocalEnv();
+
+if (!process.env.TIMING_API_KEY) {
+  console.warn('ATENCAO: TIMING_API_KEY vazio, mutações e rotas privadas ficam bloqueadas.');
+}
 
 const PORT = Number(process.env.TIMING_PORT || 4050);
 const SIMULATE = process.env.TIMING_SIMULATE === '1';
@@ -159,10 +177,10 @@ function loadTransponders() {
 }
 loadTransponders();
 
-let catalog: TimingCatalog = emptyCatalog();
-if (existsSync(CATALOG_FILE)) {
-  try { catalog = normalizeCatalog(JSON.parse(readFileSync(CATALOG_FILE, 'utf8'))); }
-  catch (err) { log('cadastro de eventos ilegível; iniciando vazio', err); }
+let catalogLoadState = loadCatalogSafely(CATALOG_FILE);
+let catalog: TimingCatalog = catalogLoadState.catalog;
+if (!catalogLoadState.isValid) {
+  log('ALARME OPERACIONAL: cadastro de eventos corrompido ou ilegível; cópia preservada em', catalogLoadState.corruptedPreservedPath);
 }
 
 let timingSettings: Record<string, unknown> = {};
@@ -181,7 +199,7 @@ let activeDecoderConfig: DecoderConfig = {
   port: SIMULATE ? SIM_PORT : Number(configuredDecoder.port || ENV_DECODER_PORT),
 };
 
-function saveCatalog() { writeJsonAtomic(CATALOG_FILE, catalog); }
+function saveCatalog() { saveCatalogSafely(CATALOG_FILE, catalog, catalogLoadState.isValid); }
 function saveTimingSettings() { writeJsonAtomic(SETTINGS_FILE, timingSettings); }
 
 function saveTransponders() {
@@ -363,6 +381,12 @@ function defaultTrackLength() {
   return Number(system.defaultTrackLengthMeters ?? timingSettings.defaultTrackLengthMeters) || 1_000;
 }
 
+function nomeDaCategoria(catIdOrName?: string | null): string | null {
+  if (!catIdOrName) return null;
+  const c = catalog.categories.find((cat) => cat.id === catIdOrName || cat.name === catIdOrName);
+  return c?.name ?? catIdOrName;
+}
+
 function trackDa(s: Session) {
   const id = trackIdDa(s);
   const t = id ? catalog.tracks.find((item) => item.id === id) : undefined;
@@ -427,17 +451,27 @@ function handleDecoderPassing(p: TrxPassing) {
       lapMs = comp?.crossings[comp.crossings.length - 1]?.lapMs ?? null;
     }
   }
-  if (session && result !== 'counted') {
-    // toda leitura aparece pro operador, mesmo a que não virou volta
-    const vivos = session.competitors.find((c) => c.kart === kart)?.crossings.filter((x) => !x.deleted) ?? [];
-    const last = vivos[vivos.length - 1];
-    (session.rejected ??= []).push({ id, kart, transponder: p.transponder, wallMs, decoderTimeMs: p.decoderTimeMs, reason: result, sinceLastMs: last ? wallMs - last.wallMs : null });
-    if (session.rejected.length > 2000) session.rejected.splice(0, session.rejected.length - 2000);
-  }
-  if (session) saveSession(session);
 
-  // diario primeiro: e a fonte de verdade pra reconstruir qualquer bateria
-  journal({ wallMs, raw: p.raw, transponder: p.transponder, kart, decoderTimeMs: p.decoderTimeMs, seq: p.sequence, sessionId: session?.id ?? null, result });
+  processarPassagemSegura({
+    passing: p,
+    session,
+    kart,
+    wallMs,
+    journal,
+    applyEngine: () => {
+      if (session && result !== 'counted') {
+        // toda leitura aparece pro operador, mesmo a que não virou volta
+        const vivos = session.competitors.find((c) => c.kart === kart)?.crossings.filter((x) => !x.deleted) ?? [];
+        const last = vivos[vivos.length - 1];
+        (session.rejected ??= []).push({ id, kart, transponder: p.transponder, wallMs, decoderTimeMs: p.decoderTimeMs, reason: result, sinceLastMs: last ? wallMs - last.wallMs : null });
+        if (session.rejected.length > 2000) session.rejected.splice(0, session.rejected.length - 2000);
+      }
+      return result;
+    },
+    saveSession: (s) => saveSession(s),
+    onAlarm: (msg, err) => log(msg, err),
+  });
+
   log(`passagem transponder ${p.transponder} -> kart ${kart ?? '?'} (${result})`);
 
   recentPassings.unshift({ id, wallMs, transponder: p.transponder, kart, result, lapMs, sessionId: session?.id ?? null });
@@ -509,14 +543,14 @@ function sessionView(s: Session) {
     observations: s.observations ?? [],
     // nome próprio só na exibição (telão, resultado, operador): o cadastro vinha TUDO MAIÚSCULO ou tudo minúsculo
     competitors: s.competitors.map((c) => ({
-      kart: c.kart, name: nomeProprio(c.name), customerId: c.customerId ?? null, category: c.category ?? null, flag: c.flag ?? 'none', autoAdded: Boolean(c.autoAdded), detalhes: c.detalhes ?? null,
+      kart: c.kart, name: nomeProprio(c.name), customerId: c.customerId ?? null, category: nomeDaCategoria(c.category), flag: c.flag ?? 'none', autoAdded: Boolean(c.autoAdded), detalhes: c.detalhes ?? null,
       // já passou na linha nesta bateria (a lista de competidores fica amarela até o kart passar)
       passou: c.crossings.some((x) => !x.deleted),
       // volta em que o kart está agora (vai no texto padrão da advertência/penalidade)
       voltaAtual: voltaAtualDoKart(s, c),
       penalidades: c.penalidades ?? [],
     })),
-    standings: computeStandings(s, trackLengthFor(s)).filter((r) => !s.competitors.find((c) => c.kart === r.kart && c.name === r.name)?.detalhes?.oculto).map((r) => ({ ...r, name: nomeProprio(r.name) })),
+    standings: computeStandings(s, trackLengthFor(s)).filter((r) => !s.competitors.find((c) => c.kart === r.kart && c.name === r.name)?.detalhes?.oculto).map((r) => ({ ...r, name: nomeProprio(r.name), category: nomeDaCategoria(r.category) })),
     emailsResultado: s.emailsResultado ?? null,
   };
 }
@@ -693,10 +727,11 @@ setInterval(() => {
 
 function send(res: http.ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}) {
   const isString = typeof body === 'string';
+  const cors = (res as any).__cors || {};
   res.writeHead(status, {
     'content-type': isString ? 'text/plain; charset=utf-8' : 'application/json; charset=utf-8',
-    'access-control-allow-origin': '*',
     'cache-control': 'no-store',
+    ...cors,
     ...headers,
   });
   res.end(isString ? body : JSON.stringify(body));
@@ -890,6 +925,8 @@ async function opsGet(path: string) {
   return data;
 }
 
+const enviosUsoKartsEmAndamento = new Set<string>();
+
 /**
  * Horas de uso dos karts para a oficina (Manutenções no Módulo Office): ao encerrar a bateria manda quantos minutos
  * cada kart ficou na pista (da primeira à última passagem). Uma vez por bateria; se o servidor da operação estiver
@@ -898,13 +935,15 @@ async function opsGet(path: string) {
 async function enviarUsoKarts(s: Session) {
   // simulador (testes) nunca grava horas de uso de mentira no controle da oficina de verdade
   if (SIMULATE || s.usoKartsEnviado || s.state !== 'encerrada') return;
-  const karts = s.competitors
-    .map((c) => {
-      const t = c.crossings.filter((x) => !x.deleted).map((x) => x.wallMs).sort((a, b) => a - b);
-      return { kart: c.kart, minutos: t.length > 1 ? Math.round((t[t.length - 1] - t[0]) / 60_000) : 0 };
-    })
-    .filter((k) => k.kart && k.minutos > 0);
-  if (!karts.length) { s.usoKartsEnviado = true; saveSession(s); return; }
+  if (enviosUsoKartsEmAndamento.has(s.id)) return;
+  enviosUsoKartsEmAndamento.add(s.id);
+  const karts = usoKartsDaSessao(s, transponderMap);
+  if (!karts.length) {
+    s.usoKartsEnviado = true;
+    saveSession(s);
+    enviosUsoKartsEmAndamento.delete(s.id);
+    return;
+  }
   try {
     const r = await fetch(OPS_URL + '/api/crono/uso-karts', {
       method: 'POST',
@@ -913,13 +952,22 @@ async function enviarUsoKarts(s: Session) {
       body: JSON.stringify({ sessaoId: s.id, agendaId: await agendaIdDa(s), karts }),
       signal: AbortSignal.timeout(8000),
     });
-    const d = (await r.json().catch(() => ({}))) as { somados?: number; criados?: number; ignorados?: number; categoria?: string | null; error?: string };
+    const d = (await r.json().catch(() => ({}))) as {
+      somados?: number;
+      criados?: number;
+      ignorados?: number;
+      categoria?: string | null;
+      jaAplicado?: boolean;
+      error?: string;
+    };
     if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
     s.usoKartsEnviado = true;
     saveSession(s);
-    log(`uso dos karts de ${s.name} enviado para a oficina: ${karts.length} karts, ${d.somados ?? 0} controles somados, ${d.criados ?? 0} novos, ${d.ignorados ?? 0} sem controle (${d.categoria ?? 'sem categoria'})`);
+    log(`uso dos karts de ${s.name} enviado para a oficina: ${karts.length} karts, ${d.somados ?? 0} controles somados, ${d.criados ?? 0} novos, ${d.ignorados ?? 0} sem controle (${d.categoria ?? 'sem categoria'})${d.jaAplicado ? ' [já aplicado anteriormente]' : ''}`);
   } catch (err) {
     log(`uso dos karts de ${s.name} não foi enviado (tenta de novo): ${(err as Error).message}`);
+  } finally {
+    enviosUsoKartsEmAndamento.delete(s.id);
   }
 }
 setInterval(() => {
@@ -1223,18 +1271,7 @@ function probeTcp(host: string, port: number) {
 }
 
 function createTimingBackup() {
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const target = join(DATA_DIR, 'backups', `timing-${stamp}`);
-  mkdirSync(target, { recursive: true });
-  for (const name of ['sessions', 'passagens']) {
-    const source = join(DATA_DIR, name);
-    if (existsSync(source)) cpSync(source, join(target, name), { recursive: true, errorOnExist: false });
-  }
-  for (const name of ['transponders.json', 'catalog.json', 'settings.json']) {
-    const source = join(DATA_DIR, name);
-    if (existsSync(source)) copyFileSync(source, join(target, name));
-  }
-  return { path: target, files: readdirSync(target) };
+  return persistenceBackup(DATA_DIR);
 }
 
 function eventBackupDir() {
@@ -1269,6 +1306,7 @@ function restoreEventBackup(id: string) {
   if (!existsSync(file)) throw new Error('Cópia de eventos não encontrada.');
   const previousCatalog = catalog;
   catalog = normalizeCatalog(JSON.parse(readFileSync(file, 'utf8')));
+  catalogLoadState = { catalog, isValid: true };
   syncCatalogTransponders(previousCatalog, catalog);
   saveCatalog();
   scheduleStateBroadcast();
@@ -1335,6 +1373,12 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
   const path = url.pathname;
   const method = req.method ?? 'GET';
 
+  if (rotaExigeChave(method, path)) {
+    if (!validarChaveTiming(req)) {
+      return send(res, 401, { error: 'Não autorizado. Chave de cronometragem não configurada ou inválida.' });
+    }
+  }
+
   if (path === '/api/catalog' && method === 'GET') return send(res, 200, catalog);
   if (path === '/api/catalog/export' && method === 'GET') return send(res, 200, catalog, { 'content-disposition': 'attachment; filename="kartodromo-eventos.json"' });
   if (path === '/api/catalog/backups' && method === 'GET') return send(res, 200, listEventBackups());
@@ -1349,6 +1393,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       if (runningSession()) return send(res, 409, { error: 'Encerre a bateria em andamento antes de importar eventos.' });
       const previousCatalog = catalog;
       catalog = normalizeCatalog(await readBody(req));
+      catalogLoadState = { catalog, isValid: true };
       syncCatalogTransponders(previousCatalog, catalog);
       saveCatalog();
       scheduleStateBroadcast();
@@ -1409,7 +1454,11 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
   }
   if (path === '/api/email-config/teste' && method === 'POST') {
     const body = await readBody(req);
-    try { await enviarTeste(EMAIL_FILE, String(body.para ?? ''), SIMULATE); log(`e-mail de teste enviado para ${String(body.para ?? '')}`); return send(res, 200, { ok: true }); }
+    try {
+      await enviarTeste(EMAIL_FILE, String(body.para ?? ''), SIMULATE, body.config as Record<string, unknown> | undefined);
+      log(`e-mail de teste enviado para ${String(body.para ?? '')}`);
+      return send(res, 200, { ok: true });
+    }
     catch (e) { return send(res, 400, { error: `Não enviou: ${traduzirErro(e)}` }); }
   }
   if (path === '/api/settings' && method === 'GET') return send(res, 200, { ...timingSettings, decoder: activeDecoderConfig });
@@ -1427,6 +1476,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       const config = normalizeDecoderConfig(await readBody(req));
       const probe = await probeTcp(config.host, config.port);
       if (!probe.ok) return send(res, 502, { error: probe.error || 'Não foi possível conectar ao decoder.' });
+      if (runningSession()) return send(res, 409, { error: 'Uma bateria foi iniciada durante o teste do decoder. Alteração recusada.' });
       decoder.stop();
       activeDecoderConfig = config;
       timingSettings = { ...timingSettings, decoder: config };
@@ -1497,11 +1547,15 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     const prova = typeof body.proofId === 'string' && body.proofId ? catalog.provas.find((p) => p.id === body.proofId) : undefined;
     const jaExiste = prova ? [...sessions.values()].find((x) => x.proofId === prova.id && x.state !== 'cancelada') : undefined;
     if (jaExiste) return send(res, 200, sessionView(jaExiste));
+    const porVoltas = Boolean(body.maxLaps && Number(body.maxLaps) > 0);
+    const durPadrao = porVoltas ? 0 : Number((timingSettings.timing as Record<string, unknown> | undefined)?.defaultDurationMin ?? (type === 'corrida' ? 20 : type === 'classificacao' ? 5 : 10));
     const s = createSession({
       id: `${hojeBrasilia()}-${randomUUID().slice(0, 8)}`,
       name: String(body.name ?? ''),
       type,
-      durationMin: Number(body.durationMin ?? ((timingSettings.timing as Record<string, unknown> | undefined)?.defaultDurationMin ?? (type === 'corrida' ? 20 : type === 'classificacao' ? 5 : 10))),
+      durationMin: body.durationMin !== undefined && body.durationMin !== null && body.durationMin !== ''
+        ? Number(body.durationMin)
+        : durPadrao,
       maxLaps: body.maxLaps ? Number(body.maxLaps) : null,
       minLapSec: body.minLapSec ? Number(body.minLapSec) : prova?.minLapSec ? prova.minLapSec : Number((timingSettings.timing as Record<string, unknown> | undefined)?.minimumLapSeconds ?? 5),
       now: Date.now(),
@@ -1511,6 +1565,8 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       proofId: typeof body.proofId === 'string' ? body.proofId : null,
       programaId: typeof body.programaId === 'string' && body.programaId ? body.programaId : null,
     });
+    const trackId = typeof body.trackId === 'string' && body.trackId ? body.trackId : (prova?.trackId ?? null);
+    if (trackId) s.trackId = trackId;
     // bateria da agenda da recepção: guarda de qual horário veio (o app avisa antes de criar a mesma duas vezes)
     if (Number(body.agendaId) > 0) s.agendaId = Number(body.agendaId);
     if (prova?.agendaId && Number(prova.agendaId) > 0) {
@@ -1579,17 +1635,13 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     if (!s) return send(res, 404, { error: 'Bateria não encontrada.' });
     const i = Number(rc[2]);
     const atual = s.competitors[i];
-    if (!atual) return send(res, 404, { error: 'Competidor não encontrado nessa bateria.' });
     const body = await readBody(req);
-    const num = (v: unknown) => (v === '' || v == null || !Number.isFinite(Number(String(v).replace(',', '.'))) ? null : Number(String(v).replace(',', '.')));
-    const txt = (v: unknown, max = 80) => String(v ?? '').trim().slice(0, max);
-    const d = (body.detalhes ?? {}) as Record<string, unknown>;
-    const detalhes = {
-      sexo: txt(d.sexo, 20), iniciais: txt(d.iniciais, 6).toUpperCase(), email: txt(d.email, 160), patrocinador: txt(d.patrocinador), clube: txt(d.clube),
-      cidade: txt(d.cidade), estado: txt(d.estado, 4).toUpperCase(), pais: txt(d.pais, 40), box: txt(d.box, 20),
-      peso: num(d.peso), pesoIndumentaria: num(d.pesoIndumentaria), pesoLastro: num(d.pesoLastro), pontuacao: num(d.pontuacao),
-      oculto: Boolean(d.oculto), equipe: Array.isArray(d.equipe) ? (d.equipe as unknown[]).map((x) => txt(x, 100)).slice(0, 6) : [],
-    };
+    let detalhes;
+    try {
+      detalhes = sanitizarCompetidorDetalhes(body.detalhes && typeof body.detalhes === 'object' ? body.detalhes as Record<string, unknown> : undefined);
+    } catch (err) {
+      return send(res, 400, { error: (err as Error).message });
+    }
     const kart = typeof body.kart === 'string' ? body.kart.trim() : atual.kart;
     // o kart novo pode já estar na lista como "Kart 12" (passou na linha antes da troca): esse não conta
     // como outro piloto; as passagens dele vão para este competidor
@@ -1879,14 +1931,19 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         tipoKart: await tipoKartDa(s),
         karts: kartsCadastrados(),
         pilotos: pilotos.map((p) => ({ ...p, pesoKg: p.customerId ? pesos.get(p.customerId) ?? null : null })),
+        revisaoLista: revisaoListaSorteio(s),
       });
     }
     if (method === 'POST') {
       const body = await readBody(req);
       const atribuicoes = (Array.isArray(body.atribuicoes) ? body.atribuicoes : []) as Atribuicao[];
+      const revisaoEnviada = typeof body.revisaoLista === 'string' ? body.revisaoLista.trim() : null;
       try {
-        validarSorteio(s, atribuicoes, new Set(kartsCadastrados()));
-      } catch (err) { return send(res, 400, { error: (err as Error).message }); }
+        validarSorteio(s, atribuicoes, new Set(kartsCadastrados()), revisaoEnviada);
+      } catch (err) {
+        const status = (err as { status?: number }).status ?? 400;
+        return send(res, status, { error: (err as Error).message, revisaoAtual: revisaoListaSorteio(s) });
+      }
       const nomes = atribuicoes.map((a) => `${s.competitors[Number(a.indice)]?.name ?? '?'} → kart ${a.kart}`);
       setCompetitors(s, competidoresComSorteio(s, atribuicoes));
       const modo = descricaoModoSorteio(String(body.modo ?? ''));
@@ -1941,7 +1998,13 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     const action = m[2];
     const now = Date.now();
     try {
-      if (!action && method === 'GET') return send(res, 200, sessionView(s));
+      if (!action && method === 'GET') {
+        const view = sessionView(s);
+        if (!validarChaveTiming(req)) {
+          view.competitors = sanitizarCompetidoresPublicos(view.competitors);
+        }
+        return send(res, 200, view);
+      }
       if (action === 'emails' && !m[3] && method === 'GET') return send(res, 200, s.emailsResultado ?? null);
       if (action === 'emails' && !m[3] && method === 'POST') {
         // reenvio manual (menu da cronometragem): todos, só um kart, ou o resultado oficial para outro endereço
@@ -2233,12 +2296,14 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+  const cors = corsHeaders(req.headers.origin);
+  (res as any).__cors = cors;
   if (url.pathname === '/favicon.ico') {
     res.writeHead(204);
     return res.end();
   }
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET,POST,PUT,PATCH', 'access-control-allow-headers': 'content-type' });
+    res.writeHead(204, { ...cors, 'cache-control': 'no-store' });
     return res.end();
   }
   if (url.pathname === '/' || url.pathname === '/operador') return sendFile(res, 'operador.html');

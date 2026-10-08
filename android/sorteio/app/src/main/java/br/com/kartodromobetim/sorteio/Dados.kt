@@ -29,6 +29,7 @@ data class InfoSorteio(
     val tipoKart: String?,
     val karts: List<String>,
     val pilotos: List<Piloto>,
+    val revisaoLista: String? = null,
 )
 
 class ErroServidor(msg: String) : Exception(msg)
@@ -119,6 +120,10 @@ class Preferencias(ctx: Context) {
         get() = p.getString("servidor", null) ?: "http://192.168.20.249:4050"
         set(v) = p.edit().putString("servidor", v.trim().trimEnd('/')).apply()
 
+    var chave: String
+        get() = p.getString("chave", "") ?: ""
+        set(v) = p.edit().putString("chave", v.trim()).apply()
+
     var kartsFora: Set<String>
         get() = p.getStringSet("kartsFora", emptySet())!!.toSet()
         set(v) = p.edit().putStringSet("kartsFora", v).apply()
@@ -150,7 +155,7 @@ class Preferencias(ctx: Context) {
 }
 
 /** Serviço de cronometragem (ORBITS :4050). */
-class Api(private val base: () -> String) {
+class Api(private val base: () -> String, private val chave: () -> String = { "" }) {
 
     private suspend fun chamar(metodo: String, caminho: String, corpo: JSONObject? = null): String = withContext(Dispatchers.IO) {
         val endereco = base().trim().trimEnd('/')
@@ -166,6 +171,10 @@ class Api(private val base: () -> String) {
             c.connectTimeout = 6000
             c.readTimeout = 15000
             c.setRequestProperty("Accept", "application/json")
+            val k = chave().trim()
+            if (k.isNotEmpty()) {
+                c.setRequestProperty("x-timing-key", k)
+            }
             if (corpo != null) {
                 c.doOutput = true
                 c.setRequestProperty("Content-Type", "application/json; charset=utf-8")
@@ -243,23 +252,27 @@ class Api(private val base: () -> String) {
         // a própria prova + as outras do mesmo programa (ex.: TOMADA DE TEMPO + CORRIDA)
         val provas = if (prog.length() == 0) emptyList() else listOf(nome.substringAfterLast(" · ", "")) +
             (0 until prog.length()).map { prog.getJSONObject(it).optString("name").substringAfterLast(" · ") }
+        val revisaoLista = o.optString("revisaoLista").takeIf { it.isNotBlank() }
         return InfoSorteio(
             bateria = Bateria(s.optString("id"), nome.substringBeforeLast(" · ", nome), s.optString("type"), s.optLong("createdAt"), pil.size, provas.filter { it.isNotBlank() }),
             estado = s.optString("state"),
             tipoKart = if (o.isNull("tipoKart")) null else o.optString("tipoKart"),
             karts = karts,
             pilotos = pil,
+            revisaoLista = revisaoLista,
         )
     }
 
-    suspend fun gravar(id: String, resultado: List<Sorteado>, umAUm: Boolean, modo: String? = null): Long? {
+    suspend fun gravar(id: String, resultado: List<Sorteado>, umAUm: Boolean, modo: String? = null, revisaoLista: String? = null): Long? {
         val atr = JSONArray()
         resultado.forEach {
             val atribuicao = JSONObject().put("indice", it.piloto.indice).put("kart", it.kart)
             it.planoLastro?.let { plano -> atribuicao.put("lastroKg", plano.lastroKg).put("pecas5Kg", plano.pecas5Kg).put("pecas2_5Kg", plano.pecas2_5Kg) }
             atr.put(atribuicao)
         }
-        val resposta = JSONObject(chamar("POST", "/api/sessions/$id/sorteio", JSONObject().put("atribuicoes", atr).put("modo", modo ?: if (umAUm) "um-a-um" else "todos")))
+        val corpo = JSONObject().put("atribuicoes", atr).put("modo", modo ?: if (umAUm) "um-a-um" else "todos")
+        if (!revisaoLista.isNullOrBlank()) corpo.put("revisaoLista", revisaoLista)
+        val resposta = JSONObject(chamar("POST", "/api/sessions/$id/sorteio", corpo))
         return resposta.optLong("gravadoEm").takeIf { it > 0 }
     }
 }

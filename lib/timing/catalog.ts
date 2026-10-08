@@ -112,7 +112,14 @@ export function updateCatalogRecord(catalog: TimingCatalog, entity: CatalogEntit
   const next: Record<string, unknown> = { ...before, ...input, id };
   if (typeof next.name === 'string') next.name = next.name.trim();
   if (!next.name) throw new Error('Informe o nome.');
-  if (entity === 'groups' && !catalog.events.some((event) => event.id === next.eventId)) throw new Error('Selecione um evento existente.');
+  if (entity === 'groups') {
+    if (!catalog.events.some((event) => event.id === next.eventId)) throw new Error('Selecione um evento existente.');
+    if (before.eventId !== next.eventId) {
+      for (const proof of catalog.provas) {
+        if (proof.groupId === id) proof.eventId = String(next.eventId);
+      }
+    }
+  }
   if (entity === 'competitors') {
     next.kart = String(next.kart ?? '').trim();
     next.transponder = String(next.transponder ?? '').trim() || null;
