@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280,height=720,initial-scale=1">
+<title>Placar</title>
+<!--
+  Placar da sala para TVs com navegador ANTIGO (ex.: LG Netcast 2013 "pipoca"), que não rodam o /tv moderno.
+  Só ES5 e CSS sem variáveis (como o tb50.html). Tela fixa 1280x720 escalada para a janela.
+  Mesmo comportamento do /tv: ao vivo durante a bateria; corrida encerrada = vencedor e resultado; sem bateria = espera.
+-->
+<style>
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#030504;font-family:Arial,Helvetica,sans-serif;color:#fff}
+#tela{position:absolute;left:0;top:0;width:1280px;height:720px;overflow:hidden;background:#030504;-webkit-transform-origin:0 0;transform-origin:0 0}
+#topo{position:absolute;left:0;top:0;width:1280px;height:86px;background:#0b100c;border-bottom:3px solid #00e676}
+#topo img{position:absolute;left:24px;top:13px;height:60px}
+#evento{position:absolute;left:120px;right:260px;top:14px;font-size:34px;font-weight:bold;line-height:58px;white-space:nowrap;overflow:hidden;text-transform:uppercase;letter-spacing:1px}
+#estado{position:absolute;right:24px;top:22px;height:42px;line-height:42px;padding:0 18px;font-size:24px;font-weight:bold;border-radius:6px;background:#1c241e;color:#a8b2aa}
+#estado.vivo{background:#00e676;color:#00210a}
+#estado.fim{background:#ffc400;color:#1a1300}
+#lista{position:absolute;left:0;top:98px;width:1280px;height:610px}
+.cab{position:absolute;top:0;height:34px;line-height:34px;font-size:18px;font-weight:bold;color:#829083;text-transform:uppercase;letter-spacing:1px}
+.lin{position:absolute;height:56px;background:#0b100c;border-radius:6px;overflow:hidden}
+.lin.par{background:#101712}
+.lin span{position:absolute;top:0;line-height:56px;white-space:nowrap;overflow:hidden}
+.lin .p{left:0;width:64px;text-align:center;font-size:30px;font-weight:bold;background:#1c241e;color:#fff}
+.lin .k{left:76px;width:80px;text-align:center;font-size:30px;font-weight:bold;color:#00e676}
+.lin .n{left:166px;font-size:28px;text-transform:uppercase}
+.lin .t{right:16px;text-align:right;font-size:30px;font-weight:bold;font-family:Consolas,"Courier New",monospace;color:#ffffff}
+.lin.o1 .p{background:#ffc400;color:#1a1300}
+.lin.o2 .p{background:#c9d1cb;color:#111}
+.lin.o3 .p{background:#c77b30;color:#160b00}
+#espera{position:absolute;left:0;top:0;width:1280px;height:720px;display:none;text-align:center;background:#030504}
+#espera img{margin-top:190px;height:200px}
+#espera div{margin-top:30px;font-size:40px;font-weight:bold;color:#a8b2aa;text-transform:uppercase;letter-spacing:2px}
+#vencedor{position:absolute;left:0;top:0;width:1280px;height:720px;display:none;text-align:center;background:#000;background:-webkit-radial-gradient(50% 55%,ellipse,#3a2c05 0%,#0b0a07 55%,#000 90%);background:radial-gradient(ellipse at 50% 55%,#3a2c05 0%,#0b0a07 55%,#000 90%)}
+#vencedor .r{display:block;margin-top:150px;font-size:40px;font-weight:bold;color:#ffc400;letter-spacing:4px;text-transform:uppercase}
+#vencedor .nome{display:block;margin-top:30px;font-size:96px;line-height:1.05;font-weight:bold;font-style:italic;text-transform:uppercase;white-space:nowrap}
+#vencedor .tempo{display:block;margin-top:24px;font-size:60px;font-weight:bold;font-style:italic;color:#ffd24a}
+</style>
+</head>
+<body>
+<div id="tela">
+  <div id="topo"><img src="/kib-logo.png" alt=""><div id="evento"></div><div id="estado"></div></div>
+  <div id="lista"></div>
+  <div id="espera"><img src="/kib-logo.png" alt=""><div>Aguardando a próxima bateria</div></div>
+  <div id="vencedor"><span class="r">Vencedor</span><span class="nome" id="v-nome"></span><span class="tempo" id="v-tempo"></span></div>
+</div>
+<script>
+(function () {
+  var tela = document.getElementById('tela');
+  var lista = document.getElementById('lista');
+  var espera = document.getElementById('espera');
+  var vencedor = document.getElementById('vencedor');
+  var ultimo = null;
+  var chaveLista = '';
+  var vencedorChave = '';
+  var vencedorAte = 0;
+  var PARTICULAS = /^(DE|DA|DO|DOS|DAS|E)$/;
+
+  function agora() { return new Date().getTime(); }
+  function texto(el, v) { if (el.textContent !== v) el.textContent = v; }
+  function esc(v) { return String(v == null ? '' : v).replace(/[<>&"]/g, ''); }
+
+  function escala() {
+    var w = window.innerWidth || document.documentElement.clientWidth || 1280;
+    var h = window.innerHeight || document.documentElement.clientHeight || 720;
+    var s = Math.min(w / 1280, h / 720);
+    if (!(s > 0)) s = 1;
+    var t = 'scale(' + s + ')';
+    tela.style.webkitTransform = t; tela.style.transform = t;
+    tela.style.left = Math.max(0, Math.floor((w - 1280 * s) / 2)) + 'px';
+    tela.style.top = Math.max(0, Math.floor((h - 720 * s) / 2)) + 'px';
+  }
+
+  function nomeCurto(nome) {
+    var p = String(nome || '').replace(/^\s+|\s+$/g, '').toUpperCase().split(/\s+/);
+    if (p.length > 2 && p[p.length - 1].length <= 3) p = p.slice(0, -1);
+    var primeiro = p[0] || '';
+    for (var i = p.length - 1; i > 0; i--) if (!PARTICULAS.test(p[i])) return primeiro + ' ' + p[i];
+    return primeiro;
+  }
+
+  // até 10 pilotos: uma coluna larga; 11–20: duas colunas de 10
+  function montarLista(pilotos) {
+    var duas = pilotos.length > 10;
+    var largura = duas ? 616 : 1232, linhasPorColuna = 10, alt = 56, passo = 57;
+    var html = '';
+    for (var c = 0; c < (duas ? 2 : 1); c++) {
+      var x = 24 + c * 640;
+      html += '<div class="cab" style="left:' + (x + 8) + 'px;width:60px">Pos</div>' +
+        '<div class="cab" style="left:' + (x + 88) + 'px">Kart</div>' +
+        '<div class="cab" style="left:' + (x + 166) + 'px">Piloto</div>' +
+        '<div class="cab" style="left:' + (x + largura - 200) + 'px;width:184px;text-align:right">Melhor volta</div>';
+    }
+    for (var i = 0; i < pilotos.length && i < 20; i++) {
+      var col = duas ? Math.floor(i / linhasPorColuna) : 0, lin = duas ? i % linhasPorColuna : i;
+      var d = pilotos[i];
+      html += '<div class="lin' + (lin % 2 ? ' par' : '') + (d.position <= 3 ? ' o' + d.position : '') + '" style="left:' + (24 + col * 640) + 'px;top:' + (40 + lin * passo) + 'px;width:' + largura + 'px;height:' + alt + 'px">' +
+        '<span class="p">' + esc(d.position) + '</span><span class="k">' + esc(d.kart || '-') + '</span>' +
+        '<span class="n" style="width:' + (largura - 166 - 190) + 'px"></span><span class="t">' + esc(d.time || '') + '</span></div>';
+    }
+    lista.innerHTML = html;
+    var linhas = lista.getElementsByTagName('div'), k = 0;
+    for (var j = 0; j < linhas.length; j++) {
+      if (linhas[j].className.indexOf('lin') !== 0) continue;
+      var dd = pilotos[k++];
+      linhas[j].childNodes[2].textContent = nomeCurto(dd.name) || ('KART ' + dd.kart);
+    }
+  }
+
+  function desenhar() {
+    var s = ultimo;
+    if (!s) return;
+    var pilotos = [];
+    for (var i = 0; i < (s.drivers || []).length; i++) if (s.drivers[i].position < 999) pilotos.push(s.drivers[i]);
+    pilotos.sort(function (a, b) { return a.position - b.position; });
+    var aoVivo = s.status === 'live';
+    var corridaEncerrada = s.status === 'finished' && s.sessionType === 'race';
+
+    if (s.status === 'empty') { espera.style.display = 'block'; vencedor.style.display = 'none'; return; }
+    espera.style.display = 'none';
+    texto(document.getElementById('evento'), String(s.eventName || '').replace(/\s*·\s*/g, ' · '));
+    var est = document.getElementById('estado');
+    var cls = aoVivo ? 'vivo' : (corridaEncerrada ? 'fim' : '');
+    if (est.className !== cls) est.className = cls;
+    texto(est, aoVivo ? 'AO VIVO' : (corridaEncerrada ? 'RESULTADO FINAL' : 'ENCERRADA'));
+
+    var chave = s.eventName + '|' + pilotos.map(function (d) { return d.position + ':' + d.kart + ':' + d.name + ':' + d.time; }).join(',');
+    if (chave !== chaveLista) { chaveLista = chave; montarLista(pilotos); }
+
+    // corrida encerrada: 7 s com o vencedor em tela cheia, depois o resultado
+    if (corridaEncerrada && pilotos.length) {
+      var vk = (s.race && s.race.id || s.eventName) + '|' + pilotos[0].kart;
+      if (vk !== vencedorChave) {
+        vencedorChave = vk;
+        texto(document.getElementById('v-nome'), nomeCurto(pilotos[0].name) || ('KART ' + pilotos[0].kart));
+        texto(document.getElementById('v-tempo'), pilotos[0].time ? 'Melhor volta ' + pilotos[0].time : '');
+        vencedorAte = agora() + 7000;
+      }
+    }
+    vencedor.style.display = agora() < vencedorAte ? 'block' : 'none';
+  }
+
+  var pendente = 0;
+  function pegar() {
+    if (pendente && agora() - pendente < 4000) return;
+    pendente = agora();
+    var x = new XMLHttpRequest();
+    x.open('GET', '/api/livetime-snapshot?painel=tb50&_ts=' + agora(), true);
+    x.onreadystatechange = function () {
+      if (x.readyState !== 4) return;
+      pendente = 0;
+      if (x.status === 200) { try { var s = JSON.parse(x.responseText); if (s && s.drivers) { ultimo = s; desenhar(); } } catch (e) {} }
+    };
+    x.send(null);
+  }
+
+  // fluxo ao vivo quando o navegador tem EventSource; sem ele, pergunta a cada 500 ms
+  var fluxo = null, fluxoAberto = false;
+  function abrirFluxo() {
+    if (!window.EventSource) return;
+    try {
+      if (fluxo) fluxo.close();
+      fluxo = new EventSource('/api/livetime-snapshot/eventos?painel=tb50');
+      fluxo.onopen = function () { fluxoAberto = true; };
+      fluxo.addEventListener('snapshot', function (e) {
+        fluxoAberto = true;
+        try { var s = JSON.parse(e.data); if (s && s.drivers) { ultimo = s; desenhar(); } } catch (err) {}
+      });
+      fluxo.onerror = function () { fluxoAberto = false; };
+    } catch (e) { fluxoAberto = false; fluxo = null; }
+  }
+
+  var voltas = 0;
+  function atualizar() {
+    voltas++;
+    if (!fluxoAberto || voltas % 20 === 0) pegar();
+    if (voltas % 20 === 0 && (!fluxo || fluxo.readyState === 2)) abrirFluxo();
+  }
+
+  escala();
+  window.onresize = escala;
+  abrirFluxo();
+  pegar();
+  setInterval(atualizar, 500);
+  setInterval(desenhar, 1000);
+  // segurança: recarrega a página a cada 30 min
+  setTimeout(function () { location.reload(); }, 30 * 60 * 1000);
+})();
+</script>
+</body>
+</html>
