@@ -1,0 +1,41 @@
+name: Deploy reserva online (worker kartodromo-cadastro)
+
+# Servidor da reserva online e do pré-cadastro (workers/pre-cadastro): pedidos, Asaas, política de cancelamento.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'workers/pre-cadastro/**'
+      - 'src/config/politica-cancelamento.ts'
+      - '.github/workflows/deploy-reservas.yml'
+
+concurrency:
+  group: deploy-reservas
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - run: npm ci
+
+      - name: Testes da reserva e da política
+        run: npx vitest run tests/reserva-online.test.ts tests/politica-cancelamento.test.ts tests/pre-cadastro-validar.test.ts
+
+      - name: Publicar worker
+        working-directory: workers/pre-cadastro
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

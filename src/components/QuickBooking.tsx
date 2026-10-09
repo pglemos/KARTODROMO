@@ -1,5 +1,6 @@
 import { RESERVA_ONLINE_URL } from '../config/booking';
 import AngledButton from './site-ui/AngledButton';
+import PoliticaCancelamento from './site-ui/PoliticaCancelamento';
 import SectionHeading from './site-ui/SectionHeading';
 
 type QuickBookingProps = {
@@ -61,36 +62,17 @@ const QuickBooking = ({ surface = 'home' }: QuickBookingProps) => {
           <p className="mt-4 text-sm text-white/50">
             Abre em uma nova aba a página de reservas do kartódromo.
           </p>
+          <p className="mt-2 text-sm text-white/60">
+            A reserva só é concluída depois de aceitar a{' '}
+            <a className="font-semibold text-primary-400 underline underline-offset-4" href={surface === 'page' ? '#politica-cancelamento' : '/reservas#politica-cancelamento'}>
+              Política de Cancelamento, Reagendamento e Reembolso
+            </a>
+            .
+          </p>
         </div>
       </div>
 
-      {surface === 'page' && (
-        <div className="mx-auto mt-10 max-w-5xl border border-white/10 bg-ink-950 px-5 py-6 text-left md:px-8">
-          <h2 className="font-race text-lg italic font-bold uppercase tracking-[0.08em] text-white">
-            Política de Cancelamento, Reagendamento e Reembolso
-          </h2>
-          {/* mesmo texto da página de reserva (reservas.kartodromodebetim.com.br), que é o que o MyLapTime mostrava */}
-          <div className="mt-4 space-y-3 text-sm leading-6 text-white/70 md:text-base">
-            <p>
-              O cancelamento pode ser solicitado com até 48 horas de antecedência da data e horário agendados. Nessa
-              condição, o valor pago é reembolsado com desconto de 5% referente à taxa administrativa.
-            </p>
-            <p>
-              Solicitações com menos de 48 horas de antecedência, bem como o não comparecimento, não dão direito a
-              reembolso. Em casos excepcionais, analisados individualmente, pode ser concedido um voucher para outra data.
-            </p>
-            <p>
-              Reembolsos: no cartão, o estorno é solicitado em até 7 dias úteis após o cancelamento (o prazo do crédito
-              depende da operadora); no Pix, a devolução é feita em até 7 dias úteis, somente para conta do titular.
-            </p>
-            <p>
-              O reagendamento é gratuito quando pedido com no mínimo 48 horas de antecedência, conforme disponibilidade.
-              Se o kartódromo cancelar por motivo operacional ou de força maior, o reembolso é integral. Cancelamentos e
-              reagendamentos pelo WhatsApp da recepção.
-            </p>
-          </div>
-        </div>
-      )}
+      {surface === 'page' && <PoliticaCancelamento className="mx-auto mt-10 max-w-5xl" />}
     </section>
   );
 };

@@ -122,7 +122,7 @@ export function validarReserva(entrada: Record<string, unknown>, agenda: Agenda 
   if (quantidade > horario.livres) return { ok: false, erro: horario.livres ? `Esse horário tem só ${horario.livres} ${horario.livres === 1 ? 'vaga' : 'vagas'}.` : 'Esse horário lotou. Escolha outro.' };
   const forma = entrada.forma === 'pix' || entrada.forma === 'cartao' ? entrada.forma : null;
   if (!forma) return { ok: false, erro: 'Escolha Pix ou cartão.' };
-  if (entrada.politica !== true) return { ok: false, erro: 'É preciso aceitar a política de cancelamento.' };
+  if (entrada.politica !== true) return { ok: false, erro: 'Para reservar, aceite a Política de Cancelamento, Reagendamento e Reembolso.' };
   const v = validar({ ...entrada, tipoDocumento: 'CPF' }, hoje);
   if (!v.ok) return v;
   if (idade(v.dados.nascimento, hoje) < 18) return { ok: false, erro: 'A reserva precisa ser feita por um adulto (18 anos ou mais), que é o responsável pelo pagamento.' };

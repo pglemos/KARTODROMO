@@ -6,7 +6,7 @@
  */
 import { chaveDocumento, validar } from './validar';
 import { diagnostico } from './asaas';
-import { agendaPublica, criarPedido, situacaoPedido, syncAgenda, syncPedidos, syncResultado, webhookAsaas, type EnvReservas } from './reservas';
+import { agendaPublica, criarPedido, politicaPublica, situacaoPedido, syncAgenda, syncPedidos, syncResultado, webhookAsaas, type EnvReservas } from './reservas';
 
 export interface Env extends EnvReservas {
   ASSETS: Fetcher;
@@ -88,6 +88,7 @@ export default {
       // reserva online (reservas.kartodromodebetim.com.br)
       if (p === '/api/agenda' && req.method === 'GET') return await agendaPublica(req, env);
       if (p === '/api/reservas' && req.method === 'POST') return await criarPedido(req, env, (ip) => excedeuLimite(ip, 'reserva'));
+      if (p === '/api/reservas/politica' && req.method === 'GET') return politicaPublica();
       if (p.startsWith('/api/reservas/') && req.method === 'GET') return await situacaoPedido(env, p.slice('/api/reservas/'.length), ctx);
       if (p === '/api/asaas/webhook' && req.method === 'POST') return await webhookAsaas(req, env);
       if (p.startsWith('/api/sync/')) {

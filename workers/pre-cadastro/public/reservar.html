@@ -10,14 +10,14 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@500;600;700&display=swap">
 <link rel="icon" href="/icone.png">
 <style>
-  /* Tokens da marca (os mesmos do site kartodromodebetim.com.br): fundo preto, verde neon, Anton nos títulos. */
+  /* Reserva: calendário claro e progressivo, inspirado na agenda aprovada. */
   :root {
-    color-scheme: dark;
-    --fundo: #030504; --fundo-2: #070b08; --cartao: #0b100c; --cartao-2: #111712;
-    --linha: rgba(255,255,255,.12); --linha-forte: rgba(255,255,255,.24);
-    --texto: #f7faf6; --suave: #a8b2aa; --apagado: #6b746d;
-    --verde: #00e676; --verde-escuro: #00b85e; --verde-fundo: rgba(0,230,118,.10); --tinta: #03140b;
-    --erro: #ff7a6b; --erro-fundo: rgba(255,122,107,.12); --laranja: #ffb547;
+    color-scheme: light;
+    --fundo: #f7faf8; --fundo-2: #ffffff; --cartao: #ffffff; --cartao-2: #ffffff;
+    --linha: #e2e8e3; --linha-forte: #cbd6ce;
+    --texto: #111711; --suave: #5f6b62; --apagado: #526057;
+    --verde: #007c3e; --verde-escuro: #006532; --verde-fundo: #edf8f0; --tinta: #ffffff;
+    --erro: #b3261e; --erro-fundo: #fff0ee; --laranja: #a35b00;
     --titulo: 'Anton', Impact, 'Arial Narrow', sans-serif; --corpo: 'Rajdhani', 'Segoe UI', Roboto, Arial, sans-serif;
     --raio: 4px; --foco: 0 0 0 2px var(--fundo), 0 0 0 4px var(--verde);
     --chanfro: polygon(5% 0, 100% 0, 95% 100%, 0 100%);
@@ -27,53 +27,63 @@
   * { font-synthesis-weight: none; }
   :focus-visible { outline: none; box-shadow: var(--foco); }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
-  .topo { background: radial-gradient(120% 90% at 50% 0%, rgba(0,230,118,.16) 0%, rgba(0,230,118,0) 60%), var(--fundo-2); border-bottom: 1px solid var(--linha); color: var(--texto); padding: 26px 18px 70px; }
-  .topo .logo { display: block; width: min(300px, 76vw); height: auto; margin: 0 auto 20px; }
-  .topo h1 { font: 400 clamp(32px, 9vw, 54px)/1 var(--titulo); text-transform: uppercase; margin: 0 auto 10px; max-width: 640px; text-align: center; letter-spacing: .005em; text-wrap: balance; }
+  .topo { background: var(--fundo-2); border-bottom: 1px solid var(--linha); color: var(--texto); padding: 24px 18px 50px; }
+  .topo .logo { display: block; width: min(250px, 72vw); height: auto; margin: 0 auto 18px; }
+  .topo h1 { font: 400 clamp(30px, 7vw, 48px)/1 var(--titulo); text-transform: uppercase; margin: 0 auto 10px; max-width: 680px; text-align: center; letter-spacing: .005em; text-wrap: balance; }
   .topo h1 em { font-style: normal; color: var(--verde); }
   .topo p { margin: 0 auto; max-width: 560px; text-align: center; color: var(--suave); font-size: 17px; text-wrap: balance; }
   .fatos { display: flex; justify-content: center; gap: 8px; margin: 18px auto 0; flex-wrap: wrap; max-width: 640px; }
   .fatos span { font: 400 13px/1 var(--titulo); text-transform: uppercase; letter-spacing: .06em; color: var(--texto); border: 1px solid var(--linha-forte); padding: 9px 12px; }
-  .fatos span:nth-child(2) { color: var(--verde); border-color: rgba(0,230,118,.45); }
-  main { max-width: 720px; margin: -46px auto 0; padding: 0 14px 44px; }
-  .cartao { background: linear-gradient(180deg, var(--cartao-2), var(--cartao)); border: 1px solid var(--linha); border-radius: var(--raio); padding: 22px 18px; margin-bottom: 14px; }
-  .cartao h2 { font: 400 20px/1.05 var(--titulo); text-transform: uppercase; letter-spacing: .02em; margin: 0 0 4px; display: flex; align-items: center; gap: 12px; }
-  .cartao h2 .n { width: 28px; height: 28px; background: var(--verde); color: var(--tinta); font: 400 15px/1 var(--titulo); display: inline-flex; align-items: center; justify-content: center; flex: none; clip-path: var(--chanfro); }
-  .cartao .sub { color: var(--suave); font-size: 15.5px; margin: 0 0 16px 40px; }
-  .desligado { opacity: .4; pointer-events: none; }
-  /* dias */
+  .fatos span:nth-child(2) { color: var(--verde); border-color: rgba(0,124,62,.42); }
+  main { max-width: 780px; margin: -28px auto 0; padding: 0 14px 44px; }
+  .cartao { background: var(--cartao); border: 1px solid var(--linha); border-radius: 16px; padding: 22px 18px; margin-bottom: 14px; box-shadow: 0 14px 34px rgba(16,31,19,.07); }
+  .cartao h2 { font: 400 22px/1.05 var(--titulo); text-transform: uppercase; letter-spacing: .02em; margin: 0 0 4px; display: flex; align-items: center; gap: 12px; }
+  .cartao h2 .n { width: 30px; height: 30px; background: var(--verde); color: var(--tinta); font: 400 15px/1 var(--titulo); display: inline-flex; align-items: center; justify-content: center; flex: none; clip-path: var(--chanfro); }
+  .cartao .sub { color: var(--suave); font-size: 15.5px; margin: 0 0 16px 42px; }
+  .etapa[hidden] { display: none; }
+  .passos { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 0 0 14px; padding: 0; list-style: none; }
+  .passo { min-width: 0; color: var(--apagado); text-align: center; font-size: 12px; }
+  .passo span { display: grid; place-items: center; width: 28px; height: 28px; margin: 0 auto 5px; border: 1px solid var(--linha-forte); border-radius: 50%; font: 400 14px/1 var(--titulo); }
+  .passo b { display: block; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .passo.ativo, .passo.concluido { color: var(--verde); }
+  .passo.ativo span, .passo.concluido span { border-color: var(--verde); color: var(--verde); }
+  .passo.ativo span { background: var(--verde); color: #fff; }
+  /* calendário mensal */
+  .calendario { max-width: 520px; margin: 18px auto 0; }
+  .calendario-cabecalho { display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .calendario-cabecalho strong { text-align: center; font: 400 21px/1 var(--titulo); text-transform: uppercase; color: var(--texto); }
+  .mes-nav { width: 40px; height: 40px; border: 1px solid var(--linha-forte); border-radius: 50%; background: #fff; color: var(--texto); font: 700 24px/1 var(--corpo); cursor: pointer; }
+  .mes-nav:disabled { color: var(--apagado); cursor: default; }
+  .semana, .dias { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+  .semana { margin-bottom: 6px; color: var(--suave); font: 400 12px/1 var(--titulo); text-align: center; text-transform: uppercase; }
+  .dias { min-height: 260px; }
+  .dia { width: 100%; min-height: 52px; border: 1px solid var(--linha); border-radius: 8px; background: #fff; font: inherit; cursor: pointer; display: grid; place-items: center; gap: 1px; color: var(--texto); }
+  .dia.vazio { border-color: transparent; background: transparent; cursor: default; }
+  .dia small, .dia i { display: none; }
+  .dia b { font: 400 19px/1 var(--titulo); }
+  .dia:disabled { background: #f4f7f5; border-color: #e7ece8; color: var(--apagado); cursor: default; }
+  .dia.sel { border-color: var(--verde); background: var(--verde); color: #fff; box-shadow: 0 6px 16px rgba(0,124,62,.22); }
+  .avancar { width: 100%; min-height: 52px; margin-top: 20px; border: 0; border-radius: 10px; background: var(--verde); color: #fff; font: 400 18px/1.1 var(--titulo); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; padding: 12px 20px; transition: background .15s, transform .15s; }
+  .avancar:hover:not(:disabled) { background: var(--verde-escuro); }
+  .avancar:active:not(:disabled) { transform: translateY(1px); }
+  .avancar:disabled { background: #dfe8e1; color: var(--apagado); cursor: default; }
+  .voltar { display: block; width: 100%; margin-top: 10px; border: 0; background: transparent; color: var(--suave); font: 600 14px/1.2 var(--corpo); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
   .mes { font: 400 17px/1.1 var(--titulo); text-transform: uppercase; letter-spacing: .03em; margin: 2px 0 10px; color: var(--verde); }
-  .meses { display: flex; gap: 6px; overflow-x: auto; padding: 0 2px 12px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-  .meses::-webkit-scrollbar { display: none; }
-  .meses button { flex: none; min-height: 40px; padding: 0 14px; border: 1px solid var(--linha-forte); background: transparent; font: 400 14px/1 var(--titulo); letter-spacing: .04em; text-transform: uppercase; color: var(--suave); cursor: pointer; border-radius: var(--raio); }
-  .meses button.sel { background: var(--texto); border-color: var(--texto); color: var(--fundo); }
-  .meses button:disabled { color: var(--apagado); border-color: var(--linha); cursor: default; }
-  /* a faixa rola para o lado: as pontas esmaecem para mostrar que há mais dias */
-  .dias { display: flex; gap: 8px; overflow-x: auto; padding: 6px 6px 16px; margin: -4px -6px 0; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; scrollbar-width: thin; scrollbar-color: var(--linha-forte) transparent;
-    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 28px), transparent 100%); mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 28px), transparent 100%); }
-  .dia { flex: none; width: 64px; height: 78px; border: 1px solid var(--linha-forte); border-radius: var(--raio); background: var(--fundo-2); font: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; scroll-snap-align: start; color: var(--texto); }
-  .dia small { font: 400 12px/1 var(--titulo); color: var(--suave); text-transform: uppercase; letter-spacing: .06em; }
-  .dia b { font: 400 26px/1 var(--titulo); }
-  .dia i { font-style: normal; font-size: 12px; line-height: 1; color: var(--suave); }
-  .dia:disabled { background: transparent; border-color: var(--linha); color: var(--apagado); cursor: default; }
-  .dia:disabled small, .dia:disabled i { color: var(--apagado); }
-  .dia.sel { border-color: var(--verde); background: var(--verde); color: var(--tinta); }
-  .dia.sel small, .dia.sel i { color: var(--tinta); }
   /* horários */
   .horas { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; }
-  .hora { border: 1px solid var(--linha-forte); border-radius: var(--raio); background: var(--fundo-2); padding: 12px 14px; text-align: left; font: inherit; cursor: pointer; color: var(--texto); transition: border-color .15s, background-color .15s; }
-  .hora:hover:not(:disabled) { border-color: rgba(0,230,118,.6); }
+  .hora { border: 1px solid var(--linha-forte); border-radius: 10px; background: #fff; padding: 12px 14px; text-align: left; font: inherit; cursor: pointer; color: var(--texto); transition: border-color .15s, background-color .15s; }
+  .hora:hover:not(:disabled) { border-color: rgba(0,124,62,.6); }
   .hora b { display: block; font: 400 26px/1 var(--titulo); letter-spacing: .01em; }
   .hora span { display: block; font-size: 14.5px; color: var(--suave); margin-top: 4px; }
   .hora .vagas { margin-top: 6px; font-weight: 700; color: var(--verde); }
   .hora .vagas.poucas { color: var(--laranja); }
-  .hora:disabled { background: transparent; border-color: var(--linha); color: var(--apagado); cursor: default; }
+  .hora:disabled { background: #f4f7f5; border-color: var(--linha); color: var(--apagado); cursor: default; }
   .hora:disabled span, .hora:disabled .vagas { color: var(--apagado); }
   .hora.sel { border-color: var(--verde); background: var(--verde-fundo); box-shadow: inset 0 0 0 1px var(--verde); }
   .vazio { color: var(--suave); text-align: center; padding: 18px 8px; }
   /* quantidade */
   .qtd { display: flex; align-items: center; gap: 14px; }
-  .qtd button { width: 52px; height: 52px; border-radius: var(--raio); border: 1px solid var(--linha-forte); background: var(--fundo-2); font: 600 34px/1 var(--corpo); color: var(--verde); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0 0 3px; }
+  .qtd button { width: 52px; height: 52px; border-radius: 10px; border: 1px solid var(--linha-forte); background: #fff; font: 600 34px/1 var(--corpo); color: var(--verde); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0 0 3px; }
   .qtd button:disabled { color: var(--apagado); cursor: default; }
   .qtd output { font: 400 40px/1 var(--titulo); min-width: 44px; text-align: center; }
   .total { margin-left: auto; text-align: right; }
@@ -84,16 +94,16 @@
   .grade > div { min-width: 0; }
   .c6 { grid-column: span 6; } .c3 { grid-column: span 3; }
   @media (max-width: 520px) { .c3 { grid-column: span 6; } }
-  label { display: block; font: 400 13px/1.2 var(--titulo); text-transform: uppercase; letter-spacing: .06em; color: var(--suave); margin: 0 0 7px; }
+  label { display: block; font: 400 13px/1.3 var(--titulo); text-transform: uppercase; letter-spacing: .06em; color: var(--suave); margin: 0 0 7px; }
   label .op { font-family: var(--corpo); text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--apagado); }
-  input { width: 100%; min-width: 0; height: 50px; border: 1px solid var(--linha-forte); border-radius: var(--raio); padding: 0 14px; font: 500 17px var(--corpo); color: var(--texto); background: var(--fundo); outline: none; -webkit-appearance: none; appearance: none; transition: border-color .15s, box-shadow .15s; }
+  input { width: 100%; min-width: 0; height: 50px; border: 1px solid var(--linha-forte); border-radius: 10px; padding: 0 14px; font: 500 17px var(--corpo); color: var(--texto); background: #fff; outline: none; -webkit-appearance: none; appearance: none; transition: border-color .15s, box-shadow .15s; }
   input::placeholder { color: var(--apagado); }
   input:focus { border-color: var(--verde); box-shadow: 0 0 0 3px rgba(0,230,118,.18); }
   input.invalido { border-color: var(--erro); box-shadow: 0 0 0 3px rgba(255,122,107,.16); }
   .pilotos { display: grid; gap: 10px; margin-top: 12px; }
   /* pagamento */
   .formas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .forma { border: 1px solid var(--linha-forte); border-radius: var(--raio); background: var(--fundo-2); padding: 14px; text-align: left; font: inherit; cursor: pointer; color: var(--texto); display: flex; flex-direction: column; justify-content: flex-start; gap: 4px; }
+  .forma { border: 1px solid var(--linha-forte); border-radius: 10px; background: #fff; padding: 14px; text-align: left; font: inherit; cursor: pointer; color: var(--texto); display: flex; flex-direction: column; justify-content: flex-start; gap: 4px; }
   .forma b { display: block; font: 400 20px/1 var(--titulo); text-transform: uppercase; letter-spacing: .02em; }
   .forma span { font-size: 14.5px; color: var(--suave); line-height: 1.35; }
   .forma.sel { border-color: var(--verde); background: var(--verde-fundo); box-shadow: inset 0 0 0 1px var(--verde); }
@@ -103,26 +113,26 @@
   summary { cursor: pointer; font: 400 14px/1.3 var(--titulo); text-transform: uppercase; letter-spacing: .05em; color: var(--verde); }
   details p { margin: 10px 0 0; }
   ul.req { margin: 8px 0 0; padding-left: 20px; }
-  .enviar { width: 100%; min-height: 60px; border: 0; background: var(--verde); color: var(--tinta); font: 400 20px/1.1 var(--titulo); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; padding: 12px 34px; clip-path: var(--chanfro); transition: background-color .15s, transform .15s; }
-  .enviar:hover:not(:disabled) { background: #33ff99; }
+  .enviar { width: 100%; min-height: 60px; border: 0; border-radius: 10px; background: var(--verde); color: var(--tinta); font: 400 20px/1.1 var(--titulo); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; padding: 12px 34px; transition: background-color .15s, transform .15s; }
+  .enviar:hover:not(:disabled) { background: var(--verde-escuro); }
   .enviar:active:not(:disabled) { transform: translateY(1px); }
-  .enviar:disabled { background: #1b3a29; color: #7fa68f; cursor: default; }
-  .btn2 { display: inline-flex; align-items: center; justify-content: center; width: 100%; min-height: 52px; border: 1px solid var(--linha-forte); border-radius: var(--raio); background: transparent; font: 400 16px/1.1 var(--titulo); text-transform: uppercase; letter-spacing: .05em; color: var(--texto); cursor: pointer; text-decoration: none; margin-top: 10px; padding: 0 16px; }
+  .enviar:disabled { background: #dfe8e1; color: var(--apagado); cursor: default; }
+  .btn2 { display: inline-flex; align-items: center; justify-content: center; width: 100%; min-height: 52px; border: 1px solid var(--linha-forte); border-radius: 10px; background: #fff; font: 400 16px/1.1 var(--titulo); text-transform: uppercase; letter-spacing: .05em; color: var(--verde); cursor: pointer; text-decoration: none; margin-top: 10px; padding: 0 16px; }
   .btn2:hover { border-color: var(--verde); color: var(--verde); }
-  .erro { display: none; background: var(--erro-fundo); border: 1px solid rgba(255,122,107,.4); color: var(--erro); border-radius: var(--raio); padding: 12px 14px; margin-bottom: 14px; font-weight: 600; }
-  .rodape { text-align: center; color: var(--apagado); font-size: 14.5px; margin-top: 18px; }
+  .erro { display: none; background: var(--erro-fundo); border: 1px solid rgba(179,38,30,.25); color: var(--erro); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; font-weight: 600; }
+  .rodape { text-align: center; color: var(--suave); font-size: 14.5px; margin-top: 18px; }
   .rodape a { color: var(--verde); }
   .oculto { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
-  .resumo { background: var(--verde-fundo); border: 1px solid rgba(0,230,118,.3); border-radius: var(--raio); padding: 12px 14px; font-size: 16px; margin-top: 14px; display: none; }
+  .resumo { background: var(--verde-fundo); border: 1px solid rgba(0,124,62,.25); border-radius: 10px; padding: 12px 14px; font-size: 16px; margin-top: 14px; display: none; }
   .resumo b { color: var(--verde); }
   /* acompanhamento */
   #acomp { display: none; text-align: center; padding: 30px 20px; }
   #acomp h2 { font: 400 30px/1.05 var(--titulo); text-transform: uppercase; margin: 6px 0 10px; justify-content: center; }
   #acomp p { color: var(--suave); margin: 0 auto 8px; max-width: 470px; }
   #acomp a:not(.btn2):not(.enviar) { color: var(--verde); }
-  .roda { width: 46px; height: 46px; border-radius: 50%; border: 4px solid rgba(0,230,118,.18); border-top-color: var(--verde); margin: 6px auto 14px; animation: gira 0.9s linear infinite; }
+  .roda { width: 46px; height: 46px; border-radius: 50%; border: 4px solid rgba(0,124,62,.18); border-top-color: var(--verde); margin: 6px auto 14px; animation: gira 0.9s linear infinite; }
   @keyframes gira { to { transform: rotate(360deg); } }
-  .ok { width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 12px; background: var(--verde-fundo); border: 1px solid rgba(0,230,118,.4); display: flex; align-items: center; justify-content: center; }
+  .ok { width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 12px; background: var(--verde-fundo); border: 1px solid rgba(0,124,62,.3); display: flex; align-items: center; justify-content: center; }
   .ok svg { stroke: var(--verde); }
   /* QR em fundo branco: leitores de Pix precisam de contraste claro */
   .qr { image-rendering: pixelated; width: min(260px, 70vw); height: auto; border-radius: var(--raio); padding: 10px; background: #fff; margin: 10px auto; display: block; }
@@ -161,26 +171,44 @@
 
   <section class="cartao" id="carregando"><div class="roda"></div>Carregando os horários…</section>
 
+  <ol class="passos" aria-label="Etapas da reserva">
+    <li class="passo ativo" data-passo="1"><span>1</span><b>Data</b></li>
+    <li class="passo" data-passo="2"><span>2</span><b>Horário</b></li>
+    <li class="passo" data-passo="3"><span>3</span><b>Pilotos</b></li>
+    <li class="passo" data-passo="4"><span>4</span><b>Cadastro</b></li>
+    <li class="passo" data-passo="5"><span>5</span><b>Pagamento</b></li>
+  </ol>
+
   <form id="form" novalidate autocomplete="on">
     <div class="erro" id="erro" role="alert"></div>
 
-    <section class="cartao">
-      <h2><span class="n">1</span>Dia</h2>
-      <p class="sub">Dias em cinza não têm horário livre.</p>
-      <div class="meses" id="meses"></div>
-      <div class="dias" id="dias"><div class="vazio">Carregando a agenda…</div></div>
+    <section class="cartao etapa" id="secDia">
+      <h2><span class="n">1</span>Escolha o dia</h2>
+      <p class="sub">O calendário mostra somente os dias com agenda publicada.</p>
+      <div class="calendario">
+        <div class="calendario-cabecalho">
+          <button class="mes-nav" type="button" id="mesAnterior" aria-label="Mês anterior">‹</button>
+          <strong id="mes" aria-live="polite">Carregando…</strong>
+          <button class="mes-nav" type="button" id="mesProximo" aria-label="Próximo mês">›</button>
+        </div>
+        <div class="semana" aria-hidden="true"><span>dom</span><span>seg</span><span>ter</span><span>qua</span><span>qui</span><span>sex</span><span>sáb</span></div>
+        <div class="dias" id="dias"><div class="vazio">Carregando a agenda…</div></div>
+      </div>
+      <button class="avancar" type="button" id="continuarDia" disabled>Continuar para horários</button>
     </section>
 
-    <section class="cartao desligado" id="secHora">
-      <h2><span class="n">2</span>Horário da largada</h2>
+    <section class="cartao etapa" id="secHora" hidden>
+      <h2><span class="n">2</span>Escolha o horário</h2>
       <p class="sub">A chegada é 1 hora antes, para cadastro, equipamento e briefing.</p>
-      <p class="mes" id="mes"></p>
+      <p class="mes" id="diaSelecionado"></p>
       <div class="horas" id="horas"><div class="vazio">Escolha o dia acima.</div></div>
+      <button class="avancar" type="button" id="continuarHora" disabled>Continuar para pilotos</button>
+      <button class="voltar" type="button" id="voltarDia">Alterar data</button>
     </section>
 
-    <section class="cartao desligado" id="secQtd">
+    <section class="cartao etapa" id="secQtd" hidden>
       <h2><span class="n">3</span>Quantos pilotos</h2>
-      <p class="sub">Grupos maiores ou eventos: fale com a recepção.</p>
+      <p class="sub">Escolha quantas vagas deseja reservar nesta bateria.</p>
       <div class="qtd">
         <button type="button" id="menos" aria-label="Menos um piloto">−</button>
         <output id="qtd">1</output>
@@ -190,11 +218,13 @@
       <details><summary>Informar o nome dos pilotos (opcional)</summary>
         <div class="pilotos" id="pilotos"></div>
       </details>
+      <button class="avancar" type="button" id="continuarQtd">Continuar para cadastro</button>
+      <button class="voltar" type="button" id="voltarHora">Alterar horário</button>
     </section>
 
-    <section class="cartao desligado" id="secDados">
-      <h2><span class="n">4</span>Quem está reservando</h2>
-      <p class="sub">Adulto responsável pelo pagamento. No kartódromo, é só digitar o CPF no totem.</p>
+    <section class="cartao etapa" id="secDados" hidden>
+      <h2><span class="n">4</span>Seus dados</h2>
+      <p class="sub">Preencha somente os dados do responsável pelo pagamento.</p>
       <div class="grade">
         <div class="c6"><label for="documento">CPF</label><input id="documento" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00"></div>
         <div class="c6"><label for="nome">Nome completo</label><input id="nome" autocomplete="name" autocapitalize="words" placeholder="Como no documento"></div>
@@ -203,9 +233,11 @@
         <div class="c3"><label for="nascimento">Data de nascimento</label><input id="nascimento" inputmode="numeric" autocomplete="bday" placeholder="DD/MM/AAAA"></div>
         <div class="c3"><label for="peso">Peso (kg) <span class="op">(opcional)</span></label><input id="peso" inputmode="decimal" placeholder="Ex.: 72"></div>
       </div>
+      <button class="avancar" type="button" id="continuarDados">Continuar para pagamento</button>
+      <button class="voltar" type="button" id="voltarQtd">Alterar quantidade</button>
     </section>
 
-    <section class="cartao desligado" id="secPag">
+    <section class="cartao etapa" id="secPag" hidden>
       <h2><span class="n">5</span>Pagamento</h2>
       <p class="sub">A vaga fica guardada por <b id="prazoTxt">15 minutos</b> enquanto você paga.</p>
       <div class="formas" id="formas">
@@ -215,19 +247,41 @@
       <details><summary>Quem pode pilotar</summary>
         <ul class="req"><li>14 anos completos ou mais, 1,50 m de altura e de 50 kg a 120 kg</li><li>Calçado fechado; gestantes não podem correr</li><li>Menores de 18 anos precisam do responsável no dia para assinar o termo</li><li>Não precisa de experiência nem equipamento próprio</li></ul>
       </details>
-      <details><summary>Política de cancelamento e reembolso</summary>
-        <p>Cancelamento com até 48 horas de antecedência: reembolso do valor pago com desconto de 5% de taxa administrativa (cartão: estorno pedido em até 7 dias úteis; Pix: devolução em até 7 dias úteis, só para conta do titular).</p>
-        <p>Com menos de 48 horas, ou não comparecimento, não há reembolso; em casos excepcionais pode ser concedido voucher para outra data. Reagendamento sem custo com 48 horas de antecedência, conforme disponibilidade.</p>
-        <p>Se o kartódromo cancelar por motivo operacional ou de força maior, o reembolso é integral. Cancelamentos pelo WhatsApp da recepção.</p>
+      <details><summary>Política de Cancelamento, Reagendamento e Reembolso</summary>
+        <p><b>1. Objetivo</b></p>
+        <p>Esta Política define as regras para cancelamento, reagendamento e reembolso de reservas realizadas em nossa plataforma. Ao concluir a reserva, o cliente declara estar ciente e de acordo com os termos.</p>
+        <p><b>2. Cancelamento pelo Cliente</b></p>
+        <p><b>2.1 Prazo para Cancelamento</b></p>
+        <p>O cancelamento pode ser solicitado com até 48 horas de antecedência da data e horário agendados.</p>
+        <p>Nessa condição, o valor pago será reembolsado com desconto de 5% referente à taxa administrativa.</p>
+        <p><b>2.2 Cancelamento Fora do Prazo</b></p>
+        <p>Solicitações com menos de 48 horas de antecedência, bem como o não comparecimento (no-show), não dão direito a reembolso.</p>
+        <p>Em casos excepcionais, analisados individualmente, poderá ser concedido um voucher para utilização em outra data.</p>
+        <p><b>3. Reembolsos</b></p>
+        <p><b>3.1 Cartão de Crédito ou Débito</b></p>
+        <p>O estorno será solicitado em até 7 dias úteis após o cancelamento.</p>
+        <p>O prazo para crédito depende da operadora do cartão.</p>
+        <p><b>3.2 PIX</b></p>
+        <p>O reembolso será realizado em até 7 dias úteis após o cancelamento.</p>
+        <p>A devolução será feita exclusivamente para conta de titularidade do cliente.</p>
+        <p><b>4. Reagendamento</b></p>
+        <p>O reagendamento pode ser solicitado sem custo, desde que realizado com no mínimo 48 horas de antecedência e sujeito à disponibilidade.</p>
+        <p><b>5. Cancelamento pelo Kartódromo Internacional de Betim</b></p>
+        <p>O kartódromo poderá cancelar reservas por motivos operacionais ou de força maior, garantindo reembolso integral ao cliente.</p>
+        <p><b>6. Disposições Gerais</b></p>
+        <ul class="req"><li>Cancelamentos devem ser feitos pelos canais oficiais;</li><li>A confirmação será enviada via WhatsApp;</li><li>Promoções podem ter regras específicas.</li></ul>
+        <p><b>7. Aceitação</b></p>
+        <p>Ao realizar a reserva, o cliente declara que leu e aceita integralmente esta Política.</p>
       </details>
-      <label class="termo"><input type="checkbox" id="politica"><span>Li e aceito a política de cancelamento e os requisitos para pilotar.</span></label>
+      <label class="termo"><input type="checkbox" id="politica"><span>Li e aceito a Política de Cancelamento, Reagendamento e Reembolso e os requisitos para pilotar.</span></label>
       <label class="termo"><input type="checkbox" id="lgpd"><span>Concordo com o tratamento dos meus dados para a reserva e o termo de responsabilidade (LGPD).</span></label>
       <div class="resumo" id="resumo"></div>
       <div class="oculto" aria-hidden="true"><label>Site<input id="site" tabindex="-1" autocomplete="off"></label></div>
+      <button class="voltar" type="button" id="voltarDados">Alterar cadastro</button>
     </section>
 
-    <button class="enviar" id="enviar" type="submit" disabled>Escolha o dia e o horário</button>
-    <p class="rodape">Pagamento processado pela Asaas. O termo de responsabilidade é assinado no kartódromo, no dia da corrida.</p>
+    <button class="enviar" id="enviar" type="submit" disabled hidden>Reservar e pagar</button>
+    <p class="rodape" id="rodape" hidden>Pagamento processado pela Asaas. O termo de responsabilidade é assinado no kartódromo, no dia da corrida.</p>
   </form>
 
   <section class="cartao" id="acomp" aria-live="polite"></section>
@@ -244,7 +298,7 @@
   const DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
   const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
   const WHATS = 'https://wa.me/5531998842898';
-  let agenda = null, dia = null, horario = null, qtd = 1, forma = null;
+  let agenda = null, agendaAssinatura = '', agendaCarregando = false, dia = null, horario = null, qtd = 1, forma = null;
 
   const mascaras = {
     CPF: (v) => dig(v).slice(0, 11).replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2'),
@@ -272,79 +326,119 @@
   }
 
   // ---------------- agenda
-  async function carregar() {
+  async function carregar(silencioso = false) {
+    if (agendaCarregando) return;
+    agendaCarregando = true;
     try {
-      const r = await fetch('/api/agenda' + (previa ? '?previa=' + encodeURIComponent(previa) : ''), { headers: hdr });
+      const r = await fetch('/api/agenda' + (previa ? '?previa=' + encodeURIComponent(previa) : ''), { headers: hdr, cache: 'no-store' });
       const j = await r.json().catch(() => ({}));
-      if (!r.ok) return fechado(j.erro ? j.erro + ' Fale com a recepção pelo WhatsApp para reservar.' : null);
-      if (!j.pagamentoOnline) return fechado('O pagamento online está em manutenção. Fale com a recepção pelo WhatsApp para reservar.');
+      if (!r.ok) { if (!silencioso) fechado(j.erro ? j.erro + ' Fale com a recepção pelo WhatsApp para reservar.' : null); return; }
+      if (!j.pagamentoOnline) { if (!silencioso) fechado('O pagamento online está em manutenção. Fale com a recepção pelo WhatsApp para reservar.'); return; }
+      const assinatura = JSON.stringify({ ...j, atualizadoEm: null });
+      if (silencioso && assinatura === agendaAssinatura) return;
+      agendaAssinatura = assinatura;
       agenda = j;
       $('carregando').style.display = 'none'; $('form').style.display = 'block';
       $('fatoPreco').textContent = `${brl(j.precoCentavos).replace(',00', '')} por piloto`;
       $('prazoTxt').textContent = `${j.prazoMin} minutos`;
       desenharDias();
-    } catch { fechado('Sem conexão com a agenda agora. Fale com a recepção pelo WhatsApp para reservar.'); }
+    } catch { if (!silencioso) fechado('Sem conexão com a agenda agora. Fale com a recepção pelo WhatsApp para reservar.'); }
+    finally { agendaCarregando = false; }
   }
 
-  // meses (a agenda do ano seguinte abre em outubro) e os dias do mês escolhido
-  let porDia = {}, mesSel = null;
+  // ---------------- fluxo em etapas e calendário mensal
+  let porDia = {}, mesesDisponiveis = [], mesSel = null, indiceMes = 0, etapa = 1;
+  const idsEtapas = ['secDia', 'secHora', 'secQtd', 'secDados', 'secPag'];
   const livresNoDia = (d) => (porDia[d] || []).reduce((s, h) => s + h.livres, 0);
+  const notificarAltura = () => requestAnimationFrame(() => window.parent.postMessage({ type: 'kartodromo-reserva-height', height: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight) }, '*'));
+
+  function mostrarEtapa(numero, rolar = true) {
+    etapa = numero;
+    idsEtapas.forEach((id, i) => { $(id).hidden = i !== numero - 1; });
+    document.querySelectorAll('[data-passo]').forEach((el) => {
+      const passo = Number(el.dataset.passo);
+      el.classList.toggle('ativo', passo === numero);
+      el.classList.toggle('concluido', passo < numero);
+    });
+    $('enviar').hidden = numero !== 5;
+    $('rodape').hidden = numero !== 5;
+    habilitar();
+    notificarAltura();
+    if (rolar) setTimeout(() => $(idsEtapas[numero - 1]).scrollIntoView({ behavior: 'smooth', block: 'start' }), 40);
+  }
+
   function desenharDias() {
     porDia = {};
     for (const h of agenda.horarios) (porDia[h.inicio.slice(0, 10)] ??= []).push(h);
     const comVaga = Object.keys(porDia).filter((d) => livresNoDia(d) > 0).sort();
-    if (!comVaga.length) { $('dias').innerHTML = '<div class="vazio">Nenhum horário livre nos próximos dias. Fale com a recepção pelo WhatsApp.</div>'; return; }
-    const meses = [...new Set(Object.keys(porDia).map((d) => d.slice(0, 7)))].sort();
-    const box = $('meses'); box.innerHTML = '';
-    for (const ym of meses) {
-      const [a, m] = ym.split('-').map(Number);
-      const b = document.createElement('button');
-      b.type = 'button'; b.dataset.m = ym; b.textContent = `${MESES[m - 1]}${a !== new Date().getFullYear() ? ' ' + a : ''}`;
-      b.disabled = !comVaga.some((d) => d.startsWith(ym));
-      b.onclick = () => escolherMes(ym);
-      box.appendChild(b);
+    if (!comVaga.length) {
+      $('dias').innerHTML = '<div class="vazio">Nenhum horário livre nos próximos dias. Fale com a recepção pelo WhatsApp.</div>';
+      $('continuarDia').disabled = true;
+      return;
     }
-    escolherMes(comVaga[0].slice(0, 7), comVaga[0]);
+    mesesDisponiveis = [...new Set(Object.keys(porDia).map((d) => d.slice(0, 7)))].sort();
+    escolherMes(mesesDisponiveis.find((ym) => comVaga.some((d) => d.startsWith(ym))) || mesesDisponiveis[0]);
+    mostrarEtapa(1, false);
   }
 
-  function escolherMes(ym, diaInicial) {
-    mesSel = ym;
-    for (const b of $('meses').children) b.classList.toggle('sel', b.dataset.m === ym);
-    $('meses').querySelector('.sel')?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
-    const [a, m] = ym.split('-').map(Number), hoje = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);
+  function escolherMes(ym) {
+    if (!mesesDisponiveis.includes(ym)) return;
+    mesSel = ym; indiceMes = mesesDisponiveis.indexOf(ym);
+    const [a, m] = ym.split('-').map(Number);
+    $('mes').textContent = `${MESES[m - 1]} ${a}`;
+    $('mesAnterior').disabled = indiceMes <= 0;
+    $('mesProximo').disabled = indiceMes >= mesesDisponiveis.length - 1;
+    const hoje = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);
     const dias = $('dias'); dias.innerHTML = '';
+    const primeiroDia = new Date(Date.UTC(a, m - 1, 1)).getUTCDay();
+    for (let i = 0; i < primeiroDia; i++) {
+      const vazio = document.createElement('span'); vazio.className = 'dia vazio'; vazio.setAttribute('aria-hidden', 'true'); dias.appendChild(vazio);
+    }
     for (let x = 1; x <= new Date(Date.UTC(a, m, 0)).getUTCDate(); x++) {
-      const d = `${ym}-${String(x).padStart(2, '0')}`;
-      if (d < hoje) continue;
-      const dt = new Date(Date.UTC(a, m - 1, x)), livres = livresNoDia(d);
+      const d = `${ym}-${String(x).padStart(2, '0')}`, dt = new Date(Date.UTC(a, m - 1, x)), livres = livresNoDia(d);
       const b = document.createElement('button');
-      b.type = 'button'; b.className = 'dia'; b.dataset.d = d; b.disabled = !livres;
-      b.innerHTML = `<small>${DIAS[dt.getUTCDay()]}</small><b>${x}</b><i>${livres ? '&nbsp;' : porDia[d] ? 'lotado' : 'fechado'}</i>`;
+      b.type = 'button'; b.className = 'dia'; b.dataset.d = d; b.disabled = d < hoje || !livres;
+      b.setAttribute('aria-label', `${x} de ${MESES[m - 1]}${livres ? ', disponível' : ', sem horário disponível'}`);
+      b.title = livres ? `${livres} ${livres === 1 ? 'vaga disponível' : 'vagas disponíveis'}` : 'Sem horário disponível';
+      b.innerHTML = `<b>${x}</b>`;
       b.onclick = () => escolherDia(d);
       dias.appendChild(b);
     }
-    escolherDia(diaInicial || Object.keys(porDia).filter((d) => d.startsWith(ym) && livresNoDia(d) > 0).sort()[0]);
+    dia = null; horario = null; $('diaSelecionado').textContent = '';
+    $('continuarDia').disabled = true; $('continuarHora').disabled = true;
+    mostrarEtapa(1, false);
   }
 
   function escolherDia(d) {
-    if (!d) return;
+    if (!d || !livresNoDia(d)) return;
     dia = d; horario = null;
-    for (const b of $('dias').children) b.classList?.toggle('sel', b.dataset.d === d);
-    $('dias').querySelector('.sel')?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
-    $('mes').textContent = dataLonga(d);
+    for (const b of $('dias').querySelectorAll('[data-d]')) b.classList.toggle('sel', b.dataset.d === d);
+    $('diaSelecionado').textContent = dataLonga(d);
     const hs = agenda.horarios.filter((h) => h.inicio.startsWith(d));
     const box = $('horas'); box.innerHTML = '';
-    $('secHora').classList.remove('desligado');
     for (const h of hs) {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'hora'; b.disabled = h.livres <= 0;
       b.innerHTML = `<b>${hhmm(h.inicio)}</b><span>chegada ${chegada(h.inicio)}</span><span class="vagas${h.livres <= 4 ? ' poucas' : ''}">${h.livres <= 0 ? 'lotado' : h.livres === 1 ? '1 vaga' : h.livres + ' vagas'}</span>`;
-      b.onclick = () => { horario = h; for (const x of box.children) x.classList.toggle('sel', x === b); ajustarQtd(); habilitar(); setTimeout(() => $('secQtd').scrollIntoView({ behavior: 'smooth', block: 'center' }), 60); };
+      b.onclick = () => { horario = h; for (const x of box.children) x.classList.toggle('sel', x === b); ajustarQtd(); $('continuarHora').disabled = false; habilitar(); };
       box.appendChild(b);
     }
     if (!hs.length) box.innerHTML = '<div class="vazio">Sem horários neste dia.</div>';
+    $('continuarDia').disabled = false;
+    $('continuarHora').disabled = true;
     habilitar();
+    notificarAltura();
   }
+
+  $('mesAnterior').onclick = () => escolherMes(mesesDisponiveis[indiceMes - 1]);
+  $('mesProximo').onclick = () => escolherMes(mesesDisponiveis[indiceMes + 1]);
+  $('continuarDia').onclick = () => { if (dia) mostrarEtapa(2); };
+  $('continuarHora').onclick = () => { if (horario) mostrarEtapa(3); };
+  $('continuarQtd').onclick = () => mostrarEtapa(4);
+  $('voltarDia').onclick = () => mostrarEtapa(1);
+  $('voltarHora').onclick = () => mostrarEtapa(2);
+  $('voltarQtd').onclick = () => mostrarEtapa(3);
+  $('voltarDados').onclick = () => mostrarEtapa(4);
 
   // ---------------- quantidade e pilotos
   const maxQtd = () => Math.max(1, Math.min(agenda?.maxPilotos || 10, horario?.livres || 1));
@@ -372,16 +466,17 @@
     for (const x of $('formas').children) x.classList.toggle('sel', x === b);
     habilitar();
   });
+  for (const id of ['politica', 'lgpd']) $(id).addEventListener('change', habilitar);
 
   function habilitar() {
     const pronto = Boolean(horario);
-    for (const id of ['secQtd', 'secDados', 'secPag']) $(id).classList.toggle('desligado', !pronto);
     const btn = $('enviar');
-    btn.disabled = !pronto;
-    btn.textContent = !pronto ? 'Escolha o dia e o horário' : `Reservar e pagar ${brl((agenda?.precoCentavos || 0) * qtd)}`;
+    btn.disabled = etapa !== 5 || !pronto || !forma || !$('politica').checked || !$('lgpd').checked;
+    btn.textContent = `Reservar e pagar ${brl((agenda?.precoCentavos || 0) * qtd)}`;
     const r = $('resumo');
-    if (pronto) { r.style.display = 'block'; r.innerHTML = `<b>${dataLonga(dia)}</b> · largada ${hhmm(horario.inicio)} (chegada ${chegada(horario.inicio)}) · ${qtd} ${qtd === 1 ? 'piloto' : 'pilotos'} · <b>${brl(agenda.precoCentavos * qtd)}</b>`; }
-    else r.style.display = 'none';
+    if (r && pronto) { r.style.display = 'block'; r.innerHTML = `<b>${dataLonga(dia)}</b> · largada ${hhmm(horario.inicio)} (chegada ${chegada(horario.inicio)}) · ${qtd} ${qtd === 1 ? 'piloto' : 'pilotos'} · <b>${brl(agenda.precoCentavos * qtd)}</b>`; }
+    else if (r) r.style.display = 'none';
+    notificarAltura();
   }
 
   // ---------------- envio
@@ -389,19 +484,29 @@
   const cpfOk = (v) => { const d = dig(v); if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false; for (const t of [9, 10]) { let s = 0; for (let i = 0; i < t; i++) s += +d[i] * (t + 1 - i); if (((s * 10) % 11) % 10 !== +d[t]) return false; } return true; };
   const idade = (n) => { const [a, m, d] = n.split('-').map(Number), h = new Date(); let x = h.getFullYear() - a; if (h.getMonth() + 1 < m || (h.getMonth() + 1 === m && h.getDate() < d)) x--; return x; };
 
+  function validarDados() {
+    const doc = $('documento'), nome = $('nome'), fone = $('telefone'), nasc = $('nascimento'), email = $('email');
+    if (!cpfOk(doc.value)) { erro('CPF inválido. Confira os números.', doc); return false; }
+    if (nome.value.trim().split(/\s+/).length < 2) { erro('Informe o nome completo.', nome); return false; }
+    if (dig(fone.value).length < 10) { erro('Informe o celular com DDD.', fone); return false; }
+    if (email.value && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.value.trim())) { erro('E-mail inválido.', email); return false; }
+    if (!iso(nasc.value)) { erro('Informe a data de nascimento (DD/MM/AAAA).', nasc); return false; }
+    if (idade(iso(nasc.value)) < 18) { erro('A reserva precisa ser feita por um adulto (18 anos ou mais).', nasc); return false; }
+    return true;
+  }
+
+  $('continuarDados').onclick = () => {
+    $('erro').style.display = 'none';
+    if (validarDados()) mostrarEtapa(5);
+  };
+
   $('form').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     $('erro').style.display = 'none';
     if (!horario) return erro('Escolha o dia e o horário.', null);
-    const doc = $('documento'), nome = $('nome'), fone = $('telefone'), nasc = $('nascimento'), email = $('email');
-    if (!cpfOk(doc.value)) return erro('CPF inválido. Confira os números.', doc);
-    if (nome.value.trim().split(/\s+/).length < 2) return erro('Informe o nome completo.', nome);
-    if (dig(fone.value).length < 10) return erro('Informe o celular com DDD.', fone);
-    if (email.value && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.value.trim())) return erro('E-mail inválido.', email);
-    if (!iso(nasc.value)) return erro('Informe a data de nascimento (DD/MM/AAAA).', nasc);
-    if (idade(iso(nasc.value)) < 18) return erro('A reserva precisa ser feita por um adulto (18 anos ou mais).', nasc);
+    if (!validarDados()) return;
     if (!forma) return erro('Escolha Pix ou cartão.', null);
-    if (!$('politica').checked) return erro('Para continuar, aceite a política de cancelamento e os requisitos.', null);
+    if (!$('politica').checked) return erro('Para continuar, aceite a Política de Cancelamento, Reagendamento e Reembolso e os requisitos.', null);
     if (!$('lgpd').checked) return erro('Para continuar, aceite o tratamento dos dados (LGPD).', null);
 
     const btn = $('enviar'); btn.disabled = true; btn.textContent = 'Enviando…';
@@ -503,7 +608,13 @@
 
   // retoma uma reserva em andamento (recarregou a página ou voltou da fatura do cartão)
   const salvo = (/#p=([a-f0-9-]{36})/.exec(location.hash) || [])[1] || (() => { try { return localStorage.getItem('kib-reserva'); } catch { return null; } })();
-  if (salvo) acompanhar(salvo); else carregar();
+  if (salvo) acompanhar(salvo); else {
+    carregar();
+    setInterval(() => {
+      // Não interrompe quem já está preenchendo uma reserva; o servidor valida a vaga novamente no envio.
+      if (!document.hidden && etapa === 1 && !dia && !horario) carregar(true);
+    }, 5000);
+  }
 })();
 </script>
 </body>

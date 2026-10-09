@@ -30,7 +30,7 @@ describe('validarReserva', () => {
     [{ quantidade: 4 }, 'só 3 vagas'],
     [{ quantidade: 0 }, 'de 1 a 10'],
     [{ forma: 'boleto' }, 'Pix ou cartão'],
-    [{ politica: false }, 'política de cancelamento'],
+    [{ politica: false }, 'Política de Cancelamento, Reagendamento e Reembolso'],
     [{ documento: '123.456.789-00' }, 'CPF inválido'],
     [{ nascimento: '2010-01-01' }, 'adulto'],
   ])('recusa %o', (mudanca, trecho) => {

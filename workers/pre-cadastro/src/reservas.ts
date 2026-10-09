@@ -6,6 +6,7 @@
  */
 import { asaasLigado, cancelar, consultar, criarCobranca, EVENTOS_PAGO, garantirCliente, PAGO, qrPix, type AsaasEnv } from './asaas';
 import { chaveDocumento, codigoReserva, digitos, validarReserva, type Agenda, type PreCadastro } from './validar';
+import { POLITICA_ACEITE, POLITICA_SECOES, POLITICA_TITULO, POLITICA_VERSAO } from '../../../src/config/politica-cancelamento';
 
 export interface EnvReservas extends AsaasEnv {
   PRE: R2Bucket;
@@ -26,6 +27,8 @@ export type Pedido = {
   forma: 'pix' | 'cartao';
   pilotos: string[];
   cliente: PreCadastro & { chave: string };
+  /** Comprovante do aceite: qual versão da Política de Cancelamento o cliente aceitou e quando. */
+  politica?: { versao: string; aceitaEm: string };
   servidor?: { valorCentavos: number; expiraEm: string; descricao: string; inicio: string };
   asaas?: { pagamentoId: string; invoiceUrl: string; pixPayload?: string; pixImagem?: string; consultadoEm?: string };
   pagamento?: { asaasId: string; billingType: string; pagoEm: string; valorCentavos: number };
@@ -110,9 +113,15 @@ export async function criarPedido(req: Request, env: EnvReservas, excedeuLimite:
     forma: v.dados.forma,
     pilotos: v.dados.pilotos,
     cliente: { ...v.dados.cliente, chave: chaveDocumento('CPF', v.dados.cliente.documento) },
+    politica: { versao: POLITICA_VERSAO, aceitaEm: agora },
   };
   await gravarPedido(env, p, true);
   return json(201, { id: p.id, codigo: p.codigo });
+}
+
+/** Texto oficial da política, para qualquer tela de reserva mostrar a mesma coisa (e a versão que será gravada). */
+export function politicaPublica() {
+  return json(200, { versao: POLITICA_VERSAO, titulo: POLITICA_TITULO, aceite: POLITICA_ACEITE, secoes: POLITICA_SECOES }, 'public, max-age=300');
 }
 
 /** A tela consulta a cada 2–3 s. Se o aviso da Asaas atrasar, confere direto na Asaas (no máximo a cada 15 s). */
@@ -138,7 +147,7 @@ export async function agendaPublica(req: Request, env: EnvReservas) {
   if (!liberado(req, env)) return json(403, { erro: 'A reserva online ainda não está aberta.' });
   const a = await agendaAtual(env);
   if (!a) return json(503, { erro: 'A agenda está sendo atualizada. Tente de novo em instantes.' });
-  return json(200, { ...a, pagamentoOnline: asaasLigado(env) }, 'public, max-age=15');
+  return json(200, { ...a, pagamentoOnline: asaasLigado(env) }, 'public, max-age=3, must-revalidate');
 }
 
 // ---------------------------------------------------------------- Asaas
