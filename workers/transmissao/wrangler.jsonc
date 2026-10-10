@@ -1,0 +1,12 @@
+{
+  // API de transmissão ao vivo (ORBITS publica, parceiro lê) fora do Next do site — ver src/index.ts
+  "name": "kartodromo-transmissao",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-20",
+  "routes": [
+    { "pattern": "kartodromodebetim.com.br/api/transmissao/*", "zone_name": "kartodromodebetim.com.br" },
+    { "pattern": "www.kartodromodebetim.com.br/api/transmissao/*", "zone_name": "kartodromodebetim.com.br" }
+  ],
+  "r2_buckets": [{ "binding": "TELAO", "bucket_name": "kartodromo-telao" }],
+  "observability": { "enabled": true }
+}
