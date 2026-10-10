@@ -149,20 +149,22 @@ class Tv {
     this.respostas.clear();
   }
 
-  // abre o placar e confere; até 4 tentativas (TV recém-ligada às vezes ignora o 1º pedido)
+  // abre o placar e confere; até 3 tentativas com 20 s para o navegador da TV carregar (reabrir antes disso
+  // interrompia o carregamento). Não conseguiu: deixa a TV em paz por 10 min em vez de reabrir sem parar.
   async abrirPlacar(motivo) {
     if (Date.now() < this.abrindoAte) return;
-    this.abrindoAte = Date.now() + 60_000;
+    this.abrindoAte = Date.now() + 120_000;
+    let conseguiu = false;
     try {
       await espera(motivo === 'ligou' ? 3000 : 0);
-      for (let tentativa = 1; tentativa <= 4 && this.ligada; tentativa++) {
+      for (let tentativa = 1; tentativa <= 3 && this.ligada; tentativa++) {
         const r = await this.pedir({ type: 'request', uri: 'ssap://system.launcher/open', payload: { target: URL_PLACAR } }, 10_000);
-        await espera(8000);
-        if (this.app === 'com.webos.app.browser' && conectadosNoPlacar().has(this.ip)) { log(`${this.ip}: placar na tela (${motivo}${tentativa > 1 ? `, tentativa ${tentativa}` : ''})`); return; }
-        log(`${this.ip}: placar ainda não apareceu (${r.payload?.errorText || r.error || `na tela ${this.app || 'nada'}`}); tentando de novo`);
-        await espera(4000);
+        for (let s = 0; s < 20 && !conseguiu; s++) { await espera(1000); conseguiu = conectadosNoPlacar().has(this.ip); }
+        if (conseguiu) { log(`${this.ip}: placar na tela (${motivo}${tentativa > 1 ? `, tentativa ${tentativa}` : ''})`); return; }
+        log(`${this.ip}: placar não carregou em 20 s (${r.payload?.errorText || r.error || `na tela ${this.app || 'nada'}`})${tentativa < 3 ? '; tentando de novo' : ''}`);
       }
-    } finally { this.abrindoAte = Date.now() + 15_000; }
+      log(`${this.ip}: a TV abre o navegador mas não chega ao placar — alguém precisa olhar a tela dela; tento de novo em 10 min`);
+    } finally { this.abrindoAte = Date.now() + (conseguiu ? 15_000 : 10 * 60_000); }
   }
 
   // checagem de manutenção: ligada, sem o placar e parada na tela inicial/navegador → abre
