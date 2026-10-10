@@ -64,6 +64,7 @@ class Tv {
     this.app = '';
     this.abrindoAte = 0;
     this.ultimoPedido = 0;
+    this.serie = '';            // a mesma TV pode responder em 2 endereços (cabo + Wi-Fi): agrupa pelo número de série
     this.id = 0;
     this.respostas = new Map();
   }
@@ -116,6 +117,7 @@ class Tv {
         writeFileSync(join(PASTA, `${this.ip}.json`), JSON.stringify({ 'client-key': reg.payload['client-key'], pareadoEm: new Date().toISOString() }, null, 2));
         log(`${this.ip}: pareada`);
       }
+      this.serie = (await this.pedir({ type: 'request', uri: 'ssap://system/getSystemInfo' })).payload?.serialNumber ?? '';
       const voltou = this.vistaFora;
       this.vistaFora = false;
       const energia = await this.pedir({ type: 'request', uri: 'ssap://com.webos.service.tvpower/power/getPowerState' });
@@ -152,14 +154,14 @@ class Tv {
   // abre o placar e confere; até 3 tentativas com 20 s para o navegador da TV carregar (reabrir antes disso
   // interrompia o carregamento). Não conseguiu: deixa a TV em paz por 10 min em vez de reabrir sem parar.
   async abrirPlacar(motivo) {
-    if (Date.now() < this.abrindoAte) return;
+    if (Date.now() < this.abrindoAte || irmaAbrindo(this)) return;
     this.abrindoAte = Date.now() + 120_000;
     let conseguiu = false;
     try {
       await espera(motivo === 'ligou' ? 3000 : 0);
       for (let tentativa = 1; tentativa <= 3 && this.ligada; tentativa++) {
         const r = await this.pedir({ type: 'request', uri: 'ssap://system.launcher/open', payload: { target: URL_PLACAR } }, 10_000);
-        for (let s = 0; s < 20 && !conseguiu; s++) { await espera(1000); conseguiu = conectadosNoPlacar().has(this.ip); }
+        for (let s = 0; s < 20 && !conseguiu; s++) { await espera(1000); conseguiu = noPlacarPorAlgumEndereco(this, conectadosNoPlacar()); }
         if (conseguiu) { log(`${this.ip}: placar na tela (${motivo}${tentativa > 1 ? `, tentativa ${tentativa}` : ''})`); return; }
         log(`${this.ip}: placar não carregou em 20 s (${r.payload?.errorText || r.error || `na tela ${this.app || 'nada'}`})${tentativa < 3 ? '; tentando de novo' : ''}`);
       }
@@ -169,7 +171,7 @@ class Tv {
 
   // checagem de manutenção: ligada, sem o placar e parada na tela inicial/navegador → abre
   async conferir(noPlacar) {
-    if (!this.ligada || noPlacar.has(this.ip) || Date.now() < this.abrindoAte) return;
+    if (!this.ligada || noPlacarPorAlgumEndereco(this, noPlacar) || Date.now() < this.abrindoAte) return;
     const r = await this.pedir({ type: 'request', uri: 'ssap://com.webos.applicationManager/getForegroundAppInfo' });
     if (r.type === 'error') { this.ws?.terminate(); return; }   // conexão morta sem aviso
     this.app = r.payload?.appId ?? '';
@@ -178,6 +180,14 @@ class Tv {
 }
 
 const tvs = new Map();
+/** A TV (por qualquer um dos endereços dela) está com o placar conectado? */
+function noPlacarPorAlgumEndereco(tv, noPlacar) {
+  return [...tvs.values()].some((t) => (t === tv || (tv.serie && t.serie === tv.serie)) && noPlacar.has(t.ip));
+}
+/** Outro endereço da mesma TV já está cuidando dela (abrindo o placar agora)? */
+function irmaAbrindo(tv) {
+  return [...tvs.values()].some((t) => t !== tv && tv.serie && t.serie === tv.serie && Date.now() < t.abrindoAte);
+}
 const tv = (ip) => { if (!tvs.has(ip)) tvs.set(ip, new Tv(ip)); return tvs.get(ip); };
 
 if (args.includes('--uma-vez')) {
