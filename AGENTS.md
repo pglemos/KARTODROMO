@@ -17,6 +17,9 @@ Regras que não podem ser quebradas:
 - **Nunca** colocar senha em arquivo versionado, commit ou log.
 - **Não clonar nem fazer proxy do MyLapTime/Sisecom.**
 - Mais de uma sessão mexe no repo: rode `git status` e `git fetch` antes de editar.
+- **Antes de publicar `kartodromo-site-2026` ou `kartodromo-reservas-2026`: leia
+  `docs/operacao/patches-producao/README.md`.** Política de reembolso com aceite e "uma vaga por pessoa" foram aplicadas
+  direto nos pacotes em produção (09/10); publicar o código-fonte sem elas tira essas mudanças do ar.
 
 ## Site institucional
 
