@@ -1,37 +1,31 @@
-// Vigia das TVs LG (webOS): mantém o placar /tv aberto em todas as TVs LG da rede.
+// Vigia das TVs LG (webOS): ligou a TV → a primeira coisa na tela é o placar /tv, esteja ela no canal, HDMI ou app.
 //
-//   node scripts/tv-lg-vigia.mjs [--url http://192.168.20.249:4050/tv] [--intervalo 60] [--uma-vez]
+//   node scripts/tv-lg-vigia.mjs [--url http://192.168.20.249:4050/tv] [--uma-vez]
 //
-// A cada ciclo procura as TVs LG pela rede (SSDP) e, em cada TV ligada que não está com o placar conectado no :4050:
-//   - TV acabou de ligar (não respondia no ciclo anterior) → abre o placar;
-//   - TV ligada na tela inicial ou no navegador (placar fechado/travado) → abre o placar;
-//   - TV em outro app (TV aberta, YouTube, HDMI…) → deixa como está: alguém escolheu aquilo.
-// TV ainda não pareada mostra "permitir controle?" no máximo a cada 10 min até alguém aceitar no controle remoto.
+// Fica conectado em cada TV (SSAP do webOS) e acompanha se ela está ligada:
+//   - TV LIGOU (voltou à rede, ou saiu do modo de espera) → abre o placar em ~3 s e confere; tenta de novo se não abriu;
+//   - TV ligada na tela inicial ou no navegador sem o placar (fechado/travado) → abre o placar (checagem a cada 60 s);
+//   - TV que alguém trocou para outro app DEPOIS de ligar → respeita até ela ser desligada e ligada de novo.
+// TVs novas são achadas pela rede (SSDP) a cada 30 s; TV não pareada pede ACEITAR no máximo a cada 10 min.
 // Chaves de pareamento em C:\KARTODROMO\segredos\lg-tv\<ip>.json (as mesmas do tv-lg-abrir.mjs, fora do Git).
 import { execFileSync } from 'node:child_process';
 import dgram from 'node:dgram';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import WebSocket from 'ws';
+import { manifesto } from './tv-lg-manifesto.mjs';
 
 const args = process.argv.slice(2);
 const valor = (n, padrao) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : padrao; };
 const URL_PLACAR = valor('--url', 'http://192.168.20.249:4050/tv');
-const INTERVALO = Number(valor('--intervalo', '60')) * 1000;
 const PASTA = valor('--chaves', 'C:\\KARTODROMO\\segredos\\lg-tv');
 const PORTA_PLACAR = new URL(URL_PLACAR).port || '80';
 const NO_PLACAR = new Set(['com.webos.app.home', 'com.webos.app.homeconnect', 'com.webos.app.browser', 'com.webos.app.discovery', '']);
+const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const log = (m) => console.log(`${new Date().toLocaleString('pt-BR')} ${m}`);
 const chaveDe = (ip) => { const f = join(PASTA, `${ip}.json`); return existsSync(f) ? JSON.parse(readFileSync(f, 'utf8'))['client-key'] : undefined; };
-
-const manifesto = {
-  manifestVersion: 1, appVersion: '1.0',
-  signed: { appId: 'br.com.kartodromodebetim.placar', created: '20261008', localizedAppNames: { '': 'Placar Kartódromo' }, localizedVendorNames: { '': 'Kartódromo Internacional de Betim' }, permissions: ['LAUNCH', 'LAUNCH_WEBAPP', 'APP_TO_APP', 'READ_RUNNING_APPS', 'READ_INSTALLED_APPS'], serial: 'kib-placar-1', vendorId: 'br.com.kartodromodebetim' },
-  permissions: ['LAUNCH', 'LAUNCH_WEBAPP', 'APP_TO_APP', 'READ_RUNNING_APPS', 'READ_INSTALLED_APPS'],
-  signatures: [{ signatureVersion: 1, signature: 'kib' }],
-};
 
 // TVs LG que responderam ao SSDP (webOS anuncia "WebOS" ou "LGE WebOS TV" no SERVER)
 function procurarTvs() {
@@ -59,68 +53,150 @@ function conectadosNoPlacar() {
   } catch { return new Set(); }
 }
 
-// Conversa SSAP com a TV: porta segura 3001 (webOS novo) e, se falhar, 3000
-function conectar(ip, permitirPedido) {
-  const tentar = (segura) => new Promise((ok, falha) => {
-    const ws = segura ? new WebSocket(`wss://${ip}:3001`, { rejectUnauthorized: false, handshakeTimeout: 4000 }) : new WebSocket(`ws://${ip}:3000`, { handshakeTimeout: 4000 });
-    ws.once('error', falha);
-    ws.once('open', () => ok(ws));
-  });
-  return tentar(true).catch(() => tentar(false)).then((ws) => new Promise((ok, falha) => {
-    let id = 0;
-    const pendentes = new Map();
-    const pedir = (msg) => new Promise((r) => { const i = `kib_${++id}`; pendentes.set(i, r); ws.send(JSON.stringify({ id: i, ...msg })); });
-    const tempo = setTimeout(() => { ws.terminate(); falha(new Error('ninguém aceitou na TV')); }, permitirPedido ? 95_000 : 8_000);
-    ws.on('message', (d) => {
-      const m = JSON.parse(String(d));
-      if (m.payload?.pairingType === 'PROMPT') { if (!permitirPedido) { ws.terminate(); } else log(`${ip}: pedindo permissão na tela da TV (apertar ACEITAR)`); return; }
-      const r = pendentes.get(m.id); if (r) { pendentes.delete(m.id); r(m); }
+/** Uma TV: conexão SSAP aberta o tempo todo, com o estado de energia e o app na tela. */
+class Tv {
+  constructor(ip) {
+    this.ip = ip;
+    this.ws = null;
+    this.conectando = false;
+    this.vistaFora = false;     // ficou fora da rede depois que o vigia começou (ao voltar = acabou de ligar)
+    this.energia = null;        // 'Active' | 'Active Standby' | 'Screen Off' | 'Suspend' | null (TV antiga sem esse dado)
+    this.app = '';
+    this.abrindoAte = 0;
+    this.ultimoPedido = 0;
+    this.id = 0;
+    this.respostas = new Map();
+  }
+
+  get ligada() { return !!this.ws && (this.energia === null || this.energia === 'Active'); }
+
+  pedir(msg, ms = 5000) {
+    return new Promise((ok) => {
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return ok({ type: 'error', error: 'desconectada' });
+      const i = `kib_${++this.id}`;
+      const t = setTimeout(() => { this.respostas.delete(i); ok({ type: 'error', error: 'sem resposta' }); }, ms);
+      this.respostas.set(i, (m) => { clearTimeout(t); this.respostas.delete(i); ok(m); });
+      this.ws.send(JSON.stringify({ id: i, ...msg }));
     });
-    ws.on('close', () => { clearTimeout(tempo); falha(new Error('conexão fechada')); });
-    const chave = chaveDe(ip);
-    pedir({ type: 'register', payload: { forcePairing: false, pairingType: 'PROMPT', 'client-key': chave, manifest: manifesto } }).then((reg) => {
-      clearTimeout(tempo);
-      if (reg.type !== 'registered') { ws.terminate(); return falha(new Error(reg.error || 'recusou')); }
+  }
+
+  assinar(uri, aoMudar) {
+    if (!this.ws) return;
+    const i = `kib_s${++this.id}`;
+    this.respostas.set(i, (m) => { if (m.type !== 'error') aoMudar(m.payload ?? {}); });
+    this.ws.send(JSON.stringify({ id: i, type: 'subscribe', uri }));
+  }
+
+  async conectar() {
+    if (this.ws || this.conectando) return;
+    const pareada = !!chaveDe(this.ip);
+    if (!pareada && Date.now() - this.ultimoPedido < 10 * 60_000) return;
+    this.conectando = true;
+    try {
+      const abrir = (segura) => new Promise((ok, falha) => {
+        const ws = segura ? new WebSocket(`wss://${this.ip}:3001`, { rejectUnauthorized: false, handshakeTimeout: 2500 }) : new WebSocket(`ws://${this.ip}:3000`, { handshakeTimeout: 2500 });
+        ws.once('error', falha);
+        ws.once('open', () => { ws.removeListener('error', falha); ok(ws); });
+      });
+      const ws = await abrir(true).catch(() => abrir(false));
+      ws.on('error', () => {});
+      ws.on('message', (d) => {
+        let m; try { m = JSON.parse(String(d)); } catch { return; }
+        if (m.payload?.pairingType === 'PROMPT') { log(`${this.ip}: pedindo permissão na tela da TV (apertar ACEITAR)`); return; }
+        this.respostas.get(m.id)?.(m);
+      });
+      ws.on('close', () => this.caiu());
+      this.ws = ws;
+      if (!pareada) this.ultimoPedido = Date.now();
+      const chave = chaveDe(this.ip);
+      const reg = await this.pedir({ type: 'register', payload: { forcePairing: false, pairingType: 'PROMPT', 'client-key': chave, manifest: manifesto } }, 95_000);
+      if (reg.type !== 'registered') { log(`${this.ip}: sem controle (${reg.error || reg.type})`); ws.terminate(); return; }
       if (reg.payload?.['client-key'] && reg.payload['client-key'] !== chave) {
         mkdirSync(PASTA, { recursive: true });
-        writeFileSync(join(PASTA, `${ip}.json`), JSON.stringify({ 'client-key': reg.payload['client-key'], pareadoEm: new Date().toISOString() }, null, 2));
-        log(`${ip}: pareada`);
+        writeFileSync(join(PASTA, `${this.ip}.json`), JSON.stringify({ 'client-key': reg.payload['client-key'], pareadoEm: new Date().toISOString() }, null, 2));
+        log(`${this.ip}: pareada`);
       }
-      ok({ pedir, fechar: () => ws.close() });
-    });
-  }));
+      const voltou = this.vistaFora;
+      this.vistaFora = false;
+      const energia = await this.pedir({ type: 'request', uri: 'ssap://com.webos.service.tvpower/power/getPowerState' });
+      this.energia = energia.type === 'error' ? null : energia.payload?.state ?? null;
+      this.app = (await this.pedir({ type: 'request', uri: 'ssap://com.webos.applicationManager/getForegroundAppInfo' })).payload?.appId ?? '';
+      log(`${this.ip}: conectada (energia ${this.energia ?? 'sem dado'}, na tela ${this.app || 'nada'})`);
+      this.assinar('ssap://com.webos.service.tvpower/power/getPowerState', (p) => {
+        const antes = this.energia;
+        this.energia = p.state ?? this.energia;
+        if (antes !== this.energia) log(`${this.ip}: energia ${antes ?? '?'} → ${this.energia}`);
+        if (this.energia === 'Active' && antes && antes !== 'Active' && !p.processing) this.abrirPlacar('ligou');
+      });
+      // TV sem a permissão de energia: em espera ela fica sem app na tela; ao ligar, volta um app (canal, HDMI…)
+      this.assinar('ssap://com.webos.applicationManager/getForegroundAppInfo', (p) => {
+        if (p.appId === undefined) return;
+        const antes = this.app;
+        this.app = p.appId;
+        if (antes !== this.app) log(`${this.ip}: na tela ${antes || 'nada'} → ${this.app || 'nada'}`);
+        if (this.energia === null && !antes && this.app && this.app !== 'com.webos.app.browser') this.abrirPlacar('ligou');
+      });
+      if (voltou && this.ligada) this.abrirPlacar('ligou');
+    } catch {
+      this.vistaFora = true;   // não respondeu: desligada (ou fora da rede)
+    } finally { this.conectando = false; }
+  }
+
+  caiu() {
+    if (this.ws) log(`${this.ip}: desconectou (desligada?)`);
+    this.ws = null; this.energia = null; this.vistaFora = true;
+    for (const r of this.respostas.values()) r({ type: 'error', error: 'desconectada' });
+    this.respostas.clear();
+  }
+
+  // abre o placar e confere; até 4 tentativas (TV recém-ligada às vezes ignora o 1º pedido)
+  async abrirPlacar(motivo) {
+    if (Date.now() < this.abrindoAte) return;
+    this.abrindoAte = Date.now() + 60_000;
+    try {
+      await espera(motivo === 'ligou' ? 3000 : 0);
+      for (let tentativa = 1; tentativa <= 4 && this.ligada; tentativa++) {
+        const r = await this.pedir({ type: 'request', uri: 'ssap://system.launcher/open', payload: { target: URL_PLACAR } }, 10_000);
+        await espera(8000);
+        if (this.app === 'com.webos.app.browser' && conectadosNoPlacar().has(this.ip)) { log(`${this.ip}: placar na tela (${motivo}${tentativa > 1 ? `, tentativa ${tentativa}` : ''})`); return; }
+        log(`${this.ip}: placar ainda não apareceu (${r.payload?.errorText || r.error || `na tela ${this.app || 'nada'}`}); tentando de novo`);
+        await espera(4000);
+      }
+    } finally { this.abrindoAte = Date.now() + 15_000; }
+  }
+
+  // checagem de manutenção: ligada, sem o placar e parada na tela inicial/navegador → abre
+  async conferir(noPlacar) {
+    if (!this.ligada || noPlacar.has(this.ip) || Date.now() < this.abrindoAte) return;
+    const r = await this.pedir({ type: 'request', uri: 'ssap://com.webos.applicationManager/getForegroundAppInfo' });
+    if (r.type === 'error') { this.ws?.terminate(); return; }   // conexão morta sem aviso
+    this.app = r.payload?.appId ?? '';
+    if (NO_PLACAR.has(this.app)) this.abrirPlacar(`estava em ${this.app || 'nada'}`);
+  }
 }
 
-const ligadaAntes = new Map();   // ip → respondeu no ciclo anterior
-const ultimoPedido = new Map();  // ip → hora do último "permitir controle?" mostrado
+const tvs = new Map();
+const tv = (ip) => { if (!tvs.has(ip)) tvs.set(ip, new Tv(ip)); return tvs.get(ip); };
 
-async function cuidar(ip, noPlacar) {
-  const acabouDeLigar = !ligadaAntes.get(ip);
-  ligadaAntes.set(ip, true);
-  if (noPlacar.has(ip)) return;
-  const pareada = !!chaveDe(ip);
-  if (!pareada && Date.now() - (ultimoPedido.get(ip) ?? 0) < 10 * 60_000) return;
-  if (!pareada) ultimoPedido.set(ip, Date.now());
-  let tv;
-  try { tv = await conectar(ip, !pareada); } catch (e) { log(`${ip}: sem controle (${e.message})`); return; }
-  try {
-    const frente = (await tv.pedir({ type: 'request', uri: 'ssap://com.webos.applicationManager/getForegroundAppInfo' })).payload?.appId ?? '';
-    if (!acabouDeLigar && !NO_PLACAR.has(frente)) return;   // alguém pôs outro app: respeita
-    const r = await tv.pedir({ type: 'request', uri: 'ssap://system.launcher/open', payload: { target: URL_PLACAR } });
-    log(r.payload?.returnValue ? `${ip}: placar aberto (estava em ${frente || 'nada'}${acabouDeLigar ? ', acabou de ligar' : ''})` : `${ip}: não abriu (${r.payload?.errorText || r.error})`);
-  } finally { tv.fechar(); }
-}
-
-async function ciclo() {
-  const tvs = await procurarTvs();
-  for (const ip of ligadaAntes.keys()) if (!tvs.has(ip)) ligadaAntes.set(ip, false);
+if (args.includes('--uma-vez')) {
+  const achadas = await procurarTvs();
   const noPlacar = conectadosNoPlacar();
-  if (args.includes('--uma-vez')) log(`TVs: ${[...tvs].map((ip) => `${ip}${noPlacar.has(ip) ? ' (no placar)' : ''}`).join(', ') || 'nenhuma'}`);
-  await Promise.all([...tvs].map((ip) => cuidar(ip, noPlacar).catch((e) => log(`${ip}: ${e.message}`))));
+  log(`TVs: ${[...achadas].map((ip) => `${ip}${noPlacar.has(ip) ? ' (no placar)' : ''}${chaveDe(ip) ? '' : ' (não pareada)'}`).join(', ') || 'nenhuma'}`);
+  process.exit(0);
 }
 
-log(`vigia das TVs: placar ${URL_PLACAR}, a cada ${INTERVALO / 1000} s`);
-// no 1º ciclo as TVs já ligadas não contam como "acabou de ligar" (não tira ninguém de outro app ao reiniciar o vigia)
-for (const ip of await procurarTvs()) ligadaAntes.set(ip, true);
-if (args.includes('--uma-vez')) { await ciclo(); process.exit(0); }
-for (;;) { await ciclo().catch((e) => log(`erro: ${e.message}`)); await new Promise((r) => setTimeout(r, INTERVALO)); }
+log(`vigia das TVs: placar ${URL_PLACAR}`);
+// TVs já pareadas entram mesmo se estiverem desligadas agora (ao ligar, são vistas em segundos)
+if (existsSync(PASTA)) for (const f of readdirSync(PASTA)) if (/^\d+\.\d+\.\d+\.\d+\.json$/.test(f)) tv(f.slice(0, -5));
+for (const ip of await procurarTvs()) tv(ip);
+
+let ciclo = 0;
+for (;;) {
+  try {
+    if (ciclo % 10 === 0 && ciclo) for (const ip of await procurarTvs()) tv(ip);        // ~30 s: TVs novas
+    await Promise.all([...tvs.values()].map((t) => t.conectar()));                    // 3 s: quem ligou
+    if (ciclo % 20 === 0) { const noPlacar = conectadosNoPlacar(); await Promise.all([...tvs.values()].map((t) => t.conferir(noPlacar))); }  // ~60 s
+  } catch (e) { log(`erro: ${e.message}`); }
+  ciclo++;
+  await espera(3000);
+}
