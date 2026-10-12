@@ -133,3 +133,14 @@ Cronometragem por GPS externo ou OBD, análise avançada de vídeo, comunidade/c
 3. Usar validação assistida pela recepção quando o cadastro antigo não tiver e-mail/telefone que permita confirmar o vínculo; nenhuma busca apenas pelo nome libera histórico.
 
 Esses itens são pré-condições funcionais para as partes correspondentes; não autorizam expor a cronometragem interna nem alterar as regras operacionais de reservas sem revisão.
+
+## 10. Preparação para distribuição
+
+- Produzir builds assinados para iOS (`.ipa`) e Android (`.aab`) com identificadores de pacote escolhidos e controlados pelo kartódromo.
+- Manter certificados, keystores, senhas e tokens somente em armazenamento protegido/segredos de CI; nunca no repositório, app ou logs.
+- Preparar CI próprio do pacote móvel para compilar ambos os alvos e guardar artefatos de release. O fluxo existente de CI cobre o site/Cloudflare e não substitui essa validação.
+- Validar a versão candidata em ao menos um dispositivo iOS e um Android, incluindo cadastro, reserva/pagamento e permissão/localização GPS.
+- Preparar listagens, ícones, capturas de tela, política de privacidade, declarações de dados e permissões para App Store Connect e Google Play Console.
+- Disponibilizar primeiro para avaliação interna via TestFlight e faixa interna do Google Play. Publicação aberta nas lojas depende da aprovação final do responsável pelo kartódromo.
+
+A distribuição depende de contas de desenvolvedor ativas na Apple e no Google Play, identificadores aprovados e credenciais de assinatura disponíveis em local seguro. A criação de builds de release não autoriza publicar o app publicamente.
