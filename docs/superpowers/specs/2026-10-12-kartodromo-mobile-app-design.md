@@ -78,6 +78,8 @@ Adicionar rotas versionadas `/api/mobile/v1/*` ao Cloudflare Worker `workers/pre
 
 A senha é armazenada somente como hash adaptativo com salt. Tokens de acesso têm validade curta; renovação e revogação são suportadas. Login, cadastro e recuperação têm limites de tentativa e mensagens que não permitem enumerar contas. Nenhum segredo, senha, token ou CPF completo vai para log.
 
+O Worker não tem envio de e-mail hoje. Verificação e recuperação exigem integração HTTPS com um provedor transacional e domínio remetente configurado; credenciais ficam como segredo do Worker. O SMTP do serviço local de cronometragem não será exposto nem reutilizado pelo app.
+
 ### Reservas, pagamentos e cupons
 
 Reaproveitar a integração atual: `GET /api/agenda`, `POST /api/reservas`, consulta de pedido, sincronização autenticada com o servidor da operação e cobrança Asaas. Esses endpoints atuais são voltados à reserva pública sem conta e não bastam, sozinhos, para autorizar consulta de histórico de um usuário ou aplicar cupom a uma reserva. A API móvel deve adicionar identidade da conta e vínculo com cliente no pedido e no servidor da operação, mantendo validação de vagas, preço, cupom e estado no servidor autoritativo.
@@ -86,7 +88,7 @@ O estado da cobrança continua vindo do fluxo Asaas/servidor; o app recebe apena
 
 ### Resultados
 
-O `GET /api/livetime-snapshot` existente é um snapshot de cronometragem ao vivo, não um arquivo público de resultados oficiais. Depois de encerrar e conferir uma sessão, o cronometrista usa uma ação explícita de publicação; correção ou retirada posterior também fica auditada. Um processo de saída autenticado envia ao Worker somente os campos autorizados para persistência no D1. O Worker serve resultados publicados e o histórico do cliente vinculado à conta. A cronometragem em `:4050` permanece interna: nenhum app, Worker ou serviço público conecta diretamente a ela.
+O `GET /api/livetime-snapshot` existente é um snapshot ao vivo, não um arquivo público de resultados oficiais. Hoje as sessões ficam em arquivos locais e o encerramento pode gerar PDFs enviados por e-mail; ainda não existe arquivo/API pública de resultados. Depois de encerrar e conferir uma sessão, o cronometrista usa uma ação explícita de publicação; correção ou retirada posterior também fica auditada. Um processo de saída autenticado envia ao Worker somente os campos autorizados para persistência no D1. O Worker serve resultados publicados e o histórico do cliente vinculado à conta. A cronometragem em `:4050` permanece interna: nenhum app, Worker ou serviço público conecta diretamente a ela.
 
 ## 5. Contratos móveis propostos
 
@@ -131,6 +133,7 @@ Cronometragem por GPS externo ou OBD, análise avançada de vídeo, comunidade/c
 1. Entregar a geometria medida do traçado e da linha de largada/chegada antes de habilitar o cronômetro GPS.
 2. Habilitar a ação de publicação e a lista fechada de campos oficiais antes de exibir resultados no app.
 3. Usar validação assistida pela recepção quando o cadastro antigo não tiver e-mail/telefone que permita confirmar o vínculo; nenhuma busca apenas pelo nome libera histórico.
+4. Configurar provedor transacional e domínio remetente antes de habilitar verificação de e-mail e recuperação de conta.
 
 Esses itens são pré-condições funcionais para as partes correspondentes; não autorizam expor a cronometragem interna nem alterar as regras operacionais de reservas sem revisão.
 
