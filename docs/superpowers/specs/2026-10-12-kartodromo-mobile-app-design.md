@@ -70,9 +70,11 @@ O sistema já tem `dbo.Voucher` e regras internas de validade, produto, limite p
 
 React Native + TypeScript, com navegação e componentes próprios do produto. Tokens de sessão ficam no Keychain do iOS/Keystore do Android. O app não guarda senha e não acessa banco de dados nem serviços administrativos.
 
+O repositório atual não contém um projeto React Native nem projetos iOS/Android do app de cliente. Criar o pacote independente em `mobile/`, sem adicionar dependências móveis ao `package.json` raiz e sem alterar `desktop/` ou o app interno de sorteio.
+
 ### API móvel
 
-Adicionar rotas versionadas `/api/mobile/v1/*` ao Cloudflare Worker `workers/pre-cadastro`, que já atende agenda, reserva online e Asaas. Guardar contas, vínculos de identidade e sessões revogáveis em um binding D1 dedicado; manter pedidos no R2 existente e a validação operacional no servidor atual. A camada cuida de autenticação de cliente, rate limit, autorização por conta, idempotência e respostas filtradas. O app não chama diretamente SQL Server, Asaas, `/api/office/*`, a API administrativa ou a rede interna.
+Adicionar rotas versionadas `/api/mobile/v1/*` ao Cloudflare Worker `workers/pre-cadastro`, que já atende agenda, reserva online e Asaas. Sua configuração atual vincula somente o bucket R2 `PRE`; criar um banco Cloudflare D1 e binding próprios para contas, vínculos de identidade, sessões revogáveis e resultados publicados. Manter pedidos no R2 existente e a validação operacional no servidor atual. A camada cuida de autenticação de cliente, rate limit, autorização por conta, idempotência e respostas filtradas. O app não chama diretamente SQL Server, Asaas, `/api/office/*`, a API administrativa ou a rede interna.
 
 A senha é armazenada somente como hash adaptativo com salt. Tokens de acesso têm validade curta; renovação e revogação são suportadas. Login, cadastro e recuperação têm limites de tentativa e mensagens que não permitem enumerar contas. Nenhum segredo, senha, token ou CPF completo vai para log.
 
@@ -84,7 +86,7 @@ O estado da cobrança continua vindo do fluxo Asaas/servidor; o app recebe apena
 
 ### Resultados
 
-O `GET /api/livetime-snapshot` existente é um snapshot de cronometragem ao vivo, não um arquivo público de resultados oficiais. Depois de encerrar e conferir uma sessão, o cronometrista usa uma ação explícita de publicação; correção ou retirada posterior também fica auditada. Um processo de saída autenticado publica em R2 apenas os campos autorizados. O Worker serve resultados publicados e o histórico do cliente vinculado à conta. A cronometragem em `:4050` permanece interna: nenhum app, Worker ou serviço público conecta diretamente a ela.
+O `GET /api/livetime-snapshot` existente é um snapshot de cronometragem ao vivo, não um arquivo público de resultados oficiais. Depois de encerrar e conferir uma sessão, o cronometrista usa uma ação explícita de publicação; correção ou retirada posterior também fica auditada. Um processo de saída autenticado envia ao Worker somente os campos autorizados para persistência no D1. O Worker serve resultados publicados e o histórico do cliente vinculado à conta. A cronometragem em `:4050` permanece interna: nenhum app, Worker ou serviço público conecta diretamente a ela.
 
 ## 5. Contratos móveis propostos
 
