@@ -7,8 +7,9 @@
 import { chaveDocumento, validar } from './validar';
 import { diagnostico } from './asaas';
 import { agendaPublica, criarPedido, situacaoPedido, syncAgenda, syncPedidos, syncResultado, webhookAsaas, type EnvReservas } from './reservas';
+import { handleMobileAuth, type MobileAuthEnv } from './mobile/auth';
 
-export interface Env extends EnvReservas {
+export interface Env extends EnvReservas, MobileAuthEnv {
   ASSETS: Fetcher;
   PRE: R2Bucket;
   SYNC_KEY: string;
@@ -85,6 +86,7 @@ export default {
     const p = url.pathname;
     try {
       if (p === '/api/pre-cadastro' && req.method === 'POST') return await receber(req, env);
+      if (p.startsWith('/api/mobile/v1/auth/')) return await handleMobileAuth(req, env);
       // reserva online (reservas.kartodromodebetim.com.br)
       if (p === '/api/agenda' && req.method === 'GET') return await agendaPublica(req, env);
       if (p === '/api/reservas' && req.method === 'POST') return await criarPedido(req, env, (ip) => excedeuLimite(ip, 'reserva'));

@@ -1,7 +1,7 @@
 # Especificação — App móvel do Kartódromo Internacional de Betim
 
 - Data: 2026-10-12
-- Status: **Rascunho para revisão do usuário**
+- Status: **Aprovada pelo usuário em 2026-10-12**
 - Plataformas: iOS e Android
 - Decisão técnica aprovada: React Native com TypeScript, em um app separado dos programas internos do kartódromo.
 
