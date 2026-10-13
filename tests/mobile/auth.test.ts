@@ -168,6 +168,25 @@ describe('autenticação móvel', () => {
     });
   });
 
+  it('rejects oversized login passwords before running PBKDF2', async () => {
+    await register();
+    await call('email/verify', { token: tokenFromLastEmail() });
+    const deriveBits = vi.spyOn(crypto.subtle, 'deriveBits');
+
+    try {
+      const response = await call('login', {
+        identifier: validRegistration.email,
+        password: 'x'.repeat(129),
+      });
+
+      expect(response.status).toBe(401);
+      expect(await body(response)).toEqual({ erro: 'E-mail/CPF ou senha inválidos.' });
+      expect(deriveBits).not.toHaveBeenCalled();
+    } finally {
+      deriveBits.mockRestore();
+    }
+  });
+
   it('verifies accounts, authenticates by e-mail or CPF, rotates refresh tokens and logs out', async () => {
     const created = await register();
     expect(created.status).toBe(202);

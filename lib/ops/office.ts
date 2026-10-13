@@ -4,6 +4,7 @@
  */
 import { CLIENTE_COLS, insertCliente, isValidCpf, one, onlyDigits, query, tx, updateCliente, type ClienteInput } from './db';
 import { confereSenha, hashSenha, type Sessao } from './auth';
+import { mobileApiEndpoint } from '../mobile-api-url';
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
@@ -674,17 +675,15 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const destination = process.env.MOBILE_IDENTITY_LINK_URL;
     const adminToken = process.env.MOBILE_ADMIN_TOKEN;
     if (!destination || !adminToken) throw new HttpError(503, 'O vínculo de contas do app ainda não está configurado.');
-    let endpoint: URL;
-    try { endpoint = new URL(destination); } catch { throw new HttpError(503, 'O vínculo de contas do app ainda não está configurado.'); }
-    if (endpoint.protocol !== 'https:' || endpoint.pathname !== '/api/mobile/v1/internal/identity-links') {
-      throw new HttpError(503, 'O destino do vínculo de contas precisa usar HTTPS.');
-    }
+    const endpoint = mobileApiEndpoint(destination, '/api/mobile/v1/internal/identity-links');
+    if (!endpoint) throw new HttpError(503, 'O destino do vínculo de contas não é o Worker móvel autorizado.');
     let response: Response;
     try {
       response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-mobile-admin-token': adminToken },
         body: JSON.stringify({ customerId: String(customerId), email }),
+        redirect: 'error',
         signal: AbortSignal.timeout(10_000),
       });
     } catch {

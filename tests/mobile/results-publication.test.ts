@@ -250,10 +250,14 @@ describe('publicação pela API da cronometragem simulada', () => {
   let dataDir: string;
   let baseUrl: string;
   let permissionAllowed = true;
+  let redirectPublication = false;
+  let redirectedRequests = 0;
   let receivedPublications: Record<string, unknown>[];
 
   beforeAll(async () => {
     permissionAllowed = true;
+    redirectPublication = false;
+    redirectedRequests = 0;
     receivedPublications = [];
     mockServer = createServer((request, response) => {
       if (request.url === '/api/office/mobile-permissions/resultados_publicar_mobile') {
@@ -267,6 +271,11 @@ describe('publicação pela API da cronometragem simulada', () => {
         return;
       }
       if (request.url === '/api/mobile/v1/internal/results') {
+        if (redirectPublication) {
+          response.writeHead(307, { location: '/capture' });
+          response.end();
+          return;
+        }
         if (request.headers['x-mobile-publish-token'] !== PUBLISH_TOKEN) {
           response.writeHead(401, { 'content-type': 'application/json' });
           response.end('{"erro":"Não autorizado."}');
@@ -280,6 +289,12 @@ describe('publicação pela API da cronometragem simulada', () => {
           response.writeHead(200, { 'content-type': 'application/json' });
           response.end('{"ok":true}');
         });
+        return;
+      }
+      if (request.url === '/capture') {
+        redirectedRequests++;
+        response.writeHead(200);
+        response.end();
         return;
       }
       response.writeHead(404);
@@ -397,5 +412,17 @@ describe('publicação pela API da cronometragem simulada', () => {
 
     expect((await timingPost(`/api/sessions/${session.id}/mobile-publication`, { action: 'withdraw' }, OPERATOR_TOKEN)).status).toBe(200);
     expect(receivedPublications[receivedPublications.length - 1]).toEqual({ action: 'withdraw', sessionId: session.id });
+  });
+
+  it('não segue redirecionamentos antes de enviar o token de publicação', async () => {
+    const session = await createSession('TESTE CODEX · sem redirecionamento', '312');
+    await closeSession(session.id);
+    redirectPublication = true;
+
+    const response = await timingPost(`/api/sessions/${session.id}/mobile-publication`, { action: 'publish' }, OPERATOR_TOKEN);
+
+    redirectPublication = false;
+    expect(response.status).toBe(502);
+    expect(redirectedRequests).toBe(0);
   });
 });

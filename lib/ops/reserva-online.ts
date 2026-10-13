@@ -110,7 +110,6 @@ const brasilia = (local: string) => `${String(local ?? '').slice(0, 19)}-03:00`;
 const ids = (s: string) => s.split(',').map(Number).filter((n) => n > 0);
 const brl = (centavos: number) => (centavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-type OpsRun = (text: string, params?: Record<string, unknown>) => Promise<Record<string, unknown>[]>;
 type CouponInput = { codigo: string; documento: string; bateriaId: number; quantidade: number };
 type CouponQuote = { brutoCentavos: number; descontoCentavos: number; totalCentavos: number; voucherId: number | null; clienteId: number };
 type ReadOne = (text: string, params?: Record<string, unknown>) => Promise<Record<string, unknown> | null>;

@@ -437,8 +437,10 @@ async function login(request: Request, input: Record<string, unknown>, context: 
     return json(429, { erro: 'Muitas tentativas. Aguarde alguns minutos.' });
   }
 
-  const account = await findAccount(context, identifier);
   const password = value(input, 'password');
+  if (password.length < PASSWORD_MIN || password.length > PASSWORD_MAX) return json(401, { erro: authError });
+
+  const account = await findAccount(context, identifier);
   const salt = account ? decodeBase64Url(account.password_salt) : new Uint8Array(16);
   const iterations = account?.password_iterations === ITERATIONS ? ITERATIONS : ITERATIONS;
   const candidate = await passwordHash(password, salt, iterations);

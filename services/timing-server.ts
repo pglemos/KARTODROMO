@@ -19,6 +19,7 @@ import { extname, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { DecoderClient, type DecoderProtocol } from '../lib/timing/decoder-client';
 import { formatTrxPassing, type TrxPassing } from '../lib/timing/trx-parser';
+import { mobileApiEndpoint } from '../lib/mobile-api-url';
 import {
   acceptRejected,
   addPenalty,
@@ -1568,13 +1569,13 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     const publishToken = process.env.MOBILE_PUBLISH_TOKEN;
     if (!destination || !publishToken) return send(res, 503, { error: 'Publicação móvel ainda não está configurada.' });
     try {
-      const url = new URL(destination);
-      const localSimulation = SIMULATE && ['127.0.0.1', 'localhost', '::1'].includes(url.hostname);
-      if (url.protocol !== 'https:' && !localSimulation) return send(res, 503, { error: 'O destino de publicação precisa usar HTTPS.' });
+      const url = mobileApiEndpoint(destination, '/api/mobile/v1/internal/results', SIMULATE);
+      if (!url) return send(res, 503, { error: 'O destino de publicação não é o Worker móvel autorizado.' });
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-mobile-publish-token': publishToken },
         body: JSON.stringify(payload),
+        redirect: 'error',
         signal: AbortSignal.timeout(10_000),
       });
       if (!response.ok) return send(res, 502, { error: 'O serviço móvel não confirmou a publicação.' });

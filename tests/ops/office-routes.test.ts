@@ -60,26 +60,48 @@ describe('Office: permissões de resultados móveis e vínculo assistido', () =>
   });
 
   it('encaminha somente o vínculo explicitamente autorizado ao Worker por HTTPS', async () => {
-    process.env.MOBILE_IDENTITY_LINK_URL = 'https://worker.example/api/mobile/v1/internal/identity-links';
+    process.env.MOBILE_IDENTITY_LINK_URL = 'https://reservas.kartodromodebetim.com.br/api/mobile/v1/internal/identity-links';
     process.env.MOBILE_ADMIN_TOKEN = 'separate-admin-token';
     db.one.mockResolvedValueOnce({ allowed: 1 }).mockResolvedValueOnce({ id: 312 });
-    const request = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response('{"ok":true}', { status: 200 }));
+    const request = vi.fn<
+      (url: string | URL | Request, init?: RequestInit) => Promise<Response>
+    >(async () => new Response('{"ok":true}', { status: 200 }));
     vi.stubGlobal('fetch', request);
 
     expect(await call('/mobile-identities/link', 'POST', {
       customerId: '312', email: 'ana@example.com',
     }, recepcionista)).toEqual({ status: 200, body: { ok: true } });
     const [url, init] = request.mock.calls[0];
-    expect(String(url)).toBe('https://worker.example/api/mobile/v1/internal/identity-links');
+    expect(String(url)).toBe('https://reservas.kartodromodebetim.com.br/api/mobile/v1/internal/identity-links');
     expect(init).toMatchObject({
       method: 'POST',
       headers: expect.objectContaining({ 'x-mobile-admin-token': 'separate-admin-token' }),
       body: JSON.stringify({ customerId: '312', email: 'ana@example.com' }),
+      redirect: 'error',
     });
   });
 
+  it.each([
+    'https://worker.example/api/mobile/v1/internal/identity-links',
+    'https://user:pass@reservas.kartodromodebetim.com.br/api/mobile/v1/internal/identity-links',
+    'https://reservas.kartodromodebetim.com.br:8443/api/mobile/v1/internal/identity-links',
+    'https://reservas.kartodromodebetim.com.br/api/mobile/v1/internal/identity-links?next=elsewhere',
+    'https://reservas.kartodromodebetim.com.br/api/mobile/v1/internal/identity-links#fragment',
+  ])('não envia token administrativo a destino não autorizado: %s', async (destination) => {
+    process.env.MOBILE_IDENTITY_LINK_URL = destination;
+    process.env.MOBILE_ADMIN_TOKEN = 'separate-admin-token';
+    db.one.mockResolvedValueOnce({ allowed: 1 }).mockResolvedValueOnce({ id: 312 });
+    const request = vi.fn(async () => new Response('{"ok":true}', { status: 200 }));
+    vi.stubGlobal('fetch', request);
+
+    await expect(call('/mobile-identities/link', 'POST', {
+      customerId: '312', email: 'ana@example.com',
+    }, recepcionista)).rejects.toMatchObject({ status: 503 });
+    expect(request).not.toHaveBeenCalled();
+  });
+
   it('não encaminha vínculo sem permissão do perfil', async () => {
-    process.env.MOBILE_IDENTITY_LINK_URL = 'https://worker.example/api/mobile/v1/internal/identity-links';
+    process.env.MOBILE_IDENTITY_LINK_URL = 'https://reservas.kartodromodebetim.com.br/api/mobile/v1/internal/identity-links';
     process.env.MOBILE_ADMIN_TOKEN = 'separate-admin-token';
     db.one.mockResolvedValueOnce({ allowed: 0 });
     const request = vi.fn();
