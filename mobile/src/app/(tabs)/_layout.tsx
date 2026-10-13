@@ -6,6 +6,7 @@ export default function CustomerTabs() {
       screenOptions={{
         headerShown: false,
         tabBarIcon: () => null,
+        tabBarIconStyle: { display: 'none' },
         tabBarLabelPosition: 'beside-icon',
         tabBarActiveTintColor: '#c9f36a',
         tabBarInactiveTintColor: '#a5b2a8',
@@ -16,7 +17,7 @@ export default function CustomerTabs() {
           paddingTop: 6,
           paddingBottom: 8,
         },
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '700' },
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '700', marginStart: 0, marginEnd: 0 },
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Início' }} />
