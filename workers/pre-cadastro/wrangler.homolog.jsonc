@@ -4,6 +4,7 @@
   "account_id": "e476c4322903cf98849d505ea26f726f",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-01",
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "observability": { "enabled": true },
   "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/api/*", "/"] },

@@ -1,4 +1,4 @@
-const MOBILE_API_HOST = 'reservas.kartodromodebetim.com.br';
+const MOBILE_API_HOSTS = ['reservas.kartodromodebetim.com.br', 'kartodromo-mobile-homolog.kartodromo.workers.dev'];
 
 export function mobileApiEndpoint(destination: string | undefined, path: string, allowLocalSimulation = false): URL | null {
   if (!destination) return null;
@@ -7,10 +7,10 @@ export function mobileApiEndpoint(destination: string | undefined, path: string,
     const endpoint = new URL(destination);
     const loopback = ['127.0.0.1', 'localhost', '::1'].includes(endpoint.hostname);
     const localSimulation = allowLocalSimulation && loopback && ['http:', 'https:'].includes(endpoint.protocol);
-    const trustedProduction = endpoint.protocol === 'https:' && endpoint.hostname === MOBILE_API_HOST && endpoint.port === '';
+    const trustedWorker = endpoint.protocol === 'https:' && MOBILE_API_HOSTS.includes(endpoint.hostname) && endpoint.port === '';
 
     if (
-      (!localSimulation && !trustedProduction) ||
+      (!localSimulation && !trustedWorker) ||
       endpoint.pathname !== path ||
       endpoint.username ||
       endpoint.password ||

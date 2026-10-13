@@ -6,7 +6,7 @@ import worker from '../../workers/pre-cadastro/src/index';
 
 const IDENTITY_SCHEMA = readFileSync(
   new URL('../../workers/pre-cadastro/migrations/0001_mobile_identity.sql', import.meta.url), 'utf8',
-);
+) + readFileSync(new URL('../../workers/pre-cadastro/migrations/0005_mobile_password_scheme.sql', import.meta.url), 'utf8');
 const BOOKINGS_SCHEMA = readFileSync(
   new URL('../../workers/pre-cadastro/migrations/0002_mobile_bookings.sql', import.meta.url), 'utf8',
 );

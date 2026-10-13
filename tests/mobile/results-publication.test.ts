@@ -14,6 +14,7 @@ const migrations = [
   '0002_mobile_bookings.sql',
   '0003_mobile_coupon_previews.sql',
   '0004_mobile_results.sql',
+  '0005_mobile_password_scheme.sql',
 ].map((name) => new URL(`../../workers/pre-cadastro/migrations/${name}`, import.meta.url));
 
 type Row = Record<string, unknown>;

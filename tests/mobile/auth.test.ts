@@ -8,7 +8,7 @@ import { authenticateMobileRequest } from '../../workers/pre-cadastro/src/mobile
 const SCHEMA = readFileSync(
   new URL('../../workers/pre-cadastro/migrations/0001_mobile_identity.sql', import.meta.url),
   'utf8',
-);
+) + readFileSync(new URL('../../workers/pre-cadastro/migrations/0005_mobile_password_scheme.sql', import.meta.url), 'utf8');
 
 type Row = Record<string, unknown>;
 
@@ -150,6 +150,29 @@ function tokenFromLastEmail() {
 }
 
 describe('autenticação móvel', () => {
+  it('preserva credenciais PBKDF2 existentes ao versionar o esquema', () => {
+    const legacy = new DatabaseSync(':memory:');
+    try {
+      legacy.exec(readFileSync(new URL('../../workers/pre-cadastro/migrations/0001_mobile_identity.sql', import.meta.url), 'utf8'));
+      legacy.prepare('INSERT INTO mobile_accounts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .run('legacy', ...Array(8).fill('cipher'), 600_000, null, 0);
+      legacy.exec(readFileSync(new URL('../../workers/pre-cadastro/migrations/0005_mobile_password_scheme.sql', import.meta.url), 'utf8'));
+      expect(legacy.prepare('SELECT id, password_hash, password_iterations, password_scheme FROM mobile_accounts').get())
+        .toMatchObject({ id: 'legacy', password_hash: 'cipher', password_iterations: 600_000, password_scheme: 'pbkdf2-sha256-v1' });
+    } finally { legacy.close(); }
+  });
+  it('usa scrypt versionado quando o runtime rejeita PBKDF2', async () => {
+    const deriveBits = vi.spyOn(crypto.subtle, 'deriveBits').mockRejectedValue(new Error('Pbkdf2 failed: iteration counts above 100000 are not supported'));
+    try {
+      const response = await register();
+      expect(response.status).toBe(202);
+      expect((await call('email/verify', { token: tokenFromLastEmail() })).status).toBe(200);
+      expect((await call('login', { identifier: validRegistration.email, password: validRegistration.password })).status).toBe(200);
+      expect(database.database.prepare('SELECT password_scheme FROM mobile_accounts').get()).toMatchObject({ password_scheme: 'scrypt-32768-8-3-v1' });
+    } finally {
+      deriveBits.mockRestore();
+    }
+  });
   it('rejects oversized JSON bodies even when Content-Length is absent', async () => {
     const response = await register({ ignored: 'x'.repeat(20_000) });
 
@@ -349,7 +372,7 @@ describe('autenticação móvel', () => {
       ),
     );
 
-    expect(responses.slice(0, 6).every((response) => response.status === 401)).toBe(true);
-    expect(responses[6].status).toBe(429);
+    // Requisições concorrentes podem chegar ao contador em qualquer ordem.
+    expect(responses.map((response) => response.status).sort()).toEqual([401, 401, 401, 401, 401, 401, 429]);
   });
 });

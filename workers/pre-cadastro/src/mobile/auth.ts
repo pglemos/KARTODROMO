@@ -1,3 +1,5 @@
+import { scryptSync } from 'node:crypto';
+
 import { cpfValido, digitos } from '../validar';
 import {
   mobileEmailConfigured,
@@ -37,10 +39,12 @@ interface AccountRow {
   password_salt: string;
   password_hash: string;
   password_iterations: number;
+  password_scheme: string;
   email_verified_at: number | null;
 }
 
 const ITERATIONS = 600_000;
+const PASSWORD_SCHEME = 'scrypt-32768-8-3-v1';
 const PASSWORD_MIN = 8;
 const PASSWORD_MAX = 128;
 const ACCESS_TTL = 15 * 60_000;
@@ -135,12 +139,16 @@ export async function mobileAccountCpf(env: MobileAuthEnv, accountId: string): P
   return row ? decrypt(context, row.cpf_cipher) : null;
 }
 
-async function passwordHash(password: string, salt: Uint8Array, iterations = ITERATIONS) {
+async function passwordHash(password: string, salt: Uint8Array, scheme = PASSWORD_SCHEME) {
+  if (scheme === PASSWORD_SCHEME) {
+    return encodeBase64Url(scryptSync(password, salt, 32, { N: 32768, r: 8, p: 3, maxmem: 64 * 1024 * 1024 }));
+  }
+  if (scheme !== 'pbkdf2-sha256-v1') throw new Error('Unsupported password scheme');
   const key = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
   const saltBuffer = new ArrayBuffer(salt.byteLength);
   new Uint8Array(saltBuffer).set(salt);
   const derived = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', hash: 'SHA-256', salt: saltBuffer, iterations },
+    { name: 'PBKDF2', hash: 'SHA-256', salt: saltBuffer, iterations: ITERATIONS },
     key,
     256,
   );
@@ -280,7 +288,7 @@ async function findAccount(context: CryptoContext, identifier: string) {
     return context.db
       .prepare(
         `SELECT id, name_cipher, email_lookup, email_cipher, cpf_lookup, cpf_cipher,
-                phone_cipher, password_salt, password_hash, password_iterations, email_verified_at
+                phone_cipher, password_salt, password_hash, password_iterations, password_scheme, email_verified_at
          FROM mobile_accounts WHERE email_lookup = ? LIMIT 1`,
       )
       .bind(lookup)
@@ -291,7 +299,7 @@ async function findAccount(context: CryptoContext, identifier: string) {
   return context.db
     .prepare(
       `SELECT id, name_cipher, email_lookup, email_cipher, cpf_lookup, cpf_cipher,
-              phone_cipher, password_salt, password_hash, password_iterations, email_verified_at
+              phone_cipher, password_salt, password_hash, password_iterations, password_scheme, email_verified_at
        FROM mobile_accounts WHERE cpf_lookup = ? LIMIT 1`,
     )
     .bind(lookup)
@@ -364,8 +372,8 @@ async function register(
       .prepare(
         `INSERT INTO mobile_accounts(
           id, name_cipher, email_lookup, email_cipher, cpf_lookup, cpf_cipher, phone_cipher,
-          password_salt, password_hash, password_iterations, email_verified_at, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)`,
+          password_salt, password_hash, password_iterations, password_scheme, email_verified_at, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)`,
       )
       .bind(
         id,
@@ -378,6 +386,7 @@ async function register(
         encodeBase64Url(salt),
         passwordDigest,
         ITERATIONS,
+        PASSWORD_SCHEME,
         now,
       )
       .run();
@@ -442,8 +451,7 @@ async function login(request: Request, input: Record<string, unknown>, context: 
 
   const account = await findAccount(context, identifier);
   const salt = account ? decodeBase64Url(account.password_salt) : new Uint8Array(16);
-  const iterations = account?.password_iterations === ITERATIONS ? ITERATIONS : ITERATIONS;
-  const candidate = await passwordHash(password, salt, iterations);
+  const candidate = await passwordHash(password, salt, account?.password_scheme ?? PASSWORD_SCHEME);
   const valid = Boolean(
     account &&
       account.email_verified_at !== null &&
@@ -517,10 +525,10 @@ async function resetPassword(input: Record<string, unknown>, context: CryptoCont
   await context.db
     .prepare(
       `UPDATE mobile_accounts
-       SET password_salt = ?, password_hash = ?, password_iterations = ?
+       SET password_salt = ?, password_hash = ?, password_iterations = ?, password_scheme = ?
        WHERE id = ?`,
     )
-    .bind(encodeBase64Url(salt), await passwordHash(password, salt), ITERATIONS, tokenRow.account_id)
+    .bind(encodeBase64Url(salt), await passwordHash(password, salt), ITERATIONS, PASSWORD_SCHEME, tokenRow.account_id)
     .run();
   await context.db
     .prepare('UPDATE mobile_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL')
@@ -632,7 +640,10 @@ export async function handleMobileAuth(request: Request, env: MobileAuthEnv) {
       default:
         return json(404, { erro: 'Rota desconhecida.' });
     }
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    console.error('mobile-auth', /iteration counts above \d+ are not supported/i.test(message)
+      ? 'PBKDF2 iteration limit' : message.startsWith('D1_ERROR:') ? 'D1 operation failed' : 'Authentication operation failed');
     return json(503, { erro: 'Serviço temporariamente indisponível.' });
   }
 }
