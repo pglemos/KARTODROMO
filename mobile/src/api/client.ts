@@ -21,16 +21,25 @@ export class MobileApiError extends Error {
   }
 }
 
-async function post<T>(path: string, input: unknown, accessToken?: string): Promise<T> {
+export interface MobileRequestOptions {
+  method?: 'GET' | 'POST';
+  body?: unknown;
+  accessToken?: string;
+  idempotencyKey?: string;
+}
+
+export async function mobileRequest<T>(path: string, options: MobileRequestOptions = {}): Promise<T> {
+  const { method = 'GET', body, accessToken, idempotencyKey } = options;
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}${AUTH}/${path}`, {
-      method: 'POST',
+    response = await fetch(`${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`, {
+      method,
       headers: {
-        'content-type': 'application/json',
+        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
         ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+        ...(idempotencyKey ? { 'idempotency-key': idempotencyKey } : {}),
       },
-      body: JSON.stringify(input),
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
   } catch {
     throw new MobileApiError('Sem conexão. Confira a internet e tente novamente.');
@@ -52,6 +61,10 @@ async function post<T>(path: string, input: unknown, accessToken?: string): Prom
     throw new MobileApiError(message, response.status);
   }
   return payload as T;
+}
+
+async function post<T>(path: string, input: unknown, accessToken?: string): Promise<T> {
+  return mobileRequest<T>(`${AUTH}/${path}`, { method: 'POST', body: input, accessToken });
 }
 
 export const authApi = {

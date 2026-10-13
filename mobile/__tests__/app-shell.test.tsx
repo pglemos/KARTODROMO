@@ -1,7 +1,8 @@
 import { fireEvent, renderRouter } from 'expo-router/testing-library';
 import { Text } from 'react-native';
 
-import HomeScreen from '../src/app/index';
+import LandingRoute from '../src/app/index';
+import HomeScreen from '../src/components/home-screen';
 
 function AgendaScreen() {
   return <Text>Agenda da pista</Text>;
@@ -13,10 +14,11 @@ function LoginScreen() {
 
 test('home offers battery booking, agenda and login', async () => {
   const view = await renderRouter({
-    index: HomeScreen,
+    index: LandingRoute,
+    '(tabs)/index': HomeScreen,
     '(tabs)/agenda': AgendaScreen,
     '(auth)/login': LoginScreen,
-  });
+  }, { initialUrl: '/' });
 
   expect(view.getByText('Reservar bateria')).toBeTruthy();
   expect(view.getByText('Entrar')).toBeTruthy();
