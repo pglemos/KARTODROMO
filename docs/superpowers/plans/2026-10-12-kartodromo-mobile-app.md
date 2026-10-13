@@ -94,10 +94,10 @@
 - Sessão guarda somente access/refresh tokens no expo-secure-store; senha e tokens não são escritos em AsyncStorage, SQLite, logs ou analytics.
 - Cadastro exige aceite da política pública /privacidade e apresenta coleta/uso de dados; permissão do sistema para localização só é solicitada ao iniciar um treino.
 
-- [ ] **Step 1: Escrever session.test.tsx** cobrindo restauração da sessão, expiração do access token, refresh único, logout e falha de refresh que limpa os tokens.
-- [ ] **Step 2: Rodar o teste e confirmar a falha** com npm --prefix mobile test -- --runInBand __tests__/session.test.tsx.
-- [ ] **Step 3: Implementar contratos HTTP, SecureStore, provider e telas de conta**; validar a senha no cliente para orientar o usuário e repetir a validação no Worker.
-- [ ] **Step 4: Verificar teste e tipos** com npm --prefix mobile test -- --runInBand __tests__/session.test.tsx e npm --prefix mobile run typecheck. Resultado esperado: PASS.
+- [x] **Step 1: Escrever session.test.tsx** cobrindo restauração da sessão, expiração do access token, refresh único, logout e falha de refresh que limpa os tokens.
+- [x] **Step 2: Rodar o teste e confirmar a falha** com npm --prefix mobile test -- --runInBand __tests__/session.test.tsx.
+- [x] **Step 3: Implementar contratos HTTP, SecureStore, provider e telas de conta**; validar a senha no cliente para orientar o usuário e repetir a validação no Worker.
+- [x] **Step 4: Verificar teste e tipos** com npm --prefix mobile test -- --runInBand __tests__/session.test.tsx e npm --prefix mobile run typecheck. Resultado esperado: PASS.
 
 ### Task 4: Vincular reservas à conta e garantir idempotência
 
