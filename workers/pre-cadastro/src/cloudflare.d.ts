@@ -27,6 +27,7 @@ interface R2Bucket {
 interface D1PreparedStatement {
   bind(...values: unknown[]): D1PreparedStatement;
   first<T = Record<string, unknown>>(columnName?: string): Promise<T | null>;
+  all<T = Record<string, unknown>>(): Promise<{ success: boolean; results: T[]; meta: { changes: number } }>;
   run(): Promise<{ success: boolean; meta: { changes: number } }>;
 }
 

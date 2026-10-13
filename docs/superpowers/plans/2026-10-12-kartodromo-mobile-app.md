@@ -115,11 +115,11 @@
 - O Worker carrega nome/documento/e-mail/telefone do perfil autenticado; nunca aceita do app um account_id ou preço autoritativo. Pedido móvel consultado pela rota pública antiga por ID retorna 404; pedidos legados sem conta mantêm seu fluxo.
 - A cobrança usa o pedido como externalReference estável; depois de timeout ambíguo, consultar GET /payments?externalReference=:pedidoId e reutilizar a cobrança existente antes de tentar criar outra.
 
-- [ ] **Step 1: Escrever testes** para agenda pública, cliente A sem acesso ao pedido B, chave repetida, corpo diferente com 409, recuperação após falha entre gravação D1/R2 e reutilização da cobrança Asaas após timeout.
-- [ ] **Step 2: Rodar os testes e confirmar falha** com npx vitest run tests/mobile/reservations-api.test.ts tests/mobile/asaas-idempotency.test.ts tests/reserva-online.test.ts.
-- [ ] **Step 3: Criar migration e rotas móveis**; gravar propriedade/idempotência em D1, encaminhar pedido ao fluxo R2 existente e bloquear leitura anônima do pedido móvel.
-- [ ] **Step 4: Ajustar o sincronizador operacional** para preservar o ID do pedido e os estados existentes: novo, aguardando_pagamento, pago, confirmado, recusado, expirado, pago_sem_vaga e erro_pagamento.
-- [ ] **Step 5: Aplicar migrations no banco local/de homologação antes do código** e rodar npx vitest run tests/mobile/reservations-api.test.ts tests/mobile/asaas-idempotency.test.ts tests/reserva-online.test.ts. Resultado esperado: testes PASS; cobrança continua criada apenas pela integração Asaas existente.
+- [x] **Step 1: Escrever testes** para agenda pública, propriedade da reserva, chave repetida, corpo diferente com 409, falha parcial D1/R2, fila operacional e reutilização da cobrança Asaas após timeout.
+- [x] **Step 2: Rodar os testes e confirmar falha** com npx vitest run tests/mobile/reservations-api.test.ts tests/mobile/asaas-idempotency.test.ts tests/reserva-online.test.ts.
+- [x] **Step 3: Criar migration e rotas móveis**; gravar propriedade/idempotência em D1, encaminhar pedido ao fluxo R2 existente e bloquear leitura anônima do pedido móvel.
+- [x] **Step 4: Verificar o sincronizador operacional**; o DTO/ciclo existentes preservam o ID e os estados do pedido e a fila recebe pedidos móveis sem uma alteração extra no servidor.
+- [x] **Step 5: Aplicar migrations somente no banco local antes do código** e rodar npx vitest run tests/mobile/reservations-api.test.ts tests/mobile/asaas-idempotency.test.ts tests/reserva-online.test.ts. Resultado esperado: testes PASS; cobrança continua criada apenas pela integração Asaas existente.
 
 ### Task 5: Validar e consumir cupons de forma atômica
 
