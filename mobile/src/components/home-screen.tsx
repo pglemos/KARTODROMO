@@ -227,10 +227,12 @@ const styles = StyleSheet.create({
   },
   quickLinks: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
   },
   quickLink: {
-    flex: 1,
+    flexBasis: '45%',
+    flexGrow: 1,
     minHeight: 92,
     justifyContent: 'center',
     padding: 16,

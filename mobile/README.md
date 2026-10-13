@@ -16,14 +16,23 @@ npm run export
 
 O app usa `https://reservas.kartodromodebetim.com.br` por padrão. Para homologação, defina `EXPO_PUBLIC_API_URL` no ambiente local. Não coloque tokens do Worker, chaves Asaas, credenciais de loja ou dados pessoais no cliente.
 
+## Compilação nativa local
+
+`npm run android` e `npm run ios` geram os projetos nativos com Expo e compilam para um dispositivo ou emulador. As pastas `android/` e `ios/` são geradas e ficam fora do Git.
+
+- Android: JDK 17, Android SDK/API 36 e NDK 27.1.12297006. Configure `JAVA_HOME` e `ANDROID_HOME` para essas instalações.
+- iOS: Expo SDK 57 exige Xcode 26.4 ou superior, além de um runtime iOS disponível. Xcode 26.2 não atende esse requisito.
+- Um APK local de QA pode ser compilado depois de `npx expo prebuild --platform android --no-install`, executando `NODE_ENV=production ./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a` dentro de `android/`. O template usa assinatura de desenvolvimento nesse build; ele não é um artefato de loja. Para assinatura de distribuição, use os perfis EAS abaixo.
+
 ## Builds EAS
 
 - `development`: cliente de desenvolvimento interno.
 - `preview`: instaladores diretos para QA em iOS/Android; Android gera APK.
+- `simulator`: build iOS para simulador, sem exigir assinatura Apple; não instala em iPhone físico.
 - `store-preview`: artefatos assinados para TestFlight e faixa interna do Google Play; Android gera AAB.
 - `production`: build de loja; este perfil não é enviado automaticamente para nenhuma loja.
 
-O projeto EAS exige a variável local `EAS_PROJECT_ID`. Em GitHub Actions, configure-a como variável e `EXPO_TOKEN` como secret. Os certificados Apple e Google devem ser administrados pelo EAS; não adicionar arquivos de assinatura ao repositório.
+O projeto EAS está vinculado a `@synvolt/kartodromo-betim` em `app.json`. `EAS_PROJECT_ID` permite substituir esse vínculo por ambiente; em GitHub Actions, configure-a como variável e `EXPO_TOKEN` como secret. Os certificados Apple e Google devem ser administrados pelo EAS; não adicionar arquivos de assinatura ao repositório.
 
 Para solicitar builds internos, execute manualmente o workflow **Mobile app**. Ele publica os links e IDs retornados pela EAS como artefato da execução. O workflow não executa `eas submit` nem publica em uma faixa aberta.
 

@@ -5,6 +5,8 @@ export default function CustomerTabs() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        tabBarIcon: () => null,
+        tabBarLabelPosition: 'beside-icon',
         tabBarActiveTintColor: '#c9f36a',
         tabBarInactiveTintColor: '#a5b2a8',
         tabBarStyle: {

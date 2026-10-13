@@ -10,7 +10,10 @@
     "ios": {
       "bundleIdentifier": "br.com.kartodromobetim.app",
       "buildNumber": "1",
-      "icon": "./assets/app-icon.png"
+      "icon": "./assets/app-icon.png",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "br.com.kartodromobetim.app",
@@ -51,6 +54,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "7e765447-c4ac-4bf7-b958-a63209853334"
+      }
+    },
+    "owner": "synvolt"
   }
 }
