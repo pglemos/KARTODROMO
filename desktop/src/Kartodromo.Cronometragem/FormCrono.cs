@@ -193,6 +193,8 @@ public partial class FormCrono : Form
         crono.DropDownItems.Add(new ToolStripSeparator());
         var vermelho = Color.FromArgb(196, 40, 28);
         crono.DropDownItems.Add(new ToolStripMenuItem("Finalizar prova", null, (_, _) => Acao("close")) { ShortcutKeyDisplayString = "F5", ForeColor = vermelho });
+        crono.DropDownItems.Add(new ToolStripMenuItem("Publicar / corrigir resultado no app", null, (_, _) => PublicarResultadoMobile()));
+        crono.DropDownItems.Add(new ToolStripMenuItem("Retirar resultado do app", null, (_, _) => RetirarResultadoMobile()) { ForeColor = vermelho });
         crono.DropDownItems.Add(new ToolStripMenuItem("Limpar passagens", null, (_, _) => LimparPassagens()) { ShortcutKeyDisplayString = "F6", ForeColor = vermelho });
         crono.DropDownItems.Add(new ToolStripMenuItem("Cancelar bateria", null, (_, _) => Acao("cancel")) { ForeColor = vermelho });
         crono.DropDownItems.Add(new ToolStripMenuItem("Reiniciar bateria…", null, (_, _) => ReiniciarBateria()) { ForeColor = vermelho });
@@ -665,6 +667,26 @@ public partial class FormCrono : Form
         _sel = id; _fixado = true;
         _ = Atualizar();
     }
+
+    void PublicarResultadoMobile() => Seguro.Rodar(this, async () =>
+    {
+        if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria encerrada."); return; }
+        if (!await EntrarComoUsuario()) return;
+        if (!Msg.Pergunta(this, $"Publicar ou corrigir o resultado de \"{_sess.S("name")}\" no app?\n\nA ação será registrada no histórico de auditoria.")) return;
+        Crono.Api.Token = Api.Servidor.Token;
+        await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/mobile-publication", new JsonObject { ["action"] = "publish" });
+        Msg.Info(this, "Resultado enviado para publicação no app.");
+    });
+
+    void RetirarResultadoMobile() => Seguro.Rodar(this, async () =>
+    {
+        if (_sess == null) { Msg.Aviso(this, "Selecione a bateria cujo resultado deve ser retirado."); return; }
+        if (!await EntrarComoUsuario()) return;
+        if (!Msg.Pergunta(this, $"Retirar o resultado de \"{_sess.S("name")}\" do app?\n\nA retirada será registrada no histórico de auditoria.")) return;
+        Crono.Api.Token = Api.Servidor.Token;
+        await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/mobile-publication", new JsonObject { ["action"] = "withdraw" });
+        Msg.Info(this, "Resultado retirado do app.");
+    });
 
 
     void ConfigurarPainel()

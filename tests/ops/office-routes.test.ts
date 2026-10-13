@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({ one: vi.fn(), query: vi.fn(), tx: vi.fn() }));
 
@@ -18,6 +18,10 @@ import { HttpError, officeRoutes } from '../../lib/ops/office';
 
 const admin = { uid: 7, nome: 'Admin de teste', admin: true, exp: Date.now() + 60_000 };
 const recepcionista = { ...admin, admin: false };
+const previousMobileEnv = {
+  url: process.env.MOBILE_IDENTITY_LINK_URL,
+  token: process.env.MOBILE_ADMIN_TOKEN,
+};
 
 async function call(path: string, method = 'GET', body: Record<string, unknown> = {}, sessao = admin) {
   const received: { status: number; body: unknown }[] = [];
@@ -36,6 +40,56 @@ beforeEach(() => {
   db.one.mockResolvedValue(null);
   db.query.mockResolvedValue([]);
   db.tx.mockImplementation(async (work: (run: (sql: string, params?: Record<string, unknown>) => Promise<Record<string, unknown>[]>) => Promise<unknown>) => work(async () => []));
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  if (previousMobileEnv.url === undefined) delete process.env.MOBILE_IDENTITY_LINK_URL;
+  else process.env.MOBILE_IDENTITY_LINK_URL = previousMobileEnv.url;
+  if (previousMobileEnv.token === undefined) delete process.env.MOBILE_ADMIN_TOKEN;
+  else process.env.MOBILE_ADMIN_TOKEN = previousMobileEnv.token;
+});
+
+describe('Office: permissões de resultados móveis e vínculo assistido', () => {
+  it('consulta a permissão ativa do perfil e nega por padrão', async () => {
+    db.one.mockResolvedValueOnce({ allowed: 0 });
+    expect(await call('/mobile-permissions/resultados_publicar_mobile', 'GET', {}, recepcionista))
+      .toEqual({ status: 200, body: { allowed: false } });
+    expect(db.one.mock.calls[0][0]).toContain('PerfilPermissao');
+    expect(db.one.mock.calls[0][1]).toMatchObject({ uid: recepcionista.uid, funcao: 'resultados_publicar_mobile' });
+  });
+
+  it('encaminha somente o vínculo explicitamente autorizado ao Worker por HTTPS', async () => {
+    process.env.MOBILE_IDENTITY_LINK_URL = 'https://worker.example/api/mobile/v1/internal/identity-links';
+    process.env.MOBILE_ADMIN_TOKEN = 'separate-admin-token';
+    db.one.mockResolvedValueOnce({ allowed: 1 }).mockResolvedValueOnce({ id: 312 });
+    const request = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response('{"ok":true}', { status: 200 }));
+    vi.stubGlobal('fetch', request);
+
+    expect(await call('/mobile-identities/link', 'POST', {
+      customerId: '312', email: 'ana@example.com',
+    }, recepcionista)).toEqual({ status: 200, body: { ok: true } });
+    const [url, init] = request.mock.calls[0];
+    expect(String(url)).toBe('https://worker.example/api/mobile/v1/internal/identity-links');
+    expect(init).toMatchObject({
+      method: 'POST',
+      headers: expect.objectContaining({ 'x-mobile-admin-token': 'separate-admin-token' }),
+      body: JSON.stringify({ customerId: '312', email: 'ana@example.com' }),
+    });
+  });
+
+  it('não encaminha vínculo sem permissão do perfil', async () => {
+    process.env.MOBILE_IDENTITY_LINK_URL = 'https://worker.example/api/mobile/v1/internal/identity-links';
+    process.env.MOBILE_ADMIN_TOKEN = 'separate-admin-token';
+    db.one.mockResolvedValueOnce({ allowed: 0 });
+    const request = vi.fn();
+    vi.stubGlobal('fetch', request);
+
+    await expect(call('/mobile-identities/link', 'POST', {
+      customerId: '312', email: 'ana@example.com',
+    }, recepcionista)).rejects.toMatchObject({ status: 403 });
+    expect(request).not.toHaveBeenCalled();
+  });
 });
 
 describe('Office: gravação de baterias com hora local', () => {

@@ -10,8 +10,9 @@ import { agendaPublica, criarPedido, situacaoPedido, syncAgenda, syncPedidos, sy
 import { handleMobileAuth, type MobileAuthEnv } from './mobile/auth';
 import { handleMobileReservations } from './mobile/reservations';
 import { handleMobileCoupons, handleMobileCouponsSync } from './mobile/coupons';
+import { handleMobileResults, type MobileResultsEnv } from './mobile/results';
 
-export interface Env extends EnvReservas, MobileAuthEnv {
+export interface Env extends EnvReservas, MobileAuthEnv, MobileResultsEnv {
   ASSETS: Fetcher;
   PRE: R2Bucket;
   SYNC_KEY: string;
@@ -91,6 +92,10 @@ export default {
       if (p.startsWith('/api/mobile/v1/auth/')) return await handleMobileAuth(req, env);
       if (p === '/api/mobile/v1/coupons/preview' || p.startsWith('/api/mobile/v1/coupons/preview/')) {
         return await handleMobileCoupons(req, env);
+      }
+      if (p === '/api/mobile/v1/internal/results' || p === '/api/mobile/v1/internal/identity-links' ||
+          p === '/api/mobile/v1/results' || p === '/api/mobile/v1/results/me') {
+        return await handleMobileResults(req, env);
       }
       if (p === '/api/mobile/v1/agenda' || p === '/api/mobile/v1/reservations' || p.startsWith('/api/mobile/v1/reservations/')) {
         return await handleMobileReservations(req, env);

@@ -60,6 +60,18 @@ const percentual = (v: unknown) => {
 };
 const bit = (v: unknown) => (v === true || v === 'true' || v === 1 || v === '1' ? 1 : 0);
 const duplicateSql = (e: unknown) => /UNIQUE|duplicate|2627|2601/i.test(e instanceof Error ? e.message : String(e));
+const mobilePermissions = new Set(['resultados_publicar_mobile', 'identidade_mobile_vincular']);
+
+async function mobilePermission(sessao: Sessao, funcao: string) {
+  const row = await one<{ allowed: boolean | number | string }>(
+    `SELECT CAST(CASE WHEN COALESCE(p.AcessoTotal, 0) = 1 OR COALESCE(pp.Incluir, 0) = 1 THEN 1 ELSE 0 END AS bit) allowed
+     FROM dbo.Usuario u LEFT JOIN dbo.Perfil p ON p.Id = u.PerfilId
+     LEFT JOIN dbo.PerfilPermissao pp ON pp.PerfilId = p.Id AND pp.Modulo = @modulo AND pp.Funcao = @funcao
+     WHERE u.Id = @uid AND u.Ativo = 1`,
+    { uid: sessao.uid, modulo: 'App Mobile', funcao },
+  );
+  return row?.allowed === true || row?.allowed === 1 || row?.allowed === '1';
+}
 
 async function servicosOnline() {
   const servicos: { id: string; nome: string; online: boolean | null; status: 'online' | 'offline' | 'indisponivel'; verificadoEm: string | null; detalhe?: string }[] = [
@@ -643,6 +655,47 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   const { method, url, sessao } = req;
   const path = url.pathname.replace(/^\/api\/office/, '');
   let m: RegExpMatchArray | null;
+
+  const mobilePermissionRoute = path.match(/^\/mobile-permissions\/([a-z_]+)$/);
+  if (mobilePermissionRoute && method === 'GET') {
+    if (!mobilePermissions.has(mobilePermissionRoute[1])) throw new HttpError(404, 'Permissão não encontrada.');
+    send(200, { allowed: await mobilePermission(sessao, mobilePermissionRoute[1]) });
+    return true;
+  }
+
+  if (path === '/mobile-identities/link' && method === 'POST') {
+    if (!await mobilePermission(sessao, 'identidade_mobile_vincular')) throw new HttpError(403, 'Seu perfil não pode vincular contas do app.');
+    const body = await req.body();
+    const customerId = int(body.customerId, 'Cliente');
+    const email = String(body.email ?? '').trim().toLowerCase();
+    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new HttpError(400, 'Informe o e-mail verificado da conta do app.');
+    if (!await one(`SELECT Id id FROM dbo.Cliente WHERE Id = @id`, { id: customerId })) throw new HttpError(404, 'Cliente não encontrado.');
+
+    const destination = process.env.MOBILE_IDENTITY_LINK_URL;
+    const adminToken = process.env.MOBILE_ADMIN_TOKEN;
+    if (!destination || !adminToken) throw new HttpError(503, 'O vínculo de contas do app ainda não está configurado.');
+    let endpoint: URL;
+    try { endpoint = new URL(destination); } catch { throw new HttpError(503, 'O vínculo de contas do app ainda não está configurado.'); }
+    if (endpoint.protocol !== 'https:' || endpoint.pathname !== '/api/mobile/v1/internal/identity-links') {
+      throw new HttpError(503, 'O destino do vínculo de contas precisa usar HTTPS.');
+    }
+    let response: Response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-mobile-admin-token': adminToken },
+        body: JSON.stringify({ customerId: String(customerId), email }),
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch {
+      throw new HttpError(502, 'Não foi possível concluir o vínculo com o app agora.');
+    }
+    if (response.status === 409) throw new HttpError(409, 'Este cliente ou esta conta já está vinculado.');
+    if (response.status === 404) throw new HttpError(400, 'Não foi possível validar o e-mail. Confirme o endereço e se a conta verificou o e-mail.');
+    if (!response.ok) throw new HttpError(502, 'Não foi possível concluir o vínculo com o app agora.');
+    send(200, { ok: true });
+    return true;
+  }
 
   if (path === '/servicos-online' && method === 'GET') {
     send(200, await servicosOnline());

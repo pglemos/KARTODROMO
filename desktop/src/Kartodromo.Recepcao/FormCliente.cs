@@ -9,6 +9,7 @@ public class FormCliente : Janela, ISemKit
     static Api Api => Sessao.Api;
     JsonObject _atual;
     string _modo = "ver";
+    bool? _podeVincularMobile;
     readonly bool _soNovo;
     public long? CriadoId { get; private set; }
 
@@ -103,6 +104,10 @@ public class FormCliente : Janela, ISemKit
         Icone(gNav, "first", "«", "Primeiro", () => Navegar("first")); Icone(gNav, "prev", "‹", "Anterior", () => Navegar("prev"));
         Icone(gNav, "next", "›", "Próximo", () => Navegar("next")); Icone(gNav, "last", "»", "Último", () => Navegar("last"));
         var gExtra = Grupo();
+        var vincularApp = new BotaoPlano { Text = "App", AutoSize = true, Height = 32, MinimumSize = new Size(42, 32), FlatStyle = FlatStyle.Flat, BackColor = gExtra.BackColor, ForeColor = KitVisual.Texto, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Padding = new Padding(8, 0, 8, 0), Margin = new Padding(0), Cursor = Cursors.Hand, TabStop = false, Visible = false };
+        vincularApp.FlatAppearance.BorderSize = 0; vincularApp.Click += (_, _) => VincularIdentidadeMobile();
+        gExtra.Controls.Add(vincularApp); _bt["mobileLink"] = vincularApp;
+        _dica.SetToolTip(vincularApp, "Vincular a conta do app a este cliente após conferir a identidade");
         Icone(gExtra, "termo", "", "Imprimir o termo de responsabilidade deste cliente", ImprimirTermo);
         Icone(gExtra, "fechar", "", "Fechar", Close);
         cab.Controls.AddRange([ico, tit, _sub, _status, acoes]);
@@ -439,7 +444,8 @@ public class FormCliente : Janela, ISemKit
         foreach (var k in new[] { "save", "save2" }) { _bt[k].BackColor = ro ? Color.FromArgb(196, 222, 210) : KitVisual.Verde; _bt[k].ForeColor = Color.White; }
         _status.BackColor = m == "novo" ? Tokens.AzulSuave : m == "edit" ? Color.FromArgb(255, 240, 214) : KitVisual.Fundo;
         _status.ForeColor = m == "novo" ? Tokens.AzulTexto : Tokens.LaranjaEscuro;
-        foreach (var k in new[] { "pesq", "novo", "edit", "del", "first", "prev", "next", "last", "termo" }) _bt[k].Enabled = ro && (!_soNovo);
+        foreach (var k in new[] { "pesq", "novo", "edit", "del", "first", "prev", "next", "last", "termo", "mobileLink" }) _bt[k].Enabled = ro && (!_soNovo);
+        _bt["mobileLink"].Visible = ro && _podeVincularMobile == true;
     }
 
     async Task Mostrar(long id)
@@ -467,6 +473,19 @@ public class FormCliente : Janela, ISemKit
         _fin.Text = $"Compras: {f.S("vendas")} · Total: {Fmt.Brl(f.L("total"))} · Última: {Fmt.DmyHm(f.S("ultima"))}{deps}";
         _hist.Carregar(c["historico"] is JsonArray h ? h.OfType<JsonObject>() : []);
         SetModo("ver");
+        await CarregarPermissaoVinculoMobile();
+    }
+
+    async Task CarregarPermissaoVinculoMobile()
+    {
+        if (_podeVincularMobile.HasValue) return;
+        try
+        {
+            var permissao = await Api.Get("/api/office/mobile-permissions/identidade_mobile_vincular");
+            _podeVincularMobile = permissao?.AsObject().B("allowed") == true;
+        }
+        catch { _podeVincularMobile = false; }
+        _bt["mobileLink"].Visible = _modo == "ver" && _podeVincularMobile == true;
     }
 
     void Navegar(string dir) => Seguro.Rodar(this, async () =>
@@ -538,6 +557,27 @@ public class FormCliente : Janela, ISemKit
         await Api.Delete($"/api/office/clientes/{_atual.S("id")}");
         _atual = null;
         Navegar("last");
+    });
+
+    void VincularIdentidadeMobile() => Seguro.Rodar(this, async () =>
+    {
+        if (_atual == null || !long.TryParse(_id.Text, out var customerId) || customerId <= 0) { Msg.Aviso(this, "Selecione um cliente salvo."); return; }
+        if (!Msg.Pergunta(this, "Confirma que conferiu a identidade do cliente antes de vincular a conta do app?")) return;
+        using var dialog = new DialogoDesign("Vincular conta do app", "Informe o e-mail verificado da conta após conferir a identidade", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0", "linear-gradient(180deg, #44D7B6, #08A87A)", 680, 320);
+        var email = Campos.Texto(254); email.Text = _email.Text.Trim();
+        var secao = dialog.Secao("Conta do app");
+        dialog.Campo(secao, "E-mail verificado", email, 6);
+        var confirmar = false;
+        dialog.BotaoRodape("Vincular", true, () =>
+        {
+            if (string.IsNullOrWhiteSpace(email.Text)) { Msg.Aviso(dialog, "Informe o e-mail verificado da conta do app."); return; }
+            confirmar = true; dialog.Close();
+        });
+        dialog.BotaoRodape("Cancelar", false, dialog.Close);
+        dialog.ShowDialog(this);
+        if (!confirmar) return;
+        await Api.Post("/api/office/mobile-identities/link", new JsonObject { ["customerId"] = customerId, ["email"] = email.Text.Trim() });
+        Msg.Info(this, "Conta do app vinculada ao cliente.");
     });
 
     async void BuscarCep()
