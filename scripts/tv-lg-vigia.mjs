@@ -26,12 +26,27 @@ const DESTINOS = (() => {
   const f = new URL('./tv-lg-destinos.json', import.meta.url);
   try { return JSON.parse(readFileSync(f, 'utf8')); } catch { return {}; }
 })();
-const paginaDa = (ip) => DESTINOS[ip]?.url ?? URL_PLACAR;
+// destino por série (TV nova informa), por MAC (TV antiga, ex.: 65UK6540 de 2018 não dá a série) ou por IP
+const paginaDa = (tv) => (DESTINOS[`serie:${tv.serie}`] ?? DESTINOS[`mac:${tv.mac}`] ?? DESTINOS[tv.ip])?.url ?? URL_PLACAR;
+
+/** MAC do IP pela tabela ARP do Windows (a TV acabou de responder ao SSDP/SSAP, então está lá). */
+function macDe(ip) {
+  try { return execFileSync('arp', ['-a', ip], { encoding: 'utf8', windowsHide: true }).match(/([0-9a-f]{2}-){5}[0-9a-f]{2}/i)?.[0].toLowerCase() ?? ''; } catch { return ''; }
+}
 const NO_PLACAR = new Set(['com.webos.app.home', 'com.webos.app.homeconnect', 'com.webos.app.browser', 'com.webos.app.discovery', '']);
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const log = (m) => console.log(`${new Date().toLocaleString('pt-BR')} ${m}`);
-const chaveDe = (ip) => { const f = join(PASTA, `${ip}.json`); return existsSync(f) ? JSON.parse(readFileSync(f, 'utf8'))['client-key'] : undefined; };
+const lerChave = (f) => { try { return JSON.parse(readFileSync(f, 'utf8')); } catch { return null; } };
+/** Chave de pareamento do IP; TV que voltou com outro IP (DHCP) é achada pelo MAC guardado — não pede ACEITAR de novo. */
+const chaveDe = (ip) => {
+  const f = join(PASTA, `${ip}.json`);
+  if (existsSync(f)) return lerChave(f)?.['client-key'];
+  const mac = existsSync(PASTA) ? macDe(ip) : '';
+  if (!mac) return undefined;
+  for (const x of readdirSync(PASTA).filter((n) => n.endsWith('.json'))) { const c = lerChave(join(PASTA, x)); if (c?.mac === mac) return c['client-key']; }
+  return undefined;
+};
 
 // TVs LG que responderam ao SSDP (webOS anuncia "WebOS" ou "LGE WebOS TV" no SERVER)
 function procurarTvs() {
@@ -73,6 +88,7 @@ class Tv {
     this.abrindoAte = 0;
     this.ultimoPedido = 0;
     this.serie = '';            // a mesma TV pode responder em 2 endereços (cabo + Wi-Fi): agrupa pelo número de série
+    this.mac = '';
     this.id = 0;
     this.respostas = new Map();
   }
@@ -126,6 +142,14 @@ class Tv {
         log(`${this.ip}: pareada`);
       }
       this.serie = (await this.pedir({ type: 'request', uri: 'ssap://system/getSystemInfo' })).payload?.serialNumber ?? '';
+      this.mac = macDe(this.ip);
+      // guarda MAC e série junto da chave deste IP (para achar a TV se o IP mudar)
+      const arq = join(PASTA, `${this.ip}.json`);
+      const salvo = lerChave(arq) ?? { 'client-key': reg.payload?.['client-key'] ?? chave, pareadoEm: new Date().toISOString() };
+      if ((this.mac && salvo.mac !== this.mac) || (this.serie && salvo.serie !== this.serie)) {
+        mkdirSync(PASTA, { recursive: true });
+        writeFileSync(arq, JSON.stringify({ ...salvo, ...(this.mac ? { mac: this.mac } : {}), ...(this.serie ? { serie: this.serie } : {}) }, null, 2));
+      }
       const voltou = this.vistaFora;
       this.vistaFora = false;
       const energia = await this.pedir({ type: 'request', uri: 'ssap://com.webos.service.tvpower/power/getPowerState' });
@@ -168,7 +192,7 @@ class Tv {
     try {
       await espera(motivo === 'ligou' ? 3000 : 0);
       for (let tentativa = 1; tentativa <= 3 && this.ligada; tentativa++) {
-        const r = await this.pedir({ type: 'request', uri: 'ssap://system.launcher/open', payload: { target: paginaDa(this.ip) } }, 10_000);
+        const r = await this.pedir({ type: 'request', uri: 'ssap://system.launcher/open', payload: { target: paginaDa(this) } }, 10_000);
         for (let s = 0; s < 20 && !conseguiu; s++) { await espera(1000); conseguiu = noPlacarPorAlgumEndereco(this, conectadosNoPlacar()); }
         if (conseguiu) { log(`${this.ip}: placar na tela (${motivo}${tentativa > 1 ? `, tentativa ${tentativa}` : ''})`); return; }
         log(`${this.ip}: placar não carregou em 20 s (${r.payload?.errorText || r.error || `na tela ${this.app || 'nada'}`})${tentativa < 3 ? '; tentando de novo' : ''}`);
@@ -183,7 +207,11 @@ class Tv {
     const r = await this.pedir({ type: 'request', uri: 'ssap://com.webos.applicationManager/getForegroundAppInfo' });
     if (r.type === 'error') { this.ws?.terminate(); return; }   // conexão morta sem aviso
     this.app = r.payload?.appId ?? '';
-    if (NO_PLACAR.has(this.app)) this.abrirPlacar(`estava em ${this.app || 'nada'}`);
+    if (!NO_PLACAR.has(this.app)) return;
+    // a página do sorteio consulta a cada 3 s e o navegador da TV fecha a conexão entre uma consulta e outra: uma olhada
+    // só no netstat pegava o intervalo e recarregava a página à toa (.120, 13/10). Confere por 6 s antes de reabrir.
+    for (let i = 0; i < 4; i++) { await espera(1500); if (noPlacarPorAlgumEndereco(this, conectadosNoPlacar())) return; }
+    this.abrirPlacar(`estava em ${this.app || 'nada'}`);
   }
 }
 

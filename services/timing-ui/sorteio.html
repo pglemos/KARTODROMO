@@ -9,22 +9,26 @@
 <style>
   * { box-sizing:border-box; }
   html, body { margin:0; height:100%; background:#000; color:#fff; font-family: system-ui, "Segoe UI", sans-serif; overflow:hidden; cursor:none; }
-  .bar { display:flex; align-items:center; gap:2vw; height:12vh; padding:0 2.4vw; background:#0a3d1f; }
-  .bar img { height:8vh; }
+  .bar { display:flex; align-items:center; height:12vh; padding:0 2.4vw; background:#0a3d1f; }
+  .bar img { height:8vh; margin-right:2vw; }
   .bar .titulo { display:flex; flex-direction:column; min-width:0; }
   .bar .bateria { font-size:4.6vh; font-weight:900; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .bar .dica { font-size:2.4vh; font-weight:700; color:#bfe8cc; }
   .bar .hora { margin-left:auto; font:900 5vh/1 ui-monospace, Consolas, monospace; color:#bfe8cc; }
-  #lista { height:88vh; padding:2vh 2.4vw; display:grid; gap:1.4vh 1.6vw; grid-auto-flow:column; align-content:start; }
-  .p { display:flex; align-items:center; gap:1.4vw; background:#101010; border-radius:1.2vh; padding:0 0 0 1.6vw; overflow:hidden; height:var(--h); }
-  .p .nome { flex:1; min-width:0; font-size:var(--fs); font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .p .kart { align-self:stretch; display:flex; align-items:center; justify-content:center; flex:none; width:calc(var(--fs) * 4.6); background:#f5c518; color:#000;
-             font:900 calc(var(--fs) * 1.35)/1 ui-monospace, Consolas, monospace; }
-  .p .kart small { font:800 calc(var(--fs) * .42)/1 system-ui, sans-serif; margin-right:.5vw; opacity:.7; }
+  /* 13/10: a TV do sorteio (LG 65UK6540, 2018) tem navegador antigo — sem grid, min(), var(): colunas em flex e
+     tamanhos calculados no script (em px) */
+  #lista { height:88vh; padding:2vh 2.4vw; display:flex; flex-direction:row; align-items:flex-start; }
+  .col { display:flex; flex-direction:column; flex:1; min-width:0; }
+  .col + .col { margin-left:1.6vw; }
+  .p { display:flex; align-items:center; background:#101010; border-radius:1.2vh; padding:0 0 0 1.6vw; overflow:hidden; margin-bottom:1.4vh; }
+  .p .nome { flex:1; min-width:0; margin-right:1.4vw; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .p .kart { align-self:stretch; display:flex; align-items:center; justify-content:center; flex:none; background:#f5c518; color:#000;
+             font-weight:900; line-height:1; font-family: ui-monospace, Consolas, monospace; }
+  .p .kart small { font-weight:800; line-height:1; font-family: system-ui, sans-serif; margin-right:.5vw; opacity:.7; }
   .novo .p { animation: chega 1.4s ease-out both; }
   @keyframes chega { from { transform:scale(.92); background:#1d5c34; } to { transform:none; background:#101010; } }
-  .idle { height:88vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3vh; color:#666; }
-  .idle b { font-size:6vh; color:#888; } .idle span { font-size:3vh; }
+  .idle { flex:1; height:84vh; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#666; }
+  .idle b { font-size:6vh; color:#888; margin-bottom:3vh; } .idle span { font-size:3vh; }
 </style>
 </head>
 <body>
@@ -35,54 +39,83 @@
 </div>
 <div id="lista"></div>
 <script>
-const MAX_IDADE_MS = 90 * 60_000;
-const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+// ES5 de propósito (13/10): a TV do sorteio é uma LG de 2018 (navegador Chromium antigo) — nada de const/let, =>, ??,
+// 60_000, async/await, fetch, template literal nem "catch {". Teste: tests/timing-ui-tv-antiga.test.ts.
+var MAX_IDADE_MS = 90 * 60000;
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; });
+}
 // nome longo vira primeiro nome + último sobrenome, como no telão
-const curto = (n) => { const p = String(n || '').trim().split(/\s+/); return p.join(' ').length <= 16 || p.length < 3 ? p.join(' ') : p[0] + ' ' + p[p.length - 1]; };
-let mostrado = '';
+function curto(n) {
+  var p = String(n || '').replace(/^\s+|\s+$/g, '').split(/\s+/);
+  return p.join(' ').length <= 16 || p.length < 3 ? p.join(' ') : p[0] + ' ' + p[p.length - 1];
+}
+var mostrado = '';
+var ultimo = null;
 
 function espera() {
   if (mostrado === 'espera') return;
-  mostrado = 'espera';
+  mostrado = 'espera'; ultimo = null;
   document.getElementById('bateria').textContent = 'Sorteio dos karts';
   document.getElementById('dica').textContent = 'Kartódromo Internacional de Betim';
   document.getElementById('lista').innerHTML = '<div class="idle"><b>Aguardando o sorteio dos karts</b><span>Assim que o sorteio for feito no tablet, os karts aparecem aqui</span></div>';
-  document.getElementById('lista').style.gridTemplateColumns = '1fr';
+}
+
+function desenha(s, novo) {
+  var n = s.pilotos.length;
+  // colunas e altura das linhas pelo número de pilotos: tudo cabe na tela sem rolar
+  var cols = n <= 6 ? 1 : n <= 14 ? 2 : n <= 24 ? 3 : 4;
+  var linhas = Math.max(1, Math.ceil(n / cols));
+  var hVh = Math.min(14, (84 - (linhas - 1) * 1.4) / linhas);
+  var vh = window.innerHeight / 100, vw = window.innerWidth / 100;
+  // letra pela altura da linha E pela largura da coluna (cabem ~17 letras do nome + a caixa do kart)
+  var colunaVw = (95.2 - (cols - 1) * 1.6) / cols;
+  var fs = Math.min(Math.min(6, hVh * 0.5) * vh, (colunaVw / 16) * vw);
+  var html = '';
+  // preenche coluna por coluna (de cima para baixo), como antes
+  for (var c = 0; c < cols; c++) {
+    html += '<div class="col">';
+    for (var i = c * linhas; i < Math.min(n, (c + 1) * linhas); i++) {
+      var p = s.pilotos[i];
+      html += '<div class="p" style="height:' + (hVh * vh).toFixed(1) + 'px">' +
+        '<span class="nome" style="font-size:' + fs.toFixed(1) + 'px">' + esc(curto(p.nome)) + '</span>' +
+        '<span class="kart" style="width:' + (fs * 4.6).toFixed(1) + 'px;font-size:' + (fs * 1.35).toFixed(1) + 'px">' +
+        '<small style="font-size:' + (fs * 0.42).toFixed(1) + 'px">KART</small>' + esc(p.kart) + '</span></div>';
+    }
+    html += '</div>';
+  }
+  var lista = document.getElementById('lista');
+  lista.className = novo ? 'novo' : '';
+  lista.innerHTML = html;
 }
 
 function mostra(s) {
-  const chave = s.sessaoId + ':' + s.em;
+  var chave = s.sessaoId + ':' + s.em;
   if (chave === mostrado) return;
-  const novo = mostrado !== '' && mostrado !== 'espera';
-  mostrado = chave;
+  var novo = mostrado !== '' && mostrado !== 'espera';
+  mostrado = chave; ultimo = s;
   document.getElementById('bateria').textContent = s.bateria + (s.tipoKart ? ' · ' + (s.tipoKart === 'super' ? 'Super Kart' : 'Light') : '');
   document.getElementById('dica').textContent = 'Procure o seu nome e vá direto para o seu kart';
-  const n = s.pilotos.length;
-  // colunas e altura das linhas pelo número de pilotos: tudo cabe na tela sem rolar
-  const cols = n <= 6 ? 1 : n <= 14 ? 2 : n <= 24 ? 3 : 4;
-  const linhas = Math.max(1, Math.ceil(n / cols));
-  const h = Math.min(14, (84 - (linhas - 1) * 1.4) / linhas);
-  const lista = document.getElementById('lista');
-  lista.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-  lista.style.gridTemplateRows = `repeat(${linhas}, auto)`;
-  lista.style.setProperty('--h', h + 'vh');
-  // letra pela altura da linha E pela largura da coluna (cabem ~17 letras do nome + a caixa do kart)
-  const colunaVw = (95.2 - (cols - 1) * 1.6) / cols;
-  lista.style.setProperty('--fs', `min(${Math.min(6, h * 0.5)}vh, ${(colunaVw / 16).toFixed(2)}vw)`);
-  lista.className = novo ? 'novo' : '';
-  lista.innerHTML = s.pilotos.map((p) => `<div class="p"><span class="nome">${esc(curto(p.nome))}</span><span class="kart"><small>KART</small>${esc(p.kart)}</span></div>`).join('');
+  desenha(s, novo);
 }
 
-async function atualiza() {
-  try {
-    const r = await fetch('/api/sorteio/ultimo', { cache: 'no-store' });
-    const { sorteio } = await r.json();
-    if (!sorteio || !sorteio.pilotos.length || Date.now() - sorteio.em > MAX_IDADE_MS) espera(); else mostra(sorteio);
-  } catch { /* sem rede: mantém o que está na tela e tenta de novo */ }
+function atualiza() {
+  var x = new XMLHttpRequest();
+  x.open('GET', '/api/sorteio/ultimo?t=' + new Date().getTime());
+  x.timeout = 8000;
+  x.onload = function () {
+    try {
+      var s = JSON.parse(x.responseText).sorteio;
+      if (!s || !s.pilotos || !s.pilotos.length || new Date().getTime() - s.em > MAX_IDADE_MS) espera(); else mostra(s);
+    } catch (e) { /* resposta estranha: mantém o que está na tela */ }
+  };
+  x.send();   // sem rede: mantém o que está na tela e tenta de novo daqui a 3 s
 }
-function relogio() { document.getElementById('hora').textContent = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
-relogio(); setInterval(relogio, 10_000);
-atualiza(); setInterval(atualiza, 3_000);
+function dois(n) { return (n < 10 ? '0' : '') + n; }
+function relogio() { var d = new Date(); document.getElementById('hora').textContent = dois(d.getHours()) + ':' + dois(d.getMinutes()); }
+window.onresize = function () { if (ultimo) desenha(ultimo, false); };
+relogio(); setInterval(relogio, 10000);
+atualiza(); setInterval(atualiza, 3000);
 </script>
 </body>
 </html>
