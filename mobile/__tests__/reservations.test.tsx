@@ -1,7 +1,7 @@
-import { render, userEvent, waitFor } from '@testing-library/react-native';
+import { act, render, userEvent, waitFor } from '@testing-library/react-native';
 import * as Clipboard from 'expo-clipboard';
 import type { PropsWithChildren } from 'react';
-import { Text } from 'react-native';
+import { Alert, Text } from 'react-native';
 
 import AgendaScreen from '../src/app/(tabs)/agenda';
 import ReservationsScreen from '../src/app/(tabs)/reservas';
@@ -77,13 +77,15 @@ function LoginScreen() {
 }
 
 function setSession(value: typeof session | null) {
+  const logout = jest.fn<Promise<void>, []>().mockResolvedValue(undefined);
   jest.mocked(useSession).mockReturnValue({
     session: value,
     isLoading: false,
     login: jest.fn(),
-    logout: jest.fn(),
+    logout,
     refresh: jest.fn(),
   });
+  return logout;
 }
 
 beforeEach(() => {
@@ -115,6 +117,116 @@ afterEach(() => {
 });
 
 describe('agenda e reservas do cliente', () => {
+  it('não navega para pedido atrasado depois de sair da conta', async () => {
+    let finishCreate!: (response: Response) => void;
+    const previous = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (input, init) =>
+      init?.method === 'POST' && new URL(String(input)).pathname === '/api/mobile/v1/reservations'
+        ? new Promise<Response>((resolve) => { finishCreate = resolve; }) : previous(input, init),
+    );
+    setSession(session);
+    mockUseLocalSearchParams.mockReturnValue({ bateriaId: '101' });
+    const view = await render(<ReservationsScreen />);
+    const user = userEvent.setup();
+    await view.findByText('BATERIA 09:15');
+    await user.type(view.getByLabelText('Data de nascimento do responsável'), '15/05/1990');
+    await user.press(view.getByLabelText('Aceito a política de cancelamento'));
+    await user.press(view.getByRole('button', { name: 'Enviar reserva' }));
+    await waitFor(() => expect(finishCreate).toBeDefined());
+    setSession(null);
+    await view.rerender(<ReservationsScreen />);
+    await act(async () => finishCreate(apiResponse({ id: order.id, codigo: order.codigo })));
+    expect(mockRouter.push).not.toHaveBeenCalled();
+    expect(view.getByText('Entre para reservar')).toBeTruthy();
+  });
+  it('limpa detalhes e Pix ao trocar de conta mesmo se a nova consulta falhar', async () => {
+    setSession(session);
+    mockUseLocalSearchParams.mockReturnValue({ id: order.id });
+    const view = await render(<ReservationDetailScreen />);
+    expect(await view.findByText(order.pix!.payload)).toBeTruthy();
+    fetchMock.mockImplementation(async () => ({ ok: false, status: 403, json: async () => ({ error: 'Sem acesso' }) }) as Response);
+    setSession({ ...session, accessToken: 'next-account' });
+    await view.rerender(<ReservationDetailScreen />);
+    expect(view.queryByText(order.pix!.payload)).toBeNull();
+    expect(await view.findByText('Não foi possível carregar')).toBeTruthy();
+  });
+
+  it('ignora detalhes atrasados da conta anterior', async () => {
+    let finishOld!: (response: Response) => void;
+    const oldResponse = new Promise<Response>((resolve) => { finishOld = resolve; });
+    fetchMock.mockImplementation(async (_, init) =>
+      new Headers(init?.headers).get('authorization') === `Bearer ${session.accessToken}`
+        ? oldResponse : apiResponse({ ...order, codigo: 'BETIM-NOVA-CONTA', pix: null }),
+    );
+    setSession(session);
+    mockUseLocalSearchParams.mockReturnValue({ id: order.id });
+    const view = await render(<ReservationDetailScreen />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    setSession({ ...session, accessToken: 'next-account' });
+    await view.rerender(<ReservationDetailScreen />);
+    expect(await view.findByText('Pedido BETIM-NOVA-CONTA')).toBeTruthy();
+    await act(async () => finishOld(apiResponse(order)));
+    expect(view.queryByText(order.pix!.payload)).toBeNull();
+    expect(view.getByText('Pedido BETIM-NOVA-CONTA')).toBeTruthy();
+  });
+  it('permite sair da conta pela lista e pelo formulário de reserva', async () => {
+    const logout = setSession(session);
+    const view = await render(<ReservationsScreen />);
+    const user = userEvent.setup();
+    await user.press(view.getByRole('button', { name: 'Sair da conta' }));
+    expect(logout).toHaveBeenCalledTimes(1);
+
+    mockUseLocalSearchParams.mockReturnValue({ bateriaId: '101' });
+    await view.rerender(<ReservationsScreen />);
+    expect(await view.findByText('Confirmar reserva')).toBeTruthy();
+    await user.press(view.getByRole('button', { name: 'Sair da conta' }));
+    expect(logout).toHaveBeenCalledTimes(2);
+  });
+
+  it('oferece nova tentativa se não conseguir apagar a sessão salva', async () => {
+    const logout = setSession(session);
+    logout.mockRejectedValueOnce(new Error('storage unavailable'));
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const view = await render(<ReservationsScreen />);
+    await userEvent.setup().press(view.getByRole('button', { name: 'Sair da conta' }));
+    await waitFor(() => expect(alert).toHaveBeenCalled());
+    const retry = alert.mock.calls[0][2]?.find((button) => button.text === 'Tentar novamente');
+    expect(retry?.onPress).toBeDefined();
+    await act(async () => retry?.onPress?.());
+    await waitFor(() => expect(logout).toHaveBeenCalledTimes(2));
+  });
+
+  it('esconde imediatamente as reservas anteriores ao trocar de conta', async () => {
+    setSession(session);
+    listedOrders = [order];
+    const view = await render(<ReservationsScreen />);
+    expect(await view.findByText(order.codigo)).toBeTruthy();
+    fetchMock.mockImplementation(() => new Promise<Response>(() => undefined));
+    setSession({ ...session, accessToken: `test-next-${crypto.randomUUID()}` });
+    await view.rerender(<ReservationsScreen />);
+    expect(view.queryByText(order.codigo)).toBeNull();
+  });
+
+  it('ignora reservas recebidas depois que a conta de origem saiu', async () => {
+    let finishOld!: (response: Response) => void;
+    const oldResponse = new Promise<Response>((resolve) => { finishOld = resolve; });
+    const nextSession = { ...session, accessToken: `test-next-${crypto.randomUUID()}` };
+    const nextOrder = { ...order, codigo: 'BETIM-NOVA-CONTA' };
+    fetchMock.mockImplementation(async (_, init) =>
+      (init?.headers as Record<string, string>)?.authorization === `Bearer ${session.accessToken}`
+        ? oldResponse : apiResponse([nextOrder]),
+    );
+    setSession(session);
+    const view = await render(<ReservationsScreen />);
+    await waitFor(() => expect(requests('GET', '/api/mobile/v1/reservations')).toHaveLength(1));
+    setSession(nextSession);
+    await view.rerender(<ReservationsScreen />);
+    expect(await view.findByText(nextOrder.codigo)).toBeTruthy();
+    await act(async () => finishOld(apiResponse([order])));
+    expect(view.getByText(nextOrder.codigo)).toBeTruthy();
+    expect(view.queryByText(order.codigo)).toBeNull();
+  });
+
   it('carrega a agenda sem login e exige conta antes de abrir a reserva', async () => {
     const view = await render(<AgendaScreen />);
 

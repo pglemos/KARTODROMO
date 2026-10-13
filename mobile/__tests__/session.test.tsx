@@ -46,6 +46,35 @@ beforeEach(() => {
 });
 
 describe('sessão do app', () => {
+  it('não restaura a conta antiga depois de um login novo durante a inicialização', async () => {
+    let finishRestore!: (value: SessionTokens) => void;
+    jest.mocked(secureStorage.readSession).mockImplementation(() => new Promise((resolve) => { finishRestore = resolve; }));
+    jest.mocked(authApi.login).mockResolvedValue(renewedSession);
+    const { result } = await renderHook(() => useSession(), { wrapper });
+    await waitFor(() => expect(finishRestore).toBeDefined());
+    let login!: Promise<void>;
+    await act(async () => { login = result.current.login('teste@example.com', 'test-password'); });
+    await act(async () => { finishRestore(currentSession); await login; });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.session).toEqual(renewedSession);
+  });
+
+  it('não ressuscita sessão quando refresh termina depois do logout', async () => {
+    jest.mocked(secureStorage.readSession).mockResolvedValue(currentSession);
+    let finishRefresh!: (value: SessionTokens) => void;
+    jest.mocked(authApi.refresh).mockImplementation(() => new Promise((resolve) => { finishRefresh = resolve; }));
+    jest.mocked(authApi.logout).mockResolvedValue(undefined);
+    const { result } = await renderHook(() => useSession(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    let refresh!: Promise<SessionTokens | null>;
+    let logout!: Promise<void>;
+    await act(async () => { refresh = result.current.refresh(); });
+    await waitFor(() => expect(finishRefresh).toBeDefined());
+    await act(async () => { logout = result.current.logout(); });
+    await act(async () => { finishRefresh(renewedSession); await Promise.all([refresh, logout]); });
+    expect(result.current.session).toBeNull();
+    expect(jest.mocked(secureStorage.clearSession).mock.invocationCallOrder.at(-1)).toBeGreaterThan(jest.mocked(secureStorage.saveSession).mock.invocationCallOrder.at(-1)!);
+  });
   it('restores a valid session from secure storage', async () => {
     jest.mocked(secureStorage.readSession).mockResolvedValue(currentSession);
 

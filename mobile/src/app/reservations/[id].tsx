@@ -7,6 +7,7 @@ import { reservationsApi } from '../../features/reservations/api';
 import type { ReservationOrder, ReservationStatus } from '../../features/reservations/schemas';
 import { ActionButton, formatBrl, formatDateTime, InlineError, LoadingMessage, Page, PageHeader, Panel, palette, styles } from '../../features/reservations/components';
 import { useSession } from '../../session/provider';
+import { SessionBoundary } from '../../session/boundary';
 
 function statusLabel(status: ReservationStatus) {
   return {
@@ -25,7 +26,7 @@ function imageUri(value: string) {
   return value.startsWith('data:image/') ? value : `data:image/png;base64,${value}`;
 }
 
-export default function ReservationDetailScreen() {
+function ReservationDetailContent() {
   const { session, isLoading: sessionLoading } = useSession();
   const params = useLocalSearchParams<{ id: string | string[] }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -130,4 +131,10 @@ export default function ReservationDetailScreen() {
       </Pressable>
     </Page>
   );
+}
+
+export default function ReservationDetailScreen() {
+  const params = useLocalSearchParams<{ id: string | string[] }>();
+  const id = Array.isArray(params.id) ? params.id[0] : params.id;
+  return <SessionBoundary><ReservationDetailContent key={id} /></SessionBoundary>;
 }

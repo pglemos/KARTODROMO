@@ -1,11 +1,14 @@
 import { Link, router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, Text, TextInput, View } from 'react-native';
+
+import type { SessionTokens } from '../../api/contracts';
 
 import { reservationsApi } from '../../features/reservations/api';
 import type { AgendaResponse, CreateReservationInput, ReservationOrder } from '../../features/reservations/schemas';
 import { ActionButton, Field, formatBrl, formatDateTime, InlineError, LoadingMessage, Page, PageHeader, Panel, palette, styles } from '../../features/reservations/components';
 import { useSession } from '../../session/provider';
+import { SessionBoundary } from '../../session/boundary';
 
 const inputStyle = {
   minHeight: 48,
@@ -49,6 +52,25 @@ function LoginPrompt({ booking }: { booking: boolean }) {
   );
 }
 
+function LogoutButton() {
+  const { logout } = useSession();
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    setBusy(true);
+    try { await logout(); }
+    catch {
+      Alert.alert('Não foi possível sair', 'Não foi possível apagar a sessão salva neste aparelho.', [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Tentar novamente', onPress: () => void submit() },
+      ]);
+    }
+    finally { setBusy(false); }
+  }
+
+  return <View style={{ marginBottom: 18 }}><ActionButton label={busy ? 'Encerrando sessão…' : 'Sair da conta'} onPress={() => void submit()} disabled={busy} secondary /></View>;
+}
+
 function ReservationList({ orders, loading, error, retry }: {
   orders: ReservationOrder[] | null;
   loading: boolean;
@@ -58,6 +80,7 @@ function ReservationList({ orders, loading, error, retry }: {
   return (
     <Page>
       <PageHeader eyebrow="Sua conta" title="Minhas reservas" description="Acompanhe somente os pedidos vinculados à sua conta." />
+      <LogoutButton />
       {loading && !orders ? <LoadingMessage label="Buscando suas reservas…" /> : null}
       {error ? <View style={{ gap: 12 }}><InlineError message={error} /><ActionButton label="Tentar novamente" onPress={retry} secondary /></View> : null}
       {orders?.length === 0 ? (
@@ -99,6 +122,11 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
   const [error, setError] = useState('');
   const [couponError, setCouponError] = useState('');
   const key = useRef<string | null>(null);
+  const active = useRef(true);
+  useEffect(() => {
+    active.current = true;
+    return () => { active.current = false; };
+  }, []);
   const count = Number(quantity);
 
   function changed() {
@@ -157,7 +185,7 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
     key.current ??= idempotencyKey();
     try {
       const created = await reservationsApi.create(input, accessToken, key.current);
-      router.push({ pathname: '/reservations/[id]', params: { id: created.id } });
+      if (active.current) router.push({ pathname: '/reservations/[id]', params: { id: created.id } });
     } catch (reason) {
       setError(messageOf(reason));
     } finally {
@@ -257,11 +285,7 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
   );
 }
 
-export default function ReservationsScreen() {
-  const { session, isLoading: sessionLoading } = useSession();
-  const params = useLocalSearchParams<{ bateriaId?: string | string[] }>();
-  const rawBatteryId = Array.isArray(params.bateriaId) ? params.bateriaId[0] : params.bateriaId;
-  const batteryId = rawBatteryId && /^\d+$/.test(rawBatteryId) ? Number(rawBatteryId) : null;
+function AuthenticatedReservations({ session, batteryId }: { session: SessionTokens; batteryId: number | null }) {
   const [agenda, setAgenda] = useState<AgendaResponse | null>(null);
   const [orders, setOrders] = useState<ReservationOrder[] | null>(null);
   const [error, setError] = useState('');
@@ -301,16 +325,15 @@ export default function ReservationsScreen() {
   }
 
   useEffect(() => {
-    if (sessionLoading || !session) return;
+    if (!session) return;
     void Promise.resolve().then(() => batteryId !== null ? loadAgenda() : loadOrders());
-  }, [batteryId, loadAgenda, loadOrders, session, sessionLoading]);
+  }, [batteryId, loadAgenda, loadOrders, session]);
 
-  if (sessionLoading) return <Page><LoadingMessage label="Carregando sua conta…" /></Page>;
-  if (!session) return <LoginPrompt booking={batteryId !== null} />;
   if (batteryId !== null) {
     return (
       <Page>
         <PageHeader eyebrow="Nova reserva" title="Confirmar reserva" description="Informe os dados do responsável e revise o pedido antes de pagar." />
+        <LogoutButton />
         {loading && !agenda ? <LoadingMessage label="Carregando horário…" /> : null}
         {error ? <View style={{ gap: 12 }}><InlineError message={error} /><ActionButton label="Tentar novamente" onPress={retryAgenda} secondary /></View> : null}
         {agenda ? <BookingForm key={batteryId} agenda={agenda} batteryId={batteryId} accessToken={session.accessToken} /> : null}
@@ -318,6 +341,20 @@ export default function ReservationsScreen() {
     );
   }
   return <ReservationList orders={orders} loading={loading} error={error} retry={retryOrders} />;
+}
+
+function ReservationsContent() {
+  const { session, isLoading } = useSession();
+  const params = useLocalSearchParams<{ bateriaId?: string | string[] }>();
+  const rawBatteryId = Array.isArray(params.bateriaId) ? params.bateriaId[0] : params.bateriaId;
+  const batteryId = rawBatteryId && /^\d+$/.test(rawBatteryId) ? Number(rawBatteryId) : null;
+  if (isLoading) return <Page><LoadingMessage label="Carregando sua conta…" /></Page>;
+  if (!session) return <LoginPrompt booking={batteryId !== null} />;
+  return <AuthenticatedReservations session={session} batteryId={batteryId} />;
+}
+
+export default function ReservationsScreen() {
+  return <SessionBoundary><ReservationsContent /></SessionBoundary>;
 }
 
 function statusLabel(status: ReservationOrder['status']) {

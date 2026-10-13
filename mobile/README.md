@@ -16,6 +16,8 @@ npm run export
 
 O app usa `https://reservas.kartodromodebetim.com.br` por padrão. Para homologação, defina `EXPO_PUBLIC_API_URL` no ambiente local. Não coloque tokens do Worker, chaves Asaas, credenciais de loja ou dados pessoais no cliente.
 
+Os perfis EAS `development`, `preview`, `simulator` e `store-preview` usam a homologação `https://kartodromo-mobile-homolog.kartodromo.workers.dev`. O ambiente tem D1/R2 próprios e reservas fechadas. Ver [estado da distribuição](../docs/mobile/distribution-status.md).
+
 ## Compilação nativa local
 
 `npm run android` e `npm run ios` geram os projetos nativos com Expo e compilam para um dispositivo ou emulador. As pastas `android/` e `ios/` são geradas e ficam fora do Git.
@@ -33,6 +35,8 @@ O app usa `https://reservas.kartodromodebetim.com.br` por padrão. Para homologa
 - `production`: build de loja; este perfil não é enviado automaticamente para nenhuma loja.
 
 O projeto EAS está vinculado a `@synvolt/kartodromo-betim` em `app.json`. `EAS_PROJECT_ID` permite substituir esse vínculo por ambiente; em GitHub Actions, configure-a como variável e `EXPO_TOKEN` como secret. Os certificados Apple e Google devem ser administrados pelo EAS; não adicionar arquivos de assinatura ao repositório.
+
+Com o ambiente Android local configurado e login EAS ativo, `npx eas-cli@24.13.0 build --platform android --profile store-preview --local --non-interactive --output /tmp/kartodromo-internal.aab` gera um AAB usando as credenciais administradas pelo EAS. O perfil incrementa o versionCode remoto. Isso comprova compilação e assinatura; a validação funcional nos dispositivos e do servidor continua necessária.
 
 Para solicitar builds internos, execute manualmente o workflow **Mobile app**. Ele publica os links e IDs retornados pela EAS como artefato da execução. O workflow não executa `eas submit` nem publica em uma faixa aberta.
 

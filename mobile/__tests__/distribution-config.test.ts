@@ -36,6 +36,13 @@ function readJson<T>(path: string): T | null {
 }
 
 describe('configuração de distribuição móvel', () => {
+  it('direciona candidatos de avaliação para a homologação isolada', () => {
+    const eas = readJson<{ build: Record<string, { env?: Record<string, string> }> }>(easJsonPath)!;
+    for (const profile of ['development', 'preview', 'store-preview']) {
+      expect(eas.build[profile].env?.EXPO_PUBLIC_API_URL).toBe('https://kartodromo-mobile-homolog.kartodromo.workers.dev');
+    }
+    expect(eas.build.production.env?.EXPO_PUBLIC_API_URL).toBeUndefined();
+  });
   it('usa o mesmo identificador nas lojas e aponta para a política pública', () => {
     const expo = readJson<AppConfig>(appJsonPath)?.expo;
     const registration = readFileSync(registrationPath, 'utf8');

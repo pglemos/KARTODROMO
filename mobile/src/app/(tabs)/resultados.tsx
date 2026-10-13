@@ -6,6 +6,7 @@ import { resultsApi } from '../../features/results/api';
 import type { PersonalResultsResponse, PublicSessionResults } from '../../features/results/types';
 import { ActionButton, InlineError, LoadingMessage, Page, PageHeader, Panel, palette, styles } from '../../features/reservations/components';
 import { useSession } from '../../session/provider';
+import { SessionBoundary } from '../../session/boundary';
 
 function messageOf(error: unknown) {
   return error instanceof Error ? error.message : 'Não foi possível carregar os resultados. Tente novamente.';
@@ -45,7 +46,7 @@ function ResultCard({ eventName, eventDate, displayName, position, kart, laps, b
   );
 }
 
-export default function ResultsScreen() {
+function ResultsContent() {
   const { session } = useSession();
   const [publicResults, setPublicResults] = useState<PublicSessionResults[]>([]);
   const [personalResults, setPersonalResults] = useState<PersonalResultsResponse | null>(null);
@@ -135,4 +136,8 @@ export default function ResultsScreen() {
       )) : null}
     </Page>
   );
+}
+
+export default function ResultsScreen() {
+  return <SessionBoundary><ResultsContent /></SessionBoundary>;
 }

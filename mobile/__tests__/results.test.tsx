@@ -1,4 +1,4 @@
-import { render, waitFor } from '@testing-library/react-native';
+import { act, render, waitFor } from '@testing-library/react-native';
 import type { PropsWithChildren } from 'react';
 
 import ResultsScreen from '../src/app/(tabs)/resultados';
@@ -72,6 +72,24 @@ afterEach(() => {
 });
 
 describe('resultados oficiais e histórico do cliente', () => {
+  it('ignora histórico atrasado da conta anterior', async () => {
+    let finishOld!: (response: Response) => void;
+    const oldResponse = new Promise<Response>((resolve) => { finishOld = resolve; });
+    fetchMock.mockImplementation(async (input, init) => {
+      if (new URL(String(input)).pathname !== '/api/mobile/v1/results/me') return apiResponse([]);
+      return new Headers(init?.headers).get('authorization') === `Bearer ${accessSession.accessToken}`
+        ? oldResponse : apiResponse({ vinculo: 'pendente', mensagem: 'Conta nova sem vínculo', results: [] });
+    });
+    setSession(accessSession);
+    const view = await render(<ResultsScreen />);
+    await waitFor(() => expect(requests('/api/mobile/v1/results/me')).toHaveLength(1));
+    setSession({ ...accessSession, accessToken: 'next-account' });
+    await view.rerender(<ResultsScreen />);
+    expect(await view.findByText('Conta nova sem vínculo')).toBeTruthy();
+    await act(async () => finishOld(apiResponse({ vinculo: 'pendente', mensagem: 'Histórico privado antigo', results: [] })));
+    expect(view.queryByText('Histórico privado antigo')).toBeNull();
+    expect(view.getByText('Conta nova sem vínculo')).toBeTruthy();
+  });
   it('mostra os resultados publicados pela API e não reapresenta uma sessão retirada', async () => {
     setSession(null);
     const view = await render(<ResultsScreen />);
