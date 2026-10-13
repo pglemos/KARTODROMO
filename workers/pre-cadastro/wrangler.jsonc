@@ -21,6 +21,8 @@
     // reserva online (pagamento Asaas). Segredos: SYNC_KEY, ASAAS_API_KEY, ASAAS_WEBHOOK_TOKEN, RESERVAS_PREVIA
     { "pattern": "reservas.kartodromodebetim.com.br", "custom_domain": true }
   ],
+  // Secrets da conta e dos resultados móveis usam `wrangler secret put` em cada ambiente; nunca adicionar valores aqui.
+  // Novos nomes: MOBILE_LOOKUP_KEY, MOBILE_DATA_KEY, MOBILE_PUBLISH_TOKEN e MOBILE_ADMIN_TOKEN.
   // RESERVAS_ATIVAS=1 abre ao público; ASAAS_URL = https://api-sandbox.asaas.com/v3 para testar no ambiente de testes
   "vars": { "RESERVAS_ATIVAS": "1", "ASAAS_URL": "https://api.asaas.com/v3" }
 }

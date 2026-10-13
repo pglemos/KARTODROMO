@@ -197,7 +197,17 @@ async function createAccount(name: string, email: string, cpfBase: string) {
   return { accessToken: result.accessToken, name, email, cpf, phone: registration.phone.replace(/\D/g, '') };
 }
 
-const requestBody = {
+const requestBody: {
+  bateriaId: number;
+  quantidade: number;
+  pilotos: string[];
+  forma: string;
+  nascimento: string;
+  politica: boolean;
+  account_id: string;
+  valorCentavos: number;
+  cupom?: string;
+} = {
   bateriaId: 101,
   quantidade: 2,
   pilotos: ['Ana Silva', 'Bruno Souza'],

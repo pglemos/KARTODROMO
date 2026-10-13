@@ -1,56 +1,37 @@
-# Welcome to your Expo app 👋
+# App Kartódromo de Betim
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+App cliente iOS/Android em Expo SDK 57, React Native, TypeScript e Expo Router. As rotas ficam em `src/app/`; APIs móveis e sessão são separadas do sistema Windows de operação.
 
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Desenvolvimento
 
 ```bash
-npm run reset-project
+npm ci
+npm start
+npm test -- --runInBand
+npm run typecheck
+npm run lint -- --no-cache
+npm run doctor
+npm run export
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+O app usa `https://reservas.kartodromodebetim.com.br` por padrão. Para homologação, defina `EXPO_PUBLIC_API_URL` no ambiente local. Não coloque tokens do Worker, chaves Asaas, credenciais de loja ou dados pessoais no cliente.
 
-### Other setup steps
+## Builds EAS
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+- `development`: cliente de desenvolvimento interno.
+- `preview`: instaladores diretos para QA em iOS/Android; Android gera APK.
+- `store-preview`: artefatos assinados para TestFlight e faixa interna do Google Play; Android gera AAB.
+- `production`: build de loja; este perfil não é enviado automaticamente para nenhuma loja.
 
-## Learn more
+O projeto EAS exige a variável local `EAS_PROJECT_ID`. Em GitHub Actions, configure-a como variável e `EXPO_TOKEN` como secret. Os certificados Apple e Google devem ser administrados pelo EAS; não adicionar arquivos de assinatura ao repositório.
 
-To learn more about developing your project with Expo, look at the following resources:
+Para solicitar builds internos, execute manualmente o workflow **Mobile app**. Ele publica os links e IDs retornados pela EAS como artefato da execução. O workflow não executa `eas submit` nem publica em uma faixa aberta.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Depois da validação nos dispositivos e da confirmação das contas/credenciais, gere e envie os artefatos internos com `npx eas-cli@24.13.0 build --platform all --profile store-preview` e `npx eas-cli@24.13.0 submit --platform all --profile preview --latest`. A submissão Android fica como rascunho na faixa interna; a submissão iOS vai ao App Store Connect/TestFlight.
 
-## Join the community
+## Pré-requisitos de lançamento
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- A política `/privacidade` é uma minuta até o responsável confirmar controlador, canal LGPD e retenção.
+- O GPS permanece desabilitado enquanto a geometria medida da pista não for aprovada.
+- Aplicar as migrations D1 e configurar tokens/provedor de e-mail apenas no ambiente correspondente; nunca usar o D1 local como banco remoto.
+- Confirmar IDs de pacote nos consoles, contas de desenvolvedor, credenciais e dispositivos físicos antes de builds assinados ou upload interno.

@@ -152,10 +152,13 @@ afterEach(() => {
 
 const couponInput: CouponInput = { codigo: 'betim10', documento: testDocument, bateriaId: 101, quantidade: 2 };
 const pedido = (id: string) => ({
-  id, codigo: 'K7M2QX', status: 'novo', criadoEm: '2026-10-13T12:00:00.000Z', bateriaId: 101,
-  quantidade: 2, forma: 'pix', pilotos: ['Piloto Um', 'Piloto Dois'], cupom: 'BETIM10',
-  cliente: { tipoDocumento: 'CPF', documento: testDocument, nome: 'Maria de Teste', email: 'maria@example.com', telefone: '31 99999-0000', chave: 'TESTE-HMAC' },
-}) as never;
+  id, codigo: 'K7M2QX', status: 'novo' as const, criadoEm: '2026-10-13T12:00:00.000Z', bateriaId: 101,
+  quantidade: 2, forma: 'pix' as const, pilotos: ['Piloto Um', 'Piloto Dois'], cupom: 'BETIM10',
+  cliente: {
+    tipoDocumento: 'CPF', documento: testDocument, nome: 'Maria de Teste', email: 'maria@example.com', telefone: '31 99999-0000',
+    nascimento: '1990-01-01', peso: '', cep: '', endereco: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '', menores: [], chave: 'TESTE-HMAC',
+  },
+});
 
 describe('prévia autoritativa de voucher online', () => {
   it('aplica o teto de desconto ao total calculado pelo servidor', async () => {
@@ -227,7 +230,7 @@ describe('consumo atômico e estados do voucher', () => {
       method: 'POST', url: new URL('https://ops.local/api/office/reservas-online/5/resolver'),
       body: async () => ({ resolucao }), sessao: {} as never,
     }, (status, body) => responses.push({ status, body }));
-    expect(responses.at(-1)?.status).toBe(200);
+    expect(responses[responses.length - 1]?.status).toBe(200);
     expect(usageState).toBe(estadoEsperado);
   });
 
