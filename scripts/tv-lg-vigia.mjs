@@ -21,6 +21,12 @@ const valor = (n, padrao) => { const i = args.indexOf(n); return i >= 0 ? args[i
 const URL_PLACAR = valor('--url', 'http://192.168.20.249:4050/tv');
 const PASTA = valor('--chaves', 'C:\\KARTODROMO\\segredos\\lg-tv');
 const PORTA_PLACAR = new URL(URL_PLACAR).port || '80';
+// TV com outra página em vez do placar (13/10: a .120 é a TV do sorteio dos karts do tablet). Mesmo servidor/porta.
+const DESTINOS = (() => {
+  const f = new URL('./tv-lg-destinos.json', import.meta.url);
+  try { return JSON.parse(readFileSync(f, 'utf8')); } catch { return {}; }
+})();
+const paginaDa = (ip) => DESTINOS[ip]?.url ?? URL_PLACAR;
 const NO_PLACAR = new Set(['com.webos.app.home', 'com.webos.app.homeconnect', 'com.webos.app.browser', 'com.webos.app.discovery', '']);
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -44,11 +50,13 @@ function procurarTvs() {
   });
 }
 
-// IPs com conexão aberta no placar (a página /tv mantém o fluxo de eventos aberto)
+// IPs com conexão aberta no placar (a página /tv mantém o fluxo de eventos aberto). TIME_WAIT também conta: a página do
+// sorteio consulta a cada 3 s (conexões curtas) e o navegador de algumas TVs reabre o fluxo — sem isso o vigia
+// achava que a página tinha fechado e recarregava a cada ~3 min (.120, 13/10).
 function conectadosNoPlacar() {
   try {
     const saida = execFileSync('netstat', ['-an', '-p', 'tcp'], { encoding: 'utf8', windowsHide: true });
-    return new Set(saida.split(/\r?\n/).filter((l) => l.includes('ESTABLISHED') && l.includes(`:${PORTA_PLACAR} `))
+    return new Set(saida.split(/\r?\n/).filter((l) => /ESTABLISHED|TIME_WAIT/.test(l) && l.includes(`:${PORTA_PLACAR} `))
       .map((l) => l.trim().split(/\s+/)[2]?.split(':')[0]).filter(Boolean));
   } catch { return new Set(); }
 }
@@ -160,7 +168,7 @@ class Tv {
     try {
       await espera(motivo === 'ligou' ? 3000 : 0);
       for (let tentativa = 1; tentativa <= 3 && this.ligada; tentativa++) {
-        const r = await this.pedir({ type: 'request', uri: 'ssap://system.launcher/open', payload: { target: URL_PLACAR } }, 10_000);
+        const r = await this.pedir({ type: 'request', uri: 'ssap://system.launcher/open', payload: { target: paginaDa(this.ip) } }, 10_000);
         for (let s = 0; s < 20 && !conseguiu; s++) { await espera(1000); conseguiu = noPlacarPorAlgumEndereco(this, conectadosNoPlacar()); }
         if (conseguiu) { log(`${this.ip}: placar na tela (${motivo}${tentativa > 1 ? `, tentativa ${tentativa}` : ''})`); return; }
         log(`${this.ip}: placar não carregou em 20 s (${r.payload?.errorText || r.error || `na tela ${this.app || 'nada'}`})${tentativa < 3 ? '; tentando de novo' : ''}`);
@@ -197,7 +205,7 @@ if (args.includes('--uma-vez')) {
   process.exit(0);
 }
 
-log(`vigia das TVs: placar ${URL_PLACAR}`);
+log(`vigia das TVs: placar ${URL_PLACAR}${Object.keys(DESTINOS).length ? ` · outras páginas: ${Object.entries(DESTINOS).map(([ip, d]) => `${ip} → ${d.url}`).join(', ')}` : ''}`);
 // TVs já pareadas entram mesmo se estiverem desligadas agora (ao ligar, são vistas em segundos)
 if (existsSync(PASTA)) for (const f of readdirSync(PASTA)) if (/^\d+\.\d+\.\d+\.\d+\.json$/.test(f)) tv(f.slice(0, -5));
 for (const ip of await procurarTvs()) tv(ip);
