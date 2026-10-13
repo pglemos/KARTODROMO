@@ -65,6 +65,18 @@ export default function HomeScreen() {
                 </Text>
               </Pressable>
             </Link>
+            <Link href="/(tabs)/resultados" asChild>
+              <Pressable
+                accessibilityHint="Mostra resultados oficiais publicados e seu histórico validado."
+                accessibilityRole="link"
+                style={styles.quickLink}
+              >
+                <Text style={styles.quickLinkTitle}>Resultados</Text>
+                <Text style={styles.quickLinkDescription}>
+                  Classificações oficiais
+                </Text>
+              </Pressable>
+            </Link>
             <Link href="/(auth)/login" asChild>
               <Pressable
                 accessibilityHint="Entre para consultar suas reservas e cupons."
