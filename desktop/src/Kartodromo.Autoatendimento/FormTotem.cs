@@ -628,41 +628,75 @@ public class FormTotem : Form, IMessageFilter
 
     void TelaCadastroMenor()
     {
+        // 13/10/2026 (dono): o menor tem os MESMOS campos e obrigatórios do cadastro novo de adulto — documento, nome,
+        // e-mail, celular, nascimento, peso, endereço, bairro, cidade e Instagram (CEP opcional). Contato e endereço
+        // já vêm do responsável (pode trocar); o peso é sempre o do menor, na balança.
         var c = NovaTela(etapa: 2);
-        c.Controls.Add(Rot("Cadastre quem vai correr", 150, 110, F(44, false, FontStyle.Bold), Estilo.Texto));
-        c.Controls.Add(Rot("Informe os dados do menor de idade (suba com ele na balança ao lado para o peso).", 150, 165, F(19), Estilo.Suave));
-        var painel = CartaoEm(c, 260, 210, 846, 430);
-        var nome = Campo(painel, "Nome completo *", 34, 70, 470, "", true);
-        var nasc = Campo(painel, "Data de nascimento *", 528, 70, 282);
+        c.Controls.Add(Rot("Cadastre quem vai correr", 90, 108, F(44, false, FontStyle.Bold), Estilo.Texto));
+        c.Controls.Add(Rot("Dados do menor de idade. Preencha todos os campos com * (suba com ele na balança ao lado para o peso).", 90, 163, F(19), Estilo.Suave));
+        var campos = CartaoEm(c, 90, 204, 1186, 414);
+        float[] xs = [24, 312, 600, 888];
+        const float cw = 274;
+        var tipo = Lista(campos, "Tipo de Documento", xs[0], 36, cw, "CPF", "RG", "Passaporte");
+        var doc = Campo(campos, "CPF *", xs[1], 36, cw);
+        var lDoc = campos.Controls.OfType<Label>().Last(l => l.Text == "CPF *");
+        var nome = Campo(campos, "Nome completo do menor *", xs[2], 36, cw * 2 + 14, "", true);
+        var email = Campo(campos, "E-mail *", xs[0], 132, cw, _cliente.S("email"));
+        var fone = Campo(campos, "Celular (WhatsApp) *", xs[1], 132, cw, Fmt.MascaraFone(_cliente.S("telefone")));
+        var nasc = Campo(campos, "Data de nascimento *", xs[2], 132, cw);
         nasc.Caixa.PlaceholderText = "DD/MM/AAAA";
-        var tipo = Lista(painel, "Tipo de documento", 34, 166, 220, "CPF", "RG", "Passaporte");
-        var doc = Campo(painel, "Documento (opcional)", 278, 166, 320);
-        var peso = Campo(painel, "Peso (kg) *", 622, 166, 188);   // obrigatório (10/10/2026): o peso equilibra os karts (lastro)
-        Mascarar(peso.Caixa, v => new string(v.Where(ch => char.IsDigit(ch) || ch is ',' or '.').Take(5).ToArray()));
-        var email = Campo(painel, "E-mail do menor ou responsável *", 34, 262, 470, _cliente.S("email"));
-        var instagram = Campo(painel, "Instagram do piloto (@usuário) *", 528, 262, 282);
+        var peso = Campo(campos, "Peso (kg) *", xs[3], 132, cw);   // obrigatório (10/10/2026): o peso equilibra os karts (lastro)
+        var cep = Campo(campos, "CEP", xs[0], 228, cw, Fmt.MascaraCep(_cliente.S("cep")));
+        var end = Campo(campos, "Endereço *", xs[1], 228, cw, _cliente.S("endereco"));
+        var bairro = Campo(campos, "Bairro *", xs[2], 228, cw, _cliente.S("bairro"));
+        var cidade = Campo(campos, "Cidade *", xs[3], 228, cw, _cliente.S("cidade"));
+        var instagram = Campo(campos, "Instagram do piloto (@usuário) *", xs[0], 324, cw * 2 + 16);
         instagram.Caixa.PlaceholderText = "@usuario";
-        painel.Controls.Add(Rot("* Campos obrigatórios · pode usar o e-mail do responsável", 34, 358, F(14), Estilo.MuitoSuave));
-        Mascarar(nasc.Caixa, Fmt.MascaraData);
+        c.Controls.Add(Rot("* Campos obrigatórios · contato e endereço do responsável já vêm preenchidos", 90, 624, F(14), Estilo.MuitoSuave));
+        string uf = _cliente.S("estado");
+        tipo.SelectedIndexChanged += (_, _) => { lDoc.Text = tipo.Text + " *"; if (tipo.SelectedIndex == 0) doc.Text = Fmt.MascaraCpf(doc.Text); };
         Mascarar(doc.Caixa, v => tipo.SelectedIndex == 0 ? Fmt.MascaraCpf(v) : v);
-        var voltar = Botao(c, "Voltar", 914, 660, 140, false, () => { TelaMenores(); return Task.CompletedTask; });
-        var salvar = Botao(c, "Salvar", 1070, 660, 146, true, async () =>
+        Mascarar(fone.Caixa, Fmt.MascaraFone);
+        Mascarar(nasc.Caixa, Fmt.MascaraData);
+        Mascarar(cep.Caixa, Fmt.MascaraCep);
+        Mascarar(peso.Caixa, v => new string(v.Where(ch => char.IsDigit(ch) || ch is ',' or '.').Take(5).ToArray()));
+        cep.Caixa.TextChanged += async (_, _) =>
+        {
+            var digitos = Fmt.Digitos(cep.Text);
+            if (digitos.Length != 8 || !_cfg.B("consultarCep")) return;
+            var r = await ViaCep(digitos);
+            if (r == null) return;
+            if (end.Text.Length == 0) end.Text = r.S("logradouro");
+            if (bairro.Text.Length == 0) bairro.Text = r.S("bairro");
+            if (cidade.Text.Length == 0) cidade.Text = r.S("localidade");
+            uf = r.S("uf");
+        };
+        var voltar = Botao(c, "Voltar", 958, 644, 140, false, () => { TelaMenores(); return Task.CompletedTask; });
+        var salvar = Botao(c, "Salvar", 1112, 644, 164, true, async () =>
         {
             var n = string.Join(' ', nome.Text.Split(' ', StringSplitOptions.RemoveEmptyEntries));
             var iso = Fmt.DataBrParaIso(nasc.Text.Trim());
-            if (n.Split(' ').Length < 2) { Alertar("Informe o nome completo do menor."); return; }
+            var tipoDoc = tipo.SelectedIndex switch { 0 => "CPF", 1 => "RG", _ => "PASSAPORTE" };
+            if (doc.Text.Trim().Length == 0) { Alertar("O documento do menor é obrigatório."); doc.Caixa.Focus(); return; }
+            if (tipoDoc == "CPF" && !Fmt.CpfValido(doc.Text)) { Alertar("CPF inválido."); doc.Caixa.Focus(); return; }
+            if (n.Split(' ').Length < 2) { Alertar("Informe o nome completo do menor."); nome.Caixa.Focus(); return; }
+            foreach (var (campo, rotulo) in new[] { (email, "E-mail"), (fone, "Celular (WhatsApp)"), (nasc, "Data de nascimento"), (peso, "Peso (kg)"), (end, "Endereço"), (bairro, "Bairro"), (cidade, "Cidade"), (instagram, "Instagram do piloto (@usuário)") })
+                if (campo.Text.Trim().Length == 0) { Alertar($"Preencha o campo {rotulo}."); campo.Caixa.Focus(); return; }
             if (ValidacaoCliente.ErroEmail(email.Text) is string erroEmail) { Alertar(erroEmail); email.Caixa.Focus(); return; }
-            if (ValidacaoCliente.ErroInstagram(instagram.Text) is string erroInstagram) { Alertar(erroInstagram); instagram.Caixa.Focus(); return; }
-            if (string.IsNullOrEmpty(iso) || Fmt.ParseData(iso) is not { } dn || dn > DateTime.Today || dn.Year < 1900) { Alertar("Informe a data de nascimento (DD/MM/AAAA)."); return; }
+            if (Fmt.Digitos(fone.Text).Length < 10) { Alertar("Número de telefone inválido."); fone.Caixa.Focus(); return; }
+            if (string.IsNullOrEmpty(iso) || Fmt.ParseData(iso) is not { } dn || dn > DateTime.Today || dn.Year < 1900) { Alertar("Informe a data de nascimento (DD/MM/AAAA)."); nasc.Caixa.Focus(); return; }
             var pesoTxt = peso.Text.Trim().Replace(',', '.');
-            if (pesoTxt.Length == 0) { Alertar("Informe o peso do menor (suba na balança ao lado)."); peso.Caixa.Focus(); return; }
             if (!double.TryParse(pesoTxt, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var kg) || kg < 10 || kg > 250)
             { Alertar("Peso inválido. Digite o peso em kg (ex.: 38,5)."); peso.Caixa.Focus(); return; }
-            var tipoDoc = tipo.SelectedIndex switch { 0 => "CPF", 1 => "RG", _ => "PASSAPORTE" };
-            if (doc.Text.Trim().Length > 0 && tipoDoc == "CPF" && !Fmt.CpfValido(doc.Text)) { Alertar("CPF inválido."); return; }
+            if (ValidacaoCliente.ErroInstagram(instagram.Text) is string erroInstagram) { Alertar(erroInstagram); instagram.Caixa.Focus(); return; }
             var r = await _api.Post("/api/totem/cadastro", new JsonObject
             {
-                ["dados"] = new JsonObject { ["nome"] = n, ["nascimento"] = iso, ["tipoDocumento"] = tipoDoc, ["documento"] = doc.Text.Trim(), ["peso"] = peso.Text.Trim(), ["email"] = email.Text.Trim(), ["instagram"] = ValidacaoCliente.NormalizarInstagram(instagram.Text) },
+                ["dados"] = new JsonObject
+                {
+                    ["nome"] = n, ["nascimento"] = iso, ["tipoDocumento"] = tipoDoc, ["documento"] = doc.Text.Trim(), ["peso"] = peso.Text.Trim(),
+                    ["email"] = email.Text.Trim(), ["telefone"] = fone.Text.Trim(), ["instagram"] = ValidacaoCliente.NormalizarInstagram(instagram.Text),
+                    ["cep"] = cep.Text.Trim(), ["endereco"] = end.Text.Trim(), ["bairro"] = bairro.Text.Trim(), ["cidade"] = cidade.Text.Trim(), ["estado"] = uf,
+                },
                 ["lgpd"] = true, ["responsavelId"] = _cliente.L("id"), ["responsavelToken"] = _token,
             });
             var p = new Pessoa(r.L("id") ?? 0, n, iso, r.S("token"));
