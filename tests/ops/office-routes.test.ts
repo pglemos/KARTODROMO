@@ -153,6 +153,50 @@ describe('Office: edição de produto e confirmação do termo', () => {
   });
 });
 
+describe('Office: concorrência de voucher nas vendas presenciais', () => {
+  it('serializa a leitura de uso do voucher dentro da transação da venda', async () => {
+    db.one.mockResolvedValueOnce({ id: 12, terminalId: 3 }).mockResolvedValueOnce({ v: 'false' });
+    let voucherSql = '';
+    db.tx.mockImplementation(async (work) => work(async (sql: string) => {
+      if (sql.includes('FROM dbo.Voucher')) {
+        voucherSql = sql;
+        return [];
+      }
+      return [];
+    }));
+
+    await expect(call('/vendas', 'POST', {
+      voucherCodigo: 'BETIM10',
+      itens: [{ descricao: 'Bateria', unitarioCentavos: 1000 }],
+    })).rejects.toMatchObject({ status: 400 });
+
+    expect(voucherSql).toMatch(/WITH\s*\(UPDLOCK,\s*HOLDLOCK\)/i);
+  });
+
+  it('inclui resgates online ativos ao validar o limite da venda presencial', async () => {
+    db.one.mockResolvedValueOnce({ id: 12, terminalId: 3 }).mockResolvedValueOnce({ v: 'false' });
+    let usageSql = '';
+    db.tx.mockImplementation(async (work) => work(async (sql: string) => {
+      if (sql.includes('FROM dbo.Voucher v')) return [{ Id: 5, Ativo: 1, UsoUnico: 1, UsoMaxCliente: 1 }];
+      if (sql.includes('CAST(SYSDATETIME() AS date)')) return [{ d: new Date('2026-10-13T12:00:00') }];
+      if (sql.includes('COUNT(*)') && sql.includes('VoucherUso')) {
+        usageSql = sql;
+        return [{ n: 1, doCliente: 1 }];
+      }
+      return [];
+    }));
+
+    await expect(call('/vendas', 'POST', {
+      clienteId: 42,
+      voucherCodigo: 'BETIM10',
+      itens: [{ descricao: 'Bateria', unitarioCentavos: 1000 }],
+    })).rejects.toMatchObject({ status: 400 });
+
+    expect(usageSql).toContain('dbo.ReservaOnlineVoucherUso');
+    expect(usageSql).toContain("Estado IN ('reservado', 'consumido', 'reembolso_pendente')");
+  });
+});
+
 describe('Office: mover reserva preserva os dados de cobrança', () => {
   function moverComReserva(reserva: Record<string, unknown>, destino: Record<string, unknown>) {
     const statements: { sql: string; params: Record<string, unknown> }[] = [];

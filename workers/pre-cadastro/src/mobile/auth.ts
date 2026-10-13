@@ -127,6 +127,14 @@ async function decrypt(context: CryptoContext, value: string) {
   return new TextDecoder().decode(clear);
 }
 
+export async function mobileAccountCpf(env: MobileAuthEnv, accountId: string): Promise<string | null> {
+  const context = await createContext(env);
+  if (!context) return null;
+  const row = await context.db.prepare('SELECT cpf_cipher FROM mobile_accounts WHERE id = ? LIMIT 1')
+    .bind(accountId).first<{ cpf_cipher: string }>();
+  return row ? decrypt(context, row.cpf_cipher) : null;
+}
+
 async function passwordHash(password: string, salt: Uint8Array, iterations = ITERATIONS) {
   const key = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
   const saltBuffer = new ArrayBuffer(salt.byteLength);

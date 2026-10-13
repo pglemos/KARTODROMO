@@ -270,6 +270,23 @@ describe('reservas móveis', () => {
     expect((await request(`reservations/${order.id}`, { token: accountB.accessToken })).status).toBe(404);
   });
 
+  it('normaliza o cupom na reserva e inclui-o no pedido interno idempotente', async () => {
+    const created = await createReservation({ ...requestBody, cupom: 'betim10' });
+    expect(created.status).toBe(201);
+    const { id } = await created.json() as { id: string };
+    expect(JSON.parse(bucket.data.get(`reservas/pedidos/${id}.json`)!).cupom).toBe('BETIM10');
+    expect((await createReservation(requestBody)).status).toBe(409);
+
+    const sync = await worker.fetch(
+      new Request('https://reservas.kartodromodebetim.com.br/api/sync/pedidos', {
+        headers: { 'x-sync-key': String(environment.SYNC_KEY) },
+      }),
+      environment as never,
+      { waitUntil: () => undefined } as never,
+    );
+    expect(await sync.json()).toMatchObject([{ id, cupom: 'BETIM10' }]);
+  });
+
   it('devolve o mesmo pedido para a mesma chave e corpo, e 409 para outro corpo', async () => {
     const first = await createReservation();
     const original = await first.json() as { id: string; codigo: string };

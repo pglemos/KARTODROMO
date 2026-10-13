@@ -9,6 +9,7 @@ import { diagnostico } from './asaas';
 import { agendaPublica, criarPedido, situacaoPedido, syncAgenda, syncPedidos, syncResultado, webhookAsaas, type EnvReservas } from './reservas';
 import { handleMobileAuth, type MobileAuthEnv } from './mobile/auth';
 import { handleMobileReservations } from './mobile/reservations';
+import { handleMobileCoupons, handleMobileCouponsSync } from './mobile/coupons';
 
 export interface Env extends EnvReservas, MobileAuthEnv {
   ASSETS: Fetcher;
@@ -88,6 +89,9 @@ export default {
     try {
       if (p === '/api/pre-cadastro' && req.method === 'POST') return await receber(req, env);
       if (p.startsWith('/api/mobile/v1/auth/')) return await handleMobileAuth(req, env);
+      if (p === '/api/mobile/v1/coupons/preview' || p.startsWith('/api/mobile/v1/coupons/preview/')) {
+        return await handleMobileCoupons(req, env);
+      }
       if (p === '/api/mobile/v1/agenda' || p === '/api/mobile/v1/reservations' || p.startsWith('/api/mobile/v1/reservations/')) {
         return await handleMobileReservations(req, env);
       }
@@ -115,6 +119,7 @@ export default {
         }
         if (p === '/api/sync/agenda' && req.method === 'PUT') return await syncAgenda(req, env);
         if (p === '/api/sync/asaas' && req.method === 'GET') return json(200, await diagnostico(env));
+        if (p === '/api/sync/mobile/coupons' || p.startsWith('/api/sync/mobile/coupons/')) return await handleMobileCouponsSync(req, env);
         if (p === '/api/sync/pedidos' && req.method === 'GET') return await syncPedidos(env);
         if (p === '/api/sync/pedido' && req.method === 'POST') return await syncResultado(req, env, ctx);
       }

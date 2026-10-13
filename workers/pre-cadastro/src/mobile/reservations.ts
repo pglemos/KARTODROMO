@@ -20,6 +20,7 @@ type ReservationInput = {
   forma: 'pix' | 'cartao';
   nascimento: string;
   politica: boolean;
+  cupom?: string;
 };
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), {
@@ -84,12 +85,14 @@ function reservationData(body: Record<string, unknown>): ReservationInput | null
   const bateriaId = Number(body.bateriaId);
   const quantidade = Number(body.quantidade);
   const forma = body.forma;
+  const cupom = typeof body.cupom === 'string' ? body.cupom.trim().toUpperCase() : '';
   const pilotosEntrada = body.pilotos == null ? [] : body.pilotos;
   if (!Number.isSafeInteger(bateriaId) || bateriaId < 1 || !Number.isSafeInteger(quantidade) || quantidade < 1 || quantidade > 10 ||
-      (forma !== 'pix' && forma !== 'cartao') || !Array.isArray(pilotosEntrada) || pilotosEntrada.some((nome) => typeof nome !== 'string')) return null;
+      (forma !== 'pix' && forma !== 'cartao') || (body.cupom != null && !/^[A-Z0-9_-]{1,40}$/.test(cupom)) ||
+      !Array.isArray(pilotosEntrada) || pilotosEntrada.some((nome) => typeof nome !== 'string')) return null;
   const nascimento = typeof body.nascimento === 'string' ? body.nascimento.trim().slice(0, 10) : '';
   const pilotos = pilotosEntrada.map((nome) => (nome as string).replace(/\s+/g, ' ').trim().slice(0, 80)).filter(Boolean).slice(0, quantidade);
-  return { bateriaId, quantidade, pilotos, forma, nascimento, politica: body.politica === true };
+  return { bateriaId, quantidade, pilotos, forma, nascimento, politica: body.politica === true, ...(cupom ? { cupom } : {}) };
 }
 
 function reservationInput(body: ReservationInput, account: MobileAccount) {
@@ -207,6 +210,7 @@ async function createOrder(request: Request, env: Env, account: MobileAccount) {
       quantidade: checked.dados.quantidade,
       forma: checked.dados.forma,
       pilotos: checked.dados.pilotos,
+      ...(data.cupom ? { cupom: data.cupom } : {}),
       cliente: {
         ...checked.dados.cliente,
         chave: chaveDocumento('CPF', account.cpf),

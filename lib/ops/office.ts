@@ -386,13 +386,15 @@ export async function sumarioMovimento(movId: number) {
 // ---------------------------------------------------------------- inscricao (reserva)
 
 /** opcoes.produtoId: produto escolhido na recepção (senão o da bateria); opcoes.pago: pago antecipado (site/WhatsApp), já entra paga e aprovada. */
-async function inscreverN(bateriaId: number, clienteId: number, n: number, origem: string, uid: number | null, observacao: string | null, aprovada = true, opcoes: { produtoId?: number | null; pago?: boolean } = {}) {
-  return tx(async (run) => {
+type OpsRun = (text: string, params?: Record<string, unknown>) => Promise<Record<string, unknown>[]>;
+
+async function inscreverN(bateriaId: number, clienteId: number, n: number, origem: string, uid: number | null, observacao: string | null, aprovada = true, opcoes: { produtoId?: number | null; pago?: boolean; run?: OpsRun } = {}) {
+  const inscrever = async (run: OpsRun) => {
     const [b] = await run(
       `SELECT b.Id, b.Status, b.Vagas, b.Inicio, b.ProdutoId, p.PrecoCentavos preco,
         (SELECT COUNT(*) FROM dbo.Inscricao i WITH (UPDLOCK, HOLDLOCK) WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') ocupadas,
         CASE WHEN b.Inicio < DATEADD(minute, -30, SYSDATETIME()) THEN 1 ELSE 0 END passada
-       FROM dbo.Bateria b LEFT JOIN dbo.Produto p ON p.Id = b.ProdutoId WHERE b.Id = @bateriaId`,
+       FROM dbo.Bateria b WITH (UPDLOCK, HOLDLOCK) LEFT JOIN dbo.Produto p ON p.Id = b.ProdutoId WHERE b.Id = @bateriaId`,
       { bateriaId },
     );
     if (!b) throw new HttpError(404, 'Selecione uma bateria.');
@@ -431,7 +433,8 @@ async function inscreverN(bateriaId: number, clienteId: number, n: number, orige
     }
     void uid;
     return ids;
-  });
+  };
+  return opcoes.run ? inscrever(opcoes.run) : tx(inscrever);
 }
 export { inscreverN };
 
@@ -485,7 +488,7 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
     let voucherDesconto = 0;
     if (voucherCodigo) {
       const [v] = await run(
-        `SELECT v.*, p.Ativo parceiroAtivo, fc.Ativo fidelidadeAtiva FROM dbo.Voucher v
+        `SELECT v.*, p.Ativo parceiroAtivo, fc.Ativo fidelidadeAtiva FROM dbo.Voucher v WITH (UPDLOCK, HOLDLOCK)
          LEFT JOIN dbo.Parceiro p ON p.Id = v.ParceiroId LEFT JOIN dbo.FidelidadeConta fc ON fc.Id = v.FidelidadeContaId WHERE v.Codigo = @c`,
         { c: voucherCodigo },
       );
@@ -494,7 +497,14 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
       if (v.FidelidadeContaId && !v.fidelidadeAtiva) throw new HttpError(400, 'A conta de fidelidade vinculada ao voucher está inativa.');
       const [hoje] = await run(`SELECT CAST(SYSDATETIME() AS date) d`);
       if ((hoje.d as Date) < (v.InicioEm as Date) || (hoje.d as Date) > (v.FimEm as Date)) throw new HttpError(400, 'Voucher expirado.');
-      const [usos] = await run(`SELECT COUNT(*) n, SUM(CASE WHEN ClienteId = @cli THEN 1 ELSE 0 END) doCliente FROM dbo.VoucherUso WHERE VoucherId = @id AND Estornado = 0`, { id: v.Id, cli: clienteId });
+      const [usos] = await run(
+        `SELECT
+           (SELECT COUNT(*) FROM dbo.VoucherUso WHERE VoucherId = @id AND Estornado = 0)
+           + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso WHERE VoucherId = @id AND Estado IN ('reservado', 'consumido', 'reembolso_pendente')) n,
+           (SELECT COUNT(*) FROM dbo.VoucherUso WHERE VoucherId = @id AND ClienteId = @cli AND Estornado = 0)
+           + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso WHERE VoucherId = @id AND ClienteId = @cli AND Estado IN ('reservado', 'consumido', 'reembolso_pendente')) doCliente`,
+        { id: v.Id, cli: clienteId },
+      );
       if (v.UsoUnico && (usos.n as number) > 0) throw new HttpError(400, 'Voucher já utilizado.');
       if ((usos.doCliente as number) >= (v.UsoMaxCliente as number)) throw new HttpError(400, 'Limite de usos deste voucher para este cliente já atingido.');
       const totalPedido = itens.reduce((s, i) => s + i.liquido, 0);
@@ -941,12 +951,23 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     return true;
   }
   if ((m = path.match(/^\/reservas-online\/(\d+)\/resolver$/)) && method === 'POST') {
-    const r = await one<{ Codigo: string }>(
-      `UPDATE dbo.ReservaOnline SET Status = 'resolvido' OUTPUT inserted.Codigo WHERE Id = @id AND Status = 'pago_sem_vaga'`,
-      { id: Number(m[1]) },
-    );
+    const { resolucao } = await req.body();
+    if (resolucao !== 'reembolso_confirmado' && resolucao !== 'remarcado') throw new HttpError(400, 'Confirme o reembolso ou a remarcação antes de resolver.');
+    const estadoUso = resolucao === 'reembolso_confirmado' ? 'liberado' : 'consumido';
+    const r = await tx(async (run) => {
+      const [pedido] = await run(
+        `UPDATE dbo.ReservaOnline SET Status = 'resolvido' OUTPUT inserted.Codigo WHERE Id = @id AND Status = 'pago_sem_vaga'`,
+        { id: Number(m![1]) },
+      );
+      if (!pedido) return null;
+      await run(
+        `UPDATE dbo.ReservaOnlineVoucherUso SET Estado = @estado WHERE PedidoId = (SELECT PedidoId FROM dbo.ReservaOnline WHERE Id = @id) AND Estado = 'reembolso_pendente'`,
+        { id: Number(m![1]), estado: estadoUso },
+      );
+      return pedido;
+    });
     if (!r) throw new HttpError(409, 'Este pedido não está mais pendente.');
-    send(200, { ok: true });
+    send(200, { ok: true, resolucao });
     return true;
   }
   if (path === '/reservas' && method === 'GET') {

@@ -25,6 +25,7 @@ export type Pedido = {
   quantidade: number;
   forma: 'pix' | 'cartao';
   pilotos: string[];
+  cupom?: string;
   cliente: PreCadastro & { chave: string };
   servidor?: { valorCentavos: number; expiraEm: string; descricao: string; inicio: string };
   asaas?: { pagamentoId: string; invoiceUrl: string; pixPayload?: string; pixImagem?: string; consultadoEm?: string };
