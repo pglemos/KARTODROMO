@@ -29,6 +29,14 @@ public static class Config
 public class ApiException(string msg, int status) : Exception(msg)
 {
     public int Status { get; } = status;
+
+    /// <summary>Texto para a pessoa: o motivo que o servidor mandou (validação 4xx, ex.: "A senha precisa ter pelo menos
+    /// 6 caracteres.", ou a rede fora) — senão o texto padrão da tela. Antes a tela dizia só "Não foi possível gravar" e a
+    /// pessoa repetia a mesma coisa sem saber o que corrigir.</summary>
+    public static string Motivo(Exception e, string padrao) =>
+        e is ApiException a && (a.Status == 0 || a.Status is >= 400 and < 500) && !string.IsNullOrWhiteSpace(a.Message) && !a.Message.StartsWith("Erro ")
+            ? a.Message
+            : padrao;
 }
 
 /// <summary>Cliente HTTP/JSON do servidor da operacao (SRVKART) e da cronometragem.</summary>

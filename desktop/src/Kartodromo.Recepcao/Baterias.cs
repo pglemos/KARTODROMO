@@ -14,12 +14,17 @@ public class CamposBateria : Panel
     public long? RespId;
     public event Action ProdutoMudou;
 
-    public CamposBateria(JsonObject b = null)
-    {
-        Dock = DockStyle.Top; AutoSize = true;
-        Produto.Items.AddRange(Sessao.Produtos(false));
-        Tracado.Items.AddRange(Sessao.Tracados());
-        if (Tracado.Items.Count > 0) Tracado.SelectedIndex = 0;
+        public CamposBateria(JsonObject b = null)
+        {
+            Dock = DockStyle.Top; AutoSize = true;
+            Produto.Items.AddRange(Sessao.Produtos(false));
+            Tracado.Items.AddRange(Sessao.Tracados());
+            // Baterias antigas podem apontar para um registro legado que saiu do
+            // catálogo ativo da Cronometragem. Mantemos a edição segura sem voltar
+            // a exibir esses nomes nas novas seleções.
+            if (b != null && b.L("tracadoId") is long legado && legado > 0 && !Tracado.Items.OfType<Campos.Item>().Any(x => x.Id == legado) && b.S("tracado") is { Length: > 0 } nomeLegado)
+                Tracado.Items.Add(new Campos.Item(legado, $"{nomeLegado} (legado)", b));
+            if (Tracado.Items.Count > 0) Tracado.SelectedIndex = 0;
         if (Produto.Items.Count > 0) Produto.SelectedIndex = 0;
         Produto.SelectedIndexChanged += (_, _) => ProdutoMudou?.Invoke();
 
@@ -35,7 +40,7 @@ public class CamposBateria : Panel
         Campos.Add(g, "Categoria", Categoria, 1);
 
         var pResp = new Panel { Dock = DockStyle.Fill, Height = 34 };
-        var bP = new BotaoPlano { Text = "Pesquisar", Dock = DockStyle.Right, Width = 84, FlatStyle = FlatStyle.Flat, BackColor = Tokens.BotaoSecundario, Cursor = Cursors.Hand };
+        var bP = new BotaoPlano { Text = "Pesquisar", Dock = DockStyle.Right, Width = 84, FlatStyle = FlatStyle.Flat, BackColor = Tokens.Claro.CorAcaoSecundaria, Cursor = Cursors.Hand };
         bP.FlatAppearance.BorderSize = 0;
         Resp.Dock = DockStyle.Fill;
         bP.Click += (_, _) => { var c = FormPesquisarCliente.Escolher(FindForm(), "Responsável pela reserva"); if (c != null) { RespId = c.L("id"); Resp.Text = c.S("nome"); } };
@@ -120,7 +125,7 @@ public class FormCriarReservas : DialogoDesign
         pad.SelectedIndexChanged += (_, _) => soFeriadosCk.Checked = pad.Text.Contains("Feriado", StringComparison.OrdinalIgnoreCase);
         var g3 = Secao("Prévia");
         var sec3 = (TableLayoutPanel)g3.Parent; sec3.BackColor = Fundo; g3.BackColor = Fundo; foreach (Control c in sec3.Controls) c.BackColor = Fundo;
-        var previa = new Label { AutoSize = true, MaximumSize = new Size(880, 0), Font = new Font("Segoe UI", 9.6F), ForeColor = Tokens.Grafite, BackColor = Fundo, Margin = new Padding(0, 0, 0, 4) };
+        var previa = new Label { AutoSize = true, MaximumSize = new Size(880, 0), Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo), ForeColor = Tokens.Primitivo.Cinza700, BackColor = Fundo, Margin = new Padding(0, 0, 0, 4) };
         g3.Controls.Add(previa); g3.SetColumnSpan(previa, 6);
         Control[] abaPadrao = [g1.Parent, g2.Parent, sec3];
 
@@ -269,6 +274,8 @@ public class FormBateria : DialogoDesign
         if (produto.SelectedIndex < 0 && produto.Items.Count > 0) produto.SelectedIndex = 0;
         var tracado = new ListaDesign();
         tracado.Items.AddRange(Sessao.Tracados());
+        if (b.L("tracadoId") is long legado && legado > 0 && !tracado.Items.OfType<Campos.Item>().Any(x => x.Id == legado) && b.S("tracado") is { Length: > 0 } nomeLegado)
+            tracado.Items.Add(new Campos.Item(legado, $"{nomeLegado} (legado)", b));
         Campos.Selecionar(tracado, b.L("tracadoId"));
         if (tracado.SelectedIndex < 0 && tracado.Items.Count > 0) tracado.SelectedIndex = 0;
         var categoria = new ListaDesign();
@@ -281,8 +288,8 @@ public class FormBateria : DialogoDesign
         CategoriaDoProduto();
 
         long? respId = b.L("responsavelId");
-        var resp = new Label { Text = b.S("responsavel"), AutoSize = false, Height = 22, Font = PecasDesign.FonteValor, ForeColor = PecasDesign.CorTexto, BackColor = Color.White, TextAlign = ContentAlignment.MiddleLeft, Cursor = Cursors.Hand };
-        var setaResp = new Panel { Width = 20, Height = 22, BackColor = Color.White, Cursor = Cursors.Hand };
+        var resp = new Label { Text = b.S("responsavel"), AutoSize = false, Height = 22, Font = PecasDesign.FonteValor, ForeColor = PecasDesign.CorTexto, BackColor = Tokens.Primitivo.Branco, TextAlign = ContentAlignment.MiddleLeft, Cursor = Cursors.Hand };
+        var setaResp = new Panel { Width = 20, Height = 22, BackColor = Tokens.Primitivo.Branco, Cursor = Cursors.Hand };
         setaResp.Paint += (_, e) => PecasDesign.DesenharSeta(e.Graphics, setaResp.ClientRectangle);
         void EscolherResponsavel()
         {
@@ -354,9 +361,9 @@ public class FormIncluirCliente : DialogoDesign
     /// <summary>desligado só no autoteste (a pesquisa abriria na tela)</summary>
     public static bool AbrirPesquisaAoMostrar = true;
     JsonObject _cli;
-    public FormIncluirCliente(JsonObject b) : base("Registrar reserva por cliente", $"{b.S("nome")} · {Fmt.DmyHm(b.S("dataHora"))} · {b.I("disponiveis")} vagas disponíveis", PecasDesign.Tile(Color.FromArgb(108, 184, 255), Tokens.Azul, "pessoa"))
+    public FormIncluirCliente(JsonObject b) : base("Registrar reserva por cliente", $"{b.S("nome")} · {Fmt.DmyHm(b.S("dataHora"))} · {b.I("disponiveis")} vagas disponíveis", PecasDesign.Tile(Color.FromArgb(108, 184, 255), Tokens.Claro.CorTextoLink, "pessoa"))
     {
-        var cli = new Label { AutoSize = false, Height = 22, Font = PecasDesign.FonteValor, ForeColor = PecasDesign.CorTexto, BackColor = Color.White, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
+        var cli = new Label { AutoSize = false, Height = 22, Font = PecasDesign.FonteValor, ForeColor = PecasDesign.CorTexto, BackColor = Tokens.Primitivo.Branco, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
         var pesquisar = AcaoCampo("Pesquisar");
         var n = PecasDesign.Numero(1, 3);
         var novo = new CheckBox { Text = "Novo cliente" };
@@ -413,13 +420,13 @@ public class FormAgenda : CartaoModal
     Dictionary<DateTime, JsonObject> _resumo = [];
     List<JsonObject> _feriados = [];
     List<JsonObject> _baterias = [];
-    readonly Label _titulo = new() { AutoSize = true, Font = new Font("Segoe UI", 19F, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, BackColor = DialogoDesign.Fundo };
-    readonly Label _ano = new() { AutoSize = true, Font = new Font("Segoe UI Semibold", 19F), ForeColor = PecasDesign.Cinza, BackColor = DialogoDesign.Fundo };
-    readonly CheckBox _soComReservas = new() { Text = "Só com reservas", Checked = true, AutoSize = true, Font = new Font("Segoe UI", 9.8F), BackColor = DialogoDesign.Fundo, Padding = new Padding(4, 0, 0, 0), Cursor = Cursors.Hand };
+    readonly Label _titulo = new() { AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoDestaque, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, BackColor = DialogoDesign.Fundo };
+    readonly Label _ano = new() { AutoSize = true, Font = Tokens.FonteSemibold(Tokens.Claro.FonteTamanhoDestaque), ForeColor = PecasDesign.Cinza, BackColor = DialogoDesign.Fundo };
+    readonly CheckBox _soComReservas = new() { Text = "Só com reservas", Checked = true, AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo), BackColor = DialogoDesign.Fundo, Padding = new Padding(4, 0, 0, 0), Cursor = Cursors.Hand };
     readonly CalendarioMes _cal = new();
-    readonly Label _semana = new() { AutoSize = true, Font = new Font("Segoe UI Semibold", 9F), ForeColor = DialogoDesign.VerdePrincipal, BackColor = Color.White };
-    readonly Label _data = new() { AutoSize = true, Font = new Font("Segoe UI", 16.5F, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, BackColor = Color.White };
-    readonly Label _resumoDia = new() { AutoSize = true, Font = new Font("Segoe UI", 9.4F), ForeColor = PecasDesign.Cinza, BackColor = Color.White };
+    readonly Label _semana = new() { AutoSize = true, Font = Tokens.FonteSemibold(Tokens.Claro.FonteTamanhoPequeno), ForeColor = DialogoDesign.VerdePrincipal, BackColor = Tokens.Primitivo.Branco };
+    readonly Label _data = new() { AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoTituloGrande, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, BackColor = Tokens.Primitivo.Branco };
+    readonly Label _resumoDia = new() { AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo), ForeColor = PecasDesign.Cinza, BackColor = Tokens.Primitivo.Branco };
     readonly BateriasDia _lista = new();
 
     public FormAgenda() : base(1340, 820)
@@ -432,17 +439,17 @@ public class FormAgenda : CartaoModal
         Forma.CheckVerde(_soComReservas);
 
         // ---------- lado direito (380, branco)
-        var lado = new Panel { Dock = DockStyle.Right, Width = 380, BackColor = Color.White };
-        lado.Paint += (_, e) => { using var p = new Pen(Tokens.Linha); e.Graphics.DrawLine(p, 0, 0, 0, lado.Height); };
-        var topo = new Panel { Dock = DockStyle.Top, Height = 92, BackColor = Color.White };
+        var lado = new Panel { Dock = DockStyle.Right, Width = 380, BackColor = Tokens.Primitivo.Branco };
+        lado.Paint += (_, e) => { using var p = new Pen(Tokens.Claro.CorBordaSutil); e.Graphics.DrawLine(p, 0, 0, 0, lado.Height); };
+        var topo = new Panel { Dock = DockStyle.Top, Height = 92, BackColor = Tokens.Primitivo.Branco };
         _semana.Location = new Point(18, 18); _data.Location = new Point(15, 33); _resumoDia.Location = new Point(18, 66);
-        var x = Botao("✕", CinzaBotao, PecasDesign.CorTexto); x.Font = new Font("Segoe UI", 9.5F); x.Size = new Size(30, 30); x.Location = new Point(380 - 18 - 30, 18);
+        var x = Botao("✕", CinzaBotao, PecasDesign.CorTexto); x.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo); x.Size = new Size(30, 30); x.Location = new Point(380 - 18 - 30, 18);
         x.Resize += (_, _) => Forma.AplicarRaio(x, 8); Forma.AplicarRaio(x, 8); x.Click += (_, _) => Close();
         topo.Controls.AddRange([_semana, _data, _resumoDia, x]);
-        var rod = new Panel { Dock = DockStyle.Bottom, Height = 67, BackColor = Color.White };
-        rod.Paint += (_, e) => { using var p = new Pen(Tokens.Linha); e.Graphics.DrawLine(p, 0, 0, rod.Width, 0); };
-        var bLista = Botao("Lista de participantes", CinzaBotao, PecasDesign.CorTexto); bLista.Font = new Font("Segoe UI", 9.8F);
-        var bCriar = Botao("+ Criar reservas", DialogoDesign.VerdePrincipal, Color.White, true); bCriar.Font = new Font("Segoe UI", 9.8F, FontStyle.Bold);
+        var rod = new Panel { Dock = DockStyle.Bottom, Height = 67, BackColor = Tokens.Primitivo.Branco };
+        rod.Paint += (_, e) => { using var p = new Pen(Tokens.Claro.CorBordaSutil); e.Graphics.DrawLine(p, 0, 0, rod.Width, 0); };
+        var bLista = Botao("Lista de participantes", CinzaBotao, PecasDesign.CorTexto); bLista.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo);
+        var bCriar = Botao("+ Criar reservas", DialogoDesign.VerdePrincipal, Tokens.Primitivo.Branco, true); bCriar.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo, FontStyle.Bold);
         bLista.SetBounds(16, 14, 170, 38); bCriar.SetBounds(194, 14, 170, 38);
         foreach (var b in new[] { bLista, bCriar }) { b.Resize += (_, _) => Forma.AplicarRaio(b, 10); Forma.AplicarRaio(b, 10); }
         bLista.Click += (_, _) => { if (_lista.Atual is { } bat) new FormListaParticipantes(bat).ShowDialog(this); else Msg.Aviso(this, "Escolha a bateria na lista."); };
@@ -451,7 +458,7 @@ public class FormAgenda : CartaoModal
         _lista.Dock = DockStyle.Fill;
         _lista.Duplo += b => { using var f = new FormBateria(b); if (f.ShowDialog(this) == DialogResult.OK) Recarregar(); };
         _lista.Menu += (b, onde) => MenuBateria(b, onde);
-        var meioLista = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12, 0, 12, 6), BackColor = Color.White };
+        var meioLista = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12, 0, 12, 6), BackColor = Tokens.Primitivo.Branco };
         meioLista.Controls.Add(_lista);
         lado.Controls.Add(meioLista); lado.Controls.Add(rod); lado.Controls.Add(topo);
         meioLista.BringToFront();
@@ -465,7 +472,7 @@ public class FormAgenda : CartaoModal
         nav.Anterior += () => Ir(_mes.AddMonths(-1)); nav.Proximo += () => Ir(_mes.AddMonths(1)); nav.Hoje += () => { _dia = DateTime.Today; Ir(new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1)); };
         void Posicionar() { _ano.Location = new Point(_titulo.Right - 6, 0); nav.Left = _ano.Right + 6; }
         _titulo.SizeChanged += (_, _) => Posicionar(); _ano.SizeChanged += (_, _) => Posicionar();
-        var imprimir = Botao("Imprimir agenda mensal", CinzaBotao, PecasDesign.CorTexto); imprimir.Font = new Font("Segoe UI", 9.8F);
+        var imprimir = Botao("Imprimir agenda mensal", CinzaBotao, PecasDesign.CorTexto); imprimir.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo);
         imprimir.Size = new Size(TextRenderer.MeasureText(imprimir.Text, imprimir.Font).Width + 26, 32); imprimir.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         imprimir.Resize += (_, _) => Forma.AplicarRaio(imprimir, 8); Forma.AplicarRaio(imprimir, 8);
         imprimir.Click += (_, _) => Relatorio.Abrir(this, Api.UrlComToken("/relatorio/agenda?mes=" + _mes.ToString("yyyy-MM")), "Agenda Mensal");
@@ -478,7 +485,7 @@ public class FormAgenda : CartaoModal
         {
             var w = (semana.Width - 6 * 6) / 7f;
             string[] n = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-            using var f = new Font("Segoe UI Semibold", 9F);
+            using var f = Tokens.FonteSemibold(Tokens.Claro.FonteTamanhoPequeno);
             for (var i = 0; i < 7; i++) TextRenderer.DrawText(e.Graphics, n[i], f, new Rectangle((int)(i * (w + 6)) + 4, 14, (int)w, 18), PecasDesign.Cinza, TextFormatFlags.Left);
         };
         _cal.Dock = DockStyle.Fill;
@@ -487,9 +494,8 @@ public class FormAgenda : CartaoModal
         {
             if (d.Month != _mes.Month || d.Year != _mes.Year) return;
             _dia = d; _cal.Dia = d; _cal.Invalidate(); CarregarDia();
-            var m = new ContextMenuStrip { Font = new Font("Segoe UI", 9.5F) };
+            var m = new ContextMenuStrip { Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo) };
             m.Items.Add("Fechar o dia inteiro (feriado)…", null, (_, _) => FecharDia(d));
-            m.Closed += (_, _) => BeginInvoke(() => m.Dispose());
             m.Show(_cal, onde);
         };
         esq.Controls.Add(_cal); esq.Controls.Add(semana); esq.Controls.Add(cab);
@@ -546,7 +552,7 @@ public class FormAgenda : CartaoModal
 
     void MenuBateria(JsonObject b, Point onde)
     {
-        var m = new ContextMenuStrip { Font = new Font("Segoe UI", 9.5F) };
+        var m = new ContextMenuStrip { Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo) };
         m.Items.Add("Incluir cliente", null, (_, _) => { using var f = new FormIncluirCliente(b); f.ShowDialog(this); CarregarDia(); });
         m.Items.Add("Editar bateria", null, (_, _) => { using var f = new FormBateria(b); if (f.ShowDialog(this) == DialogResult.OK) Recarregar(); });
         m.Items.Add("Lista de participantes", null, (_, _) => new FormListaParticipantes(b).ShowDialog(this));
@@ -565,7 +571,6 @@ public class FormAgenda : CartaoModal
         }));
         m.Items.Add(new ToolStripSeparator());
         m.Items.Add("Fechar o dia inteiro (feriado)…", null, (_, _) => FecharDia(_dia));
-        m.Closed += (_, _) => BeginInvoke(() => m.Dispose());
         m.Show(_lista, onde);
     }
 
@@ -592,26 +597,39 @@ class SegmentoMes : Control
     public event Action Anterior, Proximo, Hoje;
     public SegmentoMes()
     {
-        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.Selectable, true);
         Size = new Size(32 + 60 + 32 + 4, 32); Cursor = Cursors.Hand; BackColor = DialogoDesign.Fundo;
+        TabStop = true; AccessibleRole = AccessibleRole.PushButton; AccessibleName = "Navegar pelos meses";
+        AccessibleDescription = "Seta esquerda: mês anterior. Hoje: mês atual. Seta direita: próximo mês.";
     }
+    protected override void OnMouseDown(MouseEventArgs e) { base.OnMouseDown(e); Focus(); }
     protected override void OnMouseClick(MouseEventArgs e)
     {
         base.OnMouseClick(e);
         if (e.X < 34) Anterior?.Invoke(); else if (e.X > Width - 34) Proximo?.Invoke(); else Hoje?.Invoke();
     }
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.KeyCode == Keys.Left) Anterior?.Invoke();
+        else if (e.KeyCode == Keys.Right) Proximo?.Invoke();
+        else if (e.KeyCode is Keys.Enter or Keys.Space) Hoje?.Invoke();
+        else return;
+        e.Handled = true; e.SuppressKeyPress = true;
+    }
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics; g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
         g.Clear(BackColor);
-        using (var p = Forma.Redondo(new Rectangle(0, 0, Width - 1, Height - 1), 9)) using (var b = new SolidBrush(Tokens.Linha)) g.FillPath(b, p);
+        using (var p = Forma.Redondo(new Rectangle(0, 0, Width - 1, Height - 1), 9)) using (var b = new SolidBrush(Tokens.Claro.CorBordaSutil)) g.FillPath(b, p);
         var hoje = new Rectangle(34, 2, 60, 28);
         using (var s = Forma.Redondo(new Rectangle(hoje.X, hoje.Y + 1, hoje.Width, hoje.Height), 7)) using (var bs = new SolidBrush(Color.FromArgb(30, 0, 0, 0))) g.FillPath(bs, s);
         using (var p = Forma.Redondo(hoje, 7)) g.FillPath(Brushes.White, p);
-        using var f = new Font("Segoe UI", 11F); using var fb = new Font("Segoe UI Semibold", 9.6F);
+        using var f = Tokens.Fonte(Tokens.Claro.FonteTamanhoSubtitulo); using var fb = Tokens.FonteSemibold(Tokens.Claro.FonteTamanhoCorpo);
         TextRenderer.DrawText(g, "‹", f, new Rectangle(2, 0, 32, 30), PecasDesign.CorTexto, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
         TextRenderer.DrawText(g, "Hoje", fb, hoje, PecasDesign.CorTexto, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
         TextRenderer.DrawText(g, "›", f, new Rectangle(Width - 34, 0, 32, 30), PecasDesign.CorTexto, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+        if (Focused) ControlPaint.DrawFocusRectangle(g, new Rectangle(1, 1, Width - 3, Height - 3));
     }
 }
 
@@ -629,8 +647,10 @@ class CalendarioMes : Control
 
     public CalendarioMes()
     {
-        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
         BackColor = DialogoDesign.Fundo; Cursor = Cursors.Hand;
+        TabStop = true; AccessibleRole = AccessibleRole.Table; AccessibleName = "Calendário da agenda";
+        AccessibleDescription = "Use as setas para navegar pelos dias e Enter para selecionar o dia.";
     }
 
     public void Mostrar(DateTime mes, DateTime dia, Dictionary<DateTime, JsonObject> resumo, Func<DateTime, bool> feriado)
@@ -646,6 +666,8 @@ class CalendarioMes : Control
         var w = (Width - 6 * 6) / 7f; var h = (Height - (sem - 1) * 6) / (float)sem;
         return new RectangleF(i % 7 * (w + 6), i / 7 * (h + 6), w, h);
     }
+
+    protected override void OnMouseDown(MouseEventArgs e) { base.OnMouseDown(e); Focus(); }
 
     protected override void OnMouseClick(MouseEventArgs e)
     {
@@ -663,7 +685,7 @@ class CalendarioMes : Control
     {
         var g = e.Graphics; g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; g.Clear(BackColor);
         if (_mes == default) return;
-        using var fNum = new Font("Segoe UI", 9.8F, FontStyle.Bold); using var fTag = new Font("Segoe UI Semibold", 8.3F); using var fTxt = new Font("Segoe UI", 9F);
+        using var fNum = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo, FontStyle.Bold); using var fTag = Tokens.FonteSemibold(Tokens.Claro.FonteTamanhoLegenda); using var fTxt = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno);
         // mês sem nenhuma bateria = agenda ainda não aberta (ex.: o ano seguinte em outubro), não "Fechado" em todos os dias
         var mesVazio = _mes >= new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1) && !_resumo.Any(x => x.Key.Month == _mes.Month && x.Key.Year == _mes.Year && x.Value.I("baterias") > 0);
         for (var i = 0; i < Math.Max(5, Semanas) * 7; i++)
@@ -677,45 +699,90 @@ class CalendarioMes : Control
             using var p = Forma.Redondo(r, 12);
             if (doMes)
             {
-                if (fechado) { using var b = new SolidBrush(Color.FromArgb(239, 239, 241)); g.FillPath(b, p); }
+                if (fechado) { using var b = new SolidBrush(Tokens.Claro.CorSuperficieLateral); g.FillPath(b, p); }
                 else
                 {
                     if (escolhido) { using var sombra = Forma.Redondo(new RectangleF(r.X + 4, r.Y + 8, r.Width - 8, r.Height - 4), 12); using var bs = new SolidBrush(Color.FromArgb(40, 11, 122, 83)); g.FillPath(bs, sombra); }
                     g.FillPath(Brushes.White, p);
-                    using var borda = new Pen(escolhido ? DialogoDesign.VerdePrincipal : Color.FromArgb(232, 232, 234), escolhido ? 2f : 1f); g.DrawPath(borda, p);
+                    using var borda = new Pen(escolhido ? DialogoDesign.VerdePrincipal : Tokens.Claro.CorBordaSutil, escolhido ? 2f : 1f); g.DrawPath(borda, p);
                 }
             }
             // número (hoje em círculo verde)
             var num = new RectangleF(r.X + 8, r.Y + 8, 26, 26);
             if (hoje && doMes) { using var bv = new SolidBrush(DialogoDesign.VerdePrincipal); g.FillEllipse(bv, num); }
-            var corNum = !doMes ? Color.FromArgb(174, 174, 178) : hoje ? Color.White : d < DateTime.Today || fechado ? Tokens.TextoTerciario : PecasDesign.CorTexto;
+            var corNum = !doMes ? Color.FromArgb(174, 174, 178) : hoje ? Tokens.Primitivo.Branco : d < DateTime.Today || fechado ? Tokens.Claro.CorTextoTerciario : PecasDesign.CorTexto;
             TextRenderer.DrawText(g, d.Day.ToString(), fNum, Rectangle.Round(num), corNum, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             if (!doMes) continue;
             var tag = feriado ? "Feriado" : fechado && !mesVazio ? "Fechado" : "";
-            if (tag.Length > 0) TextRenderer.DrawText(g, tag, fTag, Rectangle.Round(new RectangleF(r.X, r.Y + 8, r.Width - 9, 26)), feriado ? Tokens.Vermelho : Tokens.TextoTerciario, TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
+            if (tag.Length > 0) TextRenderer.DrawText(g, tag, fTag, Rectangle.Round(new RectangleF(r.X, r.Y + 8, r.Width - 9, 26)), feriado ? Tokens.Claro.CorEstadoPerigoTexto : Tokens.Claro.CorTextoTerciario, TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
             if (bat == 0) continue;
             // "17 baterias · 0" + "pilotos" quebrava no meio: se não couber numa linha, pilotos vai inteiro para a de baixo
             var resumo = $"{bat} {(bat == 1 ? "bateria" : "baterias")} · {pil} {(pil == 1 ? "piloto" : "pilotos")}";
             if (TextRenderer.MeasureText(resumo, fTxt).Width > r.Width - 14) resumo = resumo.Replace(" · ", "\n");
-            TextRenderer.DrawText(g, resumo, fTxt, Rectangle.Round(new RectangleF(r.X + 9, r.Y + 40, r.Width - 14, 34)), Tokens.Grafite, TextFormatFlags.Left | TextFormatFlags.WordBreak);
+            TextRenderer.DrawText(g, resumo, fTxt, Rectangle.Round(new RectangleF(r.X + 9, r.Y + 40, r.Width - 14, 34)), Tokens.Primitivo.Cinza700, TextFormatFlags.Left | TextFormatFlags.WordBreak);
             var pct = vagas > 0 ? Math.Min(1f, pil / (float)vagas) : 0;
             var barra = new RectangleF(r.X + 9, Math.Min(r.Bottom - 12, r.Y + 76), r.Width - 18, 5);
-            using (var fundo = Forma.Redondo(barra, 3)) using (var bf = new SolidBrush(Tokens.Linha)) g.FillPath(bf, fundo);
-            if (pct > 0) { using var cheio = Forma.Redondo(new RectangleF(barra.X, barra.Y, Math.Max(6, barra.Width * pct), barra.Height), 3); using var bc = new SolidBrush(pct > 0.8f ? Tokens.LaranjaVivo : Tokens.VerdeStatus); g.FillPath(bc, cheio); }
+            using (var fundo = Forma.Redondo(barra, 3)) using (var bf = new SolidBrush(Tokens.Claro.CorBordaSutil)) g.FillPath(bf, fundo);
+            if (pct > 0) { using var cheio = Forma.Redondo(new RectangleF(barra.X, barra.Y, Math.Max(6, barra.Width * pct), barra.Height), 3); using var bc = new SolidBrush(pct > 0.8f ? Tokens.Claro.CorEstadoAvisoSolido : Tokens.Claro.CorStatusOnline); g.FillPath(bc, cheio); }
         }
         if (mesVazio)
         {
-            using var fT = new Font("Segoe UI", 12.5F, FontStyle.Bold); using var fS = new Font("Segoe UI", 9.8F);
+            using var fT = Tokens.Fonte(Tokens.Claro.FonteTamanhoTitulo, FontStyle.Bold); using var fS = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo);
             var titulo = $"A agenda de {_mes.ToString("MMMM 'de' yyyy", Fmt.Br)} ainda não foi aberta";
             const string sub = "Gere as baterias em “+ Criar reservas” (pode escolher vários meses de uma vez).";
             var w = Math.Max(TextRenderer.MeasureText(titulo, fT).Width, TextRenderer.MeasureText(sub, fS).Width) + 56;
             var caixa = new RectangleF((Width - w) / 2f, Height / 2f - 46, w, 92);
             using (var sombra = Forma.Redondo(new RectangleF(caixa.X + 2, caixa.Y + 6, caixa.Width - 4, caixa.Height), 14)) using (var bs = new SolidBrush(Color.FromArgb(28, 0, 0, 0))) g.FillPath(bs, sombra);
-            using (var p = Forma.Redondo(caixa, 14)) { g.FillPath(Brushes.White, p); using var borda = new Pen(Color.FromArgb(232, 232, 234)); g.DrawPath(borda, p); }
+            using (var p = Forma.Redondo(caixa, 14)) { g.FillPath(Brushes.White, p); using var borda = new Pen(Tokens.Claro.CorBordaSutil); g.DrawPath(borda, p); }
             TextRenderer.DrawText(g, titulo, fT, Rectangle.Round(new RectangleF(caixa.X, caixa.Y + 18, caixa.Width, 28)), PecasDesign.CorTexto, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             TextRenderer.DrawText(g, sub, fS, Rectangle.Round(new RectangleF(caixa.X, caixa.Y + 50, caixa.Width, 24)), PecasDesign.Cinza, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
         }
+        if (Focused && Dia != default)
+        {
+            var indice = (int)(Dia.Date - _inicio.Date).TotalDays;
+            if (indice >= 0 && indice < Math.Max(5, Semanas) * 7)
+                using (var foco = new Pen(DialogoDesign.VerdePrincipal, 2f)) e.Graphics.DrawRectangle(foco, Rectangle.Round(Celula(indice)));
+        }
     }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        var atual = Dia == default ? _mes : Dia.Date;
+        DateTime? destino = e.KeyCode switch
+        {
+            Keys.Left => atual.AddDays(-1),
+            Keys.Right => atual.AddDays(1),
+            Keys.Up => atual.AddDays(-7),
+            Keys.Down => atual.AddDays(7),
+            Keys.PageUp => atual.AddMonths(-1),
+            Keys.PageDown => atual.AddMonths(1),
+            Keys.Home => new DateTime(atual.Year, atual.Month, 1),
+            Keys.End => new DateTime(atual.Year, atual.Month, DateTime.DaysInMonth(atual.Year, atual.Month)),
+            _ => null,
+        };
+        if (destino is DateTime d)
+        {
+            Dia = d;
+            Escolheu?.Invoke(d);
+            Invalidate();
+            e.Handled = true; e.SuppressKeyPress = true;
+        }
+        else if ((e.KeyCode is Keys.Enter or Keys.Space) && Dia != default)
+        {
+            Escolheu?.Invoke(Dia);
+            e.Handled = true; e.SuppressKeyPress = true;
+        }
+        else if (e.KeyCode == Keys.Apps || e.KeyCode == Keys.F10 && e.Shift && Dia != default)
+        {
+            var indice = (int)(Dia.Date - _inicio.Date).TotalDays;
+            MenuDia?.Invoke(Dia.Date, indice >= 0 ? Point.Round(Celula(indice).Location) : Point.Empty);
+            e.Handled = true; e.SuppressKeyPress = true;
+        }
+    }
+
+    protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
+    protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
 }
 
 /// <summary>As baterias do dia: hora (mono), nome, barra de ocupação, n/vagas e a situação (Encerrada / Na pista / Aberta / Fechada).</summary>
@@ -731,12 +798,14 @@ class BateriasDia : Control
     public BateriasDia()
     {
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
-        BackColor = Color.White;
+        BackColor = Tokens.Primitivo.Branco; TabStop = true; AccessibleRole = AccessibleRole.List; AccessibleName = "Baterias do dia";
+        AccessibleDescription = "Use as setas para selecionar uma bateria, Enter para abrir e Shift+F10 para ações.";
     }
 
     public void Mostrar(List<JsonObject> itens)
     {
         _itens = itens; _topo = 0;
+        AccessibleName = itens.Count == 0 ? "Baterias do dia, nenhuma" : $"Baterias do dia, {itens.Count} disponíveis";
         var agora = DateTime.Now;
         _sel = itens.FindIndex(b => b.D("dataHora") is DateTime d && d.AddMinutes(35) >= agora);
         Invalidate();
@@ -747,21 +816,47 @@ class BateriasDia : Control
     protected override void OnMouseDoubleClick(MouseEventArgs e) { base.OnMouseDoubleClick(e); var i = Em(e.Location); if (i >= 0 && e.Button == MouseButtons.Left) Duplo?.Invoke(_itens[i]); }
     protected override void OnMouseWheel(MouseEventArgs e) { base.OnMouseWheel(e); _topo = Math.Clamp(_topo - Math.Sign(e.Delta) * 60, 0, Math.Max(0, _itens.Count * (Alt + Esp) - Height)); Invalidate(); }
     protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); Focus(); }
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (_itens.Count == 0) return;
+        var proximo = _sel < 0 ? 0 : _sel;
+        if (e.KeyCode == Keys.Up) proximo--;
+        else if (e.KeyCode == Keys.Down) proximo++;
+        else if (e.KeyCode == Keys.PageUp) proximo -= Math.Max(1, Height / (Alt + Esp));
+        else if (e.KeyCode == Keys.PageDown) proximo += Math.Max(1, Height / (Alt + Esp));
+        else if (e.KeyCode == Keys.Home) proximo = 0;
+        else if (e.KeyCode == Keys.End) proximo = _itens.Count - 1;
+        else if (e.KeyCode is Keys.Enter or Keys.Space)
+        {
+            if (Atual != null) Duplo?.Invoke(Atual);
+            e.Handled = true; e.SuppressKeyPress = true; return;
+        }
+        else if (e.KeyCode == Keys.Apps || e.KeyCode == Keys.F10 && e.Shift)
+        {
+            if (Atual != null) Menu?.Invoke(Atual, new Point(12, Math.Max(0, _sel * (Alt + Esp) - _topo + 12)));
+            e.Handled = true; e.SuppressKeyPress = true; return;
+        }
+        else return;
+        _sel = Math.Clamp(proximo, 0, _itens.Count - 1);
+        _topo = Math.Clamp(_sel * (Alt + Esp) - Height / 2, 0, Math.Max(0, _itens.Count * (Alt + Esp) - Height));
+        Invalidate(); e.Handled = true; e.SuppressKeyPress = true;
+    }
 
     static (string texto, Color cor, bool pista, bool fim) Situacao(JsonObject b)
     {
         var ini = b.D("dataHora") ?? DateTime.MinValue; var agora = DateTime.Now;
-        if (ini <= agora && agora < ini.AddMinutes(35)) return ("Na pista", Tokens.AzulTexto, true, false);
-        if (ini.AddMinutes(35) <= agora) return ("Encerrada", Tokens.TextoTerciario, false, true);
-        if (b.S("status") == "fechada" || b.B("reservaFechada")) return ("Fechada", Tokens.Vermelho, false, false);
-        return ("Aberta", Tokens.VerdeTexto, false, false);
+        if (ini <= agora && agora < ini.AddMinutes(35)) return ("Na pista", Tokens.Claro.CorEstadoInfoTexto, true, false);
+        if (ini.AddMinutes(35) <= agora) return ("Encerrada", Tokens.Claro.CorTextoTerciario, false, true);
+        if (b.S("status") == "fechada" || b.B("reservaFechada")) return ("Fechada", Tokens.Claro.CorEstadoPerigoTexto, false, false);
+        return ("Aberta", Tokens.Claro.CorEstadoSucessoTexto, false, false);
     }
 
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics; g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; g.Clear(BackColor);
-        using var fHora = new Font("Consolas", 10.5F, FontStyle.Bold); using var fNome = new Font("Segoe UI Semibold", 9.8F); using var fOc = new Font("Segoe UI Semibold", 9.4F); using var fEst = new Font("Segoe UI Semibold", 8.3F);
-        if (_itens.Count == 0) { TextRenderer.DrawText(g, "Nenhuma bateria.", new Font("Segoe UI", 9.8F), new Rectangle(0, 20, Width, 30), PecasDesign.Cinza, TextFormatFlags.HorizontalCenter); return; }
+        using var fHora = new Font("Consolas", 10.5F, FontStyle.Bold); using var fNome = Tokens.FonteSemibold(Tokens.Claro.FonteTamanhoCorpo); using var fOc = Tokens.FonteSemibold(Tokens.Claro.FonteTamanhoCorpo); using var fEst = Tokens.FonteSemibold(Tokens.Claro.FonteTamanhoLegenda);
+        if (_itens.Count == 0) { TextRenderer.DrawText(g, "Nenhuma bateria neste dia.\nUse + Criar reservas.", Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo), new Rectangle(8, 20, Width - 16, 48), PecasDesign.Cinza, TextFormatFlags.HorizontalCenter | TextFormatFlags.WordBreak); return; }
         for (var i = 0; i < _itens.Count; i++)
         {
             var y = i * (Alt + Esp) - _topo;
@@ -769,7 +864,7 @@ class BateriasDia : Control
             var b = _itens[i]; var r = new Rectangle(0, y, Width - 1, Alt);
             var (texto, cor, pista, fim) = Situacao(b);
             using var p = Forma.Redondo(r, 11);
-            using (var bg = new SolidBrush(pista ? Color.FromArgb(235, 244, 255) : Tokens.Fundo)) g.FillPath(bg, p);
+            using (var bg = new SolidBrush(pista ? Color.FromArgb(235, 244, 255) : Tokens.Claro.CorFundoApp)) g.FillPath(bg, p);
             if (pista) { using var pe = new Pen(Color.FromArgb(191, 222, 255)); g.DrawPath(pe, p); }
             if (i == _sel) { using var ps = new Pen(DialogoDesign.VerdePrincipal, 2f); g.DrawPath(ps, p); }
             TextRenderer.DrawText(g, b.D("dataHora")?.ToString("HH:mm") ?? "", fHora, new Rectangle(10, y, 54, Alt), PecasDesign.CorTexto, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
@@ -780,9 +875,9 @@ class BateriasDia : Control
             var nome = b.S("nome") + (b.S("categoria") == "Super Kart" && !b.S("nome").Contains("Super", StringComparison.OrdinalIgnoreCase) ? " · Super Kart" : "");
             TextRenderer.DrawText(g, nome, fNome, new Rectangle(74, y + 9, nomeW, 20), PecasDesign.CorTexto, TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
             var barra = new RectangleF(74, y + 34, nomeW, 4);
-            using (var bf = Forma.Redondo(barra, 2)) using (var bb = new SolidBrush(Tokens.Linha)) g.FillPath(bb, bf);
+            using (var bf = Forma.Redondo(barra, 2)) using (var bb = new SolidBrush(Tokens.Claro.CorBordaSutil)) g.FillPath(bb, bf);
             var pct = Math.Min(1f, ins / (float)vagas);
-            if (pct > 0) { using var bc = Forma.Redondo(new RectangleF(barra.X, barra.Y, Math.Max(4, barra.Width * pct), 4), 2); using var cb = new SolidBrush(fim ? Tokens.TextoDesabilitado : ins >= vagas ? Tokens.LaranjaVivo : Tokens.VerdeStatus); g.FillPath(cb, bc); }
+            if (pct > 0) { using var bc = Forma.Redondo(new RectangleF(barra.X, barra.Y, Math.Max(4, barra.Width * pct), 4), 2); using var cb = new SolidBrush(fim ? Tokens.Claro.CorTextoDesabilitado : ins >= vagas ? Tokens.Claro.CorEstadoAvisoSolido : Tokens.Claro.CorStatusOnline); g.FillPath(cb, bc); }
             TextRenderer.DrawText(g, oc, fOc, new Rectangle(Width - wDir - 10, y + 9, wDir, 18), PecasDesign.CorTexto, TextFormatFlags.Right);
             TextRenderer.DrawText(g, texto, fEst, new Rectangle(Width - wDir - 10, y + 29, wDir, 16), cor, TextFormatFlags.Right);
         }

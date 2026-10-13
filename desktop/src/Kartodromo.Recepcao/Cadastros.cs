@@ -66,26 +66,30 @@ public static class Cadastros
 /// <summary>Parâmetros do sistema (OfficeParametros.dc.html): abas e a tabela Descrição / Valor; toque no valor para alterar.</summary>
 public class FormParametros : DialogoDesign
 {
-    static readonly string[] Abas_ = ["Cronometragem", "Office", "Autoatendimento", "Ranking/TV", "Lista de participantes", "Placar eletrônico", "API"];
+    static readonly string[] Abas_ = ["Office", "Autoatendimento", "Lista de participantes", "Configurações externas"];
     static readonly HashSet<string> DaLista = ["office.exibirEmailLista", "office.exibirPesoLista"];
     readonly Dictionary<string, string> _alterados = [];
     List<JsonObject> _todos = [];
     readonly TabelaDesign _tabela;
     readonly Label _vazio;
-    int _aba = 1;
+    readonly FlowLayoutPanel _externos = new() { AutoSize = true, WrapContents = true, FlowDirection = FlowDirection.LeftToRight, BackColor = Tokens.Primitivo.Branco, Margin = new Padding(0, 6, 0, 8), Visible = false };
+    Button _salvar;
+    int _aba;
 
-    public FormParametros() : base("Parâmetros do sistema", "Ajustes da recepção · toque no valor para alterar",
+    public FormParametros() : base("Parâmetros do sistema", "Ajustes locais da recepção · toque no valor para alterar",
         "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1", "linear-gradient(180deg, #9A9AA0, #4A4A4F)")
     {
         var g = Secao(null);
-        _vazio = new Label { AutoSize = true, MaximumSize = new Size(860, 0), Font = new Font("Segoe UI", 9.6F), ForeColor = Tokens.Grafite, BackColor = Color.White, Visible = false, Margin = new Padding(0, 0, 0, 8) };
+        _vazio = new Label { AutoSize = true, MaximumSize = new Size(860, 0), Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo), ForeColor = Tokens.Primitivo.Cinza700, BackColor = Tokens.Primitivo.Branco, Visible = false, Margin = new Padding(0, 0, 0, 8) };
         g.Controls.Add(_vazio); g.SetColumnSpan(_vazio, 6);
         _tabela = new TabelaDesign { Dock = DockStyle.Fill, Height = 100, Margin = new Padding(0, 0, 14, 0), MaxLinhas = 11 };
         _tabela.Colunas(new("Descrição", 700), new("Valor", 180, Direita: true, Editavel: true));
         g.Controls.Add(_tabela); g.SetColumnSpan(_tabela, 6);
+        MontarConfiguracoesExternas();
+        g.Controls.Add(_externos); g.SetColumnSpan(_externos, 6);
         _tabela.CelulaMudou += (l, _, v) => { var p = Visiveis()[l]; _alterados[p.S("chave")] = v is "Sim" ? "true" : v is "Não" ? "false" : v; };
-        Abas(Abas_, i => { _aba = i; Mostrar(); }, 1);
-        BotaoRodape("Salvar", true, () => Seguro.Rodar(this, async () =>
+        Abas(Abas_, i => { _aba = i; Mostrar(); }, 0);
+        _salvar = BotaoRodape("Salvar", true, () => Seguro.Rodar(this, async () =>
         {
             if (_alterados.Count == 0) { Close(); return; }
             var body = new JsonObject(); foreach (var (k, v) in _alterados) body[k] = v;
@@ -98,14 +102,35 @@ public class FormParametros : DialogoDesign
         Load += (_, _) => Seguro.Rodar(this, async () => { _todos = await Sessao.Api.Lista("/api/office/parametros"); Mostrar(); });
     }
 
+    void MontarConfiguracoesExternas()
+    {
+        Button Externo(string texto, string destino, string descricao)
+        {
+            var b = CartaoModal.Botao(texto, Tokens.Claro.CorAcaoSecundaria, Tokens.Claro.CorTextoPrincipal, true);
+            b.Size = new Size(240, 46);
+            b.AccessibleName = texto;
+            b.AccessibleDescription = descricao;
+            b.Click += (_, _) =>
+            {
+                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(destino) { UseShellExecute = true }); }
+                catch (Exception e) { Diagnostico.Registrar(this, e); Msg.Erro(this, $"Não foi possível abrir {texto}.\n\n{descricao}"); }
+            };
+            return b;
+        }
+        _externos.Controls.Add(Externo("Abrir Cronometragem", Config.CronoUrl, "Ajustes de baterias, cronometragem e sessões."));
+        _externos.Controls.Add(Externo("Abrir Ranking / TV", Config.CronoUrl.TrimEnd('/') + "/tv", "Abre a classificação ao vivo em uma nova janela."));
+        _externos.Controls.Add(Externo("Abrir Placar eletrônico", Config.CronoUrl.TrimEnd('/') + "/tv", "O placar eletrônico é configurado no módulo Cronometragem."));
+        _externos.Controls.Add(Externo("Abrir configuração da API", Config.ServidorUrl, "Endereço e acesso da API pertencem ao servidor da operação."));
+    }
+
     List<JsonObject> Visiveis() => _todos.Where(p =>
     {
         var k = p.S("chave");
         return _aba switch
         {
-            1 => k.StartsWith("office.") && !DaLista.Contains(k),
-            2 => k.StartsWith("totem."),
-            4 => DaLista.Contains(k),
+            0 => k.StartsWith("office.") && !DaLista.Contains(k),
+            1 => k.StartsWith("totem."),
+            2 => DaLista.Contains(k),
             _ => false,
         };
     }).ToList();
@@ -113,16 +138,19 @@ public class FormParametros : DialogoDesign
     void Mostrar()
     {
         var itens = Visiveis();
+        var externa = _aba == 3;
+        Subtitulo.Text = externa ? "Configurações externas · abra o módulo responsável" : "Ajustes locais da recepção · toque no valor para alterar";
+        if (_salvar != null) _salvar.Visible = !externa;
         string Valor(JsonObject p) { var v = _alterados.GetValueOrDefault(p.S("chave"), p.S("valor")); return v == "true" ? "Sim" : v == "false" ? "Não" : v; }
         _tabela.Linhas(itens.Select(p => new[] { p.S("descricao"), Valor(p) }));
-        _tabela.Visible = itens.Count > 0;
-        _vazio.Visible = itens.Count == 0;
-        _vazio.Text = _aba switch
+        _tabela.Visible = !externa && itens.Count > 0;
+        _externos.Visible = externa;
+        _vazio.Visible = externa || itens.Count == 0;
+        _vazio.Text = externa ? "Estas configurações pertencem a outros módulos. Abra o sistema correto pelos botões abaixo." : _aba switch
         {
-            0 or 5 => "Os ajustes da cronometragem e do placar ficam no programa da Cronometragem (Ferramentas › Parâmetros da cronometragem).",
-            3 => "O ranking e o telão são configurados no programa da Cronometragem (Relatórios › Ranking e Placar).",
-            6 => "A API do servidor não tem ajustes pela recepção: o endereço e o acesso ficam na configuração do servidor.",
-            _ => "Nenhum parâmetro nesta aba.",
+            1 => "Nenhum ajuste do Autoatendimento foi publicado para esta unidade.",
+            2 => "Nenhum parâmetro de lista de participantes foi encontrado.",
+            _ => "Nenhum parâmetro nesta aba. Volte para Office ou escolha Configurações externas.",
         };
     }
 }
@@ -145,7 +173,7 @@ public class FormEmpresa : DialogoDesign
         _uf.Items.AddRange("AC AL AM AP BA CE DF ES GO MA MG MS MT PA PB PE PI PR RJ RN RO RR RS SC SE SP TO".Split(' '));
         _pais.Items.AddRange(["Brasil", "Argentina", "Paraguai", "Uruguai", "Outro"]);
         // ---------- aba 1
-        var logo = PecasDesign.Texto("", 200); logo.ReadOnly = true; logo.BackColor = Color.White;
+        var logo = PecasDesign.Texto("", 200); logo.ReadOnly = true; logo.BackColor = Tokens.Primitivo.Branco;
         var trocar = AcaoCampo("Trocar");
         trocar.Click += (_, _) =>
         {
@@ -174,12 +202,12 @@ public class FormEmpresa : DialogoDesign
         Control[] aba2 = [i1.Parent];
         // ---------- aba 3
         var p1 = Secao("Política de reembolso");
-        var caixa = new Panel { Dock = DockStyle.Fill, Height = 350, Margin = new Padding(0, 0, 14, 0), Padding = new Padding(10, 8, 6, 8), BackColor = Color.White };
+        var caixa = new Panel { Dock = DockStyle.Fill, Height = 350, Margin = new Padding(0, 0, 14, 0), Padding = new Padding(10, 8, 6, 8), BackColor = Tokens.Primitivo.Branco };
         caixa.Paint += (_, e) =>
         {
             e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             using var path = Forma.Redondo(new Rectangle(0, 0, caixa.Width - 1, caixa.Height - 1), 8);
-            using var pen = new Pen(Tokens.BordaCampo); e.Graphics.DrawPath(pen, path);
+            using var pen = new Pen(Tokens.Claro.CorBordaCampo); e.Graphics.DrawPath(pen, path);
         };
         _politica.Dock = DockStyle.Fill; caixa.Controls.Add(_politica);
         p1.Controls.Add(caixa); p1.SetColumnSpan(caixa, 6);
@@ -235,7 +263,7 @@ public class FormEmpresa : DialogoDesign
     }
 }
 
-public class FormCadastro : Janela
+public class FormCadastro : CartaoModal
 {
     readonly string _ent;
     readonly DefCad _def;
@@ -248,10 +276,10 @@ public class FormCadastro : Janela
     readonly ListBox _produtoLista = new() { Dock = DockStyle.Fill, DrawMode = DrawMode.OwnerDrawFixed, ItemHeight = 56, BorderStyle = BorderStyle.None, IntegralHeight = false };
     readonly TextBox _produtoBusca = new() { Dock = DockStyle.Fill, PlaceholderText = "Pesquisar por código ou nome", BorderStyle = BorderStyle.None };
     readonly ComboBox _produtoFiltro = new() { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList };
-    readonly Label _produtoTitulo = new() { AutoEllipsis = true, Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = Tokens.Texto };
-    readonly Label _produtoSubtitulo = new() { AutoEllipsis = true, ForeColor = Tokens.TextoSecundario };
-    readonly Label _produtoAtivo = new() { AutoSize = true, Padding = new Padding(8, 4, 8, 4), BackColor = Tokens.VerdeSuave, ForeColor = Tokens.VerdeEscuro };
-    readonly Label _estado = new() { AutoSize = true, Padding = new Padding(8, 3, 8, 3), Font = new Font("Segoe UI", 8.8F, FontStyle.Bold) };
+    readonly Label _produtoTitulo = new() { AutoEllipsis = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoSubtitulo, FontStyle.Bold), ForeColor = Tokens.Claro.CorTextoPrincipal };
+    readonly Label _produtoSubtitulo = new() { AutoEllipsis = true, ForeColor = Tokens.Claro.CorTextoSecundario };
+    readonly Label _produtoAtivo = new() { AutoSize = true, Padding = new Padding(8, 4, 8, 4), BackColor = Tokens.Claro.CorEstadoSucessoFundo, ForeColor = Tokens.Claro.CorAcaoPrincipalPressionado };
+    readonly Label _estado = new() { AutoSize = true, Padding = new Padding(8, 3, 8, 3), Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold) };
     List<JsonObject> _lista = [];
     JsonObject _atual;
     string _modo = "ver";
@@ -260,8 +288,9 @@ public class FormCadastro : Janela
     internal bool EhProduto => Produto;
     bool _suprimeSelecaoProduto;
 
-    public FormCadastro(string ent, DefCad def) : base(def.Titulo, ent == "produtos" ? 1140 : 900, ent == "produtos" ? 772 : def.ComProvas ? 680 : 560, true)
+    public FormCadastro(string ent, DefCad def) : base(ent == "produtos" ? 1140 : 900, ent == "produtos" ? 772 : def.ComProvas ? 680 : 560)
     {
+        Text = def.Titulo;
         _ent = ent; _def = def;
         ShowInTaskbar = true;
         var g = Campos.Grade(ent == "produtos" ? 6 : 4);
@@ -297,7 +326,7 @@ public class FormCadastro : Janela
         var nav = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 52, Padding = new Padding(4) };
         Button B(string k, string t, string gl, Color cor, Action a)
         {
-            var b = new BotaoPlano { Text = t, Image = Icone.Tile(gl, cor, 18), TextImageRelation = TextImageRelation.ImageAboveText, Size = new Size(t.Length > 2 ? 66 : 38, 44) };
+            var b = new BotaoPlano { Text = t, Image = Kartodromo.Comum.Icone.Tile(gl, cor, 18), TextImageRelation = TextImageRelation.ImageAboveText, Size = new Size(t.Length > 2 ? 66 : 38, 44) };
             b.Click += (_, _) => a(); _b[k] = b; return b;
         }
         nav.Controls.AddRange([B("first", "", "", Color.DimGray, () => Ir(0)), B("prev", "", "", Color.DimGray, () => Ir(Indice() - 1)), B("next", "", "", Color.DimGray, () => Ir(Indice() + 1)),
@@ -314,8 +343,8 @@ public class FormCadastro : Janela
     // Cadastro.dc.html: barra de ações no topo, cartão do formulário, lista em cartão e rodapé com navegação + Gravar
     void MontarLayoutGenerico(TableLayoutPanel campos)
     {
-        var fundo = Tokens.Fundo;
-        var cinza = Tokens.Linha;
+        var fundo = Tokens.Claro.CorFundoApp;
+        var cinza = Tokens.Claro.CorBordaSutil;
         var oldRoots = Controls.Cast<Control>().ToArray();
         Controls.Clear();
         BackColor = fundo;
@@ -323,39 +352,42 @@ public class FormCadastro : Janela
         {
             var b = _b[k]; b.Text = texto; b.Image = null; b.TextImageRelation = TextImageRelation.Overlay; b.FlatStyle = FlatStyle.Flat; b.FlatAppearance.BorderSize = 0;
             b.BackColor = fundoBt; b.ForeColor = frente; b.Size = new Size(largura, 34); b.Margin = new Padding(0, 0, 6, 0); b.Cursor = Cursors.Hand;
-            b.Font = new Font("Segoe UI", 9.3F, negrito ? FontStyle.Bold : FontStyle.Regular); b.AccessibleDescription = "kit:ignorar";
+            b.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, negrito ? FontStyle.Bold : FontStyle.Regular);
+            b.AccessibleRole = AccessibleRole.PushButton;
+            b.AccessibleName = texto.Length > 0 ? texto : k switch { "first" => "Primeiro registro", "prev" => "Registro anterior", "next" => "Próximo registro", "last" => "Último registro", _ => k };
+            b.AccessibleDescription = "kit:ignorar";
             b.Resize += (_, _) => KitVisual.AplicarRaio(b, 8); KitVisual.AplicarRaio(b, 8);
             return b;
         }
         var acoes = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 46, WrapContents = false, BackColor = fundo, Padding = new Padding(0, 4, 0, 6) };
         acoes.Controls.AddRange([
-            Estilo("novo", "+ Novo", KitVisual.Verde, Color.White, 92, true), Estilo("edit", "Editar", cinza, KitVisual.Texto, 84),
-            Estilo("del", "Excluir", cinza, Tokens.Vermelho, 84), Estilo("canc", "Cancelar", cinza, KitVisual.Texto, 90),
+            Estilo("novo", "+ Novo", KitVisual.Verde, Tokens.Primitivo.Branco, 92, true), Estilo("edit", "Editar", cinza, KitVisual.Texto, 84),
+            Estilo("del", "Excluir", cinza, Tokens.Claro.CorEstadoPerigoTexto, 84), Estilo("canc", "Cancelar", cinza, KitVisual.Texto, 90),
             Estilo("pesq", "Pesquisar", cinza, KitVisual.Texto, 94)]);
         _estado.Margin = new Padding(8, 8, 0, 0);
         acoes.Controls.Add(_estado);
 
-        var cartao = new Panel { Dock = DockStyle.Top, BackColor = Color.White, Padding = new Padding(14, 10, 14, 8), Height = 140 };
+        var cartao = new Panel { Dock = DockStyle.Top, BackColor = Tokens.Primitivo.Branco, Padding = new Padding(14, 10, 14, 8), Height = 140 };
         cartao.Resize += (_, _) => KitVisual.AplicarRaio(cartao, 14);
-        campos.Dock = DockStyle.Top; campos.AutoSize = true; campos.BackColor = Color.White;
+        campos.Dock = DockStyle.Top; campos.AutoSize = true; campos.BackColor = Tokens.Primitivo.Branco;
         foreach (Control c in campos.Controls) if (c.Controls.OfType<CheckBox>().Any() || c is CheckBox) c.Margin = new Padding(6, 22, 3, 3);
-        _extra.BackColor = Color.White;
+        _extra.BackColor = Tokens.Primitivo.Branco;
         cartao.Controls.Add(_extra); cartao.Controls.Add(campos);
         void Altura() { var h = campos.Height + _extra.Height + cartao.Padding.Vertical + 4; if (Math.Abs(cartao.Height - h) > 1) cartao.Height = h; }
         campos.SizeChanged += (_, _) => Altura(); Shown += (_, _) => Altura();
 
         var espaco = new Panel { Dock = DockStyle.Top, Height = 12, BackColor = fundo };
-        var lista = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(10, 10, 10, 4) };
+        var lista = new Panel { Dock = DockStyle.Fill, BackColor = Tokens.Primitivo.Branco, Padding = new Padding(10, 10, 10, 4) };
         lista.Resize += (_, _) => KitVisual.AplicarRaio(lista, 14);
         _g.Dock = DockStyle.Fill; KitVisual.EstilizarGrade(_g);
-        _pos.Dock = DockStyle.Bottom; _pos.Height = 26; _pos.TextAlign = ContentAlignment.MiddleLeft; _pos.ForeColor = KitVisual.Secundario; _pos.BackColor = Color.White;
+        _pos.Dock = DockStyle.Bottom; _pos.Height = 26; _pos.TextAlign = ContentAlignment.MiddleLeft; _pos.ForeColor = KitVisual.Secundario; _pos.BackColor = Tokens.Primitivo.Branco;
         lista.Controls.Add(_g); lista.Controls.Add(_pos);
 
         var rodape = new Panel { Dock = DockStyle.Bottom, Height = 54, BackColor = fundo, Padding = new Padding(0, 10, 0, 0) };
         var nav = new FlowLayoutPanel { Dock = DockStyle.Left, Width = 180, WrapContents = false, BackColor = fundo };
         foreach (var (k, t) in new[] { ("first", "«"), ("prev", "‹"), ("next", "›"), ("last", "»") }) nav.Controls.Add(Estilo(k, t, cinza, KitVisual.Texto, 38));
         var fim = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 290, WrapContents = false, FlowDirection = FlowDirection.RightToLeft, BackColor = fundo };
-        fim.Controls.AddRange([Estilo("gravar", "Gravar", KitVisual.Verde, Color.White, 120, true), Estilo("fechar", "Fechar", cinza, KitVisual.Texto, 90)]);
+        fim.Controls.AddRange([Estilo("gravar", "Gravar", KitVisual.Verde, Tokens.Primitivo.Branco, 120, true), Estilo("fechar", "Fechar", cinza, KitVisual.Texto, 90)]);
         rodape.Controls.Add(nav); rodape.Controls.Add(fim);
 
         var corpo = new Panel { Dock = DockStyle.Fill, BackColor = fundo };
@@ -368,48 +400,48 @@ public class FormCadastro : Janela
 
     void MontarLayoutProduto(TableLayoutPanel campos)
     {
-        var fundo = Tokens.Fundo;
-        var linha = Tokens.Linha;
+        var fundo = Tokens.Claro.CorFundoApp;
+        var linha = Tokens.Claro.CorBordaSutil;
         var oldRoots = Controls.Cast<Control>().ToArray();
         Controls.Clear();
         BackColor = fundo;
-        var lateral = new Panel { Dock = DockStyle.Left, Width = 380, BackColor = Tokens.BotaoSecundario, Padding = new Padding(10, 8, 10, 8) };
+        var lateral = new Panel { Dock = DockStyle.Left, Width = 380, BackColor = Tokens.Claro.CorAcaoSecundaria, Padding = new Padding(10, 8, 10, 8) };
         var topoLista = new TableLayoutPanel { Dock = DockStyle.Top, Height = 48, ColumnCount = 2, RowCount = 1 };
         topoLista.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); topoLista.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         var tituloLista = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
-        tituloLista.Controls.Add(new Label { Text = "Produtos", AutoSize = true, Font = new Font("Segoe UI", 12F, FontStyle.Bold), Location = new Point(40, 12), BackColor = Color.Transparent });
+        tituloLista.Controls.Add(new Label { Text = "Produtos", AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoSubtitulo, FontStyle.Bold), Location = new Point(40, 12), BackColor = Color.Transparent });
         tituloLista.Controls.Add(new PictureBox { Image = VisualPrincipal.Icone("produtos"), SizeMode = PictureBoxSizeMode.Zoom, Size = new Size(44, 44), Location = new Point(-4, 2), BackColor = Color.Transparent });
         topoLista.Controls.Add(tituloLista, 0, 0);
-        var novo = _b["novo"]; novo.Text = "+ Novo"; novo.Image = null; novo.TextImageRelation = TextImageRelation.Overlay; novo.Size = new Size(82, 32); novo.FlatStyle = FlatStyle.Flat; novo.BackColor = Tokens.Verde; novo.ForeColor = Color.White; novo.Font = new Font("Segoe UI", 9F, FontStyle.Bold); novo.Margin = new Padding(0, 7, 0, 7); novo.FlatAppearance.BorderSize = 0; novo.AccessibleDescription = "kit:ignorar"; novo.Resize += (_, _) => KitVisual.AplicarRaio(novo, 9); KitVisual.AplicarRaio(novo, 9);
+        var novo = _b["novo"]; novo.Text = "+ Novo"; novo.Image = null; novo.TextImageRelation = TextImageRelation.Overlay; novo.Size = new Size(82, 32); novo.FlatStyle = FlatStyle.Flat; novo.BackColor = Tokens.Claro.CorAcaoPrincipal; novo.ForeColor = Tokens.Primitivo.Branco; novo.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold); novo.Margin = new Padding(0, 7, 0, 7); novo.FlatAppearance.BorderSize = 0; novo.AccessibleDescription = "kit:ignorar"; novo.Resize += (_, _) => KitVisual.AplicarRaio(novo, 9); KitVisual.AplicarRaio(novo, 9);
         topoLista.Controls.Add(novo, 1, 0);
         // busca do canvas: p\u00EDlula cinza com lupa; fora do kit visual (ele achava que era "campo com r\u00F3tulo", trocava a
         // fonte da lupa \u2014 virava um "-" \u2014 e esticava a caixa)
-        var busca = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = Tokens.FundoCampo, Padding = new Padding(10, 0, 10, 0), Margin = new Padding(0, 2, 0, 6), AccessibleDescription = "kit:ignorar" };
+        var busca = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = Tokens.Claro.CorSuperficieCampo, Padding = new Padding(10, 0, 10, 0), Margin = new Padding(0, 2, 0, 6), AccessibleDescription = "kit:ignorar" };
         Arredondar(busca, 10);
-        var lupa = new Label { Text = "\uE721", Dock = DockStyle.Left, Width = 24, Font = new Font("Segoe MDL2 Assets", 9.5F), ForeColor = Tokens.TextoSecundario, TextAlign = ContentAlignment.MiddleLeft, BackColor = Tokens.FundoCampo };
-        _produtoBusca.Dock = DockStyle.None; _produtoBusca.BackColor = Tokens.FundoCampo; _produtoBusca.ForeColor = Tokens.Texto; _produtoBusca.Font = new Font("Segoe UI", 10F);
+        var lupa = new Label { Text = "\uE721", Dock = DockStyle.Left, Width = 24, Font = new Font("Segoe MDL2 Assets", 9.5F), ForeColor = Tokens.Claro.CorTextoSecundario, TextAlign = ContentAlignment.MiddleLeft, BackColor = Tokens.Claro.CorSuperficieCampo };
+        _produtoBusca.Dock = DockStyle.None; _produtoBusca.BackColor = Tokens.Claro.CorSuperficieCampo; _produtoBusca.ForeColor = Tokens.Claro.CorTextoPrincipal; _produtoBusca.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo);
         busca.Controls.Add(_produtoBusca); busca.Controls.Add(lupa);
         busca.Resize += (_, _) => _produtoBusca.SetBounds(lupa.Right + 2, (busca.Height - _produtoBusca.Height) / 2, busca.ClientSize.Width - lupa.Right - 12, _produtoBusca.Height);
-        var filtros = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = Color.White, Padding = new Padding(8, 4, 8, 4), Margin = new Padding(0, 0, 0, 8) };
+        var filtros = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = Tokens.Primitivo.Branco, Padding = new Padding(8, 4, 8, 4), Margin = new Padding(0, 0, 0, 8) };
         Arredondar(filtros, 8);
         _produtoFiltro.FlatStyle = FlatStyle.Flat; filtros.Controls.Add(_produtoFiltro);
         var listaBox = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent, Padding = new Padding(0, 0, 0, 2) };
         listaBox.Controls.Add(_produtoLista);
-        _pos.Dock = DockStyle.Bottom; _pos.Height = 28; _pos.TextAlign = ContentAlignment.MiddleLeft; _pos.ForeColor = Tokens.TextoSecundario;
+        _pos.Dock = DockStyle.Bottom; _pos.Height = 28; _pos.TextAlign = ContentAlignment.MiddleLeft; _pos.ForeColor = Tokens.Claro.CorTextoSecundario;
         filtros.Visible = false; // o design não tem esse filtro: a busca já acha por código ou nome
         var respiro = new Panel { Dock = DockStyle.Top, Height = 8, BackColor = Color.Transparent };
         lateral.Controls.Add(listaBox); lateral.Controls.Add(_pos); lateral.Controls.Add(filtros); lateral.Controls.Add(respiro); lateral.Controls.Add(busca); lateral.Controls.Add(topoLista);
 
         var direito = new Panel { Dock = DockStyle.Fill, BackColor = fundo };
-        var cab = new Panel { Dock = DockStyle.Top, Height = 68, BackColor = Color.White, Padding = new Padding(16, 8, 14, 8) };
+        var cab = new Panel { Dock = DockStyle.Top, Height = 68, BackColor = Tokens.Primitivo.Branco, Padding = new Padding(16, 8, 14, 8) };
         // título/subtítulo dentro do respiro do cabeçalho (antes encostavam na borda esquerda); selo "Ativo" logo após o nome
         _produtoTitulo.SetBounds(18, 12, 360, 26);
         _produtoSubtitulo.SetBounds(18, 38, 360, 20);
         _produtoAtivo.Location = new Point(380, 15);
         _produtoTitulo.TextChanged += (_, _) => _produtoAtivo.Left = Math.Min(_produtoTitulo.Left + TextRenderer.MeasureText(_produtoTitulo.Text, _produtoTitulo.Font).Width + 10, _produtoTitulo.Right + 10);
-        var editar = _b["edit"]; editar.Text = "Editar"; editar.Image = null; editar.TextImageRelation = TextImageRelation.Overlay; editar.Size = new Size(82, 34); editar.FlatStyle = FlatStyle.Flat; editar.BackColor = Tokens.BotaoSecundario; editar.ForeColor = Tokens.Texto; editar.Anchor = AnchorStyles.Top | AnchorStyles.Right; editar.SetBounds(cab.Width - 194, 17, 82, 34); editar.FlatAppearance.BorderSize = 0; editar.AccessibleDescription = "kit:ignorar"; KitVisual.AplicarRaio(editar, 9);
-        var excluir = _b["del"]; excluir.Text = "Excluir"; excluir.Image = null; excluir.TextImageRelation = TextImageRelation.Overlay; excluir.Size = new Size(86, 34); excluir.FlatStyle = FlatStyle.Flat; excluir.BackColor = Tokens.BotaoSecundario; excluir.ForeColor = Tokens.Vermelho; excluir.Anchor = AnchorStyles.Top | AnchorStyles.Right; excluir.SetBounds(cab.Width - 104, 17, 86, 34); excluir.FlatAppearance.BorderSize = 0; excluir.AccessibleDescription = "kit:ignorar"; KitVisual.AplicarRaio(excluir, 9);
-        var fecharX = new BotaoPlano { Text = "\uE711", Font = new Font("Segoe MDL2 Assets", 9F), Size = new Size(34, 34), FlatStyle = FlatStyle.Flat, BackColor = Tokens.BotaoSecundario, ForeColor = Tokens.Texto, Anchor = AnchorStyles.Top | AnchorStyles.Right, Cursor = Cursors.Hand, AccessibleDescription = "kit:ignorar" };
+        var editar = _b["edit"]; editar.Text = "Editar"; editar.Image = null; editar.TextImageRelation = TextImageRelation.Overlay; editar.Size = new Size(82, 34); editar.FlatStyle = FlatStyle.Flat; editar.BackColor = Tokens.Claro.CorAcaoSecundaria; editar.ForeColor = Tokens.Claro.CorTextoPrincipal; editar.Anchor = AnchorStyles.Top | AnchorStyles.Right; editar.SetBounds(cab.Width - 194, 17, 82, 34); editar.FlatAppearance.BorderSize = 0; editar.AccessibleDescription = "kit:ignorar"; KitVisual.AplicarRaio(editar, 9);
+        var excluir = _b["del"]; excluir.Text = "Excluir"; excluir.Image = null; excluir.TextImageRelation = TextImageRelation.Overlay; excluir.Size = new Size(86, 34); excluir.FlatStyle = FlatStyle.Flat; excluir.BackColor = Tokens.Claro.CorAcaoSecundaria; excluir.ForeColor = Tokens.Claro.CorEstadoPerigoTexto; excluir.Anchor = AnchorStyles.Top | AnchorStyles.Right; excluir.SetBounds(cab.Width - 104, 17, 86, 34); excluir.FlatAppearance.BorderSize = 0; excluir.AccessibleDescription = "kit:ignorar"; KitVisual.AplicarRaio(excluir, 9);
+        var fecharX = new BotaoPlano { Text = "\uE711", Font = new Font("Segoe MDL2 Assets", 9F), Size = new Size(34, 34), FlatStyle = FlatStyle.Flat, BackColor = Tokens.Claro.CorAcaoSecundaria, ForeColor = Tokens.Claro.CorTextoPrincipal, Anchor = AnchorStyles.Top | AnchorStyles.Right, Cursor = Cursors.Hand, AccessibleRole = AccessibleRole.PushButton, AccessibleName = "Fechar cadastro de produtos", AccessibleDescription = "kit:ignorar" };
         fecharX.FlatAppearance.BorderSize = 0; fecharX.Click += (_, _) => Close(); fecharX.Resize += (_, _) => KitVisual.AplicarRaio(fecharX, 9); KitVisual.AplicarRaio(fecharX, 9);
         cab.Controls.AddRange([_produtoTitulo, _produtoSubtitulo, _produtoAtivo, editar, excluir, fecharX]);
         cab.Resize += (_, _) => { fecharX.Location = new Point(cab.ClientSize.Width - fecharX.Width - 2, 17); excluir.Left = fecharX.Left - excluir.Width - 8; editar.Left = excluir.Left - editar.Width - 8; };
@@ -418,7 +450,7 @@ public class FormCadastro : Janela
         var centro = new Panel { Dock = DockStyle.Fill, Padding = new Padding(16, 12, 16, 10), BackColor = fundo };
         var corpo = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, BackColor = fundo, Padding = new Padding(0) };
         corpo.RowStyles.Add(new RowStyle(SizeType.Absolute, 204)); corpo.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        var cartao = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(12), Margin = new Padding(0, 0, 0, 12) };
+        var cartao = new Panel { Dock = DockStyle.Fill, BackColor = Tokens.Primitivo.Branco, Padding = new Padding(12), Margin = new Padding(0, 0, 0, 12) };
         Arredondar(cartao, 14);
         campos.Dock = DockStyle.Top; campos.AutoSize = false; campos.Height = 116; campos.RowCount = 2; campos.RowStyles.Clear();
         campos.RowStyles.Add(new RowStyle(SizeType.Absolute, 58)); campos.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
@@ -432,7 +464,7 @@ public class FormCadastro : Janela
             _c[chave].Parent?.Controls.Remove(_c[chave]);
             var novo = CampoProva(rotulos[w], _c[chave]);
             novo.Margin = new Padding(0, 0, 10, 0);
-            _c[chave].Font = new Font("Segoe UI", 10F);
+            _c[chave].Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo);
             campos.Controls.Add(novo, coluna, linha); if (span > 1) campos.SetColumnSpan(novo, span);
         }
         Campo("classeContabil", 0, 0, 3); Campo("categoria", 3, 0, 3);
@@ -441,26 +473,26 @@ public class FormCadastro : Janela
         var opcoes = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 42, WrapContents = false, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(2, 8, 0, 0), Margin = new Padding(0) };
         foreach (var chave in new[] { "ativo", "servicoLocacao", "publicarNuvem", "requerDevolucao" })
         {
-            if (_c.TryGetValue(chave, out var c) && c is CheckBox cb) { cb.Margin = new Padding(0, 0, 15, 0); cb.ForeColor = Tokens.Grafite; opcoes.Controls.Add(cb); }
+            if (_c.TryGetValue(chave, out var c) && c is CheckBox cb) { cb.Margin = new Padding(0, 0, 15, 0); cb.ForeColor = Tokens.Primitivo.Cinza700; opcoes.Controls.Add(cb); }
         }
         cartao.Controls.Add(opcoes);
-        var provas = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(12) };
+        var provas = new Panel { Dock = DockStyle.Fill, BackColor = Tokens.Primitivo.Branco, Padding = new Padding(12) };
         Arredondar(provas, 14);
-        var tituloProvas = new Label { Text = "Provas desta locação", Dock = DockStyle.Top, Height = 27, Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Tokens.Texto };
-        var subtituloProvas = new Label { Text = "As provas da bateria são enviadas à cronometragem na ordem configurada.", Dock = DockStyle.Top, Height = 22, ForeColor = Tokens.TextoSecundario };
+        var tituloProvas = new Label { Text = "Provas desta locação", Dock = DockStyle.Top, Height = 27, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo, FontStyle.Bold), ForeColor = Tokens.Claro.CorTextoPrincipal };
+        var subtituloProvas = new Label { Text = "As provas da bateria são enviadas à cronometragem na ordem configurada.", Dock = DockStyle.Top, Height = 22, ForeColor = Tokens.Claro.CorTextoSecundario };
         _extra.Dock = DockStyle.Fill; _extra.AutoSize = false; _extra.Padding = new Padding(0, 8, 0, 0);
         provas.Controls.Add(_extra); provas.Controls.Add(subtituloProvas); provas.Controls.Add(tituloProvas);
         corpo.Controls.Add(cartao, 0, 0); corpo.Controls.Add(provas, 0, 1); centro.Controls.Add(corpo);
 
-        var rodape = new Panel { Dock = DockStyle.Bottom, Height = 56, BackColor = Color.White, Padding = new Padding(10, 8, 10, 8) };
+        var rodape = new Panel { Dock = DockStyle.Bottom, Height = 56, BackColor = Tokens.Primitivo.Branco, Padding = new Padding(10, 8, 10, 8) };
         var nav = new FlowLayoutPanel { Dock = DockStyle.Left, Width = 178, WrapContents = false, Padding = new Padding(0), FlowDirection = FlowDirection.LeftToRight };
         foreach (var key in new[] { "first", "prev", "next", "last" })
         {
-            var b = _b[key]; b.Text = key switch { "first" => "«", "prev" => "‹", "next" => "›", _ => "»" }; b.Image = null; b.Size = new Size(36, 34); b.FlatStyle = FlatStyle.Flat; b.BackColor = Tokens.BotaoSecundario; b.FlatAppearance.BorderSize = 0; b.AccessibleDescription = "kit:ignorar"; KitVisual.AplicarRaio(b, 8); nav.Controls.Add(b);
+            var b = _b[key]; b.Text = key switch { "first" => "«", "prev" => "‹", "next" => "›", _ => "»" }; b.Image = null; b.Size = new Size(36, 34); b.FlatStyle = FlatStyle.Flat; b.BackColor = Tokens.Claro.CorAcaoSecundaria; b.FlatAppearance.BorderSize = 0; b.AccessibleDescription = "kit:ignorar"; KitVisual.AplicarRaio(b, 8); nav.Controls.Add(b);
         }
         var acoes = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 250, WrapContents = false, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(0) };
-        var gravar = _b["gravar"]; gravar.Text = "Gravar produto"; gravar.Image = null; gravar.Size = new Size(142, 36); gravar.FlatStyle = FlatStyle.Flat; gravar.BackColor = Tokens.Verde; gravar.ForeColor = Color.White; gravar.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold); gravar.FlatAppearance.BorderSize = 0; gravar.AccessibleDescription = "kit:ignorar"; KitVisual.AplicarRaio(gravar, 10);
-        var cancelar = _b["canc"]; cancelar.Image = null; cancelar.Size = new Size(96, 36); cancelar.FlatStyle = FlatStyle.Flat; cancelar.BackColor = Tokens.BotaoSecundario; cancelar.ForeColor = Tokens.Texto; cancelar.FlatAppearance.BorderSize = 0; cancelar.AccessibleDescription = "kit:ignorar"; KitVisual.AplicarRaio(cancelar, 10);
+        var gravar = _b["gravar"]; gravar.Text = "Gravar produto"; gravar.Image = null; gravar.Size = new Size(142, 36); gravar.FlatStyle = FlatStyle.Flat; gravar.BackColor = Tokens.Claro.CorAcaoPrincipal; gravar.ForeColor = Tokens.Primitivo.Branco; gravar.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo, FontStyle.Bold); gravar.FlatAppearance.BorderSize = 0; gravar.AccessibleDescription = "kit:ignorar"; KitVisual.AplicarRaio(gravar, 10);
+        var cancelar = _b["canc"]; cancelar.Image = null; cancelar.Size = new Size(96, 36); cancelar.FlatStyle = FlatStyle.Flat; cancelar.BackColor = Tokens.Claro.CorAcaoSecundaria; cancelar.ForeColor = Tokens.Claro.CorTextoPrincipal; cancelar.FlatAppearance.BorderSize = 0; cancelar.AccessibleDescription = "kit:ignorar"; KitVisual.AplicarRaio(cancelar, 10);
         acoes.Controls.AddRange([gravar, cancelar]); rodape.Controls.Add(acoes); rodape.Controls.Add(nav);
         direito.Controls.Add(centro); direito.Controls.Add(rodape); direito.Controls.Add(cab);
         Controls.Add(direito); Controls.Add(lateral);
@@ -553,9 +585,9 @@ public class FormCadastro : Janela
         if (!Produto || e.Index < 0 || e.Index >= _produtoLista.Items.Count) return;
         var p = (JsonObject)_produtoLista.Items[e.Index];
         var selecionado = (e.State & DrawItemState.Selected) != 0;
-        var fundo = selecionado ? Tokens.Verde : Color.Transparent;
-        var fg = selecionado ? Color.White : Tokens.Texto;
-        var sec = selecionado ? Color.FromArgb(220, 244, 232) : Tokens.TextoSecundario;
+        var fundo = selecionado ? Tokens.Claro.CorAcaoPrincipal : Color.Transparent;
+        var fg = selecionado ? Tokens.Primitivo.Branco : Tokens.Claro.CorTextoPrincipal;
+        var sec = selecionado ? Color.FromArgb(220, 244, 232) : Tokens.Claro.CorTextoSecundario;
         // linha selecionada = pílula verde arredondada (canvas); o nome usa todo o espaço até o preço (antes cortava cedo)
         using (var lim = new SolidBrush(_produtoLista.BackColor)) e.Graphics.FillRectangle(lim, e.Bounds);
         if (selecionado)
@@ -565,18 +597,18 @@ public class FormCadastro : Janela
             using var b = new SolidBrush(fundo); e.Graphics.FillPath(b, pilula);
         }
         var r = e.Bounds; r.Inflate(-10, -4);
-        var fontePreco = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+        var fontePreco = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold);
         var larguraPreco = TextRenderer.MeasureText(Fmt.Dinheiro(p.L("preco")), fontePreco).Width + 4;
         var codeRect = new Rectangle(r.Left, r.Top + 8, 48, 20);
         var textRect = new Rectangle(r.Left + 50, r.Top + 2, Math.Max(30, r.Width - 50 - larguraPreco - 8), 23);
         var subRect = new Rectangle(r.Left + 50, r.Top + 25, Math.Max(30, r.Width - 50 - larguraPreco - 8), 19);
         var priceRect = new Rectangle(r.Right - larguraPreco, r.Top + 8, larguraPreco, 22);
         TextRenderer.DrawText(e.Graphics, p.S("codigo"), new Font("Consolas", 8.5F), codeRect, sec, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
-        TextRenderer.DrawText(e.Graphics, p.S("nome"), new Font("Segoe UI", 9F, FontStyle.Bold), textRect, fg, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
-        TextRenderer.DrawText(e.Graphics, p.S("categoria"), new Font("Segoe UI", 8F), subRect, sec, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+        TextRenderer.DrawText(e.Graphics, p.S("nome"), Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold), textRect, fg, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+        TextRenderer.DrawText(e.Graphics, p.S("categoria"), Tokens.Fonte(Tokens.Claro.FonteTamanhoLegenda), subRect, sec, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
         TextRenderer.DrawText(e.Graphics, Fmt.Dinheiro(p.L("preco")), fontePreco, priceRect, fg, TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
         if (e.Index < _produtoLista.Items.Count - 1 && !selecionado)
-            using (var pen = new Pen(Tokens.Linha)) e.Graphics.DrawLine(pen, r.Left, e.Bounds.Bottom - 1, r.Right, e.Bounds.Bottom - 1);
+            using (var pen = new Pen(Tokens.Claro.CorBordaSutil)) e.Graphics.DrawLine(pen, r.Left, e.Bounds.Bottom - 1, r.Right, e.Bounds.Bottom - 1);
     }
 
     void AtualizarCabecalhoProduto(JsonObject p)
@@ -603,8 +635,8 @@ public class FormCadastro : Janela
         }
         _estado.Text = m == "novo" ? "Incluindo" : m == "edit" ? "Editando" : "";
         _estado.Visible = m != "ver";
-        _estado.BackColor = m == "novo" ? Tokens.AzulSuave : Color.FromArgb(255, 240, 214);
-        _estado.ForeColor = m == "novo" ? Tokens.AzulTexto : Tokens.LaranjaEscuro;
+        _estado.BackColor = m == "novo" ? Tokens.Claro.CorEstadoInfoFundo : Color.FromArgb(255, 240, 214);
+        _estado.ForeColor = m == "novo" ? Tokens.Claro.CorEstadoInfoTexto : Tokens.Claro.CorEstadoAvisoTexto;
         // botões verdes apagados quando desabilitados
         foreach (var k in new[] { "gravar", "novo" }) if (_b.TryGetValue(k, out var bv) && bv.AccessibleDescription == "kit:ignorar") bv.BackColor = bv.Enabled ? KitVisual.Verde : Color.FromArgb(196, 222, 210);
     }
@@ -622,7 +654,7 @@ public class FormCadastro : Janela
             _produtoLista.ClearSelected();
             AtualizarCabecalhoProduto(null);
             _extra.Controls.Clear();
-            _extra.Controls.Add(new Label { Text = "Grave o produto para configurar suas provas de bateria.", Dock = DockStyle.Top, ForeColor = Tokens.TextoSecundario, Padding = new Padding(4, 8, 4, 4) });
+            _extra.Controls.Add(new Label { Text = "Grave o produto para configurar suas provas de bateria.", Dock = DockStyle.Top, ForeColor = Tokens.Claro.CorTextoSecundario, Padding = new Padding(4, 8, 4, 4) });
         }
         SetModo("novo");
         _c.Values.First().Focus();
@@ -684,8 +716,8 @@ public class FormCadastro : Janela
         linhaCampos.Controls.Add(CampoProva("Ordem", ordem), 0, 0); linhaCampos.Controls.Add(CampoProva("Nome", nome), 1, 0);
         linhaCampos.Controls.Add(CampoProva("Tipo", tipo), 2, 0); linhaCampos.Controls.Add(CampoProva("Autofinalizar", fin), 3, 0);
         linhaCampos.Controls.Add(CampoProva("Tempo (min)", tempo), 4, 0); linhaCampos.Controls.Add(CampoProva("Voltas (máx)", voltas), 5, 0);
-        var bIns = new BotaoPlano { Text = "Inserir", Height = 34, Width = 72, Dock = DockStyle.Bottom, FlatStyle = FlatStyle.Flat, BackColor = Tokens.Verde, ForeColor = Color.White, Font = new Font("Segoe UI", 11F, FontStyle.Bold), Margin = new Padding(2, 20, 2, 0), AccessibleName = "Inserir prova", AccessibleDescription = "kit:ignorar" };
-        var bDel = new BotaoPlano { Text = "×", Height = 34, Width = 34, Dock = DockStyle.Bottom, FlatStyle = FlatStyle.Flat, BackColor = Tokens.BotaoSecundario, ForeColor = Tokens.Vermelho, Font = new Font("Segoe UI", 11F, FontStyle.Bold), Margin = new Padding(2, 20, 2, 0), AccessibleName = "Excluir prova selecionada", AccessibleDescription = "kit:ignorar" };
+        var bIns = new BotaoPlano { Text = "Inserir", Height = 34, Width = 72, Dock = DockStyle.Bottom, FlatStyle = FlatStyle.Flat, BackColor = Tokens.Claro.CorAcaoPrincipal, ForeColor = Tokens.Primitivo.Branco, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoSubtitulo, FontStyle.Bold), Margin = new Padding(2, 20, 2, 0), AccessibleName = "Inserir prova", AccessibleDescription = "kit:ignorar" };
+        var bDel = new BotaoPlano { Text = "×", Height = 34, Width = 34, Dock = DockStyle.Bottom, FlatStyle = FlatStyle.Flat, BackColor = Tokens.Claro.CorAcaoSecundaria, ForeColor = Tokens.Claro.CorEstadoPerigoTexto, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoSubtitulo, FontStyle.Bold), Margin = new Padding(2, 20, 2, 0), AccessibleName = "Excluir prova selecionada", AccessibleDescription = "kit:ignorar" };
         bIns.FlatAppearance.BorderSize = bDel.FlatAppearance.BorderSize = 0;
         var acoes = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(0), Margin = new Padding(0) };
         acoes.Controls.AddRange([bIns, bDel]); linhaCampos.Controls.Add(acoes, 6, 0);
@@ -696,8 +728,8 @@ public class FormCadastro : Janela
         {
             if (e.RowIndex < 0 || gp.Columns[e.ColumnIndex].Name != "tipo" || e.Value is not string t || t.Length == 0) return;
             VisualPrincipal.Fundo(e);
-            var (fundo, texto) = t switch { "Corrida" => (Color.FromArgb(255, 226, 224), Color.FromArgb(161, 29, 20)), "Classificatório" => (Tokens.AzulSuave, Tokens.AzulTexto), _ => (Tokens.Linha, Tokens.Grafite) };
-            var fonte = new Font("Segoe UI", 8.2F, FontStyle.Bold);
+            var (fundo, texto) = t switch { "Corrida" => (Color.FromArgb(255, 226, 224), Color.FromArgb(161, 29, 20)), "Classificatório" => (Tokens.Claro.CorEstadoInfoFundo, Tokens.Claro.CorEstadoInfoTexto), _ => (Tokens.Claro.CorBordaSutil, Tokens.Primitivo.Cinza700) };
+            var fonte = Tokens.Fonte(Tokens.Claro.FonteTamanhoLegenda, FontStyle.Bold);
             var w = TextRenderer.MeasureText(t, fonte).Width + 12;
             var r = new Rectangle(e.CellBounds.X + 6, e.CellBounds.Y + (e.CellBounds.Height - 20) / 2, Math.Min(w, e.CellBounds.Width - 10), 20);
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
@@ -706,10 +738,10 @@ public class FormCadastro : Janela
             e.Handled = true;
         };
         gp.Carregar(lista);
-        var listaCard = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0), BackColor = Color.White };
+        var listaCard = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0), BackColor = Tokens.Primitivo.Branco };
         listaCard.Controls.Add(gp);
         _extra.Controls.Clear();
-        var provasLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(0), BackColor = Color.White };
+        var provasLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(0), BackColor = Tokens.Primitivo.Branco };
         provasLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 82)); provasLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         provasLayout.Controls.Add(linhaCampos, 0, 0); provasLayout.Controls.Add(listaCard, 0, 1); _extra.Controls.Add(provasLayout);
         bIns.Click += (_, _) => Seguro.Rodar(this, async () =>
@@ -729,13 +761,13 @@ public class FormCadastro : Janela
     static Panel CampoProva(string rotulo, Control campo)
     {
         var p = new Panel { Dock = DockStyle.Fill, Padding = new Padding(3, 0, 5, 0), Margin = new Padding(0) };
-        var label = new Label { Text = rotulo, Dock = DockStyle.Top, Height = 18, ForeColor = Tokens.TextoSecundario, Font = new Font("Segoe UI", 8F, FontStyle.Bold) };
+        var label = new Label { Text = rotulo, Dock = DockStyle.Top, Height = 18, ForeColor = Tokens.Claro.CorTextoSecundario, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoLegenda, FontStyle.Bold) };
         // centrado na vertical: caixa de uma linha, lista e número têm altura fixa (com Dock=Fill ficavam grudados no topo)
         campo.Dock = DockStyle.None;
-        if (campo is TextBox t) { t.BorderStyle = BorderStyle.None; t.BackColor = Color.White; }
-        if (campo is ComboBox c) { c.FlatStyle = FlatStyle.Flat; c.BackColor = Color.White; }
-        if (campo is NumericUpDown nu) { nu.BorderStyle = BorderStyle.None; nu.BackColor = Color.White; }
-        var input = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0, 2, 0, 0), BackColor = Color.White, Padding = new Padding(8, 2, 6, 2) };
+        if (campo is TextBox t) { t.BorderStyle = BorderStyle.None; t.BackColor = Tokens.Primitivo.Branco; }
+        if (campo is ComboBox c) { c.FlatStyle = FlatStyle.Flat; c.BackColor = Tokens.Primitivo.Branco; }
+        if (campo is NumericUpDown nu) { nu.BorderStyle = BorderStyle.None; nu.BackColor = Tokens.Primitivo.Branco; }
+        var input = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0, 2, 0, 0), BackColor = Tokens.Primitivo.Branco, Padding = new Padding(8, 2, 6, 2) };
         input.Controls.Add(campo);
         void Centralizar() => campo.SetBounds(input.Padding.Left, Math.Max(1, (input.Height - campo.Height) / 2), Math.Max(10, input.Width - input.Padding.Horizontal), campo.Height);
         input.Resize += (_, _) => Centralizar(); campo.SizeChanged += (_, _) => { if (campo.Top != Math.Max(1, (input.Height - campo.Height) / 2)) Centralizar(); };
@@ -744,29 +776,13 @@ public class FormCadastro : Janela
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             using var path = new GraphicsPath(); var r = 7; var w = input.Width - 1; var h = input.Height - 1;
             path.AddArc(0, 0, r, r, 180, 90); path.AddArc(w - r, 0, r, r, 270, 90); path.AddArc(w - r, h - r, r, r, 0, 90); path.AddArc(0, h - r, r, r, 90, 90); path.CloseFigure();
-            using var pen = new Pen(Tokens.BordaCampo); e.Graphics.DrawPath(pen, path);
+            using var pen = new Pen(Tokens.Claro.CorBordaCampo); e.Graphics.DrawPath(pen, path);
         };
         input.Resize += (_, _) => input.Invalidate(); p.Controls.Add(input); p.Controls.Add(label); return p;
     }
 
-    static void Arredondar(Panel painel, int raio)
-    {
-        void Ajustar()
-        {
-            if (painel.Width < raio * 2 || painel.Height < raio * 2) return;
-            using var path = new GraphicsPath(); var w = painel.Width - 1; var h = painel.Height - 1;
-            path.AddArc(0, 0, raio, raio, 180, 90); path.AddArc(w - raio, 0, raio, raio, 270, 90); path.AddArc(w - raio, h - raio, raio, raio, 0, 90); path.AddArc(0, h - raio, raio, raio, 90, 90); path.CloseFigure();
-            painel.Region = new Region(path);
-        }
-        painel.Resize += (_, _) => Ajustar(); painel.Paint += (_, e) =>
-        {
-            if (painel.Width < raio * 2 || painel.Height < raio * 2) return;
-            using var path = new GraphicsPath(); var w = painel.Width - 1; var h = painel.Height - 1;
-            path.AddArc(0, 0, raio, raio, 180, 90); path.AddArc(w - raio, 0, raio, raio, 270, 90); path.AddArc(w - raio, h - raio, raio, raio, 0, 90); path.AddArc(0, h - raio, raio, raio, 90, 90); path.CloseFigure();
-            using var pen = new Pen(Tokens.Linha); e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; e.Graphics.DrawPath(pen, path);
-        };
-        Ajustar();
-    }
+    /// <summary>Contorno arredondado do design (peça única em <see cref="Forma.ArredondarComContorno"/>).</summary>
+    static void Arredondar(Panel painel, int raio) => Forma.ArredondarComContorno(painel, raio);
 }
 
 /// <summary>Regras comuns dos vouchers (fidelidade, parceiro e avulso): lê os campos e grava.</summary>
@@ -864,7 +880,7 @@ public class FormVoucher : CartaoModal
         lado.Paint += (_, e) =>
         {
             var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
-            using (var b = new LinearGradientBrush(lado.ClientRectangle, Tokens.Preto, Color.FromArgb(11, 11, 12), 90f)) g.FillRectangle(b, lado.ClientRectangle);
+            using (var b = new LinearGradientBrush(lado.ClientRectangle, Tokens.Claro.CorSuperficieInversa, Color.FromArgb(11, 11, 12), 90f)) g.FillRectangle(b, lado.ClientRectangle);
             using var brilho = new GraphicsPath(); brilho.AddEllipse(-30, -10, 360, 300);
             using var pb = new PathGradientBrush(brilho) { CenterColor = Color.FromArgb(90, 255, 216, 74), SurroundColors = [Color.FromArgb(0, 255, 216, 74)] };
             g.FillPath(pb, brilho);
@@ -872,14 +888,14 @@ public class FormVoucher : CartaoModal
         _cartao = new Panel { Size = new Size(300, 195), Location = new Point(0, 187), BackColor = Color.Transparent };
         _cartao.Paint += (_, e) => DesenharCartao(e.Graphics);
         lado.Paint += (_, e) => { }; // o cartão desenha por cima do degradê (fundo transparente)
-        var prev = new Label { Text = "Prévia do voucher. O cliente usa o código no caixa (Receita avulsa → Aplicar voucher).", Location = new Point(28, 386), Size = new Size(244, 60), ForeColor = Color.FromArgb(174, 174, 178), Font = new Font("Segoe UI", 9.8F), TextAlign = ContentAlignment.TopCenter, BackColor = Color.Transparent };
+        var prev = new Label { Text = "Prévia do voucher. O cliente usa o código no caixa (Receita avulsa → Aplicar voucher).", Location = new Point(28, 386), Size = new Size(244, 60), ForeColor = Color.FromArgb(174, 174, 178), Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo), TextAlign = ContentAlignment.TopCenter, BackColor = Color.Transparent };
         lado.Controls.Add(_cartao); lado.Controls.Add(prev);
 
         // ---------- cabeçalho (padding 16 20, título 17 px, ✕ 30 px)
-        var cab = new Panel { Dock = DockStyle.Top, Height = 63, BackColor = Color.White };
-        cab.Paint += (_, e) => { using var p = new Pen(Tokens.Linha); e.Graphics.DrawLine(p, 0, cab.Height - 1, cab.Width, cab.Height - 1); };
-        cab.Controls.Add(new Label { Text = Text, AutoSize = true, Font = new Font("Segoe UI", 12.8F, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, Location = new Point(20, 18), BackColor = Color.Transparent });
-        var x = Botao("✕", CinzaBotao, PecasDesign.CorTexto); x.Font = new Font("Segoe UI", 9.5F); x.Size = new Size(30, 30); x.Location = new Point(520 - 20 - 30, 16);
+        var cab = new Panel { Dock = DockStyle.Top, Height = 63, BackColor = Tokens.Primitivo.Branco };
+        cab.Paint += (_, e) => { using var p = new Pen(Tokens.Claro.CorBordaSutil); e.Graphics.DrawLine(p, 0, cab.Height - 1, cab.Width, cab.Height - 1); };
+        cab.Controls.Add(new Label { Text = Text, AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoTitulo, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, Location = new Point(20, 18), BackColor = Color.Transparent });
+        var x = Botao("✕", CinzaBotao, PecasDesign.CorTexto); x.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo); x.Size = new Size(30, 30); x.Location = new Point(520 - 20 - 30, 16);
         x.Resize += (_, _) => Forma.AplicarRaio(x, 8); Forma.AplicarRaio(x, 8); x.Click += (_, _) => Close();
         cab.Controls.Add(x);
 
@@ -896,10 +912,10 @@ public class FormVoucher : CartaoModal
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 using var p = Forma.Redondo(new Rectangle(0, 0, caixa.Width - 1, caixa.Height - 1), 9);
                 e.Graphics.FillPath(Brushes.White, p);
-                using var pen = new Pen(ctl.ContainsFocus ? DialogoDesign.VerdePrincipal : Tokens.BordaCampo); e.Graphics.DrawPath(pen, p);
+                using var pen = new Pen(ctl.ContainsFocus ? DialogoDesign.VerdePrincipal : Tokens.Claro.CorBordaCampo); e.Graphics.DrawPath(pen, p);
             };
             ctl.GotFocus += (_, _) => caixa.Invalidate(); ctl.LostFocus += (_, _) => caixa.Invalidate();
-            if (ctl is TextBox tb) tb.BackColor = Color.White;
+            if (ctl is TextBox tb) tb.BackColor = Tokens.Primitivo.Branco;
             caixa.Controls.Add(ctl);
             if (acao != null) { acao.Height = 26; caixa.Controls.Add(acao); }
             void Ajustar()
@@ -926,7 +942,7 @@ public class FormVoucher : CartaoModal
         var uso = PecasDesign.Numero(1, 4);
         var min = PecasDesign.Texto("", 14); min.PlaceholderText = "Sem mínimo";
         var max = PecasDesign.Texto("", 14); max.PlaceholderText = "Sem limite";
-        var unico = new CheckBox { Text = "Uso único (vale uma vez só)", Checked = true, AutoSize = true, Font = new Font("Segoe UI", 10.1F), BackColor = DialogoDesign.Fundo, Padding = new Padding(4, 0, 0, 0), Cursor = Cursors.Hand, Margin = new Padding(0, 0, 0, 0) };
+        var unico = new CheckBox { Text = "Uso único (vale uma vez só)", Checked = true, AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoSubtitulo), BackColor = DialogoDesign.Fundo, Padding = new Padding(4, 0, 0, 0), Cursor = Cursors.Hand, Margin = new Padding(0, 0, 0, 0) };
         Forma.CheckVerde(unico);
 
         CheckBox ativo = null;
@@ -981,11 +997,11 @@ public class FormVoucher : CartaoModal
         Previa();
 
         // ---------- rodapé (padding 14 20, botões 38 px)
-        var rod = new Panel { Dock = DockStyle.Bottom, Height = 67, BackColor = Color.White };
-        rod.Paint += (_, e) => { using var p = new Pen(Tokens.Linha); e.Graphics.DrawLine(p, 0, 0, rod.Width, 0); };
-        var salvar = Botao("Salvar e fechar", DialogoDesign.VerdePrincipal, Color.White, true); salvar.Font = new Font("Segoe UI", 10.1F, FontStyle.Bold);
+        var rod = new Panel { Dock = DockStyle.Bottom, Height = 67, BackColor = Tokens.Primitivo.Branco };
+        rod.Paint += (_, e) => { using var p = new Pen(Tokens.Claro.CorBordaSutil); e.Graphics.DrawLine(p, 0, 0, rod.Width, 0); };
+        var salvar = Botao("Salvar e fechar", DialogoDesign.VerdePrincipal, Tokens.Primitivo.Branco, true); salvar.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoSubtitulo, FontStyle.Bold);
         salvar.Size = new Size(TextRenderer.MeasureText(salvar.Text, salvar.Font).Width + 36, 38); salvar.Location = new Point(520 - 20 - salvar.Width, 14);
-        var cancelar = Botao("Cancelar", CinzaBotao, PecasDesign.CorTexto); cancelar.Font = new Font("Segoe UI", 10.1F);
+        var cancelar = Botao("Cancelar", CinzaBotao, PecasDesign.CorTexto); cancelar.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoSubtitulo);
         cancelar.Size = new Size(TextRenderer.MeasureText("Cancelar", cancelar.Font).Width + 32, 38); cancelar.Location = new Point(salvar.Left - 10 - cancelar.Width, 14);
         foreach (var b in new[] { salvar, cancelar }) { b.Resize += (_, _) => Forma.AplicarRaio(b, 10); Forma.AplicarRaio(b, 10); }
         cancelar.Click += (_, _) => Close();
@@ -1034,10 +1050,10 @@ public class FormVoucher : CartaoModal
         }
         var cor = Color.FromArgb(58, 39, 0);
         using var br = new SolidBrush(cor);
-        using var f12 = new Font("Segoe UI", 9F, FontStyle.Bold);
+        using var f12 = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold);
         g.DrawString("VOUCHER", f12, br, r.X + 18, r.Y + 14);
         var sz = g.MeasureString(_selo, f12); g.DrawString(_selo, f12, br, r.Right - 18 - sz.Width, r.Y + 14);
-        using var f34 = new Font("Segoe UI", 25F, FontStyle.Bold);
+        using var f34 = Tokens.Fonte(Tokens.Claro.FonteTamanhoDisplayP, FontStyle.Bold);
         g.DrawString(_valorCartao, f34, br, r.X + 14, r.Y + 44);
         using var fm = new Font("Consolas", 10.5F, FontStyle.Bold);
         g.DrawString(_codigoCartao.Length == 0 ? "—" : _codigoCartao, fm, br, r.X + 18, r.Bottom - 34);

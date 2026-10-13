@@ -258,13 +258,13 @@ function cleanUrlScript() {
     '<script>(function(){var n=location.pathname.split("/").pop();' +
     'n=n.endsWith(".html")?n.slice(0,-5):n;n=n.endsWith(".dc")?n.slice(0,-3):n;' +
     `var m=${map};` +
-    'if(m[n]&&location.pathname!==m[n])history.replaceState(null,"",m[n]+location.hash)})();</script>\n'
+    'if(m[n]&&location.pathname!==m[n])history.replaceState(null,"",m[n]+location.search+location.hash)})();</script>\n'
   );
 }
 
 function rewriteLinks(html) {
-  return html.replace(/(["'])([a-z0-9-]+)\.dc\.html\1/g, (match, quote, page) =>
-    routes[page] ? `${quote}${routes[page]}${quote}` : match,
+  return html.replace(/(["'])([a-z0-9-]+)\.dc\.html((?:[?#][^"']*)?)\1/g, (match, quote, page, suffix) =>
+    routes[page] ? `${quote}${routes[page]}${suffix}${quote}` : match,
   );
 }
 

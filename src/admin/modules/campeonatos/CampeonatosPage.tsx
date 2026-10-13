@@ -164,10 +164,10 @@ const emptyPilotoForm: PilotoFormState = {
 };
 
 const inputClassName =
-  'w-full rounded-lg border border-zinc-700 bg-zinc-950 min-h-[44px] px-3 py-2 sm:min-h-0 sm:py-2.5 text-sm text-white placeholder:text-zinc-600 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20';
+  'w-full rounded-lg border border-kib-borda-forte bg-kib-fundo min-h-[44px] px-3 py-2 sm:min-h-0 sm:py-2.5 text-sm text-kib-texto placeholder:text-kib-texto-3 focus:border-kib-acao focus:outline-none focus:ring-2 focus:ring-kib-acao/20';
 
 const checkboxClass =
-  'h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-brand-500 focus:ring-brand-500/30';
+  'h-4 w-4 rounded border-kib-borda-forte bg-kib-fundo text-kib-acao focus:ring-kib-acao/30';
 
 const campeonatoStatusLabels: Record<CampeonatoStatus, string> = {
   ativo: 'Ativo',
@@ -176,9 +176,9 @@ const campeonatoStatusLabels: Record<CampeonatoStatus, string> = {
 };
 
 const campeonatoStatusClasses: Record<CampeonatoStatus, string> = {
-  ativo: 'border-brand-800 bg-brand-950 text-brand-100',
-  encerrado: 'border-zinc-700 bg-zinc-800 text-zinc-200',
-  rascunho: 'border-amber-800 bg-amber-950 text-amber-200',
+  ativo: 'border-kib-acao bg-kib-sucesso-fundo text-kib-acao',
+  encerrado: 'border-kib-borda-forte bg-kib-campo text-kib-texto',
+  rascunho: 'border-kib-aviso/40 bg-kib-aviso-fundo text-kib-aviso',
 };
 
 const etapaStatusLabels: Record<EtapaStatus, string> = {
@@ -188,9 +188,9 @@ const etapaStatusLabels: Record<EtapaStatus, string> = {
 };
 
 const etapaStatusClasses: Record<EtapaStatus, string> = {
-  agendada: 'border-sky-900 bg-sky-950 text-sky-200',
-  realizada: 'border-brand-800 bg-brand-950 text-brand-100',
-  cancelada: 'border-red-900 bg-red-950 text-red-200',
+  agendada: 'border-kib-info/40 bg-kib-info-fundo text-kib-info',
+  realizada: 'border-kib-acao bg-kib-sucesso-fundo text-kib-acao',
+  cancelada: 'border-kib-perigo/40 bg-kib-perigo-fundo text-kib-perigo',
 };
 
 const tabLabels: Record<Tab, string> = {
@@ -480,11 +480,11 @@ const [activeTab, setActiveTab] = useState<Tab>('inscricoes');
         label: 'Formato',
         render: (formato) => (
           <div>
-            <strong className="block text-sm text-zinc-100">
+            <strong className="block text-sm text-kib-texto">
               {formato.nome}
-              {formato.is_default ? <span className="ml-2 rounded-full border border-brand-800 bg-brand-950 px-2 py-0.5 text-[11px] font-bold text-brand-200">DEFAULT</span> : null}
+              {formato.is_default ? <span className="ml-2 rounded-full border border-kib-acao bg-kib-sucesso-fundo px-2 py-0.5 text-[11px] font-bold text-kib-acao">DEFAULT</span> : null}
             </strong>
-            <span className="text-xs text-zinc-500">{formato.descricao ?? '—'}</span>
+            <span className="text-xs text-kib-texto-3">{formato.descricao ?? '—'}</span>
           </div>
         ),
       },
@@ -964,7 +964,7 @@ const [activeTab, setActiveTab] = useState<Tab>('inscricoes');
 
       <div
         aria-label="Seções de campeonatos"
-        className="mt-8 flex gap-2 overflow-x-auto border-b border-zinc-800"
+        className="mt-8 flex gap-2 overflow-x-auto border-b border-kib-borda"
         role="tablist"
       >
         {(Object.keys(tabLabels) as Tab[]).map((tab) => (
@@ -972,8 +972,8 @@ const [activeTab, setActiveTab] = useState<Tab>('inscricoes');
             aria-selected={activeTab === tab}
             className={`whitespace-nowrap border-b-2 px-4 py-3 text-sm font-bold transition-colors ${
               activeTab === tab
-                ? 'border-brand-400 text-brand-200'
-                : 'border-transparent text-zinc-400 hover:text-white'
+                ? 'border-kib-acao text-kib-acao'
+                : 'border-transparent text-kib-texto-2 hover:text-kib-texto'
             }`}
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -990,7 +990,7 @@ const [activeTab, setActiveTab] = useState<Tab>('inscricoes');
 
 {activeTab === 'formatos' ? (
           <div className="space-y-4">
-            <p className="text-sm text-zinc-400">
+            <p className="text-sm text-kib-texto-2">
               Templates de regulamento reutilizáveis. O formato define tomada de tempo, paradas obrigatórias e
               critério de classificação — aplicado por campeonato, com override por etapa ou corrida.
             </p>
@@ -1315,8 +1315,8 @@ const [activeTab, setActiveTab] = useState<Tab>('inscricoes');
         ) : null}
 
         {formKind === 'campeonatos' ? (
-          <div className="mt-5 space-y-4 rounded-lg border border-zinc-800 bg-zinc-950/60 p-4">
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-brand-300">Regulamento esportivo</p>
+          <div className="mt-5 space-y-4 rounded-lg border border-kib-borda bg-kib-fundo p-4">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-kib-acao">Regulamento esportivo</p>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <FormField htmlFor="camp-pontos-1" label="1º lugar">
                 <input className={inputClassName} id="camp-pontos-1" inputMode="decimal" onChange={(e) => setCampeonatoForm((c) => ({ ...c, pontos: { ...c.pontos, pos1: e.target.value } }))} value={campeonatoForm.pontos.pos1} />
@@ -1368,14 +1368,14 @@ const [activeTab, setActiveTab] = useState<Tab>('inscricoes');
               </FormField>
             </div>
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Ordem de desempate</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-kib-texto-3">Ordem de desempate</p>
               <ol className="mt-2 space-y-1">
                 {campeonatoForm.desempates.map((criterio, index) => (
-                  <li className="flex items-center justify-between gap-2 rounded-md border border-zinc-800 px-3 py-1.5 text-sm text-zinc-200" key={criterio}>
+                  <li className="flex items-center justify-between gap-2 rounded-md border border-kib-borda px-3 py-1.5 text-sm text-kib-texto" key={criterio}>
                     <span>{index + 1}. {DESEMPATE_LABELS[criterio]}</span>
                     <span className="flex gap-1">
-                      <button aria-label={`Subir ${DESEMPATE_LABELS[criterio]}`} className="rounded px-2 py-0.5 text-zinc-400 hover:bg-zinc-800 hover:text-white disabled:opacity-30" disabled={index === 0} onClick={() => moverDesempate(index, -1)} type="button">↑</button>
-                      <button aria-label={`Descer ${DESEMPATE_LABELS[criterio]}`} className="rounded px-2 py-0.5 text-zinc-400 hover:bg-zinc-800 hover:text-white disabled:opacity-30" disabled={index === campeonatoForm.desempates.length - 1} onClick={() => moverDesempate(index, 1)} type="button">↓</button>
+                      <button aria-label={`Subir ${DESEMPATE_LABELS[criterio]}`} className="rounded px-2 py-0.5 text-kib-texto-2 hover:bg-kib-campo hover:text-kib-texto disabled:opacity-30" disabled={index === 0} onClick={() => moverDesempate(index, -1)} type="button">↑</button>
+                      <button aria-label={`Descer ${DESEMPATE_LABELS[criterio]}`} className="rounded px-2 py-0.5 text-kib-texto-2 hover:bg-kib-campo hover:text-kib-texto disabled:opacity-30" disabled={index === campeonatoForm.desempates.length - 1} onClick={() => moverDesempate(index, 1)} type="button">↓</button>
                     </span>
                   </li>
                 ))}
@@ -1571,8 +1571,8 @@ const [activeTab, setActiveTab] = useState<Tab>('inscricoes');
             <input className={inputClassName} id="formato-corrida-duracao" inputMode="numeric" onChange={(e) => setFormatoForm((c) => ({ ...c, corrida_duracao_min: e.target.value }))} value={formatoForm.corrida_duracao_min} />
           </FormField>
 
-          <div className="rounded-lg border border-zinc-800 p-3 md:col-span-2">
-            <label className="flex items-center gap-2 text-sm font-bold text-zinc-200">
+          <div className="rounded-lg border border-kib-borda p-3 md:col-span-2">
+            <label className="flex items-center gap-2 text-sm font-bold text-kib-texto">
               <input checked={formatoForm.tt_habilitada} className={checkboxClass} onChange={(e) => setFormatoForm((c) => ({ ...c, tt_habilitada: e.target.checked }))} type="checkbox" />
               Tem fase de tomada de tempo
             </label>
@@ -1581,11 +1581,11 @@ const [activeTab, setActiveTab] = useState<Tab>('inscricoes');
                 <FormField htmlFor="formato-tt-duracao" label="Duração (min)">
                   <input className={inputClassName} id="formato-tt-duracao" inputMode="numeric" onChange={(e) => setFormatoForm((c) => ({ ...c, tt_duracao_min: e.target.value }))} value={formatoForm.tt_duracao_min} />
                 </FormField>
-                <label className="flex items-center gap-2 self-end pb-2 text-sm text-zinc-300">
+                <label className="flex items-center gap-2 self-end pb-2 text-sm text-kib-texto-2">
                   <input checked={formatoForm.tt_define_grid} className={checkboxClass} onChange={(e) => setFormatoForm((c) => ({ ...c, tt_define_grid: e.target.checked }))} type="checkbox" />
                   Define o grid da corrida
                 </label>
-                <label className="flex items-center gap-2 self-end pb-2 text-sm text-zinc-300">
+                <label className="flex items-center gap-2 self-end pb-2 text-sm text-kib-texto-2">
                   <input checked={formatoForm.tt_pontua} className={checkboxClass} onChange={(e) => setFormatoForm((c) => ({ ...c, tt_pontua: e.target.checked }))} type="checkbox" />
                   Pontua separadamente
                 </label>
@@ -1593,8 +1593,8 @@ const [activeTab, setActiveTab] = useState<Tab>('inscricoes');
             ) : null}
           </div>
 
-          <div className="rounded-lg border border-zinc-800 p-3 md:col-span-2">
-            <label className="flex items-center gap-2 text-sm font-bold text-zinc-200">
+          <div className="rounded-lg border border-kib-borda p-3 md:col-span-2">
+            <label className="flex items-center gap-2 text-sm font-bold text-kib-texto">
               <input checked={formatoForm.paradas_habilitadas} className={checkboxClass} onChange={(e) => setFormatoForm((c) => ({ ...c, paradas_habilitadas: e.target.checked }))} type="checkbox" />
               Paradas obrigatórias (endurance)
             </label>
@@ -1617,15 +1617,15 @@ const [activeTab, setActiveTab] = useState<Tab>('inscricoes');
                 </FormField>
               </div>
             ) : (
-              <p className="mt-2 text-xs text-zinc-500">Corrida sem pit stop obrigatório — painéis não exibem colunas de box.</p>
+              <p className="mt-2 text-xs text-kib-texto-3">Corrida sem pit stop obrigatório — painéis não exibem colunas de box.</p>
             )}
           </div>
 
-          <label className="flex items-center gap-2 text-sm font-bold text-zinc-200 md:col-span-2">
+          <label className="flex items-center gap-2 text-sm font-bold text-kib-texto md:col-span-2">
             <input checked={formatoForm.is_default} className={checkboxClass} onChange={(e) => setFormatoForm((c) => ({ ...c, is_default: e.target.checked }))} type="checkbox" />
             Definir como formato padrão do kartódromo
           </label>
-          <p className="text-xs text-zinc-500 md:col-span-2">
+          <p className="text-xs text-kib-texto-3 md:col-span-2">
             Punições são sempre aplicadas em tempo real pela cronometragem (LapTime); este sistema apenas as exibe.
           </p>
         </form>

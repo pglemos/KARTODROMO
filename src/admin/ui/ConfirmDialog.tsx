@@ -33,6 +33,6 @@ export const ConfirmDialog = ({
     onClose={loading ? () => undefined : onClose}
     title={title}
   >
-    <p className="text-sm leading-6 text-zinc-200">{message}</p>
+    <p className="text-sm leading-6 text-kib-texto">{message}</p>
   </Modal>
 );

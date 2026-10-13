@@ -103,7 +103,13 @@ public static class AutoTeste
                 };
                 timer.Start();
                 var t0 = DateTime.Now;
-                try { acao(); } catch (Exception e) { eventos.Add("EXCECAO: " + e.GetType().Name + ": " + e.Message); }
+                try { acao(); }
+                catch (Exception e)
+                {
+                    var causa = e is System.Reflection.TargetInvocationException { InnerException: not null } tie ? tie.InnerException : e;
+                    var detalhe = causa.ToString().Replace(Environment.NewLine, " ⇢ ");
+                    eventos.Add("EXCECAO: " + detalhe);
+                }
                 // espera: janela aberta e fechada, ou 4 s sem nada
                 while ((DateTime.Now - t0).TotalSeconds < 4 || ocupado || Application.OpenForms.Cast<Form>().Any(f => !abertas.Contains(f) && f.Visible && f is not Escurecer))
                 {
@@ -138,7 +144,13 @@ public static class AutoTeste
                 principal.Selecionar(visao); await Esperar(1200);
                 if (campoAcao?.GetValue(principal) is Control topoBtn && topoBtn.Visible)
                 {
-                    await Clicar($"Lista {visao} › botão \"{topoBtn.Text}\"", () => topoBtn.GetType().GetMethod("OnClick", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.Invoke(topoBtn, [EventArgs.Empty]));
+                    await Clicar($"Lista {visao} › botão \"{topoBtn.Text}\"", () =>
+                    {
+                        if (topoBtn is Button botao)
+                            botao.PerformClick();
+                        else
+                            topoBtn.GetType().GetMethod("OnClick", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.Invoke(topoBtn, [EventArgs.Empty]);
+                    });
                     principal.Selecionar(visao); await Esperar(900);
                 }
                 var grade = Descendentes(principal).OfType<DataGridView>().FirstOrDefault(g => g.Visible);
@@ -715,9 +727,14 @@ public static class AutoTeste
                 try
                 {
                     var p = filho.PointToScreen(Point.Empty);
+                    // só a parte que aparece: rótulo rolado para fora de um painel com rolagem não pode sair por cima do rodapé
+                    var visivel = new Rectangle(p, filho.Size);
+                    for (var pai = filho.Parent; pai != null && pai != c; pai = pai.Parent) visivel.Intersect(pai.RectangleToScreen(pai.ClientRectangle));
+                    if (visivel.Width <= 0 || visivel.Height <= 0) continue;
                     using var parte = new Bitmap(filho.Width, filho.Height);
                     filho.DrawToBitmap(parte, new Rectangle(0, 0, filho.Width, filho.Height));
-                    if (filho.Region != null) { g.SetClip(filho.Region, System.Drawing.Drawing2D.CombineMode.Replace); g.TranslateClip(p.X - origem.X, p.Y - origem.Y); }
+                    g.SetClip(new Rectangle(visivel.X - origem.X, visivel.Y - origem.Y, visivel.Width, visivel.Height));
+                    if (filho.Region != null) { using var r = filho.Region.Clone(); r.Translate(p.X - origem.X, p.Y - origem.Y); g.SetClip(r, System.Drawing.Drawing2D.CombineMode.Intersect); }
                     g.DrawImage(parte, p.X - origem.X, p.Y - origem.Y);
                     g.ResetClip();
                 }

@@ -197,12 +197,12 @@ export const EqualizacaoListPage = () => {
         subtitle="Dados reais da frota LapTime, com captura automática durante a tomada de tempo."
       />
 
-      <div className="flex flex-col gap-3 rounded-xl border border-brand-900/50 bg-brand-950/20 p-4 text-sm text-brand-100 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-xl border border-kib-acao/50 bg-kib-sucesso-fundo p-4 text-sm text-kib-acao sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
-          <Gauge aria-hidden="true" className="mt-0.5 flex-none text-brand-300" size={18} />
+          <Gauge aria-hidden="true" className="mt-0.5 flex-none text-kib-acao" size={18} />
           <div>
             <strong className="block">Somente equalização</strong>
-            <span className="mt-1 block text-xs leading-5 text-brand-100/70">
+            <span className="mt-1 block text-xs leading-5 text-kib-acao">
               O número da placa define a categoria. Chassi e redutores são os únicos dados físicos editáveis; sensor e tempo vêm da cronometragem.
             </span>
           </div>
@@ -214,22 +214,22 @@ export const EqualizacaoListPage = () => {
       </div>
 
       {fleetFreshness === 'snapshot' ? (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-900/60 bg-amber-950/20 p-4 text-sm text-amber-100" role="status">
-          <AlertTriangle aria-hidden="true" className="mt-0.5 flex-none text-amber-300" size={18} />
+        <div className="flex items-start gap-3 rounded-xl border border-kib-aviso/60 bg-kib-aviso-fundo p-4 text-sm text-kib-aviso" role="status">
+          <AlertTriangle aria-hidden="true" className="mt-0.5 flex-none text-kib-aviso" size={18} />
           <div>
             <strong className="block">Atualização ao vivo indisponível</strong>
-            <span className="mt-1 block text-xs leading-5 text-amber-100/70">
+            <span className="mt-1 block text-xs leading-5 text-kib-aviso">
               Exibindo o último snapshot real salvo no D1. Nenhum kart ou tempo foi criado; a atualização será tentada novamente ao recarregar.
             </span>
           </div>
         </div>
       ) : null}
 
-      <div className="flex items-start gap-3 rounded-xl border border-zinc-800 bg-zinc-950/30 p-4 text-sm text-zinc-200" role="status">
-        <Database aria-hidden="true" className="mt-0.5 flex-none text-brand-300" size={18} />
+      <div className="flex items-start gap-3 rounded-xl border border-kib-borda bg-kib-fundo p-4 text-sm text-kib-texto" role="status">
+        <Database aria-hidden="true" className="mt-0.5 flex-none text-kib-acao" size={18} />
         <div>
           <strong className="block">Indicadores históricos reais</strong>
-          <span className="mt-1 block text-xs leading-5 text-zinc-500">
+          <span className="mt-1 block text-xs leading-5 text-kib-texto-3">
             {historyLoading
               ? 'Consultando médias e melhores voltas no LapTime...'
               : historyError
@@ -253,15 +253,15 @@ export const EqualizacaoListPage = () => {
             <Card className="p-4 md:p-5" key={category}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[.12em] text-zinc-500">Referência da categoria</p>
-                  <h2 className="mt-1 text-base font-semibold text-zinc-50">{KART_CATEGORY_LABELS[category]}</h2>
+                  <p className="text-[11px] font-bold uppercase tracking-[.12em] text-kib-texto-3">Referência da categoria</p>
+                  <h2 className="mt-1 text-base font-semibold text-kib-texto">{KART_CATEGORY_LABELS[category]}</h2>
                 </div>
                 <Badge variant={categoryVariant[category]}>{summary.total} karts</Badge>
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <div><span className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500">Alvo</span><strong className="mt-1 block text-lg text-zinc-100">{formatTime(KART_CATEGORY_TARGETS_MS[category])}</strong></div>
-                <div><span className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500">Média da frota</span><strong className="mt-1 block text-lg text-zinc-100">{formatTime(summary.averageMs)}</strong></div>
-                <div><span className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500">Medições</span><strong className="mt-1 block text-lg text-zinc-100">{summary.measured}/{summary.total}</strong></div>
+                <div><span className="block text-[11px] font-bold uppercase tracking-wider text-kib-texto-3">Alvo</span><strong className="mt-1 block text-lg text-kib-texto">{formatTime(KART_CATEGORY_TARGETS_MS[category])}</strong></div>
+                <div><span className="block text-[11px] font-bold uppercase tracking-wider text-kib-texto-3">Média da frota</span><strong className="mt-1 block text-lg text-kib-texto">{formatTime(summary.averageMs)}</strong></div>
+                <div><span className="block text-[11px] font-bold uppercase tracking-wider text-kib-texto-3">Medições</span><strong className="mt-1 block text-lg text-kib-texto">{summary.measured}/{summary.total}</strong></div>
               </div>
             </Card>
           );
@@ -269,29 +269,29 @@ export const EqualizacaoListPage = () => {
       </section>
 
       <Card className="overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-zinc-800 p-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-3 border-b border-kib-borda p-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className="text-base font-semibold text-zinc-50">Frota para equalização</h2>
-            <p className="mt-1 text-xs text-zinc-500">{filteredKarts.length} registro(s) filtrado(s) · clique no kart para abrir o painel completo.</p>
+            <h2 className="text-base font-semibold text-kib-texto">Frota para equalização</h2>
+            <p className="mt-1 text-xs text-kib-texto-3">{filteredKarts.length} registro(s) filtrado(s) · clique no kart para abrir o painel completo.</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <label className="relative block">
               <span className="sr-only">Buscar kart</span>
-              <Search aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={15} />
+              <Search aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-kib-texto-3" size={15} />
               <input
                 aria-label="Buscar por kart, chassi ou redutor"
-                className="h-9 w-full rounded-lg border border-zinc-800 bg-zinc-950 pl-9 pr-3 text-sm text-zinc-100 outline-none focus:border-brand-500/60 sm:w-64"
+                className="h-9 w-full rounded-lg border border-kib-borda bg-kib-fundo pl-9 pr-3 text-sm text-kib-texto outline-none focus:border-kib-acao/60 sm:w-64"
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Kart, chassi ou redutor"
                 value={search}
               />
             </label>
-            <select aria-label="Filtrar categoria" className="h-9 rounded-lg border border-zinc-800 bg-zinc-950 px-3 text-sm text-zinc-200" onChange={(event) => setCategoryFilter(event.target.value as CategoryFilter)} value={categoryFilter}>
+            <select aria-label="Filtrar categoria" className="h-9 rounded-lg border border-kib-borda bg-kib-fundo px-3 text-sm text-kib-texto" onChange={(event) => setCategoryFilter(event.target.value as CategoryFilter)} value={categoryFilter}>
               <option value="all">Todas as categorias</option>
               <option value="super">Super Kart</option>
               <option value="indoor">Kart Indoor</option>
             </select>
-            <select aria-label="Filtrar situação" className="h-9 rounded-lg border border-zinc-800 bg-zinc-950 px-3 text-sm text-zinc-200" onChange={(event) => setStateFilter(event.target.value as StateFilter)} value={stateFilter}>
+            <select aria-label="Filtrar situação" className="h-9 rounded-lg border border-kib-borda bg-kib-fundo px-3 text-sm text-kib-texto" onChange={(event) => setStateFilter(event.target.value as StateFilter)} value={stateFilter}>
               <option value="all">Todas as situações</option>
               <option value="equilibrado">Dentro do alvo</option>
               <option value="ajustar">Ajustar kart</option>
@@ -303,51 +303,51 @@ export const EqualizacaoListPage = () => {
         </div>
 
         {error ? (
-          <div className="m-4 flex items-start gap-3 rounded-lg border border-red-900/60 bg-red-950/20 p-4 text-sm text-red-200" role="alert">
+          <div className="m-4 flex items-start gap-3 rounded-lg border border-kib-perigo/60 bg-kib-perigo-fundo p-4 text-sm text-kib-perigo" role="alert">
             <XCircle aria-hidden="true" className="mt-0.5 flex-none" size={18} />
-            <div><strong className="block">Não foi possível atualizar a frota real.</strong><span className="mt-1 block text-xs text-red-200/70">{error}</span></div>
+            <div><strong className="block">Não foi possível atualizar a frota real.</strong><span className="mt-1 block text-xs text-kib-perigo">{error}</span></div>
           </div>
         ) : null}
 
         <div className="overflow-x-auto">
           <table className="min-w-[1780px] w-full text-left">
-            <thead className="border-b border-zinc-800 bg-zinc-950/40">
+            <thead className="border-b border-kib-borda bg-kib-fundo">
               <tr>
                 {['Kart / categoria', 'Chassi', 'Redutor', 'Média histórica', 'Melhor volta', 'Melhor mês', 'Melhor 15 dias', 'Melhor 7 dias', 'Desvio', 'Última equalização', 'Ação', 'Abrir'].map((label) => (
-                  <th className="whitespace-nowrap px-4 py-3 text-[11px] font-bold uppercase tracking-[.1em] text-zinc-500" key={label}>{label}</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-[11px] font-bold uppercase tracking-[.1em] text-kib-texto-3" key={label}>{label}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td className="px-4 py-12 text-center text-sm text-zinc-500" colSpan={12}>Carregando dados reais do LapTime...</td></tr>
+                <tr><td className="px-4 py-12 text-center text-sm text-kib-texto-3" colSpan={12}>Carregando dados reais do LapTime...</td></tr>
               ) : pageKarts.map((kart) => {
                 const physicalAlert = getPhysicalAlert(kart);
                 const state = equalizationState(kart.media_equalizacao_ms, kart.numero);
                 const summary = historyByKart.get(historyKey(kart.numero));
                 return (
-                  <tr className="border-b border-zinc-800/70 last:border-0 hover:bg-zinc-800/20" key={kart.id}>
+                  <tr className="border-b border-kib-borda last:border-0 hover:bg-kib-campo" key={kart.id}>
                     <td className="px-4 py-3">
                       <Link className="block min-w-32" href={`/admin/equalizacao/${encodeURIComponent(kart.id)}`}>
-                        <strong className="block text-sm font-semibold text-zinc-100">Kart {kart.numero}</strong>
+                        <strong className="block text-sm font-semibold text-kib-texto">Kart {kart.numero}</strong>
                         <span className="mt-1 block"><CategoryBadge numero={kart.numero} /></span>
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-sm text-zinc-300">{kart.chassi_numero || <span className="text-zinc-600">Não informado</span>}</td>
-                    <td className="px-4 py-3 text-xs text-zinc-400"><span className="block">Antigo: {kart.redutor_antigo || '—'}</span><span className="mt-1 block">Novo: {kart.redutor_novo || '—'}</span></td>
-                    <td className="px-4 py-3"><strong className="block text-sm tabular-nums text-zinc-100">{historyMetric(summary, summary?.averageLapMs, historyLoading)}</strong><span className="mt-1 block text-[11px] text-zinc-500">{summary ? `${summary.raceCount} corrida(s) · ${summary.matchedBy === 'sensor' ? 'sensor' : 'placa'}` : 'Dados históricos do LapTime'}</span></td>
-                    <td className="px-4 py-3"><strong className="block text-sm tabular-nums text-zinc-100">{historyMetric(summary, summary?.bestLapMs, historyLoading)}</strong><span className="mt-1 block text-[11px] text-zinc-500">Melhor geral</span></td>
-                    <td className="px-4 py-3"><strong className="block text-sm tabular-nums text-zinc-100">{historyMetric(summary, summary?.bestMonthMs, historyLoading)}</strong><span className="mt-1 block text-[11px] text-zinc-500">Mês atual</span></td>
-                    <td className="px-4 py-3"><strong className="block text-sm tabular-nums text-zinc-100">{historyMetric(summary, summary?.best15DaysMs, historyLoading)}</strong><span className="mt-1 block text-[11px] text-zinc-500">Janela móvel</span></td>
-                    <td className="px-4 py-3"><strong className="block text-sm tabular-nums text-zinc-100">{historyMetric(summary, summary?.best7DaysMs, historyLoading)}</strong><span className="mt-1 block text-[11px] text-zinc-500">Janela móvel</span></td>
-                    <td className="px-4 py-3"><strong className="block text-sm tabular-nums text-zinc-100">{historyMetric(summary, summary?.deviationMs, historyLoading)}</strong><span className="mt-1 block text-[11px] text-zinc-500">Variação da média</span></td>
-                    <td className="px-4 py-3"><StateBadge kart={kart} /><span className="mt-1 block text-[11px] text-zinc-500">Alvo {formatTime(targetForKart(kart.numero))}</span><span className="mt-1 block text-[11px] text-zinc-500">{formatDate(kart.ultima_equalizacao)}</span></td>
-                    <td className="px-4 py-3"><span className={state === 'equilibrado' ? 'text-xs text-emerald-300' : 'text-xs text-amber-300'}>{getAlertText(kart)}</span>{physicalAlert ? <span className="mt-1 block text-[11px] text-red-300">{physicalAlert}</span> : null}</td>
-                    <td className="px-4 py-3"><Link aria-label={`Abrir painel do kart ${kart.numero}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-zinc-700 text-zinc-300 transition hover:border-brand-400 hover:text-brand-300" href={`/admin/equalizacao/${encodeURIComponent(kart.id)}`} title="Abrir painel"><ArrowRight aria-hidden="true" size={16} /></Link></td>
+                    <td className="px-4 py-3 text-sm text-kib-texto-2">{kart.chassi_numero || <span className="text-kib-texto-3">Não informado</span>}</td>
+                    <td className="px-4 py-3 text-xs text-kib-texto-2"><span className="block">Antigo: {kart.redutor_antigo || '—'}</span><span className="mt-1 block">Novo: {kart.redutor_novo || '—'}</span></td>
+                    <td className="px-4 py-3"><strong className="block text-sm tabular-nums text-kib-texto">{historyMetric(summary, summary?.averageLapMs, historyLoading)}</strong><span className="mt-1 block text-[11px] text-kib-texto-3">{summary ? `${summary.raceCount} corrida(s) · ${summary.matchedBy === 'sensor' ? 'sensor' : 'placa'}` : 'Dados históricos do LapTime'}</span></td>
+                    <td className="px-4 py-3"><strong className="block text-sm tabular-nums text-kib-texto">{historyMetric(summary, summary?.bestLapMs, historyLoading)}</strong><span className="mt-1 block text-[11px] text-kib-texto-3">Melhor geral</span></td>
+                    <td className="px-4 py-3"><strong className="block text-sm tabular-nums text-kib-texto">{historyMetric(summary, summary?.bestMonthMs, historyLoading)}</strong><span className="mt-1 block text-[11px] text-kib-texto-3">Mês atual</span></td>
+                    <td className="px-4 py-3"><strong className="block text-sm tabular-nums text-kib-texto">{historyMetric(summary, summary?.best15DaysMs, historyLoading)}</strong><span className="mt-1 block text-[11px] text-kib-texto-3">Janela móvel</span></td>
+                    <td className="px-4 py-3"><strong className="block text-sm tabular-nums text-kib-texto">{historyMetric(summary, summary?.best7DaysMs, historyLoading)}</strong><span className="mt-1 block text-[11px] text-kib-texto-3">Janela móvel</span></td>
+                    <td className="px-4 py-3"><strong className="block text-sm tabular-nums text-kib-texto">{historyMetric(summary, summary?.deviationMs, historyLoading)}</strong><span className="mt-1 block text-[11px] text-kib-texto-3">Variação da média</span></td>
+                    <td className="px-4 py-3"><StateBadge kart={kart} /><span className="mt-1 block text-[11px] text-kib-texto-3">Alvo {formatTime(targetForKart(kart.numero))}</span><span className="mt-1 block text-[11px] text-kib-texto-3">{formatDate(kart.ultima_equalizacao)}</span></td>
+                    <td className="px-4 py-3"><span className={state === 'equilibrado' ? 'text-xs text-kib-sucesso' : 'text-xs text-kib-aviso'}>{getAlertText(kart)}</span>{physicalAlert ? <span className="mt-1 block text-[11px] text-kib-perigo">{physicalAlert}</span> : null}</td>
+                    <td className="px-4 py-3"><Link aria-label={`Abrir painel do kart ${kart.numero}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-kib-borda-forte text-kib-texto-2 transition hover:border-kib-acao hover:text-kib-acao" href={`/admin/equalizacao/${encodeURIComponent(kart.id)}`} title="Abrir painel"><ArrowRight aria-hidden="true" size={16} /></Link></td>
                   </tr>
                 );
               })}
-              {!loading && pageKarts.length === 0 ? <tr><td className="px-4 py-12 text-center text-sm text-zinc-500" colSpan={12}>Nenhum kart corresponde aos filtros atuais.</td></tr> : null}
+              {!loading && pageKarts.length === 0 ? <tr><td className="px-4 py-12 text-center text-sm text-kib-texto-3" colSpan={12}>Nenhum kart corresponde aos filtros atuais.</td></tr> : null}
             </tbody>
           </table>
         </div>

@@ -50,7 +50,7 @@ public sealed class FormServicosOnline : DialogoDesign
         Marca(g, _lembrete, 3, false);
         var qr = AcaoCampo("Imprimir QR");
         qr.Click += (_, _) => ImprimirQr();
-        var url = PecasDesign.Texto(UrlCheckin); url.ReadOnly = true; url.BackColor = Color.White;
+        var url = PecasDesign.Texto(UrlCheckin); url.ReadOnly = true; url.BackColor = Tokens.Primitivo.Branco;
         Campo(g, "QR code do pré-cadastro (o cliente se cadastra no celular antes do totem)", url, 6, qr);
         var dica = new ToolTip();
         foreach (var ck in new[] { _agenda, _lembrete }) ck.Enabled = false;
@@ -113,18 +113,27 @@ public sealed class FormServicosOnline : DialogoDesign
     }
 }
 
-/// <summary>Ajuda local para operação e atalhos da recepção.</summary>
-public sealed class FormAjuda : Janela
+/// <summary>Ajuda local para operação e atalhos da recepção, no visual padrão (DialogoDesign): os atalhos numa tabela
+/// Tecla | O que faz (antes era uma lista solta de texto sobre o fundo cinza).</summary>
+public sealed class FormAjuda : DialogoDesign
 {
-    public FormAjuda(string secao) : base(secao, 560, 320)
+    const string Atalhos = "F1  ·  Abrir esta ajuda\nF2  ·  Cadastro rápido de cliente\nF3  ·  Buscar cliente\nF9  ·  Cobrar reserva selecionada\nCtrl+A  ·  Aprovar pré-reserva\nEnter  ·  Abrir ou editar o registro selecionado\nIns  ·  Incluir cliente na bateria\nCtrl+P  ·  Imprimir o relatório da tela atual\nDel  ·  Excluir o registro selecionado\nEsc  ·  Cancelar/fechar o diálogo atual (não encerra a tela principal)";
+    const string IconeAjuda = "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01";
+    const string CorIcone = "linear-gradient(180deg, #5EB6FF, #0A63D6)"; // design-lint-ignore: degradê do ícone (Forma.Tile lê CSS)
+
+    public FormAjuda(string secao) : base(secao, "Kartódromo Internacional de Betim · Módulo Office", IconeAjuda, CorIcone, 760, secao == "Atalhos do teclado" ? 620 : 380)
     {
-        var texto = secao switch
+        if (secao == "Atalhos do teclado")
         {
-            "Atalhos do teclado" => "F1  ·  Abrir esta ajuda\nF2  ·  Cadastro rápido de cliente\nF3  ·  Buscar cliente\nF9  ·  Cobrar reserva selecionada\nCtrl+A  ·  Aprovar pré-reserva\nEnter  ·  Abrir ou editar o registro selecionado\nIns  ·  Incluir cliente na bateria\nCtrl+P  ·  Imprimir o relatório da tela atual\nDel  ·  Excluir o registro selecionado\nEsc  ·  Fechar a janela atual",
-            "Suporte remoto" => "Para suporte, informe ao responsável de TI o nome do computador, o usuário conectado e o horário do problema. Não compartilhe sua senha.",
-            _ => "Use a árvore lateral para alternar entre reservas, baterias, vendas e listas.\nClique com o botão direito numa linha para ver as ações disponíveis.\nO caixa é individual por usuário, terminal e turno. Confira o nome do terminal antes de iniciar uma venda."
-        };
-        Controls.Add(new Label { Text = texto, Dock = DockStyle.Fill, Font = new Font("Segoe UI", 10F), Padding = new Padding(12), ForeColor = KitVisual.Texto });
-        Rodape(("Fechar", (_, _) => Close(), true));
+            var tabela = SecaoTabelaDesign(null);
+            tabela.Colunas(new("Tecla", 1.2f), new("O que faz", 5f));
+            tabela.Linhas(Atalhos.Split('\n').Select(l => l.Split("  ·  ", 2)).Where(p => p.Length == 2).Select(p => new[] { p[0].Trim(), p[1].Trim() }));
+        }
+        else
+        {
+            var texto = secao == "Suporte remoto" ? "Para suporte, informe ao responsável de TI o nome do computador, o usuário conectado e o horário do problema. Não compartilhe sua senha." : "Use a árvore lateral para alternar entre reservas, baterias, vendas e listas.\nClique com o botão direito numa linha para ver as ações disponíveis.\nO caixa é individual por usuário, terminal e turno. Confira o nome do terminal antes de iniciar uma venda.";
+            Secao(null, texto);
+        }
+        BotaoRodape("Fechar", true, Close);
     }
 }

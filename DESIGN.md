@@ -146,6 +146,10 @@ components:
 
 # Design System: Kartódromo Internacional de Betim
 
+> **Fonte canônica:** [`tokens/kib.tokens.json`](tokens/kib.tokens.json) (gera CSS, C#, Kotlin) e a documentação em
+> [`docs/design-system/`](docs/design-system/README.md). Este arquivo descreve o **tema escuro (público)** do site; um
+> teste garante que as cores-chave do cabeçalho acima batem com os tokens. Em caso de conflito, valem os tokens.
+
 ## Overview
 
 **Creative North Star: "Pit Lane Noturno"**

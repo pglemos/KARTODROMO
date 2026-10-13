@@ -161,7 +161,7 @@ public partial class FormCrono
     DialogoDesign NovoDialogo(string titulo, string sub, string svg, string cor, int largura, int altura) => new(titulo, sub, svg, cor, largura, altura);
 
     static TextBox Txt(string v, int max = 200) => PecasDesign.Texto(v ?? "", max);
-    static TextBox Leitura(string v) { var t = PecasDesign.Texto(v ?? ""); t.ReadOnly = true; t.BackColor = Color.White; t.TabStop = false; return t; }
+    static TextBox Leitura(string v) { var t = PecasDesign.Texto(v ?? ""); t.ReadOnly = true; t.BackColor = Tokens.Primitivo.Branco; t.TabStop = false; return t; }
 
     void EditarEventoDesign(bool editar)
     {
@@ -311,7 +311,7 @@ public partial class FormCrono
             if (!avulsa.Checked && c == null) { Msg.Aviso(d, "Escolha o competidor."); return; }
             await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/passings/manual", new JsonObject { ["kart"] = c?.S("kart") ?? "", ["name"] = c?.S("name") ?? "", ["lapMs"] = (long)(s * 1000) });
             var texto = $"Passagem manual · kart {c?.S("kart") ?? "(avulsa)"} · {tempo.Text.Trim()} s" + (motivo.Text.Trim().Length > 0 ? " · " + motivo.Text.Trim() : "");
-            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/observations", new JsonObject { ["text"] = texto, ["author"] = Environment.UserName });
+            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/observations", new JsonObject { ["text"] = texto, ["author"] = Environment.UserName, ["kind"] = "manual" });
             d.DialogResult = DialogResult.OK; d.Close(); await Atualizar();
         }));
         d.BotaoRodape("Cancelar", false, d.Close);
@@ -336,7 +336,7 @@ public partial class FormCrono
         var selKart = (_abas.SelectedIndex == 2 ? (_gRes.ChaveAtual as JsonObject)?.S("kart") : null)
             ?? (_gPilotos.CurrentRow is { IsNewRow: false } r ? r.Cells[0].Value?.ToString() : null)
             ?? (_gRes.ChaveAtual as JsonObject)?.S("kart");
-        using var d = NovoDialogo("Trocar kart do piloto", "O piloto continua com as voltas e o melhor tempo", "M4 8h13l-3-3M20 16H7l3 3", "linear-gradient(180deg, #FFB547, #F07A00)");
+        using var d = NovoDialogo("Trocar kart do piloto", "Escolha se as voltas do kart anterior continuam valendo", "M4 8h13l-3-3M20 16H7l3 3", "linear-gradient(180deg, #FFB547, #F07A00)");
         var comp = new ListaDesign();
         foreach (var c in pilotos) comp.Items.Add(new Campos.Item(0, $"{c.S("kart").PadLeft(2, '0')} · {c.S("name")}", c));
         comp.SelectedIndex = Math.Max(0, pilotos.FindIndex(c => c.S("kart") == selKart));
@@ -352,7 +352,14 @@ public partial class FormCrono
         var g = d.Secao("Troca");
         d.Campo(g, "Piloto", comp, 6);
         d.Campo(g, "Kart atual", atual, 2); d.Campo(g, "Voltas até agora", voltas, 2); d.Campo(g, "Kart novo", novo, 2);
-        d.Nota("As voltas do kart atual vão junto para o kart novo. Se o kart novo já passou na linha sem piloto (aparece como \"Kart 12\"), essas passagens também entram para o piloto e a linha \"Kart 12\" some.");
+        // áudio 06/10: bateria normal guarda as voltas; no Tabajara vale só o kart novo (numeração e tempos recomeçam)
+        var ev = _events.FirstOrDefault(e => e.S("id") == _sess.S("eventId"));
+        var tabajara = $"{ev?.S("name")} {_sess.S("name")}".Contains("tabajara", StringComparison.OrdinalIgnoreCase);
+        var guardar = new RadioButton { Text = "Sim, guardar: o piloto leva as voltas e os tempos para o kart novo (bateria normal)", Checked = !tabajara };
+        var ignorar = new RadioButton { Text = "Não, ignorar: vale só o kart novo, voltas e tempos recomeçam nele (Tabajara)", Checked = tabajara };
+        var gv = d.Secao("Guardar as voltas e os tempos do kart anterior?");
+        d.Opcao(gv, guardar, 6); d.Opcao(gv, ignorar, 6);
+        d.Nota("Se o kart novo já passou na linha sem piloto (aparece como \"Kart 12\"), essas passagens entram para o piloto e a linha \"Kart 12\" some. Ao ignorar, as voltas do kart anterior ficam como excluídas no diário (dá para restaurar).");
         Preencher();
         d.BotaoRodape("Trocar kart", true, () => Seguro.Rodar(d, async () =>
         {
@@ -369,8 +376,9 @@ public partial class FormCrono
                 ["fromKart"] = kartAntigo, ["toKart"] = kartNovo, ["name"] = c.S("name"),
                 ["customerId"] = c["customerId"]?.DeepClone(), ["category"] = c.S("category").Length > 0 ? c.S("category") : null,
                 ["detalhes"] = c["detalhes"]?.DeepClone() ?? new JsonObject(),
+                ["manterVoltas"] = guardar.Checked,
             });
-            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/observations", new JsonObject { ["text"] = $"Troca de kart · {c.S("name")} do kart {kartAntigo} para o {kartNovo}", ["author"] = Environment.UserName });
+            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/observations", new JsonObject { ["text"] = $"Troca de kart · {c.S("name")} do kart {kartAntigo} para o {kartNovo}" + (guardar.Checked ? "" : $" (voltas e tempos do kart {kartAntigo} desconsiderados)"), ["author"] = Environment.UserName, ["kind"] = "kart-swap" });
             d.DialogResult = DialogResult.OK; d.Close();
             await Atualizar();
             var st = Crono.Arr(_sess, "standings").FirstOrDefault(s => s.S("kart") == kartNovo);
@@ -403,13 +411,16 @@ public partial class FormCrono
         var g = d.Secao("Bateria");
         d.Campo(g, "Nome da prova", nome, 3); d.Campo(g, "Tempo (min)", dur, 1); d.Campo(g, "Voltas (máx)", voltas, 2);
         d.Campo(g, "Traçado", tracado, 6);
+        // Tabajara (áudio 06/10): o organizador divulga o resultado; já vem marcado quando o nome tem "Tabajara"
+        var semEmail = new CheckBox { Text = "Não enviar o resultado por e-mail aos pilotos (o organizador divulga, ex.: Tabajara)", Checked = _sess.B("semEmailPilotos"), AutoSize = true };
+        d.Marca(g, semEmail, 6);
         var podeRegras = _sess.S("state") is "preparando" or "em_andamento" or "encerrada";
         if (!podeRegras) { dur.Enabled = false; voltas.Enabled = false; }
         d.Nota("As passagens já registradas continuam na prova. O traçado define a extensão usada na velocidade média, no relatório e no ranking dos karts. Para cronometrar outra bateria, escolha-a no seletor da barra (ao lado das bandeiras).");
         var durAntes = dur.Text; var voltasAntes = voltas.Text;
         d.BotaoRodape("Salvar", true, () => Seguro.Rodar(d, async () =>
         {
-            var corpo = new JsonObject { ["name"] = nome.Text.Trim(), ["trackId"] = (tracado.SelectedItem as Campos.Item)?.Dados?.S("id") };
+            var corpo = new JsonObject { ["name"] = nome.Text.Trim(), ["trackId"] = (tracado.SelectedItem as Campos.Item)?.Dados?.S("id"), ["semEmailPilotos"] = semEmail.Checked };
             // tempo e voltas só vão se mudaram (durante a quadriculada o serviço não aceita mudar)
             if (podeRegras && (dur.Text != durAntes || voltas.Text != voltasAntes))
             {
@@ -502,10 +513,10 @@ public partial class FormCrono
                 };
                 var g = d.Secao(null);
                 var tab = new TabelaDesign { Dock = DockStyle.Fill, Height = 100, Margin = new Padding(0, 0, 14, 0), MaxLinhas = 10 };
-                tab.Colunas(new("Descrição", 700), new("Valor", 200, Direita: true, Editavel: true));
+                tab.Colunas(new("Descrição", 520), new("Valor", 380, Direita: true, Editavel: true)); // valor com espaço (o nome da pista saía cortado)
                 tab.Linhas(linhas.Select(l => new[] { l.desc, l.valor }));
                 g.Controls.Add(tab); g.SetColumnSpan(tab, 6);
-                var nota = new Label { AutoSize = true, MaximumSize = new Size(860, 0), Font = new Font("Segoe UI", 9.6F), ForeColor = Color.FromArgb(58, 58, 60), BackColor = Color.White, Visible = false };
+                var nota = new Label { AutoSize = true, MaximumSize = new Size(860, 0), Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo), ForeColor = Tokens.Primitivo.Cinza700, BackColor = Tokens.Primitivo.Branco, Visible = false };
                 g.Controls.Add(nota); g.SetColumnSpan(nota, 6);
                 d.Abas(["Cronometragem", "Office", "Autoatendimento", "Ranking/TV", "Lista de participantes", "Placar eletrônico", "API"], i =>
                 {

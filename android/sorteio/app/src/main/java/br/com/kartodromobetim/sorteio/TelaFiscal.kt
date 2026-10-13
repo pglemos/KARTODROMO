@@ -33,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Scale
 import androidx.compose.material.icons.rounded.SportsMotorsports
 import androidx.compose.material3.AlertDialog
@@ -73,22 +74,34 @@ import org.json.JSONObject
 
 private data class RascunhoFiscal(val atribuicoes: Map<Int, String>, val pesos: Map<Int, Double>)
 
-private fun carregarRascunhoFiscal(contexto: Context, chave: String): RascunhoFiscal? = runCatching {
+private fun identidadeFiscal(piloto: Piloto) = "${piloto.customerId.orEmpty()}|${piloto.nome.trim().lowercase(Locale.ROOT)}"
+
+private fun carregarRascunhoFiscal(contexto: Context, chave: String, pilotos: List<Piloto>): RascunhoFiscal? = runCatching {
     val json = contexto.getSharedPreferences("sorteio", Context.MODE_PRIVATE).getString(chave, null) ?: return null
+    val identidades = JSONObject(json).optJSONObject("identidades")
+    val atuais = pilotos.associate { it.indice to identidadeFiscal(it) }
+    fun aindaEhMesmoPiloto(indice: Int) = atuais[indice] != null && (identidades == null || identidades.optString(indice.toString()) == atuais[indice])
     val atribuicoes = mutableMapOf<Int, String>()
     val atribuicoesJson = JSONObject(json).optJSONObject("atribuicoes")
-    if (atribuicoesJson != null) atribuicoesJson.keys().forEach { indice -> atribuicoes[indice.toIntOrNull() ?: return@forEach] = atribuicoesJson.optString(indice) }
+    if (atribuicoesJson != null) atribuicoesJson.keys().forEach { indice ->
+        val i = indice.toIntOrNull() ?: return@forEach
+        if (aindaEhMesmoPiloto(i)) atribuicoes[i] = atribuicoesJson.optString(indice)
+    }
     val pesos = mutableMapOf<Int, Double>()
     val pesosJson = JSONObject(json).optJSONObject("pesos")
-    if (pesosJson != null) pesosJson.keys().forEach { indice -> pesosJson.optDouble(indice).takeIf { !it.isNaN() }?.let { pesos[indice.toIntOrNull() ?: return@forEach] = it } }
+    if (pesosJson != null) pesosJson.keys().forEach { indice ->
+        val i = indice.toIntOrNull() ?: return@forEach
+        if (aindaEhMesmoPiloto(i)) pesosJson.optDouble(indice).takeIf { !it.isNaN() }?.let { pesos[i] = it }
+    }
     if (atribuicoes.isEmpty() && pesos.isEmpty()) null else RascunhoFiscal(atribuicoes, pesos)
 }.getOrNull()
 
-private fun salvarRascunhoFiscal(contexto: Context, chave: String, atribuicoes: Map<Int, String>, pesos: Map<Int, Double>) {
+private fun salvarRascunhoFiscal(contexto: Context, chave: String, atribuicoes: Map<Int, String>, pesos: Map<Int, Double>, pilotos: List<Piloto>) {
     val atribuicoesJson = JSONObject().apply { atribuicoes.forEach { (indice, kart) -> put(indice.toString(), kart) } }
     val pesosJson = JSONObject().apply { pesos.forEach { (indice, peso) -> put(indice.toString(), peso) } }
+    val identidadesJson = JSONObject().apply { pilotos.forEach { put(it.indice.toString(), identidadeFiscal(it)) } }
     contexto.getSharedPreferences("sorteio", Context.MODE_PRIVATE).edit()
-        .putString(chave, JSONObject().put("atribuicoes", atribuicoesJson).put("pesos", pesosJson).toString()).apply()
+        .putString(chave, JSONObject().put("atribuicoes", atribuicoesJson).put("pesos", pesosJson).put("identidades", identidadesJson).toString()).apply()
 }
 
 private fun apagarRascunhoFiscal(contexto: Context, chave: String) {
@@ -125,12 +138,13 @@ fun TelaFiscal(
     frota: Frota,
     inicial: List<Sorteado> = emptyList(),
     onVoltar: () -> Unit,
+    onAtualizarPilotos: () -> Unit,
     onConcluir: (List<Sorteado>) -> Unit,
 ) {
     val contexto = LocalContext.current
     val rascunhoChave = "fiscalDraft:${info.bateria.id}:${frota.name}"
     val rascunho = remember(info.bateria.id, frota, inicial) {
-        if (inicial.isEmpty()) carregarRascunhoFiscal(contexto, rascunhoChave) else null
+        if (inicial.isEmpty()) carregarRascunhoFiscal(contexto, rascunhoChave, info.pilotos) else null
     }
     val inicialPorIndice = remember(info.bateria.id, inicial) { inicial.associateBy { it.piloto.indice } }
     val atribuicoesIniciais = remember(info.bateria.id, inicial) {
@@ -164,7 +178,7 @@ fun TelaFiscal(
         if (inicial.isEmpty()) {
             val temRascunho = assigned.any { (indice, kart) -> info.pilotos.firstOrNull { it.indice == indice }?.kartAtual != kart } ||
                 info.pilotos.any { pesos[it.indice] != it.pesoKg }
-            if (temRascunho) salvarRascunhoFiscal(contexto, rascunhoChave, assigned.toMap(), pesos.toMap())
+            if (temRascunho) salvarRascunhoFiscal(contexto, rascunhoChave, assigned.toMap(), pesos.toMap(), info.pilotos)
             else apagarRascunhoFiscal(contexto, rascunhoChave)
         }
     }
@@ -183,6 +197,10 @@ fun TelaFiscal(
             onVoltar = ::voltarComSeguranca,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                BotaoSecundario("Atualizar pilotos", onClick = {
+                    salvarRascunhoFiscal(contexto, rascunhoChave, assigned.toMap(), pesos.toMap(), info.pilotos)
+                    onAtualizarPilotos()
+                }, icone = Icons.Rounded.Refresh)
                 if (rascunhoTemMudancas) Selo("RASCUNHO RESTAURADO", fundo = Cor.AmareloClaro, textoCor = Cor.Amarelo)
                 Selo("META ${formatarKg(meta)} kg", icone = Icons.Rounded.Scale)
                 BotaoAjuda(
@@ -240,7 +258,7 @@ fun TelaFiscal(
                         Spacer(Modifier.height(10.dp))
                         Acoes {
                             Selo("Livre", fundo = Cor.VerdeClaro, textoCor = Cor.VerdeTexto)
-                            Selo("Escolhido", fundo = Cor.Verde, textoCor = Color.White)
+                            Selo("Escolhido", fundo = Cor.Verde, textoCor = Cor.SobreVerde)
                             Selo("Ocupado", fundo = Cor.CartaoElevado, textoCor = Cor.Secundario)
                             TextButton(
                                 onClick = {
@@ -287,8 +305,8 @@ fun TelaFiscal(
                                         Text(kart, color = if (ativo) Cor.Texto else Cor.Secundario, fontSize = 22.sp, fontWeight = FontWeight.Black)
                                         when {
                                             escolhido -> Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.Rounded.Check, null, tint = Color.White, modifier = Modifier.size(12.dp))
-                                                Text("escolhido", color = Color.White, fontSize = 12.sp)
+                                                Icon(Icons.Rounded.Check, null, tint = Cor.SobreVerde, modifier = Modifier.size(12.dp))
+                                                Text("escolhido", color = Cor.SobreVerde, fontSize = 12.sp)
                                             }
                                             dono != null -> Text(
                                                 nomeDono?.substringAfterLast(' ')?.takeIf { it.isNotBlank() } ?: "piloto ${dono + 1}",
@@ -380,7 +398,7 @@ private fun PilotoFiscal(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(if (selecionado) Cor.Verde else Cor.VerdeClaro), contentAlignment = Alignment.Center) {
-                Text((piloto.indice + 1).toString(), color = if (selecionado) Color.White else Cor.VerdeTextoSuave, fontWeight = FontWeight.Bold)
+                Text((piloto.indice + 1).toString(), color = if (selecionado) Cor.SobreVerde else Cor.VerdeTextoSuave, fontWeight = FontWeight.Bold)
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {

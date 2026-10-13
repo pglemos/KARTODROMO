@@ -55,6 +55,12 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Design tokens em dia
+        run: npm run tokens:check
+
+      - name: Sem cor/fonte nova fora dos tokens
+        run: npm run lint:design
+
       - name: Unit tests
         run: npm test
 

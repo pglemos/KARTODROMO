@@ -61,9 +61,12 @@ public class FormTotem : Form, IMessageFilter
         else
         {
             StartPosition = FormStartPosition.Manual;
-            Location = new Point(0, 0);
+            // KARTODROMO_FORA_DA_TELA=1: autoteste num PC em uso (ex.: o ORBITS durante a corrida) sem cobrir a tela de ninguém
+            var foraDaTela = Environment.GetEnvironmentVariable("KARTODROMO_FORA_DA_TELA") == "1";
+            Location = foraDaTela ? new Point(-4000, 0) : new Point(0, 0);
             ClientSize = new Size(1366, 768);
-            TopMost = true;
+            TopMost = !foraDaTela;
+            ShowInTaskbar = !foraDaTela;
         }
         Resize += (_, _) =>
         {
@@ -118,7 +121,7 @@ public class FormTotem : Form, IMessageFilter
         }
 
         // Grade de perspectiva discreta inspirada no fundo do design aprovado.
-        using var gridPen = new Pen(Color.FromArgb(9, 255, 255, 255), Math.Max(1, scale));
+        using var gridPen = new Pen(Tokens.Escuro.ComponenteTotemGrade, Math.Max(1, scale));
         var horizon = oy + h * .69f;
         for (var i = -8; i <= 8; i++)
         {
@@ -182,7 +185,9 @@ public class FormTotem : Form, IMessageFilter
         if (velho != null) { Controls.Remove(velho); velho.Dispose(); }
         ResumeLayout();
         GarantirCabecalhoNoTopo();
-        c.Controls.OfType<CampoTexto>().FirstOrDefault(x => x.Enabled && x.Tag as string == "foco")?.Caixa.Focus();
+        // procura também dentro dos cartões (os campos do cadastro ficam num cartão; antes o foco caía no 1º campo da tela)
+        static IEnumerable<Control> Todos(Control raiz) => raiz.Controls.Cast<Control>().SelectMany(x => new[] { x }.Concat(Todos(x)));
+        Todos(c).OfType<CampoTexto>().FirstOrDefault(x => x.Enabled && x.Tag as string == "foco")?.Caixa.Focus();
     }
 
     void GarantirCabecalhoNoTopo()
@@ -407,12 +412,12 @@ public class FormTotem : Form, IMessageFilter
             _ => (doc.Length == 0 || Fmt.Digitos(doc).Length == 11 && Fmt.Digitos(doc) == doc.Replace(".", "").Replace("-", "") ? "CPF" : "RG")
         };
         var sub = existente
-            ? $"Olá, {_cliente.S("nome").Split(' ')[0]}! Confira e atualize seus dados. Campos em branco continuam como estão."
-            : "Primeira vez aqui. Leva menos de um minuto.";
+            ? $"Olá, {_cliente.S("nome").Split(' ')[0]}! Confira seus dados e suba na balança ao lado para atualizar seu peso."
+            : "Primeira vez aqui. Preencha todos os campos com * (suba na balança ao lado para o peso).";
         var c = NovaTela(etapa: 2);
         c.Controls.Add(Rot(existente ? "Confira seus dados" : "Registre-se para continuar", 90, 108, F(44, false, FontStyle.Bold), Estilo.Texto));
         c.Controls.Add(Rot(sub, 90, 163, F(19), Estilo.Suave));
-        var campos = CartaoEm(c, 90, 204, 1186, 338);
+        var campos = CartaoEm(c, 90, 204, 1186, 414);
         float[] xs = [24, 312, 600, 888];
         const float cw = 274;
         var reg = Lista(campos, "Tipo de Registro", xs[0], 36, cw, "Pessoa Física", "Pessoa Jurídica");
@@ -423,27 +428,40 @@ public class FormTotem : Form, IMessageFilter
         var lDoc = campos.Controls.OfType<Label>().Last(l => l.Text == "CPF");
         lDoc.Text = tipo.Text;
         var fNome = Campo(campos, "Nome completo", xs[3], 36, cw, _cliente.S("nome"), !existente && doc.Length > 0);
-        var fEmail = Campo(campos, "E-mail", xs[0], 132, cw, email, existente);
+        var fEmail = Campo(campos, "E-mail", xs[0], 132, cw, email);
         var fFone = Campo(campos, "Celular (WhatsApp)", xs[1], 132, cw, Fmt.MascaraFone(_cliente.S("telefone")));
         var nascIni = _cliente.S("nascimento").Length >= 10 ? Fmt.Dmy(_cliente.S("nascimento")) : "";
         var fNasc = Campo(campos, "Data de nascimento", xs[2], 132, cw, nascIni);
-        var fPeso = Campo(campos, "Peso (kg)", xs[3], 132, cw, _cliente.S("peso"));
+        var fPeso = Campo(campos, "Peso (kg)", xs[3], 132, cw, _cliente.S("peso"), existente);
         var fCep = Campo(campos, "CEP", xs[0], 228, cw, Fmt.MascaraCep(_cliente.S("cep")));
         var fEnd = Campo(campos, "Endereço", xs[1], 228, cw, _cliente.S("endereco"));
         var fBairro = Campo(campos, "Bairro", xs[2], 228, cw, _cliente.S("bairro"));
         var fCidade = Campo(campos, "Cidade", xs[3], 228, cw, _cliente.S("cidade"));
-        if (!existente)
+        var fInstagram = Campo(campos, "Instagram do piloto (@usuário)", xs[0], 324, cw * 2 + 16, _cliente.S("instagram"));
+        fInstagram.Caixa.PlaceholderText = "@andre.silva";
+        // obrigatórios (pedido do dono em 10/10/2026): cliente NOVO preenche tudo — documento, nome, e-mail, celular,
+        // nascimento, peso e endereço (endereço, bairro, cidade); o CEP é opcional (só ajuda a preencher o endereço).
+        // Cliente que JÁ tem cadastro pode atualizar o que quiser, mas tem que completar o que estiver faltando.
+        var obrigatorios = new List<(CampoTexto Campo, string Rotulo)>();
+        void Obrigatorio(CampoTexto campo, string rotulo, bool exigir)
         {
-            lDoc.Text += " *";
-            var nomeLabel = campos.Controls.OfType<Label>().FirstOrDefault(l => l.Text == "Nome completo");
-            if (nomeLabel != null) nomeLabel.Text += " *";
-            var telefoneLabel = campos.Controls.OfType<Label>().FirstOrDefault(l => l.Text == "Celular (WhatsApp)");
-            if (telefoneLabel != null) telefoneLabel.Text += " *";
+            if (!exigir) return;
+            obrigatorios.Add((campo, rotulo));
+            var l = campos.Controls.OfType<Label>().FirstOrDefault(x => x.Text == rotulo);
+            if (l != null) l.Text += " *";
         }
-        var nascimentoLabel = campos.Controls.OfType<Label>().FirstOrDefault(l => l.Text == "Data de nascimento");
-        if (!existente || !_cliente.B("temNascimento"))
-            if (nascimentoLabel != null) nascimentoLabel.Text += " *";
-        c.Controls.Add(Rot("* Campos obrigatórios", 90, 548, F(14), Estilo.MuitoSuave));
+        bool Falta(string chave) => !existente || _cliente.S(chave).Trim().Length == 0;
+        if (!existente) lDoc.Text += " *";
+        Obrigatorio(fNome, "Nome completo", !existente);
+        Obrigatorio(fEmail, "E-mail", true);
+        Obrigatorio(fFone, "Celular (WhatsApp)", Falta("telefone"));
+        Obrigatorio(fNasc, "Data de nascimento", !existente || !_cliente.B("temNascimento"));
+        Obrigatorio(fPeso, "Peso (kg)", true);
+        Obrigatorio(fInstagram, "Instagram do piloto (@usuário)", true);
+        Obrigatorio(fEnd, "Endereço", Falta("endereco"));
+        Obrigatorio(fBairro, "Bairro", Falta("bairro"));
+        Obrigatorio(fCidade, "Cidade", Falta("cidade"));
+        c.Controls.Add(Rot("* Campos obrigatórios · Instagram será usado no resultado e no pódio", 90, 624, F(14), Estilo.MuitoSuave));
         if (existente)
         {
             reg.Enabled = tipo.Enabled = fDoc.Enabled = fNome.Enabled = false;
@@ -487,7 +505,7 @@ public class FormTotem : Form, IMessageFilter
             if (nasc != "" && Fmt.ParseData(nasc) is { } dn && (dn > DateTime.Today || dn.Year < 1900)) nasc = null;
             var dados = new JsonObject
             {
-                ["email"] = fEmail.Text.Trim(), ["telefone"] = fFone.Text.Trim(), ["nascimento"] = nasc ?? "",
+                ["email"] = fEmail.Text.Trim(), ["instagram"] = ValidacaoCliente.NormalizarInstagram(fInstagram.Text), ["telefone"] = fFone.Text.Trim(), ["nascimento"] = nasc ?? "",
                 ["peso"] = fPeso.Text.Trim(), ["cep"] = fCep.Text.Trim(), ["endereco"] = fEnd.Text.Trim(),
                 ["bairro"] = fBairro.Text.Trim(), ["cidade"] = fCidade.Text.Trim(), ["estado"] = uf,
             };
@@ -501,10 +519,16 @@ public class FormTotem : Form, IMessageFilter
                 if (Fmt.Digitos(fFone.Text).Length < 10) { Alertar("O número de telefone é obrigatório."); return; }
                 dados["tipoDocumento"] = tipoDoc; dados["documento"] = fDoc.Text.Trim(); dados["nome"] = nome;
             }
+            foreach (var (campoObrig, rotuloObrig) in obrigatorios)
+                if (campoObrig.Text.Trim().Length == 0 && campoObrig != fNasc) { Alertar($"Preencha o campo {rotuloObrig}."); campoObrig.Caixa.Focus(); return; }
+            if (ValidacaoCliente.ErroInstagram(fInstagram.Text) is string erroInstagram) { Alertar(erroInstagram); fInstagram.Caixa.Focus(); return; }
+            var pesoTxt = fPeso.Text.Trim().Replace(',', '.');
+            if (pesoTxt.Length > 0 && (!double.TryParse(pesoTxt, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var kg) || kg < 20 || kg > 250))
+            { Alertar("Peso inválido. Suba na balança ao lado e digite o peso em kg (ex.: 78,5)."); fPeso.Caixa.Focus(); return; }
             if (nasc == null) { Alertar("Data de nascimento inválida."); return; }
             if (nasc == "" && (!existente || !_cliente.B("temNascimento"))) { Alertar("A data de nascimento é obrigatória."); return; }
             var em = fEmail.Text.Trim();
-            if (em.Length > 0 && !System.Text.RegularExpressions.Regex.IsMatch(em, @"^[^@\s]+@[^@\s]+\.[^@\s]+$")) { Alertar("E-mail inválido."); return; }
+            if (ValidacaoCliente.ErroEmail(em) is string erroEmail) { Alertar(erroEmail); fEmail.Caixa.Focus(); return; }
             if (fFone.Text.Trim().Length > 0 && Fmt.Digitos(fFone.Text).Length < 10) { Alertar("Número de telefone inválido."); return; }
             if (!lgpd.Marcado) { Alertar("É necessário aceitar o Termo de Consentimento para Tratamento de Dados Pessoais."); return; }
             if (existente)
@@ -606,13 +630,19 @@ public class FormTotem : Form, IMessageFilter
     {
         var c = NovaTela(etapa: 2);
         c.Controls.Add(Rot("Cadastre quem vai correr", 150, 110, F(44, false, FontStyle.Bold), Estilo.Texto));
-        c.Controls.Add(Rot("Informe os dados do menor de idade.", 150, 165, F(19), Estilo.Suave));
-        var painel = CartaoEm(c, 260, 220, 846, 340);
-        var nome = Campo(painel, "Nome completo", 34, 70, 470, "", true);
-        var nasc = Campo(painel, "Data de nascimento", 528, 70, 282);
+        c.Controls.Add(Rot("Informe os dados do menor de idade (suba com ele na balança ao lado para o peso).", 150, 165, F(19), Estilo.Suave));
+        var painel = CartaoEm(c, 260, 210, 846, 430);
+        var nome = Campo(painel, "Nome completo *", 34, 70, 470, "", true);
+        var nasc = Campo(painel, "Data de nascimento *", 528, 70, 282);
         nasc.Caixa.PlaceholderText = "DD/MM/AAAA";
-        var tipo = Lista(painel, "Tipo de documento", 34, 166, 282, "CPF", "RG", "Passaporte");
-        var doc = Campo(painel, "Documento (opcional)", 340, 166, 470);
+        var tipo = Lista(painel, "Tipo de documento", 34, 166, 220, "CPF", "RG", "Passaporte");
+        var doc = Campo(painel, "Documento (opcional)", 278, 166, 320);
+        var peso = Campo(painel, "Peso (kg) *", 622, 166, 188);   // obrigatório (10/10/2026): o peso equilibra os karts (lastro)
+        Mascarar(peso.Caixa, v => new string(v.Where(ch => char.IsDigit(ch) || ch is ',' or '.').Take(5).ToArray()));
+        var email = Campo(painel, "E-mail do menor ou responsável *", 34, 262, 470, _cliente.S("email"));
+        var instagram = Campo(painel, "Instagram do piloto (@usuário) *", 528, 262, 282);
+        instagram.Caixa.PlaceholderText = "@usuario";
+        painel.Controls.Add(Rot("* Campos obrigatórios · pode usar o e-mail do responsável", 34, 358, F(14), Estilo.MuitoSuave));
         Mascarar(nasc.Caixa, Fmt.MascaraData);
         Mascarar(doc.Caixa, v => tipo.SelectedIndex == 0 ? Fmt.MascaraCpf(v) : v);
         var voltar = Botao(c, "Voltar", 914, 660, 140, false, () => { TelaMenores(); return Task.CompletedTask; });
@@ -621,12 +651,18 @@ public class FormTotem : Form, IMessageFilter
             var n = string.Join(' ', nome.Text.Split(' ', StringSplitOptions.RemoveEmptyEntries));
             var iso = Fmt.DataBrParaIso(nasc.Text.Trim());
             if (n.Split(' ').Length < 2) { Alertar("Informe o nome completo do menor."); return; }
+            if (ValidacaoCliente.ErroEmail(email.Text) is string erroEmail) { Alertar(erroEmail); email.Caixa.Focus(); return; }
+            if (ValidacaoCliente.ErroInstagram(instagram.Text) is string erroInstagram) { Alertar(erroInstagram); instagram.Caixa.Focus(); return; }
             if (string.IsNullOrEmpty(iso) || Fmt.ParseData(iso) is not { } dn || dn > DateTime.Today || dn.Year < 1900) { Alertar("Informe a data de nascimento (DD/MM/AAAA)."); return; }
+            var pesoTxt = peso.Text.Trim().Replace(',', '.');
+            if (pesoTxt.Length == 0) { Alertar("Informe o peso do menor (suba na balança ao lado)."); peso.Caixa.Focus(); return; }
+            if (!double.TryParse(pesoTxt, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var kg) || kg < 10 || kg > 250)
+            { Alertar("Peso inválido. Digite o peso em kg (ex.: 38,5)."); peso.Caixa.Focus(); return; }
             var tipoDoc = tipo.SelectedIndex switch { 0 => "CPF", 1 => "RG", _ => "PASSAPORTE" };
             if (doc.Text.Trim().Length > 0 && tipoDoc == "CPF" && !Fmt.CpfValido(doc.Text)) { Alertar("CPF inválido."); return; }
             var r = await _api.Post("/api/totem/cadastro", new JsonObject
             {
-                ["dados"] = new JsonObject { ["nome"] = n, ["nascimento"] = iso, ["tipoDocumento"] = tipoDoc, ["documento"] = doc.Text.Trim() },
+                ["dados"] = new JsonObject { ["nome"] = n, ["nascimento"] = iso, ["tipoDocumento"] = tipoDoc, ["documento"] = doc.Text.Trim(), ["peso"] = peso.Text.Trim(), ["email"] = email.Text.Trim(), ["instagram"] = ValidacaoCliente.NormalizarInstagram(instagram.Text) },
                 ["lgpd"] = true, ["responsavelId"] = _cliente.L("id"), ["responsavelToken"] = _token,
             });
             var p = new Pessoa(r.L("id") ?? 0, n, iso, r.S("token"));
@@ -840,7 +876,7 @@ public class ListaOpcoes : Panel
     protected override void OnPaintBackground(PaintEventArgs e)
     {
         base.OnPaintBackground(e);
-        using var wash = new SolidBrush(Color.FromArgb(10, 255, 255, 255));
+        using var wash = new SolidBrush(Tokens.Escuro.ComponenteTotemVeuLeve);
         e.Graphics.FillRectangle(wash, ClientRectangle);
     }
     public void Adicionar(OpcaoLinha l)
@@ -928,7 +964,7 @@ public class OpcaoLinha : Control
         var bounds = new Rectangle(0, 0, Width, Height);
         if (_marcado || _sobre)
         {
-            using var row = new SolidBrush(_marcado ? Color.FromArgb(30, Estilo.Verde.R, Estilo.Verde.G, Estilo.Verde.B) : Color.FromArgb(12, 255, 255, 255));
+            using var row = new SolidBrush(_marcado ? Color.FromArgb(30, Estilo.Verde.R, Estilo.Verde.G, Estilo.Verde.B) : Tokens.Escuro.ComponenteTotemLinhaLista);
             g.FillRectangle(row, bounds);
         }
         var s = (int)(30 * _k);
@@ -938,10 +974,10 @@ public class OpcaoLinha : Control
             if (_marcado)
             {
                 using var b = new SolidBrush(Estilo.Verde); g.FillPath(b, p);
-                using var pen = new Pen(Color.FromArgb(0, 33, 10), 2.8f * _k) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+                using var pen = new Pen(Tokens.Escuro.ComponenteTotemMarcaCheck, 2.8f * _k) { StartCap = LineCap.Round, EndCap = LineCap.Round };
                 g.DrawLines(pen, [new PointF(box.X + s * .22f, box.Y + s * .52f), new PointF(box.X + s * .42f, box.Y + s * .72f), new PointF(box.X + s * .78f, box.Y + s * .28f)]);
             }
-            else { using var pen = new Pen(Color.FromArgb(180, 255, 255, 255), 1.5f * _k); g.DrawPath(pen, p); }
+            else { using var pen = new Pen(Tokens.Escuro.ComponenteTotemContornoCaixa, 1.5f * _k); g.DrawPath(pen, p); }
         }
         var x = (int)(76 * _k);
         using var titulo = Estilo.F((Tipo.Length > 0 ? 22 : 20) * _k, false, FontStyle.Bold);
@@ -965,7 +1001,7 @@ public class OpcaoLinha : Control
             using var vagasFont = Estilo.F(18 * _k, false, FontStyle.Bold);
         TextRenderer.DrawText(g, Direita, vagasFont, vagas, Livres <= 3 ? Estilo.Amarelo : Estilo.Texto, TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
             var trilho = new Rectangle(Width - (int)(142 * _k), centro + (int)(12 * _k), (int)(120 * _k), (int)(5 * _k));
-            using var fundo = new SolidBrush(Color.FromArgb(45, 255, 255, 255)); g.FillRectangle(fundo, trilho);
+            using var fundo = new SolidBrush(Tokens.Escuro.ComponenteTotemTrilho); g.FillRectangle(fundo, trilho);
             if (Total > 0)
             {
                 var ocupadas = Math.Clamp(Total - Livres, 0, Total);
@@ -979,7 +1015,7 @@ public class OpcaoLinha : Control
             using var idade = Estilo.F(16 * _k, false, FontStyle.Bold);
             TextRenderer.DrawText(g, Direita, idade, new Rectangle(Width - (int)(180 * _k), 0, (int)(150 * _k), Height), Estilo.Suave, TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
         }
-        using var linha = new Pen(Color.FromArgb(20, 255, 255, 255));
+        using var linha = new Pen(Tokens.Escuro.ComponenteTotemLinhaFina);
         g.DrawLine(linha, 0, Height - 1, Width, Height - 1);
         if (_foco)
         {

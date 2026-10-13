@@ -22,6 +22,8 @@
 /championships/*
   Cache-Control: public, max-age=604800, stale-while-revalidate=86400
 
-/design/*
+/design/clube-*
   X-Robots-Tag: noindex, nofollow, noarchive
+
+/design/*
   Cache-Control: public, max-age=0, s-maxage=60, must-revalidate

@@ -1,7 +1,7 @@
 /* Recepcao — telas (replica funcional do LapTime Office). Depende de office-core.js. */
 'use strict';
 
-const App = { apoio: null, view: null, grid: null, rows: [], filtroBateria: null };
+const App = { apoio: null, view: null, grid: null, rows: [], filtroBateria: null, carregando: false, assinatura: '', refreshTimer: null };
 const P = (k) => App.apoio?.parametros?.[k];
 
 // =====================================================================================
@@ -45,6 +45,10 @@ async function iniciar() {
   $('#fData').onchange = $('#fFiltro').onchange = () => carregar();
   statusBar();
   selecionarNo('reservas:todas');
+  if (App.refreshTimer) clearInterval(App.refreshTimer);
+  App.refreshTimer = setInterval(() => {
+    if (!document.hidden && App.view) carregar(true);
+  }, 10000);
 }
 
 function statusBar() {
@@ -285,24 +289,36 @@ const VIEWS = {
   parceiros: { vazio: 'Nenhum parceiro cadastrado (o LapTime não tinha parceiros nem comissões).', cols: () => [{ key: 'nome', label: 'Parceiro' }, { key: 'comissao', label: 'Comissão' }] },
 };
 
-async function carregar() {
-  const { grupo, status } = App.view;
-  const v = VIEWS[grupo];
-  let rows = [];
-  if (v.url) rows = await api(v.url(status)).catch(() => []);
-  App.rows = rows;
-  const cols = v.cols(status);
-  const tituloFiltro = App.filtroBateria ? `<span class="extra">Bateria: <b>${esc(App.filtroBateria.nome)} ${fmt.dmyhm(App.filtroBateria.dataHora)}</b> <a href="#" id="limpaBat">(mostrar todas)</a></span>` : '';
-  const render = (list) => {
-    $('#totalbar').innerHTML = `Total de registros: ${list.length} ${v.extra ? `<span class="extra">${v.extra(list)}</span>` : ''} ${tituloFiltro}`;
-    const lb = $('#limpaBat'); if (lb) lb.onclick = (e) => { e.preventDefault(); App.filtroBateria = null; carregar(); };
-  };
-  App.grid = grade($('#gridwrap'), cols, rows, {
-    multi: v.multi, vazio: v.vazio, rowClass: v.rowClass, onDbl: v.dbl,
-    onCtx: v.ctx ? (sel, e) => ctxMenu(e.clientX, e.clientY, v.ctx(sel)) : null,
-    onFilter: render,
-  });
-  render(rows);
+async function carregar(silencioso = false) {
+  if (App.carregando || !App.view) return;
+  App.carregando = true;
+  try {
+    const { grupo, status } = App.view;
+    const v = VIEWS[grupo];
+    let rows = [];
+    if (v.url) {
+      try { rows = await api(v.url(status)); }
+      catch { if (silencioso) return; }
+    }
+    const assinatura = JSON.stringify(rows);
+    if (silencioso && assinatura === App.assinatura) return;
+    App.assinatura = assinatura;
+    App.rows = rows;
+    const cols = v.cols(status);
+    const tituloFiltro = App.filtroBateria ? `<span class="extra">Bateria: <b>${esc(App.filtroBateria.nome)} ${fmt.dmyhm(App.filtroBateria.dataHora)}</b> <a href="#" id="limpaBat">(mostrar todas)</a></span>` : '';
+    const render = (list) => {
+      $('#totalbar').innerHTML = `Total de registros: ${list.length} ${v.extra ? `<span class="extra">${v.extra(list)}</span>` : ''} ${tituloFiltro}`;
+      const lb = $('#limpaBat'); if (lb) lb.onclick = (e) => { e.preventDefault(); App.filtroBateria = null; carregar(); };
+    };
+    App.grid = grade($('#gridwrap'), cols, rows, {
+      multi: v.multi, vazio: v.vazio, rowClass: v.rowClass, onDbl: v.dbl,
+      onCtx: v.ctx ? (sel, e) => ctxMenu(e.clientX, e.clientY, v.ctx(sel)) : null,
+      onFilter: render,
+    });
+    render(rows);
+  } finally {
+    App.carregando = false;
+  }
 }
 const recarregar = () => carregar();
 

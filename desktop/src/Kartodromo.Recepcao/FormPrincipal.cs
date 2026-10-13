@@ -8,20 +8,20 @@ namespace Kartodromo.Recepcao;
 public class FormPrincipal : Form
 {
     public bool ConfirmarSaida { get; set; } = true;
-    readonly TreeView _arvore = new() { Dock = DockStyle.Fill, HideSelection = false, BorderStyle = BorderStyle.None, ItemHeight = 26, FullRowSelect = true, ShowLines = false, ShowPlusMinus = false, ShowRootLines = false, Indent = 8, BackColor = VisualPrincipal.Lateral, ForeColor = KitVisual.Texto, DrawMode = TreeViewDrawMode.OwnerDrawText, Font = new Font("Segoe UI", 9.5F) };
+    readonly TreeView _arvore = new() { Dock = DockStyle.Fill, HideSelection = false, BorderStyle = BorderStyle.None, ItemHeight = 26, FullRowSelect = true, ShowLines = false, ShowPlusMinus = true, ShowRootLines = false, Indent = 8, BackColor = VisualPrincipal.Lateral, ForeColor = KitVisual.Texto, DrawMode = TreeViewDrawMode.OwnerDrawText, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo), TabStop = true, AccessibleRole = AccessibleRole.Outline, AccessibleName = "Navegação por módulos", AccessibleDescription = "Use as setas para expandir um módulo e escolher a lista de trabalho." };
     readonly DateTimePicker _data = Campos.Data();
-    readonly Label _total = new() { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 8.8F), BackColor = Color.White, ForeColor = KitVisual.Secundario, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(14, 0, 0, 0), AutoEllipsis = true };
+    readonly Label _total = new() { Dock = DockStyle.Fill, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno), BackColor = Tokens.Primitivo.Branco, ForeColor = KitVisual.Secundario, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(14, 0, 0, 0), AutoEllipsis = true };
     readonly Panel _filtroBar = new() { Width = 540, Height = 38, BackColor = KitVisual.Fundo };
-    readonly Label _titulo = new() { AutoSize = true, Font = new Font("Segoe UI", 18F, FontStyle.Bold), ForeColor = KitVisual.Texto };
-    readonly Label _subtitulo = new() { AutoSize = true, Font = new Font("Segoe UI", 9.5F), ForeColor = KitVisual.Secundario };
+    readonly Label _titulo = new() { AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoDestaque, FontStyle.Bold), ForeColor = KitVisual.Texto };
+    readonly Label _subtitulo = new() { AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo), ForeColor = KitVisual.Secundario };
     readonly TableLayoutPanel _resumo = new() { Dock = DockStyle.Top, Height = 82, ColumnCount = 4, RowCount = 1, BackColor = KitVisual.Fundo, Padding = new Padding(0, 0, 0, 4) };
     readonly VisualPrincipal.SeloTerminal _selo = new();
-    readonly Label _dataTexto = new() { AutoSize = false, Size = new Size(96, 30), TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Cascadia Mono", 9F, FontStyle.Bold), ForeColor = KitVisual.Texto, Cursor = Cursors.Hand };
-    readonly Panel _dataCaixa = new() { Size = new Size(152, 34), BackColor = Color.White };
+    readonly Label _dataTexto = new() { AutoSize = false, Size = new Size(96, 30), TextAlign = ContentAlignment.MiddleCenter, Font = Tokens.FonteNumero(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold), ForeColor = KitVisual.Texto, Cursor = Cursors.Hand };
+    readonly Panel _dataCaixa = new() { Size = new Size(152, 34), BackColor = Tokens.Primitivo.Branco };
     readonly Button _acaoTopo = KitVisual.Botao("", true);
-    readonly TextBox _buscaGlobal = new() { BorderStyle = BorderStyle.None, Font = new Font("Segoe UI", 9F), PlaceholderText = "Buscar cliente, CPF, reserva…" };
+    readonly TextBox _buscaGlobal = new() { BorderStyle = BorderStyle.None, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno), PlaceholderText = "Buscar cliente ou CPF…", AccessibleName = "Buscar cliente ou CPF" };
     readonly Grade _grade = new();
-    readonly ToolStripStatusLabel _sbHora = new(), _sbData = new(), _sbSrv = new() { Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) }, _sbCrono = new(), _sbSite = new();
+    readonly ToolStripStatusLabel _sbHora = new(), _sbData = new(), _sbSrv = new() { Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold) }, _sbCrono = new(), _sbSite = new();
     string _grupo = "reservas", _status = "todas";
     string _periodo = "dia";
     JsonObject _filtroBateria, _filtroContaFidelidade;
@@ -30,12 +30,16 @@ public class FormPrincipal : Form
     public FormPrincipal()
     {
         Text = "Kartódromo - Módulo Office";
-        Font = new Font("Segoe UI", 9F);
+        Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno);
         BackColor = KitVisual.Fundo;
         Icon = Icone.App;
         WindowState = FormWindowState.Maximized;
         MinimumSize = new Size(1024, 640);
         KeyPreview = true;
+        AccessibleRole = AccessibleRole.Window;
+        AccessibleName = "Recepção do Kartódromo";
+        _grade.AccessibleName = "Lista principal da recepção";
+        _acaoTopo.AccessibleName = "Ação principal do módulo";
 
         // O menu de contexto que a Grade cria internamente usa o renderer global.
         // A barra principal conserva o renderer próprio definido em MontarMenu().
@@ -62,7 +66,7 @@ public class FormPrincipal : Form
         var direita = MontarAreaDados();
         _grade.FiltroMudou += Totais;
 
-        var split = new SplitContainer { Dock = DockStyle.Fill, FixedPanel = FixedPanel.Panel1, BackColor = Tokens.Linha, BorderStyle = BorderStyle.None, SplitterWidth = 1 };
+        var split = new SplitContainer { Dock = DockStyle.Fill, FixedPanel = FixedPanel.Panel1, BackColor = Tokens.Claro.CorBordaSutil, BorderStyle = BorderStyle.None, SplitterWidth = 1 };
         Load += (_, _) => { split.Panel1MinSize = 220; split.SplitterDistance = 256; };
         // a busca não começa com o cursor (o design mostra o texto de ajuda "Buscar cliente, CPF, reserva…")
         Shown += (_, _) => ActiveControl = _grade;
@@ -96,6 +100,16 @@ public class FormPrincipal : Form
         var ping = new System.Windows.Forms.Timer { Interval = 30000 };
         ping.Tick += async (_, _) => await Ping();
         ping.Start();
+        // A operação também pode ser alterada pelo totem, pelo site ou pela cronometragem.
+        // Recarrega a lista sem exigir que a recepção troque de menu/data.
+        var sincronizacao = new System.Windows.Forms.Timer { Interval = 10000 };
+        sincronizacao.Tick += (_, _) =>
+        {
+            if (Visible && WindowState != FormWindowState.Minimized &&
+                (Form.ActiveForm is null || Form.ActiveForm == this) && !_grade.Carregando && !_sincronizando)
+                Recarregar(silencioso: true);
+        };
+        sincronizacao.Start();
         Load += async (_, _) =>
         {
             Relogio();
@@ -104,6 +118,12 @@ public class FormPrincipal : Form
             AgenteImpressao.Iniciar(this);
         };
         FormClosing += (_, e) => { if (ConfirmarSaida && !Msg.Pergunta(this, "Deseja sair do sistema?")) e.Cancel = true; };
+        FormClosed += (_, _) => { t.Dispose(); ping.Dispose(); sincronizacao.Dispose(); };
+        Disposed += (_, _) =>
+        {
+            if (_menuAberto is { IsDisposed: false }) _menuAberto.Dispose();
+            if (_menuMaisAcoes is { IsDisposed: false }) _menuMaisAcoes.Dispose();
+        };
     }
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
@@ -123,7 +143,7 @@ public class FormPrincipal : Form
 
         if (modifiers == Keys.None && key == Keys.F2)
         {
-            new FormCliente(null).Show(this);
+            AbrirClientes();
             return true;
         }
         if (modifiers == Keys.None && key == Keys.F3)
@@ -138,8 +158,23 @@ public class FormPrincipal : Form
         }
         if (modifiers == Keys.None && key == Keys.Escape)
         {
-            Close();
+            // Esc nunca encerra a janela de operação. Primeiro fecha menus e,
+            // na busca, limpa o texto; sair continua sendo uma ação explícita
+            // com confirmação no FormClosing.
+            if (_menuAberto is { IsDisposed: false }) { _menuAberto.Close(); return true; }
+            if (_menuMaisAcoes is { IsDisposed: false }) { _menuMaisAcoes.Close(); return true; }
+            if (_buscaGlobal.Focused) { _buscaGlobal.Clear(); _grade.Focus(); return true; }
+            _grade.Focus();
             return true;
+        }
+        if ((modifiers == Keys.None && key == Keys.Apps) || (modifiers == Keys.Shift && key == Keys.F10))
+        {
+            if (_grade.CurrentCell != null && _menuAtual != null)
+            {
+                var cel = _grade.GetCellDisplayRectangle(_grade.CurrentCell.ColumnIndex, _grade.CurrentCell.RowIndex, false);
+                MostrarMenuContexto(new Point(cel.Left, cel.Bottom));
+                return true;
+            }
         }
         if (modifiers == Keys.Control && key == Keys.A && _grupo == "reservas" && _grade.ContainsFocus)
         {
@@ -192,7 +227,7 @@ public class FormPrincipal : Form
         }
     }
 
-    ContextMenuStrip _menuAberto;
+    ContextMenuStrip _menuAberto, _menuMaisAcoes;
 
     void AbrirMenuContexto(MouseEventArgs e)
     {
@@ -234,9 +269,9 @@ public class FormPrincipal : Form
             AutoSize = false,
             Size = new Size(290, 20),
             Padding = new Padding(6),
-            BackColor = Tokens.SuperficieSuave,
+            BackColor = Tokens.Claro.CorSuperficieSuave,
             ForeColor = KitVisual.Texto,
-            Font = new Font("Segoe UI", 9F),
+            Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno),
             Renderer = new MenuRecepcaoRenderer(),
             ShowImageMargin = false,
             ShowCheckMargin = false,
@@ -264,11 +299,11 @@ public class FormPrincipal : Form
                 {
                     mi.Tag = "principal";
                     mi.Font = new Font(menu.Font, FontStyle.Bold);
-                    mi.ForeColor = Color.White;
+                    mi.ForeColor = Tokens.Primitivo.Branco;
                 }
                 else if (mi.Text.Equals("Excluir", StringComparison.OrdinalIgnoreCase)
                     || mi.Text.StartsWith("Estornar", StringComparison.OrdinalIgnoreCase))
-                    mi.ForeColor = Tokens.Vermelho;
+                    mi.ForeColor = Tokens.Claro.CorEstadoPerigoTexto;
             }
             altura += item.Height;
         }
@@ -301,15 +336,15 @@ public class FormPrincipal : Form
     void PrepararPeriodos()
     {
         var bar = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(0), Margin = new Padding(0), BackColor = KitVisual.Fundo };
-        bar.Controls.Add(new Label { Text = "Exibir dados", AutoSize = true, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 8.5F), Margin = new Padding(0, 9, 7, 0) });
-        var segmento = new Panel { Name = "periodos", Size = new Size(300, 32), BackColor = Tokens.BotaoSecundario, Margin = new Padding(0, 2, 8, 0), Padding = new Padding(2) };
+        bar.Controls.Add(new Label { Text = "Exibir dados", AutoSize = true, ForeColor = KitVisual.Secundario, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno), Margin = new Padding(0, 9, 7, 0) });
+        var segmento = new Panel { Name = "periodos", Size = new Size(300, 32), BackColor = Tokens.Claro.CorAcaoSecundaria, Margin = new Padding(0, 2, 8, 0), Padding = new Padding(2) };
         KitVisual.AplicarRaio(segmento, 8);
         var defs = new[] { ("dia", "Nesta data", 78), ("mes", "Neste mês", 78), ("apartir", "A partir de", 82), ("todas", "Todas", 58) };
         var x = 2;
         foreach (var (chave, texto, largura) in defs)
         {
-            var b = new BotaoPlano { Name = "periodo-" + chave, Text = texto, Size = new Size(largura, 28), Location = new Point(x, 2), FlatStyle = FlatStyle.Flat, BackColor = chave == _periodo ? Color.White : segmento.BackColor,
-                ForeColor = chave == _periodo ? KitVisual.Texto : Tokens.Grafite, Font = new Font("Segoe UI", 8.2F, chave == _periodo ? FontStyle.Bold : FontStyle.Regular), Cursor = Cursors.Hand };
+            var b = new BotaoPlano { Name = "periodo-" + chave, Text = texto, Size = new Size(largura, 28), Location = new Point(x, 2), FlatStyle = FlatStyle.Flat, BackColor = chave == _periodo ? Tokens.Primitivo.Branco : segmento.BackColor,
+                ForeColor = chave == _periodo ? KitVisual.Texto : Tokens.Primitivo.Cinza700, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoLegenda, chave == _periodo ? FontStyle.Bold : FontStyle.Regular), Cursor = Cursors.Hand, AccessibleRole = AccessibleRole.PushButton, AccessibleName = "Exibir " + texto };
             b.FlatAppearance.BorderSize = 0;
             KitVisual.AplicarRaio(b, 6);
             b.Click += (_, _) => { _periodo = chave; AtualizaPeriodos(); Recarregar(); };
@@ -320,8 +355,8 @@ public class FormPrincipal : Form
         // data: "‹ 25/09/2026 ›" como no design; clicar no texto abre o calendário
         Button Seta(string t, int dias)
         {
-            var b = new BotaoPlano { Text = t, Size = new Size(26, 30), FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 11F), Cursor = Cursors.Hand, TabStop = false, AccessibleDescription = "kit:ignorar" };
-            b.FlatAppearance.BorderSize = 0; b.FlatAppearance.MouseOverBackColor = Tokens.FundoCampo;
+            var b = new BotaoPlano { Text = t, Size = new Size(26, 30), FlatStyle = FlatStyle.Flat, BackColor = Tokens.Primitivo.Branco, ForeColor = KitVisual.Secundario, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoSubtitulo), Cursor = Cursors.Hand, TabStop = true, AccessibleRole = AccessibleRole.PushButton, AccessibleName = dias < 0 ? "Dia anterior" : "Próximo dia" };
+            b.FlatAppearance.BorderSize = 0; b.FlatAppearance.MouseOverBackColor = Tokens.Claro.CorSuperficieCampo;
             b.Click += (_, _) => _data.Value = _data.Value.AddDays(dias);
             return b;
         }
@@ -329,7 +364,7 @@ public class FormPrincipal : Form
         ant.Location = new Point(2, 2); _dataTexto.Location = new Point(28, 2); prox.Location = new Point(124, 2);
         _dataCaixa.Controls.AddRange([ant, _dataTexto, prox]);
         _dataCaixa.Margin = new Padding(0, 1, 0, 0);
-        _dataCaixa.Paint += (_, e) => { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using var p = VisualPrincipal.Redondo(new Rectangle(0, 0, _dataCaixa.Width - 1, _dataCaixa.Height - 1), 9); using var pen = new Pen(Tokens.Linha); e.Graphics.DrawPath(pen, p); };
+        _dataCaixa.Paint += (_, e) => { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using var p = VisualPrincipal.Redondo(new Rectangle(0, 0, _dataCaixa.Width - 1, _dataCaixa.Height - 1), 9); using var pen = new Pen(Tokens.Claro.CorBordaSutil); e.Graphics.DrawPath(pen, p); };
         _dataTexto.Text = _data.Value.ToString("dd/MM/yyyy");
         _data.ValueChanged += (_, _) => _dataTexto.Text = _data.Value.ToString("dd/MM/yyyy");
         _dataTexto.Click += (_, _) =>
@@ -354,9 +389,9 @@ public class FormPrincipal : Form
             foreach (Control b in p.Controls)
             {
                 var ativo = b.Name == "periodo-" + _periodo;
-                b.BackColor = ativo ? Color.White : p.BackColor;
-                b.ForeColor = ativo ? KitVisual.Texto : Tokens.Grafite;
-                b.Font = new Font("Segoe UI", 8.2F, ativo ? FontStyle.Bold : FontStyle.Regular);
+                b.BackColor = ativo ? Tokens.Primitivo.Branco : p.BackColor;
+                b.ForeColor = ativo ? KitVisual.Texto : Tokens.Primitivo.Cinza700;
+                b.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoLegenda, ativo ? FontStyle.Bold : FontStyle.Regular);
             }
         }
         _dataCaixa.Visible = _periodo != "todas";
@@ -389,11 +424,11 @@ public class FormPrincipal : Form
         cab.Resize += (_, _) => Posicionar();
         _acaoTopo.SizeChanged += (_, _) => Posicionar();
 
-        var lista = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(0) };
+        var lista = new Panel { Dock = DockStyle.Fill, BackColor = Tokens.Primitivo.Branco, Padding = new Padding(0) };
         lista.Resize += (_, _) => KitVisual.AplicarRaio(lista, 14);
-        var rodape = new Panel { Dock = DockStyle.Bottom, Height = 36, BackColor = Color.White };
-        rodape.Paint += (_, e) => { using var pen = new Pen(Tokens.Lateral); e.Graphics.DrawLine(pen, 0, 0, rodape.Width, 0); };
-        var exportar = new LinkLabel { Text = "Exportar para Excel", AutoSize = true, Dock = DockStyle.Right, LinkColor = KitVisual.Verde, ActiveLinkColor = KitVisual.Verde, LinkBehavior = LinkBehavior.HoverUnderline, Font = new Font("Segoe UI", 8.8F, FontStyle.Bold), Padding = new Padding(0, 10, 16, 0), BackColor = Color.White };
+        var rodape = new Panel { Dock = DockStyle.Bottom, Height = 36, BackColor = Tokens.Primitivo.Branco };
+        rodape.Paint += (_, e) => { using var pen = new Pen(Tokens.Claro.CorSuperficieLateral); e.Graphics.DrawLine(pen, 0, 0, rodape.Width, 0); };
+        var exportar = new LinkLabel { Text = "Exportar para Excel", AutoSize = true, Dock = DockStyle.Right, LinkColor = KitVisual.Verde, ActiveLinkColor = KitVisual.Verde, LinkBehavior = LinkBehavior.HoverUnderline, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold), Padding = new Padding(0, 10, 16, 0), BackColor = Tokens.Primitivo.Branco };
         exportar.LinkClicked += (_, _) => _grade.ExportarExcel(_grupo);
         rodape.Controls.Add(_total); rodape.Controls.Add(exportar);
         lista.Controls.Add(_grade);
@@ -413,40 +448,40 @@ public class FormPrincipal : Form
     {
         switch (_grupo)
         {
-            case "reservas": case "baterias": using (var f = new FormCriarReservas()) f.ShowDialog(this); Recarregar(); break;
-            case "vendas": Caixa.Checkout(this, null, null, null); break;
+            case "reservas": case "baterias": CriarReservas(); break;
+            case "vendas": AbrirReceitaAvulsa(); break;
             case "oficina": Cadastros.Abrir(this, "itensManutencao"); break;
-            case "vouchers": FormVoucher.Criar("manual").ShowDialog(this); Recarregar(); break;
+            case "vouchers": CriarVoucherManual(); break;
             case "parceiros": Cadastros.Abrir(this, "parceiros"); break;
-            case "fidelidade": if (_status == "contas") AbrirContaFidelidade(); else { FormVoucher.Criar("fidelidade").ShowDialog(this); Recarregar(); } break;
+            case "fidelidade": if (_status == "contas") AbrirContaFidelidade(); else { CriarVoucherFidelidade(); Recarregar(); } break;
         }
     }
 
     Control MontarCabecalho()
     {
-        var barra = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1, BackColor = Color.FromArgb(255, 255, 255), Padding = new Padding(14, 0, 14, 0), Margin = new Padding(0) };
+        var barra = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1, BackColor = Tokens.Claro.CorAcaoSobrePrincipal, Padding = new Padding(14, 0, 14, 0), Margin = new Padding(0) };
         barra.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 292));
         barra.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         barra.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 310));
         barra.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 155));
         barra.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         var marca = new Panel { Dock = DockStyle.Fill };
-        var logo = new PictureBox { Image = Icone.Logo(), SizeMode = PictureBoxSizeMode.Zoom, Size = new Size(36, 36), Location = new Point(0, 8), BackColor = Tokens.Preto, Padding = new Padding(3) };
+        var logo = new PictureBox { Image = Icone.Logo(), SizeMode = PictureBoxSizeMode.Zoom, Size = new Size(36, 36), Location = new Point(0, 8), BackColor = Tokens.Claro.CorSuperficieInversa, Padding = new Padding(3) };
         logo.Resize += (_, _) => KitVisual.AplicarRaio(logo, 9); KitVisual.AplicarRaio(logo, 9);
-        var marcaNome = new Label { Text = "Kartódromo Internacional de Betim", AutoSize = false, Width = 246, Height = 18, AutoEllipsis = true, Font = new Font("Segoe UI", 9.3F, FontStyle.Bold), ForeColor = KitVisual.Texto, Location = new Point(44, 9) };
-        var marcaSub = new Label { Text = "Módulo Office", AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = KitVisual.Secundario, Location = new Point(45, 27) };
+        var marcaNome = new Label { Text = "Kartódromo Internacional de Betim", AutoSize = false, Width = 246, Height = 18, AutoEllipsis = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo, FontStyle.Bold), ForeColor = KitVisual.Texto, Location = new Point(44, 9) };
+        var marcaSub = new Label { Text = "Módulo Office", AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoLegenda), ForeColor = KitVisual.Secundario, Location = new Point(45, 27) };
         marca.Controls.AddRange([logo, marcaNome, marcaSub]);
         var menus = MontarMenu();
         menus.Dock = DockStyle.Fill;
-        menus.BackColor = Color.White;
+        menus.BackColor = Tokens.Primitivo.Branco;
         menus.Padding = new Padding(0, 8, 0, 0);
-        var busca = new Panel { Dock = DockStyle.Fill, BackColor = Tokens.FundoCampo, Margin = new Padding(0, 10, 10, 10), Padding = new Padding(9, 3, 8, 0) };
+        var busca = new Panel { Dock = DockStyle.Fill, BackColor = Tokens.Claro.CorSuperficieCampo, Margin = new Padding(0, 10, 10, 10), Padding = new Padding(9, 3, 8, 0) };
         KitVisual.AplicarRaio(busca, 9);
         busca.SizeChanged += (_, _) => KitVisual.AplicarRaio(busca, 9);
         var q = _buscaGlobal;
         q.Dock = DockStyle.Fill;
         q.BackColor = busca.BackColor;
-        var atalho = new Label { Text = "F3", AutoSize = true, Dock = DockStyle.Right, ForeColor = KitVisual.Secundario, Font = new Font("Segoe UI", 8F), Padding = new Padding(4, 7, 0, 0) };
+        var atalho = new Label { Text = "F3", AutoSize = true, Dock = DockStyle.Right, ForeColor = KitVisual.Secundario, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoLegenda), Padding = new Padding(4, 7, 0, 0) };
         var lupa = new Label { Text = "\uE721", AutoSize = false, Width = 22, Dock = DockStyle.Left, ForeColor = KitVisual.Secundario, Font = new Font("Segoe MDL2 Assets", 9F), TextAlign = ContentAlignment.MiddleLeft };
         q.Margin = Padding.Empty;
         var qBox = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 7, 0, 0), BackColor = busca.BackColor };
@@ -466,12 +501,12 @@ public class FormPrincipal : Form
         circulo.Paint += (_, e) =>
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using var b = new LinearGradientBrush(circulo.ClientRectangle, Color.FromArgb(127, 184, 255), Tokens.Azul, 90f);
+            using var b = new LinearGradientBrush(circulo.ClientRectangle, Color.FromArgb(127, 184, 255), Tokens.Claro.CorTextoLink, 90f);
             e.Graphics.FillEllipse(b, circulo.ClientRectangle);
-            TextRenderer.DrawText(e.Graphics, letra, new Font("Segoe UI", 10F, FontStyle.Bold), circulo.ClientRectangle, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            TextRenderer.DrawText(e.Graphics, letra, Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo, FontStyle.Bold), circulo.ClientRectangle, Tokens.Primitivo.Branco, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
         };
         usuario.Controls.Add(circulo);
-        usuario.Controls.Add(new Label { Text = Sessao.Nome, AutoSize = false, Width = 116, Height = 18, Font = new Font("Segoe UI", 8.8F, FontStyle.Bold), ForeColor = KitVisual.Texto, Location = new Point(38, 17), AutoEllipsis = true });
+        usuario.Controls.Add(new Label { Text = Sessao.Nome, AutoSize = false, Width = 116, Height = 18, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold), ForeColor = KitVisual.Texto, Location = new Point(38, 17), AutoEllipsis = true });
         barra.Controls.Add(marca, 0, 0); barra.Controls.Add(menus, 1, 0); barra.Controls.Add(busca, 2, 0); barra.Controls.Add(usuario, 3, 0);
         barra.Paint += (_, e) => { using var pen = new Pen(KitVisual.Linha); e.Graphics.DrawLine(pen, 0, barra.Height - 1, barra.Width, barra.Height - 1); };
         return barra;
@@ -479,7 +514,7 @@ public class FormPrincipal : Form
 
     StatusStrip MontarStatus()
     {
-        var s = new StatusStrip { Font = new Font("Segoe UI", 8.3F), SizingGrip = false, BackColor = Color.White, ForeColor = KitVisual.Secundario, Dock = DockStyle.Fill };
+        var s = new StatusStrip { Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoLegenda), SizingGrip = false, BackColor = Tokens.Primitivo.Branco, ForeColor = KitVisual.Secundario, Dock = DockStyle.Fill };
         var host = new Uri(Config.ServidorUrl).Host;
         _sbCrono.Text = "● Cronometragem · verificando"; _sbCrono.ForeColor = KitVisual.Secundario;
         _sbSite.Text = "● Site · verificando"; _sbSite.ForeColor = KitVisual.Secundario;
@@ -500,7 +535,7 @@ public class FormPrincipal : Form
         try
         {
             await Sessao.Api.Get("/healthz");
-            _sbSrv.Text = "● Servidor on-line"; _sbSrv.ForeColor = Tokens.VerdeTexto;
+            _sbSrv.Text = "● Servidor on-line"; _sbSrv.ForeColor = Tokens.Claro.CorEstadoSucessoTexto;
             var c = (await Sessao.Api.Get("/api/office/caixa")).AsObject();
             if (c["aberto"] is JsonObject ab)
             {
@@ -517,7 +552,7 @@ public class FormPrincipal : Form
         }
         catch
         {
-            _sbSrv.Text = "● Servidor off-line"; _sbSrv.ForeColor = Tokens.Vermelho;
+            _sbSrv.Text = "● Servidor off-line"; _sbSrv.ForeColor = Tokens.Claro.CorEstadoPerigoTexto;
             _selo.Definir(false, "Terminal indisponível", "Não foi possível consultar o caixa");
         }
         await PingServico("crono", Config.CronoUrl, _sbCrono);
@@ -532,9 +567,9 @@ public class FormPrincipal : Form
             using var r = await http.GetAsync(baseUrl.TrimEnd('/') + "/healthz");
             var online = r.IsSuccessStatusCode;
             label.Text = $"● Cronometragem {(online ? "on-line" : "off-line")}";
-            label.ForeColor = online ? Tokens.VerdeTexto : Tokens.Vermelho;
+            label.ForeColor = online ? Tokens.Claro.CorEstadoSucessoTexto : Tokens.Claro.CorEstadoPerigoTexto;
         }
-        catch { label.Text = "● Cronometragem · off-line"; label.ForeColor = Tokens.Vermelho; }
+        catch { label.Text = "● Cronometragem · off-line"; label.ForeColor = Tokens.Claro.CorEstadoPerigoTexto; }
     }
 
     static async Task PingSite(ToolStripStatusLabel label)
@@ -546,15 +581,78 @@ public class FormPrincipal : Form
             var online = r.IsSuccessStatusCode;
             label.Text = $"● Site {(online ? "on-line" : "off-line")}";
             label.Visible = !online;
-            label.ForeColor = online ? Tokens.VerdeTexto : Tokens.Vermelho;
+            label.ForeColor = online ? Tokens.Claro.CorEstadoSucessoTexto : Tokens.Claro.CorEstadoPerigoTexto;
         }
-        catch { label.Text = "● Site · off-line"; label.ForeColor = Tokens.Vermelho; }
+        catch { label.Text = "● Site · off-line"; label.ForeColor = Tokens.Claro.CorEstadoPerigoTexto; }
+    }
+
+    // ------------------------------------------------------------------ comandos principais
+    // A barra, os menus e os atalhos chamam estes mesmos comandos. Assim uma
+    // mudança de fluxo não precisa ser corrigida em três lugares diferentes.
+    void AbrirClientes() => new FormCliente(null).Show(this);
+    void AbrirProdutos() => Cadastros.Abrir(this, "produtos");
+    void AbrirTraçados() => Cadastros.Abrir(this, "tracados");
+    void CriarReservas()
+    {
+        using var f = new FormCriarReservas();
+        f.ShowDialog(this);
+        Recarregar();
+    }
+    void AbrirAgenda()
+    {
+        using var f = new FormAgenda();
+        f.ShowDialog(this);
+        Recarregar();
+    }
+    void AbrirTerminal() => Caixa.Terminal(this);
+    void AbrirReceitaAvulsa() => Caixa.Checkout(this, null, null, null);
+    void AbrirSuprimento() => Caixa.Transacao(this, "suprimento");
+    void AbrirSangria() => Caixa.Transacao(this, "sangria");
+    void CriarVoucherFidelidade() => FormVoucher.Criar("fidelidade").ShowDialog(this);
+    void CriarVoucherParceiro() => FormVoucher.Criar("parceiro").ShowDialog(this);
+    void CriarVoucherManual() { FormVoucher.Criar("manual").ShowDialog(this); Recarregar(); }
+    void AbrirServicosOnline() => new FormServicosOnline().ShowDialog(this);
+
+    ToolStripItem[] MenuMaisAcoes() => [
+        new ToolStripLabel("Cadastros") { Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoLegenda, FontStyle.Bold), ForeColor = KitVisual.Secundario },
+        Item("Clientes", AbrirClientes, atalho: "F2"),
+        Item("Produtos", AbrirProdutos),
+        Item("Traçados", AbrirTraçados),
+        new ToolStripSeparator(),
+        new ToolStripLabel("Operação") { Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoLegenda, FontStyle.Bold), ForeColor = KitVisual.Secundario },
+        Item("Agenda", AbrirAgenda),
+        Item("Suprimento", AbrirSuprimento),
+        Item("Sangria", AbrirSangria),
+        Item("Serviços online", AbrirServicosOnline),
+        new ToolStripSeparator(),
+        new ToolStripLabel("Vouchers") { Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoLegenda, FontStyle.Bold), ForeColor = KitVisual.Secundario },
+        Item("Voucher de fidelidade", CriarVoucherFidelidade),
+        Item("Voucher de parceiro", CriarVoucherParceiro),
+    ];
+
+    void MostrarMenuMaisAcoes(Control ancora)
+    {
+        if (_menuMaisAcoes is { IsDisposed: false }) _menuMaisAcoes.Dispose();
+        var menu = new ContextMenuStrip
+        {
+            Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno),
+            Renderer = KitVisual.RenderizadorMenu(),
+            ShowImageMargin = false,
+            Padding = new Padding(6),
+        };
+        menu.Items.AddRange(MenuMaisAcoes());
+        // Não descartar no evento Closed: durante a abertura de um diálogo o
+        // WinForms ainda pode pedir ao filtro modal para ocultar este menu.
+        // Mantemos a instância até outro menu assumir a posse ou o formulário
+        // ser descartado, evitando Handle/ContextMenuStrip já destruído.
+        _menuMaisAcoes = menu;
+        menu.Show(ancora, new Point(0, ancora.Height));
     }
 
     // ------------------------------------------------------------------ menu
     MenuStrip MontarMenu()
     {
-        var m = new MenuStrip { Font = new Font("Segoe UI", 9F), BackColor = Color.White, Renderer = KitVisual.RenderizadorMenu(), Padding = new Padding(0, 5, 0, 0), GripStyle = ToolStripGripStyle.Hidden };
+        var m = new MenuStrip { Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno), BackColor = Tokens.Primitivo.Branco, Renderer = KitVisual.RenderizadorMenu(), Padding = new Padding(0, 5, 0, 0), GripStyle = ToolStripGripStyle.Hidden };
         var adm = Sessao.Admin;
         ToolStripMenuItem I(string t, Action a, bool hab = true) { var it = new ToolStripMenuItem(t, null, (_, _) => a()) { Enabled = hab }; return it; }
         ToolStripMenuItem S(string t, params object[] filhos)
@@ -566,7 +664,7 @@ public class FormPrincipal : Form
         // grupo do design (MenusOffice): título pequeno em negrito e os itens recuados logo abaixo, sem submenu
         ToolStripItem[] G(string titulo, params ToolStripMenuItem[] itens)
         {
-            var cab = new ToolStripLabel(titulo) { Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = KitVisual.Secundario, Margin = new Padding(0, 4, 0, 0) };
+            var cab = new ToolStripLabel(titulo) { Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoLegenda, FontStyle.Bold), ForeColor = KitVisual.Secundario, Margin = new Padding(0, 4, 0, 0) };
             foreach (var i in itens) i.Text = "    " + i.Text;
             return [cab, .. itens];
         }
@@ -578,17 +676,15 @@ public class FormPrincipal : Form
             new ToolStripSeparator(), I("Sair / trocar de usuário", () => Application.Restart()), A(I("Fechar", Close), "Alt+F4")));
         m.Items.Add(S("&Cadastros",
             I("Empresa", () => Cadastros.Empresa(this), adm), I("Feriados", () => Cadastros.Abrir(this, "feriados")), new ToolStripSeparator(),
-            A(I("Cliente", () => new FormCliente(null).Show(this)), "F2"), I("Produto", () => Cadastros.Abrir(this, "produtos")), I("Traçados", () => Cadastros.Abrir(this, "tracados")), new ToolStripSeparator(),
             G("POS", I("Turno", () => Cadastros.Abrir(this, "turnos")), I("Terminal", () => Cadastros.Abrir(this, "terminais"))), new ToolStripSeparator(),
             G("Oficina", I("Itens de manutenção", () => Cadastros.Abrir(this, "itensManutencao")), I("Registro de manutenções", () => Selecionar("oficina:arealizar")))));
         m.Items.Add(S("&Financeiro",
-            I("Métodos de pagamento", () => Cadastros.Abrir(this, "formas")), I("Terminal (abrir / fechar caixa)", () => Caixa.Terminal(this)),
-            I("Suprimento", () => Caixa.Transacao(this, "suprimento")), I("Sangria", () => Caixa.Transacao(this, "sangria")), new ToolStripSeparator(),
+            I("Métodos de pagamento", () => Cadastros.Abrir(this, "formas")), new ToolStripSeparator(),
             G("Programa de fidelidade", I("Contas", () => Selecionar("fidelidade:contas")), I("Transações", () => Selecionar("fidelidade:transacoes"))), new ToolStripSeparator(),
-            G("Vouchers", I("Cadastro de vouchers", () => Selecionar("vouchers:lista")), I("Histórico de consumo", () => Selecionar("vouchers:uso")), I("Criar voucher", () => FormVoucher.Criar("manual").ShowDialog(this))), new ToolStripSeparator(),
+            G("Vouchers", I("Cadastro de vouchers", () => Selecionar("vouchers:lista")), I("Histórico de consumo", () => Selecionar("vouchers:uso"))), new ToolStripSeparator(),
             G("Parceiros", I("Cadastro de parceiros", () => Cadastros.Abrir(this, "parceiros")), I("Comissões", () => Selecionar("parceiros:comissoes")))));
         m.Items.Add(S("F&erramentas", I("Parâmetros do sistema", () => Cadastros.Parametros(this), adm), I("Padrões de reservas", () => Cadastros.Abrir(this, "padroes")),
-            I("Criar reservas (mês ou ano)", () => { new FormCriarReservas().ShowDialog(this); Recarregar(); }), new ToolStripSeparator(), I("Serviços online", () => new FormServicosOnline().ShowDialog(this))));
+            new ToolStripSeparator(), I("Serviços online", AbrirServicosOnline)));
         m.Items.Add(S("&Relatórios",
             G("Cronometragem", I("Resultados da cronometragem", () => Relatorios.Cronometragem(this)), I("Classificação ao vivo (TV)", () => Relatorio.Abrir(this, Config.CronoUrl + "/tv", "TV"))), new ToolStripSeparator(),
             G("Financeiro", I("Receitas por forma de pagamento", () => Relatorios.Periodo(this, "receitas", "forma")), I("Receitas por clientes", () => Relatorios.Periodo(this, "receitas", "cliente")),
@@ -607,26 +703,27 @@ public class FormPrincipal : Form
     // ------------------------------------------------------------------ toolbar
     Control MontarToolbar()
     {
-        var barra = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, BackColor = Color.White, Padding = new Padding(12, 0, 16, 0), Margin = new Padding(0) };
+        var barra = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, BackColor = Tokens.Primitivo.Branco, Padding = new Padding(12, 0, 16, 0), Margin = new Padding(0) };
         barra.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); barra.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        var fluxo = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, AutoScroll = true, BackColor = Color.White, Margin = new Padding(0) };
+        var fluxo = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, AutoScroll = true, BackColor = Tokens.Primitivo.Branco, Margin = new Padding(0) };
         Control B(string icone, string texto, string dica, Action a) { AcoesBarra.Add((texto, a)); return VisualPrincipal.BotaoBarra(icone, texto, dica, a); }
+        // Pedido da recepção (02/10/2026): todas as ações à vista na barra, sem o menu "Mais ações" (três pontinhos).
         fluxo.Controls.AddRange([
-            B("clientes", "Clientes", "Cadastro de clientes (F2)", () => new FormCliente(null).Show(this)),
-            B("produtos", "Produtos", "Produtos e provas de cada locação", () => Cadastros.Abrir(this, "produtos")),
+            B("clientes", "Clientes", "Cadastro de clientes (F2)", AbrirClientes),
+            B("produtos", "Produtos", "Produtos e provas de cada locação", AbrirProdutos),
             VisualPrincipal.Separador(),
-            B("reservas", "Reservas", "Criar reservas avulsas ou pelo padrão", () => { new FormCriarReservas().ShowDialog(this); Recarregar(); }),
-            B("agenda", "Agenda", "Agenda mensal de baterias", () => { using (var f = new FormAgenda()) f.ShowDialog(this); Recarregar(); }),
+            B("reservas", "Nova reserva", "Criar reservas avulsas ou pelo padrão", CriarReservas),
+            B("agenda", "Agenda", "Agenda mensal de baterias", AbrirAgenda),
             VisualPrincipal.Separador(),
-            B("terminal", "Terminal", "Abrir ou fechar o caixa", () => Caixa.Terminal(this)),
-            B("receita", "Receita Avulsa", "Cobrar reservas e produtos (checkout)", () => Caixa.Checkout(this, null, null, null)),
-            B("suprimento", "Suprimento", "Colocar dinheiro no caixa", () => Caixa.Transacao(this, "suprimento")),
-            B("sangria", "Sangria", "Retirar dinheiro do caixa", () => Caixa.Transacao(this, "sangria")),
+            B("terminal", "Terminal", "Abrir ou fechar o caixa", AbrirTerminal),
+            B("receita", "Cobrar", "Cobrar reservas e produtos (checkout)", AbrirReceitaAvulsa),
+            B("suprimento", "Suprimento", "Colocar dinheiro no caixa", AbrirSuprimento),
+            B("sangria", "Sangria", "Retirar dinheiro do caixa", AbrirSangria),
             VisualPrincipal.Separador(),
-            B("vfidelidade", "Voucher (Fidelidade)", "Criar voucher para conta fidelidade", () => FormVoucher.Criar("fidelidade").ShowDialog(this)),
-            B("vparceiro", "Voucher (Parceiro)", "Criar voucher para parceiro", () => FormVoucher.Criar("parceiro").ShowDialog(this)),
+            B("vfidelidade", "Voucher (Fidelidade)", "Criar voucher para conta fidelidade", CriarVoucherFidelidade),
+            B("vparceiro", "Voucher (Parceiro)", "Criar voucher para parceiro", CriarVoucherParceiro),
             VisualPrincipal.Separador(),
-            B("online", "Serviços Online", "Site, WhatsApp e reservas online", () => new FormServicosOnline().ShowDialog(this)),
+            B("online", "Serviços Online", "Site, WhatsApp e reservas online", AbrirServicosOnline),
         ]);
         _selo.Anchor = AnchorStyles.Right; _selo.Margin = new Padding(8, 20, 0, 20);
         barra.Controls.Add(fluxo, 0, 0); barra.Controls.Add(_selo, 1, 0);
@@ -649,12 +746,13 @@ public class FormPrincipal : Form
             N("Vouchers", "g-vouchers", "vouchers:lista", N("Vouchers", "b", "vouchers:lista"), N("Histórico de uso", "b", "vouchers:uso")),
             N("Parceiros", "g-parceiros", "parceiros:lista", N("Parceiros", "b", "parceiros:lista"), N("Histórico de comissões", "b", "parceiros:comissoes"), N("Comissões pagas", "b", "parceiros:pagas")),
         ]);
-        _arvore.ExpandAll();
-        _arvore.BeforeCollapse += (_, e) => e.Cancel = true;
-        var fonteGrupo = new Font("Segoe UI", 8.6F, FontStyle.Bold);
-        var fonteItem = new Font("Segoe UI", 9.6F);
-        var fonteItemSel = new Font("Segoe UI", 9.6F, FontStyle.Bold);
-        var fonteConta = new Font("Segoe UI", 8.4F, FontStyle.Bold);
+        // Começa com divulgação progressiva: só o módulo escolhido fica aberto.
+        // O operador pode expandir outros módulos com mouse ou teclado quando precisar.
+        foreach (TreeNode no in _arvore.Nodes) no.Collapse();
+        var fonteGrupo = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold);
+        var fonteItem = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo);
+        var fonteItemSel = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo, FontStyle.Bold);
+        var fonteConta = Tokens.Fonte(Tokens.Claro.FonteTamanhoLegenda, FontStyle.Bold);
         _arvore.DrawNode += (_, e) =>
         {
             e.DrawDefault = false;
@@ -680,15 +778,16 @@ public class FormPrincipal : Form
                 {
                     var w = TextRenderer.MeasureText(num, fonteConta).Width + 12;
                     var r = new Rectangle(largura - w - 10, y + 5, w, 17);
-                    using var p = VisualPrincipal.Redondo(r, 8); using var b = new SolidBrush(Tokens.LaranjaVivo); g.FillPath(b, p);
-                    TextRenderer.DrawText(g, num, fonteConta, r, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                    using var p = VisualPrincipal.Redondo(r, 8); using var b = new SolidBrush(Tokens.Claro.CorEstadoAvisoSolido); g.FillPath(b, p);
+                    TextRenderer.DrawText(g, num, fonteConta, r, Tokens.Primitivo.Branco, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
                 }
-                else TextRenderer.DrawText(g, num, new Font("Segoe UI", 8.8F), new Rectangle(largura - 60, y, 50, e.Bounds.Height), KitVisual.Secundario, TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                else TextRenderer.DrawText(g, num, Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno), new Rectangle(largura - 60, y, 50, e.Bounds.Height), KitVisual.Secundario, TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
             }
         };
         _arvore.AfterSelect += (_, e) =>
         {
             if (e.Action is not (TreeViewAction.ByMouse or TreeViewAction.ByKeyboard)) return;
+            if (e.Node.Level == 0 && e.Node.Nodes.Count > 0) e.Node.Expand();
             _filtroBateria = _filtroContaFidelidade = null;
             if (e.Node.Tag is string k) Aplicar(k);
         };
@@ -700,7 +799,12 @@ public class FormPrincipal : Form
         var no = Achar(_arvore.Nodes);
         _filtroBateria = bateria;
         _filtroContaFidelidade = chave == "fidelidade:transacoes" ? contaFidelidade : null;
-        if (no != null && _arvore.SelectedNode != no) { _arvore.SelectedNode = no; _filtroBateria = bateria; }
+        if (no != null)
+        {
+            no.Parent?.Expand();
+            if (no.Level == 0 && no.Nodes.Count > 0) no.Expand();
+            if (_arvore.SelectedNode != no) { _arvore.SelectedNode = no; _filtroBateria = bateria; }
+        }
         Aplicar(chave);
     }
 
@@ -708,6 +812,7 @@ public class FormPrincipal : Form
     {
         var p = chave.Split(':');
         _grupo = p[0]; _status = p[1];
+        _grade.LimparFiltros();   // trocou de lista (a grade mantém filtros quando as colunas são as mesmas)
         AtualizarTitulo();
         _filtroBar.Visible = _grupo is "reservas" or "baterias" or "vendas" || _grupo == "fidelidade" && _status == "transacoes" || _grupo == "vouchers" && _status == "uso" || _grupo == "parceiros" && _status != "lista" || _grupo == "online" && _status != "atencao";
         Recarregar();
@@ -739,7 +844,10 @@ public class FormPrincipal : Form
             _ => "Módulo Office"
         };
         _acaoTopo.Text = _grupo switch { "reservas" or "baterias" => "+ Criar reservas", "vendas" => "Receita avulsa", "oficina" => "Itens de manutenção", "vouchers" => "+ Criar voucher", "parceiros" => "+ Novo parceiro", "fidelidade" => _status == "contas" ? "+ Abrir conta" : "+ Voucher com pontos", _ => "" };
-        _acaoTopo.Visible = _grupo is "reservas" or "baterias" or "vendas" or "oficina" or "vouchers" or "parceiros" or "fidelidade";
+        // Nova reserva, cobrança e vouchers já têm um único comando primário na
+        // toolbar. O botão contextual fica reservado aos módulos sem comando
+        // equivalente na barra, evitando duas ações verdes para a mesma coisa.
+        _acaoTopo.Visible = _grupo is "oficina" or "parceiros" || _grupo == "fidelidade" && _status == "contas";
         AtualizaPeriodos();
     }
 
@@ -793,23 +901,22 @@ public class FormPrincipal : Form
     {
         var formas = Sessao.Formas();
         if (formas.Length == 0) { Msg.Aviso(this, "Cadastre um método de pagamento antes."); return; }
-        using var j = new Janela(acao == "pagar" ? "Pagar comissão" : "Estornar pagamento da comissão", 520, 300);
+        // visual padrão (DialogoDesign), como as outras janelas de parceiro
+        using var j = new DialogoDesign(acao == "pagar" ? "Pagar comissão" : "Estornar pagamento da comissão", $"{c.S("parceiro")} · venda {c.S("vendaId")} · comissão {Fmt.Brl(c.L("comissaoCentavos"))}", "vparceiro", 620, acao == "pagar" ? 300 : 380);
         var forma = Campos.Combo(); forma.Items.AddRange(formas); forma.SelectedIndex = 0;
-        var motivo = new TextBox();
-        var g = Campos.Grade(2);
-        var resumo = new Label { Text = $"{c.S("parceiro")} · venda {c.S("vendaId")} · comissão {Fmt.Brl(c.L("comissaoCentavos"))}", AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold), Margin = new Padding(3, 3, 3, 12) };
-        g.Controls.Add(resumo); g.SetColumnSpan(resumo, 2);
-        Campos.Add(g, acao == "pagar" ? "Pago com" : "Devolvido para", forma, 2);
-        if (acao == "estornar") Campos.Add(g, "Motivo do estorno", motivo, 2);
-        j.Controls.Add(new Panel { Dock = DockStyle.Fill, Padding = new Padding(10), Controls = { g } });
+        var motivo = new TextBox { BorderStyle = BorderStyle.None };
+        var g = j.Secao(null);
+        j.Campo(g, acao == "pagar" ? "Pago com" : "Devolvido para", forma, 6);
+        if (acao == "estornar") j.Campo(g, "Motivo do estorno", motivo, 6);
         var chave = acao + "-" + Guid.NewGuid().ToString("N");
-        j.Rodape(("Cancelar", (_, _) => j.Close(), false), (acao == "pagar" ? "Confirmar pagamento" : "Confirmar estorno", (_, _) => Seguro.Rodar(j, async () =>
+        j.BotaoRodape(acao == "pagar" ? "Confirmar pagamento" : "Confirmar estorno", true, () => Seguro.Rodar(j, async () =>
         {
             if (acao == "estornar" && string.IsNullOrWhiteSpace(motivo.Text)) { Msg.Aviso(j, "Informe o motivo do estorno."); return; }
             await Sessao.Api.Post($"/api/office/parceiros/comissoes/{c.S("id")}/{acao}", new { idempotencyKey = chave, formaPagamentoId = Campos.IdDe(forma), motivo = motivo.Text.Trim() });
             j.Close();
             Recarregar();
-        }), true));
+        }));
+        j.BotaoRodape("Cancelar", false, j.Close);
         j.ShowDialog(this);
     }
 
@@ -818,7 +925,20 @@ public class FormPrincipal : Form
         return $"filtro={_periodo}&data={Fmt.Iso(_data.Value)}";
     }
 
-    public void Recarregar() => Seguro.Rodar(this, CarregarAsync);
+    /// <param name="silencioso">atualização automática de 10 s: sem ponteiro de espera e sem janela de erro</param>
+    public void Recarregar(bool silencioso = false)
+    {
+        // automática: a lista atual fica na tela (sem "Carregando…" por cima) até os dados novos chegarem
+        if (silencioso) _sincronizando = true; else _grade.Carregando = true;
+        Seguro.Rodar(this, async () =>
+        {
+            try { await CarregarAsync(); }
+            finally { if (silencioso) _sincronizando = false; else { _grade.Carregando = false; _grade.Invalidate(); } }
+        }, silencioso);
+    }
+
+    bool _sincronizando;
+    int _colunasAjustadas = -1;
 
     int _seqCarga;
 
@@ -840,14 +960,18 @@ public class FormPrincipal : Form
             ("online", "atencao") => "Nenhum pedido precisa de atenção.",
             _ when usaPeriodo && _periodo == "dia" => $"Nenhum registro em {_data.Value:dd/MM/yyyy}.\nPara ver outros dias, use “Neste mês” ou “Todas” em Exibir dados.",
             _ when usaPeriodo && _periodo == "mes" => $"Nenhum registro em {_data.Value:MM/yyyy}.",
-            _ => "Nenhum registro.",
+            _ => "Não há registros para este filtro. Ajuste o período ou escolha outra lista.",
         };
         _menuAtual = null;
         switch (_grupo)
         {
             case "reservas":
                 _grade.Colunas([
-                    new("pago", "Pago", TipoCol.Bool), new("dataHora", "Data/Hora", TipoCol.DataHora), new("reserva", "Reserva", Largura: 150), new("cliente", "Cliente", Largura: 240),
+                    new("pago", "Pago", TipoCol.Bool),
+                    // 13/10 (dono): situação e forma de pagamento à vista — paga / aguardando / pré-reserva / cancelada; Pix, crédito, débito…
+                    new("situacao", "Situação", Largura: 118, Valor: SituacaoReserva),
+                    new("formaPagamento", "Pagamento", Largura: 130, Valor: r => r.S("status") == "cancelada" ? "—" : r.S("formaPagamento") is { Length: > 0 } f ? f : r.B("pago") ? "Não informado" : "—"),
+                    new("dataHora", "Data/Hora", TipoCol.DataHora), new("reserva", "Reserva", Largura: 150), new("cliente", "Cliente", Largura: 240),
                     .. (Sessao.ParamSim("office.exibirColunaResponsavel", false) ? new Col[] { new("responsavel", "Responsável") } : []),
                     new("produto", "Produto", Largura: 220), new("categoria", "Categoria", Largura: 110), new("preco", "Preço", TipoCol.Dinheiro, 90), new("desconto", "Desconto", TipoCol.Dinheiro, 90),
                     new("total", "Total", TipoCol.Dinheiro, 90), new("observacao", "Observação")]);
@@ -895,7 +1019,7 @@ public class FormPrincipal : Form
                 {
                     if (r.B("realizada")) return null;
                     var limite = (r.L("limiteHoras") ?? 0) * 60; var uso = r.L("minutosUso") ?? 0;
-                    return limite <= 0 ? null : uso >= limite ? Tokens.Vermelho : uso >= limite * 0.8 ? Tokens.Laranja : null; // 80%, igual ao "A realizar"
+                    return limite <= 0 ? null : uso >= limite ? Tokens.Claro.CorEstadoPerigoTexto : uso >= limite * 0.8 ? Tokens.Claro.CorEstadoAvisoTexto : null; // 80%, igual ao "A realizar"
                 };
                 _menuAtual = MenuOficina;
                 rows = await Sessao.Api.Lista($"/api/office/manutencoes?status={_status}");
@@ -928,7 +1052,7 @@ public class FormPrincipal : Form
                 {
                     _grade.Colunas(new("dataHora", "Data/Hora", TipoCol.DataHora), new("conta", "Conta", Largura: 240), new("tipo", "Tipo", Largura: 90), new("motivo", "Descrição", Largura: 300),
                         new("pontos", "Pontos", TipoCol.Inteiro), new("saldoApos", "Saldo após", TipoCol.Inteiro), new("usuario", "Usuário", Largura: 120));
-                    _grade.CorLinha = r => (r.L("pontos") ?? 0) < 0 ? Tokens.Vermelho : null;
+                    _grade.CorLinha = r => (r.L("pontos") ?? 0) < 0 ? Tokens.Claro.CorEstadoPerigoTexto : null;
                     rows = await Sessao.Api.Lista(_filtroContaFidelidade != null
                         ? $"/api/office/fidelidade/contas/{_filtroContaFidelidade.S("id")}/transacoes?{Periodo()}"
                         : $"/api/office/fidelidade/transacoes?{Periodo()}");
@@ -947,9 +1071,9 @@ public class FormPrincipal : Form
                     new("dataHora", "Pedido em", TipoCol.DataHora), new("codigo", "Código", Largura: 80), new("cliente", "Quem reservou", Largura: 210), new("telefone", "Telefone", Largura: 120),
                     new("inicio", "Bateria", Largura: 150, Valor: r => r.D("inicio") is DateTime i ? $"{i:dd/MM HH:mm} · {r.S("bateria")}" : r.S("bateria")),
                     new("quantidade", "Pilotos", TipoCol.Inteiro, 60), new("valor", "Valor", TipoCol.Dinheiro, 90),
-                    new("forma", "Pagamento", Largura: 90, Valor: r => r.S("forma") == "pix" ? "Pix" : r.S("forma") == "cartao" ? "Cartão" : ""),
+                    new("forma", "Pagamento", Largura: 90, Valor: r => r.S("forma") switch { "pix" => "Pix", "credito" => "Crédito", "debito" => "Débito", "cartao" => "Cartão", _ => "" }),
                     new("status", "Situação", Largura: 200, Valor: r => SituacaoOnline(r.S("status"))), new("pilotos", "Pilotos informados")]);
-                _grade.CorLinha = r => r.S("status") switch { "pago_sem_vaga" => Tokens.Vermelho, "expirado" => Color.Silver, "aguardando" => Tokens.Laranja, _ => null };
+                _grade.CorLinha = r => r.S("status") switch { "pago_sem_vaga" => Tokens.Claro.CorEstadoPerigoTexto, "expirado" => Color.Silver, "aguardando" => Tokens.Claro.CorEstadoAvisoTexto, _ => null };
                 _menuAtual = sel => [
                     Item("Ver as reservas desta bateria", () => Selecionar("reservas:todas", new JsonObject { ["id"] = sel[0].L("bateriaId"), ["nome"] = sel[0].S("bateria"), ["dataHora"] = sel[0].S("inicio") }), sel.Count == 1),
                     Item("Marcar como resolvido (valor devolvido ou remarcado)", () => Seguro.Rodar(this, async () =>
@@ -977,7 +1101,7 @@ public class FormPrincipal : Form
                         new("valorVendaCentavos", "Valor venda (R$)", TipoCol.Dinheiro), new("percentual", "%", Largura: 55), new("comissaoCentavos", "Comissão (R$)", TipoCol.Dinheiro),
                         new("situacao", "Situação", Largura: 90, Valor: r => r.S("situacao") switch { "paga" => "Paga", "estornada" => "Estornada", _ => "Pendente" }),
                         new("metodoPagamento", "Pago com", Largura: 110), new("pagoEm", "Pago em", TipoCol.DataHora));
-                    _grade.CorLinha = r => r.S("situacao") == "estornada" ? Color.Gray : r.S("situacao") == "pendente" ? Tokens.Laranja : null;
+                    _grade.CorLinha = r => r.S("situacao") == "estornada" ? Color.Gray : r.S("situacao") == "pendente" ? Tokens.Claro.CorEstadoAvisoTexto : null;
                     rows = await Sessao.Api.Lista($"/api/office/parceiros/comissoes?status={(_status == "pagas" ? "pagas" : "todas")}&{Periodo()}");
                 }
                 _menuAtual = _status == "lista" ? sel => [
@@ -993,7 +1117,8 @@ public class FormPrincipal : Form
                 break;
         }
         if (seq != _seqCarga || IsDisposed) return;
-        VisualPrincipal.AjustarColunas(_grade);
+        // visual das colunas só quando elas foram refeitas (antes: a cada 10 s, com fontes novas a cada vez)
+        if (_grade.VersaoColunas != _colunasAjustadas) { VisualPrincipal.AjustarColunas(_grade); _colunasAjustadas = _grade.VersaoColunas; }
         _grade.Carregar(rows);
         AtualizarResumo(rows);
         Totais();
@@ -1065,7 +1190,11 @@ public class FormPrincipal : Form
     };
 
     /// <summary>Vermelho só quando há algo a ver: "R$ 0,00" em vermelho parecia problema.</summary>
-    static Color? Alerta(long valor) => valor > 0 ? Tokens.Vermelho : null;
+    static Color? Alerta(long valor) => valor > 0 ? Tokens.Claro.CorEstadoPerigoTexto : null;
+
+    /// <summary>Situação da reserva em palavras (a etiqueta colorida sai em VisualPrincipal.PintarCelulas).</summary>
+    internal static object SituacaoReserva(JsonObject r) =>
+        r.S("status") == "cancelada" ? "Cancelada" : r.B("pago") ? "Paga" : r["aprovada"] != null && !r.B("aprovada") ? "Pré-reserva" : "A pagar";
 
     /// <summary>Controle da oficina que pede atenção: não realizado e vencido ou com 80% do limite de horas.</summary>
     static bool PrecisaManutencao(JsonObject r) =>
@@ -1096,37 +1225,37 @@ public class FormPrincipal : Form
         {
             "reservas" => [
                 ("Reservas", rows.Count.ToString(), null),
-                ("Pré-reservas para aprovar", rows.Count(r => !r.B("aprovada") && r.S("status") != "cancelada").ToString(), Tokens.Laranja),
-                ("Recebido", Fmt.Brl(rows.Where(r => r.B("pago")).Sum(r => r.L("total") ?? 0)), Tokens.VerdeTexto),
+                ("Pré-reservas para aprovar", rows.Count(r => !r.B("aprovada") && r.S("status") != "cancelada").ToString(), Tokens.Claro.CorEstadoAvisoTexto),
+                ("Recebido", Fmt.Brl(rows.Where(r => r.B("pago")).Sum(r => r.L("total") ?? 0)), Tokens.Claro.CorEstadoSucessoTexto),
                 ("A receber", Fmt.Brl(rows.Where(r => !r.B("pago") && r.S("status") != "cancelada").Sum(r => r.L("total") ?? 0)), null)],
             "baterias" => [
                 ("Baterias", rows.Count.ToString(), null), ("Vagas", rows.Sum(r => r.I("vagas")).ToString(), null),
-                ("Reservas", rows.Sum(r => r.I("inscritos")).ToString(), null), ("Pagos", rows.Sum(r => r.I("pagos")).ToString(), Tokens.VerdeTexto)],
+                ("Reservas", rows.Sum(r => r.I("inscritos")).ToString(), null), ("Pagos", rows.Sum(r => r.I("pagos")).ToString(), Tokens.Claro.CorEstadoSucessoTexto)],
             "vendas" => [
                 ("Vendas", rows.Count.ToString(), null), ("Descontos", Fmt.Brl(rows.Sum(r => r.L("desconto") ?? 0)), Alerta(rows.Sum(r => r.L("desconto") ?? 0))),
                 ("Estornos", Fmt.Brl(rows.Sum(r => r.L("estorno") ?? 0)), Alerta(rows.Sum(r => r.L("estorno") ?? 0))),
-                ("Total final", Fmt.Brl(rows.Where(r => !r.B("cancelada")).Sum(r => r.L("final") ?? 0)), Tokens.VerdeTexto)],
+                ("Total final", Fmt.Brl(rows.Where(r => !r.B("cancelada")).Sum(r => r.L("final") ?? 0)), Tokens.Claro.CorEstadoSucessoTexto)],
             "oficina" => [
                 ("Vencidas", rows.Count(r => !r.B("realizada") && r.I("limiteHoras") > 0 && r.I("minutosUso") >= r.I("limiteHoras") * 60).ToString(), Alerta(rows.Count(r => !r.B("realizada") && r.I("limiteHoras") > 0 && r.I("minutosUso") >= r.I("limiteHoras") * 60))),
-                ("Perto do limite (80%)", rows.Count(r => !r.B("realizada") && r.I("limiteHoras") > 0 && r.I("minutosUso") >= r.I("limiteHoras") * 48 && r.I("minutosUso") < r.I("limiteHoras") * 60).ToString(), Tokens.Laranja),
-                ("Realizadas", rows.Count(r => r.B("realizada")).ToString(), Tokens.VerdeTexto),
+                ("Perto do limite (80%)", rows.Count(r => !r.B("realizada") && r.I("limiteHoras") > 0 && r.I("minutosUso") >= r.I("limiteHoras") * 48 && r.I("minutosUso") < r.I("limiteHoras") * 60).ToString(), Tokens.Claro.CorEstadoAvisoTexto),
+                ("Realizadas", rows.Count(r => r.B("realizada")).ToString(), Tokens.Claro.CorEstadoSucessoTexto),
                 ("Registros", rows.Count.ToString(), null)],
             "vouchers" => [
-                ("Vouchers", rows.Count.ToString(), null), ("Ativos", rows.Count(r => r.B("ativo")).ToString(), Tokens.VerdeTexto),
-                ("Usos", rows.Sum(r => r.I("usos")).ToString(), null), ("Vencem em 7 dias", rows.Count(r => r.D("fim") is DateTime d && d >= DateTime.Today && d <= DateTime.Today.AddDays(7)).ToString(), Tokens.Laranja)],
-            "fidelidade" when _status == "contas" => [("Contas", rows.Count.ToString(), null), ("Ativas", rows.Count(r => r.B("ativo")).ToString(), Tokens.VerdeTexto),
-                ("Pontos em aberto", rows.Sum(r => r.L("saldo") ?? 0).ToString("N0", Fmt.Br), Tokens.Laranja), ("Baterias pagas", rows.Sum(r => r.I("baterias")).ToString(), null)],
-            "fidelidade" => [("Transações", rows.Count.ToString(), null), ("Pontos creditados", rows.Where(r => (r.L("pontos") ?? 0) > 0).Sum(r => r.L("pontos") ?? 0).ToString("N0", Fmt.Br), Tokens.VerdeTexto),
+                ("Vouchers", rows.Count.ToString(), null), ("Ativos", rows.Count(r => r.B("ativo")).ToString(), Tokens.Claro.CorEstadoSucessoTexto),
+                ("Usos", rows.Sum(r => r.I("usos")).ToString(), null), ("Vencem em 7 dias", rows.Count(r => r.D("fim") is DateTime d && d >= DateTime.Today && d <= DateTime.Today.AddDays(7)).ToString(), Tokens.Claro.CorEstadoAvisoTexto)],
+            "fidelidade" when _status == "contas" => [("Contas", rows.Count.ToString(), null), ("Ativas", rows.Count(r => r.B("ativo")).ToString(), Tokens.Claro.CorEstadoSucessoTexto),
+                ("Pontos em aberto", rows.Sum(r => r.L("saldo") ?? 0).ToString("N0", Fmt.Br), Tokens.Claro.CorEstadoAvisoTexto), ("Baterias pagas", rows.Sum(r => r.I("baterias")).ToString(), null)],
+            "fidelidade" => [("Transações", rows.Count.ToString(), null), ("Pontos creditados", rows.Where(r => (r.L("pontos") ?? 0) > 0).Sum(r => r.L("pontos") ?? 0).ToString("N0", Fmt.Br), Tokens.Claro.CorEstadoSucessoTexto),
                 ("Pontos debitados", (-rows.Where(r => (r.L("pontos") ?? 0) < 0).Sum(r => r.L("pontos") ?? 0)).ToString("N0", Fmt.Br), Alerta(-rows.Where(r => (r.L("pontos") ?? 0) < 0).Sum(r => r.L("pontos") ?? 0))), ("Contas", rows.Select(r => r.S("conta")).Distinct().Count().ToString(), null)],
             "online" => [
                 ("Pedidos", rows.Count.ToString(), null),
-                ("Pilotos pagos", rows.Where(r => r.S("status") is "pago" or "resolvido").Sum(r => r.I("quantidade")).ToString(), Tokens.VerdeTexto),
-                ("Recebido online", Fmt.Brl(rows.Where(r => r.S("status") is "pago" or "resolvido").Sum(r => r.L("valor") ?? 0)), Tokens.VerdeTexto),
+                ("Pilotos pagos", rows.Where(r => r.S("status") is "pago" or "resolvido").Sum(r => r.I("quantidade")).ToString(), Tokens.Claro.CorEstadoSucessoTexto),
+                ("Recebido online", Fmt.Brl(rows.Where(r => r.S("status") is "pago" or "resolvido").Sum(r => r.L("valor") ?? 0)), Tokens.Claro.CorEstadoSucessoTexto),
                 ("Precisa de atenção", rows.Count(r => r.S("status") == "pago_sem_vaga").ToString(), Alerta(rows.Count(r => r.S("status") == "pago_sem_vaga")))],
             "parceiros" when _status == "lista" => [("Parceiros", rows.Count(r => r.B("ativo")).ToString(), null), ("Vendas indicadas", rows.Sum(r => r.I("vendasIndicadas")).ToString(), null),
-                ("Comissão a pagar", Fmt.Brl(rows.Sum(r => r.L("comissaoPendenteCentavos") ?? 0)), Tokens.Laranja), ("Comissão paga", Fmt.Brl(rows.Sum(r => r.L("comissaoPagaCentavos") ?? 0)), Tokens.VerdeTexto)],
+                ("Comissão a pagar", Fmt.Brl(rows.Sum(r => r.L("comissaoPendenteCentavos") ?? 0)), Tokens.Claro.CorEstadoAvisoTexto), ("Comissão paga", Fmt.Brl(rows.Sum(r => r.L("comissaoPagaCentavos") ?? 0)), Tokens.Claro.CorEstadoSucessoTexto)],
             "parceiros" => [("Comissões", rows.Count.ToString(), null), ("Vendas indicadas", Fmt.Brl(rows.Sum(r => r.L("valorVendaCentavos") ?? 0)), null),
-                ("A pagar", Fmt.Brl(rows.Where(r => r.S("situacao") == "pendente").Sum(r => r.L("comissaoCentavos") ?? 0)), Tokens.Laranja), ("Pagas", Fmt.Brl(rows.Where(r => r.S("situacao") == "paga").Sum(r => r.L("comissaoCentavos") ?? 0)), Tokens.VerdeTexto)],
+                ("A pagar", Fmt.Brl(rows.Where(r => r.S("situacao") == "pendente").Sum(r => r.L("comissaoCentavos") ?? 0)), Tokens.Claro.CorEstadoAvisoTexto), ("Pagas", Fmt.Brl(rows.Where(r => r.S("situacao") == "paga").Sum(r => r.L("comissaoCentavos") ?? 0)), Tokens.Claro.CorEstadoSucessoTexto)],
             _ => [("Registros", rows.Count.ToString(), null), ("—", "—", null), ("—", "—", null), ("—", "—", null)]
         };
         for (var i = 0; i < Math.Min(cards.Length, _resumo.Controls.Count); i++)
@@ -1246,15 +1375,15 @@ sealed class MenuRecepcaoRenderer : ToolStripProfessionalRenderer
 {
     sealed class Cores : ProfessionalColorTable
     {
-        public override Color ToolStripDropDownBackground => Tokens.SuperficieSuave;
-        public override Color MenuBorder => Tokens.Linha;
-        public override Color MenuItemSelected => Tokens.VerdeSuave;
-        public override Color MenuItemSelectedGradientBegin => Tokens.VerdeSuave;
-        public override Color MenuItemSelectedGradientEnd => Tokens.VerdeSuave;
-        public override Color MenuItemPressedGradientBegin => Tokens.VerdeSuave;
-        public override Color MenuItemPressedGradientEnd => Tokens.VerdeSuave;
-        public override Color SeparatorDark => Tokens.Linha;
-        public override Color SeparatorLight => Tokens.Linha;
+        public override Color ToolStripDropDownBackground => Tokens.Claro.CorSuperficieSuave;
+        public override Color MenuBorder => Tokens.Claro.CorBordaSutil;
+        public override Color MenuItemSelected => Tokens.Claro.CorEstadoSucessoFundo;
+        public override Color MenuItemSelectedGradientBegin => Tokens.Claro.CorEstadoSucessoFundo;
+        public override Color MenuItemSelectedGradientEnd => Tokens.Claro.CorEstadoSucessoFundo;
+        public override Color MenuItemPressedGradientBegin => Tokens.Claro.CorEstadoSucessoFundo;
+        public override Color MenuItemPressedGradientEnd => Tokens.Claro.CorEstadoSucessoFundo;
+        public override Color SeparatorDark => Tokens.Claro.CorBordaSutil;
+        public override Color SeparatorLight => Tokens.Claro.CorBordaSutil;
     }
 
     public MenuRecepcaoRenderer() : base(new Cores()) { }
@@ -1271,7 +1400,7 @@ sealed class MenuRecepcaoRenderer : ToolStripProfessionalRenderer
         if (bounds.Width < 4 || bounds.Height < 4) return;
         bounds.Inflate(-1, -1);
         using var path = RetanguloArredondado(bounds, 12);
-        using var brush = new SolidBrush(Tokens.SuperficieSuave);
+        using var brush = new SolidBrush(Tokens.Claro.CorSuperficieSuave);
         var smoothing = e.Graphics.SmoothingMode;
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         e.Graphics.FillPath(brush, path);
@@ -1294,7 +1423,7 @@ sealed class MenuRecepcaoRenderer : ToolStripProfessionalRenderer
         var bounds = e.ToolStrip.ClientRectangle;
         bounds.Inflate(-1, -1);
         using var path = RetanguloArredondado(bounds, 12);
-        using var pen = new Pen(Tokens.Linha);
+        using var pen = new Pen(Tokens.Claro.CorBordaSutil);
         var smoothing = e.Graphics.SmoothingMode;
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         e.Graphics.DrawPath(pen, path);
@@ -1310,8 +1439,8 @@ sealed class MenuRecepcaoRenderer : ToolStripProfessionalRenderer
             bounds.Inflate(-3, -1);
             using var path = RetanguloArredondado(bounds, 7);
             var cor = principal
-                ? e.Item.Selected ? Color.FromArgb(8, 85, 58) : Tokens.Verde
-                : Tokens.VerdeSuave;
+                ? e.Item.Selected ? Color.FromArgb(8, 85, 58) : Tokens.Claro.CorAcaoPrincipal
+                : Tokens.Claro.CorEstadoSucessoFundo;
             using var brush = new SolidBrush(cor);
             var smoothing = e.Graphics.SmoothingMode;
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
@@ -1323,7 +1452,7 @@ sealed class MenuRecepcaoRenderer : ToolStripProfessionalRenderer
     protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
     {
         var y = e.Item.Height / 2;
-        using var pen = new Pen(Tokens.Linha);
+        using var pen = new Pen(Tokens.Claro.CorBordaSutil);
         e.Graphics.DrawLine(pen, 9, y, e.Item.Width - 9, y);
     }
 

@@ -40,8 +40,6 @@
     "node_modules",
     "dist",
     "tmp",
-    "src/main.tsx",
-    "vite.config.ts",
     ".aiox-core",
     ".agents",
     ".codex"

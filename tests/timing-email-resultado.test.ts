@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Competitor, Session, Standing } from '../lib/timing/race-engine';
-import { assunto, destinatarios, emailValido, htmlEmail, htmlPdfVoltaAVolta, nomeArquivo, tempo, textoEmail, voltasDoPiloto, type ContextoProva } from '../lib/timing/email-resultado';
+import { AVISO_ATRASO, assunto, destinatarios, emailValido, htmlEmail, htmlPdfResultado, htmlPdfVoltaAVolta, nomeArquivo, tempo, textoEmail, voltasDoPiloto, type ContextoProva } from '../lib/timing/email-resultado';
 
 const comp = (kart: string, name: string, extra: Partial<Competitor> = {}): Competitor => ({ kart, name, crossings: [], finished: false, ...extra });
 const sessao = (competitors: Competitor[]): Session => ({ id: 's1', name: 'BATERIA 17:00 · CORRIDA', type: 'corrida', durationMs: 0, maxLaps: null, minLapMs: 0, state: 'encerrada', createdAt: 0, startedAt: 0, checkeredAt: null, finishedAt: 0, competitors });
@@ -64,6 +64,15 @@ describe('e-mail do resultado', () => {
     expect(html).toContain('cid:logo-kartodromo');
     expect(textoEmail(ctx, p)).toContain('Posição: 1º de 2');
     expect(assunto(ctx)).toBe('Resultado oficial · BATERIA 17:00 · CORRIDA | Kartódromo Internacional de Betim');
+    expect(html).not.toContain('Pedimos desculpas');
+  });
+
+  it('reenvio atrasado abre com o pedido de desculpas (html e texto)', () => {
+    const p = { nome: 'MARIA SOUZA', kart: '07', email: 'maria@exemplo.com', standing: ctx.classificacao[0], voltas: [] };
+    expect(htmlEmail(ctx, p, null, AVISO_ATRASO)).toContain('Pedimos desculpas pelo atraso');
+    const texto = textoEmail(ctx, p, AVISO_ATRASO).split('\n');
+    expect(texto[0]).toBe('Olá, Maria!');
+    expect(texto[2]).toBe(AVISO_ATRASO);
   });
 
   it('PDF do volta a volta traz o piloto e as voltas', () => {
@@ -73,5 +82,35 @@ describe('e-mail do resultado', () => {
     expect(html).toContain('melhor volta');
     expect(html).toContain('+0.786');
     expect(nomeArquivo('Volta a volta João kart 07')).toBe('Volta-a-volta-Joao-kart-07');
+  });
+
+  it('leva melhor volta da sessão, como ler e somente notas permitidas aos PDFs e ao e-mail', () => {
+    const ctxNotas: ContextoProva = {
+      ...ctx,
+      observacoes: [
+        { text: 'Troca de kart · Maria do kart 07 para o 12', kind: 'kart-swap', author: 'Diretor', wallMs: 1_000 },
+        { text: 'Piloto informado pela direção de prova', kind: 'manual', author: 'Diretor', wallMs: 2_000 },
+        { text: 'Condição de pista: chuva', kind: 'system', author: 'Cronometragem', wallMs: 3_000 },
+        { text: 'ADV: Kart 31 cortou a chicane', kind: 'manual', author: 'Diretor', wallMs: 3_500 },
+        { text: 'PEN +5 s: Kart 12 (JOÃO SILVA)', author: 'Diretor', wallMs: 4_000 },
+      ],
+      penalidades: [{ kart: '12', nome: 'JOÃO SILVA', tipo: 'tempo', segundos: 5, texto: 'PEN +5 s: Kart 12', wallMs: 4_000 }],
+    };
+    const p = { nome: 'MARIA SOUZA', kart: '07', email: 'maria@exemplo.com', standing: ctxNotas.classificacao[0], voltas: [] };
+    const html = htmlEmail(ctxNotas, p, null);
+    const texto = textoEmail(ctxNotas, p);
+    const pdf = htmlPdfResultado(ctxNotas, null);
+
+    for (const output of [html, texto, pdf]) {
+      expect(output).toContain('MELHOR VOLTA DA SESSÃO');
+      expect(output).toContain('COMO LER');
+      expect(output).toContain('Troca de kart');
+      // áudio 06/10: só advertência, penalização e troca de kart vão para o resultado
+      expect(output).not.toContain('Piloto informado pela direção de prova');
+      expect(output).toContain('ADV: Kart 31 cortou a chicane');
+      expect(output.split('PEN +5 s: Kart 12').length - 1).toBe(1); // a penalidade antiga não sai em dobro
+      expect(output).toContain('PENALIDADES E PUNIÇÕES');
+      expect(output).not.toContain('Condição de pista: chuva');
+    }
   });
 });

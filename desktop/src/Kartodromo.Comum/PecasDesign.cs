@@ -28,7 +28,7 @@ public static class PecasDesign
         g.SmoothingMode = SmoothingMode.AntiAlias;
         using (var path = Forma.Redondo(new Rectangle(1, 1, 69, 69), 18))
         using (var b = new LinearGradientBrush(new Rectangle(0, 0, 72, 72), cima, baixo, 90f)) g.FillPath(b, path);
-        using var pen = new Pen(Color.White, 5f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
+        using var pen = new Pen(Tokens.Primitivo.Branco, 5f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
         if (caminho == "seta") { g.DrawLine(pen, 22, 36, 50, 36); g.DrawLines(pen, [new PointF(39, 25), new PointF(50, 36), new PointF(39, 47)]); }
         else if (caminho == "pessoa") { g.DrawEllipse(pen, 28, 17, 16, 16); g.DrawArc(pen, 20, 39, 32, 30, 200, 140); }
         else if (caminho == "bandeira") { g.DrawLine(pen, 24, 54, 24, 18); g.DrawLines(pen, [new PointF(24, 19), new PointF(48, 19), new PointF(42, 28), new PointF(48, 37), new PointF(24, 37)]); }
@@ -38,7 +38,7 @@ public static class PecasDesign
     /// <summary>dd/MM de uma data ISO (vazio se não tiver data).</summary>
     public static string DiaMes(string iso) { var d = Kartodromo.Comum.Fmt.Dmy(iso); return d.Length >= 5 ? d[..5] : d; }
 
-    public static TextBox Texto(string valor = "", int max = 200) => new() { Text = valor, MaxLength = max, BorderStyle = BorderStyle.None, Font = FonteValor, ForeColor = CorTexto, BackColor = Color.White };
+    public static TextBox Texto(string valor = "", int max = 200) => new() { Text = valor, MaxLength = max, BorderStyle = BorderStyle.None, Font = FonteValor, ForeColor = CorTexto, BackColor = Tokens.Primitivo.Branco };
 
     /// <summary>Caixa de texto só com números.</summary>
     public static TextBox Numero(int valor, int max = 5)
@@ -77,7 +77,7 @@ public class ListaDesign : ComboBox
         FlatStyle = FlatStyle.Flat;
         Font = PecasDesign.FonteValor;
         ItemHeight = 22;
-        BackColor = Color.White;
+        BackColor = Tokens.Primitivo.Branco;
         ForeColor = PecasDesign.CorTexto;
         Cursor = Cursors.Hand;
     }
@@ -86,7 +86,7 @@ public class ListaDesign : ComboBox
     {
         if (e.Index < 0) return;
         var sel = (e.State & DrawItemState.Selected) != 0 && (e.State & DrawItemState.ComboBoxEdit) == 0;
-        using (var b = new SolidBrush(sel ? Tokens.VerdeSuave : Color.White)) e.Graphics.FillRectangle(b, e.Bounds);
+        using (var b = new SolidBrush(sel ? Tokens.VerdeSuave : Tokens.Primitivo.Branco)) e.Graphics.FillRectangle(b, e.Bounds);
         TextRenderer.DrawText(e.Graphics, GetItemText(Items[e.Index]), Font, new Rectangle(e.Bounds.X + 4, e.Bounds.Y, e.Bounds.Width - 8, e.Bounds.Height), Enabled ? PecasDesign.CorTexto : PecasDesign.Cinza, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
     }
 
@@ -117,12 +117,12 @@ public class DataDesign : Panel
 
     public DataDesign(DateTime valor)
     {
-        Height = PecasDesign.FonteValor.Height + 2; BackColor = Color.White;
+        Height = PecasDesign.FonteValor.Height + 2; BackColor = Tokens.Primitivo.Branco;
         _txt = PecasDesign.Texto(valor.ToString("dd/MM/yyyy"), 10);
         _txt.Dock = DockStyle.Fill;
         _txt.KeyPress += (_, e) => { if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar) && e.KeyChar != '/') e.Handled = true; };
         _txt.Leave += (_, _) => { var d = new string(_txt.Text.Where(char.IsDigit).ToArray()); if (d.Length == 8) _txt.Text = $"{d[..2]}/{d[2..4]}/{d[4..]}"; };
-        var seta = new Panel { Dock = DockStyle.Right, Width = 20, BackColor = Color.White, Cursor = Cursors.Hand };
+        var seta = new Panel { Dock = DockStyle.Right, Width = 20, BackColor = Tokens.Primitivo.Branco, Cursor = Cursors.Hand };
         seta.Paint += (_, e) => PecasDesign.DesenharSeta(e.Graphics, seta.ClientRectangle);
         seta.Click += (_, _) => AbrirCalendario();
         Controls.Add(_txt); Controls.Add(seta);
@@ -204,9 +204,93 @@ public class TabelaDesign : Control
 
     public TabelaDesign()
     {
-        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-        BackColor = Color.White; Font = new Font("Segoe UI", 10F); Cursor = Cursors.Default;
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
+        TabStop = true;
+        AccessibleRole = AccessibleRole.Table;
+        BackColor = Tokens.Primitivo.Branco; Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo); Cursor = Cursors.Default;
     }
+
+    protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
+    protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
+    // sem isto o Windows usa as setas para trocar de campo e elas nunca chegam ao OnKeyDown
+    protected override bool IsInputKey(Keys keyData) => keyData is Keys.Up or Keys.Down || base.IsInputKey(keyData);
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (_linhas.Count == 0) return;
+
+        if (e.KeyCode == Keys.Down)
+        {
+            e.Handled = true;
+            var novo = Math.Min(_linhas.Count - 1, Selecionada + 1);
+            if (novo != Selecionada) Selecionar(novo);
+        }
+        else if (e.KeyCode == Keys.Up)
+        {
+            e.Handled = true;
+            var novo = Math.Max(0, Selecionada - 1);
+            if (novo != Selecionada) Selecionar(novo);
+        }
+        else if (e.KeyCode == Keys.Space)
+        {
+            if (MarcasEditaveis && Selecionada >= 0 && Selecionada < _linhas.Count)
+            {
+                e.Handled = true;
+                for (var c = 0; c < _cols.Length; c++)
+                {
+                    if (_cols[c].Marca && c < _linhas[Selecionada].Length)
+                    {
+                        _linhas[Selecionada][c] = _linhas[Selecionada][c] == "1" ? "0" : "1";
+                        Invalidate();
+                        MarcaMudou?.Invoke(Selecionada, c);
+                        break;
+                    }
+                }
+            }
+        }
+        else if (e.KeyCode == Keys.Enter)
+        {
+            if (Selecionada >= 0 && Selecionada < _linhas.Count)
+            {
+                var soma0 = _cols.Sum(c => c.Peso); var x0 = 12f; var util0 = Width - 24f;
+                for (var c = 0; c < _cols.Length; c++)
+                {
+                    var larg = util0 * _cols[c].Peso / soma0;
+                    if (_cols[c].Editavel && c < _linhas[Selecionada].Length)
+                    {
+                        e.Handled = true;
+                        Editar(Selecionada, c, new Rectangle((int)x0, 32 + (Selecionada - _topo) * 33 + 4, (int)larg - 8, 25));
+                        break;
+                    }
+                    x0 += larg;
+                }
+            }
+        }
+    }
+
+    public class TabelaDesignAccessibleObject : ControlAccessibleObject
+    {
+        readonly TabelaDesign _tabela;
+        public TabelaDesignAccessibleObject(TabelaDesign tabela) : base(tabela) { _tabela = tabela; }
+        public override AccessibleRole Role => AccessibleRole.Table;
+        public override string Name => _tabela.AccessibleName ?? "Tabela";
+        public override AccessibleStates State => AccessibleStates.Focusable | (_tabela.Focused ? AccessibleStates.Focused : AccessibleStates.None);
+        public override int GetChildCount() => _tabela.Dados.Count;
+        public override AccessibleObject GetChild(int index) => new LinhaAccessibleObject(_tabela, index);
+    }
+
+    public class LinhaAccessibleObject : AccessibleObject
+    {
+        readonly TabelaDesign _tabela;
+        readonly int _indice;
+        public LinhaAccessibleObject(TabelaDesign tabela, int indice) { _tabela = tabela; _indice = indice; }
+        public override AccessibleRole Role => AccessibleRole.Row;
+        public override string Name => _indice >= 0 && _indice < _tabela.Dados.Count ? string.Join(" · ", _tabela.Dados[_indice]) : "";
+        public override AccessibleStates State => AccessibleStates.Selectable | (_tabela.Selecionada == _indice ? AccessibleStates.Selected : AccessibleStates.None);
+    }
+
+    protected override AccessibleObject CreateAccessibilityInstance() => new TabelaDesignAccessibleObject(this);
 
     void Editar(int linha, int col, Rectangle area)
     {
@@ -234,14 +318,14 @@ public class TabelaDesign : Control
         if (marcada)
         {
             using var b = new SolidBrush(Forma.Verde); g.FillPath(b, p);
-            using var pen = new Pen(Color.White, 2.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
+            using var pen = new Pen(Tokens.Primitivo.Branco, 2.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
             g.DrawLines(pen, [new PointF(q.X + 4.5f, q.Y + 9.5f), new PointF(q.X + 7.8f, q.Y + 12.8f), new PointF(q.X + 13.5f, q.Y + 5.8f)]);
         }
         else { g.FillPath(Brushes.White, p); using var pen = new Pen(Tokens.TextoDesabilitado, 1.5f); g.DrawPath(pen, p); }
     }
 
     /// <summary>Mensagem quando a tabela está vazia (antes ficava só a faixa branca, parecendo que não carregou).</summary>
-    public string Vazio { get; set; } = "Nenhum registro.";
+    public string Vazio { get; set; } = "Não há registros para este filtro.";
     public void Colunas(params Coluna[] cols) { _cols = cols; Invalidate(); }
     public void Linhas(IEnumerable<string[]> linhas) { _linhas = linhas.ToList(); _topo = 0; Height = 32 + Math.Max(1, Visiveis) * 33 + 2; Invalidate(); }
 
@@ -258,7 +342,7 @@ public class TabelaDesign : Control
             var soma = _cols.Sum(c => c.Peso);
             var x = 12f; var util = Width - 24f;
             var xs = _cols.Select(c => { var ini = x; x += util * c.Peso / soma; return (ini, larg: util * c.Peso / soma); }).ToArray();
-            using var fCab = new Font("Segoe UI Semibold", 9F);
+            using var fCab = Tokens.FonteSemibold(Tokens.Claro.FonteTamanhoPequeno);   // = Segoe UI Semibold 9 pt (12 px), mesmo cabeçalho da Grade
             for (var i = 0; i < _cols.Length; i++)
                 TextRenderer.DrawText(g, _cols[i].Titulo, fCab, Rectangle.Round(new RectangleF(xs[i].ini, 0, xs[i].larg - 8, 31)), PecasDesign.Cinza, TextFormatFlags.VerticalCenter | (_cols[i].Direita ? TextFormatFlags.Right : _cols[i].Centro || _cols[i].Marca ? TextFormatFlags.HorizontalCenter : TextFormatFlags.Left));
             for (var l = _topo; l < _topo + Visiveis && l < _linhas.Count; l++)
@@ -271,13 +355,18 @@ public class TabelaDesign : Control
                     if (l == Selecionada)
                     {
                         using var verde = new SolidBrush(Tokens.Verde); g.FillEllipse(verde, cx, cy, 17, 17);
-                        using var miolo = new SolidBrush(Color.White); g.FillEllipse(miolo, cx + 5.5f, cy + 5.5f, 6, 6);
+                        using var miolo = new SolidBrush(Tokens.Primitivo.Branco); g.FillEllipse(miolo, cx + 5.5f, cy + 5.5f, 6, 6);
                     }
                     else { using var cinza = new Pen(Tokens.TextoDesabilitado, 1.5f); g.DrawEllipse(cinza, cx + .75f, cy + .75f, 15.5f, 15.5f); }
                 }
                 for (var i = Selecionavel ? 1 : 0; i < _cols.Length && i < _linhas[l].Length; i++)
                     if (_cols[i].Marca) Marcar(g, new RectangleF(xs[i].ini, y, xs[i].larg - 8, 33), _linhas[l][i] == "1");
                     else TextRenderer.DrawText(g, _linhas[l][i], Font, Rectangle.Round(new RectangleF(xs[i].ini, y, xs[i].larg - 8, 33)), PecasDesign.CorTexto, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | (_cols[i].Direita ? TextFormatFlags.Right : _cols[i].Centro ? TextFormatFlags.HorizontalCenter : TextFormatFlags.Left));
+                if (Focused && l == Selecionada)
+                {
+                    using var penFoco = new Pen(Tokens.Claro.CorAcaoPrincipal, 1.5f);   // #0B7A53
+                    g.DrawRectangle(penFoco, 2, y + 1, Width - 5, 31);
+                }
                 if (l < _topo + Visiveis - 1) g.DrawLine(linha, 0, y + 33, Width, y + 33);
             }
             if (_linhas.Count == 0 && !string.IsNullOrEmpty(Vazio))
@@ -341,7 +430,7 @@ public class SegmentoDesign : Control
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
-        using (var fundo = new SolidBrush(Parent?.BackColor ?? Color.White)) g.FillRectangle(fundo, ClientRectangle);
+        using (var fundo = new SolidBrush(Parent?.BackColor ?? Tokens.Primitivo.Branco)) g.FillRectangle(fundo, ClientRectangle);
         using (var p = Forma.Redondo(new Rectangle(0, 0, Width - 1, Height - 1), 9))
         using (var b = new SolidBrush(Tokens.Linha)) g.FillPath(b, p);
         var x = 2; var l = Larguras();

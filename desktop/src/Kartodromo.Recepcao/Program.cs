@@ -8,15 +8,16 @@ static class Program
     [STAThread]
     static void Main()
     {
+        var args = Environment.GetCommandLineArgs();
         ApplicationConfiguration.Initialize();
+        if (Atualizacao.TratarInicioAsync("Recepcao", args).GetAwaiter().GetResult()) return;
         KitVisual.Instalar();
         Forma.Icones = VisualPrincipal.Icone;
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
-        Application.ThreadException += (_, e) => { Diagnostico.Registrar(Form.ActiveForm?.Text ?? "", e.Exception); MessageBox.Show(e.Exception.Message, "Kartódromo - Módulo Office", MessageBoxButtons.OK, MessageBoxIcon.Error); };
+        Application.ThreadException += (_, e) => { Diagnostico.Registrar(Form.ActiveForm?.Text ?? "", e.Exception); Msg.Erro(Form.ActiveForm, "O sistema encontrou um erro inesperado. Tente novamente; se persistir, acione o suporte."); };
         AppDomain.CurrentDomain.UnhandledException += (_, e) => { if (e.ExceptionObject is Exception ex) Diagnostico.Registrar("fatal", ex); };
         Thread.CurrentThread.CurrentCulture = Fmt.Br;
         Thread.CurrentThread.CurrentUICulture = Fmt.Br;
-        var args = Environment.GetCommandLineArgs();
         if (args.Length >= 5 && args[1] is "--autoteste" or "--teste-relatorio" or "--teste-filtro" or "--teste-bateria" or "--teste-telas" or "--teste-cliques" or "--roteiro-agenda")
         {
             var ctx = new ApplicationContext();

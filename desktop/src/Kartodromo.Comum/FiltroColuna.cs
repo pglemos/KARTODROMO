@@ -48,14 +48,14 @@ public static class FiltroColuna
         var todos = contagem.Keys.OrderBy(v => v.Length == 0 ? 1 : 0).ThenBy(v => double.TryParse(v.Replace(".", "").Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var n) ? n : double.MaxValue).ThenBy(v => v, StringComparer.CurrentCultureIgnoreCase).ToList();
         var marcados = new HashSet<string>(atual ?? (IEnumerable<string>)todos);
 
-        var fonte = new Font("Segoe UI", 9F);
-        var painel = new Panel { Size = new Size(270, 340), BackColor = Color.White, Padding = new Padding(10), Font = fonte };
-        var cab = new Label { Text = "Filtrar · " + titulo.Trim(), Dock = DockStyle.Top, Height = 24, Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Tokens.Texto };
+        var fonte = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno);
+        var painel = new Panel { Size = new Size(270, 340), BackColor = Tokens.Primitivo.Branco, Padding = new Padding(10), Font = fonte };
+        var cab = new Label { Text = "Filtrar · " + titulo.Trim(), Dock = DockStyle.Top, Height = 24, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold), ForeColor = Tokens.Texto };
         var busca = new TextBox { Dock = DockStyle.Top, PlaceholderText = "Pesquisar", BorderStyle = BorderStyle.FixedSingle, Font = fonte };
         var espaco = new Panel { Dock = DockStyle.Top, Height = 6 };
         var lista = new CheckedListBox { Dock = DockStyle.Fill, CheckOnClick = true, BorderStyle = BorderStyle.None, IntegralHeight = false, Font = fonte };
         var rodape = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 40, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(0, 8, 0, 0) };
-        var filtrar = new BotaoPlano { Text = "Filtrar", Size = new Size(88, 28), FlatStyle = FlatStyle.Flat, BackColor = Tokens.Verde, ForeColor = Color.White, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Cursor = Cursors.Hand };
+        var filtrar = new BotaoPlano { Text = "Filtrar", Size = new Size(88, 28), FlatStyle = FlatStyle.Flat, BackColor = Tokens.Verde, ForeColor = Tokens.Primitivo.Branco, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold), Cursor = Cursors.Hand };
         var limpar = new BotaoPlano { Text = "Limpar", Size = new Size(80, 28), FlatStyle = FlatStyle.Flat, BackColor = Tokens.BotaoSecundario, ForeColor = Tokens.Texto, Font = fonte, Cursor = Cursors.Hand };
         filtrar.FlatAppearance.BorderSize = 0; limpar.FlatAppearance.BorderSize = 0;
         rodape.Controls.Add(filtrar); rodape.Controls.Add(limpar);

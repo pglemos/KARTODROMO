@@ -29,6 +29,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Casino
+import androidx.compose.material.icons.rounded.Refresh
+import kotlinx.coroutines.delay
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -76,13 +78,26 @@ fun TelaPreparar(
     var fora by remember { mutableStateOf(prefs.kartsFora) }
     var umAUm by remember { mutableStateOf(prefs.umAUm) }
     var fiscalEscolhe by remember { mutableStateOf(false) }
+    var atualizando by remember { mutableStateOf(false) }
+    var erroAtualizacao by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(id, tentativa) {
+        atualizando = true
         try {
             val i = api.info(id)
             info = i
-            frota = Frota.da(i.tipoKart).takeIf { it != Frota.TODOS }
-        } catch (e: ErroServidor) { erro = e.message }
+            if (frota == null) frota = Frota.da(i.tipoKart).takeIf { it != Frota.TODOS }
+            erro = null
+            erroAtualizacao = null
+        } catch (e: ErroServidor) {
+            if (info == null) erro = e.message else erroAtualizacao = e.message
+        } finally { atualizando = false }
+    }
+    LaunchedEffect(id) {
+        while (true) {
+            delay(15_000)
+            if (info?.estado == "preparando" && !atualizando) tentativa++
+        }
     }
 
     FundoCinematografico(FundoApp.PIT_LANE) {
@@ -93,6 +108,8 @@ fun TelaPreparar(
             cabecalhoInfo?.let { listOf(it.bateria.programaIrmas.joinToString(" + ").ifBlank { Crono.tipo(it.bateria.tipo) }, "${it.pilotos.size} pilotos").joinToString(" · ") },
             onVoltar = onVoltar,
         ) {
+            BotaoSecundario("Atualizar pilotos", onClick = { tentativa++ }, icone = Icons.Rounded.Refresh, habilitado = !atualizando)
+            Spacer(Modifier.width(8.dp))
             BotaoAjuda(
                 "Como preparar a bateria",
                 "Light usa karts de 1 a 99 e meta de 90 kg. Super usa karts 100+ e meta de 100 kg. " +
@@ -101,6 +118,10 @@ fun TelaPreparar(
         }
         Spacer(Modifier.height(14.dp))
         Etapa("02", "PREPARE O GRID", "Confira os pilotos, escolha a frota e libere os karts.")
+        erroAtualizacao?.let { mensagem ->
+            Aviso("Não foi possível atualizar os pilotos: $mensagem", erro = true, acaoTexto = "Tentar novamente", onAcao = { tentativa++ })
+            Spacer(Modifier.height(12.dp))
+        }
         erro?.let { mensagem ->
             Cartao(Modifier.weight(1f).fillMaxWidth(), fundo = Cor.VermelhoClaro, borda = Cor.Vermelho) {
                 Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
@@ -209,7 +230,7 @@ fun TelaPreparar(
                                 ) {
                                     Text(
                                         k, fontSize = 20.sp, fontWeight = FontWeight.Black,
-                                        color = if (sel) Color.White else Cor.TextoDesativado,
+                                        color = if (sel) Cor.SobreVerde else Cor.TextoDesativado,
                                         textDecoration = if (sel) null else TextDecoration.LineThrough,
                                     )
                                 }

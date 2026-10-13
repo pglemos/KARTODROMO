@@ -1,10 +1,10 @@
 param(
-  [string]$ScoreboardUrl = "http://localhost:3000/podio-live-tb50",
+  [string]$ScoreboardUrl = "http://127.0.0.1:3000/placar-telao-tb50?layout=designer",
   [string]$StreamPath = "tb50",
   [int]$Width = 2048,
   [int]$Height = 512,
-  [int]$CaptureFps = 8,
-  [int]$OutputFps = 8,
+  [int]$CaptureFps = 2,
+  [int]$OutputFps = 2,
   [string]$VideoBitrate = "1400k",
   [string]$VideoBufferSize = "2800k",
   [string]$RtpPacketSize = "1200"

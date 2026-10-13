@@ -50,10 +50,9 @@ public partial class FormCrono
         {
             var para = Prompt.Pedir(d, "Mandar um e-mail de teste para qual endereço?", usuario.Text.Trim(), "E-mail de teste");
             if (string.IsNullOrWhiteSpace(para)) return;
-            await Crono.Api.Put("/api/email-config", Corpo()); // testa exatamente o que está na tela
-            senha.Text = ""; senha.PlaceholderText = "(deixe em branco para manter a senha atual)";
-            await Crono.Api.Post("/api/email-config/teste", new { para = para.Trim() });
-            Msg.Info(d, $"E-mail de teste enviado para {para.Trim()}. Confira a caixa de entrada (e o spam).");
+            // testa exatamente o que está na tela SEM gravar: só o Salvar grava (testar e cancelar deixava a configuração trocada)
+            var resultado = (await Crono.Api.Post("/api/email-config/teste", new JsonObject { ["para"] = para.Trim(), ["config"] = Corpo() }))?.AsObject();
+            Msg.Info(d, resultado?.S("mensagem") ?? $"O servidor aceitou o teste para {para.Trim()}. Confira a caixa de entrada (e o spam).");
         }));
         d.ShowDialog(this);
     });
@@ -86,7 +85,14 @@ public partial class FormCrono
                 situacao.Linhas([]); info.Text = ""; return;
             }
             var linhas = new List<string[]>();
-            foreach (var x in e["enviados"]?.AsArray() ?? []) { var p = x!.ToString().Split('|', 2); linhas.Add([p[0], NomeDoKart(p[0]), p.ElementAtOrDefault(1) ?? "", "Enviado"]); }
+            var rotuloAceite = e.S("aceite") switch
+            {
+                "aceito-pelo-relay" => "Aceito pelo relay",
+                "aceito-pelo-smtp" => "Aceito pelo SMTP",
+                "simulador" => "Simulado",
+                _ => "Aceito pelo servidor",
+            };
+            foreach (var x in e["enviados"]?.AsArray() ?? []) { var p = x!.ToString().Split('|', 2); linhas.Add([p[0], NomeDoKart(p[0]), p.ElementAtOrDefault(1) ?? "", rotuloAceite]); }
             foreach (var f in (e["falhas"]?.AsArray() ?? []).OfType<JsonObject>()) linhas.Add([f.S("kart"), f.S("nome"), f.S("email"), "Falhou: " + f.S("erro")]);
             foreach (var s in (e["semEmail"]?.AsArray() ?? []).OfType<JsonObject>()) linhas.Add([s.S("kart"), s.S("nome"), "—", "Sem e-mail no cadastro"]);
             situacao.Vazio = "Nenhum piloto nesta prova.";
@@ -94,11 +100,12 @@ public partial class FormCrono
             var quando = e.L("atualizadoEm") is long ms ? DateTimeOffset.FromUnixTimeMilliseconds(ms).ToLocalTime().ToString("dd/MM HH:mm") : "";
             info.Text = e.S("status") switch
             {
-                "enviado" => $"Enviado em {quando}",
+                "enviado" => $"{(string.IsNullOrWhiteSpace(e.S("mensagemEntrega")) ? "Aceito pelo servidor; entrega final não confirmada." : e.S("mensagemEntrega"))} ({quando})",
                 "parcial" => $"Parte não foi ({quando}) — o servidor tenta de novo a cada 5 min",
                 "falhou" => $"Não foi enviado ({quando}) — o servidor tenta de novo a cada 5 min",
                 "sem-destinatarios" => "Nenhum piloto desta prova tem e-mail no cadastro",
                 "desligado" => "Envio automático estava desligado quando a prova foi finalizada",
+                "sem-email-pilotos" => "Esta bateria não manda e-mail aos pilotos (o organizador divulga). Use \"Para o organizador…\"",
                 _ => "",
             };
         }
@@ -123,8 +130,8 @@ public partial class FormCrono
             d.BotaoRodape($"Só o kart {kartSel}", false, () => Seguro.Rodar(d, async () =>
             {
                 if (!encerrada) { Msg.Aviso(d, "Finalize a prova antes de enviar o resultado."); return; }
-                await Crono.Api.Post($"/api/sessions/{id}/emails", new { kart = kartSel });
-                Msg.Info(d, $"Resultado enviado para {pilotoSel} (kart {kartSel}).");
+                var r = (await Crono.Api.Post($"/api/sessions/{id}/emails", new { kart = kartSel }))?.AsObject();
+                Msg.Info(d, r?.S("mensagemEntrega") ?? $"O servidor aceitou o resultado para {pilotoSel} (kart {kartSel}); a chegada na caixa não foi confirmada.");
                 await Carregar();
             }));
         d.BotaoRodape("Para outro e-mail…", false, () => Seguro.Rodar(d, async () =>
@@ -132,8 +139,19 @@ public partial class FormCrono
             if (!encerrada) { Msg.Aviso(d, "Finalize a prova antes de enviar o resultado."); return; }
             var para = Prompt.Pedir(d, "Mandar o resultado oficial desta prova para qual e-mail?", "", "Enviar resultado");
             if (string.IsNullOrWhiteSpace(para)) return;
-            await Crono.Api.Post($"/api/sessions/{id}/emails", new { para = para.Trim() });
-            Msg.Info(d, $"Resultado enviado para {para.Trim()}.");
+            var r = (await Crono.Api.Post($"/api/sessions/{id}/emails", new { para = para.Trim() }))?.AsObject();
+            Msg.Info(d, r?.S("mensagemEntrega") ?? $"O servidor aceitou o resultado para {para.Trim()}; a chegada na caixa não foi confirmada.");
+        }));
+        // Tabajara: um e-mail só com o resultado oficial e o volta a volta de todos os pilotos (num PDF), para o organizador divulgar
+        d.BotaoRodape("Para o organizador…", false, () => Seguro.Rodar(d, async () =>
+        {
+            if (!encerrada) { Msg.Aviso(d, "Finalize a prova antes de enviar o resultado."); return; }
+            var para = Prompt.Pedir(d, "E-mail do organizador (recebe o resultado oficial e o volta a volta de todos os pilotos, para divulgar):", "", "Enviar ao organizador");
+            if (string.IsNullOrWhiteSpace(para)) return;
+            info.Text = "Enviando ao organizador… (gerando o volta a volta de todos)";
+            var r = (await Crono.Api.Post($"/api/sessions/{id}/emails", new { para = para.Trim(), organizador = true }))?.AsObject();
+            info.Text = "";
+            Msg.Info(d, $"Resultado oficial e volta a volta de todos os pilotos enviados para {para.Trim()}." + (r?.S("mensagemEntrega") is { Length: > 0 } m ? $"\n\n{m}" : ""));
         }));
         d.BotaoRodape("Configurar…", false, () => { d.Close(); ConfigurarEmail(); });
         d.Load += (_, _) => Seguro.Rodar(d, Carregar);

@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Rajdhani } from 'next/font/google';
+// design tokens (--kib-*): gerado de tokens/kib.tokens.json; só declara variáveis, não muda nenhuma tela
+import '@/styles/tokens.css';
 import '@/styles/globals.css';
 import '@/styles/admin.css';
 import '@/src/index.css';

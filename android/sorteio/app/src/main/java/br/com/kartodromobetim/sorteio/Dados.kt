@@ -31,6 +31,17 @@ data class InfoSorteio(
     val pilotos: List<Piloto>,
 )
 
+/** Evita gravar um sorteio feito com a lista antiga quando a recepção incluiu outro piloto. */
+fun listaDoSorteioMudou(atual: InfoSorteio, resultado: List<Sorteado>): Boolean {
+    if (atual.estado != "preparando" || atual.pilotos.size != resultado.size) return true
+    val porIndice = atual.pilotos.associateBy { it.indice }
+    return resultado.any { sorteado ->
+        val antigo = sorteado.piloto
+        val novo = porIndice[antigo.indice]
+        novo == null || novo.customerId != antigo.customerId || novo.nome.trim() != antigo.nome.trim()
+    }
+}
+
 class ErroServidor(msg: String) : Exception(msg)
 
 /** Preferências do tablet (endereço do serviço, karts fora do sorteio, modo). */
@@ -253,9 +264,13 @@ class Api(private val base: () -> String) {
     }
 
     suspend fun gravar(id: String, resultado: List<Sorteado>, umAUm: Boolean, modo: String? = null): Long? {
+        if (listaDoSorteioMudou(info(id), resultado))
+            throw ErroServidor("A lista de pilotos mudou. Volte para a bateria, toque em Atualizar pilotos e confira o sorteio novamente.")
         val atr = JSONArray()
         resultado.forEach {
-            val atribuicao = JSONObject().put("indice", it.piloto.indice).put("kart", it.kart)
+            // nome/cliente de quem o tablet viu nesse índice: se a lista mudou no meio, o servidor recusa (não dá kart a outro piloto)
+            val atribuicao = JSONObject().put("indice", it.piloto.indice).put("kart", it.kart).put("nome", it.piloto.nome)
+            it.piloto.customerId?.let { cid -> atribuicao.put("customerId", cid) }
             it.planoLastro?.let { plano -> atribuicao.put("lastroKg", plano.lastroKg).put("pecas5Kg", plano.pecas5Kg).put("pecas2_5Kg", plano.pecas2_5Kg) }
             atr.put(atribuicao)
         }

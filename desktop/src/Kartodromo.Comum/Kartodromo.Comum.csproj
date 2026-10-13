@@ -7,6 +7,9 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="*" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Kartodromo.Comum.Testes" />
+  </ItemGroup>
+  <ItemGroup>
     <EmbeddedResource Include="Recursos\*.png" />
   </ItemGroup>
 </Project>

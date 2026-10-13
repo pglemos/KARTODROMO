@@ -148,10 +148,10 @@ const emptyVoltaForm: VoltaFormState = {
 };
 
 const inputClassName =
-  'w-full min-h-[44px] sm:h-10 rounded-lg border border-zinc-800 bg-zinc-950 px-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-brand-500/60 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition';
+  'w-full min-h-[44px] sm:h-10 rounded-lg border border-kib-borda bg-kib-fundo px-3 text-sm text-kib-texto placeholder:text-kib-texto-3 focus:border-kib-acao/60 focus:outline-none focus:ring-2 focus:ring-kib-acao/20 transition';
 
 const checkboxClassName =
-  'h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-brand-500 focus:ring-brand-500/30';
+  'h-4 w-4 rounded border-kib-borda-forte bg-kib-fundo text-kib-acao focus:ring-kib-acao/30';
 
 const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
   dateStyle: 'short',
@@ -436,7 +436,7 @@ export const CronometragemPage = () => {
         render: (racing) => (
           <button
             className={`text-left font-bold underline-offset-4 hover:underline ${
-              selectedHistoricoId === racing.id ? 'text-brand-300' : 'text-white'
+              selectedHistoricoId === racing.id ? 'text-kib-acao' : 'text-kib-texto'
             }`}
             onClick={() => setSelectedHistoricoId(racing.id)}
             type="button"
@@ -859,7 +859,7 @@ export const CronometragemPage = () => {
         label: 'Sessão',
         render: (sessao) => (
           <button
-            className="font-medium text-zinc-100 underline-offset-4 hover:text-brand-300 hover:underline"
+            className="font-medium text-kib-texto underline-offset-4 hover:text-kib-acao hover:underline"
             onClick={() => openVoltas(sessao)}
             type="button"
           >
@@ -918,7 +918,7 @@ export const CronometragemPage = () => {
         key: 'tempo_ms',
         label: 'Tempo',
         render: (volta) => (
-          <span className={volta.melhor ? 'font-semibold text-brand-300' : undefined}>
+          <span className={volta.melhor ? 'font-semibold text-kib-acao' : undefined}>
             {msParaTexto(volta.tempo_ms)}
           </span>
         ),
@@ -1005,9 +1005,9 @@ export const CronometragemPage = () => {
       />
 
       {generatedLink ? (
-        <Card className="flex flex-wrap items-center justify-between gap-3 border-brand-500/30 p-4">
-          <p className="text-sm text-zinc-300">Resultados publicados e classificação recalculada.</p>
-          <a className="text-sm font-medium text-brand-400 hover:text-brand-300" href={generatedLink}>
+        <Card className="flex flex-wrap items-center justify-between gap-3 border-kib-acao/30 p-4">
+          <p className="text-sm text-kib-texto-2">Resultados publicados e classificação recalculada.</p>
+          <a className="text-sm font-medium text-kib-acao hover:text-kib-acao" href={generatedLink}>
             Abrir resultados
           </a>
         </Card>
@@ -1087,16 +1087,16 @@ export const CronometragemPage = () => {
           </div>
 
           {snapshot.corrida ? (
-            <Card aria-live="polite" className="border-brand-500/30 p-5">
+            <Card aria-live="polite" className="border-kib-acao/30 p-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-300">Sessão atual</p>
-                  <h2 className="mt-1 text-xl font-bold text-zinc-50">{snapshot.corrida.nome}</h2>
-                  <p className="mt-1 text-sm text-zinc-400">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-kib-acao">Sessão atual</p>
+                  <h2 className="mt-1 text-xl font-bold text-kib-texto">{snapshot.corrida.nome}</h2>
+                  <p className="mt-1 text-sm text-kib-texto-2">
                     {snapshot.corrida.tipo ?? 'Timing LapTime'} · ID {snapshot.corrida.id}
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2 text-xs text-zinc-300">
+                <div className="flex flex-wrap gap-2 text-xs text-kib-texto-2">
                   {paradasHabilitadas && snapshot.corrida.regras ? (
                     <>
                       <Badge variant="emerald">
@@ -1114,7 +1114,7 @@ export const CronometragemPage = () => {
                 </div>
               </div>
               {divergenciaRegras ? (
-                <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-800/50 bg-amber-950/20 p-3 text-xs text-amber-200" role="alert">
+                <div className="mt-4 flex items-start gap-2 rounded-lg border border-kib-aviso/50 bg-kib-aviso-fundo p-3 text-xs text-kib-aviso" role="alert">
                   <AlertTriangle aria-hidden="true" className="mt-0.5 shrink-0" size={14} />
                   <span>
                     <strong>Divergência de regulamento</strong> entre o formato configurado e a cronometragem: {divergenciaRegras}.
@@ -1125,11 +1125,11 @@ export const CronometragemPage = () => {
           ) : null}
 
           {projectionMode && paradasHabilitadas ? (
-            <Card aria-live="polite" className="border-blue-500/30 bg-blue-500/5 p-4">
+            <Card aria-live="polite" className="border-kib-info/30 bg-kib-info-solido/5 p-4">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-sm font-bold text-blue-200">PROJEÇÃO FUTURA</p>
-                  <p className="mt-1 text-xs text-zinc-300">
+                  <p className="text-sm font-bold text-kib-info">PROJEÇÃO FUTURA</p>
+                  <p className="mt-1 text-xs text-kib-texto-2">
                     Simulação com todos os karts completando as paradas obrigatórias do regulamento ({regrasAovivo?.requiredStops}× {msParaTexto(regrasAovivo?.minimumStopMs)}).
                   </p>
                 </div>
@@ -1139,12 +1139,12 @@ export const CronometragemPage = () => {
           ) : null}
 
           {snapshot.status === 'offline' ? (
-            <Card className="flex min-h-56 flex-col items-center justify-center border-amber-900/50 p-8 text-center">
-              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10 text-amber-300">
+            <Card className="flex min-h-56 flex-col items-center justify-center border-kib-aviso/50 p-8 text-center">
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-kib-aviso-solido/10 text-kib-aviso">
                 <WifiOff aria-hidden="true" size={23} />
               </span>
-              <h2 className="mt-4 text-base font-semibold text-zinc-100">LiveTime offline</h2>
-              <p className="mt-1 max-w-lg text-sm text-zinc-400">
+              <h2 className="mt-4 text-base font-semibold text-kib-texto">LiveTime offline</h2>
+              <p className="mt-1 max-w-lg text-sm text-kib-texto-2">
                 {snapshot.erro ?? 'Não foi possível acessar o endpoint. O polling continuará tentando.'}
               </p>
             </Card>
@@ -1152,23 +1152,23 @@ export const CronometragemPage = () => {
             <Card className="overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="min-w-[1280px] text-left">
-                  <thead className="border-b border-zinc-800">
+                  <thead className="border-b border-kib-borda">
                     <tr>
                       {[projectionMode ? 'Pos. futura' : 'Pos', 'Piloto', 'Kart', 'Melhor volta', 'Última', 'Voltas', 'Gap'].map((label) => (
-                        <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500" key={label}>
+                        <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-kib-texto-3" key={label}>
                           {label}
                         </th>
                       ))}
                       {projectionMode ? (
-                        <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500">Voltas projetadas</th>
+                        <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-kib-texto-3">Voltas projetadas</th>
                       ) : null}
                       {paradasHabilitadas ? (
                         <>
-                          <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500">Paradas &gt;= {msParaTexto(regrasAovivo?.minimumStopMs)}</th>
-                          <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500">Faltam obrigatórias</th>
-                          <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500">Curtas</th>
-                          <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500">Total</th>
-                          <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500">Punição</th>
+                          <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-kib-texto-3">Paradas &gt;= {msParaTexto(regrasAovivo?.minimumStopMs)}</th>
+                          <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-kib-texto-3">Faltam obrigatórias</th>
+                          <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-kib-texto-3">Curtas</th>
+                          <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-kib-texto-3">Total</th>
+                          <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-kib-texto-3">Punição</th>
                         </>
                       ) : null}
                     </tr>
@@ -1178,33 +1178,33 @@ export const CronometragemPage = () => {
                       <tr
                         className={
                           posicao === 1
-                            ? 'border-b border-brand-500/20 bg-brand-500/10'
-                            : 'border-b border-zinc-800/60 last:border-0'
+                            ? 'border-b border-kib-acao/20 bg-kib-acao/10'
+                            : 'border-b border-kib-borda last:border-0'
                         }
                         key={`${piloto.posicao}-${piloto.nome}-${piloto.kart ?? ''}`}
                       >
-                        <td className="px-4 py-3 text-sm font-semibold text-zinc-100">{posicao}</td>
-                        <td className="px-4 py-3 text-sm text-zinc-200">{piloto.nome}</td>
-                        <td className="px-4 py-3 text-sm text-zinc-300">{piloto.kart ?? '—'}</td>
-                        <td className="px-4 py-3 text-sm font-medium text-brand-300">
+                        <td className="px-4 py-3 text-sm font-semibold text-kib-texto">{posicao}</td>
+                        <td className="px-4 py-3 text-sm text-kib-texto">{piloto.nome}</td>
+                        <td className="px-4 py-3 text-sm text-kib-texto-2">{piloto.kart ?? '—'}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-kib-acao">
                           {piloto.melhorVoltaMs !== undefined
                             ? msParaTexto(piloto.melhorVoltaMs)
                             : (piloto.melhorVoltaTexto ?? '—')}
                         </td>
-                        <td className="px-4 py-3 text-sm text-zinc-300">{piloto.ultimaVolta ?? '—'}</td>
-                        <td className="px-4 py-3 text-sm text-zinc-300">{piloto.voltas ?? piloto.paradas?.voltaAtual ?? '—'}</td>
-                        <td className="px-4 py-3 text-sm text-zinc-400">{piloto.gap ?? (posicao === 1 ? 'Líder' : '—')}</td>
+                        <td className="px-4 py-3 text-sm text-kib-texto-2">{piloto.ultimaVolta ?? '—'}</td>
+                        <td className="px-4 py-3 text-sm text-kib-texto-2">{piloto.voltas ?? piloto.paradas?.voltaAtual ?? '—'}</td>
+                        <td className="px-4 py-3 text-sm text-kib-texto-2">{piloto.gap ?? (posicao === 1 ? 'Líder' : '—')}</td>
                         {projectionMode ? (
-                          <td className="px-4 py-3 text-sm font-semibold text-blue-200">
+                          <td className="px-4 py-3 text-sm font-semibold text-kib-info">
                             {voltasProjetadas !== null ? `${voltasProjetadas.toFixed(1)} v` : '—'}
                           </td>
                         ) : null}
                         {paradasHabilitadas ? (
                           <>
-                            <td className="px-4 py-3 text-sm text-zinc-200">
+                            <td className="px-4 py-3 text-sm text-kib-texto">
                               <button
                                 aria-label={`Ver paradas do kart ${piloto.kart ?? piloto.nome}`}
-                                className="inline-flex items-center gap-2 rounded-md px-2 py-1 font-semibold text-brand-300 transition-colors hover:bg-brand-500/10 hover:text-brand-200 disabled:cursor-not-allowed disabled:text-zinc-600"
+                                className="inline-flex items-center gap-2 rounded-md px-2 py-1 font-semibold text-kib-acao transition-colors hover:bg-kib-acao/10 hover:text-kib-acao disabled:cursor-not-allowed disabled:text-kib-texto-3"
                                 disabled={!piloto.paradas}
                                 onClick={() => setSelectedPitPiloto(piloto)}
                                 title="Ver paradas por volta e tempo de prova"
@@ -1214,12 +1214,12 @@ export const CronometragemPage = () => {
                                 {piloto.paradas?.validas ?? '—'}
                               </button>
                             </td>
-                            <td className="px-4 py-3 text-sm font-semibold text-amber-300">{piloto.paradas?.faltam ?? '—'}</td>
-                            <td className="px-4 py-3 text-sm text-amber-300">{piloto.paradas?.curtas ?? '—'}</td>
-                            <td className="px-4 py-3 text-sm text-zinc-300">{piloto.paradas?.total ?? '—'}</td>
+                            <td className="px-4 py-3 text-sm font-semibold text-kib-aviso">{piloto.paradas?.faltam ?? '—'}</td>
+                            <td className="px-4 py-3 text-sm text-kib-aviso">{piloto.paradas?.curtas ?? '—'}</td>
+                            <td className="px-4 py-3 text-sm text-kib-texto-2">{piloto.paradas?.total ?? '—'}</td>
                             <td className="px-4 py-3 text-sm">
                               {piloto.paradas ? (
-                                <span className={piloto.paradas.penalidadeVoltas > 0 ? 'font-semibold text-red-300' : 'text-emerald-300'}>
+                                <span className={piloto.paradas.penalidadeVoltas > 0 ? 'font-semibold text-kib-perigo' : 'text-kib-sucesso'}>
                                   {piloto.paradas.penalidadeVoltas > 0 ? `+${piloto.paradas.penalidadeVoltas} voltas` : 'Nenhuma'}
                                 </span>
                               ) : (
@@ -1235,8 +1235,8 @@ export const CronometragemPage = () => {
               </div>
               {!snapshot.pilotos.length ? (
                 <div className="flex min-h-48 flex-col items-center justify-center p-8 text-center">
-                  <Activity aria-hidden="true" className="text-zinc-600" size={28} />
-                  <p className="mt-3 text-sm text-zinc-400">Aguardando dados do timing em tempo real.</p>
+                  <Activity aria-hidden="true" className="text-kib-texto-3" size={28} />
+                  <p className="mt-3 text-sm text-kib-texto-2">Aguardando dados do timing em tempo real.</p>
                 </div>
               ) : null}
             </Card>
@@ -1280,9 +1280,9 @@ export const CronometragemPage = () => {
           />
           <Pagination onPageChange={setHistoricoPage} page={historicoPage} pageSize={PAGE_SIZE} total={historicoTotal} />
 
-          <div className="border-t border-zinc-800 pt-6">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-brand-300">Resultado da corrida</p>
-            <h2 className="mt-2 text-xl font-black text-white">{selectedHistorico?.nome ?? 'Selecione uma corrida'}</h2>
+          <div className="border-t border-kib-borda pt-6">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-kib-acao">Resultado da corrida</p>
+            <h2 className="mt-2 text-xl font-black text-kib-texto">{selectedHistorico?.nome ?? 'Selecione uma corrida'}</h2>
             <div className="mt-4">
               <DataTable
                 columns={historicoCompetitorColumns}
@@ -1359,7 +1359,7 @@ export const CronometragemPage = () => {
               </select>
             </FormField>
             {selectedSessao ? (
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-kib-texto-2">
                 <StatusBadge status={selectedSessao.status} />
                 <span>{selectedSessao.campeonatos?.nome ?? 'Sem campeonato'}</span>
               </div>
@@ -1387,33 +1387,33 @@ export const CronometragemPage = () => {
         {selectedPitPiloto && selectedPitPiloto.paradas ? (
           <div className="space-y-5">
             <div>
-              <p className="text-sm font-semibold text-zinc-100">{selectedPitPiloto.nome}</p>
-              <p className="mt-1 text-xs text-zinc-400">
+              <p className="text-sm font-semibold text-kib-texto">{selectedPitPiloto.nome}</p>
+              <p className="mt-1 text-xs text-kib-texto-2">
                 {snapshot.corrida?.nome ?? 'Sessão atual'} · parada registrada por passagem na cronometragem
               </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
-                <p className="text-xs text-zinc-400">Obrigatórias válidas</p>
-                <p className="mt-1 text-xl font-bold text-emerald-300">{selectedPitPiloto.paradas.validas}/{regrasAovivo?.requiredStops ?? 11}</p>
+              <div className="rounded-lg border border-kib-sucesso/20 bg-kib-sucesso-solido/5 p-3">
+                <p className="text-xs text-kib-texto-2">Obrigatórias válidas</p>
+                <p className="mt-1 text-xl font-bold text-kib-sucesso">{selectedPitPiloto.paradas.validas}/{regrasAovivo?.requiredStops ?? 11}</p>
               </div>
-              <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
-                <p className="text-xs text-zinc-400">Faltam obrigatórias</p>
-                <p className="mt-1 text-xl font-bold text-amber-300">{selectedPitPiloto.paradas.faltam}</p>
+              <div className="rounded-lg border border-kib-aviso/20 bg-kib-aviso-solido/5 p-3">
+                <p className="text-xs text-kib-texto-2">Faltam obrigatórias</p>
+                <p className="mt-1 text-xl font-bold text-kib-aviso">{selectedPitPiloto.paradas.faltam}</p>
               </div>
-              <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3">
-                <p className="text-xs text-zinc-400">Punição calculada</p>
-                <p className="mt-1 text-xl font-bold text-red-300">+{selectedPitPiloto.paradas.penalidadeVoltas} voltas</p>
+              <div className="rounded-lg border border-kib-perigo/20 bg-kib-perigo-solido/5 p-3">
+                <p className="text-xs text-kib-texto-2">Punição calculada</p>
+                <p className="mt-1 text-xl font-bold text-kib-perigo">+{selectedPitPiloto.paradas.penalidadeVoltas} voltas</p>
               </div>
             </div>
 
-            <div className="overflow-x-auto rounded-lg border border-zinc-800">
+            <div className="overflow-x-auto rounded-lg border border-kib-borda">
               <table className="min-w-[640px] w-full text-left">
-                <thead className="border-b border-zinc-800 bg-zinc-950/40">
+                <thead className="border-b border-kib-borda bg-kib-fundo">
                   <tr>
                     {['Volta', 'Tempo da parada', 'Tempo de prova', 'Posição', 'Classificação'].map((label) => (
-                      <th className="px-3 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500" key={label}>
+                      <th className="px-3 py-3 text-xs font-medium uppercase tracking-wider text-kib-texto-3" key={label}>
                         {label}
                       </th>
                     ))}
@@ -1421,11 +1421,11 @@ export const CronometragemPage = () => {
                 </thead>
                 <tbody>
                   {selectedPitPiloto.paradas.paradas.map((parada) => (
-                    <tr className="border-b border-zinc-800/60 last:border-0" key={parada.id}>
-                      <td className="px-3 py-3 text-sm font-semibold text-zinc-100">{parada.volta ?? '—'}</td>
-                      <td className="px-3 py-3 text-sm text-zinc-200">{parada.tempoParada ?? '—'}</td>
-                      <td className="px-3 py-3 text-sm text-zinc-300">{parada.tempoCorrida ?? '—'}</td>
-                      <td className="px-3 py-3 text-sm text-zinc-400">{parada.posicao ?? '—'}</td>
+                    <tr className="border-b border-kib-borda last:border-0" key={parada.id}>
+                      <td className="px-3 py-3 text-sm font-semibold text-kib-texto">{parada.volta ?? '—'}</td>
+                      <td className="px-3 py-3 text-sm text-kib-texto">{parada.tempoParada ?? '—'}</td>
+                      <td className="px-3 py-3 text-sm text-kib-texto-2">{parada.tempoCorrida ?? '—'}</td>
+                      <td className="px-3 py-3 text-sm text-kib-texto-2">{parada.posicao ?? '—'}</td>
                       <td className="px-3 py-3 text-sm">
                         <Badge variant={pitStopStatusVariant[parada.status]}>
                           {parada.status === 'mandatory' && parada.numeroObrigatoria
@@ -1439,17 +1439,17 @@ export const CronometragemPage = () => {
               </table>
             </div>
 
-            <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-zinc-400">
+            <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-kib-texto-2">
               <span>Paradas de 4:00-6:59: {selectedPitPiloto.paradas.curtas}</span>
               <span>Total registrado: {selectedPitPiloto.paradas.total}</span>
               <span>Excedentes acima de 15: {selectedPitPiloto.paradas.excedentes}</span>
               {selectedPitPiloto.paradas.foraJanela > 0 ? (
-                <span className="text-red-300">Fora da janela dos boxes: {selectedPitPiloto.paradas.foraJanela}</span>
+                <span className="text-kib-perigo">Fora da janela dos boxes: {selectedPitPiloto.paradas.foraJanela}</span>
               ) : null}
             </div>
           </div>
         ) : (
-          <p className="text-sm text-zinc-400">Nenhuma parada foi recebida para este kart.</p>
+          <p className="text-sm text-kib-texto-2">Nenhuma parada foi recebida para este kart.</p>
         )}
       </Modal>
 
@@ -1549,8 +1549,8 @@ export const CronometragemPage = () => {
             </FormField>
           ))}
           <div className="flex items-center gap-6 pt-6">
-            <label className="flex items-center gap-2 text-sm text-zinc-300"><input checked={voltaForm.melhor} className={checkboxClassName} onChange={(event) => setVoltaForm((current) => ({ ...current, melhor: event.target.checked }))} type="checkbox" />Melhor</label>
-            <label className="flex items-center gap-2 text-sm text-zinc-300"><input checked={voltaForm.valida} className={checkboxClassName} onChange={(event) => setVoltaForm((current) => ({ ...current, valida: event.target.checked }))} type="checkbox" />Válida</label>
+            <label className="flex items-center gap-2 text-sm text-kib-texto-2"><input checked={voltaForm.melhor} className={checkboxClassName} onChange={(event) => setVoltaForm((current) => ({ ...current, melhor: event.target.checked }))} type="checkbox" />Melhor</label>
+            <label className="flex items-center gap-2 text-sm text-kib-texto-2"><input checked={voltaForm.valida} className={checkboxClassName} onChange={(event) => setVoltaForm((current) => ({ ...current, valida: event.target.checked }))} type="checkbox" />Válida</label>
           </div>
         </form>
       </Modal>

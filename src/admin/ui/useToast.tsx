@@ -78,13 +78,13 @@ export const ToastProvider = ({ children }: PropsWithChildren) => {
 
           return (
             <div
-              className="flex items-start gap-3 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm font-medium text-zinc-100 shadow-elevated animate-slide-up"
+              className="flex items-start gap-3 rounded-lg border border-kib-borda bg-kib-superficie px-4 py-3 text-sm font-medium text-kib-texto shadow-elevated animate-slide-up"
               key={toast.id}
               role={isSuccess ? 'status' : 'alert'}
             >
               <Icon
                 aria-hidden="true"
-                className={`mt-0.5 shrink-0 ${isSuccess ? 'text-emerald-400' : 'text-red-400'}`}
+                className={`mt-0.5 shrink-0 ${isSuccess ? 'text-kib-sucesso' : 'text-kib-perigo'}`}
                 size={18}
               />
               <span>{toast.message}</span>

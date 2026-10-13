@@ -3,11 +3,11 @@ import type { PropsWithChildren } from 'react';
 export type BadgeVariant = 'emerald' | 'amber' | 'red' | 'blue' | 'zinc';
 
 const variantClasses: Record<BadgeVariant, string> = {
-  emerald: 'bg-emerald-500/15 text-emerald-300',
-  amber: 'bg-amber-500/15 text-amber-300',
-  red: 'bg-red-500/15 text-red-300',
-  blue: 'bg-blue-500/15 text-blue-300',
-  zinc: 'bg-zinc-700/40 text-zinc-300',
+  emerald: 'bg-kib-sucesso-fundo text-kib-sucesso',
+  amber: 'bg-kib-aviso-fundo text-kib-aviso',
+  red: 'bg-kib-perigo-fundo text-kib-perigo',
+  blue: 'bg-kib-info-fundo text-kib-info',
+  zinc: 'bg-kib-campo text-kib-texto-2',
 };
 
 const statusVariant: Record<string, BadgeVariant> = {

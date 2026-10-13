@@ -1,0 +1,282 @@
+{
+  "Texto": {
+    "tipo": "Color",
+    "argb": [
+      29,
+      29,
+      31
+    ]
+  },
+  "TextoSecundario": {
+    "tipo": "Color",
+    "argb": [
+      110,
+      110,
+      115
+    ]
+  },
+  "TextoTerciario": {
+    "tipo": "Color",
+    "argb": [
+      142,
+      142,
+      147
+    ]
+  },
+  "TextoDesabilitado": {
+    "tipo": "Color",
+    "argb": [
+      199,
+      199,
+      204
+    ]
+  },
+  "Fundo": {
+    "tipo": "Color",
+    "argb": [
+      245,
+      245,
+      247
+    ]
+  },
+  "Superficie": {
+    "tipo": "Color",
+    "conhecida": "White"
+  },
+  "SuperficieSuave": {
+    "tipo": "Color",
+    "argb": [
+      250,
+      250,
+      252
+    ]
+  },
+  "FundoCampo": {
+    "tipo": "Color",
+    "argb": [
+      242,
+      242,
+      245
+    ]
+  },
+  "Lateral": {
+    "tipo": "Color",
+    "argb": [
+      236,
+      236,
+      240
+    ]
+  },
+  "Linha": {
+    "tipo": "Color",
+    "argb": [
+      229,
+      229,
+      234
+    ]
+  },
+  "BordaCampo": {
+    "tipo": "Color",
+    "argb": [
+      219,
+      219,
+      219
+    ]
+  },
+  "BotaoSecundario": {
+    "tipo": "Color",
+    "argb": [
+      235,
+      235,
+      239
+    ]
+  },
+  "Verde": {
+    "tipo": "Color",
+    "argb": [
+      11,
+      122,
+      83
+    ]
+  },
+  "VerdeEscuro": {
+    "tipo": "Color",
+    "argb": [
+      10,
+      94,
+      64
+    ]
+  },
+  "VerdeTexto": {
+    "tipo": "Color",
+    "argb": [
+      28,
+      107,
+      53
+    ]
+  },
+  "VerdeSuave": {
+    "tipo": "Color",
+    "argb": [
+      232,
+      245,
+      238
+    ]
+  },
+  "VerdeSelecao": {
+    "tipo": "Color",
+    "argb": [
+      218,
+      232,
+      225
+    ]
+  },
+  "VerdeStatus": {
+    "tipo": "Color",
+    "argb": [
+      52,
+      199,
+      89
+    ]
+  },
+  "Vermelho": {
+    "tipo": "Color",
+    "argb": [
+      196,
+      40,
+      28
+    ]
+  },
+  "Laranja": {
+    "tipo": "Color",
+    "argb": [
+      178,
+      106,
+      0
+    ]
+  },
+  "LaranjaVivo": {
+    "tipo": "Color",
+    "argb": [
+      255,
+      159,
+      10
+    ]
+  },
+  "LaranjaEscuro": {
+    "tipo": "Color",
+    "argb": [
+      138,
+      75,
+      0
+    ]
+  },
+  "Azul": {
+    "tipo": "Color",
+    "argb": [
+      30,
+      111,
+      232
+    ]
+  },
+  "AzulTexto": {
+    "tipo": "Color",
+    "argb": [
+      10,
+      79,
+      160
+    ]
+  },
+  "AzulSuave": {
+    "tipo": "Color",
+    "argb": [
+      225,
+      238,
+      255
+    ]
+  },
+  "Preto": {
+    "tipo": "Color",
+    "argb": [
+      28,
+      28,
+      30
+    ]
+  },
+  "Grafite": {
+    "tipo": "Color",
+    "argb": [
+      58,
+      58,
+      60
+    ]
+  },
+  "RaioCampo": {
+    "tipo": "int",
+    "valor": 9
+  },
+  "RaioBotao": {
+    "tipo": "int",
+    "valor": 10
+  },
+  "RaioCartao": {
+    "tipo": "int",
+    "valor": 14
+  },
+  "RaioJanela": {
+    "tipo": "int",
+    "valor": 18
+  },
+  "Espaco1": {
+    "tipo": "int",
+    "valor": 4
+  },
+  "Espaco2": {
+    "tipo": "int",
+    "valor": 8
+  },
+  "Espaco3": {
+    "tipo": "int",
+    "valor": 12
+  },
+  "Espaco4": {
+    "tipo": "int",
+    "valor": 16
+  },
+  "Espaco5": {
+    "tipo": "int",
+    "valor": 20
+  },
+  "Espaco6": {
+    "tipo": "int",
+    "valor": 24
+  },
+  "Legenda": {
+    "tipo": "float",
+    "valor": 11
+  },
+  "Pequeno": {
+    "tipo": "float",
+    "valor": 12
+  },
+  "Corpo": {
+    "tipo": "float",
+    "valor": 13
+  },
+  "CorpoMaior": {
+    "tipo": "float",
+    "valor": 13.5
+  },
+  "Subtitulo": {
+    "tipo": "float",
+    "valor": 15
+  },
+  "Titulo": {
+    "tipo": "float",
+    "valor": 17
+  },
+  "TituloGrande": {
+    "tipo": "float",
+    "valor": 22
+  }
+}

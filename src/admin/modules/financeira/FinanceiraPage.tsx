@@ -89,7 +89,7 @@ const emptyResumo: ResumoFinanceiro = {
 };
 
 const inputClassName =
-  'w-full rounded-lg border border-zinc-700 bg-zinc-950 min-h-[44px] px-3 py-2 sm:min-h-0 sm:py-2.5 text-sm text-white placeholder:text-zinc-600 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20';
+  'w-full rounded-lg border border-kib-borda-forte bg-kib-fundo min-h-[44px] px-3 py-2 sm:min-h-0 sm:py-2.5 text-sm text-kib-texto placeholder:text-kib-texto-3 focus:border-kib-acao focus:outline-none focus:ring-2 focus:ring-kib-acao/20';
 
 const tipoLabels: Record<FinanceiroTipo, string> = {
   receita: 'Receita',
@@ -97,8 +97,8 @@ const tipoLabels: Record<FinanceiroTipo, string> = {
 };
 
 const tipoClasses: Record<FinanceiroTipo, string> = {
-  receita: 'border-emerald-800 bg-emerald-950 text-emerald-200',
-  despesa: 'border-red-900 bg-red-950 text-red-200',
+  receita: 'border-kib-sucesso/40 bg-kib-sucesso-fundo text-kib-sucesso',
+  despesa: 'border-kib-perigo/40 bg-kib-perigo-fundo text-kib-perigo',
 };
 
 const statusLabels: Record<LancamentoStatus, string> = {
@@ -108,9 +108,9 @@ const statusLabels: Record<LancamentoStatus, string> = {
 };
 
 const statusClasses: Record<LancamentoStatus, string> = {
-  previsto: 'border-amber-800 bg-amber-950 text-amber-200',
-  confirmado: 'border-emerald-800 bg-emerald-950 text-emerald-200',
-  cancelado: 'border-zinc-700 bg-zinc-800 text-zinc-300',
+  previsto: 'border-kib-aviso/40 bg-kib-aviso-fundo text-kib-aviso',
+  confirmado: 'border-kib-sucesso/40 bg-kib-sucesso-fundo text-kib-sucesso',
+  cancelado: 'border-kib-borda-forte bg-kib-campo text-kib-texto-2',
 };
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
@@ -311,7 +311,7 @@ export const FinanceiraPage = () => {
         key: 'valor',
         label: 'Valor',
         render: (item) => (
-          <span className={item.tipo === 'receita' ? 'font-bold text-emerald-300' : 'font-bold text-red-300'}>
+          <span className={item.tipo === 'receita' ? 'font-bold text-kib-sucesso' : 'font-bold text-kib-perigo'}>
             {currencyFormatter.format(Number(item.valor))}
           </span>
         ),
@@ -357,7 +357,7 @@ export const FinanceiraPage = () => {
       {
         key: 'valor',
         label: 'Valor',
-        render: (item) => <span className="font-bold text-emerald-300">{currencyFormatter.format(item.valor)}</span>,
+        render: (item) => <span className="font-bold text-kib-sucesso">{currencyFormatter.format(item.valor)}</span>,
       },
     ],
     [],
@@ -388,10 +388,10 @@ export const FinanceiraPage = () => {
     return (
       <section>
         <PageHeader title="Financeira" subtitle="Controle de receitas, despesas e categorias." />
-        <div className="mt-8 flex min-h-64 flex-col items-center justify-center rounded-xl border border-amber-900/70 bg-amber-950/30 p-8 text-center">
-          <LockKeyhole aria-hidden="true" className="text-amber-300" size={32} />
-          <h2 className="mt-4 text-lg font-black text-white">Acesso restrito</h2>
-          <p className="mt-2 max-w-lg text-sm leading-6 text-amber-100">
+        <div className="mt-8 flex min-h-64 flex-col items-center justify-center rounded-xl border border-kib-aviso/70 bg-kib-aviso-fundo p-8 text-center">
+          <LockKeyhole aria-hidden="true" className="text-kib-aviso" size={32} />
+          <h2 className="mt-4 text-lg font-black text-kib-texto">Acesso restrito</h2>
+          <p className="mt-2 max-w-lg text-sm leading-6 text-kib-aviso">
             Este módulo contém dados sensíveis e está disponível somente para proprietário, administrador ou financeiro.
           </p>
         </div>
@@ -565,18 +565,18 @@ export const FinanceiraPage = () => {
 
       <div className="mt-8 grid gap-4 md:grid-cols-3">
         {[
-          { label: 'Receitas', value: resumo.receitas, className: 'border-emerald-900/70 text-emerald-300' },
-          { label: 'Despesas', value: resumo.despesas, className: 'border-red-900/70 text-red-300' },
-          { label: 'Saldo', value: resumo.saldo, className: 'border-zinc-700 text-white' },
+          { label: 'Receitas', value: resumo.receitas, className: 'border-kib-sucesso/70 text-kib-sucesso' },
+          { label: 'Despesas', value: resumo.despesas, className: 'border-kib-perigo/70 text-kib-perigo' },
+          { label: 'Saldo', value: resumo.saldo, className: 'border-kib-borda-forte text-kib-texto' },
         ].map((card) => (
-          <article className={`rounded-xl border bg-zinc-900/80 p-5 ${card.className}`} key={card.label}>
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-zinc-400">{card.label}</p>
+          <article className={`rounded-xl border bg-kib-superficie p-5 ${card.className}`} key={card.label}>
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-kib-texto-2">{card.label}</p>
             <p className="mt-3 text-2xl font-black">{loading ? '—' : currencyFormatter.format(card.value)}</p>
           </article>
         ))}
       </div>
 
-      <div className="mt-8 flex flex-wrap gap-3 border-b border-zinc-800 pb-4">
+      <div className="mt-8 flex flex-wrap gap-3 border-b border-kib-borda pb-4">
         <Button onClick={() => setSection('lancamentos')} variant={section === 'lancamentos' ? 'primary' : 'ghost'}>
           Lançamentos
         </Button>
@@ -676,7 +676,7 @@ export const FinanceiraPage = () => {
 
         {section === 'calxpro-receitas' ? (
           <div>
-            <p className="mb-4 text-sm text-zinc-400">
+            <p className="mb-4 text-sm text-kib-texto-2">
               Lançamentos de faturamento do sistema anterior (CalXPro), de 2018-09-28 até 2025-01-29, quando a
               operação migrou para o LapTime. Somente leitura. Total: {calxproReceitasTotal.toLocaleString('pt-BR')}.
             </p>
@@ -710,7 +710,7 @@ export const FinanceiraPage = () => {
 
         {section === 'calxpro-creditos' ? (
           <div>
-            <p className="mb-4 text-sm text-zinc-400">
+            <p className="mb-4 text-sm text-kib-texto-2">
               Créditos de clientes registrados no sistema anterior (CalXPro). Somente leitura. Total:{' '}
               {calxproCreditosTotal.toLocaleString('pt-BR')}.
             </p>

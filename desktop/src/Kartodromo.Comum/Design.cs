@@ -27,11 +27,60 @@ public static partial class Forma
         return p;
     }
 
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Control, object> _raios = new();
+
+    /// <summary>Recorta o controle com cantos arredondados e ACOMPANHA o tamanho: aplicado cedo (controle ainda pequeno)
+    /// o recorte cortava o resto depois que o texto/layout crescia (ex.: "+ Criar reser"). Chamar de novo só troca o raio.</summary>
     public static void AplicarRaio(Control c, int raio)
+    {
+        if (!_raios.TryGetValue(c, out _))
+        {
+            _raios.Add(c, raio);
+            c.SizeChanged += (_, _) => { if (_raios.TryGetValue(c, out var r)) Recortar(c, (int)r); };
+        }
+        else _raios.AddOrUpdate(c, raio);
+        Recortar(c, raio);
+    }
+
+    static void Recortar(Control c, int raio)
     {
         if (c.Width < 2 || c.Height < 2) return;
         using var path = Redondo(new Rectangle(0, 0, c.Width, c.Height), Math.Min(raio, Math.Min(c.Width, c.Height) / 2));
         c.Region = new Region(path);
+    }
+
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Panel, object> _contornos = new();
+
+    /// <summary>Painel recortado com cantos arredondados e contorno fino (<c>Tokens.Linha</c>), acompanhando o tamanho.
+    /// <paramref name="diametro"/> é o tamanho do arco do canto (raio visível = metade), como nas telas da recepção.
+    /// Chamar de novo não empilha eventos.</summary>
+    public static void ArredondarComContorno(Panel painel, int diametro)
+    {
+        if (_contornos.TryGetValue(painel, out _)) { _contornos.AddOrUpdate(painel, diametro); AjustarContorno(painel, diametro); return; }
+        _contornos.Add(painel, diametro);
+        painel.Resize += (_, _) => { if (_contornos.TryGetValue(painel, out var d)) AjustarContorno(painel, (int)d); };
+        painel.Paint += (_, e) =>
+        {
+            if (!_contornos.TryGetValue(painel, out var d)) return;
+            using var path = CaminhoContorno(painel, (int)d);
+            if (path == null) return;
+            using var pen = new Pen(Tokens.Linha); e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; e.Graphics.DrawPath(pen, path);
+        };
+        AjustarContorno(painel, diametro);
+    }
+
+    static void AjustarContorno(Panel painel, int diametro)
+    {
+        using var path = CaminhoContorno(painel, diametro);
+        if (path != null) painel.Region = new Region(path);
+    }
+
+    static GraphicsPath CaminhoContorno(Panel painel, int d)
+    {
+        if (painel.Width < d * 2 || painel.Height < d * 2) return null;
+        var path = new GraphicsPath(); var w = painel.Width - 1; var h = painel.Height - 1;
+        path.AddArc(0, 0, d, d, 180, 90); path.AddArc(w - d, 0, d, d, 270, 90); path.AddArc(w - d, h - d, d, d, 0, 90); path.AddArc(0, h - d, d, d, 90, 90); path.CloseFigure();
+        return path;
     }
 
     public static readonly Color Verde = Tokens.Verde;
@@ -47,17 +96,17 @@ public static partial class Forma
             var lado = (int)Math.Round(16 * ck.DeviceDpi / 96.0);
             var y = ck.CheckAlign switch { ContentAlignment.TopLeft => 1, _ => (ck.Height - lado) / 2 };
             var r = new Rectangle(0, y, lado, lado);
-            using (var fundo = new SolidBrush(ck.BackColor.A == 255 ? ck.BackColor : ck.Parent?.BackColor ?? Color.White)) g.FillRectangle(fundo, new Rectangle(0, 0, lado + 2, ck.Height));
+            using (var fundo = new SolidBrush(ck.BackColor.A == 255 ? ck.BackColor : ck.Parent?.BackColor ?? Tokens.Primitivo.Branco)) g.FillRectangle(fundo, new Rectangle(0, 0, lado + 2, ck.Height));
             using var p = Redondo(r, 4);
             if (ck.Checked)
             {
                 using var b = new SolidBrush(ck.Enabled ? Verde : Color.FromArgb(160, 196, 180)); g.FillPath(b, p);
-                using var pen = new Pen(Color.White, 2F) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
+                using var pen = new Pen(Tokens.Primitivo.Branco, 2F) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
                 g.DrawLines(pen, [new PointF(r.X + lado * 0.26F, r.Y + lado * 0.52F), new PointF(r.X + lado * 0.44F, r.Y + lado * 0.70F), new PointF(r.X + lado * 0.76F, r.Y + lado * 0.32F)]);
             }
             else
             {
-                using var b = new SolidBrush(Color.White); g.FillPath(b, p);
+                using var b = new SolidBrush(Tokens.Primitivo.Branco); g.FillPath(b, p);
                 using var pen = new Pen(Tokens.TextoDesabilitado, 1.4F); g.DrawPath(pen, p);
             }
         };
@@ -95,7 +144,7 @@ public static partial class Forma
             using var caminho = Svg(svg);
             using var m = new Matrix(); m.Translate(off, off); m.Scale(escala, escala);
             caminho.Transform(m);
-            using var pen = new Pen(Color.White, 2f * escala) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
+            using var pen = new Pen(Tokens.Primitivo.Branco, 2f * escala) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
             g.DrawPath(pen, caminho);
         }
         _tiles[chave] = bmp;
@@ -227,7 +276,7 @@ public static partial class Forma
             var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
             var lado = (int)Math.Round(16 * rb.DeviceDpi / 96.0);
             var r = new Rectangle(0, (rb.Height - lado) / 2, lado, lado);
-            using (var fundo = new SolidBrush(rb.BackColor.A == 255 ? rb.BackColor : rb.Parent?.BackColor ?? Color.White)) g.FillRectangle(fundo, new Rectangle(0, 0, lado + 2, rb.Height));
+            using (var fundo = new SolidBrush(rb.BackColor.A == 255 ? rb.BackColor : rb.Parent?.BackColor ?? Tokens.Primitivo.Branco)) g.FillRectangle(fundo, new Rectangle(0, 0, lado + 2, rb.Height));
             if (rb.Checked)
             {
                 using var b = new SolidBrush(rb.Enabled ? Verde : Color.FromArgb(160, 196, 180)); g.FillEllipse(b, r);

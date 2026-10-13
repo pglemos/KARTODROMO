@@ -256,7 +256,7 @@ public class FormRelatoriosOffice : DialogoDesign
                 if (js.Count == 0) { Msg.Aviso(this, "Nenhuma corrida cronometrada nesse período."); return null; }
                 MostrarEscolha("Escolha a prova", [new("Início", 120), new("Prova", 460), new("Situação", 120), new("Pilotos", 80, Direita: true)], js,
                     x => [DataCrono(x).ToString("dd/MM HH:mm"), x.S("name"), x.S("state") switch { "encerrada" => "Encerrada", "em_andamento" => "Em andamento", var st => st }, x.S("competitors")],
-                    x => Config.CronoUrl.TrimEnd('/') + "/resultado/" + Uri.EscapeDataString(x.S("id")));
+                    x => api.UrlComToken("/relatorio/crono/" + Uri.EscapeDataString(x.S("id"))));
                 return null;
             }
         }
@@ -318,7 +318,7 @@ public class FormEditarReserva : DialogoDesign
         var pago = r.B("pago");
         var termo = new CheckBox { Text = "Termo assinado", Checked = r.B("termo") };
 
-        var cliente = new Label { Text = r.S("cliente"), AutoSize = false, Height = 22, Font = PecasDesign.FonteValor, ForeColor = PecasDesign.CorTexto, BackColor = Color.White, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
+        var cliente = new Label { Text = r.S("cliente"), AutoSize = false, Height = 22, Font = PecasDesign.FonteValor, ForeColor = PecasDesign.CorTexto, BackColor = Tokens.Primitivo.Branco, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
         var alterar = AcaoCampo("Alterar");
         alterar.Click += (_, _) => Seguro.Rodar(this, async () =>
         {
@@ -329,7 +329,7 @@ public class FormEditarReserva : DialogoDesign
             termo.Checked = false;
             Msg.Info(this, "Cliente alterado.");
         });
-        var bateria = new Label { Text = $"{r.S("reserva")} · {PecasDesign.DiaMes(r.S("dataHora"))}", AutoSize = false, Height = 22, Font = PecasDesign.FonteValor, ForeColor = PecasDesign.CorTexto, BackColor = Color.White, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
+        var bateria = new Label { Text = $"{r.S("reserva")} · {PecasDesign.DiaMes(r.S("dataHora"))}", AutoSize = false, Height = 22, Font = PecasDesign.FonteValor, ForeColor = PecasDesign.CorTexto, BackColor = Tokens.Primitivo.Branco, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
         var mover = AcaoCampo("Mover");
         mover.Click += (_, _) => { using var f = new FormMoverCliente(r); if (f.ShowDialog(this) == DialogResult.OK) { DialogResult = DialogResult.OK; Close(); } };
 
@@ -350,7 +350,7 @@ public class FormEditarReserva : DialogoDesign
             if (decimal.TryParse(valor, NumberStyles.Number, CultureInfo.InvariantCulture, out var n) && n > 0 && n < 500)
                 peso.Text = n.ToString("0.#", Fmt.Br);
         };
-        TextBox SoLeitura(string v) { var t = PecasDesign.Texto(v); t.ReadOnly = true; t.BackColor = Color.White; t.TabStop = false; return t; }
+        TextBox SoLeitura(string v) { var t = PecasDesign.Texto(v); t.ReadOnly = true; t.BackColor = Tokens.Primitivo.Branco; t.TabStop = false; return t; }
         var preco = SoLeitura(Fmt.Brl(r.L("preco") ?? 0).Replace("R$", "").Trim());
         var desc = SoLeitura(Fmt.Brl(r.L("desconto") ?? 0).Replace("R$", "").Trim());
         var total = SoLeitura(Fmt.Brl(r.L("total") ?? 0).Replace("R$", "").Trim());

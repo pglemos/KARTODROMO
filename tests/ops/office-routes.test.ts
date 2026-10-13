@@ -19,6 +19,24 @@ import { HttpError, officeRoutes } from '../../lib/ops/office';
 const admin = { uid: 7, nome: 'Admin de teste', admin: true, exp: Date.now() + 60_000 };
 const recepcionista = { ...admin, admin: false };
 
+describe('cadastro da recepção exige peso e e-mail', () => {
+  it.each([
+    ['/clientes', 'POST'], ['/clientes/42', 'PUT'],
+  ])('%s %s rejeita campos vazios antes de gravar', async (path, method) => {
+    await expect(call(path, method, { nome: 'TESTE CODEX', email: '', peso: '' })).rejects.toMatchObject({ status: 400 });
+  });
+  it.each([
+    { email: 'piloto@example.com', peso: '' },
+    { email: '', peso: '80' },
+    { email: 'email-invalido', peso: '80' },
+    { email: 'piloto@example.com', peso: 'NaN' },
+    { email: 'piloto@example.com', peso: '80', instagram: '' },
+    { email: 'piloto@example.com', peso: '80', instagram: 'perfil inválido' },
+  ])('rejeita cadastro incompleto ou inválido: %j', async (dados) => {
+    await expect(call('/clientes', 'POST', { nome: 'TESTE CODEX', ...dados })).rejects.toMatchObject({ status: 400 });
+  });
+});
+
 async function call(path: string, method = 'GET', body: Record<string, unknown> = {}, sessao = admin) {
   const received: { status: number; body: unknown }[] = [];
   const handled = await officeRoutes(
@@ -90,11 +108,9 @@ describe('Office: edição de reserva atualiza o peso do cliente', () => {
     expect(db.query).not.toHaveBeenCalled();
   });
 
-  it('permite limpar o peso cadastrado', async () => {
-    let params: Record<string, unknown>;
-    db.tx.mockImplementation(async (work) => work(async (_sql: string, p: Record<string, unknown> = {}) => { params = p; return []; }));
-    await call('/reservas/42', 'PUT', { peso: '' });
-    expect(params!).toEqual({ id: 42, peso: null });
+  it('impede apagar o peso cadastrado pela reserva', async () => {
+    await expect(call('/reservas/42', 'PUT', { peso: '' })).rejects.toMatchObject({ status: 400 });
+    expect(db.tx).not.toHaveBeenCalled();
   });
 
   it.each(['abc', '-1', '500'])('recusa peso fora do intervalo: %s', async (peso) => {

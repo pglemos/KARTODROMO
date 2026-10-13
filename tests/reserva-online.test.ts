@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { codigoReserva, idade, validarReserva, type Agenda } from '../workers/pre-cadastro/src/validar';
-import { criarPedido, liberado, situacaoPedido, syncPedidos, syncResultado, visaoPublica, webhookAsaas, type EnvReservas, type Pedido } from '../workers/pre-cadastro/src/reservas';
+import { conciliarPagamentos, criarPedido, liberado, situacaoPedido, syncPedidos, syncResultado, visaoPublica, webhookAsaas, type EnvReservas, type Pedido } from '../workers/pre-cadastro/src/reservas';
 import { hojeBrasilia } from '../workers/pre-cadastro/src/asaas';
 import { descricaoPedido } from '../lib/ops/reserva-online';
 
@@ -13,14 +13,16 @@ const base = {
   bateriaId: 101, quantidade: 2, forma: 'pix', politica: true, lgpd: true,
   documento: '529.982.247-25', nome: 'Maria da Silva', email: 'maria@exemplo.com', telefone: '(31) 98888-7777', nascimento: '1990-05-20', peso: '62',
   pilotos: ['Maria da Silva', 'João Silva', 'sobra'],
+  acompanhantes: [{ nome: 'João Silva', documento: '111.444.777-35', nascimento: '2008-03-10' }],
 };
 
 describe('validarReserva', () => {
-  it('aceita um pedido completo e corta a lista de pilotos na quantidade', () => {
+  it('aceita um pedido completo: cada vaga com o cadastro de uma pessoa', () => {
     const v = validarReserva(base, agenda, HOJE);
     expect(v.ok).toBe(true);
     if (v.ok) {
       expect(v.dados).toMatchObject({ bateriaId: 101, quantidade: 2, forma: 'pix', pilotos: ['Maria da Silva', 'João Silva'] });
+      expect(v.dados.acompanhantes).toEqual([{ nome: 'João Silva', documento: '111.444.777-35', nascimento: '2008-03-10' }]);
       expect(v.dados.cliente.tipoDocumento).toBe('CPF');
     }
   });
@@ -37,6 +39,35 @@ describe('validarReserva', () => {
     const v = validarReserva({ ...base, ...mudanca }, agenda, HOJE);
     expect(v.ok).toBe(false);
     if (!v.ok) expect(v.erro).toContain(trecho);
+  });
+  it('1 vaga não precisa de outros pilotos', () => {
+    const v = validarReserva({ ...base, quantidade: 1, acompanhantes: [] }, agenda, HOJE);
+    expect(v.ok).toBe(true);
+  });
+  it.each([
+    [{ acompanhantes: [] }, 'Cadastre o outro piloto'],
+    [{ quantidade: 3, acompanhantes: [{ nome: 'João Silva', documento: '111.444.777-35', nascimento: '2008-03-10' }] }, 'Cadastre os outros 2 pilotos'],
+    [{ acompanhantes: [{ nome: 'João', documento: '111.444.777-35', nascimento: '2008-03-10' }] }, 'nome completo do piloto 2'],
+    [{ acompanhantes: [{ nome: 'João Silva', documento: '111.444.777-00', nascimento: '2008-03-10' }] }, 'CPF inválido do piloto 2'],
+    [{ acompanhantes: [{ nome: 'Maria Outra', documento: '529.982.247-25', nascimento: '2008-03-10' }] }, 'repete o de outro piloto'],
+    [{ quantidade: 3, acompanhantes: [{ nome: 'João Silva', documento: '111.444.777-35', nascimento: '2008-03-10' }, { nome: 'Pedro Silva', documento: '111.444.777-35', nascimento: '2001-01-01' }] }, 'repete o de outro piloto'],
+    [{ acompanhantes: [{ nome: 'Ana Silva', documento: '111.444.777-35', nascimento: '2013-01-01' }] }, '14 anos ou mais'],
+  ])('mais de uma vaga exige uma pessoa diferente em cada uma: %o', (mudanca, trecho) => {
+    const v = validarReserva({ ...base, ...mudanca }, agenda, HOJE);
+    expect(v.ok).toBe(false);
+    if (!v.ok) expect(v.erro).toContain(trecho);
+  });
+  it('quem compra pode não pilotar: aí cada vaga precisa de um cadastro', () => {
+    const doisFilhos = [{ nome: 'João Silva', documento: '111.444.777-35', nascimento: '2008-03-10' }, { nome: 'Pedro Silva', documento: '390.533.447-05', nascimento: '2010-06-15' }];
+    const v = validarReserva({ ...base, compradorPilota: false, acompanhantes: doisFilhos }, agenda, HOJE);
+    expect(v.ok).toBe(true);
+    if (v.ok) expect(v.dados).toMatchObject({ compradorPilota: false, pilotos: ['João Silva', 'Pedro Silva'] });
+    const falta = validarReserva({ ...base, compradorPilota: false }, agenda, HOJE);
+    expect(falta.ok).toBe(false);
+    if (!falta.ok) expect(falta.erro).toContain('Cadastre os 2 pilotos');
+    const um = validarReserva({ ...base, quantidade: 1, compradorPilota: false, acompanhantes: [] }, agenda, HOJE);
+    expect(um.ok).toBe(false);
+    if (!um.ok) expect(um.erro).toContain('Cadastre quem vai pilotar');
   });
   it('sem agenda publicada pede para tentar de novo', () => {
     const v = validarReserva(base, null, HOJE);
@@ -72,6 +103,7 @@ function r2() {
   const m = new Map<string, string>();
   const bucket = {
     get: async (k: string) => (m.has(k) ? { key: k, json: async () => JSON.parse(m.get(k)!), text: async () => m.get(k)! } : null),
+    head: async (k: string) => (m.has(k) ? { key: k } : null),
     put: async (k: string, v: string) => { m.set(k, v); },
     list: async ({ prefix = '' }: { prefix?: string } = {}) => ({ objects: [...m.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({ key })), truncated: false }),
     delete: async (k: string | string[]) => { for (const x of Array.isArray(k) ? k : [k]) m.delete(x); },
@@ -182,6 +214,36 @@ describe('fluxo da reserva no site', () => {
     await k2.esperar();
     expect(asaas.chamadas.some((c) => c.caminho === '/payments/pay_1' && c.metodo === 'DELETE')).toBe(true);
     expect(((await (await situacaoPedido(env, id, k2.c)).json()) as { status: string }).status).toBe('expirado');
+  });
+
+  it('Pix pago sem aviso e com a página fechada: a conferência com a Asaas acha e manda para o servidor (ACEXRJ, 12/10)', async () => {
+    const { m, env } = ambiente();
+    m.set('reservas/agenda.json', JSON.stringify(agenda));
+    const asaas = asaasFalsa();
+    vi.stubGlobal('fetch', asaas.f);
+    const { id } = (await (await criarPedido(pedir({ ...base, t: Date.now() - 10_000 }), env, semLimite)).json()) as { id: string };
+    const k = ctx();
+    await syncResultado(new Request('https://x', { method: 'POST', body: JSON.stringify([{ id, acao: 'reservado', valorCentavos: 29000, expiraEm: '2026-10-01T12:15:00-03:00', descricao: 'x', inicio: '2026-10-03T09:15' }]) }), env, k.c);
+    await k.esperar();
+    // o servidor venceu o prazo (o aviso foi para o endereço antigo)
+    await syncResultado(new Request('https://x', { method: 'POST', body: JSON.stringify([{ id, acao: 'expirado' }]) }), env, ctx().c);
+    // a Asaas tem o Pix recebido
+    asaas.f.mockImplementation(async (url: string) => {
+      const caminho = String(url).replace('https://api-sandbox.asaas.com/v3', '');
+      const pagas = caminho.startsWith('/payments?status=RECEIVED') ? [{ id: 'pay_1', status: 'RECEIVED', billingType: 'PIX', externalReference: id }, { id: 'pay_9', status: 'RECEIVED', billingType: 'PIX', externalReference: 'outra-coisa' }] : [];
+      return new Response(JSON.stringify({ data: pagas }), { status: 200 });
+    });
+    expect(await conciliarPagamentos(env, Date.now() + 3_600_000)).toBe(1);
+    expect(await conciliarPagamentos(env, Date.now() + 3_600_000)).toBe(0); // a mesma conferência não repete dentro do minuto
+    const fila = (await (await syncPedidos(env)).json()) as Pedido[];
+    expect(fila).toHaveLength(1);
+    expect(fila[0]).toMatchObject({ id, status: 'pago', pagamento: { asaasId: 'pay_1', billingType: 'PIX' } });
+
+    // "pago" no site mas fora da fila (nunca chegou à recepção): a conferência põe de volta
+    m.delete(`reservas/fila/${id}`);
+    expect(((await (await syncPedidos(env)).json()) as Pedido[]).length).toBe(0);
+    expect(await conciliarPagamentos(env, Date.now() + 7_200_000)).toBe(1);
+    expect(((await (await syncPedidos(env)).json()) as Pedido[]).map((p) => p.id)).toEqual([id]);
   });
 
   it('recusa envio rápido demais (robô) e horário lotado', async () => {

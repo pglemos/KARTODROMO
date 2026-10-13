@@ -7,15 +7,15 @@ type TabsProps = {
 };
 
 export const Tabs = ({ items, onChange, value }: TabsProps) => (
-  <div className="inline-flex gap-1 rounded-lg border border-zinc-800 bg-zinc-900 p-1">
+  <div className="inline-flex gap-1 rounded-lg border border-kib-borda bg-kib-superficie p-1">
     {items.map((item) => (
       <button
         key={item.key}
         className={[
           'h-8 rounded-md px-3 text-sm font-medium transition-colors',
           value === item.key
-            ? 'bg-zinc-800 text-zinc-50 shadow-soft'
-            : 'text-zinc-400 hover:text-zinc-200',
+            ? 'bg-kib-campo text-kib-texto shadow-soft'
+            : 'text-kib-texto-2 hover:text-kib-texto',
         ].join(' ')}
         onClick={() => onChange(item.key)}
         type="button"

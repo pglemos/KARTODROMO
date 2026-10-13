@@ -15,7 +15,7 @@ import type { CampeonatoInscricao, CampeonatoInscricaoStatus } from './campeonat
 const PAGE_SIZE = 10;
 
 const inputClassName =
-  'w-full rounded-lg border border-zinc-700 bg-zinc-950 min-h-[44px] px-3 py-2 sm:min-h-0 sm:py-2.5 text-sm text-white placeholder:text-zinc-600 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20';
+  'w-full rounded-lg border border-kib-borda-forte bg-kib-fundo min-h-[44px] px-3 py-2 sm:min-h-0 sm:py-2.5 text-sm text-kib-texto placeholder:text-kib-texto-3 focus:border-kib-acao focus:outline-none focus:ring-2 focus:ring-kib-acao/20';
 
 const statusLabels: Record<CampeonatoInscricaoStatus, string> = {
   pendente: 'Pendente',
@@ -26,11 +26,11 @@ const statusLabels: Record<CampeonatoInscricaoStatus, string> = {
 };
 
 const statusClasses: Record<CampeonatoInscricaoStatus, string> = {
-  pendente: 'border-amber-800 bg-amber-950 text-amber-200',
-  em_analise: 'border-sky-900 bg-sky-950 text-sky-200',
-  confirmada: 'border-brand-800 bg-brand-950 text-brand-100',
-  recusada: 'border-red-900 bg-red-950 text-red-200',
-  cancelada: 'border-zinc-700 bg-zinc-800 text-zinc-200',
+  pendente: 'border-kib-aviso/40 bg-kib-aviso-fundo text-kib-aviso',
+  em_analise: 'border-kib-info/40 bg-kib-info-fundo text-kib-info',
+  confirmada: 'border-kib-acao bg-kib-sucesso-fundo text-kib-acao',
+  recusada: 'border-kib-perigo/40 bg-kib-perigo-fundo text-kib-perigo',
+  cancelada: 'border-kib-borda-forte bg-kib-campo text-kib-texto',
 };
 
 const dateTimeFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
@@ -104,8 +104,8 @@ export function CampeonatoInscricoesPanel() {
         label: 'Inscrito',
         render: (registration) => (
           <div>
-            <strong className="block text-sm text-zinc-100">{primaryName(registration)}</strong>
-            <span className="text-xs text-zinc-500">
+            <strong className="block text-sm text-kib-texto">{primaryName(registration)}</strong>
+            <span className="text-xs text-kib-texto-3">
               {registration.modalidade === 'equipe' ? registration.nome_chefe || 'Chefe não informado' : 'Piloto individual'}
             </span>
           </div>
@@ -207,14 +207,14 @@ export function CampeonatoInscricoesPanel() {
       >
         {selected ? (
           <form className="grid gap-5" id="campeonato-inscricao-form" onSubmit={handleSubmit}>
-            <div className="rounded-lg border border-zinc-800 bg-zinc-950/70 p-4">
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-brand-300">{selected.evento}</p>
-              <h3 className="mt-1 text-lg font-black text-white">{primaryName(selected)}</h3>
-              <p className="mt-1 text-sm text-zinc-400">{contactLine(selected)}</p>
+            <div className="rounded-lg border border-kib-borda bg-kib-fundo p-4">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-kib-acao">{selected.evento}</p>
+              <h3 className="mt-1 text-lg font-black text-kib-texto">{primaryName(selected)}</h3>
+              <p className="mt-1 text-sm text-kib-texto-2">{contactLine(selected)}</p>
               {selected.pilotos.length ? (
                 <div className="mt-4">
-                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-zinc-500">Pilotos</p>
-                  <ul className="mt-2 grid gap-1 text-sm text-zinc-300">
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-kib-texto-3">Pilotos</p>
+                  <ul className="mt-2 grid gap-1 text-sm text-kib-texto-2">
                     {selected.pilotos.map((pilot, index) => (
                       <li key={`${pilot.nome}-${index}`}>
                         {pilot.nome}

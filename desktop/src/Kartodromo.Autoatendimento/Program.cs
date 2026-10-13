@@ -7,11 +7,18 @@ static class Program
     [STAThread]
     static void Main()
     {
-        using var unico = new Mutex(true, "Kartodromo.Autoatendimento", out var primeiro);
         var args = Environment.GetCommandLineArgs();
         var autoteste = args.Length >= 3 && args[1] == "--autoteste";
+        if (args.Length > 1 && args[1] == "--kartodromo-instalar")
+        {
+            ApplicationConfiguration.Initialize();
+            Atualizacao.TratarInicioAsync("Autoatendimento", args).GetAwaiter().GetResult();
+            return;
+        }
+        using var unico = new Mutex(true, "Kartodromo.Autoatendimento", out var primeiro);
         if (!primeiro && !autoteste) return;
         ApplicationConfiguration.Initialize();
+        if (!autoteste && Atualizacao.TratarInicioAsync("Autoatendimento", args).GetAwaiter().GetResult()) return;
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
         Application.ThreadException += (_, e) => Log("erro: " + e.Exception);
         Thread.CurrentThread.CurrentCulture = Fmt.Br;

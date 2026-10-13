@@ -31,7 +31,12 @@
     "tb50:install-watchdog": "powershell -ExecutionPolicy Bypass -File scripts/install-tb50-watchdog.ps1",
     "livetime:install-cloudflare-watch": "powershell -ExecutionPolicy Bypass -File scripts/install-cloudflare-vercel-watch.ps1",
     "sync:design": "node scripts/sync-design.mjs",
-    "check:design": "node scripts/sync-design.mjs --check"
+    "check:design": "node scripts/sync-design.mjs --check",
+    "tokens": "node scripts/design-tokens/build.mjs",
+    "tokens:check": "node scripts/design-tokens/build.mjs --check",
+    "lint:design": "node scripts/design-tokens/lint-hardcode.mjs",
+    "lint:design:relatorio": "node scripts/design-tokens/lint-hardcode.mjs --relatorio",
+    "lint:design:baseline": "node scripts/design-tokens/lint-hardcode.mjs --atualizar-baseline"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",

@@ -9,8 +9,48 @@ public partial class FormCrono
     /// <summary>Evento mostrado na árvore dos passos 4–5 (o escolhido no passo 1; hoje, por padrão).</summary>
     string _eventoArvore;
 
+    // navegação pelo teclado (setas) nos eventos/grupos recarrega o que depende deles; a flag evita que o próprio
+    // preenchimento das grades dispare outra carga (recursão)
+    bool _carregandoCatalogo;
+    string _ultimoEventoId, _ultimoGrupoId;
+
+    // O /api/state traz só as 40 baterias mais recentes (~3 dias): ao abrir um evento mais antigo (ex.: "Baterias 03/10")
+    // as provas não achavam a bateria delas e o Registro de competidores ficava em branco. Quando falta alguma, busca a
+    // lista completa (/api/sessions) e junta na árvore.
+    List<JsonObject> _sessoesExtras = [];
+    DateTime _sessoesExtrasEm = DateTime.MinValue;
+    bool _buscandoSessoesExtras;
+
+    /// <summary>Sessões do /api/state + as que vieram da lista completa (o /api/state vale mais: é o mais novo).</summary>
+    List<JsonObject> SessoesParaArvore()
+    {
+        var doEstado = Crono.Arr(_state, "sessions");
+        var ids = doEstado.Select(x => x.S("id")).ToHashSet();
+        return doEstado.Concat(_sessoesExtras.Where(x => !ids.Contains(x.S("id")))).ToList();
+    }
+
+    /// <summary>Falta a bateria de alguma prova do evento escolhido? Busca a lista completa (no máximo a cada 30 s).</summary>
+    async Task GarantirSessoesDoEvento()
+    {
+        if (_buscandoSessoesExtras || string.IsNullOrEmpty(_eventoArvore)) return;
+        var grupos = _groups.Where(g => g.S("eventId") == _eventoArvore).Select(g => g.S("id")).ToHashSet();
+        var provas = _proofs.Where(p => grupos.Contains(p.S("groupId"))).Select(p => p.S("id")).ToList();
+        var conhecidas = SessoesParaArvore().Select(x => x.S("proofId")).ToHashSet();
+        if (provas.All(conhecidas.Contains) || DateTime.Now - _sessoesExtrasEm < TimeSpan.FromSeconds(30)) return;
+        _buscandoSessoesExtras = true;
+        try
+        {
+            _sessoesExtras = await Crono.Api.Lista("/api/sessions");
+            _sessoesExtrasEm = DateTime.Now;
+            MontarArvore();
+        }
+        catch (ApiException) { /* sem servidor agora: tenta de novo na próxima carga */ }
+        finally { _buscandoSessoesExtras = false; }
+    }
+
     async Task CarregarCatalogo()
     {
+        _carregandoCatalogo = true;
         try
         {
             _catalog = (await Crono.Api.Get("/api/catalog"))?.AsObject() ?? new JsonObject();
@@ -27,9 +67,12 @@ public partial class FormCrono
             _gEventos.Preencher(eventosVisiveis.Select(e => new object[] { "Karting", e.S("name"), DataLegivel(e.S("date")) }).ToList(), eventosVisiveis.Cast<object>().ToList());
             if (selectedEvent != null && _gEventos.Rows.Count > 0 && _gEventos.ChaveAtual == null) SelecionarLinha(_gEventos, eventosVisiveis.IndexOf(selectedEvent));
             _eventoArvore = selectedEvent?.S("id");
+            _ = GarantirSessoesDoEvento();
             _subGrupos.Text = selectedEvent?.S("name") ?? "Selecione um evento";
             // evento sem traçado (o do dia, vindo da agenda) usa o comprimento padrão — antes mostrava o 1º da lista ("Traçado 11 Invertido")
-            var tracado = Crono.Arr(_catalog, "tracks").FirstOrDefault(t => t.S("id") == selectedEvent?.S("trackId"))?.S("name") ?? "Padrão (1.110 m)";
+            // nome curto (cabia cortado "Padrão (1.11…"; e o 1.110 m era fixo, não o comprimento configurado)
+            string NomeTracado(string id) => string.IsNullOrEmpty(id) ? null : Crono.Arr(_catalog, "tracks").FirstOrDefault(t => t.S("id") == id)?.S("name");
+            var tracado = NomeTracado(selectedEvent?.S("trackId")) ?? "Padrão";
             var eventId = selectedEvent?.S("id") ?? "";
             var eventGroups = _groups.Where(g => g.S("eventId") == eventId).ToList();
             var selectedGroupId = (_gGrupos.ChaveAtual as JsonObject)?.S("id");
@@ -49,11 +92,14 @@ public partial class FormCrono
             var groupProofs = _proofs.Where(p => p.S("groupId") == groupId).OrderBy(p => p.I("order")).ToList();
             _tituloProvas.Text = selectedGroup == null ? "Provas" : $"Provas da {selectedGroup.S("name")}";
             string Previsao(JsonObject p) { var d = DateTime.TryParse(selectedEvent?.S("date"), out var dd) ? dd : DateTime.Today; var h = p.S("startAt") is { Length: >= 4 } sa ? sa : (selectedGroup?.S("name") is { } gn && System.Text.RegularExpressions.Regex.Match(gn, @"\d{1,2}:\d{2}") is { Success: true } m ? m.Value : ""); return $"{d:dd/MM} {h}".Trim(); }
-            _gProvas.Preencher(groupProofs.Select(p => new object[] { Previsao(p), Crono.Tipo(p.S("type")), p.S("name"), tracado, p.I("durationMin") > 0 ? "Por tempo" : "Por voltas", p.I("durationMin") > 0 ? TimeSpan.FromMinutes(p.I("durationMin")).ToString(@"hh\:mm\:ss") : "—", p.L("maxLaps") is long laps && laps > 0 ? laps.ToString() : "—" }).ToList(), groupProofs.Cast<object>().ToList());
+            // traçado da própria prova vale mais que o do evento
+            _gProvas.Preencher(groupProofs.Select(p => new object[] { Previsao(p), Crono.Tipo(p.S("type")), p.S("name"), NomeTracado(p.S("trackId")) ?? tracado, p.I("durationMin") > 0 ? "Por tempo" : "Por voltas", p.I("durationMin") > 0 ? TimeSpan.FromMinutes(p.I("durationMin")).ToString(@"hh\:mm\:ss") : "—", p.L("maxLaps") is long laps && laps > 0 ? laps.ToString() : "—" }).ToList(), groupProofs.Cast<object>().ToList());
             if (groupProofs.Count > 0 && _gProvas.ChaveAtual == null) SelecionarLinha(_gProvas, 0);
             MontarArvore();
+            _ultimoEventoId = eventId; _ultimoGrupoId = groupId;
         }
         catch (ApiException e) { _servidorOk = false; _gEventos.Preencher([new object[] { "Cadastros indisponíveis", e.Message, "" }]); }
+        finally { _carregandoCatalogo = false; }
     }
 
     static string DataLegivel(string data)
@@ -84,7 +130,7 @@ public partial class FormCrono
     void MontarArvore()
     {
         if (_arvore.IsDisposed || _arvore.IsHandleCreated == false) return;
-        var sessoes = Crono.Arr(_state, "sessions");
+        var sessoes = SessoesParaArvore();
         var assinatura = $"sel:{_eventoArvore}|" + string.Join("|", _events.Select(e => $"e:{e.S("id")}:{e.S("name")}:{e.S("date")}")) +
             string.Join("|", _groups.Select(g => $"g:{g.S("id")}:{g.S("eventId")}:{g.S("name")}")) +
             string.Join("|", _proofs.Select(p => $"p:{p.S("id")}:{p.S("groupId")}:{p.S("name")}:{p.I("order")}")) +
@@ -196,7 +242,7 @@ public partial class FormCrono
     {
         var selected = entity switch { "events" => _gEventos.ChaveAtual as JsonObject, "groups" => _gGrupos.ChaveAtual as JsonObject, "provas" => _gProvas.ChaveAtual as JsonObject, _ => null };
         if (selected == null) { Msg.Aviso(this, "Selecione um registro para excluir."); return; }
-        if (!Msg.Pergunta(this, $"Excluir “{selected.S("name")}” e os registros vinculados?")) return;
+        if (!Msg.Confirmar(this, $"Excluir “{selected.S("name")}”?", "Os registros vinculados a ele também são excluídos.", "Excluir")) return;
         Seguro.Rodar(this, async () => { await Crono.Api.Delete($"/api/catalog/{entity}/{selected.S("id")}"); await CarregarCatalogo(); });
     }
 
@@ -276,8 +322,8 @@ public partial class FormCrono
         var lineIndex = 0;
         print.PrintPage += (_, e) =>
         {
-            var fontTitle = new Font("Segoe UI", 16, FontStyle.Bold);
-            var fontText = new Font("Segoe UI", 10);
+            var fontTitle = Tokens.Fonte(Tokens.Claro.FonteTamanhoTituloGrande, FontStyle.Bold);
+            var fontText = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo);
             var y = e.MarginBounds.Top;
             e.Graphics.DrawString(titulo, fontTitle, Brushes.Black, e.MarginBounds.Left, y);
             y += 38;
@@ -340,7 +386,13 @@ public partial class FormCrono
         if (nome == "MudarCorrida")
         {
             if (_sess == null) return;
-            Seguro.Rodar(this, async () => { await Crono.Api.Patch($"/api/sessions/{_sess.S("id")}", new JsonObject { ["name"] = dialog.Valor("name"), ["durationMin"] = int.TryParse(dialog.Valor("durationMin"), out var d) ? d : 20, ["maxLaps"] = int.TryParse(dialog.Valor("maxLaps"), out var l) ? l : 0 }); await Atualizar(); });
+            // em branco = 0 (prova por voltas não ganha 20 min sozinha); texto inválido não grava nada
+            var durTxt = dialog.Valor("durationMin").Trim(); var voltasTxt = dialog.Valor("maxLaps").Trim();
+            if (!(durTxt.Length == 0 || int.TryParse(durTxt, out var dur) && dur >= 0)) { Msg.Aviso(this, "Duração: digite os minutos (número inteiro, 0 ou mais)."); return; }
+            if (!(voltasTxt.Length == 0 || int.TryParse(voltasTxt, out var vol) && vol >= 0)) { Msg.Aviso(this, "Voltas máximas: digite um número inteiro (0 ou em branco = sem limite)."); return; }
+            var minutos = durTxt.Length == 0 ? 0 : int.Parse(durTxt); var voltas = voltasTxt.Length == 0 ? 0 : int.Parse(voltasTxt);
+            var sessaoId = _sess.S("id");
+            Seguro.Rodar(this, async () => { await Crono.Api.Patch($"/api/sessions/{sessaoId}", new JsonObject { ["name"] = dialog.Valor("name"), ["durationMin"] = minutos, ["maxLaps"] = voltas }); await Atualizar(); });
         }
         else if (nome == "IncluirPassagem")
         {
@@ -442,10 +494,10 @@ sealed class FormCatalogoAux : Form
         if (entity == "categories") _grid.Col("Categoria", 250, DataGridViewContentAlignment.MiddleLeft, true).Col("Cor", 120);
         else if (entity == "competitors") _grid.Col("Competidor", 280, DataGridViewContentAlignment.MiddleLeft, true).Col("Kart", 80).Col("Transponder", 135).Col("Categoria", 180).Col("Peso (kg)", 100);
         else _grid.Col("Traçado", 300, DataGridViewContentAlignment.MiddleLeft, true).Col("Extensão (m)", 130);
-        var header = new Panel { Dock = DockStyle.Top, Height = 66, Padding = new Padding(18, 8, 18, 8), BackColor = Color.White };
+        var header = new Panel { Dock = DockStyle.Top, Height = 66, Padding = new Padding(18, 8, 18, 8), BackColor = Tokens.Primitivo.Branco };
         header.Controls.Add(new Label { Text = Text, Dock = DockStyle.Top, Height = 28, Font = TemaCrono.Titulo, ForeColor = TemaCrono.Texto });
         header.Controls.Add(new Label { Text = "Cadastros usados para organizar provas e resultados", Dock = DockStyle.Bottom, Height = 20, ForeColor = TemaCrono.Secundario, Font = TemaCrono.Pequena });
-        var actions = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 48, WrapContents = false, Padding = new Padding(10, 6, 10, 6), BackColor = Color.White };
+        var actions = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 48, WrapContents = false, Padding = new Padding(10, 6, 10, 6), BackColor = Tokens.Primitivo.Branco };
         foreach (var (label, action, primary) in new (string, Action, bool)[] { ("+ Novo", () => Editar(), true), ("Editar", () => Editar(true), false), ("Excluir", Excluir, false), ("Fechar", Close, false) })
         {
             var b = TemaCrono.Botao(label, primary); b.Click += (_, _) => action(); actions.Controls.Add(b);
@@ -508,7 +560,7 @@ sealed class FormCatalogoAux : Form
     void Excluir()
     {
         if (_grid.ChaveAtual is not JsonObject selected) { Msg.Aviso(this, "Selecione um cadastro."); return; }
-        if (!Msg.Pergunta(this, $"Excluir “{selected.S("name")}”?")) return;
+        if (!Msg.Confirmar(this, $"Excluir “{selected.S("name")}”?", "O cadastro sai da lista.", "Excluir")) return;
         Seguro.Rodar(this, async () => { await Crono.Api.Delete($"/api/catalog/{_entity}/{selected.S("id")}"); await Carregar(); });
     }
 }

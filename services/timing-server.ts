@@ -33,15 +33,21 @@ import {
   closeSession,
   timeIsUp,
   computeStandings,
+  crossingIdsFromKartAtOrAfter,
+  progressoNasPassagens,
   createSession,
   aguardandoLargada,
   copiarCompetidores,
+  propagarTrocaKart,
   mesmoPrograma,
   elapsedMs,
   formatLap,
   includeManualPassing,
   remainingMs,
   setCompetitors,
+  restoreCompetitor,
+  setChuva,
+  setManualPosition,
   setCrossingDeleted,
   setCrossingInvalid,
   setRaceFlag,
@@ -53,6 +59,7 @@ import {
   type Session,
   type SessionType,
   type TrocaDeKart,
+  type ObservationKind,
 } from '../lib/timing/race-engine';
 import {
   createCatalogRecord,
@@ -66,12 +73,15 @@ import {
   type TimingCatalog,
 } from '../lib/timing/catalog';
 import { rankingPorPeso, tituloFaixas, type DadosPiloto } from '../lib/timing/ranking-peso';
-import { dataBrasilia, historicoDoKart, rankingKarts } from '../lib/timing/ranking-karts';
-import { calcularComAnteriores, faixasDaRegra, importarKarts, REGRA_PADRAO, regraDa, SISTEMAS_KART, tempoVoltaParaMs, TOLERANCIA_PADRAO_MS, ultimaEqualizacaoPorKart, voltasNasBaterias, type ChecklistKart, type ConfigEqualizacao } from '../lib/timing/equalizacao';
+import { condicaoChuvaPeloTracado, dataBrasilia, historicoDoKart, rankingKarts } from '../lib/timing/ranking-karts';
+import { calcularComAnteriores, retomarEqualizacao, validarFaixasRedutor, type FaixaRedutor, faixasDaRegra, importarKarts, REGRA_PADRAO, regraDa, SISTEMAS_KART, tempoVoltaParaMs, TOLERANCIA_PADRAO_MS, ultimaEqualizacaoPorKart, voltasNasBaterias, type ChecklistKart, type ConfigEqualizacao } from '../lib/timing/equalizacao';
 import { nomeProprio } from '../lib/nomes';
-import { configPublica, enviarResultado, enviarTeste, lerConfig, salvarConfig, traduzirErro, type Dependencias } from './timing-email';
+import { configPublica, enviarResultado, enviarTeste, lerConfig, salvarConfig, semEmailAosPilotos, traduzirErro, type Dependencias, type OpcoesEnvio } from './timing-email';
+import { usoKartsDaSessao } from '../lib/timing/kart-fisico';
 import type { ContextoProva, EmpresaEmail } from '../lib/timing/email-resultado';
-import { competidoresComSorteio, descricaoModoSorteio, pilotosDoSorteio, validarSorteio, type Atribuicao } from '../lib/timing/sorteio';
+import { competidoresComSorteio, descricaoModoSorteio, ListaMudouError, pilotosDoSorteio, validarSorteio, type Atribuicao } from '../lib/timing/sorteio';
+import { normalizarPaginaPainel, PAINEL_LED_PAGE_SIZE } from '../lib/timing/painel-page';
+import { assinaturaDoConteudo, conferirChave, extrairChave, lerHashes, montarTransmissao, type Transmissao } from '../lib/timing/transmissao';
 
 // ---------------------------------------------------------------- config
 
@@ -139,7 +149,9 @@ for (const f of readdirSync(SESSIONS_DIR).filter((f) => f.endsWith('.json'))) {
 }
 for (const session of sessions.values()) {
   session.currentFlag ??= session.state === 'em_andamento' ? 'green' : session.state === 'bandeira_final' ? 'checkered' : 'none';
+  session.chuva ??= false;
   session.observations ??= [];
+  for (const o of session.observations) o.id ??= randomUUID(); // toda observação precisa de id para poder ser excluída
   session.competitors ??= [];
   for (const competitor of session.competitors) {
     competitor.crossings ??= [];
@@ -162,7 +174,12 @@ loadTransponders();
 let catalog: TimingCatalog = emptyCatalog();
 if (existsSync(CATALOG_FILE)) {
   try { catalog = normalizeCatalog(JSON.parse(readFileSync(CATALOG_FILE, 'utf8'))); }
-  catch (err) { log('cadastro de eventos ilegível; iniciando vazio', err); }
+  catch (err) {
+    // guarda o arquivo antes: a próxima gravação do cadastro vazio apagaria todos os eventos, grupos e provas
+    const copia = CATALOG_FILE.replace(/\.json$/i, `.ilegivel-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
+    try { copyFileSync(CATALOG_FILE, copia); } catch { /* sem cópia: o log abaixo avisa */ }
+    log(`cadastro de eventos ilegível; iniciando vazio (o arquivo original foi guardado em ${copia})`, err);
+  }
 }
 
 let timingSettings: Record<string, unknown> = {};
@@ -322,8 +339,20 @@ function herdarCompetidores(s: Session): Session | null {
   return fonte;
 }
 
-function registrarObservacao(s: Session, text: string, author: string) {
-  (s.observations ??= []).unshift({ id: randomUUID(), text, wallMs: Date.now(), author });
+function atualizarKartsNasProvasPreparadas(origem: Session, de: string, para: string, customerId?: string | null) {
+  for (const destino of irmasDe(origem)) {
+    try {
+      if (!propagarTrocaKart(origem, destino, de, para, customerId)) continue;
+      saveSession(destino);
+      log(`troca de kart ${de} → ${para} de ${origem.name} aplicada em ${destino.name}`);
+    } catch (err) {
+      log(`troca de kart ${de} → ${para} não aplicada em ${destino.name}: ${(err as Error).message}`);
+    }
+  }
+}
+
+function registrarObservacao(s: Session, text: string, author: string, kind: ObservationKind = 'system') {
+  (s.observations ??= []).unshift({ id: randomUUID(), text, wallMs: Date.now(), author, kind });
   log(`bateria ${s.name}: ${text}`);
 }
 
@@ -350,6 +379,23 @@ function sortedSessions() {
   return [...sessions.values()].sort((a, b) => b.createdAt - a.createdAt);
 }
 
+/**
+ * Trocou o traçado da PROVA (Registro de prova): as baterias dela que ainda estavam com o traçado antigo da prova vão
+ * junto. A bateria guarda o próprio traçado quando nasce da agenda e ele vale antes do da prova — sem isso o ranking
+ * dos karts seguia mostrando "Normal" numa bateria corrida no Invertido (06/10). Traçado escolhido à mão na bateria fica.
+ */
+function levarTracadoDaProva(provaId: string, antes: string | null, depois: string | null) {
+  if (antes === depois) return;
+  for (const s of sessions.values()) {
+    if (s.proofId !== provaId || s.state === 'cancelada' || (s.trackId ?? null) !== antes && s.trackId != null) continue;
+    s.trackId = depois;
+    aplicarCondicaoDoTracado(s);
+    saveSession(s);
+    log(`bateria ${s.name}: traçado ${trackDa(s).name} (veio da prova)`);
+  }
+  scheduleStateBroadcast();
+}
+
 /** Traçado da bateria: o escolhido nela (Editar bateria) › o da prova › o do evento. null = traçado padrão. */
 function trackIdDa(s: Session): string | null {
   if (s.trackId && catalog.tracks.some((t) => t.id === s.trackId)) return s.trackId;
@@ -372,6 +418,28 @@ function trackDa(s: Session) {
 function trackLengthFor(s: Session) {
   return trackDa(s).lengthMeters;
 }
+
+/** Traçado com sufixo "(Chuva)" já informa a condição da pista da bateria. */
+function aplicarCondicaoDoTracado(s: Session) {
+  if (!s.chuva && condicaoChuvaPeloTracado(trackDa(s).name)) {
+    s.chuva = true;
+    return true;
+  }
+  return false;
+}
+
+/** Corrige sessões antigas criadas a partir de traçados de chuva antes da regra existir. */
+function normalizarCondicoesDosTracados() {
+  let corrigidas = 0;
+  for (const s of sessions.values()) {
+    if (!aplicarCondicaoDoTracado(s)) continue;
+    saveSession(s);
+    corrigidas++;
+  }
+  if (corrigidas) log(`condição de chuva sincronizada em ${corrigidas} bateria(s) pelo traçado`);
+}
+
+normalizarCondicoesDosTracados();
 
 type RecentPassing = {
   id: string;
@@ -434,16 +502,23 @@ function handleDecoderPassing(p: TrxPassing) {
     (session.rejected ??= []).push({ id, kart, transponder: p.transponder, wallMs, decoderTimeMs: p.decoderTimeMs, reason: result, sinceLastMs: last ? wallMs - last.wallMs : null });
     if (session.rejected.length > 2000) session.rejected.splice(0, session.rejected.length - 2000);
   }
-  if (session) saveSession(session);
-
-  // diario primeiro: e a fonte de verdade pra reconstruir qualquer bateria
-  journal({ wallMs, raw: p.raw, transponder: p.transponder, kart, decoderTimeMs: p.decoderTimeMs, seq: p.sequence, sessionId: session?.id ?? null, result });
+  // diário primeiro: é a fonte de verdade para remontar qualquer bateria. Falha de disco (arquivo preso pelo
+  // antivírus, disco cheio) não pode perder a leitura nem derrubar o serviço no meio da prova.
+  try {
+    journal({ wallMs, raw: p.raw, transponder: p.transponder, kart, decoderTimeMs: p.decoderTimeMs, seq: p.sequence, sessionId: session?.id ?? null, result });
+  } catch (err) { log(`ERRO ao gravar o diário de passagens (kart ${kart ?? '?'}): ${(err as Error).message}`); }
+  if (session) {
+    try { saveSession(session); }
+    catch (err) { log(`ERRO ao gravar a bateria ${session.name} (a passagem está na memória e no diário): ${(err as Error).message}`); }
+  }
   log(`passagem transponder ${p.transponder} -> kart ${kart ?? '?'} (${result})`);
 
   recentPassings.unshift({ id, wallMs, transponder: p.transponder, kart, result, lapMs, sessionId: session?.id ?? null });
   recentPassings.length = Math.min(recentPassings.length, 60);
   broadcast('passing', recentPassings[0]);
-  scheduleStateBroadcast();
+  // painéis de LED na hora (o piloto olha o tempo assim que cruza a linha); telas do operador em 20 ms
+  enviarAosPaineis();
+  scheduleStateBroadcast(20);
 }
 
 function createDecoderClient(config: DecoderConfig) {
@@ -487,6 +562,7 @@ function sessionView(s: Session) {
     name: s.name,
     type: s.type,
     state: s.state,
+    semEmailPilotos: semEmailAosPilotos(s, nomeEventoDa(s)),
     durationMs: s.durationMs,
     maxLaps: s.maxLaps,
     minLapMs: s.minLapMs,
@@ -500,6 +576,7 @@ function sessionView(s: Session) {
     tempoEsgotado: timeIsUp(s, now),
     voltasCompletas: voltasCompletas(s),
     trackId: s.trackId ?? null,
+    chuva: s.chuva === true,
     track: trackDa(s),
     elapsedMs: elapsedMs(s, now),
     currentFlag: s.currentFlag ?? 'none',
@@ -507,6 +584,7 @@ function sessionView(s: Session) {
     groupId: s.groupId ?? null,
     proofId: s.proofId ?? null,
     observations: s.observations ?? [],
+    manualPositions: s.manualPositions ?? {},
     // nome próprio só na exibição (telão, resultado, operador): o cadastro vinha TUDO MAIÚSCULO ou tudo minúsculo
     competitors: s.competitors.map((c) => ({
       kart: c.kart, name: nomeProprio(c.name), customerId: c.customerId ?? null, category: c.category ?? null, flag: c.flag ?? 'none', autoAdded: Boolean(c.autoAdded), detalhes: c.detalhes ?? null,
@@ -517,6 +595,7 @@ function sessionView(s: Session) {
       penalidades: c.penalidades ?? [],
     })),
     standings: computeStandings(s, trackLengthFor(s)).filter((r) => !s.competitors.find((c) => c.kart === r.kart && c.name === r.name)?.detalhes?.oculto).map((r) => ({ ...r, name: nomeProprio(r.name) })),
+    excludedCompetitors: (s.excludedCompetitors ?? []).map((e) => ({ id: e.id, excludedAt: e.excludedAt, kart: e.competitor.kart, name: e.competitor.name })),
     emailsResultado: s.emailsResultado ?? null,
   };
 }
@@ -534,6 +613,7 @@ function sessionSummary(s: Session) {
     groupId: s.groupId ?? null,
     proofId: s.proofId ?? null,
     currentFlag: s.currentFlag ?? 'none',
+    chuva: s.chuva === true,
     competitors: s.competitors.length,
     semKart: s.competitors.filter((c) => !c.kart && c.name?.trim()).length,
     agendaId: s.agendaId ?? null,
@@ -585,6 +665,12 @@ function stateView() {
       updatedAt: tb50Page.updatedAt,
       telas: [...tb50Pings.entries()].map(([ip, p]) => ({ ip, ultimoSinalMs: Date.now() - p.at, navegador: p.ua })),
     },
+    painelLed: {
+      pagina: painelLedPage.pagina,
+      pageSize: PAINEL_LED_PAGE_SIZE,
+      updatedAt: painelLedPage.updatedAt,
+      origem: painelLedPage.origem,
+    },
   };
 }
 
@@ -611,6 +697,173 @@ function setTb50Offset(value: unknown, motivo: string) {
   log(`telao TB50: posicoes ${offset + 1}-${offset + TB50_PAGE_SIZE} (${motivo})`);
   scheduleStateBroadcast();
   return tb50Page;
+}
+
+// ---------------------------------------------------------------- painel de LED físico (COM3 do ORBITS)
+// O hardware fica no ORBITS, mas a página selecionada é compartilhada para que o CRONO1
+// controle o mesmo painel sem tentar abrir uma porta serial que não existe nele.
+
+const PAINEL_LED_PAGE_FILE = join(DATA_DIR, 'painel-led-page.json');
+let painelLedPage: { pagina: number; updatedAt: string | null; origem: string } = {
+  pagina: 0,
+  updatedAt: null,
+  origem: 'inicialização',
+};
+try {
+  if (existsSync(PAINEL_LED_PAGE_FILE)) {
+    const salvo = JSON.parse(readFileSync(PAINEL_LED_PAGE_FILE, 'utf8')) as Record<string, unknown>;
+    painelLedPage = {
+      pagina: normalizarPaginaPainel(salvo.pagina),
+      updatedAt: typeof salvo.updatedAt === 'string' ? salvo.updatedAt : null,
+      origem: typeof salvo.origem === 'string' && salvo.origem.trim() ? salvo.origem.slice(0, 80) : 'arquivo',
+    };
+  }
+} catch {
+  // arquivo ausente ou inválido: começa da primeira página
+}
+
+function setPainelLedPage(value: unknown, origem: string) {
+  const pagina = normalizarPaginaPainel(value);
+  if (pagina === painelLedPage.pagina && painelLedPage.updatedAt) return painelLedPage;
+  painelLedPage = {
+    pagina,
+    updatedAt: new Date().toISOString(),
+    origem: origem.trim().slice(0, 80) || 'cronometragem',
+  };
+  try { writeJsonAtomic(PAINEL_LED_PAGE_FILE, painelLedPage); } catch { /* continua em memória */ }
+  log(`painel LED COM3: posições ${pagina * PAINEL_LED_PAGE_SIZE + 1}-${(pagina + 1) * PAINEL_LED_PAGE_SIZE} (${painelLedPage.origem})`);
+  scheduleStateBroadcast();
+  return painelLedPage;
+}
+
+// ---------------------------------------------------------------- transmissão ao vivo (parceiros, ex.: YouTube)
+// Leitura com chave: GET /api/transmissao/v1/corrida (JSON) e /api/transmissao/v1/eventos (fluxo SSE).
+// Fora da rede do kartódromo o parceiro lê do site: este servidor ENVIA o retrato para lá (sem abrir porta nenhuma).
+// As chaves ficam só como SHA-256 em data/timing/transmissao.json (fora do Git). Documentação: docs/api-transmissao.md
+
+const TRANSMISSAO_FILE = join(DATA_DIR, 'transmissao.json');
+type ConfigTransmissao = { chavesSha256: string; publicarUrl: string; publicarChave: string };
+let configTransmissao: ConfigTransmissao = { chavesSha256: '', publicarUrl: '', publicarChave: '' };
+let configTransmissaoLidaEm = 0;
+
+function lerConfigTransmissao(): ConfigTransmissao {
+  if (Date.now() - configTransmissaoLidaEm < 5_000) return configTransmissao;
+  configTransmissaoLidaEm = Date.now();
+  let arquivo: Partial<ConfigTransmissao> = {};
+  try {
+    if (existsSync(TRANSMISSAO_FILE)) arquivo = JSON.parse(readFileSync(TRANSMISSAO_FILE, 'utf8'));
+  } catch (err) {
+    log('transmissão: data/timing/transmissao.json inválido', (err as Error).message);
+  }
+  configTransmissao = {
+    chavesSha256: process.env.TRANSMISSAO_CHAVES_SHA256 || String(arquivo.chavesSha256 ?? ''),
+    publicarUrl: process.env.TRANSMISSAO_PUBLICAR_URL || String(arquivo.publicarUrl ?? ''),
+    publicarChave: process.env.TRANSMISSAO_PUBLICAR_CHAVE || String(arquivo.publicarChave ?? ''),
+  };
+  return configTransmissao;
+}
+
+/** A mesma bateria em foco da tela do operador; equalização é interna da oficina e não vai para a transmissão. */
+function transmissaoAtual(): Transmissao {
+  const foco = stateView().focus;
+  if (foco && foco.type !== 'equalizacao') return montarTransmissao(foco);
+  const ultima = ultimaEncerrada();
+  return montarTransmissao(ultima ? sessionView(ultima) : null);
+}
+
+const clientesTransmissao = new Set<http.ServerResponse>();
+let ultimaTransmissao: { assinatura: string; dados: Transmissao } | null = null;
+const publicacao = { emAndamento: false, assinaturaEnviada: '', enviadoEm: 0, ultimoOkEm: 0, ultimoErro: '', erroLogadoEm: 0, falhas: 0, proximaTentativaEm: 0 };
+/** O site guarda o retrato num arquivo só do R2, que aceita no máximo ~1 gravação por segundo por arquivo. */
+const INTERVALO_MINIMO_PUBLICACAO_MS = 1_000;
+
+async function publicarTransmissao(t: Transmissao, assinatura: string) {
+  const cfg = lerConfigTransmissao();
+  if (!cfg.publicarUrl || !cfg.publicarChave || publicacao.emAndamento) return;
+  publicacao.emAndamento = true;
+  publicacao.enviadoEm = Date.now();
+  try {
+    const resposta = await fetch(cfg.publicarUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${cfg.publicarChave}` },
+      body: JSON.stringify(t),
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
+    if (publicacao.ultimoErro) log(`transmissão: envio ao site voltou a funcionar (falhava: ${publicacao.ultimoErro}${publicacao.falhas > 1 ? `, ${publicacao.falhas} tentativas` : ''})`);
+    publicacao.falhas = 0;
+    publicacao.proximaTentativaEm = 0;
+    publicacao.assinaturaEnviada = assinatura;
+    publicacao.ultimoOkEm = Date.now();
+    publicacao.ultimoErro = '';
+  } catch (err) {
+    publicacao.ultimoErro = (err as Error).message;
+    // espera crescente (1, 2, 4… até 30 s): antes tentava de novo a cada 250 ms e martelava o site enquanto ele falhava
+    publicacao.falhas++;
+    publicacao.proximaTentativaEm = Date.now() + Math.min(30_000, 1_000 * 2 ** Math.min(5, publicacao.falhas - 1));
+    // o log registra no máximo 1x por minuto
+    if (Date.now() - publicacao.erroLogadoEm > 60_000) {
+      publicacao.erroLogadoEm = Date.now();
+      log(`transmissão: não consegui enviar ao site (${publicacao.ultimoErro}); a cronometragem segue normal`);
+    }
+  } finally {
+    publicacao.emAndamento = false;
+  }
+}
+
+// a cada 250 ms: passagem/bandeira saem na hora; o relógio do retrato muda 1x por segundo
+setInterval(() => {
+  const cfg = lerConfigTransmissao();
+  const publicando = Boolean(cfg.publicarUrl && cfg.publicarChave);
+  if (!clientesTransmissao.size && !publicando) return;
+  const t = transmissaoAtual();
+  const assinatura = assinaturaDoConteudo(t);
+  const mudou = assinatura !== ultimaTransmissao?.assinatura;
+  ultimaTransmissao = { assinatura, dados: t };
+  if (mudou) {
+    const payload = `event: corrida\ndata: ${JSON.stringify(t)}\n\n`;
+    for (const res of clientesTransmissao) res.write(payload);
+  }
+  // reenvia a cada 30 s mesmo parado: o site sabe que a cronometragem está viva (economiza pedidos no Cloudflare)
+  const agora = Date.now();
+  const podeEnviar = agora - publicacao.enviadoEm >= INTERVALO_MINIMO_PUBLICACAO_MS && agora >= publicacao.proximaTentativaEm;
+  if (publicando && podeEnviar && (assinatura !== publicacao.assinaturaEnviada || agora - publicacao.enviadoEm > 30_000)) void publicarTransmissao(t, assinatura);
+}, 250);
+setInterval(() => {
+  for (const res of clientesTransmissao) res.write(': ping\n\n');
+}, 15_000);
+
+async function rotaTransmissao(req: http.IncomingMessage, res: http.ServerResponse, url: URL) {
+  if (req.method !== 'GET') return send(res, 405, { erro: 'Use GET.' });
+  const aceitos = lerHashes(lerConfigTransmissao().chavesSha256);
+  if (!aceitos.length) return send(res, 503, { erro: 'API de transmissão sem chave cadastrada neste servidor.' });
+  const parceiro = await conferirChave(extrairChave((n) => (req.headers[n] as string | undefined) ?? null, url), aceitos);
+  if (!parceiro) {
+    log(`transmissão: chave recusada (${req.socket.remoteAddress ?? '?'} ${url.pathname})`);
+    return send(res, 401, { erro: 'Chave ausente ou inválida. Envie no cabeçalho Authorization: Bearer <chave>.' }, { 'www-authenticate': 'Bearer' });
+  }
+  if (url.pathname === '/api/transmissao/v1/corrida') return send(res, 200, transmissaoAtual());
+  if (url.pathname === '/api/transmissao/v1/eventos') {
+    res.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', connection: 'keep-alive', 'access-control-allow-origin': '*' });
+    res.write(`retry: 2000\nevent: corrida\ndata: ${JSON.stringify(transmissaoAtual())}\n\n`);
+    clientesTransmissao.add(res);
+    log(`transmissão: ${parceiro} conectou no fluxo ao vivo (${req.socket.remoteAddress ?? '?'})`);
+    req.on('close', () => clientesTransmissao.delete(res));
+    return;
+  }
+  return send(res, 404, { erro: 'Rota desconhecida. Use /api/transmissao/v1/corrida ou /api/transmissao/v1/eventos.' });
+}
+
+/** Situação da API de transmissão para o /healthz (sem chave nenhuma). */
+function transmissaoStatus() {
+  const cfg = lerConfigTransmissao();
+  return {
+    chavesCadastradas: lerHashes(cfg.chavesSha256).length,
+    conexoesAoVivo: clientesTransmissao.size,
+    enviandoAoSite: Boolean(cfg.publicarUrl && cfg.publicarChave),
+    ultimoEnvioOkEm: publicacao.ultimoOkEm ? new Date(publicacao.ultimoOkEm).toISOString() : null,
+    ultimoErro: publicacao.ultimoErro || null,
+  };
 }
 
 /** Formato LiveTimingSnapshot (lib/livetime/types.ts) consumido pelo site, telao e TB50. */
@@ -673,21 +926,54 @@ function broadcast(event: string, data: unknown) {
   for (const res of clients) res.write(payload);
 }
 
-function scheduleStateBroadcast() {
-  if (stateTimer) return;
+let stateTimerAte = 0;
+
+/** Junta mudanças próximas num aviso só. Passagem de kart pede aviso quase imediato (20 ms): os painéis de LED do
+ * piloto (TB50 e o placar 1–10 da COM3) dependem disso; o resto (cadastros, relógio) pode esperar 150 ms. */
+function scheduleStateBroadcast(esperaMs = 150) {
+  const ate = Date.now() + esperaMs;
+  if (stateTimer && stateTimerAte <= ate) return;
+  if (stateTimer) clearTimeout(stateTimer);
+  stateTimerAte = ate;
   stateTimer = setTimeout(() => {
     stateTimer = null;
-    broadcast('state', stateView());
-  }, 150);
+    if (clients.size) broadcast('state', stateView());
+    enviarAosPaineis();
+  }, esperaMs);
 }
 
 // cronometro na tela anda mesmo sem passagem
 setInterval(() => {
-  if (clients.size && runningSession()) scheduleStateBroadcast();
+  if ((clients.size || clientesPainel.size) && runningSession()) scheduleStateBroadcast();
 }, 1_000);
 setInterval(() => {
   for (const res of clients) res.write(': ping\n\n');
+  for (const c of clientesPainel) c.res.write(': ping\n\n');
 }, 15_000);
+
+// ---------------------------------------------------------------- fluxo para os painéis de LED (TB50)
+// O TB50 perguntava o placar 1x por segundo: o piloto via o tempo até ~1,5 s depois de passar na linha. Agora a página
+// abre GET /api/livetime-snapshot/eventos?painel=tb50 e recebe o retrato no instante da passagem.
+
+type ClientePainel = { res: http.ServerResponse; tb50: boolean; ultimo: string };
+const clientesPainel = new Set<ClientePainel>();
+
+function enviarAosPaineis() {
+  if (!clientesPainel.size) return;
+  const prontos = new Map<boolean, { texto: string; semHora: string }>();
+  for (const c of clientesPainel) {
+    let r = prontos.get(c.tb50);
+    if (!r) {
+      const texto = JSON.stringify(liveSnapshot(c.tb50));
+      // o carimbo de hora muda sempre; só manda quando o placar mudou de verdade
+      r = { texto, semHora: texto.replace(/"updatedAt":"[^"]*",?/, '') };
+      prontos.set(c.tb50, r);
+    }
+    if (r.semHora === c.ultimo) continue;
+    c.ultimo = r.semHora;
+    c.res.write(`event: snapshot\ndata: ${r.texto}\n\n`);
+  }
+}
 
 // ---------------------------------------------------------------- HTTP
 
@@ -776,7 +1062,7 @@ const METAS_FILE = join(DATA_DIR, 'equalizacao-metas.json');
 let metasTracado: MetaTracado[] = (() => {
   try { const j = JSON.parse(readFileSync(METAS_FILE, 'utf8')) as unknown; return Array.isArray(j) ? (j as MetaTracado[]) : []; } catch { return []; }
 })();
-function saveMetas() { writeFileSync(METAS_FILE, JSON.stringify(metasTracado, null, 2)); }
+function saveMetas() { writeJsonAtomic(METAS_FILE, metasTracado); }
 
 /** Última meta registrada para o traçado até a data dada. */
 function metaVigente(trackId: string | null, ate = Date.now()) {
@@ -803,13 +1089,29 @@ function milimetros(v: unknown) {
 }
 
 // Regra do redutor por tipo de kart (editável): até a tolerância = equalizado; a cada faixa de diferença, um passo em mm.
-type RegraSalva = { id: string; nome: string; toleranciaMs: number; faixaMs: number; passoMm: number; atualizadoEm?: number; autor?: string };
+type RegraSalva = { faixasPersonalizadas?: FaixaRedutor[] | null; id: string; nome: string; toleranciaMs: number; faixaMs: number; passoMm: number; limiteMs?: number | null; faixa2Ms?: number | null; passo2Mm?: number | null; atualizadoEm?: number; autor?: string };
+
+/**
+ * 2ª faixa da regra (acima de limiteSeg, "a cada faixa2Seg, passo2Mm"). limiteSeg vazio/0 = desliga.
+ * Campo que não veio no pedido mantém o anterior (undefined).
+ */
+function segundaFaixaDoPedido(body: Record<string, unknown>, toleranciaMs: number, anterior?: { limiteMs?: number | null; faixa2Ms?: number | null; passo2Mm?: number | null } | null) {
+  if (body.limiteSeg === undefined && body.faixa2Seg === undefined && body.passo2Mm === undefined)
+    return { limiteMs: anterior?.limiteMs ?? null, faixa2Ms: anterior?.faixa2Ms ?? null, passo2Mm: anterior?.passo2Mm ?? null };
+  const limiteMs = segundosParaMs(body.limiteSeg);
+  if (!limiteMs) return { limiteMs: null, faixa2Ms: null, passo2Mm: null };
+  const faixa2Ms = segundosParaMs(body.faixa2Seg); const passo2Mm = milimetros(body.passo2Mm);
+  if (limiteMs <= toleranciaMs || limiteMs > 60_000) throw new Error('O limite da 2ª faixa tem que ser maior que a tolerância (ex.: 2,000 s).');
+  if (!faixa2Ms || faixa2Ms < 10 || faixa2Ms > 10_000) throw new Error('2ª faixa: digite de quantos em quantos segundos muda o redutor acima do limite (ex.: 0,500).');
+  if (!passo2Mm || passo2Mm <= 0 || passo2Mm > 5) throw new Error('2ª faixa: digite quantos milímetros abrir ou fechar a cada faixa acima do limite (ex.: 0,1).');
+  return { limiteMs, faixa2Ms, passo2Mm };
+}
 const REGRAS_FILE = join(DATA_DIR, 'equalizacao-regras.json');
 let regrasRedutor: RegraSalva[] = (() => {
   try { const j = JSON.parse(readFileSync(REGRAS_FILE, 'utf8')) as unknown; if (Array.isArray(j) && j.length) return j as RegraSalva[]; } catch { /* primeira vez: vale a regra padrão */ }
   return [{ id: 'kart-indoor', ...REGRA_PADRAO }];
 })();
-function saveRegras() { writeFileSync(REGRAS_FILE, JSON.stringify(regrasRedutor, null, 2)); }
+function saveRegras() { writeJsonAtomic(REGRAS_FILE, regrasRedutor); }
 const regraView = (r: RegraSalva) => ({ ...r, faixas: faixasDaRegra(r, 5) });
 /** Regra pelo id ou pelo nome do tipo de kart; sem achar, a primeira (Kart Indoor). */
 function regraSalva(chave: unknown) {
@@ -825,7 +1127,9 @@ function regraDoPedido(body: Record<string, unknown>, atual?: ConfigEqualizacao)
   const toleranciaMs = segundosParaMs(body.toleranciaSeg) ?? base?.toleranciaMs ?? atual?.toleranciaMs ?? REGRA_PADRAO.toleranciaMs;
   if (faixaMs < 10 || faixaMs > 10_000) throw new Error('A faixa de tempo da regra do redutor deve ficar entre 0,010 e 10 segundos.');
   if (!(passoMm > 0) || passoMm > 5) throw new Error('O passo do redutor deve ficar entre 0,01 e 5 mm.');
-  return { regraNome: base?.nome ?? atual?.regraNome ?? REGRA_PADRAO.nome, toleranciaMs, faixaMs, passoMm };
+  // 2ª faixa: a da tela; sem ela, a do tipo de kart escolhido (ou a que a equalização já tinha)
+  const faixa2 = segundaFaixaDoPedido(body, toleranciaMs, base ?? atual);
+  return { regraNome: base?.nome ?? atual?.regraNome ?? REGRA_PADRAO.nome, toleranciaMs, faixaMs, passoMm, ...faixa2, faixasPersonalizadas: validarFaixasRedutor(body.faixasPersonalizadas === undefined ? (base ?? atual)?.faixasPersonalizadas : body.faixasPersonalizadas, toleranciaMs) };
 }
 
 /** Configuração usada na conta: no modo "meta fixa" sem valor digitado vale a última meta do traçado. */
@@ -895,23 +1199,24 @@ async function opsGet(path: string) {
  * cada kart ficou na pista (da primeira à última passagem). Uma vez por bateria; se o servidor da operação estiver
  * fora, tenta de novo a cada 5 minutos (baterias dos últimos 2 dias).
  */
+const usoKartsEmEnvio = new Set<string>();
 async function enviarUsoKarts(s: Session) {
   // simulador (testes) nunca grava horas de uso de mentira no controle da oficina de verdade
   if (SIMULATE || s.usoKartsEnviado || s.state !== 'encerrada') return;
-  const karts = s.competitors
-    .map((c) => {
-      const t = c.crossings.filter((x) => !x.deleted).map((x) => x.wallMs).sort((a, b) => a - b);
-      return { kart: c.kart, minutos: t.length > 1 ? Math.round((t[t.length - 1] - t[0]) / 60_000) : 0 };
-    })
-    .filter((k) => k.kart && k.minutos > 0);
+  // um envio por vez por bateria: o envio ao encerrar e a nova tentativa de 5 em 5 min não podem somar duas vezes
+  if (usoKartsEmEnvio.has(s.id)) return;
+  // por kart FÍSICO: com troca de kart cada um fica com o tempo em que esteve na pista
+  const karts = usoKartsDaSessao(s);
   if (!karts.length) { s.usoKartsEnviado = true; saveSession(s); return; }
+  usoKartsEmEnvio.add(s.id);
   try {
     const r = await fetch(OPS_URL + '/api/crono/uso-karts', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-ops-key': process.env.OPS_RECEPCAO_KEY || '' },
       // sem a bateria da agenda não se sabe a categoria (Indoor/Super Kart têm karts com o mesmo número)
       body: JSON.stringify({ sessaoId: s.id, agendaId: await agendaIdDa(s), karts }),
-      signal: AbortSignal.timeout(8000),
+      // 8 s era pouco: o servidor somava, a resposta chegava atrasada e a nova tentativa somava de novo
+      signal: AbortSignal.timeout(60_000),
     });
     const d = (await r.json().catch(() => ({}))) as { somados?: number; criados?: number; ignorados?: number; categoria?: string | null; error?: string };
     if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
@@ -920,6 +1225,8 @@ async function enviarUsoKarts(s: Session) {
     log(`uso dos karts de ${s.name} enviado para a oficina: ${karts.length} karts, ${d.somados ?? 0} controles somados, ${d.criados ?? 0} novos, ${d.ignorados ?? 0} sem controle (${d.categoria ?? 'sem categoria'})`);
   } catch (err) {
     log(`uso dos karts de ${s.name} não foi enviado (tenta de novo): ${(err as Error).message}`);
+  } finally {
+    usoKartsEmEnvio.delete(s.id);
   }
 }
 setInterval(() => {
@@ -957,6 +1264,21 @@ async function contextoDaProva(s: Session): Promise<ContextoProva> {
   const pista = catalog.tracks.find((t) => t.id === trackIdDa(s));
   // sem o programa do catálogo, o nome da bateria já vem "BATERIA 17:00 · CORRIDA"
   const i = s.name.lastIndexOf(' · ');
+  const classificacao = computeStandings(s, trackLengthFor(s))
+    .filter((r) => !r.autoAdded || r.laps > 0)
+    .filter((r) => !s.competitors.find((c) => c.kart === r.kart && c.name === r.name)?.detalhes?.oculto);
+  const penalidades = s.competitors.flatMap((c) => [
+    ...(c.flag === 'black' ? [{ kart: c.kart, nome: c.name, flag: 'black', wallMs: s.finishedAt ?? s.createdAt }] : []),
+    ...(c.penalidades ?? []).map((p) => ({
+      kart: c.kart,
+      nome: c.name,
+      tipo: p.tipo,
+      segundos: p.segundos,
+      texto: p.texto,
+      motivo: p.motivo,
+      wallMs: p.wallMs,
+    })),
+  ]);
   return {
     empresa: await empresaParaEmail(),
     evento: evento?.name ?? null,
@@ -965,7 +1287,9 @@ async function contextoDaProva(s: Session): Promise<ContextoProva> {
     tipo: s.type,
     tracado: pista?.name ?? null,
     quando: s.startedAt ?? s.finishedAt ?? s.createdAt,
-    classificacao: computeStandings(s, trackLengthFor(s)).filter((r) => !r.autoAdded || r.laps > 0).filter((r) => !s.competitors.find((c) => c.kart === r.kart && c.name === r.name)?.detalhes?.oculto),
+    classificacao,
+    observacoes: s.observations ?? [],
+    penalidades,
   };
 }
 
@@ -986,12 +1310,45 @@ const depEmail: Dependencias = {
   logoPng: LOGO_EMAIL,
 };
 
+/**
+ * Um envio de e-mail por vez em cada bateria. Dois cliques em "Enviar a todos" (ou o automático junto com o manual)
+ * mandavam o resultado em dobro para cada piloto e disputavam os mesmos PDFs temporários.
+ */
+const filaEmails = new Map<string, Promise<void>>();
+const LIMITE_ENVIO_EMAILS_MS = 30 * 60_000;
+const envioATodosAtivo = new Set<string>();
+function enviarResultadoEmFila(s: Session, op: OpcoesEnvio) {
+  const aTodos = !op.kart && !op.para;
+  if (aTodos) envioATodosAtivo.add(s.id);
+  // 11/10: o envio da BATERIA 18:00 · CORRIDA nunca terminou nem deu erro e prendia a bateria para sempre
+  // (envioATodosAtivo); com o limite, vira "falhou" e a nova tentativa de 5 em 5 min assume
+  const tarefa = () => {
+    let timer: NodeJS.Timeout | undefined;
+    const limite = new Promise<never>((_, falhar) => { timer = setTimeout(() => falhar(new Error('o envio travou por 30 min; tentando de novo')), LIMITE_ENVIO_EMAILS_MS); });
+    return Promise.race([enviarResultado(s, EMAIL_FILE, depEmail, op), limite]).finally(() => clearTimeout(timer));
+  };
+  const atual = (filaEmails.get(s.id) ?? Promise.resolve()).then(tarefa, tarefa);
+  const marca = atual.then(() => undefined, () => undefined);
+  filaEmails.set(s.id, marca);
+  void marca.then(() => {
+    if (aTodos) envioATodosAtivo.delete(s.id);
+    if (filaEmails.get(s.id) === marca) filaEmails.delete(s.id);
+  });
+  return atual;
+}
+
 /** Disparo do encerramento: só tomada de tempo e corrida, com voltas; nunca derruba o servidor. */
+function nomeEventoDa(s: Session) {
+  const prova = catalog.provas.find((p) => p.id === s.proofId);
+  return catalog.events.find((e) => e.id === (s.eventId ?? prova?.eventId))?.name ?? '';
+}
+
 async function emailsAoEncerrar(s: Session) {
   if (s.state !== 'encerrada' || !['classificacao', 'corrida'].includes(s.type)) return;
   if (!s.competitors.some((c) => c.crossings.some((x) => !x.deleted && x.lapMs != null))) return; // bateria sem volta nenhuma
+  if (envioATodosAtivo.has(s.id)) return; // já está mandando para todos (a próxima tentativa confere quem faltou)
   try {
-    await enviarResultado(s, EMAIL_FILE, depEmail, { automatico: true });
+    await enviarResultadoEmFila(s, { automatico: true, nomeEvento: nomeEventoDa(s) });
   } catch (err) {
     const erro = (err as Error).message;
     s.emailsResultado = { status: 'falhou', atualizadoEm: Date.now(), tentativas: (s.emailsResultado?.tentativas ?? 0) + 1, enviados: s.emailsResultado?.enviados ?? [], falhas: [{ kart: '', nome: '', email: '', erro }], semEmail: s.emailsResultado?.semEmail ?? [] };
@@ -999,12 +1356,17 @@ async function emailsAoEncerrar(s: Session) {
     log(`e-mail do resultado de ${s.name} não foi enviado (tenta de novo): ${erro}`);
   }
 }
-// nova tentativa a cada 5 min só para quem falhou (servidor de e-mail fora, internet caiu), até 6 h depois do encerramento
+// nova tentativa a cada 5 min só para quem falhou (servidor de e-mail fora, internet caiu), até 6 h depois do encerramento.
+// Bateria encerrada há mais de 3 min sem registro de envio = o envio morreu no meio (servidor reiniciado logo depois do
+// encerramento: 10/10 09:50 e 11/10 17:25 ficaram sem resultado) → manda de novo.
 setInterval(() => {
-  const limite = Date.now() - 6 * 3_600_000;
+  const agora = Date.now();
+  const limite = agora - 6 * 3_600_000;
   for (const s of sessions.values()) {
     const e = s.emailsResultado;
-    if (s.state === 'encerrada' && e && (e.status === 'parcial' || e.status === 'falhou') && e.tentativas < 12 && (s.finishedAt ?? s.createdAt) > limite) void emailsAoEncerrar(s);
+    const fim = s.finishedAt ?? s.createdAt;
+    if (s.state !== 'encerrada' || fim <= limite) continue;
+    if (e ? (e.status === 'parcial' || e.status === 'falhou') && e.tentativas < 12 : fim < agora - 3 * 60_000) void emailsAoEncerrar(s);
   }
 }, 5 * 60_000);
 
@@ -1013,8 +1375,8 @@ setInterval(() => {
 // provas vêm do produto vendido (Tomada de tempo + Corrida...). As provas criadas aqui podem ser ajustadas pelo
 // cronometrista: a sincronização só cria o que falta, nunca sobrescreve.
 
-type BateriaAgenda = { id: number; nome?: string; inicio?: string; tipoKart?: string; pagos?: number; inscritos?: number };
-type ProgramaAgenda = { ordem?: number; nome?: string; tipo?: string; finalizacao?: string; tempoMin?: number; voltasMax?: number; voltaMinimaSeg?: number };
+type BateriaAgenda = { id: number; nome?: string; inicio?: string; tipoKart?: string; trackId?: string | null; pagos?: number; inscritos?: number };
+type ProgramaAgenda = { ordem?: number; nome?: string; tipo?: string; finalizacao?: string; tempoMin?: number; voltasMax?: number; voltaMinimaSeg?: number; trackId?: string | null };
 const programasAgenda = new Map<number, { em: number; provas: ProgramaAgenda[] }>();
 
 function hojeBrasilia() {
@@ -1069,12 +1431,20 @@ async function sincronizarAgendaDoDia() {
       if (!catalog.provas.some((x) => x.id === id)) {
         const tipo: SessionType = p.tipo === 'treino' || p.tipo === 'classificacao' || p.tipo === 'corrida' ? p.tipo : 'corrida';
         catalog.provas.push({
-          id, eventId, groupId, agendaId: String(b.id), order: k + 1, heats: 1, intervalMin: 0, trackId: null,
+          id, eventId, groupId, agendaId: String(b.id), order: k + 1, heats: 1, intervalMin: 0, trackId: b.trackId ?? null,
           name: String(p.nome ?? '').trim() || (tipo === 'classificacao' ? 'TOMADA DE TEMPO' : tipo === 'treino' ? 'TREINO' : 'CORRIDA'),
           type: tipo, durationMin: tempo, maxLaps: porVoltas && Number(p.voltasMax) > 0 ? Number(p.voltasMax) : null,
           minLapSec: Number(p.voltaMinimaSeg) > 0 ? Number(p.voltaMinimaSeg) : null,
           startAt: minutos == null ? '' : `${String(Math.floor(minutos / 60) % 24).padStart(2, '0')}:${String(minutos % 60).padStart(2, '0')}`,
         });
+        mudou = true;
+      }
+      const existente = catalog.provas.find((x) => x.id === id);
+      const trackId = b.trackId ?? null;
+      // O traçado da Recepção é a fonte da agenda enquanto a prova ainda não foi usada.
+      // Depois que existe uma sessão, a escolha do cronometrista permanece intocada.
+      if (existente && existente.trackId !== trackId && ![...sessions.values()].some((s) => s.proofId === id && s.state !== 'cancelada')) {
+        existente.trackId = trackId;
         mudou = true;
       }
       if (minutos != null) minutos += (tempo || 10) + 5;
@@ -1144,6 +1514,8 @@ async function prepararBateriaDaAgenda(b: BateriaAgenda): Promise<boolean> {
       now: Date.now(), competitors: pagos.map(doGrid),
       eventId: p.eventId, groupId: p.groupId, proofId: p.id, programaId: `agenda-${b.id}`,
     });
+    s.trackId = p.trackId ?? null;
+    aplicarCondicaoDoTracado(s);
     s.agendaId = b.id;
     const herdada = herdarCompetidores(s);
     s.agendaPuxados = pagos.map((g) => (g.clienteId != null ? String(g.clienteId) : String(g.nome).trim().toLowerCase()));
@@ -1230,7 +1602,8 @@ function createTimingBackup() {
     const source = join(DATA_DIR, name);
     if (existsSync(source)) cpSync(source, join(target, name), { recursive: true, errorOnExist: false });
   }
-  for (const name of ['transponders.json', 'catalog.json', 'settings.json']) {
+  // metas e regras da equalização também (o e-mail fica fora: tem a senha da caixa)
+  for (const name of ['transponders.json', 'catalog.json', 'settings.json', 'equalizacao-metas.json', 'equalizacao-regras.json']) {
     const source = join(DATA_DIR, name);
     if (existsSync(source)) copyFileSync(source, join(target, name));
   }
@@ -1276,6 +1649,7 @@ function restoreEventBackup(id: string) {
 }
 
 function crossingRows(s: Session) {
+  const progresso = progressoNasPassagens(s);
   return s.competitors.flatMap((competitor) => competitor.crossings.map((crossing, index) => ({
     id: crossing.id ?? `${s.id}-${competitor.kart}-${index}`,
     kart: competitor.kart,
@@ -1283,6 +1657,8 @@ function crossingRows(s: Session) {
     category: competitor.category ?? null,
     transponder: crossing.transponder ?? null,
     lap: index,
+    voltas: progresso.get(crossing)?.voltas ?? null,
+    leaderLap: progresso.get(crossing)?.lider ?? 0,
     lapMs: crossing.lapMs,
     wallMs: crossing.wallMs,
     decoderTimeMs: crossing.decoderTimeMs,
@@ -1300,6 +1676,8 @@ function crossingRows(s: Session) {
     category: null,
     transponder: r.transponder,
     lap: -1,
+    voltas: null,
+    leaderLap: 0,
     lapMs: null,
     wallMs: r.wallMs,
     decoderTimeMs: r.decoderTimeMs,
@@ -1321,7 +1699,8 @@ function correctCrossings(s: Session, action: string, ids: string[], aboveId?: s
   }
   const rows = crossingRows(s).filter((row) => !row.rejected);
   const target = aboveId ? rows.find((row) => row.id === aboveId) : undefined;
-  const selected = rows.filter((row) => ids.includes(row.id) || (target && row.wallMs >= target.wallMs));
+  const sameKartFromTarget = target ? new Set(crossingIdsFromKartAtOrAfter(s, target.id)) : null;
+  const selected = rows.filter((row) => ids.includes(row.id) || sameKartFromTarget?.has(row.id));
   for (const row of selected) {
     if (action === 'delete') setCrossingDeleted(s, row.id, true);
     else if (action === 'restore') setCrossingDeleted(s, row.id, false);
@@ -1382,7 +1761,9 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       }
       if (id && !subAction && (method === 'PATCH' || method === 'PUT')) {
         const previousCompetitor = entity === 'competitors' ? catalog.competitors.find((item) => item.id === id) : undefined;
+        const tracadoAntes = entity === 'provas' ? catalog.provas.find((p) => p.id === id)?.trackId ?? null : undefined;
         const item = updateCatalogRecord(catalog, entity, id, await readBody(req));
+        if (entity === 'provas') levarTracadoDaProva(id, tracadoAntes ?? null, (item as { trackId?: string | null }).trackId ?? null);
         if (entity === 'competitors') {
           unlinkCompetitorTransponder(previousCompetitor);
           linkCompetitorTransponder(item as TimingCatalog['competitors'][number]);
@@ -1409,7 +1790,12 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
   }
   if (path === '/api/email-config/teste' && method === 'POST') {
     const body = await readBody(req);
-    try { await enviarTeste(EMAIL_FILE, String(body.para ?? ''), SIMULATE); log(`e-mail de teste enviado para ${String(body.para ?? '')}`); return send(res, 200, { ok: true }); }
+    try {
+      const daTela = body.config && typeof body.config === 'object' && !Array.isArray(body.config) ? body.config as Record<string, unknown> : undefined;
+      const resultado = await enviarTeste(EMAIL_FILE, String(body.para ?? ''), SIMULATE, daTela);
+      log(`e-mail de teste aceito pelo servidor para ${String(body.para ?? '')}`);
+      return send(res, 200, { ok: true, ...(resultado ?? { status: 'simulador', entregaConfirmada: false, mensagem: 'Teste gravado no simulador.' }) });
+    }
     catch (e) { return send(res, 400, { error: `Não enviou: ${traduzirErro(e)}` }); }
   }
   if (path === '/api/settings' && method === 'GET') return send(res, 200, { ...timingSettings, decoder: activeDecoderConfig });
@@ -1427,6 +1813,8 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       const config = normalizeDecoderConfig(await readBody(req));
       const probe = await probeTcp(config.host, config.port);
       if (!probe.ok) return send(res, 502, { error: probe.error || 'Não foi possível conectar ao decoder.' });
+      // o teste da conexão leva até alguns segundos: se alguém deu a verde nesse meio tempo, não troca o decoder
+      if (runningSession()) return send(res, 409, { error: 'Uma bateria largou enquanto a conexão era testada. Encerre a bateria antes de alterar o decoder.' });
       decoder.stop();
       activeDecoderConfig = config;
       timingSettings = { ...timingSettings, decoder: config };
@@ -1459,6 +1847,15 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
 
   if (path === '/api/state') return send(res, 200, stateView());
   if (path === '/api/livetime-snapshot') return send(res, 200, liveSnapshot(url.searchParams.get('painel') === 'tb50'));
+  if (path === '/api/painel-led-page' && method === 'GET') return send(res, 200, painelLedPage);
+  if (path === '/api/painel-led-page' && (method === 'PUT' || method === 'POST')) {
+    const body = await readBody(req);
+    try {
+      return send(res, 200, setPainelLedPage(body.pagina, String(body.origem ?? 'cronometragem')));
+    } catch (err) {
+      return send(res, 400, { error: (err as Error).message });
+    }
+  }
   if (path === '/api/tb50-page' && method === 'GET') return send(res, 200, tb50Page);
   if (path === '/api/tb50-ping') {
     const ip = (req.socket.remoteAddress ?? '').replace(/^::ffff:/, '');
@@ -1487,6 +1884,18 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     return;
   }
 
+  if (path.startsWith('/api/transmissao/')) return rotaTransmissao(req, res, url);
+
+  if (path === '/api/livetime-snapshot/eventos') {
+    res.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', connection: 'keep-alive', 'access-control-allow-origin': '*' });
+    const cliente: ClientePainel = { res, tb50: url.searchParams.get('painel') === 'tb50', ultimo: '' };
+    res.write('retry: 1000\n\n');
+    clientesPainel.add(cliente);
+    enviarAosPaineis(); // o retrato atual na hora de conectar
+    req.on('close', () => clientesPainel.delete(cliente));
+    return;
+  }
+
   if (path === '/api/sessions' && method === 'GET') return send(res, 200, sortedSessions().map(sessionSummary));
 
   if (path === '/api/sessions' && method === 'POST') {
@@ -1511,6 +1920,10 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       proofId: typeof body.proofId === 'string' ? body.proofId : null,
       programaId: typeof body.programaId === 'string' && body.programaId ? body.programaId : null,
     });
+    s.trackId = typeof body.trackId === 'string' && catalog.tracks.some((track) => track.id === body.trackId)
+      ? body.trackId
+      : prova?.trackId ?? null;
+    aplicarCondicaoDoTracado(s);
     // bateria da agenda da recepção: guarda de qual horário veio (o app avisa antes de criar a mesma duas vezes)
     if (Number(body.agendaId) > 0) s.agendaId = Number(body.agendaId);
     if (prova?.agendaId && Number(prova.agendaId) > 0) {
@@ -1564,15 +1977,30 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         name: body.name == null ? undefined : String(body.name),
         category: body.category == null ? undefined : String(body.category),
         detalhes: body.detalhes && typeof body.detalhes === 'object' ? body.detalhes as Record<string, unknown> : undefined,
+        // Tabajara: false = vale só o kart novo (voltas e tempos do anterior saem da conta)
+        manterVoltas: body.manterVoltas !== false,
       });
       registrarTrocas(s, [troca], 'explicit-swap');
       saveSession(s);
+      atualizarKartsNasProvasPreparadas(s, troca.de, troca.para, body.customerId == null ? null : String(body.customerId));
       scheduleStateBroadcast();
       return send(res, 200, { ok: true, troca, session: sessionView(s) });
     } catch (err) { return send(res, 400, { error: (err as Error).message }); }
   }
 
   // ---------------------------------------------------------------- registro de competidor (Competidor do canvas)
+  const recuperar = path.match(/^\/api\/sessions\/([\w-]+)\/competitors\/restore$/);
+  if (recuperar && method === 'POST') {
+    const s = sessions.get(recuperar[1]);
+    if (!s) return send(res, 404, { error: 'Bateria não encontrada.' });
+    const body = await readBody(req);
+    try {
+      const c = restoreCompetitor(s, String(body.id ?? ''));
+      registrarObservacao(s, `Piloto recuperado · Kart ${c.kart} · ${c.name}`, String(body.autor ?? 'Cronometragem'), 'system');
+      saveSession(s); scheduleStateBroadcast();
+      return send(res, 200, sessionView(s));
+    } catch (err) { return send(res, 409, { error: (err as Error).message }); }
+  }
   const rc = path.match(/^\/api\/sessions\/([\w-]+)\/competitors\/(\d+)$/);
   if (rc && method === 'PUT') {
     const s = sessions.get(rc[1]);
@@ -1581,6 +2009,9 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     const atual = s.competitors[i];
     if (!atual) return send(res, 404, { error: 'Competidor não encontrado nessa bateria.' });
     const body = await readBody(req);
+    // a tela manda quem estava nessa linha quando abriu o registro: se a lista mudou no meio, não grava em outro piloto
+    if ((typeof body.kartAntes === 'string' && body.kartAntes !== atual.kart) || (typeof body.nomeAntes === 'string' && body.nomeAntes.trim() !== atual.name.trim()))
+      return send(res, 409, { error: 'A lista de pilotos desta bateria mudou enquanto o registro estava aberto. Feche e abra o registro de novo.' });
     const num = (v: unknown) => (v === '' || v == null || !Number.isFinite(Number(String(v).replace(',', '.'))) ? null : Number(String(v).replace(',', '.')));
     const txt = (v: unknown, max = 80) => String(v ?? '').trim().slice(0, max);
     const d = (body.detalhes ?? {}) as Record<string, unknown>;
@@ -1589,6 +2020,8 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       cidade: txt(d.cidade), estado: txt(d.estado, 4).toUpperCase(), pais: txt(d.pais, 40), box: txt(d.box, 20),
       peso: num(d.peso), pesoIndumentaria: num(d.pesoIndumentaria), pesoLastro: num(d.pesoLastro), pontuacao: num(d.pontuacao),
       oculto: Boolean(d.oculto), equipe: Array.isArray(d.equipe) ? (d.equipe as unknown[]).map((x) => txt(x, 100)).slice(0, 6) : [],
+      // transponder de cada piloto da equipe, na mesma posição de "equipe" (a coluna da tela não era gravada)
+      ...(Array.isArray(d.equipeTransponders) ? { equipeTransponders: (d.equipeTransponders as unknown[]).map((x) => txt(x, 12).replace(/\D/g, '') || null).slice(0, 6) } : {}),
     };
     const kart = typeof body.kart === 'string' ? body.kart.trim() : atual.kart;
     // o kart novo pode já estar na lista como "Kart 12" (passou na linha antes da troca): esse não conta
@@ -1605,6 +2038,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     } catch (err) { return send(res, 400, { error: (err as Error).message }); }
     registrarTrocas(s, trocas, 'competitor-edit');
     saveSession(s);
+    for (const troca of trocas) atualizarKartsNasProvasPreparadas(s, troca.de, troca.para, atual.customerId ?? null);
     // "Aplicar alterações nas demais provas do grupo": o mesmo piloto nas outras provas do grupo/programa
     let outras = 0;
     if (body.aplicarGrupo) {
@@ -1680,10 +2114,13 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     const outra = regrasRedutor.find((r) => r.nome.toLowerCase() === nome.toLowerCase());
     const atual = (body.id ? regrasRedutor.find((r) => r.id === String(body.id)) : null) ?? outra;
     if (atual && outra && outra !== atual) return send(res, 409, { error: `Já existe a regra "${outra.nome}".` });
-    const regra: RegraSalva = { id: atual?.id ?? randomUUID().slice(0, 8), nome, toleranciaMs, faixaMs, passoMm, atualizadoEm: Date.now(), autor: String(body.autor ?? 'Cronometragem').slice(0, 60) };
+    let faixasPersonalizadas: FaixaRedutor[] | null;
+    let faixa2: ReturnType<typeof segundaFaixaDoPedido>;
+    try { faixa2 = segundaFaixaDoPedido(body, toleranciaMs, atual); faixasPersonalizadas = validarFaixasRedutor(body.faixasPersonalizadas === undefined ? atual?.faixasPersonalizadas : body.faixasPersonalizadas, toleranciaMs); } catch (err) { return send(res, 400, { error: (err as Error).message }); }
+    const regra: RegraSalva = { id: atual?.id ?? randomUUID().slice(0, 8), nome, toleranciaMs, faixaMs, passoMm, ...faixa2, faixasPersonalizadas, atualizadoEm: Date.now(), autor: String(body.autor ?? 'Cronometragem').slice(0, 60) };
     regrasRedutor = atual ? regrasRedutor.map((r) => (r === atual ? regra : r)) : [...regrasRedutor, regra];
     saveRegras();
-    log(`equalização: regra do redutor "${nome}" — equalizado até ${toleranciaMs} ms; a cada ${faixaMs} ms, ${passoMm} mm`);
+    log(`equalização: regra do redutor "${nome}" — equalizado até ${toleranciaMs} ms; a cada ${faixaMs} ms, ${passoMm} mm` + (faixa2.limiteMs ? `; acima de ${faixa2.limiteMs} ms, a cada ${faixa2.faixa2Ms} ms, ${faixa2.passo2Mm} mm` : ''));
     return send(res, atual ? 200 : 201, { regra: regraView(regra), regras: regrasRedutor.map(regraView) });
   }
   const regraId = path.match(/^\/api\/equalizacao\/regras\/([\w-]+)$/);
@@ -1725,6 +2162,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       competitors: [...referencias.map((k) => ({ kart: k, name: `Kart ${k} (referência)` })), ...parseCompetitors(body.karts).filter((c) => c.kart && !referencias.includes(c.kart))],
     });
     s.trackId = tid;
+    aplicarCondicaoDoTracado(s);
     s.equalizacao = {
       referencias, metaModo: body.metaModo === 'fixa' ? 'fixa' : 'referencia', metaFixaMs: tempoVoltaParaMs(body.metaSeg),
       ...regra, mecanico: String(body.mecanico ?? '').trim().slice(0, 80), checklist: {}, aberturas: {}, redutorInicialMm: {},
@@ -1749,6 +2187,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
           const tid = body.trackId ? String(body.trackId) : null;
           if (tid && !catalog.tracks.some((t) => t.id === tid)) return send(res, 400, { error: 'Traçado não encontrado.' });
           s.trackId = tid;
+          aplicarCondicaoDoTracado(s);
         }
         if (body.referencias !== undefined) {
           const refs = [...new Set((Array.isArray(body.referencias) ? body.referencias : String(body.referencias ?? '').split(/[;, ]+/)).map((k: unknown) => String(k).trim().replace(/^0+(?=\d)/, '')).filter(Boolean))];
@@ -1763,7 +2202,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
           if (String(body.metaSeg ?? '').trim() && !tempoVoltaParaMs(body.metaSeg)) return send(res, 400, { error: META_INVALIDA });
           cfg.metaFixaMs = tempoVoltaParaMs(body.metaSeg);
         }
-        if (body.regra !== undefined || body.toleranciaSeg !== undefined || body.faixaSeg !== undefined || body.passoMm !== undefined) Object.assign(cfg, regraDoPedido(body, cfg));
+        if (body.regra !== undefined || body.toleranciaSeg !== undefined || body.faixaSeg !== undefined || body.passoMm !== undefined || body.limiteSeg !== undefined || body.faixasPersonalizadas !== undefined) Object.assign(cfg, regraDoPedido(body, cfg));
         if (typeof body.mecanico === 'string') cfg.mecanico = body.mecanico.trim().slice(0, 80);
         if (body.abertura && typeof body.abertura === 'object') {
           // correção do redutor de um bloco: abertura em mm em relação ao inicial (vazio volta para o ajuste sugerido)
@@ -1789,15 +2228,24 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       } else if (eq[2] === 'karts' && eq[3] && method === 'PUT') {
         // apontamentos da oficina para o kart: chassi, pneu, motor, embreagem, freio, observações e ação
         const kart = decodeURIComponent(eq[3]);
-        let comp = s.competitors.find((c) => c.kart === kart);
-        if (!comp) {
-          // kart pendente de uma equalização anterior que ainda não andou nesta: entra na lista ao receber apontamento
-          const pendente = resultadoEqualizacao(s).karts.find((k) => k.kart === kart && k.pendenteDe != null);
-          if (!pendente) return send(res, 404, { error: 'Kart não encontrado nesta equalização.' });
-          comp = { kart, name: pendente.piloto, flag: 'none', crossings: [], finished: false };
-          s.competitors.push(comp);
-        }
+        const comp = s.competitors.find((c) => c.kart === kart);
+        if (!comp) return send(res, 404, { error: 'Kart não encontrado nesta equalização.' });
         const body = await readBody(req);
+        const anteriorChecklist = cfg.checklist?.[kart];
+        let confirmacaoManual = anteriorChecklist?.confirmacaoManual;
+        if (Object.prototype.hasOwnProperty.call(body, 'confirmacaoManual')) {
+          if (body.confirmacaoManual == null) confirmacaoManual = undefined;
+          else {
+            const atual = resultadoEqualizacao(s).karts.find((k) => k.kart === kart);
+            const completos = atual?.blocos.filter((b) => b.completo) ?? [];
+            const ultimo = completos[completos.length - 1];
+            const pedido = body.confirmacaoManual as { aberturaMm?: unknown };
+            const aberturaMm = milimetros(pedido.aberturaMm);
+            if (!atual || atual.referencia || !ultimo || atual.melhorMs == null || aberturaMm == null || Math.abs(aberturaMm) > 20 || resultadoEqualizacao(s).metaMs == null)
+              return send(res, 400, { error: 'Para confirmar manualmente, informe um ajuste de até 20 mm para um kart não referência com bloco completo e meta definida nesta equalização.' });
+            confirmacaoManual = { aberturaMm, bloco: ultimo.bloco, confirmadoEm: Date.now(), autor: String(body.autor ?? 'Cronometragem').slice(0, 60) };
+          }
+        }
         const entrada = (body.sistemas ?? {}) as Record<string, { status?: string; nota?: string }>;
         const sistemas: NonNullable<ChecklistKart['sistemas']> = {};
         for (const nome of SISTEMAS_KART) {
@@ -1809,6 +2257,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         (cfg.checklist ??= {})[kart] = {
           sistemas, observacoes: String(body.observacoes ?? '').trim().slice(0, 500), acaoOficina: String(body.acaoOficina ?? '').trim().slice(0, 200),
           atualizadoEm: Date.now(), autor: String(body.autor ?? 'Cronometragem').slice(0, 60),
+          ...(confirmacaoManual ? { confirmacaoManual } : {}),
         };
         if (typeof body.piloto === 'string' && body.piloto.trim()) comp.name = body.piloto.trim().slice(0, 80);
       } else if (eq[2] === 'importar' && !eq[3] && method === 'POST') {
@@ -1837,7 +2286,20 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         saveMetas();
         registrarObservacao(s, `Equalização finalizada: meta ${r.metaMs ? formatLap(r.metaMs) : 'não definida'}, ${r.karts.filter((k) => k.status === 'EQUALIZADO').length} equalizado(s), ${r.karts.filter((k) => k.status === 'REVISAR').length} para revisar`, 'Cronometragem');
       } else if (eq[2] === 'reabrir' && method === 'POST') {
+        // retomar a MESMA equalização (volta a contar passagens) em vez de criar outra a cada pausa
+        if (s.state === 'encerrada') {
+          const outra = runningSession();
+          if (outra && outra.id !== s.id) return send(res, 409, { error: `A bateria "${outra.name}" está em andamento. Encerre ela antes de retomar a equalização.` });
+          const body = await readBody(req);
+          retomarEqualizacao(s);
+          registrarObservacao(s, 'Equalização retomada: as voltas já feitas continuam e as novas entram nos blocos seguintes', String(body.autor ?? 'Cronometragem').slice(0, 60));
+          log(`equalização ${s.name}: RETOMADA`);
+        }
         cfg.finalizadaEm = null;
+        // a meta desta equalização sai do histórico até ser finalizada de novo
+        const antes = metasTracado.length;
+        metasTracado = metasTracado.filter((m) => m.sessionId !== s.id);
+        if (metasTracado.length !== antes) saveMetas();
       } else return send(res, 404, { error: 'Ação desconhecida.' });
     } catch (err) { return send(res, 400, { error: (err as Error).message }); }
     saveSession(s);
@@ -1850,10 +2312,43 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     const q = url.searchParams;
     const data = (v: string | null) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
     const tipos = String(q.get('tipos') ?? '').split(',').filter((t): t is SessionType => SESSION_TYPES.has(t as SessionType));
-    const opcoes = { de: data(q.get('de')), ate: data(q.get('ate')), trackId: q.get('trackId') || null, tipos: tipos.length ? tipos : null, extensaoM: trackLengthFor };
+    const chaveCategoria = (valor: string) => valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('pt-BR');
+    const categoriaPedida = (q.get('categoria') ?? '').trim();
+    const chavePedida = chaveCategoria(categoriaPedida);
+    // A agenda chama a categoria não-Super de "Light", enquanto o cadastro histórico
+    // ainda guarda esse grupo como "Indoor". Prefere um cadastro "Light" quando existir.
+    const nomeCadastro = chavePedida === 'light' ? 'indoor' : chavePedida;
+    const categoriaCadastro = catalog.categories.find((c) => chaveCategoria(c.name) === chavePedida)
+      ?? (chavePedida === 'light' ? catalog.categories.find((c) => chaveCategoria(c.name) === nomeCadastro) : undefined);
+    const categorias = categoriaPedida
+      ? [...new Set([chavePedida, ...(categoriaCadastro ? [chaveCategoria(categoriaCadastro.id), chaveCategoria(categoriaCadastro.name)] : [])])]
+      : null;
+    const categoriaDaBateria = (s: Session) => {
+      const prova = catalog.provas.find((p) => p.id === s.proofId);
+      const grupo = catalog.groups.find((g) => g.id === (s.groupId ?? prova?.groupId));
+      return grupo?.categoryId ?? null;
+    };
+    const opcoes = { de: data(q.get('de')), ate: data(q.get('ate')), trackId: q.get('trackId') || null, tipos: tipos.length ? tipos : null, categorias, categoriaDaBateria, extensaoM: trackLengthFor };
     const kart = q.get('kart');
-    if (kart) return send(res, 200, historicoDoKart(sessions.values(), kart, opcoes, trackIdDa, kartDaPassagem).map((h) => ({ ...h, piloto: nomeProprio(h.piloto) })));
-    return send(res, 200, rankingKarts(sessions.values(), opcoes, trackIdDa, kartDaPassagem).map((r) => ({ ...r, melhorPiloto: nomeProprio(r.melhorPiloto) })));
+    if (kart) return send(res, 200, historicoDoKart(sessions.values(), kart, opcoes, trackIdDa, kartDaPassagem, (s) => trackDa(s).name).map((h) => ({ ...h, piloto: nomeProprio(h.piloto) })));
+    return send(res, 200, rankingKarts(sessions.values(), opcoes, trackIdDa, kartDaPassagem, (s) => trackDa(s).name).map((r) => ({ ...r, melhorPiloto: nomeProprio(r.melhorPiloto) })));
+  }
+
+  // ---------------------------------------------------------------- último sorteio, para a TV do briefing (áudio 06/10):
+  // cada piloto acha o nome e vai direto para o kart, sem esquecer o número no caminho
+  if (path === '/api/sorteio/ultimo' && method === 'GET') {
+    let ultimo: { s: Session; em: number } | null = null;
+    for (const x of sessions.values()) {
+      if (x.state === 'cancelada') continue;
+      for (const o of x.observations ?? []) if (o.author === 'Sorteio' && (!ultimo || o.wallMs > ultimo.em)) ultimo = { s: x, em: o.wallMs };
+    }
+    if (!ultimo) return send(res, 200, { sorteio: null });
+    const { s, em } = ultimo;
+    const pilotos = s.competitors
+      .filter((c) => c.kart && !c.autoAdded && !c.detalhes?.oculto)
+      .map((c) => ({ nome: nomeProprio(c.name), kart: c.kart }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    return send(res, 200, { sorteio: { sessaoId: s.id, bateria: s.name.split(' · ')[0], tipo: s.type, state: s.state, em, tipoKart: await tipoKartDa(s), pilotos } });
   }
 
   // ---------------------------------------------------------------- sorteio de karts (tablet)
@@ -1886,12 +2381,12 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       const atribuicoes = (Array.isArray(body.atribuicoes) ? body.atribuicoes : []) as Atribuicao[];
       try {
         validarSorteio(s, atribuicoes, new Set(kartsCadastrados()));
-      } catch (err) { return send(res, 400, { error: (err as Error).message }); }
+      } catch (err) { return send(res, err instanceof ListaMudouError ? 409 : 400, { error: (err as Error).message }); }
       const nomes = atribuicoes.map((a) => `${s.competitors[Number(a.indice)]?.name ?? '?'} → kart ${a.kart}`);
       setCompetitors(s, competidoresComSorteio(s, atribuicoes));
       const modo = descricaoModoSorteio(String(body.modo ?? ''));
       const texto = `Sorteio de karts no tablet (${modo}): ` + nomes.join('; ');
-      (s.observations ??= []).push({ id: randomUUID(), text: texto, wallMs: Date.now(), author: 'Sorteio' });
+      (s.observations ??= []).push({ id: randomUUID(), text: texto, wallMs: Date.now(), author: 'Sorteio', kind: 'system' });
       saveSession(s);
       log(`bateria ${s.name}: ${texto}`);
       for (const irma of sessions.values()) {
@@ -1922,16 +2417,30 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
           curva: body.curva == null ? undefined : String(body.curva),
           volta: body.volta == null || body.volta === '' ? undefined : Number(body.volta),
         });
-        registrarObservacao(s, `${penalidade.texto} (${competitor.name})`, autor);
+        registrarObservacao(s, `${penalidade.texto} (${competitor.name})`, autor, 'penalty');
       } else {
         if (!pen[3]) return send(res, 400, { error: 'Informe a penalidade.' });
         const { competitor, penalidade } = removePenalty(s, kart, pen[3]);
-        registrarObservacao(s, `Retirada de ${competitor.name}: ${penalidade.texto ?? textoPenalidade(penalidade)}`, 'Cronometragem');
+        registrarObservacao(s, `Retirada de ${competitor.name}: ${penalidade.texto ?? textoPenalidade(penalidade)}`, 'Cronometragem', 'penalty');
       }
     } catch (err) { return send(res, 400, { error: (err as Error).message }); }
     saveSession(s);
     scheduleStateBroadcast();
     return send(res, 200, sessionView(s));
+  }
+
+  // excluir uma observação da prova (aba Observações, pedido de 07/10): sai do resultado e dos relatórios; fica no log
+  const ob = path.match(/^\/api\/sessions\/([\w-]+)\/observations\/([\w-]+)$/);
+  if (ob && method === 'DELETE') {
+    const s = sessions.get(ob[1]);
+    if (!s) return send(res, 404, { error: 'Bateria não encontrada.' });
+    const o = (s.observations ?? []).find((x) => x.id === ob[2]);
+    if (!o) return send(res, 404, { error: 'Essa observação não existe mais (a lista foi atualizada).' });
+    s.observations = (s.observations ?? []).filter((x) => x !== o);
+    saveSession(s);
+    scheduleStateBroadcast();
+    log(`bateria ${s.name}: observação excluída por ${url.searchParams.get('autor') || 'Cronometragem'}: "${o.text}"`);
+    return send(res, 200, { ok: true });
   }
 
   const m = path.match(/^\/api\/sessions\/([\w-]+)(?:\/(\w+))?(?:\/(\w+))?$/);
@@ -1952,10 +2461,12 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         if (!kart && !para) {
           // todos: um PDF + um e-mail por piloto pode passar de 1 min — vai em segundo plano, a tela acompanha pelo GET
           if (!lerConfig(EMAIL_FILE).senha && !SIMULATE) return send(res, 400, { error: 'E-mail não configurado: preencha a conta de e-mail do kartódromo em Ferramentas › E-mail dos resultados.' });
-          void enviarResultado(s, EMAIL_FILE, depEmail, { automatico: false }).catch((e) => log(`e-mail do resultado de ${s.name}: ${(e as Error).message}`));
+          if (envioATodosAtivo.has(s.id)) return send(res, 409, { error: 'O resultado desta bateria já está sendo enviado a todos os pilotos. Aguarde terminar.' });
+          // somenteFaltantes: só quem ainda não recebeu; atrasado: abre com o pedido de desculpas (reenvio de 13/10)
+          void enviarResultadoEmFila(s, { automatico: false, somenteFaltantes: body.somenteFaltantes === true, atrasado: body.atrasado === true }).catch((e) => log(`e-mail do resultado de ${s.name}: ${(e as Error).message}`));
           return send(res, 202, { emSegundoPlano: true });
         }
-        return send(res, 200, await enviarResultado(s, EMAIL_FILE, depEmail, { automatico: false, kart, para }));
+        return send(res, 200, await enviarResultadoEmFila(s, { automatico: false, kart, para, organizador: Boolean(para) && body.organizador === true }));
       }
       if (action === 'laps' && !m[3] && method === 'GET') {
         return send(
@@ -2034,11 +2545,36 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         const text = String(body.text ?? '').trim();
         if (!text) return send(res, 400, { error: 'Escreva a observação.' });
         s.observations ??= [];
-        const observation = { id: randomUUID(), text, wallMs: now, author: String(body.author ?? 'Cronometragem') };
+        const requestedKind = String(body.kind ?? '').trim();
+        const kind: ObservationKind = requestedKind === 'kart-swap' ? 'kart-swap' : 'manual';
+        const observation = { id: randomUUID(), text, wallMs: now, author: String(body.author ?? 'Cronometragem'), kind };
         s.observations.unshift(observation);
         saveSession(s);
         scheduleStateBroadcast();
         return send(res, 201, observation);
+      }
+      if (action === 'weather' && !m[3] && method === 'POST') {
+        const body = await readBody(req);
+        const valor = body.chuva;
+        const chuva = valor === true || valor === 1 || String(valor ?? '').trim().toLowerCase() === 'true';
+        setChuva(s, chuva);
+        registrarObservacao(s, chuva ? 'Condição de pista: chuva' : 'Condição de pista: seca', String(body.autor ?? 'Cronometragem').slice(0, 60));
+        saveSession(s);
+        scheduleStateBroadcast();
+        return send(res, 200, sessionView(s));
+      }
+      if (action === 'position' && !m[3] && method === 'POST') {
+        const body = await readBody(req);
+        const kart = String(body.kart ?? '').trim();
+        const bruto = body.position;
+        const limpar = bruto === null || bruto === undefined || String(bruto).trim() === '' || Number(bruto) === 0;
+        const position = limpar ? null : Number(bruto);
+        setManualPosition(s, kart, position);
+        const autor = String(body.autor ?? 'Cronometragem').slice(0, 60);
+        registrarObservacao(s, limpar ? `Posição automática restaurada · Kart ${kart}` : `Posição manual · Kart ${kart} → P${position}`, autor, limpar ? 'system' : 'manual');
+        saveSession(s);
+        scheduleStateBroadcast();
+        return send(res, 200, sessionView(s));
       }
       if (!action && method === 'PATCH') {
         const body = await readBody(req);
@@ -2059,6 +2595,10 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
             }
           }
         }
+        if (typeof body.semEmailPilotos === 'boolean') {
+          for (const x of [s, ...irmasDe(s)]) { x.semEmailPilotos = body.semEmailPilotos; if (x !== s) saveSession(x); }
+          log(`bateria ${s.name}: resultado por e-mail aos pilotos ${body.semEmailPilotos ? 'DESLIGADO (o organizador divulga)' : 'ligado'}`);
+        }
         if (typeof body.eventId === 'string' || body.eventId === null) s.eventId = body.eventId as string | null;
         if (typeof body.groupId === 'string' || body.groupId === null) s.groupId = body.groupId as string | null;
         if (typeof body.proofId === 'string' || body.proofId === null) s.proofId = body.proofId as string | null;
@@ -2066,6 +2606,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
           const tid = body.trackId ? String(body.trackId) : null;
           if (tid && !catalog.tracks.some((t) => t.id === tid)) return send(res, 400, { error: 'Traçado não encontrado.' });
           s.trackId = tid;
+          aplicarCondicaoDoTracado(s);
           log(`bateria ${s.name}: traçado ${trackDa(s).name} (${trackDa(s).lengthMeters} m)`);
         }
       } else if (action === 'diario' && method === 'GET') {
@@ -2115,8 +2656,8 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         const antes = competitor.flag ?? 'none';
         competitor.flag = flag;
         const quem = `${competitor.name} (kart ${competitor.kart})`;
-        if (flag === 'black' && antes !== 'black') registrarObservacao(s, `Bandeira preta · ${quem} desclassificado, vai para o último lugar`, String(body.autor ?? 'Cronometragem'));
-        else if (antes === 'black' && flag !== 'black') registrarObservacao(s, `Bandeira preta retirada · ${quem} volta à classificação`, String(body.autor ?? 'Cronometragem'));
+        if (flag === 'black' && antes !== 'black') registrarObservacao(s, `Bandeira preta · ${quem} desclassificado, vai para o último lugar`, String(body.autor ?? 'Cronometragem'), 'penalty');
+        else if (antes === 'black' && flag !== 'black') registrarObservacao(s, `Bandeira preta retirada · ${quem} volta à classificação`, String(body.autor ?? 'Cronometragem'), 'penalty');
       } else if (action === 'laps' && m[3] === 'invalidate' && method === 'POST') {
         const body = await readBody(req);
         toggleLapInvalid(s, String(body.kart), Number(body.lap));
@@ -2169,7 +2710,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     if (existentes.length) return send(res, 200, existentes.map(sessionSummary));
     const body = await readBody(req);
     let grade: { nome?: string; clienteId?: unknown; kart?: string }[];
-    let programa: { nome?: string; tipo?: string; tempoMin?: number; finalizacao?: string; voltasMax?: number; voltaMinimaSeg?: number }[] = [];
+    let programa: { nome?: string; tipo?: string; tempoMin?: number; finalizacao?: string; voltasMax?: number; voltaMinimaSeg?: number; trackId?: string | null }[] = [];
     try {
       grade = await opsGet(`/api/crono/baterias/${agendaId}/grid`);
       try { programa = await opsGet(`/api/crono/baterias/${agendaId}/programa`); } catch { programa = []; }
@@ -2196,6 +2737,8 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         competitors,
         programaId,
       });
+      s.trackId = typeof p.trackId === 'string' && catalog.tracks.some((track) => track.id === p.trackId) ? p.trackId : null;
+      aplicarCondicaoDoTracado(s);
       s.agendaId = agendaId;
       sessions.set(s.id, s);
       saveSession(s);
@@ -2226,25 +2769,44 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     }
   }
 
-  if (path === '/healthz') return send(res, 200, { ok: true, decoder: decoderView(), sessions: sessions.size });
+  if (path === '/healthz') return send(res, 200, { ok: true, decoder: decoderView(), sessions: sessions.size, transmissao: transmissaoStatus() });
 
   return send(res, 404, { error: 'Rota desconhecida.' });
 }
 
+/**
+ * Pedido que veio da INTERNET pelo túnel do Cloudflare (crono.kartodromodebetim.com.br → :4050): o cloudflared põe
+ * `cf-connecting-ip`/`cf-ray`; a rede interna (ORBITS, CRONO1, TVs, TB50) nunca manda. Pela internet só LEITURA do placar:
+ * antes o painel do operador, a administração e as rotas que alteram baterias ficavam abertos sem senha (10/10/2026).
+ */
+const LEITURA_PELA_INTERNET = new Set(['/tv', '/tv-classica', '/tb50', '/tokens.css', '/kib-logo.png', '/api/livetime-snapshot', '/api/livetime-snapshot/eventos', '/healthz']);
+function veioDaInternet(req: http.IncomingMessage): boolean {
+  return Boolean(req.headers['cf-connecting-ip'] || req.headers['cf-ray']);
+}
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+  if (veioDaInternet(req) && !((req.method === 'GET' || req.method === 'HEAD') && LEITURA_PELA_INTERNET.has(url.pathname))) {
+    res.writeHead(403, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+    return res.end(JSON.stringify({ error: 'Acesso só pela rede do kartódromo.' }));
+  }
   if (url.pathname === '/favicon.ico') {
     res.writeHead(204);
     return res.end();
   }
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET,POST,PUT,PATCH', 'access-control-allow-headers': 'content-type' });
+    res.writeHead(204, { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET,POST,PUT,PATCH', 'access-control-allow-headers': 'content-type, authorization, x-api-key' });
     return res.end();
   }
   if (url.pathname === '/' || url.pathname === '/operador') return sendFile(res, 'operador.html');
   if (['/admin', '/cadastros', '/ferramentas', '/configuracoes'].includes(url.pathname)) return sendFile(res, 'admin.html');
   if (url.pathname === '/tv') return sendFile(res, 'tv.html');
   if (url.pathname === '/tb50') return sendFile(res, 'tb50.html');
+  // TV com navegador antigo (LG Netcast 2013): mesmo placar em ES5, sem o /tv moderno
+  if (url.pathname === '/tv-classica') return sendFile(res, 'tv-classica.html');
+  if (url.pathname === '/sorteio') return sendFile(res, 'sorteio.html');
+  // design tokens (gerado de tokens/kib.tokens.json): as páginas de operação/relatório passam a ler cores e fontes daqui
+  if (url.pathname === '/tokens.css') return sendFile(res, 'tokens.css');
   if (url.pathname.startsWith('/resultado/')) return sendFile(res, 'resultado.html');
   if (url.pathname === '/equalizacao' || url.pathname.startsWith('/equalizacao/')) return sendFile(res, 'equalizacao.html');
   if (url.pathname === '/kib-logo.png' || url.pathname === '/assets/da264d01b784a13054e2da496b5f46ff.png' || url.pathname === '/assets/kib-logo.png') return sendFile(res, 'kib-logo.png');
@@ -2254,6 +2816,12 @@ const server = http.createServer((req, res) => {
       if (!res.headersSent) send(res, 500, { error: 'Erro interno.' });
     });
     return;
+  }
+  // endereço errado no navegador (ex.: /design): página com as telas que existem, em vez de "nao encontrado" cru
+  const pagina404 = join(UI_DIR, 'nao-encontrado.html');
+  if ((req.headers.accept ?? '').includes('text/html') && existsSync(pagina404)) {
+    res.writeHead(404, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+    return res.end(readFileSync(pagina404));
   }
   send(res, 404, 'nao encontrado');
 });

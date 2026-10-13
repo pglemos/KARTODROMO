@@ -16,6 +16,13 @@ do ar.** Depois de incorporar, apague este aviso do `AGENTS.md`.
   o pedido leva `politica: { versao, aceitaEm }`. O Worker `kartodromo-cadastro` (`workers/pre-cadastro`, este repo)
   recusa pedido sem aceite e serve o texto em `GET /api/reservas/politica`.
 
+- **10/10/2026**: a política também aparece **desde o passo 1**, num quadro abaixo do cartão "Sua corrida" (fora do
+  trecho que fecha no celular), com o texto completo recolhível; o aceite continua obrigatório no pagamento. Pacote
+  `booking-assets/index-politica2-20261010.js`.
+- **10/10/2026**: a atualização automática da agenda (a cada 5 s) trocava o fluxo inteiro pelo esqueleto "Consultando
+  horários disponíveis…" (a página piscava e parecia travada). Agora o esqueleto só aparece na 1ª carga
+  (`loading && !agenda`).
+
 ## 2. Uma vaga por pessoa (reserva com mais de 1 piloto)
 
 - Na etapa 3 da reserva: seção **"Quem vai pilotar"** com a caixa "Eu também vou pilotar nesta reserva" e, para cada

@@ -1,47 +1,33 @@
+/* Cores do admin = tokens (styles/tokens.css, gerado de tokens/kib.tokens.json). O tema vem de data-tema no
+   .admin-root/.admin-login: "claro" (padrão da operação) ou "escuro" (botão da lua). Nada de cor solta aqui. */
 .admin-login,
 .admin-root {
-  --admin-bg: #f5f7f5;
-  --admin-surface: #ffffff;
-  --admin-surface-2: #eef1ee;
-  --admin-border: #e2e6e1;
-  --admin-border-strong: #d3d9d2;
-  --admin-text: #14170f;
-  --admin-muted: #5d6660;
-  --admin-faint: #7b857d;
-  --admin-accent: #007a3d;
-  --admin-accent-soft: rgba(0, 122, 61, 0.1);
-  --admin-accent-border: rgba(0, 122, 61, 0.38);
-  --admin-accent-contrast: #ffffff;
-  --admin-danger: #d92d2d;
-  --admin-danger-soft: rgba(217, 45, 45, 0.08);
-  --admin-warning: #b8720a;
-  --admin-info: #1868c2;
-  --admin-shadow: 0 12px 32px rgba(20, 30, 20, 0.08);
-  --admin-overlay: rgba(10, 14, 10, 0.42);
+  --admin-bg: var(--kib-cor-fundo-app);
+  --admin-surface: var(--kib-cor-superficie-padrao);
+  --admin-surface-2: var(--kib-cor-superficie-campo);
+  --admin-border: var(--kib-cor-borda-sutil);
+  --admin-border-strong: var(--kib-cor-borda-forte);
+  --admin-text: var(--kib-cor-texto-principal);
+  --admin-muted: var(--kib-cor-texto-secundario);
+  --admin-faint: var(--kib-cor-texto-terciario);
+  --admin-accent: var(--kib-cor-acao-principal);
+  --admin-accent-soft: color-mix(in srgb, var(--kib-cor-acao-principal) 11%, transparent);
+  --admin-accent-border: color-mix(in srgb, var(--kib-cor-acao-principal) 38%, transparent);
+  --admin-accent-contrast: var(--kib-cor-acao-sobre-principal);
+  --admin-danger: var(--kib-cor-estado-perigo-texto);
+  --admin-danger-soft: var(--kib-cor-estado-perigo-fundo);
+  --admin-warning: var(--kib-cor-estado-aviso-texto);
+  --admin-info: var(--kib-cor-estado-info-texto);
+  --admin-shadow: var(--kib-elevacao-2);
+  --admin-overlay: var(--kib-cor-sobreposicao);
   color: var(--admin-text);
+  color-scheme: light;
   font-family: var(--font-admin, 'Rajdhani'), ui-sans-serif, system-ui, sans-serif;
 }
 
-.admin-login[data-theme='dark'],
-.admin-root[data-theme='dark'] {
-  --admin-bg: #0a0d0a;
-  --admin-surface: #121613;
-  --admin-surface-2: #181d19;
-  --admin-border: #242b25;
-  --admin-border-strong: #333c34;
-  --admin-text: #f2f5f1;
-  --admin-muted: #a6b1a7;
-  --admin-faint: #778279;
-  --admin-accent: #00e676;
-  --admin-accent-soft: rgba(0, 230, 118, 0.14);
-  --admin-accent-border: rgba(0, 230, 118, 0.4);
-  --admin-accent-contrast: #041a0d;
-  --admin-danger: #ff7474;
-  --admin-danger-soft: rgba(255, 107, 107, 0.14);
-  --admin-warning: #f2b23b;
-  --admin-info: #5eb6ff;
-  --admin-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
-  --admin-overlay: rgba(3, 5, 4, 0.72);
+.admin-login[data-tema='escuro'],
+.admin-root[data-tema='escuro'] {
+  color-scheme: dark;
 }
 
 .admin-root {
@@ -62,43 +48,8 @@
   font-family: inherit;
 }
 
-.admin-root :is(input, select, textarea) {
-  border-color: var(--admin-border) !important;
-  background: var(--admin-surface-2) !important;
-  color: var(--admin-text) !important;
-}
-
 .admin-root :is(input, select, textarea)::placeholder {
   color: var(--admin-faint);
-}
-
-.admin-root [class*='bg-zinc-950'] { background-color: var(--admin-bg) !important; }
-.admin-root [class*='bg-zinc-900'] { background-color: var(--admin-surface) !important; }
-.admin-root [class*='bg-zinc-800'] { background-color: var(--admin-surface-2) !important; }
-.admin-root [class*='border-zinc-800'],
-.admin-root [class*='border-zinc-700'],
-.admin-root [class*='divide-zinc-800'] { border-color: var(--admin-border) !important; }
-.admin-root [class*='text-zinc-50'],
-.admin-root [class*='text-zinc-100'],
-.admin-root [class*='text-zinc-200'] { color: var(--admin-text) !important; }
-.admin-root [class*='text-zinc-300'],
-.admin-root [class*='text-zinc-400'] { color: var(--admin-muted) !important; }
-.admin-root [class*='text-zinc-500'] { color: var(--admin-faint) !important; }
-.admin-root [class*='text-primary-300'],
-.admin-root [class*='text-brand-300'],
-.admin-root [class*='text-brand-400'] { color: var(--admin-accent) !important; }
-.admin-root [class*='text-emerald-300'] { color: var(--admin-accent) !important; }
-.admin-root [class*='text-amber-200'],
-.admin-root [class*='text-amber-300'] { color: var(--admin-warning) !important; }
-.admin-root [class*='text-red-200'],
-.admin-root [class*='text-red-300'] { color: var(--admin-danger) !important; }
-.admin-root [class*='bg-primary-500'],
-.admin-root [class*='bg-brand-500'] { background-color: var(--admin-accent-soft) !important; }
-.admin-root a[class*='bg-primary-500'],
-.admin-root button[class*='bg-primary-500'],
-.admin-root button[class*='bg-brand-500'] {
-  background-color: var(--admin-accent) !important;
-  color: var(--admin-accent-contrast) !important;
 }
 
 .admin-card {
@@ -141,9 +92,9 @@
   align-items: center;
   padding: clamp(48px, 7vw, 88px);
   background:
-    radial-gradient(circle at 20% 84%, rgba(0, 230, 118, 0.16), transparent 32%),
-    linear-gradient(150deg, #080c09, #122016 70%);
-  color: #fff;
+    radial-gradient(circle at 20% 84%, color-mix(in srgb, var(--kib-cor-acao-principal) 16%, transparent), transparent 32%),
+    linear-gradient(150deg, var(--kib-cor-fundo-app), var(--kib-cor-estado-sucesso-fundo) 70%);
+  color: var(--kib-cor-texto-principal);
 }
 
 .admin-login__showcase::after {
@@ -152,7 +103,7 @@
   bottom: -15%;
   width: 70%;
   height: 52%;
-  border: 1px solid rgba(0, 230, 118, 0.13);
+  border: 1px solid color-mix(in srgb, var(--kib-cor-acao-principal) 13%, transparent);
   border-radius: 50%;
   content: '';
   transform: rotate(-15deg);
@@ -209,7 +160,7 @@
 }
 
 /* No iOS um campo abaixo de 16px faz a página dar zoom ao receber foco. */
-@media (max-width: 720px) {
+@media (max-width: 767px) {
   .admin-root :is(input, select, textarea),
   .admin-login :is(input, select, textarea),
   .admin-input {
@@ -231,7 +182,7 @@
   border-radius: 9px;
   background: var(--admin-accent);
   color: var(--admin-accent-contrast);
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 700;
   transition: transform 180ms cubic-bezier(.16, 1, .3, 1), box-shadow 180ms;
 }

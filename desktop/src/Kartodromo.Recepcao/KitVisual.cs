@@ -7,28 +7,28 @@ namespace Kartodromo.Recepcao;
 /// <summary>Kit visual local da Recepção: paleta, cartões, campos, botões e cabeçalho das janelas.</summary>
 public static class KitVisual
 {
-    public static readonly Color Fundo = Tokens.Fundo;
-    public static readonly Color Cartao = Color.White;
-    public static readonly Color Texto = Tokens.Texto;
-    public static readonly Color Secundario = Tokens.TextoSecundario;
-    public static readonly Color Verde = Tokens.Verde;
-    public static readonly Color VerdeClaro = Tokens.VerdeSuave;
-    public static readonly Color Linha = Tokens.Linha;
-    public static readonly Color CabecalhoGrade = Tokens.SuperficieSuave;
+    public static readonly Color Fundo = Tokens.Claro.CorFundoApp;
+    public static readonly Color Cartao = Tokens.Primitivo.Branco;
+    public static readonly Color Texto = Tokens.Claro.CorTextoPrincipal;
+    public static readonly Color Secundario = Tokens.Claro.CorTextoSecundario;
+    public static readonly Color Verde = Tokens.Claro.CorAcaoPrincipal;
+    public static readonly Color VerdeClaro = Tokens.Claro.CorEstadoSucessoFundo;
+    public static readonly Color Linha = Tokens.Claro.CorBordaSutil;
+    public static readonly Color CabecalhoGrade = Tokens.Claro.CorSuperficieSuave;
 
     sealed class PaletaMenu : ProfessionalColorTable
     {
-        public override Color MenuStripGradientBegin => Color.White;
-        public override Color MenuStripGradientEnd => Color.White;
-        public override Color ToolStripDropDownBackground => Tokens.SuperficieSuave;
-        public override Color MenuBorder => Tokens.Linha;
-        public override Color MenuItemSelected => Tokens.VerdeSuave;
-        public override Color MenuItemSelectedGradientBegin => Tokens.VerdeSuave;
-        public override Color MenuItemSelectedGradientEnd => Tokens.VerdeSuave;
-        public override Color MenuItemPressedGradientBegin => Tokens.VerdeSuave;
-        public override Color MenuItemPressedGradientEnd => Tokens.VerdeSuave;
-        public override Color SeparatorDark => Tokens.Linha;
-        public override Color SeparatorLight => Tokens.Linha;
+        public override Color MenuStripGradientBegin => Tokens.Primitivo.Branco;
+        public override Color MenuStripGradientEnd => Tokens.Primitivo.Branco;
+        public override Color ToolStripDropDownBackground => Tokens.Claro.CorSuperficieSuave;
+        public override Color MenuBorder => Tokens.Claro.CorBordaSutil;
+        public override Color MenuItemSelected => Tokens.Claro.CorEstadoSucessoFundo;
+        public override Color MenuItemSelectedGradientBegin => Tokens.Claro.CorEstadoSucessoFundo;
+        public override Color MenuItemSelectedGradientEnd => Tokens.Claro.CorEstadoSucessoFundo;
+        public override Color MenuItemPressedGradientBegin => Tokens.Claro.CorEstadoSucessoFundo;
+        public override Color MenuItemPressedGradientEnd => Tokens.Claro.CorEstadoSucessoFundo;
+        public override Color SeparatorDark => Tokens.Claro.CorBordaSutil;
+        public override Color SeparatorLight => Tokens.Claro.CorBordaSutil;
     }
 
     public static ToolStripRenderer RenderizadorMenu() => new ToolStripProfessionalRenderer(new PaletaMenu());
@@ -58,9 +58,12 @@ public static class KitVisual
         f.SuspendLayout();
         f.BackColor = Fundo;
         f.ForeColor = Texto;
-        f.Font = new Font("Segoe UI", 9.5F);
+        f.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo);
 
+        // legado: desde 10/10/2026 nenhuma tela usa Janela (todas viraram DialogoDesign); fica para código antigo de fora
+#pragma warning disable CS0618
         if (f is Janela)
+#pragma warning restore CS0618
         {
             var originais = f.Controls.Cast<Control>().ToArray();
             f.Controls.Clear();
@@ -97,10 +100,10 @@ public static class KitVisual
             {
                 rodape.Dock = DockStyle.Bottom;
                 rodape.Height = 58;
-                rodape.BackColor = Color.White;
+                rodape.BackColor = Tokens.Primitivo.Branco;
                 rodape.Paint += (_, e) =>
                 {
-                    using var pen = new Pen(Tokens.Linha);
+                    using var pen = new Pen(Tokens.Claro.CorBordaSutil);
                     e.Graphics.DrawLine(pen, 0, 0, rodape.Width, 0);
                 };
                 f.Controls.Add(rodape);
@@ -148,13 +151,13 @@ public static class KitVisual
         if (t.Contains("agenda"))
             return new() { Titulo = "Agenda de reservas", Sub = "Calendário mensal, baterias do dia e inclusão de clientes", Cor1 = Color.FromArgb(192, 139, 255), Cor2 = Color.FromArgb(134, 69, 214), Glifo = "\uE787" };
         if (t.Contains("editar bateria") || t.StartsWith("bateria") || t == "bateria")
-            return new() { Titulo = "Editar bateria", Sub = (f.Tag as string) ?? "BATERIA 19:20 · 25/09/2026", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Tokens.Azul, Glifo = "\uE823" };
+            return new() { Titulo = "Editar bateria", Sub = (f.Tag as string) ?? "BATERIA 19:20 · 25/09/2026", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Tokens.Claro.CorTextoLink, Glifo = "\uE823" };
         if (t.Contains("incluir cliente") || t.Contains("registra reserva por cliente") || t.Contains("registrar reserva"))
-            return new() { Titulo = "Registrar reserva por cliente", Sub = (f.Tag as string) ?? "BATERIA 19:20 · 25/09/2026 19:20 · 6 vagas disponíveis", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Tokens.Azul, Glifo = "\uE77B" };
+            return new() { Titulo = "Registrar reserva por cliente", Sub = (f.Tag as string) ?? "BATERIA 19:20 · 25/09/2026 19:20 · 6 vagas disponíveis", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Tokens.Claro.CorTextoLink, Glifo = "\uE77B" };
         if (t.Contains("mover"))
             return new() { Titulo = "Mover cliente para outra bateria", Sub = (f.Tag as string) ?? "Rafael Martins · hoje na BATERIA 19:20", Cor1 = Color.FromArgb(255, 181, 71), Cor2 = Color.FromArgb(240, 122, 0), Glifo = "\uE76C" };
         if (t.Contains("participantes"))
-            return new() { Titulo = "Lista de participantes", Sub = (f.Tag as string) ?? "BATERIA 19:20 · 25/09/2026 · para o briefing e a pista", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Tokens.Azul, Glifo = "\uE71D" };
+            return new() { Titulo = "Lista de participantes", Sub = (f.Tag as string) ?? "BATERIA 19:20 · 25/09/2026 · para o briefing e a pista", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Tokens.Claro.CorTextoLink, Glifo = "\uE71D" };
         if (t.Contains("criar reservas"))
             return new() { Titulo = "Criar reservas", Sub = "Gere as baterias de um ou vários meses pelo padrão, ou uma reserva avulsa", Cor1 = Color.FromArgb(255, 122, 107), Cor2 = Color.FromArgb(224, 52, 42), Glifo = "\uE7C1" };
         if (t.Contains("editar reserva"))
@@ -168,39 +171,39 @@ public static class KitVisual
         if (t.Contains("padrões") || t.Contains("configuração de reservas"))
             return new() { Titulo = "Configuração de reservas (padrões)", Sub = "Modelos usados em \"Criar reservas\" para gerar as baterias de um ou vários meses", Cor1 = Color.FromArgb(255, 122, 107), Cor2 = Color.FromArgb(224, 52, 42), Glifo = "\uE7C1" };
         if (t.Contains("parâmetros"))
-            return new() { Titulo = "Parâmetros do sistema", Sub = "Ajustes da recepção · toque no valor para alterar", Cor1 = Tokens.TextoTerciario, Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE713" };
+            return new() { Titulo = "Parâmetros do sistema", Sub = "Ajustes da recepção · toque no valor para alterar", Cor1 = Tokens.Claro.CorTextoTerciario, Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE713" };
         if (t.Contains("usuário"))
-            return new() { Titulo = "Registro de usuário", Sub = "Atendentes que entram no Módulo Office", Cor1 = Tokens.TextoTerciario, Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE77B" };
+            return new() { Titulo = "Registro de usuário", Sub = "Atendentes que entram no Módulo Office", Cor1 = Tokens.Claro.CorTextoTerciario, Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE77B" };
         if (t.Contains("produto"))
             return new() { Titulo = "Registro de produto", Sub = "Produtos e provas de cada locação", Cor1 = Color.FromArgb(255, 181, 71), Cor2 = Color.FromArgb(240, 122, 0), Glifo = "\uE8EC" };
         if (t.Contains("pesquisar cliente") || t.Contains("pesquisar / alterar"))
-            return new() { Titulo = "Pesquisar cliente", Sub = "137.539 clientes · pesquise por nome, CPF, celular ou e-mail", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Tokens.Azul, Glifo = "\uE721", Estado = "Pesquisa" };
+            return new() { Titulo = "Pesquisar cliente", Sub = "Pesquise por nome, CPF, celular ou e-mail", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Tokens.Claro.CorTextoLink, Glifo = "\uE721", Estado = "Pesquisa" };
         if (t.Contains("sangria"))
             return new() { Titulo = "Registrar sangria", Sub = "Retirar dinheiro da gaveta (depósito, cofre)", Cor1 = Color.FromArgb(255, 122, 150), Cor2 = Color.FromArgb(212, 42, 85), Glifo = "\uE898" };
         if (t.Contains("suprimento"))
             return new() { Titulo = "Registrar suprimento", Sub = "Colocar dinheiro na gaveta (troco, fundo de caixa)", Cor1 = Color.FromArgb(72, 214, 204), Cor2 = Color.FromArgb(14, 156, 156), Glifo = "\uE896" };
         if (t.Contains("voucher"))
-            return new() { Titulo = "Criar voucher", Sub = "Voucher de desconto ou crédito", Cor1 = Color.FromArgb(255, 216, 74), Cor2 = Color.FromArgb(232, 164, 0), Glifo = "\uE734" };
+            return new() { Titulo = "Criar voucher", Sub = "Voucher de desconto ou crédito", Cor1 = Tokens.Claro.CorDominioPodioOuro, Cor2 = Color.FromArgb(232, 164, 0), Glifo = "\uE734" };
         if (t.Contains("agenda"))
             return new() { Titulo = "Agenda mensal", Sub = "Agenda mensal de baterias", Cor1 = Color.FromArgb(192, 139, 255), Cor2 = Color.FromArgb(134, 69, 214), Glifo = "\uE787" };
         if (t.Contains("traçado"))
-            return new() { Titulo = "Registro de traçado", Sub = "Traçados da pista para provas e tomada de tempo", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Tokens.Azul, Glifo = "\uE707" };
+            return new() { Titulo = "Registro de traçado", Sub = "Traçados da pista para provas e tomada de tempo", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Tokens.Claro.CorTextoLink, Glifo = "\uE707" };
         if (t.Contains("feriado"))
             return new() { Titulo = "Registro de feriados", Sub = "Feriados considerados na geração automática de reservas", Cor1 = Color.FromArgb(255, 122, 107), Cor2 = Color.FromArgb(224, 52, 42), Glifo = "\uE787" };
         if (t.Contains("turno"))
-            return new() { Titulo = "Registro de turnos", Sub = "Turnos de operação da recepção e do caixa", Cor1 = Tokens.TextoTerciario, Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE823" };
+            return new() { Titulo = "Registro de turnos", Sub = "Turnos de operação da recepção e do caixa", Cor1 = Tokens.Claro.CorTextoTerciario, Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE823" };
         if (t.Contains("terminal"))
-            return new() { Titulo = "Registro de terminais", Sub = "Terminais autorizados para abertura de caixa", Cor1 = Tokens.TextoTerciario, Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE7F4" };
+            return new() { Titulo = "Registro de terminais", Sub = "Terminais autorizados para abertura de caixa", Cor1 = Tokens.Claro.CorTextoTerciario, Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE7F4" };
         if (t.Contains("parceiro"))
             return new() { Titulo = "Registro de parceiro", Sub = "Parceiros e comissões do kartódromo", Cor1 = Color.FromArgb(140, 137, 255), Cor2 = Color.FromArgb(75, 71, 214), Glifo = "\uE77B" };
         if (t.Contains("manutenção") || t.Contains("itens"))
             return new() { Titulo = "Itens de manutenção", Sub = "Itens e peças controlados na oficina", Cor1 = Color.FromArgb(255, 181, 71), Cor2 = Color.FromArgb(240, 122, 0), Glifo = "\uE90F" };
         if (t.Contains("empresa"))
-            return new() { Titulo = "Registro de empresa", Sub = "Dados cadastrais e política do kartódromo", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Tokens.Azul, Glifo = "\uE821" };
+            return new() { Titulo = "Registro de empresa", Sub = "Dados cadastrais e política do kartódromo", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Tokens.Claro.CorTextoLink, Glifo = "\uE821" };
         if (t.Contains("senha"))
-            return new() { Titulo = "Trocar senha", Sub = "Alteração de senha do atendente", Cor1 = Tokens.TextoTerciario, Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE890" };
+            return new() { Titulo = "Trocar senha", Sub = "Alteração de senha do atendente", Cor1 = Tokens.Claro.CorTextoTerciario, Cor2 = Color.FromArgb(74, 74, 79), Glifo = "\uE890" };
 
-        return new() { Titulo = titulo ?? f.Text, Sub = "Kartódromo Internacional de Betim · Módulo Office", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Tokens.Azul, Glifo = "\uE700" };
+        return new() { Titulo = titulo ?? f.Text, Sub = "Kartódromo Internacional de Betim · Módulo Office", Cor1 = Color.FromArgb(108, 184, 255), Cor2 = Tokens.Claro.CorTextoLink, Glifo = "\uE700" };
     }
 
     static Size TamanhoDaJanela(Form f)
@@ -227,7 +230,7 @@ public static class KitVisual
         var meta = ObterMeta(janela, titulo);
         if (!string.IsNullOrEmpty(subtitulo)) meta.Sub = subtitulo;
 
-        var p = new Panel { Dock = DockStyle.Top, Height = 58, BackColor = Color.White, Padding = new Padding(16, 11, 16, 11), Cursor = Cursors.SizeAll };
+        var p = new Panel { Dock = DockStyle.Top, Height = 58, BackColor = Tokens.Primitivo.Branco, Padding = new Padding(16, 11, 16, 11), Cursor = Cursors.SizeAll };
         p.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = Linha });
 
         var badge = new Panel { Size = new Size(34, 34), Location = new Point(16, 12), Cursor = Cursors.SizeAll };
@@ -237,11 +240,11 @@ public static class KitVisual
             using var path = CaminhoArredondado(new Rectangle(0, 0, 33, 33), 9);
             using var br = new LinearGradientBrush(new Rectangle(0, 0, 34, 34), meta.Cor1, meta.Cor2, 90f);
             e.Graphics.FillPath(br, path);
-            TextRenderer.DrawText(e.Graphics, meta.Glifo, new Font("Segoe MDL2 Assets", 11.5F), new Rectangle(0, 0, 34, 34), Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            TextRenderer.DrawText(e.Graphics, meta.Glifo, new Font("Segoe MDL2 Assets", 11.5F), new Rectangle(0, 0, 34, 34), Tokens.Primitivo.Branco, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
         };
 
-        var t = new Label { Text = meta.Titulo, AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = Texto, Location = new Point(58, 9), Cursor = Cursors.SizeAll };
-        var sub = new Label { Text = meta.Sub, AutoSize = true, Font = new Font("Segoe UI", 8.4F), ForeColor = Secundario, Location = new Point(59, 31), Cursor = Cursors.SizeAll };
+        var t = new Label { Text = meta.Titulo, AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoSubtitulo, FontStyle.Bold), ForeColor = Texto, Location = new Point(58, 9), Cursor = Cursors.SizeAll };
+        var sub = new Label { Text = meta.Sub, AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoLegenda), ForeColor = Secundario, Location = new Point(59, 31), Cursor = Cursors.SizeAll };
 
         var x = new BotaoPlano
         {
@@ -250,14 +253,14 @@ public static class KitVisual
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
             Location = new Point(p.Width - 46, 13),
             FlatStyle = FlatStyle.Flat,
-            BackColor = Tokens.BotaoSecundario,
+            BackColor = Tokens.Claro.CorAcaoSecundaria,
             ForeColor = Texto,
-            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+            Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo, FontStyle.Bold),
             Cursor = Cursors.Hand,
             AccessibleName = "Fechar janela"
         };
         x.FlatAppearance.BorderSize = 0;
-        x.FlatAppearance.MouseOverBackColor = Tokens.Linha;
+        x.FlatAppearance.MouseOverBackColor = Tokens.Claro.CorBordaSutil;
         AplicarRaio(x, 9);
         x.Click += (_, _) => janela.Close();
 
@@ -299,23 +302,23 @@ public static class KitVisual
             }
             else if (c is TextBox t)
             {
-                t.Font = new Font("Segoe UI", 9.5F);
+                t.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo);
                 t.BackColor = Cartao;
                 t.ForeColor = Texto;
                 t.BorderStyle = BorderStyle.None;
             }
             else if (c is ComboBox cb)
             {
-                cb.Font = new Font("Segoe UI", 9.5F);
+                cb.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo);
                 cb.BackColor = Cartao;
                 cb.ForeColor = Texto;
                 cb.FlatStyle = FlatStyle.Flat;
             }
             else if (c is DateTimePicker dt)
             {
-                dt.Font = new Font("Segoe UI", 9.5F);
+                dt.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo);
                 dt.CalendarTitleBackColor = Verde;
-                dt.CalendarTitleForeColor = Color.White;
+                dt.CalendarTitleForeColor = Tokens.Primitivo.Branco;
             }
             else if (c is CheckBox ck && c is not ChaveLiga && ck.Appearance == Appearance.Normal)
             {
@@ -338,31 +341,7 @@ public static class KitVisual
     }
 
     /// <summary>Caixa de seleção do design: quadradinho arredondado verde com ✓ branco.</summary>
-    public static void CheckVerde(CheckBox ck)
-    {
-        if (ck.Tag as string == "check-verde") return;
-        ck.Tag ??= "check-verde";
-        ck.Paint += (_, e) =>
-        {
-            var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
-            var lado = (int)Math.Round(16 * ck.DeviceDpi / 96.0);
-            var y = ck.CheckAlign switch { ContentAlignment.TopLeft => 1, _ => (ck.Height - lado) / 2 };
-            var r = new Rectangle(0, y, lado, lado);
-            using (var fundo = new SolidBrush(ck.Parent?.BackColor ?? Color.White)) g.FillRectangle(fundo, new Rectangle(0, 0, lado + 2, ck.Height));
-            using var p = CaminhoArredondado(r, 4);
-            if (ck.Checked)
-            {
-                using var b = new SolidBrush(ck.Enabled ? Verde : Color.FromArgb(160, 196, 180)); g.FillPath(b, p);
-                using var pen = new Pen(Color.White, 2F) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
-                g.DrawLines(pen, [new PointF(r.X + lado * 0.26F, r.Y + lado * 0.52F), new PointF(r.X + lado * 0.44F, r.Y + lado * 0.70F), new PointF(r.X + lado * 0.76F, r.Y + lado * 0.32F)]);
-            }
-            else
-            {
-                using var b = new SolidBrush(Color.White); g.FillPath(b, p);
-                using var pen = new Pen(Tokens.TextoDesabilitado, 1.4F); g.DrawPath(pen, p);
-            }
-        };
-    }
+    public static void CheckVerde(CheckBox ck) => Forma.CheckVerde(ck);
 
     static bool EhPainelDeCampo(Panel p) => p.Controls.OfType<Label>().Any() &&
         p.Controls.Cast<Control>().Any(c => c is TextBox or ComboBox or DateTimePicker or NumericUpDown or MaskedTextBox);
@@ -377,17 +356,17 @@ public static class KitVisual
             if (c is Label l)
             {
                 l.ForeColor = Secundario;
-                l.Font = new Font("Segoe UI", 8.2F, FontStyle.Bold);
+                l.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoLegenda, FontStyle.Bold);
             }
             else if (c is TextBox tb) { tb.BorderStyle = BorderStyle.None; tb.BackColor = Cartao; }
             else if (c is ComboBox cb) { cb.FlatStyle = FlatStyle.Flat; cb.BackColor = Cartao; }
-            else if (c is DateTimePicker dt) { dt.CalendarTitleBackColor = Verde; dt.CalendarTitleForeColor = Color.White; }
+            else if (c is DateTimePicker dt) { dt.CalendarTitleBackColor = Verde; dt.CalendarTitleForeColor = Tokens.Primitivo.Branco; }
         }
         p.Paint += (_, e) =>
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             using var path = CaminhoArredondado(new Rectangle(0, 0, p.Width - 1, p.Height - 1), 8);
-            using var pen = new Pen(Tokens.BordaCampo);
+            using var pen = new Pen(Tokens.Claro.CorBordaCampo);
             e.Graphics.DrawPath(pen, path);
         };
         p.Resize += (_, _) => AplicarRaio(p, 8);
@@ -398,20 +377,20 @@ public static class KitVisual
     {
         g.BackgroundColor = Cartao;
         g.BorderStyle = BorderStyle.None;
-        g.GridColor = Color.FromArgb(241, 241, 244);
+        g.GridColor = Tokens.Claro.CorSuperficieCampo;
         g.EnableHeadersVisualStyles = false;
         g.ColumnHeadersDefaultCellStyle.BackColor = CabecalhoGrade;
         g.ColumnHeadersDefaultCellStyle.ForeColor = Secundario;
-        g.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+        g.ColumnHeadersDefaultCellStyle.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold);
         g.ColumnHeadersDefaultCellStyle.SelectionBackColor = CabecalhoGrade;
         g.ColumnHeadersHeight = 36;
         g.DefaultCellStyle.BackColor = Cartao;
         g.DefaultCellStyle.ForeColor = Texto;
         g.DefaultCellStyle.SelectionBackColor = VerdeClaro;
         g.DefaultCellStyle.SelectionForeColor = Texto;
-        g.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(253, 253, 254);
+        g.AlternatingRowsDefaultCellStyle.BackColor = Tokens.Claro.CorAcaoSobrePrincipal;
         g.RowTemplate.Height = 30;
-        g.Font = new Font("Segoe UI", 9.2F);
+        g.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno);
     }
 
     public static Button Botao(string texto, bool principal = false, int largura = 0)
@@ -423,9 +402,9 @@ public static class KitVisual
             MinimumSize = new Size(largura > 0 ? largura : 92, 34),
             Height = 34,
             FlatStyle = FlatStyle.Flat,
-            BackColor = principal ? Verde : Tokens.BotaoSecundario,
-            ForeColor = principal ? Color.White : Texto,
-            Font = new Font("Segoe UI", 9.5F, principal ? FontStyle.Bold : FontStyle.Regular),
+            BackColor = principal ? Verde : Tokens.Claro.CorAcaoSecundaria,
+            ForeColor = principal ? Tokens.Primitivo.Branco : Texto,
+            Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo, principal ? FontStyle.Bold : FontStyle.Regular),
             Cursor = Cursors.Hand,
             Margin = new Padding(4),
             Padding = new Padding(10, 0, 10, 0),
@@ -439,14 +418,14 @@ public static class KitVisual
     public static Panel CartaoResumo(string rotulo, string valor, Color? corValor = null)
     {
         var p = new Panel { Height = 68, BackColor = Cartao, Padding = new Padding(14, 10, 14, 8), Margin = new Padding(0, 0, 10, 0) };
-        p.Controls.Add(new Label { Name = "valor", Text = valor, Dock = DockStyle.Top, Height = 30, Font = new Font("Segoe UI", 14.5F, FontStyle.Bold), ForeColor = corValor ?? Texto, AutoEllipsis = true });
-        p.Controls.Add(new Label { Name = "rotulo", Text = rotulo, Dock = DockStyle.Top, Height = 19, Font = new Font("Segoe UI", 9F), ForeColor = Secundario, AutoEllipsis = true });
+        p.Controls.Add(new Label { Name = "valor", Text = valor, Dock = DockStyle.Top, Height = 30, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoTituloGrande, FontStyle.Bold), ForeColor = corValor ?? Texto, AutoEllipsis = true });
+        p.Controls.Add(new Label { Name = "rotulo", Text = rotulo, Dock = DockStyle.Top, Height = 19, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno), ForeColor = Secundario, AutoEllipsis = true });
         p.Paint += (_, e) =>
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             using var path = CaminhoArredondado(p.ClientRectangle, 12);
             using var b = new SolidBrush(Cartao);
-            using var pen = new Pen(Tokens.Linha);
+            using var pen = new Pen(Tokens.Claro.CorBordaSutil);
             e.Graphics.FillPath(b, path); e.Graphics.DrawPath(pen, path);
         };
         p.Resize += (_, _) => AplicarRaio(p, 12);
@@ -462,14 +441,14 @@ public static class KitVisual
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             using var path = CaminhoArredondado(new Rectangle(0, 0, p.Width - 1, p.Height - 1), 14);
-            using var pen = new Pen(Tokens.Linha);
+            using var pen = new Pen(Tokens.Claro.CorBordaSutil);
             e.Graphics.DrawPath(pen, path);
         };
         p.Resize += (_, _) => AplicarRaio(p, 14);
         AplicarRaio(p, 14);
         if (!string.IsNullOrEmpty(titulo))
         {
-            var l = new Label { Name = "tituloSecao", Text = titulo, Dock = DockStyle.Top, Height = 24, Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Texto };
+            var l = new Label { Name = "tituloSecao", Text = titulo, Dock = DockStyle.Top, Height = 24, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo, FontStyle.Bold), ForeColor = Texto };
             p.Controls.Add(l);
             p.ControlAdded += (_, e) =>
             {
@@ -484,7 +463,7 @@ public static class KitVisual
     public static Control AbaSegmentada(string[] abas, int indiceInicial, Action<int> aoMudar)
     {
         var wrapper = new Panel { Dock = DockStyle.Top, Height = 42, BackColor = Color.Transparent, Padding = new Padding(0, 0, 0, 10) };
-        var bar = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(2), Margin = Padding.Empty, BackColor = Tokens.BotaoSecundario };
+        var bar = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Padding = new Padding(2), Margin = Padding.Empty, BackColor = Tokens.Claro.CorAcaoSecundaria };
         AplicarRaio(bar, 9);
         var botoes = new List<Button>();
         for (var i = 0; i < abas.Length; i++)
@@ -497,8 +476,8 @@ public static class KitVisual
                 AutoSize = true,
                 Padding = new Padding(12, 0, 12, 0),
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9F, i == indiceInicial ? FontStyle.Bold : FontStyle.Regular),
-                BackColor = i == indiceInicial ? Color.White : Color.Transparent,
+                Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, i == indiceInicial ? FontStyle.Bold : FontStyle.Regular),
+                BackColor = i == indiceInicial ? Tokens.Primitivo.Branco : Color.Transparent,
                 ForeColor = i == indiceInicial ? Texto : Secundario,
                 Cursor = Cursors.Hand,
                 Margin = Padding.Empty
@@ -510,9 +489,9 @@ public static class KitVisual
                 for (var j = 0; j < botoes.Count; j++)
                 {
                     var ativo = j == idx;
-                    botoes[j].BackColor = ativo ? Color.White : Color.Transparent;
+                    botoes[j].BackColor = ativo ? Tokens.Primitivo.Branco : Color.Transparent;
                     botoes[j].ForeColor = ativo ? Texto : Secundario;
-                    botoes[j].Font = new Font("Segoe UI", 9F, ativo ? FontStyle.Bold : FontStyle.Regular);
+                    botoes[j].Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, ativo ? FontStyle.Bold : FontStyle.Regular);
                 }
                 aoMudar(idx);
             };
@@ -530,11 +509,11 @@ public static class KitVisual
         {
             Dock = DockStyle.Bottom,
             Height = 58,
-            BackColor = Color.White
+            BackColor = Tokens.Primitivo.Branco
         };
         p.Paint += (_, e) =>
         {
-            using var pen = new Pen(Tokens.Linha);
+            using var pen = new Pen(Tokens.Claro.CorBordaSutil);
             e.Graphics.DrawLine(pen, 0, 0, p.Width, 0);
         };
         if (!string.IsNullOrEmpty(textoEsquerda))
@@ -548,7 +527,7 @@ public static class KitVisual
                 Width = 480,
                 TextAlign = ContentAlignment.MiddleLeft,
                 Padding = new Padding(18, 0, 0, 0),
-                Font = new Font("Segoe UI", 9F),
+                Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno),
                 ForeColor = Secundario
             };
             p.Controls.Add(l);
@@ -584,50 +563,27 @@ public static class KitVisual
     public static Panel Campo(string rotulo, Control campo, int altura = 58)
     {
         var p = new Panel { Height = altura, BackColor = Cartao, Padding = new Padding(11, 6, 10, 5), Margin = new Padding(4) };
-        p.Controls.Add(new Label { Text = rotulo, Dock = DockStyle.Top, Height = 17, Font = new Font("Segoe UI", 8.2F, FontStyle.Bold), ForeColor = Secundario });
+        p.Controls.Add(new Label { Text = rotulo, Dock = DockStyle.Top, Height = 17, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoLegenda, FontStyle.Bold), ForeColor = Secundario });
         campo.Dock = DockStyle.Fill;
         campo.Margin = new Padding(0);
-        if (campo is TextBox tb) { tb.BorderStyle = BorderStyle.None; tb.Font = new Font("Segoe UI", 11F); }
+        if (campo is TextBox tb) { tb.BorderStyle = BorderStyle.None; tb.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoSubtitulo); }
         p.Controls.Add(campo);
         p.Resize += (_, _) => AplicarRaio(p, 9);
         AplicarRaio(p, 9);
         return p;
     }
 
-    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Control, object> _raios = new();
+    public static void AplicarRaio(Control c, int raio) => Forma.AplicarRaio(c, raio);
 
-    public static void AplicarRaio(Control c, int raio)
-    {
-        // o arredondamento acompanha o tamanho: aplicado cedo (controle ainda pequeno) ele cortava o
-        // resto depois que o texto/layout crescia (ex.: "+ Criar reser", busca com o "F3" para fora)
-        if (!_raios.TryGetValue(c, out _))
-        {
-            _raios.Add(c, raio);
-            c.SizeChanged += (_, _) => { if (_raios.TryGetValue(c, out var r)) AplicarRaio(c, (int)r); };
-        }
-        else { _raios.Remove(c); _raios.Add(c, raio); }
-        if (c.Width < 2 || c.Height < 2) return;
-        using var path = CaminhoArredondado(new Rectangle(0, 0, c.Width, c.Height), Math.Min(raio, Math.Min(c.Width, c.Height) / 2));
-        c.Region = new Region(path);
-    }
-
-    static GraphicsPath CaminhoArredondado(Rectangle r, int raio)
-    {
-        var d = Math.Clamp(raio * 2, 2, Math.Max(2, Math.Min(r.Width, r.Height)));
-        var p = new GraphicsPath();
-        p.AddArc(r.Left, r.Top, d, d, 180, 90); p.AddArc(r.Right - d, r.Top, d, d, 270, 90);
-        p.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90); p.AddArc(r.Left, r.Bottom - d, d, d, 90, 90);
-        p.CloseFigure();
-        return p;
-    }
+    static GraphicsPath CaminhoArredondado(Rectangle r, int raio) => Forma.Redondo(r, raio);
 
     static void PrepararBotao(Button b, bool principal)
     {
         b.FlatStyle = FlatStyle.Flat;
         b.FlatAppearance.BorderSize = 0;
-        b.Font = new Font("Segoe UI", 9.3F, principal ? FontStyle.Bold : FontStyle.Regular);
-        b.BackColor = principal ? Verde : Tokens.BotaoSecundario;
-        b.ForeColor = principal ? Color.White : Texto;
+        b.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, principal ? FontStyle.Bold : FontStyle.Regular);
+        b.BackColor = principal ? Verde : Tokens.Claro.CorAcaoSecundaria;
+        b.ForeColor = principal ? Tokens.Primitivo.Branco : Texto;
         b.Cursor = Cursors.Hand;
         b.Resize += (_, _) => AplicarRaio(b, 8);
         AplicarRaio(b, 8);

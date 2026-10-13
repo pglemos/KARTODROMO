@@ -32,19 +32,20 @@ function reportHtml() {
 
 function loadReportHelpers() {
   const html = reportHtml();
-  const start = html.indexOf('function getResultadoCriterio(');
-  const end = html.indexOf('\nfunction renderReport', start);
+  const start = html.indexOf('const cleanText =');
+  const end = html.indexOf('\nfunction renderReport()', start);
   if (start < 0 || end < 0) throw new Error('Helpers de apresentação do relatório não encontrados.');
 
   const sandbox: Record<string, unknown> = {};
   vm.runInNewContext(
-    `${html.slice(start, end)}\nglobalThis.getResultadoCriterio = getResultadoCriterio;\nglobalThis.calcularPaginasRelatorio = calcularPaginasRelatorio;\nglobalThis.obterUltimaFoto = obterUltimaFoto;`,
+    `${html.slice(start, end)}\nglobalThis.getResultadoCriterio = getResultadoCriterio;\nglobalThis.calcularPaginasRelatorio = calcularPaginasRelatorio;\nglobalThis.obterUltimaFoto = obterUltimaFoto;\nglobalThis.blocoObservacoes = blocoObservacoes;`,
     sandbox,
   );
   return {
     getResultadoCriterio: sandbox.getResultadoCriterio as (sessionType: string) => Record<string, string>,
     calcularPaginasRelatorio: sandbox.calcularPaginasRelatorio as (contentHeight: number, pageHeight: number) => number,
     obterUltimaFoto: sandbox.obterUltimaFoto as (row: Record<string, unknown>) => number | null,
+    blocoObservacoes: sandbox.blocoObservacoes as (observations: Array<Record<string, unknown>>) => string,
   };
 }
 
@@ -118,5 +119,43 @@ describe('ordenação do relatório de cronometragem', () => {
     expect(html).toContain('@page landscape');
     expect(html).not.toContain('Página 1 de 1');
     expect(html).not.toContain('uf: s.startPos || s.position');
+  });
+
+  it('inclui as observações da prova em todos os formatos de relatório', () => {
+    const html = reportHtml();
+
+    expect(html).toContain('function blocoObservacoes(');
+    expect(html).toContain('id="observacoesBloco"');
+    expect(html).toContain('renderObservacoes();');
+    expect(html).toContain('Observações da prova');
+  });
+
+  it('escapa o texto das observações e preserva autor e horário', () => {
+    const { blocoObservacoes } = loadReportHelpers();
+
+    const rendered = blocoObservacoes([
+      { text: 'ADV: <Kart 7> & revisão', author: 'Diretor de prova', wallMs: Date.UTC(2026, 9, 4, 12, 34, 56) },
+      { text: 'Troca de kart · Maria do kart 7 para o 12', kind: 'kart-swap', author: 'Diretor de prova', wallMs: Date.UTC(2026, 9, 4, 12, 35, 56) },
+      { text: 'Relargada: evento operacional', kind: 'system', author: 'Cronometragem', wallMs: Date.UTC(2026, 9, 4, 12, 36, 0) },
+      { text: 'Pista liberada para a próxima bateria', kind: 'manual', author: 'Cronometragem', wallMs: Date.UTC(2026, 9, 4, 12, 37, 0) },
+      { text: '   ', author: 'Cronometragem', wallMs: Date.UTC(2026, 9, 4, 12, 35, 0) },
+    ]);
+
+    expect(rendered).toContain('id="observacoesBloco"');
+    expect(rendered).toContain('ADV: &lt;Kart 7&gt; &amp; revisão');
+    expect(rendered).toContain('Diretor de prova');
+    expect(rendered).toContain('04/10/2026');
+    expect(rendered).toContain('Troca de kart');
+    expect(rendered).not.toContain('Relargada: evento operacional');
+    expect(rendered).not.toContain('Pista liberada'); // anotação que não é advertência/penalidade/troca fica só no diário
+    expect(rendered).not.toContain('Cronometragem');
+    expect(blocoObservacoes([])).toBe('');
+  });
+
+  it('nomeia o bloco de penalidades e mantém os marcadores exigidos no relatório', () => {
+    const html = reportHtml();
+    expect(html).toContain('Penalidades e punições');
+    expect(html).toContain('Melhor volta da sessão');
+    expect(html).toContain('Como ler');
   });
 });

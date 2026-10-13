@@ -23,10 +23,10 @@ const displayModes: readonly { label: string; value: TelaoDisplayMode }[] = [
 ];
 
 const cardClassName =
-  'rounded-xl border border-zinc-800 bg-zinc-900/70 p-5 shadow-lg shadow-black/10 md:p-6';
+  'rounded-xl border border-kib-borda bg-kib-superficie p-5 shadow-lg shadow-black/10 md:p-6';
 
 const inputClassName =
-  'w-full rounded-lg border border-zinc-700 bg-zinc-950 min-h-[44px] px-3 py-2 sm:min-h-0 sm:py-2.5 text-sm text-white placeholder:text-zinc-600 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-60';
+  'w-full rounded-lg border border-kib-borda-forte bg-kib-fundo min-h-[44px] px-3 py-2 sm:min-h-0 sm:py-2.5 text-sm text-kib-texto placeholder:text-kib-texto-3 focus:border-kib-acao focus:outline-none focus:ring-2 focus:ring-kib-acao/20 disabled:cursor-not-allowed disabled:opacity-60';
 
 const updatedAtFormatter = new Intl.DateTimeFormat('pt-BR', {
   dateStyle: 'short',
@@ -157,13 +157,13 @@ export const TelaoPage = () => {
       />
 
       {loading ? (
-        <div className={`${cardClassName} mt-8 text-sm text-zinc-300`} role="status">
+        <div className={`${cardClassName} mt-8 text-sm text-kib-texto-2`} role="status">
           Carregando estado do telão...
         </div>
       ) : loadError || !state ? (
         <div className={`${cardClassName} mt-8`} role="alert">
-          <p className="font-bold text-red-200">Não foi possível carregar o telão.</p>
-          <p className="mt-2 text-sm text-zinc-300">{loadError}</p>
+          <p className="font-bold text-kib-perigo">Não foi possível carregar o telão.</p>
+          <p className="mt-2 text-sm text-kib-texto-2">{loadError}</p>
           <Button className="mt-4" onClick={() => void loadState()} variant="ghost">
             Tentar novamente
           </Button>
@@ -172,8 +172,8 @@ export const TelaoPage = () => {
         <>
           <div className="mt-8 grid gap-5 lg:grid-cols-2">
             <article className={cardClassName}>
-              <h2 className="text-lg font-black text-white">Modo de exibição</h2>
-              <p className="mt-1 text-sm text-zinc-400">
+              <h2 className="text-lg font-black text-kib-texto">Modo de exibição</h2>
+              <p className="mt-1 text-sm text-kib-texto-2">
                 Define qual etapa da classificação aparece no placar.
               </p>
               <div className="mt-5 flex flex-wrap gap-3">
@@ -193,8 +193,8 @@ export const TelaoPage = () => {
             </article>
 
             <article className={cardClassName}>
-              <h2 className="text-lg font-black text-white">Paginação</h2>
-              <p className="mt-1 text-sm text-zinc-400">
+              <h2 className="text-lg font-black text-kib-texto">Paginação</h2>
+              <p className="mt-1 text-sm text-kib-texto-2">
                 Ajuste o deslocamento da página exibida no telão.
               </p>
               <form className="mt-5" onSubmit={(event) => void handlePaginationSave(event)}>
@@ -239,8 +239,8 @@ export const TelaoPage = () => {
           </div>
 
           <article className={`${cardClassName} mt-5`}>
-            <h2 className="text-lg font-black text-white">Layout (JSON)</h2>
-            <p className="mt-1 text-sm text-zinc-400">
+            <h2 className="text-lg font-black text-kib-texto">Layout (JSON)</h2>
+            <p className="mt-1 text-sm text-kib-texto-2">
               Edite a configuração consumida pelo aplicativo do telão.
             </p>
             <div className="mt-5">
@@ -268,10 +268,10 @@ export const TelaoPage = () => {
           <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_auto]">
             <article className={cardClassName}>
               <div className="flex items-center gap-3">
-                <Monitor aria-hidden="true" className="text-brand-300" size={24} />
+                <Monitor aria-hidden="true" className="text-kib-acao" size={24} />
                 <div>
-                  <h2 className="font-black text-white">Estado do telão</h2>
-                  <p className="mt-1 text-sm text-zinc-400">
+                  <h2 className="font-black text-kib-texto">Estado do telão</h2>
+                  <p className="mt-1 text-sm text-kib-texto-2">
                     Última atualização: {formatUpdatedAt(state.updated_at)}
                   </p>
                 </div>
@@ -279,10 +279,10 @@ export const TelaoPage = () => {
             </article>
 
             <article className={cardClassName}>
-              <h2 className="font-black text-white">Links úteis</h2>
+              <h2 className="font-black text-kib-texto">Links úteis</h2>
               <div className="mt-3 flex flex-col gap-3 sm:flex-row lg:flex-col">
                 <a
-                  className="inline-flex items-center gap-2 text-sm font-bold text-brand-300 hover:text-brand-200"
+                  className="inline-flex items-center gap-2 text-sm font-bold text-kib-acao hover:text-kib-acao"
                   href="/podio-live-tb50"
                   rel="noreferrer"
                   target="_blank"
@@ -291,7 +291,7 @@ export const TelaoPage = () => {
                   <ExternalLink aria-hidden="true" size={15} />
                 </a>
                 <a
-                  className="inline-flex items-center gap-2 text-sm font-bold text-brand-300 hover:text-brand-200"
+                  className="inline-flex items-center gap-2 text-sm font-bold text-kib-acao hover:text-kib-acao"
                   href="/designer-telao"
                   rel="noreferrer"
                   target="_blank"

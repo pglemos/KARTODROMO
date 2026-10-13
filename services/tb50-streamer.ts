@@ -7,18 +7,36 @@ import { ensureWindowsSystemPath, resolvePreferredBrowserExecutablePath } from '
 const repoRoot = process.cwd();
 const width = Number(process.env.TB50_STREAM_WIDTH || '2048');
 const height = Number(process.env.TB50_STREAM_HEIGHT || '512');
-const captureFps = Number(process.env.TB50_CAPTURE_FPS || '8');
-const outputFps = Number(process.env.TB50_OUTPUT_FPS || '8');
+const configuredCaptureFps = Number(process.env.TB50_CAPTURE_FPS || '2');
+const configuredOutputFps = Number(process.env.TB50_OUTPUT_FPS || '2');
+// A inicialização antiga deixava TB50_CAPTURE_FPS=8 no ambiente de alguns
+// lançadores. Limitar aqui evita que uma rota legada volte a saturar o pipe
+// mesmo que o watchdog seja reiniciado com variáveis antigas.
+const captureFps = Number.isFinite(configuredCaptureFps)
+  ? Math.min(2, Math.max(1, configuredCaptureFps))
+  : 2;
+const outputFps = Number.isFinite(configuredOutputFps)
+  ? Math.min(2, Math.max(1, configuredOutputFps))
+  : 2;
 const bitrate = process.env.TB50_STREAM_BITRATE || '1400k';
 const bufferSize = process.env.TB50_STREAM_BUFSIZE || '2800k';
 const rtpPacketSize = process.env.TB50_RTP_PKT_SIZE || '1200';
-const scoreboardUrl = process.env.TB50_SCOREBOARD_URL || 'http://127.0.0.1:3000/podio-live-tb50';
-const streamUrl = process.env.TB50_STREAM_URL || 'rtsp://192.168.20.13:8554/tb50';
+const scoreboardUrl = process.env.TB50_SCOREBOARD_URL || 'http://127.0.0.1:3000/placar-telao-tb50?layout=designer';
+const streamUrl = process.env.TB50_STREAM_URL || 'rtsp://127.0.0.1:8554/tb50';
 ensureWindowsSystemPath();
 const chromePath = resolvePreferredBrowserExecutablePath(process.env.TB50_CHROME_PATH);
 const pageRecycleMs = Number(process.env.TB50_PAGE_RECYCLE_MS || '1800000');
 const browserRecycleMs = Number(process.env.TB50_BROWSER_RECYCLE_MS || '3600000');
 const frameWriteTimeoutMs = Number(process.env.TB50_FRAME_WRITE_TIMEOUT_MS || '5000');
+const screenshotTimeoutMs = Math.max(
+  1000,
+  Number(process.env.TB50_SCREENSHOT_TIMEOUT_MS || '3000'),
+);
+const configuredScreenshotQuality = Number(process.env.TB50_SCREENSHOT_QUALITY || '50');
+const screenshotQuality = Number.isFinite(configuredScreenshotQuality)
+  ? Math.min(100, Math.max(1, configuredScreenshotQuality))
+  : 50;
+const encoderPreset = process.env.TB50_ENCODER_PRESET || 'ultrafast';
 
 function findBundledFfmpeg(): string | null {
   const ffmpegRoot = join(repoRoot, '.tools', 'ffmpeg');
@@ -65,6 +83,11 @@ function startFfmpeg(onExit: (code: number | null, signal: NodeJS.Signals | null
     '-hide_banner',
     '-loglevel',
     'warning',
+    // Bufferiza quadros JPEG no lado do FFmpeg. Sem essa fila, uma pausa
+    // momentânea no muxador RTSP fazia o pipe bloquear e o painel recebia
+    // saltos de vários segundos entre segmentos HLS.
+    '-thread_queue_size',
+    '64',
     '-f',
     'image2pipe',
     '-framerate',
@@ -83,7 +106,7 @@ function startFfmpeg(onExit: (code: number | null, signal: NodeJS.Signals | null
     '-level:v',
     '3.2',
     '-preset',
-    'veryfast',
+    encoderPreset,
     '-tune',
     'zerolatency',
     '-bf',
@@ -168,7 +191,27 @@ async function openScoreboardPage(browser: Browser): Promise<Page> {
     try {
       await page.goto(scoreboardUrl, { waitUntil: 'commit', timeout: 15000 });
       await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => undefined);
-      await page.waitForSelector('.screen, .final-screen, .final-screen-viewport', { timeout: 15000 });
+
+      // A rota do placar pode responder com um meta-refresh para o pódio
+      // automático. O primeiro documento não contém o palco; siga o destino
+      // explicitamente para não encerrar o streamer durante a transição.
+      const metaRefreshTarget = await page
+        .evaluate(() => {
+          const meta = Array.from(document.querySelectorAll('meta')).find((item) => item.httpEquiv.toLowerCase() === 'refresh');
+          const content = meta?.content || '';
+          const match = content.match(/url\s*=\s*(.+)$/i);
+          return match?.[1]?.trim() || null;
+        })
+        .catch(() => null);
+
+      if (metaRefreshTarget) {
+        await page.goto(new URL(metaRefreshTarget, page.url()).toString(), { waitUntil: 'domcontentloaded', timeout: 15000 });
+      }
+
+      // A página final pode terminar de hidratar com o elemento inicialmente
+      // fora da área visível; para o capturador basta que o palco exista no
+      // DOM (a captura CDP não depende da visibilidade do seletor).
+      await page.waitForSelector('.screen, .final-screen, .final-screen-viewport', { timeout: 15000, state: 'attached' });
       return page;
     } catch (error) {
       lastError = error;
@@ -230,9 +273,34 @@ async function writeFrame(
   });
 }
 
+async function captureFrame(page: Page, timeoutMs: number): Promise<Buffer> {
+  // page.screenshot() aguarda document.fonts.ready antes de chamar o CDP.
+  // Na telao isso pode ficar pendente quando a fonte web nao responde, mesmo
+  // com o DOM pronto. A captura CDP direta evita essa espera e preserva o
+  // tamanho exato do viewport 2048x512.
+  const client = await page.context().newCDPSession(page);
+  try {
+    const result = await withTimeout(
+      client.send('Page.captureScreenshot', {
+        format: 'jpeg',
+        quality: screenshotQuality,
+        fromSurface: true,
+        captureBeyondViewport: false,
+      }),
+      timeoutMs,
+      `Timed out capturing TB50 frame after ${timeoutMs}ms`,
+    );
+
+    return Buffer.from(result.data, 'base64');
+  } finally {
+    await client.detach().catch(() => undefined);
+  }
+}
+
 async function main() {
   console.log(`TB50 streamer rendering ${scoreboardUrl}`);
   console.log(`TB50 streamer publishing ${streamUrl}`);
+  console.log(`TB50 streamer cadence capture=${captureFps}fps output=${outputFps}fps quality=${screenshotQuality}`);
 
   let stopped = false;
   let ffmpeg: ChildProcessWithoutNullStreams | null = null;
@@ -311,63 +379,109 @@ async function main() {
 
   const frameDelayMs = Math.max(1, Math.floor(1000 / captureFps));
   let lastHeartbeatAt = 0;
+  let latestImage: Buffer | null = null;
+  let captureFailures = 0;
+  let lastPublishedAt = 0;
 
-  while (!stopped) {
-    if (!ffmpeg || ffmpeg.exitCode !== null || !ffmpeg.stdin.writable) {
-      await restartFfmpeg();
-      await delay(frameDelayMs);
-      continue;
+  // Captura e publicação precisam ter relógios independentes. Uma captura de
+  // tela pode bloquear esperando fontes, layout ou uma atualização do placar;
+  // nesse intervalo o FFmpeg ainda deve receber o último quadro válido para
+  // manter os timestamps do RTSP/HLS contínuos.
+  const captureLoop = async () => {
+    while (!stopped) {
+      const start = Date.now();
+
+      try {
+        if (browserRecycleMs > 0 && Date.now() - browserOpenedAt >= browserRecycleMs) {
+          await recreateBrowser(`scheduled ${browserRecycleMs}ms recycle`);
+        } else if (pageRecycleMs > 0 && Date.now() - pageOpenedAt >= pageRecycleMs) {
+          await recreatePage(`scheduled ${pageRecycleMs}ms recycle`);
+        }
+
+        const pageHealthy = await withTimeout(
+          isScoreboardPageHealthy(page),
+          screenshotTimeoutMs,
+          `Timed out checking TB50 scoreboard after ${screenshotTimeoutMs}ms`,
+        ).catch(() => false);
+
+        if (pageCrashed || !pageHealthy) {
+          await recreatePage(pageCrashed ? 'page crashed' : 'scoreboard DOM missing');
+        }
+
+        const image = await captureFrame(page, screenshotTimeoutMs);
+        latestImage = image;
+        captureFailures = 0;
+      } catch (error) {
+        captureFailures += 1;
+        const message = error instanceof Error ? error.message : 'screenshot failed';
+        console.error(`TB50 frame capture failed (${captureFailures}): ${message}`);
+
+        // Não recarregue a página a cada falha: isso transformava uma espera
+        // transitória de fonte/layout em vários segundos sem nenhum quadro.
+        // Depois de três falhas consecutivas, recriamos a aba enquanto o loop
+        // de publicação continua repetindo latestImage.
+        if (captureFailures >= 3) {
+          try {
+            await recreatePage(`capture failed ${captureFailures} times`);
+            captureFailures = 0;
+          } catch (recreateError) {
+            const recreateMessage = recreateError instanceof Error ? recreateError.message : 'page recreation failed';
+            console.error(`TB50 page recreation failed: ${recreateMessage}`);
+            await delay(1000);
+          }
+        }
+      }
+
+      const elapsed = Date.now() - start;
+      const wait = frameDelayMs - elapsed;
+      if (wait > 0) await delay(wait);
     }
+  };
 
-    const start = Date.now();
-    if (browserRecycleMs > 0 && Date.now() - browserOpenedAt >= browserRecycleMs) {
-      await recreateBrowser(`scheduled ${browserRecycleMs}ms recycle`);
-    } else if (pageRecycleMs > 0 && Date.now() - pageOpenedAt >= pageRecycleMs) {
-      await recreatePage(`scheduled ${pageRecycleMs}ms recycle`);
+  const publishLoop = async () => {
+    while (!stopped) {
+      const start = Date.now();
+
+      if (!ffmpeg || ffmpeg.exitCode !== null || !ffmpeg.stdin.writable) {
+        await restartFfmpeg();
+        await delay(frameDelayMs);
+        continue;
+      }
+
+      const image = latestImage;
+      if (image) {
+        const activeFfmpeg: ChildProcessWithoutNullStreams = ffmpeg;
+        const frameWritten = await writeFrame(activeFfmpeg, image, frameWriteTimeoutMs);
+        if (!frameWritten) {
+          console.error('FFmpeg publisher is not accepting frames; restarting publisher.');
+          activeFfmpeg.kill();
+          if (ffmpeg === activeFfmpeg) ffmpeg = null;
+          await restartFfmpeg();
+        } else {
+          const publishedAt = Date.now();
+          if (lastPublishedAt > 0) {
+            const publishGapMs = publishedAt - lastPublishedAt;
+            if (publishGapMs > frameDelayMs * 3) {
+              console.warn(`TB50 publish gap ${publishGapMs}ms`);
+            }
+          }
+          lastPublishedAt = publishedAt;
+        }
+      }
+
+      if (Date.now() - lastHeartbeatAt > 60000) {
+        const rssMb = Math.round(process.memoryUsage().rss / 1024 / 1024);
+        console.log(`TB50 streamer heartbeat rss=${rssMb}MB`);
+        lastHeartbeatAt = Date.now();
+      }
+
+      const elapsed = Date.now() - start;
+      const wait = frameDelayMs - elapsed;
+      if (wait > 0) await delay(wait);
     }
+  };
 
-    if (pageCrashed || !(await isScoreboardPageHealthy(page))) {
-      await recreatePage(pageCrashed ? 'page crashed' : 'scoreboard DOM missing');
-    }
-
-    const image = await page
-      .screenshot({
-        type: 'jpeg',
-        quality: 90,
-        animations: 'allow',
-        caret: 'hide',
-      })
-      .catch(async (error) => {
-        await recreatePage(error instanceof Error ? error.message : 'screenshot failed');
-        return page.screenshot({
-          type: 'jpeg',
-          quality: 90,
-          animations: 'allow',
-          caret: 'hide',
-        });
-      });
-
-    const activeFfmpeg: ChildProcessWithoutNullStreams = ffmpeg;
-    const frameWritten = await writeFrame(activeFfmpeg, image, frameWriteTimeoutMs);
-    if (!frameWritten) {
-      console.error('FFmpeg publisher is not accepting frames; restarting publisher.');
-      activeFfmpeg.kill();
-      if (ffmpeg === activeFfmpeg) ffmpeg = null;
-      await restartFfmpeg();
-      await delay(frameDelayMs);
-      continue;
-    }
-
-    if (Date.now() - lastHeartbeatAt > 60000) {
-      const rssMb = Math.round(process.memoryUsage().rss / 1024 / 1024);
-      console.log(`TB50 streamer heartbeat rss=${rssMb}MB`);
-      lastHeartbeatAt = Date.now();
-    }
-
-    const elapsed = Date.now() - start;
-    const wait = frameDelayMs - elapsed;
-    if (wait > 0) await delay(wait);
-  }
+  await Promise.all([captureLoop(), publishLoop()]);
 }
 
 main().catch((error) => {

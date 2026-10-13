@@ -1,5 +1,7 @@
 package br.com.kartodromobetim.sorteio
 
+import br.com.kartodromobetim.sorteio.design.Tokens
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -75,32 +77,39 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 
+/**
+ * Cores do tablet = tema ESCURO oficial (tokens/kib.tokens.json → design/Tokens.kt). Fase 7 do design system (09/10/2026):
+ * o verde próprio (#087F5B) virou o neon da marca; texto sobre o verde é escuro (Cor.SobreVerde), como no site e no totem.
+ */
 object Cor {
-    val Verde = Color(0xFF087F5B)
-    val VerdeVivo = Color(0xFF0BB783)
-    val VerdeClaro = Color(0xFF123C32)
-    val VerdeSuave = Color(0xFF1B5747)
-    val Fundo = Color(0xFF0B1214)
-    val Cartao = Color(0xFF151F22)
-    val CartaoElevado = Color(0xFF1A272A)
-    val Texto = Color(0xFFF2F5F4)
-    val Secundario = Color(0xFFB5C1C4)
-    val Borda = Color(0xFF2A3A3D)
-    val BordaFoco = Color(0xFF35D1A0)
-    val VerdeTexto = Color(0xFF8BECC7)
-    val VerdeTextoSuave = Color(0xFF7CE5BE)
-    val VerdeSelecao = Color(0xFF17372E)
-    val VerdeBorda = Color(0xFF50CFA3)
-    val TextoDesativado = Color(0xFFB0B5BD)
-    val Palco = Color(0xFF0E1116)
-    val PalcoCartao = Color(0xFF1A1F27)
-    val Amarelo = Color(0xFFF5B301)
-    val AmareloClaro = Color(0xFF342B18)
-    val Vermelho = Color(0xFFFF8F88)
-    val VermelhoClaro = Color(0xFF3D2327)
-    val Vidro = Color(0xCC152124)
-    val VidroLeve = Color(0x80172225)
-    val IconeSurface = Color(0x661F2C31)
+    val Verde = Tokens.Escuro.CorAcaoPrincipal
+    val VerdeVivo = Tokens.Escuro.CorAcaoPrincipal
+    val VerdePressionado = Tokens.Escuro.CorAcaoPrincipalPressionado
+    val SobreVerde = Tokens.Escuro.CorAcaoSobrePrincipal
+    val VerdeClaro = Tokens.Escuro.CorEstadoSucessoFundo
+    val VerdeSuave = Tokens.Escuro.CorSelecaoFundo
+    val Fundo = Tokens.Escuro.CorFundoApp
+    val Cartao = Tokens.Escuro.CorSuperficiePadrao
+    val CartaoElevado = Tokens.Escuro.CorSuperficieCampo
+    val Texto = Tokens.Escuro.CorTextoPrincipal
+    val Secundario = Tokens.Escuro.CorTextoSecundario
+    val Borda = Tokens.Escuro.CorBordaSutil
+    val BordaForte = Tokens.Escuro.CorBordaForte
+    val BordaFoco = Tokens.Escuro.CorBordaFoco
+    val VerdeTexto = Tokens.Escuro.CorEstadoSucessoTexto
+    val VerdeTextoSuave = Tokens.Escuro.CorEstadoSucessoTexto
+    val VerdeSelecao = Tokens.Escuro.CorSelecaoFundo
+    val VerdeBorda = Tokens.Escuro.CorAcaoPrincipal
+    val TextoDesativado = Tokens.Escuro.CorTextoTerciario
+    val Palco = Tokens.Escuro.CorSuperficieLateral
+    val PalcoCartao = Tokens.Escuro.CorSuperficiePadrao
+    val Amarelo = Tokens.Escuro.CorEstadoAvisoTexto
+    val AmareloClaro = Tokens.Escuro.CorEstadoAvisoFundo
+    val Vermelho = Tokens.Escuro.CorEstadoPerigoTexto
+    val VermelhoClaro = Tokens.Escuro.CorEstadoPerigoFundo
+    val Vidro = Tokens.Escuro.CorSuperficiePadrao.copy(alpha = 0.8f)
+    val VidroLeve = Tokens.Escuro.CorSuperficiePadrao.copy(alpha = 0.5f)
+    val IconeSurface = Tokens.Escuro.CorSuperficieCampo.copy(alpha = 0.6f)
 }
 
 enum class FundoApp { PIT_LANE, LIVE_TRACK, CHECKERED }
@@ -109,9 +118,9 @@ enum class FundoApp { PIT_LANE, LIVE_TRACK, CHECKERED }
 fun TemaSorteio(conteudo: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = darkColorScheme(
-            primary = Cor.Verde, onPrimary = Color.White, background = Cor.Fundo, surface = Cor.Cartao,
+            primary = Cor.Verde, onPrimary = Cor.SobreVerde, background = Cor.Fundo, surface = Cor.Cartao,
             onSurface = Cor.Texto, onBackground = Cor.Texto, secondary = Cor.Secundario, error = Cor.Vermelho,
-            primaryContainer = Cor.VerdeClaro, onPrimaryContainer = Color(0xFF9AF2D2),
+            primaryContainer = Cor.VerdeClaro, onPrimaryContainer = Cor.VerdeTexto,
             surfaceVariant = Cor.CartaoElevado, onSurfaceVariant = Cor.Secundario, outline = Cor.Borda,
         ),
         typography = Typography(
@@ -179,7 +188,7 @@ fun AcaoCircular(
             .size(52.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(if (destaque) Cor.Verde.copy(alpha = 0.35f) else Cor.IconeSurface)
-            .border(1.dp, if (destaque) Cor.BordaFoco else Color(0x334C6268), RoundedCornerShape(18.dp)),
+            .border(1.dp, if (destaque) Cor.BordaFoco else Cor.Borda, RoundedCornerShape(18.dp)),
     ) { Icon(icone, descricao, tint = if (destaque) Cor.VerdeTexto else Cor.Texto, modifier = Modifier.size(24.dp)) }
 }
 
@@ -209,11 +218,11 @@ fun PlacaKart(kart: String, tamanho: TextUnit = 18.sp, largura: Dp = 56.dp, altu
         Modifier
             .size(largura, altura)
             .clip(RoundedCornerShape(10.dp))
-            .background(if (destaque) Brush.verticalGradient(listOf(Cor.Verde, Color(0xFF056044))) else Brush.verticalGradient(listOf(Cor.Fundo, Cor.Fundo)))
+            .background(if (destaque) Brush.verticalGradient(listOf(Cor.Verde, Cor.VerdePressionado)) else Brush.verticalGradient(listOf(Cor.Fundo, Cor.Fundo)))
             .border(1.dp, if (destaque) Color(0x33000000) else Cor.Borda, RoundedCornerShape(10.dp)),
         contentAlignment = Alignment.Center,
     ) {
-        Text(kart.ifBlank { "—" }, color = if (destaque) Color.White else Cor.Secundario, fontSize = tamanho, fontWeight = FontWeight.Black)
+        Text(kart.ifBlank { "—" }, color = if (destaque) Cor.SobreVerde else Cor.Secundario, fontSize = tamanho, fontWeight = FontWeight.Black)
     }
 }
 
@@ -231,7 +240,7 @@ fun BotaoPrincipal(
     Button(
         onClick = onClick, enabled = habilitado, modifier = modifier.height(altura),
         shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = if (habilitado) cor else Cor.Borda, contentColor = Color.White, disabledContainerColor = Cor.Borda, disabledContentColor = Cor.Secundario),
+        colors = ButtonDefaults.buttonColors(containerColor = if (habilitado) cor else Cor.CartaoElevado, contentColor = if (cor == Cor.Verde) Cor.SobreVerde else Color.White, disabledContainerColor = Cor.CartaoElevado, disabledContentColor = Cor.Secundario),
         contentPadding = PaddingValues(horizontal = 20.dp),
     ) {
         if (icone != null) { Icon(icone, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)) }
@@ -352,7 +361,7 @@ fun CabecalhoTela(titulo: String, subtitulo: String? = null, onVoltar: () -> Uni
         androidx.compose.material3.IconButton(
             onClick = onVoltar,
             modifier = Modifier.size(52.dp).clip(RoundedCornerShape(18.dp)).background(Cor.IconeSurface)
-                .border(1.dp, Color(0x334C6268), RoundedCornerShape(18.dp)),
+                .border(1.dp, Cor.Borda, RoundedCornerShape(18.dp)),
         ) {
             Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Voltar", tint = Cor.Texto)
         }

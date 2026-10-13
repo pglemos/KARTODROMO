@@ -1,0 +1,8 @@
+{
+  // Ponte SMTP para a HostGator (ver worker.ts). Deploy: npx wrangler deploy -c services/smtp-ponte/wrangler.jsonc
+  "name": "kartodromo-smtp-ponte",
+  "main": "worker.ts",
+  "compatibility_date": "2026-10-01",
+  "account_id": "e476c4322903cf98849d505ea26f726f",
+  "workers_dev": true
+}

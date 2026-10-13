@@ -4,6 +4,7 @@
  */
 import { CLIENTE_COLS, insertCliente, isValidCpf, one, onlyDigits, query, tx, updateCliente, type ClienteInput } from './db';
 import { confereSenha, hashSenha, type Sessao } from './auth';
+import { erroCadastroObrigatorio, erroPesoCliente } from './cadastro-obrigatorio';
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
@@ -186,9 +187,14 @@ const RESERVA_SELECT = `SELECT TOP 5000 i.Id id, i.Pago pago, CONVERT(varchar(16
   r.Nome responsavel, p.Id produtoId, p.Nome produto, p.Categoria categoria, ISNULL(i.PrecoCentavos, p.PrecoCentavos) preco, i.DescontoCentavos desconto,
   CASE WHEN i.Pago = 1 THEN i.ValorCentavos ELSE ISNULL(i.PrecoCentavos, p.PrecoCentavos) - i.DescontoCentavos END total,
   i.Observacao observacao, i.Aprovada aprovada, CASE WHEN i.TermoImpressoEm IS NULL THEN 0 ELSE 1 END termo, i.Status status, i.Origem origem, i.Kart kart, i.VendaId vendaId,
-  CONVERT(varchar(16), i.TermoImpressoEm, 126) termoImpressoEm, CONVERT(varchar(16), i.CriadoEm, 126) criadoEm
+  CONVERT(varchar(16), i.TermoImpressoEm, 126) termoImpressoEm, CONVERT(varchar(16), i.CriadoEm, 126) criadoEm,
+  CASE WHEN i.Pago = 1 THEN ISNULL(onl.forma, cx.formas) END formaPagamento
   FROM dbo.Inscricao i JOIN dbo.Bateria b ON b.Id = i.BateriaId JOIN dbo.Cliente c ON c.Id = i.ClienteId
-  LEFT JOIN dbo.Cliente r ON r.Id = ISNULL(i.ResponsavelId, c.ResponsavelId) LEFT JOIN dbo.Produto p ON p.Id = ISNULL(i.ProdutoId, b.ProdutoId)`;
+  LEFT JOIN dbo.Cliente r ON r.Id = ISNULL(i.ResponsavelId, c.ResponsavelId) LEFT JOIN dbo.Produto p ON p.Id = ISNULL(i.ProdutoId, b.ProdutoId)
+  OUTER APPLY (SELECT TOP 1 CASE ro.Forma WHEN 'pix' THEN 'Pix' WHEN 'debito' THEN 'Débito' WHEN 'credito' THEN 'Crédito' ELSE 'Cartão' END + ' (site)' forma
+    FROM dbo.ReservaOnline ro WHERE i.Origem = 'site' AND ro.Status = 'pago' AND ',' + ro.InscricaoIds + ',' LIKE '%,' + CAST(i.Id AS varchar(12)) + ',%') onl
+  OUTER APPLY (SELECT STUFF((SELECT DISTINCT ' + ' + fp.Nome FROM dbo.VendaPagamento vp JOIN dbo.FormaPagamento fp ON fp.Id = vp.FormaPagamentoId
+    WHERE vp.VendaId = i.VendaId AND vp.Cancelado = 0 FOR XML PATH(''), TYPE).value('.', 'nvarchar(200)'), 1, 3, '') formas) cx`;
 
 const BATERIA_SELECT = `SELECT TOP 5000 b.Id id, CONVERT(varchar(16), b.Inicio, 126) dataHora, b.Nome nome, p.Id produtoId, p.Nome produto, p.Categoria categoria,
   p.PrecoCentavos preco, b.Vagas vagas, b.Vagas - (SELECT COUNT(*) FROM dbo.Inscricao x WHERE x.BateriaId = b.Id AND x.Status <> 'cancelada') disponiveis,
@@ -224,7 +230,7 @@ const CAD: Record<string, CadDef> = {
     cols: { produtoId: ['ProdutoId', 'int'], ordem: ['Ordem', 'int'], nome: ['Nome', 'text', 60], tipo: ['Tipo', 'text', 14], finalizacao: ['Finalizacao', 'text', 10], tempoMin: ['TempoMin', 'int'], voltasMax: ['VoltasMax', 'int'] },
     order: 'ProdutoId, Ordem', required: ['produtoId', 'nome'], filter: 'produtoId',
   },
-  tracados: { table: 'Tracado', cols: { nome: ['Nome', 'text', 100], comprimento: ['Comprimento', 'int'], ativo: ['Ativo', 'bool'] }, order: 'LEN(Nome), Nome', required: ['nome'] }, // "Traçado 2" antes de "Traçado 10"
+  tracados: { table: 'Tracado', cols: { nome: ['Nome', 'text', 100], comprimento: ['Comprimento', 'int'], ativo: ['Ativo', 'bool'] }, order: 'LEN(Nome), Nome', required: ['nome'] }, // o catálogo ativo vem da Cronometragem; o servidor mantém a ponte local
   feriados: { table: 'Feriado', cols: { data: ['Data', 'date'], descricao: ['Descricao', 'text', 100], recorrente: ['Recorrente', 'bool'], abre: ['Abre', 'bool'] }, order: 'Data', required: ['data', 'descricao'] },
   turnos: { table: 'Turno', cols: { descricao: ['Descricao', 'text', 60], inicio: ['Inicio', 'time'], fim: ['Fim', 'time'], ativo: ['Ativo', 'bool'] }, order: 'Descricao', required: ['descricao'] },
   terminais: {
@@ -292,7 +298,11 @@ async function cadRoutes(req: Req, send: Res, ent: string, id: number | null): P
   if (req.method === 'GET') {
     if (id) return send(200, await one(`${cadSelect(def)} WHERE Id = @id`, { id }));
     const f = def.filter && req.url.searchParams.get(def.filter);
-    const where = f ? `WHERE ${def.cols[def.filter!][0]} = @f` : '';
+    const filtros = [
+      ent === 'tracados' ? `(TimingTrackId IS NOT NULL OR NOT EXISTS (SELECT 1 FROM dbo.Tracado WHERE Ativo = 1 AND TimingTrackId IS NOT NULL))` : '',
+      f ? `${def.cols[def.filter!][0]} = @f` : '',
+    ].filter(Boolean);
+    const where = filtros.length ? `WHERE ${filtros.join(' AND ')}` : '';
     return send(200, await query(`${cadSelect(def)} ${where} ORDER BY ${def.order}`, f ? { f } : {}));
   }
   if (req.method === 'POST' || req.method === 'PUT') {
@@ -385,8 +395,14 @@ export async function sumarioMovimento(movId: number) {
 
 // ---------------------------------------------------------------- inscricao (reserva)
 
-/** opcoes.produtoId: produto escolhido na recepção (senão o da bateria); opcoes.pago: pago antecipado (site/WhatsApp), já entra paga e aprovada. */
-async function inscreverN(bateriaId: number, clienteId: number, n: number, origem: string, uid: number | null, observacao: string | null, aprovada = true, opcoes: { produtoId?: number | null; pago?: boolean } = {}) {
+/**
+ * opcoes.produtoId: produto escolhido na recepção (senão o da bateria); opcoes.pago: pago antecipado (site/WhatsApp), já entra paga e aprovada.
+ * opcoes.clientes: uma vaga para CADA pessoa da lista (reserva online de grupo: comprador + os outros pilotos); clienteId fica
+ * como responsável. Sem a lista, as n vagas ficam no nome de clienteId (como a recepção sempre fez).
+ */
+async function inscreverN(bateriaId: number, clienteId: number, n: number, origem: string, uid: number | null, observacao: string | null, aprovada = true, opcoes: { produtoId?: number | null; pago?: boolean; clientes?: number[] } = {}) {
+  const pessoas = opcoes.clientes?.length ? opcoes.clientes : null;
+  if (pessoas) n = pessoas.length;
   return tx(async (run) => {
     const [b] = await run(
       `SELECT b.Id, b.Status, b.Vagas, b.Inicio, b.ProdutoId, p.PrecoCentavos preco,
@@ -406,9 +422,11 @@ async function inscreverN(bateriaId: number, clienteId: number, n: number, orige
       const [dup] = await run(`SELECT Id FROM dbo.Inscricao WHERE BateriaId = @bateriaId AND ClienteId = @clienteId AND Status <> 'cancelada'`, { bateriaId, clienteId });
       if (dup) throw new HttpError(409, 'Já existe uma reserva em nome deste cliente.');
     }
-    const [c] = await run(`SELECT Bloqueado FROM dbo.Cliente WHERE Id = @clienteId`, { clienteId });
-    if (!c) throw new HttpError(404, 'Cliente não localizado.');
-    if (c.Bloqueado) throw new HttpError(409, 'Cliente bloqueado.');
+    for (const id of pessoas ?? [clienteId]) {
+      const [c] = await run(`SELECT Bloqueado, Nome FROM dbo.Cliente WHERE Id = @id`, { id });
+      if (!c) throw new HttpError(404, 'Cliente não localizado.');
+      if (c.Bloqueado) throw new HttpError(409, pessoas ? `Cliente bloqueado: ${c.Nome}.` : 'Cliente bloqueado.');
+    }
     let produtoId = (b.ProdutoId as number | null) ?? null;
     let preco = (b.preco as number | null) ?? null;
     if (opcoes.produtoId) {
@@ -423,7 +441,7 @@ async function inscreverN(bateriaId: number, clienteId: number, n: number, orige
         `INSERT INTO dbo.Inscricao (BateriaId, ClienteId, Origem, Observacao, ProdutoId, PrecoCentavos, Aprovada, ResponsavelId, Pago, ValorCentavos, Status)
          OUTPUT inserted.Id id VALUES (@bateriaId, @clienteId, @origem, @obs, @produtoId, @preco, @aprovada, @resp, @pago, @valor, @status)`,
         {
-          bateriaId, clienteId, origem, obs: observacao, produtoId, preco, aprovada: aprovada || pago ? 1 : 0, resp: n > 1 ? clienteId : null,
+          bateriaId, clienteId: pessoas ? pessoas[k] : clienteId, origem, obs: observacao, produtoId, preco, aprovada: aprovada || pago ? 1 : 0, resp: n > 1 ? clienteId : null,
           pago: pago ? 1 : 0, valor: pago ? preco : null, status: pago ? 'confirmada' : 'reservada',
         },
       );
@@ -1346,6 +1364,8 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     let atualizarPeso = false;
     let peso: number | null = null;
     if (b.peso !== undefined) {
+      const erroPeso = erroPesoCliente(b.peso);
+      if (erroPeso) throw new HttpError(400, erroPeso);
       atualizarPeso = true;
       const valor = String(b.peso ?? '').trim().replace(',', '.');
       if (valor) {
@@ -1519,6 +1539,8 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   }
   if (path === '/clientes' && method === 'POST') {
     const b = (await req.body()) as ClienteInput;
+    const erroCadastro = erroCadastroObrigatorio(b);
+    if (erroCadastro) throw new HttpError(400, erroCadastro);
     if ((b.tipoDocumento ?? 'CPF') === 'CPF' && b.documento && !isValidCpf(b.documento)) throw new HttpError(400, 'CPF inválido.');
     if (b.documento && !b.responsavelId) {
       const dup = await one<{ id: number; nome: string }>(`SELECT TOP 1 Id id, Nome nome FROM dbo.Cliente WHERE DocumentoNum = @d`, { d: onlyDigits(b.documento) });
@@ -1529,6 +1551,8 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   }
   if ((m = path.match(/^\/clientes\/(\d+)$/)) && method === 'PUT') {
     const b = (await req.body()) as ClienteInput;
+    const erroCadastro = erroCadastroObrigatorio(b);
+    if (erroCadastro) throw new HttpError(400, erroCadastro);
     if ((b.tipoDocumento ?? 'CPF') === 'CPF' && b.documento && !isValidCpf(b.documento)) throw new HttpError(400, 'CPF inválido.');
     await updateCliente(Number(m[1]), b, false);
     send(200, { ok: true });
@@ -1626,7 +1650,9 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   if (path === '/apoio' && method === 'GET') {
     const [produtos, tracados, formas, padroes, empresa, parametros] = await Promise.all([
       query(`SELECT Id id, Codigo codigo, Nome nome, PrecoCentavos preco, Categoria categoria, Ativo ativo FROM dbo.Produto ORDER BY Nome`),
-      query(`SELECT Id id, Nome nome FROM dbo.Tracado WHERE Ativo = 1 ORDER BY LEN(Nome), Nome`),
+      query(`SELECT Id id, Nome nome FROM dbo.Tracado
+             WHERE Ativo = 1 AND (TimingTrackId IS NOT NULL OR NOT EXISTS (SELECT 1 FROM dbo.Tracado WHERE Ativo = 1 AND TimingTrackId IS NOT NULL))
+             ORDER BY LEN(Nome), Nome`),
       query(`SELECT Id id, Nome nome, Tipo tipo FROM dbo.FormaPagamento WHERE Ativo = 1 ORDER BY Codigo`),
       // campos do padrão para a prévia de "Criar reservas" (hora como texto hh:mm)
       query(`SELECT Id id, Nome nome, Quantidade quantidade, CONVERT(varchar(5), PrimeiraHora, 108) primeiraHora, IntervaloMin intervaloMin, Vagas vagas, Ativo ativo

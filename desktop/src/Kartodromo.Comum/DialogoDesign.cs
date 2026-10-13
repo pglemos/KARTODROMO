@@ -13,7 +13,7 @@ public class DialogoDesign : CartaoModal
     public static readonly Color Fundo = Tokens.Fundo;
     public static readonly Color VerdePrincipal = Tokens.Verde;
     static readonly Color Rotulo = Tokens.TextoSecundario;
-    static readonly Color Borda = Color.FromArgb(219, 219, 222); // rgba(0,0,0,0.14) sobre branco
+    static Color Borda => Tokens.Claro.CorBordaCampo; // contorno de campo 3:1 sobre branco (WCAG 1.4.11), decidido 10/10/2026
 
     readonly TableLayoutPanel _secoes;
     /// <summary>largura útil das seções (a janela menos as margens e a barra de rolagem)</summary>
@@ -31,15 +31,17 @@ public class DialogoDesign : CartaoModal
     {
         Text = titulo;
         BackColor = Fundo;
+        largura = ClientSize.Width;
+        altura = ClientSize.Height;
 
         // cabeçalho
-        var cab = _cab = new Panel { Dock = DockStyle.Top, Height = 62, BackColor = Color.White };
+        var cab = _cab = new Panel { Dock = DockStyle.Top, Height = 62, BackColor = Tokens.Primitivo.Branco };
         cab.Paint += (_, e) => { using var pen = new Pen(Tokens.Linha); e.Graphics.DrawLine(pen, 0, cab.Height - 1, cab.Width, cab.Height - 1); };
         var ic = new PictureBox { Image = icone, SizeMode = PictureBoxSizeMode.Zoom, Size = new Size(36, 36), BackColor = Color.Transparent, Location = new Point(18, 13) };
-        var t = new Label { Text = titulo, AutoSize = true, Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, Location = new Point(62, 11), BackColor = Color.Transparent };
-        Subtitulo = new Label { Text = sub, AutoSize = true, Font = new Font("Segoe UI", 9F), ForeColor = Rotulo, Location = new Point(63, 33), BackColor = Color.Transparent };
+        var t = new Label { Text = titulo, AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpoLeitura, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, Location = new Point(62, 11), BackColor = Color.Transparent };
+        Subtitulo = new Label { Text = sub, AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno), ForeColor = Rotulo, Location = new Point(63, 33), BackColor = Color.Transparent };
         var fechar = Botao("✕", Tokens.BotaoSecundario, PecasDesign.CorTexto);
-        fechar.Size = new Size(34, 32); fechar.Font = new Font("Segoe UI", 9.5F);
+        fechar.Size = new Size(34, 32); fechar.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo);
         // posição pelo tamanho real do cabeçalho (com âncora, criado antes de ter largura, o ✕ ficava fora da janela)
         fechar.Location = new Point(largura - 52, 15);
         cab.Resize += (_, _) => fechar.Left = cab.ClientSize.Width - 52;
@@ -55,9 +57,10 @@ public class DialogoDesign : CartaoModal
         }
 
         // rodapé
-        var rod = _rod = new Panel { Dock = DockStyle.Bottom, Height = 60, BackColor = Color.White };
+        // 1 px livre em cima: a linha fina do rodapé ia até os botões e sumia embaixo deles
+        var rod = _rod = new Panel { Dock = DockStyle.Bottom, Height = 60, BackColor = Tokens.Primitivo.Branco, Padding = new Padding(0, 1, 0, 0) };
         rod.Paint += (_, e) => { using var pen = new Pen(Tokens.Linha); e.Graphics.DrawLine(pen, 0, 0, rod.Width, 0); };
-        _botoes = new FlowLayoutPanel { Dock = DockStyle.Right, FlowDirection = FlowDirection.RightToLeft, AutoSize = true, WrapContents = false, Padding = new Padding(0, 12, 14, 0), BackColor = Color.White };
+        _botoes = new FlowLayoutPanel { Dock = DockStyle.Right, FlowDirection = FlowDirection.RightToLeft, AutoSize = true, WrapContents = false, Padding = new Padding(0, 12, 14, 0), BackColor = Tokens.Primitivo.Branco };
         rod.Controls.Add(_botoes);
 
         // corpo: seções empilhadas, com rolagem se não couber
@@ -66,15 +69,69 @@ public class DialogoDesign : CartaoModal
         _secoes = new TableLayoutPanel { MinimumSize = new Size(_larguraSecao, 0), MaximumSize = new Size(_larguraSecao, 0), Dock = DockStyle.Top, ColumnCount = 1, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = Fundo };
         _secoes.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         corpo.Controls.Add(_secoes);
+        // janela encolhida para caber na tela (1366×768, DPI alto): as seções acompanham a largura. Sempre reserva o
+        // espaço da barra de rolagem (como o cálculo original): descontar só quando ela já aparece deixava as seções
+        // 17 px largas demais quando a rolagem surgia, com rolagem horizontal e o conteúdo cortado à direita
+        corpo.Resize += (_, _) =>
+        {
+            var w = Math.Max(300, corpo.Width - 36 - SystemInformation.VerticalScrollBarWidth);
+            _secoes.MinimumSize = new Size(w, 0);
+            _secoes.MaximumSize = new Size(w, 0);
+            _secoes.Width = w;
+        };
 
         Controls.Add(corpo); Controls.Add(rod); Controls.Add(cab);
         corpo.BringToFront(); // o Fill por último no encaixe: não fica por baixo do cabeçalho/rodapé
     }
 
+    bool _temAbas;
+
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);
         foreach (Control c in Controls) if (c is Panel { AutoScroll: true } p) p.AutoScrollPosition = Point.Empty; // abre mostrando o topo
+        AjustarAlturaAoConteudo();
+        // foco num botão (o ✕ do cabeçalho ou um "Configurar"/"Selecionar imagem" dentro do campo) aparecia com a moldura
+        // escura de foco: começa no primeiro campo de digitação; sem campo, em nenhum
+        if (ActiveControl is ButtonBase)
+            ActiveControl = PrimeiroCampo(_secoes);
+    }
+
+    static bool TemLista(Control raiz)
+    {
+        foreach (Control c in raiz.Controls)
+            if (c is TabelaDesign or ListBox or DataGridView or ListView || TemLista(c)) return true;
+        return false;
+    }
+
+    static Control PrimeiroCampo(Control raiz)
+    {
+        foreach (Control c in raiz.Controls)
+        {
+            if (!c.Visible || !c.Enabled) continue;
+            if (c is TextBoxBase or ComboBox or NumericUpDown or DateTimePicker) return c;
+            if (PrimeiroCampo(c) is Control dentro) return dentro;
+        }
+        return null;
+    }
+
+    /// <summary>Janela com pouco conteúdo encolhe até ele (antes sobrava meia janela vazia, ex.: Distribuir prova).
+    /// Nunca cresce; janelas com abas ficam como estão (o conteúdo muda ao trocar de aba).</summary>
+    void AjustarAlturaAoConteudo()
+    {
+        // abas ou listas/tabelas (que se enchem depois de abrir, ex.: os pilotos do envio de e-mail) ficam no tamanho pedido
+        if (_temAbas || WindowState != FormWindowState.Normal || TemLista(_secoes)) return;
+        var necessaria = _cab.Height + _corpo.Padding.Vertical + _secoes.GetPreferredSize(new Size(_secoes.Width, 0)).Height + _rod.Height + 12;
+        var sobra = ClientSize.Height - necessaria;
+        if (sobra < 80) return;
+        var nova = Math.Max(240, necessaria);
+        var antes = Height;
+        SuspendLayout();
+        ClientSize = new Size(ClientSize.Width, nova);
+        Top += (antes - Height) / 2; // continua centralizada
+        ResumeLayout(true);
+        Arredondar(); // a moldura acompanha o tamanho novo (o rodapé ficava fora do cartão)
+        Invalidate(true);
     }
 
     protected override void OnLoad(EventArgs e)
@@ -92,6 +149,7 @@ public class DialogoDesign : CartaoModal
     /// <summary>Abas segmentadas logo abaixo do cabeçalho (margem 12 18 0).</summary>
     public SegmentoDesign Abas(string[] nomes, Action<int> mudou, int sel = 0)
     {
+        _temAbas = true;
         var faixa = new Panel { Dock = DockStyle.Top, Height = 44, BackColor = Fundo };
         var seg = new SegmentoDesign { Location = new Point(18, 12), BackColor = Fundo };
         seg.Itens = nomes; seg.Selecionado = sel;
@@ -105,7 +163,7 @@ public class DialogoDesign : CartaoModal
     /// <summary>Texto cinza à esquerda do rodapé.</summary>
     public Label TextoRodape(string texto)
     {
-        var l = new Label { Text = texto, AutoSize = false, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(18, 0, 0, 0), Font = new Font("Segoe UI", 9F), ForeColor = Rotulo, BackColor = Color.White };
+        var l = new Label { Text = texto, AutoSize = false, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(18, 0, 0, 0), Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno), ForeColor = Rotulo, BackColor = Tokens.Primitivo.Branco };
         _rod.Controls.Add(l); l.BringToFront();
         return l;
     }
@@ -127,7 +185,7 @@ public class DialogoDesign : CartaoModal
 
     public TableLayoutPanel Secao(string titulo, string texto = null)
     {
-        var s = new TableLayoutPanel { MinimumSize = new Size(_larguraSecao, 0), MaximumSize = new Size(_larguraSecao, 0), Dock = DockStyle.Fill, ColumnCount = 1, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = Color.White, Padding = new Padding(16, 12, 2, 14), Margin = new Padding(0, 0, 0, 12) }; // à direita a margem de 14 da última coluna completa os 16
+        var s = new TableLayoutPanel { MinimumSize = new Size(_larguraSecao, 0), MaximumSize = new Size(_larguraSecao, 0), Dock = DockStyle.Fill, ColumnCount = 1, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = Tokens.Primitivo.Branco, Padding = new Padding(16, 12, 2, 14), Margin = new Padding(0, 0, 0, 12) }; // à direita a margem de 14 da última coluna completa os 16
         s.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         s.Paint += (_, e) =>
         {
@@ -137,9 +195,9 @@ public class DialogoDesign : CartaoModal
             e.Graphics.DrawPath(pen, path);
         };
         s.Resize += (_, _) => Forma.AplicarRaio(s, 14);
-        if (!string.IsNullOrEmpty(titulo)) s.Controls.Add(new Label { Text = titulo, AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, Margin = new Padding(0, 0, 0, 8) });
-        if (!string.IsNullOrEmpty(texto)) s.Controls.Add(new Label { Text = texto, AutoSize = true, MaximumSize = new Size(_larguraSecao - 40, 0), Font = new Font("Segoe UI", 9.6F), ForeColor = Tokens.Grafite, Margin = new Padding(0, 0, 0, 6) });
-        var grade = new TableLayoutPanel { MinimumSize = new Size(_larguraSecao - 18, 0), MaximumSize = new Size(_larguraSecao - 18, 0), Dock = DockStyle.Fill, ColumnCount = 6, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = Color.White, Margin = Padding.Empty };
+        if (!string.IsNullOrEmpty(titulo)) s.Controls.Add(new Label { Text = titulo, AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoSubtitulo, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, Margin = new Padding(0, 0, 0, 8) });
+        if (!string.IsNullOrEmpty(texto)) s.Controls.Add(new Label { Text = texto, AutoSize = true, MaximumSize = new Size(_larguraSecao - 40, 0), Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo), ForeColor = Tokens.Grafite, Margin = new Padding(0, 0, 0, 6) });
+        var grade = new TableLayoutPanel { MinimumSize = new Size(_larguraSecao - 18, 0), MaximumSize = new Size(_larguraSecao - 18, 0), Dock = DockStyle.Fill, ColumnCount = 6, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = Tokens.Primitivo.Branco, Margin = Padding.Empty };
         for (var i = 0; i < 6; i++) grade.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / 6));
         s.Controls.Add(grade);
         _secoes.Controls.Add(s);
@@ -160,7 +218,7 @@ public class DialogoDesign : CartaoModal
     public Grade SecaoTabela(string titulo, int altura)
     {
         var grade = Secao(titulo);
-        var g = new Grade { Dock = DockStyle.Fill, Height = altura, Margin = Padding.Empty, BackgroundColor = Color.White, BorderStyle = BorderStyle.None };
+        var g = new Grade { Dock = DockStyle.Fill, Height = altura, Margin = Padding.Empty, BackgroundColor = Tokens.Primitivo.Branco, BorderStyle = BorderStyle.None };
         grade.Controls.Add(g);
         grade.SetColumnSpan(g, 6);
         return g;
@@ -169,12 +227,12 @@ public class DialogoDesign : CartaoModal
     /// <summary>Campo: nome em cima e a caixa branca arredondada com o controle dentro (e um botão de ação opcional).</summary>
     public void Campo(TableLayoutPanel grade, string rotulo, Control controle, int span, params Control[] acoes)
     {
-        var cel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Height = 58, Margin = new Padding(0, 0, 14, 6), BackColor = Color.White };
+        var cel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Height = 58, Margin = new Padding(0, 0, 14, 6), BackColor = Tokens.Primitivo.Branco };
         cel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); // largura = a da coluna da grade (automática estourava)
         cel.RowStyles.Add(new RowStyle(SizeType.Absolute, 20)); cel.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
         cel.Controls.Add(new Label { Text = rotulo, Dock = DockStyle.Fill, Font = PecasDesign.FonteRotulo, ForeColor = Rotulo, Margin = Padding.Empty, TextAlign = ContentAlignment.BottomLeft }, 0, 0);
         // o conteúdo fica 2 px para dentro para não cobrir a linha da borda
-        var caixa = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Margin = new Padding(0, 2, 0, 0), Padding = controle is DateTimePicker ? new Padding(0, 2, 0, 2) : new Padding(9, 2, 6, 2) };
+        var caixa = new Panel { Dock = DockStyle.Fill, BackColor = Tokens.Primitivo.Branco, Margin = new Padding(0, 2, 0, 0), Padding = controle is DateTimePicker ? new Padding(0, 2, 0, 2) : new Padding(9, 2, 6, 2) };
         caixa.Paint += (_, e) =>
         {
             if (controle is DateTimePicker) return; // o campo de data já tem a própria borda
@@ -206,7 +264,7 @@ public class DialogoDesign : CartaoModal
             return;
         }
         // com botão: controle à esquerda e os botões à direita
-        var meio = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1 + acoes.Length, RowCount = 1, Margin = Padding.Empty, BackColor = Color.White };
+        var meio = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1 + acoes.Length, RowCount = 1, Margin = Padding.Empty, BackColor = Tokens.Primitivo.Branco };
         meio.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         // largura pequena de partida: quem manda é a coluna (senão numérico/lista estouram a caixa)
         controle.MinimumSize = Size.Empty; controle.Width = 24;
@@ -227,7 +285,7 @@ public class DialogoDesign : CartaoModal
     /// <summary>Caixa de marcar verde ocupando <paramref name="span"/> colunas.</summary>
     public void Marca(TableLayoutPanel grade, CheckBox c, int span, bool alinharComCampo = true)
     {
-        c.AutoSize = true; c.Font = PecasDesign.FonteValor; c.Anchor = AnchorStyles.Left; c.Margin = new Padding(0, alinharComCampo ? 26 : 4, 14, 6); c.BackColor = Color.White; c.Padding = new Padding(4, 0, 0, 0); c.Cursor = Cursors.Hand;
+        c.AutoSize = true; c.Font = PecasDesign.FonteValor; c.Anchor = AnchorStyles.Left; c.Margin = new Padding(0, alinharComCampo ? 26 : 4, 14, 6); c.BackColor = Tokens.Primitivo.Branco; c.Padding = new Padding(4, 0, 0, 0); c.Cursor = Cursors.Hand;
         Forma.CheckVerde(c);
         grade.Controls.Add(c);
         grade.SetColumnSpan(c, span);
@@ -236,7 +294,7 @@ public class DialogoDesign : CartaoModal
     /// <summary>Botão de opção verde ocupando <paramref name="span"/> colunas (linha só de opções: sem o espaço do rótulo).</summary>
     public void Opcao(TableLayoutPanel grade, RadioButton r, int span, bool alinharComCampo = false)
     {
-        r.AutoSize = true; r.Font = PecasDesign.FonteValor; r.Anchor = AnchorStyles.Left; r.Margin = new Padding(0, alinharComCampo ? 26 : 6, 14, 8); r.BackColor = Color.White; r.Padding = new Padding(4, 0, 0, 0); r.Cursor = Cursors.Hand;
+        r.AutoSize = true; r.Font = PecasDesign.FonteValor; r.Anchor = AnchorStyles.Left; r.Margin = new Padding(0, alinharComCampo ? 26 : 6, 14, 8); r.BackColor = Tokens.Primitivo.Branco; r.Padding = new Padding(4, 0, 0, 0); r.Cursor = Cursors.Hand;
         Forma.RadioVerde(r);
         grade.Controls.Add(r);
         grade.SetColumnSpan(r, span);
@@ -245,7 +303,7 @@ public class DialogoDesign : CartaoModal
     /// <summary>Botão pequeno dentro de uma caixa (ex.: "Pesquisar").</summary>
     public static Button AcaoCampo(string texto)
     {
-        var b = new BotaoPlano { Text = texto, AutoSize = true, Height = 26, FlatStyle = FlatStyle.Flat, BackColor = Tokens.VerdeSuave, ForeColor = Tokens.VerdeEscuro, Font = new Font("Segoe UI", 8.8F, FontStyle.Bold), Cursor = Cursors.Hand, Padding = new Padding(4, 0, 4, 0) };
+        var b = new BotaoPlano { Text = texto, AutoSize = true, Height = 26, FlatStyle = FlatStyle.Flat, BackColor = Tokens.VerdeSuave, ForeColor = Tokens.VerdeEscuro, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold), Cursor = Cursors.Hand, Padding = new Padding(4, 0, 4, 0) };
         b.FlatAppearance.BorderSize = 0;
         return b;
     }
@@ -253,7 +311,7 @@ public class DialogoDesign : CartaoModal
     /// <summary>Botão do rodapé (da direita para a esquerda: chame o principal primeiro).</summary>
     public Button BotaoRodape(string texto, bool principal, Action clique)
     {
-        var b = Botao(texto, principal ? VerdePrincipal : Tokens.BotaoSecundario, principal ? Color.White : PecasDesign.CorTexto, principal);
+        var b = Botao(texto, principal ? VerdePrincipal : Tokens.BotaoSecundario, principal ? Tokens.Primitivo.Branco : PecasDesign.CorTexto, principal);
         b.Height = 36; b.AutoSize = true; b.MinimumSize = new Size(96, 36); b.Padding = new Padding(10, 0, 10, 0); b.Margin = new Padding(8, 0, 0, 0);
         b.Click += (_, _) => clique();
         _botoes.Controls.Add(b);

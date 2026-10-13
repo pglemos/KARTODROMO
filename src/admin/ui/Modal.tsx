@@ -38,7 +38,7 @@ export const Modal = ({ children, footer, isOpen, onClose, title }: ModalProps) 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-kib-sobreposicao p-4 backdrop-blur-sm animate-fade-in"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
@@ -48,16 +48,16 @@ export const Modal = ({ children, footer, isOpen, onClose, title }: ModalProps) 
       <section
         aria-labelledby={titleId}
         aria-modal="true"
-        className="flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-elevated animate-scale-in"
+        className="flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-kib-borda bg-kib-superficie shadow-elevated animate-scale-in"
         role="dialog"
       >
-        <header className="flex items-center justify-between gap-4 border-b border-zinc-800 px-5 py-4 md:px-6">
-          <h2 className="text-base font-semibold text-zinc-50" id={titleId}>
+        <header className="flex items-center justify-between gap-4 border-b border-kib-borda px-5 py-4 md:px-6">
+          <h2 className="text-base font-semibold text-kib-texto" id={titleId}>
             {title}
           </h2>
           <button
             aria-label="Fechar modal"
-            className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+            className="rounded-lg p-2 text-kib-texto-2 transition-colors hover:bg-kib-campo hover:text-kib-texto"
             onClick={onClose}
             type="button"
           >
@@ -68,7 +68,7 @@ export const Modal = ({ children, footer, isOpen, onClose, title }: ModalProps) 
         <div className="overflow-y-auto px-5 py-5 md:px-6">{children}</div>
 
         {footer ? (
-          <footer className="flex flex-wrap justify-end gap-3 border-t border-zinc-800 px-5 py-4 md:px-6">
+          <footer className="flex flex-wrap justify-end gap-3 border-t border-kib-borda px-5 py-4 md:px-6">
             {footer}
           </footer>
         ) : null}

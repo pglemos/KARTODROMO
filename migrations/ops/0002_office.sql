@@ -45,6 +45,11 @@ CREATE TABLE dbo.Tracado (
 );
 GO
 
+-- ID estável do catálogo da Cronometragem. O Id inteiro continua sendo usado
+-- pelas baterias da Recepção; este campo faz a ponte com o UUID do catálogo.
+IF COL_LENGTH('dbo.Tracado', 'TimingTrackId') IS NULL ALTER TABLE dbo.Tracado ADD TimingTrackId NVARCHAR(80) NULL;
+GO
+
 IF OBJECT_ID('dbo.Feriado') IS NULL
 CREATE TABLE dbo.Feriado (
   Id INT IDENTITY(1,1) PRIMARY KEY,

@@ -133,6 +133,11 @@ export function updateCatalogRecord(catalog: TimingCatalog, entity: CatalogEntit
   }
   if (entity === 'tracks' && (!Number.isFinite(Number(next.lengthMeters)) || Number(next.lengthMeters) <= 0)) throw new Error('Informe a extensão do traçado em metros.');
   records[index] = next as never;
+  // grupo mudou de evento: as provas dele vão junto (ficavam apontando para o evento antigo e o cadastro inteiro
+  // deixava de abrir na próxima vez que o serviço iniciasse)
+  if (entity === 'groups' && before.eventId !== next.eventId) {
+    for (const proof of catalog.provas) if (proof.groupId === id) proof.eventId = String(next.eventId);
+  }
   return records[index] as TimingCatalog[keyof TimingCatalog][number];
 }
 

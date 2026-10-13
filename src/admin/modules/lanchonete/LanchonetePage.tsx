@@ -71,7 +71,7 @@ const emptyProdutoForm: ProdutoFormState = {
 };
 
 const inputClassName =
-  'w-full rounded-lg border border-zinc-700 bg-zinc-950 min-h-[44px] px-3 py-2 sm:min-h-0 sm:py-2.5 text-sm text-white placeholder:text-zinc-600 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20';
+  'w-full rounded-lg border border-kib-borda-forte bg-kib-fundo min-h-[44px] px-3 py-2 sm:min-h-0 sm:py-2.5 text-sm text-kib-texto placeholder:text-kib-texto-3 focus:border-kib-acao focus:outline-none focus:ring-2 focus:ring-kib-acao/20';
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
   style: 'currency',
@@ -287,8 +287,8 @@ export const LanchonetePage = () => {
           <span
             className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${
               produto.ativo
-                ? 'border-brand-800 bg-brand-950 text-brand-100'
-                : 'border-zinc-700 bg-zinc-800 text-zinc-300'
+                ? 'border-kib-acao bg-kib-sucesso-fundo text-kib-acao'
+                : 'border-kib-borda-forte bg-kib-campo text-kib-texto-2'
             }`}
           >
             {produto.ativo ? 'Sim' : 'Não'}
@@ -305,10 +305,10 @@ export const LanchonetePage = () => {
         key: 'produto',
         label: 'Produto',
         render: (row) => (
-          <div className={row.quantidade <= row.min_alerta ? 'text-red-300' : ''}>
+          <div className={row.quantidade <= row.min_alerta ? 'text-kib-perigo' : ''}>
             <span className="font-semibold">{row.produto.nome}</span>
             {row.quantidade <= row.min_alerta ? (
-              <span className="ml-2 rounded-full bg-red-950 px-2 py-1 text-xs font-bold text-red-200">
+              <span className="ml-2 rounded-full bg-kib-perigo-fundo px-2 py-1 text-xs font-bold text-kib-perigo">
                 Estoque baixo
               </span>
             ) : null}
@@ -319,7 +319,7 @@ export const LanchonetePage = () => {
         key: 'quantidade',
         label: 'Quantidade',
         render: (row) => (
-          <span className={row.quantidade <= row.min_alerta ? 'font-bold text-red-300' : ''}>
+          <span className={row.quantidade <= row.min_alerta ? 'font-bold text-kib-perigo' : ''}>
             {quantityFormatter.format(row.quantidade)}
           </span>
         ),
@@ -454,14 +454,14 @@ export const LanchonetePage = () => {
         title="Lanchonete"
       />
 
-      <div className="mt-7 flex gap-2 overflow-x-auto border-b border-zinc-800" role="tablist">
+      <div className="mt-7 flex gap-2 overflow-x-auto border-b border-kib-borda" role="tablist">
         {tabs.map((tab) => (
           <button
             aria-selected={activeTab === tab.id}
             className={`border-b-2 px-4 py-3 text-sm font-bold transition-colors ${
               activeTab === tab.id
-                ? 'border-brand-400 text-brand-200'
-                : 'border-transparent text-zinc-400 hover:text-white'
+                ? 'border-kib-acao text-kib-acao'
+                : 'border-transparent text-kib-texto-2 hover:text-kib-texto'
             }`}
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
@@ -477,9 +477,9 @@ export const LanchonetePage = () => {
         {activeTab === 'pdv' ? (
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
             <div>
-              <h2 className="text-lg font-black text-white">Produtos disponíveis</h2>
+              <h2 className="text-lg font-black text-kib-texto">Produtos disponíveis</h2>
               {loadError ? (
-                <div className="mt-4 rounded-xl border border-red-900 bg-red-950/30 p-5 text-red-200">
+                <div className="mt-4 rounded-xl border border-kib-perigo/40 bg-kib-perigo-fundo p-5 text-kib-perigo">
                   <p>{loadError}</p>
                   <Button className="mt-4" onClick={() => void loadData()} variant="ghost">
                     Tentar novamente
@@ -489,13 +489,13 @@ export const LanchonetePage = () => {
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {Array.from({ length: 6 }, (_, index) => (
                     <div
-                      className="h-28 animate-pulse rounded-xl bg-zinc-800"
+                      className="h-28 animate-pulse rounded-xl bg-kib-campo"
                       key={index}
                     />
                   ))}
                 </div>
               ) : activeProducts.length === 0 ? (
-                <div className="mt-4 rounded-xl border border-dashed border-zinc-700 p-8 text-center text-zinc-400">
+                <div className="mt-4 rounded-xl border border-dashed border-kib-borda-forte p-8 text-center text-kib-texto-2">
                   Nenhum produto ativo cadastrado.
                 </div>
               ) : (
@@ -504,21 +504,21 @@ export const LanchonetePage = () => {
                     const available = stockByProduct.get(produto.id) ?? 0;
                     return (
                       <button
-                        className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-left transition-colors hover:border-brand-700 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="rounded-xl border border-kib-borda bg-kib-superficie p-4 text-left transition-colors hover:border-kib-acao hover:bg-kib-campo disabled:cursor-not-allowed disabled:opacity-50"
                         disabled={!canWrite || available <= 0}
                         key={produto.id}
                         onClick={() => addToCart(produto)}
                         type="button"
                       >
-                        <span className="block text-xs font-bold uppercase tracking-wide text-zinc-400">
+                        <span className="block text-xs font-bold uppercase tracking-wide text-kib-texto-2">
                           {produto.categoria}
                         </span>
-                        <span className="mt-1 block font-bold text-white">{produto.nome}</span>
+                        <span className="mt-1 block font-bold text-kib-texto">{produto.nome}</span>
                         <span className="mt-3 flex items-end justify-between gap-2">
-                          <span className="text-lg font-black text-brand-300">
+                          <span className="text-lg font-black text-kib-acao">
                             {currencyFormatter.format(Number(produto.preco))}
                           </span>
-                          <span className="text-xs text-zinc-400">
+                          <span className="text-xs text-kib-texto-2">
                             {available > 0
                               ? `${quantityFormatter.format(available)} em estoque`
                               : 'Sem estoque'}
@@ -531,23 +531,23 @@ export const LanchonetePage = () => {
               )}
             </div>
 
-            <aside className="h-fit rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+            <aside className="h-fit rounded-xl border border-kib-borda bg-kib-superficie p-5">
               <div className="flex items-center gap-3">
-                <ShoppingCart className="text-brand-300" size={22} />
-                <h2 className="text-lg font-black text-white">Carrinho</h2>
+                <ShoppingCart className="text-kib-acao" size={22} />
+                <h2 className="text-lg font-black text-kib-texto">Carrinho</h2>
               </div>
               {cart.length === 0 ? (
-                <div className="py-10 text-center text-sm text-zinc-400">
+                <div className="py-10 text-center text-sm text-kib-texto-2">
                   <UtensilsCrossed className="mx-auto mb-3" size={26} />
                   Clique em um produto para adicionar.
                 </div>
               ) : (
-                <div className="mt-4 divide-y divide-zinc-800">
+                <div className="mt-4 divide-y divide-kib-borda">
                   {cart.map((item) => (
                     <div className="py-4" key={item.produto.id}>
                       <div className="flex justify-between gap-3">
-                        <span className="font-semibold text-white">{item.produto.nome}</span>
-                        <span className="text-sm font-bold text-zinc-200">
+                        <span className="font-semibold text-kib-texto">{item.produto.nome}</span>
+                        <span className="text-sm font-bold text-kib-texto">
                           {currencyFormatter.format(
                             Number(item.produto.preco) * item.quantidade,
                           )}
@@ -562,7 +562,7 @@ export const LanchonetePage = () => {
                         >
                           <Minus size={15} />
                         </Button>
-                        <span className="min-w-8 text-center font-bold text-white">
+                        <span className="min-w-8 text-center font-bold text-kib-texto">
                           {item.quantidade}
                         </span>
                         <Button
@@ -579,7 +579,7 @@ export const LanchonetePage = () => {
                 </div>
               )}
 
-              <div className="mt-5 border-t border-zinc-800 pt-5">
+              <div className="mt-5 border-t border-kib-borda pt-5">
                 <FormField htmlFor="pdv-pagamento" label="Pagamento">
                   <select
                     className={inputClassName}
@@ -595,9 +595,9 @@ export const LanchonetePage = () => {
                     ))}
                   </select>
                 </FormField>
-                <div className="mt-5 flex items-center justify-between text-white">
+                <div className="mt-5 flex items-center justify-between text-kib-texto">
                   <span className="font-bold">Total</span>
-                  <strong className="text-2xl text-brand-300">
+                  <strong className="text-2xl text-kib-acao">
                     {currencyFormatter.format(cartTotal)}
                   </strong>
                 </div>
@@ -610,7 +610,7 @@ export const LanchonetePage = () => {
                   Finalizar venda
                 </Button>
                 {!canWrite ? (
-                  <p className="mt-3 text-center text-xs text-zinc-400">
+                  <p className="mt-3 text-center text-xs text-kib-texto-2">
                     Seu perfil possui acesso somente para leitura.
                   </p>
                 ) : null}
@@ -623,8 +623,8 @@ export const LanchonetePage = () => {
           <div>
             <div className="mb-5 flex items-center justify-between gap-4">
               <div>
-                <h2 className="text-lg font-black text-white">Produtos</h2>
-                <p className="mt-1 text-sm text-zinc-400">Itens disponíveis para venda no PDV.</p>
+                <h2 className="text-lg font-black text-kib-texto">Produtos</h2>
+                <p className="mt-1 text-sm text-kib-texto-2">Itens disponíveis para venda no PDV.</p>
               </div>
               {canWrite ? <Button onClick={openCreateProduto}>Novo produto</Button> : null}
             </div>
@@ -644,8 +644,8 @@ export const LanchonetePage = () => {
         {activeTab === 'estoque' ? (
           <div>
             <div className="mb-5">
-              <h2 className="text-lg font-black text-white">Estoque</h2>
-              <p className="mt-1 text-sm text-zinc-400">
+              <h2 className="text-lg font-black text-kib-texto">Estoque</h2>
+              <p className="mt-1 text-sm text-kib-texto-2">
                 Produtos no limite mínimo aparecem destacados em vermelho.
               </p>
             </div>
@@ -728,10 +728,10 @@ export const LanchonetePage = () => {
             />
           </FormField>
           <FormField htmlFor="produto-ativo" label="Disponibilidade">
-            <label className="flex min-h-11 items-center gap-3 rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-sm text-zinc-200">
+            <label className="flex min-h-11 items-center gap-3 rounded-lg border border-kib-borda-forte bg-kib-fundo px-3 text-sm text-kib-texto">
               <input
                 checked={produtoForm.ativo}
-                className="h-4 w-4 accent-brand-500"
+                className="h-4 w-4 accent-kib-acao"
                 id="produto-ativo"
                 onChange={(event) => updateProdutoForm('ativo', event.target.checked)}
                 type="checkbox"

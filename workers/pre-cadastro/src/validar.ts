@@ -98,7 +98,11 @@ export function validar(entrada: Record<string, unknown>, hoje = new Date()): { 
 
 export type Horario = { id: number; inicio: string; nome: string; livres: number };
 export type Agenda = { atualizadoEm: string; precoCentavos: number; maxPilotos: number; prazoMin: number; antecedenciaMin: number; horarios: Horario[] };
-export type Reserva = { cliente: PreCadastro; bateriaId: number; quantidade: number; forma: 'pix' | 'cartao'; pilotos: string[] };
+/** Cada vaga é de uma pessoa: com 3 vagas, quem compra é o piloto 1 e os outros 2 vêm cadastrados aqui. */
+export type Acompanhante = { nome: string; documento: string; nascimento: string };
+export type Reserva = { cliente: PreCadastro; bateriaId: number; quantidade: number; forma: 'pix' | 'cartao'; pilotos: string[]; acompanhantes: Acompanhante[]; compradorPilota: boolean };
+/** Idade mínima para pilotar o kart de locação (requisito do kartódromo). */
+export const IDADE_MINIMA_PILOTO = 14;
 
 /** Anos completos em `hoje` para quem nasceu em AAAA-MM-DD. */
 export function idade(nascimento: string, hoje = new Date()) {
@@ -126,8 +130,29 @@ export function validarReserva(entrada: Record<string, unknown>, agenda: Agenda 
   const v = validar({ ...entrada, tipoDocumento: 'CPF' }, hoje);
   if (!v.ok) return v;
   if (idade(v.dados.nascimento, hoje) < 18) return { ok: false, erro: 'A reserva precisa ser feita por um adulto (18 anos ou mais), que é o responsável pelo pagamento.' };
-  const pilotos = (Array.isArray(entrada.pilotos) ? entrada.pilotos : []).map((p) => txt(p, 80)).filter(Boolean).slice(0, quantidade);
-  return { ok: true, dados: { cliente: v.dados, bateriaId: horario.id, quantidade, forma, pilotos } };
+  // cada vaga é de uma pessoa diferente: quem compra ocupa uma vaga se for pilotar (padrão); cada outra vaga precisa do
+  // cadastro de quem vai correr (nome, CPF, nascimento). Cadastros a mais (diminuiu a quantidade depois) são ignorados.
+  const compradorPilota = entrada.compradorPilota !== false;
+  const faltam = quantidade - (compradorPilota ? 1 : 0);
+  const brutos = ((Array.isArray(entrada.acompanhantes) ? entrada.acompanhantes : []) as Record<string, unknown>[]).slice(0, faltam);
+  if (brutos.length !== faltam) return { ok: false, erro: faltam === 1 ? (compradorPilota ? 'Cadastre o outro piloto: cada vaga é de uma pessoa diferente.' : 'Cadastre quem vai pilotar.') : compradorPilota ? `Cadastre os outros ${faltam} pilotos: cada vaga é de uma pessoa diferente.` : `Cadastre os ${faltam} pilotos: cada vaga é de uma pessoa diferente.` };
+  const documentos = new Set([digitos(v.dados.documento)]);
+  const acompanhantes: Acompanhante[] = [];
+  for (const [i, a] of brutos.entries()) {
+    const n = i + (compradorPilota ? 2 : 1);
+    const nome = txt(a?.nome, 120);
+    const documento = txt(a?.documento, 20);
+    const nascimento = txt(a?.nascimento, 10);
+    if (nome.split(' ').length < 2) return { ok: false, erro: `Informe o nome completo do piloto ${n}.` };
+    if (!cpfValido(documento)) return { ok: false, erro: `CPF inválido do piloto ${n} (${nome}).` };
+    if (documentos.has(digitos(documento))) return { ok: false, erro: `O CPF do piloto ${n} (${nome}) repete o de outro piloto. Cada vaga é de uma pessoa diferente.` };
+    documentos.add(digitos(documento));
+    if (!dataValida(nascimento, hoje)) return { ok: false, erro: `Data de nascimento inválida do piloto ${n} (${nome}).` };
+    if (idade(nascimento, hoje) < IDADE_MINIMA_PILOTO) return { ok: false, erro: `${nome} precisa ter ${IDADE_MINIMA_PILOTO} anos ou mais para pilotar.` };
+    acompanhantes.push({ nome, documento, nascimento });
+  }
+  const pilotos = [...(compradorPilota ? [v.dados.nome] : []), ...acompanhantes.map((a) => a.nome)];
+  return { ok: true, dados: { cliente: v.dados, bateriaId: horario.id, quantidade, forma, pilotos, acompanhantes, compradorPilota } };
 }
 
 /** Código curto da reserva, sem letras que se confundem (0/O, 1/I/L). */

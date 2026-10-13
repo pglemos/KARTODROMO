@@ -135,22 +135,24 @@ public class FormNovaBateria : DialogoDesign
     }
 }
 
-/// <summary>Voltas de um kart, com invalidar/validar (corte de pista, passagem dupla...).</summary>
-public class FormVoltas : Janela
+/// <summary>Voltas de um kart, com invalidar/validar (corte de pista, passagem dupla...). Visual padrão (DialogoDesign + Grade):
+/// volta inválida em vermelho e melhor volta em roxo, sempre com a Situação escrita (nunca só a cor).</summary>
+public class FormVoltas : DialogoDesign
 {
+    const string IconeLista = "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01";
+    const string CorIcone = "linear-gradient(180deg, #5EB6FF, #0A63D6)"; // design-lint-ignore: degradê do ícone (Forma.Tile lê CSS)
     readonly string _sessao, _kart;
-    readonly ListView _lista = new() { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, GridLines = true, Font = new Font("Segoe UI", 10F) };
+    readonly Grade _lista;
 
-    public FormVoltas(string sessao, string kart) : base("Voltas do kart " + kart, 460, 520, true)
+    public FormVoltas(string sessao, string kart) : base("Voltas do kart " + kart, "Duplo clique (ou o botão) invalida ou valida a volta", IconeLista, CorIcone, 620, 640)
     {
         _sessao = sessao; _kart = kart;
-        _lista.Columns.Add("Volta", 70, HorizontalAlignment.Center);
-        _lista.Columns.Add("Tempo", 120, HorizontalAlignment.Center);
-        _lista.Columns.Add("Hora", 130, HorizontalAlignment.Center);
-        _lista.Columns.Add("Situação", 100, HorizontalAlignment.Center);
-        Controls.Add(_lista);
-        Rodape(("Invalidar / Validar volta", async (_, _) => await Alternar(), false), ("Fechar", (_, _) => Close(), true));
-        _lista.DoubleClick += async (_, _) => await Alternar();
+        _lista = SecaoTabela(null, 420);
+        _lista.Colunas(new Col("lap", "Volta", TipoCol.Inteiro, 70), new Col("tempo", "Tempo", Largura: 120), new Col("hora", "Hora", Largura: 130), new Col("situacao", "Situação"));
+        _lista.CorLinha = r => r.B("invalid") ? Tokens.Claro.CorEstadoPerigoTexto : r.B("melhor") ? Tokens.Claro.CorDominioMelhorVolta : null;
+        _lista.Duplo += async _ => await Alternar();
+        BotaoRodape("Fechar", true, Close);
+        BotaoRodape("Invalidar / validar volta", false, async () => await Alternar());
         Load += async (_, _) => await Carregar();
     }
 
@@ -160,54 +162,58 @@ public class FormVoltas : Janela
         {
             var todos = await Crono.Api.Lista($"/api/sessions/{_sessao}/laps");
             var c = todos.FirstOrDefault(x => x.S("kart") == _kart);
-            Text = $"Voltas do kart {_kart}" + (c?.S("name") is { Length: > 0 } n ? " · " + n : "");
-            _lista.Items.Clear();
+            if (c?.S("name") is { Length: > 0 } n) Subtitulo.Text = n + " · duplo clique invalida ou valida a volta";
             var melhor = Crono.Arr(c, "laps").Where(l => !l.B("invalid")).Select(l => l.L("lapMs")).Min();
-            foreach (var l in Crono.Arr(c, "laps"))
+            _lista.Carregar(Crono.Arr(c, "laps").Select(l => new JsonObject
             {
-                var it = new ListViewItem([l.S("lap"), Crono.Volta(l.L("lapMs")), Crono.Hora(l.L("wallMs")), l.B("invalid") ? "INVÁLIDA" : l.L("lapMs") == melhor ? "Melhor" : ""]) { Tag = l.I("lap") };
-                if (l.B("invalid")) { it.BackColor = Color.FromArgb(230, 20, 20); it.ForeColor = Color.White; }
-                else if (l.L("lapMs") == melhor) it.ForeColor = Color.FromArgb(128, 0, 160);
-                _lista.Items.Add(it);
-            }
+                ["id"] = l.S("lap"), ["lap"] = l.L("lap"), ["tempo"] = Crono.Volta(l.L("lapMs")), ["hora"] = Crono.Hora(l.L("wallMs")),
+                ["invalid"] = l.B("invalid"), ["melhor"] = !l.B("invalid") && l.L("lapMs") == melhor,
+                ["situacao"] = l.B("invalid") ? "INVÁLIDA" : l.L("lapMs") == melhor ? "Melhor volta" : "",
+            }));
         }
         catch (ApiException e) { Msg.Erro(this, e.Message); }
     }
 
     async Task Alternar()
     {
-        if (_lista.SelectedItems.Count == 0) { Msg.Aviso(this, "Selecione a volta."); return; }
+        if (_lista.Atual is not { } volta) { Msg.Aviso(this, "Selecione a volta."); return; }
         try
         {
-            await Crono.Api.Post($"/api/sessions/{_sessao}/laps/invalidate", new JsonObject { ["kart"] = _kart, ["lap"] = (int)_lista.SelectedItems[0].Tag });
+            await Crono.Api.Post($"/api/sessions/{_sessao}/laps/invalidate", new JsonObject { ["kart"] = _kart, ["lap"] = (int)(volta.L("lap") ?? 0) });
             await Carregar();
         }
         catch (ApiException e) { Msg.Erro(this, e.Message); }
     }
 }
 
-/// <summary>Tabela transponder (numero lido pelo decoder) -> numero do kart.</summary>
-public class FormTransponders : Janela
+/// <summary>Tabela transponder (número lido pelo decoder) → número do kart, no visual padrão. A grade é editável
+/// (digita o kart na célula; linha nova no fim); transponder lido sem kart aparece em vermelho.</summary>
+public class FormTransponders : DialogoDesign
 {
-    readonly DataGridView _g = new() { Dock = DockStyle.Fill, BackgroundColor = Color.White, BorderStyle = BorderStyle.None, AllowUserToAddRows = true, RowHeadersWidth = 28, Font = new Font("Segoe UI", 10F) };
+    const string IconeSinal = "M4.9 19.1C1 15.2 1 8.8 4.9 4.9M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5M19.1 4.9C23 8.8 23 15.1 19.1 19M12 12h.01";
+    const string CorIcone = "linear-gradient(180deg, #FF7A6B, #E0342A)"; // design-lint-ignore: degradê do ícone (Forma.Tile lê CSS)
+    readonly DataGridView _g = new() { Dock = DockStyle.Fill, Height = 400, BackgroundColor = Tokens.Claro.CorSuperficiePadrao, BorderStyle = BorderStyle.None, AllowUserToAddRows = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo), Margin = Padding.Empty, GridColor = Tokens.Claro.CorSuperficieCampo, CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal };
     readonly List<string> _desconhecidos;
     Dictionary<string, string> _original = [];
 
-    public FormTransponders(List<string> desconhecidos, string titulo = "Transponders") : base(titulo, 520, 600, true)
+    public FormTransponders(List<string> desconhecidos, string titulo = "Transponders") : base(titulo, "Cada kart tem um transponder", IconeSinal, CorIcone, 640, 680)
     {
         _desconhecidos = desconhecidos;
         _g.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Transponder", Width = 200 });
         _g.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Nº do kart", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
         _g.EnableHeadersVisualStyles = false;
-        _g.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(249, 249, 249);
-        var dica = new Label
-        {
-            Dock = DockStyle.Top, Height = 46, Padding = new Padding(8, 6, 8, 0), ForeColor = Color.FromArgb(70, 70, 70),
-            Text = "Cada kart tem um transponder. Para trocar, altere o número do kart; para liberar um transponder, apague o kart. Transponders lidos recentemente sem kart aparecem em vermelho.",
-        };
-        Controls.Add(_g);
-        Controls.Add(dica);
-        Rodape(("Salvar", async (_, _) => await Salvar(), true), ("Fechar", (_, _) => Close(), false));
+        _g.ColumnHeadersDefaultCellStyle.BackColor = Tokens.Claro.CorSuperficieSuave;
+        _g.ColumnHeadersDefaultCellStyle.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold);
+        _g.ColumnHeadersHeight = 32;
+        _g.RowTemplate.Height = 28;
+        _g.RowHeadersVisible = false;                                   // sem a coluna cinza de marcador do Windows
+        _g.DefaultCellStyle.SelectionBackColor = Tokens.VerdeSelecao;   // seleção na cor do sistema (não o azul do Windows)
+        _g.DefaultCellStyle.SelectionForeColor = Tokens.Claro.CorTextoPrincipal;
+        var grade = Secao(null, "Para trocar, altere o número do kart; para liberar um transponder, apague o kart. Transponders lidos recentemente sem kart aparecem em vermelho no topo.");
+        grade.Controls.Add(_g);
+        grade.SetColumnSpan(_g, 6);
+        BotaoRodape("Salvar", true, async () => await Salvar());
+        BotaoRodape("Fechar", false, Close);
         Load += async (_, _) => await Carregar();
     }
 
@@ -221,7 +227,8 @@ public class FormTransponders : Janela
             foreach (var d in _desconhecidos.Where(d => !_original.ContainsKey(d)))
             {
                 var i = _g.Rows.Add(d, "");
-                _g.Rows[i].DefaultCellStyle.BackColor = Color.FromArgb(255, 220, 220);
+                _g.Rows[i].DefaultCellStyle.BackColor = Tokens.Claro.CorEstadoPerigoFundo;
+                _g.Rows[i].DefaultCellStyle.ForeColor = Tokens.Claro.CorEstadoPerigoTexto;
             }
             foreach (var kv in _original.OrderBy(kv => int.TryParse(kv.Value, out var n) ? n : int.MaxValue).ThenBy(kv => kv.Value)) _g.Rows.Add(kv.Key, kv.Value);
         }

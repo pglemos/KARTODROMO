@@ -1,61 +1,66 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-tema="claro">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cronometragem · Operador</title>
+<!-- cores, fontes e medidas: tokens/kib.tokens.json (tema claro = operação) — docs/design-system/05-plataformas/timing-ui.md -->
+<link rel="stylesheet" href="/tokens.css">
 <style>
-  :root { --bg:#0e1210; --panel:#161c19; --line:#26302b; --text:#e9efe9; --muted:#8b978f; --green:#1db954; --red:#e5484d; --yellow:#f5c518; --blue:#4c9aff; }
+  :root { --bg:var(--kib-cor-fundo-app); --panel:var(--kib-cor-superficie-padrao); --line:var(--kib-cor-borda-sutil); --text:var(--kib-cor-texto-principal); --muted:var(--kib-cor-texto-secundario); --green:var(--kib-cor-acao-principal); --red:var(--kib-cor-estado-perigo-solido); --yellow:var(--kib-cor-estado-aviso-texto); --blue:var(--kib-cor-estado-info-solido); --mono:var(--kib-fonte-familia-numero), Consolas, monospace; }
   * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.35 system-ui, "Segoe UI", sans-serif; }
-  header { display:flex; align-items:center; gap:16px; padding:10px 16px; border-bottom:1px solid var(--line); background:#0b0f0d; position:sticky; top:0; z-index:5; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.35 var(--kib-fonte-familia-interface), system-ui, sans-serif; }
+  header { display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px; padding:10px 16px; border-bottom:1px solid var(--line); background:var(--panel); position:sticky; top:0; z-index:5; }
   header h1 { font-size:17px; margin:0; font-weight:700; }
-  .pill { padding:4px 10px; border-radius:999px; font-weight:700; font-size:13px; }
-  .ok { background:#12351f; color:#5ee08d; } .bad { background:#3b1618; color:#ff8a8d; } .warn { background:#3a3210; color:#ffd84d; }
+  .pill { padding:4px 10px; border-radius:var(--kib-raio-pilula); font-weight:700; font-size:13px; }
+  .ok { background:var(--kib-cor-estado-sucesso-fundo); color:var(--kib-cor-estado-sucesso-texto); } .bad { background:var(--kib-cor-estado-perigo-fundo); color:var(--kib-cor-estado-perigo-texto); } .warn { background:var(--kib-cor-estado-aviso-fundo); color:var(--kib-cor-estado-aviso-texto); }
   header .spacer { flex:1; }
-  header a { color:var(--blue); text-decoration:none; font-weight:600; }
-  header nav { display:flex; gap:14px; align-items:center; }
-  main { display:grid; grid-template-columns: 250px 1fr 320px; gap:12px; padding:12px; min-height:calc(100vh - 50px); }
-  @media (max-width: 1200px) { main { grid-template-columns: 1fr; } }
-  section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; min-width:0; }
+  header a { color:var(--kib-cor-texto-link); text-decoration:none; font-weight:600; }
+  header nav { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; }
+  main { display:grid; grid-template-columns: 250px minmax(0,1fr) 320px; gap:12px; padding:12px; min-height:calc(100vh - 50px); }
+  @media (max-width: 1200px) { main { grid-template-columns: minmax(0,1fr); } }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:var(--kib-raio-cartao); padding:12px; min-width:0; box-shadow:var(--kib-elevacao-1); }
   h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0 0 10px; }
-  button { font:inherit; font-weight:700; border:0; border-radius:8px; padding:10px 14px; cursor:pointer; background:#2a3530; color:var(--text); }
-  button:hover { filter:brightness(1.15); } button:disabled { opacity:.35; cursor:not-allowed; }
-  .b-green { background:var(--green); color:#04160a; } .b-red { background:var(--red); color:#fff; } .b-check { background:#fff; color:#000; } .b-blue { background:var(--blue); color:#021024; }
-  input, select, textarea { font:inherit; background:#0e1411; color:var(--text); border:1px solid var(--line); border-radius:7px; padding:8px 10px; width:100%; }
+  button { font:inherit; font-weight:700; border:0; border-radius:var(--kib-raio-botao); padding:10px 14px; cursor:pointer; background:var(--kib-cor-acao-secundaria); color:var(--kib-cor-acao-sobre-secundaria); transition:filter var(--kib-movimento-duracao-rapido); }
+  button:hover { filter:brightness(.94); } button:disabled { opacity:.45; cursor:not-allowed; }
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, .list .item:focus-visible { outline:var(--kib-foco-largura) solid var(--kib-cor-borda-foco); outline-offset:var(--kib-foco-deslocamento); }
+  .b-green { background:var(--green); color:var(--kib-cor-acao-sobre-principal); } .b-red { background:var(--red); color:var(--kib-cor-acao-sobre-principal); } .b-check { background:var(--panel); color:var(--text); box-shadow:inset 0 0 0 1px var(--kib-cor-borda-forte); } .b-blue { background:var(--blue); color:var(--kib-cor-acao-sobre-principal); }
+  input, select, textarea { font:inherit; background:var(--panel); color:var(--text); border:1px solid var(--kib-cor-borda-campo); border-radius:var(--kib-raio-campo); padding:8px 10px; width:100%; }
   label { display:block; font-size:12px; color:var(--muted); margin:8px 0 4px; }
-  .list .item { padding:8px 10px; border-radius:8px; cursor:pointer; border:1px solid transparent; margin-bottom:4px; }
-  .list .item:hover { background:#1c2420; } .list .item.sel { border-color:var(--green); background:#15261c; }
+  .list .item { padding:8px 10px; border-radius:var(--kib-raio-botao); cursor:pointer; border:1px solid transparent; margin-bottom:4px; }
+  .list .item:hover { background:var(--kib-cor-superficie-suave); } .list .item.sel { border-color:var(--green); background:var(--kib-cor-selecao-fundo); }
   .list .item small { display:block; color:var(--muted); }
-  .st { font-size:11px; font-weight:800; padding:2px 7px; border-radius:6px; text-transform:uppercase; }
-  .st-preparando { background:#243040; color:#8fc1ff; } .st-em_andamento { background:#12351f; color:#5ee08d; }
-  .st-bandeira_final { background:#fff; color:#000; } .st-encerrada { background:#2a2f2c; color:#aab5ae; } .st-cancelada { background:#3b1618; color:#ff8a8d; }
+  .st { font-size:11px; font-weight:800; padding:2px 7px; border-radius:var(--kib-raio-chip); text-transform:uppercase; }
+  .st-preparando { background:var(--kib-cor-estado-info-fundo); color:var(--kib-cor-estado-info-texto); } .st-em_andamento { background:var(--kib-cor-estado-sucesso-fundo); color:var(--kib-cor-estado-sucesso-texto); }
+  .st-bandeira_final { background:var(--panel); color:var(--text); box-shadow:inset 0 0 0 1px var(--kib-cor-borda-forte); } .st-encerrada { background:var(--kib-cor-superficie-campo); color:var(--muted); } .st-cancelada { background:var(--kib-cor-estado-perigo-fundo); color:var(--kib-cor-estado-perigo-texto); }
   .top { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
   .top .name { font-size:24px; font-weight:800; }
-  .timer { font:800 44px/1 ui-monospace, Consolas, monospace; letter-spacing:.02em; margin-left:auto; }
+  .timer { font:800 44px/1 var(--mono); letter-spacing:.02em; margin-left:auto; }
   .controls { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; }
   .tabs { display:flex; gap:6px; flex-wrap:wrap; border-bottom:1px solid var(--line); margin:12px 0; }
   .tabs button { background:transparent; border-radius:7px 7px 0 0; color:var(--muted); padding:8px 12px; }
-  .tabs button.active { background:#1c2922; color:var(--text); box-shadow:inset 0 -2px var(--green); }
+  .tabs button.active { background:var(--kib-cor-selecao-fundo); color:var(--text); box-shadow:inset 0 -2px var(--green); }
   .tab-content { min-height:160px; overflow:auto; }
   table { width:100%; border-collapse:collapse; }
   th { text-align:left; font-size:12px; color:var(--muted); font-weight:600; padding:6px 8px; border-bottom:1px solid var(--line); }
-  td { padding:7px 8px; border-bottom:1px solid #1d2622; font-variant-numeric: tabular-nums; }
-  td.num { font:700 16px ui-monospace, Consolas, monospace; }
+  td { padding:7px 8px; border-bottom:1px solid var(--line); font-variant-numeric: tabular-nums; }
+  td.num { font:700 16px var(--mono); }
   .pos { font-weight:800; width:40px; } .kart { font-weight:800; color:var(--yellow); width:60px; }
   tr.fin td { opacity:.75; } tr.fin .pos::after { content:" 🏁"; }
-  .best { color:#c77dff; font-weight:800; }
+  /* melhor volta: roxo E marcador ■ (cor sozinha não basta) */
+  .best { color:var(--kib-cor-dominio-melhor-volta); font-weight:800; } .best::before { content:"■ "; font-size:.7em; vertical-align:.15em; }
   .grid-row { display:grid; grid-template-columns: 70px 1fr 36px; gap:6px; margin-bottom:6px; }
-  .feed { font:13px ui-monospace, Consolas, monospace; max-height:60vh; overflow:auto; }
-  .feed div { padding:4px 2px; border-bottom:1px solid #1d2622; display:flex; gap:8px; align-items:center; }
-  .feed .unk { color:#ff8a8d; } .feed .lap { margin-left:auto; font-weight:700; }
+  .feed { font:13px var(--mono); max-height:60vh; overflow:auto; }
+  .feed div { padding:4px 2px; border-bottom:1px solid var(--line); display:flex; gap:8px; align-items:center; }
+  .feed .unk { color:var(--kib-cor-estado-perigo-texto); } .feed .lap { margin-left:auto; font-weight:700; }
   .muted { color:var(--muted); } .row { display:flex; gap:8px; } .row > * { flex:1; }
-  dialog { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:12px; width:min(520px, 94vw); }
-  dialog::backdrop { background:rgba(0,0,0,.6); }
+  dialog { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:var(--kib-raio-janela); width:min(520px, 94vw); box-shadow:var(--kib-elevacao-3); }
+  dialog::backdrop { background:var(--kib-cor-sobreposicao); }
   summary { cursor:pointer; margin-bottom:8px; }
   .hint { font-size:12px; color:var(--muted); margin-top:6px; }
-  .laps span { display:inline-block; margin:3px; padding:4px 8px; border-radius:6px; background:#1d2622; cursor:pointer; font:13px ui-monospace, Consolas, monospace; }
-  .laps span.inv { text-decoration:line-through; color:var(--red); }
+  .laps span { display:inline-block; margin:3px; padding:4px 8px; border-radius:var(--kib-raio-chip); background:var(--kib-cor-superficie-campo); cursor:pointer; font:13px var(--mono); }
+  .laps span.inv { text-decoration:line-through; color:var(--kib-cor-estado-perigo-texto); }
+  @media (prefers-reduced-motion: reduce) { button { transition:none; } }
 </style>
 </head>
 <body>
@@ -200,7 +205,7 @@ let state = null, sel = null, view = null, gridDirty = false, activeResultsTab =
 const fmt = (ms) => { if (ms == null) return '--'; const s = ms/1000, m = Math.floor(s/60); const r = (s - m*60).toFixed(3); return m ? `${m}:${r.padStart(6,'0')}` : r; };
 const clockFmt = (ms) => { if (ms == null) return '--:--'; const t = Math.max(0, Math.ceil(ms/1000)); return `${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`; };
 const hhmm = (t) => t ? new Date(t).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '';
-const TYPES = { treino:'Treino', classificacao:'Tomada de tempo', corrida:'Corrida' };
+const TYPES = { treino:'Treino', classificacao:'Tomada de tempo', corrida:'Corrida', equalizacao:'Equalização' };
 const STATES = { preparando:'Preparando', em_andamento:'Em andamento', bandeira_final:'Quadriculada', encerrada:'Encerrada', cancelada:'Cancelada' };
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
@@ -230,7 +235,7 @@ async function render() {
   $('list').innerHTML = state.sessions.map(s => `
     <div class="item ${s.id === sel ? 'sel' : ''}" onclick="pick('${s.id}')">
       <span class="st st-${s.state}">${STATES[s.state]}</span> <b>${esc(s.name)}</b>
-      <small>${TYPES[s.type]} · ${s.competitors} pilotos · ${hhmm(s.startedAt || s.createdAt)}</small>
+      <small>${[TYPES[s.type], `${s.competitors} ${s.competitors === 1 ? 'piloto' : 'pilotos'}`, hhmm(s.startedAt || s.createdAt)].filter(Boolean).join(' · ')}</small>
     </div>`).join('') || '<div class="muted">—</div>';
 
   $('feed').innerHTML = state.recentPassings.map(p => {

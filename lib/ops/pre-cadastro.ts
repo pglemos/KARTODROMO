@@ -78,6 +78,27 @@ export async function gravarPreCadastro(p: PreCadastro, log: Log): Promise<numbe
   return id;
 }
 
+/**
+ * Outro piloto de uma reserva online (o comprador informou nome, CPF e nascimento). Quem já tem cadastro pelo CPF é
+ * reaproveitado sem mexer nos dados (só preenche o nascimento se faltar); quem não tem ganha um cadastro novo. O termo e o
+ * aceite de dados (LGPD) a própria pessoa faz no totem — por isso não marcamos LGPD aqui.
+ */
+export async function gravarAcompanhante(a: { nome: string; documento: string; nascimento: string; chave?: string }, log: Log): Promise<number> {
+  const doc = a.chave || onlyDigits(a.documento);
+  const existente = await one<{ id: number; nascimento: string | null }>(
+    `SELECT TOP 1 Id id, CONVERT(varchar(10), Nascimento, 126) nascimento FROM dbo.Cliente
+      WHERE (DocumentoNum = @d OR Documento = @d) AND ResponsavelId IS NULL ORDER BY AtualizadoEm DESC`,
+    { d: doc },
+  );
+  if (existente) {
+    if (!existente.nascimento && a.nascimento) await updateCliente(existente.id, { nascimento: a.nascimento }, true);
+    return existente.id;
+  }
+  const id = await insertCliente({ nome: a.nome, tipoDocumento: 'CPF', documento: a.documento, nascimento: a.nascimento }, 'site');
+  log(`pré-cadastro: piloto ${id} cadastrado pela reserva online de outra pessoa`);
+  return id;
+}
+
 /** Busca os pendentes no site, grava e apaga lá. Chamado a cada 30 s. */
 export async function sincronizarPreCadastros(log: Log) {
   if (!preCadastroLigado()) return 0;

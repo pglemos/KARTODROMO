@@ -6,12 +6,14 @@ import {
   clearCrossings,
   closeSession,
   computeStandings,
+  crossingIdsFromKartAtOrAfter,
   createSession,
   elapsedMs,
   formatLap,
   startSession,
   mesmoPrograma,
   copiarCompetidores,
+  propagarTrocaKart,
   setCompetitors,
   swapKart,
   includeManualPassing,
@@ -29,6 +31,7 @@ import {
   restartSession,
   aguardandoLargada,
   voltaAtualDoKart,
+  setManualPosition,
 } from '../lib/timing/race-engine';
 import { createCatalogRecord, deleteCatalogRecord, distributeProof, duplicateEvent, emptyCatalog, normalizeCatalog } from '../lib/timing/catalog';
 
@@ -67,6 +70,80 @@ function race(type: 'treino' | 'classificacao' | 'corrida' = 'treino', durationM
 }
 
 describe('race-engine', () => {
+  it('mantém na corrida preparada a troca feita durante a tomada, sem alterar corrida iniciada', () => {
+    const tomada = createSession({ id: 'tomada', name: 'Bateria · TOMADA', type: 'classificacao', durationMin: 5, now: 1, competitors: [{ kart: '4', name: 'Ana', customerId: '10' }] });
+    const corrida = createSession({ id: 'corrida', name: 'Bateria · CORRIDA', type: 'corrida', durationMin: 20, now: 1, competitors: [{ kart: '4', name: 'Ana', customerId: '10' }] });
+    tomada.programaId = corrida.programaId = 'agenda-1';
+    startSession(tomada, 2);
+    swapKart(tomada, { fromKart: '4', toKart: '8', customerId: '10' });
+    expect(propagarTrocaKart(tomada, corrida, '4', '8', '10')).toBe(true);
+    expect(corrida.competitors[0].kart).toBe('8');
+    startSession(corrida, 3);
+    expect(propagarTrocaKart(tomada, corrida, '8', '9', '10')).toBe(false);
+    expect(corrida.competitors[0].kart).toBe('8');
+  });
+  it('mostra a volta do líder em cada passagem e recalcula após excluir uma volta', async () => {
+    const { progressoNasPassagens } = await import('../lib/timing/race-engine');
+    expect(progressoNasPassagens).toBeTypeOf('function');
+
+    const s = race('corrida', 20);
+    const passagem = (id: string, kart: string, wallMs: number) =>
+      applyPassing(s, { id, kart, decoderTimeMs: wallMs, wallMs });
+
+    passagem('lead-start', '4', 10_000);
+    passagem('backmarker-start', '5', 12_000);
+    passagem('lead-lap-1', '4', 70_000);
+    passagem('lead-lap-2', '4', 130_000);
+    passagem('backmarker-lap-1', '5', 140_000);
+    passagem('lead-lap-3', '4', 190_000);
+    passagem('backmarker-lap-2', '5', 200_000);
+
+    const passagemRetardatario = s.competitors.find((c) => c.kart === '5')!.crossings.find((x) => x.id === 'backmarker-lap-2')!;
+    expect(progressoNasPassagens(s).get(passagemRetardatario)).toEqual({ voltas: 2, lider: 3 });
+
+    setCrossingDeleted(s, 'lead-lap-3', true);
+    expect(progressoNasPassagens(s).get(passagemRetardatario)).toEqual({ voltas: 2, lider: 2 });
+  });
+
+  it('limita passagens posteriores ao kart selecionado', () => {
+    const s = race('corrida', 20);
+    const passagem = (id: string, kart: string, wallMs: number) =>
+      applyPassing(s, { id, kart, decoderTimeMs: wallMs - 1_000, wallMs });
+
+    passagem('a1', '4', 2_000);
+    passagem('b1', '5', 3_000);
+    passagem('a2', '4', 62_000);
+    passagem('b2', '5', 63_000);
+    passagem('a3', '4', 122_000);
+    passagem('b3', '5', 123_000);
+
+    const idsDoKartSelecionado = crossingIdsFromKartAtOrAfter(s, 'a2');
+    expect(idsDoKartSelecionado).toEqual(['a2', 'a3']);
+    for (const id of idsDoKartSelecionado) setCrossingDeleted(s, id, true);
+
+    expect(computeStandings(s).find((row) => row.kart === '4')?.laps).toBe(0);
+    expect(computeStandings(s).find((row) => row.kart === '5')?.laps).toBe(2);
+  });
+
+  it('mantém a posição manual do kart mesmo após novas atualizações da classificação', () => {
+    const s = createSession({
+      id: 'manual-position', name: 'Corrida', type: 'corrida', durationMin: 20, now: 0,
+      competitors: [{ kart: '4', name: 'Ana' }, { kart: '5', name: 'Bia' }, { kart: '6', name: 'Caio' }],
+    });
+    startSession(s, 1_000);
+
+    setManualPosition(s, '4', 3);
+    expect(computeStandings(s).map((row) => row.kart)).toEqual(['5', '6', '4']);
+    expect(computeStandings(s)[2]).toMatchObject({ position: 3, kart: '4', manualPosition: 3 });
+
+    applyPassing(s, { kart: '4', decoderTimeMs: 0, wallMs: 2_000 });
+    applyPassing(s, { kart: '4', decoderTimeMs: 60_000, wallMs: 62_000 });
+    expect(computeStandings(s).map((row) => row.kart)).toEqual(['5', '6', '4']);
+
+    setManualPosition(s, '4', null);
+    expect(computeStandings(s)[0].kart).toBe('4');
+  });
+
   it('salva duração e voltas ao editar uma corrida encerrada sem reabri-la', () => {
     const s = race('corrida', 20);
     closeSession(s, 80_000);
@@ -496,6 +573,27 @@ describe('race-engine', () => {
       expect(volta(s, '12', 291)).toBe('counted');
       expect(pilotos(s).Ana).toMatchObject({ kart: '12', laps: 4 });
       expect(s.competitors.find((c) => c.kart === '8')).toBeUndefined();
+    });
+
+    it('Tabajara: "não manter" ignora voltas e tempos do kart anterior; vale só o kart novo (áudio 06/10)', () => {
+      const montar = () => {
+        const s = race('corrida', 20);
+        setCompetitors(s, [{ kart: '8', name: 'Ana', customerId: '10' }]);
+        volta(s, '8', 10); volta(s, '8', 60); volta(s, '8', 112); // 2 voltas no kart 8, melhor 50 s
+        return s;
+      };
+      const tabajara = montar();
+      const troca = swapKart(tabajara, { fromKart: '8', toKart: '12', customerId: '10', manterVoltas: false });
+      expect(troca).toMatchObject({ de: '8', para: '12', voltasLevadas: 0, voltasIgnoradas: 2 });
+      expect(pilotos(tabajara).Ana).toMatchObject({ kart: '12', laps: 0 });
+      volta(tabajara, '12', 200); volta(tabajara, '12', 255); volta(tabajara, '12', 311);
+      expect(pilotos(tabajara).Ana).toEqual({ kart: '12', laps: 2, best: 55_000 }); // só as voltas do 12 (o 50 s do 8 sumiu)
+      expect(tabajara.competitors[0].crossings.filter((x) => x.deleted)).toHaveLength(3); // continuam no diário, restauráveis
+
+      const normal = montar();
+      swapKart(normal, { fromKart: '8', toKart: '12', customerId: '10' }); // padrão: leva as voltas
+      volta(normal, '12', 200); volta(normal, '12', 255);
+      expect(pilotos(normal).Ana).toMatchObject({ kart: '12', laps: 4, best: 50_000 });
     });
 
     it('junta as passagens que o kart novo já tinha feito sem piloto', () => {

@@ -33,6 +33,7 @@ sealed class PainelLed : IDisposable
     public int TotalPilotos { get; private set; } = 0;
     public bool AutoAvanco { get; set; } = false;
     public int IntervaloAutoAvancoSegundos { get; set; } = 5;
+    public event Action<int> PaginaAlterada;
 
     public string SessaoExibidaNome { get; private set; } = "";
     public string SessaoExibidaId { get; private set; } = "";
@@ -40,7 +41,7 @@ sealed class PainelLed : IDisposable
     public JsonObject SessaoClassificacao => _sessaoClassificacao;
 
     SerialPort _serial;
-    string _sessaoId, _assinatura;
+    string _sessaoId;
     int _paginaAnterior = -1;
     JsonObject _sessaoClassificacao;
     DateTime _ultimoEnvio = DateTime.MinValue, _proximaTentativa = DateTime.MinValue, _ultimoAvanco = DateTime.MinValue;
@@ -70,11 +71,23 @@ sealed class PainelLed : IDisposable
 
     public void DefinirPagina(int pagina)
     {
+        DefinirPaginaInterno(pagina, true);
+    }
+
+    /// <summary>Aplica uma página recebida do outro computador sem publicá-la de volta.</summary>
+    public void DefinirPaginaRemota(int pagina)
+    {
+        DefinirPaginaInterno(pagina, false);
+    }
+
+    void DefinirPaginaInterno(int pagina, bool notificar)
+    {
         var clamped = Math.Clamp(pagina, 0, Math.Max(0, TotalPaginas - 1));
         if (clamped != Pagina)
         {
             Pagina = clamped;
             _paginaAnterior = -1; // força reenvio com $I na serial
+            if (notificar) PaginaAlterada?.Invoke(Pagina);
         }
     }
 
@@ -108,7 +121,7 @@ sealed class PainelLed : IDisposable
             _serial.Open();
             var agora = DateTime.Now;
             Escrever($"$I,\"{agora:HH:mm:ss.fff}\",\"{agora:ddMMyy}\"\r\n");
-            _sessaoId = null; _assinatura = null; _paginaAnterior = -1;
+            _sessaoId = null; _paginaAnterior = -1; _enviadas = new string[Linhas];
             Ok = true; Situacao = $"{Porta} conectado";
             return true;
         }
@@ -200,18 +213,18 @@ sealed class PainelLed : IDisposable
             // Auto-avanço de páginas a cada N segundos se ativado
             if (AutoAvanco && TotalPaginas > 1 && DateTime.Now - _ultimoAvanco >= TimeSpan.FromSeconds(IntervaloAutoAvancoSegundos))
             {
-                Pagina = (Pagina + 1) % TotalPaginas;
+                DefinirPagina((Pagina + 1) % TotalPaginas);
                 _ultimoAvanco = DateTime.Now;
             }
 
-            if (Pagina >= TotalPaginas) Pagina = Math.Max(0, TotalPaginas - 1);
+            if (Pagina >= TotalPaginas) DefinirPagina(Math.Max(0, TotalPaginas - 1));
 
             if (!Ativo) { Situacao = "desligado"; Ok = false; return; }
             if (!Abrir()) return;
 
             // Se mudou a sessão ou mudou a página selecionada, manda $I para limpar o painel físico de LED
             var mudouSessao = id != _sessaoId;
-            if (mudouSessao) Pagina = 0;
+            if (mudouSessao) DefinirPagina(0);
             var mudouPagina = Pagina != _paginaAnterior;
             if (mudouSessao || mudouPagina)
             {
@@ -219,15 +232,13 @@ sealed class PainelLed : IDisposable
                 Escrever($"$I,\"{agora:HH:mm:ss.fff}\",\"{agora:ddMMyy}\"");
                 _sessaoId = id;
                 _paginaAnterior = Pagina;
-                _assinatura = null;
+
+                _enviadas = new string[Linhas]; // painel limpo: tudo precisa ir de novo
             }
 
-            var pacote = Montar(sessaoExibir, Pagina, Linhas, DateTime.Now, out var assinatura);
+            var pacote = MontarAlteracoes(sessaoExibir, DateTime.Now);
             if (pacote.Length == 0) return;
-            if (assinatura == _assinatura && DateTime.Now - _ultimoEnvio < TimeSpan.FromSeconds(5)) return;
-
             Escrever(pacote);
-            _assinatura = assinatura;
             _ultimoEnvio = DateTime.Now;
             Ok = true;
             Situacao = $"{Porta} ok";
@@ -241,11 +252,63 @@ sealed class PainelLed : IDisposable
         }
     }
 
+    // A COM3 roda a 9600 baud (~960 bytes/s). O quadro inteiro (10 posições × $SR/$J/$G + $F) tem ~1.150 bytes: reenviar
+    // tudo a cada passagem levava mais de 1 s só no cabo e o piloto via o tempo atrasado. Agora vai só a posição que
+    // mudou (~110 bytes, ~0,1 s), mais 1 posição de reforço por segundo em rodízio (se o painel perder um pacote,
+    // ele se corrige em até 10 s). O formato de cada comando é o mesmo do LapTime.
+    string[] _enviadas = [];
+    DateTime _ultimoReforco = DateTime.MinValue, _ultimoRodape = DateTime.MinValue;
+    int _reforco;
+
+    internal string MontarAlteracoes(JsonObject sessao, DateTime agora)
+    {
+        var (posicoes, rodape) = MontarQuadro(sessao, Pagina, Linhas, agora);
+        if (posicoes.Count == 0) return "";
+        if (_enviadas.Length != Linhas) _enviadas = new string[Linhas];
+        var sb = new StringBuilder();
+        var mudou = false;
+        for (var i = 0; i < posicoes.Count && i < Linhas; i++)
+        {
+            if (posicoes[i] == _enviadas[i]) continue;
+            sb.Append(posicoes[i]);
+            _enviadas[i] = posicoes[i];
+            mudou = true;
+        }
+        if (mudou) _ultimoReforco = agora; // o reforço só entra depois de 1 s parado
+        if (!mudou && agora - _ultimoReforco >= TimeSpan.FromSeconds(1))
+        {
+            var i = _reforco++ % posicoes.Count;
+            sb.Append(posicoes[i]);
+            _ultimoReforco = agora;
+        }
+        // relógio/voltas restantes: junto de cada mudança, e a cada 5 s mesmo parado (como antes)
+        if (mudou || agora - _ultimoRodape >= TimeSpan.FromSeconds(5))
+        {
+            sb.Append(rodape);
+            _ultimoRodape = agora;
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>Uma linha de texto por posição da página ($SR/$J/$G na corrida, $SP/$J/$H no treino) e o rodapé $F.
+    /// Público para teste.</summary>
+    public static (List<string> posicoes, string rodape) MontarQuadro(JsonObject sessao, int pagina, int linhas, DateTime agora)
+    {
+        var posicoes = new List<string>();
+        if (sessao == null) return (posicoes, "");
+        Montar(sessao, pagina, linhas, agora, out _, posicoes, out var rodape);
+        return (posicoes, rodape);
+    }
+
     static string Hora(long? ms) { var t = TimeSpan.FromMilliseconds(Math.Max(0, ms ?? 0)); return $"{(int)t.TotalHours % 24:00}:{t.Minutes:00}:{t.Seconds:00}.{t.Milliseconds:000}"; }
 
     /// <summary>Monta o quadro do LapTime (protocolo 1) com suporte a paginação. Público para teste.</summary>
-    public static string Montar(JsonObject sessao, int pagina, int linhas, DateTime agora, out string assinatura)
+    public static string Montar(JsonObject sessao, int pagina, int linhas, DateTime agora, out string assinatura) =>
+        Montar(sessao, pagina, linhas, agora, out assinatura, null, out _);
+
+    static string Montar(JsonObject sessao, int pagina, int linhas, DateTime agora, out string assinatura, List<string> porPosicao, out string rodape)
     {
+        rodape = "";
         if (sessao == null) { assinatura = ""; return ""; }
         var corrida = sessao.S("type") == "corrida";
 
@@ -282,26 +345,30 @@ sealed class PainelLed : IDisposable
             var melhor = r["bestLapMs"] is null ? null : Hora(r.L("bestLapMs"));
             var total = r["totalMs"] is null ? "00:00:00.000" : Hora(r.L("totalMs"));
 
+            string linha;
             if (corrida)
             {
-                sb.Append($"$SR,{pos},\"{kart}\",{voltas},\"{ultima}\"\r\n");
-                sb.Append($"$J,\"{kart}\",\"{ultima}\",\"{total}\"\r\n");
-                sb.Append($"$G,{pos},\"{kart}\",{voltas},\"{ultima}\"\r\n");
+                linha = $"$SR,{pos},\"{kart}\",{voltas},\"{ultima}\"\r\n"
+                      + $"$J,\"{kart}\",\"{ultima}\",\"{total}\"\r\n"
+                      + $"$G,{pos},\"{kart}\",{voltas},\"{ultima}\"\r\n";
             }
             else
             {
                 var tempo = melhor ?? ultima;
-                sb.Append($"$SP,{pos},\"{kart}\",{voltas},\"{tempo}\"\r\n");
-                sb.Append($"$J,\"{kart}\",\"{tempo}\",\"{total}\"\r\n");
-                sb.Append($"$H,{pos},\"{kart}\",{voltas},\"{ultima}\"\r\n");
+                linha = $"$SP,{pos},\"{kart}\",{voltas},\"{tempo}\"\r\n"
+                      + $"$J,\"{kart}\",\"{tempo}\",\"{total}\"\r\n"
+                      + $"$H,{pos},\"{kart}\",{voltas},\"{ultima}\"\r\n";
             }
+            sb.Append(linha);
+            porPosicao?.Add(linha);
         }
 
         assinatura = sb.ToString();
         if (sb.Length == 0) return "";
         var lider = standings.FirstOrDefault()?.I("laps") ?? 0;
         var voltasRestantes = sessao["maxLaps"] is JsonValue && sessao.I("maxLaps") > 0 ? Math.Max(0, sessao.I("maxLaps") - lider) : 0;
-        sb.Append($"$F,{voltasRestantes},\"{Hora(sessao.L("remainingMs"))}\",\"{agora:HH:mm:ss.fff}\",\"{Hora(sessao.L("elapsedMs"))}\"\r\n");
+        rodape = $"$F,{voltasRestantes},\"{Hora(sessao.L("remainingMs"))}\",\"{agora:HH:mm:ss.fff}\",\"{Hora(sessao.L("elapsedMs"))}\"\r\n";
+        sb.Append(rodape);
         return sb.ToString();
     }
 

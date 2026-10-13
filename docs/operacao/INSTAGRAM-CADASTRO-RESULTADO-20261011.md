@@ -1,0 +1,15 @@
+# Instagram obrigatório e resultado impresso — 11/10/2026
+
+Versão **1.0.61** do Autoatendimento e da Recepção instalada nos totens 1/2 e nas recepções 1/2. Manifestos e ZIPs publicados no SRVKART. A recepção 1 manteve sua sessão aberta para preservar o atendimento: deve reabrir o programa para usar o campo novo e o relatório novo. A recepção 2 estava com o aplicativo Recepção fechado; seu Autoatendimento foi atualizado e reaberto.
+
+O cadastro novo e a alteração de cliente exigem Instagram válido, além de peso e e-mail. São aceitos `@usuário`, usuário sem `@` ou link do perfil; o valor gravado é sempre `@usuário` em minúsculas, com até 30 caracteres no identificador. A validação confere formato, não a existência da conta. O menor informa seu próprio Instagram; não se copia automaticamente o perfil do responsável.
+
+Migration aplicada antes do código: `migrations/ops/0010_cliente_instagram.sql`, coluna `dbo.Cliente.Instagram nvarchar(31) NULL`. Cadastros históricos e pré-cadastros importados podem permanecer incompletos até a conferência presencial. Não houve preenchimento com perfis fictícios.
+
+Na Recepção, tanto o menu de resultados por período quanto “Imprimir resultado oficial” abrem `/relatorio/crono/:id` com a sessão autenticada. O servidor reaproveita o modelo oficial do cronômetro e acrescenta o Instagram abaixo do nome. Os dados são consultados por `customerId`; na classificação, o kart identifica o competidor atual que fornece esse ID. Não há associação por nome. A posição, voltas, tempos e critérios de classificação permanecem intactos. Resultados antigos sem cadastro/perfil mostram “Instagram: Não informado”. O serviço da cronometragem e o telão não foram modificados.
+
+Verificação: 90 testes TypeScript passaram; suíte C# passou; TypeScript conferido; os dois aplicativos compilaram. Autoteste visual do totem em 1366×768/1920×1080 e escalas geométricas 125%/150%; cadastro da Recepção fotografado e conferido. Resultado de TESTE CODEX renderizado sem erros JavaScript e exportado em A4/cupom; o texto dos dois PDFs confirmou os dois perfis nos respectivos pilotos. Nenhuma impressão física de teste foi enviada à fila.
+
+Em produção, cadastro sem Instagram/Instagram inválido retornou 400 na recepção e no totem; link de perfil foi gravado normalizado; tentativa de apagar Instagram foi rejeitada; menor preservou seu perfil próprio. Os cadastros TESTE CODEX foram removidos. HTML e dados de uma sessão encerrada foram consultados por leitura e confirmaram o acréscimo do Instagram. `/healthz` e SQL responderam após a publicação.
+
+A implantação teve uma etapa temporária que já armazenava o Instagram, ainda sem obrigatoriedade no servidor, para permitir a atualização das telas. A etapa final exige o campo. O processo validado usa `services/ops-server-instagram.cjs`; a tarefa `Kartodromo Servidor` conserva sua ação original para usar `services/ops-server.ts` na próxima inicialização. Backups dos fontes anteriores têm sufixo `.antes-instagram-20261011`. Roteiros, evidências e PDFs de TESTE CODEX ficam em `C:\KARTODROMO\instagram-20261011`, fora do repositório.

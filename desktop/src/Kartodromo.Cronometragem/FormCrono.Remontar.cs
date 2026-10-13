@@ -18,7 +18,7 @@ public partial class FormCrono
         var inicio = Txt("", 8); var fim = Txt("", 8);
         var outros = new CheckBox { Text = "Incluir karts que não estão na lista desta bateria" };
         var lista = new ListBox { Height = 190, BorderStyle = BorderStyle.None, IntegralHeight = false, Font = PecasDesign.FonteValor, Anchor = AnchorStyles.Left | AnchorStyles.Right, Margin = new Padding(0, 0, 14, 8) };
-        var resumo = new Label { AutoSize = true, MaximumSize = new Size(780, 0), Font = new Font("Segoe UI Semibold", 10F), ForeColor = PecasDesign.CorTexto, BackColor = Color.White, Margin = new Padding(0, 0, 14, 6) };
+        var resumo = new Label { AutoSize = true, MaximumSize = new Size(780, 0), Font = Tokens.FonteSemibold(Tokens.Claro.FonteTamanhoCorpo), ForeColor = PecasDesign.CorTexto, BackColor = Tokens.Primitivo.Branco, Margin = new Padding(0, 0, 14, 6) };
         var dia = DateTime.Today;
         long de = 0, ate = 0;
         var g = d.Secao("Horário da prova", "As passagens deste horário que ficaram sem bateria viram as voltas desta prova. Ajuste o início e o fim se precisar e clique em Conferir.");
@@ -57,10 +57,18 @@ public partial class FormCrono
             resumo.Text = karts.Count == 0 ? "Nenhuma passagem sem bateria nesse horário."
                 : $"{naLista.Sum(k => k.I("passagens"))} passagens de {naLista.Count} kart(s) da lista" + (karts.Count > naLista.Count ? $" · {karts.Count - naLista.Count} kart(s) fora da lista" : "");
         }
-        conferir.Click += (_, _) => Seguro.Rodar(d, () => Carregar(true));
+        // horário digitado errado não pode remontar com o horário anterior sem avisar
+        bool HorariosOk()
+        {
+            foreach (var (t, rotulo) in new[] { (inicio, "início"), (fim, "fim") })
+                if (!TimeSpan.TryParse(t.Text.Trim(), out var h) || h < TimeSpan.Zero || h >= TimeSpan.FromDays(1)) { Msg.Aviso(d, $"Horário de {rotulo} inválido: use hh:mm:ss (ex.: 20:15:00)."); t.Focus(); return false; }
+            return true;
+        }
+        conferir.Click += (_, _) => { if (HorariosOk()) Seguro.Rodar(d, () => Carregar(true)); };
         d.Shown += (_, _) => Seguro.Rodar(d, () => Carregar(false));
         d.BotaoRodape("Remontar resultado", true, () => Seguro.Rodar(d, async () =>
         {
+            if (!HorariosOk()) return;
             var a = ParaMs(inicio.Text, de); var b = ParaMs(fim.Text, ate);
             if (b <= a) { Msg.Aviso(d, "O fim precisa ser depois do início."); fim.Focus(); return; }
             if (!Msg.Pergunta(d, $"Remontar \"{_sess.S("name")}\" com as passagens de {Hora(a)} a {Hora(b)}?\n\nO resultado passa a valer como oficial (fica registrado nas observações).")) return;

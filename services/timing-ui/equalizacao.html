@@ -1,18 +1,20 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-tema="claro">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Equalização dos karts</title>
+<!-- cores dos tokens (tema claro); o valor depois da vírgula é a reserva se o tokens.css não carregar -->
+<link rel="stylesheet" href="/tokens.css">
 <style>
   :root {
-    --page-bg: #e8eee9; --surface: #fff; --ink: #15201a; --muted: #526057; --line: #cbd5ce; --line-strong: #78867d;
-    --accent: #087f48; --accent-strong: #065d35; --accent-soft: #e5f4eb;
-    --ok: #087f48; --ok-soft: #e5f4eb; --warn: #8a5200; --warn-soft: #fff5d9; --bad: #a62b24; --bad-soft: #fff0ee; --ref: #0a4fa0; --ref-soft: #e6f0fb;
+    --page-bg: var(--kib-cor-fundo-app, #F5F5F7); --surface: var(--kib-cor-superficie-padrao, #FFFFFF); --ink: var(--kib-cor-texto-principal, #1D1D1F); --muted: var(--kib-cor-texto-secundario, #6E6E73); --line: var(--kib-cor-borda-forte, #C7C7CC); --line-strong: var(--kib-cor-texto-terciario, #76767B);
+    --accent: var(--kib-cor-acao-principal, #0B7A53); --accent-strong: var(--kib-cor-acao-principal-pressionado, #0A5E40); --accent-soft: var(--kib-cor-estado-sucesso-fundo, #E8F5EE);
+    --ok: var(--kib-cor-estado-sucesso-texto, #1C6B35); --ok-soft: var(--kib-cor-estado-sucesso-fundo, #E8F5EE); --warn: var(--kib-cor-estado-aviso-texto, #9A5B00); --warn-soft: var(--kib-cor-estado-aviso-fundo, #FFF4E0); --bad: var(--kib-cor-estado-perigo-texto, #C4281C); --bad-soft: var(--kib-cor-estado-perigo-fundo, #FDECEA); --ref: var(--kib-cor-estado-info-texto, #0A4FA0); --ref-soft: var(--kib-cor-estado-info-fundo, #E1EEFF);
   }
   * { box-sizing: border-box; }
   html { min-width: 320px; }
-  body { margin: 0; background: var(--page-bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  body { margin: 0; background: var(--page-bg); color: var(--ink); font: 14px/1.45 var(--kib-fonte-familia-interface, "Segoe UI"), system-ui, sans-serif; }
   [hidden] { display: none !important; }
   .tools { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-height: 58px; padding: 10px clamp(16px, 3vw, 32px); background: #070a08; border-bottom: 1px solid #27352c; color: #f3faf5; }
   .tools a, .tools button, .tools select { min-height: 38px; padding: 8px 13px; border: 1px solid #526157; border-radius: 8px; background: #1d2821; color: #f6fbf7; font: inherit; font-size: 13px; font-weight: 700; text-decoration: none; cursor: pointer; }
@@ -84,6 +86,7 @@
     .nota { font-size: 7.5pt; color: #333; margin-top: 2mm; }
     .assin { margin-top: 14mm; gap: 14mm; break-inside: avoid; } .assin div { font-size: 8pt; }
   }
+  table.oficina td.obs { min-width: 180px; height: 34px; background-image: repeating-linear-gradient(transparent, transparent 15px, #d9dde3 16px); }
 </style>
 </head>
 <body>
@@ -124,7 +127,9 @@ const dia = (ms) => (ms ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', mon
 const mm = (x) => Math.abs(x).toFixed(2).replace(/0$/, '').replace('.', ',');
 const segs = (ms) => (ms / 1000).toFixed(3).replace('.', ',');
 const ajuste = (x) => (x == null ? '' : x === 0 ? 'equalizado' : `${x > 0 ? 'abrir' : 'fechar'} ${mm(x)} mm`);
-const regraTexto = (g) => `até ±${segs(g.toleranciaMs)} s equalizado; depois, a cada ${segs(g.faixaMs)} s, ${mm(g.passoMm)} mm`;
+// 2ª faixa (acima do limite, ex.: mais de 2 s): outra conta, somada à da 1ª
+const faixa2Texto = (g) => (g && g.limiteMs ? `; acima de ${segs(g.limiteMs)} s, a cada ${segs(g.faixa2Ms)} s, ${mm(g.passo2Mm)} mm` : '');
+const regraTexto = (g) => `até ±${segs(g.toleranciaMs)} s equalizado; depois, a cada ${segs(g.faixaMs)} s, ${mm(g.passoMm)} mm${faixa2Texto(g)}`;
 const ESTADOS = { preparando: 'Preparando', em_andamento: 'Em andamento', bandeira_final: 'Bandeira final', encerrada: 'Encerrada' };
 const SISTEMAS = { chassi: 'Chassi / direção', pneu: 'Pneus / calibragem', motor: 'Motor / carburação', embreagem: 'Transmissão / embreagem', freio: 'Freios' };
 const NOME_STATUS = { ok: 'OK', atencao: 'ATENÇÃO', critico: 'CRÍTICO' };
@@ -136,6 +141,18 @@ async function api(caminho) {
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`);
   return r.json();
 }
+
+// dois relatórios ao finalizar (áudio de 06/10): ?tipo=oficina (padrão, com campo de observações) e ?tipo=controle
+// (fica na cronometragem: quais são os karts mais rápidos). Os dois do mais rápido para o mais lento.
+const TIPO = new URLSearchParams(location.search).get('tipo') === 'controle' ? 'controle' : 'oficina';
+// como o kart está agora: a melhor volta do último bloco completo (o redutor que ficou no kart); referência = a melhor
+function tempoAtual(k) {
+  if (k.referencia) return k.melhorMs ?? null;
+  const blocos = [...(k.blocos || [])].reverse();
+  return (blocos.find((b) => b.completo && b.melhorMs) || blocos.find((b) => b.melhorMs))?.melhorMs ?? k.melhorMs ?? null;
+}
+const doMaisRapido = (karts) => [...karts].sort((a, b) => (tempoAtual(a) ?? Infinity) - (tempoAtual(b) ?? Infinity)
+  || String(a.kart).localeCompare(String(b.kart), 'pt-BR', { numeric: true }));
 
 function metaTexto(e) {
   if (!e.metaMs) return 'Meta ainda não definida';
@@ -153,6 +170,8 @@ function relatorio(e) {
   el('sub3').textContent = `${e.track.name} · ${Number(e.track.lengthMeters).toLocaleString('pt-BR')} m${e.mecanico ? ` · responsável: ${e.mecanico}` : ''}`;
   el('pill').hidden = false; el('pill').innerHTML = `Meta <strong>${esc(metaTexto(e))}</strong>`;
   el('emitido').textContent = agora();
+  if (TIPO === 'controle') return controle(e);
+  el('kicker').textContent = 'Equalização dos karts · relatório da oficina';
 
   const testados = r.karts.filter((k) => !k.referencia);
   const refs = r.referencias;
@@ -160,7 +179,7 @@ function relatorio(e) {
   let h = `<div class="resumo">
     <div><span>Meta de tempo</span><b>${tempo(r.metaMs)}</b><small>${esc(origem)}</small></div>
     <div><span>Equalizado até</span><b>± ${(r.toleranciaMs / 1000).toFixed(3)} s</b><small>${r.metaMs ? `${tempo(r.metaMs - r.toleranciaMs)} a ${tempo(r.metaMs + r.toleranciaMs)}` : ''}</small></div>
-    <div><span>Regra do redutor</span><b>${esc(r.regra.nome)}</b><small>a cada ${segs(r.regra.faixaMs)} s, ${mm(r.regra.passoMm)} mm</small></div>
+    <div><span>Regra do redutor</span><b>${esc(r.regra.nome)}</b><small>a cada ${segs(r.regra.faixaMs)} s, ${mm(r.regra.passoMm)} mm${faixa2Texto(r.regra)}</small></div>
     ${refs.map((x, i) => `<div><span>Kart referência ${i + 1}</span><b>#${esc(x.kart)} · ${tempo(x.melhorMs)}</b><small>${x.voltas} volta(s) · média ${tempo(x.mediaMs)}</small></div>`).join('')}
     <div><span>Resultado</span><b>${testados.filter((k) => k.status === 'EQUALIZADO').length} de ${testados.length} equalizados</b><small>${testados.filter((k) => k.status === 'REVISAR').length} para a oficina · ${testados.filter((k) => k.status === 'AJUSTANDO').length} ajustando</small></div>
   </div>`;
@@ -171,16 +190,17 @@ function relatorio(e) {
   const maisBlocos = Math.max(0, ...testados.map((k) => k.blocos.length));
   const cortado = maisBlocos > LIMITE_BLOCOS;
   const maxBlocos = Math.min(LIMITE_BLOCOS, Math.max(4, maisBlocos));
-  h += `<h2>Matriz de testes por bloco de 2 voltas (um redutor por bloco)</h2><div class="wrap"><table><thead><tr>
-    <th>Kart</th><th>Mecânico / piloto</th>
+  h += `<h2>Matriz de testes por bloco de 2 voltas · do kart mais rápido para o mais lento</h2><div class="wrap"><table><thead><tr>
+    <th class="num">Pos</th><th>Kart</th><th>Mecânico / piloto</th>
     ${cortado ? `<th class="num" colspan="${maxBlocos}">Blocos de 2 voltas (os ${maxBlocos} últimos de cada kart)</th>`
       : Array.from({ length: maxBlocos }, (_, i) => `<th class="num">Bloco ${i + 1}<br>${i === 0 ? 'redutor inicial' : 'redutor trocado'}</th>`).join('')}
     <th>Redutor<br>sugerido</th><th>Status</th><th>Ação recomendada</th><th class="num">Voltas nas baterias<br>desde a última</th>
   </tr></thead><tbody>`;
-  for (const k of r.karts) {
+  const ordem = doMaisRapido(r.karts);
+  for (const [pos, k] of ordem.entries()) {
     const v = e.voltasDesdeUltima[k.kart] || { voltas: 0, baterias: 0, desde: null };
     const voltasTxt = `${v.voltas}<small style="display:block;color:var(--muted)">${v.baterias} bateria(s)</small><small style="display:block;color:var(--muted)">${v.desde ? `desde ${dia(v.desde)}` : '1ª equalização'}</small>`;
-    h += `<tr><td class="c"><span class="kart">${esc(k.kart)}</span></td><td>${esc(k.piloto)}</td>`;
+    h += `<tr><td class="num">${tempoAtual(k) ? `${pos + 1}º` : VAZIO}</td><td class="c"><span class="kart">${esc(k.kart)}</span></td><td>${esc(k.piloto)}</td>`;
     if (k.referencia) {
       h += `<td class="num bloco" colspan="${maxBlocos}" style="text-align:left">Melhor <strong>${tempo(k.melhorMs)}</strong> · média ${tempo(k.mediaMs)} · ${k.voltas} volta(s) — base de comparação</td>`;
     } else {
@@ -193,10 +213,26 @@ function relatorio(e) {
       }
     }
     const cls = k.status === 'SEM VOLTAS' ? 'SEM' : k.status;
-    h += `<td>${k.redutorSugerido == null ? VAZIO : esc(k.redutorSugerido)}</td><td><span class="st st-${cls}">${esc(k.status)}</span></td><td>${esc(k.acao)}</td><td class="num">${voltasTxt}</td></tr>`;
+    h += `<td>${k.redutorSugerido == null ? VAZIO : esc(k.redutorSugerido)}</td><td><span class="st st-${cls}">${k.confirmadoManualmente ? 'EQUALIZADO MANUAL' : esc(k.status)}</span></td><td>${esc(k.acao)}</td><td class="num">${voltasTxt}</td></tr>`;
   }
-  if (!r.karts.length) h += `<tr><td colspan="${maxBlocos + 6}" class="c" style="padding:18px;color:var(--muted)">Nenhum kart nesta equalização ainda.</td></tr>`;
+  if (!r.karts.length) h += `<tr><td colspan="${maxBlocos + 7}" class="c" style="padding:18px;color:var(--muted)">Nenhum kart nesta equalização ainda.</td></tr>`;
   h += `</tbody></table></div>`;
+
+  // folha para a oficina: o que fazer em cada kart e um campo para anotar (do mais rápido para o mais lento)
+  const paraOficina = ordem.filter((k) => !k.referencia);
+  if (paraOficina.length) {
+    h += `<h2>Para a oficina · do kart mais rápido para o mais lento</h2><div class="wrap"><table class="oficina"><thead><tr>
+      <th class="num">Pos</th><th>Kart</th><th class="num">Tempo atual</th><th class="num">Dif. p/ meta</th><th>Redutor</th><th>Status</th><th>Ação recomendada</th><th style="width:30%">Observações da oficina</th>
+    </tr></thead><tbody>`;
+    for (const k of paraOficina) {
+      const t = tempoAtual(k);
+      const cls = k.status === 'SEM VOLTAS' ? 'SEM' : k.status;
+      h += `<tr><td class="num">${t ? `${ordem.indexOf(k) + 1}º` : VAZIO}</td><td class="c"><span class="kart">${esc(k.kart)}</span></td><td class="num">${tempo(t)}</td>
+        <td class="num">${t && r.metaMs ? delta(t - r.metaMs) : VAZIO}</td><td>${k.redutorSugerido == null ? VAZIO : esc(k.redutorSugerido)}</td>
+        <td><span class="st st-${cls}">${k.confirmadoManualmente ? 'EQUALIZADO MANUAL' : esc(k.status)}</span></td><td>${esc(k.acao)}</td><td class="obs">${esc(k.checklist?.observacoes || '')}</td></tr>`;
+    }
+    h += `</tbody></table></div>`;
+  }
 
   // apontamentos técnicos (checklist da oficina)
   const comApontamento = r.karts.filter((k) => k.checklist && (Object.keys(k.checklist.sistemas || {}).length || k.checklist.observacoes || k.checklist.acaoOficina));
@@ -215,11 +251,45 @@ function relatorio(e) {
     h += `</tbody></table></div>`;
   }
   const fx = e.regra.faixas || [];
-  h += `<p class="nota"><strong>Regra do redutor (${esc(r.regra.nome)}):</strong> ${fx.map((f, i) => (i === 0 ? `diferença até ${segs(f.ateMs)} s = equalizado` : `de ${segs(f.deMs)} a ${segs(f.ateMs)} s = ${mm(f.mm)} mm`)).join(' · ')} · e assim por diante (a cada ${segs(r.regra.faixaMs)} s, mais ${mm(r.regra.passoMm)} mm). Kart mais lento que a referência: <strong>abrir</strong>; mais rápido: <strong>fechar</strong>.</p>
-    <p class="nota"><strong>Como ler:</strong> cada bloco são 2 voltas com um redutor. O bloco 1 é com o redutor que estava no kart (o inicial); a diferença da melhor volta do bloco para a meta diz quanto abrir ou fechar, e o bloco seguinte já é com o redutor trocado. Vale o último bloco: dentro da faixa de equalizado, o kart é liberado com aquele redutor. Kart que ficou para revisar continua na equalização seguinte: os blocos anteriores aparecem com a data e as voltas novas entram no bloco seguinte. Os karts referência passam várias vezes e servem só de comparação: a meta é a melhor volta entre eles. As voltas da equalização ficam separadas das baterias normais.</p>
+  h += `<p class="nota"><strong>Regra do redutor (${esc(r.regra.nome)}):</strong> ${fx.filter((f) => !f.segunda).map((f, i) => (i === 0 ? `diferença até ${segs(f.ateMs)} s = equalizado` : `de ${segs(f.deMs)} a ${segs(f.ateMs)} s = ${mm(f.mm)} mm`)).join(' · ')} · e assim por diante (a cada ${segs(r.regra.faixaMs)} s, mais ${mm(r.regra.passoMm)} mm${r.regra.limiteMs ? `, até ${segs(r.regra.limiteMs)} s` : ''}).${r.regra.limiteMs ? ` <strong>Acima de ${segs(r.regra.limiteMs)} s</strong> (2ª faixa): ${fx.filter((f) => f.segunda).map((f) => `de ${segs(f.deMs)} a ${segs(f.ateMs)} s = ${mm(f.mm)} mm`).join(' · ')} · e assim por diante (a cada ${segs(r.regra.faixa2Ms)} s, mais ${mm(r.regra.passo2Mm)} mm).` : ''} Kart mais lento que a referência: <strong>abrir</strong>; mais rápido: <strong>fechar</strong>.</p>
+    <p class="nota"><strong>Como ler:</strong> cada bloco são 2 voltas com um redutor. O bloco 1 é com o redutor que estava no kart (o inicial); a diferença da melhor volta do bloco para a meta diz quanto abrir ou fechar. Cada nova equalização começa sem blocos herdados: medições passadas ficam no histórico da respectiva sessão. Depois de aplicar o redutor sugerido, a oficina pode registrar EQUALIZADO MANUALMENTE sem criar voltas de confirmação; a próxima medição completa volta a definir a situação automaticamente. Os karts referência servem de comparação: a meta é a melhor volta entre eles. As voltas da equalização ficam separadas das baterias normais.</p>
     <div class="assin"><div>Cronometragem</div><div>Oficina · mecânico responsável</div><div>Data</div></div>`;
   el('conteudo').innerHTML = h;
   el('estado').textContent = `${ESTADOS[e.state] || e.state}${e.finalizadaEm ? ' · finalizada' : ''} · ${r.karts.length} karts`;
+}
+
+// ------------------------------------------------------------------ controle da cronometragem: do kart mais rápido para o mais lento
+function controle(e) {
+  const r = e.resultado;
+  document.title = `Equalização · controle · ${e.name}`;
+  window.nomeArquivoRelatorio = (window.nomeArquivoRelatorio || 'Equalizacao') + ' - controle';
+  el('kicker').textContent = 'Equalização dos karts · controle da cronometragem';
+  const ordem = doMaisRapido(r.karts);
+  const comTempo = ordem.filter((k) => tempoAtual(k));
+  const maisRapido = comTempo.length ? tempoAtual(comTempo[0]) : null;
+  let h = `<div class="resumo">
+    <div><span>Meta de tempo</span><b>${tempo(r.metaMs)}</b><small>equalizado até ± ${(r.toleranciaMs / 1000).toFixed(3)} s</small></div>
+    <div><span>Kart mais rápido</span><b>${comTempo.length ? `#${esc(comTempo[0].kart)} · ${tempo(maisRapido)}` : VAZIO}</b><small>${comTempo.length ? esc(comTempo[0].piloto) : ''}</small></div>
+    <div><span>Kart mais lento</span><b>${comTempo.length > 1 ? `#${esc(comTempo[comTempo.length - 1].kart)} · ${tempo(tempoAtual(comTempo[comTempo.length - 1]))}` : VAZIO}</b><small>${comTempo.length > 1 ? `${segs(tempoAtual(comTempo[comTempo.length - 1]) - maisRapido)} s atrás do mais rápido` : ''}</small></div>
+    <div><span>Karts</span><b>${r.karts.length}</b><small>${r.karts.filter((k) => k.status === 'EQUALIZADO').length} equalizado(s) · ${r.karts.filter((k) => k.status === 'REVISAR').length} para revisar</small></div>
+  </div>`;
+  h += `<h2>Do kart mais rápido para o mais lento</h2><div class="wrap"><table><thead><tr>
+    <th class="num">Pos</th><th>Kart</th><th>Mecânico / piloto</th><th class="num">Tempo atual<br><small>melhor do último bloco</small></th><th class="num">Dif. p/ meta</th>
+    <th class="num">Dif. p/ o mais rápido</th><th class="num">Melhor volta<br>na equalização</th><th class="num">Voltas</th><th>Redutor</th><th>Status</th>
+  </tr></thead><tbody>`;
+  for (const [pos, k] of ordem.entries()) {
+    const t = tempoAtual(k);
+    const cls = k.status === 'SEM VOLTAS' ? 'SEM' : k.status;
+    h += `<tr><td class="num">${t ? `${pos + 1}º` : VAZIO}</td><td class="c"><span class="kart">${esc(k.kart)}</span></td><td>${esc(k.piloto)}</td>
+      <td class="num"><strong>${tempo(t)}</strong></td><td class="num">${t && r.metaMs ? delta(t - r.metaMs) : VAZIO}</td><td class="num">${t && maisRapido ? (t === maisRapido ? '–' : delta(t - maisRapido)) : VAZIO}</td>
+      <td class="num">${tempo(k.melhorMs)}</td><td class="num">${k.voltas}</td><td>${k.referencia ? 'referência' : k.redutorSugerido == null ? VAZIO : esc(k.redutorSugerido)}</td>
+      <td><span class="st st-${cls}">${k.confirmadoManualmente ? 'EQUALIZADO MANUAL' : esc(k.status)}</span></td></tr>`;
+  }
+  if (!ordem.length) h += `<tr><td colspan="10" class="c" style="padding:18px;color:var(--muted)">Nenhum kart nesta equalização ainda.</td></tr>`;
+  h += `</tbody></table></div>
+    <p class="nota"><strong>Como ler:</strong> o tempo atual é a melhor volta do último bloco completo de cada kart, ou seja, com o redutor que ficou nele (karts referência: a melhor volta). A ordem vai do mais rápido para o mais lento; kart sem volta fica no fim.</p>`;
+  el('conteudo').innerHTML = h;
+  el('estado').textContent = `Controle · ${r.karts.length} karts`;
 }
 
 // ------------------------------------------------------------------ histórico: equalizações por data e metas por traçado

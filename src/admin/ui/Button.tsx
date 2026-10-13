@@ -11,10 +11,10 @@ type ButtonProps = PropsWithChildren<
 >;
 
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: 'bg-brand-500 text-zinc-950 hover:bg-brand-400 shadow-soft',
-  secondary: 'bg-zinc-800 text-zinc-100 hover:bg-zinc-700',
-  ghost: 'border border-zinc-800 bg-transparent text-zinc-300 hover:bg-zinc-800/70 hover:text-zinc-100',
-  danger: 'bg-red-500/90 text-white hover:bg-red-500',
+  primary: 'bg-kib-acao text-kib-sobre-acao hover:bg-kib-acao-forte shadow-soft',
+  secondary: 'bg-kib-campo text-kib-texto hover:bg-kib-borda-forte',
+  ghost: 'border border-kib-borda bg-transparent text-kib-texto-2 hover:bg-kib-campo hover:text-kib-texto',
+  danger: 'bg-kib-perigo-solido text-kib-inverso hover:bg-kib-perigo-solido/90',
 };
 
 export const Button = ({

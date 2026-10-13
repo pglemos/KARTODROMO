@@ -2,7 +2,8 @@
 import type { Session } from './race-engine';
 
 export type PilotoSorteio = { indice: number; nome: string; customerId: string | null; kartAtual: string; excecoes: string[] };
-export type Atribuicao = { indice: number; kart: string };
+/** nome/customerId: quem o tablet viu nesse índice (tablet 1.4+). Sem eles vale só o índice (tablets antigos). */
+export type Atribuicao = { indice: number; kart: string; nome?: string | null; customerId?: string | null };
 
 export function descricaoModoSorteio(modo: string): string {
   if (modo === 'um-a-um') return 'um a um';
@@ -39,6 +40,8 @@ export function pilotosDoSorteio(sessao: Session, todas: Iterable<Session>, mesm
     });
 }
 
+export class ListaMudouError extends Error {}
+
 /** Confere o resultado vindo do tablet antes de gravar: um kart por piloto, sem repetir, só karts cadastrados. */
 export function validarSorteio(sessao: Session, atribuicoes: Atribuicao[], kartsCadastrados: Set<string>) {
   if (sessao.state !== 'preparando') throw new Error('Essa bateria já largou: o sorteio só vale antes da bandeira verde.');
@@ -50,6 +53,11 @@ export function validarSorteio(sessao: Session, atribuicoes: Atribuicao[], karts
     const indice = Number(a?.indice);
     if (!Number.isInteger(indice) || !sessao.competitors[indice]) throw new Error('O sorteio tem um piloto que não está nessa bateria. Atualize a lista e sorteie de novo.');
     if (indices.has(indice)) throw new Error(`O piloto ${sessao.competitors[indice].name} aparece duas vezes no sorteio.`);
+    // a lista mudou entre o tablet carregar e gravar (piloto incluído, tirado ou reordenado): o kart iria para outro piloto
+    const atual = sessao.competitors[indice];
+    const cid = a.customerId == null ? '' : String(a.customerId).trim();
+    const mudou = cid ? String(atual.customerId ?? '') !== cid : typeof a.nome === 'string' && a.nome.trim() !== '' && nome(a.nome) !== nome(atual.name);
+    if (mudou) throw new ListaMudouError('A lista de pilotos desta bateria mudou depois que o tablet carregou. Atualize a lista e sorteie de novo.');
     if (!/^\d+$/.test(kart)) throw new Error(`Kart inválido no sorteio: "${kart}".`);
     if (!kartsCadastrados.has(kart)) throw new Error(`O kart ${kart} não tem transponder cadastrado na cronometragem.`);
     if (vistos.has(kart)) throw new Error(`O kart ${kart} saiu para dois pilotos.`);
@@ -67,5 +75,6 @@ export function competidoresComSorteio(sessao: Session, atribuicoes: Atribuicao[
     name: c.name,
     customerId: c.customerId ?? null,
     category: c.category ?? null,
+    detalhes: c.detalhes,
   }));
 }

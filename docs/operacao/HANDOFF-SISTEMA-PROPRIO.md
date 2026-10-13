@@ -377,6 +377,7 @@ Invoke-Command 192.168.20.53 -Credential $c { Get-Process Kartodromo* }   # um c
   - Ligado na **COM3 do ORBITS**. Quem envia é o **app Cronometragem do ORBITS** (`PainelLed.cs`).
   - Configuração em `C:\ProgramData\Kartodromo\painel-led.json` (`{"porta":"COM3","baud":9600,"linhas":10}`).
   - Protocolo do LapTime: `$I`, `$SP/$J/$H` (treino), `$SR/$J/$G` (corrida), `$F`, com CRLF, RTS ligado e DTR desligado.
+  - A página selecionada é compartilhada pelo serviço do ORBITS em `GET/POST /api/painel-led-page` e no campo `painelLed` de `/api/state`; o CRONO1 controla 1–10, 11–20 e 21–30 pela rede, sem precisar da COM3.
   - A saída "Alimentador do painel" (RMonitor) do Orbits 4 foi **desligada**, com autorização do
     dono, para liberar a COM3.
 - **Telão de LED da TB50** (posições 1–20; PC **192.168.20.250**, `DESKTOP-UATKK4T`, usuário `laptime1`):
@@ -474,8 +475,8 @@ Remove-Item publish/<App>/*.xml
 ```powershell
 cd C:\repos\KARTODROMO
 .\scripts\apps\implantar-remoto.ps1 -Computador 192.168.20.53  -App Recepcao        -Print "$env:TEMP\rec.png"
-.\scripts\apps\implantar-remoto.ps1 -Computador 192.168.20.161 -App Autoatendimento  -Print "$env:TEMP\t1.png"
-.\scripts\apps\implantar-remoto.ps1 -Computador 192.168.20.69  -App Autoatendimento  -Print "$env:TEMP\t2.png"
+.\scripts\apps\implantar-remoto.ps1 -Computador 192.168.20.161 -App Autoatendimento -IniciarNoLogon -Print "$env:TEMP\t1.png"
+.\scripts\apps\implantar-remoto.ps1 -Computador 192.168.20.69  -App Autoatendimento -IniciarNoLogon -Print "$env:TEMP\t2.png"
 .\scripts\apps\implantar-remoto.ps1 -Computador 192.168.20.254 -App Cronometragem
 # no próprio ORBITS:
 .\scripts\apps\instalar-desktop.ps1 -App Recepcao -Origem C:\repos\KARTODROMO\desktop\publish\Recepcao
@@ -500,6 +501,30 @@ cd C:\repos\KARTODROMO
 4. **Antes de reiniciar,** veja se a fila de impressão está vazia (`/api/office/impressao/fila`).
 5. **Migrations primeiro:** grave o `.sql` em `C:\kartodromo-servidor\migrations\ops\` e rode com
    `sqlcmd -S localhost\SQLEXPRESS -d KartodromoOps -E -i <arquivo>`. Só depois publique o código.
+
+### 8.3 Atualização autônoma dos apps desktop
+
+- Os executáveis desktop consultam `http://192.168.20.13:4060/updates/<App>/manifest.json`
+  ao abrir. Se houver versão nova, mostram “Atualizando para a versão X...”, validam o SHA-256,
+  preservam o `appsettings.json` local, trocam os arquivos e reabrem o programa com os mesmos
+  argumentos (inclusive `--tv`).
+- Sem rede ou com o computador desligado, o programa abre a versão já instalada e tenta de novo
+  na próxima abertura.
+- O servidor publica os arquivos em `C:\kartodromo-servidor\updates\`. A rota é somente leitura
+  e só aceita `Recepcao`, `Autoatendimento` e `Cronometragem`.
+- Toda alteração nos apps deve terminar com:
+
+`powershell
+cd C:\repos\KARTODROMO
+.\scripts\apps\publicar-desktop.ps1
+`
+
+  O script compila os três apps, cria ZIP + SHA-256 + manifesto e publica no SRVKART. A
+  instalação inicial que habilita a atualização automática continua sendo feita com
+  `implantar-remoto.ps1`; depois disso, a próxima versão chega sozinha na abertura.
+- A pasta de cada app tem permissão `Modify` para `Usuários`, limitada àquela pasta, para o
+  atualizador concluir sem pedir credencial administrativa. O restante de `Program Files` continua
+  protegido.
 
 ---
 

@@ -58,7 +58,7 @@ const emptyForm: AtendimentoFormState = {
 };
 
 const inputClassName =
-  'w-full rounded-lg border border-zinc-700 bg-zinc-950 min-h-[44px] px-3 py-2 sm:min-h-0 sm:py-2.5 text-sm text-white placeholder:text-zinc-600 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20';
+  'w-full rounded-lg border border-kib-borda-forte bg-kib-fundo min-h-[44px] px-3 py-2 sm:min-h-0 sm:py-2.5 text-sm text-kib-texto placeholder:text-kib-texto-3 focus:border-kib-acao focus:outline-none focus:ring-2 focus:ring-kib-acao/20';
 
 const columns: readonly KanbanColumn[] = [
   {
@@ -67,7 +67,7 @@ const columns: readonly KanbanColumn[] = [
     description: 'Fila de chegada',
     emptyLabel: 'Ninguém aguardando.',
     icon: Clock3,
-    headerClassName: 'border-amber-800/70 bg-amber-950/40 text-amber-200',
+    headerClassName: 'border-kib-aviso/70 bg-kib-aviso-fundo text-kib-aviso',
   },
   {
     status: 'em_atendimento',
@@ -75,7 +75,7 @@ const columns: readonly KanbanColumn[] = [
     description: 'Atendimentos em curso',
     emptyLabel: 'Nenhum atendimento em curso.',
     icon: Headphones,
-    headerClassName: 'border-brand-800/70 bg-brand-950/40 text-brand-100',
+    headerClassName: 'border-kib-acao/70 bg-kib-sucesso-fundo text-kib-acao',
   },
   {
     status: 'finalizado',
@@ -83,7 +83,7 @@ const columns: readonly KanbanColumn[] = [
     description: 'Atendimentos concluídos',
     emptyLabel: 'Nenhum atendimento finalizado.',
     icon: CheckCircle2,
-    headerClassName: 'border-sky-800/70 bg-sky-950/40 text-sky-100',
+    headerClassName: 'border-kib-info/70 bg-kib-info-fundo text-kib-info',
   },
 ];
 
@@ -157,26 +157,26 @@ const AtendimentoCard = ({
   const isUpdating = updatingStatus !== null;
 
   return (
-    <article className="rounded-xl border border-zinc-700 bg-zinc-950/80 p-4 shadow-lg shadow-black/10">
+    <article className="rounded-xl border border-kib-borda-forte bg-kib-fundo p-4 shadow-lg shadow-black/10">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="truncate font-black text-white">{atendimento.nome}</h3>
-          <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-brand-300">
+          <h3 className="truncate font-black text-kib-texto">{atendimento.nome}</h3>
+          <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-kib-acao">
             {atendimento.tipo ?? 'Tipo não informado'}
           </p>
         </div>
         <time
-          className="shrink-0 rounded-full bg-zinc-800 px-2.5 py-1 text-xs font-bold text-zinc-300"
+          className="shrink-0 rounded-full bg-kib-campo px-2.5 py-1 text-xs font-bold text-kib-texto-2"
           dateTime={atendimento.created_at}
         >
           {timeFormatter.format(new Date(atendimento.created_at))}
         </time>
       </div>
 
-      <div className="mt-4 space-y-2 text-sm text-zinc-300">
+      <div className="mt-4 space-y-2 text-sm text-kib-texto-2">
         {atendimento.cliente_id ? (
           <p className="flex items-center gap-2">
-            <UserRound aria-hidden="true" className="shrink-0 text-zinc-500" size={15} />
+            <UserRound aria-hidden="true" className="shrink-0 text-kib-texto-3" size={15} />
             <span className="truncate">
               {atendimento.clientes?.nome ?? 'Cliente removido'}
             </span>
@@ -186,7 +186,7 @@ const AtendimentoCard = ({
           <p className="flex items-center gap-2">
             <CalendarClock
               aria-hidden="true"
-              className="shrink-0 text-zinc-500"
+              className="shrink-0 text-kib-texto-3"
               size={15}
             />
             <span>
@@ -199,13 +199,13 @@ const AtendimentoCard = ({
       </div>
 
       {atendimento.notes ? (
-        <p className="mt-4 whitespace-pre-wrap border-t border-zinc-800 pt-3 text-sm leading-6 text-zinc-400">
+        <p className="mt-4 whitespace-pre-wrap border-t border-kib-borda pt-3 text-sm leading-6 text-kib-texto-2">
           {atendimento.notes}
         </p>
       ) : null}
 
       {canWrite ? (
-        <div className="mt-4 flex flex-col gap-2 border-t border-zinc-800 pt-4 sm:flex-row">
+        <div className="mt-4 flex flex-col gap-2 border-t border-kib-borda pt-4 sm:flex-row">
           {next ? (
             <Button
               className="flex-1 px-3 py-2"
@@ -389,9 +389,9 @@ export const RecepcaoPage = () => {
       />
 
       {loadError ? (
-        <div className="mt-8 flex min-h-52 flex-col items-center justify-center rounded-xl border border-red-900/70 bg-red-950/30 p-6 text-center">
-          <AlertCircle aria-hidden="true" className="text-red-300" size={28} />
-          <p className="mt-3 text-sm text-red-200" role="alert">
+        <div className="mt-8 flex min-h-52 flex-col items-center justify-center rounded-xl border border-kib-perigo/70 bg-kib-perigo-fundo p-6 text-center">
+          <AlertCircle aria-hidden="true" className="text-kib-perigo" size={28} />
+          <p className="mt-3 text-sm text-kib-perigo" role="alert">
             {loadError}
           </p>
           <Button className="mt-4" onClick={() => void loadData()} variant="ghost">
@@ -408,7 +408,7 @@ export const RecepcaoPage = () => {
             return (
               <section
                 aria-labelledby={`recepcao-${column.status}`}
-                className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/70"
+                className="overflow-hidden rounded-2xl border border-kib-borda bg-kib-superficie"
                 key={column.status}
               >
                 <header className={`border-b px-4 py-4 ${column.headerClassName}`}>
@@ -433,7 +433,7 @@ export const RecepcaoPage = () => {
                     ? Array.from({ length: 2 }, (_, index) => (
                         <div
                           aria-hidden="true"
-                          className="h-44 animate-pulse rounded-xl border border-zinc-800 bg-zinc-950/70"
+                          className="h-44 animate-pulse rounded-xl border border-kib-borda bg-kib-fundo"
                           key={`${column.status}-loading-${index}`}
                         />
                       ))
@@ -450,7 +450,7 @@ export const RecepcaoPage = () => {
                       ))}
 
                   {!loading && columnAtendimentos.length === 0 ? (
-                    <p className="px-4 py-12 text-center text-sm text-zinc-400">
+                    <p className="px-4 py-12 text-center text-sm text-kib-texto-2">
                       {column.emptyLabel}
                     </p>
                   ) : null}

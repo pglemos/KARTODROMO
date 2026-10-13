@@ -101,7 +101,7 @@ const emptyResultadoForm: ResultadoFormState = {
 };
 
 const inputClassName =
-  'w-full rounded-lg border border-zinc-700 bg-zinc-950 min-h-[44px] px-3 py-2 sm:min-h-0 sm:py-2.5 text-sm text-white placeholder:text-zinc-600 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20';
+  'w-full rounded-lg border border-kib-borda-forte bg-kib-fundo min-h-[44px] px-3 py-2 sm:min-h-0 sm:py-2.5 text-sm text-kib-texto placeholder:text-kib-texto-3 focus:border-kib-acao focus:outline-none focus:ring-2 focus:ring-kib-acao/20';
 
 const corridaStatusLabels: Record<CorridaStatus, string> = {
   rascunho: 'Rascunho',
@@ -109,8 +109,8 @@ const corridaStatusLabels: Record<CorridaStatus, string> = {
 };
 
 const corridaStatusClasses: Record<CorridaStatus, string> = {
-  rascunho: 'border-amber-800 bg-amber-950 text-amber-200',
-  publicada: 'border-brand-800 bg-brand-950 text-brand-100',
+  rascunho: 'border-kib-aviso/40 bg-kib-aviso-fundo text-kib-aviso',
+  publicada: 'border-kib-acao bg-kib-sucesso-fundo text-kib-acao',
 };
 
 const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
@@ -344,7 +344,7 @@ export const ResultadosPage = () => {
         label: 'Corrida',
         render: (racing) => (
           <a
-            className="text-left font-bold text-white underline-offset-4 hover:text-brand-300 hover:underline"
+            className="text-left font-bold text-kib-texto underline-offset-4 hover:text-kib-acao hover:underline"
             href={`/admin/resultados/${encodeURIComponent(racing.id)}`}
           >
             {racing.nome}
@@ -365,10 +365,10 @@ export const ResultadosPage = () => {
           <span
             className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${
               racing.situacao === 'finalizada'
-                ? 'border-brand-800 bg-brand-950 text-brand-100'
+                ? 'border-kib-acao bg-kib-sucesso-fundo text-kib-acao'
                 : racing.situacao === 'agendada'
-                  ? 'border-zinc-700 bg-zinc-900 text-zinc-300'
-                  : 'border-amber-800 bg-amber-950 text-amber-200'
+                  ? 'border-kib-borda-forte bg-kib-superficie text-kib-texto-2'
+                  : 'border-kib-aviso/40 bg-kib-aviso-fundo text-kib-aviso'
             }`}
           >
             {racing.situacao === 'finalizada'
@@ -391,7 +391,7 @@ export const ResultadosPage = () => {
         render: (corrida) => (
           <button
             className={`text-left font-bold underline-offset-4 hover:underline ${
-              selectedCalxproCorridaId === corrida.id ? 'text-brand-300' : 'text-white'
+              selectedCalxproCorridaId === corrida.id ? 'text-kib-acao' : 'text-kib-texto'
             }`}
             onClick={() => setSelectedCalxproCorridaId(corrida.id)}
             type="button"
@@ -456,7 +456,7 @@ export const ResultadosPage = () => {
         render: (corrida) => (
           <button
             className={`text-left font-bold underline-offset-4 hover:underline ${
-              selectedCorridaId === corrida.id ? 'text-brand-300' : 'text-white'
+              selectedCorridaId === corrida.id ? 'text-kib-acao' : 'text-kib-texto'
             }`}
             onClick={() => setSelectedCorridaId(corrida.id)}
             type="button"
@@ -785,7 +785,7 @@ export const ResultadosPage = () => {
       {activeTab === 'calxpro' ? (
         <div className="mt-6 space-y-5">
           <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
-            <p className="text-sm text-zinc-400">
+            <p className="text-sm text-kib-texto-2">
               Corridas do sistema anterior (CalXPro), ativo até jan/2025. Somente leitura. Total:{' '}
               {calxproCorridasTotal.toLocaleString('pt-BR')}.
             </p>
@@ -812,11 +812,11 @@ export const ResultadosPage = () => {
             total={calxproCorridasTotal}
           />
 
-          <div className="border-t border-zinc-800 pt-6">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-brand-300">
+          <div className="border-t border-kib-borda pt-6">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-kib-acao">
               Resultado da corrida selecionada
             </p>
-            <h2 className="mt-2 text-xl font-black text-white">
+            <h2 className="mt-2 text-xl font-black text-kib-texto">
               {calxproCorridas.find((corrida) => corrida.id === selectedCalxproCorridaId)?.nome ??
                 'Selecione uma corrida'}
             </h2>
@@ -879,17 +879,17 @@ export const ResultadosPage = () => {
             />
           </div>
 
-          <div className="mt-10 border-t border-zinc-800 pt-8">
+          <div className="mt-10 border-t border-kib-borda pt-8">
             <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-brand-300">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-kib-acao">
                   Corrida selecionada
                 </p>
-                <h2 className="mt-2 text-2xl font-black text-white">
+                <h2 className="mt-2 text-2xl font-black text-kib-texto">
                   {selectedCorrida?.titulo ?? 'Selecione uma corrida'}
                 </h2>
                 {selectedCorrida ? (
-                  <p className="mt-1 text-sm text-zinc-400">
+                  <p className="mt-1 text-sm text-kib-texto-2">
                     {selectedCorrida.campeonatos?.nome ?? 'Campeonato não informado'} ·{' '}
                     {selectedCorrida.etapas?.nome ?? 'Etapa não informada'}
                   </p>

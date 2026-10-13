@@ -1,13 +1,15 @@
 param(
-  [string]$ScoreboardUrl = "http://127.0.0.1:3000/podio-live-tb50",
-  [string]$StreamUrl = "rtsp://192.168.20.13:8554/tb50",
+  [string]$ScoreboardUrl = "http://127.0.0.1:3000/placar-telao-tb50?layout=designer",
+  [string]$StreamUrl = "rtsp://127.0.0.1:8554/tb50",
   [int]$Width = 2048,
   [int]$Height = 512,
-  [int]$CaptureFps = 8,
-  [int]$OutputFps = 8,
+  [int]$CaptureFps = 2,
+  [int]$OutputFps = 2,
   [string]$VideoBitrate = "1400k",
   [string]$VideoBufferSize = "2800k",
-  [string]$RtpPacketSize = "1200"
+  [string]$RtpPacketSize = "1200",
+  [int]$ScreenshotQuality = 50,
+  [string]$EncoderPreset = "ultrafast"
 )
 
 $ErrorActionPreference = "Stop"
@@ -24,6 +26,8 @@ $env:TB50_OUTPUT_FPS = [string]$OutputFps
 $env:TB50_STREAM_BITRATE = $VideoBitrate
 $env:TB50_STREAM_BUFSIZE = $VideoBufferSize
 $env:TB50_RTP_PKT_SIZE = $RtpPacketSize
+$env:TB50_SCREENSHOT_QUALITY = [string]$ScreenshotQuality
+$env:TB50_ENCODER_PRESET = $EncoderPreset
 
 function Get-InstalledBrowserPath {
   $candidates = @(

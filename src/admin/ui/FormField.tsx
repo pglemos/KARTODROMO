@@ -9,16 +9,16 @@ type FormFieldProps = PropsWithChildren<{
 
 export const FormField = ({ children, error, hint, htmlFor, label }: FormFieldProps) => (
   <div>
-    <label className="mb-1.5 block text-xs font-medium text-zinc-400" htmlFor={htmlFor}>
+    <label className="mb-1.5 block text-xs font-medium text-kib-texto-2" htmlFor={htmlFor}>
       {label}
     </label>
     {children}
     {error ? (
-      <p className="mt-1.5 text-xs text-red-400" role="alert">
+      <p className="mt-1.5 text-xs text-kib-perigo" role="alert">
         {error}
       </p>
     ) : hint ? (
-      <p className="mt-1.5 text-xs text-zinc-500">{hint}</p>
+      <p className="mt-1.5 text-xs text-kib-texto-3">{hint}</p>
     ) : null}
   </div>
 );

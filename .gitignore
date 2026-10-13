@@ -84,5 +84,18 @@ data/timing/transponders.json
 scratch/
 # conta de e-mail dos resultados (tem a senha) e arquivos temporarios dos PDFs
 data/timing/email.json
+# API de transmissão ao vivo: hashes das chaves dos parceiros e a chave de publicação do ORBITS (nunca no Git)
+data/timing/transmissao.json
 data/timing/emails-tmp/
 data/timing/emails-simulador/
+
+# dados locais, pacotes e cópias de trabalho: nunca vão para o repositório público (09/10/2026)
+/data/
+/publish/
+/.backup-*/
+/.codex-deploy-*/
+/.tmp-*
+/.tmp-*/
+/.impeccable/
+/.agents/skills/impeccable
+services/*.antes-*.ts

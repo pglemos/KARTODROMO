@@ -1,3 +1,41 @@
+// Cores `kib-*`: apelidos das variáveis --kib-cor-* geradas de tokens/kib.tokens.json (styles/tokens.css).
+// Seguem o tema do trecho (data-tema="claro" | "escuro"); `/20` etc. vira color-mix com transparente.
+const corToken = (variavel) => ({ opacityValue }) =>
+  opacityValue === undefined || opacityValue === '1'
+    ? `var(--kib-cor-${variavel})`
+    : `color-mix(in srgb, var(--kib-cor-${variavel}) calc(${opacityValue} * 100%), transparent)`;
+
+const kib = {
+  fundo: corToken('fundo-app'),
+  superficie: corToken('superficie-padrao'),
+  suave: corToken('superficie-suave'),
+  campo: corToken('superficie-campo'),
+  borda: corToken('borda-sutil'),
+  'borda-forte': corToken('borda-forte'),
+  'borda-campo': corToken('borda-campo'),
+  texto: corToken('texto-principal'),
+  'texto-2': corToken('texto-secundario'),
+  'texto-3': corToken('texto-terciario'),
+  acao: corToken('acao-principal'),
+  'acao-forte': corToken('acao-principal-pressionado'),
+  'sobre-acao': corToken('acao-sobre-principal'),
+  sucesso: corToken('estado-sucesso-texto'),
+  'sucesso-solido': corToken('estado-sucesso-solido'),
+  'sucesso-fundo': corToken('estado-sucesso-fundo'),
+  perigo: corToken('estado-perigo-texto'),
+  'perigo-solido': corToken('estado-perigo-solido'),
+  'perigo-fundo': corToken('estado-perigo-fundo'),
+  aviso: corToken('estado-aviso-texto'),
+  'aviso-solido': corToken('estado-aviso-solido'),
+  'aviso-fundo': corToken('estado-aviso-fundo'),
+  info: corToken('estado-info-texto'),
+  'info-solido': corToken('estado-info-solido'),
+  'info-fundo': corToken('estado-info-fundo'),
+  roxo: corToken('dominio-melhor-volta'),
+  inverso: corToken('texto-inverso'),
+  sobreposicao: corToken('sobreposicao'),
+};
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -9,6 +47,7 @@ export default {
   theme: {
     extend: {
       colors: {
+        kib,
         primary: {
           50: '#e8fbf3',
           100: '#bbf7dd',

@@ -32,9 +32,10 @@ public sealed class FormRelatoriosCronometragem : DialogoDesign
     readonly bool _abrirAutomaticamente;
     readonly Grade _lista = new();
     readonly ComboBox _tipo = Campos.Combo();
-    readonly Label _criterio = new() { AutoSize = true, Font = new Font("Segoe UI", 9.2F), ForeColor = Tokens.Grafite, Margin = new Padding(0, 2, 0, 6) };
-    readonly Label _estado = new() { AutoSize = true, Font = new Font("Segoe UI", 9F), ForeColor = Tokens.TextoSecundario, Margin = new Padding(0, 0, 0, 4) };
+    readonly Label _criterio = new() { AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno), ForeColor = Tokens.Primitivo.Cinza700, Margin = new Padding(0, 2, 0, 6) };
+    readonly Label _estado = new() { AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno), ForeColor = Tokens.Claro.CorTextoSecundario, Margin = new Padding(0, 0, 0, 4) };
     List<JsonObject> _sessoes = [];
+    Button _tentarNovamente;
 
     public FormRelatoriosCronometragem(JsonObject bateriaInicial = null, string tipoInicial = "resultados_oficiais", bool abrirAutomaticamente = false)
         : base("Relatórios de cronometragem", "Escolha uma bateria e abra o resultado no mesmo padrão da Cronometragem", "M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7", "linear-gradient(180deg, #6CB8FF, #1E6FE8)", 1080, 800) // 720 cortava o "Formato do relatório" no rodapé
@@ -50,7 +51,7 @@ public sealed class FormRelatoriosCronometragem : DialogoDesign
             new("tipo", "Tipo", Largura: 145, Valor: r => Tipo(r.S("type"))),
             new("state", "Situação", Largura: 120, Valor: r => Estado(r.S("state"))),
             new("competitors", "Pilotos", TipoCol.Inteiro, 78));
-        _lista.CorLinha = r => r.S("state") == "encerrada" ? Color.FromArgb(52, 52, 54) : Tokens.Verde;
+        _lista.CorLinha = r => r.S("state") == "encerrada" ? Color.FromArgb(52, 52, 54) : Tokens.Claro.CorAcaoPrincipal;
         _lista.Height = 330;
         _lista.MultiSelect = false;
         _lista.SelectionChanged += (_, _) => AtualizarCriterio();
@@ -69,6 +70,8 @@ public sealed class FormRelatoriosCronometragem : DialogoDesign
 
         BotaoRodape("Abrir relatório", true, AbrirRelatorio);
         BotaoRodape("Fechar", false, Close);
+        _tentarNovamente = BotaoRodape("Tentar novamente", false, () => Seguro.Rodar(this, CarregarAsync));
+        _tentarNovamente.Visible = false;
         Load += (_, _) => Seguro.Rodar(this, CarregarAsync);
     }
 
@@ -100,6 +103,9 @@ public sealed class FormRelatoriosCronometragem : DialogoDesign
     {
         try
         {
+            _tentarNovamente.Visible = false;
+            _estado.ForeColor = Tokens.Claro.CorTextoSecundario;
+            _estado.Text = "Consultando a Cronometragem…";
             // A API autenticada do servidor agrega a Cronometragem e usa
             // startedAt/finishedAt/createdAt, nessa ordem, para não perder encerradas.
             _sessoes = await Sessao.Api.Lista("/api/office/crono/sessoes");
@@ -121,8 +127,10 @@ public sealed class FormRelatoriosCronometragem : DialogoDesign
         }
         catch (Exception ex)
         {
-            _estado.ForeColor = Tokens.Vermelho;
-            _estado.Text = "Não foi possível consultar a Cronometragem: " + ex.Message;
+            Diagnostico.Registrar(this, ex);
+            _estado.ForeColor = Tokens.Claro.CorEstadoPerigoTexto;
+            _estado.Text = "Não foi possível consultar a Cronometragem. Verifique a conexão e tente novamente.";
+            _tentarNovamente.Visible = true;
         }
     }
 
@@ -176,7 +184,7 @@ public sealed class FormRelatoriosCronometragem : DialogoDesign
             return;
         }
         var tipo = tipoForcado ?? Tipos[Math.Clamp(_tipo.SelectedIndex, 0, Tipos.Length - 1)].slug;
-        var url = $"{Config.CronoUrl}/resultado/{Uri.EscapeDataString(sessao.S("id"))}?tipo={Uri.EscapeDataString(tipo)}";
+        var url = Sessao.Api.UrlComToken($"/relatorio/crono/{Uri.EscapeDataString(sessao.S("id"))}?tipo={Uri.EscapeDataString(tipo)}");
         var titulo = $"{Tipos.First(t => t.slug == tipo).nome} · {sessao.S("name")}";
         var dono = Owner ?? this;
         Relatorio.Abrir(dono, url, titulo);

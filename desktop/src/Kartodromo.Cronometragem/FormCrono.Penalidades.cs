@@ -46,8 +46,8 @@ public partial class FormCrono
         if (tempo) d.Campo(g, "Segundos", segundos, 1);
         d.Campo(g, "Kart atingido (quebrou ou rodou)", atingido, 2); d.Campo(g, "Curva do incidente", curva, tempo ? 2 : 3); d.Campo(g, "Volta", volta, 1);
         d.Campo(g, "Complemento (opcional)", motivo, 6);
-        var previa = new Label { AutoSize = true, MaximumSize = new Size(820, 0), Font = new Font("Segoe UI Semibold", 10.4F), ForeColor = PecasDesign.CorTexto, BackColor = Color.White, Margin = new Padding(0, 4, 14, 2) };
-        g.Controls.Add(new Label { Text = "Texto que fica gravado no resultado e no relatório", AutoSize = true, Font = PecasDesign.FonteRotulo, ForeColor = Tokens.TextoSecundario, BackColor = Color.White, Margin = new Padding(0, 6, 0, 0) });
+        var previa = new Label { AutoSize = true, MaximumSize = new Size(820, 0), Font = Tokens.FonteSemibold(Tokens.Claro.FonteTamanhoSubtitulo), ForeColor = PecasDesign.CorTexto, BackColor = Tokens.Primitivo.Branco, Margin = new Padding(0, 4, 14, 2) };
+        g.Controls.Add(new Label { Text = "Texto que fica gravado no resultado e no relatório", AutoSize = true, Font = PecasDesign.FonteRotulo, ForeColor = Tokens.TextoSecundario, BackColor = Tokens.Primitivo.Branco, Margin = new Padding(0, 6, 0, 0) });
         g.SetColumnSpan(g.Controls[^1], 6);
         g.Controls.Add(previa); g.SetColumnSpan(previa, 6);
         string TextoPadrao()
@@ -90,7 +90,7 @@ public partial class FormCrono
         {
             if (lista.SelectedIndex < 0 || lista.SelectedIndex >= tem.Count) { Msg.Aviso(d, "Escolha na lista a advertência ou penalidade a retirar."); return; }
             var p = tem[lista.SelectedIndex];
-            if (!Msg.Pergunta(d, $"Retirar \"{lista.SelectedItem}\" de {comp.S("name")}?")) return;
+            if (!Msg.Confirmar(d, "Retirar a penalidade?", $"\"{lista.SelectedItem}\" de {comp.S("name")}. O resultado é recalculado.", "Retirar penalidade")) return;
             await Crono.Api.Delete($"/api/sessions/{_sess.S("id")}/penalties/{Uri.EscapeDataString(kart)}/{p.S("id")}");
             await Atualizar(); Recarregar();
         });
@@ -246,7 +246,7 @@ public partial class FormCrono
         foreach (DataGridViewRow r in _gPilotos.Rows)
         {
             if (r.IsNewRow) continue;
-            var cor = passou.Contains(r.Cells["kart"].Value?.ToString() ?? "") ? Color.White : AmareloNaoPassou;
+            var cor = passou.Contains(r.Cells["kart"].Value?.ToString() ?? "") ? Tokens.Primitivo.Branco : AmareloNaoPassou;
             if (r.DefaultCellStyle.BackColor != cor) r.DefaultCellStyle.BackColor = cor;
         }
     }

@@ -53,7 +53,7 @@ function Navigation({ currentPath, onNavigate }: { currentPath: string; onNaviga
         const items = adminModules.filter((module) => module.group === group);
         return (
           <section className="mb-[22px]" key={group}>
-            <h2 className="mb-1.5 px-2.5 text-[10.5px] font-bold uppercase tracking-[.1em] text-[var(--admin-faint)]">{group}</h2>
+            <h2 className="mb-1.5 px-2.5 text-[11px] font-bold uppercase tracking-[.1em] text-kib-texto-3">{group}</h2>
             <div className="grid gap-0.5">
               {items.map((item) => {
                 const Icon = iconMap[item.key];
@@ -147,22 +147,22 @@ export function AdminShell({
   }
 
   const Brand = () => (
-    <a className="flex items-center gap-2.5 border-b border-[var(--admin-border)] px-[18px] py-5 no-underline" href="/admin">
+    <a className="flex items-center gap-2.5 border-b border-kib-borda px-[18px] py-5 no-underline" href="/admin">
       <span className="admin-brand-mark"><Grid2X2 aria-hidden="true" size={18} /></span>
       <span>
-        <span className="block text-[10px] font-bold uppercase tracking-[.12em] text-[var(--admin-accent)]">Sistema</span>
-        <strong className="block text-sm font-bold text-[var(--admin-text)]">Kartódromo Betim</strong>
+        <span className="block text-[11px] font-bold uppercase tracking-[.12em] text-kib-acao">Sistema</span>
+        <strong className="block text-sm font-bold text-kib-texto">Kartódromo Betim</strong>
       </span>
     </a>
   );
 
   return (
-    <main className="admin-root" data-theme={theme}>
+    <main className="admin-root" data-theme={theme} data-tema={theme === 'dark' ? 'escuro' : 'claro'}>
       <aside className="admin-sidebar">
         <Brand />
         <Navigation currentPath={currentPath} />
-        <div className="border-t border-[var(--admin-border)] px-[18px] py-3.5">
-          <p className="mb-2 truncate text-xs font-semibold text-[var(--admin-muted)]">{sessionEmail}</p>
+        <div className="border-t border-kib-borda px-[18px] py-3.5">
+          <p className="mb-2 truncate text-xs font-semibold text-kib-texto-2">{sessionEmail}</p>
           <LogoutButton />
         </div>
       </aside>
@@ -175,15 +175,15 @@ export function AdminShell({
         type="button"
       />
       <aside aria-hidden={!mobileNavOpen} className="admin-mobile-drawer" data-open={mobileNavOpen} id="admin-mobile-navigation" inert={!mobileNavOpen} ref={mobileDrawerRef}>
-        <div className="flex items-center justify-between border-b border-[var(--admin-border)] px-[18px] py-4">
-          <strong className="text-sm font-bold text-[var(--admin-text)]">Menu</strong>
+        <div className="flex items-center justify-between border-b border-kib-borda px-[18px] py-4">
+          <strong className="text-sm font-bold text-kib-texto">Menu</strong>
           <button className="admin-icon-button" onClick={closeMobileNav} type="button" aria-label="Fechar menu">
             <X aria-hidden="true" size={18} />
           </button>
         </div>
         <Navigation currentPath={currentPath} onNavigate={closeMobileNav} />
-        <div className="border-t border-[var(--admin-border)] px-[18px] py-3.5">
-          <p className="mb-2 truncate text-xs font-semibold text-[var(--admin-muted)]">{sessionEmail}</p>
+        <div className="border-t border-kib-borda px-[18px] py-3.5">
+          <p className="mb-2 truncate text-xs font-semibold text-kib-texto-2">{sessionEmail}</p>
           <LogoutButton />
         </div>
       </aside>
@@ -195,15 +195,15 @@ export function AdminShell({
               <Menu aria-hidden="true" size={20} />
             </button>
             <div className="min-w-0">
-              <p className="mb-0.5 text-[10.5px] font-bold uppercase tracking-[.14em] text-[var(--admin-accent)]">Administração</p>
-              <h1 className="m-0 truncate text-[22px] font-bold leading-tight text-[var(--admin-text)]">{title}</h1>
+              <p className="mb-0.5 text-[11px] font-bold uppercase tracking-[.14em] text-kib-acao">Administração</p>
+              <h1 className="m-0 truncate text-[22px] font-bold leading-tight text-kib-texto">{title}</h1>
             </div>
           </div>
           <div className="flex items-center gap-2.5">
             <button className="admin-icon-button" type="button" onClick={toggleTheme} aria-label="Alternar tema">
               {theme === 'dark' ? <Sun aria-hidden="true" size={17} /> : <Moon aria-hidden="true" size={17} />}
             </button>
-            <a className="hidden h-[38px] items-center rounded-[9px] border border-[var(--admin-border)] px-3.5 text-xs font-bold text-[var(--admin-muted)] no-underline transition-colors hover:border-[var(--admin-accent-border)] hover:text-[var(--admin-accent)] sm:inline-flex" href="/">
+            <a className="hidden h-[38px] items-center rounded-[9px] border border-kib-borda px-3.5 text-xs font-bold text-kib-texto-2 no-underline transition-colors hover:border-kib-acao/40 hover:text-kib-acao sm:inline-flex" href="/">
               Ver site
             </a>
           </div>

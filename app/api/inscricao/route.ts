@@ -11,6 +11,8 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 const MAX_CONTENT_LENGTH = 30000;
+const TWO_HUNDRED_MILHAS_OPEN_AT = Date.parse('2026-10-05T10:00:00-03:00');
+const TWO_HUNDRED_MILHAS_DEADLINE = Date.parse('2027-01-10T23:59:59-03:00');
 
 const jsonResponse = (payload: unknown, status = 200) =>
   new Response(JSON.stringify(payload), {
@@ -62,6 +64,16 @@ export async function POST(request: Request) {
 
   if (validationErrors.length > 0) {
     return jsonResponse({ error: 'Invalid registration payload', details: validationErrors }, 400);
+  }
+
+  if (payload.campeonato_id === '200-milhas') {
+    const now = Date.now();
+    if (now < TWO_HUNDRED_MILHAS_OPEN_AT) {
+      return jsonResponse({ error: 'As inscrições das 200 Milhas de Betim 2027 abrem em 05/10/2026 às 10h (horário de Brasília).' }, 409);
+    }
+    if (now > TWO_HUNDRED_MILHAS_DEADLINE) {
+      return jsonResponse({ error: 'As inscrições das 200 Milhas de Betim 2027 estão encerradas.' }, 409);
+    }
   }
 
   try {

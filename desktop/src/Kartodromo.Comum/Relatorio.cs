@@ -35,20 +35,20 @@ public class Relatorio : CartaoModal
         BackColor = FundoFolha;
         Padding = new Padding(1);
         // branco: o fundo padrão do WebView2 aparece nas margens do papel ao imprimir/exportar (antes saía cinza)
-        _web.DefaultBackgroundColor = Color.White;
+        _web.DefaultBackgroundColor = Tokens.Primitivo.Branco;
         // barra própria (o kit visual da Recepção não mexe nesta janela: mover o WebView2 depois de aberto quebra a página)
-        var barra = new Panel { Dock = DockStyle.Top, Height = 60, BackColor = Color.White };
+        var barra = new Panel { Dock = DockStyle.Top, Height = 60, BackColor = Tokens.Primitivo.Branco };
         barra.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = Tokens.Linha });
-        var titulo_ = new Label { Text = titulo, AutoSize = true, Font = new Font("Segoe UI", 11.5F, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, Location = new Point(16, 18) };
+        var titulo_ = new Label { Text = titulo, AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoSubtitulo, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, Location = new Point(16, 18) };
         var pdf = BotaoBarra("Exportar PDF", Tokens.BotaoSecundario, PecasDesign.CorTexto);
         var excel = BotaoBarra("Exportar Excel", Tokens.BotaoSecundario, PecasDesign.CorTexto);
-        var imprimir = BotaoBarra("Imprimir", Tokens.Verde, Color.White);
+        var imprimir = BotaoBarra("Imprimir", Tokens.Verde, Tokens.Primitivo.Branco);
         var fechar = BotaoBarra("✕", Tokens.BotaoSecundario, PecasDesign.CorTexto);
-        fechar.Font = new Font("Segoe UI", 10F); fechar.AutoSize = false; fechar.MinimumSize = Size.Empty; fechar.Padding = Padding.Empty; fechar.Size = new Size(34, 34);
+        fechar.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo); fechar.AutoSize = false; fechar.MinimumSize = Size.Empty; fechar.Padding = Padding.Empty; fechar.Size = new Size(34, 34);
         // termo com impressora de termos configurada (Recepção): vai direto na TM-T20, sem a janela do Chrome
         // (que lembra a última impressora usada e podia mandar o termo pra jato de tinta/laser)
         var impressoraTermo = url.Contains("/termo") ? Config.Get("ImpressoraTermos", "") : "";
-        _aviso = new Label { AutoSize = true, Font = new Font("Segoe UI", 9F), ForeColor = Tokens.Verde, BackColor = Color.White };
+        _aviso = new Label { AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno), ForeColor = Tokens.Verde, BackColor = Tokens.Primitivo.Branco };
         barra.Controls.Add(_aviso);
         imprimir.Click += async (_, _) =>
         {
@@ -105,7 +105,15 @@ public class Relatorio : CartaoModal
                 }
                 _web.Source = new Uri(url);
             }
-            catch (Exception e) { Msg.Erro(this, "Não foi possível abrir o relatório (WebView2): " + e.Message); }
+            catch (Exception e)
+            {
+                Diagnostico.Registrar("relatório/WebView2", e);
+                if (Msg.ErroComRetry(this, "Não foi possível abrir o relatório agora. Verifique a conexão."))
+                {
+                    try { _web.Source = new Uri(url); }
+                    catch (Exception retry) { Diagnostico.Registrar("relatório/WebView2/retry", retry); }
+                }
+            }
         };
     }
 
@@ -132,17 +140,20 @@ public class Relatorio : CartaoModal
         }
         catch (Exception e)
         {
+            Diagnostico.Registrar("relatório/impressão", e);
             _aviso.ForeColor = Tokens.Vermelho;
-            _aviso.Text = $"Não imprimiu na {impressora}: {e.Message}";
+            _aviso.Text = $"Não foi possível imprimir na {impressora}. Verifique se ela está ligada e tente novamente.";
         }
         finally { _imprimindo = false; }
     }
 
     static Button BotaoBarra(string texto, Color fundo, Color letra)
     {
-        var principal = letra == Color.White;
+        var principal = letra.ToArgb() == Tokens.Primitivo.Branco.ToArgb(); // compara o valor (Color.White ≠ FromArgb(255,255,255) no ==)
         var b = new BotaoPlano { Text = texto, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowOnly, MinimumSize = new Size(0, 36), Height = 36, Padding = new Padding(10, 0, 10, 0), FlatStyle = FlatStyle.Flat, BackColor = fundo, ForeColor = letra,
-            Font = new Font("Segoe UI", 9.75F, principal ? FontStyle.Bold : FontStyle.Regular), Cursor = Cursors.Hand };
+            Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo, principal ? FontStyle.Bold : FontStyle.Regular), Cursor = Cursors.Hand };
+        b.AccessibleRole = AccessibleRole.PushButton;
+        b.AccessibleName = texto == "✕" ? "Fechar relatório" : texto;
         b.FlatAppearance.BorderSize = 0;
         b.FlatAppearance.MouseOverBackColor = ControlPaint.Light(fundo, 0.12f);
         b.Resize += (_, _) => Forma.AplicarRaio(b, 8);

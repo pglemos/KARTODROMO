@@ -4,7 +4,7 @@
  *   novo → (servidor segura as vagas) aguardando_pagamento → (Asaas avisa) pago → (servidor confirma) confirmado
  *   e os desvios: recusado (sem vaga), expirado (15 min sem pagar), pago_sem_vaga (pagou depois e o horário lotou).
  */
-import { asaasLigado, cancelar, consultar, criarCobranca, EVENTOS_PAGO, garantirCliente, PAGO, qrPix, type AsaasEnv } from './asaas';
+import { asaasLigado, cancelar, consultar, criarCobranca, EVENTOS_PAGO, garantirCliente, hojeBrasilia, PAGO, pagasDesde, qrPix, type AsaasEnv } from './asaas';
 import { chaveDocumento, codigoReserva, digitos, validarReserva, type Agenda, type PreCadastro } from './validar';
 import { POLITICA_ACEITE, POLITICA_SECOES, POLITICA_TITULO, POLITICA_VERSAO } from '../../../src/config/politica-cancelamento';
 
@@ -26,6 +26,10 @@ export type Pedido = {
   quantidade: number;
   forma: 'pix' | 'cartao';
   pilotos: string[];
+  /** Os outros pilotos da reserva (um por vaga, além de quem comprou), cada um com o próprio cadastro. */
+  acompanhantes?: { nome: string; documento: string; nascimento: string; chave: string }[];
+  /** false = quem comprou não vai pilotar (todas as vagas são dos acompanhantes). */
+  compradorPilota?: boolean;
   cliente: PreCadastro & { chave: string };
   /** Comprovante do aceite: qual versão da Política de Cancelamento o cliente aceitou e quando. */
   politica?: { versao: string; aceitaEm: string };
@@ -112,6 +116,8 @@ export async function criarPedido(req: Request, env: EnvReservas, excedeuLimite:
     quantidade: v.dados.quantidade,
     forma: v.dados.forma,
     pilotos: v.dados.pilotos,
+    acompanhantes: v.dados.acompanhantes.map((a) => ({ ...a, chave: chaveDocumento('CPF', a.documento) })),
+    compradorPilota: v.dados.compradorPilota,
     cliente: { ...v.dados.cliente, chave: chaveDocumento('CPF', v.dados.cliente.documento) },
     politica: { versao: POLITICA_VERSAO, aceitaEm: agora },
   };
@@ -204,7 +210,35 @@ async function cobrar(env: EnvReservas, p: Pedido) {
 
 // ---------------------------------------------------------------- servidor da recepção (/api/sync, x-sync-key)
 
+/**
+ * Conferência independente do aviso e da página aberta: a cada minuto pergunta à Asaas o que foi pago nos últimos
+ * 2 dias e marca como pago o pedido que ficou para trás. 12/10 (ACEXRJ): o webhook ainda ia para o MyLapTime, o
+ * cliente fechou a página depois do Pix e o pedido venceu pago — a recepção cancelou as vagas de quem tinha pago.
+ */
+let proximaConciliacao = 0;
+export async function conciliarPagamentos(env: EnvReservas, agora = Date.now()) {
+  if (!asaasLigado(env) || agora < proximaConciliacao) return 0;
+  proximaConciliacao = agora + 60_000;
+  let n = 0;
+  try {
+    for (const c of await pagasDesde(env, hojeBrasilia(new Date(agora - 2 * 86_400_000)))) {
+      if (!PAGO.has(c.status) || !c.externalReference || !idValido(c.externalReference)) continue;
+      const p = await lerPedido(env, c.externalReference);
+      if (!p) continue;
+      // já "pago" no site mas fora da fila (ACEXRJ, 13/10: nunca chegou à recepção) também volta para a fila
+      const parado = p.status === 'pago' && !(await env.PRE.get(chaveFila(p.id)));
+      if (marcarPago(p, c.id, c.billingType) || parado) {
+        await gravarPedido(env, p, true);
+        console.log(`reserva ${p.codigo}: pagamento ${c.id} achado na conferência com a Asaas`);
+        n++;
+      }
+    }
+  } catch (e) { console.error('conferência asaas', (e as Error).message); }
+  return n;
+}
+
 export async function syncPedidos(env: EnvReservas) {
+  await conciliarPagamentos(env);
   const fila = await env.PRE.list({ prefix: 'reservas/fila/', limit: 50 });
   const itens: Pedido[] = [];
   for (const o of fila.objects) {

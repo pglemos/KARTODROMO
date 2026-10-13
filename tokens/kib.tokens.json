@@ -1,0 +1,1809 @@
+{
+  "$description": "Design tokens do Kartódromo Internacional de Betim — fonte ÚNICA de cor, tipografia, espaço, raio, sombra e movimento de todo o sistema (site, admin, apps nativos, totem, tablet, páginas da cronometragem). Formato W3C DTCG. Camadas: primitivo → semântico (temas claro/escuro) → componente. Tema claro em $value; tema escuro em $extensions.kib.temas.escuro. Gere as saídas com `npm run tokens`. Documentação: docs/design-system/02-tokens/README.md",
+  "primitivo": {
+    "$description": "Valores puros. NUNCA use primitivo direto numa tela: use o token semântico.",
+    "cor": {
+      "$type": "color",
+      "branco": {
+        "$value": "#FFFFFF"
+      },
+      "preto": {
+        "$value": "#000000"
+      },
+      "cinza": {
+        "50": {
+          "$value": "#FAFAFC"
+        },
+        "75": {
+          "$value": "#F5F5F7"
+        },
+        "100": {
+          "$value": "#F2F2F5"
+        },
+        "125": {
+          "$value": "#EBEBEF"
+        },
+        "150": {
+          "$value": "#ECECF0"
+        },
+        "200": {
+          "$value": "#E5E5EA"
+        },
+        "250": {
+          "$value": "#DBDBDB"
+        },
+        "300": {
+          "$value": "#C7C7CC"
+        },
+        "400": {
+          "$value": "#8E8E93"
+        },
+        "450": {
+          "$value": "#76767B"
+        },
+        "500": {
+          "$value": "#6E6E73"
+        },
+        "700": {
+          "$value": "#3A3A3C"
+        },
+        "800": {
+          "$value": "#1C1C1E"
+        },
+        "900": {
+          "$value": "#1D1D1F"
+        }
+      },
+      "noite": {
+        "100": {
+          "$value": "#F7FAF6"
+        },
+        "200": {
+          "$value": "#D7DED8"
+        },
+        "300": {
+          "$value": "#A8B2AA"
+        },
+        "400": {
+          "$value": "#829083"
+        },
+        "500": {
+          "$value": "#6B786E"
+        },
+        "600": {
+          "$value": "#5D6660"
+        },
+        "750": {
+          "$value": "#151E16"
+        },
+        "800": {
+          "$value": "#101711"
+        },
+        "850": {
+          "$value": "#0B100C"
+        },
+        "900": {
+          "$value": "#070B08"
+        },
+        "950": {
+          "$value": "#030504"
+        },
+        "$description": "Escala escura do tema público (Pit Lane Noturno)."
+      },
+      "verde": {
+        "50": {
+          "$value": "#E8F5EE"
+        },
+        "100": {
+          "$value": "#DAE8E1"
+        },
+        "500": {
+          "$value": "#34C759"
+        },
+        "600": {
+          "$value": "#0B7A53"
+        },
+        "650": {
+          "$value": "#1C6B35"
+        },
+        "700": {
+          "$value": "#0A5E40"
+        },
+        "900": {
+          "$value": "#0F2A1A"
+        }
+      },
+      "neon": {
+        "400": {
+          "$value": "#00E676"
+        },
+        "500": {
+          "$value": "#00C853"
+        },
+        "tinta": {
+          "$value": "#041301"
+        }
+      },
+      "vermelho": {
+        "50": {
+          "$value": "#FDECEA"
+        },
+        "300": {
+          "$value": "#FF7474"
+        },
+        "600": {
+          "$value": "#C4281C"
+        },
+        "900": {
+          "$value": "#2A1414"
+        }
+      },
+      "laranja": {
+        "50": {
+          "$value": "#FFF4E0"
+        },
+        "400": {
+          "$value": "#FF9F0A"
+        },
+        "600": {
+          "$value": "#B26A00"
+        },
+        "650": {
+          "$value": "#9A5B00"
+        },
+        "800": {
+          "$value": "#8A4B00"
+        }
+      },
+      "amarelo": {
+        "400": {
+          "$value": "#FACC15"
+        },
+        "900": {
+          "$value": "#2A2410"
+        },
+        "ouro": {
+          "$value": "#FFD24A"
+        }
+      },
+      "azul": {
+        "50": {
+          "$value": "#E1EEFF"
+        },
+        "300": {
+          "$value": "#5EB6FF"
+        },
+        "500": {
+          "$value": "#1E6FE8"
+        },
+        "600": {
+          "$value": "#0A63D6"
+        },
+        "700": {
+          "$value": "#0A4FA0"
+        },
+        "900": {
+          "$value": "#0E1E2E"
+        }
+      },
+      "roxo": {
+        "300": {
+          "$value": "#C084FC"
+        },
+        "600": {
+          "$value": "#7A2FC2"
+        }
+      },
+      "bandeira": {
+        "$description": "Cores das bandeiras de pista (cronometragem). Fixas nos dois temas.",
+        "verde": {
+          "$value": "#34C759"
+        },
+        "amarela": {
+          "$value": "#FFCC00"
+        },
+        "vermelha": {
+          "$value": "#FF3B30"
+        },
+        "azul": {
+          "$value": "#0A84FF"
+        },
+        "preta": {
+          "$value": "#1D1D1F"
+        },
+        "branca": {
+          "$value": "#FFFFFF"
+        }
+      },
+      "telao": {
+        "$description": "Telão TB50 — CONGELADO (não usar em telas novas; só documenta o que existe).",
+        "teal": {
+          "$value": "#03110F"
+        },
+        "cabecalho": {
+          "$value": "#007965"
+        }
+      },
+      "alfa": {
+        "branco-10": {
+          "$value": "#FFFFFF1A"
+        },
+        "preto-30": {
+          "$value": "#1C1C1E4D"
+        },
+        "preto-65": {
+          "$value": "#000000A6"
+        }
+      }
+    },
+    "dimensao": {
+      "0": {
+        "$value": "0px"
+      },
+      "1": {
+        "$value": "1px"
+      },
+      "2": {
+        "$value": "2px"
+      },
+      "3": {
+        "$value": "3px"
+      },
+      "4": {
+        "$value": "4px"
+      },
+      "6": {
+        "$value": "6px"
+      },
+      "8": {
+        "$value": "8px"
+      },
+      "9": {
+        "$value": "9px"
+      },
+      "10": {
+        "$value": "10px"
+      },
+      "12": {
+        "$value": "12px"
+      },
+      "14": {
+        "$value": "14px"
+      },
+      "16": {
+        "$value": "16px"
+      },
+      "18": {
+        "$value": "18px"
+      },
+      "20": {
+        "$value": "20px"
+      },
+      "24": {
+        "$value": "24px"
+      },
+      "32": {
+        "$value": "32px"
+      },
+      "40": {
+        "$value": "40px"
+      },
+      "48": {
+        "$value": "48px"
+      },
+      "56": {
+        "$value": "56px"
+      },
+      "64": {
+        "$value": "64px"
+      },
+      "999": {
+        "$value": "999px"
+      },
+      "$type": "dimension"
+    },
+    "fonte": {
+      "familia": {
+        "$type": "fontFamily",
+        "segoe": {
+          "$value": [
+            "Segoe UI",
+            "Segoe UI Variable",
+            "sans-serif"
+          ]
+        },
+        "anton": {
+          "$value": [
+            "Anton",
+            "Impact",
+            "sans-serif"
+          ]
+        },
+        "rajdhani": {
+          "$value": [
+            "Rajdhani",
+            "Bahnschrift SemiCondensed",
+            "Segoe UI",
+            "sans-serif"
+          ]
+        },
+        "mono": {
+          "$value": [
+            "Cascadia Mono",
+            "Consolas",
+            "ui-monospace",
+            "monospace"
+          ]
+        }
+      },
+      "peso": {
+        "$type": "fontWeight",
+        "regular": {
+          "$value": 400
+        },
+        "medio": {
+          "$value": 500
+        },
+        "semibold": {
+          "$value": 600
+        },
+        "negrito": {
+          "$value": 700
+        }
+      }
+    },
+    "duracao": {
+      "120": {
+        "$value": "120ms"
+      },
+      "200": {
+        "$value": "200ms"
+      },
+      "320": {
+        "$value": "320ms"
+      },
+      "$type": "duration"
+    }
+  },
+  "cor": {
+    "$type": "color",
+    "marca": {
+      "principal": {
+        "$description": "Cor da marca (o verde do kartódromo).",
+        "$value": "{primitivo.cor.verde.600}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.neon.400}"
+            }
+          }
+        }
+      }
+    },
+    "acao": {
+      "principal": {
+        "$description": "Botão principal (Salvar, Entrar, Confirmar), seleção ativa, link de ação.",
+        "$value": "{primitivo.cor.verde.600}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.neon.400}"
+            },
+            "contraste": [
+              {
+                "sobre": "cor.superficie.padrao",
+                "min": 3
+              },
+              {
+                "sobre": "cor.fundo.app",
+                "min": 3
+              }
+            ]
+          }
+        }
+      },
+      "principal-pressionado": {
+        "$value": "{primitivo.cor.verde.700}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.neon.500}"
+            }
+          }
+        }
+      },
+      "sobre-principal": {
+        "$description": "Texto/ícone em cima do botão principal.",
+        "$value": "{primitivo.cor.branco}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.neon.tinta}"
+            },
+            "contraste": [
+              {
+                "sobre": "cor.acao.principal",
+                "min": 4.5
+              }
+            ]
+          }
+        }
+      },
+      "secundaria": {
+        "$description": "Botão secundário (Cancelar, Fechar).",
+        "$value": "{primitivo.cor.cinza.125}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.noite.800}"
+            }
+          }
+        }
+      },
+      "sobre-secundaria": {
+        "$value": "{primitivo.cor.cinza.900}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.noite.100}"
+            },
+            "contraste": [
+              {
+                "sobre": "cor.acao.secundaria",
+                "min": 4.5
+              }
+            ]
+          }
+        }
+      }
+    },
+    "fundo": {
+      "app": {
+        "$description": "Fundo da janela/página.",
+        "$value": "{primitivo.cor.cinza.75}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.noite.950}"
+            }
+          }
+        }
+      }
+    },
+    "superficie": {
+      "padrao": {
+        "$description": "Cartões, campos, cabeçalhos.",
+        "$value": "{primitivo.cor.branco}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.noite.850}"
+            }
+          }
+        }
+      },
+      "suave": {
+        "$description": "Menus, cabeçalho de tabela.",
+        "$value": "{primitivo.cor.cinza.50}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.noite.900}"
+            }
+          }
+        }
+      },
+      "campo": {
+        "$description": "Busca, segmentados, botão fantasma.",
+        "$value": "{primitivo.cor.cinza.100}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.noite.800}"
+            }
+          }
+        }
+      },
+      "lateral": {
+        "$description": "Sidebar/árvore lateral.",
+        "$value": "{primitivo.cor.cinza.150}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.noite.900}"
+            }
+          }
+        }
+      },
+      "inversa": {
+        "$description": "Painel escuro dentro do tema claro (troco, faixa ao vivo).",
+        "$value": "{primitivo.cor.cinza.800}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.noite.100}"
+            }
+          }
+        }
+      }
+    },
+    "texto": {
+      "principal": {
+        "$value": "{primitivo.cor.cinza.900}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.noite.100}"
+            },
+            "contraste": [
+              {
+                "sobre": "cor.superficie.padrao",
+                "min": 4.5
+              },
+              {
+                "sobre": "cor.fundo.app",
+                "min": 4.5
+              }
+            ]
+          }
+        }
+      },
+      "secundario": {
+        "$description": "Rótulos, subtítulos, legendas.",
+        "$value": "{primitivo.cor.cinza.500}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.noite.300}"
+            },
+            "contraste": [
+              {
+                "sobre": "cor.superficie.padrao",
+                "min": 4.5
+              },
+              {
+                "sobre": "cor.fundo.app",
+                "min": 4.5
+              }
+            ]
+          }
+        }
+      },
+      "terciario": {
+        "$description": "Dicas e placeholders (só sobre superfície).",
+        "$value": "{primitivo.cor.cinza.450}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.noite.400}"
+            },
+            "contraste": [
+              {
+                "sobre": "cor.superficie.padrao",
+                "min": 4.5
+              }
+            ]
+          }
+        }
+      },
+      "desabilitado": {
+        "$description": "Texto desabilitado (isento de contraste pela WCAG).",
+        "$value": "{primitivo.cor.cinza.300}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.noite.600}"
+            }
+          }
+        }
+      },
+      "inverso": {
+        "$description": "Texto sobre superfície inversa.",
+        "$value": "{primitivo.cor.branco}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.noite.950}"
+            },
+            "contraste": [
+              {
+                "sobre": "cor.superficie.inversa",
+                "min": 4.5
+              }
+            ]
+          }
+        }
+      },
+      "link": {
+        "$value": "{primitivo.cor.azul.600}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.azul.300}"
+            },
+            "contraste": [
+              {
+                "sobre": "cor.superficie.padrao",
+                "min": 4.5
+              },
+              {
+                "sobre": "cor.fundo.app",
+                "min": 4.5
+              }
+            ]
+          }
+        }
+      }
+    },
+    "borda": {
+      "sutil": {
+        "$description": "Linha divisória, borda de cartão.",
+        "$value": "{primitivo.cor.cinza.200}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.alfa.branco-10}"
+            }
+          }
+        }
+      },
+      "campo": {
+        "$description": "Borda de campo sem foco. Decidido 10/10/2026: #8E8E93 no claro (3,26:1 sobre branco — WCAG 1.4.11 pede 3:1 para o contorno de campo; o #DBDBDB antigo dava ~1,3).",
+        "$value": "{primitivo.cor.cinza.400}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.noite.500}"
+            },
+            "contraste": [
+              {
+                "sobre": "cor.superficie.padrao",
+                "min": 3,
+                "nivel": "erro"
+              }
+            ]
+          }
+        }
+      },
+      "forte": {
+        "$value": "{primitivo.cor.cinza.300}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.noite.600}"
+            }
+          }
+        }
+      },
+      "foco": {
+        "$description": "Anel de foco do teclado.",
+        "$value": "{primitivo.cor.verde.600}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.neon.400}"
+            },
+            "contraste": [
+              {
+                "sobre": "cor.superficie.padrao",
+                "min": 3
+              }
+            ]
+          }
+        }
+      }
+    },
+    "estado": {
+      "sucesso": {
+        "solido": {
+          "$value": "{primitivo.cor.verde.600}",
+          "$extensions": {
+            "kib": {
+              "temas": {
+                "escuro": "{primitivo.cor.neon.400}"
+              }
+            }
+          }
+        },
+        "texto": {
+          "$value": "{primitivo.cor.verde.650}",
+          "$extensions": {
+            "kib": {
+              "temas": {
+                "escuro": "{primitivo.cor.neon.400}"
+              },
+              "contraste": [
+                {
+                  "sobre": "cor.superficie.padrao",
+                  "min": 4.5
+                },
+                {
+                  "sobre": "cor.estado.sucesso.fundo",
+                  "min": 4.5
+                }
+              ]
+            }
+          }
+        },
+        "fundo": {
+          "$value": "{primitivo.cor.verde.50}",
+          "$extensions": {
+            "kib": {
+              "temas": {
+                "escuro": "{primitivo.cor.verde.900}"
+              }
+            }
+          }
+        }
+      },
+      "perigo": {
+        "solido": {
+          "$description": "Excluir, estornar, erro.",
+          "$value": "{primitivo.cor.vermelho.600}",
+          "$extensions": {
+            "kib": {
+              "temas": {
+                "escuro": "{primitivo.cor.vermelho.300}"
+              }
+            }
+          }
+        },
+        "texto": {
+          "$value": "{primitivo.cor.vermelho.600}",
+          "$extensions": {
+            "kib": {
+              "temas": {
+                "escuro": "{primitivo.cor.vermelho.300}"
+              },
+              "contraste": [
+                {
+                  "sobre": "cor.superficie.padrao",
+                  "min": 4.5
+                },
+                {
+                  "sobre": "cor.fundo.app",
+                  "min": 4.5
+                },
+                {
+                  "sobre": "cor.estado.perigo.fundo",
+                  "min": 4.5
+                }
+              ]
+            }
+          }
+        },
+        "fundo": {
+          "$value": "{primitivo.cor.vermelho.50}",
+          "$extensions": {
+            "kib": {
+              "temas": {
+                "escuro": "{primitivo.cor.vermelho.900}"
+              }
+            }
+          }
+        }
+      },
+      "aviso": {
+        "solido": {
+          "$description": "Preenchimento de aviso (selo/contador); texto por cima = sobre-solido.",
+          "$value": "{primitivo.cor.laranja.400}",
+          "$extensions": {
+            "kib": {
+              "temas": {
+                "escuro": "{primitivo.cor.amarelo.400}"
+              }
+            }
+          }
+        },
+        "sobre-solido": {
+          "$value": "{primitivo.cor.cinza.900}",
+          "$extensions": {
+            "kib": {
+              "temas": {
+                "escuro": "{primitivo.cor.noite.950}"
+              },
+              "contraste": [
+                {
+                  "sobre": "cor.estado.aviso.solido",
+                  "min": 4.5
+                }
+              ]
+            }
+          }
+        },
+        "texto": {
+          "$description": "A pagar, pendente, atenção em texto.",
+          "$value": "{primitivo.cor.laranja.650}",
+          "$extensions": {
+            "kib": {
+              "temas": {
+                "escuro": "{primitivo.cor.amarelo.400}"
+              },
+              "contraste": [
+                {
+                  "sobre": "cor.superficie.padrao",
+                  "min": 4.5
+                },
+                {
+                  "sobre": "cor.fundo.app",
+                  "min": 4.5
+                }
+              ]
+            }
+          }
+        },
+        "fundo": {
+          "$value": "{primitivo.cor.laranja.50}",
+          "$extensions": {
+            "kib": {
+              "temas": {
+                "escuro": "{primitivo.cor.amarelo.900}"
+              }
+            }
+          }
+        }
+      },
+      "info": {
+        "solido": {
+          "$value": "{primitivo.cor.azul.600}",
+          "$extensions": {
+            "kib": {
+              "temas": {
+                "escuro": "{primitivo.cor.azul.300}"
+              }
+            }
+          }
+        },
+        "texto": {
+          "$value": "{primitivo.cor.azul.700}",
+          "$extensions": {
+            "kib": {
+              "temas": {
+                "escuro": "{primitivo.cor.azul.300}"
+              },
+              "contraste": [
+                {
+                  "sobre": "cor.superficie.padrao",
+                  "min": 4.5
+                },
+                {
+                  "sobre": "cor.estado.info.fundo",
+                  "min": 4.5
+                }
+              ]
+            }
+          }
+        },
+        "fundo": {
+          "$value": "{primitivo.cor.azul.50}",
+          "$extensions": {
+            "kib": {
+              "temas": {
+                "escuro": "{primitivo.cor.azul.900}"
+              }
+            }
+          }
+        }
+      }
+    },
+    "status": {
+      "online": {
+        "$description": "Bolinha de status / interruptor ligado. Decorativa: SEMPRE com texto ao lado.",
+        "$value": "{primitivo.cor.verde.500}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.neon.400}"
+            }
+          }
+        }
+      }
+    },
+    "selecao": {
+      "fundo": {
+        "$description": "Linha/ item selecionado (lista, lateral).",
+        "$value": "{primitivo.cor.verde.100}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.verde.900}"
+            }
+          }
+        }
+      },
+      "texto": {
+        "$value": "{primitivo.cor.cinza.900}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.noite.100}"
+            },
+            "contraste": [
+              {
+                "sobre": "cor.selecao.fundo",
+                "min": 4.5
+              }
+            ]
+          }
+        }
+      }
+    },
+    "sobreposicao": {
+      "$description": "Véu escuro atrás de modal.",
+      "$value": "{primitivo.cor.alfa.preto-30}",
+      "$extensions": {
+        "kib": {
+          "temas": {
+            "escuro": "{primitivo.cor.alfa.preto-65}"
+          }
+        }
+      }
+    },
+    "dominio": {
+      "$description": "Cores de domínio da pista: iguais nos dois temas.",
+      "podio-ouro": {
+        "$value": "{primitivo.cor.amarelo.ouro}"
+      },
+      "posicao": {
+        "$value": "{primitivo.cor.amarelo.400}"
+      },
+      "melhor-volta": {
+        "$description": "Melhor volta da prova (roxo, convenção de cronometragem). Sempre junto de negrito ou marcador — nunca só a cor.",
+        "$value": "{primitivo.cor.roxo.600}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.cor.roxo.300}"
+            },
+            "contraste": [
+              {
+                "sobre": "cor.superficie.padrao",
+                "min": 4.5
+              }
+            ]
+          }
+        }
+      },
+      "bandeira-verde": {
+        "$value": "{primitivo.cor.bandeira.verde}"
+      },
+      "bandeira-amarela": {
+        "$value": "{primitivo.cor.bandeira.amarela}"
+      },
+      "bandeira-vermelha": {
+        "$value": "{primitivo.cor.bandeira.vermelha}"
+      },
+      "bandeira-azul": {
+        "$value": "{primitivo.cor.bandeira.azul}"
+      },
+      "bandeira-preta": {
+        "$value": "{primitivo.cor.bandeira.preta}"
+      },
+      "bandeira-branca": {
+        "$value": "{primitivo.cor.bandeira.branca}"
+      }
+    }
+  },
+  "fonte": {
+    "familia": {
+      "$type": "fontFamily",
+      "interface": {
+        "$description": "Corpo e títulos das telas. Claro (operação, desktop) = Segoe UI; escuro (público) = Rajdhani. Admin web usa Rajdhani (ver 05-plataformas).",
+        "$value": "{primitivo.fonte.familia.segoe}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.fonte.familia.rajdhani}"
+            }
+          }
+        }
+      },
+      "destaque": {
+        "$description": "Títulos de destaque do público (MAIÚSCULAS). No claro não há fonte de destaque: usa a de interface em negrito.",
+        "$value": "{primitivo.fonte.familia.segoe}",
+        "$extensions": {
+          "kib": {
+            "temas": {
+              "escuro": "{primitivo.fonte.familia.anton}"
+            }
+          }
+        }
+      },
+      "numero": {
+        "$description": "Tempos de volta, contadores, números tabulares.",
+        "$value": "{primitivo.fonte.familia.mono}"
+      }
+    },
+    "tamanho": {
+      "$type": "dimension",
+      "legenda": {
+        "$value": "11px"
+      },
+      "pequeno": {
+        "$value": "12px"
+      },
+      "corpo": {
+        "$value": "13px"
+      },
+      "corpo-leitura": {
+        "$description": "Corpo de texto corrido na web pública.",
+        "$value": "16px"
+      },
+      "subtitulo": {
+        "$value": "15px"
+      },
+      "titulo": {
+        "$value": "17px"
+      },
+      "titulo-grande": {
+        "$value": "22px"
+      },
+      "destaque": {
+        "$value": "28px"
+      },
+      "display-p": {
+        "$value": "34px"
+      },
+      "display-g": {
+        "$value": "48px"
+      }
+    },
+    "peso": {
+      "$type": "fontWeight",
+      "regular": {
+        "$value": "{primitivo.fonte.peso.regular}"
+      },
+      "medio": {
+        "$value": "{primitivo.fonte.peso.medio}"
+      },
+      "semibold": {
+        "$value": "{primitivo.fonte.peso.semibold}"
+      },
+      "negrito": {
+        "$value": "{primitivo.fonte.peso.negrito}"
+      }
+    },
+    "altura-linha": {
+      "$type": "number",
+      "titulo": {
+        "$description": "Nunca abaixo de 1 (acentos encavalam).",
+        "$value": 1.1
+      },
+      "corpo": {
+        "$value": 1.45
+      },
+      "leitura": {
+        "$value": 1.55
+      }
+    }
+  },
+  "espaco": {
+    "0": {
+      "$value": "{primitivo.dimensao.0}"
+    },
+    "1": {
+      "$value": "{primitivo.dimensao.8}"
+    },
+    "2": {
+      "$value": "{primitivo.dimensao.16}"
+    },
+    "3": {
+      "$value": "{primitivo.dimensao.24}"
+    },
+    "4": {
+      "$value": "{primitivo.dimensao.32}"
+    },
+    "5": {
+      "$value": "{primitivo.dimensao.40}"
+    },
+    "6": {
+      "$value": "{primitivo.dimensao.48}"
+    },
+    "8": {
+      "$value": "{primitivo.dimensao.64}"
+    },
+    "$type": "dimension",
+    "$description": "Grade de 8 pontos. 4 é meio passo (ícone↔texto). 12 e 20 só em operação densa (grades, barras).",
+    "meio": {
+      "$value": "{primitivo.dimensao.4}"
+    },
+    "denso-12": {
+      "$value": "{primitivo.dimensao.12}"
+    },
+    "denso-20": {
+      "$value": "{primitivo.dimensao.20}"
+    }
+  },
+  "raio": {
+    "$type": "dimension",
+    "chip": {
+      "$value": "{primitivo.dimensao.6}",
+      "$extensions": {
+        "kib": {
+          "temas": {
+            "escuro": "{primitivo.dimensao.4}"
+          }
+        }
+      },
+      "$description": "Chip/selo. Escuro 4 (meio passo da grade de 8), decidido 10/10/2026 (era 3)."
+    },
+    "campo": {
+      "$value": "{primitivo.dimensao.9}",
+      "$extensions": {
+        "kib": {
+          "temas": {
+            "escuro": "{primitivo.dimensao.8}"
+          }
+        }
+      }
+    },
+    "botao": {
+      "$value": "{primitivo.dimensao.10}",
+      "$extensions": {
+        "kib": {
+          "temas": {
+            "escuro": "{primitivo.dimensao.8}"
+          }
+        }
+      }
+    },
+    "cartao": {
+      "$value": "{primitivo.dimensao.14}"
+    },
+    "janela": {
+      "$value": "{primitivo.dimensao.18}",
+      "$extensions": {
+        "kib": {
+          "temas": {
+            "escuro": "{primitivo.dimensao.16}"
+          }
+        }
+      }
+    },
+    "pilula": {
+      "$value": "{primitivo.dimensao.999}"
+    }
+  },
+  "borda-largura": {
+    "$type": "dimension",
+    "padrao": {
+      "$value": "{primitivo.dimensao.1}"
+    },
+    "foco": {
+      "$value": "{primitivo.dimensao.2}"
+    }
+  },
+  "foco": {
+    "$type": "dimension",
+    "largura": {
+      "$value": "{primitivo.dimensao.2}"
+    },
+    "deslocamento": {
+      "$value": "{primitivo.dimensao.2}"
+    }
+  },
+  "elevacao": {
+    "1": {
+      "$description": "Cartão.",
+      "$value": {
+        "color": "#0000000F",
+        "offsetX": "0px",
+        "offsetY": "1px",
+        "blur": "2px",
+        "spread": "0px"
+      },
+      "$extensions": {
+        "kib": {
+          "temas": {
+            "escuro": {
+              "color": "#00000066",
+              "offsetX": "0px",
+              "offsetY": "2px",
+              "blur": "6px",
+              "spread": "0px"
+            }
+          }
+        }
+      }
+    },
+    "2": {
+      "$description": "Menu, popover, cartão destacado.",
+      "$value": {
+        "color": "#141E1414",
+        "offsetX": "0px",
+        "offsetY": "12px",
+        "blur": "32px",
+        "spread": "0px"
+      },
+      "$extensions": {
+        "kib": {
+          "temas": {
+            "escuro": {
+              "color": "#03050499",
+              "offsetX": "0px",
+              "offsetY": "22px",
+              "blur": "55px",
+              "spread": "0px"
+            }
+          }
+        }
+      }
+    },
+    "3": {
+      "$description": "Modal / diálogo.",
+      "$value": {
+        "color": "#00000033",
+        "offsetX": "0px",
+        "offsetY": "24px",
+        "blur": "64px",
+        "spread": "0px"
+      },
+      "$extensions": {
+        "kib": {
+          "temas": {
+            "escuro": {
+              "color": "#0000008C",
+              "offsetX": "0px",
+              "offsetY": "30px",
+              "blur": "90px",
+              "spread": "0px"
+            }
+          }
+        }
+      }
+    },
+    "$type": "shadow",
+    "$description": "Sombras. No tema escuro a elevação vem mais da superfície/borda que da sombra."
+  },
+  "movimento": {
+    "duracao": {
+      "$type": "duration",
+      "rapido": {
+        "$description": "Hover, foco, troca de cor.",
+        "$value": "{primitivo.duracao.120}"
+      },
+      "padrao": {
+        "$description": "Abrir menu, trocar aba, aparecer toast.",
+        "$value": "{primitivo.duracao.200}"
+      },
+      "lento": {
+        "$description": "Abrir modal, painel lateral.",
+        "$value": "{primitivo.duracao.320}"
+      }
+    },
+    "curva": {
+      "$type": "cubicBezier",
+      "padrao": {
+        "$value": [
+          0.2,
+          0,
+          0,
+          1
+        ]
+      },
+      "saida": {
+        "$value": [
+          0.4,
+          0,
+          1,
+          1
+        ]
+      }
+    }
+  },
+  "tela": {
+    "$type": "dimension",
+    "$description": "Larguras de teste/quebra (px lógicos).",
+    "celular": {
+      "$value": "360px"
+    },
+    "celular-g": {
+      "$value": "390px"
+    },
+    "tablet": {
+      "$value": "768px"
+    },
+    "toque-limite": {
+      "$description": "Abaixo disto, alvo de toque ≥ 44×44.",
+      "$value": "1024px"
+    },
+    "notebook": {
+      "$value": "1280px"
+    },
+    "notebook-g": {
+      "$value": "1366px"
+    },
+    "desktop": {
+      "$value": "1440px"
+    },
+    "desktop-g": {
+      "$value": "1536px"
+    },
+    "full-hd": {
+      "$value": "1920px"
+    }
+  },
+  "componente": {
+    "controle": {
+      "$type": "dimension",
+      "altura-p": {
+        "$description": "Botão/campo compacto (barras de cartão, grades).",
+        "$value": "{primitivo.dimensao.32}"
+      },
+      "altura-m": {
+        "$description": "Padrão de botão e campo.",
+        "$value": "{primitivo.dimensao.40}"
+      },
+      "altura-g": {
+        "$description": "Ação principal de destaque.",
+        "$value": "{primitivo.dimensao.48}"
+      },
+      "alvo-toque": {
+        "$description": "Mínimo de área de toque abaixo de 1024 px.",
+        "$value": "{primitivo.dimensao.48}"
+      }
+    },
+    "tabela": {
+      "$type": "dimension",
+      "cabecalho-altura": {
+        "$value": "{primitivo.dimensao.32}"
+      },
+      "linha-altura": {
+        "$value": "{primitivo.dimensao.32}"
+      },
+      "linha-altura-ao-vivo": {
+        "$value": "{primitivo.dimensao.32}"
+      }
+    },
+    "janela": {
+      "$type": "dimension",
+      "cabecalho-altura": {
+        "$value": "62px"
+      },
+      "rodape-altura": {
+        "$value": "60px"
+      },
+      "largura-padrao": {
+        "$value": "960px"
+      },
+      "altura-padrao": {
+        "$value": "680px"
+      }
+    },
+    "totem": {
+      "$description": "Totem de autoatendimento: visual APROVADO e congelado. Alvo de toque generoso.",
+      "alvo-toque": {
+        "$type": "dimension",
+        "$value": "{primitivo.dimensao.64}"
+      },
+      "acao": {
+        "$type": "color",
+        "$value": "{primitivo.cor.neon.400}"
+      },
+      "fundo": {
+        "$type": "color",
+        "$value": "{primitivo.cor.noite.950}"
+      },
+      "cartao": {
+        "$type": "color",
+        "$value": "#FFFFFF12",
+        "$description": "Cartão de vidro sobre o fundo (branco 7%)."
+      },
+      "verde-escuro": {
+        "$type": "color",
+        "$value": "#007A3D"
+      },
+      "verde-suave": {
+        "$type": "color",
+        "$value": "#BFEFD2"
+      },
+      "texto": {
+        "$type": "color",
+        "$value": "#F7FAF6"
+      },
+      "texto-suave": {
+        "$type": "color",
+        "$value": "#B7C2BA"
+      },
+      "texto-muito-suave": {
+        "$type": "color",
+        "$value": "#829388"
+      },
+      "campo": {
+        "$type": "color",
+        "$value": "#0B100C"
+      },
+      "borda-campo": {
+        "$type": "color",
+        "$value": "#415044"
+      },
+      "amarelo": {
+        "$type": "color",
+        "$value": "#FACC15"
+      },
+      "informativo-fundo": {
+        "$type": "color",
+        "$value": "#184030"
+      },
+      "informativo-texto": {
+        "$type": "color",
+        "$value": "#97F7C2"
+      },
+      "super-fundo": {
+        "$type": "color",
+        "$value": "#4C390C",
+        "$description": "Selo do kart Super (fundo)."
+      },
+      "super-texto": {
+        "$type": "color",
+        "$value": "#FFD24A",
+        "$description": "Selo do kart Super (texto)."
+      },
+      "foco": {
+        "$type": "color",
+        "$value": "#00E676",
+        "$description": "Anel de foco do teclado no totem."
+      },
+      "grade": {
+        "$type": "color",
+        "$value": "#FFFFFF09",
+        "$description": "Grade de fundo (branco 3,5%)."
+      },
+      "divisor": {
+        "$type": "color",
+        "$value": "#FFFFFF18",
+        "$description": "Divisor dentro do cartão."
+      },
+      "contorno": {
+        "$type": "color",
+        "$value": "#FFFFFF1A",
+        "$description": "Contorno de botão/cartão claro."
+      },
+      "contorno-forte": {
+        "$type": "color",
+        "$value": "#FFFFFF26",
+        "$description": "Contorno de botão sob o dedo."
+      },
+      "botao-claro-sobre": {
+        "$type": "color",
+        "$value": "#FFFFFF2A",
+        "$description": "Botão claro sob o dedo."
+      },
+      "check-topo": {
+        "$type": "color",
+        "$value": "#4CE07A",
+        "$description": "Bolinha do “ok” (degradê, cima)."
+      },
+      "check-base": {
+        "$type": "color",
+        "$value": "#1FA64A",
+        "$description": "Bolinha do “ok” (degradê, baixo)."
+      },
+      "check-borda": {
+        "$type": "color",
+        "$value": "#D0D0D0",
+        "$description": "Borda da caixa de marcar desligada."
+      },
+      "menu-selecionado": {
+        "$type": "color",
+        "$value": "#464A50",
+        "$description": "Item de menu sob o ponteiro (menu da equipe)."
+      },
+      "campo-desligado": {
+        "$type": "color",
+        "$value": "#222428",
+        "$description": "Campo desabilitado."
+      },
+      "botao-claro-pressionado": {
+        "$type": "color",
+        "$value": "#E8ECE8",
+        "$description": "Botão claro (texto escuro) sob o dedo."
+      },
+      "passo-pendente": {
+        "$type": "color",
+        "$value": "#FFFFFF14",
+        "$description": "Bolinha de etapa ainda não feita."
+      },
+      "veu-leve": {
+        "$type": "color",
+        "$value": "#FFFFFF0A",
+        "$description": "Véu claro sobre o termo."
+      },
+      "linha-lista": {
+        "$type": "color",
+        "$value": "#FFFFFF0C",
+        "$description": "Linha de lista não marcada."
+      },
+      "linha-fina": {
+        "$type": "color",
+        "$value": "#FFFFFF14",
+        "$description": "Linha divisória fina."
+      },
+      "trilho": {
+        "$type": "color",
+        "$value": "#FFFFFF2D",
+        "$description": "Trilho da barra de rolagem."
+      },
+      "contorno-caixa": {
+        "$type": "color",
+        "$value": "#FFFFFFB4",
+        "$description": "Contorno da caixa de marcar desligada."
+      },
+      "marca-check": {
+        "$type": "color",
+        "$value": "#00210A",
+        "$description": "Traço do “ok” sobre o verde."
+      }
+    },
+    "tablet": {
+      "alvo-toque": {
+        "$type": "dimension",
+        "$value": "{primitivo.dimensao.48}"
+      }
+    }
+  },
+  "legado": {
+    "desktop": {
+      "$description": "Nomes antigos de Kartodromo.Comum.Tokens com o valor EXATO de hoje (não mudam nenhum pixel). Telas novas usam os tokens semânticos.",
+      "$extensions": {
+        "kib": {
+          "legado": true
+        }
+      },
+      "Texto": {
+        "$type": "color",
+        "$description": "Texto principal (#1D1D1F).",
+        "$value": "{primitivo.cor.cinza.900}",
+        "$deprecated": "use cor.texto.principal"
+      },
+      "TextoSecundario": {
+        "$type": "color",
+        "$description": "Rótulos, subtítulos, legendas (#6E6E73).",
+        "$value": "{primitivo.cor.cinza.500}",
+        "$deprecated": "use cor.texto.secundario"
+      },
+      "TextoTerciario": {
+        "$type": "color",
+        "$description": "Dicas e placeholders (#8E8E93).",
+        "$value": "{primitivo.cor.cinza.400}",
+        "$deprecated": "use cor.texto.terciario (#76767B passa 4.5:1)"
+      },
+      "TextoDesabilitado": {
+        "$type": "color",
+        "$description": "Texto/controle desabilitado e bordas fortes (#C7C7CC).",
+        "$value": "{primitivo.cor.cinza.300}",
+        "$deprecated": "use cor.texto.desabilitado"
+      },
+      "Fundo": {
+        "$type": "color",
+        "$description": "Fundo das janelas e da área de trabalho (#F5F5F7).",
+        "$value": "{primitivo.cor.cinza.75}",
+        "$deprecated": "use cor.fundo.app"
+      },
+      "Superficie": {
+        "$type": "color",
+        "$description": "Cartões, campos e cabeçalhos.",
+        "$value": "{primitivo.cor.branco}",
+        "$deprecated": "use cor.superficie.padrao",
+        "$extensions": {
+          "kib": {
+            "csharp": {
+              "corConhecida": "White"
+            }
+          }
+        }
+      },
+      "SuperficieSuave": {
+        "$type": "color",
+        "$description": "Superfície levemente cinza: menus suspensos, cabeçalho de tabela (#FAFAFC).",
+        "$value": "{primitivo.cor.cinza.50}",
+        "$deprecated": "use cor.superficie.suave"
+      },
+      "FundoCampo": {
+        "$type": "color",
+        "$description": "Busca, segmentados e botões “fantasma” (#F2F2F5).",
+        "$value": "{primitivo.cor.cinza.100}",
+        "$deprecated": "use cor.superficie.campo"
+      },
+      "Lateral": {
+        "$type": "color",
+        "$description": "Lateral (árvore) da tela principal (#ECECF0).",
+        "$value": "{primitivo.cor.cinza.150}",
+        "$deprecated": "use cor.superficie.lateral"
+      },
+      "Linha": {
+        "$type": "color",
+        "$description": "Linha divisória e borda de cartão/campo (#E5E5EA).",
+        "$value": "{primitivo.cor.cinza.200}",
+        "$deprecated": "use cor.borda.sutil"
+      },
+      "BordaCampo": {
+        "$type": "color",
+        "$description": "Borda de campo de digitação sem foco (#DBDBDB).",
+        "$value": "{primitivo.cor.cinza.250}",
+        "$deprecated": "use cor.borda.campo"
+      },
+      "BotaoSecundario": {
+        "$type": "color",
+        "$description": "Botão secundário (Cancelar, Fechar, ✕) (#EBEBEF).",
+        "$value": "{primitivo.cor.cinza.125}",
+        "$deprecated": "use cor.acao.secundaria"
+      },
+      "Verde": {
+        "$type": "color",
+        "$description": "Ação principal (Salvar, Entrar, seleção) (#0B7A53).",
+        "$value": "{primitivo.cor.verde.600}",
+        "$deprecated": "use cor.acao.principal"
+      },
+      "VerdeEscuro": {
+        "$type": "color",
+        "$description": "Verde escuro de texto sobre verde suave (#0A5E40).",
+        "$value": "{primitivo.cor.verde.700}",
+        "$deprecated": "use cor.acao.principal-pressionado"
+      },
+      "VerdeTexto": {
+        "$type": "color",
+        "$description": "Valores positivos / ativo (#1C6B35).",
+        "$value": "{primitivo.cor.verde.650}",
+        "$deprecated": "use cor.estado.sucesso.texto"
+      },
+      "VerdeSuave": {
+        "$type": "color",
+        "$description": "Fundo verde suave (botão de campo, selo “Ativo”) (#E8F5EE).",
+        "$value": "{primitivo.cor.verde.50}",
+        "$deprecated": "use cor.estado.sucesso.fundo"
+      },
+      "VerdeSelecao": {
+        "$type": "color",
+        "$description": "Seleção na lateral (#DAE8E1).",
+        "$value": "{primitivo.cor.verde.100}",
+        "$deprecated": "use cor.selecao.fundo"
+      },
+      "VerdeStatus": {
+        "$type": "color",
+        "$description": "Bolinha de status on-line / interruptor ligado (#34C759).",
+        "$value": "{primitivo.cor.verde.500}",
+        "$deprecated": "use cor.status.online"
+      },
+      "Vermelho": {
+        "$type": "color",
+        "$description": "Perigo: excluir, estornar, valores negativos (#C4281C).",
+        "$value": "{primitivo.cor.vermelho.600}",
+        "$deprecated": "use cor.estado.perigo.texto"
+      },
+      "Laranja": {
+        "$type": "color",
+        "$description": "Atenção em texto: a pagar, pendente (#B26A00).",
+        "$value": "{primitivo.cor.laranja.600}",
+        "$deprecated": "use cor.estado.aviso.texto (#9A5B00 passa 4.5:1)"
+      },
+      "LaranjaVivo": {
+        "$type": "color",
+        "$description": "Selo/contador laranja (#FF9F0A).",
+        "$value": "{primitivo.cor.laranja.400}",
+        "$deprecated": "use cor.estado.aviso.solido"
+      },
+      "LaranjaEscuro": {
+        "$type": "color",
+        "$description": "Texto sobre fundo laranja suave (#8A4B00).",
+        "$value": "{primitivo.cor.laranja.800}",
+        "$deprecated": "use cor.estado.aviso.texto"
+      },
+      "Azul": {
+        "$type": "color",
+        "$description": "Informação / links (#1E6FE8).",
+        "$value": "{primitivo.cor.azul.500}",
+        "$deprecated": "use cor.texto.link / cor.estado.info.solido (#0A63D6 passa 4.5:1)"
+      },
+      "AzulTexto": {
+        "$type": "color",
+        "$description": "Texto azul sobre azul suave (#0A4FA0).",
+        "$value": "{primitivo.cor.azul.700}",
+        "$deprecated": "use cor.estado.info.texto"
+      },
+      "AzulSuave": {
+        "$type": "color",
+        "$description": "Fundo azul suave (selo “Classificatório”, “Incluindo”) (#E1EEFF).",
+        "$value": "{primitivo.cor.azul.50}",
+        "$deprecated": "use cor.estado.info.fundo"
+      },
+      "Preto": {
+        "$type": "color",
+        "$description": "Superfície escura (painel do troco, lateral do voucher) (#1C1C1E).",
+        "$value": "{primitivo.cor.cinza.800}",
+        "$deprecated": "use cor.superficie.inversa"
+      },
+      "Grafite": {
+        "$type": "color",
+        "$description": "Cinza-grafite de ícones e texto sobre escuro (#3A3A3C).",
+        "$value": "{primitivo.cor.cinza.700}",
+        "$deprecated": "use cor.texto.secundario / ícone"
+      },
+      "RaioCampo": {
+        "$type": "dimension",
+        "$value": "9px",
+        "$deprecated": "use raio.campo"
+      },
+      "RaioBotao": {
+        "$type": "dimension",
+        "$value": "10px",
+        "$deprecated": "use raio.botao"
+      },
+      "RaioCartao": {
+        "$type": "dimension",
+        "$value": "14px",
+        "$deprecated": "use raio.cartao"
+      },
+      "RaioJanela": {
+        "$type": "dimension",
+        "$value": "18px",
+        "$deprecated": "use raio.janela"
+      },
+      "Espaco1": {
+        "$type": "dimension",
+        "$value": "4px",
+        "$deprecated": "use espaco.meio"
+      },
+      "Espaco2": {
+        "$type": "dimension",
+        "$value": "8px",
+        "$deprecated": "use espaco.1"
+      },
+      "Espaco3": {
+        "$type": "dimension",
+        "$value": "12px",
+        "$deprecated": "use espaco.denso-12 (ATENÇÃO: espaco.3 novo = 24)"
+      },
+      "Espaco4": {
+        "$type": "dimension",
+        "$value": "16px",
+        "$deprecated": "use espaco.2"
+      },
+      "Espaco5": {
+        "$type": "dimension",
+        "$value": "20px",
+        "$deprecated": "use espaco.denso-20"
+      },
+      "Espaco6": {
+        "$type": "dimension",
+        "$value": "24px",
+        "$deprecated": "use espaco.3"
+      },
+      "Legenda": {
+        "$type": "fontSize",
+        "$value": 11,
+        "$deprecated": "use fonte.tamanho.legenda"
+      },
+      "Pequeno": {
+        "$type": "fontSize",
+        "$value": 12,
+        "$deprecated": "use fonte.tamanho.pequeno"
+      },
+      "Corpo": {
+        "$type": "fontSize",
+        "$value": 13,
+        "$deprecated": "use fonte.tamanho.corpo"
+      },
+      "CorpoMaior": {
+        "$type": "fontSize",
+        "$value": 13.5,
+        "$deprecated": "use fonte.tamanho.corpo ou subtitulo"
+      },
+      "Subtitulo": {
+        "$type": "fontSize",
+        "$value": 15,
+        "$deprecated": "use fonte.tamanho.subtitulo"
+      },
+      "Titulo": {
+        "$type": "fontSize",
+        "$value": 17,
+        "$deprecated": "use fonte.tamanho.titulo"
+      },
+      "TituloGrande": {
+        "$type": "fontSize",
+        "$value": 22,
+        "$deprecated": "use fonte.tamanho.titulo-grande"
+      }
+    }
+  }
+}

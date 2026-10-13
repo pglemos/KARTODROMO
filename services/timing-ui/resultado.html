@@ -1,9 +1,10 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-tema="claro">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Relatório Oficial de Cronometragem</title>
+<link rel="stylesheet" href="/tokens.css">
 <style>
   :root {
     --text: #000000;
@@ -351,23 +352,24 @@
     }
   }
 
-  /* Refinamento visual Impeccable: tela operacional clara, papel reservado para impressão. */
+  /* Tela operacional clara, papel reservado para impressão. Cores dos tokens (tema claro, /tokens.css); o valor
+     depois da vírgula é a reserva se o tokens.css não carregar. docs/design-system/05-plataformas/timing-ui.md */
   :root {
-    --page-bg: #e8eee9;
-    --surface: #ffffff;
-    --surface-subtle: #f4f7f5;
-    --ink: #15201a;
-    --muted: #526057;
-    --line: #cbd5ce;
-    --line-strong: #78867d;
-    --accent: #087f48;
-    --accent-strong: #065d35;
-    --accent-soft: #e5f4eb;
-    --warning: #8a5200;
-    --warning-soft: #fff5d9;
-    --danger: #a62b24;
-    --danger-soft: #fff0ee;
-    --focus: #00a86b;
+    --page-bg: var(--kib-cor-fundo-app, #F5F5F7);
+    --surface: var(--kib-cor-superficie-padrao, #FFFFFF);
+    --surface-subtle: var(--kib-cor-superficie-suave, #FAFAFC);
+    --ink: var(--kib-cor-texto-principal, #1D1D1F);
+    --muted: var(--kib-cor-texto-secundario, #6E6E73);
+    --line: var(--kib-cor-borda-forte, #C7C7CC);
+    --line-strong: var(--kib-cor-texto-terciario, #76767B);
+    --accent: var(--kib-cor-acao-principal, #0B7A53);
+    --accent-strong: var(--kib-cor-acao-principal-pressionado, #0A5E40);
+    --accent-soft: var(--kib-cor-estado-sucesso-fundo, #E8F5EE);
+    --warning: var(--kib-cor-estado-aviso-texto, #9A5B00);
+    --warning-soft: var(--kib-cor-estado-aviso-fundo, #FFF4E0);
+    --danger: var(--kib-cor-estado-perigo-texto, #C4281C);
+    --danger-soft: var(--kib-cor-estado-perigo-fundo, #FDECEA);
+    --focus: var(--kib-cor-borda-foco, #0B7A53);
   }
 
   html { min-width: 320px; }
@@ -375,7 +377,7 @@
   body {
     background: var(--page-bg);
     color: var(--ink);
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: var(--kib-fonte-familia-interface, "Segoe UI"), system-ui, sans-serif;
     font-size: 14px;
     line-height: 1.45;
   }
@@ -765,6 +767,15 @@
   .penalidades-bloco ul { margin: 4px 0 0; padding-left: 18px; }
   .penalidades-bloco li { margin: 2px 0; }
   .pen-quem { color: var(--muted); }
+  .observacoes-bloco {
+    break-inside: avoid;
+    color: var(--ink);
+    font-size: 12px;
+  }
+  .observacoes-bloco ul { margin: 4px 0 0; padding-left: 18px; }
+  .observacoes-bloco li { margin: 3px 0; }
+  .observacao-text { color: var(--ink); }
+  .observacao-meta { color: var(--muted); font-size: 11px; }
 
   /* Assinaturas iguais, com nome e data */
   .signatures-table td { text-align: left; }
@@ -857,6 +868,8 @@
     .nota-rotulo { font-size: 7pt; margin-right: 2mm; }
     .legend-details { font-size: 7.5pt; line-height: 1.45; break-inside: avoid; color: #333; }
     .penalidades-bloco { font-size: 8pt; break-inside: avoid; }
+    .observacoes-bloco { font-size: 8pt; }
+    .observacao-meta { font-size: 7.5pt; }
     .rep-footer { margin-top: 6mm; break-inside: avoid; }
     .signatures-table { margin-bottom: 0; }
     .signatures-table td { padding: 0 5mm; }
@@ -1207,6 +1220,7 @@ function atualizarPaginacao() {
 function finalizarRenderReport() {
   renderDataWarnings();
   aprimorarTabelas();
+  renderObservacoes();
   atualizarPaginacao();
 }
 
@@ -1340,8 +1354,9 @@ function preencherCabecalho() {
   document.getElementById('hdrSub2').textContent = quando;
   // traçado da bateria (Editar bateria › traçado), senão o da prova/evento, senão o padrão
   const trac = v.track || {};
-  const metros = Number(trac.lengthMeters) > 0 ? `${Number(trac.lengthMeters).toLocaleString('pt-BR')} m` : '1.110 m';
-  document.getElementById('hdrSub3').textContent = `${cleanText(trac.name) || 'Traçado principal'} · ${metros} · ${pilotos} ${pilotos === 1 ? 'piloto' : 'pilotos'}`;
+  // sem extensão conhecida não inventa número (antes saía "1.110 m" fixo, diferente do padrão configurado)
+  const metros = Number(trac.lengthMeters) > 0 ? `${Number(trac.lengthMeters).toLocaleString('pt-BR')} m` : '';
+  document.getElementById('hdrSub3').textContent = [cleanText(trac.name) || 'Traçado principal', metros, `${pilotos} ${pilotos === 1 ? 'piloto' : 'pilotos'}`].filter(Boolean).join(' · ');
   const agora = new Date();
   document.getElementById('hdrDateTime').textContent = `Emitido em ${fmtData(agora)} às ${fmtHora(agora)}`;
   atualizarRegraVisual(v.type);
@@ -1366,7 +1381,54 @@ function blocoPenalidades() {
   }
   if (!itens.length) return '';
   itens.sort((a, b) => a.ms - b.ms);
-  return `<div class="penalidades-bloco"><span class="nota-rotulo">Advertências e penalidades</span><ul>${itens.map(i => `<li>${i.html}</li>`).join('')}</ul></div>`;
+  return `<div class="penalidades-bloco"><span class="nota-rotulo">Penalidades e punições</span><ul>${itens.map(i => `<li>${i.html}</li>`).join('')}</ul></div>`;
+}
+
+// No relatório só entra o que o piloto precisa saber (áudio de 06/10): advertência, penalização e troca de kart.
+// Penalidade/advertência/bandeira preta registradas pelo botão já saem em "Penalidades e punições" (blocoPenalidades);
+// aqui fica a troca de kart e a advertência/penalidade escrita à mão que não esteja já naquele bloco. Relargada, sorteio,
+// condição de pista e demais anotações ficam só no diário da cronometragem (mesma regra de lib/timing/email-resultado.ts).
+const OBSERVACAO_PENALIDADE = /^(?:ADV\b|PEN\b|Advert[eê]ncia|Penalidade|Penaliza[cç][aã]o|Puni[cç][aã]o|Bandeira preta|Desclassifica)/i;
+function deveExibirObservacao(observation) {
+  const kind = cleanText(observation?.kind).toLowerCase();
+  const text = cleanText(observation?.text);
+  if (!text || kind === 'system' || kind === 'penalty') return false;
+  if (kind === 'kart-swap' || /^Troca de kart\b/i.test(text)) return true;
+  const textosPenalidades = (sessionData?.competitors || []).flatMap((c) => (c.penalidades || []).map((p) => cleanText(p.texto)));
+  return OBSERVACAO_PENALIDADE.test(text) && !textosPenalidades.some((t) => t && text.startsWith(t));
+}
+
+// Observações registradas na aba Observações da cronometragem. Este bloco fica fora
+// da tabela para aparecer de forma consistente em todos os formatos de relatório.
+function blocoObservacoes(observations = sessionData?.observations) {
+  const itens = Array.isArray(observations)
+    ? observations
+      .filter(deveExibirObservacao)
+      .map((observation) => ({
+        text: cleanText(observation?.text),
+        author: cleanText(observation?.author),
+        when: observation?.wallMs ? formatarDataHora(observation.wallMs) : ''
+      }))
+      .filter((observation) => observation.text)
+    : [];
+
+  if (!itens.length) return '';
+
+  return `<section class="observacoes-bloco" id="observacoesBloco" aria-labelledby="observacoesTitulo">
+    <span class="nota-rotulo" id="observacoesTitulo">Observações da prova</span>
+    <ul>${itens.map((observation) => {
+      const meta = [observation.author, observation.when].filter(Boolean).join(' · ');
+      return `<li><span class="observacao-text">${esc(observation.text)}</span>${meta ? ` <span class="observacao-meta">(${esc(meta)})</span>` : ''}</li>`;
+    }).join('')}</ul>
+  </section>`;
+}
+
+function renderObservacoes() {
+  const notes = document.getElementById('notesContainer');
+  if (!notes) return;
+  notes.querySelector('#observacoesBloco')?.remove();
+  const html = blocoObservacoes();
+  if (html) notes.insertAdjacentHTML('beforeend', html);
 }
 
 function dataValida(value) {

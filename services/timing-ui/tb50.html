@@ -174,9 +174,31 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
     x.send(null);
   }
 
+  // Fluxo ao vivo: o servidor empurra o placar no instante em que o kart cruza a linha (antes: pergunta 1x/s,
+  // o piloto via o tempo até 1,5 s depois). Sem fluxo (servidor antigo, rede caiu), volta a perguntar a cada 250 ms.
+  var fluxo = null;
+  var fluxoAberto = false;
+  function abrirFluxo() {
+    if (!window.EventSource) return;
+    try {
+      if (fluxo) fluxo.close();
+      fluxo = new EventSource('/api/livetime-snapshot/eventos?painel=tb50');
+      fluxo.onopen = function () { fluxoAberto = true; };
+      fluxo.addEventListener('snapshot', function (e) {
+        fluxoAberto = true;
+        try { var s = JSON.parse(e.data); if (s && s.drivers) { ultimo = s; desenhar(); } } catch (err) {}
+      });
+      fluxo.onerror = function () { fluxoAberto = false; };
+    } catch (e) { fluxoAberto = false; fluxo = null; }
+  }
+
+  var voltas = 0;
   function atualizar() {
-    pegar('/api/livetime-snapshot?painel=tb50', function (s) { if (s && s.drivers) ultimo = s; });
-    pegar('/api/tb50-page', function (p) { offset = p && p.offset > 0 ? p.offset : 0; });
+    voltas++;
+    if (!fluxoAberto) pegar('/api/livetime-snapshot?painel=tb50', function (s) { if (s && s.drivers) ultimo = s; });
+    if (voltas % 4 === 0) pegar('/api/tb50-page', function (p) { offset = p && p.offset > 0 ? p.offset : 0; });
+    // fluxo fechado de vez (ex.: servidor reiniciando): tenta abrir de novo a cada 10 s
+    if (voltas % 40 === 0 && (!fluxo || fluxo.readyState === 2)) abrirFluxo();
   }
 
   // avisa o servidor que a página está viva na TB50 (e com qual navegador)
@@ -189,8 +211,9 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
   montarCasas();
   escala();
   window.onresize = escala;
+  abrirFluxo();
   atualizar();
-  setInterval(atualizar, 1000);
+  setInterval(atualizar, 250);
   setInterval(desenhar, 500);
   ping();
   setInterval(ping, 30000);

@@ -1,5 +1,10 @@
 # Brandbook e Direção Visual - Kartódromo Internacional de Betim
 
+> **SUBSTITUÍDO** (08/10/2026) por [`docs/design-system/`](design-system/README.md). As cores e fontes valem a partir de
+> [`tokens/kib.tokens.json`](../tokens/kib.tokens.json); a identidade está em
+> [`00-fundacao/identidade-visual.md`](design-system/00-fundacao/identidade-visual.md). Este arquivo fica só como histórico —
+> não use os valores abaixo (ex.: o verde `#3B8B78` não é mais da marca).
+
 Versão: 1.0
 Data: 2026-06-20
 Objetivo: orientar o redesign completo do site do Kartódromo Internacional de Betim, mantendo a logo original e migrando a experiência para uma linguagem clara, premium, técnica e com energia de motorsport.

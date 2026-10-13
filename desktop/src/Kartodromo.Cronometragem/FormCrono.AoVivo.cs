@@ -8,6 +8,22 @@ public partial class FormCrono
 {
     string BandeiraNome(string flag) => flag switch { "green" => "verde", "yellow" => "amarela", "red" => "vermelha", "white" => "branca", "checkered" => "quadriculada", _ => "sem bandeira" };
 
+    /// <summary>Registra a condição da bateria sem alterar o traçado selecionado.</summary>
+    void AlternarChuva()
+    {
+        if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
+        var chuva = !_sess.B("chuva");
+        Seguro.Rodar(this, async () =>
+        {
+            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/weather", new JsonObject
+            {
+                ["chuva"] = chuva,
+                ["autor"] = Environment.UserName,
+            });
+            await Atualizar();
+        });
+    }
+
     void Bandeira(string cor)
     {
         if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
@@ -36,7 +52,11 @@ public partial class FormCrono
     {
         if (_sess == null || _gPass.ChaveAtual is not JsonObject passagem) { Msg.Aviso(this, "Selecione uma passagem para corrigir."); return; }
         var frase = acao switch { "delete" => "excluir", "restore" => "restaurar", "invalidate" => "invalidar", _ => "validar" };
-        if (!Msg.Pergunta(this, acima ? $"{frase.ToUpperInvariant()} esta passagem e todas as passagens acima dela?" : $"{frase.ToUpperInvariant()} a passagem selecionada?")) return;
+        var kart = passagem.S("kart");
+        var pergunta = acima
+            ? $"{frase.ToUpperInvariant()} esta passagem e as posteriores do kart {kart}? Os outros karts não serão afetados."
+            : $"{frase.ToUpperInvariant()} a passagem selecionada do kart {kart}?";
+        if (!Msg.Pergunta(this, pergunta)) return;
         Seguro.Rodar(this, async () =>
         {
             await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/passings/actions", new JsonObject {
@@ -91,6 +111,79 @@ public partial class FormCrono
         await Atualizar();
     }
 
+    /// <summary>Exclui a observação selecionada na grade (aba Observações). Pergunta antes; fica registrado no log do servidor.</summary>
+    async Task ExcluirObservacao(LiveGrid grade)
+    {
+        if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
+        if (grade.ChaveAtual is not JsonObject o || o.S("id").Length == 0) { Msg.Aviso(this, "Clique na observação que quer excluir."); return; }
+        var sessaoId = _sess.S("id");
+        var texto = o.S("text");
+        if (!Msg.Confirmar(this, "Excluir esta observação?", $"{Crono.Hora(o.L("wallMs"))}  {texto}\n\nEla sai do resultado e dos relatórios.", "Excluir observação")) return;
+        await Crono.Api.Delete($"/api/sessions/{sessaoId}/observations/{Uri.EscapeDataString(o.S("id"))}?autor={Uri.EscapeDataString(Environment.UserName)}");
+        await Atualizar();
+    }
+
+    /// <summary>Corrige a posição quando um sensor deixa de marcar um kart.
+    /// Duplo clique no resultado abre esta janela centrada; 0 devolve o kart à ordem automática.</summary>
+    void EditarPosicao(JsonObject standing)
+    {
+        if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
+        if (standing == null) { Msg.Aviso(this, "Selecione um competidor no resultado."); return; }
+        var kart = standing.S("kart");
+        if (string.IsNullOrWhiteSpace(kart))
+        {
+            Toast.Mostrar(this, "Este piloto ainda não tem kart. Atribua um kart no registro de competidores antes de ajustar a posição.", Estado.Aviso);
+            return;
+        }
+        var atual = standing.I("manualPosition") > 0 ? standing.I("manualPosition") : standing.I("position");
+        using var dialog = new DialogoDados(
+            "Ajustar posição",
+            $"Kart {kart} · {standing.S("name")} · posição atual: {atual} · informe a nova posição",
+            new[] { ("Nova posição (1 = líder; 0 = automática)", "position", atual.ToString()) },
+            new Size(620, 300));
+        if (dialog.ShowDialog(this) != DialogResult.OK || !dialog.Confirmado) return;
+        var texto = dialog.Valor("position");
+        if (!int.TryParse(texto, out var posicao) || posicao < 0)
+        {
+            Msg.Aviso(this, "Informe uma posição inteira. Use 0 para voltar à ordem automática.");
+            return;
+        }
+        Seguro.Rodar(this, async () =>
+        {
+            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/position", new JsonObject { ["kart"] = kart, ["position"] = posicao == 0 ? null : posicao, ["autor"] = Environment.UserName });
+            await Atualizar();
+        });
+    }
+
+    /// <summary>Remove a volta válida mais recente do competidor selecionado no resultado.</summary>
+    void RetirarUltimaVolta(JsonObject standing)
+    {
+        if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
+        if (standing == null) { Msg.Aviso(this, "Selecione um competidor no resultado."); return; }
+        var kart = standing.S("kart");
+        if (string.IsNullOrWhiteSpace(kart))
+        {
+            Toast.Mostrar(this, "Este piloto ainda não tem kart nem volta para retirar. Atribua um kart no registro de competidores.", Estado.Aviso);
+            return;
+        }
+        var passagem = _laps
+            .Where(p => p.S("kart") == kart && p.S("id").Length > 0 && !p.B("deleted") && !p.B("invalid") && !p.B("rejected") && p.L("lapMs") is long ms && ms > 0)
+            .OrderByDescending(p => p.L("wallMs") ?? 0)
+            .FirstOrDefault();
+        if (passagem == null) { Msg.Info(this, $"O kart {kart} não tem volta válida para retirar."); return; }
+        var volta = passagem.I("lap");
+        var tempo = Crono.Volta(passagem.L("lapMs"));
+        if (!Msg.Pergunta(this, $"Retirar a última volta válida do kart {kart} (volta {volta}, {tempo})?\n\nO resultado e as posições serão recalculados. A passagem poderá ser restaurada na lista de passagens.")) return;
+        Seguro.Rodar(this, async () =>
+        {
+            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/passings/actions", new JsonObject {
+                ["action"] = "delete",
+                ["ids"] = new JsonArray(JsonValue.Create(passagem.S("id"))),
+            });
+            await Atualizar();
+        });
+    }
+
     void AtualizarResultadoCompetidores()
     {
         if (_sess == null) { _gResultComp.Preencher([]); _gCategoriaComp.Preencher([]); return; }
@@ -111,7 +204,7 @@ public partial class FormCrono
     {
         var dl = r.I("position") == 1 ? "" : r.I("gapLaps") > 0 ? $"+{r.I("gapLaps")} volta{(r.I("gapLaps") == 1 ? "" : "s")}" : Crono.Volta(r.L("gapMs"));
         var speed = double.TryParse(r["averageSpeedKmh"]?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var kmh) ? kmh.ToString("0.0", Fmt.Br) : "—";
-        return [r.I("position"), r.S("kart"), r.S("name"), r.S("bestLapNumber"), Crono.Volta(r.L("bestLapMs")), r.I("laps"), Crono.Volta(r.L("lastLapMs")), Crono.Volta(r.L("totalMs")), dl, "", speed];
+        return [r.I("position"), r.S("kart"), r.S("name"), r.S("bestLapNumber"), Crono.Volta(r.L("bestLapMs")), r.I("laps"), Crono.Volta(r.L("lastLapMs")), Crono.Volta(r.L("totalMs")), dl, r.I("manualPosition") > 0 ? "Manual" : "", speed];
     }
 
     void EnviarWhatsApp()

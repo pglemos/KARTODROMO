@@ -4,73 +4,447 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cronometragem · TV</title>
+<!-- TV da sala (público): tema escuro dos tokens (tokens/kib.tokens.json). O valor depois da vírgula é a reserva. -->
+<link rel="stylesheet" href="/tokens.css">
 <style>
-  * { box-sizing:border-box; }
-  html, body { margin:0; height:100%; background:#000; color:#fff; font-family: system-ui, "Segoe UI", sans-serif; overflow:hidden; cursor:none; }
-  .bar { display:flex; align-items:center; gap:2vw; padding:1.4vh 2vw; background:#0a3d1f; }
-  .bar .name { font-size:4vh; font-weight:900; text-transform:uppercase; }
-  .bar .state { font-size:2.4vh; font-weight:800; padding:.4vh 1vw; border-radius:.6vh; background:#1db954; color:#000; }
-  .bar .state.fin { background:#fff; }
-  .bar .timer { margin-left:auto; font:900 6vh/1 ui-monospace, Consolas, monospace; }
-  /* larguras fixas: a letra cresce pela altura (vh) e em 16:9 a última coluna (Dif.) saía cortada da tela */
-  table { width:100%; border-collapse:collapse; table-layout:fixed; }
-  th { font-size:2.2vh; color:#8b978f; text-align:left; padding:.8vh 1.2vw; font-weight:700; text-transform:uppercase; }
-  td { font-size:var(--fs, 4.2vh); padding:.35vh .8vw; font-weight:800; font-variant-numeric:tabular-nums; border-top:1px solid #1a1a1a; white-space:nowrap; }
-  tr:nth-child(even) td { background:#0c0c0c; }
-  .pos { color:#f5c518; } .kart b { background:#fff; color:#000; border-radius:.5vh; padding:0 .6vw; }
-  .nm { overflow:hidden; text-overflow:ellipsis; }
-  th { padding:.8vh .8vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .t { font-family: ui-monospace, Consolas, monospace; text-align:right; }
-  .best { color:#c77dff; }
-  .flash td { animation: fl 1.2s ease-out; }
-  @keyframes fl { from { background:#1d5c34; } to { background:transparent; } }
-  .idle { height:80vh; display:flex; align-items:center; justify-content:center; font-size:5vh; color:#555; }
+  :root {
+    --fundo: var(--kib-cor-fundo-app, #030504);
+    --texto: var(--kib-cor-texto-principal, #F7FAF6);
+    --sec: var(--kib-cor-texto-secundario, #A8B2AA);
+    --neon: var(--kib-cor-acao-principal, #00E676);
+    --pos: var(--kib-cor-dominio-posicao, #FACC15);
+    --roxo: var(--kib-cor-dominio-melhor-volta, #C084FC);
+    --perigo: var(--kib-cor-estado-perigo-texto, #FF7474);
+    --aviso: var(--kib-cor-estado-aviso-texto, #FACC15);
+    --ouro: var(--kib-cor-dominio-podio-ouro, #FFD24A); --prata: #C9D1D9; --bronze: #D08A4E;
+    --destaque: var(--neon);
+    --fonte: "Bahnschrift SemiCondensed", "Bahnschrift", "Segoe UI", system-ui, sans-serif;
+    --cab: 12vh; --tit: 4.4vh; --lh: 6vh; --fs: 3.4vh;
+    --rapido: var(--kib-movimento-duracao-padrao, 200ms);
+    --lento: 620ms;
+    --curva: cubic-bezier(.2, .8, .2, 1);
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; } /* senão o display:flex da bandeira/espera ganhava do hidden */
+  html, body { margin: 0; height: 100%; overflow: hidden; cursor: none; color: var(--texto); font-family: var(--fonte); }
+  body {
+    background:
+      radial-gradient(70vw 45vh at 0% -10%, rgba(0, 230, 118, .13), transparent 70%),
+      radial-gradient(60vw 50vh at 110% 120%, rgba(192, 132, 252, .09), transparent 70%),
+      linear-gradient(180deg, #050806, var(--fundo));
+  }
+  body.amarela { --destaque: #FFCC00; } body.vermelha { --destaque: #FF3B30; }
+  .num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+
+  /* ---------- cabeçalho */
+  header { position: relative; height: var(--cab); display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 2vw; padding: 0 2.2vw;
+    background: linear-gradient(180deg, rgba(11, 16, 12, .92), rgba(7, 11, 8, .78)); backdrop-filter: blur(8px); transition: box-shadow var(--lento); }
+  header::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: .35vh; background: var(--destaque); box-shadow: 0 0 2.2vh var(--destaque); transition: background var(--lento), box-shadow var(--lento); }
+  body.amarela header, body.vermelha header { animation: alerta 1.6s ease-in-out infinite; }
+  @keyframes alerta { 50% { box-shadow: inset 0 -6vh 6vh -4vh var(--destaque); } }
+  header img { height: 7.5vh; display: block; filter: drop-shadow(0 .4vh 1.2vh rgba(0, 0, 0, .6)); }
+  .titulo { min-width: 0; }
+  .titulo .nome { font-size: 4.6vh; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.1; }
+  .titulo .sub { margin-top: .4vh; display: flex; gap: 1vw; align-items: center; font-size: 2.2vh; color: var(--sec); text-transform: uppercase; letter-spacing: .08em; white-space: nowrap; }
+  .selo { font-size: 2.1vh; font-weight: 700; padding: .35vh 1vw; border-radius: 999px; text-transform: uppercase; letter-spacing: .06em; }
+  .selo.vivo { background: var(--neon); color: #041301; box-shadow: 0 0 1.6vh rgba(0, 230, 118, .45); }
+  .selo.vivo::before { content: ""; display: inline-block; width: 1vh; height: 1vh; margin-right: .5vw; border-radius: 50%; background: #041301; vertical-align: .15vh; animation: pulso 1.4s infinite; }
+  .selo.fim { background: var(--texto); color: #000; }
+  .selo.breve { background: transparent; color: var(--sec); box-shadow: inset 0 0 0 .2vh var(--sec); }
+  @keyframes pulso { 50% { opacity: .2; transform: scale(.7); } }
+  .bandeira { display: flex; align-items: center; gap: .8vw; font-size: 2.6vh; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+  .bandeira i { width: 5.6vh; height: 3.8vh; border-radius: .5vh; display: block; transform-origin: left center; animation: tremula 2.4s ease-in-out infinite; box-shadow: 0 0 0 .2vh rgba(255, 255, 255, .25), 0 .6vh 1.6vh rgba(0, 0, 0, .5); }
+  .bandeira.trocou { animation: aparece .5s var(--curva); }
+  @keyframes tremula { 50% { transform: skewY(-4deg) scaleX(.94); } }
+  @keyframes aparece { from { transform: scale(.6); opacity: 0; } }
+  .b-green i { background: #34C759; } .b-yellow i { background: #FFCC00; } .b-red i { background: #FF3B30; } .b-white i { background: #fff; }
+  .b-checkered i { background: conic-gradient(#fff 25%, #000 0 50%, #fff 0 75%, #000 0) 0 0 / 1.2vh 1.2vh; }
+  .relogio { text-align: right; line-height: 1; min-width: 14vw; }
+  .relogio .valor { font-size: 7.4vh; font-weight: 700; text-shadow: 0 0 2vh rgba(0, 0, 0, .6); }
+  .relogio .rotulo { font-size: 1.8vh; color: var(--sec); text-transform: uppercase; letter-spacing: .12em; margin-top: .3vh; }
+  .relogio.alerta .valor { color: var(--aviso); font-size: 5.2vh; animation: piscar 1.2s ease-in-out infinite; }
+  .relogio.final .valor { color: var(--aviso); }
+  @keyframes piscar { 50% { opacity: .55; } }
+  /* tempo que falta (some quando a bateria não tem duração) */
+  .progresso { height: .7vh; background: rgba(255, 255, 255, .06); }
+  .progresso i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--neon), #7CFFB2); box-shadow: 0 0 1.4vh var(--neon); transition: width 1s linear, background .6s; }
+  .progresso.fim i { background: linear-gradient(90deg, var(--aviso), #FFE58A); box-shadow: 0 0 1.4vh var(--aviso); }
+
+  /* ---------- lista (cada kart é uma linha fixa que desliza até a posição nova) */
+  .cols { display: grid; grid-template-columns: 6vw 8.5vw minmax(0, 1fr) 7vw 12.5vw 13.5vw 13vw; align-items: center; column-gap: 1vw; padding: 0 2.2vw; }
+  .titulos { height: var(--tit); font-size: 1.9vh; color: var(--sec); text-transform: uppercase; letter-spacing: .14em; }
+  .grid-largada .titulos > :nth-child(n+4), .grid-largada .linha > :nth-child(n+4) { visibility: hidden; }
+  .d { text-align: right; }
+  /* muitos pilotos: a lista ROLA devagar (para no topo, desce no ritmo de leitura, para no fim, volta) */
+  #lista { position: relative; margin: 0 1.2vw; overflow: hidden; }
+  #lista.rolando { -webkit-mask-image: linear-gradient(transparent, #000 2.5%, #000 93%, transparent); mask-image: linear-gradient(transparent, #000 2.5%, #000 93%, transparent); }
+  #rolo { position: relative; will-change: transform; }
+  .linha { position: absolute; left: 0; right: 0; top: 0; height: calc(var(--lh) - .55vh); padding: 0 1vw; font-size: var(--fs); font-weight: 600; border-radius: .9vh; overflow: hidden;
+    background: linear-gradient(90deg, rgba(255, 255, 255, .055), rgba(255, 255, 255, .02) 60%, rgba(255, 255, 255, .035));
+    border: 1px solid rgba(255, 255, 255, .06);
+    transition: transform var(--lento) var(--curva), opacity var(--lento) var(--curva), background .4s; will-change: transform; }
+  .linha.entra { animation: entrar .7s var(--curva) both; }
+  @keyframes entrar { from { opacity: 0; translate: -4vw 0; } }
+  .linha.fora { opacity: 0; pointer-events: none; }
+  .linha::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: .45vw; }
+  .linha.p1 { background: linear-gradient(90deg, rgba(255, 210, 74, .16), rgba(255, 255, 255, .03) 55%); border-color: rgba(255, 210, 74, .25); }
+  .p1::before { background: var(--ouro); box-shadow: 0 0 1.8vh var(--ouro); } .p2::before { background: var(--prata); } .p3::before { background: var(--bronze); }
+  /* varredura neon quando o kart cruza a linha */
+  .linha::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, rgba(0, 230, 118, .38) 50%, transparent 80%); transform: translateX(-110%); pointer-events: none; }
+  .linha.passou::after { animation: varre 1.1s var(--curva); }
+  @keyframes varre { to { transform: translateX(110%); } }
+  .pos { position: relative; color: var(--pos); font-weight: 700; display: flex; align-items: center; gap: .5vw; }
+  .seta { font-style: normal; font-size: .55em; opacity: 0; }
+  .subiu .seta { color: var(--neon); animation: seta 2.4s var(--curva); } .subiu .seta::before { content: "▲"; }
+  .desceu .seta { color: var(--perigo); animation: seta 2.4s var(--curva); } .desceu .seta::before { content: "▼"; }
+  @keyframes seta { 10%, 75% { opacity: 1; } }
+  .kart b { display: inline-flex; align-items: center; justify-content: center; width: 100%; max-width: 7.5vw; height: calc(var(--lh) * .66);
+    background: linear-gradient(180deg, #fff, #E6EBE7); color: #000; border-radius: .6vh; font-weight: 700; box-shadow: 0 .3vh .8vh rgba(0, 0, 0, .45); }
+  .nome { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tag { font-size: .55em; font-weight: 700; padding: .1em .45em; border-radius: .4vh; margin-left: .5vw; vertical-align: .18em; letter-spacing: .04em; }
+  .tag.dc { background: var(--perigo); color: #000; } .tag.pen { background: var(--aviso); color: #000; } .tag.fim { background: var(--texto); color: #000; }
+  .linha.dc { filter: grayscale(.8); opacity: .55; }
+  .melhor { color: var(--roxo); font-weight: 700; text-shadow: 0 0 1.6vh rgba(192, 132, 252, .55); } .melhor::before { content: "■ "; font-size: .62em; vertical-align: .2em; }
+  .dif { color: var(--sec); }
+  .mudou { animation: mudou .9s var(--curva); }
+  @keyframes mudou { from { color: var(--neon); text-shadow: 0 0 1.4vh var(--neon); } }
+  .recorde { animation: recorde 1.6s ease-out 2; }
+  @keyframes recorde { 30% { text-shadow: 0 0 3vh var(--roxo), 0 0 6vh var(--roxo); transform: scale(1.08); } }
+  .rolagem { position: fixed; right: 2.2vw; bottom: .8vh; font-size: 1.7vh; color: var(--sec); letter-spacing: .12em; text-transform: uppercase; display: flex; align-items: center; gap: .6vw; }
+  .rolagem b { display: inline-block; width: 6vw; height: .5vh; background: rgba(255, 255, 255, .12); border-radius: 1vh; overflow: hidden; }
+  .rolagem b i { display: block; height: 100%; width: 0; background: var(--sec); }
+
+  /* ---------- fim da corrida: vencedor → pódio → resultado completo (igual ao painel de LED TB50) */
+  #fim { position: fixed; inset: var(--cab) 0 0 0; overflow: hidden; }
+  .vencedor { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    background: radial-gradient(60vw 55vh at 50% 40%, rgba(255, 196, 0, .22), transparent 70%); }
+  .vencedor .rot { font-size: 3.4vh; letter-spacing: .5em; color: var(--ouro); font-weight: 700; text-transform: uppercase; animation: subir .8s var(--curva) both; }
+  .vencedor .trofeu { font-size: 15vh; line-height: 1.1; margin: 4vh 0 1.5vh; filter: drop-shadow(0 0 4vh rgba(255, 196, 0, .6)); animation: trofeu 1.2s var(--curva) both, flutua 4s 1.2s ease-in-out infinite; }
+  .vencedor .quem { font-size: 11vh; font-weight: 700; line-height: 1; text-transform: uppercase; letter-spacing: .02em; animation: subir .9s .35s var(--curva) both;
+    background: linear-gradient(180deg, #FFF6D0, var(--ouro) 55%, #C8901A); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; }
+  .vencedor .det { margin-top: 2.4vh; font-size: 3.4vh; color: var(--texto); display: flex; gap: 2.4vw; align-items: center; animation: subir .9s .6s var(--curva) both; }
+  .vencedor .det b { background: #fff; color: #000; border-radius: .6vh; padding: .2vh 1vw; }
+  .vencedor .det span { color: var(--sec); } .vencedor .det em { font-style: normal; color: var(--roxo); }
+  @keyframes trofeu { from { transform: scale(.2) rotate(-25deg); opacity: 0; } }
+  @keyframes subir { from { transform: translateY(4vh); opacity: 0; } }
+  .confete { position: absolute; top: -4vh; width: .9vw; height: 1.8vh; border-radius: .2vh; opacity: .9; animation: cair linear infinite; }
+  @keyframes cair { to { transform: translateY(110vh) rotate(720deg); } }
+
+  .podio { position: absolute; inset: 0; background: radial-gradient(70vw 60vh at 50% 20%, rgba(255, 196, 0, .16), transparent 70%); }
+  .podio .faixa { position: absolute; left: 50%; top: 2.5vh; transform: translateX(-50%) skewX(-12deg); background: #0d0d0d; border-top: .6vh solid var(--ouro); padding: .4vh 4vw; box-shadow: 0 1vh 4vh rgba(0, 0, 0, .6); animation: faixa .7s var(--curva) both; }
+  .podio .faixa span { display: block; transform: skewX(12deg); font-size: 6vh; font-weight: 700; font-style: italic; letter-spacing: .08em; }
+  @keyframes faixa { from { transform: translateX(-50%) skewX(-12deg) translateY(-6vh); opacity: 0; } }
+  .podio .evento { position: absolute; left: 0; right: 0; top: 13vh; text-align: center; font-size: 2.4vh; color: var(--ouro); letter-spacing: .3em; text-transform: uppercase; }
+  .degraus { position: absolute; left: 50%; bottom: 17vh; transform: translateX(-50%); display: flex; align-items: flex-end; gap: 1.6vw; }
+  .degrau { width: 25vw; display: flex; flex-direction: column; align-items: center; animation: degrau .9s var(--curva) both; }
+  .degrau .quem { text-align: center; margin-bottom: 1.6vh; }
+  .degrau .quem b { display: inline-block; background: #fff; color: #000; border-radius: .6vh; padding: .2vh .9vw; font-size: 3vh; margin-bottom: .8vh; }
+  .degrau .quem div { font-size: 4.2vh; font-weight: 700; text-transform: uppercase; white-space: nowrap; max-width: 25vw; overflow: hidden; text-overflow: ellipsis; }
+  .degrau .quem small { display: block; font-size: 2.5vh; color: var(--sec); margin-top: .3vh; }
+  .degrau .bloco { width: 100%; border-radius: 1.2vh 1.2vh 0 0; display: flex; align-items: flex-start; justify-content: center; padding-top: 1.4vh; font-size: 9vh; font-weight: 700; color: rgba(0, 0, 0, .55);
+    box-shadow: inset 0 .4vh 0 rgba(255, 255, 255, .45), 0 2vh 5vh rgba(0, 0, 0, .5); }
+  .d1 .bloco { height: 30vh; background: linear-gradient(180deg, #FFE27A, var(--ouro) 40%, #B7861C); }
+  .d2 .bloco { height: 22vh; background: linear-gradient(180deg, #F2F5F8, var(--prata) 40%, #8B949E); }
+  .d3 .bloco { height: 16vh; background: linear-gradient(180deg, #F0B07A, var(--bronze) 40%, #8A5226); }
+  .d1 { animation-delay: .9s; } .d2 { animation-delay: .5s; } .d3 { animation-delay: .2s; }
+  .d1 .quem div { font-size: 5vh; color: var(--ouro); }
+  @keyframes degrau { from { transform: translateY(40vh); opacity: 0; } }
+  .seguintes { position: absolute; left: 50%; bottom: 3vh; transform: translateX(-50%); display: flex; gap: 1.6vw; animation: subir .8s 1.4s var(--curva) both; }
+  .seguintes div { min-width: 30vw; display: flex; align-items: center; gap: 1.2vw; padding: 1.2vh 1.6vw; border-radius: 1vh; font-size: 3.2vh; font-weight: 600;
+    background: linear-gradient(90deg, rgba(255, 255, 255, .07), rgba(255, 255, 255, .02)); border: 1px solid rgba(255, 255, 255, .08); }
+  .seguintes .p { color: var(--pos); font-weight: 700; } .seguintes b { background: #fff; color: #000; border-radius: .5vh; padding: 0 .7vw; }
+  .seguintes .g { margin-left: auto; color: var(--sec); }
+
+  /* ---------- nova melhor volta da bateria */
+  /* entra por cima, sobre o título do cabeçalho: não cobre nenhuma linha, e o relógio e a bandeira seguem visíveis */
+  .aviso { position: fixed; top: 1.2vh; left: 19vw; width: 46vw; height: calc(var(--cab) - 2.4vh); z-index: 5; display: flex; align-items: center; gap: 1.6vw;
+    padding: 0 2vw; border-radius: 1.4vh; color: var(--texto);
+    background: linear-gradient(135deg, #7A2FC2, #3C146E); box-shadow: 0 0 0 .2vh rgba(192, 132, 252, .6), 0 1.6vh 4vh rgba(0, 0, 0, .6), 0 0 6vh rgba(192, 132, 252, .45);
+    transform: translateY(-140%); opacity: 0; transition: transform .7s var(--curva), opacity .7s; }
+  .aviso.mostra { transform: none; opacity: 1; }
+  body.com-aviso .titulo { opacity: 0; transition: opacity .3s; }
+  .aviso small { font-size: 1.8vh; letter-spacing: .18em; text-transform: uppercase; opacity: .85; max-width: 8vw; line-height: 1.2; }
+  .aviso strong { font-size: 5.4vh; line-height: 1; white-space: nowrap; }
+  .aviso span { font-size: 2.6vh; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
+  /* ---------- sem bateria */
+  .espera { height: calc(100vh - var(--cab)); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3vh; text-align: center; }
+  .espera img { height: 22vh; animation: flutua 6s ease-in-out infinite; filter: drop-shadow(0 2vh 4vh rgba(0, 230, 118, .18)); }
+  @keyframes flutua { 50% { transform: translateY(-1.4vh); } }
+  .espera .msg { font-size: 4.4vh; font-weight: 600; color: var(--sec); text-transform: uppercase; letter-spacing: .08em; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
-<div class="bar"><span id="name" class="name">Kartódromo Internacional de Betim</span><span id="state" class="state" hidden></span><span id="timer" class="timer"></span></div>
-<div id="body"></div>
+<header>
+  <img src="/kib-logo.png" alt="Kartódromo Internacional de Betim">
+  <div class="titulo"><div id="nome" class="nome">Kartódromo Internacional de Betim</div><div class="sub"><span id="selo"></span><span id="info"></span></div></div>
+  <div id="bandeira" class="bandeira" hidden></div>
+  <div id="relogio" class="relogio"></div>
+</header>
+<div id="progresso" class="progresso"><i></i></div>
+<section id="quadro">
+  <div id="titulos" class="cols titulos"></div>
+  <div id="lista"><div id="rolo"></div></div>
+</section>
+<div id="espera" class="espera" hidden><img src="/kib-logo.png" alt=""><div class="msg">Aguardando a próxima bateria</div></div>
+<div id="rolagem" class="rolagem" hidden><span id="rolagemTexto"></span><b><i id="rolagemBarra"></i></b></div>
+<section id="fim" hidden>
+  <div id="vencedor" class="vencedor" hidden></div>
+  <div id="podio" class="podio" hidden></div>
+</section>
+<div id="aviso" class="aviso"><small>Nova melhor volta</small><strong id="avisoTempo"></strong><span id="avisoQuem"></span></div>
 <script>
-const fmt = (ms) => { if (ms == null) return '--'; const s = ms/1000, m = Math.floor(s/60); const r = (s - m*60).toFixed(3); return m ? `${m}:${r.padStart(6,'0')}` : r; };
-const clockFmt = (ms) => { const t = Math.max(0, Math.ceil((ms||0)/1000)); return `${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`; };
-const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const lastSeen = {};
+const fmt = (ms) => { if (ms == null) return '–'; const s = ms / 1000, m = Math.floor(s / 60); const r = (s - m * 60).toFixed(3); return m ? `${m}:${r.padStart(6, '0')}` : r; };
+const relogio = (ms) => { const t = Math.max(0, Math.ceil((ms || 0) / 1000)); return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 // no telão, nome longo vira primeiro nome + último sobrenome ("Kleimons Valadares Machado" → "Kleimons Machado")
-const curto = (n) => { const p = String(n || '').trim().split(/\s+/); return p.join(' ').length <= 20 || p.length < 3 ? p.join(' ') : p[0] + ' ' + p[p.length - 1]; };
+const curto = (n) => { const p = String(n || '').trim().split(/\s+/); return p.join(' ').length <= 22 || p.length < 3 ? p.join(' ') : p[0] + ' ' + p[p.length - 1]; };
+const BANDEIRA = { green: 'Verde', yellow: 'Amarela', red: 'Vermelha', white: 'Branca', checkered: 'Quadriculada' };
+const TIPO = { corrida: 'Corrida', classificacao: 'Tomada de tempo', treino: 'Treino' };
+const $ = (id) => document.getElementById(id);
+
+const linhasDom = new Map(); // kart -> { el, pos, cruzou, ultima, melhor }
+let ultimo = null, sessaoAtual = null, bandeiraAtual = null, recorde = null, avisoTimer = null;
+// rolagem da lista longa: topo (6 s) → desce 1 linha a cada 1,5 s → fim (4 s) → volta ao topo
+const rol = { ativo: false, max: 0, vel: 0, off: 0, fase: 'topo', desde: performance.now(), ult: 0, de: 0, ciclos: 0 };
+// fim da corrida: vencedor (7 s) → pódio (15 s) → resultado completo → vencedor…
+const fim = { id: null, fase: 'lista', desde: 0, assinatura: '', ciclosNoInicio: 0 };
+
+/** reinicia uma animação CSS no elemento (remove a classe, força o navegador a notar, põe de novo) */
+function anima(el, classe) { el.classList.remove(classe); void el.offsetWidth; el.classList.add(classe); }
+function texto(el, valor) { if (el.textContent !== valor) { el.textContent = valor; return true; } return false; }
+
+function cabecalho(v, voltasLider) {
+  $('nome').textContent = v.name;
+  const selo = { preparando: ['breve', 'Em breve'], em_andamento: ['vivo', 'Ao vivo'], bandeira_final: ['fim', 'Bandeira final'], encerrada: ['fim', 'Resultado final'] }[v.state];
+  $('selo').innerHTML = selo ? `<span class="selo ${selo[0]}">${selo[1]}</span>` : '';
+  // o tipo só aparece embaixo se o nome da bateria ainda não diz ("BIER KART II · TOMADA DE TEMPO" já diz)
+  const tipo = TIPO[v.type] || '';
+  const nomeJaDiz = tipo && String(v.name || '').toLowerCase().includes(tipo.toLowerCase());
+  $('info').textContent = [v.state === 'preparando' ? 'Grid de largada' : '', nomeJaDiz ? '' : tipo, v.track && v.track.name || '', v.chuva ? 'Pista molhada' : ''].filter(Boolean).join(' · ');
+
+  const flag = v.state === 'preparando' ? null : v.currentFlag;
+  const b = $('bandeira');
+  b.hidden = !BANDEIRA[flag];
+  if (flag !== bandeiraAtual) { b.className = 'bandeira b-' + flag; b.innerHTML = BANDEIRA[flag] ? `<i></i>${BANDEIRA[flag]}` : ''; if (bandeiraAtual !== null) anima(b, 'trocou'); bandeiraAtual = flag; }
+  document.body.classList.toggle('amarela', flag === 'yellow');
+  document.body.classList.toggle('vermelha', flag === 'red');
+
+  // relógio: restante; tempo acabou = última volta (quem encerra é o cronometrista); prova por voltas = volta x/y
+  let html = '', classe = 'relogio', fracao = null;
+  if (v.state === 'em_andamento' || v.state === 'bandeira_final') {
+    if (v.state === 'bandeira_final') { html = `<div class="valor">🏁</div><div class="rotulo">Bandeira final</div>`; classe += ' final'; fracao = 0; }
+    else if (v.maxLaps) { html = `<div class="valor num">${Math.min(voltasLider + 1, v.maxLaps)}/${v.maxLaps}</div><div class="rotulo">Volta</div>`; fracao = 1 - voltasLider / v.maxLaps; }
+    else if (v.durationMs > 0 && (v.tempoEsgotado || (v.remainingMs ?? 1) <= 0)) { html = `<div class="valor">ÚLTIMA VOLTA</div><div class="rotulo">Tempo esgotado</div>`; classe += ' alerta'; fracao = 0; }
+    else if (v.durationMs > 0) { html = `<div class="valor num">${relogio(v.remainingMs)}</div><div class="rotulo">Restante</div>`; fracao = (v.remainingMs || 0) / v.durationMs; }
+    else { html = `<div class="valor num">${relogio(v.elapsedMs)}</div><div class="rotulo">Decorrido</div>`; }
+  }
+  if ($('relogio').innerHTML !== html) $('relogio').innerHTML = html;
+  $('relogio').className = classe;
+  const p = $('progresso');
+  p.style.visibility = fracao == null ? 'hidden' : 'visible';
+  p.firstElementChild.style.width = `${Math.max(0, Math.min(1, fracao ?? 0)) * 100}%`;
+  p.classList.toggle('fim', fracao != null && (fracao < 0.1 || v.state !== 'em_andamento'));
+}
+
+function novaLinha(kart) {
+  const el = document.createElement('div');
+  el.className = 'cols linha num entra';
+  el.innerHTML = '<span class="pos"><b></b><em class="seta"></em></span><span class="kart"><b></b></span><span class="nome"></span><span class="d"></span><span class="d"></span><span class="d"></span><span class="d dif"></span>';
+  $('rolo').appendChild(el);
+  const d = { el, pos: null, cruzou: undefined, ultima: undefined, melhor: undefined };
+  linhasDom.set(kart, d);
+  setTimeout(() => el.classList.remove('entra'), 800);
+  return d;
+}
+
+function mostrarRecorde(r) {
+  $('avisoTempo').textContent = fmt(r.bestLapMs);
+  $('avisoQuem').textContent = `Kart ${r.kart} · ${curto(r.name)}`;
+  $('aviso').classList.add('mostra');
+  document.body.classList.add('com-aviso');
+  clearTimeout(avisoTimer);
+  avisoTimer = setTimeout(() => { $('aviso').classList.remove('mostra'); document.body.classList.remove('com-aviso'); }, 5500);
+}
+
+// ---------------------------------------------------------------- fim da corrida (igual ao painel de LED TB50)
+
+const CORES_CONFETE = ['#FFD24A', '#00E676', '#FFFFFF', '#C084FC', '#5EB6FF', '#FF7474'];
+const diferenca = (r) => (r.gapLaps ? `+${r.gapLaps} ${r.gapLaps === 1 ? 'volta' : 'voltas'}` : r.gapMs != null ? '+' + fmt(r.gapMs) : '');
+const corridaEncerrada = (v) => v && v.type === 'corrida' && v.state === 'encerrada' && v.standings.some((r) => r.laps > 0);
+
+function montarFim(v, forcar) {
+  const top = v.standings.filter((r) => !r.desclassificado && r.laps > 0).sort((a, b) => a.position - b.position).slice(0, 5);
+  const assinatura = v.id + '|' + top.map((r) => `${r.kart}:${r.name}:${r.totalMs}`).join(',');
+  if (!forcar && assinatura === fim.assinatura) return;
+  fim.assinatura = assinatura;
+  const [p1, p2, p3, ...resto] = top;
+  if (!p1) return;
+  let confete = '';
+  for (let i = 0; i < 46; i++) confete += `<i class="confete" style="left:${(i * 37) % 100}vw;background:${CORES_CONFETE[i % CORES_CONFETE.length]};animation-duration:${4 + (i % 7) * 0.7}s;animation-delay:-${(i * 0.53) % 6}s"></i>`;
+  $('vencedor').innerHTML = `${confete}<div class="rot">Vencedor</div><div class="trofeu">🏆</div><div class="quem">${esc(curto(p1.name) || 'Kart ' + p1.kart)}</div>
+    <div class="det num"><b>KART ${esc(p1.kart)}</b><span>${p1.laps} voltas</span>${p1.totalMs ? `<span>${fmt(p1.totalMs)}</span>` : ''}${p1.bestLapMs ? `<em>■ ${fmt(p1.bestLapMs)}</em>` : ''}</div>`;
+  const degrau = (r, n) => !r ? `<div class="degrau d${n}" style="visibility:hidden"><div class="bloco"></div></div>` :
+    `<div class="degrau d${n}"><div class="quem num"><b>${esc(r.kart)}</b><div>${esc(curto(r.name) || 'Kart ' + r.kart)}</div><small>${n === 1 ? (r.totalMs ? fmt(r.totalMs) : `${r.laps} voltas`) : diferenca(r)}</small></div><div class="bloco">${n}</div></div>`;
+  $('podio').innerHTML = `<div class="faixa"><span>PÓDIO</span></div><div class="evento">${esc(v.name)}</div>
+    <div class="degraus">${degrau(p2, 2)}${degrau(p1, 1)}${degrau(p3, 3)}</div>
+    ${resto.length ? `<div class="seguintes num">${resto.map((r) => `<div><span class="p">${r.position}º</span><b>${esc(r.kart)}</b>${esc(curto(r.name) || 'Kart ' + r.kart)}<span class="g">${diferenca(r)}</span></div>`).join('')}</div>` : ''}`;
+}
+
+function mudarFase(f) {
+  fim.fase = f; fim.desde = performance.now();
+  if (f === 'lista') { rol.fase = 'topo'; rol.desde = performance.now(); rol.off = 0; fim.ciclosNoInicio = rol.ciclos; }
+  if (f === 'vencedor' || f === 'podio') { const v = ultimo && escolherBateria(ultimo); if (corridaEncerrada(v)) montarFim(v, true); } // recomeça as animações
+  aplicarFase();
+}
+
+function aplicarFase() {
+  const naLista = fim.fase === 'lista' || !fim.id;
+  $('fim').hidden = naLista;
+  $('vencedor').hidden = fim.fase !== 'vencedor';
+  $('podio').hidden = fim.fase !== 'podio';
+  if (!$('espera').hidden) return;
+  $('quadro').style.visibility = naLista ? 'visible' : 'hidden';
+}
+
+// troca as telas do fim da corrida; a lista longa só sai depois de rolar até o fim uma vez
+setInterval(() => {
+  if (!fim.id) return;
+  const t = performance.now() - fim.desde;
+  if (fim.fase === 'vencedor' && t > 7000) mudarFase('podio');
+  else if (fim.fase === 'podio' && t > 15000) mudarFase('lista');
+  else if (fim.fase === 'lista' && (rol.ativo ? rol.ciclos > fim.ciclosNoInicio : t > 20000)) mudarFase('vencedor');
+}, 300);
+
+// ---------------------------------------------------------------- rolagem da lista longa
+
+function rolar(t) {
+  const dt = Math.min(0.1, (t - (rol.ult || t)) / 1000); rol.ult = t;
+  if (!rol.ativo || rol.max <= 0) { rol.off = 0; rol.fase = 'topo'; rol.desde = t; }
+  else if (rol.fase === 'topo') { rol.off = 0; if (t - rol.desde > 6000) rol.fase = 'descendo'; }
+  else if (rol.fase === 'descendo') { rol.off = Math.min(rol.max, rol.off + rol.vel * dt); if (rol.off >= rol.max) { rol.fase = 'fundo'; rol.desde = t; } }
+  else if (rol.fase === 'fundo') { rol.off = Math.min(rol.off, rol.max); if (t - rol.desde > 4000) { rol.fase = 'subindo'; rol.desde = t; rol.de = rol.off; } }
+  else if (rol.fase === 'subindo') { const k = Math.min(1, (t - rol.desde) / 1600); rol.off = rol.de * (1 - (1 - Math.pow(1 - k, 3))); if (k >= 1) { rol.fase = 'topo'; rol.desde = t; rol.off = 0; rol.ciclos++; } }
+  $('rolo').style.transform = `translateY(${-rol.off.toFixed(1)}px)`;
+  $('rolagemBarra').style.width = `${rol.max ? (rol.off / rol.max) * 100 : 0}%`;
+  requestAnimationFrame(rolar);
+}
+requestAnimationFrame(rolar);
+
+/** O que a TV mostra: com kart na pista, a bateria em andamento; corrida que ACABOU de terminar (até 5 min, sem outra
+ * correndo) fica com vencedor/pódio/resultado — o servidor já põe em foco a próxima preparada da agenda, e o pódio
+ * sumia na hora; depois disso, o grid da próxima bateria. */
+const PODIO_POR_MS = 5 * 60 * 1000;
+function escolherBateria(st) {
+  const f = st.lastFinished;
+  const agora = st.now || Date.now();
+  if (!st.runningId && corridaEncerrada(f) && f.finishedAt && agora - f.finishedAt < PODIO_POR_MS) return f;
+  return st.focus;
+}
+
+/** Identidade de cada linha: o kart; sem kart sorteado ainda (grid antes do sorteio), o piloto. */
+const chaveDa = (r, i) => (r.kart ? 'k:' + r.kart : 'p:' + (r.name || '') + ':' + i);
 
 function render(st) {
-  const v = st.focus;
-  const show = v && v.state !== 'cancelada' && (v.state !== 'preparando' || v.competitors.length);
-  if (!show) { document.getElementById('body').innerHTML = '<div class="idle">Aguardando a próxima bateria</div>'; document.getElementById('state').hidden = true; document.getElementById('timer').textContent = ''; return; }
-  document.getElementById('name').textContent = v.name;
-  const stEl = document.getElementById('state');
-  stEl.hidden = false;
-  stEl.className = 'state' + (v.state === 'bandeira_final' || v.state === 'encerrada' ? ' fin' : '');
-  stEl.textContent = { preparando:'EM BREVE', em_andamento:'AO VIVO', bandeira_final:'🏁 BANDEIRA FINAL', encerrada:'RESULTADO FINAL' }[v.state] || '';
-  document.getElementById('timer').textContent = v.state === 'em_andamento' ? clockFmt(v.remainingMs) : '';
-  const race = v.type === 'corrida';
-  const rows = v.state === 'preparando' ? v.competitors.map((c, i) => ({ position: i+1, kart: c.kart, name: c.name, laps: 0 })) : v.standings;
-  const best = Math.min(...rows.filter(r => r.bestLapMs).map(r => r.bestLapMs));
-  const n = Math.max(rows.length, 8);
-  document.body.style.setProperty('--fs', `min(${Math.min(5.2, 78 / (n + 1)).toFixed(2)}vh, ${race ? 2.6 : 2.9}vw)`);
-  document.getElementById('body').innerHTML = `<table><colgroup><col style="width:6vw"><col style="width:9vw"><col><col style="width:7vw"><col style="width:13vw"><col style="width:13vw">${race ? '<col style="width:16vw">' : ''}</colgroup><thead><tr><th>Pos</th><th>Kart</th><th>Piloto</th>
-    <th class="t">Voltas</th><th class="t">Última</th><th class="t">Melhor</th>${race ? '<th class="t">Dif.</th>' : ''}</tr></thead><tbody>` +
-    rows.map(r => {
-      const flash = r.lastCrossingWallMs && lastSeen[r.kart] !== r.lastCrossingWallMs && lastSeen[r.kart] !== undefined;
-      lastSeen[r.kart] = r.lastCrossingWallMs;
-      return `<tr class="${flash ? 'flash' : ''}"><td class="pos">${r.position}</td><td class="kart"><b>${esc(r.kart)}</b></td>
-      <td class="nm">${esc(curto(r.name) || 'Kart ' + r.kart)}${r.finished ? ' 🏁' : ''}</td><td class="t">${r.laps ?? ''}</td>
-      <td class="t">${fmt(r.lastLapMs)}</td><td class="t ${r.bestLapMs === best ? 'best' : ''}">${fmt(r.bestLapMs)}</td>
-      ${race ? `<td class="t">${r.position === 1 ? '' : r.gapLaps ? '+' + r.gapLaps + 'V' : r.gapMs != null ? '+' + fmt(r.gapMs) : ''}</td>` : ''}</tr>`;
-    }).join('') + '</tbody></table>';
+  ultimo = st;
+  const v = escolherBateria(st);
+  const mostrar = v && v.type !== 'equalizacao' && v.state !== 'cancelada' && (v.state !== 'preparando' || v.competitors.length);
+  $('quadro').hidden = !mostrar; $('espera').hidden = !!mostrar;
+  if (!mostrar) {
+    $('nome').textContent = 'Kartódromo Internacional de Betim'; $('selo').innerHTML = ''; $('info').textContent = 'Cronometragem oficial';
+    $('bandeira').hidden = true; bandeiraAtual = null; $('relogio').innerHTML = ''; $('progresso').style.visibility = 'hidden'; $('rolagem').hidden = true;
+    fim.id = null; fim.fase = 'lista'; aplicarFase();
+    document.body.classList.remove('amarela', 'vermelha');
+    return;
+  }
+  // bateria nova: começa do zero (sem setas nem "passou" herdados da anterior)
+  if (v.id !== sessaoAtual) { for (const d of linhasDom.values()) d.el.remove(); linhasDom.clear(); sessaoAtual = v.id; recorde = null; rol.fase = 'topo'; rol.desde = performance.now(); rol.off = 0; }
+
+  // corrida encerrada: vencedor → pódio → resultado (enquanto ela for a bateria em foco)
+  if (corridaEncerrada(v)) {
+    montarFim(v, false);
+    if (fim.id !== v.id) { fim.id = v.id; mudarFase('vencedor'); }
+  } else if (fim.id) { fim.id = null; fim.fase = 'lista'; }
+  aplicarFase();
+
+  const grid = v.state === 'preparando';
+  const corrida = v.type === 'corrida';
+  const linhas = grid ? v.competitors.map((c, i) => ({ position: i + 1, kart: c.kart, name: c.name, laps: null })) : v.standings;
+  const voltasLider = Math.max(0, ...linhas.map((r) => r.laps || 0));
+  cabecalho(v, voltasLider);
+
+  $('quadro').className = grid ? 'grid-largada' : '';
+  $('titulos').innerHTML = `<span>Pos</span><span>Kart</span><span>Piloto</span><span class="d">Voltas</span><span class="d">Última</span><span class="d">Melhor</span><span class="d">${corrida ? 'Diferença' : 'Dif. melhor'}</span>`;
+
+  // melhor volta da bateria (desclassificado não conta) e o cartão de "nova melhor volta"
+  const validos = linhas.filter((r) => r.bestLapMs && !r.desclassificado);
+  const dono = validos.reduce((m, r) => (!m || r.bestLapMs < m.bestLapMs ? r : m), null);
+  if (dono && (!recorde || dono.bestLapMs < recorde.ms)) {
+    if (recorde && !grid) mostrarRecorde(dono);
+    recorde = { ms: dono.bestLapMs, kart: dono.kart, novo: !!recorde };
+  }
+
+  // tamanho: todas as linhas na tela se couberem em tamanho legível (≥ 4,8% da altura da TV); se não couberem,
+  // ficam nesse tamanho e a lista ROLA devagar (1 linha a cada 1,5 s), parando no topo e no fim
+  const topoLista = $('quadro').hidden ? 0 : $('lista').getBoundingClientRect().top;
+  const util = Math.max(100, window.innerHeight - (topoLista || window.innerHeight * 0.17) - window.innerHeight * 0.03);
+  const minimo = Math.max(window.innerHeight * 0.048, 40);
+  const cabem = Math.max(1, Math.floor(util / minimo));
+  const n = linhas.length;
+  const lh = n <= cabem ? Math.min(util / Math.max(n, 8), window.innerHeight * 0.085) : util / cabem;
+  rol.ativo = n > cabem;
+  rol.max = Math.max(0, n * lh - util);
+  rol.vel = lh / 1.5;
+  document.body.style.setProperty('--lh', `${lh}px`);
+  document.body.style.setProperty('--fs', `${Math.min(lh * 0.52, window.innerWidth * 0.025)}px`);
+  $('lista').style.height = `${rol.ativo ? util : n * lh}px`;
+  $('lista').classList.toggle('rolando', rol.ativo);
+  $('rolo').style.height = `${n * lh}px`;
+  $('rolagem').hidden = !rol.ativo || (fim.id && fim.fase !== 'lista');
+  texto($('rolagemTexto'), `${n} pilotos · rolando`);
+
+  const presentes = new Set();
+  linhas.forEach((r, i) => {
+    const chave = chaveDa(r, i);
+    presentes.add(chave);
+    const d = linhasDom.get(chave) || novaLinha(chave);
+    const el = d.el, c = el.children;
+    // desliza até a posição nova (a transição do transform faz a ultrapassagem "andar" na tela)
+    el.style.transform = `translateY(${i * lh}px)`;
+    el.className = el.className.replace(/\bp\d+\b/g, '').trim() + (grid ? '' : ` p${r.position}`);
+    el.classList.toggle('dc', !!r.desclassificado);
+    if (d.pos != null && !grid && r.position !== d.pos) anima(el, r.position < d.pos ? 'subiu' : 'desceu');
+    d.pos = r.position;
+    if (r.lastCrossingWallMs && d.cruzou !== undefined && d.cruzou !== r.lastCrossingWallMs) anima(el, 'passou');
+    d.cruzou = r.lastCrossingWallMs;
+
+    texto(c[0].firstChild, String(r.position));
+    texto(c[1].firstChild, r.kart ? String(r.kart) : '–');
+    const tags = (r.desclassificado ? '<span class="tag dc">DC</span>' : '') + (r.penaltyMs ? `<span class="tag pen">+${Math.round(r.penaltyMs / 1000)}s</span>` : '') + (r.finished ? '<span class="tag fim">🏁</span>' : '');
+    const nomeHtml = esc(curto(r.name) || 'Kart ' + r.kart) + tags;
+    if (c[2].innerHTML !== nomeHtml) c[2].innerHTML = nomeHtml;
+    texto(c[3], r.laps == null ? '' : String(r.laps));
+    if (texto(c[4], r.laps == null ? '' : fmt(r.lastLapMs)) && d.ultima !== undefined) anima(c[4], 'mudou');
+    d.ultima = r.lastLapMs;
+    const ehMelhor = dono && r.kart === dono.kart && r.bestLapMs === dono.bestLapMs;
+    c[5].classList.toggle('melhor', !!ehMelhor);
+    if (texto(c[5], r.laps == null ? '' : fmt(r.bestLapMs)) && d.melhor !== undefined && ehMelhor && recorde && recorde.novo) anima(c[5], 'recorde');
+    d.melhor = r.bestLapMs;
+    let dif = '';
+    if (r.position !== 1 && !r.desclassificado && !grid) dif = corrida && r.gapLaps ? `+${r.gapLaps} ${r.gapLaps === 1 ? 'volta' : 'voltas'}` : r.gapMs != null ? '+' + fmt(r.gapMs) : '';
+    texto(c[6], dif);
+  });
+  for (const [kart, d] of linhasDom) if (!presentes.has(kart)) { d.el.remove(); linhasDom.delete(kart); }
 }
 
-function connect() {
+function conectar() {
   const es = new EventSource('/api/events');
   es.addEventListener('state', (e) => render(JSON.parse(e.data)));
-  es.onerror = () => { es.close(); setTimeout(connect, 3000); };
+  es.onerror = () => { es.close(); setTimeout(conectar, 2000); };
 }
-connect();
+window.addEventListener('resize', () => ultimo && render(ultimo));
+conectar();
 </script>
 </body>
 </html>

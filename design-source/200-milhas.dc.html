@@ -9,18 +9,22 @@
 <x-dc>
 
 <helmet>
-  <meta name="description" content="Endurance estratégico em equipe, com ritmo, trocas, constância e gestão de corrida.">
+  <meta name="description" content="200 Milhas de Betim 2027: endurance de 5 horas em equipe, regulamento oficial, inscrições e cronograma da prova de 30/01/2027.">
   <link rel="icon" type="image/png" href="assets/brand/kib-logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     html { scroll-behavior: smooth; }
+    *, *::before, *::after { box-sizing: border-box; }
     body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size:18px; -webkit-font-smoothing: antialiased; overflow-x: clip; }
     a { color: #00e676; }
     a:hover { color: #3ce396; }
     ::selection { background: #00e676; color: #041301; }
+    ::placeholder { color: #829083; opacity: 1; }
     img, video { display: block; max-width: 100%; }
     button, input, select, textarea { font: inherit; }
+    :where(a, button, input, select, textarea):focus-visible { outline: 3px solid #00e676 !important; outline-offset: 3px; }
+    :where(input, select, textarea):focus-visible { border-color: #00e676 !important; box-shadow: 0 0 0 3px rgba(0,230,118,.16); caret-color: #00e676; }
     @view-transition { navigation: auto; }
     ::view-transition-old(root) { animation: 320ms cubic-bezier(.16,1,.3,1) both kib-page-out; }
     ::view-transition-new(root) { animation: 420ms cubic-bezier(.16,1,.3,1) both kib-page-in; }
@@ -31,6 +35,16 @@
     [style*="background:linear-gradient(135deg,#00e676,#00c853)"]:hover { transform: translateY(-4px); box-shadow: 0 22px 55px rgba(3,5,4,.6); }
     [style*="background:rgba(255,255,255,.035)"][style*="border:1px solid rgba(255,255,255,.22)"] { transition: border-color .25s, color .25s, transform .25s cubic-bezier(.16,1,.3,1); }
     [style*="background:rgba(255,255,255,.035)"][style*="border:1px solid rgba(255,255,255,.22)"]:hover { border-color:#00e676; color:#00e676; transform: translateY(-4px); }
+    @media (max-width: 760px) {
+      [style*="grid-template-columns:1fr minmax(300px,.52fr)"],
+      [style*="grid-template-columns:1.05fr .95fr"],
+      [style*="grid-template-columns:1fr 1fr"],
+      [style*="grid-template-columns:1.2fr .8fr"],
+      [style*="grid-template-columns:1.2fr .7fr .7fr"] { grid-template-columns: 1fr !important; }
+      [style*="grid-template-columns:repeat(3,1fr)"] { grid-template-columns: 1fr !important; }
+      [style*="grid-template-columns:repeat(4,1fr)"] { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+      [style*="grid-template-columns:90px 1fr"] { grid-template-columns: 64px minmax(0,1fr) !important; gap: 14px !important; }
+    }
   </style>
 </helmet>
 <div data-screen-label="200 Milhas" style="min-height:100vh; background:#030504; color:#f7faf6;">
@@ -63,7 +77,7 @@
 
   <main id="conteudo">
   <!-- HERO -->
-  <section style="position:relative; min-height:82svh; display:flex; align-items:flex-end; overflow:hidden; padding-top:90px; background:#020302;">
+  <section style="position:relative; min-height:82svh; display:flex; align-items:flex-end; overflow:hidden; padding-top:90px; background:#030504;">
     <video autoplay loop muted playsinline preload="auto" poster="assets/posters/home-karting.jpg" aria-hidden="true" tabindex="-1" style="position:absolute; inset:0; z-index:0; width:100%; height:100%; object-fit:cover; object-position:center 50%; filter:saturate(.75) contrast(1.14) brightness(.46); pointer-events:none;">
       <source src="assets/videos/home-karting.mp4" type="video/mp4">
     </video>
@@ -73,13 +87,15 @@
       <div style="min-width:0;">
         <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Endurance</p>
         <h1 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; line-height:0.78; letter-spacing:-0.01em; font-size:clamp(64px,10.5vw,160px);">200 <span style="color:#00e676;">Milhas</span><br><span style="color:transparent; -webkit-text-stroke:1px rgba(255,255,255,.7);">de Betim</span></h1>
-        <p style="max-width:680px; margin:28px 0 0; font-size:clamp(18px,1.5vw,22px); line-height:1.5; color:#d7ded8;">Endurance estratégico em equipe, com ritmo, trocas, constância e gestão de corrida.</p>
+        <p style="max-width:680px; margin:28px 0 0; font-size:clamp(18px,1.5vw,22px); line-height:1.5; color:#d7ded8;">Endurance de 5 horas em equipe, com 5 paradas obrigatórias, karts de locação e estratégia do primeiro briefing à bandeirada.</p>
         <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:30px;">
-          <a href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Quero%20ser%20avisado%20sobre%20a%20pr%C3%B3xima%20edi%C3%A7%C3%A3o%20das%20200%20Milhas%20de%20Betim." target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Avisem-me da próxima edição <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></a>
-          <a href="assets/regulamentos/200-milhas-de-betim-2026.pdf" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 21h14"/></svg> Regulamento</a>
+          <sc-if value="{{ registrationOpen }}"><a href="campeonatos.dc.html?inscricao=200-milhas" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Inscrever equipe <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></a></sc-if>
+          <sc-if value="{{ registrationBeforeOpen }}"><a href="campeonatos.dc.html?inscricao=200-milhas" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Ver inscrição e abertura <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></a></sc-if>
+          <sc-if value="{{ registrationClosed }}"><span style="display:inline-flex; align-items:center; justify-content:center; min-height:56px; padding:0 26px; border:1px solid rgba(255,255,255,.22); color:#d7ded8; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em;">Inscrições encerradas</span></sc-if>
+          <a href="assets/regulamentos/200-milhas-de-betim-2027.pdf" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 21h14"/></svg> Regulamento oficial</a>
         </div>
       </div>
-      <div style="text-align:right;"><img src="assets/championships/200-milhas-logo.png" alt="200 Milhas de Betim" style="width:100%; max-width:200px; margin-left:auto; filter:drop-shadow(0 20px 34px rgba(0,0,0,.45));"><div style="font-family:'Anton',sans-serif; font-size:clamp(40px,7vw,80px); line-height:0.68; color:transparent; -webkit-text-stroke:1px rgba(0,230,118,.4); margin-top:20px;">07 FEV<small style="display:block; font-family:'Rajdhani',sans-serif; font-weight:700; font-size:12px; letter-spacing:0.18em; color:#00e676; -webkit-text-stroke:0; text-transform:uppercase; margin-top:14px;">Edição 2026 realizada</small></div></div>
+      <div style="text-align:right;"><img src="assets/championships/200-milhas-logo.png" alt="200 Milhas de Betim" style="width:100%; max-width:200px; margin-left:auto; filter:drop-shadow(0 20px 34px rgba(0,0,0,.45));"><div style="font-family:'Anton',sans-serif; font-size:clamp(40px,7vw,80px); line-height:0.68; color:transparent; -webkit-text-stroke:1px rgba(0,230,118,.4); margin-top:20px;">30 JAN<small style="display:block; font-family:'Rajdhani',sans-serif; font-weight:700; font-size:12px; letter-spacing:0.18em; color:#00e676; -webkit-text-stroke:0; text-transform:uppercase; margin-top:14px;">{{ registrationStatusLabel }}</small></div></div>
     </div>
   </section>
 
@@ -107,11 +123,40 @@
       <aside style="min-width:0; background:linear-gradient(180deg,rgba(17,23,18,.95),rgba(7,10,8,.96)); border:1px solid rgba(255,255,255,.22); box-shadow:0 30px 90px rgba(0,0,0,.55); padding:30px; position:relative; overflow:hidden;">
         <div aria-hidden="true" style="position:absolute; inset:0 0 auto; height:3px; background:linear-gradient(90deg,#00e676,transparent);"></div>
         <h2 style="margin:0 0 16px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:22px;">Informação principal</h2>
-        <div style="padding:18px 0; border-block:1px solid rgba(255,255,255,.12);"><small style="display:block; font-family:'Anton',sans-serif; font-size:12px; text-transform:uppercase; color:#a8b2aa;">Evento</small><strong style="display:block; margin-top:8px; font-family:'Anton',sans-serif; font-weight:400; font-size:44px; color:#00e676;">Próxima edição</strong></div>
+         <div style="padding:18px 0; border-block:1px solid rgba(255,255,255,.12);"><small style="display:block; font-family:'Anton',sans-serif; font-size:12px; text-transform:uppercase; color:#a8b2aa;">Data oficial</small><strong style="display:block; margin-top:8px; font-family:'Anton',sans-serif; font-weight:400; font-size:44px; color:#00e676;">30/01/2027</strong></div>
         <div style="display:grid; gap:13px; margin:22px 0;">
-          <div style="padding-left:18px; position:relative; color:#a8b2aa; font-size:14px; line-height:1.4;"><span aria-hidden="true" style="position:absolute; left:0; top:6px; width:7px; height:7px; border:2px solid #00e676; transform:rotate(45deg);"></span><strong style="display:block; color:#fff; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:12px;">Regulamento oficial</strong>Formato, punições e procedimentos detalhados.</div>
-          <div style="padding-left:18px; position:relative; color:#a8b2aa; font-size:14px; line-height:1.4;"><span aria-hidden="true" style="position:absolute; left:0; top:6px; width:7px; height:7px; border:2px solid #00e676; transform:rotate(45deg);"></span><strong style="display:block; color:#fff; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:12px;">Equipe organizada</strong>Pilotos e estratégia definidos antes da largada.</div>
-          <div style="padding-left:18px; position:relative; color:#a8b2aa; font-size:14px; line-height:1.4;"><span aria-hidden="true" style="position:absolute; left:0; top:6px; width:7px; height:7px; border:2px solid #00e676; transform:rotate(45deg);"></span><strong style="display:block; color:#fff; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:12px;">Inscrição confirmada</strong>Conforme documentação e pagamento aplicáveis.</div>
+           <div style="padding-left:18px; position:relative; color:#a8b2aa; font-size:14px; line-height:1.4;"><span aria-hidden="true" style="position:absolute; left:0; top:6px; width:7px; height:7px; border:2px solid #00e676; transform:rotate(45deg);"></span><strong style="display:block; color:#fff; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:12px;">Prova de 5 horas + 1 volta</strong>Paradas obrigatórias e procedimentos de boxe.</div>
+           <div style="padding-left:18px; position:relative; color:#a8b2aa; font-size:14px; line-height:1.4;"><span aria-hidden="true" style="position:absolute; left:0; top:6px; width:7px; height:7px; border:2px solid #00e676; transform:rotate(45deg);"></span><strong style="display:block; color:#fff; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:12px;">R$ 2.800 por kart</strong>Pagamento por transferência, PIX ou cartão em até 5x sem juros.</div>
+           <div style="padding-left:18px; position:relative; color:#a8b2aa; font-size:14px; line-height:1.4;"><span aria-hidden="true" style="position:absolute; left:0; top:6px; width:7px; height:7px; border:2px solid #00e676; transform:rotate(45deg);"></span><strong style="display:block; color:#fff; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:12px;">Mínimo de 20 equipes</strong>A prova pode ser cancelada e reembolsada se não atingir o mínimo.</div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- INSCRIÇÃO -->
+  <section id="inscricoes" style="background:#070b08; border-block:1px solid rgba(255,255,255,.1); padding:clamp(72px,8vw,120px) 0;">
+    <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:clamp(28px,5vw,80px); align-items:start;">
+      <div style="min-width:0;">
+        <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Inscrição de equipe</p>
+        <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:1;">O próximo grid<br><span style="color:#00e676;">começa aqui</span></h2>
+        <p style="max-width:58ch; margin:22px 0 0; color:#a8b2aa; font-size:clamp(16px,1.2vw,19px); line-height:1.6;">A edição 2027 acontece em 30/01. Monte sua equipe com pelo menos 2 pilotos, confira o regulamento e envie os dados dentro da janela oficial.</p>
+        <ul style="list-style:none; margin:26px 0 0; padding:0; display:grid; gap:12px;">
+          <li style="display:flex; gap:10px; align-items:flex-start; color:#d7ded8; font-size:15px; line-height:1.45;"><span aria-hidden="true" style="flex:none; width:7px; height:7px; margin-top:7px; border:2px solid #00e676; transform:rotate(45deg);"></span><span>Inscrições: 05/10/2026 às 10h até 10/01/2027, ou enquanto houver vagas.</span></li>
+          <li style="display:flex; gap:10px; align-items:flex-start; color:#d7ded8; font-size:15px; line-height:1.45;"><span aria-hidden="true" style="flex:none; width:7px; height:7px; margin-top:7px; border:2px solid #00e676; transform:rotate(45deg);"></span><span>Idade mínima de 12 anos, altura acima de 1,50 m e peso acima de 50 kg.</span></li>
+          <li style="display:flex; gap:10px; align-items:flex-start; color:#d7ded8; font-size:15px; line-height:1.45;"><span aria-hidden="true" style="flex:none; width:7px; height:7px; margin-top:7px; border:2px solid #00e676; transform:rotate(45deg);"></span><span>Todos os pilotos devem constar na inscrição e um representante participa do briefing.</span></li>
+        </ul>
+      </div>
+      <aside style="min-width:0; background:linear-gradient(180deg,rgba(17,23,18,.95),rgba(7,10,8,.96)); border:1px solid rgba(0,230,118,.28); box-shadow:0 30px 90px rgba(0,0,0,.45); padding:30px; position:relative; overflow:hidden;">
+        <div aria-hidden="true" style="position:absolute; inset:0 0 auto; height:3px; background:linear-gradient(90deg,#00e676,transparent);"></div>
+        <p style="margin:0; color:#a8b2aa; font-family:'Anton',sans-serif; font-size:12px; text-transform:uppercase; letter-spacing:.12em;">Valor de inscrição</p>
+        <strong style="display:block; margin-top:8px; font-family:'Anton',sans-serif; font-weight:400; font-size:clamp(42px,5vw,64px); line-height:1; color:#00e676;">R$ 2.800</strong>
+        <span style="display:block; margin-top:8px; color:#d7ded8; font-size:15px;">por kart · independente do número de pilotos</span>
+        <p style="margin:22px 0 0; color:#a8b2aa; font-size:15px; line-height:1.5;">Transferência, PIX ou cartão de crédito em até 5x sem juros.</p>
+        <div style="margin-top:22px; display:grid; gap:10px;">
+          <sc-if value="{{ registrationOpen }}"><a href="campeonatos.dc.html?inscricao=200-milhas" style="display:flex; align-items:center; justify-content:center; min-height:54px; padding:0 20px; clip-path:polygon(5% 0,100% 0,95% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:14px; letter-spacing:.04em; text-decoration:none;">Inscrever equipe</a></sc-if>
+          <sc-if value="{{ registrationBeforeOpen }}"><div style="border:1px solid rgba(245,197,24,.3); background:rgba(245,197,24,.08); color:#f5c518; padding:14px 16px; font-size:15px; line-height:1.45;"><strong style="display:block; color:#fff;">Abertura programada</strong>05/10/2026, às 10h (horário de Brasília).</div></sc-if>
+          <sc-if value="{{ registrationClosed }}"><div style="border:1px solid rgba(255,255,255,.18); color:#d7ded8; padding:14px 16px; font-size:15px; line-height:1.45;">A janela oficial de inscrição foi encerrada.</div></sc-if>
+          <a href="assets/regulamentos/200-milhas-de-betim-2027.pdf" target="_blank" rel="noopener noreferrer" style="display:flex; align-items:center; justify-content:center; min-height:50px; padding:0 20px; border:1px solid rgba(255,255,255,.2); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:.04em; text-decoration:none;">Ler o regulamento oficial</a>
         </div>
       </aside>
     </div>
@@ -121,11 +166,11 @@
   <section style="background:#070b08; padding:clamp(88px,9vw,140px) 0;">
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:1.05fr .95fr; gap:clamp(28px,5vw,80px);">
       <div style="min-width:0;">
-        <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Cronograma oficial</p>
+       <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Cronograma oficial · 29 e 30/01/2027</p>
         <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:1;">Da chegada<br><span style="color:#00e676;">à bandeirada</span></h2>
       </div>
       <div style="min-width:0; border-left:1px solid rgba(255,255,255,.12); margin-left:18px;">
-        <sc-for list="{{ schedule }}" as="e" hint-placeholder-count="5">
+        <sc-for list="{{ schedule }}" as="e" hint-placeholder-count="6">
           <div style="display:grid; grid-template-columns:90px 1fr; gap:24px; padding:0 0 26px 30px; position:relative;">
             <span aria-hidden="true" style="position:absolute; left:-7px; top:4px; width:13px; height:13px; background:#070b08; border:2px solid #00e676; transform:rotate(45deg);"></span>
             <div style="font-family:'Anton',sans-serif; color:#00e676; font-size:24px; line-height:0.8;">{{ e.time }}</div>
@@ -146,14 +191,14 @@
           <article style="padding:30px; background:#0b100c; border:1px solid rgba(255,255,255,.12); min-height:180px;"><h3 style="margin:0; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:16px;">{{ r.title }}</h3><p style="color:#a8b2aa; line-height:1.5; font-size:14px;">{{ r.text }}</p></article>
         </sc-for>
       </div>
-      <div style="margin-top:30px;"><a href="assets/regulamentos/200-milhas-de-betim-2026.pdf" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 21h14"/></svg> Baixar PDF oficial</a></div>
+       <div style="margin-top:30px;"><a href="assets/regulamentos/200-milhas-de-betim-2027.pdf" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 21h14"/></svg> Baixar PDF oficial</a></div>
     </div>
   </section>
 
   <!-- PREMIAÇÃO -->
   <section style="background:#070b08; padding:clamp(88px,9vw,140px) 0;">
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto;">
-      <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Premiação e memória</p>
+       <p style="margin:0 0 18px; color:#00e676; font-family:'Anton',sans-serif; font-size:12px; letter-spacing:0.17em; text-transform:uppercase;">Premiação e condições</p>
       <h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5vw,64px); line-height:1;">Uma prova para<br><span style="color:#00e676;">entrar na história</span></h2>
       <div style="margin-top:50px; display:grid; grid-template-columns:repeat(4,1fr); border:1px solid rgba(255,255,255,.12); background:#0b100c;">
         <sc-for list="{{ legacy }}" as="l" hint-placeholder-count="4"><div style="padding:24px; border-right:1px solid rgba(255,255,255,.12);"><strong style="display:block; font-family:'Anton',sans-serif; font-weight:400; font-size:clamp(34px,4vw,50px); line-height:0.8; color:#00e676;">{{ l.value }}</strong><span style="display:block; color:#a8b2aa; font-size:12px; margin-top:8px; line-height:1.4;">{{ l.label }}</span></div></sc-for>
@@ -165,19 +210,20 @@
   <section style="padding:clamp(88px,9vw,140px) 0;">
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto;">
       <div style="position:relative; overflow:hidden; border:1px solid rgba(255,255,255,.22); background:linear-gradient(135deg,#101711,#030504); padding:clamp(34px,5vw,72px); display:grid; grid-template-columns:1.2fr .8fr; gap:36px; align-items:center;">
-        <div style="min-width:0;"><h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5.5vw,72px); line-height:1;">Avisem-me da próxima edição<br><span style="color:#00e676;">agora</span></h2><p style="margin:14px 0 0; color:#a8b2aa; font-size:18px;">Fale com a organização para confirmar vaga, documentos e próximos passos.</p></div>
+        <div style="min-width:0;"><h2 style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:clamp(40px,5.5vw,72px); line-height:1;">Monte sua equipe<br><span style="color:#00e676;">entre no grid</span></h2><p style="margin:14px 0 0; color:#a8b2aa; font-size:18px;">A edição 2027 reúne estratégia, resistência e trabalho de equipe em 5 horas de prova.</p></div>
         <div style="display:grid; gap:12px;">
-          <a href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Quero%20ser%20avisado%20sobre%20a%20pr%C3%B3xima%20edi%C3%A7%C3%A3o%20das%20200%20Milhas%20de%20Betim." target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Avisem-me da próxima edição <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></a>
-          <a href="https://wa.me/5531998842898" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-11.9 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5Z"/><path d="M8.5 8.5c.5 3 2 4.5 5 5"/></svg> Falar no WhatsApp</a>
+          <sc-if value="{{ registrationOpen }}"><a href="campeonatos.dc.html?inscricao=200-milhas" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;">Inscrever equipe <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></a></sc-if>
+          <sc-if value="{{ registrationBeforeOpen }}"><div style="display:flex; align-items:center; justify-content:center; min-height:56px; padding:0 20px; border:1px solid rgba(245,197,24,.3); color:#f5c518; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-align:center;">Abertura · 05/10 às 10h</div></sc-if>
+          <a href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Quero%20tirar%20d%C3%BAvidas%20sobre%20as%20200%20Milhas%20de%20Betim%202027." target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 26px; clip-path:polygon(7% 0,100% 0,93% 100%,0 100%); background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.22); color:#fff; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:0.04em; text-decoration:none;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-11.9 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5Z"/><path d="M8.5 8.5c.5 3 2 4.5 5 5"/></svg> Falar com a organização</a>
         </div>
       </div>
     </div>
   </section>
   </main>
 
-  <footer style="border-top:1px solid rgba(255,255,255,.12); padding:64px 0 28px; background:#020302;">
+  <footer style="border-top:1px solid rgba(255,255,255,.12); padding:64px 0 28px; background:#030504;">
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:1.2fr .7fr .7fr; gap:50px;">
-      <div><img src="assets/brand/kib-logo.png" alt="Kartódromo Internacional de Betim" style="width:220px;"><p style="margin:16px 0 0; max-width:380px; color:#a8b2aa; line-height:1.55;">Pista homologada de 1.110 metros, kart de locação, campeonatos e estrutura para aniversários, grupos e empresas em Betim.</p></div>
+      <div><img src="assets/brand/kib-logo.png" alt="Kartódromo Internacional de Betim" style="width:220px;"><p style="margin:16px 0 0; max-width:380px; color:#a8b2aa; line-height:1.55;">Traçado oficial de 1.117 metros nesta prova, kart de locação, campeonatos e estrutura para aniversários, grupos e empresas em Betim.</p></div>
       <div>
         <h3 style="margin:0 0 18px; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:14px; color:#00e676;">Navegar</h3>
         <div style="display:grid; gap:10px;">
@@ -210,8 +256,11 @@
 </x-dc>
 <script type="text/x-dc" data-dc-script>
 
+const REGISTRATION_OPEN_AT = new Date('2026-10-05T10:00:00-03:00').getTime();
+const REGISTRATION_DEADLINE = new Date('2027-01-10T23:59:59-03:00').getTime();
+
 class Component extends DCLogic {
-  state = { headerScrolled: false, mobileNavOpen: false, isMobile: typeof window !== 'undefined' && window.matchMedia('(max-width: 1100px)').matches };
+  state = { headerScrolled: false, mobileNavOpen: false, isMobile: typeof window !== 'undefined' && window.matchMedia('(max-width: 1100px)').matches, registrationTick: 0 };
 
   componentDidMount() {
     this._onScroll = () => {
@@ -228,6 +277,7 @@ class Component extends DCLogic {
     if (this._mq.addEventListener) this._mq.addEventListener('change', this._onMqChange); else this._mq.addListener(this._onMqChange);
     this._onKeydown = (e) => { if (e.key === 'Escape' && this.state.mobileNavOpen) this.setState({ mobileNavOpen: false }); };
     window.addEventListener('keydown', this._onKeydown);
+    this._registrationTimer = window.setInterval(() => this.setState({ registrationTick: Date.now() }), 30000);
     import('./motion.js').then((m) => { this._cleanup = m.initPageMotion({ progressBarSelector: '#progress' }); });
   }
 
@@ -235,6 +285,7 @@ class Component extends DCLogic {
     window.removeEventListener('scroll', this._onScroll);
     window.removeEventListener('keydown', this._onKeydown);
     if (this._mq) { if (this._mq.removeEventListener) this._mq.removeEventListener('change', this._onMqChange); else this._mq.removeListener(this._onMqChange); }
+    if (this._registrationTimer) window.clearInterval(this._registrationTimer);
     if (this._cleanup) this._cleanup();
   }
 
@@ -242,7 +293,12 @@ class Component extends DCLogic {
   closeMobileNav = () => this.setState({ mobileNavOpen: false });
 
   renderVals() {
-    const { headerScrolled, mobileNavOpen, isMobile } = this.state;
+    const { headerScrolled, mobileNavOpen, isMobile, registrationTick } = this.state;
+    const now = registrationTick || Date.now();
+    const registrationBeforeOpen = now < REGISTRATION_OPEN_AT;
+    const registrationOpen = now >= REGISTRATION_OPEN_AT && now <= REGISTRATION_DEADLINE;
+    const registrationClosed = now > REGISTRATION_DEADLINE;
+    const registrationStatusLabel = registrationOpen ? 'INSCRIÇÕES ABERTAS' : registrationBeforeOpen ? 'ABERTURA 05/10 · 10H' : 'INSCRIÇÕES ENCERRADAS';
     const navBase = { fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '12px', letterSpacing: '0.04em', padding: '10px 0', borderBottom: '2px solid transparent', textDecoration: 'none', transition: 'color .25s, border-color .25s' };
     const pages = [
       { label: 'Home', href: 'home.dc.html', id: 'home' },
@@ -271,32 +327,38 @@ class Component extends DCLogic {
       reservaCtaStyle: { display: isMobile ? 'none' : 'inline-flex', flex: 'none', alignItems: 'center', gap: '8px', minHeight: '46px', padding: '0 20px', clipPath: 'polygon(7% 0,100% 0,93% 100%,0 100%)', background: 'linear-gradient(135deg,#00e676,#00c853)', color: '#041301', fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '12px', letterSpacing: '0.04em', textDecoration: 'none' },
       hamburgerBtnStyle: { display: isMobile ? 'block' : 'none', width: '48px', height: '48px', flex: 'none', border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)', cursor: 'pointer' },
 
+      registrationOpen,
+      registrationBeforeOpen,
+      registrationClosed,
+      registrationStatusLabel,
+
       telemetry: [
-        { icon: 'M3 5h18v16H3zM8 3v4M16 3v4M3 10h18', title: '07 FEV', text: 'Edição 2026 realizada' },
+        { icon: 'M3 5h18v16H3zM8 3v4M16 3v4M3 10h18', title: '30 JAN', text: registrationStatusLabel },
         { icon: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75', title: 'Equipes', text: 'Estratégia e revezamento' },
         { icon: 'M12 7v5l3 2M9 2h6M12 22a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z', title: 'Longa duração', text: 'Ritmo e resistência' },
         { icon: 'M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4ZM7 6H4v2a4 4 0 0 0 4 4M17 6h3v2a4 4 0 0 1-4 4', title: 'Pódio oficial', text: 'Resultado e reconhecimento' },
       ],
       schedule: [
-        { time: '06:30', title: 'Credenciamento', text: 'Chegada das equipes e conferência documental.' },
-        { time: '07:15', title: 'Briefing', text: 'Regras, bandeiras, trocas e procedimento de prova.' },
-        { time: '08:00', title: 'Classificação', text: 'Definição do grid de largada.' },
-        { time: '09:00', title: 'Largada', text: 'Início do endurance e estratégia de equipe.' },
-        { time: 'Final', title: 'Pódio', text: 'Resultado oficial e premiação.' },
+        { time: '21:00', title: 'Tomada de tempo · 29/01', text: 'Definição do grid de largada.' },
+        { time: '07:00', title: 'Credenciamento · 30/01', text: 'Café da manhã, chegada das equipes e registro dos pilotos.' },
+        { time: '07:30', title: 'Briefing e sorteio', text: 'Briefing dos chefes de equipe e sorteio dos karts.' },
+        { time: '08:00', title: 'Largada', text: 'Início do endurance de 5 horas + 1 volta.' },
+        { time: '13:00', title: 'Encerramento', text: 'Fim das 5 horas de prova + 1 volta.' },
+        { time: '13:30', title: 'Resultado e premiação', text: 'Resultado oficial, pódio e entrega dos troféus.' },
       ],
       ruleCards: [
-        { title: 'Equipe e revezamento', text: 'Pilotos dividem a prova e cumprem janelas e procedimentos de troca.' },
-        { title: 'Peso e lastro', text: 'A prova aplica critérios de peso definidos no regulamento oficial.' },
-        { title: 'Abastecimento e boxes', text: 'Entrada, velocidade e operação de boxes seguem fiscalização.' },
-        { title: 'Bandeiras', text: 'Sinalização de pista deve ser obedecida imediatamente.' },
-        { title: 'Punições', text: 'Condutas irregulares geram advertência, tempo ou posições.' },
-        { title: 'Resultado', text: 'Vence a equipe que completa a distância nas condições oficiais.' },
+        { title: 'Equipe', text: 'Mínimo de 2 pilotos por equipe; cada piloto só pode correr por uma equipe.' },
+        { title: 'Peso base', text: 'Peso-base de 100 kg por piloto, com lastro conforme os procedimentos oficiais.' },
+        { title: 'Paradas obrigatórias', text: 'São obrigatórias 5 paradas de pelo menos 7 minutos cada.' },
+        { title: 'Boxes', text: 'Troca de piloto, pesagem, placa/sensor e lastro seguem a ordem do regulamento.' },
+        { title: 'Traçado oficial', text: 'Pista de 1.117 m no Traçado 1 invertido com chicane.' },
+        { title: 'Punições', text: 'Advertências, penalidades de tempo, perda de voltas e desclassificação estão previstas.' },
       ],
       legacy: [
-        { value: '01', label: 'Troféu Equipe campeã' },
-        { value: '02', label: 'Reconhecimento Pódio oficial' },
-        { value: '03', label: 'Memória Prova histórica' },
-        { value: '∞', label: 'histórias de equipe' },
+        { value: '5h+1', label: 'Duração da prova' },
+        { value: '05', label: 'Paradas obrigatórias' },
+        { value: '20', label: 'Equipes mínimas' },
+        { value: '01', label: 'Kart por inscrição' },
       ],
     };
   }

@@ -5,6 +5,10 @@ param(
   [int]$StackMemoryLimitMb = 2800,
   [int]$MinFreeMemoryMb = 700,
   [int]$MaxHeadlessProcessCount = 12,
+  [int]$StreamerStartupGraceSeconds = 90,
+  [int]$StreamerCaptureFps = 2,
+  [int]$StreamerOutputFps = 2,
+  [int]$StreamerScreenshotQuality = 50,
   [int]$LogMaxMb = 10,
   [int]$LogArchiveRetentionDays = 2
 )
@@ -225,7 +229,7 @@ function Get-JsonOrNull {
 
 function Test-HlsStream {
   try {
-    $response = Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:8888/tb50/index.m3u8" -TimeoutSec 8
+    $response = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:8888/tb50/index.m3u8" -TimeoutSec 8
     return $response.StatusCode -eq 200
   } catch {
     return $false
@@ -246,7 +250,7 @@ function Wait-HlsStream {
 }
 
 function Get-CronometragemProgram {
-  $programs = Get-JsonOrNull -Uri "http://localhost:3000/api/viplex-programs"
+  $programs = Get-JsonOrNull -Uri "http://127.0.0.1:3000/api/viplex-programs"
   if (-not $programs) {
     return $null
   }
@@ -267,7 +271,7 @@ function Start-CronometragemProgram {
   try {
     Invoke-RestMethod `
       -Method Put `
-      -Uri "http://localhost:3000/api/viplex-programs" `
+      -Uri "http://127.0.0.1:3000/api/viplex-programs" `
       -ContentType "application/json" `
       -Body (@{ identifier = $Program.identifier } | ConvertTo-Json -Compress) `
       -TimeoutSec 45 | Out-Null
@@ -298,8 +302,8 @@ function Restart-Scraper {
 
 function Ensure-Scraper {
   $processes = @(Get-ProcessByPattern -Name "node.exe" -Pattern "livetime-scraper-server|npm-cli\.js.*scraper")
-  $health = Get-JsonOrNull -Uri "http://localhost:4010/healthz"
-  $snapshot = Get-JsonOrNull -Uri "http://localhost:4010/api/livetime-snapshot"
+  $health = Get-JsonOrNull -Uri "http://127.0.0.1:4010/healthz"
+  $snapshot = Get-JsonOrNull -Uri "http://127.0.0.1:4010/api/livetime-snapshot"
 
   $playwrightBroken = $snapshot -and $snapshot.status -eq "error" -and $snapshot.message -match "Executable doesn't exist|browserType\.launch|Playwright"
 
@@ -323,7 +327,7 @@ function Restart-Next {
 function Ensure-Next {
   $pageOk = $false
   try {
-    $response = Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:3000/podio-live-tb50?_watchdog=$(Get-Date -Format FileDateTime)" -TimeoutSec 10
+    $response = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:3000/placar-telao-tb50?layout=designer&_watchdog=$(Get-Date -Format FileDateTime)" -TimeoutSec 10
     $pageOk = $response.StatusCode -eq 200
   } catch {
     $pageOk = $false
@@ -336,7 +340,7 @@ function Ensure-Next {
   try {
     Invoke-RestMethod `
       -Method Put `
-      -Uri "http://localhost:3000/api/tb50-display-mode" `
+      -Uri "http://127.0.0.1:3000/api/tb50-display-mode" `
       -ContentType "application/json" `
       -Body '{"mode":"live"}' `
       -TimeoutSec 5 | Out-Null
@@ -363,8 +367,11 @@ function Restart-Streamer {
   Stop-ProcessByPattern -Name "ffmpeg.exe" -Pattern "rtsp://.*tb50|rtmp://.*tb50"
 
   & (Join-Path $PSScriptRoot "start-tb50-stream.ps1") `
-    -ScoreboardUrl "http://localhost:3000/podio-live-tb50" `
-    -StreamUrl "rtsp://192.168.20.13:8554/tb50" | Out-Null
+    -ScoreboardUrl "http://127.0.0.1:3000/placar-telao-tb50?layout=designer" `
+    -StreamUrl "rtsp://127.0.0.1:8554/tb50" `
+    -CaptureFps $StreamerCaptureFps `
+    -OutputFps $StreamerOutputFps `
+    -ScreenshotQuality $StreamerScreenshotQuality | Out-Null
 
   if (-not (Wait-HlsStream)) {
     Write-WatchLog "TB50 streamer restarted, but HLS is still unavailable."
@@ -400,6 +407,17 @@ function Ensure-Streamer {
   if ($headlessMemoryMb -gt $StreamerMemoryLimitMb) {
     Restart-Streamer -Reason "headless browser memory ${headlessMemoryMb}MB above ${StreamerMemoryLimitMb}MB"
     return
+  }
+
+  $streamerStartTimes = @($streamerProcesses | ForEach-Object {
+    try { (Get-Process -Id $_.ProcessId -ErrorAction Stop).StartTime } catch { $null }
+  } | Where-Object { $_ })
+  if ($streamerStartTimes.Count -gt 0) {
+    $streamerAgeSeconds = ((Get-Date) - ($streamerStartTimes | Sort-Object | Select-Object -First 1)).TotalSeconds
+    if ($streamerAgeSeconds -lt $StreamerStartupGraceSeconds) {
+      Write-WatchLog "TB50 streamer startup grace active: age=$([math]::Round($streamerAgeSeconds))s limit=${StreamerStartupGraceSeconds}s"
+      return
+    }
   }
 
   if (-not (Wait-HlsStream -Attempts 15)) {

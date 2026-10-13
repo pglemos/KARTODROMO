@@ -7,6 +7,7 @@
  */
 import sql from 'mssql';
 import { corrigeEmail } from './email-dominio';
+import { normalizarInstagram } from './instagram';
 import { nomeProprio } from '../nomes';
 
 let pool: sql.ConnectionPool | null = null;
@@ -71,7 +72,7 @@ export function isValidCpf(value: string): boolean {
   return calc(9) === Number(cpf[9]) && calc(10) === Number(cpf[10]);
 }
 
-export const CLIENTE_COLS = `c.Id id, c.Nome nome, c.TipoDocumento tipoDocumento, c.Documento documento, c.Email email, c.Telefone telefone,
+export const CLIENTE_COLS = `c.Id id, c.Nome nome, c.TipoDocumento tipoDocumento, c.Documento documento, c.Email email, c.Instagram instagram, c.Telefone telefone,
   CONVERT(varchar(10), c.Nascimento, 126) nascimento, c.Sexo sexo, c.Peso peso, c.Cep cep, c.Endereco endereco, c.Numero numero,
   c.Complemento complemento, c.Bairro bairro, c.Cidade cidade, c.Estado estado, c.ResponsavelId responsavelId,
   CONVERT(varchar(19), c.LgpdAceiteEm, 126) lgpdAceiteEm, c.Bloqueado bloqueado, c.Observacao observacao, c.Origem origem, c.TipoSanguineo tipoSanguineo, c.Ibge ibge, c.Pais pais,
@@ -82,6 +83,7 @@ export type ClienteInput = {
   tipoDocumento?: string;
   documento?: string | null;
   email?: string | null;
+  instagram?: string | null;
   telefone?: string | null;
   nascimento?: string | null;
   sexo?: string | null;
@@ -107,6 +109,7 @@ const FIELD_MAP: Record<string, [string, number]> = {
   tipoDocumento: ['TipoDocumento', 20],
   documento: ['Documento', 60],
   email: ['Email', 200],
+  instagram: ['Instagram', 31],
   telefone: ['Telefone', 40],
   cep: ['Cep', 12],
   endereco: ['Endereco', 200],
@@ -134,6 +137,7 @@ export function clienteColumns(input: ClienteInput, partial: boolean): Record<st
   for (const [key, [col, max]] of Object.entries(FIELD_MAP)) {
     if (!(key in input)) continue;
     let v = (input as Record<string, unknown>)[key];
+    if (key === 'instagram' && typeof v === 'string') v = normalizarInstagram(v);
     if (typeof v === 'string') v = v.trim().slice(0, max);
     if (key === 'email' && typeof v === 'string') v = corrigeEmail(v); // minúsculo + "gmal.com" → "gmail.com"
     if (key === 'nome' && typeof v === 'string') v = nomeProprio(v); // "joao victor" / "JOAO VICTOR" → "Joao Victor"

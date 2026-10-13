@@ -7,6 +7,6 @@
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowNoTitle">true</item>
     </style>
-    <color name="fundo">#FF0C1115</color>
-    <color name="verde">#FF0B7A53</color>
+    <color name="fundo">@color/kib_escuro_cor_fundo_app</color>
+    <color name="verde">@color/kib_escuro_cor_acao_principal</color>
 </resources>

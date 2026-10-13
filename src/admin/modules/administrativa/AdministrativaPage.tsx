@@ -23,7 +23,7 @@ type ProfileFormState = {
 type ProfileFormErrors = Partial<Record<keyof ProfileFormState, string>>;
 
 const inputClassName =
-  'w-full rounded-lg border border-zinc-700 bg-zinc-950 min-h-[44px] px-3 py-2 sm:min-h-0 sm:py-2.5 text-sm text-white placeholder:text-zinc-600 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20';
+  'w-full rounded-lg border border-kib-borda-forte bg-kib-fundo min-h-[44px] px-3 py-2 sm:min-h-0 sm:py-2.5 text-sm text-kib-texto placeholder:text-kib-texto-3 focus:border-kib-acao focus:outline-none focus:ring-2 focus:ring-kib-acao/20';
 
 const roleLabels: Readonly<Record<Role, string>> = {
   owner: 'Proprietário',
@@ -36,13 +36,13 @@ const roleLabels: Readonly<Record<Role, string>> = {
 };
 
 const roleClasses: Readonly<Record<Role, string>> = {
-  owner: 'border-violet-800 bg-violet-950 text-violet-200',
-  admin: 'border-brand-800 bg-brand-950 text-brand-100',
-  financeiro: 'border-emerald-800 bg-emerald-950 text-emerald-200',
-  recepcao: 'border-sky-800 bg-sky-950 text-sky-200',
-  lanchonete: 'border-amber-800 bg-amber-950 text-amber-200',
-  operador_telao: 'border-indigo-800 bg-indigo-950 text-indigo-200',
-  viewer: 'border-zinc-700 bg-zinc-800 text-zinc-200',
+  owner: 'border-kib-roxo/40 bg-kib-roxo/10 text-kib-roxo',
+  admin: 'border-kib-acao bg-kib-sucesso-fundo text-kib-acao',
+  financeiro: 'border-kib-sucesso/40 bg-kib-sucesso-fundo text-kib-sucesso',
+  recepcao: 'border-kib-info/40 bg-kib-info-fundo text-kib-info',
+  lanchonete: 'border-kib-aviso/40 bg-kib-aviso-fundo text-kib-aviso',
+  operador_telao: 'border-kib-roxo/40 bg-kib-roxo/10 text-kib-roxo',
+  viewer: 'border-kib-borda-forte bg-kib-campo text-kib-texto',
 };
 
 const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
@@ -159,8 +159,8 @@ export const AdministrativaPage = () => {
           <span
             className={
               profile.active
-                ? 'font-semibold text-emerald-300'
-                : 'font-semibold text-zinc-400'
+                ? 'font-semibold text-kib-sucesso'
+                : 'font-semibold text-kib-texto-2'
             }
           >
             {profile.active ? 'Sim' : 'Não'}
@@ -261,10 +261,10 @@ export const AdministrativaPage = () => {
           subtitle="Esta área é exclusiva para proprietários e administradores."
           title="Administrativa"
         />
-        <div className="mt-8 flex min-h-64 flex-col items-center justify-center rounded-xl border border-red-900/70 bg-red-950/30 p-8 text-center">
-          <ShieldAlert aria-hidden="true" className="text-red-300" size={32} />
-          <h2 className="mt-4 text-lg font-bold text-white">Acesso restrito</h2>
-          <p className="mt-2 max-w-md text-sm text-red-100">
+        <div className="mt-8 flex min-h-64 flex-col items-center justify-center rounded-xl border border-kib-perigo/70 bg-kib-perigo-fundo p-8 text-center">
+          <ShieldAlert aria-hidden="true" className="text-kib-perigo" size={32} />
+          <h2 className="mt-4 text-lg font-bold text-kib-texto">Acesso restrito</h2>
+          <p className="mt-2 max-w-md text-sm text-kib-perigo">
             Seu papel não possui permissão para gerenciar usuários ou consultar a auditoria.
           </p>
         </div>
@@ -279,7 +279,7 @@ export const AdministrativaPage = () => {
         title="Administrativa"
       />
 
-      <div className="mt-8 border-b border-zinc-800" role="tablist">
+      <div className="mt-8 border-b border-kib-borda" role="tablist">
         {([
           ['usuarios', 'Usuários'],
           ['auditoria', 'Auditoria'],
@@ -291,8 +291,8 @@ export const AdministrativaPage = () => {
               className={[
                 'border-b-2 px-4 py-3 text-sm font-bold transition-colors',
                 isActive
-                  ? 'border-brand-400 text-brand-200'
-                  : 'border-transparent text-zinc-400 hover:text-white',
+                  ? 'border-kib-acao text-kib-acao'
+                  : 'border-transparent text-kib-texto-2 hover:text-kib-texto',
               ].join(' ')}
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -389,14 +389,14 @@ export const AdministrativaPage = () => {
 
             <div className="md:col-span-2">
               <FormField label="Status da conta">
-                <label className="inline-flex cursor-pointer items-center gap-3 text-sm text-zinc-200">
+                <label className="inline-flex cursor-pointer items-center gap-3 text-sm text-kib-texto">
                   <input
                     checked={form.active}
                     className="peer sr-only"
                     onChange={(event) => updateForm('active', event.target.checked)}
                     type="checkbox"
                   />
-                  <span className="relative h-6 w-11 rounded-full bg-zinc-700 transition-colors after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform peer-checked:bg-brand-500 peer-checked:after:translate-x-5 peer-focus-visible:ring-2 peer-focus-visible:ring-brand-400" />
+                  <span className="relative h-6 w-11 rounded-full bg-kib-borda-forte transition-colors after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform peer-checked:bg-kib-acao peer-checked:after:translate-x-5 peer-focus-visible:ring-2 peer-focus-visible:ring-kib-acao" />
                   {form.active ? 'Usuário ativo' : 'Usuário inativo'}
                 </label>
               </FormField>

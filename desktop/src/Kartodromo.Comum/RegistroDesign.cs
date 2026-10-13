@@ -49,10 +49,10 @@ public class RegistroDesign : CartaoModal
     readonly ColunaReg[] _cols;
     readonly FonteReg _fonte;
     readonly Dictionary<string, Control> _c = [];
-    readonly Label _estado = new() { AutoSize = false, Font = new Font("Segoe UI Semibold", 9F), TextAlign = ContentAlignment.MiddleCenter };
-    readonly TextBox _busca = new() { BorderStyle = BorderStyle.None, Font = new Font("Segoe UI", 9.8F), PlaceholderText = "Pesquisar", BackColor = BotaoCinza };
+    readonly Label _estado = new() { AutoSize = false, Font = Tokens.FonteSemibold(Tokens.Claro.FonteTamanhoPequeno), TextAlign = ContentAlignment.MiddleCenter };
+    readonly TextBox _busca = new() { BorderStyle = BorderStyle.None, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo), PlaceholderText = "Pesquisar", BackColor = BotaoCinza };
     readonly ListaReg _lista;
-    readonly Panel _faixa = new() { BackColor = Color.White };
+    readonly Panel _faixa = new() { BackColor = Tokens.Primitivo.Branco };
     readonly FlowLayoutPanel _acoes = new() { FlowDirection = FlowDirection.LeftToRight, WrapContents = false, BackColor = Fundo, Margin = Padding.Empty };
     List<JsonObject> _todos = [];
     JsonObject _atual;
@@ -75,16 +75,16 @@ public class RegistroDesign : CartaoModal
         _lista = new ListaReg(colunas);
 
         // ---------- cabeçalho: padding 14 18, ícone 34, título 16/sub 12, estado, pesquisa 240×32, ✕ 32
-        var cab = new Panel { Dock = DockStyle.Top, Height = 63, BackColor = Color.White };
+        var cab = new Panel { Dock = DockStyle.Top, Height = 63, BackColor = Tokens.Primitivo.Branco };
         cab.Paint += (_, e) => { using var p = new Pen(Tokens.Linha); e.Graphics.DrawLine(p, 0, cab.Height - 1, cab.Width, cab.Height - 1); };
         var ic = new PictureBox { Image = Forma.Tile(svg, corCss), SizeMode = PictureBoxSizeMode.Zoom, Size = new Size(34, 34), Location = new Point(M, 14), BackColor = Color.Transparent };
-        var fT = new Font("Segoe UI", 12F, FontStyle.Bold); var fS = new Font("Segoe UI", 9F);
+        var fT = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpoLeitura, FontStyle.Bold); var fS = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno);
         var t = new Label { Text = titulo, AutoSize = true, Font = fT, ForeColor = PecasDesign.CorTexto, Location = new Point(M + 46, 11), BackColor = Color.Transparent };
         var s = new Label { Text = sub, AutoSize = true, Font = fS, ForeColor = Cinza, Location = new Point(M + 47, 32), BackColor = Color.Transparent };
         var largTexto = Math.Max(TextRenderer.MeasureText(titulo, fT).Width, TextRenderer.MeasureText(sub, fS).Width);
         _estado.Location = new Point(M + 46 + largTexto + 8, 20); _estado.Size = new Size(80, 23);
         _estado.Resize += (_, _) => Forma.AplicarRaio(_estado, 7);
-        var fechar = Botao("✕", BotaoCinza, PecasDesign.CorTexto); fechar.Font = new Font("Segoe UI", 9.5F); fechar.Size = new Size(32, 32); fechar.Location = new Point(L - M - 32, 15);
+        var fechar = Botao("✕", BotaoCinza, PecasDesign.CorTexto); fechar.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo); fechar.Size = new Size(32, 32); fechar.Location = new Point(L - M - 32, 15);
         fechar.Resize += (_, _) => Forma.AplicarRaio(fechar, 9); Forma.AplicarRaio(fechar, 9);
         fechar.Click += (_, _) => Close();
         var busca = new Panel { Size = new Size(240, 32), Location = new Point(fechar.Left - 12 - 240, 15), BackColor = BotaoCinza };
@@ -113,12 +113,12 @@ public class RegistroDesign : CartaoModal
         for (var i = 0; i < setas.Length; i++)
         {
             var (tx, dica, a) = setas[i];
-            var b = Botao(tx, BotaoCinza, PecasDesign.CorTexto); b.Font = new Font("Segoe UI", 10F); b.SetBounds(2 + i * 32, 2, 32, 28); b.AccessibleName = dica;
-            b.FlatAppearance.MouseOverBackColor = Color.White; b.Resize += (_, _) => Forma.AplicarRaio(b, 7); Forma.AplicarRaio(b, 7);
+            var b = Botao(tx, BotaoCinza, PecasDesign.CorTexto); b.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo); b.SetBounds(2 + i * 32, 2, 32, 28); b.AccessibleName = dica;
+            b.FlatAppearance.MouseOverBackColor = Tokens.Primitivo.Branco; b.Resize += (_, _) => Forma.AplicarRaio(b, 7); Forma.AplicarRaio(b, 7);
             b.Click += (_, _) => a(); nav.Controls.Add(b);
         }
         _acoes.Location = new Point(nav.Right + 8, 13); _acoes.Size = new Size(700, 34);
-        Acao("+ Novo", Forma.Verde, Color.White, true, Novo);
+        Acao("+ Novo", Forma.Verde, Tokens.Primitivo.Branco, true, Novo);
         Acao("Editar", BotaoCinza, PecasDesign.CorTexto, false, Editar);
         Acao("Excluir", BotaoCinza, Vermelho, false, Excluir);
         Acao("Cancelar", BotaoCinza, PecasDesign.CorTexto, false, Cancelar);
@@ -126,9 +126,9 @@ public class RegistroDesign : CartaoModal
         Acao("Importar", BotaoCinza, PecasDesign.CorTexto, false, Importar);
         Acao("Exportar", BotaoCinza, PecasDesign.CorTexto, false, Exportar);
         foreach (var (texto, acao) in extras) Acao(texto, BotaoCinza, PecasDesign.CorTexto, false, () => { if (_atual != null) acao(_atual); });
-        var gravar = Botao("Gravar e fechar", Forma.Verde, Color.White, true); gravar.Font = new Font("Segoe UI", 9.8F, FontStyle.Bold);
+        var gravar = Botao("Gravar e fechar", Forma.Verde, Tokens.Primitivo.Branco, true); gravar.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo, FontStyle.Bold);
         gravar.Size = new Size(TextRenderer.MeasureText(gravar.Text, gravar.Font).Width + 36, 34); gravar.Location = new Point(L - M - gravar.Width, 12);
-        var fecharRod = Botao("Fechar", BotaoCinza, PecasDesign.CorTexto); fecharRod.Font = new Font("Segoe UI", 9.8F);
+        var fecharRod = Botao("Fechar", BotaoCinza, PecasDesign.CorTexto); fecharRod.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo);
         fecharRod.Size = new Size(TextRenderer.MeasureText("Fechar", fecharRod.Font).Width + 32, 34); fecharRod.Location = new Point(gravar.Left - 8 - fecharRod.Width, 12);
         foreach (var b in new[] { gravar, fecharRod }) { b.Resize += (_, _) => Forma.AplicarRaio(b, 9); Forma.AplicarRaio(b, 9); }
         gravar.Click += (_, _) => Gravar(true);
@@ -186,7 +186,7 @@ public class RegistroDesign : CartaoModal
     void Acao(string texto, Color fundo, Color frente, bool negrito, Action a)
     {
         var b = Botao(texto, fundo, frente, negrito);
-        b.Font = new Font("Segoe UI", 9.4F, negrito ? FontStyle.Bold : FontStyle.Regular);
+        b.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo, negrito ? FontStyle.Bold : FontStyle.Regular);
         b.Size = new Size(TextRenderer.MeasureText(texto, b.Font).Width + 24, 32); b.Margin = new Padding(0, 1, 8, 0);
         b.Resize += (_, _) => Forma.AplicarRaio(b, 8); Forma.AplicarRaio(b, 8);
         b.Click += (_, _) => a();
@@ -209,15 +209,15 @@ public class RegistroDesign : CartaoModal
             Control ctl;
             if (c.Tipo == "bool")
             {
-                var ck = new CheckBox { Text = c.Rotulo, AutoSize = true, Font = new Font("Segoe UI", 9.8F), ForeColor = PecasDesign.CorTexto, BackColor = Color.White, Location = new Point(x, y + 20 + 7), Cursor = Cursors.Hand, Padding = new Padding(4, 0, 0, 0) };
+                var ck = new CheckBox { Text = c.Rotulo, AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo), ForeColor = PecasDesign.CorTexto, BackColor = Tokens.Primitivo.Branco, Location = new Point(x, y + 20 + 7), Cursor = Cursors.Hand, Padding = new Padding(4, 0, 0, 0) };
                 Forma.CheckVerde(ck);
                 ck.CheckedChanged += (_, _) => Mexeu();
                 _faixa.Controls.Add(ck); ctl = ck;
             }
             else
             {
-                var rot = new Label { Text = c.Rotulo, AutoSize = false, Font = PecasDesign.FonteRotulo, ForeColor = Cinza, Location = new Point(x, y), Size = new Size(w, 16), BackColor = Color.White, AutoEllipsis = true };
-                var caixa = new Panel { Location = new Point(x, y + 20), Size = new Size(w, 34), BackColor = Color.White };
+                var rot = new Label { Text = c.Rotulo, AutoSize = false, Font = PecasDesign.FonteRotulo, ForeColor = Cinza, Location = new Point(x, y), Size = new Size(w, 16), BackColor = Tokens.Primitivo.Branco, AutoEllipsis = true };
+                var caixa = new Panel { Location = new Point(x, y + 20), Size = new Size(w, 34), BackColor = Tokens.Primitivo.Branco };
                 ctl = Criar(c);
                 var foco = ctl;
                 caixa.Paint += (_, e) =>
@@ -248,13 +248,13 @@ public class RegistroDesign : CartaoModal
         {
             case "select":
             {
-                var l = new ListaDesign { Font = new Font("Segoe UI", 10.1F) };
+                var l = new ListaDesign { Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo) };
                 foreach (var o in c.Opcoes ?? []) { var p = o.Split('=', 2); l.Items.Add(new Campos.Item(0, p.Length == 2 ? p[1] : p[0], new JsonObject { ["v"] = p[0] })); }
                 l.SelectedIndexChanged += (_, _) => Mexeu(); ctl = l; break;
             }
             case "lista":
             {
-                var l = new ListaDesign { Font = new Font("Segoe UI", 10.1F) };
+                var l = new ListaDesign { Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo) };
                 l.Items.Add(new Campos.Item(0, ""));
                 foreach (var it in c.Itens?.Invoke() ?? []) l.Items.Add(it);
                 l.SelectedIndexChanged += (_, _) => Mexeu(); ctl = l; break;
@@ -262,22 +262,22 @@ public class RegistroDesign : CartaoModal
             case "date":
             {
                 var d = new DataDesign(DateTime.Today);
-                foreach (Control x in d.Controls) if (x is TextBox tb) { tb.Font = new Font("Segoe UI", 10.1F); tb.TextChanged += (_, _) => Mexeu(); }
+                foreach (Control x in d.Controls) if (x is TextBox tb) { tb.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo); tb.TextChanged += (_, _) => Mexeu(); }
                 ctl = d; break;
             }
             case "time":
             {
-                var t = PecasDesign.Hora(DateTime.Today.AddHours(17)); t.Text = ""; t.Font = new Font("Segoe UI", 10.1F);
+                var t = PecasDesign.Hora(DateTime.Today.AddHours(17)); t.Text = ""; t.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo);
                 t.TextChanged += (_, _) => Mexeu(); ctl = t; break;
             }
             case "int":
             {
-                var t = PecasDesign.Numero(0, 9); t.Text = ""; t.Font = new Font("Segoe UI", 10.1F);
+                var t = PecasDesign.Numero(0, 9); t.Text = ""; t.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo);
                 t.TextChanged += (_, _) => Mexeu(); ctl = t; break;
             }
             default:
             {
-                var t = PecasDesign.Texto(); t.Font = new Font("Segoe UI", 10.1F);
+                var t = PecasDesign.Texto(); t.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo);
                 if (c.Tipo == "password") t.UseSystemPasswordChar = true;
                 t.TextChanged += (_, _) => Mexeu(); ctl = t; break;
             }
@@ -310,7 +310,7 @@ public class RegistroDesign : CartaoModal
             Filtrar(idSel ?? _atual?.S("id"));
             if (_lista.Atual == null) Novo();
         }
-        catch (Exception e) { Msg.Erro(this, e.Message); }
+        catch (Exception e) { _lista.Carregando = false; Diagnostico.Registrar(this, e); Msg.Erro(this, ApiException.Motivo(e, "Não foi possível carregar os registros. Tente novamente ou verifique a conexão.")); }
     }
 
     void Filtrar(string idSel = null)
@@ -448,7 +448,7 @@ public class RegistroDesign : CartaoModal
             if (fechar) { DialogResult = DialogResult.OK; Close(); return; }
             await Carregar(r?["id"]?.ToString() ?? _atual?.S("id"));
         }
-        catch (Exception e) { Msg.Erro(this, e.Message); }
+        catch (Exception e) { Diagnostico.Registrar(this, e); Msg.Erro(this, ApiException.Motivo(e, "Não foi possível gravar o registro. Tente novamente.")); }
         finally { UseWaitCursor = false; }
     }
 
@@ -464,7 +464,7 @@ public class RegistroDesign : CartaoModal
             if (Depois != null) await Depois();
             await Carregar(null);
         }
-        catch (Exception e) { Msg.Erro(this, e.Message); }
+        catch (Exception e) { Diagnostico.Registrar(this, e); Msg.Erro(this, ApiException.Motivo(e, "Não foi possível excluir o registro. Tente novamente.")); }
     }
 
     string TextoCampo(CampoReg c, JsonObject r) => c.Tipo switch
@@ -549,7 +549,7 @@ public class RegistroDesign : CartaoModal
             await Carregar(null);
             Msg.Info(this, $"{ok} registro(s) importado(s)." + (erros.Count > 0 ? $"\n\nNão importados ({erros.Count}):\n" + string.Join("\n", erros.Take(10)) : ""));
         }
-        catch (Exception e) { Msg.Erro(this, e.Message); }
+        catch (Exception e) { Diagnostico.Registrar(this, e); Msg.Erro(this, "Não foi possível importar os registros. Confira o arquivo e tente novamente."); }
     }
 
     static string[] Csv(string linha)
@@ -595,11 +595,18 @@ public class ListaReg : Control
         _cols = cols;
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
         BackColor = RegistroDesign.Fundo; TabStop = true;
+        AccessibleRole = AccessibleRole.Table;
+        AccessibleName = "Lista de registros";
+        AccessibleDescription = "Lista navegável por teclado; use Enter para abrir o registro selecionado.";
     }
 
     int Cabem => Math.Max(1, (Height - Cab - Rod) / Lin);
 
-    public void Carregar(List<JsonObject> linhas) { Linhas = linhas; Selecionada = -1; _topo = 0; Invalidate(); }
+    public void Carregar(List<JsonObject> linhas) { Linhas = linhas; Selecionada = -1; _topo = 0; Carregando = false; Invalidate(); }
+
+    public bool Carregando { get; set; } = true;
+
+    protected override AccessibleObject CreateAccessibilityInstance() => new ListaRegAccessibleObject(this);
 
     public void Selecionar(int i)
     {
@@ -693,8 +700,10 @@ public class ListaReg : Control
                 TextRenderer.DrawText(g, txt, i == 0 && l == Selecionada ? FonteNegrito : FonteLinha, new Rectangle(xs[i].x, y, xs[i].w, Lin - 1), PecasDesign.CorTexto, Al(_cols[i].Alinha));
             }
         }
-        if (Linhas.Count == 0)
-            TextRenderer.DrawText(g, "Nenhum registro.", FonteLinha, new Rectangle(0, Cab + 10, Width, 30), Tokens.TextoSecundario, TextFormatFlags.HorizontalCenter);
+        if (Carregando)
+            TextRenderer.DrawText(g, "Carregando…", FonteLinha, new Rectangle(0, Cab + 10, Width, 30), Tokens.TextoSecundario, TextFormatFlags.HorizontalCenter);
+        else if (Linhas.Count == 0)
+            TextRenderer.DrawText(g, "Não há registros. Use + Novo para cadastrar.", FonteLinha, new Rectangle(0, Cab + 10, Width, 42), Tokens.TextoSecundario, TextFormatFlags.HorizontalCenter | TextFormatFlags.WordBreak);
         // rolagem
         if (Linhas.Count > Cabem)
         {
@@ -706,9 +715,40 @@ public class ListaReg : Control
         }
         // total
         g.DrawLine(linFina, 0, Height - Rod, Width, Height - Rod);
-        TextRenderer.DrawText(g, _total, new Font("Segoe UI", 9F), new Rectangle(14, Height - Rod, Width - 28, Rod), Tokens.TextoSecundario, TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
+        TextRenderer.DrawText(g, _total, Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno), new Rectangle(14, Height - Rod, Width - 28, Rod), Tokens.TextoSecundario, TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
         g.ResetClip();
         using var borda = new Pen(Tokens.Linha);
         g.DrawPath(borda, card);
+    }
+
+    sealed class ListaRegAccessibleObject : ControlAccessibleObject
+    {
+        readonly ListaReg _lista;
+        public ListaRegAccessibleObject(ListaReg lista) : base(lista) { _lista = lista; }
+        public override string Name => _lista.AccessibleName ?? "Lista de registros";
+        public override AccessibleRole Role => AccessibleRole.Table;
+        public override AccessibleStates State => _lista.Focused ? AccessibleStates.Focused : AccessibleStates.Focusable;
+        public override int GetChildCount() => _lista.Linhas.Count;
+        public override AccessibleObject GetChild(int index) => index >= 0 && index < _lista.Linhas.Count ? new LinhaRegAccessibleObject(_lista, index) : null;
+        public override AccessibleObject GetFocused() => _lista.Selecionada >= 0 ? new LinhaRegAccessibleObject(_lista, _lista.Selecionada) : this;
+    }
+
+    sealed class LinhaRegAccessibleObject : AccessibleObject
+    {
+        readonly ListaReg _lista;
+        readonly int _indice;
+        public LinhaRegAccessibleObject(ListaReg lista, int indice) { _lista = lista; _indice = indice; }
+        public override string Name => string.Join(", ", _lista._cols.Select(c => c.Texto(_lista.Linhas[_indice]) ?? "").Where(s => s.Length > 0));
+        public override AccessibleRole Role => AccessibleRole.Row;
+        public override AccessibleStates State => (_lista.Selecionada == _indice ? AccessibleStates.Selected | AccessibleStates.Focused : AccessibleStates.Selectable);
+        public override Rectangle Bounds
+        {
+            get
+            {
+                var y = Cab + (_indice - _lista._topo) * Lin;
+                return _lista.RectangleToScreen(new Rectangle(0, y, _lista.Width, Lin - 1));
+            }
+        }
+        public override void DoDefaultAction() => _lista.Selecionar(_indice);
     }
 }

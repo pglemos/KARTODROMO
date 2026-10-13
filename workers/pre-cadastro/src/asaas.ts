@@ -61,6 +61,18 @@ export const qrPix = (env: AsaasEnv, id: string) => chamar<{ encodedImage: strin
 export const consultar = (env: AsaasEnv, id: string) => chamar<Cobranca>(env, `/payments/${encodeURIComponent(id)}`);
 export const cancelar = (env: AsaasEnv, id: string) => chamar<{ deleted: boolean }>(env, `/payments/${encodeURIComponent(id)}`, { method: 'DELETE' });
 
+export type CobrancaPaga = { id: string; status: string; billingType: string; externalReference?: string | null };
+
+/** Cobranças pagas desde a data (AAAA-MM-DD): Pix recebido e cartão confirmado/recebido. */
+export async function pagasDesde(env: AsaasEnv, data: string) {
+  const todas: CobrancaPaga[] = [];
+  for (const status of ['RECEIVED', 'CONFIRMED']) {
+    const r = await chamar<{ data?: CobrancaPaga[] }>(env, `/payments?status=${status}&paymentDate%5Bge%5D=${data}&limit=100`);
+    todas.push(...(r.data ?? []));
+  }
+  return todas;
+}
+
 /** Diagnóstico sem segredos: webhooks cadastrados (endereço, eventos, ativo, interrompido) e chaves Pix ativas. */
 export async function diagnostico(env: AsaasEnv) {
   const w = await chamar<{ data: { url: string; enabled: boolean; interrupted: boolean; apiVersion: number; events?: string[]; sendType?: string }[] }>(env, '/webhooks?limit=20');

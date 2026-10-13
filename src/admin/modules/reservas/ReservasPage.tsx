@@ -63,7 +63,7 @@ const emptyForm: ReservaFormState = {
 };
 
 const inputClassName =
-  'w-full rounded-lg border border-zinc-700 bg-zinc-950 min-h-[44px] px-3 py-2 sm:min-h-0 sm:py-2.5 text-sm text-white placeholder:text-zinc-600 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20';
+  'w-full rounded-lg border border-kib-borda-forte bg-kib-fundo min-h-[44px] px-3 py-2 sm:min-h-0 sm:py-2.5 text-sm text-kib-texto placeholder:text-kib-texto-3 focus:border-kib-acao focus:outline-none focus:ring-2 focus:ring-kib-acao/20';
 
 const statusLabels: Record<ReservaStatus, string> = {
   pendente: 'Pendente',
@@ -73,10 +73,10 @@ const statusLabels: Record<ReservaStatus, string> = {
 };
 
 const statusClasses: Record<ReservaStatus, string> = {
-  pendente: 'border-amber-800 bg-amber-950 text-amber-200',
-  confirmada: 'border-brand-800 bg-brand-950 text-brand-100',
-  cancelada: 'border-red-900 bg-red-950 text-red-200',
-  concluida: 'border-sky-900 bg-sky-950 text-sky-200',
+  pendente: 'border-kib-aviso/40 bg-kib-aviso-fundo text-kib-aviso',
+  confirmada: 'border-kib-acao bg-kib-sucesso-fundo text-kib-acao',
+  cancelada: 'border-kib-perigo/40 bg-kib-perigo-fundo text-kib-perigo',
+  concluida: 'border-kib-info/40 bg-kib-info-fundo text-kib-info',
 };
 
 const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
@@ -282,7 +282,7 @@ export const ReservasPage = () => {
         render: (booking) => (
           <button
             className={`text-left font-bold underline-offset-4 hover:underline ${
-              selectedBookingId === booking.id ? 'text-brand-300' : 'text-white'
+              selectedBookingId === booking.id ? 'text-kib-acao' : 'text-kib-texto'
             }`}
             onClick={() => setSelectedBookingId(booking.id)}
             type="button"
@@ -311,8 +311,8 @@ export const ReservasPage = () => {
           <span
             className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${
               booking.encerrada
-                ? 'border-zinc-700 bg-zinc-900 text-zinc-400'
-                : 'border-brand-800 bg-brand-950 text-brand-100'
+                ? 'border-kib-borda-forte bg-kib-superficie text-kib-texto-2'
+                : 'border-kib-acao bg-kib-sucesso-fundo text-kib-acao'
             }`}
           >
             {booking.encerrada ? 'Encerrada' : 'Aberta'}
@@ -339,8 +339,8 @@ export const ReservasPage = () => {
           <span
             className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${
               item.pagou
-                ? 'border-brand-800 bg-brand-950 text-brand-100'
-                : 'border-amber-800 bg-amber-950 text-amber-200'
+                ? 'border-kib-acao bg-kib-sucesso-fundo text-kib-acao'
+                : 'border-kib-aviso/40 bg-kib-aviso-fundo text-kib-aviso'
             }`}
           >
             {item.pagou ? 'Pago' : 'Pendente'}
@@ -354,8 +354,8 @@ export const ReservasPage = () => {
           <span
             className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${
               item.aprovado
-                ? 'border-brand-800 bg-brand-950 text-brand-100'
-                : 'border-amber-800 bg-amber-950 text-amber-200'
+                ? 'border-kib-acao bg-kib-sucesso-fundo text-kib-acao'
+                : 'border-kib-aviso/40 bg-kib-aviso-fundo text-kib-aviso'
             }`}
           >
             {item.aprovado ? 'Aprovado' : 'Pendente'}
@@ -558,11 +558,11 @@ export const ReservasPage = () => {
           />
           <Pagination onPageChange={setBookingsPage} page={bookingsPage} pageSize={PAGE_SIZE} total={bookingsTotal} />
 
-          <div className="border-t border-zinc-800 pt-6">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-brand-300">
+          <div className="border-t border-kib-borda pt-6">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-kib-acao">
               Reservas da bateria selecionada
             </p>
-            <h2 className="mt-2 text-xl font-black text-white">{selectedBooking?.nome ?? 'Selecione uma bateria'}</h2>
+            <h2 className="mt-2 text-xl font-black text-kib-texto">{selectedBooking?.nome ?? 'Selecione uma bateria'}</h2>
             <div className="mt-4">
               <DataTable
                 columns={bookingCustomerColumns}

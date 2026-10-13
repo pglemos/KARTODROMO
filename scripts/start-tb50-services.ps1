@@ -107,7 +107,7 @@ function Test-ListeningPort {
 function Invoke-ViplexCronometragemRepair {
   try {
     $programs = Invoke-RestMethod `
-      -Uri "http://localhost:3000/api/viplex-programs" `
+      -Uri "http://127.0.0.1:3000/api/viplex-programs" `
       -TimeoutSec 10
 
     $program = @($programs.programs) |
@@ -121,7 +121,7 @@ function Invoke-ViplexCronometragemRepair {
 
     Invoke-RestMethod `
       -Method Put `
-      -Uri "http://localhost:3000/api/viplex-programs" `
+      -Uri "http://127.0.0.1:3000/api/viplex-programs" `
       -ContentType "application/json" `
       -Body (@{ identifier = $program.identifier } | ConvertTo-Json -Compress) `
       -TimeoutSec 45 | Out-Null
@@ -148,12 +148,12 @@ for ($i = 0; $i -lt 15 -and -not (Test-ListeningPort 3000); $i++) {
 try {
   Invoke-RestMethod `
     -Method Put `
-    -Uri "http://localhost:3000/api/tb50-display-mode" `
+    -Uri "http://127.0.0.1:3000/api/tb50-display-mode" `
     -ContentType "application/json" `
     -Body '{"mode":"live"}' `
     -TimeoutSec 5 | Out-Null
 } catch {
-  Write-Warning "Nao foi possivel forcar modo live em http://localhost:3000/api/tb50-display-mode: $($_.Exception.Message)"
+  Write-Warning "Nao foi possivel forcar modo live em http://127.0.0.1:3000/api/tb50-display-mode: $($_.Exception.Message)"
 }
 
 & (Join-Path $PSScriptRoot "start-mediamtx.ps1") | Out-Null
@@ -163,8 +163,11 @@ Stop-ProcessByPattern -Name "cmd.exe" -Pattern "tb50-streamer|npm(\.cmd)? run st
 Stop-ProcessByPattern -Name "ffmpeg.exe" -Pattern "rtsp://.*tb50|rtmp://.*tb50"
 
 & (Join-Path $PSScriptRoot "start-tb50-stream.ps1") `
-  -ScoreboardUrl "http://127.0.0.1:3000/podio-live-tb50" `
-  -StreamUrl "rtsp://192.168.20.13:8554/tb50" | Out-Null
+  -ScoreboardUrl "http://127.0.0.1:3000/placar-telao-tb50?layout=designer" `
+  -StreamUrl "rtsp://127.0.0.1:8554/tb50" `
+  -CaptureFps 2 `
+  -OutputFps 2 `
+  -ScreenshotQuality 50 | Out-Null
 
 Start-Sleep -Seconds 2
 

@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
+    <!-- versão vem do desktop\Directory.Build.props (13/10: um <Version> fixo aqui fez o pacote 1.0.67 sair como 1.0.66) -->
     <RootNamespace>Kartodromo.Cronometragem</RootNamespace>
     <AssemblyName>Kartodromo.Cronometragem</AssemblyName>
     <ApplicationIcon>app.ico</ApplicationIcon>
@@ -10,6 +11,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Kartodromo.Cronometragem.Testes" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.IO.Ports" Version="8.0.0" />

@@ -40,23 +40,29 @@ public sealed class FormRelatoriosCrono : Form
         _sessaoInicial = sessaoAtual ?? (state?["focus"] as JsonObject);
 
         Text = "Relatórios de cronometragem";
-        ClientSize = new Size(960, 600);
-        MinimumSize = new Size(880, 560);
+        ClientSize = new Size(960, 560);
+        MinimumSize = new Size(880, 520);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.None;
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
-        BackColor = Color.FromArgb(245, 245, 247);
-        Font = new Font("Segoe UI", 9.5F);
+        BackColor = Tokens.Claro.CorFundoApp;
+        Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo);
         KeyPreview = true;
         KeyDown += (_, e) => { if (e.KeyCode == Keys.Escape) Close(); };
 
+        // mesmo formato das outras janelas (cantos arredondados de 18, borda fina)
+        Resize += (_, _) => { using var p = Forma.Redondo(new Rectangle(0, 0, Width, Height), 18); Region = new Region(p); };
         Paint += (_, e) =>
         {
-            using var pen = new Pen(Color.FromArgb(200, 200, 205), 1f);
-            e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using var p = Forma.Redondo(new Rectangle(0, 0, Width - 1, Height - 1), 18);
+            using var pen = new Pen(Color.FromArgb(220, 220, 225), 1f);
+            e.Graphics.DrawPath(pen, p);
         };
+        // o foco começava no ✕ (moldura de foco no botão): começa no filtro de data
+        Shown += (_, _) => ActiveControl = _cbData;
 
         ConstruirInterface();
         CarregarDados();
@@ -69,7 +75,7 @@ public sealed class FormRelatoriosCrono : Form
         {
             Dock = DockStyle.Top,
             Height = 64,
-            BackColor = Color.FromArgb(255, 255, 255),
+            BackColor = Tokens.Primitivo.Branco,
             Padding = new Padding(18, 12, 18, 12)
         };
         pnlHeader.Paint += (_, e) =>
@@ -98,7 +104,7 @@ public sealed class FormRelatoriosCrono : Form
             e.Graphics.FillPath(brush, path);
 
             // Símbolo de documento
-            using var pen = new Pen(Color.White, 2f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            using var pen = new Pen(Tokens.Primitivo.Branco, 2f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
             e.Graphics.DrawRectangle(pen, 9, 8, 16, 18);
             e.Graphics.DrawLine(pen, 13, 14, 21, 14);
             e.Graphics.DrawLine(pen, 13, 18, 21, 18);
@@ -107,16 +113,16 @@ public sealed class FormRelatoriosCrono : Form
         var lTitulo = new Label
         {
             Text = "Relatórios de cronometragem",
-            Font = new Font("Segoe UI", 12.5F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(29, 29, 31),
+            Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoTitulo, FontStyle.Bold),
+            ForeColor = Tokens.Claro.CorTextoPrincipal,
             AutoSize = true,
             Location = new Point(62, 13)
         };
         var lSub = new Label
         {
             Text = "Resultados, mapas de volta e grids de largada",
-            Font = new Font("Segoe UI", 8.5F),
-            ForeColor = Color.FromArgb(110, 110, 115),
+            Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno),
+            ForeColor = Tokens.Claro.CorTextoSecundario,
             AutoSize = true,
             Location = new Point(63, 36)
         };
@@ -128,12 +134,13 @@ public sealed class FormRelatoriosCrono : Form
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
             Location = new Point(pnlHeader.Width - 50, 16),
             FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(110, 110, 115),
+            Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold),
+            ForeColor = Tokens.Claro.CorTextoSecundario,
             BackColor = Color.FromArgb(240, 240, 243),
             Cursor = Cursors.Hand
         };
         btnFechar.FlatAppearance.BorderSize = 0;
+        btnFechar.Resize += (_, _) => Forma.AplicarRaio(btnFechar, 10); Forma.AplicarRaio(btnFechar, 10);
         btnFechar.Click += (_, _) => Close();
         pnlHeader.Resize += (_, _) => btnFechar.Left = pnlHeader.ClientSize.Width - 46;
 
@@ -145,7 +152,7 @@ public sealed class FormRelatoriosCrono : Form
         {
             Dock = DockStyle.Bottom,
             Height = 58,
-            BackColor = Color.FromArgb(255, 255, 255),
+            BackColor = Tokens.Primitivo.Branco,
             Padding = new Padding(18, 12, 18, 12)
         };
         pnlFooter.Paint += (_, e) =>
@@ -166,29 +173,31 @@ public sealed class FormRelatoriosCrono : Form
         var btnCancelar = new BotaoPlano
         {
             Text = "Cancelar",
-            Size = new Size(96, 34),
+            Size = new Size(104, 36),
             FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(240, 240, 243),
-            ForeColor = Color.FromArgb(29, 29, 31),
-            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            BackColor = Tokens.BotaoSecundario,
+            ForeColor = Tokens.Claro.CorTextoPrincipal,
+            Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold),
             Cursor = Cursors.Hand,
             Margin = new Padding(0, 0, 10, 0)
         };
         btnCancelar.FlatAppearance.BorderSize = 0;
+        btnCancelar.Resize += (_, _) => Forma.AplicarRaio(btnCancelar, 12); Forma.AplicarRaio(btnCancelar, 12);
         btnCancelar.Click += (_, _) => Close();
 
         var btnGerar = new BotaoPlano
         {
             Text = "Gerar relatório",
-            Size = new Size(130, 34),
+            Size = new Size(140, 36),
             FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(11, 122, 83),
-            ForeColor = Color.White,
-            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+            BackColor = Tokens.Claro.CorAcaoPrincipal,
+            ForeColor = Tokens.Primitivo.Branco,
+            Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo, FontStyle.Bold),
             Cursor = Cursors.Hand,
             Margin = new Padding(0)
         };
         btnGerar.FlatAppearance.BorderSize = 0;
+        btnGerar.Resize += (_, _) => Forma.AplicarRaio(btnGerar, 12); Forma.AplicarRaio(btnGerar, 12);
         btnGerar.Click += (_, _) => GerarRelatorio();
 
         flowBotoes.Controls.AddRange([btnCancelar, btnGerar]);
@@ -264,8 +273,8 @@ public sealed class FormRelatoriosCrono : Form
         var col = 0;
         foreach (var r in radios)
         {
-            r.Font = new Font("Segoe UI", 9.25F);
-            r.ForeColor = Color.FromArgb(29, 29, 31);
+            r.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno);
+            r.ForeColor = Tokens.Claro.CorTextoPrincipal;
             r.Cursor = Cursors.Hand;
             r.Dock = DockStyle.Fill;
             r.Margin = new Padding(4, 1, 4, 1);
@@ -299,7 +308,7 @@ public sealed class FormRelatoriosCrono : Form
     {
         var card = new Panel
         {
-            BackColor = Color.White,
+            BackColor = Tokens.Primitivo.Branco,
             Padding = new Padding(16, 10, 16, 10)
         };
         card.Paint += (_, e) =>
@@ -324,8 +333,8 @@ public sealed class FormRelatoriosCrono : Form
         var lTitulo = new Label
         {
             Text = titulo,
-            Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(29, 29, 31),
+            Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoSubtitulo, FontStyle.Bold),
+            ForeColor = Tokens.Claro.CorTextoPrincipal,
             Dock = DockStyle.Fill,
             TextAlign = ContentAlignment.MiddleLeft,
             Margin = new Padding(0)
@@ -349,15 +358,15 @@ public sealed class FormRelatoriosCrono : Form
             Text = rotulo,
             Dock = DockStyle.Top,
             Height = 18,
-            Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(110, 110, 115)
+            Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold),
+            ForeColor = Tokens.Claro.CorTextoSecundario
         };
         // caixa com borda arredondada, como os campos do canvas
-        var caixa = new Panel { Dock = DockStyle.Top, Height = 34, BackColor = Color.White, Padding = new Padding(8, 6, 6, 4), Margin = new Padding(0, 2, 0, 0) };
+        var caixa = new Panel { Dock = DockStyle.Top, Height = 34, BackColor = Tokens.Primitivo.Branco, Padding = new Padding(8, 6, 6, 4), Margin = new Padding(0, 2, 0, 0) };
         caixa.Paint += (_, e) => { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using var p = Arredondado(new Rectangle(0, 0, caixa.Width - 1, caixa.Height - 1), 7); using var pen = new Pen(Color.FromArgb(218, 218, 224)); e.Graphics.DrawPath(pen, p); };
         caixa.Resize += (_, _) => caixa.Invalidate();
         controle.Dock = DockStyle.Fill;
-        controle.Font = new Font("Segoe UI", 9.5F);
+        controle.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo);
         caixa.Controls.Add(controle);
         pnl.Controls.Add(caixa);
         pnl.Controls.Add(lbl);
@@ -376,6 +385,11 @@ public sealed class FormRelatoriosCrono : Form
         return path;
     }
 
+    static string DataDaSessao(JsonObject s) =>
+        s.L("createdAt") is long ms && ms > 0
+            ? DateTimeOffset.FromUnixTimeMilliseconds(ms).LocalDateTime.ToString("dd/MM/yyyy")
+            : DateTime.Today.ToString("dd/MM/yyyy");
+
     void CarregarDados()
     {
         _sessoes = Crono.Arr(_state, "sessions");
@@ -383,14 +397,24 @@ public sealed class FormRelatoriosCrono : Form
 
         // Preenche datas distintas
         var datas = _sessoes
-            .Select(s => s.L("createdAt") is long ms && ms > 0 ? DateTimeOffset.FromUnixTimeMilliseconds(ms).LocalDateTime.ToString("dd/MM/yyyy") : DateTime.Today.ToString("dd/MM/yyyy"))
+            .Select(DataDaSessao)
             .Distinct()
             .ToList();
         if (datas.Count == 0) datas.Add(DateTime.Today.ToString("dd/MM/yyyy"));
 
         _cbData.Items.Clear();
         foreach (var d in datas) _cbData.Items.Add(d);
-        _cbData.SelectedIndex = 0;
+
+        if (_sessaoInicial != null)
+        {
+            var dataInicial = DataDaSessao(_sessaoInicial);
+            var idxData = datas.IndexOf(dataInicial);
+            _cbData.SelectedIndex = idxData >= 0 ? idxData : 0;
+        }
+        else
+        {
+            _cbData.SelectedIndex = 0;
+        }
 
         // Preenche eventos
         _cbEvento.Items.Clear();
@@ -400,19 +424,29 @@ public sealed class FormRelatoriosCrono : Form
         // Preenche grupos
         AtualizarGrupos();
 
-        _cbData.SelectedIndexChanged += (_, _) => { AtualizarGrupos(); };
+        _cbData.SelectedIndexChanged += (_, _) =>
+        {
+            _cbEvento.Items.Clear();
+            _cbEvento.Items.Add("Baterias " + _cbData.SelectedItem);
+            _cbEvento.SelectedIndex = 0;
+            AtualizarGrupos();
+        };
         _cbGrupo.SelectedIndexChanged += (_, _) => { AtualizarProvas(); };
     }
 
     void AtualizarGrupos()
     {
-        var grupos = _sessoes.Select(s => ExtrairGrupo(s.S("name"))).Distinct().ToList();
+        var dataSel = _cbData.SelectedItem?.ToString() ?? "";
+        var sessoesDoDia = _sessoes.Where(s => DataDaSessao(s) == dataSel).ToList();
+        if (sessoesDoDia.Count == 0) sessoesDoDia = _sessoes;
+
+        var grupos = sessoesDoDia.Select(s => ExtrairGrupo(s.S("name"))).Distinct().ToList();
         if (grupos.Count == 0) grupos.Add("BATERIA " + DateTime.Now.ToString("HH:mm"));
 
         _cbGrupo.Items.Clear();
         foreach (var g in grupos) _cbGrupo.Items.Add(g);
 
-        if (_sessaoInicial != null)
+        if (_sessaoInicial != null && DataDaSessao(_sessaoInicial) == dataSel)
         {
             var grupoInicial = ExtrairGrupo(_sessaoInicial.S("name"));
             var idx = grupos.IndexOf(grupoInicial);
@@ -425,8 +459,10 @@ public sealed class FormRelatoriosCrono : Form
 
     void AtualizarProvas()
     {
+        var dataSel = _cbData.SelectedItem?.ToString() ?? "";
         var grupoSel = _cbGrupo.SelectedItem?.ToString() ?? "";
-        var candidatas = _sessoes.Where(s => ExtrairGrupo(s.S("name")) == grupoSel).ToList();
+        var candidatas = _sessoes.Where(s => DataDaSessao(s) == dataSel && ExtrairGrupo(s.S("name")) == grupoSel).ToList();
+        if (candidatas.Count == 0) candidatas = _sessoes.Where(s => DataDaSessao(s) == dataSel).ToList();
         if (candidatas.Count == 0) candidatas = _sessoes;
 
         _cbProva.Items.Clear();

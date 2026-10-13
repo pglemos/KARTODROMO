@@ -25,7 +25,7 @@ const getCellValue = <T,>(row: T, key: keyof T): ReactNode => {
 };
 
 const headClass =
-  'whitespace-nowrap px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500';
+  'whitespace-nowrap px-4 py-3 text-xs font-medium uppercase tracking-wider text-kib-texto-3';
 
 export const DataTable = <T extends { id: string | number },>({
   columns,
@@ -41,11 +41,11 @@ export const DataTable = <T extends { id: string | number },>({
 
   if (error) {
     return (
-      <div className="flex min-h-52 flex-col items-center justify-center rounded-xl border border-red-900/60 bg-red-950/20 p-8 text-center">
-        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-red-500/10 text-red-400">
+      <div className="flex min-h-52 flex-col items-center justify-center rounded-xl border border-kib-perigo/60 bg-kib-perigo-fundo p-8 text-center">
+        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-kib-perigo-solido/10 text-kib-perigo">
           <AlertCircle aria-hidden="true" size={22} />
         </span>
-        <p className="mt-3 text-sm text-red-200" role="alert">
+        <p className="mt-3 text-sm text-kib-perigo" role="alert">
           {error}
         </p>
         {onRetry ? (
@@ -59,10 +59,10 @@ export const DataTable = <T extends { id: string | number },>({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60 shadow-card">
+    <div className="overflow-hidden rounded-xl border border-kib-borda bg-kib-superficie shadow-card">
       <div className="overflow-x-auto">
         <table className="min-w-full text-left">
-          <thead className="border-b border-zinc-800">
+          <thead className="border-b border-kib-borda">
             <tr>
               {columns.map((column) => (
                 <th className={headClass} key={String(column.key)} scope="col">
@@ -81,29 +81,29 @@ export const DataTable = <T extends { id: string | number },>({
               ? Array.from({ length: 5 }, (_, rowIndex) => (
                   <tr
                     aria-hidden="true"
-                    className="border-b border-zinc-800/60 last:border-0"
+                    className="border-b border-kib-borda last:border-0"
                     key={`loading-${rowIndex}`}
                   >
                     {columns.map((column) => (
                       <td className="px-4 py-3.5" key={String(column.key)}>
-                        <span className="block h-4 animate-pulse rounded bg-zinc-800/70" />
+                        <span className="block h-4 animate-pulse rounded bg-kib-campo" />
                       </td>
                     ))}
                     {hasActions ? (
                       <td className="px-4 py-3.5">
-                        <span className="ml-auto block h-7 w-16 animate-pulse rounded bg-zinc-800/70" />
+                        <span className="ml-auto block h-7 w-16 animate-pulse rounded bg-kib-campo" />
                       </td>
                     ) : null}
                   </tr>
                 ))
               : rows.map((row) => (
                   <tr
-                    className="border-b border-zinc-800/60 transition-colors last:border-0 hover:bg-zinc-800/30"
+                    className="border-b border-kib-borda transition-colors last:border-0 hover:bg-kib-campo"
                     key={row.id}
                   >
                     {columns.map((column) => (
                       <td
-                        className="whitespace-nowrap px-4 py-3.5 text-sm text-zinc-300"
+                        className="whitespace-nowrap px-4 py-3.5 text-sm text-kib-texto-2"
                         key={String(column.key)}
                       >
                         {column.render ? column.render(row) : getCellValue(row, column.key)}
@@ -115,7 +115,7 @@ export const DataTable = <T extends { id: string | number },>({
                           {onEdit ? (
                             <button
                               aria-label="Editar registro"
-                              className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+                              className="flex h-8 w-8 items-center justify-center rounded-md text-kib-texto-2 transition-colors hover:bg-kib-campo hover:text-kib-texto"
                               onClick={() => onEdit(row)}
                               type="button"
                             >
@@ -125,7 +125,7 @@ export const DataTable = <T extends { id: string | number },>({
                           {onDelete ? (
                             <button
                               aria-label="Excluir registro"
-                              className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                              className="flex h-8 w-8 items-center justify-center rounded-md text-kib-texto-2 transition-colors hover:bg-kib-perigo-solido/10 hover:text-kib-perigo"
                               onClick={() => onDelete(row)}
                               type="button"
                             >
@@ -143,10 +143,10 @@ export const DataTable = <T extends { id: string | number },>({
 
       {!loading && rows.length === 0 ? (
         <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-zinc-800/80 text-zinc-500">
+          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-kib-campo text-kib-texto-3">
             <Inbox aria-hidden="true" size={22} />
           </span>
-          <p className="mt-3 text-sm text-zinc-400">{emptyLabel}</p>
+          <p className="mt-3 text-sm text-kib-texto-2">{emptyLabel}</p>
         </div>
       ) : null}
     </div>

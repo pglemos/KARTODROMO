@@ -37,7 +37,7 @@ type Meta = { id: string; trackId: string | null; track: string; metaMs: number;
 const SISTEMAS: [string, string][] = [['chassi', 'Chassi / direção'], ['pneu', 'Pneus'], ['motor', 'Motor'], ['embreagem', 'Embreagem'], ['freio', 'Freios']];
 const ESTADOS: Record<string, string> = { preparando: 'Preparando', em_andamento: 'Em andamento', bandeira_final: 'Bandeira final', encerrada: 'Encerrada' };
 const statusVariant: Record<string, BadgeVariant> = { REF: 'blue', EQUALIZADO: 'emerald', AJUSTANDO: 'amber', REVISAR: 'red' };
-const sistemaCor: Record<string, string> = { ok: 'text-emerald-400', atencao: 'text-amber-300', critico: 'text-red-400' };
+const sistemaCor: Record<string, string> = { ok: 'text-kib-sucesso', atencao: 'text-kib-aviso', critico: 'text-kib-perigo' };
 const sistemaNome: Record<string, string> = { ok: 'OK', atencao: 'Atenção', critico: 'Crítico' };
 
 const tempo = (ms: number | null | undefined) => {
@@ -100,14 +100,14 @@ export function EqualizacaoCronoPage() {
     <div className="space-y-6">
       <PageHeader eyebrow="Oficina" title="Equalização dos karts" subtitle="Histórico por data, meta de tempo por traçado e a matriz de cada equalização. Os tempos vêm da cronometragem do kartódromo e ficam separados das baterias normais." />
 
-      <div className="flex flex-col gap-3 rounded-xl border border-brand-900/50 bg-brand-950/20 p-4 text-sm text-brand-100 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-xl border border-kib-acao/50 bg-kib-sucesso-fundo p-4 text-sm text-kib-acao sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
-          <Gauge aria-hidden="true" className="mt-0.5 flex-none text-brand-300" size={18} />
-          <span className="text-xs leading-5 text-brand-100/80">Aqui é só consulta. Para criar uma equalização, escolher os karts referência, anotar os pontos da oficina e gerar o PDF, use a aba <strong>Equalização</strong> do programa da Cronometragem.</span>
+          <Gauge aria-hidden="true" className="mt-0.5 flex-none text-kib-acao" size={18} />
+          <span className="text-xs leading-5 text-kib-acao">Aqui é só consulta. Para criar uma equalização, escolher os karts referência, anotar os pontos da oficina e gerar o PDF, use a aba <strong>Equalização</strong> do programa da Cronometragem.</span>
         </div>
         <div className="flex flex-none items-center gap-2">
           <label className="sr-only" htmlFor="eq-tracado">Traçado</label>
-          <select id="eq-tracado" className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-100" value={tracado} onChange={(e) => { setAberta(null); setTracado(e.target.value); }}>
+          <select id="eq-tracado" className="h-10 rounded-lg border border-kib-borda-forte bg-kib-superficie px-3 text-sm text-kib-texto" value={tracado} onChange={(e) => { setAberta(null); setTracado(e.target.value); }}>
             <option value="*">Todos os traçados</option>
             {tracados.map((t) => <option key={t.id ?? ''} value={t.id ?? ''}>{t.name} · {t.lengthMeters} m</option>)}
           </select>
@@ -116,8 +116,8 @@ export function EqualizacaoCronoPage() {
       </div>
 
       {erro ? (
-        <div className="flex items-start gap-3 rounded-xl border border-red-900/60 bg-red-950/20 p-4 text-sm text-red-100" role="alert">
-          <AlertTriangle aria-hidden="true" className="mt-0.5 flex-none text-red-300" size={18} />
+        <div className="flex items-start gap-3 rounded-xl border border-kib-perigo/60 bg-kib-perigo-fundo p-4 text-sm text-kib-perigo" role="alert">
+          <AlertTriangle aria-hidden="true" className="mt-0.5 flex-none text-kib-perigo" size={18} />
           <span>{erro}</span>
         </div>
       ) : null}
@@ -132,22 +132,22 @@ export function EqualizacaoCronoPage() {
       {aberta ? <DetalheEqualizacao e={aberta} fechar={() => setAberta(null)} /> : null}
 
       <Card className="p-4 md:p-5">
-        <h2 className="text-base font-semibold text-zinc-50">Equalizações por data</h2>
-        {!carregando && !lista.length ? <p className="mt-3 text-sm text-zinc-400">Nenhuma equalização registrada{tracado === '*' ? '' : ' neste traçado'}.</p> : null}
+        <h2 className="text-base font-semibold text-kib-texto">Equalizações por data</h2>
+        {!carregando && !lista.length ? <p className="mt-3 text-sm text-kib-texto-2">Nenhuma equalização registrada{tracado === '*' ? '' : ' neste traçado'}.</p> : null}
         {lista.length ? (
           <div className="mt-3 overflow-x-auto">
             <table className="w-full min-w-[820px] text-left text-sm">
-              <thead className="text-xs uppercase tracking-wider text-zinc-500">
+              <thead className="text-xs uppercase tracking-wider text-kib-texto-3">
                 <tr><th className="py-2 pr-3">Data</th><th className="py-2 pr-3">Equalização</th><th className="py-2 pr-3">Traçado</th><th className="py-2 pr-3 text-right">Meta</th><th className="py-2 pr-3">Referências</th><th className="py-2 pr-3 text-right">Karts</th><th className="py-2 pr-3 text-right">Equalizados</th><th className="py-2 pr-3 text-right">Oficina</th><th className="py-2">Situação</th></tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800 text-zinc-200">
+              <tbody className="divide-y divide-kib-borda text-kib-texto">
                 {lista.map((e) => (
-                  <tr key={e.id} className="cursor-pointer hover:bg-zinc-800/40" onClick={() => void abrir(e.id)}>
-                    <td className="py-2.5 pr-3 tabular-nums text-zinc-400">{dataHora(e.startedAt ?? e.createdAt)}</td>
-                    <td className="py-2.5 pr-3 font-medium text-brand-300"><button className="text-left underline-offset-2 hover:underline" type="button" onClick={(ev) => { ev.stopPropagation(); void abrir(e.id); }}>{e.name}</button></td>
+                  <tr key={e.id} className="cursor-pointer hover:bg-kib-campo" onClick={() => void abrir(e.id)}>
+                    <td className="py-2.5 pr-3 tabular-nums text-kib-texto-2">{dataHora(e.startedAt ?? e.createdAt)}</td>
+                    <td className="py-2.5 pr-3 font-medium text-kib-acao"><button className="text-left underline-offset-2 hover:underline" type="button" onClick={(ev) => { ev.stopPropagation(); void abrir(e.id); }}>{e.name}</button></td>
                     <td className="py-2.5 pr-3">{e.track.name}</td>
-                    <td className="py-2.5 pr-3 text-right font-semibold tabular-nums">{tempo(e.metaMs)} <span className="font-normal text-zinc-500">± {(e.toleranciaMs / 1000).toFixed(3)}</span></td>
-                    <td className="py-2.5 pr-3 text-zinc-400">{e.referencias.map((k) => `#${k}`).join(', ') || '–'}</td>
+                    <td className="py-2.5 pr-3 text-right font-semibold tabular-nums">{tempo(e.metaMs)} <span className="font-normal text-kib-texto-3">± {(e.toleranciaMs / 1000).toFixed(3)}</span></td>
+                    <td className="py-2.5 pr-3 text-kib-texto-2">{e.referencias.map((k) => `#${k}`).join(', ') || '–'}</td>
                     <td className="py-2.5 pr-3 text-right tabular-nums">{e.karts}</td>
                     <td className="py-2.5 pr-3 text-right tabular-nums">{e.equalizados}</td>
                     <td className="py-2.5 pr-3 text-right tabular-nums">{e.revisar}</td>
@@ -161,19 +161,19 @@ export function EqualizacaoCronoPage() {
       </Card>
 
       <Card className="p-4 md:p-5">
-        <h2 className="text-base font-semibold text-zinc-50">Meta de tempo por traçado</h2>
-        <p className="mt-1 text-xs text-zinc-500">A meta não é fixa: cada equalização finalizada registra a sua, e a cronometragem pode definir uma meta fixa para o traçado.</p>
-        {!carregando && !metas.length ? <p className="mt-3 text-sm text-zinc-400">Nenhuma meta registrada ainda.</p> : null}
+        <h2 className="text-base font-semibold text-kib-texto">Meta de tempo por traçado</h2>
+        <p className="mt-1 text-xs text-kib-texto-3">A meta não é fixa: cada equalização finalizada registra a sua, e a cronometragem pode definir uma meta fixa para o traçado.</p>
+        {!carregando && !metas.length ? <p className="mt-3 text-sm text-kib-texto-2">Nenhuma meta registrada ainda.</p> : null}
         {metas.length ? (
           <div className="mt-3 overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="text-xs uppercase tracking-wider text-zinc-500"><tr><th className="py-2 pr-3">Data</th><th className="py-2 pr-3">Traçado</th><th className="py-2 pr-3 text-right">Meta</th><th className="py-2 pr-3 text-right">Tolerância</th><th className="py-2 pr-3">Origem</th><th className="py-2">Referências</th></tr></thead>
-              <tbody className="divide-y divide-zinc-800 text-zinc-200">
+              <thead className="text-xs uppercase tracking-wider text-kib-texto-3"><tr><th className="py-2 pr-3">Data</th><th className="py-2 pr-3">Traçado</th><th className="py-2 pr-3 text-right">Meta</th><th className="py-2 pr-3 text-right">Tolerância</th><th className="py-2 pr-3">Origem</th><th className="py-2">Referências</th></tr></thead>
+              <tbody className="divide-y divide-kib-borda text-kib-texto">
                 {metas.map((m) => (
                   <tr key={m.id}>
-                    <td className="py-2.5 pr-3 tabular-nums text-zinc-400">{dataHora(m.quando)}</td><td className="py-2.5 pr-3">{m.track}</td>
+                    <td className="py-2.5 pr-3 tabular-nums text-kib-texto-2">{dataHora(m.quando)}</td><td className="py-2.5 pr-3">{m.track}</td>
                     <td className="py-2.5 pr-3 text-right font-semibold tabular-nums">{tempo(m.metaMs)}</td><td className="py-2.5 pr-3 text-right tabular-nums">± {(m.toleranciaMs / 1000).toFixed(3)}</td>
-                    <td className="py-2.5 pr-3">{m.origem === 'manual' ? 'Meta fixa definida' : 'Equalização'}</td><td className="py-2.5 text-zinc-400">{(m.referencias ?? []).map((k) => `#${k}`).join(', ') || '–'}</td>
+                    <td className="py-2.5 pr-3">{m.origem === 'manual' ? 'Meta fixa definida' : 'Equalização'}</td><td className="py-2.5 text-kib-texto-2">{(m.referencias ?? []).map((k) => `#${k}`).join(', ') || '–'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -193,27 +193,27 @@ function DetalheEqualizacao({ e, fechar }: { e: Detalhe; fechar: () => void }) {
     <Card className="p-4 md:p-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-brand-400">{dataHora(e.startedAt ?? e.createdAt)} · {e.track.name} · {e.track.lengthMeters} m</p>
-          <h2 className="mt-1 text-lg font-semibold text-zinc-50">{e.name}</h2>
-          <p className="mt-1 text-sm text-zinc-400">
-            Meta <strong className="text-zinc-100">{tempo(r.metaMs)}</strong> ± {(r.toleranciaMs / 1000).toFixed(3)} s
+          <p className="text-xs font-bold uppercase tracking-wider text-kib-acao">{dataHora(e.startedAt ?? e.createdAt)} · {e.track.name} · {e.track.lengthMeters} m</p>
+          <h2 className="mt-1 text-lg font-semibold text-kib-texto">{e.name}</h2>
+          <p className="mt-1 text-sm text-kib-texto-2">
+            Meta <strong className="text-kib-texto">{tempo(r.metaMs)}</strong> ± {(r.toleranciaMs / 1000).toFixed(3)} s
             {r.referencias.length ? ` · referências: ${r.referencias.map((x) => `#${x.kart} ${tempo(x.melhorMs)}`).join(', ')}` : ''}
             {e.mecanico ? ` · responsável: ${e.mecanico}` : ''}
           </p>
-          {e.regra ? <p className="mt-1 text-xs text-zinc-500">Regra do redutor ({e.regra.nome}): equalizado até ±{segs(e.regra.toleranciaMs)} s; depois, a cada {segs(e.regra.faixaMs)} s, {mm(e.regra.passoMm)} mm. Mais lento que a referência = abrir; mais rápido = fechar.</p> : null}
+          {e.regra ? <p className="mt-1 text-xs text-kib-texto-3">Regra do redutor ({e.regra.nome}): equalizado até ±{segs(e.regra.toleranciaMs)} s; depois, a cada {segs(e.regra.faixaMs)} s, {mm(e.regra.passoMm)} mm. Mais lento que a referência = abrir; mais rápido = fechar.</p> : null}
         </div>
         <Button onClick={fechar} variant="ghost">Fechar</Button>
       </div>
       <div className="mt-4 overflow-x-auto">
         <table className="w-full min-w-[980px] text-left text-sm">
-          <thead className="text-xs uppercase tracking-wider text-zinc-500">
+          <thead className="text-xs uppercase tracking-wider text-kib-texto-3">
             <tr>
               <th className="py-2 pr-3">Kart</th><th className="py-2 pr-3">Mecânico / piloto</th>
               {Array.from({ length: maxBlocos }, (_, i) => <th className="py-2 pr-3 text-right" key={i}>Bloco {i + 1}<span className="block font-normal normal-case tracking-normal">{i === 0 ? 'redutor inicial' : 'redutor trocado'}</span></th>)}
               <th className="py-2 pr-3">Redutor sugerido</th><th className="py-2 pr-3">Status</th><th className="py-2 pr-3">Ação recomendada</th><th className="py-2 text-right">Voltas desde a última</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800 text-zinc-200">
+          <tbody className="divide-y divide-kib-borda text-kib-texto">
             {r.karts.map((k) => {
               const v = e.voltasDesdeUltima[k.kart];
               return (
@@ -221,51 +221,51 @@ function DetalheEqualizacao({ e, fechar }: { e: Detalhe; fechar: () => void }) {
                   <td className="py-2.5 pr-3 font-semibold tabular-nums">#{k.kart}</td>
                   <td className="py-2.5 pr-3">{k.piloto}</td>
                   {k.referencia ? (
-                    <td className="py-2.5 pr-3 text-zinc-400" colSpan={maxBlocos}>Melhor <strong className="text-zinc-100">{tempo(k.melhorMs)}</strong> · média {tempo(k.mediaMs)} · {k.voltas} volta(s) — base de comparação</td>
+                    <td className="py-2.5 pr-3 text-kib-texto-2" colSpan={maxBlocos}>Melhor <strong className="text-kib-texto">{tempo(k.melhorMs)}</strong> · média {tempo(k.mediaMs)} · {k.voltas} volta(s) — base de comparação</td>
                   ) : Array.from({ length: maxBlocos }, (_, i) => {
                     const b = k.blocos[i];
-                    if (!b) return <td className="py-2.5 pr-3 text-right text-zinc-600" key={i}>–</td>;
+                    if (!b) return <td className="py-2.5 pr-3 text-right text-kib-texto-3" key={i}>–</td>;
                     return (
-                      <td className={`py-2.5 pr-3 text-right tabular-nums ${b.dentro && b.completo ? 'font-semibold text-emerald-400' : ''}`} key={i}>
-                        {b.anteriorEm ? <span className="block text-xs font-normal text-zinc-500">equalização de {dataHora(b.anteriorEm).slice(0, 5)}</span> : null}
+                      <td className={`py-2.5 pr-3 text-right tabular-nums ${b.dentro && b.completo ? 'font-semibold text-kib-sucesso' : ''}`} key={i}>
+                        {b.anteriorEm ? <span className="block text-xs font-normal text-kib-texto-3">equalização de {dataHora(b.anteriorEm).slice(0, 5)}</span> : null}
                         {b.voltasMs.map(tempo).join(' / ')}{b.completo ? '' : ' / …'}
-                        <span className="block text-xs font-normal text-zinc-500">{b.completo ? `melhor ${tempo(b.melhorMs ?? Math.min(...b.voltasMs))} (${delta(b.deltaMs)})` : 'falta 1 volta'}</span>
-                        <span className="block text-xs font-normal text-zinc-400">{b.rotulo}{b.ajusteMm != null ? ` → ${ajuste(b.ajusteMm)}` : ''}</span>
+                        <span className="block text-xs font-normal text-kib-texto-3">{b.completo ? `melhor ${tempo(b.melhorMs ?? Math.min(...b.voltasMs))} (${delta(b.deltaMs)})` : 'falta 1 volta'}</span>
+                        <span className="block text-xs font-normal text-kib-texto-2">{b.rotulo}{b.ajusteMm != null ? ` → ${ajuste(b.ajusteMm)}` : ''}</span>
                       </td>
                     );
                   })}
                   <td className="py-2.5 pr-3">{k.redutorSugerido ?? '–'}</td>
                   <td className="py-2.5 pr-3"><Badge variant={statusVariant[k.status] ?? 'zinc'}>{k.status}</Badge></td>
-                  <td className="py-2.5 pr-3 text-zinc-300">{k.acao}</td>
-                  <td className="py-2.5 text-right tabular-nums">{v ? v.voltas : 0}<span className="block text-xs text-zinc-500">{v ? `${v.baterias} bateria(s)` : ''}</span></td>
+                  <td className="py-2.5 pr-3 text-kib-texto-2">{k.acao}</td>
+                  <td className="py-2.5 text-right tabular-nums">{v ? v.voltas : 0}<span className="block text-xs text-kib-texto-3">{v ? `${v.baterias} bateria(s)` : ''}</span></td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
-      <h3 className="mt-6 text-sm font-semibold text-zinc-50">Apontamentos técnicos · checklist da oficina</h3>
-      {!comApontamento.length ? <p className="mt-2 text-sm text-zinc-400">Nenhum apontamento registrado para os karts desta equalização.</p> : (
+      <h3 className="mt-6 text-sm font-semibold text-kib-texto">Apontamentos técnicos · checklist da oficina</h3>
+      {!comApontamento.length ? <p className="mt-2 text-sm text-kib-texto-2">Nenhum apontamento registrado para os karts desta equalização.</p> : (
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[900px] text-left text-sm">
-            <thead className="text-xs uppercase tracking-wider text-zinc-500"><tr><th className="py-2 pr-3">Kart</th>{SISTEMAS.map(([id, nome]) => <th className="py-2 pr-3" key={id}>{nome}</th>)}<th className="py-2 pr-3">Observações</th><th className="py-2">Ação da oficina / peças</th></tr></thead>
-            <tbody className="divide-y divide-zinc-800 text-zinc-200">
+            <thead className="text-xs uppercase tracking-wider text-kib-texto-3"><tr><th className="py-2 pr-3">Kart</th>{SISTEMAS.map(([id, nome]) => <th className="py-2 pr-3" key={id}>{nome}</th>)}<th className="py-2 pr-3">Observações</th><th className="py-2">Ação da oficina / peças</th></tr></thead>
+            <tbody className="divide-y divide-kib-borda text-kib-texto">
               {comApontamento.map((k) => (
                 <tr key={k.kart}>
                   <td className="py-2.5 pr-3 font-semibold tabular-nums">#{k.kart}</td>
                   {SISTEMAS.map(([id]) => {
                     const s = k.checklist?.sistemas?.[id];
-                    return <td className="py-2.5 pr-3" key={id}>{s ? <><strong className={sistemaCor[s.status]}>{sistemaNome[s.status]}</strong>{s.nota ? <span className="block text-xs text-zinc-400">{s.nota}</span> : null}</> : <span className="text-zinc-600">–</span>}</td>;
+                    return <td className="py-2.5 pr-3" key={id}>{s ? <><strong className={sistemaCor[s.status]}>{sistemaNome[s.status]}</strong>{s.nota ? <span className="block text-xs text-kib-texto-2">{s.nota}</span> : null}</> : <span className="text-kib-texto-3">–</span>}</td>;
                   })}
-                  <td className="py-2.5 pr-3 text-zinc-300">{k.checklist?.observacoes || '–'}</td>
-                  <td className="py-2.5 text-zinc-300">{k.checklist?.acaoOficina || '–'}</td>
+                  <td className="py-2.5 pr-3 text-kib-texto-2">{k.checklist?.observacoes || '–'}</td>
+                  <td className="py-2.5 text-kib-texto-2">{k.checklist?.acaoOficina || '–'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
-      <p className="mt-4 text-xs leading-5 text-zinc-500">Cada bloco são 2 voltas com um redutor: o bloco 1 é com o redutor que estava no kart e a diferença da melhor volta do bloco para a meta diz quanto abrir ou fechar para o bloco seguinte. Vale o último bloco: dentro da faixa de equalizado, o kart é liberado com aquele redutor. O PDF para a oficina sai pela Cronometragem (Equalização › Relatório para a oficina).</p>
+      <p className="mt-4 text-xs leading-5 text-kib-texto-3">Cada bloco são 2 voltas com um redutor: o bloco 1 é com o redutor que estava no kart e a diferença da melhor volta do bloco para a meta diz quanto abrir ou fechar para o bloco seguinte. Vale o último bloco: dentro da faixa de equalizado, o kart é liberado com aquele redutor. O PDF para a oficina sai pela Cronometragem (Equalização › Relatório para a oficina).</p>
     </Card>
   );
 }

@@ -9,18 +9,22 @@
 <x-dc>
 
 <helmet>
-  <meta name="description" content="Conheça os campeonatos KAC Iniciantes (Kart Light), KAC Super Kart, 100 Milhas Light, 500 Milhas, Desafio 2 Horas e 200 Milhas de Betim.">
+  <meta name="description" content="Conheça os campeonatos do Kartódromo de Betim, incluindo as 200 Milhas de Betim 2027, com datas, regulamentos e inscrições.">
   <link rel="icon" type="image/png" href="assets/brand/kib-logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     html { scroll-behavior: smooth; }
+    *, *::before, *::after { box-sizing: border-box; }
     body { margin: 0; background: #030504; color: #f7faf6; font-family: 'Rajdhani', sans-serif; font-size:18px; -webkit-font-smoothing: antialiased; overflow-x: clip; }
     a { color: #00e676; }
     a:hover { color: #3ce396; }
     ::selection { background: #00e676; color: #041301; }
+    ::placeholder { color: #829083; opacity: 1; }
     img, video { display: block; max-width: 100%; }
     button, input, select, textarea { font: inherit; }
+    :where(a, button, input, select, textarea):focus-visible { outline: 3px solid #00e676 !important; outline-offset: 3px; }
+    :where(input, select, textarea):focus-visible { border-color: #00e676 !important; box-shadow: 0 0 0 3px rgba(0,230,118,.16); caret-color: #00e676; }
     @view-transition { navigation: auto; }
     ::view-transition-old(root) { animation: 320ms cubic-bezier(.16,1,.3,1) both kib-page-out; }
     ::view-transition-new(root) { animation: 420ms cubic-bezier(.16,1,.3,1) both kib-page-in; }
@@ -31,6 +35,15 @@
     [style*="background:linear-gradient(135deg,#00e676,#00c853)"]:hover { transform: translateY(-4px); box-shadow: 0 22px 55px rgba(3,5,4,.6); }
     [style*="background:rgba(255,255,255,.035)"][style*="border:1px solid rgba(255,255,255,.22)"] { transition: border-color .25s, color .25s, transform .25s cubic-bezier(.16,1,.3,1); }
     [style*="background:rgba(255,255,255,.035)"][style*="border:1px solid rgba(255,255,255,.22)"]:hover { border-color:#00e676; color:#00e676; transform: translateY(-4px); }
+    @media (max-width: 760px) {
+      [style*="grid-template-columns:1fr auto"],
+      [style*="grid-template-columns:repeat(2,1fr)"],
+      [style*="grid-template-columns:1.2fr .8fr"],
+      [style*="grid-template-columns:1.2fr .7fr .7fr"],
+      [style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
+      [style*="grid-template-columns:repeat(4,1fr)"] { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+      [style*="grid-template-columns:56px 1fr auto"] { grid-template-columns: 44px minmax(0,1fr) !important; gap: 12px !important; }
+    }
   </style>
 </helmet>
 <div data-screen-label="Campeonatos" style="min-height:100vh; background:#030504; color:#f7faf6;">
@@ -193,8 +206,9 @@
         <sc-if value="{{ selectedIsTeam }}">
           <div style="display:grid; gap:6px;"><label for="c-equipe" style="font-size:14px; font-weight:700; color:#d7ded8;">Nome da equipe</label><input id="c-equipe" name="nome_equipe" type="text" aria-required="true" aria-invalid="{{ rinv.nome_equipe }}" aria-describedby="rerr-nome_equipe" autocomplete="organization" placeholder="Ex.: Minas Racing Team" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"><sc-if value="{{ re.nome_equipe }}"><p id="rerr-nome_equipe" style="margin:0; color:#ffb3b3; font-size:14px;">{{ re.nome_equipe }}</p></sc-if></div>
           <div style="display:grid; gap:6px;"><label for="c-chefe" style="font-size:14px; font-weight:700; color:#d7ded8;">Nome do chefe de equipe</label><input id="c-chefe" name="nome_chefe" type="text" aria-required="true" aria-invalid="{{ rinv.nome_chefe }}" aria-describedby="rerr-nome_chefe" autocomplete="name" placeholder="Nome completo do responsável" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"><sc-if value="{{ re.nome_chefe }}"><p id="rerr-nome_chefe" style="margin:0; color:#ffb3b3; font-size:14px;">{{ re.nome_chefe }}</p></sc-if></div>
-          <div style="display:grid; gap:6px;"><label for="c-pilotos" style="font-size:14px; font-weight:700; color:#d7ded8;">Pilotos e pesos, um por linha</label><textarea id="c-pilotos" name="pilotos" aria-required="true" aria-invalid="{{ rinv.pilotos }}" aria-describedby="rerr-pilotos" placeholder="Ex.: João Silva - 78 kg" style="width:100%; min-height:96px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none; resize:vertical;"></textarea><sc-if value="{{ re.pilotos }}"><p id="rerr-pilotos" style="margin:0; color:#ffb3b3; font-size:14px;">{{ re.pilotos }}</p></sc-if></div>
+          <div style="display:grid; gap:6px;"><label for="c-pilotos" style="font-size:14px; font-weight:700; color:#d7ded8;">Pilotos, idade, altura e peso · um por linha</label><textarea id="c-pilotos" name="pilotos" aria-required="true" aria-invalid="{{ rinv.pilotos }}" aria-describedby="rerr-pilotos" placeholder="Ex.: João Silva · 28 anos · 1,78 m · 78 kg" style="width:100%; min-height:112px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none; resize:vertical;"></textarea><small style="color:#a8b2aa; font-size:13px; line-height:1.4;">A organização confere idade mínima de 12 anos, altura acima de 1,50 m e peso acima de 50 kg.</small><sc-if value="{{ re.pilotos }}"><p id="rerr-pilotos" style="margin:0; color:#ffb3b3; font-size:14px;">{{ re.pilotos }}</p></sc-if></div>
           <div style="display:grid; gap:6px;"><label for="c-karts" style="font-size:14px; font-weight:700; color:#d7ded8;">Quantidade de karts</label><input id="c-karts" name="qtd_karts" type="text" inputmode="numeric" maxlength="2" aria-required="true" aria-invalid="{{ rinv.qtd_karts }}" aria-describedby="rerr-qtd_karts" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"><sc-if value="{{ re.qtd_karts }}"><p id="rerr-qtd_karts" style="margin:0; color:#ffb3b3; font-size:14px;">{{ re.qtd_karts }}</p></sc-if></div>
+          <sc-if value="{{ selectedIsTwoHundred }}"><label for="c-aceite-regulamento" style="display:flex; align-items:flex-start; gap:10px; color:#d7ded8; font-size:14px; line-height:1.45; cursor:pointer;"><input id="c-aceite-regulamento" name="aceite_regulamento" type="checkbox" value="sim" aria-required="true" aria-invalid="{{ rinv.aceite_regulamento }}" aria-describedby="rerr-aceite_regulamento" style="flex:none; width:20px; height:20px; margin:2px 0 0; accent-color:#00e676;"><span>Li e aceito o <a href="assets/regulamentos/200-milhas-de-betim-2027.pdf" target="_blank" rel="noopener noreferrer" style="color:#00e676;">regulamento oficial das 200 Milhas de Betim 2027</a>.</span></label><sc-if value="{{ re.aceite_regulamento }}"><p id="rerr-aceite_regulamento" style="margin:0; color:#ffb3b3; font-size:14px;">{{ re.aceite_regulamento }}</p></sc-if></sc-if>
         </sc-if>
         <sc-if value="{{ selectedIsIndividual }}">
           <div style="display:grid; gap:6px;"><label for="c-nome" style="font-size:14px; font-weight:700; color:#d7ded8;">Nome completo</label><input id="c-nome" name="nome" type="text" aria-required="true" aria-invalid="{{ rinv.nome }}" aria-describedby="rerr-nome" autocomplete="name" placeholder="Nome e sobrenome" style="width:100%; min-height:48px; border:1px solid rgba(255,255,255,.16); background:#030504; color:#fff; padding:12px; outline:none;"><sc-if value="{{ re.nome }}"><p id="rerr-nome" style="margin:0; color:#ffb3b3; font-size:14px;">{{ re.nome }}</p></sc-if></div>
@@ -214,8 +228,9 @@
       </sc-if>
       <sc-if value="{{ regSent }}">
         <div style="padding:28px 24px; display:grid; gap:16px;">
-          <div style="display:flex; align-items:center; gap:14px;"><span aria-hidden="true" style="flex:none; width:44px; height:44px; display:grid; place-items:center; border:2px solid #00e676; color:#00e676;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12 5 5 9-10"/></svg></span><h3 id="reg-sent-title" tabindex="-1" style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:24px; line-height:1; outline:none;">Falta enviar no WhatsApp</h3></div>
+          <div style="display:flex; align-items:center; gap:14px;"><span aria-hidden="true" style="flex:none; color:#00e676; display:grid; place-items:center;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12 5 5 9-10"/></svg></span><h3 id="reg-sent-title" tabindex="-1" style="margin:0; font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase; font-size:24px; line-height:1; outline:none;">Falta enviar no WhatsApp</h3></div>
           <p style="margin:0; color:#d7ded8; font-size:16px; line-height:1.55;">Abrimos o WhatsApp da organização com seus dados preenchidos. <strong style="color:#f7faf6;">Envie a mensagem para concluir a inscrição.</strong> Se o WhatsApp não abriu, use o botão abaixo.</p>
+          <p role="status" aria-live="polite" style="{{ regSyncStatusStyle }}">{{ regSyncStatus }}</p>
           <a href="{{ regWhatsappHref }}" target="_blank" rel="noopener noreferrer" style="display:flex; align-items:center; justify-content:center; gap:10px; min-height:56px; padding:0 24px; clip-path:polygon(3% 0,100% 0,97% 100%,0 100%); background:linear-gradient(135deg,#00e676,#00c853); color:#041301; font-family:'Anton',sans-serif; text-transform:uppercase; font-size:15px; letter-spacing:0.04em; text-decoration:none;">Abrir WhatsApp com a inscrição</a>
           <button type="button" onClick="{{ closeModal }}" style="min-height:48px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#d7ded8; font-size:15px; font-weight:700; cursor:pointer;">Fechar</button>
         </div>
@@ -223,7 +238,7 @@
     </div>
   </div>
 
-  <footer style="border-top:1px solid rgba(255,255,255,.12); padding:64px 0 28px; background:#020302;">
+  <footer style="border-top:1px solid rgba(255,255,255,.12); padding:64px 0 28px; background:#030504;">
     <div style="width:min(1480px,calc(100% - 48px)); margin:0 auto; display:grid; grid-template-columns:1.2fr .7fr .7fr; gap:50px;">
       <div><img src="assets/brand/kib-logo.png" alt="Kartódromo Internacional de Betim" style="width:220px;"><p style="margin:16px 0 0; max-width:380px; color:#a8b2aa; line-height:1.55;">Pista homologada de 1.110 metros, kart de locação, campeonatos e estrutura para aniversários, grupos e empresas em Betim.</p></div>
       <div>
@@ -263,18 +278,19 @@ const CHAMPIONSHIPS_DATA = [
   { id: 'kac-iniciantes', title: 'KAC Iniciantes · Kart Light', desc: 'Um campeonato mensal disputado na categoria Kart Light para pilotos iniciantes, com 7 corridas no mês. As 4 melhores corridas entram no ranking, com regulamento, calendário, pontuação e premiação oficiais.', date: 'Mensal', status: 'open', statusLabel: 'INSCRIÇÕES ABERTAS', logo: 'assets/championships/kac-iniciantes-logo.png', requiresTeamForm: false, pageHref: 'kac.dc.html' },
   { id: 'kac-super-kart', title: 'KAC Super Kart', desc: 'Um campeonato anual disputado na categoria Super Kart com 9 etapas, sendo uma corrida por mês, para pilotos experientes.', date: 'Mensal', status: 'open', statusLabel: 'INSCRIÇÕES ABERTAS', logo: 'assets/championships/kac-super-kart-logo.png', requiresTeamForm: false, pageHref: 'kac-super.dc.html' },
   { id: '100-milhas-light', title: '100 Milhas Light de Betim', desc: 'Endurance de 2h30 com os karts light de locação do kartódromo. Equipes de 1 a 3 pilotos por kart, até 5 karts por equipe, com 3 paradas obrigatórias. Inscrição de R$ 900 por kart, até 15/10/2026.', date: '25/10/2026', status: 'open', statusLabel: 'INSCRIÇÕES ABERTAS', logo: 'assets/championships/100-milhas-light-logo.png', requiresTeamForm: true, pageHref: '100-milhas-light.dc.html', registerHref: '/100-milhas-light#formulario', registrationDeadline: '2026-10-15T23:59:59-03:00', requirementsTitle: 'Resumo da inscrição', requirements: ['R$ 900 por kart, com até 5 karts por equipe', 'Chefe de equipe com CPF, WhatsApp e e-mail', 'Nome, idade, altura e peso de cada piloto', 'Inscrições e pagamento até 15/10/2026'] },
+  { id: '200-milhas', title: '200 Milhas de Betim 2027', desc: 'Endurance de 5 horas + 1 volta em equipe, no dia 30/01/2027. Inscrição de R$ 2.800 por kart, com 5 paradas obrigatórias e mínimo de 20 equipes.', date: '30/01/2027', status: 'open', statusLabel: 'INSCRIÇÕES ABERTAS', soonLabel: 'ABERTURA 05/10 ÀS 10H', logo: 'assets/championships/200-milhas-logo.png', requiresTeamForm: true, pageHref: '200-milhas.dc.html', registrationOpensAt: '2026-10-05T10:00:00-03:00', registrationDeadline: '2027-01-10T23:59:59-03:00', requirementsTitle: 'Resumo da inscrição', requirements: ['R$ 2.800 por kart, independentemente do número de pilotos', 'Equipe com pelo menos 2 pilotos e chefe de equipe identificado', 'Pilotos com idade mínima de 12 anos, altura acima de 1,50 m e peso acima de 50 kg', 'Inscrições e nomes dos pilotos até 10/01/2027 ou enquanto houver vagas'] },
   { id: '500-milhas', title: '500 Milhas de Betim', desc: 'O maior desafio do calendário, com alto nível de competitividade e emoção. Uma corrida com 12 horas de duração que exige preparo físico, mental e estratégia apurada das equipes.', date: '29/08/2026', status: 'past', statusLabel: 'JÁ ACONTECEU', logo: 'assets/championships/500-milhas-logo.png', requiresTeamForm: true, pageHref: '500-milhas.dc.html' },
   { id: 'desafio-2h', title: 'Desafio 2 Horas de Betim', desc: 'Prova dinâmica e estratégica, com duas horas de corrida intensa. Ideal para quem busca adrenalina, constância e trabalho em equipe em um formato competitivo e equilibrado.', date: '08/08/2026', status: 'past', statusLabel: 'JÁ ACONTECEU', logo: 'assets/championships/desafio-2h-logo.png', requiresTeamForm: true, pageHref: null },
-  { id: '200-milhas', title: '200 Milhas de Betim', desc: 'Prova com duração de 5 horas que desafia estratégia, resistência e trabalho em equipe. Uma das corridas mais tradicionais do kartismo regional, reunindo pilotos em uma disputa intensa do início ao fim.', date: '07/02/2026', status: 'past', statusLabel: 'JÁ ACONTECEU', logo: 'assets/championships/200-milhas-logo.png', requiresTeamForm: true, pageHref: '200-milhas.dc.html' },
 ];
 
-const championshipStatus = (c) => {
-  if (c.status === 'open' && c.registrationDeadline && Date.now() > new Date(c.registrationDeadline).getTime()) return 'closed';
+const championshipStatus = (c, now = Date.now()) => {
+  if (c.status === 'open' && c.registrationOpensAt && now < new Date(c.registrationOpensAt).getTime()) return 'soon';
+  if (c.status === 'open' && c.registrationDeadline && now > new Date(c.registrationDeadline).getTime()) return 'closed';
   return c.status;
 };
 
 class Component extends DCLogic {
-  state = { headerScrolled: false, mobileNavOpen: false, isMobile: typeof window !== 'undefined' && window.matchMedia('(max-width: 1100px)').matches, modalOpen: false, selectedId: null, regErrors: {}, regSent: false, regWhatsappHref: '' };
+  state = { headerScrolled: false, mobileNavOpen: false, isMobile: typeof window !== 'undefined' && window.matchMedia('(max-width: 1100px)').matches, modalOpen: false, selectedId: null, regErrors: {}, regSent: false, regWhatsappHref: '', regSyncStatus: '', regSyncStatusTone: 'pending', registrationTick: 0 };
 
   componentDidMount() {
     this._onScroll = () => {
@@ -296,6 +312,12 @@ class Component extends DCLogic {
       }
     };
     window.addEventListener('keydown', this._onKeydown);
+    this._registrationTimer = window.setInterval(() => this.setState({ registrationTick: Date.now() }), 30000);
+    const requestedId = new URLSearchParams(window.location.search).get('inscricao');
+    const requestedChampionship = CHAMPIONSHIPS_DATA.find((c) => c.id === requestedId);
+    if (requestedChampionship && championshipStatus(requestedChampionship) === 'open') {
+      setTimeout(() => this.openModal(requestedId), 120);
+    }
     import('./motion.js').then((m) => { this._cleanup = m.initPageMotion({ progressBarSelector: '#progress' }); });
   }
 
@@ -303,6 +325,7 @@ class Component extends DCLogic {
     window.removeEventListener('scroll', this._onScroll);
     window.removeEventListener('keydown', this._onKeydown);
     if (this._mq) { if (this._mq.removeEventListener) this._mq.removeEventListener('change', this._onMqChange); else this._mq.removeListener(this._onMqChange); }
+    if (this._registrationTimer) window.clearInterval(this._registrationTimer);
     if (this._cleanup) this._cleanup();
   }
 
@@ -328,7 +351,7 @@ class Component extends DCLogic {
     }), 120);
   };
   closeModal = () => {
-    this.setState({ modalOpen: false, regErrors: {}, regSent: false, regWhatsappHref: '', regSubmitAttempted: false });
+    this.setState({ modalOpen: false, regErrors: {}, regSent: false, regWhatsappHref: '', regSyncStatus: '', regSyncStatusTone: 'pending', regSubmitAttempted: false });
     this.setBackgroundInert(false);
     if (this._trigger && this._trigger.focus) this._trigger.focus();
   };
@@ -354,9 +377,12 @@ class Component extends DCLogic {
     if (champ && champ.requiresTeamForm) {
       if (!val('nome_equipe')) errors.nome_equipe = 'Informe o nome da equipe.';
       if (!val('nome_chefe')) errors.nome_chefe = 'Informe o nome do chefe de equipe.';
-      if (!val('pilotos')) errors.pilotos = 'Informe pelo menos um piloto, um por linha.';
+      const pilotLines = val('pilotos').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      const minimumPilots = champ.id === '200-milhas' ? 2 : 1;
+      if (pilotLines.length < minimumPilots) errors.pilotos = 'Informe pelo menos ' + minimumPilots + ' piloto' + (minimumPilots > 1 ? 's' : '') + ', um por linha.';
       const karts = Number(val('qtd_karts'));
       if (!(karts >= 1 && karts <= 50)) errors.qtd_karts = 'Informe de 1 a 50 karts.';
+      if (champ.id === '200-milhas' && !data.get('aceite_regulamento')) errors.aceite_regulamento = 'Leia e aceite o regulamento oficial para continuar.';
     } else {
       if (!val('nome')) errors.nome = 'Informe seu nome completo.';
       const idade = val('idade');
@@ -430,6 +456,10 @@ class Component extends DCLogic {
       lines.push('Chefe de equipe: ' + (data.get('nome_chefe') || ''));
       lines.push('Pilotos: ' + (data.get('pilotos') || ''));
       lines.push('Qtd. karts: ' + (data.get('qtd_karts') || ''));
+      if (champ && champ.id === '200-milhas') {
+        lines.push('Valor: R$ 2.800 por kart');
+        lines.push('Pagamento: transferência, PIX ou cartão em até 5x sem juros');
+      }
     } else {
       lines.push('Nome: ' + (data.get('nome') || ''));
       lines.push('Idade: ' + (data.get('idade') || ''));
@@ -446,24 +476,36 @@ class Component extends DCLogic {
           nomeEquipe: data.get('nome_equipe'), nomeChefe: data.get('nome_chefe'),
           pilotos: String(data.get('pilotos') || '').split('\n').map((line) => line.trim()).filter(Boolean).map((line) => {
             const weight = line.match(/(\d+(?:[.,]\d+)?)\s*kg/i);
-            return { nome: line.replace(/[-–—]?\s*\d+(?:[.,]\d+)?\s*kg.*$/i, '').trim() || line, peso_kg: weight ? Number(weight[1].replace(',', '.')) : null };
+            const normalizedName = line.replace(/[-–—]?\s*\d+(?:[.,]\d+)?\s*kg.*$/i, '').trim();
+            const nome = normalizedName.split(/\s*(?:[·|;]|[-–—])\s*(?=\d)/, 1)[0].trim() || normalizedName || line;
+            return { nome, peso_kg: weight ? Number(weight[1].replace(',', '.')) : null };
           }),
           quantidadeKarts: Number(data.get('qtd_karts')) || null,
           whatsapp: data.get('whatsapp'), email: data.get('email') || null, acceptedContact: true,
+          acceptedRules: champ && champ.id === '200-milhas' ? data.get('aceite_regulamento') === 'sim' : undefined,
         }
       : {
           campeonato_id: champ ? champ.id : null, evento: champ ? champ.title : 'Campeonato', modalidade: 'individual',
           fullName: data.get('nome'), idade: data.get('idade') || null, peso_kg: data.get('peso') || null,
           cidade: data.get('cidade') || null, whatsapp: data.get('whatsapp'), email: data.get('email'), acceptedContact: true,
         };
-    try {
-      fetch('/api/inscricao', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(() => undefined);
-    } catch (error) { /* WhatsApp segue como canal principal */ }
-
     const whatsappHref = 'https://wa.me/5531998842898?text=' + encodeURIComponent(lines.join('\n'));
     // Abre no mesmo gesto do clique (não é bloqueado); a tela seguinte oferece o link caso não abra.
     window.open(whatsappHref, '_blank', 'noopener,noreferrer');
-    this.setState({ regSent: true, regErrors: {}, regWhatsappHref: whatsappHref });
+    this.setState({ regSent: true, regErrors: {}, regWhatsappHref: whatsappHref, regSyncStatus: 'Registrando uma cópia da inscrição no painel…', regSyncStatusTone: 'pending' });
+    try {
+      fetch('/api/inscricao', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        .then((response) => {
+          if (response.ok) {
+            this.setState({ regSyncStatus: 'Cópia registrada no painel. Envie a mensagem no WhatsApp para concluir.', regSyncStatusTone: 'success' });
+            return;
+          }
+          this.setState({ regSyncStatus: 'Atenção: o WhatsApp foi aberto, mas não foi possível registrar a cópia automática. Envie a mensagem e fale com a organização.', regSyncStatusTone: 'warning' });
+        })
+        .catch(() => this.setState({ regSyncStatus: 'Atenção: o WhatsApp foi aberto, mas não foi possível registrar a cópia automática. Envie a mensagem e fale com a organização.', regSyncStatusTone: 'warning' }));
+    } catch (error) {
+      this.setState({ regSyncStatus: 'Atenção: o WhatsApp foi aberto, mas não foi possível registrar a cópia automática. Envie a mensagem e fale com a organização.', regSyncStatusTone: 'warning' });
+    }
     setTimeout(() => requestAnimationFrame(() => {
       const title = document.getElementById('reg-sent-title');
       if (title) title.focus();
@@ -471,7 +513,8 @@ class Component extends DCLogic {
   };
 
   renderVals() {
-    const { headerScrolled, mobileNavOpen, isMobile, modalOpen, selectedId } = this.state;
+    const { headerScrolled, mobileNavOpen, isMobile, modalOpen, selectedId, registrationTick } = this.state;
+    const now = registrationTick || Date.now();
     const navBase = { fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: '12px', letterSpacing: '0.04em', padding: '10px 0', borderBottom: '2px solid transparent', textDecoration: 'none', transition: 'color .25s, border-color .25s' };
     const pages = [
       { label: 'Home', href: 'home.dc.html', id: 'home' },
@@ -491,12 +534,12 @@ class Component extends DCLogic {
     const badgeBase = { display: 'inline-flex', whiteSpace: 'nowrap', padding: '5px 12px', fontFamily: "'Anton',sans-serif", fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.06em' };
 
     const championships = CHAMPIONSHIPS_DATA.map((c) => {
-      const status = championshipStatus(c);
+      const status = championshipStatus(c, now);
       const isOpen = status === 'open';
       return {
         id: c.id, title: c.title, desc: c.desc, date: c.date, logo: c.logo,
-        statusLabel: status === 'closed' ? 'INSCRIÇÕES ENCERRADAS' : c.statusLabel,
-        dateLabel: isOpen ? (c.date === 'Mensal' ? 'Formato' : 'Data') : 'Data',
+        statusLabel: status === 'closed' ? 'INSCRIÇÕES ENCERRADAS' : status === 'soon' ? (c.soonLabel || 'EM BREVE') : c.statusLabel,
+        dateLabel: status === 'soon' ? 'Prova' : isOpen ? (c.date === 'Mensal' ? 'Formato' : 'Data') : 'Data',
         cardStyle: { display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: isOpen ? '1px solid rgba(0,230,118,.22)' : '1px solid rgba(255,255,255,.12)', background: '#0b100c', padding: '28px', opacity: status === 'past' ? 0.55 : 1 },
         badgeStyle: { ...badgeBase, ...(statusStyles[status] || statusStyles.past) },
         requirementsTitle: c.requirementsTitle || 'Como funciona a inscrição',
@@ -512,7 +555,7 @@ class Component extends DCLogic {
         pageHref: c.pageHref,
         showWhatsapp: isOpen && !c.registerHref,
         whatsappHref: 'https://wa.me/5531998842898?text=' + encodeURIComponent('Olá! Gostaria de saber valores e regulamento para o campeonato ' + c.title),
-        closedLabel: status === 'past' || status === 'closed' ? 'Inscrições encerradas' : status === 'soon' ? 'Em breve / Pré-inscrições' : null,
+        closedLabel: status === 'past' || status === 'closed' ? 'Inscrições encerradas' : status === 'soon' ? 'Inscrições abrem em 05/10 às 10h' : null,
       };
     });
 
@@ -520,8 +563,8 @@ class Component extends DCLogic {
     const openList = championships.filter((c) => c.status === 'open');
     const openCount = openList.length;
     const openTitles = openList.map((c) => c.title.replace(' · Kart Light', '').replace(' de Betim', '')).join(', ');
-    const nextRace = CHAMPIONSHIPS_DATA.find((c) => championshipStatus(c) === 'open' && /^\d{2}\/\d{2}\/\d{4}$/.test(c.date));
-    const { regErrors, regSent, regWhatsappHref, regSubmitAttempted } = this.state;
+    const nextRace = CHAMPIONSHIPS_DATA.find((c) => championshipStatus(c, now) === 'open' && /^\d{2}\/\d{2}\/\d{4}$/.test(c.date));
+    const { regErrors, regSent, regWhatsappHref, regSubmitAttempted, regSyncStatus, regSyncStatusTone } = this.state;
     const regErrorNames = Object.keys(regErrors);
 
     return {
@@ -544,7 +587,7 @@ class Component extends DCLogic {
       // Faixa do topo com informação real, derivada do próprio calendário.
       topStats: [
         { icon: 'M3 5h18v16H3zM8 3v4M16 3v4M3 10h18', title: openCount + (openCount === 1 ? ' inscrição aberta' : ' inscrições abertas'), text: openTitles },
-        { icon: 'M5 21V4m0 1c5-3 9 3 14 0v9c-5 3-9-3-14 0', title: nextRace ? 'Próxima prova: ' + nextRace.date.slice(0, 5) : 'Calendário 2026', text: nextRace ? nextRace.title : 'Novas datas em breve' },
+        { icon: 'M5 21V4m0 1c5-3 9 3 14 0v9c-5 3-9-3-14 0', title: nextRace ? 'Próxima prova: ' + nextRace.date.slice(0, 5) : 'Calendário 2027', text: nextRace ? nextRace.title : 'Novas datas em breve' },
         { icon: 'M12 7v5l3 2M9 2h6M12 22a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z', title: 'Cronometragem eletrônica', text: 'Tempos e posições oficiais do LapTime' },
         { icon: 'M12 3v12m-5-5 5 5 5-5M5 21h14', title: 'Regulamentos em PDF', text: 'Na página oficial de cada prova' },
       ],
@@ -576,11 +619,14 @@ class Component extends DCLogic {
       showRegForm: !regSent,
       regSent,
       regWhatsappHref,
+      regSyncStatus,
+      regSyncStatusStyle: { margin: 0, color: regSyncStatusTone === 'warning' ? '#f5c518' : regSyncStatusTone === 'success' ? '#bfe9d0' : '#a8b2aa', fontSize: '14px', lineHeight: 1.45 },
       modalTitle: selected && selected.requiresTeamForm ? 'Inscrição de equipe' : 'Inscrição de piloto',
       modalClosed: !modalOpen,
       modalOverlayStyle: { position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(0,0,0,.78)', backdropFilter: 'blur(12px)', display: 'grid', placeItems: 'center', padding: '20px', opacity: modalOpen ? 1 : 0, visibility: modalOpen ? 'visible' : 'hidden', transition: '.3s', pointerEvents: modalOpen ? 'auto' : 'none' },
       selectedTitle: selected ? selected.title : 'Campeonatos do Kartódromo de Betim',
       selectedIsTeam: !!(selected && selected.requiresTeamForm),
+      selectedIsTwoHundred: !!(selected && selected.id === '200-milhas'),
       selectedIsIndividual: !!(selected && !selected.requiresTeamForm),
     };
   }

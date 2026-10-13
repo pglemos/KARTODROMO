@@ -1,0 +1,383 @@
+{
+  "$descricao": "Contagem de hardcode visual por arquivo (catraca). Atualize só depois de uma migração que REDUZA os números: npm run lint:design:baseline",
+  "arquivos": {
+    "android/sorteio/app/src/main/java/br/com/kartodromobetim/sorteio/TelaSortear.kt": {
+      "kt-cor": 5
+    },
+    "android/sorteio/app/src/main/java/br/com/kartodromobetim/sorteio/Tema.kt": {
+      "kt-cor": 4
+    },
+    "android/sorteio/app/src/main/res/drawable/icone_frente.xml": {
+      "xml-cor": 6
+    },
+    "android/sorteio/app/src/main/res/drawable/icone_fundo.xml": {
+      "xml-cor": 2
+    },
+    "app/HomeDashboard.tsx": {
+      "tw-arbitrario": 7,
+      "tw-paleta-crua": 89
+    },
+    "app/TelaoProgramacao.tsx": {
+      "tw-arbitrario": 5,
+      "tw-paleta-crua": 63
+    },
+    "app/admin/equalizacao/[kartId]/page.tsx": {
+      "tw-arbitrario": 1
+    },
+    "app/admin/login/LoginForm.tsx": {
+      "tw-arbitrario": 14
+    },
+    "app/designer-telao/DesignerTelaoClient.tsx": {
+      "css-hex": 33
+    },
+    "app/designer-telao/designer.css": {
+      "css-hex": 65,
+      "css-rgb-hsl": 1,
+      "css-font-family": 4
+    },
+    "app/favicon.ico/route.ts": {
+      "css-hex": 3
+    },
+    "app/placar-telao-tb50/route.ts": {
+      "css-hex": 11,
+      "css-rgb-hsl": 4,
+      "css-font-family": 2
+    },
+    "app/podio-final-tb50/FinalPodiumClient.tsx": {
+      "css-hex": 5,
+      "css-rgb-hsl": 1
+    },
+    "app/podio-final-tb50/podio-final.css": {
+      "css-hex": 72,
+      "css-rgb-hsl": 111,
+      "css-font-family": 1
+    },
+    "app/podio-live-tb50/live-podium.css": {
+      "css-hex": 7,
+      "css-rgb-hsl": 20,
+      "css-font-family": 1
+    },
+    "components/admin/AdminDashboard.tsx": {
+      "tw-arbitrario": 3
+    },
+    "components/admin/AdminModulePage.tsx": {
+      "tw-arbitrario": 1
+    },
+    "components/admin/AdminShell.tsx": {
+      "tw-arbitrario": 10
+    },
+    "components/admin/LegacyAdminContent.tsx": {
+      "tw-arbitrario": 2
+    },
+    "components/telao/telao.css": {
+      "css-hex": 25,
+      "css-rgb-hsl": 4
+    },
+    "desktop/src/Kartodromo.Autoatendimento/Controles.cs": {
+      "cs-fonte": 2
+    },
+    "desktop/src/Kartodromo.Autoatendimento/FormTotem.cs": {
+      "cs-cor-nomeada": 1
+    },
+    "desktop/src/Kartodromo.Comum/CartaoModal.cs": {
+      "cs-cor-literal": 1
+    },
+    "desktop/src/Kartodromo.Comum/Design.cs": {
+      "cs-cor-literal": 4,
+      "cs-cor-html": 1
+    },
+    "desktop/src/Kartodromo.Comum/DialogoDesign.cs": {
+      "cs-cor-literal": 1
+    },
+    "desktop/src/Kartodromo.Comum/FiltroColuna.cs": {
+      "cs-cor-literal": 2
+    },
+    "desktop/src/Kartodromo.Comum/FormAtualizacao.cs": {
+      "cs-cor-nomeada": 1
+    },
+    "desktop/src/Kartodromo.Comum/PecasDesign.cs": {
+      "cs-cor-literal": 2
+    },
+    "desktop/src/Kartodromo.Comum/RegistroDesign.cs": {
+      "cs-cor-literal": 5
+    },
+    "desktop/src/Kartodromo.Comum/Ui.cs": {
+      "cs-cor-literal": 8,
+      "cs-cor-nomeada": 1,
+      "cs-fonte": 1
+    },
+    "desktop/src/Kartodromo.Cronometragem/FormCrono.Cadastros.cs": {
+      "cs-cor-literal": 1
+    },
+    "desktop/src/Kartodromo.Cronometragem/FormCrono.Competidores.cs": {
+      "cs-cor-literal": 7
+    },
+    "desktop/src/Kartodromo.Cronometragem/FormCrono.Design.cs": {
+      "cs-cor-literal": 52,
+      "cs-cor-nomeada": 1
+    },
+    "desktop/src/Kartodromo.Cronometragem/FormCrono.Equalizacao.cs": {
+      "cs-cor-literal": 9
+    },
+    "desktop/src/Kartodromo.Cronometragem/FormCrono.Eventos.cs": {
+      "cs-cor-literal": 13
+    },
+    "desktop/src/Kartodromo.Cronometragem/FormCrono.Penalidades.cs": {
+      "cs-cor-literal": 1
+    },
+    "desktop/src/Kartodromo.Cronometragem/FormCrono.Ranking.cs": {
+      "cs-cor-literal": 1
+    },
+    "desktop/src/Kartodromo.Cronometragem/FormCrono.Seguranca.cs": {
+      "cs-cor-literal": 3,
+      "cs-fonte": 3
+    },
+    "desktop/src/Kartodromo.Cronometragem/FormCrono.cs": {
+      "cs-cor-literal": 41,
+      "cs-cor-nomeada": 8
+    },
+    "desktop/src/Kartodromo.Cronometragem/FormRelatoriosCrono.cs": {
+      "cs-cor-literal": 8
+    },
+    "desktop/src/Kartodromo.Cronometragem/FormTV.cs": {
+      "cs-cor-literal": 12,
+      "cs-cor-nomeada": 8,
+      "cs-fonte": 9
+    },
+    "desktop/src/Kartodromo.Cronometragem/LiveGrid.cs": {
+      "cs-cor-literal": 8,
+      "cs-cor-nomeada": 1
+    },
+    "desktop/src/Kartodromo.Cronometragem/Program.cs": {
+      "cs-cor-literal": 5
+    },
+    "desktop/src/Kartodromo.Cronometragem/TemaCrono.cs": {
+      "cs-cor-literal": 5
+    },
+    "desktop/src/Kartodromo.Recepcao/Acoes.cs": {
+      "cs-cor-literal": 4
+    },
+    "desktop/src/Kartodromo.Recepcao/Baterias.cs": {
+      "cs-cor-literal": 7,
+      "cs-fonte": 1
+    },
+    "desktop/src/Kartodromo.Recepcao/Cadastros.cs": {
+      "cs-cor-literal": 17,
+      "cs-cor-nomeada": 6,
+      "cs-fonte": 4
+    },
+    "desktop/src/Kartodromo.Recepcao/Caixa.cs": {
+      "cs-cor-literal": 16,
+      "cs-cor-nomeada": 3,
+      "cs-fonte": 5
+    },
+    "desktop/src/Kartodromo.Recepcao/FormCliente.cs": {
+      "cs-cor-literal": 4,
+      "cs-fonte": 2
+    },
+    "desktop/src/Kartodromo.Recepcao/FormLogin.cs": {
+      "cs-cor-literal": 6,
+      "cs-fonte": 3
+    },
+    "desktop/src/Kartodromo.Recepcao/FormPrincipal.cs": {
+      "cs-cor-literal": 2,
+      "cs-cor-nomeada": 8,
+      "cs-fonte": 2
+    },
+    "desktop/src/Kartodromo.Recepcao/FormRelatoriosCronometragem.cs": {
+      "cs-cor-literal": 1
+    },
+    "desktop/src/Kartodromo.Recepcao/KitVisual.cs": {
+      "cs-cor-literal": 43,
+      "cs-cor-nomeada": 1,
+      "cs-fonte": 1
+    },
+    "desktop/src/Kartodromo.Recepcao/TelasCaixa.cs": {
+      "cs-cor-literal": 4,
+      "cs-fonte": 2
+    },
+    "desktop/src/Kartodromo.Recepcao/VisualPrincipal.cs": {
+      "cs-cor-literal": 4
+    },
+    "lib/ops/relatorios.ts": {
+      "css-hex": 15,
+      "css-rgb-hsl": 2
+    },
+    "lib/ops/termo.ts": {
+      "css-hex": 5
+    },
+    "lib/telao-layout-config.ts": {
+      "css-hex": 14,
+      "css-rgb-hsl": 1
+    },
+    "lib/timing/catalog.ts": {
+      "css-hex": 1
+    },
+    "lib/timing/email-resultado.ts": {
+      "css-hex": 37,
+      "css-font-family": 1
+    },
+    "services/timing-ui/admin.html": {
+      "css-hex": 2
+    },
+    "services/timing-ui/equalizacao.html": {
+      "css-hex": 44,
+      "css-rgb-hsl": 1
+    },
+    "services/timing-ui/resultado.html": {
+      "css-hex": 130,
+      "css-rgb-hsl": 5,
+      "css-font-family": 2
+    },
+    "services/timing-ui/sorteio.html": {
+      "css-hex": 12,
+      "css-font-family": 1
+    },
+    "services/timing-ui/tb50.html": {
+      "css-hex": 36,
+      "css-rgb-hsl": 3,
+      "css-font-family": 1
+    },
+    "services/timing-ui/tv-classica.html": {
+      "css-hex": 35,
+      "css-font-family": 2
+    },
+    "services/timing-ui/tv.html": {
+      "css-hex": 60,
+      "css-rgb-hsl": 35,
+      "css-font-family": 1
+    },
+    "src/admin/modules/administrativa/AdministrativaPage.tsx": {
+      "tw-arbitrario": 1
+    },
+    "src/admin/modules/campeonatos/CampeonatoInscricoesPanel.tsx": {
+      "tw-arbitrario": 1
+    },
+    "src/admin/modules/campeonatos/CampeonatosPage.tsx": {
+      "tw-arbitrario": 2
+    },
+    "src/admin/modules/clientes/ClientesPage.tsx": {
+      "tw-arbitrario": 1
+    },
+    "src/admin/modules/clube/ClubePage.tsx": {
+      "tw-arbitrario": 1
+    },
+    "src/admin/modules/cronometragem/CronometragemPage.tsx": {
+      "tw-arbitrario": 7
+    },
+    "src/admin/modules/dashboard/DashboardPage.tsx": {
+      "tw-arbitrario": 18
+    },
+    "src/admin/modules/equalizacao/EqualizacaoCronoPage.tsx": {
+      "tw-arbitrario": 4
+    },
+    "src/admin/modules/equalizacao/EqualizacaoKartDetailPage.tsx": {
+      "tw-arbitrario": 17
+    },
+    "src/admin/modules/equalizacao/EqualizacaoListPage.tsx": {
+      "tw-arbitrario": 15
+    },
+    "src/admin/modules/financeira/FinanceiraPage.tsx": {
+      "tw-arbitrario": 1
+    },
+    "src/admin/modules/lanchonete/LanchonetePage.tsx": {
+      "tw-arbitrario": 1
+    },
+    "src/admin/modules/recepcao/RecepcaoPage.tsx": {
+      "tw-arbitrario": 1
+    },
+    "src/admin/modules/reservas/ReservasPage.tsx": {
+      "tw-arbitrario": 4
+    },
+    "src/admin/modules/resultados/ResultadoRacingDetailPage.tsx": {
+      "tw-arbitrario": 13
+    },
+    "src/admin/modules/resultados/ResultadosPage.tsx": {
+      "tw-arbitrario": 5
+    },
+    "src/admin/modules/telao/TelaoPage.tsx": {
+      "tw-arbitrario": 1
+    },
+    "src/components/About.tsx": {
+      "tw-arbitrario": 1,
+      "tw-paleta-crua": 1
+    },
+    "src/components/ChampionshipDetailLayout.tsx": {
+      "tw-arbitrario": 3
+    },
+    "src/components/Championships.tsx": {
+      "tw-arbitrario": 4,
+      "tw-paleta-crua": 14
+    },
+    "src/components/Events.tsx": {
+      "tw-arbitrario": 4
+    },
+    "src/components/FAQ.tsx": {
+      "tw-arbitrario": 1
+    },
+    "src/components/Footer.tsx": {
+      "tw-paleta-crua": 1
+    },
+    "src/components/Gallery.tsx": {
+      "tw-arbitrario": 1
+    },
+    "src/components/Header.tsx": {
+      "tw-arbitrario": 15
+    },
+    "src/components/Hero.tsx": {
+      "tw-arbitrario": 3
+    },
+    "src/components/History.tsx": {
+      "tw-arbitrario": 1
+    },
+    "src/components/KartLocacao.tsx": {
+      "tw-arbitrario": 6
+    },
+    "src/components/Promotions.tsx": {
+      "tw-paleta-crua": 12
+    },
+    "src/components/Services.tsx": {
+      "tw-paleta-crua": 19
+    },
+    "src/components/Track.tsx": {
+      "css-rgb-hsl": 2,
+      "tw-arbitrario": 4,
+      "tw-paleta-crua": 3
+    },
+    "src/components/site-ui/AngledButton.tsx": {
+      "tw-arbitrario": 2
+    },
+    "src/components/site-ui/BigCTA.tsx": {
+      "tw-arbitrario": 2
+    },
+    "src/components/site-ui/GlassPanel.tsx": {
+      "tw-arbitrario": 2
+    },
+    "src/components/site-ui/PosterCard.tsx": {
+      "tw-arbitrario": 5
+    },
+    "src/components/site-ui/ScrollProgressBar.tsx": {
+      "tw-arbitrario": 1
+    },
+    "src/components/site-ui/WhatsAppFloat.tsx": {
+      "tw-arbitrario": 1
+    },
+    "src/index.css": {
+      "css-hex": 10,
+      "css-rgb-hsl": 27
+    },
+    "src/site-pages/ClubPages.tsx": {
+      "css-rgb-hsl": 1
+    },
+    "src/site-pages/KACPage.tsx": {
+      "tw-arbitrario": 2
+    },
+    "styles/admin.css": {
+      "css-font-family": 2
+    },
+    "styles/globals.css": {
+      "css-hex": 16,
+      "css-font-family": 1
+    }
+  }
+}

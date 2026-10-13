@@ -12,7 +12,7 @@
  */
 import { one, query, tx } from './db';
 import { inscreverN } from './office';
-import { gravarPreCadastro, preCadastroLigado, type PreCadastro } from './pre-cadastro';
+import { gravarAcompanhante, gravarPreCadastro, preCadastroLigado, type PreCadastro } from './pre-cadastro';
 
 type Log = (...args: unknown[]) => void;
 
@@ -90,6 +90,10 @@ export type PedidoSite = {
   quantidade: number;
   forma: 'pix' | 'cartao';
   pilotos: string[];
+  /** Os outros pilotos (uma vaga para cada, além do comprador). Pedidos antigos não têm: as vagas ficam no nome do comprador. */
+  acompanhantes?: { nome: string; documento: string; nascimento: string; chave?: string }[];
+  /** false = quem comprou não pilota: as vagas são todas dos acompanhantes (ele fica como responsável). */
+  compradorPilota?: boolean;
   cliente: Omit<PreCadastro, 'key' | 'chave' | 'recebidoEm'> & { chave: string };
   pagamento?: { asaasId: string; billingType: string; pagoEm: string; valorCentavos: number };
 };
@@ -144,10 +148,18 @@ export async function reservarPedido(p: PedidoSite, log: Log): Promise<Resultado
 
   const cliente: PreCadastro = { ...p.cliente, key: '', recebidoEm: p.criadoEm, menores: p.cliente.menores ?? [] } as PreCadastro;
   const clienteId = await gravarPreCadastro(cliente, log);
+  // cada vaga é de uma pessoa: o comprador + um cadastro para cada outro piloto (pedidos antigos, sem a lista: tudo no comprador)
+  const eu = p.compradorPilota !== false;
+  const faltam = n - (eu ? 1 : 0);
+  const outros = (p.acompanhantes ?? []).slice(0, faltam);
+  const pessoas = faltam > 0 && outros.length === faltam
+    ? [...(eu ? [clienteId] : []), ...(await Promise.all(outros.map((a) => gravarAcompanhante(a, log))))]
+    : undefined;
+  if (pessoas && new Set(pessoas).size !== pessoas.length) return { id: p.id, acao: 'recusado', erro: 'Cada vaga precisa ser de uma pessoa diferente (há CPF repetido entre os pilotos).' };
   const obs = `Reserva online ${p.codigo}` + (p.pilotos?.length ? ` · pilotos: ${p.pilotos.join(', ')}`.slice(0, 380) : '');
   let inscricoes: number[];
   try {
-    inscricoes = await inscreverN(Number(p.bateriaId), clienteId, n, 'site', null, obs, true, { produtoId: c.produtoVenda });
+    inscricoes = await inscreverN(Number(p.bateriaId), clienteId, n, 'site', null, obs, true, { produtoId: c.produtoVenda, clientes: pessoas });
   } catch (e) {
     return { id: p.id, acao: 'recusado', erro: (e as Error).message };
   }
@@ -168,13 +180,17 @@ export async function confirmarPagamento(p: PedidoSite, log: Log): Promise<Resul
   const r = await one<Linha>(`${LINHA} WHERE PedidoId = @id`, { id: p.id });
   if (!r) return { id: p.id, acao: 'pago_sem_vaga', erro: 'Pedido não encontrado no sistema da recepção.' };
   if (r.Status === 'pago') return { id: p.id, acao: 'confirmado', codigo: r.Codigo };
-  const forma = p.pagamento?.billingType === 'PIX' ? 'pix' : 'cartao';
+  // a Asaas diz se o cartão foi de débito (DEBIT_CARD) — a recepção mostra Pix / Crédito / Débito
+  const forma = p.pagamento?.billingType === 'PIX' ? 'pix' : p.pagamento?.billingType === 'DEBIT_CARD' ? 'debito' : 'credito';
   let insc = ids(r.InscricaoIds);
   const ativas = await query<{ Id: number }>(`SELECT Id FROM dbo.Inscricao WHERE Id IN (${insc.join(',') || '0'}) AND Status <> 'cancelada'`);
-  if (ativas.length < insc.length) {
-    // pagou depois do prazo: as vagas foram liberadas — segura de novo se ainda houver
+  if (ativas.length < insc.length && (await reativarVagas(r.BateriaId, insc.filter((i) => !ativas.some((a) => a.Id === i))))) {
+    log(`reserva online ${r.Codigo}: paga após o prazo, as mesmas ${insc.length - ativas.length} vaga(s) voltaram`);
+  } else if (ativas.length < insc.length) {
+    // pagou depois do prazo e não deu para devolver as mesmas linhas: segura de novo se ainda houver, para as MESMAS pessoas
+    const canceladas = await query<{ ClienteId: number }>(`SELECT ClienteId FROM dbo.Inscricao WHERE Id IN (${insc.join(',') || '0'}) AND Status = 'cancelada' ORDER BY Id`);
     try {
-      const novas = await inscreverN(r.BateriaId, r.ClienteId, r.Quantidade - ativas.length, 'site', null, `Reserva online ${r.Codigo} (paga após o prazo)`, true, { produtoId: configOnline().produtoVenda });
+      const novas = await inscreverN(r.BateriaId, r.ClienteId, r.Quantidade - ativas.length, 'site', null, `Reserva online ${r.Codigo} (paga após o prazo)`, true, { produtoId: configOnline().produtoVenda, clientes: canceladas.length === r.Quantidade - ativas.length ? canceladas.map((x) => x.ClienteId) : undefined });
       insc = [...ativas.map((a) => a.Id), ...novas];
     } catch (e) {
       await query(`UPDATE dbo.ReservaOnline SET Status = 'pago_sem_vaga', AsaasPagamentoId = @asaas, PagoEm = SYSDATETIME(), Forma = @forma WHERE Id = @id`, { id: r.Id, asaas: p.pagamento?.asaasId ?? null, forma });
@@ -189,6 +205,26 @@ export async function confirmarPagamento(p: PedidoSite, log: Log): Promise<Resul
   });
   log(`reserva online ${r.Codigo}: paga (${forma}), ${insc.length} vaga(s) confirmadas`);
   return { id: p.id, acao: 'confirmado', codigo: r.Codigo };
+}
+
+/**
+ * Pix pago dentro do prazo cujo aviso só chegou depois (13/10, reserva ACEXRJ: o webhook ainda ia para o MyLapTime):
+ * as vagas já tinham sido canceladas. Devolve as MESMAS inscrições (se a bateria ainda tem lugar e não passou) em vez de
+ * criar outras — senão a recepção via o piloto duas vezes na bateria (as canceladas + as novas).
+ */
+async function reativarVagas(bateriaId: number, canceladas: number[]) {
+  if (!canceladas.length) return false;
+  return tx(async (run) => {
+    const [b] = await run(
+      `SELECT b.Vagas - (SELECT COUNT(*) FROM dbo.Inscricao i WITH (UPDLOCK, HOLDLOCK) WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') livres,
+              CASE WHEN b.Status = 'cancelada' OR b.Inicio < DATEADD(minute, -30, SYSDATETIME()) THEN 0 ELSE 1 END ok
+         FROM dbo.Bateria b WHERE b.Id = @id`,
+      { id: bateriaId },
+    );
+    if (!b || !b.ok || (b.livres as number) < canceladas.length) return false;
+    const n = await run(`UPDATE dbo.Inscricao SET Status = 'confirmada', AtualizadoEm = SYSDATETIME() OUTPUT inserted.Id WHERE Id IN (${canceladas.join(',')}) AND Status = 'cancelada'`);
+    return n.length === canceladas.length;
+  });
 }
 
 /** Prazo vencido sem pagamento (com 2 min de folga para o aviso da Asaas chegar): cancela as vagas. */

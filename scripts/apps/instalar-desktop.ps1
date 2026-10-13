@@ -8,7 +8,7 @@
 
   - copia para C:\Program Files\Kartodromo\<App> e grava o appsettings.json
   - atalhos no Menu Iniciar (pasta Kartódromo) e na Area de Trabalho publica
-  - Autoatendimento inicia sozinho no logon (tela cheia travada; equipe sai com Ctrl+Shift+Alt+S)
+  - Autoatendimento só inicia sozinho no logon quando -IniciarNoLogon é informado (tela cheia travada; equipe sai com Ctrl+Shift+Alt+S)
   - Cronometragem instala tambem o atalho "Kartódromo TV" (telao na 2a tela)
   - registra em Aplicativos instalados (Adicionar/Remover programas) com desinstalador
   - remove os lancadores antigos do Chrome (C:\KartodromoApps\<App>, atalhos .vbs)
@@ -62,6 +62,23 @@ foreach ($arq in Get-ChildItem $destino -Recurse -File) {
   $acl.SetAccessRuleProtection($false, $false)
   Set-Acl -Path $arq.FullName -AclObject $acl
 }
+# O próprio programa precisa conseguir concluir uma atualização sem UAC quando a máquina
+# voltar do modo desligado. A permissão fica limitada à pasta deste aplicativo; o restante
+# de Program Files continua protegido.
+$usuarios = New-Object System.Security.Principal.SecurityIdentifier 'S-1-5-32-545'
+$heranca = [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor [System.Security.AccessControl.InheritanceFlags]::ObjectInherit
+$regraPastaAtualizacao = [System.Security.AccessControl.FileSystemAccessRule]::new($usuarios, [System.Security.AccessControl.FileSystemRights]::Modify, $heranca, [System.Security.AccessControl.PropagationFlags]::None, [System.Security.AccessControl.AccessControlType]::Allow)
+$regraArquivoAtualizacao = [System.Security.AccessControl.FileSystemAccessRule]::new($usuarios, [System.Security.AccessControl.FileSystemRights]::Modify, [System.Security.AccessControl.InheritanceFlags]::None, [System.Security.AccessControl.PropagationFlags]::None, [System.Security.AccessControl.AccessControlType]::Allow)
+foreach ($pasta in @(Get-Item $destino) + @(Get-ChildItem $destino -Recurse -Directory)) {
+  $acl = Get-Acl $pasta.FullName
+  $acl.SetAccessRule($regraPastaAtualizacao)
+  Set-Acl -Path $pasta.FullName -AclObject $acl
+}
+foreach ($arq in Get-ChildItem $destino -Recurse -File) {
+  $acl = Get-Acl $arq.FullName
+  $acl.SetAccessRule($regraArquivoAtualizacao)
+  Set-Acl -Path $arq.FullName -AclObject $acl
+}
 $cfg = [ordered]@{ ServidorUrl = $ServidorUrl; CronometragemUrl = $CronometragemUrl }
 if ($anterior -and $anterior.ImpressoraTermos) { $cfg.ImpressoraTermos = $anterior.ImpressoraTermos }
 if ($App -eq 'Autoatendimento') { $cfg.Impressora = $Impressora }
@@ -84,7 +101,7 @@ $startup = "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp"
 New-Item -ItemType Directory -Force $menu | Out-Null
 Novo-Atalho "$menu\$($meta.Nome).lnk"
 Novo-Atalho "$env:PUBLIC\Desktop\$($meta.Nome).lnk"
-if ($IniciarNoLogon -or $App -eq 'Autoatendimento') { Novo-Atalho "$startup\$($meta.Nome).lnk" }
+if ($IniciarNoLogon) { Novo-Atalho "$startup\$($meta.Nome).lnk" }
 elseif (Test-Path "$startup\$($meta.Nome).lnk") { Remove-Item "$startup\$($meta.Nome).lnk" -Force }
 if ($App -eq 'Cronometragem') {
   Novo-Atalho "$menu\Kartódromo TV.lnk" '--tv' 'Telão da cronometragem'

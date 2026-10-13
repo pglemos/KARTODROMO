@@ -8,6 +8,8 @@ static class TestesPainel
     {
         Console.WriteLine("=== INICIANDO TESTES DO PAINEL LED (COM3) ===");
 
+        TestarFiltrosRanking();
+
         // Teste 1: Tomada de tempo com 25 pilotos e paginação
         TestarPaginacaoTomadaDeTempo();
 
@@ -20,7 +22,21 @@ static class TestesPainel
         // Teste 4: Retenção de classificação da tomada de tempo para montagem do grid
         TestarRetencaoClassificacaoGrid();
 
+        // Teste 5: página local publica, página remota não gera eco
+        TestarSincronismoPagina();
+
         Console.WriteLine("=== TODOS OS TESTES PASSARAM COM SUCESSO! ===");
+    }
+
+    static void TestarFiltrosRanking()
+    {
+        using var form = new FormCrono("teste-filtros");
+        foreach (var campo in new[] { "_gRankKarts", "_gHistKart" })
+        {
+            var grade = (LiveGrid)typeof(FormCrono).GetField(campo, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(form);
+            foreach (DataGridViewColumn coluna in grade.Columns)
+                Assert(coluna.HeaderCell.Style.Padding.Right >= Kartodromo.Comum.FiltroColuna.LarguraFunil, $"Funil no cabeçalho {campo}: {coluna.HeaderText}");
+        }
     }
 
     static void Assert(bool condicao, string mensagem)
@@ -204,5 +220,28 @@ static class TestesPainel
         Assert(!painel.EmModoGrid, "Com bandeira verde na corrida, sai do Modo Grid");
         Assert(painel.Pagina == 0, "Página deve resetar para 0 na largada da corrida");
         Assert(painel.SessaoExibidaNome.Contains("Corrida"), "Sessão exibida deve mudar para a corrida");
+    }
+
+    static void TestarSincronismoPagina()
+    {
+        Console.WriteLine("\n-- Teste 5: Sincronismo da página do painel entre ORBITS e CRONO1 --");
+        using var painel = new PainelLed();
+        painel.Atualizar(CriarSessaoQualificacao(24));
+
+        var evento = typeof(PainelLed).GetEvent("PaginaAlterada");
+        var aplicarRemota = typeof(PainelLed).GetMethod("DefinirPaginaRemota");
+        Assert(evento != null, "Painel deve expor evento de página local alterada");
+        Assert(aplicarRemota != null, "Painel deve aceitar página recebida pela rede");
+
+        var paginasPublicadas = new List<int>();
+        evento!.AddEventHandler(painel, new Action<int>(paginasPublicadas.Add));
+
+        painel.DefinirPagina(1);
+        Assert(painel.Pagina == 1, "Página local deve mudar para 11–20");
+        Assert(paginasPublicadas.SequenceEqual([1]), "Página local deve ser publicada uma vez");
+
+        aplicarRemota!.Invoke(painel, [2]);
+        Assert(painel.Pagina == 2, "Página recebida do outro computador deve ser aplicada");
+        Assert(paginasPublicadas.SequenceEqual([1]), "Página remota não deve gerar eco para a rede");
     }
 }

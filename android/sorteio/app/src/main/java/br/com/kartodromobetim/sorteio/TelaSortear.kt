@@ -237,12 +237,12 @@ private fun Palco(
                     .clip(RoundedCornerShape(24.dp))
                     .background(
                         if (girando || numero == "?") Brush.verticalGradient(listOf(Color(0xB31D292D), Color(0xCC101619)))
-                        else Brush.linearGradient(listOf(Cor.VerdeVivo, Cor.Verde)),
+                        else Brush.linearGradient(listOf(Cor.VerdeVivo, Cor.VerdePressionado)),
                     )
                     .border(1.dp, if (girando || numero == "?") Cor.Borda else Cor.VerdeBorda, RoundedCornerShape(24.dp)), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("SEU KART", color = Color(0xCCFFFFFF), fontSize = 11.sp, letterSpacing = 3.sp)
-                        Text(numero, color = Color.White, fontSize = if (baixo || compacto) 92.sp else 142.sp,
+                        Text("SEU KART", color = if (girando || numero == "?") Color(0xCCFFFFFF) else Cor.SobreVerde.copy(alpha = 0.8f), fontSize = 11.sp, letterSpacing = 3.sp)
+                        Text(numero, color = if (girando || numero == "?") Color.White else Cor.SobreVerde, fontSize = if (baixo || compacto) 92.sp else 142.sp,
                             fontWeight = FontWeight.Black, lineHeight = if (baixo || compacto) 98.sp else 148.sp)
                     }
                 }
@@ -255,7 +255,7 @@ private fun Palco(
                 Column {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("Grid da bateria", color = Cor.Texto, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                        Text(aceitos.size.toString(), color = Color(0xFF7CE5BE), fontWeight = FontWeight.Bold)
+                        Text(aceitos.size.toString(), color = Cor.VerdeTexto, fontWeight = FontWeight.Bold)
                     }
                     Spacer(Modifier.height(12.dp))
                     if (aceitos.isEmpty()) Text("Os pilotos aparecem aqui após a confirmação.", color = Cor.Secundario, fontSize = 13.sp)

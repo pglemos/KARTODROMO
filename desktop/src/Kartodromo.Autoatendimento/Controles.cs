@@ -7,22 +7,22 @@ namespace Kartodromo.Autoatendimento;
 /// <summary>Paleta operacional do totem: Pit Lane Noturno.</summary>
 public static class Estilo
 {
-    public static readonly Color Fundo = Color.FromArgb(3, 5, 4);
-    public static readonly Color Cartao = Color.FromArgb(18, 255, 255, 255);
-    public static readonly Color Verde = Color.FromArgb(0, 230, 118);
-    public static readonly Color VerdeEscuro = Color.FromArgb(0, 122, 61);
-    public static readonly Color VerdeSuave = Color.FromArgb(191, 239, 210);
-    public static readonly Color Texto = Color.FromArgb(247, 250, 246);
-    public static readonly Color Suave = Color.FromArgb(183, 194, 186);
-    public static readonly Color MuitoSuave = Color.FromArgb(130, 147, 136);
-    public static readonly Color Campo = Color.FromArgb(11, 16, 12);
-    public static readonly Color BordaCampo = Color.FromArgb(65, 80, 68);
-    public static readonly Color Amarelo = Color.FromArgb(250, 204, 21);
-    public static readonly Color InformativoFundo = Color.FromArgb(24, 64, 48);
-    public static readonly Color InformativoTexto = Color.FromArgb(151, 247, 194);
-    public static readonly Color SuperFundo = Color.FromArgb(76, 57, 12);
-    public static readonly Color SuperTexto = Color.FromArgb(255, 210, 74);
-    public static readonly Color Foco = Color.FromArgb(0, 230, 118);
+    public static readonly Color Fundo = Tokens.Escuro.ComponenteTotemFundo;
+    public static readonly Color Cartao = Tokens.Escuro.ComponenteTotemCartao;
+    public static readonly Color Verde = Tokens.Escuro.ComponenteTotemAcao;
+    public static readonly Color VerdeEscuro = Tokens.Escuro.ComponenteTotemVerdeEscuro;
+    public static readonly Color VerdeSuave = Tokens.Escuro.ComponenteTotemVerdeSuave;
+    public static readonly Color Texto = Tokens.Escuro.ComponenteTotemTexto;
+    public static readonly Color Suave = Tokens.Escuro.ComponenteTotemTextoSuave;
+    public static readonly Color MuitoSuave = Tokens.Escuro.ComponenteTotemTextoMuitoSuave;
+    public static readonly Color Campo = Tokens.Escuro.ComponenteTotemCampo;
+    public static readonly Color BordaCampo = Tokens.Escuro.ComponenteTotemBordaCampo;
+    public static readonly Color Amarelo = Tokens.Escuro.ComponenteTotemAmarelo;
+    public static readonly Color InformativoFundo = Tokens.Escuro.ComponenteTotemInformativoFundo;
+    public static readonly Color InformativoTexto = Tokens.Escuro.ComponenteTotemInformativoTexto;
+    public static readonly Color SuperFundo = Tokens.Escuro.ComponenteTotemSuperFundo;
+    public static readonly Color SuperTexto = Tokens.Escuro.ComponenteTotemSuperTexto;
+    public static readonly Color Foco = Tokens.Escuro.ComponenteTotemFoco;
 
     static readonly string Familia = new[] { "Rajdhani", "Bahnschrift SemiCondensed", "Segoe UI Variable Text", "Segoe UI" }
         .First(f => { using var t = new Font(f, 10); return t.Name.Equals(f, StringComparison.OrdinalIgnoreCase); });
@@ -131,7 +131,7 @@ public class CabecalhoTotem : Control
             var atual = i + 1 == _etapa;
             var r = new Rectangle(x, y, w, h);
             using var path = Estilo.Arredondado(new Rectangle(r.X, r.Y, r.Width - 1, r.Height - 1), h / 2);
-            var fundo = atual ? Estilo.Texto : concluida ? Color.FromArgb(48, Estilo.Verde.R, Estilo.Verde.G, Estilo.Verde.B) : Color.FromArgb(20, 255, 255, 255);
+            var fundo = atual ? Estilo.Texto : concluida ? Color.FromArgb(48, Estilo.Verde.R, Estilo.Verde.G, Estilo.Verde.B) : Tokens.Escuro.ComponenteTotemPassoPendente;
             using (var brush = new SolidBrush(fundo)) g.FillPath(brush, path);
             var cor = atual ? Estilo.Fundo : concluida ? Estilo.VerdeSuave : Estilo.Suave;
             using var font = Estilo.F(14 * _escala, false, atual ? FontStyle.Bold : FontStyle.Regular);
@@ -139,7 +139,7 @@ public class CabecalhoTotem : Control
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
             x += (int)Math.Round(174 * _escala);
         }
-        using var divisor = new Pen(Color.FromArgb(24, 255, 255, 255), Math.Max(1, _escala));
+        using var divisor = new Pen(Tokens.Escuro.ComponenteTotemDivisor, Math.Max(1, _escala));
         g.DrawLine(divisor, 56 * _escala, Height - Math.Max(1, _escala), Width - 56 * _escala, Height - Math.Max(1, _escala));
     }
     protected override void Dispose(bool disposing)
@@ -167,7 +167,7 @@ public class Cartao : Panel
         using var p = Estilo.Arredondado(r, 28);
         using var fundo = new SolidBrush(Estilo.Cartao);
         e.Graphics.FillPath(fundo, p);
-        using var borda = new Pen(Color.FromArgb(26, 255, 255, 255), 1);
+        using var borda = new Pen(Tokens.Escuro.ComponenteTotemContorno, 1);
         e.Graphics.DrawPath(borda, p);
     }
     protected override void OnResize(EventArgs e)
@@ -210,14 +210,14 @@ public class Pilula : Control
         using var p = Estilo.Arredondado(r, (Height - 3) / 2);
         if (Principal)
         {
-            using var b = new SolidBrush(Enabled ? (_sobre ? Color.FromArgb(232, 236, 232) : Estilo.Texto) : Color.FromArgb(130, 147, 136));
+            using var b = new SolidBrush(Enabled ? (_sobre ? Tokens.Escuro.ComponenteTotemBotaoClaroPressionado : Estilo.Texto) : Tokens.Escuro.ComponenteTotemTextoMuitoSuave);
             g.FillPath(b, p);
         }
         else
         {
-            using var b = new SolidBrush(_sobre ? Color.FromArgb(42, 255, 255, 255) : Color.FromArgb(26, 255, 255, 255));
+            using var b = new SolidBrush(_sobre ? Tokens.Escuro.ComponenteTotemBotaoClaroSobre : Tokens.Escuro.ComponenteTotemContorno);
             g.FillPath(b, p);
-            using var pen = new Pen(Color.FromArgb(38, 255, 255, 255), 1);
+            using var pen = new Pen(Tokens.Escuro.ComponenteTotemContornoForte, 1);
             g.DrawPath(pen, p);
         }
         TextRenderer.DrawText(g, Text, Font, r, Principal ? Estilo.Fundo : Estilo.Texto, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
@@ -256,7 +256,7 @@ public class IconeSucesso : Control
         var halo = new Rectangle(1, 1, Width - 3, Height - 3);
         using (var b = new SolidBrush(Color.FromArgb(35, Estilo.Verde.R, Estilo.Verde.G, Estilo.Verde.B))) g.FillEllipse(b, halo);
         var circ = new Rectangle(14, 14, Width - 29, Height - 29);
-        using (var grad = new LinearGradientBrush(circ, Color.FromArgb(76, 224, 122), Color.FromArgb(31, 166, 74), LinearGradientMode.Vertical)) g.FillEllipse(grad, circ);
+        using (var grad = new LinearGradientBrush(circ, Tokens.Escuro.ComponenteTotemCheckTopo, Tokens.Escuro.ComponenteTotemCheckBase, LinearGradientMode.Vertical)) g.FillEllipse(grad, circ);
         using var check = new Pen(Estilo.Texto, Math.Max(3, Width * .027f)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
         g.DrawLines(check, [new PointF(Width * .31f, Height * .51f), new PointF(Width * .45f, Height * .65f), new PointF(Width * .72f, Height * .37f)]);
     }
@@ -298,7 +298,7 @@ public class Marcador : Control
             using var pen = new Pen(Estilo.Texto, 2.4f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
             g.DrawLines(pen, new Point[] { new Point(box.X + 5, box.Y + 11), new Point(box.X + 9, box.Y + 16), new Point(box.X + 17, box.Y + 6) });
         }
-        else { using var pen = new Pen(Color.FromArgb(208, 208, 208), 2); g.DrawPath(pen, p); }
+        else { using var pen = new Pen(Tokens.Escuro.ComponenteTotemCheckBorda, 2); g.DrawPath(pen, p); }
         if (Text.Length > 0) TextRenderer.DrawText(g, Text, Font, new Point(32, (Height - Font.Height) / 2), ForeColor);
         if (_foco)
         {
@@ -343,10 +343,10 @@ public class CampoTexto : Panel
         base.OnPaintBackground(e);
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         using var p = Estilo.Arredondado(new Rectangle(1, 1, Width - 3, Height - 3), 16);
-        using var b = new SolidBrush(Enabled ? Estilo.Campo : Color.FromArgb(34, 36, 40)); e.Graphics.FillPath(b, p);
-        using var pen = new Pen(_foco ? Estilo.Foco : Color.FromArgb(26, 255, 255, 255), _foco ? 2 : 1); e.Graphics.DrawPath(pen, p);
+        using var b = new SolidBrush(Enabled ? Estilo.Campo : Tokens.Escuro.ComponenteTotemCampoDesligado); e.Graphics.FillPath(b, p);
+        using var pen = new Pen(_foco ? Estilo.Foco : Tokens.Escuro.ComponenteTotemContorno, _foco ? 2 : 1); e.Graphics.DrawPath(pen, p);
     }
-    protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Caixa.BackColor = Enabled ? Estilo.Campo : Color.FromArgb(34, 36, 40); Invalidate(); }
+    protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Caixa.BackColor = Enabled ? Estilo.Campo : Tokens.Escuro.ComponenteTotemCampoDesligado; Invalidate(); }
 }
 
 /// <summary>Lista suspensa escura no mesmo formato dos campos (desenhada, abre um menu ao tocar).</summary>
@@ -388,8 +388,8 @@ public class CampoLista : Control
         base.OnPaintBackground(e);
         g.SmoothingMode = SmoothingMode.AntiAlias;
         using var p = Estilo.Arredondado(new Rectangle(1, 1, Width - 3, Height - 3), 16);
-        using (var b = new SolidBrush(Enabled ? Estilo.Campo : Color.FromArgb(34, 36, 40))) g.FillPath(b, p);
-        using (var pen = new Pen(Focused ? Estilo.Foco : Color.FromArgb(26, 255, 255, 255), Focused ? 2 : 1)) g.DrawPath(pen, p);
+        using (var b = new SolidBrush(Enabled ? Estilo.Campo : Tokens.Escuro.ComponenteTotemCampoDesligado)) g.FillPath(b, p);
+        using (var pen = new Pen(Focused ? Estilo.Foco : Tokens.Escuro.ComponenteTotemContorno, Focused ? 2 : 1)) g.DrawPath(pen, p);
         TextRenderer.DrawText(g, Text, Font, new Rectangle(12, 0, Width - 40, Height), Enabled ? ForeColor : Estilo.Suave, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
         var cx = Width - 22; var cy = Height / 2;
         using var seta = new Pen(Estilo.Suave, 1.6f);
@@ -407,11 +407,11 @@ public class CampoLista : Control
     class CoresMenu : ProfessionalColorTable
     {
         public override Color ToolStripDropDownBackground => Estilo.Campo;
-        public override Color MenuItemSelected => Color.FromArgb(70, 74, 80);
-        public override Color MenuItemBorder => Color.FromArgb(70, 74, 80);
+        public override Color MenuItemSelected => Tokens.Escuro.ComponenteTotemMenuSelecionado;
+        public override Color MenuItemBorder => Tokens.Escuro.ComponenteTotemMenuSelecionado;
         public override Color MenuBorder => Estilo.BordaCampo;
         public override Color CheckBackground => Estilo.Campo;
-        public override Color CheckSelectedBackground => Color.FromArgb(70, 74, 80);
+        public override Color CheckSelectedBackground => Tokens.Escuro.ComponenteTotemMenuSelecionado;
     }
 }
 /// <summary>Alerta escuro compatível com as telas do totem.</summary>

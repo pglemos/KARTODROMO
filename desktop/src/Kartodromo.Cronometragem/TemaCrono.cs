@@ -1,17 +1,18 @@
 using System.Drawing.Drawing2D;
+using Kartodromo.Comum;
 
 namespace Kartodromo.Cronometragem;
 
 static class TemaCrono
 {
-    public static readonly Color Fundo = Color.FromArgb(245, 245, 247);
-    public static readonly Color Cartao = Color.White;
-    public static readonly Color Texto = Color.FromArgb(29, 29, 31);
-    public static readonly Color Secundario = Color.FromArgb(110, 110, 115);
-    public static readonly Color Verde = Color.FromArgb(11, 122, 83);
-    public static readonly Color Azul = Color.FromArgb(10, 132, 255);
-    public static readonly Color Vermelho = Color.FromArgb(196, 40, 28);
-    public static readonly Color Borda = Color.FromArgb(229, 229, 234);
+    public static readonly Color Fundo = Tokens.Claro.CorFundoApp;
+    public static readonly Color Cartao = Tokens.Claro.CorSuperficiePadrao;
+    public static readonly Color Texto = Tokens.Claro.CorTextoPrincipal;
+    public static readonly Color Secundario = Tokens.Claro.CorTextoSecundario;
+    public static readonly Color Verde = Tokens.Claro.CorAcaoPrincipal;
+    public static readonly Color Azul = Tokens.Claro.CorDominioBandeiraAzul;
+    public static readonly Color Vermelho = Tokens.Claro.CorEstadoPerigoSolido;
+    public static readonly Color Borda = Tokens.Claro.CorBordaSutil;
     public static readonly Font Normal = new("Segoe UI", 9.5F);
     public static readonly Font Pequena = new("Segoe UI", 8.5F);
     public static readonly Font Titulo = new("Segoe UI", 14F, FontStyle.Bold);
@@ -26,7 +27,7 @@ static class TemaCrono
         if (titulo != null)
         {
             var cab = new Panel { Dock = DockStyle.Top, Height = subtitulo == null ? 28 : 46, Padding = new Padding(4, 1, 4, 4), BackColor = Cartao };
-            cab.Controls.Add(new Label { Text = titulo, Dock = subtitulo == null ? DockStyle.Fill : DockStyle.Top, Height = 24, Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Texto, TextAlign = ContentAlignment.MiddleLeft });
+            cab.Controls.Add(new Label { Text = titulo, Dock = subtitulo == null ? DockStyle.Fill : DockStyle.Top, Height = 24, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo, FontStyle.Bold), ForeColor = Texto, TextAlign = ContentAlignment.MiddleLeft });
             if (subtitulo != null) cab.Controls.Add(new Label { Text = subtitulo, Dock = DockStyle.Bottom, Height = 20, Font = Pequena, ForeColor = Secundario, TextAlign = ContentAlignment.MiddleLeft });
             card.Controls.Add(cab);
         }
@@ -43,8 +44,8 @@ static class TemaCrono
             MinimumSize = new Size(72, 32),
             FlatStyle = FlatStyle.Flat,
             BackColor = color,
-            ForeColor = primario || cor != null ? Color.White : Texto,
-            Font = new Font("Segoe UI", 9F, primario ? FontStyle.Bold : FontStyle.Regular),
+            ForeColor = primario || cor != null ? Tokens.Primitivo.Branco : Texto,
+            Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, primario ? FontStyle.Bold : FontStyle.Regular),
             Padding = new Padding(8, 1, 8, 1),
             Margin = new Padding(3),
             Cursor = Cursors.Hand,
@@ -54,11 +55,12 @@ static class TemaCrono
         return b;
     }
 
+    /// <summary>Rótulo de operação: o tamanho (pt, como antes) vai para o degrau mais próximo da escala oficial.</summary>
     public static Label Rotulo(string texto, int tamanho = 10, bool forte = false) => new()
     {
         Text = texto,
         AutoSize = true,
-        Font = new Font("Segoe UI", tamanho, forte ? FontStyle.Bold : FontStyle.Regular),
+        Font = Tokens.Fonte(tamanho <= 9 ? Tokens.Claro.FonteTamanhoPequeno : Tokens.Claro.FonteTamanhoCorpo, forte ? FontStyle.Bold : FontStyle.Regular),
         ForeColor = forte ? Texto : Secundario,
         Margin = new Padding(3, 4, 3, 4),
     };
@@ -74,7 +76,7 @@ static class TemaCrono
         grid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
         grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(251, 251, 253);
         grid.ColumnHeadersDefaultCellStyle.ForeColor = Secundario;
-        grid.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI Semibold", 9F);
+        grid.ColumnHeadersDefaultCellStyle.Font = Tokens.FonteSemibold(Tokens.Claro.FonteTamanhoPequeno);
         grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(251, 251, 253);
         grid.ColumnHeadersHeight = 30;
         grid.DefaultCellStyle.Font = Normal;
@@ -124,54 +126,33 @@ static class TemaCrono
 }
 
 /// <summary>Formulário nativo reutilizável com o cabeçalho e os campos do diálogo aprovado.</summary>
-sealed class DialogoDados : Form
+/// <summary>Janela de campos (ex.: penalidade, editar bateria) no visual padrão do sistema — é um <see cref="DialogoDesign"/>
+/// (cabeçalho com ícone, seção branca arredondada, campos com rótulo, Gravar/Cancelar no rodapé). Mesma API de antes
+/// (<see cref="Valor"/>, <see cref="Confirmado"/>), então as chamadas não mudam. Enter grava, Esc fecha.</summary>
+sealed class DialogoDados : DialogoDesign
 {
+    const string IconeEditar = "M12 20h9M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4Z";
+    const string CorIcone = "linear-gradient(180deg, #34C759, #0B7A53)"; // design-lint-ignore: o mesmo degradê dos outros diálogos (Forma.Tile lê CSS)
     readonly Dictionary<string, TextBox> _campos = new(StringComparer.OrdinalIgnoreCase);
     public string Valor(string nome) => _campos.TryGetValue(nome, out var campo) ? campo.Text.Trim() : "";
     public bool Confirmado { get; private set; }
 
     public DialogoDados(string titulo, string subtitulo, IEnumerable<(string Rotulo, string Nome, string Valor)> campos, Size? tamanho = null)
+        : base(titulo, subtitulo, IconeEditar, CorIcone, Math.Max(600, (tamanho ?? new Size(760, 450)).Width), Math.Max(360, (tamanho ?? new Size(760, 450)).Height + 60))
     {
-        Text = titulo;
-        Font = TemaCrono.Normal;
-        BackColor = TemaCrono.Fundo;
-        StartPosition = FormStartPosition.CenterParent;
-        FormBorderStyle = FormBorderStyle.Sizable;
-        MinimizeBox = false;
-        MaximizeBox = false;
-        ShowInTaskbar = false;
-        KeyPreview = true;
-        ClientSize = tamanho ?? new Size(760, 450);
-        MinimumSize = new Size(600, 360);
-        KeyDown += (_, e) => { if (e.KeyCode == Keys.Escape) Close(); };
-
-        var header = new Panel { Dock = DockStyle.Top, Height = 74, BackColor = Color.White, Padding = new Padding(20, 10, 20, 8) };
-        header.Controls.Add(new Label { Text = titulo, Dock = DockStyle.Top, Height = 30, Font = new Font("Segoe UI", 15F, FontStyle.Bold), ForeColor = TemaCrono.Texto });
-        header.Controls.Add(new Label { Text = subtitulo, Dock = DockStyle.Bottom, Height = 22, Font = TemaCrono.Pequena, ForeColor = TemaCrono.Secundario });
-        Controls.Add(header);
-
-        var body = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(18) };
-        var table = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, Padding = new Padding(12), BackColor = Color.White, Margin = new Padding(0) };
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        foreach (var field in campos)
+        var lista = campos.ToList();
+        var grade = Secao(null);
+        // 2 colunas (como antes); um campo só ocupa a linha inteira
+        foreach (var field in lista)
         {
-            var box = new TextBox { Dock = DockStyle.Bottom, Height = 32, Text = field.Valor ?? "", BorderStyle = BorderStyle.FixedSingle, Font = TemaCrono.Normal };
+            var box = new TextBox { Text = field.Valor ?? "", BorderStyle = BorderStyle.None, AccessibleName = field.Rotulo };
             _campos[field.Nome] = box;
-            var cell = new Panel { Dock = DockStyle.Fill, Height = 64, Padding = new Padding(6, 5, 10, 3) };
-            cell.Controls.Add(box);
-            cell.Controls.Add(new Label { Text = field.Rotulo, Dock = DockStyle.Top, Height = 20, ForeColor = TemaCrono.Secundario, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) });
-            table.Controls.Add(cell);
+            Campo(grade, field.Rotulo, box, lista.Count == 1 ? 6 : 3);
         }
-        body.Controls.Add(table);
-        Controls.Add(body);
-
-        var footer = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 58, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(12, 10, 12, 8), BackColor = Color.White };
-        var save = TemaCrono.Botao("Gravar e fechar", true); save.Click += (_, _) => { Confirmado = true; DialogResult = DialogResult.OK; Close(); };
-        var cancel = TemaCrono.Botao("Cancelar"); cancel.Click += (_, _) => Close();
-        footer.Controls.Add(save);
-        footer.Controls.Add(cancel);
-        Controls.Add(footer);
-        AcceptButton = save;
+        // rodapé da direita para a esquerda: o principal primeiro fica na ponta direita, como nas outras janelas
+        var gravar = BotaoRodape("Gravar e fechar", true, () => { Confirmado = true; DialogResult = DialogResult.OK; Close(); });
+        BotaoRodape("Cancelar", false, Close);
+        AcceptButton = gravar;
+        Shown += (_, _) => { if (_campos.Values.FirstOrDefault() is { } primeiro) { primeiro.Focus(); primeiro.SelectAll(); } };
     }
 }

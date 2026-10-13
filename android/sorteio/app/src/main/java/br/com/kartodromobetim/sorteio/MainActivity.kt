@@ -94,7 +94,7 @@ private fun App(api: Api, prefs: Preferencias) {
             } else {
                 Tela.Preparar(t.info.bateria.id)
             }
-        }) { resultado ->
+        }, onAtualizarPilotos = { tela = Tela.Preparar(t.info.bateria.id) }) { resultado ->
             tela = Tela.Resultado(t.info, t.karts, false, resultado, modo = "fiscal", frota = t.frota)
         }
         is Tela.Sortear -> key(rodada) {

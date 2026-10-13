@@ -21,7 +21,7 @@ public partial class FormCrono
 
         // ---- árvore (cartão 4)
         _arvore.DrawMode = TreeViewDrawMode.OwnerDrawAll; _arvore.ItemHeight = 30; _arvore.ShowLines = false; _arvore.ShowPlusMinus = false; _arvore.ShowRootLines = false;
-        _arvore.Indent = 0; _arvore.FullRowSelect = true; _arvore.BackColor = Color.White; _arvore.Font = new Font("Segoe UI", 9.6F);
+        _arvore.Indent = 0; _arvore.FullRowSelect = true; _arvore.BackColor = Tokens.Primitivo.Branco; _arvore.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo);
         _arvore.DrawNode += (_, e) => DesenharNo(e);
         _arvore.AfterSelect += (_, e) =>
         {
@@ -31,7 +31,7 @@ public partial class FormCrono
             else if (tag.S("kind") == "proof")
             {
                 _selectedProof = _proofs.FirstOrDefault(p => p.S("id") == tag.S("proofId"));
-                var session = Crono.Arr(_state, "sessions").FirstOrDefault(s => s.S("proofId") == tag.S("proofId"));
+                var session = SessoesParaArvore().FirstOrDefault(s => s.S("proofId") == tag.S("proofId"));
                 if (session != null) Selecionar(session.S("id"));
                 else { _lPilotosTitulo.Text = _selectedProof?.S("name") ?? "Selecione uma prova"; _subPilotos.Text = "Esta prova ainda não tem bateria · use Criar bateria nos passos 1–3"; }
             }
@@ -45,10 +45,10 @@ public partial class FormCrono
         {
             if (e.Button != MouseButtons.Right || e.Node?.Tag is not JsonObject tag) return;
             _arvore.SelectedNode = e.Node;
-            var temBateria = tag.S("kind") == "session" || tag.S("kind") == "proof" && Crono.Arr(_state, "sessions").Any(s => s.S("proofId") == tag.S("proofId"));
+            var temBateria = tag.S("kind") == "session" || tag.S("kind") == "proof" && SessoesParaArvore().Any(s => s.S("proofId") == tag.S("proofId"));
             if (temBateria) menuBateria.Show(_arvore, e.Location);
         };
-        var arvoreBox = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8, 4, 8, 8), BackColor = Color.White };
+        var arvoreBox = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8, 4, 8, 8), BackColor = Tokens.Primitivo.Branco };
         arvoreBox.Controls.Add(_arvore);
         _subArvore.Text = "Selecione uma prova";
         var arvCard = CartaoPasso(4, "Grupos e provas", _subArvore, arvoreBox, []);
@@ -77,9 +77,9 @@ public partial class FormCrono
         };
         var ordem = new[] { "category", "kart", "transponder", "name", "iniciais", "email", "cidade", "uf", "pais", "peso", "customerId" };
         for (var i = 0; i < ordem.Length; i++) _gPilotos.Columns[ordem[i]].DisplayIndex = i;
-        _gPilotos.Columns["name"].DefaultCellStyle.Font = new Font("Segoe UI Semibold", 9.6F);
-        foreach (var n in new[] { "transponder", "iniciais", "email", "cidade", "uf", "pais" }) _gPilotos.Columns[n].DefaultCellStyle.ForeColor = Color.FromArgb(58, 58, 60);
-        _gPilotos.Columns["transponder"].DefaultCellStyle.Font = new Font("Cascadia Mono", 8.8F);
+        _gPilotos.Columns["name"].DefaultCellStyle.Font = Tokens.FonteSemibold(Tokens.Claro.FonteTamanhoCorpo);
+        foreach (var n in new[] { "transponder", "iniciais", "email", "cidade", "uf", "pais" }) _gPilotos.Columns[n].DefaultCellStyle.ForeColor = Tokens.Primitivo.Cinza700;
+        _gPilotos.Columns["transponder"].DefaultCellStyle.Font = Tokens.FonteNumero(Tokens.Claro.FonteTamanhoPequeno);
         _gPilotos.Columns["peso"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
         _gPilotos.RowTemplate.Height = 34;
         foreach (DataGridViewColumn col in _gPilotos.Columns) col.SortMode = DataGridViewColumnSortMode.Automatic;
@@ -110,19 +110,19 @@ public partial class FormCrono
             g.SmoothingMode = SmoothingMode.AntiAlias;
             if (nome == "category")
             {
-                using var f = new Font("Segoe UI Semibold", 8.4F);
+                using var f = Tokens.FonteSemibold(Tokens.Claro.FonteTamanhoLegenda);
                 var w = TextRenderer.MeasureText(t, f).Width + 8;
                 var r = new Rectangle(e.CellBounds.X + 6, e.CellBounds.Y + (e.CellBounds.Height - 20) / 2, Math.Min(w, e.CellBounds.Width - 10), 20);
                 var super = t.Contains("super", StringComparison.OrdinalIgnoreCase);
-                using (var p = Forma.Redondo(r, 6)) using (var b = new SolidBrush(super ? Color.FromArgb(255, 236, 204) : Color.FromArgb(225, 238, 255))) g.FillPath(b, p);
-                TextRenderer.DrawText(g, t, f, r, super ? Color.FromArgb(138, 75, 0) : Color.FromArgb(10, 79, 160), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                using (var p = Forma.Redondo(r, 6)) using (var b = new SolidBrush(super ? Color.FromArgb(255, 236, 204) : Tokens.Claro.CorEstadoInfoFundo)) g.FillPath(b, p);
+                TextRenderer.DrawText(g, t, f, r, super ? Tokens.Primitivo.Laranja800 : Tokens.Claro.CorEstadoInfoTexto, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
             }
             else
             {
                 var q = new RectangleF(e.CellBounds.X + 6, e.CellBounds.Y + (e.CellBounds.Height - 22) / 2f, 32, 22);
                 using (var s = Forma.Redondo(new RectangleF(q.X, q.Y + 1, q.Width, q.Height), 6)) using (var bs = new SolidBrush(Color.FromArgb(174, 174, 178))) g.FillPath(bs, s);
-                using (var p = Forma.Redondo(q, 6)) using (var lg = new LinearGradientBrush(q, Color.White, Color.FromArgb(229, 229, 234), 90f)) g.FillPath(lg, p);
-                TextRenderer.DrawText(g, t.PadLeft(2, '0'), new Font("Cascadia Mono", 8.8F, FontStyle.Bold), Rectangle.Round(q), TemaCrono.Texto, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                using (var p = Forma.Redondo(q, 6)) using (var lg = new LinearGradientBrush(q, Tokens.Primitivo.Branco, Tokens.Claro.CorBordaSutil, 90f)) g.FillPath(lg, p);
+                TextRenderer.DrawText(g, t.PadLeft(2, '0'), Tokens.FonteNumero(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold), Rectangle.Round(q), TemaCrono.Texto, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
             }
             g.SmoothingMode = SmoothingMode.None;
             e.Handled = true;
@@ -150,43 +150,43 @@ public partial class FormCrono
 
         SetupResultado(_gResultComp); SetupResultado(_gCategoriaComp);
         EstilizarResultado(_gResultComp); EstilizarResultado(_gCategoriaComp);
-        _gResultComp.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0 && _gResultComp.Chaves[e.RowIndex] is JsonObject s) Voltas(s.S("kart")); };
-        _gCategoriaComp.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0 && _gCategoriaComp.Chaves[e.RowIndex] is JsonObject s) Voltas(s.S("kart")); };
+        _gResultComp.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0 && _gResultComp.Chaves[e.RowIndex] is JsonObject s) EditarPosicao(s); };
+        _gCategoriaComp.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0 && _gCategoriaComp.Chaves[e.RowIndex] is JsonObject s) EditarPosicao(s); };
         TemaCrono.EstilizarGrade(_gObs);
         _gObs.Col("Hora", 94).Col("Observação", 440, DataGridViewContentAlignment.MiddleLeft, true).Col("Responsável", 130);
 
         // abas sem cabeçalho + segmento
         var abasNovas = _tabsCompetidor; abasNovas.TabPages.Clear(); abasNovas.Dock = DockStyle.Fill;
-        var tabComp = new TabPage("Competidores") { BackColor = Color.White };
-        var banner = new Panel { Dock = DockStyle.Top, Height = 58, BackColor = Color.White, Padding = new Padding(12, 10, 12, 6) };
+        var tabComp = new TabPage("Competidores") { BackColor = Tokens.Primitivo.Branco };
+        var banner = new Panel { Dock = DockStyle.Top, Height = 58, BackColor = Tokens.Primitivo.Branco, Padding = new Padding(12, 10, 12, 6) };
         var caixa = new TemaCrono.PainelArredondado { Dock = DockStyle.Fill, BackColor = Color.FromArgb(235, 244, 255), Raio = 10 };
-        var textoBanner = new Label { AutoSize = false, Font = new Font("Segoe UI", 9.4F), ForeColor = Color.FromArgb(10, 79, 160), BackColor = Color.FromArgb(235, 244, 255), TextAlign = ContentAlignment.MiddleLeft };
-        var puxar = new BotaoPlano { Text = "Puxar da recepção agora", FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(10, 132, 255), ForeColor = Color.White, Font = new Font("Segoe UI Semibold", 9F), Cursor = Cursors.Hand, Height = 28 };
+        var textoBanner = new Label { AutoSize = false, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo), ForeColor = Tokens.Claro.CorEstadoInfoTexto, BackColor = Color.FromArgb(235, 244, 255), TextAlign = ContentAlignment.MiddleLeft };
+        var puxar = new BotaoPlano { Text = "Puxar da recepção agora", FlatStyle = FlatStyle.Flat, BackColor = Tokens.Claro.CorDominioBandeiraAzul, ForeColor = Tokens.Primitivo.Branco, Font = Tokens.FonteSemibold(Tokens.Claro.FonteTamanhoPequeno), Cursor = Cursors.Hand, Height = 28 };
         puxar.Width = TextRenderer.MeasureText(puxar.Text, puxar.Font).Width + 22; puxar.FlatAppearance.BorderSize = 0;
         puxar.Resize += (_, _) => Forma.AplicarRaio(puxar, 7); Forma.AplicarRaio(puxar, 7);
         puxar.Click += (_, _) => Seguro.Rodar(this, PuxarAgenda);
-        caixa.Paint += (_, e) => Forma.DesenharSvg(e.Graphics, "M4 12a8 8 0 0 1 14-5.3M20 4v5h-5M20 12a8 8 0 0 1-14 5.3M4 20v-5h5", new RectangleF(12, (caixa.Height - 16) / 2f, 16, 16), Color.FromArgb(10, 79, 160), 2f);
+        caixa.Paint += (_, e) => Forma.DesenharSvg(e.Graphics, "M4 12a8 8 0 0 1 14-5.3M20 4v5h-5M20 12a8 8 0 0 1-14 5.3M4 20v-5h5", new RectangleF(12, (caixa.Height - 16) / 2f, 16, 16), Tokens.Claro.CorEstadoInfoTexto, 2f);
         caixa.Controls.Add(textoBanner); caixa.Controls.Add(puxar);
         caixa.Resize += (_, _) => { puxar.Location = new Point(caixa.Width - puxar.Width - 10, (caixa.Height - puxar.Height) / 2); textoBanner.SetBounds(36, 0, Math.Max(50, puxar.Left - 44), caixa.Height); };
         banner.Controls.Add(caixa);
         _textoBannerPilotos = textoBanner;
         tabComp.Controls.Add(_gPilotos); tabComp.Controls.Add(banner); _gPilotos.BringToFront();
-        var tabOficial = new TabPage("Resultado oficial") { BackColor = Color.White }; tabOficial.Controls.Add(_gResultComp);
-        var tabCategoria = new TabPage("Por categoria") { BackColor = Color.White }; tabCategoria.Controls.Add(_gCategoriaComp);
-        var tabObs = new TabPage("Observações") { BackColor = Color.White };
-        var obsInput = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 48, WrapContents = false, Padding = new Padding(10, 8, 10, 4), BackColor = Color.White };
-        _txtObservacao.Width = 550;
-        obsInput.Controls.Add(_txtObservacao); obsInput.Controls.Add(BotaoPeq("Adicionar", 1, () => Seguro.Rodar(this, AdicionarObservacao)));
+        var tabOficial = new TabPage("Resultado oficial") { BackColor = Tokens.Primitivo.Branco }; tabOficial.Controls.Add(_gResultComp);
+        var tabCategoria = new TabPage("Por categoria") { BackColor = Tokens.Primitivo.Branco }; tabCategoria.Controls.Add(_gCategoriaComp);
+        var tabObs = new TabPage("Observações") { BackColor = Tokens.Primitivo.Branco };
+        var obsInput = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 48, WrapContents = false, Padding = new Padding(10, 8, 10, 4), BackColor = Tokens.Primitivo.Branco };
+        obsInput.Controls.Add(CaixaTexto(_txtObservacao, 550, 30)); obsInput.Controls.Add(BotaoPeq("Adicionar", 1, () => Seguro.Rodar(this, AdicionarObservacao)));
+        obsInput.Controls.Add(BotaoPeq("Excluir", 2, () => Seguro.Rodar(this, () => ExcluirObservacao(_gObs))));
         tabObs.Controls.Add(_gObs); tabObs.Controls.Add(obsInput); _gObs.BringToFront();
         abasNovas.TabPages.AddRange([tabComp, tabOficial, tabCategoria, tabObs]);
         _tabsCompetidorNovo = abasNovas;
-        var seg = new SegmentoDesign { BackColor = Color.White };
+        var seg = new SegmentoDesign { BackColor = Tokens.Primitivo.Branco };
         seg.Itens = ["Competidores", "Resultado oficial", "Por categoria", "Observações"];
         seg.Mudou += i => abasNovas.SelectedIndex = i;
         abasNovas.SelectedIndexChanged += (_, _) => { seg.Selecionado = abasNovas.SelectedIndex; _abaCompetidores = abasNovas.SelectedTab?.Text ?? "Competidores"; AtualizarResultadoCompetidores(); };
 
         _lPilotosTitulo.Text = "Selecione uma prova";
-        _totalPilotos.AutoSize = true; _totalPilotos.Font = new Font("Segoe UI", 9.4F); _totalPilotos.ForeColor = TemaCrono.Secundario; _totalPilotos.BackColor = Color.FromArgb(251, 251, 253);
+        _totalPilotos.AutoSize = true; _totalPilotos.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo); _totalPilotos.ForeColor = TemaCrono.Secundario; _totalPilotos.BackColor = Color.FromArgb(251, 251, 253);
         var direitaRod = new FlowLayoutPanel { AutoSize = true, WrapContents = false, BackColor = Color.FromArgb(251, 251, 253), Margin = Padding.Empty, Padding = Padding.Empty };
         _totalPilotos.Margin = new Padding(0, 7, 10, 0);
         direitaRod.Controls.Add(_totalPilotos);
@@ -220,36 +220,36 @@ public partial class FormCrono
         if (e.Node == null || e.Bounds.Height <= 0) return;
         var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
         var r = new Rectangle(0, e.Bounds.Y, _arvore.ClientSize.Width, e.Bounds.Height);
-        using (var b = new SolidBrush(Color.White)) g.FillRectangle(b, r);
+        using (var b = new SolidBrush(Tokens.Primitivo.Branco)) g.FillRectangle(b, r);
         var tag = e.Node.Tag as JsonObject;
         var tipo = tag?.S("kind") ?? "";
         var sel = e.Node.IsSelected && tipo is "proof" or "session";
-        if (sel) { using var p = Forma.Redondo(new Rectangle(2, r.Y + 1, r.Width - 4, r.Height - 2), 8); using var bs = new SolidBrush(Color.FromArgb(11, 122, 83)); g.FillPath(bs, p); }
+        if (sel) { using var p = Forma.Redondo(new Rectangle(2, r.Y + 1, r.Width - 4, r.Height - 2), 8); using var bs = new SolidBrush(Tokens.Claro.CorAcaoPrincipal); g.FillPath(bs, p); }
         var nivel = e.Node.Level;
         if (tipo == "event")
         {
-            TextRenderer.DrawText(g, tag.S("name").ToUpperInvariant(), new Font("Segoe UI", 8F, FontStyle.Bold), new Rectangle(6, r.Y, r.Width - 12, r.Height), TemaCrono.Secundario, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            TextRenderer.DrawText(g, tag.S("name").ToUpperInvariant(), Tokens.Fonte(Tokens.Claro.FonteTamanhoLegenda, FontStyle.Bold), new Rectangle(6, r.Y, r.Width - 12, r.Height), TemaCrono.Secundario, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
         }
         else if (tipo == "group" || nivel == 0 && tag == null)
         {
             using var pen = new Pen(TemaCrono.Secundario, 1.6f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
             var cy = r.Y + r.Height / 2f;
             g.DrawLines(pen, [new PointF(9, cy - 2), new PointF(12, cy + 1.5f), new PointF(15, cy - 2)]);
-            TextRenderer.DrawText(g, tag?.S("name") ?? e.Node.Text, new Font("Segoe UI", 9.4F, FontStyle.Bold), new Rectangle(22, r.Y, r.Width - 100, r.Height), TemaCrono.Texto, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
-            if (tag?.I("pilotos") is int n && n > 0) TextRenderer.DrawText(g, $"{n} pilotos", new Font("Segoe UI", 8.6F), new Rectangle(0, r.Y, r.Width - 10, r.Height), TemaCrono.Secundario, TextFormatFlags.VerticalCenter | TextFormatFlags.Right);
+            TextRenderer.DrawText(g, tag?.S("name") ?? e.Node.Text, Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo, FontStyle.Bold), new Rectangle(22, r.Y, r.Width - 30, r.Height), TemaCrono.Texto, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            if (tag?.I("pilotos") is int n && n > 0) TextRenderer.DrawText(g, $"{n} pilotos", Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno), new Rectangle(0, r.Y, r.Width - 10, r.Height), TemaCrono.Secundario, TextFormatFlags.VerticalCenter | TextFormatFlags.Right);
         }
         else
         {
             var corrida = tag?.S("type") == "corrida";
-            var cor = corrida ? Color.FromArgb(255, 59, 48) : Color.FromArgb(10, 132, 255);
-            using (var b = new SolidBrush(sel ? Color.White : cor)) g.FillEllipse(b, 28, r.Y + r.Height / 2f - 3, 6, 6);
+            var cor = corrida ? Tokens.Claro.CorDominioBandeiraVermelha : Tokens.Claro.CorDominioBandeiraAzul;
+            using (var b = new SolidBrush(sel ? Tokens.Primitivo.Branco : cor)) g.FillEllipse(b, 28, r.Y + r.Height / 2f - 3, 6, 6);
             var nome = tag?.S("label") is { Length: > 0 } l ? l : e.Node.Text;
-            TextRenderer.DrawText(g, nome, new Font(sel ? "Segoe UI Semibold" : "Segoe UI", 9.4F), new Rectangle(42, r.Y, r.Width - 110, r.Height), sel ? Color.White : TemaCrono.Texto, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            TextRenderer.DrawText(g, nome, sel ? Tokens.FonteSemibold(Tokens.Claro.FonteTamanhoCorpo) : Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo), new Rectangle(42, r.Y, r.Width - 110, r.Height), sel ? Tokens.Primitivo.Branco : TemaCrono.Texto, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
             var estado = tag?.S("state") ?? "";
             if (estado.Length > 0)
             {
-                var (txt, c) = estado switch { "em_andamento" => ("ao vivo", Color.FromArgb(28, 107, 53)), "bandeira_final" => ("final", Color.FromArgb(28, 107, 53)), "encerrada" => ("encerrada", TemaCrono.Secundario), "preparando" => ("preparando", Color.FromArgb(10, 79, 160)), _ => ("", TemaCrono.Secundario) };
-                TextRenderer.DrawText(g, txt, new Font("Segoe UI", 8.4F), new Rectangle(0, r.Y, r.Width - 10, r.Height), sel ? Color.FromArgb(220, 255, 255, 255) : c, TextFormatFlags.VerticalCenter | TextFormatFlags.Right);
+                var (txt, c) = estado switch { "em_andamento" => ("ao vivo", Tokens.Claro.CorEstadoSucessoTexto), "bandeira_final" => ("final", Tokens.Claro.CorEstadoSucessoTexto), "encerrada" => ("encerrada", TemaCrono.Secundario), "preparando" => ("preparando", Tokens.Claro.CorEstadoInfoTexto), _ => ("", TemaCrono.Secundario) };
+                TextRenderer.DrawText(g, txt, Tokens.Fonte(Tokens.Claro.FonteTamanhoLegenda), new Rectangle(0, r.Y, r.Width - 10, r.Height), sel ? Color.FromArgb(220, 255, 255, 255) : c, TextFormatFlags.VerticalCenter | TextFormatFlags.Right);
             }
         }
     }
@@ -348,5 +348,15 @@ public partial class FormCrono
         }
         _pilotosSujos = true;
         Msg.Info(this, $"{n} competidor(es) incluído(s). Confira e clique em Salvar.");
+    }
+}
+
+/// <summary>Árvore de grupos sem a barra de rolagem lateral (os nomes já cortam com "…"; a barra só aparecia vazia
+/// embaixo do cartão).</summary>
+public class ArvoreSemRolagemLateral : TreeView
+{
+    protected override CreateParams CreateParams
+    {
+        get { var cp = base.CreateParams; cp.Style |= 0x8000; return cp; } // TVS_NOHSCROLL
     }
 }

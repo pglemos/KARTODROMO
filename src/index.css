@@ -3,17 +3,14 @@
 @tailwind utilities;
 
 @layer base {
+  /* Fontes do site vêm do layout público (Anton/Oswald/Rajdhani via next/font); Inter e Montserrat, do site
+     antigo em Vite, nunca eram carregadas e saíram (fase 8 do design system). */
   html {
     scroll-behavior: smooth;
-    font-family: 'Inter', sans-serif;
   }
   
   body {
     @apply bg-white text-zinc-800 overflow-x-clip;
-  }
-
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'Montserrat', sans-serif;
   }
 
   a,

@@ -15,17 +15,22 @@
  */
 import http from 'node:http';
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
+import { pipeline } from 'node:stream';
 import { extname, join, normalize, resolve } from 'node:path';
+import { caminhoArquivoAtualizacao, tipoConteudoAtualizacao } from '../lib/desktop-updates';
 import { CLIENTE_COLS, insertCliente, isValidCpf, one, onlyDigits, query, updateCliente, type ClienteInput } from '../lib/ops/db';
 import { confereSenha, emiteToken, renovaToken, validaToken } from '../lib/ops/auth';
 import { corrigeEmail } from '../lib/ops/email-dominio';
+import { erroCadastroObrigatorio } from '../lib/ops/cadastro-obrigatorio';
+import { acrescentarInstagramRelatorio, idsClientesRelatorio, prepararRelatorioRecepcao, type SessaoRelatorio } from '../lib/ops/relatorio-crono';
 import { HttpError, inscreverN, officeRoutes } from '../lib/ops/office';
 import { bateriaDisponivelNoTotem, type TotemBateriaCandidate, TOTEM_BATERIAS_SQL } from '../lib/ops/totem-baterias';
 import { relatorio } from '../lib/ops/relatorios';
 import { renderTermoResponsabilidade, type TermoParticipante } from '../lib/ops/termo';
 import { buscarPreCadastroAgora, preCadastroLigado, sincronizarPreCadastros } from '../lib/ops/pre-cadastro';
 import { publicarAgenda, sincronizarReservasOnline, vagaOnlineDoGrupo } from '../lib/ops/reserva-online';
+import { syncTimingTracks } from '../lib/ops/tracado-sync';
 import { selecionarSessoesParaRelatorio, type ReceptionTimingSession } from '../lib/timing/reception-crono-reports';
 
 function loadLocalEnv() {
@@ -46,13 +51,32 @@ loadLocalEnv();
 const PORT = Number(process.env.OPS_PORT || 4060);
 const KEY = process.env.OPS_RECEPCAO_KEY || '';
 const UI_DIR = resolve(process.cwd(), 'services', 'ops-ui');
+const UPDATES_DIR = resolve(process.env.OPS_UPDATES_DIR || join(process.cwd(), 'updates'));
 const TERMO_FILE = process.env.OPS_TERMO_FILE ? resolve(process.cwd(), process.env.OPS_TERMO_FILE) : null;
 const TIMING_URL = (process.env.OPS_TIMING_URL || 'http://192.168.20.249:4050').replace(/\/$/, '');
+let sincronizacaoTracados: Promise<unknown> | null = null;
+let tracadosSincronizadosEm = 0;
 
 if (!KEY) console.warn('ATENCAO: OPS_RECEPCAO_KEY vazio, rotas da cronometragem ficam sem protecao');
 
 function log(...args: unknown[]) {
   console.log(`[${new Date().toISOString()}]`, ...args);
+}
+
+/** Espelha o catálogo da Cronometragem sob demanda, inclusive quando a Recepção é aberta depois de uma alteração. */
+async function sincronizarTracadosDaCronometragem() {
+  if (Date.now() - tracadosSincronizadosEm < 30_000) return;
+  if (sincronizacaoTracados) return sincronizacaoTracados;
+  sincronizacaoTracados = syncTimingTracks({ timingUrl: TIMING_URL, query, one })
+    .then((tracks) => {
+      tracadosSincronizadosEm = Date.now();
+      log(`catálogo de traçados sincronizado: ${tracks.length} opção(ões) ativas`);
+    })
+    .catch((err) => {
+      log(`catálogo de traçados: sincronização indisponível (${(err as Error).message})`);
+    })
+    .finally(() => { sincronizacaoTracados = null; });
+  return sincronizacaoTracados;
 }
 
 // ---------------------------------------------------------------- helpers
@@ -74,6 +98,20 @@ function sendStatic(res: http.ServerResponse, rel: string) {
   if (!file.startsWith(UI_DIR) || !existsSync(file)) return send(res, 404, { error: 'Arquivo não encontrado.' });
   res.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream', 'cache-control': 'no-store' });
   res.end(readFileSync(file));
+}
+
+function sendUpdateFile(res: http.ServerResponse, app: string, nome: string) {
+  const file = caminhoArquivoAtualizacao(UPDATES_DIR, app, nome);
+  if (!file || !existsSync(file) || statSync(file).isDirectory()) return send(res, 404, { error: 'Arquivo de atualização não encontrado.' });
+  const stat = statSync(file);
+  res.writeHead(200, {
+    'content-type': tipoConteudoAtualizacao(nome),
+    'content-length': stat.size,
+    'cache-control': 'no-store',
+  });
+  // pipeline fecha o arquivo se o app desistir no meio; com .pipe() o manifest.json ficava aberto para sempre e
+  // não dava mais para publicar versão nova (06/10: "acesso negado" ao trocar o manifesto da Cronometragem)
+  pipeline(createReadStream(file), res, () => undefined);
 }
 
 async function readBody(req: http.IncomingMessage): Promise<Record<string, unknown>> {
@@ -306,6 +344,13 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
       if (String(body.responsavelToken ?? '') !== sign(`cli:${responsavelId}`)) throw new HttpError(403, 'Sessão expirada, identifique-se de novo.');
     }
     if (!responsavelId && !body.lgpd) throw new HttpError(400, 'É necessário aceitar o Termo de Consentimento para Tratamento de Dados Pessoais.');
+    // Menores podem usar o contato do responsável, inclusive em versões antigas do totem.
+    if (responsavelId && !String(dados.email ?? '').trim()) {
+      const responsavel = await one<{ email: string | null }>(`SELECT Email email FROM dbo.Cliente WHERE Id = @id`, { id: responsavelId });
+      dados.email = responsavel?.email ?? '';
+    }
+    const erroCadastro = erroCadastroObrigatorio(dados);
+    if (erroCadastro) throw new HttpError(400, erroCadastro);
     if (id) {
       if (String(body.token ?? '') !== sign(`cli:${id}`)) throw new HttpError(403, 'Sessão expirada, identifique-se de novo.');
       // o totem mostra rua, número e complemento num campo só: se o cliente não mexeu, não regrava
@@ -463,6 +508,11 @@ const server = http.createServer(async (req, res) => {
   const path = url.pathname;
   const method = req.method ?? 'GET';
   try {
+    if (method === 'GET' && path.startsWith('/updates/')) {
+      const partes = path.slice('/updates/'.length).split('/').map(decodeURIComponent);
+      if (partes.length !== 2 || !partes[0] || !partes[1]) return send(res, 404, { error: 'Arquivo de atualização não encontrado.' });
+      return sendUpdateFile(res, partes[0], partes[1]);
+    }
     if (path === '/' || path === '/recepcao') return sendStatic(res, 'office.html');
     if (path === '/totem') return sendStatic(res, 'totem.html');
     if (path.startsWith('/ui/')) return sendStatic(res, path.slice(4));
@@ -481,6 +531,12 @@ const server = http.createServer(async (req, res) => {
     }
     if (path.startsWith('/relatorio/')) {
       sessaoDe(req, url);
+      const crono = path.match(/^\/relatorio\/crono\/([a-zA-Z0-9_-]{1,80})$/);
+      if (crono) {
+        const response = await fetch(`${TIMING_URL}/resultado/${encodeURIComponent(crono[1])}`, { signal: AbortSignal.timeout(10_000) });
+        if (!response.ok) throw new HttpError(502, 'Não foi possível carregar o resultado da cronometragem.');
+        return sendHtml(res, prepararRelatorioRecepcao(await response.text(), TIMING_URL));
+      }
       return sendHtml(res, await relatorio(path.slice('/relatorio/'.length), url));
     }
     if (path === '/api/login' && method === 'POST') return await loginRoute(req, res);
@@ -489,8 +545,24 @@ const server = http.createServer(async (req, res) => {
     }
     if (path.startsWith('/api/office/')) {
       const sessao = sessaoDe(req, url);
+      const dadosCrono = path.match(/^\/api\/office\/crono\/dados\/([a-zA-Z0-9_-]{1,80})(\/(?:passings|laps))?$/);
+      if (dadosCrono && method === 'GET') {
+        const response = await fetch(`${TIMING_URL}/api/sessions/${encodeURIComponent(dadosCrono[1])}${dadosCrono[2] ?? ''}`, { signal: AbortSignal.timeout(10_000) });
+        if (!response.ok) throw new HttpError(response.status === 404 ? 404 : 502, 'Dados da cronometragem indisponíveis.');
+        const data = await response.json();
+        if (dadosCrono[2]) return send(res, 200, data);
+        if (!data || !Array.isArray(data.competitors) || !Array.isArray(data.standings)) throw new HttpError(502, 'Resultado da cronometragem inválido.');
+        const ids = idsClientesRelatorio(data as SessaoRelatorio);
+        if (ids.length > 1000) throw new HttpError(502, 'Quantidade de pilotos inválida.');
+        const params = Object.fromEntries(ids.map((id, i) => ['id' + i, id]));
+        const clientes = ids.length ? await query<{ id: number; instagram: string | null }>(
+          `SELECT Id id, Instagram instagram FROM dbo.Cliente WHERE Id IN (${ids.map((_, i) => '@id' + i).join(',')})`, params,
+        ) : [];
+        return send(res, 200, acrescentarInstagramRelatorio(data as SessaoRelatorio, clientes));
+      }
       const novo = renovaToken(sessao);
       if (novo) res.setHeader('X-Novo-Token', novo);
+      if (path === '/api/office/apoio' || path === '/api/office/cad/tracados') await sincronizarTracadosDaCronometragem();
       if (path === '/api/office/termo-link' && method === 'GET') {
         const ids = String(url.searchParams.get('ids') ?? '').split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0);
         return send(res, 200, { url: termoLink(ids) });
@@ -526,6 +598,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (path.startsWith('/api/crono/')) {
       requireKey(req);
+      if (path === '/api/crono/baterias' || path.startsWith('/api/crono/baterias/')) await sincronizarTracadosDaCronometragem();
       let m = path.match(/^\/api\/crono\/baterias\/(\d+)\/grid$/);
       if (m) {
         const rows = await query(
@@ -587,16 +660,18 @@ const server = http.createServer(async (req, res) => {
       }
       m = path.match(/^\/api\/crono\/baterias\/(\d+)\/programa$/);
       if (m) {
-        return send(res, 200, await query(`SELECT pp.Ordem ordem, pp.Nome nome, pp.Tipo tipo, pp.Finalizacao finalizacao, pp.TempoMin tempoMin, pp.VoltasMax voltasMax, b.VoltaMinimaSeg voltaMinimaSeg
-          FROM dbo.Bateria b JOIN dbo.ProdutoProva pp ON pp.ProdutoId = b.ProdutoId WHERE b.Id = @id ORDER BY pp.Ordem`, { id: Number(m[1]) }));
+        return send(res, 200, await query(`SELECT pp.Ordem ordem, pp.Nome nome, pp.Tipo tipo, pp.Finalizacao finalizacao, pp.TempoMin tempoMin, pp.VoltasMax voltasMax, b.VoltaMinimaSeg voltaMinimaSeg, t.TimingTrackId trackId
+          FROM dbo.Bateria b JOIN dbo.ProdutoProva pp ON pp.ProdutoId = b.ProdutoId LEFT JOIN dbo.Tracado t ON t.Id = b.TracadoId
+          WHERE b.Id = @id ORDER BY pp.Ordem`, { id: Number(m[1]) }));
       }
       if (path === '/api/crono/baterias' && method === 'GET') {
         const data = String(url.searchParams.get('data') ?? '');
         return send(res, 200, await query(
-          `SELECT b.Id id, b.Nome nome, CONVERT(varchar(16), b.Inicio, 126) inicio, b.Vagas vagas, b.TipoKart tipoKart,
+          `SELECT b.Id id, b.Nome nome, CONVERT(varchar(16), b.Inicio, 126) inicio, b.Vagas vagas, b.TipoKart tipoKart, t.TimingTrackId trackId,
                   (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') inscritos,
                   (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada' AND i.Pago = 1) pagos
-           FROM dbo.Bateria b WHERE b.Status <> 'cancelada' AND b.Inicio >= @d AND b.Inicio < DATEADD(day, 1, @d) ORDER BY b.Inicio`,
+           FROM dbo.Bateria b LEFT JOIN dbo.Tracado t ON t.Id = b.TracadoId
+           WHERE b.Status <> 'cancelada' AND b.Inicio >= @d AND b.Inicio < DATEADD(day, 1, @d) ORDER BY b.Inicio`,
           { d: /^\d{4}-\d{2}-\d{2}$/.test(data) ? data : new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }) },
         ));
       }
@@ -604,12 +679,14 @@ const server = http.createServer(async (req, res) => {
     // compatibilidade com a cronometragem instalada antes (usa /api/baterias?data= com a chave)
     if (path === '/api/baterias' && method === 'GET') {
       requireKey(req);
+      await sincronizarTracadosDaCronometragem();
       const data = String(url.searchParams.get('data') ?? '');
       return send(res, 200, await query(
-        `SELECT b.Id id, b.Nome nome, CONVERT(varchar(16), b.Inicio, 126) inicio, b.Vagas vagas, b.TipoKart tipoKart,
+        `SELECT b.Id id, b.Nome nome, CONVERT(varchar(16), b.Inicio, 126) inicio, b.Vagas vagas, b.TipoKart tipoKart, t.TimingTrackId trackId,
                 (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') inscritos,
                 (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada' AND i.Pago = 1) pagos
-         FROM dbo.Bateria b WHERE b.Status <> 'cancelada' AND b.Inicio >= @d AND b.Inicio < DATEADD(day, 1, @d) ORDER BY b.Inicio`,
+         FROM dbo.Bateria b LEFT JOIN dbo.Tracado t ON t.Id = b.TracadoId
+         WHERE b.Status <> 'cancelada' AND b.Inicio >= @d AND b.Inicio < DATEADD(day, 1, @d) ORDER BY b.Inicio`,
         { d: /^\d{4}-\d{2}-\d{2}$/.test(data) ? data : new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }) },
       ));
     }
@@ -660,7 +737,7 @@ if (preCadastroLigado()) {
   log('pré-cadastro online ligado');
 }
 
-// reserva online (reservas.kartodromodebetim.com.br): agenda a cada 30 s, pedidos/pagamentos/prazos a cada 5 s.
+// reserva online (reservas.kartodromodebetim.com.br): agenda a cada 5 s, pedidos/pagamentos/prazos a cada 5 s.
 // Liga com OPS_RESERVA_ONLINE=1 no .env.local (usa a mesma chave do pré-cadastro).
 if (preCadastroLigado() && process.env.OPS_RESERVA_ONLINE === '1') {
   let ocupado = false, ultimoErro = 0;
@@ -672,7 +749,7 @@ if (preCadastroLigado() && process.env.OPS_RESERVA_ONLINE === '1') {
   };
   const agenda = async () => { try { await publicarAgenda(); } catch (e) { falhou('agenda', e); } };
   setTimeout(agenda, 3_000);
-  setInterval(agenda, 30_000).unref();
+  setInterval(agenda, 5_000).unref();
   setInterval(pedidos, 5_000).unref();
   log('reserva online ligada');
 }

@@ -9,7 +9,9 @@ static class Program
     [STAThread]
     static void Main()
     {
+        var args = Environment.GetCommandLineArgs();
         ApplicationConfiguration.Initialize();
+        if (Atualizacao.TratarInicioAsync("Cronometragem", args).GetAwaiter().GetResult()) return;
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
         Application.ThreadException += (_, e) =>
         {
@@ -20,7 +22,6 @@ static class Program
         };
         Thread.CurrentThread.CurrentCulture = Fmt.Br;
         Thread.CurrentThread.CurrentUICulture = Fmt.Br;
-        var args = Environment.GetCommandLineArgs();
         if (args.Length >= 2 && args[1] == "--test-painel") { TestesPainel.Executar(); return; }
         if (args.Length >= 3 && args[1] == "--autoteste") { Application.Run(new FormCrono(args[2])); return; }
         if (args.Length >= 2 && args[1] == "--tv") { Application.Run(FormTV.Sozinha()); return; }

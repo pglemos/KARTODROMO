@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { applyPassing, closeSession, createSession, startSession, swapKart, type Session } from '../lib/timing/race-engine';
-import { historicoDoKart, rankingKarts } from '../lib/timing/ranking-karts';
+import { applyPassing, closeSession, createSession, setChuva, startSession, swapKart, type Session } from '../lib/timing/race-engine';
+import { condicaoChuvaPeloTracado, historicoDoKart, rankingKarts } from '../lib/timing/ranking-karts';
 
 // 30/09/2026 20:00 em Brasília
 const BASE = Date.UTC(2026, 8, 30, 23, 0, 0);
@@ -21,6 +21,12 @@ const semFiltro = { de: null, ate: null, trackId: null, tipos: null };
 const kartPeloNumero = (kart: string) => kart;
 
 describe('ranking dos karts', () => {
+  it('reconhece a condição de chuva nos nomes de traçado importados', () => {
+    expect(condicaoChuvaPeloTracado('Traçado 6 Normal (Chuva)')).toBe(true);
+    expect(condicaoChuvaPeloTracado('Traçado 11 Normal (chuva)')).toBe(true);
+    expect(condicaoChuvaPeloTracado('Traçado 6 Normal')).toBe(false);
+  });
+
   it('ordena pelo melhor tempo de cada kart somando todas as baterias do período', () => {
     const a = bateria('a', BASE, { '10': [55_000, 54_000], '11': [53_900, 56_000] }, { '10': 'Ana', '11': 'Bia' });
     const b = bateria('b', BASE + 3_600_000, { '10': [53_500, 54_100], '11': [54_200] }, { '10': 'Caio', '11': 'Duda' });
@@ -37,6 +43,32 @@ describe('ranking dos karts', () => {
     const h = historicoDoKart([a, b], '10', semFiltro, () => null, kartPeloNumero);
     expect(h.map((x) => x.bateria)).toEqual(['Bateria b', 'Bateria a']);
     expect(h[1]).toMatchObject({ data: '2026-09-30', hora: '20:00', piloto: 'Ana', voltas: 1, melhorMs: 55_000 });
+  });
+
+  it('leva a condição de chuva da bateria para o ranking e o histórico do kart', () => {
+    const s = bateria('chuva', BASE, { '10': [55_000] }, { '10': 'Ana' });
+    setChuva(s, true);
+
+    const [ranking] = rankingKarts([s], semFiltro, () => null, kartPeloNumero);
+    const [historico] = historicoDoKart([s], '10', semFiltro, () => null, kartPeloNumero);
+
+    expect(s.chuva).toBe(true);
+    expect(ranking).toMatchObject({ chuva: true });
+    expect(historico).toMatchObject({ chuva: true });
+  });
+
+  it('mostra o traçado da melhor volta no ranking e o traçado de cada bateria no histórico', () => {
+    const seca = bateria('seca', BASE, { '10': [55_000, 54_000] }, { '10': 'Ana' });
+    seca.trackId = 'tracado-seco';
+    const chuva = bateria('chuva', BASE + 3_600_000, { '10': [53_000] }, { '10': 'Bia' });
+    chuva.trackId = 'tracado-chuva';
+    const nomeTracado = (s: Session) => s.trackId === 'tracado-chuva' ? 'Traçado 6 Normal (Chuva)' : 'Traçado 1 Normal';
+
+    const [ranking] = rankingKarts([seca, chuva], semFiltro, () => null, kartPeloNumero, nomeTracado);
+    const historico = historicoDoKart([seca, chuva], '10', semFiltro, () => null, kartPeloNumero, nomeTracado);
+
+    expect(ranking.melhorTracado).toBe('Traçado 6 Normal (Chuva)');
+    expect(historico.map((h) => h.tracado)).toEqual(['Traçado 6 Normal (Chuva)', 'Traçado 1 Normal']);
   });
 
   it('bateria em andamento ou cancelada não entra; na troca de kart a volta fica com o kart físico (transponder)', () => {

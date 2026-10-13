@@ -9,7 +9,7 @@ import type { Cliente } from './clientes.types';
 const PAGE_SIZE = 10;
 
 const inputClassName =
-  'w-full rounded-lg border border-zinc-700 bg-zinc-950 min-h-[44px] px-3 py-2 sm:min-h-0 sm:py-2.5 text-sm text-white placeholder:text-zinc-600 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20';
+  'w-full rounded-lg border border-kib-borda-forte bg-kib-fundo min-h-[44px] px-3 py-2 sm:min-h-0 sm:py-2.5 text-sm text-kib-texto placeholder:text-kib-texto-3 focus:border-kib-acao focus:outline-none focus:ring-2 focus:ring-kib-acao/20';
 
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : 'Ocorreu um erro inesperado.';
@@ -74,7 +74,7 @@ export const ClientesPage = () => {
 
       <div className="mt-6 space-y-4">
         <Card className="p-4">
-          <p className="text-sm text-zinc-400">Total: {total.toLocaleString('pt-BR')}.</p>
+          <p className="text-sm text-kib-texto-2">Total: {total.toLocaleString('pt-BR')}.</p>
           <input
             className={`${inputClassName} mt-3 sm:max-w-xs`}
             onChange={(event) => setSearchInput(event.target.value)}
