@@ -20,6 +20,7 @@ export default function CustomerTabs() {
       <Tabs.Screen name="index" options={{ title: 'Início' }} />
       <Tabs.Screen name="agenda" options={{ title: 'Agenda' }} />
       <Tabs.Screen name="reservas" options={{ title: 'Reservas' }} />
+      <Tabs.Screen name="gps" options={{ title: 'GPS' }} />
     </Tabs>
   );
 }
