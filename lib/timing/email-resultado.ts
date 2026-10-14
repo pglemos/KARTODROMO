@@ -217,6 +217,8 @@ function blocosNotasEmail(ctx: ContextoProva) {
 /** Corpo do e-mail (HTML compatível com Gmail/Outlook: tabelas e estilo inline). logoCid = imagem anexada inline. */
 /** Aviso no topo do reenvio de resultados que não chegaram na data (HostGator/Gmail, 29/09–11/10). */
 export const AVISO_ATRASO = 'Pedimos desculpas pelo atraso: este resultado não chegou para você no dia da prova por uma falha no nosso envio de e-mails, que já foi corrigida.';
+/** Reenvio depois que a cronometragem ajustou a classificação de uma bateria já encerrada (Ultras 13/10: kart 114 saiu em 10º). */
+export const AVISO_CORRECAO = 'Resultado corrigido: a cronometragem ajustou a classificação desta prova depois do primeiro envio. Este é o resultado válido; desconsidere o e-mail anterior.';
 const AVISO_FUNDO = '#FFF4E0'; // design-lint-ignore: cliente de e-mail não lê var(--kib-*)
 const AVISO_TEXTO = '#5C3A00'; // design-lint-ignore: cliente de e-mail não lê var(--kib-*)
 

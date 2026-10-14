@@ -16,6 +16,7 @@ import {
   destinatarios,
   emailValido,
   AVISO_ATRASO,
+  AVISO_CORRECAO,
   htmlEmail,
   htmlPdfResultado,
   htmlPdfVoltaAVolta,
@@ -317,6 +318,8 @@ export type OpcoesEnvio = {
   somenteFaltantes?: boolean;
   /** reenvio de resultado que não chegou na data: o e-mail abre com o pedido de desculpas (AVISO_ATRASO) */
   atrasado?: boolean;
+  /** reenvio depois de a classificação mudar com a bateria já encerrada: abre com AVISO_CORRECAO */
+  corrigido?: boolean;
 };
 
 /**
@@ -380,7 +383,7 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
   const t = transporte(cfg, dep.simulador);
   const remetente = { name: cfg.remetenteNome || ctx.empresa.nome, address: enderecoRemetente(cfg) };
   const enviados = op.automatico || op.somenteFaltantes ? [...(anterior?.enviados ?? [])] : [];
-  const aviso = op.atrasado ? AVISO_ATRASO : undefined;
+  const aviso = op.atrasado ? AVISO_ATRASO : op.corrigido ? AVISO_CORRECAO : undefined;
   const falhas: EnvioEmailsResultado['falhas'] = [];
   const pastaTeste = join(dep.dataDir, 'emails-simulador');
   const inicioEnvio = Date.now();

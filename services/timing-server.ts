@@ -1356,6 +1356,32 @@ async function emailsAoEncerrar(s: Session) {
     log(`e-mail do resultado de ${s.name} não foi enviado (tenta de novo): ${erro}`);
   }
 }
+/**
+ * O e-mail do resultado sai 3 min depois do encerramento e de cada ajuste na classificação. Ultras 13/10: o kart 114
+ * foi posto em P10 por engano, a bateria encerrou, o e-mail saiu 1 min depois e a correção para P28 veio 30 s
+ * depois do envio — os pilotos receberam o 114 em 10º. Se já tinha saído, vai de novo para todos com o aviso de
+ * resultado corrigido (só até 6 h do encerramento; depois disso, reenvio manual pelo menu).
+ */
+const ESPERA_EMAIL_MS = Number(process.env.TIMING_ESPERA_EMAIL_MS || 3 * 60_000); // o simulador de teste encurta
+const emailsAgendados = new Map<string, NodeJS.Timeout>();
+function agendarEmails(s: Session) {
+  clearTimeout(emailsAgendados.get(s.id));
+  emailsAgendados.set(s.id, setTimeout(() => {
+    emailsAgendados.delete(s.id);
+    if (s.state !== 'encerrada' || !['classificacao', 'corrida'].includes(s.type)) return;
+    if (envioATodosAtivo.has(s.id)) return agendarEmails(s); // ainda mandando a versão anterior: corrige quando terminar
+    if (!(s.emailsResultado?.enviados.length)) return void emailsAoEncerrar(s);
+    if (!lerConfig(EMAIL_FILE).automatico || semEmailAosPilotos(s, nomeEventoDa(s))) return;
+    log(`e-mail do resultado de ${s.name}: a classificação mudou depois do envio, reenviando a todos com o aviso de correção`);
+    void enviarResultadoEmFila(s, { automatico: false, corrigido: true, nomeEvento: nomeEventoDa(s) })
+      .catch((e) => log(`e-mail corrigido de ${s.name}: ${(e as Error).message}`));
+  }, ESPERA_EMAIL_MS));
+}
+function assinaturaResultado(s: Session) {
+  // o que o piloto lê no e-mail; marcar a posição que ele já tinha (manualPosition igual) não reenvia
+  return JSON.stringify(computeStandings(s, trackLengthFor(s)).map((r) => [r.position, r.kart, r.name, r.laps, r.bestLapMs, r.totalMs, r.gapMs, r.gapLaps, r.penaltyMs, r.advertencias, r.desclassificado]));
+}
+
 // nova tentativa a cada 5 min só para quem falhou (servidor de e-mail fora, internet caiu), até 6 h depois do encerramento.
 // Bateria encerrada há mais de 3 min sem registro de envio = o envio morreu no meio (servidor reiniciado logo depois do
 // encerramento: 10/10 09:50 e 11/10 17:25 ficaram sem resultado) → manda de novo.
@@ -1365,7 +1391,7 @@ setInterval(() => {
   for (const s of sessions.values()) {
     const e = s.emailsResultado;
     const fim = s.finishedAt ?? s.createdAt;
-    if (s.state !== 'encerrada' || fim <= limite) continue;
+    if (s.state !== 'encerrada' || fim <= limite || emailsAgendados.has(s.id)) continue;
     if (e ? (e.status === 'parcial' || e.status === 'falhou') && e.tentativas < 12 : fim < agora - 3 * 60_000) void emailsAoEncerrar(s);
   }
 }, 5 * 60_000);
@@ -2449,6 +2475,11 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     if (!s) return send(res, 404, { error: 'Bateria nao encontrada.' });
     const action = m[2];
     const now = Date.now();
+    // ajuste na classificação de bateria encerrada (posição manual, penalidade, passagem): o e-mail espera ou sai corrigido
+    if (method !== 'GET' && action !== 'emails' && s.state === 'encerrada' && (s.finishedAt ?? 0) > now - 6 * 3_600_000) {
+      const antes = assinaturaResultado(s);
+      res.once('finish', () => { if (s.state === 'encerrada' && assinaturaResultado(s) !== antes) agendarEmails(s); });
+    }
     try {
       if (!action && method === 'GET') return send(res, 200, sessionView(s));
       if (action === 'emails' && !m[3] && method === 'GET') return send(res, 200, s.emailsResultado ?? null);
@@ -2644,7 +2675,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       } else if (action === 'close' && method === 'POST') {
         closeSession(s, now);
         void enviarUsoKarts(s);
-        void emailsAoEncerrar(s);
+        agendarEmails(s); // 3 min para o cronometrista acertar posição/penalidade antes do e-mail sair
       } else if (action === 'cancel' && method === 'POST') {
         cancelSession(s, now);
       } else if (action === 'flag' && m[3] && method === 'POST') {
