@@ -1,0 +1,24 @@
+{
+  "artifacts": [
+    {
+      "type": "apk",
+      "id": "ac325056-965c-4036-a952-9f3fd2a8043b",
+      "status": "FINISHED",
+      "versionCode": "8",
+      "url": "https://expo.dev/artifacts/eas/kRHyepMApLg7CR73It7mD6zZ7wPfDMl9y7Uq0pWL2As.apk",
+      "sha256": "7936bd686b2e912d29317a3df9e7bdb96cff0bc1d46a0aae92f3827934883b39",
+      "bytes": 112260013
+    },
+    {
+      "type": "aab",
+      "id": "37145a8d-2073-4917-b012-cbbc219d11c9",
+      "status": "FINISHED",
+      "versionCode": "8",
+      "url": "https://expo.dev/artifacts/eas/k8Vth5K8ud0eVY7_9EkXd-fFStwtICu6kSEYRmm2xUU.aab",
+      "sha256": "756366342af19b385abb057791570f0f0d089889bfa1ff22bea57cf32403e527",
+      "bytes": 76871925
+    }
+  ],
+  "signingCertificateSha256": "0b415bcb6e72e5e9a7ba71276e94a37e769ab5da9b91bc76e83357424f693ffc",
+  "api": "https://kartodromo-mobile-homolog.kartodromo.workers.dev"
+}

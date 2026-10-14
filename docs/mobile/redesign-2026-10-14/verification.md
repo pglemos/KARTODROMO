@@ -40,7 +40,7 @@ Buffer de crash Android consultado: vazio.
 
 ## Builds e distribuição
 
-Candidatos v5 e v7 cancelados para incluir as últimas correções. O pacote v6 falhou na preparação do arquivo, antes de produzir binário; o filtro foi corrigido e a cópia real do empacotador EAS passou por asserts de inclusão de fontes/config/assets e exclusão de node_modules, Android/iOS gerados, dist e outros produtos do repositório. Candidatos finais v8 na fila da Expo, com pacote de 2,4 MB em vez dos 372 MB do repositório inteiro. Links, assinaturas e captura do APK de homologação serão registrados ao concluir.
+Candidatos v5 e v7 cancelados para incluir as últimas correções. O pacote v6 falhou na preparação do arquivo, antes de produzir binário; o filtro foi corrigido e a cópia real do empacotador EAS passou por asserts de inclusão de fontes/config/assets e exclusão de node_modules, Android/iOS gerados, dist e outros produtos do repositório. Candidatos finais v8 concluídos na Expo, com pacote de 2,4 MB em vez dos 372 MB do repositório inteiro. Links e hashes em `android-v8.json`. APK assinado verificado, `zipalign -c -P 16 4` exit 0, pacote br.com.kartodromobetim.app, versão 1.0.0 (8), target SDK36. Certificado igual ao APK v4; AAB validado por JarFile/jarsigner. Capturas 47–49 da versão EAS instalada no emulador, com marca original, temas claro/escuro e GPS corretamente bloqueado. Os servidores locais de QA e Metro foram encerrados.
 
 ## Limites da comprovação
 
@@ -56,3 +56,9 @@ Candidatos v5 e v7 cancelados para incluir as últimas correções. O pacote v6 
 ## Revisão de código
 
 CodeRabbit CLI 0.7.6, autenticado, revisão de alterações preparada incluindo os novos arquivos: **29 arquivos revisados, 0 problemas reportados**. Resultado estruturado em `code-review.json`. Revisão adicional do diff e rastreabilidade para a matriz acima, pelo fluxo local de QA do AIOX. A revisão automatizada não substitui os limites físicos e operacionais indicados.
+
+## CI do PR
+
+As primeiras execuções dos workflows Mobile app e Cloudflare Worker falharam na instalação/conferência do lockfile da raiz: peer `esbuild@0.28.2` do Vitest ausente. Regeneração em diretório sem node_modules, usando Node 22.23.3 / npm 10.9.9, conforme a CI. Manifesto e versões já existentes comparados e preservados. A nova execução será registrada após a correção.
+
+Lockfile corrigido: `npm ci --ignore-scripts` com Node 22.23.3/npm 10.9.9 em diretório limpo instalou 846 pacotes (exit 0). CodeRabbit exclui lockfiles e retornou exatamente `No files to review` nessa revisão adicional; a alteração não foi apresentada como revisão de código automatizada aprovada.
