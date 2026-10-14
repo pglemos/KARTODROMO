@@ -57,3 +57,16 @@ Atualização às 19h de 13/10: e-mail autenticado da Apple informou problema no
 ## Condições para liberar distribuição
 
 Ver [QA e pendências](qa-2026-10-13.md). Persistem homologação das APIs, reserva/pagamento completo, revisão das dependências móveis, política LGPD confirmada, linha GPS medida e QA em dispositivos físicos. Preparar cadastro e artefatos não comprova essas condições.
+
+
+## Atualização de 14/10/2026 — redesenho do app
+
+- Direção “Interface nativa essencial” aprovada e aplicada ao cliente Expo; marca/foto originais, temas claro/escuro, cinco destinos com ícones, listas e formulários reformulados.
+- Candidatos finais **Android 1.0.0 (8)** concluídos na Expo:
+  - APK: https://expo.dev/artifacts/eas/kRHyepMApLg7CR73It7mD6zZ7wPfDMl9y7Uq0pWL2As.apk
+  - AAB: https://expo.dev/artifacts/eas/k8Vth5K8ud0eVY7_9EkXd-fFStwtICu6kSEYRmm2xUU.aab
+- APK instalado e executado no emulador API36, com certificado igual ao v4. Assinatura, zipalign16KB e alinhamento ELF de 48 libs de 64 bits por artefato conferidos; AAB validado por bundletool.
+- 46 testes móveis, tipos, lint, exportações iOS/Android e CodeRabbit (29 arquivos, 0 problemas). Provas completas e hashes em `redesign-2026-10-14/verification.md` e `android-v8.json`.
+- Código publicado na branch `feature/kartodromo-mobile-app`, PR #15 em rascunho: https://github.com/pglemos/KARTODROMO/pull/15.
+- Os artefatos usam homologação isolada; agenda permanece fechada. Não houve publicação pública nem substituição do rascunho v4 no Google Play.
+- iPhone, aparelho físico, GPS medido, e-mail transacional, pagamento real e conexão com a rede do kartódromo continuam com os limites descritos anteriormente.

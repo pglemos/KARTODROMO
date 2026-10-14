@@ -20,5 +20,14 @@
     }
   ],
   "signingCertificateSha256": "0b415bcb6e72e5e9a7ba71276e94a37e769ab5da9b91bc76e83357424f693ffc",
-  "api": "https://kartodromo-mobile-homolog.kartodromo.workers.dev"
+  "api": "https://kartodromo-mobile-homolog.kartodromo.workers.dev",
+  "apkSignatureVerified": true,
+  "sameSigningCertificateAsV4": true,
+  "zipAlignment16Kb": true,
+  "elf64BitLibrariesPerArtifact": 48,
+  "elfPageAlignment16Kb": true,
+  "bundletool": {
+    "version": "1.18.3",
+    "validateExitCode": 0
+  }
 }

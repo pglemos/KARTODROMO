@@ -59,6 +59,12 @@ CodeRabbit CLI 0.7.6, autenticado, revisão de alterações preparada incluindo 
 
 ## CI do PR
 
-As primeiras execuções dos workflows Mobile app e Cloudflare Worker falharam na instalação/conferência do lockfile da raiz: peer `esbuild@0.28.2` do Vitest ausente. Regeneração em diretório sem node_modules, usando Node 22.23.3 / npm 10.9.9, conforme a CI. Manifesto e versões já existentes comparados e preservados. A nova execução será registrada após a correção.
+As primeiras execuções dos workflows Mobile app e Cloudflare Worker falharam na instalação/conferência do lockfile da raiz: peer `esbuild@0.28.2` do Vitest ausente. Regeneração em diretório sem node_modules, usando Node 22.23.3 / npm 10.9.9, conforme a CI. Manifesto e versões já existentes comparados e preservados. Execuções da CI disponíveis no PR #15.
 
 Lockfile corrigido: `npm ci --ignore-scripts` com Node 22.23.3/npm 10.9.9 em diretório limpo instalou 846 pacotes (exit 0). CodeRabbit exclui lockfiles e retornou exatamente `No files to review` nessa revisão adicional; a alteração não foi apresentada como revisão de código automatizada aprovada.
+
+AAB: `bundletool 1.18.3 validate` exit 0. APK e AAB: 48 bibliotecas de 64 bits por arquivo, todos os segmentos PT_LOAD com alinhamento de pelo menos 16 KB. Configuração original do emulador restaurada ao terminar, mantendo o APK EAS v8 instalado.
+
+A CI Mobile app passou no commit `bd0700d`: testes raiz/API, tipos raiz, 46 testes móveis, tipos/lint móveis, Expo Doctor e exportação dos dois sistemas. O check separado do site passou pela instalação e pelos tipos, mas encontrou `_ordem` não usado na remoção do campo interno de histórico de karts. Correção limitada ao descarte explícito do campo, preservando o resultado; testes específicos executados antes e depois.
+
+Correção de lint: lint raiz completo exit 0; 18 testes de ranking/equalização passaram. O descarte explícito de `_ordem` mantém o histórico sem esse campo interno.
