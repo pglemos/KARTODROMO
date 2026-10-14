@@ -1,10 +1,11 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { FlatList, Text, View } from 'react-native';
 
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { reservationsApi } from '../../features/reservations/api';
 import type { AgendaResponse } from '../../features/reservations/schemas';
-import { ActionButton, formatBrl, formatDateTime, InlineError, LoadingMessage, Page, PageHeader, Panel, palette, styles } from '../../features/reservations/components';
+import { ActionButton, formatBrl, formatDateTime, InlineError, LoadingMessage, PageHeader, Panel, useUi } from '../../features/reservations/components';
 import { useSession } from '../../session/provider';
 
 function messageOf(error: unknown) {
@@ -12,6 +13,7 @@ function messageOf(error: unknown) {
 }
 
 export default function AgendaScreen() {
+  const { palette, styles } = useUi();
   const { session } = useSession();
   const [agenda, setAgenda] = useState<AgendaResponse | null>(null);
   const [error, setError] = useState('');
@@ -42,48 +44,27 @@ export default function AgendaScreen() {
   function reserve(bateriaId: number) {
     router.push(session
       ? { pathname: '/(tabs)/reservas', params: { bateriaId: String(bateriaId) } }
-      : '/(auth)/login');
+      : { pathname: '/(auth)/login', params: { bateriaId: String(bateriaId) } });
   }
 
-  return (
-    <Page>
-      <PageHeader
-        eyebrow="Kartódromo de Betim"
-        title="Agenda da pista"
-        description="Escolha o horário da sua próxima bateria. A disponibilidade e o preço vêm do servidor do kartódromo."
-      />
-      {loading && !agenda ? <LoadingMessage label="Buscando horários disponíveis…" /> : null}
-      {error ? (
-        <View style={{ gap: 12 }}>
-          <InlineError message={error} />
-          <ActionButton label="Tentar novamente" onPress={retry} secondary />
+  return <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
+    <FlatList data={agenda?.horarios ?? []} keyExtractor={(slot) => String(slot.id)} contentContainerStyle={styles.content} refreshing={loading} onRefresh={retry}
+      ListHeaderComponent={<>
+        <PageHeader title="Agenda da pista" description="Escolha o horário da sua próxima bateria." />
+        {loading && !agenda ? <LoadingMessage label="Buscando horários disponíveis…" /> : null}
+        {error ? <View style={{ gap: 12, marginBottom: 16 }}><InlineError message={error} /><ActionButton label="Tentar novamente" onPress={retry} secondary /></View> : null}
+        {agenda && !loading && !error && !agenda.horarios.length ? <Panel><Text style={styles.muted}>Não há baterias abertas para reserva neste momento.</Text></Panel> : null}
+      </>}
+      renderItem={({ item: slot }) => <View style={{ paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+        <Text style={[styles.rowTitle, { color: palette.accent, fontVariant: ['tabular-nums'] }]}>{formatDateTime(slot.inicio)}</Text>
+        <Text style={[styles.rowTitle, { marginTop: 6 }]}>{slot.nome}</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8, marginTop: 8, marginBottom: 16 }}>
+          <Text style={styles.muted}>{slot.livres} {slot.livres === 1 ? 'vaga disponível' : 'vagas disponíveis'}</Text>
+          <Text style={[styles.muted, { color: palette.text }]}>{formatBrl(agenda!.precoCentavos)} / piloto</Text>
         </View>
-      ) : null}
-      {agenda && !agenda.horarios.length ? (
-        <Panel><Text style={styles.muted}>Não há baterias abertas para reserva neste momento.</Text></Panel>
-      ) : null}
-      {agenda?.horarios.map((slot) => (
-        <Panel key={slot.id} style={{ marginBottom: 12 }}>
-          <Text style={{ color: palette.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1.1 }}>
-            {formatDateTime(slot.inicio)}
-          </Text>
-          <Text style={{ color: palette.text, fontSize: 19, fontWeight: '800', marginTop: 7 }}>{slot.nome}</Text>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 13 }}>
-            <Text style={styles.muted}>{slot.livres} {slot.livres === 1 ? 'vaga disponível' : 'vagas disponíveis'}</Text>
-            <Text style={{ color: palette.text, fontSize: 13, fontWeight: '700' }}>{formatBrl(agenda.precoCentavos)} / piloto</Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityHint="Entre na sua conta para informar os participantes e pagar a reserva."
-            onPress={() => reserve(slot.id)}
-            disabled={!agenda.pagamentoOnline || slot.livres < 1}
-            style={({ pressed }) => [styles.action, { marginTop: 17 }, (!agenda.pagamentoOnline || slot.livres < 1) && styles.disabledAction, pressed && styles.pressedAction]}
-          >
-            <Text style={styles.actionText}>{agenda.pagamentoOnline ? 'Reservar bateria' : 'Reserva online indisponível'}</Text>
-          </Pressable>
-        </Panel>
-      ))}
-      <Text style={[styles.muted, { marginTop: 4 }]}>Os horários são exibidos no horário de Brasília.</Text>
-    </Page>
-  );
+        <ActionButton label={!agenda!.pagamentoOnline ? 'Reserva online indisponível' : slot.livres < 1 ? 'Esgotado' : 'Reservar bateria'}
+          onPress={() => reserve(slot.id)} disabled={!agenda!.pagamentoOnline || slot.livres < 1} />
+      </View>}
+      ListFooterComponent={<Text style={[styles.muted, { marginTop: 20 }]}>Horários de Brasília.</Text>} />
+  </SafeAreaView>;
 }

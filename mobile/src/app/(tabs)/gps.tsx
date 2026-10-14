@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { FlatList, Pressable, Text, View } from 'react-native';
 import type { LocationObject } from 'expo-location';
 
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Icon } from '../../components/brand';
 import { findLineCrossingAt, type GpsPoint } from '../../features/gps/lap-detector';
 import { requestForegroundLocationPermission, watchForegroundLocation } from '../../features/gps/location';
 import { trackConfig } from '../../features/gps/track-config';
@@ -16,7 +18,7 @@ import {
   type GpsLap,
   type GpsSessionSummary,
 } from '../../features/gps/repository';
-import { ActionButton, InlineError, Page, PageHeader, Panel, palette, styles } from '../../features/reservations/components';
+import { ActionButton, InlineError, PageHeader, Panel, Notice, useUi } from '../../features/reservations/components';
 
 function messageOf(error: unknown) {
   return error instanceof Error ? error.message : 'Não foi possível salvar este treino GPS.';
@@ -30,6 +32,7 @@ function formatLap(milliseconds: number | null) {
 }
 
 export default function GpsScreen() {
+  const { palette, styles } = useUi();
   const [sessions, setSessions] = useState<GpsSessionSummary[]>([]);
   const [consented, setConsented] = useState(false);
   const [permissionGranted, setPermissionGranted] = useState(false);
@@ -195,24 +198,27 @@ export default function GpsScreen() {
   }
 
   return (
-    <Page>
-      <PageHeader eyebrow="Treino pessoal" title="Cronometragem GPS" description="Os pontos e voltas ficam somente neste aparelho. Não são resultados oficiais." />
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
+      <FlatList data={sessions} keyExtractor={(item) => item.id} contentContainerStyle={styles.content} ListHeaderComponent={<>
+      <PageHeader title="Cronometragem GPS" description="Os pontos e voltas ficam somente neste aparelho. Não são resultados oficiais." />
       <Panel style={{ gap: 10 }}>
-        <Text style={{ color: palette.accent, fontSize: 12, fontWeight: '800' }}>TREINO PESSOAL</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><Icon name="timer" color={palette.accent} /><Text style={styles.rowTitle}>Treino pessoal</Text></View>
         <Text style={styles.muted}>A localização só será coletada durante um treino iniciado por você, com o app aberto. Você pode apagar cada sessão quando quiser.</Text>
-        {!trackConfig ? <InlineError message="Cronometragem desabilitada: falta a medição aprovada da linha de largada/chegada." /> : null}
+        {!trackConfig ? <Notice message="Cronometragem desabilitada: falta a medição aprovada da linha de largada/chegada." /> : null}
         <Pressable
           accessibilityRole="checkbox"
           accessibilityLabel="Concordo com a coleta de localização durante este treino GPS pessoal"
-          accessibilityState={{ checked: consented, disabled: !trackConfig }}
-          disabled={!trackConfig}
+          accessibilityState={{ checked: consented, disabled: !trackConfig || tracking }}
+          disabled={!trackConfig || tracking}
           onPress={() => setConsented((value) => !value)}
-          style={{ paddingVertical: 8 }}
+          style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 }}
         >
-          <Text style={styles.muted}>{consented ? '✓ ' : '□ '}Concordo com a coleta de localização somente durante este treino.</Text>
+          <View style={{ width: 24, height: 24, borderRadius: 5, borderWidth: 1, borderColor: palette.muted, backgroundColor: consented ? palette.accent : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+            {consented ? <Icon name="check" color={palette.onAccent} size={16} /> : null}
+          </View><Text style={[styles.muted, { flex: 1 }]}>Concordo com a coleta de localização somente durante este treino.</Text>
         </Pressable>
         <ActionButton label={permissionGranted ? 'Localização autorizada' : 'Autorizar localização'} onPress={() => void authorizeLocation()} disabled={!trackConfig || !consented || permissionGranted} secondary />
-        <ActionButton label={tracking ? 'Encerrar treino' : paused ? 'Retomar treino' : 'Iniciar treino'} onPress={() => void (tracking ? stopTraining() : startTraining())} disabled={!trackConfig || !permissionGranted || (!tracking && !paused)} />
+        <ActionButton label={tracking ? 'Encerrar treino' : paused ? 'Retomar treino' : 'Iniciar treino'} onPress={() => void (tracking ? stopTraining() : startTraining())} disabled={!tracking && (!trackConfig || !permissionGranted || !consented)} />
         {trackConfig && accuracy !== null ? <Text style={styles.muted}>Precisão atual: ±{accuracy.toFixed(0)} m · {accuracy > trackConfig.maxAccuracyMeters ? 'insuficiente para registrar volta' : 'adequada'}</Text> : null}
         {trackConfig ? <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
           <Text style={styles.muted}>{tracking ? 'Treino em andamento' : paused ? 'Treino pausado' : 'Aguardando início'}</Text>
@@ -222,17 +228,18 @@ export default function GpsScreen() {
       {error ? <View style={{ marginTop: 14 }}><InlineError message={error} /></View> : null}
 
       <View style={{ marginTop: 24 }}>
-        <PageHeader eyebrow="Neste aparelho" title="Treinos salvos" description="Nenhuma sessão é enviada para a nuvem ou para a cronometragem oficial." />
+        <Text accessibilityRole="header" style={styles.sectionTitle}>Treinos salvos</Text><Text style={[styles.muted, { marginTop: 8, marginBottom: 16 }]}>Disponíveis somente neste aparelho.</Text>
       </View>
-      {!sessions.length ? <Panel><Text style={styles.muted}>Nenhum treino salvo neste aparelho.</Text></Panel> : sessions.map((session) => (
+      </>} ListEmptyComponent={<Panel><Text style={styles.muted}>Nenhum treino salvo neste aparelho.</Text></Panel>}
+      renderItem={({ item: session }) => (
         <Panel key={session.id} style={{ marginBottom: 12, gap: 8 }}>
-          <Text style={{ color: palette.accent, fontSize: 11, fontWeight: '800' }}>TREINO PESSOAL</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><Icon name="timer" color={palette.accent} /><Text style={styles.rowTitle}>Treino pessoal</Text></View>
           <Text style={{ color: palette.text, fontSize: 15, fontWeight: '800' }}>{new Date(session.startedAt).toLocaleString('pt-BR')}</Text>
           <Text style={styles.muted}>{session.lapCount} voltas · melhor {formatLap(session.bestLapMs)}</Text>
           {session.endedAt === null ? <Text style={styles.muted}>Sessão pausada</Text> : null}
           <ActionButton label="Excluir treino" onPress={() => void removeSession(session.id)} secondary />
         </Panel>
-      ))}
-    </Page>
+      )} />
+    </SafeAreaView>
   );
 }

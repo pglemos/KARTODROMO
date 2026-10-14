@@ -170,11 +170,11 @@ describe('resultados oficiais e histórico do cliente', () => {
     await waitFor(() => expect(finishSecondRequest).toBeDefined());
     expect(view.queryByText('Histórico da primeira conta')).toBeNull();
 
-    finishSecondRequest?.(apiResponse({
+    await act(async () => finishSecondRequest?.(apiResponse({
       vinculo: 'pendente',
       mensagem: 'Para ver seu histórico, procure a recepção.',
       results: [],
-    }));
+    })));
     expect(await view.findByText('Para ver seu histórico, procure a recepção.')).toBeTruthy();
   });
 });

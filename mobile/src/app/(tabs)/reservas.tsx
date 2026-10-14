@@ -1,25 +1,16 @@
 import { Link, router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Pressable, TouchableOpacity, Text, TextInput, View } from 'react-native';
 
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Icon } from '../../components/brand';
 import type { SessionTokens } from '../../api/contracts';
 
 import { reservationsApi } from '../../features/reservations/api';
 import type { AgendaResponse, CreateReservationInput, ReservationOrder } from '../../features/reservations/schemas';
-import { ActionButton, Field, formatBrl, formatDateTime, InlineError, LoadingMessage, Page, PageHeader, Panel, palette, styles } from '../../features/reservations/components';
+import { ActionButton, Field, formatBrl, formatDateTime, InlineError, LoadingMessage, Page, PageHeader, Panel, Notice, useUi } from '../../features/reservations/components';
 import { useSession } from '../../session/provider';
 import { SessionBoundary } from '../../session/boundary';
-
-const inputStyle = {
-  minHeight: 48,
-  borderRadius: 12,
-  borderWidth: 1,
-  borderColor: palette.border,
-  backgroundColor: '#0a1511',
-  color: palette.text,
-  fontSize: 15,
-  paddingHorizontal: 13,
-};
 
 function messageOf(error: unknown) {
   return error instanceof Error ? error.message : 'Não foi possível concluir. Tente novamente.';
@@ -38,13 +29,15 @@ function idempotencyKey() {
   return `mobile-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function LoginPrompt({ booking }: { booking: boolean }) {
+function LoginPrompt({ batteryId }: { batteryId: number | null }) {
+  const booking = batteryId !== null;
+  const { styles } = useUi();
   return (
     <Page>
-      <PageHeader eyebrow="Sua conta" title={booking ? 'Entre para reservar' : 'Minhas reservas'} />
+      <PageHeader title={booking ? 'Entre para reservar' : 'Minhas reservas'} />
       <Panel style={{ gap: 14 }}>
         <Text style={styles.muted}>{booking ? 'Entre na sua conta para confirmar participantes, aplicar cupom e pagar com segurança.' : 'Entre para ver suas reservas e acompanhar o pagamento.'}</Text>
-        <Link href="/(auth)/login" asChild>
+        <Link href={batteryId ? { pathname: '/(auth)/login', params: { bateriaId: String(batteryId) } } : '/(auth)/login'} asChild>
           <Pressable accessibilityRole="button" style={styles.action}><Text style={styles.actionText}>Entrar na conta</Text></Pressable>
         </Link>
       </Panel>
@@ -68,7 +61,7 @@ function LogoutButton() {
     finally { setBusy(false); }
   }
 
-  return <View style={{ marginBottom: 18 }}><ActionButton label={busy ? 'Encerrando sessão…' : 'Sair da conta'} onPress={() => void submit()} disabled={busy} secondary /></View>;
+  return <View style={{ alignSelf: 'flex-end', marginBottom: 18 }}><ActionButton label={busy ? 'Encerrando sessão…' : 'Sair da conta'} onPress={() => void submit()} disabled={busy} secondary /></View>;
 }
 
 function ReservationList({ orders, loading, error, retry }: {
@@ -77,38 +70,37 @@ function ReservationList({ orders, loading, error, retry }: {
   error: string;
   retry: () => void;
 }) {
-  return (
-    <Page>
-      <PageHeader eyebrow="Sua conta" title="Minhas reservas" description="Acompanhe somente os pedidos vinculados à sua conta." />
-      <LogoutButton />
-      {loading && !orders ? <LoadingMessage label="Buscando suas reservas…" /> : null}
-      {error ? <View style={{ gap: 12 }}><InlineError message={error} /><ActionButton label="Tentar novamente" onPress={retry} secondary /></View> : null}
-      {orders?.length === 0 ? (
-        <Panel style={{ gap: 14 }}>
+  const { palette, styles } = useUi();
+  return <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
+    <FlatList data={orders ?? []} keyExtractor={(order) => order.id} contentContainerStyle={styles.content} refreshing={loading} onRefresh={retry}
+      ListHeaderComponent={<>
+        <PageHeader title="Minhas reservas" description="Seus próximos encontros com a pista." />
+        <LogoutButton />
+        {loading && !orders ? <LoadingMessage label="Buscando suas reservas…" /> : null}
+        {error ? <View style={{ gap: 12 }}><InlineError message={error} /><ActionButton label="Tentar novamente" onPress={retry} secondary /></View> : null}
+        {!loading && !error && orders?.length === 0 ? <Panel style={{ gap: 14 }}>
           <Text style={styles.muted}>Você ainda não tem reservas.</Text>
-          <Link href="/(tabs)/agenda" asChild>
-            <Pressable accessibilityRole="button" style={styles.action}><Text style={styles.actionText}>Ver agenda</Text></Pressable>
-          </Link>
-        </Panel>
-      ) : null}
-      {orders?.map((order) => (
-        <Link key={order.id} href={{ pathname: '/reservations/[id]', params: { id: order.id } }} asChild>
-          <Pressable accessibilityRole="link" style={[styles.panel, { marginBottom: 12 }]}>
-            <Text style={{ color: palette.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>{order.codigo}</Text>
-            <Text style={{ color: palette.text, fontSize: 17, fontWeight: '800', marginTop: 7 }}>{order.descricao ?? 'Reserva em processamento'}</Text>
-            <Text style={[styles.muted, { marginTop: 8 }]}>{formatDateTime(order.inicio)}</Text>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
-              <Text style={{ color: palette.text, fontSize: 13, fontWeight: '700' }}>{order.valorCentavos === null ? 'Valor em confirmação' : formatBrl(order.valorCentavos)}</Text>
-              <Text style={{ color: palette.accent, fontSize: 12, fontWeight: '800' }}>{statusLabel(order.status)}</Text>
-            </View>
-          </Pressable>
-        </Link>
-      ))}
-    </Page>
-  );
+          <Link href="/(tabs)/agenda" asChild><Pressable accessibilityRole="button" style={styles.action}><Text style={styles.actionText}>Ver agenda</Text></Pressable></Link>
+        </Panel> : null}
+      </>}
+      renderItem={({ item: order }) => <Link href={{ pathname: '/reservations/[id]', params: { id: order.id } }} asChild>
+        <TouchableOpacity activeOpacity={0.65} accessibilityRole="link" style={styles.row}>
+          <Icon name="ticket" color={palette.accent} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rowTitle}>{order.descricao ?? 'Reserva em processamento'}</Text>
+            <Text style={styles.rowDetail}>{formatDateTime(order.inicio)}</Text>
+            <Text style={styles.rowDetail}>{order.codigo}</Text>
+            <Text style={[styles.rowDetail, { color: palette.text }]}>{order.valorCentavos === null ? 'Valor em confirmação' : formatBrl(order.valorCentavos)}</Text>
+            <Text style={[styles.rowDetail, { color: palette.accent, fontWeight: '600' }]}>{statusLabel(order.status)}</Text>
+          </View>
+          <Icon name="chevron" color={palette.muted} size={18} />
+        </TouchableOpacity>
+      </Link>} />
+  </SafeAreaView>;
 }
 
 function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaResponse; batteryId: number; accessToken: string }) {
+  const { palette, styles } = useUi();
   const slot = agenda.horarios.find((item) => item.id === batteryId);
   const [quantity, setQuantity] = useState('1');
   const [pilots, setPilots] = useState('');
@@ -200,18 +192,19 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
   return (
     <View style={{ gap: 14 }}>
       <Panel>
-        <Text style={{ color: palette.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>{formatDateTime(slot.inicio)}</Text>
+        <Text style={{ color: palette.accent, fontSize: 14, fontWeight: '800' }}>{formatDateTime(slot.inicio)}</Text>
         <Text style={{ color: palette.text, fontSize: 19, fontWeight: '800', marginTop: 7 }}>{slot.nome}</Text>
-        <Text style={[styles.muted, { marginTop: 8 }]}>{slot.livres} vagas no servidor · {formatBrl(agenda.precoCentavos)} por piloto</Text>
+        <Text style={[styles.muted, { marginTop: 8 }]}>{slot.livres} vagas disponíveis · {formatBrl(agenda.precoCentavos)} por piloto</Text>
       </Panel>
 
+      <Text accessibilityRole="header" style={[styles.sectionTitle, { marginTop: 12 }]}>Participantes</Text>
       <Field label="Quantidade de vagas">
         <TextInput
           accessibilityLabel="Quantidade de vagas"
           value={quantity}
           onChangeText={(value) => { setQuantity(value.replace(/\D/g, '')); setQuote(null); changed(); }}
           keyboardType="number-pad"
-          style={inputStyle}
+          style={styles.input}
         />
       </Field>
       <Field label="Pilotos (um nome por linha)" hint={<Text style={styles.muted}>Opcional. O nome da conta é usado como responsável pela reserva.</Text>}>
@@ -220,7 +213,7 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
           value={pilots}
           onChangeText={(value) => { setPilots(value); changed(); }}
           multiline
-          style={[inputStyle, { minHeight: 78, paddingTop: 12, textAlignVertical: 'top' }]}
+          style={[styles.input, { minHeight: 78, paddingTop: 12, textAlignVertical: 'top' }]}
         />
       </Field>
       <Field label="Data de nascimento do responsável">
@@ -229,11 +222,17 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
           placeholder="DD/MM/AAAA"
           placeholderTextColor={palette.muted}
           value={birthDate}
-          onChangeText={(value) => { setBirthDate(value); changed(); }}
+          onChangeText={(value) => {
+            const digits = value.replace(/\D/g, '').slice(0, 8);
+            setBirthDate([digits.slice(0, 2), digits.slice(2, 4), digits.slice(4)].filter(Boolean).join('/'));
+            changed();
+          }}
           keyboardType="number-pad"
-          style={inputStyle}
+          maxLength={10}
+          style={styles.input}
         />
       </Field>
+      <Text accessibilityRole="header" style={[styles.sectionTitle, { marginTop: 20 }]}>Pagamento</Text>
       <Field label="Cupom de desconto">
         <TextInput
           accessibilityLabel="Cupom de desconto"
@@ -241,11 +240,11 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
           autoCorrect={false}
           value={coupon}
           onChangeText={(value) => { setCoupon(value); setQuote(null); setCouponError(''); changed(); }}
-          style={inputStyle}
+          style={styles.input}
         />
         <View style={{ marginTop: 9 }}><ActionButton label={couponBusy ? 'Validando cupom…' : 'Validar cupom'} onPress={() => void validateCoupon()} disabled={couponBusy} secondary /></View>
         {couponError ? <View style={{ marginTop: 9 }}><InlineError message={couponError} /></View> : null}
-        {quote ? <Text accessibilityLiveRegion="polite" style={{ color: palette.accent, fontSize: 15, fontWeight: '800', marginTop: 10 }}>Total com desconto do servidor: {formatBrl(quote.totalCentavos)}</Text> : null}
+        {quote ? <Text accessibilityLiveRegion="polite" style={{ color: palette.accent, fontSize: 15, fontWeight: '800', marginTop: 10 }}>Total com desconto: {formatBrl(quote.totalCentavos)}</Text> : null}
       </Field>
 
       <Field label="Forma de pagamento">
@@ -258,7 +257,7 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
               onPress={() => { setPaymentMethod(method); changed(); }}
               style={[styles.panel, { flex: 1, padding: 13, borderColor: paymentMethod === method ? palette.accent : palette.border }]}
             >
-              <Text style={{ color: palette.text, fontSize: 13, fontWeight: '700', textAlign: 'center' }}>{method === 'pix' ? 'Pix' : 'Cartão'}</Text>
+              <Text style={{ color: palette.text, fontSize: 15, fontWeight: '700', textAlign: 'center' }}>{method === 'pix' ? 'Pix' : 'Cartão'}</Text>
             </Pressable>
           ))}
         </View>
@@ -269,17 +268,17 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
         accessibilityLabel="Aceito a política de cancelamento"
         accessibilityState={{ checked: policyAccepted }}
         onPress={() => { setPolicyAccepted(!policyAccepted); changed(); }}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 }}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48, paddingVertical: 12 }}
       >
         <View style={{ width: 23, height: 23, borderRadius: 6, borderWidth: 1, borderColor: policyAccepted ? palette.accent : palette.border, alignItems: 'center', justifyContent: 'center', backgroundColor: policyAccepted ? palette.accent : 'transparent' }}>
-          {policyAccepted ? <Text style={{ color: palette.background, fontWeight: '900' }}>✓</Text> : null}
+          {policyAccepted ? <Icon name="check" color={palette.onAccent} size={16} /> : null}
         </View>
         <Text style={[styles.muted, { flex: 1, color: palette.text }]}>Aceito a política de cancelamento da reserva.</Text>
       </Pressable>
 
-      <Text style={styles.muted}>O cupom será validado novamente ao reservar. O pedido só fica confirmado após a confirmação oficial do pagamento e das vagas.</Text>
+      <Text style={styles.muted}>A reserva será confirmada após o pagamento e a confirmação das vagas.</Text>
       {error ? <InlineError message={error} /> : null}
-      {!agenda.pagamentoOnline ? <InlineError message="O pagamento online está indisponível. Fale com a recepção para reservar." /> : null}
+      {!agenda.pagamentoOnline ? <Notice message="O pagamento online está indisponível. Fale com a recepção para reservar." /> : null}
       <ActionButton label={busy ? 'Enviando reserva…' : 'Enviar reserva'} onPress={() => void submit()} disabled={busy || !agenda.pagamentoOnline} />
     </View>
   );
@@ -332,7 +331,7 @@ function AuthenticatedReservations({ session, batteryId }: { session: SessionTok
   if (batteryId !== null) {
     return (
       <Page>
-        <PageHeader eyebrow="Nova reserva" title="Confirmar reserva" description="Informe os dados do responsável e revise o pedido antes de pagar." />
+        <PageHeader title="Confirmar reserva" description="Informe os dados do responsável e revise o pedido antes de pagar." />
         <LogoutButton />
         {loading && !agenda ? <LoadingMessage label="Carregando horário…" /> : null}
         {error ? <View style={{ gap: 12 }}><InlineError message={error} /><ActionButton label="Tentar novamente" onPress={retryAgenda} secondary /></View> : null}
@@ -347,9 +346,9 @@ function ReservationsContent() {
   const { session, isLoading } = useSession();
   const params = useLocalSearchParams<{ bateriaId?: string | string[] }>();
   const rawBatteryId = Array.isArray(params.bateriaId) ? params.bateriaId[0] : params.bateriaId;
-  const batteryId = rawBatteryId && /^\d+$/.test(rawBatteryId) ? Number(rawBatteryId) : null;
+  const batteryId = rawBatteryId && /^\d+$/.test(rawBatteryId) && Number.isSafeInteger(Number(rawBatteryId)) && Number(rawBatteryId) > 0 ? Number(rawBatteryId) : null;
   if (isLoading) return <Page><LoadingMessage label="Carregando sua conta…" /></Page>;
-  if (!session) return <LoginPrompt booking={batteryId !== null} />;
+  if (!session) return <LoginPrompt batteryId={batteryId} />;
   return <AuthenticatedReservations session={session} batteryId={batteryId} />;
 }
 

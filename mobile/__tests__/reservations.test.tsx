@@ -6,6 +6,7 @@ import { Alert, Text } from 'react-native';
 import AgendaScreen from '../src/app/(tabs)/agenda';
 import ReservationsScreen from '../src/app/(tabs)/reservas';
 import ReservationDetailScreen from '../src/app/reservations/[id]';
+import ActualLoginScreen from '../src/app/(auth)/login';
 import type { AgendaResponse, ReservationOrder } from '../src/features/reservations/schemas';
 import { useSession } from '../src/session/provider';
 
@@ -117,6 +118,18 @@ afterEach(() => {
 });
 
 describe('agenda e reservas do cliente', () => {
+  it.each(['101', 'https://outside.example', '-1', '1.5'])('retorna somente ao horário interno válido após login: %s', async (bateriaId) => {
+    const login = jest.fn().mockResolvedValue(undefined);
+    jest.mocked(useSession).mockReturnValue({ ...jest.mocked(useSession)(), login });
+    mockUseLocalSearchParams.mockReturnValue({ bateriaId });
+    const view = await render(<ActualLoginScreen />);
+    const user = userEvent.setup();
+    await user.type(view.getByLabelText('E-mail ou CPF'), 'piloto@example.test');
+    await user.type(view.getByLabelText('Senha'), 'test-only-password');
+    await user.press(view.getByRole('button', { name: 'Entrar' }));
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith(bateriaId === '101'
+      ? { pathname: '/(tabs)/reservas', params: { bateriaId: '101' } } : '/'));
+  });
   it('não navega para pedido atrasado depois de sair da conta', async () => {
     let finishCreate!: (response: Response) => void;
     const previous = fetchMock.getMockImplementation()!;
@@ -129,7 +142,8 @@ describe('agenda e reservas do cliente', () => {
     const view = await render(<ReservationsScreen />);
     const user = userEvent.setup();
     await view.findByText('BATERIA 09:15');
-    await user.type(view.getByLabelText('Data de nascimento do responsável'), '15/05/1990');
+    await user.type(view.getByLabelText('Data de nascimento do responsável'), '15051990');
+    expect(view.getByLabelText('Data de nascimento do responsável').props.value).toBe('15/05/1990');
     await user.press(view.getByLabelText('Aceito a política de cancelamento'));
     await user.press(view.getByRole('button', { name: 'Enviar reserva' }));
     await waitFor(() => expect(finishCreate).toBeDefined());
@@ -235,7 +249,7 @@ describe('agenda e reservas do cliente', () => {
     expect(requests('GET', '/api/mobile/v1/agenda').length).toBeGreaterThan(0);
     const user = userEvent.setup();
     await user.press(view.getByRole('button', { name: /reservar/i }));
-    expect(mockRouter.push).toHaveBeenCalledWith('/(auth)/login');
+    expect(mockRouter.push).toHaveBeenCalledWith({ pathname: '/(auth)/login', params: { bateriaId: '101' } });
     expect(requests('POST', '/api/mobile/v1/reservations')).toHaveLength(0);
   });
 

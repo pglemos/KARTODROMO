@@ -5,7 +5,7 @@ import * as Clipboard from 'expo-clipboard';
 
 import { reservationsApi } from '../../features/reservations/api';
 import type { ReservationOrder, ReservationStatus } from '../../features/reservations/schemas';
-import { ActionButton, formatBrl, formatDateTime, InlineError, LoadingMessage, Page, PageHeader, Panel, palette, styles } from '../../features/reservations/components';
+import { ActionButton, formatBrl, formatDateTime, InlineError, LoadingMessage, Page, PageHeader, Panel, useUi } from '../../features/reservations/components';
 import { useSession } from '../../session/provider';
 import { SessionBoundary } from '../../session/boundary';
 
@@ -27,6 +27,7 @@ function imageUri(value: string) {
 }
 
 function ReservationDetailContent() {
+  const { palette, styles } = useUi();
   const { session, isLoading: sessionLoading } = useSession();
   const params = useLocalSearchParams<{ id: string | string[] }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -77,11 +78,11 @@ function ReservationDetailContent() {
     }
   }
 
-  if (sessionLoading) return <Page><LoadingMessage label="Carregando sua reserva…" /></Page>;
+  if (sessionLoading) return <Page top={false}><LoadingMessage label="Carregando sua reserva…" /></Page>;
   if (!session) {
     return (
-      <Page>
-        <PageHeader eyebrow="Sua conta" title="Entre para continuar" />
+      <Page top={false}>
+        <PageHeader title="Entre para continuar" />
         <Panel style={{ gap: 14 }}>
           <Text style={styles.muted}>Entre para consultar os detalhes e o pagamento da sua reserva.</Text>
           <ActionButton label="Entrar na conta" onPress={() => router.push('/(auth)/login')} />
@@ -89,17 +90,18 @@ function ReservationDetailContent() {
       </Page>
     );
   }
-  if (loading && !order && !error) return <Page><LoadingMessage label="Carregando sua reserva…" /></Page>;
+  if (loading && !order && !error) return <Page top={false}><LoadingMessage label="Carregando sua reserva…" /></Page>;
   if (error && !order) {
-    return <Page><PageHeader eyebrow="Reserva" title="Não foi possível carregar" /><View style={{ gap: 12 }}><InlineError message={error} /><ActionButton label="Tentar novamente" onPress={refresh} secondary /></View></Page>;
+    return <Page top={false}><PageHeader title="Não foi possível carregar" /><View style={{ gap: 12 }}><InlineError message={error} /><ActionButton label="Tentar novamente" onPress={refresh} secondary /></View></Page>;
   }
-  if (!order) return <Page><LoadingMessage /></Page>;
+  if (!order) return <Page top={false}><LoadingMessage /></Page>;
 
   const attention = order.status === 'pago_sem_vaga';
   const pix = order.status === 'aguardando_pagamento' ? order.pix : null;
   return (
-    <Page>
-      <PageHeader eyebrow={`Pedido ${order.codigo}`} title={statusLabel(order.status)} description={order.descricao ?? 'Sua reserva está sendo preparada pelo servidor do kartódromo.'} />
+    <Page top={false}>
+      <Text style={[styles.muted, { marginBottom: 8 }]}>Pedido {order.codigo}</Text>
+      <PageHeader title={statusLabel(order.status)} description={order.descricao ?? 'Sua reserva está sendo preparada pelo servidor do kartódromo.'} />
       <Panel style={{ gap: 9, marginBottom: 14 }}>
         <Text style={styles.muted}>{formatDateTime(order.inicio)}</Text>
         <Text style={styles.muted}>{order.quantidade} {order.quantidade === 1 ? 'vaga' : 'vagas'} · {order.forma === 'pix' ? 'Pix' : 'Cartão'}</Text>
@@ -115,9 +117,9 @@ function ReservationDetailContent() {
       {pix ? (
         <Panel style={{ alignItems: 'center', gap: 13, marginTop: 14 }}>
           <Text style={{ color: palette.text, fontSize: 16, fontWeight: '800' }}>Pague com Pix</Text>
-          {pix.imagem ? <Image accessibilityLabel="QR Code Pix" source={{ uri: imageUri(pix.imagem) }} resizeMode="contain" style={{ width: 210, height: 210 }} /> : null}
+          {pix.imagem ? <Image accessibilityLabel="QR Code Pix" source={{ uri: imageUri(pix.imagem) }} resizeMode="contain" style={{ width: 210, height: 210, backgroundColor: '#FFFFFF' }} /> : null}
           <Text style={[styles.muted, { alignSelf: 'stretch' }]}>Pix copia e cola</Text>
-          <Text selectable style={{ color: palette.text, fontSize: 12, lineHeight: 18, alignSelf: 'stretch' }}>{pix.payload}</Text>
+          <Text selectable style={{ color: palette.text, fontSize: 14, lineHeight: 18, alignSelf: 'stretch' }}>{pix.payload}</Text>
           <ActionButton label={copied ? 'Código Pix copiado' : 'Copiar código Pix'} onPress={() => void copyPix()} secondary />
         </Panel>
       ) : null}
@@ -127,7 +129,7 @@ function ReservationDetailContent() {
       {error && order ? <View style={{ marginTop: 14 }}><InlineError message={error} /></View> : null}
       <View style={{ marginTop: 14 }}><ActionButton label={loading ? 'Atualizando…' : 'Atualizar status'} onPress={refresh} disabled={loading} secondary /></View>
       <Pressable accessibilityRole="link" onPress={() => router.replace('/(tabs)/reservas')} style={{ paddingVertical: 18 }}>
-        <Text style={{ color: palette.accent, fontSize: 13, fontWeight: '800', textAlign: 'center' }}>Voltar para minhas reservas</Text>
+        <Text style={{ color: palette.accent, fontSize: 15, fontWeight: '800', textAlign: 'center' }}>Voltar para minhas reservas</Text>
       </Pressable>
     </Page>
   );

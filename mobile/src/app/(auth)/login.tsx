@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 
 import { AuthButton, AuthFeedback, AuthField, AuthLink, AuthShell } from '../../components/auth-ui';
 import { useSession } from '../../session/provider';
 
 export default function LoginScreen() {
+  const params = useLocalSearchParams<{ bateriaId?: string | string[] }>();
+  const rawId = Array.isArray(params.bateriaId) ? params.bateriaId[0] : params.bateriaId;
+  const batteryId = rawId && /^\d+$/.test(rawId) && Number.isSafeInteger(Number(rawId)) && Number(rawId) > 0 ? String(Number(rawId)) : null;
   const { login } = useSession();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -23,7 +26,7 @@ export default function LoginScreen() {
     setFeedback('');
     try {
       await login(identifier.trim(), password);
-      router.replace('/');
+      router.replace(batteryId ? { pathname: '/(tabs)/reservas', params: { bateriaId: batteryId } } : '/');
     } catch (reason) {
       setError(true);
       setFeedback(reason instanceof Error ? reason.message : 'Não foi possível entrar. Tente novamente.');

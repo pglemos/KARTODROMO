@@ -21,7 +21,9 @@ test('home offers battery booking, agenda and login', async () => {
   }, { initialUrl: '/' });
 
   expect(view.getByText('Reservar bateria')).toBeTruthy();
-  expect(view.getByText('Entrar')).toBeTruthy();
-  await fireEvent.press(view.getByText('Agenda'));
+  expect(view.getByLabelText('Kartódromo Internacional de Betim')).toBeTruthy();
+  expect(view.queryByText('K')).toBeNull();
+  expect(view.getByLabelText('Minha conta')).toBeTruthy();
+  await fireEvent.press(view.getByText('Agenda da pista'));
   expect(await view.findByText('Agenda da pista')).toBeTruthy();
 });

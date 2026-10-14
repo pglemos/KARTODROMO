@@ -1,6 +1,6 @@
 import { AppState, type AppStateStatus } from 'react-native';
 import * as Location from 'expo-location';
-import { render } from '@testing-library/react-native';
+import { render, userEvent, waitFor } from '@testing-library/react-native';
 import { createElement } from 'react';
 
 import GpsScreen from '../src/app/(tabs)/gps';
@@ -8,6 +8,10 @@ import { findLineCrossingAt } from '../src/features/gps/lap-detector';
 import { requestForegroundLocationPermission, watchForegroundLocation } from '../src/features/gps/location';
 import * as repository from '../src/features/gps/repository';
 import type { FinishLine, GpsPoint } from '../src/features/gps/lap-detector';
+import type { TrackConfig } from '../src/features/gps/track-config';
+
+let mockTrackConfig: TrackConfig | null = null;
+jest.mock('../src/features/gps/track-config', () => ({ get trackConfig() { return mockTrackConfig; } }));
 
 jest.mock('expo-location', () => ({
   Accuracy: { BestForNavigation: 6 },
@@ -17,6 +21,8 @@ jest.mock('expo-location', () => ({
 }));
 jest.mock('../src/features/gps/repository', () => ({
   listGpsSessions: jest.fn(),
+  createGpsSession: jest.fn(),
+  pauseGpsSession: jest.fn(),
 }));
 
 const finishLine: FinishLine = {
@@ -39,6 +45,9 @@ const permission = (status: 'granted' | 'denied') => ({
 describe('treino GPS pessoal', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockTrackConfig = null;
+    jest.mocked(repository.createGpsSession).mockResolvedValue('test-gps-session');
+    jest.mocked(repository.pauseGpsSession).mockResolvedValue(undefined);
     AppState.currentState = 'active';
     jest.mocked(repository.listGpsSessions).mockResolvedValue([]);
     jest.mocked(Location.getForegroundPermissionsAsync).mockResolvedValue(permission('granted') as never);
@@ -98,5 +107,17 @@ describe('treino GPS pessoal', () => {
     expect(startButton.props.accessibilityState.disabled).toBe(true);
     expect(view.getByText(/medição aprovada/i)).toBeTruthy();
     expect(Location.requestForegroundPermissionsAsync).not.toHaveBeenCalled();
+  });
+  it('permite o primeiro início depois de consentimento e permissão com geometria válida', async () => {
+    mockTrackConfig = { name: 'TESTE CODEX', finishLine, maxAccuracyMeters: 10 };
+    jest.mocked(Location.watchPositionAsync).mockResolvedValue({ remove: jest.fn() } as never);
+    const view = await render(createElement(GpsScreen));
+    const user = userEvent.setup();
+    await user.press(view.getByLabelText('Concordo com a coleta de localização durante este treino GPS pessoal'));
+    await user.press(view.getByRole('button', { name: 'Autorizar localização' }));
+    await waitFor(() => expect(view.getByRole('button', { name: 'Iniciar treino' }).props.accessibilityState.disabled).toBe(false));
+    await user.press(view.getByRole('button', { name: 'Iniciar treino' }));
+    await waitFor(() => expect(repository.createGpsSession).toHaveBeenCalledTimes(1));
+    expect(await view.findByRole('button', { name: 'Encerrar treino' })).toBeTruthy();
   });
 });

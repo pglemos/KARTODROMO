@@ -1,30 +1,26 @@
 import { Tabs } from 'expo-router/js-tabs';
+import { Text, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '../../components/brand';
+import { useUi } from '../../components/theme';
 
 export default function CustomerTabs() {
-  return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarIcon: () => null,
-        tabBarIconStyle: { display: 'none' },
-        tabBarLabelPosition: 'beside-icon',
-        tabBarActiveTintColor: '#c9f36a',
-        tabBarInactiveTintColor: '#a5b2a8',
-        tabBarStyle: {
-          backgroundColor: '#0d1915',
-          borderTopColor: '#273b32',
-          height: 62,
-          paddingTop: 6,
-          paddingBottom: 8,
-        },
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '700', marginStart: 0, marginEnd: 0 },
-      }}
-    >
-      <Tabs.Screen name="index" options={{ title: 'Início' }} />
-      <Tabs.Screen name="agenda" options={{ title: 'Agenda' }} />
-      <Tabs.Screen name="reservas" options={{ title: 'Reservas' }} />
-      <Tabs.Screen name="resultados" options={{ title: 'Resultados' }} />
-      <Tabs.Screen name="gps" options={{ title: 'GPS' }} />
-    </Tabs>
-  );
+  const { palette } = useUi();
+  const { fontScale } = useWindowDimensions();
+  const { bottom } = useSafeAreaInsets();
+  return <Tabs screenOptions={{
+    headerShown: false,
+    tabBarLabelPosition: 'below-icon',
+    tabBarActiveTintColor: palette.accent,
+    tabBarInactiveTintColor: palette.muted,
+    tabBarStyle: { backgroundColor: palette.surface, borderTopColor: palette.border, paddingTop: 6, height: Math.max(64, 32 + 28 * fontScale) + bottom },
+    tabBarLabel: ({ children, color }) => <Text style={{ color, fontSize: 11, lineHeight: 14, fontWeight: '600', textAlign: 'center' }}>{children}</Text>,
+    tabBarHideOnKeyboard: true,
+  }}>
+    <Tabs.Screen name="index" options={{ title: 'Início', tabBarIcon: ({ color }) => <Icon name="home" color={color} /> }} />
+    <Tabs.Screen name="agenda" options={{ title: 'Agenda', tabBarIcon: ({ color }) => <Icon name="calendar" color={color} /> }} />
+    <Tabs.Screen name="reservas" options={{ title: 'Reservas', tabBarIcon: ({ color }) => <Icon name="ticket" color={color} /> }} />
+    <Tabs.Screen name="resultados" options={{ title: 'Resultados', tabBarIcon: ({ color }) => <Icon name="results" color={color} /> }} />
+    <Tabs.Screen name="gps" options={{ title: 'GPS', tabBarIcon: ({ color }) => <Icon name="gps" color={color} /> }} />
+  </Tabs>;
 }

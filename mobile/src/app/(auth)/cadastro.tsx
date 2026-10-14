@@ -2,11 +2,14 @@ import { useState } from 'react';
 import { Link } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 
+import { useUi } from '../../components/theme';
+import { Icon } from '../../components/brand';
 import { authApi } from '../../api/client';
 import type { RegistrationInput } from '../../api/contracts';
 import { AuthButton, AuthFeedback, AuthField, AuthLink, AuthShell } from '../../components/auth-ui';
 
 export default function RegistrationScreen() {
+  const { palette, styles } = useUi();
   const [name, setName] = useState('');
   const [cpf, setCpf] = useState('');
   const [email, setEmail] = useState('');
@@ -53,7 +56,7 @@ export default function RegistrationScreen() {
   return (
     <AuthShell
       title="Crie sua conta"
-      description="Seus dados ajudam a organizar reservas, pagamentos e resultados vinculados à sua identidade."
+      description="Uma conta para suas reservas e seu histórico na pista."
     >
       <AuthField label="Nome completo" value={name} onChangeText={setName} autoCapitalize="words" autoComplete="name" />
       <AuthField label="CPF" value={cpf} onChangeText={setCpf} keyboardType="number-pad" autoComplete="off" />
@@ -80,17 +83,17 @@ export default function RegistrationScreen() {
             height: 22,
             borderRadius: 6,
             borderWidth: 1,
-            borderColor: '#c9f36a',
+            borderColor: palette.accent,
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: privacyAccepted ? '#c9f36a' : 'transparent',
+            backgroundColor: privacyAccepted ? palette.accent : 'transparent',
           }}
         >
-          {privacyAccepted ? <Text style={{ color: '#07110f', fontWeight: '900' }}>✓</Text> : null}
+          {privacyAccepted ? <Icon name="check" color={palette.onAccent} size={16} /> : null}
         </View>
-        <Text style={{ flex: 1, color: '#a5b2a8', fontSize: 13, lineHeight: 19 }}>
+        <Text style={[styles.muted, { flex: 1 }]}>
           Li e aceito a{' '}
-          <Link href="https://www.kartodromodebetim.com.br/privacidade" style={{ color: '#c9f36a', fontWeight: '700' }}>
+          <Link href="https://www.kartodromodebetim.com.br/privacidade" style={{ color: palette.accent, fontWeight: '700' }}>
             política de privacidade
           </Link>
           . Entendi que o GPS só será solicitado quando eu iniciar um treino.
