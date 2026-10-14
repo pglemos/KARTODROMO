@@ -4,7 +4,7 @@
  *   novo → (servidor segura as vagas) aguardando_pagamento → (Asaas avisa) pago → (servidor confirma) confirmado
  *   e os desvios: recusado (sem vaga), expirado (15 min sem pagar), pago_sem_vaga (pagou depois e o horário lotou).
  */
-import { asaasLigado, cancelar, consultar, criarCobranca, EVENTOS_PAGO, garantirCliente, PAGO, qrPix, type AsaasEnv } from './asaas';
+import { asaasLigado, buscarCobrancaPorReferencia, cancelar, consultar, criarCobranca, EVENTOS_PAGO, garantirCliente, PAGO, qrPix, type AsaasEnv } from './asaas';
 import { chaveDocumento, codigoReserva, digitos, validarReserva, type Agenda, type PreCadastro } from './validar';
 
 export interface EnvReservas extends AsaasEnv {
@@ -25,6 +25,7 @@ export type Pedido = {
   quantidade: number;
   forma: 'pix' | 'cartao';
   pilotos: string[];
+  cupom?: string;
   cliente: PreCadastro & { chave: string };
   servidor?: { valorCentavos: number; expiraEm: string; descricao: string; inicio: string };
   asaas?: { pagamentoId: string; invoiceUrl: string; pixPayload?: string; pixImagem?: string; consultadoEm?: string };
@@ -175,12 +176,24 @@ async function cobrar(env: EnvReservas, p: Pedido) {
     const cliente = await garantirCliente(env, {
       nome: p.cliente.nome, cpf: digitos(p.cliente.documento), email: p.cliente.email, celular: digitos(p.cliente.telefone), referencia: p.cliente.chave,
     });
-    const c = await criarCobranca(env, cliente, p.forma, p.servidor!.valorCentavos, p.servidor!.descricao + ` · reserva ${p.codigo}`, p.id);
+    let c;
+    try {
+      c = await criarCobranca(env, cliente, p.forma, p.servidor!.valorCentavos, p.servidor!.descricao + ` · reserva ${p.codigo}`, p.id);
+    } catch (error) {
+      // A Asaas pode aceitar a cobrança e perder a resposta; procurar pela referência antes de reportar falha.
+      const existente = await buscarCobrancaPorReferencia(env, p.id);
+      if (!existente) throw error;
+      c = existente;
+    }
     p.asaas = { pagamentoId: c.id, invoiceUrl: c.invoiceUrl };
     if (p.forma === 'pix') {
       const q = await qrPix(env, c.id);
       p.asaas.pixPayload = q.payload;
       p.asaas.pixImagem = q.encodedImage;
+    }
+    if (PAGO.has(c.status)) {
+      p.status = 'pago';
+      p.pagamento = { asaasId: c.id, billingType: c.billingType, pagoEm: new Date().toISOString(), valorCentavos: p.servidor!.valorCentavos };
     }
   } catch (e) {
     console.error('cobrança asaas', (e as Error).message);
@@ -190,7 +203,7 @@ async function cobrar(env: EnvReservas, p: Pedido) {
   const atual = await lerPedido(env, p.id);
   // o aviso de pago pode ter chegado enquanto a cobrança era criada: não sobrescreve
   if (atual && atual.status !== 'aguardando_pagamento') return;
-  await gravarPedido(env, p, false);
+  await gravarPedido(env, p, p.status === 'pago');
 }
 
 // ---------------------------------------------------------------- servidor da recepção (/api/sync, x-sync-key)

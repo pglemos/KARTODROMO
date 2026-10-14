@@ -952,10 +952,13 @@ public class FormPrincipal : Form
                 _grade.CorLinha = r => r.S("status") switch { "pago_sem_vaga" => Tokens.Vermelho, "expirado" => Color.Silver, "aguardando" => Tokens.Laranja, _ => null };
                 _menuAtual = sel => [
                     Item("Ver as reservas desta bateria", () => Selecionar("reservas:todas", new JsonObject { ["id"] = sel[0].L("bateriaId"), ["nome"] = sel[0].S("bateria"), ["dataHora"] = sel[0].S("inicio") }), sel.Count == 1),
-                    Item("Marcar como resolvido (valor devolvido ou remarcado)", () => Seguro.Rodar(this, async () =>
+                    Item("Resolver pagamento recebido", () => Seguro.Rodar(this, async () =>
                     {
-                        if (!Msg.Pergunta(this, $"Marcar o pedido {sel[0].S("codigo")} de {sel[0].S("cliente")} como resolvido?\n\nUse depois de devolver o valor pela Asaas ou remarcar o cliente.")) return;
-                        await Sessao.Api.Post($"/api/office/reservas-online/{sel[0].S("id")}/resolver", new { });
+                        string? resolucao = Msg.Pergunta(this, $"O reembolso do pedido {sel[0].S("codigo")} de {sel[0].S("cliente")} já foi confirmado pela Asaas?")
+                            ? "reembolso_confirmado"
+                            : Msg.Pergunta(this, "O cliente já foi remarcado para outra bateria?") ? "remarcado" : null;
+                        if (resolucao is null) return;
+                        await Sessao.Api.Post($"/api/office/reservas-online/{sel[0].S("id")}/resolver", new { resolucao });
                         Recarregar();
                     }), sel.Count == 1 && sel[0].S("status") == "pago_sem_vaga"),
                     new ToolStripSeparator(), Exportar("reservas-online")];

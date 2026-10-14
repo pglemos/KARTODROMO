@@ -4,15 +4,26 @@
   "name": "kartodromo-cadastro",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-01",
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "observability": { "enabled": true },
   "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/api/*", "/"] },
   "r2_buckets": [{ "binding": "PRE", "bucket_name": "kartodromo-precadastro" }],
+  // IDs distintos para preview e produção; substituir o ID de produção pelo banco criado no Cloudflare antes do deploy.
+  "d1_databases": [{
+    "binding": "MOBILE_DB",
+    "database_name": "kartodromo-mobile",
+    "database_id": "00000000-0000-0000-0000-000000000001",
+    "preview_database_id": "00000000-0000-0000-0000-000000000000",
+    "migrations_dir": "migrations"
+  }],
   "routes": [
     { "pattern": "cadastro.kartodromodebetim.com.br", "custom_domain": true },
     // reserva online (pagamento Asaas). Segredos: SYNC_KEY, ASAAS_API_KEY, ASAAS_WEBHOOK_TOKEN, RESERVAS_PREVIA
     { "pattern": "reservas.kartodromodebetim.com.br", "custom_domain": true }
   ],
+  // Secrets da conta e dos resultados móveis usam `wrangler secret put` em cada ambiente; nunca adicionar valores aqui.
+  // Novos nomes: MOBILE_LOOKUP_KEY, MOBILE_DATA_KEY, MOBILE_PUBLISH_TOKEN e MOBILE_ADMIN_TOKEN.
   // RESERVAS_ATIVAS=1 abre ao público; ASAAS_URL = https://api-sandbox.asaas.com/v3 para testar no ambiente de testes
   "vars": { "RESERVAS_ATIVAS": "1", "ASAAS_URL": "https://api.asaas.com/v3" }
 }

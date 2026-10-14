@@ -3,6 +3,7 @@ import { codigoReserva, idade, validarReserva, type Agenda } from '../workers/pr
 import { criarPedido, liberado, situacaoPedido, syncPedidos, syncResultado, visaoPublica, webhookAsaas, type EnvReservas, type Pedido } from '../workers/pre-cadastro/src/reservas';
 import { hojeBrasilia } from '../workers/pre-cadastro/src/asaas';
 import { descricaoPedido } from '../lib/ops/reserva-online';
+import worker from '../workers/pre-cadastro/src/index';
 
 const HOJE = new Date('2026-10-01T15:00:00Z');
 const agenda: Agenda = {
@@ -133,6 +134,18 @@ describe('fluxo da reserva no site', () => {
     expect(r.status).toBe(201);
     const { id, codigo } = (await r.json()) as { id: string; codigo: string };
     expect(codigo).toHaveLength(6);
+
+    // A lookup against the mobile ownership table must leave legacy R2 orders readable.
+    const legacyEnv = {
+      ...env,
+      MOBILE_DB: { prepare: () => ({ bind: () => ({ first: async () => null }) }) },
+    };
+    const legacyRead = await worker.fetch(
+      new Request(`https://reservas.kartodromodebetim.com.br/api/reservas/${id}`),
+      legacyEnv as never,
+      ctx().c,
+    );
+    expect(legacyRead.status).toBe(200);
 
     // 2. servidor busca e segura as vagas
     const fila = (await (await syncPedidos(env)).json()) as Pedido[];

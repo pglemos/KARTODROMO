@@ -248,7 +248,9 @@ public partial class FormCrono
     // ------------------------------------------------------------------ segurança (usuários, perfis, permissões)
 
     /// <summary>Usuários e perfis ficam no servidor da operação (os mesmos da recepção): pede o login de um administrador uma vez.</summary>
-    async Task<bool> EntrarComoAdministrador()
+    async Task<bool> EntrarComoAdministrador() => await EntrarComoUsuario(true);
+
+    async Task<bool> EntrarComoUsuario(bool somenteAdministrador = false)
     {
         if (!string.IsNullOrEmpty(Api.Servidor.Token)) return true;
         if (_autoteste != null && Environment.GetEnvironmentVariable("KARTODROMO_TESTE_ADMIN") is { Length: > 3 } ta && ta.IndexOf(':') > 0)
@@ -257,7 +259,7 @@ public partial class FormCrono
             Api.Servidor.Token = r0.S("token");
             return true;
         }
-        using var d = NovoDialogo("Entrar como administrador", "Usuários e permissões são os mesmos da recepção", "M6 11V8a6 6 0 0 1 12 0v3M5 11h14v10H5z", "linear-gradient(180deg, #9A9AA0, #4A4A4F)");
+        using var d = NovoDialogo(somenteAdministrador ? "Entrar como administrador" : "Entrar", "Use seu acesso da recepção", "M6 11V8a6 6 0 0 1 12 0v3M5 11h14v10H5z", "linear-gradient(180deg, #9A9AA0, #4A4A4F)");
         d.ClientSize = new Size(560, 330);
         var login = Txt("", 40); var senha = Txt("", 60); senha.UseSystemPasswordChar = true;
         var g = d.Secao(null);
@@ -266,7 +268,7 @@ public partial class FormCrono
         d.BotaoRodape("Entrar", true, () => Seguro.Rodar(d, async () =>
         {
             var r = await Api.Servidor.Post("/api/login", new JsonObject { ["login"] = login.Text.Trim(), ["senha"] = senha.Text, ["termos"] = true });
-            if (r?["usuario"] is not JsonObject u || !u.B("admin")) { Msg.Aviso(d, "Esse usuário não é administrador."); return; }
+            if (r?["usuario"] is not JsonObject u || (somenteAdministrador && !u.B("admin"))) { Msg.Aviso(d, "Esse usuário não é administrador."); return; }
             Api.Servidor.Token = r.S("token"); ok = true; d.Close();
         }));
         d.BotaoRodape("Cancelar", false, d.Close);
@@ -312,6 +314,7 @@ public partial class FormCrono
         ("Financeiro", ["Métodos de pagamento", "Fidelidade", "Vouchers", "Parceiros e comissões"]),
         ("PDV", ["Abrir e fechar terminal", "Receita avulsa (checkout)", "Suprimento e sangria", "Estorno", "Desconto e acréscimo"]),
         ("Cronometragem", ["Bandeiras (largada, quadriculada, finalizar)", "Passagens (incluir, excluir, invalidar)", "Mudar corrida em andamento", "Configuração de eventos", "Registro de competidores", "Enviar resultado (WhatsApp, e-mail)", "Cadastros (decoder, placar, transponder)", "Configurações do sistema"]),
+        ("App Mobile", ["resultados_publicar_mobile", "identidade_mobile_vincular"]),
     ];
 
     async Task Permissoes()
@@ -332,7 +335,7 @@ public partial class FormCrono
         sec.Controls.Add(tab); sec.SetColumnSpan(tab, 6);
         // estado: perfil → módulo → função → 6 marcas
         var estado = new Dictionary<string, bool[]>();
-        var modulo = ModulosPermissao.Length - 1; // abre na aba Cronometragem, como no canvas
+        var modulo = Array.FindIndex(ModulosPermissao, x => x.Modulo == "Cronometragem");
         string Chave(string m, string f) => m + "|" + f;
         void Mostrar()
         {

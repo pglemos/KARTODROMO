@@ -142,5 +142,8 @@ export function historicoDoKart(sessions: Iterable<Session>, kart: string, o: Ra
       medianaMs: mediana(vs.map((v) => v.lapMs)),
       _ordem: inicio,
     };
-  }).sort((a, b) => b._ordem - a._ordem).map(({ _ordem, ...h }) => h);
+  }).sort((a, b) => b._ordem - a._ordem).map(({ _ordem, ...h }) => {
+    void _ordem;
+    return h;
+  });
 }

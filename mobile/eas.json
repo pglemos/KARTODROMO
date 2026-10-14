@@ -1,0 +1,40 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "env": { "EXPO_PUBLIC_API_URL": "https://kartodromo-mobile-homolog.kartodromo.workers.dev" },
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": { "buildType": "apk" }
+    },
+    "preview": {
+      "env": { "EXPO_PUBLIC_API_URL": "https://kartodromo-mobile-homolog.kartodromo.workers.dev" },
+      "distribution": "internal",
+      "android": { "buildType": "apk" }
+    },
+    "simulator": {
+      "extends": "preview",
+      "ios": { "simulator": true }
+    },
+    "store-preview": {
+      "env": { "EXPO_PUBLIC_API_URL": "https://kartodromo-mobile-homolog.kartodromo.workers.dev" },
+      "distribution": "store",
+      "autoIncrement": true,
+      "android": { "buildType": "app-bundle" }
+    },
+    "production": {
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "preview": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft"
+      }
+    }
+  }
+}

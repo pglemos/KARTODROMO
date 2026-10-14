@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({ one: vi.fn(), query: vi.fn(), tx: vi.fn() }));
 
@@ -18,6 +18,10 @@ import { HttpError, officeRoutes } from '../../lib/ops/office';
 
 const admin = { uid: 7, nome: 'Admin de teste', admin: true, exp: Date.now() + 60_000 };
 const recepcionista = { ...admin, admin: false };
+const previousMobileEnv = {
+  url: process.env.MOBILE_IDENTITY_LINK_URL,
+  token: process.env.MOBILE_ADMIN_TOKEN,
+};
 
 async function call(path: string, method = 'GET', body: Record<string, unknown> = {}, sessao = admin) {
   const received: { status: number; body: unknown }[] = [];
@@ -36,6 +40,78 @@ beforeEach(() => {
   db.one.mockResolvedValue(null);
   db.query.mockResolvedValue([]);
   db.tx.mockImplementation(async (work: (run: (sql: string, params?: Record<string, unknown>) => Promise<Record<string, unknown>[]>) => Promise<unknown>) => work(async () => []));
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  if (previousMobileEnv.url === undefined) delete process.env.MOBILE_IDENTITY_LINK_URL;
+  else process.env.MOBILE_IDENTITY_LINK_URL = previousMobileEnv.url;
+  if (previousMobileEnv.token === undefined) delete process.env.MOBILE_ADMIN_TOKEN;
+  else process.env.MOBILE_ADMIN_TOKEN = previousMobileEnv.token;
+});
+
+describe('Office: permissões de resultados móveis e vínculo assistido', () => {
+  it('consulta a permissão ativa do perfil e nega por padrão', async () => {
+    db.one.mockResolvedValueOnce({ allowed: 0 });
+    expect(await call('/mobile-permissions/resultados_publicar_mobile', 'GET', {}, recepcionista))
+      .toEqual({ status: 200, body: { allowed: false } });
+    expect(db.one.mock.calls[0][0]).toContain('PerfilPermissao');
+    expect(db.one.mock.calls[0][1]).toMatchObject({ uid: recepcionista.uid, funcao: 'resultados_publicar_mobile' });
+  });
+
+  it('encaminha somente o vínculo explicitamente autorizado ao Worker por HTTPS', async () => {
+    process.env.MOBILE_IDENTITY_LINK_URL = 'https://reservas.kartodromodebetim.com.br/api/mobile/v1/internal/identity-links';
+    process.env.MOBILE_ADMIN_TOKEN = 'separate-admin-token';
+    db.one.mockResolvedValueOnce({ allowed: 1 }).mockResolvedValueOnce({ id: 312 });
+    const request = vi.fn<
+      (url: string | URL | Request, init?: RequestInit) => Promise<Response>
+    >(async () => new Response('{"ok":true}', { status: 200 }));
+    vi.stubGlobal('fetch', request);
+
+    expect(await call('/mobile-identities/link', 'POST', {
+      customerId: '312', email: 'ana@example.com',
+    }, recepcionista)).toEqual({ status: 200, body: { ok: true } });
+    const [url, init] = request.mock.calls[0];
+    expect(String(url)).toBe('https://reservas.kartodromodebetim.com.br/api/mobile/v1/internal/identity-links');
+    expect(init).toMatchObject({
+      method: 'POST',
+      headers: expect.objectContaining({ 'x-mobile-admin-token': 'separate-admin-token' }),
+      body: JSON.stringify({ customerId: '312', email: 'ana@example.com' }),
+      redirect: 'error',
+    });
+  });
+
+  it.each([
+    'https://worker.example/api/mobile/v1/internal/identity-links',
+    'https://user:pass@reservas.kartodromodebetim.com.br/api/mobile/v1/internal/identity-links',
+    'https://reservas.kartodromodebetim.com.br:8443/api/mobile/v1/internal/identity-links',
+    'https://reservas.kartodromodebetim.com.br/api/mobile/v1/internal/identity-links?next=elsewhere',
+    'https://reservas.kartodromodebetim.com.br/api/mobile/v1/internal/identity-links#fragment',
+  ])('não envia token administrativo a destino não autorizado: %s', async (destination) => {
+    process.env.MOBILE_IDENTITY_LINK_URL = destination;
+    process.env.MOBILE_ADMIN_TOKEN = 'separate-admin-token';
+    db.one.mockResolvedValueOnce({ allowed: 1 }).mockResolvedValueOnce({ id: 312 });
+    const request = vi.fn(async () => new Response('{"ok":true}', { status: 200 }));
+    vi.stubGlobal('fetch', request);
+
+    await expect(call('/mobile-identities/link', 'POST', {
+      customerId: '312', email: 'ana@example.com',
+    }, recepcionista)).rejects.toMatchObject({ status: 503 });
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('não encaminha vínculo sem permissão do perfil', async () => {
+    process.env.MOBILE_IDENTITY_LINK_URL = 'https://reservas.kartodromodebetim.com.br/api/mobile/v1/internal/identity-links';
+    process.env.MOBILE_ADMIN_TOKEN = 'separate-admin-token';
+    db.one.mockResolvedValueOnce({ allowed: 0 });
+    const request = vi.fn();
+    vi.stubGlobal('fetch', request);
+
+    await expect(call('/mobile-identities/link', 'POST', {
+      customerId: '312', email: 'ana@example.com',
+    }, recepcionista)).rejects.toMatchObject({ status: 403 });
+    expect(request).not.toHaveBeenCalled();
+  });
 });
 
 describe('Office: gravação de baterias com hora local', () => {
@@ -150,6 +226,50 @@ describe('Office: edição de produto e confirmação do termo', () => {
   it('recusa estado do termo que não seja booleano', async () => {
     await expect(call('/reservas/42', 'PUT', { termo: 'sim' })).rejects.toMatchObject({ status: 400 });
     expect(db.tx).not.toHaveBeenCalled();
+  });
+});
+
+describe('Office: concorrência de voucher nas vendas presenciais', () => {
+  it('serializa a leitura de uso do voucher dentro da transação da venda', async () => {
+    db.one.mockResolvedValueOnce({ id: 12, terminalId: 3 }).mockResolvedValueOnce({ v: 'false' });
+    let voucherSql = '';
+    db.tx.mockImplementation(async (work) => work(async (sql: string) => {
+      if (sql.includes('FROM dbo.Voucher')) {
+        voucherSql = sql;
+        return [];
+      }
+      return [];
+    }));
+
+    await expect(call('/vendas', 'POST', {
+      voucherCodigo: 'BETIM10',
+      itens: [{ descricao: 'Bateria', unitarioCentavos: 1000 }],
+    })).rejects.toMatchObject({ status: 400 });
+
+    expect(voucherSql).toMatch(/WITH\s*\(UPDLOCK,\s*HOLDLOCK\)/i);
+  });
+
+  it('inclui resgates online ativos ao validar o limite da venda presencial', async () => {
+    db.one.mockResolvedValueOnce({ id: 12, terminalId: 3 }).mockResolvedValueOnce({ v: 'false' });
+    let usageSql = '';
+    db.tx.mockImplementation(async (work) => work(async (sql: string) => {
+      if (sql.includes('FROM dbo.Voucher v')) return [{ Id: 5, Ativo: 1, UsoUnico: 1, UsoMaxCliente: 1 }];
+      if (sql.includes('CAST(SYSDATETIME() AS date)')) return [{ d: new Date('2026-10-13T12:00:00') }];
+      if (sql.includes('COUNT(*)') && sql.includes('VoucherUso')) {
+        usageSql = sql;
+        return [{ n: 1, doCliente: 1 }];
+      }
+      return [];
+    }));
+
+    await expect(call('/vendas', 'POST', {
+      clienteId: 42,
+      voucherCodigo: 'BETIM10',
+      itens: [{ descricao: 'Bateria', unitarioCentavos: 1000 }],
+    })).rejects.toMatchObject({ status: 400 });
+
+    expect(usageSql).toContain('dbo.ReservaOnlineVoucherUso');
+    expect(usageSql).toContain("Estado IN ('reservado', 'consumido', 'reembolso_pendente')");
   });
 });
 
