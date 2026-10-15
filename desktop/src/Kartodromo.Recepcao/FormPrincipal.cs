@@ -972,6 +972,8 @@ public class FormPrincipal : Form
                     new("situacao", "Situação", Largura: 118, Valor: SituacaoReserva),
                     new("formaPagamento", "Pagamento", Largura: 130, Valor: r => r.S("status") == "cancelada" ? "—" : r.S("formaPagamento") is { Length: > 0 } f ? f : r.B("pago") ? "Não informado" : "—"),
                     new("dataHora", "Data/Hora", TipoCol.DataHora), new("reserva", "Reserva", Largura: 150), new("cliente", "Cliente", Largura: 240),
+                    // 15/10 (recepção): idade logo depois do cliente, para ver de cara quem é menor
+                    new("idade", "Idade", Largura: 56, Valor: r => r.I("idade") is > 0 and var i ? i.ToString() : "—"),
                     .. (Sessao.ParamSim("office.exibirColunaResponsavel", false) ? new Col[] { new("responsavel", "Responsável") } : []),
                     new("produto", "Produto", Largura: 220), new("categoria", "Categoria", Largura: 110), new("preco", "Preço", TipoCol.Dinheiro, 90), new("desconto", "Desconto", TipoCol.Dinheiro, 90),
                     new("total", "Total", TipoCol.Dinheiro, 90), new("observacao", "Observação")]);
