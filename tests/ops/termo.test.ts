@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderTermoResponsabilidade, type TermoParticipante } from '../../lib/ops/termo';
+import { idadeNaData, renderTermoResponsabilidade, type TermoParticipante } from '../../lib/ops/termo';
 
 const participante: TermoParticipante = {
   nome: 'Ana Exemplo <Pilota>',
@@ -63,6 +63,47 @@ describe('termo de responsabilidade em bobina', () => {
     expect(html).toContain('Nascimento: ____/____/________');
     expect(html).toContain('Doc.: ________________________');
     expect(html).not.toContain('signature-grid');
+  });
+
+  it('mostra a idade em destaque logo abaixo do título e junto da data de nascimento', () => {
+    const html = renderTermoResponsabilidade({ empresa, participantes: [participante], impressoEm });
+
+    expect(html).toContain('<div class="anos">24 ANOS</div>');
+    expect(html).toContain('Nasc. 31/12/2001');
+    expect(html).toContain('Nascimento: 31/12/2001 · Idade: <b>24 anos</b>');
+    expect(html).not.toContain('class="idade menor"');
+    expect(html.indexOf('class="idade"')).toBeGreaterThan(html.indexOf('TERMO DE RESPONSABILIDADE</h1>'));
+    expect(html.indexOf('class="idade"')).toBeLessThan(html.indexOf('Nome: '));
+  });
+
+  it('destaca o menor de idade em preto com o aviso do responsável legal', () => {
+    const html = renderTermoResponsabilidade({ empresa, participantes: [{ ...participante, nascimento: '2010-05-21' }], impressoEm });
+
+    expect(html).toContain('class="idade menor"');
+    expect(html).toContain('<div class="anos">15 ANOS</div>');
+    expect(html).toContain('MENOR DE IDADE · Nasc. 21/05/2010');
+    expect(html).toContain('Assinatura do responsável legal obrigatória');
+  });
+
+  it('conta o aniversário no próprio dia, no horário de Brasília', () => {
+    // 20/05/2026 10:39 em Brasília: faz 16 hoje; amanhã ainda tem 15
+    expect(idadeNaData('2010-05-20', impressoEm)).toBe(16);
+    expect(idadeNaData('2010-05-21', impressoEm)).toBe(15);
+    expect(idadeNaData('2008-05-20', impressoEm)).toBe(18);
+    // 21/05 01:00 UTC ainda é 20/05 em Brasília
+    expect(idadeNaData('2008-05-21', new Date('2026-05-21T01:00:00.000Z'))).toBe(17);
+    expect(idadeNaData(null, impressoEm)).toBeNull();
+    expect(idadeNaData('lixo', impressoEm)).toBeNull();
+  });
+
+  it('sem nascimento não inventa idade; em branco deixa a idade para preencher', () => {
+    const semData = renderTermoResponsabilidade({ empresa, participantes: [{ ...participante, nascimento: null }], impressoEm });
+    expect(semData).not.toContain('class="idade');
+    expect(semData).not.toContain('Idade:');
+
+    const branco = renderTermoResponsabilidade({ empresa, participantes: [participante], branco: true, impressoEm });
+    expect(branco).not.toContain('class="idade');
+    expect(branco).toContain('Nascimento: ____/____/________ · Idade: <b>____ anos</b>');
   });
 
   it('traz as assinaturas do participante e do responsável legal, como no LapTime', () => {

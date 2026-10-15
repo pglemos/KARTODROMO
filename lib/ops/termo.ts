@@ -82,6 +82,35 @@ function dataNascimento(value: string | null) {
   return match ? match[3] + '/' + match[2] + '/' + match[1] : value ?? '';
 }
 
+// idade completa na data da impressão (horário de Brasília), para a recepção ver de cara quem é menor
+export function idadeNaData(nascimento: string | null, date: Date): number | null {
+  const match = String(nascimento ?? '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  const [ano, mes, dia] = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'America/Sao_Paulo' })
+    .format(date)
+    .split('-')
+    .map(Number);
+  const idade = ano! - Number(match[1]) - (mes! * 100 + dia! < Number(match[2]) * 100 + Number(match[3]) ? 1 : 0);
+  return idade >= 0 && idade < 120 ? idade : null;
+}
+
+function anos(idade: number) {
+  return idade + (idade === 1 ? ' ano' : ' anos');
+}
+
+// faixa logo abaixo do título: idade grande e nascimento; menor sai em preto com o aviso do responsável
+function faixaIdade(idade: number | null, nascimento: string) {
+  if (idade === null) return '';
+  const menor = idade < 18;
+  return (
+    '<div class="idade' + (menor ? ' menor' : '') + '">' +
+    '<div class="anos">' + anos(idade).toLocaleUpperCase('pt-BR') + '</div>' +
+    '<div class="nasc">' + (menor ? 'MENOR DE IDADE · ' : '') + 'Nasc. ' + esc(nascimento) + '</div>' +
+    (menor ? '<div class="aviso">Assinatura do responsável legal obrigatória</div>' : '') +
+    '</div>'
+  );
+}
+
 function dataImpressao(date: Date, cidade: string) {
   const data = new Intl.DateTimeFormat('pt-BR', {
     weekday: 'long',
@@ -131,14 +160,19 @@ function participanteHtml(
     .join(', ');
   const companyName = empresa.razaoSocial?.trim() || empresa.nome;
   const city = empresa.cidade?.trim() || 'Betim';
+  const nascimento = dataNascimento(participante.nascimento);
+  const idade = branco ? null : idadeNaData(participante.nascimento, date);
+  const idadeTexto = branco ? '____ anos' : idade === null ? '' : anos(idade);
 
   return (
     '<section class="page">' +
     '<img class="logo" src="/ui/kib-logo.png" alt="Kartódromo Internacional de Betim">' +
     '<h1>TERMO DE RESPONSABILIDADE</h1>' +
+    faixaIdade(idade, nascimento) +
     '<div class="customer-info">' +
     '<div class="row"><div>Nome: ' + value(participante.nome, branco) + '</div></div>' +
-    '<div class="row pair"><div>Doc.: ' + value(participante.documento, branco) + '</div><div>Nascimento: ' + value(dataNascimento(participante.nascimento), branco, '____/____/________') + '</div></div>' +
+    '<div class="row"><div>Doc.: ' + value(participante.documento, branco) + '</div></div>' +
+    '<div class="row"><div>Nascimento: ' + value(nascimento, branco, '____/____/________') + (idadeTexto ? ' · Idade: <b>' + esc(idadeTexto) + '</b>' : '') + '</div></div>' +
     '<div class="row"><div>Endereço: ' + value(endereco, branco) + '</div></div>' +
     '<div class="row pair"><div>Bairro: ' + value(participante.bairro, branco) + '</div><div>CEP: ' + value(participante.cep, branco) + '</div></div>' +
     '<div class="row"><div>Cidade: ' + value(participante.cidade, branco) + '</div></div>' +
@@ -176,6 +210,11 @@ export function renderTermoResponsabilidade(options: RenderTermoOptions) {
     '.page:last-child{break-after:auto;page-break-after:auto}' +
     '.logo{display:block;width:38.1mm;height:20.3mm;object-fit:contain;filter:grayscale(1) contrast(1.15);margin:.7mm auto .7mm}' +
     'h1{font:bold 12pt/1.2 Arial,Helvetica,sans-serif;text-align:center;height:7.62mm;flex:none;margin:0}' +
+    '.idade{border:1.2pt solid #000;text-align:center;padding:1mm 1mm 1.1mm;margin:0 0 1mm;flex:none;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+    '.idade .anos{font:bold 16pt/1.05 Arial,Helvetica,sans-serif}' +
+    '.idade .nasc{font:bold 8pt/1.25 Arial,Helvetica,sans-serif}' +
+    '.idade .aviso{font:bold 7pt/1.25 Arial,Helvetica,sans-serif;text-transform:uppercase}' +
+    '.idade.menor{background:#000;color:#fff}' +
     '.rule{height:0;border:0;border-top:.45pt solid #000;width:100%;flex:none}' +
     '.customer-info{font:8pt/1.35 Arial,Helvetica,sans-serif;margin:1.67mm 0 0;flex:none}' +
     '.row{min-height:3.81mm;display:block;overflow-wrap:anywhere}' +
