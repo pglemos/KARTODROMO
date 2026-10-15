@@ -11,7 +11,7 @@ const agenda: Agenda = {
 };
 const base = {
   bateriaId: 101, quantidade: 2, forma: 'pix', politica: true, lgpd: true,
-  documento: '529.982.247-25', nome: 'Maria da Silva', email: 'maria@exemplo.com', telefone: '(31) 98888-7777', nascimento: '1990-05-20', peso: '62',
+  documento: '529.982.247-25', nome: 'Maria da Silva', email: 'maria@exemplo.com', instagram: '@maria.silva', telefone: '(31) 98888-7777', nascimento: '1990-05-20', peso: '62',
   pilotos: ['Maria da Silva', 'João Silva', 'sobra'],
   acompanhantes: [{ nome: 'João Silva', documento: '111.444.777-35', nascimento: '2008-03-10' }],
 };
@@ -25,6 +25,13 @@ describe('validarReserva', () => {
       expect(v.dados.acompanhantes).toEqual([{ nome: 'João Silva', documento: '111.444.777-35', nascimento: '2008-03-10' }]);
       expect(v.dados.cliente.tipoDocumento).toBe('CPF');
     }
+  });
+  it('Instagram: obrigatório para quem reserva, opcional para os outros pilotos (se vier, tem que ser válido)', () => {
+    expect(validarReserva({ ...base, instagram: '' }, agenda, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/Instagram é obrigatório/) });
+    const joao = { nome: 'João Silva', documento: '111.444.777-35', nascimento: '2008-03-10' };
+    const v = validarReserva({ ...base, acompanhantes: [{ ...joao, instagram: 'instagram.com/Joao_Kart' }] }, agenda, HOJE);
+    expect(v.ok && v.dados.acompanhantes).toEqual([{ ...joao, instagram: '@joao_kart' }]);
+    expect(validarReserva({ ...base, acompanhantes: [{ ...joao, instagram: 'joão silva' }] }, agenda, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/Instagram inválido do piloto 2/) });
   });
   it.each([
     [{ bateriaId: 999 }, 'não está mais disponível'],

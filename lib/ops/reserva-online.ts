@@ -91,7 +91,7 @@ export type PedidoSite = {
   forma: 'pix' | 'cartao';
   pilotos: string[];
   /** Os outros pilotos (uma vaga para cada, além do comprador). Pedidos antigos não têm: as vagas ficam no nome do comprador. */
-  acompanhantes?: { nome: string; documento: string; nascimento: string; chave?: string }[];
+  acompanhantes?: { nome: string; documento: string; nascimento: string; instagram?: string; chave?: string }[];
   /** false = quem comprou não pilota: as vagas são todas dos acompanhantes (ele fica como responsável). */
   compradorPilota?: boolean;
   cliente: Omit<PreCadastro, 'key' | 'chave' | 'recebidoEm'> & { chave: string };

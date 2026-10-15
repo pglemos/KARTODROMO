@@ -105,6 +105,7 @@
       <div class="grade">
         <div class="c3"><label for="telefone">Celular (WhatsApp)</label><input id="telefone" name="tel" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="(31) 90000-0000" required></div>
         <div class="c3"><label for="email">E-mail <span class="op">(para receber o resultado da corrida)</span></label><input id="email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="voce@email.com"></div>
+        <div class="c6"><label for="instagram">Instagram <span class="op">(sai junto com seu nome no resultado da bateria)</span></label><input id="instagram" name="instagram" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="@seuusuario" maxlength="80" required></div>
       </div>
     </section>
 
@@ -235,12 +236,15 @@
   $('form').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     $('erro').style.display = 'none';
-    const doc = $('documento'), nome = $('nome'), fone = $('telefone'), nasc = $('nascimento'), email = $('email');
+    const doc = $('documento'), nome = $('nome'), fone = $('telefone'), nasc = $('nascimento'), email = $('email'), insta = $('instagram');
     if (!doc.value.trim()) return erro(`Informe o ${tipo === 'Passaporte' ? 'passaporte' : tipo}.`, doc);
     if (tipo === 'CPF' && !cpfOk(doc.value)) return erro('CPF inválido. Confira os números.', doc);
     if (nome.value.trim().split(/\s+/).length < 2) return erro('Informe o nome completo.', nome);
     if (dig(fone.value).length < 10) return erro('Informe o celular com DDD.', fone);
     if (email.value && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.value.trim())) return erro('E-mail inválido.', email);
+    const ig = insta.value.trim().replace(/^(?:https?:\/\/)?(?:www\.)?instagram\.com\//i, '').replace(/[\/?#].*$/, '').replace(/^@/, '').toLowerCase();
+    if (!ig) return erro('Informe seu Instagram (o @usuário).', insta);
+    if (!/^[a-z0-9_](?:[a-z0-9_.]{0,28}[a-z0-9_])?$/.test(ig) || ig.includes('..')) return erro('Instagram inválido. Informe o @usuário (ex.: @andre.silva).', insta);
     if (!iso(nasc.value)) return erro('Informe a data de nascimento (DD/MM/AAAA).', nasc);
     const menores = [...document.querySelectorAll('.menor')].map((m) => ({ nome: m.querySelector('.mNome').value, nascimento: iso(m.querySelector('.mNasc').value), documento: m.querySelector('.mDoc').value, el: m }))
       .filter((m) => m.nome.trim() || m.nascimento);
@@ -255,7 +259,7 @@
       const r = await fetch('/api/pre-cadastro', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          tipoDocumento: tipo, documento: doc.value, nome: nome.value, email: email.value, telefone: fone.value, nascimento: iso(nasc.value),
+          tipoDocumento: tipo, documento: doc.value, nome: nome.value, email: email.value, instagram: insta.value, telefone: fone.value, nascimento: iso(nasc.value),
           peso: $('peso').value, cep: $('cep').value, endereco: $('endereco').value, numero: $('numero').value, complemento: $('complemento').value,
           bairro: $('bairro').value, cidade: $('cidade').value, estado: $('estado').value,
           menores: menores.map(({ el, ...m }) => m), lgpd: true, site: $('site').value, t: aberto,

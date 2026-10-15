@@ -1,4 +1,5 @@
 /** Validação do pré-cadastro online: as mesmas regras do cadastro no totem (lib/ops + FormTotem). Sem IO. */
+import { erroInstagramCliente, normalizarInstagram } from '../../../lib/ops/instagram';
 
 export type Menor = { nome: string; nascimento: string; documento: string };
 export type PreCadastro = {
@@ -6,6 +7,8 @@ export type PreCadastro = {
   documento: string;
   nome: string;
   email: string;
+  /** @usuário do Instagram (sai no resultado impresso da bateria) */
+  instagram: string;
   telefone: string;
   nascimento: string; // AAAA-MM-DD
   peso: string;
@@ -70,6 +73,9 @@ export function validar(entrada: Record<string, unknown>, hoje = new Date()): { 
   if (!dataValida(nascimento, hoje)) return { ok: false, erro: 'Data de nascimento inválida.' };
   if (peso && !(Number(peso) >= 15 && Number(peso) <= 250)) return { ok: false, erro: 'Peso inválido (em kg).' };
   if (estado && !/^[A-Z]{2}$/.test(estado)) return { ok: false, erro: 'UF inválida.' };
+  // obrigatório como no totem: o resultado impresso traz o Instagram de cada piloto (15/10, recepção)
+  const erroInstagram = erroInstagramCliente(entrada.instagram);
+  if (erroInstagram) return { ok: false, erro: erroInstagram.replace(' do piloto', '') };
   if (entrada.lgpd !== true) return { ok: false, erro: 'É preciso aceitar o Termo de Consentimento para Tratamento de Dados Pessoais.' };
 
   const menoresBrutos = Array.isArray(entrada.menores) ? entrada.menores.slice(0, 10) : [];
@@ -86,7 +92,7 @@ export function validar(entrada: Record<string, unknown>, hoje = new Date()): { 
   return {
     ok: true,
     dados: {
-      tipoDocumento: tipo, documento, nome, email, telefone, nascimento, peso,
+      tipoDocumento: tipo, documento, nome, email, instagram: normalizarInstagram(entrada.instagram), telefone, nascimento, peso,
       cep: digitos(entrada.cep).slice(0, 8), endereco: txt(entrada.endereco, 150), numero: txt(entrada.numero, 20),
       complemento: txt(entrada.complemento, 80), bairro: txt(entrada.bairro, 80), cidade: txt(entrada.cidade, 80), estado,
       menores, lgpd: true,
@@ -99,7 +105,7 @@ export function validar(entrada: Record<string, unknown>, hoje = new Date()): { 
 export type Horario = { id: number; inicio: string; nome: string; livres: number };
 export type Agenda = { atualizadoEm: string; precoCentavos: number; maxPilotos: number; prazoMin: number; antecedenciaMin: number; horarios: Horario[] };
 /** Cada vaga é de uma pessoa: com 3 vagas, quem compra é o piloto 1 e os outros 2 vêm cadastrados aqui. */
-export type Acompanhante = { nome: string; documento: string; nascimento: string };
+export type Acompanhante = { nome: string; documento: string; nascimento: string; instagram?: string };
 export type Reserva = { cliente: PreCadastro; bateriaId: number; quantidade: number; forma: 'pix' | 'cartao'; pilotos: string[]; acompanhantes: Acompanhante[]; compradorPilota: boolean };
 /** Idade mínima para pilotar o kart de locação (requisito do kartódromo). */
 export const IDADE_MINIMA_PILOTO = 14;
@@ -149,7 +155,10 @@ export function validarReserva(entrada: Record<string, unknown>, agenda: Agenda 
     documentos.add(digitos(documento));
     if (!dataValida(nascimento, hoje)) return { ok: false, erro: `Data de nascimento inválida do piloto ${n} (${nome}).` };
     if (idade(nascimento, hoje) < IDADE_MINIMA_PILOTO) return { ok: false, erro: `${nome} precisa ter ${IDADE_MINIMA_PILOTO} anos ou mais para pilotar.` };
-    acompanhantes.push({ nome, documento, nascimento });
+    // Instagram dos outros pilotos é opcional (quem paga nem sempre sabe); se vier, tem que ser válido
+    const instagram = String(a?.instagram ?? '').trim();
+    if (instagram && erroInstagramCliente(instagram)) return { ok: false, erro: `Instagram inválido do piloto ${n} (${nome}). Informe o @usuário (ex.: @andre.silva) ou deixe em branco.` };
+    acompanhantes.push({ nome, documento, nascimento, ...(instagram ? { instagram: normalizarInstagram(instagram) } : {}) });
   }
   const pilotos = [...(compradorPilota ? [v.dados.nome] : []), ...acompanhantes.map((a) => a.nome)];
   return { ok: true, dados: { cliente: v.dados, bateriaId: horario.id, quantidade, forma, pilotos, acompanhantes, compradorPilota } };

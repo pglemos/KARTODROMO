@@ -13,6 +13,8 @@ export type PreCadastro = {
   documento: string;
   nome: string;
   email: string;
+  /** @usuário do Instagram; cadastros antigos do site não têm */
+  instagram?: string;
   telefone: string;
   nascimento: string;
   peso: string;
@@ -44,7 +46,7 @@ async function chamar(caminho: string, init: RequestInit = {}, timeoutMs = 8000)
  */
 export function dadosDoCliente(p: PreCadastro, existente: { nascimento: string | null } | null): ClienteInput {
   const endereco: ClienteInput = { cep: p.cep, endereco: p.endereco, numero: p.numero, complemento: p.complemento, bairro: p.bairro, cidade: p.cidade, estado: p.estado };
-  const contato: ClienteInput = { email: p.email, telefone: p.telefone, peso: p.peso || null, ...endereco, lgpd: true };
+  const contato: ClienteInput = { email: p.email, telefone: p.telefone, peso: p.peso || null, ...(p.instagram ? { instagram: p.instagram } : {}), ...endereco, lgpd: true };
   if (existente) return { ...contato, ...(existente.nascimento ? {} : { nascimento: p.nascimento }) };
   return { nome: p.nome, tipoDocumento: p.tipoDocumento, documento: p.documento, nascimento: p.nascimento, ...contato };
 }
@@ -83,7 +85,7 @@ export async function gravarPreCadastro(p: PreCadastro, log: Log): Promise<numbe
  * reaproveitado sem mexer nos dados (só preenche o nascimento se faltar); quem não tem ganha um cadastro novo. O termo e o
  * aceite de dados (LGPD) a própria pessoa faz no totem — por isso não marcamos LGPD aqui.
  */
-export async function gravarAcompanhante(a: { nome: string; documento: string; nascimento: string; chave?: string }, log: Log): Promise<number> {
+export async function gravarAcompanhante(a: { nome: string; documento: string; nascimento: string; instagram?: string; chave?: string }, log: Log): Promise<number> {
   const doc = a.chave || onlyDigits(a.documento);
   const existente = await one<{ id: number; nascimento: string | null }>(
     `SELECT TOP 1 Id id, CONVERT(varchar(10), Nascimento, 126) nascimento FROM dbo.Cliente
@@ -91,10 +93,11 @@ export async function gravarAcompanhante(a: { nome: string; documento: string; n
     { d: doc },
   );
   if (existente) {
-    if (!existente.nascimento && a.nascimento) await updateCliente(existente.id, { nascimento: a.nascimento }, true);
+    const novos: ClienteInput = { ...(!existente.nascimento && a.nascimento ? { nascimento: a.nascimento } : {}), ...(a.instagram ? { instagram: a.instagram } : {}) };
+    if (Object.keys(novos).length) await updateCliente(existente.id, novos, true);
     return existente.id;
   }
-  const id = await insertCliente({ nome: a.nome, tipoDocumento: 'CPF', documento: a.documento, nascimento: a.nascimento }, 'site');
+  const id = await insertCliente({ nome: a.nome, tipoDocumento: 'CPF', documento: a.documento, nascimento: a.nascimento, ...(a.instagram ? { instagram: a.instagram } : {}) }, 'site');
   log(`pré-cadastro: piloto ${id} cadastrado pela reserva online de outra pessoa`);
   return id;
 }

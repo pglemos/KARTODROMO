@@ -3,7 +3,7 @@ import { chaveDocumento, cpfValido, dataValida, validar } from '../workers/pre-c
 
 const HOJE = new Date('2026-09-27T12:00:00Z');
 const base = {
-  tipoDocumento: 'CPF', documento: '529.982.247-25', nome: 'Maria  da Silva', email: 'Maria@Email.com', telefone: '(31) 98888-7777',
+  tipoDocumento: 'CPF', documento: '529.982.247-25', nome: 'Maria  da Silva', email: 'Maria@Email.com', instagram: 'https://www.instagram.com/Maria.Silva/', telefone: '(31) 98888-7777',
   nascimento: '1990-05-20', peso: '72,5', cep: '32600-000', endereco: 'Rua A', numero: '10', complemento: '', bairro: 'Centro', cidade: 'Betim', estado: 'mg', lgpd: true,
 };
 
@@ -12,7 +12,7 @@ describe('pré-cadastro online', () => {
     const r = validar(base, HOJE);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.dados).toMatchObject({ nome: 'Maria da Silva', email: 'maria@email.com', peso: '72.5', cep: '32600000', estado: 'MG', menores: [] });
+    expect(r.dados).toMatchObject({ nome: 'Maria da Silva', email: 'maria@email.com', instagram: '@maria.silva', peso: '72.5', cep: '32600000', estado: 'MG', menores: [] });
   });
 
   it('recusa como o totem: CPF inválido, nome sem sobrenome, celular sem DDD, nascimento, termo', () => {
@@ -22,6 +22,13 @@ describe('pré-cadastro online', () => {
     expect(validar({ ...base, nascimento: '2027-01-01' }, HOJE)).toMatchObject({ ok: false });
     expect(validar({ ...base, lgpd: false }, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/Termo/) });
     expect(validar({ ...base, email: 'sem-arroba' }, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/E-mail/) });
+  });
+
+  it('Instagram obrigatório e válido, como no totem (sai no resultado impresso)', () => {
+    expect(validar({ ...base, instagram: '' }, HOJE)).toMatchObject({ ok: false, erro: 'O Instagram é obrigatório. Informe o @usuário.' });
+    expect(validar({ ...base, instagram: 'maria silva' }, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/Instagram inválido/) });
+    const r = validar({ ...base, instagram: '@Kart_Betim' }, HOJE);
+    expect(r.ok && r.dados.instagram).toBe('@kart_betim');
   });
 
   it('RG e passaporte viram a mesma chave que o totem procura', () => {

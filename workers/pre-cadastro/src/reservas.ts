@@ -27,7 +27,7 @@ export type Pedido = {
   forma: 'pix' | 'cartao';
   pilotos: string[];
   /** Os outros pilotos da reserva (um por vaga, além de quem comprou), cada um com o próprio cadastro. */
-  acompanhantes?: { nome: string; documento: string; nascimento: string; chave: string }[];
+  acompanhantes?: { nome: string; documento: string; nascimento: string; instagram?: string; chave: string }[];
   /** false = quem comprou não vai pilotar (todas as vagas são dos acompanhantes). */
   compradorPilota?: boolean;
   cliente: PreCadastro & { chave: string };
