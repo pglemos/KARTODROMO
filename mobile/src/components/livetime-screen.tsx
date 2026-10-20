@@ -19,12 +19,21 @@ import type { LiveSession } from '../types/racing';
 export interface LiveTimeScreenProps {
   onOpenCockpitHUD?: () => void;
   session?: LiveSession;
+  /** dado real: puxar para baixo busca o retrato da crono de novo */
+  onRefresh?: () => Promise<void> | void;
+  /** modo cockpit (telemetria de demonstração); desligado com dado real */
+  hudEnabled?: boolean;
 }
 
 export function LiveTimeScreen({
   onOpenCockpitHUD,
   session = MOCK_LIVE_SESSION,
+  onRefresh: refreshData,
+  hudEnabled = true,
 }: LiveTimeScreenProps) {
+  const finished = session.status === 'CHECKERED';
+  const flagColor = finished ? '#FFFFFF' : session.status === 'YELLOW' ? '#FACC15' : session.status === 'RED' ? '#EF4444' : '#00C853';
+  const flagLabel = finished ? 'BANDEIRA QUADRICULADA' : session.status === 'YELLOW' ? 'BANDEIRA AMARELA' : session.status === 'RED' ? 'BANDEIRA VERMELHA' : 'BANDEIRA VERDE';
   const [refreshing, setRefreshing] = useState(false);
 
   const handleOpenCockpit = () => {
@@ -45,6 +54,10 @@ export function LiveTimeScreen({
 
   const onRefresh = () => {
     setRefreshing(true);
+    if (refreshData) {
+      void Promise.resolve(refreshData()).finally(() => setRefreshing(false));
+      return;
+    }
     setTimeout(() => setRefreshing(false), 800);
   };
 
@@ -86,7 +99,7 @@ export function LiveTimeScreen({
             </View>
 
             <View style={styles.srOnly}>
-              <Text>AO VIVO</Text>
+              <Text>{finished ? 'ENCERRADA' : 'AO VIVO'}</Text>
             </View>
           </View>
         </View>
@@ -121,13 +134,14 @@ export function LiveTimeScreen({
           {/* 3. Flag Status & Elapsed Session Timer Bar (Matches IMG_3792.PNG) */}
           <Pressable
             testID="flag-status-card"
-            onPress={handleOpenCockpit}
+            onPress={hudEnabled ? handleOpenCockpit : undefined}
+            disabled={!hudEnabled}
             style={styles.flagBar}
           >
             <View style={styles.flagLeft}>
-              <SportsIcon name="flag" size={24} color="#00C853" />
+              <SportsIcon name="flag" size={24} color={flagColor} />
               <Text testID="flag-status-label" style={styles.srOnly}>
-                BANDEIRA VERDE
+                {flagLabel}
               </Text>
             </View>
 
@@ -143,7 +157,7 @@ export function LiveTimeScreen({
           </Pressable>
 
           {/* 4. Cockpit HUD Launcher Button (srOnly for tests; tapping timer bar also opens HUD) */}
-          <Pressable
+          {hudEnabled ? <Pressable
             testID="btn-open-cockpit-hud"
             accessibilityRole="button"
             accessibilityLabel="Abrir Modo Cockpit HUD"
@@ -152,7 +166,7 @@ export function LiveTimeScreen({
           >
             <Text>⛶ MODO COCKPIT HUD (PAISAGEM)</Text>
             <Text>Telemetria horizontal de pista em tela cheia</Text>
-          </Pressable>
+          </Pressable> : null}
 
           {/* 5. Competitor Telemetry Cards List (Matches IMG_3792.PNG 4-column card layout) */}
           <View testID="telemetry-table" style={styles.telemetryList}>

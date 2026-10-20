@@ -14,13 +14,13 @@ export default function StartScreen() {
     <Page>
       <PageHeader
         title="Kartódromo de Betim"
-        description="Veja os horários da pista, reserve sua bateria e acompanhe seus resultados."
+        description="Veja os horários da pista, reserve sua bateria, acompanhe a corrida ao vivo e seus resultados."
       />
       <Panel style={{ gap: 12 }}>
         <ActionButton label="Ver agenda" onPress={() => router.push('/(tabs)/agenda')} />
         <ActionButton label="Minhas reservas" onPress={() => router.push('/(tabs)/reservas')} secondary />
+        <ActionButton label="Ao vivo na pista" onPress={() => router.push('/(tabs)/livetime')} secondary />
         <ActionButton label="Resultados" onPress={() => router.push('/(tabs)/resultados')} secondary />
-        <ActionButton label="Treino com GPS" onPress={() => router.push('/(tabs)/gps')} secondary />
       </Panel>
       <Panel style={{ gap: 12 }}>
         <Text style={styles.muted}>

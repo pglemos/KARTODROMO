@@ -11,8 +11,9 @@ import { handleMobileAuth, type MobileAuthEnv } from './mobile/auth';
 import { handleMobileReservations } from './mobile/reservations';
 import { handleMobileCoupons, handleMobileCouponsSync } from './mobile/coupons';
 import { handleMobileResults, type MobileResultsEnv } from './mobile/results';
+import { handleMobileLive, type MobileLiveEnv } from './mobile/live';
 
-export interface Env extends EnvReservas, MobileAuthEnv, MobileResultsEnv {
+export interface Env extends EnvReservas, MobileAuthEnv, MobileResultsEnv, MobileLiveEnv {
   ASSETS: Fetcher;
   PRE: R2Bucket;
   SYNC_KEY: string;
@@ -97,6 +98,7 @@ export default {
           p === '/api/mobile/v1/results' || p === '/api/mobile/v1/results/me') {
         return await handleMobileResults(req, env);
       }
+      if (p === '/api/mobile/v1/live') return await handleMobileLive(req, env);
       if (p === '/api/mobile/v1/agenda' || p === '/api/mobile/v1/reservations' || p.startsWith('/api/mobile/v1/reservations/')) {
         return await handleMobileReservations(req, env);
       }

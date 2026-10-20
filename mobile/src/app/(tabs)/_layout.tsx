@@ -33,9 +33,8 @@ export default function CustomerTabs() {
       <Tabs.Screen
         name="livetime"
         options={{
-          ...(DEMO_MODE ? {} : { href: null }),
-          title: 'LiveTime',
-          tabBarLabel: 'LiveTime',
+          title: DEMO_MODE ? 'LiveTime' : 'Ao vivo',
+          tabBarLabel: DEMO_MODE ? 'LiveTime' : 'Ao vivo',
         }}
       />
       <Tabs.Screen
@@ -69,10 +68,11 @@ export default function CustomerTabs() {
           title: 'Resultados',
         }}
       />
+      {/* GPS fica fora das abas até a linha de chegada medida ser aprovada (features/gps/track-config.ts) */}
       <Tabs.Screen
         name="gps"
         options={{
-          ...(DEMO_MODE ? { href: null } : {}),
+          href: null,
           title: 'GPS',
         }}
       />
