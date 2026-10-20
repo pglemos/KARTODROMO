@@ -255,7 +255,7 @@ describe('API pública de resultados móveis', () => {
     });
     expect(await unlinked.json()).toEqual({
       vinculo: 'pendente',
-      mensagem: 'Para ver seu histórico, procure a recepção.',
+      mensagem: 'Seu histórico aparece sozinho quando o documento e o e-mail ou o telefone da sua conta são os mesmos do seu cadastro no kartódromo. Se não aparecer em alguns minutos, peça para a recepção conferir seu cadastro.',
       results: [],
     });
   });

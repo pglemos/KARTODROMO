@@ -252,32 +252,34 @@ async function linkIdentity(request: Request, env: MobileResultsEnv) {
 
 async function publicResults(env: MobileResultsEnv) {
   if (!env.MOBILE_DB) return unavailable();
+  // as 60 baterias mais recentes (antes eram 200, com uma consulta por bateria): duas idas ao banco no total.
+  // Na mesma data, a última publicada primeiro (session_id é aleatório depois da data); o app ainda ordena pela hora do nome.
   const sessions = await env.MOBILE_DB.prepare(
-    `SELECT session_id, event_name, event_date FROM mobile_results WHERE status = 'published'
-     GROUP BY session_id, event_name, event_date ORDER BY event_date DESC, session_id DESC LIMIT 200`,
+    `SELECT session_id, event_name, event_date, MAX(updated_at) publicado FROM mobile_results WHERE status = 'published'
+     GROUP BY session_id, event_name, event_date ORDER BY event_date DESC, publicado DESC, session_id DESC LIMIT 60`,
   ).all<{ session_id: string; event_name: string; event_date: string }>();
-  const results = [];
-  for (const session of sessions.results) {
-    const rows = await env.MOBILE_DB.prepare(
-      `SELECT display_name, position, kart, laps, best_lap_ms FROM mobile_results
-       WHERE session_id = ? AND status = 'published' ORDER BY position, display_name LIMIT 100`,
-    ).bind(session.session_id).all<{
-      display_name: string; position: number; kart: string; laps: number; best_lap_ms: number | null;
-    }>();
-    results.push({
-      sessionId: session.session_id,
-      eventName: session.event_name,
-      eventDate: session.event_date,
-      results: rows.results.map((row) => ({
-        displayName: row.display_name,
-        position: Number(row.position),
-        kart: row.kart,
-        laps: Number(row.laps),
-        bestLapMs: row.best_lap_ms == null ? null : Number(row.best_lap_ms),
-      })),
-    });
-  }
-  return json(200, results);
+  if (!sessions.results.length) return json(200, []);
+  const ids = sessions.results.map((s) => s.session_id);
+  const rows = await env.MOBILE_DB.prepare(
+    `SELECT session_id, display_name, position, kart, laps, best_lap_ms FROM mobile_results
+     WHERE status = 'published' AND session_id IN (${ids.map(() => '?').join(',')}) ORDER BY session_id, position, display_name`,
+  ).bind(...ids).all<{
+    session_id: string; display_name: string; position: number; kart: string; laps: number; best_lap_ms: number | null;
+  }>();
+  const porBateria = new Map<string, typeof rows.results>();
+  for (const row of rows.results) porBateria.set(row.session_id, [...(porBateria.get(row.session_id) ?? []), row]);
+  return json(200, sessions.results.map((session) => ({
+    sessionId: session.session_id,
+    eventName: session.event_name,
+    eventDate: session.event_date,
+    results: (porBateria.get(session.session_id) ?? []).slice(0, 100).map((row) => ({
+      displayName: row.display_name,
+      position: Number(row.position),
+      kart: row.kart,
+      laps: Number(row.laps),
+      bestLapMs: row.best_lap_ms == null ? null : Number(row.best_lap_ms),
+    })),
+  })));
 }
 
 async function personalResults(request: Request, env: MobileResultsEnv) {
@@ -289,7 +291,7 @@ async function personalResults(request: Request, env: MobileResultsEnv) {
   ).bind(account.id).first<{ customer_id: string }>();
   if (!link) return json(200, {
     vinculo: 'pendente',
-    mensagem: 'Para ver seu histórico, procure a recepção.',
+    mensagem: 'Seu histórico aparece sozinho quando o documento e o e-mail ou o telefone da sua conta são os mesmos do seu cadastro no kartódromo. Se não aparecer em alguns minutos, peça para a recepção conferir seu cadastro.',
     results: [],
   });
   const rows = await env.MOBILE_DB.prepare(

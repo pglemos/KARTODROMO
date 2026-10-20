@@ -55,7 +55,7 @@ beforeEach(() => {
   }];
   personalResults = {
     vinculo: 'pendente',
-    mensagem: 'Para ver seu histórico, procure a recepção.',
+    mensagem: 'Seu histórico aparece sozinho quando o documento e o e-mail ou o telefone da sua conta são os mesmos do seu cadastro no kartódromo. Se não aparecer em alguns minutos, peça para a recepção conferir seu cadastro.',
     results: [],
   };
   fetchMock = jest.fn(async (input) => {
@@ -129,7 +129,7 @@ describe('resultados oficiais e histórico do cliente', () => {
     setSession(accessSession);
     const view = await render(<ResultsScreen />);
 
-    expect(await view.findByText('Para ver seu histórico, procure a recepção.')).toBeTruthy();
+    expect(await view.findByText('Seu histórico aparece sozinho quando o documento e o e-mail ou o telefone da sua conta são os mesmos do seu cadastro no kartódromo. Se não aparecer em alguns minutos, peça para a recepção conferir seu cadastro.')).toBeTruthy();
     expect(view.queryByText(/CPF|e-mail cadastrado|cliente encontrado/i)).toBeNull();
     expect(requests('/api/mobile/v1/results/me')).toHaveLength(1);
   });
@@ -173,9 +173,9 @@ describe('resultados oficiais e histórico do cliente', () => {
 
     await act(async () => finishSecondRequest?.(apiResponse({
       vinculo: 'pendente',
-      mensagem: 'Para ver seu histórico, procure a recepção.',
+      mensagem: 'Seu histórico aparece sozinho quando o documento e o e-mail ou o telefone da sua conta são os mesmos do seu cadastro no kartódromo. Se não aparecer em alguns minutos, peça para a recepção conferir seu cadastro.',
       results: [],
     })));
-    expect(await view.findByText('Para ver seu histórico, procure a recepção.')).toBeTruthy();
+    expect(await view.findByText('Seu histórico aparece sozinho quando o documento e o e-mail ou o telefone da sua conta são os mesmos do seu cadastro no kartódromo. Se não aparecer em alguns minutos, peça para a recepção conferir seu cadastro.')).toBeTruthy();
   });
 });
