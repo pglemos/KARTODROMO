@@ -3,17 +3,25 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Reserva online de grupo: cada vaga vira a inscrição de UMA pessoa (comprador + cadastros dos outros pilotos).
 const chamadas = vi.hoisted(() => ({ inscrever: [] as unknown[][], acompanhantes: [] as unknown[] }));
 
-vi.mock('../../lib/ops/db', () => ({
-  one: vi.fn(async (sql: string) => {
-    if (sql.includes('FROM dbo.ReservaOnline WHERE PedidoId')) return chamadas.inscrever.length ? { expira: '2026-10-09T18:35:00' } : null;
-    if (sql.includes('FROM dbo.Bateria b')) return { nome: 'BATERIA 19:20', inicio: '2026-10-09T19:20', ok: 1 };
-    if (sql.includes('FROM dbo.Produto')) return { preco: 14500 };
-    return null;
-  }),
-  query: vi.fn(async () => []),
-  tx: vi.fn(),
-}));
+vi.mock('../../lib/ops/db', async () => {
+  const real = await vi.importActual<typeof import('../../lib/ops/db')>('../../lib/ops/db');
+  // leituras do cálculo do pedido (bateria aberta para venda online, preço do produto) e do prazo gravado
+  const ler = async (sql: string) => {
+    if (sql.includes('FROM dbo.ReservaOnline WHERE PedidoId')) return chamadas.inscrever.length ? [{ expira: '2026-10-09T18:35:00' }] : [];
+    if (sql.includes('FROM dbo.Bateria b')) return [{ nome: 'BATERIA 19:20', inicio: '2026-10-09T19:20', ok: 1, Vagas: 20, ocupadas: 0 }];
+    if (sql.includes('FROM dbo.Produto')) return [{ preco: 14500 }];
+    return [];
+  };
+  return {
+    isValidCpf: real.isValidCpf,
+    onlyDigits: real.onlyDigits,
+    one: vi.fn(async (sql: string) => (await ler(sql))[0] ?? null),
+    query: vi.fn(async () => []),
+    tx: vi.fn(async (fn: (run: (sql: string) => Promise<unknown[]>) => unknown) => fn(ler)),
+  };
+});
 vi.mock('../../lib/ops/office', () => ({
+  HttpError: class HttpError extends Error { constructor(readonly status: number, message: string) { super(message); } },
   inscreverN: vi.fn(async (...args: unknown[]) => { chamadas.inscrever.push(args); return [501, 502, 503]; }),
 }));
 vi.mock('../../lib/ops/pre-cadastro', () => ({

@@ -204,6 +204,8 @@ const requestBody: {
   forma: string;
   nascimento: string;
   politica: boolean;
+  instagram: string;
+  acompanhantes: { nome: string; documento: string; nascimento: string; instagram?: string }[];
   account_id: string;
   valorCentavos: number;
   cupom?: string;
@@ -214,6 +216,9 @@ const requestBody: {
   forma: 'pix',
   nascimento: '1990-05-20',
   politica: true,
+  instagram: '@ana.silva',
+  // cada vaga é de uma pessoa: o dono da conta + o outro piloto (mesma regra do site)
+  acompanhantes: [{ nome: 'Bruno Souza', documento: '111.444.777-35', nascimento: '1995-06-15' }],
   // These untrusted values must never replace the authenticated profile or server price.
   account_id: 'attacker-account',
   valorCentavos: 1,

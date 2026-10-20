@@ -47,6 +47,7 @@ const validBody = {
   documento: '529.982.247-25',
   nome: 'Maria da Silva',
   email: 'maria@example.com',
+  instagram: '@maria.silva',
   telefone: '(31) 98888-7777',
   nascimento: '1990-05-20',
   pilotos: ['Maria da Silva'],

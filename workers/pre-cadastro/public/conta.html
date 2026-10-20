@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sua conta · Kartódromo de Betim</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#030504">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@500;600;700&display=swap">
+<link rel="icon" href="/icone.png">
+<style>
+  /* Página do link do e-mail do app: confirma o e-mail ou cria a senha nova (tokens da marca, iguais ao pré-cadastro). */
+  :root {
+    color-scheme: dark;
+    --fundo: #030504; --fundo-2: #070b08; --cartao: #0b100c; --cartao-2: #111712;
+    --linha: rgba(255,255,255,.12); --linha-forte: rgba(255,255,255,.24);
+    --texto: #f7faf6; --suave: #a8b2aa; --apagado: #6b746d;
+    --verde: #00e676; --tinta: #03140b; --erro: #ff7a6b;
+    --titulo: 'Anton', Impact, 'Arial Narrow', sans-serif; --corpo: 'Rajdhani', 'Segoe UI', Roboto, Arial, sans-serif;
+    --raio: 4px; --foco: 0 0 0 2px var(--fundo), 0 0 0 4px var(--verde);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--fundo); color: var(--texto); font: 500 17px/1.5 var(--corpo); -webkit-text-size-adjust: 100%; }
+  :focus-visible { outline: none; box-shadow: var(--foco); }
+  .topo { background: radial-gradient(120% 90% at 50% 0%, rgba(0,230,118,.16) 0%, rgba(0,230,118,0) 60%), var(--fundo-2); border-bottom: 1px solid var(--linha); padding: 26px 16px 64px; text-align: center; }
+  .topo img { width: min(260px, 70vw); height: auto; }
+  main { max-width: 520px; margin: -40px auto 0; padding: 0 16px 40px; }
+  .cartao { background: linear-gradient(180deg, var(--cartao-2), var(--cartao)); border: 1px solid var(--linha); border-radius: var(--raio); padding: 22px 18px; }
+  h1 { font: 400 26px/1.1 var(--titulo); text-transform: uppercase; margin: 0 0 10px; }
+  p { margin: 0 0 14px; color: var(--suave); }
+  label { display: block; font: 400 13px/1.2 var(--titulo); text-transform: uppercase; letter-spacing: .06em; color: var(--suave); margin: 14px 0 7px; }
+  input { width: 100%; height: 50px; border: 1px solid var(--linha-forte); border-radius: var(--raio); padding: 0 14px; font: 500 17px var(--corpo); color: var(--texto); background: var(--fundo); outline: none; }
+  input:focus { border-color: var(--verde); }
+  button, .botao { display: block; width: 100%; min-height: 52px; margin-top: 18px; border: 0; border-radius: var(--raio); background: var(--verde); color: var(--tinta); font: 400 18px/52px var(--titulo); text-transform: uppercase; letter-spacing: .05em; text-align: center; text-decoration: none; cursor: pointer; }
+  button[disabled] { opacity: .6; cursor: default; }
+  .secundario { background: transparent; color: var(--texto); border: 1px solid var(--linha-forte); }
+  .erro { color: var(--erro); margin-top: 12px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header class="topo"><img src="/kib-logo-escuro.png" alt="Kartódromo Internacional de Betim"></header>
+<main>
+  <section class="cartao" id="carregando"><h1>Um momento…</h1><p>Conferindo o link.</p></section>
+
+  <section class="cartao" id="verificado" hidden>
+    <h1>E-mail confirmado</h1>
+    <p>Pronto! Volte ao app do Kartódromo de Betim e entre com seu CPF ou e-mail e sua senha.</p>
+    <a class="botao" href="kartodromo://login">Abrir o app</a>
+  </section>
+
+  <form class="cartao" id="senha" hidden novalidate>
+    <h1>Nova senha</h1>
+    <p>Crie uma senha com pelo menos 8 caracteres.</p>
+    <label for="s1">Nova senha</label>
+    <input id="s1" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+    <label for="s2">Repita a nova senha</label>
+    <input id="s2" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+    <p class="erro" id="erroSenha" role="alert" hidden></p>
+    <button type="submit" id="salvar">Salvar nova senha</button>
+  </form>
+
+  <section class="cartao" id="senhaOk" hidden>
+    <h1>Senha trocada</h1>
+    <p>Volte ao app e entre com a senha nova.</p>
+    <a class="botao" href="kartodromo://login">Abrir o app</a>
+  </section>
+
+  <section class="cartao" id="falha" hidden>
+    <h1>Link inválido</h1>
+    <p id="falhaTexto">Este link expirou ou já foi usado. Peça um novo pelo app.</p>
+    <a class="botao secundario" href="kartodromo://login">Abrir o app</a>
+  </section>
+</main>
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var acao = q.get('acao');
+  var token = q.get('token') || '';
+  // o token não fica no histórico nem vai para outras páginas
+  try { history.replaceState(null, '', location.pathname + '?acao=' + encodeURIComponent(acao || '')); } catch (e) {}
+  function mostrar(id) {
+    ['carregando', 'verificado', 'senha', 'senhaOk', 'falha'].forEach(function (x) { document.getElementById(x).hidden = x !== id; });
+  }
+  function falha(texto) { if (texto) document.getElementById('falhaTexto').textContent = texto; mostrar('falha'); }
+  function enviar(rota, corpo) {
+    return fetch('/api/mobile/v1/auth/' + rota, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(corpo) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j }; }); });
+  }
+  if (!/^[A-Za-z0-9_-]{16,}$/.test(token)) return falha();
+  if (acao === 'verificar') {
+    enviar('email/verify', { token: token })
+      .then(function (r) { r.ok ? mostrar('verificado') : falha(r.j.erro && r.j.erro !== 'Link inválido ou expirado.' ? r.j.erro : null); })
+      .catch(function () { falha('Sem conexão. Confira a internet e abra o link de novo.'); });
+    return;
+  }
+  if (acao !== 'senha') return falha();
+  mostrar('senha');
+  var form = document.getElementById('senha');
+  var erro = document.getElementById('erroSenha');
+  var botao = document.getElementById('salvar');
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var s1 = document.getElementById('s1').value, s2 = document.getElementById('s2').value;
+    erro.hidden = true;
+    if (s1.length < 8) { erro.textContent = 'A senha precisa ter pelo menos 8 caracteres.'; erro.hidden = false; return; }
+    if (s1 !== s2) { erro.textContent = 'As duas senhas não são iguais.'; erro.hidden = false; return; }
+    botao.disabled = true;
+    enviar('password/reset', { token: token, password: s1 })
+      .then(function (r) {
+        botao.disabled = false;
+        if (r.ok) return mostrar('senhaOk');
+        if (r.j.erro === 'Link inválido ou expirado.') return falha();
+        erro.textContent = r.j.erro || 'Não foi possível salvar. Tente de novo.'; erro.hidden = false;
+      })
+      .catch(function () { botao.disabled = false; erro.textContent = 'Sem conexão. Tente de novo.'; erro.hidden = false; });
+  });
+})();
+</script>
+</body>
+</html>

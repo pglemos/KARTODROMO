@@ -13,10 +13,12 @@
   "d1_databases": [{
     "binding": "MOBILE_DB",
     "database_name": "kartodromo-mobile",
-    "database_id": "00000000-0000-0000-0000-000000000001",
+    "database_id": "922619d4-519b-4047-aaca-3b86c7b707c4",
     "preview_database_id": "00000000-0000-0000-0000-000000000000",
     "migrations_dir": "migrations"
   }],
+  // e-mail de confirmação de conta e de troca de senha do app (Cloudflare Email Sending, o mesmo domínio dos resultados)
+  "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["resultados@kartodromodebetim.com.br"] }],
   "routes": [
     { "pattern": "cadastro.kartodromodebetim.com.br", "custom_domain": true },
     // reserva online (pagamento Asaas). Segredos: SYNC_KEY, ASAAS_API_KEY, ASAAS_WEBHOOK_TOKEN, RESERVAS_PREVIA

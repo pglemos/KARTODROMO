@@ -145,8 +145,9 @@ describe('agenda e reservas do cliente', () => {
     const view = await render(<ReservationsScreen />);
     const user = userEvent.setup();
     await view.findByText('BATERIA 09:15');
-    await user.type(view.getByLabelText('Data de nascimento do responsável'), '15051990');
-    expect(view.getByLabelText('Data de nascimento do responsável').props.value).toBe('15/05/1990');
+    await user.type(view.getByLabelText('Seu Instagram'), '@maria.silva');
+    await user.type(view.getByLabelText('Sua data de nascimento'), '15051990');
+    expect(view.getByLabelText('Sua data de nascimento').props.value).toBe('15/05/1990');
     await user.press(view.getByLabelText('Aceito a política de cancelamento'));
     await user.press(view.getByRole('button', { name: 'Enviar reserva' }));
     await waitFor(() => expect(finishCreate).toBeDefined());
@@ -319,7 +320,8 @@ describe('agenda e reservas do cliente', () => {
     expect(requests('GET', '/api/mobile/v1/coupons/preview/preview-1')).toHaveLength(1);
     expect(await view.findByText(/95,00/)).toBeTruthy();
 
-    await user.type(view.getByLabelText('Data de nascimento do responsável'), '15/05/1990');
+    await user.type(view.getByLabelText('Seu Instagram'), '@Maria.Silva');
+    await user.type(view.getByLabelText('Sua data de nascimento'), '15/05/1990');
     await user.press(view.getByLabelText('Aceito a política de cancelamento'));
     await user.press(view.getByRole('button', { name: 'Enviar reserva' }));
 
@@ -329,6 +331,7 @@ describe('agenda e reservas do cliente', () => {
     expect(reservationRequest[1]?.headers).toHaveProperty('idempotency-key', expect.stringMatching(/^mobile-/));
     expect(JSON.parse(String(reservationRequest[1]?.body))).toEqual(expect.objectContaining({
       bateriaId: 101, quantidade: 1, forma: 'pix', cupom: 'BETIM10', nascimento: '1990-05-15', politica: true,
+      instagram: '@maria.silva', compradorPilota: true, acompanhantes: [],
     }));
     expect(mockRouter.push).toHaveBeenCalledWith({ pathname: '/reservations/[id]', params: { id: order.id } });
   });

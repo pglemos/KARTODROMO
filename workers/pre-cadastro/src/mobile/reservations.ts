@@ -20,6 +20,11 @@ type ReservationInput = {
   forma: 'pix' | 'cartao';
   nascimento: string;
   politica: boolean;
+  /** @usuário de quem reserva: sai junto com o nome no resultado da bateria (o site também exige) */
+  instagram: string;
+  /** false = quem reserva não pilota. Cada vaga é de uma pessoa: validarReserva confere como no site. */
+  compradorPilota: boolean;
+  acompanhantes: { nome: string; documento: string; nascimento: string; instagram?: string }[];
   cupom?: string;
 };
 
@@ -90,9 +95,23 @@ function reservationData(body: Record<string, unknown>): ReservationInput | null
   if (!Number.isSafeInteger(bateriaId) || bateriaId < 1 || !Number.isSafeInteger(quantidade) || quantidade < 1 || quantidade > 10 ||
       (forma !== 'pix' && forma !== 'cartao') || (body.cupom != null && !/^[A-Z0-9_-]{1,40}$/.test(cupom)) ||
       !Array.isArray(pilotosEntrada) || pilotosEntrada.some((nome) => typeof nome !== 'string')) return null;
+  const acompanhantesEntrada = body.acompanhantes == null ? [] : body.acompanhantes;
+  if (!Array.isArray(acompanhantesEntrada) || acompanhantesEntrada.length > 10 ||
+      acompanhantesEntrada.some((a) => !a || typeof a !== 'object' || Array.isArray(a))) return null;
+  const texto = (valor: unknown, max: number) => typeof valor === 'string' ? valor.replace(/\s+/g, ' ').trim().slice(0, max) : '';
+  const acompanhantes = (acompanhantesEntrada as Record<string, unknown>[]).map((a) => ({
+    nome: texto(a.nome, 120),
+    documento: texto(a.documento, 20),
+    nascimento: texto(a.nascimento, 10),
+    ...(texto(a.instagram, 80) ? { instagram: texto(a.instagram, 80) } : {}),
+  }));
   const nascimento = typeof body.nascimento === 'string' ? body.nascimento.trim().slice(0, 10) : '';
   const pilotos = pilotosEntrada.map((nome) => (nome as string).replace(/\s+/g, ' ').trim().slice(0, 80)).filter(Boolean).slice(0, quantidade);
-  return { bateriaId, quantidade, pilotos, forma, nascimento, politica: body.politica === true, ...(cupom ? { cupom } : {}) };
+  return {
+    bateriaId, quantidade, pilotos, forma, nascimento, politica: body.politica === true,
+    instagram: texto(body.instagram, 80), compradorPilota: body.compradorPilota !== false, acompanhantes,
+    ...(cupom ? { cupom } : {}),
+  };
 }
 
 function reservationInput(body: ReservationInput, account: MobileAccount) {
@@ -210,6 +229,8 @@ async function createOrder(request: Request, env: Env, account: MobileAccount) {
       quantidade: checked.dados.quantidade,
       forma: checked.dados.forma,
       pilotos: checked.dados.pilotos,
+      acompanhantes: checked.dados.acompanhantes.map((a) => ({ ...a, chave: chaveDocumento('CPF', a.documento) })),
+      compradorPilota: checked.dados.compradorPilota,
       ...(data.cupom ? { cupom: data.cupom } : {}),
       cliente: {
         ...checked.dados.cliente,

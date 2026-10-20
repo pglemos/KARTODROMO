@@ -25,6 +25,40 @@ function dateForServer(value: string) {
   return `${year}-${month}-${day}`;
 }
 
+function maskDate(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 8);
+  return [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4)].filter(Boolean).join('/');
+}
+
+function maskCpf(value: string) {
+  const d = value.replace(/\D/g, '').slice(0, 11);
+  return d.replace(/^(\d{3})(\d)/, '$1.$2').replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d{1,2})$/, '.$1-$2');
+}
+
+/** Mesma conta do site e do servidor da recepção. */
+export function cpfValido(value: string) {
+  const d = value.replace(/\D/g, '');
+  if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
+  const dv = (n: number) => {
+    let soma = 0;
+    for (let i = 0; i < n; i++) soma += Number(d[i]) * (n + 1 - i);
+    const r = (soma * 10) % 11;
+    return r === 10 ? 0 : r;
+  };
+  return dv(9) === Number(d[9]) && dv(10) === Number(d[10]);
+}
+
+/** @usuário do Instagram como o site aceita (com ou sem @, ou o link do perfil). '' = não informado; null = inválido. */
+export function instagramNormalizado(value: string): string | null {
+  const u = value.trim().replace(/^(?:https?:\/\/)?(?:www\.)?instagram\.com\//i, '').replace(/[/?#].*$/, '').replace(/^@/, '').toLowerCase();
+  if (!u) return '';
+  if (!/^[a-z0-9_](?:[a-z0-9_.]{0,28}[a-z0-9_])?$/.test(u) || u.includes('..')) return null;
+  return `@${u}`;
+}
+
+type OtherPilot = { nome: string; cpf: string; nascimento: string; instagram: string };
+const emptyPilot: OtherPilot = { nome: '', cpf: '', nascimento: '', instagram: '' };
+
 function idempotencyKey() {
   return `mobile-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
@@ -133,8 +167,10 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
   const { palette, styles } = useUi();
   const slot = agenda.horarios.find((item) => item.id === batteryId);
   const [quantity, setQuantity] = useState('1');
-  const [pilots, setPilots] = useState('');
   const [birthDate, setBirthDate] = useState('');
+  const [instagram, setInstagram] = useState('');
+  const [buyerRides, setBuyerRides] = useState(true);
+  const [others, setOthers] = useState<OtherPilot[]>([]);
   const [policyAccepted, setPolicyAccepted] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'cartao'>('pix');
   const [coupon, setCoupon] = useState('');
@@ -150,10 +186,22 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
     return () => { active.current = false; };
   }, []);
   const count = Number(quantity);
+  // cada vaga é de uma pessoa: quem reserva ocupa uma (se for pilotar) e cada outra precisa do cadastro de quem vai correr
+  const needed = Number.isSafeInteger(count) && count > 0 ? Math.max(0, Math.min(count, 10) - (buyerRides ? 1 : 0)) : 0;
 
   function changed() {
     key.current = null;
     setError('');
+  }
+
+  function updatePilot(index: number, field: keyof OtherPilot, value: string) {
+    setOthers((list) => {
+      const next = [...list];
+      while (next.length <= index) next.push({ ...emptyPilot });
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+    changed();
   }
 
   async function validateCoupon() {
@@ -189,6 +237,24 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
       setError('Informe uma data de nascimento válida no formato DD/MM/AAAA.');
       return;
     }
+    const insta = instagramNormalizado(instagram);
+    if (!insta) {
+      setError(insta === '' ? 'Informe seu Instagram (o @usuário). Ele sai junto com seu nome no resultado da bateria.' : 'Instagram inválido. Informe o @usuário (ex.: @andre.silva).');
+      return;
+    }
+    const acompanhantes: CreateReservationInput['acompanhantes'] = [];
+    for (let i = 0; i < needed; i++) {
+      const p = others[i] ?? emptyPilot;
+      const n = i + (buyerRides ? 2 : 1);
+      const nome = p.nome.replace(/\s+/g, ' ').trim();
+      if (nome.split(' ').length < 2) { setError(`Informe o nome completo do piloto ${n}.`); return; }
+      if (!cpfValido(p.cpf)) { setError(`CPF inválido do piloto ${n} (${nome}).`); return; }
+      const data = dateForServer(p.nascimento);
+      if (!data) { setError(`Data de nascimento inválida do piloto ${n} (${nome}).`); return; }
+      const ig = instagramNormalizado(p.instagram);
+      if (ig === null) { setError(`Instagram inválido do piloto ${n} (${nome}). Informe o @usuário ou deixe em branco.`); return; }
+      acompanhantes.push({ nome, documento: p.cpf, nascimento: data, ...(ig ? { instagram: ig } : {}) });
+    }
     if (!policyAccepted) {
       setError('Aceite a política de cancelamento para continuar.');
       return;
@@ -198,10 +264,13 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
     const input: CreateReservationInput = {
       bateriaId: batteryId,
       quantidade: count,
-      pilotos: pilots.split('\n').map((name) => name.trim()).filter(Boolean),
+      pilotos: acompanhantes.map((p) => p.nome),
       forma: paymentMethod,
       nascimento,
       politica: true,
+      instagram: insta,
+      compradorPilota: buyerRides,
+      acompanhantes,
       ...(coupon.trim() ? { cupom: coupon.trim().toUpperCase() } : {}),
     };
     key.current ??= idempotencyKey();
@@ -237,31 +306,71 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
           style={styles.input}
         />
       </Field>
-      <Field label="Pilotos (um nome por linha)" hint={<Text style={styles.muted}>Opcional. O nome da conta é usado como responsável pela reserva.</Text>}>
+      <Field label="Seu Instagram" hint={<Text style={styles.muted}>Sai junto com seu nome no resultado da bateria.</Text>}>
         <TextInput
-          accessibilityLabel="Pilotos, um nome por linha"
-          value={pilots}
-          onChangeText={(value) => { setPilots(value); changed(); }}
-          multiline
-          style={[styles.input, { minHeight: 78, paddingTop: 12, textAlignVertical: 'top' }]}
+          accessibilityLabel="Seu Instagram"
+          placeholder="@seuusuario"
+          placeholderTextColor={palette.muted}
+          autoCapitalize="none"
+          autoCorrect={false}
+          value={instagram}
+          onChangeText={(value) => { setInstagram(value); changed(); }}
+          maxLength={80}
+          style={styles.input}
         />
       </Field>
-      <Field label="Data de nascimento do responsável">
+      <Field label="Sua data de nascimento">
         <TextInput
-          accessibilityLabel="Data de nascimento do responsável"
+          accessibilityLabel="Sua data de nascimento"
           placeholder="DD/MM/AAAA"
           placeholderTextColor={palette.muted}
           value={birthDate}
-          onChangeText={(value) => {
-            const digits = value.replace(/\D/g, '').slice(0, 8);
-            setBirthDate([digits.slice(0, 2), digits.slice(2, 4), digits.slice(4)].filter(Boolean).join('/'));
-            changed();
-          }}
+          onChangeText={(value) => { setBirthDate(maskDate(value)); changed(); }}
           keyboardType="number-pad"
           maxLength={10}
           style={styles.input}
         />
       </Field>
+      <Pressable
+        accessibilityRole="checkbox"
+        accessibilityLabel="Eu também vou pilotar"
+        accessibilityState={{ checked: buyerRides }}
+        onPress={() => { setBuyerRides(!buyerRides); changed(); }}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48, paddingVertical: 12 }}
+      >
+        <View style={{ width: 23, height: 23, borderRadius: 6, borderWidth: 1, borderColor: buyerRides ? palette.accent : palette.border, alignItems: 'center', justifyContent: 'center', backgroundColor: buyerRides ? palette.accent : 'transparent' }}>
+          {buyerRides ? <Icon name="check" color={palette.onAccent} size={16} /> : null}
+        </View>
+        <Text style={[styles.muted, { flex: 1, color: palette.text }]}>Eu também vou pilotar (uso uma das vagas)</Text>
+      </Pressable>
+      {needed > 0 ? <Text style={styles.muted}>Cada vaga é de uma pessoa diferente. Cadastre {needed === 1 ? (buyerRides ? 'o outro piloto' : 'quem vai pilotar') : `os ${needed} pilotos`} (14 anos ou mais).</Text> : null}
+      {Array.from({ length: needed }, (_, i) => {
+        const p = others[i] ?? emptyPilot;
+        const n = i + (buyerRides ? 2 : 1);
+        return (
+          <Panel key={i} style={{ gap: 10 }}>
+            <Text style={{ color: palette.text, fontSize: 15, fontWeight: '800' }}>Piloto {n}</Text>
+            <Field label="Nome completo">
+              <TextInput accessibilityLabel={`Nome completo do piloto ${n}`} value={p.nome} autoCapitalize="words" maxLength={120}
+                onChangeText={(value) => updatePilot(i, 'nome', value)} style={styles.input} />
+            </Field>
+            <Field label="CPF">
+              <TextInput accessibilityLabel={`CPF do piloto ${n}`} value={p.cpf} keyboardType="number-pad" maxLength={14}
+                onChangeText={(value) => updatePilot(i, 'cpf', maskCpf(value))} style={styles.input} />
+            </Field>
+            <Field label="Data de nascimento">
+              <TextInput accessibilityLabel={`Data de nascimento do piloto ${n}`} placeholder="DD/MM/AAAA" placeholderTextColor={palette.muted}
+                value={p.nascimento} keyboardType="number-pad" maxLength={10}
+                onChangeText={(value) => updatePilot(i, 'nascimento', maskDate(value))} style={styles.input} />
+            </Field>
+            <Field label="Instagram (opcional)">
+              <TextInput accessibilityLabel={`Instagram do piloto ${n}`} placeholder="@usuario" placeholderTextColor={palette.muted}
+                value={p.instagram} autoCapitalize="none" autoCorrect={false} maxLength={80}
+                onChangeText={(value) => updatePilot(i, 'instagram', value)} style={styles.input} />
+            </Field>
+          </Panel>
+        );
+      })}
       <Text accessibilityRole="header" style={[styles.sectionTitle, { marginTop: 20 }]}>Pagamento</Text>
       <Field label="Cupom de desconto">
         <TextInput
@@ -361,7 +470,7 @@ function AuthenticatedReservations({ session, batteryId }: { session: SessionTok
   if (batteryId !== null) {
     return (
       <Page>
-        <PageHeader title="Confirmar reserva" description="Informe os dados do responsável e revise o pedido antes de pagar." />
+        <PageHeader title="Confirmar reserva" description="Informe quem vai pilotar e revise o pedido antes de pagar." />
         <LogoutButton />
         {loading && !agenda ? <LoadingMessage label="Carregando horário…" /> : null}
         {error ? <View style={{ gap: 12 }}><InlineError message={error} /><ActionButton label="Tentar novamente" onPress={retryAgenda} secondary /></View> : null}

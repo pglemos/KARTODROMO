@@ -51,6 +51,12 @@ export interface CreateReservationInput {
   forma: 'pix' | 'cartao';
   nascimento: string;
   politica: true;
+  /** @usuário de quem reserva (sai no resultado da bateria). */
+  instagram: string;
+  /** false = quem reserva não vai pilotar. Cada vaga é de uma pessoa diferente. */
+  compradorPilota: boolean;
+  /** Os outros pilotos, um por vaga: nome completo, CPF e nascimento (AAAA-MM-DD); Instagram opcional. */
+  acompanhantes: { nome: string; documento: string; nascimento: string; instagram?: string }[];
   cupom?: string;
 }
 
