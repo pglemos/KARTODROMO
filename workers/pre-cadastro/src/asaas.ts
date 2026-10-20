@@ -37,6 +37,11 @@ export async function garantirCliente(env: AsaasEnv, c: ClienteAsaas): Promise<s
 
 export type Cobranca = { id: string; invoiceUrl: string; status: string; billingType: string };
 
+export async function buscarCobrancaPorReferencia(env: AsaasEnv, referencia: string) {
+  const response = await chamar<{ data?: Cobranca[] }>(env, `/payments?externalReference=${encodeURIComponent(referencia)}`);
+  return response.data?.[0] ?? null;
+}
+
 /** Vencimento no dia (horário de Brasília): a vaga só fica segura por 15 min de qualquer jeito. */
 export function hojeBrasilia(agora = new Date()) {
   return new Date(agora.getTime() - 3 * 3_600_000).toISOString().slice(0, 10);

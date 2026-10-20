@@ -5,6 +5,7 @@
 import { CLIENTE_COLS, insertCliente, isValidCpf, one, onlyDigits, query, tx, updateCliente, type ClienteInput } from './db';
 import { confereSenha, hashSenha, type Sessao } from './auth';
 import { erroCadastroObrigatorio, erroPesoCliente } from './cadastro-obrigatorio';
+import { mobileApiEndpoint } from '../mobile-api-url';
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
@@ -61,6 +62,18 @@ const percentual = (v: unknown) => {
 };
 const bit = (v: unknown) => (v === true || v === 'true' || v === 1 || v === '1' ? 1 : 0);
 const duplicateSql = (e: unknown) => /UNIQUE|duplicate|2627|2601/i.test(e instanceof Error ? e.message : String(e));
+const mobilePermissions = new Set(['resultados_publicar_mobile', 'identidade_mobile_vincular']);
+
+async function mobilePermission(sessao: Sessao, funcao: string) {
+  const row = await one<{ allowed: boolean | number | string }>(
+    `SELECT CAST(CASE WHEN COALESCE(p.AcessoTotal, 0) = 1 OR COALESCE(pp.Incluir, 0) = 1 THEN 1 ELSE 0 END AS bit) allowed
+     FROM dbo.Usuario u LEFT JOIN dbo.Perfil p ON p.Id = u.PerfilId
+     LEFT JOIN dbo.PerfilPermissao pp ON pp.PerfilId = p.Id AND pp.Modulo = @modulo AND pp.Funcao = @funcao
+     WHERE u.Id = @uid AND u.Ativo = 1`,
+    { uid: sessao.uid, modulo: 'App Mobile', funcao },
+  );
+  return row?.allowed === true || row?.allowed === 1 || row?.allowed === '1';
+}
 
 async function servicosOnline() {
   const servicos: { id: string; nome: string; online: boolean | null; status: 'online' | 'offline' | 'indisponivel'; verificadoEm: string | null; detalhe?: string }[] = [
@@ -399,16 +412,19 @@ export async function sumarioMovimento(movId: number) {
  * opcoes.produtoId: produto escolhido na recepção (senão o da bateria); opcoes.pago: pago antecipado (site/WhatsApp), já entra paga e aprovada.
  * opcoes.clientes: uma vaga para CADA pessoa da lista (reserva online de grupo: comprador + os outros pilotos); clienteId fica
  * como responsável. Sem a lista, as n vagas ficam no nome de clienteId (como a recepção sempre fez).
+ * opcoes.run: roda dentro de uma transação já aberta (reserva online grava o pedido e o cupom junto).
  */
-async function inscreverN(bateriaId: number, clienteId: number, n: number, origem: string, uid: number | null, observacao: string | null, aprovada = true, opcoes: { produtoId?: number | null; pago?: boolean; clientes?: number[] } = {}) {
+type OpsRun = (text: string, params?: Record<string, unknown>) => Promise<Record<string, unknown>[]>;
+
+async function inscreverN(bateriaId: number, clienteId: number, n: number, origem: string, uid: number | null, observacao: string | null, aprovada = true, opcoes: { produtoId?: number | null; pago?: boolean; clientes?: number[]; run?: OpsRun } = {}) {
   const pessoas = opcoes.clientes?.length ? opcoes.clientes : null;
   if (pessoas) n = pessoas.length;
-  return tx(async (run) => {
+  const inscrever = async (run: OpsRun) => {
     const [b] = await run(
       `SELECT b.Id, b.Status, b.Vagas, b.Inicio, b.ProdutoId, p.PrecoCentavos preco,
         (SELECT COUNT(*) FROM dbo.Inscricao i WITH (UPDLOCK, HOLDLOCK) WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') ocupadas,
         CASE WHEN b.Inicio < DATEADD(minute, -30, SYSDATETIME()) THEN 1 ELSE 0 END passada
-       FROM dbo.Bateria b LEFT JOIN dbo.Produto p ON p.Id = b.ProdutoId WHERE b.Id = @bateriaId`,
+       FROM dbo.Bateria b WITH (UPDLOCK, HOLDLOCK) LEFT JOIN dbo.Produto p ON p.Id = b.ProdutoId WHERE b.Id = @bateriaId`,
       { bateriaId },
     );
     if (!b) throw new HttpError(404, 'Selecione uma bateria.');
@@ -449,7 +465,8 @@ async function inscreverN(bateriaId: number, clienteId: number, n: number, orige
     }
     void uid;
     return ids;
-  });
+  };
+  return opcoes.run ? inscrever(opcoes.run) : tx(inscrever);
 }
 export { inscreverN };
 
@@ -503,7 +520,7 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
     let voucherDesconto = 0;
     if (voucherCodigo) {
       const [v] = await run(
-        `SELECT v.*, p.Ativo parceiroAtivo, fc.Ativo fidelidadeAtiva FROM dbo.Voucher v
+        `SELECT v.*, p.Ativo parceiroAtivo, fc.Ativo fidelidadeAtiva FROM dbo.Voucher v WITH (UPDLOCK, HOLDLOCK)
          LEFT JOIN dbo.Parceiro p ON p.Id = v.ParceiroId LEFT JOIN dbo.FidelidadeConta fc ON fc.Id = v.FidelidadeContaId WHERE v.Codigo = @c`,
         { c: voucherCodigo },
       );
@@ -512,7 +529,14 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
       if (v.FidelidadeContaId && !v.fidelidadeAtiva) throw new HttpError(400, 'A conta de fidelidade vinculada ao voucher está inativa.');
       const [hoje] = await run(`SELECT CAST(SYSDATETIME() AS date) d`);
       if ((hoje.d as Date) < (v.InicioEm as Date) || (hoje.d as Date) > (v.FimEm as Date)) throw new HttpError(400, 'Voucher expirado.');
-      const [usos] = await run(`SELECT COUNT(*) n, SUM(CASE WHEN ClienteId = @cli THEN 1 ELSE 0 END) doCliente FROM dbo.VoucherUso WHERE VoucherId = @id AND Estornado = 0`, { id: v.Id, cli: clienteId });
+      const [usos] = await run(
+        `SELECT
+           (SELECT COUNT(*) FROM dbo.VoucherUso WHERE VoucherId = @id AND Estornado = 0)
+           + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso WHERE VoucherId = @id AND Estado IN ('reservado', 'consumido', 'reembolso_pendente')) n,
+           (SELECT COUNT(*) FROM dbo.VoucherUso WHERE VoucherId = @id AND ClienteId = @cli AND Estornado = 0)
+           + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso WHERE VoucherId = @id AND ClienteId = @cli AND Estado IN ('reservado', 'consumido', 'reembolso_pendente')) doCliente`,
+        { id: v.Id, cli: clienteId },
+      );
       if (v.UsoUnico && (usos.n as number) > 0) throw new HttpError(400, 'Voucher já utilizado.');
       if ((usos.doCliente as number) >= (v.UsoMaxCliente as number)) throw new HttpError(400, 'Limite de usos deste voucher para este cliente já atingido.');
       const totalPedido = itens.reduce((s, i) => s + i.liquido, 0);
@@ -651,6 +675,45 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   const { method, url, sessao } = req;
   const path = url.pathname.replace(/^\/api\/office/, '');
   let m: RegExpMatchArray | null;
+
+  const mobilePermissionRoute = path.match(/^\/mobile-permissions\/([a-z_]+)$/);
+  if (mobilePermissionRoute && method === 'GET') {
+    if (!mobilePermissions.has(mobilePermissionRoute[1])) throw new HttpError(404, 'Permissão não encontrada.');
+    send(200, { allowed: await mobilePermission(sessao, mobilePermissionRoute[1]) });
+    return true;
+  }
+
+  if (path === '/mobile-identities/link' && method === 'POST') {
+    if (!await mobilePermission(sessao, 'identidade_mobile_vincular')) throw new HttpError(403, 'Seu perfil não pode vincular contas do app.');
+    const body = await req.body();
+    const customerId = int(body.customerId, 'Cliente');
+    const email = String(body.email ?? '').trim().toLowerCase();
+    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new HttpError(400, 'Informe o e-mail verificado da conta do app.');
+    if (!await one(`SELECT Id id FROM dbo.Cliente WHERE Id = @id`, { id: customerId })) throw new HttpError(404, 'Cliente não encontrado.');
+
+    const destination = process.env.MOBILE_IDENTITY_LINK_URL;
+    const adminToken = process.env.MOBILE_ADMIN_TOKEN;
+    if (!destination || !adminToken) throw new HttpError(503, 'O vínculo de contas do app ainda não está configurado.');
+    const endpoint = mobileApiEndpoint(destination, '/api/mobile/v1/internal/identity-links');
+    if (!endpoint) throw new HttpError(503, 'O destino do vínculo de contas não é o Worker móvel autorizado.');
+    let response: Response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-mobile-admin-token': adminToken },
+        body: JSON.stringify({ customerId: String(customerId), email }),
+        redirect: 'error',
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch {
+      throw new HttpError(502, 'Não foi possível concluir o vínculo com o app agora.');
+    }
+    if (response.status === 409) throw new HttpError(409, 'Este cliente ou esta conta já está vinculado.');
+    if (response.status === 404) throw new HttpError(400, 'Não foi possível validar o e-mail. Confirme o endereço e se a conta verificou o e-mail.');
+    if (!response.ok) throw new HttpError(502, 'Não foi possível concluir o vínculo com o app agora.');
+    send(200, { ok: true });
+    return true;
+  }
 
   if (path === '/servicos-online' && method === 'GET') {
     send(200, await servicosOnline());
@@ -959,12 +1022,23 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     return true;
   }
   if ((m = path.match(/^\/reservas-online\/(\d+)\/resolver$/)) && method === 'POST') {
-    const r = await one<{ Codigo: string }>(
-      `UPDATE dbo.ReservaOnline SET Status = 'resolvido' OUTPUT inserted.Codigo WHERE Id = @id AND Status = 'pago_sem_vaga'`,
-      { id: Number(m[1]) },
-    );
+    const { resolucao } = await req.body();
+    if (resolucao !== 'reembolso_confirmado' && resolucao !== 'remarcado') throw new HttpError(400, 'Confirme o reembolso ou a remarcação antes de resolver.');
+    const estadoUso = resolucao === 'reembolso_confirmado' ? 'liberado' : 'consumido';
+    const r = await tx(async (run) => {
+      const [pedido] = await run(
+        `UPDATE dbo.ReservaOnline SET Status = 'resolvido' OUTPUT inserted.Codigo WHERE Id = @id AND Status = 'pago_sem_vaga'`,
+        { id: Number(m![1]) },
+      );
+      if (!pedido) return null;
+      await run(
+        `UPDATE dbo.ReservaOnlineVoucherUso SET Estado = @estado WHERE PedidoId = (SELECT PedidoId FROM dbo.ReservaOnline WHERE Id = @id) AND Estado = 'reembolso_pendente'`,
+        { id: Number(m![1]), estado: estadoUso },
+      );
+      return pedido;
+    });
     if (!r) throw new HttpError(409, 'Este pedido não está mais pendente.');
-    send(200, { ok: true });
+    send(200, { ok: true, resolucao });
     return true;
   }
   if (path === '/reservas' && method === 'GET') {

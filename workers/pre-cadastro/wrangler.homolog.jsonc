@@ -1,0 +1,22 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "kartodromo-mobile-homolog",
+  "account_id": "e476c4322903cf98849d505ea26f726f",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/api/*", "/"] },
+  "r2_buckets": [{ "binding": "PRE", "bucket_name": "kartodromo-mobile-homolog" }],
+  "d1_databases": [{
+    "binding": "MOBILE_DB",
+    "database_name": "kartodromo-mobile-homolog",
+    "database_id": "394908ee-1e8c-4c57-b0fb-726aec37cce6",
+    "migrations_dir": "migrations"
+  }],
+  "vars": {
+    "RESERVAS_ATIVAS": "0",
+    "ASAAS_URL": "https://api-sandbox.asaas.com/v3"
+  }
+}

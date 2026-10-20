@@ -24,6 +24,18 @@ interface R2Bucket {
   delete(keys: string | string[]): Promise<void>;
 }
 
+interface D1PreparedStatement {
+  bind(...values: unknown[]): D1PreparedStatement;
+  first<T = Record<string, unknown>>(columnName?: string): Promise<T | null>;
+  all<T = Record<string, unknown>>(): Promise<{ success: boolean; results: T[]; meta: { changes: number } }>;
+  run(): Promise<{ success: boolean; meta: { changes: number } }>;
+}
+
+interface D1Database {
+  prepare(query: string): D1PreparedStatement;
+  batch(statements: D1PreparedStatement[]): Promise<unknown[]>;
+}
+
 interface CacheStorage {
   readonly default: Cache;
 }

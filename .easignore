@@ -1,0 +1,20 @@
+# shortcut: mobile is standalone; include shared files if it starts importing root code.
+/*
+!/mobile
+/mobile/node_modules
+/mobile/android
+/mobile/ios
+/mobile/.expo
+/mobile/dist
+/mobile/web-build
+/mobile/.env*
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+*.tsbuildinfo
+*.log
+.DS_Store

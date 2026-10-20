@@ -11,7 +11,8 @@
       "app/placar-telao-tb50/**",
       "app/podio-final-tb50/**",
       "app/podio-live-tb50/**",
-      "app/designer-telao/**"
+      "app/designer-telao/**",
+      "components/telao/**"
     ],
     "ignoreValues": [
       "#000000"
