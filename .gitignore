@@ -58,6 +58,7 @@ KARTODROMO\ -\ SISTEMA.zip
 .github/skills/
 .github/hooks/
 .codex/hooks.json
+.codex/plugins/
 .impeccable/live/
 # Artefatos locais (não versionar)
 "KARTODROMO - SISTEMA 2.zip"
