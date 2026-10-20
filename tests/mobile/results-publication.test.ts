@@ -212,6 +212,22 @@ describe('API pública de resultados móveis', () => {
     expect(database.database.prepare('SELECT COUNT(*) AS total FROM mobile_results_audit').get()).toMatchObject({ total: 3 });
   });
 
+  it('lista para o SRVKART só contas confirmadas e ainda sem vínculo (com a chave de administração)', async () => {
+    const email = `bia+${crypto.randomUUID()}@example.com`;
+    await createVerifiedAccount(email);
+    expect((await callWorker('/api/mobile/v1/internal/identity-candidates')).status).toBe(401);
+    const listar = async () => await (await callWorker('/api/mobile/v1/internal/identity-candidates', 'GET', undefined, {
+      'x-mobile-admin-token': ADMIN_TOKEN,
+    })).json() as { email: string; cpf: string; phone: string }[];
+    const antes = (await listar()).find((c) => c.email === email);
+    expect(antes).toMatchObject({ email, phone: expect.stringMatching(/\d{10,}/) });
+    expect(antes?.cpf.replace(/\D/g, '')).toHaveLength(11);
+    expect((await callWorker('/api/mobile/v1/internal/identity-links', 'POST', { customerId: '777', email }, {
+      'x-mobile-admin-token': ADMIN_TOKEN,
+    })).status).toBe(200);
+    expect((await listar()).some((c) => c.email === email)).toBe(false);
+  });
+
   it('vincula somente e-mail verificado e entrega histórico apenas à conta validada', async () => {
     const email = `ana+${crypto.randomUUID()}@example.com`;
     const accessToken = await createVerifiedAccount(email);

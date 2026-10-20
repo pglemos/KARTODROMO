@@ -13,6 +13,7 @@
 import { isValidCpf, one, onlyDigits, query, tx } from './db';
 import { HttpError, inscreverN } from './office';
 import { gravarAcompanhante, gravarPreCadastro, preCadastroLigado, type PreCadastro } from './pre-cadastro';
+import { vincularContasDoApp } from './app-mobile';
 
 type Log = (...args: unknown[]) => void;
 
@@ -414,6 +415,9 @@ export async function sincronizarReservasOnline(log: Log) {
   let previas = 0;
   try { previas = await sincronizarCuponsOnline(log); }
   catch { log('prévia de cupons: sincronização temporariamente indisponível'); }
+  // contas do app com e-mail confirmado: vincula ao cliente pelo CPF + e-mail/telefone (uma vez por minuto)
+  try { await vincularContasDoApp(log); }
+  catch (e) { log(`app: vínculo automático indisponível agora (${(e as Error).message})`); }
   const pedidos = (await chamar('/api/sync/pedidos')) as PedidoSite[];
   const resultados: Resultado[] = [];
   for (const p of pedidos) {

@@ -1,4 +1,4 @@
-import { authenticateMobileRequest, type MobileAuthEnv } from './auth';
+import { authenticateMobileRequest, mobileIdentityCandidates, type MobileAuthEnv } from './auth';
 
 export interface MobileResultsEnv extends MobileAuthEnv {
   MOBILE_PUBLISH_TOKEN?: string;
@@ -329,6 +329,13 @@ export async function handleMobileResults(request: Request, env: MobileResultsEn
     if (path === '/api/mobile/v1/internal/identity-links') {
       if (request.method !== 'POST') return json(405, { erro: 'Método não permitido.' });
       return await linkIdentity(request, env);
+    }
+    if (path === '/api/mobile/v1/internal/identity-candidates') {
+      if (request.method !== 'GET') return json(405, { erro: 'Método não permitido.' });
+      if (!env.MOBILE_DB || !env.MOBILE_ADMIN_TOKEN) return unavailable();
+      if (!authorized(request, env.MOBILE_ADMIN_TOKEN, 'x-mobile-admin-token')) return json(401, { erro: 'Não autorizado.' });
+      const candidates = await mobileIdentityCandidates(env);
+      return candidates ? json(200, candidates) : unavailable();
     }
     if (path === '/api/mobile/v1/results') {
       if (request.method !== 'GET') return json(405, { erro: 'Método não permitido.' });

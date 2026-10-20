@@ -139,6 +139,26 @@ export async function mobileAccountCpf(env: MobileAuthEnv, accountId: string): P
   return row ? decrypt(context, row.cpf_cipher) : null;
 }
 
+/**
+ * Contas com e-mail confirmado e ainda sem vínculo com um cliente da recepção. Só o SRVKART pede (chave de
+ * administração): ele procura o cliente pelo CPF e só vincula se o e-mail ou o telefone também baterem.
+ */
+export async function mobileIdentityCandidates(env: MobileAuthEnv, limit = 50) {
+  const context = await createContext(env);
+  if (!context) return null;
+  const { results } = await context.db.prepare(
+    `SELECT a.email_cipher, a.cpf_cipher, a.phone_cipher FROM mobile_accounts a
+      WHERE a.email_verified_at IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM mobile_identity_links l WHERE l.account_id = a.id)
+      ORDER BY a.email_verified_at DESC LIMIT ?`,
+  ).bind(limit).all<{ email_cipher: string; cpf_cipher: string; phone_cipher: string }>();
+  return Promise.all(results.map(async (row) => ({
+    email: await decrypt(context, row.email_cipher),
+    cpf: await decrypt(context, row.cpf_cipher),
+    phone: await decrypt(context, row.phone_cipher),
+  })));
+}
+
 async function passwordHash(password: string, salt: Uint8Array, scheme = PASSWORD_SCHEME) {
   if (scheme === PASSWORD_SCHEME) {
     return encodeBase64Url(scryptSync(password, salt, 32, { N: 32768, r: 8, p: 3, maxmem: 64 * 1024 * 1024 }));

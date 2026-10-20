@@ -903,7 +903,12 @@ function liveSnapshot(painelTb50 = false) {
       painelTb50 && OPEN_STATES.has(s.state),
       standings
         .filter((r) => r.laps > 0 || !OPEN_STATES.has(s.state))
-        .map((r) => ({ position: r.position, kart: r.kart, name: r.name, time: formatLap(r.bestLapMs) })),
+        // laps/last/bestLap/gap: para o app do cliente (o placar, o telão e o site só leem os quatro primeiros)
+        .map((r) => ({
+          position: r.position, kart: r.kart, name: r.name, time: formatLap(r.bestLapMs),
+          laps: r.laps, last: formatLap(r.lastLapMs), bestLap: r.bestLapNumber,
+          gap: r.position === 1 ? '' : r.gapLaps > 0 ? `+${r.gapLaps} ${r.gapLaps === 1 ? 'volta' : 'voltas'}` : r.gapMs != null ? `+${(r.gapMs / 1000).toFixed(3)}` : '',
+        })),
     ),
   };
 }
@@ -1373,11 +1378,46 @@ async function emailsAoEncerrar(s: Session) {
  */
 const ESPERA_EMAIL_MS = Number(process.env.TIMING_ESPERA_EMAIL_MS || 3 * 60_000); // o simulador de teste encurta
 const emailsAgendados = new Map<string, NodeJS.Timeout>();
+
+/**
+ * App do cliente: o resultado vai para o app junto com o e-mail (3 min depois de encerrar e a cada correção), sem
+ * precisar do menu "Publicar / corrigir resultado no app". Quem correu sem cadastro fica de fora (não tem conta).
+ * Guarda a última versão enviada; se a internet falhar, o ciclo de 5 min tenta de novo (até 6 h depois).
+ */
+const publicadosNoApp = new Map<string, string>();
+async function publicarNoAppAutomatico(s: Session) {
+  const destination = process.env.MOBILE_RESULTS_URL;
+  const publishToken = process.env.MOBILE_PUBLISH_TOKEN;
+  if (!destination || !publishToken || s.state !== 'encerrada' || !['classificacao', 'corrida'].includes(s.type)) return;
+  const url = mobileApiEndpoint(destination, '/api/mobile/v1/internal/results', SIMULATE);
+  if (!url) return;
+  const assinatura = assinaturaResultado(s);
+  if (publicadosNoApp.get(s.id) === assinatura) return;
+  let payload: ReturnType<typeof serializeMobilePublication>;
+  try { payload = serializeMobilePublication(s, 'publish', { ignorarSemCadastro: true }); }
+  catch (e) { publicadosNoApp.set(s.id, assinatura); log(`app: resultado de ${s.name} não foi para o app (${(e as Error).message})`); return; }
+  try {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-mobile-publish-token': publishToken },
+      body: JSON.stringify(payload),
+      redirect: 'error',
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!r.ok) { log(`app: o serviço do app recusou o resultado de ${s.name} (HTTP ${r.status})`); return; }
+    publicadosNoApp.set(s.id, assinatura);
+    log(`app: resultado de ${s.name} publicado (${payload.results?.length ?? 0} pilotos com cadastro)`);
+  } catch (e) {
+    log(`app: não foi possível publicar ${s.name} agora (${(e as Error).message}); tenta de novo em 5 min`);
+  }
+}
+
 function agendarEmails(s: Session) {
   clearTimeout(emailsAgendados.get(s.id));
   emailsAgendados.set(s.id, setTimeout(() => {
     emailsAgendados.delete(s.id);
     if (s.state !== 'encerrada' || !['classificacao', 'corrida'].includes(s.type)) return;
+    void publicarNoAppAutomatico(s);
     if (envioATodosAtivo.has(s.id)) return agendarEmails(s); // ainda mandando a versão anterior: corrige quando terminar
     if (!(s.emailsResultado?.enviados.length)) return void emailsAoEncerrar(s);
     if (!lerConfig(EMAIL_FILE).automatico || semEmailAosPilotos(s, nomeEventoDa(s))) return;
@@ -1402,6 +1442,7 @@ setInterval(() => {
     const fim = s.finishedAt ?? s.createdAt;
     if (s.state !== 'encerrada' || fim <= limite || emailsAgendados.has(s.id)) continue;
     if (e ? (e.status === 'parcial' || e.status === 'falhou') && e.tentativas < 12 : fim < agora - 3 * 60_000) void emailsAoEncerrar(s);
+    if (fim < agora - 3 * 60_000) void publicarNoAppAutomatico(s);
   }
 }, 5 * 60_000);
 

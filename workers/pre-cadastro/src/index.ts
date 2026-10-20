@@ -93,7 +93,7 @@ export default {
       if (p === '/api/mobile/v1/coupons/preview' || p.startsWith('/api/mobile/v1/coupons/preview/')) {
         return await handleMobileCoupons(req, env);
       }
-      if (p === '/api/mobile/v1/internal/results' || p === '/api/mobile/v1/internal/identity-links' ||
+      if (p === '/api/mobile/v1/internal/results' || p === '/api/mobile/v1/internal/identity-links' || p === '/api/mobile/v1/internal/identity-candidates' ||
           p === '/api/mobile/v1/results' || p === '/api/mobile/v1/results/me') {
         return await handleMobileResults(req, env);
       }

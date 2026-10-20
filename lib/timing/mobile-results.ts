@@ -14,7 +14,12 @@ function competitorKey(kart: string, name: string) {
   return `${kart}\0${name.trim()}`;
 }
 
-export function serializeMobilePublication(session: Session, action: MobileResultAction) {
+/**
+ * opcoes.ignorarSemCadastro: publicação automática (3 min depois de encerrar, junto com o e-mail): quem correu sem
+ * cadastro na recepção fica de fora do app (não tem conta para ver), mas as posições dos outros continuam as oficiais.
+ * Sem a opção (publicação pelo menu da crono), exige todos vinculados, como antes.
+ */
+export function serializeMobilePublication(session: Session, action: MobileResultAction, opcoes: { ignorarSemCadastro?: boolean } = {}) {
   if (action === 'withdraw') return { action, sessionId: session.id };
   if (session.state !== 'encerrada') throw new Error('Encerre a bateria antes de publicar o resultado.');
   if (!session.competitors.length || session.competitors.length > 100) throw new Error('A bateria não tem uma lista de pilotos publicável.');
@@ -24,22 +29,26 @@ export function serializeMobilePublication(session: Session, action: MobileResul
     const key = competitorKey(competitor.kart, competitor.name);
     byStanding.set(key, [...(byStanding.get(key) ?? []), competitor]);
   }
-  const results = computeStandings(session).map((standing) => {
+  const vistos = new Set<string>();
+  const results = computeStandings(session).flatMap((standing) => {
     const competitor = byStanding.get(competitorKey(standing.kart, standing.name))?.shift();
     const customerId = String(competitor?.customerId ?? '').trim();
     const displayName = standing.name.trim().replace(/\s+/g, ' ');
-    if (!competitor || !/^\d{1,20}$/.test(customerId) || !displayName) {
+    if (!competitor || !/^\d{1,20}$/.test(customerId) || !displayName || (opcoes.ignorarSemCadastro && vistos.has(customerId))) {
+      if (opcoes.ignorarSemCadastro) return [];
       throw new Error('Vincule todos os pilotos a clientes antes de publicar.');
     }
-    return {
+    vistos.add(customerId);
+    return [{
       customerId,
       displayName,
       position: standing.position,
       kart: standing.kart,
       laps: standing.laps,
       bestLapMs: standing.bestLapMs,
-    };
+    }];
   });
+  if (!results.length) throw new Error('Nenhum piloto da bateria tem cadastro na recepção.');
   const eventName = session.name.trim();
   if (!eventName) throw new Error('Informe o nome da bateria antes de publicar.');
   return {
