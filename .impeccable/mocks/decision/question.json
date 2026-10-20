@@ -1,0 +1,198 @@
+{
+  "title": "Novo aplicativo do Kartódromo Internacional de Betim",
+  "question": "Escolha a direção visual. Logo e foto são arquivos originais de Betim. As telas abaixo são propostas de layout, ainda não um novo aplicativo publicado.",
+  "options": [
+    {
+      "id": "paddock",
+      "label": "Paddock Betim",
+      "kicker": "PROPOSTA PRINCIPAL",
+      "lineage": "Credenciais de evento e passes digitais de corrida",
+      "thesis": "Reservas e corridas organizadas como passes pessoais do piloto.",
+      "palette": [
+        "#F8F9F9",
+        "#252525",
+        "#3F8979",
+        "#DA332E"
+      ],
+      "materials": [
+        "Logo oficial",
+        "Fotos reais da pista",
+        "Superfícies claras e passes digitais"
+      ],
+      "viewport": "Logo original no topo; foto de Betim; bloco Reservar e acesso ao histórico; navegação com ícones.",
+      "risk": "O passe deve aparecer só quando há uma reserva real, sem QR ou confirmação fictícios.",
+      "raised": [
+        {
+          "from": "Sistema modular",
+          "raise": "Hierarquia e alinhamentos consistentes em todas as telas."
+        },
+        {
+          "from": "Painel de partidas",
+          "raise": "Horários, disponibilidade e situação financeira sempre legíveis."
+        },
+        {
+          "from": "Cartografia",
+          "raise": "Navegação e estados claros, sem inventar geometria da pista."
+        }
+      ],
+      "comp": ".impeccable/mocks/decision/paddock.svg"
+    },
+    {
+      "id": "companion",
+      "label": "Betim, seu lugar na pista",
+      "kicker": "RECOMENDAÇÃO",
+      "lineage": "Apps de experiências, reservas e atividade esportiva",
+      "thesis": "Fotografia de Betim e reserva rápida, com a vida do piloto ao lado.",
+      "palette": [
+        "#FFFFFF",
+        "#151919",
+        "#3F8979",
+        "#DA332E"
+      ],
+      "materials": [
+        "Marca original",
+        "Foto grande",
+        "Listas nativas e resumos de corrida"
+      ],
+      "viewport": "Logo e acesso à conta; foto de corrida com CTA Reservar; atalhos Agenda, Reservas e Meu histórico.",
+      "risk": "A estrutura é familiar nos grandes apps; a marca e as fotos reais devem distinguir Betim.",
+      "comp": ".impeccable/mocks/decision/companion.svg"
+    },
+    {
+      "id": "raceboard",
+      "label": "Central de corrida",
+      "verdict": "competitive",
+      "lineage": "Painéis de resultados e programação esportiva",
+      "thesis": "A agenda e os resultados vivem em uma central técnica de corrida.",
+      "palette": [
+        "#111618",
+        "#FFFFFF",
+        "#3F8979",
+        "#D83E38"
+      ],
+      "materials": [
+        "Grafite técnico",
+        "Fotos reais",
+        "Números tabulares"
+      ],
+      "viewport": "Marca original bem contrastada; fotografia de Betim; ações Reservar e Resultados em uma grade compacta.",
+      "case": "Identificação esportiva forte; a agenda precisa continuar tão simples quanto o histórico.",
+      "risk": "Pode pesar na leitura ao ar livre se o contraste e a densidade forem mal executados.",
+      "comp": ".impeccable/mocks/decision/raceboard.svg"
+    },
+    {
+      "id": "map",
+      "label": "Mapa de orientação",
+      "verdict": "declined",
+      "thesis": "Referência estrutural avaliada e descartada para o app.",
+      "palette": [
+        "#FFFFFF",
+        "#252525",
+        "#3F8979"
+      ],
+      "materials": [
+        "Sistema de organização"
+      ],
+      "viewport": "Não será usado como visual principal.",
+      "risk": "A metáfora poderia esconder a função do aplicativo.",
+      "case": "A pista ainda não tem geometria GPS medida e aprovada.",
+      "kept": "Estados claros e legenda consistente."
+    },
+    {
+      "id": "grid",
+      "label": "Tipografia em grade",
+      "verdict": "declined",
+      "thesis": "Referência estrutural avaliada e descartada para o app.",
+      "palette": [
+        "#FFFFFF",
+        "#252525",
+        "#3F8979"
+      ],
+      "materials": [
+        "Sistema de organização"
+      ],
+      "viewport": "Não será usado como visual principal.",
+      "risk": "A metáfora poderia esconder a função do aplicativo.",
+      "case": "Títulos monumentais repetiriam um problema do app atual.",
+      "kept": "Alinhamento e escala tipográfica."
+    },
+    {
+      "id": "bitmap",
+      "label": "Tipografia pixelada",
+      "verdict": "declined",
+      "thesis": "Referência estrutural avaliada e descartada para o app.",
+      "palette": [
+        "#FFFFFF",
+        "#252525",
+        "#3F8979"
+      ],
+      "materials": [
+        "Sistema de organização"
+      ],
+      "viewport": "Não será usado como visual principal.",
+      "risk": "A metáfora poderia esconder a função do aplicativo.",
+      "case": "Não atende ao pedido de interface moderna e legível.",
+      "kept": "Disciplina na apresentação de números."
+    },
+    {
+      "id": "catalog",
+      "label": "Catálogo de miniaturas",
+      "verdict": "declined",
+      "thesis": "Referência estrutural avaliada e descartada para o app.",
+      "palette": [
+        "#FFFFFF",
+        "#252525",
+        "#3F8979"
+      ],
+      "materials": [
+        "Sistema de organização"
+      ],
+      "viewport": "Não será usado como visual principal.",
+      "risk": "A metáfora poderia esconder a função do aplicativo.",
+      "case": "Densidade excessiva para reservar uma bateria.",
+      "kept": "Conteúdo compacto com hierarquia."
+    },
+    {
+      "id": "metro",
+      "label": "Diagrama de transporte",
+      "verdict": "declined",
+      "thesis": "Referência estrutural avaliada e descartada para o app.",
+      "palette": [
+        "#FFFFFF",
+        "#252525",
+        "#3F8979"
+      ],
+      "materials": [
+        "Sistema de organização"
+      ],
+      "viewport": "Não será usado como visual principal.",
+      "risk": "A metáfora poderia esconder a função do aplicativo.",
+      "case": "Não representa as tarefas nem a identidade do kartódromo.",
+      "kept": "Continuidade entre etapas de uma reserva."
+    }
+  ],
+  "buildPath": {
+    "value": "comp",
+    "toggle": false
+  },
+  "canon": true,
+  "canonCard": {
+    "label": "Interface nativa essencial",
+    "thesis": "Uma opção sóbria com foco em reservas e histórico.",
+    "palette": [
+      "#FFFFFF",
+      "#252525",
+      "#3F8979"
+    ],
+    "materials": [
+      "Logo oficial",
+      "Foto real",
+      "Componentes nativos"
+    ],
+    "viewport": "Header com marca, fotografia pequena, lista de ações e barra de navegação com ícones.",
+    "risk": "Menos personalidade visual; exige fotos e identidade fortes para não parecer genérico.",
+    "comp": ".impeccable/mocks/decision/native.svg"
+  },
+  "steer": true,
+  "reroll": true
+}
