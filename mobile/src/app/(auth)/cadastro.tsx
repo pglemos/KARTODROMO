@@ -93,7 +93,7 @@ export default function RegistrationScreen() {
         </View>
         <Text style={[styles.muted, { flex: 1 }]}>
           Li e aceito a{' '}
-          <Link href="https://www.kartodromodebetim.com.br/privacidade" style={{ color: palette.accent, fontWeight: '700' }}>
+          <Link href="https://reservas.kartodromodebetim.com.br/privacidade" style={{ color: palette.accent, fontWeight: '700' }}>
             política de privacidade
           </Link>
           . Entendi que o GPS só será solicitado quando eu iniciar um treino.

@@ -4,7 +4,8 @@ import { Linking, Text } from 'react-native';
 import { ActionButton, Page, PageHeader, Panel, useUi } from '../features/reservations/components';
 import { useSession } from '../session/provider';
 
-const SITE = 'https://www.kartodromodebetim.com.br';
+/** política do app (página do domínio das reservas; o site principal não tem /privacidade) */
+const PRIVACIDADE = 'https://reservas.kartodromodebetim.com.br/privacidade';
 
 /** Início do app de loja: só atalhos para funções ligadas a dados reais. */
 export default function StartScreen() {
@@ -31,7 +32,7 @@ export default function StartScreen() {
           onPress={() => router.push(session ? '/(tabs)/reservas' : '/(auth)/login')}
           secondary
         />
-        <ActionButton label="Política de privacidade" onPress={() => void Linking.openURL(`${SITE}/privacidade`)} secondary />
+        <ActionButton label="Política de privacidade" onPress={() => void Linking.openURL(PRIVACIDADE)} secondary />
       </Panel>
     </Page>
   );

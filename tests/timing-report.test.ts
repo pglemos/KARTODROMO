@@ -13,7 +13,8 @@ type ReportRow = {
 };
 
 function loadReportRanking() {
-  const html = readFileSync(resolve(process.cwd(), 'services/timing-ui/resultado.html'), 'utf8');
+  // checkout no Windows com autocrlf traz o HTML com CRLF; a busca abaixo usa \n
+  const html = reportHtml();
   const start = html.indexOf('function ordenarResultadoOficial(');
   const end = html.indexOf('\n}\n\nfunction renderReport', start);
   if (start < 0 || end < 0) throw new Error('Função de ordenação do relatório não encontrada.');
@@ -27,7 +28,7 @@ function loadReportRanking() {
 }
 
 function reportHtml() {
-  return readFileSync(resolve(process.cwd(), 'services/timing-ui/resultado.html'), 'utf8');
+  return readFileSync(resolve(process.cwd(), 'services/timing-ui/resultado.html'), 'utf8').replace(/\r\n/g, '\n');
 }
 
 function loadReportHelpers() {

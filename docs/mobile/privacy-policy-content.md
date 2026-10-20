@@ -1,6 +1,6 @@
 # Política de privacidade do app — conteúdo e pendências
 
-Esta minuta corresponde à página pública `/privacidade`. A página permanece bloqueada para publicação nas lojas até que o responsável confirme a identidade legal do controlador, o canal de atendimento LGPD e os prazos de retenção de conta, reserva, pagamento e resultados.
+Esta minuta corresponde à página pública `/privacidade` (no ar em https://reservas.kartodromodebetim.com.br/privacidade, arquivo workers/pre-cadastro/public/privacidade.html; o site principal não tem a rota). A página permanece bloqueada para publicação nas lojas até que o responsável confirme a identidade legal do controlador, o canal de atendimento LGPD e os prazos de retenção de conta, reserva, pagamento e resultados.
 
 ## Dados e finalidades
 

@@ -58,7 +58,7 @@ describe('configuração de distribuição móvel', () => {
     expect(existsSync(resolve(mobileRoot, 'assets/app-icon.png'))).toBe(true);
     expect(expo?.android?.adaptiveIcon?.foregroundImage).toBe('./assets/adaptive-icon.png');
     expect(existsSync(resolve(mobileRoot, 'assets/adaptive-icon.png'))).toBe(true);
-    expect(registration).toContain('https://www.kartodromodebetim.com.br/privacidade');
+    expect(registration).toContain('https://reservas.kartodromodebetim.com.br/privacidade');
   });
 
   testMonorepo('[monorepo] inclui a política pública no site', () => {

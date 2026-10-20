@@ -101,7 +101,7 @@ public class FormCliente : CartaoModal
         Icone(gNav, "first", "«", "Primeiro", () => Navegar("first")); Icone(gNav, "prev", "‹", "Anterior", () => Navegar("prev"));
         Icone(gNav, "next", "›", "Próximo", () => Navegar("next")); Icone(gNav, "last", "»", "Último", () => Navegar("last"));
         var gExtra = Grupo();
-        var vincularApp = new BotaoPlano { Text = "App", AutoSize = true, Height = 32, MinimumSize = new Size(42, 32), FlatStyle = FlatStyle.Flat, BackColor = gExtra.BackColor, ForeColor = KitVisual.Texto, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Padding = new Padding(8, 0, 8, 0), Margin = new Padding(0), Cursor = Cursors.Hand, TabStop = false, Visible = false };
+        var vincularApp = new BotaoPlano { Text = "App", AutoSize = true, Height = 32, MinimumSize = new Size(42, 32), FlatStyle = FlatStyle.Flat, BackColor = gExtra.BackColor, ForeColor = KitVisual.Texto, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo, FontStyle.Bold), Padding = new Padding(8, 0, 8, 0), Margin = new Padding(0), Cursor = Cursors.Hand, TabStop = false, Visible = false };
         vincularApp.FlatAppearance.BorderSize = 0; vincularApp.Click += (_, _) => VincularIdentidadeMobile();
         gExtra.Controls.Add(vincularApp); _bt["mobileLink"] = vincularApp;
         _dica.SetToolTip(vincularApp, "Vincular a conta do app a este cliente após conferir a identidade");
