@@ -15,6 +15,7 @@ const migrations = [
   '0003_mobile_coupon_previews.sql',
   '0004_mobile_results.sql',
   '0005_mobile_password_scheme.sql',
+  '0006_mobile_email_outbox.sql',
 ].map((name) => new URL(`../../workers/pre-cadastro/migrations/${name}`, import.meta.url));
 
 type Row = Record<string, unknown>;
@@ -174,6 +175,30 @@ async function createVerifiedAccount(email: string) {
   expect(login.status).toBe(200);
   return String((await login.json() as { accessToken: string }).accessToken);
 }
+
+describe('fila dos e-mails de conta (enviada pela cronometragem)', () => {
+  it('sem o Email Sending liberado, o e-mail vai para a fila e a crono envia e confirma', async () => {
+    delete env.RESEND_API_KEY;
+    delete env.RESEND_FROM_EMAIL;
+    env.EMAIL = { send: async () => { throw Object.assign(new Error('destination address is not a verified address'), { code: 'E_RECIPIENT_NOT_ALLOWED' }); } };
+    const email = `fila+${crypto.randomUUID()}@example.com`;
+    const cadastro = await callWorker('/api/mobile/v1/auth/register', 'POST', {
+      name: 'Ana Silva', cpf: cpfForTest(), email, phone: '+55 31 98888-7777', password: 'SenhaSegura!2026', privacyAccepted: true,
+    }, { 'cf-connecting-ip': '203.0.113.30' });
+    expect(cadastro.status).toBe(202);
+    expect((await callWorker('/api/mobile/v1/internal/outbox')).status).toBe(401);
+    const fila = await (await callWorker('/api/mobile/v1/internal/outbox', 'GET', undefined, { 'x-mobile-publish-token': PUBLISH_TOKEN })).json() as { id: string; to: string; subject: string; text: string }[];
+    expect(fila).toHaveLength(1);
+    expect(fila[0]).toMatchObject({ to: email, subject: expect.stringContaining('Confirme seu e-mail') });
+    expect(fila[0].text).toContain('https://reservas.kartodromodebetim.com.br/conta?acao=verificar&token=');
+    // pega de novo dentro de 2 min: não repete o que já está sendo enviado
+    expect(await (await callWorker('/api/mobile/v1/internal/outbox', 'GET', undefined, { 'x-mobile-publish-token': PUBLISH_TOKEN })).json()).toEqual([]);
+    expect((await callWorker(`/api/mobile/v1/internal/outbox/${fila[0].id}/enviado`, 'POST', undefined, { 'x-mobile-publish-token': PUBLISH_TOKEN })).status).toBe(200);
+    expect(database.database.prepare('SELECT COUNT(*) n FROM mobile_email_outbox').get()).toMatchObject({ n: 0 });
+    const token = /token=([A-Za-z0-9_-]+)/.exec(fila[0].text)![1];
+    expect((await callWorker('/api/mobile/v1/auth/email/verify', 'POST', { token })).status).toBe(200);
+  });
+});
 
 describe('API pública de resultados móveis', () => {
   it('aceita apenas publicação autenticada e exibe os dados oficiais permitidos', async () => {

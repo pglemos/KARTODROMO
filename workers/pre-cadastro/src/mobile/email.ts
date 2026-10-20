@@ -4,8 +4,11 @@ interface SendEmailBinding {
 }
 
 export interface MobileEmailEnv {
-  /** binding send_email do wrangler: não precisa de chave */
+  MOBILE_DB?: D1Database;
+  /** binding send_email do wrangler: não precisa de chave (só funciona com o domínio liberado no Email Sending) */
   EMAIL?: SendEmailBinding;
+  /** "1" = nem tenta o binding: tudo pela fila que o servidor da cronometragem envia pela HostGator */
+  MOBILE_EMAIL_FILA?: string;
   /** remetente do binding; o padrão é o mesmo do resultado das baterias */
   MOBILE_EMAIL_FROM?: string;
   RESEND_API_KEY?: string;
@@ -19,7 +22,22 @@ export type MobileEmailPurpose = 'verify' | 'reset';
 const REMETENTE_PADRAO = 'resultados@kartodromodebetim.com.br';
 
 export function mobileEmailConfigured(env: MobileEmailEnv) {
-  return Boolean(env.EMAIL || (env.RESEND_API_KEY?.trim() && env.RESEND_FROM_EMAIL?.trim()));
+  return Boolean(env.EMAIL || env.MOBILE_DB || (env.RESEND_API_KEY?.trim() && env.RESEND_FROM_EMAIL?.trim()));
+}
+
+/**
+ * Fila do e-mail de conta (20/10/2026): o Email Sending da Cloudflare não está liberado para o domínio (só manda para
+ * endereços verificados — E_RECIPIENT_NOT_ALLOWED). O servidor da cronometragem busca a fila a cada 10 s e envia pela
+ * HostGator, a mesma saída dos resultados das baterias. A linha some depois de enviada.
+ */
+async function enfileirar(env: MobileEmailEnv, to: string, subject: string, text: string, html: string) {
+  if (!env.MOBILE_DB) return false;
+  const agora = Date.now();
+  await env.MOBILE_DB.prepare('DELETE FROM mobile_email_outbox WHERE created_at < ?').bind(agora - 3_600_000).run();
+  await env.MOBILE_DB.prepare(
+    'INSERT INTO mobile_email_outbox(id, to_address, subject, text_body, html_body, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+  ).bind(crypto.randomUUID(), to, subject, text, html, agora).run();
+  return true;
 }
 
 /** Link https (o app de e-mail abre; a página confirma ou troca a senha mesmo sem o app instalado). */
@@ -58,7 +76,7 @@ export async function sendMobileAuthEmail(
   if (!mobileEmailConfigured(env)) return false;
   const { subject, text, html } = conteudo(purpose, mobileEmailLink(env, purpose, token));
 
-  if (env.EMAIL) {
+  if (env.EMAIL && env.MOBILE_EMAIL_FILA !== '1') {
     try {
       await env.EMAIL.send({
         to,
@@ -70,8 +88,11 @@ export async function sendMobileAuthEmail(
       return true;
     } catch (e) {
       console.error('mobile email binding', (e as { code?: string }).code ?? '', (e as Error).message);
-      return false;
     }
+  }
+  if (env.MOBILE_DB && !(env.RESEND_API_KEY?.trim() && env.RESEND_FROM_EMAIL?.trim())) {
+    try { return await enfileirar(env, to, subject, text, html); }
+    catch (e) { console.error('mobile email outbox', (e as Error).message); return false; }
   }
 
   try {

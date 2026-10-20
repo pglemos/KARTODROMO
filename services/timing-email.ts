@@ -490,6 +490,19 @@ export function traduzirErro(e: unknown): string {
 
 /** E-mail de teste da tela de configuração (confere servidor, porta, usuário e senha). */
 /** `daTela`: o que está digitado na tela, testado sem gravar (sem ele vale a configuração gravada). */
+/** E-mail avulso pela mesma saída dos resultados (usado pelos e-mails de conta do app: confirmação e troca de senha). */
+export async function enviarEmailSimples(cfgArquivo: string, simulador: boolean, m: { to: string; subject: string; text: string; html: string }) {
+  const cfg = lerConfig(cfgArquivo);
+  if (!emailValido(m.to)) throw new Error('destinatário inválido');
+  if (!simulador && !(cfg.host && cfg.usuario && cfg.senha)) throw new Error('e-mail da cronometragem não configurado');
+  const t = transporte(cfg, simulador);
+  try {
+    await t.sendMail({ from: { name: 'Kartódromo de Betim', address: enderecoRemetente(cfg) }, to: m.to, subject: m.subject, text: m.text, html: m.html });
+  } finally {
+    t.close();
+  }
+}
+
 export async function enviarTeste(cfgArquivo: string, para: string, simulador: boolean, daTela?: Record<string, unknown>): Promise<SituacaoTesteEmail | undefined> {
   const cfg = daTela ? montarConfig(lerConfig(cfgArquivo), daTela) : lerConfig(cfgArquivo);
   if (!emailValido(para)) throw new Error('Informe um e-mail válido para o teste.');

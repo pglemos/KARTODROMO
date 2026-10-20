@@ -77,7 +77,7 @@ import { rankingPorPeso, tituloFaixas, type DadosPiloto } from '../lib/timing/ra
 import { condicaoChuvaPeloTracado, dataBrasilia, historicoDoKart, rankingKarts } from '../lib/timing/ranking-karts';
 import { calcularComAnteriores, retomarEqualizacao, validarFaixasRedutor, type FaixaRedutor, faixasDaRegra, importarKarts, REGRA_PADRAO, regraDa, SISTEMAS_KART, tempoVoltaParaMs, TOLERANCIA_PADRAO_MS, ultimaEqualizacaoPorKart, voltasNasBaterias, type ChecklistKart, type ConfigEqualizacao } from '../lib/timing/equalizacao';
 import { nomeProprio } from '../lib/nomes';
-import { configPublica, enviarResultado, enviarTeste, lerConfig, salvarConfig, semEmailAosPilotos, traduzirErro, type Dependencias, type OpcoesEnvio } from './timing-email';
+import { configPublica, enviarEmailSimples, enviarResultado, enviarTeste, lerConfig, salvarConfig, semEmailAosPilotos, traduzirErro, type Dependencias, type OpcoesEnvio } from './timing-email';
 import { usoKartsDaSessao } from '../lib/timing/kart-fisico';
 import { serializeMobilePublication } from '../lib/timing/mobile-results';
 import type { ContextoProva, EmpresaEmail } from '../lib/timing/email-resultado';
@@ -1384,6 +1384,41 @@ const emailsAgendados = new Map<string, NodeJS.Timeout>();
  * precisar do menu "Publicar / corrigir resultado no app". Quem correu sem cadastro fica de fora (não tem conta).
  * Guarda a última versão enviada; se a internet falhar, o ciclo de 5 min tenta de novo (até 6 h depois).
  */
+/**
+ * E-mails de conta do app (confirmação e troca de senha): o Worker deixa numa fila e este servidor envia pela mesma
+ * saída dos resultados (HostGator), porque o Email Sending da Cloudflare não está liberado para o domínio. A cada 10 s.
+ * O log não mostra destinatário nem o link (o link é a chave da conta).
+ */
+let filaEmailsDoAppRodando = false;
+async function enviarEmailsDoApp() {
+  const destination = process.env.MOBILE_RESULTS_URL;
+  const token = process.env.MOBILE_PUBLISH_TOKEN;
+  if (filaEmailsDoAppRodando || !destination || !token) return;
+  const base = mobileApiEndpoint(destination, '/api/mobile/v1/internal/results', SIMULATE);
+  if (!base) return;
+  filaEmailsDoAppRodando = true;
+  try {
+    const r = await fetch(new URL('/api/mobile/v1/internal/outbox', base), { headers: { 'x-mobile-publish-token': token }, redirect: 'error', signal: AbortSignal.timeout(15_000) });
+    if (!r.ok) return;
+    const fila = (await r.json()) as { id: string; to: string; subject: string; text: string; html: string }[];
+    let enviados = 0;
+    for (const m of fila) {
+      let ok = true;
+      try { await enviarEmailSimples(EMAIL_FILE, SIMULATE, m); enviados++; }
+      catch (e) { ok = false; log(`app: e-mail de conta não saiu (${traduzirErro(e)}); tenta de novo`); }
+      await fetch(new URL(`/api/mobile/v1/internal/outbox/${m.id}/${ok ? 'enviado' : 'falhou'}`, base), {
+        method: 'POST', headers: { 'x-mobile-publish-token': token }, redirect: 'error', signal: AbortSignal.timeout(15_000),
+      }).catch(() => undefined);
+    }
+    if (enviados) log(`app: ${enviados} e-mail(s) de conta enviados (confirmação/troca de senha)`);
+  } catch {
+    // internet ou Worker fora: tenta no próximo ciclo
+  } finally {
+    filaEmailsDoAppRodando = false;
+  }
+}
+setInterval(() => void enviarEmailsDoApp(), 10_000);
+
 const publicadosNoApp = new Map<string, string>();
 async function publicarNoAppAutomatico(s: Session) {
   const destination = process.env.MOBILE_RESULTS_URL;

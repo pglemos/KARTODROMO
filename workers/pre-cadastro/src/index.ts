@@ -12,6 +12,7 @@ import { handleMobileReservations } from './mobile/reservations';
 import { handleMobileCoupons, handleMobileCouponsSync } from './mobile/coupons';
 import { handleMobileResults, type MobileResultsEnv } from './mobile/results';
 import { handleMobileLive, type MobileLiveEnv } from './mobile/live';
+import { handleMobileOutbox } from './mobile/outbox';
 
 export interface Env extends EnvReservas, MobileAuthEnv, MobileResultsEnv, MobileLiveEnv {
   ASSETS: Fetcher;
@@ -99,6 +100,7 @@ export default {
         return await handleMobileResults(req, env);
       }
       if (p === '/api/mobile/v1/live') return await handleMobileLive(req, env);
+      if (p === '/api/mobile/v1/internal/outbox' || p.startsWith('/api/mobile/v1/internal/outbox/')) return await handleMobileOutbox(req, env);
       if (p === '/api/mobile/v1/agenda' || p === '/api/mobile/v1/reservations' || p.startsWith('/api/mobile/v1/reservations/')) {
         return await handleMobileReservations(req, env);
       }
