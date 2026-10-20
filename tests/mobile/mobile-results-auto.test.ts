@@ -18,6 +18,11 @@ describe('resultado automático no app', () => {
     expect(p.results?.every((r) => r.position >= 1)).toBe(true);
   });
 
+  it('deixa de fora quem foi inscrito e ficou sem kart', () => {
+    const s = bateria([{ kart: '4', name: 'Ana Silva', customerId: '10' }, { kart: '', name: 'Bia Souza', customerId: '11' }]);
+    expect(serializeMobilePublication(s, 'publish', { ignorarSemCadastro: true }).results?.map((r) => r.customerId)).toEqual(['10']);
+  });
+
   it('pelo menu continua exigindo todos vinculados', () => {
     const s = bateria([{ kart: '4', name: 'Ana Silva', customerId: '10' }, { kart: '5', name: 'Kart 5' }]);
     expect(() => serializeMobilePublication(s, 'publish')).toThrow('Vincule todos os pilotos');

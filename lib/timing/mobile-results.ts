@@ -34,7 +34,9 @@ export function serializeMobilePublication(session: Session, action: MobileResul
     const competitor = byStanding.get(competitorKey(standing.kart, standing.name))?.shift();
     const customerId = String(competitor?.customerId ?? '').trim();
     const displayName = standing.name.trim().replace(/\s+/g, ' ');
-    if (!competitor || !/^\d{1,20}$/.test(customerId) || !displayName || (opcoes.ignorarSemCadastro && vistos.has(customerId))) {
+    // automático: também fica de fora quem foi inscrito e não andou (sem kart; o Worker recusaria a bateria inteira)
+    const naoAndou = !standing.kart.trim() || standing.kart.trim().length > 40;
+    if (!competitor || !/^\d{1,20}$/.test(customerId) || !displayName || (opcoes.ignorarSemCadastro && (vistos.has(customerId) || naoAndou))) {
       if (opcoes.ignorarSemCadastro) return [];
       throw new Error('Vincule todos os pilotos a clientes antes de publicar.');
     }
