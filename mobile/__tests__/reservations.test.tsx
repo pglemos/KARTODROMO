@@ -86,6 +86,7 @@ function setSession(value: typeof session | null) {
     isLoading: false,
     login: jest.fn(),
     logout,
+    deleteAccount: jest.fn().mockResolvedValue(undefined),
     refresh: jest.fn(),
   });
   return logout;

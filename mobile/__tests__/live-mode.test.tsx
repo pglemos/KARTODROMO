@@ -34,7 +34,7 @@ describe('modo loja (sem dados demonstrativos)', () => {
     const view = await renderRouter(
       {
         '(tabs)/index': () => <Text>Início real</Text>,
-        '(tabs)/ranking-teste': MockScreen,
+        '(tabs)/ranking-teste': () => <MockScreen />,
       },
       { initialUrl: '/(tabs)/ranking-teste' },
     );

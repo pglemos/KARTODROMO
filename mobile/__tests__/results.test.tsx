@@ -36,6 +36,7 @@ function setSession(value: typeof accessSession | null) {
     isLoading: false,
     login: jest.fn(),
     logout: jest.fn(),
+    deleteAccount: jest.fn().mockResolvedValue(undefined),
     refresh: jest.fn(),
   });
 }
