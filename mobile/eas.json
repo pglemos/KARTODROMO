@@ -33,7 +33,6 @@
     },
     "store-preview": {
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://kartodromo-mobile-homolog.kartodromo.workers.dev",
         "EXPO_PUBLIC_DEMO_MODE": "0"
       },
       "distribution": "store",

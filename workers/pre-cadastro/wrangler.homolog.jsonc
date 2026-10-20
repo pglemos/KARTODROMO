@@ -15,6 +15,7 @@
     "database_id": "394908ee-1e8c-4c57-b0fb-726aec37cce6",
     "migrations_dir": "migrations"
   }],
+  "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["resultados@kartodromodebetim.com.br"] }],
   "vars": {
     "RESERVAS_ATIVAS": "0",
     "ASAAS_URL": "https://api-sandbox.asaas.com/v3"

@@ -37,11 +37,14 @@ function readJson<T>(path: string): T | null {
 }
 
 describe('configuração de distribuição móvel', () => {
-  it('direciona candidatos de avaliação para a homologação isolada', () => {
+  it('QA interno na homologação isolada; TestFlight/Play interno e loja no servidor real', () => {
     const eas = readJson<{ build: Record<string, { env?: Record<string, string> }> }>(easJsonPath)!;
-    for (const profile of ['development', 'preview', 'store-preview']) {
+    for (const profile of ['development', 'preview']) {
       expect(eas.build[profile].env?.EXPO_PUBLIC_API_URL).toBe('https://kartodromo-mobile-homolog.kartodromo.workers.dev');
     }
+    // 20/10/2026: o backend do app está em produção (reservas, resultados, ao vivo); o build que vai para o
+    // TestFlight e para a faixa interna do Google Play usa o mesmo servidor da loja (sem URL = produção).
+    expect(eas.build['store-preview'].env?.EXPO_PUBLIC_API_URL).toBeUndefined();
     expect(eas.build.production.env?.EXPO_PUBLIC_API_URL).toBeUndefined();
   });
   it('usa o mesmo identificador nas lojas e aponta para a política pública', () => {
