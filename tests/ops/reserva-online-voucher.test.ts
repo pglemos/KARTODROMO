@@ -78,6 +78,8 @@ beforeEach(() => {
   db.one.mockImplementation(async (sql: string, params: Record<string, unknown> = {}) => {
     if (sql.includes('SELECT CONVERT(varchar(19), ExpiraEm')) return { expira: '2026-10-13T12:15:00' };
     if (sql.includes('FROM dbo.Bateria') && sql.includes('inicio')) return { ...battery, inicio: '2026-10-20T09:15', ok: 1 };
+    // pedido com cupom esperando o desfecho (rota resolver da Recepção antiga)
+    if (sql.includes('FROM dbo.ReservaOnlineVoucherUso u')) return usageState === 'reembolso_pendente' ? { x: 1 } : null;
     if (sql.includes('FROM dbo.ReservaOnline') && sql.includes('PedidoId')) return reservation?.PedidoId === params.id ? reservation : null;
     if (sql.includes('FROM dbo.Bateria')) return battery;
     if (sql.includes('FROM dbo.Produto')) return { Id: 4, preco: 14500 };
@@ -242,6 +244,17 @@ describe('consumo atômico e estados do voucher', () => {
       body: async () => ({}), sessao: {} as never,
     }, () => undefined)).rejects.toMatchObject({ status: 400 });
     expect(usageState).toBe('reembolso_pendente');
+  });
+
+  it('Recepção antiga (sem o desfecho) ainda resolve pedido sem cupom', async () => {
+    reservation = { Id: 10, PedidoId: 'pedido-sem-cupom', Codigo: 'K7M2QX', Status: 'pago_sem_vaga' };
+    usageState = '';
+    const responses: { status: number; body: unknown }[] = [];
+    await officeRoutes({
+      method: 'POST', url: new URL('https://ops.local/api/office/reservas-online/10/resolver'),
+      body: async () => ({}), sessao: {} as never,
+    }, (status, body) => responses.push({ status, body }));
+    expect(responses[responses.length - 1]).toEqual({ status: 200, body: { ok: true, resolucao: 'resolvido' } });
   });
 
   it('mantém o uso pendente quando o pagamento chega sem vaga', async () => {

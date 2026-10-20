@@ -1023,7 +1023,13 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   }
   if ((m = path.match(/^\/reservas-online\/(\d+)\/resolver$/)) && method === 'POST') {
     const { resolucao } = await req.body();
-    if (resolucao !== 'reembolso_confirmado' && resolucao !== 'remarcado') throw new HttpError(400, 'Confirme o reembolso ou a remarcação antes de resolver.');
+    // Recepção até a 1.0.69 manda só "resolvido", sem dizer se devolveu ou remarcou: vale para pedido sem cupom pendente
+    const legado = resolucao === undefined || resolucao === null || resolucao === '';
+    if (!legado && resolucao !== 'reembolso_confirmado' && resolucao !== 'remarcado') throw new HttpError(400, 'Confirme o reembolso ou a remarcação antes de resolver.');
+    if (legado && await one(
+      `SELECT TOP 1 1 x FROM dbo.ReservaOnlineVoucherUso u JOIN dbo.ReservaOnline r ON r.PedidoId = u.PedidoId WHERE r.Id = @id AND u.Estado = 'reembolso_pendente'`,
+      { id: Number(m![1]) },
+    )) throw new HttpError(400, 'Este pedido usou cupom: atualize a Recepção para dizer se o valor foi devolvido ou se o cliente foi remarcado.');
     const estadoUso = resolucao === 'reembolso_confirmado' ? 'liberado' : 'consumido';
     const r = await tx(async (run) => {
       const [pedido] = await run(
@@ -1038,7 +1044,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
       return pedido;
     });
     if (!r) throw new HttpError(409, 'Este pedido não está mais pendente.');
-    send(200, { ok: true, resolucao });
+    send(200, { ok: true, resolucao: legado ? 'resolvido' : resolucao });
     return true;
   }
   if (path === '/reservas' && method === 'GET') {
