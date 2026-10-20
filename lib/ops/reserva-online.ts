@@ -410,14 +410,29 @@ export async function vagaOnlineDoGrupo(bateriaId: number, clienteId: number, pa
 }
 
 /** Ciclo de 5 s: pedidos novos, pagos e vencidos. */
+/**
+ * Tarefas do app que não podem segurar os pedidos pagos: rodam em paralelo (uma de cada vez) e o aviso de falha
+ * sai no máximo a cada 10 min (20/10: o banco do app às vezes leva 12–15 s e atrasava o ciclo inteiro).
+ */
+const emAndamento = new Set<string>();
+const ultimoAviso = new Map<string, number>();
+function emParalelo(nome: string, tarefa: () => Promise<unknown>, log: Log, aviso: (e: Error) => string) {
+  if (emAndamento.has(nome)) return;
+  emAndamento.add(nome);
+  void tarefa()
+    .catch((e: Error) => {
+      if (Date.now() - (ultimoAviso.get(nome) ?? 0) < 10 * 60_000) return;
+      ultimoAviso.set(nome, Date.now());
+      log(aviso(e));
+    })
+    .finally(() => emAndamento.delete(nome));
+}
+
 export async function sincronizarReservasOnline(log: Log) {
   if (!preCadastroLigado()) return 0;
-  let previas = 0;
-  try { previas = await sincronizarCuponsOnline(log); }
-  catch { log('prévia de cupons: sincronização temporariamente indisponível'); }
+  emParalelo('cupons', () => sincronizarCuponsOnline(log), log, () => 'prévia de cupons do app: sincronização temporariamente indisponível (tenta de novo a cada 5 s)');
   // contas do app com e-mail confirmado: vincula ao cliente pelo CPF + e-mail/telefone (uma vez por minuto)
-  try { await vincularContasDoApp(log); }
-  catch (e) { log(`app: vínculo automático indisponível agora (${(e as Error).message})`); }
+  emParalelo('vinculo', () => vincularContasDoApp(log), log, (e) => `app: vínculo automático indisponível agora (${e.message})`);
   const pedidos = (await chamar('/api/sync/pedidos')) as PedidoSite[];
   const resultados: Resultado[] = [];
   for (const p of pedidos) {
@@ -429,5 +444,5 @@ export async function sincronizarReservasOnline(log: Log) {
   }
   resultados.push(...(await expirarVencidos(log)));
   if (resultados.length) await chamar('/api/sync/pedido', { method: 'POST', body: JSON.stringify(resultados) });
-  return resultados.length + previas;
+  return resultados.length;
 }

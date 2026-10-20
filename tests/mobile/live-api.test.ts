@@ -28,7 +28,7 @@ describe('ao vivo do app', () => {
   });
 
   it('busca na crono e responde 503 quando ela não responde', async () => {
-    const f = vi.fn(async () => new Response(JSON.stringify(retrato), { status: 200 }));
+    const f = vi.fn(async (_url: string) => new Response(JSON.stringify(retrato), { status: 200 }));
     vi.stubGlobal('fetch', f);
     const ok = await handleMobileLive(new Request('https://reservas.kartodromodebetim.com.br/api/mobile/v1/live'), {});
     expect(ok.status).toBe(200);
