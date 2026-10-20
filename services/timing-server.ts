@@ -19,6 +19,7 @@ import { extname, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { DecoderClient, type DecoderProtocol } from '../lib/timing/decoder-client';
 import { formatTrxPassing, type TrxPassing } from '../lib/timing/trx-parser';
+import { mobileApiEndpoint } from '../lib/mobile-api-url';
 import {
   acceptRejected,
   addPenalty,
@@ -78,6 +79,7 @@ import { calcularComAnteriores, retomarEqualizacao, validarFaixasRedutor, type F
 import { nomeProprio } from '../lib/nomes';
 import { configPublica, enviarResultado, enviarTeste, lerConfig, salvarConfig, semEmailAosPilotos, traduzirErro, type Dependencias, type OpcoesEnvio } from './timing-email';
 import { usoKartsDaSessao } from '../lib/timing/kart-fisico';
+import { serializeMobilePublication } from '../lib/timing/mobile-results';
 import type { ContextoProva, EmpresaEmail } from '../lib/timing/email-resultado';
 import { competidoresComSorteio, descricaoModoSorteio, ListaMudouError, pilotosDoSorteio, validarSorteio, type Atribuicao } from '../lib/timing/sorteio';
 import { normalizarPaginaPainel, PAINEL_LED_PAGE_SIZE } from '../lib/timing/painel-page';
@@ -901,7 +903,12 @@ function liveSnapshot(painelTb50 = false) {
       painelTb50 && OPEN_STATES.has(s.state),
       standings
         .filter((r) => r.laps > 0 || !OPEN_STATES.has(s.state))
-        .map((r) => ({ position: r.position, kart: r.kart, name: r.name, time: formatLap(r.bestLapMs) })),
+        // laps/last/bestLap/gap: para o app do cliente (o placar, o telão e o site só leem os quatro primeiros)
+        .map((r) => ({
+          position: r.position, kart: r.kart, name: r.name, time: formatLap(r.bestLapMs),
+          laps: r.laps, last: formatLap(r.lastLapMs), bestLap: r.bestLapNumber,
+          gap: r.position === 1 ? '' : r.gapLaps > 0 ? `+${r.gapLaps} ${r.gapLaps === 1 ? 'volta' : 'voltas'}` : r.gapMs != null ? `+${(r.gapMs / 1000).toFixed(3)}` : '',
+        })),
     ),
   };
 }
@@ -1194,6 +1201,13 @@ async function opsGet(path: string) {
   return data;
 }
 
+async function mobilePublishPermission(token: string) {
+  return fetch(`${OPS_URL}/api/office/mobile-permissions/resultados_publicar_mobile`, {
+    headers: { authorization: `Bearer ${token}`, 'x-ops-key': process.env.OPS_RECEPCAO_KEY || '' },
+    signal: AbortSignal.timeout(6000),
+  });
+}
+
 /**
  * Horas de uso dos karts para a oficina (Manutenções no Módulo Office): ao encerrar a bateria manda quantos minutos
  * cada kart ficou na pista (da primeira à última passagem). Uma vez por bateria; se o servidor da operação estiver
@@ -1364,11 +1378,46 @@ async function emailsAoEncerrar(s: Session) {
  */
 const ESPERA_EMAIL_MS = Number(process.env.TIMING_ESPERA_EMAIL_MS || 3 * 60_000); // o simulador de teste encurta
 const emailsAgendados = new Map<string, NodeJS.Timeout>();
+
+/**
+ * App do cliente: o resultado vai para o app junto com o e-mail (3 min depois de encerrar e a cada correção), sem
+ * precisar do menu "Publicar / corrigir resultado no app". Quem correu sem cadastro fica de fora (não tem conta).
+ * Guarda a última versão enviada; se a internet falhar, o ciclo de 5 min tenta de novo (até 6 h depois).
+ */
+const publicadosNoApp = new Map<string, string>();
+async function publicarNoAppAutomatico(s: Session) {
+  const destination = process.env.MOBILE_RESULTS_URL;
+  const publishToken = process.env.MOBILE_PUBLISH_TOKEN;
+  if (!destination || !publishToken || s.state !== 'encerrada' || !['classificacao', 'corrida'].includes(s.type)) return;
+  const url = mobileApiEndpoint(destination, '/api/mobile/v1/internal/results', SIMULATE);
+  if (!url) return;
+  const assinatura = assinaturaResultado(s);
+  if (publicadosNoApp.get(s.id) === assinatura) return;
+  let payload: ReturnType<typeof serializeMobilePublication>;
+  try { payload = serializeMobilePublication(s, 'publish', { ignorarSemCadastro: true }); }
+  catch (e) { publicadosNoApp.set(s.id, assinatura); log(`app: resultado de ${s.name} não foi para o app (${(e as Error).message})`); return; }
+  try {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-mobile-publish-token': publishToken },
+      body: JSON.stringify(payload),
+      redirect: 'error',
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!r.ok) { log(`app: o serviço do app recusou o resultado de ${s.name} (HTTP ${r.status})`); return; }
+    publicadosNoApp.set(s.id, assinatura);
+    log(`app: resultado de ${s.name} publicado (${payload.results?.length ?? 0} pilotos com cadastro)`);
+  } catch (e) {
+    log(`app: não foi possível publicar ${s.name} agora (${(e as Error).message}); tenta de novo em 5 min`);
+  }
+}
+
 function agendarEmails(s: Session) {
   clearTimeout(emailsAgendados.get(s.id));
   emailsAgendados.set(s.id, setTimeout(() => {
     emailsAgendados.delete(s.id);
     if (s.state !== 'encerrada' || !['classificacao', 'corrida'].includes(s.type)) return;
+    void publicarNoAppAutomatico(s);
     if (envioATodosAtivo.has(s.id)) return agendarEmails(s); // ainda mandando a versão anterior: corrige quando terminar
     if (!(s.emailsResultado?.enviados.length)) return void emailsAoEncerrar(s);
     if (!lerConfig(EMAIL_FILE).automatico || semEmailAosPilotos(s, nomeEventoDa(s))) return;
@@ -1393,6 +1442,7 @@ setInterval(() => {
     const fim = s.finishedAt ?? s.createdAt;
     if (s.state !== 'encerrada' || fim <= limite || emailsAgendados.has(s.id)) continue;
     if (e ? (e.status === 'parcial' || e.status === 'falhou') && e.tentativas < 12 : fim < agora - 3 * 60_000) void emailsAoEncerrar(s);
+    if (fim < agora - 3 * 60_000) void publicarNoAppAutomatico(s);
   }
 }, 5 * 60_000);
 
@@ -1967,6 +2017,52 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     log(`bateria criada ${s.name} (${s.type}) com ${s.competitors.length} pilotos${s.agendaId ? ` (agenda ${s.agendaId})` : ''}`);
     scheduleStateBroadcast();
     return send(res, 201, sessionView(s));
+  }
+
+  const mobilePublicationRoute = path.match(/^\/api\/sessions\/([\w-]+)\/mobile-publication$/);
+  if (mobilePublicationRoute && method === 'POST') {
+    const token = /^Bearer\s+([^\s]+)$/i.exec(String(req.headers.authorization ?? ''))?.[1];
+    if (!token) return send(res, 401, { error: 'Entre novamente para publicar resultados.' });
+    let permission: Response;
+    try {
+      permission = await mobilePublishPermission(token);
+    } catch {
+      return send(res, 503, { error: 'Não foi possível validar sua permissão agora.' });
+    }
+    if (permission.status === 401) return send(res, 401, { error: 'Sessão expirada. Entre novamente.' });
+    if (!permission.ok || !(await permission.json().catch(() => ({})) as { allowed?: boolean }).allowed) {
+      return send(res, 403, { error: 'Seu perfil não pode publicar resultados no app.' });
+    }
+
+    const session = sessions.get(mobilePublicationRoute[1]);
+    if (!session) return send(res, 404, { error: 'Bateria não encontrada.' });
+    let payload: ReturnType<typeof serializeMobilePublication>;
+    try {
+      const body = await readBody(req);
+      if (body.action !== 'publish' && body.action !== 'withdraw') return send(res, 400, { error: 'Ação de publicação inválida.' });
+      payload = serializeMobilePublication(session, body.action);
+    } catch (error) {
+      return send(res, session.state === 'encerrada' ? 400 : 409, { error: (error as Error).message });
+    }
+
+    const destination = process.env.MOBILE_RESULTS_URL;
+    const publishToken = process.env.MOBILE_PUBLISH_TOKEN;
+    if (!destination || !publishToken) return send(res, 503, { error: 'Publicação móvel ainda não está configurada.' });
+    try {
+      const url = mobileApiEndpoint(destination, '/api/mobile/v1/internal/results', SIMULATE);
+      if (!url) return send(res, 503, { error: 'O destino de publicação não é o Worker móvel autorizado.' });
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-mobile-publish-token': publishToken },
+        body: JSON.stringify(payload),
+        redirect: 'error',
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) return send(res, 502, { error: 'O serviço móvel não confirmou a publicação.' });
+      return send(res, 200, { ok: true, action: payload.action });
+    } catch {
+      return send(res, 502, { error: 'Não foi possível enviar o resultado ao app.' });
+    }
   }
 
   const passageCorrection = path.match(/^\/api\/sessions\/([\w-]+)\/passings\/([\w-]+)\/(delete|restore|invalidate|validate|assign|unassign)$/);
