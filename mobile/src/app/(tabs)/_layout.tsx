@@ -1,26 +1,81 @@
+import React from 'react';
 import { Tabs } from 'expo-router/js-tabs';
-import { Text, useWindowDimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Icon } from '../../components/brand';
-import { useUi } from '../../components/theme';
+import { FloatingTabBar } from '../../components/floating-tab-bar';
+import { DEMO_MODE } from '../../config/features';
 
 export default function CustomerTabs() {
-  const { palette } = useUi();
-  const { fontScale } = useWindowDimensions();
-  const { bottom } = useSafeAreaInsets();
-  return <Tabs screenOptions={{
-    headerShown: false,
-    tabBarLabelPosition: 'below-icon',
-    tabBarActiveTintColor: palette.accent,
-    tabBarInactiveTintColor: palette.muted,
-    tabBarStyle: { backgroundColor: palette.surface, borderTopColor: palette.border, paddingTop: 6, height: Math.max(64, 32 + 28 * fontScale) + bottom },
-    tabBarLabel: ({ children, color }) => <Text style={{ color, fontSize: 11, lineHeight: 14, fontWeight: '600', textAlign: 'center' }}>{children}</Text>,
-    tabBarHideOnKeyboard: true,
-  }}>
-    <Tabs.Screen name="index" options={{ title: 'Início', tabBarIcon: ({ color }) => <Icon name="home" color={color} /> }} />
-    <Tabs.Screen name="agenda" options={{ title: 'Agenda', tabBarIcon: ({ color }) => <Icon name="calendar" color={color} /> }} />
-    <Tabs.Screen name="reservas" options={{ title: 'Reservas', tabBarIcon: ({ color }) => <Icon name="ticket" color={color} /> }} />
-    <Tabs.Screen name="resultados" options={{ title: 'Resultados', tabBarIcon: ({ color }) => <Icon name="results" color={color} /> }} />
-    <Tabs.Screen name="gps" options={{ title: 'GPS', tabBarIcon: ({ color }) => <Icon name="gps" color={color} /> }} />
-  </Tabs>;
+  return (
+    <Tabs
+      tabBar={(props) => <FloatingTabBar {...props} />}
+      screenOptions={{
+        headerShown: false,
+        tabBarHideOnKeyboard: true,
+        animation: 'fade',
+        sceneStyle: { backgroundColor: '#000000' },
+      }}
+    >
+      {/* 5 Abas Oficiais do Redesenho Esportivo */}
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Home',
+          tabBarLabel: 'Home',
+        }}
+      />
+      <Tabs.Screen
+        name="parceiros"
+        options={{
+          ...(DEMO_MODE ? {} : { href: null }),
+          title: 'Parceiros',
+          tabBarLabel: 'Parceiros',
+        }}
+      />
+      <Tabs.Screen
+        name="livetime"
+        options={{
+          ...(DEMO_MODE ? {} : { href: null }),
+          title: 'LiveTime',
+          tabBarLabel: 'LiveTime',
+        }}
+      />
+      <Tabs.Screen
+        name="agenda"
+        options={{
+          title: 'Agenda',
+          tabBarLabel: 'Agenda',
+        }}
+      />
+      <Tabs.Screen
+        name="carreira"
+        options={{
+          ...(DEMO_MODE ? {} : { href: null }),
+          title: 'Carreira',
+          tabBarLabel: 'Carreira',
+        }}
+      />
+
+      {/* Rotas Auxiliares / Legadas Ocultadas da Tab Bar */}
+      <Tabs.Screen
+        name="reservas"
+        options={{
+          ...(DEMO_MODE ? { href: null } : {}),
+          title: 'Reservas',
+        }}
+      />
+      <Tabs.Screen
+        name="resultados"
+        options={{
+          ...(DEMO_MODE ? { href: null } : {}),
+          title: 'Resultados',
+        }}
+      />
+      <Tabs.Screen
+        name="gps"
+        options={{
+          ...(DEMO_MODE ? { href: null } : {}),
+          title: 'GPS',
+        }}
+      />
+    </Tabs>
+  );
 }

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { themes } from '../src/components/theme';
 
@@ -19,8 +19,10 @@ it.each(['light', 'dark'] as const)('mantém contraste AA no tema %s', (appearan
   }
 });
 
-it('preserva os bytes da logo e fotografia oficiais no aplicativo', () => {
-  const root = resolve(__dirname, '../..');
+const root = resolve(__dirname, '../..');
+const testMonorepo = existsSync(resolve(root, 'workers/pre-cadastro/src/index.ts')) ? it : it.skip;
+
+testMonorepo('[monorepo] preserva os bytes da logo e fotografia oficiais no aplicativo', () => {
   expect(readFileSync(resolve(root, 'mobile/assets/brand-logo.png'))).toEqual(readFileSync(resolve(root, 'public/brand/kib-logo.png')));
   expect(readFileSync(resolve(root, 'mobile/assets/betim-track.jpg'))).toEqual(readFileSync(resolve(root, 'public/posters/home-karting.jpg')));
 });

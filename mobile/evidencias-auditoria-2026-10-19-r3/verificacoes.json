@@ -1,0 +1,91 @@
+{
+  "date": "2026-10-19",
+  "revision": 3,
+  "mobile": {
+    "suites": 26,
+    "passed": 373,
+    "failed": 0
+  },
+  "standalone": {
+    "suites": 26,
+    "passed": 367,
+    "skippedMonorepo": 6,
+    "failed": 0,
+    "dependencies": "node_modules compartilhado; fontes isoladas sem arquivos do monorepo"
+  },
+  "backend": {
+    "files": 6,
+    "passed": 35,
+    "failed": 0
+  },
+  "typecheck": "passed",
+  "lint": "passed",
+  "doctor": "21/21",
+  "hermesExport": [
+    "ios",
+    "android"
+  ],
+  "dependencies": {
+    "test-renderer": "1.2.0",
+    "react-reconciler": "0.33.0",
+    "react": "19.2.3"
+  },
+  "npmAudit": {
+    "info": 0,
+    "low": 0,
+    "moderate": 8,
+    "high": 49,
+    "critical": 0,
+    "total": 57
+  },
+  "apiSmoke": {
+    "productionMobileAgenda": 404,
+    "homologMobileAgenda": 403,
+    "productionPublicAgenda": 200,
+    "publicSlots": 417
+  },
+  "android": "QA de interface mantido da revisão 2; nenhuma alteração de UI nesta revisão",
+  "iosBuildId": "77b1f5a7-63a8-44dc-a258-8124cf504c00",
+  "advisories": {
+    "braces": {
+      "severity": "high",
+      "advisories": [
+        {
+          "title": "braces vulnerable to stack-exhaustion denial of service through deeply nested patterns",
+          "url": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
+          "range": "<=3.0.3"
+        }
+      ]
+    },
+    "decode-uri-component": {
+      "severity": "moderate",
+      "advisories": [
+        {
+          "title": "decode-uri-component: Denial of service via exponential decoding of malformed percent-encoded input",
+          "url": "https://github.com/advisories/GHSA-vcc3-ghjq-m6fr",
+          "range": "<=0.4.2"
+        }
+      ]
+    },
+    "node-forge": {
+      "severity": "high",
+      "advisories": [
+        {
+          "title": "node-forge RSA PKCS#1 v1.5 signature verification accepts extra nested DigestAlgorithm elements",
+          "url": "https://github.com/advisories/GHSA-86w9-cpqp-85rv",
+          "range": "<=1.4.0"
+        }
+      ]
+    },
+    "sprintf-js": {
+      "severity": "moderate",
+      "advisories": [
+        {
+          "title": "sprintf-js vulnerable to denial of service through unbounded precision specifiers",
+          "url": "https://github.com/advisories/GHSA-hp3w-g68c-fv3c",
+          "range": "<=1.1.3"
+        }
+      ]
+    }
+  }
+}

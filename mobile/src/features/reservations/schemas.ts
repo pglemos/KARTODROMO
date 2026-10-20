@@ -6,6 +6,7 @@ export interface AgendaSlot {
 }
 
 export interface AgendaResponse {
+  bookingChannel?: 'site';
   atualizadoEm: string;
   precoCentavos: number;
   maxPilotos: number;

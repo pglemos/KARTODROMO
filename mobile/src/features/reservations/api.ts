@@ -10,8 +10,28 @@ import type {
 const pause = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 export const reservationsApi = {
-  agenda() {
-    return mobileRequest<AgendaResponse>('/api/mobile/v1/agenda');
+  async agenda() {
+    let data: AgendaResponse;
+    try {
+      data = await mobileRequest<AgendaResponse>('/api/mobile/v1/agenda');
+    } catch (error) {
+      if (!(error instanceof MobileApiError) || error.status !== 404) throw error;
+      // A agenda pública existe antes da implantação das contas e reservas mobile.
+      data = { ...await mobileRequest<AgendaResponse>('/api/agenda'), bookingChannel: 'site' };
+    }
+    if (!data || !Number.isSafeInteger(data.precoCentavos) || data.precoCentavos < 0 ||
+        !Number.isSafeInteger(data.maxPilotos) || data.maxPilotos < 1 ||
+        typeof data.pagamentoOnline !== 'boolean' || !Array.isArray(data.horarios) ||
+        data.horarios.some((slot) => !slot || !Number.isSafeInteger(slot.id) || slot.id < 1 ||
+          typeof slot.nome !== 'string' || !slot.nome.trim() ||
+          !Number.isSafeInteger(slot.livres) || slot.livres < 0 ||
+          typeof slot.inicio !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(slot.inicio) ||
+          !Number.isFinite(Date.parse(slot.inicio)) ||
+          new Date(`${slot.inicio.slice(0, 10)}T00:00:00Z`).toISOString().slice(0, 10) !== slot.inicio.slice(0, 10)) ||
+        new Set(data.horarios.map((slot) => slot.id)).size !== data.horarios.length) {
+      throw new MobileApiError('A agenda recebida é inválida. Tente novamente.');
+    }
+    return data;
   },
   list(accessToken: string) {
     return mobileRequest<ReservationOrder[]>('/api/mobile/v1/reservations', { accessToken });

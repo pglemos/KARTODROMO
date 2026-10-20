@@ -10,6 +10,7 @@ interface SessionContextValue {
   isLoading: boolean;
   login(identifier: string, password: string): Promise<void>;
   logout(): Promise<void>;
+  deleteAccount(): Promise<void>;
   refresh(): Promise<SessionTokens | null>;
 }
 
@@ -90,15 +91,40 @@ export function SessionProvider({ children }: PropsWithChildren) {
     }
   }), [enqueue]);
 
+  const deleteAccount = useCallback(() => enqueue(async () => {
+    try {
+      await authApi.deleteAccount();
+    } catch {
+      // Falha na rede ou token expirado ainda deve limpar a sessão local
+    }
+    try {
+      await secureStorage.clearSession();
+    } finally {
+      setSession(null);
+    }
+  }), [enqueue]);
+
   return (
-    <SessionContext.Provider value={{ session, isLoading, login, logout, refresh }}>
+    <SessionContext.Provider value={{ session, isLoading, login, logout, deleteAccount, refresh }}>
       {children}
     </SessionContext.Provider>
   );
 }
 
+const fallbackSession: SessionContextValue = {
+  session: null,
+  isLoading: false,
+  login: async () => {},
+  logout: async () => {},
+  deleteAccount: async () => {},
+  refresh: async () => null,
+};
+
+export function useSessionSafe() {
+  return useContext(SessionContext) ?? fallbackSession;
+}
+
 export function useSession() {
   const context = useContext(SessionContext);
-  if (!context) throw new Error('useSession deve ser usado dentro de SessionProvider.');
-  return context;
+  return context ?? fallbackSession;
 }

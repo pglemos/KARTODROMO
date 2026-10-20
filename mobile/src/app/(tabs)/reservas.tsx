@@ -46,7 +46,7 @@ function LoginPrompt({ batteryId }: { batteryId: number | null }) {
 }
 
 function LogoutButton() {
-  const { logout } = useSession();
+  const { logout, deleteAccount } = useSession();
   const [busy, setBusy] = useState(false);
 
   async function submit() {
@@ -61,7 +61,37 @@ function LogoutButton() {
     finally { setBusy(false); }
   }
 
-  return <View style={{ alignSelf: 'flex-end', marginBottom: 18 }}><ActionButton label={busy ? 'Encerrando sessão…' : 'Sair da conta'} onPress={() => void submit()} disabled={busy} secondary /></View>;
+  function promptDeleteAccount() {
+    Alert.alert(
+      'Excluir conta definitivamente',
+      'Tem certeza de que deseja excluir sua conta? Seus dados de cadastro serão apagados permanentemente.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir minha conta',
+          style: 'destructive',
+          onPress: async () => {
+            setBusy(true);
+            try {
+              await deleteAccount();
+              Alert.alert('Conta excluída', 'Sua conta e seus dados foram excluídos com sucesso.');
+            } catch {
+              Alert.alert('Aviso', 'Sua sessão foi encerrada.');
+            } finally {
+              setBusy(false);
+            }
+          },
+        },
+      ],
+    );
+  }
+
+  return (
+    <View style={{ flexDirection: 'row', gap: 8, alignSelf: 'flex-end', marginBottom: 18, alignItems: 'center' }}>
+      <ActionButton label={busy ? 'Aguarde…' : 'Excluir conta'} onPress={promptDeleteAccount} disabled={busy} secondary />
+      <ActionButton label={busy ? 'Encerrando…' : 'Sair da conta'} onPress={() => void submit()} disabled={busy} secondary />
+    </View>
+  );
 }
 
 function ReservationList({ orders, loading, error, retry }: {

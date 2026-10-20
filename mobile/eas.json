@@ -5,28 +5,48 @@
   },
   "build": {
     "development": {
-      "env": { "EXPO_PUBLIC_API_URL": "https://kartodromo-mobile-homolog.kartodromo.workers.dev" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://kartodromo-mobile-homolog.kartodromo.workers.dev",
+        "EXPO_PUBLIC_DEMO_MODE": "1"
+      },
       "developmentClient": true,
       "distribution": "internal",
-      "android": { "buildType": "apk" }
+      "android": {
+        "buildType": "apk"
+      }
     },
     "preview": {
-      "env": { "EXPO_PUBLIC_API_URL": "https://kartodromo-mobile-homolog.kartodromo.workers.dev" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://kartodromo-mobile-homolog.kartodromo.workers.dev",
+        "EXPO_PUBLIC_DEMO_MODE": "1"
+      },
       "distribution": "internal",
-      "android": { "buildType": "apk" }
+      "android": {
+        "buildType": "apk"
+      }
     },
     "simulator": {
       "extends": "preview",
-      "ios": { "simulator": true }
+      "ios": {
+        "simulator": true
+      }
     },
     "store-preview": {
-      "env": { "EXPO_PUBLIC_API_URL": "https://kartodromo-mobile-homolog.kartodromo.workers.dev" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://kartodromo-mobile-homolog.kartodromo.workers.dev",
+        "EXPO_PUBLIC_DEMO_MODE": "0"
+      },
       "distribution": "store",
       "autoIncrement": true,
-      "android": { "buildType": "app-bundle" }
+      "android": {
+        "buildType": "app-bundle"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_DEMO_MODE": "0"
+      }
     }
   },
   "submit": {
@@ -34,6 +54,11 @@
       "android": {
         "track": "internal",
         "releaseStatus": "draft"
+      }
+    },
+    "production": {
+      "ios": {
+        "ascAppId": "6824677679"
       }
     }
   }

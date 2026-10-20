@@ -1,13 +1,15 @@
 import { act, render, userEvent, waitFor } from '@testing-library/react-native';
 import * as Clipboard from 'expo-clipboard';
 import type { PropsWithChildren } from 'react';
-import { Alert, Text } from 'react-native';
+import { Alert, Linking, Text } from 'react-native';
 
 import AgendaScreen from '../src/app/(tabs)/agenda';
+import { AgendaScreen as AgendaComponent } from '../src/components/agenda-screen';
 import ReservationsScreen from '../src/app/(tabs)/reservas';
 import ReservationDetailScreen from '../src/app/reservations/[id]';
 import ActualLoginScreen from '../src/app/(auth)/login';
 import type { AgendaResponse, ReservationOrder } from '../src/features/reservations/schemas';
+import { reservationsApi } from '../src/features/reservations/api';
 import { useSession } from '../src/session/provider';
 
 const mockRouter = { push: jest.fn(), replace: jest.fn() };
@@ -215,10 +217,13 @@ describe('agenda e reservas do cliente', () => {
     listedOrders = [order];
     const view = await render(<ReservationsScreen />);
     expect(await view.findByText(order.codigo)).toBeTruthy();
-    fetchMock.mockImplementation(() => new Promise<Response>(() => undefined));
+    let finishNext!: (response: Response) => void;
+    fetchMock.mockImplementation(() => new Promise<Response>((resolve) => { finishNext = resolve; }));
     setSession({ ...session, accessToken: `test-next-${crypto.randomUUID()}` });
     await view.rerender(<ReservationsScreen />);
     expect(view.queryByText(order.codigo)).toBeNull();
+    await waitFor(() => expect(finishNext).toBeDefined());
+    await act(async () => finishNext(apiResponse([])));
   });
 
   it('ignora reservas recebidas depois que a conta de origem saiu', async () => {
@@ -258,12 +263,40 @@ describe('agenda e reservas do cliente', () => {
     const view = await render(<AgendaScreen />);
 
     expect(await view.findByText('Sem conexão. Confira a internet e tente novamente.')).toBeTruthy();
+    expect(view.queryByText('BATERIA 11:00')).toBeNull();
+    expect(view.getByRole('alert')).toHaveStyle({ color: '#FFFFFF' });
     const callsBeforeRetry = requests('GET', '/api/mobile/v1/agenda').length;
     agendaUnavailable = false;
     const user = userEvent.setup();
     await user.press(view.getByRole('button', { name: 'Tentar novamente' }));
     expect(await view.findByText('BATERIA 09:15')).toBeTruthy();
     expect(requests('GET', '/api/mobile/v1/agenda')).toHaveLength(callsBeforeRetry + 1);
+  });
+
+  it('identifica a reserva no site quando somente a agenda pública está implantada', async () => {
+    fetchMock.mockImplementation(async (input) => new URL(String(input)).pathname === '/api/mobile/v1/agenda'
+      ? { ok: false, status: 404, json: async () => ({ erro: 'Rota desconhecida.' }) } as Response
+      : apiResponse(agenda));
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    const view = await render(<AgendaScreen />);
+    expect(await view.findByText('Horários oficiais. A reserva será concluída no site do kartódromo.')).toBeTruthy();
+    await userEvent.setup().press(view.getByRole('button', { name: 'Reservar no site' }));
+    expect(open).toHaveBeenCalledWith('https://reservas.kartodromodebetim.com.br');
+    expect(requests('POST', '/api/mobile/v1/reservations')).toHaveLength(0);
+  });
+
+  it('uma resposta antiga não substitui a agenda da última tentativa', async () => {
+    let finishOld!: (data: AgendaResponse) => void;
+    const old = new Promise<AgendaResponse>((resolve) => { finishOld = resolve; });
+    const fresh = { ...agenda, horarios: [{ ...agenda.horarios[0], nome: 'HORÁRIO ATUAL TESTE CODEX' }] };
+    const load = jest.spyOn(reservationsApi, 'agenda').mockReturnValueOnce(old).mockResolvedValueOnce(fresh);
+    const view = await render(<AgendaComponent />);
+    await waitFor(() => expect(load).toHaveBeenCalledTimes(1));
+    await view.rerender(<AgendaComponent slots={[]} />);
+    await view.rerender(<AgendaComponent />);
+    expect(await view.findByText('HORÁRIO ATUAL TESTE CODEX')).toBeTruthy();
+    await act(async () => finishOld(agenda));
+    expect(view.queryByText('BATERIA 09:15')).toBeNull();
   });
 
   it('usa somente o total de cupom calculado pelo servidor e envia a reserva autenticada', async () => {
@@ -320,5 +353,40 @@ describe('agenda e reservas do cliente', () => {
     const view = await render(<ReservationsScreen />);
     expect(await view.findByText('Entre para ver suas reservas e acompanhar o pagamento.')).toBeTruthy();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('exibe confirmação destrutiva e chama deleteAccount ao solicitar exclusão de conta', async () => {
+    const deleteAccountMock = jest.fn().mockResolvedValue(undefined);
+    (useSession as jest.Mock).mockReturnValue({
+      session,
+      isLoading: false,
+      login: jest.fn(),
+      logout: jest.fn(),
+      deleteAccount: deleteAccountMock,
+      refresh: jest.fn(),
+    });
+    const alertSpy = jest.spyOn(Alert, 'alert');
+    const user = userEvent.setup();
+    const view = await render(<ReservationsScreen />);
+
+    const deleteBtn = await view.findByRole('button', { name: 'Excluir conta' });
+    await user.press(deleteBtn);
+
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Excluir conta definitivamente',
+      expect.stringContaining('Tem certeza'),
+      expect.any(Array),
+    );
+
+    const buttons = alertSpy.mock.calls[0][2] as { text: string; style?: string; onPress?: () => Promise<void> }[];
+    const confirmAction = buttons?.find((b) => b.style === 'destructive');
+    expect(confirmAction).toBeDefined();
+
+    await act(async () => {
+      await confirmAction?.onPress?.();
+    });
+
+    expect(deleteAccountMock).toHaveBeenCalledTimes(1);
+    alertSpy.mockRestore();
   });
 });

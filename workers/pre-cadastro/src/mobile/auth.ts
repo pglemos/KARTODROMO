@@ -567,6 +567,40 @@ async function logout(request: Request, context: CryptoContext) {
   });
 }
 
+async function deleteAccount(request: Request, context: CryptoContext) {
+  const match = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '');
+  if (!match?.[1]) return json(401, { erro: 'Você precisa estar conectado.' });
+
+  const tokenHash = await sha256(match[1]);
+  const now = Date.now();
+  const session = await context.db
+    .prepare(
+      `SELECT account_id FROM mobile_sessions
+       WHERE access_token_hash = ? AND revoked_at IS NULL AND access_expires_at > ?
+       LIMIT 1`,
+    )
+    .bind(tokenHash, now)
+    .first<{ account_id: string }>();
+
+  if (!session) return json(401, { erro: 'Sessão inválida ou expirada.' });
+
+  const accountId = session.account_id;
+
+  await context.db.batch([
+    context.db.prepare('DELETE FROM mobile_sessions WHERE account_id = ?').bind(accountId),
+    context.db.prepare('DELETE FROM mobile_email_tokens WHERE account_id = ?').bind(accountId),
+    context.db.prepare('DELETE FROM mobile_coupon_previews WHERE account_id = ?').bind(accountId),
+    context.db.prepare('DELETE FROM mobile_identity_links WHERE account_id = ?').bind(accountId),
+    context.db.prepare('DELETE FROM mobile_orders WHERE account_id = ?').bind(accountId),
+    context.db.prepare('DELETE FROM mobile_accounts WHERE id = ?').bind(accountId),
+  ]);
+
+  return new Response(null, {
+    status: 204,
+    headers: { 'cache-control': 'no-store' },
+  });
+}
+
 export async function authenticateMobileRequest(
   request: Request,
   env: MobileAuthEnv,
@@ -637,6 +671,8 @@ export async function handleMobileAuth(request: Request, env: MobileAuthEnv) {
         return await refreshSession(input, context);
       case 'session/logout':
         return await logout(request, context);
+      case 'account/delete':
+        return await deleteAccount(request, context);
       default:
         return json(404, { erro: 'Rota desconhecida.' });
     }

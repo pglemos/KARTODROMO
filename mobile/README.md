@@ -14,6 +14,8 @@ npm run doctor
 npm run export
 ```
 
+No pacote mobile isolado, os seis testes identificados com `[monorepo]` são ignorados porque conferem arquivos do site e da CI; todas as verificações do aplicativo continuam ativas. No pacote completo, os seis testes também são executados.
+
 O app usa `https://reservas.kartodromodebetim.com.br` por padrão. Para homologação, defina `EXPO_PUBLIC_API_URL` no ambiente local. Não coloque tokens do Worker, chaves Asaas, credenciais de loja ou dados pessoais no cliente.
 
 Os perfis EAS `development`, `preview`, `simulator` e `store-preview` usam a homologação `https://kartodromo-mobile-homolog.kartodromo.workers.dev`. O ambiente tem D1/R2 próprios e reservas fechadas. Ver [estado da distribuição](../docs/mobile/distribution-status.md).
@@ -48,3 +50,15 @@ Depois da validação nos dispositivos e da confirmação das contas/credenciais
 - O GPS permanece desabilitado enquanto a geometria medida da pista não for aprovada.
 - Aplicar as migrations D1 e configurar tokens/provedor de e-mail apenas no ambiente correspondente; nunca usar o D1 local como banco remoto.
 - Confirmar IDs de pacote nos consoles, contas de desenvolvedor, credenciais e dispositivos físicos antes de builds assinados ou upload interno.
+# Verificação em 19/10/2026
+
+Este pacote inclui uma prévia visual OLED. Ranking, notícias, carreira e telemetria usam dados demonstrativos, identificados no aplicativo; não representam a operação real. O carrinho demonstrativo não cria pedidos. Reservas reais passam pela agenda da API e pelo formulário de reservas existente.
+
+Quando `/api/mobile/v1/agenda` não estiver implantada (404), a agenda consulta `/api/agenda` e oferece “Reservar no site”, abrindo a página oficial. Autenticação e checkout mobile ainda exigem backend compatível. Não há comprovação de pagamento real ou publicação nas lojas.
+
+O projeto `android/` está incluído. Exige Android SDK, JDK e `ANDROID_HOME` configurados na máquina de destino; `android/local.properties` é local e não acompanha o ZIP. `debug.keystore` é a chave pública padrão de desenvolvimento, sem valor para distribuição: configure sua própria assinatura de produção, fora do código.
+
+Resultados, correções, dependências pendentes e evidências: `AUDITORIA-2026-10-19-R3.md`.
+
+
+Projeto iOS também incluído. No macOS com Xcode e plataforma iOS instalados: `cd ios && pod install`, depois `npm run ios` na pasta mobile. O simulador exige runtime instalado; esta versão foi compilada nativamente no EAS com Xcode 26.6 para simulador (arm64/x86_64), mas não executada no iOS nesta máquina. Consulte o relatório R3 para o ID do build e o artefato.

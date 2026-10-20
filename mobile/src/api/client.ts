@@ -30,37 +30,47 @@ export interface MobileRequestOptions {
 
 export async function mobileRequest<T>(path: string, options: MobileRequestOptions = {}): Promise<T> {
   const { method = 'GET', body, accessToken, idempotencyKey } = options;
-  let response: Response;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timeoutError = () => new MobileApiError('A conexão demorou demais. Tente novamente.');
   try {
-    response = await fetch(`${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`, {
-      method,
-      headers: {
-        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
-        ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
-        ...(idempotencyKey ? { 'idempotency-key': idempotencyKey } : {}),
-      },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    });
-  } catch {
-    throw new MobileApiError('Sem conexão. Confira a internet e tente novamente.');
-  }
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`, {
+        method,
+        signal: controller.signal,
+        headers: {
+          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+          ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+          ...(idempotencyKey ? { 'idempotency-key': idempotencyKey } : {}),
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    } catch {
+      if (controller.signal.aborted) throw timeoutError();
+      throw new MobileApiError('Sem conexão. Confira a internet e tente novamente.');
+    }
 
-  if (response.status === 204) return undefined as T;
+    if (response.status === 204) return undefined as T;
 
-  let payload: unknown;
-  try {
-    payload = await response.json();
-  } catch {
-    throw new MobileApiError('O serviço respondeu em um formato inválido.', response.status);
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      if (controller.signal.aborted) throw timeoutError();
+      throw new MobileApiError('O serviço respondeu em um formato inválido.', response.status);
+    }
+    if (!response.ok) {
+      const message =
+        payload && typeof payload === 'object' && 'erro' in payload && typeof payload.erro === 'string'
+          ? payload.erro
+          : 'Não foi possível concluir. Tente novamente.';
+      throw new MobileApiError(message, response.status);
+    }
+    return payload as T;
+  } finally {
+    clearTimeout(timeout);
   }
-  if (!response.ok) {
-    const message =
-      payload && typeof payload === 'object' && 'erro' in payload && typeof payload.erro === 'string'
-        ? payload.erro
-        : 'Não foi possível concluir. Tente novamente.';
-    throw new MobileApiError(message, response.status);
-  }
-  return payload as T;
 }
 
 async function post<T>(path: string, input: unknown, accessToken?: string): Promise<T> {
@@ -91,5 +101,10 @@ export const authApi = {
   async logout() {
     const session = await readSession();
     if (session) await post<void>('session/logout', {}, session.accessToken);
+  },
+  async deleteAccount() {
+    const session = await readSession();
+    if (!session) throw new MobileApiError('Você precisa estar conectado.', 401);
+    await post<void>('account/delete', {}, session.accessToken);
   },
 };

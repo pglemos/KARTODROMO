@@ -1,0 +1,9 @@
+
+ RUN  v4.1.9 /Users/pedroguilherme/.codex/worktrees/kartodromo-mobile-app/KARTODROMO
+
+
+ Test Files  6 passed (6)
+      Tests  35 passed (35)
+   Start at  17:26:30
+   Duration  16.20s (transform 123ms, setup 0ms, import 265ms, tests 14.76s, environment 0ms)
+
