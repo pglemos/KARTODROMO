@@ -117,7 +117,8 @@ export default function CockpitReal({ kartInicial = null }: { kartInicial?: stri
     return () => { ativo = false; clearInterval(t); };
   }, []);
 
-  const pilotos = useMemo(() => snap?.drivers ?? [], [snap]);
+  // só a bateria que está na pista; a encerrada (que a crono mostra enquanto não há kart rodando) fica de fora
+  const pilotos = useMemo(() => (snap?.status === 'live' ? snap.drivers : []), [snap]);
   const automatico = useMemo(() => (meuNome ? pilotos.find((p) => normal(p.name) === normal(meuNome))?.kart ?? null : null), [meuNome, pilotos]);
   const escolhido = kart ?? automatico;
   const eu = pilotos.find((p) => p.kart === escolhido) ?? null;
@@ -161,7 +162,12 @@ export default function CockpitReal({ kartInicial = null }: { kartInicial?: stri
         <ScrollView contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40 }}>
           {erro ? <Text style={{ color: palette.danger }}>{erro}</Text> : null}
           {!snap ? <Text style={{ color: palette.textMuted }}>Conectando à cronometragem…</Text> : null}
-          {snap && !pilotos.length ? <Text style={{ color: palette.textSecondary, fontSize: 16, lineHeight: 23 }}>Nenhuma bateria na pista agora. Abra o cockpit quando a sua largar.</Text> : null}
+          {snap && !pilotos.length ? (
+            <View style={{ gap: 8 }}>
+              <Text style={{ color: palette.text, fontSize: 20, fontWeight: '800' }}>{snap.status === 'live' ? `${snap.eventName}: aguardando a primeira passagem` : 'Nenhuma bateria na pista agora'}</Text>
+              <Text style={{ color: palette.textSecondary, fontSize: 16, lineHeight: 23 }}>Deixe o cockpit aberto: ele entra sozinho na bateria assim que o primeiro kart cruzar a linha.{snap.status === 'finished' && snap.eventName ? ` Última encerrada: ${snap.eventName}.` : ''}</Text>
+            </View>
+          ) : null}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
             {pilotos.map((p) => (
               <Pressable key={p.kart} onPress={() => { tap(); setKart(p.kart); }} accessibilityRole="button" accessibilityLabel={`Kart ${p.kart}, ${p.name}`}

@@ -128,7 +128,8 @@ export function AoVivoReal({ session, onRefresh }: { session: LiveSession; onRef
                 </View>
               </View>
             ) : null}
-            <Text style={{ color: palette.textMuted, fontSize: 12 }}>Toque num piloto para acompanhar pelo cockpit. Última volta e, embaixo, a melhor.</Text>
+            {aoVivo ? <Text style={{ color: palette.textMuted, fontSize: 12 }}>Toque num piloto para acompanhar pelo cockpit. Última volta e, embaixo, a melhor.</Text>
+              : <Text style={{ color: palette.textSecondary, fontSize: 13, lineHeight: 19 }}>Nenhuma bateria na pista agora — este é o resultado da última que terminou. A próxima aparece aqui sozinha assim que o primeiro kart cruzar a linha.</Text>}
           </View>
         }
       />
