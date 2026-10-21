@@ -152,14 +152,20 @@ function ReservationList({ orders, loading, error, retry }: {
         </Panel> : null}
       </>}
       renderItem={({ item: order }) => <Link href={{ pathname: '/reservations/[id]', params: { id: order.id } }} asChild>
-        <TouchableOpacity activeOpacity={0.65} accessibilityRole="link" style={styles.row}>
-          <Icon name="ticket" color={palette.accent} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.rowTitle}>{order.descricao ?? 'Reserva em processamento'}</Text>
-            <Text style={styles.rowDetail}>{formatDateTime(order.inicio)}</Text>
-            <Text style={styles.rowDetail}>{order.codigo}</Text>
-            <Text style={[styles.rowDetail, { color: palette.text }]}>{order.valorCentavos === null ? 'Valor em confirmação' : formatBrl(order.valorCentavos)}</Text>
-            <Text style={[styles.rowDetail, { color: palette.accent, fontWeight: '600' }]}>{statusLabel(order.status)}</Text>
+        <TouchableOpacity activeOpacity={0.75} accessibilityRole="link" accessibilityLabel={`${order.descricao ?? 'Reserva'}, ${formatDateTime(order.inicio)}, ${statusLabel(order.status)}`}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, marginBottom: 10, borderRadius: 20, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border }}>
+          {/* data em destaque, como um bilhete */}
+          <View style={{ width: 58, borderRadius: 14, backgroundColor: palette.surfaceElevated, alignItems: 'center', paddingVertical: 8 }}>
+            <Text style={{ color: palette.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>{formatDateTime(order.inicio).slice(3, 5) ? ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'][Number(formatDateTime(order.inicio).slice(3, 5)) - 1] ?? '' : ''}</Text>
+            <Text style={{ color: palette.text, fontSize: 24, fontWeight: '900', lineHeight: 28 }}>{formatDateTime(order.inicio).slice(0, 2)}</Text>
+            <Text style={{ color: palette.textMuted, fontSize: 12, fontVariant: ['tabular-nums'] }}>{formatDateTime(order.inicio).split(' · ')[1] ?? ''}</Text>
+          </View>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text numberOfLines={1} style={{ color: palette.text, fontSize: 16, fontWeight: '800' }}>{order.descricao ?? 'Reserva em processamento'}</Text>
+            <View style={{ flexDirection: 'row', gap: 6 }}><Text style={{ color: palette.textMuted, fontSize: 13 }}>{order.codigo}</Text><Text style={{ color: palette.textMuted, fontSize: 13 }}>· {order.valorCentavos === null ? 'valor em confirmação' : formatBrl(order.valorCentavos)}</Text></View>
+            <View style={{ alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: corStatus(order.status) + '26' }}>
+              <Text style={{ color: corStatus(order.status), fontSize: 12, fontWeight: '800' }}>{statusLabel(order.status)}</Text>
+            </View>
           </View>
           <Icon name="chevron" color={palette.muted} size={18} />
         </TouchableOpacity>
@@ -515,6 +521,11 @@ function ReservationsContent() {
 
 export default function ReservationsScreen() {
   return <SessionBoundary><ReservationsContent /></SessionBoundary>;
+}
+
+/** cor da etiqueta do status (verde = garantida, amarelo = falta algo, vermelho = não vale mais) */
+function corStatus(status: ReservationOrder['status']) {
+  return ({ confirmado: '#00E676', pago: '#00E676', novo: '#F59E0B', aguardando_pagamento: '#F59E0B', pago_sem_vaga: '#F59E0B', recusado: '#EF4444', expirado: '#EF4444', erro_pagamento: '#EF4444' } as Record<string, string>)[status] ?? '#9CA3AF';
 }
 
 function statusLabel(status: ReservationOrder['status']) {

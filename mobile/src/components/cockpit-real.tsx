@@ -48,14 +48,14 @@ function Bloco({ rotulo, valor, cor, grande = false }: { rotulo: string; valor: 
   );
 }
 
-export default function CockpitReal() {
+export default function CockpitReal({ kartInicial = null }: { kartInicial?: string | null }) {
   useKeepAwake();
   const { palette } = useUi();
   const { session } = useSession();
   const [snap, setSnap] = useState<LiveSnapshot | null>(null);
   const [erro, setErro] = useState('');
   const [meuNome, setMeuNome] = useState<string | null>(null);
-  const [kart, setKart] = useState<string | null>(null);
+  const [kart, setKart] = useState<string | null>(kartInicial);
   const [brilho] = useState(() => new Animated.Value(0));
   const ultimaVolta = useRef<number | null>(null);
   const melhorAnterior = useRef<number | null>(null);

@@ -18,11 +18,12 @@ export function AuthShell({ title, description, children }: PropsWithChildren<{ 
 export function AuthField({ label, style, secureTextEntry, ...props }: TextInputProps & { label: string }) {
   const { palette, styles } = useUi();
   const [visivel, setVisivel] = useState(false);
+  const [foco, setFoco] = useState(false);
   return <View style={{ marginBottom: 18 }}>
     <Text style={styles.fieldLabel}>{label}</Text>
     <View>
-      <TextInput {...props} secureTextEntry={secureTextEntry && !visivel} accessibilityLabel={label} placeholderTextColor={palette.muted} selectionColor={palette.accent}
-        style={[styles.input, secureTextEntry && { paddingRight: 92 }, style]} />
+      <TextInput {...props} onFocus={(e) => { setFoco(true); props.onFocus?.(e); }} onBlur={(e) => { setFoco(false); props.onBlur?.(e); }} secureTextEntry={secureTextEntry && !visivel} accessibilityLabel={label} placeholderTextColor={palette.muted} selectionColor={palette.accent}
+        style={[styles.input, { borderWidth: 1.5, borderColor: foco ? palette.accent : 'transparent' }, secureTextEntry && { paddingRight: 92 }, style]} />
       {secureTextEntry ? (
         // mostrar/ocultar a senha: evita errar a digitação no celular
         <Pressable accessibilityRole="button" accessibilityLabel={visivel ? 'Ocultar senha' : 'Mostrar senha'} onPress={() => setVisivel((v) => !v)}
