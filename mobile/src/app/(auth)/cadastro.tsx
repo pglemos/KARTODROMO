@@ -38,7 +38,7 @@ export default function RegistrationScreen() {
   const [enviado, setEnviado] = useState('');
   // CPF completo: pergunta se já existe conta no app ou cadastro no kartódromo (só volta o e-mail mascarado)
   const [existente, setExistente] = useState<{ contaApp: boolean; cadastro: boolean; email: string | null } | null>(null);
-  const cpfDigitos = cpf.replace(/D/g, '');
+  const cpfDigitos = cpf.replace(/\D/g, '');
   useEffect(() => {
     if (cpfDigitos.length !== 11) { void Promise.resolve().then(() => setExistente(null)); return; }
     let vivo = true;
