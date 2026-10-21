@@ -221,7 +221,7 @@ describe('autenticação móvel', () => {
       identifier: validRegistration.email,
       password: validRegistration.password,
     });
-    expect(beforeVerification.status).toBe(401);
+    expect(beforeVerification.status).toBe(403);
 
     const verificationToken = tokenFromLastEmail();
     expect((await call('email/verify', { token: verificationToken })).status).toBe(200);
