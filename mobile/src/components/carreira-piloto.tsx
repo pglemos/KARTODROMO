@@ -57,6 +57,23 @@ function Cartao({ titulo, children, index = 0 }: { titulo?: string; children: Re
 }
 
 const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0);
+const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+/** metas do piloto, calculadas da própria carreira: ritmo do mês, próxima categoria, alcançar quem está acima, primeiro pódio/vitória */
+function metasDe(d: CarreiraPiloto, xp: number) {
+  const mes = new Date().toISOString().slice(0, 7);
+  const doMes = d.xpMes?.find((m) => m.mes === mes)?.baterias ?? 0;
+  const cat = categoriaDe(xp);
+  const metas: { icone: string; titulo: string; feito: number; alvo: number; detalhe: string }[] = [
+    { icone: '🏁', titulo: 'Ritmo do mês', feito: doMes, alvo: 4, detalhe: '4 baterias neste mês: +200 XP garantidos' },
+  ];
+  if (cat.proxima) metas.push({ icone: '⭐', titulo: `Chegar a ${cat.proxima.nome}`, feito: xp, alvo: cat.proxima.desde, detalhe: `faltam ${(cat.proxima.desde - xp).toLocaleString('pt-BR')} XP` });
+  const acima = d.comparativo?.acima;
+  if (acima && acima.xp > xp) metas.push({ icone: '🎯', titulo: `Passar ${nomeBonito(acima.nome)}`, feito: xp, alvo: acima.xp + 1, detalhe: `${(acima.xp + 1 - xp).toLocaleString('pt-BR')} XP para subir no ranking` });
+  if (!d.vitorias) metas.push({ icone: '🏆', titulo: 'Primeira vitória', feito: 0, alvo: 1, detalhe: 'vença uma corrida: +150 XP' });
+  else if (!d.voltasMaisRapidas) metas.push({ icone: '⚡', titulo: 'Volta mais rápida', feito: 0, alvo: 1, detalhe: 'faça a melhor volta de uma bateria: +50 XP' });
+  return metas;
+}
 const posTexto = (p: PosicaoRanking | null) => (p ? `${p.pos}º de ${p.de}` : '—');
 
 export default function CarreiraPilotoTela({ id, aba = false }: { id: string; aba?: boolean }) {
@@ -254,6 +271,43 @@ export default function CarreiraPilotoTela({ id, aba = false }: { id: string; ab
                 </View>
               </View>
             ))}
+          </Cartao>
+        ) : null}
+
+        {eu ? (
+          <Cartao titulo="Metas" index={5}>
+            <View style={{ gap: 12 }}>
+              {metasDe(dados, xp).map((m) => (
+                <View key={m.titulo} style={{ gap: 6 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ fontSize: 18 }}>{m.icone}</Text>
+                    <Text style={{ flex: 1, color: palette.text, fontWeight: '800' }}>{m.titulo}</Text>
+                    <Text style={{ color: m.feito >= m.alvo ? palette.neonGreen : palette.textMuted, fontWeight: '800', fontVariant: ['tabular-nums'] }}>{m.feito >= m.alvo ? '✓' : `${m.feito.toLocaleString('pt-BR')}/${m.alvo.toLocaleString('pt-BR')}`}</Text>
+                  </View>
+                  <View style={{ height: 8, borderRadius: 4, backgroundColor: palette.surfaceElevated, overflow: 'hidden' }}>
+                    <View style={{ width: `${Math.min(100, (m.feito / m.alvo) * 100)}%`, height: 8, borderRadius: 4, backgroundColor: m.feito >= m.alvo ? palette.neonGreen : palette.accent }} />
+                  </View>
+                  <Text style={{ color: palette.textMuted, fontSize: 12 }}>{m.detalhe}</Text>
+                </View>
+              ))}
+            </View>
+          </Cartao>
+        ) : null}
+
+        {dados.xpMes?.length ? (
+          <Cartao titulo="XP por mês" index={5}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 120 }}>
+              {[...dados.xpMes].reverse().map((m) => {
+                const max = Math.max(...dados.xpMes!.map((x) => x.xp), 1);
+                return (
+                  <View key={m.mes} style={{ flex: 1, alignItems: 'center', gap: 4 }} accessibilityLabel={`${m.mes}: ${m.xp} XP em ${m.baterias} baterias`}>
+                    <Text style={{ color: palette.textMuted, fontSize: 9, fontVariant: ['tabular-nums'] }}>{m.xp >= 1000 ? `${(m.xp / 1000).toFixed(1)}k` : m.xp}</Text>
+                    <View style={{ width: '100%', height: Math.max(4, (m.xp / max) * 80), borderRadius: 4, backgroundColor: palette.accent }} />
+                    <Text style={{ color: palette.textMuted, fontSize: 9 }}>{MESES[Number(m.mes.slice(5, 7)) - 1]}</Text>
+                  </View>
+                );
+              })}
+            </View>
           </Cartao>
         ) : null}
 

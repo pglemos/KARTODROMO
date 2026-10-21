@@ -38,10 +38,12 @@ const TEMAS = {
   laranja: { fundo: '#F59E0B', texto: '#000000', apagado: '#5C3B00', verde: '#0B6B2E', vermelho: '#9B0012', roxo: '#4C1D95', ouro: '#000000' },
   vermelho: { fundo: '#C8102E', texto: '#FFFFFF', apagado: '#FFC2CB', verde: '#7CFF9E', vermelho: '#FFE066', roxo: '#E9D5FF', ouro: '#FFE066' },
   azul: { fundo: '#1D6FE0', texto: '#FFFFFF', apagado: '#CFE2FF', verde: '#86FFB0', vermelho: '#FFD0D0', roxo: '#F0E2FF', ouro: '#FFE066' },
+  verde: { fundo: '#0F7A3A', texto: '#FFFFFF', apagado: '#BFF0D0', verde: '#FFE066', vermelho: '#FFC2C2', roxo: '#F0E2FF', ouro: '#FFE066' },
+  roxo: { fundo: '#5B21B6', texto: '#FFFFFF', apagado: '#DCCCFF', verde: '#86FFB0', vermelho: '#FFC2C2', roxo: '#FFE066', ouro: '#FFE066' },
   sol: { fundo: '#FFFFFF', texto: '#000000', apagado: '#4B5058', verde: '#0A8F3C', vermelho: '#D70015', roxo: '#6E2BD9', ouro: '#B26A00' },
 };
 const ORDEM_TEMAS = Object.keys(TEMAS) as (keyof typeof TEMAS)[];
-const NOME_TEMA: Record<keyof typeof TEMAS, string> = { escuro: 'Clássico', laranja: 'Laranja', vermelho: 'Vermelho', azul: 'Azul', sol: 'Sol' };
+const NOME_TEMA: Record<keyof typeof TEMAS, string> = { escuro: 'Clássico', laranja: 'Laranja', vermelho: 'Vermelho', azul: 'Azul', verde: 'Verde', roxo: 'Roxo', sol: 'Sol' };
 
 /** número grande que pulsa quando muda */
 function Pulso({ valor, estilo }: { valor: string; estilo: object }) {

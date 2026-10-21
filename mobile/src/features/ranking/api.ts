@@ -37,6 +37,8 @@ export interface CarreiraPiloto {
   /** semanas no top 10 semanal do LapTime antigo (antes de 02/09/2026, quando não há corrida detalhada) */
   semanasTop10?: number;
   mesesTop10?: number;
+  /** XP e baterias por mês (mais recente primeiro, até 12) */
+  xpMes?: { mes: string; xp: number; baterias: number }[];
   /** posição no ranking de XP: líder e quem está logo acima e abaixo */
   comparativo?: { pos: number; de: number; lider: VizinhoXp | null; acima: VizinhoXp | null; abaixo: VizinhoXp | null };
   primeira: string | null;
