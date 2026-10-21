@@ -120,7 +120,7 @@ describe('resultados oficiais e histórico do cliente', () => {
     const view = await render(<ResultsScreen />);
 
     expect(await view.findByText('Bateria de outubro')).toBeTruthy();
-    expect(view.getByText(/2º lugar/)).toBeTruthy();
+    expect(view.getByText("2º")).toBeTruthy();
     const [historyRequest] = requests('/api/mobile/v1/results/me');
     expect(historyRequest[1]?.headers).toMatchObject({ authorization: `Bearer ${accessSession.accessToken}` });
   });

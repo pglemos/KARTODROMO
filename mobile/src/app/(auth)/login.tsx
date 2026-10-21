@@ -36,9 +36,10 @@ export default function LoginScreen() {
   }
 
   return (
-    <AuthShell title="Entre para continuar" description="Use seu e-mail ou CPF para consultar reservas e cupons.">
+    <AuthShell title="Entre para continuar" description="Use seu e-mail ou CPF para reservar e ver seus resultados.">
       <AuthField
         label="E-mail ou CPF"
+        placeholder="voce@email.com ou 000.000.000-00"
         value={identifier}
         onChangeText={setIdentifier}
         autoCapitalize="none"
@@ -48,6 +49,7 @@ export default function LoginScreen() {
       />
       <AuthField
         label="Senha"
+        placeholder="Sua senha"
         value={password}
         onChangeText={setPassword}
         secureTextEntry

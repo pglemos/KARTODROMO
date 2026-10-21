@@ -1,5 +1,5 @@
 import { Link, type Href } from 'expo-router';
-import type { PropsWithChildren } from 'react';
+import { useState, type PropsWithChildren } from 'react';
 import { ActivityIndicator, Pressable, TouchableOpacity, Text, TextInput, View, type TextInputProps } from 'react-native';
 import { Page } from '../features/reservations/components';
 import { Brand } from './brand';
@@ -15,11 +15,22 @@ export function AuthShell({ title, description, children }: PropsWithChildren<{ 
   </Page>;
 }
 
-export function AuthField({ label, style, ...props }: TextInputProps & { label: string }) {
+export function AuthField({ label, style, secureTextEntry, ...props }: TextInputProps & { label: string }) {
   const { palette, styles } = useUi();
+  const [visivel, setVisivel] = useState(false);
   return <View style={{ marginBottom: 18 }}>
     <Text style={styles.fieldLabel}>{label}</Text>
-    <TextInput {...props} accessibilityLabel={label} placeholderTextColor={palette.muted} selectionColor={palette.accent} style={[styles.input, style]} />
+    <View>
+      <TextInput {...props} secureTextEntry={secureTextEntry && !visivel} accessibilityLabel={label} placeholderTextColor={palette.muted} selectionColor={palette.accent}
+        style={[styles.input, secureTextEntry && { paddingRight: 92 }, style]} />
+      {secureTextEntry ? (
+        // mostrar/ocultar a senha: evita errar a digitação no celular
+        <Pressable accessibilityRole="button" accessibilityLabel={visivel ? 'Ocultar senha' : 'Mostrar senha'} onPress={() => setVisivel((v) => !v)}
+          style={{ position: 'absolute', right: 6, top: 0, bottom: 0, justifyContent: 'center', paddingHorizontal: 14 }}>
+          <Text style={{ color: palette.accent, fontWeight: '700', fontSize: 14 }}>{visivel ? 'Ocultar' : 'Mostrar'}</Text>
+        </Pressable>
+      ) : null}
+    </View>
   </View>;
 }
 

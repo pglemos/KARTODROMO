@@ -1,7 +1,6 @@
 import * as Haptics from 'expo-haptics';
-import type { PropsWithChildren } from 'react';
-import { Platform } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useEffect, useRef, type PropsWithChildren } from 'react';
+import { Animated, Easing, Platform } from 'react-native';
 
 /** toque leve de confirmação nos botões principais (silencioso na web) */
 export function tap() {
@@ -10,8 +9,18 @@ export function tap() {
 
 /** entrada em cascata: cada item sobe e aparece um pouco depois do anterior */
 export function Entrada({ index = 0, children, style }: PropsWithChildren<{ index?: number; style?: object }>) {
+  const progresso = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(progresso, {
+      toValue: 1,
+      duration: 380,
+      delay: Math.min(index, 10) * 45,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+  }, [index, progresso]);
   return (
-    <Animated.View entering={FadeInDown.duration(380).delay(Math.min(index, 10) * 45).springify().damping(18)} style={style}>
+    <Animated.View style={[style, { opacity: progresso, transform: [{ translateY: progresso.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }]}>
       {children}
     </Animated.View>
   );

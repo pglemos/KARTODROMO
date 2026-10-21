@@ -33,10 +33,10 @@ function ResultRow({ result, showEvent = false }: { result: PersonalResult; show
   return <View style={{ paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: palette.border }}>
     {showEvent ? <Text style={[styles.rowTitle, { marginBottom: 8 }]}>{result.eventName}</Text> : null}
     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
-      <Text style={{ color: palette.accent, fontSize: 20, fontWeight: '700', minWidth: 30 }}>{result.position}º</Text>
+      <Text style={{ color: ({ 1: palette.gold, 2: '#C0C7D1', 3: '#CD7F32' } as Record<number, string>)[result.position] ?? palette.textMuted, fontSize: 22, fontWeight: '900', minWidth: 36, fontVariant: ['tabular-nums'] }}>{result.position}º</Text>
       <View style={{ flex: 1 }}>
         <Text style={styles.rowTitle}>{result.displayName}</Text>
-        <Text style={styles.rowDetail}>{result.position}º lugar · Kart {result.kart} · {result.laps} voltas</Text>
+        <Text style={styles.rowDetail}>Kart {result.kart} · {result.laps} voltas</Text>
         <Text style={[styles.rowDetail, { color: palette.text, fontVariant: ['tabular-nums'] }]}>Melhor volta {formatLap(result.bestLapMs)}</Text>
         {showEvent ? <Text style={styles.rowDetail}>{formatDate(result.eventDate)}</Text> : null}
       </View>

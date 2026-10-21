@@ -41,6 +41,11 @@ function diaDaSemana(data: string) {
   const diff = Math.round((dia.getTime() - hoje.getTime()) / 86_400_000);
   return diff === 0 ? 'HOJE' : diff === 1 ? 'AMANHÃ' : DIAS[dia.getDay()] ?? '';
 }
+/** nome da bateria só quando não é o padrão "BATERIA 17:00" (ex.: evento, grupo) */
+function nomeEspecial(titulo: string, hora: string) {
+  const t = (titulo ?? '').trim();
+  return !t || t.toUpperCase() === `BATERIA ${hora}` ? null : t;
+}
 /** "21/10/2026" → "21 out" */
 function diaMes(data: string) {
   const [d, m] = data.split('/').map(Number);
@@ -259,14 +264,14 @@ export function AgendaScreen({
               <Pressable
                 testID={`agenda-slot-card-${slot.id}`}
                 accessibilityRole="button"
-                accessibilityLabel={isSoldOut ? `${slot.time}, esgotado` : `Reservar bateria das ${slot.time}, ${slot.availableSlots} vagas`}
+                accessibilityLabel={isSoldOut ? `${slot.time}, esgotado` : bookingOnSite ? 'Reservar no site' : `Reservar bateria das ${slot.time}, ${slot.availableSlots} vagas`}
                 disabled={isSoldOut}
                 onPress={handlePressSlot}
                 style={({ pressed }) => [styles.slotCard, isSoldOut && styles.slotCardSoldOut, { transform: [{ scale: pressed ? 0.98 : 1 }], opacity: pressed ? 0.9 : 1 }]}
               >
                 <View style={{ width: 92 }}>
                   <Text style={[styles.slotHora, styles.tabularNums]}>{slot.time}</Text>
-                  <Text style={styles.slotRotulo}>BATERIA</Text>
+                  <Text style={styles.slotRotulo} numberOfLines={2}>{nomeEspecial(slot.title, slot.time) ?? 'BATERIA'}</Text>
                 </View>
                 <View style={{ flex: 1, paddingRight: 12 }}>
                   <Text testID={`slot-vagas-${slot.id}`} style={[styles.slotVagas, isSoldOut ? styles.vagasSoldOut : styles.vagasAvailable]}>

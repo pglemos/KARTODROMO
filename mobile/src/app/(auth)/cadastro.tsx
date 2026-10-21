@@ -8,6 +8,20 @@ import { authApi } from '../../api/client';
 import type { RegistrationInput } from '../../api/contracts';
 import { AuthButton, AuthFeedback, AuthField, AuthLink, AuthShell } from '../../components/auth-ui';
 
+/** 12345678901 → 123.456.789-01 */
+function maskCpf(value: string) {
+  const d = value.replace(/\D/g, '').slice(0, 11);
+  return d.replace(/^(\d{3})(\d)/, '$1.$2').replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1-$2');
+}
+
+/** 31999998888 → (31) 99999-8888 */
+function maskPhone(value: string) {
+  const d = value.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 2) return d;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, d.length - 4)}-${d.slice(-4)}`;
+}
+
 export default function RegistrationScreen() {
   const { palette, styles } = useUi();
   const [name, setName] = useState('');
@@ -44,7 +58,8 @@ export default function RegistrationScreen() {
     setFeedback('');
     try {
       const result = await authApi.register(input);
-      setFeedback(result.mensagem);
+      void result;
+      setFeedback(`Quase lá! Enviamos um link de confirmação para ${email}. Abra o e-mail (confira também o spam), toque no link e depois entre com sua senha.`);
     } catch (reason) {
       setError(true);
       setFeedback(reason instanceof Error ? reason.message : 'Não foi possível criar a conta.');
@@ -58,10 +73,10 @@ export default function RegistrationScreen() {
       title="Crie sua conta"
       description="Uma conta para suas reservas e seu histórico na pista."
     >
-      <AuthField label="Nome completo" value={name} onChangeText={setName} autoCapitalize="words" autoComplete="name" />
-      <AuthField label="CPF" value={cpf} onChangeText={setCpf} keyboardType="number-pad" autoComplete="off" />
-      <AuthField label="E-mail" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" />
-      <AuthField label="Telefone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" autoComplete="tel" />
+      <AuthField label="Nome completo" placeholder="Como no seu documento" value={name} onChangeText={setName} autoCapitalize="words" autoComplete="name" />
+      <AuthField label="CPF" placeholder="000.000.000-00" value={cpf} onChangeText={(v) => setCpf(maskCpf(v))} keyboardType="number-pad" autoComplete="off" maxLength={14} />
+      <AuthField label="E-mail" placeholder="voce@email.com" value={email} onChangeText={(v) => setEmail(v.trim())} keyboardType="email-address" autoCapitalize="none" autoComplete="email" />
+      <AuthField label="Celular com DDD" placeholder="(31) 99999-9999" value={phone} onChangeText={(v) => setPhone(maskPhone(v))} keyboardType="phone-pad" autoComplete="tel" maxLength={15} />
       <AuthField
         label="Senha (mínimo 8 caracteres)"
         value={password}
@@ -97,7 +112,7 @@ export default function RegistrationScreen() {
           <Link href="https://reservas.kartodromodebetim.com.br/privacidade" style={{ color: palette.accent, fontWeight: '700' }}>
             política de privacidade
           </Link>
-          . Entendi que o GPS só será solicitado quando eu iniciar um treino.
+          .
         </Text>
       </Pressable>
       <AuthButton label="Criar conta" busy={busy} onPress={() => void submit()} />

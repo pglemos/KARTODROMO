@@ -51,7 +51,7 @@ describe('modo loja (sem dados demonstrativos)', () => {
       );
     }
     const view = await renderRouter({ '(tabs)/index': WrappedStart }, { initialUrl: '/' });
-    expect(view.getByText('Ver agenda')).toBeTruthy();
+    expect(view.getByText('Agenda')).toBeTruthy();
     expect(view.getByText('Política de privacidade')).toBeTruthy();
     expect(view.queryByText(/ranking|notícia|telemetria|demonstrativ/i)).toBeNull();
   });

@@ -49,6 +49,7 @@ describe('ao vivo com dado real', () => {
     await waitFor(() => expect(view.getByText('BATERIA 17:00')).toBeTruthy());
     expect(view.queryByTestId('btn-open-cockpit-hud')).toBeNull();
     expect(view.getByTestId('flag-status-label').props.children).toBe('BANDEIRA QUADRICULADA');
-    expect(view.getByText(/48 Jorge Antonio/)).toBeTruthy();
+    expect(view.getByText("Jorge Antonio")).toBeTruthy();
+    expect(view.getByText("KART 48")).toBeTruthy();
   });
 });
