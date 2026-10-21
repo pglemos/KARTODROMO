@@ -8,7 +8,7 @@ export interface MobileLiveEnv {
   AO_VIVO?: DurableObjectNamespace;
 }
 
-type Piloto = { position?: unknown; kart?: unknown; name?: unknown; time?: unknown; laps?: unknown; last?: unknown; bestLap?: unknown; gap?: unknown };
+type Piloto = { position?: unknown; kart?: unknown; name?: unknown; time?: unknown; laps?: unknown; last?: unknown; bestLap?: unknown; gap?: unknown; passouEm?: unknown };
 type Retrato = { status?: unknown; updatedAt?: unknown; sessionType?: unknown; eventName?: unknown; trackName?: unknown; race?: { startedAt?: unknown } | null; drivers?: unknown };
 
 const json = (status: number, body: unknown, maxAge = 0) => new Response(JSON.stringify(body), {
@@ -34,6 +34,8 @@ export function retratoParaApp(r: Retrato) {
       last: texto(d.last, 16),
       bestLap: inteiro(d.bestLap),
       gap: texto(d.gap, 20),
+      // hora exata da última passagem, no relógio da cronometragem (versão app=1 do retrato)
+      passouEm: typeof d.passouEm === 'number' && Number.isFinite(d.passouEm) ? d.passouEm : null,
     }));
   return {
     status,
@@ -145,7 +147,7 @@ export class AoVivo implements DurableObject {
   private async ler(ctl: AbortController) {
     const origem = (this.env.CRONO_URL?.trim() || 'https://crono.kartodromodebetim.com.br').replace(/\/$/, '');
     try {
-      const r = await fetch(`${origem}/api/livetime-snapshot/eventos`, { signal: ctl.signal, headers: { accept: 'text/event-stream' } });
+      const r = await fetch(`${origem}/api/livetime-snapshot/eventos?app=1`, { signal: ctl.signal, headers: { accept: 'text/event-stream' } });
       if (!r.ok || !r.body) return;
       this.ultimoDado = Date.now();
       this.difCrono = null; this.medido = 0; // conexão nova: mede de novo (o relógio do PC pode ter sido acertado)
@@ -176,14 +178,17 @@ export class AoVivo implements DurableObject {
     const agora = Number.isFinite(gerado) ? gerado : this.agoraCrono();
     const base = retratoParaApp(corpo);
     const raceId = typeof corpo.race?.id === 'string' ? corpo.race.id : null;
-    if (raceId !== this.corrida) { this.corrida = raceId; this.voltas.clear(); this.passou.clear(); }
+    const novaCorrida = raceId !== this.corrida;
+    if (novaCorrida) { this.corrida = raceId; this.voltas.clear(); this.passou.clear(); }
+    const conhecida = !novaCorrida && this.voltas.size > 0;
     const drivers = base.drivers.map((d) => {
       const antes = this.voltas.get(d.kart);
       if (d.laps !== null) {
-        if (antes !== undefined && d.laps > antes) this.passou.set(d.kart, agora);
+        // volta nova, ou kart que acabou de aparecer no meio da bateria (fechou a 1ª volta agora)
+        if ((antes !== undefined && d.laps > antes) || (antes === undefined && conhecida && d.laps > 0)) this.passou.set(d.kart, agora);
         this.voltas.set(d.kart, d.laps);
       }
-      return { ...d, passouEm: this.passou.get(d.kart) ?? null };
+      return { ...d, passouEm: d.passouEm ?? this.passou.get(d.kart) ?? null };
     });
     this.retrato = { ...base, raceId, drivers };
     for (const ok of this.esperando.splice(0)) ok();

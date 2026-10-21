@@ -9,7 +9,7 @@ import { router } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Platform, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
+import { Animated, Easing, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as SecureStore from 'expo-secure-store';
@@ -28,8 +28,8 @@ const gapMs = (g: string) => { const m = /^\+?(\d+)\.(\d{1,3})$/.exec(g.trim());
 const seg = (ms: number) => `${(ms / 1000).toFixed(3)}`;
 const MONO = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' });
 
-/** 65432 → "1:05.4" (décimos, para o cronômetro que corre) */
-const relogio = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}.${Math.floor((ms % 1000) / 100)}`;
+/** 65432 → "1:05.432" (milésimos, para o cronômetro que corre) */
+const relogio = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}.${String(Math.floor(ms % 1000)).padStart(3, '0')}`;
 /** tempo de prova "0:16:34" */
 const prova = (ms: number) => `${Math.floor(ms / 3600000)}:${String(Math.floor((ms % 3600000) / 60000)).padStart(2, '0')}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`;
 
@@ -59,14 +59,14 @@ function Pulso({ valor, estilo }: { valor: string; estilo: object }) {
   return <Animated.Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.4} style={[estilo, { transform: [{ scale: esc }] }]}>{valor}</Animated.Text>;
 }
 
-/** cronômetro da volta em andamento (relógio da cronometragem), redesenhado a cada 50 ms */
+/** cronômetro da volta em andamento (relógio da cronometragem), redesenhado a cada 31 ms; zerado até a 1ª passagem */
 function VoltaCorrendo({ inicio, cor, tamanho, fim = false }: { inicio: number | null; cor: string; tamanho: number; fim?: boolean }) {
-  const agora = useAgoraCrono(50);
+  const agora = useAgoraCrono(31);
   const ms = inicio ? Math.max(0, agora - inicio) : null;
   return (
     <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.4} accessibilityLabel="Tempo da volta atual"
       style={{ color: cor, fontFamily: MONO, fontSize: tamanho, lineHeight: tamanho * 1.05, fontWeight: '900', fontVariant: ['tabular-nums'], letterSpacing: -tamanho / 30, textAlign: 'center' }}>
-      {fim ? 'FIM' : ms === null || ms > 10 * 60000 ? '-:--.-' : relogio(ms)}
+      {fim ? 'FIM' : ms === null ? '0:00.000' : ms > 10 * 60000 ? '-:--.---' : relogio(ms)}
     </Text>
   );
 }
@@ -90,6 +90,7 @@ export default function CockpitReal({ kartInicial = null }: { kartInicial?: stri
   const { snapshot: snap, error: erro } = useAoVivo();
   const [meuNome, setMeuNome] = useState<string | null>(null);
   const [kart, setKart] = useState<string | null>(kartInicial);
+  const [digitado, setDigitado] = useState('');
   const [tema, setTemaEstado] = useState<keyof typeof TEMAS>('escuro');
   useEffect(() => { void SecureStore.getItemAsync('cockpit-tema').then((t) => { if (t && t in TEMAS) setTemaEstado(t as keyof typeof TEMAS); }).catch(() => undefined); }, []);
   const proximoTema = () => { const t = ORDEM_TEMAS[(ORDEM_TEMAS.indexOf(tema) + 1) % ORDEM_TEMAS.length]; setTemaEstado(t); void SecureStore.setItemAsync('cockpit-tema', t).catch(() => undefined); };
@@ -118,7 +119,8 @@ export default function CockpitReal({ kartInicial = null }: { kartInicial?: stri
   const pilotos = useMemo(() => (snap?.status === 'live' ? snap.drivers : []), [snap]);
   const automatico = useMemo(() => (meuNome ? pilotos.find((p) => normal(p.name) === normal(meuNome))?.kart ?? null : null), [meuNome, pilotos]);
   const escolhido = kart ?? automatico;
-  const eu = pilotos.find((p) => p.kart === escolhido) ?? null;
+  // kart escolhido antes de passar na linha: cockpit zerado esperando a primeira passagem
+  const eu = useMemo(() => pilotos.find((p) => p.kart === escolhido) ?? (escolhido ? { position: 0, kart: escolhido, name: '', best: '', laps: 0, last: '', bestLap: null, gap: '', passouEm: null } : null), [pilotos, escolhido]);
   const ao = snap?.status === 'live';
 
   // volta nova: marca o início da próxima e vibra; recorde pessoal: brilho roxo
@@ -154,9 +156,20 @@ export default function CockpitReal({ kartInicial = null }: { kartInicial?: stri
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8, gap: 10 }}>
           <Pressable accessibilityRole="button" accessibilityLabel="Fechar cockpit" onPress={voltar} style={{ padding: 6 }}><Icon name="close" color={palette.text} size={26} /></Pressable>
           <Text accessibilityRole="header" style={{ color: palette.text, fontSize: 26, fontWeight: '900' }}>Cockpit</Text>
-          {pilotos.length ? <Text style={{ color: palette.textSecondary, fontSize: 16, marginLeft: 8 }}>Qual é o seu kart?</Text> : null}
         </View>
-        <ScrollView contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40 }}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40 }}>
+          <Text style={{ color: palette.text, fontSize: 20, fontWeight: '900' }}>Qual é o número do seu kart?</Text>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TextInput value={digitado} onChangeText={(t) => setDigitado(t.replace(/\D/g, '').slice(0, 3))} keyboardType="number-pad" returnKeyType="go" autoFocus accessibilityLabel="Número do kart"
+              onSubmitEditing={() => { if (digitado) { tap(); setKart(digitado); } }} placeholder="Ex.: 26" placeholderTextColor={palette.textMuted}
+              style={{ flex: 1, backgroundColor: palette.surface, color: palette.text, borderRadius: 16, paddingHorizontal: 18, fontSize: 32, fontWeight: '900', textAlign: 'center', borderWidth: 1, borderColor: palette.border, height: 70 }} />
+            <Pressable disabled={!digitado} onPress={() => { tap(); setKart(digitado); }} accessibilityRole="button" accessibilityLabel="Abrir cockpit do kart"
+              style={{ width: 110, borderRadius: 16, backgroundColor: digitado ? palette.accent : palette.surface, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ color: digitado ? '#000000' : palette.textMuted, fontSize: 18, fontWeight: '900' }}>Entrar</Text>
+            </Pressable>
+          </View>
+          <Text style={{ color: palette.textMuted, fontSize: 13 }}>O cockpit fica zerado e começa a contar no instante em que seu kart cruza a linha pela primeira vez.</Text>
+          {pilotos.length ? <Text style={{ color: palette.textSecondary, fontSize: 15, fontWeight: '800', marginTop: 8 }}>Ou toque no seu kart:</Text> : null}
           {erro ? <Text style={{ color: palette.danger }}>{erro}</Text> : null}
           {!snap ? <Text style={{ color: palette.textMuted }}>Conectando à cronometragem…</Text> : null}
           {snap && !pilotos.length ? (
@@ -230,7 +243,7 @@ export default function CockpitReal({ kartInicial = null }: { kartInicial?: stri
             <Pulso valor={atras ? (Number.isFinite(difAtras) && difAtras > 0 ? `+${seg(difAtras)}` : /volta/.test(atras.gap) ? atras.gap : '—') : '—'} estilo={{ ...grande, fontSize: t.lado, color: c.verde }} />
           </View>
           <View style={{ flex: 2, alignItems: 'center' }}>
-            <Pulso valor={`P${eu.position}`} estilo={{ color: eu.position === 1 ? c.ouro : c.texto, fontFamily: MONO, fontSize: t.pos, lineHeight: t.pos * 1.1, fontWeight: '900' }} />
+            <Pulso valor={eu.position ? `P${eu.position}` : 'P–'} estilo={{ color: eu.position === 1 ? c.ouro : c.texto, fontFamily: MONO, fontSize: t.pos, lineHeight: t.pos * 1.1, fontWeight: '900' }} />
             <VoltaCorrendo inicio={ao ? eu.passouEm ?? inicioVolta : null} cor={c.texto} tamanho={t.relogio} fim={!ao} />
           </View>
           <View style={{ flex: 1, alignItems: 'flex-end', gap: 4 }}>
