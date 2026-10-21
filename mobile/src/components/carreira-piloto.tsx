@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from './brand';
 import { FotoPiloto } from './foto-piloto';
 import { Entrada, tap, ListaEsqueleto } from './motion';
+import { BotaoCompartilhar } from './cartao-compartilhar';
 import { RegrasRanking } from './ranking-regras';
 import { useUi } from './theme';
 import { MobileApiError } from '../api/client';
@@ -192,6 +193,7 @@ export default function CarreiraPilotoTela({ id, aba = false }: { id: string; ab
               <Text style={{ color: '#000000', fontWeight: '900', fontSize: 13, letterSpacing: 1 }}>{cat.nome}</Text>
             </View>
             {dados.primeira ? <Text style={{ color: palette.textMuted, fontSize: 13 }}>Na pista desde {formatarDia(dados.primeira)}</Text> : null}
+            <BotaoCompartilhar dados={dados} xp={xp} cat={cat} versaoFoto={versaoFoto} />
           </View>
         </Entrada>
 
