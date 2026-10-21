@@ -1,6 +1,7 @@
 import { scryptSync } from 'node:crypto';
 
 import { cpfValido, digitos } from '../validar';
+import { clienteExistente, type MobileClientesEnv } from './clientes';
 import {
   mobileEmailConfigured,
   sendMobileAuthEmail,
@@ -671,6 +672,15 @@ export async function handleMobileAuth(request: Request, env: MobileAuthEnv) {
 
   try {
     switch (route) {
+      case 'cadastro-existente': {
+        // cadastro do app: o CPF já tem conta no app ou cadastro no kartódromo? (mostra só o e-mail mascarado)
+        if (await rateLimited(context, request, 'lookup')) return json(429, { erro: 'Muitas tentativas. Aguarde alguns minutos.' });
+        const cpf = digitos(String(input.cpf ?? ''));
+        if (!cpfValido(cpf)) return json(400, { erro: 'CPF inválido.' });
+        const conta = await context.db.prepare('SELECT 1 FROM mobile_accounts WHERE cpf_lookup = ? LIMIT 1').bind(await hmac(context, `cpf:${cpf}`)).first();
+        const cadastro = await clienteExistente(env as MobileClientesEnv, cpf).catch(() => null);
+        return json(200, { contaApp: Boolean(conta), cadastro: cadastro !== null, email: cadastro || null });
+      }
       case 'register':
         return await register(request, input, env, context);
       case 'login':

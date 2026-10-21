@@ -81,6 +81,10 @@ export const authApi = {
   login(identifier: string, password: string) {
     return post<SessionTokens>('login', { identifier, password });
   },
+  /** o CPF já tem conta no app ou cadastro no kartódromo (e-mail mascarado)? */
+  cadastroExistente(cpf: string) {
+    return post<{ contaApp: boolean; cadastro: boolean; email: string | null }>('cadastro-existente', { cpf });
+  },
   register(input: RegistrationInput) {
     return post<MessageResponse>('register', input);
   },

@@ -9,6 +9,7 @@
  *   GET  /api/mobile/v1/ranking/me                carreira do dono da sessão (conta vinculada ao cadastro)
  */
 import { authenticateMobileRequest, type MobileAuthEnv } from './auth';
+import { receberClientes } from './clientes';
 
 export interface MobileRankingEnv extends MobileAuthEnv {
   MOBILE_DB?: D1Database;
@@ -142,6 +143,9 @@ export async function handleMobileRanking(request: Request, env: MobileRankingEn
       if (request.method === 'PUT') return await enviarFoto(request, env, cliente);
       if (request.method === 'DELETE') { await env.PRE?.delete(fotoChave(cliente)); return json(200, { ok: true }); }
       return json(405, { erro: 'Método não permitido.' });
+    }
+    if (p === '/api/mobile/v1/ranking/interno/clientes' && request.method === 'POST') {
+      return await receberClientes(request, env, constantTimeEqual(request.headers.get('x-mobile-admin-token') ?? '', env.MOBILE_ADMIN_TOKEN!));
     }
     if (request.method !== 'GET') return json(405, { erro: 'Método não permitido.' });
     const mf = /^\/api\/mobile\/v1\/ranking\/pilotos\/(\d{1,12})\/foto$/.exec(p);

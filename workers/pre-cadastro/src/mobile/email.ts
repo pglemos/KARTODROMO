@@ -46,25 +46,61 @@ export function mobileEmailLink(env: MobileEmailEnv, purpose: MobileEmailPurpose
   return `${base}/conta?acao=${purpose === 'verify' ? 'verificar' : 'senha'}&token=${encodeURIComponent(token)}`;
 }
 
+const LOGO = 'https://reservas.kartodromodebetim.com.br/kib-logo-escuro.png';
+const xadrez = (inverte: boolean) => Array.from({ length: 45 }, (_, i) => `<td height="10" style="background:${(i + (inverte ? 1 : 0)) % 2 ? '#ffffff' : '#0b0b0d'};font-size:0;line-height:0">&nbsp;</td>`).join('');
+
+/** E-mail da conta com a cara do kartódromo: logo, faixa xadrez de bandeirada, botão dourado e os atalhos do app. */
 function conteudo(purpose: MobileEmailPurpose, link: string) {
   const verificar = purpose === 'verify';
-  const subject = verificar ? 'Confirme seu e-mail · Kartódromo de Betim' : 'Crie uma nova senha · Kartódromo de Betim';
+  const subject = verificar ? '🏁 Confirme seu e-mail e acelere · Kartódromo de Betim' : '🔑 Crie uma nova senha · Kartódromo de Betim';
   const acao = verificar ? 'Confirmar meu e-mail' : 'Criar nova senha';
+  const titulo = verificar ? 'Falta só uma volta!' : 'Vamos trocar sua senha';
   const intro = verificar
-    ? 'Falta só confirmar seu e-mail para usar sua conta no app do Kartódromo de Betim (reservas, resultados e carreira).'
-    : 'Recebemos um pedido para trocar a senha da sua conta no app do Kartódromo de Betim.';
-  const fim = verificar ? '' : ' Se não foi você, ignore este e-mail: sua senha continua a mesma.';
+    ? 'Sua conta no app do Kartódromo Internacional de Betim está quase pronta. Confirme seu e-mail para reservar baterias, acompanhar a corrida ao vivo, ver seus resultados e montar sua carreira de piloto.'
+    : 'Recebemos um pedido para trocar a senha da sua conta no app do Kartódromo Internacional de Betim. Toque no botão para escolher uma senha nova.';
+  const fim = verificar ? 'Se você não criou esta conta, é só ignorar este e-mail.' : 'Se não foi você, ignore este e-mail: sua senha continua a mesma.';
+  const vantagens = verificar
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 26px"><tr>${[['🏎️', 'Reserve sua bateria'], ['⏱️', 'Tempos ao vivo'], ['🏆', 'Ranking e carreira']]
+      .map(([e, t]) => `<td align="center" width="32%" style="padding:12px 4px;background:#17171b;border-radius:14px;font-size:12px;color:#d4d4d8"><div style="font-size:22px;line-height:30px">${e}</div>${t}</td>`)
+      .join('<td width="2%"></td>')}</tr></table>`
+    : '';
   const href = link.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-  const text = `${intro}\n\n${acao}: ${link}\n\nO link vale por 30 minutos.${fim}\n\nKartódromo Internacional de Betim`;
-  const html = `<!doctype html><html lang="pt-BR"><body style="margin:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;color:#18181b">
-<div style="max-width:520px;margin:0 auto;padding:28px 20px">
-<p style="font-size:13px;font-weight:bold;letter-spacing:.08em;color:#e4002b;margin:0 0 10px">KARTÓDROMO DE BETIM</p>
-<h1 style="font-size:22px;margin:0 0 14px">${verificar ? 'Confirme seu e-mail' : 'Crie uma nova senha'}</h1>
-<p style="font-size:15px;line-height:1.5;margin:0 0 22px">${intro}</p>
-<p style="margin:0 0 22px"><a href="${href}" style="display:inline-block;background:#e4002b;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:13px 22px;border-radius:8px">${acao}</a></p>
-<p style="font-size:13px;line-height:1.5;color:#52525b;margin:0">O link vale por 30 minutos.${fim}</p>
-</div></body></html>`;
+  const text = `${titulo}\n\n${intro}\n\n${acao}: ${link}\n\nO link vale por 30 minutos. ${fim}\n\nKartódromo Internacional de Betim`;
+  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="color-scheme" content="dark light"></head>
+<body style="margin:0;padding:0;background:#000000;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#000000"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:540px;background:#0b0b0d;border-radius:24px;overflow:hidden;border:1px solid #26262b">
+<tr><td align="center" style="padding:30px 24px 24px"><img src="${LOGO}" width="240" alt="Kartódromo Internacional de Betim" style="display:block;width:240px;max-width:80%;height:auto;border:0"></td></tr>
+<tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed"><tr>${xadrez(false)}</tr><tr>${xadrez(true)}</tr></table></td></tr>
+<tr><td style="padding:32px 28px 8px">
+<p style="margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:.18em;color:#f59e0b">APP DO PILOTO</p>
+<h1 style="margin:0 0 14px;font-size:30px;line-height:1.15;color:#ffffff;font-weight:900">${titulo}</h1>
+<p style="margin:0 0 26px;font-size:16px;line-height:1.6;color:#a1a1aa">${intro}</p>
+${vantagens}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="border-radius:999px;background:#f59e0b">
+<a href="${href}" style="display:block;padding:17px 24px;font-size:17px;font-weight:900;color:#000000;text-decoration:none;border-radius:999px">${acao} →</a></td></tr></table>
+<p style="margin:18px 0 0;font-size:13px;line-height:1.5;color:#71717a;text-align:center">O link vale por 30 minutos. ${fim}</p>
+</td></tr>
+<tr><td style="padding:26px 28px 30px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #26262b"><tr><td style="padding-top:18px;font-size:12px;line-height:1.6;color:#71717a;text-align:center">
+Kartódromo Internacional de Betim · Betim/MG<br>E-mail automático do app. Não precisa responder.</td></tr></table></td></tr>
+</table></td></tr></table></body></html>`;
   return { subject, text, html };
+}
+
+// Email Sending da Cloudflare (Workers Paid): 3.000 e-mails/mês inclusos. Passando de 2.500 no mês, vai pela fila
+// (servidor da cronometragem) para nunca gerar cobrança além do plano.
+const LIMITE_MES = 2500;
+async function cotaDoMes(env: MobileEmailEnv) {
+  if (!env.MOBILE_DB) return true;
+  const mes = new Date().toISOString().slice(0, 7);
+  await env.MOBILE_DB.prepare('CREATE TABLE IF NOT EXISTS mobile_email_cota (mes TEXT PRIMARY KEY, enviados INTEGER NOT NULL)').run();
+  const r = await env.MOBILE_DB.prepare('SELECT enviados FROM mobile_email_cota WHERE mes = ?').bind(mes).first<{ enviados: number }>();
+  return (r?.enviados ?? 0) < LIMITE_MES;
+}
+async function contar(env: MobileEmailEnv) {
+  if (!env.MOBILE_DB) return;
+  const mes = new Date().toISOString().slice(0, 7);
+  await env.MOBILE_DB.prepare('INSERT INTO mobile_email_cota(mes, enviados) VALUES (?, 1) ON CONFLICT(mes) DO UPDATE SET enviados = enviados + 1').bind(mes).run();
 }
 
 export async function sendMobileAuthEmail(
@@ -76,7 +112,7 @@ export async function sendMobileAuthEmail(
   if (!mobileEmailConfigured(env)) return false;
   const { subject, text, html } = conteudo(purpose, mobileEmailLink(env, purpose, token));
 
-  if (env.EMAIL && env.MOBILE_EMAIL_FILA !== '1') {
+  if (env.EMAIL && env.MOBILE_EMAIL_FILA !== '1' && await cotaDoMes(env).catch(() => false)) {
     try {
       await env.EMAIL.send({
         to,
@@ -85,6 +121,7 @@ export async function sendMobileAuthEmail(
         text,
         html,
       });
+      await contar(env).catch(() => undefined);
       return true;
     } catch (e) {
       console.error('mobile email binding', (e as { code?: string }).code ?? '', (e as Error).message);

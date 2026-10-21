@@ -1,11 +1,13 @@
-import { useState } from 'react';
-import { Link } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Link, router } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 
 import { useUi } from '../../components/theme';
 import { Icon } from '../../components/brand';
 import { authApi } from '../../api/client';
 import type { RegistrationInput } from '../../api/contracts';
+import { CadastroSucesso } from '../../components/cadastro-sucesso';
+import { Entrada, tap } from '../../components/motion';
 import { AuthButton, AuthFeedback, AuthField, AuthLink, AuthShell } from '../../components/auth-ui';
 
 /** 12345678901 → 123.456.789-01 */
@@ -33,6 +35,16 @@ export default function RegistrationScreen() {
   const [feedback, setFeedback] = useState('');
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [enviado, setEnviado] = useState('');
+  // CPF completo: pergunta se já existe conta no app ou cadastro no kartódromo (só volta o e-mail mascarado)
+  const [existente, setExistente] = useState<{ contaApp: boolean; cadastro: boolean; email: string | null } | null>(null);
+  const cpfDigitos = cpf.replace(/D/g, '');
+  useEffect(() => {
+    if (cpfDigitos.length !== 11) { void Promise.resolve().then(() => setExistente(null)); return; }
+    let vivo = true;
+    void authApi.cadastroExistente(cpfDigitos).then((r) => { if (vivo) setExistente(r); }).catch(() => undefined);
+    return () => { vivo = false; };
+  }, [cpfDigitos]);
 
   async function submit() {
     if (password.length < 8) {
@@ -59,13 +71,17 @@ export default function RegistrationScreen() {
     try {
       const result = await authApi.register(input);
       void result;
-      setFeedback(`Quase lá! Enviamos um link de confirmação para ${email}. Abra o e-mail (confira também o spam), toque no link e depois entre com sua senha.`);
+      setEnviado(email);
     } catch (reason) {
       setError(true);
       setFeedback(reason instanceof Error ? reason.message : 'Não foi possível criar a conta.');
     } finally {
       setBusy(false);
     }
+  }
+
+  if (enviado) {
+    return <AuthShell title="Bem-vindo à pista" description="Sua conta foi criada."><CadastroSucesso email={enviado} /></AuthShell>;
   }
 
   return (
@@ -75,6 +91,25 @@ export default function RegistrationScreen() {
     >
       <AuthField label="Nome completo" placeholder="Como no seu documento" value={name} onChangeText={setName} autoCapitalize="words" autoComplete="name" />
       <AuthField label="CPF" placeholder="000.000.000-00" value={cpf} onChangeText={(v) => setCpf(maskCpf(v))} keyboardType="number-pad" autoComplete="off" maxLength={14} />
+      {existente?.contaApp ? (
+        <Entrada>
+          <View style={{ backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: palette.accent, borderRadius: 16, padding: 14, marginBottom: 18, gap: 10 }}>
+            <Text style={{ color: palette.text, fontWeight: '800', fontSize: 15 }}>Este CPF já tem conta no app</Text>
+            <Text style={[styles.muted, { fontSize: 14 }]}>Não precisa criar outra: entre com ela ou crie uma senha nova.</Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable accessibilityRole="button" onPress={() => { tap(); router.replace('/(auth)/login'); }} style={{ flex: 1, backgroundColor: palette.accent, borderRadius: 999, paddingVertical: 11, alignItems: 'center' }}><Text style={{ color: '#000000', fontWeight: '900' }}>Entrar</Text></Pressable>
+              <Pressable accessibilityRole="button" onPress={() => { tap(); router.push('/(auth)/recuperar-senha'); }} style={{ flex: 1, borderWidth: 1, borderColor: palette.accent, borderRadius: 999, paddingVertical: 11, alignItems: 'center' }}><Text style={{ color: palette.accent, fontWeight: '800' }}>Esqueci a senha</Text></Pressable>
+            </View>
+          </View>
+        </Entrada>
+      ) : existente?.cadastro ? (
+        <Entrada>
+          <View style={{ backgroundColor: 'rgba(34,197,94,0.12)', borderWidth: 1, borderColor: palette.neonGreen, borderRadius: 16, padding: 14, marginBottom: 18, gap: 6 }}>
+            <Text style={{ color: palette.text, fontWeight: '800', fontSize: 15 }}>🏁 Você já é piloto do kartódromo!</Text>
+            <Text style={[styles.muted, { fontSize: 14, lineHeight: 20 }]}>{existente.email ? <>Para trazer todo o seu histórico de corridas, use o mesmo e-mail do seu cadastro: <Text style={{ color: palette.text, fontWeight: '800' }}>{existente.email}</Text> (ou o mesmo celular).</> : 'Use o mesmo celular do seu cadastro na recepção para trazer todo o seu histórico de corridas.'}</Text>
+          </View>
+        </Entrada>
+      ) : null}
       <AuthField label="E-mail" placeholder="voce@email.com" value={email} onChangeText={(v) => setEmail(v.trim())} keyboardType="email-address" autoCapitalize="none" autoComplete="email" />
       <AuthField label="Celular com DDD" placeholder="(31) 99999-9999" value={phone} onChangeText={(v) => setPhone(maskPhone(v))} keyboardType="phone-pad" autoComplete="tel" maxLength={15} />
       <AuthField
