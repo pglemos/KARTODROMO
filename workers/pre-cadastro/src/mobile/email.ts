@@ -47,7 +47,7 @@ export function mobileEmailLink(env: MobileEmailEnv, purpose: MobileEmailPurpose
 }
 
 const LOGO = 'https://reservas.kartodromodebetim.com.br/kib-logo-escuro.png';
-const KART = 'https://reservas.kartodromodebetim.com.br/email-kart.gif';
+const KART = 'https://reservas.kartodromodebetim.com.br/email-kart.gif?v=2';
 const xadrez = (inverte: boolean) => Array.from({ length: 45 }, (_, i) => `<td height="10" style="background:${(i + (inverte ? 1 : 0)) % 2 ? '#ffffff' : '#0b0b0d'};font-size:0;line-height:0">&nbsp;</td>`).join('');
 
 /** E-mail da conta com a cara do kartódromo: logo, faixa xadrez de bandeirada, botão dourado e os atalhos do app. */
@@ -81,7 +81,7 @@ export function conteudo(purpose: MobileEmailPurpose, link: string) {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#000000"><tr><td align="center" style="padding:24px 12px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:540px;background:#0b0b0d;border-radius:24px;overflow:hidden;border:1px solid #26262b">
 <tr><td align="center" style="padding:30px 24px 24px"><img src="${LOGO}" width="240" alt="Kartódromo Internacional de Betim" style="display:block;width:240px;max-width:80%;height:auto;border:0"></td></tr>
-<tr><td style="line-height:0;font-size:0"><img src="${KART}" width="540" alt="Kart em alta velocidade com as rodas pegando fogo" style="display:block;width:100%;max-width:540px;height:auto;border:0"></td></tr>
+<tr><td style="line-height:0;font-size:0"><img src="${KART}" width="540" alt="Karts disputando a curva na pista do Kartódromo de Betim" style="display:block;width:100%;max-width:540px;height:auto;border:0"></td></tr>
 <tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed"><tr>${xadrez(false)}</tr><tr>${xadrez(true)}</tr></table></td></tr>
 <tr><td style="padding:32px 28px 8px">
 <p style="margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:.18em;color:#f59e0b">APP DO PILOTO</p>
