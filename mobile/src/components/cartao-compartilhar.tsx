@@ -18,7 +18,10 @@ type Categoria = { nome: string; cor: string };
 
 function Cartao({ dados, xp, cat, versaoFoto }: { dados: CarreiraPiloto; xp: number; cat: Categoria; versaoFoto: number }) {
   const melhores = [...dados.tracados].sort((a, b) => b.corridas - a.corridas).slice(0, 2);
-  const numeros = [['Vitórias', dados.vitorias], ['Pódios', dados.podios], ['Baterias', dados.baterias]] as const;
+  // quem só correu no LapTime antigo não tem baterias detalhadas: mostra as semanas no top 10
+  const numeros = dados.baterias === 0 && (dados.semanasTop10 || dados.mesesTop10)
+    ? [['Semanas no top 10', dados.semanasTop10 ?? 0], ['Meses no top 10', dados.mesesTop10 ?? 0]] as const
+    : [['Vitórias', dados.vitorias], ['Pódios', dados.podios], ['Baterias', dados.baterias]] as const;
   return (
     <View style={{ width: 360, height: 640, backgroundColor: '#050505', padding: 28, justifyContent: 'space-between', overflow: 'hidden' }}>
       {/* faixas diagonais de fundo, na cor da categoria */}

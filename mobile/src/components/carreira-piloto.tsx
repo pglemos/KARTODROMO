@@ -205,6 +205,13 @@ export default function CarreiraPilotoTela({ id, aba = false }: { id: string; ab
           <BarraXp progresso={cat.progresso} cor={cat.cor} />
         </Cartao>
 
+        {dados.baterias === 0 && (dados.semanasTop10 || dados.mesesTop10) ? (
+          <Cartao titulo="Antes de setembro de 2026" index={2}>
+            <Text style={{ color: palette.textSecondary, fontSize: 15, lineHeight: 22 }}>
+              Esteve no top 10 do sistema antigo em <Text style={{ color: palette.accent, fontWeight: '900' }}>{[dados.semanasTop10 ? `${dados.semanasTop10} ${dados.semanasTop10 === 1 ? 'semana' : 'semanas'}` : '', dados.mesesTop10 ? `${dados.mesesTop10} ${dados.mesesTop10 === 1 ? 'mês' : 'meses'}` : ''].filter(Boolean).join(' e ')}</Text>. O sistema antigo não guardou as baterias uma a uma, então as contagens abaixo começam na próxima corrida.
+            </Text>
+          </Cartao>
+        ) : null}
         <Cartao titulo="Carreira" index={2}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 16 }}>
             {numeros.map((n) => (

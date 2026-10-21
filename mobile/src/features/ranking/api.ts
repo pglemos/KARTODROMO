@@ -34,6 +34,9 @@ export interface CarreiraPiloto {
   podios: number;
   poles: number;
   voltasMaisRapidas: number;
+  /** semanas no top 10 semanal do LapTime antigo (antes de 02/09/2026, quando não há corrida detalhada) */
+  semanasTop10?: number;
+  mesesTop10?: number;
   primeira: string | null;
   ultima: string | null;
   tracados: { nome: string; ms: number; dia: string; corridas: number; semana: PosicaoRanking | null; mes: PosicaoRanking | null; geral: PosicaoRanking | null }[];
