@@ -47,7 +47,6 @@ export default function CustomerTabs() {
       <Tabs.Screen
         name="carreira"
         options={{
-          ...(DEMO_MODE ? {} : { href: null }),
           title: 'Carreira',
           tabBarLabel: 'Carreira',
         }}
@@ -64,7 +63,7 @@ export default function CustomerTabs() {
       <Tabs.Screen
         name="resultados"
         options={{
-          ...(DEMO_MODE ? { href: null } : {}),
+          href: null,
           title: 'Resultados',
         }}
       />

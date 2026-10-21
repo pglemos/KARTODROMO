@@ -58,7 +58,7 @@ function Cartao({ titulo, children, index = 0 }: { titulo?: string; children: Re
 const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0);
 const posTexto = (p: PosicaoRanking | null) => (p ? `${p.pos}º de ${p.de}` : '—');
 
-export default function CarreiraPilotoTela({ id }: { id: string }) {
+export default function CarreiraPilotoTela({ id, aba = false }: { id: string; aba?: boolean }) {
   const { palette, styles } = useUi();
   const { session } = useSession();
   const eu = id === 'eu';
@@ -115,8 +115,15 @@ export default function CarreiraPilotoTela({ id }: { id: string }) {
   const voltar = () => (router.canGoBack() ? router.back() : router.replace('/(tabs)'));
   const topo = (
     <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: 12, paddingBottom: 8, gap: 10 }}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Voltar" onPress={voltar} style={{ padding: 6, marginLeft: -6 }}><Icon name="back" color={palette.text} size={24} /></Pressable>
-      <View style={{ flex: 1 }} />
+      {aba ? <Text accessibilityRole="header" style={[styles.title, { flex: 1 }]}>Carreira</Text>
+        : <><Pressable accessibilityRole="button" accessibilityLabel="Voltar" onPress={voltar} style={{ padding: 6, marginLeft: -6 }}><Icon name="back" color={palette.text} size={24} /></Pressable><View style={{ flex: 1 }} /></>}
+      {eu ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="Meus resultados" onPress={() => { tap(); router.push('/(tabs)/resultados'); }}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, paddingHorizontal: 14, borderRadius: 20, backgroundColor: palette.surface }}>
+          <Icon name="results" color={palette.neonGreen} size={18} />
+          <Text style={{ color: palette.text, fontWeight: '700', fontSize: 14 }}>Resultados</Text>
+        </Pressable>
+      ) : null}
       <Pressable accessibilityRole="button" accessibilityLabel="Como funciona o ranking" onPress={() => { tap(); setRegras(true); }}
         style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: palette.surface, alignItems: 'center', justifyContent: 'center' }}>
         <Icon name="info" color={palette.text} size={22} />

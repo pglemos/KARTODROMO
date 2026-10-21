@@ -25,7 +25,7 @@ describe('modo loja (sem dados demonstrativos)', () => {
   it('a barra de abas em modo de produção só tem telas com dados reais', () => {
     process.env.EXPO_PUBLIC_DEMO_MODE = '0';
     const items = getTabBarItems(false);
-    expect(items.map((item) => item.name)).toEqual(['index', 'agenda', 'reservas', 'livetime', 'resultados']);
+    expect(items.map((item) => item.name)).toEqual(['index', 'agenda', 'reservas', 'livetime', 'carreira']);
   });
 
   it('rotas fictícias redirecionam para o início quando demo está desligado', async () => {

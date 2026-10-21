@@ -3,7 +3,7 @@
     "name": "Kartódromo de Betim",
     "slug": "kartodromo-betim",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/app-icon.png",
     "scheme": "kartodromo",
     "userInterfaceStyle": "automatic",
@@ -60,6 +60,12 @@
           "photosPermission": "Permita escolher uma foto para o seu perfil de piloto.",
           "cameraPermission": "Permita tirar uma foto para o seu perfil de piloto.",
           "microphonePermission": false
+        }
+      ],
+      [
+        "expo-screen-orientation",
+        {
+          "initialOrientation": "PORTRAIT_UP"
         }
       ]
     ],

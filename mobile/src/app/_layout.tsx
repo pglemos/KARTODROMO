@@ -1,11 +1,16 @@
 import { Stack, useSegments } from 'expo-router';
-import { Text, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useUi } from '../components/theme';
 import { DEMO_MODE } from '../config/features';
 import { CartProvider } from '../features/cart/context';
+import * as ScreenOrientation from 'expo-screen-orientation';
+
 import { SessionProvider } from '../session/provider';
+
+// o app é em pé; só o cockpit deita a tela (ele trava em paisagem ao abrir e devolve ao sair)
+if (Platform.OS !== 'web') void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => undefined);
 
 export default function RootLayout() {
   const { palette } = useUi();

@@ -36,7 +36,7 @@ const LIVE_TAB_ITEMS: readonly TabItemConfig[] = [
   { name: 'agenda', label: 'Agenda', icon: 'calendar' },
   { name: 'reservas', label: 'Reservas', icon: 'ticket' },
   { name: 'livetime', label: 'Ao vivo', icon: 'timer' },
-  { name: 'resultados', label: 'Resultados', icon: 'trophy' },
+  { name: 'carreira', label: 'Carreira', icon: 'helmet' },
 ] as const;
 
 export function getTabBarItems(demo = isDemoMode()): readonly TabItemConfig[] {

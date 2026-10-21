@@ -28,7 +28,7 @@ export default function StartScreen() {
     { titulo: 'Ao vivo', texto: 'Tempos volta a volta', icone: 'timer', href: '/(tabs)/livetime', cor: palette.neonRed },
     { titulo: 'Resultados', texto: 'Seu histórico na pista', icone: 'results', href: '/(tabs)/resultados', cor: palette.neonGreen },
     { titulo: 'Ranking', texto: 'Os mais rápidos da pista', icone: 'podium', href: '/ranking', cor: palette.purpleNeon },
-    { titulo: 'Minha carreira', texto: 'XP, conquistas e tempos', icone: 'trophy', href: (session ? '/piloto/eu' : '/(auth)/login') as Href, cor: palette.gold },
+    { titulo: 'Minha carreira', texto: 'XP, conquistas e tempos', icone: 'trophy', href: '/(tabs)/carreira' as Href, cor: palette.gold },
   ];
 
   return (
