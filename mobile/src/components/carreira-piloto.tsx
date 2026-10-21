@@ -238,6 +238,8 @@ export default function CarreiraPilotoTela({ id, aba = false }: { id: string; ab
               ['Minhas metas', 'target', '#16A34A', '/metas'],
               ['Karts do dia', 'timer', '#7C3AED', '/karts'],
               ['Modo piloto', 'gps', '#EA580C', '/cockpit'],
+              ['Carteira', 'ticket', '#0891B2', '/carteira'],
+              ['Meu perfil', 'account', '#475569', '/perfil'],
             ] as const).map(([rotulo, icone, cor, rota]) => (
               <Pressable key={rota} onPress={() => { tap(); router.push(rota as Href); }} accessibilityRole="button" accessibilityLabel={rotulo}
                 style={({ pressed }) => ({ width: '31%', flexGrow: 1, backgroundColor: palette.surface, borderRadius: 18, borderWidth: 1, borderColor: palette.borderSubtle, paddingVertical: 14, alignItems: 'center', gap: 8, transform: [{ scale: pressed ? 0.96 : 1 }] })}>

@@ -45,6 +45,8 @@ export default function RootLayout() {
           <Stack.Screen name="desafios" options={{ headerShown: false }} />
           <Stack.Screen name="metas" options={{ headerShown: false }} />
           <Stack.Screen name="karts" options={{ headerShown: false }} />
+          <Stack.Screen name="perfil" options={{ headerShown: false }} />
+          <Stack.Screen name="carteira" options={{ headerShown: false }} />
           <Stack.Screen name="ranking" options={{ headerShown: false }} />
           <Stack.Screen name="piloto/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="cockpit" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
