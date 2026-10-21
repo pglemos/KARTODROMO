@@ -6,7 +6,7 @@ import { Brand, Icon } from './brand';
 import { Entrada, tap } from './motion';
 import { ProximaReserva } from './proxima-reserva';
 import { useUi } from './theme';
-import { useLiveSession } from '../features/live/api';
+import { useLiveStatus } from '../features/live/api';
 import { useSession } from '../session/provider';
 
 /** política do app (página do domínio das reservas; o site principal não tem /privacidade) */
@@ -18,7 +18,7 @@ type Atalho = { titulo: string; texto: string; icone: 'calendar' | 'ticket' | 't
 export default function StartScreen() {
   const { palette } = useUi();
   const { session } = useSession();
-  const { snapshot } = useLiveSession(10_000);
+  const { snapshot } = useLiveStatus(10_000);
   const insets = useSafeAreaInsets();
   const aoVivo = snapshot?.status === 'live' && snapshot.drivers.length > 0;
 

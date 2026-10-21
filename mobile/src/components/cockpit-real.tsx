@@ -2,7 +2,7 @@
  * Cockpit do piloto: a bateria ao vivo vista do SEU kart, com a tela deitada (paisagem) e letras enormes para ler
  * de relance no suporte do kart ou na mão de quem assiste. No centro corre o cronômetro da volta em andamento;
  * em volta ficam posição, volta, quem está à frente e atrás, última/melhor volta e o delta para a melhor.
- * Acha o kart pelo nome da conta; se não achar, o piloto escolhe. Atualiza a cada 1 s, vibra a cada volta nova,
+ * Acha o kart pelo nome da conta; se não achar, o piloto escolhe. Recebe cada passagem em tempo real (WebSocket), vibra a cada volta nova,
  * pisca roxo no recorde pessoal e tem o modo "sol" (fundo branco) para ler no sol. A tela não apaga.
  */
 import { router } from 'expo-router';
@@ -16,7 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { Icon } from './brand';
 import { tap } from './motion';
 import { useUi } from './theme';
-import { lapMs, liveApi, type LiveSnapshot } from '../features/live/api';
+import { agoraCrono, lapMs, useAgoraCrono, useAoVivo } from '../features/live/api';
 import { rankingApi } from '../features/ranking/api';
 import { nomeBonito } from '../features/ranking/gamificacao';
 import { useSession } from '../session/provider';
@@ -51,10 +51,9 @@ function Pulso({ valor, estilo }: { valor: string; estilo: object }) {
   return <Animated.Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.4} style={[estilo, { transform: [{ scale: esc }] }]}>{valor}</Animated.Text>;
 }
 
-/** cronômetro da volta em andamento, redesenhado a cada décimo */
+/** cronômetro da volta em andamento (relógio da cronometragem), redesenhado a cada 50 ms */
 function VoltaCorrendo({ inicio, cor, tamanho, fim = false }: { inicio: number | null; cor: string; tamanho: number; fim?: boolean }) {
-  const [agora, setAgora] = useState(() => Date.now());
-  useEffect(() => { const t = setInterval(() => setAgora(Date.now()), 100); return () => clearInterval(t); }, []);
+  const agora = useAgoraCrono(50);
   const ms = inicio ? Math.max(0, agora - inicio) : null;
   return (
     <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.4} accessibilityLabel="Tempo da volta atual"
@@ -64,10 +63,9 @@ function VoltaCorrendo({ inicio, cor, tamanho, fim = false }: { inicio: number |
   );
 }
 
-/** tempo de prova correndo (desde a largada) */
+/** tempo de prova correndo (desde a largada, no relógio da cronometragem) */
 function RelogioProva({ inicio }: { inicio: number }) {
-  const [agora, setAgora] = useState(() => Date.now());
-  useEffect(() => { const t = setInterval(() => setAgora(Date.now()), 1000); return () => clearInterval(t); }, []);
+  const agora = useAgoraCrono(250);
   return <>{prova(Math.max(0, agora - inicio))}</>;
 }
 
@@ -80,8 +78,7 @@ export default function CockpitReal({ kartInicial = null }: { kartInicial?: stri
   const { palette } = useUi();
   const tela = useWindowDimensions();
   const { session } = useSession();
-  const [snap, setSnap] = useState<LiveSnapshot | null>(null);
-  const [erro, setErro] = useState('');
+  const { snapshot: snap, error: erro } = useAoVivo();
   const [meuNome, setMeuNome] = useState<string | null>(null);
   const [kart, setKart] = useState<string | null>(kartInicial);
   const [tema, setTema] = useState<keyof typeof TEMAS>('escuro');
@@ -106,17 +103,6 @@ export default function CockpitReal({ kartInicial = null }: { kartInicial?: stri
     void rankingApi.minha(session.accessToken).then((c) => setMeuNome(c.nome)).catch(() => undefined);
   }, [session]);
 
-  useEffect(() => {
-    let ativo = true;
-    const buscar = async () => {
-      try { const s = await liveApi.snapshot(); if (ativo) { setSnap(s); setErro(''); } }
-      catch (e) { if (ativo) setErro(e instanceof Error ? e.message : 'Sem conexão com a cronometragem.'); }
-    };
-    void buscar();
-    const t = setInterval(() => void buscar(), 1000);
-    return () => { ativo = false; clearInterval(t); };
-  }, []);
-
   // só a bateria que está na pista; a encerrada (que a crono mostra enquanto não há kart rodando) fica de fora
   const pilotos = useMemo(() => (snap?.status === 'live' ? snap.drivers : []), [snap]);
   const automatico = useMemo(() => (meuNome ? pilotos.find((p) => normal(p.name) === normal(meuNome))?.kart ?? null : null), [meuNome, pilotos]);
@@ -129,9 +115,9 @@ export default function CockpitReal({ kartInicial = null }: { kartInicial?: stri
     if (!eu || eu.laps === null) return;
     const melhor = lapMs(eu.best);
     if (ultimaVolta.current !== null && eu.laps > ultimaVolta.current) {
-      // o retrato da crono é gerado na passagem: a hora dele é o começo da volta nova
-      const passagem = snap ? Date.parse(snap.updatedAt) : NaN;
-      const inicio = Number.isFinite(passagem) && Math.abs(Date.now() - passagem) < 15000 ? passagem : Date.now();
+      // hora da passagem marcada pela cronometragem; sem ela, a do retrato (gerado na passagem)
+      const passagem = eu.passouEm ?? (snap ? Date.parse(snap.updatedAt) : NaN);
+      const inicio = Number.isFinite(passagem) && Math.abs(agoraCrono() - passagem) < 15000 ? passagem : agoraCrono();
       void Promise.resolve().then(() => setInicioVolta(inicio));
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
       if (melhor !== null && melhorAnterior.current !== null && melhor < melhorAnterior.current) {
@@ -234,7 +220,7 @@ export default function CockpitReal({ kartInicial = null }: { kartInicial?: stri
           </View>
           <View style={{ flex: 2, alignItems: 'center' }}>
             <Pulso valor={`P${eu.position}`} estilo={{ color: eu.position === 1 ? c.ouro : c.texto, fontFamily: MONO, fontSize: t.pos, lineHeight: t.pos * 1.1, fontWeight: '900' }} />
-            <VoltaCorrendo inicio={ao ? inicioVolta : null} cor={c.texto} tamanho={t.relogio} fim={!ao} />
+            <VoltaCorrendo inicio={ao ? eu.passouEm ?? inicioVolta : null} cor={c.texto} tamanho={t.relogio} fim={!ao} />
           </View>
           <View style={{ flex: 1, alignItems: 'flex-end', gap: 4 }}>
             <Rotulo texto={frente ? `À FRENTE #${frente.kart}` : 'LÍDER'} cor={c.apagado} tamanho={t.rotulo} />

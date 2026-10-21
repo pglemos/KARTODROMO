@@ -12,6 +12,7 @@ import { handleMobileReservations } from './mobile/reservations';
 import { handleMobileCoupons, handleMobileCouponsSync } from './mobile/coupons';
 import { handleMobileResults, type MobileResultsEnv } from './mobile/results';
 import { handleMobileLive, type MobileLiveEnv } from './mobile/live';
+export { AoVivo } from './mobile/live';
 import { handleMobileRanking } from './mobile/ranking';
 import { handleMobileOutbox } from './mobile/outbox';
 
@@ -100,7 +101,7 @@ export default {
           p === '/api/mobile/v1/results' || p === '/api/mobile/v1/results/me') {
         return await handleMobileResults(req, env);
       }
-      if (p === '/api/mobile/v1/live') return await handleMobileLive(req, env);
+      if (p === '/api/mobile/v1/live' || p === '/api/mobile/v1/live/ws') return await handleMobileLive(req, env);
       if (p === '/api/mobile/v1/internal/ranking' || p === '/api/mobile/v1/ranking' || p.startsWith('/api/mobile/v1/ranking/')) return await handleMobileRanking(req, env);
       if (p === '/api/mobile/v1/internal/outbox' || p.startsWith('/api/mobile/v1/internal/outbox/')) return await handleMobileOutbox(req, env);
       if (p === '/api/mobile/v1/agenda' || p === '/api/mobile/v1/reservations' || p.startsWith('/api/mobile/v1/reservations/')) {
