@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { useEffect, useRef, type PropsWithChildren } from 'react';
+import { useEffect, useState, type PropsWithChildren } from 'react';
 import { Animated, Easing, Platform } from 'react-native';
 
 /** toque leve de confirmação nos botões principais (silencioso na web) */
@@ -9,7 +9,7 @@ export function tap() {
 
 /** entrada em cascata: cada item sobe e aparece um pouco depois do anterior */
 export function Entrada({ index = 0, children, style }: PropsWithChildren<{ index?: number; style?: object }>) {
-  const progresso = useRef(new Animated.Value(0)).current;
+  const [progresso] = useState(() => new Animated.Value(0));
   useEffect(() => {
     Animated.timing(progresso, {
       toValue: 1,

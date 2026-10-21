@@ -5,7 +5,8 @@
  * Conforms to F07 acceptance criteria and Tier 1-4 test harnesses.
  */
 
-import { demoOnly } from '../config/features';
+import { DEMO_MODE } from '../config/features';
+import RankingReal from '../components/ranking-real';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
@@ -649,4 +650,5 @@ const styles = StyleSheet.create({
   },
 });
 
-export default demoOnly(RankingScreen);
+// loja: ranking real (melhor volta por traçado); demonstração: o ranking fictício de XP
+export default DEMO_MODE ? RankingScreen : RankingReal;

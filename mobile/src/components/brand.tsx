@@ -13,6 +13,18 @@ const symbols = {
   check: { ios: 'checkmark', android: 'check', web: 'check' },
   info: { ios: 'info.circle', android: 'info', web: 'info' },
   timer: { ios: 'stopwatch', android: 'timer', web: 'timer' },
+  trophy: { ios: 'trophy.fill', android: 'emoji_events', web: 'emoji_events' },
+  medal: { ios: 'medal.fill', android: 'military_tech', web: 'military_tech' },
+  bolt: { ios: 'bolt.fill', android: 'bolt', web: 'bolt' },
+  target: { ios: 'scope', android: 'my_location', web: 'my_location' },
+  fire: { ios: 'flame.fill', android: 'local_fire_department', web: 'local_fire_department' },
+  crown: { ios: 'crown.fill', android: 'workspace_premium', web: 'workspace_premium' },
+  star: { ios: 'star.fill', android: 'star', web: 'star' },
+  flag: { ios: 'flag.checkered', android: 'sports_score', web: 'sports_score' },
+  search: { ios: 'magnifyingglass', android: 'search', web: 'search' },
+  close: { ios: 'xmark', android: 'close', web: 'close' },
+  lock: { ios: 'lock.fill', android: 'lock', web: 'lock' },
+  podium: { ios: 'chart.bar.fill', android: 'leaderboard', web: 'leaderboard' },
 } as const;
 
 export function Icon({ name, color, size = 24 }: { name: keyof typeof symbols; color: ColorValue; size?: number }) {

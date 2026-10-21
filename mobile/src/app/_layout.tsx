@@ -35,6 +35,8 @@ export default function RootLayout() {
           <Stack.Screen name="reservations/[id]" options={{ headerShown: true }} />
           <Stack.Screen name="carrinho" options={{ headerShown: false }} />
           <Stack.Screen name="conquistas" options={{ headerShown: false }} />
+          <Stack.Screen name="ranking" options={{ headerShown: false }} />
+          <Stack.Screen name="piloto/[id]" options={{ headerShown: false }} />
         </Stack>
         </View>
         {DEMO_MODE && !realDataRoute && (

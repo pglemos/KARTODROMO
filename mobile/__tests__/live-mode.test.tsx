@@ -42,7 +42,7 @@ describe('modo loja (sem dados demonstrativos)', () => {
     expect(view.queryByText('Ranking fictício')).toBeNull();
   });
 
-  it('o início de loja não mostra ranking, notícias nem telemetria', async () => {
+  it('o início de loja não mostra notícias, telemetria nem dados de demonstração (o ranking é o real)', async () => {
     function WrappedStart() {
       return (
         <SessionProvider>
@@ -53,6 +53,7 @@ describe('modo loja (sem dados demonstrativos)', () => {
     const view = await renderRouter({ '(tabs)/index': WrappedStart }, { initialUrl: '/' });
     expect(view.getByText('Agenda')).toBeTruthy();
     expect(view.getByText('Política de privacidade')).toBeTruthy();
-    expect(view.queryByText(/ranking|notícia|telemetria|demonstrativ/i)).toBeNull();
+    expect(view.queryByText(/notícia|telemetria|demonstrativ|fictíci/i)).toBeNull();
+    expect(view.getByText('Ranking')).toBeTruthy();
   });
 });

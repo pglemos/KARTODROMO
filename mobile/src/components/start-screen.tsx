@@ -11,7 +11,7 @@ import { useSession } from '../session/provider';
 /** política do app (página do domínio das reservas; o site principal não tem /privacidade) */
 const PRIVACIDADE = 'https://reservas.kartodromodebetim.com.br/privacidade';
 
-type Atalho = { titulo: string; texto: string; icone: 'calendar' | 'ticket' | 'timer' | 'results'; href: Href; cor: string };
+type Atalho = { titulo: string; texto: string; icone: 'calendar' | 'ticket' | 'timer' | 'results' | 'trophy' | 'podium'; href: Href; cor: string };
 
 /** Início do app de loja: capa da pista, corrida ao vivo e atalhos para as funções ligadas a dados reais. */
 export default function StartScreen() {
@@ -26,6 +26,8 @@ export default function StartScreen() {
     { titulo: 'Reservas', texto: 'Suas baterias e cupons', icone: 'ticket', href: '/(tabs)/reservas', cor: palette.blue },
     { titulo: 'Ao vivo', texto: 'Tempos volta a volta', icone: 'timer', href: '/(tabs)/livetime', cor: palette.neonRed },
     { titulo: 'Resultados', texto: 'Seu histórico na pista', icone: 'results', href: '/(tabs)/resultados', cor: palette.neonGreen },
+    { titulo: 'Ranking', texto: 'Os mais rápidos da pista', icone: 'podium', href: '/ranking', cor: palette.purpleNeon },
+    { titulo: 'Minha carreira', texto: 'XP, conquistas e tempos', icone: 'trophy', href: (session ? '/piloto/eu' : '/(auth)/login') as Href, cor: palette.gold },
   ];
 
   return (
@@ -89,7 +91,7 @@ export default function StartScreen() {
           ))}
         </View>
 
-        <Entrada index={5}>
+        <Entrada index={7}>
         <Pressable onPress={() => { tap(); router.push(session ? '/(tabs)/reservas' : '/(auth)/login'); }} accessibilityRole="button"
           style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: session ? palette.surface : palette.accent, borderRadius: 20, padding: 18, opacity: pressed ? 0.85 : 1 })}>
           <Icon name="account" color={session ? palette.accent : palette.onAccent} size={28} />
