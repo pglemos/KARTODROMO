@@ -1,6 +1,8 @@
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, LayoutAnimation, Pressable, Text, View } from 'react-native';
+import { Icon } from '../../components/brand';
+import { Entrada, tap } from '../../components/motion';
 import { resultsApi } from '../../features/results/api';
 import type { PersonalResult, PersonalResultsResponse, PublicSessionResults, ResultLine } from '../../features/results/types';
 import { ordenarBaterias, resumoCarreira } from '../../features/results/resumo';
@@ -52,30 +54,50 @@ function Numero({ valor, rotulo }: { valor: string; rotulo: string }) {
   </View>;
 }
 
-/** Bateria fechada: nome, data e pódio; tocar abre a classificação inteira. */
-function EventCard({ event, open, onToggle }: { event: PublicSessionResults; open: boolean; onToggle: () => void }) {
-  const { palette, styles } = useUi();
+const MEDALHA = ['#F59E0B', '#C0C7D1', '#CD7F32'];
+
+/** Bateria fechada: cartão com o pódio em três colunas; tocar abre a classificação inteira (com animação). */
+function EventCard({ event, open, onToggle, index }: { event: PublicSessionResults; open: boolean; onToggle: () => void; index: number }) {
+  const { palette } = useUi();
   const podio = event.results.slice(0, 3);
-  return <View style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
-    <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={`${event.eventName}, ${formatDate(event.eventDate)}`}
-      onPress={onToggle} style={{ paddingVertical: 16, minHeight: 48 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.rowTitle}>{event.eventName}</Text>
-          <Text style={styles.rowDetail}>{formatDate(event.eventDate)} · {event.results.length} {event.results.length === 1 ? 'piloto' : 'pilotos'}</Text>
+  const corrida = /corrida/i.test(event.eventName);
+  return <Entrada index={index} style={{ marginTop: 12 }}>
+    <View style={{ backgroundColor: palette.surface, borderRadius: 20, borderWidth: 1, borderColor: palette.border, overflow: 'hidden' }}>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={`${event.eventName}, ${formatDate(event.eventDate)}`}
+        onPress={() => { tap(); LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); onToggle(); }}
+        style={({ pressed }) => ({ padding: 16, opacity: pressed ? 0.85 : 1 })}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: corrida ? 'rgba(245,158,11,0.15)' : 'rgba(139,92,246,0.15)', alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name={corrida ? 'flag' : 'timer'} color={corrida ? palette.accent : palette.purpleNeon} size={20} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: palette.text, fontSize: 16, fontWeight: '800' }} numberOfLines={1}>{event.eventName}</Text>
+            <Text style={{ color: palette.textMuted, fontSize: 13, marginTop: 2 }}>{formatDate(event.eventDate)} · {event.results.length} {event.results.length === 1 ? 'piloto' : 'pilotos'}</Text>
+          </View>
+          <View style={{ transform: [{ rotate: open ? '90deg' : '0deg' }] }}><Icon name="chevron" color={palette.textMuted} size={18} /></View>
         </View>
-        <Text style={{ color: palette.accent, fontSize: 14, fontWeight: '700' }}>{open ? 'Fechar' : 'Ver tudo'}</Text>
-      </View>
-      {!open ? podio.map((r) => (
-        <Text key={`${r.position}-${r.kart}`} style={[styles.rowDetail, { marginTop: 4 }]} numberOfLines={1}>
-          {r.position}º {r.displayName} · Kart {r.kart} · {formatLap(r.bestLapMs)}
-        </Text>
-      )) : null}
-    </Pressable>
-    {open ? event.results.map((result: ResultLine, index) => (
-      <ResultRow key={`${event.sessionId}-${index}`} result={{ ...result, sessionId: event.sessionId, eventName: event.eventName, eventDate: event.eventDate }} />
-    )) : null}
-  </View>;
+        {!open && podio.length ? <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
+          {podio.map((r) => (
+            <View key={`${r.position}-${r.kart}`} style={{ flex: 1, backgroundColor: palette.surfaceElevated, borderRadius: 14, padding: 10, gap: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: MEDALHA[r.position - 1] ?? palette.border, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: '#000000', fontWeight: '900', fontSize: 12 }}>{r.position}</Text>
+                </View>
+                <Text style={{ color: palette.textMuted, fontSize: 11 }}>Kart {r.kart}</Text>
+              </View>
+              <Text style={{ color: palette.text, fontWeight: '700', fontSize: 13 }} numberOfLines={1}>{r.displayName}</Text>
+              <Text style={{ color: palette.textSecondary, fontSize: 12, fontVariant: ['tabular-nums'] }}>{formatLap(r.bestLapMs)}</Text>
+            </View>
+          ))}
+        </View> : null}
+      </Pressable>
+      {open ? <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+        {event.results.map((result: ResultLine, i) => (
+          <ResultRow key={`${event.sessionId}-${i}`} result={{ ...result, sessionId: event.sessionId, eventName: event.eventName, eventDate: event.eventDate }} />
+        ))}
+      </View> : null}
+    </View>
+  </Entrada>;
 }
 
 type ResultItem =
@@ -180,7 +202,7 @@ function ResultsContent() {
         if (item.kind === 'more') return <View style={{ marginTop: 16 }}><ActionButton label="Ver mais baterias" onPress={() => setMostrar(mostrar + PAGINA)} secondary /></View>;
         return <>
           {index === 0 && !meus.length ? publicoTopo() : null}
-          <EventCard event={item.event} open={aberta === item.event.sessionId} onToggle={() => setAberta(aberta === item.event.sessionId ? null : item.event.sessionId)} />
+          <EventCard index={index} event={item.event} open={aberta === item.event.sessionId} onToggle={() => setAberta(aberta === item.event.sessionId ? null : item.event.sessionId)} />
         </>;
       }}
       ListFooterComponent={!items.some((i) => i.kind === 'event') ? publicoTopo() : null} />
@@ -190,12 +212,16 @@ function ResultsContent() {
     return <View style={{ marginTop: 28 }}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginBottom: 4 }}>
         <Text style={[styles.sectionTitle, { flex: 1, minWidth: 170 }]}>Resultados publicados</Text>
-        <ActionButton label="Atualizar" onPress={() => void load()} disabled={publicLoading} secondary />
+        <Pressable accessibilityRole="button" onPress={() => { tap(); router.push('/ranking' as Href); }}
+          style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, transform: [{ scale: pressed ? 0.95 : 1 }] })}>
+          <Icon name="podium" color={palette.purpleNeon} size={16} />
+          <Text style={{ color: palette.text, fontWeight: '700', fontSize: 14 }}>Ranking</Text>
+        </Pressable>
       </View>
       {publicLoading && !publicResults.length ? <LoadingMessage label="Buscando resultados oficiais…" /> : null}
       {publicError ? <View style={{ gap: 12 }}><InlineError message={publicError} /><ActionButton label="Tentar novamente" onPress={() => void load()} secondary /></View> : null}
       {!publicLoading && !publicError && !publicResults.length ? <Panel><Text style={styles.muted}>Ainda não há resultados oficiais publicados.</Text></Panel> : null}
-      {publicResults.length ? <Text style={[styles.muted, { color: palette.muted }]}>Toque numa bateria para ver a classificação inteira.</Text> : null}
+      {publicResults.length ? <Text style={[styles.muted, { color: palette.muted }]}>Toque numa bateria para ver a classificação inteira. Puxe para baixo para atualizar.</Text> : null}
     </View>;
   }
 }
