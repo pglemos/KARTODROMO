@@ -151,6 +151,23 @@ export async function handleMobileRanking(request: Request, env: MobileRankingEn
     const mf = /^\/api\/mobile\/v1\/ranking\/pilotos\/(\d{1,12})\/foto$/.exec(p);
     if (mf) return await lerFoto(env, mf[1]);
     if (p === '/api/mobile/v1/ranking') return await ranking(url, env);
+    if (p === '/api/mobile/v1/ranking/busca') {
+      // busca de piloto por nome (comparação personalizada): até 20, com o XP na mesma conta do app
+      const termo = (url.searchParams.get('nome') ?? '').trim().replace(/[%_]/g, '');
+      if (termo.length < 3) return json(400, { erro: 'Digite pelo menos 3 letras do nome.' });
+      await garantirTabela(env);
+      const r = await env.MOBILE_DB!.prepare(
+        `SELECT substr(chave, 8) id, json_extract(dados, '$.nome') nome,
+                json_extract(dados, '$.baterias') * 50 + json_extract(dados, '$.podios') * 50 + json_extract(dados, '$.vitorias') * 100
+                + json_extract(dados, '$.poles') * 50 + json_extract(dados, '$.voltasMaisRapidas') * 50 xp
+           FROM mobile_ranking WHERE chave LIKE 'piloto:%' AND json_extract(dados, '$.nome') LIKE ? ORDER BY xp DESC LIMIT 20`,
+      ).bind(`%${termo}%`).all<{ id: string; nome: string; xp: number }>();
+      return json(200, { pilotos: r.results ?? [] }, 300);
+    }
+    if (p === '/api/mobile/v1/ranking/karts') {
+      const r = await ler(env, 'ranking');
+      return json(200, { ...((r?.dados.kartsDoDia as object | undefined) ?? { dia: null, karts: [] }), atualizadoEm: r?.atualizadoEm ?? null }, 60);
+    }
     if (p === '/api/mobile/v1/ranking/me') {
       const cliente = await clienteDaSessao(request, env);
       if (!cliente) return json(404, { erro: 'Sua conta ainda não está ligada ao seu cadastro no kartódromo.' });

@@ -40,7 +40,9 @@ export interface CarreiraPiloto {
   /** XP e baterias por mês (mais recente primeiro, até 12) */
   xpMes?: { mes: string; xp: number; baterias: number; podios?: number; vitorias?: number }[];
   /** posição no ranking de XP: líder e quem está logo acima e abaixo */
-  comparativo?: { pos: number; de: number; lider: VizinhoXp | null; acima: VizinhoXp | null; abaixo: VizinhoXp | null };
+  comparativo?: { pos: number; de: number; lider: VizinhoXp | null; acima: VizinhoXp | null; abaixo: VizinhoXp | null; acimaLista?: VizinhoXp[] };
+  /** contagens completas da carreira (servidor) */
+  estatisticas?: { corridas: number; classificatorias: number; treinos: number; comTempo: number; noturnas: number; vitoriasChuva: number; maiorSequenciaVitorias: number; cheias: { corridas: number; vitorias: number; podios: number }; tracadosDiferentes: number };
   primeira: string | null;
   ultima: string | null;
   tracados: { nome: string; ms: number; dia: string; corridas: number; semana: PosicaoRanking | null; mes: PosicaoRanking | null; geral: PosicaoRanking | null }[];
@@ -48,7 +50,15 @@ export interface CarreiraPiloto {
   atualizadoEm: string;
 }
 
+export interface KartDoDia { kart: string; melhorMs: number | null; posVolta: number | null; melhorPos: number | null; corridas: { inicio: number; pos: number; piloto: string; ms: number | null; bateria: string; de: number }[] }
+
 export const rankingApi = {
+  kartsDoDia() {
+    return mobileRequest<{ dia: string | null; karts: KartDoDia[]; atualizadoEm: string | null }>('/api/mobile/v1/ranking/karts');
+  },
+  buscar(nome: string) {
+    return mobileRequest<{ pilotos: VizinhoXp[] }>(`/api/mobile/v1/ranking/busca?nome=${encodeURIComponent(nome)}`);
+  },
   ranking(periodo: PeriodoRanking, tracado?: string | null) {
     const q = new URLSearchParams({ periodo });
     if (tracado) q.set('tracado', tracado);

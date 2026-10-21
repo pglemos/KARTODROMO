@@ -229,6 +229,27 @@ export default function CarreiraPilotoTela({ id, aba = false }: { id: string; ab
             </Text>
           </Cartao>
         ) : null}
+        {eu ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+            {([
+              ['Meu progresso', 'results', '#2563EB', '/progresso'],
+              ['Conquistas', 'trophy', '#F59E0B', '/minhas-conquistas'],
+              ['Desafios', 'fire', '#DB2777', '/desafios'],
+              ['Minhas metas', 'target', '#16A34A', '/metas'],
+              ['Karts do dia', 'timer', '#7C3AED', '/karts'],
+              ['Modo piloto', 'gps', '#EA580C', '/cockpit'],
+            ] as const).map(([rotulo, icone, cor, rota]) => (
+              <Pressable key={rota} onPress={() => { tap(); router.push(rota as Href); }} accessibilityRole="button" accessibilityLabel={rotulo}
+                style={({ pressed }) => ({ width: '31%', flexGrow: 1, backgroundColor: palette.surface, borderRadius: 18, borderWidth: 1, borderColor: palette.borderSubtle, paddingVertical: 14, alignItems: 'center', gap: 8, transform: [{ scale: pressed ? 0.96 : 1 }] })}>
+                <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: cor, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name={icone} color="#FFFFFF" size={22} />
+                </View>
+                <Text style={{ color: palette.text, fontSize: 12, fontWeight: '800' }}>{rotulo}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+
         <Cartao titulo="Carreira" index={2}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 16 }}>
             {numeros.map((n) => (

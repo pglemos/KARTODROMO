@@ -40,6 +40,11 @@ export default function RootLayout() {
           <Stack.Screen name="reservations/[id]" options={{ headerShown: true }} />
           <Stack.Screen name="carrinho" options={{ headerShown: false }} />
           <Stack.Screen name="conquistas" options={{ headerShown: false }} />
+          <Stack.Screen name="progresso" options={{ headerShown: false }} />
+          <Stack.Screen name="minhas-conquistas" options={{ headerShown: false }} />
+          <Stack.Screen name="desafios" options={{ headerShown: false }} />
+          <Stack.Screen name="metas" options={{ headerShown: false }} />
+          <Stack.Screen name="karts" options={{ headerShown: false }} />
           <Stack.Screen name="ranking" options={{ headerShown: false }} />
           <Stack.Screen name="piloto/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="cockpit" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
