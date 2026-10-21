@@ -38,7 +38,7 @@ export interface CarreiraPiloto {
   semanasTop10?: number;
   mesesTop10?: number;
   /** XP e baterias por mês (mais recente primeiro, até 12) */
-  xpMes?: { mes: string; xp: number; baterias: number }[];
+  xpMes?: { mes: string; xp: number; baterias: number; podios?: number; vitorias?: number }[];
   /** posição no ranking de XP: líder e quem está logo acima e abaixo */
   comparativo?: { pos: number; de: number; lider: VizinhoXp | null; acima: VizinhoXp | null; abaixo: VizinhoXp | null };
   primeira: string | null;

@@ -53,6 +53,14 @@ export function conquistasDe(c: CarreiraPiloto): Conquista[] {
     { id: 'campeao', nome: 'Colecionador', descricao: '10 vitórias em corrida', icone: 'crown', cor: '#8B5CF6', atual: c.vitorias, meta: 10 },
     { id: 'pole', nome: 'Pole', descricao: 'Primeiro lugar numa tomada de tempo', icone: 'target', cor: '#00E676', atual: c.poles, meta: 1 },
     { id: 'relampago', nome: 'Relâmpago', descricao: 'Volta mais rápida de uma bateria', icone: 'bolt', cor: '#EC4899', atual: c.voltasMaisRapidas, meta: 1 },
+    { id: 'centuriao', nome: 'Centurião', descricao: '100 baterias na pista', icone: 'star', cor: '#F59E0B', atual: c.baterias, meta: 100 },
+    { id: 'lenda', nome: 'Lenda da pista', descricao: '500 baterias na pista', icone: 'crown', cor: '#EF4444', atual: c.baterias, meta: 500 },
+    { id: 'podios10', nome: 'Rei do pódio', descricao: '10 pódios em corrida', icone: 'medal', cor: '#F97316', atual: c.podios, meta: 10 },
+    { id: 'poles3', nome: 'Mestre da pole', descricao: '3 poles em tomada de tempo', icone: 'target', cor: '#22C55E', atual: c.poles, meta: 3 },
+    { id: 'relampago5', nome: 'Raio', descricao: '5 voltas mais rápidas', icone: 'bolt', cor: '#A855F7', atual: c.voltasMaisRapidas, meta: 5 },
+    { id: 'explorador', nome: 'Explorador', descricao: 'Correu em 3 traçados diferentes', icone: 'flag', cor: '#06B6D4', atual: c.tracados.length, meta: 3 },
+    { id: 'fiel', nome: 'Piloto da casa', descricao: '1 ano desde a primeira bateria', icone: 'fire', cor: '#EC4899', atual: c.primeira ? Math.floor((Date.now() - Date.parse(c.primeira)) / 86_400_000) : 0, meta: 365 },
+    { id: 'pro', nome: 'Profissional', descricao: 'Chegou à categoria PROFISSIONAL', icone: 'trophy', cor: '#8B5CF6', atual: xpDe(c), meta: CATEGORIAS.find((x) => x.nome === 'PROFISSIONAL')?.desde ?? 1 },
     { id: 'top10', nome: 'Top 10', descricao: 'Entre os 10 melhores tempos de um traçado (geral)', icone: 'crown', cor: '#F59E0B', atual: Number.isFinite(melhorGeral) && melhorGeral <= 10 ? 1 : 0, meta: 1 },
   ];
   return lista.map((x) => ({ ...x, atual: Math.min(x.atual, x.meta), liberada: x.atual >= x.meta }));

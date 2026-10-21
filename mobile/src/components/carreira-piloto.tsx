@@ -294,6 +294,41 @@ export default function CarreiraPilotoTela({ id, aba = false }: { id: string; ab
           </Cartao>
         ) : null}
 
+        {eu ? (() => {
+          const agora = new Date();
+          const mes = agora.toISOString().slice(0, 7);
+          const m = dados.xpMes?.find((x) => x.mes === mes);
+          const fim = new Date(agora.getFullYear(), agora.getMonth() + 1, 0);
+          const dias = Math.max(0, Math.ceil((fim.getTime() - agora.getTime()) / 86_400_000));
+          const nomeMes = MESES[agora.getMonth()];
+          const desafios = [
+            { cor: '#7C3AED', titulo: 'Maratonista do mês', texto: `Ande 6 baterias em ${nomeMes}`, feito: m?.baterias ?? 0, alvo: 6 },
+            { cor: '#B45309', titulo: 'Caçador de pódio', texto: `Suba ao pódio 2 vezes em ${nomeMes}`, feito: m?.podios ?? 0, alvo: 2 },
+            { cor: '#047857', titulo: 'Vencedor do mês', texto: `Vença uma corrida em ${nomeMes}`, feito: m?.vitorias ?? 0, alvo: 1 },
+          ];
+          return (
+            <Cartao titulo={`Desafios de ${nomeMes} · termina em ${dias} dia${dias === 1 ? '' : 's'}`} index={5}>
+              <View style={{ gap: 10 }}>
+                {desafios.map((d) => {
+                  const ok = d.feito >= d.alvo;
+                  return (
+                    <View key={d.titulo} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, backgroundColor: palette.surfaceElevated, borderLeftWidth: 4, borderLeftColor: d.cor }}>
+                      <View style={{ flex: 1, gap: 6 }}>
+                        <Text style={{ color: palette.text, fontWeight: '900' }}>{d.titulo}</Text>
+                        <Text style={{ color: palette.textMuted, fontSize: 12 }}>{d.texto}</Text>
+                        <View style={{ height: 6, borderRadius: 3, backgroundColor: palette.surface, overflow: 'hidden' }}>
+                          <View style={{ width: `${Math.min(100, (d.feito / d.alvo) * 100)}%`, height: 6, backgroundColor: ok ? palette.neonGreen : d.cor }} />
+                        </View>
+                      </View>
+                      <Text style={{ color: ok ? palette.neonGreen : palette.text, fontSize: 16, fontWeight: '900', fontVariant: ['tabular-nums'] }}>{ok ? '✓' : `${d.feito}/${d.alvo}`}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </Cartao>
+          );
+        })() : null}
+
         {dados.xpMes?.length ? (
           <Cartao titulo="XP por mês" index={5}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 120 }}>
