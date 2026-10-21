@@ -5,12 +5,13 @@
  */
 import { router, type Href } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { Animated, Easing, FlatList, Platform, Pressable, RefreshControl, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from './brand';
 import { Entrada, tap } from './motion';
 import { useUi } from './theme';
+import { useAgoraCrono } from '../features/live/api';
 import type { LiveCompetitor, LiveSession } from '../types/racing';
 
 const MEDALHA = ['#F59E0B', '#C0C7D1', '#CD7F32'];
@@ -30,6 +31,16 @@ function PontoAoVivo({ cor }: { cor: string }) {
       <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: cor }} />
     </View>
   );
+}
+
+const MONO = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' });
+
+/** tempo de prova com milésimos, no relógio da cronometragem */
+function RelogioMs({ inicio, reserva }: { inicio: number; reserva: string }) {
+  const agora = useAgoraCrono(50);
+  if (!Number.isFinite(inicio)) return <>{reserva}</>;
+  const ms = Math.max(0, agora - inicio);
+  return <>{Math.floor(ms / 3600000)}:{String(Math.floor((ms % 3600000) / 60000)).padStart(2, '0')}:{String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}.{String(ms % 1000).padStart(3, '0')}</>;
 }
 
 /** seta que aparece por 4 s quando a posição muda */
@@ -64,19 +75,25 @@ function Linha({ c, ganhou, index, maisRapida }: { c: LiveCompetitor; ganhou: nu
         </View>
         <View style={{ flex: 1, gap: 6 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text numberOfLines={1} style={{ flex: 1, color: palette.text, fontSize: 16, fontWeight: '800' }}>#{c.kartNumber} {c.name}</Text>
-            <Text style={{ color: palette.textMuted, fontSize: 11, fontWeight: '700' }}>VOLTA <Text style={{ color: palette.text, fontSize: 15, fontWeight: '900' }}>{c.currentLap}</Text></Text>
+            <View style={{ flex: 1 }}>
+              <Text numberOfLines={1} style={{ color: palette.text, fontSize: 16, fontWeight: '900', fontFamily: MONO }}>#{c.kartNumber} {/^kart\s*\d+$/i.test(c.name.trim()) ? '' : c.name.toUpperCase()}</Text>
+              <Text style={{ color: palette.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }}>{c.category}</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={{ color: palette.textMuted, fontSize: 10, fontWeight: '800', fontFamily: MONO }}>VOLTA</Text>
+              <Text style={{ color: palette.text, fontSize: 20, fontWeight: '900', fontFamily: MONO, fontVariant: ['tabular-nums'] }}>{c.currentLap}</Text>
+            </View>
           </View>
           <View style={{ flexDirection: 'row', gap: 6 }}>
             {[
-              { r: 'ÚLTIMA', v: c.lastLapTime, cor: palette.text },
-              { r: c.bestLapNumber ? `MELHOR · V${c.bestLapNumber}` : 'MELHOR', v: c.bestLapTime, cor: maisRapida ? '#FFFFFF' : palette.text, fundo: maisRapida ? palette.purpleNeon : undefined },
-              { r: 'DIF.', v: c.position === 1 ? '—' : c.diffPrev, cor: palette.textSecondary },
-              { r: 'LÍDER', v: c.position === 1 ? 'LÍDER' : c.diffLeader, cor: c.position === 1 ? palette.accent : palette.textSecondary },
+              { r: 'ÚLTIMA VOLTA', v: c.lastLapTime, cor: palette.text },
+              { r: 'MELHOR VOLTA', v: c.bestLapNumber ? `V${c.bestLapNumber} ${c.bestLapTime}` : c.bestLapTime, cor: maisRapida ? '#FFFFFF' : palette.text, fundo: maisRapida ? palette.purpleNeon : undefined },
+              { r: 'DIFF', v: c.position === 1 ? '—' : c.diffPrev, cor: palette.textSecondary },
+              { r: 'DIF. LÍDER', v: c.position === 1 ? 'LÍDER' : c.diffLeader, cor: c.position === 1 ? palette.accent : palette.textSecondary },
             ].map((x) => (
               <View key={x.r} style={{ flex: 1, paddingVertical: 3, paddingHorizontal: 4, borderRadius: 6, backgroundColor: x.fundo }}>
                 <Text numberOfLines={1} style={{ color: x.fundo ? '#FFFFFF' : palette.textMuted, fontSize: 9, fontWeight: '800', letterSpacing: 0.5 }}>{x.r}</Text>
-                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ color: x.cor, fontSize: 13, fontWeight: '800', fontVariant: ['tabular-nums'] }}>{x.v}</Text>
+                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ color: x.cor, fontSize: 14, fontWeight: '800', fontFamily: MONO, fontVariant: ['tabular-nums'] }}>{x.v}</Text>
               </View>
             ))}
           </View>
@@ -117,7 +134,7 @@ export function AoVivoReal({ session, onRefresh }: { session: LiveSession; onRef
               <Text accessibilityRole="header" style={[styles.title, { flex: 1 }]}>Ao vivo</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: aoVivo ? 'rgba(239,68,68,0.15)' : palette.surface }}>
                 {aoVivo ? <PontoAoVivo cor={palette.neonRed} /> : <Icon name="flag" color={palette.textSecondary} size={14} />}
-                <Text style={{ color: aoVivo ? palette.neonRed : palette.textSecondary, fontWeight: '800', fontSize: 13, fontVariant: ['tabular-nums'] }}>{aoVivo ? session.elapsedTime : 'Encerrada'}</Text>
+                <Text style={{ color: aoVivo ? palette.neonRed : palette.textSecondary, fontWeight: '800', fontSize: 13, fontVariant: ['tabular-nums'] }}>{aoVivo ? <RelogioMs inicio={Date.parse(session.id)} reserva={session.elapsedTime} /> : 'Encerrada'}</Text>
               </View>
             </View>
             <View>
@@ -125,15 +142,15 @@ export function AoVivoReal({ session, onRefresh }: { session: LiveSession; onRef
               <Text style={{ color: palette.textMuted, fontSize: 13, marginTop: 2 }}>{session.subtitle} · {session.competitors.length} pilotos</Text>
             </View>
             {session.fastestLap ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 18, backgroundColor: 'rgba(139,92,246,0.18)', borderWidth: 1, borderColor: 'rgba(139,92,246,0.45)' }}>
-                <Icon name="bolt" color={palette.purpleNeon} size={22} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 18, backgroundColor: palette.purpleNeon }}>
+                <Icon name="bolt" color="#FFFFFF" size={22} />
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: palette.purpleNeon, fontSize: 12, fontWeight: '800', letterSpacing: 1 }}>VOLTA MAIS RÁPIDA</Text>
-                  <Text numberOfLines={1} style={{ color: palette.text, fontSize: 15, fontWeight: '700', marginTop: 2 }}>{session.fastestLap.name} · Kart {session.fastestLap.competitorNumber}</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '800', letterSpacing: 1, fontFamily: MONO }}>VOLTA MAIS RÁPIDA</Text>
+                  <Text numberOfLines={1} style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '800', marginTop: 2, fontFamily: MONO }}>#{session.fastestLap.competitorNumber} {/^kart\s*\d+$/i.test(session.fastestLap.name.trim()) ? '' : session.fastestLap.name.toUpperCase()}</Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={{ color: palette.text, fontSize: 20, fontWeight: '900', fontVariant: ['tabular-nums'] }}>{session.fastestLap.time}</Text>
-                  <Text style={{ color: palette.textMuted, fontSize: 11 }}>volta {session.fastestLap.lapNumber}</Text>
+                  <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '900', fontFamily: MONO, fontVariant: ['tabular-nums'] }}>{session.fastestLap.time}</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11, fontFamily: MONO }}>NA VOLTA {session.fastestLap.lapNumber}</Text>
                 </View>
               </View>
             ) : null}
