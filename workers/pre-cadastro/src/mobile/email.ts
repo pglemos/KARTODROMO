@@ -47,22 +47,32 @@ export function mobileEmailLink(env: MobileEmailEnv, purpose: MobileEmailPurpose
 }
 
 const LOGO = 'https://reservas.kartodromodebetim.com.br/kib-logo-escuro.png';
+const KART = 'https://reservas.kartodromodebetim.com.br/email-kart.gif';
 const xadrez = (inverte: boolean) => Array.from({ length: 45 }, (_, i) => `<td height="10" style="background:${(i + (inverte ? 1 : 0)) % 2 ? '#ffffff' : '#0b0b0d'};font-size:0;line-height:0">&nbsp;</td>`).join('');
 
 /** E-mail da conta com a cara do kartódromo: logo, faixa xadrez de bandeirada, botão dourado e os atalhos do app. */
-function conteudo(purpose: MobileEmailPurpose, link: string) {
+export function conteudo(purpose: MobileEmailPurpose, link: string) {
   const verificar = purpose === 'verify';
-  const subject = verificar ? '🏁 Confirme seu e-mail e acelere · Kartódromo de Betim' : '🔑 Crie uma nova senha · Kartódromo de Betim';
-  const acao = verificar ? 'Confirmar meu e-mail' : 'Criar nova senha';
-  const titulo = verificar ? 'Falta só uma volta!' : 'Vamos trocar sua senha';
+  const subject = verificar ? '🏁 Seu kart está no grid — falta só a largada!' : '🔧 Pit stop: crie sua nova senha · Kartódromo de Betim';
+  const acao = verificar ? 'Confirmar e acelerar 🏎️' : 'Criar nova senha';
+  const titulo = verificar ? 'Motor ligado. Falta a largada!' : 'Pit stop rápido';
   const intro = verificar
-    ? 'Sua conta no app do Kartódromo Internacional de Betim está quase pronta. Confirme seu e-mail para reservar baterias, acompanhar a corrida ao vivo, ver seus resultados e montar sua carreira de piloto.'
-    : 'Recebemos um pedido para trocar a senha da sua conta no app do Kartódromo Internacional de Betim. Toque no botão para escolher uma senha nova.';
+    ? 'Bem-vindo ao Kartódromo Internacional de Betim! Sua conta já está aquecendo os pneus no grid. Confirme seu e-mail e libere tudo: reserve baterias em segundos, acompanhe cada volta ao vivo e construa sua carreira de piloto — com XP, conquistas e categorias de Novato a Lenda.'
+    : 'Recebemos um pedido para trocar a senha da sua conta. É rapidinho: toque no botão, escolha uma senha nova e volte para a pista em segundos.';
   const fim = verificar ? 'Se você não criou esta conta, é só ignorar este e-mail.' : 'Se não foi você, ignore este e-mail: sua senha continua a mesma.';
   const vantagens = verificar
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 26px"><tr>${[['🏎️', 'Reserve sua bateria'], ['⏱️', 'Tempos ao vivo'], ['🏆', 'Ranking e carreira']]
       .map(([e, t]) => `<td align="center" width="32%" style="padding:12px 4px;background:#17171b;border-radius:14px;font-size:12px;color:#d4d4d8"><div style="font-size:22px;line-height:30px">${e}</div>${t}</td>`)
       .join('<td width="2%"></td>')}</tr></table>`
+    : '';
+  // desafio e escada de categorias: um gostinho do que vem depois da confirmação
+  const categorias = verificar
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:26px 0 0;background:#141418;border-radius:16px"><tr><td style="padding:18px 18px 16px">
+<p style="margin:0 0 10px;font-size:12px;font-weight:800;letter-spacing:.14em;color:#f59e0b">🔥 SEU DESAFIO DE ESTREIA</p>
+<p style="margin:0 0 14px;font-size:14px;line-height:1.55;color:#d4d4d8">Confirme, reserve sua primeira bateria e tente entrar no <b style="color:#ffffff">top 10 da semana</b>. Cada bateria vale XP — e cada pódio te leva mais perto do topo.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${[['NOVATO', '#9ca3af'], ['AMADOR', '#22c55e'], ['SEMI-PRO', '#3b82f6'], ['PRO', '#a855f7'], ['LENDA', '#f59e0b']]
+      .map(([n, c], i) => `<td align="center" style="padding:7px 2px;border-radius:999px;background:${i === 0 ? c : '#1f1f25'};color:${i === 0 ? '#000000' : c};font-size:10px;font-weight:900;letter-spacing:.06em">${n}</td>`).join('<td width="4" style="font-size:10px;color:#3f3f46">›</td>')}</tr></table>
+<p style="margin:10px 0 0;font-size:12px;color:#71717a">Você começa aqui ⬆️ Até onde vai chegar?</p></td></tr></table>`
     : '';
   const href = link.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
   const text = `${titulo}\n\n${intro}\n\n${acao}: ${link}\n\nO link vale por 30 minutos. ${fim}\n\nKartódromo Internacional de Betim`;
@@ -71,6 +81,7 @@ function conteudo(purpose: MobileEmailPurpose, link: string) {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#000000"><tr><td align="center" style="padding:24px 12px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:540px;background:#0b0b0d;border-radius:24px;overflow:hidden;border:1px solid #26262b">
 <tr><td align="center" style="padding:30px 24px 24px"><img src="${LOGO}" width="240" alt="Kartódromo Internacional de Betim" style="display:block;width:240px;max-width:80%;height:auto;border:0"></td></tr>
+<tr><td style="line-height:0;font-size:0"><img src="${KART}" width="540" alt="Kart em alta velocidade com as rodas pegando fogo" style="display:block;width:100%;max-width:540px;height:auto;border:0"></td></tr>
 <tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed"><tr>${xadrez(false)}</tr><tr>${xadrez(true)}</tr></table></td></tr>
 <tr><td style="padding:32px 28px 8px">
 <p style="margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:.18em;color:#f59e0b">APP DO PILOTO</p>
@@ -79,10 +90,11 @@ function conteudo(purpose: MobileEmailPurpose, link: string) {
 ${vantagens}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="border-radius:999px;background:#f59e0b">
 <a href="${href}" style="display:block;padding:17px 24px;font-size:17px;font-weight:900;color:#000000;text-decoration:none;border-radius:999px">${acao} →</a></td></tr></table>
-<p style="margin:18px 0 0;font-size:13px;line-height:1.5;color:#71717a;text-align:center">O link vale por 30 minutos. ${fim}</p>
+<p style="margin:18px 0 0;font-size:13px;line-height:1.5;color:#71717a;text-align:center">⏱️ O link vale por 30 minutos. ${fim}</p>
+${categorias}
 </td></tr>
 <tr><td style="padding:26px 28px 30px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #26262b"><tr><td style="padding-top:18px;font-size:12px;line-height:1.6;color:#71717a;text-align:center">
-Kartódromo Internacional de Betim · Betim/MG<br>E-mail automático do app. Não precisa responder.</td></tr></table></td></tr>
+<b style="color:#a1a1aa">Nos vemos na pista! 🏁</b><br>Kartódromo Internacional de Betim · Betim/MG<br>E-mail automático do app. Não precisa responder.</td></tr></table></td></tr>
 </table></td></tr></table></body></html>`;
   return { subject, text, html };
 }

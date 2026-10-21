@@ -189,7 +189,7 @@ describe('fila dos e-mails de conta (enviada pela cronometragem)', () => {
     expect((await callWorker('/api/mobile/v1/internal/outbox')).status).toBe(401);
     const fila = await (await callWorker('/api/mobile/v1/internal/outbox', 'GET', undefined, { 'x-mobile-publish-token': PUBLISH_TOKEN })).json() as { id: string; to: string; subject: string; text: string }[];
     expect(fila).toHaveLength(1);
-    expect(fila[0]).toMatchObject({ to: email, subject: expect.stringContaining('Confirme seu e-mail') });
+    expect(fila[0]).toMatchObject({ to: email, subject: expect.stringContaining('falta só a largada') });
     expect(fila[0].text).toContain('https://reservas.kartodromodebetim.com.br/conta?acao=verificar&token=');
     // pega de novo dentro de 2 min: não repete o que já está sendo enviado
     expect(await (await callWorker('/api/mobile/v1/internal/outbox', 'GET', undefined, { 'x-mobile-publish-token': PUBLISH_TOKEN })).json()).toEqual([]);
