@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { Image, Linking, Pressable, Text, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Image, Linking, Platform, Pressable, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 
 import { reservationsApi } from '../../features/reservations/api';
@@ -8,6 +9,44 @@ import type { ReservationOrder, ReservationStatus } from '../../features/reserva
 import { ActionButton, formatBrl, formatDateTime, InlineError, LoadingMessage, Page, PageHeader, Panel, useUi } from '../../features/reservations/components';
 import { useSession } from '../../session/provider';
 import { SessionBoundary } from '../../session/boundary';
+import { Icon } from '../../components/brand';
+import { tap } from '../../components/motion';
+
+const PAGO: ReservationStatus[] = ['pago', 'confirmado'];
+const RUIM: ReservationStatus[] = ['recusado', 'expirado', 'erro_pagamento', 'pago_sem_vaga'];
+
+/** selo do status: círculo colorido que entra com mola a cada mudança de status */
+function SeloStatus({ status }: { status: ReservationStatus }) {
+  const { palette } = useUi();
+  const [escala] = useState(() => new Animated.Value(0.6));
+  useEffect(() => {
+    escala.setValue(0.6);
+    Animated.spring(escala, { toValue: 1, friction: 4, tension: 120, useNativeDriver: Platform.OS !== 'web' }).start();
+  }, [escala, status]);
+  const pago = PAGO.includes(status), ruim = RUIM.includes(status);
+  const cor = pago ? palette.neonGreen : ruim ? palette.neonRed : palette.accent;
+  return (
+    <Animated.View style={{ alignSelf: 'center', width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center', backgroundColor: cor + '26', borderWidth: 2, borderColor: cor, transform: [{ scale: escala }], marginBottom: 14 }}>
+      <Icon name={pago ? 'check' : ruim ? 'close' : 'timer'} color={cor} size={40} />
+    </Animated.View>
+  );
+}
+
+/** contagem regressiva até o Pix expirar */
+function Contagem({ ate }: { ate: string }) {
+  const { palette } = useUi();
+  const [agora, setAgora] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setAgora(Date.now()), 1000); return () => clearInterval(t); }, []);
+  const resta = Math.max(0, new Date(ate).getTime() - agora);
+  const min = Math.floor(resta / 60000), seg = Math.floor((resta % 60000) / 1000);
+  const urgente = resta < 5 * 60000;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: urgente ? 'rgba(239,68,68,0.15)' : palette.surfaceElevated }}>
+      <Icon name="timer" color={urgente ? palette.neonRed : palette.textSecondary} size={16} />
+      <Text style={{ color: urgente ? palette.neonRed : palette.text, fontWeight: '800', fontVariant: ['tabular-nums'] }}>{resta ? `Pague em ${min}:${String(seg).padStart(2, '0')}` : 'Prazo encerrado'}</Text>
+    </View>
+  );
+}
 
 function statusLabel(status: ReservationStatus) {
   return {
@@ -51,6 +90,20 @@ function ReservationDetailContent() {
     if (session) void Promise.resolve().then(load);
   }, [load, session]);
 
+  // enquanto espera o pagamento, confere sozinho a cada 5 s; quando o Pix cai, vibra de sucesso
+  const aguardando = order?.status === 'aguardando_pagamento' || Boolean(order?.preparandoPagamento);
+  useEffect(() => {
+    if (!aguardando) return;
+    const t = setInterval(() => void load(), 5000);
+    return () => clearInterval(t);
+  }, [aguardando, load]);
+  const statusAntes = useRef<ReservationStatus | null>(null);
+  useEffect(() => {
+    const st = order?.status ?? null;
+    if (statusAntes.current === 'aguardando_pagamento' && st && PAGO.includes(st) && Platform.OS !== 'web') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+    statusAntes.current = st;
+  }, [order?.status]);
+
   function refresh() {
     setLoading(true);
     setError('');
@@ -61,7 +114,9 @@ function ReservationDetailContent() {
     if (!order?.pix?.payload) return;
     try {
       await Clipboard.setStringAsync(order.pix.payload);
+      tap();
       setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
     } catch {
       setError('Não foi possível copiar o código Pix. Você pode selecioná-lo e copiar manualmente.');
     }
@@ -100,6 +155,7 @@ function ReservationDetailContent() {
   const pix = order.status === 'aguardando_pagamento' ? order.pix : null;
   return (
     <Page top={false}>
+      <SeloStatus status={order.status} />
       <Text style={[styles.muted, { marginBottom: 8 }]}>Pedido {order.codigo}</Text>
       <PageHeader title={statusLabel(order.status)} description={order.descricao ?? 'Sua reserva está sendo preparada pelo servidor do kartódromo.'} />
       <Panel style={{ gap: 9, marginBottom: 14 }}>
@@ -108,7 +164,7 @@ function ReservationDetailContent() {
         <Text style={{ color: palette.text, fontSize: 24, fontWeight: '900', marginTop: 5 }}>
           {order.valorCentavos === null ? 'Valor em confirmação' : formatBrl(order.valorCentavos)}
         </Text>
-        {order.expiraEm && order.status === 'aguardando_pagamento' ? <Text style={styles.muted}>Pague até {formatDateTime(order.expiraEm)}.</Text> : null}
+        {order.expiraEm && order.status === 'aguardando_pagamento' ? <View style={{ marginTop: 6 }}><Contagem ate={order.expiraEm} /></View> : null}
       </Panel>
 
       {order.preparandoPagamento ? <Panel style={{ marginBottom: 14 }}><Text style={styles.muted}>Estamos preparando as instruções de pagamento. Atualize o pedido em alguns instantes.</Text></Panel> : null}
@@ -117,10 +173,11 @@ function ReservationDetailContent() {
       {pix ? (
         <Panel style={{ alignItems: 'center', gap: 13, marginTop: 14 }}>
           <Text style={{ color: palette.text, fontSize: 16, fontWeight: '800' }}>Pague com Pix</Text>
-          {pix.imagem ? <Image accessibilityLabel="QR Code Pix" source={{ uri: imageUri(pix.imagem) }} resizeMode="contain" style={{ width: 210, height: 210, backgroundColor: '#FFFFFF' }} /> : null}
+          {pix.imagem ? <Image accessibilityLabel="QR Code Pix" source={{ uri: imageUri(pix.imagem) }} resizeMode="contain" style={{ width: 220, height: 220, backgroundColor: '#FFFFFF', borderRadius: 16 }} /> : null}
+          <Text style={[styles.muted, { textAlign: 'center' }]}>Abra o app do seu banco, escolha Pix e leia o QR Code — ou copie o código abaixo. A confirmação aparece aqui sozinha.</Text>
           <Text style={[styles.muted, { alignSelf: 'stretch' }]}>Pix copia e cola</Text>
-          <Text selectable style={{ color: palette.text, fontSize: 14, lineHeight: 18, alignSelf: 'stretch' }}>{pix.payload}</Text>
-          <ActionButton label={copied ? 'Código Pix copiado' : 'Copiar código Pix'} onPress={() => void copyPix()} secondary />
+          <Text selectable numberOfLines={3} style={{ color: palette.textSecondary, fontSize: 13, lineHeight: 18, alignSelf: 'stretch', padding: 10, borderRadius: 12, backgroundColor: palette.surfaceElevated }}>{pix.payload}</Text>
+          <ActionButton label={copied ? '✓ Código copiado' : 'Copiar código Pix'} onPress={() => void copyPix()} />
         </Panel>
       ) : null}
       {order.status === 'aguardando_pagamento' && order.forma === 'cartao' && order.invoiceUrl ? (

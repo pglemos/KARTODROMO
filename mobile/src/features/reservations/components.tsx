@@ -3,6 +3,7 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollVie
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useUi } from '../../components/theme';
+import { ListaEsqueleto } from '../../components/motion';
 import { Icon } from '../../components/brand';
 export { useUi } from '../../components/theme';
 

@@ -11,7 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from './brand';
 import { FotoPiloto } from './foto-piloto';
-import { Entrada, tap } from './motion';
+import { Entrada, tap, ListaEsqueleto } from './motion';
 import { RegrasRanking } from './ranking-regras';
 import { useUi } from './theme';
 import { MobileApiError } from '../api/client';
@@ -129,7 +129,7 @@ export default function CarreiraPilotoTela({ id }: { id: string }) {
       <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
         <View style={{ paddingHorizontal: 16 }}>
           {topo}
-          {carregando ? <Text style={{ color: palette.textMuted, marginTop: 24 }}>Carregando carreira…</Text> : null}
+          {carregando ? <ListaEsqueleto itens={4} altura={96} rotulo="Carregando carreira" /> : null}
           {!carregando && erro ? (
             <View style={{ marginTop: 24, gap: 14 }}>
               <Text style={{ color: palette.textSecondary, fontSize: 16, lineHeight: 23 }}>{erro}</Text>

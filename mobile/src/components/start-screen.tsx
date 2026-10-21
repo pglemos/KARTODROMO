@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Brand, Icon } from './brand';
 import { Entrada, tap } from './motion';
+import { ProximaReserva } from './proxima-reserva';
 import { useUi } from './theme';
 import { useLiveSession } from '../features/live/api';
 import { useSession } from '../session/provider';
@@ -46,6 +47,7 @@ export default function StartScreen() {
       </ImageBackground>
 
       <View style={{ paddingHorizontal: 20, marginTop: -14, gap: 14, width: '100%', maxWidth: 600, alignSelf: 'center' }}>
+        <ProximaReserva />
         <Entrada index={0}>
         <Pressable onPress={() => { tap(); router.push('/(tabs)/livetime'); }} accessibilityRole="button"
           style={({ pressed }) => ({ backgroundColor: palette.surface, borderRadius: 20, borderWidth: 1, borderColor: aoVivo ? palette.neonRed : palette.border, padding: 18, opacity: pressed ? 0.85 : 1 })}>

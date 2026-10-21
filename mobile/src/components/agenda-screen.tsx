@@ -20,7 +20,7 @@ import { formatDateTime } from '../features/reservations/components';
 import { useSession } from '../session/provider';
 import { AgendaSlot } from '../types/racing';
 import { Brand } from './brand';
-import { Entrada, tap } from './motion';
+import { Entrada, tap, ListaEsqueleto } from './motion';
 import { CartModal } from './cart-modal';
 import { FloatingCartBar } from './floating-cart-bar';
 import { SportsIcon } from './sports-icons';
@@ -225,7 +225,7 @@ export function AgendaScreen({
             ) : null}
           </View>
 
-          {!customSlots && apiSlots === null && !apiError && <Text style={styles.statusText}>Carregando horários…</Text>}
+          {!customSlots && apiSlots === null && !apiError && <ListaEsqueleto itens={5} altura={92} rotulo="Carregando horários" />}
           {!apiError && apiSlots !== null && activeSlots.length === 0 && <Text style={styles.statusText}>Nenhum horário disponível nesta data.</Text>}
 
           {/* 5. Battery Slots Cards (Matches IMG_3793.PNG) */}

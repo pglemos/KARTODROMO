@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from './brand';
 import { FotoPiloto } from './foto-piloto';
-import { Entrada, tap } from './motion';
+import { Entrada, tap, ListaEsqueleto } from './motion';
 import { useUi } from './theme';
 import { formatarDia, formatarVolta, rankingApi, type LinhaRanking, type PeriodoRanking, type RankingResponse } from '../features/ranking/api';
 import { nomeBonito } from '../features/ranking/gamificacao';
@@ -170,7 +170,7 @@ export default function RankingReal() {
                 {periodo === 'geral' ? 'Todos os tempos' : `${formatarDia(dados.de)} a ${formatarDia(dados.ate ?? dados.de)}`} · {dados.linhas.length} melhores tempos
               </Text>
             ) : null}
-            {carregando && !dados ? <Text style={{ color: palette.textMuted, marginTop: 24 }}>Carregando ranking…</Text> : null}
+            {carregando && !dados ? <ListaEsqueleto itens={8} altura={60} rotulo="Carregando ranking" /> : null}
             {erro && !dados ? (
               <View style={{ marginTop: 24, gap: 12 }}>
                 <Text style={{ color: palette.danger }}>{erro}</Text>
