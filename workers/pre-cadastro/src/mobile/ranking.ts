@@ -13,6 +13,28 @@ import { authenticateMobileRequest, type MobileAuthEnv } from './auth';
 export interface MobileRankingEnv extends MobileAuthEnv {
   MOBILE_DB?: D1Database;
   MOBILE_ADMIN_TOKEN?: string;
+  PRE?: R2Bucket;
+}
+
+// foto do piloto (enviada pelo próprio app): JPEG de até 1,5 MB no R2, em fotos-app/<cliente>.jpg
+const FOTO_MAX = 1_500_000;
+const fotoChave = (cliente: string) => `fotos-app/${cliente}.jpg`;
+
+async function enviarFoto(request: Request, env: MobileRankingEnv, cliente: string) {
+  if (!env.PRE) return json(503, { erro: 'Serviço temporariamente indisponível.' });
+  if (request.headers.get('content-type') !== 'image/jpeg') return json(415, { erro: 'Envie a foto em JPEG.' });
+  if (Number(request.headers.get('content-length') ?? 0) > FOTO_MAX) return json(413, { erro: 'A foto é grande demais.' });
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  // começo de todo JPEG: FF D8 FF
+  if (bytes.length < 100 || bytes.length > FOTO_MAX || bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[2] !== 0xff) return json(400, { erro: 'Arquivo de imagem inválido.' });
+  await env.PRE.put(fotoChave(cliente), bytes, { httpMetadata: { contentType: 'image/jpeg' }, customMetadata: { enviadaEm: new Date().toISOString() } });
+  return json(200, { ok: true, versao: Date.now() });
+}
+
+async function lerFoto(env: MobileRankingEnv, cliente: string) {
+  const obj = env.PRE ? await env.PRE.get(fotoChave(cliente)) : null;
+  if (!obj) return new Response(null, { status: 404, headers: { 'cache-control': 'public, max-age=300' } });
+  return new Response(obj.body, { headers: { 'content-type': 'image/jpeg', 'cache-control': 'public, max-age=300', etag: obj.httpEtag } });
 }
 
 const json = (status: number, body: unknown, maxAge = 0) => new Response(JSON.stringify(body), {
@@ -114,7 +136,16 @@ export async function handleMobileRanking(request: Request, env: MobileRankingEn
   const p = url.pathname;
   try {
     if (p === '/api/mobile/v1/internal/ranking') return request.method === 'POST' ? await receber(request, env) : json(405, { erro: 'Método não permitido.' });
+    if (p === '/api/mobile/v1/ranking/me/foto') {
+      const cliente = await clienteDaSessao(request, env);
+      if (!cliente) return json(404, { erro: 'Sua conta ainda não está ligada ao seu cadastro no kartódromo.' });
+      if (request.method === 'PUT') return await enviarFoto(request, env, cliente);
+      if (request.method === 'DELETE') { await env.PRE?.delete(fotoChave(cliente)); return json(200, { ok: true }); }
+      return json(405, { erro: 'Método não permitido.' });
+    }
     if (request.method !== 'GET') return json(405, { erro: 'Método não permitido.' });
+    const mf = /^\/api\/mobile\/v1\/ranking\/pilotos\/(\d{1,12})\/foto$/.exec(p);
+    if (mf) return await lerFoto(env, mf[1]);
     if (p === '/api/mobile/v1/ranking') return await ranking(url, env);
     if (p === '/api/mobile/v1/ranking/me') {
       const cliente = await clienteDaSessao(request, env);

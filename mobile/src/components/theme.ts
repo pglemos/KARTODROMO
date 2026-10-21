@@ -97,19 +97,17 @@ function createStyles(palette: ThemePalette) {
     header: { marginBottom: 24 },
     title: {
       color: palette.text,
-      fontSize: 26,
-      lineHeight: 32,
+      fontSize: 34,
+      lineHeight: 40,
       fontWeight: '800',
-      letterSpacing: 0.5,
-      textTransform: 'uppercase',
+      letterSpacing: -0.6,
     },
     sectionTitle: {
       color: palette.text,
-      fontSize: 18,
-      lineHeight: 24,
+      fontSize: 22,
+      lineHeight: 28,
       fontWeight: '800',
-      letterSpacing: 0.5,
-      textTransform: 'uppercase',
+      letterSpacing: -0.3,
     },
     description: {
       color: palette.muted,
@@ -208,12 +206,11 @@ function createStyles(palette: ThemePalette) {
     // Inputs & Forms
     field: { gap: 0 },
     fieldLabel: {
-      color: palette.text,
-      fontSize: 14,
-      fontWeight: '700',
+      fontSize: 13,
+      fontWeight: '600',
       marginBottom: 8,
-      textTransform: 'uppercase',
-      letterSpacing: 0.4,
+      color: palette.textSecondary,
+      letterSpacing: 0.1,
     },
     fieldHint: { marginTop: 6 },
     input: {

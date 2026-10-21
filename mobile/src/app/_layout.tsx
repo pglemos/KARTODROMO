@@ -37,6 +37,7 @@ export default function RootLayout() {
           <Stack.Screen name="conquistas" options={{ headerShown: false }} />
           <Stack.Screen name="ranking" options={{ headerShown: false }} />
           <Stack.Screen name="piloto/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="cockpit" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
         </Stack>
         </View>
         {DEMO_MODE && !realDataRoute && (

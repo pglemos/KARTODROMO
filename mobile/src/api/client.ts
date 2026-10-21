@@ -6,7 +6,7 @@ import type {
 } from './contracts';
 import { readSession } from '../session/secure-storage';
 
-const API_BASE_URL = (
+export const API_BASE_URL = (
   process.env.EXPO_PUBLIC_API_URL ?? 'https://reservas.kartodromodebetim.com.br'
 ).replace(/\/$/, '');
 const AUTH = '/api/mobile/v1/auth';
@@ -22,7 +22,7 @@ export class MobileApiError extends Error {
 }
 
 export interface MobileRequestOptions {
-  method?: 'GET' | 'POST';
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: unknown;
   accessToken?: string;
   idempotencyKey?: string;

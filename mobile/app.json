@@ -53,6 +53,14 @@
           "isAndroidForegroundServiceEnabled": false,
           "isIosBackgroundLocationEnabled": false
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permita escolher uma foto para o seu perfil de piloto.",
+          "cameraPermission": "Permita tirar uma foto para o seu perfil de piloto.",
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {

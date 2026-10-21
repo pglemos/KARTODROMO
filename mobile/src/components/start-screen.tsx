@@ -67,6 +67,10 @@ export default function StartScreen() {
                   <Text style={{ color: palette.textSecondary, fontSize: 15, fontVariant: ['tabular-nums'] }}>{d.best || '—'}</Text>
                 </View>
               ))}
+              <Pressable onPress={() => { tap(); router.push('/cockpit' as Href); }} accessibilityRole="button" style={({ pressed }) => ({ marginTop: 14, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: palette.neonRed, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, transform: [{ scale: pressed ? 0.95 : 1 }] })}>
+                <Icon name="timer" color="#FFFFFF" size={16} />
+                <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>Abrir meu cockpit</Text>
+              </Pressable>
             </>
           ) : (
             <Text style={{ color: palette.textSecondary, fontSize: 15, marginTop: 8 }}>

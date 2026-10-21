@@ -9,10 +9,11 @@ import { Animated, Easing, FlatList, Pressable, RefreshControl, ScrollView, Text
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from './brand';
+import { FotoPiloto } from './foto-piloto';
 import { Entrada, tap } from './motion';
 import { useUi } from './theme';
 import { formatarDia, formatarVolta, rankingApi, type LinhaRanking, type PeriodoRanking, type RankingResponse } from '../features/ranking/api';
-import { iniciais, nomeBonito } from '../features/ranking/gamificacao';
+import { nomeBonito } from '../features/ranking/gamificacao';
 import { RegrasRanking } from './ranking-regras';
 
 const PERIODOS: { id: PeriodoRanking; nome: string }[] = [
@@ -45,14 +46,6 @@ function SeletorPeriodo({ valor, onChange }: { valor: PeriodoRanking; onChange(p
   );
 }
 
-function Avatar({ nome, tamanho = 44, cor, claro = true }: { nome: string; tamanho?: number; cor: string; claro?: boolean }) {
-  return (
-    <View style={{ width: tamanho, height: tamanho, borderRadius: tamanho / 2, backgroundColor: cor, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ color: claro ? '#000000' : '#FFFFFF', fontWeight: '900', fontSize: tamanho * 0.36 }}>{iniciais(nome)}</Text>
-    </View>
-  );
-}
-
 /** os três primeiros lado a lado, o 1º mais alto, com subida animada */
 function Podio({ linhas }: { linhas: LinhaRanking[] }) {
   const { palette } = useUi();
@@ -67,7 +60,7 @@ function Podio({ linhas }: { linhas: LinhaRanking[] }) {
         return (
           <Pressable key={l.pos} disabled={!l.id} onPress={() => { tap(); router.push(`/piloto/${l.id}` as Href); }} style={{ flex: 1, alignItems: 'center' }}
             accessibilityRole="button" accessibilityLabel={`${l.pos}º lugar, ${nomeBonito(l.nome)}, ${formatarVolta(l.ms)}`}>
-            <Avatar nome={l.nome} tamanho={l.pos === 1 ? 58 : 48} cor={COR_PODIO[l.pos - 1]} />
+            <FotoPiloto id={l.id} nome={l.nome} tamanho={l.pos === 1 ? 58 : 48} cor={COR_PODIO[l.pos - 1]} />
             <Text numberOfLines={2} style={{ color: palette.text, fontWeight: '800', fontSize: 13, textAlign: 'center', marginTop: 6, minHeight: 34 }}>{nomeBonito(l.nome)}</Text>
             <Text style={{ color: palette.textSecondary, fontSize: 13, fontVariant: ['tabular-nums'], marginBottom: 6 }}>{formatarVolta(l.ms)}</Text>
             <Animated.View style={{ width: '100%', height: alto, borderTopLeftRadius: 14, borderTopRightRadius: 14, backgroundColor: palette.surface, borderWidth: 1, borderColor: COR_PODIO[l.pos - 1], alignItems: 'center', paddingTop: 10,
@@ -89,7 +82,7 @@ function Linha({ l, index }: { l: LinhaRanking; index: number }) {
         accessibilityLabel={`${l.pos}º, ${nomeBonito(l.nome)}, ${formatarVolta(l.ms)}`}
         style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14, marginBottom: 8, borderRadius: 16, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.borderSubtle, transform: [{ scale: pressed ? 0.98 : 1 }] })}>
         <Text style={{ color: COR_PODIO[l.pos - 1] ?? palette.textMuted, fontWeight: '900', fontSize: 17, width: 38, fontVariant: ['tabular-nums'] }}>{l.pos}º</Text>
-        <Avatar nome={l.nome} tamanho={40} cor={COR_PODIO[l.pos - 1] ?? palette.surfaceElevated} claro={l.pos <= 3} />
+        <FotoPiloto id={l.id} nome={l.nome} tamanho={40} cor={COR_PODIO[l.pos - 1] ?? palette.surfaceElevated} claro={l.pos <= 3} />
         <View style={{ flex: 1 }}>
           <Text numberOfLines={1} style={{ color: palette.text, fontWeight: '700', fontSize: 15 }}>{nomeBonito(l.nome)}</Text>
           <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 2 }}>{formatarDia(l.dia)}{l.kart ? ` · Kart ${l.kart}` : ''}</Text>

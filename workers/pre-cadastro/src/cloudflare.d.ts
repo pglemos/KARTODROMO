@@ -10,6 +10,8 @@ interface R2ObjectBody {
   key: string;
   json<T>(): Promise<T>;
   text(): Promise<string>;
+  body: ReadableStream;
+  httpEtag: string;
 }
 
 interface R2Objects {
@@ -19,7 +21,7 @@ interface R2Objects {
 
 interface R2Bucket {
   get(key: string): Promise<R2ObjectBody | null>;
-  put(key: string, value: string, options?: { httpMetadata?: { contentType?: string } }): Promise<unknown>;
+  put(key: string, value: string | ArrayBuffer | Uint8Array, options?: { httpMetadata?: { contentType?: string }; customMetadata?: Record<string, string> }): Promise<unknown>;
   list(options?: { prefix?: string; limit?: number }): Promise<R2Objects>;
   delete(keys: string | string[]): Promise<void>;
 }

@@ -4,16 +4,19 @@
  */
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Animated, Easing, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import * as ImageManipulator from 'expo-image-manipulator';
+import * as ImagePicker from 'expo-image-picker';
+import { ActivityIndicator, Alert, Animated, Easing, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from './brand';
+import { FotoPiloto } from './foto-piloto';
 import { Entrada, tap } from './motion';
 import { RegrasRanking } from './ranking-regras';
 import { useUi } from './theme';
 import { MobileApiError } from '../api/client';
 import { formatarDia, formatarVolta, rankingApi, type CarreiraPiloto, type PosicaoRanking } from '../features/ranking/api';
-import { categoriaDe, conquistasDe, iniciais, nomeBonito, xpDe } from '../features/ranking/gamificacao';
+import { categoriaDe, conquistasDe, nomeBonito, xpDe } from '../features/ranking/gamificacao';
 import { useSession } from '../session/provider';
 
 /** número que conta de 0 até o valor quando a tela abre */
@@ -63,6 +66,37 @@ export default function CarreiraPilotoTela({ id }: { id: string }) {
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(true);
   const [regras, setRegras] = useState(false);
+  const [versaoFoto, setVersaoFoto] = useState(0);
+  const [enviandoFoto, setEnviandoFoto] = useState(false);
+
+  /** escolhe (galeria ou câmera), recorta quadrado, reduz para 600 px e envia */
+  async function trocarFoto(origem: 'galeria' | 'camera') {
+    const perm = origem === 'camera' ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { Alert.alert('Sem permissão', origem === 'camera' ? 'Libere a câmera nos Ajustes para tirar a foto.' : 'Libere o acesso às fotos nos Ajustes para escolher uma.'); return; }
+    const opcoes: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 1 };
+    const r = origem === 'camera' ? await ImagePicker.launchCameraAsync(opcoes) : await ImagePicker.launchImageLibraryAsync(opcoes);
+    if (r.canceled || !r.assets[0] || !session) return;
+    setEnviandoFoto(true);
+    try {
+      const reduzida = await ImageManipulator.manipulateAsync(r.assets[0].uri, [{ resize: { width: 600 } }], { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG });
+      setVersaoFoto(await rankingApi.enviarFoto(session.accessToken, reduzida.uri));
+      tap();
+    } catch (e) {
+      Alert.alert('Foto não enviada', e instanceof Error ? e.message : 'Tente novamente.');
+    } finally {
+      setEnviandoFoto(false);
+    }
+  }
+
+  function menuFoto() {
+    tap();
+    Alert.alert('Foto do piloto', 'Ela aparece no ranking e na sua carreira.', [
+      { text: 'Escolher da galeria', onPress: () => void trocarFoto('galeria') },
+      { text: 'Tirar foto', onPress: () => void trocarFoto('camera') },
+      { text: 'Remover foto', style: 'destructive', onPress: () => { if (session) void rankingApi.removerFoto(session.accessToken).then(() => setVersaoFoto(Date.now())).catch(() => Alert.alert('Não foi possível remover a foto.')); } },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
+  }
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -134,9 +168,17 @@ export default function CarreiraPilotoTela({ id }: { id: string }) {
         {topo}
         <Entrada>
           <View style={{ alignItems: 'center', gap: 8 }}>
-            <View style={{ width: 104, height: 104, borderRadius: 52, backgroundColor: cat.cor, alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: palette.surfaceElevated }}>
-              <Text style={{ color: '#000000', fontSize: 38, fontWeight: '900' }}>{iniciais(dados.nome)}</Text>
-            </View>
+            <Pressable disabled={!eu || enviandoFoto} onPress={menuFoto} accessibilityRole={eu ? 'button' : undefined} accessibilityLabel={eu ? 'Trocar foto' : undefined}
+              style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.95 : 1 }] })}>
+              <View style={{ padding: 4, borderRadius: 60, backgroundColor: palette.surfaceElevated }}>
+                <FotoPiloto key={versaoFoto} id={dados.id} versao={versaoFoto} nome={dados.nome} tamanho={104} cor={cat.cor} />
+              </View>
+              {eu ? (
+                <View style={{ position: 'absolute', right: 0, bottom: 0, width: 34, height: 34, borderRadius: 17, backgroundColor: palette.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: palette.background }}>
+                  {enviandoFoto ? <ActivityIndicator size="small" color="#000000" /> : <Text style={{ color: '#000000', fontWeight: '900', fontSize: 18, lineHeight: 20 }}>+</Text>}
+                </View>
+              ) : null}
+            </Pressable>
             <Text accessibilityRole="header" style={{ color: palette.text, fontSize: 24, fontWeight: '900', textAlign: 'center' }}>{nomeBonito(dados.nome)}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: cat.cor, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999 }}>
               <Icon name="star" color="#000000" size={14} />
