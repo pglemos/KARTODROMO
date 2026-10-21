@@ -37,6 +37,8 @@ export interface CarreiraPiloto {
   /** semanas no top 10 semanal do LapTime antigo (antes de 02/09/2026, quando não há corrida detalhada) */
   semanasTop10?: number;
   mesesTop10?: number;
+  /** posição no ranking de XP: líder e quem está logo acima e abaixo */
+  comparativo?: { pos: number; de: number; lider: VizinhoXp | null; acima: VizinhoXp | null; abaixo: VizinhoXp | null };
   primeira: string | null;
   ultima: string | null;
   tracados: { nome: string; ms: number; dia: string; corridas: number; semana: PosicaoRanking | null; mes: PosicaoRanking | null; geral: PosicaoRanking | null }[];
@@ -84,3 +86,5 @@ export function formatarDia(dia: string) {
   const [a, m, d] = dia.split('-');
   return d && m && a ? `${d}/${m}/${a}` : dia;
 }
+
+export interface VizinhoXp { id: string; nome: string; xp: number }

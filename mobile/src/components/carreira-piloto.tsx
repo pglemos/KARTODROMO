@@ -2,7 +2,7 @@
  * Carreira de um piloto (ou a sua, com id "eu"): categoria e XP, números da carreira, eficiência, melhor tempo e
  * posição em cada traçado, conquistas e últimas baterias. Tudo calculado da carreira real publicada pelo SRVKART.
  */
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
@@ -254,6 +254,35 @@ export default function CarreiraPilotoTela({ id, aba = false }: { id: string; ab
                 </View>
               </View>
             ))}
+          </Cartao>
+        ) : null}
+
+        {dados.comparativo ? (
+          <Cartao titulo={`Ranking de XP · ${dados.comparativo.pos}º de ${dados.comparativo.de.toLocaleString('pt-BR')}`} index={5}>
+            <View style={{ gap: 8 }}>
+              {([
+                ['Líder', dados.comparativo.lider, '#B45309'],
+                ['Logo acima', dados.comparativo.acima, '#B91C1C'],
+                ['Logo abaixo', dados.comparativo.abaixo, '#047857'],
+              ] as const).map(([rotulo, v, cor]) => {
+                if (!v) return null;
+                const dif = v.xp - xp;
+                const bats = Math.ceil(dif / 50);
+                return (
+                  <Pressable key={rotulo} onPress={() => { tap(); router.push(`/piloto/${v.id}` as Href); }} accessibilityRole="button" accessibilityLabel={`${rotulo}: ${v.nome}, ${v.xp} XP`}
+                    style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, backgroundColor: cor, opacity: pressed ? 0.85 : 1 })}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '800', letterSpacing: 0.5 }}>{rotulo.toUpperCase()}</Text>
+                      <Text numberOfLines={1} style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '900' }}>{nomeBonito(v.nome)}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '900', fontVariant: ['tabular-nums'] }}>{dif > 0 ? '-' : '+'}{Math.abs(dif).toLocaleString('pt-BR')} XP</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11 }}>{dif > 0 ? `≈ ${bats} bateria${bats === 1 ? '' : 's'} para alcançar` : `${v.xp.toLocaleString('pt-BR')} XP`}</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
           </Cartao>
         ) : null}
 

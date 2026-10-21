@@ -62,14 +62,23 @@ function Linha({ c, ganhou, index, maisRapida }: { c: LiveCompetitor; ganhou: nu
           <Text style={{ color: medalha ? '#000000' : palette.text, fontSize: 18, fontWeight: '900', fontVariant: ['tabular-nums'] }}>{c.position}</Text>
           <Movimento ganhou={ganhou} />
         </View>
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text numberOfLines={1} style={{ color: palette.text, fontSize: 16, fontWeight: '800' }}>{c.name}</Text>
-          <Text style={{ color: palette.textMuted, fontSize: 12 }}>Kart {c.kartNumber} · volta {c.currentLap}{c.position > 1 && c.diffLeader !== '—' ? ` · ${c.diffLeader}` : ''}</Text>
-        </View>
-        <View style={{ alignItems: 'flex-end', gap: 3 }}>
-          <Text style={{ color: palette.text, fontSize: 16, fontWeight: '800', fontVariant: ['tabular-nums'] }}>{c.lastLapTime}</Text>
-          <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, backgroundColor: maisRapida ? palette.purpleNeon : palette.surfaceElevated }}>
-            <Text style={{ color: maisRapida ? '#FFFFFF' : palette.textSecondary, fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{c.bestLapTime}</Text>
+        <View style={{ flex: 1, gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text numberOfLines={1} style={{ flex: 1, color: palette.text, fontSize: 16, fontWeight: '800' }}>#{c.kartNumber} {c.name}</Text>
+            <Text style={{ color: palette.textMuted, fontSize: 11, fontWeight: '700' }}>VOLTA <Text style={{ color: palette.text, fontSize: 15, fontWeight: '900' }}>{c.currentLap}</Text></Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            {[
+              { r: 'ÚLTIMA', v: c.lastLapTime, cor: palette.text },
+              { r: c.bestLapNumber ? `MELHOR · V${c.bestLapNumber}` : 'MELHOR', v: c.bestLapTime, cor: maisRapida ? '#FFFFFF' : palette.text, fundo: maisRapida ? palette.purpleNeon : undefined },
+              { r: 'DIF.', v: c.position === 1 ? '—' : c.diffPrev, cor: palette.textSecondary },
+              { r: 'LÍDER', v: c.position === 1 ? 'LÍDER' : c.diffLeader, cor: c.position === 1 ? palette.accent : palette.textSecondary },
+            ].map((x) => (
+              <View key={x.r} style={{ flex: 1, paddingVertical: 3, paddingHorizontal: 4, borderRadius: 6, backgroundColor: x.fundo }}>
+                <Text numberOfLines={1} style={{ color: x.fundo ? '#FFFFFF' : palette.textMuted, fontSize: 9, fontWeight: '800', letterSpacing: 0.5 }}>{x.r}</Text>
+                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ color: x.cor, fontSize: 13, fontWeight: '800', fontVariant: ['tabular-nums'] }}>{x.v}</Text>
+              </View>
+            ))}
           </View>
         </View>
       </Pressable>

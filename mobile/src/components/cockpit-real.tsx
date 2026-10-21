@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Platform, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import * as SecureStore from 'expo-secure-store';
 
 import { Icon } from './brand';
 import { tap } from './motion';
@@ -34,8 +35,13 @@ const prova = (ms: number) => `${Math.floor(ms / 3600000)}:${String(Math.floor((
 
 const TEMAS = {
   escuro: { fundo: '#000000', texto: '#FFFFFF', apagado: '#8A8F98', verde: '#22E06B', vermelho: '#FF3B30', roxo: '#B07CFF', ouro: '#F59E0B' },
+  laranja: { fundo: '#F59E0B', texto: '#000000', apagado: '#5C3B00', verde: '#0B6B2E', vermelho: '#9B0012', roxo: '#4C1D95', ouro: '#000000' },
+  vermelho: { fundo: '#C8102E', texto: '#FFFFFF', apagado: '#FFC2CB', verde: '#7CFF9E', vermelho: '#FFE066', roxo: '#E9D5FF', ouro: '#FFE066' },
+  azul: { fundo: '#1D6FE0', texto: '#FFFFFF', apagado: '#CFE2FF', verde: '#86FFB0', vermelho: '#FFD0D0', roxo: '#F0E2FF', ouro: '#FFE066' },
   sol: { fundo: '#FFFFFF', texto: '#000000', apagado: '#4B5058', verde: '#0A8F3C', vermelho: '#D70015', roxo: '#6E2BD9', ouro: '#B26A00' },
 };
+const ORDEM_TEMAS = Object.keys(TEMAS) as (keyof typeof TEMAS)[];
+const NOME_TEMA: Record<keyof typeof TEMAS, string> = { escuro: 'Clássico', laranja: 'Laranja', vermelho: 'Vermelho', azul: 'Azul', sol: 'Sol' };
 
 /** número grande que pulsa quando muda */
 function Pulso({ valor, estilo }: { valor: string; estilo: object }) {
@@ -65,8 +71,9 @@ function VoltaCorrendo({ inicio, cor, tamanho, fim = false }: { inicio: number |
 
 /** tempo de prova correndo (desde a largada, no relógio da cronometragem) */
 function RelogioProva({ inicio }: { inicio: number }) {
-  const agora = useAgoraCrono(250);
-  return <>{prova(Math.max(0, agora - inicio))}</>;
+  const agora = useAgoraCrono(50);
+  const ms = Math.max(0, agora - inicio);
+  return <>{prova(ms)}.{String(ms % 1000).padStart(3, '0')}</>;
 }
 
 function Rotulo({ texto, cor, tamanho = 13 }: { texto: string; cor: string; tamanho?: number }) {
@@ -81,7 +88,9 @@ export default function CockpitReal({ kartInicial = null }: { kartInicial?: stri
   const { snapshot: snap, error: erro } = useAoVivo();
   const [meuNome, setMeuNome] = useState<string | null>(null);
   const [kart, setKart] = useState<string | null>(kartInicial);
-  const [tema, setTema] = useState<keyof typeof TEMAS>('escuro');
+  const [tema, setTemaEstado] = useState<keyof typeof TEMAS>('escuro');
+  useEffect(() => { void SecureStore.getItemAsync('cockpit-tema').then((t) => { if (t && t in TEMAS) setTemaEstado(t as keyof typeof TEMAS); }).catch(() => undefined); }, []);
+  const proximoTema = () => { const t = ORDEM_TEMAS[(ORDEM_TEMAS.indexOf(tema) + 1) % ORDEM_TEMAS.length]; setTemaEstado(t); void SecureStore.setItemAsync('cockpit-tema', t).catch(() => undefined); };
   const [brilho] = useState(() => new Animated.Value(0));
   const ultimaVolta = useRef<number | null>(null);
   const melhorAnterior = useRef<number | null>(null);
@@ -199,8 +208,8 @@ export default function CockpitReal({ kartInicial = null }: { kartInicial?: stri
           </View>
           <Text style={{ flex: 1, textAlign: 'center', color: c.texto, fontFamily: MONO, fontSize: t.topo * 1.1, fontWeight: '700' }}>VOLTA {eu.laps ?? 0}</Text>
           <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 20 }}>
-            <Pressable accessibilityRole="button" accessibilityLabel={tema === 'escuro' ? 'Modo sol' : 'Modo escuro'} hitSlop={10} onPress={() => { tap(); setTema(tema === 'escuro' ? 'sol' : 'escuro'); }}>
-              <Text style={{ fontSize: 24 }}>{tema === 'escuro' ? '☀️' : '🌙'}</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel={`Cor do cockpit: ${NOME_TEMA[tema]}. Toque para trocar`} hitSlop={10} onPress={() => { tap(); proximoTema(); }}>
+              <Text style={{ fontSize: 22 }}>🎨</Text>
             </Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel="Trocar kart" hitSlop={10} onPress={() => { tap(); setKart(null); if (automatico) setMeuNome(null); }}>
               <Icon name="flag" color={c.texto} size={26} />
