@@ -74,7 +74,8 @@ function createStyles(palette: ThemePalette) {
       alignSelf: 'center',
       paddingHorizontal: 20,
       paddingTop: 16,
-      paddingBottom: 24,
+      // espaço para a barra de abas flutuante não cobrir o último botão
+      paddingBottom: 140,
     },
     // Floating Nav aware containers (Avoids bottom tab bar clipping)
     contentScroll: {
@@ -141,10 +142,10 @@ function createStyles(palette: ThemePalette) {
       paddingVertical: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: palette.silver,
+      backgroundColor: palette.accent,
     },
     actionText: {
-      color: palette.onSilver,
+      color: palette.onAccent,
       fontSize: 15,
       fontWeight: '700',
       textAlign: 'center',
@@ -185,7 +186,7 @@ function createStyles(palette: ThemePalette) {
       textTransform: 'uppercase',
     },
     disabledAction: { opacity: 0.45 },
-    pressedAction: { opacity: 0.7 },
+    pressedAction: { opacity: 0.85, transform: [{ scale: 0.97 }] },
 
     // Alerts & Feedback
     error: {

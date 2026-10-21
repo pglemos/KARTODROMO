@@ -12,7 +12,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { SPORTS_PALETTE } from './theme';
 import { SportsIcon } from './sports-icons';
-import { StateFlagBadge } from './state-flag-badge';
 import { MOCK_LIVE_SESSION } from '../mock/kart-data';
 import type { LiveSession } from '../types/racing';
 
@@ -44,13 +43,6 @@ export function LiveTimeScreen({
     }
   };
 
-  const handleBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace('/(tabs)');
-    }
-  };
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -80,14 +72,6 @@ export function LiveTimeScreen({
         {/* 1. Session Header Block (Matches IMG_3792.PNG) */}
         <View testID="livetime-session-header" style={styles.sessionHeader}>
           <View style={styles.sessionHeaderRow}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Voltar"
-              onPress={handleBack}
-              style={styles.backBtn}
-            >
-              <SportsIcon name="back" size={22} color="#FFFFFF" />
-            </Pressable>
 
             <View style={{ flex: 1 }}>
               <Text testID="livetime-title" style={styles.sessionTitle}>
@@ -200,12 +184,11 @@ export function LiveTimeScreen({
                         style={[styles.compName, styles.tabularNums]}
                         numberOfLines={1}
                       >
-                        {comp.kartNumber} {comp.name}
+                        {comp.name}
                       </Text>
                       <View style={styles.compCategoryRow}>
-                        <StateFlagBadge flag={comp.flag || 'MG'} />
                         <Text style={[styles.rentalTagText, styles.tabularNums]}>
-                          {comp.category}
+                          KART {comp.kartNumber}
                         </Text>
                       </View>
                     </View>
@@ -250,7 +233,7 @@ export function LiveTimeScreen({
                             comp.isFastestLap && { color: '#FFFFFF' },
                           ]}
                         >
-                          L{comp.bestLapNumber || 1} T
+                          V{comp.bestLapNumber || 1}{' '}
                         </Text>
                         <Text
                           style={[

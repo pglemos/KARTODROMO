@@ -40,7 +40,14 @@ export function lapMs(value: string): number | null {
 /** "+2.350" → 2350 ms; "+1 volta" e vazio → null. */
 function gapMs(value: string): number | null {
   const m = /^\+?(\d+)\.(\d{1,3})$/.exec(value.trim());
-  return m ? Number(m[1]) * 1000 + Number(m[2].padEnd(3, '0')) : null;
+  const ms = m ? Number(m[1]) * 1000 + Number(m[2].padEnd(3, '0')) : null;
+  // +0.000 fora do líder vem de passagem lançada à mão depois das outras: não há diferença confiável
+  return ms ? ms : null;
+}
+
+/** diferença para exibir: tempo válido ou "+N voltas"; o resto vira travessão */
+function gapLabel(value: string) {
+  return gapMs(value) !== null || /volta/.test(value) ? value : '—';
 }
 
 export function formatElapsed(ms: number) {
@@ -65,7 +72,7 @@ export function snapshotToSession(snap: LiveSnapshot, now = Date.now()): LiveSes
   const competitors: LiveCompetitor[] = snap.drivers.map((d, i) => {
     const anterior = i > 0 ? gapMs(snap.drivers[i - 1].gap) ?? (i === 1 ? 0 : null) : null;
     const meu = gapMs(d.gap);
-    const diffPrev = i === 0 ? '—' : meu !== null && anterior !== null ? `+${((meu - anterior) / 1000).toFixed(3)}` : d.gap || '—';
+    const diffPrev = i === 0 ? '—' : meu !== null && anterior !== null ? `+${((meu - anterior) / 1000).toFixed(3)}` : gapLabel(d.gap);
     return {
       position: d.position,
       kartNumber: d.kart,
@@ -78,7 +85,7 @@ export function snapshotToSession(snap: LiveSnapshot, now = Date.now()): LiveSes
       bestLapTime: d.best || '—',
       bestLapMs: tempos[i] ?? 0,
       bestLapNumber: d.bestLap ?? 0,
-      diffLeader: i === 0 ? '—' : d.gap || '—',
+      diffLeader: i === 0 ? '—' : gapLabel(d.gap),
       diffPrev,
       isFastestLap: i === iMelhor,
       deltaRealtime: { value: '', trend: 'neutral' },
@@ -88,7 +95,7 @@ export function snapshotToSession(snap: LiveSnapshot, now = Date.now()): LiveSes
     id: snap.startedAt ?? snap.eventName,
     title: (titulo || snap.eventName || 'Bateria').toUpperCase(),
     subtitle: `${(prova || tipo).toUpperCase()} · ${aoVivo ? 'AO VIVO' : 'ENCERRADA'}`,
-    trackName: snap.trackName || 'Kartódromo Internacional de Betim',
+    trackName: (snap.trackName || 'Kartódromo Internacional de Betim').replace('Kartodromo', 'Kartódromo'),
     status: aoVivo ? 'GREEN' : 'CHECKERED',
     elapsedTime: aoVivo ? formatElapsed(elapsedMs) : 'Encerrada',
     elapsedMs,

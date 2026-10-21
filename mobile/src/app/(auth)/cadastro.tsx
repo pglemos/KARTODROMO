@@ -68,8 +68,9 @@ export default function RegistrationScreen() {
         onChangeText={setPassword}
         secureTextEntry
         autoCapitalize="none"
-        autoComplete="new-password"
-        textContentType="newPassword"
+        autoComplete="off"
+        textContentType="oneTimeCode"
+        autoCorrect={false}
       />
       <Pressable
         accessibilityRole="checkbox"

@@ -81,6 +81,7 @@ function LoginPrompt({ batteryId }: { batteryId: number | null }) {
 
 function LogoutButton() {
   const { logout, deleteAccount } = useSession();
+  const { palette } = useUi();
   const [busy, setBusy] = useState(false);
 
   async function submit() {
@@ -121,9 +122,12 @@ function LogoutButton() {
   }
 
   return (
-    <View style={{ flexDirection: 'row', gap: 8, alignSelf: 'flex-end', marginBottom: 18, alignItems: 'center' }}>
-      <ActionButton label={busy ? 'Aguarde…' : 'Excluir conta'} onPress={promptDeleteAccount} disabled={busy} secondary />
+    // fica no fim da lista, longe do fluxo de reserva, para ninguém excluir a conta por engano
+    <View style={{ marginTop: 32, gap: 4 }}>
       <ActionButton label={busy ? 'Encerrando…' : 'Sair da conta'} onPress={() => void submit()} disabled={busy} secondary />
+      <Pressable accessibilityRole="button" onPress={promptDeleteAccount} disabled={busy} style={{ paddingVertical: 14, alignSelf: 'center' }}>
+        <Text style={{ color: palette.danger, fontSize: 14, fontWeight: '600' }}>Excluir minha conta</Text>
+      </Pressable>
     </View>
   );
 }
@@ -137,9 +141,9 @@ function ReservationList({ orders, loading, error, retry }: {
   const { palette, styles } = useUi();
   return <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
     <FlatList data={orders ?? []} keyExtractor={(order) => order.id} contentContainerStyle={styles.content} refreshing={loading} onRefresh={retry}
+      ListFooterComponent={<LogoutButton />}
       ListHeaderComponent={<>
         <PageHeader title="Minhas reservas" description="Seus próximos encontros com a pista." />
-        <LogoutButton />
         {loading && !orders ? <LoadingMessage label="Buscando suas reservas…" /> : null}
         {error ? <View style={{ gap: 12 }}><InlineError message={error} /><ActionButton label="Tentar novamente" onPress={retry} secondary /></View> : null}
         {!loading && !error && orders?.length === 0 ? <Panel style={{ gap: 14 }}>
@@ -298,13 +302,28 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
 
       <Text accessibilityRole="header" style={[styles.sectionTitle, { marginTop: 12 }]}>Participantes</Text>
       <Field label="Quantidade de vagas">
-        <TextInput
-          accessibilityLabel="Quantidade de vagas"
-          value={quantity}
-          onChangeText={(value) => { setQuantity(value.replace(/\D/g, '')); setQuote(null); changed(); }}
-          keyboardType="number-pad"
-          style={styles.input}
-        />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+          {(() => {
+            const atual = Number(quantity) || 1;
+            const limite = Math.max(slot.livres, 1);
+            const botao = (delta: number) => {
+              const proximo = Math.min(Math.max(atual + delta, 1), limite);
+              return (
+                <Pressable accessibilityRole="button" accessibilityLabel={delta < 0 ? 'Menos uma vaga' : 'Mais uma vaga'} disabled={proximo === atual}
+                  onPress={() => { setQuantity(String(proximo)); setQuote(null); changed(); }}
+                  style={({ pressed }) => ({ width: 52, height: 52, borderRadius: 26, backgroundColor: palette.surfaceElevated, borderWidth: 1, borderColor: palette.border, alignItems: 'center', justifyContent: 'center', opacity: proximo === atual ? 0.35 : 1, transform: [{ scale: pressed ? 0.9 : 1 }] })}>
+                  <Text style={{ color: palette.text, fontSize: 26, fontWeight: '700', lineHeight: 30 }}>{delta < 0 ? '−' : '+'}</Text>
+                </Pressable>
+              );
+            };
+            return <>
+              {botao(-1)}
+              <Text accessibilityLabel={String(atual) + " vagas"} style={{ color: palette.text, fontSize: 28, fontWeight: '900', minWidth: 40, textAlign: 'center', fontVariant: ['tabular-nums'] }}>{atual}</Text>
+              {botao(1)}
+            </>;
+          })()}
+          <Text style={[styles.muted, { flex: 1, textAlign: 'right' }]}>{formatBrl((Number(quantity) || 1) * agenda.precoCentavos)}</Text>
+        </View>
       </Field>
       <Field label="Seu Instagram" hint={<Text style={styles.muted}>Sai junto com seu nome no resultado da bateria.</Text>}>
         <TextInput
@@ -418,7 +437,11 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
       <Text style={styles.muted}>A reserva será confirmada após o pagamento e a confirmação das vagas.</Text>
       {error ? <InlineError message={error} /> : null}
       {!agenda.pagamentoOnline ? <Notice message="O pagamento online está indisponível. Fale com a recepção para reservar." /> : null}
-      <ActionButton label={busy ? 'Enviando reserva…' : 'Enviar reserva'} onPress={() => void submit()} disabled={busy || !agenda.pagamentoOnline} />
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 4 }}>
+        <Text style={{ color: palette.textSecondary, fontSize: 15 }}>Total</Text>
+        <Text style={{ color: palette.text, fontSize: 24, fontWeight: '900' }}>{formatBrl(quote ? quote.totalCentavos : (Number(quantity) || 1) * agenda.precoCentavos)}</Text>
+      </View>
+      <ActionButton label={busy ? 'Enviando reserva…' : 'Ir para o pagamento'} onPress={() => void submit()} disabled={busy || !agenda.pagamentoOnline} />
     </View>
   );
 }
@@ -471,7 +494,6 @@ function AuthenticatedReservations({ session, batteryId }: { session: SessionTok
     return (
       <Page>
         <PageHeader title="Confirmar reserva" description="Informe quem vai pilotar e revise o pedido antes de pagar." />
-        <LogoutButton />
         {loading && !agenda ? <LoadingMessage label="Carregando horário…" /> : null}
         {error ? <View style={{ gap: 12 }}><InlineError message={error} /><ActionButton label="Tentar novamente" onPress={retryAgenda} secondary /></View> : null}
         {agenda ? <BookingForm key={batteryId} agenda={agenda} batteryId={batteryId} accessToken={session.accessToken} /> : null}

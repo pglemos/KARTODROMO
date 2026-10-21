@@ -22,8 +22,8 @@ export function Page({ children, top = true }: PropsWithChildren<{ top?: boolean
   const { styles } = useUi();
   return (
     <SafeAreaView edges={top ? ['top', 'left', 'right'] : ['left', 'right', 'bottom']} style={styles.safeArea}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+      <KeyboardAvoidingView behavior={Platform.OS === 'android' ? 'height' : undefined} style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" automaticallyAdjustKeyboardInsets>
         {children}
       </ScrollView>
       </KeyboardAvoidingView>

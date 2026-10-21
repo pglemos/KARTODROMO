@@ -21,8 +21,8 @@ export function Icon({ name, color, size = 24 }: { name: keyof typeof symbols; c
 
 export function Brand({ width = 246 }: { width?: number }) {
   return (
-    <View style={{ backgroundColor: '#FFFFFF', borderRadius: 6, padding: 6, alignSelf: 'flex-start', maxWidth: '100%', flexShrink: 1 }}>
-      <Image accessibilityLabel="Kartódromo Internacional de Betim" source={require('../../assets/brand-logo.png')}
+    <View style={{ alignSelf: 'flex-start', maxWidth: '100%', flexShrink: 1 }}>
+      <Image accessibilityLabel="Kartódromo Internacional de Betim" source={require('../../assets/brand-logo-dark.png')}
         resizeMode="contain" style={{ width, maxWidth: '100%', height: width * 420 / 1536 }} />
     </View>
   );

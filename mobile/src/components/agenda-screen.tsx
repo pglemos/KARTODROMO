@@ -20,6 +20,7 @@ import { formatDateTime } from '../features/reservations/components';
 import { useSession } from '../session/provider';
 import { AgendaSlot } from '../types/racing';
 import { Brand } from './brand';
+import { Entrada, tap } from './motion';
 import { CartModal } from './cart-modal';
 import { FloatingCartBar } from './floating-cart-bar';
 import { SportsIcon } from './sports-icons';
@@ -28,6 +29,22 @@ import { SPORTS_PALETTE } from './theme';
 export interface AgendaScreenProps {
   onAddToCart?: (slot: AgendaSlot, quantity: number) => void;
   slots?: AgendaSlot[];
+}
+
+const DIAS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
+const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+/** "21/10/2026" → "TER" (ou "HOJE"/"AMANHÃ") */
+function diaDaSemana(data: string) {
+  const [d, m, a] = data.split('/').map(Number);
+  const dia = new Date(a, m - 1, d);
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const diff = Math.round((dia.getTime() - hoje.getTime()) / 86_400_000);
+  return diff === 0 ? 'HOJE' : diff === 1 ? 'AMANHÃ' : DIAS[dia.getDay()] ?? '';
+}
+/** "21/10/2026" → "21 out" */
+function diaMes(data: string) {
+  const [d, m] = data.split('/').map(Number);
+  return `${d} ${MESES[m - 1] ?? ''}`;
 }
 
 export function AgendaScreen({
@@ -56,7 +73,9 @@ export function AgendaScreen({
       if (requestVersion.current.version !== requestId) return;
       if (data && Array.isArray(data.horarios)) {
         setApiError('');
-        const mapped: AgendaSlot[] = data.horarios.map((h) => {
+        // horário que já largou não aparece para reservar
+        const agora = Date.now();
+        const mapped: AgendaSlot[] = data.horarios.filter((h) => Date.parse(h.inicio) > agora).map((h) => {
           const dt = formatDateTime(h.inicio);
           const [dPart, tPart] = dt.split(' · ');
           return {
@@ -118,14 +137,6 @@ export function AgendaScreen({
     setQuantity(1);
   };
 
-  const handleBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace('/(tabs)');
-    }
-  };
-
   const handleConfirmAddToCart = () => {
     if (!selectedSlot) return;
 
@@ -158,21 +169,9 @@ export function AgendaScreen({
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <View testID="screen-agenda" style={styles.screenContainer}>
         {/* 1. Header Block (Matches IMG_3793.PNG) */}
-        <View style={styles.headerBlock}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Voltar"
-            onPress={handleBack}
-            style={styles.headerBackBtn}
-          >
-            <SportsIcon name="back" size={22} color="#FFFFFF" />
-          </Pressable>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.screenHeaderTitle}>AGENDA</Text>
-            <Text testID="agenda-selected-date" style={styles.dateLabel}>
-              {selectedDate}
-            </Text>
-          </View>
+        <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 }}>
+          <Text accessibilityRole="header" style={{ color: '#FFFFFF', fontSize: 32, fontWeight: '900', letterSpacing: -0.5 }}>Agenda</Text>
+          <Text testID="agenda-selected-date" style={{ color: '#9CA3AF', fontSize: 15, marginTop: 2 }}>Escolha o dia e o horário da sua bateria</Text>
         </View>
 
         <FlatList
@@ -183,23 +182,7 @@ export function AgendaScreen({
           data={activeSlots}
           keyExtractor={(slot) => String(slot.id)}
           ListHeaderComponent={<>
-          {/* 2. Partner Identity Card (Matches IMG_3793.PNG) */}
-          <View style={styles.partnerCard}>
-            <Brand width={90} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.partnerCardTitle}>KARTÓDROMO DE BETIM</Text>
-              <Text style={styles.srOnly}>
-                KARTÓDROMO INTERNACIONAL DE BETIM
-              </Text>
-            </View>
-          </View>
-
           {bookingOnSite && <Text style={styles.statusText}>Horários oficiais. A reserva será concluída no site do kartódromo.</Text>}
-
-          {/* 3. Section Bar: RESERVAS DISPONÍVEIS */}
-          <View style={styles.reservasHeaderBar}>
-            <Text style={styles.reservasHeaderText}>RESERVAS DISPONÍVEIS</Text>
-          </View>
 
           {/* Falhas da API nunca viram vagas demonstrativas. */}
           <View style={styles.agendaStatus}>
@@ -212,10 +195,11 @@ export function AgendaScreen({
                     testID={`date-pill-${date}`}
                     accessibilityRole="button"
                     accessibilityState={{ selected: isSelected }}
-                    onPress={() => setSelectedDate(date)}
+                    onPress={() => { tap(); setSelectedDate(date); }}
                     style={[styles.datePill, isSelected && styles.datePillSelected]}
                   >
-                    <Text style={styles.statusText}>{date}</Text>
+                    <Text style={[styles.dayName, isSelected && { color: '#000000' }]}>{diaDaSemana(date)}</Text>
+                    <Text style={[styles.dayNumber, isSelected && { color: '#000000' }]}>{diaMes(date)}</Text>
                   </Pressable>
                 );
               })}
@@ -241,13 +225,13 @@ export function AgendaScreen({
 
           {/* 5. Battery Slots Cards (Matches IMG_3793.PNG) */}
           </>}
-          renderItem={({ item: slot }) => {
+          renderItem={({ item: slot, index }) => {
             const isSoldOut = slot.isSoldOut || slot.availableSlots <= 0;
             const isBackend = slot.isBackendSlot;
-            const formattedDateTime = slot.formattedDateTime;
 
             const handlePressSlot = () => {
               if (isSoldOut) return;
+              tap();
               if (isBackend) {
                 if (bookingOnSite) {
                   void Linking.openURL('https://reservas.kartodromodebetim.com.br').catch(() =>
@@ -271,68 +255,34 @@ export function AgendaScreen({
             };
 
             return (
-              <View
-                key={slot.id}
+              <Entrada index={index}>
+              <Pressable
                 testID={`agenda-slot-card-${slot.id}`}
-                style={[styles.slotCard, isSoldOut && styles.slotCardSoldOut]}
+                accessibilityRole="button"
+                accessibilityLabel={isSoldOut ? `${slot.time}, esgotado` : `Reservar bateria das ${slot.time}, ${slot.availableSlots} vagas`}
+                disabled={isSoldOut}
+                onPress={handlePressSlot}
+                style={({ pressed }) => [styles.slotCard, isSoldOut && styles.slotCardSoldOut, { transform: [{ scale: pressed ? 0.98 : 1 }], opacity: pressed ? 0.9 : 1 }]}
               >
-                <View style={{ flex: 1, paddingRight: 10 }}>
-                  <Text style={[styles.slotTitle, styles.tabularNums]}>
-                    {slot.title}
+                <View style={{ width: 92 }}>
+                  <Text style={[styles.slotHora, styles.tabularNums]}>{slot.time}</Text>
+                  <Text style={styles.slotRotulo}>BATERIA</Text>
+                </View>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text testID={`slot-vagas-${slot.id}`} style={[styles.slotVagas, isSoldOut ? styles.vagasSoldOut : styles.vagasAvailable]}>
+                    {isSoldOut ? 'Esgotado' : slot.availableSlots === 1 ? '1 vaga' : `${slot.availableSlots} vagas`}
                   </Text>
-                  <Text style={[styles.slotTimeSub, styles.tabularNums]}>
-                    {slot.time}
-                  </Text>
-
-                  <View>
-                    {formattedDateTime ? (
-                      <Text style={styles.slotTimeSub}>{formattedDateTime}</Text>
-                    ) : null}
+                  <View style={styles.vagasTrilho}>
+                    <View style={[styles.vagasBarra, { width: `${Math.min(100, Math.max(6, (slot.availableSlots / 30) * 100))}%`, backgroundColor: isSoldOut ? '#EF4444' : slot.availableSlots <= 5 ? '#F59E0B' : '#00E676' }]} />
                   </View>
                 </View>
-
-                <View style={styles.slotRightCol}>
-                  <View style={styles.vagasChevronRow}>
-                    <Text
-                      testID={`slot-vagas-${slot.id}`}
-                      style={[
-                        styles.slotVagas,
-                        isSoldOut ? styles.vagasSoldOut : styles.vagasAvailable,
-                      ]}
-                    >
-                      {isSoldOut ? 'ESGOTADO' : `${slot.availableSlots} VAGAS`}
-                    </Text>
-                    <SportsIcon
-                      name="chevron-right"
-                      size={16}
-                      color="#9CA3AF"
-                    />
+                {isSoldOut ? null : (
+                  <View style={styles.reservarPill}>
+                    <Text style={styles.reservarTexto}>{isBackend ? (bookingOnSite ? 'No site' : 'Reservar') : 'Escolher'}</Text>
                   </View>
-
-                  <Pressable
-                    testID={`btn-select-slot-${slot.id}`}
-                    accessibilityRole="button"
-                    accessibilityLabel={
-                      isSoldOut
-                        ? 'Esgotado'
-                        : isBackend
-                        ? bookingOnSite ? 'Reservar no site' : 'Reservar bateria'
-                        : 'SELECIONAR'
-                    }
-                    disabled={isSoldOut}
-                    onPress={handlePressSlot}
-                    style={styles.datePill}
-                  >
-                    <Text style={styles.statusText}>
-                      {isSoldOut
-                        ? 'Esgotado'
-                        : isBackend
-                        ? bookingOnSite ? 'Reservar no site' : 'Reservar bateria'
-                        : 'SELECIONAR'}
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
+                )}
+              </Pressable>
+              </Entrada>
             );
           }}
         />
@@ -515,8 +465,16 @@ const condensedFont = Platform.select({
 const styles = StyleSheet.create({
   agendaStatus: { gap: 12, marginBottom: 16 },
   statusText: { color: '#FFFFFF', fontSize: 15 },
-  datePill: { minHeight: 48, padding: 12, borderRadius: 8, backgroundColor: '#252A30', justifyContent: 'center' },
-  datePillSelected: { borderWidth: 1, borderColor: '#F59E0B' },
+  datePill: { minHeight: 64, minWidth: 72, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 16, backgroundColor: '#1E2228', justifyContent: 'center' },
+  datePillSelected: { backgroundColor: '#F59E0B' },
+  dayName: { color: '#9CA3AF', fontSize: 12, fontWeight: '800', letterSpacing: 1, textAlign: 'center' },
+  dayNumber: { color: '#FFFFFF', fontSize: 17, fontWeight: '800', textAlign: 'center', marginTop: 2 },
+  slotHora: { color: '#FFFFFF', fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
+  slotRotulo: { color: '#9CA3AF', fontSize: 11, fontWeight: '800', letterSpacing: 1.5, marginTop: 2 },
+  vagasTrilho: { height: 6, borderRadius: 3, backgroundColor: '#2A2E35', marginTop: 8, overflow: 'hidden' },
+  vagasBarra: { height: 6, borderRadius: 3 },
+  reservarPill: { backgroundColor: '#F59E0B', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10 },
+  reservarTexto: { color: '#000000', fontWeight: '800', fontSize: 14 },
   safeArea: {
     flex: 1,
     backgroundColor: '#000000',
