@@ -2,11 +2,11 @@ import { Platform, StyleSheet, useColorScheme } from 'react-native';
 
 export const sportsPalette = {
   // Root & Surfaces (OLED True Black & Elevated Cards)
-  background: '#000000',
-  surface: '#161A1D',
-  surfaceElevated: '#1E2228',
-  border: '#2A2E35',
-  borderSubtle: '#1F242C',
+  background: '#050807',
+  surface: '#0D1411',
+  surfaceElevated: '#111815',
+  border: '#1C2621',
+  borderSubtle: '#16201B',
 
   // Typography
   text: '#FFFFFF',
@@ -15,12 +15,12 @@ export const sportsPalette = {
   textMuted: '#9CA3AF',
 
   // Sports Semantics
-  accent: '#F59E0B',        // Sports Gold (P1, PTS, Lenda avatar)
-  onAccent: '#000000',      // High contrast text over gold
+  accent: '#2BF27A',        // verde da marca (ações principais)
+  onAccent: '#04170B',      // texto sobre o verde
   gold: '#F59E0B',
-  neonGreen: '#00E676',     // Positive delta, green flag, high efficiency
+  neonGreen: '#2BF27A',     // Positive delta, green flag, high efficiency
   neonRed: '#EF4444',       // Negative delta, loss of time, alerts
-  purple: '#6F4B89',        // Fastest lap banner, best lap pill
+  purple: '#7B4DFF',        // Fastest lap banner, best lap pill
   purpleNeon: '#8B5CF6',    // Vibrant purple accent
   blue: '#3B82F6',          // Semi-Pro, active pills, telemetry
   onBlue: '#000000',        // High contrast text over electric blue (WCAG AA 5.71:1)
@@ -30,13 +30,13 @@ export const sportsPalette = {
   onSilver: '#000000',      // Action text over silver
 
   // UI Structure & Navigation
-  navBar: '#121212',        // Floating bottom tab bar capsule
-  navActivePill: '#343434', // Active tab pill
-  input: '#2A2C2D',         // Search / form input background
+  navBar: '#0D1310',        // Floating bottom tab bar capsule
+  navActivePill: '#12361F', // Active tab pill
+  input: '#0D1411',         // Search / form input background
   pillInactive: '#2A2A2A',  // Category filter pill inactive
 
   // Semantics & Status (WCAG AA Contrast Compliant >= 4.5)
-  subtle: '#1E2228',
+  subtle: '#111815',
   danger: '#EF4444',
   dangerSurface: '#2A0808', // Contrast ratio 4.91 vs #EF4444
   warning: '#F59E0B',
