@@ -168,10 +168,32 @@ export default function HomeScreen({
         ]}
       >
         {/* Título de Tela "HOME" em Caixa Alta Condensada */}
-        <View style={homeStyles.screenTitleRow}>
-          <Text style={[homeStyles.screenTitleText, { color: palette.text }]}>
-            HOME
+        <View style={{ gap: 8, marginBottom: 16 }}>
+          <Text style={{ color: palette.muted, fontSize: 11, letterSpacing: 4, fontWeight: '600' }}>
+            ADRENALINA REAL
           </Text>
+          <Text
+            accessibilityRole="header"
+            style={{ color: palette.text, fontSize: 54, lineHeight: 50, fontWeight: '900', fontStyle: 'italic', letterSpacing: -0.5 }}
+          >
+            BORA PRA{'\n'}
+            <Text style={{ color: palette.accent }}>PISTA?</Text>
+          </Text>
+          <Text style={{ color: palette.textSecondary, fontSize: 15, lineHeight: 21 }}>
+            Reserve sua bateria, acompanhe a corrida ao vivo e veja seus tempos volta a volta.
+          </Text>
+          <Link href="/(tabs)/agenda" asChild>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Reservar agora"
+              style={{ marginTop: 8, height: 56, borderRadius: 16, backgroundColor: palette.accent, justifyContent: 'center', paddingHorizontal: 20 }}
+            >
+              <Text style={{ color: palette.onAccent, fontWeight: '800', fontSize: 15, letterSpacing: 0.5 }}>
+                RESERVAR AGORA  ›
+              </Text>
+            </TouchableOpacity>
+          </Link>
         </View>
 
         {/* Atalhos visíveis também para quem não usa leitor de tela. */}
