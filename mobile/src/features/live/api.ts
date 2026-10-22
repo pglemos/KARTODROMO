@@ -101,7 +101,7 @@ export function snapshotToSession(snap: LiveSnapshot, now = Date.now()): LiveSes
     subtitle: `${(prova || tipo).toUpperCase()} · ${aoVivo ? 'AO VIVO' : 'ENCERRADA'}`,
     trackName: (snap.trackName || 'Kartódromo Internacional de Betim').replace('Kartodromo', 'Kartódromo'),
     status: aoVivo ? 'GREEN' : 'CHECKERED',
-    elapsedTime: aoVivo ? formatElapsed(elapsedMs) : 'Encerrada',
+    elapsedTime: aoVivo ? (Number.isFinite(iniciou) ? formatElapsed(elapsedMs) : '—') : 'Encerrada',
     elapsedMs,
     fastestLap: iMelhor >= 0 ? {
       competitorNumber: snap.drivers[iMelhor].kart,

@@ -37,7 +37,8 @@ function PontoAoVivo({ c, d }: { c: string; d: number }) {
 /** tempo de prova com milésimos, no relógio da cronometragem */
 function RelogioMs({ inicio, reserva }: { inicio: number; reserva: string }) {
   const agora = useAgoraCrono(50);
-  if (!Number.isFinite(inicio)) return <>{reserva}</>;
+  // sem largada o id é o nome do evento, e Date.parse("... 2") dá o ano 2001: só vale horário das últimas 24 h
+  if (!Number.isFinite(inicio) || inicio > agora + 60_000 || agora - inicio > 86_400_000) return <>{reserva}</>;
   const ms = Math.max(0, agora - inicio);
   return <>{Math.floor(ms / 3600000)}:{String(Math.floor((ms % 3600000) / 60000)).padStart(2, '0')}:{String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}.{String(ms % 1000).padStart(3, '0')}</>;
 }
