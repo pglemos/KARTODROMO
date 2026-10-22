@@ -173,7 +173,7 @@ export function FloatingTabBar(props: FloatingTabBarProps) {
               <SportsIcon
                 name={item.icon}
                 size={22}
-                color={isFocused ? '#F59E0B' : '#A1A1AA'}
+                color={isFocused ? '#2BF27A' : '#A1A1AA'}
               />
               <Text
                 style={[

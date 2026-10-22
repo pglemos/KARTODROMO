@@ -175,7 +175,7 @@ export function AgendaScreen({
       <View testID="screen-agenda" style={styles.screenContainer}>
         {/* 1. Header Block (Matches IMG_3793.PNG) */}
         <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 }}>
-          <Text accessibilityRole="header" style={{ color: '#FFFFFF', fontSize: 32, fontWeight: '900', letterSpacing: -0.5 }}>Agenda</Text>
+          <Text accessibilityRole="header" style={{ color: '#FFFFFF', fontSize: 40, fontWeight: '900', fontStyle: 'italic', letterSpacing: -0.5 }}>ESCOLHA SUA <Text style={{ color: '#2BF27A' }}>BATERIA</Text></Text>
           <Text testID="agenda-selected-date" style={{ color: '#9CA3AF', fontSize: 15, marginTop: 2 }}>Escolha o dia e o horário da sua bateria</Text>
         </View>
 
@@ -278,7 +278,7 @@ export function AgendaScreen({
                     {isSoldOut ? 'Esgotado' : slot.availableSlots === 1 ? '1 vaga' : `${slot.availableSlots} vagas`}
                   </Text>
                   <View style={styles.vagasTrilho}>
-                    <View style={[styles.vagasBarra, { width: `${Math.min(100, Math.max(6, (slot.availableSlots / 30) * 100))}%`, backgroundColor: isSoldOut ? '#EF4444' : slot.availableSlots <= 5 ? '#F59E0B' : '#00E676' }]} />
+                    <View style={[styles.vagasBarra, { width: `${Math.min(100, Math.max(6, (slot.availableSlots / 30) * 100))}%`, backgroundColor: isSoldOut ? '#EF4444' : slot.availableSlots <= 5 ? '#F59E0B' : '#2BF27A' }]} />
                   </View>
                 </View>
                 {isSoldOut ? null : (
@@ -471,14 +471,14 @@ const styles = StyleSheet.create({
   agendaStatus: { gap: 12, marginBottom: 16 },
   statusText: { color: '#FFFFFF', fontSize: 15 },
   datePill: { minHeight: 64, minWidth: 72, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 16, backgroundColor: '#1E2228', justifyContent: 'center' },
-  datePillSelected: { backgroundColor: '#F59E0B' },
+  datePillSelected: { backgroundColor: '#2BF27A' },
   dayName: { color: '#9CA3AF', fontSize: 12, fontWeight: '800', letterSpacing: 1, textAlign: 'center' },
   dayNumber: { color: '#FFFFFF', fontSize: 17, fontWeight: '800', textAlign: 'center', marginTop: 2 },
   slotHora: { color: '#FFFFFF', fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
   slotRotulo: { color: '#9CA3AF', fontSize: 11, fontWeight: '800', letterSpacing: 1.5, marginTop: 2 },
   vagasTrilho: { height: 6, borderRadius: 3, backgroundColor: '#2A2E35', marginTop: 8, overflow: 'hidden' },
   vagasBarra: { height: 6, borderRadius: 3 },
-  reservarPill: { backgroundColor: '#F59E0B', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10 },
+  reservarPill: { backgroundColor: '#2BF27A', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10 },
   reservarTexto: { color: '#000000', fontWeight: '800', fontSize: 14 },
   safeArea: {
     flex: 1,
