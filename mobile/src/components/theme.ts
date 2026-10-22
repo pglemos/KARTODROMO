@@ -99,7 +99,9 @@ function createStyles(palette: ThemePalette) {
       color: palette.text,
       fontSize: 34,
       lineHeight: 40,
-      fontWeight: '800',
+      fontWeight: '900',
+      fontStyle: 'italic',
+      textTransform: 'uppercase',
       letterSpacing: -0.6,
     },
     sectionTitle: {
