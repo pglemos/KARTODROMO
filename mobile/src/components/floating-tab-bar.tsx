@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   tabLabelActive: {
-    color: '#FFFFFF',
+    color: '#2BF27A',
     fontWeight: '600',
     letterSpacing: 0.2,
   },
@@ -261,6 +261,6 @@ function PilulaAtiva({ pilula, indice, largura }: { pilula: Animated.Value; indi
   }, [indice, largura, pilula]);
   return (
     <Animated.View pointerEvents="none" testID="tab-active-indicator"
-      style={{ position: 'absolute', left: 6, top: 5, bottom: 5, width: largura, borderRadius: 27, backgroundColor: 'rgba(255, 255, 255, 0.12)', transform: [{ translateX: pilula }] }} />
+      style={{ position: 'absolute', left: 6, top: 5, bottom: 5, width: largura, borderRadius: 27, backgroundColor: 'rgba(43, 242, 122, 0.16)', transform: [{ translateX: pilula }] }} />
   );
 }

@@ -6,10 +6,11 @@ import { router, type Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
-import { ActivityIndicator, Alert, Animated, Easing, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Easing, Image, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from './brand';
+import { Esmaecer, fotos } from './hero-foto';
 import { FotoPiloto } from './foto-piloto';
 import { Entrada, tap, ListaEsqueleto } from './motion';
 import { BotaoCompartilhar } from './cartao-compartilhar';
@@ -192,25 +193,36 @@ export default function CarreiraPilotoTela({ id, aba = false }: { id: string; ab
         refreshControl={<RefreshControl refreshing={carregando} onRefresh={() => void carregar()} tintColor={palette.accent} />}>
         {topo}
         <Entrada>
-          <View style={{ alignItems: 'center', gap: 8 }}>
-            <Pressable disabled={!eu || enviandoFoto} onPress={menuFoto} accessibilityRole={eu ? 'button' : undefined} accessibilityLabel={eu ? 'Trocar foto' : undefined}
-              style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.95 : 1 }] })}>
-              <View style={{ padding: 4, borderRadius: 60, backgroundColor: palette.surfaceElevated }}>
-                <FotoPiloto key={versaoFoto} id={dados.id} versao={versaoFoto} nome={dados.nome} tamanho={104} cor={cat.cor} />
-              </View>
-              {eu ? (
-                <View style={{ position: 'absolute', right: 0, bottom: 0, width: 34, height: 34, borderRadius: 17, backgroundColor: palette.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: palette.background }}>
-                  {enviandoFoto ? <ActivityIndicator size="small" color="#000000" /> : <Text style={{ color: '#000000', fontWeight: '900', fontSize: 18, lineHeight: 20 }}>+</Text>}
-                </View>
-              ) : null}
-            </Pressable>
-            <Text accessibilityRole="header" style={{ color: palette.text, fontSize: 24, fontWeight: '900', textAlign: 'center' }}>{nomeBonito(dados.nome)}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: cat.cor, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999 }}>
-              <Icon name="star" color="#000000" size={14} />
-              <Text style={{ color: '#000000', fontWeight: '900', fontSize: 13, letterSpacing: 1 }}>{cat.nome}</Text>
+          <View style={{ marginHorizontal: -16, paddingHorizontal: 16, paddingVertical: 18, overflow: 'hidden' }}>
+            <View pointerEvents="none" style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '70%' }}>
+              <Image source={fotos.carreira} resizeMode="cover" style={{ width: '100%', height: '100%', opacity: 0.9 }} />
+              <Esmaecer lado="left" tamanho={140} />
+              <Esmaecer lado="bottom" tamanho={60} />
             </View>
-            {dados.primeira ? <Text style={{ color: palette.textMuted, fontSize: 13 }}>Na pista desde {formatarDia(dados.primeira)}</Text> : null}
-            <BotaoCompartilhar dados={dados} xp={xp} cat={cat} versaoFoto={versaoFoto} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+              <Pressable disabled={!eu || enviandoFoto} onPress={menuFoto} accessibilityRole={eu ? 'button' : undefined} accessibilityLabel={eu ? 'Trocar foto' : undefined}
+                style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.95 : 1 }] })}>
+                <View style={{ padding: 4, borderRadius: 64, borderWidth: 3, borderColor: '#2BF27A', backgroundColor: '#0B110E', shadowColor: '#2BF27A', shadowOpacity: 0.6, shadowRadius: 14 }}>
+                  <FotoPiloto key={versaoFoto} id={dados.id} versao={versaoFoto} nome={dados.nome} tamanho={104} cor={cat.cor} />
+                </View>
+                {eu ? (
+                  <View style={{ position: 'absolute', right: 0, bottom: 0, width: 36, height: 36, borderRadius: 18, backgroundColor: '#111815', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#2F3B35' }}>
+                    {enviandoFoto ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 18, lineHeight: 20 }}>+</Text>}
+                  </View>
+                ) : null}
+              </Pressable>
+              <View style={{ flex: 1, gap: 8 }}>
+                <Text accessibilityRole="header" style={{ color: '#FFFFFF', fontSize: 22, lineHeight: 26, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.8)', textShadowRadius: 8 }}>{nomeBonito(dados.nome)}</Text>
+                <View style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: cat.cor, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 }}>
+                  <Icon name="crown" color="#000000" size={14} />
+                  <Text style={{ color: '#000000', fontWeight: '900', fontSize: 14, letterSpacing: 1 }}>{cat.nome}</Text>
+                </View>
+                {dados.primeira ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Icon name="calendar" color="#D4DBD7" size={14} /><Text style={{ color: '#D4DBD7', fontSize: 13 }}>Na pista desde {formatarDia(dados.primeira)}</Text></View> : null}
+              </View>
+            </View>
+            <View style={{ alignItems: 'flex-end', marginTop: 10 }}>
+              <BotaoCompartilhar dados={dados} xp={xp} cat={cat} versaoFoto={versaoFoto} />
+            </View>
           </View>
         </Entrada>
 

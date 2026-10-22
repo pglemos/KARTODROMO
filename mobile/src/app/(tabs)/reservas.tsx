@@ -4,6 +4,7 @@ import { Alert, FlatList, Pressable, TouchableOpacity, Text, TextInput, View } f
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '../../components/brand';
+import { HeroFoto, fotos } from '../../components/hero-foto';
 import type { SessionTokens } from '../../api/contracts';
 
 import { reservationsApi } from '../../features/reservations/api';
@@ -300,11 +301,27 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
 
   return (
     <View style={{ gap: 14 }}>
-      <Panel>
-        <Text style={{ color: palette.accent, fontSize: 14, fontWeight: '800' }}>{formatDateTime(slot.inicio)}</Text>
-        <Text style={{ color: palette.text, fontSize: 19, fontWeight: '800', marginTop: 7 }}>{slot.nome}</Text>
-        <Text style={[styles.muted, { marginTop: 8 }]}>{slot.livres} vagas disponíveis · {formatBrl(agenda.precoCentavos)} por piloto</Text>
-      </Panel>
+      <View style={{ marginHorizontal: -20, marginTop: -16 }}>
+        <HeroFoto foto={fotos.reserva} rotulo="RESERVA DE BATERIA" linha1="CONFIRMAR" linha2="RESERVA" texto="Revise os detalhes e preencha suas informações para garantir sua vaga na pista." altura={300} />
+      </View>
+      <View style={{ borderRadius: 20, borderWidth: 1, borderColor: '#1C2621', backgroundColor: '#0D1411', padding: 14, gap: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ width: 52, height: 52, borderRadius: 14, backgroundColor: '#0F2418', alignItems: 'center', justifyContent: 'center' }}><Icon name="calendar" color="#2BF27A" size={26} /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: '#A8B3AD', fontSize: 11, letterSpacing: 1 }}>DATA E HORÁRIO</Text>
+            <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '800', fontVariant: ['tabular-nums'] }}>{formatDateTime(slot.inicio)}</Text>
+            <Text style={{ color: '#2BF27A', fontSize: 12, fontWeight: '800', marginTop: 2 }} numberOfLines={1}>{slot.nome.toUpperCase()}</Text>
+          </View>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {[['VAGAS', `${slot.livres} vagas`], ['DURAÇÃO', '20 min'], ['POR PILOTO', formatBrl(agenda.precoCentavos)]].map(([r, v]) => (
+            <View key={r} style={{ flex: 1, borderRadius: 12, backgroundColor: '#111815', padding: 10 }}>
+              <Text style={{ color: '#A8B3AD', fontSize: 10, letterSpacing: 0.5 }}>{r}</Text>
+              <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '800', marginTop: 2 }} numberOfLines={1}>{v}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
 
       <Text accessibilityRole="header" style={[styles.sectionTitle, { marginTop: 12 }]}>Participantes</Text>
       <Field label="Quantidade de vagas">

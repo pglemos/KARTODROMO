@@ -20,6 +20,7 @@ import { formatDateTime } from '../features/reservations/components';
 import { useSession } from '../session/provider';
 import { AgendaSlot } from '../types/racing';
 import { Brand } from './brand';
+import { HeroFoto, fotos } from './hero-foto';
 import { Entrada, tap, ListaEsqueleto } from './motion';
 import { CartModal } from './cart-modal';
 import { FloatingCartBar } from './floating-cart-bar';
@@ -171,14 +172,8 @@ export function AgendaScreen({
   };
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <View testID="screen-agenda" style={styles.screenContainer}>
-        {/* 1. Header Block (Matches IMG_3793.PNG) */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 }}>
-          <Text accessibilityRole="header" style={{ color: '#FFFFFF', fontSize: 40, fontWeight: '900', fontStyle: 'italic', letterSpacing: -0.5 }}>ESCOLHA SUA <Text style={{ color: '#2BF27A' }}>BATERIA</Text></Text>
-          <Text testID="agenda-selected-date" style={{ color: '#9CA3AF', fontSize: 15, marginTop: 2 }}>Escolha o dia e o horário da sua bateria</Text>
-        </View>
-
         <FlatList
           testID="agenda-slots-list"
           style={styles.slotsList}
@@ -187,6 +182,11 @@ export function AgendaScreen({
           data={activeSlots}
           keyExtractor={(slot) => String(slot.id)}
           ListHeaderComponent={<>
+          <View style={{ marginHorizontal: -20 }}>
+            <HeroFoto foto={fotos.agenda} rotulo="AGENDA" linha1="ESCOLHA" linha2="SUA BATERIA" altura={330} topo={<Brand width={170} />}>
+              <Text testID="agenda-selected-date" style={{ color: '#D4DBD7', fontSize: 15, lineHeight: 21, maxWidth: 250 }}>Selecione o dia e o horário da sua bateria e garanta sua vaga na pista.</Text>
+            </HeroFoto>
+          </View>
           {bookingOnSite && <Text style={styles.statusText}>Horários oficiais. A reserva será concluída no site do kartódromo.</Text>}
 
           {/* Falhas da API nunca viram vagas demonstrativas. */}
@@ -269,17 +269,21 @@ export function AgendaScreen({
                 onPress={handlePressSlot}
                 style={({ pressed }) => [styles.slotCard, isSoldOut && styles.slotCardSoldOut, { transform: [{ scale: pressed ? 0.98 : 1 }], opacity: pressed ? 0.9 : 1 }]}
               >
-                <View style={{ width: 92 }}>
+                <View style={{ width: 96 }}>
                   <Text style={[styles.slotHora, styles.tabularNums]}>{slot.time}</Text>
                   <Text style={styles.slotRotulo} numberOfLines={2}>{nomeEspecial(slot.title, slot.time) ?? 'BATERIA'}</Text>
+                  <Text style={{ color: '#C9D2CD', fontSize: 12, marginTop: 6 }}>20 min</Text>
                 </View>
-                <View style={{ flex: 1, paddingRight: 12 }}>
+                <View style={{ flex: 1, paddingRight: 10, gap: 8 }}>
                   <Text testID={`slot-vagas-${slot.id}`} style={[styles.slotVagas, isSoldOut ? styles.vagasSoldOut : styles.vagasAvailable]}>
                     {isSoldOut ? 'Esgotado' : slot.availableSlots === 1 ? '1 vaga' : `${slot.availableSlots} vagas`}
                   </Text>
-                  <View style={styles.vagasTrilho}>
-                    <View style={[styles.vagasBarra, { width: `${Math.min(100, Math.max(6, (slot.availableSlots / 30) * 100))}%`, backgroundColor: isSoldOut ? '#EF4444' : slot.availableSlots <= 5 ? '#F59E0B' : '#2BF27A' }]} />
+                  <View style={{ flexDirection: 'row', gap: 2 }}>
+                    {Array.from({ length: 20 }, (_, i) => (
+                      <View key={i} style={{ flex: 1, height: 10, borderRadius: 2, backgroundColor: i < Math.round(Math.min(1, slot.availableSlots / 30) * 20) ? (isSoldOut ? '#EF4444' : slot.availableSlots <= 5 ? '#F59E0B' : '#2BF27A') : '#24302A' }} />
+                    ))}
                   </View>
+                  <Text style={{ color: '#A8B3AD', fontSize: 11 }}>Tomada de tempo · Individual</Text>
                 </View>
                 {isSoldOut ? null : (
                   <View style={styles.reservarPill}>
@@ -470,7 +474,7 @@ const condensedFont = Platform.select({
 const styles = StyleSheet.create({
   agendaStatus: { gap: 12, marginBottom: 16 },
   statusText: { color: '#FFFFFF', fontSize: 15 },
-  datePill: { minHeight: 64, minWidth: 72, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 16, backgroundColor: '#1E2228', justifyContent: 'center' },
+  datePill: { minHeight: 74, minWidth: 78, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 16, backgroundColor: '#0D1411', borderWidth: 1, borderColor: '#1C2621', justifyContent: 'center' },
   datePillSelected: { backgroundColor: '#2BF27A' },
   dayName: { color: '#9CA3AF', fontSize: 12, fontWeight: '800', letterSpacing: 1, textAlign: 'center' },
   dayNumber: { color: '#FFFFFF', fontSize: 17, fontWeight: '800', textAlign: 'center', marginTop: 2 },
@@ -531,8 +535,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   slotsListContent: {
-    paddingHorizontal: 14,
-    paddingTop: 14,
+    paddingHorizontal: 20,
+    paddingTop: 0,
     paddingBottom: 140,
   },
   partnerCard: {
@@ -567,11 +571,13 @@ const styles = StyleSheet.create({
   },
   slotCard: {
     flexDirection: 'row',
-    backgroundColor: '#181C20',
-    borderRadius: 14,
+    backgroundColor: '#0D1411',
+    borderWidth: 1,
+    borderColor: '#1C2621',
+    borderRadius: 18,
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginBottom: 10,
+    paddingVertical: 16,
+    marginBottom: 12,
     alignItems: 'center',
   },
   slotCardSoldOut: {

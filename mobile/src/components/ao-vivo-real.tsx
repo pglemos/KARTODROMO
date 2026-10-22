@@ -8,7 +8,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, FlatList, Platform, Pressable, RefreshControl, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Icon } from './brand';
+import { Brand, Icon } from './brand';
+import { HeroFoto, fotos } from './hero-foto';
 import { Entrada, tap } from './motion';
 import { useUi } from './theme';
 import { useAgoraCrono } from '../features/live/api';
@@ -67,37 +68,23 @@ function Linha({ c, ganhou, index, maisRapida }: { c: LiveCompetitor; ganhou: nu
     <Entrada index={index}>
       <Pressable onPress={() => { tap(); router.push(`/cockpit?kart=${encodeURIComponent(c.kartNumber)}` as Href); }} accessibilityRole="button"
         accessibilityLabel={`${c.position}º, ${c.name}, kart ${c.kartNumber}, melhor volta ${c.bestLapTime}. Toque para abrir o cockpit.`}
-        style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 12, marginBottom: 8, borderRadius: 18,
-          backgroundColor: palette.surface, borderWidth: 1, borderColor: c.position === 1 ? 'rgba(245,158,11,0.45)' : palette.borderSubtle, transform: [{ scale: pressed ? 0.98 : 1 }] })}>
-        <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: medalha ?? palette.surfaceElevated, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ color: medalha ? '#000000' : palette.text, fontSize: 18, fontWeight: '900', fontVariant: ['tabular-nums'] }}>{c.position}</Text>
+        style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 8, marginBottom: 6, borderRadius: 14,
+          backgroundColor: '#0D1411', borderWidth: 1, borderColor: c.position === 1 ? 'rgba(245,184,46,0.7)' : '#1C2621', transform: [{ scale: pressed ? 0.98 : 1 }] })}>
+        <View style={{ width: 32, height: 32, borderRadius: 9, backgroundColor: medalha ?? '#24302A', alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: medalha ? '#000000' : palette.text, fontSize: 15, fontWeight: '900', fontVariant: ['tabular-nums'] }}>{c.position}</Text>
           <Movimento ganhou={ganhou} />
         </View>
-        <View style={{ flex: 1, gap: 6 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <View style={{ flex: 1 }}>
-              <Text numberOfLines={1} style={{ color: palette.text, fontSize: 16, fontWeight: '900', fontFamily: MONO }}>#{c.kartNumber} {/^kart\s*\d+$/i.test(c.name.trim()) ? '' : c.name.toUpperCase()}</Text>
-              <Text style={{ color: palette.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }}>{c.category}</Text>
-            </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={{ color: palette.textMuted, fontSize: 10, fontWeight: '800', fontFamily: MONO }}>VOLTA</Text>
-              <Text style={{ color: palette.text, fontSize: 20, fontWeight: '900', fontFamily: MONO, fontVariant: ['tabular-nums'] }}>{c.currentLap}</Text>
-            </View>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 6 }}>
-            {[
-              { r: 'ÚLTIMA VOLTA', v: c.lastLapTime, cor: palette.text },
-              { r: 'MELHOR VOLTA', v: c.bestLapNumber ? `V${c.bestLapNumber} ${c.bestLapTime}` : c.bestLapTime, cor: maisRapida ? '#FFFFFF' : palette.text, fundo: maisRapida ? palette.purpleNeon : undefined },
-              { r: 'DIFF', v: c.position === 1 ? '—' : c.diffPrev, cor: palette.textSecondary },
-              { r: 'DIF. LÍDER', v: c.position === 1 ? 'LÍDER' : c.diffLeader, cor: c.position === 1 ? palette.accent : palette.textSecondary },
-            ].map((x) => (
-              <View key={x.r} style={{ flex: 1, paddingVertical: 3, paddingHorizontal: 4, borderRadius: 6, backgroundColor: x.fundo }}>
-                <Text numberOfLines={1} style={{ color: x.fundo ? '#FFFFFF' : palette.textMuted, fontSize: 9, fontWeight: '800', letterSpacing: 0.5 }}>{x.r}</Text>
-                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ color: x.cor, fontSize: 14, fontWeight: '800', fontFamily: MONO, fontVariant: ['tabular-nums'] }}>{x.v}</Text>
-              </View>
-            ))}
-          </View>
+        <View style={{ width: 3, height: 30, borderRadius: 2, backgroundColor: medalha ?? (ganhou > 0 ? palette.neonGreen : '#3A4640') }} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ color: '#E6EBE8', fontSize: 12, fontWeight: '800', fontFamily: MONO }}>#{c.kartNumber}</Text>
+          <Text numberOfLines={2} style={{ color: palette.text, fontSize: 12, lineHeight: 14, fontWeight: '900' }}>{/^karts*d+$/i.test(c.name.trim()) ? `KART ${c.kartNumber}` : c.name.toUpperCase()}</Text>
         </View>
+        <Text style={{ width: 58, textAlign: 'right', color: palette.neonGreen, fontSize: 12, fontWeight: '700', fontFamily: MONO, fontVariant: ['tabular-nums'] }}>{c.lastLapTime}</Text>
+        <View style={{ width: 64, alignItems: 'center', paddingVertical: 4, borderRadius: 999, backgroundColor: maisRapida ? '#7B4DFF' : 'transparent' }}>
+          <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700', fontFamily: MONO, fontVariant: ['tabular-nums'] }}>{c.bestLapTime}</Text>
+        </View>
+        <Text style={{ width: 44, textAlign: 'right', color: '#C9D2CD', fontSize: 11.5, fontFamily: MONO, fontVariant: ['tabular-nums'] }}>{c.position === 1 ? '-' : c.diffLeader}</Text>
+        <Text style={{ width: 24, textAlign: 'right', color: palette.text, fontSize: 13, fontWeight: '800', fontVariant: ['tabular-nums'] }}>{c.currentLap}</Text>
       </Pressable>
     </Entrada>
   );
@@ -121,7 +108,7 @@ export function AoVivoReal({ session, onRefresh }: { session: LiveSession; onRef
   }, [session.competitors]);
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
+    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <FlatList
         data={session.competitors}
         keyExtractor={(c) => c.kartNumber}
@@ -130,19 +117,22 @@ export function AoVivoReal({ session, onRefresh }: { session: LiveSession; onRef
         refreshControl={<RefreshControl refreshing={atualizando} tintColor={palette.accent} onRefresh={() => { setAtualizando(true); void Promise.resolve(onRefresh()).finally(() => setAtualizando(false)); }} />}
         ListHeaderComponent={
           <View style={{ paddingTop: 12, paddingBottom: 6, gap: 12 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Text accessibilityRole="header" style={[styles.title, { flex: 1 }]}>Ao vivo</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: aoVivo ? 'rgba(239,68,68,0.15)' : palette.surface }}>
-                {aoVivo ? <PontoAoVivo cor={palette.neonRed} /> : <Icon name="flag" color={palette.textSecondary} size={14} />}
-                <Text style={{ color: aoVivo ? palette.neonRed : palette.textSecondary, fontWeight: '800', fontSize: 13, fontVariant: ['tabular-nums'] }}>{aoVivo ? <RelogioMs inicio={Date.parse(session.id)} reserva={session.elapsedTime} /> : 'Encerrada'}</Text>
-              </View>
-            </View>
-            <View>
-              <Text style={{ color: palette.text, fontSize: 18, fontWeight: '800' }}>{session.title}</Text>
-              <Text style={{ color: palette.textMuted, fontSize: 13, marginTop: 2 }}>{session.subtitle} · {session.competitors.length} pilotos</Text>
+            <View style={{ marginHorizontal: -16, marginTop: -12 }}>
+              <HeroFoto foto={fotos.aovivo} rotulo={aoVivo ? 'AO VIVO' : 'ÚLTIMA BATERIA'} linha1={(() => { const t = session.title.trim().split(/s+/); return t.length > 1 ? [t.slice(0, -1).join(' '), t[t.length - 1]] : [t[0] ?? 'Bateria', '']; })()[0].toUpperCase()} linha2={(() => { const t = session.title.trim().split(/s+/); return t.length > 1 ? [t.slice(0, -1).join(' '), t[t.length - 1]] : [t[0] ?? 'Bateria', '']; })()[1].toUpperCase() || undefined} altura={300}
+                topo={
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={{ flex: 1 }}><Brand width={150} /></View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, height: 40, borderRadius: 20, borderWidth: 1, borderColor: '#1C2621', backgroundColor: aoVivo ? 'rgba(239,68,68,0.18)' : 'rgba(17,24,21,0.9)' }}>
+                      {aoVivo ? <PontoAoVivo cor={palette.neonRed} /> : <Icon name="flag" color="#FFFFFF" size={14} />}
+                      <Text style={{ color: aoVivo ? palette.neonRed : '#FFFFFF', fontWeight: '800', fontSize: 14, fontVariant: ['tabular-nums'] }}>{aoVivo ? <RelogioMs inicio={Date.parse(session.id)} reserva={session.elapsedTime} /> : 'Encerrada'}</Text>
+                    </View>
+                  </View>
+                }>
+                <Text style={{ color: '#A8B3AD', fontSize: 13, letterSpacing: 1 }}>{session.subtitle.toUpperCase()} · {session.competitors.length} PILOTOS</Text>
+              </HeroFoto>
             </View>
             {session.fastestLap ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 18, backgroundColor: palette.purpleNeon }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 20, backgroundColor: '#24124F', borderWidth: 1.5, borderColor: '#8B5CF6', shadowColor: '#8B5CF6', shadowOpacity: 0.45, shadowRadius: 16, elevation: 6 }}>
                 <Icon name="bolt" color="#FFFFFF" size={22} />
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '800', letterSpacing: 1, fontFamily: MONO }}>VOLTA MAIS RÁPIDA</Text>
@@ -156,6 +146,14 @@ export function AoVivoReal({ session, onRefresh }: { session: LiveSession; onRef
             ) : null}
             {aoVivo ? <Text style={{ color: palette.textMuted, fontSize: 12 }}>Toque num piloto para acompanhar pelo cockpit. Última volta e, embaixo, a melhor.</Text>
               : <Text style={{ color: palette.textSecondary, fontSize: 13, lineHeight: 19 }}>Nenhuma bateria na pista agora — este é o resultado da última que terminou. A próxima aparece aqui sozinha assim que o primeiro kart cruzar a linha.</Text>}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8 }}>
+              {[['#', 32], ['', 3]].map(([t, w]) => <Text key={String(w)} style={{ width: w as number, color: '#8C9892', fontSize: 10, fontWeight: '700', textAlign: 'center' }}>{t}</Text>)}
+              <Text style={{ flex: 1, color: '#8C9892', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 }}>PILOTO</Text>
+              <Text style={{ width: 58, textAlign: 'right', color: '#8C9892', fontSize: 10, fontWeight: '700' }}>ÚLTIMA</Text>
+              <Text style={{ width: 64, textAlign: 'center', color: '#8C9892', fontSize: 10, fontWeight: '700' }}>MELHOR</Text>
+              <Text style={{ width: 44, textAlign: 'right', color: '#8C9892', fontSize: 10, fontWeight: '700' }}>DIFF</Text>
+              <Text style={{ width: 24, textAlign: 'right', color: '#8C9892', fontSize: 10, fontWeight: '700' }}>V</Text>
+            </View>
           </View>
         }
       />
