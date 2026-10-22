@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from './brand';
 import { CarreiraTopo } from './carreira-desenho';
+import { useK } from './design-kit';
 import { Entrada, tap, ListaEsqueleto } from './motion';
 import { BotaoCompartilhar } from './cartao-compartilhar';
 import { RegrasRanking } from './ranking-regras';
@@ -35,10 +36,11 @@ function Contador({ valor, estilo, sufixo = '' }: { valor: number; estilo: objec
 
 function Cartao({ titulo, children, index = 0 }: { titulo?: string; children: React.ReactNode; index?: number }) {
   const { palette } = useUi();
+  const k = useK();
   return (
     <Entrada index={index}>
-      <View style={{ backgroundColor: palette.surface, borderRadius: 20, padding: 18, borderWidth: 1, borderColor: palette.border, gap: 14 }}>
-        {titulo ? <Text style={{ color: palette.text, fontSize: 17, fontWeight: '800' }}>{titulo}</Text> : null}
+      <View style={{ backgroundColor: '#0E1211', borderRadius: 16 * k, padding: 23 * k, borderWidth: 1, borderColor: '#1F2422', gap: 18 * k, marginHorizontal: (33 - 16 / k) * k }}>
+        {titulo ? <Text style={{ color: palette.text, fontSize: 21 * k, fontWeight: '700' }}>{titulo}</Text> : null}
         {children}
       </View>
     </Entrada>

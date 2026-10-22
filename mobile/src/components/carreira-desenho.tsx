@@ -70,7 +70,7 @@ export function CarreiraTopo({ dados, xp, cat, eu, versaoFoto, enviandoFoto, onF
         <Pressable disabled={!eu || enviandoFoto} onPress={onFoto} accessibilityRole={eu ? 'button' : undefined} accessibilityLabel={eu ? 'Trocar foto' : undefined}
           style={{ position: 'absolute', left: 33 * k, top: y(200) * k, width: 186 * k, height: 186 * k }}>
           <View style={{ width: 186 * k, height: 186 * k, borderRadius: 93 * k, borderWidth: 6 * k, borderColor: cor.verde, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0B110E', shadowColor: cor.verde, shadowOpacity: 0.6, shadowRadius: 16 * k }}>
-            <FotoPiloto key={versaoFoto} id={dados.id} versao={versaoFoto} nome={dados.nome} tamanho={164 * k} cor={cat.cor} />
+            <FotoPiloto key={versaoFoto} id={dados.id} versao={versaoFoto} nome={dados.nome} tamanho={164 * k} cor={cat.cor} padrao={fundos.avatarPadrao} />
           </View>
           {eu ? (
             <View style={{ position: 'absolute', left: 120 * k, top: 129 * k, width: 58 * k, height: 58 * k, borderRadius: 29 * k, backgroundColor: '#111615', borderWidth: 1.5, borderColor: '#3A403D', alignItems: 'center', justifyContent: 'center' }}>

@@ -93,6 +93,7 @@ export const fundos = {
   tileMetas: require('../../assets/design/tile-metas.jpg'),
   tileKarts: require('../../assets/design/tile-karts.jpg'),
   tileModo: require('../../assets/design/tile-modo.jpg'),
+  avatarPadrao: require('../../assets/design/avatar-padrao.jpg'),
   ultimaAtividade: require('../../assets/design/ultima-atividade.jpg'),
   agendaTopo: require('../../assets/design/agenda-topo.jpg'),
   agendaCartao: require('../../assets/design/agenda-cartao.jpg'),
