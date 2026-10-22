@@ -206,7 +206,8 @@ export default function CockpitReal({ kartInicial = null }: { kartInicial?: stri
   const inicioProva = snap?.startedAt ? Date.parse(snap.startedAt) : NaN;
   // tudo proporcional à tela deitada: a altura manda (celular baixo), a largura limita (tablet)
   const alt = Math.min(tela.height, tela.width), larg = Math.max(tela.height, tela.width);
-  const t = { relogio: Math.min(alt * 0.3, larg * 0.13), pos: alt * 0.1, valor: Math.min(alt * 0.11, larg * 0.045), lado: Math.min(alt * 0.085, larg * 0.035), rotulo: Math.max(11, alt * 0.033), topo: Math.max(14, alt * 0.05), nome: Math.max(12, alt * 0.038) };
+  // na web o adjustsFontSizeToFit não encolhe o relógio: o tamanho já sai do que cabe na coluna do meio
+  const t = { relogio: Math.min(alt * 0.3, larg * (Platform.OS === 'web' ? 0.085 : 0.13)), pos: alt * 0.1, valor: Math.min(alt * 0.11, larg * 0.045), lado: Math.min(alt * 0.085, larg * 0.035), rotulo: Math.max(11, alt * 0.033), topo: Math.max(14, alt * 0.05), nome: Math.max(12, alt * 0.038) };
   const grande = { color: c.texto, fontFamily: MONO, fontSize: t.valor, fontWeight: '800' as const, fontVariant: ['tabular-nums' as const] };
 
   return (
@@ -237,7 +238,7 @@ export default function CockpitReal({ kartInicial = null }: { kartInicial?: stri
 
         {/* meio: atrás · posição + volta correndo · à frente */}
         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ flex: 1, alignItems: 'flex-start', gap: 4 }}>
+          <View style={{ flex: 1, minWidth: 0, alignItems: 'flex-start', gap: 4 }}>
             <Rotulo texto={atras ? `ATRÁS #${atras.kart}` : 'ATRÁS'} cor={c.apagado} tamanho={t.rotulo} />
             <Text numberOfLines={1} style={{ color: c.texto, fontFamily: MONO, fontSize: t.nome }}>{atras ? nomeBonito(atras.name).toUpperCase() : '—'}</Text>
             <Pulso valor={atras ? (Number.isFinite(difAtras) && difAtras > 0 ? `+${seg(difAtras)}` : /volta/.test(atras.gap) ? atras.gap : '—') : '—'} estilo={{ ...grande, fontSize: t.lado, color: c.verde }} />
@@ -246,7 +247,7 @@ export default function CockpitReal({ kartInicial = null }: { kartInicial?: stri
             <Pulso valor={eu.position ? `P${eu.position}` : 'P–'} estilo={{ color: eu.position === 1 ? c.ouro : c.texto, fontFamily: MONO, fontSize: t.pos, lineHeight: t.pos * 1.1, fontWeight: '900' }} />
             <VoltaCorrendo inicio={ao ? eu.passouEm ?? inicioVolta : null} cor={c.texto} tamanho={t.relogio} fim={!ao} />
           </View>
-          <View style={{ flex: 1, alignItems: 'flex-end', gap: 4 }}>
+          <View style={{ flex: 1, minWidth: 0, alignItems: 'flex-end', gap: 4 }}>
             <Rotulo texto={frente ? `À FRENTE #${frente.kart}` : 'LÍDER'} cor={c.apagado} tamanho={t.rotulo} />
             <Text numberOfLines={1} style={{ color: c.texto, fontFamily: MONO, fontSize: t.nome }}>{frente ? nomeBonito(frente.name).toUpperCase() : 'VOCÊ'}</Text>
             <Pulso valor={frente ? (Number.isFinite(difFrente) && difFrente > 0 ? `-${seg(difFrente)}` : '—') : '★'} estilo={{ ...grande, fontSize: t.lado, color: frente ? c.vermelho : c.ouro }} />
