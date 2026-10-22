@@ -488,7 +488,7 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
                 ? <View style={{ width: 46 * k, alignItems: 'center' }}><Icon name="pix" color="#33E6A0" size={44 * k} /></View>
                 : <View style={{ width: 64 * k, height: 56 * k, borderRadius: 12 * k, backgroundColor: '#1A1F1D', alignItems: 'center', justifyContent: 'center' }}><Icon name="card" color="#FFFFFF" size={32 * k} /></View>}
               <View style={{ flex: 1 }}>
-                <T s={21} p="700">{m === 'pix' ? 'Pix' : 'Cartão de crédito'}</T>
+                <T s={20} p="700" linhas={1} style={{ letterSpacing: -0.3 * k }}>{m === 'pix' ? 'Pix' : 'Cartão de crédito'}</T>
                 <T s={17} c="#C9CFCC" style={{ marginTop: 4 * k }}>{m === 'pix' ? 'Aprovação imediata' : 'Em até 12x'}</T>
               </View>
               <View style={{ marginRight: 14 * k, width: 30 * k, height: 30 * k, borderRadius: 15 * k, backgroundColor: sel ? '#22D865' : 'transparent', borderWidth: sel ? 0 : 1.5, borderColor: '#8E9692', alignItems: 'center', justifyContent: 'center' }}>
