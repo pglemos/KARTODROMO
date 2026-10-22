@@ -7,7 +7,6 @@ import {
   Linking,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -20,7 +19,8 @@ import { formatDateTime } from '../features/reservations/components';
 import { useSession } from '../session/provider';
 import { AgendaSlot } from '../types/racing';
 import { Brand } from './brand';
-import { HeroFoto, fotos } from './hero-foto';
+import { CabecalhoAgenda, CartaoHorario, tipoDe, type TipoHorario } from './agenda-desenho';
+import { Desenho } from './design-kit';
 import { Entrada, tap, ListaEsqueleto } from './motion';
 import { CartModal } from './cart-modal';
 import { FloatingCartBar } from './floating-cart-bar';
@@ -30,27 +30,6 @@ import { SPORTS_PALETTE } from './theme';
 export interface AgendaScreenProps {
   onAddToCart?: (slot: AgendaSlot, quantity: number) => void;
   slots?: AgendaSlot[];
-}
-
-const DIAS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
-const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-/** "21/10/2026" → "TER" (ou "HOJE"/"AMANHÃ") */
-function diaDaSemana(data: string) {
-  const [d, m, a] = data.split('/').map(Number);
-  const dia = new Date(a, m - 1, d);
-  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-  const diff = Math.round((dia.getTime() - hoje.getTime()) / 86_400_000);
-  return diff === 0 ? 'HOJE' : diff === 1 ? 'AMANHÃ' : DIAS[dia.getDay()] ?? '';
-}
-/** nome da bateria só quando não é o padrão "BATERIA 17:00" (ex.: evento, grupo) */
-function nomeEspecial(titulo: string, hora: string) {
-  const t = (titulo ?? '').trim();
-  return !t || t.toUpperCase() === `BATERIA ${hora}` ? null : t;
-}
-/** "21/10/2026" → "21 out" */
-function diaMes(data: string) {
-  const [d, m] = data.split('/').map(Number);
-  return `${d} ${MESES[m - 1] ?? ''}`;
 }
 
 export function AgendaScreen({
@@ -136,6 +115,8 @@ export function AgendaScreen({
   }, [slots, selectedDate]);
 
   const activeSlots = filteredSlots;
+  const [tipo, setTipo] = useState<TipoHorario>('bateria');
+  const visiveis = useMemo(() => activeSlots.filter((sl) => tipoDe(sl.title) === tipo), [activeSlots, tipo]);
 
   const handleOpenSlot = (slot: AgendaSlot) => {
     if (slot.isSoldOut) return;
@@ -172,64 +153,31 @@ export function AgendaScreen({
   };
 
   return (
+    <Desenho>
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <View testID="screen-agenda" style={styles.screenContainer}>
         <FlatList
           testID="agenda-slots-list"
           style={styles.slotsList}
-          contentContainerStyle={styles.slotsListContent}
+          contentContainerStyle={{ paddingBottom: 140 }}
           showsVerticalScrollIndicator={false}
-          data={activeSlots}
+          data={visiveis}
           keyExtractor={(slot) => String(slot.id)}
-          ListHeaderComponent={<>
-          <View style={{ marginHorizontal: -20 }}>
-            <HeroFoto foto={fotos.agenda} rotulo="AGENDA" linha1="ESCOLHA" linha2="SUA BATERIA" altura={330} topo={<Brand width={170} />}>
-              <Text testID="agenda-selected-date" style={{ color: '#D4DBD7', fontSize: 15, lineHeight: 21, maxWidth: 250 }}>Selecione o dia e o horário da sua bateria e garanta sua vaga na pista.</Text>
-            </HeroFoto>
-          </View>
+          ListHeaderComponent={<CabecalhoAgenda
+            dates={dates} selectedDate={selectedDate} onDate={(d) => { tap(); setSelectedDate(d); }}
+            tipo={tipo} onTipo={(t) => { tap(); setTipo(t); }}>
           {bookingOnSite && <Text style={styles.statusText}>Horários oficiais. A reserva será concluída no site do kartódromo.</Text>}
-
-          {/* Falhas da API nunca viram vagas demonstrativas. */}
-          <View style={styles.agendaStatus}>
-            <ScrollView horizontal contentContainerStyle={{ gap: 8 }}>
-              {dates.map((date) => {
-                const isSelected = selectedDate === date;
-                return (
-                  <Pressable
-                    key={date}
-                    testID={`date-pill-${date}`}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: isSelected }}
-                    onPress={() => { tap(); setSelectedDate(date); }}
-                    style={[styles.datePill, isSelected && styles.datePillSelected]}
-                  >
-                    <Text style={[styles.dayName, isSelected && { color: '#000000' }]}>{diaDaSemana(date)}</Text>
-                    <Text style={[styles.dayNumber, isSelected && { color: '#000000' }]}>{diaMes(date)}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-
-            {apiError ? (
-              <View>
-                <Text accessibilityRole="alert" style={styles.statusText}>{apiError}</Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Tentar novamente"
-                  style={styles.datePill}
-                  onPress={loadBackendAgenda}
-                >
-                  <Text style={styles.statusText}>Tentar novamente</Text>
-                </Pressable>
-              </View>
-            ) : null}
-          </View>
-
-          {!customSlots && apiSlots === null && !apiError && <ListaEsqueleto itens={5} altura={92} rotulo="Carregando horários" />}
-          {!apiError && apiSlots !== null && activeSlots.length === 0 && <Text style={styles.statusText}>Nenhum horário disponível nesta data.</Text>}
-
-          {/* 5. Battery Slots Cards (Matches IMG_3793.PNG) */}
-          </>}
+          {apiError ? (
+            <View style={{ paddingHorizontal: 20 }}>
+              <Text accessibilityRole="alert" style={styles.statusText}>{apiError}</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="Tentar novamente" style={styles.datePill} onPress={loadBackendAgenda}>
+                <Text style={styles.statusText}>Tentar novamente</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {!customSlots && apiSlots === null && !apiError && <View style={{ paddingHorizontal: 14 }}><ListaEsqueleto itens={5} altura={92} rotulo="Carregando horários" /></View>}
+          {!apiError && apiSlots !== null && visiveis.length === 0 && <Text style={[styles.statusText, { paddingHorizontal: 20 }]}>{activeSlots.length ? 'Nenhum horário deste tipo nesta data.' : 'Nenhum horário disponível nesta data.'}</Text>}
+          </CabecalhoAgenda>}
           renderItem={({ item: slot, index }) => {
             const isSoldOut = slot.isSoldOut || slot.availableSlots <= 0;
             const isBackend = slot.isBackendSlot;
@@ -261,36 +209,10 @@ export function AgendaScreen({
 
             return (
               <Entrada index={index}>
-              <Pressable
-                testID={`agenda-slot-card-${slot.id}`}
-                accessibilityRole="button"
-                accessibilityLabel={isSoldOut ? `${slot.time}, esgotado` : bookingOnSite ? 'Reservar no site' : `Reservar bateria das ${slot.time}, ${slot.availableSlots} vagas`}
-                disabled={isSoldOut}
-                onPress={handlePressSlot}
-                style={({ pressed }) => [styles.slotCard, isSoldOut && styles.slotCardSoldOut, { transform: [{ scale: pressed ? 0.98 : 1 }], opacity: pressed ? 0.9 : 1 }]}
-              >
-                <View style={{ width: 96 }}>
-                  <Text style={[styles.slotHora, styles.tabularNums]}>{slot.time}</Text>
-                  <Text style={styles.slotRotulo} numberOfLines={2}>{nomeEspecial(slot.title, slot.time) ?? 'BATERIA'}</Text>
-                  <Text style={{ color: '#C9D2CD', fontSize: 12, marginTop: 6 }}>20 min</Text>
-                </View>
-                <View style={{ flex: 1, paddingRight: 10, gap: 8 }}>
-                  <Text testID={`slot-vagas-${slot.id}`} style={[styles.slotVagas, isSoldOut ? styles.vagasSoldOut : styles.vagasAvailable]}>
-                    {isSoldOut ? 'Esgotado' : slot.availableSlots === 1 ? '1 vaga' : `${slot.availableSlots} vagas`}
-                  </Text>
-                  <View style={{ flexDirection: 'row', gap: 2 }}>
-                    {Array.from({ length: 20 }, (_, i) => (
-                      <View key={i} style={{ flex: 1, height: 10, borderRadius: 2, backgroundColor: i < Math.round(Math.min(1, slot.availableSlots / 30) * 20) ? (isSoldOut ? '#EF4444' : slot.availableSlots <= 5 ? '#F59E0B' : '#2BF27A') : '#24302A' }} />
-                    ))}
-                  </View>
-                  <Text style={{ color: '#A8B3AD', fontSize: 11 }}>Tomada de tempo · Individual</Text>
-                </View>
-                {isSoldOut ? null : (
-                  <View style={styles.reservarPill}>
-                    <Text style={styles.reservarTexto}>{isBackend ? (bookingOnSite ? 'No site' : 'Reservar') : 'Escolher'}</Text>
-                  </View>
-                )}
-              </Pressable>
+                <CartaoHorario slot={slot} destaque={index === 0} esgotado={isSoldOut}
+                  rotuloBotao={isBackend ? (bookingOnSite ? 'No site' : 'Reservar') : 'Escolher'}
+                  rotulo={isSoldOut ? `${slot.time}, esgotado` : bookingOnSite ? 'Reservar no site' : `Reservar bateria das ${slot.time}, ${slot.availableSlots} vagas`}
+                  onPress={handlePressSlot} />
               </Entrada>
             );
           }}
@@ -462,6 +384,7 @@ export function AgendaScreen({
         )}
       </View>
     </SafeAreaView>
+    </Desenho>
   );
 }
 

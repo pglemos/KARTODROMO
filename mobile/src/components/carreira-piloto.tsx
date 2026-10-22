@@ -6,12 +6,11 @@ import { router, type Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
-import { ActivityIndicator, Alert, Animated, Easing, Image, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Alert, Animated, Easing, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from './brand';
-import { Esmaecer, fotos } from './hero-foto';
-import { FotoPiloto } from './foto-piloto';
+import { CarreiraTopo } from './carreira-desenho';
 import { Entrada, tap, ListaEsqueleto } from './motion';
 import { BotaoCompartilhar } from './cartao-compartilhar';
 import { RegrasRanking } from './ranking-regras';
@@ -32,17 +31,6 @@ function Contador({ valor, estilo, sufixo = '' }: { valor: number; estilo: objec
     return () => anim.removeListener(id);
   }, [anim, valor]);
   return <Text style={estilo}>{mostrado.toLocaleString('pt-BR')}{sufixo}</Text>;
-}
-
-function BarraXp({ progresso, cor }: { progresso: number; cor: string }) {
-  const { palette } = useUi();
-  const [anim] = useState(() => new Animated.Value(0));
-  useEffect(() => { Animated.timing(anim, { toValue: progresso, duration: 1000, delay: 200, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start(); }, [anim, progresso]);
-  return (
-    <View style={{ height: 8, borderRadius: 4, backgroundColor: palette.surfaceElevated, overflow: 'hidden' }}>
-      <Animated.View style={{ height: 8, borderRadius: 4, backgroundColor: cor, width: anim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }} />
-    </View>
-  );
 }
 
 function Cartao({ titulo, children, index = 0 }: { titulo?: string; children: React.ReactNode; index?: number }) {
@@ -173,14 +161,6 @@ export default function CarreiraPilotoTela({ id, aba = false }: { id: string; ab
   const cat = categoriaDe(xp);
   const conquistas = conquistasDe(dados);
   const liberadas = conquistas.filter((c) => c.liberada).length;
-  const numeros = [
-    { rotulo: 'Baterias', valor: dados.baterias },
-    { rotulo: 'Vitórias', valor: dados.vitorias },
-    { rotulo: 'Pódios', valor: dados.podios },
-    { rotulo: 'Poles', valor: dados.poles },
-    { rotulo: 'Voltas + rápidas', valor: dados.voltasMaisRapidas },
-    { rotulo: 'Voltas', valor: dados.voltas },
-  ];
   const eficiencia = [
     { rotulo: 'Vitórias', valor: pct(dados.vitorias, dados.corridas), cor: palette.neonGreen },
     { rotulo: 'Pódios', valor: pct(dados.podios, dados.corridas), cor: palette.accent },
@@ -191,48 +171,10 @@ export default function CarreiraPilotoTela({ id, aba = false }: { id: string; ab
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 140, gap: 14, width: '100%', maxWidth: 640, alignSelf: 'center' }}
         refreshControl={<RefreshControl refreshing={carregando} onRefresh={() => void carregar()} tintColor={palette.accent} />}>
-        {topo}
-        <Entrada>
-          <View style={{ marginHorizontal: -16, paddingHorizontal: 16, paddingVertical: 18, overflow: 'hidden' }}>
-            <View pointerEvents="none" style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '70%' }}>
-              <Image source={fotos.carreira} resizeMode="cover" style={{ width: '100%', height: '100%', opacity: 0.9 }} />
-              <Esmaecer lado="left" tamanho={140} />
-              <Esmaecer lado="bottom" tamanho={60} />
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-              <Pressable disabled={!eu || enviandoFoto} onPress={menuFoto} accessibilityRole={eu ? 'button' : undefined} accessibilityLabel={eu ? 'Trocar foto' : undefined}
-                style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.95 : 1 }] })}>
-                <View style={{ padding: 4, borderRadius: 64, borderWidth: 3, borderColor: '#2BF27A', backgroundColor: '#0B110E', shadowColor: '#2BF27A', shadowOpacity: 0.6, shadowRadius: 14 }}>
-                  <FotoPiloto key={versaoFoto} id={dados.id} versao={versaoFoto} nome={dados.nome} tamanho={104} cor={cat.cor} />
-                </View>
-                {eu ? (
-                  <View style={{ position: 'absolute', right: 0, bottom: 0, width: 36, height: 36, borderRadius: 18, backgroundColor: '#111815', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#2F3B35' }}>
-                    {enviandoFoto ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 18, lineHeight: 20 }}>+</Text>}
-                  </View>
-                ) : null}
-              </Pressable>
-              <View style={{ flex: 1, gap: 8 }}>
-                <Text accessibilityRole="header" style={{ color: '#FFFFFF', fontSize: 22, lineHeight: 26, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.8)', textShadowRadius: 8 }}>{nomeBonito(dados.nome)}</Text>
-                <View style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: cat.cor, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 }}>
-                  <Icon name="crown" color="#000000" size={14} />
-                  <Text style={{ color: '#000000', fontWeight: '900', fontSize: 14, letterSpacing: 1 }}>{cat.nome}</Text>
-                </View>
-                {dados.primeira ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Icon name="calendar" color="#D4DBD7" size={14} /><Text style={{ color: '#D4DBD7', fontSize: 13 }}>Na pista desde {formatarDia(dados.primeira)}</Text></View> : null}
-              </View>
-            </View>
-            <View style={{ alignItems: 'flex-end', marginTop: 10 }}>
-              <BotaoCompartilhar dados={dados} xp={xp} cat={cat} versaoFoto={versaoFoto} />
-            </View>
-          </View>
-        </Entrada>
-
-        <Cartao index={1}>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
-            <Contador valor={xp} sufixo=" XP" estilo={{ color: palette.text, fontSize: 30, fontWeight: '900', fontVariant: ['tabular-nums'] }} />
-            <Text style={{ color: palette.textMuted, fontSize: 13 }}>{cat.proxima ? `faltam ${(cat.proxima.desde - xp).toLocaleString('pt-BR')} para ${cat.proxima.nome}` : 'categoria máxima'}</Text>
-          </View>
-          <BarraXp progresso={cat.progresso} cor={cat.cor} />
-        </Cartao>
+        <View style={{ marginHorizontal: -16 }}>
+          <CarreiraTopo dados={dados} xp={xp} cat={cat} eu={eu} versaoFoto={versaoFoto} enviandoFoto={enviandoFoto} onFoto={menuFoto} />
+        </View>
+        <View style={{ alignItems: 'flex-end' }}><BotaoCompartilhar dados={dados} xp={xp} cat={cat} versaoFoto={versaoFoto} /></View>
 
         {dados.baterias === 0 && (dados.semanasTop10 || dados.mesesTop10) ? (
           <Cartao titulo="Antes de setembro de 2026" index={2}>
@@ -241,39 +183,6 @@ export default function CarreiraPilotoTela({ id, aba = false }: { id: string; ab
             </Text>
           </Cartao>
         ) : null}
-        {eu ? (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-            {([
-              ['Meu progresso', 'results', '#2563EB', '/progresso'],
-              ['Conquistas', 'trophy', '#F59E0B', '/minhas-conquistas'],
-              ['Desafios', 'fire', '#DB2777', '/desafios'],
-              ['Minhas metas', 'target', '#16A34A', '/metas'],
-              ['Karts do dia', 'timer', '#7C3AED', '/karts'],
-              ['Modo piloto', 'gps', '#EA580C', '/cockpit'],
-              ['Carteira', 'ticket', '#0891B2', '/carteira'],
-              ['Meu perfil', 'account', '#475569', '/perfil'],
-            ] as const).map(([rotulo, icone, cor, rota]) => (
-              <Pressable key={rota} onPress={() => { tap(); router.push(rota as Href); }} accessibilityRole="button" accessibilityLabel={rotulo}
-                style={({ pressed }) => ({ width: '31%', flexGrow: 1, backgroundColor: palette.surface, borderRadius: 18, borderWidth: 1, borderColor: palette.borderSubtle, paddingVertical: 14, alignItems: 'center', gap: 8, transform: [{ scale: pressed ? 0.96 : 1 }] })}>
-                <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: cor, alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name={icone} color="#FFFFFF" size={22} />
-                </View>
-                <Text style={{ color: palette.text, fontSize: 12, fontWeight: '800' }}>{rotulo}</Text>
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
-
-        <Cartao titulo="Carreira" index={2}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 16 }}>
-            {numeros.map((n) => (
-              <View key={n.rotulo} style={{ width: '33.33%', alignItems: 'center' }}>
-                <Contador valor={n.valor} estilo={{ color: palette.text, fontSize: 24, fontWeight: '900', fontVariant: ['tabular-nums'] }} />
-                <Text style={{ color: palette.textMuted, fontSize: 12, marginTop: 2, textAlign: 'center' }}>{n.rotulo}</Text>
-              </View>
-            ))}
-          </View>
-        </Cartao>
 
         {dados.corridas > 0 ? (
           <Cartao titulo={`Eficiência em ${dados.corridas} corrida${dados.corridas === 1 ? '' : 's'}`} index={3}>

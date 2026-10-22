@@ -6,6 +6,7 @@ import { useUi } from '../components/theme';
 import { DEMO_MODE } from '../config/features';
 import { CartProvider } from '../features/cart/context';
 import * as ScreenOrientation from 'expo-screen-orientation';
+import { useFonts } from 'expo-font';
 
 import { SessionProvider } from '../session/provider';
 
@@ -15,6 +16,14 @@ if (Platform.OS !== 'web') void ScreenOrientation.lockAsync(ScreenOrientation.Or
 export default function RootLayout() {
   const { palette } = useUi();
   const segments = useSegments() as string[];
+  // fontes do design (títulos itálicos e números da cronometragem); sem elas o app usa a do sistema
+  useFonts({
+    Display: require('../../assets/fonts/Barlow-BlackItalic.ttf'),
+    DisplayBold: require('../../assets/fonts/Barlow-ExtraBoldItalic.ttf'),
+    Tempo: require('../../assets/fonts/BarlowSemiCondensed-SemiBold.ttf'),
+    TempoBold: require('../../assets/fonts/BarlowSemiCondensed-Bold.ttf'),
+    TempoItalic: require('../../assets/fonts/BarlowSemiCondensed-BoldItalic.ttf'),
+  });
   const realDataRoute = segments.includes('(auth)') || segments.includes('reservations') || segments.some((segment) => ['agenda', 'reservas', 'resultados', 'gps'].includes(segment));
   return (
     <SessionProvider>

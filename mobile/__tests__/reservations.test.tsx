@@ -197,7 +197,7 @@ describe('agenda e reservas do cliente', () => {
     // no formulário de reserva não há mais sair/excluir conta (ficam só no fim da lista)
     mockUseLocalSearchParams.mockReturnValue({ bateriaId: '101' });
     await view.rerender(<ReservationsScreen />);
-    expect(await view.findByText('Confirmar reserva')).toBeTruthy();
+    expect(await view.findByLabelText('Confirmar reserva')).toBeTruthy();
     expect(view.queryByRole('button', { name: 'Sair da conta' })).toBeNull();
   });
 
@@ -306,7 +306,7 @@ describe('agenda e reservas do cliente', () => {
     const user = userEvent.setup();
     const view = await render(<ReservationsScreen />);
 
-    expect(await view.findByText('Confirmar reserva')).toBeTruthy();
+    expect(await view.findByLabelText('Confirmar reserva')).toBeTruthy();
     expect(view.queryByText('R$ 95,00')).toBeNull();
     await user.type(view.getByLabelText('Cupom de desconto'), 'BETIM10');
     expect(view.getByLabelText('Cupom de desconto').props.value).toBe('BETIM10');
