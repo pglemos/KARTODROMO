@@ -1,8 +1,12 @@
-# Snapshot de produção — 23/10/2026
+# Snapshot de produção — 23/10/2026 (RESOLVIDO)
+
+RESOLVIDO: o código legível estava no branch `orbits/app-integrado` e foi mesclado no `main`
+em 23/10 (commit de merge incluindo clientes.ts, perfil.ts e ranking.ts). O bundle recompilhado
+a partir do `main` ficou funcionalmente igual a este snapshot. Mantido como evidência histórica.
 
 O Worker publicado (`kartodromo-cadastro`, por trás de `reservas.kartodromodebetim.com.br` e
-`cadastro.kartodromodebetim.com.br`) está **à frente do `main`**: tem o template novo de e-mail
-(escuro, com logo/gif do kart, vantagens, categorias, cota de 2.500/mês) e módulos que não estão
+`cadastro.kartodromodebetim.com.br`) estava **à frente do `main`**: tem o template novo de e-mail
+(escuro, com logo/gif do kart, vantagens, categorias, cota de 2.500/mês) e módulos que não estavam
 no repositório (`src/mobile/clientes.ts`, `src/mobile/perfil.ts` — foto do piloto — e
 `src/mobile/ranking.ts`).
 
