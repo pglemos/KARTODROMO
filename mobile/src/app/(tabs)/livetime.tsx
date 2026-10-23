@@ -2,6 +2,7 @@ import React from 'react';
 import { Text, View } from 'react-native';
 
 import { LiveTimeScreen, LiveTimeScreenProps } from '../../components/livetime-screen';
+import { AoVivoReal } from '../../components/ao-vivo-real';
 import { DEMO_MODE } from '../../config/features';
 import { useLiveSession } from '../../features/live/api';
 import { ActionButton, InlineError, LoadingMessage, Page, PageHeader, Panel, useUi } from '../../features/reservations/components';
@@ -15,7 +16,7 @@ function DemoLiveTime(props: LiveTimeScreenProps) {
 function RealLiveTime() {
   const { session, error, loading, refresh } = useLiveSession();
   const { styles } = useUi();
-  if (session) return <LiveTimeScreen session={session} onRefresh={refresh} hudEnabled={false} />;
+  if (session) return <AoVivoReal session={session} onRefresh={refresh} />;
   return (
     <Page>
       <PageHeader title="Ao vivo" description="Posições, voltas e tempos da bateria que está na pista, direto da cronometragem." />

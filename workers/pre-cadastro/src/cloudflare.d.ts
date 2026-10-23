@@ -10,6 +10,8 @@ interface R2ObjectBody {
   key: string;
   json<T>(): Promise<T>;
   text(): Promise<string>;
+  body: ReadableStream;
+  httpEtag: string;
 }
 
 interface R2Objects {
@@ -19,7 +21,7 @@ interface R2Objects {
 
 interface R2Bucket {
   get(key: string): Promise<R2ObjectBody | null>;
-  put(key: string, value: string, options?: { httpMetadata?: { contentType?: string } }): Promise<unknown>;
+  put(key: string, value: string | ArrayBuffer | Uint8Array, options?: { httpMetadata?: { contentType?: string }; customMetadata?: Record<string, string> }): Promise<unknown>;
   list(options?: { prefix?: string; limit?: number }): Promise<R2Objects>;
   delete(keys: string | string[]): Promise<void>;
 }
@@ -47,3 +49,13 @@ interface ExecutionContext {
 interface ExportedHandler<E = unknown> {
   fetch?(req: Request, env: E, ctx: ExecutionContext): Promise<Response>;
 }
+
+// Durable Objects e WebSocket do Workers (só o que o tempo real do app usa)
+interface DurableObjectId { toString(): string }
+interface DurableObjectStub { fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> }
+interface DurableObjectNamespace { idFromName(name: string): DurableObjectId; get(id: DurableObjectId): DurableObjectStub }
+interface DurableObjectStorage { getAlarm(): Promise<number | null>; setAlarm(time: number | Date): Promise<void> }
+interface DurableObjectState { storage: DurableObjectStorage; acceptWebSocket(ws: WebSocket, tags?: string[]): void; getWebSockets(tag?: string): WebSocket[] }
+interface DurableObject { fetch(request: Request): Promise<Response> | Response; alarm?(): Promise<void> | void }
+declare const WebSocketPair: { new (): { 0: WebSocket; 1: WebSocket } };
+interface ResponseInit { webSocket?: WebSocket | null }

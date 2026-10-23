@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  Animated,
   Keyboard,
   Platform,
   Pressable,
@@ -9,6 +10,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
+import { tap } from './motion';
 import type { BottomTabBarProps } from 'expo-router/build/react-navigation/bottom-tabs/types';
 import { DEMO_MODE, isDemoMode } from '../config/features';
 import { SportsIcon, type SportsIconName } from './sports-icons';
@@ -33,7 +36,7 @@ const LIVE_TAB_ITEMS: readonly TabItemConfig[] = [
   { name: 'agenda', label: 'Agenda', icon: 'calendar' },
   { name: 'reservas', label: 'Reservas', icon: 'ticket' },
   { name: 'livetime', label: 'Ao vivo', icon: 'timer' },
-  { name: 'resultados', label: 'Resultados', icon: 'trophy' },
+  { name: 'carreira', label: 'Carreira', icon: 'helmet' },
 ] as const;
 
 export function getTabBarItems(demo = isDemoMode()): readonly TabItemConfig[] {
@@ -58,6 +61,8 @@ export function FloatingTabBar(props: FloatingTabBarProps) {
   const { state, navigation, insets, activeTab, onTabPress, testID } = props;
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const { width: windowWidth } = useWindowDimensions();
+  const [larguraBarra, setLarguraBarra] = useState(0);
+  const [pilula] = useState(() => new Animated.Value(0));
   const safeInsets = useSafeAreaInsets();
 
   const bottomInset = insets?.bottom ?? safeInsets.bottom ?? 0;
@@ -82,18 +87,14 @@ export function FloatingTabBar(props: FloatingTabBarProps) {
     state?.routes && typeof state.index === 'number' ? state.routes[state.index] : undefined;
   const focusedRouteName = currentRoute?.name;
 
+  const itens = getTabBarItems();
+  const indiceAtivo = itens.findIndex((i) => i.name === focusedRouteName);
+  const larguraItem = larguraBarra > 0 ? (larguraBarra - 12) / itens.length : 0;
   const isLargeScreen = windowWidth > 512;
   const bottomPosition = Math.max(16, bottomInset) + 8;
 
   return (
     <>
-      <View
-        pointerEvents="none"
-        style={[
-          styles.bottomBackdrop,
-          { height: bottomPosition + Math.round(FLOATING_BAR_HEIGHT * 0.55) },
-        ]}
-      />
       <View
         accessibilityRole="tablist"
         style={[
@@ -103,8 +104,13 @@ export function FloatingTabBar(props: FloatingTabBarProps) {
             : { left: 16, right: 16, bottom: bottomPosition },
         ]}
         testID={testID ?? 'floating-bottom-tabs'}
+        onLayout={(e) => setLarguraBarra(e.nativeEvent.layout.width)}
       >
-        {getTabBarItems().map((item) => {
+        {/* vidro fosco no estilo do iOS */}
+        <BlurView intensity={50} tint="dark" style={[StyleSheet.absoluteFill, { borderRadius: 40, overflow: 'hidden' }]} />
+        {/* pílula da aba ativa que desliza até a aba tocada */}
+        {indiceAtivo >= 0 ? <PilulaAtiva pilula={pilula} indice={indiceAtivo} largura={larguraItem} /> : null}
+        {itens.map((item) => {
           const isFocused =
             focusedRouteName === item.name ||
             (focusedRouteName === undefined &&
@@ -118,6 +124,7 @@ export function FloatingTabBar(props: FloatingTabBarProps) {
           const route = state?.routes?.find((r) => r.name === item.name);
 
           const handlePress = () => {
+            tap();
             if (onTabPress) {
               onTabPress(item.label);
             }
@@ -160,21 +167,13 @@ export function FloatingTabBar(props: FloatingTabBarProps) {
               hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
               style={({ pressed }) => [
                 styles.tabItem,
-                isFocused && styles.tabItemActive,
                 pressed && styles.tabItemPressed,
               ]}
             >
-              {isFocused && (
-                <View
-                  testID="tab-active-indicator"
-                  style={StyleSheet.absoluteFill}
-                  pointerEvents="none"
-                />
-              )}
               <SportsIcon
                 name={item.icon}
                 size={22}
-                color={isFocused ? '#FFFFFF' : '#A1A1AA'}
+                color={isFocused ? '#2BF27A' : '#A1A1AA'}
               />
               <Text
                 style={[
@@ -205,10 +204,11 @@ const styles = StyleSheet.create({
   container: {
     position: 'absolute',
     height: FLOATING_BAR_HEIGHT,
-    backgroundColor: '#16181B',
+    // no Android o desfoque não vale por padrão: fundo quase opaco para o texto não vazar
+    backgroundColor: Platform.OS === 'ios' ? 'rgba(22, 24, 27, 0.72)' : 'rgba(22, 24, 27, 0.96)',
     borderRadius: 40,
     borderWidth: 1,
-    borderColor: '#2B2E33',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   tabLabelActive: {
-    color: '#FFFFFF',
+    color: '#2BF27A',
     fontWeight: '600',
     letterSpacing: 0.2,
   },
@@ -253,3 +253,14 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 });
+
+/** pílula clara atrás da aba ativa; desliza com mola quando a aba muda */
+function PilulaAtiva({ pilula, indice, largura }: { pilula: Animated.Value; indice: number; largura: number }) {
+  useEffect(() => {
+    Animated.spring(pilula, { toValue: indice * largura, useNativeDriver: true, damping: 18, stiffness: 190, mass: 0.8 }).start();
+  }, [indice, largura, pilula]);
+  return (
+    <Animated.View pointerEvents="none" testID="tab-active-indicator"
+      style={{ position: 'absolute', left: 6, top: 5, bottom: 5, width: largura, borderRadius: 27, backgroundColor: 'rgba(43, 242, 122, 0.16)', transform: [{ translateX: pilula }] }} />
+  );
+}

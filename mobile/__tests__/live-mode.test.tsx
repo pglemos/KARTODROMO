@@ -25,7 +25,7 @@ describe('modo loja (sem dados demonstrativos)', () => {
   it('a barra de abas em modo de produção só tem telas com dados reais', () => {
     process.env.EXPO_PUBLIC_DEMO_MODE = '0';
     const items = getTabBarItems(false);
-    expect(items.map((item) => item.name)).toEqual(['index', 'agenda', 'reservas', 'livetime', 'resultados']);
+    expect(items.map((item) => item.name)).toEqual(['index', 'agenda', 'reservas', 'livetime', 'carreira']);
   });
 
   it('rotas fictícias redirecionam para o início quando demo está desligado', async () => {
@@ -42,7 +42,7 @@ describe('modo loja (sem dados demonstrativos)', () => {
     expect(view.queryByText('Ranking fictício')).toBeNull();
   });
 
-  it('o início de loja não mostra ranking, notícias nem telemetria', async () => {
+  it('o início de loja não mostra notícias, telemetria nem dados de demonstração (o ranking é o real)', async () => {
     function WrappedStart() {
       return (
         <SessionProvider>
@@ -51,8 +51,9 @@ describe('modo loja (sem dados demonstrativos)', () => {
       );
     }
     const view = await renderRouter({ '(tabs)/index': WrappedStart }, { initialUrl: '/' });
-    expect(view.getByText('Ver agenda')).toBeTruthy();
+    expect(view.getByText('Agenda')).toBeTruthy();
     expect(view.getByText('Política de privacidade')).toBeTruthy();
-    expect(view.queryByText(/ranking|notícia|telemetria|demonstrativ/i)).toBeNull();
+    expect(view.queryByText(/notícia|telemetria|demonstrativ|fictíci/i)).toBeNull();
+    expect(view.getByText('Ranking')).toBeTruthy();
   });
 });

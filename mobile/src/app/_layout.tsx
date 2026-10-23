@@ -1,15 +1,29 @@
 import { Stack, useSegments } from 'expo-router';
-import { Text, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useUi } from '../components/theme';
 import { DEMO_MODE } from '../config/features';
 import { CartProvider } from '../features/cart/context';
+import * as ScreenOrientation from 'expo-screen-orientation';
+import { useFonts } from 'expo-font';
+
 import { SessionProvider } from '../session/provider';
+
+// o app é em pé; só o cockpit deita a tela (ele trava em paisagem ao abrir e devolve ao sair)
+if (Platform.OS !== 'web') void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => undefined);
 
 export default function RootLayout() {
   const { palette } = useUi();
   const segments = useSegments() as string[];
+  // fontes do design (títulos itálicos e números da cronometragem); sem elas o app usa a do sistema
+  useFonts({
+    Display: require('../../assets/fonts/Barlow-BlackItalic.ttf'),
+    DisplayBold: require('../../assets/fonts/Barlow-ExtraBoldItalic.ttf'),
+    Tempo: require('../../assets/fonts/BarlowSemiCondensed-SemiBold.ttf'),
+    TempoBold: require('../../assets/fonts/BarlowSemiCondensed-Bold.ttf'),
+    TempoItalic: require('../../assets/fonts/BarlowSemiCondensed-BoldItalic.ttf'),
+  });
   const realDataRoute = segments.includes('(auth)') || segments.includes('reservations') || segments.some((segment) => ['agenda', 'reservas', 'resultados', 'gps'].includes(segment));
   return (
     <SessionProvider>
@@ -35,6 +49,16 @@ export default function RootLayout() {
           <Stack.Screen name="reservations/[id]" options={{ headerShown: true }} />
           <Stack.Screen name="carrinho" options={{ headerShown: false }} />
           <Stack.Screen name="conquistas" options={{ headerShown: false }} />
+          <Stack.Screen name="progresso" options={{ headerShown: false }} />
+          <Stack.Screen name="minhas-conquistas" options={{ headerShown: false }} />
+          <Stack.Screen name="desafios" options={{ headerShown: false }} />
+          <Stack.Screen name="metas" options={{ headerShown: false }} />
+          <Stack.Screen name="karts" options={{ headerShown: false }} />
+          <Stack.Screen name="perfil" options={{ headerShown: false }} />
+          <Stack.Screen name="carteira" options={{ headerShown: false }} />
+          <Stack.Screen name="ranking" options={{ headerShown: false }} />
+          <Stack.Screen name="piloto/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="cockpit" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
         </Stack>
         </View>
         {DEMO_MODE && !realDataRoute && (

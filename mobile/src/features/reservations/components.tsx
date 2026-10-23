@@ -3,6 +3,7 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollVie
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useUi } from '../../components/theme';
+import { ListaEsqueleto } from '../../components/motion';
 import { Icon } from '../../components/brand';
 export { useUi } from '../../components/theme';
 
@@ -22,8 +23,8 @@ export function Page({ children, top = true }: PropsWithChildren<{ top?: boolean
   const { styles } = useUi();
   return (
     <SafeAreaView edges={top ? ['top', 'left', 'right'] : ['left', 'right', 'bottom']} style={styles.safeArea}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+      <KeyboardAvoidingView behavior={Platform.OS === 'android' ? 'height' : undefined} style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" automaticallyAdjustKeyboardInsets>
         {children}
       </ScrollView>
       </KeyboardAvoidingView>

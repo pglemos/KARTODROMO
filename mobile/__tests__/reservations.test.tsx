@@ -40,7 +40,7 @@ const agenda: AgendaResponse = {
   prazoMin: 15,
   antecedenciaMin: 120,
   pagamentoOnline: true,
-  horarios: [{ id: 101, inicio: '2026-10-15T09:15', nome: 'BATERIA 09:15', livres: 4 }],
+  horarios: [{ id: 101, inicio: '2099-10-15T09:15', nome: 'BATERIA 09:15', livres: 4 }],
 };
 const order: ReservationOrder = {
   id: '123e4567-e89b-42d3-a456-426614174000',
@@ -149,7 +149,7 @@ describe('agenda e reservas do cliente', () => {
     await user.type(view.getByLabelText('Sua data de nascimento'), '15051990');
     expect(view.getByLabelText('Sua data de nascimento').props.value).toBe('15/05/1990');
     await user.press(view.getByLabelText('Aceito a política de cancelamento'));
-    await user.press(view.getByRole('button', { name: 'Enviar reserva' }));
+    await user.press(view.getByRole('button', { name: 'Ir para o pagamento' }));
     await waitFor(() => expect(finishCreate).toBeDefined());
     setSession(null);
     await view.rerender(<ReservationsScreen />);
@@ -187,18 +187,18 @@ describe('agenda e reservas do cliente', () => {
     expect(view.queryByText(order.pix!.payload)).toBeNull();
     expect(view.getByText('Pedido BETIM-NOVA-CONTA')).toBeTruthy();
   });
-  it('permite sair da conta pela lista e pelo formulário de reserva', async () => {
+  it('permite sair da conta pela lista, mas não no formulário de reserva', async () => {
     const logout = setSession(session);
     const view = await render(<ReservationsScreen />);
     const user = userEvent.setup();
     await user.press(view.getByRole('button', { name: 'Sair da conta' }));
     expect(logout).toHaveBeenCalledTimes(1);
 
+    // no formulário de reserva não há mais sair/excluir conta (ficam só no fim da lista)
     mockUseLocalSearchParams.mockReturnValue({ bateriaId: '101' });
     await view.rerender(<ReservationsScreen />);
-    expect(await view.findByText('Confirmar reserva')).toBeTruthy();
-    await user.press(view.getByRole('button', { name: 'Sair da conta' }));
-    expect(logout).toHaveBeenCalledTimes(2);
+    expect(await view.findByLabelText('Confirmar reserva')).toBeTruthy();
+    expect(view.queryByRole('button', { name: 'Sair da conta' })).toBeNull();
   });
 
   it('oferece nova tentativa se não conseguir apagar a sessão salva', async () => {
@@ -251,8 +251,7 @@ describe('agenda e reservas do cliente', () => {
   it('carrega a agenda sem login e exige conta antes de abrir a reserva', async () => {
     const view = await render(<AgendaScreen />);
 
-    expect(await view.findByText('BATERIA 09:15')).toBeTruthy();
-    expect(view.getByText('15/10/2026 · 09:15')).toBeTruthy();
+    expect(await view.findByText('09:15')).toBeTruthy();
     expect(requests('GET', '/api/mobile/v1/agenda').length).toBeGreaterThan(0);
     const user = userEvent.setup();
     await user.press(view.getByRole('button', { name: /reservar/i }));
@@ -271,7 +270,7 @@ describe('agenda e reservas do cliente', () => {
     agendaUnavailable = false;
     const user = userEvent.setup();
     await user.press(view.getByRole('button', { name: 'Tentar novamente' }));
-    expect(await view.findByText('BATERIA 09:15')).toBeTruthy();
+    expect(await view.findByText('09:15')).toBeTruthy();
     expect(requests('GET', '/api/mobile/v1/agenda')).toHaveLength(callsBeforeRetry + 1);
   });
 
@@ -298,7 +297,7 @@ describe('agenda e reservas do cliente', () => {
     await view.rerender(<AgendaComponent />);
     expect(await view.findByText('HORÁRIO ATUAL TESTE CODEX')).toBeTruthy();
     await act(async () => finishOld(agenda));
-    expect(view.queryByText('BATERIA 09:15')).toBeNull();
+    expect(view.getByText('HORÁRIO ATUAL TESTE CODEX')).toBeTruthy();
   });
 
   it('usa somente o total de cupom calculado pelo servidor e envia a reserva autenticada', async () => {
@@ -307,7 +306,7 @@ describe('agenda e reservas do cliente', () => {
     const user = userEvent.setup();
     const view = await render(<ReservationsScreen />);
 
-    expect(await view.findByText('Confirmar reserva')).toBeTruthy();
+    expect(await view.findByLabelText('Confirmar reserva')).toBeTruthy();
     expect(view.queryByText('R$ 95,00')).toBeNull();
     await user.type(view.getByLabelText('Cupom de desconto'), 'BETIM10');
     expect(view.getByLabelText('Cupom de desconto').props.value).toBe('BETIM10');
@@ -318,12 +317,12 @@ describe('agenda e reservas do cliente', () => {
     expect(couponRequest[1]?.headers).toMatchObject({ authorization: `Bearer ${accessToken}` });
     expect(JSON.parse(String(couponRequest[1]?.body))).toEqual({ codigo: 'BETIM10', bateriaId: 101, quantidade: 1 });
     expect(requests('GET', '/api/mobile/v1/coupons/preview/preview-1')).toHaveLength(1);
-    expect(await view.findByText(/95,00/)).toBeTruthy();
+    expect((await view.findAllByText(/95,00/)).length).toBeGreaterThan(0);
 
     await user.type(view.getByLabelText('Seu Instagram'), '@Maria.Silva');
     await user.type(view.getByLabelText('Sua data de nascimento'), '15/05/1990');
     await user.press(view.getByLabelText('Aceito a política de cancelamento'));
-    await user.press(view.getByRole('button', { name: 'Enviar reserva' }));
+    await user.press(view.getByRole('button', { name: 'Ir para o pagamento' }));
 
     await waitFor(() => expect(requests('POST', '/api/mobile/v1/reservations')).toHaveLength(1));
     const [reservationRequest] = requests('POST', '/api/mobile/v1/reservations');
@@ -373,7 +372,7 @@ describe('agenda e reservas do cliente', () => {
     const user = userEvent.setup();
     const view = await render(<ReservationsScreen />);
 
-    const deleteBtn = await view.findByRole('button', { name: 'Excluir conta' });
+    const deleteBtn = await view.findByRole('button', { name: 'Excluir minha conta' });
     await user.press(deleteBtn);
 
     expect(alertSpy).toHaveBeenCalledWith(

@@ -285,16 +285,16 @@ describe('Milestone 5 — Cart & Agenda Component Suite', () => {
       // 1. Root and Header
       expect(getByTestId('screen-agenda')).toBeTruthy();
       expect(getByTestId('agenda-selected-date')).toBeTruthy();
-      expect(getByTestId('agenda-selected-date').props.children).toBe('14/10/2026');
+      expect(getByTestId('date-pill-14/10/2026').props.accessibilityState).toMatchObject({ selected: true });
 
       // 2. Slots list
       expect(getByTestId('agenda-slots-list')).toBeTruthy();
       expect(getByTestId('agenda-slot-card-agenda-slot-1100')).toBeTruthy();
       expect(getByTestId('slot-vagas-agenda-slot-1100')).toBeTruthy();
-      expect(getByText('12 VAGAS')).toBeTruthy();
+      expect(getByText('12 vagas')).toBeTruthy();
 
       // 3. Select slot to open detail stepper
-      const selectBtn = getByTestId('btn-select-slot-agenda-slot-1100');
+      const selectBtn = getByTestId('agenda-slot-card-agenda-slot-1100');
       fireEvent.press(selectBtn);
 
       await waitFor(() => {

@@ -21,6 +21,9 @@
     "migrations_dir": "migrations"
   }],
   // e-mail de confirmação de conta e de troca de senha do app (Cloudflare Email Sending, o mesmo domínio dos resultados)
+  // tempo real do app: uma conexão com a cronometragem repassada por WebSocket aos celulares (src/mobile/live.ts)
+  "durable_objects": { "bindings": [{ "name": "AO_VIVO", "class_name": "AoVivo" }] },
+  "migrations": [{ "tag": "ao-vivo-1", "new_sqlite_classes": ["AoVivo"] }],
   "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["resultados@kartodromodebetim.com.br"] }],
   "routes": [
     { "pattern": "cadastro.kartodromodebetim.com.br", "custom_domain": true },

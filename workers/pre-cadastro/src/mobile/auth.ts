@@ -1,6 +1,7 @@
 import { scryptSync } from 'node:crypto';
 
 import { cpfValido, digitos } from '../validar';
+import { clienteExistente, type MobileClientesEnv } from './clientes';
 import {
   mobileEmailConfigured,
   sendMobileAuthEmail,
@@ -51,6 +52,8 @@ const ACCESS_TTL = 15 * 60_000;
 const REFRESH_TTL = 30 * 24 * 60 * 60_000;
 const RATE_WINDOW = 10 * 60_000;
 const RATE_LIMIT = 6;
+// o Wi-Fi do kartódromo põe todo mundo atrás do mesmo IP: o limite por IP é bem mais alto que o por conta
+const RATE_LIMIT_IP = 60;
 const TOKEN_TTL = 30 * 60_000;
 const encoder = new TextEncoder();
 const authError = 'E-mail/CPF ou senha inválidos.';
@@ -197,7 +200,7 @@ function clientIp(request: Request) {
   return request.headers.get('cf-connecting-ip') ?? 'unknown';
 }
 
-async function overLimit(context: CryptoContext, scope: string) {
+async function overLimit(context: CryptoContext, scope: string, limit = RATE_LIMIT) {
   const now = Date.now();
   const key = await hmac(context, scope);
   const row = await context.db
@@ -221,11 +224,11 @@ async function overLimit(context: CryptoContext, scope: string) {
     .prepare('DELETE FROM mobile_auth_attempts WHERE window_started_at + ? < ?')
     .bind(24 * 60 * 60_000, now)
     .run();
-  return Number(row?.attempt_count ?? RATE_LIMIT + 1) > RATE_LIMIT;
+  return Number(row?.attempt_count ?? limit + 1) > limit;
 }
 
 async function rateLimited(context: CryptoContext, request: Request, route: string, identifier = '') {
-  const ipLimit = await overLimit(context, `${route}:ip:${clientIp(request)}`);
+  const ipLimit = await overLimit(context, `${route}:ip:${clientIp(request)}`, RATE_LIMIT_IP);
   if (ipLimit) return true;
   return identifier ? overLimit(context, `${route}:id:${identifier}`) : false;
 }
@@ -460,7 +463,7 @@ async function createSession(context: CryptoContext, accountId: string) {
   };
 }
 
-async function login(request: Request, input: Record<string, unknown>, context: CryptoContext) {
+async function login(request: Request, input: Record<string, unknown>, env: MobileAuthEnv, context: CryptoContext) {
   const identifier = normalizeIdentifier(value(input, 'identifier'));
   if (await rateLimited(context, request, 'login', identifier)) {
     return json(429, { erro: 'Muitas tentativas. Aguarde alguns minutos.' });
@@ -472,12 +475,13 @@ async function login(request: Request, input: Record<string, unknown>, context: 
   const account = await findAccount(context, identifier);
   const salt = account ? decodeBase64Url(account.password_salt) : new Uint8Array(16);
   const candidate = await passwordHash(password, salt, account?.password_scheme ?? PASSWORD_SCHEME);
-  const valid = Boolean(
-    account &&
-      account.email_verified_at !== null &&
-      constantTimeEqual(candidate, account.password_hash),
-  );
+  const valid = Boolean(account && constantTimeEqual(candidate, account.password_hash));
   if (!valid || !account) return json(401, { erro: authError });
+  if (account.email_verified_at === null) {
+    // senha certa mas e-mail ainda não confirmado: reenvia o link em vez de dizer "senha inválida"
+    if (mobileEmailConfigured(env)) await deliverEmail(env, context, account, 'verify');
+    return json(403, { erro: 'Confirme seu e-mail para entrar. Reenviamos o link de confirmação; confira também o spam.' });
+  }
   return json(200, await createSession(context, account.id));
 }
 
@@ -668,10 +672,19 @@ export async function handleMobileAuth(request: Request, env: MobileAuthEnv) {
 
   try {
     switch (route) {
+      case 'cadastro-existente': {
+        // cadastro do app: o CPF já tem conta no app ou cadastro no kartódromo? (mostra só o e-mail mascarado)
+        if (await rateLimited(context, request, 'lookup')) return json(429, { erro: 'Muitas tentativas. Aguarde alguns minutos.' });
+        const cpf = digitos(String(input.cpf ?? ''));
+        if (!cpfValido(cpf)) return json(400, { erro: 'CPF inválido.' });
+        const conta = await context.db.prepare('SELECT 1 FROM mobile_accounts WHERE cpf_lookup = ? LIMIT 1').bind(await hmac(context, `cpf:${cpf}`)).first();
+        const cadastro = await clienteExistente(env as MobileClientesEnv, cpf).catch(() => null);
+        return json(200, { contaApp: Boolean(conta), cadastro: cadastro !== null, email: cadastro || null });
+      }
       case 'register':
         return await register(request, input, env, context);
       case 'login':
-        return await login(request, input, context);
+        return await login(request, input, env, context);
       case 'email/verify':
         if (await rateLimited(context, request, 'verify')) {
           return json(429, { erro: 'Muitas tentativas. Aguarde alguns minutos.' });

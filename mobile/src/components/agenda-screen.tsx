@@ -7,7 +7,6 @@ import {
   Linking,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -20,6 +19,9 @@ import { formatDateTime } from '../features/reservations/components';
 import { useSession } from '../session/provider';
 import { AgendaSlot } from '../types/racing';
 import { Brand } from './brand';
+import { CabecalhoAgenda, CartaoHorario, tipoDe, type TipoHorario } from './agenda-desenho';
+import { Desenho } from './design-kit';
+import { Entrada, tap, ListaEsqueleto } from './motion';
 import { CartModal } from './cart-modal';
 import { FloatingCartBar } from './floating-cart-bar';
 import { SportsIcon } from './sports-icons';
@@ -56,7 +58,9 @@ export function AgendaScreen({
       if (requestVersion.current.version !== requestId) return;
       if (data && Array.isArray(data.horarios)) {
         setApiError('');
-        const mapped: AgendaSlot[] = data.horarios.map((h) => {
+        // horário que já largou não aparece para reservar
+        const agora = Date.now();
+        const mapped: AgendaSlot[] = data.horarios.filter((h) => Date.parse(h.inicio) > agora).map((h) => {
           const dt = formatDateTime(h.inicio);
           const [dPart, tPart] = dt.split(' · ');
           return {
@@ -111,19 +115,13 @@ export function AgendaScreen({
   }, [slots, selectedDate]);
 
   const activeSlots = filteredSlots;
+  const [tipo, setTipo] = useState<TipoHorario>('bateria');
+  const visiveis = useMemo(() => activeSlots.filter((sl) => tipoDe(sl.title) === tipo), [activeSlots, tipo]);
 
   const handleOpenSlot = (slot: AgendaSlot) => {
     if (slot.isSoldOut) return;
     setSelectedSlot(slot);
     setQuantity(1);
-  };
-
-  const handleBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace('/(tabs)');
-    }
   };
 
   const handleConfirmAddToCart = () => {
@@ -155,99 +153,38 @@ export function AgendaScreen({
   };
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
+    <Desenho>
+    <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
       <View testID="screen-agenda" style={styles.screenContainer}>
-        {/* 1. Header Block (Matches IMG_3793.PNG) */}
-        <View style={styles.headerBlock}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Voltar"
-            onPress={handleBack}
-            style={styles.headerBackBtn}
-          >
-            <SportsIcon name="back" size={22} color="#FFFFFF" />
-          </Pressable>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.screenHeaderTitle}>AGENDA</Text>
-            <Text testID="agenda-selected-date" style={styles.dateLabel}>
-              {selectedDate}
-            </Text>
-          </View>
-        </View>
-
         <FlatList
           testID="agenda-slots-list"
           style={styles.slotsList}
-          contentContainerStyle={styles.slotsListContent}
+          contentContainerStyle={{ paddingBottom: 140 }}
           showsVerticalScrollIndicator={false}
-          data={activeSlots}
+          data={visiveis}
           keyExtractor={(slot) => String(slot.id)}
-          ListHeaderComponent={<>
-          {/* 2. Partner Identity Card (Matches IMG_3793.PNG) */}
-          <View style={styles.partnerCard}>
-            <Brand width={90} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.partnerCardTitle}>KARTÓDROMO DE BETIM</Text>
-              <Text style={styles.srOnly}>
-                KARTÓDROMO INTERNACIONAL DE BETIM
-              </Text>
-            </View>
-          </View>
-
+          ListHeaderComponent={<CabecalhoAgenda
+            dates={dates} selectedDate={selectedDate} onDate={(d) => { tap(); setSelectedDate(d); }}
+            tipo={tipo} onTipo={(t) => { tap(); setTipo(t); }}>
           {bookingOnSite && <Text style={styles.statusText}>Horários oficiais. A reserva será concluída no site do kartódromo.</Text>}
-
-          {/* 3. Section Bar: RESERVAS DISPONÍVEIS */}
-          <View style={styles.reservasHeaderBar}>
-            <Text style={styles.reservasHeaderText}>RESERVAS DISPONÍVEIS</Text>
-          </View>
-
-          {/* Falhas da API nunca viram vagas demonstrativas. */}
-          <View style={styles.agendaStatus}>
-            <ScrollView horizontal contentContainerStyle={{ gap: 8 }}>
-              {dates.map((date) => {
-                const isSelected = selectedDate === date;
-                return (
-                  <Pressable
-                    key={date}
-                    testID={`date-pill-${date}`}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: isSelected }}
-                    onPress={() => setSelectedDate(date)}
-                    style={[styles.datePill, isSelected && styles.datePillSelected]}
-                  >
-                    <Text style={styles.statusText}>{date}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-
-            {apiError ? (
-              <View>
-                <Text accessibilityRole="alert" style={styles.statusText}>{apiError}</Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Tentar novamente"
-                  style={styles.datePill}
-                  onPress={loadBackendAgenda}
-                >
-                  <Text style={styles.statusText}>Tentar novamente</Text>
-                </Pressable>
-              </View>
-            ) : null}
-          </View>
-
-          {!customSlots && apiSlots === null && !apiError && <Text style={styles.statusText}>Carregando horários…</Text>}
-          {!apiError && apiSlots !== null && activeSlots.length === 0 && <Text style={styles.statusText}>Nenhum horário disponível nesta data.</Text>}
-
-          {/* 5. Battery Slots Cards (Matches IMG_3793.PNG) */}
-          </>}
-          renderItem={({ item: slot }) => {
+          {apiError ? (
+            <View style={{ paddingHorizontal: 20 }}>
+              <Text accessibilityRole="alert" style={styles.statusText}>{apiError}</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="Tentar novamente" style={styles.datePill} onPress={loadBackendAgenda}>
+                <Text style={styles.statusText}>Tentar novamente</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {!customSlots && apiSlots === null && !apiError && <View style={{ paddingHorizontal: 14 }}><ListaEsqueleto itens={5} altura={92} rotulo="Carregando horários" /></View>}
+          {!apiError && apiSlots !== null && visiveis.length === 0 && <Text style={[styles.statusText, { paddingHorizontal: 20 }]}>{activeSlots.length ? 'Nenhum horário deste tipo nesta data.' : 'Nenhum horário disponível nesta data.'}</Text>}
+          </CabecalhoAgenda>}
+          renderItem={({ item: slot, index }) => {
             const isSoldOut = slot.isSoldOut || slot.availableSlots <= 0;
             const isBackend = slot.isBackendSlot;
-            const formattedDateTime = slot.formattedDateTime;
 
             const handlePressSlot = () => {
               if (isSoldOut) return;
+              tap();
               if (isBackend) {
                 if (bookingOnSite) {
                   void Linking.openURL('https://reservas.kartodromodebetim.com.br').catch(() =>
@@ -271,68 +208,12 @@ export function AgendaScreen({
             };
 
             return (
-              <View
-                key={slot.id}
-                testID={`agenda-slot-card-${slot.id}`}
-                style={[styles.slotCard, isSoldOut && styles.slotCardSoldOut]}
-              >
-                <View style={{ flex: 1, paddingRight: 10 }}>
-                  <Text style={[styles.slotTitle, styles.tabularNums]}>
-                    {slot.title}
-                  </Text>
-                  <Text style={[styles.slotTimeSub, styles.tabularNums]}>
-                    {slot.time}
-                  </Text>
-
-                  <View>
-                    {formattedDateTime ? (
-                      <Text style={styles.slotTimeSub}>{formattedDateTime}</Text>
-                    ) : null}
-                  </View>
-                </View>
-
-                <View style={styles.slotRightCol}>
-                  <View style={styles.vagasChevronRow}>
-                    <Text
-                      testID={`slot-vagas-${slot.id}`}
-                      style={[
-                        styles.slotVagas,
-                        isSoldOut ? styles.vagasSoldOut : styles.vagasAvailable,
-                      ]}
-                    >
-                      {isSoldOut ? 'ESGOTADO' : `${slot.availableSlots} VAGAS`}
-                    </Text>
-                    <SportsIcon
-                      name="chevron-right"
-                      size={16}
-                      color="#9CA3AF"
-                    />
-                  </View>
-
-                  <Pressable
-                    testID={`btn-select-slot-${slot.id}`}
-                    accessibilityRole="button"
-                    accessibilityLabel={
-                      isSoldOut
-                        ? 'Esgotado'
-                        : isBackend
-                        ? bookingOnSite ? 'Reservar no site' : 'Reservar bateria'
-                        : 'SELECIONAR'
-                    }
-                    disabled={isSoldOut}
-                    onPress={handlePressSlot}
-                    style={styles.datePill}
-                  >
-                    <Text style={styles.statusText}>
-                      {isSoldOut
-                        ? 'Esgotado'
-                        : isBackend
-                        ? bookingOnSite ? 'Reservar no site' : 'Reservar bateria'
-                        : 'SELECIONAR'}
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
+              <Entrada index={index}>
+                <CartaoHorario slot={slot} destaque={index === 0} esgotado={isSoldOut}
+                  rotuloBotao={isBackend ? (bookingOnSite ? 'No site' : 'Reservar') : 'Escolher'}
+                  rotulo={isSoldOut ? `${slot.time}, esgotado` : bookingOnSite ? 'Reservar no site' : `Reservar bateria das ${slot.time}, ${slot.availableSlots} vagas`}
+                  onPress={handlePressSlot} />
+              </Entrada>
             );
           }}
         />
@@ -503,6 +384,7 @@ export function AgendaScreen({
         )}
       </View>
     </SafeAreaView>
+    </Desenho>
   );
 }
 
@@ -515,8 +397,16 @@ const condensedFont = Platform.select({
 const styles = StyleSheet.create({
   agendaStatus: { gap: 12, marginBottom: 16 },
   statusText: { color: '#FFFFFF', fontSize: 15 },
-  datePill: { minHeight: 48, padding: 12, borderRadius: 8, backgroundColor: '#252A30', justifyContent: 'center' },
-  datePillSelected: { borderWidth: 1, borderColor: '#F59E0B' },
+  datePill: { minHeight: 74, minWidth: 78, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 16, backgroundColor: '#0D1411', borderWidth: 1, borderColor: '#1C2621', justifyContent: 'center' },
+  datePillSelected: { backgroundColor: '#2BF27A' },
+  dayName: { color: '#9CA3AF', fontSize: 12, fontWeight: '800', letterSpacing: 1, textAlign: 'center' },
+  dayNumber: { color: '#FFFFFF', fontSize: 17, fontWeight: '800', textAlign: 'center', marginTop: 2 },
+  slotHora: { color: '#FFFFFF', fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
+  slotRotulo: { color: '#9CA3AF', fontSize: 11, fontWeight: '800', letterSpacing: 1.5, marginTop: 2 },
+  vagasTrilho: { height: 6, borderRadius: 3, backgroundColor: '#2A2E35', marginTop: 8, overflow: 'hidden' },
+  vagasBarra: { height: 6, borderRadius: 3 },
+  reservarPill: { backgroundColor: '#2BF27A', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10 },
+  reservarTexto: { color: '#000000', fontWeight: '800', fontSize: 14 },
   safeArea: {
     flex: 1,
     backgroundColor: '#000000',
@@ -568,8 +458,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   slotsListContent: {
-    paddingHorizontal: 14,
-    paddingTop: 14,
+    paddingHorizontal: 20,
+    paddingTop: 0,
     paddingBottom: 140,
   },
   partnerCard: {
@@ -604,11 +494,13 @@ const styles = StyleSheet.create({
   },
   slotCard: {
     flexDirection: 'row',
-    backgroundColor: '#181C20',
-    borderRadius: 14,
+    backgroundColor: '#0D1411',
+    borderWidth: 1,
+    borderColor: '#1C2621',
+    borderRadius: 18,
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginBottom: 10,
+    paddingVertical: 16,
+    marginBottom: 12,
     alignItems: 'center',
   },
   slotCardSoldOut: {
