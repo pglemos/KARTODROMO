@@ -1,4 +1,8 @@
 {
+  // ATENÇÃO: o Worker publicado em 23/10/2026 está À FRENTE deste src (template novo de e-mail e
+  // módulos clientes/perfil/ranking que não estão aqui). Publicar este src agora apaga as mudanças
+  // de produção. Leia referencia-producao/2026-10-23/README.md antes de qualquer deploy.
+
   // Pré-cadastro online dos clientes (QR code no kartódromo). Worker separado do site para não mexer nele.
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "kartodromo-cadastro",
