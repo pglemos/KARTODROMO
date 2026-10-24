@@ -903,12 +903,22 @@ function liveSnapshot(painelTb50 = false) {
       painelTb50 && OPEN_STATES.has(s.state),
       standings
         .filter((r) => r.laps > 0 || !OPEN_STATES.has(s.state))
-        // laps/last/bestLap/gap: para o app do cliente (o placar, o telão e o site só leem os quatro primeiros)
-        .map((r) => ({
-          position: r.position, kart: r.kart, name: r.name, time: formatLap(r.bestLapMs),
-          laps: r.laps, last: formatLap(r.lastLapMs), bestLap: r.bestLapNumber,
-          gap: r.position === 1 ? '' : r.gapLaps > 0 ? `+${r.gapLaps} ${r.gapLaps === 1 ? 'volta' : 'voltas'}` : r.gapMs != null ? `+${(r.gapMs / 1000).toFixed(3)}` : '',
-        })),
+        // O placar/telão usam os quatro primeiros campos; o app também recebe o histórico
+        // completo para abrir a volta a volta do piloto selecionado.
+        .map((r) => {
+          const c = s.competitors.find((competitor) => competitor.kart === r.kart);
+          const ativas = c?.crossings.filter((x) => !x.deleted).sort((a, b) => a.wallMs - b.wallMs) ?? [];
+          const lapTimes = ativas
+            .map((crossing, index) => ({ crossing, number: index }))
+            .filter(({ crossing, number }) => number > 0 && typeof crossing.lapMs === 'number' && Number.isFinite(crossing.lapMs) && crossing.lapMs > 0)
+            .map(({ crossing, number }) => ({ number, time: formatLap(crossing.lapMs), timeMs: crossing.lapMs! }));
+          return {
+            position: r.position, kart: r.kart, name: r.name, time: formatLap(r.bestLapMs),
+            laps: r.laps, last: formatLap(r.lastLapMs), bestLap: r.bestLapNumber,
+            gap: r.position === 1 ? '' : r.gapLaps > 0 ? `+${r.gapLaps} ${r.gapLaps === 1 ? 'volta' : 'voltas'}` : r.gapMs != null ? `+${(r.gapMs / 1000).toFixed(3)}` : '',
+            lapTimes,
+          };
+        }),
     ),
   };
 }
