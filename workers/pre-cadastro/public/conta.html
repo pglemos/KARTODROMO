@@ -102,7 +102,7 @@
   var botao = document.getElementById('salvar');
   form.addEventListener('submit', function (ev) {
     ev.preventDefault();
-    var s1 = document.getElementById('s1').value, s2 = document.getElementById('s2').value;
+    var s1 = document.getElementById('s1').value.trim(), s2 = document.getElementById('s2').value.trim();
     erro.hidden = true;
     if (s1.length < 8) { erro.textContent = 'A senha precisa ter pelo menos 8 caracteres.'; erro.hidden = false; return; }
     if (s1 !== s2) { erro.textContent = 'As duas senhas não são iguais.'; erro.hidden = false; return; }
@@ -111,7 +111,7 @@
       .then(function (r) {
         botao.disabled = false;
         if (r.ok) return mostrar('senhaOk');
-        if (r.j.erro === 'Link inválido ou expirado.') return falha();
+        if (r.j.erro === 'Link inválido ou expirado.') return falha('Este link expirou ou já foi usado. Se você recebeu mais de um e-mail, abra o e-mail mais recente ou peça um novo pelo app.');
         erro.textContent = r.j.erro || 'Não foi possível salvar. Tente de novo.'; erro.hidden = false;
       })
       .catch(function () { botao.disabled = false; erro.textContent = 'Sem conexão. Tente de novo.'; erro.hidden = false; });

@@ -336,12 +336,6 @@ async function createEmailToken(context: CryptoContext, accountId: string, purpo
   await context.db.prepare('DELETE FROM mobile_email_tokens WHERE expires_at <= ?').bind(now).run();
   await context.db
     .prepare(
-      'UPDATE mobile_email_tokens SET used_at = ? WHERE account_id = ? AND purpose = ? AND used_at IS NULL',
-    )
-    .bind(now, accountId, purpose)
-    .run();
-  await context.db
-    .prepare(
       `INSERT INTO mobile_email_tokens(token_hash, account_id, purpose, expires_at, used_at, created_at)
        VALUES (?, ?, ?, ?, NULL, ?)`,
     )
@@ -507,6 +501,10 @@ async function verifyEmail(input: Record<string, unknown>, context: CryptoContex
     .prepare('UPDATE mobile_accounts SET email_verified_at = ? WHERE id = ?')
     .bind(now, tokenRow.account_id)
     .run();
+  await context.db
+    .prepare("UPDATE mobile_email_tokens SET used_at = ? WHERE account_id = ? AND purpose = 'verify' AND used_at IS NULL")
+    .bind(now, tokenRow.account_id)
+    .run();
   return json(200, { ok: true });
 }
 
@@ -560,6 +558,10 @@ async function resetPassword(input: Record<string, unknown>, context: CryptoCont
     .run();
   await context.db
     .prepare('UPDATE mobile_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL')
+    .bind(now, tokenRow.account_id)
+    .run();
+  await context.db
+    .prepare("UPDATE mobile_email_tokens SET used_at = ? WHERE account_id = ? AND purpose = 'reset' AND used_at IS NULL")
     .bind(now, tokenRow.account_id)
     .run();
   return json(200, { ok: true });
