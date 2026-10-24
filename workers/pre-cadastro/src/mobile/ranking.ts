@@ -10,6 +10,7 @@
  */
 import { authenticateMobileRequest, type MobileAuthEnv } from './auth';
 import { receberClientes } from './clientes';
+import { filtrarKarts, type VoltaKart } from './karts';
 
 export interface MobileRankingEnv extends MobileAuthEnv {
   MOBILE_DB?: D1Database;
@@ -52,7 +53,7 @@ function constantTimeEqual(a: string, b: string) {
   return dif === 0;
 }
 
-const CHAVE = /^(ranking|piloto:\d{1,12})$/;
+const CHAVE = /^(ranking|piloto:\d{1,12}|karts:\d{4}-\d{2}-\d{2})$/;
 const LIMITE_CORPO = 4_000_000;
 
 // a tabela também é criada aqui (mesmo SQL da migration 0007): o wrangler local não tem permissão de D1
@@ -165,6 +166,16 @@ export async function handleMobileRanking(request: Request, env: MobileRankingEn
       return json(200, { pilotos: r.results ?? [] }, 300);
     }
     if (p === '/api/mobile/v1/ranking/karts') {
+      await garantirTabela(env);
+      const catalogo = await env.MOBILE_DB.prepare("SELECT chave FROM mobile_ranking WHERE chave LIKE 'karts:%' ORDER BY chave DESC").all<{ chave: string }>();
+      const dias = (catalogo.results ?? []).map((r) => r.chave.slice(6));
+      if (dias.length) {
+        let filtro: ReturnType<typeof filtrarKarts>;
+        try { filtro = filtrarKarts([], url, dias); } catch (e) { return json(400, { erro: (e as Error).message }); }
+        const registros = await env.MOBILE_DB.prepare('SELECT dados, atualizado_em FROM mobile_ranking WHERE chave >= ? AND chave <= ? ORDER BY chave').bind('karts:' + filtro.de, 'karts:' + filtro.ate).all<{ dados: string; atualizado_em: number }>();
+        const linhas = (registros.results ?? []).flatMap((r) => (JSON.parse(r.dados) as { linhas: VoltaKart[] }).linhas);
+        return json(200, { ...filtrarKarts(linhas, url, dias), atualizadoEm: new Date(Math.max(0, ...(registros.results ?? []).map((r) => r.atualizado_em))).toISOString() }, 60);
+      }
       const r = await ler(env, 'ranking');
       return json(200, { ...((r?.dados.kartsDoDia as object | undefined) ?? { dia: null, karts: [] }), atualizadoEm: r?.atualizadoEm ?? null }, 60);
     }
