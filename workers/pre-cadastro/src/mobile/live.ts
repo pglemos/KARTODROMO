@@ -34,6 +34,22 @@ function voltasParaApp(value: unknown) {
   return [...porNumero.values()].sort((a, b) => a.number - b.number);
 }
 
+/**
+ * Um Durable Object pode ter sido criado antes do histórico ser publicado. Nesse caso o retrato
+ * ainda tem `lapTimes: []`, embora `laps` já conte muitas voltas. Esse retrato não pode chegar ao
+ * app: ele faria a tela perder o histórico completo que a cronometragem já possui.
+ */
+function historicoIncompleto(drivers: unknown) {
+  if (!Array.isArray(drivers) || drivers.length === 0) return false;
+  return (drivers as Piloto[]).some((driver) => {
+    const laps = inteiro(driver?.laps);
+    const bruto = driver?.lapTimes;
+    if (laps === null) return !Array.isArray(bruto);
+    if (laps === 0) return false;
+    return voltasParaApp(bruto).length < laps;
+  });
+}
+
 /** Só os campos que o app mostra, com tamanho limitado (o retrato vem de fora do Worker). */
 export function retratoParaApp(r: Retrato) {
   const status = r.status === 'live' ? 'live' : r.status === 'finished' ? 'finished' : 'empty';
@@ -81,9 +97,8 @@ export async function handleMobileLive(request: Request, env: MobileLiveEnv) {
     // Retratos criados antes da publicação do histórico não têm lapTimes. Não devolva esse
     // estado legado: leia uma vez da cronometragem para atualizar o objeto e o cache do app.
     try {
-      const corpo = await r.clone().json() as { drivers?: { lapTimes?: unknown }[] };
-      const semHistorico = Array.isArray(corpo.drivers) && corpo.drivers.length > 0 && corpo.drivers.some((d) => !Array.isArray(d.lapTimes));
-      if (semHistorico) return handleMobileLive(request, { CRONO_URL: env.CRONO_URL });
+      const corpo = await r.clone().json() as { drivers?: unknown };
+      if (historicoIncompleto(corpo.drivers)) return handleMobileLive(request, { CRONO_URL: env.CRONO_URL });
     } catch {
       return handleMobileLive(request, { CRONO_URL: env.CRONO_URL });
     }

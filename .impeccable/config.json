@@ -15,7 +15,114 @@
       "components/telao/**"
     ],
     "ignoreValues": [
-      "#000000"
+      {
+        "rule": "design-system-color",
+        "value": "#a3a82b",
+        "files": [
+          "mobile/src/components/ao-vivo-real.tsx"
+        ],
+        "createdAt": "2026-10-24T13:37:14.246Z",
+        "reason": "Agent review: existing native Ao vivo podium, dark border, live, selection and error state colors; preserve incumbent app design, website DESIGN.md has different scope."
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#1f2422",
+        "files": [
+          "mobile/src/components/ao-vivo-real.tsx"
+        ],
+        "createdAt": "2026-10-24T13:37:14.291Z",
+        "reason": "Agent review: existing native Ao vivo podium, dark border, live, selection and error state colors; preserve incumbent app design, website DESIGN.md has different scope."
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#7c4dff",
+        "files": [
+          "mobile/src/components/ao-vivo-real.tsx"
+        ],
+        "createdAt": "2026-10-24T13:37:14.335Z",
+        "reason": "Agent review: existing purple fastest-lap treatment in native Ao vivo; DESIGN.md explicitly describes website public/admin palette."
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#2e3431",
+        "files": [
+          "mobile/src/components/ao-vivo-real.tsx"
+        ],
+        "createdAt": "2026-10-24T13:37:14.380Z",
+        "reason": "Agent review: existing native Ao vivo podium, dark border, live, selection and error state colors; preserve incumbent app design, website DESIGN.md has different scope."
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(70,12,12,0.85)",
+        "files": [
+          "mobile/src/components/ao-vivo-real.tsx"
+        ],
+        "createdAt": "2026-10-24T13:37:14.429Z",
+        "reason": "Agent review: existing native Ao vivo podium, dark border, live, selection and error state colors; preserve incumbent app design, website DESIGN.md has different scope."
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(36,16,90,0.55)",
+        "files": [
+          "mobile/src/components/ao-vivo-real.tsx"
+        ],
+        "createdAt": "2026-10-24T13:37:14.478Z",
+        "reason": "Agent review: existing purple fastest-lap treatment in native Ao vivo; DESIGN.md explicitly describes website public/admin palette."
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(12,10,26,0.82)",
+        "files": [
+          "mobile/src/components/ao-vivo-real.tsx"
+        ],
+        "createdAt": "2026-10-24T13:37:14.526Z",
+        "reason": "Agent review: existing purple fastest-lap treatment in native Ao vivo; DESIGN.md explicitly describes website public/admin palette."
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#2bd96a",
+        "files": [
+          "mobile/src/components/ao-vivo-real.tsx"
+        ],
+        "createdAt": "2026-10-24T13:37:14.573Z",
+        "reason": "Agent review: existing native Ao vivo podium, dark border, live, selection and error state colors; preserve incumbent app design, website DESIGN.md has different scope."
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#1d5b35",
+        "files": [
+          "mobile/src/components/ao-vivo-real.tsx"
+        ],
+        "createdAt": "2026-10-24T13:37:14.618Z",
+        "reason": "Agent review: existing native Ao vivo podium, dark border, live, selection and error state colors; preserve incumbent app design, website DESIGN.md has different scope."
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#7a2e25",
+        "files": [
+          "mobile/src/components/ao-vivo-real.tsx"
+        ],
+        "createdAt": "2026-10-24T13:37:14.665Z",
+        "reason": "Agent review: existing native Ao vivo podium, dark border, live, selection and error state colors; preserve incumbent app design, website DESIGN.md has different scope."
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#331a17",
+        "files": [
+          "mobile/src/components/ao-vivo-real.tsx"
+        ],
+        "createdAt": "2026-10-24T13:37:14.714Z",
+        "reason": "Agent review: existing native Ao vivo podium, dark border, live, selection and error state colors; preserve incumbent app design, website DESIGN.md has different scope."
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#ffb4ab",
+        "files": [
+          "mobile/src/components/ao-vivo-real.tsx"
+        ],
+        "createdAt": "2026-10-24T13:37:14.763Z",
+        "reason": "Agent review: existing native Ao vivo podium, dark border, live, selection and error state colors; preserve incumbent app design, website DESIGN.md has different scope."
+      }
     ]
   }
 }

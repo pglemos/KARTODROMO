@@ -16,7 +16,7 @@ function DemoLiveTime(props: LiveTimeScreenProps) {
 function RealLiveTime() {
   const { session, error, loading, refresh } = useLiveSession();
   const { styles } = useUi();
-  if (session) return <AoVivoReal session={session} onRefresh={refresh} />;
+  if (session) return <AoVivoReal session={session} onRefresh={refresh} refreshError={error} />;
   return (
     <Page>
       <PageHeader title="Ao vivo" description="Posições, voltas e tempos da bateria que está na pista, direto da cronometragem." />

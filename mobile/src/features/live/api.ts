@@ -100,6 +100,7 @@ export function snapshotToSession(snap: LiveSnapshot, now = Date.now()): LiveSes
     title: (titulo || snap.eventName || 'Bateria').toUpperCase(),
     subtitle: `${(prova || tipo).toUpperCase()} · ${aoVivo ? 'AO VIVO' : 'ENCERRADA'}`,
     trackName: (snap.trackName || 'Kartódromo Internacional de Betim').replace('Kartodromo', 'Kartódromo'),
+    updatedAt: snap.updatedAt,
     status: aoVivo ? 'GREEN' : 'CHECKERED',
     elapsedTime: aoVivo ? (Number.isFinite(iniciou) ? formatElapsed(elapsedMs) : '—') : 'Encerrada',
     elapsedMs,

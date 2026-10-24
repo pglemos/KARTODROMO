@@ -142,6 +142,8 @@ export interface LiveSession {
   title: string; // e.g. 'BATERIAS 14/10/2026'
   subtitle: string; // e.g. 'BATERIA 09:00 - ESCOLA - RACE'
   trackName: string; // e.g. 'KART CENTER BETIM'
+  /** instante do último retrato recebido da cronometragem, em ISO */
+  updatedAt?: string;
   status: SessionFlagStatus;
   elapsedTime: string; // e.g. '0:17:54.548'
   elapsedMs: number;

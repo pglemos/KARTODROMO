@@ -68,4 +68,38 @@ describe('ao vivo do app', () => {
     const fora = await handleMobileLive(new Request('https://reservas.kartodromodebetim.com.br/api/mobile/v1/live'), {});
     expect(fora.status).toBe(503);
   });
+
+  it('descarta retrato antigo do Durable Object quando as voltas estão incompletas', async () => {
+    const antigo = {
+      ...retrato,
+      drivers: [{ ...retrato.drivers[0], laps: 16, lapTimes: [] }],
+    };
+    const completo = {
+      ...retrato,
+      drivers: [{
+        ...retrato.drivers[0],
+        laps: 3,
+        lapTimes: [
+          { number: 1, time: '1:20.001', timeMs: 80001 },
+          { number: 2, time: '1:18.450', timeMs: 78450 },
+          { number: 3, time: '1:17.683', timeMs: 77683 },
+        ],
+      }],
+    };
+    const objeto = { fetch: vi.fn(async () => new Response(JSON.stringify(antigo), { status: 200 })) };
+    const namespace = { idFromName: () => 'crono', get: () => objeto };
+    const fetchCrono = vi.fn(async () => new Response(JSON.stringify(completo), { status: 200 }));
+    vi.stubGlobal('fetch', fetchCrono);
+
+    const resposta = await handleMobileLive(
+      new Request('https://reservas.kartodromodebetim.com.br/api/mobile/v1/live'),
+      { AO_VIVO: namespace as never },
+    );
+    const corpo = await resposta.json() as { drivers: { lapTimes: unknown[] }[] };
+    expect(fetchCrono).toHaveBeenCalledWith(
+      'https://crono.kartodromodebetim.com.br/api/livetime-snapshot',
+      expect.objectContaining({ headers: { accept: 'application/json' } }),
+    );
+    expect(corpo.drivers[0].lapTimes).toHaveLength(3);
+  });
 });
