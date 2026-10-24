@@ -8,8 +8,9 @@ export interface MobileLiveEnv {
   AO_VIVO?: DurableObjectNamespace;
 }
 
-type Piloto = { position?: unknown; kart?: unknown; name?: unknown; time?: unknown; laps?: unknown; last?: unknown; bestLap?: unknown; gap?: unknown; passouEm?: unknown };
-type Retrato = { status?: unknown; updatedAt?: unknown; sessionType?: unknown; eventName?: unknown; trackName?: unknown; race?: { startedAt?: unknown } | null; drivers?: unknown };
+type Volta = { number?: unknown; time?: unknown; timeMs?: unknown };
+type Piloto = { position?: unknown; kart?: unknown; name?: unknown; time?: unknown; laps?: unknown; last?: unknown; bestLap?: unknown; gap?: unknown; passouEm?: unknown; lapTimes?: unknown };
+type Retrato = { status?: unknown; updatedAt?: unknown; sessionType?: unknown; eventName?: unknown; trackName?: unknown; race?: { id?: unknown; startedAt?: unknown } | null; drivers?: unknown };
 
 const json = (status: number, body: unknown, maxAge = 0) => new Response(JSON.stringify(body), {
   status,
@@ -18,6 +19,20 @@ const json = (status: number, body: unknown, maxAge = 0) => new Response(JSON.st
 
 const texto = (v: unknown, max: number) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, max) : '');
 const inteiro = (v: unknown) => (typeof v === 'number' && Number.isSafeInteger(v) && v >= 0 ? v : null);
+const milissegundos = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && Number.isSafeInteger(v) && v > 0 ? v : null);
+
+function voltasParaApp(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  const porNumero = new Map<number, { number: number; time: string; timeMs: number }>();
+  for (const item of value as Volta[]) {
+    const number = inteiro(item?.number);
+    const time = texto(item?.time, 16);
+    const timeMs = milissegundos(item?.timeMs);
+    if (number === null || number < 1 || !time || timeMs === null) continue;
+    porNumero.set(number, { number, time, timeMs });
+  }
+  return [...porNumero.values()].sort((a, b) => a.number - b.number);
+}
 
 /** Só os campos que o app mostra, com tamanho limitado (o retrato vem de fora do Worker). */
 export function retratoParaApp(r: Retrato) {
@@ -34,6 +49,7 @@ export function retratoParaApp(r: Retrato) {
       last: texto(d.last, 16),
       bestLap: inteiro(d.bestLap),
       gap: texto(d.gap, 20),
+      lapTimes: voltasParaApp(d.lapTimes),
       // hora exata da última passagem, no relógio da cronometragem (versão app=1 do retrato)
       passouEm: typeof d.passouEm === 'number' && Number.isFinite(d.passouEm) ? d.passouEm : null,
     }));
@@ -42,6 +58,7 @@ export function retratoParaApp(r: Retrato) {
     eventName: texto(r.eventName, 120),
     trackName: texto(r.trackName, 120),
     sessionType: r.sessionType === 'race' ? 'race' : 'qualifying',
+    raceId: typeof r.race?.id === 'string' ? r.race.id : null,
     startedAt: typeof r.race?.startedAt === 'string' ? r.race.startedAt : null,
     updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : new Date().toISOString(),
     drivers: status === 'empty' ? [] : pilotos,
@@ -61,6 +78,15 @@ export async function handleMobileLive(request: Request, env: MobileLiveEnv) {
     if (guardado) return guardado;
     const r = await objeto.fetch('https://ao-vivo/retrato').catch(() => null);
     if (!r?.ok) return handleMobileLive(request, { CRONO_URL: env.CRONO_URL }); // repasse fora: lê direto da crono
+    // Retratos criados antes da publicação do histórico não têm lapTimes. Não devolva esse
+    // estado legado: leia uma vez da cronometragem para atualizar o objeto e o cache do app.
+    try {
+      const corpo = await r.clone().json() as { drivers?: { lapTimes?: unknown }[] };
+      const semHistorico = Array.isArray(corpo.drivers) && corpo.drivers.length > 0 && corpo.drivers.some((d) => !Array.isArray(d.lapTimes));
+      if (semHistorico) return handleMobileLive(request, { CRONO_URL: env.CRONO_URL });
+    } catch {
+      return handleMobileLive(request, { CRONO_URL: env.CRONO_URL });
+    }
     const resposta = new Response(r.body, { status: r.status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': r.ok ? 'public, max-age=1' : 'no-store' } });
     if (cache && r.ok) await cache.put(chave, resposta.clone());
     return resposta;

@@ -6,7 +6,12 @@ const retrato = {
   status: 'live', updatedAt: '2026-10-20T20:01:00.000Z', sessionType: 'race', eventName: 'BATERIA 17:00 · CORRIDA',
   trackName: 'Kartodromo Internacional de Betim', race: { startedAt: '2026-10-20T20:00:00.000Z', id: 'x', rules: {} },
   drivers: [
-    { position: 1, kart: '48', name: 'Jorge Antonio', time: '1:15.418', laps: 16, last: '1:17.683', bestLap: 15, gap: '', passouEm: 1792620000123 },
+    { position: 1, kart: '48', name: 'Jorge Antonio', time: '1:15.418', laps: 16, last: '1:17.683', bestLap: 15, gap: '', passouEm: 1792620000123,
+      lapTimes: [
+        { number: 1, time: '1:20.001', timeMs: 80001 },
+        { number: 2, time: '1:18.450', timeMs: 78450 },
+        { number: 3, time: '1:17.683', timeMs: 77683 },
+      ] },
     { position: 2, kart: '44', name: 'Iury Pedroso', time: '1:16.471', laps: 16, last: '1:16.900', bestLap: 9, gap: '+2.350', cpf: '000' },
     { position: 999, kart: '-', name: '-', time: '-' },
   ],
@@ -17,11 +22,36 @@ describe('ao vivo do app', () => {
 
   it('mantém só os campos da tela e tira a linha vazia do painel', () => {
     const r = retratoParaApp(retrato);
-    expect(r).toMatchObject({ status: 'live', eventName: 'BATERIA 17:00 · CORRIDA', startedAt: '2026-10-20T20:00:00.000Z', sessionType: 'race' });
+    expect(r).toMatchObject({ status: 'live', eventName: 'BATERIA 17:00 · CORRIDA', raceId: 'x', startedAt: '2026-10-20T20:00:00.000Z', sessionType: 'race' });
     expect(r.drivers).toHaveLength(2);
-    expect(r.drivers[1]).toEqual({ position: 2, kart: '44', name: 'Iury Pedroso', best: '1:16.471', laps: 16, last: '1:16.900', bestLap: 9, gap: '+2.350', passouEm: null });
+    expect(r.drivers[0].lapTimes).toEqual([
+      { number: 1, time: '1:20.001', timeMs: 80001 },
+      { number: 2, time: '1:18.450', timeMs: 78450 },
+      { number: 3, time: '1:17.683', timeMs: 77683 },
+    ]);
+    expect(r.drivers[1]).toEqual({ position: 2, kart: '44', name: 'Iury Pedroso', best: '1:16.471', laps: 16, last: '1:16.900', bestLap: 9, gap: '+2.350', lapTimes: [], passouEm: null });
     expect(r.drivers[0].passouEm).toBe(1792620000123);
     expect(JSON.stringify(r)).not.toContain('cpf');
+  });
+
+  it('preserva todas as voltas em ordem e descarta entradas inválidas', () => {
+    const r = retratoParaApp({
+      ...retrato,
+      drivers: [{
+        position: 1, kart: '48', name: 'Jorge Antonio', time: '1:15.418', laps: 3, last: '1:17.683', bestLap: 3, gap: '',
+        lapTimes: [
+          { number: 3, time: '1:17.683', timeMs: 77683 },
+          { number: 1, time: '1:20.001', timeMs: 80001 },
+          { number: 2, time: '1:18.450', timeMs: 78450 },
+          { number: 4, time: 'fraude', timeMs: 0 },
+        ],
+      }],
+    });
+    expect(r.drivers[0].lapTimes).toEqual([
+      { number: 1, time: '1:20.001', timeMs: 80001 },
+      { number: 2, time: '1:18.450', timeMs: 78450 },
+      { number: 3, time: '1:17.683', timeMs: 77683 },
+    ]);
   });
 
   it('sem bateria: lista vazia', () => {
