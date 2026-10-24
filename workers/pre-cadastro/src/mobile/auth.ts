@@ -475,7 +475,11 @@ async function login(request: Request, input: Record<string, unknown>, env: Mobi
   const account = await findAccount(context, identifier);
   const salt = account ? decodeBase64Url(account.password_salt) : new Uint8Array(16);
   const candidate = await passwordHash(password, salt, account?.password_scheme ?? PASSWORD_SCHEME);
-  const valid = Boolean(account && constantTimeEqual(candidate, account.password_hash));
+  let valid = Boolean(account && constantTimeEqual(candidate, account.password_hash));
+  if (!valid && account && password.trim() !== password && password.trim().length >= PASSWORD_MIN) {
+    const candidateTrimmed = await passwordHash(password.trim(), salt, account.password_scheme ?? PASSWORD_SCHEME);
+    valid = constantTimeEqual(candidateTrimmed, account.password_hash);
+  }
   if (!valid || !account) return json(401, { erro: authError });
   if (account.email_verified_at === null) {
     // senha certa mas e-mail ainda não confirmado: reenvia o link em vez de dizer "senha inválida"
@@ -519,7 +523,7 @@ async function forgotPassword(
     return json(429, { erro: 'Muitas tentativas. Aguarde alguns minutos.' });
   }
   const account = identifier ? await findAccount(context, identifier) : null;
-  if (account?.email_verified_at !== null && account) await deliverEmail(env, context, account, 'reset');
+  if (account) await deliverEmail(env, context, account, account.email_verified_at === null ? 'verify' : 'reset');
   return json(202, { mensagem: genericMessage });
 }
 

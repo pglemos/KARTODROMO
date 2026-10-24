@@ -241,6 +241,12 @@ describe('autenticação móvel', () => {
     expect(cpfLogin.status).toBe(200);
     const cpfSession = await body(cpfLogin);
 
+    const spaceLogin = await call('login', {
+      identifier: validRegistration.email,
+      password: validRegistration.password + ' ',
+    });
+    expect(spaceLogin.status).toBe(200);
+
     const account = database.database
       .prepare('SELECT name_cipher, email_cipher, cpf_cipher, phone_cipher FROM mobile_accounts')
       .get() as Row;
@@ -312,6 +318,17 @@ describe('autenticação móvel', () => {
     });
     expect(existingReset.status).toBe(202);
     expect(await body(existingReset)).toEqual(await body(unknownReset));
+  });
+
+  it('reenvia a confirmação quando a conta ainda não verificou o e-mail', async () => {
+    await register();
+    const before = sentEmails.length;
+
+    expect((await call('password/forgot', { identifier: validRegistration.email })).status).toBe(202);
+    expect(sentEmails).toHaveLength(before + 1);
+    expect(sentEmails.at(-1)?.subject).toContain('grid');
+    expect(database.database.prepare("SELECT purpose FROM mobile_email_tokens ORDER BY created_at DESC LIMIT 1").get())
+      .toMatchObject({ purpose: 'verify' });
   });
 
   it('changes a password with a single-use reset token', async () => {
