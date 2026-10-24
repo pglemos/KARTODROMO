@@ -529,7 +529,7 @@ async function forgotPassword(
 
 async function resetPassword(input: Record<string, unknown>, context: CryptoContext) {
   const token = value(input, 'token');
-  const password = value(input, 'password');
+  const password = value(input, 'password').trim();
   if (password.length < PASSWORD_MIN) {
     return json(400, { erro: 'A senha deve ter pelo menos 8 caracteres.' });
   }

@@ -378,6 +378,19 @@ describe('autenticação móvel', () => {
     ).toBe(200);
   });
 
+  it('ignora espaço acidental no fim da senha criada pelo link', async () => {
+    await register();
+    expect((await call('email/verify', { token: tokenFromLastEmail() })).status).toBe(200);
+    expect((await call('password/forgot', { identifier: validRegistration.email })).status).toBe(202);
+
+    expect(
+      (await call('password/reset', { token: tokenFromLastEmail(), password: 'SenhaNova!2026 ' })).status,
+    ).toBe(200);
+    expect(
+      (await call('login', { identifier: validRegistration.email, password: 'SenhaNova!2026' })).status,
+    ).toBe(200);
+  });
+
   it('rate limits authentication attempts by IP', async () => {
     const responses = await Promise.all(
       Array.from({ length: 7 }, () =>
