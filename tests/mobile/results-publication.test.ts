@@ -177,6 +177,45 @@ async function createVerifiedAccount(email: string) {
 }
 
 describe('fila dos e-mails de conta (enviada pela cronometragem)', () => {
+  it('retoma mensagens após cinco falhas sem entregar links expirados', async () => {
+    const now = Date.now();
+    for (const [id, age] of [['11111111-1111-1111-1111-111111111111', 60_000], ['22222222-2222-2222-2222-222222222222', 31 * 60_000]] as const) {
+      database.database.prepare('INSERT INTO mobile_email_outbox(id,to_address,subject,text_body,html_body,created_at,attempts) VALUES (?,?,?,?,?,?,6)')
+        .run(id, 'teste-codex@example.com', 'TESTE CODEX', 'texto', '<p>texto</p>', now - age);
+    }
+    const response = await callWorker('/api/mobile/v1/internal/outbox', 'GET', undefined, { 'x-mobile-publish-token': PUBLISH_TOKEN });
+    expect(await response.json()).toMatchObject([{ id: '11111111-1111-1111-1111-111111111111' }]);
+  });
+
+  it.each(['http', 'network'])('guarda a mensagem na fila quando o provedor falha: %s', async (failure) => {
+    vi.stubGlobal('fetch', async () => {
+      if (failure === 'network') throw new Error('network unavailable');
+      return new Response('unavailable', { status: 503 });
+    });
+    const response = await callWorker('/api/mobile/v1/auth/register', 'POST', {
+      name: 'TESTE CODEX', cpf: cpfForTest(), email: 'teste-codex@example.com', phone: '+55 31 98888-7777', password: 'SenhaSegura!2026', privacyAccepted: true,
+    });
+    expect(response.status).toBe(202);
+    expect(database.database.prepare('SELECT to_address FROM mobile_email_outbox').all()).toEqual([{ to_address: 'teste-codex@example.com' }]);
+  });
+
+  it('dois consumidores não recebem a mesma mensagem simultaneamente', async () => {
+    database.database.prepare('INSERT INTO mobile_email_outbox(id,to_address,subject,text_body,html_body,created_at) VALUES (?,?,?,?,?,?)')
+      .run('33333333-3333-3333-3333-333333333333', 'teste-codex@example.com', 'TESTE CODEX', 'texto', '<p>texto</p>', Date.now());
+    const responses = await Promise.all([1, 2].map(() => callWorker('/api/mobile/v1/internal/outbox', 'GET', undefined, { 'x-mobile-publish-token': PUBLISH_TOKEN })));
+    const batches = await Promise.all(responses.map((response) => response.json() as Promise<{ id: string }[]>));
+    expect(batches.flat()).toEqual([expect.objectContaining({ id: '33333333-3333-3333-3333-333333333333' })]);
+  });
+
+  it('responde indisponível quando o envio e a persistência falham', async () => {
+    vi.stubGlobal('fetch', async () => new Response('unavailable', { status: 503 }));
+    database.database.exec('DROP TABLE mobile_email_outbox');
+    const response = await callWorker('/api/mobile/v1/auth/register', 'POST', {
+      name: 'TESTE CODEX', cpf: cpfForTest(), email: 'teste-codex@example.com', phone: '+55 31 98888-7777', password: 'SenhaSegura!2026', privacyAccepted: true,
+    });
+    expect(response.status).toBe(503);
+  });
+
   it('sem o Email Sending liberado, o e-mail vai para a fila e a crono envia e confirma', async () => {
     delete env.RESEND_API_KEY;
     delete env.RESEND_FROM_EMAIL;

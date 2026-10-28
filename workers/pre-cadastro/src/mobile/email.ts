@@ -33,7 +33,6 @@ export function mobileEmailConfigured(env: MobileEmailEnv) {
 async function enfileirar(env: MobileEmailEnv, to: string, subject: string, text: string, html: string) {
   if (!env.MOBILE_DB) return false;
   const agora = Date.now();
-  await env.MOBILE_DB.prepare('DELETE FROM mobile_email_outbox WHERE created_at < ?').bind(agora - 3_600_000).run();
   await env.MOBILE_DB.prepare(
     'INSERT INTO mobile_email_outbox(id, to_address, subject, text_body, html_body, created_at) VALUES (?, ?, ?, ?, ?, ?)',
   ).bind(crypto.randomUUID(), to, subject, text, html, agora).run();
@@ -139,7 +138,7 @@ export async function sendMobileAuthEmail(
       console.error('mobile email binding', (e as { code?: string }).code ?? '', (e as Error).message);
     }
   }
-  if (env.MOBILE_DB && !(env.RESEND_API_KEY?.trim() && env.RESEND_FROM_EMAIL?.trim())) {
+  if (env.MOBILE_EMAIL_FILA === '1' || !(env.RESEND_API_KEY?.trim() && env.RESEND_FROM_EMAIL?.trim())) {
     try { return await enfileirar(env, to, subject, text, html); }
     catch (e) { console.error('mobile email outbox', (e as Error).message); return false; }
   }
@@ -153,8 +152,10 @@ export async function sendMobileAuthEmail(
       },
       body: JSON.stringify({ from: env.RESEND_FROM_EMAIL, to: [to], subject, text, html }),
     });
-    return response.ok;
+    if (response.ok) return true;
   } catch {
-    return false;
+    // Falha do provedor não pode descartar a mensagem antes de tentar a fila durável.
   }
+  try { return await enfileirar(env, to, subject, text, html); }
+  catch { console.error('mobile email outbox unavailable'); return false; }
 }

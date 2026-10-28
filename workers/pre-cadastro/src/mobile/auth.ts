@@ -358,7 +358,7 @@ async function deliverEmail(
   const email = await decrypt(context, account.email_cipher);
   const token = await createEmailToken(context, account.id, purpose);
   const delivered = await sendMobileAuthEmail(env, email, purpose, token);
-  if (!delivered) console.error('mobile auth email delivery failed');
+  if (!delivered) throw new Error('Mobile email delivery unavailable');
 }
 
 async function register(

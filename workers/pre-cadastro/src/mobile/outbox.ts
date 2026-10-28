@@ -1,7 +1,7 @@
 /**
  * Fila dos e-mails de conta, lida pelo servidor da cronometragem (o mesmo que publica os resultados, com a mesma
  * chave x-mobile-publish-token): pega até 10, envia pela HostGator e avisa enviado (apaga) ou falhou (volta à fila).
- * Até 5 tentativas; o que ficou parado 2 min sem resposta volta para a fila.
+ * Retenta enquanto o link vale (30 min); o que ficou parado 2 min sem resposta volta para a fila.
  */
 export interface MobileOutboxEnv {
   MOBILE_DB?: D1Database;
@@ -30,15 +30,12 @@ export async function handleMobileOutbox(request: Request, env: MobileOutboxEnv)
   const agora = Date.now();
   if (path === '/api/mobile/v1/internal/outbox' && request.method === 'GET') {
     const { results } = await env.MOBILE_DB.prepare(
-      `SELECT id, to_address, subject, text_body, html_body FROM mobile_email_outbox
-        WHERE attempts < 5 AND (claimed_at IS NULL OR claimed_at < ?) AND created_at > ?
-        ORDER BY created_at LIMIT 10`,
-    ).bind(agora - 120_000, agora - 3_600_000).all<Linha>();
-    if (results.length) {
-      await env.MOBILE_DB.batch(results.map((r) => env.MOBILE_DB!.prepare(
-        'UPDATE mobile_email_outbox SET claimed_at = ?, attempts = attempts + 1 WHERE id = ?',
-      ).bind(agora, r.id)));
-    }
+      `UPDATE mobile_email_outbox SET claimed_at = ?, attempts = attempts + 1
+        WHERE id IN (SELECT id FROM mobile_email_outbox
+          WHERE (claimed_at IS NULL OR claimed_at < ?) AND created_at > ?
+          ORDER BY created_at LIMIT 10)
+        RETURNING id, to_address, subject, text_body, html_body`,
+    ).bind(agora, agora - 120_000, agora - 30 * 60_000).all<Linha>();
     return json(200, results.map((r) => ({ id: r.id, to: r.to_address, subject: r.subject, text: r.text_body, html: r.html_body })));
   }
   const m = path.match(/^\/api\/mobile\/v1\/internal\/outbox\/([0-9a-f-]{36})\/(enviado|falhou)$/);
