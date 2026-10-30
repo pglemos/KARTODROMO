@@ -74,6 +74,7 @@ public partial class FormCrono
             if (!Msg.Pergunta(d, $"Remontar \"{_sess.S("name")}\" com as passagens de {Hora(a)} a {Hora(b)}?\n\nO resultado passa a valer como oficial (fica registrado nas observações).")) return;
             await Crono.Api.Post($"/api/sessions/{id}/remontar", new JsonObject { ["de"] = a, ["ate"] = b, ["incluirOutros"] = outros.Checked, ["autor"] = Environment.UserName });
             d.DialogResult = DialogResult.OK; d.Close();
+            InvalidarCachePassagens();
             await Atualizar();
             Msg.Info(this, "Resultado remontado. Confira a classificação; o e-mail dos pilotos não é enviado sozinho (use Relatórios › Enviar resultado por e-mail).");
         }));

@@ -51,6 +51,7 @@ public partial class FormCrono
             if (d.ShowDialog(this) != DialogResult.OK || escolhido == null) return;
         }
         await Crono.Api.Post($"/api/sessions/{sessaoId}/competitors/restore", new JsonObject { ["id"] = escolhido.S("id"), ["autor"] = Environment.UserName });
+        InvalidarCachePassagens();
         await Atualizar();
     });
 }

@@ -68,11 +68,17 @@ export function validar(entrada: Record<string, unknown>, hoje = new Date()): { 
   if (tipo === 'CPF' && !cpfValido(documento)) return { ok: false, erro: 'CPF inválido. Confira os números.' };
   if (tipo !== 'CPF' && chaveDocumento(tipo, documento).length < 5) return { ok: false, erro: `${tipo} inválido.` };
   if (nome.split(' ').length < 2) return { ok: false, erro: 'Informe o nome completo.' };
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return { ok: false, erro: 'E-mail inválido.' };
+  // e-mail, peso e endereço são obrigatórios como no totem (cadastro novo); o CEP é opcional
+  if (!email) return { ok: false, erro: 'Informe seu e-mail (o recibo e o resultado vão para ele).' };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return { ok: false, erro: 'E-mail inválido.' };
   if (digitos(telefone).length < 10) return { ok: false, erro: 'Informe o celular com DDD.' };
   if (!dataValida(nascimento, hoje)) return { ok: false, erro: 'Data de nascimento inválida.' };
-  if (peso && !(Number(peso) >= 15 && Number(peso) <= 250)) return { ok: false, erro: 'Peso inválido (em kg).' };
+  if (!peso) return { ok: false, erro: 'Informe seu peso (kg). Ele é usado para equilibrar os karts.' };
+  if (!(Number(peso) >= 20 && Number(peso) <= 250)) return { ok: false, erro: 'Peso inválido: informe entre 20 e 250 kg.' };
   if (estado && !/^[A-Z]{2}$/.test(estado)) return { ok: false, erro: 'UF inválida.' };
+  if (!txt(entrada.endereco, 150)) return { ok: false, erro: 'Informe o endereço (rua e número).' };
+  if (!txt(entrada.bairro, 80)) return { ok: false, erro: 'Informe o bairro.' };
+  if (!txt(entrada.cidade, 80)) return { ok: false, erro: 'Informe a cidade.' };
   // obrigatório como no totem: o resultado impresso traz o Instagram de cada piloto (15/10, recepção)
   const erroInstagram = erroInstagramCliente(entrada.instagram);
   if (erroInstagram) return { ok: false, erro: erroInstagram.replace(' do piloto', '') };
@@ -105,7 +111,10 @@ export function validar(entrada: Record<string, unknown>, hoje = new Date()): { 
 export type Horario = { id: number; inicio: string; nome: string; livres: number };
 export type Agenda = { atualizadoEm: string; precoCentavos: number; maxPilotos: number; prazoMin: number; antecedenciaMin: number; horarios: Horario[] };
 /** Cada vaga é de uma pessoa: com 3 vagas, quem compra é o piloto 1 e os outros 2 vêm cadastrados aqui. */
-export type Acompanhante = { nome: string; documento: string; nascimento: string; instagram?: string };
+export type Acompanhante = {
+  nome: string; documento: string; nascimento: string; instagram: string; email: string; telefone: string; peso: string;
+  cep: string; endereco: string; complemento: string; bairro: string; cidade: string;
+};
 export type Reserva = { cliente: PreCadastro; bateriaId: number; quantidade: number; forma: 'pix' | 'cartao'; pilotos: string[]; acompanhantes: Acompanhante[]; compradorPilota: boolean };
 /** Idade mínima para pilotar o kart de locação (requisito do kartódromo). */
 export const IDADE_MINIMA_PILOTO = 14;
@@ -155,10 +164,28 @@ export function validarReserva(entrada: Record<string, unknown>, agenda: Agenda 
     documentos.add(digitos(documento));
     if (!dataValida(nascimento, hoje)) return { ok: false, erro: `Data de nascimento inválida do piloto ${n} (${nome}).` };
     if (idade(nascimento, hoje) < IDADE_MINIMA_PILOTO) return { ok: false, erro: `${nome} precisa ter ${IDADE_MINIMA_PILOTO} anos ou mais para pilotar.` };
-    // Instagram dos outros pilotos é opcional (quem paga nem sempre sabe); se vier, tem que ser válido
+    // mesmos campos obrigatórios do totem para cada piloto (cada um tem o próprio cadastro)
+    const quem = `do piloto ${n} (${nome})`;
+    const email = txt(a?.email, 160).toLowerCase();
+    if (!email) return { ok: false, erro: `Informe o e-mail ${quem}.` };
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return { ok: false, erro: `E-mail inválido ${quem}.` };
+    const telefone = txt(a?.telefone, 25);
+    if (digitos(telefone).length < 10) return { ok: false, erro: `Informe o celular com DDD ${quem}.` };
+    const peso = txt(a?.peso, 6).replace(',', '.');
+    if (!peso) return { ok: false, erro: `Informe o peso (kg) ${quem}.` };
+    if (!(Number(peso) >= 20 && Number(peso) <= 250)) return { ok: false, erro: `Peso inválido ${quem}: informe entre 20 e 250 kg.` };
+    const endereco = txt(a?.endereco, 150);
+    if (!endereco) return { ok: false, erro: `Informe o endereço (rua e número) ${quem}.` };
+    const bairro = txt(a?.bairro, 80);
+    if (!bairro) return { ok: false, erro: `Informe o bairro ${quem}.` };
+    const cidade = txt(a?.cidade, 80);
+    if (!cidade) return { ok: false, erro: `Informe a cidade ${quem}.` };
     const instagram = String(a?.instagram ?? '').trim();
-    if (instagram && erroInstagramCliente(instagram)) return { ok: false, erro: `Instagram inválido do piloto ${n} (${nome}). Informe o @usuário (ex.: @andre.silva) ou deixe em branco.` };
-    acompanhantes.push({ nome, documento, nascimento, ...(instagram ? { instagram: normalizarInstagram(instagram) } : {}) });
+    if (erroInstagramCliente(instagram)) return { ok: false, erro: `Informe o Instagram ${quem}. Use o @usuário (ex.: @andre.silva).` };
+    acompanhantes.push({
+      nome, documento, nascimento, instagram: normalizarInstagram(instagram), email, telefone, peso,
+      cep: digitos(a?.cep).slice(0, 8), endereco, complemento: txt(a?.complemento, 80), bairro, cidade,
+    });
   }
   const pilotos = [...(compradorPilota ? [v.dados.nome] : []), ...acompanhantes.map((a) => a.nome)];
   return { ok: true, dados: { cliente: v.dados, bateriaId: horario.id, quantidade, forma, pilotos, acompanhantes, compradorPilota } };

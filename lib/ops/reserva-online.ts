@@ -10,9 +10,10 @@
  * Env: PRECADASTRO_URL/PRECADASTRO_KEY (os mesmos do pré-cadastro); OPS_ONLINE_PRODUTO (4 = ANTECIPADO),
  * OPS_ONLINE_PRODUTOS_BATERIA (baterias vendidas online: 11,4), OPS_ONLINE_ANTECEDENCIA_MIN, OPS_ONLINE_MAX, OPS_ONLINE_PRAZO_MIN.
  */
-import { one, query, tx } from './db';
-import { inscreverN } from './office';
+import { isValidCpf, one, onlyDigits, query, tx } from './db';
+import { HttpError, inscreverN } from './office';
 import { gravarAcompanhante, gravarPreCadastro, preCadastroLigado, type PreCadastro } from './pre-cadastro';
+import { vincularContasDoApp } from './app-mobile';
 
 type Log = (...args: unknown[]) => void;
 
@@ -94,6 +95,7 @@ export type PedidoSite = {
   acompanhantes?: { nome: string; documento: string; nascimento: string; instagram?: string; chave?: string }[];
   /** false = quem comprou não pilota: as vagas são todas dos acompanhantes (ele fica como responsável). */
   compradorPilota?: boolean;
+  cupom?: string;
   cliente: Omit<PreCadastro, 'key' | 'chave' | 'recebidoEm'> & { chave: string };
   pagamento?: { asaasId: string; billingType: string; pagoEm: string; valorCentavos: number };
 };
@@ -111,6 +113,89 @@ const LINHA = `SELECT *, CONVERT(varchar(19), ExpiraEm, 126) expira FROM dbo.Res
 const brasilia = (local: string) => `${String(local ?? '').slice(0, 19)}-03:00`;
 
 const ids = (s: string) => s.split(',').map(Number).filter((n) => n > 0);
+const brl = (centavos: number) => (centavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+type CouponInput = { codigo: string; documento: string; bateriaId: number; quantidade: number };
+type CouponQuote = { brutoCentavos: number; descontoCentavos: number; totalCentavos: number; voucherId: number | null; clienteId: number };
+type ReadOne = (text: string, params?: Record<string, unknown>) => Promise<Record<string, unknown> | null>;
+
+async function calcularPedidoOnline(input: CouponInput, read: ReadOne, lock: boolean, clienteId?: number): Promise<CouponQuote & { nome: string; inicio: string }> {
+  const c = configOnline();
+  const quantidade = Math.trunc(Number(input.quantidade));
+  const codigo = String(input.codigo ?? '').trim().toUpperCase();
+  const documento = onlyDigits(input.documento);
+  if (!(quantidade >= 1 && quantidade <= c.maxPilotos) || (codigo && !isValidCpf(documento))) throw new HttpError(400, 'Dados do cupom inválidos.');
+
+  const baterias = c.produtosBateria.map(Number).filter((id) => Number.isSafeInteger(id) && id > 0).join(',') || '0';
+  const bateria = await read(
+    `SELECT b.Id, b.Nome nome, CONVERT(varchar(16), b.Inicio, 126) inicio, b.Status, b.Vagas, b.ReservaFechada, b.AutoAtendimento, b.ProdutoId,
+            (SELECT COUNT(*) FROM dbo.Inscricao i WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') ocupadas,
+            CASE WHEN b.Status = 'aberta' AND b.ReservaFechada = 0 AND b.AutoAtendimento = 1
+                  AND b.ProdutoId IN (${baterias}) AND b.Inicio > DATEADD(minute, @antes, SYSDATETIME()) THEN 1 ELSE 0 END ok
+       FROM dbo.Bateria b${lock ? ' WITH (UPDLOCK, HOLDLOCK)' : ''} WHERE b.Id = @id`,
+    { id: Number(input.bateriaId), antes: c.antecedenciaMin - 10 },
+  );
+  if (!bateria || Number(bateria.ok) !== 1) throw new HttpError(400, 'Esse horário não está mais disponível. Escolha outro.');
+  const livres = Number(bateria.Vagas) - Number(bateria.ocupadas);
+  if (livres < quantidade) throw new HttpError(409, `Não há vagas o suficiente para a quantidade de participantes selecionada. Vagas disponíveis: ${Math.max(0, livres)}.`);
+
+  const produto = await read('SELECT Id, PrecoCentavos preco FROM dbo.Produto WHERE Id = @id', { id: c.produtoVenda });
+  const preco = Number(produto?.preco ?? 0);
+  if (!Number.isSafeInteger(preco) || preco <= 0) throw new HttpError(503, 'Reserva online indisponível no momento. Fale com a recepção pelo WhatsApp.');
+  const brutoCentavos = preco * quantidade;
+  if (!Number.isSafeInteger(brutoCentavos)) throw new HttpError(400, 'Valor da reserva inválido.');
+  if (!codigo) return { brutoCentavos, descontoCentavos: 0, totalCentavos: brutoCentavos, voucherId: null, clienteId: clienteId ?? 0, nome: String(bateria.nome), inicio: String(bateria.inicio) };
+  if (!/^[A-Z0-9_-]{1,40}$/.test(codigo)) throw new HttpError(400, 'Voucher não encontrado.');
+
+  const cliente = clienteId ?? Number((await read(
+    `SELECT TOP 1 Id id FROM dbo.Cliente WHERE (DocumentoNum = @doc OR Documento = @doc) AND ResponsavelId IS NULL ORDER BY AtualizadoEm DESC`,
+    { doc: documento },
+  ))?.id ?? 0);
+  const voucher = await read(
+    `SELECT v.*, p.Ativo parceiroAtivo, fc.Ativo fidelidadeAtiva,
+            CASE WHEN CAST(SYSDATETIME() AS date) BETWEEN v.InicioEm AND v.FimEm THEN 1 ELSE 0 END vigenciaOk
+       FROM dbo.Voucher v${lock ? ' WITH (UPDLOCK, HOLDLOCK)' : ''}
+       LEFT JOIN dbo.Parceiro p ON p.Id = v.ParceiroId LEFT JOIN dbo.FidelidadeConta fc ON fc.Id = v.FidelidadeContaId
+      WHERE v.Codigo = @codigo`,
+    { codigo },
+  );
+  if (!voucher || !voucher.Ativo) throw new HttpError(400, 'Voucher não encontrado.');
+  if (voucher.ParceiroId && !voucher.parceiroAtivo) throw new HttpError(400, 'O parceiro vinculado ao voucher está inativo.');
+  if (voucher.FidelidadeContaId && !voucher.fidelidadeAtiva) throw new HttpError(400, 'A conta de fidelidade vinculada ao voucher está inativa.');
+  if (!voucher.vigenciaOk) throw new HttpError(400, 'Voucher expirado.');
+  if (voucher.ProdutoId && Number(voucher.ProdutoId) !== c.produtoVenda) throw new HttpError(400, 'O produto do voucher não está na reserva.');
+
+  const usos = await read(
+    `SELECT
+       (SELECT COUNT(*) FROM dbo.VoucherUso u WHERE u.VoucherId = @voucher AND u.Estornado = 0)
+       + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso o WHERE o.VoucherId = @voucher AND o.Estado IN ('reservado', 'consumido', 'reembolso_pendente')) n,
+       (SELECT COUNT(*) FROM dbo.VoucherUso u WHERE u.VoucherId = @voucher AND u.ClienteId = @cliente AND u.Estornado = 0)
+       + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso o WHERE o.VoucherId = @voucher AND o.ClienteId = @cliente AND o.Estado IN ('reservado', 'consumido', 'reembolso_pendente')) doCliente`,
+    { voucher: voucher.Id, cliente },
+  );
+  if (voucher.UsoUnico && Number(usos?.n ?? 0) > 0) throw new HttpError(400, 'Voucher já utilizado.');
+  if (Number(usos?.doCliente ?? 0) >= Number(voucher.UsoMaxCliente ?? 1)) throw new HttpError(400, 'Limite de usos deste voucher para este cliente já atingido.');
+  if (voucher.PedidoMinimoCentavos && brutoCentavos < Number(voucher.PedidoMinimoCentavos)) {
+    throw new HttpError(400, `Valor do pedido insuficiente. Mínimo exigido: ${brl(Number(voucher.PedidoMinimoCentavos))}.`);
+  }
+
+  let descontoCentavos = voucher.Tipo === 'percentual'
+    ? Math.round((brutoCentavos * Number(voucher.Valor)) / 100)
+    : Number(voucher.Valor);
+  if (voucher.DescontoMaximoCentavos) descontoCentavos = Math.min(descontoCentavos, Number(voucher.DescontoMaximoCentavos));
+  descontoCentavos = Math.min(Math.max(0, descontoCentavos), brutoCentavos);
+  return { brutoCentavos, descontoCentavos, totalCentavos: brutoCentavos - descontoCentavos, voucherId: Number(voucher.Id), clienteId: cliente, nome: String(bateria.nome), inicio: String(bateria.inicio) };
+}
+
+export async function previsualizarVoucherOnline(input: CouponInput) {
+  try {
+    const quote = await calcularPedidoOnline(input, (sql, params) => one(sql, params), false);
+    return { brutoCentavos: quote.brutoCentavos, descontoCentavos: quote.descontoCentavos, totalCentavos: quote.totalCentavos };
+  } catch (error) {
+    if (error instanceof HttpError) return { erro: error.message };
+    throw error;
+  }
+}
 
 /** Texto curto do pedido (vai na cobrança da Asaas e na tela de confirmação). */
 export function descricaoPedido(nomeBateria: string, inicio: string, quantidade: number) {
@@ -133,19 +218,16 @@ export async function reservarPedido(p: PedidoSite, log: Log): Promise<Resultado
   }
   const n = Math.trunc(Number(p.quantidade));
   if (!(n >= 1 && n <= c.maxPilotos)) return { id: p.id, acao: 'recusado', erro: `Escolha de 1 a ${c.maxPilotos} pilotos.` };
-  const bat = await one<{ nome: string; inicio: string; ok: number }>(
-    `SELECT b.Nome nome, CONVERT(varchar(16), b.Inicio, 126) inicio,
-            CASE WHEN b.Status = 'aberta' AND b.ReservaFechada = 0 AND b.AutoAtendimento = 1
-                  AND b.ProdutoId IN (${c.produtosBateria.map((x) => Number(x)).join(',') || '0'})
-                  AND b.Inicio > DATEADD(minute, @antes, SYSDATETIME()) THEN 1 ELSE 0 END ok
-       FROM dbo.Bateria b WHERE b.Id = @id`,
-    { id: Number(p.bateriaId), antes: c.antecedenciaMin - 10 },
-  );
-  if (!bat || !bat.ok) return { id: p.id, acao: 'recusado', erro: 'Esse horário não está mais disponível. Escolha outro.' };
-  const produto = await one<{ preco: number | null }>(`SELECT PrecoCentavos preco FROM dbo.Produto WHERE Id = @id`, { id: c.produtoVenda });
-  const preco = produto?.preco ?? 0;
-  if (preco <= 0) return { id: p.id, acao: 'recusado', erro: 'Reserva online indisponível no momento. Fale com a recepção pelo WhatsApp.' };
-
+  try {
+    await calcularPedidoOnline(
+      { codigo: p.cupom ?? '', documento: p.cliente.documento, bateriaId: Number(p.bateriaId), quantidade: n },
+      (sql, params) => one(sql, params),
+      false,
+    );
+  } catch (e) {
+    if (e instanceof HttpError) return { id: p.id, acao: 'recusado', erro: e.message };
+    throw e;
+  }
   const cliente: PreCadastro = { ...p.cliente, key: '', recebidoEm: p.criadoEm, menores: p.cliente.menores ?? [] } as PreCadastro;
   const clienteId = await gravarPreCadastro(cliente, log);
   // cada vaga é de uma pessoa: o comprador + um cadastro para cada outro piloto (pedidos antigos, sem a lista: tudo no comprador)
@@ -157,22 +239,38 @@ export async function reservarPedido(p: PedidoSite, log: Log): Promise<Resultado
     : undefined;
   if (pessoas && new Set(pessoas).size !== pessoas.length) return { id: p.id, acao: 'recusado', erro: 'Cada vaga precisa ser de uma pessoa diferente (há CPF repetido entre os pilotos).' };
   const obs = `Reserva online ${p.codigo}` + (p.pilotos?.length ? ` · pilotos: ${p.pilotos.join(', ')}`.slice(0, 380) : '');
-  let inscricoes: number[];
   try {
-    inscricoes = await inscreverN(Number(p.bateriaId), clienteId, n, 'site', null, obs, true, { produtoId: c.produtoVenda, clientes: pessoas });
+    const result = await tx(async (run) => {
+      const read: ReadOne = async (sql, params) => (await run(sql, params))[0] ?? null;
+      const quote = await calcularPedidoOnline(
+        { codigo: p.cupom ?? '', documento: p.cliente.documento, bateriaId: Number(p.bateriaId), quantidade: n },
+        read,
+        true,
+        clienteId,
+      );
+      const inscricoes = await inscreverN(Number(p.bateriaId), clienteId, n, 'site', null, obs, true, { produtoId: c.produtoVenda, clientes: pessoas, run });
+      await run(
+        `INSERT INTO dbo.ReservaOnline (PedidoId, Codigo, ClienteId, BateriaId, Quantidade, ValorCentavos, Status, Forma, InscricaoIds, Pilotos, ExpiraEm)
+         VALUES (@pedido, @codigo, @cliente, @bateria, @n, @valor, 'aguardando', @forma, @insc, @pilotos, DATEADD(minute, @prazo, SYSDATETIME()))`,
+        { pedido: p.id, codigo: p.codigo, cliente: clienteId, bateria: Number(p.bateriaId), n, valor: quote.totalCentavos, forma: p.forma, insc: inscricoes.join(','), pilotos: (p.pilotos ?? []).join(', ').slice(0, 600) || null, prazo: c.prazoMin },
+      );
+      if (quote.voucherId !== null) {
+        await run(
+          `INSERT INTO dbo.ReservaOnlineVoucherUso (PedidoId, VoucherId, ClienteId, DescontoCentavos, ValidadeEm, Estado)
+           VALUES (@pedido, @voucher, @cliente, @desconto, DATEADD(minute, @prazo, SYSDATETIME()), 'reservado')`,
+          { pedido: p.id, voucher: quote.voucherId, cliente: clienteId, desconto: quote.descontoCentavos, prazo: c.prazoMin },
+        );
+      }
+      const nova = await read(`SELECT CONVERT(varchar(19), ExpiraEm, 126) expira FROM dbo.ReservaOnline WHERE PedidoId = @p`, { p: p.id });
+      return { quote, inscricoes, expira: String(nova?.expira ?? '') };
+    });
+    const expiraEm = brasilia(result.expira);
+    log(`reserva online ${p.codigo}: ${n} vaga(s) seguradas na bateria ${p.bateriaId} para o cliente ${clienteId} até ${result.expira.slice(11, 16)}`);
+    return { id: p.id, acao: 'reservado', valorCentavos: result.quote.totalCentavos, expiraEm, descricao: descricaoPedido(result.quote.nome, result.quote.inicio, n), inicio: result.quote.inicio };
   } catch (e) {
-    return { id: p.id, acao: 'recusado', erro: (e as Error).message };
+    if (e instanceof HttpError && [400, 404, 409, 503].includes(e.status)) return { id: p.id, acao: 'recusado', erro: e.message };
+    throw e;
   }
-  await query(
-    `INSERT INTO dbo.ReservaOnline (PedidoId, Codigo, ClienteId, BateriaId, Quantidade, ValorCentavos, Status, Forma, InscricaoIds, Pilotos, ExpiraEm)
-     VALUES (@pedido, @codigo, @cliente, @bateria, @n, @valor, 'aguardando', @forma, @insc, @pilotos, DATEADD(minute, @prazo, SYSDATETIME()))`,
-    { pedido: p.id, codigo: p.codigo, cliente: clienteId, bateria: Number(p.bateriaId), n, valor: preco * n, forma: p.forma, insc: inscricoes.join(','), pilotos: (p.pilotos ?? []).join(', ').slice(0, 600) || null, prazo: c.prazoMin },
-  );
-  // lido de volta do banco (o OUTPUT CONVERT do INSERT chegava vazio pelo driver)
-  const nova = await one<{ expira: string }>(`SELECT CONVERT(varchar(19), ExpiraEm, 126) expira FROM dbo.ReservaOnline WHERE PedidoId = @p`, { p: p.id });
-  const expiraEm = brasilia(nova!.expira);
-  log(`reserva online ${p.codigo}: ${n} vaga(s) seguradas na bateria ${p.bateriaId} para o cliente ${clienteId} até ${nova!.expira.slice(11, 16)}`);
-  return { id: p.id, acao: 'reservado', valorCentavos: preco * n, expiraEm, descricao: descricaoPedido(bat.nome, bat.inicio, n), inicio: bat.inicio };
 }
 
 /** Pagamento confirmado no site: vagas pagas. Se o prazo já tinha vencido, tenta segurar de novo; sem vaga, fica para devolver. */
@@ -182,6 +280,17 @@ export async function confirmarPagamento(p: PedidoSite, log: Log): Promise<Resul
   if (r.Status === 'pago') return { id: p.id, acao: 'confirmado', codigo: r.Codigo };
   // a Asaas diz se o cartão foi de débito (DEBIT_CARD) — a recepção mostra Pix / Crédito / Débito
   const forma = p.pagamento?.billingType === 'PIX' ? 'pix' : p.pagamento?.billingType === 'DEBIT_CARD' ? 'debito' : 'credito';
+  if (r.Status === 'pago_sem_vaga') return { id: p.id, acao: 'pago_sem_vaga', erro: 'O pagamento está aguardando a resolução da recepção.' };
+  const voucherUso = await one<{ Estado: string }>(`SELECT Estado FROM dbo.ReservaOnlineVoucherUso WHERE PedidoId = @id`, { id: p.id });
+  if (voucherUso?.Estado === 'liberado') {
+    await tx(async (run) => {
+      await run(`UPDATE dbo.ReservaOnline SET Status = 'pago_sem_vaga', AsaasPagamentoId = @asaas, PagoEm = SYSDATETIME(), Forma = @forma WHERE Id = @id`, {
+        id: r.Id, asaas: p.pagamento?.asaasId ?? null, forma,
+      });
+      await run(`UPDATE dbo.ReservaOnlineVoucherUso SET Estado = 'reembolso_pendente' WHERE PedidoId = @pedido AND Estado = 'liberado'`, { pedido: p.id });
+    });
+    return { id: p.id, acao: 'pago_sem_vaga', erro: 'O pagamento chegou depois do prazo da reserva. A recepção precisa conferir o pedido e o cupom.' };
+  }
   let insc = ids(r.InscricaoIds);
   const ativas = await query<{ Id: number }>(`SELECT Id FROM dbo.Inscricao WHERE Id IN (${insc.join(',') || '0'}) AND Status <> 'cancelada'`);
   if (ativas.length < insc.length && (await reativarVagas(r.BateriaId, insc.filter((i) => !ativas.some((a) => a.Id === i))))) {
@@ -193,7 +302,10 @@ export async function confirmarPagamento(p: PedidoSite, log: Log): Promise<Resul
       const novas = await inscreverN(r.BateriaId, r.ClienteId, r.Quantidade - ativas.length, 'site', null, `Reserva online ${r.Codigo} (paga após o prazo)`, true, { produtoId: configOnline().produtoVenda, clientes: canceladas.length === r.Quantidade - ativas.length ? canceladas.map((x) => x.ClienteId) : undefined });
       insc = [...ativas.map((a) => a.Id), ...novas];
     } catch (e) {
-      await query(`UPDATE dbo.ReservaOnline SET Status = 'pago_sem_vaga', AsaasPagamentoId = @asaas, PagoEm = SYSDATETIME(), Forma = @forma WHERE Id = @id`, { id: r.Id, asaas: p.pagamento?.asaasId ?? null, forma });
+      await tx(async (run) => {
+        await run(`UPDATE dbo.ReservaOnline SET Status = 'pago_sem_vaga', AsaasPagamentoId = @asaas, PagoEm = SYSDATETIME(), Forma = @forma WHERE Id = @id`, { id: r.Id, asaas: p.pagamento?.asaasId ?? null, forma });
+        await run(`UPDATE dbo.ReservaOnlineVoucherUso SET Estado = 'reembolso_pendente' WHERE PedidoId = @pedido AND Estado IN ('reservado', 'liberado')`, { pedido: p.id });
+      });
       log(`reserva online ${r.Codigo}: PAGO SEM VAGA (${(e as Error).message}) — devolver ou reagendar`);
       return { id: p.id, acao: 'pago_sem_vaga', erro: 'Recebemos o pagamento, mas as vagas desse horário acabaram. A recepção vai entrar em contato para trocar o horário ou devolver o valor.' };
     }
@@ -202,6 +314,7 @@ export async function confirmarPagamento(p: PedidoSite, log: Log): Promise<Resul
   await tx(async (run) => {
     await run(`UPDATE dbo.Inscricao SET Pago = 1, ValorCentavos = @unit, Status = 'confirmada', Aprovada = 1, AtualizadoEm = SYSDATETIME() WHERE Id IN (${insc.join(',')})`, { unit });
     await run(`UPDATE dbo.ReservaOnline SET Status = 'pago', InscricaoIds = @insc, AsaasPagamentoId = @asaas, PagoEm = SYSDATETIME(), Forma = @forma WHERE Id = @id`, { id: r.Id, insc: insc.join(','), asaas: p.pagamento?.asaasId ?? null, forma });
+    await run(`UPDATE dbo.ReservaOnlineVoucherUso SET Estado = 'consumido' WHERE PedidoId = @pedido AND Estado IN ('reservado', 'reembolso_pendente')`, { pedido: p.id });
   });
   log(`reserva online ${r.Codigo}: paga (${forma}), ${insc.length} vaga(s) confirmadas`);
   return { id: p.id, acao: 'confirmado', codigo: r.Codigo };
@@ -235,11 +348,29 @@ export async function expirarVencidos(log: Log) {
     await tx(async (run) => {
       await run(`UPDATE dbo.Inscricao SET Status = 'cancelada', AtualizadoEm = SYSDATETIME() WHERE Id IN (${ids(v.InscricaoIds).join(',') || '0'}) AND Pago = 0 AND Status <> 'cancelada'`);
       await run(`UPDATE dbo.ReservaOnline SET Status = 'expirado' WHERE Id = @id AND Status = 'aguardando'`, { id: v.Id });
+      await run(`UPDATE dbo.ReservaOnlineVoucherUso SET Estado = 'liberado' WHERE PedidoId = @pedido AND Estado = 'reservado'`, { pedido: v.PedidoId });
     });
     log(`reserva online ${v.Codigo}: sem pagamento no prazo, vagas liberadas`);
     res.push({ id: v.PedidoId, acao: 'expirado' });
   }
   return res;
+}
+
+/** Processa prévias móveis pendentes pela fila autenticada do Worker. */
+export async function sincronizarCuponsOnline(log: Log) {
+  if (!preCadastroLigado()) return 0;
+  const jobs = await chamar('/api/sync/mobile/coupons') as (CouponInput & { requestId: string })[];
+  let processados = 0;
+  for (const job of jobs) {
+    try {
+      const result = await previsualizarVoucherOnline(job);
+      await chamar(`/api/sync/mobile/coupons/${encodeURIComponent(job.requestId)}`, { method: 'POST', body: JSON.stringify(result) });
+      processados++;
+    } catch {
+      log(`prévia de cupom ${String(job.requestId).slice(0, 8)}: não foi possível concluir agora`);
+    }
+  }
+  return processados;
 }
 
 // ---------------------------------------------------------------- no totem
@@ -279,8 +410,29 @@ export async function vagaOnlineDoGrupo(bateriaId: number, clienteId: number, pa
 }
 
 /** Ciclo de 5 s: pedidos novos, pagos e vencidos. */
+/**
+ * Tarefas do app que não podem segurar os pedidos pagos: rodam em paralelo (uma de cada vez) e o aviso de falha
+ * sai no máximo a cada 10 min (20/10: o banco do app às vezes leva 12–15 s e atrasava o ciclo inteiro).
+ */
+const emAndamento = new Set<string>();
+const ultimoAviso = new Map<string, number>();
+function emParalelo(nome: string, tarefa: () => Promise<unknown>, log: Log, aviso: (e: Error) => string) {
+  if (emAndamento.has(nome)) return;
+  emAndamento.add(nome);
+  void tarefa()
+    .catch((e: Error) => {
+      if (Date.now() - (ultimoAviso.get(nome) ?? 0) < 10 * 60_000) return;
+      ultimoAviso.set(nome, Date.now());
+      log(aviso(e));
+    })
+    .finally(() => emAndamento.delete(nome));
+}
+
 export async function sincronizarReservasOnline(log: Log) {
   if (!preCadastroLigado()) return 0;
+  emParalelo('cupons', () => sincronizarCuponsOnline(log), log, () => 'prévia de cupons do app: sincronização temporariamente indisponível (tenta de novo a cada 5 s)');
+  // contas do app com e-mail confirmado: vincula ao cliente pelo CPF + e-mail/telefone (uma vez por minuto)
+  emParalelo('vinculo', () => vincularContasDoApp(log), log, (e) => `app: vínculo automático indisponível agora (${e.message})`);
   const pedidos = (await chamar('/api/sync/pedidos')) as PedidoSite[];
   const resultados: Resultado[] = [];
   for (const p of pedidos) {

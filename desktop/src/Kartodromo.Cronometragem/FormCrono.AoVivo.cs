@@ -37,7 +37,7 @@ public partial class FormCrono
         if (_sess.S("state") is not ("em_andamento" or "bandeira_final")) { Msg.Aviso(this, "A prova precisa estar em andamento para receber uma bandeira."); return; }
         var confirm = cor is "vermelha" or "quadriculada";
         if (confirm && !Msg.Pergunta(this, cor == "vermelha" ? "Dar bandeira vermelha e pausar o cronômetro?" : "Dar bandeira quadriculada e encerrar cada kart na próxima passagem?")) return;
-        Seguro.Rodar(this, async () => { await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/flag", new JsonObject { ["flag"] = flag }); await Atualizar(); });
+        Seguro.Rodar(this, async () => { await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/flag", new JsonObject { ["flag"] = flag }); InvalidarCachePassagens(); await Atualizar(); });
     }
 
     void LimparPassagens()
@@ -45,7 +45,7 @@ public partial class FormCrono
         if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
         if (!_laps.Any(p => !p.B("deleted"))) { Msg.Info(this, "Não há passagens para limpar."); return; }
         if (!Msg.Pergunta(this, $"Limpar as passagens da bateria “{_sess.S("name")}”? Elas ficarão no diário e poderão ser restauradas.")) return;
-        Seguro.Rodar(this, async () => { await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/passings/clear"); await Atualizar(); });
+        Seguro.Rodar(this, async () => { await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/passings/clear"); InvalidarCachePassagens(); await Atualizar(); });
     }
 
     void CorrigirPassagem(string acao, bool acima = false)
@@ -64,6 +64,7 @@ public partial class FormCrono
                 ["ids"] = new JsonArray(JsonValue.Create(passagem.S("id"))),
                 ["aboveId"] = acima ? passagem.S("id") : null,
             });
+            InvalidarCachePassagens();
             await Atualizar();
         });
     }
@@ -81,6 +82,7 @@ public partial class FormCrono
         Seguro.Rodar(this, async () =>
         {
             await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/passings/{passagem.S("id")}/assign", new JsonObject { ["kart"] = dialog.Valor("kart"), ["name"] = dialog.Valor("name") });
+            InvalidarCachePassagens();
             await Atualizar();
         });
     }
@@ -89,7 +91,7 @@ public partial class FormCrono
     {
         if (_sess == null || _gPass.ChaveAtual is not JsonObject passagem) { Msg.Aviso(this, "Selecione uma passagem."); return; }
         if (!passagem.B("assigned")) { Msg.Aviso(this, "Esta passagem não tem atribuição para cancelar."); return; }
-        Seguro.Rodar(this, async () => { await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/passings/{passagem.S("id")}/unassign"); await Atualizar(); });
+        Seguro.Rodar(this, async () => { await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/passings/{passagem.S("id")}/unassign"); InvalidarCachePassagens(); await Atualizar(); });
     }
 
     void BandeiraPiloto(string flag)
@@ -180,6 +182,7 @@ public partial class FormCrono
                 ["action"] = "delete",
                 ["ids"] = new JsonArray(JsonValue.Create(passagem.S("id"))),
             });
+            InvalidarCachePassagens();
             await Atualizar();
         });
     }

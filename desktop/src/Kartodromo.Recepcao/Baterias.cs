@@ -73,7 +73,7 @@ public class CamposBateria : Panel
 
     public object Corpo() => new
     {
-        nome = Nome.Text.Trim(), inicio = $"{Fmt.Iso(Data.Value)}T{Hora.Value:HH:mm}", vagas = (int)Vagas.Value, produtoId = Campos.IdDe(Produto), tracadoId = Campos.IdDe(Tracado),
+        nome = Nome.Text.Trim(), inicio = $"{Fmt.Iso(Data.Value)}T{Hora.Value:HH:mm}:00", vagas = (int)Vagas.Value, produtoId = Campos.IdDe(Produto), tracadoId = Campos.IdDe(Tracado),
         voltaMinimaSeg = (int)VoltaMin.Value, responsavelId = RespId, codigoReserva = CodReserva.Text.Trim(), reservaFechada = !Aberta.Checked, autoAtendimento = Totem.Checked, observacao = Obs.Text.Trim(),
         categoria = Categoria.Text
     };
@@ -207,7 +207,7 @@ public class FormCriarReservas : DialogoDesign
                 if (!PecasDesign.LerHora(hora, out var hh)) { Msg.Aviso(this, "Hora inválida (use hh:mm)."); hora.Focus(); return; }
                 await Sessao.Api.Post("/api/office/baterias", new
                 {
-                    nome = nome.Text.Trim(), inicio = $"{Fmt.Iso(data.Value)}T{hh:hh\\:mm}", vagas = int.TryParse(vagas.Text, out var v) ? v : 12, produtoId = Campos.IdDe(produto), tracadoId = Campos.IdDe(tracado),
+                    nome = nome.Text.Trim(), inicio = $"{Fmt.Iso(data.Value)}T{hh:hh\\:mm}:00", vagas = int.TryParse(vagas.Text, out var v) ? v : 12, produtoId = Campos.IdDe(produto), tracadoId = Campos.IdDe(tracado),
                     voltaMinimaSeg = int.TryParse(volta.Text, out var vm) ? vm : 0, responsavelId = respId, reservaFechada = !aberta.Checked, autoAtendimento = totem.Checked, observacao = obs.Text.Trim(), categoria = categoria.Text,
                 });
                 Msg.Info(this, "Reserva criada com sucesso.");
@@ -342,7 +342,7 @@ public class FormBateria : DialogoDesign
             int.TryParse(volta.Text, out var nVolta);
             await Sessao.Api.Put($"/api/office/baterias/{b.S("id")}", new
             {
-                nome = nome.Text.Trim(), inicio = $"{Fmt.Iso(data.Value)}T{h.Hours:00}:{h.Minutes:00}", vagas = nVagas, produtoId = Campos.IdDe(produto), tracadoId = Campos.IdDe(tracado),
+                nome = nome.Text.Trim(), inicio = $"{Fmt.Iso(data.Value)}T{h.Hours:00}:{h.Minutes:00}:00", vagas = nVagas, produtoId = Campos.IdDe(produto), tracadoId = Campos.IdDe(tracado),
                 voltaMinimaSeg = nVolta, responsavelId = respId, codigoReserva = b.S("codigoReserva"), reservaFechada = !aberta.Checked, autoAtendimento = totem.Checked,
                 observacao = b.S("observacao"), categoria = categoria.Text,
             });

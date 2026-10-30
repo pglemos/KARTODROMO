@@ -5,7 +5,7 @@
  * No totem o cliente digita CPF, RG, passaporte ou e-mail e os dados já aparecem.
  */
 import { chaveDocumento, validar } from './validar';
-import { diagnostico } from './asaas';
+import { cancelar, consultar, criarCobrancaLink, diagnostico, garantirCliente, PAGO } from './asaas';
 import { agendaPublica, criarPedido, politicaPublica, situacaoPedido, syncAgenda, syncPedidos, syncResultado, webhookAsaas, type EnvReservas } from './reservas';
 
 export interface Env extends EnvReservas {
@@ -48,7 +48,9 @@ async function receber(req: Request, env: Env) {
   const v = validar(corpo);
   if (!v.ok) return json(400, { erro: v.erro });
   const chave = chaveDocumento(v.dados.tipoDocumento, v.dados.documento);
-  const registro = { chave, recebidoEm: new Date().toISOString(), ...v.dados };
+  // link da reserva em grupo (painel web): só o código; o SRVKART põe a vaga no nome desta pessoa
+  const reserva = /^[A-Za-z0-9]{10,24}$/.test(String(corpo.reserva ?? '')) ? String(corpo.reserva) : undefined;
+  const registro = { chave, recebidoEm: new Date().toISOString(), ...v.dados, ...(reserva ? { reserva } : {}) };
   // um cadastro por documento: se a pessoa enviar de novo, vale o último
   await env.PRE.put(`pendentes/${chave}.json`, JSON.stringify(registro), { httpMetadata: { contentType: 'application/json' } });
   return json(201, { ok: true, nome: v.dados.nome.split(' ')[0] });
@@ -105,6 +107,16 @@ export default {
         if (p === '/api/sync/asaas' && req.method === 'GET') return json(200, await diagnostico(env));
         if (p === '/api/sync/pedidos' && req.method === 'GET') return await syncPedidos(env);
         if (p === '/api/sync/pedido' && req.method === 'POST') return await syncResultado(req, env, ctx);
+        // cobrança da reserva em grupo (painel web): link da Asaas (Pix ou cartão) para um piloto ou para o grupo
+        if (p === '/api/sync/cobranca' && req.method === 'POST') {
+          const c = (await req.json()) as { nome: string; cpf: string; email?: string; celular?: string; valorCentavos: number; descricao: string; referencia: string; vencimento: string };
+          const cliente = await garantirCliente(env, { nome: c.nome, cpf: String(c.cpf ?? '').replace(/\D/g, ''), email: c.email ?? '', celular: String(c.celular ?? '').replace(/\D/g, ''), referencia: c.referencia });
+          const cob = await criarCobrancaLink(env, cliente, c.valorCentavos, c.descricao, c.referencia, c.vencimento);
+          return json(201, { id: cob.id, link: cob.invoiceUrl, status: cob.status });
+        }
+        const mc = p.match(/^\/api\/sync\/cobranca\/([A-Za-z0-9_]{6,40})$/);
+        if (mc && req.method === 'GET') { const c = await consultar(env, mc[1]); return json(200, { id: c.id, status: c.status, pago: PAGO.has(c.status), forma: c.billingType }); }
+        if (mc && req.method === 'DELETE') return json(200, await cancelar(env, mc[1]));
       }
       if (p.startsWith('/api/')) return json(404, { erro: 'Rota desconhecida.' });
       // reservas.kartodromodebetim.com.br abre direto a página de reserva

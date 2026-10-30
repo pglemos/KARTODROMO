@@ -38,7 +38,14 @@ const SPECIAL_TRANSPONDERS = new Set([0, 9991, 9993]);
 
 function hex(value: string | undefined): number | null {
   if (value === undefined || value === '' || !/^[0-9a-fA-F]+$/.test(value)) return null;
-  return parseInt(value, 16);
+  const n = Number.parseInt(value, 16);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+function dec(value: string | undefined): number | null {
+  if (value === undefined || value === '' || !/^\d+$/.test(value)) return null;
+  const n = Number.parseInt(value, 10);
+  return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
 export function parseTrxLine(line: string): TrxRecord {
@@ -73,18 +80,23 @@ export function parseTrxLine(line: string): TrxRecord {
     const transponder = hex(fields[3]);
     let timeField = fields[4] ?? '';
     // Mesma correcao que o LapTime aplica pra um overflow conhecido do relogio do TranX.
-    if (timeField.startsWith('4BC6A') || timeField.startsWith('19999')) {
+    if (/^[0-9a-fA-F]+$/.test(timeField) && (timeField.startsWith('4BC6A') || timeField.startsWith('19999'))) {
       timeField = '000000' + timeField.slice(6, 8);
     }
     const decoderTimeMs = hex(timeField);
-    if (transponder === null || decoderTimeMs === null || SPECIAL_TRANSPONDERS.has(transponder)) {
+    if (
+      transponder === null ||
+      transponder <= 0 ||
+      decoderTimeMs === null ||
+      decoderTimeMs < 0 ||
+      SPECIAL_TRANSPONDERS.has(transponder)
+    ) {
       return { kind: 'other', raw };
     }
-    const seq = Number.parseInt(fields[2] ?? '', 10);
     return {
       kind: 'passing',
       decoderId,
-      sequence: Number.isFinite(seq) ? seq : null,
+      sequence: dec(fields[2]),
       transponder,
       decoderTimeMs,
       hits: hex(fields[5]),
@@ -95,18 +107,23 @@ export function parseTrxLine(line: string): TrxRecord {
 
   // Formato decimal (o que o TranX do kartódromo manda depois do @RESET), igual ao LapTime:
   //   SOH @ <decoder> <seq> <transponder decimal> <segundos.milésimos> <hits> <força> <bateria> x<crc>
-  if (type !== '$' && type !== '#' && fields.length >= 8 && /^\d+$/.test(fields[3] ?? '') && /^\d+(\.\d+)?$/.test(fields[4] ?? '')) {
-    const transponder = Number.parseInt(fields[3], 10);
-    if (SPECIAL_TRANSPONDERS.has(transponder)) return { kind: 'other', raw };
-    const [rawSeg, frac = ''] = fields[4].split('.');
+  if (type !== '$' && type !== '#' && fields.length >= 8) {
+    const transponder = dec(fields[3]);
+    const rawTime = fields[4] ?? '';
+    if (transponder === null || transponder <= 0 || SPECIAL_TRANSPONDERS.has(transponder) || !/^\d+(\.\d+)?$/.test(rawTime)) {
+      return { kind: 'other', raw };
+    }
+    const [rawSeg, frac = ''] = rawTime.split('.');
     const seg = rawSeg === '18446744073709' ? '0' : rawSeg; // overflow do relógio que o LapTime também zera
-    const decoderTimeMs = Number.parseInt(seg, 10) * 1000 + Number.parseInt(frac.padEnd(3, '0').slice(0, 3), 10);
-    const seq = Number.parseInt(fields[2] ?? '', 10);
-    const dec = (v: string | undefined) => (v !== undefined && /^\d+$/.test(v) ? Number.parseInt(v, 10) : null);
+    const segVal = dec(seg);
+    const fracVal = dec(frac.padEnd(3, '0').slice(0, 3));
+    if (segVal === null || fracVal === null) return { kind: 'other', raw };
+    const decoderTimeMs = segVal * 1000 + fracVal;
+    if (!Number.isFinite(decoderTimeMs) || decoderTimeMs < 0) return { kind: 'other', raw };
     return {
       kind: 'passing',
       decoderId,
-      sequence: Number.isFinite(seq) ? seq : null,
+      sequence: dec(fields[2]),
       transponder,
       decoderTimeMs,
       hits: dec(fields[5]),

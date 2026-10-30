@@ -82,13 +82,21 @@ public static class Acoes
         var txt = todas ? "Deseja excluir definitivamente *** TODAS *** as baterias listadas?"
             : sel.Count == 1 ? $"Deseja excluir definitivamente a bateria atual?\n{sel[0].S("nome")} {Fmt.DmyHm(sel[0].S("dataHora"))}" : $"Deseja excluir as {sel.Count} baterias selecionadas?";
         if (!Msg.Pergunta(f, txt)) return;
-        var erros = 0;
+        var falhas = new List<string>();
         foreach (var b in sel)
         {
             try { await Api.Delete($"/api/office/baterias/{b.S("id")}"); }
-            catch (ApiException) { erros++; }
+            catch (ApiException e)
+            {
+                falhas.Add($"{b.S("nome")} ({Fmt.DmyHm(b.S("dataHora"))}) — {e.Message}");
+            }
         }
-        if (erros > 0) Msg.Aviso(f, $"{erros} bateria(s) não foram excluídas porque têm reservas pagas.");
+        if (falhas.Count > 0)
+        {
+            var msg = $"{falhas.Count} bateria(s) não puderam ser excluídas:\n\n" + string.Join("\n", falhas.Take(8));
+            if (falhas.Count > 8) msg += $"\n... e mais {falhas.Count - 8} bateria(s).";
+            Msg.Aviso(f, msg);
+        }
         f.Recarregar();
     });
 

@@ -1,0 +1,16 @@
+{
+  // Painel administrativo web. Worker separado do site (kartodromo / kartodromo-site-2026) e do pré-cadastro.
+  // Lê e grava no KartodromoOps (SRVKART) pelo servidor da operação, com o login dos usuários da Recepção.
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "kartodromo-admin",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-01",
+  "workers_dev": false,
+  "observability": { "enabled": true },
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/api/*"] },
+  "routes": [{ "pattern": "admin.kartodromodebetim.com.br", "custom_domain": true }],
+  "vars": {
+    "OPS_URL": "https://ops.kartodromodebetim.com.br",
+    "CRONO_URL": "https://crono.kartodromodebetim.com.br"
+  }
+}

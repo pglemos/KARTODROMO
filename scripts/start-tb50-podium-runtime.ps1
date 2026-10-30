@@ -49,6 +49,19 @@ function Test-ListeningPort {
   return [bool](Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
 }
 
+function Stop-PortProcesses {
+  param([int]$Port)
+  try {
+    $conns = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+    foreach ($conn in $conns) {
+      if ($conn.OwningProcess -gt 0 -and $conn.OwningProcess -ne $PID) {
+        Write-Log "Encerrando processo zumbi na porta $Port (pid=$($conn.OwningProcess))"
+        Stop-Process -Id $conn.OwningProcess -Force -ErrorAction SilentlyContinue
+      }
+    }
+  } catch {}
+}
+
 function Test-RepoProcess {
   param([string]$Pattern)
 

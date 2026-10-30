@@ -61,6 +61,21 @@ foreach ($nome in $App) {
   Write-Output "gerado: $nome $versao | $arquivo | $hash"
 }
 
+# Item 4: Expurgo automático de versões antigas em _autoupdate (mantém apenas as 3 mais recentes)
+$autoUpdateRoot = Join-Path $desktop 'publish\_autoupdate'
+if (Test-Path $autoUpdateRoot) {
+  $versoesAntigas = Get-ChildItem -LiteralPath $autoUpdateRoot -Directory |
+    Sort-Object {
+      $v = [version]::new(0, 0, 0)
+      if ([version]::TryParse($_.Name, [ref]$v)) { $v } else { [version]::new(0, 0, 0) }
+    } -Descending |
+    Select-Object -Skip 3
+  foreach ($dirAntigo in $versoesAntigas) {
+    Remove-Item -LiteralPath $dirAntigo.FullName -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Output "expurgado _autoupdate antigo: $($dirAntigo.Name)"
+  }
+}
+
 if ($NaoPublicarNoServidor) { return }
 
 . (Join-Path $repo 'scripts\apps\credencial.ps1')
@@ -69,19 +84,38 @@ $sessao = New-PSSession -ComputerName $Servidor -Credential $cred
 try {
   foreach ($p in $pacotes) {
     $remoto = "C:\kartodromo-servidor\updates\$($p.App)"
-    Invoke-Command -Session $sessao -ArgumentList $remoto {
-      param($pasta)
+    Invoke-Command -Session $sessao -ArgumentList $remoto, $p.Nome {
+      param($pasta, $zipAtual)
       New-Item -ItemType Directory -Force $pasta | Out-Null
       $identidade = "$env:COMPUTERNAME\KARTODROMO"
       $icacls = Join-Path $env:SystemRoot 'System32\icacls.exe'
       & $icacls $pasta /grant "$identidade`:(OI)(CI)M" | Out-Null
       if ($LASTEXITCODE -ne 0) { throw "Não foi possível preparar a pasta de atualizações: $pasta" }
+      # Limpa pacotes zip antigos na pasta remota (mantém os 3 mais recentes)
+      Get-ChildItem -LiteralPath $pasta -Filter '*.zip' -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -ne $zipAtual } |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -Skip 2 |
+        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
     }
     Copy-Item $p.Zip "$remoto\$($p.Nome)" -ToSession $sessao -Force
     # O manifesto é copiado por último: o cliente só passa a enxergar a versão
     # depois que o ZIP completo já está no servidor.
     Copy-Item $p.Manifesto "$remoto\manifest.json" -ToSession $sessao -Force
     Write-Output "publicado: $($p.App) em $Servidor"
+
+    # Item 23: Verificação HTTP pós-publicação da rota de autoupdate (:4060)
+    $urlManifesto = "http://$($Servidor):4060/updates/$($p.App)/manifest.json"
+    try {
+      $resp = Invoke-RestMethod -Uri $urlManifesto -Method Get -TimeoutSec 8
+      if ($resp.version -ne $versao) {
+        Write-Warning "Aviso: manifesto HTTP em $urlManifesto retornou versão '$($resp.version)' (esperado '$versao')."
+      } else {
+        Write-Output "verificado HTTP: $urlManifesto -> v$($resp.version) OK"
+      }
+    } catch {
+      Write-Warning "Não foi possível validar $urlManifesto via HTTP (:4060): $($_.Exception.Message)"
+    }
   }
 }
 finally { Remove-PSSession $sessao }

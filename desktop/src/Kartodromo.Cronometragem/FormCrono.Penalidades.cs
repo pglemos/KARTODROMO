@@ -159,6 +159,7 @@ public partial class FormCrono
             await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/restart", new JsonObject { ["largar"] = largar, ["autor"] = Environment.UserName });
             d.DialogResult = DialogResult.OK; d.Close();
             if (largar) _fixado = false;
+            InvalidarCachePassagens();
             await Atualizar();
         }
         d.BotaoRodape("Reiniciar e dar a verde", true, () => Seguro.Rodar(d, () => Rodar(true)));
@@ -177,6 +178,7 @@ public partial class FormCrono
         {
             await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/flag", new JsonObject { ["flag"] = "verde", ["relargar"] = relargar, ["autor"] = Environment.UserName });
             d.DialogResult = DialogResult.OK; d.Close();
+            InvalidarCachePassagens();
             await Atualizar();
         }
         d.BotaoRodape("Relargar (zerar o tempo)", true, () => Seguro.Rodar(d, () => Enviar(true)));

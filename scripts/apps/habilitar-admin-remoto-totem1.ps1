@@ -48,6 +48,18 @@ $customRule = Get-NetFirewallRule -Name 'KIB-Totem1-WinRM-CRONOMETRAGEM' -ErrorA
 if (-not $customRule) {
   New-NetFirewallRule -Name 'KIB-Totem1-WinRM-CRONOMETRAGEM' `
     -DisplayName 'Kartodromo Totem 1 - WinRM somente do CRONOMETRAGEM' `
+    -Direction Inbound `
+    -Action Allow `
+    -Protocol TCP `
+    -LocalPort 5985 `
+    -RemoteAddress $controllerIp | Out-Null
+}
+
+# Sincronismo de relógio NTP (Item 26)
+Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\W32Time\TimeProviders\NtpClient' -Name 'SpecialPollInterval' -Value 900 -ErrorAction SilentlyContinue
+& w32tm /config /manualpeerlist:"a.st1.ntp.br,0x9 192.168.20.249,0x9" /syncfromflags:manual /reliable:YES /update
+Set-Service -Name w32time -StartupType Automatic
+Restart-Service w32time -Force -ErrorAction SilentlyContinue
     -Direction Inbound -Action Allow -Enabled True -Profile Any `
     -Protocol TCP -LocalPort 5985 -RemoteAddress $controllerIp | Out-Null
 } else {

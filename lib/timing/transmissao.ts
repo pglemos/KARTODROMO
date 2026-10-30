@@ -137,6 +137,9 @@ export function montarTransmissao(s: SessaoParaTransmissao | null, agora: number
       if (corrida) {
         intervaloVoltas = Math.max(0, (acima.laps ?? 0) - (r.laps ?? 0));
         if (intervaloVoltas === 0 && r.gapMs != null) intervaloMs = Math.max(0, r.gapMs - (acima.gapMs ?? 0));
+        // retardatários na mesma volta não têm gapMs (estão a N voltas do líder): compara a chegada na linha, com penalidade
+        else if (intervaloVoltas === 0 && (r.laps ?? 0) > 0 && r.lastCrossingWallMs != null && acima.lastCrossingWallMs != null)
+          intervaloMs = Math.max(0, r.lastCrossingWallMs - acima.lastCrossingWallMs + (r.penaltyMs ?? 0) - (acima.penaltyMs ?? 0));
       } else if (r.bestLapMs != null && acima.bestLapMs != null) {
         intervaloMs = Math.max(0, r.bestLapMs - acima.bestLapMs);
       }
@@ -165,7 +168,8 @@ export function montarTransmissao(s: SessaoParaTransmissao | null, agora: number
       penalidadeMs: r.penaltyMs ?? 0,
       advertencias: r.advertencias ?? 0,
       desclassificado: r.desclassificado === true,
-      terminou: r.finished === true,
+      // quem não cruzou depois da quadriculada também terminou quando a bateria é encerrada
+      terminou: r.finished === true || s.state === 'encerrada' || s.state === 'cancelada',
     };
   });
 
@@ -201,6 +205,58 @@ export function montarTransmissao(s: SessaoParaTransmissao | null, agora: number
       : null,
     pilotos,
   };
+}
+
+export type VoltaTransmissao = {
+  /** 1 = primeira volta completa (a passagem de abertura não conta como volta) */
+  volta: number;
+  tempoMs: number | null;
+  tempo: string | null;
+  /** hora em que o kart fechou a volta na linha */
+  em: string;
+  /** false = anulada pelo cronometrista: não vale como melhor volta */
+  valida: boolean;
+  melhor: boolean;
+};
+
+export type VoltasPiloto = { posicao: number; kart: string; nome: string; penalidadeMs: number; voltas: VoltaTransmissao[] };
+
+export type VoltasTransmissao = {
+  versao: number;
+  atualizadoEm: string;
+  situacao: Situacao;
+  bateria: null | { id: string; nome: string };
+  pilotos: VoltasPiloto[];
+};
+
+type CompetidorComPassagens = { kart: string; nome: string; crossings: { wallMs: number; lapMs: number | null; invalid?: boolean; deleted?: boolean }[] };
+
+/** Volta a volta de todos os pilotos do retrato, na mesma ordem e com os mesmos pilotos dele. */
+export function montarVoltas(t: Transmissao, competidores: CompetidorComPassagens[]): VoltasTransmissao {
+  const pilotos = t.pilotos.map((p): VoltasPiloto => {
+    const c = competidores.find((x) => x.kart === p.kart && x.nome === p.nome);
+    const ativas = (c?.crossings ?? []).filter((x) => !x.deleted).sort((a, b) => a.wallMs - b.wallMs);
+    return {
+      posicao: p.posicao,
+      kart: p.kart,
+      nome: p.nome,
+      penalidadeMs: p.penalidadeMs,
+      voltas: ativas.slice(1).map((x, i) => ({
+        volta: i + 1,
+        tempoMs: x.lapMs,
+        tempo: texto(x.lapMs),
+        em: new Date(x.wallMs).toISOString(),
+        valida: !x.invalid,
+        melhor: p.melhorVoltaNumero === i + 1,
+      })),
+    };
+  });
+  return { versao: VERSAO_TRANSMISSAO, atualizadoEm: t.atualizadoEm, situacao: t.situacao, bateria: t.bateria && { id: t.bateria.id, nome: t.bateria.nome }, pilotos };
+}
+
+/** ?kart=78 devolve só aquele kart. */
+export function filtrarVoltasPorKart<T extends { pilotos: { kart: string }[] }>(v: T, kart: string | null): T {
+  return kart ? { ...v, pilotos: v.pilotos.filter((p) => p.kart === kart) } : v;
 }
 
 /** Mesmo retrato sem o carimbo de hora: para saber se algo mudou e só então reenviar. */

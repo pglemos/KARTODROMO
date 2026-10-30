@@ -80,6 +80,7 @@
   <img class="logo" src="/kib-logo-escuro.png" alt="Kartódromo Internacional de Betim" width="720" height="200">
   <h1>Faça seu cadastro <em>antes de chegar</em></h1>
   <p>Preencha uma vez aqui. No kartódromo, é só digitar seu CPF no totem de autoatendimento e escolher a bateria.</p>
+<div id="avisoGrupo" style="display: none; max-width: 640px; margin: 16px auto 0; padding: 12px 16px; border: 1px solid rgba(0,230,118,.45); background: rgba(0,230,118,.08); border-radius: 4px; font-weight: 600; text-align: center">Sua vaga já está guardada na reserva do seu grupo. Faça o cadastro para entrar direto pelo totem.</div>
   <div class="passos"><span>1 · Cadastro aqui</span><span>2 · CPF no totem</span><span>3 · Pista!</span></div>
 </header>
 
@@ -165,6 +166,8 @@
 
 <script>
 (() => {
+  const reservaGrupo = (new URLSearchParams(location.search).get('r') || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 24);
+  if (reservaGrupo) document.getElementById('avisoGrupo').style.display = 'block';
   const $ = (id) => document.getElementById(id);
   const aberto = Date.now();
   let tipo = 'CPF';
@@ -262,7 +265,7 @@
           tipoDocumento: tipo, documento: doc.value, nome: nome.value, email: email.value, instagram: insta.value, telefone: fone.value, nascimento: iso(nasc.value),
           peso: $('peso').value, cep: $('cep').value, endereco: $('endereco').value, numero: $('numero').value, complemento: $('complemento').value,
           bairro: $('bairro').value, cidade: $('cidade').value, estado: $('estado').value,
-          menores: menores.map(({ el, ...m }) => m), lgpd: true, site: $('site').value, t: aberto,
+          menores: menores.map(({ el, ...m }) => m), lgpd: true, site: $('site').value, t: aberto, reserva: reservaGrupo,
         }),
       });
       const j = await r.json().catch(() => ({}));

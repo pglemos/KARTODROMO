@@ -57,6 +57,21 @@ export async function criarCobranca(env: AsaasEnv, cliente: string, forma: 'pix'
   });
 }
 
+/** Link de pagamento da reserva em grupo: a pessoa escolhe Pix ou cartão na fatura da Asaas. Vence no dia da bateria. */
+export async function criarCobrancaLink(env: AsaasEnv, cliente: string, valorCentavos: number, descricao: string, referencia: string, vencimento: string) {
+  return chamar<Cobranca>(env, '/payments', {
+    method: 'POST',
+    body: JSON.stringify({
+      customer: cliente,
+      billingType: 'UNDEFINED',
+      value: Math.round(valorCentavos) / 100,
+      dueDate: /^\d{4}-\d{2}-\d{2}$/.test(vencimento) && vencimento >= hojeBrasilia() ? vencimento : hojeBrasilia(),
+      description: descricao.slice(0, 500),
+      externalReference: referencia.slice(0, 100),
+    }),
+  });
+}
+
 export const qrPix = (env: AsaasEnv, id: string) => chamar<{ encodedImage: string; payload: string; expirationDate: string }>(env, `/payments/${encodeURIComponent(id)}/pixQrCode`);
 export const consultar = (env: AsaasEnv, id: string) => chamar<Cobranca>(env, `/payments/${encodeURIComponent(id)}`);
 export const cancelar = (env: AsaasEnv, id: string) => chamar<{ deleted: boolean }>(env, `/payments/${encodeURIComponent(id)}`, { method: 'DELETE' });
