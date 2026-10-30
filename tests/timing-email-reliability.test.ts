@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,6 +8,8 @@ import type { ContextoProva } from '../lib/timing/email-resultado';
 import { chaveOperadorValida, clienteEhMaquinaOperadora } from '../lib/timing/operator-auth';
 import { protegerSegredoLocal, revelarSegredoLocal } from '../lib/timing/secret-storage';
 import { redigirEmails } from '../lib/timing/redact-pii';
+
+vi.mock('../lib/timing/secret-storage', async (real) => (process.platform === 'win32' ? real() : import('./segredo-local-simulado')));
 
 const dirs: string[] = [];
 afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }); });
