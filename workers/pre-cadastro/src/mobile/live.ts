@@ -10,7 +10,7 @@ export interface MobileLiveEnv {
 
 type Volta = { number?: unknown; time?: unknown; timeMs?: unknown };
 type Piloto = { position?: unknown; kart?: unknown; name?: unknown; time?: unknown; laps?: unknown; last?: unknown; bestLap?: unknown; gap?: unknown; passouEm?: unknown; lapTimes?: unknown };
-type Retrato = { status?: unknown; updatedAt?: unknown; sessionType?: unknown; eventName?: unknown; trackName?: unknown; race?: { id?: unknown; startedAt?: unknown } | null; drivers?: unknown };
+type Retrato = { status?: unknown; updatedAt?: unknown; lastUpdatedAt?: unknown; sessionType?: unknown; eventName?: unknown; trackName?: unknown; race?: { id?: unknown; startedAt?: unknown } | null; drivers?: unknown };
 
 const json = (status: number, body: unknown, maxAge = 0) => new Response(JSON.stringify(body), {
   status,
@@ -69,14 +69,17 @@ export function retratoParaApp(r: Retrato) {
       // hora exata da última passagem, no relógio da cronometragem (versão app=1 do retrato)
       passouEm: typeof d.passouEm === 'number' && Number.isFinite(d.passouEm) ? d.passouEm : null,
     }));
+  const updatedAt = typeof r.updatedAt === 'string' ? r.updatedAt : new Date().toISOString();
   return {
+    transport: 'polling' as const,
     status,
     eventName: texto(r.eventName, 120),
     trackName: texto(r.trackName, 120),
     sessionType: r.sessionType === 'race' ? 'race' : 'qualifying',
     raceId: typeof r.race?.id === 'string' ? r.race.id : null,
     startedAt: typeof r.race?.startedAt === 'string' ? r.race.startedAt : null,
-    updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : new Date().toISOString(),
+    updatedAt,
+    lastUpdatedAt: typeof r.lastUpdatedAt === 'string' ? r.lastUpdatedAt : updatedAt,
     drivers: status === 'empty' ? [] : pilotos,
   };
 }
@@ -256,5 +259,5 @@ export class AoVivo implements DurableObject {
     }
   }
   private agoraCrono() { return Date.now() + (this.difCrono ?? 0); }
-  private mensagem() { return JSON.stringify({ tipo: 'retrato', agora: this.agoraCrono(), ...this.retrato }); }
+  private mensagem() { return JSON.stringify({ tipo: 'retrato', agora: this.agoraCrono(), ...this.retrato, lastUpdatedAt: this.retrato?.updatedAt ?? null, transport: 'websocket' as const }); }
 }

@@ -7,7 +7,7 @@
 import { chaveDocumento, validar } from './validar';
 import { diagnostico } from './asaas';
 import { agendaPublica, criarPedido, politicaPublica, situacaoPedido, syncAgenda, syncPedidos, syncResultado, webhookAsaas, type EnvReservas } from './reservas';
-import { handleMobileAuth, type MobileAuthEnv } from './mobile/auth';
+import { handleMobileAccountEmail, handleMobileAuth, type MobileAccountAdminEnv } from './mobile/auth';
 import { handleMobileReservations } from './mobile/reservations';
 import { handleMobileCoupons, handleMobileCouponsSync } from './mobile/coupons';
 import { handleMobileResults, type MobileResultsEnv } from './mobile/results';
@@ -17,7 +17,7 @@ import { handleMobilePerfil, type MobilePerfilEnv } from './mobile/perfil';
 import { handleMobileRanking } from './mobile/ranking';
 import { handleMobileOutbox } from './mobile/outbox';
 
-export interface Env extends EnvReservas, MobileAuthEnv, MobileResultsEnv, MobileLiveEnv, MobilePerfilEnv {
+export interface Env extends EnvReservas, MobileAccountAdminEnv, MobileResultsEnv, MobileLiveEnv, MobilePerfilEnv {
   ASSETS: Fetcher;
   PRE: R2Bucket;
   SYNC_KEY: string;
@@ -94,6 +94,7 @@ export default {
     const p = url.pathname;
     try {
       if (p === '/api/pre-cadastro' && req.method === 'POST') return await receber(req, env);
+      if (p === '/api/mobile/v1/internal/account-email') return await handleMobileAccountEmail(req, env);
       if (p.startsWith('/api/mobile/v1/auth/')) return await handleMobileAuth(req, env);
       if (p === '/api/mobile/v1/coupons/preview' || p.startsWith('/api/mobile/v1/coupons/preview/')) {
         return await handleMobileCoupons(req, env);

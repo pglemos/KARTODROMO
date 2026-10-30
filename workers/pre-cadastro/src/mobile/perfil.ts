@@ -28,6 +28,15 @@ function igual(a: string, b: string) {
 const TEXTO: Record<string, number> = { telefone: 20, sexo: 1, tipoSanguineo: 3, cep: 12, endereco: 120, numero: 20, complemento: 60, bairro: 60, cidade: 60, estado: 2 };
 const SANGUE = new Set(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']);
 
+function dataIsoValida(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [ano, mes, dia] = value.split('-').map(Number);
+  const data = new Date(Date.UTC(ano, mes - 1, dia));
+  const hoje = new Date();
+  return data.getUTCFullYear() === ano && data.getUTCMonth() === mes - 1 && data.getUTCDate() === dia
+    && value >= '1920-01-01' && value <= hoje.toISOString().slice(0, 10);
+}
+
 /** Só os campos editáveis, limpos e validados; erro em texto para o piloto. */
 export function validarPerfil(c: Record<string, unknown>): { ok: true; dados: Record<string, string | number | null> } | { ok: false; erro: string } {
   const dados: Record<string, string | number | null> = {};
@@ -43,7 +52,7 @@ export function validarPerfil(c: Record<string, unknown>): { ok: true; dados: Re
   if (dados.tipoSanguineo && !SANGUE.has(String(dados.tipoSanguineo))) return { ok: false, erro: 'Tipo sanguíneo inválido.' };
   if ('nascimento' in c) {
     const n = String(c.nascimento ?? '').trim();
-    if (n && (!/^\d{4}-\d{2}-\d{2}$/.test(n) || Number.isNaN(Date.parse(n)) || n < '1920-01-01' || n > new Date().toISOString().slice(0, 10))) return { ok: false, erro: 'Data de nascimento inválida.' };
+    if (n && !dataIsoValida(n)) return { ok: false, erro: 'Data de nascimento inválida.' };
     dados.nascimento = n || null;
   }
   if ('peso' in c) {

@@ -15,6 +15,11 @@ export interface MobileAuthEnv extends MobileEmailEnv {
   MOBILE_DATA_KEY?: string;
 }
 
+export interface MobileAccountAdminEnv extends MobileAuthEnv {
+  MOBILE_ADMIN_TOKEN?: string;
+  MOBILE_PUBLISH_TOKEN?: string;
+}
+
 export interface MobileAccount {
   id: string;
   name: string;
@@ -353,7 +358,7 @@ async function deliverEmail(
   const email = await decrypt(context, account.email_cipher);
   const token = await createEmailToken(context, account.id, purpose);
   const delivered = await sendMobileAuthEmail(env, email, purpose, token);
-  if (!delivered) console.error('mobile auth email delivery failed');
+  if (!delivered) throw new Error('Mobile email delivery unavailable');
 }
 
 async function register(
@@ -464,7 +469,7 @@ async function login(request: Request, input: Record<string, unknown>, env: Mobi
   }
 
   const password = value(input, 'password');
-  if (password.length < PASSWORD_MIN || password.length > PASSWORD_MAX) return json(401, { erro: authError });
+  if (password.length === 0 || password.length > PASSWORD_MAX) return json(401, { erro: authError });
 
   const account = await findAccount(context, identifier);
   const salt = account ? decodeBase64Url(account.password_salt) : new Uint8Array(16);
@@ -625,10 +630,62 @@ async function deleteAccount(request: Request, context: CryptoContext) {
     context.db.prepare('DELETE FROM mobile_accounts WHERE id = ?').bind(accountId),
   ]);
 
+  console.info('mobile-account-deleted', {
+    accountId, deletedAt: now, requestId: request.headers.get('cf-ray'),
+  });
+
   return new Response(null, {
     status: 204,
     headers: { 'cache-control': 'no-store' },
   });
+}
+
+/** Corrige o endereço de uma conta ainda não confirmada, sem tocar na senha ou no histórico. */
+export async function handleMobileAccountEmail(request: Request, env: MobileAccountAdminEnv) {
+  if (request.method !== 'POST') return json(405, { erro: 'Método não permitido.' });
+  if (!env.MOBILE_DB || !env.MOBILE_ADMIN_TOKEN || env.MOBILE_ADMIN_TOKEN === env.MOBILE_PUBLISH_TOKEN) {
+    return json(503, { erro: 'Serviço temporariamente indisponível.' });
+  }
+  if (!constantTimeEqual(request.headers.get('x-mobile-admin-token') ?? '', env.MOBILE_ADMIN_TOKEN)) {
+    return json(401, { erro: 'Não autorizado.' });
+  }
+
+  const context = await createContext(env);
+  if (!context || !mobileEmailConfigured(env)) return json(503, { erro: 'Serviço temporariamente indisponível.' });
+  const input = await requestBody(request);
+  if (!input) return json(400, { erro: 'Envio inválido.' });
+
+  const cpf = digitos(value(input, 'cpf'));
+  const email = normalizeEmail(value(input, 'email'));
+  if (!cpfValido(cpf) || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    return json(400, { erro: 'Informe um CPF e um e-mail válidos.' });
+  }
+
+  const account = await findAccount(context, cpf);
+  if (!account) return json(404, { erro: 'Conta não encontrada.' });
+  if (account.email_verified_at !== null) return json(409, { erro: 'A conta já foi confirmada.' });
+
+  const emailLookup = await hmac(context, `email:${email}`);
+  const other = await context.db.prepare(
+    'SELECT id FROM mobile_accounts WHERE email_lookup = ? AND id <> ? LIMIT 1',
+  ).bind(emailLookup, account.id).first<{ id: string }>();
+  if (other) return json(409, { erro: 'Este e-mail já está em outra conta.' });
+
+  const emailCipher = await encrypt(context, email);
+  try {
+    await context.db.batch([
+      context.db.prepare(
+        'UPDATE mobile_accounts SET email_lookup = ?, email_cipher = ?, email_verified_at = NULL WHERE id = ? AND email_verified_at IS NULL',
+      ).bind(emailLookup, emailCipher, account.id),
+      context.db.prepare('DELETE FROM mobile_email_tokens WHERE account_id = ?').bind(account.id),
+    ]);
+  } catch (error) {
+    if (String(error).includes('UNIQUE constraint failed')) return json(409, { erro: 'Este e-mail já está em outra conta.' });
+    throw error;
+  }
+
+  await deliverEmail(env, context, { id: account.id, email_cipher: emailCipher }, 'verify');
+  return json(202, { mensagem: genericMessage });
 }
 
 export async function authenticateMobileRequest(

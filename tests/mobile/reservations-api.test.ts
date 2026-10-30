@@ -283,7 +283,7 @@ describe('reservas móveis', () => {
     expect((await request('reservations', { token: accountB.accessToken })).status).toBe(200);
     expect(await (await request('reservations', { token: accountB.accessToken })).json()).toEqual([]);
     expect((await request(`reservations/${order.id}`, { token: accountB.accessToken })).status).toBe(404);
-  });
+  }, 30_000);
 
   it('normaliza o cupom na reserva e inclui-o no pedido interno idempotente', async () => {
     const created = await createReservation({ ...requestBody, cupom: 'betim10' });

@@ -31,6 +31,16 @@ type ResultRow = {
   best_lap_ms: number | null;
   status: 'published' | 'withdrawn';
 };
+type PersonalResult = {
+  sessionId: string;
+  eventName: string;
+  eventDate: string;
+  displayName: string;
+  position: number;
+  kart: string;
+  laps: number;
+  bestLapMs: number | null;
+};
 
 const encoder = new TextEncoder();
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), {
@@ -103,6 +113,23 @@ function publicResult(row: ResultRow) {
     laps: Number(row.laps),
     bestLapMs: row.best_lap_ms == null ? null : Number(row.best_lap_ms),
   };
+}
+
+function historicalResult(value: unknown): PersonalResult | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const row = value as Record<string, unknown>;
+  const sessionId = typeof row.sessionId === 'string' ? row.sessionId : '';
+  const eventName = typeof row.eventName === 'string' ? row.eventName : '';
+  const displayName = typeof row.displayName === 'string' ? row.displayName : '';
+  const kart = typeof row.kart === 'string' ? row.kart : '';
+  const position = Number(row.position);
+  const laps = Number(row.laps);
+  const bestLapMs = row.bestLapMs == null ? null : Number(row.bestLapMs);
+  if (!/^[A-Za-z0-9._:-]{1,128}$/.test(sessionId) || !eventName || eventName.length > 160 || !isDate(row.eventDate) ||
+      !displayName || displayName.length > 80 || !kart || kart.length > 40 || !Number.isSafeInteger(position) || position < 1 || position > 1000 ||
+      !Number.isSafeInteger(laps) || laps < 0 || laps > 10_000 ||
+      (bestLapMs !== null && (!Number.isSafeInteger(bestLapMs) || bestLapMs < 1 || bestLapMs > 600_000))) return null;
+  return { sessionId, eventName, eventDate: row.eventDate, displayName, position, kart, laps, bestLapMs };
 }
 
 function auditJson(row: ResultRow | null) {
@@ -299,19 +326,51 @@ async function personalResults(request: Request, env: MobileResultsEnv) {
      FROM mobile_results WHERE customer_id = ? AND status = 'published'
      ORDER BY event_date DESC, session_id DESC, position LIMIT 500`,
   ).bind(link.customer_id).all<Record<string, unknown>>();
-  return json(200, {
-    vinculo: 'validado',
-    results: rows.results.map((row) => ({
-      sessionId: row.session_id,
-      eventName: row.event_name,
-      eventDate: row.event_date,
-      displayName: row.display_name,
+  await env.MOBILE_DB.prepare('CREATE TABLE IF NOT EXISTS mobile_ranking (chave TEXT PRIMARY KEY, dados TEXT NOT NULL, atualizado_em INTEGER NOT NULL)').run();
+  const historyRow = await env.MOBILE_DB.prepare('SELECT dados FROM mobile_ranking WHERE chave = ?')
+    .bind(`historico:${link.customer_id}`).first<{ dados: string }>();
+  const bySession = new Map<string, PersonalResult>();
+  if (historyRow) {
+    try {
+      const stored = JSON.parse(historyRow.dados) as { results?: unknown };
+      if (Array.isArray(stored.results)) {
+        for (const value of stored.results) {
+          const result = historicalResult(value);
+          if (result) bySession.set(result.sessionId, result);
+        }
+      }
+    } catch {
+      // Um snapshot histórico inválido não pode interromper a leitura dos resultados publicados.
+    }
+  }
+  for (const row of rows.results) {
+    const result: PersonalResult = {
+      sessionId: String(row.session_id),
+      eventName: String(row.event_name),
+      eventDate: String(row.event_date),
+      displayName: String(row.display_name),
       position: Number(row.position),
-      kart: row.kart,
+      kart: String(row.kart),
       laps: Number(row.laps),
       bestLapMs: row.best_lap_ms == null ? null : Number(row.best_lap_ms),
-    })),
+    };
+    bySession.set(result.sessionId, result);
+  }
+  const results = [...bySession.values()]
+    .sort((a, b) => b.eventDate.localeCompare(a.eventDate) || b.sessionId.localeCompare(a.sessionId) || a.position - b.position)
+    .slice(0, 500);
+  return json(200, {
+    vinculo: 'validado',
+    results,
   });
+}
+
+async function linkedCustomers(request: Request, env: MobileResultsEnv) {
+  if (!env.MOBILE_DB || !env.MOBILE_ADMIN_TOKEN) return unavailable();
+  if (!authorized(request, env.MOBILE_ADMIN_TOKEN, 'x-mobile-admin-token')) return json(401, { erro: 'Não autorizado.' });
+  const links = await env.MOBILE_DB.prepare('SELECT DISTINCT customer_id FROM mobile_identity_links ORDER BY customer_id')
+    .all<{ customer_id: string }>();
+  return json(200, { customerIds: links.results.map((row) => String(row.customer_id)).filter((id) => /^\d{1,20}$/.test(id)) });
 }
 
 export async function handleMobileResults(request: Request, env: MobileResultsEnv) {
@@ -329,6 +388,7 @@ export async function handleMobileResults(request: Request, env: MobileResultsEn
       return await publish(env, body);
     }
     if (path === '/api/mobile/v1/internal/identity-links') {
+      if (request.method === 'GET') return await linkedCustomers(request, env);
       if (request.method !== 'POST') return json(405, { erro: 'Método não permitido.' });
       return await linkIdentity(request, env);
     }

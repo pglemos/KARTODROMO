@@ -9,6 +9,7 @@ describe('validarPerfil', () => {
   it('recusa dados impossíveis', () => {
     expect(validarPerfil({ peso: 400 }).ok).toBe(false);
     expect(validarPerfil({ nascimento: '2999-01-01' }).ok).toBe(false);
+    expect(validarPerfil({ nascimento: '2026-02-31' }).ok).toBe(false);
     expect(validarPerfil({ tipoSanguineo: 'X' }).ok).toBe(false);
     expect(validarPerfil({ telefone: '123' }).ok).toBe(false);
   });

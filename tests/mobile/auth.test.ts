@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { scryptSync } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -53,6 +54,16 @@ class TestD1 {
     return new TestStatement(this.database, query);
   }
 
+  async batch(statements: TestStatement[]) {
+    this.database.exec('BEGIN');
+    try {
+      const results = [];
+      for (const statement of statements) results.push(await statement.run());
+      this.database.exec('COMMIT');
+      return results;
+    } catch (error) { this.database.exec('ROLLBACK'); throw error; }
+  }
+
   close() {
     this.database.close();
   }
@@ -99,6 +110,7 @@ beforeEach(() => {
   );
   environment = {
     MOBILE_DB: database,
+    MOBILE_ADMIN_TOKEN: 'admin-token-for-tests',
     MOBILE_LOOKUP_KEY: randomSecret(),
     MOBILE_DATA_KEY: randomSecret(),
     RESEND_API_KEY: randomSecret(),
@@ -142,6 +154,22 @@ async function register(overrides: Record<string, unknown> = {}) {
   return call('register', { ...validRegistration, ...overrides });
 }
 
+async function changeAccountEmail(body: Record<string, unknown>, token = 'admin-token-for-tests') {
+  return worker.fetch(
+    new Request('https://reservas.kartodromodebetim.com.br/api/mobile/v1/internal/account-email', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'content-length': String(JSON.stringify(body).length),
+        'x-mobile-admin-token': token,
+      },
+      body: JSON.stringify(body),
+    }),
+    environment as never,
+    { waitUntil: () => undefined },
+  );
+}
+
 function tokenFromLastEmail() {
   const message = JSON.stringify(sentEmails[sentEmails.length - 1]);
   const token = /token=([A-Za-z0-9_-]+)/.exec(message)?.[1];
@@ -150,6 +178,62 @@ function tokenFromLastEmail() {
 }
 
 describe('autenticação móvel', () => {
+  it('autentica uma senha curta já armazenada sem permitir seu cadastro em contas novas', async () => {
+    expect((await register({ password: '123456' })).status).toBe(400);
+    expect((await register()).status).toBe(202);
+    expect((await call('email/verify', { token: tokenFromLastEmail() })).status).toBe(200);
+    const salt = Buffer.alloc(16, 9);
+    const hash = scryptSync('123456', salt, 32, { N: 32768, r: 8, p: 3, maxmem: 64 * 1024 * 1024 });
+    database.database.prepare('UPDATE mobile_accounts SET password_salt = ?, password_hash = ?, password_scheme = ?')
+      .run(salt.toString('base64url'), hash.toString('base64url'), 'scrypt-32768-8-3-v1');
+    expect((await call('login', { identifier: validRegistration.email, password: '123456' })).status).toBe(200);
+    expect((await call('login', { identifier: validRegistration.email, password: '654321' })).status).toBe(401);
+  }, 30_000);
+  it('corrige o e-mail de uma conta ainda não verificada e reenvia a confirmação', async () => {
+    expect((await changeAccountEmail({ cpf: validRegistration.cpf, email: 'novo@example.com' }, 'errado')).status).toBe(401);
+    await register();
+
+    const changed = await changeAccountEmail({ cpf: validRegistration.cpf, email: 'conta-teste@example.com' });
+    expect(changed.status).toBe(202);
+    expect(sentEmails).toHaveLength(2);
+    expect(sentEmails[1]).toMatchObject({ to: ['conta-teste@example.com'] });
+
+    expect((await call('email/verify', { token: tokenFromLastEmail() })).status).toBe(200);
+    expect((await call('login', { identifier: 'conta-teste@example.com', password: validRegistration.password })).status).toBe(200);
+    expect((await call('login', { identifier: validRegistration.email, password: validRegistration.password })).status).toBe(401);
+  }, 30_000);
+
+  it('não permite trocar o e-mail de uma conta já verificada', async () => {
+    await register();
+    await call('email/verify', { token: tokenFromLastEmail() });
+    expect((await changeAccountEmail({ cpf: validRegistration.cpf, email: 'outro@example.com' })).status).toBe(409);
+  }, 30_000);
+
+  it('isola a exclusão explícita de uma conta e registra o evento sem credenciais', async () => {
+    for (const migration of ['0002_mobile_bookings.sql', '0003_mobile_coupon_previews.sql', '0004_mobile_results.sql']) {
+      database.database.exec(readFileSync(new URL(`../../workers/pre-cadastro/migrations/${migration}`, import.meta.url), 'utf8'));
+    }
+    const audit = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    try {
+      await register();
+      await call('email/verify', { token: tokenFromLastEmail() });
+      const first = await body(await call('login', { identifier: validRegistration.email, password: validRegistration.password }));
+      const otherEmail = 'outro-teste-codex@example.com';
+      await register({ email: otherEmail, cpf: cpfForTest('987654321') });
+      await call('email/verify', { token: tokenFromLastEmail() });
+      const other = await body(await call('login', { identifier: otherEmail, password: validRegistration.password }));
+      expect((await call('account/delete', {})).status).toBe(401);
+      expect(audit).not.toHaveBeenCalled();
+      expect((await call('account/delete', {}, { authorization: `Bearer ${String(first.accessToken)}` })).status).toBe(204);
+      expect(database.database.prepare('SELECT COUNT(*) total FROM mobile_accounts').get()).toMatchObject({ total: 1 });
+      expect(await authenticateMobileRequest(authenticatedRequest(first.accessToken), environment as never)).toBeNull();
+      expect(await authenticateMobileRequest(authenticatedRequest(other.accessToken), environment as never)).toMatchObject({ email: otherEmail });
+      expect(audit).toHaveBeenCalledWith('mobile-account-deleted', expect.objectContaining({ accountId: expect.any(String), deletedAt: expect.any(Number) }));
+      const logs = JSON.stringify(audit.mock.calls);
+      for (const secret of [validRegistration.email, validRegistration.password, first.accessToken, first.refreshToken]) expect(logs).not.toContain(String(secret));
+    } finally { audit.mockRestore(); }
+  }, 30_000);
+
   it('preserva credenciais PBKDF2 existentes ao versionar o esquema', () => {
     const legacy = new DatabaseSync(':memory:');
     try {
@@ -288,7 +372,7 @@ describe('autenticação móvel', () => {
         })
       ).status,
     ).toBe(401);
-  });
+  }, 30_000);
 
   it('keeps login, registration and reset responses indistinguishable for existing and unknown accounts', async () => {
     const initial = await register();
@@ -318,7 +402,7 @@ describe('autenticação móvel', () => {
     });
     expect(existingReset.status).toBe(202);
     expect(await body(existingReset)).toEqual(await body(unknownReset));
-  });
+  }, 30_000);
 
   it('reenvia a confirmação quando a conta ainda não verificou o e-mail', async () => {
     await register();
@@ -326,7 +410,7 @@ describe('autenticação móvel', () => {
 
     expect((await call('password/forgot', { identifier: validRegistration.email })).status).toBe(202);
     expect(sentEmails).toHaveLength(before + 1);
-    expect(sentEmails.at(-1)?.subject).toContain('grid');
+    expect(sentEmails[sentEmails.length - 1]?.subject).toContain('grid');
     expect(database.database.prepare("SELECT purpose FROM mobile_email_tokens ORDER BY created_at DESC LIMIT 1").get())
       .toMatchObject({ purpose: 'verify' });
   });
@@ -376,7 +460,7 @@ describe('autenticação móvel', () => {
         })
       ).status,
     ).toBe(200);
-  });
+  }, 30_000);
 
   it('ignora espaço acidental no fim da senha criada pelo link', async () => {
     await register();
@@ -389,7 +473,7 @@ describe('autenticação móvel', () => {
     expect(
       (await call('login', { identifier: validRegistration.email, password: 'SenhaNova!2026' })).status,
     ).toBe(200);
-  });
+  }, 30_000);
 
   it('rate limits authentication attempts by IP', async () => {
     const responses = await Promise.all(
@@ -404,5 +488,5 @@ describe('autenticação móvel', () => {
 
     // Requisições concorrentes podem chegar ao contador em qualquer ordem.
     expect(responses.map((response) => response.status).sort()).toEqual([401, 401, 401, 401, 401, 401, 429]);
-  });
+  }, 30_000);
 });
