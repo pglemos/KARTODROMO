@@ -416,7 +416,7 @@ export async function sumarioMovimento(movId: number) {
  */
 type OpsRun = (text: string, params?: Record<string, unknown>) => Promise<Record<string, unknown>[]>;
 
-async function inscreverN(bateriaId: number, clienteId: number, n: number, origem: string, uid: number | null, observacao: string | null, aprovada = true, opcoes: { produtoId?: number | null; pago?: boolean; clientes?: number[]; run?: OpsRun } = {}) {
+async function inscreverN(bateriaId: number, clienteId: number, n: number, origem: string, uid: number | null, observacao: string | null, aprovada = true, opcoes: { produtoId?: number | null; pago?: boolean; clientes?: number[]; run?: OpsRun; vagaDoGrupo?: boolean } = {}) {
   const pessoas = opcoes.clientes?.length ? opcoes.clientes : null;
   if (pessoas) n = pessoas.length;
   const inscrever = async (run: OpsRun) => {
@@ -434,7 +434,8 @@ async function inscreverN(bateriaId: number, clienteId: number, n: number, orige
     if (livres <= 0) throw new HttpError(409, 'Não há vagas para a bateria selecionada.');
     if (n > livres) throw new HttpError(409, `Não há vagas o suficiente para a quantidade de participantes selecionada. Vagas disponíveis: ${livres}.`);
     // no site quem compra nem sempre pilota: pode reservar de novo para mais alguém na mesma bateria
-    if (n === 1 && origem !== 'site') {
+    // no grupo cada vaga nasce no nome do responsável e depois passa para o piloto: não é reserva duplicada
+    if (n === 1 && origem !== 'site' && !opcoes.vagaDoGrupo) {
       const [dup] = await run(`SELECT Id FROM dbo.Inscricao WHERE BateriaId = @bateriaId AND ClienteId = @clienteId AND Status <> 'cancelada'`, { bateriaId, clienteId });
       if (dup) throw new HttpError(409, 'Já existe uma reserva em nome deste cliente.');
     }

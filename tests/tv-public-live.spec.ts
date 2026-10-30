@@ -49,7 +49,7 @@ test('desktop keeps the mouse pointer visible over the live page', async ({ page
   await waitForRanking(page);
   const cursors = await page.evaluate(() => ({
     body: getComputedStyle(document.body).cursor,
-    row: getComputedStyle(document.querySelector('.linha')).cursor,
+    row: getComputedStyle(document.querySelector('.linha')!).cursor,
   }));
   expect(cursors.body).not.toBe('none');
   expect(cursors.row).toBe('pointer');
@@ -102,7 +102,7 @@ test('mobile ranking keeps scrolling manual and exposes the full list', async ({
     crossings: [],
     finished: false,
   }));
-  session.standings = session.competitors.map((competitor, index) => ({
+  session.standings = session.competitors.map((competitor: any, index: number) => ({
     position: index + 1,
     kart: competitor.kart,
     name: competitor.name,
@@ -174,7 +174,7 @@ test('mobile ranking keeps scrolling manual and exposes the full list', async ({
 
   const beforeOrder = await firstRow.evaluate((el) => getComputedStyle(el).transform);
   const nextFixture = structuredClone(fixture);
-  nextFixture.focus.standings = nextFixture.focus.standings.map((row, index, rows) => ({
+  nextFixture.focus.standings = nextFixture.focus.standings.map((row: any, index: number, rows: any[]) => ({
     ...row,
     position: rows.length - index,
   }));
