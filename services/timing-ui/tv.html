@@ -197,7 +197,7 @@
   #detalhe th { position: sticky; top: 0; background: #0D1210; padding: 10px 6px; text-align: right; font-size: 13px; color: var(--sec); font-weight: 600; }
   #detalhe td { padding: 8px 6px; text-align: right; border-top: 1px solid rgba(255, 255, 255, .07); }
   #detalhe th:first-child, #detalhe td:first-child { text-align: left; }
-  #detalhe tr.melhor td { color: var(--roxo); font-weight: 700; }
+  #detalhe tr.volta-melhor td { color: var(--roxo); font-weight: 700; }
   #detalhe tr.anulada td { color: var(--sec); text-decoration: line-through; }
   #detalhe .msg { padding: 24px 0; text-align: center; color: var(--sec); }
   #detalhe .msg button { display: block; margin: 12px auto 0; min-height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, .3); background: transparent; color: var(--texto); cursor: pointer; }
@@ -509,7 +509,7 @@ async function carregarDetalhe() {
     const corpo = $('detalheCorpo'), rolou = corpo.scrollTop;
     corpo.innerHTML = voltas.length ? '<table><thead><tr><th>Volta</th><th>Tempo</th><th>Dif. melhor</th><th>Hora</th></tr></thead><tbody>' + voltas.map((x) => {
       const ehMelhor = !x.invalid && x.lapMs === melhor;
-      return '<tr class="' + (x.invalid ? 'anulada' : ehMelhor ? 'melhor' : '') + '"><td>' + x.lap + '</td><td>' + fmt(x.lapMs) + '</td><td>' + (x.invalid ? 'anulada' : ehMelhor ? 'melhor' : x.lapMs != null ? '+' + fmt(x.lapMs - melhor) : '') + '</td><td>' + horaDe(x.wallMs) + '</td></tr>';
+      return '<tr class="' + (x.invalid ? 'anulada' : ehMelhor ? 'volta-melhor' : '') + '"><td>' + x.lap + '</td><td>' + fmt(x.lapMs) + '</td><td>' + (x.invalid ? 'anulada' : ehMelhor ? 'melhor' : x.lapMs != null ? '+' + fmt(x.lapMs - melhor) : '') + '</td><td>' + horaDe(x.wallMs) + '</td></tr>';
     }).join('') + '</tbody></table>' : '<div class="msg">Este piloto ainda não completou nenhuma volta.</div>';
     corpo.scrollTop = rolou;
     $('detalheResumo').textContent = voltas.length ? voltas.length + (voltas.length === 1 ? ' volta' : ' voltas') + (melhor != null ? ' · melhor ' + fmt(melhor) : '') : '';
