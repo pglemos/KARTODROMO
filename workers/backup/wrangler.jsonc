@@ -1,0 +1,9 @@
+{
+  // Cópia do banco da operação fora do prédio: o SRVKART envia o .bak já criptografado (scripts/ops/backup-banco.cjs)
+  "name": "kartodromo-backup",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-20",
+  "workers_dev": true,
+  "r2_buckets": [{ "binding": "BACKUP", "bucket_name": "kartodromo-backup" }],
+  "observability": { "enabled": true }
+}

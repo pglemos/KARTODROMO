@@ -1205,9 +1205,18 @@ function painelVazio<T extends { position: number; kart: string; name: string; t
 const clients = new Set<http.ServerResponse>();
 let stateTimer: NodeJS.Timeout | null = null;
 
+/** Pela internet (aovivo, crono.*) saem só os dados do placar: nada de código de cliente, nome de PC ou endereço do decoder. */
+const OCULTOS_NA_INTERNET = new Set(['customerId', 'detalhes', 'activeOperators', 'host', 'port']);
+const jsonPublico = (dados: unknown) => JSON.stringify(dados, (k, v) => (OCULTOS_NA_INTERNET.has(k) ? undefined : v));
+const clientesPublicos = new Set<http.ServerResponse>();
+
 function broadcast(event: string, data: unknown) {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const res of clients) res.write(payload);
+  if (clientesPublicos.size) {
+    const publico = `event: ${event}\ndata: ${jsonPublico(data)}\n\n`;
+    for (const res of clientesPublicos) res.write(publico);
+  }
 }
 
 let stateTimerAte = 0;
@@ -2301,7 +2310,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     catch (err) { return send(res, 500, { error: `Falha ao criar cópia: ${(err as Error).message}` }); }
   }
 
-  if (path === '/api/state') return send(res, 200, stateView());
+  if (path === '/api/state') return send(res, 200, veioDaInternet(req) ? JSON.parse(jsonPublico(stateView())) : stateView());
   if (path === '/api/livetime-snapshot') return send(res, 200, liveSnapshot(url.searchParams.get('painel') === 'tb50'));
   if (path === '/api/painel-led-page' && method === 'GET') return send(res, 200, painelLedPage);
   if (path === '/api/painel-led-page' && (method === 'PUT' || method === 'POST')) {
@@ -2334,9 +2343,11 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       connection: 'keep-alive',
       'access-control-allow-origin': '*',
     });
-    res.write(`event: state\ndata: ${JSON.stringify(stateView())}\n\n`);
-    clients.add(res);
-    req.on('close', () => clients.delete(res));
+    const publico = veioDaInternet(req);
+    res.write(`event: state\ndata: ${publico ? jsonPublico(stateView()) : JSON.stringify(stateView())}\n\n`);
+    const lista = publico ? clientesPublicos : clients;
+    lista.add(res);
+    req.on('close', () => lista.delete(res));
     return;
   }
 
@@ -3300,7 +3311,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     }
   }
 
-  if (path === '/healthz') return send(res, 200, { ok: true, decoder: decoderView(), sessions: sessions.size, transmissao: transmissaoStatus() });
+  if (path === '/healthz') return send(res, 200, { ok: true, decoder: veioDaInternet(req) ? JSON.parse(jsonPublico(decoderView())) : decoderView(), sessions: sessions.size, transmissao: transmissaoStatus() });
 
   return send(res, 404, { error: 'Rota desconhecida.' });
 }

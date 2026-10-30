@@ -40,6 +40,7 @@
     "node_modules",
     "mobile",
     "workers/transmissao",
+    "workers/backup",
     "dist",
     "tmp",
     ".aiox-core",
