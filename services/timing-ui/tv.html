@@ -173,12 +173,53 @@
   @keyframes flutua { 50% { transform: translateY(-1.4vh); } }
   .espera .msg { font-size: 4.4vh; font-weight: 600; color: var(--sec); text-transform: uppercase; letter-spacing: .08em; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+  /* ---------- aovivo.kartodromodebetim.com.br: mesma tela, para quem assiste de fora. Rolagem na mão e voltas do piloto; as TVs não mudam */
+  body.publico, body.publico html { cursor: default; }
+  body.publico .linha { cursor: pointer; font-size: max(var(--fs), 13px); }
+  body.publico .linha:hover { border-color: rgba(255, 255, 255, .3); }
+  body.publico .linha:focus-visible { outline: 2px solid var(--destaque, #00E676); outline-offset: -2px; }
+  body.publico #lista.manual { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  body.publico #rolo { will-change: auto; }
+  #conexao { display: none; margin-left: 12px; font-size: max(1.6vh, 12px); color: var(--sec); white-space: nowrap; }
+  body.publico #conexao { display: inline; }
+  #conexao.ruim { color: #FFCC00; font-weight: 700; }
+  #verClassificacao { display: none; position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 40; padding: 12px 20px; min-height: 44px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, .35); background: rgba(10, 14, 12, .92); color: var(--texto); font: 600 15px var(--fonte); cursor: pointer; }
+  body.publico #verClassificacao.ativo { display: block; }
+  #detalhe { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(0, 0, 0, .7); }
+  #detalhe .caixa { width: min(560px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; background: #0D1210; border: 1px solid rgba(255, 255, 255, .18); border-radius: 14px; overflow: hidden; }
+  #detalhe .topo { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 18px; border-bottom: 1px solid rgba(255, 255, 255, .12); }
+  #detalhe h2 { margin: 0; font-size: 20px; line-height: 1.25; }
+  #detalhe .resumo { margin-top: 4px; font-size: 14px; color: var(--sec); }
+  #detalheFechar { flex: none; min-width: 44px; min-height: 44px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, .3); background: transparent; color: var(--texto); font-size: 15px; cursor: pointer; }
+  #detalheCorpo { overflow-y: auto; padding: 4px 18px 16px; font-size: 15px; }
+  #detalhe table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  #detalhe th { position: sticky; top: 0; background: #0D1210; padding: 10px 6px; text-align: right; font-size: 13px; color: var(--sec); font-weight: 600; }
+  #detalhe td { padding: 8px 6px; text-align: right; border-top: 1px solid rgba(255, 255, 255, .07); }
+  #detalhe th:first-child, #detalhe td:first-child { text-align: left; }
+  #detalhe tr.melhor td { color: var(--roxo); font-weight: 700; }
+  #detalhe tr.anulada td { color: var(--sec); text-decoration: line-through; }
+  #detalhe .msg { padding: 24px 0; text-align: center; color: var(--sec); }
+  #detalhe .msg button { display: block; margin: 12px auto 0; min-height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, .3); background: transparent; color: var(--texto); cursor: pointer; }
+  @media (max-width: 760px) {
+    body.publico .cols { grid-template-columns: 9vw 11vw minmax(0, 1fr) 22vw 19vw; column-gap: 1.5vw; padding: 0 2vw; }
+    body.publico .cols > :nth-child(4), body.publico .cols > :nth-child(5) { display: none; }
+    body.publico .titulos { font-size: 11px; }
+    body.publico .linha { font-size: max(var(--fs), 13px); }
+    body.publico header { grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; }
+    body.publico header .bandeira { display: none; }
+    body.publico header { height: auto; min-height: 68px; padding: 8px 10px; }
+    body.publico header img { height: 34px; width: auto; max-width: 88px; }
+    body.publico header .nome { font-size: 16px; line-height: 1.2; white-space: normal; overflow: visible; }
+    body.publico header .sub { flex-wrap: wrap; font-size: 11px; white-space: normal; gap: 4px 8px; }
+    body.publico #conexao { margin-left: 0; }
+  }
 </style>
 </head>
 <body>
 <header>
   <img src="/kib-logo.png" alt="Kartódromo Internacional de Betim">
-  <div class="titulo"><div id="nome" class="nome">Kartódromo Internacional de Betim</div><div class="sub"><span id="selo"></span><span id="info"></span></div></div>
+  <div class="titulo"><div id="nome" class="nome">Kartódromo Internacional de Betim</div><div class="sub"><span id="selo"></span><span id="info"></span><span id="conexao" role="status"></span></div></div>
   <div id="bandeira" class="bandeira" hidden></div>
   <div id="relogio" class="relogio"></div>
 </header>
@@ -194,7 +235,12 @@
   <div id="podio" class="podio" hidden></div>
 </section>
 <div id="aviso" class="aviso"><small>Nova melhor volta</small><strong id="avisoTempo"></strong><span id="avisoQuem"></span></div>
+<button id="verClassificacao" type="button">Fixar classificação</button>
+<div id="detalhe" role="dialog" aria-modal="true" aria-labelledby="detalheTitulo" hidden><div class="caixa"><div class="topo"><div><h2 id="detalheTitulo"></h2><div id="detalheResumo" class="resumo"></div></div><button id="detalheFechar" type="button" aria-label="Fechar">✕</button></div><div id="detalheCorpo"></div></div></div>
 <script>
+// aovivo.* (ou ?publico=1): para quem assiste de fora. A TV do kartódromo segue com rolagem automática e sem ponteiro.
+const PUBLICO = location.hostname.startsWith('aovivo.') || new URLSearchParams(location.search).has('publico');
+if (PUBLICO) document.body.classList.add('publico');
 const fmt = (ms) => { if (ms == null) return '–'; const s = ms / 1000, m = Math.floor(s / 60); const r = (s - m * 60).toFixed(3); return m ? `${m}:${r.padStart(6, '0')}` : r; };
 const relogio = (ms) => { const t = Math.max(0, Math.ceil((ms || 0) / 1000)); return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -209,6 +255,7 @@ let ultimo = null, sessaoAtual = null, bandeiraAtual = null, recorde = null, avi
 // rolagem da lista longa: topo (6 s) → desce 1 linha a cada 1,5 s → fim (4 s) → volta ao topo
 const rol = { ativo: false, max: 0, vel: 0, off: 0, fase: 'topo', desde: performance.now(), ult: 0, de: 0, ciclos: 0 };
 // fim da corrida: vencedor (7 s) → pódio (15 s) → resultado completo → vencedor…
+let fixado = false;
 const fim = { id: null, fase: 'lista', desde: 0, assinatura: '', ciclosNoInicio: 0 };
 
 /** reinicia uma animação CSS no elemento (remove a classe, força o navegador a notar, põe de novo) */
@@ -251,6 +298,7 @@ function cabecalho(v, voltasLider) {
 function novaLinha(kart) {
   const el = document.createElement('div');
   el.className = 'cols linha num entra';
+  if (PUBLICO) { el.tabIndex = 0; el.setAttribute('role', 'button'); }
   el.innerHTML = '<span class="pos"><b></b><em class="seta"></em></span><span class="kart"><b></b></span><span class="nome"></span><span class="d"></span><span class="d"></span><span class="d"></span><span class="d dif"></span>';
   $('rolo').appendChild(el);
   const d = { el, pos: null, cruzou: undefined, ultima: undefined, melhor: undefined };
@@ -301,6 +349,7 @@ function mudarFase(f) {
 
 function aplicarFase() {
   const naLista = fim.fase === 'lista' || !fim.id;
+  $('verClassificacao').classList.toggle('ativo', !!fim.id);
   $('fim').hidden = naLista;
   $('vencedor').hidden = fim.fase !== 'vencedor';
   $('podio').hidden = fim.fase !== 'podio';
@@ -310,7 +359,7 @@ function aplicarFase() {
 
 // troca as telas do fim da corrida; a lista longa só sai depois de rolar até o fim uma vez
 setInterval(() => {
-  if (!fim.id) return;
+  if (!fim.id || fixado) return;
   const t = performance.now() - fim.desde;
   if (fim.fase === 'vencedor' && t > 7000) mudarFase('podio');
   else if (fim.fase === 'podio' && t > 15000) mudarFase('lista');
@@ -326,7 +375,7 @@ function rolar(t) {
   else if (rol.fase === 'descendo') { rol.off = Math.min(rol.max, rol.off + rol.vel * dt); if (rol.off >= rol.max) { rol.fase = 'fundo'; rol.desde = t; } }
   else if (rol.fase === 'fundo') { rol.off = Math.min(rol.off, rol.max); if (t - rol.desde > 4000) { rol.fase = 'subindo'; rol.desde = t; rol.de = rol.off; } }
   else if (rol.fase === 'subindo') { const k = Math.min(1, (t - rol.desde) / 1600); rol.off = rol.de * (1 - (1 - Math.pow(1 - k, 3))); if (k >= 1) { rol.fase = 'topo'; rol.desde = t; rol.off = 0; rol.ciclos++; } }
-  $('rolo').style.transform = `translateY(${-rol.off.toFixed(1)}px)`;
+  if (!PUBLICO) $('rolo').style.transform = `translateY(${-rol.off.toFixed(1)}px)`;
   $('rolagemBarra').style.width = `${rol.max ? (rol.off / rol.max) * 100 : 0}%`;
   requestAnimationFrame(rolar);
 }
@@ -393,16 +442,18 @@ function render(st) {
   const cabem = Math.max(1, Math.floor(util / minimo));
   const n = linhas.length;
   const lh = n <= cabem ? Math.min(util / Math.max(n, 8), window.innerHeight * 0.085) : util / cabem;
-  rol.ativo = n > cabem;
+  const longa = n > cabem;
+  rol.ativo = longa && !PUBLICO;
   rol.max = Math.max(0, n * lh - util);
   rol.vel = lh / 1.5;
   document.body.style.setProperty('--lh', `${lh}px`);
   document.body.style.setProperty('--fs', `${Math.min(lh * 0.52, window.innerWidth * 0.025)}px`);
-  $('lista').style.height = `${rol.ativo ? util : n * lh}px`;
+  $('lista').style.height = `${longa ? util : n * lh}px`;
+  $('lista').classList.toggle('manual', PUBLICO && longa);
   $('lista').classList.toggle('rolando', rol.ativo);
   $('rolo').style.height = `${n * lh}px`;
-  $('rolagem').hidden = !rol.ativo || (fim.id && fim.fase !== 'lista');
-  texto($('rolagemTexto'), `${n} pilotos · rolando`);
+  $('rolagem').hidden = !longa || (fim.id && fim.fase !== 'lista');
+  texto($('rolagemTexto'), PUBLICO ? `${n} pilotos · deslize a lista` : `${n} pilotos · rolando`);
 
   const presentes = new Set();
   linhas.forEach((r, i) => {
@@ -410,6 +461,7 @@ function render(st) {
     presentes.add(chave);
     const d = linhasDom.get(chave) || novaLinha(chave);
     const el = d.el, c = el.children;
+    if (PUBLICO) { el.dataset.chave = chave; el.dataset.kart = r.kart || ''; el.dataset.nome = r.name || ''; el.setAttribute('aria-label', `${r.position}º, kart ${r.kart || '-'}, ${r.name || ''}. Ver volta a volta`); }
     // desliza até a posição nova (a transição do transform faz a ultrapassagem "andar" na tela)
     el.style.transform = `translateY(${i * lh}px)`;
     el.className = el.className.replace(/\bp\d+\b/g, '').trim() + (grid ? '' : ` p${r.position}`);
@@ -438,10 +490,101 @@ function render(st) {
   for (const [kart, d] of linhasDom) if (!presentes.has(kart)) { d.el.remove(); linhasDom.delete(kart); }
 }
 
+// ---------------------------------------------------------------- só no público: voltas do piloto e estado da conexão
+let recebidoEm = Date.now(), caiu = false, detalheDe = null, origemFoco = null, detalheTimer = null;
+const horaDe = (ms) => new Date(ms).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+
+async function carregarDetalhe() {
+  if (!detalheDe) return;
+  const alvo = detalheDe;
+  try {
+    const r = await fetch('/api/sessions/' + encodeURIComponent(alvo.sessao) + '/laps', { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const lista = await r.json();
+    if (detalheDe !== alvo) return;
+    const p = lista.find((x) => String(x.kart) === alvo.kart && x.name === alvo.nome) || lista.find((x) => String(x.kart) === alvo.kart);
+    const voltas = p ? p.laps : [];
+    const validas = voltas.filter((x) => !x.invalid && x.lapMs != null).map((x) => x.lapMs);
+    const melhor = validas.length ? Math.min(...validas) : null;
+    const corpo = $('detalheCorpo'), rolou = corpo.scrollTop;
+    corpo.innerHTML = voltas.length ? '<table><thead><tr><th>Volta</th><th>Tempo</th><th>Dif. melhor</th><th>Hora</th></tr></thead><tbody>' + voltas.map((x) => {
+      const ehMelhor = !x.invalid && x.lapMs === melhor;
+      return '<tr class="' + (x.invalid ? 'anulada' : ehMelhor ? 'melhor' : '') + '"><td>' + x.lap + '</td><td>' + fmt(x.lapMs) + '</td><td>' + (x.invalid ? 'anulada' : ehMelhor ? 'melhor' : x.lapMs != null ? '+' + fmt(x.lapMs - melhor) : '') + '</td><td>' + horaDe(x.wallMs) + '</td></tr>';
+    }).join('') + '</tbody></table>' : '<div class="msg">Este piloto ainda não completou nenhuma volta.</div>';
+    corpo.scrollTop = rolou;
+    $('detalheResumo').textContent = voltas.length ? voltas.length + (voltas.length === 1 ? ' volta' : ' voltas') + (melhor != null ? ' · melhor ' + fmt(melhor) : '') : '';
+  } catch {
+    if (detalheDe !== alvo || $('detalheCorpo').querySelector('table')) return;
+    $('detalheCorpo').innerHTML = '<div class="msg">Não foi possível carregar as voltas.<button type="button" id="detalheTentar">Tentar de novo</button></div>';
+    $('detalheTentar').addEventListener('click', carregarDetalhe);
+  }
+}
+
+function abrirDetalhe(el) {
+  if (!sessaoAtual || !el.dataset.chave) return;
+  detalheDe = { sessao: sessaoAtual, kart: el.dataset.kart, nome: el.dataset.nome, chave: el.dataset.chave };
+  origemFoco = el;
+  $('detalheTitulo').textContent = 'Kart ' + (el.dataset.kart || '-') + ' · ' + (curto(el.dataset.nome) || 'Piloto');
+  $('detalheResumo').textContent = '';
+  $('detalheCorpo').innerHTML = '<div class="msg">Carregando voltas…</div>';
+  $('detalhe').hidden = false;
+  $('detalheFechar').focus();
+  carregarDetalhe();
+  clearInterval(detalheTimer);
+  detalheTimer = setInterval(carregarDetalhe, 5000);
+}
+
+function fecharDetalhe() {
+  clearInterval(detalheTimer);
+  detalheDe = null;
+  $('detalhe').hidden = true;
+  if (origemFoco && origemFoco.isConnected) origemFoco.focus();
+}
+
+function mostrarConexao() {
+  const idade = Date.now() - recebidoEm, ruim = caiu || idade > 15000;
+  const c = $('conexao');
+  c.classList.toggle('ruim', ruim);
+  texto(c, caiu && idade <= 15000 ? '· Reconectando…' : ruim ? '· Dados desatualizados há ' + Math.round(idade / 1000) + ' s' : '· Ao vivo, atualizado');
+}
+
+if (PUBLICO) {
+  $('rolo').addEventListener('click', (e) => { const el = e.target.closest('.linha'); if (el) abrirDetalhe(el); });
+  $('rolo').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const el = e.target.closest('.linha');
+    if (el) { e.preventDefault(); abrirDetalhe(el); }
+  });
+  $('detalheFechar').addEventListener('click', fecharDetalhe);
+  $('detalhe').addEventListener('click', (e) => { if (e.target === $('detalhe')) fecharDetalhe(); });
+  document.addEventListener('keydown', (e) => {
+    if ($('detalhe').hidden) return;
+    if (e.key === 'Escape') fecharDetalhe();
+    if (e.key === 'Tab') { e.preventDefault(); $('detalheFechar').focus(); }
+  });
+  $('verClassificacao').addEventListener('click', () => {
+    fixado = !fixado;
+    $('verClassificacao').textContent = fixado ? 'Retomar apresentação' : 'Fixar classificação';
+    if (fixado) mudarFase('lista');
+  });
+  $('lista').addEventListener('scroll', () => {
+    const l = $('lista'), max = l.scrollHeight - l.clientHeight;
+    $('rolagemBarra').style.width = (max > 0 ? (l.scrollTop / max) * 100 : 0) + '%';
+  }, { passive: true });
+  // sem bateria o servidor fica quieto: a consulta separa "nada mudou" de "sem conexão"
+  setInterval(async () => {
+    if (Date.now() - recebidoEm > 10000) {
+      try { const r = await fetch('/api/state', { cache: 'no-store' }); if (r.ok) { render(await r.json()); recebidoEm = Date.now(); } } catch { /* segue marcando desatualizado */ }
+    }
+    mostrarConexao();
+  }, 1000);
+  mostrarConexao();
+}
+
 function conectar() {
   const es = new EventSource('/api/events');
-  es.addEventListener('state', (e) => render(JSON.parse(e.data)));
-  es.onerror = () => { es.close(); setTimeout(conectar, 2000); };
+  es.addEventListener('state', (e) => { recebidoEm = Date.now(); caiu = false; render(JSON.parse(e.data)); });
+  es.onerror = () => { caiu = true; es.close(); setTimeout(conectar, 2000); };
 }
 window.addEventListener('resize', () => ultimo && render(ultimo));
 conectar();
