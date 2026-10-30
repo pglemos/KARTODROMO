@@ -23,6 +23,7 @@ public static class AgenteImpressao
         var existe = PrinterSettings.InstalledPrinters.Cast<string>().Any(p => string.Equals(p, _impressora, StringComparison.OrdinalIgnoreCase));
         Log(existe ? $"agente ligado, impressora {_impressora}" : $"ATENÇÃO: impressora '{_impressora}' não existe neste computador");
         Situacao = existe ? "Termos do totem: " + _impressora : "Impressora dos termos não encontrada";
+        if (!existe) return;
         var t = new System.Windows.Forms.Timer { Interval = 3000 };
         t.Tick += async (_, _) => await Rodada(dono);
         dono.FormClosed += (_, _) => { t.Stop(); t.Dispose(); };
@@ -62,7 +63,10 @@ public static class AgenteImpressao
                 Situacao = "Termos do totem PARADOS: " + e.Message;
                 // antes ficava só no registro e os termos paravam em silêncio (30/09: 1h40 sem imprimir)
                 if (e is ApiException { Status: 401 })
-                    dono.BeginInvoke(() => Msg.Info(dono, "O login venceu e os termos do totem pararam de imprimir.\nFeche e abra a Recepção e entre de novo.", "Termos do totem parados"));
+                {
+                    _pausaAte = DateTime.Now.AddMinutes(2);
+                    dono.BeginInvoke(() => Msg.Info(dono, "O login venceu e os termos do totem pararam de imprimir temporariamente.\nPor favor, refaça o login na Recepção.", "Termos do totem parados"));
+                }
             }
             _ultimoErro = e.Message;
         }

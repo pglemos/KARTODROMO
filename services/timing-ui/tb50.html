@@ -153,6 +153,11 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
     var s = ultimo;
     if (!s) return;
     var pilotos = s.drivers || [];
+    // Item 21: Limpa o grid estruturado na largada/bandeira verde sem depender apenas da posição 999
+    if (s.clearGrid || (pilotos.length === 1 && pilotos[0].position === 999)) {
+      mostrarPlacar([]);
+      return;
+    }
     var corridaEncerrada = s.status === 'finished' && s.sessionType === 'race';
     var temTop = false;
     for (var i = 0; i < pilotos.length; i++) if (pilotos[i].position >= 1 && pilotos[i].position <= 5) temTop = true;
@@ -174,31 +179,99 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
     x.send(null);
   }
 
-  // Fluxo ao vivo: o servidor empurra o placar no instante em que o kart cruza a linha (antes: pergunta 1x/s,
-  // o piloto via o tempo até 1,5 s depois). Sem fluxo (servidor antigo, rede caiu), volta a perguntar a cada 250 ms.
+  function fmtMs(ms) {
+    if (!(ms > 0)) return '';
+    var m = Math.floor(ms / 60000);
+    var s = Math.floor((ms % 60000) / 1000);
+    var mil = Math.floor(ms % 1000);
+    var ss = (s < 10 && m > 0 ? '0' : '') + s;
+    var mm = (mil < 10 ? '00' : mil < 100 ? '0' : '') + mil;
+    return (m > 0 ? m + ':' : '') + ss + '.' + mm;
+  }
+
+  function deEstado(st) {
+    if (!st) return null;
+    if (st.tb50 && typeof st.tb50.offset === 'number') {
+      offset = st.tb50.offset > 0 ? st.tb50.offset : 0;
+    }
+    var s = (st.runningId && st.focus && st.focus.id === st.runningId) ? st.focus : (st.lastFinished || st.focus);
+    if (!s || s.type === 'equalizacao') return null;
+    var aoVivo = s.state === 'em_andamento' || s.state === 'bandeira_amarela' || s.state === 'bandeira_vermelha' || s.state === 'bandeira_final';
+    var fim = s.state === 'encerrada';
+    if (!aoVivo && !fim) return null;
+    var lista = s.standings || [];
+    var drivers = [];
+    for (var i = 0; i < lista.length; i++) {
+      var r = lista[i];
+      if (aoVivo && !(r.laps > 0)) continue;
+      drivers.push({
+        position: r.position,
+        kart: r.kart,
+        name: r.name,
+        time: fmtMs(r.bestLapMs),
+        laps: r.laps
+      });
+    }
+    return {
+      status: aoVivo ? 'live' : 'finished',
+      sessionType: s.type === 'corrida' ? 'race' : 'qualifying',
+      eventName: s.name,
+      race: { id: s.id, name: s.name, type: s.type },
+      drivers: drivers
+    };
+  }
+
+  // Item 20: Fluxo ao vivo direto no canal /api/livetime-snapshot/eventos?painel=tb50
+  // para sincronismo em milissegundos a cada passagem na linha, com fallback para /api/events e HTTP.
   var fluxo = null;
-  var fluxoAberto = false;
+  var ultimoSseEm = 0;
   function abrirFluxo() {
     if (!window.EventSource) return;
     try {
       if (fluxo) fluxo.close();
       fluxo = new EventSource('/api/livetime-snapshot/eventos?painel=tb50');
-      fluxo.onopen = function () { fluxoAberto = true; };
       fluxo.addEventListener('snapshot', function (e) {
-        fluxoAberto = true;
-        try { var s = JSON.parse(e.data); if (s && s.drivers) { ultimo = s; desenhar(); } } catch (err) {}
+        try {
+          var s = JSON.parse(e.data);
+          ultimoSseEm = new Date().getTime();
+          if (s && s.drivers) {
+            ultimo = s;
+            desenhar();
+          }
+        } catch (err) {}
       });
-      fluxo.onerror = function () { fluxoAberto = false; };
-    } catch (e) { fluxoAberto = false; fluxo = null; }
+      fluxo.addEventListener('state', function (e) {
+        try {
+          var s = deEstado(JSON.parse(e.data));
+          ultimoSseEm = new Date().getTime();
+          if (s && s.drivers) {
+            ultimo = s;
+            desenhar();
+          }
+        } catch (err) {}
+      });
+      fluxo.onerror = function () {
+        try { if (fluxo) fluxo.close(); } catch (err) {}
+        fluxo = null;
+      };
+    } catch (e) { fluxo = null; }
   }
 
   var voltas = 0;
   function atualizar() {
     voltas++;
-    if (!fluxoAberto) pegar('/api/livetime-snapshot?painel=tb50', function (s) { if (s && s.drivers) ultimo = s; });
-    if (voltas % 4 === 0) pegar('/api/tb50-page', function (p) { offset = p && p.offset > 0 ? p.offset : 0; });
-    // fluxo fechado de vez (ex.: servidor reiniciando): tenta abrir de novo a cada 10 s
-    if (voltas % 40 === 0 && (!fluxo || fluxo.readyState === 2)) abrirFluxo();
+    var agora = new Date().getTime();
+    if (agora - ultimoSseEm > 1200) {
+      pegar('/api/livetime-snapshot?painel=tb50', function (s) {
+        if (s && s.drivers) ultimo = s;
+      });
+    }
+    if (voltas % 4 === 0 && agora - ultimoSseEm > 1500) {
+      pegar('/api/tb50-page', function (p) { offset = p && p.offset > 0 ? p.offset : 0; });
+    }
+    if (voltas % 12 === 0 && (!fluxo || fluxo.readyState === 2 || agora - ultimoSseEm > 3500)) {
+      abrirFluxo();
+    }
   }
 
   // avisa o servidor que a página está viva na TB50 (e com qual navegador)

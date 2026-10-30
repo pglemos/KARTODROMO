@@ -117,8 +117,8 @@ public class FormCheckout : CartaoModal
     Label _avisoPagamento;
     Panel _formasCard, _pagamentosCard, _bloqueioPagamento;
     TableLayoutPanel _pagamentos;
-    Button _btnAdicionarSelecionadas, _btnConcluir, _btnContinuarPagamento;
-    bool _pagamentoAtivo;
+    Button _btnAdicionarSelecionadas, _btnConcluir, _btnContinuarPagamento, _btnVoucher;
+    bool _pagamentoAtivo, _salvando;
 
     public FormCheckout(JsonObject terminal, long? bateriaId, List<long> reservaIds, long? clienteId)
         : base(1320, 812)
@@ -230,6 +230,7 @@ public class FormCheckout : CartaoModal
         var resumo = new Panel { Dock = DockStyle.Right, Width = 300, BackColor = Tokens.Claro.CorSuperficieInversa, Padding = new Padding(18, 12, 18, 16) };
         resumo.Paint += (_, e) =>
         {
+            if (resumo.ClientRectangle.Width <= 0 || resumo.ClientRectangle.Height <= 0) return;
             using var b = new LinearGradientBrush(resumo.ClientRectangle, Tokens.Claro.CorSuperficieInversa, Color.FromArgb(11, 11, 12), 90f);
             e.Graphics.FillRectangle(b, resumo.ClientRectangle);
         };
@@ -246,6 +247,7 @@ public class FormCheckout : CartaoModal
         aprovar.FlatAppearance.BorderSize = 0; aprovar.FlatAppearance.MouseOverBackColor = Color.FromArgb(76, 217, 100); aprovar.Click += (_, _) => Aprovar();
         aprovar.Paint += (_, e) =>
         {
+            if (aprovar.ClientRectangle.Width <= 0 || aprovar.ClientRectangle.Height <= 0) return;
             // gradiente do design (verde claro em cima, verde escuro embaixo)
             var inicio = aprovar.Enabled ? Color.FromArgb(76, 217, 100) : Color.FromArgb(155, 178, 161);
             var fim = aprovar.Enabled ? Color.FromArgb(31, 158, 74) : Color.FromArgb(121, 139, 128);
@@ -388,8 +390,9 @@ public class FormCheckout : CartaoModal
         barraCarrinho.SetFlowBreak(barraCarrinho.Controls[^1], true);
         _codVoucher.PlaceholderText = "Código do voucher"; _codVoucher.AccessibleName = "Código do voucher";
         _codVoucher.Font = Tokens.FonteNumero(Tokens.Claro.FonteTamanhoCorpo);
-        var aplicarVoucher = new BotaoPlano { Text = "Aplicar", AutoSize = true, Dock = DockStyle.Right, FlatStyle = FlatStyle.Flat, BackColor = KitVisual.VerdeClaro, ForeColor = KitVisual.Verde, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold), Cursor = Cursors.Hand, AccessibleRole = AccessibleRole.PushButton, AccessibleName = "Aplicar voucher" };
-        aplicarVoucher.FlatAppearance.BorderSize = 0; aplicarVoucher.Click += (_, _) => AplicarVoucher();
+        var aplicarVoucher = new BotaoPlano { Text = "Aplicar", AutoSize = true, Dock = DockStyle.Right, FlatStyle = FlatStyle.Flat, BackColor = KitVisual.VerdeClaro, ForeColor = KitVisual.Verde, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold), Cursor = Cursors.Hand, AccessibleRole = AccessibleRole.PushButton, AccessibleName = "Aplicar ou remover voucher" };
+        _btnVoucher = aplicarVoucher;
+        aplicarVoucher.FlatAppearance.BorderSize = 0; aplicarVoucher.Click += (_, _) => { if (_voucher != null) RemoverVoucher(); else AplicarVoucher(); };
         var caixaVoucher = FormCliente.Caixa(_codVoucher, aplicarVoucher); caixaVoucher.Dock = DockStyle.None; caixaVoucher.Size = new Size(236, 34); caixaVoucher.Margin = new Padding(0, 0, 0, 0);
         barraCarrinho.Controls.Add(caixaVoucher);
         barraCarrinho.Resize += (_, _) => caixaVoucher.Margin = new Padding(Math.Max(0, barraCarrinho.ClientSize.Width - 24 - caixaVoucher.Width), 0, 0, 0);
@@ -642,6 +645,21 @@ public class FormCheckout : CartaoModal
         }
         if (_btnAdicionarSelecionadas != null) _btnAdicionarSelecionadas.Enabled = _gDisp.Rows.Count > 0;
         if (_btnContinuarPagamento != null) _btnContinuarPagamento.Enabled = _car.Count > 0;
+        if (_btnVoucher != null)
+        {
+            if (_voucher != null)
+            {
+                _btnVoucher.Text = "Remover";
+                _btnVoucher.BackColor = Color.FromArgb(255, 230, 230);
+                _btnVoucher.ForeColor = Color.FromArgb(200, 30, 30);
+            }
+            else
+            {
+                _btnVoucher.Text = "Aplicar";
+                _btnVoucher.BackColor = KitVisual.VerdeClaro;
+                _btnVoucher.ForeColor = KitVisual.Verde;
+            }
+        }
         _cli.Text = _cliente?.S("nome") ?? ""; _doc.Text = _cliente?.S("documento") ?? "";
     }
 
@@ -721,25 +739,68 @@ public class FormCheckout : CartaoModal
         Msg.Info(this, $"Voucher aplicado! Desconto de {Fmt.Brl(alvo.Desc)} em {alvo.Produto}.");
     });
 
+    void RemoverVoucher()
+    {
+        if (_voucher == null) return;
+        foreach (var c in _car.Where(c => c.Voucher))
+        {
+            c.Voucher = false;
+            c.Desc = 0;
+            c.DescPct = 0;
+        }
+        _voucher = null;
+        _codVoucher.Text = "";
+        Atualizar();
+        Msg.Info(this, "Voucher removido da venda.");
+    }
+
     void Aprovar() => Seguro.Rodar(this, async () =>
     {
+        if (_salvando) return;
         if (_car.Count == 0) { Msg.Aviso(this, "Carrinho vazio."); return; }
         if (!_pagamentoAtivo) { Msg.Aviso(this, "Revise o carrinho e clique em ‘Continuar para pagamento’ antes de concluir."); return; }
         var t = Totais();
         if (_pags.Count == 0 && t.sub > 0 && _forma.SelectedItem is Campos.Item f) { _pags.Add((f.Id, f.Texto, Fmt.Centavos(_valor.Text) is long vv && vv > 0 ? vv : t.sub)); Atualizar(); t = Totais(); }
         if (t.falta > 0 && Sessao.ParamSim("office.validarTotalPago", true)) { Msg.Aviso(this, $"Ainda faltam ser pagos {Fmt.Brl(t.falta)} para poder concluir a compra."); return; }
-        var itens = new JsonArray();
-        foreach (var c in _car) itens.Add(new JsonObject { ["inscricaoId"] = c.InscricaoId, ["produtoId"] = c.ProdutoId, ["quantidade"] = c.Qtd, ["unitarioCentavos"] = c.Unit, ["descontoCentavos"] = c.Voucher ? 0 : c.Desc, ["acrescimoCentavos"] = c.Acr });
-        var pags = new JsonArray();
-        foreach (var p in _pags) pags.Add(new JsonObject { ["formaPagamentoId"] = p.forma, ["valorCentavos"] = p.valor });
-        var r = await Api.Post("/api/office/vendas", new JsonObject { ["clienteId"] = _cliente?.L("id"), ["observacao"] = _obs.Text, ["voucherCodigo"] = _voucher, ["itens"] = itens, ["pagamentos"] = pags });
-        Concluido = true;
-        Msg.Sucesso(this, $"Venda nº {r.S("id")} aprovada." + (r.L("troco") is long tr && tr > 0 ? $"\nTroco: {Fmt.Brl(tr)}" : ""));
-        var inscr = r["inscricoes"] is JsonArray a ? a.Select(x => x?.ToString()).Where(x => x != null).ToList() : [];
-        Close();
-        if (Sessao.ParamSim("office.imprimirTicketAposVenda", false)) Relatorio.Abrir(Owner, Api.UrlComToken("/relatorio/venda?id=" + r.S("id")), "Comprovante");
-        if (inscr.Count > 0 && (Sessao.ParamSim("office.gerarTermoAposPagamento", false) || (Sessao.ParamSim("office.perguntarImprimirTermo", true) && Msg.Pergunta(Owner, "Deseja imprimir o Termo de Responsabilidade?", "Pergunta!"))))
-            Acoes.ImprimirTermo(Owner, inscr);
+        if (t.troco > 0)
+        {
+            var dinheiroRecebido = _pags.Where(p => p.nome.IndexOf("dinheiro", StringComparison.OrdinalIgnoreCase) >= 0 || p.forma == 1).Sum(p => p.valor);
+            if (t.troco > dinheiroRecebido)
+            {
+                Msg.Aviso(this, $"O troco de {Fmt.Brl(t.troco)} não pode ser maior que o valor recebido em dinheiro ({Fmt.Brl(dinheiroRecebido)}).\nNão é permitido troco para pagamentos em cartão ou Pix.");
+                return;
+            }
+        }
+        _salvando = true;
+        if (_btnConcluir != null) _btnConcluir.Enabled = false;
+        try
+        {
+            var itens = new JsonArray();
+            foreach (var c in _car) itens.Add(new JsonObject { ["inscricaoId"] = c.InscricaoId, ["produtoId"] = c.ProdutoId, ["quantidade"] = c.Qtd, ["unitarioCentavos"] = c.Unit, ["descontoCentavos"] = c.Voucher ? 0 : c.Desc, ["acrescimoCentavos"] = c.Acr });
+            var pags = new JsonArray();
+            foreach (var p in _pags) pags.Add(new JsonObject { ["formaPagamentoId"] = p.forma, ["valorCentavos"] = p.valor });
+            var idempotencyKey = Guid.NewGuid().ToString();
+            var r = await Api.Post("/api/office/vendas", new JsonObject { ["clienteId"] = _cliente?.L("id"), ["observacao"] = _obs.Text, ["voucherCodigo"] = _voucher, ["itens"] = itens, ["pagamentos"] = pags, ["idempotencyKey"] = idempotencyKey });
+            Concluido = true;
+            if (r.L("troco") is long tr && tr > 0)
+            {
+                Msg.Info(this, $"TROCO A ENTREGAR AO CLIENTE:\n{Fmt.Brl(tr)}\n\nVenda nº {r.S("id")} aprovada com sucesso.", "Troco");
+            }
+            else
+            {
+                Msg.Sucesso(this, $"Venda nº {r.S("id")} aprovada.");
+            }
+            var inscr = r["inscricoes"] is JsonArray a ? a.Select(x => x?.ToString()).Where(x => x != null).ToList() : [];
+            Close();
+            if (Sessao.ParamSim("office.imprimirTicketAposVenda", false)) Relatorio.Abrir(Owner, Api.UrlComToken("/relatorio/venda?id=" + r.S("id")), "Comprovante");
+            if (inscr.Count > 0 && (Sessao.ParamSim("office.gerarTermoAposPagamento", false) || (Sessao.ParamSim("office.perguntarImprimirTermo", true) && Msg.Pergunta(Owner, "Deseja imprimir o Termo de Responsabilidade?", "Pergunta!"))))
+                Acoes.ImprimirTermo(Owner, inscr);
+        }
+        finally
+        {
+            _salvando = false;
+            if (_btnConcluir != null) _btnConcluir.Enabled = true;
+        }
     });
 }
 

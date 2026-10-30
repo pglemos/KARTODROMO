@@ -312,7 +312,7 @@ public partial class FormCrono
             await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/passings/manual", new JsonObject { ["kart"] = c?.S("kart") ?? "", ["name"] = c?.S("name") ?? "", ["lapMs"] = (long)(s * 1000) });
             var texto = $"Passagem manual · kart {c?.S("kart") ?? "(avulsa)"} · {tempo.Text.Trim()} s" + (motivo.Text.Trim().Length > 0 ? " · " + motivo.Text.Trim() : "");
             await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/observations", new JsonObject { ["text"] = texto, ["author"] = Environment.UserName, ["kind"] = "manual" });
-            d.DialogResult = DialogResult.OK; d.Close(); await Atualizar();
+            d.DialogResult = DialogResult.OK; d.Close(); InvalidarCachePassagens(); await Atualizar();
         }));
         d.BotaoRodape("Cancelar", false, d.Close);
         d.ShowDialog(this);
@@ -380,6 +380,7 @@ public partial class FormCrono
             });
             await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/observations", new JsonObject { ["text"] = $"Troca de kart · {c.S("name")} do kart {kartAntigo} para o {kartNovo}" + (guardar.Checked ? "" : $" (voltas e tempos do kart {kartAntigo} desconsiderados)"), ["author"] = Environment.UserName, ["kind"] = "kart-swap" });
             d.DialogResult = DialogResult.OK; d.Close();
+            InvalidarCachePassagens();
             await Atualizar();
             var st = Crono.Arr(_sess, "standings").FirstOrDefault(s => s.S("kart") == kartNovo);
             Msg.Info(this, $"{c.S("name")} agora está no kart {kartNovo}, com {st?.I("laps") ?? 0} volta(s) e melhor volta {Crono.Volta(st?.L("bestLapMs"))}.");

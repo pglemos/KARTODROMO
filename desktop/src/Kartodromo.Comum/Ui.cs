@@ -236,9 +236,34 @@ public static class Campos
         {
             if (ocupado) return;
             ocupado = true;
-            var fim = t.SelectionStart == t.TextLength;
-            t.Text = fn(t.Text);
-            if (fim) t.SelectionStart = t.TextLength;
+            var pos = t.SelectionStart;
+            var textoAntes = t.Text;
+            var textoNovo = fn(textoAntes);
+            if (textoNovo != textoAntes)
+            {
+                var fim = pos >= textoAntes.Length;
+                var rawAntes = 0;
+                for (int i = 0; i < Math.Min(pos, textoAntes.Length); i++)
+                {
+                    if (char.IsLetterOrDigit(textoAntes[i])) rawAntes++;
+                }
+                t.Text = textoNovo;
+                if (fim)
+                {
+                    t.SelectionStart = t.TextLength;
+                }
+                else
+                {
+                    var novoPos = 0;
+                    var rawCont = 0;
+                    while (novoPos < textoNovo.Length && rawCont < rawAntes)
+                    {
+                        if (char.IsLetterOrDigit(textoNovo[novoPos])) rawCont++;
+                        novoPos++;
+                    }
+                    t.SelectionStart = Math.Min(novoPos, t.TextLength);
+                }
+            }
             ocupado = false;
         };
     }

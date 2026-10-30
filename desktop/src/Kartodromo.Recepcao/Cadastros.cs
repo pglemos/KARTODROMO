@@ -879,6 +879,7 @@ public class FormVoucher : CartaoModal
         var lado = new Panel { Dock = DockStyle.Left, Width = 300 };
         lado.Paint += (_, e) =>
         {
+            if (lado.ClientRectangle.Width <= 0 || lado.ClientRectangle.Height <= 0) return;
             var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
             using (var b = new LinearGradientBrush(lado.ClientRectangle, Tokens.Claro.CorSuperficieInversa, Color.FromArgb(11, 11, 12), 90f)) g.FillRectangle(b, lado.ClientRectangle);
             using var brilho = new GraphicsPath(); brilho.AddEllipse(-30, -10, 360, 300);

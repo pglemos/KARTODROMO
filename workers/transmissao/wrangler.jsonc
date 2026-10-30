@@ -8,5 +8,8 @@
     { "pattern": "www.kartodromodebetim.com.br/api/transmissao/*", "zone_name": "kartodromodebetim.com.br" }
   ],
   "r2_buckets": [{ "binding": "TELAO", "bucket_name": "kartodromo-telao" }],
-  "observability": { "enabled": true }
+  "durable_objects": { "bindings": [{ "name": "HUB", "class_name": "HubTransmissao" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["HubTransmissao"] }],
+  // a chave pode vir em ?chave=: o registro automático de pedidos gravaria a URL com ela
+  "observability": { "enabled": true, "logs": { "invocation_logs": false } }
 }

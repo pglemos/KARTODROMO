@@ -27,7 +27,7 @@ public static partial class Fmt
         return DateTime.TryParseExact(s.Length > 19 ? s[..19] : s, f, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
     }
     public static string Iso(DateTime d) => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-    public static string IsoHora(DateTime d) => d.ToString("yyyy-MM-dd'T'HH:mm", CultureInfo.InvariantCulture);
+    public static string IsoHora(DateTime d) => d.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture);
     public static string Dmy(string iso) => ParseData(iso)?.ToString("dd/MM/yyyy") ?? "";
     public static string DmyHm(string iso) => ParseData(iso)?.ToString("dd/MM/yyyy HH:mm") ?? "";
     public static string Hm(string iso) => ParseData(iso)?.ToString("HH:mm") ?? "";

@@ -328,5 +328,5 @@ public static class Atualizacao
     static bool HashValido(string hash) => !string.IsNullOrWhiteSpace(hash) && hash.Length == 64 && hash.All(Uri.IsHexDigit);
     static string Codificar(string texto) => Convert.ToBase64String(Encoding.UTF8.GetBytes(texto ?? ""));
     static string Decodificar(string texto) => Encoding.UTF8.GetString(Convert.FromBase64String(texto));
-    static string Nome(string app) => app switch { "Recepcao" => "Kartódromo Recepção", "Autoatendimento" => "Kartódromo Autoatendimento", _ => "Kartódromo Cronometragem" };
+    public static string Nome(string app) => app switch { "Recepcao" => "Kartódromo Recepção", "Autoatendimento" => "Kartódromo Autoatendimento", _ => "Kartódromo Cronometragem" };
 }

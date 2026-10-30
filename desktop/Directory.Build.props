@@ -7,7 +7,7 @@
     <LangVersion>latest</LangVersion>
     <Company>Kartódromo Internacional de Betim</Company>
     <Product>Kartódromo</Product>
-    <Version>1.0.70</Version>
+    <Version>1.0.86</Version>
     <Copyright>Kartódromo Internacional de Betim</Copyright>
     <!-- As telas são desenhadas em pixels de 96 dpi. Com SystemAware, num PC em 125% (Recepção 2, .239) só as fontes
          cresciam e tudo se sobrepunha; DpiUnawareGdiScaled faz o Windows ampliar a tela inteira por igual (texto nítido).

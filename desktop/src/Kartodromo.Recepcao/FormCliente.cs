@@ -540,11 +540,28 @@ public class FormCliente : CartaoModal
         var body = Corpo();
         if (_modo == "novo")
         {
-            var r = await Api.Post("/api/office/clientes", body);
-            CriadoId = r.L("id");
-            Msg.Sucesso(this, "Cliente criado com sucesso.");
-            if (_soNovo) { DialogResult = DialogResult.OK; Close(); return; }
-            await Mostrar(CriadoId.Value);
+            try
+            {
+                var r = await Api.Post("/api/office/clientes", body);
+                CriadoId = r.L("id");
+                Msg.Sucesso(this, "Cliente criado com sucesso.");
+                if (_soNovo) { DialogResult = DialogResult.OK; Close(); return; }
+                await Mostrar(CriadoId.Value);
+            }
+            catch (ApiException e) when (e.Status == 409 && !string.IsNullOrWhiteSpace(_doc.Text))
+            {
+                var d = Fmt.Digitos(_doc.Text);
+                if (Msg.Pergunta(this, $"{e.Message}\n\nDeseja localizar e carregar o cadastro deste documento agora?"))
+                {
+                    var busca = await Api.Lista($"/api/office/clientes?busca={d}");
+                    if (busca.Count > 0 && busca[0].L("id") is long idExistente)
+                    {
+                        await Mostrar(idExistente);
+                        return;
+                    }
+                }
+                throw;
+            }
         }
         else
         {
@@ -583,19 +600,24 @@ public class FormCliente : CartaoModal
         Msg.Info(this, "Conta do app vinculada ao cliente.");
     });
 
+    static readonly HttpClient _cepHttp = new() { Timeout = TimeSpan.FromSeconds(4) };
+
     async void BuscarCep()
     {
         var cep = Fmt.Digitos(_cep.Text);
         if (cep.Length != 8) { Msg.Aviso(this, "Informe o CEP com 8 dígitos."); return; }
         try
         {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
-            var r = JsonNode.Parse(await http.GetStringAsync($"https://viacep.com.br/ws/{cep}/json/"));
+            var json = await _cepHttp.GetStringAsync($"https://viacep.com.br/ws/{cep}/json/");
+            var r = JsonNode.Parse(json);
             if (r?["erro"] != null) { Msg.Aviso(this, "CEP não encontrado."); return; }
             _end.Text = r.S("logradouro"); _bairro.Text = r.S("bairro"); _cidade.Text = r.S("localidade"); _uf.Text = r.S("uf"); _ibge.Text = r.S("ibge");
             if (string.IsNullOrEmpty(_num.Text)) _num.Focus();
         }
-        catch { Msg.Aviso(this, "Não foi possível consultar o CEP (sem internet?)."); }
+        catch
+        {
+            _end.Focus();
+        }
     }
 
     /// <summary>Cadastro rapido a partir da pesquisa: abre em modo inclusao e devolve o id.</summary>

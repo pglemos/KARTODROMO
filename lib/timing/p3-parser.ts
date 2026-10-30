@@ -58,9 +58,43 @@ export class P3FrameSplitter {
     const out: Buffer[] = [];
     for (;;) {
       const start = this.buffer.indexOf(SOR);
-      if (start < 0) { this.buffer = Buffer.alloc(0); break; }
-      const end = this.buffer.indexOf(EOR, start + 1);
-      if (end < 0) { this.buffer = this.buffer.subarray(start); break; }
+      if (start < 0) {
+        if (this.buffer.length > 4096) {
+          this.buffer = this.buffer.subarray(this.buffer.length - 4096);
+        }
+        break;
+      }
+      // Procura EOR respeitando bytes de escape (0x8D)
+      let end = -1;
+      let escaped = false;
+      for (let i = start + 1; i < this.buffer.length; i++) {
+        const b = this.buffer[i];
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (b === ESC) {
+          escaped = true;
+          continue;
+        }
+        if (b === EOR) {
+          end = i;
+          break;
+        }
+        if (b === SOR) {
+          // Re-sincroniza caso outro SOR comece antes do EOR (frame corrompido)
+          break;
+        }
+      }
+      if (end < 0) {
+        const nextSor = this.buffer.indexOf(SOR, start + 1);
+        if (nextSor > start) {
+          this.buffer = this.buffer.subarray(nextSor);
+          continue;
+        }
+        this.buffer = this.buffer.subarray(start);
+        break;
+      }
       const body = this.buffer.subarray(start + 1, end);
       this.buffer = this.buffer.subarray(end + 1);
       const bytes: number[] = [];
@@ -70,7 +104,15 @@ export class P3FrameSplitter {
       }
       out.push(Buffer.from(bytes));
     }
-    if (this.buffer.length > 65536) this.buffer = Buffer.alloc(0);
+    // Item 2: Tratamento de buffer > 64KB sem descarte abrupto de resíduos
+    if (this.buffer.length > 65536) {
+      const lastSor = this.buffer.lastIndexOf(SOR);
+      if (lastSor >= 0) {
+        this.buffer = this.buffer.subarray(lastSor);
+      } else {
+        this.buffer = this.buffer.subarray(this.buffer.length - 4096);
+      }
+    }
     return out;
   }
 }

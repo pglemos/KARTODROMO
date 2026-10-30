@@ -14,9 +14,13 @@
  */
 import http from 'node:http';
 import net from 'node:net';
-import { appendFileSync, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import { appendFileSync, closeSync, copyFileSync, cpSync, createWriteStream, existsSync, fsyncSync, ftruncateSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { format } from 'node:util';
+import { chaveOperadorValida, clienteEhMaquinaOperadora } from '../lib/timing/operator-auth';
+import { redigirEmails } from '../lib/timing/redact-pii';
 import { DecoderClient, type DecoderProtocol } from '../lib/timing/decoder-client';
 import { formatTrxPassing, type TrxPassing } from '../lib/timing/trx-parser';
 import { mobileApiEndpoint } from '../lib/mobile-api-url';
@@ -77,13 +81,13 @@ import { rankingPorPeso, tituloFaixas, type DadosPiloto } from '../lib/timing/ra
 import { condicaoChuvaPeloTracado, dataBrasilia, historicoDoKart, rankingKarts } from '../lib/timing/ranking-karts';
 import { calcularComAnteriores, retomarEqualizacao, validarFaixasRedutor, type FaixaRedutor, faixasDaRegra, importarKarts, REGRA_PADRAO, regraDa, SISTEMAS_KART, tempoVoltaParaMs, TOLERANCIA_PADRAO_MS, ultimaEqualizacaoPorKart, voltasNasBaterias, type ChecklistKart, type ConfigEqualizacao } from '../lib/timing/equalizacao';
 import { nomeProprio } from '../lib/nomes';
-import { configPublica, enviarEmailSimples, enviarResultado, enviarTeste, lerConfig, salvarConfig, semEmailAosPilotos, traduzirErro, type Dependencias, type OpcoesEnvio } from './timing-email';
+import { configPublica, enviarEmailSimples, enviarResultado, enviarTeste, lerConfig, salvarConfig, semEmailAosPilotos, traduzirErro, verificarTransporteEmail, type Dependencias, type OpcoesEnvio } from './timing-email';
 import { usoKartsDaSessao } from '../lib/timing/kart-fisico';
 import { serializeMobilePublication } from '../lib/timing/mobile-results';
 import type { ContextoProva, EmpresaEmail } from '../lib/timing/email-resultado';
 import { competidoresComSorteio, descricaoModoSorteio, ListaMudouError, pilotosDoSorteio, validarSorteio, type Atribuicao } from '../lib/timing/sorteio';
 import { normalizarPaginaPainel, PAINEL_LED_PAGE_SIZE } from '../lib/timing/painel-page';
-import { assinaturaDoConteudo, conferirChave, extrairChave, lerHashes, montarTransmissao, type Transmissao } from '../lib/timing/transmissao';
+import { assinaturaDoConteudo, conferirChave, extrairChave, filtrarVoltasPorKart, lerHashes, montarTransmissao, montarVoltas, type Transmissao, type VoltasTransmissao } from '../lib/timing/transmissao';
 
 // ---------------------------------------------------------------- config
 
@@ -121,8 +125,18 @@ const TRACK_NAME = process.env.TIMING_TRACK_NAME || 'Kartodromo Internacional de
 
 for (const dir of [DATA_DIR, SESSIONS_DIR, JOURNAL_DIR]) mkdirSync(dir, { recursive: true });
 
+// Item 3: Rotação ativa de log timing.log (> 5MB) sem manter offset corrompido de cmd.exe
+const TIMING_LOG_FILE = join(DATA_DIR, 'timing.log');
+
 function log(...args: unknown[]) {
-  console.log(`[${new Date().toISOString()}]`, ...args);
+  const formatted = format(...args);
+  const line = redigirEmails(`[${new Date().toISOString()}] ${formatted}`);
+  console.log(line);
+  try {
+    appendFileSync(TIMING_LOG_FILE, line + '\n', 'utf8');
+  } catch {
+    // silencioso se o arquivo de log estiver em rotação
+  }
 }
 
 function logTrocas(s: { name: string }, trocas: TrocaDeKart[]) {
@@ -134,37 +148,220 @@ function logTrocas(s: { name: string }, trocas: TrocaDeKart[]) {
 
 // ---------------------------------------------------------------- persistencia
 
-function writeJsonAtomic(file: string, data: unknown) {
-  const tmp = `${file}.tmp`;
-  writeFileSync(tmp, JSON.stringify(data, null, 1));
-  renameSync(tmp, file);
-}
-
-const sessions = new Map<string, Session>();
-for (const f of readdirSync(SESSIONS_DIR).filter((f) => f.endsWith('.json'))) {
+function rotateTimingLogIfNeeded() {
   try {
-    const s = JSON.parse(readFileSync(join(SESSIONS_DIR, f), 'utf8')) as Session;
-    sessions.set(s.id, s);
-  } catch (err) {
-    log('sessao ilegivel ignorada', f, err);
+    if (!existsSync(TIMING_LOG_FILE)) return;
+    const stats = statSync(TIMING_LOG_FILE);
+    if (stats.size > 5 * 1024 * 1024) {
+      const now = new Date();
+      const stamp = now.toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }) + '-' + String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
+      const backup = join(DATA_DIR, `timing-${stamp}.log`);
+      try {
+        renameSync(TIMING_LOG_FILE, backup);
+      } catch {
+        copyFileSync(TIMING_LOG_FILE, backup);
+        writeFileSync(TIMING_LOG_FILE, '', 'utf8');
+      }
+      // Mantém no máximo os 5 backups rotacionados mais recentes
+      const rotated = readdirSync(DATA_DIR)
+        .filter((f) => /^timing-\d{4}-\d{2}-\d{2}-.*\.log$/.test(f))
+        .map((f) => ({ full: join(DATA_DIR, f), mtime: statSync(join(DATA_DIR, f)).mtimeMs }))
+        .sort((a, b) => b.mtime - a.mtime);
+      for (const old of rotated.slice(5)) {
+        try { unlinkSync(old.full); } catch {}
+      }
+      log(`timing.log rotacionado (${(stats.size / 1024 / 1024).toFixed(1)} MB -> 0 MB; backup em ${backup})`);
+    }
+  } catch {
+    // silencioso para não impactar operação
   }
 }
+setInterval(rotateTimingLogIfNeeded, 60_000).unref();
+
+// Item 7 & 32: Escrita atômica com fsyncSync e recuperação contra locks temporários no Windows
+function writeJsonAtomic(file: string, data: unknown) {
+  const tmp = `${file}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 6)}.tmp`;
+  const content = JSON.stringify(data, null, 1);
+  const fd = openSync(tmp, 'w');
+  try {
+    writeFileSync(fd, content, 'utf8');
+    try { fsyncSync(fd); } catch {}
+  } finally {
+    try { closeSync(fd); } catch {}
+  }
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      renameSync(tmp, file);
+      return;
+    } catch (err: any) {
+      if ((err?.code === 'EPERM' || err?.code === 'EBUSY') && attempt < 4) {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20 * (attempt + 1));
+        continue;
+      }
+      try {
+        copyFileSync(tmp, file);
+        try { unlinkSync(tmp); } catch {}
+        return;
+      } catch (fallbackErr) {
+        if (attempt === 4) {
+          try { unlinkSync(tmp); } catch {}
+          throw err;
+        }
+      }
+    }
+  }
+}
+
+function cleanOrphanTmpFiles(dir: string) {
+  try {
+    if (!existsSync(dir)) return;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) cleanOrphanTmpFiles(full);
+      else if (entry.name.endsWith('.tmp')) {
+        try { unlinkSync(full); } catch {}
+      }
+    }
+  } catch {}
+}
+cleanOrphanTmpFiles(DATA_DIR);
+
+// Item 8: Mutex de serialização por sessão para concorrência
+const sessionLocks = new Map<string, Promise<void>>();
+async function withSessionLock<T>(sessionId: string, action: () => Promise<T> | T): Promise<T> {
+  const prev = sessionLocks.get(sessionId) ?? Promise.resolve();
+  let resolveCurrent!: () => void;
+  const current = new Promise<void>((r) => { resolveCurrent = r; });
+  sessionLocks.set(sessionId, prev.then(() => current, () => current));
+  try {
+    await prev;
+    return await action();
+  } finally {
+    resolveCurrent();
+    if (sessionLocks.get(sessionId) === current) sessionLocks.delete(sessionId);
+  }
+}
+
+// Item 12: Fila de sessões sujas (dirty queue) para retentativa de gravação
+const dirtySessions = new Set<string>();
+
+// Item 2 & 30: Particionamento de sessões em data/timing/sessions/YYYY-MM/ e poda de RAM em cold sessions
+const sessions = new Map<string, Session>();
+const sessionPaths = new Map<string, string>();
+
+function sessionMonth(s: { createdAt?: number }) {
+  return new Date(s.createdAt || Date.now()).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }).slice(0, 7);
+}
+
+function isOldColdSession(s: Session) {
+  return (s.state === 'encerrada' || s.state === 'cancelada') && Date.now() - (s.finishedAt ?? s.createdAt) > 7 * 86_400_000;
+}
+
+function resolveSessionFilePath(s: Session): string {
+  if (isOldColdSession(s)) {
+    const ym = sessionMonth(s);
+    const dir = join(SESSIONS_DIR, ym);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    return join(dir, `${s.id}.json`);
+  }
+  return join(SESSIONS_DIR, `${s.id}.json`);
+}
+
+function loadSessionsFromDisk() {
+  const filesToLoad: string[] = [];
+  for (const entry of readdirSync(SESSIONS_DIR, { withFileTypes: true })) {
+    if (entry.isFile() && entry.name.endsWith('.json')) {
+      filesToLoad.push(join(SESSIONS_DIR, entry.name));
+    } else if (entry.isDirectory() && /^\d{4}-\d{2}$/.test(entry.name)) {
+      const sub = join(SESSIONS_DIR, entry.name);
+      for (const subEntry of readdirSync(sub, { withFileTypes: true })) {
+        if (subEntry.isFile() && subEntry.name.endsWith('.json')) {
+          filesToLoad.push(join(sub, subEntry.name));
+        }
+      }
+    }
+  }
+
+  for (const fullPath of filesToLoad) {
+    try {
+      const s = JSON.parse(readFileSync(fullPath, 'utf8')) as Session;
+      sessions.set(s.id, s);
+      sessionPaths.set(s.id, fullPath);
+    } catch (err) {
+      log('sessao ilegivel ignorada', fullPath, err);
+    }
+  }
+}
+loadSessionsFromDisk();
+
 for (const session of sessions.values()) {
   session.currentFlag ??= session.state === 'em_andamento' ? 'green' : session.state === 'bandeira_final' ? 'checkered' : 'none';
   session.chuva ??= false;
   session.observations ??= [];
-  for (const o of session.observations) o.id ??= randomUUID(); // toda observação precisa de id para poder ser excluída
+  for (const o of session.observations) o.id ??= randomUUID();
   session.competitors ??= [];
   for (const competitor of session.competitors) {
     competitor.crossings ??= [];
     competitor.flag ??= 'none';
     competitor.crossings.forEach((crossing) => { crossing.id ??= randomUUID(); crossing.source ??= 'decoder'; });
   }
+  if (isOldColdSession(session)) {
+    // Redução imediata de heap: sessões encerradas há mais de 7 dias não mantêm rejected em memória
+    session.rejected = [];
+  }
 }
 
 function saveSession(s: Session) {
-  writeJsonAtomic(join(SESSIONS_DIR, `${s.id}.json`), s);
+  const targetPath = resolveSessionFilePath(s);
+  try {
+    writeJsonAtomic(targetPath, s);
+    const previousPath = sessionPaths.get(s.id);
+    if (previousPath && previousPath !== targetPath && existsSync(previousPath)) {
+      try { unlinkSync(previousPath); } catch {}
+    }
+    sessionPaths.set(s.id, targetPath);
+    dirtySessions.delete(s.id);
+  } catch (err) {
+    dirtySessions.add(s.id);
+    log(`ERRO ao gravar bateria ${s.name} (${s.id}) no disco; retentando em segundo plano: ${(err as Error).message}`);
+    throw err;
+  }
 }
+
+function archiveOldSessions() {
+  let arquivadas = 0;
+  for (const s of sessions.values()) {
+    if (!isOldColdSession(s)) continue;
+    const target = resolveSessionFilePath(s);
+    const current = sessionPaths.get(s.id);
+    if (current && current !== target) {
+      try {
+        writeJsonAtomic(target, s);
+        if (existsSync(current)) unlinkSync(current);
+        sessionPaths.set(s.id, target);
+        s.rejected = [];
+        arquivadas++;
+      } catch {}
+    }
+  }
+  if (arquivadas > 0) log(`particionamento: ${arquivadas} bateria(s) arquivada(s) por ano/mês`);
+}
+setInterval(archiveOldSessions, 6 * 3_600_000).unref();
+archiveOldSessions();
+
+// Retentativa periódica das sessões com erro de disco (Item 12)
+setInterval(() => {
+  if (!dirtySessions.size) return;
+  for (const id of [...dirtySessions]) {
+    const s = sessions.get(id);
+    if (!s) { dirtySessions.delete(id); continue; }
+    try {
+      saveSession(s);
+      log(`bateria ${s.name} salva com sucesso no disco na retentativa`);
+    } catch {}
+  }
+}, 3_000).unref();
 
 let transponderMap: Record<string, string> = {};
 function loadTransponders() {
@@ -173,15 +370,33 @@ function loadTransponders() {
 }
 loadTransponders();
 
+// Item 9: Catálogo com backup automático .bak e proteção contra reset acidental
+const CATALOG_BAK_FILE = join(DATA_DIR, 'catalog.json.bak');
 let catalog: TimingCatalog = emptyCatalog();
 if (existsSync(CATALOG_FILE)) {
-  try { catalog = normalizeCatalog(JSON.parse(readFileSync(CATALOG_FILE, 'utf8'))); }
-  catch (err) {
-    // guarda o arquivo antes: a próxima gravação do cadastro vazio apagaria todos os eventos, grupos e provas
-    const copia = CATALOG_FILE.replace(/\.json$/i, `.ilegivel-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
-    try { copyFileSync(CATALOG_FILE, copia); } catch { /* sem cópia: o log abaixo avisa */ }
-    log(`cadastro de eventos ilegível; iniciando vazio (o arquivo original foi guardado em ${copia})`, err);
+  try {
+    catalog = normalizeCatalog(JSON.parse(readFileSync(CATALOG_FILE, 'utf8')));
+    try { copyFileSync(CATALOG_FILE, CATALOG_BAK_FILE); } catch {}
+  } catch (err) {
+    let recuperado = false;
+    if (existsSync(CATALOG_BAK_FILE)) {
+      try {
+        catalog = normalizeCatalog(JSON.parse(readFileSync(CATALOG_BAK_FILE, 'utf8')));
+        log('catálogo principal ilegível; recuperado da cópia de segurança catalog.json.bak');
+        recuperado = true;
+      } catch {}
+    }
+    if (!recuperado) {
+      const copia = CATALOG_FILE.replace(/\.json$/i, `.ilegivel-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
+      try { copyFileSync(CATALOG_FILE, copia); } catch {}
+      log(`cadastro de eventos ilegível; iniciando vazio (o arquivo original foi guardado em ${copia})`, err);
+    }
   }
+} else if (existsSync(CATALOG_BAK_FILE)) {
+  try {
+    catalog = normalizeCatalog(JSON.parse(readFileSync(CATALOG_BAK_FILE, 'utf8')));
+    log('catálogo carregado da cópia de segurança catalog.json.bak');
+  } catch {}
 }
 
 let timingSettings: Record<string, unknown> = {};
@@ -200,7 +415,12 @@ let activeDecoderConfig: DecoderConfig = {
   port: SIMULATE ? SIM_PORT : Number(configuredDecoder.port || ENV_DECODER_PORT),
 };
 
-function saveCatalog() { writeJsonAtomic(CATALOG_FILE, catalog); }
+function saveCatalog() {
+  if (existsSync(CATALOG_FILE)) {
+    try { copyFileSync(CATALOG_FILE, CATALOG_BAK_FILE); } catch {}
+  }
+  writeJsonAtomic(CATALOG_FILE, catalog);
+}
 function saveTimingSettings() { writeJsonAtomic(SETTINGS_FILE, timingSettings); }
 
 function saveTransponders() {
@@ -231,9 +451,21 @@ function kartFor(raw: number): string | null {
   return null;
 }
 
+// Item 10: Stream assíncrono bufferizado para gravação do diário sem bloquear o event loop
+let activeJournalDay = '';
+let journalStream: ReturnType<typeof createWriteStream> | null = null;
+
 function journal(entry: Record<string, unknown>) {
   const day = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
-  appendFileSync(join(JOURNAL_DIR, `${day}.jsonl`), JSON.stringify(entry) + '\n');
+  const line = JSON.stringify(entry) + '\n';
+  if (day !== activeJournalDay || !journalStream || journalStream.destroyed) {
+    if (journalStream && !journalStream.destroyed) {
+      try { journalStream.end(); } catch {}
+    }
+    activeJournalDay = day;
+    journalStream = createWriteStream(join(JOURNAL_DIR, `${day}.jsonl`), { flags: 'a', encoding: 'utf8' });
+  }
+  journalStream.write(line);
 }
 
 type EntradaDiario = { wallMs: number; kart: string | null; transponder: number | null; decoderTimeMs: number; result: string };
@@ -598,6 +830,8 @@ function sessionView(s: Session) {
     })),
     standings: computeStandings(s, trackLengthFor(s)).filter((r) => !s.competitors.find((c) => c.kart === r.kart && c.name === r.name)?.detalhes?.oculto).map((r) => ({ ...r, name: nomeProprio(r.name) })),
     excludedCompetitors: (s.excludedCompetitors ?? []).map((e) => ({ id: e.id, excludedAt: e.excludedAt, kart: e.competitor.kart, name: e.competitor.name })),
+    passingsCount: s.competitors.reduce((acc, c) => acc + c.crossings.filter((x) => !x.deleted).length, 0),
+    rejectedCount: (s.rejected ?? []).length,
     emailsResultado: s.emailsResultado ?? null,
   };
 }
@@ -628,6 +862,26 @@ function decoderView() {
   return { ...st, simulated: SIMULATE, healthy: st.connected && !!st.lastDataAt && Date.now() - st.lastDataAt < 15_000 };
 }
 
+// Item 16: Monitoramento de instâncias concorrentes do app do operador
+const activeOperatorMachines = new Map<string, { machine: string; ip: string; lastSeenAt: number }>();
+function recordOperatorMachine(req: http.IncomingMessage) {
+  const machine = req.headers['x-client-machine'];
+  if (machine && typeof machine === 'string' && machine.trim()) {
+    const name = machine.trim().slice(0, 60);
+    const ip = (req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+    activeOperatorMachines.set(name, { machine: name, ip, lastSeenAt: Date.now() });
+  }
+}
+function activeOperatorsList(): string[] {
+  const now = Date.now();
+  const list: string[] = [];
+  for (const [name, op] of activeOperatorMachines.entries()) {
+    if (now - op.lastSeenAt <= 20_000) list.push(name);
+    else activeOperatorMachines.delete(name);
+  }
+  return list;
+}
+
 function stateView() {
   const running = runningSession();
   const list = sortedSessions();
@@ -655,6 +909,7 @@ function stateView() {
     track: TRACK_NAME,
     decoder: decoderView(),
     runningId: running?.id ?? null,
+    activeOperators: activeOperatorsList(),
     focus: focus ? sessionView(focus) : null,
     lastQualifying: lastQualifying ? sessionView(lastQualifying) : null,
     // painel de LED sem kart na pista: tomada encerrada = grid; corrida encerrada = segue com o resultado da corrida
@@ -773,13 +1028,18 @@ function transmissaoAtual(): Transmissao {
   return montarTransmissao(ultima ? sessionView(ultima) : null);
 }
 
+function voltasDaTransmissao(t: Transmissao): VoltasTransmissao {
+  const s = t.bateria ? sessions.get(t.bateria.id) : undefined;
+  return montarVoltas(t, (s?.competitors ?? []).map((c) => ({ kart: c.kart, nome: nomeProprio(c.name), crossings: c.crossings })));
+}
+
 const clientesTransmissao = new Set<http.ServerResponse>();
 let ultimaTransmissao: { assinatura: string; dados: Transmissao } | null = null;
 const publicacao = { emAndamento: false, assinaturaEnviada: '', enviadoEm: 0, ultimoOkEm: 0, ultimoErro: '', erroLogadoEm: 0, falhas: 0, proximaTentativaEm: 0 };
-/** O site guarda o retrato num arquivo só do R2, que aceita no máximo ~1 gravação por segundo por arquivo. */
-const INTERVALO_MINIMO_PUBLICACAO_MS = 1_000;
+/** Passagem chega ao site em até meio segundo; o hub do site distribui na hora a quem está conectado. */
+const INTERVALO_MINIMO_PUBLICACAO_MS = 500;
 
-async function publicarTransmissao(t: Transmissao, assinatura: string) {
+async function publicarTransmissao(t: Transmissao, voltas: VoltasTransmissao, assinatura: string) {
   const cfg = lerConfigTransmissao();
   if (!cfg.publicarUrl || !cfg.publicarChave || publicacao.emAndamento) return;
   publicacao.emAndamento = true;
@@ -788,7 +1048,8 @@ async function publicarTransmissao(t: Transmissao, assinatura: string) {
     const resposta = await fetch(cfg.publicarUrl, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${cfg.publicarChave}` },
-      body: JSON.stringify(t),
+      // o volta a volta vai junto, num envio só; o site o separa em /corrida e /voltas
+      body: JSON.stringify({ ...t, voltaAVolta: voltas.pilotos }),
       signal: AbortSignal.timeout(5_000),
     });
     if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
@@ -819,17 +1080,20 @@ setInterval(() => {
   const publicando = Boolean(cfg.publicarUrl && cfg.publicarChave);
   if (!clientesTransmissao.size && !publicando) return;
   const t = transmissaoAtual();
-  const assinatura = assinaturaDoConteudo(t);
+  const voltas = voltasDaTransmissao(t);
+  const voltasTexto = JSON.stringify(voltas.pilotos);
+  // anular uma volta nem sempre muda a classificação: o volta a volta entra na comparação
+  const assinatura = assinaturaDoConteudo(t) + voltasTexto;
   const mudou = assinatura !== ultimaTransmissao?.assinatura;
   ultimaTransmissao = { assinatura, dados: t };
   if (mudou) {
-    const payload = `event: corrida\ndata: ${JSON.stringify(t)}\n\n`;
+    const payload = `event: corrida\ndata: ${JSON.stringify(t)}\n\nevent: voltas\ndata: ${JSON.stringify(voltas)}\n\n`;
     for (const res of clientesTransmissao) res.write(payload);
   }
   // reenvia a cada 30 s mesmo parado: o site sabe que a cronometragem está viva (economiza pedidos no Cloudflare)
   const agora = Date.now();
   const podeEnviar = agora - publicacao.enviadoEm >= INTERVALO_MINIMO_PUBLICACAO_MS && agora >= publicacao.proximaTentativaEm;
-  if (publicando && podeEnviar && (assinatura !== publicacao.assinaturaEnviada || agora - publicacao.enviadoEm > 30_000)) void publicarTransmissao(t, assinatura);
+  if (publicando && podeEnviar && (assinatura !== publicacao.assinaturaEnviada || agora - publicacao.enviadoEm > 30_000)) void publicarTransmissao(t, voltas, assinatura);
 }, 250);
 setInterval(() => {
   for (const res of clientesTransmissao) res.write(': ping\n\n');
@@ -845,15 +1109,17 @@ async function rotaTransmissao(req: http.IncomingMessage, res: http.ServerRespon
     return send(res, 401, { erro: 'Chave ausente ou inválida. Envie no cabeçalho Authorization: Bearer <chave>.' }, { 'www-authenticate': 'Bearer' });
   }
   if (url.pathname === '/api/transmissao/v1/corrida') return send(res, 200, transmissaoAtual());
+  if (url.pathname === '/api/transmissao/v1/voltas') return send(res, 200, filtrarVoltasPorKart(voltasDaTransmissao(transmissaoAtual()), url.searchParams.get('kart')));
   if (url.pathname === '/api/transmissao/v1/eventos') {
     res.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', connection: 'keep-alive', 'access-control-allow-origin': '*' });
-    res.write(`retry: 2000\nevent: corrida\ndata: ${JSON.stringify(transmissaoAtual())}\n\n`);
+    const inicial = transmissaoAtual();
+    res.write(`retry: 2000\nevent: corrida\ndata: ${JSON.stringify(inicial)}\n\nevent: voltas\ndata: ${JSON.stringify(voltasDaTransmissao(inicial))}\n\n`);
     clientesTransmissao.add(res);
     log(`transmissão: ${parceiro} conectou no fluxo ao vivo (${req.socket.remoteAddress ?? '?'})`);
     req.on('close', () => clientesTransmissao.delete(res));
     return;
   }
-  return send(res, 404, { erro: 'Rota desconhecida. Use /api/transmissao/v1/corrida ou /api/transmissao/v1/eventos.' });
+  return send(res, 404, { erro: 'Rota desconhecida. Use /api/transmissao/v1/corrida, /api/transmissao/v1/voltas ou /api/transmissao/v1/eventos.' });
 }
 
 /** Situação da API de transmissão para o /healthz (sem chave nenhuma). */
@@ -886,6 +1152,7 @@ function liveSnapshot(painelTb50 = false) {
   const standings = computeStandings(s);
   return {
     status: OPEN_STATES.has(s.state) ? 'live' : 'finished',
+    clearGrid: Boolean(OPEN_STATES.has(s.state) && !standings.some((r) => r.laps > 0)),
     source: 'sql',
     updatedAt,
     sessionType: s.type === 'corrida' ? 'race' : 'qualifying',
@@ -1339,24 +1606,73 @@ const depEmail: Dependencias = {
  * mandavam o resultado em dobro para cada piloto e disputavam os mesmos PDFs temporários.
  */
 const filaEmails = new Map<string, Promise<void>>();
-const LIMITE_ENVIO_EMAILS_MS = 30 * 60_000;
+// Item 14: Redução do limite de bloqueio de 30 min para 3 min por envio
+const LIMITE_ENVIO_EMAILS_MS = 3 * 60_000;
 const envioATodosAtivo = new Set<string>();
+
+// Item 13: Fila de e-mails persistida em disco (pending-emails.json) contra perda em reinicializações
+const PENDING_EMAILS_FILE = join(DATA_DIR, 'pending-emails.json');
+type JobEmailPendente = { sessionId: string; agendadoPara: number; tentativas: number };
+let jobsEmailsPendentes: JobEmailPendente[] = [];
+function carregarJobsEmails() {
+  if (existsSync(PENDING_EMAILS_FILE)) {
+    try {
+      const dados = JSON.parse(readFileSync(PENDING_EMAILS_FILE, 'utf8')) as unknown;
+      if (!Array.isArray(dados) || dados.some((j) => !j || typeof j.sessionId !== 'string' || !Number.isFinite(j.agendadoPara) || !Number.isInteger(j.tentativas))) throw new Error('esquema inválido');
+      jobsEmailsPendentes = dados as JobEmailPendente[];
+    } catch (e) {
+      const quarentena = `${PENDING_EMAILS_FILE}.corrompido-${Date.now()}`;
+      try { renameSync(PENDING_EMAILS_FILE, quarentena); } catch {}
+      log(`ERRO: fila de e-mails inválida; arquivo preservado para diagnóstico em ${quarentena}: ${(e as Error).message}`);
+      jobsEmailsPendentes = [];
+    }
+  }
+}
+function salvarJobsEmails() {
+  try {
+    writeJsonAtomic(PENDING_EMAILS_FILE, jobsEmailsPendentes);
+  } catch (e) { log(`ERRO ao persistir fila de e-mails (${PENDING_EMAILS_FILE}): ${(e as Error).message}`); }
+}
+carregarJobsEmails();
+
+function registrarJobEmail(sessionId: string, agendadoPara: number) {
+  jobsEmailsPendentes = jobsEmailsPendentes.filter((j) => j.sessionId !== sessionId);
+  jobsEmailsPendentes.push({ sessionId, agendadoPara, tentativas: 0 });
+  salvarJobsEmails();
+}
+function concluirJobEmail(sessionId: string) {
+  jobsEmailsPendentes = jobsEmailsPendentes.filter((j) => j.sessionId !== sessionId);
+  salvarJobsEmails();
+}
+
 function enviarResultadoEmFila(s: Session, op: OpcoesEnvio) {
   const aTodos = !op.kart && !op.para;
   if (aTodos) envioATodosAtivo.add(s.id);
-  // 11/10: o envio da BATERIA 18:00 · CORRIDA nunca terminou nem deu erro e prendia a bateria para sempre
-  // (envioATodosAtivo); com o limite, vira "falhou" e a nova tentativa de 5 em 5 min assume
+  let iniciar!: () => void;
+  let trabalhoReal: Promise<void> = Promise.resolve();
+  const iniciou = new Promise<void>((resolve) => { iniciar = resolve; });
   const tarefa = () => {
+    const trabalho = enviarResultado(s, EMAIL_FILE, depEmail, op);
+    trabalhoReal = trabalho.then(() => undefined, () => undefined);
+    iniciar();
     let timer: NodeJS.Timeout | undefined;
-    const limite = new Promise<never>((_, falhar) => { timer = setTimeout(() => falhar(new Error('o envio travou por 30 min; tentando de novo')), LIMITE_ENVIO_EMAILS_MS); });
-    return Promise.race([enviarResultado(s, EMAIL_FILE, depEmail, op), limite]).finally(() => clearTimeout(timer));
+    const limite = new Promise<never>((_, falhar) => {
+      timer = setTimeout(() => falhar(new Error('o envio atingiu o tempo limite de 3 min; tentando de novo no próximo ciclo')), LIMITE_ENVIO_EMAILS_MS);
+    });
+    // A resposta pode expirar para o chamador, mas a fila permanece ocupada até o trabalho real terminar.
+    // Isso impede que a tentativa seguinte envie duplicatas enquanto um SMTP/PDF antigo ainda executa.
+    void trabalho.finally(() => clearTimeout(timer)).catch(() => undefined);
+    return Promise.race([trabalho, limite]);
   };
-  const atual = (filaEmails.get(s.id) ?? Promise.resolve()).then(tarefa, tarefa);
+  const anterior = filaEmails.get(s.id) ?? Promise.resolve();
+  const atual = anterior.then(tarefa, tarefa);
   const marca = atual.then(() => undefined, () => undefined);
-  filaEmails.set(s.id, marca);
-  void marca.then(() => {
+  // Em timeout, atual já rejeitou mas o trabalho SMTP continua. Mantemos uma trava até sua liquidação real.
+  const bloqueio: Promise<void> = Promise.all([marca, iniciou.then(() => trabalhoReal)]).then(() => undefined);
+  filaEmails.set(s.id, bloqueio);
+  void bloqueio.then(() => {
     if (aTodos) envioATodosAtivo.delete(s.id);
-    if (filaEmails.get(s.id) === marca) filaEmails.delete(s.id);
+    if (filaEmails.get(s.id) === bloqueio) filaEmails.delete(s.id);
   });
   return atual;
 }
@@ -1372,10 +1688,11 @@ async function emailsAoEncerrar(s: Session) {
   if (!s.competitors.some((c) => c.crossings.some((x) => !x.deleted && x.lapMs != null))) return; // bateria sem volta nenhuma
   if (envioATodosAtivo.has(s.id)) return; // já está mandando para todos (a próxima tentativa confere quem faltou)
   try {
-    await enviarResultadoEmFila(s, { automatico: true, nomeEvento: nomeEventoDa(s) });
+    await enviarResultadoEmFila(s, { automatico: true, nomeEvento: nomeEventoDa(s), assinaturaResultado: assinaturaResultado(s) });
   } catch (err) {
     const erro = (err as Error).message;
-    s.emailsResultado = { status: 'falhou', atualizadoEm: Date.now(), tentativas: (s.emailsResultado?.tentativas ?? 0) + 1, enviados: s.emailsResultado?.enviados ?? [], falhas: [{ kart: '', nome: '', email: '', erro }], semEmail: s.emailsResultado?.semEmail ?? [] };
+    const tentativas = (s.emailsResultado?.tentativas ?? 0) + 1;
+    s.emailsResultado = { status: 'falhou', atualizadoEm: Date.now(), tentativas, proximaTentativaEm: Date.now() + Math.min(30 * 60_000, 60_000 * 2 ** Math.min(tentativas - 1, 5)) + Math.floor(Math.random() * 30_000), enviados: s.emailsResultado?.enviados ?? [], falhas: [{ kart: '', nome: '', email: '', erro }], semEmail: s.emailsResultado?.semEmail ?? [] };
     saveSession(s);
     log(`e-mail do resultado de ${s.name} não foi enviado (tenta de novo): ${erro}`);
   }
@@ -1459,15 +1776,25 @@ async function publicarNoAppAutomatico(s: Session) {
 
 function agendarEmails(s: Session) {
   clearTimeout(emailsAgendados.get(s.id));
+  registrarJobEmail(s.id, Date.now() + ESPERA_EMAIL_MS);
   emailsAgendados.set(s.id, setTimeout(() => {
     emailsAgendados.delete(s.id);
+    concluirJobEmail(s.id);
     if (s.state !== 'encerrada' || !['classificacao', 'corrida'].includes(s.type)) return;
     void publicarNoAppAutomatico(s);
     if (envioATodosAtivo.has(s.id)) return agendarEmails(s); // ainda mandando a versão anterior: corrige quando terminar
-    if (!(s.emailsResultado?.enviados.length)) return void emailsAoEncerrar(s);
+    const assinaturaAtual = assinaturaResultado(s);
+    if (!(s.emailsResultado?.enviados.length)) {
+      return void emailsAoEncerrar(s);
+    }
     if (!lerConfig(EMAIL_FILE).automatico || semEmailAosPilotos(s, nomeEventoDa(s))) return;
+    // Item 15: Só reenvia resultado com aviso de correção se a classificação realmente tiver mudado
+    if (s.emailsResultado.assinaturaResultado && s.emailsResultado.assinaturaResultado === assinaturaAtual) {
+      log(`e-mail de ${s.name}: classificação inalterada após ajuste manual; reenvio de correção cancelado`);
+      return;
+    }
     log(`e-mail do resultado de ${s.name}: a classificação mudou depois do envio, reenviando a todos com o aviso de correção`);
-    void enviarResultadoEmFila(s, { automatico: false, corrigido: true, nomeEvento: nomeEventoDa(s) })
+    void enviarResultadoEmFila(s, { automatico: false, corrigido: true, nomeEvento: nomeEventoDa(s), assinaturaResultado: assinaturaAtual })
       .catch((e) => log(`e-mail corrigido de ${s.name}: ${(e as Error).message}`));
   }, ESPERA_EMAIL_MS));
 }
@@ -1486,10 +1813,13 @@ setInterval(() => {
     const e = s.emailsResultado;
     const fim = s.finishedAt ?? s.createdAt;
     if (s.state !== 'encerrada' || fim <= limite || emailsAgendados.has(s.id)) continue;
-    if (e ? (e.status === 'parcial' || e.status === 'falhou') && e.tentativas < 12 : fim < agora - 3 * 60_000) void emailsAoEncerrar(s);
+    const suprimidoHistorico100Milhas = e?.status === 'sem-email-pilotos' && /100\s*milhas/i.test(`${nomeEventoDa(s)} ${s.name}`);
+    const horaRetry = e?.proximaTentativaEm ?? 0;
+    const possuiFalhaTransitoria = e?.falhas.some((f) => !f.permanente) ?? false;
+    if (suprimidoHistorico100Milhas || (e ? (e.status === 'parcial' || e.status === 'falhou') && possuiFalhaTransitoria && e.tentativas < 12 && agora >= horaRetry : fim < agora - 3 * 60_000)) void emailsAoEncerrar(s);
     if (fim < agora - 3 * 60_000) void publicarNoAppAutomatico(s);
   }
-}, 5 * 60_000);
+}, 60_000);
 
 // ---------------------------------------------------------------- agenda da recepção -> evento do dia (canvas Eventos.dc.html)
 // Como no canvas: cada dia vira o evento "Baterias dd/mm/aaaa", cada bateria da agenda da recepção vira um grupo e as
@@ -1905,16 +2235,21 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
   }
 
   // conta de e-mail dos resultados (a senha nunca volta; vazia no PUT = mantém)
+  if (path.startsWith('/api/email-config') && !isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para configurações de e-mail.' });
   if (path === '/api/email-config' && method === 'GET') return send(res, 200, configPublica(lerConfig(EMAIL_FILE)));
   if (path === '/api/email-config' && method === 'PUT') {
     try { return send(res, 200, configPublica(salvarConfig(EMAIL_FILE, await readBody(req)))); } catch (e) { return send(res, 400, { error: (e as Error).message }); }
+  }
+  if (path === '/api/email-config/verificar' && method === 'POST') {
+    try { return send(res, 200, await verificarTransporteEmail(EMAIL_FILE, SIMULATE)); }
+    catch (e) { return send(res, 502, { error: `Falha na autenticação SMTP: ${traduzirErro(e)}` }); }
   }
   if (path === '/api/email-config/teste' && method === 'POST') {
     const body = await readBody(req);
     try {
       const daTela = body.config && typeof body.config === 'object' && !Array.isArray(body.config) ? body.config as Record<string, unknown> : undefined;
       const resultado = await enviarTeste(EMAIL_FILE, String(body.para ?? ''), SIMULATE, daTela);
-      log(`e-mail de teste aceito pelo servidor para ${String(body.para ?? '')}`);
+      log('e-mail de teste aceito pelo servidor; destinatário ocultado do log');
       return send(res, 200, { ok: true, ...(resultado ?? { status: 'simulador', entregaConfirmada: false, mensagem: 'Teste gravado no simulador.' }) });
     }
     catch (e) { return send(res, 400, { error: `Não enviou: ${traduzirErro(e)}` }); }
@@ -2623,8 +2958,12 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     }
     try {
       if (!action && method === 'GET') return send(res, 200, sessionView(s));
-      if (action === 'emails' && !m[3] && method === 'GET') return send(res, 200, s.emailsResultado ?? null);
+      if (action === 'emails' && !m[3] && method === 'GET') {
+        if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para consultar destinatários e resultado dos e-mails.' });
+        return send(res, 200, s.emailsResultado ?? null);
+      }
       if (action === 'emails' && !m[3] && method === 'POST') {
+        if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para reenvio de resultados.' });
         // reenvio manual (menu da cronometragem): todos, só um kart, ou o resultado oficial para outro endereço
         const body = await readBody(req);
         if (s.state !== 'encerrada' && s.state !== 'bandeira_final') return send(res, 409, { error: 'Encerre a bateria antes de enviar o resultado.' });
@@ -2657,7 +2996,23 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
           }),
         );
       }
-      if (action === 'passings' && !m[3] && method === 'GET') return send(res, 200, crossingRows(s));
+      if (action === 'passings' && !m[3] && method === 'GET') {
+        let rows = crossingRows(s);
+        const since = Number(url.searchParams.get('since'));
+        if (Number.isFinite(since) && since > 0) {
+          rows = rows.filter((r) => r.wallMs >= since);
+        }
+        const afterId = url.searchParams.get('afterId');
+        if (afterId) {
+          const idx = rows.findIndex((r) => r.id === afterId);
+          if (idx >= 0) rows = rows.slice(0, idx);
+        }
+        const limit = Number(url.searchParams.get('limit'));
+        if (Number.isFinite(limit) && limit > 0) {
+          rows = rows.slice(0, limit);
+        }
+        return send(res, 200, rows);
+      }
       if (action === 'passings' && m[3] === 'manual' && method === 'POST') {
         const body = await readBody(req);
         const kart = String(body.kart ?? '').trim();
@@ -2684,6 +3039,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         return send(res, 200, { ok: true, count, passages: crossingRows(s) });
       }
       if (action === 'passings' && m[3] === 'clear' && method === 'POST') {
+        if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para limpar passagens.' });
         clearCrossings(s);
         s.rejected = [];
         saveSession(s);
@@ -2796,6 +3152,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         void enviarUsoKarts(s);
         log(`bateria ${s.name}: REMONTADA pelo diário (${contadas} passagens)`);
       } else if (action === 'restart' && method === 'POST') {
+        if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para reiniciar a bateria.' });
         const body = await readBody(req);
         if (body.largar) {
           const other = runningSession();
@@ -2814,10 +3171,12 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       } else if (action === 'checkered' && method === 'POST') {
         setRaceFlag(s, 'checkered', now);
       } else if (action === 'close' && method === 'POST') {
+        if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para encerrar a bateria.' });
         closeSession(s, now);
         void enviarUsoKarts(s);
         agendarEmails(s); // 3 min para o cronometrista acertar posição/penalidade antes do e-mail sair
       } else if (action === 'cancel' && method === 'POST') {
+        if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para cancelar a bateria.' });
         cancelSession(s, now);
       } else if (action === 'flag' && m[3] && method === 'POST') {
         const body = await readBody(req);
@@ -2947,18 +3306,77 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
 }
 
 /**
- * Pedido que veio da INTERNET pelo túnel do Cloudflare (crono.kartodromodebetim.com.br → :4050): o cloudflared põe
- * `cf-connecting-ip`/`cf-ray`; a rede interna (ORBITS, CRONO1, TVs, TB50) nunca manda. Pela internet só LEITURA do placar:
- * antes o painel do operador, a administração e as rotas que alteram baterias ficavam abertos sem senha (10/10/2026).
+ * Pedido que veio da INTERNET pelo túnel do Cloudflare (crono.kartodromodebetim.com.br → :4050)
+ * ou pela ponte local tv-public-bridge.mjs (:4051). Pela internet só LEITURA do placar e status.
  */
-const LEITURA_PELA_INTERNET = new Set(['/tv', '/tv-classica', '/tb50', '/tokens.css', '/kib-logo.png', '/api/livetime-snapshot', '/api/livetime-snapshot/eventos', '/healthz']);
+const LEITURA_PELA_INTERNET = new Set([
+  '/tv',
+  '/tv-classica',
+  '/tb50',
+  '/tokens.css',
+  '/kib-logo.png',
+  '/favicon.ico',
+  '/healthz',
+  '/api/events',
+  '/api/state',
+  '/api/livetime-snapshot',
+  '/api/livetime-snapshot/eventos',
+]);
+
+function isAllowedPublicReadPath(pathname: string): boolean {
+  if (LEITURA_PELA_INTERNET.has(pathname)) return true;
+  if (/^\/api\/sessions\/[\w-]+\/laps$/.test(pathname)) return true;
+  return false;
+}
+
 function veioDaInternet(req: http.IncomingMessage): boolean {
-  return Boolean(req.headers['cf-connecting-ip'] || req.headers['cf-ray']);
+  return Boolean(req.headers['cf-connecting-ip'] || req.headers['cf-ray'] || req.headers['x-public-bridge'] === '1');
+}
+
+// Item 13: Rate limiting por IP para proteção contra DoS em rotas de tempo real
+const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
+function checkRateLimit(req: http.IncomingMessage): boolean {
+  const ip = (req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1')
+    .toString().split(',')[0].trim().replace(/^::ffff:/, '');
+  const now = Date.now();
+  const bucket = rateLimitBuckets.get(ip);
+  if (!bucket || now >= bucket.resetAt) {
+    rateLimitBuckets.set(ip, { count: 1, resetAt: now + 10_000 });
+    return true;
+  }
+  bucket.count++;
+  if (bucket.count > 300) return false;
+  return true;
+}
+
+// Item 33: Proteção de endpoints destrutivos (close, cancel, restart, clear)
+function isAuthorizedDestructive(req: http.IncomingMessage): boolean {
+  if (veioDaInternet(req)) return false;
+  const ip = req.socket.remoteAddress || '';
+  if (ip === '127.0.0.1' || ip === '::1' || ip.endsWith('127.0.0.1') || ip === '::ffff:127.0.0.1') return true;
+  const ipsLocais = Object.values(os.networkInterfaces()).flatMap((items) => (items ?? []).map((item) => item.address));
+  if (clienteEhMaquinaOperadora(ip, req.headers['x-client-machine'], process.env.COMPUTERNAME, ipsLocais)) return true;
+  const key = req.headers['x-timing-key'] || req.headers['x-ops-key'] || req.headers['authorization'];
+  const configPath = process.env.TIMING_AUTH_CONFIG_FILE || 'C:/Program Files/Kartodromo/Cronometragem/appsettings.json';
+  let installedKey = '';
+  try { installedKey = String((JSON.parse(readFileSync(configPath, 'utf8')) as { ChaveCronometragem?: unknown }).ChaveCronometragem ?? ''); } catch {}
+  const expected = [process.env.TIMING_OPS_KEY, process.env.OPS_RECEPCAO_KEY, installedKey].filter((x): x is string => Boolean(x));
+  if (typeof key === 'string' && expected.some((secret) => chaveOperadorValida(key, secret) || key.startsWith('Bearer ') && chaveOperadorValida(key.slice(7), secret))) return true;
+  return false;
 }
 
 const server = http.createServer((req, res) => {
+  recordOperatorMachine(req);
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
-  if (veioDaInternet(req) && !((req.method === 'GET' || req.method === 'HEAD') && LEITURA_PELA_INTERNET.has(url.pathname))) {
+
+  if (['/tv', '/tb50', '/tv-classica', '/api/state', '/api/livetime-snapshot'].includes(url.pathname)) {
+    if (!checkRateLimit(req)) {
+      res.writeHead(429, { 'content-type': 'application/json; charset=utf-8', 'retry-after': '2', 'cache-control': 'no-store' });
+      return res.end(JSON.stringify({ error: 'Muitas requisições em sequência deste endereço. Aguarde alguns segundos.' }));
+    }
+  }
+
+  if (veioDaInternet(req) && !((req.method === 'GET' || req.method === 'HEAD') && isAllowedPublicReadPath(url.pathname))) {
     res.writeHead(403, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
     return res.end(JSON.stringify({ error: 'Acesso só pela rede do kartódromo.' }));
   }

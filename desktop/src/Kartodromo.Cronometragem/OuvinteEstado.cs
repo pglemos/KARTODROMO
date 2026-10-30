@@ -24,6 +24,9 @@ sealed class OuvinteEstado : IDisposable
         _url = url;
         _aoReceber = aoReceber;
         _tela = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
+        _http.DefaultRequestHeaders.TryAddWithoutValidation("X-Client-Machine", Environment.MachineName);
+        if (Config.Get("ChaveCronometragem", "") is { Length: > 0 } chaveCrono)
+            _http.DefaultRequestHeaders.TryAddWithoutValidation("X-Timing-Key", chaveCrono);
     }
 
     public void Iniciar() => _ = Task.Run(Loop);
