@@ -27,6 +27,23 @@ type BateriaCrono = { id: string; nome: string; tipo: string; dia: string; inici
 let indice: Record<string, BateriaCrono> = {};
 try { if (existsSync(ARQ)) indice = JSON.parse(readFileSync(ARQ, 'utf8')).baterias ?? {}; } catch { indice = {}; }
 let atualizadoEm = 0, atualizando: Promise<void> | null = null, ultimoErro: string | null = null;
+// versão do índice: sobe a cada gravação — o ranking do app só reconstrói quando muda (antes era reconstruído
+// inteiro a cada 10 min e travava o servidor ~21 s; medido pelo watchdog em 28-29/10/2026)
+let indiceVersao = 0;
+
+/** Grava o índice em blocos com yield: stringify único de 27 MB travava o event loop por segundos. Mesma saída. */
+async function gravarIndiceArq() {
+  const pares: string[] = [];
+  let n = 0;
+  for (const [k, b] of Object.entries(indice)) {
+    pares.push(JSON.stringify(k) + ':' + JSON.stringify(b));
+    if ((++n & 255) === 255) await new Promise<void>((r) => setImmediate(r));
+  }
+  const tmp = ARQ + '.tmp';
+  writeFileSync(tmp, '{"baterias":{' + pares.join(',') + '}}');
+  renameSync(tmp, ARQ);
+  indiceVersao++;
+}
 
 const diaSp = (ms: number) => new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
 const hojeSp = () => diaSp(Date.now());
@@ -74,8 +91,8 @@ export function atualizarIndice(log?: (m: string) => void): Promise<void> {
     // CalXPro (2023 a jan/2025) não depende da cronometragem estar no ar: lê uma vez e grava no índice
     // LapTime antigo (banco local LapTimeMirror) também não depende da cronometragem
     try {
-      if (!legadoCarregado) { await carregarLegado(log); const tmp = ARQ + '.tmp'; writeFileSync(tmp, JSON.stringify({ baterias: indice })); renameSync(tmp, ARQ); }
-      if (!calxproCarregado && await carregarCalxpro(log)) { const tmp = ARQ + '.tmp'; writeFileSync(tmp, JSON.stringify({ baterias: indice })); renameSync(tmp, ARQ); }
+      if (!legadoCarregado) { await carregarLegado(log); await gravarIndiceArq(); }
+      if (!calxproCarregado && await carregarCalxpro(log)) { await gravarIndiceArq(); }
     } catch (e) { log?.(`pilotos: índice dos sistemas antigos não foi gravado (${(e as Error).message})`); }
     try {
       const lista = (await timing('/api/sessions')) as { id: string; type: string; state: string; finishedAt: number | null; createdAt: number }[];
@@ -102,7 +119,7 @@ export function atualizarIndice(log?: (m: string) => void): Promise<void> {
         }));
       }
       normalizarNomes();
-      if (mudou) { const tmp = ARQ + '.tmp'; writeFileSync(tmp, JSON.stringify({ baterias: indice })); renameSync(tmp, ARQ); }
+      if (mudou) { await gravarIndiceArq(); }
       atualizadoEm = Date.now(); ultimoErro = null;
       if (faltam.length) log?.(`pilotos: ${faltam.length} bateria(s) lida(s) da cronometragem, ${Object.keys(indice).length} no índice`);
     } catch (e) { ultimoErro = (e as Error).message; log?.(`pilotos: cronometragem indisponível (${ultimoErro})`); }
@@ -514,8 +531,11 @@ export async function pilotosRoutes(req: Req, send: Res): Promise<boolean> {
 /** Mesmo cálculo do ranking/carreira do painel, só com o que pode ser público no app: nome, tempos, posições e
  *  contagens de corridas (nada de documento, telefone, nascimento, compras). `ranking` = top 100 de cada traçado em
  *  semana/mês/geral; `pilotos` = carreira de todo piloto com cadastro que andou desde o início do índice. */
+// cache do ranking do app: a reconstrução leva ~20 s sobre o índice inteiro; só refaz quando o índice muda
+let rankingCache: { versao: number; ranking: unknown; pilotos: unknown } | null = null;
 export async function rankingPublicoParaApp() {
   await indiceFresco();
+  if (rankingCache && rankingCache.versao === indiceVersao) return { ranking: rankingCache.ranking, pilotos: rankingCache.pilotos };
   const TOP = 100;
   const per = { semana: periodo('semana'), mes: periodo('mes'), geral: periodo('geral') };
   const pos = new Map<string, Record<string, Record<string, { pos: number; de: number }>>>(); // cid → período → traçado → posição
@@ -538,7 +558,9 @@ export async function rankingPublicoParaApp() {
 
   const car = carreiras();
   const corridasPor = new Map<string, { dia: string; inicio: number; bateria: string; tipo: string; tracado: string; pos: number; de: number; melhor: number | null; kart: string; dq: boolean; chuva: boolean; voltaMaisRapida: boolean; reserva: boolean }[]>();
-  for (const b of Object.values(indice)) {
+  const bateriasIndice = Object.values(indice);
+  for (let ib = 0; ib < bateriasIndice.length; ib++) {
+    const b = bateriasIndice[ib];
     const validos = b.pilotos.filter((p) => p.melhor && !p.dq);
     const maisRapida = validos.length ? Math.min(...validos.map((p) => p.melhor!)) : null;
     for (const p of b.pilotos) {
@@ -548,12 +570,15 @@ export async function rankingPublicoParaApp() {
       l.push({ dia: b.dia, inicio: b.inicio, bateria: b.nome, tipo: b.tipo, tracado: tk(b, p), pos: p.pos, de: b.pilotos.length, melhor: p.melhor, kart: p.kart, dq: p.dq, chuva: b.chuva, voltaMaisRapida: !!p.melhor && p.melhor === maisRapida && validos.length > 1, reserva: !!b.reserva });
       corridasPor.set(p.cid, l);
     }
+    if ((ib & 511) === 511) await new Promise<void>((r) => setImmediate(r)); // não congela o event loop (rebuild de ~20 s medido)
   }
   const pilotos: Record<string, unknown> = {};
   const antigoPor = new Map<string, RankAntigo[]>();
   for (const x of rankAntigo) if (x.cid) { const l = antigoPor.get(x.cid) ?? []; l.push(x); antigoPor.set(x.cid, l); }
   // inclui quem só aparece no ranking (LapTime antigo, sem corrida no índice novo)
-  for (const cid of new Set([...corridasPor.keys(), ...pos.keys()])) {
+  const cidsPilotos = [...new Set([...corridasPor.keys(), ...pos.keys()])];
+  for (let ip = 0; ip < cidsPilotos.length; ip++) {
+    const cid = cidsPilotos[ip];
     const corridas = corridasPor.get(cid) ?? [];
     corridas.sort((a, b) => b.inicio - a.inicio);
     const r = car.get(cid);
@@ -590,8 +615,10 @@ export async function rankingPublicoParaApp() {
       // só reserva (sem posição nem tempo) não aparece em "últimas baterias": o app mostraria "0º"
       recentes: corridas.filter((c) => !c.reserva).slice(0, 15).map((c) => ({ dia: c.dia, bateria: c.bateria, tipo: c.tipo, tracado: c.tracado, pos: c.pos, de: c.de, melhor: c.melhor, kart: c.kart })),
     };
+    if ((ip & 511) === 511) await new Promise<void>((r) => setImmediate(r));
   }
   // histórico de XP por mês (últimos 12), na mesma conta do app: bateria 50, pódio +50, vitória +100, pole +50, volta mais rápida +50
+  let ix = 0;
   for (const [cid, lista] of corridasPor) {
     const p = pilotos[cid] as Record<string, unknown> | undefined;
     if (!p) continue;
@@ -623,6 +650,7 @@ export async function rankingPublicoParaApp() {
       tracadosDiferentes: new Set(lista.map((c) => c.tracado)).size,
     };
     p.xpMes = [...porMes.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 12).map(([mes, v]) => ({ mes, ...v }));
+    if ((++ix & 511) === 511) await new Promise<void>((r) => setImmediate(r));
   }
   // comparativo de XP (mesma conta do app): líder geral e quem está logo acima e logo abaixo de cada piloto
   type P = { nome: string; baterias: number; podios: number; vitorias: number; poles: number; voltasMaisRapidas: number };
@@ -648,5 +676,6 @@ export async function rankingPublicoParaApp() {
   }
   const karts = [...porKart.values()].sort((a, b) => (a.melhorMs ?? 1e12) - (b.melhorMs ?? 1e12)).map((k, i) => ({ ...k, posVolta: k.melhorMs ? i + 1 : null, corridas: k.corridas.sort((a, b) => b.inicio - a.inicio) }));
   const kartsDoDia = { dia: ultimoDia || null, karts };
+  rankingCache = { versao: indiceVersao, ranking: { periodos, kartsDoDia }, pilotos };
   return { ranking: { periodos, kartsDoDia }, pilotos };
 }

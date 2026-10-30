@@ -27,7 +27,7 @@ export type Regras = {
   voltasPorParadaFaltante: number;
   boxAbreMin: number;
   boxFechaMin: number;
-  /** volta acima disto (e pelo menos 40% da parada mínima acima da volta normal) é volta do box */
+  /** volta acima disto (e pelo menos 35 s acima da volta normal da equipe) é volta do box */
   limiarParadaMs: number;
   /** tempo adicional de trânsito no pit lane (entrada/saída e velocidade reduzida) a descontar da parada */
   pitTransitDeltaMs?: number;
@@ -282,7 +282,7 @@ export function analisarCorrida(input: {
       const lapMs = v.lapMs as number;
       const numVolta = v.lap || i + 1;
       const ajuste = ajustes.get(i + 1) ?? ajustes.get(numVolta) ?? null;
-      const minDelta = Math.max(35_000, Math.round(r.paradaMinMs * 0.4));
+      const minDelta = 35_000;
       if ((lapMs < r.limiarParadaMs || lapMs < refEquipe + minDelta) && ajuste !== 'validar' && ajuste !== 'quebra' && ajuste !== 'invalidar') return;
       const inicioMs = v.wallMs - lapMs;
       const prev = i > 0 ? voltas[i - 1] : null;
@@ -295,11 +295,8 @@ export function analisarCorrida(input: {
       const temposNaVolta = temposPorVolta.get(numVolta) ?? [];
       const medVolta = mediana(temposNaVolta);
       const limiarSafetyCar = Math.min(r.limiarParadaMs, Math.max(r.voltaLimpaMaxMs, refGeral * 1.35));
-      const medianaSubiuAbruptamente = temposNaVolta.length >= 2 && medVolta != null && (
-        temposNaVolta.length >= 3
-          ? medVolta >= limiarSafetyCar
-          : Math.min(...temposNaVolta) >= limiarSafetyCar && (Math.max(...temposNaVolta) - Math.min(...temposNaVolta)) < minDelta
-      );
+      // safety car só com 3 equipes ou mais: duas parando na mesma volta é parada de verdade, não pista lenta
+      const medianaSubiuAbruptamente = temposNaVolta.length >= 3 && medVolta != null && medVolta >= limiarSafetyCar;
       if ((voltaSobBandeira(v) || medianaSubiuAbruptamente) && !v.pitStopExplicit && !teveTroca && ajuste !== 'validar' && ajuste !== 'quebra' && ajuste !== 'invalidar') {
         return;
       }

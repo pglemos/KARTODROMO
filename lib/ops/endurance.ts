@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars -- _u e _s só tiram campos internos das respostas */
 /**
  * Endurance (100 Milhas): evento, equipes, pilotos com número de pulseira, pesagem, filas e sorteio do box, punições.
  *

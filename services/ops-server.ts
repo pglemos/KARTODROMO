@@ -29,6 +29,11 @@ import { bateriaDisponivelNoTotem, type TotemBateriaCandidate, TOTEM_BATERIAS_SQ
 import { relatorio } from '../lib/ops/relatorios';
 import { renderTermoResponsabilidade, type TermoParticipante } from '../lib/ops/termo';
 import { buscarPreCadastroAgora, preCadastroLigado, sincronizarPreCadastros } from '../lib/ops/pre-cadastro';
+import { conferirCobrancas, gruposRoutes } from '../lib/ops/grupos';
+import { painelRoutes, registrarSinal } from '../lib/ops/painel';
+import { enduranceDasBaterias, enduranceRoutes, equipesParaOTotem, paginaDoChefe, vincularNoTotem } from '../lib/ops/endurance';
+import { ENDURANCE_VINCULO_SQL } from '../lib/ops/endurance-vinculo';
+import { atualizarIndice as atualizarIndicePilotos, pilotosRoutes } from '../lib/ops/pilotos';
 import { publicarAgenda, sincronizarReservasOnline, vagaOnlineDoGrupo } from '../lib/ops/reserva-online';
 import { syncTimingTracks } from '../lib/ops/tracado-sync';
 import { selecionarSessoesParaRelatorio, type ReceptionTimingSession } from '../lib/timing/reception-crono-reports';
@@ -56,12 +61,26 @@ const TERMO_FILE = process.env.OPS_TERMO_FILE ? resolve(process.cwd(), process.e
 const TIMING_URL = (process.env.OPS_TIMING_URL || 'http://192.168.20.249:4050').replace(/\/$/, '');
 let sincronizacaoTracados: Promise<unknown> | null = null;
 let tracadosSincronizadosEm = 0;
+let tracadosUltimaQtd = -1;
 
 if (!KEY) console.warn('ATENCAO: OPS_RECEPCAO_KEY vazio, rotas da cronometragem ficam sem protecao');
 
 function log(...args: unknown[]) {
-  console.log(`[${new Date().toISOString()}]`, ...args);
+  // hora local de Brasília (o servidor roda em -03:00); antes ia UTC e atrapalhava o diagnóstico
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  console.log(`[${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}]`, ...args);
 }
+
+// Detecta travamento do event loop (a rede cai em rajadas de 10-40 s a cada ~10 min; isso dirá se é o processo).
+// ponytail: só registra; se aparecer cadência regular, investigar o timer culpado antes de trocar arquitetura.
+let pingAnterior = Date.now();
+setInterval(() => {
+  const agora = Date.now();
+  const atraso = agora - pingAnterior;
+  pingAnterior = agora;
+  if (atraso > 2000) log(`AVISO: event loop travado por ${atraso} ms`);
+}, 1000).unref();
 
 /** Espelha o catálogo da Cronometragem sob demanda, inclusive quando a Recepção é aberta depois de uma alteração. */
 async function sincronizarTracadosDaCronometragem() {
@@ -70,7 +89,11 @@ async function sincronizarTracadosDaCronometragem() {
   sincronizacaoTracados = syncTimingTracks({ timingUrl: TIMING_URL, query, one })
     .then((tracks) => {
       tracadosSincronizadosEm = Date.now();
-      log(`catálogo de traçados sincronizado: ${tracks.length} opção(ões) ativas`);
+      // só registra quando muda a quantidade — antes enchia o log a cada 30 s
+      if (tracks.length !== tracadosUltimaQtd) {
+        tracadosUltimaQtd = tracks.length;
+        log(`catálogo de traçados sincronizado: ${tracks.length} opção(ões) ativas`);
+      }
     })
     .catch((err) => {
       log(`catálogo de traçados: sincronização indisponível (${(err as Error).message})`);
@@ -314,6 +337,8 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
         tipoDocumento: txt(c.tipoDocumento) || 'CPF',
         documento: txt(c.documento),
         email: txt(c.email),
+        // sem isso o totem abria o campo vazio e exigia o @ de novo a cada visita
+        instagram: txt(c.instagram),
         telefone: txt(c.telefone),
         nascimento: txt(c.nascimento),
         temNascimento: Boolean(c.nascimento),
@@ -405,10 +430,13 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
           GROUP BY i.BateriaId`,
       )) doGrupo.set(g.b, g.n);
     }
+    // bateria de endurance (100 Milhas): depois de escolher, o totem pede a equipe e dá o número da pulseira
+    const endurance = await enduranceDasBaterias(rows.map((r) => Number(r.id)));
     send(res, 200, rows
       .map((r) => ({ ...r, livres: Math.max(0, r.vagas - r.ocupadas) + (doGrupo.get(Number(r.id)) ?? 0) }))
       .filter((r) => bateriaDisponivelNoTotem(r, r.dataHoje))
       .map((r) => ({
+        endurance: endurance.get(Number(r.id)) ?? null,
         id: r.id,
         nome: r.nome,
         inicio: r.inicio,
@@ -417,6 +445,13 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
         ocupadas: r.ocupadas,
         livres: r.livres,
       })));
+    return true;
+  }
+
+  if (path === '/api/totem/endurance' && method === 'GET') {
+    const bateria = Number(new URL(req.url ?? '/', 'http://totem').searchParams.get('bateria'));
+    if (!Number.isInteger(bateria) || bateria <= 0) throw new HttpError(400, 'Bateria inválida.');
+    send(res, 200, await equipesParaOTotem(bateria));
     return true;
   }
 
@@ -434,6 +469,18 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
       const cid = int(p.id, 'Participante');
       if (String(p.token ?? '') !== sign(`cli:${cid}`)) throw new HttpError(403, 'Sessão expirada, identifique-se de novo.');
       grupo.push(cid);
+    }
+    // endurance: cada piloto vira membro da equipe escolhida e ganha o número da pulseira (antes da inscrição:
+    // se a equipe estiver cheia ou o piloto já for de outra equipe, nada é gravado)
+    let pulseiras: Awaited<ReturnType<typeof vincularNoTotem>> = [];
+    const end = body.endurance as { eventoId?: unknown; equipeId?: unknown; equipeIds?: unknown[] } | undefined;
+    if (end && end.eventoId && (end.equipeId || Array.isArray(end.equipeIds))) {
+      const eventoId=int(end.eventoId,'Evento');
+      const vinculo=await one<{bateriaId:number}>('SELECT BateriaId bateriaId FROM dbo.EnduranceEvento WHERE Id=@id AND Ativo=1',{id:eventoId});
+      if(!vinculo || !baterias.includes(vinculo.bateriaId)) throw new HttpError(409,'O campeonato não pertence à bateria selecionada.');
+      const equipeIds=Array.isArray(end.equipeIds)?end.equipeIds.map(id=>int(id,'Inscrição')):[int(end.equipeId,'Equipe')];
+      pulseiras = await vincularNoTotem(eventoId,equipeIds,grupo);
+      log(`totem: endurance ${pulseiras.map((p) => `${p.nome} #${p.pulseira}`).join(', ')} na equipe ${pulseiras[0]?.equipe ?? '?'}`);
     }
     for (const bateriaId of baterias) {
       // quem já tem vaga na bateria primeiro (o comprador da reserva online fica com a dele; as outras vão para o grupo)
@@ -469,7 +516,7 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     // cada termo é um trabalho de impressão separado: a TM-T20 corta o papel no fim de cada trabalho,
     // então vários termos num trabalho só saíam emendados
     if (naRecepcao) for (const idInscricao of termoDoPiloto.values()) enfileirarImpressao(termoLink([idInscricao]), 'Termo de responsabilidade', origemDe(req));
-    send(res, 201, { inscricoes: ids, inicio: primeira?.inicio, termoUrl: imprimir ? termoLink(ids) : null, termoNaRecepcao: naRecepcao });
+    send(res, 201, { inscricoes: ids, inicio: primeira?.inicio, termoUrl: imprimir ? termoLink(ids) : null, termoNaRecepcao: naRecepcao, pulseiras });
     return true;
   }
 
@@ -478,16 +525,28 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
 
 // ---------------------------------------------------------------- login da recepcao
 
+// limite simples de tentativas de login por IP (rede local): 10 erros = 15 min de bloqueio
+const tentativasLogin = new Map<string, { n: number; ate: number }>();
+
 async function loginRoute(req: http.IncomingMessage, res: http.ServerResponse) {
   const b = await readBody(req);
+  const ip = req.socket.remoteAddress ?? '?';
+  const agora = Date.now();
+  const tent = tentativasLogin.get(ip);
+  if (tent && tent.n >= 10 && agora < tent.ate) throw new HttpError(429, 'Muitas tentativas de login. Aguarde alguns minutos.');
   const login = String(b.login ?? '').trim().toLowerCase();
   const senha = String(b.senha ?? '');
   if (!b.termos) throw new HttpError(400, 'É necessário concordar com os termos de uso.');
   const u = await one<{ id: number; nome: string; hash: string; admin: boolean; ativo: boolean }>(`SELECT Id id, Nome nome, SenhaHash hash, Admin admin, Ativo ativo FROM dbo.Usuario WHERE Login = @login`, { login });
   if (!u || !u.ativo || !confereSenha(senha, u.hash)) {
+    const reg = tentativasLogin.get(ip) ?? { n: 0, ate: 0 };
+    reg.n += 1;
+    if (reg.n >= 10) reg.ate = agora + 15 * 60_000;
+    tentativasLogin.set(ip, reg);
     log(`login recusado: ${login}`);
     throw new HttpError(401, 'Login ou senha inválidos.');
   }
+  tentativasLogin.delete(ip);
   log(`login: ${login}`);
   await query(`UPDATE dbo.Usuario SET UltimoAcesso = SYSDATETIME() WHERE Id = @id`, { id: u.id }).catch(() => undefined);
   send(res, 200, { token: emiteToken({ uid: u.id, nome: u.nome, admin: Boolean(u.admin) }), usuario: { id: u.id, nome: u.nome, admin: Boolean(u.admin) } });
@@ -511,6 +570,7 @@ const server = http.createServer(async (req, res) => {
     if (method === 'GET' && path.startsWith('/updates/')) {
       const partes = path.slice('/updates/'.length).split('/').map(decodeURIComponent);
       if (partes.length !== 2 || !partes[0] || !partes[1]) return send(res, 404, { error: 'Arquivo de atualização não encontrado.' });
+      registrarSinal(ipDe(req), path);
       return sendUpdateFile(res, partes[0], partes[1]);
     }
     if (path === '/' || path === '/recepcao') return sendStatic(res, 'office.html');
@@ -540,7 +600,11 @@ const server = http.createServer(async (req, res) => {
       return sendHtml(res, await relatorio(path.slice('/relatorio/'.length), url));
     }
     if (path === '/api/login' && method === 'POST') return await loginRoute(req, res);
+    // página do chefe de equipe do endurance: link assinado por equipe, só leitura
+    const chefe = path.match(/^\/api\/publico\/endurance\/([\w.-]{3,60})$/);
+    if (chefe && method === 'GET') return send(res, 200, await paginaDoChefe(chefe[1]));
     if (path.startsWith('/api/totem/')) {
+      registrarSinal(ipDe(req), path);
       if (await totemRoutes(req, res, path)) return;
     }
     if (path.startsWith('/api/office/')) {
@@ -593,7 +657,12 @@ const server = http.createServer(async (req, res) => {
         if (job && mi[2] === 'falhou') { job.pegoEm = undefined; log(`impressao #${job.id} falhou na recepcao, volta pra fila`); }
         return send(res, 200, { ok: !!job });
       }
-      const handled = await officeRoutes({ method, url, sessao, body: () => readBody(req) }, (status, body) => send(res, status, body));
+      const reqOffice = { method, url, sessao, body: () => readBody(req) };
+      if (await gruposRoutes(reqOffice, (status, body) => send(res, status, body))) return;
+      if (await painelRoutes(reqOffice, (status, body) => send(res, status, body))) return;
+      if (await enduranceRoutes(reqOffice, (status, body) => send(res, status, body))) return;
+      if (await pilotosRoutes(reqOffice, (status, body) => send(res, status, body))) return;
+      const handled = await officeRoutes(reqOffice, (status, body) => send(res, status, body));
       if (handled) return;
     }
     if (path.startsWith('/api/crono/')) {
@@ -602,7 +671,8 @@ const server = http.createServer(async (req, res) => {
       let m = path.match(/^\/api\/crono\/baterias\/(\d+)\/grid$/);
       if (m) {
         const rows = await query(
-          `SELECT i.Id inscricaoId, c.Nome nome, i.Kart kart, i.Pago pago, i.Aprovada aprovada, c.Id clienteId FROM dbo.Inscricao i JOIN dbo.Cliente c ON c.Id = i.ClienteId
+          `SELECT i.Id inscricaoId, c.Nome nome, endurance.equipe, endurance.equipeId, endurance.pulseira, i.Kart kart, i.Pago pago, i.Aprovada aprovada, c.Id clienteId FROM dbo.Inscricao i JOIN dbo.Cliente c ON c.Id = i.ClienteId
+           ${ENDURANCE_VINCULO_SQL}
            WHERE i.BateriaId = @id AND i.Status <> 'cancelada' ORDER BY i.Id`,
           { id: Number(m[1]) },
         );
@@ -656,7 +726,13 @@ const server = http.createServer(async (req, res) => {
         // dados dos pilotos para a lista de competidores da cronometragem (só leitura)
         const ids = String(url.searchParams.get('ids') ?? '').split(',').map(Number).filter((n) => Number.isSafeInteger(n) && n > 0).slice(0, 200);
         if (!ids.length) return send(res, 200, []);
-        return send(res, 200, await query(`SELECT Id id, Email email, Cidade cidade, Estado uf, Peso peso, Sexo sexo, Telefone telefone FROM dbo.Cliente WHERE Id IN (${ids.join(',')})`));
+        const clientes = await query<Record<string, unknown>>(`SELECT Id id, Email email, Cidade cidade, Estado uf, Peso peso, Sexo sexo, Telefone telefone FROM dbo.Cliente WHERE Id IN (${ids.join(',')})`);
+        const vinculos = await query<{ clienteId: number; bateriaId: number; equipeId: number; equipe: string; pulseira: number }>(
+          `SELECT p.ClienteId clienteId, ev.BateriaId bateriaId, q.Id equipeId, q.Nome equipe, p.Pulseira pulseira
+           FROM dbo.EndurancePilotoInscricao p JOIN dbo.EnduranceEvento ev ON ev.Id = p.EventoId
+           JOIN dbo.EnduranceEquipe q ON q.Id = p.EquipeId AND q.EventoId = ev.Id
+           WHERE p.ClienteId IN (${ids.join(',')}) AND p.Ativo = 1 AND ev.Ativo = 1`);
+        return send(res, 200, clientes.map((c) => ({ ...c, enduranceVinculos: vinculos.filter((v) => v.clienteId === c.id) })));
       }
       m = path.match(/^\/api\/crono\/baterias\/(\d+)\/programa$/);
       if (m) {
@@ -735,7 +811,18 @@ if (preCadastroLigado()) {
   setTimeout(sincronizar, 5_000);
   setInterval(sincronizar, 30_000).unref();
   log('pré-cadastro online ligado');
+  // reserva em grupo (painel web): confere no Asaas os links de pagamento em aberto
+  let conferindo = false;
+  setInterval(async () => {
+    if (conferindo) return;
+    conferindo = true;
+    try { await conferirCobrancas(log); } catch (e) { log(`grupo: conferência das cobranças falhou (${(e as Error).message})`); } finally { conferindo = false; }
+  }, 60_000).unref();
 }
+
+// página Pilotos do painel web: lê da cronometragem as baterias encerradas novas (carreira e ranking por traçado)
+setTimeout(() => { atualizarIndicePilotos(log).catch(() => undefined); }, 20_000);
+setInterval(() => { atualizarIndicePilotos(log).catch(() => undefined); }, 120_000).unref();
 
 // reserva online (reservas.kartodromodebetim.com.br): agenda a cada 5 s, pedidos/pagamentos/prazos a cada 5 s.
 // Liga com OPS_RESERVA_ONLINE=1 no .env.local (usa a mesma chave do pré-cadastro).

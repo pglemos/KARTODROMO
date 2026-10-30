@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- fixtures soltas do placar */
 import { test, expect, type Page } from '@playwright/test';
 
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'https://aovivo.kartodromodebetim.com.br';
