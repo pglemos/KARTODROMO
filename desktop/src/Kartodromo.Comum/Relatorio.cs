@@ -1,3 +1,7 @@
+using System.Drawing.Printing;
+using System.Globalization;
+using System.Linq;
+using System.Runtime.InteropServices;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
@@ -25,7 +29,7 @@ public class Relatorio : CartaoModal
         return _env;
     }
 
-    Relatorio(string titulo, string url) : base(1000, 760)
+    Relatorio(string titulo, string url, int largura = 1000) : base(largura, 760)
     {
         Text = titulo;
         _titulo = titulo;
@@ -108,11 +112,9 @@ public class Relatorio : CartaoModal
             catch (Exception e)
             {
                 Diagnostico.Registrar("relatório/WebView2", e);
-                if (Msg.ErroComRetry(this, "Não foi possível abrir o relatório agora. Verifique a conexão."))
-                {
-                    try { _web.Source = new Uri(url); }
-                    catch (Exception retry) { Diagnostico.Registrar("relatório/WebView2/retry", retry); }
-                }
+                // Sem fallback para o navegador: a URL do relatório leva o token da sessão (?t=...) e ficaria no
+                // histórico/barra de endereço da máquina do balcão. Mostra o erro SEM a URL.
+                Msg.Aviso(this, $"Não foi possível abrir o visualizador de relatórios (WebView2): {e.Message}\nFeche e abra o relatório de novo. Se continuar, avise o suporte.");
             }
         };
     }
@@ -260,33 +262,269 @@ public class Relatorio : CartaoModal
         catch (Exception e) { Avisar("Não salvou a planilha: " + e.Message, true); }
     }
 
-    public static void Abrir(IWin32Window dono, string url, string titulo = "Relatório")
+    public static void Abrir(IWin32Window dono, string url, string titulo = "Relatório", int largura = 1000)
     {
-        var f = new Relatorio(titulo, url);
+        var f = new Relatorio(titulo, url, largura);
         f.Show(dono);
     }
+
+    /// <summary>Verifica se uma impressora está instalada e acessível no Windows.</summary>
+    public static bool ImpressoraExiste(string impressora)
+    {
+        if (string.IsNullOrWhiteSpace(impressora)) return false;
+        try
+        {
+            return PrinterSettings.InstalledPrinters.Cast<string>()
+                .Any(p => string.Equals(p, impressora.Trim(), StringComparison.OrdinalIgnoreCase));
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    [DllImport("winspool.drv", CharSet = CharSet.Auto, SetLastError = true)]
+    private static extern bool OpenPrinter(string pPrinterName, out IntPtr phPrinter, IntPtr pDefault);
+
+    [DllImport("winspool.drv", SetLastError = true)]
+    private static extern bool ClosePrinter(IntPtr hPrinter);
+
+    [DllImport("winspool.drv", SetLastError = true)]
+    private static extern bool SetPrinter(IntPtr hPrinter, int Level, IntPtr pPrinter, int Command);
+
+    [DllImport("winspool.drv", CharSet = CharSet.Auto, SetLastError = true)]
+    private static extern bool GetPrinter(IntPtr hPrinter, int dwLevel, IntPtr pPrinter, int cbBuf, out int pcbNeeded);
+
+    private const int PRINTER_CONTROL_PURGE = 3;
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    private struct PRINTER_INFO_2
+    {
+        public string pServerName;
+        public string pPrinterName;
+        public string pShareName;
+        public string pPortName;
+        public string pDriverName;
+        public string pComment;
+        public string pLocation;
+        public IntPtr pDevMode;
+        public string pSepFile;
+        public string pPrintProcessor;
+        public string pDatatype;
+        public string pParameters;
+        public IntPtr pSecurityDescriptor;
+        public uint Attributes;
+        public uint Priority;
+        public uint DefaultPriority;
+        public uint StartTime;
+        public uint UntilTime;
+        public uint Status;
+        public uint cJobs;
+        public uint AveragePPM;
+    }
+
+    private const uint PRINTER_STATUS_PAUSED = 0x00000001;
+    private const uint PRINTER_STATUS_ERROR = 0x00000002;
+    private const uint PRINTER_STATUS_PENDING_DELETION = 0x00000004;
+    private const uint PRINTER_STATUS_PAPER_JAM = 0x00000008;
+    private const uint PRINTER_STATUS_PAPER_OUT = 0x00000010;
+    private const uint PRINTER_STATUS_MANUAL_FEED = 0x00000020;
+    private const uint PRINTER_STATUS_PAPER_PROBLEM = 0x00000040;
+    private const uint PRINTER_STATUS_OFFLINE = 0x00000080;
+    private const uint PRINTER_STATUS_IO_ACTIVE = 0x00000100;
+    private const uint PRINTER_STATUS_BUSY = 0x00000200;
+    private const uint PRINTER_STATUS_PRINTING = 0x00000400;
+    private const uint PRINTER_STATUS_OUTPUT_BIN_FULL = 0x00000800;
+    private const uint PRINTER_STATUS_NOT_AVAILABLE = 0x00001000;
+    private const uint PRINTER_STATUS_DOOR_OPEN = 0x00400000;
+
+    /// <summary>
+    /// Verifica o status operacional do spooler da impressora (offline, sem papel, tampa aberta, erro).
+    /// </summary>
+    public static (bool ok, string motivo) VerificarSpooler(string impressora)
+    {
+        if (string.IsNullOrWhiteSpace(impressora))
+            return (false, "Impressora não configurada");
+
+        if (!ImpressoraExiste(impressora))
+            return (false, "Impressora não encontrada no sistema");
+
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return (true, null);
+
+        try
+        {
+            if (!OpenPrinter(impressora.Trim(), out var hPrinter, IntPtr.Zero))
+                return (false, "Não foi possível abrir o canal com o spooler da impressora");
+
+            try
+            {
+                GetPrinter(hPrinter, 2, IntPtr.Zero, 0, out var needed);
+                if (needed <= 0) return (true, null);
+
+                var buffer = Marshal.AllocHGlobal(needed);
+                try
+                {
+                    if (GetPrinter(hPrinter, 2, buffer, needed, out _))
+                    {
+                        var info = Marshal.PtrToStructure<PRINTER_INFO_2>(buffer);
+                        var status = info.Status;
+
+                        if ((status & PRINTER_STATUS_OFFLINE) != 0)
+                            return (false, "Impressora offline ou desconectada");
+                        if ((status & PRINTER_STATUS_PAPER_OUT) != 0)
+                            return (false, "Impressora sem papel");
+                        if ((status & PRINTER_STATUS_PAPER_JAM) != 0)
+                            return (false, "Papel atolado na impressora");
+                        if ((status & PRINTER_STATUS_DOOR_OPEN) != 0)
+                            return (false, "Tampa da impressora aberta");
+                        if ((status & PRINTER_STATUS_ERROR) != 0)
+                            return (false, "Erro no spooler da impressora");
+                        if ((status & PRINTER_STATUS_PAUSED) != 0)
+                            return (false, "Impressora pausada no Windows");
+                        if ((status & PRINTER_STATUS_NOT_AVAILABLE) != 0)
+                            return (false, "Impressora indisponível");
+                    }
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(buffer);
+                }
+            }
+            finally
+            {
+                ClosePrinter(hPrinter);
+            }
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            return (false, "Falha ao consultar spooler: " + ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Saneamento de filas fantasmas: cancela todos os trabalhos retidos ou órfãos no spooler sem reiniciar o serviço.
+    /// </summary>
+    public static bool LimparFilaSpooler(string impressora)
+    {
+        if (string.IsNullOrWhiteSpace(impressora) || !ImpressoraExiste(impressora))
+            return false;
+
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return false;
+
+        try
+        {
+            if (!OpenPrinter(impressora.Trim(), out var hPrinter, IntPtr.Zero))
+                return false;
+
+            try
+            {
+                return SetPrinter(hPrinter, 0, IntPtr.Zero, PRINTER_CONTROL_PURGE);
+            }
+            finally
+            {
+                ClosePrinter(hPrinter);
+            }
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    static readonly SemaphoreSlim _semImpressaoSilenciosa = new(1, 1);
 
     /// <summary>Imprime uma pagina direto na impressora (sem dialogo), ex.: termo no totem.</summary>
     public static async Task ImprimirSilencioso(string url, string impressora = null)
     {
-        using var host = new Form { ShowInTaskbar = false, FormBorderStyle = FormBorderStyle.None, Size = new Size(10, 10), StartPosition = FormStartPosition.Manual, Location = new Point(-2000, -2000) };
-        using var web = new WebView2 { Dock = DockStyle.Fill };
-        host.Controls.Add(web);
-        host.Show();
-        await web.EnsureCoreWebView2Async(await Ambiente());
-        await web.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync("window.print = function(){};");
-        var carregou = new TaskCompletionSource<bool>();
-        web.CoreWebView2.NavigationCompleted += (_, e) => carregou.TrySetResult(e.IsSuccess);
-        web.CoreWebView2.Navigate(url);
-        if (!await carregou.Task) throw new Exception("Falha ao carregar o termo para impressão.");
-        await Task.Delay(600); // imagens (logo) terminarem de desenhar
-        var cfg = web.CoreWebView2.Environment.CreatePrintSettings();
-        cfg.ShouldPrintBackgrounds = true;
-        cfg.ShouldPrintHeaderAndFooter = false;
-        cfg.MarginTop = cfg.MarginBottom = cfg.MarginLeft = cfg.MarginRight = 0;
-        if (!string.IsNullOrWhiteSpace(impressora)) cfg.PrinterName = impressora;
-        var st = await web.CoreWebView2.PrintAsync(cfg);
-        if (st != CoreWebView2PrintStatus.Succeeded) throw new Exception("Impressora indisponível: " + st);
-        host.Close();
+        if (string.IsNullOrWhiteSpace(url))
+            throw new ArgumentException("A URL para impressão não pode ser vazia.", nameof(url));
+
+        if (string.IsNullOrWhiteSpace(impressora))
+            throw new InvalidOperationException("Nenhuma impressora informada para impressão silenciosa. A impressão cega na impressora padrão foi desabilitada.");
+
+        if (!ImpressoraExiste(impressora))
+            throw new InvalidOperationException($"A impressora '{impressora}' não está instalada ou acessível no sistema.");
+
+        var (spoolerOk, motivoSpooler) = VerificarSpooler(impressora);
+        if (!spoolerOk && motivoSpooler != null && (motivoSpooler.Contains("offline") || motivoSpooler.Contains("papel")))
+            throw new InvalidOperationException($"A impressora '{impressora}' não está pronta para impressão: {motivoSpooler}");
+
+        await _semImpressaoSilenciosa.WaitAsync();
+        try
+        {
+            using var host = new Form { ShowInTaskbar = false, FormBorderStyle = FormBorderStyle.None, Size = new Size(10, 10), StartPosition = FormStartPosition.Manual, Location = new Point(-2000, -2000) };
+            using var web = new WebView2 { Dock = DockStyle.Fill };
+            host.Controls.Add(web);
+            host.Show();
+            try
+            {
+                await web.EnsureCoreWebView2Async(await Ambiente());
+                await web.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync("window.print = function(){};");
+
+                var carregou = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                void OnNavCompleted(object sender, CoreWebView2NavigationCompletedEventArgs e) => carregou.TrySetResult(e.IsSuccess);
+                web.CoreWebView2.NavigationCompleted += OnNavCompleted;
+                web.CoreWebView2.Navigate(url);
+
+                var timeoutTask = Task.Delay(TimeSpan.FromSeconds(15));
+                var completou = await Task.WhenAny(carregou.Task, timeoutTask);
+                web.CoreWebView2.NavigationCompleted -= OnNavCompleted;
+
+                if (completou == timeoutTask)
+                    throw new TimeoutException($"Tempo limite de 15 segundos excedido ao carregar o termo para impressão silenciosa. URL: {url}");
+
+                if (!await carregou.Task)
+                    throw new InvalidOperationException($"Falha ao carregar o termo para impressão silenciosa. URL: {url}");
+
+                try
+                {
+                    await web.CoreWebView2.ExecuteScriptAsync(
+                        "new Promise(resolve => { if (document.readyState === 'complete') resolve(); else window.addEventListener('load', () => resolve()); })");
+                }
+                catch { }
+
+                var cfg = web.CoreWebView2.Environment.CreatePrintSettings();
+                cfg.ShouldPrintBackgrounds = true;
+                cfg.ShouldPrintHeaderAndFooter = false;
+                cfg.MarginTop = cfg.MarginBottom = cfg.MarginLeft = cfg.MarginRight = 0;
+                cfg.PrinterName = impressora.Trim();
+
+                // Altura dinâmica para bobina térmica de 80mm (TM-T20X)
+                // Evita que o driver assuma folha A4 fixa (297mm) e acione corte prematuro ou desperdício de bobina
+                try
+                {
+                    var alturaPxStr = await web.CoreWebView2.ExecuteScriptAsync(
+                        "Math.max(document.body ? document.body.scrollHeight : 0, document.documentElement ? document.documentElement.scrollHeight : 0)");
+                    if (double.TryParse(alturaPxStr, NumberStyles.Float, CultureInfo.InvariantCulture, out var alturaPx) && alturaPx > 0)
+                    {
+                        cfg.PageWidth = 80.0 / 25.4; // 80mm em polegadas (~3.15 in)
+                        cfg.PageHeight = Math.Max(2.5, (alturaPx / 96.0) + 0.25);
+                    }
+                    else
+                    {
+                        cfg.PageWidth = 80.0 / 25.4;
+                    }
+                }
+                catch
+                {
+                    cfg.PageWidth = 80.0 / 25.4;
+                }
+
+                var st = await web.CoreWebView2.PrintAsync(cfg);
+                if (st != CoreWebView2PrintStatus.Succeeded)
+                    throw new Exception($"Impressora '{impressora}' falhou ao imprimir: " + st);
+            }
+            finally
+            {
+                host.Close();
+            }
+        }
+        finally
+        {
+            _semImpressaoSilenciosa.Release();
+        }
     }
 }

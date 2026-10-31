@@ -26,15 +26,15 @@
   "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["resultados@kartodromodebetim.com.br"] }],
   "routes": [
     { "pattern": "cadastro.kartodromodebetim.com.br", "custom_domain": true },
-    // reserva online (pagamento Asaas). Segredos: SYNC_KEY, ASAAS_API_KEY, ASAAS_WEBHOOK_TOKEN, RESERVAS_PREVIA
+    // reserva online (pagamento Stone). Segredos: SYNC_KEY, STONE_API_KEY, STONE_WEBHOOK_TOKEN, RESERVAS_PREVIA
     { "pattern": "reservas.kartodromodebetim.com.br", "custom_domain": true }
   ],
   // Secrets da conta e dos resultados móveis usam `wrangler secret put` em cada ambiente; nunca adicionar valores aqui.
   // Novos nomes: MOBILE_LOOKUP_KEY, MOBILE_DATA_KEY, MOBILE_PUBLISH_TOKEN e MOBILE_ADMIN_TOKEN.
-  // RESERVAS_ATIVAS=1 abre ao público; ASAAS_URL = https://api-sandbox.asaas.com/v3 para testar no ambiente de testes
+  // RESERVAS_ATIVAS=1 abre ao público; STONE_URL = https://sdx-api.pagar.me/core/v5 para testar com chave sk_test_
   "vars": {
     "RESERVAS_ATIVAS": "1",
-    "ASAAS_URL": "https://api.asaas.com/v3",
+    "STONE_URL": "https://api.pagar.me/core/v5",
     "MOBILE_EMAIL_FILA": "1"
   }
 }

@@ -4,7 +4,7 @@
  * (nada daqui fica exposto na internet).
  *   1. a cada 30 s publica a agenda (baterias abertas, vagas e preço) para o site mostrar;
  *   2. a cada 5 s busca pedidos novos: grava o cliente (como o pré-cadastro), segura as vagas (Inscricao Origem 'site',
- *      status 'reservada') por 15 min e devolve o valor — o site então cobra na Asaas (Pix ou cartão);
+ *      status 'reservada') por 15 min e devolve o valor — o site então cobra na Stone (Pix ou cartão);
  *   3. pedido pago no site: marca as vagas como pagas (Pago=1, 'confirmada');
  *   4. sem pagamento depois do prazo: cancela as vagas e avisa o site (que cancela a cobrança).
  * Env: PRECADASTRO_URL/PRECADASTRO_KEY (os mesmos do pré-cadastro); OPS_ONLINE_PRODUTO (4 = ANTECIPADO),
@@ -30,7 +30,7 @@ export const configOnline = () => {
 };
 
 const url = () => (process.env.PRECADASTRO_URL || '').replace(/\/+$/, '');
-async function chamar(caminho: string, init: RequestInit = {}, timeoutMs = 10_000) {
+async function chamar(caminho: string, init: RequestInit = {}, timeoutMs = 25_000) {
   const r = await fetch(url() + caminho, {
     ...init,
     headers: { 'x-sync-key': process.env.PRECADASTRO_KEY || '', 'content-type': 'application/json', ...(init.headers ?? {}) },
@@ -42,7 +42,7 @@ async function chamar(caminho: string, init: RequestInit = {}, timeoutMs = 10_00
 
 // ---------------------------------------------------------------- agenda
 
-export type HorarioOnline = { id: number; inicio: string; nome: string; livres: number };
+export type HorarioOnline = { id: number; inicio: string; nome: string; livres: number; vagasTotais: number };
 
 /** Baterias à venda no site: abertas, que aparecem no totem, do produto de locação, com antecedência e vaga. */
 export async function agendaOnline() {
@@ -58,7 +58,9 @@ export async function agendaOnline() {
       ORDER BY b.Inicio`,
     { antes: c.antecedenciaMin, dias: c.diasAgenda },
   );
-  const horarios: HorarioOnline[] = linhas.map((l) => ({ id: l.id, inicio: l.inicio, nome: l.nome, livres: Math.max(0, l.vagas - l.ocupadas) }));
+  const horarios: HorarioOnline[] = linhas.map((l) => ({
+    id: l.id, inicio: l.inicio, nome: l.nome, livres: Math.max(0, l.vagas - l.ocupadas), vagasTotais: l.vagas,
+  }));
   return {
     atualizadoEm: new Date().toISOString(),
     precoCentavos: produto?.preco ?? 0,
@@ -197,7 +199,7 @@ export async function previsualizarVoucherOnline(input: CouponInput) {
   }
 }
 
-/** Texto curto do pedido (vai na cobrança da Asaas e na tela de confirmação). */
+/** Texto curto do pedido (vai na cobrança da Stone e na tela de confirmação). */
 export function descricaoPedido(nomeBateria: string, inicio: string, quantidade: number) {
   const [d, h] = inicio.split('T');
   const [a, m, dia] = d.split('-');
@@ -278,7 +280,7 @@ export async function confirmarPagamento(p: PedidoSite, log: Log): Promise<Resul
   const r = await one<Linha>(`${LINHA} WHERE PedidoId = @id`, { id: p.id });
   if (!r) return { id: p.id, acao: 'pago_sem_vaga', erro: 'Pedido não encontrado no sistema da recepção.' };
   if (r.Status === 'pago') return { id: p.id, acao: 'confirmado', codigo: r.Codigo };
-  // a Asaas diz se o cartão foi de débito (DEBIT_CARD) — a recepção mostra Pix / Crédito / Débito
+  // a Stone diz se o cartão foi de débito (DEBIT_CARD) — a recepção mostra Pix / Crédito / Débito
   const forma = p.pagamento?.billingType === 'PIX' ? 'pix' : p.pagamento?.billingType === 'DEBIT_CARD' ? 'debito' : 'credito';
   if (r.Status === 'pago_sem_vaga') return { id: p.id, acao: 'pago_sem_vaga', erro: 'O pagamento está aguardando a resolução da recepção.' };
   const voucherUso = await one<{ Estado: string }>(`SELECT Estado FROM dbo.ReservaOnlineVoucherUso WHERE PedidoId = @id`, { id: p.id });
@@ -340,7 +342,7 @@ async function reativarVagas(bateriaId: number, canceladas: number[]) {
   });
 }
 
-/** Prazo vencido sem pagamento (com 2 min de folga para o aviso da Asaas chegar): cancela as vagas. */
+/** Prazo vencido sem pagamento (com 2 min de folga para o aviso da Stone chegar): cancela as vagas. */
 export async function expirarVencidos(log: Log) {
   const vencidos = await query<Linha & { PedidoId: string }>(`${LINHA} WHERE Status = 'aguardando' AND ExpiraEm < DATEADD(minute, -2, SYSDATETIME())`);
   const res: Resultado[] = [];

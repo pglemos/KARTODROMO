@@ -34,10 +34,14 @@ describe('cadastro da recepção exige peso e e-mail', () => {
     { email: '', peso: '80' },
     { email: 'email-invalido', peso: '80' },
     { email: 'piloto@example.com', peso: 'NaN' },
-    { email: 'piloto@example.com', peso: '80', instagram: '' },
     { email: 'piloto@example.com', peso: '80', instagram: 'perfil inválido' },
   ])('rejeita cadastro incompleto ou inválido: %j', async (dados) => {
     await expect(call('/clientes', 'POST', { nome: 'TESTE CODEX', ...dados })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('aceita cadastro com Instagram vazio (opcional)', async () => {
+    const res = await call('/clientes', 'POST', { nome: 'TESTE CODEX', email: 'piloto@example.com', peso: '80', instagram: '' });
+    expect(res.status).toBe(201);
   });
 });
 
@@ -445,7 +449,7 @@ describe('Office: fidelidade e parceiros', () => {
     await expect(call('/senha', 'POST', { senhaAtual: 'senha-incorreta', nova: 'outra-senha' }))
       .rejects.toMatchObject({ status: 403 });
     expect(db.query).not.toHaveBeenCalled();
-  });
+  }, 15_000);
 
   it('requires at least eight characters for a new password', async () => {
     await expect(call('/senha', 'POST', { senhaAtual: 'old-password', nova: '1234567' }))

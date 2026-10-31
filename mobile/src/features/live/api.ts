@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { API_BASE_URL, MobileApiError, mobileRequest } from '../../api/client';
@@ -6,12 +6,17 @@ import type { LiveCompetitor, LiveSession } from '../../types/racing';
 
 /** O que /api/mobile/v1/live devolve: o retrato da cronometragem (o mesmo do placar e do telão). */
 export interface LiveSnapshot {
+  /** transporte usado pelo servidor para entregar este retrato */
+  transport?: 'websocket' | 'polling' | null;
   status: 'live' | 'finished' | 'empty';
   eventName: string;
   trackName: string;
   sessionType: 'race' | 'qualifying';
   startedAt: string | null;
   updatedAt: string;
+  /** alias explícito para o instante que deve aparecer como idade do snapshot */
+  lastUpdatedAt?: string | null;
+  raceId?: string | null;
   /** hora da cronometragem no envio (ms); vem no tempo real e na busca simples */
   agora?: number;
   drivers: {
@@ -23,6 +28,7 @@ export interface LiveSnapshot {
     last: string;
     bestLap: number | null;
     gap: string;
+    lapTimes?: { number: number; time: string; timeMs: number }[];
     /** quando o kart completou a última volta, no relógio da cronometragem (ms) */
     passouEm?: number | null;
   }[];
@@ -33,6 +39,15 @@ export const liveApi = {
     return mobileRequest<LiveSnapshot>('/api/mobile/v1/live');
   },
 };
+
+export function preserveSnapshotTimestamp(previous: LiveSnapshot | null, next: LiveSnapshot, unchanged: boolean): LiveSnapshot {
+  return {
+    ...next,
+    lastUpdatedAt: unchanged && previous
+      ? previous.lastUpdatedAt ?? previous.updatedAt
+      : next.lastUpdatedAt ?? next.updatedAt,
+  };
+}
 
 /** "1:15.418" ou "58.120" → ms; vazio/inválido → null. */
 export function lapMs(value: string): number | null {
@@ -68,6 +83,10 @@ export function snapshotToSession(snap: LiveSnapshot, now = Date.now()): LiveSes
   const [titulo, prova] = snap.eventName.split(' · ');
   const tipo = snap.sessionType === 'race' ? 'CORRIDA' : 'TOMADA DE TEMPO';
   const aoVivo = snap.status === 'live';
+  const lastUpdatedAt = snap.lastUpdatedAt ?? snap.updatedAt;
+  const updatedMs = Date.parse(lastUpdatedAt);
+  const snapshotAgeMs = Number.isFinite(updatedMs) ? Math.max(0, now - updatedMs) : null;
+  const stale = snapshotAgeMs !== null && snapshotAgeMs > (aoVivo ? 15_000 : 60_000);
   const iniciou = snap.startedAt ? Date.parse(snap.startedAt) : NaN;
   const elapsedMs = aoVivo && Number.isFinite(iniciou) ? now - iniciou : 0;
   const tempos = snap.drivers.map((d) => lapMs(d.best));
@@ -91,6 +110,7 @@ export function snapshotToSession(snap: LiveSnapshot, now = Date.now()): LiveSes
       bestLapNumber: d.bestLap ?? 0,
       diffLeader: i === 0 ? '—' : gapLabel(d.gap),
       diffPrev,
+      lapTimes: Array.isArray(d.lapTimes) ? d.lapTimes : [],
       isFastestLap: i === iMelhor,
       deltaRealtime: { value: '', trend: 'neutral' },
     };
@@ -101,6 +121,10 @@ export function snapshotToSession(snap: LiveSnapshot, now = Date.now()): LiveSes
     subtitle: `${(prova || tipo).toUpperCase()} · ${aoVivo ? 'AO VIVO' : 'ENCERRADA'}`,
     trackName: (snap.trackName || 'Kartódromo Internacional de Betim').replace('Kartodromo', 'Kartódromo'),
     updatedAt: snap.updatedAt,
+    lastUpdatedAt,
+    snapshotAgeMs,
+    stale,
+    transport: snap.transport ?? 'polling',
     status: aoVivo ? 'GREEN' : 'CHECKERED',
     elapsedTime: aoVivo ? (Number.isFinite(iniciou) ? formatElapsed(elapsedMs) : '—') : 'Encerrada',
     elapsedMs,
@@ -113,6 +137,49 @@ export function snapshotToSession(snap: LiveSnapshot, now = Date.now()): LiveSes
     } : null,
     competitors,
   };
+}
+
+function competitorSnapshot(snap: LiveSnapshot, now: number) {
+  return snapshotToSession(snap, now)?.competitors ?? [];
+}
+
+export function retainLiveCompetitors(previous: LiveCompetitor[], next: LiveCompetitor[]) {
+  const unchanged = previous.length === next.length && previous.every((driver, index) => {
+    const candidate = next[index];
+    const laps = driver.lapTimes ?? [];
+    const candidateLaps = candidate.lapTimes ?? [];
+    return driver.position === candidate.position
+      && driver.kartNumber === candidate.kartNumber
+      && driver.name === candidate.name
+      && driver.category === candidate.category
+      && driver.flag === candidate.flag
+      && driver.currentLap === candidate.currentLap
+      && driver.lastLapTime === candidate.lastLapTime
+      && driver.lastLapMs === candidate.lastLapMs
+      && driver.bestLapTime === candidate.bestLapTime
+      && driver.bestLapMs === candidate.bestLapMs
+      && driver.bestLapNumber === candidate.bestLapNumber
+      && driver.diffLeader === candidate.diffLeader
+      && driver.diffPrev === candidate.diffPrev
+      && driver.isFastestLap === candidate.isFastestLap
+      && driver.deltaRealtime.value === candidate.deltaRealtime.value
+      && driver.deltaRealtime.trend === candidate.deltaRealtime.trend
+      && laps.length === candidateLaps.length
+      && laps.every((lap, lapIndex) => {
+        const candidateLap = candidateLaps[lapIndex];
+        return lap.number === candidateLap.number && lap.time === candidateLap.time && lap.timeMs === candidateLap.timeMs;
+      });
+  });
+  return unchanged ? previous : next;
+}
+
+export function retainExpandedCompetitorPosition(competitors: LiveCompetitor[], kartNumber: string, position: number) {
+  const current = competitors.findIndex((driver) => driver.kartNumber === kartNumber);
+  if (current < 0 || current === position) return competitors;
+  const reordered = [...competitors];
+  const [driver] = reordered.splice(current, 1);
+  reordered.splice(Math.max(0, Math.min(position, reordered.length)), 0, driver);
+  return reordered;
 }
 
 // ---------------------------------------------------------------- relógio da cronometragem
@@ -142,7 +209,7 @@ const WS_URL = `${API_BASE_URL.replace(/^http/, 'ws')}/api/mobile/v1/live/ws`;
  * registra. Se a conexão cair, busca a cada 2 s enquanto tenta reabrir. Pausa com o app em segundo plano.
  */
 export function useAoVivo() {
-  const [snapshot, setSnapshot] = useState<LiveSnapshot | null>(null);
+  const [live, setLive] = useState<{ snapshot: LiveSnapshot | null; receivedAt: number; competitors: LiveCompetitor[] }>({ snapshot: null, receivedAt: 0, competitors: [] });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const buscarRef = useRef<() => Promise<void>>(async () => undefined);
@@ -156,7 +223,28 @@ export function useAoVivo() {
     let ping: ReturnType<typeof setInterval> | null = null;
     let pingEm = 0;
 
-    const aplicar = (s: LiveSnapshot) => { setSnapshot(s); setError(''); setLoading(false); };
+    const aplicar = (s: LiveSnapshot) => {
+      const received = Date.now();
+      const nextCompetitors = competitorSnapshot(s, received);
+      setLive((previous) => {
+        const competitors = retainLiveCompetitors(previous.competitors, nextCompetitors);
+        const unchanged = !!previous.snapshot
+          && competitors === previous.competitors
+          && previous.snapshot.status === s.status
+          && previous.snapshot.eventName === s.eventName
+          && previous.snapshot.trackName === s.trackName
+          && previous.snapshot.sessionType === s.sessionType
+          && previous.snapshot.startedAt === s.startedAt
+          && previous.snapshot.raceId === s.raceId;
+        return {
+          snapshot: preserveSnapshotTimestamp(previous.snapshot, s, unchanged),
+          receivedAt: Math.max(received, previous.receivedAt + 1),
+          competitors,
+        };
+      });
+      setError('');
+      setLoading(false);
+    };
     const buscar = async () => {
       try { const s = await liveApi.snapshot(); if (ligado) aplicar(s); }
       catch (reason) { if (ligado) { setError(reason instanceof MobileApiError ? reason.message : 'Não foi possível carregar a cronometragem.'); setLoading(false); } }
@@ -206,7 +294,7 @@ export function useAoVivo() {
   }, []);
 
   const refresh = useCallback(() => buscarRef.current(), []);
-  return { snapshot, error, loading, refresh };
+  return { ...live, error, loading, refresh };
 }
 
 /** Relógio que anda sozinho no compasso da cronometragem (para tempo de prova e volta correndo). */
@@ -218,20 +306,50 @@ export function useAgoraCrono(passoMs = 1000) {
 
 /** Tela Ao vivo: bateria em tempo real com o relógio da prova andando de segundo em segundo, sem pular. */
 export function useLiveSession() {
-  const { snapshot, error, loading, refresh } = useAoVivo();
-  const now = useAgoraCrono(1000);
-  return { snapshot, session: snapshot ? snapshotToSession(snapshot, now) : null, error, loading, refresh };
+  const { snapshot, receivedAt, competitors, error, loading, refresh } = useAoVivo();
+  const [staleness, setStaleness] = useState<{ receivedAt: number; at: number } | null>(null);
+  const lastUpdatedAt = snapshot?.lastUpdatedAt ?? snapshot?.updatedAt;
+  const staleAfterMs = snapshot?.status === 'live' ? 15_000 : 60_000;
+  const now = staleness?.receivedAt === receivedAt ? staleness.at : receivedAt;
+
+  useEffect(() => {
+    if (!snapshot || snapshot.status === 'empty' || !snapshot.drivers.length || !lastUpdatedAt || !receivedAt) return undefined;
+    const updatedAt = Date.parse(lastUpdatedAt);
+    if (!Number.isFinite(updatedAt)) return undefined;
+    const delay = Math.max(0, updatedAt + staleAfterMs - receivedAt + 1);
+    const timeout = setTimeout(() => setStaleness({ receivedAt, at: updatedAt + staleAfterMs + 1 }), delay);
+    return () => clearTimeout(timeout);
+  }, [lastUpdatedAt, receivedAt, snapshot, staleAfterMs]);
+
+  useEffect(() => {
+    if (staleness?.receivedAt !== receivedAt) return undefined;
+    const timer = setInterval(() => setStaleness((current) => current?.receivedAt === receivedAt
+      ? { ...current, at: Math.max(current.at + 1000, agoraCrono()) }
+      : current), 1000);
+    return () => clearInterval(timer);
+  }, [receivedAt, staleness?.receivedAt]);
+
+  const session = useMemo(() => {
+    if (!snapshot) return null;
+    const current = snapshotToSession(snapshot, now);
+    return current ? { ...current, competitors } : current;
+  }, [competitors, now, snapshot]);
+
+  return { snapshot, session, error, loading, refresh };
 }
 
 /** Só para saber se há bateria na pista (tela inicial): busca simples de tempos em tempos, sem conexão aberta. */
 export function useLiveStatus(intervalMs = 10_000) {
   const [snapshot, setSnapshot] = useState<LiveSnapshot | null>(null);
+  const [error, setError] = useState('');
   useEffect(() => {
     let ativo = true;
-    const buscar = () => liveApi.snapshot().then((s) => { if (ativo) setSnapshot(s); }).catch(() => undefined);
+    const buscar = () => liveApi.snapshot().then((s) => { if (ativo) { setSnapshot(s); setError(''); } }).catch((e: unknown) => {
+      if (ativo) setError(e instanceof Error ? e.message : 'Não foi possível consultar a cronometragem.');
+    });
     void buscar();
     const t = setInterval(() => void buscar(), intervalMs);
     return () => { ativo = false; clearInterval(t); };
   }, [intervalMs]);
-  return { snapshot };
+  return { snapshot, error };
 }

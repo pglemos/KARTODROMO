@@ -17,13 +17,26 @@ sealed class OuvinteEstado : IDisposable
     readonly CancellationTokenSource _parar = new();
     readonly HttpClient _http = new() { Timeout = Timeout.InfiniteTimeSpan };
 
-    public bool Conectado { get; private set; }
+    volatile bool _conectado;
+    /// <summary>Item 27: leitura segura entre a task de fundo e a thread da tela.</summary>
+    public bool Conectado => _conectado;
+    public event Action<bool> ConexaoAlterada;
+
+    void DefinirConectado(bool valor)
+    {
+        if (_conectado == valor) return;
+        _conectado = valor;
+        try { ConexaoAlterada?.Invoke(valor); } catch { /* assinante não derruba o ouvinte */ }
+    }
 
     public OuvinteEstado(string url, Action<JsonObject> aoReceber)
     {
         _url = url;
         _aoReceber = aoReceber;
         _tela = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
+        _http.DefaultRequestHeaders.TryAddWithoutValidation("X-Client-Machine", Environment.MachineName);
+        if (Config.Get("ChaveCronometragem", "") is { Length: > 0 } chaveCrono)
+            _http.DefaultRequestHeaders.TryAddWithoutValidation("X-Timing-Key", chaveCrono);
     }
 
     public void Iniciar() => _ = Task.Run(Loop);
@@ -34,11 +47,14 @@ sealed class OuvinteEstado : IDisposable
         {
             try
             {
-                using var resposta = await _http.GetAsync(_url, HttpCompletionOption.ResponseHeadersRead, _parar.Token);
+                // Item 28: o fluxo SSE não tem fim (Timeout infinito no HttpClient), mas a conexão inicial precisa responder em 10 s
+                using var limite = CancellationTokenSource.CreateLinkedTokenSource(_parar.Token);
+                limite.CancelAfter(TimeSpan.FromSeconds(10));
+                using var resposta = await _http.GetAsync(_url, HttpCompletionOption.ResponseHeadersRead, limite.Token);
                 resposta.EnsureSuccessStatusCode();
                 using var fluxo = await resposta.Content.ReadAsStreamAsync(_parar.Token);
                 using var leitor = new StreamReader(fluxo, Encoding.UTF8);
-                Conectado = true;
+                DefinirConectado(true);
                 string evento = null;
                 var dados = new StringBuilder();
                 // sem nada por 40 s (o serviço manda ": ping" a cada 15 s) = conexão morta: reconecta
@@ -59,7 +75,7 @@ sealed class OuvinteEstado : IDisposable
             }
             catch (OperationCanceledException) when (_parar.IsCancellationRequested) { return; }
             catch (Exception) { /* serviço fora ou rede caiu: o ciclo de 1 s segue; tenta de novo abaixo */ }
-            Conectado = false;
+            DefinirConectado(false);
             try { await Task.Delay(2_000, _parar.Token); } catch (OperationCanceledException) { return; }
         }
     }

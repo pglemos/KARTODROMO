@@ -4,12 +4,13 @@ import { Redirect } from 'expo-router';
 /**
  * Modo demonstração: telas com dados ilustrativos (src/mock) só existem em desenvolvimento.
  * Builds de loja nunca mostram dado fictício ("dado real ou nada").
- * EXPO_PUBLIC_DEMO_MODE=1 força ligado (builds internos de QA); =0 força desligado.
+ * EXPO_PUBLIC_DEMO_MODE=1 só é reservado aos testes de componentes; =0 mantém a loja real.
  */
 export function isDemoMode(): boolean {
-  if (process.env.EXPO_PUBLIC_DEMO_MODE === '1') return true;
+  if (process.env.NODE_ENV !== 'test') return false;
   if (process.env.EXPO_PUBLIC_DEMO_MODE === '0') return false;
-  return typeof __DEV__ !== 'undefined' && Boolean(__DEV__);
+  // Fixtures ficam disponíveis somente para Jest e componentes legados isolados.
+  return true;
 }
 
 export const DEMO_MODE: boolean = isDemoMode();

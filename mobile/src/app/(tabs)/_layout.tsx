@@ -1,7 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router/js-tabs';
 import { FloatingTabBar } from '../../components/floating-tab-bar';
-import { DEMO_MODE } from '../../config/features';
 
 export default function CustomerTabs() {
   return (
@@ -25,7 +24,7 @@ export default function CustomerTabs() {
       <Tabs.Screen
         name="parceiros"
         options={{
-          ...(DEMO_MODE ? {} : { href: null }),
+          href: null,
           title: 'Parceiros',
           tabBarLabel: 'Parceiros',
         }}
@@ -33,8 +32,8 @@ export default function CustomerTabs() {
       <Tabs.Screen
         name="livetime"
         options={{
-          title: DEMO_MODE ? 'LiveTime' : 'Ao vivo',
-          tabBarLabel: DEMO_MODE ? 'LiveTime' : 'Ao vivo',
+          title: 'Ao vivo',
+          tabBarLabel: 'Ao vivo',
         }}
       />
       <Tabs.Screen
@@ -56,7 +55,6 @@ export default function CustomerTabs() {
       <Tabs.Screen
         name="reservas"
         options={{
-          ...(DEMO_MODE ? { href: null } : {}),
           title: 'Reservas',
         }}
       />

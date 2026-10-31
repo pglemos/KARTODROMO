@@ -13,8 +13,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { tap } from './motion';
 import type { BottomTabBarProps } from 'expo-router/build/react-navigation/bottom-tabs/types';
-import { DEMO_MODE, isDemoMode } from '../config/features';
 import { SportsIcon, type SportsIconName } from './sports-icons';
+import { SPORTS_PALETTE } from './theme';
 
 export interface TabItemConfig {
   name: string;
@@ -22,15 +22,7 @@ export interface TabItemConfig {
   icon: SportsIconName;
 }
 
-const DEMO_TAB_ITEMS: readonly TabItemConfig[] = [
-  { name: 'index', label: 'Home', icon: 'home' },
-  { name: 'parceiros', label: 'Parceiros', icon: 'map-pin' },
-  { name: 'livetime', label: 'LiveTime', icon: 'timer' },
-  { name: 'agenda', label: 'Agenda', icon: 'calendar' },
-  { name: 'carreira', label: 'Carreira', icon: 'helmet' },
-] as const;
-
-// Build de loja: só abas ligadas a dados reais (agenda, reservas, resultados, treino GPS).
+// Abas publicadas: todas apontam para telas ligadas à API/Worker real.
 const LIVE_TAB_ITEMS: readonly TabItemConfig[] = [
   { name: 'index', label: 'Início', icon: 'home' },
   { name: 'agenda', label: 'Agenda', icon: 'calendar' },
@@ -39,15 +31,26 @@ const LIVE_TAB_ITEMS: readonly TabItemConfig[] = [
   { name: 'carreira', label: 'Carreira', icon: 'helmet' },
 ] as const;
 
-export function getTabBarItems(demo = isDemoMode()): readonly TabItemConfig[] {
-  return demo ? DEMO_TAB_ITEMS : LIVE_TAB_ITEMS;
+export function getTabBarItems(_demo?: boolean): readonly TabItemConfig[] {
+  return LIVE_TAB_ITEMS;
 }
 
-export const TAB_BAR_ITEMS: readonly TabItemConfig[] = DEMO_MODE ? DEMO_TAB_ITEMS : LIVE_TAB_ITEMS;
+export const TAB_BAR_ITEMS: readonly TabItemConfig[] = LIVE_TAB_ITEMS;
 
 export const FLOATING_BAR_HEIGHT = 64;
+export const FLOATING_BAR_GAP = 16;
+// Mantidos para consumidores/testes antigos; as telas usam o clearance dinâmico abaixo.
 export const FLOATING_CONTENT_PADDING = 120;
 export const FLOATING_CONTENT_PADDING_WITH_CART = 170;
+
+function bottomPositionFor(bottomInset: number) {
+  return Math.max(16, bottomInset) + 8;
+}
+
+/** Mantém folgas próprias de conteúdo sem duplicar a altura reservada pela barra. */
+export function useFloatingTabBarClearance(extra = 0) {
+  return Math.max(0, extra);
+}
 
 export interface FloatingTabBarCustomProps {
   activeTab?: string;
@@ -91,10 +94,10 @@ export function FloatingTabBar(props: FloatingTabBarProps) {
   const indiceAtivo = itens.findIndex((i) => i.name === focusedRouteName);
   const larguraItem = larguraBarra > 0 ? (larguraBarra - 12) / itens.length : 0;
   const isLargeScreen = windowWidth > 512;
-  const bottomPosition = Math.max(16, bottomInset) + 8;
+  const bottomPosition = bottomPositionFor(bottomInset);
 
   return (
-    <>
+    <View testID="floating-tab-bar-reserved-area" pointerEvents="box-none" style={{ height: FLOATING_BAR_HEIGHT + bottomPosition + FLOATING_BAR_GAP }}>
       <View
         accessibilityRole="tablist"
         style={[
@@ -173,7 +176,7 @@ export function FloatingTabBar(props: FloatingTabBarProps) {
               <SportsIcon
                 name={item.icon}
                 size={22}
-                color={isFocused ? '#2BF27A' : '#A1A1AA'}
+                color={isFocused ? SPORTS_PALETTE.accent : SPORTS_PALETTE.muted}
               />
               <Text
                 style={[
@@ -188,7 +191,7 @@ export function FloatingTabBar(props: FloatingTabBarProps) {
           );
         })}
       </View>
-    </>
+    </View>
   );
 }
 
@@ -243,12 +246,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   tabLabelActive: {
-    color: '#2BF27A',
+    color: SPORTS_PALETTE.accent,
     fontWeight: '600',
     letterSpacing: 0.2,
   },
   tabLabelInactive: {
-    color: '#D4D4D8',
+    color: SPORTS_PALETTE.textSecondary,
     fontWeight: '400',
     letterSpacing: 0.2,
   },
@@ -261,6 +264,6 @@ function PilulaAtiva({ pilula, indice, largura }: { pilula: Animated.Value; indi
   }, [indice, largura, pilula]);
   return (
     <Animated.View pointerEvents="none" testID="tab-active-indicator"
-      style={{ position: 'absolute', left: 6, top: 5, bottom: 5, width: largura, borderRadius: 27, backgroundColor: 'rgba(43, 242, 122, 0.16)', transform: [{ translateX: pilula }] }} />
+      style={{ position: 'absolute', left: 6, top: 5, bottom: 5, width: largura, borderRadius: 27, backgroundColor: SPORTS_PALETTE.navActivePill, transform: [{ translateX: pilula }] }} />
   );
 }

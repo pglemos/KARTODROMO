@@ -6,20 +6,29 @@
     "orientation": "default",
     "icon": "./assets/app-icon.png",
     "scheme": "kartodromo",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#000000",
+    "androidStatusBar": {
+      "barStyle": "light-content",
+      "backgroundColor": "#000000",
+      "translucent": false
+    },
     "ios": {
       "bundleIdentifier": "br.com.kartodromobetim.app",
-      "buildNumber": "1",
+      "buildNumber": "42",
       "icon": "./assets/app-icon.png",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIUserInterfaceStyle": "Dark",
+        "UIStatusBarStyle": "UIStatusBarStyleLightContent",
+        "UIViewControllerBasedStatusBarAppearance": false
       }
     },
     "android": {
       "package": "br.com.kartodromobetim.app",
-      "versionCode": 1,
+      "versionCode": 42,
       "adaptiveIcon": {
-        "backgroundColor": "#FFFFFF",
+        "backgroundColor": "#000000",
         "foregroundImage": "./assets/adaptive-icon.png",
         "monochromeImage": "./assets/monochrome-icon.png"
       },
@@ -34,11 +43,11 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#F8F9F9",
+          "backgroundColor": "#000000",
           "image": "./assets/splash.png",
           "imageWidth": 280,
           "dark": {
-            "backgroundColor": "#151B18",
+            "backgroundColor": "#000000",
             "image": "./assets/splash.png"
           }
         }

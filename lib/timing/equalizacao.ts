@@ -220,7 +220,7 @@ export function ajusteRedutorMm(deltaMs: number, regra: RegraRedutor): number {
   if (a <= regra.toleranciaMs) return 0;
   if (regra.faixasPersonalizadas?.length) {
     const linha = regra.faixasPersonalizadas.find((f) => a <= f.ateMs);
-    const ultima = regra.faixasPersonalizadas.at(-1)!;
+    const ultima = regra.faixasPersonalizadas[regra.faixasPersonalizadas.length - 1]!;
     const ajuste = linha ? linha.mm : ultima.mm + Math.ceil((a - ultima.ateMs) / regra.faixaMs) * regra.passoMm;
     return mm2(Math.sign(deltaMs) * ajuste);
   }
@@ -304,6 +304,8 @@ export function calcularEqualizacao(
   let metaOrigem: ResultadoEqualizacao['metaOrigem'] = 'sem-meta';
   if (cfg.metaModo === 'fixa' && Number(cfg.metaFixaMs) > 0) { metaMs = Math.round(Number(cfg.metaFixaMs)); metaOrigem = 'fixa'; }
   else if (melhoresRefs.length) { metaMs = Math.min(...melhoresRefs); metaOrigem = 'referencia'; }
+  // Item 9: Fallback determinístico para meta fixa do traçado se karts referência ainda não completaram volta
+  else if (Number(cfg.metaFixaMs) > 0) { metaMs = Math.round(Number(cfg.metaFixaMs)); metaOrigem = 'fixa'; }
 
   const karts = competidores.map((c): KartEqualizacao => {
     const v = voltasValidas(c);

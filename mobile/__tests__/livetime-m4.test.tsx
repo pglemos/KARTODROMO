@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { LiveTimeScreen } from '../src/components/livetime-screen';
-import CockpitHUDScreen from '../src/app/cockpit-hud';
+import CockpitHUDScreen from '../src/legacy/cockpit-hud-screen';
 import { MOCK_LIVE_SESSION, MOCK_COCKPIT_HUD_STATE } from '../src/mock/kart-data';
 
 describe('Milestone 4 — LiveTime Screen & Cockpit HUD Component Suite', () => {

@@ -8,8 +8,9 @@ export function normalizarInstagram(value: unknown): string {
 }
 
 export function erroInstagramCliente(value: unknown): string | null {
-  if (!String(value ?? '').trim()) return 'O Instagram é obrigatório. Informe o @usuário do piloto.';
-  const perfil = normalizarInstagram(value);
+  const usuario = String(value ?? '').trim();
+  if (!usuario) return null;
+  const perfil = normalizarInstagram(usuario);
   return /^@[a-z0-9_](?:[a-z0-9_.]{0,28}[a-z0-9_])?$/.test(perfil) && !perfil.includes('..')
     ? null : 'Instagram inválido. Informe o @usuário do piloto (ex.: @andre.silva).';
 }
