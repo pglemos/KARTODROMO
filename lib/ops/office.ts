@@ -1057,8 +1057,9 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const st = url.searchParams.get('status') || 'todas';
     const where = ["b.Status <> 'cancelada'"];
     if (st === 'aprovar') where.push("i.Aprovada = 0 AND i.Status <> 'cancelada'");
-    else if (st === 'aprovadas') where.push("i.Aprovada = 1 AND i.Status <> 'cancelada'");
-    else if (st === 'pendentes') where.push("i.Aprovada = 1 AND i.Pago = 0 AND i.Status <> 'cancelada'");
+    // equipes de Endurance são da organização do evento: não entram em Aprovadas nem em Pagamento pendente
+    else if (st === 'aprovadas') where.push("i.Aprovada = 1 AND i.Status <> 'cancelada' AND NOT EXISTS (SELECT 1 FROM dbo.EnduranceEvento ev WHERE ev.BateriaId = i.BateriaId AND ev.Ativo = 1)");
+    else if (st === 'pendentes') where.push("i.Aprovada = 1 AND i.Pago = 0 AND i.Status <> 'cancelada' AND ISNULL(i.PrecoCentavos, p.PrecoCentavos) - i.DescontoCentavos > 0 AND NOT EXISTS (SELECT 1 FROM dbo.EnduranceEvento ev WHERE ev.BateriaId = i.BateriaId AND ev.Ativo = 1)");
     else if (st === 'canceladas') where.push("i.Status = 'cancelada'");
     const bat = url.searchParams.get('bateriaId');
     let p: Record<string, unknown> = {};
@@ -1556,7 +1557,18 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     return true;
   }
   if ((m = path.match(/^\/reservas\/(\d+)\/aprovar$/)) && method === 'POST') {
-    await query(`UPDATE dbo.Inscricao SET Aprovada = 1, AtualizadoEm = SYSDATETIME() WHERE Id = @id AND Status <> 'cancelada'`, { id: Number(m[1]) });
+    // evento já acertado fora da recepção (preço final R$ 0): aprovar já confirma, sem caixa nem planilha
+    await query(
+      `UPDATE i SET Aprovada = 1,
+         Pago = CASE WHEN x.total = 0 THEN 1 ELSE i.Pago END,
+         ValorCentavos = CASE WHEN x.total = 0 THEN 0 ELSE i.ValorCentavos END,
+         Status = CASE WHEN x.total = 0 THEN 'confirmada' ELSE i.Status END,
+         AtualizadoEm = SYSDATETIME()
+       FROM dbo.Inscricao i JOIN dbo.Bateria b ON b.Id = i.BateriaId LEFT JOIN dbo.Produto p ON p.Id = ISNULL(i.ProdutoId, b.ProdutoId)
+       CROSS APPLY (SELECT ISNULL(i.PrecoCentavos, p.PrecoCentavos) - i.DescontoCentavos total) x
+       WHERE i.Id = @id AND i.Status <> 'cancelada'`,
+      { id: Number(m[1]) },
+    );
     send(200, { ok: true });
     return true;
   }

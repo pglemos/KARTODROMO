@@ -1,0 +1,18 @@
+{
+  // Página própria das 200 Milhas de Betim (inscrição e pagamento). O resto do site segue no kartodromo-site-2026.
+  // Segredo: OPS_KEY (mesma OPS_RECEPCAO_KEY do SRVKART).
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "kartodromo-200-milhas",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "observability": { "enabled": true },
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": true },
+  "vars": { "OPS_URL": "https://ops.kartodromodebetim.com.br" },
+  "routes": [
+    { "pattern": "kartodromodebetim.com.br/media/championships/200-milhas-logo.png", "zone_name": "kartodromodebetim.com.br" },
+    { "pattern": "www.kartodromodebetim.com.br/media/championships/200-milhas-logo.png", "zone_name": "kartodromodebetim.com.br" },
+    { "pattern": "kartodromodebetim.com.br/200-milhas*", "zone_name": "kartodromodebetim.com.br" },
+    { "pattern": "www.kartodromodebetim.com.br/200-milhas*", "zone_name": "kartodromodebetim.com.br" }
+  ]
+}

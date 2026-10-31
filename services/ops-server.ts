@@ -30,6 +30,7 @@ import { relatorio } from '../lib/ops/relatorios';
 import { renderTermoResponsabilidade, type TermoParticipante } from '../lib/ops/termo';
 import { buscarPreCadastroAgora, preCadastroLigado, sincronizarPreCadastros } from '../lib/ops/pre-cadastro';
 import { conferirCobrancas, gruposRoutes } from '../lib/ops/grupos';
+import { campeonatoOfficeRoutes, campeonatoSiteRoutes, conferirCobrancasCampeonato } from '../lib/ops/campeonato-inscricoes';
 import { painelRoutes, registrarSinal } from '../lib/ops/painel';
 import { enduranceDasBaterias, enduranceRoutes, equipesParaOTotem, paginaDoChefe, vincularNoTotem } from '../lib/ops/endurance';
 import { ENDURANCE_VINCULO_SQL } from '../lib/ops/endurance-vinculo';
@@ -658,12 +659,18 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, { ok: !!job });
       }
       const reqOffice = { method, url, sessao, body: () => readBody(req) };
+      if (await campeonatoOfficeRoutes(reqOffice, (status, body) => send(res, status, body))) return;
       if (await gruposRoutes(reqOffice, (status, body) => send(res, status, body))) return;
       if (await painelRoutes(reqOffice, (status, body) => send(res, status, body))) return;
       if (await enduranceRoutes(reqOffice, (status, body) => send(res, status, body))) return;
       if (await pilotosRoutes(reqOffice, (status, body) => send(res, status, body))) return;
       const handled = await officeRoutes(reqOffice, (status, body) => send(res, status, body));
       if (handled) return;
+    }
+    if (path.startsWith('/api/campeonato-site/')) {
+      requireKey(req);
+      if (await campeonatoSiteRoutes(path, method, () => readBody(req), (status, body) => send(res, status, body))) return;
+      return send(res, 404, { error: 'Rota desconhecida.' });
     }
     if (path.startsWith('/api/crono/')) {
       requireKey(req);
@@ -816,7 +823,7 @@ if (preCadastroLigado()) {
   setInterval(async () => {
     if (conferindo) return;
     conferindo = true;
-    try { await conferirCobrancas(log); } catch (e) { log(`grupo: conferência das cobranças falhou (${(e as Error).message})`); } finally { conferindo = false; }
+    try { await conferirCobrancas(log); await conferirCobrancasCampeonato(log); } catch (e) { log(`grupo: conferência das cobranças falhou (${(e as Error).message})`); } finally { conferindo = false; }
   }, 60_000).unref();
 }
 

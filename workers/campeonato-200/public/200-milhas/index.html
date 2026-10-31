@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>200 Milhas de Betim 2027 | Inscrição de equipes</title>
+<meta name="description" content="30 de janeiro de 2027: 5 horas de endurance em Super Kart no Kartódromo Internacional de Betim. Inscreva sua equipe e pague por Pix ou cartão em até 5x sem juros.">
+<meta property="og:title" content="200 Milhas de Betim 2027">
+<meta property="og:description" content="5 horas, 5 paradas e uma estratégia. Inscreva sua equipe por R$ 2.800 por kart.">
+<meta property="og:image" content="https://kartodromodebetim.com.br/media/championships/200-milhas-logo.png">
+<meta name="theme-color" content="#0a0f0b">
+<link rel="icon" href="/media/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Extra+Condensed:ital,wght@0,800;1,800;1,900&family=Saira:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/200-milhas/style.css?v=20261031d">
+<script src="/200-milhas/app.js?v=20261031d" defer></script>
+<script src="/200-milhas/efeitos.js?v=20261031d" defer></script>
+<link rel="preload" as="image" href="/200-milhas/img/1.webp">
+</head>
+<body>
+<a class="pular" href="#conteudo">Pular para o conteúdo</a>
+<div id="paginaEvento"><main id="conteudo">
+<div style="background:#050706;color:#f4f7f4;font-family:'Saira',sans-serif;overflow-x:clip">
+  <div id="barra" aria-hidden="true" style="display:none"></div><div class="leds" id="leds" aria-hidden="true"><span class="led" style="--c:#00E676"></span><span class="led" style="--c:#00E676"></span><span class="led" style="--c:#00E676"></span><span class="led" style="--c:#00E676"></span><span class="led" style="--c:#00E676"></span><span class="led" style="--c:#ff2d2d"></span><span class="led" style="--c:#ff2d2d"></span><span class="led" style="--c:#ff2d2d"></span><span class="led" style="--c:#ff2d2d"></span><span class="led" style="--c:#ff2d2d"></span><span class="led" style="--c:#4d7cff"></span><span class="led" style="--c:#4d7cff"></span><span class="led" style="--c:#4d7cff"></span><span class="led" style="--c:#4d7cff"></span><span class="led" style="--c:#4d7cff"></span></div><div class="linhas" id="linhas" aria-hidden="true"></div><div class="brilhoCursor" id="luzCursor" aria-hidden="true"></div><div class="hud" aria-hidden="true"><div><small>TEMPO DE PROVA</small><b class="m" id="hudTempo">0:00:00</b></div><div><small>BOX</small><b id="hudBox" style="color:#ff6b6b">FECHADO</b></div><div class="setores"><small>SETORES</small><span class="setor"></span><span class="setor"></span><span class="setor"></span></div></div>
+  <header id="topoH" class="topoH" style="position:sticky;top:0;z-index:20;background:rgba(5,7,6,.8);backdrop-filter:blur(14px)">
+    <div style="max-width:1360px;margin:0 auto;padding:10px 24px;display:flex;align-items:center;gap:32px">
+      <a href="#topo" aria-label="200 Milhas de Betim"><img src="/media/championships/200-milhas-logo.png" alt="Logo 200 Milhas de Betim" style="width:58px;height:58px;display:block"></a>
+      <nav class="nav" aria-label="Seções" style="display:flex;gap:28px;font-weight:500;font-size:15px;margin-left:auto"><a href="#pista">A pista</a><a href="#box">O box</a><a href="#dia">O dia</a><a href="#vaga">Inscrição</a></nav>
+      <a class="cta botaoTopo brilho" href="#inscricao" style="background:#00E676;color:#02120a;text-decoration:none;font-weight:600;padding:13px 22px;font-size:15px;clip-path:polygon(8% 0,100% 0,92% 100%,0 100%)">Inscrever equipe</a>
+    </div>
+  </header>
+
+  <section id="topo" style="position:relative;min-height:880px;overflow:hidden;display:flex;align-items:flex-end;margin-top:-78px;background:#000"><div id="flash" aria-hidden="true" style="position:absolute;inset:0;background:#00E676;mix-blend-mode:overlay;opacity:0;z-index:1;pointer-events:none"></div>
+    <img class="foto fotoHero" id="fotoHero" src="/200-milhas/img/1.webp" alt="Grid completo alinhado para a largada Le Mans, pilotos sentados nos karts diante da torre e do público" style="position:absolute;left:0;right:0;top:0;width:100%;height:68%;object-fit:cover;object-position:50% 58%">
+    <div aria-hidden="true" style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,7,6,.5) 0%,rgba(5,7,6,0) 16%,rgba(5,7,6,0) 40%,rgba(5,7,6,.94) 62%,#050706 72%)"></div>
+    <div class="heroB" style="position:relative;width:100%;max-width:1360px;margin:0 auto;padding:0 24px 44px;box-sizing:border-box">
+      <div aria-hidden="true" id="luzes" class="a1" style="display:flex;gap:10px;margin-bottom:18px"><span class="l1" style="width:26px;height:26px;border-radius:50%;background:#ff2d2d;box-shadow:0 0 24px #ff2d2d"></span><span class="l2" style="width:26px;height:26px;border-radius:50%;background:#ff2d2d;box-shadow:0 0 24px #ff2d2d"></span><span class="l3" style="width:26px;height:26px;border-radius:50%;background:#ff2d2d;box-shadow:0 0 24px #ff2d2d"></span><span class="l4" style="width:26px;height:26px;border-radius:50%;background:#ff2d2d;box-shadow:0 0 24px #ff2d2d"></span><span class="l5" style="width:26px;height:26px;border-radius:50%;background:#ff2d2d;box-shadow:0 0 24px #ff2d2d"></span></div>
+      <h1 class="t a2" style="font-size:clamp(68px,11vw,168px)">Seu lugar<br><span style="color:#00E676">neste grid.</span></h1>
+      <div class="a3" style="display:flex;flex-wrap:wrap;gap:24px 40px;justify-content:space-between;align-items:flex-end;margin-top:26px">
+        <p style="margin:0;font-size:clamp(19px,1.9vw,25px);line-height:1.35;max-width:640px"><b>200 Milhas de Betim, 30/01/2027.</b> Largada Le Mans, sentado no kart. Cinco horas depois, só a bandeirada decide.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:12px"><a class="cta brilho magnet" href="#inscricao" style="background:#00E676;color:#02120a;text-decoration:none;font-weight:600;font-size:18px;padding:20px 36px;clip-path:polygon(6% 0,100% 0,94% 100%,0 100%)">Colocar minha equipe no grid<span class="seta" aria-hidden="true">→</span></a><a class="ghost" href="/media/regulamentos/200-milhas-de-betim-2027.pdf" target="_blank" rel="noopener" style="border:1px solid rgba(255,255,255,.45);color:#fff;text-decoration:none;padding:19px 24px">Regulamento</a></div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-label="Contagem para a largada" style="background:#00E676;color:#02120a"><div style="max-width:1360px;margin:0 auto;padding:16px 24px;display:flex;flex-wrap:wrap;gap:8px 36px;justify-content:space-between;align-items:center"><span class="t" style="font-size:30px">Luzes apagam em</span><span class="m" style="font-size:clamp(26px,4vw,44px);font-weight:700"><span id="falta">--</span></span><span class="m" style="font-size:14px;font-weight:700">INSCRIÇÕES ATÉ 10/01/2027</span></div></section>
+
+  <div class="faixa" aria-hidden="true"><p class="t" data-faixa="1">LARGADA LE MANS <i>/</i> 5 HORAS + 1 VOLTA <i>/</i> 5 PARADAS DE 7 MIN <i>/</i> SORTEIO DE KART <i>/</i> 100 KG <i>/</i> LARGADA LE MANS <i>/</i> 5 HORAS + 1 VOLTA <i>/</i> 5 PARADAS DE 7 MIN <i>/</i> SORTEIO DE KART <i>/</i> 100 KG <i>/</i> LARGADA LE MANS <i>/</i> 5 HORAS + 1 VOLTA <i>/</i> 5 PARADAS DE 7 MIN <i>/</i> SORTEIO DE KART <i>/</i> 100 KG <i>/</i> LARGADA LE MANS <i>/</i> 5 HORAS + 1 VOLTA <i>/</i> 5 PARADAS DE 7 MIN <i>/</i> SORTEIO DE KART <i>/</i> 100 KG <i>/</i> LARGADA LE MANS <i>/</i> 5 HORAS + 1 VOLTA <i>/</i> 5 PARADAS DE 7 MIN <i>/</i> SORTEIO DE KART <i>/</i> 100 KG <i>/</i> LARGADA LE MANS <i>/</i> 5 HORAS + 1 VOLTA <i>/</i> 5 PARADAS DE 7 MIN <i>/</i> SORTEIO DE KART <i>/</i> 100 KG <i>/</i> </p></div>
+  <section id="pista" style="position:relative;height:1500px;background:#050706">
+    <div id="fixa" style="position:sticky;top:0;height:max(720px,min(100vh,1000px));overflow:hidden">
+      <img id="aero" src="/200-milhas/img/2.webp" alt="Vista aérea do Kartódromo Internacional de Betim, com as curvas do traçado" style="position:absolute;left:0;top:0;width:100%;height:118%;object-fit:cover;object-position:50% 10%;transform-origin:50% 0" loading="lazy">
+      <div class="veuPista" aria-hidden="true" style="position:absolute;inset:0;background:linear-gradient(90deg,rgba(5,7,6,.96) 0%,rgba(5,7,6,.82) 42%,rgba(5,7,6,.1) 74%)"></div>
+      <div style="position:relative;max-width:1360px;height:100%;margin:0 auto;padding:96px 24px 48px;display:flex;flex-direction:column;justify-content:center;box-sizing:border-box">
+        <p class="m" style="color:#00E676;margin:0 0 14px;font-size:14px">5 HORAS + 1 VOLTA</p>
+        <h2 class="t" style="font-size:clamp(64px,9vw,136px);max-width:820px">Você vai decorar cada metro.</h2>
+        <p style="font-size:22px;max-width:540px;line-height:1.4;margin:22px 0 0">Super Karts de locação, abastecidos pela organização e sorteados. O que muda o resultado é o piloto e a estratégia.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="box" style="position:relative;z-index:1;background:#050706;padding:110px 0 0">
+    <div style="max-width:1360px;margin:0 auto;padding:0 24px">
+      <h2 class="t rev" style="font-size:clamp(64px,9vw,136px)">A corrida se ganha fora da pista também.</h2>
+    </div>
+    <div class="zoomH" style="position:relative;height:clamp(420px,62vw,860px);margin-top:48px;overflow:hidden">
+      <img class="par" data-par="70" src="/200-milhas/img/5.webp" alt="Karts 03 e 39 disputando a curva, com o pelotão logo atrás" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" loading="lazy">
+    </div>
+    <div class="dois cartoes" style="position:relative;max-width:1360px;margin:-90px auto 0;padding:0 24px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
+      <article class="rev card3" style="background:#0d1410;border-top:4px solid #00E676;padding:28px"><b class="t" style="font-size:72px;color:#00E676;display:block">5 × 7 min</b><p style="margin:14px 0 0;line-height:1.5">Cinco paradas obrigatórias de 7 minutos, mais até 2 extras sem tempo mínimo.</p></article>
+      <article class="rev card3" style="background:#0d1410;border-top:4px solid #00E676;padding:28px"><b class="t" style="font-size:72px;color:#00E676;display:block">Fileira 1 a 4</b><p style="margin:14px 0 0;line-height:1.5">A bolinha decide a fileira. O piloto que entra pega o primeiro kart dela.</p></article>
+      <article class="rev card3" style="background:#0d1410;border-top:4px solid #00E676;padding:28px"><b class="t" style="font-size:72px;color:#00E676;display:block">100 kg</b><p style="margin:14px 0 0;line-height:1.5">Pesagem em toda parada. Cada 500 g abaixo custa 1 minuto; abaixo de 98 kg, o kart está fora.</p></article>
+    </div>
+  </section>
+
+  <div class="faixa" aria-hidden="true" style="transform:rotate(1.2deg) scale(1.02);background:#f4f7f4"><p class="t" data-faixa="-1">LARGADA LE MANS <i>/</i> 5 HORAS + 1 VOLTA <i>/</i> 5 PARADAS DE 7 MIN <i>/</i> SORTEIO DE KART <i>/</i> 100 KG <i>/</i> LARGADA LE MANS <i>/</i> 5 HORAS + 1 VOLTA <i>/</i> 5 PARADAS DE 7 MIN <i>/</i> SORTEIO DE KART <i>/</i> 100 KG <i>/</i> LARGADA LE MANS <i>/</i> 5 HORAS + 1 VOLTA <i>/</i> 5 PARADAS DE 7 MIN <i>/</i> SORTEIO DE KART <i>/</i> 100 KG <i>/</i> LARGADA LE MANS <i>/</i> 5 HORAS + 1 VOLTA <i>/</i> 5 PARADAS DE 7 MIN <i>/</i> SORTEIO DE KART <i>/</i> 100 KG <i>/</i> LARGADA LE MANS <i>/</i> 5 HORAS + 1 VOLTA <i>/</i> 5 PARADAS DE 7 MIN <i>/</i> SORTEIO DE KART <i>/</i> 100 KG <i>/</i> LARGADA LE MANS <i>/</i> 5 HORAS + 1 VOLTA <i>/</i> 5 PARADAS DE 7 MIN <i>/</i> SORTEIO DE KART <i>/</i> 100 KG <i>/</i> </p></div>
+  <section id="dia" style="padding:120px 0">
+    <div class="dois" style="max-width:1360px;margin:0 auto;padding:0 24px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:64px">
+      <h2 class="t rev" style="font-size:clamp(60px,7vw,108px)">Do café à bandeirada</h2>
+      <ol class="crono" style="list-style:none;margin:0;padding:0;font-size:20px">
+        <li class="rev" style="display:grid;grid-template-columns:170px 1fr;gap:16px;padding:22px 0;border-top:1px solid rgba(255,255,255,.18)"><span class="m" style="color:#00E676;font-size:15px">SEX 29/01 · 21:00</span>Tomada de tempo, 10 minutos</li>
+        <li class="rev" style="display:grid;grid-template-columns:170px 1fr;gap:16px;padding:22px 0;border-top:1px solid rgba(255,255,255,.18)"><span class="m" style="color:#00E676;font-size:15px">SÁB 30/01 · 07:00</span>Café da manhã e inscrição dos pilotos</li>
+        <li class="rev" style="display:grid;grid-template-columns:170px 1fr;gap:16px;padding:22px 0;border-top:1px solid rgba(255,255,255,.18)"><span class="m" style="color:#00E676;font-size:15px">07:30</span>Briefing e sorteio dos karts</li>
+        <li class="rev" style="display:grid;grid-template-columns:170px 1fr;gap:16px;padding:22px 0;border-top:1px solid rgba(255,255,255,.18)"><span class="m" style="color:#00E676;font-size:15px">08:00</span><b class="t" style="font-size:46px;color:#00E676">Largada Le Mans</b></li>
+        <li class="rev" style="display:grid;grid-template-columns:170px 1fr;gap:16px;padding:22px 0;border-top:1px solid rgba(255,255,255,.18)"><span class="m" style="color:#00E676;font-size:15px">13:00</span>Encerramento</li>
+        <li class="rev" style="display:grid;grid-template-columns:170px 1fr;gap:16px;padding:22px 0;border-block:1px solid rgba(255,255,255,.18)"><span class="m" style="color:#00E676;font-size:15px">13:30</span>Resultado oficial e premiação</li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="reflexo" style="padding:120px 0;background:#0a0f0c;text-align:center" aria-labelledby="tReflexo">
+    <div style="max-width:980px;margin:0 auto;padding:0 24px;display:flex;flex-direction:column;align-items:center">
+      <p class="m" style="margin:0 0 12px;color:#00E676;font-size:14px">TESTE DE LARGADA</p>
+      <h2 id="tReflexo" class="t rev" style="font-size:clamp(60px,9vw,130px)">Você larga bem?</h2>
+      <p style="font-size:20px;margin:14px 0 36px;color:#c8d1ca">Espere as cinco luzes acenderem. Apagou, clique. Antes disso é largada queimada.</p>
+      <div id="semaforo" aria-hidden="true" style="display:flex;gap:clamp(8px,2vw,20px);padding:clamp(14px,2vw,24px);background:#050706;border:2px solid #2c3230;margin-bottom:32px"><span class="rl" style="width:clamp(44px,8vw,92px);height:clamp(44px,8vw,92px);border-radius:50%;background:#1a0606;border:4px solid #2c3230;transition:background .06s,box-shadow .06s"></span><span class="rl" style="width:clamp(44px,8vw,92px);height:clamp(44px,8vw,92px);border-radius:50%;background:#1a0606;border:4px solid #2c3230;transition:background .06s,box-shadow .06s"></span><span class="rl" style="width:clamp(44px,8vw,92px);height:clamp(44px,8vw,92px);border-radius:50%;background:#1a0606;border:4px solid #2c3230;transition:background .06s,box-shadow .06s"></span><span class="rl" style="width:clamp(44px,8vw,92px);height:clamp(44px,8vw,92px);border-radius:50%;background:#1a0606;border:4px solid #2c3230;transition:background .06s,box-shadow .06s"></span><span class="rl" style="width:clamp(44px,8vw,92px);height:clamp(44px,8vw,92px);border-radius:50%;background:#1a0606;border:4px solid #2c3230;transition:background .06s,box-shadow .06s"></span></div>
+      <button type="button" class="reage" id="botaoReage">Ligar o motor</button>
+      <p id="saidaReage" role="status" aria-live="polite" style="min-height:64px;margin:22px 0 0;font-size:22px"></p>
+    </div>
+  </section>
+  <section id="vaga" class="zoomH" style="position:relative;min-height:860px;overflow:hidden;display:flex;align-items:center;background:#000">
+    <img id="sol" src="/200-milhas/img/4.webp" alt="Piloto do kart 24 encarando a pista, à frente da fila de karts" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:60% 40%" loading="lazy">
+    <div class="veuPreco" aria-hidden="true" style="position:absolute;inset:0;background:linear-gradient(90deg,rgba(5,7,6,.97) 10%,rgba(5,7,6,.86) 42%,rgba(5,7,6,0) 70%)"></div>
+    <div style="position:relative;width:100%;max-width:1360px;margin:0 auto;padding:60px 24px;box-sizing:border-box">
+      <p class="m rev" style="margin:0 0 12px;color:#00E676;font-size:14px;font-weight:700">POR KART · QUALQUER Nº DE PILOTOS</p>
+      <p class="t rev" id="preco" style="font-size:clamp(96px,15vw,220px);color:#00E676">R$ 2.800</p>
+      <p class="rev" style="font-size:21px;line-height:1.4;max-width:520px;margin:18px 0 28px">Pix ou até 5x de R$ 560 sem juros. Sua vaga fica garantida quando o pagamento confirma.</p>
+      <div class="rev" style="display:flex;flex-wrap:wrap;gap:12px"><a class="cta brilho magnet" href="#inscricao" style="background:#00E676;color:#02120a;text-decoration:none;font-weight:600;font-size:18px;padding:20px 36px;clip-path:polygon(6% 0,100% 0,94% 100%,0 100%)">Inscrever minha equipe<span class="seta" aria-hidden="true">→</span></a><a class="ghost" href="/media/regulamentos/200-milhas-de-betim-2027.pdf" target="_blank" rel="noopener" style="border:1px solid rgba(255,255,255,.5);color:#fff;text-decoration:none;padding:19px 24px">Regulamento oficial</a></div>
+      <p class="rev" style="font-size:14px;margin:18px 0 0;max-width:520px;color:#dfe6e0">Prova sujeita ao mínimo de 20 equipes. Se for cancelada, o valor é devolvido.</p>
+    </div>
+  </section>
+
+  <section id="inscricao" class="bloco caixa inscr" aria-labelledby="tInscr">
+    <aside class="resumo" aria-live="polite">
+      <h2 id="tInscr">Inscrição da equipe</h2>
+      <p>Preencha e pague aqui mesmo. A vaga fica garantida quando o pagamento for confirmado.</p>
+      <dl><div><dt>Karts</dt><dd id="rKarts">1</dd></div><div><dt>Pilotos</dt><dd id="rPilotos">2</dd></div><div class="total"><dt>Total</dt><dd id="rTotal">R$ 2.800,00</dd></div></dl>
+      <p class="parcela" id="rParcela"></p>
+      <p class="ajuda">Dúvidas sobre a inscrição? <a href="https://wa.me/5531998842898?text=Ol%C3%A1!%20Preciso%20de%20ajuda%20com%20a%20inscri%C3%A7%C3%A3o%20nas%20200%20Milhas." target="_blank" rel="noopener">Fale com a organização no WhatsApp</a></p>
+    </aside>
+    <form id="form" novalidate>
+      <div class="erros" id="erros" role="alert" tabindex="-1" hidden></div>
+      <input type="text" name="site" class="isca" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <fieldset>
+        <legend><span>1</span> Equipe e chefe de equipe</legend>
+        <label class="campo">Nome da equipe<input name="equipe" required maxlength="100" autocomplete="organization"></label>
+        <p class="dica forte">Já correu aqui? Informe seu CPF e a data de nascimento e trazemos seus dados.</p>
+        <div class="grade2">
+          <label class="campo">CPF do chefe<input name="chefeCpf" required inputmode="numeric" maxlength="14" autocomplete="off" placeholder="000.000.000-00" data-mascara="cpf"></label>
+          <label class="campo">Data de nascimento<input name="chefeNasc" type="date" autocomplete="bday"></label>
+        </div>
+        <p class="achado" id="chefeAchado" role="status"></p>
+        <label class="campo">Nome completo<input name="chefeNome" required maxlength="150" autocomplete="name"></label>
+        <div class="grade2">
+          <label class="campo">WhatsApp com DDD<input name="chefeTelefone" required inputmode="tel" maxlength="16" autocomplete="tel-national" placeholder="(31) 99999-9999" data-mascara="tel"></label>
+          <label class="campo">E-mail<input name="chefeEmail" required type="email" maxlength="200" autocomplete="email"></label>
+        </div>
+        <label class="campo">Cidade<input name="cidade" maxlength="100" autocomplete="address-level2"></label>
+      </fieldset>
+      <fieldset>
+        <legend><span>2</span> Karts e pilotos</legend>
+        <label class="campo curto">Quantidade de karts<select name="karts" id="karts"><option value="1">1 kart · R$ 2.800</option><option value="2">2 karts · R$ 5.600</option><option value="3">3 karts · R$ 8.400</option><option value="4">4 karts · R$ 11.200</option><option value="5">5 karts · R$ 14.000</option></select></label>
+        <p class="dica">Informe o CPF ou e-mail e o nascimento de cada piloto: quem já tem cadastro aparece preenchido. Altura e peso são confirmados aqui.</p>
+        <div id="pilotos"></div>
+      </fieldset>
+      <fieldset>
+        <legend><span>3</span> Pagamento</legend>
+        <div class="formas" role="radiogroup" aria-label="Forma de pagamento">
+          <label class="forma"><input type="radio" name="forma" value="pix" checked><span><b>Pix</b><small>Confirmação em minutos</small></span></label>
+          <label class="forma"><input type="radio" name="forma" value="cartao"><span><b>Cartão de crédito</b><small>Até 5x sem juros</small></span></label>
+        </div>
+        <label class="campo curto" id="campoParcelas" hidden>Parcelas<select name="parcelas" id="parcelas"></select></label>
+        <label class="campo">Observações <small>(opcional)</small><textarea name="observacao" rows="2" maxlength="1000"></textarea></label>
+      </fieldset>
+      <fieldset class="aceites">
+        <legend><span>4</span> Confirmações</legend>
+        <label class="marca"><input type="checkbox" name="aceiteRegulamento" required><span>Li e aceito o <a href="/media/regulamentos/200-milhas-de-betim-2027.pdf" target="_blank" rel="noopener">regulamento oficial</a>.</span></label>
+        <label class="marca"><input type="checkbox" name="aceiteRequisitos" required><span>Os pilotos atendem aos requisitos e os menores estarão com um responsável adulto.</span></label>
+        <label class="marca"><input type="checkbox" name="autorizaImagem"><span>Autorizo o uso de imagem da equipe na divulgação do evento (opcional).</span></label>
+      </fieldset>
+      <button class="btn cheio" type="submit" id="enviar">Inscrever e ir para o pagamento</button>
+      <p class="dica centro">O pagamento é feito na página segura do Asaas, nosso parceiro de cobrança. Não recebemos os dados do seu cartão.</p>
+    </form>
+  </section>
+  <section style="padding:110px 0 0">
+    <div style="max-width:1360px;margin:0 auto;padding:0 24px 40px"><h2 class="t rev" style="font-size:clamp(64px,9vw,136px)">E é assim que termina.</h2><p class="rev" style="font-size:21px;margin:16px 0 0">Com o time inteiro no pódio e o troféu das 200 Milhas na mão.</p></div>
+    <img id="abre" src="/200-milhas/img/3.webp" alt="Equipes comemorando no pódio das 200 Milhas de Betim, com troféus e painel de box" style="display:block;width:100%;max-height:1000px;object-fit:cover;object-position:50% 40%" loading="lazy">
+  </section>
+
+  <section style="padding:100px 0"><div style="max-width:880px;margin:0 auto;padding:0 24px">
+    <h2 class="t" style="font-size:72px;margin-bottom:26px">Antes de acelerar</h2>
+    <details style="border-top:1px solid rgba(255,255,255,.18)"><summary style="display:flex;justify-content:space-between;padding:20px 0;font-size:20px;font-weight:500">Quem pode correr?<span class="mais" aria-hidden="true" style="color:#00E676;font-size:26px">+</span></summary><p style="margin:0 0 20px;color:#c8d1ca">12 anos ou mais, acima de 1,50 m e de 50 kg, em equipes de 2 pilotos ou mais. Menores vão com um responsável adulto. Um piloto só pode estar em uma equipe.</p></details>
+    <details style="border-top:1px solid rgba(255,255,255,.18)"><summary style="display:flex;justify-content:space-between;padding:20px 0;font-size:20px;font-weight:500">Posso pagar depois de inscrever?<span class="mais" aria-hidden="true" style="color:#00E676;font-size:26px">+</span></summary><p style="margin:0 0 20px;color:#c8d1ca">Sim, pelo link da sua equipe, até 10/01/2027. Sem pagamento, a vaga não fica reservada.</p></details>
+    <details style="border-block:1px solid rgba(255,255,255,.18)"><summary style="display:flex;justify-content:space-between;padding:20px 0;font-size:20px;font-weight:500">E se eu desistir?<span class="mais" aria-hidden="true" style="color:#00E676;font-size:26px">+</span></summary><p style="margin:0 0 20px;color:#c8d1ca">O reembolso sai em até 30 dias, com retenção de R$ 280.</p></details>
+  </div></section>
+
+  <div class="quadriculada" aria-hidden="true" style="height:96px"></div>
+  <footer style="padding:36px 24px;text-align:center;color:#aab4ad;font-size:15px">Kartódromo Internacional de Betim · Av. Adutora Várzea das Flores, 477 · <a href="https://wa.me/5531998842898">(31) 99884-2898</a></footer>
+</div>
+</main></div>
+<main><section id="paginaStatus" class="bloco caixa status" hidden aria-live="polite"></section></main>
+</body>
+</html>

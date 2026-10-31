@@ -85,6 +85,7 @@ import { configPublica, enviarEmailSimples, enviarResultado, enviarTeste, lerCon
 import { usoKartsDaSessao } from '../lib/timing/kart-fisico';
 import { serializeMobilePublication } from '../lib/timing/mobile-results';
 import type { ContextoProva, EmpresaEmail } from '../lib/timing/email-resultado';
+import { quemSaiuDaAgenda } from '../lib/timing/agenda-saida';
 import { competidoresComSorteio, descricaoModoSorteio, ListaMudouError, pilotosDoSorteio, validarSorteio, type Atribuicao } from '../lib/timing/sorteio';
 import { normalizarPaginaPainel, PAINEL_LED_PAGE_SIZE } from '../lib/timing/painel-page';
 import { assinaturaDoConteudo, conferirChave, extrairChave, filtrarVoltasPorKart, lerHashes, montarTransmissao, montarVoltas, type Transmissao, type VoltasTransmissao } from '../lib/timing/transmissao';
@@ -1938,8 +1939,42 @@ async function sincronizarAgendaDoDia() {
   for (const b of baterias) {
     try { if (await prepararBateriaDaAgenda(b)) criou = true; } catch (err) { log(`agenda ${b.id}: não consegui preparar a bateria (${(err as Error).message})`); }
   }
+  if (await tirarQuemSaiuDaAgenda(baterias)) criou = true;
   if (criou) scheduleStateBroadcast();
   return mudou || criou;
+}
+
+/**
+ * Cliente movido de horário ou cancelado na recepção sai da lista que ainda não largou (cronometragem e tablet do galpão).
+ * Só tira quem veio da agenda (agendaPuxados): quem o cronometrista pôs à mão fica. Falha ao ler a agenda não tira ninguém.
+ */
+async function tirarQuemSaiuDaAgenda(baterias: BateriaAgenda[]) {
+  let mudou = false;
+  for (const b of baterias) {
+    const abertas = [...sessions.values()].filter((s) => s.agendaId === b.id && s.state === 'preparando' && s.agendaPuxados);
+    if (!abertas.length) continue;
+    let grade: InscritoAgenda[];
+    try { grade = (await opsGet(`/api/crono/baterias/${b.id}/grid`)) as InscritoAgenda[]; } catch { continue; }
+    if (!Array.isArray(grade)) continue;
+    const naAgenda = new Set(grade.map(chaveDoInscrito));
+    for (const s of abertas) {
+      const saiu = quemSaiuDaAgenda(s.agendaPuxados ?? [], s.competitors, naAgenda);
+      if (!saiu.chaves.size) continue;
+      s.agendaPuxados = (s.agendaPuxados ?? []).filter((k) => !saiu.chaves.has(k));
+      if (saiu.competidores.length) {
+        const fora = new Set(saiu.competidores);
+        setCompetitors(s, s.competitors.filter((c) => !fora.has(c)).map((c) => ({ kart: c.kart, name: c.name, customerId: c.customerId ?? null, category: c.category ?? null, detalhes: c.detalhes })));
+        log(`${s.name}: saiu da lista por mudança na recepção: ${saiu.competidores.map((c) => c.name).join(', ')}`);
+      }
+      saveSession(s);
+      mudou = true;
+    }
+  }
+  return mudou;
+}
+
+function chaveDoInscrito(g: InscritoAgenda) {
+  return g.clienteId != null ? String(g.clienteId) : String(g.nome ?? '').trim().toLowerCase();
 }
 
 type InscritoAgenda = { nome?: string; kart?: string | null; clienteId?: unknown; pago?: boolean; aprovada?: boolean };
