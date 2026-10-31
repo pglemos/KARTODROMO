@@ -4,7 +4,7 @@ import { cpfValido, digitos } from '../validar';
 import { clienteExistente, type MobileClientesEnv } from './clientes';
 import {
   mobileEmailConfigured,
-  sendMobileAuthEmail,
+  sendMobileAccountDeletionEmail, sendMobileAuthEmail,
   type MobileEmailEnv,
   type MobileEmailPurpose,
 } from './email';
@@ -47,6 +47,7 @@ interface AccountRow {
   password_iterations: number;
   password_scheme: string;
   email_verified_at: number | null;
+  deleted_at: number | null;
 }
 
 const ITERATIONS = 600_000;
@@ -56,6 +57,7 @@ const PASSWORD_MAX = 128;
 const ACCESS_TTL = 15 * 60_000;
 const REFRESH_TTL = 30 * 24 * 60 * 60_000;
 const RATE_WINDOW = 10 * 60_000;
+const DELETION_GRACE = 30 * 24 * 60 * 60 * 1000;
 const RATE_LIMIT = 6;
 // o Wi-Fi do kartódromo põe todo mundo atrás do mesmo IP: o limite por IP é bem mais alto que o por conta
 const RATE_LIMIT_IP = 60;
@@ -157,6 +159,7 @@ export async function mobileIdentityCandidates(env: MobileAuthEnv, limit = 50) {
   const { results } = await context.db.prepare(
     `SELECT a.email_cipher, a.cpf_cipher, a.phone_cipher FROM mobile_accounts a
       WHERE a.email_verified_at IS NOT NULL
+        AND a.deleted_at IS NULL
         AND NOT EXISTS (SELECT 1 FROM mobile_identity_links l WHERE l.account_id = a.id)
       ORDER BY a.email_verified_at DESC LIMIT ?`,
   ).bind(limit).all<{ email_cipher: string; cpf_cipher: string; phone_cipher: string }>();
@@ -316,7 +319,7 @@ async function findAccount(context: CryptoContext, identifier: string) {
     return context.db
       .prepare(
         `SELECT id, name_cipher, email_lookup, email_cipher, cpf_lookup, cpf_cipher,
-                phone_cipher, password_salt, password_hash, password_iterations, password_scheme, email_verified_at
+                phone_cipher, password_salt, password_hash, password_iterations, password_scheme, email_verified_at, deleted_at
          FROM mobile_accounts WHERE email_lookup = ? LIMIT 1`,
       )
       .bind(lookup)
@@ -327,7 +330,7 @@ async function findAccount(context: CryptoContext, identifier: string) {
   return context.db
     .prepare(
       `SELECT id, name_cipher, email_lookup, email_cipher, cpf_lookup, cpf_cipher,
-              phone_cipher, password_salt, password_hash, password_iterations, password_scheme, email_verified_at
+              phone_cipher, password_salt, password_hash, password_iterations, password_scheme, email_verified_at, deleted_at
        FROM mobile_accounts WHERE cpf_lookup = ? LIMIT 1`,
     )
     .bind(lookup)
@@ -462,14 +465,81 @@ async function createSession(context: CryptoContext, accountId: string) {
   };
 }
 
+async function passwordMatches(account: AccountRow, password: string) {
+  if (password.length === 0 || password.length > PASSWORD_MAX) return false;
+  const salt = decodeBase64Url(account.password_salt);
+  const scheme = account.password_scheme ?? PASSWORD_SCHEME;
+  if (constantTimeEqual(await passwordHash(password, salt, scheme), account.password_hash)) return true;
+  // mesma tolerância do login: senhas antigas podem ter sido gravadas sem os espaços das pontas
+  const limpa = password.trim();
+  return limpa !== password && limpa.length >= PASSWORD_MIN && constantTimeEqual(await passwordHash(limpa, salt, scheme), account.password_hash);
+}
+
+async function auditDeletion(
+  context: CryptoContext,
+  request: Request,
+  accountId: string,
+  action: 'requested' | 'restored' | 'purged',
+  sessionId: string | null,
+  now: number,
+) {
+  const ip = action === 'purged' ? null : await hmac(context, `ip:${clientIp(request)}`);
+  const agent = action === 'purged' ? null : (request.headers.get('user-agent') ?? '').slice(0, 200) || null;
+  return context.db
+    .prepare('INSERT INTO mobile_account_deletion_audit(id, account_id, action, session_id, ip_hash, user_agent, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .bind(crypto.randomUUID(), accountId, action, sessionId, ip, agent, now);
+}
+
+/** O Worker não tem cron: quem vence o prazo é apagado na próxima exclusão ou login. */
+async function purgeExpiredAccounts(context: CryptoContext, request: Request) {
+  const now = Date.now();
+  const { results } = await context.db
+    .prepare('SELECT id FROM mobile_accounts WHERE deleted_at IS NOT NULL AND deleted_at <= ? LIMIT 20')
+    .bind(now - DELETION_GRACE)
+    .all<{ id: string }>();
+  for (const { id } of results) {
+    await context.db.batch([
+      await auditDeletion(context, request, id, 'purged', null, now),
+      context.db.prepare('DELETE FROM mobile_sessions WHERE account_id = ?').bind(id),
+      context.db.prepare('DELETE FROM mobile_email_tokens WHERE account_id = ?').bind(id),
+      context.db.prepare('DELETE FROM mobile_coupon_previews WHERE account_id = ?').bind(id),
+      context.db.prepare('DELETE FROM mobile_identity_links WHERE account_id = ?').bind(id),
+      context.db.prepare('DELETE FROM mobile_orders WHERE account_id = ?').bind(id),
+      context.db.prepare('DELETE FROM mobile_accounts WHERE id = ?').bind(id),
+    ]);
+    console.info('mobile-account-purged', { accountId: id, purgedAt: now });
+  }
+}
+
+async function restoreAccount(request: Request, input: Record<string, unknown>, context: CryptoContext) {
+  const identifier = normalizeIdentifier(value(input, 'identifier'));
+  if (await rateLimited(context, request, 'restore', identifier)) {
+    return json(429, { erro: 'Muitas tentativas. Aguarde alguns minutos.' });
+  }
+  const account = identifier ? await findAccount(context, identifier) : null;
+  const now = Date.now();
+  if (!account || !(await passwordMatches(account, value(input, 'password')))
+    || account.deleted_at === null || account.deleted_at + DELETION_GRACE <= now) {
+    return json(401, { erro: authError });
+  }
+  await context.db.batch([
+    context.db.prepare('UPDATE mobile_accounts SET deleted_at = NULL WHERE id = ?').bind(account.id),
+    await auditDeletion(context, request, account.id, 'restored', null, now),
+  ]);
+  console.info('mobile-account-restored', { accountId: account.id, restoredAt: now });
+  if (account.email_verified_at === null) return json(403, { erro: 'Conta restaurada. Confirme seu e-mail para entrar.' });
+  return json(200, await createSession(context, account.id));
+}
+
 async function login(request: Request, input: Record<string, unknown>, env: MobileAuthEnv, context: CryptoContext) {
+  await purgeExpiredAccounts(context, request);
   const identifier = normalizeIdentifier(value(input, 'identifier'));
   if (await rateLimited(context, request, 'login', identifier)) {
     return json(429, { erro: 'Muitas tentativas. Aguarde alguns minutos.' });
   }
 
   const password = value(input, 'password');
-  if (password.length < PASSWORD_MIN || password.length > PASSWORD_MAX) return json(401, { erro: authError });
+  if (password.length === 0 || password.length > PASSWORD_MAX) return json(401, { erro: authError });
 
   const account = await findAccount(context, identifier);
   const salt = account ? decodeBase64Url(account.password_salt) : new Uint8Array(16);
@@ -480,6 +550,13 @@ async function login(request: Request, input: Record<string, unknown>, env: Mobi
     valid = constantTimeEqual(candidateTrimmed, account.password_hash);
   }
   if (!valid || !account) return json(401, { erro: authError });
+  if (account.deleted_at !== null) {
+    if (account.deleted_at + DELETION_GRACE <= Date.now()) return json(401, { erro: authError });
+    return json(409, {
+      codigo: 'CONTA_EM_EXCLUSAO',
+      erro: 'Esta conta está marcada para exclusão. Restaure a conta para voltar a entrar.',
+    });
+  }
   if (account.email_verified_at === null) {
     // senha certa mas e-mail ainda não confirmado: reenvia o link em vez de dizer "senha inválida"
     if (mobileEmailConfigured(env)) await deliverEmail(env, context, account, 'verify');
@@ -602,7 +679,7 @@ async function logout(request: Request, context: CryptoContext) {
   });
 }
 
-async function deleteAccount(request: Request, context: CryptoContext) {
+async function deleteAccount(request: Request, input: Record<string, unknown>, env: MobileAuthEnv, context: CryptoContext) {
   const match = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '');
   if (!match?.[1]) return json(401, { erro: 'Você precisa estar conectado.' });
 
@@ -610,29 +687,43 @@ async function deleteAccount(request: Request, context: CryptoContext) {
   const now = Date.now();
   const session = await context.db
     .prepare(
-      `SELECT account_id FROM mobile_sessions
+      `SELECT id, account_id FROM mobile_sessions
        WHERE access_token_hash = ? AND revoked_at IS NULL AND access_expires_at > ?
        LIMIT 1`,
     )
     .bind(tokenHash, now)
-    .first<{ account_id: string }>();
+    .first<{ id: string; account_id: string }>();
 
   if (!session) return json(401, { erro: 'Sessão inválida ou expirada.' });
+  if (await rateLimited(context, request, 'delete', session.account_id)) {
+    return json(429, { erro: 'Muitas tentativas. Aguarde alguns minutos.' });
+  }
 
   const accountId = session.account_id;
+  const account = await context.db
+    .prepare('SELECT id, email_cipher, password_salt, password_hash, password_scheme FROM mobile_accounts WHERE id = ? LIMIT 1')
+    .bind(accountId)
+    .first<AccountRow>();
+  // sessão roubada ou aparelho destravado não bastam: excluir exige a senha
+  if (!account || !(await passwordMatches(account, value(input, 'password')))) {
+    return json(403, { codigo: 'SENHA_INCORRETA', erro: 'Senha incorreta. Sua conta não foi excluída.' });
+  }
 
   await context.db.batch([
+    context.db.prepare('UPDATE mobile_accounts SET deleted_at = ? WHERE id = ?').bind(now, accountId),
+    await auditDeletion(context, request, accountId, 'requested', session.id, now),
     context.db.prepare('DELETE FROM mobile_sessions WHERE account_id = ?').bind(accountId),
     context.db.prepare('DELETE FROM mobile_email_tokens WHERE account_id = ?').bind(accountId),
-    context.db.prepare('DELETE FROM mobile_coupon_previews WHERE account_id = ?').bind(accountId),
-    context.db.prepare('DELETE FROM mobile_identity_links WHERE account_id = ?').bind(accountId),
-    context.db.prepare('DELETE FROM mobile_orders WHERE account_id = ?').bind(accountId),
-    context.db.prepare('DELETE FROM mobile_accounts WHERE id = ?').bind(accountId),
   ]);
 
   console.info('mobile-account-deleted', {
     accountId, deletedAt: now, requestId: request.headers.get('cf-ray'),
   });
+  // o aviso não pode desfazer a marcação: falha no envio fica só no log
+  await sendMobileAccountDeletionEmail(env, await decrypt(context, account.email_cipher), new Date(now + DELETION_GRACE))
+    .then((enviado) => { if (!enviado) console.error('mobile-account-deletion-email', 'not delivered'); })
+    .catch(() => console.error('mobile-account-deletion-email', 'failed'));
+  await purgeExpiredAccounts(context, request);
 
   return new Response(null, {
     status: 204,
@@ -736,13 +827,13 @@ export async function handleMobileAuth(request: Request, env: MobileAuthEnv) {
   try {
     switch (route) {
       case 'cadastro-existente': {
-        // cadastro do app: o CPF já tem conta no app ou cadastro no kartódromo? (mostra só o e-mail mascarado)
+        // cadastro do app: o CPF já tem conta no app ou cadastro no kartódromo? (não devolve e-mail, nem mascarado: a consulta é pública)
         if (await rateLimited(context, request, 'lookup')) return json(429, { erro: 'Muitas tentativas. Aguarde alguns minutos.' });
         const cpf = digitos(String(input.cpf ?? ''));
         if (!cpfValido(cpf)) return json(400, { erro: 'CPF inválido.' });
         const conta = await context.db.prepare('SELECT 1 FROM mobile_accounts WHERE cpf_lookup = ? LIMIT 1').bind(await hmac(context, `cpf:${cpf}`)).first();
         const cadastro = await clienteExistente(env as MobileClientesEnv, cpf).catch(() => null);
-        return json(200, { contaApp: Boolean(conta), cadastro: cadastro !== null, email: cadastro || null });
+        return json(200, { contaApp: Boolean(conta), cadastro: cadastro !== null, email: null });
       }
       case 'register':
         return await register(request, input, env, context);
@@ -768,7 +859,9 @@ export async function handleMobileAuth(request: Request, env: MobileAuthEnv) {
       case 'session/logout':
         return await logout(request, context);
       case 'account/delete':
-        return await deleteAccount(request, context);
+        return await deleteAccount(request, input, env, context);
+      case 'account/restore':
+        return await restoreAccount(request, input, context);
       default:
         return json(404, { erro: 'Rota desconhecida.' });
     }
