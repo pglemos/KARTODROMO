@@ -1,8 +1,8 @@
 'use strict';
 /* 200 Milhas: inscrições do site, equipes, pilotos, contatos e quem pagou. Depende de app.js. */
-NAV.find((g) => g.t === 'Competições').itens.unshift(['inscricoes200', '200 Milhas · Inscrições', IC.camp, G('#00C853', '#007E33')]);
+NAV.find((g) => g.t === 'Competições').itens.unshift(['inscricoes', '200 Milhas · Inscrições', IC.camp, G('#00C853', '#007E33')]);
 
-TELAS.inscricoes200 = async (tela) => {
+TELAS.inscricoes = async (tela) => {
   const F = S.i200 || (S.i200 = { aba: 'equipes', filtro: 'todas', q: '' });
   let D = await office('/campeonato-inscricoes?evento=200-milhas');
   const zap = (t) => { const d = String(t || '').replace(/\D/g, ''); return d ? `https://wa.me/${d.length <= 11 ? '55' + d : d}` : ''; };

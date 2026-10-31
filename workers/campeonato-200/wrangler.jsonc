@@ -10,6 +10,8 @@
   "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": true },
   "vars": { "OPS_URL": "https://ops.kartodromodebetim.com.br" },
   "routes": [
+    { "pattern": "kartodromodebetim.com.br/media/championships/500-milhas-logo.png", "zone_name": "kartodromodebetim.com.br" },
+    { "pattern": "www.kartodromodebetim.com.br/media/championships/500-milhas-logo.png", "zone_name": "kartodromodebetim.com.br" },
     { "pattern": "kartodromodebetim.com.br/media/championships/200-milhas-logo.png", "zone_name": "kartodromodebetim.com.br" },
     { "pattern": "www.kartodromodebetim.com.br/media/championships/200-milhas-logo.png", "zone_name": "kartodromodebetim.com.br" },
     { "pattern": "kartodromodebetim.com.br/200-milhas*", "zone_name": "kartodromodebetim.com.br" },
