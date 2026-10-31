@@ -22,7 +22,7 @@ describe('ao vivo do app', () => {
 
   it('mantém só os campos da tela e tira a linha vazia do painel', () => {
     const r = retratoParaApp(retrato);
-    expect(r).toMatchObject({ status: 'live', eventName: 'BATERIA 17:00 · CORRIDA', raceId: 'x', startedAt: '2026-10-20T20:00:00.000Z', sessionType: 'race' });
+    expect(r).toMatchObject({ status: 'live', eventName: 'BATERIA 17:00 · CORRIDA', raceId: 'x', startedAt: '2026-10-20T20:00:00.000Z', sessionType: 'race', transport: 'polling' });
     expect(r.drivers).toHaveLength(2);
     expect(r.drivers[0].lapTimes).toEqual([
       { number: 1, time: '1:20.001', timeMs: 80001 },
@@ -59,7 +59,10 @@ describe('ao vivo do app', () => {
   });
 
   it('busca na crono e responde 503 quando ela não responde', async () => {
-    const f = vi.fn(async (_url: string) => new Response(JSON.stringify(retrato), { status: 200 }));
+    const f = vi.fn(async (url: string) => {
+      void url;
+      return new Response(JSON.stringify(retrato), { status: 200 });
+    });
     vi.stubGlobal('fetch', f);
     const ok = await handleMobileLive(new Request('https://reservas.kartodromodebetim.com.br/api/mobile/v1/live'), {});
     expect(ok.status).toBe(200);
