@@ -91,6 +91,8 @@ import { normalizarPaginaPainel, PAINEL_LED_PAGE_SIZE } from '../lib/timing/pain
 import { abrirStore } from '../lib/app-v1/store';
 import { marcarPendentesComoDesconhecidas } from '../lib/app-v1/comandos';
 import { criarModuloApp, type ModuloApp } from '../lib/app-v1/rotas';
+import { ErroLegado } from '../lib/app-v1/operacao';
+import type { Inscricao } from '../lib/app-v1/regras';
 import { assinaturaDoConteudo, conferirChave, extrairChave, filtrarVoltasPorKart, lerHashes, montarTransmissao, montarVoltas, type Transmissao, type VoltasTransmissao } from '../lib/timing/transmissao';
 
 // ---------------------------------------------------------------- config
@@ -3447,6 +3449,34 @@ function isAuthorizedDestructive(req: http.IncomingMessage): boolean {
   return false;
 }
 
+/** O app usa as mesmas rotas do programa Windows, por dentro: nenhuma regra de prova é duplicada. */
+async function chamarLegadoLocal(metodo: string, caminho: string, corpo?: unknown) {
+  let r: Response;
+  try {
+    r = await fetch(`http://127.0.0.1:${PORT}${caminho}`, {
+      method: metodo, signal: AbortSignal.timeout(20_000),
+      headers: { 'content-type': 'application/json', 'x-client-machine': process.env.COMPUTERNAME ?? '', 'x-timing-key': process.env.TIMING_OPS_KEY ?? '' },
+      ...(corpo === undefined ? {} : { body: JSON.stringify(corpo) }),
+    });
+  } catch (err) {
+    // sem resposta o comando pode ter sido aplicado: fica UNKNOWN, nunca repete sozinho
+    throw Object.assign(new Error((err as Error).message), { desconhecido: true });
+  }
+  const dados = await r.json().catch(() => ({})) as { error?: string };
+  if (!r.ok) throw Object.assign(new ErroLegado(dados.error ?? `Cronometragem respondeu ${r.status}`), { desconhecido: r.status >= 500 });
+  return dados;
+}
+
+async function inscricoesDaRecepcao(agendaId: number): Promise<Inscricao[]> {
+  const { query } = await import('../lib/ops/db');
+  return await query(`SELECT c.Id clienteId, c.Nome nome, i.Aprovada aprovada, i.Pago pago,
+      CAST(CASE WHEN i.TermoImpressoEm IS NULL THEN 0 ELSE 1 END AS bit) termo,
+      ISNULL(i.PrecoCentavos, p.PrecoCentavos) - i.DescontoCentavos totalCentavos,
+      CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.EnduranceEvento ev WHERE ev.BateriaId = i.BateriaId AND ev.Ativo = 1) THEN 1 ELSE 0 END AS bit) endurance
+    FROM dbo.Inscricao i JOIN dbo.Cliente c ON c.Id = i.ClienteId JOIN dbo.Bateria b ON b.Id = i.BateriaId LEFT JOIN dbo.Produto p ON p.Id = ISNULL(i.ProdutoId, b.ProdutoId)
+    WHERE i.BateriaId = @id AND i.Status <> 'cancelada'`, { id: agendaId }) as Inscricao[];
+}
+
 function ligarAppOperacional() {
   const segredo = process.env.APP_V1_TOKEN_SECRET ?? '';
   if (!segredo) return;
@@ -3455,6 +3485,8 @@ function ligarAppOperacional() {
     marcarPendentesComoDesconhecidas(store);
     moduloApp = criarModuloApp({
       store, segredo, gatewaySegredo: process.env.APP_V1_GATEWAY_SECRET,
+      legado: chamarLegadoLocal,
+      inscricoes: inscricoesDaRecepcao,
       listarSessoes: sortedSessions,
       verSessao: (id) => sessions.get(id),
       assinarMudancas: (cb) => { assinantesApp.add(cb); return () => assinantesApp.delete(cb); },

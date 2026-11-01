@@ -148,6 +148,17 @@ export function autenticar(ctx: AuthCtx, header: unknown): Identidade | null {
   return { usuarioId: l.usuarioId, usuario: l.usuario, nome: l.nome, perfil: l.perfil, sessaoId: l.sessaoId, deviceId: l.deviceId, expiraEm: corpo.exp };
 }
 
+export async function trocarSenha(ctx: AuthCtx, usuarioId: string, atual: string, nova: string, sessaoAtual: string) {
+  if (nova.length < 10) throw new LoginRecusado('A senha nova precisa de pelo menos 10 caracteres.');
+  const u = ctx.store.db.prepare('SELECT senhaHash FROM usuarios WHERE id = ?').get(usuarioId) as { senhaHash: string } | undefined;
+  if (!u || !await senhaConfere(atual, u.senhaHash)) throw new LoginRecusado('Senha atual incorreta.');
+  const hash = await gerarHash(nova);
+  ctx.store.transacao(() => {
+    ctx.store.db.prepare('UPDATE usuarios SET senhaHash = ? WHERE id = ?').run(hash, usuarioId);
+    ctx.store.db.prepare('UPDATE sessoes SET revogadaEm = ? WHERE usuarioId = ? AND id <> ? AND revogadaEm IS NULL').run(agoraDe(ctx), usuarioId, sessaoAtual);
+  });
+}
+
 export function bloquearUsuario(ctx: AuthCtx, usuario: string, bloqueado: boolean) {
   const r = ctx.store.db.prepare('UPDATE usuarios SET bloqueado = ? WHERE usuario = ?').run(bloqueado ? 1 : 0, usuario.trim().toLowerCase());
   if (!r.changes) throw new Error('Usuário não encontrado.');

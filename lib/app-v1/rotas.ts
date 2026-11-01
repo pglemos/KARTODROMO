@@ -1,8 +1,10 @@
 import { timingSafeEqual } from 'node:crypto';
 import type http from 'node:http';
 import { writeTimingEvent } from '../timing/sse';
-import { autenticar, bloquearUsuario, criarUsuario, login, LoginRecusado, pode, renovar, sair, type AuthCtx, type Identidade, type Perfil } from './auth';
+import { autenticar, bloquearUsuario, criarUsuario, login, LoginRecusado, pode, renovar, sair, trocarSenha, type AuthCtx, type Identidade, type Perfil } from './auth';
 import { consultarOperacao, ErroApp } from './comandos';
+import { criarOperacao, type Legado } from './operacao';
+import type { Inscricao } from './regras';
 import type { AppStore } from './store';
 
 const PREFIXO = '/api/app/v1/';
@@ -26,6 +28,8 @@ export type DepsApp = {
   limitePor10s?: number;
   routeMode?: string;
   gatewaySegredo?: string;
+  legado?: Legado;
+  inscricoes?: (agendaId: number) => Promise<Inscricao[]>;
 };
 export type ModuloApp = { tratar(req: http.IncomingMessage, res: http.ServerResponse, url: URL): Promise<boolean>; aoSalvarSessao(id: string, assinatura?: string): void };
 
@@ -90,6 +94,7 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
   const limiteGeral = limitador(d.limitePor10s ?? 200, 10_000);
   const revisoesPendentes = new Map<string, string | undefined>();
   let loginsEmCurso = 0;
+  const operacao = d.legado && d.inscricoes ? criarOperacao({ store: d.store, legado: d.legado, verSessao: d.verSessao, inscricoes: d.inscricoes, routeMode: d.routeMode }) : null;
   let indisponivel = d.segredo.length < TAMANHO_MINIMO_SEGREDO;
   let revisaoFalhou = false;
 
@@ -205,7 +210,27 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
       try { bloquearUsuario(ctx, m[1], b.bloqueado !== false); } catch (e) { throw new ErroApp(404, 'NOT_FOUND', (e as Error).message); }
       return enviar(res, 200, { ok: true });
     }
-    // Comandos de prova não existem na F1: nenhum perfil chega neles.
+    if (caminho === 'auth/password' && metodo === 'POST') {
+      const b = await lerCorpo(req);
+      await trocarSenha(ctx, quem.usuarioId, String(b.atual ?? ''), String(b.nova ?? ''), quem.sessaoId);
+      return enviar(res, 200, { ok: true });
+    }
+    if (operacao) {
+      if (caminho === 'agenda' && metodo === 'GET') return enviar(res, 200, await operacao.agenda(quem, url.searchParams.get('data')));
+      if (caminho === 'fleet' && metodo === 'GET') { exige('sessoes.ver'); return enviar(res, 200, operacao.frota()); }
+      m = /^fleet\/(\d{1,4})$/.exec(caminho);
+      if (m && metodo === 'POST') return enviar(res, 200, await operacao.marcarKart(quem, m[1], await lerCorpo(req)));
+      m = /^agenda\/(\d+)\/prepare$/.exec(caminho);
+      if (m && metodo === 'POST') return enviar(res, 200, await operacao.preparar(quem, Number(m[1]), await lerCorpo(req)));
+      m = /^sessions\/([\w-]+)\/(draw-panel|detail)$/.exec(caminho);
+      if (m && metodo === 'GET') { exige('sessoes.ver'); return enviar(res, 200, m[2] === 'detail' ? await operacao.detalhe(m[1]) : await operacao.painelSorteio(m[1])); }
+      m = /^sessions\/([\w-]+)\/(draw|late-assignments|weight-checks|kart-swaps|penalties|penalties-remove|flags|commands)$/.exec(caminho);
+      if (m && metodo === 'POST') {
+        const b = await lerCorpo(req);
+        const acao = { draw: operacao.sorteio, 'late-assignments': operacao.atrasados, 'weight-checks': operacao.peso, 'kart-swaps': operacao.trocaKart, penalties: operacao.penalidade, 'penalties-remove': operacao.retirarPenalidade, flags: operacao.bandeira, commands: operacao.comando }[m[2]];
+        return enviar(res, 200, await acao!.call(operacao, quem, m[1], b));
+      }
+    }
     return erro(res, 404, 'NOT_FOUND', 'Rota desconhecida.');
   }
 

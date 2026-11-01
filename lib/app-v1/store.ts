@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS auditoria (
 );
 CREATE TRIGGER IF NOT EXISTS auditoria_sem_update BEFORE UPDATE ON auditoria BEGIN SELECT RAISE(ABORT, 'auditoria somente insercao'); END;
 CREATE TRIGGER IF NOT EXISTS auditoria_sem_delete BEFORE DELETE ON auditoria BEGIN SELECT RAISE(ABORT, 'auditoria somente insercao'); END;
+CREATE TABLE IF NOT EXISTS karts_fora (kart TEXT PRIMARY KEY, motivo TEXT NOT NULL, usuario TEXT NOT NULL, em TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS revisoes (sessionId TEXT PRIMARY KEY, revisao INTEGER NOT NULL, assinatura TEXT);
 `;
 
