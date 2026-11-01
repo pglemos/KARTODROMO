@@ -195,6 +195,38 @@ describe('operação', () => {
     expect((await op.corrigirPassagem(OP, 'b', envio({ action: 'invalidate', ids: ['p1'] }))).status).toBe('REJECTED');
   });
 
+  it('checklist da oficina preserva o que já estava gravado', async () => {
+    legado.mockResolvedValueOnce({ resultado: { karts: [{ kart: '4', checklist: { sistemas: { motor: { status: 'atencao' } }, observacoes: 'obs', acaoOficina: 'antiga' } }] } });
+    const r = await op.comandoEqualizacao(OP, 'eq', envio({ acao: 'checklist', kart: '4', acaoOficina: 'nova' }));
+    expect(r.status).toBe('APPLIED');
+    const [m, c, corpo] = legado.mock.calls[1];
+    expect([m, c]).toEqual(['PUT', '/api/equalizacao/eq/karts/4']);
+    expect(corpo).toMatchObject({ acaoOficina: 'nova', observacoes: 'obs', sistemas: { motor: { status: 'atencao' } } });
+    expect(corpo).not.toHaveProperty('confirmacaoManual');
+  });
+
+  it('redutor e abertura usam as rotas da cronometragem; Recepção não mexe', async () => {
+    await op.comandoEqualizacao(OP, 'eq', envio({ acao: 'abertura', kart: '4', bloco: 2, mm: '0,3' }));
+    expect(legado.mock.calls[0]).toEqual(['PATCH', '/api/equalizacao/eq', { abertura: { kart: '4', bloco: 2, mm: '0,3' } }]);
+    await expect(op.comandoEqualizacao(REC, 'eq', envio({ acao: 'redutor', kart: '4', mm: '17' }))).rejects.toMatchObject({ http: 403 });
+    expect(() => op.comandoEqualizacao(OP, 'eq', envio({ acao: 'apagar' }))).toThrow(/inválido/);
+  });
+
+  it('números do dia ignoram outros dias e cancelada', () => {
+    const agora = new Date('2026-11-01T15:00:00Z');
+    const hoje = agora.getTime(); const ontem = hoje - 2 * 86_400_000;
+    store.db.prepare(`INSERT INTO auditoria (auditId, action, status, timestampServerUTC) VALUES ('a', 'penalty', 'APPLIED', ?)`).run(agora.toISOString());
+    const r = op.resumoDoDia([
+      { id: '1', state: 'encerrada', createdAt: hoje, competitors: [{ kart: '4', name: 'Ana' }, { kart: '5', name: 'Kart 5', autoAdded: true }] },
+      { id: '2', state: 'em_andamento', createdAt: hoje, competitors: [{ kart: '6', name: 'Bia' }] },
+      { id: '3', state: 'cancelada', createdAt: hoje, competitors: [] },
+      { id: '4', state: 'encerrada', createdAt: ontem, competitors: [{ kart: '7', name: 'Cid' }] },
+    ], agora);
+    expect(r.baterias).toMatchObject({ total: 2, emProva: 1, encerradas: 1 });
+    expect(r.pilotos).toBe(2);
+    expect(r.ultimas24h.punicoes).toBe(1);
+  });
+
   it('comando crítico exige motivo', () => {
     expect(() => op.comando(OP, 'b', envio({ acao: 'restart' }, { reason: '' }))).toThrow(/motivo/);
   });

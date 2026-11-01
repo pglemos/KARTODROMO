@@ -228,6 +228,11 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
         const r = m[2] === 'detail' ? await operacao.detalhe(m[1]) : m[2] === 'live' ? await operacao.aoVivo(m[1]) : m[2] === 'passings' ? await operacao.passagens(m[1], url.searchParams.get('kart')) : await operacao.painelSorteio(quem, m[1]);
         return enviar(res, 200, r);
       }
+      if (caminho === 'owner/today' && metodo === 'GET') { exige('auditoria.global'); return enviar(res, 200, operacao.resumoDoDia(d.listarSessoes())); }
+      if (caminho === 'equalization/options' && metodo === 'GET') { exige('equalizacao.gerir'); return enviar(res, 200, await operacao.opcoesEqualizacao()); }
+      if (caminho === 'equalization/create' && metodo === 'POST') return enviar(res, 200, await operacao.criarEqualizacao(quem, await lerCorpo(req)));
+      if (caminho === 'equalization/rules' && metodo === 'POST') return enviar(res, 200, await operacao.salvarRegra(quem, await lerCorpo(req)));
+      if (caminho === 'equalization/targets' && metodo === 'POST') return enviar(res, 200, await operacao.salvarMeta(quem, await lerCorpo(req)));
       if (caminho === 'equalization' && metodo === 'GET') { exige('equalizacao.gerir'); return enviar(res, 200, await operacao.equalizacoes()); }
       m = /^equalization\/([\w-]+)$/.exec(caminho);
       if (m && metodo === 'GET') { exige('equalizacao.gerir'); return enviar(res, 200, await operacao.equalizacao(m[1])); }

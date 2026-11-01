@@ -154,11 +154,63 @@ export function criarOperacao(d: DepsOperacao) {
     },
     equalizacoes: () => d.legado('GET', '/api/equalizacao').then((r) => ({ equalizacoes: ((r as { equalizacoes?: { id: string }[] }).equalizacoes ?? []).map((e) => ({ ...e, sessionRevision: d.store.revisao(e.id) })) })),
     equalizacao: (id: string) => d.legado('GET', `/api/equalizacao/${encodeURIComponent(id)}`),
+    async opcoesEqualizacao() {
+      const [regras, metas] = await Promise.all([d.legado('GET', '/api/equalizacao/regras'), d.legado('GET', '/api/equalizacao/metas')]) as [{ regras?: unknown[] }, { metas?: unknown[]; tracks?: unknown[] }];
+      return { regras: regras.regras ?? [], metas: metas.metas ?? [], tracks: metas.tracks ?? [] };
+    },
+    criarEqualizacao(q: Identidade, b: Record<string, unknown>) {
+      const pl = (b.payload ?? {}) as Record<string, unknown>;
+      return roda(q, 'equalizacao.gerir', b, 'equalizacao-nova', 'equalization-create', () => d.legado('POST', '/api/equalizacao', { nome: pl.nome, trackId: pl.trackId ?? null, referencias: pl.referencias, metaModo: pl.metaModo, metaSeg: pl.metaSeg, regra: pl.regra, mecanico: pl.mecanico, autor: autor(q) }).then((r) => ({ id: (r as { id?: string }).id })));
+    },
     comandoEqualizacao(q: Identidade, id: string, b: Record<string, unknown>) {
-      const acao = String((b.payload as { acao?: string } | undefined)?.acao);
-      if (acao !== 'finalizar' && acao !== 'reabrir') throw new ErroApp(400, 'INVALID_REQUEST', 'Comando inválido.');
-      exigeMotivo(b);
-      return roda(q, 'equalizacao.gerir', b, id, `equalization-${acao}`, () => d.legado('POST', `/api/equalizacao/${encodeURIComponent(id)}/${acao}`, { autor: autor(q) }).then(() => ({ ok: true })));
+      const pl = (b.payload ?? {}) as Record<string, unknown>;
+      const acao = String(pl.acao);
+      const base = `/api/equalizacao/${encodeURIComponent(id)}`;
+      const kart = texto(pl.kart, 6);
+      const execucoes: Record<string, () => Promise<unknown>> = {
+        finalizar: () => d.legado('POST', `${base}/finalizar`, { autor: autor(q) }),
+        reabrir: () => d.legado('POST', `${base}/reabrir`, { autor: autor(q) }),
+        config: () => d.legado('PATCH', base, { nome: pl.nome, referencias: pl.referencias, metaModo: pl.metaModo, metaSeg: pl.metaSeg, regra: pl.regra, mecanico: pl.mecanico }),
+        abertura: () => d.legado('PATCH', base, { abertura: { kart, bloco: pl.bloco, mm: pl.mm } }),
+        redutor: () => d.legado('PATCH', base, { redutorInicial: { kart, mm: pl.mm } }),
+        importar: () => d.legado('POST', `${base}/importar`, { sessionId: pl.sessionId, karts: pl.karts, autor: autor(q) }),
+        checklist: async () => {
+          // a rota troca o checklist inteiro: parte do que está gravado e só muda o que veio
+          const atual = await d.legado('GET', base) as { resultado?: { karts?: { kart: string; piloto?: string; checklist?: { sistemas?: unknown; observacoes?: string; acaoOficina?: string } | null }[] } };
+          const c = atual.resultado?.karts?.find((k) => k.kart === kart)?.checklist;
+          return d.legado('PUT', `${base}/karts/${encodeURIComponent(kart)}`, {
+            sistemas: pl.sistemas ?? c?.sistemas ?? {}, observacoes: pl.observacoes ?? c?.observacoes ?? '', acaoOficina: pl.acaoOficina ?? c?.acaoOficina ?? '', autor: autor(q),
+            ...(pl.confirmacaoMm !== undefined ? { confirmacaoManual: pl.confirmacaoMm === null ? null : { aberturaMm: pl.confirmacaoMm } } : {}),
+          });
+        },
+      };
+      const fn = execucoes[acao];
+      if (!fn) throw new ErroApp(400, 'INVALID_REQUEST', 'Comando inválido.');
+      if (acao === 'finalizar' || acao === 'reabrir') exigeMotivo(b);
+      return roda(q, 'equalizacao.gerir', b, id, `equalization-${acao}`, () => fn().then(() => ({ ok: true })));
+    },
+    salvarRegra(q: Identidade, b: Record<string, unknown>) {
+      const pl = (b.payload ?? {}) as Record<string, unknown>;
+      return roda(q, 'equalizacao.gerir', b, 'equalizacao-regras', 'equalization-rule', () => d.legado('POST', '/api/equalizacao/regras', { nome: pl.nome, toleranciaSeg: pl.toleranciaSeg, faixaSeg: pl.faixaSeg, passoMm: pl.passoMm, limiteSeg: pl.limiteSeg }).then(() => ({ ok: true })));
+    },
+    salvarMeta(q: Identidade, b: Record<string, unknown>) {
+      const pl = (b.payload ?? {}) as Record<string, unknown>;
+      return roda(q, 'equalizacao.gerir', b, 'equalizacao-metas', 'equalization-target', () => d.legado('POST', '/api/equalizacao/metas', { trackId: pl.trackId ?? null, metaSeg: pl.metaSeg, toleranciaSeg: pl.toleranciaSeg }).then(() => ({ ok: true })));
+    },
+    /** Números do dia para o dono, só do que a cronometragem e o app sabem. */
+    resumoDoDia(sessoes: unknown[], agora = new Date()) {
+      const dia = (ms: number) => new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+      const hoje = dia(agora.getTime());
+      const doDia = (sessoes as (Sessao & { createdAt: number; type?: string })[]).filter((s) => dia(s.createdAt) === hoje && s.state !== 'cancelada');
+      const contar = (prefixo: string) => (d.store.db.prepare(`SELECT COUNT(*) n FROM auditoria WHERE action LIKE ? AND status = 'APPLIED' AND timestampServerUTC >= ?`).get(`${prefixo}%`, new Date(agora.getTime() - 86_400_000).toISOString()) as { n: number }).n;
+      const incertos = d.store.db.prepare(`SELECT operationId, command, atualizadoEm FROM operacoes WHERE status = 'UNKNOWN' ORDER BY criadoEm DESC LIMIT 10`).all();
+      return {
+        baterias: { total: doDia.length, emProva: doDia.filter((s) => s.state === 'em_andamento' || s.state === 'bandeira_final').length, encerradas: doDia.filter((s) => s.state === 'encerrada').length, preparando: doDia.filter((s) => s.state === 'preparando').length },
+        pilotos: doDia.filter((s) => s.state === 'encerrada' || s.state === 'em_andamento').reduce((n, s) => n + s.competitors.filter(real).length, 0),
+        ultimas24h: { punicoes: contar('penalty'), trocas: contar('kart-swap'), sorteios: contar('draw'), atrasados: contar('late-assignment') },
+        frotaFora: (d.store.db.prepare('SELECT COUNT(*) n FROM karts_fora').get() as { n: number }).n,
+        incertos,
+      };
     },
     async agenda(q: Identidade, data: string | null) {
       if (!pode(q.perfil, 'sessoes.ver')) throw new ErroApp(403, 'FORBIDDEN', 'Sem permissão.');
