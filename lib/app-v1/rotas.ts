@@ -1,3 +1,4 @@
+import { semBateriasPassadas } from './regras';
 import { timingSafeEqual } from 'node:crypto';
 import type http from 'node:http';
 import { writeTimingEvent } from '../timing/sse';
@@ -21,6 +22,8 @@ export type DepsApp = {
   store: AppStore;
   segredo: string;
   listarSessoes: () => unknown[];
+  /** Horário de cada bateria da agenda de hoje, por id; vazio quando a agenda não respondeu. */
+  inicioPorAgenda?: () => ReadonlyMap<string, string>;
   verSessao: (id: string) => unknown;
   assinarMudancas: (cb: () => void) => () => void;
   batidaMs?: number;
@@ -108,9 +111,11 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
   };
   const derrubar = () => { indisponivel = true; for (const c of [...clientes]) c.encerrar(); };
 
+  const listarFila = () => semBateriasPassadas(d.listarSessoes(), d.inicioPorAgenda?.() ?? new Map<string, string>());
+
   const visaoAtual = () => {
     const limite = Date.now() - JANELA_EVENTOS_MS;
-    return d.listarSessoes().filter((s) => {
+    return listarFila().filter((s) => {
       const v = s as { state?: string; createdAt?: number };
       return v.state === 'em_andamento' || v.state === 'bandeira_final' || (v.createdAt ?? Date.now()) >= limite;
     }).map((s) => visaoSessao(d.store, s));
@@ -170,7 +175,7 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
       return enviar(res, 200, { usuario: quem.usuario, nome: quem.nome, perfil: quem.perfil, expiraEm: quem.expiraEm, capacidades: CAPACIDADES_CONHECIDAS.filter((c) => pode(quem.perfil, c)) });
     }
     if (caminho === 'events' && metodo === 'GET') { exige('sessoes.ver'); return eventos(res, req, header); }
-    if (caminho === 'sessions' && metodo === 'GET') { exige('sessoes.ver'); return enviar(res, 200, { sessoes: d.listarSessoes().map((s) => visaoSessao(d.store, s)) }); }
+    if (caminho === 'sessions' && metodo === 'GET') { exige('sessoes.ver'); return enviar(res, 200, { sessoes: listarFila().map((s) => visaoSessao(d.store, s)) }); }
     let m = /^sessions\/([\w-]+)$/.exec(caminho);
     if (m && metodo === 'GET') {
       exige('sessoes.ver');
@@ -228,7 +233,7 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
         const r = m[2] === 'detail' ? await operacao.detalhe(m[1]) : m[2] === 'live' ? await operacao.aoVivo(m[1]) : m[2] === 'passings' ? await operacao.passagens(m[1], url.searchParams.get('kart')) : await operacao.painelSorteio(quem, m[1]);
         return enviar(res, 200, r);
       }
-      if (caminho === 'owner/today' && metodo === 'GET') { exige('auditoria.global'); return enviar(res, 200, operacao.resumoDoDia(d.listarSessoes())); }
+      if (caminho === 'owner/today' && metodo === 'GET') { exige('auditoria.global'); return enviar(res, 200, operacao.resumoDoDia(listarFila())); }
       if (caminho === 'equalization/options' && metodo === 'GET') { exige('equalizacao.gerir'); return enviar(res, 200, await operacao.opcoesEqualizacao()); }
       if (caminho === 'equalization/create' && metodo === 'POST') return enviar(res, 200, await operacao.criarEqualizacao(quem, await lerCorpo(req)));
       if (caminho === 'equalization/rules' && metodo === 'POST') return enviar(res, 200, await operacao.salvarRegra(quem, await lerCorpo(req)));

@@ -3477,6 +3477,16 @@ async function inscricoesDaRecepcao(agendaId: number): Promise<Inscricao[]> {
     WHERE i.BateriaId = @id AND i.Status <> 'cancelada'`, { id: agendaId }) as Inscricao[];
 }
 
+/** Horários da agenda de hoje para o app; falha na consulta mantém o último resultado. */
+let inicioPorAgenda: ReadonlyMap<string, string> = new Map();
+async function atualizarInicioPorAgenda() {
+  const data = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+  const lista = await opsGet(`/api/baterias?data=${data}`).catch(() => null) as { id?: unknown; inicio?: unknown }[] | null;
+  if (Array.isArray(lista)) inicioPorAgenda = new Map(lista.map((b) => [String(b.id), String(b.inicio ?? '')]));
+}
+void atualizarInicioPorAgenda();
+setInterval(() => void atualizarInicioPorAgenda(), 60_000).unref();
+
 function ligarAppOperacional() {
   const segredo = process.env.APP_V1_TOKEN_SECRET ?? '';
   if (!segredo) return;
@@ -3488,6 +3498,7 @@ function ligarAppOperacional() {
       legado: chamarLegadoLocal,
       inscricoes: inscricoesDaRecepcao,
       listarSessoes: sortedSessions,
+      inicioPorAgenda: () => inicioPorAgenda,
       verSessao: (id) => sessions.get(id),
       assinarMudancas: (cb) => { assinantesApp.add(cb); return () => assinantesApp.delete(cb); },
     });

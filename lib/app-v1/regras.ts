@@ -28,3 +28,24 @@ export function planoLastro(pesoKg: number, frota: Frota) {
   return { pesoKg, metaKg: meta, lastroKg, pecas5: Math.floor(unidades / 2), pecas2_5: unidades % 2, finalKg: pesoKg + lastroKg };
 }
 export const pesoValido = (p: unknown): p is number => typeof p === 'number' && Number.isFinite(p) && p >= 20 && p <= 250;
+
+type SessaoDaFila = { state?: string; createdAt?: number; startedAt?: number | null; agendaId?: number | string | null };
+
+/**
+ * Tira do app as baterias preparadas que ficaram para trás e nunca largaram: as de outros dias e as de hoje
+ * cujo horário já foi ultrapassado por uma bateria posterior que largou. Nada é alterado na cronometragem.
+ */
+export function semBateriasPassadas<T>(sessoes: T[], inicioPorAgenda: ReadonlyMap<string, string>, agora = Date.now()): T[] {
+  const dia = (ms: number) => new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+  const hoje = dia(agora);
+  const inicio = (s: SessaoDaFila) => (s.agendaId == null ? undefined : inicioPorAgenda.get(String(s.agendaId)));
+  const ultimaLargada = (sessoes as SessaoDaFila[])
+    .filter((s) => s.startedAt && dia(s.startedAt) === hoje).map(inicio).filter((x): x is string => Boolean(x)).sort().pop();
+  return sessoes.filter((x) => {
+    const s = x as SessaoDaFila;
+    if (s.state !== 'preparando') return true;
+    if (dia(s.createdAt ?? agora) < hoje) return false;
+    const i = inicio(s);
+    return !(i && ultimaLargada && i < ultimaLargada);
+  });
+}
