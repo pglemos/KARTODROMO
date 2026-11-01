@@ -36,7 +36,9 @@ fora do grid (cancelada, o grid já exclui)    -> avisa que saiu da agenda
 Aprovada = 1 e Pago = 1                      -> ELEGIVEL
 caso contrário                               -> INELEGIVEL, com motivo
 ```
-**Decisões do dono no G0:** pendente com `Aprovada=1, Pago=0` pode correr? Termo é obrigatório? Endurance e total zero sem `Pago=1` não são pendência financeira: o predicado precisa de exceção para eles, a confirmar. O grid atual não traz o termo; a rota nova precisaria lê-lo.
+**Decidido pelo dono em 31/10/2026:** aprovado sem pagamento **não** pode ser sorteado; só pago.
+
+**Decisões ainda abertas:** Termo é obrigatório? Endurance e total zero sem `Pago=1` não são pendência financeira: o predicado precisa de exceção para eles, a confirmar. O grid atual não traz o termo; a rota nova precisaria lê-lo.
 
 ## Medição não feita
 Contagem real das combinações: **NÃO VERIFICADO**. A rota da porta `7070` não devolveu dados sem chave, e não usei credenciais do servidor sem autorização expressa.

@@ -27,5 +27,5 @@
 ## Pendências antes da F1
 1. **Alinhar produção e repositório.** Cada lado tem mudanças que o outro não tem, e a produção tem 321 arquivos sem commit. Publicar sem alinhar pode desfazer proteções. Precisa de plano próprio.
 2. **Backup externo falhou** na última execução (código 1).
-3. **Decisões do dono:** pendente aprovado sem pagar pode correr? Termo é obrigatório para sortear? Endurance e total zero têm exceção a confirmar.
+3. **Decisões do dono:** Termo é obrigatório para sortear? Endurance e total zero têm exceção a confirmar.
 4. **Medição real** de combinações exige autorizar leitura agregada no banco.
