@@ -88,6 +88,9 @@ import type { ContextoProva, EmpresaEmail } from '../lib/timing/email-resultado'
 import { quemSaiuDaAgenda } from '../lib/timing/agenda-saida';
 import { competidoresComSorteio, descricaoModoSorteio, ListaMudouError, pilotosDoSorteio, validarSorteio, type Atribuicao } from '../lib/timing/sorteio';
 import { normalizarPaginaPainel, PAINEL_LED_PAGE_SIZE } from '../lib/timing/painel-page';
+import { abrirStore } from '../lib/app-v1/store';
+import { marcarPendentesComoDesconhecidas } from '../lib/app-v1/comandos';
+import { criarModuloApp, type ModuloApp } from '../lib/app-v1/rotas';
 import { assinaturaDoConteudo, conferirChave, extrairChave, filtrarVoltasPorKart, lerHashes, montarTransmissao, montarVoltas, type Transmissao, type VoltasTransmissao } from '../lib/timing/transmissao';
 
 // ---------------------------------------------------------------- config
@@ -116,6 +119,9 @@ const ENV_DECODER_HOST = process.env.TIMING_DECODER_HOST || '192.168.20.171';
 const ENV_DECODER_PROTOCOL: DecoderProtocol = process.env.TIMING_DECODER_PROTOCOL === 'trx' ? 'trx' : 'p3';
 const ENV_DECODER_PORT = Number(process.env.TIMING_DECODER_PORT || (ENV_DECODER_PROTOCOL === 'p3' ? 5403 : 5100));
 const DATA_DIR = resolve(process.env.TIMING_DATA_DIR || join(process.cwd(), 'data', 'timing'));
+// App operacional: só liga com APP_V1_TOKEN_SECRET; sem ele as rotas /api/app/v1/ respondem 503
+let moduloApp: ModuloApp | null = null;
+const assinantesApp = new Set<() => void>();
 const SESSIONS_DIR = join(DATA_DIR, 'sessions');
 const JOURNAL_DIR = join(DATA_DIR, 'passagens');
 const TRANSPONDERS_FILE = join(DATA_DIR, 'transponders.json');
@@ -325,6 +331,7 @@ function saveSession(s: Session) {
     }
     sessionPaths.set(s.id, targetPath);
     dirtySessions.delete(s.id);
+    moduloApp?.aoSalvarSessao(s.id);
   } catch (err) {
     dirtySessions.add(s.id);
     log(`ERRO ao gravar bateria ${s.name} (${s.id}) no disco; retentando em segundo plano: ${(err as Error).message}`);
@@ -1244,6 +1251,7 @@ function scheduleStateBroadcast(esperaMs = 150) {
   stateTimerAte = ate;
   stateTimer = setTimeout(() => {
     stateTimer = null;
+    for (const avisar of assinantesApp) avisar();
     if (clients.size || clientesLeves.size) {
       const estado = stateView();
       if (clients.size) broadcast('state', estado);
@@ -3434,6 +3442,25 @@ function isAuthorizedDestructive(req: http.IncomingMessage): boolean {
   return false;
 }
 
+function ligarAppOperacional() {
+  const segredo = process.env.APP_V1_TOKEN_SECRET ?? '';
+  if (!segredo) return;
+  try {
+    const store = abrirStore(join(DATA_DIR, '..', 'app-operacional', 'app.db'));
+    marcarPendentesComoDesconhecidas(store);
+    moduloApp = criarModuloApp({
+      store, segredo,
+      listarSessoes: sortedSessions,
+      verSessao: (id) => sessions.get(id),
+      assinarMudancas: (cb) => { assinantesApp.add(cb); return () => assinantesApp.delete(cb); },
+    });
+    log('app operacional ligado');
+  } catch (err) {
+    log('app operacional indisponível', (err as Error).message);
+  }
+}
+ligarAppOperacional();
+
 const server = http.createServer((req, res) => {
   recordOperatorMachine(req);
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
@@ -3445,6 +3472,15 @@ const server = http.createServer((req, res) => {
     }
   }
 
+  // antes do bloqueio de internet: nestas rotas quem decide é o login do usuário, nunca a origem do pedido
+  if (url.pathname.startsWith('/api/app/v1/')) {
+    if (!moduloApp) return send(res, 503, { codigo: 'UNAVAILABLE', erro: 'App operacional indisponível.' });
+    void moduloApp.tratar(req, res, url).catch((err) => {
+      log('erro na API do app', err);
+      if (!res.headersSent) send(res, 500, { codigo: 'SERVER_ERROR', erro: 'Erro interno.' });
+    });
+    return;
+  }
   if (veioDaInternet(req) && !((req.method === 'GET' || req.method === 'HEAD') && isAllowedPublicReadPath(url.pathname))) {
     res.writeHead(403, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
     return res.end(JSON.stringify({ error: 'Acesso só pela rede do kartódromo.' }));
