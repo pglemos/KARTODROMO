@@ -125,6 +125,38 @@ export function criarOperacao(d: DepsOperacao) {
   const FLAGS_PILOTO = new Set(['preta', 'verde', 'amarela', 'vermelha', 'branca', 'nenhuma']);
 
   return {
+    async aoVivo(id: string) {
+      sessao(id);
+      const v = await d.legado('GET', `/api/sessions/${id}`) as { state?: string; remainingMs?: number | null; aguardandoLargada?: boolean; flag?: unknown; standings?: Record<string, unknown>[] };
+      return {
+        state: v.state, remainingMs: v.remainingMs ?? null, aguardandoLargada: Boolean(v.aguardandoLargada), flag: v.flag ?? null,
+        standings: (v.standings ?? []).map((l) => ({ position: l.position, kart: l.kart, name: l.name, laps: l.laps, bestLapMs: l.bestLapMs, lastLapMs: l.lastLapMs ?? null, gap: l.gap ?? null, flag: l.flag ?? null })),
+      };
+    },
+    async passagens(id: string, kart: string | null) {
+      sessao(id);
+      const rows = await d.legado('GET', `/api/sessions/${id}/passings`) as Record<string, unknown>[];
+      return { passagens: (Array.isArray(rows) ? rows : []).filter((r) => !kart || r.kart === kart).slice(0, 300).map((r) => ({ id: r.id, kart: r.kart, name: r.name, voltas: r.voltas, lapMs: r.lapMs, wallMs: r.wallMs, invalid: r.invalid, deleted: r.deleted, rejected: r.rejected, reason: r.reason, source: r.source })) };
+    },
+    corrigirPassagem(q: Identidade, id: string, b: Record<string, unknown>) {
+      const pl = (b.payload ?? {}) as { action?: string; ids?: string[] };
+      if (!['delete', 'restore', 'invalidate', 'validate'].includes(String(pl.action)) || !Array.isArray(pl.ids) || !pl.ids.length) throw new ErroApp(400, 'INVALID_REQUEST', 'Correção inválida.');
+      exigeMotivo(b);
+      return roda(q, 'passagem.corrigir', b, id, `passing-${pl.action}`, async () => {
+        exigeEstado(sessao(id), 'em_andamento', 'bandeira_final', 'encerrada');
+        const r = await d.legado('POST', `/api/sessions/${id}/passings/actions`, { action: pl.action, ids: pl.ids }) as { count?: number };
+        await d.legado('POST', `/api/sessions/${id}/observations`, { text: `Passagem corrigida (${pl.action}): ${texto(b.reason)}`, author: autor(q), kind: 'system' });
+        return { count: r.count ?? 0 };
+      });
+    },
+    equalizacoes: () => d.legado('GET', '/api/equalizacao').then((r) => ({ equalizacoes: (r as { equalizacoes?: unknown[] }).equalizacoes ?? [] })),
+    equalizacao: (id: string) => d.legado('GET', `/api/equalizacao/${encodeURIComponent(id)}`),
+    comandoEqualizacao(q: Identidade, id: string, b: Record<string, unknown>) {
+      const acao = String((b.payload as { acao?: string } | undefined)?.acao);
+      if (acao !== 'finalizar' && acao !== 'reabrir') throw new ErroApp(400, 'INVALID_REQUEST', 'Comando inválido.');
+      exigeMotivo(b);
+      return roda(q, 'equalizacao.gerir', b, id, `equalization-${acao}`, () => d.legado('POST', `/api/equalizacao/${encodeURIComponent(id)}/${acao}`, { autor: autor(q) }).then(() => ({ ok: true })));
+    },
     async agenda(q: Identidade, data: string | null) {
       if (!pode(q.perfil, 'sessoes.ver')) throw new ErroApp(403, 'FORBIDDEN', 'Sem permissão.');
       return { baterias: await d.legado('GET', `/api/agenda${data && /^\d{4}-\d{2}-\d{2}$/.test(data) ? `?data=${data}` : ''}`) };

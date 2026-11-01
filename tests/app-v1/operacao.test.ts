@@ -135,6 +135,24 @@ describe('operação', () => {
     expect(legado).not.toHaveBeenCalled();
   });
 
+  it('passagem: Recepção não corrige, motivo é obrigatório e usa a rota oficial', async () => {
+    bateria.state = 'em_andamento';
+    await expect(op.corrigirPassagem(REC, 'b', envio({ action: 'invalidate', ids: ['p1'] }))).rejects.toMatchObject({ http: 403 });
+    expect(() => op.corrigirPassagem(OP, 'b', envio({ action: 'invalidate', ids: ['p1'] }, { reason: '' }))).toThrow(/motivo/);
+    expect(() => op.corrigirPassagem(OP, 'b', envio({ action: 'apagar-tudo', ids: ['p1'] }))).toThrow(/inválida/);
+    expect((await op.corrigirPassagem(OP, 'b', envio({ action: 'invalidate', ids: ['p1'] }))).status).toBe('APPLIED');
+    expect(legado.mock.calls[0][1]).toBe('/api/sessions/b/passings/actions');
+  });
+
+  it('ao vivo e passagens não vazam cadastro', async () => {
+    legado.mockResolvedValueOnce({ state: 'em_andamento', remainingMs: 1000, standings: [{ position: 1, kart: '4', name: 'Ana', laps: 3, bestLapMs: 58000, email: 'a@b.c', customerId: '1' }] });
+    expect(JSON.stringify(await op.aoVivo('b'))).not.toMatch(/a@b|customerId/);
+    legado.mockResolvedValueOnce([{ id: 'p', kart: '4', name: 'Ana', lapMs: 1, wallMs: 2, transponder: '999' }, { id: 'q', kart: '5' }]);
+    const p = await op.passagens('b', '4');
+    expect(p.passagens).toHaveLength(1);
+    expect(JSON.stringify(p)).not.toContain('999');
+  });
+
   it('comando crítico exige motivo', () => {
     expect(() => op.comando(OP, 'b', envio({ acao: 'restart' }, { reason: '' }))).toThrow(/motivo/);
   });

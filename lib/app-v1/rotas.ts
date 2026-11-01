@@ -222,12 +222,21 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
       if (m && metodo === 'POST') return enviar(res, 200, await operacao.marcarKart(quem, m[1], await lerCorpo(req)));
       m = /^agenda\/(\d+)\/prepare$/.exec(caminho);
       if (m && metodo === 'POST') return enviar(res, 200, await operacao.preparar(quem, Number(m[1]), await lerCorpo(req)));
-      m = /^sessions\/([\w-]+)\/(draw-panel|detail)$/.exec(caminho);
-      if (m && metodo === 'GET') { exige('sessoes.ver'); return enviar(res, 200, m[2] === 'detail' ? await operacao.detalhe(m[1]) : await operacao.painelSorteio(m[1])); }
-      m = /^sessions\/([\w-]+)\/(draw|late-assignments|weight-checks|kart-swaps|penalties|penalties-remove|flags|commands)$/.exec(caminho);
+      m = /^sessions\/([\w-]+)\/(draw-panel|detail|live|passings)$/.exec(caminho);
+      if (m && metodo === 'GET') {
+        exige('sessoes.ver');
+        const r = m[2] === 'detail' ? await operacao.detalhe(m[1]) : m[2] === 'live' ? await operacao.aoVivo(m[1]) : m[2] === 'passings' ? await operacao.passagens(m[1], url.searchParams.get('kart')) : await operacao.painelSorteio(m[1]);
+        return enviar(res, 200, r);
+      }
+      if (caminho === 'equalization' && metodo === 'GET') { exige('equalizacao.gerir'); return enviar(res, 200, await operacao.equalizacoes()); }
+      m = /^equalization\/([\w-]+)$/.exec(caminho);
+      if (m && metodo === 'GET') { exige('equalizacao.gerir'); return enviar(res, 200, await operacao.equalizacao(m[1])); }
+      m = /^equalization\/([\w-]+)\/commands$/.exec(caminho);
+      if (m && metodo === 'POST') return enviar(res, 200, await operacao.comandoEqualizacao(quem, m[1], await lerCorpo(req)));
+      m = /^sessions\/([\w-]+)\/(draw|late-assignments|weight-checks|kart-swaps|penalties|penalties-remove|flags|commands|passage-corrections)$/.exec(caminho);
       if (m && metodo === 'POST') {
         const b = await lerCorpo(req);
-        const acao = { draw: operacao.sorteio, 'late-assignments': operacao.atrasados, 'weight-checks': operacao.peso, 'kart-swaps': operacao.trocaKart, penalties: operacao.penalidade, 'penalties-remove': operacao.retirarPenalidade, flags: operacao.bandeira, commands: operacao.comando }[m[2]];
+        const acao = { draw: operacao.sorteio, 'late-assignments': operacao.atrasados, 'weight-checks': operacao.peso, 'kart-swaps': operacao.trocaKart, penalties: operacao.penalidade, 'penalties-remove': operacao.retirarPenalidade, flags: operacao.bandeira, commands: operacao.comando, 'passage-corrections': operacao.corrigirPassagem }[m[2]];
         return enviar(res, 200, await acao!.call(operacao, quem, m[1], b));
       }
     }
