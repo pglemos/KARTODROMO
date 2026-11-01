@@ -8,7 +8,7 @@ import { criarModuloApp, type ModuloApp } from '../../lib/app-v1/rotas';
 
 const SEGREDO = 'segredo-de-teste-com-tamanho-suficiente';
 const SENHA = 'senha-de-teste-123';
-const bateria = { id: 'b1', name: 'Bateria', type: 'corrida', state: 'preparando', createdAt: 1, startedAt: null, competitors: [{ kart: '4', name: 'Ana', customerId: '10', detalhes: { email: 'a@b.c', peso: 70 } }] };
+const bateria = { id: 'b1', name: 'Bateria', type: 'corrida', state: 'preparando', createdAt: Date.now(), startedAt: null, competitors: [{ kart: '4', name: 'Ana', customerId: '10', detalhes: { email: 'a@b.c', peso: 70 } }] };
 
 describe('rotas /api/app/v1', () => {
   let store: AppStore; let mod: ModuloApp; let srv: http.Server; let base: string;
@@ -110,6 +110,47 @@ describe('rotas /api/app/v1', () => {
     expect((await f('/me', auth(t.accessToken))).status).toBe(503);
   });
 
+  it('passagem de kart não sobe a revisão; mudança de composição sobe', () => {
+    mod.aoSalvarSessao('b1', 'a'); mod.aoSalvarSessao('b1', 'a'); mod.aoSalvarSessao('b1', 'a');
+    expect(store.revisao('b1')).toBe(1);
+    mod.aoSalvarSessao('b1', 'b');
+    expect(store.revisao('b1')).toBe(2);
+  });
+
+  it('falha de revisão se recupera sozinha e não perde a mudança', async () => {
+    const t = await entrar('op');
+    const original = store.registrarAssinatura;
+    store.registrarAssinatura = () => { throw new Error('busy'); };
+    mod.aoSalvarSessao('b1', 'x');
+    expect((await f('/me', auth(t.accessToken))).status).toBe(503);
+    store.registrarAssinatura = original;
+    mod.aoSalvarSessao('b2', 'y');
+    expect((await f('/me', auth(t.accessToken))).status).toBe(200);
+    expect(store.revisao('b1')).toBe(1);
+  });
+
+  it('erro de banco durante /events não sobe para a cronometragem', async () => {
+    const t = await entrar('rec');
+    await f('/events', auth(t.accessToken));
+    const original = store.revisao;
+    store.revisao = () => { throw new Error('io'); };
+    expect(() => { for (const a of assinantes) a(); }).not.toThrow();
+    store.revisao = original;
+    expect((await f('/me', auth(t.accessToken))).status).toBe(503);
+  });
+
+  it('cf-connecting-ip não escapa do limite; IP do gateway só vale com o segredo', async () => {
+    const m = criarModuloApp({ store, segredo: SEGREDO, gatewaySegredo: 'gw', limiteLoginPorMinuto: 1, limitePor10s: 2000, listarSessoes: () => [], verSessao: () => undefined, assinarMudancas: () => () => undefined });
+    const s = http.createServer((req, res) => void m.tratar(req, res, new URL(req.url!, 'http://x')));
+    await new Promise<void>((r) => s.listen(0, '127.0.0.1', r));
+    const u = `http://127.0.0.1:${(s.address() as AddressInfo).port}/api/app/v1/auth/login`;
+    const ten = (h: Record<string, string>) => fetch(u, json({ usuario: 'z', senha: 'errada-errada' }, undefined, h)).then((r) => r.status);
+    expect(await ten({ 'cf-connecting-ip': '1.1.1.1' })).toBe(401);
+    expect(await ten({ 'cf-connecting-ip': '2.2.2.2', 'x-app-v1-cliente-ip': '3.3.3.3', 'x-app-v1-gateway': 'falso' })).toBe(429);
+    expect(await ten({ 'x-app-v1-cliente-ip': '4.4.4.4', 'x-app-v1-gateway': 'gw' })).toBe(401);
+    s.closeAllConnections(); await new Promise((r) => s.close(r));
+  });
+
   it('nenhum comando de prova existe na F1, em nenhum perfil', async () => {
     const caminhos = ['/sessions/b1/draw', '/sessions/b1/prepare', '/sessions/b1/late-assignments', '/sessions/b1/weight-checks', '/sessions/b1/kart-swaps', '/sessions/b1/swap-kart',
       '/sessions/b1/penalties', '/sessions/b1/flags', '/sessions/b1/commands', '/sessions/b1/start', '/sessions/b1/restart', '/sessions/b1/cancel', '/sessions/b1/close', '/sessions/b1/passage-corrections',
@@ -181,6 +222,7 @@ describe('rotas /api/app/v1', () => {
     expect(iApp).toBeGreaterThan(0);
     expect(iApp).toBeLessThan(iBloqueio);
     const salvar = fonte.slice(fonte.indexOf('function saveSession'), fonte.indexOf('function archiveOldSessions'));
-    expect(salvar).toContain('moduloApp?.aoSalvarSessao(s.id)');
+    expect(salvar).toContain('moduloApp?.aoSalvarSessao(s.id, assinaturaDeComando(s))');
+    expect(fonte).toContain("try { avisar(); } catch");
   });
 });

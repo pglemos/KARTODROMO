@@ -10,6 +10,8 @@ export interface AppStore {
   transacao<T>(fn: () => T): T;
   revisao(sessionId: string): number;
   subirRevisao(sessionId: string): number;
+  /** Sobe só se o que importa a comandos mudou; passagem de kart não muda a assinatura. */
+  registrarAssinatura(sessionId: string, assinatura: string): number;
   fechar(): void;
 }
 
@@ -27,7 +29,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   senhaHash TEXT NOT NULL, bloqueado INTEGER NOT NULL DEFAULT 0, falhas INTEGER NOT NULL DEFAULT 0, bloqueadoAte INTEGER NOT NULL DEFAULT 0, criadoEm TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS sessoes (
-  id TEXT PRIMARY KEY, usuarioId TEXT NOT NULL REFERENCES usuarios(id), deviceId TEXT NOT NULL, refreshHash TEXT NOT NULL,
+  id TEXT PRIMARY KEY, usuarioId TEXT NOT NULL REFERENCES usuarios(id), deviceId TEXT NOT NULL, refreshHash TEXT NOT NULL, refreshAnteriorHash TEXT, refreshAnteriorAte INTEGER,
   expiraAbsolutoEm INTEGER NOT NULL, revogadaEm INTEGER, criadoEm INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS operacoes (
@@ -40,7 +42,7 @@ CREATE TABLE IF NOT EXISTS auditoria (
 );
 CREATE TRIGGER IF NOT EXISTS auditoria_sem_update BEFORE UPDATE ON auditoria BEGIN SELECT RAISE(ABORT, 'auditoria somente insercao'); END;
 CREATE TRIGGER IF NOT EXISTS auditoria_sem_delete BEFORE DELETE ON auditoria BEGIN SELECT RAISE(ABORT, 'auditoria somente insercao'); END;
-CREATE TABLE IF NOT EXISTS revisoes (sessionId TEXT PRIMARY KEY, revisao INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS revisoes (sessionId TEXT PRIMARY KEY, revisao INTEGER NOT NULL, assinatura TEXT);
 `;
 
 export function abrirStore(caminho: string, abrir: Abrir = abrirNativo): AppStore {
@@ -48,7 +50,7 @@ export function abrirStore(caminho: string, abrir: Abrir = abrirNativo): AppStor
   try {
     if (caminho !== ':memory:') mkdirSync(dirname(caminho), { recursive: true });
     db = abrir(caminho);
-    db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA foreign_keys = ON;');
+    db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 200;');
     db.exec(ESQUEMA);
   } catch (err) {
     throw new StoreIndisponivel(`Armazenamento transacional indisponível: ${(err as Error).message}`);
@@ -77,6 +79,11 @@ export function abrirStore(caminho: string, abrir: Abrir = abrirNativo): AppStor
     subirRevisao(sessionId) {
       return (db.prepare(`INSERT INTO revisoes (sessionId, revisao) VALUES (?, 1)
         ON CONFLICT(sessionId) DO UPDATE SET revisao = revisao + 1 RETURNING revisao`).get(sessionId) as { revisao: number }).revisao;
+    },
+    registrarAssinatura(sessionId, assinatura) {
+      return (db.prepare(`INSERT INTO revisoes (sessionId, revisao, assinatura) VALUES (?, 1, ?)
+        ON CONFLICT(sessionId) DO UPDATE SET revisao = revisao + 1, assinatura = excluded.assinatura
+        WHERE revisoes.assinatura IS NOT excluded.assinatura RETURNING revisao`).get(sessionId, assinatura) as { revisao: number } | undefined)?.revisao ?? this.revisao(sessionId);
     },
     fechar() { db.close(); },
   };

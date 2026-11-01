@@ -23,11 +23,12 @@ export function criarGateway(origem: typeof fetch, opcoes: { loginPorMinuto?: nu
     const url = new URL(req.url);
     if (!url.pathname.startsWith(PREFIXO)) return json(404, { codigo: 'NOT_FOUND', erro: 'Rota desconhecida.' });
     if (!env.ORIGEM_URL || !env.GATEWAY_SEGREDO) return json(503, { codigo: 'UNAVAILABLE', erro: 'Serviço indisponível.' });
-    if (url.pathname === `${PREFIXO}auth/login` && !liberarLogin(req.headers.get('cf-connecting-ip') ?? '?'))
+    if (url.pathname.replace(/\/+$/, '') === `${PREFIXO}auth/login` && !liberarLogin(req.headers.get('cf-connecting-ip') ?? '?'))
       return json(429, { codigo: 'RATE_LIMITED', erro: 'Muitas tentativas. Aguarde um pouco.' }, { 'retry-after': '60' });
     const destino = new URL(url.pathname + url.search, env.ORIGEM_URL);
     const headers = new Headers(req.headers);
     headers.set('x-app-v1-gateway', env.GATEWAY_SEGREDO);
+    headers.set('x-app-v1-cliente-ip', req.headers.get('cf-connecting-ip') ?? '?');
     try {
       const r = await origem(new Request(destino, { method: req.method, headers, body: req.body, redirect: 'error', ...(req.body ? { duplex: 'half' } : {}) } as RequestInit));
       const saida = new Headers(r.headers);

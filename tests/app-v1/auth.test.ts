@@ -54,6 +54,7 @@ describe('login, sessão e perfis', () => {
     const t1 = await login(ctx(), 'ana', SENHA, 'x');
     const t2 = renovar(ctx(), t1.refreshToken);
     expect(t2.refreshToken).not.toBe(t1.refreshToken);
+    agora += 61_000;
     expect(() => renovar(ctx(), t1.refreshToken)).toThrow(LoginRecusado);
     expect(autenticar(ctx(), `Bearer ${t2.accessToken}`)).toBeNull();
     expect(() => renovar(ctx(), t2.refreshToken)).toThrow(LoginRecusado);
@@ -98,5 +99,28 @@ describe('login, sessão e perfis', () => {
     expect(pode('RECEPCAO', 'sessoes.ver')).toBe(true);
     for (const p of ['RECEPCAO', 'OPERACAO', 'GERENCIA'] as const) expect(pode(p, 'recepcao.aprovar')).toBe(false);
     expect(pode('RECEPCAO', 'inexistente')).toBe(false);
+  });
+});
+
+describe('correções da revisão: login', () => {
+  const SENHA = 'senha-de-teste-123';
+  it('refresh perdido: reenvio em até 60 s não revoga; depois disso revoga', async () => {
+    const store = abrirStore(':memory:'); let agora = 1_000_000;
+    const c = { store, segredo: SEGREDO, relogio: () => agora };
+    await criarUsuario(c, { usuario: 'ana', nome: 'Ana', perfil: 'OPERACAO', senha: SENHA });
+    const t1 = await login(c, 'ana', SENHA, 'x');
+    renovar(c, t1.refreshToken); // resposta perdida
+    agora += 30_000;
+    const t3 = renovar(c, t1.refreshToken);
+    expect(autenticar(c, `Bearer ${t3.accessToken}`)).toBeTruthy();
+    agora += 61_000;
+    expect(() => renovar(c, t1.refreshToken)).toThrow(LoginRecusado);
+    expect(autenticar(c, `Bearer ${t3.accessToken}`)).toBeNull();
+  });
+  it('logins errados em paralelo contam todos e atrasam', async () => {
+    const store = abrirStore(':memory:'); const c = { store, segredo: SEGREDO, relogio: () => 5_000 };
+    await criarUsuario(c, { usuario: 'ana', nome: 'Ana', perfil: 'OPERACAO', senha: SENHA });
+    await Promise.all(Array.from({ length: 5 }, () => login(c, 'ana', 'errada-errada', 'x').catch(() => null)));
+    await expect(login(c, 'ana', SENHA, 'x')).rejects.toBeInstanceOf(LoginRecusado);
   });
 });

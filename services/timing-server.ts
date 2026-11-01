@@ -321,6 +321,11 @@ for (const session of sessions.values()) {
   }
 }
 
+/** O que invalida um comando do app. Passagem de kart fica de fora: senão, em corrida, todo comando daria conflito. */
+function assinaturaDeComando(s: Session) {
+  return JSON.stringify([s.state, s.competitors.map((c) => [c.kart, c.name, c.customerId ?? null, c.autoAdded ? 1 : 0, c.penalidades?.length ?? 0, c.flag ?? null])]);
+}
+
 function saveSession(s: Session) {
   const targetPath = resolveSessionFilePath(s);
   try {
@@ -331,7 +336,7 @@ function saveSession(s: Session) {
     }
     sessionPaths.set(s.id, targetPath);
     dirtySessions.delete(s.id);
-    moduloApp?.aoSalvarSessao(s.id);
+    moduloApp?.aoSalvarSessao(s.id, assinaturaDeComando(s));
   } catch (err) {
     dirtySessions.add(s.id);
     log(`ERRO ao gravar bateria ${s.name} (${s.id}) no disco; retentando em segundo plano: ${(err as Error).message}`);
@@ -1251,7 +1256,7 @@ function scheduleStateBroadcast(esperaMs = 150) {
   stateTimerAte = ate;
   stateTimer = setTimeout(() => {
     stateTimer = null;
-    for (const avisar of assinantesApp) avisar();
+    for (const avisar of assinantesApp) { try { avisar(); } catch (err) { log('erro no aviso do app', (err as Error).message); } }
     if (clients.size || clientesLeves.size) {
       const estado = stateView();
       if (clients.size) broadcast('state', estado);
@@ -3449,7 +3454,7 @@ function ligarAppOperacional() {
     const store = abrirStore(join(DATA_DIR, '..', 'app-operacional', 'app.db'));
     marcarPendentesComoDesconhecidas(store);
     moduloApp = criarModuloApp({
-      store, segredo,
+      store, segredo, gatewaySegredo: process.env.APP_V1_GATEWAY_SECRET,
       listarSessoes: sortedSessions,
       verSessao: (id) => sessions.get(id),
       assinarMudancas: (cb) => { assinantesApp.add(cb); return () => assinantesApp.delete(cb); },

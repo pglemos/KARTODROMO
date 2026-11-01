@@ -16,6 +16,7 @@ export class LoginRecusado extends Error {
 
 const ACESSO_MS = 15 * 60_000;
 const SESSAO_MS = 12 * 3_600_000;
+const CARENCIA_REFRESH_MS = 60_000;
 const FALHAS_ATE_ATRASAR = 5;
 const ATRASO_MS = 30_000;
 const TAMANHO_HASH = 64;
@@ -84,11 +85,12 @@ export async function login(ctx: AuthCtx, usuario: string, senha: string, device
   const certa = await senhaConfere(String(senha ?? ''), u?.senhaHash ?? HASH_FALSO);
   if (!u || u.bloqueado) throw new LoginRecusado();
   const agora = agoraDe(ctx);
-  if (u.bloqueadoAte > agora) throw new LoginRecusado();
+  const atraso = db.prepare('SELECT bloqueadoAte FROM usuarios WHERE id = ?').get(u.id) as { bloqueadoAte: number };
+  if (atraso.bloqueadoAte > agora) throw new LoginRecusado();
   if (!certa) {
-    const falhas = u.falhas + 1;
-    db.prepare('UPDATE usuarios SET falhas = ?, bloqueadoAte = ? WHERE id = ?')
-      .run(falhas >= FALHAS_ATE_ATRASAR ? 0 : falhas, falhas >= FALHAS_ATE_ATRASAR ? agora + ATRASO_MS : 0, u.id);
+    // incremento no banco: logins em paralelo não se sobrescrevem
+    const { falhas } = db.prepare('UPDATE usuarios SET falhas = falhas + 1 WHERE id = ? RETURNING falhas').get(u.id) as { falhas: number };
+    if (falhas >= FALHAS_ATE_ATRASAR) db.prepare('UPDATE usuarios SET falhas = 0, bloqueadoAte = ? WHERE id = ?').run(agora + ATRASO_MS, u.id);
     throw new LoginRecusado();
   }
   const sessaoId = randomUUID();
@@ -101,7 +103,7 @@ export async function login(ctx: AuthCtx, usuario: string, senha: string, device
   });
 }
 
-type LinhaSessao = { id: string; usuarioId: string; deviceId: string; refreshHash: string; expiraAbsolutoEm: number; revogadaEm: number | null };
+type LinhaSessao = { id: string; usuarioId: string; deviceId: string; refreshHash: string; refreshAnteriorHash: string | null; refreshAnteriorAte: number | null; expiraAbsolutoEm: number; revogadaEm: number | null };
 
 export function renovar(ctx: AuthCtx, refreshToken: string): Tokens {
   const { db } = ctx.store;
@@ -110,13 +112,17 @@ export function renovar(ctx: AuthCtx, refreshToken: string): Tokens {
   const s = db.prepare('SELECT * FROM sessoes WHERE id = ?').get(sessaoId) as LinhaSessao | undefined;
   if (!s || s.revogadaEm) throw new LoginRecusado('Sessão encerrada.');
   const agora = agoraDe(ctx);
-  if (s.refreshHash !== sha(token)) {
+  const hash = sha(token);
+  // resposta da renovação perdida na rede: o anterior ainda vale por pouco tempo
+  const carencia = s.refreshAnteriorHash === hash && (s.refreshAnteriorAte ?? 0) > agora;
+  if (s.refreshHash !== hash && !carencia) {
     // refresh antigo reapareceu: pode ter vazado, encerra a sessão inteira
     db.prepare('UPDATE sessoes SET revogadaEm = ? WHERE id = ?').run(agora, s.id);
     throw new LoginRecusado('Sessão encerrada.');
   }
   const u = db.prepare('SELECT bloqueado FROM usuarios WHERE id = ?').get(s.usuarioId) as { bloqueado: number } | undefined;
   if (!u || u.bloqueado || agora >= s.expiraAbsolutoEm) throw new LoginRecusado('Sessão encerrada.');
+  if (!carencia) db.prepare('UPDATE sessoes SET refreshAnteriorHash = ?, refreshAnteriorAte = ? WHERE id = ?').run(hash, agora + CARENCIA_REFRESH_MS, s.id);
   return emitir(ctx, s.id, s.expiraAbsolutoEm);
 }
 

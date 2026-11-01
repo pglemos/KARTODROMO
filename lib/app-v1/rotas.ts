@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import type http from 'node:http';
 import { writeTimingEvent } from '../timing/sse';
 import { autenticar, bloquearUsuario, criarUsuario, login, LoginRecusado, pode, renovar, sair, type AuthCtx, type Identidade, type Perfil } from './auth';
@@ -7,6 +8,9 @@ import type { AppStore } from './store';
 const PREFIXO = '/api/app/v1/';
 const MAX_CORPO = 64 * 1024;
 const TAMANHO_MINIMO_SEGREDO = 32;
+const MAX_CHAVES_LIMITE = 5000;
+const MAX_LOGINS_SIMULTANEOS = 4;
+const JANELA_EVENTOS_MS = 48 * 3_600_000;
 const CAPACIDADES_CONHECIDAS = ['sessoes.ver', 'elegiveis.ver', 'operacoes.ver', 'auditoria.ver', 'auditoria.global', 'usuarios.gerir',
   'bateria.preparar', 'sorteio.gravar', 'atrasado.incluir', 'peso.conferir', 'kart.trocar', 'frota.gerir', 'penalidade.aplicar', 'bandeira.aplicar',
   'prova.comandar', 'prova.reiniciar', 'passagem.corrigir', 'equalizacao.gerir'];
@@ -21,15 +25,19 @@ export type DepsApp = {
   limiteLoginPorMinuto?: number;
   limitePor10s?: number;
   routeMode?: string;
+  gatewaySegredo?: string;
 };
-export type ModuloApp = { tratar(req: http.IncomingMessage, res: http.ServerResponse, url: URL): Promise<boolean>; aoSalvarSessao(id: string): void };
+export type ModuloApp = { tratar(req: http.IncomingMessage, res: http.ServerResponse, url: URL): Promise<boolean>; aoSalvarSessao(id: string, assinatura?: string): void };
 
 type Bucket = { n: number; ate: number };
 function limitador(limite: number, janelaMs: number) {
   const b = new Map<string, Bucket>();
   return (chave: string) => {
     const agora = Date.now();
-    if (b.size > 5000) for (const [k, v] of b) if (v.ate <= agora) b.delete(k);
+    if (b.size > MAX_CHAVES_LIMITE) {
+      for (const [k, v] of b) if (v.ate <= agora) b.delete(k);
+      if (b.size > MAX_CHAVES_LIMITE && !b.has(chave)) return false;
+    }
     const a = b.get(chave);
     if (!a || a.ate <= agora) { b.set(chave, { n: 1, ate: agora + janelaMs }); return true; }
     return ++a.n <= limite;
@@ -67,30 +75,67 @@ function visaoSessao(store: AppStore, s: unknown) {
   };
 }
 
-const ipDe = (req: http.IncomingMessage) => String(req.headers['cf-connecting-ip'] ?? req.socket?.remoteAddress ?? '?');
+/** O IP informado só vale com o segredo do gateway e só serve para limitar; nunca dá privilégio. */
+function ipDe(req: http.IncomingMessage, gatewaySegredo: string | undefined) {
+  const socket = String(req.socket?.remoteAddress ?? '?');
+  const recebido = req.headers['x-app-v1-gateway'];
+  if (!gatewaySegredo || typeof recebido !== 'string') return socket;
+  const a = Buffer.from(recebido); const b = Buffer.from(gatewaySegredo);
+  return a.length === b.length && timingSafeEqual(a, b) ? String(req.headers['x-app-v1-cliente-ip'] ?? socket) : socket;
+}
 
 export function criarModuloApp(d: DepsApp): ModuloApp {
   const ctx: AuthCtx = { store: d.store, segredo: d.segredo };
   const limiteLogin = limitador(d.limiteLoginPorMinuto ?? 10, 60_000);
   const limiteGeral = limitador(d.limitePor10s ?? 200, 10_000);
-  const clientesAtivos = new Set<() => void>();
+  const revisoesPendentes = new Map<string, string | undefined>();
+  let loginsEmCurso = 0;
   let indisponivel = d.segredo.length < TAMANHO_MINIMO_SEGREDO;
+  let revisaoFalhou = false;
+
+  type Cliente = { res: http.ServerResponse; header: string | undefined; seq: number; encerrar(): void };
+  const clientes = new Set<Cliente>();
+  let cancelarAssinatura: (() => void) | null = null;
+
+  /** Um erro do app nunca sobe para o timer da cronometragem. */
+  const protegido = (fn: () => void) => () => {
+    try { fn(); } catch { derrubar(); }
+  };
+  const derrubar = () => { indisponivel = true; for (const c of [...clientes]) c.encerrar(); };
+
+  const visaoAtual = () => {
+    const limite = Date.now() - JANELA_EVENTOS_MS;
+    return d.listarSessoes().filter((s) => {
+      const v = s as { state?: string; createdAt?: number };
+      return v.state === 'em_andamento' || v.state === 'bandeira_final' || (v.createdAt ?? Date.now()) >= limite;
+    }).map((s) => visaoSessao(d.store, s));
+  };
+  const mandar = (c: Cliente, sessoes: string) => {
+    c.seq += 1;
+    writeTimingEvent(c.res, `event: state\ndata: {"seq":${c.seq},"sessoes":${sessoes}}\n\n`);
+  };
 
   function eventos(res: http.ServerResponse, req: http.IncomingMessage, header: string | undefined) {
-    let seq = 0;
     res.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', connection: 'keep-alive', 'x-accel-buffering': 'no' });
-    const mandarEstado = () => {
-      seq += 1;
-      writeTimingEvent(res, `event: state\ndata: ${JSON.stringify({ seq, sessoes: d.listarSessoes().map((s) => visaoSessao(d.store, s)) })}\n\n`);
+    const parar = () => {
+      clearInterval(batida);
+      clientes.delete(c);
+      if (!clientes.size && cancelarAssinatura) { cancelarAssinatura(); cancelarAssinatura = null; }
     };
-    const parar = () => { clearInterval(batida); cancelar(); clientesAtivos.delete(encerrar); };
-    const encerrar = () => { writeTimingEvent(res, 'event: auth-expired\ndata: {}\n\n'); parar(); res.end(); };
-    const conferir = () => { if (indisponivel || !autenticar(ctx, header)) { encerrar(); return false; } return true; };
-    const cancelar = d.assinarMudancas(() => { if (conferir()) mandarEstado(); });
-    const batida = setInterval(() => { if (conferir()) writeTimingEvent(res, ': batida\n\n'); }, d.batidaMs ?? 15_000);
-    clientesAtivos.add(encerrar);
+    const c: Cliente = { res, header, seq: 0, encerrar() { writeTimingEvent(res, 'event: auth-expired\ndata: {}\n\n'); parar(); res.end(); } };
+    // login é revalidado na batida, não em cada passagem: bloqueio derruba o fluxo em até uma batida
+    const batida = setInterval(protegido(() => {
+      if (indisponivel || !autenticar(ctx, header)) c.encerrar();
+      else writeTimingEvent(res, ': batida\n\n');
+    }), d.batidaMs ?? 15_000);
+    clientes.add(c);
+    // serializa uma vez por mudança, para todos os clientes
+    cancelarAssinatura ??= d.assinarMudancas(protegido(() => {
+      const sessoes = JSON.stringify(visaoAtual());
+      for (const x of clientes) mandar(x, sessoes);
+    }));
     req.on('close', parar);
-    mandarEstado();
+    mandar(c, JSON.stringify(visaoAtual()));
   }
 
   async function rotear(req: http.IncomingMessage, res: http.ServerResponse, url: URL) {
@@ -99,10 +144,12 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
     const header = req.headers.authorization;
 
     if (caminho === 'auth/login' && metodo === 'POST') {
-      if (!limiteLogin(ipDe(req))) return erro(res, 429, 'RATE_LIMITED', 'Muitas tentativas. Aguarde um pouco.', { 'retry-after': '60' });
-      const b = await lerCorpo(req);
-      const t = await login(ctx, String(b.usuario ?? ''), String(b.senha ?? ''), String(b.deviceId ?? ''));
-      return enviar(res, 200, t);
+      if (!limiteLogin(ipDe(req, d.gatewaySegredo)) || loginsEmCurso >= MAX_LOGINS_SIMULTANEOS) return erro(res, 429, 'RATE_LIMITED', 'Muitas tentativas. Aguarde um pouco.', { 'retry-after': '60' });
+      loginsEmCurso += 1;
+      try {
+        const b = await lerCorpo(req);
+        return enviar(res, 200, await login(ctx, String(b.usuario ?? ''), String(b.senha ?? ''), String(b.deviceId ?? '')));
+      } finally { loginsEmCurso -= 1; }
     }
     if (caminho === 'auth/refresh' && metodo === 'POST') {
       const b = await lerCorpo(req);
@@ -166,7 +213,7 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
     async tratar(req, res, url) {
       if (!url.pathname.startsWith(PREFIXO)) return false;
       if (indisponivel) { erro(res, 503, 'UNAVAILABLE', 'App operacional indisponível.'); return true; }
-      if (!limiteGeral(ipDe(req))) { erro(res, 429, 'RATE_LIMITED', 'Muitas requisições. Aguarde.', { 'retry-after': '10' }); return true; }
+      if (!limiteGeral(ipDe(req, d.gatewaySegredo))) { erro(res, 429, 'RATE_LIMITED', 'Muitas requisições. Aguarde.', { 'retry-after': '10' }); return true; }
       try {
         await rotear(req, res, url);
       } catch (e) {
@@ -177,13 +224,20 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
       }
       return true;
     },
-    aoSalvarSessao(id) {
+    aoSalvarSessao(id, assinatura) {
+      revisoesPendentes.set(id, assinatura);
       try {
-        d.store.subirRevisao(id);
+        for (const [sessao, a] of revisoesPendentes) {
+          if (a === undefined) d.store.subirRevisao(sessao);
+          else d.store.registrarAssinatura(sessao, a);
+          revisoesPendentes.delete(sessao);
+        }
+        // tudo em dia de novo: volta sozinho, sem reiniciar a cronometragem
+        if (revisaoFalhou) { revisaoFalhou = false; indisponivel = d.segredo.length < TAMANHO_MINIMO_SEGREDO; }
       } catch {
         // sem revisão confiável não se opera, mas a cronometragem nunca para por causa do app
-        indisponivel = true;
-        for (const fechar of [...clientesAtivos]) fechar();
+        revisaoFalhou = true;
+        derrubar();
       }
     },
   };
