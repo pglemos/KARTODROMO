@@ -1,6 +1,6 @@
 # Relatório do gate G0
 
-**Situação: levantamento concluído, com pendências. Aguarda aceite do dono.** Nada foi publicado.
+**Situação: G0 aceito pelo dono em 31/10/2026, com bloqueio de quem está sem termo impresso.** Nada foi publicado. As pendências abaixo continuam abertas antes da F1.
 
 ## As 10 questões do PRD 22
 | # | Resposta | Situação |
