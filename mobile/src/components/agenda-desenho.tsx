@@ -50,23 +50,23 @@ export function CabecalhoAgenda({ dates, selectedDate, onDate, tipo, onTipo, chi
         <Caixa x={0} y={y(72)} w={852} h={386} pointerEvents="none"><Foto fonte={fundos.agendaTopo} /></Caixa>
         <CabecalhoPiloto y={y(88)} logo={{ x: 40, y: y(80), w: 325 }} detalhe />
         <Caixa x={45} y={y(203)} pointerEvents="none"><T s={21} c="#D3D8D5" p="500" style={{ letterSpacing: 12 * k }}>AGENDA</T></Caixa>
-        <Caixa x={42} y={y(241)} pointerEvents="none">
-          <T s={60} f={fonte.display} largo={LARGO} lh={49} style={{ letterSpacing: -0.5 * k }}>ESCOLHA</T>
-          <T s={60} f={fonte.display} largo={LARGO} lh={49} style={{ letterSpacing: -0.5 * k }}>SUA BATERIA</T>
+        <Caixa x={42} y={y(228)} pointerEvents="none">
+          <T testID="agenda-title" accessibilityRole="header" s={53} f={fonte.display} largo={LARGO} lh={62} style={{ letterSpacing: -0.5 * k }}>ESCOLHA</T>
+          <T s={53} f={fonte.display} largo={LARGO} lh={62} style={{ letterSpacing: -0.5 * k }}>SUA BATERIA</T>
         </Caixa>
-        <Caixa x={43} y={y(358)} w={360} pointerEvents="none">
+        <Caixa x={43} y={y(370)} w={430} pointerEvents="none">
           <T testID="agenda-selected-date" s={21} lh={28} c="#DCE1DE">Selecione o dia e o horário da sua bateria e garanta sua vaga na pista.</T>
         </Caixa>
 
         <Caixa x={0} y={y(463)} w={852} h={106}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 32 * k, gap: 12 * k }}>
+          <ScrollView horizontal accessibilityLabel="Datas disponíveis. Deslize para ver outros dias." showsHorizontalScrollIndicator contentContainerStyle={{ paddingLeft: 16 * k, gap: 12 * k }}>
             {dates.map((date) => {
               const sel = date === selectedDate;
               const r = rotuloDia(date);
               return (
                 <Pressable key={date} testID={`date-pill-${date}`} accessibilityRole="button" accessibilityState={{ selected: sel }} accessibilityLabel={`${r.semana} ${r.dia}`}
                   onPress={() => onDate(date)}
-                  style={{ width: 122 * k, height: 104 * k, borderRadius: 18 * k, alignItems: 'center', justifyContent: 'center', backgroundColor: sel ? cor.verde : '#121716', borderWidth: 1, borderColor: sel ? '#57F591' : '#262B29',
+                  style={{ width: 156 * k, height: 104 * k, borderRadius: 18 * k, alignItems: 'center', justifyContent: 'center', backgroundColor: sel ? cor.verde : '#121716', borderWidth: 1, borderColor: sel ? '#57F591' : '#262B29',
                     shadowColor: cor.verde, shadowOpacity: sel ? 0.5 : 0, shadowRadius: 14 * k, elevation: sel ? 8 : 0 }}>
                   <T s={19} p="600" c={sel ? '#04230F' : '#C3C9C6'} style={{ letterSpacing: 1 * k }}>{r.semana}</T>
                   <T s={20} p="800" c={sel ? '#04230F' : '#FFFFFF'} style={{ marginTop: 6 * k }}>{r.dia}</T>
@@ -80,6 +80,7 @@ export function CabecalhoAgenda({ dates, selectedDate, onDate, tipo, onTipo, chi
                 <T s={15} p="500" c="#C3C9C6" style={{ marginTop: 10 * k, letterSpacing: 1 * k }}>{mes}</T>
               </View>
             ) : null}
+            <View style={{ width: 16 * k }} />
           </ScrollView>
         </Caixa>
 

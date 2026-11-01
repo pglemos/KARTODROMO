@@ -1,9 +1,6 @@
-import { demoOnly } from '../../config/features';
-import React from 'react';
-import { TrackScreen, TrackScreenProps } from '../../components/track-screen';
+import { Redirect } from 'expo-router';
 
-function ParceirosScreen(props: TrackScreenProps) {
-  return <TrackScreen {...props} />;
+/** Parceiros aguarda endpoint real; a rota não expõe dados fictícios. */
+export default function ParceirosRoute() {
+  return <Redirect href="/(tabs)" />;
 }
-
-export default demoOnly(ParceirosScreen);

@@ -11,11 +11,13 @@ import { normalizarInstagram } from './instagram';
 import { nomeProprio } from '../nomes';
 
 let pool: sql.ConnectionPool | null = null;
+let poolConnecting: Promise<sql.ConnectionPool> | null = null;
 
 export async function getPool(): Promise<sql.ConnectionPool> {
   if (pool?.connected) return pool;
+  if (poolConnecting) return poolConnecting;
   const env = process.env;
-  pool = await new sql.ConnectionPool({
+  const newPool = new sql.ConnectionPool({
     server: env.OPS_SQL_SERVER || '127.0.0.1',
     database: env.OPS_SQL_DATABASE || 'KartodromoOps',
     user: env.OPS_SQL_USER,
@@ -23,8 +25,22 @@ export async function getPool(): Promise<sql.ConnectionPool> {
     options: { instanceName: env.OPS_SQL_INSTANCE || 'SQLEXPRESS', encrypt: false, trustServerCertificate: true },
     pool: { max: 10, idleTimeoutMillis: 60_000 },
     requestTimeout: 30_000,
-  }).connect();
-  return pool;
+  });
+  newPool.on('error', (err) => {
+    console.error('Erro no pool de conexões mssql:', err);
+    if (!newPool.connected) {
+      pool = null;
+    }
+  });
+  poolConnecting = newPool.connect().then((connectedPool) => {
+    pool = connectedPool;
+    poolConnecting = null;
+    return pool;
+  }).catch((err) => {
+    poolConnecting = null;
+    throw err;
+  });
+  return poolConnecting;
 }
 
 type Params = Record<string, unknown>;
@@ -76,6 +92,7 @@ export const CLIENTE_COLS = `c.Id id, c.Nome nome, c.TipoDocumento tipoDocumento
   CONVERT(varchar(10), c.Nascimento, 126) nascimento, c.Sexo sexo, c.Peso peso, c.Cep cep, c.Endereco endereco, c.Numero numero,
   c.Complemento complemento, c.Bairro bairro, c.Cidade cidade, c.Estado estado, c.ResponsavelId responsavelId,
   CONVERT(varchar(19), c.LgpdAceiteEm, 126) lgpdAceiteEm, c.Bloqueado bloqueado, c.Observacao observacao, c.Origem origem, c.TipoSanguineo tipoSanguineo, c.Ibge ibge, c.Pais pais,
+  CONVERT(varchar(19), c.LgpdMenorAceitoEm, 126) lgpdMenorAceitoEm, c.LgpdMenorResponsavelId lgpdMenorResponsavelId, c.LgpdMenorTermoVersao lgpdMenorTermoVersao,
   CONVERT(varchar(19), c.CriadoEm, 126) criadoEm`;
 
 export type ClienteInput = {
@@ -97,11 +114,15 @@ export type ClienteInput = {
   estado?: string | null;
   responsavelId?: number | null;
   lgpd?: boolean;
+  consentimentoMenor?: boolean;
+  lgpdMenorResponsavelId?: number | null;
+  lgpdMenorTermoVersao?: string | null;
   bloqueado?: boolean;
   observacao?: string | null;
   tipoSanguineo?: string | null;
   ibge?: string | null;
   pais?: string | null;
+  semInstagram?: boolean;
 };
 
 const FIELD_MAP: Record<string, [string, number]> = {
@@ -135,6 +156,7 @@ export function clienteColumns(input: ClienteInput, partial: boolean): Record<st
     out[col] = value === '' ? null : value;
   };
   for (const [key, [col, max]] of Object.entries(FIELD_MAP)) {
+    if (key === 'instagram' && input.semInstagram === true) continue;
     if (!(key in input)) continue;
     let v = (input as Record<string, unknown>)[key];
     if (key === 'instagram' && typeof v === 'string') v = normalizarInstagram(v);
@@ -143,6 +165,9 @@ export function clienteColumns(input: ClienteInput, partial: boolean): Record<st
     if (key === 'nome' && typeof v === 'string') v = nomeProprio(v); // "joao victor" / "JOAO VICTOR" → "Joao Victor"
     if (key === 'estado' && typeof v === 'string') v = v.toUpperCase();
     set(col, v);
+  }
+  if (input.semInstagram === true) {
+    out.Instagram = null;
   }
   if ('documento' in input) set('DocumentoNum', onlyDigits(input.documento).slice(0, 30) || null);
   if ('telefone' in input) set('TelefoneNum', onlyDigits(input.telefone).slice(-20) || null);
@@ -162,11 +187,19 @@ export async function insertCliente(input: ClienteInput, origem: string): Promis
   if (!cols.Nome) throw new Error('Nome e obrigatorio.');
   cols.Origem = origem;
   const names = Object.keys(cols);
-  const params = Object.fromEntries(names.map((n) => [n, cols[n]]));
+  const params: Record<string, unknown> = Object.fromEntries(names.map((n) => [n, cols[n]]));
   const lgpd = input.lgpd ? ', LgpdAceiteEm' : '';
   const lgpdV = input.lgpd ? ', SYSDATETIME()' : '';
+  let lgpdMenorCols = '';
+  let lgpdMenorVals = '';
+  if (input.consentimentoMenor) {
+    lgpdMenorCols = ', LgpdMenorAceitoEm, LgpdMenorResponsavelId, LgpdMenorTermoVersao';
+    lgpdMenorVals = ', SYSDATETIME(), @lgpdMenorResponsavelId, @lgpdMenorTermoVersao';
+    params.lgpdMenorResponsavelId = input.lgpdMenorResponsavelId ?? input.responsavelId ?? null;
+    params.lgpdMenorTermoVersao = input.lgpdMenorTermoVersao ?? '2026.1';
+  }
   const row = await one<{ id: number }>(
-    `INSERT INTO dbo.Cliente (${names.join(', ')}${lgpd}) OUTPUT inserted.Id id VALUES (${names.map((n) => '@' + n).join(', ')}${lgpdV})`,
+    `INSERT INTO dbo.Cliente (${names.join(', ')}${lgpd}${lgpdMenorCols}) OUTPUT inserted.Id id VALUES (${names.map((n) => '@' + n).join(', ')}${lgpdV}${lgpdMenorVals})`,
     params,
   );
   return row!.id;
@@ -177,8 +210,16 @@ export async function updateCliente(id: number, input: ClienteInput, partial: bo
   if ('Nome' in cols && !cols.Nome) throw new Error('Nome e obrigatorio.');
   const sets = Object.keys(cols).map((n) => `${n} = @${n}`);
   if (input.lgpd) sets.push('LgpdAceiteEm = COALESCE(LgpdAceiteEm, SYSDATETIME())');
+  const params: Record<string, unknown> = { ...cols, id };
+  if (input.consentimentoMenor) {
+    sets.push('LgpdMenorAceitoEm = COALESCE(LgpdMenorAceitoEm, SYSDATETIME())');
+    sets.push('LgpdMenorResponsavelId = COALESCE(@lgpdMenorResponsavelId, LgpdMenorResponsavelId)');
+    sets.push("LgpdMenorTermoVersao = COALESCE(@lgpdMenorTermoVersao, LgpdMenorTermoVersao, '2026.1')");
+    params.lgpdMenorResponsavelId = input.lgpdMenorResponsavelId ?? input.responsavelId ?? null;
+    params.lgpdMenorTermoVersao = input.lgpdMenorTermoVersao ?? '2026.1';
+  }
   sets.push('AtualizadoEm = SYSDATETIME()');
-  await query(`UPDATE dbo.Cliente SET ${sets.join(', ')} WHERE Id = @id`, { ...cols, id });
+  await query(`UPDATE dbo.Cliente SET ${sets.join(', ')} WHERE Id = @id`, params);
 }
 
 /** Precos em centavos (tabela passada pelo dono em 25/09/2026). Sobrescreviveis por env. */

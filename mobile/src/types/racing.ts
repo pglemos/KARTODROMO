@@ -133,6 +133,8 @@ export interface LiveCompetitor {
   bestLapNumber: number;
   diffLeader: string; // e.g. '0:00.000' or '+0:01.420'
   diffPrev: string; // e.g. '0:00.000' or '+0:00.315'
+  /** histórico completo fornecido pela cronometragem, em ordem de volta */
+  lapTimes?: { number: number; time: string; timeMs: number }[];
   isFastestLap: boolean;
   deltaRealtime: LiveCompetitorDelta;
 }
@@ -144,6 +146,10 @@ export interface LiveSession {
   trackName: string; // e.g. 'KART CENTER BETIM'
   /** instante do último retrato recebido da cronometragem, em ISO */
   updatedAt?: string;
+  lastUpdatedAt?: string;
+  snapshotAgeMs?: number | null;
+  stale?: boolean;
+  transport?: 'websocket' | 'polling';
   status: SessionFlagStatus;
   elapsedTime: string; // e.g. '0:17:54.548'
   elapsedMs: number;

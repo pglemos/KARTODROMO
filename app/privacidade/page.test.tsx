@@ -13,7 +13,7 @@ describe('política de privacidade do app', () => {
 
     expect(markup).toContain('Nome, CPF, e-mail e telefone');
     expect(markup).toContain('reservas e pagamentos');
-    expect(markup).toContain('Asaas');
+    expect(markup).toContain('Stone');
     expect(markup).toContain('GPS');
     expect(markup).toContain('primeiro plano');
     expect(markup).toContain('somente neste aparelho');

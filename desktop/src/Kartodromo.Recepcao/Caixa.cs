@@ -95,7 +95,7 @@ public class FormCheckout : CartaoModal
     }
 
     static Api Api => Sessao.Api;
-    class ItemCarrinho
+    public class ItemCarrinho
     {
         public long K; public long? InscricaoId; public long? ProdutoId; public string Cliente, Produto; public int Qtd = 1; public long Unit, Desc, Acr; public decimal DescPct, AcrPct; public bool Voucher;
     }
@@ -117,8 +117,8 @@ public class FormCheckout : CartaoModal
     Label _avisoPagamento;
     Panel _formasCard, _pagamentosCard, _bloqueioPagamento;
     TableLayoutPanel _pagamentos;
-    Button _btnAdicionarSelecionadas, _btnConcluir, _btnContinuarPagamento;
-    bool _pagamentoAtivo;
+    Button _btnAdicionarSelecionadas, _btnConcluir, _btnContinuarPagamento, _btnVoucher;
+    bool _pagamentoAtivo, _salvando;
 
     public FormCheckout(JsonObject terminal, long? bateriaId, List<long> reservaIds, long? clienteId)
         : base(1320, 812)
@@ -200,7 +200,7 @@ public class FormCheckout : CartaoModal
         var area = Screen.FromPoint(Cursor.Position).WorkingArea;
         ClientSize = new Size(Math.Min(1320, area.Width - 16), Math.Min(812, area.Height - 16));
         MinimumSize = new Size(1000, 640);
-        Resize += (_, _) => { using var p = VisualPrincipal.Redondo(new Rectangle(0, 0, Width, Height), 18); Region = new Region(p); };
+        Resize += (_, _) => { using var p = VisualPrincipal.Redondo(new Rectangle(0, 0, Width, Height), 18); var antiga = Region; Region = new Region(p); antiga?.Dispose(); };
         _bat.SelectedIndexChanged += (_, _) => CarregarDisponiveis();
         Load += (_, _) => Seguro.Rodar(this, async () =>
         {
@@ -230,6 +230,7 @@ public class FormCheckout : CartaoModal
         var resumo = new Panel { Dock = DockStyle.Right, Width = 300, BackColor = Tokens.Claro.CorSuperficieInversa, Padding = new Padding(18, 12, 18, 16) };
         resumo.Paint += (_, e) =>
         {
+            if (resumo.ClientRectangle.Width <= 0 || resumo.ClientRectangle.Height <= 0) return;
             using var b = new LinearGradientBrush(resumo.ClientRectangle, Tokens.Claro.CorSuperficieInversa, Color.FromArgb(11, 11, 12), 90f);
             e.Graphics.FillRectangle(b, resumo.ClientRectangle);
         };
@@ -246,6 +247,7 @@ public class FormCheckout : CartaoModal
         aprovar.FlatAppearance.BorderSize = 0; aprovar.FlatAppearance.MouseOverBackColor = Color.FromArgb(76, 217, 100); aprovar.Click += (_, _) => Aprovar();
         aprovar.Paint += (_, e) =>
         {
+            if (aprovar.ClientRectangle.Width <= 0 || aprovar.ClientRectangle.Height <= 0) return;
             // gradiente do design (verde claro em cima, verde escuro embaixo)
             var inicio = aprovar.Enabled ? Color.FromArgb(76, 217, 100) : Color.FromArgb(155, 178, 161);
             var fim = aprovar.Enabled ? Color.FromArgb(31, 158, 74) : Color.FromArgb(121, 139, 128);
@@ -381,6 +383,7 @@ public class FormCheckout : CartaoModal
         barraCarrinho.Controls.Add(Acao("+ Adicionar produtos", AdicionarProduto, 120));
         barraCarrinho.Controls.Add(Acao("Aplicar desconto", () => Ajuste(true), 100));
         barraCarrinho.Controls.Add(Acao("Aplicar acréscimo", () => Ajuste(false), 100));
+        barraCarrinho.Controls.Add(Acao("Desvincular voucher", DesvincularVoucher, 130));
         var continuarPagamento = Acao("Continuar para pagamento", () => { _pagamentoAtivo = true; Atualizar(); _valor.Focus(); }, 150);
         _btnContinuarPagamento = continuarPagamento;
         continuarPagamento.BackColor = Tokens.Claro.CorAcaoPrincipal; continuarPagamento.ForeColor = Tokens.Primitivo.Branco; continuarPagamento.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo, FontStyle.Bold);
@@ -388,8 +391,9 @@ public class FormCheckout : CartaoModal
         barraCarrinho.SetFlowBreak(barraCarrinho.Controls[^1], true);
         _codVoucher.PlaceholderText = "Código do voucher"; _codVoucher.AccessibleName = "Código do voucher";
         _codVoucher.Font = Tokens.FonteNumero(Tokens.Claro.FonteTamanhoCorpo);
-        var aplicarVoucher = new BotaoPlano { Text = "Aplicar", AutoSize = true, Dock = DockStyle.Right, FlatStyle = FlatStyle.Flat, BackColor = KitVisual.VerdeClaro, ForeColor = KitVisual.Verde, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold), Cursor = Cursors.Hand, AccessibleRole = AccessibleRole.PushButton, AccessibleName = "Aplicar voucher" };
-        aplicarVoucher.FlatAppearance.BorderSize = 0; aplicarVoucher.Click += (_, _) => AplicarVoucher();
+        var aplicarVoucher = new BotaoPlano { Text = "Aplicar", AutoSize = true, Dock = DockStyle.Right, FlatStyle = FlatStyle.Flat, BackColor = KitVisual.VerdeClaro, ForeColor = KitVisual.Verde, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold), Cursor = Cursors.Hand, AccessibleRole = AccessibleRole.PushButton, AccessibleName = "Aplicar ou remover voucher" };
+        _btnVoucher = aplicarVoucher;
+        aplicarVoucher.FlatAppearance.BorderSize = 0; aplicarVoucher.Click += (_, _) => { if (_voucher != null) RemoverVoucher(); else AplicarVoucher(); };
         var caixaVoucher = FormCliente.Caixa(_codVoucher, aplicarVoucher); caixaVoucher.Dock = DockStyle.None; caixaVoucher.Size = new Size(236, 34); caixaVoucher.Margin = new Padding(0, 0, 0, 0);
         barraCarrinho.Controls.Add(caixaVoucher);
         barraCarrinho.Resize += (_, _) => caixaVoucher.Margin = new Padding(Math.Max(0, barraCarrinho.ClientSize.Width - 24 - caixaVoucher.Width), 0, 0, 0);
@@ -593,12 +597,39 @@ public class FormCheckout : CartaoModal
         Atualizar();
     }
 
-    (long tot, long des, long acr, long sub, long rec, long troco, long falta) Totais()
+    public static bool EsDinheiro(long forma, string? nome) =>
+        forma == 1 || (nome != null && nome.IndexOf("dinheiro", StringComparison.OrdinalIgnoreCase) >= 0);
+
+    public static (long tot, long des, long acr, long sub, long rec, long troco, long falta) CalcularTotais(
+        IEnumerable<ItemCarrinho> itens,
+        IEnumerable<(long forma, string nome, long valor)> pagamentos)
     {
-        var tot = _car.Sum(i => i.Unit * i.Qtd); var des = _car.Sum(i => i.Desc); var acr = _car.Sum(i => i.Acr);
-        var sub = tot - des + acr; var rec = _pags.Sum(p => p.valor);
-        return (tot, des, acr, sub, rec, Math.Max(0, rec - sub), Math.Max(0, sub - rec));
+        var tot = itens.Sum(i => i.Unit * i.Qtd);
+        var des = itens.Sum(i => i.Desc);
+        var acr = itens.Sum(i => i.Acr);
+        var sub = tot - des + acr;
+        var rec = pagamentos.Sum(p => p.valor);
+        var falta = Math.Max(0, sub - rec);
+        var excessoTotal = Math.Max(0, rec - sub);
+
+        long troco = 0;
+        if (excessoTotal > 0)
+        {
+            var totalDinheiro = pagamentos.Where(p => EsDinheiro(p.forma, p.nome)).Sum(p => p.valor);
+            var totalNaoDinheiro = pagamentos.Where(p => !EsDinheiro(p.forma, p.nome)).Sum(p => p.valor);
+            var subtotalRestante = Math.Max(0, sub - totalNaoDinheiro);
+            var excessoDinheiro = totalDinheiro - subtotalRestante;
+            if (excessoDinheiro > 0)
+            {
+                troco = Math.Min(excessoTotal, excessoDinheiro);
+            }
+        }
+
+        return (tot, des, acr, sub, rec, troco, falta);
     }
+
+    (long tot, long des, long acr, long sub, long rec, long troco, long falta) Totais() =>
+        CalcularTotais(_car, _pags);
 
     void Atualizar()
     {
@@ -637,11 +668,26 @@ public class FormCheckout : CartaoModal
         }
         if (_btnConcluir != null)
         {
-            _btnConcluir.Enabled = pagamentoLiberado && (!Sessao.ParamSim("office.validarTotalPago", true) || t.falta <= 0);
+            _btnConcluir.Enabled = !_salvando && pagamentoLiberado && t.falta <= 0;
             _btnConcluir.AccessibleDescription = _btnConcluir.Enabled ? "Finaliza a cobrança e registra o pagamento." : "Adicione itens e lance o valor total antes de concluir.";
         }
         if (_btnAdicionarSelecionadas != null) _btnAdicionarSelecionadas.Enabled = _gDisp.Rows.Count > 0;
         if (_btnContinuarPagamento != null) _btnContinuarPagamento.Enabled = _car.Count > 0;
+        if (_btnVoucher != null)
+        {
+            if (_voucher != null)
+            {
+                _btnVoucher.Text = "Remover";
+                _btnVoucher.BackColor = Color.FromArgb(255, 230, 230);
+                _btnVoucher.ForeColor = Color.FromArgb(200, 30, 30);
+            }
+            else
+            {
+                _btnVoucher.Text = "Aplicar";
+                _btnVoucher.BackColor = KitVisual.VerdeClaro;
+                _btnVoucher.ForeColor = KitVisual.Verde;
+            }
+        }
         _cli.Text = _cliente?.S("nome") ?? ""; _doc.Text = _cliente?.S("documento") ?? "";
     }
 
@@ -721,26 +767,161 @@ public class FormCheckout : CartaoModal
         Msg.Info(this, $"Voucher aplicado! Desconto de {Fmt.Brl(alvo.Desc)} em {alvo.Produto}.");
     });
 
+    public void DesvincularVoucher()
+    {
+        var sel = _gCar.Selecionados.Select(s => s.L("k")).ToHashSet();
+        var comVoucher = _car.Where(c => (sel.Count == 0 || sel.Contains(c.K)) && c.Voucher).ToList();
+        if (comVoucher.Count == 0)
+        {
+            if (_voucher != null || _car.Any(c => c.Voucher))
+            {
+                RemoverVoucher();
+                return;
+            }
+            Msg.Aviso(this, "Nenhum item com voucher selecionado.");
+            return;
+        }
+
+        foreach (var c in comVoucher)
+        {
+            DesvincularVoucherItem(c);
+        }
+
+        if (!_car.Any(c => c.Voucher))
+        {
+            _voucher = null;
+            _codVoucher.Text = "";
+        }
+
+        Atualizar();
+        Msg.Info(this, "Voucher desvinculado com sucesso. O item foi mantido no carrinho com seu valor original.");
+    }
+
+    public static void DesvincularVoucherItem(ItemCarrinho item)
+    {
+        item.Voucher = false;
+        item.Desc = 0;
+        item.DescPct = 0;
+        if (item.AcrPct > 0)
+        {
+            var baseV = item.Unit * item.Qtd;
+            item.Acr = (long)Math.Round(baseV * item.AcrPct / 100m);
+        }
+    }
+
+    public void RemoverVoucher()
+    {
+        if (_voucher == null && !_car.Any(c => c.Voucher)) return;
+        foreach (var c in _car.Where(c => c.Voucher))
+        {
+            DesvincularVoucherItem(c);
+        }
+        _voucher = null;
+        _codVoucher.Text = "";
+        Atualizar();
+        Msg.Info(this, "Voucher removido da venda. Os itens foram mantidos no carrinho com seu valor original.");
+    }
+
     void Aprovar() => Seguro.Rodar(this, async () =>
     {
-        if (_car.Count == 0) { Msg.Aviso(this, "Carrinho vazio."); return; }
-        if (!_pagamentoAtivo) { Msg.Aviso(this, "Revise o carrinho e clique em ‘Continuar para pagamento’ antes de concluir."); return; }
-        var t = Totais();
-        if (_pags.Count == 0 && t.sub > 0 && _forma.SelectedItem is Campos.Item f) { _pags.Add((f.Id, f.Texto, Fmt.Centavos(_valor.Text) is long vv && vv > 0 ? vv : t.sub)); Atualizar(); t = Totais(); }
-        if (t.falta > 0 && Sessao.ParamSim("office.validarTotalPago", true)) { Msg.Aviso(this, $"Ainda faltam ser pagos {Fmt.Brl(t.falta)} para poder concluir a compra."); return; }
-        var itens = new JsonArray();
-        foreach (var c in _car) itens.Add(new JsonObject { ["inscricaoId"] = c.InscricaoId, ["produtoId"] = c.ProdutoId, ["quantidade"] = c.Qtd, ["unitarioCentavos"] = c.Unit, ["descontoCentavos"] = c.Voucher ? 0 : c.Desc, ["acrescimoCentavos"] = c.Acr });
-        var pags = new JsonArray();
-        foreach (var p in _pags) pags.Add(new JsonObject { ["formaPagamentoId"] = p.forma, ["valorCentavos"] = p.valor });
-        var r = await Api.Post("/api/office/vendas", new JsonObject { ["clienteId"] = _cliente?.L("id"), ["observacao"] = _obs.Text, ["voucherCodigo"] = _voucher, ["itens"] = itens, ["pagamentos"] = pags });
-        Concluido = true;
-        Msg.Sucesso(this, $"Venda nº {r.S("id")} aprovada." + (r.L("troco") is long tr && tr > 0 ? $"\nTroco: {Fmt.Brl(tr)}" : ""));
-        var inscr = r["inscricoes"] is JsonArray a ? a.Select(x => x?.ToString()).Where(x => x != null).ToList() : [];
-        Close();
-        if (Sessao.ParamSim("office.imprimirTicketAposVenda", false)) Relatorio.Abrir(Owner, Api.UrlComToken("/relatorio/venda?id=" + r.S("id")), "Comprovante");
-        if (inscr.Count > 0 && (Sessao.ParamSim("office.gerarTermoAposPagamento", false) || (Sessao.ParamSim("office.perguntarImprimirTermo", true) && Msg.Pergunta(Owner, "Deseja imprimir o Termo de Responsabilidade?", "Pergunta!"))))
-            Acoes.ImprimirTermo(Owner, inscr);
+        if (_salvando) return;
+        _salvando = true;
+        if (_btnConcluir != null) _btnConcluir.Enabled = false;
+
+        try
+        {
+            if (_car.Count == 0) { Msg.Aviso(this, "Carrinho vazio."); return; }
+            if (!_pagamentoAtivo) { Msg.Aviso(this, "Revise o carrinho e clique em ‘Continuar para pagamento’ antes de concluir."); return; }
+            var t = Totais();
+            if (_pags.Count == 0 && t.sub > 0 && _forma.SelectedItem is Campos.Item f)
+            {
+                _pags.Add((f.Id, f.Texto, Fmt.Centavos(_valor.Text) is long vv && vv > 0 ? vv : t.sub));
+                Atualizar();
+                t = Totais();
+            }
+            if (t.falta > 0)
+            {
+                Msg.Aviso(this, $"Ainda faltam ser pagos {Fmt.Brl(t.falta)} para poder concluir a compra.");
+                return;
+            }
+            if (t.troco > 0)
+            {
+                var dinheiroRecebido = _pags.Where(p => EsDinheiro(p.forma, p.nome)).Sum(p => p.valor);
+                if (t.troco > dinheiroRecebido)
+                {
+                    Msg.Aviso(this, $"O troco de {Fmt.Brl(t.troco)} não pode ser maior que o valor recebido em dinheiro ({Fmt.Brl(dinheiroRecebido)}).\nNão é permitido troco para pagamentos em cartão ou Pix.");
+                    return;
+                }
+            }
+            var totalNaoDinheiro = _pags.Where(p => !EsDinheiro(p.forma, p.nome)).Sum(p => p.valor);
+            if (totalNaoDinheiro > t.sub)
+            {
+                Msg.Aviso(this, $"O valor lançado em cartão/Pix ({Fmt.Brl(totalNaoDinheiro)}) não pode ser superior ao subtotal da venda ({Fmt.Brl(t.sub)}).\nNão é permitido troco para pagamentos eletrônicos.");
+                return;
+            }
+
+            var itens = new JsonArray();
+            foreach (var c in _car)
+                itens.Add(new JsonObject
+                {
+                    ["inscricaoId"] = c.InscricaoId,
+                    ["produtoId"] = c.ProdutoId,
+                    ["quantidade"] = c.Qtd,
+                    ["unitarioCentavos"] = c.Unit,
+                    ["descontoCentavos"] = c.Voucher ? 0 : c.Desc,
+                    ["acrescimoCentavos"] = c.Acr
+                });
+            var pags = new JsonArray();
+            foreach (var p in _pags)
+                pags.Add(new JsonObject
+                {
+                    ["formaPagamentoId"] = p.forma,
+                    ["valorCentavos"] = p.valor
+                });
+            var idempotencyKey = Guid.NewGuid().ToString("N");
+            var r = await Api.Post("/api/office/vendas", new JsonObject
+            {
+                ["clienteId"] = _cliente?.L("id"),
+                ["observacao"] = _obs.Text,
+                ["voucherCodigo"] = _voucher,
+                ["itens"] = itens,
+                ["pagamentos"] = pags,
+                ["idempotencyKey"] = idempotencyKey
+            });
+            Concluido = true;
+            if (r.L("troco") is long tr && tr > 0)
+            {
+                Msg.Info(this, $"TROCO A ENTREGAR AO CLIENTE:\n{Fmt.Brl(tr)}\n\nVenda nº {r.S("id")} aprovada com sucesso.", "Troco");
+            }
+            else
+            {
+                Msg.Sucesso(this, $"Venda nº {r.S("id")} aprovada.");
+            }
+            var inscr = r["inscricoes"] is JsonArray a ? a.Select(x => x?.ToString()).Where(x => x != null).ToList() : [];
+            Close();
+            if (Sessao.ParamSim("office.imprimirTicketAposVenda", false)) Relatorio.Abrir(Owner, Api.UrlComToken("/relatorio/venda?id=" + r.S("id")), "Comprovante");
+            if (inscr.Count > 0 && (Sessao.ParamSim("office.gerarTermoAposPagamento", false) || (Sessao.ParamSim("office.perguntarImprimirTermo", true) && Msg.Pergunta(Owner, "Deseja imprimir o Termo de Responsabilidade?", "Pergunta!"))))
+                Acoes.ImprimirTermo(Owner, inscr);
+        }
+        finally
+        {
+            _salvando = false;
+            Atualizar();
+        }
     });
+
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        if (keyData == Keys.F12)
+        {
+            if (_btnConcluir != null && _btnConcluir.Enabled && !_salvando)
+            {
+                Aprovar();
+                return true;
+            }
+        }
+        return base.ProcessCmdKey(ref msg, keyData);
+    }
 }
 
 /// <summary>Visualizar métodos de pagamento da venda (MetodosPagamento.dc.html): itens, pagamentos e totais.</summary>

@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react-native';
 import React from 'react';
-import ConquistasScreen from '../src/app/conquistas';
+import ConquistasScreen from '../src/legacy/conquistas-screen';
 import { CareerScreen } from '../src/components/career-screen';
 import { MOCK_CAREER_STATS, MOCK_DRIVERS } from '../src/mock/kart-data';
 

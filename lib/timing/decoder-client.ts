@@ -95,29 +95,45 @@ export class DecoderClient extends EventEmitter {
       s.connectedAt = Date.now();
       s.lastDataAt = Date.now();
       s.lastError = null;
-      socket.setTimeout(0);
+      // Item 2: Reseta reconexões após conexão estabelecida com sucesso
+      setTimeout(() => { if (s.connected) s.reconnects = 0; }, 10_000).unref();
+      // Item 4: Mantém timeout ativo de silêncio para detectar conexões half-open
+      socket.setTimeout(this.silenceTimeoutMs);
       // cada comando como o LapTime: texto + CRLF
       for (const cmd of this.initCommands) socket.write(cmd + '\r\n', 'latin1');
       if (this.initCommands.length) this.emit('init', this.initCommands);
       this.emit('change');
     });
 
+    socket.on('timeout', () => {
+      if (s.connected) {
+        s.lastError = `Timeout do socket TCP do decoder (${Math.round(this.silenceTimeoutMs / 1000)}s sem resposta)`;
+        socket.destroy();
+      }
+    });
+
     socket.on('data', (chunk: string | Buffer) => {
       s.lastDataAt = Date.now();
-      const recs = this.protocol === 'p3'
-        ? this.p3.push(chunk as Buffer).map(parseP3Frame)
-        : this.splitter.push(chunk as string).map(parseTrxLine);
-      for (const rec of recs) {
-        if (rec.kind === 'passing') {
-          s.lastPassingAt = Date.now();
-          this.emit('passing', rec satisfies TrxPassing);
-        } else if (rec.kind === 'status') {
-          s.lastStatusAt = Date.now();
-          s.noise = (rec satisfies TrxStatus).noise;
-          this.emit('status', rec);
-        } else {
-          this.emit('other', rec.raw);
+      // Item 3: Proteção contra exceções no parsing de dados corrompidos
+      try {
+        const recs = this.protocol === 'p3'
+          ? this.p3.push(chunk as Buffer).map(parseP3Frame)
+          : this.splitter.push(chunk as string).map(parseTrxLine);
+        for (const rec of recs) {
+          if (rec.kind === 'passing') {
+            s.lastPassingAt = Date.now();
+            this.emit('passing', rec satisfies TrxPassing);
+          } else if (rec.kind === 'status') {
+            s.lastStatusAt = Date.now();
+            s.noise = (rec satisfies TrxStatus).noise;
+            this.emit('status', rec);
+          } else {
+            this.emit('other', rec.raw);
+          }
         }
+      } catch (err: any) {
+        s.lastError = `Erro ao processar pacote do decoder: ${err?.message || err}`;
+        this.emit('error', err instanceof Error ? err : new Error(String(err)));
       }
     });
 
@@ -131,7 +147,9 @@ export class DecoderClient extends EventEmitter {
       if (was) this.emit('change');
       if (this.stopped) return;
       s.reconnects += 1;
-      this.reconnectTimer = setTimeout(() => this.connect(), 2_000);
+      // Item 2: Backoff exponencial para proteger o hardware do TranX (2s até no máximo 15s)
+      const esperaMs = Math.min(15_000, Math.round(2_000 * Math.pow(1.4, Math.min(s.reconnects - 1, 6))));
+      this.reconnectTimer = setTimeout(() => this.connect(), esperaMs);
     });
   }
 }

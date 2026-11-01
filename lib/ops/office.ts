@@ -423,7 +423,7 @@ async function inscreverN(bateriaId: number, clienteId: number, n: number, orige
     const [b] = await run(
       `SELECT b.Id, b.Status, b.Vagas, b.Inicio, b.ProdutoId, p.PrecoCentavos preco,
         (SELECT COUNT(*) FROM dbo.Inscricao i WITH (UPDLOCK, HOLDLOCK) WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') ocupadas,
-        CASE WHEN b.Inicio < DATEADD(minute, -30, SYSDATETIME()) THEN 1 ELSE 0 END passada
+        CASE WHEN b.Inicio < SYSDATETIME() THEN 1 ELSE 0 END passada
        FROM dbo.Bateria b WITH (UPDLOCK, HOLDLOCK) LEFT JOIN dbo.Produto p ON p.Id = b.ProdutoId WHERE b.Id = @bateriaId`,
       { bateriaId },
     );
@@ -646,8 +646,13 @@ async function estornar(sessao: Sessao, vendaId: number, body: Record<string, un
       if (it.InscricaoId) {
         await run(`UPDATE dbo.Inscricao SET Pago = 0, Status = 'reservada', ValorCentavos = NULL, VendaId = NULL, AtualizadoEm = SYSDATETIME() WHERE Id = @i`, { i: it.InscricaoId });
       }
+      if (it.VoucherId) {
+        await run(
+          `UPDATE TOP (1) dbo.VoucherUso SET Estornado = 1 WHERE VendaId = @vendaId AND VoucherId = @voucherId AND Estornado = 0`,
+          { vendaId, voucherId: it.VoucherId },
+        );
+      }
     }
-    await run(`UPDATE dbo.VoucherUso SET Estornado = 1 WHERE VendaId = @vendaId AND EXISTS (SELECT 1 FROM dbo.VendaItem vi WHERE vi.VendaId = @vendaId AND vi.VoucherId IS NOT NULL AND vi.Estornado = 1)`, { vendaId });
     const [rest] = await run(`SELECT COUNT(*) n FROM dbo.VendaItem WHERE VendaId = @vendaId AND Estornado = 0`, { vendaId });
     await run(
       `UPDATE dbo.Venda SET EstornoCentavos = EstornoCentavos + @soma, FinalCentavos = FinalCentavos - @soma,

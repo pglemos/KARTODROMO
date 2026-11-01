@@ -3,7 +3,7 @@
  * cartão, barra de progresso, número grande e o carregamento da carreira da conta.
  */
 import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -20,9 +20,11 @@ export function voltar() {
 }
 
 /** Tela da carreira com título, voltar, puxar para atualizar e rolagem. */
-export function TelaCarreira({ titulo, children, onRefresh, carregando = false, direita }: { titulo: string; children: React.ReactNode; onRefresh?: () => Promise<void> | void; carregando?: boolean; direita?: React.ReactNode }) {
+export function TelaCarreira({ titulo, children, onRefresh, carregando = false, direita, rodape, scrollKey }: { titulo: string; children: React.ReactNode; onRefresh?: () => Promise<void> | void; carregando?: boolean; direita?: React.ReactNode; rodape?: React.ReactNode; scrollKey?: string | number }) {
   const { palette } = useUi();
   const [atualizando, setAtualizando] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  useEffect(() => { scrollRef.current?.scrollTo({ y: 0, animated: false }); }, [scrollKey]);
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingTop: 6, paddingBottom: 8 }}>
@@ -32,10 +34,11 @@ export function TelaCarreira({ titulo, children, onRefresh, carregando = false, 
         <Text accessibilityRole="header" numberOfLines={1} style={{ flex: 1, color: palette.text, fontSize: 26, fontWeight: '900', letterSpacing: -0.5 }}>{titulo}</Text>
         {direita}
       </View>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 4, gap: 14, paddingBottom: 120 }}
+      <ScrollView ref={scrollRef} contentContainerStyle={{ padding: 16, paddingTop: 4, gap: 14, paddingBottom: 16 }}
         refreshControl={onRefresh ? <RefreshControl refreshing={atualizando} onRefresh={async () => { setAtualizando(true); await onRefresh(); setAtualizando(false); }} tintColor={palette.accent} /> : undefined}>
         {carregando ? <ListaEsqueleto itens={4} altura={110} rotulo="Carregando" /> : children}
       </ScrollView>
+      {rodape ? <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, borderTopWidth: 1, borderTopColor: palette.borderSubtle, backgroundColor: palette.background }}>{rodape}</View> : null}
     </SafeAreaView>
   );
 }

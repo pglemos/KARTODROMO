@@ -18,6 +18,6 @@
   "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["resultados@kartodromodebetim.com.br"] }],
   "vars": {
     "RESERVAS_ATIVAS": "0",
-    "ASAAS_URL": "https://api-sandbox.asaas.com/v3"
+    "STONE_URL": "https://sdx-api.pagar.me/core/v5"
   }
 }

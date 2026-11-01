@@ -21,7 +21,15 @@ static class VisualPrincipal
     {
         if (_cache.TryGetValue(nome, out var img)) return img;
         using var s = typeof(VisualPrincipal).Assembly.GetManifestResourceStream($"Kartodromo.Recepcao.Icones.{nome}.png");
-        img = s == null ? new Bitmap(1, 1) : Image.FromStream(s);
+        if (s == null)
+        {
+            img = new Bitmap(1, 1);
+        }
+        else
+        {
+            using var temp = Image.FromStream(s);
+            img = new Bitmap(temp);
+        }
         _cache[nome] = img;
         return img;
     }

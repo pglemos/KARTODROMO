@@ -189,11 +189,11 @@ export function renderTermoResponsabilidade(options: RenderTermoOptions) {
     '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width, initial-scale=1">' +
     '<title>Termo de responsabilidade</title><style>' +
-    '@page{size:80mm 297mm;margin:0}' +
+    '@page{size:80mm auto;margin:0}' +
     '*{box-sizing:border-box}' +
     'html,body{margin:0;padding:0;width:80mm;background:#fff;color:#000}' +
     'body{font:8pt/1.22 Arial,Helvetica,sans-serif}' +
-    '.page{position:relative;width:80mm;min-height:297mm;padding:0 5.7mm 0;display:flex;flex-direction:column;margin:0 auto;background:#fff;break-after:page;page-break-after:always}' +
+    '.page{position:relative;width:80mm;min-height:auto;padding:0 5.7mm 4mm;display:flex;flex-direction:column;margin:0 auto;background:#fff;break-after:page;page-break-after:always}' +
     '.page:last-child{break-after:auto;page-break-after:auto}' +
     '.logo{display:block;width:38.1mm;height:20.3mm;object-fit:contain;filter:grayscale(1) contrast(1.15);margin:.7mm auto .7mm}' +
     'h1{font:bold 12pt/1.2 Arial,Helvetica,sans-serif;text-align:center;height:7.62mm;flex:none;margin:0}' +

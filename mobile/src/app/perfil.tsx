@@ -4,7 +4,7 @@
  * preenche rua, bairro, cidade e estado.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 import { Aviso, Bloco, TelaCarreira, voltar } from '../components/carreira-kit';
@@ -22,17 +22,30 @@ type Resposta = { perfil: Perfil | null; pendente: Partial<Perfil> | null; erro:
 const PASSOS = ['Dados', 'Endereço', 'Confirmar'];
 const SANGUE = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const dataBr = (iso: string | null) => (iso && /^\d{4}-\d{2}-\d{2}/.test(iso) ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : '');
-const dataIso = (br: string) => { const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(br.trim()); return m ? `${m[3]}-${m[2]}-${m[1]}` : br.trim() ? 'invalida' : ''; };
+const dataIso = (br: string) => {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(br.trim());
+  if (!m) return br.trim() ? 'invalida' : '';
+  const iso = `${m[3]}-${m[2]}-${m[1]}`;
+  const data = new Date(Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1])));
+  const hoje = new Date().toISOString().slice(0, 10);
+  return data.getUTCFullYear() === Number(m[3]) && data.getUTCMonth() === Number(m[2]) - 1 && data.getUTCDate() === Number(m[1]) && iso >= '1920-01-01' && iso <= hoje ? iso : 'invalida';
+};
+const digitos = (value: string) => value.replace(/\D/g, '');
+const mascaraTelefone = (value: string) => { const d = digitos(value).slice(0, 11); if (d.length <= 2) return d; if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`; if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`; return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`; };
+const mascaraCep = (value: string) => { const d = digitos(value).slice(0, 8); return d.length > 5 ? `${d.slice(0, 5)}-${d.slice(5)}` : d; };
+const mascaraData = (value: string) => { const d = digitos(value).slice(0, 8); return d.length > 4 ? `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}` : d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d; };
 
 export default function PerfilTela() {
   const { palette } = useUi();
-  const { session } = useSession();
+  const { session, logout, deleteAccount } = useSession();
   const [dados, setDados] = useState<Resposta | null>(null);
   const [erro, setErro] = useState('');
   const [passo, setPasso] = useState(0);
   const [f, setF] = useState<Record<string, string>>({});
   const [enviando, setEnviando] = useState(false);
   const [aviso, setAviso] = useState('');
+  const [buscandoCep, setBuscandoCep] = useState(false);
+  const [alterandoConta, setAlterandoConta] = useState(false);
 
   const carregar = useCallback(async () => {
     if (!session) { setErro('Entre na sua conta para ver o seu perfil.'); return; }
@@ -50,13 +63,47 @@ export default function PerfilTela() {
 
   const muda = (k: string) => (v: string) => setF((x) => ({ ...x, [k]: v }));
   const buscarCep = async (cep: string) => {
-    const d = cep.replace(/\D/g, '');
+    const d = digitos(cep);
     if (d.length !== 8) return;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    setBuscandoCep(true); setAviso('');
     try {
-      const r = await fetch(`https://viacep.com.br/ws/${d}/json/`);
+      const r = await fetch(`https://viacep.com.br/ws/${d}/json/`, { signal: controller.signal });
+      if (!r.ok) throw new Error('ViaCEP indisponível');
       const j = await r.json() as { logradouro?: string; bairro?: string; localidade?: string; uf?: string; erro?: boolean };
-      if (!j.erro) setF((x) => ({ ...x, endereco: j.logradouro || x.endereco, bairro: j.bairro || x.bairro, cidade: j.localidade || x.cidade, estado: j.uf || x.estado }));
-    } catch { /* sem internet: preenche à mão */ }
+      if (j.erro) throw new Error('CEP não encontrado.');
+      setF((x) => ({ ...x, endereco: j.logradouro || x.endereco, bairro: j.bairro || x.bairro, cidade: j.localidade || x.cidade, estado: j.uf || x.estado }));
+    } catch (e) { setAviso(e instanceof Error && e.message === 'CEP não encontrado.' ? e.message : 'Não foi possível consultar o CEP agora. Preencha o endereço manualmente.'); }
+    finally { clearTimeout(timeout); setBuscandoCep(false); }
+  };
+
+  const proximoPasso = () => {
+    const telefone = digitos(f.telefone ?? '');
+    if (!telefone || (telefone.length !== 10 && telefone.length !== 11)) { setAviso('Informe um telefone com DDD antes de continuar.'); setPasso(0); return; }
+    if (passo === 0) {
+      if (dataIso(f.nascimento ?? '') === 'invalida') { setAviso('Data de nascimento no formato dd/mm/aaaa.'); return; }
+      const peso = Number(String(f.peso ?? '').replace(',', '.'));
+      if (!Number.isFinite(peso) || peso < 15 || peso > 250) { setAviso('Informe um peso entre 15 e 250 kg.'); return; }
+    }
+    if (passo === 1) {
+      if (digitos(f.cep ?? '').length !== 8) { setAviso('Informe um CEP com 8 números.'); return; }
+      if (!f.endereco?.trim() || !f.numero?.trim() || !f.bairro?.trim() || !f.cidade?.trim() || !/^[A-Za-z]{2}$/.test(f.estado ?? '')) { setAviso('Complete rua, número, bairro, cidade, estado e CEP.'); return; }
+    }
+    setAviso(''); setPasso((v) => v + 1);
+  };
+
+  const selecionarPasso = (alvo: number) => {
+    if (alvo <= passo) {
+      setAviso('');
+      setPasso(alvo);
+      return;
+    }
+    if (alvo > passo + 1) {
+      setAviso('Conclua os campos deste passo antes de avançar.');
+      return;
+    }
+    proximoPasso();
   };
 
   const enviar = async () => {
@@ -78,14 +125,36 @@ export default function PerfilTela() {
     } finally { setEnviando(false); }
   };
 
+  const sair = async () => {
+    setAlterandoConta(true);
+    try { await logout(); }
+    catch { Alert.alert('Não foi possível sair', 'Tente novamente. Sua sessão continua protegida neste aparelho.'); }
+    finally { setAlterandoConta(false); }
+  };
+
+  const confirmarExclusao = () => Alert.alert(
+    'Excluir conta definitivamente?',
+    'Esta ação apaga sua conta e não pode ser desfeita. Suas reservas já confirmadas podem exigir atendimento da recepção.',
+    [
+      { text: 'Manter conta', style: 'cancel' },
+      { text: 'Excluir conta', style: 'destructive', onPress: async () => {
+        setAlterandoConta(true);
+        try { await deleteAccount(); Alert.alert('Conta excluída', 'A conta foi removida.'); }
+        catch { Alert.alert('Não foi possível excluir', 'Confira a conexão e tente novamente.'); }
+        finally { setAlterandoConta(false); }
+      } },
+    ],
+  );
+
   if (!dados) return <TelaCarreira titulo="Perfil" carregando={!erro}>{erro ? <Aviso texto={erro} /> : null}</TelaCarreira>;
   const p = dados.perfil;
 
   const campo = ({ k, rotulo, teclado, metade, placeholder, onBlur }: { k: string; rotulo: string; teclado?: 'number-pad' | 'phone-pad' | 'decimal-pad'; metade?: boolean; placeholder?: string; onBlur?: () => void }) => (
     <View style={{ width: metade ? '48%' : '100%', flexGrow: 1, gap: 4 }}>
       <Text style={{ color: palette.textMuted, fontSize: 11, fontWeight: '800' }}>{rotulo.toUpperCase()}</Text>
-      <TextInput value={f[k] ?? ''} onChangeText={muda(k)} keyboardType={teclado} placeholder={placeholder} placeholderTextColor={palette.textMuted} onBlur={onBlur} accessibilityLabel={rotulo}
+      <TextInput value={f[k] ?? ''} onChangeText={(value) => muda(k)(k === 'telefone' ? mascaraTelefone(value) : k === 'cep' ? mascaraCep(value) : k === 'nascimento' ? mascaraData(value) : k === 'estado' ? value.replace(/[^a-z]/gi, '').slice(0, 2).toUpperCase() : value)} keyboardType={teclado} placeholder={placeholder} placeholderTextColor={palette.textMuted} onBlur={onBlur} accessibilityLabel={rotulo}
         style={{ backgroundColor: palette.surfaceElevated, color: palette.text, borderRadius: 12, padding: 12, fontSize: 16, borderWidth: 1, borderColor: palette.borderSubtle }} />
+      {k === 'cep' && buscandoCep ? <Text style={{ color: palette.textMuted, fontSize: 12 }}>Consultando CEP…</Text> : null}
     </View>
   );
   const fixo = ({ rotulo, valor }: { rotulo: string; valor: string | null }) => (
@@ -109,13 +178,22 @@ export default function PerfilTela() {
   );
 
   return (
-    <TelaCarreira titulo="Perfil" onRefresh={carregar}>
+    <TelaCarreira titulo="Perfil" onRefresh={carregar} scrollKey={passo} rodape={(
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        <Pressable onPress={() => { tap(); if (passo) setPasso(passo - 1); else voltar(); }} accessibilityRole="button" style={{ flex: 1, minHeight: 50, padding: 15, borderRadius: 999, borderWidth: 1, borderColor: palette.border, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: palette.text, fontWeight: '800' }}>{passo ? 'Voltar' : 'Cancelar'}</Text>
+        </Pressable>
+        <Pressable disabled={enviando} onPress={() => { tap(); if (passo < 2) proximoPasso(); else void enviar(); }} accessibilityRole="button" style={{ flex: 1, minHeight: 50, padding: 15, borderRadius: 999, backgroundColor: palette.accent, alignItems: 'center', justifyContent: 'center', opacity: enviando ? 0.6 : 1 }}>
+          <Text style={{ color: '#000000', fontWeight: '900' }}>{passo < 2 ? 'Próximo' : enviando ? 'Salvando…' : 'Salvar'}</Text>
+        </Pressable>
+      </View>
+    )}>
       <Bloco index={0}>
         <Text style={{ color: palette.textMuted, fontSize: 12, fontWeight: '800', textAlign: 'center' }}>PASSO {passo + 1} DE 3</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           {PASSOS.map((t, i) => (
             <View key={t} style={{ flex: 1, alignItems: 'center', gap: 4 }}>
-              <Pressable onPress={() => { tap(); setPasso(i); }} accessibilityRole="button" accessibilityLabel={`Passo ${i + 1}: ${t}`}
+              <Pressable onPress={() => { tap(); selecionarPasso(i); }} accessibilityRole="button" accessibilityLabel={`Passo ${i + 1}: ${t}`} accessibilityState={{ disabled: i > passo + 1 }}
                 style={{ width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: i <= passo ? palette.accent : palette.surfaceElevated }}>
                 <Text style={{ color: i <= passo ? '#000000' : palette.textMuted, fontWeight: '900' }}>{i + 1}</Text>
               </Pressable>
@@ -129,19 +207,35 @@ export default function PerfilTela() {
       </Bloco>
 
       {passo === 0 ? (
-        <Bloco titulo="Dados" index={1}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-            {fixo({ rotulo: "Nome", valor: p?.nome ?? null })}
-            {fixo({ rotulo: "CPF", valor: p?.documento ?? null })}
-            {fixo({ rotulo: "E-mail", valor: p?.email ?? null })}
-            {campo({ k: 'telefone', rotulo: 'WhatsApp com DDD', teclado: 'phone-pad', placeholder: '31 99999-9999' })}
-            {campo({ k: 'nascimento', rotulo: 'Nascimento', teclado: 'number-pad', metade: true, placeholder: 'dd/mm/aaaa' })}
-            {campo({ k: 'peso', rotulo: 'Peso em kg', teclado: 'decimal-pad', metade: true, placeholder: '75' })}
-            {opcoes({ k: 'sexo', rotulo: 'Gênero', opcoes: [['M', 'Masculino'], ['F', 'Feminino']] })}
-            {opcoes({ k: 'tipoSanguineo', rotulo: 'Tipo sanguíneo', opcoes: SANGUE.map((s) => [s, s] as [string, string]) })}
-          </View>
-          <Text style={{ color: palette.textMuted, fontSize: 12 }}>Nome, CPF e e-mail são a identidade da sua conta: para mudar, fale com a recepção.</Text>
-        </Bloco>
+        <>
+          <Bloco titulo="Dados" index={1}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              {fixo({ rotulo: "Nome", valor: p?.nome ?? null })}
+              {fixo({ rotulo: "CPF", valor: p?.documento ?? null })}
+              {fixo({ rotulo: "E-mail", valor: p?.email ?? null })}
+              {campo({ k: 'telefone', rotulo: 'WhatsApp com DDD', teclado: 'phone-pad', placeholder: '(31) 99999-9999' })}
+              {campo({ k: 'nascimento', rotulo: 'Nascimento', teclado: 'number-pad', metade: true, placeholder: 'dd/mm/aaaa' })}
+              {campo({ k: 'peso', rotulo: 'Peso em kg', teclado: 'decimal-pad', metade: true, placeholder: '75' })}
+              {opcoes({ k: 'sexo', rotulo: 'Gênero', opcoes: [['M', 'Masculino'], ['F', 'Feminino']] })}
+              {opcoes({ k: 'tipoSanguineo', rotulo: 'Tipo sanguíneo', opcoes: SANGUE.map((s) => [s, s] as [string, string]) })}
+            </View>
+            <Text style={{ color: palette.textMuted, fontSize: 12 }}>Nome, CPF e e-mail são a identidade da sua conta: para mudar, fale com a recepção.</Text>
+          </Bloco>
+          {session ? <>
+            <Bloco titulo="Conta e sessão" index={2}>
+              <Text style={{ color: palette.textMuted, fontSize: 13, lineHeight: 19 }}>Sair encerra sua sessão neste aparelho; sua conta continua ativa.</Text>
+              <Pressable disabled={alterandoConta} onPress={() => void sair()} accessibilityRole="button" accessibilityLabel="Sair da conta" style={{ minHeight: 48, justifyContent: 'center', alignItems: 'center', borderRadius: 999, borderWidth: 1, borderColor: palette.border }}>
+                <Text style={{ color: palette.text, fontWeight: '800' }}>{alterandoConta ? 'Aguarde…' : 'Sair da conta'}</Text>
+              </Pressable>
+            </Bloco>
+            <Bloco titulo="Excluir conta" index={3}>
+              <Text style={{ color: palette.textMuted, fontSize: 13, lineHeight: 19 }}>A exclusão apaga permanentemente seus dados de conta e exige confirmação separada.</Text>
+              <Pressable disabled={alterandoConta} onPress={confirmarExclusao} accessibilityRole="button" accessibilityLabel="Excluir minha conta definitivamente" style={{ minHeight: 48, justifyContent: 'center', alignItems: 'center', borderRadius: 999, borderWidth: 1, borderColor: palette.danger }}>
+                <Text style={{ color: palette.danger, fontWeight: '900' }}>Excluir minha conta</Text>
+              </Pressable>
+            </Bloco>
+          </> : null}
+        </>
       ) : null}
 
       {passo === 1 ? (
@@ -160,7 +254,7 @@ export default function PerfilTela() {
 
       {passo === 2 ? (
         <Bloco titulo="Confirmar" index={1}>
-          {[['WhatsApp', f.telefone], ['Nascimento', f.nascimento], ['Peso', f.peso ? `${f.peso} kg` : ''], ['Gênero', f.sexo === 'M' ? 'Masculino' : f.sexo === 'F' ? 'Feminino' : ''], ['Tipo sanguíneo', f.tipoSanguineo],
+          {[['Nome', p?.nome], ['CPF', p?.documento], ['E-mail', p?.email], ['WhatsApp', f.telefone], ['Nascimento', f.nascimento], ['Peso', f.peso ? `${f.peso} kg` : ''], ['Gênero', f.sexo === 'M' ? 'Masculino' : f.sexo === 'F' ? 'Feminino' : ''], ['Tipo sanguíneo', f.tipoSanguineo],
             ['Endereço', [f.endereco, f.numero, f.complemento].filter(Boolean).join(', ')], ['Bairro', f.bairro], ['Cidade', [f.cidade, f.estado].filter(Boolean).join(' / ')], ['CEP', f.cep]].map(([r, v]) => (
             <View key={r} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: palette.borderSubtle }}>
               <Text style={{ color: palette.textMuted }}>{r}</Text>
@@ -170,17 +264,6 @@ export default function PerfilTela() {
           {aviso ? <Text style={{ color: aviso.startsWith('Recebido') ? palette.neonGreen : palette.danger, fontWeight: '700' }}>{aviso}</Text> : null}
         </Bloco>
       ) : null}
-
-      <View style={{ flexDirection: 'row', gap: 10 }}>
-        <Pressable onPress={() => { tap(); if (passo) setPasso(passo - 1); else voltar(); }} accessibilityRole="button"
-          style={{ flex: 1, padding: 15, borderRadius: 999, borderWidth: 1, borderColor: palette.border, alignItems: 'center' }}>
-          <Text style={{ color: palette.text, fontWeight: '800' }}>{passo ? 'Voltar' : 'Cancelar'}</Text>
-        </Pressable>
-        <Pressable disabled={enviando} onPress={() => { tap(); if (passo < 2) setPasso(passo + 1); else void enviar(); }} accessibilityRole="button"
-          style={{ flex: 1, padding: 15, borderRadius: 999, backgroundColor: palette.accent, alignItems: 'center', opacity: enviando ? 0.6 : 1 }}>
-          <Text style={{ color: '#000000', fontWeight: '900' }}>{passo < 2 ? 'Próximo' : enviando ? 'Salvando…' : 'Salvar'}</Text>
-        </Pressable>
-      </View>
     </TelaCarreira>
   );
 }

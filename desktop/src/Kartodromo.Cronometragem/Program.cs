@@ -7,11 +7,12 @@ namespace Kartodromo.Cronometragem;
 static class Program
 {
     [STAThread]
-    static void Main()
+    static async Task Main()
     {
         var args = Environment.GetCommandLineArgs();
+        Application.SetHighDpiMode(HighDpiMode.DpiUnawareGdiScaled);
         ApplicationConfiguration.Initialize();
-        if (Atualizacao.TratarInicioAsync("Cronometragem", args).GetAwaiter().GetResult()) return;
+        if (await Atualizacao.TratarInicioAsync("Cronometragem", args)) return;
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
         Application.ThreadException += (_, e) =>
         {

@@ -40,7 +40,7 @@ export function CarreiraTopo({ dados, xp, cat, eu, versaoFoto, enviandoFoto, onF
     { v: dados.vitorias, r: 'Vitórias', icone: 'trophy', c: '#F5B729' },
     { v: dados.podios, r: 'Pódios', icone: 'chart', c: '#8B5CF6' },
     { v: dados.poles, r: 'Poles', icone: 'helmet', c: '#FFFFFF' },
-    { v: dados.voltasMaisRapidas, r: 'Voltas + rápidas', icone: 'timer', c: '#FFFFFF' },
+    { v: dados.voltasMaisRapidas, r: 'Voltas rápidas', icone: 'timer', c: '#FFFFFF' },
     { v: dados.voltas, r: 'Voltas', icone: 'route', c: '#FFFFFF' },
   ];
   const colunas = [33, 167, 297, 428, 560, 697, 820];
@@ -121,10 +121,10 @@ export function CarreiraTopo({ dados, xp, cat, eu, versaoFoto, enviandoFoto, onF
           {numeros.map((n, i) => {
             const x0 = colunas[i] - 33, w = colunas[i + 1] - colunas[i];
             return (
-              <View key={n.r} style={{ position: 'absolute', left: x0 * k, top: 0, width: w * k, height: '100%', alignItems: 'center', paddingTop: 26 * k, borderLeftWidth: i ? 1 : 0, borderLeftColor: '#262B29' }}>
-                <Icon name={n.icone} color={n.c} size={40 * k} />
-                <T s={36} p="800" style={{ marginTop: 14 * k, fontVariant: ['tabular-nums'] }}>{n.v.toLocaleString('pt-BR')}</T>
-                <T s={16.5} c="#E3E7E5" linhas={1} style={{ marginTop: 4 * k }}>{n.r}</T>
+              <View key={n.r} style={{ position: 'absolute', left: x0 * k, top: 0, width: w * k, height: '100%', alignItems: 'center', paddingTop: 16 * k, borderLeftWidth: i ? 1 : 0, borderLeftColor: '#262B29' }}>
+                <Icon name={n.icone} color={n.c} size={32 * k} />
+                <T s={36} p="800" style={{ marginTop: 8 * k, fontVariant: ['tabular-nums'] }}>{n.v.toLocaleString('pt-BR')}</T>
+                <T s={16.5} c="#E3E7E5" linhas={2} style={{ marginTop: 3 * k }}>{n.r}</T>
               </View>
             );
           })}
@@ -142,22 +142,22 @@ export function CarreiraTopo({ dados, xp, cat, eu, versaoFoto, enviandoFoto, onF
                 <Icon name={t.icone} color="#FFFFFF" size={32 * k} />
               </Caixa>
               <Caixa x={22} y={93} pointerEvents="none"><T s={21} p="700">{t.titulo}</T></Caixa>
-              <Caixa x={22} y={123} w={190} pointerEvents="none"><T s={17} c="#C9CFCC" lh={22}>{t.texto}</T></Caixa>
+              <Caixa x={22} y={123} w={t.w - 92} pointerEvents="none"><T s={17} c="#C9CFCC" lh={22} linhas={2}>{t.texto}</T></Caixa>
               <SetaCirculo x={t.w - 55} y={118} d={40}><Icon name="chevron" color="#FFFFFF" size={20 * k} /></SetaCirculo>
             </Toque>
           ))}
           {([
-            { x: 35, w: 383, titulo: 'Carteira', texto: 'Cupons, benefícios e créditos', icone: 'wallet' as NomeIcone, c: '#2563EB', rota: '/carteira' },
-            { x: 435, w: 385, titulo: 'Meu perfil', texto: 'Dados pessoais e preferências', icone: 'person' as NomeIcone, c: '#6B7280', rota: '/perfil' },
+            { x: 35, w: 383, titulo: 'Carteira', texto: 'Cupons e créditos', icone: 'wallet' as NomeIcone, c: '#2563EB', rota: '/carteira' },
+            { x: 435, w: 385, titulo: 'Meu perfil', texto: 'Dados e preferências', icone: 'person' as NomeIcone, c: '#6B7280', rota: '/perfil' },
           ]).map((c) => (
-            <Toque key={c.titulo} x={c.x} y={1176 - 765} w={c.w} h={100} rotulo={c.titulo} onPress={ir(c.rota)}
+            <Toque key={c.titulo} x={c.x} y={1176 - 765} w={c.w} h={110} rotulo={c.titulo} onPress={ir(c.rota)}
               style={{ borderRadius: 16 * k, backgroundColor: '#0E1211', borderWidth: 1, borderColor: '#1F2422' }}>
               <Caixa x={25} y={17} w={62} h={62} pointerEvents="none" style={{ borderRadius: 14 * k, backgroundColor: c.c, alignItems: 'center', justifyContent: 'center' }}>
                 <Icon name={c.icone} color="#FFFFFF" size={34 * k} />
               </Caixa>
               <Caixa x={110} y={22} w={c.w - 175} pointerEvents="none">
                 <T s={20} p="700">{c.titulo}</T>
-                <T s={17} c="#C9CFCC" lh={21} style={{ marginTop: 6 * k }}>{c.texto}</T>
+                <T s={17} c="#C9CFCC" lh={21} linhas={2} style={{ marginTop: 6 * k }}>{c.texto}</T>
               </Caixa>
               <SetaCirculo x={c.w - 56} y={32} d={36}><Icon name="chevron" color="#FFFFFF" size={18 * k} /></SetaCirculo>
             </Toque>
@@ -178,7 +178,7 @@ export function CarreiraTopo({ dados, xp, cat, eu, versaoFoto, enviandoFoto, onF
               <Image source={fundos.ultimaAtividade} resizeMode="cover" style={{ width: '100%', height: '100%' }} />
             </Caixa>
             <Caixa x={343} y={64} w={190} pointerEvents="none">
-              <T s={21} p="700" linhas={1}>{ultima.bateria || ultima.tipo}</T>
+              <T s={21} p="700" linhas={2}>{ultima.bateria || ultima.tipo}</T>
               <T s={18} c="#C9CFCC" style={{ marginTop: 8 * k }}>{formatarDia(ultima.dia)}</T>
             </Caixa>
             {ultima.pos > 0 ? (

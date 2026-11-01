@@ -5,8 +5,8 @@
  * No totem o cliente digita CPF, RG, passaporte ou e-mail e os dados já aparecem.
  */
 import { chaveDocumento, validar } from './validar';
-import { diagnostico } from './asaas';
-import { agendaPublica, criarPedido, politicaPublica, situacaoPedido, syncAgenda, syncPedidos, syncResultado, webhookAsaas, type EnvReservas } from './reservas';
+import { diagnostico } from './stone';
+import { agendaPublica, criarPedido, politicaPublica, situacaoPedido, syncAgenda, syncPedidos, syncResultado, webhookStone, type EnvReservas } from './reservas';
 import { handleMobileAccountEmail, handleMobileAuth, type MobileAccountAdminEnv } from './mobile/auth';
 import { handleMobileReservations } from './mobile/reservations';
 import { handleMobileCoupons, handleMobileCouponsSync } from './mobile/coupons';
@@ -122,7 +122,7 @@ export default {
         }
         return await situacaoPedido(env, id, ctx);
       }
-      if (p === '/api/asaas/webhook' && req.method === 'POST') return await webhookAsaas(req, env);
+      if (p === '/api/stone/webhook' && req.method === 'POST') return await webhookStone(req, env);
       if (p.startsWith('/api/sync/')) {
         if (!autorizado(req, env)) return json(401, { erro: 'Não autorizado.' });
         if (p === '/api/sync/pendentes' && req.method === 'GET') return json(200, await listar(env));
@@ -134,7 +134,7 @@ export default {
           return json(200, { apagados: validas.length });
         }
         if (p === '/api/sync/agenda' && req.method === 'PUT') return await syncAgenda(req, env);
-        if (p === '/api/sync/asaas' && req.method === 'GET') return json(200, await diagnostico(env));
+        if (p === '/api/sync/stone' && req.method === 'GET') return json(200, await diagnostico(env));
         if (p === '/api/sync/mobile/coupons' || p.startsWith('/api/sync/mobile/coupons/')) return await handleMobileCouponsSync(req, env);
         if (p === '/api/sync/pedidos' && req.method === 'GET') return await syncPedidos(env);
         if (p === '/api/sync/pedido' && req.method === 'POST') return await syncResultado(req, env, ctx);

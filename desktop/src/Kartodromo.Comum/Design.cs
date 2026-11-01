@@ -46,7 +46,9 @@ public static partial class Forma
     {
         if (c.Width < 2 || c.Height < 2) return;
         using var path = Redondo(new Rectangle(0, 0, c.Width, c.Height), Math.Min(raio, Math.Min(c.Width, c.Height) / 2));
+        var antiga = c.Region;
         c.Region = new Region(path);
+        antiga?.Dispose();
     }
 
     static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Panel, object> _contornos = new();
@@ -72,7 +74,12 @@ public static partial class Forma
     static void AjustarContorno(Panel painel, int diametro)
     {
         using var path = CaminhoContorno(painel, diametro);
-        if (path != null) painel.Region = new Region(path);
+        if (path != null)
+        {
+            var antiga = painel.Region;
+            painel.Region = new Region(path);
+            antiga?.Dispose();
+        }
     }
 
     static GraphicsPath CaminhoContorno(Panel painel, int d)

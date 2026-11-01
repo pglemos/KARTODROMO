@@ -38,3 +38,9 @@ do ar.** Depois de incorporar, apague este aviso do `AGENTS.md`.
 `kartodromodebetim.com.br/api/transmissao/*` agora é atendido pelo Worker **`kartodromo-transmissao`**
 (`workers/transmissao`, rota mais específica que a do site). Não criar rota que capture esse caminho antes dele.
 Motivo: pelo Next, ~7% dos envios do ORBITS davam HTTP 500 (`exceededResources`).
+
+## 4. Cor de acento do site institucional (28/10/2026)
+
+- No Worker `kartodromo-site-2026`, o acento foi atualizado para `#00ff7a`; o estado hover usa `#66ffa8` e os fundos translúcidos mantêm as mesmas opacidades.
+- Publicado na versão `c468a74b-28b0-4aff-b99b-2ad41b97d97f`. O subprojeto `website/` não existe no `main` atual; o CSS foi recompilado do snapshot histórico `2ff7e23` e os HTML/assets publicados foram preservados. O wrapper da política de cancelamento continua ativo.
+- Antes de uma publicação futura baseada em código-fonte, restaurar a fonte do Worker e manter esta cor; do contrário, o acento pode voltar ao valor antigo.
