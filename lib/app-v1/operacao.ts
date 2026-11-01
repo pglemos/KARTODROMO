@@ -122,15 +122,15 @@ export function criarOperacao(d: DepsOperacao) {
 
   const autor = (q: Identidade) => `${q.nome} (app)`;
   const FLAGS = new Set(['verde', 'amarela', 'vermelha', 'branca', 'quadriculada']);
-  const FLAGS_PILOTO = new Set(['preta', 'verde', 'amarela', 'vermelha', 'branca', 'nenhuma']);
+  const FLAGS_PILOTO = new Set(['black', 'none', 'green', 'yellow', 'red', 'white', 'warning', 'blue', 'mechanical']);
 
   return {
     async aoVivo(id: string) {
       sessao(id);
-      const v = await d.legado('GET', `/api/sessions/${id}`) as { state?: string; remainingMs?: number | null; aguardandoLargada?: boolean; flag?: unknown; standings?: Record<string, unknown>[] };
+      const v = await d.legado('GET', `/api/sessions/${id}`) as { state?: string; remainingMs?: number | null; aguardandoLargada?: boolean; currentFlag?: unknown; standings?: Record<string, unknown>[] };
       return {
-        state: v.state, remainingMs: v.remainingMs ?? null, aguardandoLargada: Boolean(v.aguardandoLargada), flag: v.flag ?? null,
-        standings: (v.standings ?? []).map((l) => ({ position: l.position, kart: l.kart, name: l.name, laps: l.laps, bestLapMs: l.bestLapMs, lastLapMs: l.lastLapMs ?? null, gap: l.gap ?? null, flag: l.flag ?? null })),
+        state: v.state, remainingMs: v.remainingMs ?? null, aguardandoLargada: Boolean(v.aguardandoLargada), flag: v.currentFlag ?? null,
+        standings: (v.standings ?? []).map((l) => ({ position: l.position, kart: l.kart, name: l.name, laps: l.laps, bestLapMs: l.bestLapMs, lastLapMs: l.lastLapMs ?? null, gapMs: l.gapMs ?? null, gapLaps: l.gapLaps ?? 0, flag: l.flag ?? null })),
       };
     },
     async passagens(id: string, kart: string | null) {
@@ -229,7 +229,7 @@ export function criarOperacao(d: DepsOperacao) {
       const pl = (b.payload ?? {}) as { flag?: string; kart?: string; relargar?: boolean; motivo?: string };
       const flag = String(pl.flag);
       if (pl.kart ? !FLAGS_PILOTO.has(flag) : !FLAGS.has(flag)) throw new ErroApp(400, 'INVALID_REQUEST', 'Bandeira inválida.');
-      if (pl.relargar || flag === 'preta') exigeMotivo(b);
+      if (pl.relargar || flag === 'black') exigeMotivo(b);
       const cap = pl.relargar ? 'prova.reiniciar' : 'bandeira.aplicar';
       return roda(q, cap, b, id, pl.relargar ? 'relargada' : 'flag', () => d.legado('POST', pl.kart ? `/api/sessions/${id}/flag/${encodeURIComponent(pl.kart)}` : `/api/sessions/${id}/flag`, { flag, relargar: pl.relargar === true, motivo: pl.motivo, autor: autor(q) }).then(() => ({ ok: true })));
     },

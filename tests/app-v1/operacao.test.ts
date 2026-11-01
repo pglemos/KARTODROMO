@@ -153,6 +153,13 @@ describe('operação', () => {
     expect(JSON.stringify(p)).not.toContain('999');
   });
 
+  it('bandeira preta usa o valor que a cronometragem aceita', async () => {
+    await op.bandeira(OP, 'b', envio({ flag: 'black', kart: '4', motivo: 'x' }));
+    expect(legado.mock.calls[0][1]).toBe('/api/sessions/b/flag/4');
+    expect(legado.mock.calls[0][2].flag).toBe('black');
+    expect(() => op.bandeira(OP, 'b', envio({ flag: 'preta', kart: '4' }))).toThrow(/inválida/);
+  });
+
   it('comando crítico exige motivo', () => {
     expect(() => op.comando(OP, 'b', envio({ acao: 'restart' }, { reason: '' }))).toThrow(/motivo/);
   });
