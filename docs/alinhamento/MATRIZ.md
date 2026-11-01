@@ -4,7 +4,7 @@ Três versões: snapshot da produção (`snapshot/producao-2026-10-31`), `origin
 
 **Correção do G0:** `origin/main` já contém "Estado em produção no ORBITS em 30/10/2026" e "Main alinhada ao SRVKART". A produção não está tão distante quanto parecia: diverge do GitHub só no que mudou depois disso. O desenvolvimento (`f5108f6`) está 16 commits atrás e 4 à frente de `origin/main`, e os 200+ pendentes locais não entram aqui.
 
-**Correção do G0:** a porta 4060 do `ops-server` não está em escuta no ORBITS. O servidor de operação parece rodar no SRVKART, então `lib/ops` e `services/ops-server.ts` do ORBITS **não são o código em execução**. O SRVKART não foi inspecionado.
+**Correção do G0:** a porta 4060 do `ops-server` não está em escuta no ORBITS. O servidor de operação parece rodar no SRVKART, então `lib/ops` e `services/ops-server.ts` do ORBITS **não são o código em execução**. O repositório também indica isso (`docs/operacao/HANDOFF-SISTEMA-PROPRIO.md`, `Api.cs:23`, apontando para `192.168.20.13:4060`). **O SRVKART não foi inspecionado: `lib/ops` do GitHub só pode ser publicado depois de comparar com `C:\kartodromo-servidor`.**
 
 | Área | Decisão | Motivo |
 |---|---|---|

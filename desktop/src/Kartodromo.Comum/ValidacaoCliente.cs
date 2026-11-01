@@ -16,7 +16,7 @@ public static class ValidacaoCliente
 
     public static string ErroInstagram(string instagram)
     {
-        if (string.IsNullOrWhiteSpace(instagram)) return null; // Instagram é opcional
+        if (string.IsNullOrWhiteSpace(instagram)) return "O Instagram é obrigatório. Informe o @usuário do piloto.";
         var perfil = NormalizarInstagram(instagram);
         return Regex.IsMatch(perfil, @"^@[a-z0-9_](?:[a-z0-9_.]{0,28}[a-z0-9_])?$") && !perfil.Contains("..")
             ? null : "Instagram inválido. Informe o @usuário do piloto (ex.: @andre.silva).";
