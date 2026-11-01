@@ -5,11 +5,13 @@
  * PDFs gerados pelo Edge do próprio PC (headless). No simulador nada sai de verdade: vira arquivo .eml.
  */
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import https from 'node:https';
 import { join } from 'node:path';
 import tls from 'node:tls';
 import nodemailer from 'nodemailer';
+import { protegerSegredoLocal, revelarSegredoLocal } from '../lib/timing/secret-storage';
 import type { EnvioEmailsResultado, Session } from '../lib/timing/race-engine';
 import {
   assunto,
@@ -58,8 +60,24 @@ export const CONFIG_PADRAO: ConfigEmail = {
 
 export function lerConfig(arquivo: string): ConfigEmail {
   try {
-    return { ...CONFIG_PADRAO, ...(JSON.parse(readFileSync(arquivo, 'utf8')) as Partial<ConfigEmail>) };
-  } catch {
+    const raw = JSON.parse(readFileSync(arquivo, 'utf8')) as Record<string, unknown>;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('formato inválido');
+    const chavesPermitidas = new Set(['automatico', 'host', 'porta', 'usuario', 'senha', 'remetenteNome', 'remetenteEmail', 'copiaOculta', 'anexarPdf']);
+    if (Object.keys(raw).some((key) => !chavesPermitidas.has(key))) throw new Error('campo desconhecido no esquema');
+    const merged = { ...CONFIG_PADRAO, ...raw } as ConfigEmail;
+    if (typeof merged.automatico !== 'boolean' || typeof merged.anexarPdf !== 'boolean' || !Number.isInteger(merged.porta) || merged.porta < 1 || merged.porta > 65535 || ['host','usuario','senha','remetenteNome','remetenteEmail','copiaOculta'].some((k) => typeof (merged as any)[k] !== 'string')) throw new Error('esquema inválido');
+    if (![465, 587].includes(merged.porta) || (smtpCloudflare(merged.host) && merged.porta !== 465)) throw new Error('porta/TLS inválidos');
+    if (merged.host.length > 253 || /[\s\r\n]/.test(merged.host)) throw new Error('host SMTP inválido');
+    if (['usuario', 'remetenteEmail', 'copiaOculta'].some((k) => String((merged as any)[k]).length > 254) || merged.remetenteNome.length > 120) throw new Error('campo SMTP excede o tamanho permitido');
+    merged.senha = revelarSegredoLocal(merged.senha);
+    // Migra em leitura as instalações antigas com senha em claro, sem mudar as opções SMTP.
+    if (typeof raw.senha === 'string' && raw.senha && !raw.senha.startsWith('dpapi:v1:')) {
+      try { gravarConfig(arquivo, { ...merged, senha: protegerSegredoLocal(merged.senha) }); }
+      catch { console.error(`[email] não foi possível migrar a senha SMTP para DPAPI: ${arquivo}`); }
+    }
+    return merged;
+  } catch (e) {
+    if (existsSync(arquivo)) console.error(`[email] configuração inválida em ${arquivo}; usando padrões: ${(e as Error).message}`);
     return { ...CONFIG_PADRAO };
   }
 }
@@ -67,8 +85,15 @@ export function lerConfig(arquivo: string): ConfigEmail {
 /** Grava o que veio da tela; senha vazia = mantém a atual. */
 export function salvarConfig(arquivo: string, entrada: Record<string, unknown>): ConfigEmail {
   const novo = montarConfig(lerConfig(arquivo), entrada);
-  writeFileSync(arquivo, JSON.stringify(novo, null, 2));
+  gravarConfig(arquivo, { ...novo, senha: protegerSegredoLocal(novo.senha) });
   return novo;
+}
+
+function gravarConfig(arquivo: string, config: ConfigEmail) {
+  mkdirSync(join(arquivo, '..'), { recursive: true });
+  const tmp = `${arquivo}.${process.pid}.${randomUUID()}.tmp`;
+  writeFileSync(tmp, JSON.stringify(config, null, 2), { mode: 0o600 });
+  try { renameSync(tmp, arquivo); } catch (e) { try { rmSync(tmp, { force: true }); } catch {} throw e; }
 }
 
 /**
@@ -89,6 +114,7 @@ export function montarConfig(atual: ConfigEmail, entrada: Record<string, unknown
     copiaOculta: texto('copiaOculta'),
     anexarPdf: typeof entrada.anexarPdf === 'boolean' ? entrada.anexarPdf : atual.anexarPdf,
   };
+  if (![465, 587].includes(novo.porta) || (smtpCloudflare(novo.host) && novo.porta !== 465)) throw new Error('Porta SMTP inválida: use 465 (TLS) ou 587 (STARTTLS); Cloudflare Email Sending exige 465.');
   if (novo.usuario && !emailValido(novo.usuario) && !(novo.usuario === 'api_token' && smtpCloudflare(novo.host)))
     throw new Error('Usuário deve ser o e-mail completo da caixa (ex.: resultados@kartodromodebetim.com.br).');
   if (novo.remetenteEmail && !emailValido(novo.remetenteEmail)) throw new Error('E-mail do remetente inválido.');
@@ -120,6 +146,42 @@ export function enderecoRemetente(cfg: ConfigEmail, padrao = REMETENTE_PADRAO) {
   return cfg.usuario;
 }
 
+/**
+ * Sanitiza o nome do destinatário para o cabeçalho RFC 2822 `To:`, removendo aspas duplas,
+ * quebras de linha (\r, \n), caracteres de controle, `<`, `>` e barras invertidas.
+ */
+export function sanitizarNomeDestinatario(nome: string): string {
+  return String(nome ?? '')
+    .replace(/[\r\n\t\u0000-\u001F\u007F-\u009F]+/g, ' ')
+    .replace(/["<>,;\\]+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 120);
+}
+
+/**
+ * Valida e normaliza o endereço de e-mail do destinatário para o cabeçalho `To:`,
+ * rejeitando quebras de linha, caracteres de controle, aspas e delimitadores RFC 2822.
+ */
+export function validarEmailDestinatario(email: string): string | null {
+  const limpo = String(email ?? '').trim().toLowerCase();
+  if (!limpo || limpo.length > 254) return null;
+  if (/[\r\n\t\u0000-\u001F\u007F-\u009F\s"<>\\]/.test(limpo)) return null;
+  if (!emailValido(limpo)) return null;
+  if (!/^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i.test(limpo)) {
+    return null;
+  }
+  return limpo;
+}
+
+/** Formata o cabeçalho `To:` de forma estritamente compatível com RFC 2822 (`"Nome Limpo" <email@dominio.com>`). */
+export function formatarCabecalhoTo(nome: string | null | undefined, email: string): string {
+  const emailLimpo = validarEmailDestinatario(email);
+  if (!emailLimpo) throw new Error('Endereço de e-mail inválido.');
+  const nomeLimpo = sanitizarNomeDestinatario(nome ?? '');
+  return nomeLimpo ? `"${nomeLimpo}" <${emailLimpo}>` : emailLimpo;
+}
+
 /** O que a tela pode ver: tudo menos a senha. */
 export function configPublica(c: ConfigEmail) {
   const { senha, ...resto } = c;
@@ -135,6 +197,9 @@ export type Dependencias = {
   /** clienteId → e-mail (cadastro da recepção) */
   emailsDosClientes: (ids: string[]) => Promise<Map<string, string>>;
   logoPng: Buffer | null;
+  /** Substitutos de PDF/SMTP só para testes sintéticos; ignorados fora do simulador. */
+  simuladorGerarPdf?: typeof gerarPdf;
+  simuladorEnviar?: (opcoes: any) => Promise<{ messageId?: string; message?: Buffer }>;
 };
 
 // hospedagem compartilhada (HostGator): mail.<domínio> entrega o certificado da própria HostGator (*.hostgator.com.br).
@@ -253,9 +318,9 @@ export function opcoesTransporte(cfg: ConfigEmail, simulador: boolean) {
     name: nomeEhlo(cfg.host),
     auth: { user: cfg.usuario, pass: cfg.senha },
     tls: { checkServerIdentity: aceitaNomeHostgator },
-    connectionTimeout: 15_000,
-    greetingTimeout: 15_000,
-    socketTimeout: 30_000,
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
   };
 }
 
@@ -274,6 +339,17 @@ function transporte(cfg: ConfigEmail, simulador: boolean) {
   return nodemailer.createTransport(opcoesTransporte(cfg, simulador));
 }
 
+/** Verifica DNS, TLS e autenticação SMTP sem enviar uma mensagem. */
+export async function verificarTransporteEmail(cfgArquivo: string, simulador: boolean) {
+  const cfg = lerConfig(cfgArquivo);
+  if (!(cfg.host && cfg.usuario && cfg.senha)) throw new Error('E-mail não configurado: preencha servidor, usuário e senha.');
+  const t = transporte(cfg, simulador);
+  try {
+    await t.verify();
+    return { ok: true as const, host: cfg.host, porta: cfg.porta, mensagem: 'Conexão e autenticação SMTP verificadas; nenhuma mensagem foi enviada.' };
+  } finally { t.close(); }
+}
+
 // o serviço roda como SISTEMA (sessão 0): o Edge se recusa (sai com 1002); o Chrome com --no-sandbox funciona.
 const EDGE = [process.env.TIMING_EDGE_PATH, 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
   'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', 'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'].filter(Boolean) as string[];
@@ -281,7 +357,7 @@ const EDGE = [process.env.TIMING_EDGE_PATH, 'C:\\Program Files\\Google\\Chrome\\
 /** HTML → PDF pelo Edge headless (perfil próprio, não mexe no Edge de quem usa o PC). null se não conseguir. */
 export async function gerarPdf(html: string, pasta: string, base: string, log: (t: string) => void): Promise<Buffer | null> {
   const edge = EDGE.find((p) => existsSync(p));
-  if (!edge) { log('e-mail: Chrome/Edge não encontrado, resultado vai sem PDF'); return null; }
+  if (!edge) { log('e-mail: Chrome/Edge não encontrado; PDF obrigatório indisponível'); return null; }
   mkdirSync(pasta, { recursive: true });
   const htmlArq = join(pasta, `${base}.html`);
   const pdfArq = join(pasta, `${base}.pdf`);
@@ -295,7 +371,7 @@ export async function gerarPdf(html: string, pasta: string, base: string, log: (
     try { await rodar(); } catch { await new Promise((r) => setTimeout(r, 1500)); await rodar(); } // uma nova tentativa
     return existsSync(pdfArq) ? readFileSync(pdfArq) : null;
   } catch (e) {
-    log(`e-mail: PDF ${base} não foi gerado (${(e as Error).message.split('\n')[0].slice(0, 160)}); envia sem ele`);
+    log(`e-mail: PDF ${base} não foi gerado (${(e as Error).message.split('\n')[0].slice(0, 160)}); envio cancelado para não omitir anexo`);
     return null;
   } finally {
     for (const a of [htmlArq, pdfArq]) try { rmSync(a, { force: true }); } catch { /* arquivo em uso */ }
@@ -320,6 +396,8 @@ export type OpcoesEnvio = {
   atrasado?: boolean;
   /** reenvio depois de a classificação mudar com a bateria já encerrada: abre com AVISO_CORRECAO */
   corrigido?: boolean;
+  /** assinatura do resultado para controle de versões */
+  assinaturaResultado?: string;
 };
 
 /**
@@ -327,6 +405,9 @@ export type OpcoesEnvio = {
  * Sem marcação na bateria, vale o nome: "Tabajara" no nome do evento/bateria = não manda.
  */
 export function semEmailAosPilotos(s: Session, nomeEvento = '') {
+  // Compatibilidade com sessões antigas que nasceram com a opção de endurance marcada incorretamente.
+  // A prova de 100 Milhas é sempre distribuída aos pilotos; reuniões tipo Tabajara continuam respeitando a opção.
+  if (/100\s*milhas/i.test(`${nomeEvento} ${s.name}`)) return false;
   if (typeof s.semEmailPilotos === 'boolean') return s.semEmailPilotos;
   return /tabajara/i.test(`${nomeEvento} ${s.name}`);
 }
@@ -348,7 +429,11 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
 
   const ctx = await dep.contexto(s);
   const ids = [...new Set(s.competitors.map((c) => c.customerId).filter(Boolean).map(String))];
-  const emails = ids.length ? await dep.emailsDosClientes(ids) : new Map<string, string>();
+  let emails = new Map<string, string>();
+  if (ids.length) {
+    try { emails = await dep.emailsDosClientes(ids); }
+    catch (e) { dep.log(`cadastro de e-mails indisponível; usando os contatos locais disponíveis: ${traduzirErro(e)}`); }
+  }
   const todos = destinatarios(s, emails);
   const semEmail = s.competitors
     .filter((c) => !c.autoAdded && !c.detalhes?.oculto && !todos.some((d) => d.competidor === c))
@@ -361,14 +446,14 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
     nome: c.name, kart: c.kart, email, standing: ctx.classificacao.find((r) => r.kart === c.kart && r.name === c.name) ?? ctx.classificacao.find((r) => r.kart === c.kart) ?? null, voltas: voltasDoPiloto(c),
   });
   if (op.para) {
-    if (!emailValido(op.para)) throw new Error('Endereço de e-mail inválido.');
-    const para = op.para.trim().toLowerCase();
+    const para = validarEmailDestinatario(op.para);
+    if (!para) throw new Error('Endereço de e-mail inválido.');
     // com kart: o mesmo e-mail que aquele piloto recebe (resumo + volta a volta dele), entregue neste endereço
     const c = op.kart ? s.competitors.find((x) => x.kart === op.kart && !x.autoAdded) ?? s.competitors.find((x) => x.kart === op.kart) : null;
     if (op.kart && !c) throw new Error(`Kart ${op.kart} não está nesta prova.`);
     alvos = [{ kart: c?.kart ?? '', nome: c?.name ?? 'Resultado', email: para, piloto: c ? piloto(c, para) : null }];
   } else {
-    const jaForam = new Set(op.automatico || op.somenteFaltantes ? anterior?.enviados ?? [] : []);
+    const jaForam = new Set(op.automatico || op.somenteFaltantes ? [...(anterior?.enviados ?? []), ...(anterior?.falhasPermanentes ?? [])] : []);
     alvos = todos
       .filter((d) => !op.kart || d.competidor.kart === op.kart)
       .filter((d) => !jaForam.has(`${d.competidor.kart}|${d.email}`))
@@ -377,54 +462,81 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
   }
 
   const pasta = join(dep.dataDir, 'emails-tmp');
+  const gerar = dep.simulador && dep.simuladorGerarPdf ? dep.simuladorGerarPdf : gerarPdf;
   const logoDataUri = dep.logoPng ? `data:image/png;base64,${dep.logoPng.toString('base64')}` : null;
   const base = nomeArquivo(`Resultado ${[ctx.grupo, ctx.prova].filter(Boolean).join(' ')}`);
-  const pdfResultado = cfg.anexarPdf ? await gerarPdf(htmlPdfResultado(ctx, logoDataUri), pasta, `${s.id}-resultado`, dep.log) : null;
+  const pdfResultado = cfg.anexarPdf ? await gerar(htmlPdfResultado(ctx, logoDataUri), pasta, `${s.id}-resultado`, dep.log) : null;
+  if (cfg.anexarPdf && !pdfResultado && !op.organizador) throw new Error('PDF oficial não foi gerado; nenhum e-mail foi enviado. Verifique Edge/Chrome e tente novamente.');
+  if (op.organizador && !pdfResultado) throw new Error('PDF oficial não foi gerado; o pacote do organizador não foi enviado.');
   const t = transporte(cfg, dep.simulador);
-  const remetente = { name: cfg.remetenteNome || ctx.empresa.nome, address: enderecoRemetente(cfg) };
+  const remetente = { name: sanitizarNomeDestinatario(cfg.remetenteNome || ctx.empresa.nome), address: enderecoRemetente(cfg) };
   const enviados = op.automatico || op.somenteFaltantes ? [...(anterior?.enviados ?? [])] : [];
   const aviso = op.atrasado ? AVISO_ATRASO : op.corrigido ? AVISO_CORRECAO : undefined;
   const falhas: EnvioEmailsResultado['falhas'] = [];
+  const mensagens: NonNullable<EnvioEmailsResultado['mensagens']> = [...(anterior?.mensagens ?? [])];
+  const falhasPermanentes: string[] = [...(anterior?.falhasPermanentes ?? [])];
   const pastaTeste = join(dep.dataDir, 'emails-simulador');
   const inicioEnvio = Date.now();
 
-  for (const a of alvos) {
+  for (let idx = 0; idx < alvos.length; idx++) {
+    const a = alvos[idx];
+    if (idx > 0) {
+      // Item 16: Pausa entre envios para não estourar rate-limit do provedor de e-mail (HostGator)
+      await new Promise((r) => setTimeout(r, 200));
+    }
     try {
-      const p: PilotoEmail = a.piloto ?? { nome: 'amigo(a)', kart: '', email: a.email, standing: null, voltas: [] };
+      const emailLimpo = validarEmailDestinatario(a.email);
+      if (!emailLimpo) throw new Error('Endereço de e-mail inválido.');
+      const toFormatado = a.piloto ? formatarCabecalhoTo(a.nome, emailLimpo) : emailLimpo;
+      const p: PilotoEmail = a.piloto ?? { nome: 'amigo(a)', kart: '', email: emailLimpo, standing: null, voltas: [] };
       const anexos: { filename: string; content: Buffer; contentType?: string; cid?: string }[] = [];
       if (dep.logoPng) anexos.push({ filename: 'logo.png', content: dep.logoPng, contentType: 'image/png', cid: 'logo-kartodromo' });
       if (pdfResultado) anexos.push({ filename: `${base}.pdf`, content: pdfResultado, contentType: 'application/pdf' });
       if (op.organizador) {
         // pacote do organizador: o volta a volta de todos os pilotos num PDF só (sempre anexa, mesmo com anexos desligados)
         const pilotosTodos = s.competitors.filter((c) => !c.autoAdded && !c.detalhes?.oculto && c.crossings.some((x) => !x.deleted))
-          .map((c) => piloto(c, a.email))
+          .map((c) => piloto(c, emailLimpo))
           .sort((x, y) => (x.standing?.position ?? 999) - (y.standing?.position ?? 999));
-        const todos = await gerarPdf(htmlPdfVoltaAVoltaTodos(ctx, pilotosTodos, logoDataUri), pasta, `${s.id}-todos`, dep.log);
-        if (todos) anexos.push({ filename: nomeArquivo(`Volta a volta de todos ${[ctx.grupo, ctx.prova].filter(Boolean).join(' ')}`) + '.pdf', content: todos, contentType: 'application/pdf' });
+        const todos = await gerar(htmlPdfVoltaAVoltaTodos(ctx, pilotosTodos, logoDataUri), pasta, `${s.id}-todos`, dep.log);
+        if (!todos) throw new Error('PDF volta a volta de todos não foi gerado; pacote do organizador não enviado.');
+        anexos.push({ filename: nomeArquivo(`Volta a volta de todos ${[ctx.grupo, ctx.prova].filter(Boolean).join(' ')}`) + '.pdf', content: todos, contentType: 'application/pdf' });
         if (!pdfResultado) {
-          const r = await gerarPdf(htmlPdfResultado(ctx, logoDataUri), pasta, `${s.id}-resultado`, dep.log);
-          if (r) anexos.push({ filename: `${base}.pdf`, content: r, contentType: 'application/pdf' });
+          const r = await gerar(htmlPdfResultado(ctx, logoDataUri), pasta, `${s.id}-resultado`, dep.log);
+          if (!r) throw new Error('PDF oficial não foi gerado; pacote do organizador não enviado.');
+          anexos.push({ filename: `${base}.pdf`, content: r, contentType: 'application/pdf' });
         }
       } else if (cfg.anexarPdf && a.piloto) {
-        const vv = await gerarPdf(htmlPdfVoltaAVolta(ctx, a.piloto, logoDataUri), pasta, `${s.id}-${nomeArquivo(a.kart)}`, dep.log);
-        if (vv) anexos.push({ filename: nomeArquivo(`Volta a volta ${a.nome} kart ${a.kart}`) + '.pdf', content: vv, contentType: 'application/pdf' });
+        const vv = await gerar(htmlPdfVoltaAVolta(ctx, a.piloto, logoDataUri), pasta, `${s.id}-${nomeArquivo(a.kart)}`, dep.log);
+        if (!vv) throw new Error('PDF volta a volta não foi gerado; nenhum e-mail foi enviado.');
+        anexos.push({ filename: nomeArquivo(`Volta a volta ${a.nome} kart ${a.kart}`) + '.pdf', content: vv, contentType: 'application/pdf' });
       }
-      const info = await t.sendMail({
+      const mensagem = {
         from: remetente,
-        to: a.piloto ? { name: a.nome, address: a.email } : a.email,
+        to: toFormatado,
         bcc: cfg.copiaOculta || undefined,
         subject: assunto(ctx),
-        html: htmlEmail(ctx, p, dep.logoPng ? 'logo-kartodromo' : null, aviso),
+        html: htmlEmail(ctx, p, dep.logoPng ? 'logo-kartodromo' : null, aviso, anexos.some((x) => x.contentType === 'application/pdf')),
         text: textoEmail(ctx, p, aviso),
         attachments: anexos,
-      });
+      };
+      const info = dep.simulador && dep.simuladorEnviar
+        ? await dep.simuladorEnviar(mensagem)
+        : await t.sendMail(mensagem);
+      const mid = typeof (info as any).messageId === 'string' ? (info as any).messageId : '';
+      if (mid) mensagens.push({ destinatario: emailLimpo, messageId: mid, aceitoEm: Date.now() });
       if (dep.simulador) {
         mkdirSync(pastaTeste, { recursive: true });
         writeFileSync(join(pastaTeste, `${s.id}-${nomeArquivo(a.kart || 'avulso')}.eml`), (info as unknown as { message: Buffer }).message);
       }
-      if (a.piloto && !op.para) enviados.push(`${a.kart}|${a.email}`);
+      if (a.piloto) enviados.push(`${a.kart}|${emailLimpo}`);
+      s.emailsResultado = { status: 'parcial', atualizadoEm: Date.now(), tentativas: (anterior?.tentativas ?? 0) + 1, enviados: [...new Set([...enviados])], falhas: [...falhas], semEmail, mensagens, aceite: dep.simulador ? 'simulador' : 'aceito-pelo-smtp', entregaConfirmada: false, mensagemEntrega: 'Aceite pelo SMTP não confirma chegada na caixa.' };
+      dep.salvarSessao(s);
     } catch (e) {
-      falhas.push({ kart: a.kart, nome: a.nome, email: a.email, erro: traduzirErro(e).slice(0, 200) });
+      const codigo = Number((e as { responseCode?: number })?.responseCode);
+      if (codigo >= 500 && codigo <= 599) falhasPermanentes.push(`${a.kart}|${a.email}`);
+      falhas.push({ kart: a.kart, nome: a.nome, email: a.email, erro: traduzirErro(e).slice(0, 200), ...(codigo >= 500 && codigo <= 599 ? { permanente: true } : {}) });
+      s.emailsResultado = { status: 'parcial', atualizadoEm: Date.now(), tentativas: (anterior?.tentativas ?? 0) + 1, enviados: [...new Set(enviados)], falhas: [...falhas], semEmail, mensagens, aceite: dep.simulador ? 'simulador' : 'aceito-pelo-smtp', entregaConfirmada: false, mensagemEntrega: 'O aceite SMTP não confirma a chegada na caixa.' };
+      dep.salvarSessao(s);
     }
   }
   t.close();
@@ -438,7 +550,8 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
     for (const a of aceitos) {
       const e = rastreioEntrega?.get(a.email.toLowerCase());
       if (!e || !ENTREGA_RUIM.has(e.tipo)) continue;
-      falhas.push({ kart: a.kart, nome: a.nome, email: a.email, erro: e.motivo });
+      if (e.tipo === 'failure') falhasPermanentes.push(`${a.kart}|${a.email}`);
+      falhas.push({ kart: a.kart, nome: a.nome, email: a.email, erro: e.motivo, ...(e.tipo === 'failure' ? { permanente: true } : {}) });
       const chave = `${a.kart}|${a.email}`;
       for (let i = enviados.indexOf(chave); i >= 0; i = enviados.indexOf(chave)) enviados.splice(i, 1);
     }
@@ -448,29 +561,40 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
     ? [...rastreioEntrega.values()].find((e) => e.tipo === 'success') ?? [...rastreioEntrega.values()][0] ?? null
     : null;
   const situacaoEntrega = aceitos.length ? situacaoEnvioEmail(situacaoRastreio, dep.simulador) : null;
+  const falhasResultado = [...(anterior?.falhas ?? []).filter((f) => f.permanente && !falhas.some((novo) => novo.kart === f.kart && novo.email === f.email)), ...falhas];
+  const somentePermanentes = falhasResultado.length > 0 && falhasResultado.every((f) => f.permanente);
   const resultado: EnvioEmailsResultado = {
-    status: !todos.length && !op.para ? 'sem-destinatarios' : falhas.length === 0 ? 'enviado' : falhas.length < alvos.length ? 'parcial' : 'falhou',
+    status: !todos.length && !op.para ? 'sem-destinatarios' : falhasResultado.length === 0 ? 'enviado' : somentePermanentes ? (enviados.length ? 'parcial' : 'falhou-permanente') : enviados.length ? 'parcial' : 'falhou',
     atualizadoEm: Date.now(),
     tentativas: (anterior?.tentativas ?? 0) + 1,
     enviados: [...new Set(enviados)],
-    falhas,
+    falhas: falhasResultado,
     semEmail,
+    mensagens,
+    assinaturaResultado: op.assinaturaResultado ?? anterior?.assinaturaResultado,
+    proximaTentativaEm: falhas.some((f) => !f.permanente) ? Date.now() + Math.min(30 * 60_000, 60_000 * 2 ** Math.min(anterior?.tentativas ?? 0, 5)) + Math.floor(Math.random() * 30_000) : undefined,
+    falhasPermanentes: [...new Set(falhasPermanentes)],
     ...(situacaoEntrega ? {
       aceite: situacaoEntrega.status,
       entregaConfirmada: situacaoEntrega.entregaConfirmada,
       mensagemEntrega: situacaoEntrega.mensagem,
     } : {}),
   };
-  // reenvio para um piloto só / outro endereço não apaga o histórico do envio da prova
-  if (!op.kart && !op.para) { s.emailsResultado = resultado; dep.salvarSessao(s); }
-  else if (anterior) {
-    anterior.enviados = [...new Set([...anterior.enviados, ...enviados])];
-    anterior.falhas = anterior.falhas.filter((f) => !enviados.includes(`${f.kart}|${f.email}`));
-    if (anterior.falhas.length === 0 && anterior.status !== 'sem-destinatarios') anterior.status = 'enviado';
-    anterior.atualizadoEm = Date.now();
-    dep.salvarSessao(s);
+  // Reenvio individual/avulso não apaga o histórico. A referência pode ter sido substituída
+  // por um snapshot incremental durante o lote, portanto atualizamos o estado persistido atual.
+  if (!op.kart && !op.para) s.emailsResultado = resultado;
+  else {
+    const estado = s.emailsResultado ?? anterior ?? resultado;
+    estado.enviados = [...new Set([...(estado.enviados ?? []), ...enviados])];
+    estado.falhas = [...falhas, ...(estado.falhas ?? []).filter((f) => !enviados.includes(`${f.kart}|${f.email}`))];
+    estado.mensagens = [...new Map([...(estado.mensagens ?? []), ...mensagens].map((m) => [`${m.destinatario}|${m.messageId}`, m])).values()];
+    if (estado.falhas.length === 0 && estado.status !== 'sem-destinatarios') estado.status = 'enviado';
+    else if (estado.enviados.length) estado.status = 'parcial';
+    estado.atualizadoEm = Date.now();
+    s.emailsResultado = estado;
   }
-  const quem = op.para ? `para ${op.para}${op.kart ? ` (como o kart ${op.kart} recebe)` : ''}` : op.kart ? `para o kart ${op.kart}` : `${alvos.length - falhas.length} de ${alvos.length} pilotos`;
+  dep.salvarSessao(s);
+  const quem = op.para ? `para endereço informado${op.kart ? ` (como o kart ${op.kart} recebe)` : ''}` : op.kart ? `para o kart ${op.kart}` : `${alvos.length - falhas.length} de ${alvos.length} pilotos`;
   dep.log(`e-mail do resultado de ${s.name}: ${quem} enviado(s)${falhas.length ? `, ${falhas.length} falha(s): ${falhas.map((f) => f.erro).join(' / ').slice(0, 300)}` : ''}${semEmail.length && !op.kart && !op.para ? `, ${semEmail.length} sem e-mail` : ''}`);
   return resultado;
 }
@@ -493,11 +617,12 @@ export function traduzirErro(e: unknown): string {
 /** E-mail avulso pela mesma saída dos resultados (usado pelos e-mails de conta do app: confirmação e troca de senha). */
 export async function enviarEmailSimples(cfgArquivo: string, simulador: boolean, m: { to: string; subject: string; text: string; html: string }) {
   const cfg = lerConfig(cfgArquivo);
-  if (!emailValido(m.to)) throw new Error('destinatário inválido');
+  const toLimpo = validarEmailDestinatario(m.to);
+  if (!toLimpo) throw new Error('destinatário inválido');
   if (!simulador && !(cfg.host && cfg.usuario && cfg.senha)) throw new Error('e-mail da cronometragem não configurado');
   const t = transporte(cfg, simulador);
   try {
-    await t.sendMail({ from: { name: 'Kartódromo de Betim', address: enderecoRemetente(cfg) }, to: m.to, subject: m.subject, text: m.text, html: m.html });
+    await t.sendMail({ from: { name: 'Kartódromo de Betim', address: enderecoRemetente(cfg) }, to: toLimpo, subject: m.subject, text: m.text, html: m.html });
   } finally {
     t.close();
   }
@@ -505,15 +630,16 @@ export async function enviarEmailSimples(cfgArquivo: string, simulador: boolean,
 
 export async function enviarTeste(cfgArquivo: string, para: string, simulador: boolean, daTela?: Record<string, unknown>): Promise<SituacaoTesteEmail | undefined> {
   const cfg = daTela ? montarConfig(lerConfig(cfgArquivo), daTela) : lerConfig(cfgArquivo);
-  if (!emailValido(para)) throw new Error('Informe um e-mail válido para o teste.');
+  const paraLimpo = validarEmailDestinatario(para);
+  if (!paraLimpo) throw new Error('Informe um e-mail válido para o teste.');
   if (!simulador && !(cfg.host && cfg.usuario && cfg.senha)) throw new Error('Preencha servidor, usuário e senha antes do teste.');
   const t = transporte(cfg, simulador);
   const inicio = Date.now();
   try {
     if (!simulador) await t.verify();
     await t.sendMail({
-      from: { name: cfg.remetenteNome, address: enderecoRemetente(cfg) },
-      to: para,
+      from: { name: sanitizarNomeDestinatario(cfg.remetenteNome), address: enderecoRemetente(cfg) },
+      to: paraLimpo,
       subject: 'Teste do e-mail dos resultados · Cronometragem',
       text: 'Se você recebeu este e-mail, o envio automático dos resultados para os pilotos está funcionando.',
       html: '<p style="font-family:Segoe UI,Arial,sans-serif">Se você recebeu este e-mail, o envio automático dos resultados para os pilotos está <b>funcionando</b>.</p>',
@@ -522,7 +648,7 @@ export async function enviarTeste(cfgArquivo: string, para: string, simulador: b
     t.close();
   }
   if (simulador) return undefined;
-  const e = (await conferirComEspera(cfg, inicio, [para]))?.get(para.trim().toLowerCase());
+  const e = (await conferirComEspera(cfg, inicio, [paraLimpo]))?.get(paraLimpo);
   if (e && ENTREGA_RUIM.has(e.tipo)) throw new Error(`o servidor aceitou, mas a mensagem não saiu: ${e.motivo}`);
   return situacaoTesteEmail(e ?? null);
 }

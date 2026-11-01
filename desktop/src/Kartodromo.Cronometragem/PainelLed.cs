@@ -45,11 +45,19 @@ sealed class PainelLed : IDisposable
     int _paginaAnterior = -1;
     JsonObject _sessaoClassificacao;
     DateTime _ultimoEnvio = DateTime.MinValue, _proximaTentativa = DateTime.MinValue, _ultimoAvanco = DateTime.MinValue;
+    readonly SemaphoreSlim _semaforoEnvio = new(1, 1);
+    readonly object _travaFila = new();
+    string _pacotePendente;
+    bool _limpezaPendente, _envioEmAndamento, _disposed;
+    internal Action<string> EscritorSerial { get; set; }
 
     public PainelLed() => LerConfig();
 
     public void LerConfig()
     {
+        lock (_travaFila) { _disposed = false; }
+        _proximaTentativa = DateTime.MinValue;
+        _falhasConsecutivas = 0;
         try
         {
             // testes automáticos nunca abrem a porta serial do placar (a COM3 é da pista)
@@ -101,13 +109,33 @@ sealed class PainelLed : IDisposable
 
     public void DefinirSessaoClassificacao(JsonObject sessao)
     {
-        if (sessao == null) return;
+        if (sessao == null || sessao.S("type") == "equalizacao") return;
         var st = sessao["standings"] as JsonArray;
         if (st != null && st.Count > 0)
         {
-            _sessaoClassificacao = sessao;
+            // Vale a última que LARGOU: a bateria da agenda é criada de véspera, então a hora de criação não diz qual é a mais nova
+            // (em 31/10 a tomada das 17:25, criada antes, perdia para a das 16:15 e o painel mostrava o grid errado).
+            var mesma = sessao.S("id") is { Length: > 0 } id && id == _sessaoClassificacao?.S("id");
+            if (_sessaoClassificacao == null || mesma || InicioDaSessao(sessao) >= InicioDaSessao(_sessaoClassificacao))
+                _sessaoClassificacao = sessao;
         }
     }
+
+    static long InicioDaSessao(JsonObject s) => s.L("startedAt") ?? s.L("createdAt") ?? 0;
+
+    /// <summary>Botão "Atualizar painel": esquece o que está guardado, reabre a porta se ela falhou e faz o próximo
+    /// Atualizar limpar o painel ($I) e mandar o quadro inteiro, na mesma página.</summary>
+    public void ForcarAtualizacao()
+    {
+        _sessaoClassificacao = null;
+        _paginaAnterior = -1;
+        _ultimoEnvio = DateTime.MinValue;
+        _proximaTentativa = DateTime.MinValue;
+        _falhasConsecutivas = 0;
+        if (!Ok) { try { _serial?.Dispose(); } catch { } _serial = null; }
+    }
+
+    int _falhasConsecutivas = 0;
 
     bool Abrir()
     {
@@ -116,27 +144,130 @@ sealed class PainelLed : IDisposable
         try
         {
             _serial?.Dispose();
-            // igual ao LapTime: 8N1, RTS ligado, DTR desligado
-            _serial = new SerialPort(Porta, Baud, Parity.None, 8, StopBits.One) { RtsEnable = true, DtrEnable = false, WriteTimeout = 1000, Encoding = Encoding.ASCII, NewLine = "\r\n" };
+            // igual ao LapTime: 8N1, RTS ligado, DTR desligado, DiscardNull
+            _serial = new SerialPort(Porta, Baud, Parity.None, 8, StopBits.One) { RtsEnable = true, DtrEnable = false, DiscardNull = true, WriteTimeout = 1000, Encoding = Encoding.ASCII, NewLine = "\r\n" };
             _serial.Open();
             var agora = DateTime.Now;
-            Escrever($"$I,\"{agora:HH:mm:ss.fff}\",\"{agora:ddMMyy}\"\r\n");
-            _sessaoId = null; _paginaAnterior = -1; _enviadas = new string[Linhas];
+            _serial.Write($"$I,\"{agora:HH:mm:ss.fff}\",\"{agora:ddMMyy}\"\r\n");
             Ok = true; Situacao = $"{Porta} conectado";
+            _falhasConsecutivas = 0;
             return true;
         }
         catch (Exception e)
         {
-            Ok = false; Situacao = $"{Porta}: {e.Message}";
-            _proximaTentativa = DateTime.Now.AddSeconds(10);
+            _falhasConsecutivas++;
+            var backoffSegundos = Math.Min(15, 2 * _falhasConsecutivas);
+            _proximaTentativa = DateTime.Now.AddSeconds(backoffSegundos);
+            Ok = false;
+            string motivo = e is UnauthorizedAccessException
+                ? $"porta {Porta} ocupada por outro programa (verifique se outra tela/Orbits está aberta)"
+                : e is FileNotFoundException or IOException
+                    ? $"porta {Porta} não encontrada ou desconectada (cabo serial/USB)"
+                    : e.Message;
+            Situacao = $"{Porta}: {motivo}";
+            Diagnostico.Registrar("PainelLed.Abrir", e);
             return false;
         }
     }
 
-    void Escrever(string pacote)
+    void Escrever(string pacote, bool limparAntes = false)
     {
-        if (string.IsNullOrEmpty(pacote)) return;
-        _serial.Write(pacote.EndsWith("\r\n") ? pacote : pacote + "\r\n");
+        if (string.IsNullOrEmpty(pacote) && !limparAntes) return;
+        lock (_travaFila)
+        {
+            if (_disposed) return;
+            if (limparAntes) _limpezaPendente = true;
+            // envio parcial: um pacote na fila não pode ser perdido; só com fila parada demais (3 s de cabo) recomeça do quadro inteiro
+            if (!string.IsNullOrEmpty(pacote))
+            {
+                if ((_pacotePendente?.Length ?? 0) + pacote.Length > 3000) { _pacotePendente = pacote; _reenviarTudo = true; }
+                else _pacotePendente += pacote;
+            }
+            if (_envioEmAndamento) return;
+            _envioEmAndamento = true;
+        }
+        _ = Task.Run(ProcessarFilaAsync);
+    }
+
+    async Task ProcessarFilaAsync()
+    {
+        while (!_disposed)
+        {
+            await _semaforoEnvio.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                while (!_disposed)
+                {
+                    string pacote;
+                    bool limpar;
+                    lock (_travaFila)
+                    {
+                        if (_pacotePendente == null && !_limpezaPendente)
+                        {
+                            _envioEmAndamento = false;
+                            return;
+                        }
+                        pacote = _pacotePendente;
+                        limpar = _limpezaPendente;
+                        _pacotePendente = null;
+                        _limpezaPendente = false;
+                    }
+
+                    if (DateTime.Now < _proximaTentativa) { _reenviarTudo = true; continue; }
+
+                    try
+                    {
+                        var payload = "";
+                        if (limpar)
+                        {
+                            var agora = DateTime.Now;
+                            payload = $"$I,\"{agora:HH:mm:ss.fff}\",\"{agora:ddMMyy}\"\r\n";
+                        }
+                        if (!string.IsNullOrEmpty(pacote))
+                        {
+                            payload += pacote.EndsWith("\r\n") ? pacote : pacote + "\r\n";
+                        }
+                        if (payload.Length == 0) continue;
+
+                        if (EscritorSerial != null)
+                        {
+                            EscritorSerial(payload);
+                            Ok = true;
+                            Situacao = $"{(Porta.Length > 0 ? Porta : "COM3")} ok";
+                            _falhasConsecutivas = 0;
+                        }
+                        else if (Abrir())
+                        {
+                            _serial.Write(payload);
+                            Ok = true;
+                            Situacao = $"{Porta} ok";
+                            _falhasConsecutivas = 0;
+                        }
+                        else _reenviarTudo = true;
+                    }
+                    catch (Exception e)
+                    {
+                        _reenviarTudo = true;
+                        _falhasConsecutivas++;
+                        var backoffSegundos = Math.Min(15, 2 * _falhasConsecutivas);
+                        _proximaTentativa = DateTime.Now.AddSeconds(backoffSegundos);
+                        Ok = false;
+                        Situacao = $"{Porta}: {e.Message}";
+                        Diagnostico.Registrar("PainelLed.Atualizar", e);
+                        try { _serial?.Dispose(); } catch { }
+                        _serial = null;
+                    }
+                }
+            }
+            finally
+            {
+                if (_disposed)
+                {
+                    lock (_travaFila) { _envioEmAndamento = false; }
+                }
+                _semaforoEnvio.Release();
+            }
+        }
     }
 
     /// <summary>
@@ -144,7 +275,7 @@ sealed class PainelLed : IDisposable
     /// Mantém a classificação da tomada de tempo no painel para montagem do grid até a largada da corrida.
     /// Quando a corrida recebe bandeira verde, zera todos os karts do placar e mostra karts que passaram na linha.
     /// </summary>
-    public void Atualizar(JsonObject sessaoFoco, JsonObject sessaoAlternativa = null)
+    public void Atualizar(JsonObject sessaoFoco, JsonObject sessaoAlternativa = null, int? kartPassou = null)
     {
         try
         {
@@ -219,51 +350,68 @@ sealed class PainelLed : IDisposable
 
             if (Pagina >= TotalPaginas) DefinirPagina(Math.Max(0, TotalPaginas - 1));
 
-            if (!Ativo) { Situacao = "desligado"; Ok = false; return; }
-            if (!Abrir()) return;
+            // kart que acabou de cruzar a linha: com o Auto marcado, o painel vai direto para a página dele
+            if (AutoAvanco && kartPassou is int kp)
+            {
+                var linha = rawStandings.FirstOrDefault(r => r.S("kart") is { } k && int.TryParse(k, out var n) && n == kp);
+                var posicao = linha?.I("position") ?? 0;
+                if (posicao > 0)
+                {
+                    var paginaDoKart = Math.Min((posicao - 1) / Linhas, TotalPaginas - 1);
+                    if (paginaDoKart != Pagina) DefinirPagina(paginaDoKart);
+                    // Item 19: Trava temporária na página do piloto que acabou de cruzar a linha
+                    _ultimoAvanco = DateTime.Now;
+                }
+            }
 
             // Se mudou a sessão ou mudou a página selecionada, manda $I para limpar o painel físico de LED
             var mudouSessao = id != _sessaoId;
             if (mudouSessao) DefinirPagina(0);
             var mudouPagina = Pagina != _paginaAnterior;
+
+            if (!Ativo && EscritorSerial == null) { Situacao = "desligado"; Ok = false; return; }
+            if (DateTime.Now < _proximaTentativa) return;
+
+            var limparAntes = false;
             if (mudouSessao || mudouPagina)
             {
-                var agora = DateTime.Now;
-                Escrever($"$I,\"{agora:HH:mm:ss.fff}\",\"{agora:ddMMyy}\"");
+                limparAntes = true;
                 _sessaoId = id;
                 _paginaAnterior = Pagina;
-
                 _enviadas = new string[Linhas]; // painel limpo: tudo precisa ir de novo
             }
+            if (_reenviarTudo) { _reenviarTudo = false; _enviadas = new string[Linhas]; }
 
-            var pacote = MontarAlteracoes(sessaoExibir, DateTime.Now);
-            if (pacote.Length == 0) return;
-            Escrever(pacote);
-            _ultimoEnvio = DateTime.Now;
-            Ok = true;
-            Situacao = $"{Porta} ok";
+            var agoraEnvio = DateTime.Now;
+            var pacote = MontarEnvio(sessaoExibir, agoraEnvio);
+            if (pacote.Length == 0 && !limparAntes) return;
+            _ultimoEnvio = agoraEnvio;
+            Escrever(pacote, limparAntes);
         }
         catch (Exception e)
         {
+            _falhasConsecutivas++;
+            var backoffSegundos = Math.Min(15, 2 * _falhasConsecutivas);
+            _proximaTentativa = DateTime.Now.AddSeconds(backoffSegundos);
             Ok = false;
             Situacao = $"{Porta}: {e.Message}";
+            Diagnostico.Registrar("PainelLed.Atualizar", e);
             try { _serial?.Dispose(); } catch { }
             _serial = null;
         }
     }
 
     // A COM3 roda a 9600 baud (~960 bytes/s). O quadro inteiro (10 posições × $SR/$J/$G + $F) tem ~1.150 bytes: reenviar
-    // tudo a cada passagem levava mais de 1 s só no cabo e o piloto via o tempo atrasado. Agora vai só a posição que
-    // mudou (~110 bytes, ~0,1 s), mais 1 posição de reforço por segundo em rodízio (se o painel perder um pacote,
-    // ele se corrige em até 10 s). O formato de cada comando é o mesmo do LapTime.
+    // tudo a cada passagem levava mais de 1 s só no cabo e o piloto via o tempo atrasado. Vai só a posição que mudou
+    // (~110 bytes, ~0,1 s), mais 1 posição de reforço por segundo em rodízio (pacote perdido se corrige em até 10 s).
     string[] _enviadas = [];
     DateTime _ultimoReforco = DateTime.MinValue, _ultimoRodape = DateTime.MinValue;
     int _reforco;
+    volatile bool _reenviarTudo;
 
-    internal string MontarAlteracoes(JsonObject sessao, DateTime agora)
+    string MontarEnvio(JsonObject sessao, DateTime agora)
     {
         var (posicoes, rodape) = MontarQuadro(sessao, Pagina, Linhas, agora);
-        if (posicoes.Count == 0) return "";
         if (_enviadas.Length != Linhas) _enviadas = new string[Linhas];
         var sb = new StringBuilder();
         var mudou = false;
@@ -274,20 +422,25 @@ sealed class PainelLed : IDisposable
             _enviadas[i] = posicoes[i];
             mudou = true;
         }
-        if (mudou) _ultimoReforco = agora; // o reforço só entra depois de 1 s parado
-        if (!mudou && agora - _ultimoReforco >= TimeSpan.FromSeconds(1))
+        if (mudou) _ultimoReforco = agora;
+        if (!mudou && posicoes.Count > 0 && agora - _ultimoReforco >= TimeSpan.FromSeconds(1))
         {
-            var i = _reforco++ % posicoes.Count;
-            sb.Append(posicoes[i]);
+            sb.Append(posicoes[_reforco++ % posicoes.Count]);
             _ultimoReforco = agora;
         }
-        // relógio/voltas restantes: junto de cada mudança, e a cada 5 s mesmo parado (como antes)
-        if (mudou || agora - _ultimoRodape >= TimeSpan.FromSeconds(5))
+        // relógio e voltas restantes: junto de cada mudança, e a cada 5 s mesmo parado
+        if (rodape.Length > 0 && (mudou || agora - _ultimoRodape >= TimeSpan.FromSeconds(5)))
         {
             sb.Append(rodape);
             _ultimoRodape = agora;
         }
         return sb.ToString();
+    }
+
+    internal string MontarAlteracoes(JsonObject sessao, DateTime agora)
+    {
+        var (posicoes, rodape) = MontarQuadro(sessao, Pagina, Linhas, agora);
+        return string.Concat(posicoes) + rodape;
     }
 
     /// <summary>Uma linha de texto por posição da página ($SR/$J/$G na corrida, $SP/$J/$H no treino) e o rodapé $F.
@@ -357,14 +510,13 @@ sealed class PainelLed : IDisposable
                 var tempo = melhor ?? ultima;
                 linha = $"$SP,{pos},\"{kart}\",{voltas},\"{tempo}\"\r\n"
                       + $"$J,\"{kart}\",\"{tempo}\",\"{total}\"\r\n"
-                      + $"$H,{pos},\"{kart}\",{voltas},\"{ultima}\"\r\n";
+                      + $"$H,{pos},\"{kart}\",{voltas},\"{tempo}\"\r\n";
             }
             sb.Append(linha);
             porPosicao?.Add(linha);
         }
 
         assinatura = sb.ToString();
-        if (sb.Length == 0) return "";
         var lider = standings.FirstOrDefault()?.I("laps") ?? 0;
         var voltasRestantes = sessao["maxLaps"] is JsonValue && sessao.I("maxLaps") > 0 ? Math.Max(0, sessao.I("maxLaps") - lider) : 0;
         rodape = $"$F,{voltasRestantes},\"{Hora(sessao.L("remainingMs"))}\",\"{agora:HH:mm:ss.fff}\",\"{Hora(sessao.L("elapsedMs"))}\"\r\n";
@@ -377,6 +529,12 @@ sealed class PainelLed : IDisposable
 
     public void Dispose()
     {
+        lock (_travaFila)
+        {
+            _disposed = true;
+            _pacotePendente = null;
+            _limpezaPendente = false;
+        }
         try { _serial?.Dispose(); } catch { }
         _serial = null;
     }

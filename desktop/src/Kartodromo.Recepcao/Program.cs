@@ -10,7 +10,7 @@ static class Program
     {
         var args = Environment.GetCommandLineArgs();
         ApplicationConfiguration.Initialize();
-        if (Atualizacao.TratarInicioAsync("Recepcao", args).GetAwaiter().GetResult()) return;
+        if (Atualizacao.TratarInicioAsync("Recepcao", args, instanciaUnica: true).GetAwaiter().GetResult()) return;
         KitVisual.Instalar();
         Forma.Icones = VisualPrincipal.Icone;
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);

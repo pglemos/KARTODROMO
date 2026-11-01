@@ -95,7 +95,7 @@ public partial class FormCrono
                     if (r.FirstOrDefault()?.S("peso") is { Length: > 0 } pk && double.TryParse(pk, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var kg) && kg > 0)
                         d.BeginInvoke(() => { if (peso.Text.Length == 0) peso.Text = kg.ToString("0.00", Fmt.Br); if (email.Text.Length == 0) email.Text = r[0].S("email"); if (cidade.Text.Length == 0) cidade.Text = r[0].S("cidade"); });
                 }
-                catch { }
+                catch (Exception ex) { Diagnostico.Registrar("Competidores.ClienteInfo", ex); }
             });
 
         d.BotaoRodape("Gravar", true, () => Seguro.Rodar(d, async () =>

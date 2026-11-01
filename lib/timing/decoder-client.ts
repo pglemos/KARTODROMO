@@ -95,29 +95,43 @@ export class DecoderClient extends EventEmitter {
       s.connectedAt = Date.now();
       s.lastDataAt = Date.now();
       s.lastError = null;
-      socket.setTimeout(0);
+      // Item 4: Mantém timeout ativo de silêncio para detectar conexões half-open
+      socket.setTimeout(this.silenceTimeoutMs);
       // cada comando como o LapTime: texto + CRLF
       for (const cmd of this.initCommands) socket.write(cmd + '\r\n', 'latin1');
       if (this.initCommands.length) this.emit('init', this.initCommands);
       this.emit('change');
     });
 
+    socket.on('timeout', () => {
+      if (s.connected) {
+        s.lastError = `Timeout do socket TCP do decoder (${Math.round(this.silenceTimeoutMs / 1000)}s sem resposta)`;
+        socket.destroy();
+      }
+    });
+
     socket.on('data', (chunk: string | Buffer) => {
       s.lastDataAt = Date.now();
-      const recs = this.protocol === 'p3'
-        ? this.p3.push(chunk as Buffer).map(parseP3Frame)
-        : this.splitter.push(chunk as string).map(parseTrxLine);
-      for (const rec of recs) {
-        if (rec.kind === 'passing') {
-          s.lastPassingAt = Date.now();
-          this.emit('passing', rec satisfies TrxPassing);
-        } else if (rec.kind === 'status') {
-          s.lastStatusAt = Date.now();
-          s.noise = (rec satisfies TrxStatus).noise;
-          this.emit('status', rec);
-        } else {
-          this.emit('other', rec.raw);
+      // Item 3: Proteção contra exceções no parsing de dados corrompidos
+      try {
+        const recs = this.protocol === 'p3'
+          ? this.p3.push(chunk as Buffer).map(parseP3Frame)
+          : this.splitter.push(chunk as string).map(parseTrxLine);
+        for (const rec of recs) {
+          if (rec.kind === 'passing') {
+            s.lastPassingAt = Date.now();
+            this.emit('passing', rec satisfies TrxPassing);
+          } else if (rec.kind === 'status') {
+            s.lastStatusAt = Date.now();
+            s.noise = (rec satisfies TrxStatus).noise;
+            this.emit('status', rec);
+          } else {
+            this.emit('other', rec.raw);
+          }
         }
+      } catch (err: any) {
+        s.lastError = `Erro ao processar pacote do decoder: ${err?.message || err}`;
+        this.emit('error', err instanceof Error ? err : new Error(String(err)));
       }
     });
 

@@ -85,6 +85,7 @@ export type Competitor = {
   name: string;
   customerId?: string | null;
   category?: string | null;
+  enduranceEquipeId?: number | null;
   detalhes?: CompetidorDetalhes;
   autoAdded?: boolean;
   flag?: RaceFlag | PilotFlag;
@@ -106,6 +107,8 @@ export type Session = {
   createdAt: number;
   /** hora da largada = primeira passagem contada depois da bandeira verde (null até lá) */
   startedAt: number | null;
+  /** hora original da primeira passagem na largada, preservada mesmo após relargadas ou pausas em bandeira vermelha */
+  originalStartedAt?: number | null;
   /** hora em que o operador deu a bandeira verde (a bateria fica armada esperando o 1º kart) */
   greenAt?: number | null;
   checkeredAt: number | null;
@@ -150,17 +153,22 @@ export type EnvioEmailsResultado = {
   /** enviado = todos com e-mail receberam; parcial = alguns falharam (tenta de novo); falhou = nenhum foi (tenta de novo);
    *  sem-destinatarios = ninguém da prova tem e-mail cadastrado; desligado = envio automático desativado quando encerrou;
    *  sem-email-pilotos = bateria marcada para não mandar aos pilotos (o organizador divulga — Tabajara) */
-  status: 'enviado' | 'parcial' | 'falhou' | 'sem-destinatarios' | 'desligado' | 'sem-email-pilotos';
+  status: 'enviado' | 'parcial' | 'falhou' | 'falhou-permanente' | 'sem-destinatarios' | 'desligado' | 'sem-email-pilotos';
   atualizadoEm: number;
   tentativas: number;
   /** "kart|email" de quem já recebeu (não manda de novo na nova tentativa) */
   enviados: string[];
-  falhas: { kart: string; nome: string; email: string; erro: string }[];
+  falhas: { kart: string; nome: string; email: string; erro: string; permanente?: boolean }[];
   semEmail: { kart: string; nome: string }[];
   /** aceite do SMTP/relay; não confirma chegada na caixa do destinatário */
   aceite?: 'aceito-pelo-relay' | 'aceito-pelo-smtp' | 'simulador';
   entregaConfirmada?: false;
   mensagemEntrega?: string;
+  /** assinatura do resultado para comparar antes de reenvios automáticos em correções pós-corrida */
+  assinaturaResultado?: string;
+  proximaTentativaEm?: number;
+  falhasPermanentes?: string[];
+  mensagens?: { destinatario: string; messageId: string; aceitoEm: number }[];
 };
 
 export type RejectedPassing = { id: string; kart: string | null; transponder: number | null; wallMs: number; decoderTimeMs: number; reason: string; sinceLastMs: number | null };
@@ -248,10 +256,10 @@ export function createSession(input: {
 
 export function updateSessionParameters(
   session: Session,
-  parameters: { name?: string; durationMin?: number; maxLaps?: number | null },
+  parameters: { name?: string; durationMin?: number; maxLaps?: number | null; minLapSec?: number },
   now: number,
 ) {
-  const updatesRules = parameters.durationMin !== undefined || parameters.maxLaps !== undefined;
+  const updatesRules = parameters.durationMin !== undefined || parameters.maxLaps !== undefined || parameters.minLapSec !== undefined;
   if (updatesRules && !['preparando', 'em_andamento', 'encerrada'].includes(session.state)) {
     throw new Error('Duração e limite de voltas não podem ser alterados neste estado da bateria.');
   }
@@ -270,6 +278,13 @@ export function updateSessionParameters(
       throw new Error('O limite de voltas deve ser um número inteiro igual ou maior que zero.');
     }
     maxLaps = parameters.maxLaps && parameters.maxLaps > 0 ? parameters.maxLaps : null;
+  }
+
+  if (parameters.minLapSec !== undefined) {
+    if (!Number.isFinite(parameters.minLapSec) || parameters.minLapSec <= 0) {
+      throw new Error('O tempo mínimo de volta deve ser um número maior que zero.');
+    }
+    session.minLapMs = Math.round(parameters.minLapSec * 1000);
   }
 
   if (typeof parameters.name === 'string') session.name = parameters.name.trim() || session.name;
@@ -320,9 +335,14 @@ function dedupeKarts<T extends { kart: string; name?: string }>(list: T[]): T[] 
     const atual = porKart.get(k);
     if (!atual || (semPilotoNome(k, atual.name) && !semPilotoNome(k, c.name))) porKart.set(k, c);
   }
-  return list.filter((c) => {
+  return list.flatMap((c) => {
     const k = String(c.kart).trim();
-    return k ? porKart.get(k) === c : Boolean(c.name?.trim());
+    if (!k) return c.name?.trim() ? [c] : [];
+    if (porKart.get(k) === c) return [c];
+    // Se era apenas um placeholder ("Kart 12"), é descartado pois o piloto real assumiu o kart
+    if (semPilotoNome(k, c.name)) return [];
+    // Se ambos eram pilotos reais com o mesmo kart digitado, mantém o piloto mas desassocia o kart duplicado
+    return [{ ...c, kart: '' }];
   });
 }
 
@@ -336,7 +356,7 @@ function dedupeKarts<T extends { kart: string; name?: string }>(list: T[]): T[] 
  */
 export type TrocaDeKart = { nome: string; de: string; para: string; voltasLevadas: number; passagensJuntadas: number; voltasIgnoradas?: number };
 
-export function setCompetitors(session: Session, list: { kart: string; name: string; customerId?: string | null; category?: string | null; detalhes?: CompetidorDetalhes }[]): TrocaDeKart[] {
+export function setCompetitors(session: Session, list: { kart: string; name: string; customerId?: string | null; category?: string | null; enduranceEquipeId?: number | null; detalhes?: CompetidorDetalhes }[]): TrocaDeKart[] {
   const previous = session.competitors;
   const trocas: TrocaDeKart[] = [];
   const used = new Set<Competitor>();
@@ -347,9 +367,11 @@ export function setCompetitors(session: Session, list: { kart: string; name: str
 
   // 1ª passada: reconhece cada piloto da lista nova na lista antiga
   const matches = novos.map((c) => {
+    const eid = c.enduranceEquipeId ? Number(c.enduranceEquipeId) : 0;
     const cid = c.customerId ? String(c.customerId) : '';
     const n = nome(c.name);
     const old =
+      (eid ? achar((o) => Number(o.enduranceEquipeId ?? 0) === eid) : undefined) ??
       (cid ? achar((o) => String(o.customerId ?? '') === cid) : undefined) ??
       (n && n !== `kart ${nome(c.kart)}` ? achar((o) => !semPiloto(o) && nome(o.name) === n) : undefined);
     if (old) used.add(old);
@@ -387,6 +409,7 @@ export function setCompetitors(session: Session, list: { kart: string; name: str
       name: c.name.trim(),
       customerId: c.customerId ?? old?.customerId ?? null,
       category: c.category ?? old?.category ?? null,
+      ...(c.enduranceEquipeId || old?.enduranceEquipeId ? { enduranceEquipeId: c.enduranceEquipeId ?? old?.enduranceEquipeId } : {}),
       ...(c.detalhes ?? old?.detalhes ? { detalhes: c.detalhes ?? old?.detalhes } : {}),
       autoAdded: false,
       flag: old?.flag ?? 'none',
@@ -594,7 +617,10 @@ export function aguardandoLargada(session: Session) {
 }
 
 function largarNaPrimeiraPassagem(session: Session, wallMs: number) {
-  if (session.state === 'em_andamento' && session.startedAt === null) session.startedAt = wallMs;
+  if (session.state === 'em_andamento' && session.startedAt === null) {
+    session.startedAt = wallMs;
+    session.originalStartedAt ??= wallMs;
+  }
 }
 
 export function elapsedMs(session: Session, now: number): number {
@@ -619,7 +645,10 @@ export function setRaceFlag(session: Session, flag: Exclude<RaceFlag, 'none'>, n
   if (session.redFlagAt != null) {
     const frozenElapsed = session.redFlagElapsedMs ?? 0;
     // vermelha antes do primeiro kart passar: continua esperando a largada
-    if (session.startedAt !== null) session.startedAt = now - frozenElapsed;
+    if (session.startedAt !== null) {
+      session.originalStartedAt ??= session.startedAt;
+      session.startedAt = now - frozenElapsed;
+    }
     session.redFlagAt = null;
     session.redFlagElapsedMs = null;
   }
@@ -666,6 +695,7 @@ export function restartSession(session: Session) {
   session.rejected = [];
   session.state = 'preparando';
   session.startedAt = null;
+  session.originalStartedAt = null;
   session.greenAt = null;
   session.checkeredAt = null;
   session.finishedAt = null;
@@ -753,12 +783,25 @@ function lapDuration(previous: Crossing, current: Crossing) {
   // Depois de uma passagem manual, o relógio do decoder não foi sincronizado
   // com o valor digitado. Use o intervalo real entre os registros no diário.
   if (previous.source === 'manual') return Math.max(0, current.wallMs - previous.wallMs);
+
+  const wall = Math.max(0, current.wallMs - previous.wallMs);
   let ms = current.decoderTimeMs - previous.decoderTimeMs;
-  if (ms < 0) ms += DAY_MS;
-  // O relógio do decoder é zerado a cada conexão (@RESET + ?;;;11;). Se a conexão caiu no
-  // meio da prova, a diferença pelo decoder deixa de fazer sentido: usa o intervalo real.
-  const wall = current.wallMs - previous.wallMs;
-  if (wall > 0 && Math.abs(ms - wall) > DECODER_CLOCK_TOLERANCE_MS) return wall;
+
+  if (ms < 0) {
+    // Trata virada legítima de meia-noite (24h)
+    const wrapMs = ms + DAY_MS;
+    if (wall > 0 && Math.abs(wrapMs - wall) <= DECODER_CLOCK_TOLERANCE_MS) {
+      return wrapMs;
+    }
+    // Relógio do decoder zerado no meio da prova (reconexão TRX): usa o intervalo real
+    return wall > 0 ? wall : Math.max(0, wrapMs);
+  }
+
+  // Com ms >= 0, o clock do decoder é a autoridade de alta resolução.
+  // Só recorre a wallMs se houver anomalia severa (> 15s) para evitar que jitter do NTP degrade a precisão.
+  if (wall > 0 && Math.abs(ms - wall) > 15_000) {
+    return wall;
+  }
   return ms;
 }
 
@@ -949,10 +992,10 @@ export function computeStandings(session: Session, trackLengthMeters = 1_000): S
     const firstCrossing = crossings[0] ?? null;
     const lastCrossing = crossings[crossings.length - 1] ?? null;
 
-    const validLaps: { lapNumber: number; lapMs: number; wallMs: number }[] = [];
+    const validLaps: { lapNumber: number; lapMs: number; wallMs: number; crossing: Crossing }[] = [];
     crossings.forEach((x, i) => {
       if (i > 0 && x.lapMs !== null && !x.invalid) {
-        validLaps.push({ lapNumber: i, lapMs: x.lapMs, wallMs: x.wallMs });
+        validLaps.push({ lapNumber: i, lapMs: x.lapMs, wallMs: x.wallMs, crossing: x });
       }
     });
 
@@ -960,6 +1003,7 @@ export function computeStandings(session: Session, trackLengthMeters = 1_000): S
     const best = validLaps[0]?.lapMs ?? null;
     const bestN = validLaps[0]?.lapNumber ?? null;
     const bestWall = validLaps[0]?.wallMs ?? null;
+    const bestCrossing = validLaps[0]?.crossing ?? null;
     const best2nd = validLaps[1]?.lapMs ?? null;
     const best3rd = validLaps[2]?.lapMs ?? null;
 
@@ -971,6 +1015,7 @@ export function computeStandings(session: Session, trackLengthMeters = 1_000): S
 
     return {
       c,
+      kart: c.kart,
       penalty,
       // tomada de tempo/treino: a penalidade de tempo soma na melhor volta
       bestOficial: best === null ? null : best + penalty,
@@ -983,6 +1028,7 @@ export function computeStandings(session: Session, trackLengthMeters = 1_000): S
       best,
       bestN,
       bestWall,
+      bestCrossing,
       best2nd,
       best3rd,
       lastLap: lastCrossing?.lapMs ?? null,
@@ -1049,8 +1095,11 @@ export function computeStandings(session: Session, trackLengthMeters = 1_000): S
           return a.best3rd === null ? 1 : -1;
         }
 
-        // Desempate 3: quem marcou a melhor volta antes na cronologia
-        if (a.bestWall !== null && b.bestWall !== null && a.bestWall !== b.bestWall) {
+        // Desempate 3: quem marcou a melhor volta antes na cronologia (usando o RTC de alta precisão do decoder P3/TRX)
+        if (a.bestCrossing && b.bestCrossing) {
+          const rtcDiff = compareCrossings(a.bestCrossing, b.bestCrossing);
+          if (rtcDiff !== 0) return rtcDiff;
+        } else if (a.bestWall !== null && b.bestWall !== null && a.bestWall !== b.bestWall) {
           return a.bestWall - b.bestWall;
         }
 
@@ -1067,6 +1116,12 @@ export function computeStandings(session: Session, trackLengthMeters = 1_000): S
       if (a.crossings.length > 0) {
         const arrival = compareCrossings(a.firstCrossing, b.firstCrossing);
         if (arrival !== 0) return arrival;
+      }
+
+      if (session.type === 'treino') {
+        const ka = Number.parseInt(a.kart, 10) || 999999;
+        const kb = Number.parseInt(b.kart, 10) || 999999;
+        if (ka !== kb) return ka - kb;
       }
 
       // Ordem inicial
@@ -1102,7 +1157,13 @@ export function computeStandings(session: Session, trackLengthMeters = 1_000): S
         gapLaps = leader.laps - r.laps;
         if (gapLaps === 0 && leader.laps > 0 && r.lastCrossing && leader.lastCrossing) {
           const diff = compareCrossings(r.lastCrossing, leader.lastCrossing) + (r.penalty - leader.penalty);
-          gapMs = Math.max(0, diff);
+          if (diff >= 0) {
+            gapMs = diff;
+          } else if (r.total !== null && leader.total !== null && r.total > leader.total) {
+            gapMs = r.total - leader.total;
+          } else {
+            gapMs = Math.abs(diff);
+          }
         }
       } else if (r.bestOficial !== null && leader.bestOficial !== null) {
         gapMs = r.bestOficial - leader.bestOficial;
@@ -1155,4 +1216,97 @@ export function acceptRejected(session: Session, r: RejectedPassing) {
   comp.crossings.push({ id: r.id, decoderTimeMs: r.decoderTimeMs, wallMs: r.wallMs, lapMs: null, source: 'decoder', transponder: r.transponder });
   recalculate(comp);
   session.rejected = (session.rejected ?? []).filter((x) => x.id !== r.id);
+}
+
+/**
+ * Item 25: Detecta se dois transponders apontam para o mesmo kart ativo ou se um mesmo transponder
+ * está associado de forma conflitante a múltiplos karts.
+ */
+export function detectarTranspondersDuplicados(
+  map: Record<string, string>,
+  competitors?: { kart: string; name: string; transponder?: string | number | null }[],
+): { transponder: string; karts: string[] }[] {
+  const entries = Object.entries(map ?? {})
+    .map(([k, v]) => [String(k).trim(), String(v ?? '').trim()] as const)
+    .filter(([k, v]) => Boolean(k && v));
+  if (!entries.length && (!competitors || !competitors.length)) return [];
+
+  const activeKarts = competitors && competitors.length > 0
+    ? new Set(competitors.map((c) => String(c.kart ?? '').trim()).filter(Boolean))
+    : null;
+
+  // Detecta se o mapa foi passado invertido (kart -> transponder) em vez do padrão (transponder -> kart)
+  const keysInActive = activeKarts ? entries.filter(([k]) => activeKarts.has(k)).length : 0;
+  const valsInActive = activeKarts ? entries.filter(([, v]) => activeKarts.has(v)).length : 0;
+  const looksLikeTx = (s: string) => s.length >= 4 || /[a-z_-]/i.test(s);
+  const inverted = activeKarts
+    ? keysInActive > valsInActive
+    : entries.length > 0 && entries.every(([k, v]) => !looksLikeTx(k) && looksLikeTx(v));
+
+  const txToKarts = new Map<string, string[]>();
+  const kartToTxs = new Map<string, string[]>();
+
+  const addLink = (tx: string, kart: string) => {
+    if (!tx || !kart) return;
+    if (activeKarts && !activeKarts.has(kart)) return;
+    const ks = txToKarts.get(tx) ?? [];
+    if (!ks.includes(kart)) ks.push(kart);
+    txToKarts.set(tx, ks);
+
+    const txs = kartToTxs.get(kart) ?? [];
+    if (!txs.includes(tx)) txs.push(tx);
+    kartToTxs.set(kart, txs);
+  };
+
+  for (const [k, v] of entries) {
+    if (inverted) {
+      for (const tx of v.split(/[,;/|\s]+/).map((s) => s.trim()).filter(Boolean)) addLink(tx, k);
+    } else {
+      for (const kart of v.split(/[,;/|\s]+/).map((s) => s.trim()).filter(Boolean)) addLink(k, kart);
+    }
+  }
+
+  for (const c of competitors ?? []) {
+    const kart = String(c.kart ?? '').trim();
+    const tx = c.transponder != null ? String(c.transponder).trim() : '';
+    if (kart && tx) addLink(tx, kart);
+  }
+
+  const conflitos = new Map<string, Set<string>>();
+  const registrar = (tx: string, karts: string[]) => {
+    const set = conflitos.get(tx) ?? new Set<string>();
+    for (const k of karts) set.add(k);
+    conflitos.set(tx, set);
+  };
+
+  // Caso 1: Mesmo transponder associado a múltiplos karts
+  for (const [tx, karts] of txToKarts.entries()) {
+    if (karts.length > 1) registrar(tx, karts);
+  }
+
+  // Caso 2: Dois ou mais transponders apontando para o mesmo kart ativo
+  for (const [kart, txs] of kartToTxs.entries()) {
+    if (txs.length > 1) {
+      for (const tx of txs) registrar(tx, [kart]);
+    }
+  }
+
+  // Caso 3: Dois competidores ativos com o mesmo número de kart que possui transponder vinculado
+  if (competitors && competitors.length > 1) {
+    const contagemKart = new Map<string, number>();
+    for (const c of competitors) {
+      const k = String(c.kart ?? '').trim();
+      if (k) contagemKart.set(k, (contagemKart.get(k) ?? 0) + 1);
+    }
+    for (const [kart, count] of contagemKart.entries()) {
+      if (count > 1) {
+        for (const tx of kartToTxs.get(kart) ?? []) registrar(tx, [kart]);
+      }
+    }
+  }
+
+  return [...conflitos.entries()].map(([transponder, karts]) => ({
+    transponder,
+    karts: [...karts],
+  }));
 }
