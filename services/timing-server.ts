@@ -325,7 +325,7 @@ for (const session of sessions.values()) {
 
 /** O que invalida um comando do app. Passagem de kart fica de fora: senão, em corrida, todo comando daria conflito. */
 function assinaturaDeComando(s: Session) {
-  return JSON.stringify([s.state, s.competitors.map((c) => [c.kart, c.name, c.customerId ?? null, c.autoAdded ? 1 : 0, c.penalidades?.length ?? 0, c.flag ?? null])]);
+  return JSON.stringify([s.state, s.competitors.map((c) => [c.kart, c.name, c.customerId ?? null, c.autoAdded ? 1 : 0, c.penalidades?.length ?? 0, c.flag ?? null]), s.type === 'equalizacao' ? s.equalizacao ?? null : null]);
 }
 
 function saveSession(s: Session) {

@@ -196,10 +196,11 @@ describe('operação', () => {
   });
 
   it('checklist da oficina preserva o que já estava gravado', async () => {
+    legado.mockResolvedValueOnce({ finalizadaEm: null });
     legado.mockResolvedValueOnce({ resultado: { karts: [{ kart: '4', checklist: { sistemas: { motor: { status: 'atencao' } }, observacoes: 'obs', acaoOficina: 'antiga' } }] } });
     const r = await op.comandoEqualizacao(OP, 'eq', envio({ acao: 'checklist', kart: '4', acaoOficina: 'nova' }));
     expect(r.status).toBe('APPLIED');
-    const [m, c, corpo] = legado.mock.calls[1];
+    const [m, c, corpo] = legado.mock.calls[2];
     expect([m, c]).toEqual(['PUT', '/api/equalizacao/eq/karts/4']);
     expect(corpo).toMatchObject({ acaoOficina: 'nova', observacoes: 'obs', sistemas: { motor: { status: 'atencao' } } });
     expect(corpo).not.toHaveProperty('confirmacaoManual');
@@ -207,9 +208,23 @@ describe('operação', () => {
 
   it('redutor e abertura usam as rotas da cronometragem; Recepção não mexe', async () => {
     await op.comandoEqualizacao(OP, 'eq', envio({ acao: 'abertura', kart: '4', bloco: 2, mm: '0,3' }));
-    expect(legado.mock.calls[0]).toEqual(['PATCH', '/api/equalizacao/eq', { abertura: { kart: '4', bloco: 2, mm: '0,3' } }]);
+    expect(legado.mock.calls[1]).toEqual(['PATCH', '/api/equalizacao/eq', { abertura: { kart: '4', bloco: 2, mm: '0,3' } }]);
     await expect(op.comandoEqualizacao(REC, 'eq', envio({ acao: 'redutor', kart: '4', mm: '17' }))).rejects.toMatchObject({ http: 403 });
     expect(() => op.comandoEqualizacao(OP, 'eq', envio({ acao: 'apagar' }))).toThrow(/inválido/);
+  });
+
+  it('equalização finalizada não aceita alteração, só reabrir', async () => {
+    legado.mockResolvedValueOnce({ finalizadaEm: 123 });
+    const r = await op.comandoEqualizacao(OP, 'eq', envio({ acao: 'config', mecanico: 'Zé' }));
+    expect(r.status).toBe('REJECTED');
+    expect(legado.mock.calls.some(([m]) => m === 'PATCH')).toBe(false);
+  });
+
+  it('importação devolve os karts que não vieram', async () => {
+    legado.mockResolvedValueOnce({ finalizadaEm: null });
+    legado.mockResolvedValueOnce({ importados: ['4'], ignorados: ['9'] });
+    const r = await op.comandoEqualizacao(OP, 'eq', envio({ acao: 'importar', sessionId: 'b', karts: ['4', '9'] }));
+    expect(r.resultado).toEqual({ importados: ['4'], ignorados: ['9'] });
   });
 
   it('números do dia ignoram outros dias e cancelada', () => {

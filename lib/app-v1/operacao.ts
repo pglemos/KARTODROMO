@@ -153,7 +153,7 @@ export function criarOperacao(d: DepsOperacao) {
       });
     },
     equalizacoes: () => d.legado('GET', '/api/equalizacao').then((r) => ({ equalizacoes: ((r as { equalizacoes?: { id: string }[] }).equalizacoes ?? []).map((e) => ({ ...e, sessionRevision: d.store.revisao(e.id) })) })),
-    equalizacao: (id: string) => d.legado('GET', `/api/equalizacao/${encodeURIComponent(id)}`),
+    equalizacao: (id: string) => d.legado('GET', `/api/equalizacao/${encodeURIComponent(id)}`).then((r) => ({ ...(r as object), sessionRevision: d.store.revisao(id) })),
     async opcoesEqualizacao() {
       const [regras, metas] = await Promise.all([d.legado('GET', '/api/equalizacao/regras'), d.legado('GET', '/api/equalizacao/metas')]) as [{ regras?: unknown[] }, { metas?: unknown[]; tracks?: unknown[] }];
       return { regras: regras.regras ?? [], metas: metas.metas ?? [], tracks: metas.tracks ?? [] };
@@ -187,29 +187,39 @@ export function criarOperacao(d: DepsOperacao) {
       const fn = execucoes[acao];
       if (!fn) throw new ErroApp(400, 'INVALID_REQUEST', 'Comando inválido.');
       if (acao === 'finalizar' || acao === 'reabrir') exigeMotivo(b);
-      return roda(q, 'equalizacao.gerir', b, id, `equalization-${acao}`, () => fn().then(() => ({ ok: true })));
+      return roda(q, 'equalizacao.gerir', b, id, `equalization-${acao}`, async () => {
+        // finalizada guarda a meta do resultado: só reabrindo para mudar qualquer coisa
+        if (acao !== 'reabrir' && acao !== 'finalizar' && (await d.legado('GET', base) as { finalizadaEm?: number | null }).finalizadaEm) throw new ErroApp(409, 'STATE_CONFLICT', 'Equalização finalizada: reabra antes de alterar.');
+        const r = await fn() as { importados?: unknown; ignorados?: unknown };
+        return acao === 'importar' ? { importados: r.importados ?? [], ignorados: r.ignorados ?? [] } : { ok: true };
+      });
     },
     salvarRegra(q: Identidade, b: Record<string, unknown>) {
       const pl = (b.payload ?? {}) as Record<string, unknown>;
-      return roda(q, 'equalizacao.gerir', b, 'equalizacao-regras', 'equalization-rule', () => d.legado('POST', '/api/equalizacao/regras', { nome: pl.nome, toleranciaSeg: pl.toleranciaSeg, faixaSeg: pl.faixaSeg, passoMm: pl.passoMm, limiteSeg: pl.limiteSeg }).then(() => ({ ok: true })));
+      return roda(q, 'equalizacao.gerir', b, 'equalizacao-regras', 'equalization-rule', () => d.legado('POST', '/api/equalizacao/regras', { id: pl.id, nome: pl.nome, toleranciaSeg: pl.toleranciaSeg, faixaSeg: pl.faixaSeg, passoMm: pl.passoMm, limiteSeg: pl.limiteSeg, faixa2Seg: pl.faixa2Seg, passo2Mm: pl.passo2Mm, autor: autor(q) }).then(() => ({ ok: true })));
     },
     salvarMeta(q: Identidade, b: Record<string, unknown>) {
       const pl = (b.payload ?? {}) as Record<string, unknown>;
-      return roda(q, 'equalizacao.gerir', b, 'equalizacao-metas', 'equalization-target', () => d.legado('POST', '/api/equalizacao/metas', { trackId: pl.trackId ?? null, metaSeg: pl.metaSeg, toleranciaSeg: pl.toleranciaSeg }).then(() => ({ ok: true })));
+      return roda(q, 'equalizacao.gerir', b, 'equalizacao-metas', 'equalization-target', () => d.legado('POST', '/api/equalizacao/metas', { trackId: pl.trackId ?? null, metaSeg: pl.metaSeg, toleranciaSeg: pl.toleranciaSeg, autor: autor(q) }).then(() => ({ ok: true })));
     },
     /** Números do dia para o dono, só do que a cronometragem e o app sabem. */
     resumoDoDia(sessoes: unknown[], agora = new Date()) {
       const dia = (ms: number) => new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
       const hoje = dia(agora.getTime());
-      const doDia = (sessoes as (Sessao & { createdAt: number; type?: string })[]).filter((s) => dia(s.createdAt) === hoje && s.state !== 'cancelada');
-      const contar = (prefixo: string) => (d.store.db.prepare(`SELECT COUNT(*) n FROM auditoria WHERE action LIKE ? AND status = 'APPLIED' AND timestampServerUTC >= ?`).get(`${prefixo}%`, new Date(agora.getTime() - 86_400_000).toISOString()) as { n: number }).n;
-      const incertos = d.store.db.prepare(`SELECT operationId, command, atualizadoEm FROM operacoes WHERE status = 'UNKNOWN' ORDER BY criadoEm DESC LIMIT 10`).all();
+      const doDia = (sessoes as (Sessao & { createdAt: number; type?: string })[]).filter((s) => dia(s.createdAt) === hoje && s.state !== 'cancelada' && s.type !== 'equalizacao');
+      const desde = new Date(agora.getTime() - 86_400_000).toISOString();
+      const contar = (acao: string) => (d.store.db.prepare(`SELECT COUNT(*) n FROM auditoria WHERE action = ? AND status = 'APPLIED' AND timestampServerUTC >= ?`).get(acao, desde) as { n: number }).n;
+      const incertos = d.store.db.prepare(`SELECT operationId, command, sessionId, atualizadoEm FROM operacoes WHERE status = 'UNKNOWN' AND criadoEm >= ? ORDER BY criadoEm DESC LIMIT 10`).all(desde);
+      const incertosTotal = (d.store.db.prepare(`SELECT COUNT(*) n FROM operacoes WHERE status = 'UNKNOWN' AND criadoEm >= ?`).get(desde) as { n: number }).n;
+      const naPista = (s: Sessao) => s.state === 'em_andamento' || s.state === 'bandeira_final';
       return {
-        baterias: { total: doDia.length, emProva: doDia.filter((s) => s.state === 'em_andamento' || s.state === 'bandeira_final').length, encerradas: doDia.filter((s) => s.state === 'encerrada').length, preparando: doDia.filter((s) => s.state === 'preparando').length },
-        pilotos: doDia.filter((s) => s.state === 'encerrada' || s.state === 'em_andamento').reduce((n, s) => n + s.competitors.filter(real).length, 0),
+        baterias: { total: doDia.length, emProva: doDia.filter(naPista).length, encerradas: doDia.filter((s) => s.state === 'encerrada').length, preparando: doDia.filter((s) => s.state === 'preparando').length },
+        pilotos: doDia.filter((s) => s.state === 'encerrada' || naPista(s)).reduce((n, s) => n + s.competitors.filter(real).length, 0),
+        pilotosAgora: doDia.filter(naPista).reduce((n, s) => n + s.competitors.filter(real).length, 0),
         ultimas24h: { punicoes: contar('penalty'), trocas: contar('kart-swap'), sorteios: contar('draw'), atrasados: contar('late-assignment') },
         frotaFora: (d.store.db.prepare('SELECT COUNT(*) n FROM karts_fora').get() as { n: number }).n,
         incertos,
+        incertosTotal,
       };
     },
     async agenda(q: Identidade, data: string | null) {
