@@ -1,0 +1,7 @@
+{
+  // Sem deploy até o aceite do G1. ORIGEM_URL e GATEWAY_SEGREDO entram como segredos.
+  "name": "kartodromo-app-operacional",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "routes": [{ "pattern": "operacao.kartodromodebetim.com.br", "custom_domain": true }]
+}
