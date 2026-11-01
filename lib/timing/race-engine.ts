@@ -785,7 +785,7 @@ function lapDuration(previous: Crossing, current: Crossing) {
   if (previous.source === 'manual') return Math.max(0, current.wallMs - previous.wallMs);
 
   const wall = Math.max(0, current.wallMs - previous.wallMs);
-  let ms = current.decoderTimeMs - previous.decoderTimeMs;
+  const ms = current.decoderTimeMs - previous.decoderTimeMs;
 
   if (ms < 0) {
     // Trata virada legítima de meia-noite (24h)

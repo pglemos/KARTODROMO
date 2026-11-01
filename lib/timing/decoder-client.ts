@@ -129,8 +129,8 @@ export class DecoderClient extends EventEmitter {
             this.emit('other', rec.raw);
           }
         }
-      } catch (err: any) {
-        s.lastError = `Erro ao processar pacote do decoder: ${err?.message || err}`;
+      } catch (err) {
+        s.lastError = `Erro ao processar pacote do decoder: ${err instanceof Error ? err.message : String(err)}`;
         this.emit('error', err instanceof Error ? err : new Error(String(err)));
       }
     });

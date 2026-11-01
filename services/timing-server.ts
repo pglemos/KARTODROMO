@@ -169,7 +169,7 @@ function rotateTimingLogIfNeeded() {
         .map((f) => ({ full: join(DATA_DIR, f), mtime: statSync(join(DATA_DIR, f)).mtimeMs }))
         .sort((a, b) => b.mtime - a.mtime);
       for (const old of rotated.slice(5)) {
-        try { unlinkSync(old.full); } catch {}
+        try { unlinkSync(old.full); } catch { /* melhor esforço */ }
       }
       log(`timing.log rotacionado (${(stats.size / 1024 / 1024).toFixed(1)} MB -> 0 MB; backup em ${backup})`);
     }
@@ -186,27 +186,28 @@ function writeJsonAtomic(file: string, data: unknown) {
   const fd = openSync(tmp, 'w');
   try {
     writeFileSync(fd, content, 'utf8');
-    try { fsyncSync(fd); } catch {}
+    try { fsyncSync(fd); } catch { /* melhor esforço */ }
   } finally {
-    try { closeSync(fd); } catch {}
+    try { closeSync(fd); } catch { /* melhor esforço */ }
   }
 
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       renameSync(tmp, file);
       return;
-    } catch (err: any) {
+    } catch (erro) {
+      const err = erro as NodeJS.ErrnoException;
       if ((err?.code === 'EPERM' || err?.code === 'EBUSY') && attempt < 4) {
         Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20 * (attempt + 1));
         continue;
       }
       try {
         copyFileSync(tmp, file);
-        try { unlinkSync(tmp); } catch {}
+        try { unlinkSync(tmp); } catch { /* melhor esforço */ }
         return;
-      } catch (fallbackErr) {
+      } catch {
         if (attempt === 4) {
-          try { unlinkSync(tmp); } catch {}
+          try { unlinkSync(tmp); } catch { /* melhor esforço */ }
           throw err;
         }
       }
@@ -221,15 +222,16 @@ function cleanOrphanTmpFiles(dir: string) {
       const full = join(dir, entry.name);
       if (entry.isDirectory()) cleanOrphanTmpFiles(full);
       else if (entry.name.endsWith('.tmp')) {
-        try { unlinkSync(full); } catch {}
+        try { unlinkSync(full); } catch { /* melhor esforço */ }
       }
     }
-  } catch {}
+  } catch { /* melhor esforço */ }
 }
 cleanOrphanTmpFiles(DATA_DIR);
 
 // Item 8: Mutex de serialização por sessão para concorrência
 const sessionLocks = new Map<string, Promise<void>>();
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- reservado para as rotas que ainda gravam sem trava
 async function withSessionLock<T>(sessionId: string, action: () => Promise<T> | T): Promise<T> {
   const prev = sessionLocks.get(sessionId) ?? Promise.resolve();
   let resolveCurrent!: () => void;
@@ -319,7 +321,7 @@ function saveSession(s: Session) {
     writeJsonAtomic(targetPath, s);
     const previousPath = sessionPaths.get(s.id);
     if (previousPath && previousPath !== targetPath && existsSync(previousPath)) {
-      try { unlinkSync(previousPath); } catch {}
+      try { unlinkSync(previousPath); } catch { /* melhor esforço */ }
     }
     sessionPaths.set(s.id, targetPath);
     dirtySessions.delete(s.id);
@@ -343,7 +345,7 @@ function archiveOldSessions() {
         sessionPaths.set(s.id, target);
         s.rejected = [];
         arquivadas++;
-      } catch {}
+      } catch { /* melhor esforço */ }
     }
   }
   if (arquivadas > 0) log(`particionamento: ${arquivadas} bateria(s) arquivada(s) por ano/mês`);
@@ -360,7 +362,7 @@ setInterval(() => {
     try {
       saveSession(s);
       log(`bateria ${s.name} salva com sucesso no disco na retentativa`);
-    } catch {}
+    } catch { /* melhor esforço */ }
   }
 }, 3_000).unref();
 
@@ -377,7 +379,7 @@ let catalog: TimingCatalog = emptyCatalog();
 if (existsSync(CATALOG_FILE)) {
   try {
     catalog = normalizeCatalog(JSON.parse(readFileSync(CATALOG_FILE, 'utf8')));
-    try { copyFileSync(CATALOG_FILE, CATALOG_BAK_FILE); } catch {}
+    try { copyFileSync(CATALOG_FILE, CATALOG_BAK_FILE); } catch { /* melhor esforço */ }
   } catch (err) {
     let recuperado = false;
     if (existsSync(CATALOG_BAK_FILE)) {
@@ -385,11 +387,11 @@ if (existsSync(CATALOG_FILE)) {
         catalog = normalizeCatalog(JSON.parse(readFileSync(CATALOG_BAK_FILE, 'utf8')));
         log('catálogo principal ilegível; recuperado da cópia de segurança catalog.json.bak');
         recuperado = true;
-      } catch {}
+      } catch { /* melhor esforço */ }
     }
     if (!recuperado) {
       const copia = CATALOG_FILE.replace(/\.json$/i, `.ilegivel-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
-      try { copyFileSync(CATALOG_FILE, copia); } catch {}
+      try { copyFileSync(CATALOG_FILE, copia); } catch { /* melhor esforço */ }
       log(`cadastro de eventos ilegível; iniciando vazio (o arquivo original foi guardado em ${copia})`, err);
     }
   }
@@ -397,7 +399,7 @@ if (existsSync(CATALOG_FILE)) {
   try {
     catalog = normalizeCatalog(JSON.parse(readFileSync(CATALOG_BAK_FILE, 'utf8')));
     log('catálogo carregado da cópia de segurança catalog.json.bak');
-  } catch {}
+  } catch { /* melhor esforço */ }
 }
 
 let timingSettings: Record<string, unknown> = {};
@@ -418,7 +420,7 @@ let activeDecoderConfig: DecoderConfig = {
 
 function saveCatalog() {
   if (existsSync(CATALOG_FILE)) {
-    try { copyFileSync(CATALOG_FILE, CATALOG_BAK_FILE); } catch {}
+    try { copyFileSync(CATALOG_FILE, CATALOG_BAK_FILE); } catch { /* melhor esforço */ }
   }
   writeJsonAtomic(CATALOG_FILE, catalog);
 }
@@ -461,7 +463,7 @@ function journal(entry: Record<string, unknown>) {
   const line = JSON.stringify(entry) + '\n';
   if (day !== activeJournalDay || !journalStream || journalStream.destroyed) {
     if (journalStream && !journalStream.destroyed) {
-      try { journalStream.end(); } catch {}
+      try { journalStream.end(); } catch { /* melhor esforço */ }
     }
     activeJournalDay = day;
     journalStream = createWriteStream(join(JOURNAL_DIR, `${day}.jsonl`), { flags: 'a', encoding: 'utf8' });
@@ -1652,7 +1654,7 @@ function carregarJobsEmails() {
       jobsEmailsPendentes = dados as JobEmailPendente[];
     } catch (e) {
       const quarentena = `${PENDING_EMAILS_FILE}.corrompido-${Date.now()}`;
-      try { renameSync(PENDING_EMAILS_FILE, quarentena); } catch {}
+      try { renameSync(PENDING_EMAILS_FILE, quarentena); } catch { /* melhor esforço */ }
       log(`ERRO: fila de e-mails inválida; arquivo preservado para diagnóstico em ${quarentena}: ${(e as Error).message}`);
       jobsEmailsPendentes = [];
     }
@@ -3426,7 +3428,7 @@ function isAuthorizedDestructive(req: http.IncomingMessage): boolean {
   const key = req.headers['x-timing-key'] || req.headers['x-ops-key'] || req.headers['authorization'];
   const configPath = process.env.TIMING_AUTH_CONFIG_FILE || 'C:/Program Files/Kartodromo/Cronometragem/appsettings.json';
   let installedKey = '';
-  try { installedKey = String((JSON.parse(readFileSync(configPath, 'utf8')) as { ChaveCronometragem?: unknown }).ChaveCronometragem ?? ''); } catch {}
+  try { installedKey = String((JSON.parse(readFileSync(configPath, 'utf8')) as { ChaveCronometragem?: unknown }).ChaveCronometragem ?? ''); } catch { /* melhor esforço */ }
   const expected = [process.env.TIMING_OPS_KEY, process.env.OPS_RECEPCAO_KEY, installedKey].filter((x): x is string => Boolean(x));
   if (typeof key === 'string' && expected.some((secret) => chaveOperadorValida(key, secret) || key.startsWith('Bearer ') && chaveOperadorValida(key.slice(7), secret))) return true;
   return false;

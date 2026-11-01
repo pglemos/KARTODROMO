@@ -65,10 +65,10 @@ export function lerConfig(arquivo: string): ConfigEmail {
     const chavesPermitidas = new Set(['automatico', 'host', 'porta', 'usuario', 'senha', 'remetenteNome', 'remetenteEmail', 'copiaOculta', 'anexarPdf']);
     if (Object.keys(raw).some((key) => !chavesPermitidas.has(key))) throw new Error('campo desconhecido no esquema');
     const merged = { ...CONFIG_PADRAO, ...raw } as ConfigEmail;
-    if (typeof merged.automatico !== 'boolean' || typeof merged.anexarPdf !== 'boolean' || !Number.isInteger(merged.porta) || merged.porta < 1 || merged.porta > 65535 || ['host','usuario','senha','remetenteNome','remetenteEmail','copiaOculta'].some((k) => typeof (merged as any)[k] !== 'string')) throw new Error('esquema inválido');
+    if (typeof merged.automatico !== 'boolean' || typeof merged.anexarPdf !== 'boolean' || !Number.isInteger(merged.porta) || merged.porta < 1 || merged.porta > 65535 || ['host','usuario','senha','remetenteNome','remetenteEmail','copiaOculta'].some((k) => typeof (merged as unknown as Record<string, unknown>)[k] !== 'string')) throw new Error('esquema inválido');
     if (![465, 587].includes(merged.porta) || (smtpCloudflare(merged.host) && merged.porta !== 465)) throw new Error('porta/TLS inválidos');
     if (merged.host.length > 253 || /[\s\r\n]/.test(merged.host)) throw new Error('host SMTP inválido');
-    if (['usuario', 'remetenteEmail', 'copiaOculta'].some((k) => String((merged as any)[k]).length > 254) || merged.remetenteNome.length > 120) throw new Error('campo SMTP excede o tamanho permitido');
+    if (['usuario', 'remetenteEmail', 'copiaOculta'].some((k) => String((merged as unknown as Record<string, unknown>)[k]).length > 254) || merged.remetenteNome.length > 120) throw new Error('campo SMTP excede o tamanho permitido');
     merged.senha = revelarSegredoLocal(merged.senha);
     // Migra em leitura as instalações antigas com senha em claro, sem mudar as opções SMTP.
     if (typeof raw.senha === 'string' && raw.senha && !raw.senha.startsWith('dpapi:v1:')) {
@@ -93,7 +93,7 @@ function gravarConfig(arquivo: string, config: ConfigEmail) {
   mkdirSync(join(arquivo, '..'), { recursive: true });
   const tmp = `${arquivo}.${process.pid}.${randomUUID()}.tmp`;
   writeFileSync(tmp, JSON.stringify(config, null, 2), { mode: 0o600 });
-  try { renameSync(tmp, arquivo); } catch (e) { try { rmSync(tmp, { force: true }); } catch {} throw e; }
+  try { renameSync(tmp, arquivo); } catch (e) { try { rmSync(tmp, { force: true }); } catch { /* melhor esforço */ } throw e; }
 }
 
 /**
@@ -152,6 +152,7 @@ export function enderecoRemetente(cfg: ConfigEmail, padrao = REMETENTE_PADRAO) {
  */
 export function sanitizarNomeDestinatario(nome: string): string {
   return String(nome ?? '')
+    // eslint-disable-next-line no-control-regex -- remove caracteres de controle do cabeçalho do e-mail
     .replace(/[\r\n\t\u0000-\u001F\u007F-\u009F]+/g, ' ')
     .replace(/["<>,;\\]+/g, '')
     .replace(/\s+/g, ' ')
@@ -166,6 +167,7 @@ export function sanitizarNomeDestinatario(nome: string): string {
 export function validarEmailDestinatario(email: string): string | null {
   const limpo = String(email ?? '').trim().toLowerCase();
   if (!limpo || limpo.length > 254) return null;
+  // eslint-disable-next-line no-control-regex -- recusa caracteres de controle no endereço
   if (/[\r\n\t\u0000-\u001F\u007F-\u009F\s"<>\\]/.test(limpo)) return null;
   if (!emailValido(limpo)) return null;
   if (!/^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i.test(limpo)) {
@@ -199,7 +201,7 @@ export type Dependencias = {
   logoPng: Buffer | null;
   /** Substitutos de PDF/SMTP só para testes sintéticos; ignorados fora do simulador. */
   simuladorGerarPdf?: typeof gerarPdf;
-  simuladorEnviar?: (opcoes: any) => Promise<{ messageId?: string; message?: Buffer }>;
+  simuladorEnviar?: (opcoes: Record<string, unknown>) => Promise<{ messageId?: string; message?: Buffer }>;
 };
 
 // hospedagem compartilhada (HostGator): mail.<domínio> entrega o certificado da própria HostGator (*.hostgator.com.br).
@@ -522,7 +524,8 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
       const info = dep.simulador && dep.simuladorEnviar
         ? await dep.simuladorEnviar(mensagem)
         : await t.sendMail(mensagem);
-      const mid = typeof (info as any).messageId === 'string' ? (info as any).messageId : '';
+      const idMensagem = (info as { messageId?: unknown }).messageId;
+        const mid = typeof idMensagem === 'string' ? idMensagem : '';
       if (mid) mensagens.push({ destinatario: emailLimpo, messageId: mid, aceitoEm: Date.now() });
       if (dep.simulador) {
         mkdirSync(pastaTeste, { recursive: true });

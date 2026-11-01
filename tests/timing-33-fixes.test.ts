@@ -99,7 +99,7 @@ describe('Validação dos 33 Itens de Cronometragem', () => {
       applyPassing(s, { kart: '1', decoderTimeMs: 55_000, wallMs: 55_000 });
       applyPassing(s, { kart: '2', decoderTimeMs: 56_000, wallMs: 56_000 });
 
-      addPenalty(s, '1', { tipo: 'tempo', segundos: 5, texto: 'Toque' });
+      addPenalty(s, '1', { id: 'p1', wallMs: 1, tipo: 'tempo', segundos: 5, texto: 'Toque' });
 
       const standings = computeStandings(s);
       expect(standings[0].kart).toBe('2'); // Kart 2 líder após penalidade do Kart 1

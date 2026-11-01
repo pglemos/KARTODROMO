@@ -177,6 +177,45 @@ async function createVerifiedAccount(email: string) {
 }
 
 describe('fila dos e-mails de conta (enviada pela cronometragem)', () => {
+  it('retoma mensagens após cinco falhas sem entregar links expirados', async () => {
+    const now = Date.now();
+    for (const [id, age] of [['11111111-1111-1111-1111-111111111111', 60_000], ['22222222-2222-2222-2222-222222222222', 31 * 60_000]] as const) {
+      database.database.prepare('INSERT INTO mobile_email_outbox(id,to_address,subject,text_body,html_body,created_at,attempts) VALUES (?,?,?,?,?,?,6)')
+        .run(id, 'teste-codex@example.com', 'TESTE CODEX', 'texto', '<p>texto</p>', now - age);
+    }
+    const response = await callWorker('/api/mobile/v1/internal/outbox', 'GET', undefined, { 'x-mobile-publish-token': PUBLISH_TOKEN });
+    expect(await response.json()).toMatchObject([{ id: '11111111-1111-1111-1111-111111111111' }]);
+  });
+
+  it.each(['http', 'network'])('guarda a mensagem na fila quando o provedor falha: %s', async (failure) => {
+    vi.stubGlobal('fetch', async () => {
+      if (failure === 'network') throw new Error('network unavailable');
+      return new Response('unavailable', { status: 503 });
+    });
+    const response = await callWorker('/api/mobile/v1/auth/register', 'POST', {
+      name: 'TESTE CODEX', cpf: cpfForTest(), email: 'teste-codex@example.com', phone: '+55 31 98888-7777', password: 'SenhaSegura!2026', privacyAccepted: true,
+    });
+    expect(response.status).toBe(202);
+    expect(database.database.prepare('SELECT to_address FROM mobile_email_outbox').all()).toEqual([{ to_address: 'teste-codex@example.com' }]);
+  });
+
+  it('dois consumidores não recebem a mesma mensagem simultaneamente', async () => {
+    database.database.prepare('INSERT INTO mobile_email_outbox(id,to_address,subject,text_body,html_body,created_at) VALUES (?,?,?,?,?,?)')
+      .run('33333333-3333-3333-3333-333333333333', 'teste-codex@example.com', 'TESTE CODEX', 'texto', '<p>texto</p>', Date.now());
+    const responses = await Promise.all([1, 2].map(() => callWorker('/api/mobile/v1/internal/outbox', 'GET', undefined, { 'x-mobile-publish-token': PUBLISH_TOKEN })));
+    const batches = await Promise.all(responses.map((response) => response.json() as Promise<{ id: string }[]>));
+    expect(batches.flat()).toEqual([expect.objectContaining({ id: '33333333-3333-3333-3333-333333333333' })]);
+  });
+
+  it('responde indisponível quando o envio e a persistência falham', async () => {
+    vi.stubGlobal('fetch', async () => new Response('unavailable', { status: 503 }));
+    database.database.exec('DROP TABLE mobile_email_outbox');
+    const response = await callWorker('/api/mobile/v1/auth/register', 'POST', {
+      name: 'TESTE CODEX', cpf: cpfForTest(), email: 'teste-codex@example.com', phone: '+55 31 98888-7777', password: 'SenhaSegura!2026', privacyAccepted: true,
+    });
+    expect(response.status).toBe(503);
+  });
+
   it('sem o Email Sending liberado, o e-mail vai para a fila e a crono envia e confirma', async () => {
     delete env.RESEND_API_KEY;
     delete env.RESEND_FROM_EMAIL;
@@ -251,7 +290,13 @@ describe('API pública de resultados móveis', () => {
       'x-mobile-admin-token': ADMIN_TOKEN,
     })).status).toBe(200);
     expect((await listar()).some((c) => c.email === email)).toBe(false);
-  });
+
+    const vinculados = await callWorker('/api/mobile/v1/internal/identity-links', 'GET', undefined, {
+      'x-mobile-admin-token': ADMIN_TOKEN,
+    });
+    expect(vinculados.status).toBe(200);
+    expect(await vinculados.json()).toEqual({ customerIds: ['777'] });
+  }, 30_000);
 
   it('vincula somente e-mail verificado e entrega histórico apenas à conta validada', async () => {
     const email = `ana+${crypto.randomUUID()}@example.com`;
@@ -283,7 +328,47 @@ describe('API pública de resultados móveis', () => {
       mensagem: 'Seu histórico aparece sozinho quando o documento e o e-mail ou o telefone da sua conta são os mesmos do seu cadastro no kartódromo. Se não aparecer em alguns minutos, peça para a recepção conferir seu cadastro.',
       results: [],
     });
-  });
+  }, 30_000);
+
+  it('entrega o histórico completo da cronometragem à conta vinculada sem expô-lo publicamente', async () => {
+    const email = `pedro+${crypto.randomUUID()}@example.com`;
+    const accessToken = await createVerifiedAccount(email);
+    const linked = await callWorker('/api/mobile/v1/internal/identity-links', 'POST', {
+      customerId: '312', email,
+    }, { 'x-mobile-admin-token': ADMIN_TOKEN });
+    expect(linked.status).toBe(200);
+
+    const manual = await callWorker('/api/mobile/v1/internal/results', 'POST', {
+      ...resultPayload,
+      results: [{ ...resultPayload.results[0], customerId: '312' }],
+    }, { 'x-mobile-publish-token': PUBLISH_TOKEN });
+    expect(manual.status).toBe(200);
+
+    const historical = await callWorker('/api/mobile/v1/internal/ranking', 'POST', {
+      itens: [{
+        chave: 'historico:312',
+        dados: { results: [
+          { sessionId: 'corrida-2024-10-26', eventName: 'Corrida 1', eventDate: '2024-10-26', displayName: 'Ana Silva', position: 2, kart: '14', laps: 18, bestLapMs: 38_652 },
+          { sessionId: resultPayload.sessionId, eventName: 'Resultado antigo', eventDate: '2026-10-13', displayName: 'Ana Silva', position: 8, kart: '9', laps: 3, bestLapMs: 50_000 },
+        ] },
+      }],
+    }, { 'x-mobile-admin-token': ADMIN_TOKEN });
+    expect(historical.status).toBe(200);
+
+    const response = await callWorker('/api/mobile/v1/results/me', 'GET', undefined, {
+      authorization: `Bearer ${accessToken}`,
+    });
+    expect(await response.json()).toMatchObject({
+      vinculo: 'validado',
+      results: [
+        { sessionId: resultPayload.sessionId, eventName: 'TESTE CODEX · Treino', position: 1, kart: '12', laps: 4 },
+        { sessionId: 'corrida-2024-10-26', eventName: 'Corrida 1', eventDate: '2024-10-26', position: 2, kart: '14', laps: 18 },
+      ],
+    });
+
+    const publicResults = await callWorker('/api/mobile/v1/results');
+    expect(JSON.stringify(await publicResults.json())).not.toContain('corrida-2024-10-26');
+  }, 30_000);
 });
 
 describe('publicação pela API da cronometragem simulada', () => {

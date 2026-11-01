@@ -1,10 +1,9 @@
 name: Deploy to Cloudflare Workers
 
+# Só manual (Actions › Deploy to Cloudflare Workers › Run workflow). 20/10/2026: o push automático no main publicou
+# o worker `kartodromo` de um código antigo e derrubou todo o /api do site (erro 1101) até o rollback.
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
 
 concurrency:
   group: deploy-production

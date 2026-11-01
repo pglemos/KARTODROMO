@@ -47,7 +47,7 @@ export function registrarPreCadastro(nome: string, novo: boolean, grupo: boolean
 
 function versaoPublicada(app: string): string | null {
   try {
-    const m = JSON.parse(readFileSync(join(UPDATES_DIR, app, 'manifest.json'), 'utf8').replace(/^﻿/, '')) as { version?: string };
+    const m = JSON.parse(readFileSync(join(UPDATES_DIR, app, 'manifest.json'), 'utf8').replace(/^\uFEFF/, '')) as { version?: string };
     return m.version ?? null;
   } catch { return null; }
 }

@@ -1,0 +1,84 @@
+{
+  "expo": {
+    "name": "Kartódromo de Betim",
+    "slug": "kartodromo-betim",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/app-icon.png",
+    "scheme": "kartodromo",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "br.com.kartodromobetim.app",
+      "buildNumber": "1",
+      "icon": "./assets/app-icon.png",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "br.com.kartodromobetim.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "monochromeImage": "./assets/monochrome-icon.png"
+      },
+      "predictiveBackGestureEnabled": true
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/app-icon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F8F9F9",
+          "image": "./assets/splash.png",
+          "imageWidth": 280,
+          "dark": {
+            "backgroundColor": "#151B18",
+            "image": "./assets/splash.png"
+          }
+        }
+      ],
+      "expo-secure-store",
+      "expo-sqlite",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Permita usar a localização apenas durante um treino GPS pessoal com o app aberto.",
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false,
+          "isIosBackgroundLocationEnabled": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permita escolher uma foto para o seu perfil de piloto.",
+          "cameraPermission": "Permita tirar uma foto para o seu perfil de piloto.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-screen-orientation",
+        {
+          "initialOrientation": "PORTRAIT_UP"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "7e765447-c4ac-4bf7-b958-a63209853334"
+      }
+    },
+    "owner": "synvolt"
+  }
+}

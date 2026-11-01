@@ -6,6 +6,7 @@ import { CLIENTE_COLS, insertCliente, isValidCpf, one, onlyDigits, query, tx, up
 import { confereSenha, hashSenha, type Sessao } from './auth';
 import { erroCadastroObrigatorio, erroPesoCliente } from './cadastro-obrigatorio';
 import { mobileApiEndpoint } from '../mobile-api-url';
+import { ENDURANCE_VINCULO_SQL } from './endurance-vinculo';
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
@@ -195,7 +196,7 @@ function periodo(url: URL, col: string) {
 // ---------------------------------------------------------------- consultas de lista (arvore)
 
 const RESERVA_SELECT = `SELECT TOP 5000 i.Id id, i.Pago pago, CONVERT(varchar(16), b.Inicio, 126) dataHora, b.Nome reserva, b.Id bateriaId,
-  c.Id clienteId, c.Nome cliente, c.Documento documento, c.Telefone telefone, c.Peso peso, CONVERT(varchar(10), c.Nascimento, 126) nascimento,
+  c.Id clienteId, c.Nome cliente, endurance.equipe, endurance.equipeId, endurance.pulseira, c.Documento documento, c.Telefone telefone, c.Peso peso, CONVERT(varchar(10), c.Nascimento, 126) nascimento,
   CASE WHEN c.Nascimento IS NULL THEN NULL ELSE DATEDIFF(YEAR, c.Nascimento, GETDATE()) - CASE WHEN DATEADD(YEAR, DATEDIFF(YEAR, c.Nascimento, GETDATE()), c.Nascimento) > GETDATE() THEN 1 ELSE 0 END END idade,
   r.Nome responsavel, p.Id produtoId, p.Nome produto, p.Categoria categoria, ISNULL(i.PrecoCentavos, p.PrecoCentavos) preco, i.DescontoCentavos desconto,
   CASE WHEN i.Pago = 1 THEN i.ValorCentavos ELSE ISNULL(i.PrecoCentavos, p.PrecoCentavos) - i.DescontoCentavos END total,
@@ -203,6 +204,7 @@ const RESERVA_SELECT = `SELECT TOP 5000 i.Id id, i.Pago pago, CONVERT(varchar(16
   CONVERT(varchar(16), i.TermoImpressoEm, 126) termoImpressoEm, CONVERT(varchar(16), i.CriadoEm, 126) criadoEm,
   CASE WHEN i.Pago = 1 THEN ISNULL(onl.forma, cx.formas) END formaPagamento
   FROM dbo.Inscricao i JOIN dbo.Bateria b ON b.Id = i.BateriaId JOIN dbo.Cliente c ON c.Id = i.ClienteId
+  ${ENDURANCE_VINCULO_SQL}
   LEFT JOIN dbo.Cliente r ON r.Id = ISNULL(i.ResponsavelId, c.ResponsavelId) LEFT JOIN dbo.Produto p ON p.Id = ISNULL(i.ProdutoId, b.ProdutoId)
   OUTER APPLY (SELECT TOP 1 CASE ro.Forma WHEN 'pix' THEN 'Pix' WHEN 'debito' THEN 'Débito' WHEN 'credito' THEN 'Crédito' ELSE 'Cartão' END + ' (site)' forma
     FROM dbo.ReservaOnline ro WHERE i.Origem = 'site' AND ro.Status = 'pago' AND ',' + ro.InscricaoIds + ',' LIKE '%,' + CAST(i.Id AS varchar(12)) + ',%') onl
@@ -688,8 +690,11 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     if (!await mobilePermission(sessao, 'identidade_mobile_vincular')) throw new HttpError(403, 'Seu perfil não pode vincular contas do app.');
     const body = await req.body();
     const customerId = int(body.customerId, 'Cliente');
+    const cpf = body.cpf === undefined ? '' : onlyDigits(body.cpf);
     const email = String(body.email ?? '').trim().toLowerCase();
-    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new HttpError(400, 'Informe o e-mail verificado da conta do app.');
+    if ((body.cpf !== undefined && !isValidCpf(cpf)) || email.length > 254 || (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) || (!cpf && !email)) {
+      throw new HttpError(400, 'Informe um CPF válido ou o e-mail verificado da conta do app.');
+    }
     if (!await one(`SELECT Id id FROM dbo.Cliente WHERE Id = @id`, { id: customerId })) throw new HttpError(404, 'Cliente não encontrado.');
 
     const destination = process.env.MOBILE_IDENTITY_LINK_URL;
@@ -702,7 +707,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
       response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-mobile-admin-token': adminToken },
-        body: JSON.stringify({ customerId: String(customerId), email }),
+        body: JSON.stringify({ customerId: String(customerId), ...(cpf ? { cpf } : {}), ...(email ? { email } : {}) }),
         redirect: 'error',
         signal: AbortSignal.timeout(10_000),
       });

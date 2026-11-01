@@ -37,6 +37,11 @@ export async function garantirCliente(env: AsaasEnv, c: ClienteAsaas): Promise<s
 
 export type Cobranca = { id: string; invoiceUrl: string; status: string; billingType: string };
 
+export async function buscarCobrancaPorReferencia(env: AsaasEnv, referencia: string) {
+  const response = await chamar<{ data?: Cobranca[] }>(env, `/payments?externalReference=${encodeURIComponent(referencia)}`);
+  return response.data?.[0] ?? null;
+}
+
 /** Vencimento no dia (horário de Brasília): a vaga só fica segura por 15 min de qualquer jeito. */
 export function hojeBrasilia(agora = new Date()) {
   return new Date(agora.getTime() - 3 * 3_600_000).toISOString().slice(0, 10);
@@ -53,21 +58,6 @@ export async function criarCobranca(env: AsaasEnv, cliente: string, forma: 'pix'
       dueDate: hojeBrasilia(),
       description: descricao.slice(0, 500),
       externalReference: pedidoId,
-    }),
-  });
-}
-
-/** Link de pagamento da reserva em grupo: a pessoa escolhe Pix ou cartão na fatura da Asaas. Vence no dia da bateria. */
-export async function criarCobrancaLink(env: AsaasEnv, cliente: string, valorCentavos: number, descricao: string, referencia: string, vencimento: string) {
-  return chamar<Cobranca>(env, '/payments', {
-    method: 'POST',
-    body: JSON.stringify({
-      customer: cliente,
-      billingType: 'UNDEFINED',
-      value: Math.round(valorCentavos) / 100,
-      dueDate: /^\d{4}-\d{2}-\d{2}$/.test(vencimento) && vencimento >= hojeBrasilia() ? vencimento : hojeBrasilia(),
-      description: descricao.slice(0, 500),
-      externalReference: referencia.slice(0, 100),
     }),
   });
 }

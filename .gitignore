@@ -58,6 +58,7 @@ KARTODROMO\ -\ SISTEMA.zip
 .github/skills/
 .github/hooks/
 .codex/hooks.json
+.codex/plugins/
 .impeccable/live/
 # Artefatos locais (não versionar)
 "KARTODROMO - SISTEMA 2.zip"
@@ -99,3 +100,9 @@ data/timing/emails-simulador/
 /.impeccable/
 /.agents/skills/impeccable
 services/*.antes-*.ts
+
+# chaves de loja (Apple .p8, Google .json de conta de serviço) nunca entram no Git
+*.p8
+
+# lixo do macOS (AppleDouble)
+._*

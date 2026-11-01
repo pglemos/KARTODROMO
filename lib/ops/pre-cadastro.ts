@@ -4,6 +4,8 @@
  * Env: PRECADASTRO_URL (https://cadastro.kartodromodebetim.com.br) e PRECADASTRO_KEY (segredo do /api/sync).
  */
 import { insertCliente, one, onlyDigits, updateCliente, type ClienteInput } from './db';
+import { vincularCadastroDoLink } from './grupos';
+import { registrarPreCadastro } from './painel';
 
 export type PreCadastro = {
   key: string;
@@ -26,9 +28,33 @@ export type PreCadastro = {
   cidade: string;
   estado: string;
   menores: { nome: string; nascimento: string; documento: string }[];
+  /** Link da reserva em grupo (painel web): a vaga do grupo passa para o nome desta pessoa. */
+  reserva?: string;
 };
 
 type Log = (...args: unknown[]) => void;
+
+/** Outro piloto da reserva online, com os mesmos campos do cadastro do totem (ver workers/pre-cadastro/src/validar.ts). */
+export type AcompanhanteSite = {
+  nome: string; documento: string; nascimento: string; instagram?: string; email?: string; telefone?: string; peso?: string;
+  cep?: string; endereco?: string; complemento?: string; bairro?: string; cidade?: string;
+};
+
+/** Contato e endereço do piloto que não é o comprador: o que vier preenchido (campo vazio não apaga o que já existe). */
+export function contatoAcompanhante(a: AcompanhanteSite): ClienteInput {
+  const peso = Number(String(a.peso ?? '').replace(',', '.'));
+  return {
+    ...(a.instagram ? { instagram: a.instagram } : {}),
+    ...(a.email ? { email: a.email } : {}),
+    ...(a.telefone ? { telefone: a.telefone } : {}),
+    ...(peso > 0 ? { peso } : {}),
+    ...(a.cep ? { cep: a.cep } : {}),
+    ...(a.endereco ? { endereco: a.endereco } : {}),
+    ...(a.complemento ? { complemento: a.complemento } : {}),
+    ...(a.bairro ? { bairro: a.bairro } : {}),
+    ...(a.cidade ? { cidade: a.cidade } : {}),
+  };
+}
 
 const url = () => (process.env.PRECADASTRO_URL || '').replace(/\/+$/, '');
 const chave = () => process.env.PRECADASTRO_KEY || '';
@@ -68,6 +94,7 @@ export async function gravarPreCadastro(p: PreCadastro, log: Log): Promise<numbe
     id = await insertCliente(dadosDoCliente(p, null), 'site');
     log(`pré-cadastro: cliente novo ${id} pelo site`);
   }
+  registrarPreCadastro(p.nome, !existente, !!p.reserva);
   for (const m of p.menores ?? []) {
     const filho = await one<{ id: number }>(
       `SELECT TOP 1 Id id FROM dbo.Cliente WHERE ResponsavelId = @r AND UPPER(LTRIM(RTRIM(Nome))) = UPPER(@n)`,
@@ -85,19 +112,21 @@ export async function gravarPreCadastro(p: PreCadastro, log: Log): Promise<numbe
  * reaproveitado sem mexer nos dados (só preenche o nascimento se faltar); quem não tem ganha um cadastro novo. O termo e o
  * aceite de dados (LGPD) a própria pessoa faz no totem — por isso não marcamos LGPD aqui.
  */
-export async function gravarAcompanhante(a: { nome: string; documento: string; nascimento: string; instagram?: string; chave?: string }, log: Log): Promise<number> {
+export async function gravarAcompanhante(a: AcompanhanteSite & { chave?: string }, log: Log): Promise<number> {
   const doc = a.chave || onlyDigits(a.documento);
   const existente = await one<{ id: number; nascimento: string | null }>(
     `SELECT TOP 1 Id id, CONVERT(varchar(10), Nascimento, 126) nascimento FROM dbo.Cliente
       WHERE (DocumentoNum = @d OR Documento = @d) AND ResponsavelId IS NULL ORDER BY AtualizadoEm DESC`,
     { d: doc },
   );
+  // os mesmos campos do cadastro do totem (e-mail, celular, peso, endereço, Instagram); o que vier em branco não apaga
+  const contato = contatoAcompanhante(a);
   if (existente) {
-    const novos: ClienteInput = { ...(!existente.nascimento && a.nascimento ? { nascimento: a.nascimento } : {}), ...(a.instagram ? { instagram: a.instagram } : {}) };
+    const novos: ClienteInput = { ...contato, ...(!existente.nascimento && a.nascimento ? { nascimento: a.nascimento } : {}) };
     if (Object.keys(novos).length) await updateCliente(existente.id, novos, true);
     return existente.id;
   }
-  const id = await insertCliente({ nome: a.nome, tipoDocumento: 'CPF', documento: a.documento, nascimento: a.nascimento, ...(a.instagram ? { instagram: a.instagram } : {}) }, 'site');
+  const id = await insertCliente({ nome: a.nome, tipoDocumento: 'CPF', documento: a.documento, nascimento: a.nascimento, ...contato }, 'site');
   log(`pré-cadastro: piloto ${id} cadastrado pela reserva online de outra pessoa`);
   return id;
 }
@@ -108,7 +137,11 @@ export async function sincronizarPreCadastros(log: Log) {
   const pendentes = (await chamar('/api/sync/pendentes')) as PreCadastro[];
   const feitos: string[] = [];
   for (const p of pendentes) {
-    try { await gravarPreCadastro(p, log); feitos.push(p.key); } catch (e) { log(`pré-cadastro ${p.key}: erro ${(e as Error).message}`); }
+    try {
+      const id = await gravarPreCadastro(p, log);
+      if (p.reserva) await vincularCadastroDoLink(p.reserva, id, log).catch((e) => log(`grupo: vínculo do link falhou (${(e as Error).message})`));
+      feitos.push(p.key);
+    } catch (e) { log(`pré-cadastro ${p.key}: erro ${(e as Error).message}`); }
   }
   if (feitos.length) await chamar('/api/sync/concluir', { method: 'POST', body: JSON.stringify({ keys: feitos }) });
   return feitos.length;
@@ -120,7 +153,8 @@ export async function buscarPreCadastroAgora(identificador: string, log: Log) {
   try {
     const p = (await chamar(`/api/sync/buscar?q=${encodeURIComponent(identificador)}`, {}, 4000)) as PreCadastro | null;
     if (!p) return false;
-    await gravarPreCadastro(p, log);
+    const id = await gravarPreCadastro(p, log);
+    if (p.reserva) await vincularCadastroDoLink(p.reserva, id, log).catch(() => undefined);
     await chamar('/api/sync/concluir', { method: 'POST', body: JSON.stringify({ keys: [p.key] }) }).catch(() => undefined);
     return true;
   } catch (e) {
