@@ -25,6 +25,11 @@ describe('gateway público', () => {
     expect(h.get('authorization')).toBe('Bearer t');
   });
 
+  it('usa redirecionamento manual, único modo seguro aceito pelo Workers', async () => {
+    await gateway(req('/api/app/v1/me'), ENV);
+    expect(origem.mock.calls[0][0].redirect).toBe('manual');
+  });
+
   it('limita login por IP', async () => {
     const login = () => gateway(req('/api/app/v1/auth/login', { method: 'POST', headers: { 'cf-connecting-ip': '1.2.3.4' }, body: '{}' }), ENV);
     expect((await login()).status).toBe(200);

@@ -30,7 +30,7 @@ export function criarGateway(origem: typeof fetch, opcoes: { loginPorMinuto?: nu
     headers.set('x-app-v1-gateway', env.GATEWAY_SEGREDO);
     headers.set('x-app-v1-cliente-ip', req.headers.get('cf-connecting-ip') ?? '?');
     try {
-      const r = await origem(new Request(destino, { method: req.method, headers, body: req.body, redirect: 'error', ...(req.body ? { duplex: 'half' } : {}) } as RequestInit));
+      const r = await origem(new Request(destino, { method: req.method, headers, body: req.body, redirect: 'manual', ...(req.body ? { duplex: 'half' } : {}) } as RequestInit));
       const saida = new Headers(r.headers);
       saida.set('cache-control', 'no-store');
       return new Response(r.body, { status: r.status, headers: saida });
