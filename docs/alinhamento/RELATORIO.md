@@ -20,3 +20,8 @@ Em `origin/main`, `Baterias.cs` e `ValidacaoCliente.cs` têm problemas que a bas
 1. Validação da reserva do site: qual é a correta (ver `MATRIZ.md`)?
 2. Autorizar leitura no SRVKART e na Cloudflare.
 3. Autorizar a Task 5: enviar as branches ao GitHub, sem mexer em `main`.
+
+## Leituras autorizadas (31/10/2026)
+- **SRVKART:** servidor `C:\kartodromo-servidor`, sem Git. Comparados 9 arquivos com `origin/main`, ignorando CR: 7 iguais; diferem `lib/ops/endurance-regras.ts` (21/10) e `lib/ops/painel.ts` (14/10). Antes de publicar `lib/ops`, conferir esses dois. O `ops-server.ts` do SRVKART é o do GitHub, então as citações de `lib/ops` devem usar esta base.
+- **Cloudflare:** `kartodromo-cadastro` na versão `2bf8873e` (31/10, 14:24 UTC), feita por upload. O código publicado não foi baixado; **não sei qual validação da reserva está no ar**.
+- **GitHub:** `pglemos/KARTODROMO` é **público**. Envio suspenso: o plano exige repositório privado.
