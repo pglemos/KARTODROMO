@@ -52,3 +52,12 @@ Termo é obrigatório. Endurance e valor zero são exceção **só ao pagamento*
 Limites: é o estado de agora, não o da hora do sorteio, então quem foi aprovado depois conta como aprovado e **isto não mede o bug**. O campo é `TermoImpressoEm`; não verifiquei se o site ou totem registram aceite de termo em outro lugar.
 
 **Risco:** com a regra atual, cerca de **9,2%** dessas inscrições seriam bloqueadas no sorteio até a recepção marcar o termo.
+
+## Onde o termo fica registrado (investigado em 31/10/2026, só leitura)
+- **`Inscricao.TermoImpressoEm` é o único registro por inscrição.** `dbo.TermoAceite` existe, mas tem **0 linhas**. `Cliente.LgpdAceiteEm` é aceite de privacidade por cliente, não termo da bateria.
+- Marca o **envio à impressão** (`ops-server.ts:194`) ou a caixa da recepção (`office.ts:1494`). **Não prova assinatura.**
+- É apagado ao trocar produto, cliente ou bateria (`office.ts:1481`, `:1509`, `:1541`, `:1546`).
+- Os 236 sem termo: 218 em baterias já passadas (totem 150, site 62, recepção 6) e 18 futuras (site). Não há como saber quantos dos 218 correram. Hoje o termo **não trava** a operação.
+- Causa dos 150 do totem (falha de impressão ou troca de bateria): NÃO VERIFICADA.
+
+Regra no app: sem `TermoImpressoEm`, bloqueia com o motivo "Sem termo: imprimir na recepção". Resolver é imprimir o termo no programa da recepção, que grava a marca.
