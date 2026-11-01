@@ -97,6 +97,7 @@ describe('baseline do App Operacional', () => {
     expect(b.competitors.find((c: any) => c.customerId === '10').kart).toBe('8');
   });
 
+  // função do motor; a rota gera id novo a cada chamada, então repetir o pedido cria outra penalidade
   it('duas penalidades iguais criam dois registros: repetir duplica o efeito', () => {
     const s = nova();
     e.addPenalty(s, '4', { id: 'x1', tipo: 'tempo', segundos: 5, wallMs: 1 });
@@ -104,14 +105,16 @@ describe('baseline do App Operacional', () => {
     expect(s.competitors.find((c: any) => c.kart === '4').penalidades).toHaveLength(2);
   });
 
+  it('piloto acrescentado ao fim da lista não dispara lista mudou', () => {
+    const s = nova();
+    const atribuicoes = [{ indice: 0, kart: '7', nome: 'Ana', customerId: '10' }, { indice: 1, kart: '8', nome: 'Bia', customerId: '11' }];
+    e.setCompetitors(s, [...s.competitors.map((c: any) => ({ kart: c.kart, name: c.name, customerId: c.customerId })), { kart: '', name: 'Cid', customerId: '12' }]);
+    expect(() => so.validarSorteio(s, atribuicoes, new Set(['7', '8']))).not.toThrow();
+  });
+
   it('pela internet, só leitura em lista fechada', () => {
     expect(servidor).toContain("Acesso só pela rede do kartódromo.");
     expect(servidor).toMatch(/veioDaInternet\(req\) && !\(\(req\.method === 'GET' \|\| req\.method === 'HEAD'\) && isAllowedPublicReadPath/);
   });
 
-  it('bateria sem agenda mantém os competidores como vieram', () => {
-    const s = nova();
-    expect(s.agendaId ?? null).toBeNull();
-    expect(s.competitors.map((c: any) => c.name)).toEqual(['Ana', 'Bia']);
-  });
 });

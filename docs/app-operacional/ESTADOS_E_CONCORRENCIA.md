@@ -34,6 +34,6 @@ Não existe. Repetição duplica ao menos em penalidade, observação, relargada
 Não há rota específica. `validarSorteio` recusa após a largada; `setCompetitors` e `acrescentarPilotos` existem, mas a sincronização só age em `preparando`. Um kart desconhecido vira linha `autoAdded`, e a troca sabe absorvê-la. Tecnicamente viável, ainda **não homologado**: botão desligado até testes da F3.
 
 ## Autenticação atual
-- Internet: só `GET/HEAD` em lista fechada; o resto recebe 403 (`:3446`). Detecção por cabeçalhos `cf-*`.
-- Rede local: **a maioria das rotas de escrita não tem login**. Só as destrutivas usam `isAuthorizedDestructive` (`:3420`). Quem está no Wi-Fi da operação alcança as outras.
+- Internet: só `GET/HEAD` em lista fechada; o resto recebe 403 (`:3446`). Detecção por cabeçalhos `cf-*` e `x-public-bridge`.
+- Rede local: **a maioria das rotas de escrita não tem login**. `isAuthorizedDestructive` (`:3420`) protege restart, close, cancel, clear e e-mails, mas não `remontar` (`:3214`), relargada por `/flag` (`:3125`) nem restore do catálogo (`:2237`), que também sobrescrevem dados. Quem de fato alcança a porta pelo Wi-Fi: NÃO VERIFICADO (firewall e segmentação não vistos).
 - A API pública atual não tem usuários operacionais; o Worker só tem contas de clientes.
