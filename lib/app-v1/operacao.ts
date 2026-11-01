@@ -53,9 +53,10 @@ export function criarOperacao(d: DepsOperacao) {
     if (!s.agendaId) return { vinculada: false, mapa: new Map<string, ReturnType<typeof elegibilidade>>(), novos: [] as Inscricao[], consultaOk: true };
     try {
       const lista = await d.inscricoes(s.agendaId);
-      const mapa = new Map(lista.map((i) => [chave({ customerId: i.clienteId, nome: i.nome }), elegibilidade(i)]));
-      const presentes = new Set(s.competitors.map(chave));
-      return { vinculada: true, mapa, novos: lista.filter((i) => !presentes.has(chave({ customerId: i.clienteId, nome: i.nome }))), consultaOk: true };
+      // casa por cliente e também por nome: piloto digitado na cronometragem pode não ter o id
+      const mapa = new Map(lista.flatMap((i) => [[chave({ customerId: i.clienteId }), elegibilidade(i)], [chave({ nome: i.nome }), elegibilidade(i)]] as [string, ReturnType<typeof elegibilidade>][]));
+      const presentes = new Set(s.competitors.flatMap((c) => [chave(c), chave({ nome: c.name })]));
+      return { vinculada: true, mapa, novos: lista.filter((i) => !presentes.has(chave({ customerId: i.clienteId })) && !presentes.has(chave({ nome: i.nome }))), consultaOk: true };
     } catch {
       return { vinculada: true, mapa: new Map<string, ReturnType<typeof elegibilidade>>(), novos: [] as Inscricao[], consultaOk: false };
     }
@@ -76,6 +77,7 @@ export function criarOperacao(d: DepsOperacao) {
     const sit = await situacoes(s);
     const fora = karts();
     const usados = new Set(s.competitors.filter(real).map((c) => c.kart).filter(Boolean));
+    const conferidos = new Map((d.store.db.prepare('SELECT chave, kart FROM lastros_conferidos WHERE sessionId = ?').all(id) as { chave: string; kart: string }[]).map((l) => [l.chave, l.kart]));
     return {
       sessao: { id: s.id, name: s.name, state: s.state, sessionRevision: d.store.revisao(s.id), vinculadaRecepcao: sit.vinculada, recepcaoDisponivel: sit.consultaOk, tipoKart: bruto.tipoKart },
       pilotos: bruto.pilotos.map((p) => {
@@ -83,7 +85,7 @@ export function criarOperacao(d: DepsOperacao) {
         const e = !sit.vinculada ? { situacao: 'SEM_VINCULO', motivo: null } : !sit.consultaOk ? { situacao: 'INDETERMINADA', motivo: 'Recepção indisponível.' } : sit.mapa.get(chave(c)) ?? { situacao: 'INELEGIVEL', motivo: 'Saiu da agenda da recepção.' };
         const frota = frotaDoKart(p.kartAtual);
         const peso = (c.detalhes?.peso as number | null | undefined) ?? p.pesoKg;
-        return { ...p, pesoKg: peso ?? null, situacao: e.situacao, motivo: e.motivo, lastro: frota && pesoValido(peso) ? planoLastro(peso, frota) : null, lastroConferido: c.detalhes?.lastroConferido === true };
+        return { ...p, pesoKg: peso ?? null, situacao: e.situacao, motivo: e.motivo, lastro: frota && pesoValido(peso) ? planoLastro(peso, frota) : null, lastroConferido: conferidos.get(chave(c)) === c.kart };
       }),
       aguardandoEntrada: sit.novos.filter((i) => elegibilidade(i).situacao === 'ELEGIVEL').map((i) => i.nome),
       karts: bruto.karts.map((kart) => ({ kart, frota: frotaDoKart(kart), fora: fora.has(kart), ocupado: usados.has(kart) })),
@@ -136,7 +138,7 @@ export function criarOperacao(d: DepsOperacao) {
     async passagens(id: string, kart: string | null) {
       sessao(id);
       const rows = await d.legado('GET', `/api/sessions/${id}/passings`) as Record<string, unknown>[];
-      return { passagens: (Array.isArray(rows) ? rows : []).filter((r) => !kart || r.kart === kart).slice(0, 300).map((r) => ({ id: r.id, kart: r.kart, name: r.name, voltas: r.voltas, lapMs: r.lapMs, wallMs: r.wallMs, invalid: r.invalid, deleted: r.deleted, rejected: r.rejected, reason: r.reason, source: r.source })) };
+      return { sessionRevision: d.store.revisao(id), passagens: (Array.isArray(rows) ? rows : []).filter((r) => !kart || r.kart === kart).slice(0, 300).map((r) => ({ id: r.id, kart: r.kart, name: r.name, voltas: r.voltas, lapMs: r.lapMs, wallMs: r.wallMs, invalid: r.invalid, deleted: r.deleted, rejected: r.rejected, reason: r.reason, source: r.source })) };
     },
     corrigirPassagem(q: Identidade, id: string, b: Record<string, unknown>) {
       const pl = (b.payload ?? {}) as { action?: string; ids?: string[] };
@@ -145,11 +147,12 @@ export function criarOperacao(d: DepsOperacao) {
       return roda(q, 'passagem.corrigir', b, id, `passing-${pl.action}`, async () => {
         exigeEstado(sessao(id), 'em_andamento', 'bandeira_final', 'encerrada');
         const r = await d.legado('POST', `/api/sessions/${id}/passings/actions`, { action: pl.action, ids: pl.ids }) as { count?: number };
-        await d.legado('POST', `/api/sessions/${id}/observations`, { text: `Passagem corrigida (${pl.action}): ${texto(b.reason)}`, author: autor(q), kind: 'system' });
-        return { count: r.count ?? 0 };
+        await d.legado('POST', `/api/sessions/${id}/observations`, { text: `Passagem corrigida (${pl.action}): ${texto(b.reason)}`, author: autor(q), kind: 'system' }).catch(() => null);
+        if (!r.count) throw new Error('Nada mudou: essa passagem não pode ter essa correção.');
+        return { count: r.count };
       });
     },
-    equalizacoes: () => d.legado('GET', '/api/equalizacao').then((r) => ({ equalizacoes: (r as { equalizacoes?: unknown[] }).equalizacoes ?? [] })),
+    equalizacoes: () => d.legado('GET', '/api/equalizacao').then((r) => ({ equalizacoes: ((r as { equalizacoes?: { id: string }[] }).equalizacoes ?? []).map((e) => ({ ...e, sessionRevision: d.store.revisao(e.id) })) })),
     equalizacao: (id: string) => d.legado('GET', `/api/equalizacao/${encodeURIComponent(id)}`),
     comandoEqualizacao(q: Identidade, id: string, b: Record<string, unknown>) {
       const acao = String((b.payload as { acao?: string } | undefined)?.acao);
@@ -161,7 +164,11 @@ export function criarOperacao(d: DepsOperacao) {
       if (!pode(q.perfil, 'sessoes.ver')) throw new ErroApp(403, 'FORBIDDEN', 'Sem permissão.');
       return { baterias: await d.legado('GET', `/api/agenda${data && /^\d{4}-\d{2}-\d{2}$/.test(data) ? `?data=${data}` : ''}`) };
     },
-    painelSorteio,
+    painelSorteio: async (q: Identidade, id: string) => {
+      const p = await painelSorteio(id);
+      // peso e cadastro só para quem pesa
+      return pode(q.perfil, 'peso.conferir') ? p : { ...p, pilotos: p.pilotos.map((x) => ({ ...x, pesoKg: null, lastro: null, customerId: null })) };
+    },
     async detalhe(id: string) {
       const s = sessao(id);
       return { state: s.state, competitors: s.competitors.filter(real).map((c) => ({ kart: c.kart, name: c.name, customerId: c.customerId ?? null, penalidades: c.penalidades ?? [] })), standings: s.standings ?? null };
@@ -193,8 +200,10 @@ export function criarOperacao(d: DepsOperacao) {
         const plano = frota ? planoLastro(pl.pesoKg as number, frota) : null;
         await d.legado('PUT', `/api/sessions/${id}/competitors/${indice}`, {
           kartAntes: c.kart, nomeAntes: c.name, kart: c.kart, name: c.name,
-          detalhes: { ...c.detalhes, peso: pl.pesoKg, pesoLastro: plano?.lastroKg ?? null, lastroConferido: pl.lastroConferido === true },
+          detalhes: { ...c.detalhes, peso: pl.pesoKg, pesoLastro: plano?.lastroKg ?? null },
         });
+        // a rota da cronometragem não guarda a conferência: fica no banco do app, ligada ao kart
+        if (pl.lastroConferido === true) d.store.db.prepare('INSERT OR REPLACE INTO lastros_conferidos (sessionId, chave, kart, pesoKg, usuario, em) VALUES (?, ?, ?, ?, ?, ?)').run(id, chave(c), c.kart, pl.pesoKg as number, q.usuario, new Date().toISOString());
         return plano;
       });
     },
@@ -210,7 +219,7 @@ export function criarOperacao(d: DepsOperacao) {
         const c = s.competitors.find((x) => x.kart === pl.fromKart && chave(x) === chave({ customerId: pl.customerId, nome: pl.nome }));
         if (!c) throw new ErroApp(409, 'STALE_ASSIGNMENT', 'O piloto não está mais nesse kart. Atualize.');
         const r = await d.legado('POST', `/api/sessions/${id}/swap-kart`, { fromKart: pl.fromKart, toKart: para, name: c.name, customerId: c.customerId ?? null, category: c.category ?? null, detalhes: c.detalhes ?? {}, manterVoltas: pl.manterVoltas !== false });
-        await d.legado('POST', `/api/sessions/${id}/observations`, { text: `Troca de kart · ${c.name} do kart ${pl.fromKart} para o ${para}${pl.manterVoltas === false ? ` (voltas e tempos do kart ${pl.fromKart} desconsiderados)` : ''}`, author: autor(q), kind: 'kart-swap' });
+        await d.legado('POST', `/api/sessions/${id}/observations`, { text: `Troca de kart · ${c.name} do kart ${pl.fromKart} para o ${para}${pl.manterVoltas === false ? ` (voltas e tempos do kart ${pl.fromKart} desconsiderados)` : ''}`, author: autor(q), kind: 'kart-swap' }).catch(() => null);
         return { troca: (r as { troca?: unknown })?.troca ?? null };
       });
     },
@@ -235,14 +244,19 @@ export function criarOperacao(d: DepsOperacao) {
     },
     comando(q: Identidade, id: string, b: Record<string, unknown>) {
       const pl = (b.payload ?? {}) as { acao?: string };
-      const acoes: Record<string, { rota: string; cap: string; critico: boolean }> = {
-        start: { rota: 'start', cap: 'prova.comandar', critico: true }, checkered: { rota: 'checkered', cap: 'prova.comandar', critico: true },
-        close: { rota: 'close', cap: 'prova.comandar', critico: true }, cancel: { rota: 'cancel', cap: 'prova.reiniciar', critico: true }, restart: { rota: 'restart', cap: 'prova.reiniciar', critico: true },
+      const vivos = ['preparando', 'em_andamento', 'bandeira_final'];
+      const acoes: Record<string, { rota: string; cap: string; critico: boolean; estados: string[] }> = {
+        start: { rota: 'start', cap: 'prova.comandar', critico: true, estados: ['preparando'] }, checkered: { rota: 'checkered', cap: 'prova.comandar', critico: true, estados: ['em_andamento'] },
+        close: { rota: 'close', cap: 'prova.comandar', critico: true, estados: ['em_andamento', 'bandeira_final'] }, cancel: { rota: 'cancel', cap: 'prova.reiniciar', critico: true, estados: vivos }, restart: { rota: 'restart', cap: 'prova.reiniciar', critico: true, estados: vivos },
       };
       const a = acoes[String(pl.acao)];
       if (!a) throw new ErroApp(400, 'INVALID_REQUEST', 'Comando inválido.');
       if (a.critico) exigeMotivo(b);
-      return roda(q, a.cap, b, id, `command-${pl.acao}`, () => d.legado('POST', `/api/sessions/${id}/${a.rota}`, { autor: autor(q) }).then(() => ({ ok: true })));
+      return roda(q, a.cap, b, id, `command-${pl.acao}`, async () => {
+        exigeEstado(sessao(id), ...a.estados);
+        await d.legado('POST', `/api/sessions/${id}/${a.rota}`, { autor: autor(q) });
+        return { ok: true };
+      });
     },
   };
 }

@@ -225,7 +225,7 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
       m = /^sessions\/([\w-]+)\/(draw-panel|detail|live|passings)$/.exec(caminho);
       if (m && metodo === 'GET') {
         exige('sessoes.ver');
-        const r = m[2] === 'detail' ? await operacao.detalhe(m[1]) : m[2] === 'live' ? await operacao.aoVivo(m[1]) : m[2] === 'passings' ? await operacao.passagens(m[1], url.searchParams.get('kart')) : await operacao.painelSorteio(m[1]);
+        const r = m[2] === 'detail' ? await operacao.detalhe(m[1]) : m[2] === 'live' ? await operacao.aoVivo(m[1]) : m[2] === 'passings' ? await operacao.passagens(m[1], url.searchParams.get('kart')) : await operacao.painelSorteio(quem, m[1]);
         return enviar(res, 200, r);
       }
       if (caminho === 'equalization' && metodo === 'GET') { exige('equalizacao.gerir'); return enviar(res, 200, await operacao.equalizacoes()); }

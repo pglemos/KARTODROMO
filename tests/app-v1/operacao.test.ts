@@ -140,6 +140,7 @@ describe('operação', () => {
     await expect(op.corrigirPassagem(REC, 'b', envio({ action: 'invalidate', ids: ['p1'] }))).rejects.toMatchObject({ http: 403 });
     expect(() => op.corrigirPassagem(OP, 'b', envio({ action: 'invalidate', ids: ['p1'] }, { reason: '' }))).toThrow(/motivo/);
     expect(() => op.corrigirPassagem(OP, 'b', envio({ action: 'apagar-tudo', ids: ['p1'] }))).toThrow(/inválida/);
+    legado.mockResolvedValueOnce({ count: 1 });
     expect((await op.corrigirPassagem(OP, 'b', envio({ action: 'invalidate', ids: ['p1'] }))).status).toBe('APPLIED');
     expect(legado.mock.calls[0][1]).toBe('/api/sessions/b/passings/actions');
   });
@@ -160,6 +161,40 @@ describe('operação', () => {
     expect(() => op.bandeira(OP, 'b', envio({ flag: 'preta', kart: '4' }))).toThrow(/inválida/);
   });
 
+  it('conferência de lastro persiste no app e volta no painel; troca de kart zera', async () => {
+    await op.peso(OP, 'b', envio({ customerId: '1', nome: 'Ana', pesoKg: 70, lastroConferido: true }));
+    const bruto = { karts: [], tipoKart: null, pilotos: [{ indice: 0, nome: 'Ana', customerId: '1', kartAtual: '4', excecoes: [], pesoKg: 70 }] };
+    legado.mockResolvedValueOnce(bruto);
+    expect((await op.painelSorteio(OP, 'b')).pilotos[0].lastroConferido).toBe(true);
+    bateria.competitors[0].kart = '9';
+    legado.mockResolvedValueOnce({ ...bruto, pilotos: [{ ...bruto.pilotos[0], kartAtual: '9' }] });
+    expect((await op.painelSorteio(OP, 'b')).pilotos[0].lastroConferido).toBe(false);
+  });
+
+  it('Recepção não recebe peso', async () => {
+    legado.mockResolvedValueOnce({ karts: [], tipoKart: null, pilotos: [{ indice: 0, nome: 'Ana', customerId: '1', kartAtual: '4', excecoes: [], pesoKg: 70 }] });
+    expect((await op.painelSorteio(REC, 'b')).pilotos[0]).toMatchObject({ pesoKg: null, customerId: null, lastro: null });
+  });
+
+  it('piloto sem id casa pelo nome', async () => {
+    bateria.competitors[1].customerId = null;
+    const r = await op.atrasados(OP, 'b', envio({ atribuicoes: [{ customerId: null, nome: 'Bia', kart: '8' }] }));
+    expect(r.status).toBe('APPLIED');
+  });
+
+  it('comando fora do estado não chega à cronometragem', async () => {
+    bateria.state = 'encerrada';
+    const r = await op.comando(OP, 'b', envio({ acao: 'cancel' }));
+    expect(r.status).toBe('REJECTED');
+    expect(legado).not.toHaveBeenCalled();
+  });
+
+  it('correção sem efeito não diz que corrigiu', async () => {
+    bateria.state = 'em_andamento';
+    legado.mockResolvedValueOnce({ count: 0 });
+    expect((await op.corrigirPassagem(OP, 'b', envio({ action: 'invalidate', ids: ['p1'] }))).status).toBe('REJECTED');
+  });
+
   it('comando crítico exige motivo', () => {
     expect(() => op.comando(OP, 'b', envio({ acao: 'restart' }, { reason: '' }))).toThrow(/motivo/);
   });
@@ -170,7 +205,7 @@ describe('operação', () => {
       { indice: 2, nome: 'Cid', customerId: '3', kartAtual: '', excecoes: [], pesoKg: null },
     ] });
     insc.push({ clienteId: 7, nome: 'Dan', ...ok });
-    const p = await op.painelSorteio('b');
+    const p = await op.painelSorteio(OP, 'b');
     expect(p.pilotos[0]).toMatchObject({ situacao: 'ELEGIVEL', lastro: { lastroKg: 20 } });
     expect(p.pilotos[1]).toMatchObject({ situacao: 'INELEGIVEL', motivo: 'Pagamento pendente.' });
     expect(p.aguardandoEntrada).toEqual(['Dan']);
