@@ -5,7 +5,7 @@
 ## As 10 questões do PRD 22
 | # | Resposta | Situação |
 |:-:|---|---|
-| 1 | `aprovada=1` **não** inclui pagamento nem termo | Provado no código; contagens reais NÃO VERIFICADAS |
+| 1 | `aprovada=1` **não** inclui pagamento nem termo | Provado no código; contagens medidas |
 | 2 | Não há rota de entrada após largada. Parece viável com funções atuais | Desligado até homologar |
 | 3 | Troca guarda ou ignora voltas conforme descrito; Tabajara só pré-marca a opção na tela Windows | Voltas: testes. Tabajara: leitura do código |
 | 4 | Sem revisão nem transação; JSON atômico em processo único | Provado no código |
@@ -27,5 +27,6 @@
 ## Pendências antes da F1
 1. **Alinhar produção e repositório.** Cada lado tem mudanças que o outro não tem, e a produção tem 321 arquivos sem commit. Publicar sem alinhar pode desfazer proteções. Precisa de plano próprio.
 2. **Backup externo falhou** na última execução (código 1).
-3. **Decisões do dono:** Termo é obrigatório para sortear? Endurance e total zero têm exceção a confirmar.
-4. **Medição real** de combinações exige autorizar leitura agregada no banco.
+3. **Termo no filtro:** obrigatório por decisão do dono, mas 236 de 2.556 inscrições (9,2%) estão sem `TermoImpressoEm`. Confirmar se esse campo é o registro certo antes de ligar o bloqueio.
+
+Decisões do dono em 31/10/2026: só pago; termo obrigatório; Endurance e valor zero são exceção ao pagamento. Contagens medidas: ver `ELEGIBILIDADE.md`.

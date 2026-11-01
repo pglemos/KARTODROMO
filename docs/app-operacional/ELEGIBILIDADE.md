@@ -28,17 +28,27 @@ A sincronização também age enquanto a bateria está em `preparando`:
 - acrescenta quem pagou depois, ao fim da lista e sem kart (`:2047-2052`). Isso **não** gera `ListaMudouError`: os índices não mudam, e o sorteio em andamento deixaria o novo piloto sem kart sem avisar. O adaptador compara a lista completa;
 - **remove sozinha** quem saiu da agenda (`:1979-1984`). Remoção ou reordenação gera 409, ou 400 se o removido for o último. Contraria PRD 7.5, mas é comportamento da cronometragem e não será alterado; o app avisa ao detectar a saída.
 
-## Predicado proposto
+## Predicado aprovado pelo dono (31/10/2026)
 ```text
-sem agendaId                                 -> SEM_VINCULO (regras atuais, com etiqueta)
-consulta falhou ou campo ausente             -> INDETERMINADA (bloqueia)
-fora do grid (cancelada, o grid já exclui)    -> avisa que saiu da agenda
-Aprovada = 1 e Pago = 1                      -> ELEGIVEL
-caso contrário                               -> INELEGIVEL, com motivo
+sem agendaId                               -> SEM_VINCULO (regras atuais, com etiqueta)
+consulta falhou ou campo ausente           -> INDETERMINADA (bloqueia)
+fora do grid (cancelada ou movida)         -> avisa que saiu da agenda
+Aprovada=0                                 -> INELEGIVEL: não aprovado
+termo ausente                              -> INELEGIVEL: sem termo
+Pago=0, fora de Endurance, total > 0       -> INELEGIVEL: não pago
+demais                                     -> ELEGIVEL
 ```
-**Decidido pelo dono em 31/10/2026:** aprovado sem pagamento **não** pode ser sorteado; só pago.
+Termo é obrigatório. Endurance e valor zero são exceção **só ao pagamento**, não ao termo nem à aprovação. O grid atual não traz termo, total nem Endurance: a rota nova lê esses dados.
 
-**Decisões ainda abertas:** Termo é obrigatório? Endurance e total zero sem `Pago=1` não são pendência financeira: o predicado precisa de exceção para eles, a confirmar. O grid atual não traz o termo; a rota nova precisaria lê-lo.
+## Medição na produção (31/10/2026, só contagem, inscrições não canceladas criadas nos últimos 30 dias)
+| Situação | Qtde |
+|---|:--:|
+| Total | 2.556 |
+| Aprovada e paga, com termo | 2.318 |
+| Aprovada e paga, **sem termo** | 236 (totem 150, site 80, recepção 6) |
+| Não aprovada e não paga | 2 |
+| Aprovada e não paga | 0 |
 
-## Medição não feita
-Contagem real das combinações: **NÃO VERIFICADO**. A rota da porta `7070` não devolveu dados sem chave, e não usei credenciais do servidor sem autorização expressa.
+Limites: é o estado de agora, não o da hora do sorteio, então quem foi aprovado depois conta como aprovado e **isto não mede o bug**. O campo é `TermoImpressoEm`; não verifiquei se o site ou totem registram aceite de termo em outro lugar.
+
+**Risco:** com a regra atual, cerca de **9,2%** dessas inscrições seriam bloqueadas no sorteio até a recepção marcar o termo.
