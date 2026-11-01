@@ -18,11 +18,16 @@
 - Token de acesso de 15 min; renovação com rotação, 12 h no aparelho compartilhado. Bloqueio de usuário vale no pedido seguinte.
 - Fase 1 do caminho: **só HTTPS público**, também dentro do kartódromo (PRD 12.2). Atalho local com TLS fica para depois das medições. A barra mostra `Internet segura`.
 - Nada é publicado no ORBITS, no Cloudflare ou nas lojas sem autorização do dono. Toda publicação fora de bateria.
-- `node:sqlite` exige confirmar versão do Node no ORBITS na Task 1; sem suporte, gravar em JSON atômico como `writeJsonAtomic`.
+- Armazenamento transacional é obrigatório. **Nunca** cair para JSON atômico: sem runtime compatível, o módulo fica indisponível (503) até haver armazenamento transacional validado.
+- **Na F1 nenhuma rota executa sorteio, punição, troca, bandeira, largada, reinício ou alteração de prova, em nenhum perfil, inclusive `GERENCIA`.**
+- Autenticação do usuário é sempre obrigatória. `cf-*` e `x-app-v1-gateway` nunca concedem privilégio.
+- Operação `UNKNOWN` nunca é repetida automaticamente; exige consulta e reconciliação.
+- Login e hash não bloqueiam o processamento da cronometragem: `scrypt` assíncrono, com limite de requisições na origem.
+- Elegibilidade continua sendo o predicado de `docs/app-operacional/ELEGIBILIDADE.md`; `aprovada=1` sozinho nunca basta.
 
 ## Review Focus
 
-- Pedido forjado com cabeçalho `cf-*` pela rede local tentando rota v1: exige token do mesmo jeito.
+- Pedido forjado com cabeçalho `cf-*` ou `x-app-v1-gateway`, de qualquer origem, em rota v1: exige token válido do mesmo jeito.
 - Mesmo `operationId` com corpo diferente: 409 `IDEMPOTENCY_PAYLOAD_MISMATCH`, sem efeito.
 - Queda do processo entre aplicar e registrar: ao reiniciar, a operação fica `UNKNOWN`, nunca `APPLIED` por suposição.
 - Escrita pelo Windows durante a edição no app: revisão sobe em `saveSession` e o comando antigo recebe 409.
@@ -36,10 +41,10 @@
 - Create: `lib/app-v1/store.ts`, `tests/app-v1/store.test.ts`
 
 **Interfaces:**
-- Produces: `abrirStore(caminho: string): AppStore`, com tabelas `usuarios`, `sessoes`, `operacoes`, `auditoria`.
+- Produces: `abrirStore(caminho: string): AppStore`, com tabelas `usuarios`, `sessoes`, `operacoes`, `auditoria`, `revisoes`; `transacao<T>(fn): T`.
 
-- [ ] **Step 1: Ler a versão do Node no ORBITS** por `ssh orbits` e registrar a decisão de armazenamento no ledger.
-- [ ] **Step 2: Escrever testes** `cria tabelas uma vez`, `reabre sem perder dados`, `auditoria só aceita inserção`.
+- [ ] **Step 1: Ler a versão do Node no ORBITS** por `ssh orbits` e validar transação real nesse runtime. Sem suporte, parar a publicação e relatar; o módulo fica indisponível.
+- [ ] **Step 2: Escrever testes** `cria tabelas uma vez`, `reabre sem perder dados`, `auditoria só aceita inserção`, `falha no meio da transação não grava operação nem auditoria`, `runtime sem suporte deixa o módulo indisponível, sem alternativa em JSON`, `revisão persiste após reabrir`.
 - [ ] **Step 3: Rodar** `npx vitest run tests/app-v1/store.test.ts`. Expected: FAIL.
 - [ ] **Step 4: Implementar** em `data/app-operacional/app.db`, fora do Git.
 - [ ] **Step 5: Rodar de novo.** Expected: PASS. Commit.
@@ -52,9 +57,9 @@
 **Interfaces:**
 - Produces: `login(store, usuario, senha, deviceId): Tokens`, `renovar(store, refresh): Tokens`, `sair(store, sessaoId)`, `autenticar(store, header): Identidade | null`, `pode(perfil, capacidade): boolean`, com capacidades da matriz PRD 5.2.
 
-- [ ] **Step 1: Escrever testes**: senha errada recusada; refresh reutilizado revoga a família; bloqueado recusado no pedido seguinte; 5 erros seguidos atrasam o login; `pode('RECEPCAO','kart.trocar') === false`; `pode('OPERACAO','usuarios.gerir') === false`; `pode('GERENCIA','kart.trocar') === true`; nenhum perfil tem `recepcao.aprovar`.
+- [ ] **Step 1: Escrever testes**: senha errada recusada; refresh reutilizado revoga a família; bloqueado recusado no pedido seguinte; 5 erros seguidos atrasam o login; sessão expira no prazo absoluto de 12 h mesmo com renovações; o laço de eventos segue respondendo durante vários logins simultâneos; `pode('RECEPCAO','kart.trocar') === false`; `pode('OPERACAO','usuarios.gerir') === false`; `pode('GERENCIA','kart.trocar') === true`; nenhum perfil tem `recepcao.aprovar`.
 - [ ] **Step 2: Rodar.** Expected: FAIL.
-- [ ] **Step 3: Implementar** com scrypt e HMAC em `APP_V1_TOKEN_SECRET`, que vem do ambiente. Sem ele, o módulo responde 503.
+- [ ] **Step 3: Implementar** com `crypto.scrypt` assíncrono e HMAC em `APP_V1_TOKEN_SECRET`, que vem do ambiente. Sem ele, o módulo responde 503.
 - [ ] **Step 4: Rodar.** Expected: PASS. Commit.
 
 ### Task 3: Motor de comandos, idempotência e auditoria
@@ -66,9 +71,9 @@
 - Consumes: `AppStore`, `Identidade`, `pode`.
 - Produces: `executar(ctx, { operationId, sessionId, expectedSessionRevision, command, payload, reason }, handler): Resposta`; `consultarOperacao(store, id, identidade)`; `filaPorBateria(sessionId, fn)`.
 
-- [ ] **Step 1: Escrever testes** T19, T20, T21, T35 do PRD: três envios aplicam uma vez; `PENDING` encontrado no reinício vira `UNKNOWN`; corpo diferente gera `IDEMPOTENCY_PAYLOAD_MISMATCH`; revisão antiga gera `REVISION_CONFLICT`; dois comandos na mesma bateria rodam em série; cada resultado gera uma linha de auditoria com os campos PRD 15.3.
+- [ ] **Step 1: Escrever testes** T19, T20, T21, T35 do PRD: três envios aplicam uma vez; `PENDING` encontrado no reinício vira `UNKNOWN`; corpo diferente gera `IDEMPOTENCY_PAYLOAD_MISMATCH`; revisão antiga gera `REVISION_CONFLICT`; dois comandos na mesma bateria rodam em série, e a revisão é comparada dentro da seção crítica, com o segundo recebendo `REVISION_CONFLICT`; `UNKNOWN` com o mesmo `operationId` não executa o handler e devolve o estado para reconciliação; cada resultado gera uma linha de auditoria com os campos PRD 15.3.
 - [ ] **Step 2: Rodar.** Expected: FAIL.
-- [ ] **Step 3: Implementar**, gravando `PENDING` antes do handler e `APPLIED`/`REJECTED` depois.
+- [ ] **Step 3: Implementar**: dentro de `filaPorBateria`, comparar a revisão, gravar `PENDING`, rodar o handler e gravar `APPLIED`/`REJECTED`. A F1 só registra handlers de teste; nenhum handler de prova.
 - [ ] **Step 4: Rodar.** Expected: PASS. Commit.
 
 ### Task 4: Revisão e rotas no servidor
@@ -80,9 +85,9 @@
 **Interfaces:**
 - Produces: `tratarAppV1(req, res, url, deps): Promise<boolean>`; `revisaoDa(sessionId): number`; rotas `/auth/*`, `/me`, `/sessions`, `/sessions/{id}`, `/operations/{id}`, `/audit`, `/users`, `/events`.
 
-- [ ] **Step 1: Escrever testes**: T22, T24, T25; sem token 401; Recepção em `/users` 403; `/sessions/{id}` traz `sessionRevision`; revisão sobe a cada `saveSession`; rota fora de `/api/app/v1` pela internet segue 403.
+- [ ] **Step 1: Escrever testes**: T22, T24, T25; sem token 401; Recepção em `/users` 403; `/sessions/{id}` traz `sessionRevision`; revisão sobe a cada `saveSession` e sobrevive à reinicialização; cabeçalhos `cf-*` e `x-app-v1-gateway` sem token dão 401; limite na origem responde 429; todo caminho de sorteio, punição, troca, bandeira, largada, reinício e passagens responde 404 em `RECEPCAO`, `OPERACAO` e `GERENCIA`, e a bateria não muda; token expirado encerra `/events`; rota fora de `/api/app/v1` pela internet segue 403.
 - [ ] **Step 2: Rodar.** Expected: FAIL.
-- [ ] **Step 3: Implementar** com acréscimo mínimo: `Set` de revisões em `saveSession` e uma linha de roteamento. Só `/api/app/v1/` escapa do bloqueio, e sempre com `tratarAppV1`. `/events` reaproveita `stateView()`, com `revision` no evento e batida a cada 15 s.
+- [ ] **Step 3: Implementar** com acréscimo mínimo: revisão persistida a partir de `saveSession` e uma linha de roteamento. Só `/api/app/v1/` escapa do bloqueio, e sempre com `tratarAppV1`. `/events` reaproveita `stateView()`, com `revision` no evento e batida a cada 15 s; revalida o token e fecha a conexão com `auth-expired` ao expirar ou bloquear.
 - [ ] **Step 4: Rodar** essa suíte e `npx vitest run tests/app-operacional-baseline.test.ts tests/timing-sse.test.ts`. Expected: PASS, com baseline 10/10. Ajustar a baseline só se o texto procurado mudar, nunca o comportamento. Commit.
 
 ### Task 5: Worker público
@@ -108,7 +113,7 @@
 - Produces: `src/core/api`, `src/core/realtime`, `src/core/security`, `src/features/auth`, `src/core/design-system`.
 
 - [ ] **Step 1: Criar** o projeto nas versões confirmadas (Expo `~57.0.31`, React Native `0.86.3`) e copiar tokens visuais e `motion.tsx` do app de clientes.
-- [ ] **Step 2: Escrever testes**: renovação única com pedidos simultâneos; token nunca em `AsyncStorage`; 401 sai para o login; evento repetido ou fora de ordem não regride revisão (T27); volta do segundo plano recarrega antes de liberar escrita; lacuna de revisão pede estado completo.
+- [ ] **Step 2: Escrever testes**: renovação única com pedidos simultâneos; token nunca em `AsyncStorage`; 401 sai para o login; evento repetido ou fora de ordem não regride revisão (T27); `auth-expired` renova e reconecta, ou vai ao login; reconexão pede estado completo antes de liberar escrita; operação `UNKNOWN` não tem repetição automática; volta do segundo plano recarrega antes de liberar escrita; lacuna de revisão pede estado completo.
 - [ ] **Step 3: Rodar** `npx jest`. Expected: FAIL.
 - [ ] **Step 4: Implementar** login, navegação por perfil, barra de conexão e tela de baterias só de leitura.
 - [ ] **Step 5: Rodar** `npx jest`. Expected: PASS. Conferir no simulador iOS e no emulador Android contra o servidor local em `SIMULATE`. Commit.
