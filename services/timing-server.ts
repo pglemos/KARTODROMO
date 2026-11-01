@@ -3046,6 +3046,13 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para consultar destinatários e resultado dos e-mails.' });
         return send(res, 200, s.emailsResultado ?? null);
       }
+      if (action === 'republicar-app' && !m[3] && method === 'POST') {
+        // só nesta máquina: reenvia ao app de clientes depois de corrigir nome ou pilotos de bateria já encerrada
+        if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado.' });
+        publicadosNoApp.delete(s.id);
+        await publicarNoAppAutomatico(s);
+        return send(res, 200, { ok: publicadosNoApp.has(s.id) });
+      }
       if (action === 'emails' && !m[3] && method === 'POST') {
         if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para reenvio de resultados.' });
         // reenvio manual (menu da cronometragem): todos, só um kart, ou o resultado oficial para outro endereço
@@ -3058,7 +3065,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
           if (!lerConfig(EMAIL_FILE).senha && !SIMULATE) return send(res, 400, { error: 'E-mail não configurado: preencha a conta de e-mail do kartódromo em Ferramentas › E-mail dos resultados.' });
           if (envioATodosAtivo.has(s.id)) return send(res, 409, { error: 'O resultado desta bateria já está sendo enviado a todos os pilotos. Aguarde terminar.' });
           // somenteFaltantes: só quem ainda não recebeu; atrasado: abre com o pedido de desculpas (reenvio de 13/10)
-          void enviarResultadoEmFila(s, { automatico: false, somenteFaltantes: body.somenteFaltantes === true, atrasado: body.atrasado === true }).catch((e) => log(`e-mail do resultado de ${s.name}: ${(e as Error).message}`));
+          void enviarResultadoEmFila(s, { automatico: false, somenteFaltantes: body.somenteFaltantes === true, atrasado: body.atrasado === true, aviso: typeof body.aviso === 'string' ? body.aviso.trim().slice(0, 400) : undefined }).catch((e) => log(`e-mail do resultado de ${s.name}: ${(e as Error).message}`));
           return send(res, 202, { emSegundoPlano: true });
         }
         return send(res, 200, await enviarResultadoEmFila(s, { automatico: false, kart, para, organizador: Boolean(para) && body.organizador === true }));
