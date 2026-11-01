@@ -131,6 +131,7 @@ export class DecoderClient extends EventEmitter {
             this.emit('other', rec.raw);
           }
         }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
         s.lastError = `Erro ao processar pacote do decoder: ${err?.message || err}`;
         this.emit('error', err instanceof Error ? err : new Error(String(err)));

@@ -1011,7 +1011,7 @@ public partial class FormCrono : Form
 
         if (_painel.Ativo && !_painel.AutoAvanco)
         {
-            _lPainelBadge.BackColor = Color.FromArgb(217, 119, 6);
+            _lPainelBadge.BackColor = Tokens.Claro.CorEstadoAvisoSolido;
             _lPainelStatus.Text += " · PÁGINA TRAVADA MANUALMENTE (marque Auto para girar)";
         }
 
@@ -1220,7 +1220,7 @@ public partial class FormCrono : Form
         var sufixoTerminais = maquinasAtivas.Count > 1 ? $" · {maquinasAtivas.Count} TERMINAIS ATIVOS ({string.Join(" + ", maquinasAtivas)})" : "";
         if (!_servidorOk)
         {
-            _sServidor.BackColor = Color.FromArgb(185, 28, 28);
+            _sServidor.BackColor = Tokens.Claro.CorEstadoPerigoSolido;
             _sServidor.ForeColor = Color.White;
             _sServidor.Text = "⚠ SERVIDOR :4050 SEM CONEXÃO (TELÃO DESATUALIZADO)";
         }

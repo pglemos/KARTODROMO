@@ -98,6 +98,7 @@ async function dadosDaCrono(sessaoId: string | null) {
   return dados;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function sincronizarKartsComCrono(ev: Evento) {
   try {
     const [equipes, filas] = await Promise.all([
@@ -282,6 +283,7 @@ export async function paginaDoChefe(token: string) {
     equipe: { id: eq.id, nome: eq.nome, numero: eq.numero, chefeNome: eq.chefeNome },
     pilotos: pilotos.map((p) => ({ nome: p.nome, pulseira: p.pulseira, pesoKg: p.pesoKg, lastroKg: p.lastroKg, chefe: p.chefe, lastroSugerido: p.pesoKg != null ? lastroNecessario(p.pesoKg, regras).lastroKg : null })),
     pesagens: pesagens.map((x) => ({ ...x, piloto: pilotos.find((p) => p.id === x.pilotoId)?.nome ?? '' })),
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     punicoes: punicoes.map(({ usuario: _u, ...p }) => p),
     analise: a,
     porPiloto: porPiloto(a).filter((x) => x.equipeId === eq.id),
@@ -300,6 +302,7 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
   if (path === '/endurance/eventos' && method === 'GET') {
     send(200, await query(`SELECT ${EVENTO_COLS}, (SELECT COUNT(*) FROM dbo.EnduranceEquipe q WHERE q.EventoId = e.Id) equipes,
       (SELECT COUNT(*) FROM dbo.EndurancePiloto p WHERE p.EventoId = e.Id AND p.Ativo = 1) pilotos FROM dbo.EnduranceEvento e ORDER BY Ativo DESC, Data DESC, Id DESC`)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       .then((l) => l.map(({ segredo: _s, ...x }) => ({ ...x, regras: lerRegras(x.regras as string) }))));
     return true;
   }
@@ -322,6 +325,7 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
 
   if (!resto && method === 'GET') {
     const [equipes, pilotos, filas, trocas, pesagens, punicoes, ajustes] = await Promise.all([equipesDo(ev.id), pilotosDo(ev.id), filasDo(ev.id), trocasDo(ev.id), pesagensDo(ev.id), punicoesDo(ev.id), ajustesDo(ev.id)]);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { segredo: _s, ...semSegredo } = ev;
     send(200, {
       evento: { ...semSegredo, regras }, filas, trocas, pesagens, punicoes, ajustes,

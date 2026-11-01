@@ -3,7 +3,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { createHmac } from 'crypto';
 import { erroCadastroObrigatorio, erroPesoCliente } from '../../lib/ops/cadastro-obrigatorio';
-import { erroInstagramCliente, normalizarInstagram } from '../../lib/ops/instagram';
 import { clienteColumns, type ClienteInput } from '../../lib/ops/db';
 import { erroTelefone } from '../../services/ops-server';
 
@@ -19,12 +18,6 @@ const validacaoClienteCode = fs.readFileSync(validacaoClientePath, 'utf-8');
 
 const opsServerPath = path.resolve(__dirname, '../../services/ops-server.ts');
 const opsServerCode = fs.readFileSync(opsServerPath, 'utf-8');
-
-const dbPath = path.resolve(__dirname, '../../lib/ops/db.ts');
-const dbCode = fs.readFileSync(dbPath, 'utf-8');
-
-const cadastroObrigatorioPath = path.resolve(__dirname, '../../lib/ops/cadastro-obrigatorio.ts');
-const cadastroObrigatorioCode = fs.readFileSync(cadastroObrigatorioPath, 'utf-8');
 
 // Helper para emular HMAC de token idêntico ao ops-server
 const OPS_SECRET = process.env.OPS_SECRET || 'dev-secret-kartodromo-2026';

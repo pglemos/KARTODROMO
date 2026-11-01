@@ -9,7 +9,6 @@ const read = (file: string) => readFileSync(resolve(root, file), 'utf8');
 
 const uiCs = read('desktop/src/Kartodromo.Comum/Ui.cs');
 const validacaoClienteCs = read('desktop/src/Kartodromo.Comum/ValidacaoCliente.cs');
-const fmtCs = read('desktop/src/Kartodromo.Comum/Fmt.cs');
 
 // ============================================================================
 // Oráculo C# de Formatação (Fmt.cs)
@@ -359,7 +358,6 @@ describe('Desafio Adversarial M3 — Cursor Jumping e Validações de Cadastro',
 
           for (let op = 0; op < 100; op++) {
             const acao = Math.floor(Math.random() * 4);
-            const textoAntes = tb.text;
 
             if (acao === 0 || tb.text.length === 0) {
               // Digitar dígito aleatório

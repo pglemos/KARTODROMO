@@ -195,6 +195,7 @@ function writeJsonAtomic(file: string, data: unknown) {
     try {
       renameSync(tmp, file);
       return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       if ((err?.code === 'EPERM' || err?.code === 'EBUSY') && attempt < 4) {
         Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20 * (attempt + 1));
@@ -204,7 +205,7 @@ function writeJsonAtomic(file: string, data: unknown) {
         copyFileSync(tmp, file);
         try { unlinkSync(tmp); } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
         return;
-      } catch (fallbackErr) {
+      } catch {
         if (attempt === 4) {
           try { unlinkSync(tmp); } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
           throw err;
@@ -230,6 +231,7 @@ cleanOrphanTmpFiles(DATA_DIR);
 
 // Item 8: Mutex de serialização por sessão para concorrência
 const sessionLocks = new Map<string, Promise<void>>();
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function withSessionLock<T>(sessionId: string, action: () => Promise<T> | T): Promise<T> {
   const prev = sessionLocks.get(sessionId) ?? Promise.resolve();
   let resolveCurrent!: () => void;
@@ -318,6 +320,7 @@ let cachedUltimaEncerrada: { session: Session | null; timestamp: number } | null
 function invalidateUltimaEncerradaCache() {
   cachedUltimaEncerrada = null;
 }
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const invalidarCacheUltimaEncerrada = invalidateUltimaEncerradaCache;
 
 function saveSession(s: Session) {
@@ -349,6 +352,7 @@ function scheduleSessionSave(s: Session, delayMs = 150) {
   sessionSaveTimers.set(s.id, timer);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function flushSessionSave(s: Session) {
   const timer = sessionSaveTimers.get(s.id);
   if (timer) {
@@ -499,6 +503,7 @@ function journal(entry: Record<string, unknown>) {
         log(`ERRO no stream do diário: ${err.message}`);
         journalStream = null;
       });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       log(`ERRO ao criar arquivo do diário: ${err?.message || err}`);
       journalStream = null;
@@ -507,6 +512,7 @@ function journal(entry: Record<string, unknown>) {
   }
   try {
     journalStream.write(line);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (err: any) {
     log(`ERRO ao escrever no diário: ${err?.message || err}`);
   }

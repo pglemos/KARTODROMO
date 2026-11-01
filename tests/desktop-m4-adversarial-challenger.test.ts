@@ -8,7 +8,6 @@ const read = (file: string) => readFileSync(resolve(root, file), 'utf8');
 const caixaCs = read('desktop/src/Kartodromo.Recepcao/Caixa.cs');
 const telasCaixaCs = read('desktop/src/Kartodromo.Recepcao/TelasCaixa.cs');
 const formTvCs = read('desktop/src/Kartodromo.Cronometragem/FormTV.cs');
-const officeTs = read('lib/ops/office.ts');
 
 // ============================================================================
 // Modelos e Oráculos TypeScript

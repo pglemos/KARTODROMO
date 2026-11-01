@@ -339,22 +339,22 @@ describe('Challenger M1 - Auditoria Adversarial da Migração 0011', () => {
 
       // Url nula
       expect(() => {
-        table.insert({ Url: null as any, Titulo: 'T', Origem: 'O' });
+        table.insert({ Url: null as never, Titulo: 'T', Origem: 'O' });
       }).toThrow(/Cannot insert the value NULL into column Url/);
 
       // Titulo nulo
       expect(() => {
-        table.insert({ Url: 'http://u', Titulo: null as any, Origem: 'O' });
+        table.insert({ Url: 'http://u', Titulo: null as never, Origem: 'O' });
       }).toThrow(/Cannot insert the value NULL into column Titulo/);
 
       // Origem nula
       expect(() => {
-        table.insert({ Url: 'http://u', Titulo: 'T', Origem: null as any });
+        table.insert({ Url: 'http://u', Titulo: 'T', Origem: null as never });
       }).toThrow(/Cannot insert the value NULL into column Origem/);
 
       // Status nulo explícito
       expect(() => {
-        table.insert({ Url: 'http://u', Titulo: 'T', Origem: 'O', Status: null as any });
+        table.insert({ Url: 'http://u', Titulo: 'T', Origem: 'O', Status: null as never });
       }).toThrow(/Cannot insert the value NULL into column Status/);
     });
 

@@ -126,6 +126,7 @@ export function enderecoRemetente(cfg: ConfigEmail, padrao = REMETENTE_PADRAO) {
  */
 export function sanitizarNomeDestinatario(nome: string): string {
   return String(nome ?? '')
+    // eslint-disable-next-line no-control-regex
     .replace(/[\r\n\t\u0000-\u001F\u007F-\u009F]+/g, ' ')
     .replace(/["<>,;\\]+/g, '')
     .replace(/\s+/g, ' ')
@@ -140,6 +141,7 @@ export function sanitizarNomeDestinatario(nome: string): string {
 export function validarEmailDestinatario(email: string): string | null {
   const limpo = String(email ?? '').trim().toLowerCase();
   if (!limpo || limpo.length > 254) return null;
+  // eslint-disable-next-line no-control-regex
   if (/[\r\n\t\u0000-\u001F\u007F-\u009F\s"<>\\]/.test(limpo)) return null;
   if (!emailValido(limpo)) return null;
   if (!/^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i.test(limpo)) {

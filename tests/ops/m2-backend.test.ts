@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { renderTermoResponsabilidade, type TermoParticipante } from '../../lib/ops/termo';
 import { TOTEM_BATERIAS_SQL, bateriaDisponivelNoTotem } from '../../lib/ops/totem-baterias';
-import { erroInstagramCliente, normalizarInstagram } from '../../lib/ops/instagram';
-import { erroCadastroObrigatorio, erroPesoCliente } from '../../lib/ops/cadastro-obrigatorio';
+import { erroInstagramCliente } from '../../lib/ops/instagram';
+import { erroPesoCliente } from '../../lib/ops/cadastro-obrigatorio';
 import * as fs from 'fs';
 import * as path from 'path';
 

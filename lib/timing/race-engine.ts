@@ -604,6 +604,7 @@ export function startSession(session: Session, now: number, gridStart = false) {
   session.state = 'em_andamento';
   session.greenAt = now;
   // Item 6: Em largadas paradas no grid, o cronômetro começa imediatamente com a bandeira verde
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if (gridStart || (session as any).gridStart) {
     session.startedAt = now;
     session.originalStartedAt = now;
@@ -704,6 +705,7 @@ export function restartSession(session: Session, opcoes?: { preservarAutoAdded?:
     crossings: c.crossings.filter((x) => !x.deleted).map((x) => ({ ...x })),
   })).filter((c) => c.crossings.length > 0);
   if (snapshotPassagens.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (session as any).historicoRelargada = snapshotPassagens;
   }
   for (const c of session.competitors) {

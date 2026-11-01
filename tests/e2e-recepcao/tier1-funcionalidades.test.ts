@@ -18,7 +18,7 @@ describe('Tier 1: Cobertura Funcional dos 36 Itens da Recepção', () => {
     it('Item 1: Fila de impressão persiste jobs com schema relacional e consome via CTE atômica', () => {
       const fila = new SimuladorFilaImpressao();
       const job1 = fila.enfileirar('/termo?id=101', 'Termo de Responsabilidade - Ana', 'Totem 1');
-      const job2 = fila.enfileirar('/termo?id=102', 'Termo de Responsabilidade - Bruno', 'Totem 2');
+      fila.enfileirar('/termo?id=102', 'Termo de Responsabilidade - Bruno', 'Totem 2');
 
       expect(job1.id).toBe(1);
       expect(job1.status).toBe('pendente');

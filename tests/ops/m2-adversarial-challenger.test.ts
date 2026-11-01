@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { createHmac } from 'crypto';
-import { renderTermoResponsabilidade, idadeNaData, type TermoParticipante, type TermoEmpresa } from '../../lib/ops/termo';
-import { TOTEM_BATERIAS_SQL, bateriaDisponivelNoTotem, type TotemBateriaCandidate } from '../../lib/ops/totem-baterias';
+import { renderTermoResponsabilidade, type TermoParticipante, type TermoEmpresa } from '../../lib/ops/termo';
+import { TOTEM_BATERIAS_SQL, bateriaDisponivelNoTotem } from '../../lib/ops/totem-baterias';
 import { erroCadastroObrigatorio, erroPesoCliente } from '../../lib/ops/cadastro-obrigatorio';
 import { erroInstagramCliente, normalizarInstagram } from '../../lib/ops/instagram';
-import { onlyDigits, isValidCpf, clienteColumns } from '../../lib/ops/db';
+import { onlyDigits, clienteColumns } from '../../lib/ops/db';
 
 const opsServerPath = path.resolve(__dirname, '../../services/ops-server.ts');
 const opsServerCode = fs.readFileSync(opsServerPath, 'utf-8');

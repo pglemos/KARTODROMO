@@ -678,8 +678,8 @@ public class FormCheckout : CartaoModal
             if (_voucher != null)
             {
                 _btnVoucher.Text = "Remover";
-                _btnVoucher.BackColor = Color.FromArgb(255, 230, 230);
-                _btnVoucher.ForeColor = Color.FromArgb(200, 30, 30);
+                _btnVoucher.BackColor = Tokens.Claro.CorEstadoPerigoFundo;
+                _btnVoucher.ForeColor = Tokens.Claro.CorEstadoPerigoTexto;
             }
             else
             {
