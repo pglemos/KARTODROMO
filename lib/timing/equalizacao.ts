@@ -62,7 +62,7 @@ export type ChecklistKart = {
   acaoOficina?: string;
   atualizadoEm?: number;
   autor?: string;
-  confirmacaoManual?: { aberturaMm: number; bloco: number; confirmadoEm: number; autor: string };
+  confirmacaoManual?: { aberturaMm: number; bloco: number; confirmadoEm: number; autor: string; passagens?: number };
 };
 
 export type ConfigEqualizacao = {
@@ -150,6 +150,19 @@ const mm2 = (x: number) => Math.round(x * 100) / 100;
 /** 0.1 → "0,1" · 0.25 → "0,25" · 17 → "17,0" (sem sinal) */
 export const fmtMm = (x: number) => Math.abs(x).toFixed(2).replace(/0$/, '').replace('.', ',');
 
+export function kartComparavel(value: unknown): string | null {
+  const text = String(value ?? '').trim();
+  if (!/^\d+$/.test(text)) return null;
+  const numero = Number(text);
+  return Number.isInteger(numero) && numero >= 1 && numero <= 200 ? String(numero) : null;
+}
+
+export function melhoresVoltasDoKart<T extends { kart: string; lapMs: number }>(voltas: T[], kart: string): T[] {
+  const numero = kartComparavel(kart);
+  if (!numero) return [];
+  return voltas.filter((volta) => kartComparavel(volta.kart) === numero).sort((a, b) => a.lapMs - b.lapMs).slice(0, 5);
+}
+
 /** Tempo de volta como MM:SS:mmm (01:14:000) — o formato da equalização, porque há traçado de mais de um minuto. */
 export function fmtTempoVolta(ms: number | null | undefined) {
   if (ms == null || !(ms > 0)) return '';
@@ -220,7 +233,7 @@ export function ajusteRedutorMm(deltaMs: number, regra: RegraRedutor): number {
   if (a <= regra.toleranciaMs) return 0;
   if (regra.faixasPersonalizadas?.length) {
     const linha = regra.faixasPersonalizadas.find((f) => a <= f.ateMs);
-    const ultima = regra.faixasPersonalizadas.at(-1)!;
+    const ultima = regra.faixasPersonalizadas[regra.faixasPersonalizadas.length - 1]!;
     const ajuste = linha ? linha.mm : ultima.mm + Math.ceil((a - ultima.ateMs) / regra.faixaMs) * regra.passoMm;
     return mm2(Math.sign(deltaMs) * ajuste);
   }
@@ -304,6 +317,8 @@ export function calcularEqualizacao(
   let metaOrigem: ResultadoEqualizacao['metaOrigem'] = 'sem-meta';
   if (cfg.metaModo === 'fixa' && Number(cfg.metaFixaMs) > 0) { metaMs = Math.round(Number(cfg.metaFixaMs)); metaOrigem = 'fixa'; }
   else if (melhoresRefs.length) { metaMs = Math.min(...melhoresRefs); metaOrigem = 'referencia'; }
+  // Item 9: Fallback determinístico para meta fixa do traçado se karts referência ainda não completaram volta
+  else if (Number(cfg.metaFixaMs) > 0) { metaMs = Math.round(Number(cfg.metaFixaMs)); metaOrigem = 'fixa'; }
 
   const karts = competidores.map((c): KartEqualizacao => {
     const v = voltasValidas(c);
@@ -360,11 +375,14 @@ export function calcularEqualizacao(
     } else if (blocos.length) acao = 'Falta 1 volta para fechar o bloco';
     if (status === 'SEM VOLTAS' && finalizada) acao = 'Não andou nesta equalização';
     const manual = base.checklist?.confirmacaoManual;
-    const confirmadoManualmente = ultimo != null && metaMs != null && manual?.bloco === ultimo.bloco
-      && Number.isFinite(manual.aberturaMm) && Math.abs(manual.aberturaMm) <= 20;
+    const passagens = c.crossings.filter((passagem) => !passagem.deleted).length;
+    const confirmacaoAtual = manual?.passagens != null
+      ? manual.passagens === passagens
+      : manual?.bloco === (ultimo?.bloco ?? 0);
+    const confirmadoManualmente = Boolean(manual && confirmacaoAtual && Number.isFinite(manual.aberturaMm) && Math.abs(manual.aberturaMm) <= 20);
     if (confirmadoManualmente) {
       status = 'EQUALIZADO'; ajusteMm = 0; aberturaMm = mm2(manual!.aberturaMm);
-      acao = `Equalizado manualmente pela oficina com o redutor ${rotuloRedutor(aberturaMm, inicial)} (sem voltas de confirmação): liberar`;
+      acao = `Equalizado manualmente · NÃO TESTADO com o redutor ${rotuloRedutor(aberturaMm, inicial)}: liberar`;
     }
     // o que a oficina escreveu vale mais que a sugestão automática
     const daOficina = base.checklist?.acaoOficina?.trim();

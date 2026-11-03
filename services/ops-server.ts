@@ -56,21 +56,39 @@ const TERMO_FILE = process.env.OPS_TERMO_FILE ? resolve(process.cwd(), process.e
 const TIMING_URL = (process.env.OPS_TIMING_URL || 'http://192.168.20.249:4050').replace(/\/$/, '');
 let sincronizacaoTracados: Promise<unknown> | null = null;
 let tracadosSincronizadosEm = 0;
+let tracadosUltimaQtd = -1;
 
 if (!KEY) console.warn('ATENCAO: OPS_RECEPCAO_KEY vazio, rotas da cronometragem ficam sem protecao');
 
 function log(...args: unknown[]) {
-  console.log(`[${new Date().toISOString()}]`, ...args);
+  // hora local de Brasília (o servidor roda em -03:00); antes ia UTC e atrapalhava o diagnóstico
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  console.log(`[${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}]`, ...args);
 }
+
+// Detecta travamento do event loop (a rede cai em rajadas de 10-40 s a cada ~10 min; isso dirá se é o processo).
+// ponytail: só registra; se aparecer cadência regular, investigar o timer culpado antes de trocar arquitetura.
+let pingAnterior = Date.now();
+setInterval(() => {
+  const agora = Date.now();
+  const atraso = agora - pingAnterior;
+  pingAnterior = agora;
+  if (atraso > 2000) log(`AVISO: event loop travado por ${atraso} ms`);
+}, 1000).unref();
 
 /** Espelha o catálogo da Cronometragem sob demanda, inclusive quando a Recepção é aberta depois de uma alteração. */
 async function sincronizarTracadosDaCronometragem() {
   if (Date.now() - tracadosSincronizadosEm < 30_000) return;
   if (sincronizacaoTracados) return sincronizacaoTracados;
-  sincronizacaoTracados = syncTimingTracks({ timingUrl: TIMING_URL, query, one })
+    sincronizacaoTracados = syncTimingTracks({ timingUrl: TIMING_URL, query, one })
     .then((tracks) => {
       tracadosSincronizadosEm = Date.now();
-      log(`catálogo de traçados sincronizado: ${tracks.length} opção(ões) ativas`);
+      // só registra quando muda a quantidade — antes enchia o log a cada 30 s
+      if (tracks.length !== tracadosUltimaQtd) {
+        tracadosUltimaQtd = tracks.length;
+        log(`catálogo de traçados sincronizado: ${tracks.length} opção(ões) ativas`);
+      }
     })
     .catch((err) => {
       log(`catálogo de traçados: sincronização indisponível (${(err as Error).message})`);
@@ -146,13 +164,26 @@ const int = (v: unknown, name: string) => {
   return n;
 };
 
-async function sessoesDaCronometragem(de?: string, ate?: string): Promise<ReceptionTimingSession[]> {
-  let response: Response;
-  try {
-    response = await fetch(`${TIMING_URL}/api/sessions`, { signal: AbortSignal.timeout(6_000) });
-  } catch {
-    throw new HttpError(502, 'A cronometragem está indisponível no momento.');
+/** Chamada à cronometragem (ORBITS): timeout generoso (Endurance com muitas voltas demora) e 1 nova tentativa se a rede falhar na hora
+ *  (reinício do :4050 / "fetch failed"). Erro final vira 502 com mensagem clara, nunca 500. */
+async function fetchCrono(url: string, timeoutMs: number): Promise<Response> {
+  let ultimo: unknown;
+  for (let tentativa = 0; tentativa < 2; tentativa++) {
+    try {
+      return await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+    } catch (e) {
+      ultimo = e;
+      if (tentativa === 0) await new Promise((r) => setTimeout(r, 800));
+    }
   }
+  const timeout = (ultimo as Error)?.name === 'TimeoutError' || (ultimo as Error)?.name === 'AbortError';
+  throw new HttpError(502, timeout
+    ? 'A cronometragem demorou para responder (bateria longa?). Tente de novo em instantes.'
+    : 'A cronometragem está indisponível no momento.');
+}
+
+async function sessoesDaCronometragem(de?: string, ate?: string): Promise<ReceptionTimingSession[]> {
+  const response = await fetchCrono(`${TIMING_URL}/api/sessions`, 20_000);
   if (!response.ok) throw new HttpError(502, `A cronometragem respondeu HTTP ${response.status}.`);
   const payload: unknown = await response.json();
   if (!Array.isArray(payload)) throw new HttpError(502, 'A cronometragem devolveu uma lista inválida de baterias.');
@@ -205,47 +236,226 @@ async function termoHtml(ids: number[], branco = false) {
   });
 }
 // ---------------------------------------------------------------- fila de impressao da recepcao
-// O totem nao tem impressora: o termo entra nesta fila e o programa da Recepcao (com a TM-T20)
-// pega e imprime em segundos, como o LapTime fazia pelo servidor. Fica so em memoria: um
-// servidor reiniciado perde no maximo os termos das ultimas horas, que a recepcao reimprime.
-type Impressao = { id: number; url: string; titulo: string; origem: string; criadoEm: number; pegoEm?: number; feitaEm?: number; tentativas: number };
-const filaImpressao: Impressao[] = [];
-let seqImpressao = 0;
-const IMPRESSAO_VALIDADE_MS = 3 * 60 * 60 * 1000;
-const IMPRESSAO_REENTREGA_MS = 90 * 1000;
+// O totem nao tem impressora: o termo entra na tabela dbo.FilaImpressao (SQL Server) e o programa da Recepcao
+// (com a TM-T20) pega e imprime em segundos, como o LapTime fazia pelo servidor.
+// Persistido em banco: sobrevive a reinicios do SRVKART :4060.
+// Termos pendentes com mais de 3 horas passam para contingencia (Status = 'falhou', UltimoErro = 'contingencia')
+// sem expurgo fisico, garantindo retencao de dados caso a recepcao fique fechada ou deslogada.
 
-function enfileirarImpressao(url: string, titulo: string, origem: string) {
-  const agora = Date.now();
-  for (let i = filaImpressao.length - 1; i >= 0; i--) if (agora - filaImpressao[i].criadoEm > IMPRESSAO_VALIDADE_MS) filaImpressao.splice(i, 1);
-  const job: Impressao = { id: ++seqImpressao, url, titulo, origem, criadoEm: agora, tentativas: 0 };
-  filaImpressao.push(job);
-  log(`impressao #${job.id} na fila (${titulo}, ${origem})`);
-  return job;
+type FilaImpressaoJob = {
+  id: number;
+  url: string;
+  titulo: string;
+  origem: string;
+  tentativa: number;
+};
+
+async function enfileirarImpressao(url: string, titulo: string, origem: string): Promise<{ id: number; url: string; titulo: string; origem: string }> {
+  try {
+    // Transiciona para contingencia trabalhos pendentes ha mais de 3 horas (sem expurgo fisico)
+    await query(`
+      UPDATE dbo.FilaImpressao
+      SET Status = 'falhou', UltimoErro = 'contingencia'
+      WHERE Status IN ('pendente', 'imprimindo')
+        AND DATEDIFF(hour, CriadoEm, SYSDATETIME()) >= 3
+    `).catch(() => undefined);
+
+    const row = await one<{ id: number }>(`
+      INSERT INTO dbo.FilaImpressao (Url, Titulo, Origem, Status, Tentativas)
+      OUTPUT inserted.Id id
+      VALUES (@url, @titulo, @origem, 'pendente', 0)
+    `, { url, titulo, origem });
+
+    const id = row?.id ?? 0;
+    log(`impressao #${id} na fila (${titulo}, ${origem})`);
+    return { id, url, titulo, origem };
+  } catch (err) {
+    log(`erro ao enfileirar impressao no banco: ${err instanceof Error ? err.message : String(err)}`);
+    throw err;
+  }
 }
 
-function proximaImpressao() {
+async function proximaImpressao(): Promise<FilaImpressaoJob | null> {
+  try {
+    // Busca e reserva atomicamente o proximo trabalho com lock atômico UPDLOCK + READPAST
+    // Conforme contrato oficial de PROJECT.md
+    const rows = await query<FilaImpressaoJob>(`
+      WITH Proximo AS (
+        SELECT TOP (1) * FROM dbo.FilaImpressao WITH (UPDLOCK, READPAST)
+        WHERE Status = 'pendente' OR (Status = 'imprimindo' AND PegoEm < DATEADD(second, -90, SYSDATETIME()))
+        ORDER BY CriadoEm ASC
+      )
+      UPDATE Proximo SET Status = 'imprimindo', PegoEm = SYSDATETIME(), Tentativas = Tentativas + 1
+      OUTPUT inserted.Id id, inserted.Url url, inserted.Titulo titulo, inserted.Origem origem, inserted.Tentativas tentativa;
+    `);
+
+    return rows[0] ?? null;
+  } catch (err) {
+    log(`erro ao buscar proxima impressao no banco: ${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  }
+}
+
+/** Funções de proteção de privacidade (LGPD / PII) no autoatendimento público */
+function mascararDocumento(doc: unknown, tipo?: unknown): string {
+  if (!doc) return '';
+  const d = String(doc).trim();
+  const digits = onlyDigits(d);
+  if (digits.length === 11 && (!tipo || String(tipo).toUpperCase() === 'CPF')) {
+    return `***.${digits.slice(3, 6)}.${digits.slice(6, 9)}-**`;
+  }
+  if (d.length <= 4) return '***';
+  return `${d.slice(0, 2)}***${d.slice(-2)}`;
+}
+
+function mascararEmail(email: unknown): string {
+  if (!email) return '';
+  const s = String(email).trim();
+  const at = s.indexOf('@');
+  if (at <= 0) return 'u***@***.com';
+  const user = s.slice(0, at);
+  const domain = s.slice(at + 1);
+  const u = user.length > 2 ? `${user[0]}***${user[user.length - 1]}` : (user.length > 0 ? `${user[0]}***` : 'u***');
+  const dot = domain.lastIndexOf('.');
+  const domName = dot > 0 ? domain.slice(0, dot) : domain;
+  const ext = dot > 0 ? domain.slice(dot) : '.com';
+  const dMask = domName.length > 0 ? `${domName[0]}***` : 'd***';
+  return `${u}@${dMask}${ext}`;
+}
+
+function mascararTelefone(telefone: unknown): string {
+  if (!telefone) return '';
+  const digits = onlyDigits(telefone);
+  if (digits.length === 11) {
+    return `(${digits.slice(0, 2)}) ${digits[2]}****-${digits.slice(-4)}`;
+  }
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 2)}) ****-${digits.slice(-4)}`;
+  }
+  if (digits.length >= 4) {
+    return `(**) *****-${digits.slice(-4)}`;
+  }
+  return '(**) *****-****';
+}
+
+export function erroTelefone(telefone: unknown, tipoDoc?: string): string | null {
+  const raw = String(telefone ?? '').trim();
+  if (!raw) return 'O número de telefone é obrigatório.';
+  if (raw.includes('*')) return null;
+  if (!/^[+\d\s().-]+$/.test(raw)) return 'Número de telefone inválido.';
+  const digits = onlyDigits(raw);
+  const isInternacional = raw.startsWith('+') || String(tipoDoc ?? '').toUpperCase() === 'PASSAPORTE';
+  if (isInternacional) {
+    return digits.length >= 7 && digits.length <= 15 ? null : 'Número de telefone inválido.';
+  }
+  return digits.length >= 10 && digits.length <= 13 ? null : 'Número de telefone inválido.';
+}
+
+function mascararEndereco(endereco: unknown): string {
+  if (!endereco) return '';
+  const s = String(endereco).trim();
+  if (!s) return '';
+  const virgula = s.indexOf(',');
+  const logradouro = (virgula > 0 ? s.slice(0, virgula) : s).trim();
+  const partes = logradouro.split(/\s+/);
+  return partes.length <= 1 ? `${partes[0].slice(0, 3)}***` : `${partes[0]} ***, ***`;
+}
+
+function mascararNomeMenor(nome: unknown): string {
+  if (!nome) return '';
+  const partes = String(nome).trim().split(/\s+/).filter(Boolean);
+  if (partes.length <= 1) return partes[0] ?? '';
+  const primeiro = partes[0];
+  const ultimo = partes[partes.length - 1];
+  const meio = partes.slice(1, -1).map((p) => `${p[0]}.`).join(' ');
+  const meioStr = meio ? ` ${meio}` : '';
+  return `${primeiro}${meioStr} ${ultimo[0]}***`;
+}
+
+/** Calcula a idade em anos completos a partir de YYYY-MM-DD */
+function calcularIdade(nascimento: unknown, refData: Date = new Date()): number | null {
+  if (!nascimento) return null;
+  const s = String(nascimento).trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const ano = Number(m[1]);
+  const mes = Number(m[2]);
+  const dia = Number(m[3]);
+  if (!ano || !mes || !dia) return null;
+  let idade = refData.getFullYear() - ano;
+  const mDiff = (refData.getMonth() + 1) - mes;
+  if (mDiff < 0 || (mDiff === 0 && refData.getDate() < dia)) idade--;
+  return idade >= 0 ? idade : null;
+}
+
+/**
+ * Emite um token de sessão assinado por HMAC para o totem.
+ * Substitui amarração frágil por IP de socket e IPs hardcoded.
+ */
+function emiteTotemSession(clienteId: number, totemId: string): string {
   const agora = Date.now();
-  const job = filaImpressao.find((j) => !j.feitaEm && agora - j.criadoEm <= IMPRESSAO_VALIDADE_MS && (!j.pegoEm || agora - j.pegoEm > IMPRESSAO_REENTREGA_MS));
-  if (!job) return null;
-  job.pegoEm = agora;
-  job.tentativas++;
-  return job;
+  const exp = agora + 15 * 60_000;
+  const nonce = Math.random().toString(36).slice(2, 8);
+  const payload = `${clienteId}:${totemId}:${agora}:${exp}:${nonce}`;
+  const sig = sign(`totem_sess:${payload}`);
+  return `${payload}:${sig}`;
+}
+
+/** Valida o token de sessão assinado por HMAC do totem */
+function validaTotemSession(token: string | null | undefined): { clienteId: number; totemId: string } | null {
+  if (!token) return null;
+  const partes = String(token).trim().split(':');
+  if (partes.length !== 6) return null;
+  const [cidStr, totemId, agoraStr, expStr, nonce, sig] = partes;
+  const payload = `${cidStr}:${totemId}:${agoraStr}:${expStr}:${nonce}`;
+  if (sig !== sign(`totem_sess:${payload}`)) return null;
+  const exp = Number(expStr);
+  if (!Number.isFinite(exp) || Date.now() > exp) return null;
+  const cid = Number(cidStr);
+  if (!Number.isInteger(cid) || cid <= 0) return null;
+  return { clienteId: cid, totemId };
 }
 
 /**
  * Quem se identificou por último em cada totem (vale 15 min). É o "dono" das vagas pagas pela reserva online do grupo
- * que está no totem: a lista de baterias soma essas vagas e, na inscrição, elas passam para os pilotos do grupo
- * (mesmo que quem pagou não vá correr). Fica só no servidor: o app do totem aprovado não muda.
+ * que está no totem: a lista de baterias soma essas vagas e, na inscrição, elas passam para os pilotos do grupo.
+ * Valida prioritariamente o header seguro X-Totem-Session ou query totemSession/ts, com fallback para IP.
  */
 const identificadoNoTotem = new Map<string, { id: number; em: number }>();
 const ipDe = (req: http.IncomingMessage) => String(req.socket.remoteAddress ?? '').replace(/^::ffff:/, '');
-function donoNoTotem(req: http.IncomingMessage) {
+
+function donoNoTotem(req: http.IncomingMessage): number | null {
+  const headerToken = req.headers['x-totem-session'];
+  if (typeof headerToken === 'string' && headerToken.trim()) {
+    const s = validaTotemSession(headerToken.trim());
+    if (s) return s.clienteId;
+  }
+  try {
+    const u = new URL(req.url ?? '/', 'http://totem');
+    const qToken = u.searchParams.get('totemSession') || u.searchParams.get('ts');
+    if (qToken) {
+      const s = validaTotemSession(qToken);
+      if (s) return s.clienteId;
+    }
+  } catch { /* ignore */ }
+
   const x = identificadoNoTotem.get(ipDe(req));
   return x && Date.now() - x.em < 15 * 60_000 ? x.id : null;
 }
 
-function origemDe(req: http.IncomingMessage) {
-  const ip = String(req.socket.remoteAddress ?? '').replace(/^::ffff:/, '');
+function origemDe(req: http.IncomingMessage): string {
+  const totemHeader = req.headers['x-totem-id'];
+  if (typeof totemHeader === 'string' && totemHeader.trim()) return totemHeader.trim();
+
+  const clientMachine = String(req.headers['x-client-machine'] ?? '').trim().toUpperCase();
+  if (clientMachine === 'TOTEN1' || clientMachine === 'TOTEM1') return 'Totem 1';
+  if (clientMachine === 'DESKTOP-4OR2GFI' || clientMachine === 'TOTEN2' || clientMachine === 'TOTEM2') return 'Totem 2';
+  if (clientMachine && !clientMachine.startsWith('SRVKART')) return clientMachine;
+
+  const sess = validaTotemSession(String(req.headers['x-totem-session'] ?? ''));
+  if (sess?.totemId) return sess.totemId;
+
+  const ip = ipDe(req);
   return ip === '192.168.20.161' ? 'Totem 1' : ip === '192.168.20.69' ? 'Totem 2' : ip || 'totem';
 }
 
@@ -297,39 +507,59 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     // outro cliente no totem: o anterior deixa de ser o dono das vagas pagas (não passam para um estranho)
     if (!c) return identificadoNoTotem.delete(ipDe(req)), send(res, 200, { cliente: null }), true;
     identificadoNoTotem.set(ipDe(req), { id: Number(c.id), em: Date.now() });
-    const dependentes = await query<{ id: number; nome: string; nascimento: string }>(
-      `SELECT c.Id id, c.Nome nome, CONVERT(varchar(10), c.Nascimento, 126) nascimento FROM dbo.Cliente c WHERE c.ResponsavelId = @id AND c.Bloqueado = 0 ORDER BY c.Nome`,
-      { id: c.id },
-    );
+    const totemToken = emiteTotemSession(Number(c.id), origemDe(req));
+
+    const buscaMenores = Boolean(body.menor);
+    let dependentesMascarados: Array<{ id: number; nome: string; nascimento: string; token: string }> = [];
+    if (buscaMenores) {
+      const dependentes = await query<{ id: number; nome: string; nascimento: string }>(
+        `SELECT c.Id id, c.Nome nome, CONVERT(varchar(10), c.Nascimento, 126) nascimento FROM dbo.Cliente c WHERE c.ResponsavelId = @id AND c.Bloqueado = 0 ORDER BY c.Nome`,
+        { id: c.id },
+      );
+      dependentesMascarados = dependentes.map((d) => ({ ...d, token: sign(`cli:${d.id}`) })).map((d) => ({
+        id: d.id,
+        nome: mascararNomeMenor(d.nome),
+        nascimento: d.nascimento ? `${d.nascimento.slice(0, 4)}-01-01` : '',
+        token: d.token,
+      }));
+    }
+
     // cadastro completo (pedido do dono em 26/09): o cliente confere e corrige todos os dados no totem
     const txt = (v: unknown) => (v == null ? '' : String(v).trim());
-    const num = txt(c.numero);
-    const comp = txt(c.complemento);
     const enderecoCompleto = enderecoDoTotem(c.endereco, c.numero, c.complemento);
+    const docMasc = mascararDocumento(c.documento, c.tipoDocumento);
+    const emailMasc = mascararEmail(c.email);
+    const foneMasc = mascararTelefone(c.telefone);
+    const endMasc = mascararEndereco(enderecoCompleto);
 
     send(res, 200, {
       cliente: {
         id: c.id,
         nome: c.nome,
         tipoDocumento: txt(c.tipoDocumento) || 'CPF',
-        documento: txt(c.documento),
-        email: txt(c.email),
-        telefone: txt(c.telefone),
-        nascimento: txt(c.nascimento),
+        documento: docMasc,
+        documentoMascarado: docMasc,
+        email: emailMasc,
+        emailMascarado: emailMasc,
+        telefone: foneMasc,
+        telefoneMascarado: foneMasc,
+        nascimento: c.nascimento ? `**/**/${String(c.nascimento).slice(0, 4)}` : '',
         temNascimento: Boolean(c.nascimento),
         peso: c.peso == null ? '' : String(Number(c.peso)),
-        cep: txt(c.cep),
-        endereco: enderecoCompleto,
-        numero: num,
-        complemento: comp,
+        cep: txt(c.cep) ? `${txt(c.cep).slice(0, 5)}-***` : '',
+        endereco: endMasc,
+        enderecoMascarado: endMasc,
+        numero: '',
+        complemento: '',
         bairro: txt(c.bairro),
         cidade: txt(c.cidade),
         estado: txt(c.estado),
         lgpd: Boolean(c.lgpdAceiteEm),
         bloqueado: Boolean(c.bloqueado),
       },
-      dependentes: dependentes.map((d) => ({ ...d, token: sign(`cli:${d.id}`) })),
+      dependentes: dependentesMascarados,
       token: sign(`cli:${c.id}`),
+      totemToken,
     });
     return true;
   }
@@ -349,41 +579,122 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
       const responsavel = await one<{ email: string | null }>(`SELECT Email email FROM dbo.Cliente WHERE Id = @id`, { id: responsavelId });
       dados.email = responsavel?.email ?? '';
     }
+
+    const idade = calcularIdade(dados.nascimento);
+    if (responsavelId) {
+      if (body.consentimentoMenor !== true) {
+        throw new HttpError(400, 'É obrigatório o consentimento expresso do responsável legal para o tratamento de dados do menor de idade (LGPD Art. 14).');
+      }
+      if (idade !== null && idade >= 18) {
+        throw new HttpError(400, 'Participantes com 18 anos ou mais devem realizar cadastro individual próprio.');
+      }
+      if (idade !== null && idade < 6) {
+        throw new HttpError(400, 'A idade mínima regulamentar para pilotagem é de 6 anos completos.');
+      }
+    } else {
+      if (!id && idade !== null && idade < 18) {
+        throw new HttpError(400, 'Menores de 18 anos devem ser cadastrados por um responsável legal (LGPD Art. 14).');
+      }
+    }
+
+    const semInstagram = Boolean(body.semInstagram || dados.semInstagram);
+    dados.semInstagram = semInstagram;
+
     const erroCadastro = erroCadastroObrigatorio(dados);
     if (erroCadastro) throw new HttpError(400, erroCadastro);
     if (id) {
       if (String(body.token ?? '') !== sign(`cli:${id}`)) throw new HttpError(403, 'Sessão expirada, identifique-se de novo.');
-      // o totem mostra rua, número e complemento num campo só: se o cliente não mexeu, não regrava
-      // (senão o número e o complemento saíam repetidos no termo); se mexeu, o texto vira o endereço todo
-      let limparNumero = false;
+
+      // Proteção: não sobrescreve campos que retornaram com máscara e não foram alterados
+      if (typeof dados.documento === 'string' && dados.documento.includes('***')) delete dados.documento;
+      if (typeof dados.email === 'string' && dados.email.includes('***')) delete dados.email;
+      if (typeof dados.telefone === 'string' && dados.telefone.includes('***')) delete dados.telefone;
+      if (typeof dados.cep === 'string' && dados.cep.includes('***')) delete dados.cep;
+      if (typeof dados.documento === 'string' && dados.documento.includes('*')) delete dados.documento;
+      if (typeof dados.email === 'string' && dados.email.includes('*')) delete dados.email;
+      if (typeof dados.telefone === 'string' && dados.telefone.includes('*')) delete dados.telefone;
+      if (typeof dados.cep === 'string' && dados.cep.includes('*')) delete dados.cep;
+      if (typeof dados.nascimento === 'string' && (dados.nascimento.includes('*') || !dados.nascimento.trim())) delete dados.nascimento;
+
+      if (dados.documento && !String(dados.documento).includes('*')) {
+        const docDigits = onlyDigits(dados.documento);
+        if (docDigits) {
+          const dup = await one<{ id: number }>(`SELECT TOP 1 Id id FROM dbo.Cliente WHERE DocumentoNum = @d AND Id <> @id`, { d: docDigits, id });
+          if (dup) {
+            return send(res, 409, {
+              error: 'documento_cadastrado',
+              message: 'Já existe cadastro com esse documento. Volte e informe o documento para continuar.',
+              id: dup.id,
+              token: sign(`cli:${dup.id}`),
+            }), true;
+          }
+        }
+      }
+      if (dados.telefone && !String(dados.telefone).includes('*')) {
+        const errTel = erroTelefone(dados.telefone, dados.tipoDocumento);
+        if (errTel) throw new HttpError(400, errTel);
+      }
+
+      // o totem mostra rua, número e complemento num campo só: se o cliente não mexeu ou se veio mascarado, não regrava
       if (dados.endereco !== undefined) {
         const atual = await one<{ endereco: string | null; numero: string | null; complemento: string | null }>(
           `SELECT Endereco endereco, Numero numero, Complemento complemento FROM dbo.Cliente WHERE Id = @id`,
           { id },
         );
         const digitado = String(dados.endereco ?? '').trim();
-        if (!digitado || (atual && digitado === enderecoDoTotem(atual.endereco, atual.numero, atual.complemento))) delete dados.endereco;
-        else limparNumero = Boolean(atual?.numero || atual?.complemento);
+        if (digitado.includes('***') || !digitado || (atual && digitado === enderecoDoTotem(atual.endereco, atual.numero, atual.complemento))) {
+          delete dados.endereco;
+        }
       }
+
+      // Preservação de dados de endereço: NUNCA zera Numero e Complemento como NULL
       await updateCliente(id, { ...dados, lgpd: true }, true);
-      if (limparNumero) await query(`UPDATE dbo.Cliente SET Numero = NULL, Complemento = NULL WHERE Id = @id`, { id });
+      const totemToken = emiteTotemSession(id, origemDe(req));
       log(`totem: cadastro atualizado ${id}`);
-      return send(res, 200, { id, token: sign(`cli:${id}`) }), true;
+      return send(res, 200, { id, token: sign(`cli:${id}`), totemToken }), true;
     }
     if (!responsavelId && !String(dados.documento ?? '').trim()) throw new HttpError(400, 'O documento é obrigatório.');
     if (!String(dados.nome ?? '').trim()) throw new HttpError(400, 'O nome é obrigatório.');
     if (String(dados.nome).trim().split(/\s+/).length < 2) throw new HttpError(400, 'Informe o nome completo.');
     if (dados.documento && (dados.tipoDocumento ?? 'CPF') === 'CPF' && !isValidCpf(String(dados.documento))) throw new HttpError(400, 'CPF inválido.');
     if (!responsavelId) {
-      if (!dados.telefone || onlyDigits(dados.telefone).length < 10) throw new HttpError(400, 'O número de telefone é obrigatório.');
+      const errTel = erroTelefone(dados.telefone, dados.tipoDocumento);
+      if (errTel) throw new HttpError(400, errTel);
       const dup = await one<{ id: number }>(`SELECT TOP 1 Id id FROM dbo.Cliente WHERE DocumentoNum = @d`, { d: onlyDigits(dados.documento) });
-      if (dup) throw new HttpError(409, 'Já existe cadastro com esse documento. Volte e informe o documento para continuar.');
+      if (dup) {
+        return send(res, 409, {
+          error: 'documento_cadastrado',
+          message: 'Já existe cadastro com esse documento. Volte e informe o documento para continuar.',
+          id: dup.id,
+          token: sign(`cli:${dup.id}`),
+        }), true;
+      }
+    } else if (dados.documento && String(dados.documento).trim()) {
+      const dMinor = onlyDigits(dados.documento);
+      if (dMinor) {
+        const dup = await one<{ id: number }>(`SELECT TOP 1 Id id FROM dbo.Cliente WHERE DocumentoNum = @d`, { d: dMinor });
+        if (dup) {
+          return send(res, 409, {
+            error: 'documento_cadastrado',
+            message: 'Já existe cadastro com esse documento.',
+            id: dup.id,
+            token: sign(`cli:${dup.id}`),
+          }), true;
+        }
+      }
     }
     if (!dados.nascimento) throw new HttpError(400, 'A data de nascimento é obrigatória.');
-    const newId = await insertCliente({ ...dados, responsavelId, lgpd: true }, 'totem');
+    const newId = await insertCliente({
+      ...dados,
+      responsavelId,
+      lgpd: true,
+      consentimentoMenor: Boolean(responsavelId && body.consentimentoMenor),
+      lgpdMenorResponsavelId: responsavelId,
+    }, 'totem');
     if (!responsavelId) identificadoNoTotem.set(ipDe(req), { id: newId, em: Date.now() });
+    const totemToken = emiteTotemSession(newId, origemDe(req));
     log(`totem: cliente novo ${newId}${responsavelId ? ` (menor de ${responsavelId})` : ''}`);
-    send(res, 201, { id: newId, token: sign(`cli:${newId}`) });
+    send(res, 201, { id: newId, token: sign(`cli:${newId}`), totemToken });
     return true;
   }
 
@@ -396,18 +707,36 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     if (dono && !grupo.includes(dono)) grupo.push(dono);
     const doGrupo = new Map<number, number>();
     if (grupo.length && rows.length) {
-      const lista = grupo.join(',');
-      for (const g of await query<{ b: number; n: number }>(
-        `SELECT i.BateriaId b, COUNT(*) n FROM dbo.Inscricao i
-          WHERE i.BateriaId IN (${rows.map((r) => Number(r.id)).join(',')}) AND i.Status <> 'cancelada'
-            AND (i.ClienteId IN (${lista})
-                 OR (i.Origem = 'site' AND i.Pago = 1 AND i.ClienteId IN (SELECT ResponsavelId FROM dbo.Cliente WHERE Id IN (${lista}) AND ResponsavelId IS NOT NULL)))
-          GROUP BY i.BateriaId`,
-      )) doGrupo.set(g.b, g.n);
+      const bParams: Record<string, unknown> = {};
+      const bMarks: string[] = [];
+      rows.forEach((r, idx) => {
+        const key = `bat_${idx}`;
+        bParams[key] = Number(r.id);
+        bMarks.push(`@${key}`);
+      });
+
+      const gParams: Record<string, unknown> = {};
+      const gMarks: string[] = [];
+      grupo.forEach((id, idx) => {
+        const key = `grp_${idx}`;
+        gParams[key] = Number(id);
+        gMarks.push(`@${key}`);
+      });
+
+      const sqlText = `
+        SELECT i.BateriaId b, COUNT(*) n FROM dbo.Inscricao i
+        WHERE i.BateriaId IN (${bMarks.join(',')}) AND i.Status <> 'cancelada'
+          AND (i.ClienteId IN (${gMarks.join(',')})
+               OR (i.Origem = 'site' AND i.Pago = 1 AND i.ClienteId IN (SELECT ResponsavelId FROM dbo.Cliente WHERE Id IN (${gMarks.join(',')}) AND ResponsavelId IS NOT NULL)))
+        GROUP BY i.BateriaId`;
+
+      for (const g of await query<{ b: number; n: number }>(sqlText, { ...bParams, ...gParams })) {
+        doGrupo.set(g.b, g.n);
+      }
     }
     send(res, 200, rows
       .map((r) => ({ ...r, livres: Math.max(0, r.vagas - r.ocupadas) + (doGrupo.get(Number(r.id)) ?? 0) }))
-      .filter((r) => bateriaDisponivelNoTotem(r, r.dataHoje))
+      .filter((r) => bateriaDisponivelNoTotem(r, r.dataHoje, r.agoraHora))
       .map((r) => ({
         id: r.id,
         nome: r.nome,
@@ -466,9 +795,11 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     log(`totem: ${ids.length} pre-reserva(s) em ${baterias.length} bateria(s)`);
     const imprimir = p['totem.imprimirTermo'] !== 'false';
     const naRecepcao = imprimir && p['totem.termoNaRecepcao'] !== 'false';
-    // cada termo é um trabalho de impressão separado: a TM-T20 corta o papel no fim de cada trabalho,
-    // então vários termos num trabalho só saíam emendados
-    if (naRecepcao) for (const idInscricao of termoDoPiloto.values()) enfileirarImpressao(termoLink([idInscricao]), 'Termo de responsabilidade', origemDe(req));
+    if (naRecepcao) {
+      for (const idInscricao of termoDoPiloto.values()) {
+        await enfileirarImpressao(termoLink([idInscricao]), 'Termo de responsabilidade', origemDe(req));
+      }
+    }
     send(res, 201, { inscricoes: ids, inicio: primeira?.inicio, termoUrl: imprimir ? termoLink(ids) : null, termoNaRecepcao: naRecepcao });
     return true;
   }
@@ -478,16 +809,28 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
 
 // ---------------------------------------------------------------- login da recepcao
 
+// limite simples de tentativas de login por IP (rede local): 10 erros = 15 min de bloqueio
+const tentativasLogin = new Map<string, { n: number; ate: number }>();
+
 async function loginRoute(req: http.IncomingMessage, res: http.ServerResponse) {
   const b = await readBody(req);
+  const ip = req.socket.remoteAddress ?? '?';
+  const agora = Date.now();
+  const tent = tentativasLogin.get(ip);
+  if (tent && tent.n >= 10 && agora < tent.ate) throw new HttpError(429, 'Muitas tentativas de login. Aguarde alguns minutos.');
   const login = String(b.login ?? '').trim().toLowerCase();
   const senha = String(b.senha ?? '');
   if (!b.termos) throw new HttpError(400, 'É necessário concordar com os termos de uso.');
   const u = await one<{ id: number; nome: string; hash: string; admin: boolean; ativo: boolean }>(`SELECT Id id, Nome nome, SenhaHash hash, Admin admin, Ativo ativo FROM dbo.Usuario WHERE Login = @login`, { login });
   if (!u || !u.ativo || !confereSenha(senha, u.hash)) {
+    const reg = tentativasLogin.get(ip) ?? { n: 0, ate: 0 };
+    reg.n += 1;
+    if (reg.n >= 10) reg.ate = agora + 15 * 60_000;
+    tentativasLogin.set(ip, reg);
     log(`login recusado: ${login}`);
     throw new HttpError(401, 'Login ou senha inválidos.');
   }
+  tentativasLogin.delete(ip);
   log(`login: ${login}`);
   await query(`UPDATE dbo.Usuario SET UltimoAcesso = SYSDATETIME() WHERE Id = @id`, { id: u.id }).catch(() => undefined);
   send(res, 200, { token: emiteToken({ uid: u.id, nome: u.nome, admin: Boolean(u.admin) }), usuario: { id: u.id, nome: u.nome, admin: Boolean(u.admin) } });
@@ -533,7 +876,7 @@ const server = http.createServer(async (req, res) => {
       sessaoDe(req, url);
       const crono = path.match(/^\/relatorio\/crono\/([a-zA-Z0-9_-]{1,80})$/);
       if (crono) {
-        const response = await fetch(`${TIMING_URL}/resultado/${encodeURIComponent(crono[1])}`, { signal: AbortSignal.timeout(10_000) });
+        const response = await fetchCrono(`${TIMING_URL}/resultado/${encodeURIComponent(crono[1])}`, 30_000);
         if (!response.ok) throw new HttpError(502, 'Não foi possível carregar o resultado da cronometragem.');
         return sendHtml(res, prepararRelatorioRecepcao(await response.text(), TIMING_URL));
       }
@@ -547,7 +890,7 @@ const server = http.createServer(async (req, res) => {
       const sessao = sessaoDe(req, url);
       const dadosCrono = path.match(/^\/api\/office\/crono\/dados\/([a-zA-Z0-9_-]{1,80})(\/(?:passings|laps))?$/);
       if (dadosCrono && method === 'GET') {
-        const response = await fetch(`${TIMING_URL}/api/sessions/${encodeURIComponent(dadosCrono[1])}${dadosCrono[2] ?? ''}`, { signal: AbortSignal.timeout(10_000) });
+        const response = await fetchCrono(`${TIMING_URL}/api/sessions/${encodeURIComponent(dadosCrono[1])}${dadosCrono[2] ?? ''}`, 30_000);
         if (!response.ok) throw new HttpError(response.status === 404 ? 404 : 502, 'Dados da cronometragem indisponíveis.');
         const data = await response.json();
         if (dadosCrono[2]) return send(res, 200, data);
@@ -574,24 +917,81 @@ const server = http.createServer(async (req, res) => {
       }
       // agente de impressao do programa da Recepcao
       if (path === '/api/office/impressao/proxima' && method === 'GET') {
-        const job = proximaImpressao();
-        return send(res, 200, job ? { id: job.id, url: job.url, titulo: job.titulo, origem: job.origem, tentativa: job.tentativas } : {});
+        const job = await proximaImpressao();
+        return send(res, 200, {
+          ok: true,
+          job: job ? { id: job.id, url: job.url, titulo: job.titulo, origem: job.origem } : null,
+          ...(job ? { id: job.id, url: job.url, titulo: job.titulo, origem: job.origem, tentativa: job.tentativa } : {}),
+        });
       }
       if (path === '/api/office/impressao/teste' && method === 'POST') {
         const token = String(req.headers.authorization ?? '').slice(7) || String(url.searchParams.get('t') ?? '');
-        const job = enfileirarImpressao(`/termo?branco=1&t=${encodeURIComponent(token)}`, 'Teste de impressão (termo em branco)', sessao.nome);
-        return send(res, 201, { id: job.id });
+        const job = await enfileirarImpressao(`/termo?branco=1&t=${encodeURIComponent(token)}`, 'Teste de impressão (termo em branco)', sessao.nome);
+        return send(res, 201, { ok: true, id: job.id });
       }
       if (path === '/api/office/impressao/fila' && method === 'GET') {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars -- a URL assinada nao deve sair no diagnostico da fila
-        return send(res, 200, filaImpressao.map(({ url: _u, ...j }) => j));
+        const rows = await query<{
+          id: number;
+          titulo: string;
+          origem: string;
+          status: string;
+          tentativas: number;
+          criadoEm: string;
+          pegoEm: string | null;
+          feitaEm: string | null;
+          falhouEm: string | null;
+          ultimoErro: string | null;
+        }>(`
+          SELECT TOP (100)
+            Id id, Titulo titulo, Origem origem,
+            CASE WHEN Status = 'falhou' AND UltimoErro = 'contingencia' THEN 'contingencia' ELSE Status END status,
+            Tentativas tentativas,
+            CONVERT(varchar(19), CriadoEm, 126) criadoEm,
+            CONVERT(varchar(19), PegoEm, 126) pegoEm,
+            CONVERT(varchar(19), FeitaEm, 126) feitaEm,
+            CONVERT(varchar(19), FalhouEm, 126) falhouEm,
+            UltimoErro ultimoErro
+          FROM dbo.FilaImpressao
+          WHERE Status IN ('pendente', 'imprimindo')
+             OR (Status = 'falhou' AND UltimoErro = 'contingencia')
+             OR DATEDIFF(hour, CriadoEm, SYSDATETIME()) < 24
+          ORDER BY Id DESC
+        `).catch(() => []);
+        return send(res, 200, rows);
       }
       const mi = path.match(/^\/api\/office\/impressao\/(\d+)\/(feita|falhou)$/);
       if (mi && method === 'POST') {
-        const job = filaImpressao.find((j) => j.id === Number(mi[1]));
-        if (job && mi[2] === 'feita') { job.feitaEm = Date.now(); log(`impressao #${job.id} impressa na recepcao (${sessao.nome})`); }
-        if (job && mi[2] === 'falhou') { job.pegoEm = undefined; log(`impressao #${job.id} falhou na recepcao, volta pra fila`); }
-        return send(res, 200, { ok: !!job });
+        const id = Number(mi[1]);
+        if (mi[2] === 'feita') {
+          await query(`
+            UPDATE dbo.FilaImpressao
+            SET Status = 'impressa', FeitaEm = SYSDATETIME()
+            WHERE Id = @id
+          `, { id });
+          log(`impressao #${id} impressa na recepcao (${sessao.nome})`);
+          return send(res, 200, { ok: true });
+        }
+        if (mi[2] === 'falhou') {
+          await query(`
+            UPDATE dbo.FilaImpressao
+            SET Status = 'falhou',
+                FalhouEm = SYSDATETIME()
+            WHERE Id = @id
+          `, { id });
+          log(`impressao #${id} falhou na recepcao (${sessao.nome})`);
+          return send(res, 200, { ok: true });
+        }
+      }
+      const mr = path.match(/^\/api\/office\/impressao\/(\d+)\/reimprimir$/);
+      if (mr && method === 'POST') {
+        const id = Number(mr[1]);
+        await query(`
+          UPDATE dbo.FilaImpressao
+          SET Status = 'pendente', PegoEm = NULL, Tentativas = 0, UltimoErro = NULL
+          WHERE Id = @id
+        `, { id });
+        log(`impressao #${id} reenfileirada pela recepcao (${sessao.nome})`);
+        return send(res, 200, { ok: true });
       }
       const handled = await officeRoutes({ method, url, sessao, body: () => readBody(req) }, (status, body) => send(res, status, body));
       if (handled) return;
@@ -623,7 +1023,7 @@ const server = http.createServer(async (req, res) => {
           if (!Number.isSafeInteger(numero) || numero <= 0 || !(minutos > 0) || minutos > 600) { ignorados++; continue; }
           const linhas = await query<{ id: number; categoria: string | null; item: number | null; minutos: number; ultima: string | null }>(
             `SELECT Id id, Categoria categoria, ItemId item, MinutosUso minutos, CONVERT(varchar(19), UltimaManutencao, 126) ultima
-             FROM dbo.Manutencao WHERE TRY_CAST(LTRIM(RTRIM(Kart)) AS int) = @n`, { n: numero });
+             FROM dbo.Manutencao WHERE KartNumero = @n`, { n: numero });
           const cats = [...new Set(linhas.map((l) => l.categoria ?? ''))];
           const daCategoria = cat ? linhas.filter((l) => (l.categoria ?? '') === cat) : cats.length === 1 ? linhas : [];
           // o LapTime deixou controles repetidos do mesmo kart ("01" e "1", "12" e "12 "): soma só em UM por item —
@@ -753,3 +1153,15 @@ if (preCadastroLigado() && process.env.OPS_RESERVA_ONLINE === '1') {
   setInterval(pedidos, 5_000).unref();
   log('reserva online ligada');
 }
+
+// ---------------------------------------------------------------- estabilidade de runtime
+process.on('uncaughtException', (err) => {
+  console.error('CRITICAL: uncaughtException capturada no ops-server:', err);
+  log(`CRITICAL: uncaughtException: ${err instanceof Error ? err.stack ?? err.message : String(err)}`);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('CRITICAL: unhandledRejection capturada no ops-server:', reason);
+  log(`CRITICAL: unhandledRejection: ${reason instanceof Error ? reason.stack ?? reason.message : String(reason)}`);
+});
+
