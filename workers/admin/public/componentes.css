@@ -1,0 +1,153 @@
+/* Componentes do painel administrativo — UMA definição de cada peça, usada por todas as telas.
+   Só tokens (var(--kib-*)): nada de cor, fonte ou medida solta. Carregado depois de app.css (as regras daqui valem).
+   Escalas: altura de controle = tokens componente.controle; espaço = grade de 8; texto = escala fonte.tamanho.
+   Documentação: docs/design-system/03-componentes/admin-web.md */
+
+/* ---------- texto e hierarquia (do mais para o menos importante) */
+.t-titulo-grande { font-size: var(--kib-fonte-tamanho-titulo-grande); }
+.t-titulo { font-size: var(--kib-fonte-tamanho-titulo); }
+.t-subtitulo { font-size: var(--kib-fonte-tamanho-subtitulo); }
+.t-corpo { font-size: var(--kib-fonte-tamanho-corpo); }
+.t-pequeno { font-size: var(--kib-fonte-tamanho-pequeno); }
+.t-rotulo { font-size: var(--kib-fonte-tamanho-pequeno); font-weight: var(--kib-fonte-peso-negrito); letter-spacing: .06em; text-transform: uppercase; }
+.peso-semibold { font-weight: var(--kib-fonte-peso-semibold); }
+.peso-negrito { font-weight: var(--kib-fonte-peso-negrito); }
+.cor-corpo { color: var(--kib-cor-texto-corpo); }
+.cor-ok { color: var(--kib-cor-estado-sucesso-texto); }
+.cor-apoio { color: var(--kib-cor-texto-apoio); }
+.t-dir { text-align: right; }
+.t-centro { text-align: center; }
+
+/* ---------- layout (espaçamento só na grade de 8) */
+.linha { display: flex; align-items: center; }
+.linha-quebra { display: flex; flex-wrap: wrap; }
+.gap-meio { gap: var(--kib-espaco-meio); }
+.gap-1 { gap: var(--kib-espaco-1); }
+.gap-12 { gap: var(--kib-espaco-denso-12); }
+.empurra { margin-left: auto; }
+.cresce { flex-grow: 1; }
+.linha-toda { grid-column: 1 / -1; }
+.pad-2 { padding: var(--kib-espaco-2); }
+.cartao-corpo { padding: 0 var(--kib-espaco-2) var(--kib-espaco-2); }
+
+/* ---------- botão: tamanhos m (40) · peq (32) · g (48). Variantes: prim, sec, branco, escuro, perigo, aviso, verdeClaro, link, icone */
+.btn { height: var(--kib-componente-controle-altura-m); padding: 0 var(--kib-espaco-denso-12); gap: var(--kib-espaco-meio); border-radius: var(--kib-raio-botao); font-size: var(--kib-fonte-tamanho-corpo); line-height: 1; }
+.btn.peq { height: var(--kib-componente-controle-altura-p); padding: 0 var(--kib-espaco-denso-12); font-size: var(--kib-fonte-tamanho-pequeno); }
+.btn.g { height: var(--kib-componente-controle-altura-g); padding: 0 var(--kib-espaco-3); font-size: var(--kib-fonte-tamanho-subtitulo); }
+.btn.aviso { background: color-mix(in srgb, var(--kib-cor-estado-aviso-solido) 16%, transparent); color: var(--kib-cor-estado-aviso-texto-forte); }
+.btn.perigo-solido { background: var(--kib-cor-estado-perigo-solido); color: var(--kib-cor-acao-sobre-principal); }
+.btn.link { height: auto; min-height: var(--kib-espaco-3); padding: 0; background: transparent; color: var(--kib-cor-marca-principal); }
+.btn.link:hover { text-decoration: underline; }
+.btn.icone { width: var(--kib-componente-controle-altura-m); padding: 0; }
+.btn.icone.peq { width: var(--kib-componente-controle-altura-p); }
+.btn.mudo { background: transparent; }
+.btn.sec.risco { color: var(--kib-cor-estado-perigo-texto); }
+.btn:focus-visible, .seg button:focus-visible, .linhaDia:focus-visible { outline: var(--kib-foco-largura) solid var(--kib-cor-borda-foco); outline-offset: var(--kib-foco-deslocamento); }
+.btn:disabled, .btn[aria-busy="true"] { opacity: .55; cursor: not-allowed; }
+
+/* ---------- campos de formulário */
+.entrada { height: var(--kib-componente-controle-altura-m); }
+.entrada.peq { height: var(--kib-componente-controle-altura-p); font-size: var(--kib-fonte-tamanho-pequeno); }
+.entrada[aria-invalid="true"] { box-shadow: inset 0 0 0 2px var(--kib-cor-estado-perigo-solido); }
+.ajuda-campo { font-size: var(--kib-fonte-tamanho-pequeno); color: var(--kib-cor-texto-apoio); }
+
+/* ---------- selo (chip): a cor sempre vem com um sinal (✓ ! ✕ i) para quem não distingue cores */
+.chip { padding: var(--kib-espaco-meio) var(--kib-espaco-1); }
+.chip.verde::before, .chip.laranja::before, .chip.vermelho::before, .chip.azul::before, .vazio.erro b::before, .aviso-faixa::before { content: ''; flex: none; width: 1em; height: 1em; margin-right: var(--kib-espaco-meio); background: currentColor; -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; display: inline-block; vertical-align: -0.15em; }
+.chip.verde::before { --ico: var(--ico-ok); }
+.chip.laranja::before, .aviso-faixa::before { --ico: var(--ico-aviso); }
+.chip.vermelho::before, .vazio.erro b::before { --ico: var(--ico-erro); }
+.chip.azul::before { --ico: var(--ico-info); }
+.chip.pill { height: var(--kib-componente-controle-altura-p); padding: 0 var(--kib-espaco-denso-12); border-radius: var(--kib-raio-pilula); background: color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 70%, transparent); color: var(--kib-cor-texto-principal); }
+.chip.solido-ok { background: var(--kib-cor-estado-sucesso-texto); color: var(--kib-cor-acao-sobre-principal); }
+.chip.solido-perigo { background: var(--kib-cor-estado-perigo-solido); color: var(--kib-cor-acao-sobre-principal); }
+.chip.sem-sinal::before { content: none; }
+
+/* ---------- avatar: p 28 · m 32 · g 40 · xg 64 */
+.avatar { width: var(--kib-componente-controle-altura-p); height: var(--kib-componente-controle-altura-p); font-size: var(--kib-fonte-tamanho-pequeno); }
+.avatar.p { width: 28px; height: 28px; font-size: var(--kib-fonte-tamanho-legenda); }
+.avatar.m { width: var(--kib-componente-controle-altura-p); height: var(--kib-componente-controle-altura-p); font-size: var(--kib-fonte-tamanho-pequeno); }
+.avatar.g { width: var(--kib-componente-controle-altura-m); height: var(--kib-componente-controle-altura-m); font-size: var(--kib-fonte-tamanho-corpo); }
+.avatar.xg { width: var(--kib-espaco-8); height: var(--kib-espaco-8); font-size: var(--kib-fonte-tamanho-titulo-grande); box-shadow: var(--kib-elevacao-2); }
+
+/* ---------- cartão e janela */
+.cartao-rodape { display: flex; flex-wrap: wrap; align-items: center; gap: var(--kib-espaco-1); padding: var(--kib-espaco-denso-12) var(--kib-espaco-2); background: var(--kib-cor-superficie-suave); border-top: var(--kib-borda-largura-padrao) solid var(--kib-cor-borda-sutil); }
+.cartao-rodape.fim { justify-content: flex-end; }
+.fechar.solto { position: static; margin-left: auto; }
+
+/* ícones desenhados (traço único) usados como sinal junto da cor */
+:root { --ico-ok: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 12.5l5 5L20 6.5'/%3E%3C/svg%3E"); --ico-aviso: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v9M12 19h.01'/%3E%3C/svg%3E"); --ico-erro: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E"); --ico-info: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 11v7M12 6h.01'/%3E%3C/svg%3E"); }
+
+/* ---------- estados: carregando, vazio e erro seguem sempre o mesmo desenho */
+.vazio.erro b { color: var(--kib-cor-estado-perigo-texto); }
+.aviso-faixa { padding: var(--kib-espaco-denso-12) var(--kib-espaco-2); background: var(--kib-cor-estado-aviso-fundo); color: var(--kib-cor-estado-aviso-texto); font-size: var(--kib-fonte-tamanho-pequeno); }
+
+/* celular: alvo de toque mínimo */
+@media (max-width: 760px) {
+  .btn.peq, .btn.icone.peq { min-height: 44px; }
+  .btn.link { min-height: var(--kib-componente-controle-altura-m); }
+}
+
+/* dica dentro do campo: legível (≥ 4,5:1), nunca o cinza padrão do navegador */
+::placeholder { color: var(--kib-cor-texto-discreto); opacity: 1; }
+
+/* selo que pode quebrar em duas linhas (textos longos de situação) */
+.chip.quebra { white-space: normal; line-height: 1.25; text-align: left; align-items: flex-start; }
+
+/* ---------- Agenda: texto de apoio legível em pé (13px no mínimo) e números de relógio alinhados */
+:root { --kib-fonte-tamanho-pequeno: 13px; }
+.mono, .num { font-variant-numeric: tabular-nums; }
+
+/* ---------- Agenda: filtros recolhidos (mostram só o resumo) */
+.filtroDet > summary { list-style: none; display: flex; align-items: center; gap: var(--kib-espaco-1); min-height: var(--kib-componente-controle-altura-m); padding: 0 var(--kib-espaco-1); border-radius: var(--kib-raio-botao); cursor: pointer; font-size: var(--kib-fonte-tamanho-corpo); }
+.filtroDet > summary::-webkit-details-marker { display: none; }
+.filtroDet > summary::after { content: ''; margin-left: auto; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: translateY(-2px) rotate(45deg); transition: transform var(--kib-movimento-duracao-rapido) var(--kib-movimento-curva-padrao); }
+.filtroDet[open] > summary::after { transform: translateY(1px) rotate(-135deg); }
+.filtroDet > summary:hover { background: var(--kib-cor-superficie-campo); }
+.filtroDet > summary:focus-visible { outline: var(--kib-foco-largura) solid var(--kib-cor-borda-foco); outline-offset: var(--kib-foco-deslocamento); }
+
+/* ---------- Agenda: faixa de pista (agora em destaque + fila das próximas) */
+.faixaPista { position: relative; display: flex; flex-wrap: wrap; align-items: stretch; gap: var(--kib-espaco-1) var(--kib-espaco-2); padding: var(--kib-espaco-denso-20) var(--kib-espaco-2) var(--kib-espaco-denso-12); background: var(--kib-cor-superficie-inversa); color: var(--kib-cor-acao-sobre-principal); overflow: hidden; }
+.faixaPista::before { content: ''; position: absolute; inset: 0 0 auto 0; height: var(--kib-espaco-1); background: repeating-conic-gradient(var(--kib-cor-acao-sobre-principal) 0% 25%, var(--kib-cor-superficie-inversa) 0% 50%) 0 0 / var(--kib-espaco-1) var(--kib-espaco-1); }
+.pistaAgora { flex: 1 1 340px; min-width: 0; display: flex; align-items: center; gap: var(--kib-espaco-2); padding: 0; border: 0; background: transparent; color: inherit; text-align: left; border-radius: var(--kib-raio-botao); }
+.pistaAgora .col { color: inherit; }
+.pistaAgora .t-pequeno { color: color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 78%, transparent); }
+.pistaHora { font-size: var(--kib-fonte-tamanho-display-p); font-weight: var(--kib-fonte-peso-negrito); line-height: var(--kib-fonte-altura-linha-titulo); letter-spacing: -0.02em; }
+.pistaAgora.vazia .pistaHora { color: color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 55%, transparent); }
+.pistaFila { flex: 1 1 280px; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--kib-espaco-1); }
+.pistaProx { display: flex; flex-direction: column; gap: 0; min-width: 84px; padding: var(--kib-espaco-meio) var(--kib-espaco-denso-12); border: 0; border-radius: var(--kib-raio-botao); background: color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 12%, transparent); color: var(--kib-cor-acao-sobre-principal); text-align: left; }
+.pistaProx .t-pequeno { color: color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 78%, transparent); }
+.pistaAgora:focus-visible, .pistaProx:focus-visible { outline: var(--kib-foco-largura) solid var(--kib-cor-acao-sobre-principal); outline-offset: var(--kib-foco-deslocamento); }
+
+/* celular: alvos de toque de 44px nos controles principais da Agenda */
+@media (max-width: 760px) {
+  .btn, .btn.peq, .btn.icone.peq, .seg button, .agendaLayout .linhaDia, .agendaLayout .linhaLado, .cabDia, .filtroDet > summary, .pistaProx, #miniCal button, .filtroTipo, .bloco2, .buscaCampo, .buscaCampo input { min-height: 44px; }
+  .pistaHora { font-size: var(--kib-fonte-tamanho-destaque); }
+}
+
+/* ---------- leitor de tela: texto só para quem não vê */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* ---------- ajuda "?" e blocos recolhidos */
+.dicaDet { display: inline-block; margin-left: var(--kib-espaco-1); vertical-align: middle; font-weight: var(--kib-fonte-peso-regular); }
+.dicaDet > summary { list-style: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: var(--kib-raio-pilula); background: var(--kib-cor-superficie-campo); color: var(--kib-cor-texto-corpo); font-size: var(--kib-fonte-tamanho-pequeno); font-weight: var(--kib-fonte-peso-negrito); cursor: pointer; }
+.dicaDet > summary::-webkit-details-marker { display: none; }
+.dicaDet > summary:hover { background: var(--kib-cor-borda-sutil); }
+.dicaDet > summary:focus-visible, .maisOpcoes > summary:focus-visible { outline: var(--kib-foco-largura) solid var(--kib-cor-borda-foco); outline-offset: var(--kib-foco-deslocamento); }
+.dicaDet[open] { display: block; margin: var(--kib-espaco-meio) 0 0; }
+.dicaDet[open] > span { display: block; padding: var(--kib-espaco-1) var(--kib-espaco-denso-12); border-radius: var(--kib-raio-botao); background: var(--kib-cor-superficie-campo); color: var(--kib-cor-texto-corpo); font-size: var(--kib-fonte-tamanho-pequeno); line-height: var(--kib-fonte-altura-linha-corpo); }
+.maisOpcoes { padding: var(--kib-espaco-denso-12) var(--kib-espaco-2); }
+.maisOpcoes > summary { cursor: pointer; font-weight: var(--kib-fonte-peso-semibold); min-height: var(--kib-componente-controle-altura-p); display: flex; align-items: center; }
+.maisOpcoes[open] > summary { margin-bottom: var(--kib-espaco-1); }
+
+/* ---------- atalho escrito dentro do botão e botão dentro do aviso */
+kbd.atalho { margin-left: var(--kib-espaco-1); padding: 0 var(--kib-espaco-meio); border-radius: var(--kib-raio-chip); background: color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 24%, transparent); font: var(--kib-fonte-peso-negrito) var(--kib-fonte-tamanho-pequeno) var(--kib-fonte-familia-numero); }
+.toastBtn { margin-left: var(--kib-espaco-1); background: color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 18%, transparent); color: var(--kib-cor-acao-sobre-principal); }
+.btn.link.peq { min-height: var(--kib-espaco-3); }
+
+/* celular: tudo que se toca tem 44px; a Semana não cabe, então só existe Dia e Lista */
+@media (max-width: 760px) {
+  .navItem, .buscaBtn, .fechar, .passo button, .btn.icone, .btn.icone.peq, .btn.link, .btn.link.peq, .dicaDet > summary { min-height: 44px; min-width: 44px; }
+  kbd.atalho { display: none; }
+}
+@media (max-width: 480px) { [data-vista="semana"] { display: none; } }
