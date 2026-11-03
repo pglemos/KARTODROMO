@@ -27,7 +27,7 @@ O projeto nativo Android está incluído, com Gradle e wrapper. Configure Androi
 ## Backend
 Na raiz do pacote, execute npm ci. O Worker usa workers/pre-cadastro/wrangler.jsonc
 (produção) ou wrangler.homolog.jsonc (homologação). Configure as credenciais Cloudflare,
-D1/R2, Asaas e e-mail separadamente. Consulte os bindings desses arquivos e as interfaces
+D1/R2, Stone e e-mail separadamente. Consulte os bindings desses arquivos e as interfaces
 Env no código. Para desenvolvimento local:
 
 ```sh

@@ -6,13 +6,13 @@ Esta minuta corresponde à página pública `/privacidade` (no ar em https://res
 
 - Conta: nome, CPF, e-mail, telefone, senha como verificador criptográfico e estado de verificação; usados para autenticação, segurança e recuperação de acesso.
 - Reservas: horário/bateria, quantidade, nomes dos pilotos, nascimento do responsável, cupom informado, valor, forma de pagamento, referências e situação do pedido; usados para criar, acompanhar e confirmar reservas.
-- Pagamento: processamento e confirmação via Asaas. O app não armazena dados completos de cartão.
+- Pagamento: processamento e confirmação via Stone. O app não armazena dados completos de cartão.
 - Resultados oficiais: nome de exibição, evento/data, posição, kart, voltas e melhor volta; tornam-se públicos somente após publicação explícita da operação. O histórico individual exige vínculo validado pela recepção.
 - GPS pessoal: localização precisa, horário e precisão durante treino iniciado pelo usuário, em primeiro plano e após consentimento. Os dados ficam em SQLite no aparelho, não são enviados ao servidor e podem ser apagados no app. A coleta segue desabilitada até o traçado medido ser aprovado.
 
 ## Compartilhamento
 
-Os dados necessários passam pelo servidor de reservas do kartódromo e pela infraestrutura Cloudflare. Resend envia mensagens de verificação/recuperação de conta; Asaas processa pagamentos. A equipe da recepção pode validar vínculos de histórico após conferir a identidade.
+Os dados necessários passam pelo servidor de reservas do kartódromo e pela infraestrutura Cloudflare. Resend envia mensagens de verificação/recuperação de conta; Stone processa pagamentos. A equipe da recepção pode validar vínculos de histórico após conferir a identidade.
 
 ## Retenção, exclusão e contato
 
