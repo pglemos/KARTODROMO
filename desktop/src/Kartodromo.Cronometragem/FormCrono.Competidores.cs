@@ -270,7 +270,7 @@ public partial class FormCrono
                     if (mapa != null) foreach (var (raw, kart) in mapa) if (kart != null) inv[kart.ToString()] = raw;
                     BeginInvoke(() => { _transpPorKart = inv; AtualizarExtrasPilotos(); });
                 }
-                catch { }
+                catch (Exception ex) { Diagnostico.Registrar("Competidores.Transponders", ex); }
             });
         }
         var faltam = _gPilotos.Rows.Cast<DataGridViewRow>().Where(r => !r.IsNewRow).Select(r => r.Cells["customerId"].Value?.ToString()).Where(id => !string.IsNullOrEmpty(id) && !_clientesInfo.ContainsKey(id)).Distinct().ToList();

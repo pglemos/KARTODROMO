@@ -14,9 +14,13 @@
  */
 import http from 'node:http';
 import net from 'node:net';
-import { appendFileSync, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import { appendFileSync, closeSync, copyFileSync, cpSync, createWriteStream, existsSync, fsyncSync, ftruncateSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { format } from 'node:util';
+import { chaveOperadorValida, clienteEhMaquinaOperadora } from '../lib/timing/operator-auth';
+import { redigirEmails } from '../lib/timing/redact-pii';
 import { DecoderClient, type DecoderProtocol } from '../lib/timing/decoder-client';
 import { formatTrxPassing, type TrxPassing } from '../lib/timing/trx-parser';
 import { mobileApiEndpoint } from '../lib/mobile-api-url';
@@ -48,7 +52,7 @@ import {
   setCompetitors,
   restoreCompetitor,
   setChuva,
-  setManualPosition,
+  ajustarPosicaoComVoltas,
   setCrossingDeleted,
   setCrossingInvalid,
   setRaceFlag,
@@ -77,13 +81,19 @@ import { rankingPorPeso, tituloFaixas, type DadosPiloto } from '../lib/timing/ra
 import { condicaoChuvaPeloTracado, dataBrasilia, historicoDoKart, rankingKarts } from '../lib/timing/ranking-karts';
 import { calcularComAnteriores, retomarEqualizacao, validarFaixasRedutor, type FaixaRedutor, faixasDaRegra, importarKarts, REGRA_PADRAO, regraDa, SISTEMAS_KART, tempoVoltaParaMs, TOLERANCIA_PADRAO_MS, ultimaEqualizacaoPorKart, voltasNasBaterias, type ChecklistKart, type ConfigEqualizacao } from '../lib/timing/equalizacao';
 import { nomeProprio } from '../lib/nomes';
-import { configPublica, enviarEmailSimples, enviarResultado, enviarTeste, lerConfig, salvarConfig, semEmailAosPilotos, traduzirErro, type Dependencias, type OpcoesEnvio } from './timing-email';
+import { configPublica, ehErroLimitePorHora, enviarEmailSimples, enviarResultado, enviarTeste, lerConfig, salvarConfig, semEmailAosPilotos, traduzirErro, verificarTransporteEmail, type Dependencias, type OpcoesEnvio } from './timing-email';
 import { usoKartsDaSessao } from '../lib/timing/kart-fisico';
 import { serializeMobilePublication } from '../lib/timing/mobile-results';
 import type { ContextoProva, EmpresaEmail } from '../lib/timing/email-resultado';
+import { quemSaiuDaAgenda } from '../lib/timing/agenda-saida';
 import { competidoresComSorteio, descricaoModoSorteio, ListaMudouError, pilotosDoSorteio, validarSorteio, type Atribuicao } from '../lib/timing/sorteio';
 import { normalizarPaginaPainel, PAINEL_LED_PAGE_SIZE } from '../lib/timing/painel-page';
-import { assinaturaDoConteudo, conferirChave, extrairChave, lerHashes, montarTransmissao, type Transmissao } from '../lib/timing/transmissao';
+import { abrirStore } from '../lib/app-v1/store';
+import { marcarPendentesComoDesconhecidas } from '../lib/app-v1/comandos';
+import { criarModuloApp, type ModuloApp } from '../lib/app-v1/rotas';
+import { ErroLegado } from '../lib/app-v1/operacao';
+import type { Inscricao } from '../lib/app-v1/regras';
+import { assinaturaDoConteudo, conferirChave, extrairChave, filtrarVoltasPorKart, lerHashes, montarTransmissao, montarVoltas, type Transmissao, type VoltasTransmissao } from '../lib/timing/transmissao';
 
 // ---------------------------------------------------------------- config
 
@@ -111,6 +121,9 @@ const ENV_DECODER_HOST = process.env.TIMING_DECODER_HOST || '192.168.20.171';
 const ENV_DECODER_PROTOCOL: DecoderProtocol = process.env.TIMING_DECODER_PROTOCOL === 'trx' ? 'trx' : 'p3';
 const ENV_DECODER_PORT = Number(process.env.TIMING_DECODER_PORT || (ENV_DECODER_PROTOCOL === 'p3' ? 5403 : 5100));
 const DATA_DIR = resolve(process.env.TIMING_DATA_DIR || join(process.cwd(), 'data', 'timing'));
+// App operacional: só liga com APP_V1_TOKEN_SECRET; sem ele as rotas /api/app/v1/ respondem 503
+let moduloApp: ModuloApp | null = null;
+const assinantesApp = new Set<() => void>();
 const SESSIONS_DIR = join(DATA_DIR, 'sessions');
 const JOURNAL_DIR = join(DATA_DIR, 'passagens');
 const TRANSPONDERS_FILE = join(DATA_DIR, 'transponders.json');
@@ -121,8 +134,18 @@ const TRACK_NAME = process.env.TIMING_TRACK_NAME || 'Kartodromo Internacional de
 
 for (const dir of [DATA_DIR, SESSIONS_DIR, JOURNAL_DIR]) mkdirSync(dir, { recursive: true });
 
+// Item 3: Rotação ativa de log timing.log (> 5MB) sem manter offset corrompido de cmd.exe
+const TIMING_LOG_FILE = join(DATA_DIR, 'timing.log');
+
 function log(...args: unknown[]) {
-  console.log(`[${new Date().toISOString()}]`, ...args);
+  const formatted = format(...args);
+  const line = redigirEmails(`[${new Date().toISOString()}] ${formatted}`);
+  console.log(line);
+  try {
+    appendFileSync(TIMING_LOG_FILE, line + '\n', 'utf8');
+  } catch {
+    // silencioso se o arquivo de log estiver em rotação
+  }
 }
 
 function logTrocas(s: { name: string }, trocas: TrocaDeKart[]) {
@@ -134,37 +157,228 @@ function logTrocas(s: { name: string }, trocas: TrocaDeKart[]) {
 
 // ---------------------------------------------------------------- persistencia
 
-function writeJsonAtomic(file: string, data: unknown) {
-  const tmp = `${file}.tmp`;
-  writeFileSync(tmp, JSON.stringify(data, null, 1));
-  renameSync(tmp, file);
-}
-
-const sessions = new Map<string, Session>();
-for (const f of readdirSync(SESSIONS_DIR).filter((f) => f.endsWith('.json'))) {
+function rotateTimingLogIfNeeded() {
   try {
-    const s = JSON.parse(readFileSync(join(SESSIONS_DIR, f), 'utf8')) as Session;
-    sessions.set(s.id, s);
-  } catch (err) {
-    log('sessao ilegivel ignorada', f, err);
+    if (!existsSync(TIMING_LOG_FILE)) return;
+    const stats = statSync(TIMING_LOG_FILE);
+    if (stats.size > 5 * 1024 * 1024) {
+      const now = new Date();
+      const stamp = now.toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }) + '-' + String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
+      const backup = join(DATA_DIR, `timing-${stamp}.log`);
+      try {
+        renameSync(TIMING_LOG_FILE, backup);
+      } catch {
+        copyFileSync(TIMING_LOG_FILE, backup);
+        writeFileSync(TIMING_LOG_FILE, '', 'utf8');
+      }
+      // Mantém no máximo os 5 backups rotacionados mais recentes
+      const rotated = readdirSync(DATA_DIR)
+        .filter((f) => /^timing-\d{4}-\d{2}-\d{2}-.*\.log$/.test(f))
+        .map((f) => ({ full: join(DATA_DIR, f), mtime: statSync(join(DATA_DIR, f)).mtimeMs }))
+        .sort((a, b) => b.mtime - a.mtime);
+      for (const old of rotated.slice(5)) {
+        try { unlinkSync(old.full); } catch { /* melhor esforço */ }
+      }
+      log(`timing.log rotacionado (${(stats.size / 1024 / 1024).toFixed(1)} MB -> 0 MB; backup em ${backup})`);
+    }
+  } catch {
+    // silencioso para não impactar operação
   }
 }
+setInterval(rotateTimingLogIfNeeded, 60_000).unref();
+
+// Item 7 & 32: Escrita atômica com fsyncSync e recuperação contra locks temporários no Windows
+function writeJsonAtomic(file: string, data: unknown) {
+  const tmp = `${file}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 6)}.tmp`;
+  const content = JSON.stringify(data, null, 1);
+  const fd = openSync(tmp, 'w');
+  try {
+    writeFileSync(fd, content, 'utf8');
+    try { fsyncSync(fd); } catch { /* melhor esforço */ }
+  } finally {
+    try { closeSync(fd); } catch { /* melhor esforço */ }
+  }
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      renameSync(tmp, file);
+      return;
+    } catch (erro) {
+      const err = erro as NodeJS.ErrnoException;
+      if ((err?.code === 'EPERM' || err?.code === 'EBUSY') && attempt < 4) {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20 * (attempt + 1));
+        continue;
+      }
+      try {
+        copyFileSync(tmp, file);
+        try { unlinkSync(tmp); } catch { /* melhor esforço */ }
+        return;
+      } catch {
+        if (attempt === 4) {
+          try { unlinkSync(tmp); } catch { /* melhor esforço */ }
+          throw err;
+        }
+      }
+    }
+  }
+}
+
+function cleanOrphanTmpFiles(dir: string) {
+  try {
+    if (!existsSync(dir)) return;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) cleanOrphanTmpFiles(full);
+      else if (entry.name.endsWith('.tmp')) {
+        try { unlinkSync(full); } catch { /* melhor esforço */ }
+      }
+    }
+  } catch { /* melhor esforço */ }
+}
+cleanOrphanTmpFiles(DATA_DIR);
+
+// Item 8: Mutex de serialização por sessão para concorrência
+const sessionLocks = new Map<string, Promise<void>>();
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- reservado para as rotas que ainda gravam sem trava
+async function withSessionLock<T>(sessionId: string, action: () => Promise<T> | T): Promise<T> {
+  const prev = sessionLocks.get(sessionId) ?? Promise.resolve();
+  let resolveCurrent!: () => void;
+  const current = new Promise<void>((r) => { resolveCurrent = r; });
+  sessionLocks.set(sessionId, prev.then(() => current, () => current));
+  try {
+    await prev;
+    return await action();
+  } finally {
+    resolveCurrent();
+    if (sessionLocks.get(sessionId) === current) sessionLocks.delete(sessionId);
+  }
+}
+
+// Item 12: Fila de sessões sujas (dirty queue) para retentativa de gravação
+const dirtySessions = new Set<string>();
+
+// Item 2 & 30: Particionamento de sessões em data/timing/sessions/YYYY-MM/ e poda de RAM em cold sessions
+const sessions = new Map<string, Session>();
+const sessionPaths = new Map<string, string>();
+
+function sessionMonth(s: { createdAt?: number }) {
+  return new Date(s.createdAt || Date.now()).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }).slice(0, 7);
+}
+
+function isOldColdSession(s: Session) {
+  return (s.state === 'encerrada' || s.state === 'cancelada') && Date.now() - (s.finishedAt ?? s.createdAt) > 7 * 86_400_000;
+}
+
+function resolveSessionFilePath(s: Session): string {
+  if (isOldColdSession(s)) {
+    const ym = sessionMonth(s);
+    const dir = join(SESSIONS_DIR, ym);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    return join(dir, `${s.id}.json`);
+  }
+  return join(SESSIONS_DIR, `${s.id}.json`);
+}
+
+function loadSessionsFromDisk() {
+  const filesToLoad: string[] = [];
+  for (const entry of readdirSync(SESSIONS_DIR, { withFileTypes: true })) {
+    if (entry.isFile() && entry.name.endsWith('.json')) {
+      filesToLoad.push(join(SESSIONS_DIR, entry.name));
+    } else if (entry.isDirectory() && /^\d{4}-\d{2}$/.test(entry.name)) {
+      const sub = join(SESSIONS_DIR, entry.name);
+      for (const subEntry of readdirSync(sub, { withFileTypes: true })) {
+        if (subEntry.isFile() && subEntry.name.endsWith('.json')) {
+          filesToLoad.push(join(sub, subEntry.name));
+        }
+      }
+    }
+  }
+
+  for (const fullPath of filesToLoad) {
+    try {
+      const s = JSON.parse(readFileSync(fullPath, 'utf8')) as Session;
+      sessions.set(s.id, s);
+      sessionPaths.set(s.id, fullPath);
+    } catch (err) {
+      log('sessao ilegivel ignorada', fullPath, err);
+    }
+  }
+}
+loadSessionsFromDisk();
+
 for (const session of sessions.values()) {
   session.currentFlag ??= session.state === 'em_andamento' ? 'green' : session.state === 'bandeira_final' ? 'checkered' : 'none';
   session.chuva ??= false;
   session.observations ??= [];
-  for (const o of session.observations) o.id ??= randomUUID(); // toda observação precisa de id para poder ser excluída
+  for (const o of session.observations) o.id ??= randomUUID();
   session.competitors ??= [];
   for (const competitor of session.competitors) {
     competitor.crossings ??= [];
     competitor.flag ??= 'none';
     competitor.crossings.forEach((crossing) => { crossing.id ??= randomUUID(); crossing.source ??= 'decoder'; });
   }
+  if (isOldColdSession(session)) {
+    // Redução imediata de heap: sessões encerradas há mais de 7 dias não mantêm rejected em memória
+    session.rejected = [];
+  }
+}
+
+/** O que invalida um comando do app. Passagem de kart fica de fora: senão, em corrida, todo comando daria conflito. */
+function assinaturaDeComando(s: Session) {
+  return JSON.stringify([s.state, s.competitors.map((c) => [c.kart, c.name, c.customerId ?? null, c.autoAdded ? 1 : 0, c.penalidades?.length ?? 0, c.flag ?? null]), s.type === 'equalizacao' ? s.equalizacao ?? null : null]);
 }
 
 function saveSession(s: Session) {
-  writeJsonAtomic(join(SESSIONS_DIR, `${s.id}.json`), s);
+  const targetPath = resolveSessionFilePath(s);
+  try {
+    writeJsonAtomic(targetPath, s);
+    const previousPath = sessionPaths.get(s.id);
+    if (previousPath && previousPath !== targetPath && existsSync(previousPath)) {
+      try { unlinkSync(previousPath); } catch { /* melhor esforço */ }
+    }
+    sessionPaths.set(s.id, targetPath);
+    dirtySessions.delete(s.id);
+    moduloApp?.aoSalvarSessao(s.id, assinaturaDeComando(s));
+  } catch (err) {
+    dirtySessions.add(s.id);
+    log(`ERRO ao gravar bateria ${s.name} (${s.id}) no disco; retentando em segundo plano: ${(err as Error).message}`);
+    throw err;
+  }
 }
+
+function archiveOldSessions() {
+  let arquivadas = 0;
+  for (const s of sessions.values()) {
+    if (!isOldColdSession(s)) continue;
+    const target = resolveSessionFilePath(s);
+    const current = sessionPaths.get(s.id);
+    if (current && current !== target) {
+      try {
+        writeJsonAtomic(target, s);
+        if (existsSync(current)) unlinkSync(current);
+        sessionPaths.set(s.id, target);
+        s.rejected = [];
+        arquivadas++;
+      } catch { /* melhor esforço */ }
+    }
+  }
+  if (arquivadas > 0) log(`particionamento: ${arquivadas} bateria(s) arquivada(s) por ano/mês`);
+}
+setInterval(archiveOldSessions, 6 * 3_600_000).unref();
+archiveOldSessions();
+
+// Retentativa periódica das sessões com erro de disco (Item 12)
+setInterval(() => {
+  if (!dirtySessions.size) return;
+  for (const id of [...dirtySessions]) {
+    const s = sessions.get(id);
+    if (!s) { dirtySessions.delete(id); continue; }
+    try {
+      saveSession(s);
+      log(`bateria ${s.name} salva com sucesso no disco na retentativa`);
+    } catch { /* melhor esforço */ }
+  }
+}, 3_000).unref();
 
 let transponderMap: Record<string, string> = {};
 function loadTransponders() {
@@ -173,15 +387,33 @@ function loadTransponders() {
 }
 loadTransponders();
 
+// Item 9: Catálogo com backup automático .bak e proteção contra reset acidental
+const CATALOG_BAK_FILE = join(DATA_DIR, 'catalog.json.bak');
 let catalog: TimingCatalog = emptyCatalog();
 if (existsSync(CATALOG_FILE)) {
-  try { catalog = normalizeCatalog(JSON.parse(readFileSync(CATALOG_FILE, 'utf8'))); }
-  catch (err) {
-    // guarda o arquivo antes: a próxima gravação do cadastro vazio apagaria todos os eventos, grupos e provas
-    const copia = CATALOG_FILE.replace(/\.json$/i, `.ilegivel-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
-    try { copyFileSync(CATALOG_FILE, copia); } catch { /* sem cópia: o log abaixo avisa */ }
-    log(`cadastro de eventos ilegível; iniciando vazio (o arquivo original foi guardado em ${copia})`, err);
+  try {
+    catalog = normalizeCatalog(JSON.parse(readFileSync(CATALOG_FILE, 'utf8')));
+    try { copyFileSync(CATALOG_FILE, CATALOG_BAK_FILE); } catch { /* melhor esforço */ }
+  } catch (err) {
+    let recuperado = false;
+    if (existsSync(CATALOG_BAK_FILE)) {
+      try {
+        catalog = normalizeCatalog(JSON.parse(readFileSync(CATALOG_BAK_FILE, 'utf8')));
+        log('catálogo principal ilegível; recuperado da cópia de segurança catalog.json.bak');
+        recuperado = true;
+      } catch { /* melhor esforço */ }
+    }
+    if (!recuperado) {
+      const copia = CATALOG_FILE.replace(/\.json$/i, `.ilegivel-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
+      try { copyFileSync(CATALOG_FILE, copia); } catch { /* melhor esforço */ }
+      log(`cadastro de eventos ilegível; iniciando vazio (o arquivo original foi guardado em ${copia})`, err);
+    }
   }
+} else if (existsSync(CATALOG_BAK_FILE)) {
+  try {
+    catalog = normalizeCatalog(JSON.parse(readFileSync(CATALOG_BAK_FILE, 'utf8')));
+    log('catálogo carregado da cópia de segurança catalog.json.bak');
+  } catch { /* melhor esforço */ }
 }
 
 let timingSettings: Record<string, unknown> = {};
@@ -200,7 +432,12 @@ let activeDecoderConfig: DecoderConfig = {
   port: SIMULATE ? SIM_PORT : Number(configuredDecoder.port || ENV_DECODER_PORT),
 };
 
-function saveCatalog() { writeJsonAtomic(CATALOG_FILE, catalog); }
+function saveCatalog() {
+  if (existsSync(CATALOG_FILE)) {
+    try { copyFileSync(CATALOG_FILE, CATALOG_BAK_FILE); } catch { /* melhor esforço */ }
+  }
+  writeJsonAtomic(CATALOG_FILE, catalog);
+}
 function saveTimingSettings() { writeJsonAtomic(SETTINGS_FILE, timingSettings); }
 
 function saveTransponders() {
@@ -231,9 +468,21 @@ function kartFor(raw: number): string | null {
   return null;
 }
 
+// Item 10: Stream assíncrono bufferizado para gravação do diário sem bloquear o event loop
+let activeJournalDay = '';
+let journalStream: ReturnType<typeof createWriteStream> | null = null;
+
 function journal(entry: Record<string, unknown>) {
   const day = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
-  appendFileSync(join(JOURNAL_DIR, `${day}.jsonl`), JSON.stringify(entry) + '\n');
+  const line = JSON.stringify(entry) + '\n';
+  if (day !== activeJournalDay || !journalStream || journalStream.destroyed) {
+    if (journalStream && !journalStream.destroyed) {
+      try { journalStream.end(); } catch { /* melhor esforço */ }
+    }
+    activeJournalDay = day;
+    journalStream = createWriteStream(join(JOURNAL_DIR, `${day}.jsonl`), { flags: 'a', encoding: 'utf8' });
+  }
+  journalStream.write(line);
 }
 
 type EntradaDiario = { wallMs: number; kart: string | null; transponder: number | null; decoderTimeMs: number; result: string };
@@ -598,6 +847,8 @@ function sessionView(s: Session) {
     })),
     standings: computeStandings(s, trackLengthFor(s)).filter((r) => !s.competitors.find((c) => c.kart === r.kart && c.name === r.name)?.detalhes?.oculto).map((r) => ({ ...r, name: nomeProprio(r.name) })),
     excludedCompetitors: (s.excludedCompetitors ?? []).map((e) => ({ id: e.id, excludedAt: e.excludedAt, kart: e.competitor.kart, name: e.competitor.name })),
+    passingsCount: s.competitors.reduce((acc, c) => acc + c.crossings.filter((x) => !x.deleted).length, 0),
+    rejectedCount: (s.rejected ?? []).length,
     emailsResultado: s.emailsResultado ?? null,
   };
 }
@@ -628,6 +879,26 @@ function decoderView() {
   return { ...st, simulated: SIMULATE, healthy: st.connected && !!st.lastDataAt && Date.now() - st.lastDataAt < 15_000 };
 }
 
+// Item 16: Monitoramento de instâncias concorrentes do app do operador
+const activeOperatorMachines = new Map<string, { machine: string; ip: string; lastSeenAt: number }>();
+function recordOperatorMachine(req: http.IncomingMessage) {
+  const machine = req.headers['x-client-machine'];
+  if (machine && typeof machine === 'string' && machine.trim()) {
+    const name = machine.trim().slice(0, 60);
+    const ip = (req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+    activeOperatorMachines.set(name, { machine: name, ip, lastSeenAt: Date.now() });
+  }
+}
+function activeOperatorsList(): string[] {
+  const now = Date.now();
+  const list: string[] = [];
+  for (const [name, op] of activeOperatorMachines.entries()) {
+    if (now - op.lastSeenAt <= 20_000) list.push(name);
+    else activeOperatorMachines.delete(name);
+  }
+  return list;
+}
+
 function stateView() {
   const running = runningSession();
   const list = sortedSessions();
@@ -655,6 +926,7 @@ function stateView() {
     track: TRACK_NAME,
     decoder: decoderView(),
     runningId: running?.id ?? null,
+    activeOperators: activeOperatorsList(),
     focus: focus ? sessionView(focus) : null,
     lastQualifying: lastQualifying ? sessionView(lastQualifying) : null,
     // painel de LED sem kart na pista: tomada encerrada = grid; corrida encerrada = segue com o resultado da corrida
@@ -672,6 +944,7 @@ function stateView() {
       pageSize: PAINEL_LED_PAGE_SIZE,
       updatedAt: painelLedPage.updatedAt,
       origem: painelLedPage.origem,
+      atualizarEm: painelLedPage.atualizarEm,
     },
   };
 }
@@ -706,7 +979,7 @@ function setTb50Offset(value: unknown, motivo: string) {
 // controle o mesmo painel sem tentar abrir uma porta serial que não existe nele.
 
 const PAINEL_LED_PAGE_FILE = join(DATA_DIR, 'painel-led-page.json');
-let painelLedPage: { pagina: number; updatedAt: string | null; origem: string } = {
+let painelLedPage: { pagina: number; updatedAt: string | null; origem: string; atualizarEm?: string } = {
   pagina: 0,
   updatedAt: null,
   origem: 'inicialização',
@@ -734,6 +1007,14 @@ function setPainelLedPage(value: unknown, origem: string) {
   };
   try { writeJsonAtomic(PAINEL_LED_PAGE_FILE, painelLedPage); } catch { /* continua em memória */ }
   log(`painel LED COM3: posições ${pagina * PAINEL_LED_PAGE_SIZE + 1}-${(pagina + 1) * PAINEL_LED_PAGE_SIZE} (${painelLedPage.origem})`);
+  scheduleStateBroadcast();
+  return painelLedPage;
+}
+
+// Botão "Atualizar painel" de um PC sem a serial: o app do ORBITS vê o novo atualizarEm e reenvia o painel inteiro.
+function pedirAtualizacaoPainelLed(origem: string) {
+  painelLedPage = { ...painelLedPage, atualizarEm: new Date().toISOString() };
+  log(`painel LED COM3: atualização pedida (${origem.trim().slice(0, 80) || 'cronometragem'})`);
   scheduleStateBroadcast();
   return painelLedPage;
 }
@@ -773,13 +1054,18 @@ function transmissaoAtual(): Transmissao {
   return montarTransmissao(ultima ? sessionView(ultima) : null);
 }
 
+function voltasDaTransmissao(t: Transmissao): VoltasTransmissao {
+  const s = t.bateria ? sessions.get(t.bateria.id) : undefined;
+  return montarVoltas(t, (s?.competitors ?? []).map((c) => ({ kart: c.kart, nome: nomeProprio(c.name), crossings: c.crossings })));
+}
+
 const clientesTransmissao = new Set<http.ServerResponse>();
 let ultimaTransmissao: { assinatura: string; dados: Transmissao } | null = null;
 const publicacao = { emAndamento: false, assinaturaEnviada: '', enviadoEm: 0, ultimoOkEm: 0, ultimoErro: '', erroLogadoEm: 0, falhas: 0, proximaTentativaEm: 0 };
-/** O site guarda o retrato num arquivo só do R2, que aceita no máximo ~1 gravação por segundo por arquivo. */
-const INTERVALO_MINIMO_PUBLICACAO_MS = 1_000;
+/** Passagem chega ao site em até meio segundo; o hub do site distribui na hora a quem está conectado. */
+const INTERVALO_MINIMO_PUBLICACAO_MS = 500;
 
-async function publicarTransmissao(t: Transmissao, assinatura: string) {
+async function publicarTransmissao(t: Transmissao, voltas: VoltasTransmissao, assinatura: string) {
   const cfg = lerConfigTransmissao();
   if (!cfg.publicarUrl || !cfg.publicarChave || publicacao.emAndamento) return;
   publicacao.emAndamento = true;
@@ -788,7 +1074,8 @@ async function publicarTransmissao(t: Transmissao, assinatura: string) {
     const resposta = await fetch(cfg.publicarUrl, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${cfg.publicarChave}` },
-      body: JSON.stringify(t),
+      // o volta a volta vai junto, num envio só; o site o separa em /corrida e /voltas
+      body: JSON.stringify({ ...t, voltaAVolta: voltas.pilotos }),
       signal: AbortSignal.timeout(5_000),
     });
     if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
@@ -819,17 +1106,20 @@ setInterval(() => {
   const publicando = Boolean(cfg.publicarUrl && cfg.publicarChave);
   if (!clientesTransmissao.size && !publicando) return;
   const t = transmissaoAtual();
-  const assinatura = assinaturaDoConteudo(t);
+  const voltas = voltasDaTransmissao(t);
+  const voltasTexto = JSON.stringify(voltas.pilotos);
+  // anular uma volta nem sempre muda a classificação: o volta a volta entra na comparação
+  const assinatura = assinaturaDoConteudo(t) + voltasTexto;
   const mudou = assinatura !== ultimaTransmissao?.assinatura;
   ultimaTransmissao = { assinatura, dados: t };
   if (mudou) {
-    const payload = `event: corrida\ndata: ${JSON.stringify(t)}\n\n`;
+    const payload = `event: corrida\ndata: ${JSON.stringify(t)}\n\nevent: voltas\ndata: ${JSON.stringify(voltas)}\n\n`;
     for (const res of clientesTransmissao) res.write(payload);
   }
   // reenvia a cada 30 s mesmo parado: o site sabe que a cronometragem está viva (economiza pedidos no Cloudflare)
   const agora = Date.now();
   const podeEnviar = agora - publicacao.enviadoEm >= INTERVALO_MINIMO_PUBLICACAO_MS && agora >= publicacao.proximaTentativaEm;
-  if (publicando && podeEnviar && (assinatura !== publicacao.assinaturaEnviada || agora - publicacao.enviadoEm > 30_000)) void publicarTransmissao(t, assinatura);
+  if (publicando && podeEnviar && (assinatura !== publicacao.assinaturaEnviada || agora - publicacao.enviadoEm > 30_000)) void publicarTransmissao(t, voltas, assinatura);
 }, 250);
 setInterval(() => {
   for (const res of clientesTransmissao) res.write(': ping\n\n');
@@ -845,15 +1135,17 @@ async function rotaTransmissao(req: http.IncomingMessage, res: http.ServerRespon
     return send(res, 401, { erro: 'Chave ausente ou inválida. Envie no cabeçalho Authorization: Bearer <chave>.' }, { 'www-authenticate': 'Bearer' });
   }
   if (url.pathname === '/api/transmissao/v1/corrida') return send(res, 200, transmissaoAtual());
+  if (url.pathname === '/api/transmissao/v1/voltas') return send(res, 200, filtrarVoltasPorKart(voltasDaTransmissao(transmissaoAtual()), url.searchParams.get('kart')));
   if (url.pathname === '/api/transmissao/v1/eventos') {
     res.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', connection: 'keep-alive', 'access-control-allow-origin': '*' });
-    res.write(`retry: 2000\nevent: corrida\ndata: ${JSON.stringify(transmissaoAtual())}\n\n`);
+    const inicial = transmissaoAtual();
+    res.write(`retry: 2000\nevent: corrida\ndata: ${JSON.stringify(inicial)}\n\nevent: voltas\ndata: ${JSON.stringify(voltasDaTransmissao(inicial))}\n\n`);
     clientesTransmissao.add(res);
     log(`transmissão: ${parceiro} conectou no fluxo ao vivo (${req.socket.remoteAddress ?? '?'})`);
     req.on('close', () => clientesTransmissao.delete(res));
     return;
   }
-  return send(res, 404, { erro: 'Rota desconhecida. Use /api/transmissao/v1/corrida ou /api/transmissao/v1/eventos.' });
+  return send(res, 404, { erro: 'Rota desconhecida. Use /api/transmissao/v1/corrida, /api/transmissao/v1/voltas ou /api/transmissao/v1/eventos.' });
 }
 
 /** Situação da API de transmissão para o /healthz (sem chave nenhuma). */
@@ -886,6 +1178,7 @@ function liveSnapshot(painelTb50 = false) {
   const standings = computeStandings(s);
   return {
     status: OPEN_STATES.has(s.state) ? 'live' : 'finished',
+    clearGrid: Boolean(OPEN_STATES.has(s.state) && !standings.some((r) => r.laps > 0)),
     source: 'sql',
     updatedAt,
     sessionType: s.type === 'corrida' ? 'race' : 'qualifying',
@@ -903,12 +1196,22 @@ function liveSnapshot(painelTb50 = false) {
       painelTb50 && OPEN_STATES.has(s.state),
       standings
         .filter((r) => r.laps > 0 || !OPEN_STATES.has(s.state))
-        // laps/last/bestLap/gap: para o app do cliente (o placar, o telão e o site só leem os quatro primeiros)
-        .map((r) => ({
-          position: r.position, kart: r.kart, name: r.name, time: formatLap(r.bestLapMs),
-          laps: r.laps, last: formatLap(r.lastLapMs), bestLap: r.bestLapNumber,
-          gap: r.position === 1 ? '' : r.gapLaps > 0 ? `+${r.gapLaps} ${r.gapLaps === 1 ? 'volta' : 'voltas'}` : r.gapMs != null ? `+${(r.gapMs / 1000).toFixed(3)}` : '',
-        })),
+        // O placar/telão usam os quatro primeiros campos; o app também recebe o histórico
+        // completo para abrir a volta a volta do piloto selecionado.
+        .map((r) => {
+          const c = s.competitors.find((competitor) => competitor.kart === r.kart);
+          const ativas = c?.crossings.filter((x) => !x.deleted).sort((a, b) => a.wallMs - b.wallMs) ?? [];
+          const lapTimes = ativas
+            .map((crossing, index) => ({ crossing, number: index }))
+            .filter(({ crossing, number }) => number > 0 && typeof crossing.lapMs === 'number' && Number.isFinite(crossing.lapMs) && crossing.lapMs > 0)
+            .map(({ crossing, number }) => ({ number, time: formatLap(crossing.lapMs), timeMs: crossing.lapMs! }));
+          return {
+            position: r.position, kart: r.kart, name: r.name, time: formatLap(r.bestLapMs),
+            laps: r.laps, last: formatLap(r.lastLapMs), bestLap: r.bestLapNumber,
+            gap: r.position === 1 ? '' : r.gapLaps > 0 ? `+${r.gapLaps} ${r.gapLaps === 1 ? 'volta' : 'voltas'}` : r.gapMs != null ? `+${(r.gapMs / 1000).toFixed(3)}` : '',
+            lapTimes,
+          };
+        }),
     ),
   };
 }
@@ -928,9 +1231,20 @@ function painelVazio<T extends { position: number; kart: string; name: string; t
 const clients = new Set<http.ServerResponse>();
 let stateTimer: NodeJS.Timeout | null = null;
 
+/** Pela internet (aovivo, crono.*) saem só os dados do placar: nada de código de cliente, nome de PC ou endereço do decoder. */
+const OCULTOS_NA_INTERNET = new Set(['customerId', 'detalhes', 'activeOperators', 'host', 'port']);
+const jsonPublico = (dados: unknown) => JSON.stringify(dados, (k, v) => (OCULTOS_NA_INTERNET.has(k) ? undefined : v));
+const clientesPublicos = new Set<http.ServerResponse>();
+// Apps da cronometragem (/api/events?leve=1): a cada passagem só o que muda; a lista de baterias eles leem no ciclo normal.
+const clientesLeves = new Set<http.ServerResponse>();
+
 function broadcast(event: string, data: unknown) {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const res of clients) res.write(payload);
+  if (clientesPublicos.size) {
+    const publico = `event: ${event}\ndata: ${jsonPublico(data)}\n\n`;
+    for (const res of clientesPublicos) res.write(publico);
+  }
 }
 
 let stateTimerAte = 0;
@@ -944,17 +1258,27 @@ function scheduleStateBroadcast(esperaMs = 150) {
   stateTimerAte = ate;
   stateTimer = setTimeout(() => {
     stateTimer = null;
-    if (clients.size) broadcast('state', stateView());
+    for (const avisar of assinantesApp) { try { avisar(); } catch (err) { log('erro no aviso do app', (err as Error).message); } }
+    if (clients.size || clientesLeves.size) {
+      const estado = stateView();
+      if (clients.size) broadcast('state', estado);
+      if (clientesLeves.size) {
+        const { sessions: _sessions, lastQualifying, lastFinished, ...leve } = estado;
+        const payload = `event: state\ndata: ${JSON.stringify(estado.runningId ? leve : { ...leve, lastQualifying, lastFinished })}\n\n`;
+        for (const res of clientesLeves) res.write(payload);
+      }
+    }
     enviarAosPaineis();
   }, esperaMs);
 }
 
 // cronometro na tela anda mesmo sem passagem
 setInterval(() => {
-  if ((clients.size || clientesPainel.size) && runningSession()) scheduleStateBroadcast();
+  if ((clients.size || clientesLeves.size || clientesPainel.size) && runningSession()) scheduleStateBroadcast();
 }, 1_000);
 setInterval(() => {
   for (const res of clients) res.write(': ping\n\n');
+  for (const res of clientesLeves) res.write(': ping\n\n');
   for (const c of clientesPainel) c.res.write(': ping\n\n');
 }, 15_000);
 
@@ -1329,24 +1653,77 @@ const depEmail: Dependencias = {
  * mandavam o resultado em dobro para cada piloto e disputavam os mesmos PDFs temporários.
  */
 const filaEmails = new Map<string, Promise<void>>();
-const LIMITE_ENVIO_EMAILS_MS = 30 * 60_000;
+let filaGlobalEmails: Promise<void> = Promise.resolve();
+// Item 14: Redução do limite de bloqueio de 30 min para 3 min por envio
+const LIMITE_ENVIO_EMAILS_MS = 3 * 60_000;
 const envioATodosAtivo = new Set<string>();
+
+// Item 13: Fila de e-mails persistida em disco (pending-emails.json) contra perda em reinicializações
+const PENDING_EMAILS_FILE = join(DATA_DIR, 'pending-emails.json');
+type JobEmailPendente = { sessionId: string; agendadoPara: number; tentativas: number };
+let jobsEmailsPendentes: JobEmailPendente[] = [];
+function carregarJobsEmails() {
+  if (existsSync(PENDING_EMAILS_FILE)) {
+    try {
+      const dados = JSON.parse(readFileSync(PENDING_EMAILS_FILE, 'utf8')) as unknown;
+      if (!Array.isArray(dados) || dados.some((j) => !j || typeof j.sessionId !== 'string' || !Number.isFinite(j.agendadoPara) || !Number.isInteger(j.tentativas))) throw new Error('esquema inválido');
+      jobsEmailsPendentes = dados as JobEmailPendente[];
+    } catch (e) {
+      const quarentena = `${PENDING_EMAILS_FILE}.corrompido-${Date.now()}`;
+      try { renameSync(PENDING_EMAILS_FILE, quarentena); } catch { /* melhor esforço */ }
+      log(`ERRO: fila de e-mails inválida; arquivo preservado para diagnóstico em ${quarentena}: ${(e as Error).message}`);
+      jobsEmailsPendentes = [];
+    }
+  }
+}
+function salvarJobsEmails() {
+  try {
+    writeJsonAtomic(PENDING_EMAILS_FILE, jobsEmailsPendentes);
+  } catch (e) { log(`ERRO ao persistir fila de e-mails (${PENDING_EMAILS_FILE}): ${(e as Error).message}`); }
+}
+carregarJobsEmails();
+
+function registrarJobEmail(sessionId: string, agendadoPara: number) {
+  jobsEmailsPendentes = jobsEmailsPendentes.filter((j) => j.sessionId !== sessionId);
+  jobsEmailsPendentes.push({ sessionId, agendadoPara, tentativas: 0 });
+  salvarJobsEmails();
+}
+function concluirJobEmail(sessionId: string) {
+  jobsEmailsPendentes = jobsEmailsPendentes.filter((j) => j.sessionId !== sessionId);
+  salvarJobsEmails();
+}
+
 function enviarResultadoEmFila(s: Session, op: OpcoesEnvio) {
   const aTodos = !op.kart && !op.para;
   if (aTodos) envioATodosAtivo.add(s.id);
-  // 11/10: o envio da BATERIA 18:00 · CORRIDA nunca terminou nem deu erro e prendia a bateria para sempre
-  // (envioATodosAtivo); com o limite, vira "falhou" e a nova tentativa de 5 em 5 min assume
+  let iniciar!: () => void;
+  let trabalhoReal: Promise<void> = Promise.resolve();
+  const iniciou = new Promise<void>((resolve) => { iniciar = resolve; });
   const tarefa = () => {
+    const trabalho = enviarResultado(s, EMAIL_FILE, depEmail, op);
+    trabalhoReal = trabalho.then(() => undefined, () => undefined);
+    iniciar();
     let timer: NodeJS.Timeout | undefined;
-    const limite = new Promise<never>((_, falhar) => { timer = setTimeout(() => falhar(new Error('o envio travou por 30 min; tentando de novo')), LIMITE_ENVIO_EMAILS_MS); });
-    return Promise.race([enviarResultado(s, EMAIL_FILE, depEmail, op), limite]).finally(() => clearTimeout(timer));
+    const limite = new Promise<never>((_, falhar) => {
+      timer = setTimeout(() => falhar(new Error('o envio atingiu o tempo limite de 3 min; tentando de novo no próximo ciclo')), LIMITE_ENVIO_EMAILS_MS);
+    });
+    // A resposta pode expirar para o chamador, mas a fila permanece ocupada até o trabalho real terminar.
+    // Isso impede que a tentativa seguinte envie duplicatas enquanto um SMTP/PDF antigo ainda executa.
+    void trabalho.finally(() => clearTimeout(timer)).catch(() => undefined);
+    return Promise.race([trabalho, limite]);
   };
-  const atual = (filaEmails.get(s.id) ?? Promise.resolve()).then(tarefa, tarefa);
+  const anterior = aTodos
+    ? Promise.all([filaEmails.get(s.id) ?? Promise.resolve(), filaGlobalEmails]).then(() => undefined)
+    : (filaEmails.get(s.id) ?? Promise.resolve());
+  const atual = anterior.then(tarefa, tarefa);
   const marca = atual.then(() => undefined, () => undefined);
-  filaEmails.set(s.id, marca);
-  void marca.then(() => {
+  // Em timeout, atual já rejeitou mas o trabalho SMTP continua. Mantemos uma trava até sua liquidação real.
+  const bloqueio: Promise<void> = Promise.all([marca, iniciou.then(() => trabalhoReal)]).then(() => undefined);
+  filaEmails.set(s.id, bloqueio);
+  if (aTodos) filaGlobalEmails = bloqueio;
+  void bloqueio.then(() => {
     if (aTodos) envioATodosAtivo.delete(s.id);
-    if (filaEmails.get(s.id) === marca) filaEmails.delete(s.id);
+    if (filaEmails.get(s.id) === bloqueio) filaEmails.delete(s.id);
   });
   return atual;
 }
@@ -1362,10 +1739,11 @@ async function emailsAoEncerrar(s: Session) {
   if (!s.competitors.some((c) => c.crossings.some((x) => !x.deleted && x.lapMs != null))) return; // bateria sem volta nenhuma
   if (envioATodosAtivo.has(s.id)) return; // já está mandando para todos (a próxima tentativa confere quem faltou)
   try {
-    await enviarResultadoEmFila(s, { automatico: true, nomeEvento: nomeEventoDa(s) });
+    await enviarResultadoEmFila(s, { automatico: true, nomeEvento: nomeEventoDa(s), assinaturaResultado: assinaturaResultado(s) });
   } catch (err) {
     const erro = (err as Error).message;
-    s.emailsResultado = { status: 'falhou', atualizadoEm: Date.now(), tentativas: (s.emailsResultado?.tentativas ?? 0) + 1, enviados: s.emailsResultado?.enviados ?? [], falhas: [{ kart: '', nome: '', email: '', erro }], semEmail: s.emailsResultado?.semEmail ?? [] };
+    const tentativas = (s.emailsResultado?.tentativas ?? 0) + 1;
+    s.emailsResultado = { status: 'falhou', atualizadoEm: Date.now(), tentativas, proximaTentativaEm: Date.now() + Math.min(30 * 60_000, 60_000 * 2 ** Math.min(tentativas - 1, 5)) + Math.floor(Math.random() * 30_000), enviados: s.emailsResultado?.enviados ?? [], falhas: [{ kart: '', nome: '', email: '', erro }], semEmail: s.emailsResultado?.semEmail ?? [] };
     saveSession(s);
     log(`e-mail do resultado de ${s.name} não foi enviado (tenta de novo): ${erro}`);
   }
@@ -1449,15 +1827,25 @@ async function publicarNoAppAutomatico(s: Session) {
 
 function agendarEmails(s: Session) {
   clearTimeout(emailsAgendados.get(s.id));
+  registrarJobEmail(s.id, Date.now() + ESPERA_EMAIL_MS);
   emailsAgendados.set(s.id, setTimeout(() => {
     emailsAgendados.delete(s.id);
+    concluirJobEmail(s.id);
     if (s.state !== 'encerrada' || !['classificacao', 'corrida'].includes(s.type)) return;
     void publicarNoAppAutomatico(s);
     if (envioATodosAtivo.has(s.id)) return agendarEmails(s); // ainda mandando a versão anterior: corrige quando terminar
-    if (!(s.emailsResultado?.enviados.length)) return void emailsAoEncerrar(s);
+    const assinaturaAtual = assinaturaResultado(s);
+    if (!(s.emailsResultado?.enviados.length)) {
+      return void emailsAoEncerrar(s);
+    }
     if (!lerConfig(EMAIL_FILE).automatico || semEmailAosPilotos(s, nomeEventoDa(s))) return;
+    // Item 15: Só reenvia resultado com aviso de correção se a classificação realmente tiver mudado
+    if (s.emailsResultado.assinaturaResultado && s.emailsResultado.assinaturaResultado === assinaturaAtual) {
+      log(`e-mail de ${s.name}: classificação inalterada após ajuste manual; reenvio de correção cancelado`);
+      return;
+    }
     log(`e-mail do resultado de ${s.name}: a classificação mudou depois do envio, reenviando a todos com o aviso de correção`);
-    void enviarResultadoEmFila(s, { automatico: false, corrigido: true, nomeEvento: nomeEventoDa(s) })
+    void enviarResultadoEmFila(s, { automatico: false, corrigido: true, nomeEvento: nomeEventoDa(s), assinaturaResultado: assinaturaAtual })
       .catch((e) => log(`e-mail corrigido de ${s.name}: ${(e as Error).message}`));
   }, ESPERA_EMAIL_MS));
 }
@@ -1472,14 +1860,25 @@ function assinaturaResultado(s: Session) {
 setInterval(() => {
   const agora = Date.now();
   const limite = agora - 6 * 3_600_000;
+  const limiteQuota = agora - 36 * 3_600_000;
+  let disparouEmailNesteCiclo = envioATodosAtivo.size > 0;
   for (const s of sessions.values()) {
     const e = s.emailsResultado;
     const fim = s.finishedAt ?? s.createdAt;
-    if (s.state !== 'encerrada' || fim <= limite || emailsAgendados.has(s.id)) continue;
-    if (e ? (e.status === 'parcial' || e.status === 'falhou') && e.tentativas < 12 : fim < agora - 3 * 60_000) void emailsAoEncerrar(s);
+    const bloqueadoPorQuota = e?.falhas.some((f) => ehErroLimitePorHora(f.erro)) ?? false;
+    if (s.state !== 'encerrada' || fim <= (bloqueadoPorQuota ? limiteQuota : limite) || emailsAgendados.has(s.id)) continue;
+    const suprimidoHistorico100Milhas = e?.status === 'sem-email-pilotos' && /100\s*milhas/i.test(`${nomeEventoDa(s)} ${s.name}`);
+    const horaRetry = e?.proximaTentativaEm ?? 0;
+    const possuiFalhaTransitoria = e?.falhas.some((f) => !f.permanente || ehErroLimitePorHora(f.erro)) ?? false;
+    const statusRetentavel = e?.status === 'parcial' || e?.status === 'falhou' || (e?.status === 'falhou-permanente' && possuiFalhaTransitoria);
+    const maxTentativas = bloqueadoPorQuota ? 60 : 12;
+    if (!disparouEmailNesteCiclo && (suprimidoHistorico100Milhas || (e ? statusRetentavel && possuiFalhaTransitoria && e.tentativas < maxTentativas && agora >= horaRetry : fim < agora - 3 * 60_000))) {
+      disparouEmailNesteCiclo = true;
+      void emailsAoEncerrar(s);
+    }
     if (fim < agora - 3 * 60_000) void publicarNoAppAutomatico(s);
   }
-}, 5 * 60_000);
+}, 60_000);
 
 // ---------------------------------------------------------------- agenda da recepção -> evento do dia (canvas Eventos.dc.html)
 // Como no canvas: cada dia vira o evento "Baterias dd/mm/aaaa", cada bateria da agenda da recepção vira um grupo e as
@@ -1587,8 +1986,42 @@ async function sincronizarAgendaDoDia() {
   for (const b of baterias) {
     try { if (await prepararBateriaDaAgenda(b)) criou = true; } catch (err) { log(`agenda ${b.id}: não consegui preparar a bateria (${(err as Error).message})`); }
   }
+  if (await tirarQuemSaiuDaAgenda(baterias)) criou = true;
   if (criou) scheduleStateBroadcast();
   return mudou || criou;
+}
+
+/**
+ * Cliente movido de horário ou cancelado na recepção sai da lista que ainda não largou (cronometragem e tablet do galpão).
+ * Só tira quem veio da agenda (agendaPuxados): quem o cronometrista pôs à mão fica. Falha ao ler a agenda não tira ninguém.
+ */
+async function tirarQuemSaiuDaAgenda(baterias: BateriaAgenda[]) {
+  let mudou = false;
+  for (const b of baterias) {
+    const abertas = [...sessions.values()].filter((s) => s.agendaId === b.id && s.state === 'preparando' && s.agendaPuxados);
+    if (!abertas.length) continue;
+    let grade: InscritoAgenda[];
+    try { grade = (await opsGet(`/api/crono/baterias/${b.id}/grid`)) as InscritoAgenda[]; } catch { continue; }
+    if (!Array.isArray(grade)) continue;
+    const naAgenda = new Set(grade.map(chaveDoInscrito));
+    for (const s of abertas) {
+      const saiu = quemSaiuDaAgenda(s.agendaPuxados ?? [], s.competitors, naAgenda);
+      if (!saiu.chaves.size) continue;
+      s.agendaPuxados = (s.agendaPuxados ?? []).filter((k) => !saiu.chaves.has(k));
+      if (saiu.competidores.length) {
+        const fora = new Set(saiu.competidores);
+        setCompetitors(s, s.competitors.filter((c) => !fora.has(c)).map((c) => ({ kart: c.kart, name: c.name, customerId: c.customerId ?? null, category: c.category ?? null, detalhes: c.detalhes })));
+        log(`${s.name}: saiu da lista por mudança na recepção: ${saiu.competidores.map((c) => c.name).join(', ')}`);
+      }
+      saveSession(s);
+      mudou = true;
+    }
+  }
+  return mudou;
+}
+
+function chaveDoInscrito(g: InscritoAgenda) {
+  return g.clienteId != null ? String(g.clienteId) : String(g.nome ?? '').trim().toLowerCase();
 }
 
 type InscritoAgenda = { nome?: string; kart?: string | null; clienteId?: unknown; pago?: boolean; aprovada?: boolean };
@@ -1776,6 +2209,7 @@ function crossingRows(s: Session) {
     invalid: Boolean(crossing.invalid),
     deleted: Boolean(crossing.deleted),
     source: crossing.source ?? 'decoder',
+    estimada: Boolean(crossing.estimada),
     assigned: Boolean(crossing.originalKart && crossing.originalKart !== competitor.kart),
     rejected: false,
     reason: null as string | null,
@@ -1795,6 +2229,7 @@ function crossingRows(s: Session) {
     invalid: false,
     deleted: false,
     source: 'decoder',
+    estimada: false,
     assigned: false,
     rejected: true,
     reason: r.reason as string | null,
@@ -1895,16 +2330,21 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
   }
 
   // conta de e-mail dos resultados (a senha nunca volta; vazia no PUT = mantém)
+  if (path.startsWith('/api/email-config') && !isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para configurações de e-mail.' });
   if (path === '/api/email-config' && method === 'GET') return send(res, 200, configPublica(lerConfig(EMAIL_FILE)));
   if (path === '/api/email-config' && method === 'PUT') {
     try { return send(res, 200, configPublica(salvarConfig(EMAIL_FILE, await readBody(req)))); } catch (e) { return send(res, 400, { error: (e as Error).message }); }
+  }
+  if (path === '/api/email-config/verificar' && method === 'POST') {
+    try { return send(res, 200, await verificarTransporteEmail(EMAIL_FILE, SIMULATE)); }
+    catch (e) { return send(res, 502, { error: `Falha na autenticação SMTP: ${traduzirErro(e)}` }); }
   }
   if (path === '/api/email-config/teste' && method === 'POST') {
     const body = await readBody(req);
     try {
       const daTela = body.config && typeof body.config === 'object' && !Array.isArray(body.config) ? body.config as Record<string, unknown> : undefined;
       const resultado = await enviarTeste(EMAIL_FILE, String(body.para ?? ''), SIMULATE, daTela);
-      log(`e-mail de teste aceito pelo servidor para ${String(body.para ?? '')}`);
+      log('e-mail de teste aceito pelo servidor; destinatário ocultado do log');
       return send(res, 200, { ok: true, ...(resultado ?? { status: 'simulador', entregaConfirmada: false, mensagem: 'Teste gravado no simulador.' }) });
     }
     catch (e) { return send(res, 400, { error: `Não enviou: ${traduzirErro(e)}` }); }
@@ -1956,12 +2396,13 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     catch (err) { return send(res, 500, { error: `Falha ao criar cópia: ${(err as Error).message}` }); }
   }
 
-  if (path === '/api/state') return send(res, 200, stateView());
+  if (path === '/api/state') return send(res, 200, veioDaInternet(req) ? JSON.parse(jsonPublico(stateView())) : stateView());
   if (path === '/api/livetime-snapshot') return send(res, 200, liveSnapshot(url.searchParams.get('painel') === 'tb50'));
   if (path === '/api/painel-led-page' && method === 'GET') return send(res, 200, painelLedPage);
   if (path === '/api/painel-led-page' && (method === 'PUT' || method === 'POST')) {
     const body = await readBody(req);
     try {
+      if (body.atualizar === true) return send(res, 200, pedirAtualizacaoPainelLed(String(body.origem ?? 'cronometragem')));
       return send(res, 200, setPainelLedPage(body.pagina, String(body.origem ?? 'cronometragem')));
     } catch (err) {
       return send(res, 400, { error: (err as Error).message });
@@ -1989,9 +2430,11 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       connection: 'keep-alive',
       'access-control-allow-origin': '*',
     });
-    res.write(`event: state\ndata: ${JSON.stringify(stateView())}\n\n`);
-    clients.add(res);
-    req.on('close', () => clients.delete(res));
+    const publico = veioDaInternet(req);
+    res.write(`event: state\ndata: ${publico ? jsonPublico(stateView()) : JSON.stringify(stateView())}\n\n`);
+    const lista = publico ? clientesPublicos : url.searchParams.get('leve') === '1' ? clientesLeves : clients;
+    lista.add(res);
+    req.on('close', () => lista.delete(res));
     return;
   }
 
@@ -2514,7 +2957,9 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     const s = sessions.get(so[1]);
     if (!s) return send(res, 404, { error: 'Bateria não encontrada.' });
     if (method === 'GET') {
-      const pilotos = pilotosDoSorteio(s, sessions.values(), mesmoPrograma);
+      const irmas = new Set(irmasDe(s).map((x) => x.id));
+      const ehDaMesmaBateria = (a: Session, b: Session) => mesmoPrograma(a, b) || (a.id === s.id && irmas.has(b.id)) || (b.id === s.id && irmas.has(a.id));
+      const pilotos = pilotosDoSorteio(s, sessions.values(), ehDaMesmaBateria);
       const pesos = new Map<string, number>();
       const ids = pilotos.map((p) => p.customerId).filter(Boolean).join(',');
       if (ids) {
@@ -2527,7 +2972,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       }
       return send(res, 200, {
         sessao: { id: s.id, name: s.name, type: s.type, state: s.state, createdAt: s.createdAt, eventId: s.eventId ?? null },
-        programa: [...sessions.values()].filter((x) => mesmoPrograma(s, x)).map((x) => ({ id: x.id, name: x.name, state: x.state })),
+        programa: [...sessions.values()].filter((x) => ehDaMesmaBateria(s, x)).map((x) => ({ id: x.id, name: x.name, state: x.state })),
         tipoKart: await tipoKartDa(s),
         karts: kartsCadastrados(),
         pilotos: pilotos.map((p) => ({ ...p, pesoKg: p.customerId ? pesos.get(p.customerId) ?? null : null })),
@@ -2546,8 +2991,8 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       (s.observations ??= []).push({ id: randomUUID(), text: texto, wallMs: Date.now(), author: 'Sorteio', kind: 'system' });
       saveSession(s);
       log(`bateria ${s.name}: ${texto}`);
-      for (const irma of sessions.values()) {
-        if (mesmoPrograma(s, irma) && copiarCompetidores(irma, s)) { saveSession(irma); log(`competidores de ${s.name} copiados para ${irma.name}`); }
+      for (const irma of irmasDe(s)) {
+        if (copiarCompetidores(irma, s)) { saveSession(irma); log(`competidores de ${s.name} copiados para ${irma.name}`); }
       }
       scheduleStateBroadcast();
       return send(res, 200, { ...sessionView(s), gravadoEm: Date.now() });
@@ -2613,8 +3058,19 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     }
     try {
       if (!action && method === 'GET') return send(res, 200, sessionView(s));
-      if (action === 'emails' && !m[3] && method === 'GET') return send(res, 200, s.emailsResultado ?? null);
+      if (action === 'emails' && !m[3] && method === 'GET') {
+        if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para consultar destinatários e resultado dos e-mails.' });
+        return send(res, 200, s.emailsResultado ?? null);
+      }
+      if (action === 'republicar-app' && !m[3] && method === 'POST') {
+        // só nesta máquina: reenvia ao app de clientes depois de corrigir nome ou pilotos de bateria já encerrada
+        if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado.' });
+        publicadosNoApp.delete(s.id);
+        await publicarNoAppAutomatico(s);
+        return send(res, 200, { ok: publicadosNoApp.has(s.id) });
+      }
       if (action === 'emails' && !m[3] && method === 'POST') {
+        if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para reenvio de resultados.' });
         // reenvio manual (menu da cronometragem): todos, só um kart, ou o resultado oficial para outro endereço
         const body = await readBody(req);
         if (s.state !== 'encerrada' && s.state !== 'bandeira_final') return send(res, 409, { error: 'Encerre a bateria antes de enviar o resultado.' });
@@ -2625,7 +3081,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
           if (!lerConfig(EMAIL_FILE).senha && !SIMULATE) return send(res, 400, { error: 'E-mail não configurado: preencha a conta de e-mail do kartódromo em Ferramentas › E-mail dos resultados.' });
           if (envioATodosAtivo.has(s.id)) return send(res, 409, { error: 'O resultado desta bateria já está sendo enviado a todos os pilotos. Aguarde terminar.' });
           // somenteFaltantes: só quem ainda não recebeu; atrasado: abre com o pedido de desculpas (reenvio de 13/10)
-          void enviarResultadoEmFila(s, { automatico: false, somenteFaltantes: body.somenteFaltantes === true, atrasado: body.atrasado === true }).catch((e) => log(`e-mail do resultado de ${s.name}: ${(e as Error).message}`));
+          void enviarResultadoEmFila(s, { automatico: false, somenteFaltantes: body.somenteFaltantes === true, atrasado: body.atrasado === true, aviso: typeof body.aviso === 'string' ? body.aviso.trim().slice(0, 400) : undefined, assinaturaResultado: assinaturaResultado(s) }).catch((e) => log(`e-mail do resultado de ${s.name}: ${(e as Error).message}`));
           return send(res, 202, { emSegundoPlano: true });
         }
         return send(res, 200, await enviarResultadoEmFila(s, { automatico: false, kart, para, organizador: Boolean(para) && body.organizador === true }));
@@ -2647,7 +3103,23 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
           }),
         );
       }
-      if (action === 'passings' && !m[3] && method === 'GET') return send(res, 200, crossingRows(s));
+      if (action === 'passings' && !m[3] && method === 'GET') {
+        let rows = crossingRows(s);
+        const since = Number(url.searchParams.get('since'));
+        if (Number.isFinite(since) && since > 0) {
+          rows = rows.filter((r) => r.wallMs >= since);
+        }
+        const afterId = url.searchParams.get('afterId');
+        if (afterId) {
+          const idx = rows.findIndex((r) => r.id === afterId);
+          if (idx >= 0) rows = rows.slice(0, idx);
+        }
+        const limit = Number(url.searchParams.get('limit'));
+        if (Number.isFinite(limit) && limit > 0) {
+          rows = rows.slice(0, limit);
+        }
+        return send(res, 200, rows);
+      }
       if (action === 'passings' && m[3] === 'manual' && method === 'POST') {
         const body = await readBody(req);
         const kart = String(body.kart ?? '').trim();
@@ -2674,6 +3146,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         return send(res, 200, { ok: true, count, passages: crossingRows(s) });
       }
       if (action === 'passings' && m[3] === 'clear' && method === 'POST') {
+        if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para limpar passagens.' });
         clearCrossings(s);
         s.rejected = [];
         saveSession(s);
@@ -2731,9 +3204,10 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         const bruto = body.position;
         const limpar = bruto === null || bruto === undefined || String(bruto).trim() === '' || Number(bruto) === 0;
         const position = limpar ? null : Number(bruto);
-        setManualPosition(s, kart, position);
+        const { voltasAdicionadas } = ajustarPosicaoComVoltas(s, kart, position, trackLengthFor(s));
         const autor = String(body.autor ?? 'Cronometragem').slice(0, 60);
-        registrarObservacao(s, limpar ? `Posição automática restaurada · Kart ${kart}` : `Posição manual · Kart ${kart} → P${position}`, autor, limpar ? 'system' : 'manual');
+        const voltasCriadas = voltasAdicionadas > 0 ? ` · ${voltasAdicionadas} volta${voltasAdicionadas === 1 ? '' : 's'} estimada${voltasAdicionadas === 1 ? '' : 's'}` : '';
+        registrarObservacao(s, limpar ? `Posição automática restaurada · Kart ${kart}` : `Posição manual · Kart ${kart} → P${position}${voltasCriadas}`, autor, limpar ? 'system' : 'manual');
         saveSession(s);
         scheduleStateBroadcast();
         return send(res, 200, sessionView(s));
@@ -2786,6 +3260,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         void enviarUsoKarts(s);
         log(`bateria ${s.name}: REMONTADA pelo diário (${contadas} passagens)`);
       } else if (action === 'restart' && method === 'POST') {
+        if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para reiniciar a bateria.' });
         const body = await readBody(req);
         if (body.largar) {
           const other = runningSession();
@@ -2804,10 +3279,12 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       } else if (action === 'checkered' && method === 'POST') {
         setRaceFlag(s, 'checkered', now);
       } else if (action === 'close' && method === 'POST') {
+        if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para encerrar a bateria.' });
         closeSession(s, now);
         void enviarUsoKarts(s);
         agendarEmails(s); // 3 min para o cronometrista acertar posição/penalidade antes do e-mail sair
       } else if (action === 'cancel' && method === 'POST') {
+        if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para cancelar a bateria.' });
         cancelSession(s, now);
       } else if (action === 'flag' && m[3] && method === 'POST') {
         const body = await readBody(req);
@@ -2931,24 +3408,157 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     }
   }
 
-  if (path === '/healthz') return send(res, 200, { ok: true, decoder: decoderView(), sessions: sessions.size, transmissao: transmissaoStatus() });
+  if (path === '/healthz') return send(res, 200, { ok: true, decoder: veioDaInternet(req) ? JSON.parse(jsonPublico(decoderView())) : decoderView(), sessions: sessions.size, transmissao: transmissaoStatus() });
 
   return send(res, 404, { error: 'Rota desconhecida.' });
 }
 
 /**
- * Pedido que veio da INTERNET pelo túnel do Cloudflare (crono.kartodromodebetim.com.br → :4050): o cloudflared põe
- * `cf-connecting-ip`/`cf-ray`; a rede interna (ORBITS, CRONO1, TVs, TB50) nunca manda. Pela internet só LEITURA do placar:
- * antes o painel do operador, a administração e as rotas que alteram baterias ficavam abertos sem senha (10/10/2026).
+ * Pedido que veio da INTERNET pelo túnel do Cloudflare (crono.kartodromodebetim.com.br → :4050)
+ * ou pela ponte local tv-public-bridge.mjs (:4051). Pela internet só LEITURA do placar e status.
  */
-const LEITURA_PELA_INTERNET = new Set(['/tv', '/tv-classica', '/tb50', '/tokens.css', '/kib-logo.png', '/api/livetime-snapshot', '/api/livetime-snapshot/eventos', '/healthz']);
-function veioDaInternet(req: http.IncomingMessage): boolean {
-  return Boolean(req.headers['cf-connecting-ip'] || req.headers['cf-ray']);
+const LEITURA_PELA_INTERNET = new Set([
+  '/tv',
+  '/tv-classica',
+  '/tb50',
+  '/tokens.css',
+  '/kib-logo.png',
+  '/favicon.ico',
+  '/healthz',
+  '/api/events',
+  '/api/state',
+  '/api/livetime-snapshot',
+  '/api/livetime-snapshot/eventos',
+]);
+
+function isAllowedPublicReadPath(pathname: string): boolean {
+  if (LEITURA_PELA_INTERNET.has(pathname)) return true;
+  if (/^\/api\/sessions\/[\w-]+\/laps$/.test(pathname)) return true;
+  return false;
 }
 
+function veioDaInternet(req: http.IncomingMessage): boolean {
+  return Boolean(req.headers['cf-connecting-ip'] || req.headers['cf-ray'] || req.headers['x-public-bridge'] === '1');
+}
+
+// Item 13: Rate limiting por IP para proteção contra DoS em rotas de tempo real
+const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
+function checkRateLimit(req: http.IncomingMessage): boolean {
+  const ip = (req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1')
+    .toString().split(',')[0].trim().replace(/^::ffff:/, '');
+  const now = Date.now();
+  const bucket = rateLimitBuckets.get(ip);
+  if (!bucket || now >= bucket.resetAt) {
+    rateLimitBuckets.set(ip, { count: 1, resetAt: now + 10_000 });
+    return true;
+  }
+  bucket.count++;
+  if (bucket.count > 300) return false;
+  return true;
+}
+
+// Item 33: Proteção de endpoints destrutivos (close, cancel, restart, clear)
+function isAuthorizedDestructive(req: http.IncomingMessage): boolean {
+  if (veioDaInternet(req)) return false;
+  const ip = req.socket.remoteAddress || '';
+  if (ip === '127.0.0.1' || ip === '::1' || ip.endsWith('127.0.0.1') || ip === '::ffff:127.0.0.1') return true;
+  const ipsLocais = Object.values(os.networkInterfaces()).flatMap((items) => (items ?? []).map((item) => item.address));
+  if (clienteEhMaquinaOperadora(ip, req.headers['x-client-machine'], process.env.COMPUTERNAME, ipsLocais)) return true;
+  const key = req.headers['x-timing-key'] || req.headers['x-ops-key'] || req.headers['authorization'];
+  const configPath = process.env.TIMING_AUTH_CONFIG_FILE || 'C:/Program Files/Kartodromo/Cronometragem/appsettings.json';
+  let installedKey = '';
+  try { installedKey = String((JSON.parse(readFileSync(configPath, 'utf8')) as { ChaveCronometragem?: unknown }).ChaveCronometragem ?? ''); } catch { /* melhor esforço */ }
+  const expected = [process.env.TIMING_OPS_KEY, process.env.OPS_RECEPCAO_KEY, installedKey].filter((x): x is string => Boolean(x));
+  if (typeof key === 'string' && expected.some((secret) => chaveOperadorValida(key, secret) || key.startsWith('Bearer ') && chaveOperadorValida(key.slice(7), secret))) return true;
+  return false;
+}
+
+/** O app usa as mesmas rotas do programa Windows, por dentro: nenhuma regra de prova é duplicada. */
+async function chamarLegadoLocal(metodo: string, caminho: string, corpo?: unknown) {
+  let r: Response;
+  try {
+    r = await fetch(`http://127.0.0.1:${PORT}${caminho}`, {
+      method: metodo, signal: AbortSignal.timeout(20_000),
+      headers: { 'content-type': 'application/json', 'x-client-machine': process.env.COMPUTERNAME ?? '', 'x-timing-key': process.env.TIMING_OPS_KEY ?? '' },
+      ...(corpo === undefined ? {} : { body: JSON.stringify(corpo) }),
+    });
+  } catch (err) {
+    // sem resposta o comando pode ter sido aplicado: fica UNKNOWN, nunca repete sozinho
+    throw Object.assign(new Error((err as Error).message), { desconhecido: true });
+  }
+  const dados = await r.json().catch(() => ({})) as { error?: string };
+  if (!r.ok) throw Object.assign(new ErroLegado(dados.error ?? `Cronometragem respondeu ${r.status}`), { desconhecido: r.status >= 500 });
+  return dados;
+}
+
+async function inscricoesDaRecepcao(agendaId: number): Promise<Inscricao[]> {
+  if (!process.env.OPS_SQL_PASSWORD) {
+    if (SIMULATE && process.env.TIMING_SIM_INSCRICOES_JSON) return JSON.parse(process.env.TIMING_SIM_INSCRICOES_JSON) as Inscricao[];
+    throw new Error('Banco da recepção não configurado.');
+  }
+  const { query } = await import('../lib/ops/db');
+  return await query(`SELECT c.Id clienteId, c.Nome nome, i.Aprovada aprovada, i.Pago pago,
+      CAST(CASE WHEN i.TermoImpressoEm IS NULL THEN 0 ELSE 1 END AS bit) termo,
+      ISNULL(i.PrecoCentavos, p.PrecoCentavos) - i.DescontoCentavos totalCentavos,
+      CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.EnduranceEvento ev WHERE ev.BateriaId = i.BateriaId AND ev.Ativo = 1) THEN 1 ELSE 0 END AS bit) endurance
+    FROM dbo.Inscricao i JOIN dbo.Cliente c ON c.Id = i.ClienteId JOIN dbo.Bateria b ON b.Id = i.BateriaId LEFT JOIN dbo.Produto p ON p.Id = ISNULL(i.ProdutoId, b.ProdutoId)
+    WHERE i.BateriaId = @id AND i.Status <> 'cancelada'`, { id: agendaId }) as Inscricao[];
+}
+
+/** Horários da agenda de hoje para o app; falha na consulta mantém o último resultado. */
+let inicioPorAgenda: ReadonlyMap<string, string> = new Map();
+async function atualizarInicioPorAgenda() {
+  const data = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+  const lista = await opsGet(`/api/baterias?data=${data}`).catch(() => null) as { id?: unknown; inicio?: unknown }[] | null;
+  if (Array.isArray(lista)) inicioPorAgenda = new Map(lista.map((b) => [String(b.id), String(b.inicio ?? '')]));
+}
+void atualizarInicioPorAgenda();
+setInterval(() => void atualizarInicioPorAgenda(), 60_000).unref();
+
+function ligarAppOperacional() {
+  const segredo = process.env.APP_V1_TOKEN_SECRET ?? '';
+  if (!segredo) return;
+  try {
+    const store = abrirStore(join(DATA_DIR, '..', 'app-operacional', 'app.db'));
+    marcarPendentesComoDesconhecidas(store);
+    moduloApp = criarModuloApp({
+      store, segredo, gatewaySegredo: process.env.APP_V1_GATEWAY_SECRET,
+      legado: chamarLegadoLocal,
+      inscricoes: inscricoesDaRecepcao,
+      listarSessoes: sortedSessions,
+      inicioPorAgenda: () => inicioPorAgenda,
+      kartsCadastrados,
+      verSessao: (id) => sessions.get(id),
+      assinarMudancas: (cb) => { assinantesApp.add(cb); return () => assinantesApp.delete(cb); },
+    });
+    log('app operacional ligado');
+  } catch (err) {
+    log('app operacional indisponível', (err as Error).message);
+  }
+}
+ligarAppOperacional();
+
 const server = http.createServer((req, res) => {
+  recordOperatorMachine(req);
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
-  if (veioDaInternet(req) && !((req.method === 'GET' || req.method === 'HEAD') && LEITURA_PELA_INTERNET.has(url.pathname))) {
+
+  if (['/tv', '/tb50', '/tv-classica', '/api/state', '/api/livetime-snapshot'].includes(url.pathname)) {
+    if (!checkRateLimit(req)) {
+      res.writeHead(429, { 'content-type': 'application/json; charset=utf-8', 'retry-after': '2', 'cache-control': 'no-store' });
+      return res.end(JSON.stringify({ error: 'Muitas requisições em sequência deste endereço. Aguarde alguns segundos.' }));
+    }
+  }
+
+  // antes do bloqueio de internet: nestas rotas quem decide é o login do usuário, nunca a origem do pedido
+  if (url.pathname.startsWith('/api/app/v1/')) {
+    if (!moduloApp) return send(res, 503, { codigo: 'UNAVAILABLE', erro: 'App operacional indisponível.' });
+    void moduloApp.tratar(req, res, url).catch((err) => {
+      log('erro na API do app', err);
+      if (!res.headersSent) send(res, 500, { codigo: 'SERVER_ERROR', erro: 'Erro interno.' });
+    });
+    return;
+  }
+  if (veioDaInternet(req) && !((req.method === 'GET' || req.method === 'HEAD') && isAllowedPublicReadPath(url.pathname))) {
     res.writeHead(403, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
     return res.end(JSON.stringify({ error: 'Acesso só pela rede do kartódromo.' }));
   }

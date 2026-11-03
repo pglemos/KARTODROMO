@@ -220,7 +220,7 @@ export function ajusteRedutorMm(deltaMs: number, regra: RegraRedutor): number {
   if (a <= regra.toleranciaMs) return 0;
   if (regra.faixasPersonalizadas?.length) {
     const linha = regra.faixasPersonalizadas.find((f) => a <= f.ateMs);
-    const ultima = regra.faixasPersonalizadas.at(-1)!;
+    const ultima = regra.faixasPersonalizadas[regra.faixasPersonalizadas.length - 1]!;
     const ajuste = linha ? linha.mm : ultima.mm + Math.ceil((a - ultima.ateMs) / regra.faixaMs) * regra.passoMm;
     return mm2(Math.sign(deltaMs) * ajuste);
   }

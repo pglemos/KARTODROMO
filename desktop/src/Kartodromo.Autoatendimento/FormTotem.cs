@@ -13,6 +13,9 @@ public class FormTotem : Form, IMessageFilter
 {
     record Pessoa(long Id, string Nome, string Nascimento, string Token);
 
+    // Totem 1 (.161) e Totem 2 (.69)
+    static readonly bool TotemTravado = Environment.MachineName.ToUpperInvariant() is "TOTEN1" or "DESKTOP-4OR2GFI";
+
     // estado do atendimento em curso
     string _ident = "";
     bool _menor;
@@ -54,8 +57,10 @@ public class FormTotem : Form, IMessageFilter
         Controls.Add(_cabecalho);
         if (autoteste == null)
         {
+            // só os totens de verdade ficam travados; nos outros PCs é uma janela comum, com o X
+            if (!TotemTravado) FormBorderStyle = FormBorderStyle.Sizable;
             WindowState = FormWindowState.Maximized;
-            TopMost = true;
+            TopMost = TotemTravado;
             Application.AddMessageFilter(this);
         }
         else
@@ -83,7 +88,7 @@ public class FormTotem : Form, IMessageFilter
             // saida da equipe: Ctrl+Shift+Alt+S
             if (e.Control && e.Shift && e.Alt && e.KeyCode == Keys.S) { _liberadoFechar = true; Close(); }
         };
-        FormClosing += (_, e) => { if (_autoteste == null && e.CloseReason == CloseReason.UserClosing && !_liberadoFechar) e.Cancel = true; };
+        FormClosing += (_, e) => { if (_autoteste == null && TotemTravado && e.CloseReason == CloseReason.UserClosing && !_liberadoFechar) e.Cancel = true; };
         Shown += async (_, _) =>
         {
             _k = Math.Min(ClientSize.Width / 1366f, ClientSize.Height / 768f);
@@ -712,7 +717,8 @@ public class FormTotem : Form, IMessageFilter
 
     async Task TelaBaterias()
     {
-        var todas = await _api.Lista("/api/totem/baterias");
+        var grupo = string.Join(",", _participantes.Select(p => $"{p.Id}.{p.Token}"));
+        var todas = await _api.Lista("/api/totem/baterias?grupo=" + Uri.EscapeDataString(grupo));
         var n = _participantes.Count;
         var lista = todas.Where(b => b.I("livres") >= n).ToList();
         MontarBaterias(lista, n);
@@ -760,20 +766,71 @@ public class FormTotem : Form, IMessageFilter
         {
             _sel = lista.Marcados().ToHashSet();
             if (_sel.Count == 0) { Alertar("Selecione pelo menos uma bateria."); return; }
-            var r = await _api.Post("/api/totem/inscrever", new JsonObject
-            {
-                ["bateriaIds"] = new JsonArray(_sel.Select(x => (JsonNode)x).ToArray()),
-                ["participantes"] = new JsonArray(_participantes.Select(p => (JsonNode)new JsonObject { ["id"] = p.Id, ["token"] = p.Token }).ToArray()),
-            });
-            var qtd = r?["inscricoes"] is JsonArray ins ? ins.Count : 1;
-            TelaSucesso(Fmt.Hm(r.S("inicio")), qtd);
-            // o termo sai na TM-T20 da recepção (fila do servidor); só imprime aqui se o servidor não enfileirou
-            if (r["termoNaRecepcao"]?.GetValue<bool>() == true) Program.Log("termo enviado para a impressora da recepção");
-            else if (r.S("termoUrl") is { Length: > 0 } termo) _ = Imprimir(_api.BaseUrl + termo);
+            var campeonato = baterias.Where(b => _sel.Contains(b.L("id") ?? 0) && b["endurance"] is JsonObject).ToList();
+            if (campeonato.Count > 1) { Alertar("Escolha só uma bateria de campeonato por vez."); return; }
+            if (campeonato.Count == 1) await TelaEquipe(campeonato[0], baterias, n);
+            else await Inscrever(null);
         });
         proximo.Enabled = totalMarcadas > 0;
         voltar.BringToFront(); proximo.BringToFront();
         Mostrar("baterias", c, () => MontarBaterias(baterias, n));
+    }
+
+    async Task Inscrever(JsonObject endurance)
+    {
+        var corpo = new JsonObject
+        {
+            ["bateriaIds"] = new JsonArray(_sel.Select(x => (JsonNode)x).ToArray()),
+            ["participantes"] = new JsonArray(_participantes.Select(p => (JsonNode)new JsonObject { ["id"] = p.Id, ["token"] = p.Token }).ToArray()),
+        };
+        if (endurance != null) corpo["endurance"] = endurance;
+        var r = await _api.Post("/api/totem/inscrever", corpo);
+        var qtd = r?["inscricoes"] is JsonArray ins ? ins.Count : 1;
+        var pulseiras = r?["pulseiras"] is JsonArray pul ? pul.OfType<JsonObject>().ToList() : [];
+        TelaSucesso(Fmt.Hm(r.S("inicio")), qtd, pulseiras);
+        // o termo sai na TM-T20 da recepção (fila do servidor); só imprime aqui se o servidor não enfileirou
+        if (r["termoNaRecepcao"]?.GetValue<bool>() == true) Program.Log("termo enviado para a impressora da recepção");
+        else if (r.S("termoUrl") is { Length: > 0 } termo) _ = Imprimir(_api.BaseUrl + termo);
+    }
+
+    async Task TelaEquipe(JsonObject bateria, List<JsonObject> baterias, int n)
+    {
+        var info = await _api.Get("/api/totem/endurance?bateria=" + (bateria.L("id") ?? 0));
+        var equipes = info?["equipes"] is JsonArray eqs ? eqs.OfType<JsonObject>().ToList() : [];
+        var c = NovaTela(etapa: 3);
+        c.Controls.Add(Rot("Escolha onde vai correr", 150, 108, F(44, false, FontStyle.Bold), Estilo.Texto));
+        c.Controls.Add(Rot($"Marque uma ou mais inscrições da mesma família. Até {info.I("maxPilotos")} pilotos por inscrição. Kart pelo sorteio.", 150, 164, F(18), Estilo.Suave));
+        var painel = CartaoEm(c, 150, 215, 1066, 426);
+        var lista = new ListaOpcoes(_k) { Bounds = new Rectangle(0, 0, P(1066), P(426)) };
+        foreach (var q in equipes)
+        {
+            var vagas = q.I("vagas");
+            lista.Adicionar(new OpcaoLinha(_k)
+            {
+                Height = P(84), Id = q.L("id") ?? 0, Linha1 = q.S("nome").ToUpperInvariant(),
+                Linha2 = $"{q.I("pilotos")} piloto(s) inscrito(s)",
+                Direita = vagas == 0 ? "completa" : vagas + (vagas == 1 ? " vaga" : " vagas"),
+                Livres = vagas, Total = info.I("maxPilotos"),
+            });
+        }
+        if (equipes.Count == 0) lista.Vazio("Nenhuma equipe cadastrada para este campeonato.\r\nProcure a recepção.");
+        painel.Controls.Add(lista);
+        var voltar = Botao(c, "Voltar", 914, 660, 140, false, () => { MontarBaterias(baterias, n); return Task.CompletedTask; });
+        var confirmar = Botao(c, "Confirmar", 1070, 660, 146, true, async () =>
+        {
+            var marcadas = lista.Marcados().ToList();
+            if (marcadas.Count == 0) { Alertar("Marque pelo menos uma inscrição da equipe."); return; }
+            var familias = equipes.Where(q => marcadas.Contains(q.L("id") ?? 0))
+                .Select(q => q.L("grupoId") is { } g ? $"familia:{g}" : $"inscricao:{q.L("id")}").Distinct().Count();
+            if (familias > 1) { Alertar("Escolha somente inscrições da mesma família de equipes."); return; }
+            await Inscrever(new JsonObject
+            {
+                ["eventoId"] = info.L("eventoId"),
+                ["equipeIds"] = new JsonArray(marcadas.Select(id => (JsonNode)JsonValue.Create(id)).ToArray()),
+            });
+        });
+        voltar.BringToFront(); confirmar.BringToFront();
+        Mostrar("equipe", c, () => _ = TelaEquipe(bateria, baterias, n));
     }
 
     async Task Imprimir(string url)
@@ -784,8 +841,9 @@ public class FormTotem : Form, IMessageFilter
 
     // ------------------------------------------------------------------ 5. sucesso
 
-    void TelaSucesso(string hora, int n)
+    void TelaSucesso(string hora, int n, List<JsonObject> pulseiras = null)
     {
+        if (pulseiras is { Count: > 0 }) { TelaPulseira(pulseiras); return; }
         var c = NovaTela(etapa: 3);
         var icone = new IconeSucesso { Bounds = new Rectangle(P(631), P(130), P(104), P(104)) };
         c.Controls.Add(icone);
@@ -797,6 +855,27 @@ public class FormTotem : Form, IMessageFilter
         Botao(c, "Concluir", 500, 560, 180, true, () => { Reiniciar(); return Task.CompletedTask; }, 64, 19);
         c.Controls.Add(Rot("Volta para o início após 90 segundos sem interação", 700, 560, F(16), Estilo.MuitoSuave, 380, 64, ContentAlignment.MiddleLeft));
         Mostrar("fim", c, () => TelaSucesso(hora, n));
+        _fim.Stop(); _fim.Start();
+    }
+
+    void TelaPulseira(List<JsonObject> pulseiras)
+    {
+        var c = NovaTela(etapa: 3);
+        var equipe = pulseiras[0].S("equipe");
+        c.Controls.Add(Rot("Equipes: " + equipe, 80, 100, F(equipe.Length > 55 ? 23 : 32, false, FontStyle.Bold), Estilo.Texto, 1206, 72, ContentAlignment.MiddleCenter));
+        c.Controls.Add(Rot("Pegue sua pulseira na recepção com o número abaixo. Na pesagem e no box, fale só esse número.", 120, 172, F(21), Estilo.Suave, 1126, 36, ContentAlignment.MiddleCenter));
+        var largura = Math.Min(360, 1100 / pulseiras.Count);
+        var inicio = 683 - largura * pulseiras.Count / 2;
+        for (var i = 0; i < pulseiras.Count; i++)
+        {
+            var p = pulseiras[i];
+            var x = inicio + i * largura;
+            c.Controls.Add(Rot(p.S("pulseira"), x, 236, Estilo.Mono(P(pulseiras.Count > 2 ? 96 : 140), FontStyle.Bold), Estilo.Texto, largura, 190, ContentAlignment.MiddleCenter));
+            c.Controls.Add(Rot(p.S("nome"), x, 430, F(20, false, FontStyle.Bold), Estilo.Suave, largura, 64, ContentAlignment.TopCenter));
+        }
+        c.Controls.Add(Rot("Assine o termo de responsabilidade na recepção antes da corrida.", 170, 510, F(19), Estilo.Suave, 1026, 34, ContentAlignment.MiddleCenter));
+        Botao(c, "Concluir", 593, 566, 180, true, () => { Reiniciar(); return Task.CompletedTask; });
+        Mostrar("fim", c, () => TelaPulseira(pulseiras));
         _fim.Stop(); _fim.Start();
     }
 

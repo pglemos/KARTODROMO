@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { formatTrxPassing, LineSplitter, parseTrxLine } from '../lib/timing/trx-parser';
 import {
@@ -32,6 +33,7 @@ import {
   aguardandoLargada,
   voltaAtualDoKart,
   setManualPosition,
+  ajustarPosicaoComVoltas,
 } from '../lib/timing/race-engine';
 import { createCatalogRecord, deleteCatalogRecord, distributeProof, duplicateEvent, emptyCatalog, normalizeCatalog } from '../lib/timing/catalog';
 
@@ -142,6 +144,101 @@ describe('race-engine', () => {
 
     setManualPosition(s, '4', null);
     expect(computeStandings(s)[0].kart).toBe('4');
+  });
+
+  describe('ajuste de posição com sensor falhando', () => {
+    const corridaComSensorRuim = () => {
+      const s = createSession({
+        id: 'sensor-ruim', name: 'Corrida', type: 'corrida', durationMin: 20, now: 0,
+        competitors: [{ kart: '1', name: 'Líder' }, { kart: '2', name: 'Segundo' }, { kart: '3', name: 'Terceiro' }, { kart: '10', name: 'Sem sensor' }],
+      });
+      startSession(s, 1_000);
+      const voltas: [string, number, number][] = [['1', 14, 0], ['2', 13, 2_000], ['3', 12, 4_000], ['10', 3, 6_000]];
+      for (const [kart, n, atraso] of voltas) {
+        for (let i = 0; i <= n; i++) applyPassing(s, { kart, decoderTimeMs: 10_000 + atraso + i * 60_000, wallMs: 10_000 + atraso + i * 60_000 });
+      }
+      return s;
+    };
+    const linha = (s: ReturnType<typeof corridaComSensorRuim>, kart: string) => computeStandings(s).find((r) => r.kart === kart)!;
+
+    it('coloca o piloto em 3º com as voltas do 2º, sem criar melhor volta', () => {
+      const s = corridaComSensorRuim();
+      const melhorAntes = linha(s, '10').bestLapMs;
+      expect(ajustarPosicaoComVoltas(s, '10', 3)).toEqual({ voltasAdicionadas: 10 });
+      expect(computeStandings(s).map((r) => r.kart)).toEqual(['1', '2', '10', '3']);
+      expect(linha(s, '10').laps).toBe(13);
+      expect(linha(s, '10').bestLapMs).toBe(melhorAntes);
+      expect(linha(s, '10').totalMs).toBeGreaterThan(linha(s, '2').totalMs! - 5_000);
+    });
+
+    it('refazer não duplica, e a posição automática tira as voltas criadas', () => {
+      const s = corridaComSensorRuim();
+      ajustarPosicaoComVoltas(s, '10', 3);
+      expect(ajustarPosicaoComVoltas(s, '10', 2)).toEqual({ voltasAdicionadas: 11 });
+      expect(linha(s, '10').laps).toBe(14);
+      ajustarPosicaoComVoltas(s, '10', null);
+      expect(linha(s, '10')).toMatchObject({ laps: 3, position: 4 });
+    });
+
+    it('descer de posição não cria volta e 1º lugar copia o antigo líder', () => {
+      const s = corridaComSensorRuim();
+      expect(ajustarPosicaoComVoltas(s, '1', 3)).toEqual({ voltasAdicionadas: 0 });
+      ajustarPosicaoComVoltas(s, '1', null);
+      expect(ajustarPosicaoComVoltas(s, '10', 1)).toEqual({ voltasAdicionadas: 11 });
+      expect(computeStandings(s)[0]).toMatchObject({ kart: '10', laps: 14 });
+      expect(computeStandings(s)[1]).toMatchObject({ kart: '1', laps: 14, gapLaps: 0 });
+    });
+
+    it('funciona com piloto sem nenhuma passagem e com a bateria encerrada', () => {
+      const s = createSession({
+        id: 'sem-passagem', name: 'Corrida', type: 'corrida', durationMin: 20, now: 0,
+        competitors: [{ kart: '1', name: 'A' }, { kart: '2', name: 'B' }],
+      });
+      startSession(s, 1_000);
+      for (let i = 0; i <= 5; i++) applyPassing(s, { kart: '1', decoderTimeMs: 10_000 + i * 60_000, wallMs: 10_000 + i * 60_000 });
+      closeSession(s, 400_000);
+      expect(ajustarPosicaoComVoltas(s, '2', 1)).toEqual({ voltasAdicionadas: 5 });
+      expect(computeStandings(s)[0]).toMatchObject({ kart: '2', laps: 5 });
+    });
+
+    it('divide as voltas longas e deixa a média entre o kart da frente e o de trás', () => {
+      const s = createSession({
+        id: 'media', name: 'Corrida', type: 'corrida', durationMin: 20, now: 0,
+        competitors: [{ kart: '41', name: 'Frente' }, { kart: '23', name: 'Atrás' }, { kart: '34', name: 'Sem sensor' }],
+      });
+      startSession(s, 1_000);
+      for (let i = 0; i <= 19; i++) applyPassing(s, { kart: '41', decoderTimeMs: 10_000 + i * 70_000, wallMs: 10_000 + i * 70_000 });
+      for (let i = 0; i <= 18; i++) applyPassing(s, { kart: '23', decoderTimeMs: 11_000 + i * 71_000, wallMs: 11_000 + i * 71_000 });
+      for (const t of [12_000, 160_000, 367_000]) applyPassing(s, { kart: '34', decoderTimeMs: t, wallMs: t });
+
+      expect(ajustarPosicaoComVoltas(s, '34', 2)).toEqual({ voltasAdicionadas: 17 });
+      const [frente, proprio, atras] = computeStandings(s);
+      expect(proprio).toMatchObject({ kart: '34', laps: 19 });
+      const media = proprio.totalMs! / proprio.laps;
+      expect(media).toBeGreaterThan(frente.totalMs! / frente.laps);
+      expect(media).toBeLessThan(atras.totalMs! / atras.laps);
+      const tempos = s.competitors.find((c) => c.kart === '34')!.crossings.filter((x) => x.lapMs !== null).map((x) => x.lapMs as number);
+      expect(Math.min(...tempos)).toBeGreaterThan(60_000);
+      expect(Math.max(...tempos)).toBeLessThan(80_000);
+
+      ajustarPosicaoComVoltas(s, '34', null);
+      expect(computeStandings(s).find((r) => r.kart === '34')).toMatchObject({ laps: 2, totalMs: 355_000, bestLapMs: 148_000 });
+    });
+
+    it('a rota de posição do servidor usa o ajuste com voltas', () => {
+      const servidor = readFileSync(new URL('../services/timing-server.ts', import.meta.url), 'utf8');
+      expect(servidor).toContain('ajustarPosicaoComVoltas(s, kart, position');
+    });
+
+    it('não cria volta em tomada de tempo', () => {
+      const s = createSession({
+        id: 'tomada', name: 'Tomada', type: 'classificacao', durationMin: 10, now: 0,
+        competitors: [{ kart: '1', name: 'A' }, { kart: '2', name: 'B' }],
+      });
+      startSession(s, 1_000);
+      for (let i = 0; i <= 3; i++) applyPassing(s, { kart: '1', decoderTimeMs: 10_000 + i * 60_000, wallMs: 10_000 + i * 60_000 });
+      expect(ajustarPosicaoComVoltas(s, '2', 1)).toEqual({ voltasAdicionadas: 0 });
+    });
   });
 
   it('salva duração e voltas ao editar uma corrida encerrada sem reabri-la', () => {

@@ -81,6 +81,7 @@ foreach ($arq in Get-ChildItem $destino -Recurse -File) {
 }
 $cfg = [ordered]@{ ServidorUrl = $ServidorUrl; CronometragemUrl = $CronometragemUrl }
 if ($anterior -and $anterior.ImpressoraTermos) { $cfg.ImpressoraTermos = $anterior.ImpressoraTermos }
+if ($anterior -and $anterior.ChaveCronometragem) { $cfg.ChaveCronometragem = $anterior.ChaveCronometragem } # sem ela o servidor recusa encerrar/reiniciar bateria
 if ($App -eq 'Autoatendimento') { $cfg.Impressora = $Impressora }
 if ($App -eq 'Cronometragem') { $cfg.TvModo = 'placar' }
 [IO.File]::WriteAllText("$destino\appsettings.json", ($cfg | ConvertTo-Json), (New-Object Text.UTF8Encoding $false))

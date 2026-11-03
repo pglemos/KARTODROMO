@@ -55,8 +55,17 @@ export function validarSorteio(sessao: Session, atribuicoes: Atribuicao[], karts
     if (indices.has(indice)) throw new Error(`O piloto ${sessao.competitors[indice].name} aparece duas vezes no sorteio.`);
     // a lista mudou entre o tablet carregar e gravar (piloto incluído, tirado ou reordenado): o kart iria para outro piloto
     const atual = sessao.competitors[indice];
-    const cid = a.customerId == null ? '' : String(a.customerId).trim();
-    const mudou = cid ? String(atual.customerId ?? '') !== cid : typeof a.nome === 'string' && a.nome.trim() !== '' && nome(a.nome) !== nome(atual.name);
+    const cidA = a.customerId == null ? '' : String(a.customerId).trim();
+    const cidAtual = atual.customerId == null ? '' : String(atual.customerId).trim();
+    const nomeA = typeof a.nome === 'string' ? a.nome.trim() : '';
+
+    // Se houver divergência real de identidade, recusa. Metadados ausentes em um dos lados (ex: customerId vazio) não travam se o nome bate.
+    let mudou = false;
+    if (cidA && cidAtual) {
+      mudou = cidA !== cidAtual;
+    } else if (nomeA) {
+      mudou = nome(nomeA) !== nome(atual.name);
+    }
     if (mudou) throw new ListaMudouError('A lista de pilotos desta bateria mudou depois que o tablet carregou. Atualize a lista e sorteie de novo.');
     if (!/^\d+$/.test(kart)) throw new Error(`Kart inválido no sorteio: "${kart}".`);
     if (!kartsCadastrados.has(kart)) throw new Error(`O kart ${kart} não tem transponder cadastrado na cronometragem.`);

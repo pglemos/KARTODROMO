@@ -105,29 +105,31 @@ static class Program
             var g = GrupoPassagens.PorVoltaDoLider([(1, false), (0, true), (2, false), (0, true)]);
             Exigir(g.SequenceEqual([1, 1, 2, 2]), "recusadas herdam a faixa: " + string.Join(",", g));
         });
-        Teste("placar de LED (COM3): passagem manda só a posição que mudou", ref erros, () =>
+        Teste("placar de LED (COM3): quadro completo com tempo e rodapé $F", ref erros, () =>
         {
             Environment.SetEnvironmentVariable("KARTODROMO_SEM_PAINEL", "1"); // nunca abre a COM3 no teste
             var painel = new PainelLed();
             var agora = new DateTime(2026, 10, 8, 20, 0, 0);
             var sessao = Corrida(10);
-            var primeiro = painel.MontarAlteracoes(sessao, agora);
-            Exigir(Contar(primeiro, "$SR,") == 10 && Contar(primeiro, "$F,") == 1, "primeiro envio: quadro inteiro + rodapé");
-            var cheio = System.Text.Encoding.ASCII.GetByteCount(primeiro);
+            var quadro = painel.MontarAlteracoes(sessao, agora);
+            Exigir(Contar(quadro, "$SR,") == 10 && Contar(quadro, "$F,") == 1, "quadro inteiro contém 10 posições + rodapé $F");
+            var bytes = System.Text.Encoding.ASCII.GetByteCount(quadro);
+            Exigir(bytes > 900, $"quadro completo com {bytes} bytes");
 
-            // kart da 3ª posição fecha uma volta: só a 3ª posição vai (e o rodapé)
-            var depois = Corrida(10, mudar: 3);
-            var parcial = painel.MontarAlteracoes(depois, agora.AddMilliseconds(300));
-            Exigir(Contar(parcial, "$SR,") == 1 && parcial.Contains("$SR,3,"), "só a posição 3: " + parcial.Replace("\r\n", " | "));
-            var bytes = System.Text.Encoding.ASCII.GetByteCount(parcial);
-            // a 9600 baud a serial leva ~1 ms por byte: o quadro inteiro passava de 1 s, a posição sozinha fica em ~0,2 s
-            Exigir(bytes < 220 && cheio > 900, $"bytes: parcial {bytes}, quadro inteiro {cheio}");
-            Console.WriteLine($"   (9600 baud: quadro inteiro {cheio} bytes ≈ {cheio * 10 / 9.6:0} ms; só a posição {bytes} bytes ≈ {bytes * 10 / 9.6:0} ms)");
-
-            // nada mudou: nada vai até dar 1 s; depois só 1 posição de reforço (rodízio) para o painel se corrigir sozinho
-            Exigir(painel.MontarAlteracoes(depois, agora.AddMilliseconds(600)) == "", "sem mudança em menos de 1 s: nada");
-            var reforco = painel.MontarAlteracoes(depois, agora.AddMilliseconds(1700));
-            Exigir(Contar(reforco, "$SR,") == 1, "reforço de 1 posição por segundo: " + reforco.Replace("\r\n", " | "));
+            // tomada de tempo / grid: melhor tempo em $SP e $H
+            var qualif = new System.Text.Json.Nodes.JsonObject
+            {
+                ["type"] = "classificacao",
+                ["state"] = "encerrada",
+                ["standings"] = new System.Text.Json.Nodes.JsonArray
+                {
+                    new System.Text.Json.Nodes.JsonObject { ["position"] = 1, ["kart"] = "12", ["laps"] = 5, ["bestLapMs"] = 43250, ["lastLapMs"] = null }
+                }
+            };
+            var quadroQ = PainelLed.Montar(qualif, 0, 10, agora, out _);
+            Exigir(quadroQ.Contains("$SP,1,\"012\",5,\"00:00:43.250\""), "SP com tempo correto");
+            Exigir(quadroQ.Contains("$H,1,\"012\",5,\"00:00:43.250\""), "H com tempo correto sem zerar");
+            Exigir(quadroQ.Contains("$F,"), "F presente mesmo em tomada de tempo");
         });
         Teste("placar de LED: o quadro montado continua igual ao do LapTime ($SR/$J/$G + $F)", ref erros, () =>
         {
@@ -135,6 +137,46 @@ static class Program
             var (posicoes, rodape) = PainelLed.MontarQuadro(Corrida(2), 0, 10, new DateTime(2026, 10, 8, 20, 0, 0));
             Exigir(texto == string.Concat(posicoes) + rodape, "quadro por posição + rodapé = quadro inteiro");
             Exigir(posicoes[0].StartsWith("$SR,1,\"004\",5,") && posicoes[0].Contains("$J,\"004\"") && posicoes[0].Contains("$G,1,"), posicoes[0]);
+        });
+        Teste("placar de LED: tomada encerrada que largou por último vence, mesmo criada antes na agenda", ref erros, () =>
+        {
+            Environment.SetEnvironmentVariable("KARTODROMO_SEM_PAINEL", "1");
+            System.Text.Json.Nodes.JsonObject Tomada(string id, long criada, long largou, string kart) => new()
+            {
+                ["id"] = id, ["name"] = id, ["type"] = "classificacao", ["state"] = "encerrada", ["createdAt"] = criada, ["startedAt"] = largou,
+                ["standings"] = new System.Text.Json.Nodes.JsonArray { new System.Text.Json.Nodes.JsonObject { ["position"] = 1, ["kart"] = kart, ["laps"] = 3, ["bestLapMs"] = 60000 } },
+            };
+            var enviados = new System.Collections.Concurrent.ConcurrentQueue<string>();
+            using var painel = new PainelLed { EscritorSerial = enviados.Enqueue };
+            var antiga = Tomada("16:15", 2000, 5000, "73");
+            var nova = Tomada("17:25", 1000, 9000, "56");
+            painel.Atualizar(antiga);
+            painel.Atualizar(nova, antiga);
+            Exigir(painel.SessaoExibidaId == "17:25", "exibiu " + painel.SessaoExibidaId);
+            painel.Atualizar(null, antiga);
+            Exigir(painel.SessaoExibidaId == "17:25", "não pode voltar para a anterior: " + painel.SessaoExibidaId);
+
+            // botão Atualizar painel: limpa e reenvia na hora
+            for (var i = 0; i < 100 && enviados.IsEmpty; i++) Thread.Sleep(10);
+            Thread.Sleep(50);
+            enviados.Clear();
+            painel.ForcarAtualizacao();
+            painel.Atualizar(nova);
+            for (var i = 0; i < 100 && enviados.IsEmpty; i++) Thread.Sleep(10);
+            var texto = string.Concat(enviados);
+            Exigir(texto.StartsWith("$I,") && texto.Contains("\"056\""), "reenvio: " + texto);
+
+            // envio rápido: passagem manda só a posição que mudou
+            var corrida = Corrida(10); corrida["id"] = "corrida"; corrida["state"] = "em_andamento";
+            painel.Atualizar(corrida);
+            Thread.Sleep(100); enviados.Clear();
+            var mudada = Corrida(10); mudada["id"] = "corrida"; mudada["state"] = "em_andamento";
+            var linha = (System.Text.Json.Nodes.JsonObject)((System.Text.Json.Nodes.JsonArray)mudada["standings"])[3];
+            linha["lastLapMs"] = 61234;
+            painel.Atualizar(mudada, null, 4);
+            for (var i = 0; i < 100 && enviados.IsEmpty; i++) Thread.Sleep(10);
+            var parcial = string.Concat(enviados);
+            Exigir(Contar(parcial, "$SR,") == 1 && parcial.Contains("$SR,4,") && Contar(parcial, "$F,") == 1, "parcial: " + parcial);
         });
         Teste("lista de passagens: passagem nova não reescreve a lista inteira", ref erros, () =>
         {

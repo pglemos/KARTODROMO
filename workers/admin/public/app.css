@@ -692,3 +692,11 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 var(--kib-espaco-meio)
     display: none !important;
   }
 }
+
+@media (max-width: 760px) {
+  .pularLink {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+}

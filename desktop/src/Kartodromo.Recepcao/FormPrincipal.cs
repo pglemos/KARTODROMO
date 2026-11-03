@@ -19,13 +19,16 @@ public class FormPrincipal : Form
     readonly Label _dataTexto = new() { AutoSize = false, Size = new Size(96, 30), TextAlign = ContentAlignment.MiddleCenter, Font = Tokens.FonteNumero(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold), ForeColor = KitVisual.Texto, Cursor = Cursors.Hand };
     readonly Panel _dataCaixa = new() { Size = new Size(152, 34), BackColor = Tokens.Primitivo.Branco };
     readonly Button _acaoTopo = KitVisual.Botao("", true);
-    readonly TextBox _buscaGlobal = new() { BorderStyle = BorderStyle.None, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno), PlaceholderText = "Buscar cliente ou CPF…", AccessibleName = "Buscar cliente ou CPF" };
+    readonly TextBox _buscaGlobal = new() { BorderStyle = BorderStyle.None, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno), AccessibleName = "Buscar cliente ou CPF" };
     readonly Grade _grade = new();
     readonly ToolStripStatusLabel _sbHora = new(), _sbData = new(), _sbSrv = new() { Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold) }, _sbCrono = new(), _sbSite = new();
     string _grupo = "reservas", _status = "todas";
     string _periodo = "dia";
     JsonObject _filtroBateria, _filtroContaFidelidade;
     Func<List<JsonObject>, ToolStripItem[]> _menuAtual;
+
+    // pinta a janela de uma vez (a tela não pisca ao atualizar as listas)
+    protected override CreateParams CreateParams { get { var cp = base.CreateParams; cp.ExStyle |= 0x02000000; return cp; } }
 
     public FormPrincipal()
     {
@@ -486,6 +489,13 @@ public class FormPrincipal : Form
         q.Margin = Padding.Empty;
         var qBox = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 7, 0, 0), BackColor = busca.BackColor };
         qBox.Controls.Add(q);
+        // texto de ajuda próprio: o PlaceholderText não aparecia sobre o fundo desta barra
+        var dica = new Label { Text = "Buscar cliente ou CPF…", BackColor = busca.BackColor, ForeColor = KitVisual.Secundario, Font = q.Font, Cursor = Cursors.IBeam };
+        void PosicionarDica() => dica.Bounds = new Rectangle(4, qBox.Padding.Top, Math.Max(0, qBox.Width - 4), Math.Max(0, qBox.Height - qBox.Padding.Top));
+        qBox.Resize += (_, _) => PosicionarDica(); PosicionarDica();
+        dica.Click += (_, _) => q.Focus();
+        q.TextChanged += (_, _) => dica.Visible = q.Text.Length == 0;
+        qBox.Controls.Add(dica); dica.BringToFront();
         busca.Controls.Add(qBox); busca.Controls.Add(lupa); busca.Controls.Add(atalho);
         qBox.BringToFront();
         void Buscar()
@@ -529,42 +539,53 @@ public class FormPrincipal : Form
         return s;
     }
 
+    static readonly HttpClient _pingHttp = new() { Timeout = TimeSpan.FromSeconds(5) };
+    bool _emPing;
+
     void Relogio() { _sbHora.Text = DateTime.Now.ToString("HH:mm · dd/MM/yyyy"); _sbData.Text = ""; }
     async Task Ping()
     {
+        if (_emPing) return;
+        _emPing = true;
         try
         {
-            await Sessao.Api.Get("/healthz");
-            _sbSrv.Text = "● Servidor on-line"; _sbSrv.ForeColor = Tokens.Claro.CorEstadoSucessoTexto;
-            var c = (await Sessao.Api.Get("/api/office/caixa")).AsObject();
-            if (c["aberto"] is JsonObject ab)
+            try
             {
-                var dinheiro = c["sumario"]?.L("dinheiroEmCaixa") ?? 0;
-                var turno = ab.S("turno").Trim();
-                if (!turno.StartsWith("Turno", StringComparison.OrdinalIgnoreCase)) turno = "Turno " + turno;
-                var desde = ab.S("abertoEm") is { Length: >= 16 } ae ? " · desde " + ae.Substring(11, 5) : "";
-                _selo.Definir(true, $"Terminal {ab.S("terminal")} aberto", turno + desde);
+                await Sessao.Api.Get("/healthz");
+                _sbSrv.Text = "● Servidor on-line"; _sbSrv.ForeColor = Tokens.Claro.CorEstadoSucessoTexto;
+                var c = (await Sessao.Api.Get("/api/office/caixa")).AsObject();
+                if (c["aberto"] is JsonObject ab)
+                {
+                    var dinheiro = c["sumario"]?.L("dinheiroEmCaixa") ?? 0;
+                    var turno = ab.S("turno").Trim();
+                    if (!turno.StartsWith("Turno", StringComparison.OrdinalIgnoreCase)) turno = "Turno " + turno;
+                    var desde = ab.S("abertoEm") is { Length: >= 16 } ae ? " · desde " + ae.Substring(11, 5) : "";
+                    _selo.Definir(true, $"Terminal {ab.S("terminal")} aberto", turno + desde);
+                }
+                else
+                {
+                    _selo.Definir(false, "Nenhum terminal aberto", "Clique para abrir o caixa");
+                }
             }
-            else
+            catch
             {
-                _selo.Definir(false, "Nenhum terminal aberto", "Clique para abrir o caixa");
+                _sbSrv.Text = "● Servidor off-line"; _sbSrv.ForeColor = Tokens.Claro.CorEstadoPerigoTexto;
+                _selo.Definir(false, "Terminal indisponível", "Não foi possível consultar o caixa");
             }
+            await PingServico("crono", Config.CronoUrl, _sbCrono);
+            await PingSite(_sbSite);
         }
-        catch
+        finally
         {
-            _sbSrv.Text = "● Servidor off-line"; _sbSrv.ForeColor = Tokens.Claro.CorEstadoPerigoTexto;
-            _selo.Definir(false, "Terminal indisponível", "Não foi possível consultar o caixa");
+            _emPing = false;
         }
-        await PingServico("crono", Config.CronoUrl, _sbCrono);
-        await PingSite(_sbSite);
     }
 
     static async Task PingServico(string nome, string baseUrl, ToolStripStatusLabel label)
     {
         try
         {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
-            using var r = await http.GetAsync(baseUrl.TrimEnd('/') + "/healthz");
+            using var r = await _pingHttp.GetAsync(baseUrl.TrimEnd('/') + "/healthz");
             var online = r.IsSuccessStatusCode;
             label.Text = $"● Cronometragem {(online ? "on-line" : "off-line")}";
             label.ForeColor = online ? Tokens.Claro.CorEstadoSucessoTexto : Tokens.Claro.CorEstadoPerigoTexto;
@@ -576,8 +597,7 @@ public class FormPrincipal : Form
     {
         try
         {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(4) };
-            using var r = await http.GetAsync("https://www.kartodromodebetim.com.br");
+            using var r = await _pingHttp.GetAsync("https://www.kartodromodebetim.com.br");
             var online = r.IsSuccessStatusCode;
             label.Text = $"● Site {(online ? "on-line" : "off-line")}";
             label.Visible = !online;
@@ -673,7 +693,7 @@ public class FormPrincipal : Form
         m.Items.Add(S("&Início",
             I("Config inicial (empresa)", () => Cadastros.Empresa(this), adm),
             new ToolStripSeparator(), G("Segurança", I("Usuário", () => Cadastros.Abrir(this, "usuarios"), adm), I("Trocar minha senha", TrocarSenha)),
-            new ToolStripSeparator(), I("Sair / trocar de usuário", () => Application.Restart()), A(I("Fechar", Close), "Alt+F4")));
+            new ToolStripSeparator(), I("Sair / trocar de usuário", () => InstanciaUnica.FecharEReabrir(this)), A(I("Fechar", Close), "Alt+F4")));
         m.Items.Add(S("&Cadastros",
             I("Empresa", () => Cadastros.Empresa(this), adm), I("Feriados", () => Cadastros.Abrir(this, "feriados")), new ToolStripSeparator(),
             G("POS", I("Turno", () => Cadastros.Abrir(this, "turnos")), I("Terminal", () => Cadastros.Abrir(this, "terminais"))), new ToolStripSeparator(),
@@ -1078,10 +1098,13 @@ public class FormPrincipal : Form
                 _grade.CorLinha = r => r.S("status") switch { "pago_sem_vaga" => Tokens.Claro.CorEstadoPerigoTexto, "expirado" => Color.Silver, "aguardando" => Tokens.Claro.CorEstadoAvisoTexto, _ => null };
                 _menuAtual = sel => [
                     Item("Ver as reservas desta bateria", () => Selecionar("reservas:todas", new JsonObject { ["id"] = sel[0].L("bateriaId"), ["nome"] = sel[0].S("bateria"), ["dataHora"] = sel[0].S("inicio") }), sel.Count == 1),
-                    Item("Marcar como resolvido (valor devolvido ou remarcado)", () => Seguro.Rodar(this, async () =>
+                    Item("Resolver pagamento recebido", () => Seguro.Rodar(this, async () =>
                     {
-                        if (!Msg.Pergunta(this, $"Marcar o pedido {sel[0].S("codigo")} de {sel[0].S("cliente")} como resolvido?\n\nUse depois de devolver o valor pela Asaas ou remarcar o cliente.")) return;
-                        await Sessao.Api.Post($"/api/office/reservas-online/{sel[0].S("id")}/resolver", new { });
+                        string? resolucao = Msg.Pergunta(this, $"O reembolso do pedido {sel[0].S("codigo")} de {sel[0].S("cliente")} já foi confirmado pela Asaas?")
+                            ? "reembolso_confirmado"
+                            : Msg.Pergunta(this, "O cliente já foi remarcado para outra bateria?") ? "remarcado" : null;
+                        if (resolucao is null) return;
+                        await Sessao.Api.Post($"/api/office/reservas-online/{sel[0].S("id")}/resolver", new { resolucao });
                         Recarregar();
                     }), sel.Count == 1 && sel[0].S("status") == "pago_sem_vaga"),
                     new ToolStripSeparator(), Exportar("reservas-online")];

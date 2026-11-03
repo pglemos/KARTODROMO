@@ -231,6 +231,16 @@ TELAS.pilotos = async (tela) => {
 
   // ---- eventos
   tela.addEventListener('click', (e) => {
+    const pular = e.target.closest('#linkPularRank');
+    if (pular) {
+      e.preventDefault();
+      const tab = $('#tabelaRank');
+      if (tab) {
+        tab.scrollIntoView({ behavior: 'smooth' });
+        tab.focus();
+      }
+      return;
+    }
     const t = e.target;
     const menu = tela.querySelector('.menuMais'); if (menu && menu.open && (!t.closest('.menuMais') || t.closest('.menuLista button'))) menu.open = false;
     if (t.closest('[data-limpar]')) return limparBusca();
@@ -458,7 +468,7 @@ TELAS.piloto = async (tela) => {
 // ------------------------------------------------------------------ ranking
 TELAS.ranking = async (tela) => {
   const R = S.rank || (S.rank = { periodo: 'semana', tracado: null, top: 50, ref: null, outros: false, q: '' });
-  tela.innerHTML = `<a href="#tabelaRank" class="pularLink">Pular para o ranking</a>
+  tela.innerHTML = `<a href="javascript:void(0)" onclick="event.preventDefault(); const t=document.getElementById('tabelaRank'); if(t){ t.scrollIntoView({behavior:'smooth'}); t.focus(); }" class="pularLink" id="linkPularRank">Pular para o ranking</a>
   ${cabecalho(
     'Clientes · tempos oficiais sem chuva · Indoor e Super Kart separados',
     'Ranking <span id="perRank" style="font-size: var(--kib-fonte-tamanho-titulo); font-weight: 600; color: #4b5563; letter-spacing: 0"></span>',
@@ -556,7 +566,7 @@ TELAS.ranking = async (tela) => {
       : '';
 
     const tabelaHtml = L.length
-      ? `<section class="cartao" id="tabelaRank"><div class="cartaoCab"><h2>${esc(dados.tracado)} · ${R.periodo === 'mes' ? 'mês' : R.periodo}</h2><span class="sub">melhor volta de cada piloto · tempos de baterias oficiais sem chuva</span></div>
+      ? `<section class="cartao" id="tabelaRank" tabindex="-1" style="outline: none"><div class="cartaoCab"><h2>${esc(dados.tracado)} · ${R.periodo === 'mes' ? 'mês' : R.periodo}</h2><span class="sub">melhor volta de cada piloto · baterias oficiais sem chuva · desempate por quem registrou primeiro · transponder MYLAPS</span></div>
         <div class="tabelaRank" role="table" aria-label="Ranking de melhores voltas ${esc(dados.tracado)}">
           <div class="linhaRank cab" role="row">
             <span class="rPos" role="columnheader">Pos</span>
@@ -576,7 +586,7 @@ TELAS.ranking = async (tela) => {
           ${!q && dados.total > L.length ? '<button class="btn sec peq empurra" data-todos="1">Ver todos</button>' : ''}
         </div>
       </section>`
-      : `<section class="cartao" id="tabelaRank"><div class="vazio">
+      : `<section class="cartao" id="tabelaRank" tabindex="-1" style="outline: none"><div class="vazio">
           <b>${q ? `Nenhum piloto com “${esc(R.q)}” no ${esc(dados.tracado)}` : dados.tracados.length ? 'Sem tempos nesse traçado no período' : 'Nenhum tempo no período'}</b>
           <span>${q ? 'O piloto pode ter corrido em outro traçado ou período. Limpe a busca ou veja o Geral.' : R.periodo === 'semana' ? 'A semana vai de domingo a sábado. Use as setas ou veja o mês.' : 'Os tempos aparecem quando as baterias são encerradas na cronometragem.'}</span>
           <div style="display:flex;gap:var(--kib-espaco-1);margin-top:var(--kib-espaco-1);justify-content:center;flex-wrap:wrap">
@@ -586,7 +596,7 @@ TELAS.ranking = async (tela) => {
           </div>
         </div></section>`;
 
-    const atalhosHtml = `<div class="atalhosBarra peq" aria-hidden="true">
+    const atalhosHtml = `<div class="atalhosBarra peq ocultarCelular" aria-hidden="true">
       <span><kbd>/</kbd> buscar</span>
       <span><kbd>S</kbd> semana</span>
       <span><kbd>M</kbd> mês</span>

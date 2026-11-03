@@ -46,11 +46,18 @@ public class Api
     public string BaseUrl { get; }
     public string Token { get; set; }
     public string Chave { get; set; }
+    public string TotemSession { get; set; }
+    public string TotemId { get; set; } = Config.Get("TotemId", "");
 
     public Api(string baseUrl, TimeSpan? timeout = null)
     {
         BaseUrl = baseUrl.TrimEnd('/');
         _http = new HttpClient { Timeout = timeout ?? TimeSpan.FromSeconds(30) };
+        _http.DefaultRequestHeaders.TryAddWithoutValidation("X-Client-Machine", Environment.MachineName);
+        if (Config.Get("TotemId", "") is { Length: > 0 } tid)
+            _http.DefaultRequestHeaders.TryAddWithoutValidation("X-Totem-Id", tid);
+        if (Config.Get("ChaveCronometragem", "") is { Length: > 0 } chaveCrono)
+            _http.DefaultRequestHeaders.TryAddWithoutValidation("X-Timing-Key", chaveCrono);
     }
 
     public static Api Servidor { get; } = new(Config.ServidorUrl);
@@ -60,6 +67,12 @@ public class Api
         using var req = new HttpRequestMessage(metodo, BaseUrl + caminho);
         if (!string.IsNullOrEmpty(Token)) req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Token);
         if (!string.IsNullOrEmpty(Chave)) req.Headers.Add("x-ops-key", Chave);
+        if (!string.IsNullOrEmpty(TotemSession)) req.Headers.TryAddWithoutValidation("X-Totem-Session", TotemSession);
+        var totemIdent = !string.IsNullOrEmpty(TotemId) ? TotemId : Config.Get("TotemId", "");
+        if (!string.IsNullOrEmpty(totemIdent)) req.Headers.TryAddWithoutValidation("X-Totem-Id", totemIdent);
+        req.Headers.TryAddWithoutValidation("X-Client-Machine", Environment.MachineName);
+        if (Config.Get("ChaveCronometragem", "") is { Length: > 0 } chaveCrono)
+            req.Headers.TryAddWithoutValidation("X-Timing-Key", chaveCrono);
         if (corpo != null)
         {
             var json = corpo is JsonNode n ? n.ToJsonString() : JsonSerializer.Serialize(corpo);

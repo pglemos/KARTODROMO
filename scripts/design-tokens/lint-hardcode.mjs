@@ -14,7 +14,7 @@ import { contarHardcode, REGRAS } from './lint-regras.mjs';
 import { raiz } from './ler-tokens.mjs';
 import { SAIDAS } from './build.mjs';
 
-export const ESCOPO = ['desktop/src', 'app', 'components', 'src', 'lib', 'styles', 'services/timing-ui', 'android/sorteio/app/src/main'];
+export const ESCOPO = ['desktop/src', 'app', 'components', 'src', 'lib', 'styles', 'services/timing-ui', 'workers/admin/public', 'android/sorteio/app/src/main'];
 const EXTENSOES = new Set(['.cs', '.ts', '.tsx', '.js', '.jsx', '.css', '.html', '.kt', '.xml']);
 const PASTAS_FORA = new Set(['bin', 'obj', 'node_modules', '.next', 'publish', 'build', '.gradle']);
 const ARQUIVOS_FORA = new Set([
