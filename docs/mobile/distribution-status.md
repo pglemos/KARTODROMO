@@ -46,7 +46,7 @@ Atualização às 19h de 13/10: e-mail autenticado da Apple informou problema no
 - Configuração: `workers/pre-cadastro/wrangler.homolog.jsonc`; sem rotas nos domínios de produção.
 - D1 exclusivo `kartodromo-mobile-homolog`, cinco migrations aplicadas remotamente; R2 exclusivo com o mesmo nome.
 - Cinco secrets novos gerados e enviados diretamente ao Worker: lookup, criptografia, administração, publicação e sincronização. Valores não gravados no repositório. Configurar/rotacionar os tokens de integração quando o servidor homologado estiver acessível.
-- `RESERVAS_ATIVAS=0`; Asaas sandbox, sem chave de pagamentos. Cadastro por e-mail depende de Resend/remetente verificado.
+- `RESERVAS_ATIVAS=0`; Stone sandbox, sem chave de pagamentos. Cadastro por e-mail depende de Resend/remetente verificado.
 - HTTP verificado: resultados públicos `200 []`; histórico e reservas sem sessão `401`; agenda `403` com reservas fechadas. Login com conta fictícia retorna `401`, após corrigir o erro `503` de derivação de senha.
 - Perfis EAS de avaliação usam esta URL; `production` mantém o destino de produção.
 - Correções posteriores ao AAB3/APK anterior: logout visível, isolamento de lista/detalhes/Pix/histórico entre contas, bloqueio de navegação de reserva atrasada e serialização das operações de sessão/SecureStore. Suíte móvel: 38/38; lint e tipos aprovados.

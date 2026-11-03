@@ -122,6 +122,33 @@
         ],
         "createdAt": "2026-10-24T13:37:14.763Z",
         "reason": "Agent review: existing native Ao vivo podium, dark border, live, selection and error state colors; preserve incumbent app design, website DESIGN.md has different scope."
+      },
+      {
+        "rule": "design-system-color",
+        "value": "*",
+        "files": [
+          "workers/pre-cadastro/src/mobile/email.ts"
+        ],
+        "createdAt": "2026-10-28T21:01:55.232Z",
+        "reason": "Agent: template de email de producao preservado conforme referencia-producao/2026-10-23; DESIGN.md descreve o site"
+      },
+      {
+        "rule": "design-system-radius",
+        "value": "*",
+        "files": [
+          "workers/pre-cadastro/src/mobile/email.ts"
+        ],
+        "createdAt": "2026-10-28T21:01:55.256Z",
+        "reason": "Agent: template HTML de email preexistente preservado conforme snapshot de producao"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "roboto",
+        "files": [
+          "workers/pre-cadastro/src/mobile/email.ts"
+        ],
+        "createdAt": "2026-10-28T21:01:55.282Z",
+        "reason": "Agent: fallback de fonte para clientes de email no template de producao preservado"
       }
     ]
   }
