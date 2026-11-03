@@ -229,17 +229,57 @@ public static class Campos
     public static DateTimePicker Hora(DateTime? valor = null) => new() { Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true, Value = valor ?? DateTime.Today.AddHours(17) };
     public static NumericUpDown Num(int valor = 0, int min = 0, int max = 100000) => new() { Minimum = min, Maximum = max, Value = Math.Clamp(valor, min, max) };
 
+    /// <summary>
+    /// Calcula a posição correta do cursor em campos com máscara após formatação,
+    /// evitando o reset para o início (posição 0) e preservando a contagem de caracteres alfanuméricos.
+    /// </summary>
+    public static int CalcularCursorMascara(string antigoTexto, string novoTextoFormatado, int posicaoAntiga)
+    {
+        antigoTexto ??= "";
+        novoTextoFormatado ??= "";
+        if (posicaoAntiga >= antigoTexto.Length) return novoTextoFormatado.Length;
+        if (posicaoAntiga <= 0) return 0;
+
+        var rawAntes = 0;
+        for (int i = 0; i < Math.Min(posicaoAntiga, antigoTexto.Length); i++)
+        {
+            if (char.IsLetterOrDigit(antigoTexto[i])) rawAntes++;
+        }
+
+        var novoPos = 0;
+        var rawCont = 0;
+        while (novoPos < novoTextoFormatado.Length && rawCont < rawAntes)
+        {
+            if (char.IsLetterOrDigit(novoTextoFormatado[novoPos])) rawCont++;
+            novoPos++;
+        }
+
+        return Math.Min(novoPos > 0 ? novoPos : posicaoAntiga, novoTextoFormatado.Length);
+    }
+
     public static void Mascara(TextBox t, Func<string, string> fn)
     {
         var ocupado = false;
         t.TextChanged += (_, _) =>
         {
-            if (ocupado) return;
+            if (ocupado || t.IsDisposed) return;
             ocupado = true;
-            var fim = t.SelectionStart == t.TextLength;
-            t.Text = fn(t.Text);
-            if (fim) t.SelectionStart = t.TextLength;
-            ocupado = false;
+            try
+            {
+                var pos = t.SelectionStart;
+                var textoAntes = t.Text ?? "";
+                var textoNovo = fn(textoAntes) ?? "";
+                if (textoNovo != textoAntes)
+                {
+                    var novaPos = CalcularCursorMascara(textoAntes, textoNovo, pos);
+                    t.Text = textoNovo;
+                    t.SelectionStart = novaPos;
+                }
+            }
+            finally
+            {
+                ocupado = false;
+            }
         };
     }
 

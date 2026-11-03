@@ -132,7 +132,7 @@ public partial class FormCrono
         flagsPiloto.Items.Add("Trocar kart do piloto… (leva as voltas)", null, (_, _) => TrocarKart());
         flagsPiloto.Items.Add(new ToolStripSeparator());
         flagsPiloto.Items.Add("Imprimir volta a volta deste piloto", null, (_, _) => ImprimirVoltaAVoltaDoPiloto(_gPilotos.CurrentRow?.Cells["kart"].Value?.ToString()));
-        flagsPiloto.Items.Add("Advertência (preta e branca)…", null, (_, _) => AplicarPenalidade("advertencia", _gPilotos.CurrentRow?.Cells["kart"].Value?.ToString()));
+        flagsPiloto.Items.Add(MenuPunicoesFixas());
         flagsPiloto.Items.Add("Penalidade de tempo…", null, (_, _) => AplicarPenalidade("tempo", _gPilotos.CurrentRow?.Cells["kart"].Value?.ToString()));
         flagsPiloto.Items.Add("Bandeira preta (desclassificar)…", null, (_, _) => BandeiraPreta(_gPilotos.CurrentRow?.Cells["kart"].Value?.ToString()));
         flagsPiloto.Items.Add(new ToolStripSeparator());
@@ -270,7 +270,7 @@ public partial class FormCrono
                     if (mapa != null) foreach (var (raw, kart) in mapa) if (kart != null) inv[kart.ToString()] = raw;
                     BeginInvoke(() => { _transpPorKart = inv; AtualizarExtrasPilotos(); });
                 }
-                catch { }
+                catch (Exception ex) { Diagnostico.Registrar("Competidores.Transponders", ex); }
             });
         }
         var faltam = _gPilotos.Rows.Cast<DataGridViewRow>().Where(r => !r.IsNewRow).Select(r => r.Cells["customerId"].Value?.ToString()).Where(id => !string.IsNullOrEmpty(id) && !_clientesInfo.ContainsKey(id)).Distinct().ToList();

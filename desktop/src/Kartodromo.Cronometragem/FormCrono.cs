@@ -22,8 +22,20 @@ public partial class FormCrono : Form
     List<JsonObject> _events = [], _groups = [], _proofs = [];
     DateTime _lidoEm = DateTime.Now;
     string _sel;
+    string _lapsSessaoId;
+    string _lapsAssinatura;
+    DateTime _lapsLidoEm = DateTime.MinValue;
     bool _fixado, _ocupado, _servidorOk, _pilotosSujos;
+
+    void InvalidarCachePassagens()
+    {
+        _lapsAssinatura = null;
+        _lapsLidoEm = DateTime.MinValue;
+    }
     string _pilotosDe;
+    string _equipesDaAgenda;
+    Dictionary<string, JsonObject> _equipesDosPilotos = new();
+    DateTime _equipesLidasEm = DateTime.MinValue;
     FormTV _tv;
     int? _paginaPainelEsperada, _paginaPainelConfirmada;
     DateTime _paginaPainelConfirmadaEm = DateTime.MinValue;
@@ -130,7 +142,8 @@ public partial class FormCrono : Form
             else if (e.KeyCode == Keys.F2) { e.Handled = true; Bandeira("amarela"); }
             else if (e.KeyCode == Keys.F3) { e.Handled = true; Bandeira("vermelha"); }
             else if (e.KeyCode == Keys.F4) { e.Handled = true; Bandeira("quadriculada"); }
-            else if (e.KeyCode == Keys.F5) { e.Handled = true; Acao("close"); }
+            // Item 26: F5 sozinho atualiza a tela (padrão Windows); Shift+F5 ou Ctrl+F5 encerra a prova
+            else if (e.KeyCode == Keys.F5) { e.Handled = true; if (e.Shift || e.Control) Acao("close"); else _ = Atualizar(); }
             else if (e.KeyCode == Keys.F6) { e.Handled = true; LimparPassagens(); }
             else if (e.KeyCode == Keys.F7) { e.Handled = true; Bandeira("branca"); }
             else if (e.Shift && e.KeyCode is Keys.F8 or Keys.F9 or Keys.F10) { e.Handled = true; PaginaTelao(e.KeyCode - Keys.F8); }
@@ -160,7 +173,7 @@ public partial class FormCrono : Form
             FormClosed += (_, _) => _ouvinte?.Dispose();
             IniciarAtualizacaoAoVivo();
         };
-        FormClosed += (_, _) => { _tv?.Close(); _painel.Dispose(); };
+        FormClosed += (_, _) => { try { if (_tv is { IsDisposed: false }) _tv.BeginInvoke(() => _tv.Close()); } catch { } _painel.Dispose(); };
     }
 
     void DesenharAba(DrawItemEventArgs e)
@@ -230,7 +243,7 @@ public partial class FormCrono : Form
         crono.DropDownItems.Add(new ToolStripMenuItem("Reiniciar bateria…", null, (_, _) => ReiniciarBateria()) { ForeColor = vermelho });
         crono.DropDownItems.Add(new ToolStripMenuItem("Remontar pelo diário (prova que correu sem a bateria aberta)…", null, (_, _) => RemontarPeloDiario()));
         crono.DropDownItems.Add(new ToolStripSeparator());
-        crono.DropDownItems.Add(new ToolStripMenuItem("Advertência para o piloto…", null, (_, _) => AplicarPenalidade("advertencia")));
+        crono.DropDownItems.Add(MenuPunicoesFixas());
         crono.DropDownItems.Add(new ToolStripMenuItem("Penalidade de tempo para o piloto…", null, (_, _) => AplicarPenalidade("tempo")));
         crono.DropDownItems.Add(new ToolStripMenuItem("Bandeira preta (desclassificar)…", null, (_, _) => BandeiraPreta()));
         crono.DropDownItems.Add(new ToolStripSeparator());
@@ -238,6 +251,8 @@ public partial class FormCrono : Form
         crono.DropDownItems.Add(new ToolStripMenuItem("Criar bateria da prova selecionada", null, (_, _) => CriarBateriaDaProva()));
         crono.DropDownItems.Add(new ToolStripMenuItem("Editar bateria (nome, tempo, voltas, traçado)…", null, (_, _) => MudarCorrida()));
         crono.DropDownItems.Add(new ToolStripMenuItem("Incluir passagem manual", null, (_, _) => IncluirPassagem()) { ShortcutKeyDisplayString = "Insert" });
+        crono.DropDownItems.Add(new ToolStripMenuItem("Adicionar voltas · falha de sensor…", null, (_, _) => AdicionarVoltasFalhaSensor()));
+        crono.DropDownItems.Add(new ToolStripMenuItem("Marcar tempo de volta manual…", null, (_, _) => MarcarTempoVoltaManual()));
         crono.DropDownItems.Add(new ToolStripSeparator());
         crono.DropDownItems.Add("Seguir a bateria em andamento", null, (_, _) => { _fixado = false; _ = Atualizar(); });
         rel.DropDownItems.Add("Resultado da bateria selecionada", null, (_, _) => Resultado());
@@ -553,6 +568,8 @@ public partial class FormCrono : Form
         menuPass.Items.Add("Validar passagens posteriores deste kart", null, (_, _) => CorrigirPassagem("validate", true));
         menuPass.Items.Add(new ToolStripSeparator());
         menuPass.Items.Add("Incluir passagem manualmente · Insert", null, (_, _) => IncluirPassagem());
+        menuPass.Items.Add("Adicionar voltas · falha de sensor…", null, (_, _) => AdicionarVoltasFalhaSensor());
+        menuPass.Items.Add("Marcar tempo de volta manual…", null, (_, _) => MarcarTempoVoltaManual());
         menuPass.Items.Add("Atribuir passagem a um competidor", null, (_, _) => AtribuirPassagem());
         menuPass.Items.Add("Cancelar atribuição ao competidor", null, (_, _) => CancelarAtribuicao());
         _gPass.ContextMenuStrip = menuPass;
@@ -560,6 +577,8 @@ public partial class FormCrono : Form
         SetupResultado(_gRes); SetupResultado(_gResCategoria);
         var menuRes = new ContextMenuStrip();
         menuRes.Items.Add("Incluir volta…", null, (_, _) => IncluirPassagem());
+        menuRes.Items.Add("Adicionar voltas · falha de sensor…", null, (_, _) => AdicionarVoltasFalhaSensor());
+        menuRes.Items.Add("Marcar tempo de volta manual…", null, (_, _) => MarcarTempoVoltaManual());
         var retirarUltimaVolta = menuRes.Items.Add("Retirar última volta…", null, (_, _) => RetirarUltimaVolta(_gRes.ChaveAtual as JsonObject));
         var ajustarPosicao = menuRes.Items.Add("Ajustar posição…", null, (_, _) => EditarPosicao(_gRes.ChaveAtual as JsonObject));
         menuRes.Items.Add(new ToolStripSeparator());
@@ -725,6 +744,7 @@ public partial class FormCrono : Form
         if (_pilotosSujos && id != _sel && !Msg.Pergunta(this, "A lista de pilotos desta bateria tem alterações que não foram salvas.\n\nTrocar de bateria e descartar essas alterações?")) return;
         if (id != _sel) _pilotosSujos = false;
         _sel = id; _fixado = true;
+        InvalidarCachePassagens();
         _ = Atualizar();
     }
 
@@ -938,6 +958,8 @@ public partial class FormCrono : Form
         IniciarPublicacaoPaginaPainel();
     }
 
+    void AtualizarBarraPainel() => AtualizarBotoesPainel();
+
     void AtualizarBotoesPainel()
     {
         var remoto = PainelRemotoDisponivel;
@@ -991,6 +1013,12 @@ public partial class FormCrono : Form
         {
             _lPainelStatus.Text = "Painel conectado na porta " + _painel.Porta;
             _lPainelStatus.ForeColor = TemaCrono.Secundario;
+        }
+
+        if (_painel.Ativo && !_painel.AutoAvanco)
+        {
+            _lPainelBadge.BackColor = Color.FromArgb(217, 119, 6);
+            _lPainelStatus.Text += " · PÁGINA TRAVADA MANUALMENTE (marque Auto para girar)";
         }
 
         _btnPag1.Enabled = true;
@@ -1076,9 +1104,18 @@ public partial class FormCrono : Form
             if (_sel != null)
             {
                 _sess = focus != null && focus.S("id") == _sel ? focus : (await Crono.Api.Get("/api/sessions/" + _sel))?.AsObject();
-                _laps = await Crono.Api.Lista($"/api/sessions/{_sel}/passings");
+                var somaVoltas = (_sess?["standings"] as JsonArray)?.OfType<JsonObject>().Sum(s => (long)s.I("laps") + (s.L("lastCrossingWallMs") ?? 0)) ?? 0;
+                var ultPassId = (_state?["recentPassings"] as JsonArray)?.FirstOrDefault()?["id"]?.ToString() ?? "";
+                var assinatura = $"{_sel}:{_sess?.I("passingsCount")}:{_sess?.I("rejectedCount")}:{_sess?.L("updatedAt")}:{_sess?.S("state")}:{_sess?.S("currentFlag")}:{ultPassId}:{somaVoltas}";
+                if (_laps == null || _sel != _lapsSessaoId || assinatura != _lapsAssinatura || DateTime.Now - _lapsLidoEm >= TimeSpan.FromSeconds(3))
+                {
+                    _laps = await Crono.Api.Lista($"/api/sessions/{_sel}/passings");
+                    _lapsSessaoId = _sel;
+                    _lapsAssinatura = assinatura;
+                    _lapsLidoEm = DateTime.Now;
+                }
             }
-            else { _sess = null; _laps = []; }
+            else { _sess = null; _laps = []; InvalidarCachePassagens(); }
             _servidorOk = true;
             // o relógio da tela anda a partir da última leitura BOA (antes uma falha zerava a conta e o relógio voltava)
             _lidoEm = DateTime.Now;
@@ -1123,7 +1160,7 @@ public partial class FormCrono : Form
     }
 
     /// <summary>Placar de LED da COM3 (1 a 10). Chamado a cada aviso do serviço (passagem na hora) e no ciclo de 1 s.</summary>
-    void AtualizarPainel()
+    void AtualizarPainel(int? kartPassou = null)
     {
         // painel de LED antigo (serial) segue a bateria em andamento ou montagem do grid
         if (_autoteste != null) return;
@@ -1132,7 +1169,7 @@ public partial class FormCrono : Form
         var foco = !string.IsNullOrEmpty(_state?.S("runningId")) ? _state?["focus"] as JsonObject : _state?["lastFinished"] as JsonObject ?? _state?["focus"] as JsonObject;
         // equalização é da oficina: nunca vira a "última tomada" do painel (em 02/10 o painel voltava sempre para ela)
         var qualif = _state?["lastQualifying"] as JsonObject ?? (_sess != null && _sess.S("type") is not ("corrida" or "equalizacao") && _sess.S("state") == "encerrada" ? _sess : null);
-        _painel.Atualizar(foco, qualif);
+        _painel.Atualizar(foco, qualif, kartPassou);
         AplicarPaginaPainelCompartilhada();
     }
 
@@ -1144,7 +1181,12 @@ public partial class FormCrono : Form
     {
         if (IsDisposed || _autoteste != null) return;
         _state = estado;
-        AtualizarPainel();
+        int? kartRecente = null;
+        if (estado?["recentPassings"] is JsonArray pass && pass.Count > 0 && pass[0] is JsonObject p)
+        {
+            if (int.TryParse(p.S("kart"), out var k)) kartRecente = k;
+        }
+        AtualizarPainel(kartRecente);
         if (!_ocupado && DateTime.Now - _telaRapidaEm >= TimeSpan.FromMilliseconds(250))
         {
             _telaRapidaEm = DateTime.Now;
@@ -1176,8 +1218,30 @@ public partial class FormCrono : Form
     void Desenhar()
     {
         var dec = _state?["decoder"] as JsonObject;
-        _sServidor.Text = _servidorOk ? "CRONOMETRAGEM: ON-LINE" : "CRONOMETRAGEM: SEM CONEXÃO (" + Config.CronoUrl + ")";
-        _sServidor.ForeColor = _servidorOk ? TemaCrono.Verde : Color.Red;
+        var maquinasAtivas = (_state?["activeOperators"] as JsonArray)?
+            .Select(n => n is JsonObject o ? (o.S("machine") is { Length: > 0 } m ? m : o.S("name") is { Length: > 0 } nm ? nm : o.S("host")) : n?.GetValueKind() == System.Text.Json.JsonValueKind.String ? n.GetValue<string>() : n?.ToString() ?? "")
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList() ?? [];
+        var sufixoTerminais = maquinasAtivas.Count > 1 ? $" · {maquinasAtivas.Count} TERMINAIS ATIVOS ({string.Join(" + ", maquinasAtivas)})" : "";
+        if (!_servidorOk)
+        {
+            _sServidor.BackColor = Color.FromArgb(185, 28, 28);
+            _sServidor.ForeColor = Color.White;
+            _sServidor.Text = "⚠ SERVIDOR :4050 SEM CONEXÃO (TELÃO DESATUALIZADO)";
+        }
+        else
+        {
+            _sServidor.BackColor = Color.Transparent;
+            _sServidor.ForeColor = TemaCrono.Verde;
+            _sServidor.Text = "CRONOMETRAGEM: ON-LINE" + sufixoTerminais;
+        }
+        var kartsManuais = (_sess?["manualTimingKarts"] as JsonObject)?.Select(p => p.Key).OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList() ?? [];
+        if (_servidorOk && kartsManuais.Count > 0)
+        {
+            _sServidor.ForeColor = Color.FromArgb(161, 98, 7);
+            _sServidor.Text += " · VOLTAS MANUAIS ATIVAS: kart " + string.Join(", ", kartsManuais);
+        }
         var decOk = dec?.B("healthy") ?? false;
         _sDecoder.Text = "DECODER " + (dec == null ? "?" : decOk ? $"OK ({dec.S("host")})" : dec.B("connected") ? "SEM DADOS" : "DESCONECTADO");
         _sDecoder.ForeColor = decOk ? TemaCrono.Verde : Color.Red;
@@ -1359,6 +1423,7 @@ public partial class FormCrono : Form
             if (aberta != null) await Crono.Api.Post($"/api/sessions/{aberta}/close");
             await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/{acao}");
             if (acao == "start") { _fixado = false; }
+            InvalidarCachePassagens();
             await Atualizar();
         });
     }
@@ -1412,6 +1477,7 @@ public partial class FormCrono : Form
         // grava na bateria de onde a lista foi carregada (a digitada), não na que estiver selecionada agora
         await Crono.Api.Patch("/api/sessions/" + (_pilotosDe ?? _sess.S("id")), new JsonObject { ["competitors"] = comps });
         _pilotosSujos = false;
+        InvalidarCachePassagens();
         await Atualizar();
         Msg.Info(this, "Competidores salvos.");
     }
@@ -1449,6 +1515,7 @@ public partial class FormCrono : Form
     {
         if (_sess == null) return;
         await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/laps/invalidate", new JsonObject { ["kart"] = kart, ["lap"] = lap });
+        InvalidarCachePassagens();
         await Atualizar();
     }
 
@@ -1457,6 +1524,7 @@ public partial class FormCrono : Form
         if (_sess == null) return;
         using var f = new FormVoltas(_sess.S("id"), kart);
         f.ShowDialog(this);
+        InvalidarCachePassagens();
         _ = Atualizar();
     }
 
@@ -1470,12 +1538,30 @@ public partial class FormCrono : Form
 
     void AbrirTV()
     {
-        if (_tv is { IsDisposed: false }) { _tv.Activate(); return; }
-        _tv = new FormTV();
-        // fechado pelo operador, não reabre; fechado junto com o programa, volta na próxima abertura
-        _tv.FormClosed += (_, _) => { if (!_fechandoPrograma) MarcarTv(false); };
-        _tv.Show();
-        if (_autoteste == null) MarcarTv(true);
+        if (_tv is { IsDisposed: false })
+        {
+            try { _tv.BeginInvoke(() => _tv.Activate()); } catch { }
+            return;
+        }
+        if (_autoteste != null)
+        {
+            _tv = new FormTV(true);
+            _tv.FormClosed += (_, _) => { if (!_fechandoPrograma) MarcarTv(false); };
+            _tv.Show();
+            return;
+        }
+        // Item 23: Executa FormTV em thread STA separada para não congelar o telão durante diálogos modais ou travamentos
+        var thread = new Thread(() =>
+        {
+            var tv = new FormTV(false);
+            _tv = tv;
+            tv.FormClosed += (_, _) => { if (!_fechandoPrograma) { try { BeginInvoke(() => MarcarTv(false)); } catch { } } };
+            Application.Run(tv);
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.IsBackground = true;
+        thread.Start();
+        MarcarTv(true);
     }
 
     void AbrirRelatoriosCrono()

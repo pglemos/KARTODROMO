@@ -64,6 +64,7 @@ public partial class FormCrono
         barra.Controls.Add(BotaoPeq("Meta do traçado…", 0, MetaDoTracado));
         barra.Controls.Add(BotaoPeq("Regra do redutor…", 0, RegraDoRedutor));
         barra.Controls.Add(BotaoPeq("Trazer karts de outra bateria…", 0, TrazerKartsDeOutraBateria));
+        barra.Controls.Add(BotaoPeq("Comparar melhores voltas · 15 dias…", 0, CompararMelhoresVoltas));
         barra.Controls.Add(BotaoPeq("Histórico e metas", 0, () => Relatorio.Abrir(this, $"{Config.CronoUrl.TrimEnd('/')}/equalizacao", "Equalização · histórico e metas por traçado")));
         var cartaoBarra = new TemaCrono.PainelArredondado { Dock = DockStyle.Fill, BackColor = Tokens.Primitivo.Branco, Raio = 16, Margin = new Padding(0, 0, 0, 14) };
         cartaoBarra.Controls.Add(barra);
@@ -263,7 +264,7 @@ public partial class FormCrono
             }
             var v0 = voltas?[k.S("kart")] as JsonObject;
             linha[2 + BlocosNaTela] = k.B("referencia") ? "referência" : k.S("redutorSugerido") is { Length: > 0 } sug ? sug : "—";
-            linha[3 + BlocosNaTela] = k.B("confirmadoManualmente") ? "EQUALIZADO MANUAL" : k.S("status");
+            linha[3 + BlocosNaTela] = k.B("confirmadoManualmente") ? "EQUALIZADO MANUAL · NÃO TESTADO" : k.S("status");
             linha[4 + BlocosNaTela] = k.S("acao");
             linha[5 + BlocosNaTela] = v0 == null ? "" : $"{v0.I("voltas")} voltas\n{v0.I("baterias")} bateria(s)";
             linhas.Add(linha);
@@ -299,6 +300,47 @@ public partial class FormCrono
         var testados = karts.Where(k => !k.B("referencia")).ToList();
         _eqSituacao.Text = _eq.L("finalizadaEm") != null ? $"Finalizada · {_eq.I("equalizados")} de {testados.Count} equalizados"
             : $"{Crono.Estado(_eq.S("state"))} · {_eq.I("equalizados")} de {testados.Count} equalizados";
+    }
+
+    void CompararMelhoresVoltas()
+    {
+        if (_eq == null) { Msg.Aviso(this, "Escolha ou crie uma equalização para usar os karts referência."); return; }
+        using var d = NovoDialogo("Comparar melhores voltas", "Cinco melhores tempos nos últimos 15 dias · mesmo traçado e período para o kart escolhido e as referências", SvgEqualizacao, CorEqualizacao, 1120, 720);
+        var kart = Txt((_gEq.ChaveAtual as JsonObject)?.S("kart") ?? "", 3);
+        var campo = d.Secao("Kart para comparação");
+        d.Campo(campo, "Número do kart (1 a 200)", kart, 2);
+        var grade = d.SecaoTabelaDesign("Melhores voltas · selecionado e referências");
+        grade.Visiveis = 12;
+        grade.Colunas(
+            new TabelaDesign.Coluna("Grupo", 0.8f), new TabelaDesign.Coluna("Posição", 0.45f, Centro: true),
+            new TabelaDesign.Coluna("Kart", 0.45f, Centro: true), new TabelaDesign.Coluna("Tempo", 0.65f, Direita: true),
+            new TabelaDesign.Coluna("Data", 0.8f), new TabelaDesign.Coluna("Bateria", 1.5f), new TabelaDesign.Coluna("Piloto", 1.2f));
+        grade.Linhas([]);
+
+        async Task Buscar()
+        {
+            var texto = kart.Text.Trim();
+            if (!int.TryParse(texto, out var numero) || numero is < 1 or > 200)
+            { Msg.Aviso(d, "Informe um número de kart de 1 a 200."); kart.Focus(); return; }
+            var resultado = (await Crono.Api.Get($"/api/equalizacao/{Uri.EscapeDataString(_eq.S("id"))}/comparacao?kart={numero}"))?.AsObject();
+            if (resultado == null) return;
+            var linhas = new List<string[]>();
+            void Adicionar(string grupo, string numeroKart, JsonArray tempos)
+            {
+                for (var i = 0; i < tempos.Count; i++)
+                    if (tempos[i] is JsonObject volta)
+                        linhas.Add([grupo, (i + 1).ToString(), $"#{numeroKart}", volta.S("tempo"), volta.S("data"), volta.S("bateria"), volta.S("piloto")]);
+            }
+            Adicionar("Selecionado", resultado.S("kart"), Crono.Arr(resultado, "melhoresKart"));
+            foreach (var referencia in Crono.Arr(resultado, "referencias"))
+                Adicionar("Referência", referencia.S("kart"), Crono.Arr(referencia, "melhores"));
+            grade.Vazio = linhas.Count == 0 ? "Nenhuma volta registrada no período para este kart e as referências." : "";
+            grade.Linhas(linhas);
+        }
+
+        d.BotaoRodape("Buscar comparação", true, () => Seguro.Rodar(d, Buscar));
+        d.BotaoRodape("Fechar", false, d.Close);
+        d.ShowDialog(this);
     }
 
     /// <summary>Nova equalização ou os dados da escolhida: traçado, karts referência, meta (referências ou fixa), tolerância.</summary>
@@ -561,7 +603,7 @@ public partial class FormCrono
         var manualAnterior = ck?["confirmacaoManual"] as JsonObject;
         var aberturaAplicada = Txt(Abertura(Dec(manualAnterior, "aberturaMm") ?? Dec(k, "aberturaMm") ?? 0), 8);
         d.Campo(g3, "Ajuste aplicado para confirmar manualmente (mm em relação ao inicial)", aberturaAplicada, 4);
-        d.Nota("Marque EQUALIZADO MANUALMENTE somente depois de aplicar o ajuste no kart. A confirmação registra o ajuste e quem o fez, sem criar voltas fictícias. A próxima medição completa volta a definir a situação automaticamente.");
+        d.Nota("Marque EQUALIZADO MANUALMENTE somente depois de aplicar o ajuste no kart, quando não for necessário testar. A aba exibirá EQUALIZADO MANUAL · NÃO TESTADO. A próxima passagem registrada volta a definir a situação automaticamente.");
         foreach (var b in blocos.Where(b => b.I("bloco") >= 2))
         {
             var texto = Abertura(Dec(b, "aberturaMm") ?? 0);

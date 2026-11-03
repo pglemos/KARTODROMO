@@ -312,9 +312,114 @@ public partial class FormCrono
             await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/passings/manual", new JsonObject { ["kart"] = c?.S("kart") ?? "", ["name"] = c?.S("name") ?? "", ["lapMs"] = (long)(s * 1000) });
             var texto = $"Passagem manual · kart {c?.S("kart") ?? "(avulsa)"} · {tempo.Text.Trim()} s" + (motivo.Text.Trim().Length > 0 ? " · " + motivo.Text.Trim() : "");
             await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/observations", new JsonObject { ["text"] = texto, ["author"] = Environment.UserName, ["kind"] = "manual" });
-            d.DialogResult = DialogResult.OK; d.Close(); await Atualizar();
+            d.DialogResult = DialogResult.OK; d.Close(); InvalidarCachePassagens(); await Atualizar();
         }));
         d.BotaoRodape("Cancelar", false, d.Close);
+        d.ShowDialog(this);
+    }
+
+    void AdicionarVoltasFalhaSensor()
+    {
+        if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria primeiro."); return; }
+        var pilotos = Crono.Arr(_sess, "competitors");
+        if (pilotos.Count < 2) { Msg.Aviso(this, "São necessários pelo menos dois karts para usar o kart da frente como referência."); return; }
+        using var d = NovoDialogo("Adicionar voltas · falha de sensor", "Confirme quantas voltas faltam e a posição real em pista", "M12 5v14M5 12h14", "linear-gradient(180deg, #5EDB7A, #1E9E4A)");
+        var comp = new ListaDesign();
+        foreach (var c in pilotos.OrderBy(c => Crono.Arr(_sess, "standings").FirstOrDefault(s => s.S("kart") == c.S("kart"))?.I("position") ?? 999))
+            comp.Items.Add(new Campos.Item(0, $"{c.S("kart").PadLeft(2, '0')} · {c.S("name")}", c));
+        var selecionado = KartSelecionado();
+        comp.SelectedIndex = Math.Max(0, comp.Items.Cast<Campos.Item>().ToList().FindIndex(i => i.Dados.S("kart") == selecionado));
+        var qtd = new NumericUpDown { Minimum = 1, Maximum = 100, Value = 1, Width = 110, Font = PecasDesign.FonteValor };
+        var pos = new NumericUpDown { Minimum = 2, Maximum = pilotos.Count, Value = 2, Width = 110, Font = PecasDesign.FonteValor };
+        var referencia = new Label { AutoSize = true, Font = PecasDesign.FonteValor, ForeColor = TemaCrono.Texto, BackColor = Tokens.Primitivo.Branco };
+        void AtualizarReferencia()
+        {
+            var p = (int)pos.Value;
+            var kartRef = Crono.Arr(_sess, "standings").FirstOrDefault(s => s.I("position") == p - 1)?.S("kart");
+            referencia.Text = kartRef is { Length: > 0 } ? $"Referência: P{p - 1} · kart {kartRef}; os tempos volta a volta virão desse kart." : "Não há kart de referência nesta posição.";
+        }
+        pos.ValueChanged += (_, _) => AtualizarReferencia();
+        var g = d.Secao("Dados certificados pelo responsável da cronometragem");
+        d.Campo(g, "Kart com sensor falho", comp, 3);
+        d.Campo(g, "Voltas a inserir", qtd, 1);
+        d.Campo(g, "Posição real em pista", pos, 2);
+        g.Controls.Add(referencia); g.SetColumnSpan(referencia, 6);
+        d.Nota("P7 usa o kart P6 como referência em cada volta. O sistema registra a correção no diário, aplica a posição informada e mantém os tempos como voltas manuais.");
+        AtualizarReferencia();
+        d.BotaoRodape("Adicionar voltas", true, () => Seguro.Rodar(d, async () =>
+        {
+            var c = (comp.SelectedItem as Campos.Item)?.Dados;
+            if (c == null) { Msg.Aviso(d, "Escolha o kart com sensor falho."); return; }
+            var kartRef = Crono.Arr(_sess, "standings").FirstOrDefault(s => s.I("position") == (int)pos.Value - 1)?.S("kart");
+            if (string.IsNullOrEmpty(kartRef) || kartRef == c.S("kart")) { Msg.Aviso(d, "A posição não tem um kart à frente para servir de referência."); return; }
+            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/laps/manual", new JsonObject { ["kart"] = c.S("kart"), ["count"] = (int)qtd.Value, ["position"] = (int)pos.Value, ["autor"] = Environment.UserName });
+            d.DialogResult = DialogResult.OK; d.Close(); InvalidarCachePassagens(); await Atualizar();
+            Msg.Info(this, $"{(int)qtd.Value} volta(s) inserida(s) para o kart {c.S("kart")}, usando os tempos do kart {kartRef}.");
+        }));
+        d.BotaoRodape("Cancelar", false, d.Close);
+        d.ShowDialog(this);
+    }
+
+    void MarcarTempoVoltaManual()
+    {
+        if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria primeiro."); return; }
+        var pilotos = Crono.Arr(_sess, "competitors");
+        if (pilotos.Count == 0) { Msg.Aviso(this, "A bateria ainda não tem competidores."); return; }
+        using var d = NovoDialogo("Marcar tempo de volta manual", "Use a cada passagem do kart pela linha até trocar o sensor", "M12 8v4l3 2M12 3a9 9 0 1 0 9 9", "linear-gradient(180deg, #5EDB7A, #1E9E4A)");
+        var comp = new ListaDesign();
+        foreach (var c in pilotos.OrderBy(c => int.TryParse(c.S("kart"), out var k) ? k : 999)) comp.Items.Add(new Campos.Item(0, $"{c.S("kart").PadLeft(2, '0')} · {c.S("name")}", c));
+        var selecionado = KartSelecionado();
+        comp.SelectedIndex = Math.Max(0, comp.Items.Cast<Campos.Item>().ToList().FindIndex(i => i.Dados.S("kart") == selecionado));
+        var status = new Label { AutoSize = true, MaximumSize = new Size(820, 0), Font = PecasDesign.FonteValor, ForeColor = TemaCrono.Texto, BackColor = Tokens.Primitivo.Branco };
+        var ativar = DialogoDesign.AcaoCampo("Ativar marcação manual");
+        var marcar = DialogoDesign.AcaoCampo("Registrar passagem na linha");
+        var encerrar = DialogoDesign.AcaoCampo("Encerrar e voltar ao sensor");
+        var g = d.Secao("Falha do sensor");
+        d.Campo(g, "Kart", comp, 3);
+        g.Controls.Add(ativar); g.SetColumnSpan(ativar, 2);
+        g.Controls.Add(marcar); g.SetColumnSpan(marcar, 2);
+        g.Controls.Add(encerrar); g.SetColumnSpan(encerrar, 2);
+        g.Controls.Add(status); g.SetColumnSpan(status, 6);
+        d.Nota("Ative após confirmar a falha. A primeira marcação cria a referência; cada toque seguinte grava o tempo decorrido desde a passagem anterior. O decoder desse kart é ignorado até encerrar a marcação.");
+        bool Ativo()
+        {
+            var kart = (comp.SelectedItem as Campos.Item)?.Dados?.S("kart");
+            return kart != null && (_sess?["manualTimingKarts"] as JsonObject)?.ContainsKey(kart) == true;
+        }
+        void DesenharEstado()
+        {
+            var kart = (comp.SelectedItem as Campos.Item)?.Dados?.S("kart") ?? "";
+            var st = Crono.Arr(_sess, "standings").FirstOrDefault(s => s.S("kart") == kart);
+            var ativo = Ativo();
+            status.Text = ativo ? $"Kart {kart}: MARCAÇÃO MANUAL ATIVA · {st?.I("laps") ?? 0} volta(s) contada(s) · decoder bloqueado." : $"Kart {kart}: usando sensor do decoder.";
+            ativar.Enabled = !ativo; marcar.Enabled = ativo; encerrar.Enabled = ativo;
+        }
+        comp.SelectedIndexChanged += (_, _) => DesenharEstado();
+        ativar.Click += (_, _) => Seguro.Rodar(d, async () =>
+        {
+            var kart = (comp.SelectedItem as Campos.Item)?.Dados?.S("kart");
+            if (string.IsNullOrEmpty(kart)) { Msg.Aviso(d, "Escolha o kart."); return; }
+            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/manualTiming", new JsonObject { ["kart"] = kart, ["enabled"] = true, ["autor"] = Environment.UserName });
+            await Atualizar(); DesenharEstado();
+        });
+        marcar.Click += (_, _) => Seguro.Rodar(d, async () =>
+        {
+            var kart = (comp.SelectedItem as Campos.Item)?.Dados?.S("kart");
+            if (string.IsNullOrEmpty(kart)) { Msg.Aviso(d, "Escolha o kart."); return; }
+            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/passings/manual", new JsonObject { ["kart"] = kart, ["marcarManual"] = true });
+            InvalidarCachePassagens(); await Atualizar(); DesenharEstado();
+            var st = Crono.Arr(_sess, "standings").FirstOrDefault(s => s.S("kart") == kart);
+            Msg.Info(d, st?.L("lastLapMs") is long lap ? $"Kart {kart}: volta manual registrada · {Crono.Volta(lap)}." : $"Kart {kart}: referência inicial registrada. Marque novamente ao passar pela linha.");
+        });
+        encerrar.Click += (_, _) => Seguro.Rodar(d, async () =>
+        {
+            var kart = (comp.SelectedItem as Campos.Item)?.Dados?.S("kart");
+            if (string.IsNullOrEmpty(kart)) return;
+            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/manualTiming", new JsonObject { ["kart"] = kart, ["enabled"] = false, ["autor"] = Environment.UserName });
+            await Atualizar(); DesenharEstado();
+        });
+        DesenharEstado();
+        d.BotaoRodape("Fechar", false, d.Close);
         d.ShowDialog(this);
     }
 
@@ -380,6 +485,7 @@ public partial class FormCrono
             });
             await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/observations", new JsonObject { ["text"] = $"Troca de kart · {c.S("name")} do kart {kartAntigo} para o {kartNovo}" + (guardar.Checked ? "" : $" (voltas e tempos do kart {kartAntigo} desconsiderados)"), ["author"] = Environment.UserName, ["kind"] = "kart-swap" });
             d.DialogResult = DialogResult.OK; d.Close();
+            InvalidarCachePassagens();
             await Atualizar();
             var st = Crono.Arr(_sess, "standings").FirstOrDefault(s => s.S("kart") == kartNovo);
             Msg.Info(this, $"{c.S("name")} agora está no kart {kartNovo}, com {st?.I("laps") ?? 0} volta(s) e melhor volta {Crono.Volta(st?.L("bestLapMs"))}.");
