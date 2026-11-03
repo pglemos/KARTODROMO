@@ -2,32 +2,42 @@ import { describe, expect, it } from 'vitest';
 import { TOTEM_BATERIAS_SQL, bateriaDisponivelNoTotem } from '../../lib/ops/totem-baterias';
 
 describe('baterias visíveis no autoatendimento', () => {
-  it('mantém visível uma bateria aberta de hoje mesmo depois do horário inicial', () => {
+  it('bloqueia bateria aberta de hoje cujo horário inicial já passou', () => {
     expect(bateriaDisponivelNoTotem({
       inicio: '2026-09-27T12:10:00',
       status: 'aberta',
       autoAtendimento: true,
       reservaFechada: false,
       livres: 12,
-    }, '2026-09-27')).toBe(true);
+    }, '2026-09-27', '2026-09-27T12:15:00')).toBe(false);
+  });
+
+  it('mantém visível bateria aberta futura com vagas disponíveis', () => {
+    expect(bateriaDisponivelNoTotem({
+      inicio: '2026-09-27T12:30:00',
+      status: 'aberta',
+      autoAtendimento: true,
+      reservaFechada: false,
+      livres: 12,
+    }, '2026-09-27', '2026-09-27T12:15:00')).toBe(true);
   });
 
   it('não mostra bateria de outro dia, fechada ou sem vagas', () => {
     const base = {
-      inicio: '2026-09-27T12:10:00',
+      inicio: '2026-09-27T13:00:00',
       status: 'aberta',
       autoAtendimento: true,
       reservaFechada: false,
       livres: 12,
     };
 
-    expect(bateriaDisponivelNoTotem({ ...base, inicio: '2026-09-26T12:10:00' }, '2026-09-27')).toBe(false);
-    expect(bateriaDisponivelNoTotem({ ...base, status: 'fechada' }, '2026-09-27')).toBe(false);
-    expect(bateriaDisponivelNoTotem({ ...base, livres: 0 }, '2026-09-27')).toBe(false);
+    expect(bateriaDisponivelNoTotem({ ...base, inicio: '2026-09-26T13:00:00' }, '2026-09-27', '2026-09-27T12:00:00')).toBe(false);
+    expect(bateriaDisponivelNoTotem({ ...base, status: 'fechada' }, '2026-09-27', '2026-09-27T12:00:00')).toBe(false);
+    expect(bateriaDisponivelNoTotem({ ...base, livres: 0 }, '2026-09-27', '2026-09-27T12:00:00')).toBe(false);
   });
 
-  it('usa o dia corrente como limite inferior, não uma janela de dez minutos', () => {
+  it('filtra início a partir de SYSDATETIME() para não disponibilizar baterias passadas', () => {
+    expect(TOTEM_BATERIAS_SQL).toContain('b.Inicio >= SYSDATETIME()');
     expect(TOTEM_BATERIAS_SQL).toContain('CAST(SYSDATETIME() AS date)');
-    expect(TOTEM_BATERIAS_SQL).not.toContain('DATEADD(minute, -10, SYSDATETIME())');
   });
 });

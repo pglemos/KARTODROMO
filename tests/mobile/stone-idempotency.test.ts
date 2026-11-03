@@ -55,14 +55,14 @@ const validBody = {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe('idempotência de cobrança Asaas', () => {
-  it('reutiliza pagamento encontrado por externalReference após timeout ambíguo', async () => {
+describe('idempotência de cobrança Stone', () => {
+  it('reutiliza pedido encontrado pelo code após timeout ambíguo', async () => {
     const { data, bucket } = r2();
     data.set('reservas/agenda.json', JSON.stringify(agenda));
     const env: EnvReservas = {
       PRE: bucket,
-      ASAAS_API_KEY: 'sandbox-test-key',
-      ASAAS_URL: 'https://api-sandbox.asaas.com/v3',
+      STONE_API_KEY: 'sk_test_key',
+      STONE_URL: 'https://sdx-api.pagar.me/core/v5',
       RESERVAS_ATIVAS: '1',
     };
     const calls: { path: string; method: string }[] = [];
@@ -72,21 +72,14 @@ describe('idempotência de cobrança Asaas', () => {
       const method = init.method ?? 'GET';
       calls.push({ path: `${url.pathname}${url.search}`, method });
       const response = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
+      const reused = { id: 'or_reused', code: url.searchParams.get('code') ?? '', status: 'pending', charges: [{ status: 'pending', payment_method: 'pix', last_transaction: { qr_code: '000201PIX' } }] };
 
-      if (url.pathname === '/v3/customers' && method === 'GET') return response({ data: [{ id: 'cus_1' }] });
-      if (url.pathname === '/v3/payments' && method === 'POST') {
+      if (url.pathname === '/core/v5/orders' && method === 'POST') {
         storedPayment = true;
         throw new Error('timeout: conexão encerrada após aceitar a cobrança');
       }
-      if (url.pathname === '/v3/payments' && method === 'GET') {
-        return response({ data: storedPayment ? [{ id: 'pay_reused', invoiceUrl: 'https://sandbox.asaas.com/i/pay_reused', status: 'PENDING', billingType: 'PIX' }] : [] });
-      }
-      if (url.pathname === '/v3/payments/pay_reused/pixQrCode') {
-        return response({ encodedImage: 'QUJD', payload: '000201PIX', expirationDate: '2026-10-15 23:59:59' });
-      }
-      if (url.pathname === '/v3/payments/pay_reused' && method === 'GET') {
-        return response({ id: 'pay_reused', invoiceUrl: 'https://sandbox.asaas.com/i/pay_reused', status: 'PENDING', billingType: 'PIX' });
-      }
+      if (url.pathname === '/core/v5/orders' && method === 'GET') return response({ data: storedPayment ? [reused] : [] });
+      if (url.pathname === '/core/v5/orders/or_reused') return response(reused);
       return new Response('{}', { status: 404 });
     }));
 
@@ -111,10 +104,10 @@ describe('idempotência de cobrança Asaas', () => {
     );
     await execution.wait();
 
-    expect(calls.filter((call) => call.path === '/v3/payments' && call.method === 'POST')).toHaveLength(1);
-    expect(calls).toContainEqual({ path: `/v3/payments?externalReference=${id}`, method: 'GET' });
-    const stored = JSON.parse(data.get(`reservas/pedidos/${id}.json`)!) as { asaas: { pagamentoId: string } };
-    expect(stored.asaas.pagamentoId).toBe('pay_reused');
+    expect(calls.filter((call) => call.path === '/core/v5/orders' && call.method === 'POST')).toHaveLength(1);
+    expect(calls).toContainEqual({ path: `/core/v5/orders?code=${id}&size=1`, method: 'GET' });
+    const stored = JSON.parse(data.get(`reservas/pedidos/${id}.json`)!) as { cobranca: { pagamentoId: string } };
+    expect(stored.cobranca.pagamentoId).toBe('or_reused');
     const publicOrder = await (await situacaoPedido(env, id, execution.context)).json() as Record<string, unknown>;
     expect(publicOrder).toMatchObject({ status: 'aguardando_pagamento', pix: { payload: '000201PIX' } });
   });
