@@ -11,7 +11,8 @@ export type AdminModuleKey =
   | 'clientes'
   | 'equalizacao'
   | 'administrativa'
-  | 'clube';
+  | 'clube'
+  | 'patrocinadores';
 
 export type AdminModule = {
   key: AdminModuleKey;
@@ -140,6 +141,15 @@ export const adminModules: AdminModule[] = [
     summary: 'Participantes, pontuação, recompensas, campanhas e aprovação de resgates.',
     status: 'Operacional',
     features: ['Participantes', 'Recompensas', 'Campanhas', 'Resgates'],
+  },
+  {
+    key: 'patrocinadores',
+    title: 'Patrocinadores',
+    href: '/admin/patrocinadores',
+    group: 'Gestão',
+    summary: 'Empresas, outdoors, pódio, contratos, recorrência e cobranças de publicidade.',
+    status: 'Módulo novo',
+    features: ['Empresas', 'Espaços e outdoors', 'Contratos', 'Cobranças'],
   },
 ];
 

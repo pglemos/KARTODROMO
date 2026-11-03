@@ -13,6 +13,7 @@ import {
   UtensilsCrossed,
   WalletCards,
   BadgePercent,
+  Handshake,
   type LucideIcon,
 } from 'lucide-react';
 import { adminModules, type AdminModuleKey } from '../../../../components/admin/navigation';
@@ -43,6 +44,7 @@ const iconMap: Record<AdminModuleKey, LucideIcon> = {
   equalizacao: Gauge,
   administrativa: ShieldCheck,
   clube: BadgePercent,
+  patrocinadores: Handshake,
 };
 
 const liveModules = new Set<AdminModuleKey>(['cronometragem', 'telao']);

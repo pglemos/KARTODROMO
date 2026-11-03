@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Miniflare } from 'miniflare';
 import { NextRequest } from 'next/server';
 import { unstable_splitSqlQuery } from 'wrangler';
-import { handleAdminD1, type AdminD1Database } from './admin-d1';
+import { handleAdminD1, patroVencimentos, type AdminD1Database } from './admin-d1';
 
 const actor = 'admin@example.com';
 const request = (path: string, method = 'GET', body?: unknown) =>
@@ -121,5 +121,40 @@ describe('admin D1 API', () => {
     );
     expect(field.status).toBe(400);
     expect(await field.json()).toEqual({ error: 'invalid_field:injected' });
+  });
+
+  it('gera vencimentos de patrocinio por recorrencia sem passar do dia 28 nem do fim do contrato', () => {
+    expect(patroVencimentos({ data_inicio: '2026-01-15', data_fim: '2026-04-30', recorrencia: 'mensal', dia_vencimento: 10 }))
+      .toEqual(['2026-02-10', '2026-03-10', '2026-04-10']);
+    expect(patroVencimentos({ data_inicio: '2026-01-05', data_fim: '2026-12-31', recorrencia: 'trimestral', dia_vencimento: 28 }))
+      .toEqual(['2026-01-28', '2026-04-28', '2026-07-28', '2026-10-28']);
+    expect(patroVencimentos({ data_inicio: '2026-03-01', data_fim: null, recorrencia: 'unico', dia_vencimento: 15 })).toEqual(['2026-03-15']);
+    expect(patroVencimentos({ data_inicio: '2026-01-01', data_fim: null, recorrencia: 'mensal', dia_vencimento: 5 })).toHaveLength(13);
+    expect(() => patroVencimentos({ data_inicio: '2026-01-01', recorrencia: 'quinzenal', dia_vencimento: 5 })).toThrow('invalid_recorrencia');
+  });
+
+  it('gera cobrancas de patrocinio sem duplicar e mostra atraso na view', async () => {
+    const migration = unstable_splitSqlQuery(readFileSync('migrations/d1/0012_patrocinadores.sql', 'utf8'));
+    await db.batch(migration.map((statement) => db.prepare(statement)));
+
+    const empresa = await (await handleAdminD1(request('patro_empresas', 'POST', { nome: 'TESTE CODEX Auto Pecas' }), ['patro_empresas'], db, actor)).json();
+    const contrato = await (await handleAdminD1(request('patro_contratos', 'POST', {
+      empresa_id: empresa.id, titulo: 'TESTE CODEX outdoor', status: 'ativo', valor: 1500, recorrencia: 'mensal',
+      dia_vencimento: 10, data_inicio: '2020-01-01', data_fim: '2020-03-31',
+    }), ['patro_contratos'], db, actor)).json();
+
+    const primeira = await handleAdminD1(request('patro_gerar_cobrancas', 'POST', { contrato_id: contrato.id }), ['patro_gerar_cobrancas'], db, actor);
+    expect(await primeira.json()).toEqual({ geradas: 3, total: 3 });
+    const segunda = await handleAdminD1(request('patro_gerar_cobrancas', 'POST', { contrato_id: contrato.id }), ['patro_gerar_cobrancas'], db, actor);
+    expect(await segunda.json()).toEqual({ geradas: 0, total: 3 });
+
+    const lista = await (await handleAdminD1(request('patro_cobrancas_full'), ['patro_cobrancas_full'], db, actor)).json();
+    expect(lista).toHaveLength(3);
+    expect(lista.every((c: { status: string }) => c.status === 'atrasado')).toBe(true);
+
+    const baixa = await handleAdminD1(request(`patro_cobrancas/${lista[0].id}`, 'PATCH', { status: 'pago', pago_em: '2020-02-10' }), ['patro_cobrancas', lista[0].id], db, actor);
+    expect(baixa.status).toBe(200);
+    const pagas = await (await handleAdminD1(request('patro_cobrancas_full?status=pago'), ['patro_cobrancas_full'], db, actor)).json();
+    expect(pagas).toHaveLength(1);
   });
 });

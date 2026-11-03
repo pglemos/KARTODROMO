@@ -13,6 +13,7 @@ import { DashboardPage } from '@/src/admin/modules/dashboard/DashboardPage';
 import { FinanceiraPage } from '@/src/admin/modules/financeira/FinanceiraPage';
 import { EqualizacaoPage } from '@/src/admin/modules/equalizacao/EqualizacaoPage';
 import { LanchonetePage } from '@/src/admin/modules/lanchonete/LanchonetePage';
+import { PatrocinadoresPage } from '@/src/admin/modules/patrocinadores/PatrocinadoresPage';
 import { RecepcaoPage } from '@/src/admin/modules/recepcao/RecepcaoPage';
 import { ReservasPage } from '@/src/admin/modules/reservas/ReservasPage';
 import { ResultadosPage } from '@/src/admin/modules/resultados/ResultadosPage';
@@ -29,6 +30,7 @@ const legacyPages: Partial<Record<AdminModuleKey, ComponentType>> = {
   financeira: FinanceiraPage,
   equalizacao: EqualizacaoPage,
   lanchonete: LanchonetePage,
+  patrocinadores: PatrocinadoresPage,
   recepcao: RecepcaoPage,
   reservas: ReservasPage,
   resultados: ResultadosPage,
