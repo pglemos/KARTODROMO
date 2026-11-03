@@ -9,7 +9,6 @@ import {
   Gauge,
   Grid2X2,
   LayoutDashboard,
-  Handshake,
   Menu,
   Monitor,
   Moon,
@@ -40,7 +39,6 @@ const iconMap: Record<AdminModuleKey, LucideIcon> = {
   equalizacao: Gauge,
   administrativa: ShieldCheck,
   clube: BadgePercent,
-  patrocinadores: Handshake,
 };
 
 function isActive(currentPath: string, href: string) {

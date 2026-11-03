@@ -86,15 +86,7 @@ const resources = {
   clube_resgates: { columns: ['id', 'participante_id', 'recompensa_id', 'pontos', 'status', 'notes', 'created_at', 'updated_at'], search: ['notes'], defaultOrder: 'created_at', defaultDir: 'desc' },
   clube_resgates_full: { columns: ['id', 'participante_id', 'recompensa_id', 'pontos', 'status', 'notes', 'created_at', 'updated_at', 'participante_nome', 'participante_pontos', 'recompensa_nome', 'pontos_necessarios'], search: ['participante_nome', 'recompensa_nome', 'notes'], defaultOrder: 'created_at', defaultDir: 'desc', readOnly: true },
   clube_campanhas: { columns: ['id', 'nome', 'descricao', 'tipo', 'multiplicador', 'ativo', 'data_inicio', 'data_fim', 'created_at'], booleans: ['ativo'], search: ['nome', 'descricao', 'tipo'], defaultOrder: 'nome' },
-  clube_transacoes: { columns: ['id', 'participante_id', 'tipo', 'pontos', 'descricao', 'referencia', 'created_at'], search: ['descricao', 'referencia'], defaultOrder: 'created_at', defaultDir: 'desc' },
-  // Patrocinadores e publicidade
-  patro_empresas: { columns: ['id', 'nome', 'razao_social', 'cnpj', 'segmento', 'contato_nome', 'email', 'telefone', 'site', 'endereco', 'observacoes', 'logo_arquivo_id', 'ativo', 'created_at', 'updated_at'], booleans: ['ativo'], search: ['nome', 'razao_social', 'cnpj', 'contato_nome', 'segmento'], defaultOrder: 'nome' },
-  patro_espacos: { columns: ['id', 'nome', 'tipo', 'localizacao', 'dimensoes', 'descricao', 'valor_tabela', 'foto_arquivo_id', 'ativo', 'created_at'], booleans: ['ativo'], search: ['nome', 'localizacao', 'descricao'], defaultOrder: 'nome' },
-  patro_contratos: { columns: ['id', 'empresa_id', 'espaco_id', 'titulo', 'status', 'valor', 'recorrencia', 'dia_vencimento', 'data_inicio', 'data_fim', 'renovacao_automatica', 'arte_arquivo_id', 'contrato_arquivo_id', 'observacoes', 'created_at', 'updated_at'], booleans: ['renovacao_automatica'], search: ['titulo', 'observacoes'], defaultOrder: 'data_inicio', defaultDir: 'desc' },
-  patro_contratos_full: { columns: ['id', 'empresa_id', 'espaco_id', 'titulo', 'status', 'valor', 'recorrencia', 'dia_vencimento', 'data_inicio', 'data_fim', 'renovacao_automatica', 'arte_arquivo_id', 'contrato_arquivo_id', 'observacoes', 'created_at', 'updated_at', 'empresa_nome', 'espaco_nome', 'espaco_tipo'], booleans: ['renovacao_automatica'], search: ['titulo', 'empresa_nome', 'espaco_nome'], defaultOrder: 'data_inicio', defaultDir: 'desc', readOnly: true },
-  patro_cobrancas: { columns: ['id', 'contrato_id', 'parcela', 'vencimento', 'valor', 'status', 'pago_em', 'forma_pagamento', 'observacoes', 'created_at'], search: ['observacoes'], defaultOrder: 'vencimento' },
-  patro_cobrancas_full: { columns: ['id', 'contrato_id', 'parcela', 'vencimento', 'valor', 'status', 'pago_em', 'forma_pagamento', 'observacoes', 'created_at', 'contrato_titulo', 'empresa_id', 'empresa_nome'], search: ['contrato_titulo', 'empresa_nome'], defaultOrder: 'vencimento', readOnly: true },
-  patro_arquivos: { columns: ['id', 'nome', 'mime', 'tamanho', 'categoria', 'empresa_id', 'contrato_id', 'created_at'], search: ['nome'], defaultOrder: 'created_at', defaultDir: 'desc', readOnly: true }
+  clube_transacoes: { columns: ['id', 'participante_id', 'tipo', 'pontos', 'descricao', 'referencia', 'created_at'], search: ['descricao', 'referencia'], defaultOrder: 'created_at', defaultDir: 'desc' }
 } as const satisfies Record<string, ResourceConfig>;
 
 type ResourceName = keyof typeof resources;
@@ -332,67 +324,10 @@ async function registerSale(db: AdminD1Database, body: unknown, actor: string) {
   return { venda_id: saleId, total };
 }
 
-const patroRecorrenciaMeses: Record<string, number> = { unico: 0, mensal: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 };
-const patroHorizonteMeses = 12;
-
-/** Datas de vencimento (YYYY-MM-DD) de um contrato; sem data_fim, gera os proximos 12 meses. */
-export function patroVencimentos(contrato: { data_inicio: string; data_fim?: string | null; recorrencia: string; dia_vencimento: number }): string[] {
-  const passo = patroRecorrenciaMeses[contrato.recorrencia];
-  if (passo === undefined) throw new Error('invalid_recorrencia');
-  const inicio = new Date(`${contrato.data_inicio}T00:00:00Z`);
-  if (Number.isNaN(inicio.getTime())) throw new Error('invalid_data_inicio');
-  const dia = Math.min(Math.max(Math.trunc(contrato.dia_vencimento) || 1, 1), 28);
-  const ano = inicio.getUTCFullYear();
-  let mes = inicio.getUTCMonth();
-  if (dia < inicio.getUTCDate()) mes += 1;
-  const formatar = (a: number, m: number) => new Date(Date.UTC(a, m, dia)).toISOString().slice(0, 10);
-  const primeiro = formatar(ano, mes);
-  if (passo === 0) return [primeiro];
-  const limite = contrato.data_fim
-    ? contrato.data_fim
-    : new Date(Date.UTC(ano, mes + patroHorizonteMeses, dia)).toISOString().slice(0, 10);
-  const datas: string[] = [];
-  for (let i = 0; i < 600; i += 1) {
-    const data = formatar(ano, mes + i * passo);
-    if (data > limite) break;
-    datas.push(data);
-  }
-  return datas;
-}
-
-async function gerarCobrancasPatrocinio(db: AdminD1Database, body: unknown, actor: string) {
-  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('invalid_payload');
-  const contratoId = String((body as Row).contrato_id || '');
-  if (!contratoId) throw new Error('invalid_contrato');
-  const contrato = await db.prepare('SELECT * FROM patro_contratos WHERE id = ?').bind(contratoId).first<Row>();
-  if (!contrato) throw new Error('record_not_found');
-  if (contrato.status === 'cancelado') throw new Error('contrato_cancelado');
-
-  const vencimentos = patroVencimentos({
-    data_inicio: String(contrato.data_inicio),
-    data_fim: contrato.data_fim ? String(contrato.data_fim) : null,
-    recorrencia: String(contrato.recorrencia),
-    dia_vencimento: Number(contrato.dia_vencimento),
-  });
-  const existentes = await db.prepare('SELECT parcela, vencimento FROM patro_cobrancas WHERE contrato_id = ?').bind(contratoId).all<Row>();
-  const datasExistentes = new Set(existentes.results.map((row) => String(row.vencimento)));
-  let proxima = existentes.results.reduce((maior, row) => Math.max(maior, Number(row.parcela)), 0);
-  const novas = vencimentos.filter((data) => !datasExistentes.has(data));
-  const statements = novas.map((data) => {
-    proxima += 1;
-    return db.prepare('INSERT INTO patro_cobrancas (id, contrato_id, parcela, vencimento, valor) VALUES (?, ?, ?, ?, ?)')
-      .bind(crypto.randomUUID(), contratoId, proxima, data, Number(contrato.valor));
-  });
-  for (let index = 0; index < statements.length; index += 100) await db.batch(statements.slice(index, index + 100));
-  await audit(db, actor, 'gerar_cobrancas', 'patro_contratos', contratoId, { geradas: novas.length });
-  return { geradas: novas.length, total: vencimentos.length };
-}
-
 export async function handleAdminD1(request: NextRequest, path: string[], db: AdminD1Database, actor: string) {
   try {
     const [resourceName, id] = path;
     if (resourceName === 'registrar_venda' && request.method === 'POST') return json(await registerSale(db, await request.json(), actor));
-    if (resourceName === 'patro_gerar_cobrancas' && request.method === 'POST') return json(await gerarCobrancasPatrocinio(db, await request.json(), actor));
     if (resourceName === 'lanchonete_estoque' && id === 'upsert' && request.method === 'PUT') return json(await upsertStock(db, await request.json(), actor));
     if (resourceName === 'classificacao' && id === 'upsert' && request.method === 'PUT') return json(await upsertClassificacao(db, await request.json(), actor));
     if (!resourceName || !isResource(resourceName)) return json({ error: 'resource_not_found' }, 404);
