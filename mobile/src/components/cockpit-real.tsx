@@ -7,7 +7,6 @@
  */
 import { router } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
-import * as ScreenOrientation from 'expo-screen-orientation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -102,13 +101,6 @@ export default function CockpitReal({ kartInicial = null }: { kartInicial?: stri
   const [inicioVolta, setInicioVolta] = useState<number | null>(null);
   const [penultima, setPenultima] = useState<number | null>(null);
 
-  // cockpit deitado; ao sair, o app volta a ficar em pé
-  useEffect(() => {
-    if (Platform.OS === 'web') return;
-    void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(() => undefined);
-    return () => { void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => undefined); };
-  }, []);
-
   // nome do piloto da conta (para achar o kart sozinho)
   useEffect(() => {
     if (!session) return;
@@ -149,6 +141,10 @@ export default function CockpitReal({ kartInicial = null }: { kartInicial?: stri
   }, [eu, brilho, snap]);
 
   const voltar = () => (router.canGoBack() ? router.back() : router.replace('/(tabs)'));
+  const inicioEncerrado = snap?.startedAt ? new Date(snap.startedAt) : null;
+  const dataHoraEncerrada = inicioEncerrado && Number.isFinite(inicioEncerrado.getTime())
+    ? `${inicioEncerrado.toLocaleDateString('pt-BR')} ${inicioEncerrado.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+    : null;
 
   if (!eu) {
     return (
@@ -175,7 +171,7 @@ export default function CockpitReal({ kartInicial = null }: { kartInicial?: stri
           {snap && !pilotos.length ? (
             <View style={{ gap: 8 }}>
               <Text style={{ color: palette.text, fontSize: 20, fontWeight: '800' }}>{snap.status === 'live' ? `${snap.eventName}: aguardando a primeira passagem` : 'Nenhuma bateria na pista agora'}</Text>
-              <Text style={{ color: palette.textSecondary, fontSize: 16, lineHeight: 23 }}>Deixe o cockpit aberto: ele entra sozinho na bateria assim que o primeiro kart cruzar a linha.{snap.status === 'finished' && snap.eventName ? ` Última encerrada: ${snap.eventName}.` : ''}</Text>
+              <Text style={{ color: palette.textSecondary, fontSize: 16, lineHeight: 23 }}>Deixe o cockpit aberto: ele entra sozinho na bateria assim que o primeiro kart cruzar a linha.{snap.status === 'finished' && snap.eventName ? ` Última encerrada: ${snap.eventName}${dataHoraEncerrada ? ` · ${dataHoraEncerrada}` : ''}.` : ''}</Text>
             </View>
           ) : null}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>

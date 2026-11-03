@@ -1,7 +1,9 @@
 import { render, waitFor } from '@testing-library/react-native';
 
-import { formatElapsed, lapMs, snapshotToSession, type LiveSnapshot } from '../src/features/live/api';
+import { formatElapsed, lapMs, preserveSnapshotTimestamp, retainExpandedCompetitorPosition, retainLiveCompetitors, snapshotToSession, type LiveSnapshot } from '../src/features/live/api';
 import { LiveTimeScreen } from '../src/components/livetime-screen';
+import { AoVivoReal } from '../src/components/ao-vivo-real';
+import { idadeSnapshot } from '../src/components/ao-vivo-real';
 
 // Ao vivo da loja: retrato da cronometragem → tela (sem telemetria inventada).
 const snap: LiveSnapshot = {
@@ -19,12 +21,76 @@ const snap: LiveSnapshot = {
 };
 
 describe('ao vivo com dado real', () => {
+  it('preserva a lista de pilotos quando o retrato só atualiza metadados', () => {
+    const anterior = snapshotToSession(snap, Date.parse('2026-10-20T20:05:00.000Z'))!.competitors;
+    const repetido = snapshotToSession({ ...snap, updatedAt: '2026-10-20T20:05:02.000Z' }, Date.parse('2026-10-20T20:05:02.000Z'))!.competitors;
+
+    expect(retainLiveCompetitors(anterior, repetido)).toBe(anterior);
+  });
+
+  it('mantém a idade do snapshot encerrado quando só avança o horário da consulta', () => {
+    expect(preserveSnapshotTimestamp).toEqual(expect.any(Function));
+
+    const anterior = { ...snap, status: 'finished' as const, updatedAt: '2026-10-20T20:05:00.000Z' };
+    const consultaIgual = { ...anterior, updatedAt: '2026-10-20T20:06:30.000Z' };
+    const preservado = preserveSnapshotTimestamp(anterior, consultaIgual, true);
+    const sessao = snapshotToSession(preservado, Date.parse('2026-10-20T20:06:01.000Z'))!;
+
+    expect(preservado.lastUpdatedAt).toBe('2026-10-20T20:05:00.000Z');
+    expect(sessao.stale).toBe(true);
+  });
+
+  it('reinicia a idade do snapshot quando chega uma nova volta', () => {
+    expect(preserveSnapshotTimestamp).toEqual(expect.any(Function));
+
+    const anterior = { ...snap, status: 'finished' as const, updatedAt: '2026-10-20T20:05:00.000Z' };
+    const novaVolta = {
+      ...anterior,
+      updatedAt: '2026-10-20T20:06:30.000Z',
+      drivers: anterior.drivers.map((driver, index) => index === 0 ? { ...driver, laps: 5, last: '1:16.800' } : driver),
+    };
+    const preservado = preserveSnapshotTimestamp(anterior, novaVolta, false);
+    const sessao = snapshotToSession(preservado, Date.parse('2026-10-20T20:06:31.000Z'))!;
+
+    expect(preservado.lastUpdatedAt).toBe('2026-10-20T20:06:30.000Z');
+    expect(sessao.stale).toBe(false);
+  });
+
+  it('substitui a lista quando uma volta do piloto muda', () => {
+    const anterior = snapshotToSession(snap, Date.parse('2026-10-20T20:05:00.000Z'))!.competitors;
+    const comNovaVolta = snapshotToSession({
+      ...snap,
+      drivers: snap.drivers.map((driver, index) => index === 0 ? { ...driver, laps: 5, last: '1:16.800' } : driver),
+    }, Date.parse('2026-10-20T20:05:02.000Z'))!.competitors;
+
+    expect(retainLiveCompetitors(anterior, comNovaVolta)).not.toBe(anterior);
+    expect(retainLiveCompetitors(anterior, comNovaVolta)[0]).toMatchObject({ currentLap: 5, lastLapTime: '1:16.800' });
+  });
+
+  it('mantém o piloto expandido na mesma posição quando a classificação reordena', () => {
+    const atual = snapshotToSession(snap)!.competitors;
+    const reordenada = snapshotToSession({
+      ...snap,
+      drivers: [snap.drivers[1], { ...snap.drivers[0], position: 2 }, snap.drivers[2]],
+    })!.competitors;
+
+    expect(retainExpandedCompetitorPosition(reordenada, '44', 1).map((pilot) => pilot.kartNumber)).toEqual(
+      atual.map((pilot) => pilot.kartNumber),
+    );
+  });
+
   it('converte tempos e o relógio da bateria', () => {
     expect(lapMs('1:15.418')).toBe(75_418);
     expect(lapMs('58.12')).toBe(58_120);
     expect(lapMs('—')).toBeNull();
     expect(formatElapsed(65_000)).toBe('1:05');
     expect(formatElapsed(3_725_000)).toBe('1:02:05');
+  });
+
+  it('formata a idade do retrato e identifica quando ela não pode ser calculada', () => {
+    expect(idadeSnapshot(15_999)).toBe('há 15 s');
+    expect(idadeSnapshot(60_000)).toBe('há 1 min');
+    expect(idadeSnapshot(null)).toBe('idade desconhecida');
   });
 
   it('monta a tela com a volta mais rápida e as diferenças', () => {
@@ -51,5 +117,15 @@ describe('ao vivo com dado real', () => {
     expect(view.getByTestId('flag-status-label').props.children).toBe('BANDEIRA QUADRICULADA');
     expect(view.getByText("Jorge Antonio")).toBeTruthy();
     expect(view.getByText("KART 48")).toBeTruthy();
+  });
+
+  it('mantém só classificação e pilotos, com tentativa manual apenas quando há erro', async () => {
+    const session = snapshotToSession({ ...snap, status: 'finished' }, Date.parse(snap.updatedAt))!;
+    const view = await render(<AoVivoReal session={session} onRefresh={jest.fn()} refreshError="Falha de conexão" />);
+
+    expect(view.getByLabelText('classificação')).toBeTruthy();
+    expect(view.getByLabelText('pilotos')).toBeTruthy();
+    expect(view.queryByLabelText('Atualizar dados da bateria')).toBeNull();
+    expect(view.getByLabelText('Tentar novamente')).toBeTruthy();
   });
 });

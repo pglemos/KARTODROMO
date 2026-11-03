@@ -6,8 +6,7 @@
   "build": {
     "development": {
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://kartodromo-mobile-homolog.kartodromo.workers.dev",
-        "EXPO_PUBLIC_DEMO_MODE": "1"
+        "EXPO_PUBLIC_API_URL": "https://kartodromo-mobile-homolog.kartodromo.workers.dev"
       },
       "developmentClient": true,
       "distribution": "internal",
@@ -17,8 +16,7 @@
     },
     "preview": {
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://kartodromo-mobile-homolog.kartodromo.workers.dev",
-        "EXPO_PUBLIC_DEMO_MODE": "1"
+        "EXPO_PUBLIC_API_URL": "https://kartodromo-mobile-homolog.kartodromo.workers.dev"
       },
       "distribution": "internal",
       "android": {

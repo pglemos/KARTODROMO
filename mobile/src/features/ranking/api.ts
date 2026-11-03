@@ -1,6 +1,6 @@
 import { API_BASE_URL, MobileApiError, mobileRequest } from '../../api/client';
 
-export type PeriodoRanking = 'semana' | 'mes' | 'geral';
+export type PeriodoRanking = 'dia' | 'semana' | 'mes' | 'geral';
 
 export interface LinhaRanking {
   pos: number;
@@ -18,6 +18,9 @@ export interface RankingResponse {
   ate: string | null;
   tracados: { nome: string; pilotos: number }[];
   tracado: string | null;
+  dia?: string | null;
+  dias?: string[];
+  categoria?: string | null;
   linhas: LinhaRanking[];
   atualizadoEm: string;
 }
@@ -59,9 +62,11 @@ export const rankingApi = {
   buscar(nome: string) {
     return mobileRequest<{ pilotos: VizinhoXp[] }>(`/api/mobile/v1/ranking/busca?nome=${encodeURIComponent(nome)}`);
   },
-  ranking(periodo: PeriodoRanking, tracado?: string | null) {
+  ranking(periodo: PeriodoRanking, tracado?: string | null, filtros?: { dia?: string | null; categoria?: string | null }) {
     const q = new URLSearchParams({ periodo });
     if (tracado) q.set('tracado', tracado);
+    if (filtros?.dia) q.set('dia', filtros.dia);
+    if (filtros?.categoria && filtros.categoria !== 'todos') q.set('categoria', filtros.categoria);
     return mobileRequest<RankingResponse>(`/api/mobile/v1/ranking?${q.toString()}`);
   },
   piloto(id: string) {
@@ -73,7 +78,8 @@ export const rankingApi = {
   },
   async enviarFoto(accessToken: string, arquivo: string) {
     const blob = await (await fetch(arquivo)).blob();
-    const r = await fetch(`${API_BASE_URL}/api/mobile/v1/ranking/me/foto`, { method: 'PUT', headers: { authorization: `Bearer ${accessToken}`, 'content-type': 'image/jpeg' }, body: blob });
+    const contentType = blob.type?.toLowerCase().split(';', 1)[0] || 'image/jpeg';
+    const r = await fetch(`${API_BASE_URL}/api/mobile/v1/ranking/me/foto`, { method: 'PUT', headers: { authorization: `Bearer ${accessToken}`, 'content-type': contentType }, body: blob });
     const corpo = (await r.json().catch(() => ({}))) as { erro?: string; versao?: number };
     if (!r.ok) throw new MobileApiError(corpo.erro ?? 'Não foi possível enviar a foto.', r.status);
     return corpo.versao ?? Date.now();

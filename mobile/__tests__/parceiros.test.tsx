@@ -2,7 +2,7 @@ import React from 'react';
 import { Alert, Linking } from 'react-native';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react-native';
 
-import ParceirosScreen from '../src/app/(tabs)/parceiros';
+import ParceirosScreen from '../src/legacy/parceiros-screen';
 import { TrackScreen } from '../src/components/track-screen';
 import {
   BETIM_LOCAL_STANDINGS_DATA,

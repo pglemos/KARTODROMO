@@ -1,21 +1,23 @@
+import { useEffect } from 'react';
 import { Stack, useSegments } from 'expo-router';
-import { Platform, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Platform, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { useUi } from '../components/theme';
-import { DEMO_MODE } from '../config/features';
-import { CartProvider } from '../features/cart/context';
 import * as ScreenOrientation from 'expo-screen-orientation';
+import { useUi } from '../components/theme';
+import { CartProvider } from '../features/cart/context';
 import { useFonts } from 'expo-font';
 
 import { SessionProvider } from '../session/provider';
 
-// o app é em pé; só o cockpit deita a tela (ele trava em paisagem ao abrir e devolve ao sair)
-if (Platform.OS !== 'web') void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => undefined);
-
 export default function RootLayout() {
   const { palette } = useUi();
   const segments = useSegments() as string[];
+  const emCockpit = segments.includes('cockpit');
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    void ScreenOrientation.lockAsync(emCockpit ? ScreenOrientation.OrientationLock.LANDSCAPE : ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => undefined);
+  }, [emCockpit]);
+
   // fontes do design (títulos itálicos e números da cronometragem); sem elas o app usa a do sistema
   useFonts({
     Display: require('../../assets/fonts/Barlow-BlackItalic.ttf'),
@@ -24,7 +26,6 @@ export default function RootLayout() {
     TempoBold: require('../../assets/fonts/BarlowSemiCondensed-Bold.ttf'),
     TempoItalic: require('../../assets/fonts/BarlowSemiCondensed-BoldItalic.ttf'),
   });
-  const realDataRoute = segments.includes('(auth)') || segments.includes('reservations') || segments.some((segment) => ['agenda', 'reservas', 'resultados', 'gps'].includes(segment));
   return (
     <SessionProvider>
       <CartProvider>
@@ -61,13 +62,6 @@ export default function RootLayout() {
           <Stack.Screen name="cockpit" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
         </Stack>
         </View>
-        {DEMO_MODE && !realDataRoute && (
-          <SafeAreaView edges={['bottom']} style={{ backgroundColor: '#252A30' }}>
-            <Text style={{ color: '#FFFFFF', fontSize: 13, padding: 12 }}>
-              Prévia com dados demonstrativos. Ranking, notícias, carreira e telemetria ainda não estão conectados à operação.
-            </Text>
-          </SafeAreaView>
-        )}
       </CartProvider>
     </SessionProvider>
   );
