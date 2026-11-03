@@ -84,7 +84,7 @@ function lerPayload(token: string): { nome: string; admin: boolean; exp: number 
   }
 }
 
-/** O token é validado pelo servidor da operação; só depois disso as informações dele (nome, admin) são confiáveis. */
+/** O token é validado pelo servidor da operação; só depois disso nome e perfil são confiáveis. */
 export async function autenticar(req: Request, env: PatroEnv): Promise<{ nome: string; admin: boolean }> {
   const auth = req.headers.get('authorization') ?? '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
@@ -95,15 +95,22 @@ export async function autenticar(req: Request, env: PatroEnv): Promise<{ nome: s
 
   const dados = lerPayload(token);
   if (!dados || dados.exp <= agora) throw new ErroHttp(401, 'Sua sessão terminou. Entre de novo.');
-  let resp: Response;
-  try {
-    resp = await fetch(new URL('/api/office/apoio', env.OPS_URL).toString(), { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) });
-  } catch {
-    throw new ErroHttp(502, 'O servidor do kartódromo não respondeu. Confira a internet do kartódromo.');
-  }
+  const ops = async (caminho: string) => {
+    try {
+      return await fetch(new URL(caminho, env.OPS_URL).toString(), { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) });
+    } catch {
+      throw new ErroHttp(502, 'O servidor do kartódromo não respondeu. Confira a internet do kartódromo.');
+    }
+  };
+  // O servidor da operação confirma o login e diz se a pessoa é administradora (a mesma rota que o painel usa).
+  let resp = await ops('/api/office/minhas-permissoes');
+  if (resp.status === 404) resp = await ops('/api/office/apoio'); // servidor antigo, sem permissões por perfil
   if (resp.status === 401) throw new ErroHttp(401, 'Sua sessão terminou. Entre de novo.');
-  if (!resp.ok) throw new ErroHttp(502, 'Não deu para confirmar o seu login agora. Tente de novo.');
-  const quem = { nome: dados.nome, admin: dados.admin };
+  if (resp.status >= 500) throw new ErroHttp(502, 'Não deu para confirmar o seu login agora. Tente de novo.');
+  if (!resp.ok) throw new ErroHttp(403, 'Seu perfil não tem acesso aos patrocinadores.');
+  const perm = (await resp.json().catch(() => null)) as { admin?: unknown; acessoTotal?: unknown } | null;
+  const admin = perm && typeof perm.admin === 'boolean' ? perm.admin : dados.admin;
+  const quem = { nome: dados.nome, admin };
   if (cacheSessoes.size > 200) cacheSessoes.clear();
   cacheSessoes.set(token, { quem, ate: agora + 60_000 });
   return quem;

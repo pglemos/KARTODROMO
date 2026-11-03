@@ -12,6 +12,7 @@ describe('admin web: patrocinadores', () => {
   let mf: Miniflare;
   let db: D1Db;
   let tokenOk = '';
+  let papelServidor = true;
 
   const chamar = (caminho: string, metodo = 'GET', corpo?: unknown, tk = tokenOk) =>
     tratarPatrocinadores(
@@ -32,9 +33,11 @@ describe('admin web: patrocinadores', () => {
     }
     db = d1 as unknown as D1Db;
     tokenOk = token(true);
+    papelServidor = true;
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
       const auth = new Headers(init?.headers).get('authorization');
-      return new Response('{}', { status: auth === `Bearer ${tokenOk}` ? 200 : 401 });
+      if (auth !== `Bearer ${tokenOk}`) return new Response('{}', { status: 401 });
+      return new Response(JSON.stringify({ admin: papelServidor }), { status: 200 });
     }));
   });
 
@@ -48,7 +51,12 @@ describe('admin web: patrocinadores', () => {
     expect((await chamar('tudo', 'GET', undefined, token(true))).status).toBe(401);
     const naoAdmin = token(false);
     tokenOk = naoAdmin;
+    papelServidor = false;
     expect((await chamar('tudo', 'GET', undefined, naoAdmin)).status).toBe(403);
+    // quem decide é o servidor da operação, não o que vem escrito no token
+    const forjado = token(true);
+    tokenOk = forjado;
+    expect((await chamar('tudo', 'GET', undefined, forjado)).status).toBe(403);
     expect((await chamar('tudo', 'GET', undefined, token(true, Date.now() - 1000))).status).toBe(401);
   });
 
