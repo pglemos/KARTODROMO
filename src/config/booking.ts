@@ -1,4 +1,4 @@
-/** Reserva online própria (pagamento Asaas, Pix ou cartão). Até 01/10/2026 era o MyLapTime, que ficou sem horários
+/** Reserva online própria (pagamento Stone, Pix ou cartão). Até 01/10/2026 era o MyLapTime, que ficou sem horários
  * quando o LapTime foi desligado. */
 export const RESERVA_ONLINE_URL = 'https://reservas.kartodromodebetim.com.br';
 
