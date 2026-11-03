@@ -142,8 +142,7 @@ public partial class FormCrono : Form
             else if (e.KeyCode == Keys.F2) { e.Handled = true; Bandeira("amarela"); }
             else if (e.KeyCode == Keys.F3) { e.Handled = true; Bandeira("vermelha"); }
             else if (e.KeyCode == Keys.F4) { e.Handled = true; Bandeira("quadriculada"); }
-            // Item 26: F5 sozinho atualiza a tela (padrão Windows); Shift+F5 ou Ctrl+F5 encerra a prova
-            else if (e.KeyCode == Keys.F5) { e.Handled = true; if (e.Shift || e.Control) Acao("close"); else _ = Atualizar(); }
+            else if (e.KeyCode == Keys.F5) { e.Handled = true; Acao("close"); }
             else if (e.KeyCode == Keys.F6) { e.Handled = true; LimparPassagens(); }
             else if (e.KeyCode == Keys.F7) { e.Handled = true; Bandeira("branca"); }
             else if (e.Shift && e.KeyCode is Keys.F8 or Keys.F9 or Keys.F10) { e.Handled = true; PaginaTelao(e.KeyCode - Keys.F8); }
@@ -243,7 +242,7 @@ public partial class FormCrono : Form
         crono.DropDownItems.Add(new ToolStripMenuItem("Reiniciar bateria…", null, (_, _) => ReiniciarBateria()) { ForeColor = vermelho });
         crono.DropDownItems.Add(new ToolStripMenuItem("Remontar pelo diário (prova que correu sem a bateria aberta)…", null, (_, _) => RemontarPeloDiario()));
         crono.DropDownItems.Add(new ToolStripSeparator());
-        crono.DropDownItems.Add(MenuPunicoesFixas());
+        crono.DropDownItems.Add(new ToolStripMenuItem("Advertência para o piloto…", null, (_, _) => AplicarPenalidade("advertencia")));
         crono.DropDownItems.Add(new ToolStripMenuItem("Penalidade de tempo para o piloto…", null, (_, _) => AplicarPenalidade("tempo")));
         crono.DropDownItems.Add(new ToolStripMenuItem("Bandeira preta (desclassificar)…", null, (_, _) => BandeiraPreta()));
         crono.DropDownItems.Add(new ToolStripSeparator());
@@ -251,8 +250,6 @@ public partial class FormCrono : Form
         crono.DropDownItems.Add(new ToolStripMenuItem("Criar bateria da prova selecionada", null, (_, _) => CriarBateriaDaProva()));
         crono.DropDownItems.Add(new ToolStripMenuItem("Editar bateria (nome, tempo, voltas, traçado)…", null, (_, _) => MudarCorrida()));
         crono.DropDownItems.Add(new ToolStripMenuItem("Incluir passagem manual", null, (_, _) => IncluirPassagem()) { ShortcutKeyDisplayString = "Insert" });
-        crono.DropDownItems.Add(new ToolStripMenuItem("Adicionar voltas · falha de sensor…", null, (_, _) => AdicionarVoltasFalhaSensor()));
-        crono.DropDownItems.Add(new ToolStripMenuItem("Marcar tempo de volta manual…", null, (_, _) => MarcarTempoVoltaManual()));
         crono.DropDownItems.Add(new ToolStripSeparator());
         crono.DropDownItems.Add("Seguir a bateria em andamento", null, (_, _) => { _fixado = false; _ = Atualizar(); });
         rel.DropDownItems.Add("Resultado da bateria selecionada", null, (_, _) => Resultado());
@@ -568,8 +565,6 @@ public partial class FormCrono : Form
         menuPass.Items.Add("Validar passagens posteriores deste kart", null, (_, _) => CorrigirPassagem("validate", true));
         menuPass.Items.Add(new ToolStripSeparator());
         menuPass.Items.Add("Incluir passagem manualmente · Insert", null, (_, _) => IncluirPassagem());
-        menuPass.Items.Add("Adicionar voltas · falha de sensor…", null, (_, _) => AdicionarVoltasFalhaSensor());
-        menuPass.Items.Add("Marcar tempo de volta manual…", null, (_, _) => MarcarTempoVoltaManual());
         menuPass.Items.Add("Atribuir passagem a um competidor", null, (_, _) => AtribuirPassagem());
         menuPass.Items.Add("Cancelar atribuição ao competidor", null, (_, _) => CancelarAtribuicao());
         _gPass.ContextMenuStrip = menuPass;
@@ -577,8 +572,6 @@ public partial class FormCrono : Form
         SetupResultado(_gRes); SetupResultado(_gResCategoria);
         var menuRes = new ContextMenuStrip();
         menuRes.Items.Add("Incluir volta…", null, (_, _) => IncluirPassagem());
-        menuRes.Items.Add("Adicionar voltas · falha de sensor…", null, (_, _) => AdicionarVoltasFalhaSensor());
-        menuRes.Items.Add("Marcar tempo de volta manual…", null, (_, _) => MarcarTempoVoltaManual());
         var retirarUltimaVolta = menuRes.Items.Add("Retirar última volta…", null, (_, _) => RetirarUltimaVolta(_gRes.ChaveAtual as JsonObject));
         var ajustarPosicao = menuRes.Items.Add("Ajustar posição…", null, (_, _) => EditarPosicao(_gRes.ChaveAtual as JsonObject));
         menuRes.Items.Add(new ToolStripSeparator());
@@ -1235,12 +1228,6 @@ public partial class FormCrono : Form
             _sServidor.BackColor = Color.Transparent;
             _sServidor.ForeColor = TemaCrono.Verde;
             _sServidor.Text = "CRONOMETRAGEM: ON-LINE" + sufixoTerminais;
-        }
-        var kartsManuais = (_sess?["manualTimingKarts"] as JsonObject)?.Select(p => p.Key).OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList() ?? [];
-        if (_servidorOk && kartsManuais.Count > 0)
-        {
-            _sServidor.ForeColor = Color.FromArgb(161, 98, 7);
-            _sServidor.Text += " · VOLTAS MANUAIS ATIVAS: kart " + string.Join(", ", kartsManuais);
         }
         var decOk = dec?.B("healthy") ?? false;
         _sDecoder.Text = "DECODER " + (dec == null ? "?" : decOk ? $"OK ({dec.S("host")})" : dec.B("connected") ? "SEM DADOS" : "DESCONECTADO");

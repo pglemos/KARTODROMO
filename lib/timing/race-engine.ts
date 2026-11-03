@@ -8,18 +8,6 @@ export type SessionState = 'preparando' | 'em_andamento' | 'bandeira_final' | 'e
 export type RaceFlag = 'none' | 'green' | 'yellow' | 'red' | 'white' | 'checkered';
 /** Bandeiras só para um piloto (sinalização): preta, preta com círculo laranja (mecânico), preta e branca (advertência), azul (deixe passar), penalidade. */
 export type PilotFlag = 'black' | 'mechanical' | 'warning' | 'blue' | 'penalty';
-export type RaceOffenseCode = 'kart-levantado' | 'capacete-retirado' | 'fechou-passagem' | 'toque' | 'queimou-largada' | 'ignorou-bandeira' | 'largar-ultimo' | 'contramao' | 'pilotagem-perigosa';
-export const RACE_OFFENSES: Record<RaceOffenseCode, string> = {
-  'kart-levantado': 'Levantou do kart',
-  'capacete-retirado': 'Tirou o capacete',
-  'fechou-passagem': 'Fechou passagem',
-  toque: 'Toque',
-  'queimou-largada': 'Queimou largada',
-  'ignorou-bandeira': 'Ignorou bandeira',
-  'largar-ultimo': 'Largar de último',
-  contramao: 'Andou na contramão',
-  'pilotagem-perigosa': 'Pilotagem perigosa (bateu ou rodou)',
-};
 
 export type Crossing = {
   id?: string;
@@ -44,12 +32,6 @@ export type Observation = { id: string; text: string; wallMs: number; author?: s
  */
 export type Penalidade = {
   id: string; tipo: 'advertencia' | 'tempo'; segundos?: number; wallMs: number; autor?: string;
-  codigo?: RaceOffenseCode;
-  alerta?: number;
-  flagAplicada?: PilotFlag;
-  flagAnterior?: PilotFlag | RaceFlag;
-  posicaoAplicada?: number;
-  posicaoAnterior?: number | null;
   /** kart que sofreu o incidente (quebrou ou rodou por causa da colisão) */
   kartAtingido?: string;
   /** curva do incidente */
@@ -162,8 +144,6 @@ export type Session = {
   observations?: Observation[];
   /** posição fixada manualmente pelo cronometrista quando o sensor falha (kart -> posição). */
   manualPositions?: Record<string, number>;
-  /** karts em modo manual: as passagens do decoder são ignoradas até o operador trocar o sensor. */
-  manualTimingKarts?: Record<string, { autor: string; ativadoEm: number }>;
   competitors: Competitor[];
   /** Leituras do decoder que não viraram volta (volta mínima, kart encerrado, transponder desconhecido...). Só pra mostrar ao operador. */
   rejected?: RejectedPassing[];
@@ -173,12 +153,12 @@ export type EnvioEmailsResultado = {
   /** enviado = todos com e-mail receberam; parcial = alguns falharam (tenta de novo); falhou = nenhum foi (tenta de novo);
    *  sem-destinatarios = ninguém da prova tem e-mail cadastrado; desligado = envio automático desativado quando encerrou;
    *  sem-email-pilotos = bateria marcada para não mandar aos pilotos (o organizador divulga — Tabajara) */
-  status: 'enviado' | 'parcial' | 'falhou' | 'sem-destinatarios' | 'desligado' | 'sem-email-pilotos';
+  status: 'enviado' | 'parcial' | 'falhou' | 'falhou-permanente' | 'sem-destinatarios' | 'desligado' | 'sem-email-pilotos';
   atualizadoEm: number;
   tentativas: number;
   /** "kart|email" de quem já recebeu (não manda de novo na nova tentativa) */
   enviados: string[];
-  falhas: { kart: string; nome: string; email: string; erro: string }[];
+  falhas: { kart: string; nome: string; email: string; erro: string; permanente?: boolean }[];
   semEmail: { kart: string; nome: string }[];
   /** aceite do SMTP/relay; não confirma chegada na caixa do destinatário */
   aceite?: 'aceito-pelo-relay' | 'aceito-pelo-smtp' | 'simulador';
@@ -186,6 +166,9 @@ export type EnvioEmailsResultado = {
   mensagemEntrega?: string;
   /** assinatura do resultado para comparar antes de reenvios automáticos em correções pós-corrida */
   assinaturaResultado?: string;
+  proximaTentativaEm?: number;
+  falhasPermanentes?: string[];
+  mensagens?: { destinatario: string; messageId: string; aceitoEm: number }[];
 };
 
 export type RejectedPassing = { id: string; kart: string | null; transponder: number | null; wallMs: number; decoderTimeMs: number; reason: string; sinceLastMs: number | null };
@@ -619,24 +602,13 @@ export function propagarTrocaKart(origem: Session, destino: Session, kartAnterio
   return true;
 }
 
-export function startSession(session: Session, now: number, gridStart = false) {
+export function startSession(session: Session, now: number) {
   if (session.state !== 'preparando') throw new Error('A bateria já foi iniciada.');
   session.state = 'em_andamento';
+  // o cronômetro só começa quando o primeiro kart cruzar a linha (igual ao LapTime)
   session.greenAt = now;
-  // Item 6: Em largadas paradas no grid, o cronômetro começa imediatamente com a bandeira verde
-  if (gridStart || (session as any).gridStart) {
-    session.startedAt = now;
-    session.originalStartedAt = now;
-  } else {
-    session.startedAt = null;
-  }
+  session.startedAt = null;
   session.currentFlag = 'green';
-}
-
-/** Item 5: Tempo decorrido desde a bandeira verde (para telão/TV não congelar em 00:00). */
-export function elapsedFromGreenMs(session: Session, now: number): number {
-  if (session.greenAt == null) return 0;
-  return Math.max(0, now - session.greenAt);
 }
 
 /** Bateria com bandeira verde mas nenhum kart passou ainda: o cronômetro está parado em zero. */
@@ -705,7 +677,6 @@ export function closeSession(session: Session, now: number) {
   else session.redFlagElapsedMs = null;
   session.finishedAt = now;
   session.redFlagAt = null;
-  session.manualTimingKarts = {};
 }
 
 /**
@@ -713,20 +684,8 @@ export function closeSession(session: Session, now: number) {
  * (continuam no diário e podem ser restauradas), bandeiras dos pilotos, advertências e penalidades saem e as
  * linhas "Kart 12" que entraram sozinhas somem. Os pilotos e os números dos karts continuam.
  */
-export function restartSession(session: Session, opcoes?: { preservarAutoAdded?: boolean }) {
-  // Item 7: Remove autoAdded por padrão no reinício limpo; preserva se solicitado na relargada
-  if (!opcoes?.preservarAutoAdded) {
-    session.competitors = session.competitors.filter((c) => !c.autoAdded);
-  }
-  // Item 8: Guarda snapshot das passagens antes da relargada para permitir auditoria do comissário
-  const snapshotPassagens = session.competitors.map((c) => ({
-    kart: c.kart,
-    name: c.name,
-    crossings: c.crossings.filter((x) => !x.deleted).map((x) => ({ ...x })),
-  })).filter((c) => c.crossings.length > 0);
-  if (snapshotPassagens.length > 0) {
-    (session as any).historicoRelargada = snapshotPassagens;
-  }
+export function restartSession(session: Session) {
+  session.competitors = session.competitors.filter((c) => !c.autoAdded);
   for (const c of session.competitors) {
     for (const x of c.crossings) x.deleted = true;
     c.finished = false;
@@ -745,7 +704,6 @@ export function restartSession(session: Session, opcoes?: { preservarAutoAdded?:
   session.currentFlag = 'none';
   session.redFlagAt = null;
   session.redFlagElapsedMs = null;
-  session.manualTimingKarts = {};
   delete session.emailsResultado;
 }
 
@@ -776,57 +734,7 @@ export function removePenalty(session: Session, kart: string, id: string) {
   const p = c?.penalidades?.find((x) => x.id === id);
   if (!c || !p) throw new Error('Penalidade não encontrada.');
   c.penalidades = c.penalidades!.filter((x) => x !== p);
-  const anteriores = c.penalidades.filter((x) => x.flagAplicada || x.posicaoAplicada != null).sort((a, b) => a.wallMs - b.wallMs);
-  if (p.flagAplicada && c.flag === p.flagAplicada) {
-    const restantes = anteriores.filter((x) => x.flagAplicada);
-    if (restantes.length) {
-      c.flag = restantes.some((x) => x.flagAplicada === 'black') ? 'black' : 'warning';
-      if (p.flagAnterior && restantes[0].flagAnterior === p.flagAplicada) restantes[0].flagAnterior = p.flagAnterior;
-    } else c.flag = p.flagAnterior ?? 'none';
-  }
-  if (p.posicaoAplicada != null && session.manualPositions?.[kart] === p.posicaoAplicada) {
-    const restantes = anteriores.filter((x) => x.posicaoAplicada != null);
-    if (restantes.length) {
-      const primeira = restantes[0];
-      if (primeira.posicaoAnterior === p.posicaoAplicada) primeira.posicaoAnterior = p.posicaoAnterior ?? null;
-      setManualPosition(session, kart, restantes[restantes.length - 1].posicaoAplicada!);
-    } else setManualPosition(session, kart, p.posicaoAnterior ?? null);
-  }
   return { competitor: c, penalidade: p };
-}
-
-/** Registra uma punição fixa e aplica no mesmo write seus efeitos automáticos. */
-export function applyRaceOffense(session: Session, kart: string, codigo: RaceOffenseCode, wallMs: number, autor: string, id = `${wallMs}-${(session.competitors.find((x) => x.kart === kart)?.penalidades?.length ?? 0) + 1}`) {
-  const c = session.competitors.find((x) => x.kart === kart);
-  if (!c) throw new Error('Competidor não encontrado.');
-  if (!Object.prototype.hasOwnProperty.call(RACE_OFFENSES, codigo)) throw new Error('Punição inválida.');
-  if (codigo === 'largar-ultimo' && session.type !== 'classificacao') throw new Error('Largar de último só pode ser aplicado durante a tomada de tempo.');
-
-  const perigosos = (c.penalidades ?? []).filter((x) => x.codigo === 'pilotagem-perigosa').length;
-  const alerta = codigo === 'pilotagem-perigosa' ? perigosos + 1 : undefined;
-  const desclassifica = codigo === 'kart-levantado' || codigo === 'contramao' || (codigo === 'pilotagem-perigosa' && alerta! >= 3);
-  const ultimaPosicao = codigo === 'capacete-retirado' || codigo === 'largar-ultimo';
-  const registro: Penalidade = {
-    id, tipo: 'advertencia', codigo, wallMs, autor,
-    ...(alerta ? { alerta } : {}),
-    texto: `${RACE_OFFENSES[codigo]}${alerta ? alerta < 3 ? ` · alerta ${alerta}/2` : ' · 3º registro: desclassificação automática' : ''}${desclassifica ? ' · desclassificação automática' : ultimaPosicao ? ` · posição ${session.competitors.length}` : ''}`,
-  };
-  if (desclassifica && c.flag !== 'black') {
-    registro.flagAnterior = c.flag ?? 'none';
-    registro.flagAplicada = 'black';
-    c.flag = 'black';
-  } else if (codigo === 'pilotagem-perigosa' && alerta! <= 2 && c.flag !== 'warning') {
-    registro.flagAnterior = c.flag ?? 'none';
-    registro.flagAplicada = 'warning';
-    c.flag = 'warning';
-  }
-  if (codigo === 'largar-ultimo') {
-    registro.posicaoAnterior = session.manualPositions?.[kart] ?? null;
-    registro.posicaoAplicada = session.competitors.length;
-    setManualPosition(session, kart, registro.posicaoAplicada);
-  }
-  (c.penalidades ??= []).push(registro);
-  return { competitor: c, penalidade: registro, alertas: alerta ?? null, desclassificado: desclassifica, ultimaPosicao };
 }
 
 export function penaltyMsOf(c: Competitor) {
@@ -839,7 +747,7 @@ export function cancelSession(session: Session, now: number) {
   session.redFlagAt = null;
 }
 
-export type PassingResult = 'counted' | 'ignored-state' | 'ignored-min-lap' | 'ignored-finished' | 'ignored-red-flag' | 'ignored-manual-mode';
+export type PassingResult = 'counted' | 'ignored-state' | 'ignored-min-lap' | 'ignored-finished' | 'ignored-red-flag';
 
 function activeCrossings(competitor: Competitor) {
   return competitor.crossings.filter((x) => !x.deleted).sort((a, b) => a.wallMs - b.wallMs);
@@ -911,7 +819,6 @@ function recalculate(competitor: Competitor) {
 export function applyPassing(session: Session, p: { id?: string; kart: string; decoderTimeMs: number; wallMs: number; transponder?: number | null; source?: 'decoder' | 'manual' }): PassingResult {
   if (session.state !== 'em_andamento' && session.state !== 'bandeira_final') return 'ignored-state';
   if (session.redFlagAt != null || session.currentFlag === 'red') return 'ignored-red-flag';
-  if (p.source !== 'manual' && session.manualTimingKarts?.[p.kart]) return 'ignored-manual-mode';
 
   let comp = session.competitors.find((c) => c.kart === p.kart);
   if (!comp) {
@@ -938,8 +845,9 @@ export function applyPassing(session: Session, p: { id?: string; kart: string; d
 }
 
 /** Inclui uma volta manual usando o tempo informado, sem depender do decoder. */
-export function includeManualPassing(session: Session, p: { id: string; kart: string; lapMs?: number; wallMs: number; name?: string; transponder?: number | null }) {
+export function includeManualPassing(session: Session, p: { id: string; kart: string; lapMs: number; wallMs: number; name?: string; transponder?: number | null }) {
   if (!p.kart.trim()) throw new Error('Informe o número do kart.');
+  if (!Number.isFinite(p.lapMs) || p.lapMs < session.minLapMs) throw new Error(`O tempo manual deve ser de pelo menos ${session.minLapMs / 1000} segundos.`);
   let competitor = session.competitors.find((c) => c.kart === p.kart);
   if (!competitor) {
     competitor = { kart: p.kart, name: p.name?.trim() || `Kart ${p.kart}`, flag: 'none', crossings: [], finished: false };
@@ -948,67 +856,13 @@ export function includeManualPassing(session: Session, p: { id: string; kart: st
   if (session.state === 'em_andamento') largarNaPrimeiraPassagem(session, p.wallMs);
   const active = activeCrossings(competitor);
   const previous = active[active.length - 1];
-  const lapMs = previous ? p.lapMs ?? p.wallMs - previous.wallMs : null;
-  if (lapMs !== null && (!Number.isFinite(lapMs) || lapMs < session.minLapMs)) throw new Error(`O tempo manual deve ser de pelo menos ${session.minLapMs / 1000} segundos.`);
-  const decoderTimeMs = previous ? (previous.decoderTimeMs + lapMs!) % DAY_MS : (p.wallMs % DAY_MS);
-  competitor.crossings.push({ id: p.id, decoderTimeMs, wallMs: p.wallMs, lapMs, source: 'manual', transponder: p.transponder ?? null });
+  const decoderTimeMs = previous ? (previous.decoderTimeMs + p.lapMs) % DAY_MS : (p.wallMs % DAY_MS);
+  competitor.crossings.push({ id: p.id, decoderTimeMs, wallMs: p.wallMs, lapMs: previous ? p.lapMs : null, source: 'manual', transponder: p.transponder ?? null });
   recalculate(competitor);
   // mesma regra do decoder: depois da quadriculada, a volta fechada (manual) é a chegada do piloto
   if (session.state === 'bandeira_final' && previous) competitor.finished = true;
   else if (session.state === 'em_andamento') marcarVoltasCompletas(session, p.wallMs);
   return competitor.crossings.find((x) => x.id === p.id)!;
-}
-
-/** Ativa/desativa o modo manual do kart; enquanto ativo, leituras do decoder desse kart não contam. */
-export function setManualTiming(session: Session, kart: string, enabled: boolean, autor: string, now: number) {
-  if (!session.competitors.some((c) => c.kart === kart)) throw new Error('Competidor não encontrado.');
-  if (session.state !== 'em_andamento' && session.state !== 'bandeira_final') throw new Error('A marcação manual só pode ser usada com a bateria em andamento.');
-  session.manualTimingKarts ??= {};
-  if (enabled) session.manualTimingKarts[kart] = { autor: autor.slice(0, 60), ativadoEm: now };
-  else delete session.manualTimingKarts[kart];
-  return Boolean(session.manualTimingKarts[kart]);
-}
-
-/** Insere voltas perdidas com os tempos do kart imediatamente à frente e fixa a posição real informada. */
-export function addMissingLaps(session: Session, input: { kart: string; count: number; position: number; trackLengthMeters: number; id: (index: number) => string }) {
-  if (session.state !== 'em_andamento' && session.state !== 'bandeira_final') throw new Error('Só é possível inserir voltas durante a bateria.');
-  if (session.type === 'equalizacao') throw new Error('Use a equalização para corrigir voltas de teste.');
-  if (!Number.isInteger(input.count) || input.count < 1 || input.count > 100) throw new Error('Informe de 1 a 100 voltas a inserir.');
-  if (!Number.isInteger(input.position) || input.position < 2 || input.position > session.competitors.length) throw new Error('Informe a posição real do kart (mínimo P2, pois os tempos vêm do kart à frente).');
-  const target = session.competitors.find((c) => c.kart === input.kart);
-  if (!target) throw new Error('Competidor não encontrado.');
-  const frontRow = computeStandings(session, input.trackLengthMeters).find((r) => r.position === input.position - 1);
-  const front = frontRow && session.competitors.find((c) => c.kart === frontRow.kart);
-  if (!front || front.kart === target.kart) throw new Error('Não foi possível localizar o kart imediatamente à frente.');
-  const alvo = activeCrossings(target);
-  const referencias = activeCrossings(front);
-  if (!referencias.length) throw new Error(`O kart ${front.kart} ainda não tem passagens para servir de referência.`);
-  const voltasAlvo = Math.max(0, alvo.length - 1);
-  const temposValidos = referencias.slice(1).filter((x) => !x.invalid && x.lapMs != null && x.lapMs >= session.minLapMs);
-  if (!temposValidos.length) throw new Error(`O kart ${front.kart} ainda não tem tempos de volta válidos.`);
-  if (!alvo.length) {
-    const largada = referencias[0];
-    target.crossings.push({ id: input.id(0), decoderTimeMs: largada.decoderTimeMs, wallMs: largada.wallMs, lapMs: null, source: 'manual' });
-  }
-  const alvoAtual = activeCrossings(target);
-  let previous = alvoAtual[alvoAtual.length - 1];
-  const tempos: number[] = [];
-  for (let i = 0; i < input.count; i++) {
-    const indiceVolta = voltasAlvo + i;
-    const ref = referencias[indiceVolta + 1];
-    const tempo = ref && !ref.invalid && ref.lapMs != null && ref.lapMs >= session.minLapMs
-      ? ref.lapMs
-      : temposValidos[Math.min(indiceVolta, temposValidos.length - 1)].lapMs!;
-    const wallMs = Math.max(previous.wallMs + 1, (ref?.wallMs ?? previous.wallMs + tempo) + 1);
-    const crossing = { id: input.id(i + 1), decoderTimeMs: (previous.decoderTimeMs + tempo) % DAY_MS, wallMs, lapMs: tempo, source: 'manual' as const };
-    target.crossings.push(crossing);
-    previous = crossing;
-    tempos.push(tempo);
-  }
-  recalculate(target);
-  setManualPosition(session, input.kart, input.position);
-  if (session.state === 'em_andamento') marcarVoltasCompletas(session, previous.wallMs);
-  return { kart: target.kart, referenceKart: front.kart, position: input.position, lapsAdded: input.count, lapTimesMs: tempos };
 }
 
 export function locateCrossing(session: Session, id: string) {
@@ -1293,8 +1147,6 @@ export function computeStandings(session: Session, trackLengthMeters = 1_000): S
     const restantes = rows.filter((row) => !fixadasSet.has(row));
     rows = Array.from({ length: rows.length }, (_, i) => fixadas.get(i + 1) ?? restantes.shift()).filter(Boolean) as (typeof rows)[number][];
   }
-  const terminamEmUltimo = rows.filter((row) => row.c.penalidades?.some((p) => p.codigo === 'capacete-retirado'));
-  if (terminamEmUltimo.length) rows = [...rows.filter((row) => !terminamEmUltimo.includes(row)), ...terminamEmUltimo];
 
   const leader = rows[0];
   return rows.map((r, i) => {

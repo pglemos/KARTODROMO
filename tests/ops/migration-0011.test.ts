@@ -139,6 +139,7 @@ describe('Milestone M1 - Migração 0011 (Fila de Impressão e Índices)', () =>
   });
 
   describe('Contrato de Interface M1 ↔ M2 (CTE Atômica do Servidor Node.js)', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const cteSql = `
       WITH Proximo AS (
         SELECT TOP (1) * FROM dbo.FilaImpressao WITH (UPDLOCK, READPAST)

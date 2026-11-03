@@ -290,17 +290,8 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
   setInterval(desenhar, 500);
   ping();
   setInterval(ping, 30000);
-  // Item 19: recarga suave após 30 min, mas SOMENTE quando não houver bateria em andamento
-  var iniciadaEm = new Date().getTime();
-  setInterval(function () {
-    var agora = new Date().getTime();
-    if (agora - iniciadaEm > 30 * 60 * 1000) {
-      var estaAoVivo = ultimo && (ultimo.status === 'live' || ultimo.state === 'em_andamento');
-      if (!estaAoVivo) {
-        location.reload();
-      }
-    }
-  }, 60 * 1000);
+  // segurança: recarrega a página a cada 30 min
+  setTimeout(function () { location.reload(); }, 30 * 60 * 1000);
 })();
 </script>
 </body>

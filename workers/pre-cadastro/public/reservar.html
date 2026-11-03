@@ -282,7 +282,7 @@
     </section>
 
     <button class="enviar" id="enviar" type="submit" disabled hidden>Reservar e pagar</button>
-    <p class="rodape" id="rodape" hidden>Pagamento processado pela Stone. O termo de responsabilidade é assinado no kartódromo, no dia da corrida.</p>
+    <p class="rodape" id="rodape" hidden>Pagamento processado pela Asaas. O termo de responsabilidade é assinado no kartódromo, no dia da corrida.</p>
   </form>
 
   <section class="cartao" id="acomp" aria-live="polite"></section>
@@ -582,7 +582,7 @@
     }
     if (p.status === 'aguardando_pagamento' && p.pix) {
       a.innerHTML = `<h2>Pague com Pix</h2><p>Abra o app do seu banco e leia o QR code, ou use o copia e cola.</p>
-        ${p.pix.imagem ? `<img class="qr" alt="QR code do Pix" src="data:image/png;base64,${p.pix.imagem}">` : ''}
+        <img class="qr" alt="QR code do Pix" src="data:image/png;base64,${p.pix.imagem}">
         <div class="copia"><input id="pixCopia" readonly value="${p.pix.payload.replace(/"/g, '&quot;')}"><button type="button" id="copiar">Copiar</button></div>
         <div class="relogio" id="relogio"></div>
         <p style="margin-top:12px">Assim que o Pix cair, esta tela confirma sozinha.</p>` + info(p);
@@ -590,7 +590,7 @@
       return contagem(p.expiraEm);
     }
     if (p.status === 'aguardando_pagamento' && p.invoiceUrl) {
-      a.innerHTML = `<h2>Pague com cartão</h2><p>Crédito ou débito, à vista, na página segura da Stone. Depois de pagar, volte para esta tela.</p>
+      a.innerHTML = `<h2>Pague com cartão</h2><p>Crédito ou débito, à vista, na página segura da Asaas. Depois de pagar, volte para esta tela.</p>
         <a class="enviar" style="display:flex;align-items:center;justify-content:center;text-decoration:none;margin-top:12px" href="${p.invoiceUrl}" target="_blank" rel="noopener">Pagar ${p.valorCentavos ? brl(p.valorCentavos) : ''} com cartão</a>
         <div class="relogio" id="relogio"></div><p style="margin-top:12px">Esta tela confirma sozinha quando o pagamento for aprovado.</p>` + info(p);
       return contagem(p.expiraEm);

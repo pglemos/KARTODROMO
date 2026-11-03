@@ -32,9 +32,6 @@ import {
   aguardandoLargada,
   voltaAtualDoKart,
   setManualPosition,
-  applyRaceOffense,
-  addMissingLaps,
-  setManualTiming,
 } from '../lib/timing/race-engine';
 import { createCatalogRecord, deleteCatalogRecord, distributeProof, duplicateEvent, emptyCatalog, normalizeCatalog } from '../lib/timing/catalog';
 
@@ -245,31 +242,6 @@ describe('race-engine', () => {
       expect(st[2]).toMatchObject({ desclassificado: true, racingStatus: 3, position: 3 });
       s.competitors.find((c) => c.kart === '4')!.flag = 'none';
       expect(computeStandings(s)[0].kart).toBe('4');
-    });
-
-    it('aplica punições fixas, posição final e desclassificação automática na terceira alerta perigosa', () => {
-      const s = corridaCom3();
-      expect(applyRaceOffense(s, '4', 'kart-levantado', 10, 'Fiscal').desclassificado).toBe(true);
-      expect(s.competitors.find((c) => c.kart === '4')?.flag).toBe('black');
-      s.competitors.find((c) => c.kart === '4')!.flag = 'none';
-      expect(applyRaceOffense(s, '5', 'capacete-retirado', 11, 'Fiscal').ultimaPosicao).toBe(true);
-      for (const wallMs of [1_500, 61_500, 121_500]) applyPassing(s, { kart: '7', decoderTimeMs: wallMs, wallMs });
-      const classificacao = computeStandings(s);
-      expect(classificacao[classificacao.length - 1]?.kart).toBe('5');
-      expect(applyRaceOffense(s, '6', 'pilotagem-perigosa', 12, 'Fiscal').alertas).toBe(1);
-      expect(s.competitors.find((c) => c.kart === '6')?.flag).toBe('warning');
-      expect(applyRaceOffense(s, '6', 'pilotagem-perigosa', 13, 'Fiscal').alertas).toBe(2);
-      expect(applyRaceOffense(s, '6', 'pilotagem-perigosa', 14, 'Fiscal')).toMatchObject({ alertas: 3, desclassificado: true });
-      expect(s.competitors.find((c) => c.kart === '6')?.flag).toBe('black');
-    });
-
-    it('só permite largar de último em tomada de tempo e a posição aparece no resultado', () => {
-      const s = createSession({ id: 'tomada', name: 'Tomada', type: 'classificacao', durationMin: 8, now: 0, competitors: [{ kart: '4', name: 'Ana' }, { kart: '5', name: 'Bia' }] });
-      startSession(s, 1_000);
-      applyRaceOffense(s, '4', 'largar-ultimo', 2_000, 'Fiscal');
-      const resultado = computeStandings(s);
-      expect(resultado[resultado.length - 1]).toMatchObject({ kart: '4', manualPosition: 2 });
-      expect(() => applyRaceOffense(race('corrida'), '4', 'largar-ultimo', 3_000, 'Fiscal')).toThrow('só pode ser aplicado durante a tomada de tempo');
     });
 
     it('grava o texto padrão: só o kart atingido e a curva são digitados; a volta é a que o kart está', () => {
@@ -563,27 +535,6 @@ describe('race-engine', () => {
     expect(s.startedAt).toBe(30_000);
   });
 
-  it('insere voltas com os tempos do kart à frente e fixa a posição real', () => {
-    const s = createSession({ id: 'sensor', name: 'Corrida', type: 'corrida', durationMin: 20, now: 0, competitors: [{ kart: '4', name: 'Ana' }, { kart: '5', name: 'Bia' }, { kart: '6', name: 'Caio' }] });
-    startSession(s, 1_000);
-    for (const [kart, wall] of [['4', 2_000], ['5', 3_000], ['6', 4_000], ['4', 62_000], ['5', 63_000]] as const)
-      applyPassing(s, { kart, decoderTimeMs: wall, wallMs: wall });
-    const r = addMissingLaps(s, { kart: '6', count: 2, position: 3, trackLengthMeters: 0, id: (i) => `manual-${i}` });
-    expect(r).toMatchObject({ referenceKart: '5', position: 3, lapsAdded: 2, lapTimesMs: [60_000, 60_000] });
-    expect(computeStandings(s).find((x) => x.kart === '6')).toMatchObject({ laps: 2, manualPosition: 3, position: 3 });
-  });
-
-  it('no modo manual ignora o decoder e mede cada volta na hora da passagem', () => {
-    const s = race('corrida', 20);
-    setManualTiming(s, '4', true, 'Fiscal', 1_000);
-    expect(applyPassing(s, { kart: '4', decoderTimeMs: 0, wallMs: 2_000 })).toBe('ignored-manual-mode');
-    includeManualPassing(s, { id: 'manual-start', kart: '4', wallMs: 3_000 });
-    const lap = includeManualPassing(s, { id: 'manual-lap', kart: '4', wallMs: 63_000 });
-    expect(lap.lapMs).toBe(60_000);
-    setManualTiming(s, '4', false, 'Fiscal', 64_000);
-    expect(applyPassing(s, { kart: '4', decoderTimeMs: 123_000, wallMs: 124_000 })).toBe('counted');
-  });
-
   it('número do kart digitado na tomada de tempo vai para a corrida da mesma bateria', () => {
     const pilotos = [{ kart: '', name: 'Ana', customerId: '10' }, { kart: '', name: 'Bia', customerId: '11' }];
     const tomada = createSession({ id: 'a', name: 'BATERIA 13:20 · TOMADA DE TEMPO', type: 'classificacao', durationMin: 8, now: 1_000, competitors: pilotos });
@@ -837,7 +788,7 @@ describe('catalogo de eventos e provas', () => {
 
   it('cadastra competidor com categoria e impede transponder duplicado', () => {
     const catalog = emptyCatalog();
-    const category = createCatalogRecord(catalog, 'categories', { name: 'Graduados', color: '#00e676' }, 'c-1', 1) as { id: string };
+    const category = createCatalogRecord(catalog, 'categories', { name: 'Graduados', color: '#12ab34' }, 'c-1', 1) as { id: string };
     const competitor = createCatalogRecord(catalog, 'competitors', { name: 'Piloto teste', kart: '42', transponder: '123456', categoryId: category.id, weightKg: 80 }, 'p-1', 1);
     expect(competitor).toMatchObject({ name: 'Piloto teste', kart: '42', transponder: '123456', categoryId: category.id, weightKg: 80, active: true });
     expect(() => createCatalogRecord(catalog, 'competitors', { name: 'Outro piloto', kart: '43', transponder: '123456' }, 'p-2', 1))

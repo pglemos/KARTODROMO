@@ -31,9 +31,7 @@ describe('termo de responsabilidade em bobina', () => {
   it('reproduz os campos e as cláusulas do termo de referência em 80 mm', () => {
     const html = renderTermoResponsabilidade({ empresa, participantes: [participante], impressoEm });
 
-    expect(html).toContain('@page{size:80mm auto;margin:0}');
-    expect(html).toContain('min-height:auto;padding:0 5.7mm 4mm');
-    expect(html).not.toContain('297mm');
+    expect(html).toContain('@page{size:80mm 297mm;margin:0}');
     expect(html).toContain('/ui/kib-logo.png');
     expect(html).not.toContain('rule-profile');
     expect(html).toContain('Nome: Ana Exemplo &lt;Pilota&gt;');

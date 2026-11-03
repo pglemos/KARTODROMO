@@ -20,40 +20,9 @@ const ESC = 0x8d;
 /** Quadros especiais de transponder que não são karts (mesmos do TRX). */
 const SPECIAL = new Set([0, 9991, 9993]);
 
-/**
- * Item 1: Cálculo e validação do CRC16 CCITT padrão MYLAPS P3 (poly 0x1021, init 0xFFFF).
- * Retorna true se o frame for íntegro ou se o CRC for 0x0000 (firmwares que suprimem CRC sobre TCP).
- */
-export function validarCrcP3(frame: Buffer): boolean {
-  if (frame.length < 9) return false;
-  const crcRecebido = frame.readUInt16LE(3);
-  if (crcRecebido === 0 || crcRecebido === 0xffff) return true; // firmware legador/TCP bypass
-
-  let crc = 0xffff;
-  for (let i = 0; i < frame.length; i++) {
-    // pula os 2 bytes do próprio campo de CRC
-    const b = (i === 3 || i === 4) ? 0 : frame[i];
-    crc = ((crc << 8) & 0xffff) ^ crcTable[((crc >> 8) ^ b) & 0xff];
-  }
-  return crc === crcRecebido;
-}
-
-const crcTable = new Uint16Array(256);
-for (let i = 0; i < 256; i++) {
-  let curr = (i << 8) & 0xffff;
-  for (let j = 0; j < 8; j++) {
-    curr = (curr & 0x8000) ? (((curr << 1) & 0xffff) ^ 0x1021) : ((curr << 1) & 0xffff);
-  }
-  crcTable[i] = curr;
-}
-
 export function parseP3Frame(frame: Buffer): P3Record {
   const raw = frame.toString('hex');
   if (frame.length < 9) return { kind: 'other', raw };
-  const declaredLen = frame.readUInt16LE(1);
-  if (declaredLen > 0 && Math.abs(declaredLen - frame.length) > 8) return { kind: 'other', raw };
-  if (!validarCrcP3(frame)) return { kind: 'other', raw };
-
   const tor = frame.readUInt16LE(7);
   const fields = new Map<number, Buffer>();
   for (let i = 9; i + 2 <= frame.length;) {

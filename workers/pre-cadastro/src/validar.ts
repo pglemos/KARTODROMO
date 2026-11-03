@@ -120,7 +120,7 @@ export function idade(nascimento: string, hoje = new Date()) {
 }
 
 /**
- * Pedido de reserva do site: os dados de quem compra (as regras do pré-cadastro, com CPF obrigatório — a Stone
+ * Pedido de reserva do site: os dados de quem compra (as regras do pré-cadastro, com CPF obrigatório — a Asaas
  * exige — e maior de 18), o horário escolhido na agenda publicada, quantos pilotos e a forma de pagamento.
  * A vaga de verdade é conferida pelo servidor da recepção; aqui só evita pedido impossível.
  */

@@ -48,12 +48,11 @@ public class Api
     public string Chave { get; set; }
     public string TotemSession { get; set; }
     public string TotemId { get; set; } = Config.Get("TotemId", "");
-    public TimeSpan Timeout => _http.Timeout;
 
     public Api(string baseUrl, TimeSpan? timeout = null)
     {
         BaseUrl = baseUrl.TrimEnd('/');
-        _http = new HttpClient { Timeout = timeout ?? TimeSpan.FromSeconds(10) };
+        _http = new HttpClient { Timeout = timeout ?? TimeSpan.FromSeconds(30) };
         _http.DefaultRequestHeaders.TryAddWithoutValidation("X-Client-Machine", Environment.MachineName);
         if (Config.Get("TotemId", "") is { Length: > 0 } tid)
             _http.DefaultRequestHeaders.TryAddWithoutValidation("X-Totem-Id", tid);

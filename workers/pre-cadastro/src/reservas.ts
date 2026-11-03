@@ -1,16 +1,16 @@
 /**
  * Reserva online (reservas.kartodromodebetim.com.br) — lado do site. Guarda os pedidos no R2 até o servidor da recepção
  * (SRVKART) buscar pelo /api/sync, igual ao pré-cadastro. Fluxo de um pedido:
- *   novo → (servidor segura as vagas) aguardando_pagamento → (Stone avisa) pago → (servidor confirma) confirmado
+ *   novo → (servidor segura as vagas) aguardando_pagamento → (Asaas avisa) pago → (servidor confirma) confirmado
  *   e os desvios: recusado (sem vaga), expirado (15 min sem pagar), pago_sem_vaga (pagou depois e o horário lotou).
  */
-import { buscarCobrancaPorReferencia, cancelar, consultar, criarCobranca, EVENTOS_PAGO, hojeBrasilia, imagemQr, PAGO, pagasDesde, stoneLigado, type StoneEnv } from './stone';
+import { asaasLigado, buscarCobrancaPorReferencia, cancelar, consultar, criarCobranca, EVENTOS_PAGO, garantirCliente, hojeBrasilia, PAGO, pagasDesde, qrPix, type AsaasEnv } from './asaas';
 import { chaveDocumento, codigoReserva, digitos, validarReserva, type Agenda, type PreCadastro } from './validar';
 import { POLITICA_ACEITE, POLITICA_SECOES, POLITICA_TITULO, POLITICA_VERSAO } from '../../../src/config/politica-cancelamento';
 
-export interface EnvReservas extends StoneEnv {
+export interface EnvReservas extends AsaasEnv {
   PRE: R2Bucket;
-  STONE_WEBHOOK_TOKEN?: string;
+  ASAAS_WEBHOOK_TOKEN?: string;
   RESERVAS_ATIVAS?: string;
   RESERVAS_PREVIA?: string;
 }
@@ -35,8 +35,7 @@ export type Pedido = {
   /** Comprovante do aceite: qual versão da Política de Cancelamento o cliente aceitou e quando. */
   politica?: { versao: string; aceitaEm: string };
   servidor?: { valorCentavos: number; expiraEm: string; descricao: string; inicio: string };
-  cobranca?: { pagamentoId: string; invoiceUrl: string; pixPayload?: string; pixImagem?: string; consultadoEm?: string };
-  /** asaasId é o nome já gravado e lido pelo servidor da recepção (coluna AsaasPagamentoId): guarda o id do pedido na Stone. */
+  asaas?: { pagamentoId: string; invoiceUrl: string; pixPayload?: string; pixImagem?: string; consultadoEm?: string };
   pagamento?: { asaasId: string; billingType: string; pagoEm: string; valorCentavos: number };
   erro?: string;
 };
@@ -86,9 +85,9 @@ export function visaoPublica(p: Pedido) {
     inicio: p.servidor?.inicio ?? null,
     valorCentavos: p.servidor?.valorCentavos ?? null,
     expiraEm: p.servidor?.expiraEm ?? null,
-    pix: p.status === 'aguardando_pagamento' && p.cobranca?.pixPayload ? { payload: p.cobranca.pixPayload, imagem: p.cobranca.pixImagem } : null,
-    invoiceUrl: p.status === 'aguardando_pagamento' && p.forma === 'cartao' ? p.cobranca?.invoiceUrl ?? null : null,
-    preparandoPagamento: p.status === 'aguardando_pagamento' && !p.cobranca,
+    pix: p.status === 'aguardando_pagamento' && p.asaas?.pixPayload ? { payload: p.asaas.pixPayload, imagem: p.asaas.pixImagem } : null,
+    invoiceUrl: p.status === 'aguardando_pagamento' && p.forma === 'cartao' ? p.asaas?.invoiceUrl ?? null : null,
+    preparandoPagamento: p.status === 'aguardando_pagamento' && !p.asaas,
     erro: p.erro ?? null,
   };
 }
@@ -97,7 +96,7 @@ export function visaoPublica(p: Pedido) {
 
 export async function criarPedido(req: Request, env: EnvReservas, excedeuLimite: (ip: string) => Promise<boolean>) {
   if (!liberado(req, env)) return json(403, { erro: 'A reserva online ainda não está aberta.' });
-  if (!stoneLigado(env)) return json(503, { erro: 'Pagamento online indisponível no momento. Fale com a recepção pelo WhatsApp.' });
+  if (!asaasLigado(env)) return json(503, { erro: 'Pagamento online indisponível no momento. Fale com a recepção pelo WhatsApp.' });
   let corpo: Record<string, unknown>;
   try { corpo = (await req.json()) as Record<string, unknown>; } catch { return json(400, { erro: 'Envio inválido.' }); }
   if (String(corpo.site ?? '') !== '') return json(400, { erro: 'Envio inválido.' });
@@ -132,19 +131,19 @@ export function politicaPublica() {
   return json(200, { versao: POLITICA_VERSAO, titulo: POLITICA_TITULO, aceite: POLITICA_ACEITE, secoes: POLITICA_SECOES }, 'public, max-age=300');
 }
 
-/** A tela consulta a cada 2–3 s. Se o aviso da Stone atrasar, confere direto na Stone (no máximo a cada 15 s). */
+/** A tela consulta a cada 2–3 s. Se o aviso da Asaas atrasar, confere direto na Asaas (no máximo a cada 15 s). */
 export async function situacaoPedido(env: EnvReservas, id: string, ctx: ExecutionContext) {
   const p = await lerPedido(env, id);
   if (!p) return json(404, { erro: 'Reserva não encontrada.' });
-  if (p.status === 'aguardando_pagamento' && p.cobranca?.pagamentoId && stoneLigado(env)) {
-    const ultima = p.cobranca.consultadoEm ? Date.parse(p.cobranca.consultadoEm) : 0;
+  if (p.status === 'aguardando_pagamento' && p.asaas?.pagamentoId && asaasLigado(env)) {
+    const ultima = p.asaas.consultadoEm ? Date.parse(p.asaas.consultadoEm) : 0;
     if (Date.now() - ultima > 15_000) {
-      p.cobranca.consultadoEm = new Date().toISOString();
+      p.asaas.consultadoEm = new Date().toISOString();
       try {
-        const c = await consultar(env, p.cobranca.pagamentoId);
+        const c = await consultar(env, p.asaas.pagamentoId);
         const pagou = PAGO.has(c.status) && marcarPago(p, c.id, c.billingType);
         await gravarPedido(env, p, pagou);
-      } catch (e) { console.error('consulta stone', (e as Error).message); }
+      } catch (e) { console.error('consulta asaas', (e as Error).message); }
     }
   }
   void ctx;
@@ -155,10 +154,10 @@ export async function agendaPublica(req: Request, env: EnvReservas) {
   if (!liberado(req, env)) return json(403, { erro: 'A reserva online ainda não está aberta.' });
   const a = await agendaAtual(env);
   if (!a) return json(503, { erro: 'A agenda está sendo atualizada. Tente de novo em instantes.' });
-  return json(200, { ...a, pagamentoOnline: stoneLigado(env) }, 'public, max-age=3, must-revalidate');
+  return json(200, { ...a, pagamentoOnline: asaasLigado(env) }, 'public, max-age=3, must-revalidate');
 }
 
-// ---------------------------------------------------------------- Stone
+// ---------------------------------------------------------------- Asaas
 
 function marcarPago(p: Pedido, asaasId: string, billingType: string) {
   if (p.status === 'pago' || p.status === 'confirmado' || p.status === 'pago_sem_vaga') return false;
@@ -174,56 +173,45 @@ function tokenConfere(recebido: string, esperado: string) {
   return dif === 0;
 }
 
-/** Aviso da Stone (pode chegar repetido — só o primeiro "pago" vale). Responde rápido: a Stone tem limite de espera. */
-export async function webhookStone(req: Request, env: EnvReservas) {
-  if (!tokenConfere(new URL(req.url).searchParams.get('token') ?? '', env.STONE_WEBHOOK_TOKEN ?? '')) return json(401, { erro: 'Não autorizado.' });
-  const corpo = (await req.json().catch(() => ({}))) as { type?: string; data?: { id?: string; code?: string } };
-  const ref = corpo.data?.code ?? '';
-  if (!corpo.type || !EVENTOS_PAGO.has(corpo.type) || !corpo.data?.id || !idValido(ref)) return json(200, { ok: true, ignorado: true });
+/** Aviso da Asaas (pode chegar repetido — só o primeiro "pago" vale). Responde rápido: a Asaas espera 10 s. */
+export async function webhookAsaas(req: Request, env: EnvReservas) {
+  if (!tokenConfere(req.headers.get('asaas-access-token') ?? '', env.ASAAS_WEBHOOK_TOKEN ?? '')) return json(401, { erro: 'Não autorizado.' });
+  const corpo = (await req.json().catch(() => ({}))) as { event?: string; payment?: { id?: string; externalReference?: string; billingType?: string } };
+  const ref = corpo.payment?.externalReference ?? '';
+  if (!corpo.event || !EVENTOS_PAGO.has(corpo.event) || !idValido(ref)) return json(200, { ok: true, ignorado: true });
   const p = await lerPedido(env, ref);
   if (!p) return json(200, { ok: true, ignorado: true });
-  // o aviso só diz onde olhar: quem confirma o pagamento é a consulta à Stone. Se ela falhar, o 5xx faz a Stone reenviar.
-  let c;
-  try { c = await consultar(env, corpo.data.id); } catch (e) {
-    console.error('aviso stone', (e as Error).message);
-    return json(502, { erro: 'Consulta indisponível.' });
-  }
-  if (c.codigo !== p.id || !PAGO.has(c.status)) return json(200, { ok: true, ignorado: true });
-  if (marcarPago(p, c.id, c.billingType)) await gravarPedido(env, p, true);
+  if (marcarPago(p, corpo.payment?.id ?? '', corpo.payment?.billingType ?? '')) await gravarPedido(env, p, true);
   return json(200, { ok: true });
 }
 
-/** Servidor segurou as vagas: cria a cobrança (pedido na Stone com o QR do Pix ou a página de cartão). */
+/** Servidor segurou as vagas: cria a cobrança (cliente Asaas pelo CPF + cobrança + QR do Pix). */
 async function cobrar(env: EnvReservas, p: Pedido) {
   try {
-    const cliente = { nome: p.cliente.nome, cpf: digitos(p.cliente.documento), email: p.cliente.email, celular: digitos(p.cliente.telefone) };
-    // o Pix e a página de cartão vencem pouco depois das vagas (mesma folga de 2 min da recepção)
-    const validade = Math.max(300, Math.ceil((Date.parse(p.servidor!.expiraEm) - Date.now()) / 1000) + 120);
-    const retorno = 'https://reservas.kartodromodebetim.com.br/';
+    const cliente = await garantirCliente(env, {
+      nome: p.cliente.nome, cpf: digitos(p.cliente.documento), email: p.cliente.email, celular: digitos(p.cliente.telefone), referencia: p.cliente.chave,
+    });
     let c;
     try {
-      c = await criarCobranca(env, cliente, p.forma, p.servidor!.valorCentavos, p.servidor!.descricao + ` · reserva ${p.codigo}`, p.id, validade, retorno);
+      c = await criarCobranca(env, cliente, p.forma, p.servidor!.valorCentavos, p.servidor!.descricao + ` · reserva ${p.codigo}`, p.id);
     } catch (error) {
-      // A Stone pode aceitar a cobrança e perder a resposta; procurar pela referência antes de reportar falha.
+      // A Asaas pode aceitar a cobrança e perder a resposta; procurar pela referência antes de reportar falha.
       const existente = await buscarCobrancaPorReferencia(env, p.id);
       if (!existente) throw error;
       c = existente;
     }
-    // a Stone responde 200 com o pedido "failed" quando recusa (ex.: Pix não habilitado na conta)
-    if (c.status === 'failed' || c.status === 'canceled') throw new Error(`pedido ${c.status}: ${c.falha ?? 'sem motivo'}`);
-    if (!PAGO.has(c.status) && !(p.forma === 'pix' ? c.pixPayload : c.invoiceUrl)) throw new Error('resposta sem QR do Pix ou página de pagamento');
-    p.cobranca = { pagamentoId: c.id, invoiceUrl: c.invoiceUrl };
-    if (p.forma === 'pix' && c.pixPayload) {
-      p.cobranca.pixPayload = c.pixPayload;
-      // sem a imagem o cliente ainda paga pelo copia e cola
-      if (c.pixQrUrl) p.cobranca.pixImagem = await imagemQr(c.pixQrUrl).catch((e: Error) => { console.error('qr stone', e.message); return undefined; });
+    p.asaas = { pagamentoId: c.id, invoiceUrl: c.invoiceUrl };
+    if (p.forma === 'pix') {
+      const q = await qrPix(env, c.id);
+      p.asaas.pixPayload = q.payload;
+      p.asaas.pixImagem = q.encodedImage;
     }
     if (PAGO.has(c.status)) {
       p.status = 'pago';
       p.pagamento = { asaasId: c.id, billingType: c.billingType, pagoEm: new Date().toISOString(), valorCentavos: p.servidor!.valorCentavos };
     }
   } catch (e) {
-    console.error('cobrança stone', (e as Error).message);
+    console.error('cobrança asaas', (e as Error).message);
     p.status = 'erro_pagamento';
     p.erro = 'Não conseguimos gerar o pagamento agora. Tente de novo em alguns minutos ou fale com a recepção pelo WhatsApp.';
   }
@@ -236,29 +224,29 @@ async function cobrar(env: EnvReservas, p: Pedido) {
 // ---------------------------------------------------------------- servidor da recepção (/api/sync, x-sync-key)
 
 /**
- * Conferência independente do aviso e da página aberta: a cada minuto pergunta à Stone o que foi pago nos últimos
+ * Conferência independente do aviso e da página aberta: a cada minuto pergunta à Asaas o que foi pago nos últimos
  * 2 dias e marca como pago o pedido que ficou para trás. 12/10 (ACEXRJ): o webhook ainda ia para o MyLapTime, o
  * cliente fechou a página depois do Pix e o pedido venceu pago — a recepção cancelou as vagas de quem tinha pago.
  */
 let proximaConciliacao = 0;
 export async function conciliarPagamentos(env: EnvReservas, agora = Date.now()) {
-  if (!stoneLigado(env) || agora < proximaConciliacao) return 0;
+  if (!asaasLigado(env) || agora < proximaConciliacao) return 0;
   proximaConciliacao = agora + 60_000;
   let n = 0;
   try {
     for (const c of await pagasDesde(env, hojeBrasilia(new Date(agora - 2 * 86_400_000)))) {
-      if (!PAGO.has(c.status) || !idValido(c.codigo)) continue;
-      const p = await lerPedido(env, c.codigo);
+      if (!PAGO.has(c.status) || !c.externalReference || !idValido(c.externalReference)) continue;
+      const p = await lerPedido(env, c.externalReference);
       if (!p) continue;
       // já "pago" no site mas fora da fila (ACEXRJ, 13/10: nunca chegou à recepção) também volta para a fila
       const parado = p.status === 'pago' && !(await env.PRE.get(chaveFila(p.id)));
       if (marcarPago(p, c.id, c.billingType) || parado) {
         await gravarPedido(env, p, true);
-        console.log(`reserva ${p.codigo}: pagamento ${c.id} achado na conferência com a Stone`);
+        console.log(`reserva ${p.codigo}: pagamento ${c.id} achado na conferência com a Asaas`);
         n++;
       }
     }
-  } catch (e) { console.error('conferência stone', (e as Error).message); }
+  } catch (e) { console.error('conferência asaas', (e as Error).message); }
   return n;
 }
 
@@ -304,7 +292,7 @@ export async function syncResultado(req: Request, env: EnvReservas, ctx: Executi
     } else if (r.acao === 'expirado' && (p.status === 'aguardando_pagamento' || p.status === 'erro_pagamento')) {
       p.status = 'expirado';
       await gravarPedido(env, p, false);
-      if (p.cobranca?.pagamentoId && stoneLigado(env)) ctx.waitUntil(cancelar(env, p.cobranca.pagamentoId).then(() => undefined, (e) => console.error('cancelar stone', (e as Error).message)));
+      if (p.asaas?.pagamentoId && asaasLigado(env)) ctx.waitUntil(cancelar(env, p.asaas.pagamentoId).then(() => undefined, (e) => console.error('cancelar asaas', (e as Error).message)));
     } else if (r.acao === 'pago_sem_vaga') {
       p.status = 'pago_sem_vaga'; p.erro = r.erro;
       await gravarPedido(env, p, false);

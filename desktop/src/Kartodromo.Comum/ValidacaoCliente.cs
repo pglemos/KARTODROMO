@@ -39,20 +39,4 @@ public static class ValidacaoCliente
             && double.IsFinite(kg) && kg >= 10 && kg <= 250
             ? null : "Peso inválido. Informe um valor entre 10 e 250 kg.";
     }
-
-    public static string ErroTelefone(string telefone, string tipoDoc = null)
-    {
-        telefone = telefone?.Trim() ?? "";
-        if (telefone.Length == 0) return "O número de telefone é obrigatório.";
-        if (telefone.Contains('*')) return null;
-        if (!Regex.IsMatch(telefone, @"^[+\d\s().-]+$")) return "Número de telefone inválido.";
-        var d = Fmt.Digitos(telefone);
-        var internacional = telefone.StartsWith('+') || string.Equals(tipoDoc, "Passaporte", StringComparison.OrdinalIgnoreCase);
-        if (internacional)
-        {
-            return d.Length >= 7 && d.Length <= 15 ? null : "Número de telefone inválido.";
-        }
-        return d.Length >= 10 && d.Length <= 13 ? null : "Número de telefone inválido.";
-    }
 }
-

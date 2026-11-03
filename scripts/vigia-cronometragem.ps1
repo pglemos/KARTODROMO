@@ -1,13 +1,5 @@
 param([switch]$CheckOnly)
 $ErrorActionPreference = 'Stop'
-
-# Item 33: Trava de manutenção manual (se o arquivo MANUTENCAO.lock existir, não inicia o serviço)
-$lockFile = 'C:\repos\KARTODROMO\data\timing\MANUTENCAO.lock'
-if (Test-Path -LiteralPath $lockFile) {
-    Write-Output 'MANUTENCAO_ATIVA: serviço em manutenção manual, vigia pausado.'
-    exit 0
-}
-
 # Recupera somente um servidor ausente. Nunca encerra processo, muda bateria ou reinicia decoder.
 $taskName = 'KartodromoCronometragem'
 $listener = Get-NetTCPConnection -LocalPort 4050 -State Listen -ErrorAction SilentlyContinue

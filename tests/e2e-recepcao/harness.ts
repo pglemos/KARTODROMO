@@ -257,6 +257,7 @@ export class OraculoCliente {
       return '(**) *****-****';
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const maskEndereco = (endereco: string, numero: string | null, comp: string | null) => {
       if (!endereco) return '';
       const parte = endereco.slice(0, Math.min(10, endereco.length));

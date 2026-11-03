@@ -3,6 +3,8 @@ import type { Standing } from '../lib/timing/race-engine';
 import {
   conferirChave,
   extrairChave,
+  filtrarVoltasPorKart,
+  montarVoltas,
   lerHashes,
   montarTransmissao,
   sha256Hex,
@@ -98,5 +100,45 @@ describe('API de transmissão ao vivo — chave', () => {
     expect(extrairChave((n) => (n === 'authorization' ? 'Bearer  ABC ' : null), url)).toBe('ABC');
     expect(extrairChave((n) => (n === 'x-api-key' ? 'XYZ' : null), url)).toBe('XYZ');
     expect(extrairChave(() => null, url)).toBe('Q');
+  });
+});
+
+describe('volta a volta da transmissão', () => {
+  const base = montarTransmissao({
+    id: 'b1', name: 'B', type: 'corrida', state: 'em_andamento', durationMs: 600_000, maxLaps: null, startedAt: 1, checkeredAt: null, finishedAt: null, remainingMs: 1000, elapsedMs: 1000, currentFlag: 'green',
+    standings: [{ position: 1, kart: '4', name: 'Ana', category: null, laps: 2, lastLapMs: 61_000, bestLapMs: 60_000, bestLapNumber: 1, totalMs: 121_000, averageSpeedKmh: 60, gapMs: null, gapLaps: 0, finished: false, autoAdded: false, lastCrossingWallMs: null, penaltyMs: 5000 }],
+  });
+
+  it('não conta a abertura, ignora apagada e marca anulada e melhor', () => {
+    const v = montarVoltas(base, [{ kart: '4', nome: 'Ana', crossings: [
+      { wallMs: 1000, lapMs: null },
+      { wallMs: 61_000, lapMs: 60_000 },
+      { wallMs: 70_000, lapMs: 9_000, deleted: true },
+      { wallMs: 122_000, lapMs: 61_000, invalid: true },
+    ] }]);
+    expect(v.pilotos[0].penalidadeMs).toBe(5000);
+    expect(v.pilotos[0].voltas.map((x) => [x.volta, x.tempoMs, x.valida, x.melhor])).toEqual([[1, 60_000, true, true], [2, 61_000, false, false]]);
+  });
+
+  it('filtra por kart', () => {
+    const v = montarVoltas(base, []);
+    expect(filtrarVoltasPorKart(v, '9').pilotos).toEqual([]);
+    expect(filtrarVoltasPorKart(v, null).pilotos).toHaveLength(1);
+  });
+});
+
+describe('correções de 30/10', () => {
+  const linha = (position: number, kart: string, laps: number, wall: number, gapLaps: number, penaltyMs = 0) => ({ position, kart, name: kart, category: null, laps, lastLapMs: 60_000, bestLapMs: 60_000, bestLapNumber: 1, totalMs: 1, averageSpeedKmh: 60, gapMs: null, gapLaps, finished: false, autoAdded: false, lastCrossingWallMs: wall, penaltyMs });
+  const s = { id: 'b', name: 'B', type: 'corrida' as const, state: 'encerrada' as const, durationMs: 0, maxLaps: null, startedAt: 1, checkeredAt: 2, finishedAt: 3, remainingMs: 0, elapsedMs: 1, currentFlag: 'checkered' };
+
+  it('intervalo entre retardatários na mesma volta, com penalidade', () => {
+    const t = montarTransmissao({ ...s, standings: [linha(1, '1', 10, 1000, 0), linha(2, '2', 9, 2000, 1), linha(3, '3', 9, 3500, 1, 2000)] });
+    expect(t.pilotos[1].intervalo).toBe('+1 volta');
+    expect(t.pilotos[2].intervaloMs).toBe(3500);
+    expect(t.pilotos[2].diferencaLider).toBe('+1 volta');
+  });
+
+  it('bateria encerrada: todos terminaram', () => {
+    expect(montarTransmissao({ ...s, standings: [linha(1, '1', 10, 1000, 0)] }).pilotos[0].terminou).toBe(true);
   });
 });

@@ -19,8 +19,6 @@ const EXACT_PATHS = new Set([
   '/api/livetime-snapshot/eventos',
 ]);
 
-const SSE_PATHS = new Set(['/api/events', '/api/livetime-snapshot/eventos']);
-
 function isAllowedPath(pathname) {
   if (EXACT_PATHS.has(pathname)) return true;
   if (/^\/api\/sessions\/[\w-]+\/laps$/.test(pathname)) return true;
@@ -31,7 +29,7 @@ function originHeaders(headers, remoteAddress) {
   const forwarded = {};
   for (const [key, value] of Object.entries(headers)) {
     const lower = key.toLowerCase();
-    if (lower === 'host' || lower === 'connection') continue;
+    if (lower === 'host') continue;
     if (value !== undefined) forwarded[key] = value;
   }
   forwarded.host = `${ORIGIN_HOST}:${ORIGIN_PORT}`;
@@ -41,17 +39,11 @@ function originHeaders(headers, remoteAddress) {
   return forwarded;
 }
 
-// Item 31: Agente dedicado com keepAlive e limite de sockets para evitar vazamento
-const upstreamAgent = new http.Agent({
-  keepAlive: true,
-  maxSockets: 64,
-  timeout: 30_000,
-});
-
 const server = http.createServer((req, res) => {
   const method = req.method || 'GET';
   const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
-  const isSse = SSE_PATHS.has(url.pathname);
+  // aovivo.kartodromodebetim.com.br abre direto no placar
+  if (url.pathname === '/') url.pathname = '/tv';
 
   if ((method !== 'GET' && method !== 'HEAD') || !isAllowedPath(url.pathname)) {
     res.writeHead(403, {
@@ -69,24 +61,12 @@ const server = http.createServer((req, res) => {
       method,
       path: `${url.pathname}${url.search}`,
       headers: originHeaders(req.headers, req.socket.remoteAddress),
-      agent: isSse ? false : upstreamAgent,
-      timeout: isSse ? 0 : 15_000,
     },
     (upstreamRes) => {
       res.writeHead(upstreamRes.statusCode || 502, upstreamRes.headers);
       upstreamRes.pipe(res);
-      upstreamRes.on('error', () => {
-        upstream.destroy();
-        if (!res.writableEnded) res.end();
-      });
     }
   );
-
-  upstream.on('timeout', () => {
-    if (!isSse) {
-      upstream.destroy(new Error('Gateway timeout upstream'));
-    }
-  });
 
   upstream.on('error', () => {
     if (!res.headersSent) {
@@ -95,24 +75,17 @@ const server = http.createServer((req, res) => {
         'cache-control': 'no-store',
       });
     }
-    if (!res.writableEnded) {
-      res.end(JSON.stringify({ error: 'Cronometragem indisponível.' }));
-    }
+    res.end(JSON.stringify({ error: 'Cronometragem indisponível.' }));
   });
 
-  req.on('close', () => {
-    upstream.destroy();
-  });
-
+  // na resposta, não no pedido: no Node atual o 'close' do pedido dispara ao terminar de lê-lo, o que cortava toda
+  // ligação com a cronometragem antes da resposta (502 em tudo). Aqui só dispara quando o visitante sai (fluxo SSE).
   res.on('close', () => {
-    upstream.destroy();
+    if (!res.writableFinished) upstream.destroy();
   });
 
   req.pipe(upstream);
 });
-
-server.keepAliveTimeout = 65_000;
-server.headersTimeout = 66_000;
 
 server.listen(LISTEN_PORT, LISTEN_HOST, () => {
   console.log(`[tv-public-bridge] http://${LISTEN_HOST}:${LISTEN_PORT} -> http://${ORIGIN_HOST}:${ORIGIN_PORT}`);

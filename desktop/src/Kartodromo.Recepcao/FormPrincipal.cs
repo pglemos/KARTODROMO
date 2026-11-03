@@ -747,7 +747,7 @@ public class FormPrincipal : Form
         TreeNode N(string texto, string img, string chave, params TreeNode[] filhos) => new(texto, filhos) { ImageKey = img, SelectedImageKey = img, Tag = chave };
         _arvore.Nodes.AddRange([
             N("Reservas", "g-reservas", "reservas:todas", N("Aprovar", "y", "reservas:aprovar"), N("Aprovadas", "g", "reservas:aprovadas"), N("Pagamento pendente", "y", "reservas:pendentes"), N("Canceladas", "r", "reservas:canceladas"), N("Todas", "b", "reservas:todas")),
-            // pedidos do site (reservas.kartodromodebetim.com.br, Pix/cartão pela Stone)
+            // pedidos do site (reservas.kartodromodebetim.com.br, Pix/cartão pela Asaas)
             N("Reservas online", "g-reservas", "online:todas", N("Pagas", "g", "online:pagas"), N("Precisa de atenção", "y", "online:atencao"), N("Todas", "b", "online:todas")),
             N("Baterias", "g-baterias", "baterias:todas", N("Abertas", "g", "baterias:abertas"), N("Fechadas", "r", "baterias:fechadas"), N("Todas", "b", "baterias:todas")),
             N("Financeiro · Vendas", "g-vendas", "vendas:todas", N("Liquidadas", "g", "vendas:liquidadas"), N("Canceladas", "r", "vendas:canceladas"), N("Todas", "b", "vendas:todas")),
@@ -1090,7 +1090,7 @@ public class FormPrincipal : Form
                     Item("Ver as reservas desta bateria", () => Selecionar("reservas:todas", new JsonObject { ["id"] = sel[0].L("bateriaId"), ["nome"] = sel[0].S("bateria"), ["dataHora"] = sel[0].S("inicio") }), sel.Count == 1),
                     Item("Resolver pagamento recebido", () => Seguro.Rodar(this, async () =>
                     {
-                        string? resolucao = Msg.Pergunta(this, $"O reembolso do pedido {sel[0].S("codigo")} de {sel[0].S("cliente")} já foi confirmado pela Stone?")
+                        string? resolucao = Msg.Pergunta(this, $"O reembolso do pedido {sel[0].S("codigo")} de {sel[0].S("cliente")} já foi confirmado pela Asaas?")
                             ? "reembolso_confirmado"
                             : Msg.Pergunta(this, "O cliente já foi remarcado para outra bateria?") ? "remarcado" : null;
                         if (resolucao is null) return;

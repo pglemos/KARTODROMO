@@ -140,8 +140,8 @@ beforeEach(async () => {
     RESEND_API_KEY: randomSecret(),
     RESEND_FROM_EMAIL: 'Kartódromo <conta@kartodromodebetim.com.br>',
     RESERVAS_ATIVAS: '1',
-    STONE_API_KEY: 'sandbox-test-key',
-    STONE_URL: 'https://sdx-api.pagar.me/core/v5',
+    ASAAS_API_KEY: 'sandbox-test-key',
+    ASAAS_URL: 'https://api-sandbox.asaas.com/v3',
     PRE: bucket.bucket,
     ASSETS: { fetch: async () => new Response(null, { status: 404 }) },
     SYNC_KEY: randomSecret(),
@@ -307,7 +307,7 @@ describe('reservas móveis', () => {
     const first = await createReservation();
     const original = await first.json() as { id: string; codigo: string };
     environment.RESERVAS_ATIVAS = '0';
-    environment.STONE_API_KEY = '';
+    environment.ASAAS_API_KEY = '';
     const repeated = await createReservation();
     expect(repeated.status).toBe(200);
     expect(await repeated.json()).toEqual(original);
@@ -333,7 +333,7 @@ describe('reservas móveis', () => {
     const pending = database.database.prepare('SELECT pedido_id, state FROM mobile_orders').get() as Row;
     expect(pending.state).toBe('creating');
     environment.RESERVAS_ATIVAS = '0';
-    environment.STONE_API_KEY = '';
+    environment.ASAAS_API_KEY = '';
 
     const recovered = await createReservation();
     expect(recovered.status).toBe(200);
@@ -349,7 +349,7 @@ describe('reservas móveis', () => {
     expect(bucket.data.has(`reservas/pedidos/${pending.pedido_id}.json`)).toBe(true);
     expect(bucket.data.has(`reservas/fila/${pending.pedido_id}`)).toBe(false);
     environment.RESERVAS_ATIVAS = '0';
-    environment.STONE_API_KEY = '';
+    environment.ASAAS_API_KEY = '';
 
     const recovered = await createReservation();
     expect(recovered.status).toBe(200);

@@ -133,7 +133,7 @@
       "cs-fonte": 3
     },
     "desktop/src/Kartodromo.Cronometragem/FormCrono.cs": {
-      "cs-cor-literal": 41,
+      "cs-cor-literal": 43,
       "cs-cor-nomeada": 8
     },
     "desktop/src/Kartodromo.Cronometragem/FormRelatoriosCrono.cs": {
@@ -167,7 +167,7 @@
       "cs-fonte": 4
     },
     "desktop/src/Kartodromo.Recepcao/Caixa.cs": {
-      "cs-cor-literal": 16,
+      "cs-cor-literal": 18,
       "cs-cor-nomeada": 3,
       "cs-fonte": 5
     },

@@ -1,6 +1,6 @@
 name: Deploy reserva online (worker kartodromo-cadastro)
 
-# Servidor da reserva online e do pré-cadastro (workers/pre-cadastro): pedidos, Stone, política de cancelamento.
+# Servidor da reserva online e do pré-cadastro (workers/pre-cadastro): pedidos, Asaas, política de cancelamento.
 on:
   workflow_dispatch:
   push:

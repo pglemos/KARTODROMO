@@ -1,4 +1,4 @@
-import { stoneLigado } from '../stone';
+import { asaasLigado } from '../asaas';
 import { agendaPublica, visaoPublica, type EnvReservas, type Pedido } from '../reservas';
 import { chaveDocumento, codigoReserva, validarReserva, type Agenda } from '../validar';
 import { authenticateMobileRequest, type MobileAccount, type MobileAuthEnv } from './auth';
@@ -180,7 +180,7 @@ async function createOrder(request: Request, env: Env, account: MobileAccount) {
     checked = validarReserva(reservationInput(data, account), recoveryAgenda(data));
     if (!checked.ok) return json(400, { erro: checked.erro });
   } else {
-    if (!stoneLigado(env)) return json(503, { erro: 'Pagamento online indisponível no momento. Fale com a recepção pelo WhatsApp.' });
+    if (!asaasLigado(env)) return json(503, { erro: 'Pagamento online indisponível no momento. Fale com a recepção pelo WhatsApp.' });
     const agendaResponse = await agendaPublica(request, env);
     if (!agendaResponse.ok) return agendaResponse;
     const agenda = await agendaResponse.json() as Agenda & { pagamentoOnline: boolean };

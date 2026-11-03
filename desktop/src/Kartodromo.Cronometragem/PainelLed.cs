@@ -75,8 +75,6 @@ sealed class PainelLed : IDisposable
     {
         Directory.CreateDirectory(Path.GetDirectoryName(ArquivoConfig)!);
         File.WriteAllText(ArquivoConfig, JsonSerializer.Serialize(new { porta, baud, linhas }));
-        // Item 29: o chamador faz Dispose() + LerConfig(), que já zera _proximaTentativa e _falhasConsecutivas,
-        // então a nova porta é tentada na hora, sem esperar o backoff da porta anterior.
     }
 
     public void DefinirPagina(int pagina)
@@ -131,12 +129,12 @@ sealed class PainelLed : IDisposable
         try
         {
             _serial?.Dispose();
-            // igual ao LapTime: 8N1, RTS ligado, DTR desligado, DiscardNull (Item 24: WriteTimeout reduzido para 300ms)
-            _serial = new SerialPort(Porta, Baud, Parity.None, 8, StopBits.One) { RtsEnable = true, DtrEnable = false, DiscardNull = true, WriteTimeout = 300, Encoding = Encoding.ASCII, NewLine = "\r\n" };
+            // igual ao LapTime: 8N1, RTS ligado, DTR desligado, DiscardNull
+            _serial = new SerialPort(Porta, Baud, Parity.None, 8, StopBits.One) { RtsEnable = true, DtrEnable = false, DiscardNull = true, WriteTimeout = 1000, Encoding = Encoding.ASCII, NewLine = "\r\n" };
             _serial.Open();
             var agora = DateTime.Now;
             _serial.Write($"$I,\"{agora:HH:mm:ss.fff}\",\"{agora:ddMMyy}\"\r\n");
-            Ok = true; Situacao = TotalPaginas > 1 ? $"{Porta} conectado · Pág. {Pagina + 1}/{TotalPaginas}" : $"{Porta} conectado";
+            Ok = true; Situacao = $"{Porta} conectado";
             _falhasConsecutivas = 0;
             return true;
         }
@@ -429,16 +427,11 @@ sealed class PainelLed : IDisposable
         }
         else
         {
-            // Item 25: Treino / tomada de tempo: apenas pilotos que completaram pelo menos uma volta válida ou têm tempo
-            // Se nenhum piloto tiver volta ainda (início da tomada), exibe todos os pilotos cadastrados por posição
-            var comVolta = rawStandings
-                .Where(r => r.I("position") > 0 && (r.I("laps") > 0 || r["bestLapMs"] is not null || r["lastLapMs"] is not null))
+            // Treino / tomada de tempo / montagem de grid: todos os pilotos classificados por posição
+            standings = rawStandings
+                .Where(r => r.I("position") > 0)
                 .OrderBy(r => r.I("position"))
                 .ToList();
-
-            standings = comVolta.Count > 0
-                ? comVolta
-                : rawStandings.Where(r => r.I("position") > 0).OrderBy(r => r.I("position")).ToList();
         }
 
         var pageRows = standings.Skip(pagina * linhas).Take(linhas).ToList();
@@ -469,27 +462,6 @@ sealed class PainelLed : IDisposable
             }
             sb.Append(linha);
             porPosicao?.Add(linha);
-        }
-
-        // Item 23: Na paginação (> 0), limpa os slots físicos não preenchidos para não manter resíduos de páginas anteriores
-        if (pagina > 0)
-        {
-            for (var sobra = pos + 1; sobra <= linhas; sobra++)
-            {
-                string linhaVazia;
-                if (corrida)
-                {
-                    linhaVazia = $"$SR,{sobra},\"   \",0,\"00:00:00.000\"\r\n"
-                               + $"$G,{sobra},\"   \",0,\"00:00:00.000\"\r\n";
-                }
-                else
-                {
-                    linhaVazia = $"$SP,{sobra},\"   \",0,\"00:00:00.000\"\r\n"
-                               + $"$H,{sobra},\"   \",0,\"00:00:00.000\"\r\n";
-                }
-                sb.Append(linhaVazia);
-                porPosicao?.Add(linhaVazia);
-            }
         }
 
         assinatura = sb.ToString();

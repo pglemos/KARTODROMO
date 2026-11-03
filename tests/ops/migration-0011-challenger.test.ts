@@ -339,21 +339,25 @@ describe('Challenger M1 - Auditoria Adversarial da Migração 0011', () => {
 
       // Url nula
       expect(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         table.insert({ Url: null as any, Titulo: 'T', Origem: 'O' });
       }).toThrow(/Cannot insert the value NULL into column Url/);
 
       // Titulo nulo
       expect(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         table.insert({ Url: 'http://u', Titulo: null as any, Origem: 'O' });
       }).toThrow(/Cannot insert the value NULL into column Titulo/);
 
       // Origem nula
       expect(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         table.insert({ Url: 'http://u', Titulo: 'T', Origem: null as any });
       }).toThrow(/Cannot insert the value NULL into column Origem/);
 
       // Status nulo explícito
       expect(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         table.insert({ Url: 'http://u', Titulo: 'T', Origem: 'O', Status: null as any });
       }).toThrow(/Cannot insert the value NULL into column Status/);
     });

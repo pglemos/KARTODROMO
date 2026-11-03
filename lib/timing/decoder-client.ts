@@ -95,8 +95,6 @@ export class DecoderClient extends EventEmitter {
       s.connectedAt = Date.now();
       s.lastDataAt = Date.now();
       s.lastError = null;
-      // Item 2: Reseta reconexões após conexão estabelecida com sucesso
-      setTimeout(() => { if (s.connected) s.reconnects = 0; }, 10_000).unref();
       // Item 4: Mantém timeout ativo de silêncio para detectar conexões half-open
       socket.setTimeout(this.silenceTimeoutMs);
       // cada comando como o LapTime: texto + CRLF
@@ -131,8 +129,8 @@ export class DecoderClient extends EventEmitter {
             this.emit('other', rec.raw);
           }
         }
-      } catch (err: any) {
-        s.lastError = `Erro ao processar pacote do decoder: ${err?.message || err}`;
+      } catch (err) {
+        s.lastError = `Erro ao processar pacote do decoder: ${err instanceof Error ? err.message : String(err)}`;
         this.emit('error', err instanceof Error ? err : new Error(String(err)));
       }
     });
@@ -147,9 +145,7 @@ export class DecoderClient extends EventEmitter {
       if (was) this.emit('change');
       if (this.stopped) return;
       s.reconnects += 1;
-      // Item 2: Backoff exponencial para proteger o hardware do TranX (2s até no máximo 15s)
-      const esperaMs = Math.min(15_000, Math.round(2_000 * Math.pow(1.4, Math.min(s.reconnects - 1, 6))));
-      this.reconnectTimer = setTimeout(() => this.connect(), esperaMs);
+      this.reconnectTimer = setTimeout(() => this.connect(), 2_000);
     });
   }
 }

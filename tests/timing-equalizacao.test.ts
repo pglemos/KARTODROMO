@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyPassing, closeSession, createSession, startSession, type Session } from '../lib/timing/race-engine';
-import { regraDa, ajusteRedutorMm, calcularComAnteriores, retomarEqualizacao, calcularEqualizacao, faixasDaRegra, fmtTempoVolta, importarKarts, tempoVoltaParaMs, textoAjuste, ultimaEqualizacaoPorKart, voltasNasBaterias, kartComparavel, melhoresVoltasDoKart } from '../lib/timing/equalizacao';
+import { regraDa, ajusteRedutorMm, calcularComAnteriores, retomarEqualizacao, calcularEqualizacao, faixasDaRegra, fmtTempoVolta, importarKarts, tempoVoltaParaMs, textoAjuste, ultimaEqualizacaoPorKart, voltasNasBaterias } from '../lib/timing/equalizacao';
 import { rankingKarts } from '../lib/timing/ranking-karts';
 
 const BASE = Date.UTC(2026, 8, 3, 12, 30, 0); // 03/09/2026 09:30 em Brasília
@@ -27,13 +27,6 @@ const PLANILHA = {
 };
 
 describe('equalização dos karts', () => {
-  it('busca as cinco melhores voltas do kart selecionado mesmo com zeros à esquerda', () => {
-    const voltas = [7, 3, 6, 1, 5, 2, 4].map((lapMs) => ({ kart: '05', lapMs }));
-    expect(kartComparavel('005')).toBe('5');
-    expect(kartComparavel('0')).toBeNull();
-    expect(melhoresVoltasDoKart(voltas, '5').map((volta) => volta.lapMs)).toEqual([1, 2, 3, 4, 5]);
-  });
-
   it('a meta é a melhor volta entre os karts referência (não a média); a regra padrão é a do Kart Indoor', () => {
     const s = sessao('equalizacao', BASE, PLANILHA);
     s.equalizacao = { referencias: ['05', '12'] };
@@ -199,16 +192,6 @@ describe('equalização dos karts', () => {
     expect(kart.acao).toContain('manualmente');
   });
 
-  it('permite marcar kart equalizado manualmente sem testar após a troca do redutor', () => {
-    const s = sessao('equalizacao', BASE, { '08': [] });
-    s.equalizacao = { checklist: { '08': {
-      confirmacaoManual: { aberturaMm: 0.3, bloco: 0, passagens: 1, confirmadoEm: BASE + 300_000, autor: 'Oficina' },
-    } } };
-    const kart = calcularEqualizacao(s).karts.find((k) => k.kart === '08')!;
-    expect(kart).toMatchObject({ status: 'EQUALIZADO', confirmadoManualmente: true, aberturaMm: 0.3 });
-    expect(kart.acao).toMatch(/não testado/i);
-  });
-
   it('uma nova medição completa substitui a confirmação manual antiga', () => {
     const s = sessao('equalizacao', BASE, { '05': [52_380], '08': [51_940, 51_950, 52_150, 52_170] });
     s.equalizacao = { referencias: ['05'], checklist: { '08': {
@@ -218,19 +201,6 @@ describe('equalização dos karts', () => {
     expect(kart.blocos).toHaveLength(2);
     expect(kart.confirmadoManualmente).toBe(false);
     expect(kart.status).toBe('AJUSTANDO');
-  });
-
-  it('a primeira passagem depois da confirmação manual reativa a medição automática', () => {
-    const s = sessao('equalizacao', BASE, { '05': [52_380], '08': [52_000, 52_010] });
-    s.equalizacao = { referencias: ['05'], checklist: { '08': {
-      confirmacaoManual: { aberturaMm: 0, bloco: 1, passagens: 3, confirmadoEm: BASE + 300_000, autor: 'Oficina' },
-    } } };
-    const comp = s.competitors.find((c) => c.kart === '08')!;
-    const ultima = comp.crossings[comp.crossings.length - 1];
-    applyPassing(s, { kart: '08', decoderTimeMs: (ultima.decoderTimeMs + 52_000) % 86_400_000,
-      wallMs: ultima.wallMs + 52_000, transponder: 800 });
-    const kart = calcularEqualizacao(s).karts.find((k) => k.kart === '08')!;
-    expect(kart.confirmadoManualmente).toBe(false);
   });
 
   it('kart mais rápido que a referência: a sugestão é fechar o redutor', () => {

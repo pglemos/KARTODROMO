@@ -189,36 +189,15 @@ public sealed class FormTerminalFechar : CartaoModal
         var fecharTerm = Botao("Fechar terminal", Tokens.Claro.CorTextoPrincipal, Tokens.Primitivo.Branco, true); fecharTerm.SetBounds(L - 22 - 136, 704, 136, 40);
         fecharTerm.Click += (_, _) => Seguro.Rodar(this, async () =>
         {
-            if (Fmt.Centavos(string.IsNullOrWhiteSpace(_proximo.Text) ? "0" : _proximo.Text) is not long valor) { Msg.Aviso(this, "Valor para o próximo turno inválido."); _proximo.Focus(); return; }
+            if (Fmt.Centavos(string.IsNullOrWhiteSpace(_proximo.Text) ? "0" : _proximo.Text) is not long valor || valor < 0) { Msg.Aviso(this, "Valor para o próximo turno inválido."); return; }
             var emCaixa = sumario?.L("dinheiroEmCaixa") ?? 0;
-            if (!ValidarFechamento(valor, emCaixa, out var erroFechamento))
-            {
-                Msg.Aviso(this, erroFechamento);
-                _proximo.Focus();
-                return;
-            }
+            if (valor > emCaixa) { Msg.Aviso(this, $"O valor para o próximo turno ({Fmt.Brl(valor)}) não pode ser maior que o dinheiro disponível na gaveta ({Fmt.Brl(emCaixa)})."); _proximo.Focus(); return; }
             if (!Msg.Pergunta(this, "Deseja fechar o terminal?")) return;
             var r = await Sessao.Api.Post("/api/office/caixa/fechar", new { proximoTurnoCentavos = valor });
             Concluido = true; MovimentoId = r.S("id"); DialogResult = DialogResult.OK; Close();
         });
         var linhaRodape = new Panel { BackColor = Tokens.Claro.CorBordaSutil, Bounds = new Rectangle(0, 690, L, 1) };
         Controls.AddRange([icone, titulo, sub, fechar, linhaTopo, corpo, linhaRodape, relatorio, cancelar, fecharTerm]);
-    }
-
-    public static bool ValidarFechamento(long valor, long dinheiroEmCaixa, out string? erro)
-    {
-        if (valor < 0)
-        {
-            erro = "Valor para o próximo turno inválido.";
-            return false;
-        }
-        if (valor > dinheiroEmCaixa)
-        {
-            erro = "O valor para o próximo turno não pode ser superior ao dinheiro disponível em caixa.";
-            return false;
-        }
-        erro = null;
-        return true;
     }
 }
 
@@ -258,9 +237,9 @@ public sealed class FormCaixaTransacao : DialogoDesign
             if (Fmt.Centavos(_valor.Text) is not long valor || valor <= 0) { Msg.Aviso(this, "Informe um valor maior que zero."); _valor.Focus(); return; }
             if (string.IsNullOrWhiteSpace(_obs.Text)) { Msg.Aviso(this, "Informe a justificativa desta transação."); _obs.Focus(); return; }
             var emCaixa = caixa["sumario"]?.L("dinheiroEmCaixa") ?? 0;
-            if (_tipo == "sangria" && !ValidarSangria(valor, emCaixa, out var erroSangria))
+            if (_tipo == "sangria" && valor > emCaixa)
             {
-                Msg.Aviso(this, erroSangria);
+                Msg.Aviso(this, $"O valor da sangria ({Fmt.Brl(valor)}) não pode ser maior que o dinheiro disponível na gaveta ({Fmt.Brl(emCaixa)}).");
                 _valor.Focus();
                 return;
             }
@@ -269,22 +248,6 @@ public sealed class FormCaixaTransacao : DialogoDesign
         }));
         BotaoRodape("Cancelar", false, Close);
         Shown += (_, _) => _valor.Focus();
-    }
-
-    public static bool ValidarSangria(long valor, long dinheiroEmCaixa, out string? erro)
-    {
-        if (valor <= 0)
-        {
-            erro = "Informe um valor maior que zero.";
-            return false;
-        }
-        if (valor > dinheiroEmCaixa)
-        {
-            erro = "Valor de sangria não pode ser superior ao dinheiro disponível em caixa.";
-            return false;
-        }
-        erro = null;
-        return true;
     }
 
     /// <summary>Valor só para ler, na mesma caixa branca dos campos.</summary>

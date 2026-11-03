@@ -67,8 +67,7 @@ export function validarSorteio(sessao: Session, atribuicoes: Atribuicao[], karts
       mudou = nome(nomeA) !== nome(atual.name);
     }
     if (mudou) throw new ListaMudouError('A lista de pilotos desta bateria mudou depois que o tablet carregou. Atualize a lista e sorteie de novo.');
-    // Item 3: Suporte a karts alfanuméricos comuns em Betim (ex: 12A, B1, 05B)
-    if (!/^[a-zA-Z0-9]{1,6}$/.test(kart)) throw new Error(`Kart inválido no sorteio: "${kart}".`);
+    if (!/^\d+$/.test(kart)) throw new Error(`Kart inválido no sorteio: "${kart}".`);
     if (!kartsCadastrados.has(kart)) throw new Error(`O kart ${kart} não tem transponder cadastrado na cronometragem.`);
     if (vistos.has(kart)) throw new Error(`O kart ${kart} saiu para dois pilotos.`);
     vistos.add(kart);

@@ -103,3 +103,6 @@ services/*.antes-*.ts
 
 # chaves de loja (Apple .p8, Google .json de conta de serviço) nunca entram no Git
 *.p8
+
+# lixo do macOS (AppleDouble)
+._*

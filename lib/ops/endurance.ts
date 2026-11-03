@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars -- _u e _s só tiram campos internos das respostas */
 /**
  * Endurance (100 Milhas): evento, equipes, pilotos com número de pulseira, pesagem, filas e sorteio do box, punições.
  *
@@ -128,7 +129,7 @@ async function sincronizarKartsComCrono(ev: Evento) {
       cacheCrono.delete(sid);
       await fetch(`${TIMING_URL}/api/sessions/${encodeURIComponent(sid)}`, {
         method: 'PATCH', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(5_000),
-        body: JSON.stringify({ competitors, semEmailPilotos: true }),
+        body: JSON.stringify({ competitors, semEmailPilotos: false }),
       }).catch(() => null);
     }
   } catch { /* sincronização auxiliar não bloqueia a operação do box */ }
@@ -253,7 +254,7 @@ export async function equipesParaOTotem(bateriaId: number) {
 /** Chamado pelo /api/totem/inscrever quando a bateria é de endurance: liga cada participante à equipe e dá a pulseira. */
 export async function vincularNoTotem(eventoId: number, equipeId: number | number[], clienteIds: number[]) {
   const ev = await evento(eventoId);
-  const dados: Array<{ clienteId: number; nome: string; origem: string }> = [];
+  const dados: { clienteId: number; nome: string; origem: 'totem' }[] = [];
   for (const cid of [...new Set(clienteIds.map(id=>idDe(id,'Piloto')))]) {
     const c = await one<{ nome: string }>(`SELECT Nome nome FROM dbo.Cliente WHERE Id = @id`, { id: cid });
     if(!c) throw new HttpError(404,'Piloto não encontrado.');
@@ -386,7 +387,7 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
     }
     const r = await fetch(`${TIMING_URL}/api/sessions/${encodeURIComponent(sessaoId)}`, {
       method: 'PATCH', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(8_000),
-      body: JSON.stringify({ competitors: equipes.map((q) => ({ kart: q.numero, name: q.nome })), semEmailPilotos: true, ...(b.tipo === 'corrida' ? { durationMin: regras.duracaoMin } : {}) }),
+      body: JSON.stringify({ competitors: equipes.map((q) => ({ kart: q.numero, name: q.nome })), semEmailPilotos: false, ...(b.tipo === 'corrida' ? { durationMin: regras.duracaoMin } : {}) }),
     });
     if (!r.ok) throw new HttpError(502, `A cronometragem recusou (${(await r.json().catch(() => ({}))).error ?? r.status}).`);
     await query(b.tipo === 'tomada' ? `UPDATE dbo.EnduranceEvento SET SessaoTomada = @s WHERE Id = @id` : `UPDATE dbo.EnduranceEvento SET SessaoCrono = @s WHERE Id = @id`, { s: sessaoId, id: ev.id });

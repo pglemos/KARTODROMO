@@ -14,18 +14,19 @@
  */
 import http from 'node:http';
 import net from 'node:net';
+import os from 'node:os';
 import { appendFileSync, closeSync, copyFileSync, cpSync, createWriteStream, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { format } from 'node:util';
+import { chaveOperadorValida, clienteEhMaquinaOperadora } from '../lib/timing/operator-auth';
+import { redigirEmails } from '../lib/timing/redact-pii';
 import { DecoderClient, type DecoderProtocol } from '../lib/timing/decoder-client';
 import { formatTrxPassing, type TrxPassing } from '../lib/timing/trx-parser';
 import { mobileApiEndpoint } from '../lib/mobile-api-url';
 import {
   acceptRejected,
-  addMissingLaps,
   addPenalty,
-  applyRaceOffense,
   removePenalty,
   voltaAtualDoKart,
   restartSession,
@@ -52,7 +53,6 @@ import {
   restoreCompetitor,
   setChuva,
   setManualPosition,
-  setManualTiming,
   setCrossingDeleted,
   setCrossingInvalid,
   setRaceFlag,
@@ -78,16 +78,17 @@ import {
   type TimingCatalog,
 } from '../lib/timing/catalog';
 import { rankingPorPeso, tituloFaixas, type DadosPiloto } from '../lib/timing/ranking-peso';
-import { condicaoChuvaPeloTracado, dataBrasilia, historicoDoKart, rankingKarts, voltasDoPeriodo } from '../lib/timing/ranking-karts';
-import { calcularComAnteriores, melhoresVoltasDoKart, kartComparavel, retomarEqualizacao, validarFaixasRedutor, type FaixaRedutor, faixasDaRegra, importarKarts, REGRA_PADRAO, regraDa, SISTEMAS_KART, tempoVoltaParaMs, TOLERANCIA_PADRAO_MS, ultimaEqualizacaoPorKart, voltasNasBaterias, type ChecklistKart, type ConfigEqualizacao } from '../lib/timing/equalizacao';
+import { condicaoChuvaPeloTracado, dataBrasilia, historicoDoKart, rankingKarts } from '../lib/timing/ranking-karts';
+import { calcularComAnteriores, retomarEqualizacao, validarFaixasRedutor, type FaixaRedutor, faixasDaRegra, importarKarts, REGRA_PADRAO, regraDa, SISTEMAS_KART, tempoVoltaParaMs, TOLERANCIA_PADRAO_MS, ultimaEqualizacaoPorKart, voltasNasBaterias, type ChecklistKart, type ConfigEqualizacao } from '../lib/timing/equalizacao';
 import { nomeProprio } from '../lib/nomes';
-import { configPublica, enviarEmailSimples, enviarResultado, enviarTeste, lerConfig, limparPerfisOrfaos, salvarConfig, semEmailAosPilotos, traduzirErro, type Dependencias, type OpcoesEnvio } from './timing-email';
+import { configPublica, enviarEmailSimples, enviarResultado, enviarTeste, lerConfig, salvarConfig, semEmailAosPilotos, traduzirErro, verificarTransporteEmail, type Dependencias, type OpcoesEnvio } from './timing-email';
 import { usoKartsDaSessao } from '../lib/timing/kart-fisico';
 import { serializeMobilePublication } from '../lib/timing/mobile-results';
 import type { ContextoProva, EmpresaEmail } from '../lib/timing/email-resultado';
+import { quemSaiuDaAgenda } from '../lib/timing/agenda-saida';
 import { competidoresComSorteio, descricaoModoSorteio, ListaMudouError, pilotosDoSorteio, validarSorteio, type Atribuicao } from '../lib/timing/sorteio';
 import { normalizarPaginaPainel, PAINEL_LED_PAGE_SIZE } from '../lib/timing/painel-page';
-import { assinaturaDoConteudo, conferirChave, extrairChave, lerHashes, montarTransmissao, type Transmissao } from '../lib/timing/transmissao';
+import { assinaturaDoConteudo, conferirChave, extrairChave, filtrarVoltasPorKart, lerHashes, montarTransmissao, montarVoltas, type Transmissao, type VoltasTransmissao } from '../lib/timing/transmissao';
 
 // ---------------------------------------------------------------- config
 
@@ -130,7 +131,7 @@ const TIMING_LOG_FILE = join(DATA_DIR, 'timing.log');
 
 function log(...args: unknown[]) {
   const formatted = format(...args);
-  const line = `[${new Date().toISOString()}] ${formatted}`;
+  const line = redigirEmails(`[${new Date().toISOString()}] ${formatted}`);
   console.log(line);
   try {
     appendFileSync(TIMING_LOG_FILE, line + '\n', 'utf8');
@@ -168,7 +169,7 @@ function rotateTimingLogIfNeeded() {
         .map((f) => ({ full: join(DATA_DIR, f), mtime: statSync(join(DATA_DIR, f)).mtimeMs }))
         .sort((a, b) => b.mtime - a.mtime);
       for (const old of rotated.slice(5)) {
-        try { unlinkSync(old.full); } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
+        try { unlinkSync(old.full); } catch { /* melhor esforço */ }
       }
       log(`timing.log rotacionado (${(stats.size / 1024 / 1024).toFixed(1)} MB -> 0 MB; backup em ${backup})`);
     }
@@ -178,10 +179,6 @@ function rotateTimingLogIfNeeded() {
 }
 setInterval(rotateTimingLogIfNeeded, 60_000).unref();
 
-// Item 16: Limpeza automática imediata de perfis temporários de PDF órfãos do Chrome/Edge
-limparPerfisOrfaos(join(DATA_DIR, 'emails-tmp'), log);
-setInterval(() => limparPerfisOrfaos(join(DATA_DIR, 'emails-tmp'), log), 60 * 60_000).unref();
-
 // Item 7 & 32: Escrita atômica com fsyncSync e recuperação contra locks temporários no Windows
 function writeJsonAtomic(file: string, data: unknown) {
   const tmp = `${file}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 6)}.tmp`;
@@ -189,27 +186,28 @@ function writeJsonAtomic(file: string, data: unknown) {
   const fd = openSync(tmp, 'w');
   try {
     writeFileSync(fd, content, 'utf8');
-    try { fsyncSync(fd); } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
+    try { fsyncSync(fd); } catch { /* melhor esforço */ }
   } finally {
-    try { closeSync(fd); } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
+    try { closeSync(fd); } catch { /* melhor esforço */ }
   }
 
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       renameSync(tmp, file);
       return;
-    } catch (err: any) {
+    } catch (erro) {
+      const err = erro as NodeJS.ErrnoException;
       if ((err?.code === 'EPERM' || err?.code === 'EBUSY') && attempt < 4) {
         Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20 * (attempt + 1));
         continue;
       }
       try {
         copyFileSync(tmp, file);
-        try { unlinkSync(tmp); } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
+        try { unlinkSync(tmp); } catch { /* melhor esforço */ }
         return;
-      } catch (fallbackErr) {
+      } catch {
         if (attempt === 4) {
-          try { unlinkSync(tmp); } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
+          try { unlinkSync(tmp); } catch { /* melhor esforço */ }
           throw err;
         }
       }
@@ -224,15 +222,16 @@ function cleanOrphanTmpFiles(dir: string) {
       const full = join(dir, entry.name);
       if (entry.isDirectory()) cleanOrphanTmpFiles(full);
       else if (entry.name.endsWith('.tmp')) {
-        try { unlinkSync(full); } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
+        try { unlinkSync(full); } catch { /* melhor esforço */ }
       }
     }
-  } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
+  } catch { /* melhor esforço */ }
 }
 cleanOrphanTmpFiles(DATA_DIR);
 
 // Item 8: Mutex de serialização por sessão para concorrência
 const sessionLocks = new Map<string, Promise<void>>();
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- reservado para as rotas que ainda gravam sem trava
 async function withSessionLock<T>(sessionId: string, action: () => Promise<T> | T): Promise<T> {
   const prev = sessionLocks.get(sessionId) ?? Promise.resolve();
   let resolveCurrent!: () => void;
@@ -316,49 +315,21 @@ for (const session of sessions.values()) {
   }
 }
 
-// Item 15: Cache de 5 segundos para ultimaEncerrada() evitando filtrar e ordenar 470+ sessões a cada 250ms
-let cachedUltimaEncerrada: { session: Session | null; timestamp: number } | null = null;
-function invalidateUltimaEncerradaCache() {
-  cachedUltimaEncerrada = null;
-}
-const invalidarCacheUltimaEncerrada = invalidateUltimaEncerradaCache;
-
 function saveSession(s: Session) {
   const targetPath = resolveSessionFilePath(s);
   try {
     writeJsonAtomic(targetPath, s);
     const previousPath = sessionPaths.get(s.id);
     if (previousPath && previousPath !== targetPath && existsSync(previousPath)) {
-      try { unlinkSync(previousPath); } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
+      try { unlinkSync(previousPath); } catch { /* melhor esforço */ }
     }
     sessionPaths.set(s.id, targetPath);
     dirtySessions.delete(s.id);
-    invalidateUltimaEncerradaCache();
   } catch (err) {
     dirtySessions.add(s.id);
     log(`ERRO ao gravar bateria ${s.name} (${s.id}) no disco; retentando em segundo plano: ${(err as Error).message}`);
     throw err;
   }
-}
-
-// Item 12: Debounce assíncrono para saveSession evitando micro-pausas no event loop por fsyncSync a cada passagem
-const sessionSaveTimers = new Map<string, NodeJS.Timeout>();
-function scheduleSessionSave(s: Session, delayMs = 150) {
-  if (sessionSaveTimers.has(s.id)) return;
-  const timer = setTimeout(() => {
-    sessionSaveTimers.delete(s.id);
-    try { saveSession(s); } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
-  }, delayMs);
-  sessionSaveTimers.set(s.id, timer);
-}
-
-function flushSessionSave(s: Session) {
-  const timer = sessionSaveTimers.get(s.id);
-  if (timer) {
-    clearTimeout(timer);
-    sessionSaveTimers.delete(s.id);
-  }
-  saveSession(s);
 }
 
 function archiveOldSessions() {
@@ -374,7 +345,7 @@ function archiveOldSessions() {
         sessionPaths.set(s.id, target);
         s.rejected = [];
         arquivadas++;
-      } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
+      } catch { /* melhor esforço */ }
     }
   }
   if (arquivadas > 0) log(`particionamento: ${arquivadas} bateria(s) arquivada(s) por ano/mês`);
@@ -391,7 +362,7 @@ setInterval(() => {
     try {
       saveSession(s);
       log(`bateria ${s.name} salva com sucesso no disco na retentativa`);
-    } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
+    } catch { /* melhor esforço */ }
   }
 }, 3_000).unref();
 
@@ -408,7 +379,7 @@ let catalog: TimingCatalog = emptyCatalog();
 if (existsSync(CATALOG_FILE)) {
   try {
     catalog = normalizeCatalog(JSON.parse(readFileSync(CATALOG_FILE, 'utf8')));
-    try { copyFileSync(CATALOG_FILE, CATALOG_BAK_FILE); } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
+    try { copyFileSync(CATALOG_FILE, CATALOG_BAK_FILE); } catch { /* melhor esforço */ }
   } catch (err) {
     let recuperado = false;
     if (existsSync(CATALOG_BAK_FILE)) {
@@ -416,11 +387,11 @@ if (existsSync(CATALOG_FILE)) {
         catalog = normalizeCatalog(JSON.parse(readFileSync(CATALOG_BAK_FILE, 'utf8')));
         log('catálogo principal ilegível; recuperado da cópia de segurança catalog.json.bak');
         recuperado = true;
-      } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
+      } catch { /* melhor esforço */ }
     }
     if (!recuperado) {
       const copia = CATALOG_FILE.replace(/\.json$/i, `.ilegivel-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
-      try { copyFileSync(CATALOG_FILE, copia); } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
+      try { copyFileSync(CATALOG_FILE, copia); } catch { /* melhor esforço */ }
       log(`cadastro de eventos ilegível; iniciando vazio (o arquivo original foi guardado em ${copia})`, err);
     }
   }
@@ -428,7 +399,7 @@ if (existsSync(CATALOG_FILE)) {
   try {
     catalog = normalizeCatalog(JSON.parse(readFileSync(CATALOG_BAK_FILE, 'utf8')));
     log('catálogo carregado da cópia de segurança catalog.json.bak');
-  } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
+  } catch { /* melhor esforço */ }
 }
 
 let timingSettings: Record<string, unknown> = {};
@@ -449,7 +420,7 @@ let activeDecoderConfig: DecoderConfig = {
 
 function saveCatalog() {
   if (existsSync(CATALOG_FILE)) {
-    try { copyFileSync(CATALOG_FILE, CATALOG_BAK_FILE); } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
+    try { copyFileSync(CATALOG_FILE, CATALOG_BAK_FILE); } catch { /* melhor esforço */ }
   }
   writeJsonAtomic(CATALOG_FILE, catalog);
 }
@@ -492,27 +463,12 @@ function journal(entry: Record<string, unknown>) {
   const line = JSON.stringify(entry) + '\n';
   if (day !== activeJournalDay || !journalStream || journalStream.destroyed) {
     if (journalStream && !journalStream.destroyed) {
-      try { journalStream.end(); } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
+      try { journalStream.end(); } catch { /* melhor esforço */ }
     }
     activeJournalDay = day;
-    try {
-      journalStream = createWriteStream(join(JOURNAL_DIR, `${day}.jsonl`), { flags: 'a', encoding: 'utf8' });
-      // Item 13: Tratamento de erro no stream do diário para não derrubar o Node.js em falha de I/O
-      journalStream.on('error', (err) => {
-        log(`ERRO no stream do diário: ${err.message}`);
-        journalStream = null;
-      });
-    } catch (err: any) {
-      log(`ERRO ao criar arquivo do diário: ${err?.message || err}`);
-      journalStream = null;
-      return;
-    }
+    journalStream = createWriteStream(join(JOURNAL_DIR, `${day}.jsonl`), { flags: 'a', encoding: 'utf8' });
   }
-  try {
-    journalStream.write(line);
-  } catch (err: any) {
-    log(`ERRO ao escrever no diário: ${err?.message || err}`);
-  }
+  journalStream.write(line);
 }
 
 type EntradaDiario = { wallMs: number; kart: string | null; transponder: number | null; decoderTimeMs: number; result: string };
@@ -789,7 +745,7 @@ function handleDecoderPassing(p: TrxPassing) {
     journal({ wallMs, raw: p.raw, transponder: p.transponder, kart, decoderTimeMs: p.decoderTimeMs, seq: p.sequence, sessionId: session?.id ?? null, result });
   } catch (err) { log(`ERRO ao gravar o diário de passagens (kart ${kart ?? '?'}): ${(err as Error).message}`); }
   if (session) {
-    try { scheduleSessionSave(session); }
+    try { saveSession(session); }
     catch (err) { log(`ERRO ao gravar a bateria ${session.name} (a passagem está na memória e no diário): ${(err as Error).message}`); }
   }
   log(`passagem transponder ${p.transponder} -> kart ${kart ?? '?'} (${result})`);
@@ -866,7 +822,6 @@ function sessionView(s: Session) {
     proofId: s.proofId ?? null,
     observations: s.observations ?? [],
     manualPositions: s.manualPositions ?? {},
-    manualTimingKarts: s.manualTimingKarts ?? {},
     // nome próprio só na exibição (telão, resultado, operador): o cadastro vinha TUDO MAIÚSCULO ou tudo minúsculo
     competitors: s.competitors.map((c) => ({
       kart: c.kart, name: nomeProprio(c.name), customerId: c.customerId ?? null, category: c.category ?? null, flag: c.flag ?? 'none', autoAdded: Boolean(c.autoAdded), detalhes: c.detalhes ?? null,
@@ -1076,13 +1031,18 @@ function transmissaoAtual(): Transmissao {
   return montarTransmissao(ultima ? sessionView(ultima) : null);
 }
 
+function voltasDaTransmissao(t: Transmissao): VoltasTransmissao {
+  const s = t.bateria ? sessions.get(t.bateria.id) : undefined;
+  return montarVoltas(t, (s?.competitors ?? []).map((c) => ({ kart: c.kart, nome: nomeProprio(c.name), crossings: c.crossings })));
+}
+
 const clientesTransmissao = new Set<http.ServerResponse>();
 let ultimaTransmissao: { assinatura: string; dados: Transmissao } | null = null;
 const publicacao = { emAndamento: false, assinaturaEnviada: '', enviadoEm: 0, ultimoOkEm: 0, ultimoErro: '', erroLogadoEm: 0, falhas: 0, proximaTentativaEm: 0 };
-/** O site guarda o retrato num arquivo só do R2, que aceita no máximo ~1 gravação por segundo por arquivo. */
-const INTERVALO_MINIMO_PUBLICACAO_MS = 1_000;
+/** Passagem chega ao site em até meio segundo; o hub do site distribui na hora a quem está conectado. */
+const INTERVALO_MINIMO_PUBLICACAO_MS = 500;
 
-async function publicarTransmissao(t: Transmissao, assinatura: string) {
+async function publicarTransmissao(t: Transmissao, voltas: VoltasTransmissao, assinatura: string) {
   const cfg = lerConfigTransmissao();
   if (!cfg.publicarUrl || !cfg.publicarChave || publicacao.emAndamento) return;
   publicacao.emAndamento = true;
@@ -1091,7 +1051,8 @@ async function publicarTransmissao(t: Transmissao, assinatura: string) {
     const resposta = await fetch(cfg.publicarUrl, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${cfg.publicarChave}` },
-      body: JSON.stringify(t),
+      // o volta a volta vai junto, num envio só; o site o separa em /corrida e /voltas
+      body: JSON.stringify({ ...t, voltaAVolta: voltas.pilotos }),
       signal: AbortSignal.timeout(5_000),
     });
     if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
@@ -1122,17 +1083,20 @@ setInterval(() => {
   const publicando = Boolean(cfg.publicarUrl && cfg.publicarChave);
   if (!clientesTransmissao.size && !publicando) return;
   const t = transmissaoAtual();
-  const assinatura = assinaturaDoConteudo(t);
+  const voltas = voltasDaTransmissao(t);
+  const voltasTexto = JSON.stringify(voltas.pilotos);
+  // anular uma volta nem sempre muda a classificação: o volta a volta entra na comparação
+  const assinatura = assinaturaDoConteudo(t) + voltasTexto;
   const mudou = assinatura !== ultimaTransmissao?.assinatura;
   ultimaTransmissao = { assinatura, dados: t };
   if (mudou) {
-    const payload = `event: corrida\ndata: ${JSON.stringify(t)}\n\n`;
+    const payload = `event: corrida\ndata: ${JSON.stringify(t)}\n\nevent: voltas\ndata: ${JSON.stringify(voltas)}\n\n`;
     for (const res of clientesTransmissao) res.write(payload);
   }
   // reenvia a cada 30 s mesmo parado: o site sabe que a cronometragem está viva (economiza pedidos no Cloudflare)
   const agora = Date.now();
   const podeEnviar = agora - publicacao.enviadoEm >= INTERVALO_MINIMO_PUBLICACAO_MS && agora >= publicacao.proximaTentativaEm;
-  if (publicando && podeEnviar && (assinatura !== publicacao.assinaturaEnviada || agora - publicacao.enviadoEm > 30_000)) void publicarTransmissao(t, assinatura);
+  if (publicando && podeEnviar && (assinatura !== publicacao.assinaturaEnviada || agora - publicacao.enviadoEm > 30_000)) void publicarTransmissao(t, voltas, assinatura);
 }, 250);
 setInterval(() => {
   for (const res of clientesTransmissao) res.write(': ping\n\n');
@@ -1148,15 +1112,17 @@ async function rotaTransmissao(req: http.IncomingMessage, res: http.ServerRespon
     return send(res, 401, { erro: 'Chave ausente ou inválida. Envie no cabeçalho Authorization: Bearer <chave>.' }, { 'www-authenticate': 'Bearer' });
   }
   if (url.pathname === '/api/transmissao/v1/corrida') return send(res, 200, transmissaoAtual());
+  if (url.pathname === '/api/transmissao/v1/voltas') return send(res, 200, filtrarVoltasPorKart(voltasDaTransmissao(transmissaoAtual()), url.searchParams.get('kart')));
   if (url.pathname === '/api/transmissao/v1/eventos') {
     res.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', connection: 'keep-alive', 'access-control-allow-origin': '*' });
-    res.write(`retry: 2000\nevent: corrida\ndata: ${JSON.stringify(transmissaoAtual())}\n\n`);
+    const inicial = transmissaoAtual();
+    res.write(`retry: 2000\nevent: corrida\ndata: ${JSON.stringify(inicial)}\n\nevent: voltas\ndata: ${JSON.stringify(voltasDaTransmissao(inicial))}\n\n`);
     clientesTransmissao.add(res);
     log(`transmissão: ${parceiro} conectou no fluxo ao vivo (${req.socket.remoteAddress ?? '?'})`);
     req.on('close', () => clientesTransmissao.delete(res));
     return;
   }
-  return send(res, 404, { erro: 'Rota desconhecida. Use /api/transmissao/v1/corrida ou /api/transmissao/v1/eventos.' });
+  return send(res, 404, { erro: 'Rota desconhecida. Use /api/transmissao/v1/corrida, /api/transmissao/v1/voltas ou /api/transmissao/v1/eventos.' });
 }
 
 /** Situação da API de transmissão para o /healthz (sem chave nenhuma). */
@@ -1172,21 +1138,14 @@ function transmissaoStatus() {
 }
 
 /** Formato LiveTimingSnapshot (lib/livetime/types.ts) consumido pelo site, telao e TB50. */
-
 /**
  * A última bateria que TERMINOU (pela hora do fim; equalização fica de fora). É o que o placar e o painel mostram
  * sem kart na pista: tomada encerrada = classificação para montar o grid; corrida encerrada = pódio (TB50) e o
  * resultado final (painel). Antes era a última CRIADA, e em 02/10 voltava sempre para a equalização do Edu.
  */
 function ultimaEncerrada() {
-  const now = Date.now();
-  if (cachedUltimaEncerrada && now - cachedUltimaEncerrada.timestamp < 5_000) {
-    return cachedUltimaEncerrada.session;
-  }
   const fimDe = (s: Session) => s.finishedAt ?? s.startedAt ?? s.createdAt;
-  const sessao = [...sessions.values()].filter((s) => s.state === 'encerrada' && s.type !== 'equalizacao').sort((a, b) => fimDe(b) - fimDe(a))[0] ?? null;
-  cachedUltimaEncerrada = { session: sessao, timestamp: now };
-  return sessao;
+  return [...sessions.values()].filter((s) => s.state === 'encerrada' && s.type !== 'equalizacao').sort((a, b) => fimDe(b) - fimDe(a))[0] ?? null;
 }
 
 function liveSnapshot(painelTb50 = false) {
@@ -1249,20 +1208,17 @@ function painelVazio<T extends { position: number; kart: string; name: string; t
 const clients = new Set<http.ServerResponse>();
 let stateTimer: NodeJS.Timeout | null = null;
 
-// Item 14: Adicionar try/catch e expurgo de conexões mortas no loop de broadcast()
+/** Pela internet (aovivo, crono.*) saem só os dados do placar: nada de código de cliente, nome de PC ou endereço do decoder. */
+const OCULTOS_NA_INTERNET = new Set(['customerId', 'detalhes', 'activeOperators', 'host', 'port']);
+const jsonPublico = (dados: unknown) => JSON.stringify(dados, (k, v) => (OCULTOS_NA_INTERNET.has(k) ? undefined : v));
+const clientesPublicos = new Set<http.ServerResponse>();
+
 function broadcast(event: string, data: unknown) {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-  for (const res of Array.from(clients)) {
-    try {
-      if (res.destroyed || res.writableEnded) {
-        clients.delete(res);
-      } else {
-        res.write(payload);
-      }
-    } catch {
-      clients.delete(res);
-      try { res.end(); } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
-    }
+  for (const res of clients) res.write(payload);
+  if (clientesPublicos.size) {
+    const publico = `event: ${event}\ndata: ${jsonPublico(data)}\n\n`;
+    for (const res of clientesPublicos) res.write(publico);
   }
 }
 
@@ -1287,30 +1243,8 @@ setInterval(() => {
   if ((clients.size || clientesPainel.size) && runningSession()) scheduleStateBroadcast();
 }, 1_000);
 setInterval(() => {
-  for (const res of Array.from(clients)) {
-    try {
-      if (res.destroyed || res.writableEnded) {
-        clients.delete(res);
-      } else {
-        res.write(': ping\n\n');
-      }
-    } catch {
-      clients.delete(res);
-      try { res.end(); } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
-    }
-  }
-  for (const c of Array.from(clientesPainel)) {
-    try {
-      if (c.res.destroyed || c.res.writableEnded) {
-        clientesPainel.delete(c);
-      } else {
-        c.res.write(': ping\n\n');
-      }
-    } catch {
-      clientesPainel.delete(c);
-      try { c.res.end(); } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
-    }
-  }
+  for (const res of clients) res.write(': ping\n\n');
+  for (const c of clientesPainel) c.res.write(': ping\n\n');
 }, 15_000);
 
 // ---------------------------------------------------------------- fluxo para os painéis de LED (TB50)
@@ -1323,26 +1257,17 @@ const clientesPainel = new Set<ClientePainel>();
 function enviarAosPaineis() {
   if (!clientesPainel.size) return;
   const prontos = new Map<boolean, { texto: string; semHora: string }>();
-  for (const c of Array.from(clientesPainel)) {
-    try {
-      if (c.res.destroyed || c.res.writableEnded) {
-        clientesPainel.delete(c);
-        continue;
-      }
-      let r = prontos.get(c.tb50);
-      if (!r) {
-        const texto = JSON.stringify(liveSnapshot(c.tb50));
-        // o carimbo de hora muda sempre; só manda quando o placar mudou de verdade
-        r = { texto, semHora: texto.replace(/"updatedAt":"[^"]*",?/, '') };
-        prontos.set(c.tb50, r);
-      }
-      if (r.semHora === c.ultimo) continue;
-      c.ultimo = r.semHora;
-      c.res.write(`event: snapshot\ndata: ${r.texto}\n\n`);
-    } catch {
-      clientesPainel.delete(c);
-      try { c.res.end(); } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
+  for (const c of clientesPainel) {
+    let r = prontos.get(c.tb50);
+    if (!r) {
+      const texto = JSON.stringify(liveSnapshot(c.tb50));
+      // o carimbo de hora muda sempre; só manda quando o placar mudou de verdade
+      r = { texto, semHora: texto.replace(/"updatedAt":"[^"]*",?/, '') };
+      prontos.set(c.tb50, r);
     }
+    if (r.semHora === c.ultimo) continue;
+    c.ultimo = r.semHora;
+    c.res.write(`event: snapshot\ndata: ${r.texto}\n\n`);
   }
 }
 
@@ -1704,8 +1629,13 @@ let jobsEmailsPendentes: JobEmailPendente[] = [];
 function carregarJobsEmails() {
   if (existsSync(PENDING_EMAILS_FILE)) {
     try {
-      jobsEmailsPendentes = JSON.parse(readFileSync(PENDING_EMAILS_FILE, 'utf8')) as JobEmailPendente[];
-    } catch {
+      const dados = JSON.parse(readFileSync(PENDING_EMAILS_FILE, 'utf8')) as unknown;
+      if (!Array.isArray(dados) || dados.some((j) => !j || typeof j.sessionId !== 'string' || !Number.isFinite(j.agendadoPara) || !Number.isInteger(j.tentativas))) throw new Error('esquema inválido');
+      jobsEmailsPendentes = dados as JobEmailPendente[];
+    } catch (e) {
+      const quarentena = `${PENDING_EMAILS_FILE}.corrompido-${Date.now()}`;
+      try { renameSync(PENDING_EMAILS_FILE, quarentena); } catch { /* melhor esforço */ }
+      log(`ERRO: fila de e-mails inválida; arquivo preservado para diagnóstico em ${quarentena}: ${(e as Error).message}`);
       jobsEmailsPendentes = [];
     }
   }
@@ -1713,7 +1643,7 @@ function carregarJobsEmails() {
 function salvarJobsEmails() {
   try {
     writeJsonAtomic(PENDING_EMAILS_FILE, jobsEmailsPendentes);
-  } catch { /* melhor esforço: a falha aqui não pode derrubar o servidor */ }
+  } catch (e) { log(`ERRO ao persistir fila de e-mails (${PENDING_EMAILS_FILE}): ${(e as Error).message}`); }
 }
 carregarJobsEmails();
 
@@ -1730,19 +1660,31 @@ function concluirJobEmail(sessionId: string) {
 function enviarResultadoEmFila(s: Session, op: OpcoesEnvio) {
   const aTodos = !op.kart && !op.para;
   if (aTodos) envioATodosAtivo.add(s.id);
+  let iniciar!: () => void;
+  let trabalhoReal: Promise<void> = Promise.resolve();
+  const iniciou = new Promise<void>((resolve) => { iniciar = resolve; });
   const tarefa = () => {
+    const trabalho = enviarResultado(s, EMAIL_FILE, depEmail, op);
+    trabalhoReal = trabalho.then(() => undefined, () => undefined);
+    iniciar();
     let timer: NodeJS.Timeout | undefined;
     const limite = new Promise<never>((_, falhar) => {
       timer = setTimeout(() => falhar(new Error('o envio atingiu o tempo limite de 3 min; tentando de novo no próximo ciclo')), LIMITE_ENVIO_EMAILS_MS);
     });
-    return Promise.race([enviarResultado(s, EMAIL_FILE, depEmail, op), limite]).finally(() => clearTimeout(timer));
+    // A resposta pode expirar para o chamador, mas a fila permanece ocupada até o trabalho real terminar.
+    // Isso impede que a tentativa seguinte envie duplicatas enquanto um SMTP/PDF antigo ainda executa.
+    void trabalho.finally(() => clearTimeout(timer)).catch(() => undefined);
+    return Promise.race([trabalho, limite]);
   };
-  const atual = (filaEmails.get(s.id) ?? Promise.resolve()).then(tarefa, tarefa);
+  const anterior = filaEmails.get(s.id) ?? Promise.resolve();
+  const atual = anterior.then(tarefa, tarefa);
   const marca = atual.then(() => undefined, () => undefined);
-  filaEmails.set(s.id, marca);
-  void marca.then(() => {
+  // Em timeout, atual já rejeitou mas o trabalho SMTP continua. Mantemos uma trava até sua liquidação real.
+  const bloqueio: Promise<void> = Promise.all([marca, iniciou.then(() => trabalhoReal)]).then(() => undefined);
+  filaEmails.set(s.id, bloqueio);
+  void bloqueio.then(() => {
     if (aTodos) envioATodosAtivo.delete(s.id);
-    if (filaEmails.get(s.id) === marca) filaEmails.delete(s.id);
+    if (filaEmails.get(s.id) === bloqueio) filaEmails.delete(s.id);
   });
   return atual;
 }
@@ -1761,7 +1703,8 @@ async function emailsAoEncerrar(s: Session) {
     await enviarResultadoEmFila(s, { automatico: true, nomeEvento: nomeEventoDa(s), assinaturaResultado: assinaturaResultado(s) });
   } catch (err) {
     const erro = (err as Error).message;
-    s.emailsResultado = { status: 'falhou', atualizadoEm: Date.now(), tentativas: (s.emailsResultado?.tentativas ?? 0) + 1, enviados: s.emailsResultado?.enviados ?? [], falhas: [{ kart: '', nome: '', email: '', erro }], semEmail: s.emailsResultado?.semEmail ?? [] };
+    const tentativas = (s.emailsResultado?.tentativas ?? 0) + 1;
+    s.emailsResultado = { status: 'falhou', atualizadoEm: Date.now(), tentativas, proximaTentativaEm: Date.now() + Math.min(30 * 60_000, 60_000 * 2 ** Math.min(tentativas - 1, 5)) + Math.floor(Math.random() * 30_000), enviados: s.emailsResultado?.enviados ?? [], falhas: [{ kart: '', nome: '', email: '', erro }], semEmail: s.emailsResultado?.semEmail ?? [] };
     saveSession(s);
     log(`e-mail do resultado de ${s.name} não foi enviado (tenta de novo): ${erro}`);
   }
@@ -1882,10 +1825,13 @@ setInterval(() => {
     const e = s.emailsResultado;
     const fim = s.finishedAt ?? s.createdAt;
     if (s.state !== 'encerrada' || fim <= limite || emailsAgendados.has(s.id)) continue;
-    if (e ? (e.status === 'parcial' || e.status === 'falhou') && e.tentativas < 12 : fim < agora - 3 * 60_000) void emailsAoEncerrar(s);
+    const suprimidoHistorico100Milhas = e?.status === 'sem-email-pilotos' && /100\s*milhas/i.test(`${nomeEventoDa(s)} ${s.name}`);
+    const horaRetry = e?.proximaTentativaEm ?? 0;
+    const possuiFalhaTransitoria = e?.falhas.some((f) => !f.permanente) ?? false;
+    if (suprimidoHistorico100Milhas || (e ? (e.status === 'parcial' || e.status === 'falhou') && possuiFalhaTransitoria && e.tentativas < 12 && agora >= horaRetry : fim < agora - 3 * 60_000)) void emailsAoEncerrar(s);
     if (fim < agora - 3 * 60_000) void publicarNoAppAutomatico(s);
   }
-}, 5 * 60_000);
+}, 60_000);
 
 // ---------------------------------------------------------------- agenda da recepção -> evento do dia (canvas Eventos.dc.html)
 // Como no canvas: cada dia vira o evento "Baterias dd/mm/aaaa", cada bateria da agenda da recepção vira um grupo e as
@@ -1990,22 +1936,45 @@ async function sincronizarAgendaDoDia() {
   // bateria da agenda com piloto pago vira bateria da cronometragem sozinha (sem depender do tablet do sorteio)
   // e quem pagar depois entra na lista até a largada
   let criou = false;
-  // Item 17: Processamento em lote (batch de 5) para paralelizar chamadas opsGet da agenda
-  const batchSize = 5;
-  for (let i = 0; i < baterias.length; i += batchSize) {
-    const batch = baterias.slice(i, i + batchSize);
-    const results = await Promise.allSettled(batch.map((b) => prepararBateriaDaAgenda(b)));
-    for (let j = 0; j < results.length; j++) {
-      const res = results[j];
-      if (res.status === 'fulfilled' && res.value) {
-        criou = true;
-      } else if (res.status === 'rejected') {
-        log(`agenda ${batch[j].id}: não consegui preparar a bateria (${res.reason?.message ?? res.reason})`);
-      }
-    }
+  for (const b of baterias) {
+    try { if (await prepararBateriaDaAgenda(b)) criou = true; } catch (err) { log(`agenda ${b.id}: não consegui preparar a bateria (${(err as Error).message})`); }
   }
+  if (await tirarQuemSaiuDaAgenda(baterias)) criou = true;
   if (criou) scheduleStateBroadcast();
   return mudou || criou;
+}
+
+/**
+ * Cliente movido de horário ou cancelado na recepção sai da lista que ainda não largou (cronometragem e tablet do galpão).
+ * Só tira quem veio da agenda (agendaPuxados): quem o cronometrista pôs à mão fica. Falha ao ler a agenda não tira ninguém.
+ */
+async function tirarQuemSaiuDaAgenda(baterias: BateriaAgenda[]) {
+  let mudou = false;
+  for (const b of baterias) {
+    const abertas = [...sessions.values()].filter((s) => s.agendaId === b.id && s.state === 'preparando' && s.agendaPuxados);
+    if (!abertas.length) continue;
+    let grade: InscritoAgenda[];
+    try { grade = (await opsGet(`/api/crono/baterias/${b.id}/grid`)) as InscritoAgenda[]; } catch { continue; }
+    if (!Array.isArray(grade)) continue;
+    const naAgenda = new Set(grade.map(chaveDoInscrito));
+    for (const s of abertas) {
+      const saiu = quemSaiuDaAgenda(s.agendaPuxados ?? [], s.competitors, naAgenda);
+      if (!saiu.chaves.size) continue;
+      s.agendaPuxados = (s.agendaPuxados ?? []).filter((k) => !saiu.chaves.has(k));
+      if (saiu.competidores.length) {
+        const fora = new Set(saiu.competidores);
+        setCompetitors(s, s.competitors.filter((c) => !fora.has(c)).map((c) => ({ kart: c.kart, name: c.name, customerId: c.customerId ?? null, category: c.category ?? null, detalhes: c.detalhes })));
+        log(`${s.name}: saiu da lista por mudança na recepção: ${saiu.competidores.map((c) => c.name).join(', ')}`);
+      }
+      saveSession(s);
+      mudou = true;
+    }
+  }
+  return mudou;
+}
+
+function chaveDoInscrito(g: InscritoAgenda) {
+  return g.clienteId != null ? String(g.clienteId) : String(g.nome ?? '').trim().toLowerCase();
 }
 
 type InscritoAgenda = { nome?: string; kart?: string | null; clienteId?: unknown; pago?: boolean; aprovada?: boolean };
@@ -2020,13 +1989,12 @@ async function prepararBateriaDaAgenda(b: BateriaAgenda): Promise<boolean> {
   const provas = catalog.provas.filter((p) => p.agendaId === String(b.id)).sort((x, y) => x.order - y.order);
   if (!provas.length) return false;
   const daBateria = [...sessions.values()].filter((s) => s.state !== 'cancelada' && (s.agendaId === b.id || provas.some((p) => p.id === s.proofId)));
-  // Item 18: Permitir inclusão de pilotos que pagaram após a largada da bateria aberta (em_andamento ou preparando)
-  const ativas = daBateria.filter((s) => s.state === 'preparando' || s.state === 'em_andamento');
+  const abertas = daBateria.filter((s) => s.state === 'preparando');
   const faltam = provas.filter((p) => !daBateria.some((s) => s.proofId === p.id));
   // bateria que já passou há mais de 3 h não ganha prova nova
   const inicio = b.inicio ? new Date(`${b.inicio}:00-03:00`).getTime() : NaN;
   const antiga = Number.isFinite(inicio) && Date.now() - inicio > 3 * 3_600_000;
-  if (!ativas.length && (!faltam.length || antiga)) return false;
+  if (!abertas.length && (!faltam.length || antiga)) return false;
   const grade = (await opsGet(`/api/crono/baterias/${b.id}/grid`)) as InscritoAgenda[];
   const pagos = (Array.isArray(grade) ? grade : []).filter((g) => g.pago !== false && String(g.nome ?? '').trim());
   if (!pagos.length) return false;
@@ -2052,12 +2020,12 @@ async function prepararBateriaDaAgenda(b: BateriaAgenda): Promise<boolean> {
     if (herdada) acrescentarPilotos(s, pagos.map(doGrid));
     sessions.set(s.id, s);
     saveSession(s);
-    ativas.push(s);
+    abertas.push(s);
     log(`bateria criada sozinha pela agenda: ${s.name} com ${s.competitors.length} pilotos pagos${herdada ? ` (karts de ${herdada.name})` : ''}`);
     mudou = true;
   }
-  for (const s of ativas) {
-    if (s.state !== 'preparando' && s.state !== 'em_andamento') continue;
+  for (const s of abertas) {
+    if (s.state !== 'preparando') continue;
     const puxados = new Set(s.agendaPuxados ?? s.competitors.map((c) => String(c.customerId ?? c.name.trim().toLowerCase())));
     const novos = pagos.filter((g) => !puxados.has(g.clienteId != null ? String(g.clienteId) : String(g.nome).trim().toLowerCase()));
     if (!s.agendaPuxados) { s.agendaPuxados = [...puxados]; mudou = true; saveSession(s); }
@@ -2065,7 +2033,7 @@ async function prepararBateriaDaAgenda(b: BateriaAgenda): Promise<boolean> {
     const entraram = acrescentarPilotos(s, novos.map(doGrid));
     s.agendaPuxados = [...puxados, ...novos.map((g) => (g.clienteId != null ? String(g.clienteId) : String(g.nome).trim().toLowerCase()))];
     saveSession(s);
-    if (entraram) log(`${s.name} (${s.state}): ${entraram} piloto(s) que pagaram depois entraram na lista`);
+    if (entraram) log(`${s.name}: ${entraram} piloto(s) que pagaram depois entraram na lista`);
     mudou = true;
   }
   return mudou;
@@ -2313,16 +2281,21 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
   }
 
   // conta de e-mail dos resultados (a senha nunca volta; vazia no PUT = mantém)
+  if (path.startsWith('/api/email-config') && !isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para configurações de e-mail.' });
   if (path === '/api/email-config' && method === 'GET') return send(res, 200, configPublica(lerConfig(EMAIL_FILE)));
   if (path === '/api/email-config' && method === 'PUT') {
     try { return send(res, 200, configPublica(salvarConfig(EMAIL_FILE, await readBody(req)))); } catch (e) { return send(res, 400, { error: (e as Error).message }); }
+  }
+  if (path === '/api/email-config/verificar' && method === 'POST') {
+    try { return send(res, 200, await verificarTransporteEmail(EMAIL_FILE, SIMULATE)); }
+    catch (e) { return send(res, 502, { error: `Falha na autenticação SMTP: ${traduzirErro(e)}` }); }
   }
   if (path === '/api/email-config/teste' && method === 'POST') {
     const body = await readBody(req);
     try {
       const daTela = body.config && typeof body.config === 'object' && !Array.isArray(body.config) ? body.config as Record<string, unknown> : undefined;
       const resultado = await enviarTeste(EMAIL_FILE, String(body.para ?? ''), SIMULATE, daTela);
-      log(`e-mail de teste aceito pelo servidor para ${String(body.para ?? '')}`);
+      log('e-mail de teste aceito pelo servidor; destinatário ocultado do log');
       return send(res, 200, { ok: true, ...(resultado ?? { status: 'simulador', entregaConfirmada: false, mensagem: 'Teste gravado no simulador.' }) });
     }
     catch (e) { return send(res, 400, { error: `Não enviou: ${traduzirErro(e)}` }); }
@@ -2374,7 +2347,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     catch (err) { return send(res, 500, { error: `Falha ao criar cópia: ${(err as Error).message}` }); }
   }
 
-  if (path === '/api/state') return send(res, 200, stateView());
+  if (path === '/api/state') return send(res, 200, veioDaInternet(req) ? JSON.parse(jsonPublico(stateView())) : stateView());
   if (path === '/api/livetime-snapshot') return send(res, 200, liveSnapshot(url.searchParams.get('painel') === 'tb50'));
   if (path === '/api/painel-led-page' && method === 'GET') return send(res, 200, painelLedPage);
   if (path === '/api/painel-led-page' && (method === 'PUT' || method === 'POST')) {
@@ -2407,9 +2380,11 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       connection: 'keep-alive',
       'access-control-allow-origin': '*',
     });
-    res.write(`event: state\ndata: ${JSON.stringify(stateView())}\n\n`);
-    clients.add(res);
-    req.on('close', () => clients.delete(res));
+    const publico = veioDaInternet(req);
+    res.write(`event: state\ndata: ${publico ? jsonPublico(stateView()) : JSON.stringify(stateView())}\n\n`);
+    const lista = publico ? clientesPublicos : clients;
+    lista.add(res);
+    req.on('close', () => lista.delete(res));
     return;
   }
 
@@ -2748,27 +2723,6 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     scheduleStateBroadcast();
     return send(res, 201, equalizacaoDetalhe(s));
   }
-  const comparacaoEq = path.match(/^\/api\/equalizacao\/([\w-]+)\/comparacao$/);
-  if (comparacaoEq && method === 'GET') {
-    const s = sessions.get(comparacaoEq[1]);
-    if (!s || s.type !== 'equalizacao') return send(res, 404, { error: 'Equalização não encontrada.' });
-    const kart = kartComparavel(url.searchParams.get('kart'));
-    const refs = [...new Set((s.equalizacao?.referencias ?? []).map(kartComparavel).filter((k): k is string => k !== null))];
-    if (!kart || refs.includes(kart)) return send(res, 400, { error: 'Informe um número de kart de 1 a 200 que não seja referência.' });
-    if (!refs.length) return send(res, 409, { error: 'Configure pelo menos um kart referência nesta equalização.' });
-    const agora = Date.now();
-    const de = dataBrasilia(agora - 14 * 24 * 60 * 60 * 1000);
-    const ate = dataBrasilia(agora);
-    const voltas = voltasDoPeriodo(sessions.values(), {
-      de, ate, trackId: s.trackId ?? null, tipos: ['corrida', 'classificacao', 'treino'], extensaoM: trackLengthFor,
-    }, trackIdDa, kartDaPassagem, (sessao) => trackDa(sessao).name);
-    const melhores = (k: string) => melhoresVoltasDoKart(voltas, k)
-      .map((v) => ({ tempoMs: v.lapMs, tempo: formatLap(v.lapMs), data: dataBrasilia(v.wallMs), bateria: v.s.name, piloto: nomeProprio(v.piloto) }));
-    return send(res, 200, {
-      kart, de, ate, tracado: trackDa(s).name, melhoresKart: melhores(kart),
-      referencias: refs.map((ref) => ({ kart: ref, melhores: melhores(ref) })),
-    });
-  }
   const eq = path.match(/^\/api\/equalizacao\/([\w-]+)(?:\/(karts|finalizar|reabrir|importar)(?:\/([^/]+))?)?$/);
   if (eq) {
     const s = sessions.get(eq[1]);
@@ -2837,9 +2791,9 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
             const ultimo = completos[completos.length - 1];
             const pedido = body.confirmacaoManual as { aberturaMm?: unknown };
             const aberturaMm = milimetros(pedido.aberturaMm);
-            if (!atual || atual.referencia || aberturaMm == null || Math.abs(aberturaMm) > 20)
-              return send(res, 400, { error: 'Para confirmar manualmente, informe o ajuste aplicado (até 20 mm) para um kart que não seja referência.' });
-            confirmacaoManual = { aberturaMm, bloco: ultimo?.bloco ?? 0, passagens: comp.crossings.filter((p) => !p.deleted).length, confirmadoEm: Date.now(), autor: String(body.autor ?? 'Cronometragem').slice(0, 60) };
+            if (!atual || atual.referencia || !ultimo || atual.melhorMs == null || aberturaMm == null || Math.abs(aberturaMm) > 20 || resultadoEqualizacao(s).metaMs == null)
+              return send(res, 400, { error: 'Para confirmar manualmente, informe um ajuste de até 20 mm para um kart não referência com bloco completo e meta definida nesta equalização.' });
+            confirmacaoManual = { aberturaMm, bloco: ultimo.bloco, confirmadoEm: Date.now(), autor: String(body.autor ?? 'Cronometragem').slice(0, 60) };
           }
         }
         const entrada = (body.sistemas ?? {}) as Record<string, { status?: string; nota?: string }>;
@@ -3025,23 +2979,6 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     return send(res, 200, sessionView(s));
   }
 
-  const ofensa = path.match(/^\/api\/sessions\/([\w-]+)\/offenses\/([^/]+)$/);
-  if (ofensa && method === 'POST') {
-    const s = sessions.get(ofensa[1]);
-    if (!s) return send(res, 404, { error: 'Bateria não encontrada.' });
-    try {
-      const body = await readBody(req);
-      const kart = String(body.kart ?? '').trim();
-      const codigo = decodeURIComponent(ofensa[2]) as import('../lib/timing/race-engine').RaceOffenseCode;
-      const autor = String(body.autor ?? 'Cronometragem').slice(0, 60);
-      const resultado = applyRaceOffense(s, kart, codigo, Date.now(), autor, randomUUID());
-      registrarObservacao(s, `${resultado.penalidade.texto} · ${resultado.competitor.name} (kart ${kart})`, autor, 'penalty');
-      saveSession(s);
-      scheduleStateBroadcast();
-      return send(res, 200, { ...sessionView(s), offense: resultado });
-    } catch (err) { return send(res, 400, { error: (err as Error).message }); }
-  }
-
   // excluir uma observação da prova (aba Observações, pedido de 07/10): sai do resultado e dos relatórios; fica no log
   const ob = path.match(/^\/api\/sessions\/([\w-]+)\/observations\/([\w-]+)$/);
   if (ob && method === 'DELETE') {
@@ -3069,8 +3006,12 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     }
     try {
       if (!action && method === 'GET') return send(res, 200, sessionView(s));
-      if (action === 'emails' && !m[3] && method === 'GET') return send(res, 200, s.emailsResultado ?? null);
+      if (action === 'emails' && !m[3] && method === 'GET') {
+        if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para consultar destinatários e resultado dos e-mails.' });
+        return send(res, 200, s.emailsResultado ?? null);
+      }
       if (action === 'emails' && !m[3] && method === 'POST') {
+        if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para reenvio de resultados.' });
         // reenvio manual (menu da cronometragem): todos, só um kart, ou o resultado oficial para outro endereço
         const body = await readBody(req);
         if (s.state !== 'encerrada' && s.state !== 'bandeira_final') return send(res, 409, { error: 'Encerre a bateria antes de enviar o resultado.' });
@@ -3123,12 +3064,10 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       if (action === 'passings' && m[3] === 'manual' && method === 'POST') {
         const body = await readBody(req);
         const kart = String(body.kart ?? '').trim();
-        const marcarManual = body.marcarManual === true;
-        if (marcarManual && !s.manualTimingKarts?.[kart]) return send(res, 409, { error: 'Ative a marcação manual deste kart antes de registrar a passagem.' });
         const passage = includeManualPassing(s, {
           id: randomUUID(),
           kart,
-          ...(marcarManual ? {} : { lapMs: Number(body.lapMs) }),
+          lapMs: Number(body.lapMs),
           wallMs: now,
           name: String(body.name ?? ''),
           transponder: body.transponder == null ? null : Number(body.transponder),
@@ -3137,20 +3076,6 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         saveSession(s);
         scheduleStateBroadcast();
         return send(res, 201, { ok: true, passages: crossingRows(s) });
-      }
-      if (action === 'laps' && m[3] === 'manual' && method === 'POST') {
-        const body = await readBody(req);
-        const antes = new Set(s.competitors.flatMap((c) => c.crossings.map((x) => x.id).filter((id): id is string => Boolean(id))));
-        const result = addMissingLaps(s, {
-          kart: String(body.kart ?? '').trim(), count: Number(body.count), position: Number(body.position),
-          trackLengthMeters: trackLengthFor(s), id: () => randomUUID(),
-        });
-        const adicionadas = s.competitors.flatMap((c) => c.crossings.filter((x) => x.id && !antes.has(x.id)).map((x) => ({ kart: c.kart, crossing: x })));
-        for (const { kart, crossing } of adicionadas) journal({ wallMs: crossing.wallMs, transponder: crossing.transponder ?? null, kart, decoderTimeMs: crossing.decoderTimeMs, sessionId: s.id, result: 'counted-manual', source: 'manual', passageId: crossing.id });
-        registrarObservacao(s, `Falha de sensor · ${result.lapsAdded} volta(s) inseridas para o kart ${result.kart}, posição P${result.position}, usando os tempos do kart ${result.referenceKart}`, String(body.autor ?? 'Cronometragem').slice(0, 60), 'manual');
-        saveSession(s);
-        scheduleStateBroadcast();
-        return send(res, 201, { ...sessionView(s), inserted: result });
       }
       if (action === 'passings' && m[3] === 'actions' && method === 'POST') {
         const body = await readBody(req);
@@ -3223,17 +3148,6 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         setManualPosition(s, kart, position);
         const autor = String(body.autor ?? 'Cronometragem').slice(0, 60);
         registrarObservacao(s, limpar ? `Posição automática restaurada · Kart ${kart}` : `Posição manual · Kart ${kart} → P${position}`, autor, limpar ? 'system' : 'manual');
-        saveSession(s);
-        scheduleStateBroadcast();
-        return send(res, 200, sessionView(s));
-      }
-      if (action === 'manualTiming' && !m[3] && method === 'POST') {
-        const body = await readBody(req);
-        const kart = String(body.kart ?? '').trim();
-        const enabled = body.enabled === true;
-        const autor = String(body.autor ?? 'Cronometragem').slice(0, 60);
-        const ativo = setManualTiming(s, kart, enabled, autor, now);
-        registrarObservacao(s, ativo ? `Sensor do kart ${kart} substituído temporariamente: marcação manual ativada` : `Sensor do kart ${kart} restabelecido: marcação manual encerrada`, autor, 'manual');
         saveSession(s);
         scheduleStateBroadcast();
         return send(res, 200, sessionView(s));
@@ -3434,7 +3348,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     }
   }
 
-  if (path === '/healthz') return send(res, 200, { ok: true, decoder: decoderView(), sessions: sessions.size, transmissao: transmissaoStatus() });
+  if (path === '/healthz') return send(res, 200, { ok: true, decoder: veioDaInternet(req) ? JSON.parse(jsonPublico(decoderView())) : decoderView(), sessions: sessions.size, transmissao: transmissaoStatus() });
 
   return send(res, 404, { error: 'Rota desconhecida.' });
 }
@@ -3488,10 +3402,14 @@ function isAuthorizedDestructive(req: http.IncomingMessage): boolean {
   if (veioDaInternet(req)) return false;
   const ip = req.socket.remoteAddress || '';
   if (ip === '127.0.0.1' || ip === '::1' || ip.endsWith('127.0.0.1') || ip === '::ffff:127.0.0.1') return true;
-  if (/^192\.168\.20\.\d+$/.test(ip) || /^10\.\d+\.\d+\.\d+$/.test(ip) || /^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/.test(ip)) return true;
-  if (ip.startsWith('::ffff:192.168.20.') || ip.startsWith('::ffff:10.') || ip.startsWith('::ffff:172.')) return true;
+  const ipsLocais = Object.values(os.networkInterfaces()).flatMap((items) => (items ?? []).map((item) => item.address));
+  if (clienteEhMaquinaOperadora(ip, req.headers['x-client-machine'], process.env.COMPUTERNAME, ipsLocais)) return true;
   const key = req.headers['x-timing-key'] || req.headers['x-ops-key'] || req.headers['authorization'];
-  if (key && (key === process.env.TIMING_OPS_KEY || key === process.env.OPS_RECEPCAO_KEY)) return true;
+  const configPath = process.env.TIMING_AUTH_CONFIG_FILE || 'C:/Program Files/Kartodromo/Cronometragem/appsettings.json';
+  let installedKey = '';
+  try { installedKey = String((JSON.parse(readFileSync(configPath, 'utf8')) as { ChaveCronometragem?: unknown }).ChaveCronometragem ?? ''); } catch { /* melhor esforço */ }
+  const expected = [process.env.TIMING_OPS_KEY, process.env.OPS_RECEPCAO_KEY, installedKey].filter((x): x is string => Boolean(x));
+  if (typeof key === 'string' && expected.some((secret) => chaveOperadorValida(key, secret) || key.startsWith('Bearer ') && chaveOperadorValida(key.slice(7), secret))) return true;
   return false;
 }
 

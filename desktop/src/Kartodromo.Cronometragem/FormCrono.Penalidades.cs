@@ -22,68 +22,6 @@ public partial class FormCrono
         return kart;
     }
 
-    ToolStripMenuItem MenuPunicoesFixas()
-    {
-        var menu = new ToolStripMenuItem("Punições fixas");
-        foreach (var (codigo, titulo) in new[]
-        {
-            ("kart-levantado", "Levantar do kart · desclassificação automática"),
-            ("capacete-retirado", "Tirar o capacete · termina em último"),
-            ("fechou-passagem", "Fechou passagem"),
-            ("toque", "Toque"),
-            ("queimou-largada", "Queimou largada"),
-            ("ignorou-bandeira", "Ignorou bandeira"),
-            ("largar-ultimo", "Largar de último · tomada de tempo"),
-            ("contramao", "Andar na contramão · desclassificação automática"),
-            ("pilotagem-perigosa", "Pilotagem perigosa · bater ou rodar (3º alerta = DSQ)"),
-        }) menu.DropDownItems.Add(titulo, null, (_, _) => AplicarInfracao(codigo));
-        return menu;
-    }
-
-    void AplicarInfracao(string codigo, string kart = null)
-    {
-        if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
-        kart ??= KartSelecionado();
-        if (string.IsNullOrWhiteSpace(kart)) { Msg.Aviso(this, "Selecione o piloto que recebeu a punição."); return; }
-        var comp = Crono.Arr(_sess, "competitors").FirstOrDefault(c => c.S("kart") == kart);
-        if (comp == null) { Msg.Aviso(this, $"O kart {kart} não está nesta bateria."); return; }
-        if (codigo == "largar-ultimo" && _sess.S("type") != "classificacao") { Msg.Aviso(this, "Largar de último só pode ser aplicado durante a tomada de tempo."); return; }
-        var alertas = Crono.Arr(comp, "penalidades").Count(p => p.S("codigo") == "pilotagem-perigosa") + 1;
-        var efeito = codigo switch
-        {
-            "kart-levantado" => "O sistema desclassificará o piloto automaticamente.",
-            "capacete-retirado" => "A posição do piloto será ajustada automaticamente para último.",
-            "contramao" => "O sistema desclassificará o piloto automaticamente.",
-            "largar-ultimo" => "A posição será ajustada automaticamente para último nesta tomada de tempo.",
-            "pilotagem-perigosa" when alertas < 3 => $"Transmita o alerta {alertas} de 2 ao piloto em pista. O terceiro registro desclassifica automaticamente.",
-            "pilotagem-perigosa" => "Este é o terceiro registro. O sistema desclassificará o piloto automaticamente.",
-            _ => "A punição será registrada na bateria e no relatório.",
-        };
-        if (!Msg.Pergunta(this, $"Registrar “{tituloPunicacao(codigo)}” para {comp.S("name")} (kart {kart})?\n\n{efeito}")) return;
-        Seguro.Rodar(this, async () =>
-        {
-            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/offenses/{Uri.EscapeDataString(codigo)}", new JsonObject { ["kart"] = kart, ["autor"] = Environment.UserName });
-            await Atualizar();
-            var atual = Crono.Arr(_sess, "competitors").FirstOrDefault(c => c.S("kart") == kart);
-            var registro = Crono.Arr(atual, "penalidades").LastOrDefault(p => p.S("codigo") == codigo);
-            Msg.Info(this, registro?.S("texto") ?? $"{tituloPunicacao(codigo)} registrado.");
-        });
-    }
-
-    static string tituloPunicacao(string codigo) => codigo switch
-    {
-        "kart-levantado" => "Levantar do kart",
-        "capacete-retirado" => "Tirar o capacete",
-        "fechou-passagem" => "Fechou passagem",
-        "toque" => "Toque",
-        "queimou-largada" => "Queimou largada",
-        "ignorou-bandeira" => "Ignorou bandeira",
-        "largar-ultimo" => "Largar de último",
-        "contramao" => "Andar na contramão",
-        "pilotagem-perigosa" => "Pilotagem perigosa",
-        _ => codigo,
-    };
-
     /// <summary>Advertência (preta e branca) ou penalidade de tempo. Cada clique é uma nova: o piloto pode receber várias.
     /// A janela também lista as que ele já tem, para retirar uma dada por engano.</summary>
     void AplicarPenalidade(string tipo, string kart = null)

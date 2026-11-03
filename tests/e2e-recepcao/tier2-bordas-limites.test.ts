@@ -284,6 +284,7 @@ describe('Tier 2: Casos de Borda e Limites dos 36 Itens da Recepção', () => {
   describe('Fila de Impressão: Reentrega e Contingência sem Purga (Itens 1, 2)', () => {
     it('job em impressão há menos de 90 segundos não é reentregue antecipadamente', () => {
       const fila = new SimuladorFilaImpressao();
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const job = fila.enfileirar('/termo?id=200', 'Termo Teste', 'Totem 1');
       const t0 = new Date('2026-10-26T12:00:00Z');
       fila.proximoJob(t0);

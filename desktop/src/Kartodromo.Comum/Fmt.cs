@@ -45,14 +45,6 @@ public static partial class Fmt
     }
     public static string MascaraFone(string v)
     {
-        if (string.IsNullOrWhiteSpace(v)) return "";
-        var trimmed = v.TrimStart();
-        if (trimmed.StartsWith('+'))
-        {
-            var intl = Digitos(trimmed);
-            if (intl.Length > 15) intl = intl[..15];
-            return "+" + intl;
-        }
         var d = Digitos(v);
         if (d.Length > 11) d = d[..11];
         if (d.Length == 0) return "";

@@ -27,7 +27,7 @@ export type Regras = {
   voltasPorParadaFaltante: number;
   boxAbreMin: number;
   boxFechaMin: number;
-  /** volta acima disto (e pelo menos 40% da parada mínima acima da volta normal) é volta do box */
+  /** volta acima disto (e pelo menos 35 s acima da volta normal da equipe) é volta do box */
   limiarParadaMs: number;
   /** tempo adicional de trânsito no pit lane (entrada/saída e velocidade reduzida) a descontar da parada */
   pitTransitDeltaMs?: number;
@@ -282,7 +282,7 @@ export function analisarCorrida(input: {
       const lapMs = v.lapMs as number;
       const numVolta = v.lap || i + 1;
       const ajuste = ajustes.get(i + 1) ?? ajustes.get(numVolta) ?? null;
-      const minDelta = Math.max(35_000, Math.round(r.paradaMinMs * 0.4));
+      const minDelta = 35_000;
       if ((lapMs < r.limiarParadaMs || lapMs < refEquipe + minDelta) && ajuste !== 'validar' && ajuste !== 'quebra' && ajuste !== 'invalidar') return;
       const inicioMs = v.wallMs - lapMs;
       const prev = i > 0 ? voltas[i - 1] : null;
@@ -295,11 +295,8 @@ export function analisarCorrida(input: {
       const temposNaVolta = temposPorVolta.get(numVolta) ?? [];
       const medVolta = mediana(temposNaVolta);
       const limiarSafetyCar = Math.min(r.limiarParadaMs, Math.max(r.voltaLimpaMaxMs, refGeral * 1.35));
-      const medianaSubiuAbruptamente = temposNaVolta.length >= 2 && medVolta != null && (
-        temposNaVolta.length >= 3
-          ? medVolta >= limiarSafetyCar
-          : Math.min(...temposNaVolta) >= limiarSafetyCar && (Math.max(...temposNaVolta) - Math.min(...temposNaVolta)) < minDelta
-      );
+      // safety car só com 3 equipes ou mais: duas parando na mesma volta é parada de verdade, não pista lenta
+      const medianaSubiuAbruptamente = temposNaVolta.length >= 3 && medVolta != null && medVolta >= limiarSafetyCar;
       if ((voltaSobBandeira(v) || medianaSubiuAbruptamente) && !v.pitStopExplicit && !teveTroca && ajuste !== 'validar' && ajuste !== 'quebra' && ajuste !== 'invalidar') {
         return;
       }
@@ -323,10 +320,8 @@ export function analisarCorrida(input: {
       if (p.situacao === 'valida_punida') alertas.push({ nivel: 'aviso', texto: `Parada da volta ${p.volta} com ${fmtMs(p.tempoMs)}: vale, mas +${r.punicaoFaixaSeg} s.` });
       if (p.foraDaJanela && !p.quebra) alertas.push({ nivel: 'grave', texto: `Parada na volta ${p.volta} com o box fechado: só vale se foi quebra (confirme no box), senão o kart é desclassificado.` });
     }
-    // Item 11: Paradas por quebra/manutenção de emergência não contam para o teto de paradas de regulamento
-    const paradasRegulamento = contam.filter((p) => !p.quebra && p.ajuste !== 'quebra');
-    if (paradasRegulamento.length > r.paradasMax) { motivosDq.push(`${paradasRegulamento.length} paradas de regulamento (máximo ${r.paradasMax})`); }
-    else if (paradasRegulamento.length === r.paradasMax) alertas.push({ nivel: 'aviso', texto: `Já fez ${r.paradasMax} paradas: a próxima desclassifica.` });
+    if (contam.length > r.paradasMax) { motivosDq.push(`${contam.length} paradas (máximo ${r.paradasMax})`); }
+    else if (contam.length === r.paradasMax) alertas.push({ nivel: 'aviso', texto: `Já fez ${r.paradasMax} paradas: a próxima desclassifica.` });
 
     // punições
     let punicaoSeg = contam.filter((p) => p.situacao === 'valida_punida').length * r.punicaoFaixaSeg;
@@ -341,15 +336,9 @@ export function analisarCorrida(input: {
     if (e.desclassificada && !motivosDq.length) motivosDq.push('desclassificada pela direção de prova');
     const voltasFaltantes = faltando * r.voltasPorParadaFaltante;
 
-    // Item 10: Associação de piloto com tolerância estendida para suportar pesagem e atraso do fiscal no tablet
+    // stints (entre as paradas) com piloto e kart pelas trocas registradas no box
     const trocas = input.trocas.filter((t) => t.equipeId === e.id).sort((a, b) => a.emMs - b.emMs);
-    const quemEm = (ms: number) => {
-      let t: TrocaIn | null = null;
-      for (const x of trocas) {
-        if (x.emMs <= ms + 300_000) t = x;
-      }
-      return t ?? trocas[0] ?? null;
-    };
+    const quemEm = (ms: number) => { let t: TrocaIn | null = null; for (const x of trocas) if (x.emMs <= ms + 90_000) t = x; return t; };
     const cortes = contam.map((p) => p.volta);
     const stints: Stint[] = [];
     let ini = 1;

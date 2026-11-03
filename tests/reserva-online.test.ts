@@ -1,9 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { codigoReserva, idade, validarReserva, type Agenda } from '../workers/pre-cadastro/src/validar';
-import { conciliarPagamentos, criarPedido, liberado, situacaoPedido, syncPedidos, syncResultado, visaoPublica, webhookStone, type EnvReservas, type Pedido } from '../workers/pre-cadastro/src/reservas';
-import { hojeBrasilia } from '../workers/pre-cadastro/src/stone';
-import * as opsDb from '../lib/ops/db';
-import { agendaOnline, descricaoPedido } from '../lib/ops/reserva-online';
+import { conciliarPagamentos, criarPedido, liberado, situacaoPedido, syncPedidos, syncResultado, visaoPublica, webhookAsaas, type EnvReservas, type Pedido } from '../workers/pre-cadastro/src/reservas';
+import { hojeBrasilia } from '../workers/pre-cadastro/src/asaas';
+import { descricaoPedido } from '../lib/ops/reserva-online';
 import worker from '../workers/pre-cadastro/src/index';
 
 const HOJE = new Date('2026-10-01T15:00:00Z');
@@ -106,7 +105,7 @@ describe('descricaoPedido e vencimento', () => {
   });
 });
 
-// ---------------------------------------------------------------- fluxo do site com R2 e Stone simulados
+// ---------------------------------------------------------------- fluxo do site com R2 e Asaas simulados
 
 function r2() {
   const m = new Map<string, string>();
@@ -125,54 +124,34 @@ function ctx() {
   return { c: { waitUntil: (p: Promise<unknown>) => { pendentes.push(p); } } as ExecutionContext, esperar: () => Promise.all(pendentes) };
 }
 
-function stoneFalsa() {
+function asaasFalsa() {
   const chamadas: { metodo: string; caminho: string; corpo?: unknown }[] = [];
-  const pedido = { id: 'or_1', code: '', status: 'pending', charges: [] as unknown[], checkouts: [] as unknown[] };
   const f = vi.fn(async (url: string, init: RequestInit = {}) => {
-    if (String(url) === 'https://qr.test/1.png') return new Response('ABC', { status: 200 });
-    const caminho = String(url).replace('https://sdx-api.pagar.me/core/v5', '');
-    const corpo = init.body ? JSON.parse(String(init.body)) : undefined;
-    chamadas.push({ metodo: init.method ?? 'GET', caminho, corpo });
+    const caminho = String(url).replace('https://api-sandbox.asaas.com/v3', '');
+    chamadas.push({ metodo: init.method ?? 'GET', caminho, corpo: init.body ? JSON.parse(String(init.body)) : undefined });
     const resp = (b: unknown) => new Response(JSON.stringify(b), { status: 200 });
-    if (caminho === '/orders' && init.method === 'POST') {
-      pedido.code = corpo.code;
-      if (corpo.payments[0].payment_method === 'pix') pedido.charges = [{ status: 'pending', payment_method: 'pix', last_transaction: { qr_code: '000201PIX', qr_code_url: 'https://qr.test/1.png' } }];
-      else pedido.checkouts = [{ payment_url: 'https://pay.test/or_1' }];
-      return resp(pedido);
-    }
-    if (caminho === '/orders/or_1/closed' && init.method === 'PATCH') return resp({ ...pedido, status: 'canceled' });
-    if (caminho === '/orders/or_1') return resp(pedido);
+    if (caminho.startsWith('/customers?')) return resp({ data: [] });
+    if (caminho === '/customers') return resp({ id: 'cus_1' });
+    if (caminho === '/payments' && init.method === 'POST') return resp({ id: 'pay_1', invoiceUrl: 'https://sandbox.asaas.com/i/pay_1', status: 'PENDING', billingType: 'PIX' });
+    if (caminho === '/payments/pay_1/pixQrCode') return resp({ encodedImage: 'QUJD', payload: '000201PIX', expirationDate: '2026-10-01 23:59:59' });
+    if (caminho === '/payments/pay_1' && init.method === 'DELETE') return resp({ deleted: true });
+    if (caminho === '/payments/pay_1') return resp({ id: 'pay_1', status: 'PENDING', billingType: 'PIX', invoiceUrl: '' });
     return new Response('{}', { status: 404 });
   });
-  return { f, chamadas, pedido };
+  return { f, chamadas };
 }
 
 const PREVIA = 'previa-secreta-de-teste';
 function ambiente() {
   const { m, bucket } = r2();
-  const env: EnvReservas = { PRE: bucket, STONE_API_KEY: 'sk_test_teste', STONE_URL: 'https://sdx-api.pagar.me/core/v5', STONE_WEBHOOK_TOKEN: 'w'.repeat(40), RESERVAS_ATIVAS: '0', RESERVAS_PREVIA: PREVIA };
+  const env: EnvReservas = { PRE: bucket, ASAAS_API_KEY: '$aact_hmlg_teste', ASAAS_URL: 'https://api-sandbox.asaas.com/v3', ASAAS_WEBHOOK_TOKEN: 'w'.repeat(40), RESERVAS_ATIVAS: '0', RESERVAS_PREVIA: PREVIA };
   return { m, env };
 }
 const pedir = (corpo: unknown, previa = PREVIA) =>
   new Request(`https://reservas.kartodromodebetim.com.br/api/reservas?previa=${previa}`, { method: 'POST', body: JSON.stringify(corpo) });
 const semLimite = async () => false;
 
-afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
-
-describe('agenda publicada para reserva mobile', () => {
-  it('envia capacidade total separada das vagas livres', async () => {
-    vi.spyOn(opsDb, 'one').mockResolvedValue({ preco: 14500, nome: 'Locação' } as never);
-    vi.spyOn(opsDb, 'query').mockResolvedValue([{
-      id: 101, inicio: '2026-10-26T12:00', nome: 'BATERIA 12:00', vagas: 20, ocupadas: 12,
-    }] as never);
-
-    const result = await agendaOnline();
-
-    expect(result.horarios).toEqual([{
-      id: 101, inicio: '2026-10-26T12:00', nome: 'BATERIA 12:00', livres: 8, vagasTotais: 20,
-    }]);
-  });
-});
+afterEach(() => vi.unstubAllGlobals());
 
 describe('fluxo da reserva no site', () => {
   it('fechado ao público sem RESERVAS_ATIVAS nem prévia', async () => {
@@ -183,11 +162,11 @@ describe('fluxo da reserva no site', () => {
     expect(r.status).toBe(403);
   });
 
-  it('pedido → vaga segurada → Pix → aviso da Stone → confirmado', async () => {
+  it('pedido → vaga segurada → Pix → aviso da Asaas → confirmado', async () => {
     const { m, env } = ambiente();
     m.set('reservas/agenda.json', JSON.stringify(agenda));
-    const stone = stoneFalsa();
-    vi.stubGlobal('fetch', stone.f);
+    const asaas = asaasFalsa();
+    vi.stubGlobal('fetch', asaas.f);
 
     // 1. cliente envia
     const r = await criarPedido(pedir({ ...base, t: Date.now() - 10_000 }), env, semLimite);
@@ -214,27 +193,22 @@ describe('fluxo da reserva no site', () => {
     const k1 = ctx();
     await syncResultado(new Request('https://x', { method: 'POST', body: JSON.stringify([{ id, acao: 'reservado', valorCentavos: 29000, expiraEm: '2026-10-01T12:15:00-03:00', descricao: 'Kartódromo de Betim · BATERIA 09:15', inicio: '2026-10-03T09:15' }]) }), env, k1.c);
     await k1.esperar();
-    const cobranca = stone.chamadas.find((c) => c.caminho === '/orders' && c.metodo === 'POST')!;
-    expect(cobranca.corpo).toMatchObject({ code: id, closed: true, items: [{ amount: 29000, quantity: 1 }], customer: { document: '52998224725', document_type: 'CPF' }, payments: [{ payment_method: 'pix' }] });
+    const cobranca = asaas.chamadas.find((c) => c.caminho === '/payments' && c.metodo === 'POST')!;
+    expect(cobranca.corpo).toMatchObject({ customer: 'cus_1', billingType: 'PIX', value: 290, externalReference: id });
     expect(((await (await syncPedidos(env)).json()) as Pedido[]).length).toBe(0);
 
     const tela = (await (await situacaoPedido(env, id, k1.c)).json()) as ReturnType<typeof visaoPublica>;
-    expect(tela).toMatchObject({ status: 'aguardando_pagamento', pix: { payload: '000201PIX', imagem: btoa('ABC') }, valorCentavos: 29000, nome: 'Maria' });
+    expect(tela).toMatchObject({ status: 'aguardando_pagamento', pix: { payload: '000201PIX', imagem: 'QUJD' }, valorCentavos: 29000, nome: 'Maria' });
     expect(JSON.stringify(tela)).not.toContain('52998224725');
 
-    // 3. aviso da Stone: token errado é recusado; o certo marca pago (repetido não muda nada)
-    const aviso = (token: string) => new Request(`https://x/api/stone/webhook?token=${token}`, { method: 'POST', body: JSON.stringify({ type: 'order.paid', data: { id: 'or_1', code: id } }) });
-    expect((await webhookStone(aviso('x'.repeat(40)), env)).status).toBe(401);
-    // aviso forjado com o token certo: a Stone ainda diz que não foi pago, então nada muda
-    expect((await webhookStone(aviso('w'.repeat(40)), env)).status).toBe(200);
-    expect(((await (await syncPedidos(env)).json()) as Pedido[]).length).toBe(0);
-    stone.pedido.status = 'paid';
-    (stone.pedido.charges[0] as { status: string }).status = 'paid';
-    expect((await webhookStone(aviso('w'.repeat(40)), env)).status).toBe(200);
-    expect((await webhookStone(aviso('w'.repeat(40)), env)).status).toBe(200);
+    // 3. aviso da Asaas: token errado é recusado; o certo marca pago (repetido não muda nada)
+    const aviso = (token: string) => new Request('https://x/api/asaas/webhook', { method: 'POST', headers: { 'asaas-access-token': token }, body: JSON.stringify({ event: 'PAYMENT_RECEIVED', payment: { id: 'pay_1', externalReference: id, billingType: 'PIX' } }) });
+    expect((await webhookAsaas(aviso('x'.repeat(40)), env)).status).toBe(401);
+    expect((await webhookAsaas(aviso('w'.repeat(40)), env)).status).toBe(200);
+    expect((await webhookAsaas(aviso('w'.repeat(40)), env)).status).toBe(200);
     const pagos = (await (await syncPedidos(env)).json()) as Pedido[];
     expect(pagos).toHaveLength(1);
-    expect(pagos[0]).toMatchObject({ status: 'pago', pagamento: { asaasId: 'or_1', billingType: 'PIX' } });
+    expect(pagos[0]).toMatchObject({ status: 'pago', pagamento: { asaasId: 'pay_1', billingType: 'PIX' } });
 
     // 4. servidor confirma
     await syncResultado(new Request('https://x', { method: 'POST', body: JSON.stringify([{ id, acao: 'confirmado', codigo }]) }), env, ctx().c);
@@ -243,48 +217,47 @@ describe('fluxo da reserva no site', () => {
     expect(((await (await syncPedidos(env)).json()) as Pedido[]).length).toBe(0);
   });
 
-  it('sem pagamento no prazo: expira e cancela a cobrança na Stone', async () => {
+  it('sem pagamento no prazo: expira e cancela a cobrança na Asaas', async () => {
     const { m, env } = ambiente();
     m.set('reservas/agenda.json', JSON.stringify(agenda));
-    const stone = stoneFalsa();
-    vi.stubGlobal('fetch', stone.f);
+    const asaas = asaasFalsa();
+    vi.stubGlobal('fetch', asaas.f);
     const { id } = (await (await criarPedido(pedir({ ...base, forma: 'cartao', quantidade: 1, t: Date.now() - 10_000 }), env, semLimite)).json()) as { id: string };
     const k = ctx();
     await syncResultado(new Request('https://x', { method: 'POST', body: JSON.stringify([{ id, acao: 'reservado', valorCentavos: 14500, expiraEm: '2026-10-01T12:15:00-03:00', descricao: 'x', inicio: '2026-10-03T09:15' }]) }), env, k.c);
     await k.esperar();
     const tela = (await (await situacaoPedido(env, id, k.c)).json()) as ReturnType<typeof visaoPublica>;
-    expect(tela).toMatchObject({ forma: 'cartao', invoiceUrl: 'https://pay.test/or_1', pix: null });
-    expect(stone.chamadas.some((c) => String(c.caminho).includes('qr'))).toBe(false);
+    expect(tela).toMatchObject({ forma: 'cartao', invoiceUrl: 'https://sandbox.asaas.com/i/pay_1', pix: null });
+    expect(asaas.chamadas.some((c) => c.caminho.endsWith('pixQrCode'))).toBe(false);
     const k2 = ctx();
     await syncResultado(new Request('https://x', { method: 'POST', body: JSON.stringify([{ id, acao: 'expirado' }]) }), env, k2.c);
     await k2.esperar();
-    expect(stone.chamadas.some((c) => c.caminho === '/orders/or_1/closed' && c.metodo === 'PATCH')).toBe(true);
+    expect(asaas.chamadas.some((c) => c.caminho === '/payments/pay_1' && c.metodo === 'DELETE')).toBe(true);
     expect(((await (await situacaoPedido(env, id, k2.c)).json()) as { status: string }).status).toBe('expirado');
   });
 
-  it('Pix pago sem aviso e com a página fechada: a conferência com a Stone acha e manda para o servidor (ACEXRJ, 12/10)', async () => {
+  it('Pix pago sem aviso e com a página fechada: a conferência com a Asaas acha e manda para o servidor (ACEXRJ, 12/10)', async () => {
     const { m, env } = ambiente();
     m.set('reservas/agenda.json', JSON.stringify(agenda));
-    const stone = stoneFalsa();
-    vi.stubGlobal('fetch', stone.f);
+    const asaas = asaasFalsa();
+    vi.stubGlobal('fetch', asaas.f);
     const { id } = (await (await criarPedido(pedir({ ...base, t: Date.now() - 10_000 }), env, semLimite)).json()) as { id: string };
     const k = ctx();
     await syncResultado(new Request('https://x', { method: 'POST', body: JSON.stringify([{ id, acao: 'reservado', valorCentavos: 29000, expiraEm: '2026-10-01T12:15:00-03:00', descricao: 'x', inicio: '2026-10-03T09:15' }]) }), env, k.c);
     await k.esperar();
     // o servidor venceu o prazo (o aviso foi para o endereço antigo)
     await syncResultado(new Request('https://x', { method: 'POST', body: JSON.stringify([{ id, acao: 'expirado' }]) }), env, ctx().c);
-    // a Stone tem o Pix recebido
-    stone.f.mockImplementation(async (url: string) => {
-      const caminho = String(url).replace('https://sdx-api.pagar.me/core/v5', '');
-      const pix = [{ status: 'paid', payment_method: 'pix' }];
-      const pagas = caminho.startsWith('/orders?status=paid') ? [{ id: 'or_1', status: 'paid', code: id, charges: pix }, { id: 'or_9', status: 'paid', code: 'outra-coisa', charges: pix }] : [];
+    // a Asaas tem o Pix recebido
+    asaas.f.mockImplementation(async (url: string) => {
+      const caminho = String(url).replace('https://api-sandbox.asaas.com/v3', '');
+      const pagas = caminho.startsWith('/payments?status=RECEIVED') ? [{ id: 'pay_1', status: 'RECEIVED', billingType: 'PIX', externalReference: id }, { id: 'pay_9', status: 'RECEIVED', billingType: 'PIX', externalReference: 'outra-coisa' }] : [];
       return new Response(JSON.stringify({ data: pagas }), { status: 200 });
     });
     expect(await conciliarPagamentos(env, Date.now() + 3_600_000)).toBe(1);
     expect(await conciliarPagamentos(env, Date.now() + 3_600_000)).toBe(0); // a mesma conferência não repete dentro do minuto
     const fila = (await (await syncPedidos(env)).json()) as Pedido[];
     expect(fila).toHaveLength(1);
-    expect(fila[0]).toMatchObject({ id, status: 'pago', pagamento: { asaasId: 'or_1', billingType: 'PIX' } });
+    expect(fila[0]).toMatchObject({ id, status: 'pago', pagamento: { asaasId: 'pay_1', billingType: 'PIX' } });
 
     // "pago" no site mas fora da fila (nunca chegou à recepção): a conferência põe de volta
     m.delete(`reservas/fila/${id}`);

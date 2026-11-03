@@ -34,14 +34,10 @@ describe('cadastro da recepção exige peso e e-mail', () => {
     { email: '', peso: '80' },
     { email: 'email-invalido', peso: '80' },
     { email: 'piloto@example.com', peso: 'NaN' },
+    { email: 'piloto@example.com', peso: '80', instagram: '' },
     { email: 'piloto@example.com', peso: '80', instagram: 'perfil inválido' },
   ])('rejeita cadastro incompleto ou inválido: %j', async (dados) => {
     await expect(call('/clientes', 'POST', { nome: 'TESTE CODEX', ...dados })).rejects.toMatchObject({ status: 400 });
-  });
-
-  it('aceita cadastro com Instagram vazio (opcional)', async () => {
-    const res = await call('/clientes', 'POST', { nome: 'TESTE CODEX', email: 'piloto@example.com', peso: '80', instagram: '' });
-    expect(res.status).toBe(201);
   });
 });
 
@@ -330,31 +326,13 @@ describe('Office: mover reserva preserva os dados de cobrança', () => {
   });
 
   it.each([
+    [{ ...reservaPendente, Pago: true }, { ...bateriaDestino, produtoId: 10, preco: 22000 }],
     [{ ...reservaPendente, Pago: true }, { ...bateriaDestino, produtoId: 20, preco: 17500 }],
-  ])('bloqueia reserva paga em produto de outro serviço', async (reserva, destino) => {
+  ])('bloqueia reserva paga quando produto ou preço diverge', async (reserva, destino) => {
     const { statements, executar } = moverComReserva(reserva, destino);
 
-    await expect(executar()).rejects.toMatchObject({ status: 409, message: expect.stringContaining('mesmo serviço') });
+    await expect(executar()).rejects.toMatchObject({ status: 409, message: expect.stringContaining('mesmo produto e preço') });
     expect(statements.some((statement) => statement.sql.startsWith('UPDATE dbo.Inscricao'))).toBe(false);
-  });
-
-  it.each([
-    [{ ...reservaPendente, Pago: true, preco: 14500 }, { ...bateriaDestino, produtoId: 10, preco: 17500 }],
-    [{ ...reservaPendente, Pago: true, preco: 14500, servicoLocacao: true, categoria: 'Indoor', servico: 'LOCAÇÃO PADRÃO', duracaoMin: 20, tipoKart: 'light' }, { ...bateriaDestino, preco: 17500, servicoLocacao: true, categoria: 'Indoor', servico: 'LOCAÇÃO PADRÃO', duracaoMin: 20, tipoKart: 'light' }],
-  ])('move antecipado pago preservando o preço original mesmo com tarifa atual diferente', async (reserva, destino) => {
-    const { statements, executar } = moverComReserva(reserva, destino);
-    await expect(executar()).resolves.toMatchObject({ status: 200 });
-    const update = statements.find((statement) => statement.sql.startsWith('UPDATE dbo.Inscricao'));
-    expect(update?.sql).toContain('BateriaId = @destino');
-    expect(update?.sql).not.toMatch(/(?:PrecoCentavos|ValorCentavos|DescontoCentavos|ProdutoId|Pago)\s*=/);
-  });
-
-  it.each([
-    { tipoKart: 'super' }, { duracaoMin: 30 }, { categoria: 'Endurance' }, { servico: 'EVENTOS' }, { servicoLocacao: false },
-  ])('bloqueia troca de serviço pago incompatível: %j', async (diferenca) => {
-    const reserva = { ...reservaPendente, Pago: true, servicoLocacao: true, categoria: 'Indoor', servico: 'LOCAÇÃO PADRÃO', duracaoMin: 20, tipoKart: 'light' };
-    const destino = { ...bateriaDestino, servicoLocacao: true, categoria: 'Indoor', servico: 'LOCAÇÃO PADRÃO', duracaoMin: 20, tipoKart: 'light', ...diferenca };
-    await expect(moverComReserva(reserva, destino).executar()).rejects.toMatchObject({ status: 409 });
   });
 
   it('permite mover reserva paga mantendo produto e preço, sem reescrever a cobrança', async () => {
@@ -467,7 +445,7 @@ describe('Office: fidelidade e parceiros', () => {
     await expect(call('/senha', 'POST', { senhaAtual: 'senha-incorreta', nova: 'outra-senha' }))
       .rejects.toMatchObject({ status: 403 });
     expect(db.query).not.toHaveBeenCalled();
-  }, 15_000);
+  });
 
   it('requires at least eight characters for a new password', async () => {
     await expect(call('/senha', 'POST', { senhaAtual: 'old-password', nova: '1234567' }))

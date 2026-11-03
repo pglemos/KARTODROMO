@@ -6,6 +6,7 @@ import { CLIENTE_COLS, insertCliente, isValidCpf, one, onlyDigits, query, tx, up
 import { confereSenha, hashSenha, type Sessao } from './auth';
 import { erroCadastroObrigatorio, erroPesoCliente } from './cadastro-obrigatorio';
 import { mobileApiEndpoint } from '../mobile-api-url';
+import { ENDURANCE_VINCULO_SQL } from './endurance-vinculo';
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
@@ -195,7 +196,7 @@ function periodo(url: URL, col: string) {
 // ---------------------------------------------------------------- consultas de lista (arvore)
 
 const RESERVA_SELECT = `SELECT TOP 5000 i.Id id, i.Pago pago, CONVERT(varchar(16), b.Inicio, 126) dataHora, b.Nome reserva, b.Id bateriaId,
-  c.Id clienteId, c.Nome cliente, c.Documento documento, c.Telefone telefone, c.Peso peso, CONVERT(varchar(10), c.Nascimento, 126) nascimento,
+  c.Id clienteId, c.Nome cliente, endurance.equipe, endurance.equipeId, endurance.pulseira, c.Documento documento, c.Telefone telefone, c.Peso peso, CONVERT(varchar(10), c.Nascimento, 126) nascimento,
   CASE WHEN c.Nascimento IS NULL THEN NULL ELSE DATEDIFF(YEAR, c.Nascimento, GETDATE()) - CASE WHEN DATEADD(YEAR, DATEDIFF(YEAR, c.Nascimento, GETDATE()), c.Nascimento) > GETDATE() THEN 1 ELSE 0 END END idade,
   r.Nome responsavel, p.Id produtoId, p.Nome produto, p.Categoria categoria, ISNULL(i.PrecoCentavos, p.PrecoCentavos) preco, i.DescontoCentavos desconto,
   CASE WHEN i.Pago = 1 THEN i.ValorCentavos ELSE ISNULL(i.PrecoCentavos, p.PrecoCentavos) - i.DescontoCentavos END total,
@@ -203,6 +204,7 @@ const RESERVA_SELECT = `SELECT TOP 5000 i.Id id, i.Pago pago, CONVERT(varchar(16
   CONVERT(varchar(16), i.TermoImpressoEm, 126) termoImpressoEm, CONVERT(varchar(16), i.CriadoEm, 126) criadoEm,
   CASE WHEN i.Pago = 1 THEN ISNULL(onl.forma, cx.formas) END formaPagamento
   FROM dbo.Inscricao i JOIN dbo.Bateria b ON b.Id = i.BateriaId JOIN dbo.Cliente c ON c.Id = i.ClienteId
+  ${ENDURANCE_VINCULO_SQL}
   LEFT JOIN dbo.Cliente r ON r.Id = ISNULL(i.ResponsavelId, c.ResponsavelId) LEFT JOIN dbo.Produto p ON p.Id = ISNULL(i.ProdutoId, b.ProdutoId)
   OUTER APPLY (SELECT TOP 1 CASE ro.Forma WHEN 'pix' THEN 'Pix' WHEN 'debito' THEN 'Débito' WHEN 'credito' THEN 'Crédito' ELSE 'Cartão' END + ' (site)' forma
     FROM dbo.ReservaOnline ro WHERE i.Origem = 'site' AND ro.Status = 'pago' AND ',' + ro.InscricaoIds + ',' LIKE '%,' + CAST(i.Id AS varchar(12)) + ',%') onl
@@ -416,14 +418,14 @@ export async function sumarioMovimento(movId: number) {
  */
 type OpsRun = (text: string, params?: Record<string, unknown>) => Promise<Record<string, unknown>[]>;
 
-async function inscreverN(bateriaId: number, clienteId: number, n: number, origem: string, uid: number | null, observacao: string | null, aprovada = true, opcoes: { produtoId?: number | null; pago?: boolean; clientes?: number[]; run?: OpsRun } = {}) {
+async function inscreverN(bateriaId: number, clienteId: number, n: number, origem: string, uid: number | null, observacao: string | null, aprovada = true, opcoes: { produtoId?: number | null; pago?: boolean; clientes?: number[]; run?: OpsRun; vagaDoGrupo?: boolean } = {}) {
   const pessoas = opcoes.clientes?.length ? opcoes.clientes : null;
   if (pessoas) n = pessoas.length;
   const inscrever = async (run: OpsRun) => {
     const [b] = await run(
       `SELECT b.Id, b.Status, b.Vagas, b.Inicio, b.ProdutoId, p.PrecoCentavos preco,
         (SELECT COUNT(*) FROM dbo.Inscricao i WITH (UPDLOCK, HOLDLOCK) WHERE i.BateriaId = b.Id AND i.Status <> 'cancelada') ocupadas,
-        CASE WHEN b.Inicio < SYSDATETIME() THEN 1 ELSE 0 END passada
+        CASE WHEN b.Inicio < DATEADD(minute, -30, SYSDATETIME()) THEN 1 ELSE 0 END passada
        FROM dbo.Bateria b WITH (UPDLOCK, HOLDLOCK) LEFT JOIN dbo.Produto p ON p.Id = b.ProdutoId WHERE b.Id = @bateriaId`,
       { bateriaId },
     );
@@ -434,7 +436,8 @@ async function inscreverN(bateriaId: number, clienteId: number, n: number, orige
     if (livres <= 0) throw new HttpError(409, 'Não há vagas para a bateria selecionada.');
     if (n > livres) throw new HttpError(409, `Não há vagas o suficiente para a quantidade de participantes selecionada. Vagas disponíveis: ${livres}.`);
     // no site quem compra nem sempre pilota: pode reservar de novo para mais alguém na mesma bateria
-    if (n === 1 && origem !== 'site') {
+    // no grupo cada vaga nasce no nome do responsável e depois passa para o piloto: não é reserva duplicada
+    if (n === 1 && origem !== 'site' && !opcoes.vagaDoGrupo) {
       const [dup] = await run(`SELECT Id FROM dbo.Inscricao WHERE BateriaId = @bateriaId AND ClienteId = @clienteId AND Status <> 'cancelada'`, { bateriaId, clienteId });
       if (dup) throw new HttpError(409, 'Já existe uma reserva em nome deste cliente.');
     }
@@ -646,13 +649,8 @@ async function estornar(sessao: Sessao, vendaId: number, body: Record<string, un
       if (it.InscricaoId) {
         await run(`UPDATE dbo.Inscricao SET Pago = 0, Status = 'reservada', ValorCentavos = NULL, VendaId = NULL, AtualizadoEm = SYSDATETIME() WHERE Id = @i`, { i: it.InscricaoId });
       }
-      if (it.VoucherId) {
-        await run(
-          `UPDATE TOP (1) dbo.VoucherUso SET Estornado = 1 WHERE VendaId = @vendaId AND VoucherId = @voucherId AND Estornado = 0`,
-          { vendaId, voucherId: it.VoucherId },
-        );
-      }
     }
+    await run(`UPDATE dbo.VoucherUso SET Estornado = 1 WHERE VendaId = @vendaId AND EXISTS (SELECT 1 FROM dbo.VendaItem vi WHERE vi.VendaId = @vendaId AND vi.VoucherId IS NOT NULL AND vi.Estornado = 1)`, { vendaId });
     const [rest] = await run(`SELECT COUNT(*) n FROM dbo.VendaItem WHERE VendaId = @vendaId AND Estornado = 0`, { vendaId });
     await run(
       `UPDATE dbo.Venda SET EstornoCentavos = EstornoCentavos + @soma, FinalCentavos = FinalCentavos - @soma,
@@ -692,8 +690,11 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     if (!await mobilePermission(sessao, 'identidade_mobile_vincular')) throw new HttpError(403, 'Seu perfil não pode vincular contas do app.');
     const body = await req.body();
     const customerId = int(body.customerId, 'Cliente');
+    const cpf = body.cpf === undefined ? '' : onlyDigits(body.cpf);
     const email = String(body.email ?? '').trim().toLowerCase();
-    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new HttpError(400, 'Informe o e-mail verificado da conta do app.');
+    if ((body.cpf !== undefined && !isValidCpf(cpf)) || email.length > 254 || (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) || (!cpf && !email)) {
+      throw new HttpError(400, 'Informe um CPF válido ou o e-mail verificado da conta do app.');
+    }
     if (!await one(`SELECT Id id FROM dbo.Cliente WHERE Id = @id`, { id: customerId })) throw new HttpError(404, 'Cliente não encontrado.');
 
     const destination = process.env.MOBILE_IDENTITY_LINK_URL;
@@ -706,7 +707,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
       response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-mobile-admin-token': adminToken },
-        body: JSON.stringify({ customerId: String(customerId), email }),
+        body: JSON.stringify({ customerId: String(customerId), ...(cpf ? { cpf } : {}), ...(email ? { email } : {}) }),
         redirect: 'error',
         signal: AbortSignal.timeout(10_000),
       });
@@ -1056,8 +1057,9 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const st = url.searchParams.get('status') || 'todas';
     const where = ["b.Status <> 'cancelada'"];
     if (st === 'aprovar') where.push("i.Aprovada = 0 AND i.Status <> 'cancelada'");
-    else if (st === 'aprovadas') where.push("i.Aprovada = 1 AND i.Status <> 'cancelada'");
-    else if (st === 'pendentes') where.push("i.Aprovada = 1 AND i.Pago = 0 AND i.Status <> 'cancelada'");
+    // equipes de Endurance são da organização do evento: não entram em Aprovadas nem em Pagamento pendente
+    else if (st === 'aprovadas') where.push("i.Aprovada = 1 AND i.Status <> 'cancelada' AND NOT EXISTS (SELECT 1 FROM dbo.EnduranceEvento ev WHERE ev.BateriaId = i.BateriaId AND ev.Ativo = 1)");
+    else if (st === 'pendentes') where.push("i.Aprovada = 1 AND i.Pago = 0 AND i.Status <> 'cancelada' AND ISNULL(i.PrecoCentavos, p.PrecoCentavos) - i.DescontoCentavos > 0 AND NOT EXISTS (SELECT 1 FROM dbo.EnduranceEvento ev WHERE ev.BateriaId = i.BateriaId AND ev.Ativo = 1)");
     else if (st === 'canceladas') where.push("i.Status = 'cancelada'");
     const bat = url.searchParams.get('bateriaId');
     let p: Record<string, unknown> = {};
@@ -1519,7 +1521,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     await tx(async (run) => {
       const [r] = await run(
         `SELECT i.ClienteId, i.BateriaId, i.Pago, i.Status, ISNULL(i.ProdutoId, b.ProdutoId) produtoId,
-         ISNULL(i.PrecoCentavos, po.PrecoCentavos) preco, i.DescontoCentavos desconto, b.TipoKart tipoKart, po.ServicoLocacao servicoLocacao, po.Categoria categoria, REPLACE(REPLACE(UPPER(po.Nome), N'ANTECIPADO - ', N''), N'BALCÃO - ', N'') servico, po.DuracaoMin duracaoMin FROM dbo.Inscricao i WITH (UPDLOCK, HOLDLOCK) JOIN dbo.Bateria b ON b.Id = i.BateriaId
+         ISNULL(i.PrecoCentavos, po.PrecoCentavos) preco, i.DescontoCentavos desconto FROM dbo.Inscricao i WITH (UPDLOCK, HOLDLOCK) JOIN dbo.Bateria b ON b.Id = i.BateriaId
          LEFT JOIN dbo.Produto po ON po.Id = ISNULL(i.ProdutoId, b.ProdutoId) WHERE i.Id = @id`,
         { id },
       );
@@ -1527,20 +1529,14 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
       if (r.Status === 'cancelada') throw new HttpError(409, 'Não é possível mover uma reserva cancelada.');
       if (Number(r.BateriaId) === destino) return;
       const [d] = await run(
-        `SELECT b.Status, b.Vagas, b.TipoKart tipoKart, p.ServicoLocacao servicoLocacao, p.Categoria categoria, REPLACE(REPLACE(UPPER(p.Nome), N'ANTECIPADO - ', N''), N'BALCÃO - ', N'') servico, p.DuracaoMin duracaoMin, p.Id produtoId, p.PrecoCentavos preco, (SELECT COUNT(*) FROM dbo.Inscricao x WITH (UPDLOCK, HOLDLOCK) WHERE x.BateriaId = b.Id AND x.Status <> 'cancelada') ocupadas
+        `SELECT b.Status, b.Vagas, p.Id produtoId, p.PrecoCentavos preco, (SELECT COUNT(*) FROM dbo.Inscricao x WITH (UPDLOCK, HOLDLOCK) WHERE x.BateriaId = b.Id AND x.Status <> 'cancelada') ocupadas
          FROM dbo.Bateria b WITH (UPDLOCK, HOLDLOCK) LEFT JOIN dbo.Produto p ON p.Id = b.ProdutoId WHERE b.Id = @destino`,
         { destino },
       );
       if (!d || d.Status === 'cancelada') throw new HttpError(404, 'Bateria destino não encontrada.');
       if (d.produtoId == null || d.preco == null) throw new HttpError(409, 'A bateria destino precisa ter um produto com preço cadastrado.');
-      // Antecipado e balcão do mesmo serviço mantêm o produto e o valor já pagos.
-      const mesmoServico = Number(d.produtoId) === Number(r.produtoId) || (
-        r.servicoLocacao && d.servicoLocacao && r.categoria && r.categoria === d.categoria
-        && r.servico && r.servico === d.servico
-        && (r.duracaoMin ?? null) === (d.duracaoMin ?? null)
-      );
-      if (r.Pago && (r.tipoKart !== d.tipoKart || !mesmoServico)) {
-        throw new HttpError(409, 'Reserva paga só pode ser movida para bateria do mesmo serviço e tipo de kart. O produto e o valor já pagos são preservados.');
+      if (r.Pago && (Number(d.produtoId) !== Number(r.produtoId) || Number(d.preco) !== Number(r.preco))) {
+        throw new HttpError(409, 'Reserva paga só pode ser movida para bateria com o mesmo produto e preço. Para mudar o valor, faça o estorno e uma nova reserva.');
       }
       if ((d.ocupadas as number) >= (d.Vagas as number)) throw new HttpError(409, 'Não há vagas disponíveis.');
       if (d.Status !== 'aberta') throw new HttpError(409, 'A bateria destino não está disponível.');
@@ -1556,21 +1552,23 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
           { destino, id, produtoOrigem: r.produtoId, produtoDestino: d.produtoId, precoDestino: d.preco },
         );
       }
-      await run(
-        `IF OBJECT_ID('dbo.ReservaGrupoPiloto') IS NOT NULL
-         UPDATE g SET BateriaId = @destino, AtualizadoEm = SYSDATETIME()
-           FROM dbo.ReservaGrupo g
-          WHERE EXISTS (SELECT 1 FROM dbo.ReservaGrupoPiloto p WHERE p.GrupoId = g.Id AND p.InscricaoId = @id)
-            AND NOT EXISTS (SELECT 1 FROM dbo.ReservaGrupoPiloto p JOIN dbo.Inscricao i ON i.Id = p.InscricaoId
-                            WHERE p.GrupoId = g.Id AND i.Status <> 'cancelada' AND i.BateriaId <> @destino)`,
-        { destino, id },
-      );
     });
     send(200, { mensagem: 'Cliente movido com sucesso.' });
     return true;
   }
   if ((m = path.match(/^\/reservas\/(\d+)\/aprovar$/)) && method === 'POST') {
-    await query(`UPDATE dbo.Inscricao SET Aprovada = 1, AtualizadoEm = SYSDATETIME() WHERE Id = @id AND Status <> 'cancelada'`, { id: Number(m[1]) });
+    // evento já acertado fora da recepção (preço final R$ 0): aprovar já confirma, sem caixa nem planilha
+    await query(
+      `UPDATE i SET Aprovada = 1,
+         Pago = CASE WHEN x.total = 0 THEN 1 ELSE i.Pago END,
+         ValorCentavos = CASE WHEN x.total = 0 THEN 0 ELSE i.ValorCentavos END,
+         Status = CASE WHEN x.total = 0 THEN 'confirmada' ELSE i.Status END,
+         AtualizadoEm = SYSDATETIME()
+       FROM dbo.Inscricao i JOIN dbo.Bateria b ON b.Id = i.BateriaId LEFT JOIN dbo.Produto p ON p.Id = ISNULL(i.ProdutoId, b.ProdutoId)
+       CROSS APPLY (SELECT ISNULL(i.PrecoCentavos, p.PrecoCentavos) - i.DescontoCentavos total) x
+       WHERE i.Id = @id AND i.Status <> 'cancelada'`,
+      { id: Number(m[1]) },
+    );
     send(200, { ok: true });
     return true;
   }

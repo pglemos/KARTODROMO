@@ -4,7 +4,7 @@
  * (nada daqui fica exposto na internet).
  *   1. a cada 30 s publica a agenda (baterias abertas, vagas e preço) para o site mostrar;
  *   2. a cada 5 s busca pedidos novos: grava o cliente (como o pré-cadastro), segura as vagas (Inscricao Origem 'site',
- *      status 'reservada') por 15 min e devolve o valor — o site então cobra na Stone (Pix ou cartão);
+ *      status 'reservada') por 15 min e devolve o valor — o site então cobra na Asaas (Pix ou cartão);
  *   3. pedido pago no site: marca as vagas como pagas (Pago=1, 'confirmada');
  *   4. sem pagamento depois do prazo: cancela as vagas e avisa o site (que cancela a cobrança).
  * Env: PRECADASTRO_URL/PRECADASTRO_KEY (os mesmos do pré-cadastro); OPS_ONLINE_PRODUTO (4 = ANTECIPADO),
@@ -12,8 +12,8 @@
  */
 import { isValidCpf, one, onlyDigits, query, tx } from './db';
 import { HttpError, inscreverN } from './office';
-import { gravarAcompanhante, gravarPreCadastro, preCadastroLigado, type PreCadastro } from './pre-cadastro';
-import { vincularContasDoApp } from './app-mobile';
+import { gravarAcompanhante, gravarPreCadastro, preCadastroLigado, type AcompanhanteSite, type PreCadastro } from './pre-cadastro';
+import { publicarClientesDoApp, publicarRankingDoApp, sincronizarPerfisDoApp, vincularContasDoApp } from './app-mobile';
 
 type Log = (...args: unknown[]) => void;
 
@@ -30,7 +30,7 @@ export const configOnline = () => {
 };
 
 const url = () => (process.env.PRECADASTRO_URL || '').replace(/\/+$/, '');
-async function chamar(caminho: string, init: RequestInit = {}, timeoutMs = 25_000) {
+async function chamar(caminho: string, init: RequestInit = {}, timeoutMs = 10_000) {
   const r = await fetch(url() + caminho, {
     ...init,
     headers: { 'x-sync-key': process.env.PRECADASTRO_KEY || '', 'content-type': 'application/json', ...(init.headers ?? {}) },
@@ -42,7 +42,7 @@ async function chamar(caminho: string, init: RequestInit = {}, timeoutMs = 25_00
 
 // ---------------------------------------------------------------- agenda
 
-export type HorarioOnline = { id: number; inicio: string; nome: string; livres: number; vagasTotais: number };
+export type HorarioOnline = { id: number; inicio: string; nome: string; livres: number };
 
 /** Baterias à venda no site: abertas, que aparecem no totem, do produto de locação, com antecedência e vaga. */
 export async function agendaOnline() {
@@ -58,9 +58,7 @@ export async function agendaOnline() {
       ORDER BY b.Inicio`,
     { antes: c.antecedenciaMin, dias: c.diasAgenda },
   );
-  const horarios: HorarioOnline[] = linhas.map((l) => ({
-    id: l.id, inicio: l.inicio, nome: l.nome, livres: Math.max(0, l.vagas - l.ocupadas), vagasTotais: l.vagas,
-  }));
+  const horarios: HorarioOnline[] = linhas.map((l) => ({ id: l.id, inicio: l.inicio, nome: l.nome, livres: Math.max(0, l.vagas - l.ocupadas) }));
   return {
     atualizadoEm: new Date().toISOString(),
     precoCentavos: produto?.preco ?? 0,
@@ -94,7 +92,7 @@ export type PedidoSite = {
   forma: 'pix' | 'cartao';
   pilotos: string[];
   /** Os outros pilotos (uma vaga para cada, além do comprador). Pedidos antigos não têm: as vagas ficam no nome do comprador. */
-  acompanhantes?: { nome: string; documento: string; nascimento: string; instagram?: string; chave?: string }[];
+  acompanhantes?: (AcompanhanteSite & { chave?: string })[];
   /** false = quem comprou não pilota: as vagas são todas dos acompanhantes (ele fica como responsável). */
   compradorPilota?: boolean;
   cupom?: string;
@@ -199,7 +197,7 @@ export async function previsualizarVoucherOnline(input: CouponInput) {
   }
 }
 
-/** Texto curto do pedido (vai na cobrança da Stone e na tela de confirmação). */
+/** Texto curto do pedido (vai na cobrança da Asaas e na tela de confirmação). */
 export function descricaoPedido(nomeBateria: string, inicio: string, quantidade: number) {
   const [d, h] = inicio.split('T');
   const [a, m, dia] = d.split('-');
@@ -280,7 +278,7 @@ export async function confirmarPagamento(p: PedidoSite, log: Log): Promise<Resul
   const r = await one<Linha>(`${LINHA} WHERE PedidoId = @id`, { id: p.id });
   if (!r) return { id: p.id, acao: 'pago_sem_vaga', erro: 'Pedido não encontrado no sistema da recepção.' };
   if (r.Status === 'pago') return { id: p.id, acao: 'confirmado', codigo: r.Codigo };
-  // a Stone diz se o cartão foi de débito (DEBIT_CARD) — a recepção mostra Pix / Crédito / Débito
+  // a Asaas diz se o cartão foi de débito (DEBIT_CARD) — a recepção mostra Pix / Crédito / Débito
   const forma = p.pagamento?.billingType === 'PIX' ? 'pix' : p.pagamento?.billingType === 'DEBIT_CARD' ? 'debito' : 'credito';
   if (r.Status === 'pago_sem_vaga') return { id: p.id, acao: 'pago_sem_vaga', erro: 'O pagamento está aguardando a resolução da recepção.' };
   const voucherUso = await one<{ Estado: string }>(`SELECT Estado FROM dbo.ReservaOnlineVoucherUso WHERE PedidoId = @id`, { id: p.id });
@@ -342,7 +340,7 @@ async function reativarVagas(bateriaId: number, canceladas: number[]) {
   });
 }
 
-/** Prazo vencido sem pagamento (com 2 min de folga para o aviso da Stone chegar): cancela as vagas. */
+/** Prazo vencido sem pagamento (com 2 min de folga para o aviso da Asaas chegar): cancela as vagas. */
 export async function expirarVencidos(log: Log) {
   const vencidos = await query<Linha & { PedidoId: string }>(`${LINHA} WHERE Status = 'aguardando' AND ExpiraEm < DATEADD(minute, -2, SYSDATETIME())`);
   const res: Resultado[] = [];
@@ -435,6 +433,10 @@ export async function sincronizarReservasOnline(log: Log) {
   emParalelo('cupons', () => sincronizarCuponsOnline(log), log, () => 'prévia de cupons do app: sincronização temporariamente indisponível (tenta de novo a cada 5 s)');
   // contas do app com e-mail confirmado: vincula ao cliente pelo CPF + e-mail/telefone (uma vez por minuto)
   emParalelo('vinculo', () => vincularContasDoApp(log), log, (e) => `app: vínculo automático indisponível agora (${e.message})`);
+  // ranking e carreira dos pilotos no app (a cada 10 min)
+  emParalelo('ranking', () => publicarRankingDoApp(log), log, (e) => `app: ranking indisponível agora (${e.message})`);
+  emParalelo('clientes-app', () => publicarClientesDoApp(log), log, (e) => `app: cadastros indisponíveis agora (${e.message})`);
+  emParalelo('perfil-app', () => sincronizarPerfisDoApp(log), log, (e) => `app: perfil indisponível agora (${e.message})`);
   const pedidos = (await chamar('/api/sync/pedidos')) as PedidoSite[];
   const resultados: Resultado[] = [];
   for (const p of pedidos) {
