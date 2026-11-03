@@ -11,6 +11,8 @@
   "d1_databases": [
     { "binding": "KARTODROMO_ADMIN_DB", "database_name": "kartodromo-admin", "database_id": "daeb26fd-cef9-42b8-b51a-22e20b1607fe" }
   ],
+  // Comprovantes de pagamento anexados pelo atendente. Criar o bucket antes do deploy: wrangler r2 bucket create kartodromo-comprovantes
+  "r2_buckets": [{ "binding": "COMPROVANTES", "bucket_name": "kartodromo-comprovantes" }],
   "routes": [{ "pattern": "admin.kartodromodebetim.com.br", "custom_domain": true }],
   "vars": {
     "OPS_URL": "https://ops.kartodromodebetim.com.br",
