@@ -45,6 +45,15 @@ CREATE TRIGGER IF NOT EXISTS auditoria_sem_delete BEFORE DELETE ON auditoria BEG
 CREATE TABLE IF NOT EXISTS karts_fora (kart TEXT PRIMARY KEY, motivo TEXT NOT NULL, usuario TEXT NOT NULL, em TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS lastros_conferidos (sessionId TEXT NOT NULL, chave TEXT NOT NULL, kart TEXT NOT NULL, pesoKg REAL NOT NULL, usuario TEXT NOT NULL, em TEXT NOT NULL, PRIMARY KEY (sessionId, chave));
 CREATE TABLE IF NOT EXISTS revisoes (sessionId TEXT PRIMARY KEY, revisao INTEGER NOT NULL, assinatura TEXT);
+CREATE TABLE IF NOT EXISTS aulas_recibos (
+  id TEXT PRIMARY KEY, instrutor TEXT NOT NULL, pilotos INTEGER NOT NULL, aulas INTEGER NOT NULL, valorCentavos INTEGER NOT NULL,
+  criadoEm TEXT NOT NULL, criadoPor TEXT NOT NULL, aceitoEm TEXT, aceitoPor TEXT
+);
+CREATE TABLE IF NOT EXISTS ordens_servico (
+  id TEXT PRIMARY KEY, kart TEXT NOT NULL, motivo TEXT NOT NULL, mecanico TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('aberta','em_execucao','concluida','cancelada')),
+  criadaEm TEXT NOT NULL, criadaPor TEXT NOT NULL, atualizadaEm TEXT NOT NULL, atualizadaPor TEXT NOT NULL, observacao TEXT
+);
 `;
 
 export function abrirStore(caminho: string, abrir: Abrir = abrirNativo): AppStore {

@@ -7,3 +7,10 @@ Rotas que o app (`kartodromo-operacional` 1.1.0) chama e este módulo ainda NÃO
 - `/lessons` e `/lessons/:id/accept` (Aulas e recibos)
 - `/maintenance/orders` (Ordens de serviço)
 - `/equalization/compare` (Comparar 5 melhores tempos)
+
+## Atualização 2026-11-04
+Implementadas aqui (ainda NÃO publicadas no servidor): `/lessons`, `/lessons/create`, `/lessons/:id/accept`,
+`/maintenance/orders`, `/maintenance/orders/create`, `/maintenance/orders/:id/status`
+(`aulas-manutencao.ts`, tabelas `aulas_recibos` e `ordens_servico` em `store.ts`, capacidades em `auth.ts`).
+Continua faltando `/equalization/compare` (depende do histórico de voltas do timing-server do servidor).
+Para publicar: copiar `aulas-manutencao.ts`, `auth.ts`, `rotas.ts`, `store.ts` para `lib/app-v1` no orbits e reiniciar o timing-server.
