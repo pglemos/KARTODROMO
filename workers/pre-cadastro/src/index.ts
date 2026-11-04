@@ -5,7 +5,7 @@
  * No totem o cliente digita CPF, RG, passaporte ou e-mail e os dados já aparecem.
  */
 import { chaveDocumento, validar } from './validar';
-import { diagnostico } from './asaas';
+import { cancelar, chamar, consultar, diagnostico, garantirCliente, hojeBrasilia, PAGO } from './asaas';
 import { agendaPublica, criarPedido, politicaPublica, situacaoPedido, syncAgenda, syncPedidos, syncResultado, webhookAsaas, type EnvReservas } from './reservas';
 import { handleMobileAccountEmail, handleMobileAuth, type MobileAccountAdminEnv } from './mobile/auth';
 import { handleMobileReservations } from './mobile/reservations';
@@ -149,6 +149,104 @@ export default {
         }
         if (p === '/api/sync/agenda' && req.method === 'PUT') return await syncAgenda(req, env);
         if (p === '/api/sync/asaas' && req.method === 'GET') return json(200, await diagnostico(env));
+        if (p === '/api/sync/campeonato/cobranca' && req.method === 'POST') {
+          const c = (await req.json()) as Record<string, unknown>;
+          const dadosCli = {
+            nome: String(c.nome ?? ''),
+            cpf: String(c.cpf ?? '').replace(/\D/g, ''),
+            email: String(c.email ?? ''),
+            celular: String(c.celular ?? '').replace(/\D/g, ''),
+            referencia: String(c.referencia ?? ''),
+          };
+          let cliente: string;
+          try {
+            cliente = await garantirCliente(env, dadosCli);
+          } catch (erroCli) {
+            if (!/celular|mobilePhone/i.test((erroCli as Error).message)) throw erroCli;
+            cliente = await garantirCliente(env, { ...dadosCli, celular: '' });
+          }
+          const valor = Math.round(Number(c.valorCentavos)) / 100;
+          const n = c.forma === 'cartao' ? Math.min(5, Math.max(1, Math.trunc(Number(c.parcelas)) || 1)) : 1;
+          const cob = await chamar<{ id: string; invoiceUrl: string; status: string }>(env, '/payments', {
+            method: 'POST',
+            body: JSON.stringify({
+              customer: cliente,
+              billingType: c.forma === 'cartao' ? 'CREDIT_CARD' : 'PIX',
+              ...(n > 1 ? { installmentCount: n, totalValue: valor } : { value: valor }),
+              dueDate: String(c.vencimento ?? hojeBrasilia()),
+              description: String(c.descricao ?? '').slice(0, 500),
+              externalReference: String(c.referencia ?? '').slice(0, 100),
+            }),
+          });
+          return json(201, { id: cob.id, link: cob.invoiceUrl, status: cob.status });
+        }
+        const mCamp = p.match(/^\/api\/sync\/campeonato\/cobranca\/([A-Za-z0-9_]{6,40})$/);
+        if (mCamp && req.method === 'GET') {
+          const c = await consultar(env, mCamp[1]);
+          return json(200, { id: c.id, status: c.status, pago: PAGO.has(c.status), forma: c.billingType });
+        }
+        if (mCamp && req.method === 'DELETE') {
+          const c = await chamar<{ id: string; installment?: string }>(env, `/payments/${encodeURIComponent(mCamp[1])}`);
+          if (c.installment) {
+            return json(200, await chamar(env, `/installments/${encodeURIComponent(c.installment)}`, { method: 'DELETE' }));
+          }
+          return json(200, await cancelar(env, mCamp[1]));
+        }
+        if (p === '/api/sync/campeonato/cobrancas' && req.method === 'GET') {
+          const cpf = (url.searchParams.get('cpf') ?? '').replace(/\D/g, '');
+          const cli = await chamar<{ data?: { id: string }[] }>(env, `/customers?cpfCnpj=${cpf}&limit=1`);
+          const id = cli.data?.[0]?.id;
+          if (!id) return json(200, []);
+          const r = await chamar<{ data?: { id: string; status: string; value: number; installment?: string; deleted: boolean; externalReference?: string }[] }>(env, `/payments?customer=${id}&limit=50`);
+          return json(200, (r.data ?? []).map((x) => ({
+            id: x.id,
+            status: x.status,
+            valor: x.value,
+            parcelamento: x.installment ?? null,
+            deleted: x.deleted,
+            ref: x.externalReference ?? null,
+          })));
+        }
+        if (p === '/api/sync/cobranca' && req.method === 'POST') {
+          const c = (await req.json()) as Record<string, unknown>;
+          const dadosCli = {
+            nome: String(c.nome ?? ''),
+            cpf: String(c.cpf ?? '').replace(/\D/g, ''),
+            email: String(c.email ?? ''),
+            celular: String(c.celular ?? '').replace(/\D/g, ''),
+            referencia: String(c.referencia ?? ''),
+          };
+          let cliente: string;
+          try {
+            cliente = await garantirCliente(env, dadosCli);
+          } catch (erroCli) {
+            if (!/celular|mobilePhone/i.test((erroCli as Error).message)) throw erroCli;
+            cliente = await garantirCliente(env, { ...dadosCli, celular: '' });
+          }
+          const hoje = hojeBrasilia();
+          const venc = String(c.vencimento ?? '');
+          const dueDate = /^\d{4}-\d{2}-\d{2}$/.test(venc) && venc >= hoje ? venc : hoje;
+          const cob = await chamar<{ id: string; invoiceUrl: string; status: string }>(env, '/payments', {
+            method: 'POST',
+            body: JSON.stringify({
+              customer: cliente,
+              billingType: 'UNDEFINED',
+              value: Math.round(Number(c.valorCentavos)) / 100,
+              dueDate,
+              description: String(c.descricao ?? '').slice(0, 500),
+              externalReference: String(c.referencia ?? '').slice(0, 100),
+            }),
+          });
+          return json(201, { id: cob.id, link: cob.invoiceUrl, status: cob.status });
+        }
+        const mGrupo = p.match(/^\/api\/sync\/cobranca\/([A-Za-z0-9_]{6,40})$/);
+        if (mGrupo && req.method === 'GET') {
+          const c = await consultar(env, mGrupo[1]);
+          return json(200, { id: c.id, status: c.status, pago: PAGO.has(c.status), forma: c.billingType });
+        }
+        if (mGrupo && req.method === 'DELETE') {
+          return json(200, await cancelar(env, mGrupo[1]));
+        }
         if (p === '/api/sync/mobile/coupons' || p.startsWith('/api/sync/mobile/coupons/')) return await handleMobileCouponsSync(req, env);
         if (p === '/api/sync/pedidos' && req.method === 'GET') return await syncPedidos(env);
         if (p === '/api/sync/pedido' && req.method === 'POST') return await syncResultado(req, env, ctx);
