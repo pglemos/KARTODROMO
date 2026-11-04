@@ -48,9 +48,45 @@ export async function clienteDaConta(c: Candidata) {
   return dono?.id ?? null;
 }
 
-/** Roda junto com o ciclo da reserva online (5 s), mas só uma vez por minuto. Devolve quantas contas vinculou. */
-export async function vincularContasDoApp(log: Log, agora = Date.now()) {
-  if (!vinculoAutomaticoLigado() || agora - ultimaVez < INTERVALO_MS) return 0;
+/** Recepção salvou/corrigiu um cadastro: o próximo ciclo (≤ 5 s) confere todas as contas pendentes de novo. */
+export function pedirVinculoAgora() {
+  ultimaVez = 0;
+  semCadastro.clear();
+}
+
+/**
+ * Vínculo sob demanda: long-poll no Worker. Responde na hora em que um cliente confirma o e-mail ou abre o histórico
+ * sem vínculo; aí vincula e publica o histórico completo daquele cliente. O ciclo de 60 s continua como rede de segurança.
+ */
+export async function escutarPedidosDeVinculo(log: Log, parar: () => boolean = () => false) {
+  if (!vinculoAutomaticoLigado()) return;
+  const vincular = mobileApiEndpoint(process.env.MOBILE_IDENTITY_LINK_URL!, '/api/mobile/v1/internal/identity-links');
+  if (!vincular) return;
+  const esperar = new URL('/api/mobile/v1/internal/identity-wait?ms=25000', vincular);
+  let pausa = 1_000;
+  while (!parar()) {
+    try {
+      const r = await fetch(esperar, {
+        headers: { 'x-mobile-admin-token': process.env.MOBILE_ADMIN_TOKEN! },
+        redirect: 'error',
+        signal: AbortSignal.timeout(35_000),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const { sinal } = (await r.json()) as { sinal?: boolean };
+      pausa = 1_000;
+      if (sinal) await vincularContasDoApp(log, Date.now(), true);
+    } catch (e) {
+      // sem internet ou Worker antigo: espera um pouco (até 30 s) e tenta de novo; o ciclo de 60 s cobre
+      if (pausa >= 30_000) log(`app: espera do vínculo sob demanda indisponível (${(e as Error).message})`);
+      await new Promise((ok) => setTimeout(ok, pausa));
+      pausa = Math.min(pausa * 2, 30_000);
+    }
+  }
+}
+
+/** Roda junto com o ciclo da reserva online (5 s), mas só uma vez por minuto (ou na hora, com forcar). Devolve quantas contas vinculou. */
+export async function vincularContasDoApp(log: Log, agora = Date.now(), forcar = false) {
+  if (!vinculoAutomaticoLigado() || (!forcar && agora - ultimaVez < INTERVALO_MS)) return 0;
   ultimaVez = agora;
   const destino = process.env.MOBILE_IDENTITY_LINK_URL!;
   const token = process.env.MOBILE_ADMIN_TOKEN!;
@@ -63,7 +99,7 @@ export async function vincularContasDoApp(log: Log, agora = Date.now()) {
   let feitos = 0;
   for (const conta of contas) {
     const chave = onlyDigits(conta.cpf) + '|' + conta.email.trim().toLowerCase();
-    if ((semCadastro.get(chave) ?? 0) > agora) continue;
+    if (!forcar && (semCadastro.get(chave) ?? 0) > agora) continue;
     const clienteId = await clienteDaConta(conta);
     if (!clienteId) { semCadastro.set(chave, agora + ESPERA_SEM_CADASTRO_MS); continue; }
     const v = await fetch(vincular, {
@@ -73,12 +109,127 @@ export async function vincularContasDoApp(log: Log, agora = Date.now()) {
       redirect: 'error',
       signal: AbortSignal.timeout(10_000),
     });
-    if (v.ok) { feitos++; log(`app: conta vinculada ao cliente ${clienteId} (CPF e e-mail ou telefone conferidos)`); continue; }
+    if (v.ok) {
+      feitos++;
+      log(`app: conta vinculada ao cliente ${clienteId} (CPF e e-mail ou telefone conferidos)`);
+      // histórico completo (inclusive o de antes do app) já no mesmo instante
+      try {
+        historicosUltimaVez = 0; // a reconciliação seguinte também confere este cliente
+        const n = await publicarHistoricoDoCliente(String(clienteId));
+        log(`app: histórico do cliente ${clienteId} publicado (${n} bateria(s))`);
+      } catch (e) {
+        log(`app: histórico do cliente ${clienteId} não publicado agora (${(e as Error).message})`);
+      }
+      continue;
+    }
     // 409 = o cliente já tem outra conta do app: fica para a recepção decidir
     semCadastro.set(chave, agora + ESPERA_SEM_CADASTRO_MS);
     if (v.status === 409) log(`app: cliente ${clienteId} já tem outra conta do app vinculada; ficou para a recepção`);
   }
   return feitos;
+}
+
+// ---------------------------------------------------------------- histórico pessoal completo
+type PilotoBateria = { cid?: unknown; nome?: unknown; kart?: unknown; pos?: unknown; voltas?: unknown; melhor?: unknown; dq?: unknown };
+type BateriaIndice = { id?: unknown; nome?: unknown; dia?: unknown; tipo?: unknown; reserva?: unknown; pilotos?: unknown };
+export type ResultadoHistorico = {
+  sessionId: string; eventName: string; eventDate: string; displayName: string;
+  position: number; kart: string; laps: number; bestLapMs: number | null;
+};
+
+/** Baterias de um cliente no índice da cronometragem (.runtime/pilotos-cronometragem.json). Mesmas regras do Worker. */
+export function historicoDoCliente(baterias: Record<string, BateriaIndice>, clienteId: string): ResultadoHistorico[] {
+  const porSessao = new Map<string, ResultadoHistorico>();
+  for (const [key, b] of Object.entries(baterias)) {
+    const sessionId = String(b.id ?? key);
+    const eventName = String(b.nome ?? '').replace(/\s+/g, ' ').trim();
+    const eventDate = String(b.dia ?? '');
+    const tipo = String(b.tipo ?? '').toLowerCase();
+    if (!/^[A-Za-z0-9._:-]{1,128}$/.test(sessionId) || !/^\d{4}-\d{2}-\d{2}$/.test(eventDate) ||
+        !eventName || eventName.length > 160 || /equalizacao|teste codex/i.test(eventName + ' ' + tipo) ||
+        /^test(?:-|_)/i.test(sessionId) || b.reserva === true || !Array.isArray(b.pilotos)) continue;
+    for (const p of b.pilotos as PilotoBateria[]) {
+      if (String(p.cid ?? '') !== clienteId || p.dq === true) continue;
+      const displayName = String(p.nome ?? '').replace(/\s+/g, ' ').trim();
+      const kart = String(p.kart ?? '').trim();
+      const position = Number(p.pos);
+      const laps = Number(p.voltas ?? 0);
+      const melhor = Number(p.melhor);
+      const bestLapMs = Number.isSafeInteger(melhor) && melhor > 0 && melhor <= 600_000 ? melhor : null;
+      if (!displayName || displayName.length > 80 || !kart || kart.length > 40 || !Number.isSafeInteger(position) ||
+          position < 1 || position > 1000 || !Number.isSafeInteger(laps) || laps < 0 || laps > 10_000) continue;
+      porSessao.set(sessionId, { sessionId, eventName, eventDate, displayName, position, kart, laps, bestLapMs });
+    }
+  }
+  return [...porSessao.values()]
+    .sort((a, b) => b.eventDate.localeCompare(a.eventDate) || b.sessionId.localeCompare(a.sessionId))
+    .slice(0, 500);
+}
+
+const ARQ_INDICE_PILOTOS = () => resolve(join(process.cwd(), '.runtime', 'pilotos-cronometragem.json'));
+
+/** Publica no app o histórico completo de um cliente (chave historico:<id>). Devolve quantas baterias foram. */
+export async function publicarHistoricoDoCliente(clienteId: string) {
+  if (!/^\d{1,20}$/.test(clienteId) || !vinculoAutomaticoLigado()) return 0;
+  const base = mobileApiEndpoint(process.env.MOBILE_IDENTITY_LINK_URL!, '/api/mobile/v1/internal/identity-links');
+  if (!base) return 0;
+  const arquivo = ARQ_INDICE_PILOTOS();
+  if (!existsSync(arquivo)) return 0;
+  const baterias = (JSON.parse(readFileSync(arquivo, 'utf8')) as { baterias?: Record<string, BateriaIndice> }).baterias ?? {};
+  const results = historicoDoCliente(baterias, clienteId);
+  if (!results.length) return 0;
+  const r = await fetch(new URL('/api/mobile/v1/internal/ranking', base), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-mobile-admin-token': process.env.MOBILE_ADMIN_TOKEN! },
+    body: JSON.stringify({ itens: [{ chave: 'historico:' + clienteId, dados: { results } }] }),
+    redirect: 'error',
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return results.length;
+}
+
+/**
+ * Reconciliação: a cada 10 min publica o histórico de todo cliente vinculado cujo histórico mudou (ou que nunca foi
+ * publicado). Substitui o script manual publicar-karts-app.mjs para o histórico: ninguém vinculado fica sem corridas.
+ */
+const HISTORICOS_INTERVALO_MS = 10 * 60_000;
+let historicosUltimaVez = 0;
+const historicoEnviado = new Map<string, string>();
+
+export async function publicarHistoricosVinculados(log: Log, agora = Date.now()) {
+  if (!vinculoAutomaticoLigado() || agora - historicosUltimaVez < HISTORICOS_INTERVALO_MS) return 0;
+  historicosUltimaVez = agora;
+  const base = mobileApiEndpoint(process.env.MOBILE_IDENTITY_LINK_URL!, '/api/mobile/v1/internal/identity-links');
+  if (!base) return 0;
+  const arquivo = ARQ_INDICE_PILOTOS();
+  if (!existsSync(arquivo)) return 0;
+  const token = process.env.MOBILE_ADMIN_TOKEN!;
+  const r = await fetch(base, { headers: { 'x-mobile-admin-token': token }, redirect: 'error', signal: AbortSignal.timeout(15_000) });
+  if (!r.ok) throw new Error(`contas vinculadas: HTTP ${r.status}`);
+  const ids = ((await r.json()) as { customerIds?: unknown[] }).customerIds?.map(String).filter((id) => /^\d{1,20}$/.test(id)) ?? [];
+  const baterias = (JSON.parse(readFileSync(arquivo, 'utf8')) as { baterias?: Record<string, BateriaIndice> }).baterias ?? {};
+  const mudaram: { chave: string; dados: { results: ResultadoHistorico[] }; texto: string }[] = [];
+  for (const id of ids) {
+    const results = historicoDoCliente(baterias, id);
+    if (!results.length) continue;
+    const texto = hashDe(JSON.stringify(results));
+    if (historicoEnviado.get(id) !== texto) mudaram.push({ chave: 'historico:' + id, dados: { results }, texto });
+  }
+  for (let i = 0; i < mudaram.length; i += 10) {
+    const lote = mudaram.slice(i, i + 10);
+    const e = await fetch(new URL('/api/mobile/v1/internal/ranking', base), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-mobile-admin-token': token },
+      body: JSON.stringify({ itens: lote.map(({ chave, dados }) => ({ chave, dados })) }),
+      redirect: 'error',
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!e.ok) throw new Error(`histórico: HTTP ${e.status}`);
+    for (const l of lote) historicoEnviado.set(l.chave.slice('historico:'.length), l.texto);
+  }
+  if (mudaram.length) log(`app: histórico de ${mudaram.length} cliente(s) vinculado(s) atualizado`);
+  return mudaram.length;
 }
 
 // ---------------------------------------------------------------- ranking e carreira no app

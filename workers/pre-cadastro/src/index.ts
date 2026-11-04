@@ -13,11 +13,13 @@ import { handleMobileCoupons, handleMobileCouponsSync } from './mobile/coupons';
 import { handleMobileResults, type MobileResultsEnv } from './mobile/results';
 import { handleMobileLive, type MobileLiveEnv } from './mobile/live';
 export { AoVivo } from './mobile/live';
+export { SinalVinculo } from './mobile/sinal-vinculo';
+import { esperarPedidoDeVinculo, pedirVinculo, type SinalVinculoEnv } from './mobile/sinal-vinculo';
 import { handleMobilePerfil, type MobilePerfilEnv } from './mobile/perfil';
 import { handleMobileRanking } from './mobile/ranking';
 import { handleMobileOutbox } from './mobile/outbox';
 
-export interface Env extends EnvReservas, MobileAccountAdminEnv, MobileResultsEnv, MobileLiveEnv, MobilePerfilEnv {
+export interface Env extends EnvReservas, MobileAccountAdminEnv, MobileResultsEnv, MobileLiveEnv, MobilePerfilEnv, SinalVinculoEnv {
   ASSETS: Fetcher;
   PRE: R2Bucket;
   SYNC_KEY: string;
@@ -95,13 +97,25 @@ export default {
     try {
       if (p === '/api/pre-cadastro' && req.method === 'POST') return await receber(req, env);
       if (p === '/api/mobile/v1/internal/account-email') return await handleMobileAccountEmail(req, env);
-      if (p.startsWith('/api/mobile/v1/auth/')) return await handleMobileAuth(req, env);
+      if (p.startsWith('/api/mobile/v1/auth/')) {
+        const resposta = await handleMobileAuth(req, env);
+        // e-mail confirmado: a conta vira candidata ao vínculo agora, não no próximo ciclo
+        if (p === '/api/mobile/v1/auth/email/verify' && resposta.ok) ctx.waitUntil(pedirVinculo(env));
+        return resposta;
+      }
+      if (p === '/api/mobile/v1/internal/identity-wait') return await esperarPedidoDeVinculo(req, env);
       if (p === '/api/mobile/v1/coupons/preview' || p.startsWith('/api/mobile/v1/coupons/preview/')) {
         return await handleMobileCoupons(req, env);
       }
       if (p === '/api/mobile/v1/internal/results' || p === '/api/mobile/v1/internal/identity-links' || p === '/api/mobile/v1/internal/identity-candidates' ||
           p === '/api/mobile/v1/results' || p === '/api/mobile/v1/results/me') {
-        return await handleMobileResults(req, env);
+        const resposta = await handleMobileResults(req, env);
+        // cliente abriu o histórico e ainda não está vinculado: pede o vínculo agora
+        if (p === '/api/mobile/v1/results/me' && resposta.ok) {
+          const corpo = await resposta.clone().json().catch(() => null) as { vinculo?: string } | null;
+          if (corpo?.vinculo === 'pendente') ctx.waitUntil(pedirVinculo(env));
+        }
+        return resposta;
       }
       if (p === '/api/mobile/v1/live' || p === '/api/mobile/v1/live/ws') return await handleMobileLive(req, env);
       if (p === '/api/mobile/v1/conta/perfil' || p === '/api/mobile/v1/internal/perfil') return await handleMobilePerfil(req, env);

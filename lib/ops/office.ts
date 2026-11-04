@@ -3,6 +3,7 @@
  * Todas as rotas daqui exigem sessao de usuario (lib/ops/auth.ts).
  */
 import { CLIENTE_COLS, insertCliente, isValidCpf, one, onlyDigits, query, tx, updateCliente, type ClienteInput } from './db';
+import { pedirVinculoAgora } from './app-mobile';
 import { confereSenha, hashSenha, type Sessao } from './auth';
 import { erroCadastroObrigatorio, erroPesoCliente } from './cadastro-obrigatorio';
 import { mobileApiEndpoint } from '../mobile-api-url';
@@ -1645,6 +1646,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
       if (dup) throw new HttpError(409, `Documento já cadastrado para ${dup.nome} (cliente ${dup.id}).`);
     }
     send(201, { id: await insertCliente(b, 'recepcao') });
+    pedirVinculoAgora(); // cliente que já criou conta no app vincula no próximo ciclo (≤ 5 s)
     return true;
   }
   if ((m = path.match(/^\/clientes\/(\d+)$/)) && method === 'PUT') {
@@ -1653,6 +1655,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     if (erroCadastro) throw new HttpError(400, erroCadastro);
     if ((b.tipoDocumento ?? 'CPF') === 'CPF' && b.documento && !isValidCpf(b.documento)) throw new HttpError(400, 'CPF inválido.');
     await updateCliente(Number(m[1]), b, false);
+    pedirVinculoAgora(); // e-mail/telefone corrigido na recepção: confere de novo as contas do app pendentes
     send(200, { ok: true });
     return true;
   }

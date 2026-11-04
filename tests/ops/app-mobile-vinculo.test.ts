@@ -52,6 +52,20 @@ describe('vínculo automático da conta do app', () => {
     expect(chamadas).toHaveLength(2);
   });
 
+  it('sob demanda (forcar): vincula na hora, mesmo dentro do minuto, e publica o histórico', async () => {
+    clientes.linhas = [{ id: 43, email: 'maria@example.com', telefone: null }];
+    const urls: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: URL | string) => {
+      urls.push(String(url));
+      if (String(url).endsWith('/identity-candidates')) return new Response(JSON.stringify([conta]), { status: 200 });
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }));
+    expect(await vincularContasDoApp(vi.fn(), 2_000_000)).toBe(1);
+    // 5 s depois chega o sino: o ciclo de 60 s não segura
+    expect(await vincularContasDoApp(vi.fn(), 2_005_000, true)).toBe(1);
+    expect(urls.filter((u) => u.endsWith('/identity-links'))).toHaveLength(2);
+  });
+
   it('desligado sem a configuração', async () => {
     delete process.env.MOBILE_ADMIN_TOKEN;
     const f = vi.fn();
