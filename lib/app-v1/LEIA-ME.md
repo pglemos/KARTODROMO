@@ -12,5 +12,5 @@ Rotas que o app (`kartodromo-operacional` 1.1.0) chama e este módulo ainda NÃO
 Implementadas aqui (ainda NÃO publicadas no servidor): `/lessons`, `/lessons/create`, `/lessons/:id/accept`,
 `/maintenance/orders`, `/maintenance/orders/create`, `/maintenance/orders/:id/status`
 (`aulas-manutencao.ts`, tabelas `aulas_recibos` e `ordens_servico` em `store.ts`, capacidades em `auth.ts`).
-Continua faltando `/equalization/compare` (depende do histórico de voltas do timing-server do servidor).
-Para publicar: copiar `aulas-manutencao.ts`, `auth.ts`, `rotas.ts`, `store.ts` para `lib/app-v1` no orbits e reiniciar o timing-server.
+`/equalization/compare` implementado em `comparacao.ts` (usa `/api/ranking-karts?kart=`: a melhor volta de cada bateria nos últimos 15 dias). Ainda não publicado.
+Para publicar: copiar `aulas-manutencao.ts`, `comparacao.ts`, `auth.ts`, `rotas.ts`, `store.ts` para `lib/app-v1` no orbits e reiniciar o timing-server.

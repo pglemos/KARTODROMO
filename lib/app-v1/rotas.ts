@@ -6,6 +6,7 @@ import { autenticar, bloquearUsuario, criarUsuario, login, LoginRecusado, pode, 
 import { consultarOperacao, ErroApp } from './comandos';
 import { criarOperacao, type Legado } from './operacao';
 import { criarAulasManutencao } from './aulas-manutencao';
+import { compararKarts } from './comparacao';
 import type { Inscricao } from './regras';
 import type { AppStore } from './store';
 
@@ -250,6 +251,10 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
       if (caminho === 'equalization/create' && metodo === 'POST') return enviar(res, 200, await operacao.criarEqualizacao(quem, await lerCorpo(req)));
       if (caminho === 'equalization/rules' && metodo === 'POST') return enviar(res, 200, await operacao.salvarRegra(quem, await lerCorpo(req)));
       if (caminho === 'equalization/targets' && metodo === 'POST') return enviar(res, 200, await operacao.salvarMeta(quem, await lerCorpo(req)));
+      if (caminho === 'equalization/compare' && metodo === 'GET') {
+        exige('equalizacao.gerir');
+        return enviar(res, 200, await compararKarts(d.legado!, { kart: url.searchParams.get('kart') ?? '', referencia: url.searchParams.get('referencia') ?? '', trackId: url.searchParams.get('trackId') }));
+      }
       if (caminho === 'equalization' && metodo === 'GET') { exige('equalizacao.gerir'); return enviar(res, 200, await operacao.equalizacoes()); }
       m = /^equalization\/([\w-]+)$/.exec(caminho);
       if (m && metodo === 'GET') { exige('equalizacao.gerir'); return enviar(res, 200, await operacao.equalizacao(m[1])); }
