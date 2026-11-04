@@ -27,9 +27,9 @@ const OPERACAO = [
   'bandeira.aplicar', 'prova.comandar', 'prova.reiniciar', 'passagem.corrigir', 'equalizacao.gerir',
 ];
 const CAPACIDADES: Record<Perfil, ReadonlySet<string>> = {
-  RECEPCAO: new Set(LEITURA),
-  OPERACAO: new Set(OPERACAO),
-  GERENCIA: new Set([...OPERACAO, 'usuarios.gerir', 'auditoria.global']),
+  RECEPCAO: new Set([...LEITURA, 'aulas.aceitar']),
+  OPERACAO: new Set([...OPERACAO, 'aulas.registrar']),
+  GERENCIA: new Set([...OPERACAO, 'usuarios.gerir', 'auditoria.global', 'aulas.registrar', 'aulas.aceitar', 'manutencao.gerir']),
 };
 
 export function pode(perfil: Perfil, capacidade: string): boolean {

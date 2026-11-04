@@ -5,6 +5,7 @@ import { writeTimingEvent } from '../timing/sse';
 import { autenticar, bloquearUsuario, criarUsuario, login, LoginRecusado, pode, renovar, sair, trocarSenha, type AuthCtx, type Identidade, type Perfil } from './auth';
 import { consultarOperacao, ErroApp } from './comandos';
 import { criarOperacao, type Legado } from './operacao';
+import { criarAulasManutencao } from './aulas-manutencao';
 import type { Inscricao } from './regras';
 import type { AppStore } from './store';
 
@@ -16,7 +17,7 @@ const MAX_LOGINS_SIMULTANEOS = 4;
 const JANELA_EVENTOS_MS = 48 * 3_600_000;
 const CAPACIDADES_CONHECIDAS = ['sessoes.ver', 'elegiveis.ver', 'operacoes.ver', 'auditoria.ver', 'auditoria.global', 'usuarios.gerir',
   'bateria.preparar', 'sorteio.gravar', 'atrasado.incluir', 'peso.conferir', 'kart.trocar', 'frota.gerir', 'penalidade.aplicar', 'bandeira.aplicar',
-  'prova.comandar', 'prova.reiniciar', 'passagem.corrigir', 'equalizacao.gerir'];
+  'prova.comandar', 'prova.reiniciar', 'passagem.corrigir', 'equalizacao.gerir', 'aulas.registrar', 'aulas.aceitar', 'manutencao.gerir'];
 
 export type DepsApp = {
   store: AppStore;
@@ -101,6 +102,7 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
   const revisoesPendentes = new Map<string, string | undefined>();
   let loginsEmCurso = 0;
   const listarFila = () => semBateriasPassadas(d.listarSessoes(), d.inicioPorAgenda?.() ?? new Map<string, string>());
+  const aulasManutencao = criarAulasManutencao({ store: d.store, routeMode: d.routeMode });
   const operacao = d.legado && d.inscricoes ? criarOperacao({ store: d.store, legado: d.legado, verSessao: d.verSessao, inscricoes: d.inscricoes, kartsCadastrados: d.kartsCadastrados, listarSessoes: listarFila, routeMode: d.routeMode }) : null;
   let indisponivel = d.segredo.length < TAMANHO_MINIMO_SEGREDO;
   let revisaoFalhou = false;
@@ -222,6 +224,14 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
       await trocarSenha(ctx, quem.usuarioId, String(b.atual ?? ''), String(b.nova ?? ''), quem.sessaoId);
       return enviar(res, 200, { ok: true });
     }
+    if (caminho === 'lessons' && metodo === 'GET') return enviar(res, 200, aulasManutencao.aulas(quem));
+    if (caminho === 'lessons/create' && metodo === 'POST') return enviar(res, 200, await aulasManutencao.criarRecibo(quem, await lerCorpo(req)));
+    m = /^lessons\/([\w-]+)\/accept$/.exec(caminho);
+    if (m && metodo === 'POST') return enviar(res, 200, await aulasManutencao.aceitarRecibo(quem, m[1], await lerCorpo(req)));
+    if (caminho === 'maintenance/orders' && metodo === 'GET') return enviar(res, 200, aulasManutencao.ordens(quem));
+    if (caminho === 'maintenance/orders/create' && metodo === 'POST') return enviar(res, 200, await aulasManutencao.criarOrdem(quem, await lerCorpo(req)));
+    m = /^maintenance\/orders\/([\w-]+)\/status$/.exec(caminho);
+    if (m && metodo === 'POST') return enviar(res, 200, await aulasManutencao.mudarStatusOrdem(quem, m[1], await lerCorpo(req)));
     if (operacao) {
       if (caminho === 'agenda' && metodo === 'GET') return enviar(res, 200, await operacao.agenda(quem, url.searchParams.get('data')));
       if (caminho === 'fleet' && metodo === 'GET') { exige('sessoes.ver'); return enviar(res, 200, operacao.frota()); }
