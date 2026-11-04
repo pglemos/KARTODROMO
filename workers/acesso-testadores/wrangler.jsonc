@@ -1,0 +1,16 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "kartodromo-acesso-testadores",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-01",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "routes": [
+    { "pattern": "acesso.kartodromodebetim.com.br", "custom_domain": true }
+  ],
+  "vars": {
+    "GRUPO_TESTADORES": "testadores-kartodromobetim@googlegroups.com",
+    "LINK_CLIENTE": "https://play.google.com/apps/testing/br.com.kartodromobetim.app",
+    "LINK_OPERACAO": "https://play.google.com/apps/testing/br.com.kartodromobetim.operacional"
+  }
+}
