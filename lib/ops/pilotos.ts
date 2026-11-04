@@ -30,6 +30,13 @@ let atualizadoEm = 0, atualizando: Promise<void> | null = null, ultimoErro: stri
 // versão do índice: sobe a cada gravação — o ranking do app só reconstrói quando muda (antes era reconstruído
 // inteiro a cada 10 min e travava o servidor ~21 s; medido pelo watchdog em 28-29/10/2026)
 let indiceVersao = 0;
+/** Versão do índice de baterias: muda a cada bateria nova lida da cronometragem (o app publica na hora). */
+export const versaoIndicePilotos = () => indiceVersao;
+
+/** Chave estável do traçado nos documentos de posição do app (o Worker usa a mesma regra). */
+export function slugTracado(nome: string) {
+  return nome.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'sem-nome';
+}
 
 /** Grava o índice em blocos com yield: stringify único de 27 MB travava o event loop por segundos. Mesma saída. */
 async function gravarIndiceArq() {
@@ -532,11 +539,19 @@ export async function pilotosRoutes(req: Req, send: Res): Promise<boolean> {
  *  contagens de corridas (nada de documento, telefone, nascimento, compras). `ranking` = top 100 de cada traçado em
  *  semana/mês/geral; `pilotos` = carreira de todo piloto com cadastro que andou desde o início do índice. */
 // cache do ranking do app: a reconstrução leva ~20 s sobre o índice inteiro; só refaz quando o índice muda
-let rankingCache: { versao: number; ranking: unknown; pilotos: unknown } | null = null;
+/** Posições de um traçado num período: { de: total, pos: { cid: posição } }. Uma linha por traçado/período no app. */
+export type PosicoesTracado = { periodo: string; tracado: string; de: number; pos: Record<string, number> };
+let rankingCache: { versao: number; dia: string; ranking: unknown; pilotos: unknown; posicoes: Record<string, PosicoesTracado> } | null = null;
 export async function rankingPublicoParaApp() {
   await indiceFresco();
-  if (rankingCache && rankingCache.versao === indiceVersao) return { ranking: rankingCache.ranking, pilotos: rankingCache.pilotos };
+  // semana/mês viram à meia-noite mesmo sem bateria nova: o dia também invalida
+  if (rankingCache && rankingCache.versao === indiceVersao && rankingCache.dia === hojeSp()) {
+    return { ranking: rankingCache.ranking, pilotos: rankingCache.pilotos, posicoes: rankingCache.posicoes };
+  }
   const TOP = 100;
+  // Posição e total ficam fora da ficha do piloto: uma bateria nova mexe no "de" de todo mundo do traçado e isso
+  // regravava ~75 mil fichas a cada publicação. Agora vira um documento por traçado/período; o Worker junta na leitura.
+  const posicoes: Record<string, PosicoesTracado> = {};
   const per = { semana: periodo('semana'), mes: periodo('mes'), geral: periodo('geral') };
   const pos = new Map<string, Record<string, Record<string, { pos: number; de: number }>>>(); // cid → período → traçado → posição
   const nomes = new Map<string, string>();
@@ -547,6 +562,9 @@ export async function rankingPublicoParaApp() {
       de: p.de, ate: p.ate,
       tracados: tracados.map((t) => {
         const todas = ranking(t.nome, p);
+        const doc: PosicoesTracado = { periodo: nome, tracado: t.nome, de: todas.length, pos: {} };
+        for (const l of todas) if (l.cid) doc.pos[l.cid] = l.pos;
+        posicoes[`posicoes:${nome}:${slugTracado(t.nome)}`] = doc;
         for (const l of todas) if (l.cid) {
           if (!nomes.has(l.cid)) nomes.set(l.cid, l.nome);
           const porPer = pos.get(l.cid) ?? {}; (porPer[nome] ??= {})[t.nome] = { pos: l.pos, de: todas.length }; pos.set(l.cid, porPer);
@@ -590,7 +608,6 @@ export async function rankingPublicoParaApp() {
     for (const x of antigoPor.get(cid) ?? []) if (valeNoRanking(x.tracado, x.ms)) {
       const at = melhorPorTracado.get(x.tracado); if (!at || x.ms < at.ms) melhorPorTracado.set(x.tracado, { ms: x.ms, dia: x.dia });
     }
-    const minhas = pos.get(cid) ?? {};
     // LapTime antigo (antes de 02/09/2026) só guardou os top 10 semanais/mensais: quantas semanas o piloto entrou nesse top
     const antigas = antigoPor.get(cid) ?? [];
     const semanasTop10 = new Set(antigas.filter((x) => x.tipo === 'semana').map((x) => x.periodo)).size;
@@ -610,7 +627,7 @@ export async function rankingPublicoParaApp() {
       ultima: r?.ultima ?? null,
       tracados: [...melhorPorTracado.entries()].map(([nome, t]) => ({
         nome, ms: t.ms, dia: t.dia, corridas: corridas.filter((c) => c.tracado === nome).length,
-        semana: minhas.semana?.[nome] ?? null, mes: minhas.mes?.[nome] ?? null, geral: minhas.geral?.[nome] ?? null,
+        // semana/mes/geral (posição) vêm dos documentos posicoes:* — o Worker preenche na leitura
       })).sort((a, b) => b.corridas - a.corridas || a.ms - b.ms),
       // só reserva (sem posição nem tempo) não aparece em "últimas baterias": o app mostraria "0º"
       recentes: corridas.filter((c) => !c.reserva).slice(0, 15).map((c) => ({ dia: c.dia, bateria: c.bateria, tipo: c.tipo, tracado: c.tracado, pos: c.pos, de: c.de, melhor: c.melhor, kart: c.kart })),
@@ -676,6 +693,6 @@ export async function rankingPublicoParaApp() {
   }
   const karts = [...porKart.values()].sort((a, b) => (a.melhorMs ?? 1e12) - (b.melhorMs ?? 1e12)).map((k, i) => ({ ...k, posVolta: k.melhorMs ? i + 1 : null, corridas: k.corridas.sort((a, b) => b.inicio - a.inicio) }));
   const kartsDoDia = { dia: ultimoDia || null, karts };
-  rankingCache = { versao: indiceVersao, ranking: { periodos, kartsDoDia }, pilotos };
-  return { ranking: { periodos, kartsDoDia }, pilotos };
+  rankingCache = { versao: indiceVersao, dia: hojeSp(), ranking: { periodos, kartsDoDia }, pilotos, posicoes };
+  return { ranking: { periodos, kartsDoDia }, pilotos, posicoes };
 }

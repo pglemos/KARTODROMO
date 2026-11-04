@@ -251,6 +251,8 @@ async function linkIdentity(request: Request, env: MobileResultsEnv) {
   const body = await parseBody(request);
   const customerId = typeof body?.customerId === 'string' ? body.customerId.trim() : '';
   const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+  // 'cpf' = só o CPF bateu (histórico); 'completo' = CPF + e-mail/telefone (também o perfil). Padrão: regra antiga.
+  const nivel = body?.nivel === 'cpf' ? 'cpf' : 'completo';
   if (!/^\d{1,20}$/.test(customerId) || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return invalid();
   const lookup = await emailLookup(env, email);
   if (!lookup) return unavailable();
@@ -261,8 +263,12 @@ async function linkIdentity(request: Request, env: MobileResultsEnv) {
   const now = Date.now();
   await env.MOBILE_DB.batch([
     env.MOBILE_DB.prepare(
-      `INSERT OR IGNORE INTO mobile_identity_links(customer_id, account_id, linked_at) VALUES (?, ?, ?)`,
-    ).bind(customerId, account.id, now),
+      `INSERT OR IGNORE INTO mobile_identity_links(customer_id, account_id, linked_at, nivel) VALUES (?, ?, ?, ?)`,
+    ).bind(customerId, account.id, now, nivel),
+    // promoção: o mesmo par passou a bater também e-mail/telefone (nunca rebaixa)
+    env.MOBILE_DB.prepare(
+      `UPDATE mobile_identity_links SET nivel = 'completo' WHERE customer_id = ? AND account_id = ? AND ? = 'completo' AND nivel <> 'completo'`,
+    ).bind(customerId, account.id, nivel),
     env.MOBILE_DB.prepare(
       `INSERT OR IGNORE INTO mobile_identity_link_audit(customer_id, account_id, action, changed_at)
        SELECT ?, ?, 'linked', ? WHERE EXISTS (
@@ -274,7 +280,7 @@ async function linkIdentity(request: Request, env: MobileResultsEnv) {
     'SELECT account_id FROM mobile_identity_links WHERE customer_id = ? LIMIT 1',
   ).bind(customerId).first<{ account_id: string }>();
   if (link?.account_id !== account.id) return json(409, { erro: 'Este cliente ou esta conta já está vinculado.' });
-  return json(200, { ok: true });
+  return json(200, { ok: true, nivel });
 }
 
 async function publicResults(env: MobileResultsEnv) {
@@ -318,7 +324,7 @@ async function personalResults(request: Request, env: MobileResultsEnv) {
   ).bind(account.id).first<{ customer_id: string }>();
   if (!link) return json(200, {
     vinculo: 'pendente',
-    mensagem: 'Seu histórico aparece sozinho quando o documento e o e-mail ou o telefone da sua conta são os mesmos do seu cadastro no kartódromo. Se não aparecer em alguns minutos, peça para a recepção conferir seu cadastro.',
+    mensagem: 'Seu histórico aparece sozinho assim que o CPF da sua conta for encontrado no cadastro do kartódromo. Se você ainda não correu aqui, ele aparece depois da sua primeira bateria.',
     results: [],
   });
   const rows = await env.MOBILE_DB.prepare(

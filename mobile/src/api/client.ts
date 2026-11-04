@@ -138,8 +138,13 @@ export const authApi = {
   verifyEmail(token: string) {
     return post<SuccessResponse>('email/verify', { token });
   },
+  /** pelo CPF, a resposta diz para qual e-mail (mascarado) o link foi: "esqueci meu e-mail" */
   requestPasswordReset(identifier: string) {
-    return post<MessageResponse>('password/forgot', { identifier });
+    return post<MessageResponse & { emailMascarado?: string; emailConfirmado?: boolean }>('password/forgot', { identifier });
+  },
+  /** cadastrou o e-mail errado e a confirmação nunca chegou: CPF + senha provam a conta, o link vai para o e-mail certo */
+  correctEmail(cpf: string, password: string, email: string) {
+    return post<MessageResponse>('email/corrigir', { cpf, password, email });
   },
   resetPassword(token: string, password: string) {
     return post<SuccessResponse>('password/reset', { token, password });

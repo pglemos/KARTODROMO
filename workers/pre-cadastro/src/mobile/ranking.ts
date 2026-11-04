@@ -71,7 +71,42 @@ function constantTimeEqual(a: string, b: string) {
   return dif === 0;
 }
 
-const CHAVE = /^(ranking|piloto:\d{1,12}|karts:\d{4}-\d{2}-\d{2}|historico:\d{1,20})$/;
+const CHAVE = /^(ranking|piloto:\d{1,12}|karts:\d{4}-\d{2}-\d{2}|historico:\d{1,20}|posicoes:(semana|mes|geral):[a-z0-9-]{1,80})$/;
+const PERIODOS_POSICAO = ['semana', 'mes', 'geral'] as const;
+
+/** Mesma regra do SRVKART (lib/ops/pilotos.ts slugTracado). */
+export function slugTracado(nome: string) {
+  return nome.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'sem-nome';
+}
+
+/**
+ * A ficha do piloto não guarda mais posição (mudava a cada bateria de qualquer um e regravava todas as fichas).
+ * Aqui junta: para cada traçado da ficha e cada período, posição e total vêm do documento posicoes:<período>:<traçado>.
+ * O SQLite extrai só a entrada do piloto (json_extract), sem trazer o documento inteiro para o Worker.
+ * Sem documento ainda (antes da primeira publicação no formato novo), mantém o que a ficha tiver.
+ */
+export async function preencherPosicoes(db: D1Database, cid: string, dados: Record<string, unknown>) {
+  const tracados = Array.isArray(dados.tracados) ? dados.tracados as Record<string, unknown>[] : [];
+  if (!tracados.length || !/^\d{1,12}$/.test(cid)) return dados;
+  const chaves = tracados.flatMap((t) => PERIODOS_POSICAO.map((p) => `posicoes:${p}:${slugTracado(String(t.nome ?? ''))}`));
+  const { results } = await db.prepare(
+    `SELECT chave, json_extract(dados, '$.de') de, json_extract(dados, '$.pos."' || ? || '"') pos
+       FROM mobile_ranking WHERE chave IN (${chaves.map(() => '?').join(',')})`,
+  ).bind(cid, ...chaves).all<{ chave: string; de: number | null; pos: number | null }>();
+  const porChave = new Map(results.map((r) => [r.chave, r]));
+  return {
+    ...dados,
+    tracados: tracados.map((t) => {
+      const novo: Record<string, unknown> = { ...t };
+      for (const p of PERIODOS_POSICAO) {
+        const doc = porChave.get(`posicoes:${p}:${slugTracado(String(t.nome ?? ''))}`);
+        if (!doc) continue;
+        novo[p] = doc.pos != null && doc.de != null ? { pos: Number(doc.pos), de: Number(doc.de) } : null;
+      }
+      return novo;
+    }),
+  };
+}
 const LIMITE_CORPO = 4_000_000;
 
 // a tabela também é criada aqui (mesmo SQL da migration 0007): o wrangler local não tem permissão de D1
@@ -198,7 +233,8 @@ async function ranking(url: URL, env: MobileRankingEnv) {
 async function piloto(id: string, env: MobileRankingEnv, publico = true) {
   const r = await ler(env, 'piloto:' + id);
   if (!r) return json(404, { erro: 'Piloto sem corridas no ranking.' });
-  return json(200, { id, ...r.dados, atualizadoEm: r.atualizadoEm }, publico ? 60 : 0);
+  const dados = await preencherPosicoes(env.MOBILE_DB!, id, r.dados);
+  return json(200, { id, ...dados, atualizadoEm: r.atualizadoEm }, publico ? 60 : 0);
 }
 
 /** sessão do app → cliente vinculado (mesma regra do histórico: só conta vinculada ao cadastro do kartódromo) */
