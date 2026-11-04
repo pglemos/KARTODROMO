@@ -10,7 +10,6 @@
   ],
   "vars": {
     "GRUPO_TESTADORES": "testadores-kartodromobetim@googlegroups.com",
-    "LINK_CLIENTE": "https://play.google.com/apps/testing/br.com.kartodromobetim.app",
-    "LINK_OPERACAO": "https://play.google.com/apps/testing/br.com.kartodromobetim.operacional"
+    "LINK_CLIENTE": "https://play.google.com/apps/testing/br.com.kartodromobetim.app"
   }
 }

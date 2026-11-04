@@ -1,17 +1,11 @@
 export interface Links {
   grupo: string;
   cliente: string;
-  operacao: string;
-  /** Mostra também o app da Operação (link com ?equipe). */
-  equipe: boolean;
 }
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 export function pagina(l: Links): string {
-  const operacao = l.equipe
-    ? `<a class="btn sec" href="${esc(l.operacao)}" target="_blank" rel="noopener">App da Operação (equipe)</a>`
-    : '';
   return `<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -30,7 +24,6 @@ h1{font-size:1.5rem;margin:0 0 8px}p{color:var(--sub);margin:0 0 16px}
 .n{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--acc);color:var(--on);font-weight:700;margin-right:8px}
 h2{font-size:1.05rem;margin:0 0 6px;display:flex;align-items:center}
 .btn{display:block;margin-top:12px;padding:14px;border-radius:999px;background:var(--acc);color:var(--on);font-weight:600;text-align:center;text-decoration:none}
-.sec{background:transparent;color:var(--acc);border:1px solid var(--acc)}
 small{display:block;color:var(--sub);margin-top:16px}
 </style>
 </head>
@@ -46,7 +39,6 @@ small{display:block;color:var(--sub);margin-top:16px}
 <h2><span class="n">2</span>Ative o teste e instale</h2>
 <p>Toque em <strong>Tornar-se testador</strong> e depois em baixar na Google Play. Pode levar alguns minutos para liberar.</p>
 <a class="btn" href="${esc(l.cliente)}" target="_blank" rel="noopener">Baixar o app</a>
-${operacao}
 </div>
 <small>No app, crie sua conta com CPF e senha. Se aparecer “app não disponível”, confira se a conta Google é a mesma do passo 1 e tente de novo em alguns minutos.</small>
 </div></main></body></html>`;

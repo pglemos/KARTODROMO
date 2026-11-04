@@ -3,11 +3,10 @@
 Página pública em `acesso.kartodromodebetim.com.br` com dois passos para o cliente:
 
 1. Entrar no Grupo do Google `testadores-kartodromobetim@googlegroups.com` (entrada livre, dono `kartodromobetim@gmail.com`).
-2. Aceitar o teste fechado (faixa **Alpha**) do app cliente e instalar.
+2. Aceitar o teste fechado (faixa **Alpha**) do app cliente e instalar. O app da Operação não aparece aqui (distribuição interna).
 
 O grupo é o testador da faixa Alpha de `br.com.kartodromobetim.app`. Ninguém precisa aprovar.
 
-- `/?equipe` também mostra o app da **Operação**. Essa faixa continua com lista fechada de e-mails (equipe), não usa o grupo aberto.
 - CPF e senha não são coletados aqui: a conta é criada no app.
 
 ## Limitações conhecidas
