@@ -106,3 +106,16 @@ services/*.antes-*.ts
 
 # lixo do macOS (AppleDouble)
 ._*
+
+# lixo local de ferramentas
+NuGetScratch/
+b4xqW9h/
+bec033bd08235fd04e04e153d79f954e/
+jest_dx/
+metro-cache/
+metro-file-map-*
+tsx-501/
+update-check/
+.auditoria-tmp/
+mobile/tests/appium/screenshots/
+resultados-legends/
