@@ -62,10 +62,11 @@ export type ChecklistKart = {
   acaoOficina?: string;
   atualizadoEm?: number;
   autor?: string;
-  confirmacaoManual?: { aberturaMm: number; bloco: number; confirmadoEm: number; autor: string };
+  confirmacaoManual?: { aberturaMm: number; bloco: number; confirmadoEm: number; autor: string; semTeste?: boolean; voltasNaConfirmacao?: number };
 };
 
 export type ConfigEqualizacao = {
+  frotas?: Partial<Record<'LIGHT' | 'SUPER', ConfigEqualizacao>>;
   faixasPersonalizadas?: FaixaRedutor[] | null;
   trackId?: string | null;
   /** referencia = a melhor volta entre os karts referência; fixa = meta escolhida para o traçado */
@@ -113,6 +114,7 @@ export type BlocoEqualizacao = {
 export type StatusKart = 'REF' | 'EQUALIZADO' | 'AJUSTANDO' | 'REVISAR' | 'SEM VOLTAS';
 
 export type KartEqualizacao = {
+  frota?: string; metaMs?: number | null; regraNome?: string;
   kart: string;
   piloto: string;
   referencia: boolean;
@@ -138,6 +140,7 @@ export type KartEqualizacao = {
 };
 
 export type ResultadoEqualizacao = {
+  frotas?: Partial<Record<'LIGHT' | 'SUPER', { metaMs: number | null; regraNome: string }>>;
   metaMs: number | null;
   metaOrigem: 'referencia' | 'fixa' | 'sem-meta';
   toleranciaMs: number;
@@ -269,7 +272,7 @@ export function rotuloRedutor(aberturaMm: number, inicialMm: number | null, curt
 
 function voltasValidas(c: Competitor) {
   const ativas = c.crossings.filter((x) => !x.deleted).sort((a, b) => a.wallMs - b.wallMs);
-  return ativas.slice(1).filter((x) => x.lapMs != null && x.lapMs > 0 && !x.invalid).map((x) => x.lapMs as number);
+  return ativas.slice(1).filter((x) => x.lapMs != null && x.lapMs > 0 && !x.invalid && !x.estimada && x.source !== 'manual').map((x) => x.lapMs as number);
 }
 
 const media = (v: number[]) => (v.length ? Math.round(v.reduce((s, x) => s + x, 0) / v.length) : null);
@@ -289,6 +292,15 @@ export function calcularEqualizacao(
   s: Session,
   cfg: ConfigEqualizacao = s.equalizacao ?? {},
 ): ResultadoEqualizacao {
+  if (cfg.frotas && Object.keys(cfg.frotas).length) {
+    const resultados = (['LIGHT', 'SUPER'] as const).filter(f => cfg.frotas?.[f]).map(frota => {
+      const propria = cfg.frotas![frota]!;
+      const r = calcularEqualizacao({ ...s, competitors: s.competitors.filter(c => (Number(c.kart) >= 100 ? 'SUPER' : 'LIGHT') === frota) }, { ...cfg, ...propria, frotas: undefined, checklist: cfg.checklist, aberturas: cfg.aberturas, redutorInicialMm: cfg.redutorInicialMm });
+      return { frota, r };
+    });
+    const base = resultados[0].r;
+    return { ...base, metaMs: null, referencias: resultados.flatMap(x => x.r.referencias), karts: resultados.flatMap(({ frota, r }) => r.karts.map(k => ({ ...k, frota, metaMs: r.metaMs, regraNome: cfg.frotas![frota]?.regraNome ?? frota }))), frotas: Object.fromEntries(resultados.map(({ frota, r }) => [frota, { metaMs: r.metaMs, regraNome: cfg.frotas![frota]?.regraNome ?? frota }])) };
+  }
   const finalizada = cfg.finalizadaEm != null || s.state === 'encerrada' || s.state === 'cancelada';
   const regra = regraDa(cfg);
   const tol = regra.toleranciaMs;
@@ -360,11 +372,10 @@ export function calcularEqualizacao(
     } else if (blocos.length) acao = 'Falta 1 volta para fechar o bloco';
     if (status === 'SEM VOLTAS' && finalizada) acao = 'Não andou nesta equalização';
     const manual = base.checklist?.confirmacaoManual;
-    const confirmadoManualmente = ultimo != null && metaMs != null && manual?.bloco === ultimo.bloco
-      && Number.isFinite(manual.aberturaMm) && Math.abs(manual.aberturaMm) <= 20;
+    const confirmadoManualmente = Boolean(manual && Number.isFinite(manual.aberturaMm) && Math.abs(manual.aberturaMm) <= 20 && (manual.semTeste ? manual.voltasNaConfirmacao === v.length : ultimo != null && metaMs != null && manual.bloco === ultimo.bloco));
     if (confirmadoManualmente) {
       status = 'EQUALIZADO'; ajusteMm = 0; aberturaMm = mm2(manual!.aberturaMm);
-      acao = `Equalizado manualmente pela oficina com o redutor ${rotuloRedutor(aberturaMm, inicial)} (sem voltas de confirmação): liberar`;
+      acao = `Equalizado — não testado. Confirmado manualmente pela oficina com o redutor ${rotuloRedutor(aberturaMm, inicial)} (sem voltas de confirmação): liberar`;
     }
     // o que a oficina escreveu vale mais que a sugestão automática
     const daOficina = base.checklist?.acaoOficina?.trim();
@@ -465,4 +476,24 @@ export function retomarEqualizacao(s: Session) {
   s.redFlagElapsedMs = null;
   for (const c of s.competitors) c.finished = false; // senão as passagens novas seriam ignoradas ("já recebeu a quadriculada")
   return true;
+}
+
+/** Usa somente medição real, no mesmo traçado e frota, com janela móvel de quinze dias. */
+export function compararHistorico(sessoes: Iterable<Session>, p: { kart: string; referencia: string; now: number; trackId?: string | null }) {
+  if (!/^\d+$/.test(p.kart) || !/^\d+$/.test(p.referencia) || p.kart === p.referencia || (Number(p.kart) >= 100) !== (Number(p.referencia) >= 100)) throw new Error('Escolha dois karts diferentes da mesma frota.');
+  const desde = p.now - 15 * 86400000;
+  const tempos = (kart: string) => {
+    const voltas: { lapMs: number; em: number; sessaoId: string; passagemId?: string }[] = [];
+    for (const s of sessoes) {
+      if (s.state === 'cancelada' || (s.trackId ?? null) !== (p.trackId ?? null)) continue;
+      for (const c of s.competitors) for (const [i, x] of c.crossings.entries()) {
+        if (i === 0 || kartFisicoDaPassagem(c, x) !== kart || kartFisicoDaPassagem(c, c.crossings[i - 1]) !== kart) continue;
+        if (x.lapMs != null && Number.isFinite(x.lapMs) && x.lapMs >= s.minLapMs && !x.deleted && !x.invalid && !x.estimada && x.source !== 'manual' && x.wallMs >= desde && x.wallMs <= p.now) voltas.push({ lapMs: x.lapMs, em: x.wallMs, sessaoId: s.id, passagemId: x.id });
+      }
+    }
+    return { numero: kart, amostra: voltas.length, voltas: voltas.sort((a,b) => a.lapMs - b.lapMs || b.em - a.em).slice(0, 5) };
+  };
+  // Materializa uma vez para permitir iteradores consumíveis nas duas consultas.
+  sessoes = [...sessoes];
+  return { desde, ate: p.now, kart: tempos(p.kart), referencia: tempos(p.referencia) };
 }

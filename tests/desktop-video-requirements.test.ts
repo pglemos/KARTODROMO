@@ -37,7 +37,7 @@ describe('correções solicitadas nos vídeos da operação', () => {
   });
 
   it('persiste a posição manual no servidor e no resultado atualizado', () => {
-    expect(servidor).toContain('setManualPosition');
+    expect(servidor).toContain('ajustarPosicaoComVoltas');
     expect(servidor).toContain("action === 'position'");
     expect(liveGrid).toContain('_hoverRow');
     expect(liveGrid).toContain('e.RowIndex % 2');

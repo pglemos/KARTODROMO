@@ -10,7 +10,7 @@ public partial class FormCrono
 {
     PassosSegmento _passos;
     readonly Label _lEvNome = Info(), _lGrupoNome = Info(), _lProvaNome = Info(), _lMinimo = Info();
-    BotaoBandeira _fVerde, _fAmarela, _fVermelha, _fBranca, _fQuad, _fParar, _fReiniciar, _fChuva;
+    BotaoBandeira _fVerde, _fAmarela, _fVermelha, _fBranca, _fQuad, _fParar, _fReiniciar, _fChuva, _fPainel;
     FaixaPlacar _faixa;
     readonly Label _rodTexto = new() { AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno), ForeColor = TemaCrono.Secundario, BackColor = Color.Transparent };
     PilulaStatus _pPlacar, _pDecoder, _pTv, _pTransp;
@@ -168,8 +168,10 @@ public partial class FormCrono
         _fBranca.Click += (_, _) => Bandeira("branca"); _fQuad.Click += (_, _) => Bandeira("quadriculada"); _fParar.Click += (_, _) => Acao("close");
         _fReiniciar.Click += (_, _) => ReiniciarBateria();
         _fChuva.Click += (_, _) => AlternarChuva();
+        _fPainel = new BotaoBandeira("Atualizar painel", Tokens.Claro.CorDominioBandeiraAzul) { PainelLed = true, Width = 96, Dica = "Limpa o painel de LED e reenvia agora a bateria certa" };
+        _fPainel.Click += (_, _) => AtualizarPainelAgora();
         var x = 20;
-        foreach (var b in new[] { _fVerde, _fAmarela, _fVermelha, _fBranca, _fQuad, _fParar, _fReiniciar, _fChuva }) { b.Location = new Point(x, 10); x += b.Width + 6; barra.Controls.Add(b); }
+        foreach (var b in new[] { _fVerde, _fAmarela, _fVermelha, _fBranca, _fQuad, _fParar, _fReiniciar, _fChuva, _fPainel }) { b.Location = new Point(x, 10); x += b.Width + 6; barra.Controls.Add(b); }
         var sep = new Panel { Location = new Point(x + 8, 19), Size = new Size(1, 40), BackColor = Color.FromArgb(225, 225, 225) };
         barra.Controls.Add(sep); x += 8 + 1 + 14;
         var pilotos = new (string flag, string dica, Action<Graphics, RectangleF> pano)[]
@@ -569,6 +571,7 @@ public class BotaoBandeira : Control
     /// <summary>Seta circular laranja (reiniciar a bateria) no lugar do pano.</summary>
     public bool Reiniciar { get; init; }
     public bool Chuva { get; init; }
+    public bool PainelLed { get; init; }
     public string Dica { set => new ToolTip().SetToolTip(this, value); }
     public EstadoBotao Estado { get => _estado; set { if (_estado == value) return; _estado = value; Cursor = value == EstadoBotao.Apagado ? Cursors.Default : Cursors.Hand; Invalidate(); } }
 
@@ -614,6 +617,10 @@ public class BotaoBandeira : Control
         {
             Forma.DesenharSvg(g, "M4 12a8 8 0 1 0 2.3-5.7M4 4v4.5h4.5", new RectangleF((Width - 24) / 2f, 9, 24, 24), Color.FromArgb(alfa, _pano), 2.4f);
         }
+        else if (PainelLed)
+        {
+            Forma.DesenharSvg(g, "M20 11a8 8 0 0 0-14-4.5L4 8.5M4 4v4.5h4.5M4 13a8 8 0 0 0 14 4.5l2-2M20 20v-4.5h-4.5", new RectangleF((Width - 24) / 2f, 9, 24, 24), Color.FromArgb(alfa, 10, 132, 255), 2.4f);
+        }
         else if (Chuva)
         {
             using var corChuva = new Pen(Color.FromArgb(alfa, 10, 132, 255), 2.2f);
@@ -635,7 +642,7 @@ public class BotaoBandeira : Control
             else using (var b = new SolidBrush(Color.FromArgb(alfa, _pano))) using (var pp = Forma.Redondo(pano, 2)) g.FillPath(b, pp);
             using var borda = new Pen(Color.FromArgb(apagado ? 20 : 38, 0, 0, 0)); g.DrawRectangle(borda, pano.X, pano.Y, pano.Width, pano.Height);
         }
-        var cor = apagado ? Tokens.Primitivo.Cinza400 : _estado == EstadoBotao.Ativo ? Tokens.Claro.CorEstadoSucessoTexto : Parar ? TemaCrono.Vermelho : Reiniciar ? Color.FromArgb(176, 92, 0) : Chuva ? Color.FromArgb(0, 99, 177) : TemaCrono.Texto;
+        var cor = apagado ? Tokens.Primitivo.Cinza400 : _estado == EstadoBotao.Ativo ? Tokens.Claro.CorEstadoSucessoTexto : Parar ? TemaCrono.Vermelho : Reiniciar ? Color.FromArgb(176, 92, 0) : Chuva || PainelLed ? Color.FromArgb(0, 99, 177) : TemaCrono.Texto;
         using var f = Tokens.FonteSemibold(Tokens.Claro.FonteTamanhoLegenda);
         TextRenderer.DrawText(g, Text, f, new Rectangle(0, 36, Width, 16), cor, TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPadding);
     }

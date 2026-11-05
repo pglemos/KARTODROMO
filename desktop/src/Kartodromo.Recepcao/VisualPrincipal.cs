@@ -223,6 +223,7 @@ static class VisualPrincipal
         if (ComAnoForaDoAtual.Add(grade)) grade.CellFormatting += DataComAno;
         foreach (DataGridViewColumn c in grade.Columns)
         {
+            if (c.Name == "__sel") { c.AutoSizeMode = DataGridViewAutoSizeColumnMode.None; c.MinimumWidth = 34; c.Width = 34; continue; }
             var dir = c.DefaultCellStyle.Alignment == DataGridViewContentAlignment.MiddleRight;
             c.HeaderCell.Style.Alignment = dir ? DataGridViewContentAlignment.MiddleRight : c is DataGridViewCheckBoxColumn ? DataGridViewContentAlignment.MiddleCenter : DataGridViewContentAlignment.MiddleLeft;
             if (c.DefaultCellStyle.Format == "dd/MM/yyyy HH:mm") { c.DefaultCellStyle.Format = "dd/MM HH:mm"; c.DefaultCellStyle.Font = Tokens.FonteNumero(Tokens.Claro.FonteTamanhoPequeno); c.Width = Math.Min(c.Width, 126); }

@@ -63,7 +63,7 @@ public static class Atualizacao
         return null;
     }
 
-    public static async Task<bool> TratarInicioAsync(string app, string[] args)
+    public static async Task<bool> TratarInicioAsync(string app, string[] args, bool instanciaUnica = false)
     {
         if (args.Length > 1 && args[1] == ArgumentoInstalador)
         {
@@ -71,6 +71,7 @@ public static class Atualizacao
             return true;
         }
         if (EhModoTeste(args)) return false;
+        if (instanciaUnica && !InstanciaUnica.Garantir(app)) return true;
         LimparSobras(app);
         if (args.Skip(1).Contains(ArgumentoSemAtualizar)) return false;
         return await VerificarEIniciarAsync(app, args);
@@ -144,6 +145,7 @@ public static class Atualizacao
         if (args.Length < 7 || !int.TryParse(args[2], out var pid)) return Task.CompletedTask;
         using var bloqueio = AdquirirBloqueio(app, TimeSpan.FromSeconds(5));
         if (bloqueio == null) return Task.CompletedTask;
+        InstanciaUnica.Adquirir(app, TimeSpan.FromSeconds(10));
         var manifestoUrl = args[3];
         var diretorio = Decodificar(args[4]);
         var executavel = Decodificar(args[5]);
@@ -171,6 +173,7 @@ public static class Atualizacao
         // falhou: abre a versão instalada SEM consultar a atualização de novo nesta abertura (senão vira ciclo)
         if (erro != null && !argumentos.Contains(ArgumentoSemAtualizar)) argumentos = [.. argumentos, ArgumentoSemAtualizar];
         else if (erro == null) argumentos = argumentos.Where(a => a != ArgumentoSemAtualizar).ToArray();
+        InstanciaUnica.Liberar();
         Iniciar(executavel, diretorio, argumentos);
         if (erro != null) Debug.WriteLine("Atualização falhou: " + erro);
         return Task.CompletedTask;

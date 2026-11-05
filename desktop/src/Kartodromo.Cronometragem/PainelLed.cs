@@ -109,15 +109,30 @@ sealed class PainelLed : IDisposable
 
     public void DefinirSessaoClassificacao(JsonObject sessao)
     {
-        if (sessao == null) return;
+        if (sessao == null || sessao.S("type") == "equalizacao") return;
         var st = sessao["standings"] as JsonArray;
         if (st != null && st.Count > 0)
         {
-            var criado = sessao.L("createdAt") ?? 0;
-            var atualCriado = _sessaoClassificacao?.L("createdAt") ?? 0;
-            if (_sessaoClassificacao == null || criado >= atualCriado)
+            // Vale a última que LARGOU: a bateria da agenda é criada de véspera, então a hora de criação não diz qual é a mais nova
+            // (em 31/10 a tomada das 17:25, criada antes, perdia para a das 16:15 e o painel mostrava o grid errado).
+            var mesma = sessao.S("id") is { Length: > 0 } id && id == _sessaoClassificacao?.S("id");
+            if (_sessaoClassificacao == null || mesma || InicioDaSessao(sessao) >= InicioDaSessao(_sessaoClassificacao))
                 _sessaoClassificacao = sessao;
         }
+    }
+
+    static long InicioDaSessao(JsonObject s) => s.L("startedAt") ?? s.L("createdAt") ?? 0;
+
+    /// <summary>Botão "Atualizar painel": esquece o que está guardado, reabre a porta se ela falhou e faz o próximo
+    /// Atualizar limpar o painel ($I) e mandar o quadro inteiro, na mesma página.</summary>
+    public void ForcarAtualizacao()
+    {
+        _sessaoClassificacao = null;
+        _paginaAnterior = -1;
+        _ultimoEnvio = DateTime.MinValue;
+        _proximaTentativa = DateTime.MinValue;
+        _falhasConsecutivas = 0;
+        if (!Ok) { try { _serial?.Dispose(); } catch { } _serial = null; }
     }
 
     int _falhasConsecutivas = 0;
@@ -162,7 +177,12 @@ sealed class PainelLed : IDisposable
         {
             if (_disposed) return;
             if (limparAntes) _limpezaPendente = true;
-            if (!string.IsNullOrEmpty(pacote)) _pacotePendente = pacote;
+            // envio parcial: um pacote na fila não pode ser perdido; só com fila parada demais (3 s de cabo) recomeça do quadro inteiro
+            if (!string.IsNullOrEmpty(pacote))
+            {
+                if ((_pacotePendente?.Length ?? 0) + pacote.Length > 3000) { _pacotePendente = pacote; _reenviarTudo = true; }
+                else _pacotePendente += pacote;
+            }
             if (_envioEmAndamento) return;
             _envioEmAndamento = true;
         }
@@ -193,7 +213,7 @@ sealed class PainelLed : IDisposable
                         _limpezaPendente = false;
                     }
 
-                    if (DateTime.Now < _proximaTentativa) continue;
+                    if (DateTime.Now < _proximaTentativa) { _reenviarTudo = true; continue; }
 
                     try
                     {
@@ -223,9 +243,11 @@ sealed class PainelLed : IDisposable
                             Situacao = $"{Porta} ok";
                             _falhasConsecutivas = 0;
                         }
+                        else _reenviarTudo = true;
                     }
                     catch (Exception e)
                     {
+                        _reenviarTudo = true;
                         _falhasConsecutivas++;
                         var backoffSegundos = Math.Min(15, 2 * _falhasConsecutivas);
                         _proximaTentativa = DateTime.Now.AddSeconds(backoffSegundos);
@@ -356,18 +378,12 @@ sealed class PainelLed : IDisposable
                 limparAntes = true;
                 _sessaoId = id;
                 _paginaAnterior = Pagina;
+                _enviadas = new string[Linhas]; // painel limpo: tudo precisa ir de novo
             }
+            if (_reenviarTudo) { _reenviarTudo = false; _enviadas = new string[Linhas]; }
 
-            // A 9600 baud (~960 bytes/s), o quadro inteiro (10 posições × $SR/$J/$G + $F) tem ~1.150 bytes e leva ~1,2 s para transmitir na UART.
-            // Para não sobrecarregar o buffer serial, limitamos o envio a no mínimo 800 ms (a menos que tenha mudado sessão, página ou passado kart)
             var agoraEnvio = DateTime.Now;
-            if (agoraEnvio - _ultimoEnvio < TimeSpan.FromMilliseconds(800) && kartPassou == null && !mudouSessao && !mudouPagina)
-            {
-                return;
-            }
-
-            var (posicoes, rodape) = MontarQuadro(sessaoExibir, Pagina, Linhas, agoraEnvio);
-            var pacote = string.Concat(posicoes) + rodape;
+            var pacote = MontarEnvio(sessaoExibir, agoraEnvio);
             if (pacote.Length == 0 && !limparAntes) return;
             _ultimoEnvio = agoraEnvio;
             Escrever(pacote, limparAntes);
@@ -383,6 +399,42 @@ sealed class PainelLed : IDisposable
             try { _serial?.Dispose(); } catch { }
             _serial = null;
         }
+    }
+
+    // A COM3 roda a 9600 baud (~960 bytes/s). O quadro inteiro (10 posições × $SR/$J/$G + $F) tem ~1.150 bytes: reenviar
+    // tudo a cada passagem levava mais de 1 s só no cabo e o piloto via o tempo atrasado. Vai só a posição que mudou
+    // (~110 bytes, ~0,1 s), mais 1 posição de reforço por segundo em rodízio (pacote perdido se corrige em até 10 s).
+    string[] _enviadas = [];
+    DateTime _ultimoReforco = DateTime.MinValue, _ultimoRodape = DateTime.MinValue;
+    int _reforco;
+    volatile bool _reenviarTudo;
+
+    string MontarEnvio(JsonObject sessao, DateTime agora)
+    {
+        var (posicoes, rodape) = MontarQuadro(sessao, Pagina, Linhas, agora);
+        if (_enviadas.Length != Linhas) _enviadas = new string[Linhas];
+        var sb = new StringBuilder();
+        var mudou = false;
+        for (var i = 0; i < posicoes.Count && i < Linhas; i++)
+        {
+            if (posicoes[i] == _enviadas[i]) continue;
+            sb.Append(posicoes[i]);
+            _enviadas[i] = posicoes[i];
+            mudou = true;
+        }
+        if (mudou) _ultimoReforco = agora;
+        if (!mudou && posicoes.Count > 0 && agora - _ultimoReforco >= TimeSpan.FromSeconds(1))
+        {
+            sb.Append(posicoes[_reforco++ % posicoes.Count]);
+            _ultimoReforco = agora;
+        }
+        // relógio e voltas restantes: junto de cada mudança, e a cada 5 s mesmo parado
+        if (rodape.Length > 0 && (mudou || agora - _ultimoRodape >= TimeSpan.FromSeconds(5)))
+        {
+            sb.Append(rodape);
+            _ultimoRodape = agora;
+        }
+        return sb.ToString();
     }
 
     internal string MontarAlteracoes(JsonObject sessao, DateTime agora)
