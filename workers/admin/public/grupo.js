@@ -199,11 +199,12 @@ const Grupo = (() => {
             </div>` : ''}
           </section>
           ${!novo ? `<section class="secao" style="padding: 14px 16px"><span class="titulo" style="font-size: 15px">Pagamentos recebidos<span class="peq" style="margin-left: auto; font-weight: 500">${pagamentos.length || ''}</span></span>
-            ${pagamentos.map((pg) => `<div style="display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--linha)"><span style="width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #FFF; font-size: 10.5px; font-weight: 700; background: ${pg.pilotoId ? CORG[pg.pilotoId % 6] : '#1D1D1F'}">${esc(pg.pilotoId ? iniciais(nomeDe(pg.pilotoId)) : 'G')}</span><span class="col" style="flex-grow: 1"><b class="trunc">${esc(nomeDe(pg.pilotoId))}</b><span class="peq">${esc(pg.forma)} · ${esc((pg.criadoEm || '').slice(8, 10) + '/' + (pg.criadoEm || '').slice(5, 7) + ' ' + (pg.criadoEm || '').slice(11, 16))}${pg.usuario ? ' · ' + esc(pg.usuario) : ''}</span></span><b class="mono" style="color: var(--okTxt)">${brl(pg.valor)}</b>${pg.origem === 'manual' ? `<button class="btn peq" style="background: transparent; color: var(--erroTxt)" data-estornar="${pg.id}">Estornar</button>` : ''}</div>`).join('') || '<span class="peq">Nenhum pagamento ainda.</span>'}
+            ${pagamentos.map((pg) => `<div style="display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--linha)"><span style="width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #FFF; font-size: 10.5px; font-weight: 700; background: ${pg.pilotoId ? CORG[pg.pilotoId % 6] : '#1D1D1F'}">${esc(pg.pilotoId ? iniciais(nomeDe(pg.pilotoId)) : 'G')}</span><span class="col" style="flex-grow: 1"><b class="trunc">${esc(nomeDe(pg.pilotoId))}</b><span class="peq">${esc(pg.forma)} · ${esc((pg.criadoEm || '').slice(8, 10) + '/' + (pg.criadoEm || '').slice(5, 7) + ' ' + (pg.criadoEm || '').slice(11, 16))}${pg.usuario ? ' · ' + esc(pg.usuario) : ''}</span></span><b class="mono" style="color: var(--okTxt)">${brl(pg.valor)}</b>${controlesComp(pg)}${pg.origem === 'manual' ? `<button class="btn peq" style="background: transparent; color: var(--erroTxt)" data-estornar="${pg.id}">Estornar</button>` : ''}</div>`).join('') || '<span class="peq">Nenhum pagamento ainda.</span>'}
             <div style="display: grid; grid-template-columns: 92px minmax(0, 1fr) 92px; gap: 6px; padding-top: 8px; border-top: 1px solid var(--linha)">
               <input class="entrada" style="height: 34px; font-size: 13px" type="number" min="0" step="0.01" placeholder="R$" aria-label="Valor recebido" data-reg="valor" value="${esc(estado.reg.valor)}">
               <select class="entrada" style="height: 34px; font-size: 12.5px; padding: 0 6px" aria-label="Quem pagou" data-reg="quem"><option value="">Grupo (responsável)</option>${g.pilotos.map((p) => `<option value="${p.id}" ${String(estado.reg.quem) === String(p.id) ? 'selected' : ''}>${esc(p.nome || 'Piloto ' + p.ordem)}</option>`).join('')}</select>
               <select class="entrada" style="height: 34px; font-size: 12.5px; padding: 0 6px" aria-label="Forma" data-reg="forma">${['Pix', 'Cartão', 'Dinheiro'].map((f) => `<option ${estado.reg.forma === f ? 'selected' : ''}>${f}</option>`).join('')}</select>
+              <label class="peq" style="grid-column: span 3; display: flex; align-items: center; gap: 8px; cursor: pointer">Comprovante (foto ou PDF, opcional)<input type="file" accept="${COMP_TIPOS}" data-reg-arquivo="1" aria-label="Comprovante do pagamento" style="min-width: 0; flex-grow: 1; font-size: 12px">${estado.regArquivo ? `<span class="chip verde trunc" style="max-width: 160px">${esc(estado.regArquivo.name)}</span>` : ''}</label>
               <button class="btn escuro peq" style="grid-column: span 3; height: 34px" data-registrar="1">Registrar pagamento</button>
             </div></section>
           <section class="secao" style="padding: 14px 16px; gap: 10px"><span class="titulo" style="font-size: 15px">O que acontece sozinho</span>${integra.map(([t, d, st, ok, ic, cor]) => `<div style="display: flex; align-items: flex-start; gap: 10px"><span class="tile" style="width: 28px; height: 28px; border-radius: 8px; background: ${cor}">${svg(ic, 14, '#FFF')}</span><span class="col" style="gap: 1px; flex-grow: 1"><b>${t}</b><span class="peq" style="line-height: 1.4">${d}</span></span><span class="chip ${ok ? 'verde' : 'laranja'}">${st}</span></div>`).join('')}</section>` : ''}
@@ -259,6 +260,18 @@ const Grupo = (() => {
     if (!estado || !e.target.closest('#camada .modal')) return;
     const t = e.target;
     if (t.dataset.reg) { estado.reg[t.dataset.reg] = t.value; return; }
+    if (t.dataset.regArquivo) {
+      const f = t.files && t.files[0]; const er = erroComp(f);
+      if (er) { t.value = ''; estado.regArquivo = null; return toast(er, true); }
+      estado.regArquivo = f || null; pintar();
+      return;
+    }
+    if (t.dataset.compAnexar && estado.g) {
+      const f = t.files && t.files[0]; if (!f) return;
+      const er = erroComp(f); if (er) { t.value = ''; return toast(er, true); }
+      try { await enviarComp(estado.g.id, +t.dataset.compAnexar, f); await carregarComp(); pintar(); toast('Comprovante anexado'); } catch (er2) { falhou(er2); }
+      return;
+    }
     if (t.dataset.preco) {
       const v = Math.round(parseFloat(String(t.value).replace(',', '.')) * 100);
       if (!(v > 0)) return toast('Preço inválido', true);
@@ -434,8 +447,26 @@ const Grupo = (() => {
     if (el('[data-registrar]')) {
       const v = Math.round(parseFloat(String(estado.reg.valor).replace(',', '.')) * 100);
       if (!(v > 0)) return toast('Digite o valor recebido', true);
+      const arquivo = estado.regArquivo;
+      const er = erroComp(arquivo); if (er) return toast(er, true);
+      const antes = new Set(g.pagamentos.map((p) => p.id));
       await atualizar(office(`/grupos/${g.id}/pagamentos`, { method: 'POST', body: { pilotoId: estado.reg.quem ? +estado.reg.quem : null, valorCentavos: v, forma: estado.reg.forma } }), `${brl(v)} registrado`);
-      estado.reg = { valor: '', quem: '', forma: 'Pix' }; pintar();
+      estado.reg = { valor: '', quem: '', forma: 'Pix' }; estado.regArquivo = null;
+      const novoPg = estado.g.pagamentos.filter((p) => !antes.has(p.id) && p.origem === 'manual').pop();
+      if (arquivo && novoPg) {
+        try { await enviarComp(estado.g.id, novoPg.id, arquivo); await carregarComp(); toast('Pagamento registrado com comprovante'); }
+        catch (er2) { falhou(new Error(`O pagamento foi registrado, mas o comprovante não subiu: ${er2.message} Use “Anexar comprovante” no pagamento.`)); }
+      }
+      pintar();
+      return;
+    }
+    if ((x = el('[data-comp-ver]'))) {
+      try { await abrirComp(+x.dataset.compVer); } catch (er) { falhou(er); }
+      return;
+    }
+    if ((x = el('[data-comp-remover]'))) {
+      if (!confirm('Remover este comprovante? O pagamento continua registrado.')) return;
+      try { await api(`/comprovantes/${+x.dataset.compRemover}`, { method: 'DELETE' }); await carregarComp(); pintar(); toast('Comprovante removido'); } catch (er) { falhou(er); }
       return;
     }
     if ((x = el('[data-estornar]'))) {
