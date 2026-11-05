@@ -2707,13 +2707,26 @@ function normalizarTracado(value2) {
   return String(value2 ?? "").replace(/\s*·\s*Super\s*Kart\s*$/i, "").replace(/\s+normal$/i, "").trim();
 }
 __name(normalizarTracado, "normalizarTracado");
+function categoriaDaVolta(l) {
+  const doKart = categoriaDoKart(l.kart);
+  if (doKart) return doKart;
+  if (/super\s*kart/i.test(String(l.tracado ?? ""))) return "Super Kart";
+  const c = String(l.categoria ?? "");
+  return /super\s*kart/i.test(c) ? "Super Kart" : /indoor/i.test(c) ? "Indoor" : null;
+}
+__name(categoriaDaVolta, "categoriaDaVolta");
+function pisoDoTracado(tracado, categoria) {
+  if (!/^tra[cç]ado\s+1$/i.test(normalizarTracado(tracado))) return 0;
+  return categoria === "Indoor" ? 7e4 : 64e3;
+}
+__name(pisoDoTracado, "pisoDoTracado");
 function montarRanking(origem, url) {
   const categoria = (url.searchParams.get("categoria") ?? "").toLowerCase().replace(/\s/g, "");
   const normalizadas = origem.filter((l) => Number.isFinite(l.ms) && l.ms > 0).map((l) => ({
     ...l,
     tracado: normalizarTracado(l.tracado),
-    categoria: categoriaDoKart(l.kart) ?? (!l.kart ? l.categoria ?? null : null)
-  }));
+    categoria: categoriaDaVolta(l)
+  })).filter((l) => l.ms >= pisoDoTracado(l.tracado, l.categoria));
   const dias = [...new Set(normalizadas.map((l) => l.dia))].sort().reverse();
   const dia = url.searchParams.get("dia");
   const filtradas = normalizadas.filter((l) => (!dia || l.dia === dia) && (!categoria || categoria === "todos" || l.categoria?.toLowerCase().replace(/\s/g, "") === categoria));
@@ -2755,7 +2768,11 @@ function filtrarKarts(linhas, url, dias) {
   const categoria = url.searchParams.get("categoria") || null;
   if (categoria && !["Indoor", "Super Kart"].includes(categoria)) throw new Error("Categoria inv\xE1lida.");
   const tracado = url.searchParams.get("tracado") || null;
-  const periodoLinhas = linhas.filter((l) => l.dia >= desde && l.dia <= fim);
+  const periodoLinhas = linhas.filter((l) => l.dia >= desde && l.dia <= fim).flatMap((l) => {
+    const cat = categoriaDoKart(l.kart);
+    if (!cat) return [];
+    return [{ ...l, categoria: cat, ms: l.ms !== null && l.ms < pisoDoTracado(l.tracado, cat) ? null : l.ms }];
+  });
   const tracados = [...new Set(periodoLinhas.map((l) => l.tracado))].sort();
   const porKart = /* @__PURE__ */ new Map();
   for (const l of periodoLinhas.filter((l2) => (!categoria || l2.categoria === categoria) && (!tracado || l2.tracado === tracado))) {
@@ -3382,7 +3399,7 @@ var index_default = {
         // resumo das reservas em grupo ativas (o SRVKART manda a cada minuto): o link do grupo mostra quem reservou e cobra a vaga
         if (p === "/api/sync/grupos" && req.method === "PUT") {
           const { grupos } = await req.json();
-          // um arquivo só com todos os grupos (gravar um por link passava de 800 gravações e estourava o tempo)
+          // um arquivo só com todos os grupos (um por link passava de 800 gravações e estourava o tempo)
           const lista = (Array.isArray(grupos) ? grupos.slice(0, 500) : []).filter((g) => Array.isArray(g.tokens));
           await env.PRE.put("grupos/todos.json", JSON.stringify(lista), { httpMetadata: { contentType: "application/json" } });
           cacheGrupos = null;

@@ -35,10 +35,16 @@ function faltaNoCadastro(d) {
   return null;
 }
 __name(faltaNoCadastro, "faltaNoCadastro");
+var cacheGrupos = null;
 async function grupoDoLink(env, token) {
-  const obj = await env.PRE.get(\`grupos/\${token}.json\`);
-  if (!obj) return null;
-  const g = await obj.json();
+  if (!token) return null;
+  if (!cacheGrupos || Date.now() - cacheGrupos.em > 3e4) {
+    const obj = await env.PRE.get("grupos/todos.json");
+    cacheGrupos = { em: Date.now(), lista: obj ? await obj.json() : [] };
+  }
+  const achado = cacheGrupos.lista.find((x) => x.tokens.includes(token));
+  if (!achado) return null;
+  const { tokens, ...g } = achado;
   if (!g || g.status !== "ativa" || Date.parse(String(g.inicio).slice(0, 16) + ":00-03:00") < Date.now() - 36e5) return null;
   return g;
 }
@@ -96,16 +102,11 @@ troca(`        if (p === "/api/sync/pedidos" && req.method === "GET") return awa
         // resumo das reservas em grupo ativas (o SRVKART manda a cada minuto): o link do grupo mostra quem reservou e cobra a vaga
         if (p === "/api/sync/grupos" && req.method === "PUT") {
           const { grupos } = await req.json();
-          let n = 0;
-          for (const g of Array.isArray(grupos) ? grupos.slice(0, 300) : []) {
-            for (const t of Array.isArray(g.tokens) ? g.tokens : []) {
-              if (!/^[A-Za-z0-9]{10,24}$/.test(String(t))) continue;
-              const { tokens, ...resumo } = g;
-              await env.PRE.put(\`grupos/\${t}.json\`, JSON.stringify(resumo), { httpMetadata: { contentType: "application/json" } });
-              n++;
-            }
-          }
-          return json12(200, { gravados: n });
+          // um arquivo só com todos os grupos (um por link passava de 800 gravações e estourava o tempo)
+          const lista = (Array.isArray(grupos) ? grupos.slice(0, 500) : []).filter((g) => Array.isArray(g.tokens));
+          await env.PRE.put("grupos/todos.json", JSON.stringify(lista), { httpMetadata: { contentType: "application/json" } });
+          cacheGrupos = null;
+          return json12(200, { gravados: lista.length });
         }`);
 for (const f of ['var consultar =']) if (js.includes(f)) { writeFileSync('index2.js', js); console.log('ok', js.length); process.exit(0); }
 throw new Error('consultar não existe');
