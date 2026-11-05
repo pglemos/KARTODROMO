@@ -1,0 +1,154 @@
+name: Premium ZIP preview
+
+on:
+  push:
+    branches:
+      - fix/premium-static-recovery-2026-07-20
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: premium-zip-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.ref == 'refs/heads/fix/premium-static-recovery-2026-07-20' ||
+      github.head_ref == 'fix/premium-static-recovery-2026-07-20'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Validate exact ZIP source
+        run: npx vitest run tests/premium-zip-source.test.ts tests/premium-static-recovery.test.ts
+
+      - name: Build exact ZIP package
+        run: node scripts/build-premium-reference.mjs premium-dist
+
+      - name: Validate generated package
+        run: |
+          node --check workers/premium-preview-worker.mjs
+          node --check premium-dist/assets/js/site.js
+          python3 premium-dist/site/qa_check.py
+
+      - name: Deploy isolated ZIP Worker
+        id: deploy
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx wrangler deploy --config wrangler.premium-preview.jsonc 2>&1 | tee /tmp/premium-preview-deploy.log
+          preview_url=$(grep -Eo 'https://[A-Za-z0-9.-]+\.workers\.dev' /tmp/premium-preview-deploy.log | tail -1)
+          test -n "$preview_url"
+          echo "url=$preview_url" >> "$GITHUB_OUTPUT"
+          echo "$preview_url" > /tmp/premium-preview-url.txt
+
+      - name: Wait for Worker propagation
+        shell: bash
+        env:
+          PREMIUM_PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+          BUILD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          ready=0
+          for attempt in $(seq 1 18); do
+            status=$(curl -sS -o /tmp/premium-ready.html -D /tmp/premium-ready.headers -w '%{http_code}' "${PREMIUM_PREVIEW_URL}/?build=${BUILD_SHA}&attempt=${attempt}" || true)
+            if [[ "$status" == "200" ]] && grep -Fqi 'x-premium-site: zip-final-v1' /tmp/premium-ready.headers; then
+              ready=1
+              break
+            fi
+            sleep 5
+          done
+          test "$ready" = '1'
+
+      - name: Smoke test clean routes and ZIP assets
+        shell: bash
+        env:
+          PREMIUM_PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+          BUILD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/premium-smoke
+          routes=('' 'pista' 'kart-locacao' 'campeonatos' 'eventos' 'duvidas' 'kac' 'kac-super' '200-milhas' '500-milhas')
+          for path in "${routes[@]}"; do
+            key="${path:-home}"
+            curl -sS -L --max-redirs 4 \
+              -D "/tmp/premium-smoke/${key}.headers" \
+              -o "/tmp/premium-smoke/${key}.html" \
+              -w '%{http_code} %{url_effective}\n' \
+              "${PREMIUM_PREVIEW_URL}/${path}?build=${BUILD_SHA}" > "/tmp/premium-smoke/${key}.meta"
+            read -r status effective < "/tmp/premium-smoke/${key}.meta"
+            test "$status" = '200'
+            [[ "$effective" != *'/site/'* ]]
+            grep -Fqi '<h1' "/tmp/premium-smoke/${key}.html"
+            grep -Fqi 'x-premium-site: zip-final-v1' "/tmp/premium-smoke/${key}.headers"
+            grep -Fqi 'cache-control: no-store' "/tmp/premium-smoke/${key}.headers"
+          done
+          curl -fsS "${PREMIUM_PREVIEW_URL}/assets/css/site.css?build=${BUILD_SHA}" -o /tmp/premium-smoke/site.css
+          curl -fsS "${PREMIUM_PREVIEW_URL}/assets/js/site.js?build=${BUILD_SHA}" -o /tmp/premium-smoke/site.js
+          test -s /tmp/premium-smoke/site.css
+          test -s /tmp/premium-smoke/site.js
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Compare clean routes with ZIP HTML
+        env:
+          PREMIUM_PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+        run: npx playwright test tests/premium-static-preview.spec.ts --reporter=html,line
+
+      - name: Publish verified preview URL on pull request
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+        with:
+          script: |
+            const marker = '<!-- premium-static-preview -->';
+            const body = `${marker}\n## Preview do ZIP final anexado\n\n${process.env.PREVIEW_URL}\n\nAs 10 rotas limpas usam os HTMLs, CSS e JavaScript do pacote \`kartodromo-betim-premium-revisado-final\`. A esteira valida hashes SHA-256, QA estrutural, recursos, overflow e screenshots em mobile, tablet e desktop.`;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const previous = comments.find((comment) => comment.body?.includes(marker));
+            if (previous) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: previous.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body });
+            }
+
+      - name: Upload comparison evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: premium-zip-preview-evidence
+          path: |
+            /tmp/premium-preview-deploy.log
+            /tmp/premium-preview-url.txt
+            /tmp/premium-ready.headers
+            /tmp/premium-ready.html
+            /tmp/premium-smoke
+            playwright-report
+            test-results/premium-zip-comparison
+          if-no-files-found: ignore
