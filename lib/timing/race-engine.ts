@@ -150,17 +150,22 @@ export type EnvioEmailsResultado = {
   /** enviado = todos com e-mail receberam; parcial = alguns falharam (tenta de novo); falhou = nenhum foi (tenta de novo);
    *  sem-destinatarios = ninguém da prova tem e-mail cadastrado; desligado = envio automático desativado quando encerrou;
    *  sem-email-pilotos = bateria marcada para não mandar aos pilotos (o organizador divulga — Tabajara) */
-  status: 'enviado' | 'parcial' | 'falhou' | 'sem-destinatarios' | 'desligado' | 'sem-email-pilotos';
+  status: 'enviado' | 'parcial' | 'falhou' | 'falhou-permanente' | 'sem-destinatarios' | 'desligado' | 'sem-email-pilotos';
   atualizadoEm: number;
   tentativas: number;
   /** "kart|email" de quem já recebeu (não manda de novo na nova tentativa) */
   enviados: string[];
-  falhas: { kart: string; nome: string; email: string; erro: string }[];
+  falhas: { kart: string; nome: string; email: string; erro: string; permanente?: boolean }[];
   semEmail: { kart: string; nome: string }[];
   /** aceite do SMTP/relay; não confirma chegada na caixa do destinatário */
   aceite?: 'aceito-pelo-relay' | 'aceito-pelo-smtp' | 'simulador';
   entregaConfirmada?: false;
   mensagemEntrega?: string;
+  /** Identificadores retornados pelo Nodemailer para conciliação com o provedor. */
+  mensagens?: { destinatario: string; messageId: string; aceitoEm: number }[];
+  assinaturaResultado?: string;
+  proximaTentativaEm?: number;
+  falhasPermanentes?: string[];
 };
 
 export type RejectedPassing = { id: string; kart: string | null; transponder: number | null; wallMs: number; decoderTimeMs: number; reason: string; sinceLastMs: number | null };
