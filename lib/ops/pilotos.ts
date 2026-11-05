@@ -234,12 +234,18 @@ async function carregarLegado(log?: (m: string) => void) {
 // Corridas de 2023 a jan/2025 com posição, voltas e melhor volta de cada piloto. O CalXPro não guardava o cliente da
 // recepção na corrida, só nome e e-mail: o piloto é ligado ao cadastro unificado pelo e-mail (só quando o e-mail é de
 // um cliente só). Lido uma vez (os dados não mudam mais) e guardado no índice com o prefixo "cx-".
-let calxproCarregado = Object.keys(indice).some((k) => k.startsWith('cx-'));
+// versão 2: e-mail repetido em cadastros duplicados da mesma pessoa também liga a corrida antiga (antes ficava sem dono)
+const ARQ_CALXPRO_VERSAO = resolve(join(process.cwd(), '.runtime', 'pilotos-calxpro-versao.txt'));
+const CALXPRO_VERSAO = '2';
+let calxproCarregado = Object.keys(indice).some((k) => k.startsWith('cx-')) && (() => { try { return readFileSync(ARQ_CALXPRO_VERSAO, 'utf8').trim() === CALXPRO_VERSAO; } catch { return false; } })();
 async function carregarCalxpro(log?: (m: string) => void) {
   try {
     const linhas = await query<{ id: string; nome: string; inicio: Date; piloto: string; sobrenome: string | null; kart: number | null; pos: number | null; voltas: number | null; melhor: number | null; cid: number | null }>(
-      `WITH em AS (SELECT LOWER(LTRIM(RTRIM(Email))) e, MIN(Id) cid FROM dbo.Cliente
-                    WHERE Email LIKE '%@%' AND ResponsavelId IS NULL GROUP BY LOWER(LTRIM(RTRIM(Email))) HAVING COUNT(*) = 1)
+      `WITH base AS (SELECT LOWER(LTRIM(RTRIM(Email))) e, Id, UPPER(LTRIM(RTRIM(Nome))) nm,
+                      ROW_NUMBER() OVER (PARTITION BY LOWER(LTRIM(RTRIM(Email))) ORDER BY AtualizadoEm DESC, Id DESC) ordem
+                      FROM dbo.Cliente WHERE Email LIKE '%@%' AND ResponsavelId IS NULL),
+            -- e-mail de um cadastro só, ou de cadastros duplicados da mesma pessoa (mesmo nome): fica o mais recente
+            em AS (SELECT e, MAX(CASE WHEN ordem = 1 THEN Id END) cid FROM base GROUP BY e HAVING COUNT(DISTINCT nm) = 1 AND COUNT(*) <= 3)
        SELECT h.ID_CORRIDA id, h.ST_NOME nome, h.DT_DATA_HORA inicio, cc.ST_NOME piloto, cc.ST_SOBRENOME sobrenome, cc.NM_NUMERO kart,
               cc.NM_POSICAO pos, cc.TOT_VOLTAS voltas,
               CASE WHEN cc.TEMPO_MELHOR_VOLTA IS NULL THEN NULL ELSE DATEDIFF(ms, CAST(CAST(cc.TEMPO_MELHOR_VOLTA AS date) AS datetime2), cc.TEMPO_MELHOR_VOLTA) END melhor,
@@ -267,6 +273,7 @@ async function carregarCalxpro(log?: (m: string) => void) {
       n++;
     }
     calxproCarregado = true;
+    try { writeFileSync(ARQ_CALXPRO_VERSAO, CALXPRO_VERSAO); } catch { /* recarrega no próximo início */ }
     log?.(`pilotos: CalXPro lido (${n} participações em corridas de 2023 a 2025)`);
     return true;
   } catch (e) { log?.(`pilotos: CalXPro indisponível (${(e as Error).message})`); calxproCarregado = true; return false; }

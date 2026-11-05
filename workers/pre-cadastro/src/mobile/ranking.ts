@@ -122,11 +122,18 @@ async function receber(request: Request, env: MobileRankingEnv) {
   if (Number(request.headers.get('content-length') ?? 0) > LIMITE_CORPO) return json(413, { erro: 'Envio grande demais.' });
   const raw = await request.text();
   if (raw.length > LIMITE_CORPO) return json(413, { erro: 'Envio grande demais.' });
-  let corpo: { itens?: { chave?: unknown; dados?: unknown }[]; limpar?: unknown };
+  let corpo: { itens?: { chave?: unknown; dados?: unknown }[]; limpar?: unknown; apagar?: unknown[] };
   try { corpo = JSON.parse(raw); } catch { return json(400, { erro: 'JSON inválido.' }); }
   const itens = Array.isArray(corpo.itens) ? corpo.itens : [];
-  if (!itens.length || itens.length > 2000) return json(400, { erro: 'Envie de 1 a 2000 itens.' });
+  const apagar = Array.isArray(corpo.apagar) ? corpo.apagar : [];
+  if (apagar.length > 2000 || apagar.some((k) => typeof k !== 'string' || !/^piloto:\d{1,12}$/.test(k))) return json(400, { erro: 'Lista para apagar inválida.' });
+  if ((!itens.length && !apagar.length) || itens.length > 2000) return json(400, { erro: 'Envie de 1 a 2000 itens.' });
   await garantirTabela(env);
+  // ficha que deixou de existir no SRVKART (cadastro duplicado unificado em outro)
+  for (let i = 0; i < apagar.length; i += 100) {
+    await env.MOBILE_DB!.batch(apagar.slice(i, i + 100).map((k) => env.MOBILE_DB!.prepare('DELETE FROM mobile_ranking WHERE chave = ?').bind(k as string)));
+  }
+  if (!itens.length) return json(200, { ok: true, gravados: 0, apagados: apagar.length });
   const agora = Date.now();
   const stmts: D1PreparedStatement[] = [];
   for (const it of itens) {
