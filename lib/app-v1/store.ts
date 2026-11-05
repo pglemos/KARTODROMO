@@ -42,18 +42,28 @@ CREATE TABLE IF NOT EXISTS auditoria (
 );
 CREATE TRIGGER IF NOT EXISTS auditoria_sem_update BEFORE UPDATE ON auditoria BEGIN SELECT RAISE(ABORT, 'auditoria somente insercao'); END;
 CREATE TRIGGER IF NOT EXISTS auditoria_sem_delete BEFORE DELETE ON auditoria BEGIN SELECT RAISE(ABORT, 'auditoria somente insercao'); END;
+CREATE TABLE IF NOT EXISTS karts_chassi (kart TEXT PRIMARY KEY, chassi TEXT NOT NULL, atualizadoPor TEXT NOT NULL, atualizadoEm TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS karts_fora (kart TEXT PRIMARY KEY, motivo TEXT NOT NULL, usuario TEXT NOT NULL, em TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS lastros_conferidos (sessionId TEXT NOT NULL, chave TEXT NOT NULL, kart TEXT NOT NULL, pesoKg REAL NOT NULL, usuario TEXT NOT NULL, em TEXT NOT NULL, PRIMARY KEY (sessionId, chave));
-CREATE TABLE IF NOT EXISTS revisoes (sessionId TEXT PRIMARY KEY, revisao INTEGER NOT NULL, assinatura TEXT);
-CREATE TABLE IF NOT EXISTS aulas_recibos (
-  id TEXT PRIMARY KEY, instrutor TEXT NOT NULL, pilotos INTEGER NOT NULL, aulas INTEGER NOT NULL, valorCentavos INTEGER NOT NULL,
-  criadoEm TEXT NOT NULL, criadoPor TEXT NOT NULL, aceitoEm TEXT, aceitoPor TEXT
+CREATE TABLE IF NOT EXISTS abertura_frota (
+  dia TEXT NOT NULL, kart TEXT NOT NULL, itens TEXT NOT NULL, conferidoPor TEXT NOT NULL, conferidoEm TEXT NOT NULL,
+  aceitoPor TEXT, aceitoEm TEXT, excecao TEXT, PRIMARY KEY (dia, kart)
 );
+CREATE TRIGGER IF NOT EXISTS abertura_invalida_oficina AFTER INSERT ON karts_fora
+BEGIN DELETE FROM abertura_frota WHERE kart = NEW.kart; END;
+CREATE TABLE IF NOT EXISTS escala_abertura (dia TEXT PRIMARY KEY, operador TEXT NOT NULL, atualizadoPor TEXT NOT NULL, atualizadoEm TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS tempos_galpao (
+  bateria TEXT PRIMARY KEY, iniciadoEm TEXT NOT NULL, concluidoEm TEXT, quantidadeKarts INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS lastros_conferidos (sessionId TEXT NOT NULL, chave TEXT NOT NULL, kart TEXT NOT NULL, pesoKg REAL NOT NULL, usuario TEXT NOT NULL, em TEXT NOT NULL, PRIMARY KEY (sessionId, chave));
+CREATE TABLE IF NOT EXISTS perfis_especiais (usuarioId TEXT PRIMARY KEY REFERENCES usuarios(id), perfil TEXT NOT NULL CHECK (perfil = 'EQUALIZACAO'));
+CREATE TABLE IF NOT EXISTS karts_sem_teste (kart TEXT PRIMARY KEY, sessionId TEXT NOT NULL, autor TEXT NOT NULL, em TEXT NOT NULL, ajusteMm REAL);
+CREATE TABLE IF NOT EXISTS aulas (id TEXT PRIMARY KEY, instrutor TEXT NOT NULL, pilotos INTEGER NOT NULL, aulas INTEGER NOT NULL, valorCentavos INTEGER NOT NULL, criadoEm TEXT NOT NULL, criadoPor TEXT NOT NULL, aceitoEm TEXT, aceitoPor TEXT);
 CREATE TABLE IF NOT EXISTS ordens_servico (
   id TEXT PRIMARY KEY, kart TEXT NOT NULL, motivo TEXT NOT NULL, mecanico TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('aberta','em_execucao','concluida','cancelada')),
   criadaEm TEXT NOT NULL, criadaPor TEXT NOT NULL, atualizadaEm TEXT NOT NULL, atualizadaPor TEXT NOT NULL, observacao TEXT
 );
+CREATE TABLE IF NOT EXISTS revisoes (sessionId TEXT PRIMARY KEY, revisao INTEGER NOT NULL, assinatura TEXT);
 `;
 
 export function abrirStore(caminho: string, abrir: Abrir = abrirNativo): AppStore {
@@ -63,6 +73,8 @@ export function abrirStore(caminho: string, abrir: Abrir = abrirNativo): AppStor
     db = abrir(caminho);
     db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 200;');
     db.exec(ESQUEMA);
+    if (!(db.prepare('PRAGMA table_info(karts_sem_teste)').all() as { name: string }[]).some(c => c.name === 'ajusteMm')) db.exec('ALTER TABLE karts_sem_teste ADD COLUMN ajusteMm REAL');
+    if (!(db.prepare('PRAGMA table_info(karts_fora)').all() as { name: string }[]).some(c => c.name === 'estado')) db.exec("ALTER TABLE karts_fora ADD COLUMN estado TEXT NOT NULL DEFAULT 'oficina' CHECK (estado IN ('oficina', 'equalizar'))");
   } catch (err) {
     throw new StoreIndisponivel(`Armazenamento transacional indisponível: ${(err as Error).message}`);
   }

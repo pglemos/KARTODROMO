@@ -5,8 +5,6 @@ import { writeTimingEvent } from '../timing/sse';
 import { autenticar, bloquearUsuario, criarUsuario, login, LoginRecusado, pode, renovar, sair, trocarSenha, type AuthCtx, type Identidade, type Perfil } from './auth';
 import { consultarOperacao, ErroApp } from './comandos';
 import { criarOperacao, type Legado } from './operacao';
-import { criarAulasManutencao } from './aulas-manutencao';
-import { compararKarts } from './comparacao';
 import type { Inscricao } from './regras';
 import type { AppStore } from './store';
 
@@ -16,9 +14,9 @@ const TAMANHO_MINIMO_SEGREDO = 32;
 const MAX_CHAVES_LIMITE = 5000;
 const MAX_LOGINS_SIMULTANEOS = 4;
 const JANELA_EVENTOS_MS = 48 * 3_600_000;
-const CAPACIDADES_CONHECIDAS = ['sessoes.ver', 'elegiveis.ver', 'operacoes.ver', 'auditoria.ver', 'auditoria.global', 'usuarios.gerir',
+const CAPACIDADES_CONHECIDAS = ['sessoes.ver', 'elegiveis.ver', 'operacoes.ver', 'auditoria.ver', 'auditoria.global', 'usuarios.gerir', 'manutencao.gerir',
   'bateria.preparar', 'sorteio.gravar', 'atrasado.incluir', 'peso.conferir', 'kart.trocar', 'frota.gerir', 'penalidade.aplicar', 'bandeira.aplicar',
-  'prova.comandar', 'prova.reiniciar', 'passagem.corrigir', 'equalizacao.gerir', 'aulas.registrar', 'aulas.aceitar', 'manutencao.gerir'];
+  'prova.comandar', 'prova.reiniciar', 'passagem.corrigir', 'equalizacao.gerir', 'frota.liberar', 'aulas.registrar', 'aulas.aceitar'];
 
 export type DepsApp = {
   store: AppStore;
@@ -37,7 +35,7 @@ export type DepsApp = {
   legado?: Legado;
   inscricoes?: (agendaId: number) => Promise<Inscricao[]>;
 };
-export type ModuloApp = { tratar(req: http.IncomingMessage, res: http.ServerResponse, url: URL): Promise<boolean>; aoSalvarSessao(id: string, assinatura?: string): void };
+export type ModuloApp = { atualizarTemposGalpao(): Promise<void>; tratar(req: http.IncomingMessage, res: http.ServerResponse, url: URL): Promise<boolean>; aoSalvarSessao(id: string, assinatura?: string): void };
 
 type Bucket = { n: number; ate: number };
 function limitador(limite: number, janelaMs: number) {
@@ -103,8 +101,7 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
   const revisoesPendentes = new Map<string, string | undefined>();
   let loginsEmCurso = 0;
   const listarFila = () => semBateriasPassadas(d.listarSessoes(), d.inicioPorAgenda?.() ?? new Map<string, string>());
-  const aulasManutencao = criarAulasManutencao({ store: d.store, routeMode: d.routeMode });
-  const operacao = d.legado && d.inscricoes ? criarOperacao({ store: d.store, legado: d.legado, verSessao: d.verSessao, inscricoes: d.inscricoes, kartsCadastrados: d.kartsCadastrados, listarSessoes: listarFila, routeMode: d.routeMode }) : null;
+  const operacao = d.legado && d.inscricoes ? criarOperacao({ store: d.store, legado: d.legado, verSessao: d.verSessao, inscricoes: d.inscricoes, kartsCadastrados: d.kartsCadastrados, listarSessoes: listarFila, sessoesHistoricas: d.listarSessoes, routeMode: d.routeMode }) : null;
   let indisponivel = d.segredo.length < TAMANHO_MINIMO_SEGREDO;
   let revisaoFalhou = false;
 
@@ -203,7 +200,7 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
     }
     if (caminho === 'users' && metodo === 'GET') {
       exige('usuarios.gerir');
-      return enviar(res, 200, { usuarios: d.store.db.prepare('SELECT usuario, nome, perfil, bloqueado, criadoEm FROM usuarios ORDER BY usuario').all() });
+      return enviar(res, 200, { usuarios: d.store.db.prepare('SELECT u.usuario, u.nome, COALESCE(p.perfil, u.perfil) perfil, u.bloqueado, u.criadoEm FROM usuarios u LEFT JOIN perfis_especiais p ON p.usuarioId = u.id ORDER BY u.usuario').all() });
     }
     if (caminho === 'users' && metodo === 'POST') {
       exige('usuarios.gerir');
@@ -225,17 +222,21 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
       await trocarSenha(ctx, quem.usuarioId, String(b.atual ?? ''), String(b.nova ?? ''), quem.sessaoId);
       return enviar(res, 200, { ok: true });
     }
-    if (caminho === 'lessons' && metodo === 'GET') return enviar(res, 200, aulasManutencao.aulas(quem));
-    if (caminho === 'lessons/create' && metodo === 'POST') return enviar(res, 200, await aulasManutencao.criarRecibo(quem, await lerCorpo(req)));
-    m = /^lessons\/([\w-]+)\/accept$/.exec(caminho);
-    if (m && metodo === 'POST') return enviar(res, 200, await aulasManutencao.aceitarRecibo(quem, m[1], await lerCorpo(req)));
-    if (caminho === 'maintenance/orders' && metodo === 'GET') return enviar(res, 200, aulasManutencao.ordens(quem));
-    if (caminho === 'maintenance/orders/create' && metodo === 'POST') return enviar(res, 200, await aulasManutencao.criarOrdem(quem, await lerCorpo(req)));
-    m = /^maintenance\/orders\/([\w-]+)\/status$/.exec(caminho);
-    if (m && metodo === 'POST') return enviar(res, 200, await aulasManutencao.mudarStatusOrdem(quem, m[1], await lerCorpo(req)));
     if (operacao) {
+      if (caminho === 'lessons' && metodo === 'GET') { exige('sessoes.ver'); return enviar(res, 200, operacao.aulas()); }
+      if (caminho === 'lessons/create' && metodo === 'POST') return enviar(res, 200, await operacao.registrarAula(quem, await lerCorpo(req)));
+      m = /^lessons\/([\w-]+)\/accept$/.exec(caminho);
+      if (m && metodo === 'POST') return enviar(res, 200, await operacao.aceitarAula(quem, m[1], await lerCorpo(req)));
       if (caminho === 'agenda' && metodo === 'GET') return enviar(res, 200, await operacao.agenda(quem, url.searchParams.get('data')));
       if (caminho === 'fleet' && metodo === 'GET') { exige('sessoes.ver'); return enviar(res, 200, operacao.frota()); }
+      if (caminho === 'maintenance/orders' && metodo === 'GET') { exige('manutencao.gerir'); return enviar(res, 200, operacao.ordensServico()); }
+      if (caminho === 'maintenance/orders/create' && metodo === 'POST') return enviar(res, 200, await operacao.criarOrdemServico(quem, await lerCorpo(req)));
+      m = /^maintenance\/orders\/([\w-]+)\/status$/.exec(caminho);
+      if (m && metodo === 'POST') return enviar(res, 200, await operacao.atualizarOrdemServico(quem, m[1], await lerCorpo(req)));
+      m = /^fleet\/opening\/(conferir|aceitar|excecao|escala)$/.exec(caminho);
+      if (m && metodo === 'POST') return enviar(res, 200, await operacao.aberturaFrota(quem, m[1], await lerCorpo(req)));
+      m = /^fleet\/(\d{1,3})\/chassis$/.exec(caminho);
+      if (m && metodo === 'POST') return enviar(res, 200, await operacao.chassiKart(quem, m[1], await lerCorpo(req)));
       m = /^fleet\/(\d{1,4})$/.exec(caminho);
       if (m && metodo === 'POST') return enviar(res, 200, await operacao.marcarKart(quem, m[1], await lerCorpo(req)));
       m = /^agenda\/(\d+)\/prepare$/.exec(caminho);
@@ -246,24 +247,21 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
         const r = m[2] === 'detail' ? await operacao.detalhe(m[1]) : m[2] === 'live' ? await operacao.aoVivo(m[1]) : m[2] === 'passings' ? await operacao.passagens(m[1], url.searchParams.get('kart')) : await operacao.painelSorteio(quem, m[1]);
         return enviar(res, 200, r);
       }
-      if (caminho === 'owner/today' && metodo === 'GET') { exige('auditoria.global'); return enviar(res, 200, operacao.resumoDoDia(listarFila())); }
+      if (caminho === 'owner/today' && metodo === 'GET') { exige('auditoria.global'); return enviar(res, 200, operacao.resumoDoDia(d.listarSessoes())); }
+      if (caminho === 'equalization/compare' && metodo === 'GET') { exige('equalizacao.gerir'); try { return enviar(res, 200, operacao.compararKarts(url.searchParams.get('kart') ?? '', url.searchParams.get('referencia') ?? '', url.searchParams.get('trackId'))); } catch (e) { throw new ErroApp(400, 'INVALID_REQUEST', (e as Error).message); } }
       if (caminho === 'equalization/options' && metodo === 'GET') { exige('equalizacao.gerir'); return enviar(res, 200, await operacao.opcoesEqualizacao()); }
       if (caminho === 'equalization/create' && metodo === 'POST') return enviar(res, 200, await operacao.criarEqualizacao(quem, await lerCorpo(req)));
       if (caminho === 'equalization/rules' && metodo === 'POST') return enviar(res, 200, await operacao.salvarRegra(quem, await lerCorpo(req)));
       if (caminho === 'equalization/targets' && metodo === 'POST') return enviar(res, 200, await operacao.salvarMeta(quem, await lerCorpo(req)));
-      if (caminho === 'equalization/compare' && metodo === 'GET') {
-        exige('equalizacao.gerir');
-        return enviar(res, 200, await compararKarts(d.legado!, { kart: url.searchParams.get('kart') ?? '', referencia: url.searchParams.get('referencia') ?? '', trackId: url.searchParams.get('trackId') }));
-      }
       if (caminho === 'equalization' && metodo === 'GET') { exige('equalizacao.gerir'); return enviar(res, 200, await operacao.equalizacoes()); }
       m = /^equalization\/([\w-]+)$/.exec(caminho);
       if (m && metodo === 'GET') { exige('equalizacao.gerir'); return enviar(res, 200, await operacao.equalizacao(m[1])); }
       m = /^equalization\/([\w-]+)\/commands$/.exec(caminho);
       if (m && metodo === 'POST') return enviar(res, 200, await operacao.comandoEqualizacao(quem, m[1], await lerCorpo(req)));
-      m = /^sessions\/([\w-]+)\/(draw|late-assignments|weight-checks|kart-swaps|penalties|penalties-remove|flags|commands|passage-corrections)$/.exec(caminho);
+      m = /^sessions\/([\w-]+)\/(draw|late-assignments|weight-checks|weight-checks-batch|kart-swaps|penalties|penalties-remove|flags|commands|passage-corrections)$/.exec(caminho);
       if (m && metodo === 'POST') {
         const b = await lerCorpo(req);
-        const acao = { draw: operacao.sorteio, 'late-assignments': operacao.atrasados, 'weight-checks': operacao.peso, 'kart-swaps': operacao.trocaKart, penalties: operacao.penalidade, 'penalties-remove': operacao.retirarPenalidade, flags: operacao.bandeira, commands: operacao.comando, 'passage-corrections': operacao.corrigirPassagem }[m[2]];
+        const acao = { draw: operacao.sorteio, 'late-assignments': operacao.atrasados, 'weight-checks': operacao.peso, 'weight-checks-batch': operacao.pesoLote, 'kart-swaps': operacao.trocaKart, penalties: operacao.penalidade, 'penalties-remove': operacao.retirarPenalidade, flags: operacao.bandeira, commands: operacao.comando, 'passage-corrections': operacao.corrigirPassagem }[m[2]];
         return enviar(res, 200, await acao!.call(operacao, quem, m[1], b));
       }
     }
@@ -271,6 +269,7 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
   }
 
   return {
+    atualizarTemposGalpao: async () => { await operacao?.atualizarTemposGalpao(); },
     async tratar(req, res, url) {
       if (!url.pathname.startsWith(PREFIXO)) return false;
       if (indisponivel) { erro(res, 503, 'UNAVAILABLE', 'App operacional indisponível.'); return true; }
