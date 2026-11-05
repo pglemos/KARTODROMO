@@ -17,6 +17,7 @@ import { nomeBonito } from '../features/ranking/gamificacao';
 import { RegrasRanking } from './ranking-regras';
 
 const PERIODOS: { id: PeriodoRanking; nome: string }[] = [
+  { id: 'dia', nome: 'Dia' },
   { id: 'semana', nome: 'Semana' },
   { id: 'mes', nome: 'Mês' },
   { id: 'geral', nome: 'Geral' },
@@ -97,6 +98,8 @@ export default function RankingReal() {
   const { palette, styles } = useUi();
   const [periodo, setPeriodo] = useState<PeriodoRanking>('semana');
   const [tracado, setTracado] = useState<string | null>(null);
+  const [dia, setDia] = useState<string | null>(null);
+  const [categoria, setCategoria] = useState<'todos' | 'Indoor' | 'Super Kart'>('todos');
   const [dados, setDados] = useState<RankingResponse | null>(null);
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(true);
@@ -108,7 +111,7 @@ export default function RankingReal() {
     const id = ++pedido.current;
     setCarregando(true);
     try {
-      const r = await rankingApi.ranking(periodo, tracado);
+      const r = await rankingApi.ranking(periodo, tracado, { dia, categoria });
       if (id !== pedido.current) return;
       setDados(r); setErro('');
     } catch (e) {
@@ -117,7 +120,7 @@ export default function RankingReal() {
     } finally {
       if (id === pedido.current) setCarregando(false);
     }
-  }, [periodo, tracado]);
+  }, [periodo, tracado, dia, categoria]);
   useEffect(() => { void Promise.resolve().then(carregar); }, [carregar]);
 
   const filtro = busca.trim().toLowerCase();
@@ -130,7 +133,7 @@ export default function RankingReal() {
         data={mostrarPodio ? linhas.slice(3) : linhas}
         keyExtractor={(l) => `${l.pos}-${l.id ?? l.nome}`}
         renderItem={({ item, index }) => <Linha l={item} index={index} />}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 140, width: '100%', maxWidth: 640, alignSelf: 'center' }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24, width: '100%', maxWidth: 640, alignSelf: 'center' }}
         refreshControl={<RefreshControl refreshing={carregando && !!dados} onRefresh={() => void carregar()} tintColor={palette.accent} />}
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
@@ -157,6 +160,18 @@ export default function RankingReal() {
                     </Pressable>
                   );
                 })}
+              </ScrollView>
+            ) : null}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 10 }} accessibilityLabel="Filtros de categoria">
+              {(['todos', 'Indoor', 'Super Kart'] as const).map((item) => {
+                const ativo = categoria === item;
+                return <Pressable key={item} accessibilityRole="button" accessibilityState={{ selected: ativo }} accessibilityLabel={`Filtrar categoria ${item === 'todos' ? 'todas' : item}`} onPress={() => { tap(); setCategoria(item); }} style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, backgroundColor: ativo ? palette.accent : palette.surface, borderWidth: 1, borderColor: ativo ? palette.accent : palette.border }}><Text style={{ color: ativo ? palette.onAccent : palette.textSecondary, fontWeight: '800', fontSize: 13 }}>{item === 'todos' ? 'Todas as categorias' : item}</Text></Pressable>;
+              })}
+            </ScrollView>
+            {dados?.dias?.length ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 10 }} accessibilityLabel="Filtros de dia">
+                <Pressable accessibilityRole="button" accessibilityState={{ selected: !dia }} onPress={() => { tap(); setDia(null); }} style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, backgroundColor: !dia ? palette.text : palette.surface, borderWidth: 1, borderColor: !dia ? palette.text : palette.border }}><Text style={{ color: !dia ? '#000000' : palette.textSecondary, fontWeight: '800', fontSize: 13 }}>Todos os dias</Text></Pressable>
+                {dados.dias.slice(0, 14).map((item) => { const ativo = dia === item; return <Pressable key={item} accessibilityRole="button" accessibilityState={{ selected: ativo }} onPress={() => { tap(); setDia(item); }} style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, backgroundColor: ativo ? palette.text : palette.surface, borderWidth: 1, borderColor: ativo ? palette.text : palette.border }}><Text style={{ color: ativo ? '#000000' : palette.textSecondary, fontWeight: '800', fontSize: 13 }}>{formatarDia(item)}</Text></Pressable>; })}
               </ScrollView>
             ) : null}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: palette.surface, borderRadius: 14, paddingHorizontal: 14, borderWidth: 1, borderColor: palette.border }}>

@@ -102,4 +102,70 @@ describe('erros do servidor de e-mail em português', () => {
     expect(traduzirErro(new Error('Can\'t send mail - all recipients were rejected: 550 (500/500 (100%)) allowed.  Message discarded.'))).toMatch(/limite de e-mails por hora/);
     expect(traduzirErro(new Error('550 relay not permitted'))).toBe('o servidor de e-mail não aceitou o destinatário');
   });
+
+  it('não marca limite de 500 e-mails/hora da HostGator (550) como falha permanente e reenvia com somenteFaltantes mesmo se sessão antiga foi marcada permanente', async () => {
+    const { ehErroLimitePorHora, enviarResultado, salvarConfig } = await import('../services/timing-email');
+    const { mkdtempSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const { tmpdir } = await import('node:os');
+    const dir = mkdtempSync(join(tmpdir(), 'email-limite-'));
+    const file = join(dir, 'email.json');
+    salvarConfig(file, { ...CONFIG_PADRAO, host: 'smtp.invalid', porta: 587, usuario: 'teste@example.invalid', senha: 'TESTE CODEX', anexarPdf: false });
+    const now = Date.now();
+    const session: Parameters<typeof enviarResultado>[0] = {
+      id: 'TESTE-CODEX-LIMITE', name: 'CLUBE DA INSÔNIA · Corrida', type: 'corrida', durationMs: 60_000, maxLaps: null,
+      minLapMs: 0, state: 'encerrada', createdAt: now - 120_000, startedAt: now - 60_000, checkeredAt: now - 1_000, finishedAt: now,
+      competitors: [
+        { kart: '01', name: 'Piloto Um', customerId: '1', finished: true, crossings: [{ decoderTimeMs: 1, wallMs: now - 60_000, lapMs: null }, { decoderTimeMs: 2, wallMs: now - 1_000, lapMs: 55_000 }] },
+        { kart: '02', name: 'Piloto Dois', customerId: '2', finished: true, crossings: [{ decoderTimeMs: 1, wallMs: now - 59_000, lapMs: null }, { decoderTimeMs: 2, wallMs: now - 500, lapMs: 56_000 }] },
+      ],
+    };
+    const context = {
+      empresa: { nome: 'Kartódromo TESTE CODEX' }, evento: 'Clube da Insônia', grupo: 'CLUBE DA INSÔNIA', prova: 'Corrida',
+      tipo: 'corrida' as const, tracado: 'Normal', quando: now,
+      classificacao: [
+        { position: 1, kart: '01', name: 'Piloto Um', category: null, laps: 1, lastLapMs: 55_000, bestLapMs: 55_000, bestLapNumber: 1, totalMs: 55_000, averageSpeedKmh: null, gapMs: null, gapLaps: 0, finished: true, autoAdded: false, lastCrossingWallMs: now - 1_000 },
+        { position: 2, kart: '02', name: 'Piloto Dois', category: null, laps: 1, lastLapMs: 56_000, bestLapMs: 56_000, bestLapNumber: 1, totalMs: 56_000, averageSpeedKmh: null, gapMs: 1_000, gapLaps: 0, finished: true, autoAdded: false, lastCrossingWallMs: now - 500 },
+      ],
+    };
+    const emails = new Map([['1', 'piloto1@example.invalid'], ['2', 'piloto2@example.invalid']]);
+
+    expect(ehErroLimitePorHora('550 (500/500 (100%)) allowed. Message discarded.')).toBe(true);
+    expect(ehErroLimitePorHora('limite de e-mails por hora da hospedagem atingido (500 por hora)')).toBe(true);
+    expect(ehErroLimitePorHora('550 NoSuchUser')).toBe(false);
+
+    const r1 = await enviarResultado(session, file, {
+      dataDir: dir, simulador: true, log: () => undefined, salvarSessao: () => undefined,
+      contexto: async () => context, emailsDosClientes: async () => emails, logoPng: null,
+      simuladorEnviar: async () => {
+        throw Object.assign(new Error("Can't send mail - all recipients were rejected: 550 (500/500 (100%)) allowed. Message discarded."), { responseCode: 550 });
+      },
+    }, { automatico: true, assinaturaResultado: 'sig-v1' });
+    expect(r1.status).toBe('falhou');
+    expect(r1.falhasPermanentes).toEqual([]);
+    expect(r1.falhas.every((f) => !f.permanente)).toBe(true);
+    expect(r1.proximaTentativaEm).toBeGreaterThan(Date.now());
+    expect(r1.assinaturaResultado).toBe('sig-v1');
+
+    // Simula sessão salva anteriormente com permanente: true por engano
+    session.emailsResultado = {
+      ...r1,
+      status: 'falhou-permanente',
+      falhas: r1.falhas.map((f) => ({ ...f, permanente: true })),
+      falhasPermanentes: ['01|piloto1@example.invalid', '02|piloto2@example.invalid'],
+    };
+
+    const enviados2: string[] = [];
+    const r2 = await enviarResultado(session, file, {
+      dataDir: dir, simulador: true, log: () => undefined, salvarSessao: () => undefined,
+      contexto: async () => context, emailsDosClientes: async () => emails, logoPng: null,
+      simuladorEnviar: async (m) => { enviados2.push(String(m.to)); return { messageId: '<ok@example.invalid>', message: Buffer.from('EML') }; },
+    }, { automatico: false, somenteFaltantes: true, aviso: 'Correção do nome da prova' });
+    expect(r2.status).toBe('enviado');
+    expect(r2.enviados).toHaveLength(2);
+    expect(r2.falhas).toEqual([]);
+    expect(r2.falhasPermanentes).toEqual([]);
+    expect(r2.assinaturaResultado).toBe('sig-v1');
+    expect(enviados2).toHaveLength(2);
+  });
 });

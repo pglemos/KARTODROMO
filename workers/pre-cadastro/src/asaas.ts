@@ -7,7 +7,7 @@ export type AsaasEnv = { ASAAS_API_KEY?: string; ASAAS_URL?: string };
 
 export const asaasLigado = (env: AsaasEnv) => Boolean(env.ASAAS_API_KEY);
 
-async function chamar<T>(env: AsaasEnv, caminho: string, init: RequestInit = {}): Promise<T> {
+export async function chamar<T>(env: AsaasEnv, caminho: string, init: RequestInit = {}): Promise<T> {
   const base = (env.ASAAS_URL || 'https://api.asaas.com/v3').replace(/\/+$/, '');
   const r = await fetch(base + caminho, {
     ...init,
@@ -58,21 +58,6 @@ export async function criarCobranca(env: AsaasEnv, cliente: string, forma: 'pix'
       dueDate: hojeBrasilia(),
       description: descricao.slice(0, 500),
       externalReference: pedidoId,
-    }),
-  });
-}
-
-/** Link de pagamento da reserva em grupo: a pessoa escolhe Pix ou cartão na fatura da Asaas. Vence no dia da bateria. */
-export async function criarCobrancaLink(env: AsaasEnv, cliente: string, valorCentavos: number, descricao: string, referencia: string, vencimento: string) {
-  return chamar<Cobranca>(env, '/payments', {
-    method: 'POST',
-    body: JSON.stringify({
-      customer: cliente,
-      billingType: 'UNDEFINED',
-      value: Math.round(valorCentavos) / 100,
-      dueDate: /^\d{4}-\d{2}-\d{2}$/.test(vencimento) && vencimento >= hojeBrasilia() ? vencimento : hojeBrasilia(),
-      description: descricao.slice(0, 500),
-      externalReference: referencia.slice(0, 100),
     }),
   });
 }

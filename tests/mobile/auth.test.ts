@@ -9,7 +9,8 @@ import { authenticateMobileRequest } from '../../workers/pre-cadastro/src/mobile
 const SCHEMA = readFileSync(
   new URL('../../workers/pre-cadastro/migrations/0001_mobile_identity.sql', import.meta.url),
   'utf8',
-) + readFileSync(new URL('../../workers/pre-cadastro/migrations/0005_mobile_password_scheme.sql', import.meta.url), 'utf8');
+) + readFileSync(new URL('../../workers/pre-cadastro/migrations/0005_mobile_password_scheme.sql', import.meta.url), 'utf8')
+  + readFileSync(new URL('../../workers/pre-cadastro/migrations/0008_mobile_account_deletion.sql', import.meta.url), 'utf8');
 
 type Row = Record<string, unknown>;
 
@@ -224,8 +225,30 @@ describe('autenticação móvel', () => {
       const other = await body(await call('login', { identifier: otherEmail, password: validRegistration.password }));
       expect((await call('account/delete', {})).status).toBe(401);
       expect(audit).not.toHaveBeenCalled();
-      expect((await call('account/delete', {}, { authorization: `Bearer ${String(first.accessToken)}` })).status).toBe(204);
+      const auth = { authorization: `Bearer ${String(first.accessToken)}` };
+      expect((await call('account/delete', {}, auth)).status).toBe(403);
+      expect((await call('account/delete', { password: 'senha-errada-123' }, auth)).status).toBe(403);
+      expect(await authenticateMobileRequest(authenticatedRequest(first.accessToken), environment as never)).not.toBeNull();
+      expect((await call('account/delete', { password: validRegistration.password }, auth)).status).toBe(204);
+      expect(database.database.prepare('SELECT COUNT(*) total FROM mobile_accounts').get()).toMatchObject({ total: 2 });
+      expect(database.database.prepare("SELECT COUNT(*) total FROM mobile_account_deletion_audit WHERE action = 'requested'").get()).toMatchObject({ total: 1 });
+
+      const bloqueado = await call('login', { identifier: validRegistration.email, password: validRegistration.password });
+      expect(bloqueado.status).toBe(409);
+      expect(await body(bloqueado)).toMatchObject({ codigo: 'CONTA_EM_EXCLUSAO' });
+      expect((await call('account/restore', { identifier: validRegistration.email, password: 'senha-errada-123' })).status).toBe(401);
+      const restaurada = await call('account/restore', { identifier: validRegistration.email, password: validRegistration.password });
+      expect(restaurada.status).toBe(200);
+      const nova = await body(restaurada);
+      expect(await authenticateMobileRequest(authenticatedRequest(nova.accessToken), environment as never)).toMatchObject({ email: validRegistration.email });
+
+      // passado o prazo de 30 dias, some de vez e o registro permanece
+      const novaAuth = { authorization: `Bearer ${String(nova.accessToken)}` };
+      expect((await call('account/delete', { password: validRegistration.password }, novaAuth)).status).toBe(204);
+      database.database.prepare('UPDATE mobile_accounts SET deleted_at = deleted_at - ? WHERE deleted_at IS NOT NULL').run(31 * 24 * 60 * 60 * 1000);
+      expect((await call('login', { identifier: validRegistration.email, password: validRegistration.password })).status).toBe(401);
       expect(database.database.prepare('SELECT COUNT(*) total FROM mobile_accounts').get()).toMatchObject({ total: 1 });
+      expect(database.database.prepare("SELECT COUNT(*) total FROM mobile_account_deletion_audit WHERE action = 'purged'").get()).toMatchObject({ total: 1 });
       expect(await authenticateMobileRequest(authenticatedRequest(first.accessToken), environment as never)).toBeNull();
       expect(await authenticateMobileRequest(authenticatedRequest(other.accessToken), environment as never)).toMatchObject({ email: otherEmail });
       expect(audit).toHaveBeenCalledWith('mobile-account-deleted', expect.objectContaining({ accountId: expect.any(String), deletedAt: expect.any(Number) }));

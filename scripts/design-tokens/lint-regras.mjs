@@ -10,7 +10,7 @@ export const REGRAS = [
   { id: 'cs-fonte', ext: ['.cs'], re: /\bnew\s+Font\(/g, ajuda: 'use Tokens.Fonte(Tokens.Claro.FonteTamanho…)' },
   { id: 'css-hex', ext: ['.css', '.html', '.ts', '.tsx', '.js', '.jsx'], re: /(?<![\w&/[])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b(?![-\w])/g, ajuda: 'use var(--kib-cor-…)' },
   { id: 'css-rgb-hsl', ext: ['.css', '.html', '.ts', '.tsx', '.js', '.jsx'], re: /\b(?:rgba?|hsla?)\(/g, ajuda: 'use var(--kib-cor-…)' },
-  { id: 'css-font-family', ext: ['.css', '.html', '.ts', '.tsx', '.js', '.jsx'], re: /\bfont-family\s*:(?!\s*(?:var\(--kib-fonte-familia-|inherit\b))|\bfontFamily\s*:/g, ajuda: 'use var(--kib-fonte-familia-…)' },
+  { id: 'css-font-family', ext: ['.css', '.html', '.ts', '.tsx', '.js', '.jsx'], re: /\bfont-family\s*:|\bfontFamily\s*:/g, ajuda: 'use var(--kib-fonte-familia-…)' },
   { id: 'tw-arbitrario', ext: ['.ts', '.tsx', '.js', '.jsx'], re: /\b(?:bg|text|border|from|to|via|fill|stroke|ring|shadow|rounded|p|px|py|m|mx|my|gap|w|h)-\[(?:#|rgb|hsl|\d)/g, ajuda: 'use classes ligadas aos tokens' },
   { id: 'tw-paleta-crua', ext: ['.ts', '.tsx', '.js', '.jsx'], re: /\b(?:bg|text|border|ring|from|to|via|fill|stroke|divide|outline)-(?:zinc|neutral|gray|slate|stone|red|green|emerald|amber|yellow|blue|sky|orange|lime|teal)-\d{2,3}\b/g, ajuda: 'use primary/ink ou var(--kib-…)' },
   { id: 'kt-cor', ext: ['.kt'], re: /\bColor\(\s*0x[0-9A-Fa-f]{6,8}\s*\)/g, ajuda: 'use Tokens.Escuro.Cor… (pacote …sorteio.design)' },

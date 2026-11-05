@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,6 +8,8 @@ import type { ContextoProva } from '../lib/timing/email-resultado';
 import { chaveOperadorValida, clienteEhMaquinaOperadora } from '../lib/timing/operator-auth';
 import { protegerSegredoLocal, revelarSegredoLocal } from '../lib/timing/secret-storage';
 import { redigirEmails } from '../lib/timing/redact-pii';
+
+vi.mock('../lib/timing/secret-storage', async (real) => (process.platform === 'win32' ? real() : import('./segredo-local-simulado')));
 
 const dirs: string[] = [];
 afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }); });
@@ -120,6 +122,7 @@ describe('confiabilidade e segurança do email', () => {
     const dir = dirs[dirs.length - 1];
     salvarConfig(file, { ...CONFIG_PADRAO, host: 'smtp.invalid', porta: 587, usuario: 'teste@example.invalid', senha: 'TESTE CODEX', anexarPdf: true });
     const { session, context } = fixtureEnvio(dir);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mensagem capturada do nodemailer
     const capturadas: any[] = [];
     let pdfsGerados = 0;
     const result = await enviarResultado(session, file, {
@@ -134,7 +137,7 @@ describe('confiabilidade e segurança do email', () => {
     expect(pdfsGerados).toBe(2);
     expect(capturadas).toHaveLength(1);
     expect(capturadas[0].attachments).toHaveLength(2);
-    expect(capturadas[0].attachments.every((a: any) => a.contentType === 'application/pdf')).toBe(true);
+    expect(capturadas[0].attachments.every((a: { contentType?: string }) => a.contentType === 'application/pdf')).toBe(true);
     expect(capturadas[0].html).toContain('PDF, anexados neste e-mail');
   });
 

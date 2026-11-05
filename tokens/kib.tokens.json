@@ -309,8 +309,6 @@
           "$value": [
             "Segoe UI",
             "Segoe UI Variable",
-            "system-ui",
-            "-apple-system",
             "sans-serif"
           ]
         },
@@ -635,18 +633,6 @@
             ]
           }
         }
-      },
-      "corpo": {
-        "$description": "Texto corrido forte (mais escuro que o secundário). Admin web.",
-        "$value": "#3A3A3C"
-      },
-      "apoio": {
-        "$value": "#5E5E63",
-        "$description": "Texto de apoio legível também sobre fundos cinza e tingidos (≥ 4,5:1 sobre superfície-lateral). Admin web."
-      },
-      "discreto": {
-        "$value": "#666669",
-        "$description": "Texto discreto (rótulos, cabeçalhos de tabela), ≥ 4,5:1 sobre superfície-lateral. Nunca para texto menor que 12px."
       }
     },
     "borda": {
@@ -898,18 +884,6 @@
             }
           }
         }
-      },
-      "aviso-texto-forte": {
-        "$description": "Texto escuro sobre fundo de aviso mais intenso (ex.: etiqueta de reserva).",
-        "$value": "#6B4000"
-      },
-      "perigo-texto-forte": {
-        "$description": "Texto escuro sobre fundo de perigo mais intenso.",
-        "$value": "#8F1F18"
-      },
-      "info-texto-forte": {
-        "$description": "Texto escuro sobre fundo de informação mais intenso.",
-        "$value": "#123A80"
       }
     },
     "status": {
@@ -923,10 +897,6 @@
             }
           }
         }
-      },
-      "ok": {
-        "$description": "Bolinha/indicador de \"ok\" vivo. Decorativa: SEMPRE com texto ao lado.",
-        "$value": "#34C759"
       }
     },
     "selecao": {
@@ -1011,296 +981,7 @@
       },
       "bandeira-branca": {
         "$value": "{primitivo.cor.bandeira.branca}"
-      },
-      "classificacao-meio": {
-        "$value": "#3F67B5",
-        "$description": "Faixa do meio da classificação (posições 4 a 6) no gráfico do endurance."
-      },
-      "classificacao-baixo": {
-        "$value": "#E6D200",
-        "$description": "Faixa seguinte da classificação (posições 7 a 10)."
       }
-    },
-    "icone": {
-      "$description": "Ícones e traços decorativos (sempre acompanhados de texto ou nome acessível).",
-      "suave": {
-        "$value": "#AEAEB2"
-      }
-    },
-    "categoria": {
-      "$description": "Degradês dos blocos de módulo e avatares do admin: topo (claro) e base (escuro). Decorativos: o nome do módulo sempre aparece junto.",
-      "cinza": {
-        "topo": {
-          "$value": "#9A9AA0"
-        },
-        "base": {
-          "$value": "#4A4A4F"
-        }
-      },
-      "laranja": {
-        "topo": {
-          "$value": "#FF8A65"
-        },
-        "base": {
-          "$value": "#E8590C"
-        }
-      },
-      "ambar": {
-        "topo": {
-          "$value": "#FFB547"
-        },
-        "base": {
-          "$value": "#F07A00"
-        }
-      },
-      "amarelo": {
-        "topo": {
-          "$value": "#FFD24A"
-        },
-        "base": {
-          "$value": "#E0A100"
-        }
-      },
-      "verde": {
-        "topo": {
-          "$value": "#5EDB7A"
-        },
-        "base": {
-          "$value": "#1E9E4A"
-        }
-      },
-      "verde-escuro": {
-        "topo": {
-          "$value": "#00C853"
-        },
-        "base": {
-          "$value": "#007E33"
-        }
-      },
-      "vermelho": {
-        "topo": {
-          "$value": "#FF6B5E"
-        },
-        "base": {
-          "$value": "#D92D20"
-        }
-      },
-      "roxo": {
-        "topo": {
-          "$value": "#C08BFF"
-        },
-        "base": {
-          "$value": "#8645D6"
-        },
-        "texto": {
-          "$value": "#6A35B0",
-          "$description": "Texto roxo legível (≥ 4,5:1) sobre fundo roxo claro, ex.: marcador de piloto menor."
-        }
-      },
-      "azul": {
-        "topo": {
-          "$value": "#6CB8FF"
-        },
-        "base": {
-          "$value": "#1E6FE8"
-        }
-      },
-      "azul-escuro": {
-        "topo": {
-          "$value": "#4A8DF0"
-        },
-        "base": {
-          "$value": "#1450A8"
-        }
-      },
-      "ciano": {
-        "topo": {
-          "$value": "#48D6CC"
-        },
-        "base": {
-          "$value": "#0E9C9C"
-        }
-      }
-    },
-    "agenda": {
-      "$description": "Tipos de bateria da agenda (mesmas cores do FamilyWall). A cor nunca vem sozinha: cada tipo tem nome e legenda.",
-      "livre": {
-        "fundo": {
-          "$value": "#E3F6F4"
-        },
-        "texto": {
-          "$value": "#0B5F5A"
-        },
-        "marca": {
-          "$value": "#2CB5AC"
-        },
-        "cheio": {
-          "$value": "#0E9C9C"
-        },
-        "topo-inicio": {
-          "$value": "#D5F3F0"
-        },
-        "topo-fim": {
-          "$value": "#EAF8F6"
-        },
-        "topo-texto": {
-          "$value": "#0B4F4B"
-        }
-      },
-      "reserva": {
-        "fundo": {
-          "$value": "#FFEBCC"
-        },
-        "texto": {
-          "$value": "#6B4000"
-        },
-        "marca": {
-          "$value": "#FF9F0A"
-        },
-        "cheio": {
-          "$value": "#E08700"
-        },
-        "topo-inicio": {
-          "$value": "#FFE1B3"
-        },
-        "topo-fim": {
-          "$value": "#FFF2DE"
-        },
-        "topo-texto": {
-          "$value": "#5C3700"
-        }
-      },
-      "fechada": {
-        "fundo": {
-          "$value": "#FFDAD7"
-        },
-        "texto": {
-          "$value": "#8F1F18"
-        },
-        "marca": {
-          "$value": "#FF453A"
-        },
-        "cheio": {
-          "$value": "#D92D20"
-        },
-        "topo-inicio": {
-          "$value": "#FFCBC6"
-        },
-        "topo-fim": {
-          "$value": "#FFE7E5"
-        },
-        "topo-texto": {
-          "$value": "#7A1A14"
-        }
-      },
-      "campeonato": {
-        "fundo": {
-          "$value": "#D3EBDF"
-        },
-        "texto": {
-          "$value": "#084D34"
-        },
-        "marca": {
-          "$value": "#0B7A53"
-        },
-        "cheio": {
-          "$value": "#0B7A53"
-        },
-        "topo-inicio": {
-          "$value": "#C4E5D5"
-        },
-        "topo-fim": {
-          "$value": "#E4F3EB"
-        },
-        "topo-texto": {
-          "$value": "#084D34"
-        }
-      },
-      "evento": {
-        "fundo": {
-          "$value": "#DCE8FB"
-        },
-        "texto": {
-          "$value": "#133F8C"
-        },
-        "marca": {
-          "$value": "#1E6FE8"
-        },
-        "cheio": {
-          "$value": "#1E6FE8"
-        },
-        "topo-inicio": {
-          "$value": "#CCDDFA"
-        },
-        "topo-fim": {
-          "$value": "#E8F0FD"
-        },
-        "topo-texto": {
-          "$value": "#123A80"
-        }
-      },
-      "bloqueado": {
-        "fundo": {
-          "$value": "#E9E9EE"
-        },
-        "texto": {
-          "$value": "#48484A"
-        },
-        "marca": {
-          "$value": "#8E8E93"
-        },
-        "cheio": {
-          "$value": "#8E8E93"
-        },
-        "topo-inicio": {
-          "$value": "#E5E5EA"
-        },
-        "topo-fim": {
-          "$value": "#F2F2F5"
-        },
-        "topo-texto": {
-          "$value": "#3A3A3C"
-        }
-      }
-    },
-    "serie": {
-      "1": {
-        "$value": "#0B7A53"
-      },
-      "2": {
-        "$value": "#1E6FE8"
-      },
-      "3": {
-        "$value": "#D92D20"
-      },
-      "4": {
-        "$value": "#FF9F0A"
-      },
-      "5": {
-        "$value": "#8645D6"
-      },
-      "6": {
-        "$value": "#0E9C9C"
-      },
-      "7": {
-        "$value": "#E8590C"
-      },
-      "8": {
-        "$value": "#5A3E36"
-      },
-      "9": {
-        "$value": "#C2185B"
-      },
-      "10": {
-        "$value": "#3F51B5"
-      },
-      "11": {
-        "$value": "#7CB342"
-      },
-      "12": {
-        "$value": "#00ACC1"
-      },
-      "$description": "Séries de gráfico (uma cor por equipe/linha). Distinguíveis entre si; nunca é a única pista: a legenda traz o nome."
     }
   },
   "fonte": {

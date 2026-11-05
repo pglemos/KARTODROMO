@@ -1,9 +1,10 @@
 import { renderRouter } from 'expo-router/testing-library';
 import { Text } from 'react-native';
+import { within } from '@testing-library/react-native';
 
 import { demoOnly, isDemoMode } from '../src/config/features';
 import { getTabBarItems } from '../src/components/floating-tab-bar';
-import StartScreen from '../src/components/start-screen';
+import StartScreen, { rotuloStatusPista } from '../src/components/start-screen';
 import { SessionProvider } from '../src/session/provider';
 
 describe('modo loja (sem dados demonstrativos)', () => {
@@ -26,6 +27,13 @@ describe('modo loja (sem dados demonstrativos)', () => {
     process.env.EXPO_PUBLIC_DEMO_MODE = '0';
     const items = getTabBarItems(false);
     expect(items.map((item) => item.name)).toEqual(['index', 'agenda', 'reservas', 'livetime', 'carreira']);
+  });
+
+  it('separa pista sem bateria, corrida encerrada e consulta indisponível', () => {
+    expect(rotuloStatusPista('empty')).toBe('SEM BATERIA');
+    expect(rotuloStatusPista('finished')).toBe('ENCERRADA');
+    expect(rotuloStatusPista('live')).toBe('AO VIVO');
+    expect(rotuloStatusPista(null, true)).toBe('INDISPONÍVEL');
   });
 
   it('rotas fictícias redirecionam para o início quando demo está desligado', async () => {
@@ -55,5 +63,6 @@ describe('modo loja (sem dados demonstrativos)', () => {
     expect(view.getByText('Política de privacidade')).toBeTruthy();
     expect(view.queryByText(/notícia|telemetria|demonstrativ|fictíci/i)).toBeNull();
     expect(view.getByText('Ranking')).toBeTruthy();
+    expect(within(view.getByTestId('btn-atalho-minha-carreira')).getByText('Minha carreira').props.numberOfLines).toBe(2);
   });
 });

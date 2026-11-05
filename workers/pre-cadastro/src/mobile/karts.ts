@@ -1,3 +1,5 @@
+import { categoriaDoKart, pisoDoTracado } from './ranking-data';
+
 export interface VoltaKart {
   kart: string; dia: string; inicio: number; pos: number; piloto: string;
   ms: number | null; bateria: string; de: number; tracado: string; categoria: string | null;
@@ -17,7 +19,12 @@ export function filtrarKarts(linhas: VoltaKart[], url: URL, dias: string[]) {
   const categoria = url.searchParams.get('categoria') || null;
   if (categoria && !['Indoor', 'Super Kart'].includes(categoria)) throw new Error('Categoria inválida.');
   const tracado = url.searchParams.get('tracado') || null;
-  const periodoLinhas = linhas.filter((l) => l.dia >= desde && l.dia <= fim);
+  const periodoLinhas = linhas.filter((l) => l.dia >= desde && l.dia <= fim).flatMap((l) => {
+    // a categoria vem do número do kart (1-99 Indoor, 100-199 Super Kart), não do cadastro do piloto
+    const cat = categoriaDoKart(l.kart);
+    if (!cat) return [];
+    return [{ ...l, categoria: cat, ms: l.ms !== null && l.ms < pisoDoTracado(l.tracado, cat) ? null : l.ms }];
+  });
   const tracados = [...new Set(periodoLinhas.map((l) => l.tracado))].sort();
   const porKart = new Map<string, { kart: string; melhorMs: number | null; melhorPos: number | null; corridas: VoltaKart[] }>();
   for (const l of periodoLinhas.filter((l) => (!categoria || l.categoria === categoria) && (!tracado || l.tracado === tracado))) {

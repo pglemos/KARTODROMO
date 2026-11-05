@@ -30,9 +30,9 @@ export default function RecoverPasswordScreen() {
   }
 
   return (
-    <AuthShell title="Recupere sua senha" description="Se os dados puderem ser processados, enviaremos as instruções ao e-mail informado.">
+    <AuthShell title="Recupere seu acesso" description="Esqueceu a senha ou o e-mail? Informe seu CPF: mostramos para qual e-mail enviamos o link.">
       <AuthField
-        label="E-mail ou CPF"
+        label="CPF ou e-mail"
         value={identifier}
         onChangeText={setIdentifier}
         autoCapitalize="none"
@@ -41,6 +41,7 @@ export default function RecoverPasswordScreen() {
       />
       <AuthButton label="Enviar instruções" busy={busy} onPress={() => void submit()} />
       <AuthFeedback message={feedback} error={error} />
+      <AuthLink href="/(auth)/corrigir-email">Esse não é meu e-mail / cadastrei errado</AuthLink>
       <AuthLink href="/(auth)/login">Voltar para entrar</AuthLink>
     </AuthShell>
   );

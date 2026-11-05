@@ -5,7 +5,7 @@
  *   node scripts/design-tokens/build.mjs --check   só confere: sai com erro se algum gerado estiver desatualizado
  *
  * Saídas (versionadas: o build do desktop e do Android não dependem de Node):
- *   styles/tokens.css, services/timing-ui/tokens.css, workers/admin/public/tokens.css, desktop/src/Kartodromo.Comum/Tokens.g.cs,
+ *   styles/tokens.css, services/timing-ui/tokens.css, desktop/src/Kartodromo.Comum/Tokens.g.cs,
  *   android/sorteio/.../design/Tokens.kt, android/sorteio/.../res/values/cores_tokens.xml,
  *   docs/design-system/02-tokens/referencia.md
  */
@@ -24,7 +24,6 @@ const ANDROID = join('android', 'sorteio', 'app', 'src', 'main');
 export const SAIDAS = {
   css: join('styles', 'tokens.css'),
   timingUi: join('services', 'timing-ui', 'tokens.css'),
-  adminWeb: join('workers', 'admin', 'public', 'tokens.css'),
   csharp: join('desktop', 'src', 'Kartodromo.Comum', 'Tokens.g.cs'),
   kotlin: join(ANDROID, 'java', 'br', 'com', 'kartodromobetim', 'sorteio', 'design', 'Tokens.kt'),
   androidXml: join(ANDROID, 'res', 'values', 'cores_tokens.xml'),
@@ -45,7 +44,6 @@ export function gerar(caminhoTokens) {
     arquivos: {
       [SAIDAS.css]: css,
       [SAIDAS.timingUi]: css,
-      [SAIDAS.adminWeb]: css,
       [SAIDAS.csharp]: gerarCsharp(dados),
       [SAIDAS.kotlin]: gerarKotlin(dados),
       [SAIDAS.androidXml]: gerarAndroidXml(dados),

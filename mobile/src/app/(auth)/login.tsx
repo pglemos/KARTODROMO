@@ -59,7 +59,8 @@ export default function LoginScreen() {
         returnKeyType="done"
         onSubmitEditing={submit}
       />
-      <AuthLink href="/(auth)/recuperar-senha">Esqueci minha senha</AuthLink>
+      <AuthLink href="/(auth)/recuperar-senha">Esqueci minha senha ou meu e-mail</AuthLink>
+      <AuthLink href="/(auth)/corrigir-email">Cadastrei o e-mail errado</AuthLink>
       <AuthButton label="Entrar" busy={busy} onPress={() => void submit()} />
       <AuthFeedback message={feedback} error={error} />
       <AuthLink href="/(auth)/cadastro">Criar minha conta</AuthLink>

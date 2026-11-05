@@ -1,0 +1,268 @@
+[
+  {
+    "periodo": "semana",
+    "categoria": "Todos",
+    "tracado": "Traçado 1",
+    "total": 369,
+    "liderMs": 60749
+  },
+  {
+    "periodo": "semana",
+    "categoria": "Indoor",
+    "tracado": "Traçado 1",
+    "total": 330,
+    "liderMs": 60749
+  },
+  {
+    "periodo": "semana",
+    "categoria": "Super Kart",
+    "tracado": "Traçado 1",
+    "total": 41,
+    "liderMs": 65261
+  },
+  {
+    "periodo": "mes",
+    "categoria": "Todos",
+    "tracado": "Traçado 1",
+    "total": 369,
+    "liderMs": 60749
+  },
+  {
+    "periodo": "mes",
+    "categoria": "Indoor",
+    "tracado": "Traçado 1",
+    "total": 330,
+    "liderMs": 60749
+  },
+  {
+    "periodo": "mes",
+    "categoria": "Super Kart",
+    "tracado": "Traçado 1",
+    "total": 41,
+    "liderMs": 65261
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Todos",
+    "tracado": "Traçado 1",
+    "total": 2077,
+    "liderMs": 60311
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Todos",
+    "tracado": "Traçado 11",
+    "total": 468,
+    "liderMs": 52634
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Todos",
+    "tracado": "Traçado 9",
+    "total": 177,
+    "liderMs": 43858
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Todos",
+    "tracado": "Traçado 5",
+    "total": 132,
+    "liderMs": 43312
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Todos",
+    "tracado": "Traçado 2",
+    "total": 126,
+    "liderMs": 42052
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Todos",
+    "tracado": "Traçado 1 Invertido",
+    "total": 86,
+    "liderMs": 64031
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Todos",
+    "tracado": "Traçado 6",
+    "total": 81,
+    "liderMs": 44185
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Todos",
+    "tracado": "Traçado 10",
+    "total": 62,
+    "liderMs": 32585
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Todos",
+    "tracado": "Traçado 11 Invertido Chicane",
+    "total": 53,
+    "liderMs": 55233
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Todos",
+    "tracado": "Traçado 1 Normal Chicane",
+    "total": 48,
+    "liderMs": 65595
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Todos",
+    "tracado": "Traçado 5 Invertido",
+    "total": 42,
+    "liderMs": 46717
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Todos",
+    "tracado": "Traçado 11 Invertido",
+    "total": 24,
+    "liderMs": 63873
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Indoor",
+    "tracado": "Traçado 1",
+    "total": 2013,
+    "liderMs": 60311
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Indoor",
+    "tracado": "Traçado 11",
+    "total": 358,
+    "liderMs": 60611
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Indoor",
+    "tracado": "Traçado 5",
+    "total": 59,
+    "liderMs": 43312
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Indoor",
+    "tracado": "Traçado 6",
+    "total": 52,
+    "liderMs": 51413
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Indoor",
+    "tracado": "Traçado 11 Invertido Chicane",
+    "total": 45,
+    "liderMs": 60946
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Indoor",
+    "tracado": "Traçado 1 Invertido",
+    "total": 30,
+    "liderMs": 64031
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Indoor",
+    "tracado": "Traçado 11 Invertido",
+    "total": 24,
+    "liderMs": 63873
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Indoor",
+    "tracado": "Traçado 2",
+    "total": 22,
+    "liderMs": 50645
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Indoor",
+    "tracado": "Traçado 9",
+    "total": 10,
+    "liderMs": 45314
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Super Kart",
+    "tracado": "Traçado 9",
+    "total": 168,
+    "liderMs": 43858
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Super Kart",
+    "tracado": "Traçado 11",
+    "total": 111,
+    "liderMs": 52634
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Super Kart",
+    "tracado": "Traçado 2",
+    "total": 103,
+    "liderMs": 42052
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Super Kart",
+    "tracado": "Traçado 1",
+    "total": 84,
+    "liderMs": 61004
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Super Kart",
+    "tracado": "Traçado 5",
+    "total": 73,
+    "liderMs": 44741
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Super Kart",
+    "tracado": "Traçado 10",
+    "total": 62,
+    "liderMs": 32585
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Super Kart",
+    "tracado": "Traçado 1 Invertido",
+    "total": 56,
+    "liderMs": 64222
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Super Kart",
+    "tracado": "Traçado 1 Normal Chicane",
+    "total": 48,
+    "liderMs": 65595
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Super Kart",
+    "tracado": "Traçado 5 Invertido",
+    "total": 42,
+    "liderMs": 46717
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Super Kart",
+    "tracado": "Traçado 6",
+    "total": 29,
+    "liderMs": 44185
+  },
+  {
+    "periodo": "geral",
+    "categoria": "Super Kart",
+    "tracado": "Traçado 11 Invertido Chicane",
+    "total": 11,
+    "liderMs": 55233
+  }
+]

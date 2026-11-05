@@ -1,7 +1,7 @@
 import { act, render, userEvent, waitFor } from '@testing-library/react-native';
 import * as Clipboard from 'expo-clipboard';
 import type { PropsWithChildren } from 'react';
-import { Alert, Linking, Text } from 'react-native';
+import { Linking, Text } from 'react-native';
 
 import AgendaScreen from '../src/app/(tabs)/agenda';
 import { AgendaScreen as AgendaComponent } from '../src/components/agenda-screen';
@@ -187,31 +187,28 @@ describe('agenda e reservas do cliente', () => {
     expect(view.queryByText(order.pix!.payload)).toBeNull();
     expect(view.getByText('Pedido BETIM-NOVA-CONTA')).toBeTruthy();
   });
-  it('permite sair da conta pela lista, mas não no formulário de reserva', async () => {
-    const logout = setSession(session);
+  it('distingue lista vazia de falha e não duplica as ações de conta', async () => {
+    setSession(session);
     const view = await render(<ReservationsScreen />);
     const user = userEvent.setup();
-    await user.press(view.getByRole('button', { name: 'Sair da conta' }));
-    expect(logout).toHaveBeenCalledTimes(1);
+    expect(await view.findByText('Nenhuma reserva foi encontrada nesta conta.')).toBeTruthy();
+    expect(view.queryByRole('button', { name: 'Sair da conta' })).toBeNull();
+    expect(view.queryByText('Excluir minha conta')).toBeNull();
+    await user.press(view.getByRole('button', { name: 'Atualizar reservas' }));
+    await waitFor(() => expect(requests('GET', '/api/mobile/v1/reservations')).toHaveLength(2));
 
-    // no formulário de reserva não há mais sair/excluir conta (ficam só no fim da lista)
+    // A reserva mantém o foco no fluxo, sem ações de conta ou exclusão.
     mockUseLocalSearchParams.mockReturnValue({ bateriaId: '101' });
     await view.rerender(<ReservationsScreen />);
     expect(await view.findByLabelText('Confirmar reserva')).toBeTruthy();
     expect(view.queryByRole('button', { name: 'Sair da conta' })).toBeNull();
   });
 
-  it('oferece nova tentativa se não conseguir apagar a sessão salva', async () => {
-    const logout = setSession(session);
-    logout.mockRejectedValueOnce(new Error('storage unavailable'));
-    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  it('mostra pedidos aguardando confirmação entre as reservas da conta', async () => {
+    setSession(session);
+    listedOrders = [{ ...order, status: 'novo' }];
     const view = await render(<ReservationsScreen />);
-    await userEvent.setup().press(view.getByRole('button', { name: 'Sair da conta' }));
-    await waitFor(() => expect(alert).toHaveBeenCalled());
-    const retry = alert.mock.calls[0][2]?.find((button) => button.text === 'Tentar novamente');
-    expect(retry?.onPress).toBeDefined();
-    await act(async () => retry?.onPress?.());
-    await waitFor(() => expect(logout).toHaveBeenCalledTimes(2));
+    expect(await view.findByText('Aguardando confirmação')).toBeTruthy();
   });
 
   it('esconde imediatamente as reservas anteriores ao trocar de conta', async () => {
@@ -358,38 +355,12 @@ describe('agenda e reservas do cliente', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('exibe confirmação destrutiva e chama deleteAccount ao solicitar exclusão de conta', async () => {
-    const deleteAccountMock = jest.fn().mockResolvedValue(undefined);
-    (useSession as jest.Mock).mockReturnValue({
-      session,
-      isLoading: false,
-      login: jest.fn(),
-      logout: jest.fn(),
-      deleteAccount: deleteAccountMock,
-      refresh: jest.fn(),
-    });
-    const alertSpy = jest.spyOn(Alert, 'alert');
-    const user = userEvent.setup();
+  it('não duplica sair e exclusão de conta na tela de reservas', async () => {
+    setSession(session);
     const view = await render(<ReservationsScreen />);
 
-    const deleteBtn = await view.findByRole('button', { name: 'Excluir minha conta' });
-    await user.press(deleteBtn);
-
-    expect(alertSpy).toHaveBeenCalledWith(
-      'Excluir conta definitivamente',
-      expect.stringContaining('Tem certeza'),
-      expect.any(Array),
-    );
-
-    const buttons = alertSpy.mock.calls[0][2] as { text: string; style?: string; onPress?: () => Promise<void> }[];
-    const confirmAction = buttons?.find((b) => b.style === 'destructive');
-    expect(confirmAction).toBeDefined();
-
-    await act(async () => {
-      await confirmAction?.onPress?.();
-    });
-
-    expect(deleteAccountMock).toHaveBeenCalledTimes(1);
-    alertSpy.mockRestore();
+    expect(await view.findByText('Minhas reservas')).toBeTruthy();
+    expect(view.queryByRole('button', { name: 'Sair da conta' })).toBeNull();
+    expect(view.queryByRole('button', { name: /Excluir minha conta/i })).toBeNull();
   });
 });

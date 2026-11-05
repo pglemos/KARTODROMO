@@ -10,12 +10,13 @@ import { AccessibilityInfo, Animated, Easing, FlatList, Pressable, RefreshContro
 import { Brand, Icon } from './brand';
 import { Caixa, Desenho, Foto, LARGO, T, Toque, cor, fonte, fundos, useK, useTopo } from './design-kit';
 import { tap } from './motion';
-import { useAgoraCrono } from '../features/live/api';
+import { useFloatingTabBarClearance } from './floating-tab-bar';
+import { retainExpandedCompetitorPosition, useAgoraCrono } from '../features/live/api';
 import type { LiveCompetitor, LiveSession } from '../types/racing';
 
 const MEDALHA = ['#F5B729', '#D9DEE2', '#E89A3C'];
 const ROXO = '#8B5CF6';
-type Aba = 'classificacao' | 'tempos' | 'setores' | 'pilotos';
+type Aba = 'classificacao' | 'pilotos';
 
 /** ponto que pulsa (anel crescendo e sumindo), como o "ao vivo" das transmissões */
 function PontoAoVivo({ c, d }: { c: string; d: number }) {
@@ -106,7 +107,20 @@ function horaAtualizacao(value?: string) {
   return Number.isFinite(ms) ? new Date(ms).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—';
 }
 
-function Topo({ session, aba, setAba, onRefresh, atualizando }: { session: LiveSession; aba: Aba; setAba: (a: Aba) => void; onRefresh: () => Promise<void> | void; atualizando: boolean }) {
+function dataHoraInicio(id: string) {
+  const date = new Date(id);
+  return Number.isFinite(date.getTime())
+    ? `${date.toLocaleDateString('pt-BR')} · ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+    : null;
+}
+
+export function idadeSnapshot(ageMs: number | null | undefined) {
+  if (ageMs == null || !Number.isFinite(ageMs)) return 'idade desconhecida';
+  const seconds = Math.floor(Math.max(0, ageMs) / 1000);
+  return seconds < 60 ? `há ${seconds} s` : `há ${Math.floor(seconds / 60)} min`;
+}
+
+function Topo({ session, aba, setAba }: { session: LiveSession; aba: Aba; setAba: (a: Aba) => void }) {
   const k = useK();
   const topo = useTopo();
   const aoVivo = session.status !== 'CHECKERED';
@@ -116,11 +130,9 @@ function Topo({ session, aba, setAba, onRefresh, atualizando }: { session: LiveS
   const r = session.fastestLap;
   const nomeRapida = r ? (/^kart\s*\d+$/i.test(r.name.trim()) ? '' : r.name.toUpperCase()) : '';
   const voltar = () => (router.canGoBack() ? router.back() : router.replace('/(tabs)'));
-  const abas: { id: Aba; nome: string; icone: 'chart' | 'timer' | 'sector' | 'helmet'; x: number; w: number }[] = [
-    { id: 'classificacao', nome: 'CLASSIFICAÇÃO', icone: 'chart', x: 0, w: 243 },
-    { id: 'tempos', nome: 'TEMPOS', icone: 'timer', x: 243, w: 188 },
-    { id: 'setores', nome: 'SETORES', icone: 'sector', x: 431, w: 190 },
-    { id: 'pilotos', nome: 'PILOTOS', icone: 'helmet', x: 621, w: 189 },
+  const abas: { id: Aba; nome: string; icone: 'chart' | 'helmet'; x: number; w: number }[] = [
+    { id: 'classificacao', nome: 'CLASSIFICAÇÃO', icone: 'chart', x: 0, w: 405 },
+    { id: 'pilotos', nome: 'PILOTOS', icone: 'helmet', x: 405, w: 405 },
   ];
   return (
     <View style={{ paddingTop: topo }}>
@@ -134,7 +146,7 @@ function Topo({ session, aba, setAba, onRefresh, atualizando }: { session: LiveS
         <Caixa x={125} y={14} pointerEvents="none"><Brand width={305 * k} /></Caixa>
         <Caixa x={580} y={19} w={240} h={67} pointerEvents="none" style={{ borderRadius: 34 * k, borderWidth: 1, borderColor: '#2E3431', backgroundColor: aoVivo ? 'rgba(70,12,12,0.85)' : 'rgba(15,18,17,0.9)', flexDirection: 'row', alignItems: 'center', paddingLeft: 26 * k, gap: 16 * k }}>
           {aoVivo ? <PontoAoVivo c="#FF4D4D" d={14 * k} /> : <Icon name="flag" color="#FFFFFF" size={26 * k} />}
-          <T s={21} p="500" c={aoVivo ? '#FF8A8A' : '#FFFFFF'} style={{ fontVariant: ['tabular-nums'] }}>{aoVivo ? <RelogioMs inicio={Date.parse(session.id)} reserva={session.elapsedTime} /> : 'Encerrada'}</T>
+          <T s={21} p="500" c={aoVivo ? '#FF8A8A' : '#FFFFFF'} linhas={2} adjustsFontSizeToFit minimumFontScale={0.72} style={{ fontVariant: ['tabular-nums'] }}>{aoVivo ? <RelogioMs inicio={Date.parse(session.id)} reserva={session.elapsedTime} /> : `Encerrada · ${dataHoraInicio(session.id) ?? 'data indisponível'}`}</T>
         </Caixa>
 
         <Caixa x={40} y={130} pointerEvents="none" style={{ flexDirection: 'row', alignItems: 'center', gap: 18 * k }}>
@@ -184,22 +196,18 @@ function Topo({ session, aba, setAba, onRefresh, atualizando }: { session: LiveS
           })}
         </View>
 
-        <View accessibilityLiveRegion="polite" accessibilityLabel={`Dados atualizados às ${horaAtualizacao(session.updatedAt)}. ${atualizando ? 'Atualizando.' : ''}`} style={{ position: 'absolute', left: 20 * k, top: 610 * k, width: 812 * k, height: 36, borderRadius: 12 * k, borderWidth: 1, borderColor: '#252B28', backgroundColor: '#0D1110', flexDirection: 'row', alignItems: 'center', paddingLeft: 16 * k, paddingRight: 5 * k }}>
+        <View accessibilityLiveRegion="polite" accessibilityLabel={`Dados ${session.stale ? 'desatualizados' : 'atualizados'} ${idadeSnapshot(session.snapshotAgeMs)}, às ${horaAtualizacao(session.lastUpdatedAt ?? session.updatedAt)}. Transporte ${session.transport === 'websocket' ? 'WebSocket' : 'polling'}.`} style={{ position: 'absolute', left: 20 * k, top: 610 * k, width: 812 * k, minHeight: 36, borderRadius: 12 * k, borderWidth: 1, borderColor: session.stale ? cor.ouro : '#252B28', backgroundColor: session.stale ? cor.cartao2 : '#0D1110', flexDirection: 'row', alignItems: 'center', paddingLeft: 16 * k, paddingRight: 16 * k }}>
           <Icon name="clock" color="#A9B0AC" size={20 * k} />
-          <T s={19} c="#C9CFCC" linhas={1} adjustsFontSizeToFit minimumFontScale={0.68} style={{ marginLeft: 10 * k, flex: 1 }}>ATUALIZADO ÀS {horaAtualizacao(session.updatedAt)}</T>
-          <Pressable disabled={atualizando} onPress={() => void onRefresh()} accessibilityRole="button" accessibilityLabel={atualizando ? 'Atualizando dados' : 'Atualizar dados da bateria'} accessibilityState={{ disabled: atualizando, busy: atualizando }} hitSlop={4}
-            style={({ pressed }) => ({ minHeight: 36, minWidth: 102, paddingHorizontal: 14, borderRadius: 9, backgroundColor: atualizando ? '#1D5B35' : cor.verde, justifyContent: 'center', alignItems: 'center', opacity: pressed ? 0.82 : 1 })}>
-            <T s={17} p="800" c="#03110A" linhas={1} adjustsFontSizeToFit minimumFontScale={0.7}>{atualizando ? 'ATUALIZANDO…' : 'ATUALIZAR'}</T>
-          </Pressable>
+          <T s={17} c={session.stale ? '#F6C65B' : '#C9CFCC'} linhas={2} adjustsFontSizeToFit minimumFontScale={0.68} style={{ marginLeft: 10 * k, flex: 1 }}>{session.stale ? 'DADOS DESATUALIZADOS' : 'ATUALIZADO'} {idadeSnapshot(session.snapshotAgeMs)} · {horaAtualizacao(session.lastUpdatedAt ?? session.updatedAt)} · {session.transport === 'websocket' ? 'WEBSOCKET' : 'POLLING'}</T>
         </View>
 
-        {aba === 'classificacao' || aba === 'tempos' ? (
+        {aba === 'classificacao' ? (
           <Caixa x={0} y={690} w={852} pointerEvents="none" style={{ flexDirection: 'row' }}>
             <View style={{ marginLeft: 52 * k, width: 60 * k }}><T s={14} c="#A9B0AC">#</T></View>
             <View style={{ marginLeft: 15 * k, width: 230 * k }}><T s={14} c="#A9B0AC" style={{ letterSpacing: 0.5 * k }}>PILOTO</T></View>
             <View style={{ width: 115 * k, alignItems: 'center' }}><T s={14} c="#A9B0AC">ÚLTIMA VOLTA</T></View>
             <View style={{ width: 138 * k, alignItems: 'center' }}><T s={14} c="#A9B0AC">MELHOR VOLTA</T></View>
-            <View style={{ width: 92 * k, alignItems: 'center' }}><T s={14} c="#A9B0AC">ATRASO</T></View>
+            <View style={{ width: 92 * k, alignItems: 'center' }}><T s={14} c="#A9B0AC" linhas={1} adjustsFontSizeToFit minimumFontScale={0.62}>DIF. (s/voltas)</T></View>
             <View style={{ width: 80 * k, alignItems: 'center' }}><T s={14} c="#A9B0AC">VOLTAS</T></View>
           </Caixa>
         ) : null}
@@ -270,6 +278,7 @@ function AvisoAtualizacao({ message, onRefresh }: { message: string; onRefresh: 
 
 function Lista({ session, onRefresh, refreshError }: { session: LiveSession; onRefresh: () => Promise<void> | void; refreshError?: string }) {
   const k = useK();
+  const bottomClearance = useFloatingTabBarClearance();
   const [aba, setAba] = useState<Aba>('classificacao');
   const [atualizando, setAtualizando] = useState(false);
   const atualizar = () => {
@@ -289,45 +298,60 @@ function Lista({ session, onRefresh, refreshError }: { session: LiveSession; onR
     if (Object.keys(novos).length) void Promise.resolve().then(() => setMovimentos((m) => ({ ...m, ...novos })));
   }, [session.competitors]);
 
-  const linhas = useMemo(() => {
-    if (aba === 'tempos') return [...session.competitors].sort((a, b) => (a.bestLapMs || Infinity) - (b.bestLapMs || Infinity));
-    return session.competitors;
-  }, [aba, session.competitors]);
+  const [pilotoExpandido, setPilotoExpandido] = useState<string | null>(null);
+  const [posicaoExpandida, setPosicaoExpandida] = useState<number | null>(null);
+  const linhas = useMemo(() => pilotoExpandido && posicaoExpandida !== null
+    ? retainExpandedCompetitorPosition(session.competitors, pilotoExpandido, posicaoExpandida)
+    : session.competitors, [pilotoExpandido, posicaoExpandida, session.competitors]);
 
   return (
     <FlatList
       style={{ flex: 1, backgroundColor: cor.fundo }}
-      data={aba === 'setores' ? [] : linhas}
+      data={linhas}
       keyExtractor={(c) => c.kartNumber}
-      renderItem={({ item }) => aba === 'pilotos'
+      maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+      renderItem={({ item, index }) => aba === 'pilotos'
         ? (
-          <Pressable disabled={session.status === 'CHECKERED'} onPress={session.status === 'CHECKERED' ? undefined : () => { tap(); router.push(`/cockpit?kart=${encodeURIComponent(item.kartNumber)}` as Href); }} accessible accessibilityRole="button" accessibilityState={{ disabled: session.status === 'CHECKERED' }} accessibilityLabel={`${nomeDe(item)}, kart ${item.kartNumber}. ${session.status === 'CHECKERED' ? 'Cockpit indisponível porque a bateria foi encerrada.' : 'Toque para abrir o cockpit.'}`}
-            style={{ width: 808 * k, height: Math.max(70 * k, 44), marginLeft: 22 * k, marginBottom: 6.5 * k, borderRadius: 12 * k, backgroundColor: '#111615', borderWidth: 1, borderColor: '#1F2422', flexDirection: 'row', alignItems: 'center', paddingLeft: 24 * k, gap: 20 * k }}>
-            <Icon name="helmet" color={cor.verde} size={32 * k} />
-            <View style={{ flex: 1 }}>
-              <T s={18} f={fonte.tempoBold} linhas={1} adjustsFontSizeToFit minimumFontScale={0.58}>{nomeDe(item)}</T>
-              <T s={15} c="#A9B0AC" linhas={1} adjustsFontSizeToFit minimumFontScale={0.68}>Kart #{item.kartNumber} · {item.category}</T>
-            </View>
-            <T s={16} p="700" c={session.status === 'CHECKERED' ? '#6E7772' : cor.verde} style={{ marginRight: 26 * k }}>{session.status === 'CHECKERED' ? 'ENCERRADA' : 'COCKPIT ›'}</T>
-          </Pressable>
+          <View style={{ width: 808 * k, marginLeft: 22 * k, marginBottom: 7 * k }}>
+            <Pressable onPress={() => {
+              tap();
+              if (pilotoExpandido === item.kartNumber) {
+                setPilotoExpandido(null);
+                setPosicaoExpandida(null);
+              } else {
+                setPilotoExpandido(item.kartNumber);
+                setPosicaoExpandida(index);
+              }
+            }} accessible accessibilityRole="button" accessibilityState={{ expanded: pilotoExpandido === item.kartNumber }} accessibilityLabel={`${nomeDe(item)}, kart ${item.kartNumber}. Toque para ${pilotoExpandido === item.kartNumber ? 'recolher' : 'ver'} todas as voltas.`}
+              style={({ pressed }) => ({ minHeight: Math.max(70 * k, 48), borderRadius: 12 * k, backgroundColor: '#111615', borderWidth: 1, borderColor: pilotoExpandido === item.kartNumber ? cor.verde : '#1F2422', flexDirection: 'row', alignItems: 'center', paddingLeft: 24 * k, gap: 20 * k, opacity: pressed ? 0.84 : 1 })}>
+              <Icon name="helmet" color={cor.verde} size={32 * k} />
+              <View style={{ flex: 1 }}>
+                <T s={18} f={fonte.tempoBold} linhas={1} adjustsFontSizeToFit minimumFontScale={0.58}>{nomeDe(item)}</T>
+                <T s={15} c="#A9B0AC" linhas={1} adjustsFontSizeToFit minimumFontScale={0.68}>Kart #{item.kartNumber} · {item.category}</T>
+              </View>
+              <T s={16} p="700" c={cor.verde} style={{ marginRight: 26 * k }}>{pilotoExpandido === item.kartNumber ? 'RECOLHER' : 'VOLTAS ›'}</T>
+            </Pressable>
+            {pilotoExpandido === item.kartNumber ? <View accessibilityLabel={`Volta a volta de ${nomeDe(item)}`} style={{ marginTop: 6 * k, padding: 14 * k, borderRadius: 12 * k, backgroundColor: '#0A0E0D', borderWidth: 1, borderColor: '#26352B' }}>
+              <T s={14} p="800" c="#A9B0AC" style={{ letterSpacing: 1 * k }}>VOLTA A VOLTA · {item.lapTimes?.length ?? 0} VOLTAS</T>
+              {item.lapTimes?.length ? item.lapTimes.map((volta) => <View key={volta.number} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 7 * k, borderBottomWidth: 1, borderBottomColor: '#1A221D' }}><T s={17} p="700">VOLTA {volta.number}</T><T s={17} f={fonte.tempo} style={{ fontVariant: ['tabular-nums'] }}>{volta.time}</T></View>) : <T s={15} c="#A9B0AC" style={{ marginTop: 8 * k }}>Nenhuma volta recebida ainda.</T>}
+            </View> : null}
+          </View>
         )
         : <Linha c={item} ganhou={movimentos[item.kartNumber] ?? 0} rapida={item.isFastestLap} cockpitEnabled={session.status !== 'CHECKERED'} />}
-      contentContainerStyle={{ paddingBottom: 120 }}
+      contentContainerStyle={{ paddingBottom: bottomClearance }}
       refreshControl={<RefreshControl refreshing={atualizando} tintColor={cor.verde} onRefresh={() => { void atualizar(); }} />}
       ListHeaderComponent={(
         <View>
-          {refreshError ? <AvisoAtualizacao message={refreshError} onRefresh={atualizar} /> : null}
-          <Topo session={session} aba={aba} setAba={setAba} onRefresh={atualizar} atualizando={atualizando} />
+          {refreshError || session.stale ? <AvisoAtualizacao message={refreshError ?? 'A cronometragem está sem atualização recente. Confira novamente.'} onRefresh={atualizar} /> : null}
+          <Topo session={session} aba={aba} setAba={setAba} />
         </View>
       )}
-      ListEmptyComponent={aba === 'setores'
-        ? <View style={{ paddingHorizontal: 40 * k, paddingTop: 10 }}><T s={19} c="#C9CFCC" lh={26}>Os tempos por setor aparecem aqui quando a pista tiver os pontos de cronometragem intermediários. Por enquanto, veja a volta completa em Classificação e Tempos.</T></View>
-        : null}
+      ListEmptyComponent={null}
       ListFooterComponent={<Rodape session={session} />}
     />
   );
 }
 
 export function AoVivoReal({ session, onRefresh, refreshError }: { session: LiveSession; onRefresh: () => Promise<void> | void; refreshError?: string }) {
-  return <Desenho><Lista session={session} onRefresh={onRefresh} refreshError={refreshError} /></Desenho>;
+  return <Desenho><Lista key={session.id} session={session} onRefresh={onRefresh} refreshError={refreshError} /></Desenho>;
 }

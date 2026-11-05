@@ -4,21 +4,32 @@ import {
   Platform,
   useWindowDimensions,
   StyleSheet,
+  View,
 } from 'react-native';
 import { render, fireEvent, act } from '@testing-library/react-native';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import {
   FloatingTabBar,
   TAB_BAR_ITEMS,
   FLOATING_BAR_HEIGHT,
   FLOATING_CONTENT_PADDING,
   FLOATING_CONTENT_PADDING_WITH_CART,
+  useFloatingTabBarClearance,
 } from '../src/components/floating-tab-bar';
 
 // Mock useSafeAreaInsets
 const mockSafeAreaInsets = { top: 0, right: 0, bottom: 0, left: 0 };
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => mockSafeAreaInsets,
-}));
+jest.mock('react-native-safe-area-context', () => {
+  const React = require('react');
+  return {
+    SafeAreaInsetsContext: React.createContext(mockSafeAreaInsets),
+    useSafeAreaInsets: () => mockSafeAreaInsets,
+  };
+});
+
+function ClearanceProbe() {
+  return <View testID="clearance-probe" style={{ paddingBottom: useFloatingTabBarClearance() }} />;
+}
 
 // Helper to create mock react-navigation BottomTabBarProps
 function createMockNavigationProps(initialRouteName = 'index', bottomInset = 0) {
@@ -83,13 +94,31 @@ describe('FloatingTabBar - Milestone 1 Empirical Challenge Suite', () => {
   // Challenge 1: Route Rendering, Icons, and Labels (All 5 Destinations)
   // =========================================================================
   describe('1. Route Rendering, Icons and Labels', () => {
+    it('reserva no layout a faixa inferior ocupada pela barra flutuante', async () => {
+      const navProps = createMockNavigationProps('index', 34);
+      const { getByTestId } = await render(<FloatingTabBar {...navProps} />);
+      const area = getByTestId('floating-tab-bar-reserved-area');
+      expect(StyleSheet.flatten(area.props.style)).toMatchObject({ height: FLOATING_BAR_HEIGHT + 34 + 8 + 16 });
+    });
+
+    it('não duplica a faixa reservada com padding nas listas roláveis', async () => {
+      mockSafeAreaInsets.bottom = 34;
+      const { getByTestId } = await render(
+        <SafeAreaInsetsContext.Provider value={mockSafeAreaInsets}>
+          <ClearanceProbe />
+        </SafeAreaInsetsContext.Provider>,
+      );
+      expect(StyleSheet.flatten(getByTestId('clearance-probe').props.style).paddingBottom)
+        .toBe(0);
+    });
+
     it('declares exact 5 tabs with correct icons in TAB_BAR_ITEMS', () => {
       expect(TAB_BAR_ITEMS).toHaveLength(5);
       expect(TAB_BAR_ITEMS).toEqual([
-        { name: 'index', label: 'Home', icon: 'home' },
-        { name: 'parceiros', label: 'Parceiros', icon: 'map-pin' },
-        { name: 'livetime', label: 'LiveTime', icon: 'timer' },
+        { name: 'index', label: 'Início', icon: 'home' },
         { name: 'agenda', label: 'Agenda', icon: 'calendar' },
+        { name: 'reservas', label: 'Reservas', icon: 'ticket' },
+        { name: 'livetime', label: 'Ao vivo', icon: 'timer' },
         { name: 'carreira', label: 'Carreira', icon: 'helmet' },
       ]);
     });
@@ -118,10 +147,10 @@ describe('FloatingTabBar - Milestone 1 Empirical Challenge Suite', () => {
       expect(activeIndicators).toHaveLength(1);
 
       // Verify accessibilityState.selected
-      const liveTab = getByTestId('tab-livetime');
+      const liveTab = getByTestId('tab-ao vivo');
       expect(liveTab.props.accessibilityState).toEqual({ selected: true });
 
-      const homeTab = getByTestId('tab-home');
+      const homeTab = getByTestId('tab-início');
       expect(homeTab.props.accessibilityState).toEqual({ selected: false });
     });
 
@@ -145,7 +174,7 @@ describe('FloatingTabBar - Milestone 1 Empirical Challenge Suite', () => {
       const navProps = createMockNavigationProps('index');
       const { getByTestId } = await render(<FloatingTabBar {...navProps} />);
 
-      await fireEvent.press(getByTestId('tab-home'));
+      await fireEvent.press(getByTestId('tab-início'));
 
       expect(navProps.navigation.emit).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -178,11 +207,11 @@ describe('FloatingTabBar - Milestone 1 Empirical Challenge Suite', () => {
       const navProps = createMockNavigationProps('index');
       const { getByTestId } = await render(<FloatingTabBar {...navProps} />);
 
-      await fireEvent(getByTestId('tab-parceiros'), 'onLongPress');
+      await fireEvent(getByTestId('tab-reservas'), 'onLongPress');
 
       expect(navProps.navigation.emit).toHaveBeenCalledWith({
         type: 'tabLongPress',
-        target: 'route-parceiros',
+          target: 'route-reservas',
       });
     });
 
@@ -201,10 +230,10 @@ describe('FloatingTabBar - Milestone 1 Empirical Challenge Suite', () => {
 
     it('matches activeTab case-insensitively and by route name', async () => {
       const { getByTestId } = await render(<FloatingTabBar activeTab="index" />);
-      expect(getByTestId('tab-home').props.accessibilityState).toEqual({ selected: true });
+      expect(getByTestId('tab-início').props.accessibilityState).toEqual({ selected: true });
 
-      const { getByTestId: getByTestId2 } = await render(<FloatingTabBar activeTab="LIVETIME" />);
-      expect(getByTestId2('tab-livetime').props.accessibilityState).toEqual({ selected: true });
+      const { getByTestId: getByTestId2 } = await render(<FloatingTabBar activeTab="AO VIVO" />);
+      expect(getByTestId2('tab-ao vivo').props.accessibilityState).toEqual({ selected: true });
     });
   });
 
@@ -451,13 +480,13 @@ describe('FloatingTabBar - Milestone 1 Empirical Challenge Suite', () => {
 
       // Bar renders all 5 main tabs
       expect(getByTestId('floating-bottom-tabs')).toBeTruthy();
-      // But no tab is selected
-      expect(queryByTestId('tab-active-indicator')).toBeNull();
-      expect(getByTestId('tab-home').props.accessibilityState).toEqual({ selected: false });
+      // Reservas agora é uma aba publicada e pode estar selecionada.
+      expect(queryByTestId('tab-active-indicator')).toBeTruthy();
+      expect(getByTestId('tab-início').props.accessibilityState).toEqual({ selected: false });
     });
 
     it('renders accessibility attributes for screen readers correctly', async () => {
-      const { getByTestId } = await render(<FloatingTabBar activeTab="LiveTime" />);
+      const { getByTestId } = await render(<FloatingTabBar activeTab="Ao vivo" />);
 
       const container = getByTestId('floating-bottom-tabs');
       expect(container.props.accessibilityRole).toBe('tablist');

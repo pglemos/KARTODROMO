@@ -1,0 +1,46 @@
+--- a/src/features/auth/sessao.tsx
++++ b/src/features/auth/sessao.tsx
+@@ -40,7 +40,7 @@ function redutor(e: EstadoTempoReal, a: Acao) {
+   return estadoInicial;
+ }
+ 
+-export function ProvedorSessao({ children }: PropsWithChildren) {
+-  if (!BASE_VALIDA) {
+-    return <ServidorNaoConfigurado />;
+-  }
++function ProvedorSessaoAtivo({ children }: PropsWithChildren) {
+   const [eu, setEu] = useState<Eu | null>(null);
+   const [carregando, setCarregando] = useState(true);
+   const [tempoReal, despachar] = useReducer(redutor, estadoInicial);
+@@ -52,12 +48,10 @@ export function ProvedorSessao({ children }: PropsWithChildren) {
+   useEffect(() => {
+     void (async () => {
+       try {
+-        if (!(await cliente.tokenAtual()) && /^http:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(BASE)) {
+-          const deviceId = await obterOuCriarDeviceId();
+-          await cliente.entrar('gerencia', 'teste-codex', deviceId).catch(() => null);
+-        }
+         if (await cliente.tokenAtual()) setEu(await cliente.get<Eu>('/me'));
+-      } catch { /* sem rede ou sessão vencida: vai ao login */ }
+-      setCarregando(false);
++      } catch {
++        /* sem rede ou sessão vencida: vai ao login */
++      } finally {
++        setCarregando(false);
++      }
+     })();
+   }, [cliente]);
+@@ -86,6 +80,13 @@ export function ProvedorSessao({ children }: PropsWithChildren) {
+   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;
+ }
+ 
++export function ProvedorSessao({ children }: PropsWithChildren) {
++  if (!BASE_VALIDA) {
++    return <ServidorNaoConfigurado />;
++  }
++  return <ProvedorSessaoAtivo>{children}</ProvedorSessaoAtivo>;
++}
++
+ export function useSessao() {
+   const v = useContext(Contexto);
+   if (!v) throw new Error('useSessao fora do provedor');

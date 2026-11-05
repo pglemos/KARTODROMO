@@ -5,7 +5,7 @@
  * No totem o cliente digita CPF, RG, passaporte ou e-mail e os dados já aparecem.
  */
 import { chaveDocumento, validar } from './validar';
-import { cancelar, consultar, criarCobrancaLink, diagnostico, garantirCliente, PAGO } from './asaas';
+import { cancelar, chamar, consultar, diagnostico, garantirCliente, hojeBrasilia, PAGO } from './asaas';
 import { agendaPublica, criarPedido, politicaPublica, situacaoPedido, syncAgenda, syncPedidos, syncResultado, webhookAsaas, type EnvReservas } from './reservas';
 import { handleMobileAccountEmail, handleMobileAuth, type MobileAccountAdminEnv } from './mobile/auth';
 import { handleMobileReservations } from './mobile/reservations';
@@ -13,11 +13,13 @@ import { handleMobileCoupons, handleMobileCouponsSync } from './mobile/coupons';
 import { handleMobileResults, type MobileResultsEnv } from './mobile/results';
 import { handleMobileLive, type MobileLiveEnv } from './mobile/live';
 export { AoVivo } from './mobile/live';
+export { SinalVinculo } from './mobile/sinal-vinculo';
+import { esperarPedidoDeVinculo, pedirVinculo, type SinalVinculoEnv } from './mobile/sinal-vinculo';
 import { handleMobilePerfil, type MobilePerfilEnv } from './mobile/perfil';
 import { handleMobileRanking } from './mobile/ranking';
 import { handleMobileOutbox } from './mobile/outbox';
 
-export interface Env extends EnvReservas, MobileAccountAdminEnv, MobileResultsEnv, MobileLiveEnv, MobilePerfilEnv {
+export interface Env extends EnvReservas, MobileAccountAdminEnv, MobileResultsEnv, MobileLiveEnv, MobilePerfilEnv, SinalVinculoEnv {
   ASSETS: Fetcher;
   PRE: R2Bucket;
   SYNC_KEY: string;
@@ -57,9 +59,7 @@ async function receber(req: Request, env: Env) {
   const v = validar(corpo);
   if (!v.ok) return json(400, { erro: v.erro });
   const chave = chaveDocumento(v.dados.tipoDocumento, v.dados.documento);
-  // link da reserva em grupo (painel web): só o código; o SRVKART põe a vaga no nome desta pessoa
-  const reserva = /^[A-Za-z0-9]{10,24}$/.test(String(corpo.reserva ?? '')) ? String(corpo.reserva) : undefined;
-  const registro = { chave, recebidoEm: new Date().toISOString(), ...v.dados, ...(reserva ? { reserva } : {}) };
+  const registro = { chave, recebidoEm: new Date().toISOString(), ...v.dados };
   // um cadastro por documento: se a pessoa enviar de novo, vale o último
   await env.PRE.put(`pendentes/${chave}.json`, JSON.stringify(registro), { httpMetadata: { contentType: 'application/json' } });
   return json(201, { ok: true, nome: v.dados.nome.split(' ')[0] });
@@ -97,13 +97,25 @@ export default {
     try {
       if (p === '/api/pre-cadastro' && req.method === 'POST') return await receber(req, env);
       if (p === '/api/mobile/v1/internal/account-email') return await handleMobileAccountEmail(req, env);
-      if (p.startsWith('/api/mobile/v1/auth/')) return await handleMobileAuth(req, env);
+      if (p.startsWith('/api/mobile/v1/auth/')) {
+        const resposta = await handleMobileAuth(req, env);
+        // e-mail confirmado: a conta vira candidata ao vínculo agora, não no próximo ciclo
+        if (p === '/api/mobile/v1/auth/email/verify' && resposta.ok) ctx.waitUntil(pedirVinculo(env));
+        return resposta;
+      }
+      if (p === '/api/mobile/v1/internal/identity-wait') return await esperarPedidoDeVinculo(req, env);
       if (p === '/api/mobile/v1/coupons/preview' || p.startsWith('/api/mobile/v1/coupons/preview/')) {
         return await handleMobileCoupons(req, env);
       }
       if (p === '/api/mobile/v1/internal/results' || p === '/api/mobile/v1/internal/identity-links' || p === '/api/mobile/v1/internal/identity-candidates' ||
           p === '/api/mobile/v1/results' || p === '/api/mobile/v1/results/me') {
-        return await handleMobileResults(req, env);
+        const resposta = await handleMobileResults(req, env);
+        // cliente abriu o histórico e ainda não está vinculado: pede o vínculo agora
+        if (p === '/api/mobile/v1/results/me' && resposta.ok) {
+          const corpo = await resposta.clone().json().catch(() => null) as { vinculo?: string } | null;
+          if (corpo?.vinculo === 'pendente') ctx.waitUntil(pedirVinculo(env));
+        }
+        return resposta;
       }
       if (p === '/api/mobile/v1/live' || p === '/api/mobile/v1/live/ws') return await handleMobileLive(req, env);
       if (p === '/api/mobile/v1/conta/perfil' || p === '/api/mobile/v1/internal/perfil') return await handleMobilePerfil(req, env);
@@ -137,19 +149,107 @@ export default {
         }
         if (p === '/api/sync/agenda' && req.method === 'PUT') return await syncAgenda(req, env);
         if (p === '/api/sync/asaas' && req.method === 'GET') return json(200, await diagnostico(env));
+        if (p === '/api/sync/campeonato/cobranca' && req.method === 'POST') {
+          const c = (await req.json()) as Record<string, unknown>;
+          const dadosCli = {
+            nome: String(c.nome ?? ''),
+            cpf: String(c.cpf ?? '').replace(/\D/g, ''),
+            email: String(c.email ?? ''),
+            celular: String(c.celular ?? '').replace(/\D/g, ''),
+            referencia: String(c.referencia ?? ''),
+          };
+          let cliente: string;
+          try {
+            cliente = await garantirCliente(env, dadosCli);
+          } catch (erroCli) {
+            if (!/celular|mobilePhone/i.test((erroCli as Error).message)) throw erroCli;
+            cliente = await garantirCliente(env, { ...dadosCli, celular: '' });
+          }
+          const valor = Math.round(Number(c.valorCentavos)) / 100;
+          const n = c.forma === 'cartao' ? Math.min(5, Math.max(1, Math.trunc(Number(c.parcelas)) || 1)) : 1;
+          const cob = await chamar<{ id: string; invoiceUrl: string; status: string }>(env, '/payments', {
+            method: 'POST',
+            body: JSON.stringify({
+              customer: cliente,
+              billingType: c.forma === 'cartao' ? 'CREDIT_CARD' : 'PIX',
+              ...(n > 1 ? { installmentCount: n, totalValue: valor } : { value: valor }),
+              dueDate: String(c.vencimento ?? hojeBrasilia()),
+              description: String(c.descricao ?? '').slice(0, 500),
+              externalReference: String(c.referencia ?? '').slice(0, 100),
+            }),
+          });
+          return json(201, { id: cob.id, link: cob.invoiceUrl, status: cob.status });
+        }
+        const mCamp = p.match(/^\/api\/sync\/campeonato\/cobranca\/([A-Za-z0-9_]{6,40})$/);
+        if (mCamp && req.method === 'GET') {
+          const c = await consultar(env, mCamp[1]);
+          return json(200, { id: c.id, status: c.status, pago: PAGO.has(c.status), forma: c.billingType });
+        }
+        if (mCamp && req.method === 'DELETE') {
+          const c = await chamar<{ id: string; installment?: string }>(env, `/payments/${encodeURIComponent(mCamp[1])}`);
+          if (c.installment) {
+            return json(200, await chamar(env, `/installments/${encodeURIComponent(c.installment)}`, { method: 'DELETE' }));
+          }
+          return json(200, await cancelar(env, mCamp[1]));
+        }
+        if (p === '/api/sync/campeonato/cobrancas' && req.method === 'GET') {
+          const cpf = (url.searchParams.get('cpf') ?? '').replace(/\D/g, '');
+          const cli = await chamar<{ data?: { id: string }[] }>(env, `/customers?cpfCnpj=${cpf}&limit=1`);
+          const id = cli.data?.[0]?.id;
+          if (!id) return json(200, []);
+          const r = await chamar<{ data?: { id: string; status: string; value: number; installment?: string; deleted: boolean; externalReference?: string }[] }>(env, `/payments?customer=${id}&limit=50`);
+          return json(200, (r.data ?? []).map((x) => ({
+            id: x.id,
+            status: x.status,
+            valor: x.value,
+            parcelamento: x.installment ?? null,
+            deleted: x.deleted,
+            ref: x.externalReference ?? null,
+          })));
+        }
+        if (p === '/api/sync/cobranca' && req.method === 'POST') {
+          const c = (await req.json()) as Record<string, unknown>;
+          const dadosCli = {
+            nome: String(c.nome ?? ''),
+            cpf: String(c.cpf ?? '').replace(/\D/g, ''),
+            email: String(c.email ?? ''),
+            celular: String(c.celular ?? '').replace(/\D/g, ''),
+            referencia: String(c.referencia ?? ''),
+          };
+          let cliente: string;
+          try {
+            cliente = await garantirCliente(env, dadosCli);
+          } catch (erroCli) {
+            if (!/celular|mobilePhone/i.test((erroCli as Error).message)) throw erroCli;
+            cliente = await garantirCliente(env, { ...dadosCli, celular: '' });
+          }
+          const hoje = hojeBrasilia();
+          const venc = String(c.vencimento ?? '');
+          const dueDate = /^\d{4}-\d{2}-\d{2}$/.test(venc) && venc >= hoje ? venc : hoje;
+          const cob = await chamar<{ id: string; invoiceUrl: string; status: string }>(env, '/payments', {
+            method: 'POST',
+            body: JSON.stringify({
+              customer: cliente,
+              billingType: 'UNDEFINED',
+              value: Math.round(Number(c.valorCentavos)) / 100,
+              dueDate,
+              description: String(c.descricao ?? '').slice(0, 500),
+              externalReference: String(c.referencia ?? '').slice(0, 100),
+            }),
+          });
+          return json(201, { id: cob.id, link: cob.invoiceUrl, status: cob.status });
+        }
+        const mGrupo = p.match(/^\/api\/sync\/cobranca\/([A-Za-z0-9_]{6,40})$/);
+        if (mGrupo && req.method === 'GET') {
+          const c = await consultar(env, mGrupo[1]);
+          return json(200, { id: c.id, status: c.status, pago: PAGO.has(c.status), forma: c.billingType });
+        }
+        if (mGrupo && req.method === 'DELETE') {
+          return json(200, await cancelar(env, mGrupo[1]));
+        }
         if (p === '/api/sync/mobile/coupons' || p.startsWith('/api/sync/mobile/coupons/')) return await handleMobileCouponsSync(req, env);
         if (p === '/api/sync/pedidos' && req.method === 'GET') return await syncPedidos(env);
         if (p === '/api/sync/pedido' && req.method === 'POST') return await syncResultado(req, env, ctx);
-        // cobrança da reserva em grupo (painel web): link da Asaas (Pix ou cartão) para um piloto ou para o grupo
-        if (p === '/api/sync/cobranca' && req.method === 'POST') {
-          const c = (await req.json()) as { nome: string; cpf: string; email?: string; celular?: string; valorCentavos: number; descricao: string; referencia: string; vencimento: string };
-          const cliente = await garantirCliente(env, { nome: c.nome, cpf: String(c.cpf ?? '').replace(/\D/g, ''), email: c.email ?? '', celular: String(c.celular ?? '').replace(/\D/g, ''), referencia: c.referencia });
-          const cob = await criarCobrancaLink(env, cliente, c.valorCentavos, c.descricao, c.referencia, c.vencimento);
-          return json(201, { id: cob.id, link: cob.invoiceUrl, status: cob.status });
-        }
-        const mc = p.match(/^\/api\/sync\/cobranca\/([A-Za-z0-9_]{6,40})$/);
-        if (mc && req.method === 'GET') { const c = await consultar(env, mc[1]); return json(200, { id: c.id, status: c.status, pago: PAGO.has(c.status), forma: c.billingType }); }
-        if (mc && req.method === 'DELETE') return json(200, await cancelar(env, mc[1]));
       }
       if (p.startsWith('/api/')) return json(404, { erro: 'Rota desconhecida.' });
       // reservas.kartodromodebetim.com.br abre direto a página de reserva
