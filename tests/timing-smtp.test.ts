@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { CONFIG_PADRAO, opcoesTransporte, situacaoEnvioEmail, situacaoTesteEmail, traduzirErro } from '../services/timing-email';
+
+vi.mock('../lib/timing/secret-storage', async (real) => (process.platform === 'win32' ? real() : import('./segredo-local-simulado')));
 
 describe('transporte SMTP dos resultados', () => {
   it('anuncia um FQDN no EHLO em vez do fallback [127.0.0.1]', () => {

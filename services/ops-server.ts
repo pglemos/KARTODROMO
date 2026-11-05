@@ -29,7 +29,7 @@ import { bateriaDisponivelNoTotem, type TotemBateriaCandidate, TOTEM_BATERIAS_SQ
 import { relatorio } from '../lib/ops/relatorios';
 import { renderTermoResponsabilidade, type TermoParticipante } from '../lib/ops/termo';
 import { buscarPreCadastroAgora, preCadastroLigado, sincronizarPreCadastros } from '../lib/ops/pre-cadastro';
-import { conferirCobrancas, gruposRoutes } from '../lib/ops/grupos';
+import { conferirCobrancas, gruposRoutes, publicarGruposNoSite } from '../lib/ops/grupos';
 import { campeonatoOfficeRoutes, campeonatoSiteRoutes, conferirCobrancasCampeonato } from '../lib/ops/campeonato-inscricoes';
 import { painelRoutes, registrarSinal } from '../lib/ops/painel';
 import { enduranceDasBaterias, enduranceRoutes, equipesParaOTotem, paginaDoChefe, vincularNoTotem } from '../lib/ops/endurance';
@@ -827,7 +827,7 @@ if (preCadastroLigado()) {
   setInterval(async () => {
     if (conferindo) return;
     conferindo = true;
-    try { await conferirCobrancas(log); await conferirCobrancasCampeonato(log); } catch (e) { log(`grupo: conferência das cobranças falhou (${(e as Error).message})`); } finally { conferindo = false; }
+    try { await publicarGruposNoSite(log).catch((e) => log(`grupo: resumo para o site falhou (${(e as Error).message})`)); await conferirCobrancas(log); await conferirCobrancasCampeonato(log); } catch (e) { log(`grupo: conferência das cobranças falhou (${(e as Error).message})`); } finally { conferindo = false; }
   }, 60_000).unref();
 }
 

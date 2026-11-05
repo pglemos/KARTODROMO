@@ -723,3 +723,59 @@ export async function tipoDaBateria(bateriaId: number, tipo: string) {
   else if (tipo === 'aberta') await query(`UPDATE dbo.Bateria SET ReservaFechada = 0, AutoAtendimento = 1 WHERE Id = @id AND Status <> 'cancelada'`, { id: bateriaId });
   else throw new HttpError(400, 'Tipo inválido.');
 }
+
+// ---------------------------------------------------------------- link único do grupo no site (cadastro + pagamento)
+
+let ultimoResumoSite = '';
+/**
+ * Manda ao site o resumo das reservas em grupo ativas: com ele o link do grupo mostra "Grupo do(a) Fulano", a bateria e,
+ * se cada um paga o seu, cobra a vaga da pessoa na hora (Asaas) no fim do cadastro. Só reenvia quando algo muda.
+ */
+export async function publicarGruposNoSite(log: Log) {
+  if (!siteUrl() || !siteChave()) return 0;
+  const gs = await query<{ id: number; codigo: string; modo: string; preco: number; status: string; bateria: string; inicio: string; responsavel: string }>(
+    `SELECT g.Id id, g.Codigo codigo, g.Modo modo, g.PrecoCentavos preco, g.Status status, b.Nome bateria, CONVERT(varchar(16), b.Inicio, 126) inicio, r.Nome responsavel
+       FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId JOIN dbo.Cliente r ON r.Id = g.ResponsavelId
+      WHERE g.Status = 'ativa' AND b.Inicio > DATEADD(hour, -2, SYSDATETIME())`,
+  );
+  if (!gs.length) return 0;
+  const lista = gs.map((g) => g.id).join(',');
+  const vagas = await query<{ grupoId: number; token: string; livre: number }>(
+    `SELECT v.GrupoId grupoId, v.Token token, CASE WHEN v.ClienteId IS NULL AND v.Responsavel = 0 AND i.Id IS NOT NULL THEN 1 ELSE 0 END livre
+       FROM dbo.ReservaGrupoPiloto v LEFT JOIN dbo.Inscricao i ON i.Id = v.InscricaoId AND i.Status <> 'cancelada'
+      WHERE v.GrupoId IN (${lista})`,
+  );
+  const grupos = gs.map((g) => {
+    const dele = vagas.filter((v) => v.grupoId === g.id);
+    return {
+      tokens: dele.map((v) => v.token).filter(Boolean), codigo: g.codigo, status: g.status, modo: g.modo, precoCentavos: Number(g.preco) || 0,
+      bateria: g.bateria, inicio: g.inicio, responsavel: primeiroNome(g.responsavel), livres: dele.reduce((s, v) => s + v.livre, 0),
+    };
+  });
+  const json = JSON.stringify({ grupos });
+  if (json === ultimoResumoSite) return 0;
+  await site('/api/sync/grupos', { method: 'PUT', body: json });
+  ultimoResumoSite = json;
+  log(`grupo: resumo de ${grupos.length} reserva(s) em grupo enviado ao site`);
+  return grupos.length;
+}
+
+/** A pessoa pagou (ou vai pagar) a vaga no fim do cadastro pelo link do grupo: a cobrança passa a ser da vaga que ficou com ela. */
+export async function registrarCobrancaDoLink(token: string, clienteId: number, cob: { id?: unknown; link?: unknown; valorCentavos?: unknown }, log: Log) {
+  const asaasId = String(cob.id ?? '');
+  if (!/^pay_[A-Za-z0-9]{6,40}$/.test(asaasId)) return false;
+  const vaga = await one<{ id: number; grupoId: number }>(
+    `SELECT TOP 1 v.Id id, v.GrupoId grupoId FROM dbo.ReservaGrupoPiloto t JOIN dbo.ReservaGrupoPiloto v ON v.GrupoId = t.GrupoId
+      WHERE t.Token = @token AND v.ClienteId = @c ORDER BY v.Responsavel, v.Ordem`,
+    { token, c: clienteId },
+  );
+  if (!vaga) { log(`grupo: cobrança ${asaasId} do link sem vaga para o cliente ${clienteId} (conferir na recepção)`); return false; }
+  if (await one(`SELECT 1 x FROM dbo.ReservaGrupoCobranca WHERE AsaasId = @a`, { a: asaasId })) return true;
+  await query(`UPDATE dbo.ReservaGrupoCobranca SET Status = 'cancelada' WHERE PilotoId = @p AND Status = 'aguardando'`, { p: vaga.id });
+  await query(
+    `INSERT INTO dbo.ReservaGrupoCobranca (GrupoId, PilotoId, ValorCentavos, AsaasId, Link) VALUES (@g, @p, @v, @a, @l)`,
+    { g: vaga.grupoId, p: vaga.id, v: Math.round(Number(cob.valorCentavos) || 0), a: asaasId, l: String(cob.link ?? '').slice(0, 400) },
+  );
+  log(`grupo ${vaga.grupoId}: cobrança ${asaasId} do link ligada ao piloto ${vaga.id} (cliente ${clienteId})`);
+  return true;
+}

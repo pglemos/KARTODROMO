@@ -18,7 +18,7 @@ const EV = (() => {
   const dif = (e) => (e.posPista === 1 ? 'Líder' : e.difLiderVoltas ? `+${e.difLiderVoltas} volta${e.difLiderVoltas > 1 ? 's' : ''}` : e.difLiderMs != null ? '+' + tempo(e.difLiderMs) : '—');
   const difFrente = (e) => (e.posPista === 1 ? '' : e.difFrenteVoltas ? `+${e.difFrenteVoltas} v` : e.difFrenteMs != null ? '+' + tempo(e.difFrenteMs) : '—');
   const RADAR = { bom: 'ev-bom', medio: 'ev-medio', ruim: 'ev-ruim' };
-  const CORES = Array.from({ length: 12 }, (_, i) => `var(--kib-cor-serie-${i + 1})`);
+  const CORES = ['#0B7A53', '#1E6FE8', '#D92D20', '#FF9F0A', '#8645D6', '#0E9C9C', '#E8590C', '#5A3E36', '#C2185B', '#3F51B5', '#7CB342', '#00ACC1'];
 
   function cabecalhoProva(a, regras) {
     const s = a.sessao;
@@ -91,10 +91,10 @@ const EV = (() => {
     for (let k = 0; k <= 10; k++) serie.slice().sort((x, y) => x.e.ultrapassagem[k] - y.e.ultrapassagem[k]).forEach((s, i) => { s.p[k] = i + 1; });
     const W = 900, H = 40 + eqs.length * 38, x = (k) => 50 + k * ((W - 170) / 10), y = (p) => 20 + (p - 1) * 38;
     return `<svg class="ev-graf" viewBox="0 0 ${W} ${H + 20}" role="img" aria-label="Ultrapassagem futura">
-      ${eqs.map((_, i) => `<line x1="50" x2="${W - 120}" y1="${y(i + 1)}" y2="${y(i + 1)}" stroke="var(--kib-cor-borda-sutil)"/><text x="30" y="${y(i + 1) + 4}" font-size="16" text-anchor="end" fill="var(--kib-cor-texto-apoio)">${i + 1}º</text>`).join('')}
-      ${Array.from({ length: 11 }, (_, k) => `<text x="${x(k)}" y="${H + 14}" font-size="15" text-anchor="middle" fill="var(--kib-cor-borda-campo)">${k}</text>`).join('')}
-      ${serie.map((s, i) => { const cor = s.e.numero === destaque ? 'var(--kib-cor-categoria-laranja-base)' : CORES[i % CORES.length]; return `<polyline fill="none" stroke="${cor}" stroke-width="${s.e.numero === destaque ? 4 : 3}" points="${s.p.map((p, k) => `${x(k)},${y(p)}`).join(' ')}"/>
-        <circle cx="${x(10)}" cy="${y(s.p[10])}" r="17" fill="var(--kib-cor-acao-sobre-principal)" stroke="${cor}" stroke-width="2"/><text x="${x(10)}" y="${y(s.p[10]) + 4}" font-size="14" font-weight="700" text-anchor="middle" fill="${cor}">${esc(s.e.numero)}</text>
+      ${eqs.map((_, i) => `<line x1="50" x2="${W - 120}" y1="${y(i + 1)}" y2="${y(i + 1)}" stroke="#E5E5EA"/><text x="30" y="${y(i + 1) + 4}" font-size="16" text-anchor="end" fill="#6E6E73">${i + 1}º</text>`).join('')}
+      ${Array.from({ length: 11 }, (_, k) => `<text x="${x(k)}" y="${H + 14}" font-size="15" text-anchor="middle" fill="#8E8E93">${k}</text>`).join('')}
+      ${serie.map((s, i) => { const cor = s.e.numero === destaque ? '#FF6B00' : CORES[i % CORES.length]; return `<polyline fill="none" stroke="${cor}" stroke-width="${s.e.numero === destaque ? 4 : 3}" points="${s.p.map((p, k) => `${x(k)},${y(p)}`).join(' ')}"/>
+        <circle cx="${x(10)}" cy="${y(s.p[10])}" r="17" fill="#FFF" stroke="${cor}" stroke-width="2"/><text x="${x(10)}" y="${y(s.p[10]) + 4}" font-size="14" font-weight="700" text-anchor="middle" fill="${cor}">${esc(s.e.numero)}</text>
         <text x="${x(10) + 24}" y="${y(s.p[10]) + 5}" font-size="15" fill="${cor}">${esc(s.e.nome).slice(0, 18)}</text>`; }).join('')}
     </svg><p class="ev-nota">Eixo de baixo = voltas a partir de agora. Considera o ritmo da média das últimas voltas de cada equipe.</p>`;
   }
@@ -105,7 +105,7 @@ const EV = (() => {
     if (!eqs.length) return '<p class="ev-vazio">A projeção aparece depois da largada.</p>';
     const min = Math.min(...eqs.map((e) => e.projecaoVoltas)), max = Math.max(...eqs.map((e) => e.projecaoVoltas));
     const larg = (v) => 8 + (max > min ? ((v - min) / (max - min)) * 92 : 92);
-    const cor = (e, i) => (e.noBox ? 'var(--kib-cor-estado-perigo-solido)' : e.numero === destaque ? 'var(--kib-cor-categoria-laranja-base)' : i < 3 ? 'var(--kib-cor-status-ok)' : i < 6 ? 'var(--kib-cor-dominio-classificacao-meio)' : i < 10 ? 'var(--kib-cor-dominio-classificacao-baixo)' : 'var(--kib-cor-borda-forte)');
+    const cor = (e, i) => (e.noBox ? '#D92D20' : e.numero === destaque ? '#FF6B00' : i < 3 ? '#0B9E3B' : i < 6 ? '#3F67B5' : i < 10 ? '#E6D200' : '#C7C7CC');
     return `<div class="ev-proj">${eqs.map((e, i) => `<div class="ev-projLinha"><span class="ev-projPos">${i + 1}º</span><span class="ev-projBarra"><i style="width: ${larg(e.projecaoVoltas)}%; background: ${cor(e, i)}"></i></span><span class="ev-projTxt">${e.noBox ? 'box · ' : ''}#${esc(e.numero)} ${esc(e.nome)} <small>${e.projecaoVoltas.toLocaleString('pt-BR')} v</small></span></div>`).join('')}</div>`;
   }
 

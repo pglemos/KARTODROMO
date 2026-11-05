@@ -34,7 +34,7 @@ const Grupo = (() => {
   const faltamLista = (g) => g.pilotos.filter((p) => p.cadastro !== 'completo').map((p) => p.id);
   const linkDoGrupo = (g) => { const r = (g.pilotos || []).find((p) => p.responsavel) || (g.pilotos || [])[0]; return r ? r.link : ''; };
   function msgGrupo(g) {
-    return `Olá! Vamos correr no Kartódromo de Betim (${quando(g.inicio)}) na reserva de ${primeiro(g.responsavel)}. Cada pessoa faz o próprio cadastro (1 minuto) neste link: ${linkDoGrupo(g)} — o mesmo link serve para todo o grupo. No dia é só digitar o CPF no totem.`;
+    return `Olá! Vamos correr no Kartódromo de Betim (${quando(g.inicio)}) na reserva de ${primeiro(g.responsavel)}. Cada pessoa faz o próprio cadastro${g.modo === 'individual' ? ' completo e paga a sua vaga no final (Pix ou cartão)' : ' (1 minuto)'} neste link: ${linkDoGrupo(g)} — o mesmo link serve para todo o grupo. No dia é só digitar o CPF no totem.`;
   }
   async function copiar(texto, msg) {
     try { await navigator.clipboard.writeText(texto); toast(msg); }
@@ -205,7 +205,7 @@ const Grupo = (() => {
             </div>
             ${!novo ? `<div style="display: flex; flex-direction: column; gap: var(--kib-espaco-1); padding: var(--kib-espaco-denso-12); border-radius: var(--kib-raio-cartao); background: linear-gradient(135deg, color-mix(in srgb, var(--kib-cor-estado-info-solido) 8%, transparent), color-mix(in srgb, var(--kib-cor-marca-principal) 8%, transparent)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--kib-cor-estado-info-solido) 15%, transparent)">
               <span class="linha gap-1"><span style="width: 26px; height: 26px; border-radius: var(--kib-raio-botao); display: flex; align-items: center; justify-content: center; background: ${G('var(--kib-cor-categoria-azul-escuro-topo)', 'var(--kib-cor-estado-info-solido)')}; color: var(--kib-cor-acao-sobre-principal); font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 800">A</span><b>Asaas · Pix e cartão</b><span class="chip ${!g.falta ? 'verde' : g.pago ? 'laranja' : 'azul'} empurra">${!g.falta ? 'Pago' : g.pago ? 'Parcial' : 'Aguardando'}</span></span>
-              <span class="peq" style="line-height: 1.45; color: var(--tinta2)">${modo === 'individual' ? `Cada piloto recebe o próprio link de ${brl(preco)}. Toque em “Cobrar” no piloto.` : modo === 'sinal' ? `Link do sinal: ${brl(g.sinal)} (${sinalPct}%). O resto cada um paga na recepção.` : `Link do grupo inteiro: ${brl(g.falta)}.`}</span>
+              <span class="peq" style="line-height: 1.45; color: var(--tinta2)">${modo === 'individual' ? `Cada piloto paga a sua vaga (${brl(preco)}) no fim do cadastro pelo link do grupo. Se precisar, “Enviar link de pagamento” no piloto gera um link avulso.` : modo === 'sinal' ? `Link do sinal: ${brl(g.sinal)} (${sinalPct}%). O resto cada um paga na recepção.` : `Link do grupo inteiro: ${brl(g.falta)}.`}</span>
               ${modo !== 'individual' && g.falta ? `<button class="btn prim peq" data-cobrar="">Gerar e enviar link ao responsável</button>` : ''}
               ${g.cobrancaGrupo ? `<a class="mono peq trunc" target="_blank" rel="noopener" href="${esc(g.cobrancaGrupo.link)}" style="padding: var(--kib-espaco-1) var(--kib-espaco-1); border-radius: var(--kib-raio-botao); background: var(--kib-cor-superficie-padrao)">${esc(g.cobrancaGrupo.link)}</a>` : ''}
             </div>` : ''}

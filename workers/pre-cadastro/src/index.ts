@@ -7,8 +7,17 @@
 import { chaveDocumento, validar } from './validar';
 import { cancelar, consultar, criarCobrancaLink, diagnostico, garantirCliente, PAGO } from './asaas';
 import { agendaPublica, criarPedido, politicaPublica, situacaoPedido, syncAgenda, syncPedidos, syncResultado, webhookAsaas, type EnvReservas } from './reservas';
+import { handleMobileAccountEmail, handleMobileAuth, type MobileAccountAdminEnv } from './mobile/auth';
+import { handleMobileReservations } from './mobile/reservations';
+import { handleMobileCoupons, handleMobileCouponsSync } from './mobile/coupons';
+import { handleMobileResults, type MobileResultsEnv } from './mobile/results';
+import { handleMobileLive, type MobileLiveEnv } from './mobile/live';
+export { AoVivo } from './mobile/live';
+import { handleMobilePerfil, type MobilePerfilEnv } from './mobile/perfil';
+import { handleMobileRanking } from './mobile/ranking';
+import { handleMobileOutbox } from './mobile/outbox';
 
-export interface Env extends EnvReservas {
+export interface Env extends EnvReservas, MobileAccountAdminEnv, MobileResultsEnv, MobileLiveEnv, MobilePerfilEnv {
   ASSETS: Fetcher;
   PRE: R2Bucket;
   SYNC_KEY: string;
@@ -87,11 +96,34 @@ export default {
     const p = url.pathname;
     try {
       if (p === '/api/pre-cadastro' && req.method === 'POST') return await receber(req, env);
+      if (p === '/api/mobile/v1/internal/account-email') return await handleMobileAccountEmail(req, env);
+      if (p.startsWith('/api/mobile/v1/auth/')) return await handleMobileAuth(req, env);
+      if (p === '/api/mobile/v1/coupons/preview' || p.startsWith('/api/mobile/v1/coupons/preview/')) {
+        return await handleMobileCoupons(req, env);
+      }
+      if (p === '/api/mobile/v1/internal/results' || p === '/api/mobile/v1/internal/identity-links' || p === '/api/mobile/v1/internal/identity-candidates' ||
+          p === '/api/mobile/v1/results' || p === '/api/mobile/v1/results/me') {
+        return await handleMobileResults(req, env);
+      }
+      if (p === '/api/mobile/v1/live' || p === '/api/mobile/v1/live/ws') return await handleMobileLive(req, env);
+      if (p === '/api/mobile/v1/conta/perfil' || p === '/api/mobile/v1/internal/perfil') return await handleMobilePerfil(req, env);
+      if (p === '/api/mobile/v1/internal/ranking' || p === '/api/mobile/v1/ranking' || p.startsWith('/api/mobile/v1/ranking/')) return await handleMobileRanking(req, env);
+      if (p === '/api/mobile/v1/internal/outbox' || p.startsWith('/api/mobile/v1/internal/outbox/')) return await handleMobileOutbox(req, env);
+      if (p === '/api/mobile/v1/agenda' || p === '/api/mobile/v1/reservations' || p.startsWith('/api/mobile/v1/reservations/')) {
+        return await handleMobileReservations(req, env);
+      }
       // reserva online (reservas.kartodromodebetim.com.br)
       if (p === '/api/agenda' && req.method === 'GET') return await agendaPublica(req, env);
       if (p === '/api/reservas' && req.method === 'POST') return await criarPedido(req, env, (ip) => excedeuLimite(ip, 'reserva'));
       if (p === '/api/reservas/politica' && req.method === 'GET') return politicaPublica();
-      if (p.startsWith('/api/reservas/') && req.method === 'GET') return await situacaoPedido(env, p.slice('/api/reservas/'.length), ctx);
+      if (p.startsWith('/api/reservas/') && req.method === 'GET') {
+        const id = p.slice('/api/reservas/'.length);
+        if (env.MOBILE_DB) {
+          const mobileOrder = await env.MOBILE_DB.prepare('SELECT 1 FROM mobile_orders WHERE pedido_id = ? LIMIT 1').bind(id).first();
+          if (mobileOrder) return json(404, { erro: 'Reserva não encontrada.' });
+        }
+        return await situacaoPedido(env, id, ctx);
+      }
       if (p === '/api/asaas/webhook' && req.method === 'POST') return await webhookAsaas(req, env);
       if (p.startsWith('/api/sync/')) {
         if (!autorizado(req, env)) return json(401, { erro: 'Não autorizado.' });
@@ -105,6 +137,7 @@ export default {
         }
         if (p === '/api/sync/agenda' && req.method === 'PUT') return await syncAgenda(req, env);
         if (p === '/api/sync/asaas' && req.method === 'GET') return json(200, await diagnostico(env));
+        if (p === '/api/sync/mobile/coupons' || p.startsWith('/api/sync/mobile/coupons/')) return await handleMobileCouponsSync(req, env);
         if (p === '/api/sync/pedidos' && req.method === 'GET') return await syncPedidos(env);
         if (p === '/api/sync/pedido' && req.method === 'POST') return await syncResultado(req, env, ctx);
         // cobrança da reserva em grupo (painel web): link da Asaas (Pix ou cartão) para um piloto ou para o grupo

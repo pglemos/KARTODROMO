@@ -27,10 +27,8 @@ export type Regras = {
   voltasPorParadaFaltante: number;
   boxAbreMin: number;
   boxFechaMin: number;
-  /** volta acima disto (e pelo menos 40% da parada mínima acima da volta normal) é volta do box */
+  /** volta acima disto (e pelo menos 35 s acima da volta normal da equipe) é volta do box */
   limiarParadaMs: number;
-  /** tempo adicional de trânsito no pit lane (entrada/saída e velocidade reduzida) a descontar da parada */
-  pitTransitDeltaMs?: number;
   /** médias só com voltas até este tempo (tira volta de bandeira amarela, box, rodada) */
   voltaLimpaMaxMs: number;
   medidaParada: 'volta-menos-media' | 'volta';
@@ -124,18 +122,7 @@ export function sortearFileira(filas: Map<number, string[]>, bola: number | null
 
 // ------------------------------------------------------------------ corrida
 
-export type VoltaCrono = {
-  lap: number;
-  lapMs: number | null;
-  invalid?: boolean;
-  wallMs: number;
-  underYellow?: boolean;
-  flag?: string | null;
-  pitStopExplicit?: boolean;
-  transponder?: string | number | null;
-  kart?: string | null;
-  originalKart?: string | null;
-};
+export type VoltaCrono = { lap: number; lapMs: number | null; invalid?: boolean; wallMs: number };
 export type EquipeIn = { id: number; numero: string; nome: string; desclassificada?: boolean };
 export type TrocaIn = { equipeId: number; pilotoId: number | null; pilotoNome: string | null; kart: string | null; tipo: string; emMs: number };
 export type PunicaoIn = { equipeId: number; tipo: 'segundos' | 'voltas' | 'advertencia' | 'dq'; valor: number; motivo: string; origem?: string };
@@ -247,32 +234,15 @@ export function analisarCorrida(input: {
   const restanteMs = inicio != null ? Math.max(0, durationMs - elapsed) : null;
 
   // referência geral para quem ainda não tem volta limpa
-  const voltaSobBandeira = (v: VoltaCrono) => Boolean(v.underYellow || v.flag === 'yellow' || v.flag === 'red');
   const todasLimpas: number[] = [];
-  for (const vs of input.voltas.values()) for (const v of vs) if (v.lapMs != null && v.lapMs <= r.voltaLimpaMaxMs && !v.invalid && !voltaSobBandeira(v)) todasLimpas.push(v.lapMs);
+  for (const vs of input.voltas.values()) for (const v of vs) if (v.lapMs != null && v.lapMs <= r.voltaLimpaMaxMs && !v.invalid) todasLimpas.push(v.lapMs);
   const refGeral = mediana(todasLimpas) ?? 65_000;
-
-  // tempos por número de volta na bateria para detectar safety car / bandeira amarela global
-  const temposPorVolta = new Map<number, number[]>();
-  const listasDaBateria = input.equipes.length
-    ? input.equipes.map((eq) => input.voltas.get(eq.numero) ?? [])
-    : [...new Set(input.voltas.values())];
-  for (const vs of listasDaBateria) {
-    const validas = vs.filter((v) => v.lapMs != null && v.lapMs > 0).sort((a, b) => a.wallMs - b.wallMs);
-    validas.forEach((v, idx) => {
-      const num = v.lap || idx + 1;
-      const arr = temposPorVolta.get(num) ?? [];
-      arr.push(v.lapMs as number);
-      temposPorVolta.set(num, arr);
-    });
-  }
 
   const eqs: EquipeAnalise[] = input.equipes.map((e) => {
     const voltas = (input.voltas.get(e.numero) ?? []).filter((v) => v.lapMs != null && v.lapMs > 0).sort((a, b) => a.wallMs - b.wallMs);
-    const limpas = voltas.filter((v) => (v.lapMs as number) <= r.voltaLimpaMaxMs && !v.invalid && !voltaSobBandeira(v));
+    const limpas = voltas.filter((v) => (v.lapMs as number) <= r.voltaLimpaMaxMs && !v.invalid);
     const refEquipe = mediana(limpas.map((v) => v.lapMs as number)) ?? refGeral;
     const ajustes = new Map(input.ajustes.filter((a) => a.equipeId === e.id).map((a) => [a.volta, a.acao]));
-    const trocasEq = input.trocas.filter((t) => t.equipeId === e.id).sort((a, b) => a.emMs - b.emMs);
     const alertas: Alerta[] = [];
     const motivosDq: string[] = [];
 
@@ -280,31 +250,10 @@ export function analisarCorrida(input: {
     const paradas: Parada[] = [];
     voltas.forEach((v, i) => {
       const lapMs = v.lapMs as number;
-      const numVolta = v.lap || i + 1;
-      const ajuste = ajustes.get(i + 1) ?? ajustes.get(numVolta) ?? null;
-      const minDelta = Math.max(35_000, Math.round(r.paradaMinMs * 0.4));
-      if ((lapMs < r.limiarParadaMs || lapMs < refEquipe + minDelta) && ajuste !== 'validar' && ajuste !== 'quebra' && ajuste !== 'invalidar') return;
+      const ajuste = ajustes.get(i + 1) ?? null;
+      if ((lapMs < r.limiarParadaMs || lapMs < refEquipe + 35_000) && ajuste !== 'validar' && ajuste !== 'quebra' && ajuste !== 'invalidar') return;
+      const tempo = r.medidaParada === 'volta' ? lapMs : Math.max(0, lapMs - refEquipe);
       const inicioMs = v.wallMs - lapMs;
-      const prev = i > 0 ? voltas[i - 1] : null;
-      const teveTroca = Boolean(
-        (prev && v.transponder != null && prev.transponder != null && String(v.transponder) !== String(prev.transponder))
-        || (prev && v.kart != null && prev.kart != null && String(v.kart) !== String(prev.kart))
-        || (v.originalKart != null && String(v.originalKart) !== String(v.kart ?? e.numero))
-        || trocasEq.some((t) => t.tipo !== 'largada' && t.emMs >= inicioMs - 10_000 && t.emMs <= v.wallMs + 10_000 && (inicio == null || t.emMs > inicio + 5_000)),
-      );
-      const temposNaVolta = temposPorVolta.get(numVolta) ?? [];
-      const medVolta = mediana(temposNaVolta);
-      const limiarSafetyCar = Math.min(r.limiarParadaMs, Math.max(r.voltaLimpaMaxMs, refGeral * 1.35));
-      const medianaSubiuAbruptamente = temposNaVolta.length >= 2 && medVolta != null && (
-        temposNaVolta.length >= 3
-          ? medVolta >= limiarSafetyCar
-          : Math.min(...temposNaVolta) >= limiarSafetyCar && (Math.max(...temposNaVolta) - Math.min(...temposNaVolta)) < minDelta
-      );
-      if ((voltaSobBandeira(v) || medianaSubiuAbruptamente) && !v.pitStopExplicit && !teveTroca && ajuste !== 'validar' && ajuste !== 'quebra' && ajuste !== 'invalidar') {
-        return;
-      }
-      const transit = r.pitTransitDeltaMs ?? 0;
-      const tempo = r.medidaParada === 'volta' ? lapMs : Math.max(0, lapMs - refEquipe - transit);
       const min = inicio != null ? (inicioMs - inicio) / 60_000 : 0;
       const fora = inicio != null && (min < r.boxAbreMin - 0.05 || min > r.boxFechaMin);
       let situacao: Parada['situacao'] = tempo >= r.paradaMinMs ? 'valida' : tempo >= r.faixaPunicaoMs ? 'valida_punida' : 'rapida';

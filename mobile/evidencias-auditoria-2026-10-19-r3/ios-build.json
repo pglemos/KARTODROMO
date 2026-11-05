@@ -1,0 +1,21 @@
+{
+  "id": "77b1f5a7-63a8-44dc-a258-8124cf504c00",
+  "status": "FINISHED",
+  "completedAt": "2026-10-19T20:31:47.412Z",
+  "buildProfile": "simulator",
+  "xcode": "26.6",
+  "bundleIdentifier": "br.com.kartodromobetim.app",
+  "platforms": [
+    "iPhoneSimulator"
+  ],
+  "architectures": [
+    "x86_64",
+    "arm64"
+  ],
+  "format": "Mach-O universal",
+  "javascriptBundle": "main.jsbundle",
+  "bytes": 29117889,
+  "sha256": "ad42149ffef103b69b1c8adc7b63a370fd74514aab68738c739e1aa769ef0a1c",
+  "url": "https://expo.dev/accounts/synvolt/projects/kartodromo-betim/builds/77b1f5a7-63a8-44dc-a258-8124cf504c00",
+  "runtimeTested": false
+}
