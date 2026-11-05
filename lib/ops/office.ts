@@ -77,6 +77,28 @@ async function mobilePermission(sessao: Sessao, funcao: string) {
   return row?.allowed === true || row?.allowed === 1 || row?.allowed === '1';
 }
 
+/**
+ * Usuários que NÃO podem fechar, bloquear nem excluir baterias (quem sai mais cedo não pode fechar os horários da noite).
+ * Lista de logins no parâmetro office.usuariosSemFecharBateria (separados por vírgula). Vale para a Recepção e para o painel web.
+ */
+let semFecharCache: { em: number; logins: Set<string> } | null = null;
+async function loginsSemFechar() {
+  if (semFecharCache && Date.now() - semFecharCache.em < 15_000) return semFecharCache.logins;
+  const r = await one<{ v: string | null }>(`SELECT Valor v FROM dbo.Parametro WHERE Chave = 'office.usuariosSemFecharBateria'`).catch(() => null);
+  const logins = new Set(String(r?.v ?? '').split(/[,;\s]+/).map((x) => x.trim().toLowerCase()).filter(Boolean));
+  semFecharCache = { em: Date.now(), logins };
+  return logins;
+}
+export async function podeFecharBateria(sessao: Sessao) {
+  const lista = await loginsSemFechar();
+  if (!lista.size) return true;
+  const u = await one<{ l: string }>(`SELECT LOWER(Login) l FROM dbo.Usuario WHERE Id = @id`, { id: sessao.uid });
+  return !(u && lista.has(u.l));
+}
+export async function exigePodeFecharBateria(sessao: Sessao) {
+  if (!(await podeFecharBateria(sessao))) throw new HttpError(403, 'Seu usuário não pode fechar, bloquear nem excluir baterias: o funcionamento precisa continuar normal até o último horário. Chame o administrador.');
+}
+
 async function servicosOnline() {
   const servicos: { id: string; nome: string; online: boolean | null; status: 'online' | 'offline' | 'indisponivel'; verificadoEm: string | null; detalhe?: string }[] = [
     { id: 'office-api', nome: 'API da Recepção', online: true, status: 'online', verificadoEm: new Date().toISOString() },
@@ -578,6 +600,16 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
     const troco = Math.max(0, recebido - total);
     if (troco > dinheiro) throw new HttpError(400, 'Troco só pode ser dado sobre pagamento em dinheiro. Ajuste os valores.');
 
+    const insIds = itens.filter((i) => i.inscricaoId).map((i) => i.inscricaoId as number);
+    let origensSemTotem = new Set<number>();
+    if (insIds.length) {
+      const qParams = Object.fromEntries(insIds.map((id, n) => ['id' + n, id]));
+      const rows = await run(
+        `SELECT Id id FROM dbo.Inscricao WHERE Id IN (${insIds.map((_, n) => '@id' + n).join(',')}) AND Origem <> 'totem' AND TermoImpressoEm IS NULL`,
+        qParams,
+      ).catch(() => []);
+      origensSemTotem = new Set((rows as { id: number }[]).map((r) => r.id));
+    }
     const [venda] = await run(
       `INSERT INTO dbo.Venda (MovimentoId, UsuarioId, TerminalId, ClienteId, BrutoCentavos, DescontoCentavos, AcrescimoCentavos, RecebidoCentavos, TrocoCentavos, FinalCentavos, Observacao)
        OUTPUT inserted.Id id VALUES (@mov, @uid, @term, @cli, @bruto, @desc, @acr, @rec, @troco, @final, @obs)`,
@@ -594,7 +626,7 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
       );
       if (i.inscricaoId) {
         await run(
-          `UPDATE dbo.Inscricao SET Pago = 1, Aprovada = 1, Status = 'confirmada', ValorCentavos = @liq, DescontoCentavos = @desc, VendaId = @vendaId, AtualizadoEm = SYSDATETIME() WHERE Id = @ins`,
+          `UPDATE dbo.Inscricao SET Pago = 1, Aprovada = 1, Status = 'confirmada', ValorCentavos = @liq, DescontoCentavos = @desc, VendaId = @vendaId, TermoImpressoEm = COALESCE(TermoImpressoEm, SYSDATETIME()), AtualizadoEm = SYSDATETIME() WHERE Id = @ins`,
           { liq: i.liquido, desc: i.descontoCentavos, vendaId, ins: i.inscricaoId },
         );
       }
@@ -627,7 +659,7 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
         }
       }
     }
-    return { id: vendaId, total, recebido, troco, inscricoes: itens.filter((i) => i.inscricaoId).map((i) => i.inscricaoId) };
+    return { id: vendaId, total, recebido, troco, inscricoes: insIds, semTermo: Array.from(origensSemTotem) };
   });
 }
 
@@ -1544,12 +1576,12 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
       const [dup] = await run(`SELECT 1 x FROM dbo.Inscricao WHERE BateriaId = @destino AND ClienteId = @c AND Status <> 'cancelada'`, { destino, c: r.ClienteId });
       if (dup) throw new HttpError(409, 'Já existe uma reserva para este cliente na bateria selecionada.');
       if (r.Pago) {
-        await run(`UPDATE dbo.Inscricao SET BateriaId = @destino, TermoImpressoEm = NULL, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { destino, id });
+        await run(`UPDATE dbo.Inscricao SET BateriaId = @destino, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { destino, id });
       } else {
         await run(
           `UPDATE dbo.Inscricao SET BateriaId = @destino, ProdutoId = @produtoDestino, PrecoCentavos = @precoDestino,
            DescontoCentavos = CASE WHEN @produtoOrigem = @produtoDestino THEN CASE WHEN DescontoCentavos > @precoDestino THEN @precoDestino ELSE DescontoCentavos END ELSE 0 END,
-           TermoImpressoEm = NULL, AtualizadoEm = SYSDATETIME() WHERE Id = @id`,
+           AtualizadoEm = SYSDATETIME() WHERE Id = @id`,
           { destino, id, produtoOrigem: r.produtoId, produtoDestino: d.produtoId, precoDestino: d.preco },
         );
       }
@@ -1564,6 +1596,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
          Pago = CASE WHEN x.total = 0 THEN 1 ELSE i.Pago END,
          ValorCentavos = CASE WHEN x.total = 0 THEN 0 ELSE i.ValorCentavos END,
          Status = CASE WHEN x.total = 0 THEN 'confirmada' ELSE i.Status END,
+         TermoImpressoEm = COALESCE(i.TermoImpressoEm, SYSDATETIME()),
          AtualizadoEm = SYSDATETIME()
        FROM dbo.Inscricao i JOIN dbo.Bateria b ON b.Id = i.BateriaId LEFT JOIN dbo.Produto p ON p.Id = ISNULL(i.ProdutoId, b.ProdutoId)
        CROSS APPLY (SELECT ISNULL(i.PrecoCentavos, p.PrecoCentavos) - i.DescontoCentavos total) x

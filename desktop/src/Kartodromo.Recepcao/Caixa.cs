@@ -791,10 +791,12 @@ public class FormCheckout : CartaoModal
                 Msg.Sucesso(this, $"Venda nº {r.S("id")} aprovada.");
             }
             var inscr = r["inscricoes"] is JsonArray a ? a.Select(x => x?.ToString()).Where(x => x != null).ToList() : [];
+            var semTermo = r["semTermo"] is JsonArray st ? st.Select(x => x?.ToString()).Where(x => x != null).ToList() : null;
+            var paraImprimir = semTermo != null && semTermo.Count > 0 ? semTermo : (semTermo == null ? inscr : []);
             Close();
             if (Sessao.ParamSim("office.imprimirTicketAposVenda", false)) Relatorio.Abrir(Owner, Api.UrlComToken("/relatorio/venda?id=" + r.S("id")), "Comprovante");
-            if (inscr.Count > 0 && (Sessao.ParamSim("office.gerarTermoAposPagamento", false) || (Sessao.ParamSim("office.perguntarImprimirTermo", true) && Msg.Pergunta(Owner, "Deseja imprimir o Termo de Responsabilidade?", "Pergunta!"))))
-                Acoes.ImprimirTermo(Owner, inscr);
+            if (paraImprimir.Count > 0 && (Sessao.ParamSim("office.gerarTermoAposPagamento", false) || (Sessao.ParamSim("office.perguntarImprimirTermo", true) && Msg.Pergunta(Owner, "Deseja imprimir o Termo de Responsabilidade?", "Pergunta!"))))
+                Acoes.ImprimirTermo(Owner, paraImprimir);
         }
         finally
         {

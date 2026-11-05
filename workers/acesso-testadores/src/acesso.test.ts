@@ -10,11 +10,11 @@ const get = (path: string) => worker.fetch(new Request(`https://x${path}`), env)
 
 describe('acesso-testadores', () => {
   it('monta link do grupo', () =>
-    expect(linkGrupo(env.GRUPO_TESTADORES)).toBe('https://groups.google.com/g/testadores-kartodromobetim'));
+    expect(linkGrupo(env.GRUPO_TESTADORES)).toBe('https://groups.google.com/g/testadores-kartodromobetim/about'));
 
   it('página mostra grupo e app cliente, sem Operação', async () => {
     const html = await (await get('/?equipe')).text();
-    expect(html).toContain('https://groups.google.com/g/testadores-kartodromobetim');
+    expect(html).toContain('https://groups.google.com/g/testadores-kartodromobetim/about');
     expect(html).toContain(env.LINK_CLIENTE);
     expect(html).not.toContain('operacional');
     expect(html).not.toContain('Operação');

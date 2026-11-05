@@ -8,7 +8,7 @@ export interface Env {
 
 export function linkGrupo(email: string): string {
   const [nome] = email.split('@');
-  return `https://groups.google.com/g/${nome}`;
+  return `https://groups.google.com/g/${nome}/about`;
 }
 
 export default {
