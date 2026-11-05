@@ -260,10 +260,10 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
       if (m && metodo === 'GET') { exige('equalizacao.gerir'); return enviar(res, 200, await operacao.equalizacao(m[1])); }
       m = /^equalization\/([\w-]+)\/commands$/.exec(caminho);
       if (m && metodo === 'POST') return enviar(res, 200, await operacao.comandoEqualizacao(quem, m[1], await lerCorpo(req)));
-      m = /^sessions\/([\w-]+)\/(draw|late-assignments|weight-checks|kart-swaps|penalties|penalties-remove|flags|commands|passage-corrections)$/.exec(caminho);
+      m = /^sessions\/([\w-]+)\/(draw|late-assignments|weight-checks|weight-checks-batch|kart-swaps|penalties|penalties-remove|flags|commands|passage-corrections)$/.exec(caminho);
       if (m && metodo === 'POST') {
         const b = await lerCorpo(req);
-        const acao = { draw: operacao.sorteio, 'late-assignments': operacao.atrasados, 'weight-checks': operacao.peso, 'kart-swaps': operacao.trocaKart, penalties: operacao.penalidade, 'penalties-remove': operacao.retirarPenalidade, flags: operacao.bandeira, commands: operacao.comando, 'passage-corrections': operacao.corrigirPassagem }[m[2]];
+        const acao = { draw: operacao.sorteio, 'late-assignments': operacao.atrasados, 'weight-checks': operacao.peso, 'weight-checks-batch': operacao.pesoLote, 'kart-swaps': operacao.trocaKart, penalties: operacao.penalidade, 'penalties-remove': operacao.retirarPenalidade, flags: operacao.bandeira, commands: operacao.comando, 'passage-corrections': operacao.corrigirPassagem }[m[2]];
         return enviar(res, 200, await acao!.call(operacao, quem, m[1], b));
       }
     }
