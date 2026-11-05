@@ -326,8 +326,19 @@ export function criarOperacao(d: DepsOperacao) {
     sorteio: (q: Identidade, id: string, b: Record<string, unknown>) => gravarKarts(q, id, b, false),
     atrasados: (q: Identidade, id: string, b: Record<string, unknown>) => gravarKarts(q, id, b, true),
     peso(q: Identidade, id: string, b: Record<string, unknown>) {
-      const pl = (b.payload ?? {}) as { customerId?: string | null; nome?: string; pesoKg?: number; lastroConferido?: boolean };
+      const pl = (b.payload ?? {}) as { customerId?: string | null; nome?: string; pesoKg?: number; lastroConferido?: boolean; postRace?: boolean };
       if (!pesoValido(pl.pesoKg)) throw new ErroApp(400, 'INVALID_REQUEST', 'Digite um peso entre 20 e 250 kg.');
+      if (pl.postRace === true) {
+        // pesagem oficial depois da prova: só registra o resultado, não mexe no peso nem no lastro da bateria
+        return roda(q, 'peso.conferir', b, id, 'weight-check-postrace', async () => {
+          const s = sessao(id);
+          exigeEstado(s, 'em_andamento', 'bandeira_final', 'encerrada');
+          const c = s.competitors.find((x) => chave(x) === chave({ customerId: pl.customerId, nome: pl.nome }));
+          if (!c) throw new Error('Piloto não está nesta bateria.');
+          await d.legado('POST', `/api/sessions/${id}/observations`, { text: `Pesagem pós-corrida · ${c.name} (kart ${c.kart}): ${pl.pesoKg} kg, peso regular`, author: autor(q), kind: 'system' });
+          return { ok: true };
+        });
+      }
       return roda(q, 'peso.conferir', b, id, 'weight-check', async () => {
         const s = sessao(id);
         exigeEstado(s, 'preparando', 'em_andamento');
@@ -343,6 +354,31 @@ export function criarOperacao(d: DepsOperacao) {
         // a rota da cronometragem não guarda a conferência: fica no banco do app, ligada ao kart
         if (pl.lastroConferido === true) d.store.db.prepare('INSERT OR REPLACE INTO lastros_conferidos (sessionId, chave, kart, pesoKg, usuario, em) VALUES (?, ?, ?, ?, ?, ?)').run(id, chave(c), c.kart, pl.pesoKg as number, q.usuario, new Date().toISOString());
         return plano;
+      });
+    },
+    /** Confere de uma vez todos os pilotos da lista que já têm peso válido (o operador conferiu as placas de cada kart). */
+    pesoLote(q: Identidade, id: string, b: Record<string, unknown>) {
+      const pl = (b.payload ?? {}) as { pilotos?: { customerId?: string | null; nome?: string; pesoKg?: number }[] };
+      const itens = Array.isArray(pl.pilotos) ? pl.pilotos : [];
+      if (!itens.length || itens.length > 100) throw new ErroApp(400, 'INVALID_REQUEST', 'Nenhum piloto para conferir.');
+      if (itens.some((i) => !pesoValido(i.pesoKg))) throw new ErroApp(400, 'INVALID_REQUEST', 'Há piloto sem peso válido (20 a 250 kg).');
+      return roda(q, 'peso.conferir', b, id, 'weight-check-batch', async () => {
+        const s = sessao(id);
+        exigeEstado(s, 'preparando', 'em_andamento');
+        const feitos: string[] = [];
+        for (const i of itens) {
+          const c = s.competitors.find((x) => chave(x) === chave({ customerId: i.customerId, nome: i.nome }));
+          if (!c) continue;
+          const frota = frotaDoKart(c.kart);
+          const plano = frota ? planoLastro(i.pesoKg as number, frota) : null;
+          await d.legado('PUT', `/api/sessions/${id}/competitors/${s.competitors.indexOf(c)}`, {
+            kartAntes: c.kart, nomeAntes: c.name, kart: c.kart, name: c.name, aplicarGrupo: true,
+            detalhes: { ...c.detalhes, peso: i.pesoKg, pesoLastro: plano?.lastroKg ?? null },
+          });
+          d.store.db.prepare('INSERT OR REPLACE INTO lastros_conferidos (sessionId, chave, kart, pesoKg, usuario, em) VALUES (?, ?, ?, ?, ?, ?)').run(id, chave(c), c.kart, i.pesoKg as number, q.usuario, new Date().toISOString());
+          feitos.push(c.kart);
+        }
+        return { conferidos: feitos.length };
       });
     },
     trocaKart(q: Identidade, id: string, b: Record<string, unknown>) {
@@ -363,6 +399,16 @@ export function criarOperacao(d: DepsOperacao) {
     },
     penalidade(q: Identidade, id: string, b: Record<string, unknown>) {
       const pl = (b.payload ?? {}) as { kart?: string; tipo?: string; segundos?: number; motivo?: string; kartAtingido?: string; curva?: string; volta?: number };
+      if (pl.tipo === 'desclassificacao' && pl.kart) {
+        // a cronometragem desclassifica pela bandeira preta (vai para o último lugar); versões antigas do app mandam como penalidade
+        const kart = pl.kart;
+        exigeMotivo(b);
+        return roda(q, 'penalidade.aplicar', b, id, 'penalty-dsq', async () => {
+          exigeEstado(sessao(id), 'em_andamento', 'bandeira_final', 'encerrada');
+          await d.legado('POST', `/api/sessions/${id}/flag/${encodeURIComponent(kart)}`, { flag: 'black', autor: autor(q) });
+          return { ok: true };
+        });
+      }
       if (!pl.kart || !['tempo', 'advertencia'].includes(String(pl.tipo))) throw new ErroApp(400, 'INVALID_REQUEST', 'Penalidade inválida.');
       return roda(q, 'penalidade.aplicar', b, id, 'penalty', () => d.legado('POST', `/api/sessions/${id}/penalties/${encodeURIComponent(pl.kart as string)}`, { ...pl, autor: autor(q) }).then(() => ({ ok: true })));
     },
