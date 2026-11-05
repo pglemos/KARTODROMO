@@ -98,7 +98,7 @@ export function criarOperacao(d: DepsOperacao) {
 
   /** Sorteio inicial, reajuste e atrasados: quem não está na lista enviada não muda de kart. */
   async function gravarKarts(q: Identidade, id: string, b: Record<string, unknown>, parcial: boolean) {
-    const s = sessao(id);
+    sessao(id); // lança se a bateria não existe
     const pl = (b.payload ?? {}) as { atribuicoes?: { customerId?: string | null; nome?: string; kart?: string }[]; modo?: string };
     const lista = Array.isArray(pl.atribuicoes) ? pl.atribuicoes : [];
     if (!lista.length) throw new ErroApp(400, 'INVALID_REQUEST', 'Nenhum piloto no sorteio.');

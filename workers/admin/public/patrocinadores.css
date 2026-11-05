@@ -39,3 +39,16 @@
 .pt-ul li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.08); font-size: 13px; }
 .pt-ul li:last-child { border-bottom: 0; }
 @media (max-width: 640px) { .pt-form { grid-template-columns: 1fr; } .pt-linha .col { width: auto; } }
+
+/* abas próprias: o admin atual não define .ev-abas */
+.pt-abas { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+.pt-abas button { border: 0; border-radius: 99px; padding: 8px 16px; min-height: 36px; background: var(--cinzaFundo, rgba(0,0,0,0.06)); color: var(--tinta, inherit); font: inherit; font-weight: 600; cursor: pointer; }
+.pt-abas button.atual { background: var(--tinta, #111); color: var(--fundo, #fff); }
+.pt-abas button:focus-visible { outline: 2px solid var(--verde, #0B7A53); outline-offset: 2px; }
+
+/* cartões de números do resumo (estilo próprio: o admin atual trata .i2-num de outro jeito) */
+.pt-num { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.pt-num .cartao { display: flex; flex-direction: column; gap: 4px; padding: 16px; }
+.pt-num .cartao span { font-size: 12.5px; font-weight: 600; color: var(--mudo); }
+.pt-num .cartao b { font-size: 26px; line-height: 1.1; letter-spacing: -0.01em; }
+.pt-num .cartao small { font-size: 12.5px; color: var(--mudo); }
