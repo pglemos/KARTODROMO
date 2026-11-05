@@ -399,7 +399,7 @@ public class FormTotem : Form, IMessageFilter
     {
         if (_menor) { TelaMenores(); return; }
         _participantes = [new Pessoa(_cliente.L("id") ?? 0, _cliente.S("nome"), "", _token)];
-        await TelaBaterias();
+        await TelaGrupos();
     }
 
     // ------------------------------------------------------------------ 2. cadastro novo / atualizacao
@@ -713,6 +713,71 @@ public class FormTotem : Form, IMessageFilter
         Mostrar("menor", c, TelaCadastroMenor);
     }
 
+    // ------------------------------------------------------------------ 3b. "Vim com um grupo" (antes das baterias)
+
+    async Task TelaGrupos()
+    {
+        // grupos de hoje com vaga aguardando: o amigo se reconhece pelo nome de quem reservou. Sem grupo (ou falha), segue direto para as baterias.
+        List<JsonObject> grupos;
+        try { grupos = await _api.Lista("/api/totem/grupos"); }
+        catch (Exception ex) { Program.Log("grupos do dia indisponíveis: " + ex.Message); grupos = []; }
+        if (grupos.Count == 0) { await TelaBaterias(); return; }
+        MontarGrupos(grupos);
+    }
+
+    void MontarGrupos(List<JsonObject> grupos)
+    {
+        var c = NovaTela(etapa: 3);
+        c.Controls.Add(Rot("Você veio com um grupo de amigos?", 150, 108, F(44, false, FontStyle.Bold), Estilo.Texto));
+        c.Controls.Add(Rot("Toque no grupo dos seus amigos. Quem reservou já pagou a corrida de todos. Se veio sozinho, toque em \"Vim sozinho\".", 150, 164, F(19), Estilo.Suave, 1066, 56));
+        var painel = CartaoEm(c, 150, 230, 1066, 411);
+        var lista = new ListaOpcoes(_k) { Bounds = new Rectangle(0, 0, P(1066), P(411)) };
+        var itens = new List<OpcaoLinha>();
+        foreach (var g in grupos)
+        {
+            var aguardando = g.I("aguardando");
+            var item = new OpcaoLinha(_k)
+            {
+                Height = P(84), Id = g.L("id") ?? 0,
+                Linha1 = "GRUPO DO(A) " + g.S("responsavel").ToUpperInvariant(),
+                Linha2 = $"Corrida às {Fmt.Hm(g.S("inicio"))} · {g.I("total")} amigos no total",
+                Direita = aguardando + (aguardando == 1 ? " vaga esperando" : " vagas esperando"),
+            };
+            item.Mudou += () => { if (item.Marcado) foreach (var o in itens) if (o != item && o.Marcado) o.Marcado = false; };
+            itens.Add(item);
+            lista.Adicionar(item);
+        }
+        painel.Controls.Add(lista);
+        var sozinho = Botao(c, "Vim sozinho", 150, 660, 205, false, TelaBaterias);
+        var voltar = Botao(c, "Voltar", 914, 660, 140, false, () => { if (_menor) TelaMenores(); else TelaCadastro(_cadastroExistente); return Task.CompletedTask; });
+        var entrar = Botao(c, "Entrar no grupo", 1070, 660, 200, true, async () =>
+        {
+            var escolhido = lista.Marcados().FirstOrDefault();
+            if (escolhido == 0) { Alertar("Toque no grupo dos seus amigos ou em \"Vim sozinho\"."); return; }
+            JsonNode r;
+            try { r = await _api.Post("/api/totem/grupo/entrar", new JsonObject { ["grupoId"] = escolhido, ["clienteId"] = _cliente.L("id"), ["token"] = _token }); }
+            catch (Exception ex) { Alertar(ex.Message.Length > 0 ? ex.Message : "Não foi possível entrar no grupo. Procure a recepção."); return; }
+            if (r is not JsonObject ok) { Alertar("Não foi possível entrar no grupo. Procure a recepção."); return; }
+            _sel = new HashSet<long> { ok.L("bateriaId") ?? 0 };
+            TelaBoasVindasGrupo(ok);
+        });
+        sozinho.BringToFront(); voltar.BringToFront(); entrar.BringToFront();
+        Mostrar("grupos", c, () => MontarGrupos(grupos));
+    }
+
+    // quem reservou para todos é valorizado: o amigo vê o nome dele(a) antes de continuar
+    void TelaBoasVindasGrupo(JsonObject g)
+    {
+        var c = NovaTela(etapa: 3);
+        c.Controls.Add(Rot("Você está no grupo do(a) " + g.S("responsavel") + "!", 150, 130, F(44, false, FontStyle.Bold), Estilo.Texto, 1066, 70));
+        var cartao = CartaoEm(c, 150, 250, 1066, 280);
+        cartao.Controls.Add(Rot(g.S("mensagem"), 40, 40, F(26, false, FontStyle.Bold), Estilo.VerdeSuave, 986, 110));
+        cartao.Controls.Add(Rot($"Sua vaga já está paga · corrida às {Fmt.Hm(g.S("inicio"))}. Que tal agradecer {g.S("responsavel")} pelo convite?", 40, 120, F(20), Estilo.Suave, 986, 80));
+        var seguir = Botao(c, "Continuar", 1030, 660, 186, true, async () => { await Inscrever(null); });
+        seguir.BringToFront();
+        Mostrar("boasvindasgrupo", c, () => TelaBoasVindasGrupo(g));
+    }
+
     // ------------------------------------------------------------------ 4. baterias
 
     async Task TelaBaterias()
@@ -926,6 +991,10 @@ public class FormTotem : Form, IMessageFilter
             _sel = [900];
             MontarBaterias(bats, 1);
             await Foto("6-baterias");
+            var gruposAmostra = new List<JsonObject> { new() { ["id"] = 1, ["responsavel"] = "Edmael", ["inicio"] = DateTime.Today.ToString("yyyy-MM-dd") + "T21:40", ["total"] = 11, ["aguardando"] = 3 }, new() { ["id"] = 2, ["responsavel"] = "Julia", ["inicio"] = DateTime.Today.ToString("yyyy-MM-dd") + "T19:20", ["total"] = 12, ["aguardando"] = 1 } };
+            _cliente = new JsonObject { ["id"] = 1, ["nome"] = "Maria da Silva" };
+            MontarGrupos(gruposAmostra); await Foto("6a-grupos");
+            TelaBoasVindasGrupo(new JsonObject { ["responsavel"] = "Edmael", ["inicio"] = DateTime.Today.ToString("yyyy-MM-dd") + "T21:40", ["mensagem"] = "Edmael reservou e pagou a corrida de todos os 11 amigos. Você é convidado(a) dele(a)!" }); await Foto("6b-boas-vindas-grupo");
             TelaSucesso("19:20", 1); await Foto("7-sucesso");
             using (var termo = CriarTermoLgpd())
             {

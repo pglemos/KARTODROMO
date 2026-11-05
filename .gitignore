@@ -99,3 +99,7 @@ data/timing/emails-simulador/
 /.impeccable/
 /.agents/skills/impeccable
 services/*.antes-*.ts
+
+# arquivos AppleDouble do macOS
+._*
+

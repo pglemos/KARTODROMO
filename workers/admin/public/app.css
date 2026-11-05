@@ -471,14 +471,14 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 var(--kib-espaco-meio)
   left: var(--kib-espaco-3);
   z-index: 1000;
   padding: 8px 16px;
-  background: #ffffff;
+  background: var(--kib-cor-superficie-padrao);
   color: #111827;
   border: 2px solid var(--verde, #00875a);
   border-radius: var(--kib-raio-botao);
   font-weight: 700;
   font-size: var(--kib-fonte-tamanho-corpo);
   text-decoration: none;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--kib-cor-texto-principal) 20%, transparent);
   transition: top 0.15s ease-out;
 }
 .pularLink:focus {
@@ -601,13 +601,13 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 var(--kib-espaco-meio)
 }
 .grupoTracados .filtros button.sel {
   background: #111827 !important;
-  color: #ffffff !important;
+  color: var(--kib-cor-acao-sobre-principal) !important;
   border-color: #111827 !important;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--kib-cor-texto-principal) 18%, transparent);
 }
 .grupoTracados .filtros button.sel span {
-  background: rgba(255,255,255,0.22) !important;
-  color: #ffffff !important;
+  background: color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 22%, transparent) !important;
+  color: var(--kib-cor-acao-sobre-principal) !important;
 }
 
 .chip.neutro {
@@ -662,7 +662,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 var(--kib-espaco-meio)
   font-size: 11px;
   font-weight: 700;
   color: #1f2937;
-  box-shadow: 0 1px 1px rgba(0,0,0,0.06);
+  box-shadow: 0 1px 1px color-mix(in srgb, var(--kib-cor-texto-principal) 6%, transparent);
 }
 
 .linhaRank[href]:focus-visible,
@@ -700,3 +700,41 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 var(--kib-espaco-meio)
     align-items: center;
   }
 }
+
+/* agenda: funções de bateria da Recepção */
+.menuDir { left: auto; right: 0; }
+.menuCima .menuLista { top: auto; bottom: calc(100% + var(--kib-espaco-meio)); }
+.linhaDestino { display: grid; grid-template-columns: auto 56px minmax(0, 1fr) auto; align-items: center; gap: var(--kib-espaco-denso-12); padding: var(--kib-espaco-1) var(--kib-espaco-denso-12); border-radius: var(--kib-raio-cartao); box-shadow: inset 0 0 0 1px var(--linha); cursor: pointer; }
+.linhaDestino:hover:not(.off) { background: var(--sup2); }
+.linhaDestino.sel { box-shadow: inset 0 0 0 2px var(--verde); background: color-mix(in srgb, var(--kib-cor-status-ok) 8%, transparent); }
+.linhaDestino.off { opacity: .6; cursor: not-allowed; }
+.linhaDestino input, .linhaMover input { width: 18px; height: 18px; accent-color: var(--verde); }
+.listaMover { display: grid; gap: var(--kib-espaco-meio); }
+.linhaMover { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: var(--kib-espaco-1); padding: var(--kib-espaco-meio) var(--kib-espaco-1); border-radius: var(--kib-raio-chip); }
+.linhaMover:hover { background: var(--sup2); }
+@media (max-width: 760px), (pointer: coarse) { .linhaDestino, .linhaMover { min-height: var(--kib-componente-controle-alvo-toque); } .linhaMover .btn { min-height: var(--kib-componente-controle-alvo-toque); } }
+
+/* agenda: seleção de várias baterias e bateria fechada */
+#calendario .agFechada[data-sel] { outline: 1px dashed var(--kib-cor-borda-forte); outline-offset: -1px; }
+#calendario .agFechada[data-sel] .dirB, #calendario .agFechada[data-sel].linhaDia .peq { color: var(--erroTxt); font-weight: 600; }
+/* modo seleção: a marca fica no centro vertical do bloco, nunca cortada, e o conteúdo ganha folga à direita */
+#calendario.agModo [data-sel] { position: relative; cursor: pointer; }
+#calendario.agModo [data-sel]:not(.pistaProx):not(.pistaAgora) { padding-right: var(--kib-espaco-4); }
+#calendario.agModo [data-sel]::after { content: ''; position: absolute; top: 50%; right: var(--kib-espaco-1); width: 16px; height: 16px; margin-top: -8px; box-sizing: border-box; border-radius: 50%; background: var(--kib-cor-superficie-padrao); box-shadow: inset 0 0 0 2px var(--kib-cor-borda-forte); }
+#calendario.agModo .agSel[data-sel] { outline: 2px solid var(--verde); outline-offset: -2px; }
+#calendario.agModo .agSel[data-sel]::after { background: var(--verde); box-shadow: none; }
+#calendario.agModo .agSel[data-sel]::before { content: ''; position: absolute; z-index: 1; top: 50%; right: calc(var(--kib-espaco-1) + 5px); width: 4px; height: 8px; margin-top: -6px; box-sizing: content-box; border: solid var(--kib-cor-acao-sobre-principal); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+#calendario.agModo .pistaProx[data-sel]::after, #calendario.agModo .pistaAgora[data-sel]::after { width: 14px; height: 14px; top: var(--kib-espaco-1); margin-top: 0; right: var(--kib-espaco-1); }
+#calendario.agModo .agSel.pistaProx[data-sel]::before, #calendario.agModo .agSel.pistaAgora[data-sel]::before { top: calc(var(--kib-espaco-1) + 2px); margin-top: 0; right: calc(var(--kib-espaco-1) + 4px); width: 3px; height: 6px; }
+#calendario.agModo .agPassou[data-sel] { cursor: not-allowed; opacity: .55; }
+#calendario.agModo .agPassou[data-sel]::after { display: none; }
+/* cabeçalho da Agenda: botões, menu, navegação e vistas na mesma altura */
+.cab .acoes { align-items: center; }
+.cab .acoes .btn, .cab .acoes .menuMais summary { height: 40px; box-sizing: border-box; }
+.cab .acoes .seg { height: 40px; box-sizing: border-box; align-items: center; }
+.cab .acoes .seg button { height: 32px; }
+.agBarraLote { position: fixed; z-index: 30; left: 50%; transform: translateX(-50%); bottom: var(--kib-espaco-3); width: min(760px, calc(100vw - var(--kib-espaco-4))); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--kib-espaco-1) var(--kib-espaco-2); padding: var(--kib-espaco-denso-12) var(--kib-espaco-2); background: var(--kib-cor-superficie-padrao); border: 1px solid var(--linha); border-radius: var(--kib-raio-cartao); box-shadow: 0 var(--kib-espaco-1) var(--kib-espaco-4) color-mix(in srgb, var(--tinta) 22%, transparent); }
+.agBarraTxt { display: flex; flex-direction: column; min-width: 0; }
+.agBarraAcoes { display: flex; flex-wrap: wrap; gap: var(--kib-espaco-meio); }
+@media (pointer: coarse) { #calendario .bloco2, #calendario .linhaDia, #calendario .pistaProx { min-height: var(--kib-componente-controle-alvo-toque); } .agBarraAcoes .btn { min-height: var(--kib-componente-controle-alvo-toque); } }
+@media (max-width: 760px) { .agBarraLote { bottom: var(--kib-espaco-1); } .agBarraAcoes { width: 100%; } .agBarraAcoes .btn { flex: 1 1 auto; } }

@@ -95,9 +95,15 @@ function toast(msg, erro = false) {
   el.innerHTML = `${svg(erro ? IC.fechar : IC.ok, 16, erro ? 'var(--kib-cor-estado-perigo-fundo)' : 'var(--kib-cor-categoria-verde-topo)', 2.6)}<span>${esc(msg)}</span>`;
   document.querySelectorAll('.toast').forEach((t) => t.remove());
   document.body.appendChild(el);
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.remove(), 3600);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.remove(), erro ? 9000 : 3600);
+  if (erro) { const x = document.createElement('button'); x.type = 'button'; x.className = 'btn peq toastBtn'; x.textContent = 'Fechar'; x.addEventListener('click', () => el.remove()); el.appendChild(x); }
 }
-const falhou = (e) => toast(e.message || String(e), true);
+const falhou = (e, tentar) => {
+  const m = String((e && e.message) || e || '');
+  if (/Cannot read|is not (defined|a function)|undefined|TypeError|Failed to fetch|NetworkError|Unexpected token/i.test(m)) { console.error(e); toast('Não consegui concluir. Confira a conexão e tente de novo.', true); } else toast(m, true);
+  const t = document.querySelector('.toast');
+  if (t && typeof tentar === 'function') { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn peq toastBtn'; b.textContent = 'Tentar de novo'; b.addEventListener('click', () => { t.remove(); tentar(); }); t.insertBefore(b, t.querySelector('button')); }
+};
 // aviso com um botão (ex.: Desfazer) que fica 8 s na tela; quem usa teclado alcança o botão com Tab
 function toastAcao(msg, rotulo, fn, ms = 8000) {
   const el = document.createElement('div');
@@ -106,12 +112,35 @@ function toastAcao(msg, rotulo, fn, ms = 8000) {
   document.querySelectorAll('.toast').forEach((t) => t.remove());
   document.body.appendChild(el);
   el.querySelector('button').addEventListener('click', async () => { el.remove(); try { await fn(); } catch (e) { falhou(e); } });
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.remove(), ms);
+  const agendar = () => { clearTimeout(toastTimer); toastTimer = setTimeout(() => el.remove(), ms); };
+  agendar();
+  el.addEventListener('mouseenter', () => clearTimeout(toastTimer)); el.addEventListener('focusin', () => clearTimeout(toastTimer));
+  el.addEventListener('mouseleave', agendar); el.addEventListener('focusout', agendar);
 }
 // "MARIA DE SOUZA" (tudo maiúsculo no cadastro) vira "Maria de Souza"; nome já misto não é mexido
+// Diálogo próprio (nada de confirm/prompt nativos): fica POR CIMA da janela aberta, prende o foco e Esc cancela.
+// botoes: [{ rotulo, valor, classe }]; devolve o valor do botão (ou null se cancelar)
+function dialogo({ titulo, texto = '', botoes, semFoco = false }) {
+  return new Promise((resolve) => {
+    const antes = document.activeElement;
+    const veu = document.createElement('div'); veu.className = 'veu veuTopo';
+    veu.innerHTML = `<div class="modal dialogoCaixa" role="alertdialog" aria-modal="true" aria-labelledby="dlgT" aria-describedby="dlgD"><div class="dialogoCorpo"><h2 id="dlgT" class="t-titulo peso-negrito">${esc(titulo)}</h2><p id="dlgD" class="t-corpo cor-corpo">${esc(texto)}</p><div class="linha-quebra gap-1 dialogoBotoes">${botoes.map((b, i) => `<button type="button" class="btn ${b.classe || 'sec'}" data-dlg="${i}">${esc(b.rotulo)}</button>`).join('')}<button type="button" class="btn link" data-dlg="x">Cancelar</button></div></div></div>`;
+    document.body.appendChild(veu);
+    const fim = (v) => { veu.remove(); document.removeEventListener('keydown', tecla, true); try { antes && antes.focus(); } catch { /* sumiu */ } resolve(v); };
+    const tecla = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fim(null); }
+      if (e.key === 'Tab') { const f = [...veu.querySelectorAll('button')]; const i = f.indexOf(document.activeElement); e.preventDefault(); e.stopPropagation(); f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length].focus(); }
+    };
+    document.addEventListener('keydown', tecla, true);
+    veu.addEventListener('click', (e) => { const b = e.target.closest('[data-dlg]'); if (b) fim(b.dataset.dlg === 'x' ? null : botoes[+b.dataset.dlg].valor); });
+    if (semFoco) { const t = veu.querySelector('#dlgT'); t.tabIndex = -1; t.focus(); } else (veu.querySelector('[data-dlg="0"]') || veu.querySelector('button')).focus();
+  });
+}
+const confirmar = (titulo, texto, ok = 'Confirmar', perigo = false) => dialogo({ titulo, texto, botoes: [{ rotulo: ok, valor: true, classe: perigo ? 'perigo-solido' : 'prim' }] }).then((v) => v === true);
+const escolherForma = (titulo, texto) => dialogo({ titulo, texto, botoes: [{ rotulo: 'Pix', valor: 'Pix', classe: 'sec' }, { rotulo: 'Cartão', valor: 'Cartão', classe: 'sec' }, { rotulo: 'Dinheiro', valor: 'Dinheiro', classe: 'sec' }], semFoco: true });
 const nomeBonito = (n) => { const t = String(n || ''); if (!t || t !== t.toUpperCase()) return t; return t.toLowerCase().replace(/(^|\s)([a-zà-ú])/g, (m, a, b) => a + b.toUpperCase()).replace(/\s(De|Da|Do|Das|Dos|E)(?=\s)/g, (m) => m.toLowerCase()); };
 // ajuda curta: um "?" que abre uma frase logo abaixo (funciona com teclado e leitor de tela, sem JS)
-const dica = (texto) => `<details class="dicaDet"><summary aria-label="O que é isto?" title="O que é isto?">?</summary><span>${esc(texto)}</span></details>`;
+const dica = (texto, nome = 'isto') => `<details class="dicaDet"><summary aria-label="Ajuda: ${esc(nome)}" title="Ajuda: ${esc(nome)}">?</summary><span>${esc(texto)}</span></details>`;
 const tracadoTxt = (t) => (/^t\d+$/i.test(String(t || '')) ? 'Traçado ' + String(t).slice(1) : t);
 
 function limparTimers() { S.timers.forEach(clearInterval); S.timers = []; }
@@ -206,20 +235,25 @@ function abrirTela(rota) {
 }
 
 // ------------------------------------------------------------------ camada (gaveta, modal)
-let focoAnterior = null;
+let focoAnterior = null, focoSeletor = null;
 // reserva nova com algo digitado: pergunta antes de descartar (Cancelar, X e Esc passam por aqui)
-const podeFechar = () => !(typeof Grupo !== 'undefined' && Grupo.sujo && Grupo.sujo()) || confirm('Descartar esta reserva? O que você digitou será perdido.');
+// fecha a janela; se há reserva em preenchimento, pergunta antes (diálogo próprio, nada de confirm nativo)
+const fecharComAviso = (fn) => {
+  if (!(typeof Grupo !== 'undefined' && Grupo.sujo && Grupo.sujo())) return fn();
+  confirmar('Descartar esta reserva?', 'O que você digitou será perdido.', 'Descartar', true).then((ok) => { if (ok) { if (Grupo.descartar) Grupo.descartar(); fn(); } });
+};
 function fecharCamada() {
   $('#camada').innerHTML = '';
-  if (focoAnterior && document.contains(focoAnterior)) { try { focoAnterior.focus(); } catch { /* elemento sumiu */ } }
-  focoAnterior = null;
+  let alvo = focoAnterior && document.contains(focoAnterior) ? focoAnterior : (focoSeletor ? document.querySelector(focoSeletor) : null);
+  if (alvo) { try { alvo.focus(); } catch { /* elemento sumiu */ } }
+  focoAnterior = null; focoSeletor = null;
 }
 function prenderFoco(el) {
-  if (!focoAnterior && document.activeElement && document.activeElement !== document.body) focoAnterior = document.activeElement;
+  if (!focoAnterior && document.activeElement && document.activeElement !== document.body) { focoAnterior = document.activeElement; const a = focoAnterior; focoSeletor = a.dataset && a.dataset.sel ? `[data-sel="${a.dataset.sel}"]` : a.dataset && a.dataset.nova ? '[data-nova]' : null; }
   el.setAttribute('tabindex', '-1'); el.focus({ preventScroll: true });
   return el;
 }
-function gaveta(html) { $('#camada').innerHTML = `<aside class="gaveta" role="dialog" aria-modal="true" aria-label="Detalhe da bateria">${html}</aside>`; return prenderFoco($('#camada .gaveta')); }
+function gaveta(html, nome = 'Detalhe da bateria') { $('#camada').innerHTML = `<aside class="gaveta" role="dialog" aria-modal="true" aria-label="${esc(nome)}">${html}</aside>`; return prenderFoco($('#camada .gaveta')); }
 function modal(html, nome = 'Janela') { $('#camada').innerHTML = `<div class="veu"><div class="modal" role="dialog" aria-modal="true" aria-label="${nome}">${html}</div></div>`; return prenderFoco($('#camada .modal')); }
 
 // ------------------------------------------------------------------ classificação das baterias (mesmas cores do FamilyWall)
@@ -242,7 +276,7 @@ function tipoDe(b) {
 }
 function situacaoBateria(b) {
   const dia = b.dataHora.slice(0, 10), hoje = hojeIso(), ini = hm(horaDe(b.dataHora)), agora = agoraMin();
-  if (b.status === 'fechada' || dia < hoje || (dia === hoje && ini + 35 <= agora)) return 'fim';
+  if (dia < hoje || (dia === hoje && ini + 35 <= agora)) return 'fim';
   if (dia === hoje && ini <= agora && agora < ini + 35) return 'pista';
   return 'futura';
 }
@@ -267,6 +301,7 @@ const urgente = (b) => b.dataHora.slice(0, 10) === hojeIso() && hm(horaDe(b.data
 const livresTxt = (b, st = situacaoBateria(b), tp = tipoDe(b)) => {
   const l = +b.disponiveis || 0, n = +b.inscritos || 0;
   if (st === 'fim') return n ? `${n} correram` : 'não correu';
+  if (b.status === 'fechada') return 'Fechada';
   if (tp === 'fechada') return 'Fechada';
   if (tp === 'bloq') return 'Bloqueada';
   return l === 0 ? 'Lotada' : `${l} ${l === 1 ? 'livre' : 'livres'}`;
@@ -471,7 +506,7 @@ TELAS.agenda = async (tela) => {
   if (S.irAgenda) { A.base = S.irAgenda.dia; A.sel = S.irAgenda.id; A.vista = celular() ? 'dia' : 'semana'; S.irAgenda = null; }
   tela.innerHTML = `${cabecalho('<span class="ponto pulso" style="background: var(--kib-cor-status-ok)"></span><span class="cor-ok">Mesma agenda da Recepção, do site e dos totens</span><span id="atualizado" style="color: var(--mudo2); font-weight: 500"></span>', 'Agenda <span id="periodo" style="font-size: var(--kib-fonte-tamanho-titulo); font-weight: 600; color: var(--mudo); letter-spacing: 0"></span>', `
     <button class="btn prim" data-nova="1" title="Nova reserva (tecla N)">${svg(IC.mais, 14, 'var(--kib-cor-acao-sobre-principal)', 2.6)}Nova reserva<kbd class="atalho" aria-hidden="true">N</kbd></button>
-    <div style="display: flex; align-items: center; gap: 2px; height: 36px; padding: 0 var(--kib-espaco-meio); border-radius: var(--kib-raio-botao); background: var(--kib-cor-superficie-padrao); box-shadow: 0 0 0 1px var(--linha2)"><button class="btn sec peq hov icone peq mudo" data-nav="-1" aria-label="Anterior" title="Anterior (seta para a esquerda)">${svg(IC.esq, 15)}</button><button class="btn sec peq" data-nav="0" title="Voltar para hoje (tecla T)">Hoje</button><button class="btn sec peq hov icone peq mudo" data-nav="1" aria-label="Próximo" title="Próximo (seta para a direita)">${svg(IC.dir, 15)}</button></div>
+    <div style="display: flex; align-items: center; gap: 2px; height: 40px; box-sizing: border-box; padding: 0 var(--kib-espaco-meio); border-radius: var(--kib-raio-botao); background: var(--kib-cor-superficie-padrao); box-shadow: 0 0 0 1px var(--linha2)"><button class="btn sec peq hov icone peq mudo" data-nav="-1" aria-label="Anterior" title="Anterior (seta para a esquerda)">${svg(IC.esq, 15)}</button><button class="btn sec peq" data-nav="0" title="Voltar para hoje (tecla T)">Hoje</button><button class="btn sec peq hov icone peq mudo" data-nav="1" aria-label="Próximo" title="Próximo (seta para a direita)">${svg(IC.dir, 15)}</button></div>
     <div class="seg" role="tablist" aria-label="Vista">${[['dia', 'Dia', 'D'], ['semana', 'Semana', 'S'], ['lista', 'Lista', 'L']].map(([v, t, k]) => `<button role="tab" data-vista="${v}" aria-selected="${A.vista === v}" title="${t} (tecla ${k})" class="${A.vista === v ? 'sel' : ''}">${t}</button>`).join('')}</div>`)}
   <main class="principal agendaLayout">
     <div class="agendaLado">
@@ -510,6 +545,7 @@ TELAS.agenda = async (tela) => {
     } finally { cal.removeAttribute('aria-busy'); cal.classList.remove('carregando'); }
   };
   const recarregar = async () => { const sel = A.sel; await carregar(); if (sel && !$('#camada .modal')) abrirBateria(sel); };
+  if (typeof AgendaAcoes !== 'undefined') AgendaAcoes.montar({ tela, A, recarregar, carregar, bats: () => bats, abrir: (id) => abrirBateria(id) });
   const filtrar = (lista) => lista.filter((b) => !A.ocultos[tipoDe(b)] && (!A.q || `${b.nome} ${b.produto} ${b.responsavel || ''}`.toLowerCase().includes(A.q.toLowerCase())));
 
   // Faixa de pista: o que está correndo AGORA em destaque e a fila das próximas baterias (só quando hoje está na tela)
@@ -570,7 +606,7 @@ TELAS.agenda = async (tela) => {
       }).join('');
       const colunasCss = dias.map((dia) => (bats.some((b) => b.dataHora.startsWith(dia)) ? 'minmax(0, 1fr)' : 'minmax(0, .45fr)')).join(' ');
       cal.innerHTML = `${faixaPista()}<div class="rolagemX"><div class="semana2"><div class="linhaSemana cabSemana" style="grid-template-columns: ${colunasCss}">${cab}</div><div class="linhaSemana" style="grid-template-columns: ${colunasCss}">${colunas}</div></div></div>
-        <div class="legendaAg"><span><span class="amostra" style="${amostra('livre', true)}"></span>Contorno = livre para reservar</span><span><span class="amostra" style="background: var(--kib-cor-agenda-reserva-fundo); box-shadow: inset 3px 0 0 var(--kib-cor-estado-aviso-solido)"></span>Cor cheia = já tem reserva, evento ou campeonato</span><span><span class="amostra" style="box-shadow: inset 0 0 0 2px var(--kib-cor-estado-perigo-solido)"></span>Na pista agora</span><span class="atalhos">Atalhos: <kbd>N</kbd> nova reserva · <kbd>T</kbd> hoje · <kbd>←</kbd><kbd>→</kbd> semana · <kbd>D</kbd><kbd>S</kbd><kbd>L</kbd> vista · <kbd>Esc</kbd> fecha</span></div>`;
+        <div class="legendaAg"><span><span class="amostra" style="${amostra('livre', true)}"></span>Livre para reservar</span><span><span class="amostra" style="background: var(--kib-cor-agenda-reserva-fundo); box-shadow: inset 3px 0 0 var(--kib-cor-estado-aviso-solido)"></span>Com reserva, evento ou campeonato</span><span><span class="amostra" style="box-shadow: inset 0 0 0 2px var(--kib-cor-estado-perigo-solido)"></span>Na pista agora</span><span class="atalhos">Atalhos: <kbd>N</kbd> nova reserva · <kbd>T</kbd> hoje · <kbd>←</kbd><kbd>→</kbd> semana · <kbd>D</kbd><kbd>S</kbd><kbd>L</kbd> vista · <kbd>Esc</kbd> fecha</span></div>`;
     } else if (A.vista === 'dia') {
       const todos = bats.filter((b) => b.dataHora.startsWith(A.base)), doDia = filtrar(todos);
       const d = deIso(A.base), ins = todos.reduce((a, b) => a + (+b.inscritos || 0), 0);
@@ -629,7 +665,7 @@ TELAS.agenda = async (tela) => {
       <span style="font-size: var(--kib-fonte-tamanho-corpo); opacity: .85">${DIAS[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]} · ${horaDe(b.dataHora)} às ${fmtHm(hm(horaDe(b.dataHora)) + 35)}${st === 'pista' ? ' · na pista agora' : st === 'fim' ? ' · já correu' : ''}</span>
       <span style="font-size: var(--kib-fonte-tamanho-pequeno); opacity: .8">${[b.nome, b.produto, tracadoTxt(b.tracado), b.tipoKart].filter(Boolean).map(esc).join(' · ')}</span></div>
       <div class="gavetaCorpo" id="corpoBateria"><div class="esqueleto" style="height: 120px"></div><div class="esqueleto" style="height: 200px"></div></div>
-      <div style="display: flex; gap: var(--kib-espaco-1); padding: var(--kib-espaco-denso-12) var(--kib-espaco-2); background: var(--kib-cor-superficie-padrao); border-top: 1px solid var(--linha2)">${st !== 'fim' && +b.disponiveis > 0 && tp !== 'bloq' ? `<button class="btn prim cresce" data-acao="novaReserva">${svg(IC.mais, 14, 'var(--kib-cor-acao-sobre-principal)', 2.6)}Nova reserva · ${b.disponiveis} ${+b.disponiveis === 1 ? 'vaga' : 'vagas'}</button>` : `<a class="btn sec cresce" href="#/recepcao">Abrir na Recepção</a>`}</div>`);
+      <div style="display: flex; gap: var(--kib-espaco-1); padding: var(--kib-espaco-denso-12) var(--kib-espaco-2); background: var(--kib-cor-superficie-padrao); border-top: 1px solid var(--linha2)">${st !== 'fim' && +b.disponiveis > 0 && tp !== 'bloq' ? `<button class="btn prim cresce" data-acao="novaReserva">${svg(IC.mais, 14, 'var(--kib-cor-acao-sobre-principal)', 2.6)}Nova reserva · ${b.disponiveis} ${+b.disponiveis === 1 ? 'vaga' : 'vagas'}</button>` : `<a class="btn sec cresce" href="#/recepcao">Abrir na Recepção</a>`}</div>`, `Bateria das ${horaDe(b.dataHora)}: ${titulo}`);
     g.dataset.bateria = id;
     let reservas = [];
     try { reservas = await office(`/reservas?bateriaId=${id}&status=todas`); } catch (e) { $('#corpoBateria').innerHTML = `<div class="vazio"><b>Não deu para carregar as reservas</b><span>${esc(e.message)}</span><button class="btn sec peq" style="margin-top: var(--kib-espaco-1)" data-reabrir="${id}">Tentar de novo</button></div>`; return; }
@@ -647,7 +683,7 @@ TELAS.agenda = async (tela) => {
     const ordenadas = reservas.slice().sort((x, y) => (doGrupo.has(y.id) ? 1 : 0) - (doGrupo.has(x.id) ? 1 : 0));
     const assentos = Array.from({ length: Math.max(1, +b.vagas || 12) }, (_, i) => { const r = ordenadas[i]; const dg = r && doGrupo.get(r.id); const nomeA = dg ? (dg.nome || r.cliente) : r && r.cliente; return r ? `<span class="vaga ocupada" style="background: ${dg ? dg.cor : cores.get(r.responsavel || r.cliente)}" title="${esc(nomeA)}">${esc(iniciais(nomeA))}</span>` : `<span class="vaga" title="Vaga ${i + 1} livre">${i + 1}</span>`; }).join('');
     const tipoAtual = b.reservaFechada ? 'fechada' : (b.autoAtendimento === false || b.autoAtendimento === 0) ? 'bloqueada' : 'aberta';
-    const tipoHtml = st === 'fim' ? '' : `<section class="secao"><span class="titulo">Quem pode reservar este horário${dica("Escolha quem pode ocupar este horário: qualquer pessoa (site, totem e Recepção), só o grupo que já reservou, ou só a Recepção.")}</span><span class="tiposBat">${[['aberta', 'Vagas abertas', 'livre', 'site, totem e Recepção'], ['fechada', 'Bateria fechada', 'fechada', 'só o grupo, sai do site'], ['bloqueada', 'Bloqueada', 'bloq', 'só a Recepção vende']].map(([v, t, tq, dd]) => `<button class="hov" data-tipo-bat="${v}" aria-pressed="${tipoAtual === v}" style="${tipoAtual === v ? (tq === 'livre' ? 'background: var(--kib-cor-superficie-padrao)' : TIPOS[tq].fundo) + '; box-shadow: inset 0 0 0 2px ' + (tq === 'livre' ? 'var(--kib-cor-texto-apoio)' : TIPOS[tq].cor) : 'background: var(--fundo); color: var(--tinta2)'}"><span style="display: flex; align-items: center; gap: var(--kib-espaco-meio); font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 700"><span class="amostra" style="width: 10px; height: 10px; ${amostra(tq, true)}"></span>${t}</span><span style="font-size: var(--kib-fonte-tamanho-pequeno); opacity: .8">${dd}</span></button>`).join('')}</span></section>`;
+    const tipoHtml = st === 'fim' ? '' : `<section class="secao"><span class="titulo">Quem pode reservar este horário${dica("Escolha quem pode ocupar este horário: qualquer pessoa (site, totem e Recepção), só o grupo que já reservou, ou só a Recepção.", "quem pode reservar este horário")}</span><span class="tiposBat">${[['aberta', 'Vagas abertas', 'livre', 'site, totem e Recepção'], ['fechada', 'Bateria fechada', 'fechada', 'só o grupo, sai do site'], ['bloqueada', 'Bloqueada', 'bloq', 'só a Recepção vende']].map(([v, t, tq, dd]) => `<button class="hov" data-tipo-bat="${v}" aria-pressed="${tipoAtual === v}" style="${tipoAtual === v ? (tq === 'livre' ? 'background: var(--kib-cor-superficie-padrao)' : TIPOS[tq].fundo) + '; box-shadow: inset 0 0 0 2px ' + (tq === 'livre' ? 'var(--kib-cor-texto-apoio)' : TIPOS[tq].cor) : 'background: var(--fundo); color: var(--tinta2)'}"><span style="display: flex; align-items: center; gap: var(--kib-espaco-meio); font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 700"><span class="amostra" style="width: 10px; height: 10px; ${amostra(tq, true)}"></span>${t}</span><span style="font-size: var(--kib-fonte-tamanho-pequeno); opacity: .8">${dd}</span></button>`).join('')}</span></section>`;
     const prontoTotem = (r) => !!(r.documento && r.peso && r.telefone);
     const cartoes = [...grupos.entries()].map(([resp, lista]) => {
       const pagos = lista.filter((r) => r.pago).length, prontos = lista.filter(prontoTotem).length, total = lista.reduce((a, r) => a + (+r.total || 0), 0), pagoValor = lista.filter((r) => r.pago).reduce((a, r) => a + (+r.total || 0), 0);
@@ -669,6 +705,7 @@ TELAS.agenda = async (tela) => {
       ${tipoHtml}
       <section class="secao"><span class="titulo">Reservas<span class="peq" style="margin-left: auto; font-weight: 500">${reservas.length ? `${reservas.length} piloto${reservas.length > 1 ? 's' : ''} em ${nGrupos} ${nGrupos > 1 ? 'grupos' : 'grupo'}` : ''}</span></span>${Grupo.cartoes(gruposReserva)}${cartoes ? (gruposReserva.length ? '<span class="peq" style="font-weight: 700; margin-top: var(--kib-espaco-meio)">Outras reservas (Recepção, totem e site)</span>' : '') + cartoes : ''}${!reservas.length ? `<span class="peq">Nenhuma reserva ainda.${st !== 'fim' && +b.disponiveis > 0 && tp !== 'bloq' ? ' Use “Nova reserva” abaixo.' : ''}</span>` : ''}</section>
       ${b.observacao ? `<section class="secao"><span class="titulo">Observação</span><span style="white-space: pre-line; line-height: 1.5">${esc(b.observacao)}</span></section>` : ''}`;
+    if (typeof AgendaAcoes !== 'undefined') AgendaAcoes.gaveta({ b, reservas, st, tp });
   };
 
   /** Nova reserva pelo cabeçalho: escolhe dia, quantos pilotos e o horário; depois abre a reserva do grupo. */
@@ -725,7 +762,7 @@ TELAS.agenda = async (tela) => {
   });
   tela.addEventListener('input', (e) => { if (e.target.id === 'qAg') { A.q = e.target.value; clearTimeout(S.tela.tq); S.tela.tq = setTimeout(() => { pintar(); const i = $('#qAg'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 300); } });
   $('#camada').onclick = async (e) => {
-    if (e.target.closest('[data-acao="fecharGaveta"]') || e.target.closest('[data-acao="fechar"]')) { if (!podeFechar()) return; A.sel = null; fecharCamada(); pintar(); return; }
+    if (e.target.closest('[data-acao="fecharGaveta"]') || e.target.closest('[data-acao="fechar"]')) { fecharComAviso(() => { A.sel = null; fecharCamada(); pintar(); }); return; }
     const re = e.target.closest('[data-reabrir]'); if (re) { abrirBateria(+re.dataset.reabrir); return; }
     if (e.target.closest('[data-acao="novaReserva"]')) { const b = bats.find((x) => x.id === A.sel); if (b) Grupo.nova(b, recarregar); return; }
     const ga = e.target.closest('[data-grupo-abrir]'); if (ga) { const b = bats.find((x) => x.id === A.sel); if (b) Grupo.abrir(+ga.dataset.grupoAbrir, b, recarregar); return; }
@@ -889,20 +926,20 @@ document.addEventListener('click', (e) => {
   const acao = a.dataset.acao;
   if (acao === 'sair') { if (confirm('Sair do painel?')) sair(); }
   if (acao === 'busca') abrirBusca();
-  if (acao === 'fechar') { if (!podeFechar()) return; fecharCamada(); }
+  if (acao === 'fechar') { fecharComAviso(() => fecharCamada()); }
 });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Tab') {
     const cx = $('#camada .modal, #camada .gaveta'); if (!cx) return;
-    const f = [...cx.querySelectorAll('a[href], button:not(:disabled), input:not(:disabled):not([readonly]), select:not(:disabled), textarea:not(:disabled), summary, [tabindex]:not([tabindex="-1"])')].filter((x) => x.offsetParent !== null);
+    const f = [...cx.querySelectorAll('a[href], button:not(:disabled), input:not(:disabled):not([readonly]), select:not(:disabled), textarea:not(:disabled), summary, [tabindex]:not([tabindex="-1"])'), ...document.querySelectorAll('.toast button')].filter((x) => x.offsetParent !== null);
     if (!f.length) return;
     const primeiro = f[0], ultimo = f[f.length - 1];
     if (e.shiftKey && (document.activeElement === primeiro || document.activeElement === cx)) { e.preventDefault(); ultimo.focus(); }
     else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primeiro.focus(); }
-    else if (!cx.contains(document.activeElement)) { e.preventDefault(); primeiro.focus(); }
+    else if (!cx.contains(document.activeElement) && !document.activeElement.closest('.toast')) { e.preventDefault(); primeiro.focus(); }
     return;
   }
-  if (e.key === 'Escape' && $('#camada').innerHTML) { if (!podeFechar()) return; fecharCamada(); }
+  if (e.key === 'Escape' && $('#camada').innerHTML) { fecharComAviso(() => fecharCamada()); }
   if (S.tela && S.tela.atalho) S.tela.atalho(e); // atalhos da tela aberta (S.tela zera a cada troca de tela)
 });
 window.addEventListener('hashchange', () => { if (S.token && $('#tela')) abrirTela(rotaAtual()); });

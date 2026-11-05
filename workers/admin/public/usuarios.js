@@ -7,6 +7,20 @@ TELAS.usuarios = async (tela) => {
     tela.innerHTML = `${cabecalho('Sistema', 'Usuários e acessos')}<main class="principal"><section class="cartao"><div class="vazio"><b>Só o administrador entra aqui</b><span>Peça a um administrador para criar ou mudar usuários.</span></div></section></main>`;
     return;
   }
+  // Funcionalidades dos programas (Recepção, Cronometragem, Segurança...): mesmas do programa, gravadas no mesmo lugar
+  const CATALOGO = [
+    ['Segurança', ['Usuários', 'Perfis de acesso', 'Permissões', 'Trocar a própria senha']],
+    ['Cadastro', ['Clientes', 'Produtos e provas', 'Traçados', 'Feriados', 'Turnos e terminais', 'Itens de manutenção']],
+    ['Ferramentas', ['Parâmetros do sistema', 'Padrões de reservas', 'Criar reservas do mês', 'Dados da empresa']],
+    ['Serviços', ['Serviços online', 'Pré-cadastro online', 'Sorteio de karts (tablet)']],
+    ['Relatórios', ['Relatórios financeiros', 'Fechamento de caixa', 'Lista de participantes', 'Agenda mensal', 'Relatórios da cronometragem']],
+    ['Financeiro', ['Métodos de pagamento', 'Fidelidade', 'Vouchers', 'Parceiros e comissões']],
+    ['PDV', ['Abrir e fechar terminal', 'Receita avulsa (checkout)', 'Suprimento e sangria', 'Estorno', 'Desconto e acréscimo']],
+    ['Cronometragem', ['Bandeiras (largada, quadriculada, finalizar)', 'Passagens (incluir, excluir, invalidar)', 'Mudar corrida em andamento', 'Configuração de eventos', 'Registro de competidores', 'Enviar resultado (WhatsApp, e-mail)', 'Cadastros (decoder, placar, transponder)', 'Configurações do sistema']],
+    ['App Mobile', ['resultados_publicar_mobile', 'identidade_mobile_vincular']],
+  ];
+  const COLS = [['acessar', 'Acessar'], ['incluir', 'Incluir'], ['alterar', 'Alterar'], ['excluir', 'Excluir'], ['exportar', 'Exportar'], ['importar', 'Importar']];
+  const chaveDk = (m, f) => m + '|' + f;
   const TELAS_PERM = NAV.flatMap((g) => g.itens.map(([id, nome]) => ({ id, nome, grupo: g.t }))).filter((t) => t.id !== 'usuarios' && t.id !== 'ajuda');
   const U = { usuarios: [], perfis: [], aba: 'usuarios', q: '', perfilSel: null, matriz: null, sujo: false };
   const dataCurta = (s) => (s ? esc(s.slice(8, 10) + '/' + s.slice(5, 7) + ' ' + s.slice(11, 16)) : 'nunca');
@@ -111,7 +125,9 @@ TELAS.usuarios = async (tela) => {
       acessoTotal: !!r.perfil.acessoTotal,
       configurado,
       telas: Object.fromEntries(TELAS_PERM.map((t) => [t.id, { ver: configurado ? !!por[t.id]?.acessar : true, alt: configurado ? !!por[t.id]?.alterar : true }])),
+      dk: Object.fromEntries((r.itens || []).filter((i) => i.modulo !== 'Admin Web').map((i) => [chaveDk(i.modulo, i.funcao), { modulo: i.modulo, funcao: i.funcao, ...Object.fromEntries(COLS.map(([k]) => [k, !!i[k]])) }])),
     };
+    U.modDk = U.modDk || CATALOGO[0][0];
     U.sujo = false;
   };
 
@@ -135,6 +151,16 @@ TELAS.usuarios = async (tela) => {
               <input type="checkbox" data-ver="${t.id}" ${m.telas[t.id].ver ? 'checked' : ''} aria-label="Ver ${esc(t.nome)}" style="accent-color: var(--verde); width: 18px; height: 18px">
               <input type="checkbox" data-alt="${t.id}" ${m.telas[t.id].alt ? 'checked' : ''} ${m.telas[t.id].ver ? '' : 'disabled'} aria-label="Alterar ${esc(t.nome)}" style="accent-color: var(--verde); width: 18px; height: 18px"></div>`).join('')}`).join('')}
         </div></div>
+        <div style="${m.acessoTotal ? 'opacity: .45; pointer-events: none' : ''}; margin-top: var(--kib-espaco-2)">
+          <b class="t-titulo">Programas da Recepção e da Cronometragem</b>
+          <p class="peq" style="line-height: 1.5; margin: 2px 0 var(--kib-espaco-1)">As mesmas funcionalidades da tela Permissões do programa. Funcionalidade sem nenhuma marca fica sem acesso para este perfil.</p>
+          <div class="seg" role="tablist" aria-label="Módulo" style="flex-wrap: wrap; height: auto">${CATALOGO.map(([mod]) => `<button type="button" role="tab" aria-selected="${mod === U.modDk}" class="${mod === U.modDk ? 'ativo' : ''}" data-dkmod="${esc(mod)}">${esc(mod)}</button>`).join('')}</div>
+          <div class="rolagemX" style="margin-top: var(--kib-espaco-1)"><div style="min-width: 640px">
+            <div class="cabTabela" style="grid-template-columns: minmax(0, 1fr) repeat(6, 64px)"><span>Funcionalidade</span>${COLS.map(([, n]) => `<span style="text-align: center">${n}</span>`).join('')}</div>
+            ${(CATALOGO.find(([mod]) => mod === U.modDk) || CATALOGO[0])[1].map((f) => { const cur = m.dk[chaveDk(U.modDk, f)] || {}; return `<div class="linhaTabela" style="grid-template-columns: minmax(0, 1fr) repeat(6, 64px)"><b>${esc(f)}</b>${COLS.map(([k, n]) => `<span style="text-align: center"><input type="checkbox" data-dk="${esc(U.modDk)}|${esc(f)}|${k}" ${cur[k] ? 'checked' : ''} aria-label="${n}: ${esc(f)}" style="accent-color: var(--verde); width: 18px; height: 18px"></span>`).join('')}</div>`; }).join('')}
+          </div></div>
+          <div style="display: flex; gap: var(--kib-espaco-1); margin-top: var(--kib-espaco-1)"><button class="btn sec peq" data-dktudo="1">Marcar o módulo todo</button><button class="btn sec peq" data-dktudo="0">Limpar o módulo</button></div>
+        </div>
         <p class="peq" style="line-height: 1.5; margin: var(--kib-espaco-denso-12) 0 0">Usuários e acessos é sempre só para administradores. Sem “Criar, editar, excluir”, a tela abre apenas para consulta.</p>
         <p class="erroMsg" id="pErro"></p>
         <div style="display: flex; gap: var(--kib-espaco-1); margin-top: var(--kib-espaco-1); flex-wrap: wrap"><button class="btn sec peq" data-tudo="1">Marcar tudo</button><button class="btn sec peq" data-tudo="0">Limpar</button><button class="btn prim empurra" id="pSalvar">Salvar telas deste perfil</button></div>`}
@@ -144,6 +170,7 @@ TELAS.usuarios = async (tela) => {
   const salvarMatriz = async () => {
     const p = U.perfis.find((x) => x.id === U.perfilSel); const m = U.matriz;
     const itens = TELAS_PERM.map((t) => { const v = m.telas[t.id]; const alt = v.ver && v.alt; return { modulo: 'Admin Web', funcao: t.id, acessar: v.ver, incluir: alt, alterar: alt, excluir: alt, exportar: v.ver, importar: alt }; });
+    for (const v of Object.values(m.dk || {})) itens.push({ modulo: v.modulo, funcao: v.funcao, ...Object.fromEntries(COLS.map(([k]) => [k, !!v[k]])) });
     $('#pSalvar').disabled = true;
     try {
       await office('/permissoes', { method: 'PUT', body: { perfilId: p.id, acessoTotal: m.acessoTotal, itens } });
@@ -211,6 +238,13 @@ TELAS.usuarios = async (tela) => {
     }
     if (t.closest('[data-renomear]')) return formPerfil(U.perfis.find((p) => p.id === U.perfilSel));
     if (t.closest('[data-excluir-perfil]')) return excluirPerfil(U.perfis.find((p) => p.id === U.perfilSel));
+    const dkm = t.closest('[data-dkmod]'); if (dkm) { U.modDk = dkm.dataset.dkmod; return pintarPerfis(); }
+    const dkt = t.closest('[data-dktudo]');
+    if (dkt) {
+      const v = dkt.dataset.dktudo === '1';
+      for (const f of (CATALOGO.find(([mod]) => mod === U.modDk) || CATALOGO[0])[1]) U.matriz.dk[chaveDk(U.modDk, f)] = { modulo: U.modDk, funcao: f, ...Object.fromEntries(COLS.map(([k]) => [k, v])) };
+      U.sujo = true; return pintarPerfis();
+    }
     const tudo = t.closest('[data-tudo]');
     if (tudo) { const v = tudo.dataset.tudo === '1'; for (const id of Object.keys(U.matriz.telas)) U.matriz.telas[id] = { ver: v, alt: v }; U.sujo = true; return pintarPerfis(); }
     if (t.closest('#pSalvar')) return salvarMatriz();
@@ -218,6 +252,12 @@ TELAS.usuarios = async (tela) => {
   tela.addEventListener('change', (e) => {
     const t = e.target;
     if (t.id === 'mTotal') { U.matriz.acessoTotal = t.checked; U.sujo = true; return pintarPerfis(); }
+    if (t.dataset.dk) {
+      const [mod, f, k] = t.dataset.dk.split('|'); const ch = chaveDk(mod, f);
+      const cur = U.matriz.dk[ch] || (U.matriz.dk[ch] = { modulo: mod, funcao: f, ...Object.fromEntries(COLS.map(([c]) => [c, false])) });
+      cur[k] = t.checked; if (k !== 'acessar' && t.checked) cur.acessar = true; if (k === 'acessar' && !t.checked) for (const [c] of COLS) cur[c] = false;
+      U.sujo = true; return pintarPerfis();
+    }
     if (t.dataset.ver) { const v = U.matriz.telas[t.dataset.ver]; v.ver = t.checked; if (!t.checked) v.alt = false; U.sujo = true; return pintarPerfis(); }
     if (t.dataset.alt) { U.matriz.telas[t.dataset.alt].alt = t.checked; U.sujo = true; }
   });

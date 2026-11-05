@@ -3,6 +3,7 @@
  * Todas as rotas daqui exigem sessao de usuario (lib/ops/auth.ts).
  */
 import { CLIENTE_COLS, insertCliente, isValidCpf, one, onlyDigits, query, tx, updateCliente, type ClienteInput } from './db';
+import { pedirVinculoAgora } from './app-mobile';
 import { confereSenha, hashSenha, type Sessao } from './auth';
 import { erroCadastroObrigatorio, erroPesoCliente } from './cadastro-obrigatorio';
 import { mobileApiEndpoint } from '../mobile-api-url';
@@ -74,6 +75,28 @@ async function mobilePermission(sessao: Sessao, funcao: string) {
     { uid: sessao.uid, modulo: 'App Mobile', funcao },
   );
   return row?.allowed === true || row?.allowed === 1 || row?.allowed === '1';
+}
+
+/**
+ * Usuários que NÃO podem fechar, bloquear nem excluir baterias (quem sai mais cedo não pode fechar os horários da noite).
+ * Lista de logins no parâmetro office.usuariosSemFecharBateria (separados por vírgula). Vale para a Recepção e para o painel web.
+ */
+let semFecharCache: { em: number; logins: Set<string> } | null = null;
+async function loginsSemFechar() {
+  if (semFecharCache && Date.now() - semFecharCache.em < 15_000) return semFecharCache.logins;
+  const r = await one<{ v: string | null }>(`SELECT Valor v FROM dbo.Parametro WHERE Chave = 'office.usuariosSemFecharBateria'`).catch(() => null);
+  const logins = new Set(String(r?.v ?? '').split(/[,;\s]+/).map((x) => x.trim().toLowerCase()).filter(Boolean));
+  semFecharCache = { em: Date.now(), logins };
+  return logins;
+}
+export async function podeFecharBateria(sessao: Sessao) {
+  const lista = await loginsSemFechar();
+  if (!lista.size) return true;
+  const u = await one<{ l: string }>(`SELECT LOWER(Login) l FROM dbo.Usuario WHERE Id = @id`, { id: sessao.uid });
+  return !(u && lista.has(u.l));
+}
+export async function exigePodeFecharBateria(sessao: Sessao) {
+  if (!(await podeFecharBateria(sessao))) throw new HttpError(403, 'Seu usuário não pode fechar, bloquear nem excluir baterias: o funcionamento precisa continuar normal até o último horário. Chame o administrador.');
 }
 
 async function servicosOnline() {
@@ -306,28 +329,6 @@ function cadValues(def: CadDef, body: Record<string, unknown>, partial: boolean)
   return out;
 }
 
-/** Protege o acesso: ninguém se tranca para fora, e sempre sobra um administrador ativo. */
-async function guardaUsuario(req: Req, id: number | null, body: Record<string, unknown> | null) {
-  const login = body && 'login' in body ? String(body.login ?? '').trim().toLowerCase() : '';
-  if (login) {
-    const igual = await one<{ id: number }>(`SELECT Id id FROM dbo.Usuario WHERE Login = @login AND (@id IS NULL OR Id <> @id)`, { login, id });
-    if (igual) throw new HttpError(409, 'Já existe um usuário com esse login.');
-  }
-  if (!id) return;
-  const alvo = await one<{ admin: boolean; ativo: boolean }>(`SELECT Admin admin, Ativo ativo FROM dbo.Usuario WHERE Id = @id`, { id });
-  if (!alvo) throw new HttpError(404, 'Usuário não encontrado.');
-  const excluir = body === null;
-  const tiraAtivo = excluir || (body && 'ativo' in body && !bit(body.ativo));
-  const tiraAdmin = excluir || (body && 'admin' in body && !bit(body.admin));
-  if (id === req.sessao.uid && (excluir)) throw new HttpError(400, 'Você não pode excluir o próprio usuário.');
-  if (id === req.sessao.uid && tiraAtivo) throw new HttpError(400, 'Você não pode desativar o próprio usuário.');
-  if (id === req.sessao.uid && tiraAdmin) throw new HttpError(400, 'Você não pode tirar o próprio acesso de administrador.');
-  if (alvo.admin && alvo.ativo && (tiraAtivo || tiraAdmin)) {
-    const outros = await one<{ n: number }>(`SELECT COUNT(*) n FROM dbo.Usuario WHERE Admin = 1 AND Ativo = 1 AND Id <> @id`, { id });
-    if (!outros || outros.n < 1) throw new HttpError(400, 'Precisa sobrar pelo menos um administrador ativo.');
-  }
-}
-
 async function cadRoutes(req: Req, send: Res, ent: string, id: number | null): Promise<void> {
   const def = CAD[ent];
   if (!def) throw new HttpError(404, 'Cadastro desconhecido.');
@@ -346,7 +347,6 @@ async function cadRoutes(req: Req, send: Res, ent: string, id: number | null): P
     const body = await req.body();
     const vals = cadValues(def, body, req.method === 'PUT');
     if (ent === 'usuarios') {
-      await guardaUsuario(req, id, body);
       const senha = String(body.senha ?? '');
       if (req.method === 'POST' && senha.length < 6) throw new HttpError(400, 'A senha precisa ter pelo menos 6 caracteres.');
       if (senha) {
@@ -356,28 +356,15 @@ async function cadRoutes(req: Req, send: Res, ent: string, id: number | null): P
       if (vals.Login) vals.Login = String(vals.Login).toLowerCase();
     }
     const names = Object.keys(vals);
-    try {
-      if (req.method === 'POST') {
-        const r = await one<{ id: number }>(`INSERT INTO dbo.${def.table} (${names.join(', ')}) OUTPUT inserted.Id id VALUES (${names.map((n) => '@' + n).join(', ')})`, vals);
-        return send(201, { id: r!.id });
-      }
-      if (!id) throw new HttpError(400, 'Registro não informado.');
-      if (names.length) await query(`UPDATE dbo.${def.table} SET ${names.map((n) => `${n} = @${n}`).join(', ')} WHERE Id = @id`, { ...vals, id });
-      return send(200, { id });
-    } catch (e) {
-      if (!(e instanceof HttpError) && (ent === 'usuarios' || ent === 'perfis') && duplicateSql(e)) {
-        throw new HttpError(409, ent === 'usuarios' ? 'Já existe um usuário com esse login.' : 'Já existe um perfil com esse nome.');
-      }
-      throw e;
+    if (req.method === 'POST') {
+      const r = await one<{ id: number }>(`INSERT INTO dbo.${def.table} (${names.join(', ')}) OUTPUT inserted.Id id VALUES (${names.map((n) => '@' + n).join(', ')})`, vals);
+      return send(201, { id: r!.id });
     }
+    if (!id) throw new HttpError(400, 'Registro não informado.');
+    if (names.length) await query(`UPDATE dbo.${def.table} SET ${names.map((n) => `${n} = @${n}`).join(', ')} WHERE Id = @id`, { ...vals, id });
+    return send(200, { id });
   }
   if (req.method === 'DELETE' && id) {
-    if (ent === 'usuarios') await guardaUsuario(req, id, null);
-    if (ent === 'perfis') {
-      const emUso = await one<{ n: number }>(`SELECT COUNT(*) n FROM dbo.Usuario WHERE PerfilId = @id`, { id });
-      if (emUso && emUso.n > 0) throw new HttpError(409, `Este perfil tem ${emUso.n} usuário(s). Troque o perfil deles antes de excluir.`);
-      await query(`DELETE FROM dbo.PerfilPermissao WHERE PerfilId = @id`, { id });
-    }
     try {
       await query(`DELETE FROM dbo.${def.table} WHERE Id = @id`, { id });
       return send(200, { ok: true });
@@ -613,6 +600,16 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
     const troco = Math.max(0, recebido - total);
     if (troco > dinheiro) throw new HttpError(400, 'Troco só pode ser dado sobre pagamento em dinheiro. Ajuste os valores.');
 
+    const insIds = itens.filter((i) => i.inscricaoId).map((i) => i.inscricaoId as number);
+    let origensSemTotem = new Set<number>();
+    if (insIds.length) {
+      const qParams = Object.fromEntries(insIds.map((id, n) => ['id' + n, id]));
+      const rows = await run(
+        `SELECT Id id FROM dbo.Inscricao WHERE Id IN (${insIds.map((_, n) => '@id' + n).join(',')}) AND Origem <> 'totem' AND TermoImpressoEm IS NULL`,
+        qParams,
+      ).catch(() => []);
+      origensSemTotem = new Set((rows as { id: number }[]).map((r) => r.id));
+    }
     const [venda] = await run(
       `INSERT INTO dbo.Venda (MovimentoId, UsuarioId, TerminalId, ClienteId, BrutoCentavos, DescontoCentavos, AcrescimoCentavos, RecebidoCentavos, TrocoCentavos, FinalCentavos, Observacao)
        OUTPUT inserted.Id id VALUES (@mov, @uid, @term, @cli, @bruto, @desc, @acr, @rec, @troco, @final, @obs)`,
@@ -629,7 +626,7 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
       );
       if (i.inscricaoId) {
         await run(
-          `UPDATE dbo.Inscricao SET Pago = 1, Aprovada = 1, Status = 'confirmada', ValorCentavos = @liq, DescontoCentavos = @desc, VendaId = @vendaId, AtualizadoEm = SYSDATETIME() WHERE Id = @ins`,
+          `UPDATE dbo.Inscricao SET Pago = 1, Aprovada = 1, Status = 'confirmada', ValorCentavos = @liq, DescontoCentavos = @desc, VendaId = @vendaId, TermoImpressoEm = COALESCE(TermoImpressoEm, SYSDATETIME()), AtualizadoEm = SYSDATETIME() WHERE Id = @ins`,
           { liq: i.liquido, desc: i.descontoCentavos, vendaId, ins: i.inscricaoId },
         );
       }
@@ -662,7 +659,7 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
         }
       }
     }
-    return { id: vendaId, total, recebido, troco, inscricoes: itens.filter((i) => i.inscricaoId).map((i) => i.inscricaoId) };
+    return { id: vendaId, total, recebido, troco, inscricoes: insIds, semTermo: Array.from(origensSemTotem) };
   });
 }
 
@@ -1579,12 +1576,12 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
       const [dup] = await run(`SELECT 1 x FROM dbo.Inscricao WHERE BateriaId = @destino AND ClienteId = @c AND Status <> 'cancelada'`, { destino, c: r.ClienteId });
       if (dup) throw new HttpError(409, 'Já existe uma reserva para este cliente na bateria selecionada.');
       if (r.Pago) {
-        await run(`UPDATE dbo.Inscricao SET BateriaId = @destino, TermoImpressoEm = NULL, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { destino, id });
+        await run(`UPDATE dbo.Inscricao SET BateriaId = @destino, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { destino, id });
       } else {
         await run(
           `UPDATE dbo.Inscricao SET BateriaId = @destino, ProdutoId = @produtoDestino, PrecoCentavos = @precoDestino,
            DescontoCentavos = CASE WHEN @produtoOrigem = @produtoDestino THEN CASE WHEN DescontoCentavos > @precoDestino THEN @precoDestino ELSE DescontoCentavos END ELSE 0 END,
-           TermoImpressoEm = NULL, AtualizadoEm = SYSDATETIME() WHERE Id = @id`,
+           AtualizadoEm = SYSDATETIME() WHERE Id = @id`,
           { destino, id, produtoOrigem: r.produtoId, produtoDestino: d.produtoId, precoDestino: d.preco },
         );
       }
@@ -1599,6 +1596,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
          Pago = CASE WHEN x.total = 0 THEN 1 ELSE i.Pago END,
          ValorCentavos = CASE WHEN x.total = 0 THEN 0 ELSE i.ValorCentavos END,
          Status = CASE WHEN x.total = 0 THEN 'confirmada' ELSE i.Status END,
+         TermoImpressoEm = COALESCE(i.TermoImpressoEm, SYSDATETIME()),
          AtualizadoEm = SYSDATETIME()
        FROM dbo.Inscricao i JOIN dbo.Bateria b ON b.Id = i.BateriaId LEFT JOIN dbo.Produto p ON p.Id = ISNULL(i.ProdutoId, b.ProdutoId)
        CROSS APPLY (SELECT ISNULL(i.PrecoCentavos, p.PrecoCentavos) - i.DescontoCentavos total) x
@@ -1681,6 +1679,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
       if (dup) throw new HttpError(409, `Documento já cadastrado para ${dup.nome} (cliente ${dup.id}).`);
     }
     send(201, { id: await insertCliente(b, 'recepcao') });
+    pedirVinculoAgora(); // cliente que já criou conta no app vincula no próximo ciclo (≤ 5 s)
     return true;
   }
   if ((m = path.match(/^\/clientes\/(\d+)$/)) && method === 'PUT') {
@@ -1689,6 +1688,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     if (erroCadastro) throw new HttpError(400, erroCadastro);
     if ((b.tipoDocumento ?? 'CPF') === 'CPF' && b.documento && !isValidCpf(b.documento)) throw new HttpError(400, 'CPF inválido.');
     await updateCliente(Number(m[1]), b, false);
+    pedirVinculoAgora(); // e-mail/telefone corrigido na recepção: confere de novo as contas do app pendentes
     send(200, { ok: true });
     return true;
   }
@@ -1852,21 +1852,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     return true;
   }
   // ---------- permissões por perfil (Permissoes do canvas): matriz funcionalidade × acessar/incluir/alterar/excluir/exportar/importar
-  if (path === '/minhas-permissoes' && method === 'GET') {
-    const u = await one<{ id: number; nome: string; login: string; admin: boolean; ativo: boolean; perfilId: number | null; perfil: string | null; acessoTotal: boolean | null }>(
-      `SELECT u.Id id, u.Nome nome, u.Login login, u.Admin admin, u.Ativo ativo, u.PerfilId perfilId, p.Descricao perfil, p.AcessoTotal acessoTotal
-       FROM dbo.Usuario u LEFT JOIN dbo.Perfil p ON p.Id = u.PerfilId WHERE u.Id = @uid`, { uid: sessao.uid });
-    if (!u || !u.ativo) throw new HttpError(401, 'Sessão expirada. Entre novamente.');
-    const total = Boolean(u.admin) || Boolean(u.acessoTotal);
-    const itens = u.perfilId
-      ? await query<{ funcao: string; acessar: boolean; incluir: boolean; alterar: boolean; excluir: boolean }>(
-        `SELECT Funcao funcao, Acessar acessar, Incluir incluir, Alterar alterar, Excluir excluir FROM dbo.PerfilPermissao WHERE PerfilId = @p AND Modulo = 'Admin Web'`, { p: u.perfilId })
-      : [];
-    send(200, { id: u.id, nome: u.nome, login: u.login, admin: Boolean(u.admin), perfilId: u.perfilId, perfil: u.perfil, acessoTotal: total, configurado: itens.length > 0, telas: itens });
-    return true;
-  }
   if (path === '/permissoes' && method === 'GET') {
-    if (!sessao.admin) throw new HttpError(403, 'Disponível apenas para administradores.');
     const perfilId = Number(url.searchParams.get('perfilId'));
     if (!perfilId) throw new HttpError(400, 'Informe o perfil.');
     const perfil = await one<{ id: number; descricao: string; acessoTotal: boolean }>(`SELECT Id id, Descricao descricao, AcessoTotal acessoTotal FROM dbo.Perfil WHERE Id = @perfilId`, { perfilId });

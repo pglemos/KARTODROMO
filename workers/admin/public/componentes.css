@@ -151,3 +151,52 @@ kbd.atalho { margin-left: var(--kib-espaco-1); padding: 0 var(--kib-espaco-meio)
   kbd.atalho { display: none; }
 }
 @media (max-width: 480px) { [data-vista="semana"] { display: none; } }
+
+/* ---------- diálogo próprio (confirmar / escolher forma): por cima da janela aberta */
+.veuTopo { position: fixed; inset: 0; z-index: 400; display: flex; align-items: center; justify-content: center; background: var(--kib-cor-sobreposicao); padding: var(--kib-espaco-2); }
+.dialogoCaixa { width: min(440px, 100%); max-width: 440px; margin: 0; }
+.dialogoCorpo { padding: var(--kib-espaco-3); display: flex; flex-direction: column; gap: var(--kib-espaco-denso-12); }
+.dialogoCorpo h2, .dialogoCorpo p { margin: 0; }
+.dialogoBotoes { justify-content: flex-end; margin-top: var(--kib-espaco-1); }
+
+/* ---------- ajuda "?": abre embaixo sem espremer o título */
+.titulo { flex-wrap: wrap; }
+.dicaDet[open] { flex-basis: 100%; width: 100%; }
+
+/* ---------- celular */
+@media (max-width: 760px) {
+  .navItem .cresce { display: none; }
+  .navItem { justify-content: center; }
+  .rolagemX > div[style*="min-width: 860px"] { min-width: 0 !important; }
+  .rolagemX .cabTabela[style*="grid-template-columns: 34px"] { display: none; }
+  .rolagemX > div > div[style*="grid-template-columns: 34px"] { display: grid; grid-template-columns: 34px minmax(0, 1fr) !important; row-gap: var(--kib-espaco-1); align-items: start; padding-top: var(--kib-espaco-denso-12); padding-bottom: var(--kib-espaco-denso-12); }
+  .rolagemX > div > div[style*="grid-template-columns: 34px"] > :nth-child(n+3) { grid-column: 2; }
+}
+
+/* Cobrar: um botão por piloto, com as duas formas dentro */
+.menuCobrar { position: relative; }
+.menuCobrar > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: var(--kib-espaco-1); }
+.menuCobrar > summary::-webkit-details-marker { display: none; }
+.menuCobrar > summary::after { content: ""; width: 6px; height: 6px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translateY(-2px); }
+.menuCobrar[open] > summary::after { transform: rotate(-135deg) translateY(-2px); }
+.menuCobrarLista { position: absolute; z-index: 5; top: calc(100% + var(--kib-espaco-meio)); left: 0; display: flex; flex-direction: column; gap: var(--kib-espaco-meio); min-width: 190px; padding: var(--kib-espaco-1); background: var(--kib-cor-superficie-padrao); border: 1px solid var(--kib-cor-borda-sutil); border-radius: var(--kib-raio-botao); box-shadow: 0 6px 18px color-mix(in srgb, var(--kib-cor-texto-principal) 18%, transparent); }
+.menuCobrarLista .btn { justify-content: flex-start; width: 100%; }
+
+/* Celular: cabeçalho da janela em poucas linhas, fechar sempre no canto */
+@media (max-width: 640px) {
+  .modalTopo { flex-wrap: nowrap; padding: var(--kib-espaco-1) var(--kib-espaco-denso-12); gap: var(--kib-espaco-1); align-items: flex-start; }
+  .modalTopo .t-titulo-grande { font-size: var(--kib-fonte-tamanho-titulo); line-height: 1.2; }
+  .modalTopo .t-subtitulo { font-size: var(--kib-fonte-tamanho-pequeno); }
+}
+
+.entrada:focus-visible, .buscaCampo:focus-within, .entrada:has(input:focus-visible) { outline: var(--kib-foco-largura) solid var(--kib-cor-borda-foco); outline-offset: var(--kib-foco-deslocamento); }
+.btn.quase { opacity: .72; }
+.btn.quase:focus-visible { opacity: 1; }
+.dicaDet > summary { min-width: 24px; min-height: 24px; }
+@media (max-width: 640px) {
+  .modal { overflow: clip; }
+  .modalRodape { position: sticky; bottom: 0; z-index: 3; box-shadow: 0 -4px 12px color-mix(in srgb, var(--kib-cor-texto-principal) 14%, transparent); }
+  .seg { flex-wrap: wrap; }
+  .seg button { min-height: 44px; }
+  .bloco, .menuCobrar > summary, .menuCobrarLista .btn, .dicaDet > summary { min-height: 44px; }
+}
