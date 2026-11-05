@@ -73,6 +73,15 @@
   #pronto p { color: var(--suave); margin: 0 auto 8px; max-width: 460px; }
   .totem { margin: 18px auto 0; max-width: 440px; text-align: left; background: var(--fundo); border: 1px solid var(--linha); border-radius: var(--raio); padding: 16px 18px; color: var(--suave); }
   .totem b { color: var(--verde); }
+  .grupo { border-color: var(--verde); background: var(--verde-fundo); }
+  .grupo h2 { margin: 0 0 6px; font-family: var(--titulo); font-weight: 400; letter-spacing: .02em; font-size: 26px; line-height: 1.15; }
+  .grupo p { margin: 0; color: var(--suave); }
+  .grupo b, .pagar b { color: var(--verde); }
+  .pagar { margin: 14px 0 18px; padding: 16px 18px; border: 1px solid var(--verde); border-radius: var(--raio); background: var(--verde-fundo); text-align: left; }
+  .pagar p { margin: 0 0 10px; }
+  .pagar .valor { font-family: var(--titulo); font-size: 34px; color: var(--texto); line-height: 1.1; }
+  .pagar a.botao { display: block; text-align: center; padding: 14px 18px; background: var(--verde); color: var(--tinta); font-weight: 700; font-size: 19px; text-decoration: none; border-radius: var(--raio); }
+  .pagar .estado { margin: 10px 0 0; font-size: 15px; color: var(--suave); }
 </style>
 </head>
 <body>
@@ -84,6 +93,7 @@
 </header>
 
 <main>
+  <section class="cartao grupo" id="grupoFaixa" hidden aria-live="polite"></section>
   <form id="form" novalidate autocomplete="on">
     <div class="erro" id="erro" role="alert"></div>
 
@@ -104,7 +114,7 @@
       <p class="sub">Para avisos da reserva. O resultado com seus tempos chega no e-mail.</p>
       <div class="grade">
         <div class="c3"><label for="telefone">Celular (WhatsApp)</label><input id="telefone" name="tel" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="(31) 90000-0000" required></div>
-        <div class="c3"><label for="email">E-mail <span class="op">(para receber o resultado da corrida)</span></label><input id="email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="voce@email.com"></div>
+        <div class="c3"><label for="email">E-mail <span class="op">(recebe o resultado da corrida)</span></label><input id="email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="voce@email.com"></div>
         <div class="c6"><label for="instagram">Instagram <span class="op">(sai junto com seu nome no resultado da bateria)</span></label><input id="instagram" name="instagram" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="@seuusuario" maxlength="80" required></div>
       </div>
     </section>
@@ -114,13 +124,13 @@
       <p class="sub">O peso ajuda a equilibrar os karts.</p>
       <div class="grade">
         <div class="c3"><label for="nascimento">Data de nascimento</label><input id="nascimento" inputmode="numeric" autocomplete="bday" placeholder="DD/MM/AAAA" required></div>
-        <div class="c3"><label for="peso">Peso (kg) <span class="op">(opcional)</span></label><input id="peso" inputmode="decimal" placeholder="Ex.: 72"></div>
+        <div class="c3"><label for="peso">Peso (kg) <span class="op">(equilibra os karts)</span></label><input id="peso" inputmode="decimal" placeholder="Ex.: 72"></div>
       </div>
     </section>
 
     <section class="cartao">
-      <h2><span class="n">4</span>Endereço <span class="op">(opcional)</span></h2>
-      <p class="sub">Pode pular. Se quiser preencher, digite o CEP que o resto se preenche sozinho.</p>
+      <h2><span class="n">4</span>Endereço</h2>
+      <p class="sub">Digite o CEP e o resto se preenche sozinho.</p>
       <div class="grade">
         <div class="c2"><label for="cep">CEP</label><input id="cep" inputmode="numeric" autocomplete="postal-code" placeholder="00000-000"></div>
         <div class="c4"><label for="endereco">Rua</label><input id="endereco" autocomplete="address-line1"></div>
@@ -155,6 +165,7 @@
   <section class="cartao" id="pronto" aria-live="polite">
     <div class="ok"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#00e676" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
     <h2 id="prontoTitulo">Tudo certo!</h2>
+    <div class="pagar" id="pagarCaixa" hidden></div>
     <p>Seu pré-cadastro foi recebido.</p>
     <div class="totem">
       <p style="margin:0 0 6px"><b>Quando chegar ao kartódromo:</b></p>
@@ -168,6 +179,20 @@
   const $ = (id) => document.getElementById(id);
   const aberto = Date.now();
   let tipo = 'CPF';
+  const reserva = /^[A-Za-z0-9]{10,24}$/.test(new URLSearchParams(location.search).get('r') || '') ? new URLSearchParams(location.search).get('r') : '';
+  const brl = (c) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const quando = (s) => { const d = new Date(String(s).slice(0, 16) + ':00-03:00'); return isNaN(d) ? '' : d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' }) + ' às ' + String(s).slice(11, 16); };
+  let grupo = null;
+  if (reserva) fetch('/api/grupo?r=' + reserva).then((r) => r.ok ? r.json() : null).then((g) => {
+    if (!g || !g.responsavel) return;
+    grupo = g;
+    const f = $('grupoFaixa');
+    const paga = g.modo === 'individual' && g.precoCentavos > 0;
+    f.innerHTML = '<h2>Grupo do(a) ' + g.responsavel.replace(/[<>&]/g, '') + '</h2><p>' + (g.bateria || 'Bateria').replace(/[<>&]/g, '') + ' · ' + quando(g.inicio) + '. ' +
+      (g.livres > 0 ? (paga ? 'Preencha seu cadastro completo e, no final, pague a sua vaga (<b>' + brl(g.precoCentavos) + '</b>) por Pix ou cartão.' : 'Preencha seu cadastro completo: sua vaga no grupo já fica no seu nome.')
+        : 'Todas as vagas do grupo já têm dono. Faça o cadastro e fale com quem reservou.') + '</p>';
+    f.hidden = false;
+  }).catch(() => {});
   const dig = (v) => v.replace(/\D/g, '');
   const mascaras = {
     CPF: (v) => dig(v).slice(0, 11).replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2'),
@@ -233,6 +258,22 @@
   };
   const cpfOk = (v) => { const d = dig(v); if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false; for (const t of [9, 10]) { let s = 0; for (let i = 0; i < t; i++) s += +d[i] * (t + 1 - i); if (((s * 10) % 11) % 10 !== +d[t]) return false; } return true; };
 
+  function mostrarPagamento(pg, g) {
+    const c = $('pagarCaixa');
+    const quem = g && g.responsavel ? ' no grupo do(a) <b>' + g.responsavel.replace(/[<>&]/g, '') + '</b>' : '';
+    if (pg.pago) { c.innerHTML = '<p><b>Pagamento confirmado!</b> Sua vaga' + quem + ' está garantida.</p>'; c.hidden = false; return; }
+    c.innerHTML = '<p>Falta pagar a sua vaga' + quem + ':</p><p class="valor">' + brl(pg.valorCentavos) + '</p>' +
+      '<a class="botao" href="' + encodeURI(pg.link) + '" target="_blank" rel="noopener">Pagar agora · Pix ou cartão</a>' +
+      '<p class="estado" id="pagarEstado">Depois de pagar, esta tela confirma sozinha.</p>';
+    c.hidden = false;
+    const t = setInterval(async () => {
+      try {
+        const s = await (await fetch('/api/grupo/pagamento?id=' + encodeURIComponent(pg.id))).json();
+        if (s.pago) { clearInterval(t); c.innerHTML = '<p><b>Pagamento confirmado!</b> Sua vaga' + quem + ' está garantida. No kartódromo, é só digitar seu CPF no totem.</p>'; }
+      } catch {}
+    }, 6000);
+  }
+
   $('form').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     $('erro').style.display = 'none';
@@ -246,6 +287,14 @@
     if (!ig) return erro('Informe seu Instagram (o @usuário).', insta);
     if (!/^[a-z0-9_](?:[a-z0-9_.]{0,28}[a-z0-9_])?$/.test(ig) || ig.includes('..')) return erro('Instagram inválido. Informe o @usuário (ex.: @andre.silva).', insta);
     if (!iso(nasc.value)) return erro('Informe a data de nascimento (DD/MM/AAAA).', nasc);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.value.trim())) return erro('Informe seu e-mail.', email);
+    const kg = Number($('peso').value.replace(',', '.'));
+    if (!(kg >= 20 && kg <= 250)) return erro('Informe seu peso em kg (entre 20 e 250).', $('peso'));
+    if (!$('endereco').value.trim()) return erro('Informe a rua do seu endereço.', $('endereco'));
+    if (!$('numero').value.trim()) return erro('Informe o número do endereço.', $('numero'));
+    if (!$('bairro').value.trim()) return erro('Informe o bairro.', $('bairro'));
+    if (!$('cidade').value.trim()) return erro('Informe a cidade.', $('cidade'));
+    if (reserva && grupo && grupo.modo === 'individual' && tipo !== 'CPF') return erro('Para pagar a vaga pelo link do grupo, use o CPF.', doc);
     const menores = [...document.querySelectorAll('.menor')].map((m) => ({ nome: m.querySelector('.mNome').value, nascimento: iso(m.querySelector('.mNasc').value), documento: m.querySelector('.mDoc').value, el: m }))
       .filter((m) => m.nome.trim() || m.nascimento);
     for (const m of menores) {
@@ -262,7 +311,7 @@
           tipoDocumento: tipo, documento: doc.value, nome: nome.value, email: email.value, instagram: insta.value, telefone: fone.value, nascimento: iso(nasc.value),
           peso: $('peso').value, cep: $('cep').value, endereco: $('endereco').value, numero: $('numero').value, complemento: $('complemento').value,
           bairro: $('bairro').value, cidade: $('cidade').value, estado: $('estado').value,
-          menores: menores.map(({ el, ...m }) => m), lgpd: true, site: $('site').value, t: aberto,
+          menores: menores.map(({ el, ...m }) => m), lgpd: true, reserva, site: $('site').value, t: aberto,
         }),
       });
       const j = await r.json().catch(() => ({}));
@@ -270,6 +319,7 @@
       $('form').style.display = 'none';
       $('prontoTitulo').textContent = `Tudo certo, ${j.nome || ''}!`.replace(', !', '!');
       $('pronto').style.display = 'block';
+      if (j.pagamento) mostrarPagamento(j.pagamento, j.grupo);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (e) {
       erro(e.message, null);
@@ -279,5 +329,6 @@
   });
 })();
 </script>
+
 </body>
 </html>

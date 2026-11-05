@@ -85,8 +85,8 @@ function chaveCategoria(valor: string | null | undefined) {
   return String(valor ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('pt-BR');
 }
 
-/** Voltas válidas filtradas do período. */
-export function voltasDoPeriodo(sessions: Iterable<Session>, o: RankingKartsOpcoes, trackDe: (s: Session) => string | null, kartDaPassagem: (kart: string, transponder: number | null | undefined) => string, nomeTracado: (s: Session) => string = (s) => s.trackId || 'Traçado principal', filtroKart?: string): Volta[] {
+/** Voltas válidas das baterias finalizadas no período, já com o kart físico de cada volta. */
+function voltasDoPeriodo(sessions: Iterable<Session>, o: RankingKartsOpcoes, trackDe: (s: Session) => string | null, kartDaPassagem: (kart: string, transponder: number | null | undefined) => string, nomeTracado: (s: Session) => string): Volta[] {
   const out: Volta[] = [];
   for (const s of sessions) {
     if (s.state !== 'encerrada' && s.state !== 'bandeira_final') continue;
@@ -95,94 +95,47 @@ export function voltasDoPeriodo(sessions: Iterable<Session>, o: RankingKartsOpco
     if (o.ate && dia > o.ate) continue;
     if (o.trackId && trackDe(s) !== o.trackId) continue;
     if (o.tipos?.length && !o.tipos.includes(s.type)) continue;
+    // os tempos da equalização ficam separados dos da cronometragem: só entram se pedidos
     if (s.type === 'equalizacao' && !o.tipos?.includes('equalizacao')) continue;
     const minimo = o.extensaoM ? voltaMinimaPlausivelMs(o.extensaoM(s)) : 0;
-    const tracado = nomeTracado(s);
-    const chuva = s.chuva === true;
-
     for (const c of s.competitors) {
       if (o.categorias != null && !o.categorias.includes(chaveCategoria(c.category || o.categoriaDaBateria?.(s)))) continue;
       const ativas = c.crossings.filter((x) => !x.deleted).sort((a, b) => a.wallMs - b.wallMs);
-      for (let i = 1; i < ativas.length; i++) {
-        const x = ativas[i];
-        if (x.lapMs === null || x.invalid || x.lapMs <= 0 || x.lapMs < minimo) continue;
-        const kart = kartDaPassagem(c.kart, x.transponder);
-        if (filtroKart && kart !== filtroKart) continue;
-        out.push({ kart, lapMs: x.lapMs, wallMs: x.wallMs, s, piloto: c.name, chuva, tracado });
-      }
+      ativas.forEach((x, i) => {
+        if (i === 0 || x.lapMs === null || x.invalid || x.lapMs <= 0 || x.lapMs < minimo) return;
+        out.push({ kart: kartDaPassagem(c.kart, x.transponder), lapMs: x.lapMs, wallMs: x.wallMs, s, piloto: c.name, chuva: s.chuva === true, tracado: nomeTracado(s) });
+      });
     }
   }
   return out;
 }
 
-type KartAcumulado = {
-  tempos: number[];
-  melhor: { lapMs: number; wallMs: number; sId: string; sName: string; piloto: string; chuva: boolean; tracado: string } | null;
-  baterias: Set<string>;
-  pilotos: Set<string>;
-  ultimaWallMs: number;
-};
-
 export function rankingKarts(sessions: Iterable<Session>, o: RankingKartsOpcoes, trackDe: (s: Session) => string | null, kartDaPassagem: (kart: string, transponder: number | null | undefined) => string, nomeTracado: (s: Session) => string = (s) => s.trackId || 'Traçado principal'): KartRanking[] {
-  // Item 34: Acumulação direta sem array plano intermediário gigante para prevenir GC Stop-The-World
-  const porKart = new Map<string, KartAcumulado>();
-
-  for (const s of sessions) {
-    if (s.state !== 'encerrada' && s.state !== 'bandeira_final') continue;
-    const dia = dataBrasilia(s.startedAt ?? s.createdAt);
-    if (o.de && dia < o.de) continue;
-    if (o.ate && dia > o.ate) continue;
-    if (o.trackId && trackDe(s) !== o.trackId) continue;
-    if (o.tipos?.length && !o.tipos.includes(s.type)) continue;
-    if (s.type === 'equalizacao' && !o.tipos?.includes('equalizacao')) continue;
-    const minimo = o.extensaoM ? voltaMinimaPlausivelMs(o.extensaoM(s)) : 0;
-    const tracado = nomeTracado(s);
-    const chuva = s.chuva === true;
-
-    for (const c of s.competitors) {
-      if (o.categorias != null && !o.categorias.includes(chaveCategoria(c.category || o.categoriaDaBateria?.(s)))) continue;
-      const ativas = c.crossings.filter((x) => !x.deleted).sort((a, b) => a.wallMs - b.wallMs);
-      for (let i = 1; i < ativas.length; i++) {
-        const x = ativas[i];
-        if (x.lapMs === null || x.invalid || x.lapMs <= 0 || x.lapMs < minimo) continue;
-        const kart = kartDaPassagem(c.kart, x.transponder);
-        let ac = porKart.get(kart);
-        if (!ac) {
-          ac = { tempos: [], melhor: null, baterias: new Set(), pilotos: new Set(), ultimaWallMs: 0 };
-          porKart.set(kart, ac);
-        }
-        ac.tempos.push(x.lapMs);
-        ac.baterias.add(s.id);
-        const pNorm = c.name.trim().toLowerCase();
-        if (pNorm) ac.pilotos.add(pNorm);
-        if (x.wallMs > ac.ultimaWallMs) ac.ultimaWallMs = x.wallMs;
-        if (!ac.melhor || x.lapMs < ac.melhor.lapMs) {
-          ac.melhor = { lapMs: x.lapMs, wallMs: x.wallMs, sId: s.id, sName: s.name, piloto: c.name, chuva, tracado };
-        }
-      }
-    }
+  const porKart = new Map<string, Volta[]>();
+  for (const v of voltasDoPeriodo(sessions, o, trackDe, kartDaPassagem, nomeTracado)) {
+    if (!porKart.has(v.kart)) porKart.set(v.kart, []);
+    porKart.get(v.kart)!.push(v);
   }
-
-  const linhas = [...porKart.entries()].map(([kart, ac]) => {
-    const tempos = ac.tempos.sort((a, b) => a - b);
-    const top = tempos.slice(0, 10);
-    const melhor = ac.melhor!;
+  const linhas = [...porKart.entries()].map(([kart, vs]) => {
+    const ord = [...vs].sort((a, b) => a.lapMs - b.lapMs);
+    const melhor = ord[0];
+    const top = ord.slice(0, 10);
     return {
       posicao: 0,
       kart,
       melhorMs: melhor.lapMs,
       melhorPiloto: melhor.piloto,
       melhorData: dataBrasilia(melhor.wallMs),
-      melhorBateria: melhor.sName,
-      melhorSessionId: melhor.sId,
+      melhorBateria: melhor.s.name,
+      melhorSessionId: melhor.s.id,
       melhorTracado: melhor.tracado,
       chuva: melhor.chuva,
-      media10Ms: Math.round(top.reduce((t, v) => t + v, 0) / top.length),
-      medianaMs: mediana(tempos),
-      voltas: tempos.length,
-      baterias: ac.baterias.size,
-      pilotos: ac.pilotos.size,
-      ultimaVez: dataBrasilia(ac.ultimaWallMs),
+      media10Ms: Math.round(top.reduce((t, v) => t + v.lapMs, 0) / top.length),
+      medianaMs: mediana(vs.map((v) => v.lapMs)),
+      voltas: vs.length,
+      baterias: new Set(vs.map((v) => v.s.id)).size,
+      pilotos: new Set(vs.map((v) => v.piloto.trim().toLowerCase())).size,
+      ultimaVez: dataBrasilia(Math.max(...vs.map((v) => v.wallMs))),
     } satisfies KartRanking;
   });
   linhas.sort((a, b) => a.melhorMs - b.melhorMs || a.media10Ms - b.media10Ms || a.kart.localeCompare(b.kart, 'pt-BR', { numeric: true }));

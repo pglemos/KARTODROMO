@@ -288,11 +288,11 @@ export async function publicarRankingDoApp(log: Log, agora = Date.now()) {
   const destino = new URL('/api/mobile/v1/internal/ranking', base);
   const token = process.env.MOBILE_ADMIN_TOKEN!;
   const { ranking, pilotos, posicoes } = await rankingPublicoParaApp();
-  const enviar = async (itens: { chave: string; dados: unknown }[]) => {
+  const enviar = async (itens: { chave: string; dados: unknown }[], apagar: string[] = []) => {
     const r = await fetch(destino, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-mobile-admin-token': token },
-      body: JSON.stringify({ itens }),
+      body: JSON.stringify(apagar.length ? { itens, apagar } : { itens }),
       redirect: 'error',
       signal: AbortSignal.timeout(30_000),
     });
@@ -341,6 +341,13 @@ export async function publicarRankingDoApp(log: Log, agora = Date.now()) {
     const parte = mudaram.slice(i, i + 400);
     await enviar(parte.map(({ chave, dados }) => ({ chave, dados })));
     for (const l of parte) rankingEnviado.set(l.chave.slice('piloto:'.length), l.texto);
+  }
+  // 3) fichas que deixaram de existir (ex.: cadastro duplicado unificado em outro): apaga no app para não aparecer na busca
+  const sumiram = [...rankingEnviado.keys()].filter((k) => /^\d{1,12}$/.test(k) && !(k in (pilotos as object)));
+  for (let i = 0; i < sumiram.length; i += 500) {
+    const parte = sumiram.slice(i, i + 500);
+    await enviar([], parte.map((cid) => 'piloto:' + cid));
+    for (const cid of parte) rankingEnviado.delete(cid);
   }
   if (migrando) rankingEnviado.set('__formato', FORMATO_ENVIO);
   rankingVersao = versao;

@@ -9,8 +9,10 @@ const AgendaAcoes = (() => {
   let apoio = null;
   const SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
   const permitido = () => podeTela('agenda', 'alterar');
+  // usuários sem permissão de fechar: o servidor recusa (403) e a tela nem oferece fechar, bloquear, excluir ou fechar o dia
+  const podeFechar = () => !(S.perm && S.perm.fecharBateria === false);
   const carregarApoio = async () => (apoio ||= await office('/apoio'));
-  const agoraLocal = () => { const d = new Date(); const p = (x) => String(x).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
+  const agoraLocal = () => `${hojeIso()}T${fmtHm(agoraMin())}`;
   // já correu = o horário passou; "fechada" é outra coisa (o app trata as duas como "fim")
   const passou = (b) => { const dia = b.dataHora.slice(0, 10), hoje = hojeIso(); return dia < hoje || (dia === hoje && hm(horaDe(b.dataHora)) + 35 <= agoraMin()); };
   const dataBr = (iso) => { const [a, m, d] = String(iso).slice(0, 10).split('-'); return `${d}/${m}/${a}`; };
@@ -20,10 +22,14 @@ const AgendaAcoes = (() => {
   const estaFechada = (b) => b.status === 'fechada' || !!b.reservaFechada;
   // abrir: deixa a bateria realmente aberta (status e tipo); fechar: tipo "fechada" (sai do site e do totem, quem já reservou continua)
   async function abrirBateria(b) {
-    if (b.status === 'fechada') await office(`/baterias/${b.id}/status`, { method: 'POST', body: { status: 'aberta' } });
-    if (b.reservaFechada) await office(`/baterias/${b.id}/tipo`, { method: 'POST', body: { tipo: 'aberta' } });
+    await office(`/baterias/${b.id}/tipo`, { method: 'POST', body: { tipo: 'aberta' } });
   }
   const fecharBateria = (b) => office(`/baterias/${b.id}/tipo`, { method: 'POST', body: { tipo: 'fechada' } });
+  // devolve a bateria ao estado que tinha antes (b é o retrato de antes da ação)
+  async function restaurar(b) {
+    const tipo = b.reservaFechada ? 'fechada' : (b.autoAtendimento === false || b.autoAtendimento === 0) ? 'bloqueada' : 'aberta';
+    await office(`/baterias/${b.id}/tipo`, { method: 'POST', body: { tipo, estadoAnterior: { status: b.status, reservaFechada: !!b.reservaFechada, autoAtendimento: !(b.autoAtendimento === false || b.autoAtendimento === 0) } } });
+  }
   const tipoDe = (b) => (b.reservaFechada ? 'fechada' : (b.autoAtendimento === false || b.autoAtendimento === 0) ? 'bloqueada' : 'aberta');
   const TIPOS_RESERVA = [['aberta', 'Vagas abertas', 'site, totem e Recepção'], ['fechada', 'Bateria fechada para novos', 'só o grupo, sai do site'], ['bloqueada', 'Bloqueada', 'só a Recepção vende']];
   const flagsDoTipo = (t) => ({ reservaFechada: t === 'fechada', autoAtendimento: t === 'aberta' });
@@ -46,7 +52,7 @@ const AgendaAcoes = (() => {
         <label class="campo"><span>Vagas (máximo de pilotos)</span><input class="entrada" id="bVagas" type="number" min="1" max="60" inputmode="numeric" value="${novo ? 12 : b.vagas}"></label>
         <label class="campo"><span>Traçado</span><select class="entrada" id="bTracado"><option value="">Sem traçado</option>${ap.tracados.map((t) => `<option value="${t.id}" ${b && t.id === b.tracadoId ? 'selected' : ''}>${esc(t.nome)}</option>`).join('')}</select></label>
         <label class="campo"><span>Volta mínima (segundos)</span><input class="entrada" id="bVolta" type="number" min="0" inputmode="numeric" value="${novo ? 5 : b.voltaMinimaSeg ?? 5}"></label>
-        <label class="campo"><span>Quem pode reservar</span><select class="entrada" id="bTipo">${TIPOS_RESERVA.map(([v, t, d]) => `<option value="${v}" ${tipo === v ? 'selected' : ''}>${t} · ${d}</option>`).join('')}</select></label>
+        <label class="campo"><span>Quem pode reservar</span><select class="entrada" id="bTipo">${TIPOS_RESERVA.filter(([v]) => podeFechar() || v === 'aberta' || v === tipo).map(([v, t, d]) => `<option value="${v}" ${tipo === v ? 'selected' : ''}>${t} · ${d}</option>`).join('')}</select></label>
         <label class="campo" style="grid-column: 1 / -1"><span>Observação (opcional)</span><textarea class="entrada" id="bObs" rows="2" maxlength="400" style="height: auto">${esc(novo ? '' : b.observacao || '')}</textarea></label>
       </div><p class="erroMsg" id="bErro" style="padding: 0 var(--kib-espaco-3)"></p>
       <div class="modalRodape"><button class="btn sec" style="margin-left: auto" data-ag-voltar>Cancelar</button><button class="btn prim" id="bSalvar">${novo ? 'Criar bateria' : 'Salvar alterações'}</button></div>`;
@@ -61,6 +67,8 @@ const AgendaAcoes = (() => {
       if (!/^\d{2}:\d{2}$/.test(h)) return erro('Informe a hora.');
       if (!produtoId) return erro('Escolha o produto: ele define o preço.');
       if (!(vagas >= 1)) return erro('Informe as vagas (pelo menos 1).');
+      if (!novo && !podeFechar() && vagas < Number(b.vagas)) return erro('Seu usuário não pode diminuir as vagas de uma bateria. Chame o administrador.');
+      if (!podeFechar() && m.querySelector('#bTipo').value !== 'aberta' && m.querySelector('#bTipo').value !== tipo) return erro('Seu usuário não pode fechar nem bloquear baterias.');
       if (!novo && vagas < b.inscritos) return erro(`A bateria já tem ${b.inscritos} inscrito(s). As vagas não podem ficar abaixo disso.`);
       const corpo = {
         nome, inicio: `${data}T${h}`, vagas, produtoId, tracadoId: Number(m.querySelector('#bTracado').value) || null,
@@ -84,7 +92,10 @@ const AgendaAcoes = (() => {
     const fechar = !estaFechada(b);
     try {
       if (fechar) await fecharBateria(b); else await abrirBateria(b);
-      toast(fechar ? 'Bateria fechada: sai do site e do totem. Quem já reservou continua' : 'Bateria aberta para reservas');
+      toastAcao(fechar ? 'Bateria fechada: sai do site e do totem. Quem já reservou continua' : 'Bateria aberta para reservas', 'Desfazer', async () => {
+        await restaurar(b);
+        await C.recarregar(); C.abrir(b.id);
+      });
       await C.recarregar(); C.abrir(b.id);
     } catch (e) { falhou(e); }
   }
@@ -119,19 +130,21 @@ const AgendaAcoes = (() => {
       <div style="padding: var(--kib-espaco-2) var(--kib-espaco-3); display: grid; gap: var(--kib-espaco-denso-12)"><label class="campo"><span>Dia</span><input class="entrada" id="fdData" type="date" value="${dia0}"></label><div id="fdResumo" class="peq" style="line-height: 1.5" role="status"></div><p class="erroMsg" id="fdErro"></p></div>
       <div class="modalRodape"><button class="btn sec" style="margin-left: auto" data-ag-voltar>Cancelar</button><button class="btn prim" id="fdOk" style="background: var(--kib-cor-estado-perigo-solido)" disabled>Fechar o dia</button></div>`;
     m.querySelector('[data-ag-voltar]').onclick = () => fecharCamada();
-    let lista = [];
+    let lista = [], consulta = 0;
     const resumo = async () => {
-      const d = m.querySelector('#fdData').value; const ok = m.querySelector('#fdOk'); ok.disabled = true;
+      const pedido = ++consulta; const d = m.querySelector('#fdData').value; const ok = m.querySelector('#fdOk'); ok.disabled = true;
       if (!d) { m.querySelector('#fdResumo').textContent = ''; return; }
       m.querySelector('#fdResumo').textContent = 'Conferindo as baterias do dia…';
       try {
-        lista = (await office(`/baterias?status=todas&filtro=entre&data=${d}&ate=${d}`)).filter((x) => x.status !== 'cancelada');
+        const recebidas = await office(`/baterias?status=todas&filtro=entre&data=${d}&ate=${d}`);
+        if (pedido !== consulta || !m.isConnected) return;
+        lista = recebidas.filter((x) => x.status !== 'cancelada');
         const com = lista.filter((x) => (+x.inscritos || 0) + (+x.preReservas || 0) > 0).length;
         m.querySelector('#fdResumo').innerHTML = lista.length
           ? `<b>${diaExtenso(d)}</b>: ${lista.length - com} de ${lista.length} baterias serão canceladas.${com ? ` <b>${com}</b> ${com === 1 ? 'tem reserva e continua' : 'têm reserva e continuam'}: avise os clientes e mova-os antes de cancelar.` : ''}<br>Para não gerar esse dia de novo, cadastre-o em Cadastros › Feriados.`
           : `${diaExtenso(d)} já não tem baterias.`;
         ok.disabled = !(lista.length - com);
-      } catch (e) { m.querySelector('#fdResumo').textContent = ''; m.querySelector('#fdErro').textContent = e.message; }
+      } catch (e) { if (pedido !== consulta || !m.isConnected) return; m.querySelector('#fdResumo').textContent = ''; m.querySelector('#fdErro').textContent = e.message; }
     };
     m.querySelector('#fdData').onchange = resumo; resumo();
     m.querySelector('#fdOk').onclick = async () => {
@@ -184,17 +197,31 @@ const AgendaAcoes = (() => {
 
   // ------------------------------------------------------------------ mover cliente de bateria ou de dia
   async function mover(origem, reservas) {
-    // reservas: lista de inscrições (pagas ou não) que saem de `origem`
+    // O grupo é uma reserva única: links e pagamentos continuam no mesmo horário.
+    const selecao = C.A.sel;
+    let grupos; try { grupos = await office(`/grupos?bateriaId=${origem.id}`); } catch (e) { falhou(e); return; }
+    if (C.A.sel !== selecao) return;
+    const ids = new Set(reservas.map((r) => r.id));
+    const inteiros = grupos.filter((g) => g.pilotos.some((p) => ids.has(p.inscricaoId)));
+    if (inteiros.length) {
+      let todas; try { todas = await office(`/reservas?bateriaId=${origem.id}&status=todas`); } catch (e) { falhou(e); return; }
+      if (C.A.sel !== selecao) return;
+      const incluir = new Set(inteiros.flatMap((g) => g.pilotos.map((p) => p.inscricaoId)));
+      const ampliadas = todas.filter((r) => r.status !== 'cancelada' && (ids.has(r.id) || incluir.has(r.id)));
+      if (ampliadas.length > reservas.length && !await confirmar('Mover o grupo inteiro?', `Para manter cadastro, preço e pagamentos juntos, serão movidos ${ampliadas.length} pilotos.`, 'Mover grupo inteiro')) return;
+      reservas = ampliadas;
+    }
+    const grupoPorInscricao = new Map(inteiros.flatMap((g) => g.pilotos.map((p) => [p.inscricaoId, g.id])));
     const n = reservas.length, pagas = reservas.filter((r) => r.pago), nome = n === 1 ? reservas[0].cliente : `${n} clientes`;
     const m = modal('', 'Mover cliente'); m.style.maxWidth = '720px';
-    let dia = origem.dataHora.slice(0, 10), lista = [], escolhida = null, ocupado = false;
+    let dia = origem.dataHora.slice(0, 10), lista = [], escolhida = null, ocupado = false, consulta = 0;
     const motivo = (b) => {
       if (b.id === origem.id) return 'Bateria atual';
-      if (b.status !== 'aberta') return 'Bateria fechada';
+      if (b.status !== 'aberta' || b.reservaFechada) return 'Bateria fechada';
       if (b.dataHora < agoraLocal()) return 'Já passou';
       if ((+b.disponiveis || 0) < reservas.length) return +b.disponiveis ? `Só ${b.disponiveis} ${+b.disponiveis === 1 ? 'vaga' : 'vagas'}` : 'Sem vagas';
       if (b.produtoId == null || b.preco == null) return 'Sem produto/preço';
-      if (reservas.some((r) => r.pago) && origem.tipoKart !== b.tipoKart) return 'Reserva paga só vai para o mesmo tipo de kart';
+      if ((inteiros.length || reservas.some((r) => r.pago)) && origem.tipoKart !== b.tipoKart) return 'Reserva paga só vai para o mesmo tipo de kart';
       return '';
     };
     const pintar = () => {
@@ -208,15 +235,17 @@ const AgendaAcoes = (() => {
       const alvo = lista.find((b) => b.id === escolhida);
       const ok = m.querySelector('#mvOk'); ok.disabled = !alvo || !!motivo(alvo) || ocupado;
       ok.textContent = alvo ? `Mover para ${horaDe(alvo.dataHora)}${alvo.dataHora.slice(0, 10) !== origem.dataHora.slice(0, 10) ? ' de ' + dataBr(alvo.dataHora) : ''}` : 'Escolha a bateria';
-      const naoPagas = reservas.filter((r) => !r.pago);
+      const naoPagas = reservas.filter((r) => !r.pago && !grupoPorInscricao.has(r.id));
       const aviso = alvo && naoPagas.length && naoPagas.some((r) => Number(r.produtoId) !== Number(alvo.produtoId) || Number(r.preco) !== Number(alvo.preco)) ? `O valor ${naoPagas.length === 1 ? 'da reserva' : 'das reservas não pagas'} passa a ser o da bateria nova (${brl(alvo.preco)}).` : '';
-      m.querySelector('#mvAviso').textContent = [aviso, alvo && reservas.some((r) => r.pago) ? 'O produto e o valor já pagos são preservados; o servidor confere se é o mesmo serviço.' : ''].filter(Boolean).join(' ');
+      m.querySelector('#mvAviso').textContent = [aviso, alvo && (inteiros.length || reservas.some((r) => r.pago)) ? 'O produto e o valor já pagos são preservados; o servidor confere se é o mesmo serviço.' : ''].filter(Boolean).join(' ');
     };
     const carregarDia = async () => {
+      const pedido = ++consulta, dataPedido = dia;
+      m.querySelector('#mvOk').disabled = true;
       m.querySelector('#mvDia').value = dia; m.querySelector('#mvTitulo2').textContent = diaExtenso(dia);
       m.querySelector('#mvLista').innerHTML = '<div class="esqueleto" style="height: 160px"></div>'; escolhida = null;
-      try { lista = (await office(`/baterias?status=todas&filtro=entre&data=${dia}&ate=${dia}`)).filter((b) => b.status !== 'cancelada').sort((x, y) => x.dataHora.localeCompare(y.dataHora)); }
-      catch (e) { lista = []; m.querySelector('#mvErro').textContent = e.message; }
+      try { const recebidas = await office(`/baterias?status=todas&filtro=entre&data=${dataPedido}&ate=${dataPedido}`); if (pedido !== consulta || !m.isConnected) return; lista = recebidas.filter((b) => b.status !== 'cancelada').sort((x, y) => x.dataHora.localeCompare(y.dataHora)); }
+      catch (e) { if (pedido !== consulta || !m.isConnected) return; lista = []; m.querySelector('#mvErro').textContent = e.message; }
       pintar();
     };
     m.innerHTML = `<div class="modalTopo"><span class="col" style="gap: var(--kib-espaco-meio); min-width: 0"><span style="font-size: var(--kib-fonte-tamanho-titulo); font-weight: 700">Mover ${esc(nome)}</span>
@@ -239,15 +268,20 @@ const AgendaAcoes = (() => {
       const alvo = lista.find((b) => b.id === escolhida); if (ocupado || !alvo || motivo(alvo)) return;
       ocupado = true; m.querySelector('#mvOk').disabled = true; m.querySelector('#mvErro').textContent = '';
       const falhas = [], pendentes = []; let feitas = 0;
+      const processados = new Set();
       for (const r of reservas) {
-        try { await office(`/reservas/${r.id}/mover`, { method: 'POST', body: { bateriaId: alvo.id } }); feitas++; }
-        catch (e) { pendentes.push(r); falhas.push(`${r.cliente}: ${e.message}`); }
+        const grupoId = grupoPorInscricao.get(r.id);
+        if (grupoId && processados.has(grupoId)) continue;
+        if (grupoId) processados.add(grupoId);
+        const membros = grupoId ? reservas.filter((x) => grupoPorInscricao.get(x.id) === grupoId) : [r];
+        try { await office(grupoId ? `/grupos/${grupoId}/mover` : `/reservas/${r.id}/mover`, { method: 'POST', body: { bateriaId: alvo.id } }); feitas += membros.length; }
+        catch (e) { pendentes.push(...membros); falhas.push(`${r.cliente}: ${e.message}`); }
       }
       ocupado = false;
       if (!falhas.length) { toast(feitas === 1 ? 'Cliente movido' : `${feitas} clientes movidos`); C.A.sel = origem.id; fecharCamada(); await C.recarregar(); return; }
       m.querySelector('#mvErro').textContent = (feitas ? `${feitas} movido(s). Não deu para mover: ` : 'Não foi possível mover: ') + falhas.join(' · ');
       reservas = pendentes; alvo.disponiveis = Math.max(0, Number(alvo.disponiveis) - feitas); pintar();
-      if (feitas) await C.recarregar().catch(() => undefined);
+      if (feitas) await C.carregar().catch(() => undefined);
     };
     carregarDia();
   }
@@ -283,10 +317,10 @@ const AgendaAcoes = (() => {
     const sel = [...lote.sel].map(porId).filter(Boolean);
     const fechadas = sel.filter(estaFechada), abertas = sel.filter((b) => !estaFechada(b));
     const futuras = lista().filter(editavel);
-    barra.innerHTML = `<span class="agBarraTxt" role="status" aria-live="polite"><b>${sel.length ? `${sel.length} ${sel.length === 1 ? 'bateria selecionada' : 'baterias selecionadas'}` : 'Escolha as baterias na agenda'}</b><span class="peq">${sel.length ? `${abertas.length} ${abertas.length === 1 ? 'aberta' : 'abertas'} · ${fechadas.length} ${fechadas.length === 1 ? 'fechada' : 'fechadas'}` : 'Toque ou clique em cada uma. As que já correram não entram.'}</span></span>
+    barra.innerHTML = `<span class="agBarraTxt" role="status" aria-live="polite"><b>${sel.length ? `${sel.length} ${sel.length === 1 ? 'bateria selecionada' : 'baterias selecionadas'}` : 'Escolha as baterias na agenda'}</b><span class="peq">${sel.length ? `${abertas.length} ${abertas.length === 1 ? 'aberta' : 'abertas'} · ${fechadas.length} ${fechadas.length === 1 ? 'fechada' : 'fechadas'}` : 'Toque ou clique em cada uma. Horários já encerrados não entram.'}</span></span>
       <span class="agBarraAcoes"><button type="button" class="btn sec peq" data-ag-lote-todas ${futuras.length ? '' : 'disabled'}>${sel.length && sel.length === futuras.length ? 'Limpar seleção' : 'Todas desta tela'}</button>
       <button type="button" class="btn sec peq" data-ag-lote-abrir ${fechadas.length ? '' : 'disabled'}>Abrir${fechadas.length ? ' ' + fechadas.length : ''}</button>
-      <button type="button" class="btn prim peq" data-ag-lote-fechar style="background: var(--kib-cor-estado-perigo-solido)" ${abertas.length ? '' : 'disabled'}>Fechar${abertas.length ? ' ' + abertas.length : ''}</button>
+      ${podeFechar() ? `<button type="button" class="btn prim peq" data-ag-lote-fechar style="background: var(--kib-cor-estado-perigo-solido)" ${abertas.length ? '' : 'disabled'}>Fechar${abertas.length ? ' ' + abertas.length : ''}</button>` : ''}
       <button type="button" class="btn sec peq" data-ag-lote-sair>Sair</button></span>`;
   }
 
@@ -298,11 +332,12 @@ const AgendaAcoes = (() => {
   function A_fecharGaveta() { if (document.querySelector('#camada .gaveta')) { C.A.sel = null; fecharCamada(); } }
   function marcar(id) {
     const b = porId(id);
-    if (!editavel(b)) { toast('Esta bateria já correu: não dá para abrir ou fechar', true); return; }
+    if (!editavel(b)) { toast('O horário desta bateria já encerrou: não dá para abrir ou fechar', true); return; }
     if (lote.sel.has(id)) lote.sel.delete(id); else lote.sel.add(id);
     decorar();
   }
   async function aplicarLote(fechar) {
+    if (fechar && !podeFechar()) { toast('Seu usuário não pode fechar baterias', true); return; }
     const alvo = [...lote.sel].map(porId).filter((b) => b && (fechar ? !estaFechada(b) : estaFechada(b)));
     if (!alvo.length) return;
     const executar = async () => {
@@ -322,14 +357,24 @@ const AgendaAcoes = (() => {
       m.querySelector('#lOk').onclick = async () => {
         m.querySelector('#lOk').disabled = true;
         const r = await executar();
-        if (!r.erros.length) { toast(`${r.feitas} ${r.feitas === 1 ? 'bateria fechada' : 'baterias fechadas'}`); fecharCamada(); await C.carregar(); decorar(); return; }
+        if (!r.erros.length) { toastAcao(`${r.feitas} ${r.feitas === 1 ? 'bateria fechada' : 'baterias fechadas'}`, 'Desfazer', desfazerLote(alvo, true)); fecharCamada(); await C.carregar(); decorar(); return; }
         m.querySelector('#lErro').textContent = `${r.feitas} fechada(s). Não deu para fechar: ${r.erros.join(' · ')}`; await C.carregar(); decorar();
       };
       return;
     }
     const r = await executar();
-    toast(r.erros.length ? `${r.feitas} aberta(s). Falhou: ${r.erros.join(' · ')}` : `${r.feitas} ${r.feitas === 1 ? 'bateria aberta' : 'baterias abertas'} para reservas`, !!r.erros.length);
+    if (r.erros.length) toast(`${r.feitas} aberta(s). Falhou: ${r.erros.join(' · ')}`, true);
+    else toastAcao(`${r.feitas} ${r.feitas === 1 ? 'bateria aberta' : 'baterias abertas'} para reservas`, 'Desfazer', desfazerLote(alvo, false));
     await C.carregar(); decorar();
+  }
+  // devolve a função que põe as baterias do lote de volta como estavam
+  function desfazerLote(alvo, foiFechar) {
+    return async () => {
+      let falhas = 0;
+      for (const b of alvo) { try { await restaurar(b); } catch { falhas++; } }
+      if (falhas) toast(`${falhas} não voltou${falhas === 1 ? '' : 'ram'} ao estado anterior`, true);
+      await C.carregar(); decorar();
+    };
   }
 
   // ------------------------------------------------------------------ pontes com o app.js
@@ -341,7 +386,7 @@ const AgendaAcoes = (() => {
     const caixa = document.createElement('span');
     caixa.style.display = 'contents';
     caixa.innerHTML = `<button class="btn sec" data-ag-selecionar aria-pressed="false" title="Escolher várias baterias para abrir ou fechar (tecla X)">Selecionar</button>
-      <details class="menuMais"><summary class="btn sec" aria-label="Ações de bateria: nova, gerar, fechar o dia">Baterias</summary><div class="menuLista menuDir"><button type="button" data-ag-nova-bat>Nova bateria…</button><button type="button" data-ag-gerar>Gerar baterias do mês…</button><button type="button" data-ag-fechar-dia>Fechar o dia (feriado)…</button></div></details>`;
+      <details class="menuMais"><summary class="btn sec" aria-label="Ações de bateria: nova, gerar, fechar o dia">Baterias</summary><div class="menuLista menuDir"><button type="button" data-ag-nova-bat>Nova bateria…</button><button type="button" data-ag-gerar>Gerar baterias do mês…</button>${podeFechar() ? '<button type="button" data-ag-fechar-dia>Fechar o dia (feriado)…</button>' : ''}</div></details>`;
     acoes.prepend(caixa);
     lote.abort = new AbortController();
     // modo seleção: o clique numa bateria marca em vez de abrir a gaveta (captura, antes do app.js)
@@ -376,16 +421,55 @@ const AgendaAcoes = (() => {
   }
 
   // gaveta da bateria: menu "Gerenciar" no rodapé + seção "Mover clientes"
+  // vagas de grupo que ainda aguardam cadastro: a recepção liga a pessoa que chegou (ou qualquer cadastro) a uma delas
+  async function pendenciasGrupo(b, g) {
+    const corpo = g.querySelector('#corpoBateria'); if (!corpo || corpo.querySelector('[data-ag-pend]')) return;
+    let r; try { r = await office(`/grupos/pendencias?bateriaId=${b.id}`); } catch (e) { if (corpo.isConnected) { const erro = document.createElement('section'); erro.className = 'secao'; erro.innerHTML = `<p role="alert">Não foi possível conferir as vagas dos grupos: ${esc(e.message)}</p><button class="btn sec peq" data-ag-pend-repetir>Tentar novamente</button>`; erro.querySelector('button').onclick = () => { erro.remove(); pendenciasGrupo(b, g); }; corpo.appendChild(erro); } return; }
+    if (!r || !r.grupos || !r.grupos.length || !document.body.contains(corpo) || corpo.querySelector('[data-ag-pend]')) return;
+    const sec = document.createElement('section'); sec.className = 'secao'; sec.setAttribute('data-ag-pend', '');
+    const total = r.grupos.reduce((a, x) => a + x.vagas.length, 0);
+    const opcoes = r.grupos.flatMap((x) => x.vagas.map((v) => `<option value="${x.id}:${v.id}">${esc(x.responsavel)} · vaga ${v.ordem}${v.nome ? ' (' + esc(v.nome) + ')' : ''}</option>`)).join('');
+    sec.innerHTML = `<span class="titulo">Vagas de grupo aguardando cadastro<span class="chip laranja" style="margin-left: auto">${total}</span></span>
+      <p class="peq" style="line-height: 1.5; margin: 0">${r.grupos.map((x) => `${esc(x.responsavel)}: ${x.vagas.length} ${x.vagas.length === 1 ? 'vaga' : 'vagas'}`).join(' · ')}. As vagas estão reservadas. Confira o pagamento no cartão do grupo antes de liberar os pilotos. Nada é vinculado só pelo horário.</p>
+      ${r.candidatos && r.candidatos.length ? `<div class="peq peso-semibold" style="margin-top: var(--kib-espaco-1)">Chegaram nesta bateria sem estar no grupo</div>
+        ${r.candidatos.map((c) => `<div class="linha gap-1" style="flex-wrap: wrap; margin-top: var(--kib-espaco-meio)"><span class="trunc cresce"><b>${esc(c.nome)}</b> <span class="peq">${esc(c.origem || '')}${c.pago ? ' · pago' : ''}</span></span><select class="entrada" data-ag-pend-vaga="${c.clienteId}" style="max-width: 230px" aria-label="Vaga para ${esc(c.nome)}">${opcoes}</select><button type="button" class="btn sec peq" data-ag-pend-ok="${c.clienteId}">Vincular</button></div>`).join('')}` : ''}
+      <div style="margin-top: var(--kib-espaco-1)"><label class="campo"><span>Ligar um cadastro a uma vaga</span><input class="entrada" data-ag-pend-q placeholder="Nome, CPF ou telefone" autocomplete="off"></label><div data-ag-pend-res></div></div>
+      <p class="erroMsg" data-ag-pend-erro></p>`;
+    corpo.appendChild(sec);
+    const erro = (m) => { sec.querySelector('[data-ag-pend-erro]').textContent = m || ''; };
+    const vincular = async (clienteId, valor) => {
+      const [grupoId, pilotoId] = String(valor).split(':').map(Number); erro('');
+      try { await office(`/grupos/${grupoId}/vincular`, { method: 'POST', body: { clienteId, pilotoId } }); toast('Cadastro vinculado à vaga do grupo'); await C.recarregar(); C.abrir(b.id); }
+      catch (e) { erro(e.message || String(e)); }
+    };
+    let tq = null;
+    sec.addEventListener('input', (e) => {
+      if (!e.target.matches('[data-ag-pend-q]')) return;
+      clearTimeout(tq); const q = e.target.value.trim(); const res = sec.querySelector('[data-ag-pend-res]');
+      tq = setTimeout(async () => {
+        if (q.length < 2) { res.innerHTML = ''; return; }
+        let lista = []; try { lista = await office('/clientes?q=' + encodeURIComponent(q)); } catch (er) { lista = []; }
+        res.innerHTML = lista.slice(0, 6).map((c) => `<div class="linha gap-1" style="flex-wrap: wrap; margin-top: var(--kib-espaco-meio)"><span class="trunc cresce"><b>${esc(c.nome)}</b> <span class="peq">${esc(c.documento || c.telefone || '')}</span></span><select class="entrada" data-ag-pend-vaga="${c.id}" style="max-width: 230px">${opcoes}</select><button type="button" class="btn sec peq" data-ag-pend-ok="${c.id}">Vincular</button></div>`).join('') || '<p class="peq">Nenhum cadastro encontrado.</p>';
+      }, 280);
+    });
+    sec.addEventListener('click', (e) => {
+      const ok = e.target.closest('[data-ag-pend-ok]'); if (!ok) return;
+      const sel = sec.querySelector(`[data-ag-pend-vaga="${ok.dataset.agPendOk}"]`); vincular(+ok.dataset.agPendOk, sel.value);
+    });
+  }
+
   function gaveta({ b, reservas }) {
     if (!C || !permitido()) return;
     const g = document.querySelector('#camada .gaveta'); if (!g || +g.dataset.bateria !== b.id) return;
     if (estaFechada(b) && !passou(b)) { const topo = g.querySelector('.gavetaTopo'); if (topo) topo.innerHTML = topo.innerHTML.replace(' · já correu', ' · bateria fechada para reservas'); }
     if (passou(b)) return;
-    if (b.status === 'fechada') { const nr = g.querySelector('[data-acao="novaReserva"]'); if (nr) { nr.disabled = true; nr.title = 'Abra a bateria para aceitar novas reservas'; nr.lastChild.textContent = ' Bateria fechada: abra para novas reservas'; } }
+    pendenciasGrupo(b, g);
+    if (!podeFechar()) g.querySelectorAll('[data-tipo-bat="fechada"], [data-tipo-bat="bloqueada"]').forEach((x) => x.remove());
+    if (estaFechada(b)) { const nr = g.querySelector('[data-acao="novaReserva"]'); if (nr) { nr.disabled = true; nr.title = 'Abra a bateria para aceitar novas reservas'; nr.lastChild.textContent = ' Bateria fechada: abra para novas reservas'; } }
     const rodape = g.lastElementChild;
     if (rodape && !rodape.querySelector('[data-ag-gerenciar]')) {
       const det = document.createElement('details'); det.className = 'menuMais menuCima'; det.setAttribute('data-ag-gerenciar', '');
-      det.innerHTML = `<summary class="btn sec" aria-label="Gerenciar esta bateria">Gerenciar</summary><div class="menuLista menuDir"><button type="button" data-ag-editar>Editar bateria</button><button type="button" data-ag-status>${estaFechada(b) ? 'Abrir bateria' : 'Fechar bateria'}</button><button type="button" data-ag-excluir style="color: var(--erroTxt)">Excluir bateria</button></div>`;
+      det.innerHTML = `<summary class="btn sec" aria-label="Gerenciar esta bateria">Gerenciar</summary><div class="menuLista menuDir"><button type="button" data-ag-editar>Editar bateria</button>${estaFechada(b) || podeFechar() ? `<button type="button" data-ag-status>${estaFechada(b) ? 'Abrir bateria' : 'Fechar bateria'}</button>` : ''}${podeFechar() ? '<button type="button" data-ag-excluir style="color: var(--erroTxt)">Excluir bateria</button>' : ''}</div>`;
       rodape.appendChild(det);
       det.addEventListener('click', (e) => {
         const bt = e.target.closest('button'); if (!bt) return; det.open = false;
@@ -396,13 +480,24 @@ const AgendaAcoes = (() => {
     const lista = reservas.filter((r) => r.status !== 'cancelada'); if (!lista.length) return;
     const sec = document.createElement('section'); sec.className = 'secao'; sec.setAttribute('data-ag-mover-secao', '');
     sec.innerHTML = `<span class="titulo">Mover clientes<span class="peq" style="margin-left: auto; font-weight: 500">de bateria ou de dia · pagos e não pagos</span></span>
-      <div class="listaMover">${lista.map((r) => `<label class="linhaMover"><input type="checkbox" data-ag-sel="${r.id}" aria-label="Selecionar ${esc(r.cliente)}"><span class="col" style="min-width: 0"><span class="trunc peso-semibold">${esc(r.cliente)}</span><span class="peq trunc">${esc(r.responsavel && r.responsavel !== r.cliente ? 'responsável ' + r.responsavel : r.origem || 'Recepção')}</span></span><span class="chip ${r.pago ? 'verde' : 'laranja'}">${r.pago ? 'pago' : 'falta ' + brlCurto(r.total)}</span><button type="button" class="btn sec peq" data-ag-mover="${r.id}">Mover</button></label>`).join('')}</div>
+      <div class="listaMover">${lista.map((r) => `<label class="linhaMover"><input type="checkbox" data-ag-sel="${r.id}" aria-label="Selecionar ${esc(r.cliente)}"><span class="col" style="min-width: 0"><span class="trunc peso-semibold">${esc(r.cliente)}</span><span class="peq trunc">${esc(r.responsavel && r.responsavel !== r.cliente ? 'responsável ' + r.responsavel : r.origem || 'Recepção')}</span></span><span class="chip ${r.pago ? 'verde' : 'laranja'}">${r.pago ? 'pago' : 'falta ' + brlCurto(r.total)}</span><span class="acoesLinha"><button type="button" class="btn sec peq" data-ag-mover="${r.id}">Mover</button><button type="button" class="btn sec peq" data-ag-edit-cli="${r.clienteId}" aria-label="Editar cadastro de ${esc(r.cliente)}">Editar</button><button type="button" class="btn sec peq" style="color: var(--erroTxt)" data-ag-del-res="${r.id}" aria-label="Excluir a reserva de ${esc(r.cliente)}">Excluir</button></span></label>`).join('')}</div>
       <div class="linha gap-1" style="flex-wrap: wrap"><button type="button" class="btn sec peq" data-ag-sel-todos>Selecionar todos</button><button type="button" class="btn prim peq" data-ag-mover-sel disabled>Mover selecionados</button></div>`;
     corpo.appendChild(sec);
+    let porInsc = {}; office(`/grupos?bateriaId=${b.id}`).then((gs) => { for (const gr of gs || []) for (const p of gr.pilotos || []) if (p.inscricaoId) porInsc[p.inscricaoId] = { grupoId: gr.id, pilotoId: p.id, responsavel: !!p.responsavel }; }).catch(() => undefined);
+    const excluirReserva = async (r) => {
+      const vaga = porInsc[r.id];
+      if (vaga && vaga.responsavel) return toast('Este é o responsável do grupo: para tirar, cancele a reserva inteira em “Abrir reserva”.', true);
+      const ok = await dialogo({ titulo: `Excluir a reserva de ${r.cliente}?`, texto: vaga ? 'A vaga sai do grupo. Se já estiver paga, estorne antes.' : r.pago ? 'Esta reserva está paga: o sistema não deixa excluir. Estorne pela Recepção.' : 'A reserva é cancelada e a vaga volta a ficar livre. O cadastro da pessoa continua.', botoes: [{ rotulo: 'Cancelar', valor: false }, { rotulo: 'Excluir reserva', valor: true, classe: 'perigo-solido' }] });
+      if (!ok) return;
+      try { await office(vaga ? `/grupos/${vaga.grupoId}/pilotos/${vaga.pilotoId}` : `/reservas/${r.id}`, { method: 'DELETE' }); toast('Reserva excluída'); await C.recarregar(); C.abrir(b.id); }
+      catch (e) { toast(e.message || String(e), true); }
+    };
     const atual = () => [...sec.querySelectorAll('[data-ag-sel]:checked')].map((x) => lista.find((r) => r.id === +x.dataset.agSel));
     const botao = () => { const k = atual().length; const bt = sec.querySelector('[data-ag-mover-sel]'); bt.disabled = !k; bt.textContent = k ? `Mover ${k} ${k === 1 ? 'selecionado' : 'selecionados'}` : 'Mover selecionados'; };
     sec.addEventListener('change', (e) => { if (e.target.matches('[data-ag-sel]')) botao(); });
     sec.addEventListener('click', (e) => {
+      const ed = e.target.closest('[data-ag-edit-cli]'); if (ed) { e.preventDefault(); fecharCamada(); location.hash = `#/piloto/${ed.dataset.agEditCli}`; return; }
+      const dl = e.target.closest('[data-ag-del-res]'); if (dl) { e.preventDefault(); excluirReserva(lista.find((r) => r.id === +dl.dataset.agDelRes)); return; }
       const um = e.target.closest('[data-ag-mover]'); if (um) { e.preventDefault(); mover(b, [lista.find((r) => r.id === +um.dataset.agMover)]); return; }
       if (e.target.closest('[data-ag-sel-todos]')) { const todos = sec.querySelectorAll('[data-ag-sel]'); const marcar = ![...todos].every((x) => x.checked); todos.forEach((x) => { x.checked = marcar; }); botao(); return; }
       if (e.target.closest('[data-ag-mover-sel]')) mover(b, atual());

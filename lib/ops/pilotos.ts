@@ -1,4 +1,3 @@
-import { tracadoLegado, tracadoConfirmado } from './tracado-legado';
 /**
  * Página Pilotos do painel web: a cartela de clientes (dbo.Cliente) com a carreira de cada um na cronometragem,
  * o ranking dos melhores tempos por traçado (semana, mês e geral) e a foto do piloto (dbo.ClienteFoto).
@@ -24,7 +23,7 @@ const ARQ = resolve(join(process.cwd(), '.runtime', 'pilotos-cronometragem.json'
 /** `t` = traçado + categoria do piloto ("Traçado 1 · Super Kart"): Super Kart e Indoor correm juntos mas não se comparam. */
 type Corrida = { cid: string | null; nome: string; kart: string; pos: number; voltas: number; melhor: number | null; cat: string | null; dq: boolean; t?: string };
 /** `reserva` = bateria do LapTime de que só sobrou a reserva paga (quem andou), sem tempos nem posição. */
-type BateriaCrono = { id: string; nome: string; tipo: string; dia: string; inicio: number; fim: number | null; chuva: boolean; trackId: string | null; tracado: string; tracadoOriginal?: string; pilotos: Corrida[]; reserva?: boolean };
+type BateriaCrono = { id: string; nome: string; tipo: string; dia: string; inicio: number; fim: number | null; chuva: boolean; trackId: string | null; tracado: string; pilotos: Corrida[]; reserva?: boolean };
 let indice: Record<string, BateriaCrono> = {};
 try { if (existsSync(ARQ)) indice = JSON.parse(readFileSync(ARQ, 'utf8')).baterias ?? {}; } catch { indice = {}; }
 let atualizadoEm = 0, atualizando: Promise<void> | null = null, ultimoErro: string | null = null;
@@ -64,19 +63,39 @@ const tracadoBase = (t: string) => t.replace(/\s*\(chuva\)\s*/i, '').replace(/\s
 const comCategoria = (t: string, cat: string | null | undefined) => (/super\s*kart/i.test(cat ?? '') && !/super kart/i.test(t) ? `${t} · Super Kart` : t);
 const SEM_TRACADO = 'Traçado principal'; // bateria sem traçado marcado: conta na carreira, fica fora do ranking
 let normalizado = false, limites: Map<string, number> | null = null;
+/**
+ * Cadastro duplicado da mesma pessoa (mesmo nome e mesmo e-mail, ex.: CPF digitado errado num deles) vira um piloto só:
+ * as corridas de todos vão para o cadastro atualizado mais recentemente, que é o que a recepção e o app usam.
+ */
+let aliasCliente = new Map<string, string>();
+/** nomes dos cadastros unificados (a busca do app acha o piloto também pelo nome antigo/apelido) */
+let outrosNomesDe = new Map<string, string[]>();
+let nomeCadastroDe = new Map<string, string>();
+let aliasEm = 0;
+async function carregarAliases(log?: (m: string) => void): Promise<boolean> {
+  if (Date.now() - aliasEm < 10 * 60_000) return false;
+  aliasEm = Date.now();
+  try {
+    const rows = await query<{ id: number; canon: number; nome: string; nomeCanon: string }>(
+      `WITH g AS (
+         SELECT Id, LOWER(LTRIM(RTRIM(Email))) em, UPPER(LTRIM(RTRIM(Nome))) nm,
+                ROW_NUMBER() OVER (PARTITION BY LOWER(LTRIM(RTRIM(Email))), UPPER(LTRIM(RTRIM(Nome))) ORDER BY AtualizadoEm DESC, Id DESC) ordem,
+                COUNT(*) OVER (PARTITION BY LOWER(LTRIM(RTRIM(Email))), UPPER(LTRIM(RTRIM(Nome)))) qtd
+           FROM dbo.Cliente WHERE ResponsavelId IS NULL AND Email LIKE '_%@_%._%' AND LEN(LTRIM(RTRIM(Nome))) >= 5)
+       SELECT a.Id id, b.Id canon, (SELECT Nome FROM dbo.Cliente WHERE Id = a.Id) nome, (SELECT Nome FROM dbo.Cliente WHERE Id = b.Id) nomeCanon FROM g a JOIN g b ON b.em = a.em AND b.nm = a.nm AND b.ordem = 1 WHERE a.qtd BETWEEN 2 AND 3 AND a.ordem > 1`, {});
+    const novo = new Map(rows.map((r) => [String(r.id), String(r.canon)]));
+    const mudou = novo.size !== aliasCliente.size || [...novo].some(([k, v]) => aliasCliente.get(k) !== v);
+    aliasCliente = novo;
+    outrosNomesDe = new Map(); nomeCadastroDe = new Map(rows.filter((r) => r.nomeCanon?.trim()).map((r) => [String(r.canon), r.nomeCanon.trim()]));
+    for (const r of rows) { const l = outrosNomesDe.get(String(r.canon)) ?? []; if (r.nome?.trim()) l.push(r.nome.trim()); outrosNomesDe.set(String(r.canon), l); }
+    if (mudou) { normalizado = false; log?.(`pilotos: ${novo.size} cadastro(s) duplicado(s) unificado(s)`); }
+    return mudou;
+  } catch (e) { log?.(`pilotos: duplicados não lidos (${(e as Error).message})`); return false; }
+}
 function normalizarNomes() {
-  for (const b of Object.values(indice)) {
-    const original = b.tracado;
-    b.tracado = tracadoBase(tracadoLegado(b.id, original));
-    if (b.tracado === 'Traçado não confirmado') b.tracadoOriginal ??= original;
-    for (const p of b.pilotos) p.t = comCategoria(b.tracado, catDoKart(p.kart) ?? p.cat);
-  }
-  for (const x of rankAntigo) {
-    const original = x.tracado;
-    const resolvido = tracadoLegado('lt-ranking', tracadoBase(original));
-    if (resolvido === 'Traçado não confirmado') x.tracadoOriginal ??= original;
-    x.tracado = comCategoria(resolvido, x.categoria);
-  }
+  const canon = (cid: string | null) => (cid && aliasCliente.get(cid)) || cid;
+  for (const b of Object.values(indice)) { b.tracado = tracadoBase(b.tracado); for (const p of b.pilotos) { p.cid = canon(p.cid); p.t = comCategoria(b.tracado, catDoKart(p.kart) ?? p.cat); } }
+  for (const x of rankAntigo) { x.cid = canon(x.cid); x.tracado = comCategoria(tracadoBase(x.tracado), x.categoria); }
   normalizado = true; limites = null;
 }
 /** Volta abaixo de 75% da volta típica (mediana) do traçado é corte de pista ou passagem dupla (o LapTime antigo tem várias). */
@@ -91,8 +110,8 @@ function limiteDe(tracado: string) {
   return limites.get(tracado) ?? 0;
 }
 /** Volta mínima possível no Traçado 1: Indoor 1:10.000, Super Kart 1:04.000. Abaixo disso é outro traçado ou corte de pista. */
-export const pisoTracado = (tracado: string) => /^tra[cç]ado\s+1(?:\s*·\s*super kart)?$/i.test(tracado.trim()) ? (/super kart/i.test(tracado) ? 64_000 : 70_000) : 0;
-const valeNoRanking = (tracado: string, ms: number | null) => !!ms && tracadoConfirmado(tracado) && ms >= limiteDe(tracado) && ms >= pisoTracado(tracado);
+const pisoTracado = (tracado: string) => /^tra[cç]ado\s+1(?:\s*·\s*super kart)?$/i.test(tracado.trim()) ? (/super kart/i.test(tracado) ? 64_000 : 70_000) : 0;
+const valeNoRanking = (tracado: string, ms: number | null) => !!ms && !tracado.startsWith(SEM_TRACADO) && ms >= limiteDe(tracado) && ms >= pisoTracado(tracado);
 /** Kart 1-99 é Indoor, 100-199 é Super Kart: vale mais que a categoria do cadastro do piloto. */
 const catDoKart = (kart: string | null | undefined) => { const s = String(kart ?? '').trim(); if (!/^\d{1,3}$/.test(s)) return null; const n = Number(s); return n >= 1 && n <= 99 ? 'Indoor' : n <= 199 && n >= 100 ? 'Super Kart' : null; };
 const tk = (b: BateriaCrono, p: Corrida) => p.t ?? comCategoria(b.tracado, catDoKart(p.kart) ?? p.cat);
@@ -140,6 +159,7 @@ export function atualizarIndice(log?: (m: string) => void): Promise<void> {
           } catch (e) { log?.(`pilotos: bateria ${s.id} não foi lida (${(e as Error).message})`); }
         }));
       }
+      if (await carregarAliases(log)) mudou = true;
       normalizarNomes();
       if (mudou) { await gravarIndiceArq(); }
       atualizadoEm = Date.now(); ultimoErro = null;
@@ -155,7 +175,7 @@ async function indiceFresco() { if (Date.now() - atualizadoEm > 120_000) await a
 // Corridas detalhadas só de 02/09 a 23/09/2026 (o LapTime não guardava mais que isso); rankings diário/semanal/mensal desde
 // jan/2025 com os 10 primeiros de cada faixa de peso, por traçado e categoria (Indoor, Super Kart). O LapTime foi desligado em
 // 23/09: os dados não mudam mais, então são lidos uma vez e guardados em .runtime/pilotos-laptime.json.
-type RankAntigo = { tipo: 'semana' | 'mes'; periodo: string; dia: string; tracado: string; categoria: string; tracadoOriginal?: string; pos: number; faixa: string | null; cid: string | null; nome: string; ms: number };
+type RankAntigo = { tipo: 'semana' | 'mes'; periodo: string; dia: string; tracado: string; categoria: string; pos: number; faixa: string | null; cid: string | null; nome: string; ms: number };
 const ARQ_LEGADO = resolve(join(process.cwd(), '.runtime', 'pilotos-laptime.json'));
 let rankAntigo: RankAntigo[] = [];
 let legadoCarregado = false;
@@ -219,12 +239,18 @@ async function carregarLegado(log?: (m: string) => void) {
 // Corridas de 2023 a jan/2025 com posição, voltas e melhor volta de cada piloto. O CalXPro não guardava o cliente da
 // recepção na corrida, só nome e e-mail: o piloto é ligado ao cadastro unificado pelo e-mail (só quando o e-mail é de
 // um cliente só). Lido uma vez (os dados não mudam mais) e guardado no índice com o prefixo "cx-".
-let calxproCarregado = Object.keys(indice).some((k) => k.startsWith('cx-'));
+// versão 2: e-mail repetido em cadastros duplicados da mesma pessoa também liga a corrida antiga (antes ficava sem dono)
+const ARQ_CALXPRO_VERSAO = resolve(join(process.cwd(), '.runtime', 'pilotos-calxpro-versao.txt'));
+const CALXPRO_VERSAO = '3';
+let calxproCarregado = Object.keys(indice).some((k) => k.startsWith('cx-')) && (() => { try { return readFileSync(ARQ_CALXPRO_VERSAO, 'utf8').trim() === CALXPRO_VERSAO; } catch { return false; } })();
 async function carregarCalxpro(log?: (m: string) => void) {
   try {
     const linhas = await query<{ id: string; nome: string; inicio: Date; piloto: string; sobrenome: string | null; kart: number | null; pos: number | null; voltas: number | null; melhor: number | null; cid: number | null }>(
-      `WITH em AS (SELECT LOWER(LTRIM(RTRIM(Email))) e, MIN(Id) cid FROM dbo.Cliente
-                    WHERE Email LIKE '%@%' AND ResponsavelId IS NULL GROUP BY LOWER(LTRIM(RTRIM(Email))) HAVING COUNT(*) = 1)
+      `WITH base AS (SELECT LOWER(LTRIM(RTRIM(Email))) e, Id, UPPER(LTRIM(RTRIM(Nome))) nm,
+                      ROW_NUMBER() OVER (PARTITION BY LOWER(LTRIM(RTRIM(Email))) ORDER BY AtualizadoEm DESC, Id DESC) ordem
+                      FROM dbo.Cliente WHERE Email LIKE '%@%' AND ResponsavelId IS NULL),
+            -- e-mail de um cadastro só, ou de cadastros duplicados da mesma pessoa (mesmo nome): fica o mais recente
+            em AS (SELECT e, MAX(CASE WHEN ordem = 1 THEN Id END) cid FROM base GROUP BY e HAVING COUNT(DISTINCT nm) = 1 AND COUNT(*) <= 3)
        SELECT h.ID_CORRIDA id, h.ST_NOME nome, h.DT_DATA_HORA inicio, cc.ST_NOME piloto, cc.ST_SOBRENOME sobrenome, cc.NM_NUMERO kart,
               cc.NM_POSICAO pos, cc.TOT_VOLTAS voltas,
               CASE WHEN cc.TEMPO_MELHOR_VOLTA IS NULL THEN NULL ELSE DATEDIFF(ms, CAST(CAST(cc.TEMPO_MELHOR_VOLTA AS date) AS datetime2), cc.TEMPO_MELHOR_VOLTA) END melhor,
@@ -233,32 +259,53 @@ async function carregarCalxpro(log?: (m: string) => void) {
          LEFT JOIN em ON em.e = LOWER(LTRIM(RTRIM(cc.ST_EMAIL)))
         WHERE h.DT_DATA_HORA IS NOT NULL AND cc.ST_NOME IS NOT NULL`,
     );
-    for (const k of Object.keys(indice)) if (k.startsWith('cx-')) delete indice[k];
-    let n = 0;
+    // HIST_COMPETIDOR_CORRIDA (09/2023 a 01/2025) só completa voltas e kart; a fonte das baterias é BATERIAS_CLIENTES
+    const extra = new Map<string, { voltas: number; kart: string }>();
     for (const x of linhas) {
+      if (!x.cid) continue;
       const nomeBat = String(x.nome ?? '');
-      // nome da corrida em linhas: "BATERIAS dd/mm…", "BATERIA 18:15", "TRAÇADO 1", "CORRIDA" | "TOMADA DE TEMPO"
-      const num = /TRA.{1,2}ADO\s*(\d+)/i.exec(nomeBat)?.[1];
-      const tracado = tracadoBase(num ? `Traçado ${num}${/INVERT/i.test(nomeBat) ? ' Invertido' : ''}` : 'Traçado principal');
       const tipo = /CORRIDA\s*$/i.test(nomeBat.trim()) ? 'corrida' : /TOMADA|CLASSIF|QUALI/i.test(nomeBat) ? 'classificacao' : 'treino';
+      extra.set(`${x.cid}|${diaSp(x.inicio.getTime() + 3 * 3_600_000)}|${tipo}|${x.pos || 0}`, { voltas: x.voltas || 0, kart: String(x.kart ?? '') });
+    }
+    // BATERIAS_CLIENTES (2018 a 01/2025): cada bateria tem tomada de tempo e corrida, com o cliente ligado pelo CalxproId
+    const bc = await query<{ bid: string; nome: string; inicio: Date; pista: number | null; cat: number | null; cid: number | null; piloto: string | null; pq: number | null; tq: Date | null; pc: number | null; tc: Date | null; nq: number; nc: number }>(
+      `SELECT b.ID_BATERIAS bid, b.ST_NOME nome, b.DT_DATA_HORA inicio, b.ID_PISTA pista, b.ID_CATEGORIA cat, c.Id cid, c.Nome piloto,
+              bc.NM_POSICAO_QFY pq, bc.TEMPO_MELHOR_VOLTA_QFY tq, bc.NM_POSICAO_CRD pc, bc.TEMPO_MELHOR_VOLTA_CRD tc,
+              SUM(CASE WHEN bc.NM_POSICAO_QFY > 0 THEN 1 ELSE 0 END) OVER (PARTITION BY bc.ID_BATERIAS) nq,
+              SUM(CASE WHEN bc.NM_POSICAO_CRD > 0 THEN 1 ELSE 0 END) OVER (PARTITION BY bc.ID_BATERIAS) nc
+         FROM CALXPRO.dbo.BATERIAS_CLIENTES bc JOIN CALXPRO.dbo.BATERIAS b ON b.ID_BATERIAS = bc.ID_BATERIAS
+         LEFT JOIN (SELECT CalxproId, MAX(Id) Id, MAX(Nome) Nome FROM dbo.Cliente WHERE CalxproId IS NOT NULL GROUP BY CalxproId) c ON c.CalxproId = bc.ID_CLIENTE
+        WHERE b.DT_DATA_HORA IS NOT NULL AND (bc.NM_POSICAO_QFY > 0 OR bc.NM_POSICAO_CRD > 0)`,
+    );
+    for (const k of Object.keys(indice)) if (k.startsWith('cx-')) delete indice[k];
+    const msVolta = (t: Date | null) => { if (!(t instanceof Date)) return null; const ms = t.getTime() - Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()); return ms > 20_000 && ms < 600_000 ? ms : null; };
+    let n = 0;
+    for (const x of bc) {
+      if (!x.cid) continue;
       const inicio = x.inicio.getTime() + 3 * 3_600_000; // DT_DATA_HORA é hora de Betim gravada sem fuso
-      const id = 'cx-' + x.id;
-      const titulo = /BATERIA\s+\d{1,2}:\d{2}/i.exec(nomeBat)?.[0] ?? 'Bateria';
-      const b = indice[id] ?? (indice[id] = { id, nome: titulo.replace(/^BATERIA/i, 'Bateria'), tipo, dia: diaSp(inicio), inicio, fim: inicio, chuva: chuvaNoNome(nomeBat), trackId: null, tracado, pilotos: [] });
-      const nome = String(x.piloto).trim(), sob = String(x.sobrenome ?? '').trim();
-      const completo = sob && !nome.toUpperCase().includes(sob.toUpperCase()) ? `${nome} ${sob}` : nome;
-      if (semNome(completo, String(x.kart ?? ''))) continue;
-      b.pilotos.push({ cid: x.cid ? String(x.cid) : null, nome: completo, kart: String(x.kart ?? ''), pos: x.pos || 0, voltas: x.voltas || 0, melhor: x.melhor && x.melhor > 0 ? x.melhor : null, cat: null, dq: false });
-      n++;
+      const dia = diaSp(inicio);
+      const tracado = tracadoBase(x.pista ? `Traçado ${x.pista}` : 'Traçado principal');
+      const titulo = /\d{1,2}:\d{2}/.exec(String(x.nome ?? ''))?.[0];
+      const cat = x.cat === 2 ? 'Super Kart' : x.cat === 1 ? 'Indoor' : null;
+      for (const [tipo, pos, t, off] of [['classificacao', x.pq, x.tq, 0], ['corrida', x.pc, x.tc, 60_000]] as const) {
+        if (!pos || pos < 1) continue;
+        const id = `cx-${tipo === 'corrida' ? 'c' : 'q'}${x.bid}`;
+        const b = indice[id] ?? (indice[id] = { id, nome: titulo ? `Bateria ${titulo}` : 'Bateria', tipo, dia, inicio: inicio + off, fim: inicio + off, chuva: chuvaNoNome(String(x.nome ?? '')), trackId: null, tracado, pilotos: [] });
+        const e = extra.get(`${x.cid}|${dia}|${tipo}|${pos}`);
+        b.pilotos.push({ cid: String(x.cid), nome: String(x.piloto ?? '').trim() || 'Piloto', kart: e?.kart ?? '', pos, voltas: e?.voltas ?? 0, melhor: msVolta(t), cat, dq: false });
+        n++;
+      }
     }
     calxproCarregado = true;
-    log?.(`pilotos: CalXPro lido (${n} participações em corridas de 2023 a 2025)`);
+    try { writeFileSync(ARQ_CALXPRO_VERSAO, CALXPRO_VERSAO); } catch { /* recarrega no próximo início */ }
+    log?.(`pilotos: CalXPro lido (${n} participações de 2018 a 2025)`);
     return true;
   } catch (e) { log?.(`pilotos: CalXPro indisponível (${(e as Error).message})`); calxproCarregado = true; return false; }
 }
 
 /** Primeiro dia com corrida detalhada (LapTime ou cronometragem nova): antes disso, só o ranking antigo do LapTime. */
-const inicioDetalhado = () => Object.values(indice).reduce((a, b) => (!a || b.dia < a ? b.dia : a), '' as string) || '9999-12-31';
+// CalXPro (cx-) e reservas do LapTime (lr-) não contam: o ranking antigo do LapTime (2025-2026) cobre esse período
+const inicioDetalhado = () => Object.values(indice).reduce((a, b) => (/^(cx|lr)-/.test(b.id) || (a && b.dia >= a) ? a : b.dia), '' as string) || '9999-12-31';
 
 type Resumo = { baterias: number; voltas: number; vitorias: number; podios: number; ultima: string | null; primeira: string | null; melhor: { ms: number; tracado: string } | null };
 /** Resumo da carreira de cada cliente (cid), calculado do índice. */
@@ -563,6 +610,16 @@ export async function rankingPublicoParaApp() {
   if (rankingCache && rankingCache.versao === indiceVersao && rankingCache.dia === hojeSp()) {
     return { ranking: rankingCache.ranking, pilotos: rankingCache.pilotos, posicoes: rankingCache.posicoes };
   }
+  // "Na pista desde": a data do cadastro conta (cliente antigo tem corridas de antes do histórico guardado);
+  // cadastros duplicados unificados ficam com a data mais antiga.
+  const cadastroDesde = new Map<string, string>();
+  try {
+    for (const c of await query<{ id: number; em: Date | null }>('SELECT Id id, CriadoEm em FROM dbo.Cliente WHERE CriadoEm IS NOT NULL', {})) {
+      if (!(c.em instanceof Date) || c.em.getFullYear() < 2000) continue;
+      const id = aliasCliente.get(String(c.id)) ?? String(c.id), dia = c.em.toISOString().slice(0, 10); // o banco grava a data local sem fuso
+      const at = cadastroDesde.get(id); if (!at || dia < at) cadastroDesde.set(id, dia);
+    }
+  } catch { /* sem banco: fica só a primeira corrida */ }
   const TOP = 100;
   // Posição e total ficam fora da ficha do piloto: uma bateria nova mexe no "de" de todo mundo do traçado e isso
   // regravava ~75 mil fichas a cada publicação. Agora vira um documento por traçado/período; o Worker junta na leitura.
@@ -630,7 +687,8 @@ export async function rankingPublicoParaApp() {
     const primeiraAntiga = antigas.reduce((a, x) => (!a || x.dia < a ? x.dia : a), '' as string) || null;
     pilotos[cid] = {
       semanasTop10, mesesTop10,
-      nome: nomes.get(cid) ?? '',
+      nome: nomeCadastroDe.get(cid) ?? nomes.get(cid) ?? '', // unificado: vale o nome do cadastro, não o digitado numa bateria
+      ...(outrosNomesDe.get(cid)?.length ? { outrosNomes: outrosNomesDe.get(cid)!.join(' | ') } : {}),
       baterias: r?.baterias ?? corridas.length,
       corridas: corridasValidas.length,
       voltas: r?.voltas ?? 0,
@@ -638,7 +696,7 @@ export async function rankingPublicoParaApp() {
       podios: r?.podios ?? 0,
       poles: corridas.filter((c) => c.tipo !== 'corrida' && !c.dq && c.pos === 1).length,
       voltasMaisRapidas: corridas.filter((c) => c.voltaMaisRapida && !c.dq).length,
-      primeira: [r?.primeira, primeiraAntiga].filter(Boolean).sort()[0] ?? null,
+      primeira: [r?.primeira, primeiraAntiga, cadastroDesde.get(cid)].filter(Boolean).sort()[0] ?? null,
       ultima: r?.ultima ?? null,
       tracados: [...melhorPorTracado.entries()].map(([nome, t]) => ({
         nome, ms: t.ms, dia: t.dia, corridas: corridas.filter((c) => c.tracado === nome).length,
@@ -679,7 +737,7 @@ export async function rankingPublicoParaApp() {
       vitoriasChuva: lista.filter((c) => c.chuva && c.tipo === 'corrida' && !c.dq && c.pos === 1).length,
       maiorSequenciaVitorias: maiorSeq,
       cheias: { corridas: cheias.length, vitorias: cheias.filter((c) => c.pos === 1).length, podios: cheias.filter((c) => c.pos >= 1 && c.pos <= 3).length },
-      tracadosDiferentes: new Set(lista.filter((c) => tracadoConfirmado(c.tracado)).map((c) => c.tracado)).size,
+      tracadosDiferentes: new Set(lista.map((c) => c.tracado)).size,
     };
     p.xpMes = [...porMes.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 12).map(([mes, v]) => ({ mes, ...v }));
     if ((++ix & 511) === 511) await new Promise<void>((r) => setImmediate(r));

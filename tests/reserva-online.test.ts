@@ -10,11 +10,13 @@ const agenda: Agenda = {
   atualizadoEm: HOJE.toISOString(), precoCentavos: 14500, maxPilotos: 10, prazoMin: 15, antecedenciaMin: 120,
   horarios: [{ id: 101, inicio: '2026-10-03T09:15', nome: 'BATERIA 09:15', livres: 3 }, { id: 102, inicio: '2026-10-03T09:50', nome: 'BATERIA 09:50', livres: 0 }],
 };
+// os mesmos campos obrigatórios do totem para cada piloto extra
+const EXTRA = { instagram: '@piloto.extra', email: 'extra@exemplo.com', telefone: '31977776666', peso: '70', cep: '', endereco: 'Rua A, 10', complemento: '', bairro: 'Centro', cidade: 'Betim' };
 const base = {
   bateriaId: 101, quantidade: 2, forma: 'pix', politica: true, lgpd: true,
   documento: '529.982.247-25', nome: 'Maria da Silva', email: 'maria@exemplo.com', instagram: '@maria.silva', telefone: '(31) 98888-7777', nascimento: '1990-05-20', peso: '62',
   pilotos: ['Maria da Silva', 'João Silva', 'sobra'],
-  acompanhantes: [{ nome: 'João Silva', documento: '111.444.777-35', nascimento: '2008-03-10' }],
+  acompanhantes: [{ nome: 'João Silva', documento: '111.444.777-35', nascimento: '2008-03-10', ...EXTRA }],
 };
 
 describe('validarReserva', () => {
@@ -23,13 +25,13 @@ describe('validarReserva', () => {
     expect(v.ok).toBe(true);
     if (v.ok) {
       expect(v.dados).toMatchObject({ bateriaId: 101, quantidade: 2, forma: 'pix', pilotos: ['Maria da Silva', 'João Silva'] });
-      expect(v.dados.acompanhantes).toEqual([{ nome: 'João Silva', documento: '111.444.777-35', nascimento: '2008-03-10' }]);
+      expect(v.dados.acompanhantes).toEqual([{ nome: 'João Silva', documento: '111.444.777-35', nascimento: '2008-03-10', ...EXTRA }]);
       expect(v.dados.cliente.tipoDocumento).toBe('CPF');
     }
   });
-  it('Instagram: obrigatório para quem reserva, opcional para os outros pilotos (se vier, tem que ser válido)', () => {
+  it('todos os campos do totem são obrigatórios também para os outros pilotos (05/11: só nome e telefone chegavam)', () => {
     expect(validarReserva({ ...base, instagram: '' }, agenda, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/Instagram é obrigatório/) });
-    const joao = { nome: 'João Silva', documento: '111.444.777-35', nascimento: '2008-03-10' };
+    const joao = { nome: 'João Silva', documento: '111.444.777-35', nascimento: '2008-03-10', ...EXTRA };
     const v = validarReserva({ ...base, acompanhantes: [{ ...joao, instagram: 'instagram.com/Joao_Kart' }] }, agenda, HOJE);
     expect(v.ok && v.dados.acompanhantes).toEqual([{ ...joao, instagram: '@joao_kart' }]);
     expect(validarReserva({ ...base, acompanhantes: [{ ...joao, instagram: 'joão silva' }] }, agenda, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/Instagram inválido do piloto 2/) });
@@ -42,7 +44,7 @@ describe('validarReserva', () => {
     [{ forma: 'boleto' }, 'Pix ou cartão'],
     [{ politica: false }, 'Política de Cancelamento, Reagendamento e Reembolso'],
     [{ documento: '123.456.789-00' }, 'CPF inválido'],
-    [{ nascimento: '2010-01-01' }, 'adulto'],
+    [{ nascimento: '2010-01-01', ...EXTRA }, 'adulto'],
   ])('recusa %o', (mudanca, trecho) => {
     const v = validarReserva({ ...base, ...mudanca }, agenda, HOJE);
     expect(v.ok).toBe(false);
@@ -54,19 +56,19 @@ describe('validarReserva', () => {
   });
   it.each([
     [{ acompanhantes: [] }, 'Cadastre o outro piloto'],
-    [{ quantidade: 3, acompanhantes: [{ nome: 'João Silva', documento: '111.444.777-35', nascimento: '2008-03-10' }] }, 'Cadastre os outros 2 pilotos'],
-    [{ acompanhantes: [{ nome: 'João', documento: '111.444.777-35', nascimento: '2008-03-10' }] }, 'nome completo do piloto 2'],
-    [{ acompanhantes: [{ nome: 'João Silva', documento: '111.444.777-00', nascimento: '2008-03-10' }] }, 'CPF inválido do piloto 2'],
-    [{ acompanhantes: [{ nome: 'Maria Outra', documento: '529.982.247-25', nascimento: '2008-03-10' }] }, 'repete o de outro piloto'],
-    [{ quantidade: 3, acompanhantes: [{ nome: 'João Silva', documento: '111.444.777-35', nascimento: '2008-03-10' }, { nome: 'Pedro Silva', documento: '111.444.777-35', nascimento: '2001-01-01' }] }, 'repete o de outro piloto'],
-    [{ acompanhantes: [{ nome: 'Ana Silva', documento: '111.444.777-35', nascimento: '2013-01-01' }] }, '14 anos ou mais'],
+    [{ quantidade: 3, acompanhantes: [{ nome: 'João Silva', documento: '111.444.777-35', nascimento: '2008-03-10', ...EXTRA }] }, 'Cadastre os outros 2 pilotos'],
+    [{ acompanhantes: [{ nome: 'João', documento: '111.444.777-35', nascimento: '2008-03-10', ...EXTRA }] }, 'nome completo do piloto 2'],
+    [{ acompanhantes: [{ nome: 'João Silva', documento: '111.444.777-00', nascimento: '2008-03-10', ...EXTRA }] }, 'CPF inválido do piloto 2'],
+    [{ acompanhantes: [{ nome: 'Maria Outra', documento: '529.982.247-25', nascimento: '2008-03-10', ...EXTRA }] }, 'repete o de outro piloto'],
+    [{ quantidade: 3, acompanhantes: [{ nome: 'João Silva', documento: '111.444.777-35', nascimento: '2008-03-10', ...EXTRA }, { nome: 'Pedro Silva', documento: '111.444.777-35', nascimento: '2001-01-01', ...EXTRA }] }, 'repete o de outro piloto'],
+    [{ acompanhantes: [{ nome: 'Ana Silva', documento: '111.444.777-35', nascimento: '2013-01-01', ...EXTRA }] }, '14 anos ou mais'],
   ])('mais de uma vaga exige uma pessoa diferente em cada uma: %o', (mudanca, trecho) => {
     const v = validarReserva({ ...base, ...mudanca }, agenda, HOJE);
     expect(v.ok).toBe(false);
     if (!v.ok) expect(v.erro).toContain(trecho);
   });
   it('quem compra pode não pilotar: aí cada vaga precisa de um cadastro', () => {
-    const doisFilhos = [{ nome: 'João Silva', documento: '111.444.777-35', nascimento: '2008-03-10' }, { nome: 'Pedro Silva', documento: '390.533.447-05', nascimento: '2010-06-15' }];
+    const doisFilhos = [{ nome: 'João Silva', documento: '111.444.777-35', nascimento: '2008-03-10', ...EXTRA }, { nome: 'Pedro Silva', documento: '390.533.447-05', nascimento: '2010-06-15', ...EXTRA }];
     const v = validarReserva({ ...base, compradorPilota: false, acompanhantes: doisFilhos }, agenda, HOJE);
     expect(v.ok).toBe(true);
     if (v.ok) expect(v.dados).toMatchObject({ compradorPilota: false, pilotos: ['João Silva', 'Pedro Silva'] });

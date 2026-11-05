@@ -1,6 +1,6 @@
 'use strict';
 /* 200 Milhas: inscrições do site, equipes, pilotos, contatos e quem pagou. Depende de app.js. */
-NAV.find((g) => g.t === 'Competições').itens.unshift(['inscricoes', '200 Milhas · Inscrições', IC.camp, G('#00C853', '#007E33')]);
+NAV.find((g) => g.t === 'Competições').itens.unshift(['inscricoes', '200 Milhas · Inscrições', IC.camp, G('var(--kib-cor-categoria-verde-escuro-topo)', 'var(--kib-cor-categoria-verde-escuro-base)')]);
 
 TELAS.inscricoes = async (tela) => {
   const F = S.i200 || (S.i200 = { aba: 'equipes', filtro: 'todas', q: '' });

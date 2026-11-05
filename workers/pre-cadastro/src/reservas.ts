@@ -5,7 +5,7 @@
  *   e os desvios: recusado (sem vaga), expirado (15 min sem pagar), pago_sem_vaga (pagou depois e o horário lotou).
  */
 import { asaasLigado, buscarCobrancaPorReferencia, cancelar, consultar, criarCobranca, EVENTOS_PAGO, garantirCliente, hojeBrasilia, PAGO, pagasDesde, qrPix, type AsaasEnv } from './asaas';
-import { chaveDocumento, codigoReserva, digitos, validarReserva, type Agenda, type PreCadastro } from './validar';
+import { chaveDocumento, codigoReserva, digitos, validarReserva, type Acompanhante, type Agenda, type PreCadastro } from './validar';
 import { POLITICA_ACEITE, POLITICA_SECOES, POLITICA_TITULO, POLITICA_VERSAO } from '../../../src/config/politica-cancelamento';
 
 export interface EnvReservas extends AsaasEnv {
@@ -27,7 +27,7 @@ export type Pedido = {
   forma: 'pix' | 'cartao';
   pilotos: string[];
   /** Os outros pilotos da reserva (um por vaga, além de quem comprou), cada um com o próprio cadastro. */
-  acompanhantes?: { nome: string; documento: string; nascimento: string; instagram?: string; chave: string }[];
+  acompanhantes?: (Acompanhante & { chave: string })[];
   /** false = quem comprou não vai pilotar (todas as vagas são dos acompanhantes). */
   compradorPilota?: boolean;
   cupom?: string;

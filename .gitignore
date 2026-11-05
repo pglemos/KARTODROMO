@@ -19,35 +19,28 @@ tsconfig.tsbuildinfo
 # Environment & Secrets (AIOX)
 *.key
 *.pem
-
 # Dependencies (AIOX)
 node_modules/
-
 # Build & Logs (AIOX)
 dist/
 build/
 logs/
-
 # IDE & OS (AIOX)
 .DS_Store
 Thumbs.db
 .idea/
 *.swp
-
 # AIOX Local (AIOX)
 .aiox-core/local/
 .claude/settings.local.json
 .aiox/install-log.txt
 .env*.local
-
 # Local tooling binaries (not part of the deployable app)
 .tools/
-
 # Reverse-engineering workspace — secrets, decompiled binaries, never publish
 /KARTODROMO - SISTEMA/
 "KARTODROMO - SISTEMA.zip"
 KARTODROMO\ -\ SISTEMA.zip
-
 # Impeccable — tooling local de design (skills, hooks, agentes)
 .agents/skills/impeccable/
 .claude/skills/impeccable/
@@ -67,19 +60,16 @@ miniflare-*/
 node-compile-cache/
 output/
 playwright_chromiumdev_profile-*/
-
 # cronometragem propria (runtime, nao versionar)
 data/timing/sessions/
 data/timing/passagens/
 *.tmp
 data/timing/*.log
-
 # Aplicativos desktop .NET: versionar fonte e instaladores, nao artefatos de build
 desktop/**/bin/
 desktop/**/obj/
 desktop/publish/
 desktop/**/*.csproj.user
-
 # Mapeamento operacional local do decoder (nao publicar)
 data/timing/transponders.json
 scratch/
@@ -89,7 +79,6 @@ data/timing/email.json
 data/timing/transmissao.json
 data/timing/emails-tmp/
 data/timing/emails-simulador/
-
 # dados locais, pacotes e cópias de trabalho: nunca vão para o repositório público (09/10/2026)
 /data/
 /publish/
@@ -100,13 +89,10 @@ data/timing/emails-simulador/
 /.impeccable/
 /.agents/skills/impeccable
 services/*.antes-*.ts
-
 # chaves de loja (Apple .p8, Google .json de conta de serviço) nunca entram no Git
 *.p8
-
 # lixo do macOS (AppleDouble)
 ._*
-
 # lixo local de ferramentas
 NuGetScratch/
 b4xqW9h/
@@ -119,3 +105,4 @@ update-check/
 .auditoria-tmp/
 mobile/tests/appium/screenshots/
 resultados-legends/
+# arquivos AppleDouble do macOS

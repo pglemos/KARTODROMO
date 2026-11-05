@@ -256,6 +256,48 @@ public static partial class Tokens
         /// <summary>Texto/ícone em cima do botão principal.</summary>
         public static readonly System.Drawing.Color CorAcaoSobrePrincipal = System.Drawing.Color.FromArgb(255, 255, 255);
         public static readonly System.Drawing.Color CorAcaoSobreSecundaria = System.Drawing.Color.FromArgb(29, 29, 31);
+        public static readonly System.Drawing.Color CorAgendaBloqueadoCheio = System.Drawing.Color.FromArgb(142, 142, 147);
+        public static readonly System.Drawing.Color CorAgendaBloqueadoFundo = System.Drawing.Color.FromArgb(233, 233, 238);
+        public static readonly System.Drawing.Color CorAgendaBloqueadoMarca = System.Drawing.Color.FromArgb(142, 142, 147);
+        public static readonly System.Drawing.Color CorAgendaBloqueadoTexto = System.Drawing.Color.FromArgb(72, 72, 74);
+        public static readonly System.Drawing.Color CorAgendaBloqueadoTopoFim = System.Drawing.Color.FromArgb(242, 242, 245);
+        public static readonly System.Drawing.Color CorAgendaBloqueadoTopoInicio = System.Drawing.Color.FromArgb(229, 229, 234);
+        public static readonly System.Drawing.Color CorAgendaBloqueadoTopoTexto = System.Drawing.Color.FromArgb(58, 58, 60);
+        public static readonly System.Drawing.Color CorAgendaCampeonatoCheio = System.Drawing.Color.FromArgb(11, 122, 83);
+        public static readonly System.Drawing.Color CorAgendaCampeonatoFundo = System.Drawing.Color.FromArgb(211, 235, 223);
+        public static readonly System.Drawing.Color CorAgendaCampeonatoMarca = System.Drawing.Color.FromArgb(11, 122, 83);
+        public static readonly System.Drawing.Color CorAgendaCampeonatoTexto = System.Drawing.Color.FromArgb(8, 77, 52);
+        public static readonly System.Drawing.Color CorAgendaCampeonatoTopoFim = System.Drawing.Color.FromArgb(228, 243, 235);
+        public static readonly System.Drawing.Color CorAgendaCampeonatoTopoInicio = System.Drawing.Color.FromArgb(196, 229, 213);
+        public static readonly System.Drawing.Color CorAgendaCampeonatoTopoTexto = System.Drawing.Color.FromArgb(8, 77, 52);
+        public static readonly System.Drawing.Color CorAgendaEventoCheio = System.Drawing.Color.FromArgb(30, 111, 232);
+        public static readonly System.Drawing.Color CorAgendaEventoFundo = System.Drawing.Color.FromArgb(220, 232, 251);
+        public static readonly System.Drawing.Color CorAgendaEventoMarca = System.Drawing.Color.FromArgb(30, 111, 232);
+        public static readonly System.Drawing.Color CorAgendaEventoTexto = System.Drawing.Color.FromArgb(19, 63, 140);
+        public static readonly System.Drawing.Color CorAgendaEventoTopoFim = System.Drawing.Color.FromArgb(232, 240, 253);
+        public static readonly System.Drawing.Color CorAgendaEventoTopoInicio = System.Drawing.Color.FromArgb(204, 221, 250);
+        public static readonly System.Drawing.Color CorAgendaEventoTopoTexto = System.Drawing.Color.FromArgb(18, 58, 128);
+        public static readonly System.Drawing.Color CorAgendaFechadaCheio = System.Drawing.Color.FromArgb(217, 45, 32);
+        public static readonly System.Drawing.Color CorAgendaFechadaFundo = System.Drawing.Color.FromArgb(255, 218, 215);
+        public static readonly System.Drawing.Color CorAgendaFechadaMarca = System.Drawing.Color.FromArgb(255, 69, 58);
+        public static readonly System.Drawing.Color CorAgendaFechadaTexto = System.Drawing.Color.FromArgb(143, 31, 24);
+        public static readonly System.Drawing.Color CorAgendaFechadaTopoFim = System.Drawing.Color.FromArgb(255, 231, 229);
+        public static readonly System.Drawing.Color CorAgendaFechadaTopoInicio = System.Drawing.Color.FromArgb(255, 203, 198);
+        public static readonly System.Drawing.Color CorAgendaFechadaTopoTexto = System.Drawing.Color.FromArgb(122, 26, 20);
+        public static readonly System.Drawing.Color CorAgendaLivreCheio = System.Drawing.Color.FromArgb(14, 156, 156);
+        public static readonly System.Drawing.Color CorAgendaLivreFundo = System.Drawing.Color.FromArgb(227, 246, 244);
+        public static readonly System.Drawing.Color CorAgendaLivreMarca = System.Drawing.Color.FromArgb(44, 181, 172);
+        public static readonly System.Drawing.Color CorAgendaLivreTexto = System.Drawing.Color.FromArgb(11, 95, 90);
+        public static readonly System.Drawing.Color CorAgendaLivreTopoFim = System.Drawing.Color.FromArgb(234, 248, 246);
+        public static readonly System.Drawing.Color CorAgendaLivreTopoInicio = System.Drawing.Color.FromArgb(213, 243, 240);
+        public static readonly System.Drawing.Color CorAgendaLivreTopoTexto = System.Drawing.Color.FromArgb(11, 79, 75);
+        public static readonly System.Drawing.Color CorAgendaReservaCheio = System.Drawing.Color.FromArgb(224, 135, 0);
+        public static readonly System.Drawing.Color CorAgendaReservaFundo = System.Drawing.Color.FromArgb(255, 235, 204);
+        public static readonly System.Drawing.Color CorAgendaReservaMarca = System.Drawing.Color.FromArgb(255, 159, 10);
+        public static readonly System.Drawing.Color CorAgendaReservaTexto = System.Drawing.Color.FromArgb(107, 64, 0);
+        public static readonly System.Drawing.Color CorAgendaReservaTopoFim = System.Drawing.Color.FromArgb(255, 242, 222);
+        public static readonly System.Drawing.Color CorAgendaReservaTopoInicio = System.Drawing.Color.FromArgb(255, 225, 179);
+        public static readonly System.Drawing.Color CorAgendaReservaTopoTexto = System.Drawing.Color.FromArgb(92, 55, 0);
         /// <summary>Borda de campo sem foco. Decidido 10/10/2026: #8E8E93 no claro (3,26:1 sobre branco — WCAG 1.4.11 pede 3:1 para o contorno de campo; o #DBDBDB antigo dava ~1,3).</summary>
         public static readonly System.Drawing.Color CorBordaCampo = System.Drawing.Color.FromArgb(142, 142, 147);
         /// <summary>Anel de foco do teclado.</summary>
@@ -263,25 +305,59 @@ public static partial class Tokens
         public static readonly System.Drawing.Color CorBordaForte = System.Drawing.Color.FromArgb(199, 199, 204);
         /// <summary>Linha divisória, borda de cartão.</summary>
         public static readonly System.Drawing.Color CorBordaSutil = System.Drawing.Color.FromArgb(229, 229, 234);
+        public static readonly System.Drawing.Color CorCategoriaAmareloBase = System.Drawing.Color.FromArgb(224, 161, 0);
+        public static readonly System.Drawing.Color CorCategoriaAmareloTopo = System.Drawing.Color.FromArgb(255, 210, 74);
+        public static readonly System.Drawing.Color CorCategoriaAmbarBase = System.Drawing.Color.FromArgb(240, 122, 0);
+        public static readonly System.Drawing.Color CorCategoriaAmbarTopo = System.Drawing.Color.FromArgb(255, 181, 71);
+        public static readonly System.Drawing.Color CorCategoriaAzulEscuroBase = System.Drawing.Color.FromArgb(20, 80, 168);
+        public static readonly System.Drawing.Color CorCategoriaAzulEscuroTopo = System.Drawing.Color.FromArgb(74, 141, 240);
+        public static readonly System.Drawing.Color CorCategoriaAzulBase = System.Drawing.Color.FromArgb(30, 111, 232);
+        public static readonly System.Drawing.Color CorCategoriaAzulTopo = System.Drawing.Color.FromArgb(108, 184, 255);
+        public static readonly System.Drawing.Color CorCategoriaCianoBase = System.Drawing.Color.FromArgb(14, 156, 156);
+        public static readonly System.Drawing.Color CorCategoriaCianoTopo = System.Drawing.Color.FromArgb(72, 214, 204);
+        public static readonly System.Drawing.Color CorCategoriaCinzaBase = System.Drawing.Color.FromArgb(74, 74, 79);
+        public static readonly System.Drawing.Color CorCategoriaCinzaTopo = System.Drawing.Color.FromArgb(154, 154, 160);
+        public static readonly System.Drawing.Color CorCategoriaLaranjaBase = System.Drawing.Color.FromArgb(232, 89, 12);
+        public static readonly System.Drawing.Color CorCategoriaLaranjaTopo = System.Drawing.Color.FromArgb(255, 138, 101);
+        public static readonly System.Drawing.Color CorCategoriaRoxoBase = System.Drawing.Color.FromArgb(134, 69, 214);
+        /// <summary>Texto roxo legível (≥ 4,5:1) sobre fundo roxo claro, ex.: marcador de piloto menor.</summary>
+        public static readonly System.Drawing.Color CorCategoriaRoxoTexto = System.Drawing.Color.FromArgb(106, 53, 176);
+        public static readonly System.Drawing.Color CorCategoriaRoxoTopo = System.Drawing.Color.FromArgb(192, 139, 255);
+        public static readonly System.Drawing.Color CorCategoriaVerdeEscuroBase = System.Drawing.Color.FromArgb(0, 126, 51);
+        public static readonly System.Drawing.Color CorCategoriaVerdeEscuroTopo = System.Drawing.Color.FromArgb(0, 200, 83);
+        public static readonly System.Drawing.Color CorCategoriaVerdeBase = System.Drawing.Color.FromArgb(30, 158, 74);
+        public static readonly System.Drawing.Color CorCategoriaVerdeTopo = System.Drawing.Color.FromArgb(94, 219, 122);
+        public static readonly System.Drawing.Color CorCategoriaVermelhoBase = System.Drawing.Color.FromArgb(217, 45, 32);
+        public static readonly System.Drawing.Color CorCategoriaVermelhoTopo = System.Drawing.Color.FromArgb(255, 107, 94);
         public static readonly System.Drawing.Color CorDominioBandeiraAmarela = System.Drawing.Color.FromArgb(255, 204, 0);
         public static readonly System.Drawing.Color CorDominioBandeiraAzul = System.Drawing.Color.FromArgb(10, 132, 255);
         public static readonly System.Drawing.Color CorDominioBandeiraBranca = System.Drawing.Color.FromArgb(255, 255, 255);
         public static readonly System.Drawing.Color CorDominioBandeiraPreta = System.Drawing.Color.FromArgb(29, 29, 31);
         public static readonly System.Drawing.Color CorDominioBandeiraVerde = System.Drawing.Color.FromArgb(52, 199, 89);
         public static readonly System.Drawing.Color CorDominioBandeiraVermelha = System.Drawing.Color.FromArgb(255, 59, 48);
+        /// <summary>Faixa seguinte da classificação (posições 7 a 10).</summary>
+        public static readonly System.Drawing.Color CorDominioClassificacaoBaixo = System.Drawing.Color.FromArgb(230, 210, 0);
+        /// <summary>Faixa do meio da classificação (posições 4 a 6) no gráfico do endurance.</summary>
+        public static readonly System.Drawing.Color CorDominioClassificacaoMeio = System.Drawing.Color.FromArgb(63, 103, 181);
         /// <summary>Melhor volta da prova (roxo, convenção de cronometragem). Sempre junto de negrito ou marcador — nunca só a cor.</summary>
         public static readonly System.Drawing.Color CorDominioMelhorVolta = System.Drawing.Color.FromArgb(122, 47, 194);
         public static readonly System.Drawing.Color CorDominioPodioOuro = System.Drawing.Color.FromArgb(255, 210, 74);
         public static readonly System.Drawing.Color CorDominioPosicao = System.Drawing.Color.FromArgb(250, 204, 21);
+        /// <summary>Texto escuro sobre fundo de aviso mais intenso (ex.: etiqueta de reserva).</summary>
+        public static readonly System.Drawing.Color CorEstadoAvisoTextoForte = System.Drawing.Color.FromArgb(107, 64, 0);
         public static readonly System.Drawing.Color CorEstadoAvisoFundo = System.Drawing.Color.FromArgb(255, 244, 224);
         public static readonly System.Drawing.Color CorEstadoAvisoSobreSolido = System.Drawing.Color.FromArgb(29, 29, 31);
         /// <summary>Preenchimento de aviso (selo/contador); texto por cima = sobre-solido.</summary>
         public static readonly System.Drawing.Color CorEstadoAvisoSolido = System.Drawing.Color.FromArgb(255, 159, 10);
         /// <summary>A pagar, pendente, atenção em texto.</summary>
         public static readonly System.Drawing.Color CorEstadoAvisoTexto = System.Drawing.Color.FromArgb(154, 91, 0);
+        /// <summary>Texto escuro sobre fundo de informação mais intenso.</summary>
+        public static readonly System.Drawing.Color CorEstadoInfoTextoForte = System.Drawing.Color.FromArgb(18, 58, 128);
         public static readonly System.Drawing.Color CorEstadoInfoFundo = System.Drawing.Color.FromArgb(225, 238, 255);
         public static readonly System.Drawing.Color CorEstadoInfoSolido = System.Drawing.Color.FromArgb(10, 99, 214);
         public static readonly System.Drawing.Color CorEstadoInfoTexto = System.Drawing.Color.FromArgb(10, 79, 160);
+        /// <summary>Texto escuro sobre fundo de perigo mais intenso.</summary>
+        public static readonly System.Drawing.Color CorEstadoPerigoTextoForte = System.Drawing.Color.FromArgb(143, 31, 24);
         public static readonly System.Drawing.Color CorEstadoPerigoFundo = System.Drawing.Color.FromArgb(253, 236, 234);
         /// <summary>Excluir, estornar, erro.</summary>
         public static readonly System.Drawing.Color CorEstadoPerigoSolido = System.Drawing.Color.FromArgb(196, 40, 28);
@@ -291,13 +367,28 @@ public static partial class Tokens
         public static readonly System.Drawing.Color CorEstadoSucessoTexto = System.Drawing.Color.FromArgb(28, 107, 53);
         /// <summary>Fundo da janela/página.</summary>
         public static readonly System.Drawing.Color CorFundoApp = System.Drawing.Color.FromArgb(245, 245, 247);
+        public static readonly System.Drawing.Color CorIconeSuave = System.Drawing.Color.FromArgb(174, 174, 178);
         /// <summary>Cor da marca (o verde do kartódromo).</summary>
         public static readonly System.Drawing.Color CorMarcaPrincipal = System.Drawing.Color.FromArgb(11, 122, 83);
         /// <summary>Linha/ item selecionado (lista, lateral).</summary>
         public static readonly System.Drawing.Color CorSelecaoFundo = System.Drawing.Color.FromArgb(218, 232, 225);
         public static readonly System.Drawing.Color CorSelecaoTexto = System.Drawing.Color.FromArgb(29, 29, 31);
+        public static readonly System.Drawing.Color CorSerie1 = System.Drawing.Color.FromArgb(11, 122, 83);
+        public static readonly System.Drawing.Color CorSerie2 = System.Drawing.Color.FromArgb(30, 111, 232);
+        public static readonly System.Drawing.Color CorSerie3 = System.Drawing.Color.FromArgb(217, 45, 32);
+        public static readonly System.Drawing.Color CorSerie4 = System.Drawing.Color.FromArgb(255, 159, 10);
+        public static readonly System.Drawing.Color CorSerie5 = System.Drawing.Color.FromArgb(134, 69, 214);
+        public static readonly System.Drawing.Color CorSerie6 = System.Drawing.Color.FromArgb(14, 156, 156);
+        public static readonly System.Drawing.Color CorSerie7 = System.Drawing.Color.FromArgb(232, 89, 12);
+        public static readonly System.Drawing.Color CorSerie8 = System.Drawing.Color.FromArgb(90, 62, 54);
+        public static readonly System.Drawing.Color CorSerie9 = System.Drawing.Color.FromArgb(194, 24, 91);
+        public static readonly System.Drawing.Color CorSerie10 = System.Drawing.Color.FromArgb(63, 81, 181);
+        public static readonly System.Drawing.Color CorSerie11 = System.Drawing.Color.FromArgb(124, 179, 66);
+        public static readonly System.Drawing.Color CorSerie12 = System.Drawing.Color.FromArgb(0, 172, 193);
         /// <summary>Véu escuro atrás de modal.</summary>
         public static readonly System.Drawing.Color CorSobreposicao = System.Drawing.Color.FromArgb(77, 28, 28, 30);
+        /// <summary>Bolinha/indicador de "ok" vivo. Decorativa: SEMPRE com texto ao lado.</summary>
+        public static readonly System.Drawing.Color CorStatusOk = System.Drawing.Color.FromArgb(52, 199, 89);
         /// <summary>Bolinha de status / interruptor ligado. Decorativa: SEMPRE com texto ao lado.</summary>
         public static readonly System.Drawing.Color CorStatusOnline = System.Drawing.Color.FromArgb(52, 199, 89);
         /// <summary>Busca, segmentados, botão fantasma.</summary>
@@ -310,8 +401,14 @@ public static partial class Tokens
         public static readonly System.Drawing.Color CorSuperficiePadrao = System.Drawing.Color.FromArgb(255, 255, 255);
         /// <summary>Menus, cabeçalho de tabela.</summary>
         public static readonly System.Drawing.Color CorSuperficieSuave = System.Drawing.Color.FromArgb(250, 250, 252);
+        /// <summary>Texto de apoio legível também sobre fundos cinza e tingidos (≥ 4,5:1 sobre superfície-lateral). Admin web.</summary>
+        public static readonly System.Drawing.Color CorTextoApoio = System.Drawing.Color.FromArgb(94, 94, 99);
+        /// <summary>Texto corrido forte (mais escuro que o secundário). Admin web.</summary>
+        public static readonly System.Drawing.Color CorTextoCorpo = System.Drawing.Color.FromArgb(58, 58, 60);
         /// <summary>Texto desabilitado (isento de contraste pela WCAG).</summary>
         public static readonly System.Drawing.Color CorTextoDesabilitado = System.Drawing.Color.FromArgb(199, 199, 204);
+        /// <summary>Texto discreto (rótulos, cabeçalhos de tabela), ≥ 4,5:1 sobre superfície-lateral. Nunca para texto menor que 12px.</summary>
+        public static readonly System.Drawing.Color CorTextoDiscreto = System.Drawing.Color.FromArgb(102, 102, 105);
         /// <summary>Texto sobre superfície inversa.</summary>
         public static readonly System.Drawing.Color CorTextoInverso = System.Drawing.Color.FromArgb(255, 255, 255);
         public static readonly System.Drawing.Color CorTextoLink = System.Drawing.Color.FromArgb(10, 99, 214);
@@ -475,6 +572,48 @@ public static partial class Tokens
         /// <summary>Texto/ícone em cima do botão principal.</summary>
         public static readonly System.Drawing.Color CorAcaoSobrePrincipal = System.Drawing.Color.FromArgb(4, 19, 1);
         public static readonly System.Drawing.Color CorAcaoSobreSecundaria = System.Drawing.Color.FromArgb(247, 250, 246);
+        public static readonly System.Drawing.Color CorAgendaBloqueadoCheio = System.Drawing.Color.FromArgb(142, 142, 147);
+        public static readonly System.Drawing.Color CorAgendaBloqueadoFundo = System.Drawing.Color.FromArgb(233, 233, 238);
+        public static readonly System.Drawing.Color CorAgendaBloqueadoMarca = System.Drawing.Color.FromArgb(142, 142, 147);
+        public static readonly System.Drawing.Color CorAgendaBloqueadoTexto = System.Drawing.Color.FromArgb(72, 72, 74);
+        public static readonly System.Drawing.Color CorAgendaBloqueadoTopoFim = System.Drawing.Color.FromArgb(242, 242, 245);
+        public static readonly System.Drawing.Color CorAgendaBloqueadoTopoInicio = System.Drawing.Color.FromArgb(229, 229, 234);
+        public static readonly System.Drawing.Color CorAgendaBloqueadoTopoTexto = System.Drawing.Color.FromArgb(58, 58, 60);
+        public static readonly System.Drawing.Color CorAgendaCampeonatoCheio = System.Drawing.Color.FromArgb(11, 122, 83);
+        public static readonly System.Drawing.Color CorAgendaCampeonatoFundo = System.Drawing.Color.FromArgb(211, 235, 223);
+        public static readonly System.Drawing.Color CorAgendaCampeonatoMarca = System.Drawing.Color.FromArgb(11, 122, 83);
+        public static readonly System.Drawing.Color CorAgendaCampeonatoTexto = System.Drawing.Color.FromArgb(8, 77, 52);
+        public static readonly System.Drawing.Color CorAgendaCampeonatoTopoFim = System.Drawing.Color.FromArgb(228, 243, 235);
+        public static readonly System.Drawing.Color CorAgendaCampeonatoTopoInicio = System.Drawing.Color.FromArgb(196, 229, 213);
+        public static readonly System.Drawing.Color CorAgendaCampeonatoTopoTexto = System.Drawing.Color.FromArgb(8, 77, 52);
+        public static readonly System.Drawing.Color CorAgendaEventoCheio = System.Drawing.Color.FromArgb(30, 111, 232);
+        public static readonly System.Drawing.Color CorAgendaEventoFundo = System.Drawing.Color.FromArgb(220, 232, 251);
+        public static readonly System.Drawing.Color CorAgendaEventoMarca = System.Drawing.Color.FromArgb(30, 111, 232);
+        public static readonly System.Drawing.Color CorAgendaEventoTexto = System.Drawing.Color.FromArgb(19, 63, 140);
+        public static readonly System.Drawing.Color CorAgendaEventoTopoFim = System.Drawing.Color.FromArgb(232, 240, 253);
+        public static readonly System.Drawing.Color CorAgendaEventoTopoInicio = System.Drawing.Color.FromArgb(204, 221, 250);
+        public static readonly System.Drawing.Color CorAgendaEventoTopoTexto = System.Drawing.Color.FromArgb(18, 58, 128);
+        public static readonly System.Drawing.Color CorAgendaFechadaCheio = System.Drawing.Color.FromArgb(217, 45, 32);
+        public static readonly System.Drawing.Color CorAgendaFechadaFundo = System.Drawing.Color.FromArgb(255, 218, 215);
+        public static readonly System.Drawing.Color CorAgendaFechadaMarca = System.Drawing.Color.FromArgb(255, 69, 58);
+        public static readonly System.Drawing.Color CorAgendaFechadaTexto = System.Drawing.Color.FromArgb(143, 31, 24);
+        public static readonly System.Drawing.Color CorAgendaFechadaTopoFim = System.Drawing.Color.FromArgb(255, 231, 229);
+        public static readonly System.Drawing.Color CorAgendaFechadaTopoInicio = System.Drawing.Color.FromArgb(255, 203, 198);
+        public static readonly System.Drawing.Color CorAgendaFechadaTopoTexto = System.Drawing.Color.FromArgb(122, 26, 20);
+        public static readonly System.Drawing.Color CorAgendaLivreCheio = System.Drawing.Color.FromArgb(14, 156, 156);
+        public static readonly System.Drawing.Color CorAgendaLivreFundo = System.Drawing.Color.FromArgb(227, 246, 244);
+        public static readonly System.Drawing.Color CorAgendaLivreMarca = System.Drawing.Color.FromArgb(44, 181, 172);
+        public static readonly System.Drawing.Color CorAgendaLivreTexto = System.Drawing.Color.FromArgb(11, 95, 90);
+        public static readonly System.Drawing.Color CorAgendaLivreTopoFim = System.Drawing.Color.FromArgb(234, 248, 246);
+        public static readonly System.Drawing.Color CorAgendaLivreTopoInicio = System.Drawing.Color.FromArgb(213, 243, 240);
+        public static readonly System.Drawing.Color CorAgendaLivreTopoTexto = System.Drawing.Color.FromArgb(11, 79, 75);
+        public static readonly System.Drawing.Color CorAgendaReservaCheio = System.Drawing.Color.FromArgb(224, 135, 0);
+        public static readonly System.Drawing.Color CorAgendaReservaFundo = System.Drawing.Color.FromArgb(255, 235, 204);
+        public static readonly System.Drawing.Color CorAgendaReservaMarca = System.Drawing.Color.FromArgb(255, 159, 10);
+        public static readonly System.Drawing.Color CorAgendaReservaTexto = System.Drawing.Color.FromArgb(107, 64, 0);
+        public static readonly System.Drawing.Color CorAgendaReservaTopoFim = System.Drawing.Color.FromArgb(255, 242, 222);
+        public static readonly System.Drawing.Color CorAgendaReservaTopoInicio = System.Drawing.Color.FromArgb(255, 225, 179);
+        public static readonly System.Drawing.Color CorAgendaReservaTopoTexto = System.Drawing.Color.FromArgb(92, 55, 0);
         /// <summary>Borda de campo sem foco. Decidido 10/10/2026: #8E8E93 no claro (3,26:1 sobre branco — WCAG 1.4.11 pede 3:1 para o contorno de campo; o #DBDBDB antigo dava ~1,3).</summary>
         public static readonly System.Drawing.Color CorBordaCampo = System.Drawing.Color.FromArgb(107, 120, 110);
         /// <summary>Anel de foco do teclado.</summary>
@@ -482,25 +621,59 @@ public static partial class Tokens
         public static readonly System.Drawing.Color CorBordaForte = System.Drawing.Color.FromArgb(93, 102, 96);
         /// <summary>Linha divisória, borda de cartão.</summary>
         public static readonly System.Drawing.Color CorBordaSutil = System.Drawing.Color.FromArgb(26, 255, 255, 255);
+        public static readonly System.Drawing.Color CorCategoriaAmareloBase = System.Drawing.Color.FromArgb(224, 161, 0);
+        public static readonly System.Drawing.Color CorCategoriaAmareloTopo = System.Drawing.Color.FromArgb(255, 210, 74);
+        public static readonly System.Drawing.Color CorCategoriaAmbarBase = System.Drawing.Color.FromArgb(240, 122, 0);
+        public static readonly System.Drawing.Color CorCategoriaAmbarTopo = System.Drawing.Color.FromArgb(255, 181, 71);
+        public static readonly System.Drawing.Color CorCategoriaAzulEscuroBase = System.Drawing.Color.FromArgb(20, 80, 168);
+        public static readonly System.Drawing.Color CorCategoriaAzulEscuroTopo = System.Drawing.Color.FromArgb(74, 141, 240);
+        public static readonly System.Drawing.Color CorCategoriaAzulBase = System.Drawing.Color.FromArgb(30, 111, 232);
+        public static readonly System.Drawing.Color CorCategoriaAzulTopo = System.Drawing.Color.FromArgb(108, 184, 255);
+        public static readonly System.Drawing.Color CorCategoriaCianoBase = System.Drawing.Color.FromArgb(14, 156, 156);
+        public static readonly System.Drawing.Color CorCategoriaCianoTopo = System.Drawing.Color.FromArgb(72, 214, 204);
+        public static readonly System.Drawing.Color CorCategoriaCinzaBase = System.Drawing.Color.FromArgb(74, 74, 79);
+        public static readonly System.Drawing.Color CorCategoriaCinzaTopo = System.Drawing.Color.FromArgb(154, 154, 160);
+        public static readonly System.Drawing.Color CorCategoriaLaranjaBase = System.Drawing.Color.FromArgb(232, 89, 12);
+        public static readonly System.Drawing.Color CorCategoriaLaranjaTopo = System.Drawing.Color.FromArgb(255, 138, 101);
+        public static readonly System.Drawing.Color CorCategoriaRoxoBase = System.Drawing.Color.FromArgb(134, 69, 214);
+        /// <summary>Texto roxo legível (≥ 4,5:1) sobre fundo roxo claro, ex.: marcador de piloto menor.</summary>
+        public static readonly System.Drawing.Color CorCategoriaRoxoTexto = System.Drawing.Color.FromArgb(106, 53, 176);
+        public static readonly System.Drawing.Color CorCategoriaRoxoTopo = System.Drawing.Color.FromArgb(192, 139, 255);
+        public static readonly System.Drawing.Color CorCategoriaVerdeEscuroBase = System.Drawing.Color.FromArgb(0, 126, 51);
+        public static readonly System.Drawing.Color CorCategoriaVerdeEscuroTopo = System.Drawing.Color.FromArgb(0, 200, 83);
+        public static readonly System.Drawing.Color CorCategoriaVerdeBase = System.Drawing.Color.FromArgb(30, 158, 74);
+        public static readonly System.Drawing.Color CorCategoriaVerdeTopo = System.Drawing.Color.FromArgb(94, 219, 122);
+        public static readonly System.Drawing.Color CorCategoriaVermelhoBase = System.Drawing.Color.FromArgb(217, 45, 32);
+        public static readonly System.Drawing.Color CorCategoriaVermelhoTopo = System.Drawing.Color.FromArgb(255, 107, 94);
         public static readonly System.Drawing.Color CorDominioBandeiraAmarela = System.Drawing.Color.FromArgb(255, 204, 0);
         public static readonly System.Drawing.Color CorDominioBandeiraAzul = System.Drawing.Color.FromArgb(10, 132, 255);
         public static readonly System.Drawing.Color CorDominioBandeiraBranca = System.Drawing.Color.FromArgb(255, 255, 255);
         public static readonly System.Drawing.Color CorDominioBandeiraPreta = System.Drawing.Color.FromArgb(29, 29, 31);
         public static readonly System.Drawing.Color CorDominioBandeiraVerde = System.Drawing.Color.FromArgb(52, 199, 89);
         public static readonly System.Drawing.Color CorDominioBandeiraVermelha = System.Drawing.Color.FromArgb(255, 59, 48);
+        /// <summary>Faixa seguinte da classificação (posições 7 a 10).</summary>
+        public static readonly System.Drawing.Color CorDominioClassificacaoBaixo = System.Drawing.Color.FromArgb(230, 210, 0);
+        /// <summary>Faixa do meio da classificação (posições 4 a 6) no gráfico do endurance.</summary>
+        public static readonly System.Drawing.Color CorDominioClassificacaoMeio = System.Drawing.Color.FromArgb(63, 103, 181);
         /// <summary>Melhor volta da prova (roxo, convenção de cronometragem). Sempre junto de negrito ou marcador — nunca só a cor.</summary>
         public static readonly System.Drawing.Color CorDominioMelhorVolta = System.Drawing.Color.FromArgb(192, 132, 252);
         public static readonly System.Drawing.Color CorDominioPodioOuro = System.Drawing.Color.FromArgb(255, 210, 74);
         public static readonly System.Drawing.Color CorDominioPosicao = System.Drawing.Color.FromArgb(250, 204, 21);
+        /// <summary>Texto escuro sobre fundo de aviso mais intenso (ex.: etiqueta de reserva).</summary>
+        public static readonly System.Drawing.Color CorEstadoAvisoTextoForte = System.Drawing.Color.FromArgb(107, 64, 0);
         public static readonly System.Drawing.Color CorEstadoAvisoFundo = System.Drawing.Color.FromArgb(42, 36, 16);
         public static readonly System.Drawing.Color CorEstadoAvisoSobreSolido = System.Drawing.Color.FromArgb(3, 5, 4);
         /// <summary>Preenchimento de aviso (selo/contador); texto por cima = sobre-solido.</summary>
         public static readonly System.Drawing.Color CorEstadoAvisoSolido = System.Drawing.Color.FromArgb(250, 204, 21);
         /// <summary>A pagar, pendente, atenção em texto.</summary>
         public static readonly System.Drawing.Color CorEstadoAvisoTexto = System.Drawing.Color.FromArgb(250, 204, 21);
+        /// <summary>Texto escuro sobre fundo de informação mais intenso.</summary>
+        public static readonly System.Drawing.Color CorEstadoInfoTextoForte = System.Drawing.Color.FromArgb(18, 58, 128);
         public static readonly System.Drawing.Color CorEstadoInfoFundo = System.Drawing.Color.FromArgb(14, 30, 46);
         public static readonly System.Drawing.Color CorEstadoInfoSolido = System.Drawing.Color.FromArgb(94, 182, 255);
         public static readonly System.Drawing.Color CorEstadoInfoTexto = System.Drawing.Color.FromArgb(94, 182, 255);
+        /// <summary>Texto escuro sobre fundo de perigo mais intenso.</summary>
+        public static readonly System.Drawing.Color CorEstadoPerigoTextoForte = System.Drawing.Color.FromArgb(143, 31, 24);
         public static readonly System.Drawing.Color CorEstadoPerigoFundo = System.Drawing.Color.FromArgb(42, 20, 20);
         /// <summary>Excluir, estornar, erro.</summary>
         public static readonly System.Drawing.Color CorEstadoPerigoSolido = System.Drawing.Color.FromArgb(255, 116, 116);
@@ -510,13 +683,28 @@ public static partial class Tokens
         public static readonly System.Drawing.Color CorEstadoSucessoTexto = System.Drawing.Color.FromArgb(0, 230, 118);
         /// <summary>Fundo da janela/página.</summary>
         public static readonly System.Drawing.Color CorFundoApp = System.Drawing.Color.FromArgb(3, 5, 4);
+        public static readonly System.Drawing.Color CorIconeSuave = System.Drawing.Color.FromArgb(174, 174, 178);
         /// <summary>Cor da marca (o verde do kartódromo).</summary>
         public static readonly System.Drawing.Color CorMarcaPrincipal = System.Drawing.Color.FromArgb(0, 230, 118);
         /// <summary>Linha/ item selecionado (lista, lateral).</summary>
         public static readonly System.Drawing.Color CorSelecaoFundo = System.Drawing.Color.FromArgb(15, 42, 26);
         public static readonly System.Drawing.Color CorSelecaoTexto = System.Drawing.Color.FromArgb(247, 250, 246);
+        public static readonly System.Drawing.Color CorSerie1 = System.Drawing.Color.FromArgb(11, 122, 83);
+        public static readonly System.Drawing.Color CorSerie2 = System.Drawing.Color.FromArgb(30, 111, 232);
+        public static readonly System.Drawing.Color CorSerie3 = System.Drawing.Color.FromArgb(217, 45, 32);
+        public static readonly System.Drawing.Color CorSerie4 = System.Drawing.Color.FromArgb(255, 159, 10);
+        public static readonly System.Drawing.Color CorSerie5 = System.Drawing.Color.FromArgb(134, 69, 214);
+        public static readonly System.Drawing.Color CorSerie6 = System.Drawing.Color.FromArgb(14, 156, 156);
+        public static readonly System.Drawing.Color CorSerie7 = System.Drawing.Color.FromArgb(232, 89, 12);
+        public static readonly System.Drawing.Color CorSerie8 = System.Drawing.Color.FromArgb(90, 62, 54);
+        public static readonly System.Drawing.Color CorSerie9 = System.Drawing.Color.FromArgb(194, 24, 91);
+        public static readonly System.Drawing.Color CorSerie10 = System.Drawing.Color.FromArgb(63, 81, 181);
+        public static readonly System.Drawing.Color CorSerie11 = System.Drawing.Color.FromArgb(124, 179, 66);
+        public static readonly System.Drawing.Color CorSerie12 = System.Drawing.Color.FromArgb(0, 172, 193);
         /// <summary>Véu escuro atrás de modal.</summary>
         public static readonly System.Drawing.Color CorSobreposicao = System.Drawing.Color.FromArgb(166, 0, 0, 0);
+        /// <summary>Bolinha/indicador de "ok" vivo. Decorativa: SEMPRE com texto ao lado.</summary>
+        public static readonly System.Drawing.Color CorStatusOk = System.Drawing.Color.FromArgb(52, 199, 89);
         /// <summary>Bolinha de status / interruptor ligado. Decorativa: SEMPRE com texto ao lado.</summary>
         public static readonly System.Drawing.Color CorStatusOnline = System.Drawing.Color.FromArgb(0, 230, 118);
         /// <summary>Busca, segmentados, botão fantasma.</summary>
@@ -529,8 +717,14 @@ public static partial class Tokens
         public static readonly System.Drawing.Color CorSuperficiePadrao = System.Drawing.Color.FromArgb(11, 16, 12);
         /// <summary>Menus, cabeçalho de tabela.</summary>
         public static readonly System.Drawing.Color CorSuperficieSuave = System.Drawing.Color.FromArgb(7, 11, 8);
+        /// <summary>Texto de apoio legível também sobre fundos cinza e tingidos (≥ 4,5:1 sobre superfície-lateral). Admin web.</summary>
+        public static readonly System.Drawing.Color CorTextoApoio = System.Drawing.Color.FromArgb(94, 94, 99);
+        /// <summary>Texto corrido forte (mais escuro que o secundário). Admin web.</summary>
+        public static readonly System.Drawing.Color CorTextoCorpo = System.Drawing.Color.FromArgb(58, 58, 60);
         /// <summary>Texto desabilitado (isento de contraste pela WCAG).</summary>
         public static readonly System.Drawing.Color CorTextoDesabilitado = System.Drawing.Color.FromArgb(93, 102, 96);
+        /// <summary>Texto discreto (rótulos, cabeçalhos de tabela), ≥ 4,5:1 sobre superfície-lateral. Nunca para texto menor que 12px.</summary>
+        public static readonly System.Drawing.Color CorTextoDiscreto = System.Drawing.Color.FromArgb(102, 102, 105);
         /// <summary>Texto sobre superfície inversa.</summary>
         public static readonly System.Drawing.Color CorTextoInverso = System.Drawing.Color.FromArgb(3, 5, 4);
         public static readonly System.Drawing.Color CorTextoLink = System.Drawing.Color.FromArgb(94, 182, 255);
