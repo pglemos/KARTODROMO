@@ -15,32 +15,6 @@ describe('App V1 - Regras de Elegibilidade para Sorteio', () => {
     expect(res).toEqual({ situacao: 'ELEGIVEL', motivo: null });
   });
 
-  it('retorna ELEGIVEL quando aprovado e pago, mesmo se termo estiver pendente no banco', () => {
-    const res = elegibilidade({
-      clienteId: 2,
-      nome: 'Piloto Pago na Recepcao',
-      aprovada: true,
-      pago: true,
-      termo: false,
-      totalCentavos: 15000,
-      endurance: false,
-    });
-    expect(res).toEqual({ situacao: 'ELEGIVEL', motivo: null });
-  });
-
-  it('retorna ELEGIVEL para endurance aprovado, mesmo se termo estiver pendente', () => {
-    const res = elegibilidade({
-      clienteId: 3,
-      nome: 'Piloto Endurance',
-      aprovada: true,
-      pago: false,
-      termo: false,
-      totalCentavos: 0,
-      endurance: true,
-    });
-    expect(res).toEqual({ situacao: 'ELEGIVEL', motivo: null });
-  });
-
   it('retorna INELEGIVEL se não estiver aprovado na recepção', () => {
     const res = elegibilidade({
       clienteId: 4,

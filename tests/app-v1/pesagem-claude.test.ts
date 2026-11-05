@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Identidade } from './auth';
-import { criarOperacao } from './operacao';
-import { abrirStore } from './store';
+import type { Identidade } from '../../lib/app-v1/auth';
+import { criarOperacao } from '../../lib/app-v1/operacao';
+import { abrirStore } from '../../lib/app-v1/store';
 
 const q: Identidade = { usuarioId: 'u1', usuario: 'op', nome: 'Op', perfil: 'OPERACAO', sessaoId: 's', deviceId: 'd', expiraEm: Date.now() + 1e6 };
 const pedido = (op: string, rev: number, payload: object) => ({ operationId: op, expectedSessionRevision: rev, payload, reason: 'teste' });
@@ -14,7 +14,7 @@ function montar(state: string) {
   ] };
   const op = criarOperacao({
     store, verSessao: () => sessao, inscricoes: async () => [], listarSessoes: () => [],
-    legado: async (m, c, corpo) => { chamadas.push({ m, c, corpo }); return {}; },
+    legado: async (m: string, c: string, corpo: unknown) => { chamadas.push({ m, c, corpo }); return {}; },
   } as never);
   return { op, chamadas, store };
 }

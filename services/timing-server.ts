@@ -17,7 +17,7 @@ import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
 import { appendFileSync, closeSync, copyFileSync, cpSync, createWriteStream, existsSync, fsyncSync, ftruncateSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
-import { extname, join, resolve } from 'node:path';
+import { extname, join, relative, resolve, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { format } from 'node:util';
 import { chaveOperadorValida, clienteEhMaquinaOperadora } from '../lib/timing/operator-auth';
@@ -92,7 +92,7 @@ import type { ContextoProva, EmpresaEmail } from '../lib/timing/email-resultado'
 import { quemSaiuDaAgenda } from '../lib/timing/agenda-saida';
 import { competidoresComSorteio, descricaoModoSorteio, ListaMudouError, pilotosDoSorteio, validarSorteio, type Atribuicao } from '../lib/timing/sorteio';
 import { normalizarPaginaPainel, PAINEL_LED_PAGE_SIZE } from '../lib/timing/painel-page';
-import { abrirStore } from '../lib/app-v1/store';
+import { abrirStore, type AppStore } from '../lib/app-v1/store';
 import { marcarPendentesComoDesconhecidas } from '../lib/app-v1/comandos';
 import { criarModuloApp, type ModuloApp } from '../lib/app-v1/rotas';
 import { ErroLegado } from '../lib/app-v1/operacao';
@@ -127,6 +127,12 @@ const ENV_DECODER_PORT = Number(process.env.TIMING_DECODER_PORT || (ENV_DECODER_
 const DATA_DIR = resolve(process.env.TIMING_DATA_DIR || join(process.cwd(), 'data', 'timing'));
 // App operacional: só liga com APP_V1_TOKEN_SECRET; sem ele as rotas /api/app/v1/ respondem 503
 let moduloApp: ModuloApp | null = null;
+let storeOperacional: AppStore | null = null;
+const bloqueioKart = (kart: string) => !kartLiberadoHoje(storeOperacional, kart);
+const exigirFrotaLiberada = (s: Session) => {
+  const bloqueado = s.type === 'equalizacao' ? undefined : s.competitors.find(c => bloqueioKart(c.kart));
+  if (bloqueado) throw new Error(`Kart ${bloqueado.kart} bloqueado: peça liberação ao gerente ou responsável pela equalização.`);
+};
 const assinantesApp = new Set<() => void>();
 const SESSIONS_DIR = join(DATA_DIR, 'sessions');
 const JOURNAL_DIR = join(DATA_DIR, 'passagens');
@@ -363,7 +369,7 @@ for (const session of sessions.values()) {
 
 /** O que invalida um comando do app. Passagem de kart fica de fora: senão, em corrida, todo comando daria conflito. */
 function assinaturaDeComando(s: Session) {
-  return JSON.stringify([s.state, s.competitors.map((c) => [c.kart, c.name, c.customerId ?? null, c.autoAdded ? 1 : 0, c.penalidades?.length ?? 0, c.flag ?? null]), s.type === 'equalizacao' ? s.equalizacao ?? null : null]);
+  return JSON.stringify([s.state, s.competitors.map((c) => [c.kart, c.name, c.customerId ?? null, c.autoAdded ? 1 : 0, c.penalidades?.length ?? 0, c.flag ?? null]), s.manualPositions ?? {}, s.type === 'equalizacao' ? s.equalizacao ?? null : null]);
 }
 
 function saveSession(s: Session) {
@@ -2310,7 +2316,7 @@ function crossingRows(s: Session) {
     invalid: Boolean(crossing.invalid),
     deleted: Boolean(crossing.deleted),
     source: crossing.source ?? 'decoder',
-    estimada: Boolean(crossing.estimada),
+    estimada: crossing.estimada ?? false, referenciaKart: crossing.referenciaKart, referenciaPassagem: crossing.referenciaPassagem,
     assigned: Boolean(crossing.originalKart && crossing.originalKart !== competitor.kart),
     rejected: false,
     reason: null as string | null,
@@ -2330,7 +2336,7 @@ function crossingRows(s: Session) {
     invalid: false,
     deleted: false,
     source: 'decoder',
-    estimada: false,
+    estimada: false, referenciaKart: undefined, referenciaPassagem: undefined,
     assigned: false,
     rejected: true,
     reason: r.reason as string | null,
@@ -3672,6 +3678,7 @@ function ligarAppOperacional() {
   if (!segredo) return;
   try {
     const store = abrirStore(join(DATA_DIR, '..', 'app-operacional', 'app.db'));
+    storeOperacional = store;
     marcarPendentesComoDesconhecidas(store);
     moduloApp = criarModuloApp({
       store, segredo, gatewaySegredo: process.env.APP_V1_GATEWAY_SECRET,
@@ -3689,6 +3696,13 @@ function ligarAppOperacional() {
   }
 }
 ligarAppOperacional();
+let atualizandoTemposGalpao = false;
+setInterval(() => {
+  if (!moduloApp || atualizandoTemposGalpao) return;
+  atualizandoTemposGalpao = true;
+  void moduloApp.atualizarTemposGalpao().catch(err => log('contador do galpão indisponível', (err as Error).message))
+    .finally(() => { atualizandoTemposGalpao = false; });
+}, 10_000).unref();
 
 const server = http.createServer((req, res) => {
   recordOperatorMachine(req);
