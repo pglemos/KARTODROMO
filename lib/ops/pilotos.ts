@@ -64,13 +64,40 @@ const tracadoBase = (t: string) => t.replace(/\s*\(chuva\)\s*/i, '').replace(/\s
 const comCategoria = (t: string, cat: string | null | undefined) => (/super\s*kart/i.test(cat ?? '') && !/super kart/i.test(t) ? `${t} · Super Kart` : t);
 const SEM_TRACADO = 'Traçado principal'; // bateria sem traçado marcado: conta na carreira, fica fora do ranking
 let normalizado = false, limites: Map<string, number> | null = null;
+/**
+ * Cadastro duplicado da mesma pessoa (mesmo nome e mesmo e-mail, ex.: CPF digitado errado num deles) vira um piloto só:
+ * as corridas de todos vão para o cadastro atualizado mais recentemente, que é o que a recepção e o app usam.
+ */
+let aliasCliente = new Map<string, string>();
+let aliasEm = 0;
+async function carregarAliases(log?: (m: string) => void): Promise<boolean> {
+  if (Date.now() - aliasEm < 10 * 60_000) return false;
+  aliasEm = Date.now();
+  try {
+    const rows = await query<{ id: number; canon: number }>(
+      `WITH g AS (
+         SELECT Id, LOWER(LTRIM(RTRIM(Email))) em, UPPER(LTRIM(RTRIM(Nome))) nm,
+                ROW_NUMBER() OVER (PARTITION BY LOWER(LTRIM(RTRIM(Email))), UPPER(LTRIM(RTRIM(Nome))) ORDER BY AtualizadoEm DESC, Id DESC) ordem,
+                COUNT(*) OVER (PARTITION BY LOWER(LTRIM(RTRIM(Email))), UPPER(LTRIM(RTRIM(Nome)))) qtd
+           FROM dbo.Cliente WHERE ResponsavelId IS NULL AND Email LIKE '_%@_%._%' AND LEN(LTRIM(RTRIM(Nome))) >= 5)
+       SELECT a.Id id, b.Id canon FROM g a JOIN g b ON b.em = a.em AND b.nm = a.nm AND b.ordem = 1 WHERE a.qtd BETWEEN 2 AND 3 AND a.ordem > 1`, {});
+    const novo = new Map(rows.map((r) => [String(r.id), String(r.canon)]));
+    const mudou = novo.size !== aliasCliente.size || [...novo].some(([k, v]) => aliasCliente.get(k) !== v);
+    aliasCliente = novo;
+    if (mudou) { normalizado = false; log?.(`pilotos: ${novo.size} cadastro(s) duplicado(s) unificado(s)`); }
+    return mudou;
+  } catch (e) { log?.(`pilotos: duplicados não lidos (${(e as Error).message})`); return false; }
+}
 function normalizarNomes() {
+  const canon = (cid: string | null) => (cid && aliasCliente.get(cid)) || cid;
   for (const b of Object.values(indice)) {
     const original = b.tracado;
     b.tracado = tracadoBase(tracadoLegado(b.id, original));
     if (b.tracado === 'Traçado não confirmado') b.tracadoOriginal ??= original;
+    for (const p of b.pilotos) p.cid = canon(p.cid);
     for (const p of b.pilotos) p.t = comCategoria(b.tracado, catDoKart(p.kart) ?? p.cat);
   }
+  for (const x of rankAntigo) x.cid = canon(x.cid);
   for (const x of rankAntigo) {
     const original = x.tracado;
     const resolvido = tracadoLegado('lt-ranking', tracadoBase(original));
@@ -140,6 +167,7 @@ export function atualizarIndice(log?: (m: string) => void): Promise<void> {
           } catch (e) { log?.(`pilotos: bateria ${s.id} não foi lida (${(e as Error).message})`); }
         }));
       }
+      if (await carregarAliases(log)) mudou = true;
       normalizarNomes();
       if (mudou) { await gravarIndiceArq(); }
       atualizadoEm = Date.now(); ultimoErro = null;
