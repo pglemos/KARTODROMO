@@ -1,0 +1,81 @@
+name: Validate previous Worker version
+
+on:
+  push:
+    branches:
+      - deploy/production-rollback-worker-routes-2026-07-20
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-kartodromo-previous-version
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Smoke test Worker version 83
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.head_ref == 'deploy/production-rollback-worker-routes-2026-07-20'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Validate versioned URLs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/version-smoke/good /tmp/version-smoke/bad
+          good='https://32632ea1-kartodromo.kartodromo.workers.dev'
+          bad='https://ec4a7cb4-kartodromo.kartodromo.workers.dev'
+          paths=('' 'pista' 'kart-locacao' 'eventos' 'campeonatos')
+
+          all_ok=true
+          for path in "${paths[@]}"; do
+            key="${path:-home}"
+            curl --max-time 45 -sS -L --max-redirs 5 \
+              -H 'Cache-Control: no-cache' \
+              -D "/tmp/version-smoke/good/${key}.headers" \
+              -o "/tmp/version-smoke/good/${key}.html" \
+              -w '%{http_code} %{url_effective}\n' \
+              "${good}/${path}" > "/tmp/version-smoke/good/${key}.meta" || true
+
+            read -r status effective < "/tmp/version-smoke/good/${key}.meta" || true
+            title=$(grep -oi '<title[^>]*>[^<]*' "/tmp/version-smoke/good/${key}.html" | sed -E 's/<title[^>]*>//I' | head -1 || true)
+            printf '%s\t%s\t%s\t%s\n' "$key" "${status:-}" "${effective:-}" "$title" >> /tmp/version-smoke/good/summary.tsv
+
+            if [[ "${status:-}" != '200' ]] \
+              || [[ "${effective:-}" == *'/design/'* ]] \
+              || grep -Fq '{{' "/tmp/version-smoke/good/${key}.html"; then
+              all_ok=false
+            fi
+          done
+
+          curl --max-time 45 -sS -L --max-redirs 5 \
+            -D /tmp/version-smoke/bad/home.headers \
+            -o /tmp/version-smoke/bad/home.html \
+            -w '%{http_code} %{url_effective}\n' \
+            "${bad}/" > /tmp/version-smoke/bad/home.meta || true
+
+          sha256sum /tmp/version-smoke/good/*.html > /tmp/version-smoke/good/hashes.txt
+          sha256sum /tmp/version-smoke/bad/home.html > /tmp/version-smoke/bad/hashes.txt || true
+          wc -c /tmp/version-smoke/good/*.html /tmp/version-smoke/bad/home.html > /tmp/version-smoke/sizes.txt || true
+          cat /tmp/version-smoke/good/summary.tsv
+          test "$all_ok" = true
+
+      - name: Upload version comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: worker-version-83-smoke-test
+          path: /tmp/version-smoke
+          if-no-files-found: error
