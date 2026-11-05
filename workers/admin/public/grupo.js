@@ -63,56 +63,28 @@ const Grupo = (() => {
   let estado = null; // { b, g (do servidor) | null, rasc (nova), aoMudar }
 
   async function abrir(grupoId, b, aoMudar) {
-    estado = { b, g: null, rasc: null, aoMudar, reg: { valor: '', quem: '', forma: 'Pix' }, comp: [], regArquivo: null };
-    modal('<div class="esqueleto" style="height: 420px; margin: 20px"></div>').style.maxWidth = '1140px';
-    try { estado.g = await office(`/grupos/${grupoId}`); await carregarComp(); pintar(); } catch (e) { falhou(e); fecharCamada(); }
-  }
-
-  // ---------------------------------------------------------------- comprovantes de pagamento (arquivo no R2, ver src/comprovantes.ts)
-  const COMP_TIPOS = 'image/jpeg,image/png,image/webp,application/pdf';
-  const COMP_MAX = 8 * 1024 * 1024;
-
-  async function carregarComp() {
-    if (!estado || !estado.g) return;
-    try { estado.comp = await api(`/comprovantes/grupo/${estado.g.id}`); } catch { estado.comp = []; }
-  }
-
-  function erroComp(f) {
-    if (!f) return '';
-    if (!COMP_TIPOS.split(',').includes(f.type)) return 'Anexe uma foto (JPG, PNG ou WebP) ou um PDF.';
-    if (f.size > COMP_MAX) return 'O comprovante passa de 8 MB. Envie uma foto menor.';
-    return '';
-  }
-
-  async function enviarComp(grupoId, pagamentoId, f) {
-    const r = await fetch(`/api/comprovantes/grupo/${grupoId}/pagamento/${pagamentoId}?nome=${encodeURIComponent(f.name || 'comprovante')}`, {
-      method: 'POST', headers: { authorization: 'Bearer ' + S.token, 'content-type': f.type }, body: f,
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.error || `Erro ${r.status}`);
-    return d;
-  }
-
-  async function abrirComp(id) {
-    const r = await fetch(`/api/comprovantes/arquivo/${id}`, { headers: { authorization: 'Bearer ' + S.token } });
-    if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.error || `Erro ${r.status}`); }
-    const url = URL.createObjectURL(await r.blob());
-    window.open(url, '_blank', 'noopener');
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  }
-
-  function controlesComp(pg) {
-    const meus = (estado.comp || []).filter((c) => c.pagamentoId === pg.id);
-    const ver = meus.map((c) => `<span style="display: flex; gap: 8px"><button class="btn peq" style="height: 22px; padding: 0; background: transparent; color: var(--azulTxt)" data-comp-ver="${c.id}" title="${esc(c.nome)}">Ver comprovante</button><button class="btn peq" style="height: 22px; padding: 0; background: transparent; color: var(--erroTxt)" data-comp-remover="${c.id}" aria-label="Remover comprovante ${esc(c.nome)}">Remover</button></span>`).join('');
-    const anexar = pg.origem === 'manual' ? `<label class="btn peq" style="height: 22px; padding: 0; background: transparent; color: var(--verde); cursor: pointer">${meus.length ? 'Anexar outro' : 'Anexar comprovante'}<input type="file" hidden accept="${COMP_TIPOS}" data-comp-anexar="${pg.id}"></label>` : '';
-    return ver || anexar ? `<span class="col" style="gap: 2px; align-items: flex-end">${ver}${anexar}</span>` : '';
+    estado = { b, g: null, rasc: null, aoMudar, reg: { valor: '', quem: '', forma: 'Pix' } };
+    modal('<div class="esqueleto" style="height: 420px; margin: 20px"></div>').style.maxWidth = '1180px';
+    try {
+      estado.g = await office(`/grupos/${grupoId}`);
+      if (estado.g?.responsavelId) {
+        try {
+          const respCli = await office(`/clientes/${estado.g.responsavelId}`);
+          estado.g.responsavelDocumento = respCli?.documento || '';
+          if (estado.g.pilotos && estado.g.pilotos[0]) {
+            estado.g.pilotos[0].cpf = respCli?.documento || '';
+          }
+        } catch (_) {}
+      }
+      pintar();
+    } catch (e) { falhou(e); fecharCamada(); }
   }
 
   function nova(b, aoMudar, qtd) {
     const n = Math.min(qtd || 2, Math.max(1, +b.disponiveis || 1));
     estado = {
-      b, g: null, aoMudar, reg: { valor: '', quem: '', forma: 'Pix' }, comp: [], regArquivo: null, enviarAgora: true, busca: '', achados: [],
-      rasc: { responsavel: null, origem: 'whatsapp', modo: 'individual', preco: +b.preco || 0, sinalPct: 30, pilotos: Array.from({ length: n }, () => ({ nome: '', telefone: '', menor: false })) },
+      b, g: null, aoMudar, reg: { valor: '', quem: '', forma: 'Pix' }, enviarAgora: true, busca: '', achados: [],
+      rasc: { responsavel: null, origem: 'whatsapp', modo: 'individual', preco: +b.preco || 0, sinalPct: 30, pilotos: Array.from({ length: n }, () => ({ nome: '', cpf: '', telefone: '', menor: false })) },
     };
     modal('').style.maxWidth = '1180px';
     pintar();

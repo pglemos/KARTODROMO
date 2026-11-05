@@ -4,7 +4,7 @@ import type { AppStore } from './store';
 
 const scryptAsync = promisify(scrypt) as (senha: string, sal: Buffer, tamanho: number) => Promise<Buffer>;
 
-export type Perfil = 'RECEPCAO' | 'OPERACAO' | 'GERENCIA' | 'EQUALIZACAO';
+export type Perfil = 'RECEPCAO' | 'OPERACAO' | 'GERENCIA';
 export type Relogio = () => number;
 export type AuthCtx = { store: AppStore; segredo: string; relogio?: Relogio };
 export type Identidade = { usuarioId: string; usuario: string; nome: string; perfil: Perfil; sessaoId: string; deviceId: string; expiraEm: number };
@@ -24,13 +24,12 @@ const TAMANHO_HASH = 64;
 const LEITURA = ['sessoes.ver', 'elegiveis.ver', 'operacoes.ver', 'auditoria.ver'];
 const OPERACAO = [
   ...LEITURA, 'bateria.preparar', 'sorteio.gravar', 'atrasado.incluir', 'peso.conferir', 'kart.trocar', 'frota.gerir', 'penalidade.aplicar',
-  'bandeira.aplicar', 'prova.comandar', 'prova.reiniciar', 'passagem.corrigir', 'aulas.registrar',
+  'bandeira.aplicar', 'prova.comandar', 'prova.reiniciar', 'passagem.corrigir', 'equalizacao.gerir',
 ];
 const CAPACIDADES: Record<Perfil, ReadonlySet<string>> = {
   RECEPCAO: new Set([...LEITURA, 'aulas.aceitar']),
-  OPERACAO: new Set(OPERACAO),
-  GERENCIA: new Set([...OPERACAO, 'usuarios.gerir', 'auditoria.global', 'equalizacao.gerir', 'frota.liberar', 'aulas.aceitar', 'manutencao.gerir']),
-  EQUALIZACAO: new Set([...LEITURA, 'equalizacao.gerir', 'frota.gerir', 'frota.liberar']),
+  OPERACAO: new Set([...OPERACAO, 'aulas.registrar']),
+  GERENCIA: new Set([...OPERACAO, 'usuarios.gerir', 'auditoria.global', 'aulas.registrar', 'aulas.aceitar', 'manutencao.gerir']),
 };
 
 export function pode(perfil: Perfil, capacidade: string): boolean {
@@ -72,8 +71,7 @@ export async function criarUsuario(ctx: AuthCtx, u: { usuario: string; nome: str
   const id = randomUUID();
   const senhaHash = await gerarHash(u.senha);
   ctx.store.db.prepare('INSERT INTO usuarios (id, usuario, nome, perfil, senhaHash, criadoEm) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(id, u.usuario.trim().toLowerCase(), u.nome.trim(), u.perfil === 'EQUALIZACAO' ? 'OPERACAO' : u.perfil, senhaHash, new Date(agoraDe(ctx)).toISOString());
-  if (u.perfil === 'EQUALIZACAO') ctx.store.db.prepare('INSERT INTO perfis_especiais (usuarioId, perfil) VALUES (?, ?)').run(id, u.perfil);
+    .run(id, u.usuario.trim().toLowerCase(), u.nome.trim(), u.perfil, senhaHash, new Date(agoraDe(ctx)).toISOString());
   return id;
 }
 
@@ -147,7 +145,7 @@ export function autenticar(ctx: AuthCtx, header: unknown): Identidade | null {
     FROM sessoes s JOIN usuarios u ON u.id = s.usuarioId WHERE s.id = ?`).get(corpo.sid) as
     (Omit<Identidade, 'expiraEm'> & { expiraAbsolutoEm: number; revogadaEm: number | null; bloqueado: number }) | undefined;
   if (!l || l.revogadaEm || l.bloqueado || agora >= l.expiraAbsolutoEm) return null;
-  return { usuarioId: l.usuarioId, usuario: l.usuario, nome: l.nome, perfil: (ctx.store.db.prepare('SELECT perfil FROM perfis_especiais WHERE usuarioId = ?').get(l.usuarioId) as { perfil: Perfil } | undefined)?.perfil ?? l.perfil, sessaoId: l.sessaoId, deviceId: l.deviceId, expiraEm: corpo.exp };
+  return { usuarioId: l.usuarioId, usuario: l.usuario, nome: l.nome, perfil: l.perfil, sessaoId: l.sessaoId, deviceId: l.deviceId, expiraEm: corpo.exp };
 }
 
 export async function trocarSenha(ctx: AuthCtx, usuarioId: string, atual: string, nova: string, sessaoAtual: string) {

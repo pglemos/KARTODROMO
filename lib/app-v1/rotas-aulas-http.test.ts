@@ -15,7 +15,6 @@ const chamadasLegado: string[] = [];
 
 async function chamar(metodo: string, caminho: string, token?: string, corpo?: unknown) {
   const r = await fetch(base + caminho, { method: metodo, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: corpo ? JSON.stringify(corpo) : undefined });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return { status: r.status, json: await r.json() as Record<string, any> };
 }
 const entrar = async (usuario: string) => (await chamar('POST', '/api/app/v1/auth/login', undefined, { usuario, senha: SENHA, deviceId: `dev-${usuario}` })).json.accessToken as string;
