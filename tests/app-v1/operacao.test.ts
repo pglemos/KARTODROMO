@@ -1,3 +1,4 @@
+import { diaAbertura } from '../../lib/app-v1/abertura-frota';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { abrirStore, type AppStore } from '../../lib/app-v1/store';
 import { criarOperacao } from '../../lib/app-v1/operacao';
@@ -36,12 +37,20 @@ describe('operação', () => {
   const envio = (payload: object, extra: object = {}) => ({ operationId: Math.random().toString(36), expectedSessionRevision: 0, payload, reason: 'motivo', ...extra });
   beforeEach(() => {
     store = abrirStore(':memory:');
+    for (const kart of ['4', '8', '9', '12', '120']) store.db.prepare('INSERT INTO abertura_frota VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(diaAbertura(), kart, '[]', 'TESTE CODEX', new Date().toISOString(), 'TESTE CODEX', new Date().toISOString(), 'Fixture: frota previamente liberada');
     legado = vi.fn(async () => ({}));
     bateria = { id: 'b', name: 'B', state: 'preparando', agendaId: 9, competitors: [
       { kart: '4', name: 'Ana', customerId: '1' }, { kart: '', name: 'Bia', customerId: '2' }, { kart: '', name: 'Cid', customerId: '3' },
     ] };
     insc = [{ clienteId: 1, nome: 'Ana', ...ok }, { clienteId: 2, nome: 'Bia', ...ok }, { clienteId: 3, nome: 'Cid', ...ok, pago: false }];
     op = criarOperacao({ store, legado: legado as never, verSessao: (id) => (id === 'b' ? bateria : undefined), inscricoes: async () => insc });
+  });
+
+  it('sorteio e troca recusam kart sem aceite diário mesmo com pedido adulterado', async () => {
+    store.db.prepare('DELETE FROM abertura_frota WHERE kart = ?').run('8');
+    expect((await op.atrasados(OP, 'b', envio({ atribuicoes: [{ customerId: '2', nome: 'Bia', kart: '8' }] }))).status).toBe('REJECTED');
+    expect((await op.trocaKart(OP, 'b', envio({ fromKart: '4', toKart: '8', customerId: '1', nome: 'Ana' }))).status).toBe('REJECTED');
+    expect(legado).not.toHaveBeenCalled();
   });
 
   it('não elegível não grava mesmo com tela adulterada (T01, T02)', async () => {
@@ -163,9 +172,15 @@ describe('operação', () => {
 
   it('conferência de lastro persiste no app e volta no painel; troca de kart zera', async () => {
     await op.peso(OP, 'b', envio({ customerId: '1', nome: 'Ana', pesoKg: 70, lastroConferido: true }));
+    expect(legado.mock.calls[0][2]).toMatchObject({ aplicarGrupo: true });
     const bruto = { karts: [], tipoKart: null, pilotos: [{ indice: 0, nome: 'Ana', customerId: '1', kartAtual: '4', excecoes: [], pesoKg: 70 }] };
     legado.mockResolvedValueOnce(bruto);
     expect((await op.painelSorteio(OP, 'b')).pilotos[0].lastroConferido).toBe(true);
+    // Outra etapa da mesma bateria (ex.: Corrida quando o lastro foi conferido na Tomada de tempo) herda a conferência no mesmo kart
+    const corrida = { ...bateria, id: 'b-corrida' };
+    const opDuasEtapas = criarOperacao({ store, legado: legado as never, verSessao: (id) => (id === 'b-corrida' ? corrida : bateria), inscricoes: async () => insc });
+    legado.mockResolvedValueOnce({ ...bruto, programa: [{ id: 'b' }] });
+    expect((await opDuasEtapas.painelSorteio(OP, 'b-corrida')).pilotos[0].lastroConferido).toBe(true);
     bateria.competitors[0].kart = '9';
     legado.mockResolvedValueOnce({ ...bruto, pilotos: [{ ...bruto.pilotos[0], kartAtual: '9' }] });
     expect((await op.painelSorteio(OP, 'b')).pilotos[0].lastroConferido).toBe(false);
@@ -198,7 +213,7 @@ describe('operação', () => {
   it('checklist da oficina preserva o que já estava gravado', async () => {
     legado.mockResolvedValueOnce({ finalizadaEm: null });
     legado.mockResolvedValueOnce({ resultado: { karts: [{ kart: '4', checklist: { sistemas: { motor: { status: 'atencao' } }, observacoes: 'obs', acaoOficina: 'antiga' } }] } });
-    const r = await op.comandoEqualizacao(OP, 'eq', envio({ acao: 'checklist', kart: '4', acaoOficina: 'nova' }));
+    const r = await op.comandoEqualizacao({ ...OP, perfil: 'EQUALIZACAO' }, 'eq', envio({ acao: 'checklist', kart: '4', acaoOficina: 'nova' }));
     expect(r.status).toBe('APPLIED');
     const [m, c, corpo] = legado.mock.calls[2];
     expect([m, c]).toEqual(['PUT', '/api/equalizacao/eq/karts/4']);
@@ -207,15 +222,15 @@ describe('operação', () => {
   });
 
   it('redutor e abertura usam as rotas da cronometragem; Recepção não mexe', async () => {
-    await op.comandoEqualizacao(OP, 'eq', envio({ acao: 'abertura', kart: '4', bloco: 2, mm: '0,3' }));
+    await op.comandoEqualizacao({ ...OP, perfil: 'EQUALIZACAO' }, 'eq', envio({ acao: 'abertura', kart: '4', bloco: 2, mm: '0,3' }));
     expect(legado.mock.calls[1]).toEqual(['PATCH', '/api/equalizacao/eq', { abertura: { kart: '4', bloco: 2, mm: '0,3' } }]);
     await expect(op.comandoEqualizacao(REC, 'eq', envio({ acao: 'redutor', kart: '4', mm: '17' }))).rejects.toMatchObject({ http: 403 });
-    expect(() => op.comandoEqualizacao(OP, 'eq', envio({ acao: 'apagar' }))).toThrow(/inválido/);
+    expect(() => op.comandoEqualizacao({ ...OP, perfil: 'EQUALIZACAO' }, 'eq', envio({ acao: 'apagar' }))).toThrow(/inválido/);
   });
 
   it('equalização finalizada não aceita alteração, só reabrir', async () => {
     legado.mockResolvedValueOnce({ finalizadaEm: 123 });
-    const r = await op.comandoEqualizacao(OP, 'eq', envio({ acao: 'config', mecanico: 'Zé' }));
+    const r = await op.comandoEqualizacao({ ...OP, perfil: 'EQUALIZACAO' }, 'eq', envio({ acao: 'config', mecanico: 'Zé' }));
     expect(r.status).toBe('REJECTED');
     expect(legado.mock.calls.some(([m]) => m === 'PATCH')).toBe(false);
   });
@@ -223,8 +238,14 @@ describe('operação', () => {
   it('importação devolve os karts que não vieram', async () => {
     legado.mockResolvedValueOnce({ finalizadaEm: null });
     legado.mockResolvedValueOnce({ importados: ['4'], ignorados: ['9'] });
-    const r = await op.comandoEqualizacao(OP, 'eq', envio({ acao: 'importar', sessionId: 'b', karts: ['4', '9'] }));
+    const r = await op.comandoEqualizacao({ ...OP, perfil: 'EQUALIZACAO' }, 'eq', envio({ acao: 'importar', sessionId: 'b', karts: ['4', '9'] }));
     expect(r.resultado).toEqual({ importados: ['4'], ignorados: ['9'] });
+  });
+
+  it.each([['quebra', 'oficina'], ['desempenho', 'equalizar']])('troca por %s bloqueia o kart antigo antes de liberar o substituto', async (tipoTroca, estado) => {
+    const r = await op.trocaKart(OP, 'b', envio({ fromKart: '4', toKart: '8', customerId: '1', tipoTroca }));
+    expect(r.status).toBe('APPLIED');
+    expect(store.db.prepare('SELECT estado, usuario FROM karts_fora WHERE kart = ?').get('4')).toMatchObject({ estado, usuario: 'op' });
   });
 
   it('números do dia ignoram outros dias e cancelada', () => {
@@ -240,6 +261,7 @@ describe('operação', () => {
     expect(r.baterias).toMatchObject({ total: 2, emProva: 1, encerradas: 1 });
     expect(r.pilotos).toBe(2);
     expect(r.ultimas24h.punicoes).toBe(1);
+    expect(r.ultimas24h.origem).toBe('app-v1');
   });
 
   it('comando crítico exige motivo', () => {
@@ -257,5 +279,142 @@ describe('operação', () => {
     expect(p.pilotos[1]).toMatchObject({ situacao: 'INELEGIVEL', motivo: 'Pagamento pendente.' });
     expect(p.aguardandoEntrada).toEqual(['Dan']);
     expect(p.karts).toContainEqual({ kart: '4', frota: 'LIGHT', fora: false, ocupado: true });
+  });
+
+  it('fluxo completo de bateria única (Tomada de tempo + Corrida): sorteio único, atrasado, lastro compartilhado, troca de kart, direção e equalização completa', async () => {
+    const tomada: any = {
+      id: '2026-11-01-tomada', name: 'BATERIA 18:00 · TOMADA DE TEMPO', type: 'classificacao', state: 'preparando',
+      agendaId: 101, programaId: 'agenda-101', groupId: 'grp-1800', createdAt: Date.now(),
+      competitors: [
+        { kart: '', name: 'Ana', customerId: '1', detalhes: {} },
+        { kart: '', name: 'Bia', customerId: '2', detalhes: {} },
+      ],
+    };
+    const corrida: any = {
+      id: '2026-11-01-corrida', name: 'BATERIA 18:00 · CORRIDA', type: 'corrida', state: 'preparando',
+      agendaId: 101, programaId: 'agenda-101', groupId: 'grp-1800', createdAt: Date.now(),
+      competitors: [
+        { kart: '', name: 'Ana', customerId: '1', detalhes: {} },
+        { kart: '', name: 'Bia', customerId: '2', detalhes: {} },
+      ],
+    };
+    const sessoes = new Map<string, any>([[tomada.id, tomada], [corrida.id, corrida]]);
+    const legadoSim = vi.fn(async (metodo: string, caminho: string, corpo?: any) => {
+      const mSorteio = /^\/api\/sessions\/([\w-]+)\/sorteio$/.exec(caminho);
+      if (mSorteio && metodo === 'GET') {
+        const s = sessoes.get(mSorteio[1]);
+        const irmas = [...sessoes.values()].filter((x) => x.id !== s.id && x.agendaId === s.agendaId);
+        return {
+          sessao: { id: s.id, name: s.name, type: s.type, state: s.state },
+          programa: irmas.map((x) => ({ id: x.id, name: x.name, state: x.state })),
+          tipoKart: 'Light',
+          karts: ['4', '8', '12'],
+          pilotos: s.competitors.map((c: any, indice: number) => ({
+            indice, nome: c.name, customerId: c.customerId, kartAtual: c.kart, excecoes: [], pesoKg: c.detalhes?.peso ?? null,
+          })),
+        };
+      }
+      if (mSorteio && metodo === 'POST') {
+        const s = sessoes.get(mSorteio[1]);
+        for (const a of corpo.atribuicoes) s.competitors[a.indice].kart = a.kart;
+        for (const irma of sessoes.values()) {
+          if (irma.id !== s.id && irma.agendaId === s.agendaId && irma.state === 'preparando') {
+            irma.competitors = s.competitors.map((c: any) => ({ ...c, detalhes: { ...c.detalhes } }));
+          }
+        }
+        return { ok: true };
+      }
+      const mComp = /^\/api\/sessions\/([\w-]+)\/competitors\/(\d+)$/.exec(caminho);
+      if (mComp && metodo === 'PUT') {
+        const s = sessoes.get(mComp[1]);
+        const idx = Number(mComp[2]);
+        s.competitors[idx] = { ...s.competitors[idx], kart: corpo.kart, name: corpo.name, detalhes: corpo.detalhes };
+        if (corpo.aplicarGrupo) {
+          for (const irma of sessoes.values()) {
+            if (irma.id !== s.id && irma.agendaId === s.agendaId) {
+              const k = irma.competitors.findIndex((c: any) => c.customerId === s.competitors[idx].customerId);
+              if (k >= 0) irma.competitors[k] = { ...irma.competitors[k], detalhes: corpo.detalhes };
+            }
+          }
+        }
+        return { ok: true };
+      }
+      const mCmd = /^\/api\/sessions\/([\w-]+)\/(start|checkered|close)$/.exec(caminho);
+      if (mCmd && metodo === 'POST') {
+        const s = sessoes.get(mCmd[1]);
+        s.state = mCmd[2] === 'start' ? 'em_andamento' : mCmd[2] === 'checkered' ? 'bandeira_final' : 'encerrada';
+        return { ok: true };
+      }
+      return { ok: true };
+    });
+
+    const opBateria = criarOperacao({
+      store,
+      legado: legadoSim as never,
+      verSessao: (id) => sessoes.get(id),
+      inscricoes: async () => [{ clienteId: 1, nome: 'Ana', ...ok }, { clienteId: 2, nome: 'Bia', ...ok }],
+    });
+
+    // 1. Sorteio inicial na Tomada de tempo (só Ana)
+    const rSorteio = await opBateria.sorteio(OP, tomada.id, envio({ atribuicoes: [{ customerId: '1', nome: 'Ana', kart: '4' }], modo: 'todos' }));
+    expect(rSorteio.status).toBe('APPLIED');
+    expect(tomada.competitors[0].kart).toBe('4');
+    expect(corrida.competitors[0].kart).toBe('4');
+
+    // 2. Atrasado (Bia) entra sem alterar o kart de Ana e propaga para a Corrida
+    const rAtrasado = await opBateria.atrasados(OP, tomada.id, envio({ atribuicoes: [{ customerId: '2', nome: 'Bia', kart: '8' }] }));
+    expect(rAtrasado.status).toBe('APPLIED');
+    expect(tomada.competitors[1].kart).toBe('8');
+    expect(corrida.competitors[1].kart).toBe('8');
+
+    // 3. Peso e conferência de lastro na Tomada de tempo valem também na Corrida
+    const rPeso = await opBateria.peso(OP, tomada.id, envio({ customerId: '1', nome: 'Ana', pesoKg: 70, lastroConferido: true }));
+    expect(rPeso.status).toBe('APPLIED');
+    expect(corrida.competitors[0].detalhes).toMatchObject({ peso: 70, pesoLastro: 20 });
+
+    // 4. Tomada de tempo larga, recebe quadriculada e encerra
+    expect((await opBateria.comando(OP, tomada.id, envio({ acao: 'start' }))).status).toBe('APPLIED');
+    expect((await opBateria.comando(OP, tomada.id, envio({ acao: 'checkered' }))).status).toBe('APPLIED');
+    expect((await opBateria.comando(OP, tomada.id, envio({ acao: 'close' }))).status).toBe('APPLIED');
+    expect(tomada.state).toBe('encerrada');
+
+    // 5. Na Corrida (ainda preparando), o painel traz os karts sorteados na tomada, o peso e o lastro já conferido
+    const painelCorrida = await opBateria.painelSorteio(OP, corrida.id);
+    expect(painelCorrida.pilotos[0]).toMatchObject({ nome: 'Ana', kartAtual: '4', pesoKg: 70, lastroConferido: true, situacao: 'ELEGIVEL' });
+    expect(painelCorrida.pilotos[1]).toMatchObject({ nome: 'Bia', kartAtual: '8', situacao: 'ELEGIVEL' });
+  });
+
+  it('permite limpar kart no sorteio antes da largada, atribuir/incluir passagem, observação/posição e resumo com frota/bateria ativa', async () => {
+    // Limpar kart de Ana antes da largada via PATCH /api/sessions/b
+    const rLimpar = await op.sorteio(OP, 'b', envio({ atribuicoes: [{ customerId: '1', nome: 'Ana', kart: '' }] }));
+    expect(rLimpar.status).toBe('APPLIED');
+    expect(legado.mock.calls[0]).toEqual(['PATCH', '/api/sessions/b', {
+      competitors: [
+        { kart: '', name: 'Ana', customerId: '1', category: null, detalhes: undefined },
+        { kart: '', name: 'Bia', customerId: '2', category: null, detalhes: undefined },
+        { kart: '', name: 'Cid', customerId: '3', category: null, detalhes: undefined },
+      ],
+    }]);
+
+    // Em andamento: incluir passagem manual, atribuir passagem, observação e posição manual
+    bateria.state = 'em_andamento';
+    expect((await op.corrigirPassagem(OP, 'b', envio({ action: 'manual', kart: '4', lapMs: 58412, name: 'Ana' }))).status).toBe('APPLIED');
+    expect(legado.mock.calls.some(([m, c]) => m === 'POST' && c === '/api/sessions/b/passings/manual')).toBe(true);
+
+    expect((await op.corrigirPassagem(OP, 'b', envio({ action: 'assign', ids: ['p1'], kart: '4', name: 'Ana' }))).status).toBe('APPLIED');
+    expect(legado.mock.calls.some(([m, c]) => m === 'POST' && c === '/api/sessions/b/passings/p1/assign')).toBe(true);
+
+    expect((await op.comando(OP, 'b', envio({ acao: 'observation', texto: 'Toque na curva 2' }))).status).toBe('APPLIED');
+    expect((await op.comando(OP, 'b', envio({ acao: 'position', kart: '4', position: 1 }))).status).toBe('APPLIED');
+
+    // Frota com naPista e cadastrados
+    const opFrota = criarOperacao({
+      store, legado: legado as never, verSessao: () => bateria, inscricoes: async () => insc,
+      kartsCadastrados: () => ['1', '4', '8', '105'],
+      listarSessoes: () => [bateria],
+    });
+    const f = opFrota.frota();
+    expect(f.cadastrados).toEqual(['1', '4', '8', '105']);
+    expect(f.naPista).toEqual([{ kart: '4', sessaoId: 'b', bateria: 'B', piloto: 'Ana', estado: 'em_andamento' }]);
   });
 });

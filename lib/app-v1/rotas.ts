@@ -14,9 +14,9 @@ const TAMANHO_MINIMO_SEGREDO = 32;
 const MAX_CHAVES_LIMITE = 5000;
 const MAX_LOGINS_SIMULTANEOS = 4;
 const JANELA_EVENTOS_MS = 48 * 3_600_000;
-const CAPACIDADES_CONHECIDAS = ['sessoes.ver', 'elegiveis.ver', 'operacoes.ver', 'auditoria.ver', 'auditoria.global', 'usuarios.gerir',
+const CAPACIDADES_CONHECIDAS = ['sessoes.ver', 'elegiveis.ver', 'operacoes.ver', 'auditoria.ver', 'auditoria.global', 'usuarios.gerir', 'manutencao.gerir',
   'bateria.preparar', 'sorteio.gravar', 'atrasado.incluir', 'peso.conferir', 'kart.trocar', 'frota.gerir', 'penalidade.aplicar', 'bandeira.aplicar',
-  'prova.comandar', 'prova.reiniciar', 'passagem.corrigir', 'equalizacao.gerir'];
+  'prova.comandar', 'prova.reiniciar', 'passagem.corrigir', 'equalizacao.gerir', 'frota.liberar', 'aulas.registrar', 'aulas.aceitar'];
 
 export type DepsApp = {
   store: AppStore;
@@ -24,6 +24,7 @@ export type DepsApp = {
   listarSessoes: () => unknown[];
   /** Horário de cada bateria da agenda de hoje, por id; vazio quando a agenda não respondeu. */
   inicioPorAgenda?: () => ReadonlyMap<string, string>;
+  kartsCadastrados?: () => string[];
   verSessao: (id: string) => unknown;
   assinarMudancas: (cb: () => void) => () => void;
   batidaMs?: number;
@@ -34,7 +35,7 @@ export type DepsApp = {
   legado?: Legado;
   inscricoes?: (agendaId: number) => Promise<Inscricao[]>;
 };
-export type ModuloApp = { tratar(req: http.IncomingMessage, res: http.ServerResponse, url: URL): Promise<boolean>; aoSalvarSessao(id: string, assinatura?: string): void };
+export type ModuloApp = { atualizarTemposGalpao(): Promise<void>; tratar(req: http.IncomingMessage, res: http.ServerResponse, url: URL): Promise<boolean>; aoSalvarSessao(id: string, assinatura?: string): void };
 
 type Bucket = { n: number; ate: number };
 function limitador(limite: number, janelaMs: number) {
@@ -74,9 +75,11 @@ async function lerCorpo(req: http.IncomingMessage): Promise<Record<string, unkno
 
 /** Só o que a operação precisa ver: e-mail, CPF, peso e cadastro não saem por esta API. */
 function visaoSessao(store: AppStore, s: unknown) {
-  const v = s as { id: string; name?: string; type?: string; state?: string; createdAt?: number; startedAt?: number | null; agendaId?: number | null; competitors?: { kart?: string; name?: string; autoAdded?: boolean }[] };
+  const v = s as { id: string; name?: string; type?: string; state?: string; createdAt?: number; startedAt?: number | null; agendaId?: number | null; programaId?: string | null; groupId?: string | null; competitors?: { kart?: string; name?: string; autoAdded?: boolean }[] };
   return {
     id: v.id, name: v.name, type: v.type, state: v.state, createdAt: v.createdAt, startedAt: v.startedAt ?? null, agendaId: v.agendaId ?? null,
+    ...(v.programaId !== undefined ? { programaId: v.programaId } : {}),
+    ...(v.groupId !== undefined ? { groupId: v.groupId } : {}),
     competitors: (v.competitors ?? []).map((c) => ({ kart: c.kart, name: c.name, autoAdded: Boolean(c.autoAdded) })),
     sessionRevision: store.revisao(v.id),
   };
@@ -97,7 +100,8 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
   const limiteGeral = limitador(d.limitePor10s ?? 200, 10_000);
   const revisoesPendentes = new Map<string, string | undefined>();
   let loginsEmCurso = 0;
-  const operacao = d.legado && d.inscricoes ? criarOperacao({ store: d.store, legado: d.legado, verSessao: d.verSessao, inscricoes: d.inscricoes, routeMode: d.routeMode }) : null;
+  const listarFila = () => semBateriasPassadas(d.listarSessoes(), d.inicioPorAgenda?.() ?? new Map<string, string>());
+  const operacao = d.legado && d.inscricoes ? criarOperacao({ store: d.store, legado: d.legado, verSessao: d.verSessao, inscricoes: d.inscricoes, kartsCadastrados: d.kartsCadastrados, listarSessoes: listarFila, sessoesHistoricas: d.listarSessoes, routeMode: d.routeMode }) : null;
   let indisponivel = d.segredo.length < TAMANHO_MINIMO_SEGREDO;
   let revisaoFalhou = false;
 
@@ -110,8 +114,6 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
     try { fn(); } catch { derrubar(); }
   };
   const derrubar = () => { indisponivel = true; for (const c of [...clientes]) c.encerrar(); };
-
-  const listarFila = () => semBateriasPassadas(d.listarSessoes(), d.inicioPorAgenda?.() ?? new Map<string, string>());
 
   const visaoAtual = () => {
     const limite = Date.now() - JANELA_EVENTOS_MS;
@@ -198,7 +200,7 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
     }
     if (caminho === 'users' && metodo === 'GET') {
       exige('usuarios.gerir');
-      return enviar(res, 200, { usuarios: d.store.db.prepare('SELECT usuario, nome, perfil, bloqueado, criadoEm FROM usuarios ORDER BY usuario').all() });
+      return enviar(res, 200, { usuarios: d.store.db.prepare('SELECT u.usuario, u.nome, COALESCE(p.perfil, u.perfil) perfil, u.bloqueado, u.criadoEm FROM usuarios u LEFT JOIN perfis_especiais p ON p.usuarioId = u.id ORDER BY u.usuario').all() });
     }
     if (caminho === 'users' && metodo === 'POST') {
       exige('usuarios.gerir');
@@ -221,8 +223,20 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
       return enviar(res, 200, { ok: true });
     }
     if (operacao) {
+      if (caminho === 'lessons' && metodo === 'GET') { exige('sessoes.ver'); return enviar(res, 200, operacao.aulas()); }
+      if (caminho === 'lessons/create' && metodo === 'POST') return enviar(res, 200, await operacao.registrarAula(quem, await lerCorpo(req)));
+      m = /^lessons\/([\w-]+)\/accept$/.exec(caminho);
+      if (m && metodo === 'POST') return enviar(res, 200, await operacao.aceitarAula(quem, m[1], await lerCorpo(req)));
       if (caminho === 'agenda' && metodo === 'GET') return enviar(res, 200, await operacao.agenda(quem, url.searchParams.get('data')));
       if (caminho === 'fleet' && metodo === 'GET') { exige('sessoes.ver'); return enviar(res, 200, operacao.frota()); }
+      if (caminho === 'maintenance/orders' && metodo === 'GET') { exige('manutencao.gerir'); return enviar(res, 200, operacao.ordensServico()); }
+      if (caminho === 'maintenance/orders/create' && metodo === 'POST') return enviar(res, 200, await operacao.criarOrdemServico(quem, await lerCorpo(req)));
+      m = /^maintenance\/orders\/([\w-]+)\/status$/.exec(caminho);
+      if (m && metodo === 'POST') return enviar(res, 200, await operacao.atualizarOrdemServico(quem, m[1], await lerCorpo(req)));
+      m = /^fleet\/opening\/(conferir|aceitar|excecao|escala)$/.exec(caminho);
+      if (m && metodo === 'POST') return enviar(res, 200, await operacao.aberturaFrota(quem, m[1], await lerCorpo(req)));
+      m = /^fleet\/(\d{1,3})\/chassis$/.exec(caminho);
+      if (m && metodo === 'POST') return enviar(res, 200, await operacao.chassiKart(quem, m[1], await lerCorpo(req)));
       m = /^fleet\/(\d{1,4})$/.exec(caminho);
       if (m && metodo === 'POST') return enviar(res, 200, await operacao.marcarKart(quem, m[1], await lerCorpo(req)));
       m = /^agenda\/(\d+)\/prepare$/.exec(caminho);
@@ -233,7 +247,8 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
         const r = m[2] === 'detail' ? await operacao.detalhe(m[1]) : m[2] === 'live' ? await operacao.aoVivo(m[1]) : m[2] === 'passings' ? await operacao.passagens(m[1], url.searchParams.get('kart')) : await operacao.painelSorteio(quem, m[1]);
         return enviar(res, 200, r);
       }
-      if (caminho === 'owner/today' && metodo === 'GET') { exige('auditoria.global'); return enviar(res, 200, operacao.resumoDoDia(listarFila())); }
+      if (caminho === 'owner/today' && metodo === 'GET') { exige('auditoria.global'); return enviar(res, 200, operacao.resumoDoDia(d.listarSessoes())); }
+      if (caminho === 'equalization/compare' && metodo === 'GET') { exige('equalizacao.gerir'); try { return enviar(res, 200, operacao.compararKarts(url.searchParams.get('kart') ?? '', url.searchParams.get('referencia') ?? '', url.searchParams.get('trackId'))); } catch (e) { throw new ErroApp(400, 'INVALID_REQUEST', (e as Error).message); } }
       if (caminho === 'equalization/options' && metodo === 'GET') { exige('equalizacao.gerir'); return enviar(res, 200, await operacao.opcoesEqualizacao()); }
       if (caminho === 'equalization/create' && metodo === 'POST') return enviar(res, 200, await operacao.criarEqualizacao(quem, await lerCorpo(req)));
       if (caminho === 'equalization/rules' && metodo === 'POST') return enviar(res, 200, await operacao.salvarRegra(quem, await lerCorpo(req)));
@@ -243,10 +258,10 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
       if (m && metodo === 'GET') { exige('equalizacao.gerir'); return enviar(res, 200, await operacao.equalizacao(m[1])); }
       m = /^equalization\/([\w-]+)\/commands$/.exec(caminho);
       if (m && metodo === 'POST') return enviar(res, 200, await operacao.comandoEqualizacao(quem, m[1], await lerCorpo(req)));
-      m = /^sessions\/([\w-]+)\/(draw|late-assignments|weight-checks|kart-swaps|penalties|penalties-remove|flags|commands|passage-corrections)$/.exec(caminho);
+      m = /^sessions\/([\w-]+)\/(draw|late-assignments|weight-checks|weight-checks-batch|kart-swaps|penalties|penalties-remove|flags|commands|passage-corrections)$/.exec(caminho);
       if (m && metodo === 'POST') {
         const b = await lerCorpo(req);
-        const acao = { draw: operacao.sorteio, 'late-assignments': operacao.atrasados, 'weight-checks': operacao.peso, 'kart-swaps': operacao.trocaKart, penalties: operacao.penalidade, 'penalties-remove': operacao.retirarPenalidade, flags: operacao.bandeira, commands: operacao.comando, 'passage-corrections': operacao.corrigirPassagem }[m[2]];
+        const acao = { draw: operacao.sorteio, 'late-assignments': operacao.atrasados, 'weight-checks': operacao.peso, 'weight-checks-batch': operacao.pesoLote, 'kart-swaps': operacao.trocaKart, penalties: operacao.penalidade, 'penalties-remove': operacao.retirarPenalidade, flags: operacao.bandeira, commands: operacao.comando, 'passage-corrections': operacao.corrigirPassagem }[m[2]];
         return enviar(res, 200, await acao!.call(operacao, quem, m[1], b));
       }
     }
@@ -254,6 +269,7 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
   }
 
   return {
+    atualizarTemposGalpao: async () => { await operacao?.atualizarTemposGalpao(); },
     async tratar(req, res, url) {
       if (!url.pathname.startsWith(PREFIXO)) return false;
       if (indisponivel) { erro(res, 503, 'UNAVAILABLE', 'App operacional indisponível.'); return true; }

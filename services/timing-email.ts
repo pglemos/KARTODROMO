@@ -449,6 +449,10 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
   const piloto = (c: (typeof todos)[number]['competidor'], email: string): PilotoEmail => ({
     nome: c.name, kart: c.kart, email, standing: ctx.classificacao.find((r) => r.kart === c.kart && r.name === c.name) ?? ctx.classificacao.find((r) => r.kart === c.kart) ?? null, voltas: voltasDoPiloto(c),
   });
+  const chavesLimitePorHora = new Set(
+    (anterior?.falhas ?? []).filter((f) => ehErroLimitePorHora(f.erro)).map((f) => `${f.kart}|${f.email}`),
+  );
+  const permanentesAnteriores = (anterior?.falhasPermanentes ?? []).filter((k) => !chavesLimitePorHora.has(k));
   if (op.para) {
     const para = validarEmailDestinatario(op.para);
     if (!para) throw new Error('Endereço de e-mail inválido.');
@@ -457,7 +461,7 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
     if (op.kart && !c) throw new Error(`Kart ${op.kart} não está nesta prova.`);
     alvos = [{ kart: c?.kart ?? '', nome: c?.name ?? 'Resultado', email: para, piloto: c ? piloto(c, para) : null }];
   } else {
-    const jaForam = new Set(op.automatico || op.somenteFaltantes ? [...(anterior?.enviados ?? []), ...(anterior?.falhasPermanentes ?? [])] : []);
+    const jaForam = new Set(op.automatico || op.somenteFaltantes ? [...(anterior?.enviados ?? []), ...permanentesAnteriores] : []);
     alvos = todos
       .filter((d) => !op.kart || d.competidor.kart === op.kart)
       .filter((d) => !jaForam.has(`${d.competidor.kart}|${d.email}`))
@@ -478,7 +482,8 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
   const aviso = op.aviso || (op.atrasado ? AVISO_ATRASO : op.corrigido ? AVISO_CORRECAO : undefined);
   const falhas: EnvioEmailsResultado['falhas'] = [];
   const mensagens: NonNullable<EnvioEmailsResultado['mensagens']> = [...(anterior?.mensagens ?? [])];
-  const falhasPermanentes: string[] = [...(anterior?.falhasPermanentes ?? [])];
+  const falhasPermanentes: string[] = op.automatico || op.somenteFaltantes ? [...permanentesAnteriores] : [];
+  const assinatura = op.assinaturaResultado ?? anterior?.assinaturaResultado;
   const pastaTeste = join(dep.dataDir, 'emails-simulador');
   const inicioEnvio = Date.now();
 
@@ -534,13 +539,16 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
         writeFileSync(join(pastaTeste, `${s.id}-${nomeArquivo(a.kart || 'avulso')}.eml`), (info as unknown as { message: Buffer }).message);
       }
       if (a.piloto) enviados.push(`${a.kart}|${emailLimpo}`);
-      s.emailsResultado = { status: 'parcial', atualizadoEm: Date.now(), tentativas: (anterior?.tentativas ?? 0) + 1, enviados: [...new Set([...enviados])], falhas: [...falhas], semEmail, mensagens, aceite: dep.simulador ? 'simulador' : 'aceito-pelo-smtp', entregaConfirmada: false, mensagemEntrega: 'Aceite pelo SMTP não confirma chegada na caixa.' };
+      s.emailsResultado = { status: 'parcial', atualizadoEm: Date.now(), tentativas: (anterior?.tentativas ?? 0) + 1, enviados: [...new Set([...enviados])], falhas: [...falhas], semEmail, mensagens, assinaturaResultado: assinatura, aceite: dep.simulador ? 'simulador' : 'aceito-pelo-smtp', entregaConfirmada: false, mensagemEntrega: 'Aceite pelo SMTP não confirma chegada na caixa.' };
       dep.salvarSessao(s);
     } catch (e) {
       const codigo = Number((e as { responseCode?: number })?.responseCode);
-      if (codigo >= 500 && codigo <= 599) falhasPermanentes.push(`${a.kart}|${a.email}`);
-      falhas.push({ kart: a.kart, nome: a.nome, email: a.email, erro: traduzirErro(e).slice(0, 200), ...(codigo >= 500 && codigo <= 599 ? { permanente: true } : {}) });
-      s.emailsResultado = { status: 'parcial', atualizadoEm: Date.now(), tentativas: (anterior?.tentativas ?? 0) + 1, enviados: [...new Set(enviados)], falhas: [...falhas], semEmail, mensagens, aceite: dep.simulador ? 'simulador' : 'aceito-pelo-smtp', entregaConfirmada: false, mensagemEntrega: 'O aceite SMTP não confirma a chegada na caixa.' };
+      const msgBruta = e instanceof Error ? e.message : String(e);
+      const erro = traduzirErro(e).slice(0, 200);
+      const permanente = codigo >= 500 && codigo <= 599 && !ehErroLimitePorHora(msgBruta) && !ehErroLimitePorHora(erro);
+      if (permanente) falhasPermanentes.push(`${a.kart}|${a.email}`);
+      falhas.push({ kart: a.kart, nome: a.nome, email: a.email, erro, ...(permanente ? { permanente: true } : {}) });
+      s.emailsResultado = { status: 'parcial', atualizadoEm: Date.now(), tentativas: (anterior?.tentativas ?? 0) + 1, enviados: [...new Set(enviados)], falhas: [...falhas], semEmail, mensagens, assinaturaResultado: assinatura, aceite: dep.simulador ? 'simulador' : 'aceito-pelo-smtp', entregaConfirmada: false, mensagemEntrega: 'O aceite SMTP não confirma a chegada na caixa.' };
       dep.salvarSessao(s);
     }
   }
@@ -555,8 +563,9 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
     for (const a of aceitos) {
       const e = rastreioEntrega?.get(a.email.toLowerCase());
       if (!e || !ENTREGA_RUIM.has(e.tipo)) continue;
-      if (e.tipo === 'failure') falhasPermanentes.push(`${a.kart}|${a.email}`);
-      falhas.push({ kart: a.kart, nome: a.nome, email: a.email, erro: e.motivo, ...(e.tipo === 'failure' ? { permanente: true } : {}) });
+      const permanente = e.tipo === 'failure' && !ehErroLimitePorHora(e.motivo);
+      if (permanente) falhasPermanentes.push(`${a.kart}|${a.email}`);
+      falhas.push({ kart: a.kart, nome: a.nome, email: a.email, erro: e.motivo, ...(permanente ? { permanente: true } : {}) });
       const chave = `${a.kart}|${a.email}`;
       for (let i = enviados.indexOf(chave); i >= 0; i = enviados.indexOf(chave)) enviados.splice(i, 1);
     }
@@ -566,7 +575,10 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
     ? [...rastreioEntrega.values()].find((e) => e.tipo === 'success') ?? [...rastreioEntrega.values()][0] ?? null
     : null;
   const situacaoEntrega = aceitos.length ? situacaoEnvioEmail(situacaoRastreio, dep.simulador) : null;
-  const falhasResultado = [...(anterior?.falhas ?? []).filter((f) => f.permanente && !falhas.some((novo) => novo.kart === f.kart && novo.email === f.email)), ...falhas];
+  const falhasAnterioresPermanentes = op.automatico || op.somenteFaltantes
+    ? (anterior?.falhas ?? []).filter((f) => f.permanente && !ehErroLimitePorHora(f.erro) && !falhas.some((novo) => novo.kart === f.kart && novo.email === f.email) && !enviados.includes(`${f.kart}|${f.email}`))
+    : [];
+  const falhasResultado = [...falhasAnterioresPermanentes, ...falhas];
   const somentePermanentes = falhasResultado.length > 0 && falhasResultado.every((f) => f.permanente);
   const resultado: EnvioEmailsResultado = {
     status: !todos.length && !op.para ? 'sem-destinatarios' : falhasResultado.length === 0 ? 'enviado' : somentePermanentes ? (enviados.length ? 'parcial' : 'falhou-permanente') : enviados.length ? 'parcial' : 'falhou',
@@ -576,7 +588,7 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
     falhas: falhasResultado,
     semEmail,
     mensagens,
-    assinaturaResultado: op.assinaturaResultado ?? anterior?.assinaturaResultado,
+    assinaturaResultado: assinatura,
     proximaTentativaEm: falhas.some((f) => !f.permanente) ? Date.now() + Math.min(30 * 60_000, 60_000 * 2 ** Math.min(anterior?.tentativas ?? 0, 5)) + Math.floor(Math.random() * 30_000) : undefined,
     falhasPermanentes: [...new Set(falhasPermanentes)],
     ...(situacaoEntrega ? {
@@ -604,15 +616,21 @@ export async function enviarResultado(s: Session, cfgArquivo: string, dep: Depen
   return resultado;
 }
 
+/** Limite de envio da hospedagem/provedor (HostGator "550 (500/500 (100%)) allowed", cPanel "exceeded the max emails per hour",
+ *  Gmail "550 5.4.5 Daily user sending limit exceeded" ou bloqueio temporário por conexões simultâneas)
+ *  é transitório: nunca deve virar falha permanente nem bloquear novas tentativas. */
+export function ehErroLimitePorHora(texto: string): boolean {
+  return /\(\d+\/\d+ \(\d+%\)\) allowed|exceeded|sending limit|limite de e-mails por hora|too many login attempts|too many.*connections/i.test(texto);
+}
+
 /** Erros do servidor de e-mail em português (a tela e o registro mostram isso para o operador). */
 export function traduzirErro(e: unknown): string {
   const m = e instanceof Error ? e.message : String(e);
+  if (/\(\d+\/\d+ \(\d+%\)\) allowed|exceeded|sending limit|too many login attempts|too many.*connections/i.test(m)) return 'limite de e-mails por hora da hospedagem atingido (500 por hora); tenta de novo sozinho em alguns minutos';
   if (/\b535\b|Invalid login|authentication/i.test(m)) return 'o servidor de e-mail recusou o usuário/senha (confira se a caixa existe na hospedagem e se a senha está certa)';
   if (/certificate|altname|self.signed/i.test(m)) return 'certificado de segurança do servidor de e-mail não confere com o endereço';
   if (/ENOTFOUND|EAI_AGAIN/i.test(m)) return 'endereço do servidor de e-mail não encontrado (confira o "Servidor de saída")';
   if (/ETIMEDOUT|ECONNREFUSED|ECONNRESET|timeout/i.test(m)) return 'sem conexão com o servidor de e-mail (internet ou porta bloqueada)';
-  // HostGator: "550 (500/500 (100%)) allowed. Message discarded." = limite de 500 e-mails por hora da conta (13/10)
-  if (/\(\d+\/\d+ \(\d+%\)\) allowed|exceeded|sending limit/i.test(m)) return 'limite de e-mails por hora da hospedagem atingido (500 por hora); tenta de novo sozinho em alguns minutos';
   if (/\b550\b|relay/i.test(m)) return 'o servidor de e-mail não aceitou o destinatário';
   return m;
 }
