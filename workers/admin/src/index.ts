@@ -5,9 +5,11 @@
  *  - /api/login e /api/office/*  → servidor da operação no SRVKART (ops.kartodromodebetim.com.br, login dos usuários da Recepção)
  *  - /api/crono/ao-vivo          → placar ao vivo da cronometragem do ORBITS (crono.kartodromodebetim.com.br, só leitura)
  *  - /api/patro/*                → patrocinadores e publicidade, guardados no D1 `kartodromo-admin` (src/patrocinadores.ts)
+ *  - /api/comprovantes/*         → comprovantes de pagamento das reservas: arquivo no R2, dados no D1 (src/comprovantes.ts)
  * Fora os patrocinadores, nada fica guardado aqui: o banco é o KartodromoOps do SRVKART, o mesmo da Recepção, dos totens e da crono.
  */
 
+import { tratarComprovantes, type R2Bucket } from './comprovantes';
 import { tratarPatrocinadores, type D1Db } from './patrocinadores';
 
 interface Env {
@@ -15,6 +17,7 @@ interface Env {
   OPS_URL: string;
   CRONO_URL: string;
   KARTODROMO_ADMIN_DB?: D1Db;
+  COMPROVANTES?: R2Bucket;
 }
 
 const SEGURANCA: Record<string, string> = {
@@ -87,6 +90,7 @@ export default {
     if (url.pathname === '/api/crono/ao-vivo') return aoVivo(env);
     if (url.pathname === '/api/saude') return saude(env);
     if (url.pathname.startsWith('/api/patro/')) return tratarPatrocinadores(req, env, url);
+    if (url.pathname.startsWith('/api/comprovantes/')) return tratarComprovantes(req, env, url);
     if (url.pathname.startsWith('/api/')) return repassar(req, env, url);
     // página do chefe de equipe do endurance: /equipe/<token> abre a mesma página (o token fica no endereço)
     const resp = url.pathname.startsWith('/equipe/') ? await env.ASSETS.fetch(new Request(new URL('/equipe.html', url), req)) : await env.ASSETS.fetch(req);
