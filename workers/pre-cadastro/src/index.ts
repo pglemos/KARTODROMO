@@ -4,7 +4,7 @@
  * servidor da operação (SRVKART) buscar pelo /api/sync, gravar na tabela de clientes e apagar daqui.
  * No totem o cliente digita CPF, RG, passaporte ou e-mail e os dados já aparecem.
  */
-import { chaveDocumento, validar } from './validar';
+import { chaveDocumento, digitos, validar, type PreCadastro } from './validar';
 import { cancelar, chamar, consultar, diagnostico, garantirCliente, hojeBrasilia, PAGO } from './asaas';
 import { agendaPublica, criarPedido, politicaPublica, situacaoPedido, syncAgenda, syncPedidos, syncResultado, webhookAsaas, type EnvReservas } from './reservas';
 import { handleMobileAccountEmail, handleMobileAuth, type MobileAccountAdminEnv } from './mobile/auth';
@@ -58,11 +58,85 @@ async function receber(req: Request, env: Env) {
 
   const v = validar(corpo);
   if (!v.ok) return json(400, { erro: v.erro });
+  const falta = faltaNoCadastro(v.dados);
+  if (falta) return json(400, { erro: falta });
   const chave = chaveDocumento(v.dados.tipoDocumento, v.dados.documento);
-  const registro = { chave, recebidoEm: new Date().toISOString(), ...v.dados };
+  // link único do grupo: o código vai junto e o SRVKART põe a pessoa na próxima vaga "Amigo N" do grupo
+  const reserva = /^[A-Za-z0-9]{10,24}$/.test(String(corpo.reserva ?? '')) ? String(corpo.reserva) : undefined;
+  const grupo = reserva ? await grupoDoLink(env, reserva) : null;
+  let pagamento: CobrancaDoLink | null = null;
+  if (grupo && grupo.modo === 'individual' && grupo.precoCentavos > 0 && grupo.livres > 0) {
+    if (v.dados.tipoDocumento !== 'CPF') return json(400, { erro: 'Para pagar a vaga pelo link do grupo, use o CPF.' });
+    pagamento = await cobrancaDoLink(env, reserva!, chave, v.dados, grupo);
+  }
+  const registro = { chave, recebidoEm: new Date().toISOString(), ...v.dados, ...(reserva ? { reserva } : {}),
+    ...(pagamento ? { cobranca: { id: pagamento.id, link: pagamento.link, valorCentavos: pagamento.valorCentavos } } : {}) };
   // um cadastro por documento: se a pessoa enviar de novo, vale o último
   await env.PRE.put(`pendentes/${chave}.json`, JSON.stringify(registro), { httpMetadata: { contentType: 'application/json' } });
-  return json(201, { ok: true, nome: v.dados.nome.split(' ')[0] });
+  return json(201, { ok: true, nome: v.dados.nome.split(' ')[0],
+    ...(grupo ? { grupo: { responsavel: grupo.responsavel, bateria: grupo.bateria, inicio: grupo.inicio } } : {}), ...(pagamento ? { pagamento } : {}) });
+}
+
+// todos os campos do totem são obrigatórios (só CEP e complemento ficam opcionais)
+function faltaNoCadastro(d: PreCadastro) {
+  if (!d.email) return 'Informe seu e-mail.';
+  if (!(Number(d.peso) >= 20 && Number(d.peso) <= 250)) return 'Informe seu peso em kg (entre 20 e 250).';
+  if (!d.endereco) return 'Informe a rua do seu endereço.';
+  if (!d.numero) return 'Informe o número do endereço.';
+  if (!d.bairro) return 'Informe o bairro.';
+  if (!d.cidade) return 'Informe a cidade.';
+  return null;
+}
+
+type GrupoDoLink = { tokens: string[]; status: string; codigo: string; responsavel: string; bateria: string; inicio: string; modo: string; precoCentavos: number; livres: number };
+type CobrancaDoLink = { id: string; link: string; valorCentavos: number; pago?: boolean };
+let cacheGrupos: { em: number; lista: GrupoDoLink[] } | null = null;
+/** Resumo das reservas em grupo ativas (o SRVKART manda a cada minuto em /api/sync/grupos). */
+async function grupoDoLink(env: Env, token: string) {
+  if (!token) return null;
+  if (!cacheGrupos || Date.now() - cacheGrupos.em > 30_000) {
+    const obj = await env.PRE.get('grupos/todos.json');
+    cacheGrupos = { em: Date.now(), lista: obj ? await obj.json<GrupoDoLink[]>() : [] };
+  }
+  const achado = cacheGrupos.lista.find((x) => x.tokens.includes(token));
+  if (!achado) return null;
+  if (achado.status !== 'ativa' || Date.parse(String(achado.inicio).slice(0, 16) + ':00-03:00') < Date.now() - 3_600_000) return null;
+  const { tokens: _tokens, ...g } = achado;
+  return g;
+}
+
+/** Uma cobrança por pessoa no grupo (o mesmo CPF reenviando reaproveita a que está aberta). */
+async function cobrancaDoLink(env: Env, token: string, chave: string, d: PreCadastro, g: NonNullable<Awaited<ReturnType<typeof grupoDoLink>>>): Promise<CobrancaDoLink> {
+  const k = `grupo-pag/${token}/${chave}.json`;
+  const antiga = await env.PRE.get(k);
+  if (antiga) {
+    const a = await antiga.json<CobrancaDoLink>();
+    try {
+      const s = await consultar(env, a.id);
+      if (PAGO.has(s.status)) return { ...a, pago: true };
+      if (s.status === 'PENDING' && Number(a.valorCentavos) === Number(g.precoCentavos)) return { ...a, pago: false };
+    } catch { /* cobrança antiga sumiu: cria outra */ }
+  }
+  const dados = { nome: d.nome, cpf: digitos(d.documento), email: d.email, celular: digitos(d.telefone), referencia: `grupo-${g.codigo}` };
+  let cliente: string;
+  try { cliente = await garantirCliente(env, dados); } catch (e) {
+    if (!/celular|mobilePhone/i.test((e as Error).message)) throw e;
+    cliente = await garantirCliente(env, { ...dados, celular: '' });
+  }
+  const hoje = hojeBrasilia();
+  const dia = String(g.inicio).slice(0, 10);
+  const cob = await chamar<{ id: string; invoiceUrl: string }>(env, '/payments', {
+    method: 'POST',
+    body: JSON.stringify({
+      customer: cliente, billingType: 'UNDEFINED', value: Math.round(Number(g.precoCentavos)) / 100,
+      dueDate: /^\d{4}-\d{2}-\d{2}$/.test(dia) && dia >= hoje ? dia : hoje,
+      description: `Kartódromo de Betim · ${g.bateria} ${dia.split('-').reverse().join('/')} ${String(g.inicio).slice(11, 16)} · ${d.nome} · grupo do(a) ${g.responsavel}`.slice(0, 500),
+      externalReference: `grupo-${g.codigo}-${chave}`.slice(0, 100),
+    }),
+  });
+  const r: CobrancaDoLink = { id: cob.id, link: cob.invoiceUrl, valorCentavos: Number(g.precoCentavos), pago: false };
+  await env.PRE.put(k, JSON.stringify(r), { httpMetadata: { contentType: 'application/json' } });
+  return r;
 }
 
 async function listar(env: Env) {
@@ -96,6 +170,16 @@ export default {
     const p = url.pathname;
     try {
       if (p === '/api/pre-cadastro' && req.method === 'POST') return await receber(req, env);
+      if (p === '/api/grupo' && req.method === 'GET') {
+        const g = await grupoDoLink(env, String(url.searchParams.get('r') ?? '').replace(/[^A-Za-z0-9]/g, '').slice(0, 24));
+        return json(g ? 200 : 404, g ? { responsavel: g.responsavel, bateria: g.bateria, inicio: g.inicio, modo: g.modo, precoCentavos: g.precoCentavos, livres: g.livres } : { erro: 'Reserva não encontrada.' });
+      }
+      if (p === '/api/grupo/pagamento' && req.method === 'GET') {
+        const id = String(url.searchParams.get('id') ?? '');
+        if (!/^pay_[A-Za-z0-9]{6,40}$/.test(id)) return json(400, { erro: 'Pagamento inválido.' });
+        const c = await consultar(env, id);
+        return json(200, { pago: PAGO.has(c.status), status: c.status });
+      }
       if (p === '/api/mobile/v1/internal/account-email') return await handleMobileAccountEmail(req, env);
       if (p.startsWith('/api/mobile/v1/auth/')) {
         const resposta = await handleMobileAuth(req, env);
@@ -148,6 +232,14 @@ export default {
           return json(200, { apagados: validas.length });
         }
         if (p === '/api/sync/agenda' && req.method === 'PUT') return await syncAgenda(req, env);
+        // resumo das reservas em grupo ativas: o link único mostra quem reservou e cobra a vaga (um arquivo só, não um por link)
+        if (p === '/api/sync/grupos' && req.method === 'PUT') {
+          const { grupos } = (await req.json()) as { grupos?: GrupoDoLink[] };
+          const lista = (Array.isArray(grupos) ? grupos.slice(0, 500) : []).filter((g) => Array.isArray(g.tokens));
+          await env.PRE.put('grupos/todos.json', JSON.stringify(lista), { httpMetadata: { contentType: 'application/json' } });
+          cacheGrupos = null;
+          return json(200, { gravados: lista.length });
+        }
         if (p === '/api/sync/asaas' && req.method === 'GET') return json(200, await diagnostico(env));
         if (p === '/api/sync/campeonato/cobranca' && req.method === 'POST') {
           const c = (await req.json()) as Record<string, unknown>;

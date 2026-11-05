@@ -106,7 +106,10 @@ export function validar(entrada: Record<string, unknown>, hoje = new Date()): { 
 export type Horario = { id: number; inicio: string; nome: string; livres: number; vagasTotais?: number };
 export type Agenda = { atualizadoEm: string; precoCentavos: number; maxPilotos: number; prazoMin: number; antecedenciaMin: number; horarios: Horario[] };
 /** Cada vaga é de uma pessoa: com 3 vagas, quem compra é o piloto 1 e os outros 2 vêm cadastrados aqui. */
-export type Acompanhante = { nome: string; documento: string; nascimento: string; instagram?: string };
+export type Acompanhante = {
+  nome: string; documento: string; nascimento: string; instagram: string; email: string; telefone: string; peso: string;
+  cep: string; endereco: string; complemento: string; bairro: string; cidade: string;
+};
 export type Reserva = { cliente: PreCadastro; bateriaId: number; quantidade: number; forma: 'pix' | 'cartao'; pilotos: string[]; acompanhantes: Acompanhante[]; compradorPilota: boolean };
 /** Idade mínima para pilotar o kart de locação (requisito do kartódromo). */
 export const IDADE_MINIMA_PILOTO = 14;
@@ -156,10 +159,25 @@ export function validarReserva(entrada: Record<string, unknown>, agenda: Agenda 
     documentos.add(digitos(documento));
     if (!dataValida(nascimento, hoje)) return { ok: false, erro: `Data de nascimento inválida do piloto ${n} (${nome}).` };
     if (idade(nascimento, hoje) < IDADE_MINIMA_PILOTO) return { ok: false, erro: `${nome} precisa ter ${IDADE_MINIMA_PILOTO} anos ou mais para pilotar.` };
-    // Instagram dos outros pilotos é opcional (quem paga nem sempre sabe); se vier, tem que ser válido
+    // os mesmos campos obrigatórios do totem para cada piloto (antes só nome/CPF/nascimento chegavam ao kartódromo)
+    const quem = `do piloto ${n} (${nome})`;
     const instagram = String(a?.instagram ?? '').trim();
-    if (instagram && erroInstagramCliente(instagram)) return { ok: false, erro: `Instagram inválido do piloto ${n} (${nome}). Informe o @usuário (ex.: @andre.silva) ou deixe em branco.` };
-    acompanhantes.push({ nome, documento, nascimento, ...(instagram ? { instagram: normalizarInstagram(instagram) } : {}) });
+    if (!instagram) return { ok: false, erro: `Informe o Instagram ${quem}.` };
+    if (erroInstagramCliente(instagram)) return { ok: false, erro: `Instagram inválido ${quem}. Informe o @usuário (ex.: @andre.silva).` };
+    const email = txt(a?.email, 120).toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return { ok: false, erro: `Informe um e-mail válido ${quem}.` };
+    const telefone = digitos(a?.telefone);
+    if (telefone.length < 10 || telefone.length > 13) return { ok: false, erro: `Informe o celular com DDD ${quem}.` };
+    const peso = txt(a?.peso, 6).replace(',', '.');
+    if (!(Number(peso) >= 20 && Number(peso) <= 250)) return { ok: false, erro: `Informe o peso ${quem} (entre 20 e 250 kg).` };
+    const endereco = txt(a?.endereco, 150);
+    if (!endereco) return { ok: false, erro: `Informe o endereço (rua e número) ${quem}.` };
+    const bairro = txt(a?.bairro, 80);
+    if (!bairro) return { ok: false, erro: `Informe o bairro ${quem}.` };
+    const cidade = txt(a?.cidade, 80);
+    if (!cidade) return { ok: false, erro: `Informe a cidade ${quem}.` };
+    acompanhantes.push({ nome, documento, nascimento, instagram: normalizarInstagram(instagram), email, telefone, peso,
+      cep: digitos(a?.cep).slice(0, 8), endereco, complemento: txt(a?.complemento, 80), bairro, cidade });
   }
   const pilotos = [...(compradorPilota ? [v.dados.nome] : []), ...acompanhantes.map((a) => a.nome)];
   return { ok: true, dados: { cliente: v.dados, bateriaId: horario.id, quantidade, forma, pilotos, acompanhantes, compradorPilota } };
