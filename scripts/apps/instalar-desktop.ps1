@@ -1,4 +1,4 @@
-<#
+﻿<#
   Instala um programa do Kartodromo (Windows, .NET self-contained) num PC. Roda como administrador,
   local ou via Invoke-Command. Substitui os antigos atalhos do Chrome (--app) de instalar-app.ps1.
 
@@ -19,7 +19,6 @@ param(
   [string]$ServidorUrl = 'http://192.168.20.13:4060',
   [string]$CronometragemUrl = 'http://192.168.20.249:4050',
   [string]$Impressora = '',
-  [string]$ChaveCronometragem = '',
   [switch]$IniciarNoLogon,
   [switch]$TvNoLogon
 )

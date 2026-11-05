@@ -37,7 +37,7 @@ class MainActivity : ComponentActivity() {
             isAppearanceLightNavigationBars = false
         }
         val prefs = Preferencias(this)
-        val api = Api({ prefs.servidor }, { prefs.chave })
+        val api = Api { prefs.servidor }
         setContent { TemaSorteio { App(api, prefs) } }
     }
 }

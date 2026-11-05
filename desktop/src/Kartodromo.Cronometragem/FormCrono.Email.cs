@@ -111,30 +111,20 @@ public partial class FormCrono
         }
         string NomeDoKart(string kart) => _sess?["competitors"]?.AsArray().OfType<JsonObject>().FirstOrDefault(c => c.S("kart") == kart)?.S("name") ?? "";
 
-        var reenviando = false;
         d.BotaoRodape("Reenviar para todos", true, () => Seguro.Rodar(d, async () =>
         {
-            if (reenviando) return;
             if (!encerrada) { Msg.Aviso(d, "Finalize a prova antes de enviar o resultado."); return; }
             if (!Msg.Pergunta(d, $"Mandar o resultado de novo para todos os pilotos de {nomeBateria} que têm e-mail?")) return;
-            reenviando = true;
-            try
+            var antes = ((await Crono.Api.Get($"/api/sessions/{id}/emails")) as JsonObject)?.L("atualizadoEm") ?? 0;
+            await Crono.Api.Post($"/api/sessions/{id}/emails", new { });
+            info.Text = "Enviando… (um e-mail com PDF por piloto)";
+            for (var i = 0; i < 90 && !d.IsDisposed; i++)
             {
-                var antes = ((await Crono.Api.Get($"/api/sessions/{id}/emails")) as JsonObject)?.L("atualizadoEm") ?? 0;
-                await Crono.Api.Post($"/api/sessions/{id}/emails", new { });
-                info.Text = "Enviando… (um e-mail com PDF por piloto)";
-                for (var i = 0; i < 90 && !d.IsDisposed; i++)
-                {
-                    await Task.Delay(2000);
-                    var e = (await Crono.Api.Get($"/api/sessions/{id}/emails")) as JsonObject;
-                    if ((e?.L("atualizadoEm") ?? 0) > antes && e?.S("status") != "enviando") break;
-                }
-                await Carregar();
+                await Task.Delay(2000);
+                var e = (await Crono.Api.Get($"/api/sessions/{id}/emails")) as JsonObject;
+                if ((e?.L("atualizadoEm") ?? 0) > antes) break;
             }
-            finally
-            {
-                reenviando = false;
-            }
+            await Carregar();
         }));
         if (kartSel != null)
             d.BotaoRodape($"Só o kart {kartSel}", false, () => Seguro.Rodar(d, async () =>

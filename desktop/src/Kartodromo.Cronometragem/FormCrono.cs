@@ -175,22 +175,6 @@ public partial class FormCrono : Form
         FormClosed += (_, _) => { try { if (_tv is { IsDisposed: false }) _tv.BeginInvoke(() => _tv.Close()); } catch { } _painel.Dispose(); };
     }
 
-    static bool FocoEmEdicaoDeTexto(Control c)
-    {
-        while (c != null)
-        {
-            if (c is TextBoxBase or ComboBox) return true;
-            if (c is IDataGridViewEditingControl) return true;
-            if (c is ContainerControl cc && cc.ActiveControl != null && cc.ActiveControl != c)
-            {
-                c = cc.ActiveControl;
-                continue;
-            }
-            break;
-        }
-        return false;
-    }
-
     void DesenharAba(DrawItemEventArgs e)
     {
         var page = _abas.TabPages[e.Index];
@@ -373,24 +357,6 @@ public partial class FormCrono : Form
         {
             if (_montandoArvore) return;
             if (e.Node?.Tag is not JsonObject tag) return;
-            var novoId = tag.S("kind") == "session" ? tag.S("sessionId")
-                : tag.S("kind") == "proof" ? Crono.Arr(_state, "sessions").FirstOrDefault(s => s.S("proofId") == tag.S("proofId"))?.S("id")
-                : null;
-            if (_pilotosSujos && novoId != null && novoId != _pilotosDe)
-            {
-                Seguro.Rodar(this, async () =>
-                {
-                    if (!await ConfirmarDescarteOuSalvarPilotos("trocar de bateria")) return;
-                    if (tag.S("kind") == "session") Selecionar(tag.S("sessionId"));
-                    else if (tag.S("kind") == "proof")
-                    {
-                        _selectedProof = _proofs.FirstOrDefault(p => p.S("id") == tag.S("proofId"));
-                        if (novoId != null) Selecionar(novoId);
-                        else _lPilotosTitulo.Text = _selectedProof?.S("name") ?? "Selecione uma prova";
-                    }
-                });
-                return;
-            }
             if (tag.S("kind") == "session") Selecionar(tag.S("sessionId"));
             else if (tag.S("kind") == "proof")
             {
@@ -763,27 +729,6 @@ public partial class FormCrono : Form
     }
 
     // ------------------------------------------------------------------ leitura
-
-    async Task<bool> ConfirmarDescarteOuSalvarPilotos(string motivo = "trocar de bateria")
-    {
-        if (!_pilotosSujos || string.IsNullOrEmpty(_pilotosDe)) return true;
-        var nomeBateria = _sess?.S("name") ?? "a bateria atual";
-        var res = MessageBox.Show(
-            this,
-            $"Há alterações não salvas na lista de competidores de {nomeBateria}.\n\nDeseja salvar antes de {motivo}?",
-            "Alterações não salvas",
-            MessageBoxButtons.YesNoCancel,
-            MessageBoxIcon.Question
-        );
-        if (res == DialogResult.Cancel) return false;
-        if (res == DialogResult.Yes)
-        {
-            await SalvarPilotos();
-            return !_pilotosSujos;
-        }
-        _pilotosSujos = false;
-        return true;
-    }
 
     void Selecionar(string id)
     {
@@ -1436,7 +1381,7 @@ public partial class FormCrono : Form
         _lVoltaFaixa.Text = passagemVisivel == null ? "VOLTA\nAGUARDANDO" : $"VOLTA\n{passagemVisivel.I("lap")}\nAGUARDANDO";
 
         // competidores (aba 1): so recarrega se o operador nao estiver editando
-        if (s0 != null && !_pilotosSujos && !_gPilotos.IsCurrentCellInEditMode)
+        if (s0 != null && (_pilotosDe != s0.S("id") || !_pilotosSujos) && !_gPilotos.IsCurrentCellInEditMode)
         {
             var comps = Crono.Arr(s0, "competitors");
             var atual = _gPilotos.Rows.Cast<DataGridViewRow>().Where(r => !r.IsNewRow).Select(r => $"{r.Cells[0].Value}|{r.Cells[1].Value}|{r.Cells[2].Value}|{r.Cells[3].Value}").ToList();
@@ -1475,8 +1420,7 @@ public partial class FormCrono : Form
         // com a verde dada mas nenhum kart na linha ainda, o cronômetro fica parado em zero
         var andando = _sess.S("state") is "em_andamento" or "bandeira_final" && !_sess.B("aguardandoLargada");
         var delta = andando && _sess.S("currentFlag") != "red" ? (long)(DateTime.Now - _lidoEm).TotalMilliseconds : 0;
-        var sufOffline = _servidorOk ? "" : " [OFFLINE]";
-        _lCrono.Text = Crono.Relogio((_sess.L("elapsedMs") ?? 0) + delta) + sufOffline;
+        _lCrono.Text = Crono.Relogio((_sess.L("elapsedMs") ?? 0) + delta);
         // o tempo acabou: a prova continua até o cronometrista dar a quadriculada (nunca encerra sozinha)
         var esgotado = _sess.S("state") == "em_andamento" && _sess.L("durationMs") > 0 && (_sess.B("tempoEsgotado") || _sess.L("remainingMs") is long r0 && r0 - delta <= 0);
         _lRestante.Text = esgotado ? "ESGOTADO" : _sess.L("remainingMs") is long rest ? Crono.Relogio(Math.Max(0, rest - delta))[..8] : "---";

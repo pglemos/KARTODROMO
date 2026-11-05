@@ -1,5 +1,4 @@
 /** Sorteio de karts para os pilotos de uma bateria (substitui o "LapTime Sorteio"). Sem IO. */
-import { createHash } from 'node:crypto';
 import type { Session } from './race-engine';
 
 export type PilotoSorteio = { indice: number; nome: string; customerId: string | null; kartAtual: string; excecoes: string[] };
@@ -44,18 +43,7 @@ export function pilotosDoSorteio(sessao: Session, todas: Iterable<Session>, mesm
 export class ListaMudouError extends Error {}
 
 /** Confere o resultado vindo do tablet antes de gravar: um kart por piloto, sem repetir, só karts cadastrados. */
-export function validarSorteio(
-  sessao: Session,
-  atribuicoes: Atribuicao[],
-  kartsCadastrados: Set<string>,
-  revisaoEnviada?: string | null,
-) {
-  if (revisaoEnviada !== undefined) {
-    const atual = revisaoListaSorteio(sessao);
-    if (!revisaoEnviada || revisaoEnviada.trim() !== atual) {
-      throw new SorteioConflictError('A lista de competidores foi alterada. Recarregue o sorteio antes de gravar.');
-    }
-  }
+export function validarSorteio(sessao: Session, atribuicoes: Atribuicao[], kartsCadastrados: Set<string>) {
   if (sessao.state !== 'preparando') throw new Error('Essa bateria já largou: o sorteio só vale antes da bandeira verde.');
   if (!Array.isArray(atribuicoes) || atribuicoes.length === 0) throw new Error('O sorteio veio vazio.');
   const vistos = new Set<string>();

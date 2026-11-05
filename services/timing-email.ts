@@ -102,18 +102,12 @@ function gravarConfig(arquivo: string, config: ConfigEmail) {
  */
 export function montarConfig(atual: ConfigEmail, entrada: Record<string, unknown>): ConfigEmail {
   const texto = (k: keyof ConfigEmail, max = 200) => (typeof entrada[k] === 'string' ? String(entrada[k]).trim().slice(0, max) : (atual[k] as string));
-  const novoHost = texto('host');
-  const mudouHost = novoHost !== atual.host;
-  const novaSenha = typeof entrada.senha === 'string' && entrada.senha.length > 0
-    ? entrada.senha
-    : (mudouHost ? '' : atual.senha);
-
   const novo: ConfigEmail = {
     automatico: typeof entrada.automatico === 'boolean' ? entrada.automatico : atual.automatico,
-    host: novoHost,
+    host: texto('host'),
     porta: Number.isInteger(Number(entrada.porta)) && Number(entrada.porta) > 0 ? Number(entrada.porta) : atual.porta,
     usuario: texto('usuario'),
-    senha: novaSenha,
+    senha: typeof entrada.senha === 'string' && entrada.senha.length > 0 ? entrada.senha : atual.senha,
     remetenteNome: texto('remetenteNome'),
     // trocou a caixa e a tela não mandou remetente: sai pela caixa nova (o antigo ficaria com o e-mail da conta anterior)
     remetenteEmail: typeof entrada.remetenteEmail === 'string' || texto('usuario').toLowerCase() === atual.usuario.toLowerCase() ? texto('remetenteEmail') : '',
@@ -410,14 +404,6 @@ export type OpcoesEnvio = {
   assinaturaResultado?: string;
 };
 
-const jobsEmAndamento = new Map<string, Promise<EnvioEmailsResultado>>();
-
-function chaveDoJob(s: Session, op: OpcoesEnvio): string {
-  if (op.para) return `${s.id}:para:${op.para.trim().toLowerCase()}:${op.kart ?? ''}`;
-  if (op.kart) return `${s.id}:kart:${op.kart}`;
-  return `${s.id}:todos`;
-}
-
 /**
  * Bateria em que o organizador divulga o resultado (Tabajara, áudio de 06/10): o automático não manda aos pilotos.
  * Sem marcação na bateria, vale o nome: "Tabajara" no nome do evento/bateria = não manda.
@@ -433,23 +419,8 @@ export function semEmailAosPilotos(s: Session, nomeEvento = '') {
 /**
  * Manda o resultado da prova. Um e-mail por piloto (resumo dele + classificação) com os PDFs anexos.
  * Guarda em s.emailsResultado quem recebeu, quem falhou e quem está sem e-mail; falhas tentam de novo depois.
- * Chamadas simultâneas para a mesma sessão/alvo compartilham a mesma execução para evitar envios duplicados.
  */
 export async function enviarResultado(s: Session, cfgArquivo: string, dep: Dependencias, op: OpcoesEnvio): Promise<EnvioEmailsResultado> {
-  const chave = chaveDoJob(s, op);
-  const emAndamento = jobsEmAndamento.get(chave);
-  if (emAndamento) return emAndamento;
-
-  const job = executarEnvioResultado(s, cfgArquivo, dep, op);
-  jobsEmAndamento.set(chave, job);
-  try {
-    return await job;
-  } finally {
-    jobsEmAndamento.delete(chave);
-  }
-}
-
-async function executarEnvioResultado(s: Session, cfgArquivo: string, dep: Dependencias, op: OpcoesEnvio): Promise<EnvioEmailsResultado> {
   const cfg = lerConfig(cfgArquivo);
   const anterior = s.emailsResultado;
   const agora = Date.now();
@@ -580,10 +551,8 @@ async function executarEnvioResultado(s: Session, cfgArquivo: string, dep: Depen
       s.emailsResultado = { status: 'parcial', atualizadoEm: Date.now(), tentativas: (anterior?.tentativas ?? 0) + 1, enviados: [...new Set(enviados)], falhas: [...falhas], semEmail, mensagens, assinaturaResultado: assinatura, aceite: dep.simulador ? 'simulador' : 'aceito-pelo-smtp', entregaConfirmada: false, mensagemEntrega: 'O aceite SMTP não confirma a chegada na caixa.' };
       dep.salvarSessao(s);
     }
-  } finally {
-    t.close();
-    try { rmSync(pasta, { recursive: true, force: true }); } catch { /* ignore */ }
   }
+  t.close();
 
   // "250 OK" do SMTP não é entrega: confere no rastreio da hospedagem e devolve para falhas o que foi descartado
   const aceitos = alvos.filter((a) => !falhas.some((f) => f.kart === a.kart && f.email === a.email));

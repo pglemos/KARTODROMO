@@ -65,7 +65,6 @@ import {
   tick,
   toggleLapInvalid,
   updateSessionParameters,
-  sanitizarCompetidorDetalhes,
   type Session,
   type SessionType,
   type TrocaDeKart,
@@ -116,10 +115,6 @@ function loadLocalEnv() {
   }
 }
 loadLocalEnv();
-
-if (!process.env.TIMING_API_KEY) {
-  console.warn('ATENCAO: TIMING_API_KEY vazio, mutações e rotas privadas ficam bloqueadas.');
-}
 
 const PORT = Number(process.env.TIMING_PORT || 4050);
 const SIMULATE = process.env.TIMING_SIMULATE === '1';
@@ -766,12 +761,6 @@ function defaultTrackLength() {
   return Number(system.defaultTrackLengthMeters ?? timingSettings.defaultTrackLengthMeters) || 1_000;
 }
 
-function nomeDaCategoria(catIdOrName?: string | null): string | null {
-  if (!catIdOrName) return null;
-  const c = catalog.categories.find((cat) => cat.id === catIdOrName || cat.name === catIdOrName);
-  return c?.name ?? catIdOrName;
-}
-
 function trackDa(s: Session) {
   const id = trackIdDa(s);
   const t = id ? catalog.tracks.find((item) => item.id === id) : undefined;
@@ -950,7 +939,7 @@ function sessionView(s: Session) {
     manualPositions: s.manualPositions ?? {},
     // nome próprio só na exibição (telão, resultado, operador): o cadastro vinha TUDO MAIÚSCULO ou tudo minúsculo
     competitors: s.competitors.map((c) => ({
-      kart: c.kart, name: nomeProprio(c.name), customerId: c.customerId ?? null, category: nomeDaCategoria(c.category), flag: c.flag ?? 'none', autoAdded: Boolean(c.autoAdded), detalhes: c.detalhes ?? null,
+      kart: c.kart, name: nomeProprio(c.name), customerId: c.customerId ?? null, category: c.category ?? null, flag: c.flag ?? 'none', autoAdded: Boolean(c.autoAdded), detalhes: c.detalhes ?? null,
       // já passou na linha nesta bateria (a lista de competidores fica amarela até o kart passar)
       passou: c.crossings.some((x) => !x.deleted),
       // volta em que o kart está agora (vai no texto padrão da advertência/penalidade)
@@ -1422,11 +1411,10 @@ function enviarAosPaineis() {
 
 function send(res: http.ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}) {
   const isString = typeof body === 'string';
-  const cors = (res as any).__cors || {};
   res.writeHead(status, {
     'content-type': isString ? 'text/plain; charset=utf-8' : 'application/json; charset=utf-8',
+    'access-control-allow-origin': '*',
     'cache-control': 'no-store',
-    ...cors,
     ...headers,
   });
   res.end(isString ? body : JSON.stringify(body));
@@ -1669,18 +1657,11 @@ async function enviarUsoKarts(s: Session) {
       // 8 s era pouco: o servidor somava, a resposta chegava atrasada e a nova tentativa somava de novo
       signal: AbortSignal.timeout(60_000),
     });
-    const d = (await r.json().catch(() => ({}))) as {
-      somados?: number;
-      criados?: number;
-      ignorados?: number;
-      categoria?: string | null;
-      jaAplicado?: boolean;
-      error?: string;
-    };
+    const d = (await r.json().catch(() => ({}))) as { somados?: number; criados?: number; ignorados?: number; categoria?: string | null; error?: string };
     if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
     s.usoKartsEnviado = true;
     saveSession(s);
-    log(`uso dos karts de ${s.name} enviado para a oficina: ${karts.length} karts, ${d.somados ?? 0} controles somados, ${d.criados ?? 0} novos, ${d.ignorados ?? 0} sem controle (${d.categoria ?? 'sem categoria'})${d.jaAplicado ? ' [já aplicado anteriormente]' : ''}`);
+    log(`uso dos karts de ${s.name} enviado para a oficina: ${karts.length} karts, ${d.somados ?? 0} controles somados, ${d.criados ?? 0} novos, ${d.ignorados ?? 0} sem controle (${d.categoria ?? 'sem categoria'})`);
   } catch (err) {
     log(`uso dos karts de ${s.name} não foi enviado (tenta de novo): ${(err as Error).message}`);
   } finally {
@@ -2306,7 +2287,6 @@ function restoreEventBackup(id: string) {
   if (!existsSync(file)) throw new Error('Cópia de eventos não encontrada.');
   const previousCatalog = catalog;
   catalog = normalizeCatalog(JSON.parse(readFileSync(file, 'utf8')));
-  catalogLoadState = { catalog, isValid: true };
   syncCatalogTransponders(previousCatalog, catalog);
   saveCatalog();
   scheduleStateBroadcast();
@@ -2381,12 +2361,6 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
   const path = url.pathname;
   const method = req.method ?? 'GET';
 
-  if (rotaExigeChave(method, path)) {
-    if (!validarChaveTiming(req)) {
-      return send(res, 401, { error: 'Não autorizado. Chave de cronometragem não configurada ou inválida.' });
-    }
-  }
-
   if (path === '/api/catalog' && method === 'GET') return send(res, 200, catalog);
   if (path === '/api/catalog/export' && method === 'GET') return send(res, 200, catalog, { 'content-disposition': 'attachment; filename="kartodromo-eventos.json"' });
   if (path === '/api/catalog/backups' && method === 'GET') return send(res, 200, listEventBackups());
@@ -2401,7 +2375,6 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       if (runningSession()) return send(res, 409, { error: 'Encerre a bateria em andamento antes de importar eventos.' });
       const previousCatalog = catalog;
       catalog = normalizeCatalog(await readBody(req));
-      catalogLoadState = { catalog, isValid: true };
       syncCatalogTransponders(previousCatalog, catalog);
       saveCatalog();
       scheduleStateBroadcast();
@@ -2588,15 +2561,11 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     const prova = typeof body.proofId === 'string' && body.proofId ? catalog.provas.find((p) => p.id === body.proofId) : undefined;
     const jaExiste = prova ? [...sessions.values()].find((x) => x.proofId === prova.id && x.state !== 'cancelada') : undefined;
     if (jaExiste) return send(res, 200, sessionView(jaExiste));
-    const porVoltas = Boolean(body.maxLaps && Number(body.maxLaps) > 0);
-    const durPadrao = porVoltas ? 0 : Number((timingSettings.timing as Record<string, unknown> | undefined)?.defaultDurationMin ?? (type === 'corrida' ? 20 : type === 'classificacao' ? 5 : 10));
     const s = createSession({
       id: `${hojeBrasilia()}-${randomUUID().slice(0, 8)}`,
       name: String(body.name ?? ''),
       type,
-      durationMin: body.durationMin !== undefined && body.durationMin !== null && body.durationMin !== ''
-        ? Number(body.durationMin)
-        : durPadrao,
+      durationMin: Number(body.durationMin ?? ((timingSettings.timing as Record<string, unknown> | undefined)?.defaultDurationMin ?? (type === 'corrida' ? 20 : type === 'classificacao' ? 5 : 10))),
       maxLaps: body.maxLaps ? Number(body.maxLaps) : null,
       minLapSec: body.minLapSec ? Number(body.minLapSec) : prova?.minLapSec ? prova.minLapSec : Number((timingSettings.timing as Record<string, unknown> | undefined)?.minimumLapSeconds ?? 5),
       now: Date.now(),
@@ -2740,6 +2709,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     if (!s) return send(res, 404, { error: 'Bateria não encontrada.' });
     const i = Number(rc[2]);
     const atual = s.competitors[i];
+    if (!atual) return send(res, 404, { error: 'Competidor não encontrado nessa bateria.' });
     const body = await readBody(req);
     // a tela manda quem estava nessa linha quando abriu o registro: se a lista mudou no meio, não grava em outro piloto
     if ((typeof body.kartAntes === 'string' && body.kartAntes !== atual.kart) || (typeof body.nomeAntes === 'string' && body.nomeAntes.trim() !== atual.name.trim()))
@@ -3122,13 +3092,11 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         tipoKart: await tipoKartDa(s),
         karts: kartsCadastrados(),
         pilotos: pilotos.map((p) => ({ ...p, pesoKg: p.customerId ? pesos.get(p.customerId) ?? null : null })),
-        revisaoLista: revisaoListaSorteio(s),
       });
     }
     if (method === 'POST') {
       const body = await readBody(req);
       const atribuicoes = (Array.isArray(body.atribuicoes) ? body.atribuicoes : []) as Atribuicao[];
-      const revisaoEnviada = typeof body.revisaoLista === 'string' ? body.revisaoLista.trim() : null;
       try {
         if (s.type !== 'equalizacao' && atribuicoes.some(a => bloqueioKart(String(a.kart)))) throw new Error('Há kart bloqueado pela gestão de frota no sorteio.');
         validarSorteio(s, atribuicoes, new Set(kartsCadastrados()));

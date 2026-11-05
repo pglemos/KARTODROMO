@@ -677,18 +677,6 @@ public class BotaoQuadrado : Control
     }
     protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); _sobre = true; Invalidate(); }
     protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); _sobre = false; Invalidate(); }
-    protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
-    protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
-
-    protected override void OnKeyDown(KeyEventArgs e)
-    {
-        base.OnKeyDown(e);
-        if (e.KeyCode is Keys.Enter or Keys.Space)
-        {
-            e.Handled = true;
-            OnClick(EventArgs.Empty);
-        }
-    }
 
     protected override void OnPaint(PaintEventArgs e)
     {
@@ -713,13 +701,6 @@ public class BotaoQuadrado : Control
             g.SmoothingMode = SmoothingMode.None;
             Pano?.Invoke(g, q);
             using var borda = new Pen(Color.FromArgb(50, 0, 0, 0)); g.DrawRectangle(borda, q.X, q.Y, q.Width, q.Height);
-        }
-
-        if (Focused)
-        {
-            using var pFoco = new Pen(Color.FromArgb(11, 122, 83), 2f);
-            using var pathFoco = Forma.Redondo(new RectangleF(r.X - 1, r.Y - 1, r.Width + 2, r.Height + 2), 12);
-            g.DrawPath(pFoco, pathFoco);
         }
     }
 }

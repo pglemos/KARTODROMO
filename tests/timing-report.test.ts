@@ -37,9 +37,6 @@ function loadReportHelpers() {
   const end = html.indexOf('\nfunction renderReport()', start);
   if (start < 0 || end < 0) throw new Error('Helpers de apresentação do relatório não encontrados.');
 
-  const catStart = html.indexOf('let catalogCategories = [];');
-  const catEnd = html.indexOf('\nasync function fetchJson', catStart);
-
   const sandbox: Record<string, unknown> = {};
   vm.runInNewContext(
     `${html.slice(start, end)}\nglobalThis.getResultadoCriterio = getResultadoCriterio;\nglobalThis.calcularPaginasRelatorio = calcularPaginasRelatorio;\nglobalThis.obterUltimaFoto = obterUltimaFoto;\nglobalThis.blocoObservacoes = blocoObservacoes;`,
