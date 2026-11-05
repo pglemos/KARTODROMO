@@ -578,6 +578,16 @@ export async function rankingPublicoParaApp() {
   if (rankingCache && rankingCache.versao === indiceVersao && rankingCache.dia === hojeSp()) {
     return { ranking: rankingCache.ranking, pilotos: rankingCache.pilotos, posicoes: rankingCache.posicoes };
   }
+  // "Na pista desde": a data do cadastro conta (cliente antigo tem corridas de antes do histórico guardado);
+  // cadastros duplicados unificados ficam com a data mais antiga.
+  const cadastroDesde = new Map<string, string>();
+  try {
+    for (const c of await query<{ id: number; em: Date | null }>('SELECT Id id, CriadoEm em FROM dbo.Cliente WHERE CriadoEm IS NOT NULL', {})) {
+      if (!(c.em instanceof Date) || c.em.getFullYear() < 2000) continue;
+      const id = aliasCliente.get(String(c.id)) ?? String(c.id), dia = c.em.toISOString().slice(0, 10); // o banco grava a data local sem fuso
+      const at = cadastroDesde.get(id); if (!at || dia < at) cadastroDesde.set(id, dia);
+    }
+  } catch { /* sem banco: fica só a primeira corrida */ }
   const TOP = 100;
   // Posição e total ficam fora da ficha do piloto: uma bateria nova mexe no "de" de todo mundo do traçado e isso
   // regravava ~75 mil fichas a cada publicação. Agora vira um documento por traçado/período; o Worker junta na leitura.
@@ -653,7 +663,7 @@ export async function rankingPublicoParaApp() {
       podios: r?.podios ?? 0,
       poles: corridas.filter((c) => c.tipo !== 'corrida' && !c.dq && c.pos === 1).length,
       voltasMaisRapidas: corridas.filter((c) => c.voltaMaisRapida && !c.dq).length,
-      primeira: [r?.primeira, primeiraAntiga].filter(Boolean).sort()[0] ?? null,
+      primeira: [r?.primeira, primeiraAntiga, cadastroDesde.get(cid)].filter(Boolean).sort()[0] ?? null,
       ultima: r?.ultima ?? null,
       tracados: [...melhorPorTracado.entries()].map(([nome, t]) => ({
         nome, ms: t.ms, dia: t.dia, corridas: corridas.filter((c) => c.tracado === nome).length,
