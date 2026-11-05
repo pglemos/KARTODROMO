@@ -68,21 +68,26 @@ let normalizado = false, limites: Map<string, number> | null = null;
  * as corridas de todos vão para o cadastro atualizado mais recentemente, que é o que a recepção e o app usam.
  */
 let aliasCliente = new Map<string, string>();
+/** nomes dos cadastros unificados (a busca do app acha o piloto também pelo nome antigo/apelido) */
+let outrosNomesDe = new Map<string, string[]>();
+let nomeCadastroDe = new Map<string, string>();
 let aliasEm = 0;
 async function carregarAliases(log?: (m: string) => void): Promise<boolean> {
   if (Date.now() - aliasEm < 10 * 60_000) return false;
   aliasEm = Date.now();
   try {
-    const rows = await query<{ id: number; canon: number }>(
+    const rows = await query<{ id: number; canon: number; nome: string; nomeCanon: string }>(
       `WITH g AS (
          SELECT Id, LOWER(LTRIM(RTRIM(Email))) em, UPPER(LTRIM(RTRIM(Nome))) nm,
                 ROW_NUMBER() OVER (PARTITION BY LOWER(LTRIM(RTRIM(Email))), UPPER(LTRIM(RTRIM(Nome))) ORDER BY AtualizadoEm DESC, Id DESC) ordem,
                 COUNT(*) OVER (PARTITION BY LOWER(LTRIM(RTRIM(Email))), UPPER(LTRIM(RTRIM(Nome)))) qtd
            FROM dbo.Cliente WHERE ResponsavelId IS NULL AND Email LIKE '_%@_%._%' AND LEN(LTRIM(RTRIM(Nome))) >= 5)
-       SELECT a.Id id, b.Id canon FROM g a JOIN g b ON b.em = a.em AND b.nm = a.nm AND b.ordem = 1 WHERE a.qtd BETWEEN 2 AND 3 AND a.ordem > 1`, {});
+       SELECT a.Id id, b.Id canon, (SELECT Nome FROM dbo.Cliente WHERE Id = a.Id) nome, (SELECT Nome FROM dbo.Cliente WHERE Id = b.Id) nomeCanon FROM g a JOIN g b ON b.em = a.em AND b.nm = a.nm AND b.ordem = 1 WHERE a.qtd BETWEEN 2 AND 3 AND a.ordem > 1`, {});
     const novo = new Map(rows.map((r) => [String(r.id), String(r.canon)]));
     const mudou = novo.size !== aliasCliente.size || [...novo].some(([k, v]) => aliasCliente.get(k) !== v);
     aliasCliente = novo;
+    outrosNomesDe = new Map(); nomeCadastroDe = new Map(rows.filter((r) => r.nomeCanon?.trim()).map((r) => [String(r.canon), r.nomeCanon.trim()]));
+    for (const r of rows) { const l = outrosNomesDe.get(String(r.canon)) ?? []; if (r.nome?.trim()) l.push(r.nome.trim()); outrosNomesDe.set(String(r.canon), l); }
     if (mudou) { normalizado = false; log?.(`pilotos: ${novo.size} cadastro(s) duplicado(s) unificado(s)`); }
     return mudou;
   } catch (e) { log?.(`pilotos: duplicados não lidos (${(e as Error).message})`); return false; }
@@ -662,7 +667,8 @@ export async function rankingPublicoParaApp() {
     const primeiraAntiga = antigas.reduce((a, x) => (!a || x.dia < a ? x.dia : a), '' as string) || null;
     pilotos[cid] = {
       semanasTop10, mesesTop10,
-      nome: nomes.get(cid) ?? '',
+      nome: nomeCadastroDe.get(cid) ?? nomes.get(cid) ?? '', // unificado: vale o nome do cadastro, não o digitado numa bateria
+      ...(outrosNomesDe.get(cid)?.length ? { outrosNomes: outrosNomesDe.get(cid)!.join(' | ') } : {}),
       baterias: r?.baterias ?? corridas.length,
       corridas: corridasValidas.length,
       voltas: r?.voltas ?? 0,

@@ -282,7 +282,7 @@ export async function handleMobileRanking(request: Request, env: MobileRankingEn
         `SELECT substr(chave, 8) id, json_extract(dados, '$.nome') nome,
                 json_extract(dados, '$.baterias') * 50 + json_extract(dados, '$.podios') * 50 + json_extract(dados, '$.vitorias') * 100
                 + json_extract(dados, '$.poles') * 50 + json_extract(dados, '$.voltasMaisRapidas') * 50 xp
-           FROM mobile_ranking WHERE chave LIKE 'piloto:%' AND json_extract(dados, '$.nome') LIKE ? ORDER BY xp DESC LIMIT 20`,
+           FROM mobile_ranking WHERE chave LIKE 'piloto:%' AND (json_extract(dados, '$.nome') LIKE ?1 OR json_extract(dados, '$.outrosNomes') LIKE ?1) ORDER BY xp DESC LIMIT 20`,
       ).bind(`%${termo}%`).all<{ id: string; nome: string; xp: number }>();
       return json(200, { pilotos: r.results ?? [] }, 300);
     }
