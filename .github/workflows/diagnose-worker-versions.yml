@@ -1,0 +1,82 @@
+name: Diagnose historical Worker versions
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'incident/diagnose-correct-production-version-2026-07-20'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Probe historical version URLs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/worker-version-diagnosis/html /tmp/worker-version-diagnosis/headers
+
+          cat > /tmp/versions.tsv <<'EOF'
+          83	32632ea1-6f92-4d5e-84e4-ccaedc1ab1fc
+          82	1e387c70-f5f0-4eb3-9924-f4d9cf0e8826
+          80	7d96f127-b7f4-4afc-ba78-2b7e39ad453c
+          78	dd05f102-f72a-4a15-97f3-4d48236ff8ff
+          76	54591a38-4c4c-4dc7-ab21-342c0b9205e9
+          74	0f57016d-ad49-4593-a1d4-e575a28cc8c5
+          72	2bc54079-c814-46fd-a7e5-13a9a1fb2a23
+          70	2c2e1709-b2bd-4892-989e-4f8d801c73c7
+          68	00a9d244-da25-467b-8847-cf09a4b52e1f
+          66	10b81e27-cc48-40ca-a36e-6c25bbbfbd66
+          64	3984cbdb-60d3-46f2-9fa9-b6fe0c3ce85e
+          62	fdf8e1dd-b1ab-44ee-8b07-f0eb5a84b00e
+          60	f86a684e-20ab-47de-be6e-497f34f7a68f
+          EOF
+
+          printf 'version\tversion_id\tpath\tstatus\teffective_url\ttitle\th1\tbytes\thash\tdesign\tplaceholders\tx_opennext\n' > /tmp/worker-version-diagnosis/summary.tsv
+
+          while IFS=$'\t' read -r number version_id; do
+            short="${version_id%%-*}"
+            host="${short}-kartodromo.kartodromo.workers.dev"
+            for path in '' 'kart-locacao' 'eventos' 'campeonatos'; do
+              key="v${number}-${path:-home}"
+              meta=$(curl -ksS -L --max-redirs 8 --connect-timeout 10 --max-time 35 \
+                -D "/tmp/worker-version-diagnosis/headers/${key}.txt" \
+                -o "/tmp/worker-version-diagnosis/html/${key}.html" \
+                -w '%{http_code}\t%{url_effective}' \
+                "https://${host}/${path}" || printf '000\thttps://%s/%s' "$host" "$path")
+
+              status=${meta%%$'\t'*}
+              effective=${meta#*$'\t'}
+              file="/tmp/worker-version-diagnosis/html/${key}.html"
+              title=$(perl -0777 -ne 'if (/<title[^>]*>(.*?)<\/title>/is) { $x=$1; $x =~ s/<[^>]+>//g; $x =~ s/[\r\n\t]+/ /g; print $x }' "$file" 2>/dev/null | head -c 180 || true)
+              h1=$(perl -0777 -ne 'if (/<h1[^>]*>(.*?)<\/h1>/is) { $x=$1; $x =~ s/<[^>]+>//g; $x =~ s/[\r\n\t]+/ /g; print $x }' "$file" 2>/dev/null | head -c 220 || true)
+              bytes=$(wc -c < "$file" 2>/dev/null || echo 0)
+              hash=$(sha256sum "$file" 2>/dev/null | awk '{print $1}' || true)
+              design=0; placeholders=0; x_opennext=0
+              [[ "$effective" == *'/design/'* ]] && design=1
+              grep -Fq '{{' "$file" 2>/dev/null && placeholders=1 || true
+              grep -Eqi '^x-opennext:[[:space:]]*1' "/tmp/worker-version-diagnosis/headers/${key}.txt" 2>/dev/null && x_opennext=1 || true
+              printf '%s\t%s\t/%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+                "$number" "$version_id" "$path" "$status" "$effective" "$title" "$h1" "$bytes" "$hash" "$design" "$placeholders" "$x_opennext" \
+                >> /tmp/worker-version-diagnosis/summary.tsv
+            done
+          done < /tmp/versions.tsv
+
+          column -t -s $'\t' /tmp/worker-version-diagnosis/summary.tsv | tee /tmp/worker-version-diagnosis/summary.txt
+
+      - name: Upload version diagnosis
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: worker-historical-version-diagnosis
+          path: /tmp/worker-version-diagnosis
+          if-no-files-found: error
