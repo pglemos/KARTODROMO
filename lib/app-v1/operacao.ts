@@ -25,7 +25,7 @@ export type DepsOperacao = {
 };
 
 type Competidor = { kart: string; name: string; customerId?: string | null; category?: string | null; autoAdded?: boolean; detalhes?: Record<string, unknown>; penalidades?: unknown[]; flag?: string | null };
-type Sessao = { id: string; name: string; state: string; agendaId?: number | null; competitors: Competidor[]; standings?: unknown; observations?: unknown[]; currentFlag?: string | null; remainingMs?: number | null };
+type Sessao = { id: string; name: string; state: string; type?: string; agendaId?: number | null; competitors: Competidor[]; standings?: unknown; observations?: unknown[]; currentFlag?: string | null; remainingMs?: number | null };
 type FrotaSnapshot = { fora: { kart: string; motivo: string; usuario: string; em: string; estado: string }[]; naPista: { kart: string; sessaoId: string; bateria: string; piloto: string; estado: string }[]; cadastrados: string[]; semTeste: { kart: string; sessionId: string; autor: string; em: string; ajusteMm: number | null }[]; sessionRevision: number };
 type RespostaOperacao = Awaited<ReturnType<typeof executar>>;
 
@@ -152,7 +152,7 @@ export function criarOperacao(d: DepsOperacao) {
           return { indice, kart: '', nome: c.name, customerId: c.customerId ?? null };
         }
         if (fora.has(kart)) throw new Error(`O kart ${kart} está fora de operação.`);
-        if (!kartLiberadoHoje(d.store, kart)) throw new Error(`Kart ${kart}: checklist e aceite diário pendentes.`);
+        if (atual.type !== 'classificacao' && !kartLiberadoHoje(d.store, kart)) throw new Error(`Kart ${kart}: checklist e aceite diário pendentes.`);
         if (parcial && c.kart) throw new Error(`${c.name} já tem o kart ${c.kart}.`);
         const dono = atual.competitors.find((o, i) => i !== indice && o.kart === kart && real(o));
         if (dono && (parcial || !lista.some((x) => chave({ customerId: x.customerId, nome: x.nome }) === chave(dono)))) throw new Error(`O kart ${kart} já está com ${dono.name}.`);
@@ -556,7 +556,7 @@ export function criarOperacao(d: DepsOperacao) {
       return roda(q, 'kart.trocar', b, id, 'kart-swap', async () => {
         const s = sessao(id);
         exigeEstado(s, 'preparando', 'em_andamento', 'bandeira_final');
-        if (!kartLiberadoHoje(d.store, para)) throw new Error(`Kart ${para}: checklist e aceite diário pendentes ou kart bloqueado.`);
+        if (s.type !== 'classificacao' && !kartLiberadoHoje(d.store, para)) throw new Error(`Kart ${para}: checklist e aceite diário pendentes ou kart bloqueado.`);
         if (karts().has(para)) throw new Error(`O kart ${para} está fora de operação.`);
         const c = s.competitors.find((x) => x.kart === pl.fromKart && chave(x) === chave({ customerId: pl.customerId, nome: pl.nome }));
         if (!c) throw new ErroApp(409, 'STALE_ASSIGNMENT', 'O piloto não está mais nesse kart. Atualize.');

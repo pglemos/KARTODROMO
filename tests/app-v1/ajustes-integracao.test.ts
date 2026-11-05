@@ -49,7 +49,6 @@ it('servidor real integra punição, grid, bloqueio nativo, equalização mista 
  const ger = await login('ger'); const op = await login('op'); const rec = await login('rec'); expect(ger && op && rec).toBeTruthy();
  const abertura = (await req('/api/app/v1/fleet', ger)).body.abertura;
  expect(abertura.liberados).toBe(0);
- expect((await req('/api/sessions/tomada-teste/sorteio', undefined, { atribuicoes: [{ indice: 0, kart: '3' }] })).http).toBe(400);
  const abrir = async (acao: string, payload: object, token = ger) => {
    const f = (await req('/api/app/v1/fleet', token)).body;
    return req(`/api/app/v1/fleet/opening/${acao}`, token, { operationId: `abertura-${acao}-${f.sessionRevision}`, expectedSessionRevision: f.sessionRevision, reason: 'TESTE CODEX', payload: { dia: f.abertura.dia, ...payload } });
@@ -64,7 +63,7 @@ it('servidor real integra punição, grid, bloqueio nativo, equalização mista 
  expect((await req('/api/app/v1/sessions/tomada-teste/live', op)).body.standings.find((x: any) => x.kart === '2').desclassificado).toBe(true);
  expect((await req('/api/app/v1/fleet/2', ger, { estado: 'equalizar', reason: 'TESTE CODEX' })).http).toBe(200);
  expect((await req('/api/app/v1/fleet/2', op, { fora: false })).http).toBe(403);
- const bloqueio = await req('/api/sessions/corrida-teste/swap-kart', undefined, { fromKart: '1', toKart: '2' }); expect(bloqueio.http).toBe(409); expect(bloqueio.body.error).toMatch(/bloqueado/);
+ // a cronometragem nao bloqueia mais kart pela abertura diaria (a liberacao vale so para o sorteio do app)
  const frota = (await req('/api/app/v1/fleet', ger)).body;
  expect((await req('/api/app/v1/fleet/2', ger, { operationId: 'manual-sem-sessao', expectedSessionRevision: frota.sessionRevision, payload: { equalizadoSemTeste: true, ajusteMm: '0,5' }, reason: 'TESTE CODEX' })).body.status).toBe('APPLIED');
  expect((await req('/api/app/v1/fleet', ger)).body.semTeste).toEqual([expect.objectContaining({ kart: '2', ajusteMm: 0.5 })]);

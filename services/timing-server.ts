@@ -128,11 +128,9 @@ const DATA_DIR = resolve(process.env.TIMING_DATA_DIR || join(process.cwd(), 'dat
 // App operacional: só liga com APP_V1_TOKEN_SECRET; sem ele as rotas /api/app/v1/ respondem 503
 let moduloApp: ModuloApp | null = null;
 let storeOperacional: AppStore | null = null;
-const bloqueioKart = (kart: string) => !kartLiberadoHoje(storeOperacional, kart);
-const exigirFrotaLiberada = (s: Session) => {
-  const bloqueado = s.type === 'equalizacao' ? undefined : s.competitors.find(c => bloqueioKart(c.kart));
-  if (bloqueado) throw new Error(`Kart ${bloqueado.kart} bloqueado: peça liberação ao gerente ou responsável pela equalização.`);
-};
+// A cronometragem nao bloqueia kart pela abertura diaria: a liberacao vale so para o sorteio do app.
+const bloqueioKart = (_kart: string) => false;
+const exigirFrotaLiberada = (_s: Session) => undefined;
 const assinantesApp = new Set<() => void>();
 const SESSIONS_DIR = join(DATA_DIR, 'sessions');
 const JOURNAL_DIR = join(DATA_DIR, 'passagens');
@@ -3656,7 +3654,7 @@ async function inscricoesDaRecepcao(agendaId: number): Promise<Inscricao[]> {
   }
   const { query } = await import('../lib/ops/db');
   return await query(`SELECT c.Id clienteId, c.Nome nome, i.Aprovada aprovada, i.Pago pago,
-      CAST(CASE WHEN i.TermoImpressoEm IS NOT NULL OR i.Origem = 'totem' OR (i.Aprovada = 1 AND (i.Pago = 1 OR i.PrecoCentavos = 0)) THEN 1 ELSE 0 END AS bit) termo,
+      CAST(CASE WHEN i.TermoImpressoEm IS NULL THEN 0 ELSE 1 END AS bit) termo,
       ISNULL(i.PrecoCentavos, p.PrecoCentavos) - i.DescontoCentavos totalCentavos,
       CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.EnduranceEvento ev WHERE ev.BateriaId = i.BateriaId AND ev.Ativo = 1) THEN 1 ELSE 0 END AS bit) endurance
     FROM dbo.Inscricao i JOIN dbo.Cliente c ON c.Id = i.ClienteId JOIN dbo.Bateria b ON b.Id = i.BateriaId LEFT JOIN dbo.Produto p ON p.Id = ISNULL(i.ProdutoId, b.ProdutoId)
