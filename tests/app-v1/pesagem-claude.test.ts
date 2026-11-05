@@ -14,7 +14,7 @@ function montar(state: string) {
   ] };
   const op = criarOperacao({
     store, verSessao: () => sessao, inscricoes: async () => [], listarSessoes: () => [],
-    legado: async (m, c, corpo) => { chamadas.push({ m, c, corpo }); return {}; },
+    legado: async (m: string, c: string, corpo: unknown) => { chamadas.push({ m, c, corpo }); return {}; },
   } as never);
   return { op, chamadas, store };
 }

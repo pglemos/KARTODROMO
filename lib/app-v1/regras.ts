@@ -8,8 +8,8 @@ const conhecido = (v: unknown) => v === true || v === false || v === 0 || v === 
 export function elegibilidade(i: Inscricao): Elegibilidade {
   if (![i.aprovada, i.pago, i.termo, i.endurance].every(conhecido) || typeof i.totalCentavos !== 'number') return { situacao: 'INDETERMINADA', motivo: 'Situação desconhecida: confira na recepção.' };
   if (!verdade(i.aprovada)) return { situacao: 'INELEGIVEL', motivo: 'Não aprovado na recepção.' };
+  if (!verdade(i.termo)) return { situacao: 'INELEGIVEL', motivo: 'Sem termo: imprimir na recepção.' };
   if (!verdade(i.pago) && !verdade(i.endurance) && i.totalCentavos > 0) return { situacao: 'INELEGIVEL', motivo: 'Pagamento pendente.' };
-  if (!verdade(i.termo) && !(verdade(i.aprovada) && (verdade(i.pago) || verdade(i.endurance)))) return { situacao: 'INELEGIVEL', motivo: 'Sem termo: imprimir na recepção.' };
   return { situacao: 'ELEGIVEL', motivo: null };
 }
 
