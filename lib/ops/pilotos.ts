@@ -241,7 +241,7 @@ async function carregarLegado(log?: (m: string) => void) {
 // um cliente só). Lido uma vez (os dados não mudam mais) e guardado no índice com o prefixo "cx-".
 // versão 2: e-mail repetido em cadastros duplicados da mesma pessoa também liga a corrida antiga (antes ficava sem dono)
 const ARQ_CALXPRO_VERSAO = resolve(join(process.cwd(), '.runtime', 'pilotos-calxpro-versao.txt'));
-const CALXPRO_VERSAO = '2';
+const CALXPRO_VERSAO = '3';
 let calxproCarregado = Object.keys(indice).some((k) => k.startsWith('cx-')) && (() => { try { return readFileSync(ARQ_CALXPRO_VERSAO, 'utf8').trim() === CALXPRO_VERSAO; } catch { return false; } })();
 async function carregarCalxpro(log?: (m: string) => void) {
   try {
@@ -259,33 +259,53 @@ async function carregarCalxpro(log?: (m: string) => void) {
          LEFT JOIN em ON em.e = LOWER(LTRIM(RTRIM(cc.ST_EMAIL)))
         WHERE h.DT_DATA_HORA IS NOT NULL AND cc.ST_NOME IS NOT NULL`,
     );
-    for (const k of Object.keys(indice)) if (k.startsWith('cx-')) delete indice[k];
-    let n = 0;
+    // HIST_COMPETIDOR_CORRIDA (09/2023 a 01/2025) só completa voltas e kart; a fonte das baterias é BATERIAS_CLIENTES
+    const extra = new Map<string, { voltas: number; kart: string }>();
     for (const x of linhas) {
+      if (!x.cid) continue;
       const nomeBat = String(x.nome ?? '');
-      // nome da corrida em linhas: "BATERIAS dd/mm…", "BATERIA 18:15", "TRAÇADO 1", "CORRIDA" | "TOMADA DE TEMPO"
-      const num = /TRA.{1,2}ADO\s*(\d+)/i.exec(nomeBat)?.[1];
-      const tracado = tracadoBase(num ? `Traçado ${num}${/INVERT/i.test(nomeBat) ? ' Invertido' : ''}` : 'Traçado principal');
       const tipo = /CORRIDA\s*$/i.test(nomeBat.trim()) ? 'corrida' : /TOMADA|CLASSIF|QUALI/i.test(nomeBat) ? 'classificacao' : 'treino';
+      extra.set(`${x.cid}|${diaSp(x.inicio.getTime() + 3 * 3_600_000)}|${tipo}|${x.pos || 0}`, { voltas: x.voltas || 0, kart: String(x.kart ?? '') });
+    }
+    // BATERIAS_CLIENTES (2018 a 01/2025): cada bateria tem tomada de tempo e corrida, com o cliente ligado pelo CalxproId
+    const bc = await query<{ bid: string; nome: string; inicio: Date; pista: number | null; cat: number | null; cid: number | null; piloto: string | null; pq: number | null; tq: Date | null; pc: number | null; tc: Date | null; nq: number; nc: number }>(
+      `SELECT b.ID_BATERIAS bid, b.ST_NOME nome, b.DT_DATA_HORA inicio, b.ID_PISTA pista, b.ID_CATEGORIA cat, c.Id cid, c.Nome piloto,
+              bc.NM_POSICAO_QFY pq, bc.TEMPO_MELHOR_VOLTA_QFY tq, bc.NM_POSICAO_CRD pc, bc.TEMPO_MELHOR_VOLTA_CRD tc,
+              SUM(CASE WHEN bc.NM_POSICAO_QFY > 0 THEN 1 ELSE 0 END) OVER (PARTITION BY bc.ID_BATERIAS) nq,
+              SUM(CASE WHEN bc.NM_POSICAO_CRD > 0 THEN 1 ELSE 0 END) OVER (PARTITION BY bc.ID_BATERIAS) nc
+         FROM CALXPRO.dbo.BATERIAS_CLIENTES bc JOIN CALXPRO.dbo.BATERIAS b ON b.ID_BATERIAS = bc.ID_BATERIAS
+         LEFT JOIN (SELECT CalxproId, MAX(Id) Id, MAX(Nome) Nome FROM dbo.Cliente WHERE CalxproId IS NOT NULL GROUP BY CalxproId) c ON c.CalxproId = bc.ID_CLIENTE
+        WHERE b.DT_DATA_HORA IS NOT NULL AND (bc.NM_POSICAO_QFY > 0 OR bc.NM_POSICAO_CRD > 0)`,
+    );
+    for (const k of Object.keys(indice)) if (k.startsWith('cx-')) delete indice[k];
+    const msVolta = (t: Date | null) => { if (!(t instanceof Date)) return null; const ms = t.getTime() - Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()); return ms > 20_000 && ms < 600_000 ? ms : null; };
+    let n = 0;
+    for (const x of bc) {
+      if (!x.cid) continue;
       const inicio = x.inicio.getTime() + 3 * 3_600_000; // DT_DATA_HORA é hora de Betim gravada sem fuso
-      const id = 'cx-' + x.id;
-      const titulo = /BATERIA\s+\d{1,2}:\d{2}/i.exec(nomeBat)?.[0] ?? 'Bateria';
-      const b = indice[id] ?? (indice[id] = { id, nome: titulo.replace(/^BATERIA/i, 'Bateria'), tipo, dia: diaSp(inicio), inicio, fim: inicio, chuva: chuvaNoNome(nomeBat), trackId: null, tracado, pilotos: [] });
-      const nome = String(x.piloto).trim(), sob = String(x.sobrenome ?? '').trim();
-      const completo = sob && !nome.toUpperCase().includes(sob.toUpperCase()) ? `${nome} ${sob}` : nome;
-      if (semNome(completo, String(x.kart ?? ''))) continue;
-      b.pilotos.push({ cid: x.cid ? String(x.cid) : null, nome: completo, kart: String(x.kart ?? ''), pos: x.pos || 0, voltas: x.voltas || 0, melhor: x.melhor && x.melhor > 0 ? x.melhor : null, cat: null, dq: false });
-      n++;
+      const dia = diaSp(inicio);
+      const tracado = tracadoBase(x.pista ? `Traçado ${x.pista}` : 'Traçado principal');
+      const titulo = /\d{1,2}:\d{2}/.exec(String(x.nome ?? ''))?.[0];
+      const cat = x.cat === 2 ? 'Super Kart' : x.cat === 1 ? 'Indoor' : null;
+      for (const [tipo, pos, t, off] of [['classificacao', x.pq, x.tq, 0], ['corrida', x.pc, x.tc, 60_000]] as const) {
+        if (!pos || pos < 1) continue;
+        const id = `cx-${tipo === 'corrida' ? 'c' : 'q'}${x.bid}`;
+        const b = indice[id] ?? (indice[id] = { id, nome: titulo ? `Bateria ${titulo}` : 'Bateria', tipo, dia, inicio: inicio + off, fim: inicio + off, chuva: chuvaNoNome(String(x.nome ?? '')), trackId: null, tracado, pilotos: [] });
+        const e = extra.get(`${x.cid}|${dia}|${tipo}|${pos}`);
+        b.pilotos.push({ cid: String(x.cid), nome: String(x.piloto ?? '').trim() || 'Piloto', kart: e?.kart ?? '', pos, voltas: e?.voltas ?? 0, melhor: msVolta(t), cat, dq: false });
+        n++;
+      }
     }
     calxproCarregado = true;
     try { writeFileSync(ARQ_CALXPRO_VERSAO, CALXPRO_VERSAO); } catch { /* recarrega no próximo início */ }
-    log?.(`pilotos: CalXPro lido (${n} participações em corridas de 2023 a 2025)`);
+    log?.(`pilotos: CalXPro lido (${n} participações de 2018 a 2025)`);
     return true;
   } catch (e) { log?.(`pilotos: CalXPro indisponível (${(e as Error).message})`); calxproCarregado = true; return false; }
 }
 
 /** Primeiro dia com corrida detalhada (LapTime ou cronometragem nova): antes disso, só o ranking antigo do LapTime. */
-const inicioDetalhado = () => Object.values(indice).reduce((a, b) => (!a || b.dia < a ? b.dia : a), '' as string) || '9999-12-31';
+// CalXPro (cx-) e reservas do LapTime (lr-) não contam: o ranking antigo do LapTime (2025-2026) cobre esse período
+const inicioDetalhado = () => Object.values(indice).reduce((a, b) => (/^(cx|lr)-/.test(b.id) || (a && b.dia >= a) ? a : b.dia), '' as string) || '9999-12-31';
 
 type Resumo = { baterias: number; voltas: number; vitorias: number; podios: number; ultima: string | null; primeira: string | null; melhor: { ms: number; tracado: string } | null };
 /** Resumo da carreira de cada cliente (cid), calculado do índice. */
