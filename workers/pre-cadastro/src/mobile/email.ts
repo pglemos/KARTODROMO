@@ -122,7 +122,20 @@ export async function sendMobileAuthEmail(
 ) {
   if (!mobileEmailConfigured(env)) return false;
   const { subject, text, html } = conteudo(purpose, mobileEmailLink(env, purpose, token));
+  return entregar(env, to, subject, text, html);
+}
 
+/** Aviso ao dono: uma exclusão que ele não pediu não pode passar despercebida. */
+export async function sendMobileAccountDeletionEmail(env: MobileEmailEnv, to: string, limite: Date) {
+  if (!mobileEmailConfigured(env)) return false;
+  const data = limite.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+  const subject = 'Sua conta foi marcada para exclusão · Kartódromo de Betim';
+  const text = `Recebemos um pedido para excluir sua conta do aplicativo do Kartódromo de Betim. Ela será apagada em ${data}.\n\nFoi você? Não precisa fazer nada.\n\nNão foi você? Abra o aplicativo, entre com sua senha e toque em Restaurar conta. Depois, troque sua senha.`;
+  const html = `<p>Recebemos um pedido para excluir sua conta do aplicativo do Kartódromo de Betim. Ela será apagada em <strong>${data}</strong>.</p><p>Foi você? Não precisa fazer nada.</p><p><strong>Não foi você?</strong> Abra o aplicativo, entre com sua senha e toque em <strong>Restaurar conta</strong>. Depois, troque sua senha.</p>`;
+  return entregar(env, to, subject, text, html);
+}
+
+async function entregar(env: MobileEmailEnv, to: string, subject: string, text: string, html: string) {
   if (env.EMAIL && env.MOBILE_EMAIL_FILA !== '1' && await cotaDoMes(env).catch(() => false)) {
     try {
       await env.EMAIL.send({

@@ -102,6 +102,28 @@ describe('resultados oficiais e histórico do cliente', () => {
     expect(requests('/api/mobile/v1/results/me')).toHaveLength(0);
   });
 
+  it('repete uma consulta pública após uma falha transitória de rede', async () => {
+    setSession(null);
+    fetchMock.mockRejectedValueOnce(new TypeError('network unavailable'));
+
+    const view = await render(<ResultsScreen />);
+
+    expect(await view.findByText('Treino oficial · TESTE CODEX')).toBeTruthy();
+    expect(requests('/api/mobile/v1/results')).toHaveLength(2);
+  });
+
+  it('mostra um único aviso quando histórico e resultados falham pela mesma causa', async () => {
+    setSession(accessSession);
+    fetchMock.mockRejectedValue(new TypeError('network unavailable'));
+
+    const view = await render(<ResultsScreen />);
+
+    expect(await view.findByText('Sem conexão. Confira a internet e tente novamente.')).toBeTruthy();
+    expect(view.getAllByText('Tentar novamente')).toHaveLength(1);
+    expect(requests('/api/mobile/v1/results')).toHaveLength(2);
+    expect(requests('/api/mobile/v1/results/me')).toHaveLength(2);
+  });
+
   it('carrega o histórico oficial apenas com sessão vinculada e envia o token', async () => {
     setSession(accessSession);
     personalResults = {
@@ -123,6 +145,40 @@ describe('resultados oficiais e histórico do cliente', () => {
     expect(view.getByText("2º")).toBeTruthy();
     const [historyRequest] = requests('/api/mobile/v1/results/me');
     expect(historyRequest[1]?.headers).toMatchObject({ authorization: `Bearer ${accessSession.accessToken}` });
+  });
+
+  it('exibe todo o histórico pessoal carregado sem exigir um toque adicional', async () => {
+    setSession(accessSession);
+    personalResults = {
+      vinculo: 'validado',
+      results: Array.from({ length: 8 }, (_, index) => ({
+        sessionId: `historico-${index + 1}`,
+        eventName: `Bateria histórica ${index + 1}`,
+        eventDate: `2026-10-${String(30 - index).padStart(2, '0')}`,
+        displayName: 'Ana Silva',
+        position: index + 1,
+        kart: '7',
+        laps: 12,
+        bestLapMs: 28_950,
+      })),
+    };
+    const view = await render(<ResultsScreen />);
+
+    expect(await view.findByText('Bateria histórica 8')).toBeTruthy();
+    expect(view.getByText('Mostrar só os últimos')).toBeTruthy();
+  });
+
+  it('não apresenta zero voltas como dado confirmado quando o resultado não tem parciais', async () => {
+    setSession(accessSession);
+    personalResults = {
+      vinculo: 'validado',
+      results: [{ sessionId: 'resultado-sem-parciais', eventName: 'Bateria antiga', eventDate: '2026-10-12', displayName: 'Ana Silva', position: 12, kart: '7', laps: 0, bestLapMs: null }],
+    };
+    const view = await render(<ResultsScreen />);
+
+    expect(await view.findByText(/voltas não informadas/)).toBeTruthy();
+    expect(view.getByText('Melhor volta não informada')).toBeTruthy();
+    expect(view.queryByText(/0 voltas/)).toBeNull();
   });
 
   it('orienta conta sem vínculo sem expor dados de cadastro', async () => {

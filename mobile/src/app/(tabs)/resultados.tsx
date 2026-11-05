@@ -11,6 +11,7 @@ import { useSession } from '../../session/provider';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SessionBoundary } from '../../session/boundary';
+import { useFloatingTabBarClearance } from '../../components/floating-tab-bar';
 
 function messageOf(error: unknown) {
   return error instanceof Error ? error.message : 'Não foi possível carregar os resultados. Tente novamente.';
@@ -38,8 +39,8 @@ function ResultRow({ result, showEvent = false }: { result: PersonalResult; show
       <Text style={{ color: ({ 1: palette.gold, 2: '#C0C7D1', 3: '#CD7F32' } as Record<number, string>)[result.position] ?? palette.textMuted, fontSize: 22, fontWeight: '900', minWidth: 36, fontVariant: ['tabular-nums'] }}>{result.position}º</Text>
       <View style={{ flex: 1 }}>
         <Text style={styles.rowTitle}>{result.displayName}</Text>
-        <Text style={styles.rowDetail}>Kart {result.kart} · {result.laps} voltas</Text>
-        <Text style={[styles.rowDetail, { color: palette.text, fontVariant: ['tabular-nums'] }]}>Melhor volta {formatLap(result.bestLapMs)}</Text>
+        <Text style={styles.rowDetail}>Kart {result.kart} · {result.laps > 0 ? `${result.laps} voltas` : 'voltas não informadas'}</Text>
+        <Text style={[styles.rowDetail, { color: palette.text, fontVariant: ['tabular-nums'] }]}>{result.bestLapMs === null ? 'Melhor volta não informada' : `Melhor volta ${formatLap(result.bestLapMs)}`}</Text>
         {showEvent ? <Text style={styles.rowDetail}>{formatDate(result.eventDate)}</Text> : null}
       </View>
     </View>
@@ -107,6 +108,7 @@ type ResultItem =
 
 function ResultsContent() {
   const { palette, styles } = useUi();
+  const bottomClearance = useFloatingTabBarClearance();
   const { session } = useSession();
   const [publicResults, setPublicResults] = useState<PublicSessionResults[]>([]);
   const [personalResults, setPersonalResults] = useState<PersonalResultsResponse | null>(null);
@@ -117,15 +119,12 @@ function ResultsContent() {
   const [historyAccessToken, setHistoryAccessToken] = useState<string | null>(null);
   const [aberta, setAberta] = useState<string | null>(null);
   const [mostrar, setMostrar] = useState(PAGINA);
-  const [historicoTodo, setHistoricoTodo] = useState(false);
+  const [historicoTodo, setHistoricoTodo] = useState(true);
 
   const load = useCallback(async () => {
     const accessToken = session?.accessToken ?? null;
     setPublicLoading(true);
     setPublicError('');
-    setPublicResults([]);
-    setPersonalResults(null);
-    setHistoryAccessToken(accessToken);
     const publicLoad = resultsApi.public()
       .then((list) => setPublicResults(ordenarBaterias(list)))
       .catch((error: unknown) => setPublicError(messageOf(error)))
@@ -133,13 +132,15 @@ function ResultsContent() {
     if (!accessToken) {
       setPersonalError('');
       setPersonalLoading(false);
+      setPersonalResults(null);
+      setHistoryAccessToken(null);
       await publicLoad;
       return;
     }
     setPersonalLoading(true);
     setPersonalError('');
     const personalLoad = resultsApi.mine(accessToken)
-      .then(setPersonalResults)
+      .then((results) => { setPersonalResults(results); setHistoryAccessToken(accessToken); })
       .catch((error: unknown) => setPersonalError(messageOf(error)))
       .finally(() => setPersonalLoading(false));
     await Promise.all([publicLoad, personalLoad]);
@@ -154,6 +155,7 @@ function ResultsContent() {
     [session, historyAccessToken, personalResults],
   );
   const resumo = useMemo(() => resumoCarreira(meus), [meus]);
+  const erroCompartilhado = session && publicError && publicError === personalError ? publicError : '';
 
   const items: ResultItem[] = [
     ...(historicoTodo ? meus : meus.slice(0, 5)).map((result, index) => ({ key: `mine-${result.sessionId}-${index}`, kind: 'personal' as const, result })),
@@ -170,10 +172,11 @@ function ResultsContent() {
         <ActionButton label="Entrar" onPress={() => router.push('/(auth)/login')} secondary />
       </Panel> : null}
       {session && personalLoading && !personalResults ? <LoadingMessage label="Buscando seu histórico…" /> : null}
-      {session && personalError ? <View style={{ gap: 12 }}><InlineError message={personalError} /><ActionButton label="Tentar novamente" onPress={() => void load()} secondary /></View> : null}
+      {session && personalError && !erroCompartilhado ? <View style={{ gap: 12 }}><InlineError message={personalError} /><ActionButton label="Tentar novamente" onPress={() => void load()} secondary /></View> : null}
       {session && historyAccessToken === session.accessToken && personalResults?.vinculo === 'pendente' ? <Panel><Text style={styles.muted}>{personalResults.mensagem}</Text></Panel> : null}
       {session && historyAccessToken === session.accessToken && personalResults?.vinculo === 'validado' && !personalResults.results.length ? <Panel><Text style={styles.muted}>Nenhum resultado oficial vinculado à sua conta ainda.</Text></Panel> : null}
       {meus.length ? <Panel style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 4 }}>
+        <Text style={[styles.muted, { width: '100%', marginBottom: 8 }]}>Este resumo usa resultados oficiais publicados e vinculados à conta. A Carreira pode incluir registros históricos adicionais.</Text>
         <Numero valor={String(resumo.baterias)} rotulo={resumo.baterias === 1 ? 'bateria' : 'baterias'} />
         <Numero valor={String(resumo.vitorias)} rotulo={resumo.vitorias === 1 ? 'vitória' : 'vitórias'} />
         <Numero valor={String(resumo.podios)} rotulo={resumo.podios === 1 ? 'pódio' : 'pódios'} />
@@ -183,9 +186,10 @@ function ResultsContent() {
   }
 
   return <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-    <FlatList data={items} keyExtractor={(item) => item.key} contentContainerStyle={styles.content} refreshing={publicLoading || personalLoading} onRefresh={() => void load()}
+    <FlatList data={items} keyExtractor={(item) => item.key} contentContainerStyle={[styles.content, { paddingBottom: bottomClearance }]} refreshing={publicLoading || personalLoading} onRefresh={() => void load()}
       ListHeaderComponent={<>
         <PageHeader title="Resultados" description="Classificações oficiais da pista de Betim." />
+        {erroCompartilhado ? <View style={{ gap: 12, marginBottom: 16 }}><InlineError message={erroCompartilhado} /><ActionButton label="Tentar novamente" onPress={() => void load()} secondary /></View> : null}
         {history()}
       </>}
       renderItem={({ item, index }) => {
@@ -219,7 +223,7 @@ function ResultsContent() {
         </Pressable>
       </View>
       {publicLoading && !publicResults.length ? <LoadingMessage label="Buscando resultados oficiais…" /> : null}
-      {publicError ? <View style={{ gap: 12 }}><InlineError message={publicError} /><ActionButton label="Tentar novamente" onPress={() => void load()} secondary /></View> : null}
+      {publicError && !erroCompartilhado ? <View style={{ gap: 12 }}><InlineError message={publicError} /><ActionButton label="Tentar novamente" onPress={() => void load()} secondary /></View> : null}
       {!publicLoading && !publicError && !publicResults.length ? <Panel><Text style={styles.muted}>Ainda não há resultados oficiais publicados.</Text></Panel> : null}
       {publicResults.length ? <Text style={[styles.muted, { color: palette.muted }]}>Toque numa bateria para ver a classificação inteira. Puxe para baixo para atualizar.</Text> : null}
     </View>;

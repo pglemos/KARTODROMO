@@ -260,6 +260,27 @@ describe('Milestone 5 — Cart & Agenda Component Suite', () => {
   });
 
   describe('AgendaScreen', () => {
+    it('explica o filtro vazio e permite voltar às baterias do mesmo dia', async () => {
+      const slot = { ...MOCK_AGENDA_SLOTS[0], title: 'BATERIA ÚNICA' };
+      const view = await render(<AgendaScreen slots={[slot]} />);
+      fireEvent.press(view.getByLabelText('evento'));
+
+      expect(await view.findByText('Quer ver as baterias disponíveis para este dia? Toque abaixo para mudar o filtro para Bateria.')).toBeTruthy();
+      fireEvent.press(view.getByLabelText('Mostrar baterias disponíveis neste dia'));
+      expect(await view.findByText(slot.title)).toBeTruthy();
+    });
+
+    it('sugere a próxima data mesmo quando há outros horários no dia selecionado', async () => {
+      const today = { ...MOCK_AGENDA_SLOTS[0], date: '18/10/2099', title: 'TREINO LIVRE' };
+      const nextEvent = { ...today, id: 'next-event', date: '19/10/2099', title: 'EVENTO COPA' };
+      const view = await render(<AgendaScreen slots={[today, nextEvent]} />);
+      fireEvent.press(view.getByLabelText('evento'));
+
+      expect(await view.findByText('Próximo dia com evento: 19/10/2099.')).toBeTruthy();
+      fireEvent.press(view.getByLabelText('Ver horários de 19/10/2099'));
+      expect(await view.findByText(nextEvent.title)).toBeTruthy();
+    });
+
     it('filtra a data sem exibir vagas de outro dia', async () => {
       const first = { ...MOCK_AGENDA_SLOTS[0], id: 'first', title: 'BATERIA PRIMEIRO DIA' };
       const second = { ...first, id: 'second', title: 'BATERIA OUTRO DIA', date: '22/10/2026' };

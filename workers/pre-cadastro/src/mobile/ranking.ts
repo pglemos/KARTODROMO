@@ -24,18 +24,29 @@ const FOTO_MAX = 1_500_000;
 const fotoChave = (cliente: string) => `fotos-app/${cliente}.jpg`;
 const FOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']);
 
+const MARCAS_HEIF = new Set(['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'mif1', 'msf1']);
+
+/** Identifica a imagem pelos primeiros bytes. `ftyp` sozinho não basta: vídeos MP4 também o têm. */
+export function tipoDaImagem(bytes: Uint8Array): string | null {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  if (bytes.length >= 8 && [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((v, i) => bytes[i] === v)) return 'image/png';
+  if (bytes.length < 12) return null;
+  const texto = (de: number, ate: number) => String.fromCharCode(...bytes.slice(de, ate));
+  if (texto(0, 4) === 'RIFF' && texto(8, 12) === 'WEBP') return 'image/webp';
+  if (texto(4, 8) === 'ftyp' && MARCAS_HEIF.has(texto(8, 12))) return 'image/heic';
+  return null;
+}
+
 async function enviarFoto(request: Request, env: MobileRankingEnv, cliente: string) {
   if (!env.PRE) return json(503, { erro: 'Serviço temporariamente indisponível.' });
   const contentType = (request.headers.get('content-type') ?? '').split(';', 1)[0].trim().toLowerCase();
   if (!FOTO_TYPES.has(contentType)) return json(415, { erro: 'Formato de foto não aceito. Escolha JPEG, PNG, WebP ou HEIC.', codigo: 'UNSUPPORTED_IMAGE' });
   if (Number(request.headers.get('content-length') ?? 0) > FOTO_MAX) return json(413, { erro: 'A foto é grande demais. Escolha uma imagem de até 1,5 MB.', codigo: 'IMAGE_TOO_LARGE' });
   const bytes = new Uint8Array(await request.arrayBuffer());
-  const jpeg = bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
-  const png = bytes.length >= 8 && bytes.slice(0, 8).every((v, i) => v === [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a][i]);
-  const webp = bytes.length >= 12 && new TextDecoder().decode(bytes.slice(0, 4)) === 'RIFF' && new TextDecoder().decode(bytes.slice(8, 12)) === 'WEBP';
-  const heif = bytes.length >= 12 && new TextDecoder().decode(bytes.slice(4, 8)) === 'ftyp';
-  if (bytes.length < 100 || bytes.length > FOTO_MAX || !(jpeg || png || webp || heif)) return json(400, { erro: 'Arquivo de imagem inválido.', codigo: 'INVALID_IMAGE' });
-  await env.PRE.put(fotoChave(cliente), bytes, { httpMetadata: { contentType }, customMetadata: { enviadaEm: new Date().toISOString() } });
+  const detectado = tipoDaImagem(bytes);
+  if (bytes.length < 100 || bytes.length > FOTO_MAX || !detectado) return json(400, { erro: 'Arquivo de imagem inválido.', codigo: 'INVALID_IMAGE' });
+  // o tipo gravado vem do conteúdo, não do que o aparelho declarou
+  await env.PRE.put(fotoChave(cliente), bytes, { httpMetadata: { contentType: detectado }, customMetadata: { enviadaEm: new Date().toISOString() } });
   return json(200, { ok: true, versao: Date.now() });
 }
 
@@ -60,7 +71,42 @@ function constantTimeEqual(a: string, b: string) {
   return dif === 0;
 }
 
-const CHAVE = /^(ranking|piloto:\d{1,12}|karts:\d{4}-\d{2}-\d{2}|historico:\d{1,20})$/;
+const CHAVE = /^(ranking|piloto:\d{1,12}|karts:\d{4}-\d{2}-\d{2}|historico:\d{1,20}|posicoes:(semana|mes|geral):[a-z0-9-]{1,80})$/;
+const PERIODOS_POSICAO = ['semana', 'mes', 'geral'] as const;
+
+/** Mesma regra do SRVKART (lib/ops/pilotos.ts slugTracado). */
+export function slugTracado(nome: string) {
+  return nome.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'sem-nome';
+}
+
+/**
+ * A ficha do piloto não guarda mais posição (mudava a cada bateria de qualquer um e regravava todas as fichas).
+ * Aqui junta: para cada traçado da ficha e cada período, posição e total vêm do documento posicoes:<período>:<traçado>.
+ * O SQLite extrai só a entrada do piloto (json_extract), sem trazer o documento inteiro para o Worker.
+ * Sem documento ainda (antes da primeira publicação no formato novo), mantém o que a ficha tiver.
+ */
+export async function preencherPosicoes(db: D1Database, cid: string, dados: Record<string, unknown>) {
+  const tracados = Array.isArray(dados.tracados) ? dados.tracados as Record<string, unknown>[] : [];
+  if (!tracados.length || !/^\d{1,12}$/.test(cid)) return dados;
+  const chaves = tracados.flatMap((t) => PERIODOS_POSICAO.map((p) => `posicoes:${p}:${slugTracado(String(t.nome ?? ''))}`));
+  const { results } = await db.prepare(
+    `SELECT chave, json_extract(dados, '$.de') de, json_extract(dados, '$.pos."' || ? || '"') pos
+       FROM mobile_ranking WHERE chave IN (${chaves.map(() => '?').join(',')})`,
+  ).bind(cid, ...chaves).all<{ chave: string; de: number | null; pos: number | null }>();
+  const porChave = new Map(results.map((r) => [r.chave, r]));
+  return {
+    ...dados,
+    tracados: tracados.map((t) => {
+      const novo: Record<string, unknown> = { ...t };
+      for (const p of PERIODOS_POSICAO) {
+        const doc = porChave.get(`posicoes:${p}:${slugTracado(String(t.nome ?? ''))}`);
+        if (!doc) continue;
+        novo[p] = doc.pos != null && doc.de != null ? { pos: Number(doc.pos), de: Number(doc.de) } : null;
+      }
+      return novo;
+    }),
+  };
+}
 const LIMITE_CORPO = 4_000_000;
 
 // a tabela também é criada aqui (mesmo SQL da migration 0007): o wrangler local não tem permissão de D1
@@ -116,6 +162,40 @@ function categoriaNormalizada(value: unknown) {
   return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
 }
 
+type VoltaDiaria = { id?: string; piloto: string; kart: string; categoria: string | null; tracado: string; dia: string; ms: number | null };
+
+/** Um dia corrompido é ignorado (e registrado) em vez de derrubar o ranking inteiro. */
+export function linhasDosDias(rows: { dados: string; atualizado_em: number }[]) {
+  const linhas = rows.flatMap((row) => {
+    try {
+      const dia = (JSON.parse(row.dados) as { linhas?: VoltaDiaria[] }).linhas;
+      return Array.isArray(dia) ? dia : [];
+    } catch {
+      console.error('mobile-ranking', 'registro diário inválido ignorado');
+      return [];
+    }
+  }).filter((l) => l.ms !== null).map((l) => ({ ...l, nome: l.piloto, ms: l.ms! }));
+  return { linhas, atualizadoEm: Math.max(0, ...rows.map((row) => row.atualizado_em)) };
+}
+
+// O app atualiza a cada 15 s e troca de filtro na hora. Guardar só os dias lidos (e não a resposta) evita reler e
+// reprocessar o banco a cada pedido, sem misturar os filtros.
+const CACHE_DIAS_MS = 30_000;
+const cacheDias = new WeakMap<D1Database, Map<string, { em: number; valor: ReturnType<typeof linhasDosDias> }>>();
+
+async function diasDoRanking(db: D1Database, de: string, ate: string) {
+  const porBanco = cacheDias.get(db) ?? new Map<string, { em: number; valor: ReturnType<typeof linhasDosDias> }>();
+  cacheDias.set(db, porBanco);
+  const chave = `${de}|${ate}`;
+  const guardado = porBanco.get(chave);
+  if (guardado && Date.now() - guardado.em < CACHE_DIAS_MS) return guardado.valor;
+  const { results } = await db.prepare('SELECT dados, atualizado_em FROM mobile_ranking WHERE chave >= ? AND chave <= ? ORDER BY chave')
+    .bind('karts:' + de, 'karts:' + ate).all<{ dados: string; atualizado_em: number }>();
+  const valor = linhasDosDias(results);
+  porBanco.set(chave, { em: Date.now(), valor });
+  return valor;
+}
+
 async function ranking(url: URL, env: MobileRankingEnv) {
   const r = await ler(env, 'ranking');
   if (!r) return json(503, { erro: 'O ranking ainda está sendo preparado. Tente de novo em alguns minutos.' });
@@ -131,11 +211,8 @@ async function ranking(url: URL, env: MobileRankingEnv) {
   const categoriaBruta = categoriaNormalizada(url.searchParams.get('categoria'));
   if (categoriaBruta && categoriaBruta !== 'todos' && categoriaBruta !== 'indoor' && categoriaBruta !== 'super kart' && categoriaBruta !== 'superkart') return json(400, { erro: 'Categoria inválida.', codigo: 'INVALID_CATEGORY' });
   const categoria = categoriaBruta === 'superkart' ? 'super kart' : categoriaBruta;
-  const registros = await env.MOBILE_DB!.prepare(
-    'SELECT dados, atualizado_em FROM mobile_ranking WHERE chave >= ? AND chave <= ? ORDER BY chave',
-  ).bind('karts:' + (per.de ?? '0000-01-01'), 'karts:' + (per.ate ?? '9999-12-31')).all<{ dados: string; atualizado_em: number }>();
-  const diarias = registros.results.flatMap(row => (JSON.parse(row.dados) as { linhas: { id?: string; piloto: string; kart: string; categoria: string | null; tracado: string; dia: string; ms: number | null }[] }).linhas)
-    .filter(l => l.ms !== null).map(l => ({ ...l, nome: l.piloto, ms: l.ms! }));
+  const registros = await diasDoRanking(env.MOBILE_DB!, per.de ?? '0000-01-01', per.ate ?? '9999-12-31');
+  const diarias = registros.linhas;
   const diasCompletos = new Set(diarias.map(l => l.dia));
   const antigas = per.tracados.flatMap(t => (t.linhas as LinhaCompleta[]).map(l => ({ ...l, tracado: t.nome })))
     .filter(l => !diasCompletos.has(l.dia));
@@ -149,14 +226,15 @@ async function ranking(url: URL, env: MobileRankingEnv) {
     ...completo,
     dia,
     categoria: categoria || null,
-    atualizadoEm: new Date(Math.max(Date.parse(r.atualizadoEm), ...registros.results.map(row => row.atualizado_em))).toISOString(),
+    atualizadoEm: new Date(Math.max(Date.parse(r.atualizadoEm), registros.atualizadoEm)).toISOString(),
   });
 }
 
 async function piloto(id: string, env: MobileRankingEnv, publico = true) {
   const r = await ler(env, 'piloto:' + id);
   if (!r) return json(404, { erro: 'Piloto sem corridas no ranking.' });
-  return json(200, { id, ...r.dados, atualizadoEm: r.atualizadoEm }, publico ? 60 : 0);
+  const dados = await preencherPosicoes(env.MOBILE_DB!, id, r.dados);
+  return json(200, { id, ...dados, atualizadoEm: r.atualizadoEm }, publico ? 60 : 0);
 }
 
 /** sessão do app → cliente vinculado (mesma regra do histórico: só conta vinculada ao cadastro do kartódromo) */

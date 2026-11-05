@@ -1,19 +1,11 @@
-import React from 'react';
 import { Text, View } from 'react-native';
 
-import { LiveTimeScreen, LiveTimeScreenProps } from '../../components/livetime-screen';
 import { AoVivoReal } from '../../components/ao-vivo-real';
-import { DEMO_MODE } from '../../config/features';
 import { useLiveSession } from '../../features/live/api';
 import { ActionButton, InlineError, LoadingMessage, Page, PageHeader, Panel, useUi } from '../../features/reservations/components';
 
-/** Demonstração: telemetria ilustrativa (src/mock). */
-function DemoLiveTime(props: LiveTimeScreenProps) {
-  return <LiveTimeScreen {...props} />;
-}
-
 /** Loja: a bateria que está na pista agora (ou a última que terminou), direto da cronometragem. */
-function RealLiveTime() {
+export default function LiveTimeTab() {
   const { session, error, loading, refresh } = useLiveSession();
   const { styles } = useUi();
   if (session) return <AoVivoReal session={session} onRefresh={refresh} refreshError={error} />;
@@ -30,5 +22,3 @@ function RealLiveTime() {
     </Page>
   );
 }
-
-export default DEMO_MODE ? DemoLiveTime : RealLiveTime;

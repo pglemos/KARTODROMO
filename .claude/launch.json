@@ -12,6 +12,12 @@
       "autoPort": true
     },
     {
+      "name": "acesso-testadores",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["wrangler", "dev", "-c", "workers/acesso-testadores/wrangler.jsonc", "--port", "8799", "--local"],
+      "port": 8799
+    },
+    {
       "name": "next-prod-4174",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

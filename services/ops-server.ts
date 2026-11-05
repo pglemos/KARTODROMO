@@ -517,6 +517,10 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     // cada termo é um trabalho de impressão separado: a TM-T20 corta o papel no fim de cada trabalho,
     // então vários termos num trabalho só saíam emendados
     if (naRecepcao) for (const idInscricao of termoDoPiloto.values()) enfileirarImpressao(termoLink([idInscricao]), 'Termo de responsabilidade', origemDe(req));
+    if (ids.length) {
+      const pmap = Object.fromEntries(ids.map((id, n) => ['id' + n, id]));
+      await query(`UPDATE dbo.Inscricao SET TermoImpressoEm = COALESCE(TermoImpressoEm, SYSDATETIME()), AtualizadoEm = SYSDATETIME() WHERE Id IN (${ids.map((_, n) => '@id' + n).join(',')})`, pmap).catch(() => undefined);
+    }
     send(res, 201, { inscricoes: ids, inicio: primeira?.inicio, termoUrl: imprimir ? termoLink(ids) : null, termoNaRecepcao: naRecepcao, pulseiras });
     return true;
   }

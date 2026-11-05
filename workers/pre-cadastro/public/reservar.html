@@ -230,6 +230,7 @@
         <div class="c6"><label for="nome">Nome completo</label><input id="nome" autocomplete="name" autocapitalize="words" placeholder="Como no documento"></div>
         <div class="c3"><label for="telefone">Celular (WhatsApp)</label><input id="telefone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="(31) 90000-0000"></div>
         <div class="c3"><label for="email">E-mail <span class="op">(recibo e resultado)</span></label><input id="email" type="email" inputmode="email" autocomplete="email" placeholder="voce@email.com"></div>
+        <div class="c6"><label for="instagram">Instagram <span class="op">(sai junto com seu nome no resultado da bateria)</span></label><input id="instagram" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="@seuusuario" maxlength="80"></div>
         <div class="c3"><label for="nascimento">Data de nascimento</label><input id="nascimento" inputmode="numeric" autocomplete="bday" placeholder="DD/MM/AAAA"></div>
         <div class="c3"><label for="peso">Peso (kg) <span class="op">(opcional)</span></label><input id="peso" inputmode="decimal" placeholder="Ex.: 72"></div>
       </div>
@@ -308,7 +309,7 @@
   const mascarar = (el, f) => el.addEventListener('input', () => { el.value = f(el.value); el.classList.remove('invalido'); });
   mascarar($('documento'), mascaras.CPF); mascarar($('telefone'), mascaras.fone); mascarar($('nascimento'), mascaras.data);
   $('peso').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/[^\d.,]/g, '').slice(0, 5); });
-  for (const id of ['nome', 'email']) $(id).addEventListener('input', (e) => e.target.classList.remove('invalido'));
+  for (const id of ['nome', 'email', 'instagram']) $(id).addEventListener('input', (e) => e.target.classList.remove('invalido'));
 
   const hhmm = (iso) => iso.slice(11, 16);
   const chegada = (iso) => { const [h, m] = hhmm(iso).split(':').map(Number); const t = h * 60 + m - 60; return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };
@@ -490,6 +491,9 @@
     if (nome.value.trim().split(/\s+/).length < 2) { erro('Informe o nome completo.', nome); return false; }
     if (dig(fone.value).length < 10) { erro('Informe o celular com DDD.', fone); return false; }
     if (email.value && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.value.trim())) { erro('E-mail inválido.', email); return false; }
+    const insta = $('instagram'), ig = insta.value.trim().replace(/^(?:https?:\/\/)?(?:www\.)?instagram\.com\//i, '').replace(/[\/?#].*$/, '').replace(/^@/, '').toLowerCase();
+    if (!ig) { erro('Informe seu Instagram (o @usuário).', insta); return false; }
+    if (!/^[a-z0-9_](?:[a-z0-9_.]{0,28}[a-z0-9_])?$/.test(ig) || ig.includes('..')) { erro('Instagram inválido. Informe o @usuário (ex.: @andre.silva).', insta); return false; }
     if (!iso(nasc.value)) { erro('Informe a data de nascimento (DD/MM/AAAA).', nasc); return false; }
     if (idade(iso(nasc.value)) < 18) { erro('A reserva precisa ser feita por um adulto (18 anos ou mais).', nasc); return false; }
     return true;
@@ -515,7 +519,7 @@
         method: 'POST', headers: { 'content-type': 'application/json', ...hdr },
         body: JSON.stringify({
           bateriaId: horario.id, quantidade: qtd, forma, politica: true, lgpd: true,
-          documento: doc.value, nome: nome.value, email: email.value, telefone: fone.value, nascimento: iso(nasc.value), peso: $('peso').value,
+          documento: doc.value, nome: nome.value, email: email.value, instagram: $('instagram').value, telefone: fone.value, nascimento: iso(nasc.value), peso: $('peso').value,
           pilotos: [...document.querySelectorAll('.piloto')].map((i) => i.value), site: $('site').value, t: aberto,
         }),
       });

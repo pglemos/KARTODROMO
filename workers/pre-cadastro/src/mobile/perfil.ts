@@ -80,7 +80,7 @@ export async function handleMobilePerfil(request: Request, env: MobilePerfilEnv)
         // pedidos pendentes primeiro; depois quem tem conta ligada e perfil velho (mais de 1 dia) ou nunca publicado
         const r = await env.MOBILE_DB.prepare(
           `SELECT l.customer_id cliente, p.pedido pedido FROM mobile_identity_links l LEFT JOIN mobile_perfil p ON p.cliente = l.customer_id
-            WHERE p.pedido IS NOT NULL OR p.publicado_em IS NULL OR p.publicado_em < ?
+            WHERE l.nivel = 'completo' AND (p.pedido IS NOT NULL OR p.publicado_em IS NULL OR p.publicado_em < ?)
             ORDER BY (p.pedido IS NULL), p.pedido_em LIMIT 50`,
         ).bind(Date.now() - 86_400_000).all<{ cliente: string; pedido: string | null }>();
         return json(200, { itens: (r.results ?? []).map((x) => ({ cliente: x.cliente, pedido: x.pedido ? JSON.parse(x.pedido) : null })) });
@@ -101,8 +101,10 @@ export async function handleMobilePerfil(request: Request, env: MobilePerfilEnv)
 
     const conta = await authenticateMobileRequest(request, env);
     if (!conta) return json(401, { erro: 'Entre na sua conta.' });
-    const link = await env.MOBILE_DB.prepare('SELECT customer_id FROM mobile_identity_links WHERE account_id = ?').bind(conta.id).first<{ customer_id: string }>();
-    if (!link) return json(404, { erro: 'Sua conta ainda não está ligada ao seu cadastro no kartódromo. Isso acontece sozinho em alguns minutos depois do cadastro; se demorar, fale com a recepção.' });
+    const link = await env.MOBILE_DB.prepare('SELECT customer_id, nivel FROM mobile_identity_links WHERE account_id = ?').bind(conta.id).first<{ customer_id: string; nivel: string }>();
+    if (!link) return json(404, { erro: 'Sua conta ainda não está ligada ao seu cadastro no kartódromo. Se você já correu aqui, confira se o CPF é o mesmo do cadastro ou fale com a recepção.' });
+    // vínculo só por CPF: corridas liberadas, dados pessoais do cadastro não (quem só sabe o CPF não vê endereço/telefone)
+    if (link.nivel !== 'completo') return json(403, { codigo: 'VINCULO_SO_CPF', erro: 'Por segurança, seus dados pessoais só aparecem quando o e-mail ou o celular da conta forem os mesmos do cadastro no kartódromo. Peça à recepção para atualizar seu cadastro.' });
     const atual = await env.MOBILE_DB.prepare('SELECT perfil, publicado_em, pedido, erro FROM mobile_perfil WHERE cliente = ?').bind(link.customer_id)
       .first<{ perfil: string | null; publicado_em: number | null; pedido: string | null; erro: string | null }>();
     if (request.method === 'GET') {

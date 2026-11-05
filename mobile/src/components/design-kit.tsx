@@ -1,6 +1,6 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
-import { Image, Pressable, Text, View, useWindowDimensions, type ImageSourcePropType, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import { Image, Pressable, Text, View, useWindowDimensions, type ImageSourcePropType, type StyleProp, type TextProps, type TextStyle, type ViewStyle } from 'react-native';
 
 /**
  * Medidas do design: as telas foram desenhadas com 852 px de largura. Toda medida aqui é em "px do desenho" e vira
@@ -53,10 +53,10 @@ export function Caixa({ x, y, w, h, style, children, pointerEvents }: { x: numbe
 }
 
 /** área tocável posicionada no desenho */
-export function Toque({ x, y, w, h, onPress, rotulo, hitSlop, style, children }: { x: number; y: number; w: number; h: number; onPress: () => void; rotulo: string; hitSlop?: number | { top?: number; bottom?: number; left?: number; right?: number }; style?: StyleProp<ViewStyle>; children?: ReactNode }) {
+export function Toque({ x, y, w, h, onPress, rotulo, hitSlop, style, children, testID }: { testID?: string; x: number; y: number; w: number; h: number; onPress: () => void; rotulo: string; hitSlop?: number | { top?: number; bottom?: number; left?: number; right?: number }; style?: StyleProp<ViewStyle>; children?: ReactNode }) {
   const k = useK();
   return (
-    <Pressable onPress={onPress} hitSlop={hitSlop} accessibilityRole="button" accessibilityLabel={rotulo}
+    <Pressable testID={testID ?? rotulo} onPress={onPress} hitSlop={hitSlop} accessibilityRole="button" accessibilityLabel={rotulo}
       style={({ pressed }) => [{ position: 'absolute', left: x * k, top: y * k, width: w * k, height: h * k, opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] }, style]}>
       {children}
     </Pressable>
@@ -64,10 +64,10 @@ export function Toque({ x, y, w, h, onPress, rotulo, hitSlop, style, children }:
 }
 
 /** texto com tamanho em px do desenho */
-export function T({ s, c = cor.texto, f, p, style, children, linhas, lh, largo, testID, adjustsFontSizeToFit, minimumFontScale }: { testID?: string; s: number; c?: string; f?: string; p?: TextStyle['fontWeight']; style?: StyleProp<TextStyle>; children: ReactNode; linhas?: number; lh?: number; largo?: number; adjustsFontSizeToFit?: boolean; minimumFontScale?: number }) {
+export function T({ s, c = cor.texto, f, p, style, children, linhas, lh, largo, testID, adjustsFontSizeToFit, minimumFontScale, accessibilityRole }: { testID?: string; s: number; c?: string; f?: string; p?: TextStyle['fontWeight']; style?: StyleProp<TextStyle>; children: ReactNode; linhas?: number; lh?: number; largo?: number; adjustsFontSizeToFit?: boolean; minimumFontScale?: number; accessibilityRole?: TextProps['accessibilityRole'] }) {
   const k = useK();
   return (
-    <Text testID={testID} numberOfLines={linhas} adjustsFontSizeToFit={adjustsFontSizeToFit} minimumFontScale={minimumFontScale} style={[{ color: c, fontSize: s * k, fontFamily: f, fontWeight: f ? undefined : p, lineHeight: lh ? lh * k : undefined, includeFontPadding: false }, largo ? { transform: [{ scaleX: largo }], transformOrigin: 'left top' } : null, style]}>
+    <Text testID={testID} accessibilityRole={accessibilityRole} numberOfLines={linhas} adjustsFontSizeToFit={adjustsFontSizeToFit} minimumFontScale={minimumFontScale} style={[{ color: c, fontSize: s * k, fontFamily: f, fontWeight: f ? undefined : p, lineHeight: lh ? lh * k : undefined, includeFontPadding: false }, largo ? { transform: [{ scaleX: largo }], transformOrigin: 'left top' } : null, style]}>
       {children}
     </Text>
   );

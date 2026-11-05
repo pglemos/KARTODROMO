@@ -10,12 +10,13 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import worker from '../../workers/pre-cadastro/src/index';
 
 const migrations = [
-  '0001_mobile_identity.sql',
+  '0001_mobile_identity.sql', '0008_mobile_account_deletion.sql',
   '0002_mobile_bookings.sql',
   '0003_mobile_coupon_previews.sql',
   '0004_mobile_results.sql',
   '0005_mobile_password_scheme.sql',
   '0006_mobile_email_outbox.sql',
+  '0009_mobile_identity_link_nivel.sql',
 ].map((name) => new URL(`../../workers/pre-cadastro/migrations/${name}`, import.meta.url));
 
 type Row = Record<string, unknown>;
@@ -325,7 +326,7 @@ describe('API pública de resultados móveis', () => {
     });
     expect(await unlinked.json()).toEqual({
       vinculo: 'pendente',
-      mensagem: 'Seu histórico aparece sozinho quando o documento e o e-mail ou o telefone da sua conta são os mesmos do seu cadastro no kartódromo. Se não aparecer em alguns minutos, peça para a recepção conferir seu cadastro.',
+      mensagem: 'Seu histórico aparece sozinho assim que o CPF da sua conta for encontrado no cadastro do kartódromo. Se você ainda não correu aqui, ele aparece depois da sua primeira bateria.',
       results: [],
     });
   }, 30_000);

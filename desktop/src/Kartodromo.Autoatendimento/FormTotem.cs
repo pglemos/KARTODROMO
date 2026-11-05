@@ -38,6 +38,7 @@ public class FormTotem : Form, IMessageFilter
     float _k = 1f;
     bool _liberadoFechar;
     int _alertasNoAutoteste;
+    BloqueioTeclasKiosk _bloqueioKiosk;
 
     public FormTotem(string autoteste, Api api = null)
     {
@@ -57,6 +58,11 @@ public class FormTotem : Form, IMessageFilter
             WindowState = FormWindowState.Maximized;
             TopMost = true;
             Application.AddMessageFilter(this);
+            _bloqueioKiosk = BloqueioTeclasKiosk.Instalar(() =>
+            {
+                _liberadoFechar = true;
+                BeginInvoke(new Action(Close));
+            });
         }
         else
         {
@@ -84,6 +90,11 @@ public class FormTotem : Form, IMessageFilter
             if (e.Control && e.Shift && e.Alt && e.KeyCode == Keys.S) { _liberadoFechar = true; Close(); }
         };
         FormClosing += (_, e) => { if (_autoteste == null && e.CloseReason == CloseReason.UserClosing && !_liberadoFechar) e.Cancel = true; };
+        FormClosed += (_, _) =>
+        {
+            _bloqueioKiosk?.Dispose();
+            _bloqueioKiosk = null;
+        };
         Shown += async (_, _) =>
         {
             _k = Math.Min(ClientSize.Width / 1366f, ClientSize.Height / 768f);
@@ -334,11 +345,24 @@ public class FormTotem : Form, IMessageFilter
         var mexendo = false;
         t.TextChanged += (_, _) =>
         {
-            if (mexendo) return;
+            if (mexendo || t.IsDisposed) return;
             mexendo = true;
-            var novo = f(t.Text);
-            if (novo != t.Text) { t.Text = novo; t.SelectionStart = novo.Length; }
-            mexendo = false;
+            try
+            {
+                var pos = t.SelectionStart;
+                var textoAntes = t.Text ?? "";
+                var novo = f(textoAntes) ?? "";
+                if (novo != textoAntes)
+                {
+                    var novaPos = Campos.CalcularCursorMascara(textoAntes, novo, pos);
+                    t.Text = novo;
+                    t.SelectionStart = novaPos;
+                }
+            }
+            finally
+            {
+                mexendo = false;
+            }
         };
     }
 
@@ -348,6 +372,7 @@ public class FormTotem : Form, IMessageFilter
     {
         _fim.Stop();
         foreach (var f in OwnedForms) f.Close();
+        if (_api != null) _api.TotemSession = null;
         _ident = ""; _menor = false; _cliente = null; _token = null; _dependentes = []; _participantes = []; _eu = true; _sel = [];
         TelaIdent();
     }
@@ -378,10 +403,11 @@ public class FormTotem : Form, IMessageFilter
         {
             _ident = campo.Text.Trim(); _menor = menor.Marcado;
             if (_ident.Length < 5) { Alertar("Informe o CPF, RG, passaporte ou e-mail."); return; }
-            var r = await _api.Post("/api/totem/identificar", new { identificador = _ident });
+            var r = await _api.Post("/api/totem/identificar", new { identificador = _ident, menor = _menor });
             if (r?["cliente"] is not JsonObject cli) { TelaCadastro(false); return; }
             if (cli.B("bloqueado")) { Alertar("Seu cadastro precisa de atenção. Por favor, procure a recepção."); return; }
             _cliente = cli; _token = r.S("token");
+            if (_api != null) _api.TotemSession = r.S("totemToken");
             _dependentes = r["dependentes"] is JsonArray a ? a.OfType<JsonObject>().Select(d => new Pessoa(d.L("id") ?? 0, d.S("nome"), d.S("nascimento"), d.S("token"))).ToList() : [];
             TelaCadastro(true);
         }
@@ -438,7 +464,13 @@ public class FormTotem : Form, IMessageFilter
         var fBairro = Campo(campos, "Bairro", xs[2], 228, cw, _cliente.S("bairro"));
         var fCidade = Campo(campos, "Cidade", xs[3], 228, cw, _cliente.S("cidade"));
         var fInstagram = Campo(campos, "Instagram do piloto (@usuário)", xs[0], 324, cw * 2 + 16, _cliente.S("instagram"));
-        fInstagram.Caixa.PlaceholderText = "@andre.silva";
+        fInstagram.Caixa.PlaceholderText = "@andre.silva (opcional)";
+        var chkSemInsta = Marca(campos, "Não possuo Instagram", xs[2], 346, false);
+        chkSemInsta.Mudou += () =>
+        {
+            if (chkSemInsta.Marcado) { fInstagram.Text = ""; fInstagram.Enabled = false; }
+            else { fInstagram.Enabled = true; }
+        };
         // obrigatórios (pedido do dono em 10/10/2026): cliente NOVO preenche tudo — documento, nome, e-mail, celular,
         // nascimento, peso e endereço (endereço, bairro, cidade); o CEP é opcional (só ajuda a preencher o endereço).
         // Cliente que JÁ tem cadastro pode atualizar o que quiser, mas tem que completar o que estiver faltando.
@@ -457,19 +489,83 @@ public class FormTotem : Form, IMessageFilter
         Obrigatorio(fFone, "Celular (WhatsApp)", Falta("telefone"));
         Obrigatorio(fNasc, "Data de nascimento", !existente || !_cliente.B("temNascimento"));
         Obrigatorio(fPeso, "Peso (kg)", true);
-        Obrigatorio(fInstagram, "Instagram do piloto (@usuário)", true);
         Obrigatorio(fEnd, "Endereço", Falta("endereco"));
         Obrigatorio(fBairro, "Bairro", Falta("bairro"));
         Obrigatorio(fCidade, "Cidade", Falta("cidade"));
-        c.Controls.Add(Rot("* Campos obrigatórios · Instagram será usado no resultado e no pódio", 90, 624, F(14), Estilo.MuitoSuave));
+        c.Controls.Add(Rot("* Campos obrigatórios · Instagram opcional (usado no resultado e no pódio)", 90, 624, F(14), Estilo.MuitoSuave));
+
+        LinkLabel lnkResgatar = null;
         if (existente)
         {
-            reg.Enabled = tipo.Enabled = fDoc.Enabled = fNome.Enabled = false;
+            reg.Enabled = false;
+            fNome.Enabled = true; // Edição assistida de nome permitida
+            tipo.Enabled = false;
+            fDoc.Enabled = false;
             if (fDoc.Text.Length == 0) fDoc.Text = "(já cadastrado)";
+
+            var lnkEditarDoc = new LinkLabel
+            {
+                Text = "Ajustar documento", Font = F(13), AutoSize = true, BackColor = Color.Transparent,
+                LinkColor = Estilo.Suave, ActiveLinkColor = Estilo.Texto, VisitedLinkColor = Estilo.Suave, LinkBehavior = LinkBehavior.AlwaysUnderline,
+                Location = new Point(P(xs[2]), P(36 + 68)),
+            };
+            lnkEditarDoc.LinkClicked += (_, _) =>
+            {
+                tipo.Enabled = true;
+                fDoc.Enabled = true;
+                fDoc.Text = "";
+                fDoc.Caixa.Focus();
+                lnkEditarDoc.Visible = false;
+            };
+            campos.Controls.Add(lnkEditarDoc);
         }
+        else
+        {
+            lnkResgatar = new LinkLabel
+            {
+                Text = "Carregar cadastro existente com este documento", Font = F(13, false, FontStyle.Bold), AutoSize = true, BackColor = Color.Transparent,
+                LinkColor = Estilo.Verde, ActiveLinkColor = Estilo.Texto, VisitedLinkColor = Estilo.Verde, LinkBehavior = LinkBehavior.AlwaysUnderline,
+                Location = new Point(P(xs[2]), P(36 + 68)),
+                Visible = false,
+            };
+            lnkResgatar.LinkClicked += async (_, _) =>
+            {
+                var docParaBuscar = fDoc.Text.Trim();
+                if (docParaBuscar.Length < 3) return;
+                try
+                {
+                    var r = await _api.Post("/api/totem/identificar", new { identificador = docParaBuscar, menor = _menor });
+                    if (r?["cliente"] is JsonObject cli)
+                    {
+                        if (cli.B("bloqueado")) { Alertar("Seu cadastro precisa de atenção. Por favor, procure a recepção."); return; }
+                        _cliente = cli;
+                        _token = r.S("token");
+                        if (_api != null) _api.TotemSession = r.S("totemToken");
+                        _dependentes = r["dependentes"] is JsonArray a ? a.OfType<JsonObject>().Select(d => new Pessoa(d.L("id") ?? 0, d.S("nome"), d.S("nascimento"), d.S("token"))).ToList() : [];
+                        if (fPeso.Text.Trim().Length > 0) _cliente["peso"] = fPeso.Text.Trim();
+                        TelaCadastro(true);
+                    }
+                    else
+                    {
+                        Alertar("Não foi possível resgatar o cadastro com o documento informado.");
+                    }
+                }
+                catch (Exception e)
+                {
+                    Alertar("Erro ao buscar cadastro: " + e.Message);
+                }
+            };
+            campos.Controls.Add(lnkResgatar);
+        }
+
         fNasc.Caixa.PlaceholderText = "DD/MM/AAAA";
         string uf = _cliente.S("estado");
-        tipo.SelectedIndexChanged += (_, _) => { lDoc.Text = tipo.Text + (!existente ? " *" : ""); if (tipo.SelectedIndex == 0) fDoc.Text = Fmt.MascaraCpf(fDoc.Text); };
+        tipo.SelectedIndexChanged += (_, _) =>
+        {
+            lDoc.Text = tipo.Text + (!existente ? " *" : "");
+            if (tipo.SelectedIndex == 0) fDoc.Text = Fmt.MascaraCpf(fDoc.Text);
+            fFone.Caixa.PlaceholderText = tipo.SelectedIndex == 2 ? "+1 202 555 0199" : "(31) 99999-9999";
+        };
         Mascarar(fDoc.Caixa, v => !existente && tipo.SelectedIndex == 0 ? Fmt.MascaraCpf(v) : v);
         Mascarar(fFone.Caixa, Fmt.MascaraFone);
         Mascarar(fNasc.Caixa, Fmt.MascaraData);
@@ -503,48 +599,82 @@ public class FormTotem : Form, IMessageFilter
             var nascTxt = fNasc.Text.Trim();
             var nasc = nascTxt.Length > 0 ? Fmt.DataBrParaIso(nascTxt) : "";
             if (nasc != "" && Fmt.ParseData(nasc) is { } dn && (dn > DateTime.Today || dn.Year < 1900)) nasc = null;
+            var instaTxt = chkSemInsta.Marcado ? "" : fInstagram.Text.Trim();
+            var instaNorm = chkSemInsta.Marcado ? "" : ValidacaoCliente.NormalizarInstagram(instaTxt);
             var dados = new JsonObject
             {
-                ["email"] = fEmail.Text.Trim(), ["instagram"] = ValidacaoCliente.NormalizarInstagram(fInstagram.Text), ["telefone"] = fFone.Text.Trim(), ["nascimento"] = nasc ?? "",
+                ["email"] = fEmail.Text.Trim(), ["instagram"] = instaNorm, ["semInstagram"] = chkSemInsta.Marcado,
+                ["telefone"] = fFone.Text.Trim(), ["nascimento"] = nasc ?? "",
                 ["peso"] = fPeso.Text.Trim(), ["cep"] = fCep.Text.Trim(), ["endereco"] = fEnd.Text.Trim(),
                 ["bairro"] = fBairro.Text.Trim(), ["cidade"] = fCidade.Text.Trim(), ["estado"] = uf,
             };
+            var tipoDoc = tipo.SelectedIndex switch { 0 => "CPF", 1 => "RG", _ => "PASSAPORTE" };
+            var nomeCompleto = string.Join(' ', fNome.Text.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+            if (nomeCompleto.Length == 0) { Alertar("O nome completo é obrigatório."); fNome.Caixa.Focus(); return; }
+            if (nomeCompleto.Split(' ').Length < 2) { Alertar("Informe o nome completo."); fNome.Caixa.Focus(); return; }
+
+            var docDigitado = fDoc.Text.Trim();
+            var docFoiAlterado = fDoc.Enabled && docDigitado.Length > 0 && !docDigitado.Contains('*') && docDigitado != "(já cadastrado)";
+
             if (!existente)
             {
-                var tipoDoc = tipo.SelectedIndex switch { 0 => "CPF", 1 => "RG", _ => "PASSAPORTE" };
-                var nome = string.Join(' ', fNome.Text.Split(' ', StringSplitOptions.RemoveEmptyEntries));
-                if (fDoc.Text.Trim().Length == 0) { Alertar("O documento é obrigatório."); return; }
-                if (tipoDoc == "CPF" && !Fmt.CpfValido(fDoc.Text)) { Alertar("CPF inválido."); return; }
-                if (nome.Split(' ').Length < 2) { Alertar("Informe o nome completo."); return; }
-                if (Fmt.Digitos(fFone.Text).Length < 10) { Alertar("O número de telefone é obrigatório."); return; }
-                dados["tipoDocumento"] = tipoDoc; dados["documento"] = fDoc.Text.Trim(); dados["nome"] = nome;
-            }
-            foreach (var (campoObrig, rotuloObrig) in obrigatorios)
-                if (campoObrig.Text.Trim().Length == 0 && campoObrig != fNasc) { Alertar($"Preencha o campo {rotuloObrig}."); campoObrig.Caixa.Focus(); return; }
-            if (ValidacaoCliente.ErroInstagram(fInstagram.Text) is string erroInstagram) { Alertar(erroInstagram); fInstagram.Caixa.Focus(); return; }
-            var pesoTxt = fPeso.Text.Trim().Replace(',', '.');
-            if (pesoTxt.Length > 0 && (!double.TryParse(pesoTxt, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var kg) || kg < 20 || kg > 250))
-            { Alertar("Peso inválido. Suba na balança ao lado e digite o peso em kg (ex.: 78,5)."); fPeso.Caixa.Focus(); return; }
-            if (nasc == null) { Alertar("Data de nascimento inválida."); return; }
-            if (nasc == "" && (!existente || !_cliente.B("temNascimento"))) { Alertar("A data de nascimento é obrigatória."); return; }
-            var em = fEmail.Text.Trim();
-            if (ValidacaoCliente.ErroEmail(em) is string erroEmail) { Alertar(erroEmail); fEmail.Caixa.Focus(); return; }
-            if (fFone.Text.Trim().Length > 0 && Fmt.Digitos(fFone.Text).Length < 10) { Alertar("Número de telefone inválido."); return; }
-            if (!lgpd.Marcado) { Alertar("É necessário aceitar o Termo de Consentimento para Tratamento de Dados Pessoais."); return; }
-            if (existente)
-            {
-                var r = await _api.Post("/api/totem/cadastro", new JsonObject { ["id"] = _cliente.L("id"), ["token"] = _token, ["dados"] = dados, ["lgpd"] = true });
-                _token = r.S("token") is { Length: > 0 } t ? t : _token;
-                _cliente["lgpd"] = true;
-                if (nasc != "") _cliente["temNascimento"] = true;
-                MesclarDadosCliente(dados);
+                if (docDigitado.Length == 0) { Alertar("O documento é obrigatório."); fDoc.Caixa.Focus(); return; }
+                if (tipoDoc == "CPF" && !Fmt.CpfValido(docDigitado)) { Alertar("CPF inválido."); fDoc.Caixa.Focus(); return; }
+                dados["tipoDocumento"] = tipoDoc; dados["documento"] = docDigitado; dados["nome"] = nomeCompleto;
             }
             else
             {
-                var r = await _api.Post("/api/totem/cadastro", new JsonObject { ["dados"] = dados, ["lgpd"] = true });
-                _cliente = new JsonObject { ["id"] = r.L("id"), ["nome"] = dados.S("nome"), ["lgpd"] = true, ["temNascimento"] = true };
-                MesclarDadosCliente(dados);
-                _token = r.S("token"); _dependentes = [];
+                if (nomeCompleto != _cliente.S("nome")) dados["nome"] = nomeCompleto;
+                if (docFoiAlterado)
+                {
+                    if (tipoDoc == "CPF" && !Fmt.CpfValido(docDigitado)) { Alertar("CPF inválido."); fDoc.Caixa.Focus(); return; }
+                    dados["tipoDocumento"] = tipoDoc; dados["documento"] = docDigitado;
+                }
+            }
+            foreach (var (campoObrig, rotuloObrig) in obrigatorios)
+                if (campoObrig.Text.Trim().Length == 0 && campoObrig != fNasc) { Alertar($"Preencha o campo {rotuloObrig}."); campoObrig.Caixa.Focus(); return; }
+            if (!chkSemInsta.Marcado && ValidacaoCliente.ErroInstagram(fInstagram.Text) is string erroInstagram) { Alertar(erroInstagram); fInstagram.Caixa.Focus(); return; }
+            if (ValidacaoCliente.ErroPeso(fPeso.Text) is string erroPeso)
+            { Alertar(erroPeso); fPeso.Caixa.Focus(); return; }
+            if (nasc == null) { Alertar("Data de nascimento inválida."); return; }
+            if (nasc == "" && (!existente || !_cliente.B("temNascimento"))) { Alertar("A data de nascimento é obrigatória."); return; }
+            if (nasc != "" && Fmt.Idade(nasc) is int idadeTitular && idadeTitular < 18)
+            {
+                Alertar("Menores de 18 anos devem ser cadastrados por um pai ou responsável legal. Marque a opção 'Sou responsável por menor' na tela inicial.");
+                fNasc.Caixa.Focus();
+                return;
+            }
+            var em = fEmail.Text.Trim();
+            if (ValidacaoCliente.ErroEmail(em) is string erroEmail) { Alertar(erroEmail); fEmail.Caixa.Focus(); return; }
+            if (ValidacaoCliente.ErroTelefone(fFone.Text, tipoDoc) is string erroFone) { Alertar(erroFone); fFone.Caixa.Focus(); return; }
+            if (!lgpd.Marcado) { Alertar("É necessário aceitar o Termo de Consentimento para Tratamento de Dados Pessoais."); return; }
+            try
+            {
+                if (existente)
+                {
+                    var r = await _api.Post("/api/totem/cadastro", new JsonObject { ["id"] = _cliente.L("id"), ["token"] = _token, ["dados"] = dados, ["lgpd"] = true });
+                    _token = r.S("token") is { Length: > 0 } t ? t : _token;
+                    if (r.S("totemToken") is { Length: > 0 } tt && _api != null) _api.TotemSession = tt;
+                    _cliente["lgpd"] = true;
+                    if (nasc != "") _cliente["temNascimento"] = true;
+                    MesclarDadosCliente(dados);
+                }
+                else
+                {
+                    var r = await _api.Post("/api/totem/cadastro", new JsonObject { ["dados"] = dados, ["lgpd"] = true });
+                    _cliente = new JsonObject { ["id"] = r.L("id"), ["nome"] = dados.S("nome"), ["lgpd"] = true, ["temNascimento"] = true };
+                    MesclarDadosCliente(dados);
+                    _token = r.S("token"); _dependentes = [];
+                    if (r.S("totemToken") is { Length: > 0 } tt && _api != null) _api.TotemSession = tt;
+                }
+            }
+            catch (ApiException ex) when (ex.Status == 409)
+            {
+                Alertar("Já existe um cadastro com este documento.\nVerifique o documento ou clique em 'Carregar cadastro existente'.");
+                fDoc.Caixa.Focus();
+                fDoc.Caixa.SelectAll();
+                if (lnkResgatar != null) lnkResgatar.Visible = true;
+                return;
             }
             await PosClienteAsync();
         });
@@ -597,6 +727,35 @@ public class FormTotem : Form, IMessageFilter
         f.ShowDialog(this);
     }
 
+    Form CriarTermoLgpdMenor()
+    {
+        var f = new Form { FormBorderStyle = FormBorderStyle.None, StartPosition = FormStartPosition.CenterParent, ShowInTaskbar = false, TopMost = true, BackColor = Estilo.Fundo, ClientSize = new Size(P(1366), P(768)), KeyPreview = true };
+        var tela = NovaTela(etapa: 2);
+        f.Controls.Add(tela);
+        var cabecalho = new CabecalhoTotem(Estilo.Logo(), 2, _k, donoDaLogo: true)
+        {
+            Bounds = new Rectangle(0, 0, f.ClientSize.Width, P(88))
+        };
+        tela.Controls.Add(cabecalho);
+        cabecalho.BringToFront();
+        var c = CartaoEm(tela, 253, 172, 860, 494);
+        c.Controls.Add(Rot("Termo de Consentimento para Tratamento de Dados de Menores (LGPD Art. 14)", 36, 30, F(26, false, FontStyle.Bold), Estilo.Texto, 780, 68));
+        var empresa = _cfg.S("empresa");
+        c.Controls.Add(Rot($"Nos termos do Art. 14 da Lei nº 13.709/2018 (LGPD), o tratamento de dados pessoais de crianças e adolescentes é realizado no seu melhor interesse. Como pai, mãe ou responsável legal, você autoriza o {empresa} a coletar e tratar os dados do menor para fins exclusivos de segurança na pista, identificação esportiva, cronometragem, seguro desportivo e emissão do termo de responsabilidade.", 36, 110, F(17), Estilo.Texto, 780, 130));
+        c.Controls.Add(Rot("Os dados do menor são protegidos com sigilo e não são compartilhados comercialmente nem expostos publicamente no quiosque. O responsável legal pode solicitar a qualquer momento a consulta, correção ou exclusão dos registros na recepção.", 36, 255, F(17), Estilo.Suave, 780, 110));
+        var ok = new Pilula("Fechar", true) { Bounds = new Rectangle(P(860 - 36 - 160), P(494 - 36 - 58), P(160), P(58)), Font = F(18, false, FontStyle.Bold) };
+        ok.Click += (_, _) => f.Close();
+        c.Controls.Add(ok);
+        f.KeyDown += (_, e) => { if (e.KeyCode == Keys.Escape) f.Close(); };
+        return f;
+    }
+
+    void TermoLgpdMenor()
+    {
+        using var f = CriarTermoLgpdMenor();
+        f.ShowDialog(this);
+    }
+
     // ------------------------------------------------------------------ 3. menores
 
     void TelaMenores()
@@ -609,7 +768,7 @@ public class FormTotem : Form, IMessageFilter
         var marcados = _participantes.Where(p => p.Id != idCli).Select(p => p.Id).ToHashSet();
         var lista = new ListaOpcoes(_k) { Bounds = new Rectangle(P(24), P(22), P(1018), P(265)) };
         foreach (var d in _dependentes)
-            lista.Adicionar(new OpcaoLinha(_k) { Height = P(72), Id = d.Id, Linha1 = d.Nome, Linha2 = d.Nascimento.Length >= 10 ? "Nascimento: " + Fmt.Dmy(d.Nascimento) : "", Direita = Fmt.Idade(d.Nascimento) is int i ? $"{i} anos" : "", Marcado = marcados.Contains(d.Id) });
+            lista.Adicionar(new OpcaoLinha(_k) { Height = P(72), Id = d.Id, Linha1 = d.Nome, Linha2 = Fmt.Idade(d.Nascimento) is int i ? $"{i} anos" : "", Direita = "", Marcado = marcados.Contains(d.Id) });
         if (_dependentes.Count == 0) lista.Vazio("Nenhum menor cadastrado no seu nome. Toque em \"Cadastrar menor\".");
         painel.Controls.Add(lista);
         var eu = Marca(c, "Eu também vou participar", 150, 600, _eu && (_participantes.Count == 0 || _participantes.Any(p => p.Id == idCli)), 36);
@@ -650,11 +809,30 @@ public class FormTotem : Form, IMessageFilter
         var end = Campo(campos, "Endereço *", xs[1], 228, cw, _cliente.S("endereco"));
         var bairro = Campo(campos, "Bairro *", xs[2], 228, cw, _cliente.S("bairro"));
         var cidade = Campo(campos, "Cidade *", xs[3], 228, cw, _cliente.S("cidade"));
-        var instagram = Campo(campos, "Instagram do piloto (@usuário) *", xs[0], 324, cw * 2 + 16);
-        instagram.Caixa.PlaceholderText = "@usuario";
-        c.Controls.Add(Rot("* Campos obrigatórios · contato e endereço do responsável já vêm preenchidos", 90, 624, F(14), Estilo.MuitoSuave));
+        var instagram = Campo(campos, "Instagram do piloto (@usuário)", xs[0], 324, cw * 2 + 16);
+        instagram.Caixa.PlaceholderText = "@usuario (opcional)";
+        var chkSemInstaMenor = Marca(campos, "Não possuo Instagram", xs[2], 346, false);
+        chkSemInstaMenor.Mudou += () =>
+        {
+            if (chkSemInstaMenor.Marcado) { instagram.Text = ""; instagram.Enabled = false; }
+            else { instagram.Enabled = true; }
+        };
+        var lgpdMenor = Marca(c, "Sou pai/mãe ou responsável legal e autorizo o tratamento de dados do menor (LGPD Art. 14) *", 90, 622, false, 32);
+        var linkMenor = new LinkLabel
+        {
+            Text = "Ver Termo de Consentimento de Menores", Font = F(14), AutoSize = true, BackColor = Color.Transparent,
+            LinkColor = Estilo.Texto, ActiveLinkColor = Estilo.Suave, VisitedLinkColor = Estilo.Texto, LinkBehavior = LinkBehavior.AlwaysUnderline,
+        };
+        linkMenor.Location = new Point(lgpdMenor.Right + P(8), lgpdMenor.Top + (lgpdMenor.Height - linkMenor.PreferredHeight) / 2);
+        linkMenor.LinkClicked += (_, _) => TermoLgpdMenor();
+        c.Controls.Add(linkMenor);
         string uf = _cliente.S("estado");
-        tipo.SelectedIndexChanged += (_, _) => { lDoc.Text = tipo.Text + " *"; if (tipo.SelectedIndex == 0) doc.Text = Fmt.MascaraCpf(doc.Text); };
+        tipo.SelectedIndexChanged += (_, _) =>
+        {
+            lDoc.Text = tipo.Text + " *";
+            if (tipo.SelectedIndex == 0) doc.Text = Fmt.MascaraCpf(doc.Text);
+            fone.Caixa.PlaceholderText = tipo.SelectedIndex == 2 ? "+1 202 555 0199" : "(31) 99999-9999";
+        };
         Mascarar(doc.Caixa, v => tipo.SelectedIndex == 0 ? Fmt.MascaraCpf(v) : v);
         Mascarar(fone.Caixa, Fmt.MascaraFone);
         Mascarar(nasc.Caixa, Fmt.MascaraData);
@@ -680,29 +858,43 @@ public class FormTotem : Form, IMessageFilter
             if (doc.Text.Trim().Length == 0) { Alertar("O documento do menor é obrigatório."); doc.Caixa.Focus(); return; }
             if (tipoDoc == "CPF" && !Fmt.CpfValido(doc.Text)) { Alertar("CPF inválido."); doc.Caixa.Focus(); return; }
             if (n.Split(' ').Length < 2) { Alertar("Informe o nome completo do menor."); nome.Caixa.Focus(); return; }
-            foreach (var (campo, rotulo) in new[] { (email, "E-mail"), (fone, "Celular (WhatsApp)"), (nasc, "Data de nascimento"), (peso, "Peso (kg)"), (end, "Endereço"), (bairro, "Bairro"), (cidade, "Cidade"), (instagram, "Instagram do piloto (@usuário)") })
+            foreach (var (campo, rotulo) in new[] { (email, "E-mail"), (fone, "Celular (WhatsApp)"), (nasc, "Data de nascimento"), (peso, "Peso (kg)"), (end, "Endereço"), (bairro, "Bairro"), (cidade, "Cidade") })
                 if (campo.Text.Trim().Length == 0) { Alertar($"Preencha o campo {rotulo}."); campo.Caixa.Focus(); return; }
             if (ValidacaoCliente.ErroEmail(email.Text) is string erroEmail) { Alertar(erroEmail); email.Caixa.Focus(); return; }
-            if (Fmt.Digitos(fone.Text).Length < 10) { Alertar("Número de telefone inválido."); fone.Caixa.Focus(); return; }
+            if (ValidacaoCliente.ErroTelefone(fone.Text, tipoDoc) is string erroFone) { Alertar(erroFone); fone.Caixa.Focus(); return; }
             if (string.IsNullOrEmpty(iso) || Fmt.ParseData(iso) is not { } dn || dn > DateTime.Today || dn.Year < 1900) { Alertar("Informe a data de nascimento (DD/MM/AAAA)."); nasc.Caixa.Focus(); return; }
-            var pesoTxt = peso.Text.Trim().Replace(',', '.');
-            if (!double.TryParse(pesoTxt, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var kg) || kg < 10 || kg > 250)
-            { Alertar("Peso inválido. Digite o peso em kg (ex.: 38,5)."); peso.Caixa.Focus(); return; }
-            if (ValidacaoCliente.ErroInstagram(instagram.Text) is string erroInstagram) { Alertar(erroInstagram); instagram.Caixa.Focus(); return; }
-            var r = await _api.Post("/api/totem/cadastro", new JsonObject
+            var idadeMenor = Fmt.Idade(iso);
+            if (idadeMenor is int idm && idm >= 18) { Alertar("Participantes com 18 anos ou mais devem realizar cadastro individual próprio como titular."); return; }
+            if (idadeMenor is int idmin && idmin < 6) { Alertar("A idade mínima regulamentar para pilotagem é de 6 anos completos."); return; }
+            if (ValidacaoCliente.ErroPeso(peso.Text) is string erroPesoMenor) { Alertar(erroPesoMenor); peso.Caixa.Focus(); return; }
+            if (!chkSemInstaMenor.Marcado && ValidacaoCliente.ErroInstagram(instagram.Text) is string erroInstagram) { Alertar(erroInstagram); instagram.Caixa.Focus(); return; }
+            if (!lgpdMenor.Marcado) { Alertar("É obrigatório o consentimento do responsável legal para o tratamento de dados do menor (LGPD Art. 14)."); return; }
+            try
             {
-                ["dados"] = new JsonObject
+                var r = await _api.Post("/api/totem/cadastro", new JsonObject
                 {
-                    ["nome"] = n, ["nascimento"] = iso, ["tipoDocumento"] = tipoDoc, ["documento"] = doc.Text.Trim(), ["peso"] = peso.Text.Trim(),
-                    ["email"] = email.Text.Trim(), ["telefone"] = fone.Text.Trim(), ["instagram"] = ValidacaoCliente.NormalizarInstagram(instagram.Text),
-                    ["cep"] = cep.Text.Trim(), ["endereco"] = end.Text.Trim(), ["bairro"] = bairro.Text.Trim(), ["cidade"] = cidade.Text.Trim(), ["estado"] = uf,
-                },
-                ["lgpd"] = true, ["responsavelId"] = _cliente.L("id"), ["responsavelToken"] = _token,
-            });
-            var p = new Pessoa(r.L("id") ?? 0, n, iso, r.S("token"));
-            _dependentes.Add(p);
-            _participantes = [.. _participantes.Where(x => x.Id != p.Id), p];
-            TelaMenores();
+                    ["dados"] = new JsonObject
+                    {
+                        ["nome"] = n, ["nascimento"] = iso, ["tipoDoc"] = tipoDoc, ["tipoDocumento"] = tipoDoc, ["documento"] = doc.Text.Trim(), ["peso"] = peso.Text.Trim(),
+                        ["email"] = email.Text.Trim(), ["telefone"] = fone.Text.Trim(),
+                        ["instagram"] = chkSemInstaMenor.Marcado ? "" : ValidacaoCliente.NormalizarInstagram(instagram.Text),
+                        ["semInstagram"] = chkSemInstaMenor.Marcado,
+                        ["cep"] = cep.Text.Trim(), ["endereco"] = end.Text.Trim(), ["bairro"] = bairro.Text.Trim(), ["cidade"] = cidade.Text.Trim(), ["estado"] = uf,
+                    },
+                    ["lgpd"] = true, ["consentimentoMenor"] = true, ["responsavelId"] = _cliente.L("id"), ["responsavelToken"] = _token,
+                });
+                var p = new Pessoa(r.L("id") ?? 0, n, iso, r.S("token"));
+                _dependentes.Add(p);
+                _participantes = [.. _participantes.Where(x => x.Id != p.Id), p];
+                TelaMenores();
+            }
+            catch (ApiException ex) when (ex.Status == 409)
+            {
+                Alertar("Já existe um cadastro com o documento informado para o menor.");
+                doc.Caixa.Focus();
+                doc.Caixa.SelectAll();
+                return;
+            }
         });
         voltar.BringToFront(); salvar.BringToFront();
         Mostrar("menor", c, TelaCadastroMenor);
@@ -714,7 +906,11 @@ public class FormTotem : Form, IMessageFilter
     {
         var todas = await _api.Lista("/api/totem/baterias");
         var n = _participantes.Count;
-        var lista = todas.Where(b => b.I("livres") >= n).ToList();
+        // fora as baterias que já começaram: antes o cliente preenchia tudo e o servidor recusava no fim
+        var lista = todas
+            .Where(b => b.I("livres") >= n)
+            .Where(b => !(DateTime.TryParse(b.S("inicio"), Fmt.Br, System.Globalization.DateTimeStyles.None, out var h) && h <= DateTime.Now))
+            .ToList();
         MontarBaterias(lista, n);
     }
 
@@ -766,37 +962,90 @@ public class FormTotem : Form, IMessageFilter
                 ["participantes"] = new JsonArray(_participantes.Select(p => (JsonNode)new JsonObject { ["id"] = p.Id, ["token"] = p.Token }).ToArray()),
             });
             var qtd = r?["inscricoes"] is JsonArray ins ? ins.Count : 1;
-            TelaSucesso(Fmt.Hm(r.S("inicio")), qtd);
-            // o termo sai na TM-T20 da recepção (fila do servidor); só imprime aqui se o servidor não enfileirou
-            if (r["termoNaRecepcao"]?.GetValue<bool>() == true) Program.Log("termo enviado para a impressora da recepção");
-            else if (r.S("termoUrl") is { Length: > 0 } termo) _ = Imprimir(_api.BaseUrl + termo);
+            var horaInicio = Fmt.Hm(r.S("inicio"));
+            var termoNaRecepcao = r["termoNaRecepcao"]?.GetValue<bool>() == true;
+            var termoUrl = r.S("termoUrl");
+
+            bool impressoraLocalValida = !string.IsNullOrWhiteSpace(Config.Impressora) && Relatorio.ImpressoraExiste(Config.Impressora);
+
+            if (termoNaRecepcao)
+            {
+                Program.Log("termo enviado para a impressora da recepção");
+                TelaSucesso(horaInicio, qtd, termoNaRecepcao: true);
+            }
+            else if (impressoraLocalValida && !string.IsNullOrWhiteSpace(termoUrl))
+            {
+                _ = Imprimir(_api.BaseUrl + termoUrl);
+                TelaSucesso(horaInicio, qtd, termoNaRecepcao: false);
+            }
+            else
+            {
+                Program.Log($"totem sem impressora local válida configurada ('{Config.Impressora}'). Termo disponível na recepção.");
+                TelaSucesso(horaInicio, qtd, termoNaRecepcao: true, avisoRetiradaRecepcao: true);
+            }
         });
         proximo.Enabled = totalMarcadas > 0;
         voltar.BringToFront(); proximo.BringToFront();
         Mostrar("baterias", c, () => MontarBaterias(baterias, n));
     }
 
-    async Task Imprimir(string url)
+    async Task<bool> Imprimir(string url)
     {
-        try { await Relatorio.ImprimirSilencioso(url, Config.Impressora); Program.Log("termo impresso: " + url.Split('?')[0]); }
-        catch (Exception e) { Program.Log("falha ao imprimir termo: " + e.Message); }
+        var impressora = Config.Impressora;
+        if (string.IsNullOrWhiteSpace(impressora) || !Relatorio.ImpressoraExiste(impressora))
+        {
+            Program.Log($"impressão local ignorada: nenhuma impressora válida configurada ('{impressora}')");
+            return false;
+        }
+        try
+        {
+            await Relatorio.ImprimirSilencioso(url, impressora);
+            Program.Log("termo impresso localmente: " + url.Split('?')[0]);
+            return true;
+        }
+        catch (Exception e)
+        {
+            Program.Log("falha ao imprimir termo localmente: " + e.Message);
+            return false;
+        }
     }
 
     // ------------------------------------------------------------------ 5. sucesso
 
-    void TelaSucesso(string hora, int n)
+    void TelaSucesso(string hora, int n, bool termoNaRecepcao = true, bool avisoRetiradaRecepcao = false)
     {
         var c = NovaTela(etapa: 3);
         var icone = new IconeSucesso { Bounds = new Rectangle(P(631), P(130), P(104), P(104)) };
         c.Controls.Add(icone);
-        c.Controls.Add(Rot("Inscrição na bateria confirmada", 100, 292, F(54, false, FontStyle.Bold), Estilo.Texto, 1166, 72, ContentAlignment.MiddleCenter));
-        c.Controls.Add(Rot($"Dirija-se até a recepção para concluir o atendimento e assinar {(n > 1 ? "os termos" : "seu termo")} de responsabilidade.", 120, 384, F(22), Estilo.Suave, 1126, 40, ContentAlignment.MiddleCenter));
-        c.Controls.Add(Rot("Sua bateria começa às", 440, 438, F(22), Estilo.Suave, 340, 36, ContentAlignment.MiddleRight));
-        c.Controls.Add(Rot(hora, 786, 434, Estilo.Mono(P(28), FontStyle.Bold), Estilo.Texto, 140, 40, ContentAlignment.MiddleLeft));
-        c.Controls.Add(Rot("Atenção às informações passadas no briefing e divirta-se!", 170, 494, F(19), Estilo.Suave, 1026, 34, ContentAlignment.MiddleCenter));
-        Botao(c, "Concluir", 500, 560, 180, true, () => { Reiniciar(); return Task.CompletedTask; }, 64, 19);
-        c.Controls.Add(Rot("Volta para o início após 90 segundos sem interação", 700, 560, F(16), Estilo.MuitoSuave, 380, 64, ContentAlignment.MiddleLeft));
-        Mostrar("fim", c, () => TelaSucesso(hora, n));
+        c.Controls.Add(Rot("Inscrição na bateria confirmada", 100, 272, F(50, false, FontStyle.Bold), Estilo.Texto, 1166, 68, ContentAlignment.MiddleCenter));
+
+        string orientacaoTermo;
+        if (avisoRetiradaRecepcao)
+        {
+            orientacaoTermo = n > 1
+                ? "Retire e assine os termos de responsabilidade diretamente no balcão da Recepção."
+                : "Retire e assine seu termo de responsabilidade diretamente no balcão da Recepção.";
+        }
+        else if (termoNaRecepcao)
+        {
+            orientacaoTermo = n > 1
+                ? "Dirija-se até a recepção para concluir o atendimento e assinar os termos de responsabilidade."
+                : "Dirija-se até a recepção para concluir o atendimento e assinar seu termo de responsabilidade.";
+        }
+        else
+        {
+            orientacaoTermo = n > 1
+                ? "Retire os termos impressos abaixo e dirija-se à recepção para concluir o atendimento."
+                : "Retire seu termo impresso abaixo e dirija-se à recepção para concluir o atendimento.";
+        }
+
+        c.Controls.Add(Rot(orientacaoTermo, 120, 360, F(22, false, FontStyle.Bold), Estilo.Texto, 1126, 44, ContentAlignment.MiddleCenter));
+        c.Controls.Add(Rot("Sua bateria começa às", 440, 424, F(22), Estilo.Suave, 340, 36, ContentAlignment.MiddleRight));
+        c.Controls.Add(Rot(hora, 786, 420, Estilo.Mono(P(28), FontStyle.Bold), Estilo.Texto, 140, 40, ContentAlignment.MiddleLeft));
+        c.Controls.Add(Rot("Atenção às informações passadas no briefing e divirta-se!", 170, 484, F(19), Estilo.Suave, 1026, 34, ContentAlignment.MiddleCenter));
+        Botao(c, "Concluir", 500, 550, 180, true, () => { Reiniciar(); return Task.CompletedTask; }, 64, 19);
+        c.Controls.Add(Rot("Volta para o início após 90 segundos sem interação", 700, 550, F(16), Estilo.MuitoSuave, 380, 64, ContentAlignment.MiddleLeft));
+        Mostrar("fim", c, () => TelaSucesso(hora, n, termoNaRecepcao, avisoRetiradaRecepcao));
         _fim.Stop(); _fim.Start();
     }
 
@@ -853,6 +1102,12 @@ public class FormTotem : Form, IMessageFilter
                 termo.Show(this);
                 await Foto("8-termo-lgpd", termo);
                 termo.Close();
+            }
+            using (var termoMenor = CriarTermoLgpdMenor())
+            {
+                termoMenor.Show(this);
+                await Foto("8b-termo-lgpd-menor", termoMenor);
+                termoMenor.Close();
             }
             using (var alerta = new Alerta("Selecione pelo menos uma bateria para continuar.", 3, ClientSize))
             {

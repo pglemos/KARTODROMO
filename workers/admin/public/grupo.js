@@ -11,6 +11,29 @@ const Grupo = (() => {
   const ORIGENS = [['whatsapp', 'WhatsApp'], ['telefone', 'Telefone'], ['recepcao', 'Recepção'], ['site', 'Site']];
   const quando = (inicio) => { const d = deIso(inicio); return `${DIAS[d.getDay()]} ${pad(d.getDate())}/${pad(d.getMonth() + 1)} às ${horaDe(inicio)}`; };
   const primeiro = (n) => String(n || '').trim().split(/\s+/)[0] || '';
+  const apenasDigitos = (s) => String(s || '').replace(/\D/g, '');
+  const fmtCpf = (v) => {
+    const d = apenasDigitos(v).slice(0, 11);
+    if (!d) return '';
+    if (d.length <= 3) return d;
+    if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
+    if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+    return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+  };
+  const cpfValido = (v) => {
+    const d = apenasDigitos(v);
+    if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
+    let soma = 0;
+    for (let i = 0; i < 9; i++) soma += +d[i] * (10 - i);
+    let r = 11 - (soma % 11);
+    if (r === 10 || r === 11) r = 0;
+    if (r !== +d[9]) return false;
+    soma = 0;
+    for (let i = 0; i < 10; i++) soma += +d[i] * (11 - i);
+    r = 11 - (soma % 11);
+    if (r === 10 || r === 11) r = 0;
+    return r === +d[10];
+  };
   const chipCad = (p) => ({ completo: ['verde', '✓ Pronto para o totem'], incompleto: ['laranja', 'Falta ' + (p.falta || []).join(', ')], enviado: ['laranja', 'Link enviado · não terminou'], pendente: ['cinza', 'Link não enviado'] }[p.cadastro] || ['cinza', p.cadastro]);
 
   function msgCadastro(g, p) {
@@ -91,7 +114,7 @@ const Grupo = (() => {
       b, g: null, aoMudar, reg: { valor: '', quem: '', forma: 'Pix' }, comp: [], regArquivo: null, enviarAgora: true, busca: '', achados: [],
       rasc: { responsavel: null, origem: 'whatsapp', modo: 'individual', preco: +b.preco || 0, sinalPct: 30, pilotos: Array.from({ length: n }, () => ({ nome: '', telefone: '', menor: false })) },
     };
-    modal('').style.maxWidth = '1140px';
+    modal('').style.maxWidth = '1180px';
     pintar();
   }
 
@@ -117,6 +140,8 @@ const Grupo = (() => {
       const resp = i === 0;
       const nomeVal = resp && novo ? (rasc.responsavel?.nome || '') : (p.nome || '');
       const foneVal = resp && novo ? (rasc.responsavel?.telefone || '') : (p.telefone || '');
+      const cpfVal = resp && novo ? (rasc.responsavel?.documento || rasc.pilotos[0]?.cpf || '') : (p.cpf || p.documento || (resp && g?.responsavelDocumento) || '');
+      const cpfOk = cpfValido(cpfVal);
       let cad = ['cinza', 'Link sai ao salvar'], pg = ['cinza', brl(preco)], acoesCad = '', acoesPg = '';
       if (!novo) {
         cad = chipCad(p);
@@ -124,13 +149,23 @@ const Grupo = (() => {
         if (modo === 'unico') { pg = p.pago ? ['verde', '✓ Pago pelo grupo'] : resp ? ['laranja', 'Paga o grupo · falta ' + brlCurto(g.falta)] : ['cinza', 'Responsável paga']; }
         else if (modo === 'sinal') { pg = p.pago ? ['verde', p.pagoNoCaixa ? '✓ Pago no caixa' : '✓ Pago'] : ['laranja', 'Resto ' + brlCurto(p.falta_centavos) + ' na recepção']; }
         else { pg = p.pago ? ['verde', p.pagoNoCaixa ? '✓ Pago no caixa' : '✓ Pago'] : p.valorPago > 0 ? ['laranja', `Pagou ${brlCurto(p.valorPago)} · falta ${brlCurto(p.falta_centavos)}`] : ['vermelho', 'Falta ' + brlCurto(p.falta_centavos)]; }
-        if (!p.pago && (modo !== 'unico' || resp)) acoesPg = `<span style="display: flex; gap: 10px"><button class="btn peq" style="height: 22px; padding: 0; background: transparent; color: var(--verde)" data-cobrar="${modo === 'unico' ? '' : p.id}">Cobrar</button><button class="btn peq" style="height: 22px; padding: 0; background: transparent; color: var(--azulTxt)" data-recebi="${modo === 'unico' ? '' : p.id}">Recebi</button></span>`;
+        const precisaCpf = modo === 'unico' ? !cpfValido(g.responsavelDocumento || g.pilotos[0]?.cpf || g.pilotos[0]?.documento) : !cpfOk;
+        if (!p.pago && (modo !== 'unico' || resp)) {
+          let cobrarBtn = '';
+          if (precisaCpf) {
+            cobrarBtn = `<button class="btn peq" style="height: 22px; padding: 0 6px; background: rgba(255,149,0,.15); color: #B25E00; border: 1px solid rgba(255,149,0,.35); border-radius: 4px; font-size: 11px; font-weight: 600" data-aviso-cpf="${i}" title="Preencha o CPF prévio para liberar o link de pagamento">! Sem CPF</button>`;
+          } else {
+            cobrarBtn = `<button class="btn peq" style="height: 22px; padding: 0; background: transparent; color: var(--verde)" data-cobrar="${modo === 'unico' ? '' : p.id}">Cobrar</button>`;
+          }
+          acoesPg = `<span style="display: flex; gap: 8px; align-items: center">${cobrarBtn}<button class="btn peq" style="height: 22px; padding: 0; background: transparent; color: var(--azulTxt)" data-recebi="${modo === 'unico' ? '' : p.id}">Recebi</button></span>`;
+        }
       }
       const okVerde = !novo && p.pago && p.cadastro === 'completo';
-      return `<div style="display: grid; grid-template-columns: 34px minmax(0, 1.3fr) minmax(0, 1fr) 66px 178px 190px 30px; gap: 10px; align-items: center; min-height: 62px; padding: 6px 16px; border-top: 1px solid rgba(0,0,0,.05); ${resp ? 'background: rgba(11,122,83,.035)' : ''}">
+      return `<div style="display: grid; grid-template-columns: 34px minmax(0, 1.2fr) 130px minmax(0, 1fr) 66px 175px 185px 30px; gap: 10px; align-items: center; min-height: 62px; padding: 6px 16px; border-top: 1px solid rgba(0,0,0,.05); ${resp ? 'background: rgba(11,122,83,.035)' : ''}">
         <span class="avatar" style="width: 32px; height: 32px; font-size: 11.5px; background: ${okVerde ? '#34C759' : CORG[i % 6]}">${esc(nomeVal ? iniciais(nomeVal) : String(i + 1))}</span>
-        <span class="col" style="gap: 3px">${resp && novo ? `<span class="entrada" style="height: 34px; display: flex; align-items: center; font-size: 13.5px; ${nomeVal ? '' : 'color: var(--mudo3)'}">${esc(nomeVal || 'Escolha o responsável ao lado')}</span>` : `<input class="entrada" style="height: 34px; font-size: 13.5px" value="${esc(nomeVal)}" placeholder="${resp ? 'Nome do responsável' : 'Nome (ou deixe para o link)'}" aria-label="Nome do piloto ${i + 1}" data-campo="nome" data-i="${i}" ${!novo && resp ? 'readonly' : ''}>`}${resp ? '<span class="chip verde" style="align-self: flex-start; font-size: 10.5px; padding: 1px 7px">RESPONSÁVEL</span>' : ''}</span>
-        ${resp && novo ? `<span class="mono peq">${esc(foneVal || '—')}</span>` : `<input class="entrada mono" style="height: 34px; font-size: 12.5px" value="${esc(foneVal)}" placeholder="(31) 9 0000-0000" inputmode="tel" aria-label="WhatsApp do piloto ${i + 1}" data-campo="telefone" data-i="${i}" ${!novo && resp ? 'readonly' : ''}>`}
+        <span class="col" style="gap: 3px">${resp && novo ? `<span class="entrada" style="height: 34px; display: flex; align-items: center; font-size: 13.5px; ${nomeVal ? '' : 'color: var(--mudo3)'}">${esc(nomeVal || 'Escolha o responsável ao lado')}</span>` : `<input class="entrada" style="height: 34px; font-size: 13.5px" value="${esc(nomeVal)}" placeholder="${resp ? 'Nome do responsável' : 'Nome (ou deixe para o link)'}" aria-label="Nome do piloto ${i + 1}" data-campo="nome" data-i="${i}">`}${resp ? '<span class="chip verde" style="align-self: flex-start; font-size: 10.5px; padding: 1px 7px">RESPONSÁVEL</span>' : ''}</span>
+        <span class="col" style="gap: 2px"><input class="entrada mono" style="height: 34px; font-size: 12px; ${cpfVal && !cpfOk ? 'border-color: #FF9500; color: #B25E00' : cpfOk ? 'border-color: rgba(52,199,89,.4)' : ''}" value="${esc(fmtCpf(cpfVal))}" placeholder="000.000.000-00" inputmode="numeric" maxlength="14" aria-label="CPF do piloto ${i + 1}" data-campo="cpf" data-i="${i}" title="${cpfOk ? 'CPF válido · link liberado' : 'Preencha o CPF prévio para liberar o link de pagamento'}">${cpfVal && !cpfOk ? '<span style="font-size: 10px; color: #B25E00; font-weight: 600">CPF incompleto</span>' : ''}</span>
+        <input class="entrada mono" style="height: 34px; font-size: 12.5px" value="${esc(foneVal)}" placeholder="(31) 9 0000-0000" inputmode="tel" aria-label="WhatsApp do piloto ${i + 1}" data-campo="telefone" data-i="${i}">
         <button class="btn peq" role="switch" aria-checked="${!!p.menor}" data-menor="${i}" style="height: 30px; ${p.menor ? 'background: rgba(134,69,214,.14); color: #6A35B0' : 'background: rgba(118,118,128,.10); color: var(--mudo)'}">${p.menor ? 'Menor' : 'Adulto'}</button>
         <span class="col" style="gap: 4px; align-items: flex-start"><span class="chip ${cad[0]} trunc" style="max-width: 100%">${esc(cad[1])}</span>${acoesCad}</span>
         <span class="col" style="gap: 4px; align-items: flex-start"><span class="chip ${pg[0]} trunc" style="max-width: 100%">${esc(pg[1])}</span>${acoesPg}</span>
@@ -160,7 +195,11 @@ const Grupo = (() => {
             <label class="buscaCampo" style="height: 38px">${svg(IC.busca, 14, '#8E8E93')}<input id="qResp" value="${esc(estado.busca)}" placeholder="Responsável: nome, CPF ou telefone" autocomplete="off" aria-label="Buscar o responsável"></label>
             <div id="achados">${estado.achados.length ? `<div class="resultadoBusca">${estado.achados.slice(0, 10).map((x) => `<button type="button" class="hov" data-resp='${esc(JSON.stringify({ id: x.id, nome: x.nome, telefone: x.telefone, documento: x.documento }))}'><span class="avatar" style="width: 28px; height: 28px; font-size: 10.5px; background: ${CORG[x.id % 6]}">${esc(iniciais(x.nome))}</span><span class="col"><b class="trunc">${esc(x.nome)}</b><span class="peq">${esc(x.documento || 'sem CPF')} · ${esc(x.telefone || 'sem telefone')}</span></span></button>`).join('')}</div>` : ''}</div>
             <span style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px"><span class="peq" style="font-weight: 600">Chegou por</span><span class="seg">${ORIGENS.map(([v, t]) => `<button type="button" data-origem="${v}" class="${rasc.origem === v ? 'sel' : ''}" style="height: 28px; font-size: 12.5px">${t}</button>`).join('')}</span><span class="peq">Não achou o responsável? Ele faz o cadastro em ${esc(LINK_CADASTRO.replace('https://', ''))} e aparece aqui.</span></span></div>` : ''}
-          <div class="rolagemX"><div style="min-width: 800px"><div class="cabTabela" style="grid-template-columns: 34px minmax(0, 1.3fr) minmax(0, 1fr) 66px 178px 190px 30px; padding: 0 16px"><span></span><span>Nome</span><span>WhatsApp</span><span>Idade</span><span>Cadastro do totem</span><span>Pagamento</span><span></span></div>${linhas}</div></div>
+          <div style="display: flex; align-items: center; gap: 8px; margin: 4px 16px 10px; padding: 8px 12px; border-radius: 8px; background: rgba(255,149,0,.12); color: #A05200; font-size: 12.5px; line-height: 1.4">
+            <span style="font-size: 15px">⚠️</span>
+            <span><b>Aviso de Pagamento:</b> O preenchimento do <b>CPF prévio</b> é obrigatório. Sem o CPF prévio, o sistema <b>não libera o link de pagamento</b> (Pix/Cartão Asaas).</span>
+          </div>
+          <div class="rolagemX"><div style="min-width: 900px"><div class="cabTabela" style="grid-template-columns: 34px minmax(0, 1.2fr) 130px minmax(0, 1fr) 66px 175px 185px 30px; padding: 0 16px"><span></span><span>Nome</span><span>CPF prévio</span><span>WhatsApp</span><span>Idade</span><span>Cadastro do totem</span><span>Pagamento</span><span></span></div>${linhas}</div></div>
           <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 16px; background: var(--sup2); border-top: 1px solid var(--linha)">
             <button class="btn branco peq" data-qtd="1" ${c.n >= max ? 'disabled' : ''}>+ Adicionar piloto</button>
             <span class="peq" style="flex: 1 1 220px; line-height: 1.4">Cada piloto recebe o próprio link: <span class="mono" style="color: var(--tinta); font-size: 11.5px">${esc(LINK_CADASTRO.replace('https://', ''))}/?r=…</span></span>
@@ -233,6 +272,16 @@ const Grupo = (() => {
       return;
     }
     if (t.dataset.reg) { estado.reg[t.dataset.reg] = t.value; return; }
+    if (t.dataset.campo === 'cpf') {
+      t.value = fmtCpf(t.value);
+      if (!estado.g && estado.rasc) {
+        estado.rasc.pilotos[+t.dataset.i].cpf = apenasDigitos(t.value);
+        if (+t.dataset.i === 0 && estado.rasc.responsavel) {
+          estado.rasc.responsavel.documento = apenasDigitos(t.value);
+        }
+      }
+      return;
+    }
     if (t.dataset.campo && !estado.g) { estado.rasc.pilotos[+t.dataset.i][t.dataset.campo] = t.value; }
   });
   document.addEventListener('change', async (e) => {
@@ -265,9 +314,68 @@ const Grupo = (() => {
       return;
     }
     if (t.dataset.campo && estado.g) {
-      const p = estado.g.pilotos[+t.dataset.i]; if (!p || p.responsavel) return;
+      const p = estado.g.pilotos[+t.dataset.i]; if (!p) return;
+      if (t.dataset.campo === 'cpf') {
+        const d = apenasDigitos(t.value);
+        if (d && d.length !== 11) return toast('CPF incompleto (digite os 11 dígitos)', true);
+        if (d && !cpfValido(d)) return toast('CPF inválido', true);
+        const cliId = p.responsavel ? estado.g.responsavelId : p.clienteId;
+        if (cliId) {
+          try {
+            await office(`/clientes/${cliId}`, { method: 'PUT', body: { documento: d } });
+            p.cpf = d;
+            p.documento = d;
+            if (p.responsavel) estado.g.responsavelDocumento = d;
+            estado.g = await office(`/grupos/${estado.g.id}`);
+            if (p.responsavel) {
+              try {
+                const rc = await office(`/clientes/${estado.g.responsavelId}`);
+                estado.g.responsavelDocumento = rc?.documento || '';
+                if (estado.g.pilotos && estado.g.pilotos[0]) estado.g.pilotos[0].cpf = rc?.documento || '';
+              } catch (_) {}
+            }
+            pintar();
+            toast('CPF prévio salvo! Link de pagamento liberado.');
+            estado.aoMudar && estado.aoMudar();
+          } catch (er) { falhou(er); }
+        } else {
+          try {
+            let cid = null;
+            if (d) {
+              const achados = await office('/clientes?q=' + d);
+              const ex = (achados || []).find((c) => apenasDigitos(c.documento) === d);
+              if (ex) {
+                cid = ex.id;
+              } else {
+                const nc = await office('/clientes', {
+                  method: 'POST',
+                  body: { nome: p.nome || `Piloto ${p.ordem}`, tipoDocumento: 'CPF', documento: d, telefone: p.telefone || '' },
+                });
+                cid = nc.id;
+              }
+            }
+            p.cpf = d;
+            p.documento = d;
+            if (cid) p.clienteId = cid;
+            pintar();
+            toast('CPF prévio anotado!');
+          } catch (er) { falhou(er); }
+        }
+        return;
+      }
+      if (p.responsavel) {
+        const corpoCli = {
+          nome: t.dataset.campo === 'nome' ? t.value : estado.g.responsavel,
+          telefone: t.dataset.campo === 'telefone' ? t.value : estado.g.responsavelTelefone,
+        };
+        await atualizar(office(`/clientes/${estado.g.responsavelId}`, { method: 'PUT', body: corpoCli }), 'Dados do responsável atualizados');
+        estado.g = await office(`/grupos/${estado.g.id}`);
+        pintar();
+        return;
+      }
       const corpo = { nome: t.dataset.campo === 'nome' ? t.value : p.nome, telefone: t.dataset.campo === 'telefone' ? t.value : p.telefone, menor: p.menor };
       await atualizar(office(`/grupos/${estado.g.id}/pilotos/${p.id}`, { method: 'PUT', body: corpo }));
+      return;
     }
   });
   document.addEventListener('click', async (e) => {
@@ -275,7 +383,14 @@ const Grupo = (() => {
     const el = (s) => e.target.closest(s);
     const { g, rasc, b } = estado;
     let x;
-    if ((x = el('[data-resp]'))) { rasc.responsavel = JSON.parse(x.dataset.resp); rasc.pilotos[0].nome = rasc.responsavel.nome; rasc.pilotos[0].telefone = rasc.responsavel.telefone || ''; estado.achados = []; estado.busca = ''; pintar(); return; }
+    if ((x = el('[data-aviso-cpf]'))) {
+      const idx = +x.dataset.avisoCpf;
+      toast('Preencha o CPF prévio deste piloto para liberar o link de pagamento.', true);
+      const inp = $(`input[data-campo="cpf"][data-i="${idx}"]`);
+      if (inp) { inp.focus(); inp.select && inp.select(); }
+      return;
+    }
+    if ((x = el('[data-resp]'))) { rasc.responsavel = JSON.parse(x.dataset.resp); rasc.pilotos[0].nome = rasc.responsavel.nome; rasc.pilotos[0].cpf = rasc.responsavel.documento || ''; rasc.pilotos[0].telefone = rasc.responsavel.telefone || ''; estado.achados = []; estado.busca = ''; pintar(); return; }
     if ((x = el('[data-origem]'))) { rasc.origem = x.dataset.origem; pintar(); return; }
     if ((x = el('[data-enviar-agora]'))) { estado.enviarAgora = !estado.enviarAgora; pintar(); return; }
     if ((x = el('[data-modo]'))) { if (g) await atualizar(office(`/grupos/${g.id}`, { method: 'PUT', body: { modo: x.dataset.modo } }), 'Forma de pagamento atualizada'); else { rasc.modo = x.dataset.modo; pintar(); } return; }
@@ -291,7 +406,7 @@ const Grupo = (() => {
         if (d > 0) await atualizar(office(`/grupos/${g.id}/pilotos`, { method: 'POST', body: {} }), 'Piloto adicionado · 1 vaga a menos no site');
         else { const ult = g.pilotos[g.pilotos.length - 1]; if (ult && !ult.responsavel) { if (!confirm(`Tirar ${ult.nome || 'o piloto ' + ult.ordem} do grupo? A vaga volta para o site e o totem.`)) return; await atualizar(office(`/grupos/${g.id}/pilotos/${ult.id}`, { method: 'DELETE' }), 'Piloto tirado · vaga liberada'); } }
       } else {
-        if (d > 0 && rasc.pilotos.length < +b.disponiveis) rasc.pilotos.push({ nome: '', telefone: '', menor: false });
+        if (d > 0 && rasc.pilotos.length < +b.disponiveis) rasc.pilotos.push({ nome: '', cpf: '', telefone: '', menor: false });
         if (d < 0 && rasc.pilotos.length > 1) rasc.pilotos.pop();
         pintar();
       }
@@ -318,10 +433,27 @@ const Grupo = (() => {
     }
     if ((x = el('[data-cobrar]'))) {
       const pid = x.dataset.cobrar ? +x.dataset.cobrar : null;
+      const piloto = pid ? g.pilotos.find((y) => y.id === pid) : g.pilotos[0];
+      const docCpf = pid ? (piloto?.cpf || piloto?.documento) : (g.responsavelDocumento || g.pilotos[0]?.cpf || g.pilotos[0]?.documento);
+      if (!cpfValido(docCpf)) {
+        toast('Preencha o CPF prévio para liberar o link de pagamento (exigência do Asaas).', true);
+        const idx = pid ? g.pilotos.findIndex((y) => y.id === pid) : 0;
+        const inp = $(`input[data-campo="cpf"][data-i="${idx >= 0 ? idx : 0}"]`);
+        if (inp) { inp.focus(); inp.select && inp.select(); }
+        return;
+      }
       x.disabled = true;
       try {
         const r = await office(`/grupos/${g.id}/cobrancas`, { method: 'POST', body: { pilotoId: pid } });
-        estado.g = r.grupo; pintar();
+        estado.g = r.grupo;
+        if (estado.g?.responsavelId) {
+          try {
+            const respCli = await office(`/clientes/${estado.g.responsavelId}`);
+            estado.g.responsavelDocumento = respCli?.documento || '';
+            if (estado.g.pilotos?.[0]) estado.g.pilotos[0].cpf = respCli?.documento || '';
+          } catch (_) {}
+        }
+        pintar();
         const p = pid ? estado.g.pilotos.find((y) => y.id === pid) : null;
         const fone = p ? destino(estado.g, p) : estado.g.responsavelTelefone;
         const texto = `Olá${p && p.nome ? ', ' + primeiro(p.nome) : ', ' + primeiro(estado.g.responsavel)}! Segue o link para pagar ${p ? 'sua vaga' : 'a reserva do grupo'} na bateria do Kartódromo de Betim (${quando(estado.g.inicio)}): ${brl(r.valor)} por Pix ou cartão — ${r.link}`;
@@ -379,9 +511,23 @@ const Grupo = (() => {
       if (!rasc.responsavel) return;
       x.disabled = true; x.textContent = 'Salvando…';
       try {
-        const pilotos = rasc.pilotos.map((p, i) => (i === 0 ? { nome: rasc.responsavel.nome, telefone: rasc.responsavel.telefone, menor: false } : p));
+        if (rasc.responsavel && rasc.pilotos[0].cpf && apenasDigitos(rasc.responsavel.documento) !== apenasDigitos(rasc.pilotos[0].cpf)) {
+          const docResp = apenasDigitos(rasc.pilotos[0].cpf);
+          if (cpfValido(docResp)) {
+            await office('/clientes/' + rasc.responsavel.id, { method: 'PUT', body: { documento: docResp } }).catch(() => {});
+            rasc.responsavel.documento = docResp;
+          }
+        }
+        const pilotos = rasc.pilotos.map((p, i) => (i === 0 ? { nome: rasc.responsavel.nome, cpf: rasc.responsavel.documento || p.cpf, telefone: rasc.responsavel.telefone, menor: false } : p));
         const novo = await office('/grupos', { method: 'POST', body: { bateriaId: b.id, responsavelId: rasc.responsavel.id, origem: rasc.origem, modo: rasc.modo, precoCentavos: rasc.preco, sinalPct: rasc.sinalPct, pilotos } });
         estado.g = novo; estado.rasc = null;
+        if (estado.g?.responsavelId) {
+          try {
+            const respCli = await office(`/clientes/${estado.g.responsavelId}`);
+            estado.g.responsavelDocumento = respCli?.documento || '';
+            if (estado.g.pilotos?.[0]) estado.g.pilotos[0].cpf = respCli?.documento || '';
+          } catch (_) {}
+        }
         toast(`Reserva de ${novo.n} piloto(s) salva · já aparece na Recepção, no site e no totem`);
         pintar();
         estado.aoMudar && estado.aoMudar();

@@ -9,7 +9,7 @@ import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { fireEvent, render, waitFor, act } from '@testing-library/react-native';
 
-import RankingScreen from '../src/app/ranking';
+import RankingScreen from '../src/legacy/ranking-screen';
 import HomeScreen from '../src/components/home-screen';
 import { RankingRulesModal } from '../src/components/ranking-rules-modal';
 import { MOCK_DRIVERS } from '../src/mock/kart-data';

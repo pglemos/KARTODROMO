@@ -1,0 +1,174 @@
+diff --git a/src/app/usuarios.tsx b/src/app/usuarios.tsx
+index 939fd60..79a72e5 100644
+--- a/src/app/usuarios.tsx
++++ b/src/app/usuarios.tsx
+@@ -85,7 +85,7 @@ export default function Usuarios() {
+       {lista.map((u, i) => {
+         const iniciais = (u.nome || u.usuario).slice(0, 2).toUpperCase();
+         const nomePerfil = PERFIS.find((p) => p.id === u.perfil)?.nome ?? u.perfil;
+-        const ehEu = Boolean(eu?.usuario && u.usuario.toLowerCase() === eu.usuario.toLowerCase());
++        const ehEu = Boolean(eu?.usuario && u.usuario.trim().toLowerCase() === eu.usuario.trim().toLowerCase());
+         return (
+           <Sobe key={u.usuario} indice={i}>
+             <Cartao tom={u.bloqueado ? 'erro' : 'neutro'} style={s.item}>
+@@ -163,7 +163,7 @@ export default function Usuarios() {
+               setMsg({ ok: false, t: 'As senhas não coincidem.' });
+               return;
+             }
+-            void acao(() => cliente.postar('/users', { usuario, nome, senha, perfil }), 'Usuário criado.').then((ok) => {
++            void acao(() => cliente.postar('/users', { usuario: usuario.trim(), nome: nome.trim(), senha, perfil }), 'Usuário criado.').then((ok) => {
+               if (ok) {
+                 setNovo(false);
+                 setUsuario('');
+diff --git a/src/features/operacao/formato.ts b/src/features/operacao/formato.ts
+index 16f5ab7..16d2eea 100644
+--- a/src/features/operacao/formato.ts
++++ b/src/features/operacao/formato.ts
+@@ -1,5 +1,8 @@
+ export const FUSO_HORARIO = 'America/Sao_Paulo';
+ 
++const ISO_HORA_REGEX = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/;
++const HORA_SIMPLES_REGEX = /^\d{2}:\d{2}$/;
++
+ export const relogio = (ms: number | null | undefined) => {
+   if (ms == null) return '--:--';
+   const t = Math.max(0, Math.floor(ms / 1000));
+@@ -16,8 +19,16 @@ export const volta = (ms: number | null | undefined) => {
+ export const minutos = (data: Date = new Date()) =>
+   data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: FUSO_HORARIO });
+ 
+-export const hora = (ms: number | Date | string) =>
+-  new Date(ms).toLocaleTimeString('pt-BR', { timeZone: FUSO_HORARIO });
++export const hora = (ms?: number | Date | string | null): string => {
++  if (ms == null || ms === '') return '--:--';
++  try {
++    const d = new Date(ms);
++    if (Number.isNaN(d.getTime())) return '--:--';
++    return d.toLocaleTimeString('pt-BR', { timeZone: FUSO_HORARIO });
++  } catch {
++    return '--:--';
++  }
++};
+ 
+ export const dataHoraLocal = (valor: string | number | Date | null | undefined): string => {
+   if (!valor) return '—';
+@@ -42,7 +53,13 @@ export const horaMinutoLocal = (valor: string | number | Date | null | undefined
+ };
+ 
+ export const formatarInicioAgenda = (inicio?: string, fallback?: number | string): string => {
+-  if (!inicio) return String(fallback ?? '');
++  if (!inicio || typeof inicio !== 'string') return String(fallback ?? '');
+   const hm = horaMinutoLocal(inicio);
+-  return hm !== '--:--' ? hm : (inicio.slice(11, 16) || String(fallback ?? ''));
++  if (hm !== '--:--') return hm;
++  if (HORA_SIMPLES_REGEX.test(inicio)) return inicio;
++  if (ISO_HORA_REGEX.test(inicio)) {
++    const fatiado = inicio.slice(11, 16);
++    if (fatiado) return fatiado;
++  }
++  return String(fallback ?? '');
+ };
+diff --git a/tests/m1-challenger-stress.test.ts b/tests/m1-challenger-stress.test.ts
+index 34ad098..805f12d 100644
+--- a/tests/m1-challenger-stress.test.ts
++++ b/tests/m1-challenger-stress.test.ts
+@@ -47,46 +47,31 @@ describe('CHALLENGER M1: RBAC, Self-Block, Password Confirmation, Timezone & Pag
+   // 2. SELF-BLOCK PREVENTION STRESS-TESTING
+   // =========================================================================
+   describe('2. Self-Block Prevention Edge Cases', () => {
+-    // Current implementation in src/app/usuarios.tsx line 88:
+-    // const ehEu = Boolean(eu?.usuario && u.usuario.toLowerCase() === eu.usuario.toLowerCase());
+-    const verificarEhEuAtual = (euUsuario: string | undefined, uUsuario: string): boolean => {
+-      return Boolean(euUsuario && uUsuario.toLowerCase() === euUsuario.toLowerCase());
+-    };
+-
+-    // Robust implementation with trimming:
+-    const verificarEhEuRobusto = (euUsuario: string | undefined, uUsuario: string): boolean => {
++    // Implementation from src/app/usuarios.tsx line 88 (with trimming):
++    const verificarEhEu = (euUsuario: string | undefined, uUsuario: string): boolean => {
+       return Boolean(euUsuario && uUsuario.trim().toLowerCase() === euUsuario.trim().toLowerCase());
+     };
+ 
+     it('protege auto-bloqueio quando username é exatamente igual', () => {
+-      expect(verificarEhEuAtual('admin', 'admin')).toBe(true);
++      expect(verificarEhEu('admin', 'admin')).toBe(true);
+     });
+ 
+     it('protege auto-bloqueio com diferença de maiúsculas/minúsculas', () => {
+-      expect(verificarEhEuAtual('Gerencia', 'GERENCIA')).toBe(true);
+-      expect(verificarEhEuAtual('PEDRO', 'pedro')).toBe(true);
++      expect(verificarEhEu('Gerencia', 'GERENCIA')).toBe(true);
++      expect(verificarEhEu('PEDRO', 'pedro')).toBe(true);
+     });
+ 
+-    it('VULNERABILIDADE / FALHA DE BORDA: falha ao detectar auto-bloqueio se houver espaços em branco (sem trim)', () => {
+-      // Se o usuário logado tem 'gerencia' mas no banco ou lista está 'gerencia ' ou ' gerencia'
+-      const atualComEspaco = verificarEhEuAtual('gerencia', 'gerencia ');
+-      const atualComEspacoInicio = verificarEhEuAtual('gerencia', ' gerencia');
+-      const atualAmbosEspacos = verificarEhEuAtual('gerencia ', 'gerencia');
+-
+-      // Pela implementação atual (sem trim), estes retornam FALSE, permitindo bloquear a própria conta!
+-      expect(atualComEspaco).toBe(false); // Falha de proteção encontrada!
+-      expect(atualComEspacoInicio).toBe(false); // Falha de proteção encontrada!
+-      expect(atualAmbosEspacos).toBe(false); // Falha de proteção encontrada!
+-
+-      // Uma verificação robusta com trim evitaria isso:
+-      expect(verificarEhEuRobusto('gerencia', 'gerencia ')).toBe(true);
+-      expect(verificarEhEuRobusto('gerencia', ' gerencia')).toBe(true);
+-      expect(verificarEhEuRobusto('gerencia ', 'gerencia')).toBe(true);
++    it('protege auto-bloqueio mesmo se houver espaços em branco (com trim)', () => {
++      expect(verificarEhEu('gerencia', 'gerencia ')).toBe(true);
++      expect(verificarEhEu('gerencia', ' gerencia')).toBe(true);
++      expect(verificarEhEu('gerencia ', 'gerencia')).toBe(true);
++      expect(verificarEhEu(' gerencia ', 'gerencia')).toBe(true);
++      expect(verificarEhEu('gerencia', '  gerencia  ')).toBe(true);
+     });
+ 
+     it('trata usernames com caracteres especiais e nulos com segurança', () => {
+-      expect(verificarEhEuAtual(undefined, 'gerencia')).toBe(false);
+-      expect(verificarEhEuAtual('', 'gerencia')).toBe(false);
++      expect(verificarEhEu(undefined, 'gerencia')).toBe(false);
++      expect(verificarEhEu('', 'gerencia')).toBe(false);
+     });
+   });
+ 
+@@ -217,14 +202,17 @@ describe('CHALLENGER M1: RBAC, Self-Block, Password Confirmation, Timezone & Pag
+       expect(horaMinutoLocal(NaN)).toBe('--:--');
+     });
+ 
+-    it('COMPORTAMENTO DE ROBUSTEZ: hora() retorna "Invalid Date" com entradas inválidas por falta de validação interna', () => {
++    it('resiliência de hora() contra entradas inválidas retornando fallback seguro', () => {
+       // Testando diretamente a função hora() com entradas inválidas
+-      // Ao invés de fallback seguro como '--:--', hora() retorna 'Invalid Date'
+-      expect(hora('string-invalida')).toBe('Invalid Date');
+-      expect(hora(NaN)).toBe('Invalid Date');
++      // Retorna fallback seguro '--:--' sem lançar exceções nem retornar 'Invalid Date'
++      expect(hora('string-invalida')).toBe('--:--');
++      expect(hora(NaN)).toBe('--:--');
++      expect(hora(undefined)).toBe('--:--');
++      expect(hora(null)).toBe('--:--');
++      expect(hora('')).toBe('--:--');
+     });
+ 
+-    it('formatarInicioAgenda: comportamento com fallbacks e artefato de slice em strings não-data', () => {
++    it('formatarInicioAgenda: elimina artefato de slice em strings não-ISO e retorna fallback seguro', () => {
+       expect(formatarInicioAgenda(undefined, 'BATERIA_1')).toBe('BATERIA_1');
+       expect(formatarInicioAgenda('', 99)).toBe('99');
+       expect(formatarInicioAgenda('2026-11-02T19:00:00.000Z', 10)).toBe('16:00');
+@@ -232,10 +220,12 @@ describe('CHALLENGER M1: RBAC, Self-Block, Password Confirmation, Timezone & Pag
+       // String curta inválida (<11 chars) cai no fallback
+       expect(formatarInicioAgenda('curta', 'FALLBACK')).toBe('FALLBACK');
+ 
+-      // String longa arbitrária não-ISO (>11 chars): sofre artefato de slice(11, 16)
+-      // "Bateria 10 - Treino".slice(11, 16) resulta em "- Tre" em vez de 'FALLBACK'
+-      const comArtefato = formatarInicioAgenda('Bateria 10 - Treino', 'FALLBACK');
+-      expect(comArtefato).toBe('- Tre'); // Artefato empírico comprovado!
++      // String longa arbitrária não-ISO (>11 chars): não sofre mais artefato de slice(11, 16)
++      expect(formatarInicioAgenda('Bateria 10 - Treino', 'FALLBACK')).toBe('FALLBACK');
++      expect(formatarInicioAgenda('nao-e-data-valida', 'FALLBACK')).toBe('FALLBACK');
++
++      // Horário simples pré-formatado (HH:mm) é preservado
++      expect(formatarInicioAgenda('14:30', 'FALLBACK')).toBe('14:30');
+     });
+   });
+ 

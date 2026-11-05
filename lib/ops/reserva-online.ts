@@ -13,7 +13,7 @@
 import { isValidCpf, one, onlyDigits, query, tx } from './db';
 import { HttpError, inscreverN } from './office';
 import { gravarAcompanhante, gravarPreCadastro, preCadastroLigado, type AcompanhanteSite, type PreCadastro } from './pre-cadastro';
-import { publicarClientesDoApp, publicarRankingDoApp, sincronizarPerfisDoApp, vincularContasDoApp } from './app-mobile';
+import { escutarPedidosDeVinculo, publicarClientesDoApp, publicarHistoricosVinculados, publicarRankingDoApp, sincronizarPerfisDoApp, vincularContasDoApp } from './app-mobile';
 
 type Log = (...args: unknown[]) => void;
 
@@ -428,13 +428,19 @@ function emParalelo(nome: string, tarefa: () => Promise<unknown>, log: Log, avis
     .finally(() => emAndamento.delete(nome));
 }
 
+let escutaVinculoLigada = false;
+
 export async function sincronizarReservasOnline(log: Log) {
   if (!preCadastroLigado()) return 0;
+  // vínculo sob demanda: long-poll permanente no Worker (liga uma vez; reconecta sozinho)
+  if (!escutaVinculoLigada) { escutaVinculoLigada = true; void escutarPedidosDeVinculo(log); }
   emParalelo('cupons', () => sincronizarCuponsOnline(log), log, () => 'prévia de cupons do app: sincronização temporariamente indisponível (tenta de novo a cada 5 s)');
   // contas do app com e-mail confirmado: vincula ao cliente pelo CPF + e-mail/telefone (uma vez por minuto)
   emParalelo('vinculo', () => vincularContasDoApp(log), log, (e) => `app: vínculo automático indisponível agora (${e.message})`);
   // ranking e carreira dos pilotos no app (a cada 10 min)
   emParalelo('ranking', () => publicarRankingDoApp(log), log, (e) => `app: ranking indisponível agora (${e.message})`);
+  // histórico completo de todo cliente vinculado (a cada 10 min, só o que mudou)
+  emParalelo('historicos', () => publicarHistoricosVinculados(log), log, (e) => `app: histórico indisponível agora (${e.message})`);
   emParalelo('clientes-app', () => publicarClientesDoApp(log), log, (e) => `app: cadastros indisponíveis agora (${e.message})`);
   emParalelo('perfil-app', () => sincronizarPerfisDoApp(log), log, (e) => `app: perfil indisponível agora (${e.message})`);
   const pedidos = (await chamar('/api/sync/pedidos')) as PedidoSite[];
