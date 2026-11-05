@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars -- _u e _s só tiram campos internos das respostas */
 /**
  * Endurance (100 Milhas): evento, equipes, pilotos com número de pulseira, pesagem, filas e sorteio do box, punições.
  *
@@ -85,80 +84,23 @@ async function dadosDaCrono(sessaoId: string | null) {
       if (!r.ok) throw new HttpError(r.status === 404 ? 404 : 502, r.status === 404 ? 'A corrida ligada a este evento não existe mais na cronometragem.' : 'A cronometragem não respondeu.');
       return r.json();
     };
-    const [s, laps] = await Promise.all([pegar(''), pegar('/laps')]) as [SessaoIn & { competitors?: { kart: string; name?: string }[] }, { kart: string; name?: string; laps: VoltaCrono[] }[]];
-    const voltas = new Map<string, VoltaCrono[]>();
-    for (const l of laps) {
-      if (l.kart) voltas.set(String(l.kart), l.laps);
-      const nome = String(l.name ?? '').trim().toLowerCase();
-      if (nome) voltas.set(`nome:${nome}`, l.laps);
-    }
-    return { sessao: s, voltas };
+    const [s, laps] = await Promise.all([pegar(''), pegar('/laps')]) as [SessaoIn & { competitors?: { kart: string }[] }, { kart: string; laps: VoltaCrono[] }[]];
+    return { sessao: s, voltas: new Map(laps.map((l) => [String(l.kart), l.laps])) };
   })();
   cacheCrono.set(sessaoId, { em: Date.now(), dados });
   dados.catch(() => cacheCrono.delete(sessaoId));
   return dados;
 }
 
-async function sincronizarKartsComCrono(ev: Evento) {
-  try {
-    const [equipes, filas] = await Promise.all([
-      equipesDo(ev.id),
-      query<{ kart: string; equipeId: number }>(`SELECT Kart kart, EquipeId equipeId FROM dbo.EnduranceFila WHERE EventoId = @e AND Situacao = 'pista' AND EquipeId IS NOT NULL`, { e: ev.id }),
-    ]);
-    const kartPorEquipe = new Map(filas.map((f) => [f.equipeId, String(f.kart).trim()]));
-    const ativas = equipes.filter((q) => !q.desclassificada);
-    const mudancas = ativas.filter((q) => {
-      const k = kartPorEquipe.get(q.id);
-      return Boolean(k && q.numero !== k);
-    });
-    if (mudancas.length) {
-      await tx(async (run) => {
-        for (const q of mudancas) {
-          const k = kartPorEquipe.get(q.id)!;
-          await run(`UPDATE dbo.EnduranceEquipe SET Numero = CONCAT('TMP_', Id) WHERE EventoId = @e AND (Id = @id OR Numero = @num)`, { e: ev.id, id: q.id, num: k });
-        }
-        for (const q of mudancas) {
-          const k = kartPorEquipe.get(q.id)!;
-          await run(`UPDATE dbo.EnduranceEquipe SET Numero = @num WHERE EventoId = @e AND Id = @id`, { e: ev.id, id: q.id, num: k });
-        }
-        await run(`UPDATE dbo.EnduranceEquipe SET Numero = CONCAT('EQ', Id) WHERE EventoId = @e AND Numero LIKE 'TMP_%'`, { e: ev.id });
-      });
-    }
-    const competitors = ativas.map((q) => ({ kart: kartPorEquipe.get(q.id) ?? (/^\d+$/.test(q.numero) ? q.numero : ''), name: q.nome }));
-    for (const sid of [ev.sessaoTomada, ev.sessaoCrono].filter((x): x is string => Boolean(x))) {
-      cacheCrono.delete(sid);
-      await fetch(`${TIMING_URL}/api/sessions/${encodeURIComponent(sid)}`, {
-        method: 'PATCH', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(5_000),
-        body: JSON.stringify({ competitors, semEmailPilotos: false }),
-      }).catch(() => null);
-    }
-  } catch { /* sincronização auxiliar não bloqueia a operação do box */ }
-}
-
 async function analise(ev: Evento): Promise<{ analise: Analise; regras: Regras; erroCrono: string | null }> {
   const regras = lerRegras(ev.regras);
-  const [equipes, trocas, punicoes, ajustes, filas] = await Promise.all([equipesDo(ev.id), trocasDo(ev.id), punicoesDo(ev.id), ajustesDo(ev.id), filasDo(ev.id)]);
+  const [equipes, trocas, punicoes, ajustes] = await Promise.all([equipesDo(ev.id), trocasDo(ev.id), punicoesDo(ev.id), ajustesDo(ev.id)]);
   let crono: Awaited<ReturnType<typeof dadosDaCrono>> = { sessao: null, voltas: new Map() };
   let erroCrono: string | null = null;
-  try {
-    crono = await dadosDaCrono(ev.sessaoCrono || ev.sessaoTomada);
-    if (ev.sessaoCrono && ev.sessaoTomada && crono.sessao?.state === 'preparando') {
-      const tomada = await dadosDaCrono(ev.sessaoTomada).catch(() => null);
-      if (tomada?.sessao && tomada.sessao.state !== 'preparando') crono = tomada;
-    }
-  } catch (e) { erroCrono = (e as Error).message; }
-  const kartNaPista = new Map(filas.filter((f) => f.situacao === 'pista' && f.equipeId != null).map((f) => [f.equipeId!, String(f.kart).trim()]));
-  const voltasResolvidas = new Map<string, VoltaCrono[]>(crono.voltas);
-  for (const e of equipes) {
-    const kPista = kartNaPista.get(e.id);
-    const vs = crono.voltas.get(e.numero)
-      ?? (kPista ? crono.voltas.get(kPista) : undefined)
-      ?? crono.voltas.get(`nome:${e.nome.trim().toLowerCase()}`);
-    if (vs) voltasResolvidas.set(e.numero, vs);
-  }
+  try { crono = await dadosDaCrono(ev.sessaoCrono); } catch (e) { erroCrono = (e as Error).message; }
   const a = analisarCorrida({
-    regras, sessao: crono.sessao, agoraMs: Date.now(), voltas: voltasResolvidas, ajustes,
-    equipes: equipes.map((e) => ({ id: e.id, numero: kartNaPista.get(e.id) || e.numero, nome: e.nome, desclassificada: e.desclassificada })),
+    regras, sessao: crono.sessao, agoraMs: Date.now(), voltas: crono.voltas, ajustes,
+    equipes: equipes.map((e) => ({ id: e.id, numero: e.numero, nome: e.nome, desclassificada: e.desclassificada })),
     trocas: trocas.map((t): TrocaIn => ({ equipeId: t.equipeId, pilotoId: t.pilotoId, pilotoNome: t.piloto, kart: t.kart, tipo: t.tipo, emMs: Number(t.emMs) })),
     punicoes: punicoes.map((p) => ({ equipeId: p.equipeId, tipo: p.tipo, valor: p.valor, motivo: p.motivo, origem: p.origem })),
   });
@@ -254,7 +196,7 @@ export async function equipesParaOTotem(bateriaId: number) {
 /** Chamado pelo /api/totem/inscrever quando a bateria é de endurance: liga cada participante à equipe e dá a pulseira. */
 export async function vincularNoTotem(eventoId: number, equipeId: number | number[], clienteIds: number[]) {
   const ev = await evento(eventoId);
-  const dados: { clienteId: number; nome: string; origem: 'totem' }[] = [];
+  const dados=[];
   for (const cid of [...new Set(clienteIds.map(id=>idDe(id,'Piloto')))]) {
     const c = await one<{ nome: string }>(`SELECT Nome nome FROM dbo.Cliente WHERE Id = @id`, { id: cid });
     if(!c) throw new HttpError(404,'Piloto não encontrado.');
@@ -387,7 +329,7 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
     }
     const r = await fetch(`${TIMING_URL}/api/sessions/${encodeURIComponent(sessaoId)}`, {
       method: 'PATCH', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(8_000),
-      body: JSON.stringify({ competitors: equipes.map((q) => ({ kart: q.numero, name: q.nome })), semEmailPilotos: false, ...(b.tipo === 'corrida' ? { durationMin: regras.duracaoMin } : {}) }),
+      body: JSON.stringify({ competitors: equipes.map((q) => ({ kart: q.numero, name: q.nome })), semEmailPilotos: true, ...(b.tipo === 'corrida' ? { durationMin: regras.duracaoMin } : {}) }),
     });
     if (!r.ok) throw new HttpError(502, `A cronometragem recusou (${(await r.json().catch(() => ({}))).error ?? r.status}).`);
     await query(b.tipo === 'tomada' ? `UPDATE dbo.EnduranceEvento SET SessaoTomada = @s WHERE Id = @id` : `UPDATE dbo.EnduranceEvento SET SessaoCrono = @s WHERE Id = @id`, { s: sessaoId, id: ev.id });

@@ -20,8 +20,7 @@ static class Program
                 Exigir(ValidacaoCliente.ErroPeso(peso) != null, "aceitou peso inválido");
             Exigir(ValidacaoCliente.ErroEmail("andre@exemplo.com") == null, "recusou e-mail válido");
             Exigir(ValidacaoCliente.ErroPeso("80,5") == null && ValidacaoCliente.ErroPeso("80.5") == null, "recusou peso válido");
-            Exigir(ValidacaoCliente.ErroInstagram("") == null && ValidacaoCliente.ErroInstagram(" ") == null, "Instagram em branco é opcional na recepção");
-            foreach (var perfil in new[] { "@", "nome com espaço", "<script>", new string('a', 31) })
+            foreach (var perfil in new[] { "", " ", "@", "nome com espaço", "<script>", new string('a', 31) })
                 Exigir(ValidacaoCliente.ErroInstagram(perfil) != null, "aceitou Instagram inválido");
             foreach (var perfil in new[] { "Piloto.Betim", "@Piloto.Betim", "https://www.instagram.com/Piloto.Betim/" })
             {

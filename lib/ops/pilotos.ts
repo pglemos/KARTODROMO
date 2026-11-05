@@ -1,4 +1,3 @@
-import { tracadoLegado, tracadoConfirmado } from './tracado-legado';
 /**
  * Página Pilotos do painel web: a cartela de clientes (dbo.Cliente) com a carreira de cada um na cronometragem,
  * o ranking dos melhores tempos por traçado (semana, mês e geral) e a foto do piloto (dbo.ClienteFoto).
@@ -24,7 +23,7 @@ const ARQ = resolve(join(process.cwd(), '.runtime', 'pilotos-cronometragem.json'
 /** `t` = traçado + categoria do piloto ("Traçado 1 · Super Kart"): Super Kart e Indoor correm juntos mas não se comparam. */
 type Corrida = { cid: string | null; nome: string; kart: string; pos: number; voltas: number; melhor: number | null; cat: string | null; dq: boolean; t?: string };
 /** `reserva` = bateria do LapTime de que só sobrou a reserva paga (quem andou), sem tempos nem posição. */
-type BateriaCrono = { id: string; nome: string; tipo: string; dia: string; inicio: number; fim: number | null; chuva: boolean; trackId: string | null; tracado: string; tracadoOriginal?: string; pilotos: Corrida[]; reserva?: boolean };
+type BateriaCrono = { id: string; nome: string; tipo: string; dia: string; inicio: number; fim: number | null; chuva: boolean; trackId: string | null; tracado: string; pilotos: Corrida[]; reserva?: boolean };
 let indice: Record<string, BateriaCrono> = {};
 try { if (existsSync(ARQ)) indice = JSON.parse(readFileSync(ARQ, 'utf8')).baterias ?? {}; } catch { indice = {}; }
 let atualizadoEm = 0, atualizando: Promise<void> | null = null, ultimoErro: string | null = null;
@@ -90,20 +89,8 @@ async function carregarAliases(log?: (m: string) => void): Promise<boolean> {
 }
 function normalizarNomes() {
   const canon = (cid: string | null) => (cid && aliasCliente.get(cid)) || cid;
-  for (const b of Object.values(indice)) {
-    const original = b.tracado;
-    b.tracado = tracadoBase(tracadoLegado(b.id, original));
-    if (b.tracado === 'Traçado não confirmado') b.tracadoOriginal ??= original;
-    for (const p of b.pilotos) p.cid = canon(p.cid);
-    for (const p of b.pilotos) p.t = comCategoria(b.tracado, catDoKart(p.kart) ?? p.cat);
-  }
-  for (const x of rankAntigo) x.cid = canon(x.cid);
-  for (const x of rankAntigo) {
-    const original = x.tracado;
-    const resolvido = tracadoLegado('lt-ranking', tracadoBase(original));
-    if (resolvido === 'Traçado não confirmado') x.tracadoOriginal ??= original;
-    x.tracado = comCategoria(resolvido, x.categoria);
-  }
+  for (const b of Object.values(indice)) { b.tracado = tracadoBase(b.tracado); for (const p of b.pilotos) { p.cid = canon(p.cid); p.t = comCategoria(b.tracado, catDoKart(p.kart) ?? p.cat); } }
+  for (const x of rankAntigo) { x.cid = canon(x.cid); x.tracado = comCategoria(tracadoBase(x.tracado), x.categoria); }
   normalizado = true; limites = null;
 }
 /** Volta abaixo de 75% da volta típica (mediana) do traçado é corte de pista ou passagem dupla (o LapTime antigo tem várias). */
@@ -118,8 +105,8 @@ function limiteDe(tracado: string) {
   return limites.get(tracado) ?? 0;
 }
 /** Volta mínima possível no Traçado 1: Indoor 1:10.000, Super Kart 1:04.000. Abaixo disso é outro traçado ou corte de pista. */
-export const pisoTracado = (tracado: string) => /^tra[cç]ado\s+1(?:\s*·\s*super kart)?$/i.test(tracado.trim()) ? (/super kart/i.test(tracado) ? 64_000 : 70_000) : 0;
-const valeNoRanking = (tracado: string, ms: number | null) => !!ms && tracadoConfirmado(tracado) && ms >= limiteDe(tracado) && ms >= pisoTracado(tracado);
+const pisoTracado = (tracado: string) => /^tra[cç]ado\s+1(?:\s*·\s*super kart)?$/i.test(tracado.trim()) ? (/super kart/i.test(tracado) ? 64_000 : 70_000) : 0;
+const valeNoRanking = (tracado: string, ms: number | null) => !!ms && !tracado.startsWith(SEM_TRACADO) && ms >= limiteDe(tracado) && ms >= pisoTracado(tracado);
 /** Kart 1-99 é Indoor, 100-199 é Super Kart: vale mais que a categoria do cadastro do piloto. */
 const catDoKart = (kart: string | null | undefined) => { const s = String(kart ?? '').trim(); if (!/^\d{1,3}$/.test(s)) return null; const n = Number(s); return n >= 1 && n <= 99 ? 'Indoor' : n <= 199 && n >= 100 ? 'Super Kart' : null; };
 const tk = (b: BateriaCrono, p: Corrida) => p.t ?? comCategoria(b.tracado, catDoKart(p.kart) ?? p.cat);
@@ -183,7 +170,7 @@ async function indiceFresco() { if (Date.now() - atualizadoEm > 120_000) await a
 // Corridas detalhadas só de 02/09 a 23/09/2026 (o LapTime não guardava mais que isso); rankings diário/semanal/mensal desde
 // jan/2025 com os 10 primeiros de cada faixa de peso, por traçado e categoria (Indoor, Super Kart). O LapTime foi desligado em
 // 23/09: os dados não mudam mais, então são lidos uma vez e guardados em .runtime/pilotos-laptime.json.
-type RankAntigo = { tipo: 'semana' | 'mes'; periodo: string; dia: string; tracado: string; categoria: string; tracadoOriginal?: string; pos: number; faixa: string | null; cid: string | null; nome: string; ms: number };
+type RankAntigo = { tipo: 'semana' | 'mes'; periodo: string; dia: string; tracado: string; categoria: string; pos: number; faixa: string | null; cid: string | null; nome: string; ms: number };
 const ARQ_LEGADO = resolve(join(process.cwd(), '.runtime', 'pilotos-laptime.json'));
 let rankAntigo: RankAntigo[] = [];
 let legadoCarregado = false;
@@ -707,7 +694,7 @@ export async function rankingPublicoParaApp() {
       vitoriasChuva: lista.filter((c) => c.chuva && c.tipo === 'corrida' && !c.dq && c.pos === 1).length,
       maiorSequenciaVitorias: maiorSeq,
       cheias: { corridas: cheias.length, vitorias: cheias.filter((c) => c.pos === 1).length, podios: cheias.filter((c) => c.pos >= 1 && c.pos <= 3).length },
-      tracadosDiferentes: new Set(lista.filter((c) => tracadoConfirmado(c.tracado)).map((c) => c.tracado)).size,
+      tracadosDiferentes: new Set(lista.map((c) => c.tracado)).size,
     };
     p.xpMes = [...porMes.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 12).map(([mes, v]) => ({ mes, ...v }));
     if ((++ix & 511) === 511) await new Promise<void>((r) => setImmediate(r));

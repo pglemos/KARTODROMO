@@ -130,7 +130,7 @@ TELAS.patrocinadores = async (tela) => {
     const ativos = D.espacos.filter((e) => e.ativo);
     const ocupados = ativos.filter((e) => vig.some((c) => c.espaco_id === e.id)).length;
     const soma = (l) => l.reduce((s, c) => s + c.valor, 0);
-    return `<section class="pt-num">
+    return `<section class="i2-num">
       <div class="cartao"><span>Receita mensal contratada</span><b>${ptRc(vig.reduce((s, c) => s + ptMensal(c), 0))}</b><small>${vig.length} contrato(s) vigente(s)</small></div>
       <div class="cartao"><span>A receber</span><b>${ptRc(soma(abertas))}</b><small>${abertas.length} cobrança(s) em aberto</small></div>
       <div class="cartao"><span>Em atraso</span><b>${ptRc(soma(atras))}</b><small>${atras.length} cobrança(s) vencida(s)</small></div>
@@ -268,7 +268,7 @@ TELAS.patrocinadores = async (tela) => {
     const abas = [['resumo', 'Resumo'], ['contratos', 'Contratos'], ['cobrancas', 'Cobranças'], ['empresas', 'Empresas'], ['espacos', 'Espaços']];
     const corpo = { resumo, contratos, cobrancas, empresas, espacos }[P.aba]();
     tela.innerHTML = `${cabecalho('Comercial · outdoor, pódio e marcas', 'Patrocinadores e publicidade')}<main class="principal">
-      <nav class="pt-abas" aria-label="Partes">${abas.map(([k, r]) => `<button data-aba="${k}" class="${P.aba === k ? 'atual' : ''}">${r}</button>`).join('')}</nav>${corpo}</main>`;
+      <nav class="ev-abas" aria-label="Partes">${abas.map(([k, r]) => `<button data-aba="${k}" class="${P.aba === k ? 'atual' : ''}">${r}</button>`).join('')}</nav>${corpo}</main>`;
     ptImagens(tela);
     const q = $('#ptq', tela);
     if (q) q.addEventListener('input', () => { P.q = q.value; const pos = q.selectionStart; desenhar(); const n = $('#ptq', tela); n.focus(); n.setSelectionRange(pos, pos); });

@@ -2,8 +2,8 @@
  * API do app da recepcao (replica funcional do LapTime Office).
  * Todas as rotas daqui exigem sessao de usuario (lib/ops/auth.ts).
  */
-import { CLIENTE_COLS, insertCliente, isValidCpf, one, onlyDigits, query, tx, updateCliente, type ClienteInput } from './db';
 import { pedirVinculoAgora } from './app-mobile';
+import { CLIENTE_COLS, insertCliente, isValidCpf, one, onlyDigits, query, tx, updateCliente, type ClienteInput } from './db';
 import { confereSenha, hashSenha, type Sessao } from './auth';
 import { erroCadastroObrigatorio, erroPesoCliente } from './cadastro-obrigatorio';
 import { mobileApiEndpoint } from '../mobile-api-url';
@@ -329,6 +329,28 @@ function cadValues(def: CadDef, body: Record<string, unknown>, partial: boolean)
   return out;
 }
 
+/** Protege o acesso: ninguém se tranca para fora, e sempre sobra um administrador ativo. */
+async function guardaUsuario(req: Req, id: number | null, body: Record<string, unknown> | null) {
+  const login = body && 'login' in body ? String(body.login ?? '').trim().toLowerCase() : '';
+  if (login) {
+    const igual = await one<{ id: number }>(`SELECT Id id FROM dbo.Usuario WHERE Login = @login AND (@id IS NULL OR Id <> @id)`, { login, id });
+    if (igual) throw new HttpError(409, 'Já existe um usuário com esse login.');
+  }
+  if (!id) return;
+  const alvo = await one<{ admin: boolean; ativo: boolean }>(`SELECT Admin admin, Ativo ativo FROM dbo.Usuario WHERE Id = @id`, { id });
+  if (!alvo) throw new HttpError(404, 'Usuário não encontrado.');
+  const excluir = body === null;
+  const tiraAtivo = excluir || (body && 'ativo' in body && !bit(body.ativo));
+  const tiraAdmin = excluir || (body && 'admin' in body && !bit(body.admin));
+  if (id === req.sessao.uid && (excluir)) throw new HttpError(400, 'Você não pode excluir o próprio usuário.');
+  if (id === req.sessao.uid && tiraAtivo) throw new HttpError(400, 'Você não pode desativar o próprio usuário.');
+  if (id === req.sessao.uid && tiraAdmin) throw new HttpError(400, 'Você não pode tirar o próprio acesso de administrador.');
+  if (alvo.admin && alvo.ativo && (tiraAtivo || tiraAdmin)) {
+    const outros = await one<{ n: number }>(`SELECT COUNT(*) n FROM dbo.Usuario WHERE Admin = 1 AND Ativo = 1 AND Id <> @id`, { id });
+    if (!outros || outros.n < 1) throw new HttpError(400, 'Precisa sobrar pelo menos um administrador ativo.');
+  }
+}
+
 async function cadRoutes(req: Req, send: Res, ent: string, id: number | null): Promise<void> {
   const def = CAD[ent];
   if (!def) throw new HttpError(404, 'Cadastro desconhecido.');
@@ -347,6 +369,7 @@ async function cadRoutes(req: Req, send: Res, ent: string, id: number | null): P
     const body = await req.body();
     const vals = cadValues(def, body, req.method === 'PUT');
     if (ent === 'usuarios') {
+      await guardaUsuario(req, id, body);
       const senha = String(body.senha ?? '');
       if (req.method === 'POST' && senha.length < 6) throw new HttpError(400, 'A senha precisa ter pelo menos 6 caracteres.');
       if (senha) {
@@ -356,15 +379,28 @@ async function cadRoutes(req: Req, send: Res, ent: string, id: number | null): P
       if (vals.Login) vals.Login = String(vals.Login).toLowerCase();
     }
     const names = Object.keys(vals);
-    if (req.method === 'POST') {
-      const r = await one<{ id: number }>(`INSERT INTO dbo.${def.table} (${names.join(', ')}) OUTPUT inserted.Id id VALUES (${names.map((n) => '@' + n).join(', ')})`, vals);
-      return send(201, { id: r!.id });
+    try {
+      if (req.method === 'POST') {
+        const r = await one<{ id: number }>(`INSERT INTO dbo.${def.table} (${names.join(', ')}) OUTPUT inserted.Id id VALUES (${names.map((n) => '@' + n).join(', ')})`, vals);
+        return send(201, { id: r!.id });
+      }
+      if (!id) throw new HttpError(400, 'Registro não informado.');
+      if (names.length) await query(`UPDATE dbo.${def.table} SET ${names.map((n) => `${n} = @${n}`).join(', ')} WHERE Id = @id`, { ...vals, id });
+      return send(200, { id });
+    } catch (e) {
+      if (!(e instanceof HttpError) && (ent === 'usuarios' || ent === 'perfis') && duplicateSql(e)) {
+        throw new HttpError(409, ent === 'usuarios' ? 'Já existe um usuário com esse login.' : 'Já existe um perfil com esse nome.');
+      }
+      throw e;
     }
-    if (!id) throw new HttpError(400, 'Registro não informado.');
-    if (names.length) await query(`UPDATE dbo.${def.table} SET ${names.map((n) => `${n} = @${n}`).join(', ')} WHERE Id = @id`, { ...vals, id });
-    return send(200, { id });
   }
   if (req.method === 'DELETE' && id) {
+    if (ent === 'usuarios') await guardaUsuario(req, id, null);
+    if (ent === 'perfis') {
+      const emUso = await one<{ n: number }>(`SELECT COUNT(*) n FROM dbo.Usuario WHERE PerfilId = @id`, { id });
+      if (emUso && emUso.n > 0) throw new HttpError(409, `Este perfil tem ${emUso.n} usuário(s). Troque o perfil deles antes de excluir.`);
+      await query(`DELETE FROM dbo.PerfilPermissao WHERE PerfilId = @id`, { id });
+    }
     try {
       await query(`DELETE FROM dbo.${def.table} WHERE Id = @id`, { id });
       return send(200, { ok: true });
@@ -600,16 +636,6 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
     const troco = Math.max(0, recebido - total);
     if (troco > dinheiro) throw new HttpError(400, 'Troco só pode ser dado sobre pagamento em dinheiro. Ajuste os valores.');
 
-    const insIds = itens.filter((i) => i.inscricaoId).map((i) => i.inscricaoId as number);
-    let origensSemTotem = new Set<number>();
-    if (insIds.length) {
-      const qParams = Object.fromEntries(insIds.map((id, n) => ['id' + n, id]));
-      const rows = await run(
-        `SELECT Id id FROM dbo.Inscricao WHERE Id IN (${insIds.map((_, n) => '@id' + n).join(',')}) AND Origem <> 'totem' AND TermoImpressoEm IS NULL`,
-        qParams,
-      ).catch(() => []);
-      origensSemTotem = new Set((rows as { id: number }[]).map((r) => r.id));
-    }
     const [venda] = await run(
       `INSERT INTO dbo.Venda (MovimentoId, UsuarioId, TerminalId, ClienteId, BrutoCentavos, DescontoCentavos, AcrescimoCentavos, RecebidoCentavos, TrocoCentavos, FinalCentavos, Observacao)
        OUTPUT inserted.Id id VALUES (@mov, @uid, @term, @cli, @bruto, @desc, @acr, @rec, @troco, @final, @obs)`,
@@ -626,7 +652,7 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
       );
       if (i.inscricaoId) {
         await run(
-          `UPDATE dbo.Inscricao SET Pago = 1, Aprovada = 1, Status = 'confirmada', ValorCentavos = @liq, DescontoCentavos = @desc, VendaId = @vendaId, TermoImpressoEm = COALESCE(TermoImpressoEm, SYSDATETIME()), AtualizadoEm = SYSDATETIME() WHERE Id = @ins`,
+          `UPDATE dbo.Inscricao SET Pago = 1, Aprovada = 1, Status = 'confirmada', ValorCentavos = @liq, DescontoCentavos = @desc, VendaId = @vendaId, AtualizadoEm = SYSDATETIME() WHERE Id = @ins`,
           { liq: i.liquido, desc: i.descontoCentavos, vendaId, ins: i.inscricaoId },
         );
       }
@@ -659,7 +685,15 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
         }
       }
     }
-    return { id: vendaId, total, recebido, troco, inscricoes: insIds, semTermo: Array.from(origensSemTotem) };
+    // termo já impresso (totem, site ou recepção) não sai de novo depois do pagamento: a Recepção só oferece estes
+    const insIds = itens.filter((i) => i.inscricaoId).map((i) => i.inscricaoId as number);
+    const semTermo = insIds.length
+      ? ((await run(
+          `SELECT Id id FROM dbo.Inscricao WHERE Id IN (${insIds.map((_, n) => '@t' + n).join(',')}) AND TermoImpressoEm IS NULL AND Origem <> 'totem'`,
+          Object.fromEntries(insIds.map((id, n) => ['t' + n, id])),
+        )) as { id: number }[]).map((r) => r.id)
+      : [];
+    return { id: vendaId, total, recebido, troco, inscricoes: insIds, semTermo };
   });
 }
 
@@ -1374,7 +1408,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const id = Number(m[1]);
     const b = await req.body();
     const atual = await one<Record<string, unknown>>(
-      `SELECT CONVERT(varchar(10), Inicio, 126) data, (SELECT COUNT(*) FROM dbo.Inscricao WHERE BateriaId = @id AND Status <> 'cancelada') n,
+      `SELECT CONVERT(varchar(10), Inicio, 126) data, Vagas vagasAtual, ReservaFechada rfAtual, AutoAtendimento aaAtual, (SELECT COUNT(*) FROM dbo.Inscricao WHERE BateriaId = @id AND Status <> 'cancelada') n,
               (SELECT COUNT(*) FROM dbo.Inscricao WHERE BateriaId = @id AND Pago = 1 AND Status <> 'cancelada') pagas FROM dbo.Bateria WHERE Id = @id`,
       { id },
     );
@@ -1382,6 +1416,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const inicio = localDateTime(b.inicio);
     if ((atual.pagas as number) > 0 && inicio.slice(0, 10) !== atual.data) throw new HttpError(409, 'Como há reservas pagas, não é possível alterar a data, apenas o horário.');
     const vagas = int(b.vagas, 'Vagas');
+    if ((b.reservaFechada && !atual.rfAtual) || (!b.autoAtendimento && atual.aaAtual) || vagas < Number(atual.vagasAtual)) await exigePodeFecharBateria(sessao);
     if (vagas < (atual.n as number)) throw new HttpError(409, `O máximo de competidores deve ser maior ou igual ao número de reservas. Número de reservas: ${atual.n}.`);
     const produtoId = int(b.produtoId, 'Produto');
     const cat = await one<{ c: string }>(`SELECT Categoria c FROM dbo.Produto WHERE Id = @produtoId`, { produtoId });
@@ -1400,11 +1435,13 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   if ((m = path.match(/^\/baterias\/(\d+)\/status$/)) && method === 'POST') {
     const b = await req.body();
     const status = b.status === 'fechada' ? 'fechada' : 'aberta';
+    if (status === 'fechada') await exigePodeFecharBateria(sessao);
     await query(`UPDATE dbo.Bateria SET Status = @status WHERE Id = @id AND Status <> 'cancelada'`, { status, id: Number(m[1]) });
     send(200, { ok: true });
     return true;
   }
   if ((m = path.match(/^\/baterias\/(\d+)$/)) && method === 'DELETE') {
+    await exigePodeFecharBateria(sessao);
     const id = Number(m[1]);
     const pagas = await one<{ n: number }>(`SELECT COUNT(*) n FROM dbo.Inscricao WHERE BateriaId = @id AND Pago = 1 AND Status <> 'cancelada'`, { id });
     if (pagas!.n > 0) throw new HttpError(409, 'Não é permitido excluir reservas pagas!');
@@ -1417,6 +1454,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   }
   if (path === '/baterias/fechar-dia' && method === 'POST') {
     // feriado decidido depois de abrir a agenda: cancela de uma vez as baterias do dia que não têm ninguém inscrito
+    await exigePodeFecharBateria(sessao);
     const b = await req.body();
     const data = isoDate(b.data);
     const r = await one<{ canceladas: number; mantidas: number }>(
@@ -1516,7 +1554,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
             'ProdutoId = @pid',
             'PrecoCentavos = @preco',
             'DescontoCentavos = CASE WHEN @produtoOrigem = @pid THEN CASE WHEN DescontoCentavos > @preco THEN @preco ELSE DescontoCentavos END ELSE 0 END',
-            'TermoImpressoEm = CASE WHEN @produtoOrigem = @pid THEN TermoImpressoEm ELSE NULL END',
+            // o termo não depende do produto: trocar o produto (ex.: 2 baterias) apagava o "impresso" e a recepção reimprimia tudo
           );
           p.preco = prod.preco;
           p.produtoOrigem = produtoOrigem;
@@ -1554,7 +1592,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     await tx(async (run) => {
       const [r] = await run(
         `SELECT i.ClienteId, i.BateriaId, i.Pago, i.Status, ISNULL(i.ProdutoId, b.ProdutoId) produtoId,
-         ISNULL(i.PrecoCentavos, po.PrecoCentavos) preco, i.DescontoCentavos desconto FROM dbo.Inscricao i WITH (UPDLOCK, HOLDLOCK) JOIN dbo.Bateria b ON b.Id = i.BateriaId
+         ISNULL(i.PrecoCentavos, po.PrecoCentavos) preco, i.DescontoCentavos desconto, b.TipoKart tipoKart, po.ServicoLocacao servicoLocacao, po.Categoria categoria, REPLACE(REPLACE(UPPER(po.Nome), N'ANTECIPADO - ', N''), N'BALCÃO - ', N'') servico, po.DuracaoMin duracaoMin FROM dbo.Inscricao i WITH (UPDLOCK, HOLDLOCK) JOIN dbo.Bateria b ON b.Id = i.BateriaId
          LEFT JOIN dbo.Produto po ON po.Id = ISNULL(i.ProdutoId, b.ProdutoId) WHERE i.Id = @id`,
         { id },
       );
@@ -1562,29 +1600,44 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
       if (r.Status === 'cancelada') throw new HttpError(409, 'Não é possível mover uma reserva cancelada.');
       if (Number(r.BateriaId) === destino) return;
       const [d] = await run(
-        `SELECT b.Status, b.Vagas, p.Id produtoId, p.PrecoCentavos preco, (SELECT COUNT(*) FROM dbo.Inscricao x WITH (UPDLOCK, HOLDLOCK) WHERE x.BateriaId = b.Id AND x.Status <> 'cancelada') ocupadas
+        `SELECT b.Status, b.Vagas, b.TipoKart tipoKart, p.ServicoLocacao servicoLocacao, p.Categoria categoria, REPLACE(REPLACE(UPPER(p.Nome), N'ANTECIPADO - ', N''), N'BALCÃO - ', N'') servico, p.DuracaoMin duracaoMin, p.Id produtoId, p.PrecoCentavos preco, (SELECT COUNT(*) FROM dbo.Inscricao x WITH (UPDLOCK, HOLDLOCK) WHERE x.BateriaId = b.Id AND x.Status <> 'cancelada') ocupadas
          FROM dbo.Bateria b WITH (UPDLOCK, HOLDLOCK) LEFT JOIN dbo.Produto p ON p.Id = b.ProdutoId WHERE b.Id = @destino`,
         { destino },
       );
       if (!d || d.Status === 'cancelada') throw new HttpError(404, 'Bateria destino não encontrada.');
       if (d.produtoId == null || d.preco == null) throw new HttpError(409, 'A bateria destino precisa ter um produto com preço cadastrado.');
-      if (r.Pago && (Number(d.produtoId) !== Number(r.produtoId) || Number(d.preco) !== Number(r.preco))) {
-        throw new HttpError(409, 'Reserva paga só pode ser movida para bateria com o mesmo produto e preço. Para mudar o valor, faça o estorno e uma nova reserva.');
+      // Antecipado e balcão do mesmo serviço mantêm o produto e o valor já pagos.
+      const mesmoServico = Number(d.produtoId) === Number(r.produtoId) || (
+        r.servicoLocacao && d.servicoLocacao && r.categoria && r.categoria === d.categoria
+        && r.servico && r.servico === d.servico
+        && (r.duracaoMin ?? null) === (d.duracaoMin ?? null)
+      );
+      if (r.Pago && (r.tipoKart !== d.tipoKart || !mesmoServico)) {
+        throw new HttpError(409, 'Reserva paga só pode ser movida para bateria do mesmo serviço e tipo de kart. O produto e o valor já pagos são preservados.');
       }
       if ((d.ocupadas as number) >= (d.Vagas as number)) throw new HttpError(409, 'Não há vagas disponíveis.');
       if (d.Status !== 'aberta') throw new HttpError(409, 'A bateria destino não está disponível.');
       const [dup] = await run(`SELECT 1 x FROM dbo.Inscricao WHERE BateriaId = @destino AND ClienteId = @c AND Status <> 'cancelada'`, { destino, c: r.ClienteId });
       if (dup) throw new HttpError(409, 'Já existe uma reserva para este cliente na bateria selecionada.');
       if (r.Pago) {
-        await run(`UPDATE dbo.Inscricao SET BateriaId = @destino, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { destino, id });
+        await run(`UPDATE dbo.Inscricao SET BateriaId = @destino, TermoImpressoEm = NULL, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { destino, id });
       } else {
         await run(
           `UPDATE dbo.Inscricao SET BateriaId = @destino, ProdutoId = @produtoDestino, PrecoCentavos = @precoDestino,
            DescontoCentavos = CASE WHEN @produtoOrigem = @produtoDestino THEN CASE WHEN DescontoCentavos > @precoDestino THEN @precoDestino ELSE DescontoCentavos END ELSE 0 END,
-           AtualizadoEm = SYSDATETIME() WHERE Id = @id`,
+           TermoImpressoEm = NULL, AtualizadoEm = SYSDATETIME() WHERE Id = @id`,
           { destino, id, produtoOrigem: r.produtoId, produtoDestino: d.produtoId, precoDestino: d.preco },
         );
       }
+      await run(
+        `IF OBJECT_ID('dbo.ReservaGrupoPiloto') IS NOT NULL
+         UPDATE g SET BateriaId = @destino, AtualizadoEm = SYSDATETIME()
+           FROM dbo.ReservaGrupo g
+          WHERE EXISTS (SELECT 1 FROM dbo.ReservaGrupoPiloto p WHERE p.GrupoId = g.Id AND p.InscricaoId = @id)
+            AND NOT EXISTS (SELECT 1 FROM dbo.ReservaGrupoPiloto p JOIN dbo.Inscricao i ON i.Id = p.InscricaoId
+                            WHERE p.GrupoId = g.Id AND i.Status <> 'cancelada' AND i.BateriaId <> @destino)`,
+        { destino, id },
+      );
     });
     send(200, { mensagem: 'Cliente movido com sucesso.' });
     return true;
@@ -1596,7 +1649,6 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
          Pago = CASE WHEN x.total = 0 THEN 1 ELSE i.Pago END,
          ValorCentavos = CASE WHEN x.total = 0 THEN 0 ELSE i.ValorCentavos END,
          Status = CASE WHEN x.total = 0 THEN 'confirmada' ELSE i.Status END,
-         TermoImpressoEm = COALESCE(i.TermoImpressoEm, SYSDATETIME()),
          AtualizadoEm = SYSDATETIME()
        FROM dbo.Inscricao i JOIN dbo.Bateria b ON b.Id = i.BateriaId LEFT JOIN dbo.Produto p ON p.Id = ISNULL(i.ProdutoId, b.ProdutoId)
        CROSS APPLY (SELECT ISNULL(i.PrecoCentavos, p.PrecoCentavos) - i.DescontoCentavos total) x
@@ -1678,8 +1730,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
       const dup = await one<{ id: number; nome: string }>(`SELECT TOP 1 Id id, Nome nome FROM dbo.Cliente WHERE DocumentoNum = @d`, { d: onlyDigits(b.documento) });
       if (dup) throw new HttpError(409, `Documento já cadastrado para ${dup.nome} (cliente ${dup.id}).`);
     }
-    send(201, { id: await insertCliente(b, 'recepcao') });
-    pedirVinculoAgora(); // cliente que já criou conta no app vincula no próximo ciclo (≤ 5 s)
+    send(201, { id: await insertCliente(b, 'recepcao') }); pedirVinculoAgora();
     return true;
   }
   if ((m = path.match(/^\/clientes\/(\d+)$/)) && method === 'PUT') {
@@ -1687,8 +1738,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const erroCadastro = erroCadastroObrigatorio(b);
     if (erroCadastro) throw new HttpError(400, erroCadastro);
     if ((b.tipoDocumento ?? 'CPF') === 'CPF' && b.documento && !isValidCpf(b.documento)) throw new HttpError(400, 'CPF inválido.');
-    await updateCliente(Number(m[1]), b, false);
-    pedirVinculoAgora(); // e-mail/telefone corrigido na recepção: confere de novo as contas do app pendentes
+    await updateCliente(Number(m[1]), b, false); pedirVinculoAgora();
     send(200, { ok: true });
     return true;
   }
@@ -1794,7 +1844,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
       one(`SELECT Nome nome, RazaoSocial razaoSocial FROM dbo.Empresa WHERE Id = 1`),
       query(`SELECT Chave chave, Valor valor FROM dbo.Parametro`),
     ]);
-    send(200, { produtos, tracados, formas, padroes, empresa, parametros: Object.fromEntries(parametros.map((p) => [p.chave, p.valor])), usuario: sessao });
+    send(200, { produtos, tracados, formas, padroes, empresa, parametros: Object.fromEntries(parametros.filter((p) => p.chave !== 'office.usuariosSemFecharBateria').map((p) => [p.chave, p.valor])), usuario: sessao, podeFecharBateria: await podeFecharBateria(sessao) });
     return true;
   }
   if (path === '/empresa' && method === 'GET') {
@@ -1852,7 +1902,21 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     return true;
   }
   // ---------- permissões por perfil (Permissoes do canvas): matriz funcionalidade × acessar/incluir/alterar/excluir/exportar/importar
+  if (path === '/minhas-permissoes' && method === 'GET') {
+    const u = await one<{ id: number; nome: string; login: string; admin: boolean; ativo: boolean; perfilId: number | null; perfil: string | null; acessoTotal: boolean | null }>(
+      `SELECT u.Id id, u.Nome nome, u.Login login, u.Admin admin, u.Ativo ativo, u.PerfilId perfilId, p.Descricao perfil, p.AcessoTotal acessoTotal
+       FROM dbo.Usuario u LEFT JOIN dbo.Perfil p ON p.Id = u.PerfilId WHERE u.Id = @uid`, { uid: sessao.uid });
+    if (!u || !u.ativo) throw new HttpError(401, 'Sessão expirada. Entre novamente.');
+    const total = Boolean(u.admin) || Boolean(u.acessoTotal);
+    const itens = u.perfilId
+      ? await query<{ funcao: string; acessar: boolean; incluir: boolean; alterar: boolean; excluir: boolean }>(
+        `SELECT Funcao funcao, Acessar acessar, Incluir incluir, Alterar alterar, Excluir excluir FROM dbo.PerfilPermissao WHERE PerfilId = @p AND Modulo = 'Admin Web'`, { p: u.perfilId })
+      : [];
+    send(200, { id: u.id, nome: u.nome, login: u.login, admin: Boolean(u.admin), perfilId: u.perfilId, perfil: u.perfil, acessoTotal: total, configurado: itens.length > 0, telas: itens, fecharBateria: await podeFecharBateria(sessao) });
+    return true;
+  }
   if (path === '/permissoes' && method === 'GET') {
+    if (!sessao.admin) throw new HttpError(403, 'Disponível apenas para administradores.');
     const perfilId = Number(url.searchParams.get('perfilId'));
     if (!perfilId) throw new HttpError(400, 'Informe o perfil.');
     const perfil = await one<{ id: number; descricao: string; acessoTotal: boolean }>(`SELECT Id id, Descricao descricao, AcessoTotal acessoTotal FROM dbo.Perfil WHERE Id = @perfilId`, { perfilId });

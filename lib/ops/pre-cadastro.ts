@@ -4,7 +4,7 @@
  * Env: PRECADASTRO_URL (https://cadastro.kartodromodebetim.com.br) e PRECADASTRO_KEY (segredo do /api/sync).
  */
 import { insertCliente, one, onlyDigits, updateCliente, type ClienteInput } from './db';
-import { vincularCadastroDoLink } from './grupos';
+import { registrarCobrancaDoLink, vincularCadastroDoLink } from './grupos';
 import { registrarPreCadastro } from './painel';
 
 export type PreCadastro = {
@@ -139,7 +139,12 @@ export async function sincronizarPreCadastros(log: Log) {
   for (const p of pendentes) {
     try {
       const id = await gravarPreCadastro(p, log);
-      if (p.reserva) await vincularCadastroDoLink(p.reserva, id, log).catch((e) => log(`grupo: vínculo do link falhou (${(e as Error).message})`));
+      if (p.reserva) {
+        const ok = await vincularCadastroDoLink(p.reserva, id, log).catch((e) => { log(`grupo: vínculo do link falhou (${(e as Error).message})`); return false; });
+        // pagou (ou vai pagar) a vaga no fim do cadastro: a cobrança fica no piloto e a conferência do Asaas marca o pagamento
+        const cob = (p as { cobranca?: { id?: unknown; link?: unknown; valorCentavos?: unknown } }).cobranca;
+        if (ok && cob) await registrarCobrancaDoLink(p.reserva, id, cob, log).catch((e) => log(`grupo: cobrança do link falhou (${(e as Error).message})`));
+      }
       feitos.push(p.key);
     } catch (e) { log(`pré-cadastro ${p.key}: erro ${(e as Error).message}`); }
   }
@@ -154,7 +159,11 @@ export async function buscarPreCadastroAgora(identificador: string, log: Log) {
     const p = (await chamar(`/api/sync/buscar?q=${encodeURIComponent(identificador)}`, {}, 4000)) as PreCadastro | null;
     if (!p) return false;
     const id = await gravarPreCadastro(p, log);
-    if (p.reserva) await vincularCadastroDoLink(p.reserva, id, log).catch(() => undefined);
+    if (p.reserva) {
+      const ok = await vincularCadastroDoLink(p.reserva, id, log).catch(() => false);
+      const cob = (p as { cobranca?: { id?: unknown; link?: unknown; valorCentavos?: unknown } }).cobranca;
+      if (ok && cob) await registrarCobrancaDoLink(p.reserva, id, cob, log).catch(() => undefined);
+    }
     await chamar('/api/sync/concluir', { method: 'POST', body: JSON.stringify({ keys: [p.key] }) }).catch(() => undefined);
     return true;
   } catch (e) {

@@ -20,6 +20,10 @@ export type TermoParticipante = {
   responsavelDocumento: string | null;
   responsavelTelefone: string | null;
   responsavelEmail: string | null;
+  // bateria da inscrição e, se veio por reserva de grupo, quem reservou (nunca a lista dos outros pilotos)
+  bateriaNome?: string | null;
+  bateriaInicio?: string | null;
+  grupoResponsavel?: string | null;
 };
 
 type RenderTermoOptions = {
@@ -135,6 +139,24 @@ function value(text: string | null | undefined, branco: boolean, placeholder = '
   return esc(branco ? placeholder : content);
 }
 
+function horaDe(inicio: string | null | undefined) {
+  const m = String(inicio ?? '').match(/(\d{2}):(\d{2})/);
+  return m ? m[1] + ':' + m[2] : '';
+}
+
+// só o nome da bateria ("BATERIA 19:20") e, se for de grupo, "GRUPO DO(A) EDMAEL"
+function bateriaHtml(participante: TermoParticipante) {
+  if (!participante.bateriaNome && !participante.bateriaInicio) return '';
+  const titulo = String(participante.bateriaNome ?? '').trim() || 'BATERIA ' + horaDe(participante.bateriaInicio);
+  const grupo = String(participante.grupoResponsavel ?? '').trim();
+  return (
+    '<div class="rule"></div>' +
+    '<div class="bateria"><div class="bat-titulo">' + esc(titulo) + '</div>' +
+    (grupo ? '<div class="bat-grupo">GRUPO DO(A) ' + esc(grupo.toLocaleUpperCase('pt-BR')) + '</div>' : '') +
+    '</div>'
+  );
+}
+
 function participanteHtml(
   participante: TermoParticipante,
   empresa: TermoEmpresa,
@@ -166,6 +188,7 @@ function participanteHtml(
     '<div class="row"><div>Tel.: ' + value(participante.telefone, branco) + '</div></div>' +
     '<div class="row"><div>E-mail: ' + value(participante.email, branco) + '</div></div>' +
     '</div>' +
+    (branco ? '' : bateriaHtml(participante)) +
     '<div class="rule rule-legal"></div>' +
     '<article class="legal">' +
     renderLegal(companyName, textoPersonalizado) +
@@ -202,6 +225,9 @@ export function renderTermoResponsabilidade(options: RenderTermoOptions) {
     '.row{min-height:3.81mm;display:block;overflow-wrap:anywhere}' +
     '.pair{display:grid;grid-template-columns:1fr 1fr;gap:1.5mm}' +
     '.rule-legal{margin-top:0}' +
+    '.bateria{margin:1.5mm 0 1.5mm;flex:none;break-inside:avoid}' +
+    '.bat-titulo{font:bold 11pt/1.2 Arial,Helvetica,sans-serif;text-align:center}' +
+    '.bat-grupo{font:bold 9pt/1.3 Arial,Helvetica,sans-serif;text-align:center;margin-top:.8mm;overflow-wrap:anywhere}' +
     '.legal{font:8pt/1.1 Arial,Helvetica,sans-serif;text-align:justify;margin:1.52mm 0 0;flex:none}' +
     '.legal p{margin:0;orphans:2;widows:2}' +
     '.legal strong{font-weight:700}' +

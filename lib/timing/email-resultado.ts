@@ -24,7 +24,7 @@ export type ContextoProva = {
   penalidades?: { kart: string; nome: string; tipo?: string; segundos?: number; texto?: string; motivo?: string; wallMs?: number; flag?: string }[];
 };
 
-export type VoltaPiloto = { numero: number; ms: number; anulada: boolean; melhor: boolean; hora: number };
+export type VoltaPiloto = { numero: number; ms: number; anulada: boolean; estimada?: boolean; melhor: boolean; hora: number };
 
 export type PilotoEmail = { nome: string; kart: string; email: string; standing: Standing | null; voltas: VoltaPiloto[] };
 
@@ -64,8 +64,8 @@ function diferenca(r: Standing, tipo: SessionType) {
 /** Voltas válidas e anuladas do piloto, em ordem, com a melhor marcada (a 1ª passagem só abre a volta 1). */
 export function voltasDoPiloto(c: Competitor): VoltaPiloto[] {
   const passagens = c.crossings.filter((x) => !x.deleted && x.lapMs != null && x.lapMs > 0).sort((a, b) => a.wallMs - b.wallMs);
-  const voltas = passagens.map((x, i) => ({ numero: i + 1, ms: x.lapMs as number, anulada: Boolean(x.invalid), melhor: false, hora: x.wallMs }));
-  const validas = voltas.filter((v) => !v.anulada);
+  const voltas = passagens.map((x, i) => ({ numero: i + 1, ms: x.lapMs as number, anulada: Boolean(x.invalid) && !x.estimada, estimada: Boolean(x.estimada), melhor: false, hora: x.wallMs }));
+  const validas = voltas.filter((v) => !v.anulada && !v.estimada);
   if (validas.length) {
     const melhor = validas.reduce((a, b) => (b.ms < a.ms ? b : a));
     melhor.melhor = true;
@@ -343,7 +343,7 @@ function corpoVoltaAVolta(ctx: ContextoProva, p: PilotoEmail, logoDataUri: strin
   const melhor = p.voltas.find((v) => v.melhor)?.ms ?? null;
   const linhas = p.voltas
     .map((v) => `<tr class="${v.anulada ? 'anulada' : v.melhor ? 'melhor' : ''}"><td>${v.numero}</td><td class="r">${tempo(v.ms)}</td>
-      <td class="r">${v.anulada ? 'anulada' : melhor != null && !v.melhor ? `+${tempo(v.ms - melhor)}` : v.melhor ? 'melhor volta' : '—'}</td><td class="r">${hora(v.hora)}</td></tr>`)
+      <td class="r">${v.anulada ? 'anulada' : v.estimada ? 'estimada' : melhor != null && !v.melhor ? `+${tempo(v.ms - melhor)}` : v.melhor ? 'melhor volta' : '—'}</td><td class="r">${hora(v.hora)}</td></tr>`)
     .join('');
   const s = p.standing;
   return `${cabecalhoPdf(ctx, 'Volta a volta', logoDataUri)}

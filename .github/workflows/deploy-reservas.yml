@@ -1,15 +1,10 @@
 name: Deploy reserva online (worker kartodromo-cadastro)
 
 # Servidor da reserva online e do pré-cadastro (workers/pre-cadastro): pedidos, Asaas, política de cancelamento.
+# So manual: o worker no ar tem remendos que nao saem de workers/pre-cadastro (docs/operacao/patches-producao/cadastro-20261105).
+# Um push publicava a versao antiga por cima (05/11/2026) e tirava o link do grupo e os campos obrigatorios.
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'workers/pre-cadastro/**'
-      - 'src/config/politica-cancelamento.ts'
-      - '.github/workflows/deploy-reservas.yml'
 
 concurrency:
   group: deploy-reservas

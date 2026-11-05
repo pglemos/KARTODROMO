@@ -11,8 +11,8 @@
  * Pagamento feito no caixa da Recepção ou pelo site também conta (a vaga já vem paga).
  */
 import { randomBytes } from 'node:crypto';
-import { one, onlyDigits, query, tx } from './db';
-import { HttpError, inscreverN } from './office';
+import { insertCliente, one, onlyDigits, query, tx, type ClienteInput } from './db';
+import { HttpError, exigePodeFecharBateria, inscreverN } from './office';
 import type { Sessao } from './auth';
 
 type Req = { method: string; url: URL; body: () => Promise<Record<string, unknown>>; sessao: Sessao };
@@ -21,7 +21,7 @@ type Log = (...args: unknown[]) => void;
 
 export const LINK_CADASTRO = 'https://cadastro.kartodromodebetim.com.br';
 const MODOS = ['unico', 'individual', 'sinal'] as const;
-const ORIGENS = ['recepcao', 'whatsapp', 'telefone', 'site'] as const;
+const ORIGENS = ['recepcao', 'whatsapp', 'telefone', 'site', 'instagram'] as const;
 
 const int = (v: unknown, nome: string, min = 1) => {
   const n = Number(v);
@@ -180,18 +180,66 @@ export async function aplicarPagos(grupoId: number) {
  */
 export async function vincularCadastroDoLink(token: string, clienteId: number, log: Log) {
   if (!/^[A-Za-z0-9]{10,24}$/.test(token)) return false;
-  const p = await one<{ id: number; grupoId: number; inscricaoId: number | null; responsavel: boolean; bateriaId: number; nome: string | null }>(
+  type Vaga = { id: number; grupoId: number; inscricaoId: number | null; responsavel: boolean; bateriaId: number; nome: string | null };
+  let p = await one<Vaga>(
     `SELECT p.Id id, p.GrupoId grupoId, p.InscricaoId inscricaoId, p.Responsavel responsavel, g.BateriaId bateriaId, p.Nome nome
        FROM dbo.ReservaGrupoPiloto p JOIN dbo.ReservaGrupo g ON g.Id = p.GrupoId WHERE p.Token = @token AND g.Status = 'ativa'`,
     { token },
   );
   if (!p) { log(`grupo: link ${token.slice(0, 4)}… não pertence a nenhuma reserva ativa`); return false; }
+  if (p.responsavel) {
+    // LINK ÚNICO DO GRUPO: o código do responsável serve para todo mundo. Quem se cadastra ocupa a primeira vaga livre
+    // (de preferência a que já tem o nome dela). Os links individuais antigos continuam valendo.
+    const jaNoGrupo = await one<{ id: number }>(`SELECT TOP 1 Id id FROM dbo.ReservaGrupoPiloto WHERE GrupoId = @g AND ClienteId = @c`, { g: p.grupoId, c: clienteId });
+    if (jaNoGrupo) {
+      await query(`UPDATE dbo.ReservaGrupoPiloto SET CadastroEm = COALESCE(CadastroEm, SYSDATETIME()) WHERE Id = @id`, { id: jaNoGrupo.id });
+      log(`grupo ${p.grupoId}: cliente ${clienteId} já está no grupo (vaga ${jaNoGrupo.id}), cadastro confirmado`);
+      return true;
+    }
+    // o responsável ainda é provisório (só nome e WhatsApp)? Se quem abriu o link é ele (mesmo WhatsApp ou mesmo nome), o cadastro
+    // dele substitui o provisório em toda a reserva (vagas, grupo e vaga do responsável).
+    const prov = await one<{ slotId: number; clienteId: number; nome: string; telefone: string | null; documento: string | null }>(
+      `SELECT p.Id slotId, p.ClienteId clienteId, c.Nome nome, c.Telefone telefone, c.Documento documento
+         FROM dbo.ReservaGrupoPiloto p JOIN dbo.Cliente c ON c.Id = p.ClienteId WHERE p.Id = @id`, { id: p.id },
+    );
+    if (prov && !prov.documento) {
+      const quem = await one<{ nome: string; telefone: string | null }>(`SELECT Nome nome, Telefone telefone FROM dbo.Cliente WHERE Id = @c`, { c: clienteId });
+      const fim = (v: string | null | undefined) => onlyDigits(v).slice(-8);
+      const mesmoFone = !!quem && fim(quem.telefone).length >= 8 && fim(quem.telefone) === fim(prov.telefone);
+      const a = semAcento(quem?.nome).split(' '), b2 = semAcento(prov.nome).split(' ');
+      const mesmoNome = !!quem && (semAcento(quem.nome) === semAcento(prov.nome) || (a.length > 1 && b2.length > 1 && a[0] === b2[0] && a[a.length - 1] === b2[b2.length - 1]));
+      if (mesmoFone || mesmoNome) {
+        const antigo = prov.clienteId;
+        await query(`UPDATE dbo.Inscricao SET ClienteId = @c, AtualizadoEm = SYSDATETIME() WHERE ClienteId = @a AND Id IN (SELECT InscricaoId FROM dbo.ReservaGrupoPiloto WHERE GrupoId = @g AND InscricaoId IS NOT NULL)`, { c: clienteId, a: antigo, g: p.grupoId });
+        await query(`UPDATE dbo.Inscricao SET ResponsavelId = @c WHERE ResponsavelId = @a AND Id IN (SELECT InscricaoId FROM dbo.ReservaGrupoPiloto WHERE GrupoId = @g AND InscricaoId IS NOT NULL)`, { c: clienteId, a: antigo, g: p.grupoId }).catch(() => undefined);
+        await query(`UPDATE dbo.ReservaGrupo SET ResponsavelId = @c, AtualizadoEm = SYSDATETIME() WHERE Id = @g`, { c: clienteId, g: p.grupoId });
+        await query(`UPDATE dbo.ReservaGrupoPiloto SET ClienteId = @c, CadastroEm = SYSDATETIME() WHERE Id = @id`, { c: clienteId, id: p.id });
+        await query(
+          `DELETE FROM dbo.Cliente WHERE Id = @a AND Documento IS NULL
+             AND NOT EXISTS (SELECT 1 FROM dbo.Inscricao WHERE ClienteId = @a) AND NOT EXISTS (SELECT 1 FROM dbo.ReservaGrupo WHERE ResponsavelId = @a)
+             AND NOT EXISTS (SELECT 1 FROM dbo.ReservaGrupoPiloto WHERE ClienteId = @a)`, { a: antigo },
+        ).catch(() => log(`grupo ${p.grupoId}: cadastro provisório ${antigo} ficou (tem outros vínculos)`));
+        log(`grupo ${p.grupoId}: responsável cadastrou-se pelo link (cliente ${clienteId} no lugar do provisório ${antigo})`);
+        return true;
+      }
+    }
+    const livre = await one<Vaga>(
+      `SELECT TOP 1 v.Id id, v.GrupoId grupoId, v.InscricaoId inscricaoId, v.Responsavel responsavel, g.BateriaId bateriaId, v.Nome nome
+         FROM dbo.ReservaGrupoPiloto v JOIN dbo.ReservaGrupo g ON g.Id = v.GrupoId JOIN dbo.Cliente c ON c.Id = @c
+        WHERE v.GrupoId = @g AND v.ClienteId IS NULL AND v.Responsavel = 0
+        ORDER BY CASE WHEN v.Nome IS NOT NULL AND LOWER(v.Nome) = LOWER(c.Nome) THEN 0 ELSE 1 END, v.Ordem`,
+      { g: p.grupoId, c: clienteId },
+    );
+    if (!livre) { log(`grupo ${p.grupoId}: link do grupo usado pelo cliente ${clienteId}, mas não há vaga livre (aumente a quantidade de pilotos na reserva)`); return false; }
+    p = livre;
+  }
   const outra = await one<{ Id: number }>(
     `SELECT TOP 1 Id FROM dbo.Inscricao WHERE BateriaId = @b AND ClienteId = @c AND Status <> 'cancelada' AND Id <> ISNULL(@i, 0)`,
     { b: p.bateriaId, c: clienteId, i: p.inscricaoId },
   );
   if (p.inscricaoId && !outra) {
     await query(`UPDATE dbo.Inscricao SET ClienteId = @c, AtualizadoEm = SYSDATETIME() WHERE Id = @i AND Status <> 'cancelada'`, { c: clienteId, i: p.inscricaoId });
+    await limparProvisorios();
   }
   await query(
     `UPDATE p SET ClienteId = @c, CadastroEm = SYSDATETIME(), Nome = COALESCE(NULLIF(p.Nome, ''), c.Nome), Telefone = COALESCE(NULLIF(p.Telefone, ''), c.Telefone)
@@ -200,6 +248,126 @@ export async function vincularCadastroDoLink(token: string, clienteId: number, l
   );
   log(`grupo ${p.grupoId}: piloto ${p.id} cadastrado pelo link (cliente ${clienteId})${outra ? ' — já tinha outra vaga na bateria, vaga do grupo mantida' : ''}`);
   return true;
+}
+
+// ---------------------------------------------------------------- vaga do grupo x pessoa que chegou (totem/recepção)
+
+type VagaLivre = { id: number; ordem: number; nome: string | null; telefone: string | null; inscricaoId: number | null };
+
+/** Vagas do grupo que ainda aguardam um cadastro de verdade (o "Amigo N de..." provisório). */
+async function vagasAguardando(grupoId: number): Promise<VagaLivre[]> {
+  return query<VagaLivre>(
+    `SELECT v.Id id, v.Ordem ordem, v.Nome nome, v.Telefone telefone, v.InscricaoId inscricaoId
+       FROM dbo.ReservaGrupoPiloto v JOIN dbo.Inscricao i ON i.Id = v.InscricaoId AND i.Status <> 'cancelada'
+      WHERE v.GrupoId = @g AND v.ClienteId IS NULL AND v.Responsavel = 0 ORDER BY v.Ordem`,
+    { g: grupoId },
+  );
+}
+
+/**
+ * Uma pessoa com cadastro de verdade passa a ocupar uma vaga que já existia no grupo, mantendo preço e pagamento da vaga.
+ * Pode ser repetida sem efeito. Se a pessoa já tinha uma pré-reserva avulsa (totem) na mesma bateria e ainda não paga,
+ * essa pré-reserva sai (a vaga do grupo é a dela). Reserva paga duplicada fica para a recepção resolver.
+ */
+export async function vincularClienteAoGrupo(grupoId: number, clienteId: number, pilotoId: number | null, log: Log) {
+  const g = await one<{ bateriaId: number }>(`SELECT BateriaId bateriaId FROM dbo.ReservaGrupo WHERE Id = @g AND Status = 'ativa'`, { g: grupoId });
+  if (!g) throw new HttpError(404, 'Reserva em grupo não encontrada.');
+  const c = await one<{ id: number }>(`SELECT Id id FROM dbo.Cliente WHERE Id = @c`, { c: clienteId });
+  if (!c) throw new HttpError(404, 'Cadastro não encontrado.');
+  const ja = await one<{ id: number }>(`SELECT TOP 1 Id id FROM dbo.ReservaGrupoPiloto WHERE GrupoId = @g AND ClienteId = @c`, { g: grupoId, c: clienteId });
+  if (ja) return { ok: true, jaVinculado: true, pilotoId: ja.id, inscricaoId: null as number | null };
+  const livres = await vagasAguardando(grupoId);
+  const vaga = pilotoId ? livres.find((v) => v.id === pilotoId) : livres[0];
+  if (!vaga || !vaga.inscricaoId) throw new HttpError(409, 'Não há vaga aguardando cadastro neste grupo.');
+  await tx(async (run) => {
+    const outras = await run(
+      `SELECT Id, Pago, VendaId FROM dbo.Inscricao WITH (UPDLOCK) WHERE BateriaId = @b AND ClienteId = @c AND Status <> 'cancelada' AND Id <> @i`,
+      { b: g.bateriaId, c: clienteId, i: vaga.inscricaoId },
+    );
+    for (const o of outras) {
+      if (o.Pago || o.VendaId) throw new HttpError(409, 'Esta pessoa já tem reserva paga nesta bateria. Resolva na recepção (estorno ou mover).');
+    }
+    for (const o of outras) await run(`UPDATE dbo.Inscricao SET Status = 'cancelada', Pago = 0, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { id: o.Id });
+    await run(`UPDATE dbo.Inscricao SET ClienteId = @c, AtualizadoEm = SYSDATETIME() WHERE Id = @i AND Status <> 'cancelada'`, { c: clienteId, i: vaga.inscricaoId });
+    await run(
+      `UPDATE p SET ClienteId = @c, CadastroEm = SYSDATETIME(), Nome = COALESCE(NULLIF(p.Nome, ''), c.Nome), Telefone = COALESCE(NULLIF(p.Telefone, ''), c.Telefone)
+         FROM dbo.ReservaGrupoPiloto p JOIN dbo.Cliente c ON c.Id = @c WHERE p.Id = @id`,
+      { c: clienteId, id: vaga.id },
+    );
+  });
+  await limparProvisorios();
+  log(`grupo ${grupoId}: cliente ${clienteId} ocupou a vaga ${vaga.id} (vínculo pela recepção/totem)`);
+  return { ok: true, jaVinculado: false, pilotoId: vaga.id, inscricaoId: vaga.inscricaoId as number | null };
+}
+
+/**
+ * Chegada no totem: se a bateria tem um grupo com vaga aguardando cuja pessoa a recepção já anotou (mesmo nome completo ou
+ * mesmo WhatsApp), a pessoa entra nessa vaga sozinha. Sem dado em comum NÃO vincula: o mesmo horário não prova que é do grupo.
+ * Devolve o id da inscrição da vaga, ou null.
+ */
+export async function vincularPorDados(bateriaId: number, clienteId: number, log: Log): Promise<number | null> {
+  const quem = await one<{ nome: string; telefone: string | null }>(`SELECT Nome nome, Telefone telefone FROM dbo.Cliente WHERE Id = @c`, { c: clienteId });
+  if (!quem) return null;
+  const grupos = await query<{ id: number }>(`SELECT Id id FROM dbo.ReservaGrupo WHERE BateriaId = @b AND Status = 'ativa'`, { b: bateriaId });
+  const fim = (v: string | null | undefined) => onlyDigits(v).slice(-8);
+  const a = semAcento(quem.nome).split(' ');
+  for (const gr of grupos) {
+    for (const v of await vagasAguardando(gr.id)) {
+      const mesmoFone = fim(quem.telefone).length >= 8 && fim(quem.telefone) === fim(v.telefone);
+      const b2 = semAcento(v.nome).split(' ');
+      const mesmoNome = !!v.nome && a.length > 1 && b2.length > 1 && a[0] === b2[0] && a[a.length - 1] === b2[b2.length - 1];
+      if (!mesmoFone && !mesmoNome) continue;
+      const r = await vincularClienteAoGrupo(gr.id, clienteId, v.id, log).catch(() => null);
+      if (r?.inscricaoId) return r.inscricaoId;
+      if (r?.jaVinculado) return (await one<{ i: number }>(`SELECT InscricaoId i FROM dbo.ReservaGrupoPiloto WHERE Id = @id`, { id: r.pilotoId }))?.i ?? null;
+    }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------- totem: "Vim com um grupo"
+
+const primeiroNome = (nome: string) => {
+  const p = String(nome ?? '').trim().split(/\s+/).filter(Boolean);
+  return p.length ? p[0].charAt(0).toUpperCase() + p[0].slice(1).toLowerCase() : '';
+};
+
+/**
+ * Grupos de hoje que ainda têm vaga aguardando quem chegar: o totem mostra "Grupo do Edmael · 21:40" ANTES das baterias,
+ * para o amigo se reconhecer. Só o primeiro nome do responsável aparece (privacidade).
+ */
+export async function gruposDoDiaNoTotem() {
+  const rows = await query<{ id: number; responsavel: string; bateriaId: number; inicio: string; total: number }>(
+    `SELECT g.Id id, r.Nome responsavel, g.BateriaId bateriaId, CONVERT(varchar(16), b.Inicio, 126) inicio,
+            (SELECT COUNT(*) FROM dbo.ReservaGrupoPiloto p WHERE p.GrupoId = g.Id) total
+       FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId JOIN dbo.Cliente r ON r.Id = g.ResponsavelId
+      WHERE g.Status = 'ativa' AND b.Status <> 'cancelada' AND CONVERT(date, b.Inicio) = CONVERT(date, SYSDATETIME())
+        AND b.Inicio >= DATEADD(MINUTE, -45, SYSDATETIME())
+      ORDER BY b.Inicio, g.Id`,
+  );
+  const out: { id: number; responsavel: string; inicio: string; total: number; aguardando: number; bateriaId: number }[] = [];
+  for (const g of rows) {
+    const aguardando = (await vagasAguardando(g.id)).length;
+    if (aguardando > 0) out.push({ id: g.id, responsavel: primeiroNome(g.responsavel), inicio: g.inicio, total: Number(g.total), aguardando, bateriaId: g.bateriaId });
+  }
+  return out;
+}
+
+/** O amigo escolheu o grupo no totem: ocupa uma vaga já paga e recebe a mensagem que valoriza quem reservou. */
+export async function entrarNoGrupoPeloTotem(grupoId: number, clienteId: number, log: Log) {
+  const r = await vincularClienteAoGrupo(grupoId, clienteId, null, log);
+  const g = await one<{ responsavel: string; bateriaId: number; inicio: string; total: number }>(
+    `SELECT rc.Nome responsavel, g.BateriaId bateriaId, CONVERT(varchar(16), b.Inicio, 126) inicio,
+            (SELECT COUNT(*) FROM dbo.ReservaGrupoPiloto p WHERE p.GrupoId = g.Id) total
+       FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId JOIN dbo.Cliente rc ON rc.Id = g.ResponsavelId WHERE g.Id = @g`,
+    { g: grupoId },
+  );
+  if (!g) throw new HttpError(404, 'Reserva em grupo não encontrada.');
+  const quem = primeiroNome(g.responsavel);
+  return {
+    ok: true, jaVinculado: r.jaVinculado, bateriaId: g.bateriaId, inicio: g.inicio, total: Number(g.total), responsavel: quem,
+    mensagem: `${quem} reservou e pagou a corrida de todos os ${g.total} amigos. Você é convidado(a) dele(a)!`,
+  };
 }
 
 // ---------------------------------------------------------------- cobrança Asaas (pelo worker do site)
@@ -291,12 +459,62 @@ async function novoPiloto(run: (t: string, p?: Record<string, unknown>) => Promi
   );
 }
 
+const semAcento = (v: unknown) => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+/**
+ * Quem liga ou escreve pelo WhatsApp quase nunca é cliente antigo e só informa nome e telefone. Cria (ou reaproveita, se o mesmo
+ * nome já existe com o mesmo telefone) um cadastro PROVISÓRIO só com nome e WhatsApp: a pessoa completa o resto pelo link do
+ * grupo e o cadastro dela substitui este (ver vincularCadastroDoLink).
+ */
+export async function responsavelProvisorio(r?: { nome?: unknown; telefone?: unknown }) {
+  const nome = txt(r?.nome, 100);
+  const tel = fone(r?.telefone);
+  if (!nome || semAcento(nome).split(' ').length < 2) throw new HttpError(400, 'Informe nome e sobrenome do responsável.');
+  if (!tel) throw new HttpError(400, 'Informe o WhatsApp do responsável, com DDD.');
+  const fim = onlyDigits(tel).slice(-9);
+  const iguais = await query<{ id: number; nome: string; telefone: string | null }>(
+    `SELECT TOP 20 Id id, Nome nome, Telefone telefone FROM dbo.Cliente WHERE Telefone IS NOT NULL AND Telefone LIKE '%' + @fim ORDER BY Id DESC`, { fim: fim.slice(-4) },
+  );
+  const ja = iguais.find((c) => onlyDigits(c.telefone).slice(-9) === fim && semAcento(c.nome) === semAcento(nome));
+  if (ja) return ja.id;
+  return insertCliente({ nome, telefone: tel } as ClienteInput, 'recepcao');
+}
+
+type Executa = (t: string, p?: Record<string, unknown>) => Promise<Linha[]>;
+
+/**
+ * Vaga ainda sem cadastro: ganha um cadastro PROVISÓRIO próprio ("Amigo 2 de Maria Souza", ou o nome que a Recepção já digitou).
+ * Sem isso todas as vagas ficam no cadastro do responsável e a Recepção, o crono e o tablet enxergam um único piloto repetido
+ * (e os amigos ficam sem kart). Quando o amigo se cadastra pelo link, o cadastro dele substitui este (vincularCadastroDoLink).
+ */
+async function cadastroDaVaga(run: Executa, responsavelId: number, ordem: number, nome: string | null, telefone: string | null) {
+  const [r] = await run(`SELECT Nome FROM dbo.Cliente WHERE Id = @id`, { id: responsavelId });
+  const rotulo = (nome && nome.trim()) || `Amigo ${ordem} de ${String(r?.Nome ?? 'responsável')}`;
+  const [c] = await run(
+    `INSERT INTO dbo.Cliente (Nome, Telefone, TelefoneNum, Origem) OUTPUT inserted.Id id VALUES (@n, @t, @tn, 'grupo')`,
+    { n: rotulo.slice(0, 200), t: telefone, tn: telefone ? onlyDigits(telefone).slice(-20) || null : null },
+  );
+  return Number(c.id);
+}
+
+/** Apaga os cadastros provisórios de vaga que ninguém mais usa (o amigo se cadastrou e a reserva passou para ele). */
+async function limparProvisorios() {
+  await query(
+    `DELETE FROM dbo.Cliente WHERE Origem = 'grupo' AND Documento IS NULL
+       AND NOT EXISTS (SELECT 1 FROM dbo.Inscricao i WHERE i.ClienteId = Cliente.Id)
+       AND NOT EXISTS (SELECT 1 FROM dbo.ReservaGrupo g WHERE g.ResponsavelId = Cliente.Id)
+       AND NOT EXISTS (SELECT 1 FROM dbo.ReservaGrupoPiloto p WHERE p.ClienteId = Cliente.Id)`,
+  ).catch(() => undefined);
+}
+
 export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
   const { method, url, sessao } = req;
   const path = url.pathname.replace(/^\/api\/office/, '');
   let m: RegExpMatchArray | null;
   if ((m = path.match(/^\/baterias\/(\d+)\/tipo$/)) && method === 'POST') {
-    await tipoDaBateria(Number(m[1]), String((await req.body()).tipo ?? ''));
+    const tipo = String((await req.body()).tipo ?? '');
+    if (tipo === 'fechada' || tipo === 'bloqueada') await exigePodeFecharBateria(sessao);
+    await tipoDaBateria(Number(m[1]), tipo);
     send(200, { ok: true });
     return true;
   }
@@ -311,10 +529,33 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
     return true;
   }
 
+  if (path === '/grupos/pendencias' && method === 'GET') {
+    // quem chegou/reservou sozinho na bateria e as vagas de grupo que aguardam cadastro: a recepção liga uma coisa à outra
+    const b = int(url.searchParams.get('bateriaId'), 'Bateria');
+    const grupos = await query<{ id: number; codigo: string; responsavel: string }>(
+      `SELECT g.Id id, g.Codigo codigo, r.Nome responsavel FROM dbo.ReservaGrupo g JOIN dbo.Cliente r ON r.Id = g.ResponsavelId WHERE g.BateriaId = @b AND g.Status = 'ativa'`, { b });
+    const comVagas = [];
+    for (const g of grupos) { const livres = await vagasAguardando(g.id); if (livres.length) comVagas.push({ ...g, vagas: livres.map((v) => ({ id: v.id, ordem: v.ordem, nome: v.nome })) }); }
+    const candidatos = comVagas.length ? await query(
+      `SELECT i.Id inscricaoId, c.Id clienteId, c.Nome nome, i.Origem origem, i.Pago pago
+         FROM dbo.Inscricao i JOIN dbo.Cliente c ON c.Id = i.ClienteId
+        WHERE i.BateriaId = @b AND i.Status <> 'cancelada'
+          AND NOT EXISTS (SELECT 1 FROM dbo.ReservaGrupoPiloto p JOIN dbo.ReservaGrupo g ON g.Id = p.GrupoId AND g.Status = 'ativa' WHERE p.InscricaoId = i.Id)
+          AND NOT EXISTS (SELECT 1 FROM dbo.ReservaGrupoPiloto p JOIN dbo.ReservaGrupo g ON g.Id = p.GrupoId AND g.Status = 'ativa' WHERE p.ClienteId = c.Id AND g.BateriaId = @b)
+          AND NOT EXISTS (SELECT 1 FROM dbo.ReservaGrupo g WHERE g.Status = 'ativa' AND g.BateriaId = @b AND g.ResponsavelId = c.Id)
+        ORDER BY c.Nome`, { b }) : [];
+    send(200, { grupos: comVagas, candidatos });
+    return true;
+  }
+  if ((m = path.match(/^\/grupos\/(\d+)\/vincular$/)) && method === 'POST') {
+    const b = await req.body();
+    send(200, await vincularClienteAoGrupo(Number(m[1]), int(b.clienteId, 'Cliente'), b.pilotoId ? int(b.pilotoId, 'Vaga') : null, (...a) => console.log(...a)));
+    return true;
+  }
   if (path === '/grupos' && method === 'POST') {
     const b = await req.body();
     const bateriaId = int(b.bateriaId, 'Bateria');
-    const responsavelId = int(b.responsavelId, 'Responsável');
+    const responsavelId = b.responsavelId ? int(b.responsavelId, 'Responsável') : await responsavelProvisorio(b.responsavelNovo as { nome?: unknown; telefone?: unknown } | undefined);
     const pilotos = (Array.isArray(b.pilotos) ? b.pilotos : []).slice(0, 40) as PilotoIn[];
     if (!pilotos.length) throw new HttpError(400, 'Informe ao menos um piloto.');
     const modo = MODOS.find((x) => x === b.modo) ?? 'individual';
@@ -337,6 +578,11 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
           { codigo: codigoNovo(), b: bateriaId, r: responsavelId, o: origem, m: modo, preco, sinal: sinalPct, obs, u: sessao.uid },
         );
         for (let k = 0; k < pilotos.length; k++) await novoPiloto(run, Number(g.id), k + 1, pilotos[k], insc[k], k === 0, k === 0 ? responsavelId : null);
+        // cada amigo é uma pessoa: a vaga nasce com cadastro provisório próprio, não no nome do responsável
+        for (let k = 1; k < pilotos.length; k++) {
+          const cid = await cadastroDaVaga(run, responsavelId, k + 1, txt(pilotos[k].nome, 120) ?? null, fone(pilotos[k].telefone) ?? null);
+          await run(`UPDATE dbo.Inscricao SET ClienteId = @c WHERE Id = @i`, { c: cid, i: insc[k] });
+        }
         await run(`UPDATE dbo.Inscricao SET PrecoCentavos = @preco WHERE Id IN (${insc.map(Number).join(',')})`, { preco });
         return Number(g.id);
       });
@@ -381,7 +627,11 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
     const g = await grupo(id);
     const p = (await req.body()) as PilotoIn;
     const [insc] = await inscreverN(Number(g.bateriaId), Number(g.responsavelId), 1, 'recepcao', sessao.uid, `Reserva em grupo ${g.codigo} pelo painel web`, true, { vagaDoGrupo: true });
-    await tx(async (run) => { await novoPiloto(run, id, g.n + 1, p, insc, false, null); await run(`UPDATE dbo.Inscricao SET ResponsavelId = @r, PrecoCentavos = @p WHERE Id = @i`, { r: g.responsavelId, p: g.preco, i: insc }); });
+    await tx(async (run) => {
+      await novoPiloto(run, id, g.n + 1, p, insc, false, null);
+      const cid = await cadastroDaVaga(run, Number(g.responsavelId), g.n + 1, txt(p.nome, 120) ?? null, fone(p.telefone) ?? null);
+      await run(`UPDATE dbo.Inscricao SET ClienteId = @c, ResponsavelId = @r, PrecoCentavos = @p WHERE Id = @i`, { c: cid, r: g.responsavelId, p: g.preco, i: insc });
+    });
     await aplicarPagos(id);
     send(201, await grupo(id));
     return true;
@@ -395,6 +645,13 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
     if (method === 'PUT') {
       const b = (await req.body()) as PilotoIn;
       await query(`UPDATE dbo.ReservaGrupoPiloto SET Nome = @n, Telefone = @t, Menor = @m WHERE Id = @id`, { id: pid, n: txt(b.nome, 120), t: b.telefone === '' ? null : fone(b.telefone) ?? txt(b.telefone, 30), m: b.menor ? 1 : 0 });
+      if (!p.clienteId && p.inscricaoId) {
+        await query(
+          `UPDATE c SET Nome = LEFT(COALESCE(NULLIF(LTRIM(RTRIM(@n)), ''), 'Amigo ' + CAST(@o AS varchar(5)) + ' de ' + r.Nome), 200), Telefone = COALESCE(@t, c.Telefone), AtualizadoEm = SYSDATETIME()
+             FROM dbo.Cliente c JOIN dbo.Inscricao i ON i.ClienteId = c.Id JOIN dbo.Cliente r ON r.Id = @r WHERE i.Id = @i AND c.Origem = 'grupo'`,
+          { n: txt(b.nome, 120) ?? '', o: p.ordem, t: b.telefone === '' ? null : fone(b.telefone) ?? null, r: g.responsavelId, i: p.inscricaoId },
+        ).catch(() => undefined);
+      }
       send(200, await grupo(id));
       return true;
     }
@@ -465,4 +722,60 @@ export async function tipoDaBateria(bateriaId: number, tipo: string) {
   else if (tipo === 'bloqueada') await query(`UPDATE dbo.Bateria SET AutoAtendimento = 0 WHERE Id = @id AND Status <> 'cancelada'`, { id: bateriaId });
   else if (tipo === 'aberta') await query(`UPDATE dbo.Bateria SET ReservaFechada = 0, AutoAtendimento = 1 WHERE Id = @id AND Status <> 'cancelada'`, { id: bateriaId });
   else throw new HttpError(400, 'Tipo inválido.');
+}
+
+// ---------------------------------------------------------------- link único do grupo no site (cadastro + pagamento)
+
+let ultimoResumoSite = '';
+/**
+ * Manda ao site o resumo das reservas em grupo ativas: com ele o link do grupo mostra "Grupo do(a) Fulano", a bateria e,
+ * se cada um paga o seu, cobra a vaga da pessoa na hora (Asaas) no fim do cadastro. Só reenvia quando algo muda.
+ */
+export async function publicarGruposNoSite(log: Log) {
+  if (!siteUrl() || !siteChave()) return 0;
+  const gs = await query<{ id: number; codigo: string; modo: string; preco: number; status: string; bateria: string; inicio: string; responsavel: string }>(
+    `SELECT g.Id id, g.Codigo codigo, g.Modo modo, g.PrecoCentavos preco, g.Status status, b.Nome bateria, CONVERT(varchar(16), b.Inicio, 126) inicio, r.Nome responsavel
+       FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId JOIN dbo.Cliente r ON r.Id = g.ResponsavelId
+      WHERE g.Status = 'ativa' AND b.Inicio > DATEADD(hour, -2, SYSDATETIME())`,
+  );
+  if (!gs.length) return 0;
+  const lista = gs.map((g) => g.id).join(',');
+  const vagas = await query<{ grupoId: number; token: string; livre: number }>(
+    `SELECT v.GrupoId grupoId, v.Token token, CASE WHEN v.ClienteId IS NULL AND v.Responsavel = 0 AND i.Id IS NOT NULL THEN 1 ELSE 0 END livre
+       FROM dbo.ReservaGrupoPiloto v LEFT JOIN dbo.Inscricao i ON i.Id = v.InscricaoId AND i.Status <> 'cancelada'
+      WHERE v.GrupoId IN (${lista})`,
+  );
+  const grupos = gs.map((g) => {
+    const dele = vagas.filter((v) => v.grupoId === g.id);
+    return {
+      tokens: dele.map((v) => v.token).filter(Boolean), codigo: g.codigo, status: g.status, modo: g.modo, precoCentavos: Number(g.preco) || 0,
+      bateria: g.bateria, inicio: g.inicio, responsavel: primeiroNome(g.responsavel), livres: dele.reduce((s, v) => s + v.livre, 0),
+    };
+  });
+  const json = JSON.stringify({ grupos });
+  if (json === ultimoResumoSite) return 0;
+  await site('/api/sync/grupos', { method: 'PUT', body: json });
+  ultimoResumoSite = json;
+  log(`grupo: resumo de ${grupos.length} reserva(s) em grupo enviado ao site`);
+  return grupos.length;
+}
+
+/** A pessoa pagou (ou vai pagar) a vaga no fim do cadastro pelo link do grupo: a cobrança passa a ser da vaga que ficou com ela. */
+export async function registrarCobrancaDoLink(token: string, clienteId: number, cob: { id?: unknown; link?: unknown; valorCentavos?: unknown }, log: Log) {
+  const asaasId = String(cob.id ?? '');
+  if (!/^pay_[A-Za-z0-9]{6,40}$/.test(asaasId)) return false;
+  const vaga = await one<{ id: number; grupoId: number }>(
+    `SELECT TOP 1 v.Id id, v.GrupoId grupoId FROM dbo.ReservaGrupoPiloto t JOIN dbo.ReservaGrupoPiloto v ON v.GrupoId = t.GrupoId
+      WHERE t.Token = @token AND v.ClienteId = @c ORDER BY v.Responsavel, v.Ordem`,
+    { token, c: clienteId },
+  );
+  if (!vaga) { log(`grupo: cobrança ${asaasId} do link sem vaga para o cliente ${clienteId} (conferir na recepção)`); return false; }
+  if (await one(`SELECT 1 x FROM dbo.ReservaGrupoCobranca WHERE AsaasId = @a`, { a: asaasId })) return true;
+  await query(`UPDATE dbo.ReservaGrupoCobranca SET Status = 'cancelada' WHERE PilotoId = @p AND Status = 'aguardando'`, { p: vaga.id });
+  await query(
+    `INSERT INTO dbo.ReservaGrupoCobranca (GrupoId, PilotoId, ValorCentavos, AsaasId, Link) VALUES (@g, @p, @v, @a, @l)`,
+    { g: vaga.grupoId, p: vaga.id, v: Math.round(Number(cob.valorCentavos) || 0), a: asaasId, l: String(cob.link ?? '').slice(0, 400) },
+  );
+  log(`grupo ${vaga.grupoId}: cobrança ${asaasId} do link ligada ao piloto ${vaga.id} (cliente ${clienteId})`);
+  return true;
 }
