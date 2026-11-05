@@ -61,12 +61,15 @@ const Grupo = (() => {
   }
 
   // ---------------------------------------------------------------- janela "Reserva do grupo"
-  let estado = null; // { b, g (do servidor) | null, rasc (nova), aoMudar }
+  let estado = null;
+  const ativo = (ctx) => !!ctx && estado === ctx && ctx.janela?.isConnected && ctx.janela === $('#camada .modal');
+  // { b, g (do servidor) | null, rasc (nova), aoMudar }
 
   async function abrir(grupoId, b, aoMudar) {
     estado = { b, g: null, rasc: null, aoMudar, reg: { valor: '', quem: '', forma: 'Pix' } };
-    modal('<div class="esqueleto" style="height: 420px; margin: var(--kib-espaco-denso-20)"></div>').style.maxWidth = '1140px';
-    try { estado.g = await office(`/grupos/${grupoId}`); pintar(); } catch (e) { falhou(e); fecharCamada(); }
+    const ctx = estado;
+    ctx.janela = modal('<div class="esqueleto" style="height: 420px; margin: var(--kib-espaco-denso-20)"></div>'); ctx.janela.style.maxWidth = '1140px';
+    try { const g = await office(`/grupos/${grupoId}`); if (!ativo(ctx)) return; ctx.g = g; pintar(); } catch (e) { if (ativo(ctx)) { falhou(e); fecharCamada(); } }
   }
 
   // rascunho da reserva nova: sobrevive a recarregar a página (sessionStorage, por bateria); some ao salvar ou descartar
@@ -87,7 +90,7 @@ const Grupo = (() => {
       b, g: null, aoMudar, voltar, reg: { valor: '', quem: '', forma: 'Pix' }, enviarAgora: true, busca: '', achados: [],
       rasc: rascAnt ? { ...rascAnt, pilotos: Array.from({ length: n }, (_, i) => rascAnt.pilotos[i] || { nome: '', telefone: '', menor: false }) } : { responsavel: null, origem: lembrado('origem', ORIGENS.map((o) => o[0]), 'whatsapp'), modo: lembrado('modo', MODOS.map((m) => m[0]), 'individual'), preco: precoPara(lembrado('origem', ORIGENS.map((o) => o[0]), 'whatsapp'), b), precoManual: false, sinalPct: 30, pilotos: Array.from({ length: n }, () => ({ nome: '', telefone: '', menor: false })) },
     };
-    modal('', 'Nova reserva').style.maxWidth = '1140px';
+    estado.janela = modal('', 'Nova reserva'); estado.janela.style.maxWidth = '1140px';
     pintar();
     if (recuperado) toast('Recuperei o que você tinha digitado nesta reserva');
     setTimeout(() => { const c = document.querySelector('#camada [data-campo="nome"][data-i="0"]') || document.getElementById('qResp'); if (c) c.focus(); }, 60);
@@ -102,7 +105,7 @@ const Grupo = (() => {
   }
 
   function pintar() {
-    const m = $('#camada .modal'); if (!m || !estado) return;
+    if (!ativo(estado)) return; const m = estado.janela;
     guardarRascunho();
     const { b, g, rasc } = estado;
     const novo = !g;
@@ -111,7 +114,7 @@ const Grupo = (() => {
     const modo = novo ? rasc.modo : g.modo;
     const preco = novo ? rasc.preco : g.preco;
     const sinalPct = novo ? rasc.sinalPct : g.sinalPct;
-    const max = b.reservaFechada ? Math.max(12, +b.vagas || 12) : (novo ? +b.disponiveis : (+b.disponiveis || 0) + g.n);
+    const max = Math.max(0, +(novo ? b.disponiveis : g.disponiveis) || 0) + (novo ? 0 : g.n);
     const pilotos = novo ? rasc.pilotos.map((p, i) => ({ ...p, ordem: i + 1, responsavel: i === 0 })) : g.pilotos;
     const titulo = novo ? 'Quem vai correr?' : `${esc(nomeBonito(g.responsavel))}${g.n > 1 ? ' e mais ' + (g.n - 1) : ''}`;
     const linhas = pilotos.map((p, i) => {
@@ -206,7 +209,7 @@ const Grupo = (() => {
             ${!novo ? `<div style="display: flex; flex-direction: column; gap: var(--kib-espaco-1); padding: var(--kib-espaco-denso-12); border-radius: var(--kib-raio-cartao); background: linear-gradient(135deg, color-mix(in srgb, var(--kib-cor-estado-info-solido) 8%, transparent), color-mix(in srgb, var(--kib-cor-marca-principal) 8%, transparent)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--kib-cor-estado-info-solido) 15%, transparent)">
               <span class="linha gap-1"><span style="width: 26px; height: 26px; border-radius: var(--kib-raio-botao); display: flex; align-items: center; justify-content: center; background: ${G('var(--kib-cor-categoria-azul-escuro-topo)', 'var(--kib-cor-estado-info-solido)')}; color: var(--kib-cor-acao-sobre-principal); font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 800">A</span><b>Asaas · Pix e cartão</b><span class="chip ${!g.falta ? 'verde' : g.pago ? 'laranja' : 'azul'} empurra">${!g.falta ? 'Pago' : g.pago ? 'Parcial' : 'Aguardando'}</span></span>
               <span class="peq" style="line-height: 1.45; color: var(--tinta2)">${modo === 'individual' ? `Cada piloto paga a sua vaga (${brl(preco)}) no fim do cadastro pelo link do grupo. Se precisar, “Enviar link de pagamento” no piloto gera um link avulso.` : modo === 'sinal' ? `Link do sinal: ${brl(g.sinal)} (${sinalPct}%). O resto cada um paga na recepção.` : `Link do grupo inteiro: ${brl(g.falta)}.`}</span>
-              ${modo !== 'individual' && g.falta ? `<button class="btn prim peq" data-cobrar="">Gerar e enviar link ao responsável</button>` : ''}
+              ${modo !== 'individual' && g.falta && (modo !== 'sinal' || g.sinal > g.pago) ? `<button class="btn prim peq" data-cobrar="">Gerar e enviar link ao responsável</button>` : ''}
               ${g.cobrancaGrupo ? `<a class="mono peq trunc" target="_blank" rel="noopener" href="${esc(g.cobrancaGrupo.link)}" style="padding: var(--kib-espaco-1) var(--kib-espaco-1); border-radius: var(--kib-raio-botao); background: var(--kib-cor-superficie-padrao)">${esc(g.cobrancaGrupo.link)}</a>` : ''}
             </div>` : ''}
           </section>${novo ? '</details>' : ''}
@@ -215,13 +218,28 @@ const Grupo = (() => {
       <div class="modalRodape">
         ${novo ? `<button type="button" role="switch" aria-checked="${estado.enviarAgora}" data-enviar-agora="1" style="display: flex; align-items: center; gap: var(--kib-espaco-1); padding: 0; border: 0; background: transparent; font-size: var(--kib-fonte-tamanho-corpo); font-weight: 600; text-align: left"><span class="chave ${estado.enviarAgora ? 'on' : ''}"></span>Depois de salvar, já mostrar o link de cadastro do grupo para mandar no WhatsApp</button>` : `<button class="btn perigo peq" data-cancelar-grupo="1">Cancelar reserva</button>`}
         <span class="${estado.tentou ? 'erroMsg' : 'ajuda-campo'} empurra" id="erroGrupo" role="alert">${estado.tentou ? erroNovo : ajudaSalvar}</span>
-        <button class="btn sec" data-acao="fechar">${novo ? 'Cancelar' : 'Fechar'}</button>
+        ${novo ? '' : '<button class="btn sec" data-grupo-atualizar>Atualizar</button>'}<button class="btn sec" data-acao="fechar">${novo ? 'Cancelar' : 'Fechar'}</button>
         ${novo ? `<button class="btn prim ${respOk ? '' : 'quase'}" data-salvar-grupo="1" aria-describedby="erroGrupo" ${respOk ? '' : 'aria-disabled="true"'} title="Salvar (Ctrl+Enter)">Salvar reserva de ${c.n} piloto${c.n > 1 ? 's' : ''}</button>` : ''}
       </div>`;
   }
 
   async function atualizar(acao, msg) {
-    try { estado.g = await acao(); pintar(); if (msg) toast(msg); estado.aoMudar && estado.aoMudar(); } catch (e) { falhou(e, () => atualizar(acao, msg)); }
+    const ctx = estado; if (!ativo(ctx) || ctx.ocupado) return false;
+    ctx.ocupado = true;
+    try {
+      const g = await acao(); if (!ativo(ctx)) return false;
+      ctx.g = g; pintar(); if (msg) toast(msg); ctx.aoMudar && ctx.aoMudar(); return true;
+    } catch (e) { if (ativo(ctx)) falhou(e, () => { if (ativo(ctx)) atualizar(acao, msg); }); return false; }
+    finally { ctx.ocupado = false; }
+  }
+
+  async function refrescar(forcar = false) {
+    const ctx = estado; if (!ativo(ctx) || !ctx.g || ctx.ocupado || ctx.reg.valor || ctx.reg.quem || (!forcar && ctx.janela.contains(document.activeElement) && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName))) return;
+    try {
+      const [g, baterias] = await Promise.all([office(`/grupos/${ctx.g.id}`), office(`/baterias?status=todas&filtro=entre&data=${ctx.g.inicio.slice(0, 10)}&ate=${ctx.g.inicio.slice(0, 10)}`)]);
+      if (!ativo(ctx) || ctx.ocupado || !forcar && ctx.janela.contains(document.activeElement) && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
+      ctx.g = g; ctx.b = baterias.find((b) => b.id === g.bateriaId) || ctx.b; pintar();
+    } catch (e) { if (ativo(ctx)) { const er = $('#erroGrupo'); if (er) er.textContent = 'Não foi possível atualizar a reserva: ' + e.message; } }
   }
 
   function mostrarLinks(lista, titulo) {
@@ -232,15 +250,16 @@ const Grupo = (() => {
   // ---------------------------------------------------------------- eventos da janela
   let tBusca;
   document.addEventListener('input', (e) => {
-    if (!estado || !e.target.closest('#camada .modal')) return;
+    if (!ativo(estado) || !e.target.closest('#camada .modal')) return;
     const t = e.target;
     if (t.id === 'qResp') {
-      estado.busca = t.value; clearTimeout(tBusca);
+      const ctx = estado; estado.busca = t.value; clearTimeout(tBusca);
       const q = t.value.trim();
       tBusca = setTimeout(async () => {
-        if (q.length < 2) { estado.achados = []; $('#achados').innerHTML = ''; return; }
-        try { estado.achados = await office('/clientes?q=' + encodeURIComponent(q)); } catch (er) { estado.achados = []; }
-        if (estado.busca.trim() !== q) return;
+        if (!ativo(ctx)) return;
+        if (q.length < 2) { ctx.achados = []; const el = $('#achados'); if (el) el.innerHTML = ''; return; }
+        let achados; try { achados = await office('/clientes?q=' + encodeURIComponent(q)); } catch (er) { if (ativo(ctx)) toast('Não foi possível buscar clientes: ' + er.message, true); return; }
+        if (!ativo(ctx) || ctx.busca.trim() !== q) return; ctx.achados = achados;
         pintar(); const i = $('#qResp'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
       }, 280);
       return;
@@ -271,7 +290,7 @@ const Grupo = (() => {
   });
   document.addEventListener('toggle', (e) => { if (estado && e.target.dataset && e.target.dataset.detPag) estado.pagAberto = e.target.open; if (e.target.classList && e.target.classList.contains('menuCobrar')) { const sm = e.target.querySelector('summary'); if (sm) sm.setAttribute('aria-expanded', String(e.target.open)); } }, true);
   document.addEventListener('change', async (e) => {
-    if (!estado || !e.target.closest('#camada .modal')) return;
+    if (!ativo(estado) || !e.target.closest('#camada .modal')) return;
     const t = e.target;
     if (t.dataset.reg) { estado.reg[t.dataset.reg] = t.value; return; }
     if (t.dataset.preco) {
@@ -294,9 +313,11 @@ const Grupo = (() => {
     }
   });
   document.addEventListener('click', async (e) => {
-    if (!estado || !e.target.closest('#camada .modal')) return;
+    if (!ativo(estado) || !e.target.closest('#camada .modal')) return;
     const el = (s) => e.target.closest(s);
-    const { g, rasc, b } = estado;
+    const ctx = estado; if (ctx.ocupado) return;
+    const { g, rasc, b } = ctx;
+    if (e.target.closest('[data-grupo-atualizar]')) return refrescar(true);
     let x;
     if ((x = el('[data-resp]'))) { rasc.responsavel = JSON.parse(x.dataset.resp); rasc.pilotos[0].nome = rasc.responsavel.nome; rasc.pilotos[0].telefone = rasc.responsavel.telefone || ''; estado.achados = []; estado.busca = ''; pintar(); return; }
     if ((x = el('[data-origem]'))) { rasc.origem = x.dataset.origem; lembrar('origem', rasc.origem); if (!rasc.precoManual) rasc.preco = precoPara(rasc.origem, estado.b); pintar(); return; }
@@ -323,7 +344,7 @@ const Grupo = (() => {
     }
     if ((x = el('[data-tirar]'))) {
       const i = +x.dataset.tirar;
-      if (g) { const p = g.pilotos[i]; if (!(await confirmar(`Tirar ${p.nome || 'o piloto ' + p.ordem} do grupo?`, `${p.pago ? 'Ele JÁ PAGOU: o pagamento precisa ser estornado depois. ' : ''}A vaga volta para o site e o totem.`, 'Tirar do grupo', true))) return; await atualizar(() => office(`/grupos/${g.id}/pilotos/${p.id}`, { method: 'DELETE' }), 'Piloto tirado · vaga liberada'); }
+      if (g) { const p = g.pilotos[i]; if (!(await confirmar(`Tirar ${p.nome || 'o piloto ' + p.ordem} do grupo?`, `${p.pago ? 'Ele JÁ PAGOU: o pagamento precisa ser estornado depois. ' : ''}A vaga volta para o site e o totem.`, 'Tirar do grupo', true)) || !ativo(ctx)) return; await atualizar(() => office(`/grupos/${g.id}/pilotos/${p.id}`, { method: 'DELETE' }), 'Piloto tirado · vaga liberada'); }
       else { rasc.pilotos.splice(i, 1); pintar(); }
       return;
     }
@@ -339,8 +360,9 @@ const Grupo = (() => {
     if (el('[data-todos-pagos]')) {
       const faltam = g.pilotos.filter((p) => !p.pago);
       const forma = await escolherForma(`Marcar ${faltam.length} pilotos como pagos?`, `Total ${brl(faltam.reduce((a, p) => a + p.falta_centavos, 0))}. Como eles pagaram?`);
-      if (!forma) return;
-      try { for (const p of faltam) estado.g = await office(`/grupos/${g.id}/pagamentos`, { method: 'POST', body: { pilotoId: p.id, valorCentavos: p.falta_centavos, forma: forma.trim() } }); pintar(); estado.aoMudar && estado.aoMudar(); toast(`${faltam.length} pagamentos registrados · aparecem pagos na Recepção`); } catch (er) { falhou(er); }
+      if (!forma || !ativo(ctx)) return;
+      ctx.ocupado = true;
+      try { for (const p of faltam) { if (!ativo(ctx)) return; ctx.g = await office(`/grupos/${g.id}/pagamentos`, { method: 'POST', body: { pilotoId: p.id, valorCentavos: p.falta_centavos, forma: forma.trim() } }); } if (!ativo(ctx)) return; pintar(); if (ativo(ctx)) ctx.aoMudar && ctx.aoMudar(); toast(`${faltam.length} pagamentos registrados · aparecem pagos na Recepção`); } catch (er) { if (ativo(ctx)) falhou(er); } finally { ctx.ocupado = false; }
       return;
     }
     if ((x = el('[data-link]'))) {
@@ -353,51 +375,59 @@ const Grupo = (() => {
     if ((x = el('[data-cobrar]'))) {
       { const d = x.closest('details.menuCobrar'); if (d) d.removeAttribute('open'); }
       const pid = x.dataset.cobrar ? +x.dataset.cobrar : null;
+      ctx.ocupado = true;
       const rotuloAntes = x.textContent; x.disabled = true; x.textContent = 'Gerando link…';
       try {
         const r = await office(`/grupos/${g.id}/cobrancas`, { method: 'POST', body: { pilotoId: pid } });
+        if (!ativo(ctx)) return;
         estado.g = r.grupo; pintar();
         const p = pid ? estado.g.pilotos.find((y) => y.id === pid) : null;
         const fone = p ? destino(estado.g, p) : estado.g.responsavelTelefone;
         const texto = `Olá${p && p.nome ? ', ' + primeiro(p.nome) : ', ' + primeiro(estado.g.responsavel)}! Segue o link para pagar ${p ? 'sua vaga' : 'a reserva do grupo'} na bateria do Kartódromo de Betim (${quando(estado.g.inicio)}): ${brl(r.valor)} por Pix ou cartão — ${r.link}`;
         if (fone) mostrarLinks([[`Mandar o link de ${brl(r.valor)} para ${p ? (p.nome || 'piloto ' + p.ordem) : estado.g.responsavel}`, zap(fone, texto)]], 'Link de pagamento pronto (Asaas)');
         toast(r.reaproveitada ? 'Link de pagamento já existia · pode reenviar' : 'Link de pagamento criado no Asaas');
-        estado.aoMudar && estado.aoMudar();
+        if (ativo(ctx)) ctx.aoMudar && ctx.aoMudar();
       } catch (er) {
+        if (!ativo(ctx)) return;
         x.disabled = false; x.textContent = rotuloAntes;
         const lk = $('#listaLinks');
         if (lk) lk.innerHTML = `<div class="aviso-faixa" role="alert">Não consegui gerar o link de pagamento: ${esc(er.message)} <button type="button" class="btn link peq" data-cobrar="${x.dataset.cobrar || ''}">Tentar de novo</button> · ou use “Marcar como pago” se o cliente pagou por fora.</div>`;
         else falhou(er);
-      }
+      } finally { ctx.ocupado = false; }
       return;
     }
     if ((x = el('[data-recebi]'))) {
       { const d = x.closest('details.menuCobrar'); if (d) d.removeAttribute('open'); }
       const pid = x.dataset.recebi ? +x.dataset.recebi : null;
       const p = pid ? g.pilotos.find((y) => y.id === pid) : null;
-      const valor = p ? p.falta_centavos : (g.modo === 'sinal' && g.pago < g.sinal ? g.sinal - g.pago : g.falta);
+      const valor = p ? p.falta_centavos : (g.modo === 'sinal' ? Math.max(0, g.sinal - g.pago) : g.falta);
+      if (!valor) return toast('Não há valor a receber nesta cobrança.');
       const forma = await escolherForma(`Marcar ${brl(valor)} como pago?`, `${p ? (p.nome || 'Piloto ' + p.ordem) : g.responsavel} pagou por fora. Como foi o pagamento?`);
-      if (!forma) return;
-      await atualizar(() => office(`/grupos/${g.id}/pagamentos`, { method: 'POST', body: { pilotoId: pid, valorCentavos: valor, forma: forma.trim() } }));
-      { const ult = estado.g && estado.g.pagamentos.slice(-1)[0], gid = g.id; if (ult) toastAcao(`${brl(valor)} registrado · aparece pago na Recepção`, 'Desfazer', async () => { await atualizar(() => office(`/grupos/${gid}/pagamentos/${ult.id}`, { method: 'DELETE' }), 'Pagamento desfeito'); }); }
+      if (!forma || !ativo(ctx)) return;
+      const recebido = await atualizar(() => office(`/grupos/${g.id}/pagamentos`, { method: 'POST', body: { pilotoId: pid, valorCentavos: valor, forma: forma.trim() } }));
+      if (!recebido) return;
+      if (!ativo(ctx)) return;
+      { const ult = estado.g && estado.g.pagamentos.slice(-1)[0], gid = g.id; if (ult) toastAcao(`${brl(valor)} registrado · aparece pago na Recepção`, 'Desfazer', async () => { const atualizado = await office(`/grupos/${gid}/pagamentos/${ult.id}`, { method: 'DELETE' }); if (ativo(ctx)) { ctx.g = atualizado; pintar(); ctx.aoMudar && ctx.aoMudar(); } toast('Pagamento desfeito'); }); }
       return;
     }
     if (el('[data-registrar]')) {
       const v = Math.round(parseFloat(String(estado.reg.valor).replace(',', '.')) * 100);
       if (!(v > 0)) return toast('Digite o valor recebido', true);
       if (v > g.falta && !(await confirmar('Valor maior do que falta receber', `Você digitou ${brl(v)} e faltam ${brl(g.falta)}. Registrar mesmo assim?`, 'Registrar mesmo assim'))) return;
-      await atualizar(() => office(`/grupos/${g.id}/pagamentos`, { method: 'POST', body: { pilotoId: estado.reg.quem ? +estado.reg.quem : null, valorCentavos: v, forma: estado.reg.forma } }), `${brl(v)} registrado`);
-      estado.reg = { valor: '', quem: '', forma: 'Pix' }; pintar();
+      if (!ativo(ctx)) return;
+      const corpo = { pilotoId: ctx.reg.quem ? +ctx.reg.quem : null, valorCentavos: v, forma: ctx.reg.forma };
+      if (!await atualizar(() => office(`/grupos/${g.id}/pagamentos`, { method: 'POST', body: corpo }), `${brl(v)} registrado`)) return;
+      if (!ativo(ctx)) return; estado.reg = { valor: '', quem: '', forma: 'Pix' }; pintar();
       return;
     }
     if ((x = el('[data-estornar]'))) {
-      if (!(await confirmar('Estornar este pagamento?', 'A vaga volta a ficar a pagar.', 'Estornar', true))) return;
+      if (!(await confirmar('Estornar este pagamento?', 'A vaga volta a ficar a pagar.', 'Estornar', true)) || !ativo(ctx)) return;
       await atualizar(() => office(`/grupos/${g.id}/pagamentos/${x.dataset.estornar}`, { method: 'DELETE' }), 'Pagamento estornado');
       return;
     }
     if (el('[data-cancelar-grupo]')) {
-      if (!(await confirmar(`Cancelar a reserva de ${nomeBonito(g.responsavel)}?`, `${g.n} vagas voltam para o site e o totem.`, 'Cancelar reserva', true))) return;
-      try { await office(`/grupos/${g.id}`, { method: 'DELETE' }); toast('Reserva cancelada · vagas liberadas'); fecharCamada(); estado.aoMudar && estado.aoMudar(); estado = null; } catch (er) { falhou(er); }
+      if (!(await confirmar(`Cancelar a reserva de ${nomeBonito(g.responsavel)}?`, `${g.n} vagas voltam para o site e o totem.`, 'Cancelar reserva', true)) || !ativo(ctx)) return;
+      try { await office(`/grupos/${g.id}`, { method: 'DELETE' }); if (!ativo(ctx)) return; toast('Reserva cancelada · vagas liberadas'); fecharCamada(); ctx.aoMudar && ctx.aoMudar(); estado = null; } catch (er) { falhou(er); }
       return;
     }
     if ((x = el('[data-salvar-grupo]'))) {
@@ -413,20 +443,22 @@ const Grupo = (() => {
       }
       x.disabled = true; x.setAttribute('aria-busy', 'true'); x.textContent = 'Salvando…';
       try {
-        const pilotos = rasc.pilotos.map((p, i) => (i === 0 ? (rasc.responsavel ? { nome: rasc.responsavel.nome, telefone: rasc.responsavel.telefone, menor: false } : { nome: p.nome, telefone: p.telefone, menor: false }) : p));
+        const pilotos = rasc.pilotos.map((p, i) => (i === 0 ? (rasc.responsavel ? { nome: rasc.responsavel.nome, telefone: rasc.responsavel.telefone, menor: !!p.menor } : { nome: p.nome, telefone: p.telefone, menor: !!p.menor }) : p));
         const novo = await office('/grupos', { method: 'POST', body: { bateriaId: b.id, ...(rasc.responsavel ? { responsavelId: rasc.responsavel.id } : { responsavelNovo: { nome: rasc.pilotos[0].nome, telefone: rasc.pilotos[0].telefone } }), origem: rasc.origem, modo: rasc.modo, precoCentavos: rasc.preco, sinalPct: rasc.sinalPct, pilotos } });
+        if (!ativo(ctx)) { try { sessionStorage.removeItem(chaveRasc(b)); } catch {} return; }
         guardarRascunho(true); estado.g = novo; estado.rasc = null;
-        { const gid = novo.id; toastAcao(`Reserva de ${novo.n} piloto(s) salva · já aparece na Recepção, no site e no totem`, 'Desfazer', async () => { await office(`/grupos/${gid}`, { method: 'DELETE' }); fecharCamada(); estado = null; toast('Reserva desfeita · vagas liberadas'); }); }
+        { const gid = novo.id; toastAcao(`Reserva de ${novo.n} piloto(s) salva · já aparece na Recepção, no site e no totem`, 'Desfazer', async () => { await office(`/grupos/${gid}`, { method: 'DELETE' }); if (ativo(ctx)) { fecharCamada(); estado = null; } toast('Reserva desfeita · vagas liberadas'); }); }
         pintar();
-        estado.aoMudar && estado.aoMudar();
+        if (ativo(ctx)) ctx.aoMudar && ctx.aoMudar();
         if (estado.enviarAgora) {
-          await office(`/grupos/${novo.id}/links`, { method: 'POST', body: { pilotoIds: faltamLista(novo) } }).then((r) => { estado.g = r; pintar(); }).catch(() => {});
+          await office(`/grupos/${novo.id}/links`, { method: 'POST', body: { pilotoIds: faltamLista(novo) } }).then((r) => { if (ativo(ctx)) { ctx.g = r; pintar(); } }).catch(() => {});
+          if (!ativo(ctx)) return;
           const fone = novo.responsavelTelefone || '';
           mostrarLinks([[fone ? `Mandar o link do grupo para ${novo.responsavel} · ${fone}` : 'Copie o link do grupo e mande no WhatsApp', fone ? zap(fone, msgGrupo(novo)) : '#']], 'Link de cadastro do grupo');
         }
-      } catch (er) { const m = $('#erroGrupo'); if (m) { m.className = 'erroMsg empurra'; m.textContent = /vaga/i.test(er.message) ? er.message + ' Reduza a quantidade ou use "‹ Trocar horário".' : er.message; } x.disabled = false; x.removeAttribute('aria-busy'); x.textContent = 'Salvar reserva'; }
+      } catch (er) { if (!ativo(ctx)) return; const m = $('#erroGrupo'); if (m) { m.className = 'erroMsg empurra'; m.textContent = /vaga/i.test(er.message) ? er.message + ' Reduza a quantidade ou use "‹ Trocar horário".' : er.message; } x.disabled = false; x.removeAttribute('aria-busy'); x.textContent = 'Salvar reserva'; }
     }
   });
 
-  return { cartoes, abrir, nova, sujo, descartar: () => guardarRascunho(true) };
+  return { cartoes, abrir, nova, refrescar, sujo, descartar: () => guardarRascunho(true) };
 })();

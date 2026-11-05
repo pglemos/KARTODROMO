@@ -71,6 +71,13 @@ async function carregarPermissoes() {
 const primeiraTela = () => { for (const g of NAV) for (const [id] of g.itens) if (podeTela(id)) return id; return null; };
 
 async function api(caminho, opcoes = {}) {
+  let tentativa = null;
+  if (opcoes.method === 'POST' && /^\/office\/grupos\/\d+\/pagamentos$/.test(caminho)) {
+    tentativa = 'kib-recebimento-' + caminho + ':' + JSON.stringify(opcoes.body);
+    const key = guarda.ler(tentativa) || crypto.randomUUID();
+    guarda.gravar(tentativa, key);
+    opcoes = { ...opcoes, body: { ...opcoes.body, idempotencyKey: key } };
+  }
   const grava = (opcoes.method || 'GET') !== 'GET';
   if (grava && S.perm && caminho !== '/login' && !/^\/office\/senha$/.test(caminho) && S.rota !== 'usuarios' && !podeTela(S.rota, 'alterar')) throw new Error('Seu perfil só pode consultar esta tela.');
   const r = await fetch('/api' + caminho, {
@@ -82,7 +89,8 @@ async function api(caminho, opcoes = {}) {
   if (novo) { S.token = novo; guarda.gravar('kib-admin-token', novo); }
   const dados = await r.json().catch(() => ({}));
   if (r.status === 401 && caminho !== '/login') { sair('Sua sessão terminou. Entre de novo.'); throw new Error('Sessão expirada.'); }
-  if (!r.ok) throw new Error(dados.error || `Erro ${r.status}`);
+  if (!r.ok) { if (tentativa && r.status >= 400 && r.status < 500) guarda.gravar(tentativa, null); throw new Error(dados.error || `Erro ${r.status}`); }
+  if (tentativa) guarda.gravar(tentativa, null);
   return dados;
 }
 const office = (c, o) => api('/office' + c, o);
@@ -268,8 +276,8 @@ const TIPOS = {
 const ORDEM_TIPOS = ['livre', 'reserva', 'fechada', 'camp', 'evento', 'bloq'];
 function tipoDe(b) {
   const nome = `${b.nome || ''} ${b.produto || ''} ${b.categoria || ''}`.toLowerCase();
-  if (+b.vagas === 0 || b.autoAtendimento === false || b.autoAtendimento === 0) return 'bloq';
   if (b.reservaFechada) return 'fechada';
+  if (+b.vagas === 0 || b.autoAtendimento === false || b.autoAtendimento === 0) return 'bloq';
   if (/kac|legends|ultras|campeonato|etapa|copa|endurance|milhas/.test(nome) && !/treino/.test(nome)) return 'camp';
   if (/treino|evento|tabajara|bier|super quinta|time attack|ins[oô]nia|empresa|equaliza|anivers/.test(nome)) return 'evento';
   return (+b.inscritos || 0) > 0 ? 'reserva' : 'livre';
@@ -277,7 +285,7 @@ function tipoDe(b) {
 function situacaoBateria(b) {
   const dia = b.dataHora.slice(0, 10), hoje = hojeIso(), ini = hm(horaDe(b.dataHora)), agora = agoraMin();
   if (dia < hoje || (dia === hoje && ini + 35 <= agora)) return 'fim';
-  if (dia === hoje && ini <= agora && agora < ini + 35) return 'pista';
+  if (dia === hoje && ini <= agora && agora < ini + 35) return 'prevista';
   return 'futura';
 }
 
@@ -293,14 +301,14 @@ const tituloBat = (b, tp = tipoDe(b), curto = false) => {
   return nomeBonito(b.responsavel) || (generico(b.nome) ? (curto ? `${n} avulso${n === 1 ? '' : 's'}` : `${n} piloto${n === 1 ? '' : 's'} avulso${n === 1 ? '' : 's'}`) : b.nome);
 };
 const falta = (b) => Math.max(0, (+b.inscritos || 0) - (+b.pagos || 0));
-const faltaValor = (b) => falta(b) * (+b.preco || 0);
+const faltaValor = (b) => Math.max(0, Number(b.saldoCentavos) || 0);
 // UM só jeito de dizer quanto falta pagar (grade, lista, gaveta e painel lateral): "faltam R$ 130 · 2 de 3 sem pagar"
 const pagCurto = (b) => (+b.preco ? `faltam ${brlCurto(faltaValor(b))}` : `${falta(b)} sem pagar`);
 const pagLongo = (b) => { const f = falta(b), n = +b.inscritos || 0; return !n ? '' : f ? `${+b.preco ? `faltam ${brlCurto(faltaValor(b))} · ` : ''}${f} de ${n} sem pagar` : 'tudo pago'; };
 const urgente = (b) => b.dataHora.slice(0, 10) === hojeIso() && hm(horaDe(b.dataHora)) - agoraMin() <= 180;
 const livresTxt = (b, st = situacaoBateria(b), tp = tipoDe(b)) => {
   const l = +b.disponiveis || 0, n = +b.inscritos || 0;
-  if (st === 'fim') return n ? `${n} correram` : 'não correu';
+  if (st === 'fim') return n ? `${n} inscritos` : 'sem inscritos';
   if (b.status === 'fechada') return 'Fechada';
   if (tp === 'fechada') return 'Fechada';
   if (tp === 'bloq') return 'Bloqueada';
@@ -360,7 +368,7 @@ TELAS.visao = async (tela) => {
     <section class="cartao" id="linhaDia"><div class="esqueleto" style="height: 150px; margin: var(--kib-espaco-2)"></div></section>
   </main>`;
   const irAgenda = (b) => { S.irAgenda = { dia: b.dataHora.slice(0, 10), id: b.id }; location.hash = '#/agenda'; };
-  const prontoTotem = (r) => !!(r.documento && r.peso && r.telefone);
+  const prontoTotem = (r) => !!(r.documento && r.email && r.peso && r.telefone);
   let bats = [];
 
   const pintarPendencias = (online, aprovar, abertos) => {
@@ -389,14 +397,14 @@ TELAS.visao = async (tela) => {
     // o dia inteiro: quem já correu sem pagar também é dinheiro a receber
     const devendo = bats.filter((b) => falta(b) > 0), aReceber = devendo.reduce((a, b) => a + faltaValor(b), 0), temUrgente = devendo.some((b) => situacaoBateria(b) !== 'fim' && urgente(b));
     const jaCorreram = devendo.filter((b) => situacaoBateria(b) === 'fim').length;
-    const feitas = bats.filter((b) => situacaoBateria(b) === 'fim').length, naPista = bats.find((b) => situacaoBateria(b) === 'pista'), prox = bats.find((b) => situacaoBateria(b) === 'futura');
+    const feitas = bats.filter((b) => situacaoBateria(b) === 'fim').length, naPista = bats.find((b) => situacaoBateria(b) === 'prevista'), prox = bats.find((b) => situacaoBateria(b) === 'futura');
     const kpi = (t, v, nota, link, extra = '', estiloV = '') => `<a href="${link}" class="kpi ergue"><span class="rot">${t}</span><span class="col gap-meio"><span class="val" style="${estiloV}">${v}</span><span class="peq">${nota}</span></span>${extra}</a>`;
     const segmentos = `<span class="segmentos" role="img" aria-label="${feitas} baterias terminadas de ${bats.length}">${bats.map((b) => { const st = situacaoBateria(b); return `<span class="${st}"></span>`; }).join('')}</span>`;
     $('#kpis').innerHTML = [
       kpi('Pilotos hoje', insc, `de ${vagas} vagas · ${Math.round(oc * 100)}% ocupado`, '#/agenda', `<span class="barra" role="img" aria-label="${Math.round(oc * 100)}% das vagas ocupadas"><span style="width: ${Math.min(100, Math.round(oc * 100))}%; background: ${oc > .8 ? 'var(--kib-cor-estado-perigo-solido)' : oc > .5 ? 'var(--kib-cor-agenda-reserva-cheio)' : 'var(--kib-cor-categoria-verde-base)'}"></span></span>`),
       kpi('Recebido hoje', brlCurto(recebidoCaixa + recebidoOnline), `caixa ${brlCurto(recebidoCaixa)} · site ${brlCurto(recebidoOnline)} (${plural(pagasOnline.length, 'reserva', 'reservas')})`, '#/reservas'),
-      kpi('A receber hoje', devendo.length ? brlCurto(aReceber) : 'Nada', devendo.length ? `${plural(devendo.length, 'bateria', 'baterias')} com piloto sem pagar${jaCorreram ? ` (${jaCorreram} já ${jaCorreram === 1 ? 'correu' : 'correram'})` : ''}` : 'todos os pilotos de hoje pagaram', '#/agenda', '', devendo.length && temUrgente ? 'color: var(--avisoTxt)' : ''),
-      kpi('Baterias', bats.length ? `${feitas} de ${bats.length}` : '—', naPista ? `${esc(tituloBat(naPista))} na pista` : prox ? `próxima às ${horaDe(prox.dataHora)}` : bats.length ? 'todas já correram' : 'sem baterias hoje', '#/recepcao', bats.length ? segmentos : ''),
+      kpi('A receber hoje', devendo.length ? brlCurto(aReceber) : 'Nada', devendo.length ? `${plural(devendo.length, 'bateria', 'baterias')} com piloto sem pagar${jaCorreram ? ` (${jaCorreram} já ${jaCorreram === 1 ? 'tem horário encerrado' : 'têm horário encerrado'})` : ''}` : 'todos os pilotos de hoje pagaram', '#/agenda', '', devendo.length && temUrgente ? 'color: var(--avisoTxt)' : ''),
+      kpi('Baterias', bats.length ? `${feitas} de ${bats.length}` : '—', naPista ? `${esc(tituloBat(naPista))} no horário previsto` : prox ? `próxima às ${horaDe(prox.dataHora)}` : bats.length ? 'horários previstos encerrados' : 'sem baterias hoje', '#/recepcao', bats.length ? segmentos : ''),
     ].join('');
   };
 
@@ -404,7 +412,7 @@ TELAS.visao = async (tela) => {
     const tp = tipoDe(b), T = TIPOS[tp], n = +b.inscritos || 0, vagas = +b.vagas || 0, pagos = +b.pagos || 0;
     const prontos = rs ? rs.filter((r) => r.status !== 'cancelada' && prontoTotem(r)).length : null;
     const ini = hm(horaDe(b.dataHora)), falt = ini - agoraMin();
-    const quando = situacaoBateria(b) === 'pista' ? '<span class="chip solido-ok sem-sinal">Na pista agora</span>' : `<span class="chip cinza">${rotulo}${falt > 0 && falt < 180 ? ` · em ${falt} min` : ''}</span>`;
+    const quando = situacaoBateria(b) === 'prevista' ? '<span class="chip solido-ok sem-sinal">Horário previsto agora</span>' : `<span class="chip cinza">${rotulo}${falt > 0 && falt < 180 ? ` · em ${falt} min` : ''}</span>`;
     const sub = [generico(b.nome) ? '' : b.nome, b.produto, b.tipoKart].filter(Boolean).filter((x) => x !== tituloBat(b, tp)).map(esc).join(' · ');
     return `<div class="painelBat">
       <span style="display: flex; align-items: center; gap: var(--kib-espaco-1); flex-wrap: wrap">${quando}<span class="mono peq cor-corpo">${horaDe(b.dataHora)}–${fmtHm(ini + 35)}</span></span>
@@ -418,12 +426,12 @@ TELAS.visao = async (tela) => {
     </div>`;
   };
   const pintarAgora = async () => {
-    const naPista = bats.find((b) => situacaoBateria(b) === 'pista'), futuras = bats.filter((b) => situacaoBateria(b) === 'futura');
-    const foco = (naPista ? [[naPista, 'Na pista'], futuras[0] && [futuras[0], 'Próxima']] : [futuras[0] && [futuras[0], 'Próxima'], futuras[1] && [futuras[1], 'Depois']]).filter(Boolean);
+    const naPista = bats.find((b) => situacaoBateria(b) === 'prevista'), futuras = bats.filter((b) => situacaoBateria(b) === 'futura');
+    const foco = (naPista ? [[naPista, 'Horário previsto'], futuras[0] && [futuras[0], 'Próxima']] : [futuras[0] && [futuras[0], 'Próxima'], futuras[1] && [futuras[1], 'Depois']]).filter(Boolean);
     const el = $('#agoraSeguir');
     if (!foco.length) {
-      const correram = bats.reduce((a, b) => a + (+b.inscritos || 0), 0), amanha = somaDias(hoje, deIso(somaDias(hoje, 1)).getDay() === 1 ? 2 : 1);
-      el.innerHTML = `<div class="cartaoCab"><h2>Agora e a seguir</h2></div><div class="fimDoDia"><b>${bats.length ? 'As baterias de hoje acabaram' : 'Sem baterias hoje'}</b><span class="peq t-corpo">${bats.length ? `${plural(correram, 'piloto correu', 'pilotos correram')} em ${plural(bats.length, 'bateria', 'baterias')}.` : d.getDay() === 1 ? 'Segunda o kartódromo não abre.' : 'Dia fechado ou grade ainda não gerada.'}</span><span style="display: flex; gap: var(--kib-espaco-1); flex-wrap: wrap; margin-top: var(--kib-espaco-meio)"><button class="btn sec peq" data-ir-dia="${amanha}">Ver ${amanha === somaDias(hoje, 1) ? 'amanhã' : 'terça'} na agenda</button><button class="btn sec peq" data-nova-reserva="1">Nova reserva</button></span></div>`;
+      const inscritos = bats.reduce((a, b) => a + (+b.inscritos || 0), 0), amanha = somaDias(hoje, deIso(somaDias(hoje, 1)).getDay() === 1 ? 2 : 1);
+      el.innerHTML = `<div class="cartaoCab"><h2>Agora e a seguir</h2></div><div class="fimDoDia"><b>${bats.length ? 'Os horários previstos de hoje terminaram' : 'Sem baterias hoje'}</b><span class="peq t-corpo">${bats.length ? `${plural(inscritos, 'piloto inscrito', 'pilotos inscritos')} em ${plural(bats.length, 'bateria', 'baterias')}.` : d.getDay() === 1 ? 'Segunda o kartódromo não abre.' : 'Dia fechado ou grade ainda não gerada.'}</span><span style="display: flex; gap: var(--kib-espaco-1); flex-wrap: wrap; margin-top: var(--kib-espaco-meio)"><button class="btn sec peq" data-ir-dia="${amanha}">Ver ${amanha === somaDias(hoje, 1) ? 'amanhã' : 'terça'} na agenda</button><button class="btn sec peq" data-nova-reserva="1">Nova reserva</button></span></div>`;
       return;
     }
     const rs = await Promise.all(foco.map(([b]) => (+b.inscritos ? office(`/reservas?bateriaId=${b.id}&status=todas`).catch(() => null) : Promise.resolve([]))));
@@ -433,16 +441,16 @@ TELAS.visao = async (tela) => {
 
   const blocoDia = (b) => {
     const tp = tipoDe(b), T = TIPOS[tp], st = situacaoBateria(b), n = +b.inscritos || 0, vagas = Math.max(1, +b.vagas || 0);
-    const cls = ['bloco2', tp === 'livre' ? 'livre' : tp === 'bloq' ? 'bloq' : '', st === 'fim' ? 'passou' : '', st === 'pista' ? 'pista' : ''].filter(Boolean).join(' ');
+    const cls = ['bloco2', tp === 'livre' ? 'livre' : tp === 'bloq' ? 'bloq' : '', st === 'fim' ? 'passou' : '', st === 'prevista' ? 'pista' : ''].filter(Boolean).join(' ');
     const titulo = tituloBat(b, tp, true), dir = livresTxt(b, st, tp);
     return `<button class="${cls}" data-ir-bat="${b.id}" style="${tp === 'livre' || tp === 'bloq' ? '' : `${T.fundo}; --faixa: ${T.cor}`}" aria-label="${esc(`${horaDe(b.dataHora)}, ${titulo}, ${T.t}, ${dir}`)}">
-      <span class="linha1"><span class="mono hora">${horaDe(b.dataHora)}</span>${st === 'pista' ? '<span class="naPista">na pista</span>' : `<span class="dirB">${dir}</span>`}</span>
+      <span class="linha1"><span class="mono hora">${horaDe(b.dataHora)}</span>${st === 'prevista' ? '<span class="naPista">no horário previsto</span>' : `<span class="dirB">${dir}</span>`}</span>
       <span class="tituloB trunc">${esc(tp === 'livre' ? 'Livre' : titulo)}</span>${st !== 'fim' && falta(b) && tp !== 'livre' ? `<span class="aPagarB">${pagCurto(b)}</span>` : ''}${tp === 'livre' ? '' : `<span class="barraB" style="width: ${Math.round(Math.min(1, n / vagas) * 100)}%; background: ${T.cheio}"></span>`}</button>`;
   };
   const pintarLinha = () => {
     const el = $('#linhaDia');
     if (!bats.length) { el.innerHTML = `<div class="cartaoCab"><h2>Linha do dia</h2></div><div class="vazio"><b>Sem baterias hoje</b><span>${d.getDay() === 1 ? 'Segunda o kartódromo não abre.' : 'Dia fechado ou grade ainda não gerada.'}</span></div>`; return; }
-    el.innerHTML = `<div class="cartaoCab"><span class="col"><h2>Linha do dia</h2><span class="sub">toque numa bateria para abrir na agenda</span></span><span class="dir legendaCurta"><span><span class="amostra" style="${amostra('livre', true)}"></span>livre</span><span><span class="amostra" style="background: var(--kib-cor-agenda-reserva-fundo); box-shadow: inset 3px 0 0 var(--kib-cor-estado-aviso-solido)"></span>com reserva ou evento</span><span><span class="amostra" style="box-shadow: inset 0 0 0 2px var(--kib-cor-estado-perigo-solido)"></span>na pista</span></span></div>
+    el.innerHTML = `<div class="cartaoCab"><span class="col"><h2>Linha do dia</h2><span class="sub">toque numa bateria para abrir na agenda</span></span><span class="dir legendaCurta"><span><span class="amostra" style="${amostra('livre', true)}"></span>livre</span><span><span class="amostra" style="background: var(--kib-cor-agenda-reserva-fundo); box-shadow: inset 3px 0 0 var(--kib-cor-estado-aviso-solido)"></span>com reserva ou evento</span><span><span class="amostra" style="box-shadow: inset 0 0 0 2px var(--kib-cor-estado-perigo-solido)"></span>no horário previsto</span></span></div>
       <div class="rolagemX cartao-corpo" id="rolaLinha"><div class="linhaBlocos">${bats.map(blocoDia).join('')}</div></div>`;
     const foco = el.querySelector('.bloco2.pista') || el.querySelector('.bloco2:not(.passou)'), rola = $('#rolaLinha');
     if (foco && rola) rola.scrollLeft = Math.max(0, foco.offsetLeft - rola.offsetLeft - 160);
@@ -476,7 +484,7 @@ TELAS.visao = async (tela) => {
       const pil = (s.drivers || []).filter((p) => +p.position < 900).slice(0, 5);
       const largou = s.race && s.race.startedAt ? new Date(s.race.startedAt) : null;
       const min = largou ? Math.max(0, Math.round((Date.now() - largou.getTime()) / 60000)) : null;
-      if (!corre && !pil.length) { el.innerHTML = `<div class="placarVazio"><span class="chip" style="background: color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 10%, transparent); color: var(--kib-cor-borda-sutil)">CRONOMETRAGEM</span><b>Nenhuma bateria na pista</b><span>O placar aparece aqui quando a próxima largar.</span></div>`; return; }
+      if (!corre && !pil.length) { el.innerHTML = `<div class="placarVazio"><span class="chip" style="background: color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 10%, transparent); color: var(--kib-cor-borda-sutil)">CRONOMETRAGEM</span><b>Nenhuma bateria no horário previsto</b><span>O placar aparece aqui quando a próxima largar.</span></div>`; return; }
       el.innerHTML = `<div style="display: flex; flex-direction: column; gap: var(--kib-espaco-meio); padding: var(--kib-espaco-2) var(--kib-espaco-2) var(--kib-espaco-1)">
           <span class="linha gap-1"><span class="chip" style="background: ${corre ? 'color-mix(in srgb, var(--kib-cor-status-ok) 20%, transparent)' : 'color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 10%, transparent)'}; color: ${corre ? 'var(--kib-cor-categoria-verde-topo)' : 'var(--kib-cor-borda-sutil)'}; letter-spacing: .05em">${corre ? '<span class="ponto pulso" style="background: var(--kib-cor-categoria-verde-topo)"></span>AO VIVO' : 'ÚLTIMA BATERIA'}</span>${largou ? `<span style="font-size: var(--kib-fonte-tamanho-pequeno); color: var(--kib-cor-icone-suave)">${corre ? `largou às ${largou.toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' })} · há ${min} min` : `largou às ${largou.toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' })}`}</span>` : ''}</span>
           <h2 style="margin: 0; font-size: var(--kib-fonte-tamanho-subtitulo); font-weight: 700">${esc(s.eventName || 'Bateria')}</h2></div>
@@ -518,33 +526,44 @@ TELAS.agenda = async (tela) => {
     <section class="cartao agendaCal" id="calendario"><div class="esqueleto" style="height: 600px; margin: var(--kib-espaco-2)"></div></section>
   </main>`;
   let bats = [];
-  let ultimaPista = null, offlineDesde = null;
+  let ultimaPista = null, offlineDesde = null, consulta = 0, periodoCarregado = null, detalhe = 0;
   tela.addEventListener('toggle', (e) => { if (e.target.matches && e.target.matches('.filtroDet')) A.filtroAberto = e.target.open; }, true);
   const semanaIni = () => { const d = deIso(A.base); d.setDate(d.getDate() - d.getDay()); return iso(d); };
 
   const carregar = async () => {
-    const cal = $('#calendario'); cal.setAttribute('aria-busy', 'true'); cal.classList.add('carregando');
+    const pedido = ++consulta, base = A.base, vista = A.vista, chavePeriodo = `${vista}:${base}`;
+    const cal = tela.querySelector('#calendario'); if (!cal) return false;
+    cal.setAttribute('aria-busy', 'true'); cal.classList.add('carregando');
+    if (periodoCarregado !== chavePeriodo) { bats = []; cal.innerHTML = '<div class="vazio" role="status">Carregando o período selecionado…</div>'; $('#aPagar').innerHTML = ''; }
     try {
-      bats = A.vista === 'lista'
-        ? await office(`/baterias?status=todas&filtro=entre&data=${A.base}&ate=${somaDias(A.base, 6)}`)
-        : await office(`/baterias?status=todas&filtro=semana&data=${semanaIni()}`);
+      const recebidas = vista === 'lista'
+        ? await office(`/baterias?status=todas&filtro=entre&data=${base}&ate=${somaDias(base, 6)}`)
+        : await office(`/baterias?status=todas&filtro=entre&data=${semanaIni()}&ate=${somaDias(semanaIni(), 6)}`);
+      if (pedido !== consulta || !tela.isConnected) return false;
+      bats = recebidas; periodoCarregado = chavePeriodo;
       bats.sort((x, y) => x.dataHora.localeCompare(y.dataHora));
       const at = $('#atualizado'); if (at) { at.style.color = ''; at.textContent = ` · atualizado às ${new Date().toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' })}`; }
       pintar();
       pintarMini();
       offlineDesde = null;
       // leitor de tela: só diz o que MUDOU (bateria entrou ou saiu da pista), não relê a grade a cada 30 s
-      const noAr = bats.find((b) => b.dataHora.startsWith(hojeIso()) && situacaoBateria(b) === 'pista');
+      const noAr = bats.find((b) => b.dataHora.startsWith(hojeIso()) && situacaoBateria(b) === 'prevista');
       const chave = noAr ? noAr.id : 0;
-      if (ultimaPista !== null && ultimaPista !== chave) { const av = $('#avisoVivo'); if (av) av.textContent = noAr ? `Bateria das ${horaDe(noAr.dataHora)} entrou na pista.` : 'Pista livre agora.'; }
+      if (ultimaPista !== null && ultimaPista !== chave) { const av = $('#avisoVivo'); if (av) av.textContent = noAr ? `Bateria das ${horaDe(noAr.dataHora)} atingiu o horário previsto.` : 'Nenhum horário previsto agora.'; }
       ultimaPista = chave;
+      return true;
     } catch (e) {
+      if (pedido !== consulta || !tela.isConnected) return false;
       // sem conexão: a tela antiga continua, mas o aviso fica claro e a próxima tentativa é automática (a cada 30 s)
       if (!offlineDesde) offlineDesde = new Date().toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' });
       const at = $('#atualizado'); if (at) { at.textContent = ` · sem conexão desde ${offlineDesde}, tentando de novo`; at.style.color = 'var(--avisoTxt)'; }
-    } finally { cal.removeAttribute('aria-busy'); cal.classList.remove('carregando'); }
+      bats = []; periodoCarregado = null;
+      cal.innerHTML = `<div class="vazio" role="alert"><b>Não foi possível carregar este período</b><span>${esc(e.message)}</span><button class="btn sec" data-ag-repetir>Tentar novamente</button></div>`;
+      $('#aPagar').innerHTML = '';
+      return false;
+    } finally { if (pedido === consulta) { cal.removeAttribute('aria-busy'); cal.classList.remove('carregando'); } }
   };
-  const recarregar = async () => { const sel = A.sel; await carregar(); if (sel && !$('#camada .modal')) abrirBateria(sel); };
+  const recarregar = async () => { const sel = A.sel, g = $('#camada .gaveta'); if (await carregar() && sel && A.sel === sel && g && g.isConnected && !$('#camada .modal')) await abrirBateria(sel); };
   if (typeof AgendaAcoes !== 'undefined') AgendaAcoes.montar({ tela, A, recarregar, carregar, bats: () => bats, abrir: (id) => abrirBateria(id) });
   const filtrar = (lista) => lista.filter((b) => !A.ocultos[tipoDe(b)] && (!A.q || `${b.nome} ${b.produto} ${b.responsavel || ''}`.toLowerCase().includes(A.q.toLowerCase())));
 
@@ -553,23 +572,23 @@ TELAS.agenda = async (tela) => {
     const hoje = hojeIso();
     const doDia = bats.filter((b) => b.dataHora.startsWith(hoje) && b.status !== 'cancelada');
     if (!doDia.length || (A.vista === 'dia' && A.base !== hoje)) return '';
-    const noAr = doDia.find((b) => situacaoBateria(b) === 'pista');
-    const fila = doDia.filter((b) => situacaoBateria(b) === 'futura' && !b.reservaFechada && tipoDe(b) !== 'bloq').slice(0, 4);
+    const noAr = doDia.find((b) => situacaoBateria(b) === 'prevista');
+    const fila = doDia.filter((b) => b.status === 'aberta' && situacaoBateria(b) === 'futura' && !b.reservaFechada && tipoDe(b) !== 'bloq').slice(0, 4);
     if (!noAr && !fila.length) return '';
     const fim = (b) => fmtHm(hm(horaDe(b.dataHora)) + 35);
-    const atual = noAr ? `<button class="pistaAgora hov" data-sel="${noAr.id}" aria-label="Bateria na pista agora, ${horaDe(noAr.dataHora)}: ${esc(tituloBat(noAr, tipoDe(noAr)))}"><span class="pistaHora mono">${horaDe(noAr.dataHora)}</span><span class="col gap-meio cresce" style="min-width: 0"><b class="trunc t-subtitulo">${esc(tituloBat(noAr, tipoDe(noAr)) === 'Livre' ? 'Bateria sem reserva' : tituloBat(noAr, tipoDe(noAr)))}</b><span class="t-pequeno">na pista até ${fim(noAr)} · ${plural(+noAr.inscritos || 0, 'piloto', 'pilotos')}${falta(noAr) ? ' · ' + pagLongo(noAr) : ''}</span></span></button>`
-      : `<span class="pistaAgora vazia"><span class="pistaHora mono">——</span><span class="col gap-meio"><b class="t-subtitulo">Pista livre agora</b><span class="t-pequeno">nenhuma bateria correndo</span></span></span>`;
+    const atual = noAr ? `<button class="pistaAgora hov" data-sel="${noAr.id}" aria-label="Bateria no horário previsto, ${horaDe(noAr.dataHora)}: ${esc(tituloBat(noAr, tipoDe(noAr)))}"><span class="pistaHora mono">${horaDe(noAr.dataHora)}</span><span class="col gap-meio cresce" style="min-width: 0"><b class="trunc t-subtitulo">${esc(tituloBat(noAr, tipoDe(noAr)) === 'Livre' ? 'Bateria sem reserva' : tituloBat(noAr, tipoDe(noAr)))}</b><span class="t-pequeno">previsão até ${fim(noAr)} · ${plural(+noAr.inscritos || 0, 'piloto', 'pilotos')}${falta(noAr) ? ' · ' + pagLongo(noAr) : ''}</span></span></button>`
+      : `<span class="pistaAgora vazia"><span class="pistaHora mono">——</span><span class="col gap-meio"><b class="t-subtitulo">Nenhum horário previsto agora</b><span class="t-pequeno">Confira a corrida real na Cronometragem</span></span></span>`;
     const proximas = fila.length ? `<span class="pistaFila" role="list" aria-label="Próximas baterias">${fila.map((b) => `<button class="pistaProx hov" role="listitem" data-sel="${b.id}"><b class="mono">${horaDe(b.dataHora)}</b><span class="t-pequeno">${(+b.inscritos || 0) ? esc(tituloBat(b, tipoDe(b), true)) : livresTxt(b)}</span></button>`).join('')}</span>` : '';
-    return `<div class="faixaPista" role="region" aria-label="Pista agora">${atual}${proximas}</div>`;
+    return `<div class="faixaPista" role="region" aria-label="Horários previstos">${atual}${proximas}</div>`;
   };
   const blocoSemana = (b) => {
     const tp = tipoDe(b), T = TIPOS[tp], st = situacaoBateria(b), n = +b.inscritos || 0, vagas = Math.max(1, +b.vagas || 0);
-    const cls = ['bloco2', tp === 'livre' ? 'livre' : tp === 'bloq' ? 'bloq' : '', st === 'fim' ? 'passou' : '', st === 'pista' ? 'pista' : '', A.sel === b.id ? 'sel' : ''].filter(Boolean).join(' ');
+    const cls = ['bloco2', tp === 'livre' ? 'livre' : tp === 'bloq' ? 'bloq' : '', st === 'fim' ? 'passou' : '', st === 'prevista' ? 'pista' : '', A.sel === b.id ? 'sel' : ''].filter(Boolean).join(' ');
     const estilo = tp === 'livre' || tp === 'bloq' ? '' : `${T.fundo}; --faixa: ${T.cor}`;
     const titulo = tituloBat(b, tp, true), dir = livresTxt(b, st, tp);
     const aPagar = st !== 'fim' && falta(b) && tp !== 'livre' ? `<span class="aPagarB">${pagCurto(b)}</span>` : '';
     return `<button class="${cls}" data-sel="${b.id}" style="${estilo}" aria-label="${esc(`${horaDe(b.dataHora)}, ${titulo}, ${T.t}, ${dir}`)}">
-      <span class="linha1"><span class="mono hora">${horaDe(b.dataHora)}</span>${st === 'pista' ? '<span class="naPista">na pista</span>' : ''}<span class="dirB">${dir}</span></span>
+      <span class="linha1"><span class="mono hora">${horaDe(b.dataHora)}</span>${st === 'prevista' ? '<span class="naPista">no horário previsto</span>' : ''}<span class="dirB">${dir}</span></span>
       ${tp === 'livre' ? '' : `<span class="tituloB trunc">${esc(titulo)}</span>${aPagar}<span class="barraB" style="width: ${Math.round(Math.min(1, n / vagas) * 100)}%; background: ${T.cheio}"></span>`}</button>`;
   };
 
@@ -606,7 +625,7 @@ TELAS.agenda = async (tela) => {
       }).join('');
       const colunasCss = dias.map((dia) => (bats.some((b) => b.dataHora.startsWith(dia)) ? 'minmax(0, 1fr)' : 'minmax(0, .45fr)')).join(' ');
       cal.innerHTML = `${faixaPista()}<div class="rolagemX"><div class="semana2"><div class="linhaSemana cabSemana" style="grid-template-columns: ${colunasCss}">${cab}</div><div class="linhaSemana" style="grid-template-columns: ${colunasCss}">${colunas}</div></div></div>
-        <div class="legendaAg"><span><span class="amostra" style="${amostra('livre', true)}"></span>Livre para reservar</span><span><span class="amostra" style="background: var(--kib-cor-agenda-reserva-fundo); box-shadow: inset 3px 0 0 var(--kib-cor-estado-aviso-solido)"></span>Com reserva, evento ou campeonato</span><span><span class="amostra" style="box-shadow: inset 0 0 0 2px var(--kib-cor-estado-perigo-solido)"></span>Na pista agora</span><span class="atalhos">Atalhos: <kbd>N</kbd> nova reserva · <kbd>T</kbd> hoje · <kbd>←</kbd><kbd>→</kbd> semana · <kbd>D</kbd><kbd>S</kbd><kbd>L</kbd> vista · <kbd>Esc</kbd> fecha</span></div>`;
+        <div class="legendaAg"><span><span class="amostra" style="${amostra('livre', true)}"></span>Livre para reservar</span><span><span class="amostra" style="background: var(--kib-cor-agenda-reserva-fundo); box-shadow: inset 3px 0 0 var(--kib-cor-estado-aviso-solido)"></span>Com reserva, evento ou campeonato</span><span><span class="amostra" style="box-shadow: inset 0 0 0 2px var(--kib-cor-estado-perigo-solido)"></span>Horário previsto agora</span><span class="atalhos">Atalhos: <kbd>N</kbd> nova reserva · <kbd>T</kbd> hoje · <kbd>←</kbd><kbd>→</kbd> semana · <kbd>D</kbd><kbd>S</kbd><kbd>L</kbd> vista · <kbd>Esc</kbd> fecha</span></div>`;
     } else if (A.vista === 'dia') {
       const todos = bats.filter((b) => b.dataHora.startsWith(A.base)), doDia = filtrar(todos);
       const d = deIso(A.base), ins = todos.reduce((a, b) => a + (+b.inscritos || 0), 0);
@@ -614,7 +633,7 @@ TELAS.agenda = async (tela) => {
         ${doDia.length ? doDia.map((b) => {
           const tp = tipoDe(b), T = TIPOS[tp], st = situacaoBateria(b), n = +b.inscritos || 0, vagas = Math.min(20, +b.vagas || 0), f = falta(b);
           const extra = [generico(b.nome) || tituloBat(b, tp) === b.nome ? '' : b.nome, b.produto, b.observacao].filter(Boolean).map(esc).join(' · ');
-          return `<button class="hov linhaDia ${A.sel === b.id ? 'sel' : ''} ${st === 'fim' ? 'passou' : ''}" data-sel="${b.id}"><span class="col" style="width: 58px"><span class="mono" style="font-size: var(--kib-fonte-tamanho-subtitulo); font-weight: 600">${horaDe(b.dataHora)}</span><span class="mono peq">${fmtHm(hm(horaDe(b.dataHora)) + 35)}</span></span><span class="faixaDia" style="${tp === 'livre' ? 'background: var(--kib-cor-superficie-padrao); box-shadow: inset 0 0 0 1.5px var(--kib-cor-icone-suave)' : tp === 'bloq' ? TIPOS.bloq.fundo : 'background: ' + T.cor}"></span><span class="col" style="flex: 1 1 220px; gap: var(--kib-espaco-meio)"><span style="display: flex; align-items: center; gap: var(--kib-espaco-1); flex-wrap: wrap"><b class="trunc" style="font-size: var(--kib-fonte-tamanho-corpo); ${tp === 'livre' ? 'color: var(--mudo); font-weight: 600' : ''}">${esc(tituloBat(b, tp))}</b>${tp === 'livre' ? '' : `<span class="chip" style="${T.fundo}">${T.curto}</span>`}${st === 'pista' ? '<span class="chip solido-perigo sem-sinal">na pista</span>' : ''}${st !== 'fim' && f ? `<span class="chip ${urgente(b) ? 'laranja' : 'cinza'}">${pagCurto(b)}</span>` : ''}</span>${extra ? `<span class="peq">${extra}</span>` : ''}</span><span class="vagasDia" role="img" aria-label="${n} de ${+b.vagas || 0} vagas ocupadas">${Array.from({ length: vagas }, (_, k) => `<span style="background: ${k < n ? (tp === 'livre' ? 'var(--kib-cor-borda-campo)' : T.cheio) : 'color-mix(in srgb, var(--kib-cor-texto-discreto) 14%, transparent)'}"></span>`).join('')}</span><span class="livresDia" style="color: ${st === 'fim' ? 'var(--mudo)' : +b.disponiveis ? 'var(--okTxt)' : 'var(--erroTxt)'}">${livresTxt(b, st, tp)}</span></button>`;
+          return `<button class="hov linhaDia ${A.sel === b.id ? 'sel' : ''} ${st === 'fim' ? 'passou' : ''}" data-sel="${b.id}"><span class="col" style="width: 58px"><span class="mono" style="font-size: var(--kib-fonte-tamanho-subtitulo); font-weight: 600">${horaDe(b.dataHora)}</span><span class="mono peq">${fmtHm(hm(horaDe(b.dataHora)) + 35)}</span></span><span class="faixaDia" style="${tp === 'livre' ? 'background: var(--kib-cor-superficie-padrao); box-shadow: inset 0 0 0 1.5px var(--kib-cor-icone-suave)' : tp === 'bloq' ? TIPOS.bloq.fundo : 'background: ' + T.cor}"></span><span class="col" style="flex: 1 1 220px; gap: var(--kib-espaco-meio)"><span style="display: flex; align-items: center; gap: var(--kib-espaco-1); flex-wrap: wrap"><b class="trunc" style="font-size: var(--kib-fonte-tamanho-corpo); ${tp === 'livre' ? 'color: var(--mudo); font-weight: 600' : ''}">${esc(tituloBat(b, tp))}</b>${tp === 'livre' ? '' : `<span class="chip" style="${T.fundo}">${T.curto}</span>`}${st === 'prevista' ? '<span class="chip solido-perigo sem-sinal">no horário previsto</span>' : ''}${st !== 'fim' && f ? `<span class="chip ${urgente(b) ? 'laranja' : 'cinza'}">${pagCurto(b)}</span>` : ''}</span>${extra ? `<span class="peq">${extra}</span>` : ''}</span><span class="vagasDia" role="img" aria-label="${n} de ${+b.vagas || 0} vagas ocupadas">${Array.from({ length: vagas }, (_, k) => `<span style="background: ${k < n ? (tp === 'livre' ? 'var(--kib-cor-borda-campo)' : T.cheio) : 'color-mix(in srgb, var(--kib-cor-texto-discreto) 14%, transparent)'}"></span>`).join('')}</span><span class="livresDia" style="color: ${st === 'fim' ? 'var(--mudo)' : +b.disponiveis ? 'var(--okTxt)' : 'var(--erroTxt)'}">${livresTxt(b, st, tp)}</span></button>`;
         }).join('') : todos.length ? '<div class="vazio"><b>Nada com esse filtro</b><span>Ligue os tipos em “Mostrar” ou limpe a busca.</span></div>' : `<div class="vazio"><b>Sem baterias neste dia</b><span>${d.getDay() === 1 ? 'Segunda o kartódromo não abre.' : 'Use as setas para ver outro dia.'}</span></div>`}`;
     } else {
       const comPiloto = filtrar(bats).filter((b) => +b.inscritos > 0);
@@ -627,9 +646,11 @@ TELAS.agenda = async (tela) => {
   };
 
   const pintarMini = async () => {
+    const pedido = consulta;
     const base = deIso(A.base), mes = `${base.getFullYear()}-${pad(base.getMonth() + 1)}`;
     let resumo = [];
     try { resumo = await office(`/agenda?mes=${mes}`); } catch { /* sem resumo: o calendário funciona sem as bolinhas */ }
+    if (pedido !== consulta || !tela.isConnected) return;
     const porDia = Object.fromEntries(resumo.map((r) => [r.dia, r]));
     const m0 = new Date(base.getFullYear(), base.getMonth(), 1), ult = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
     const ini = A.vista === 'lista' ? A.base : semanaIni(), fim = somaDias(ini, 6), hoje = hojeIso();
@@ -654,6 +675,7 @@ TELAS.agenda = async (tela) => {
   };
 
   const abrirBateria = async (id) => {
+    const pedido = ++detalhe;
     A.sel = id;
     const b = bats.find((x) => x.id === id);
     if (!b) { fecharCamada(); return; }
@@ -662,18 +684,18 @@ TELAS.agenda = async (tela) => {
     const g = gaveta(`<div class="gavetaTopo" style="${T.topo}"><button class="fechar hov" data-acao="fecharGaveta" aria-label="Fechar (Esc)">${svg(IC.fechar, 14, 'var(--kib-cor-texto-principal)', 2.4)}</button>
       <span style="display: flex; align-items: center; gap: var(--kib-espaco-meio); font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 700; letter-spacing: .05em; text-transform: uppercase"><span class="amostra" style="${amostra(tp, true)}"></span>${T.t}</span>
       <span style="padding-right: var(--kib-espaco-5); font-size: var(--kib-fonte-tamanho-titulo-grande); font-weight: 700; letter-spacing: -0.015em">${esc(titulo === 'Livre' ? 'Horário livre' : titulo)}</span>
-      <span style="font-size: var(--kib-fonte-tamanho-corpo); opacity: .85">${DIAS[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]} · ${horaDe(b.dataHora)} às ${fmtHm(hm(horaDe(b.dataHora)) + 35)}${st === 'pista' ? ' · na pista agora' : st === 'fim' ? ' · já correu' : ''}</span>
+      <span style="font-size: var(--kib-fonte-tamanho-corpo); opacity: .85">${DIAS[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]} · ${horaDe(b.dataHora)} às ${fmtHm(hm(horaDe(b.dataHora)) + 35)}${st === 'prevista' ? ' · no horário previsto' : st === 'fim' ? ' · horário encerrado' : ''}</span>
       <span style="font-size: var(--kib-fonte-tamanho-pequeno); opacity: .8">${[b.nome, b.produto, tracadoTxt(b.tracado), b.tipoKart].filter(Boolean).map(esc).join(' · ')}</span></div>
       <div class="gavetaCorpo" id="corpoBateria"><div class="esqueleto" style="height: 120px"></div><div class="esqueleto" style="height: 200px"></div></div>
-      <div style="display: flex; gap: var(--kib-espaco-1); padding: var(--kib-espaco-denso-12) var(--kib-espaco-2); background: var(--kib-cor-superficie-padrao); border-top: 1px solid var(--linha2)">${st !== 'fim' && +b.disponiveis > 0 && tp !== 'bloq' ? `<button class="btn prim cresce" data-acao="novaReserva">${svg(IC.mais, 14, 'var(--kib-cor-acao-sobre-principal)', 2.6)}Nova reserva · ${b.disponiveis} ${+b.disponiveis === 1 ? 'vaga' : 'vagas'}</button>` : `<a class="btn sec cresce" href="#/recepcao">Abrir na Recepção</a>`}</div>`, `Bateria das ${horaDe(b.dataHora)}: ${titulo}`);
+      <div style="display: flex; gap: var(--kib-espaco-1); padding: var(--kib-espaco-denso-12) var(--kib-espaco-2); background: var(--kib-cor-superficie-padrao); border-top: 1px solid var(--linha2)">${st !== 'fim' && +b.disponiveis > 0 && tp !== 'bloq' && !b.reservaFechada && b.status === 'aberta' ? `<button class="btn prim cresce" data-acao="novaReserva">${svg(IC.mais, 14, 'var(--kib-cor-acao-sobre-principal)', 2.6)}Nova reserva · ${b.disponiveis} ${+b.disponiveis === 1 ? 'vaga' : 'vagas'}</button>` : `<a class="btn sec cresce" href="#/recepcao">Abrir na Recepção</a>`}</div>`, `Bateria das ${horaDe(b.dataHora)}: ${titulo}`);
     g.dataset.bateria = id;
     let reservas = [];
-    try { reservas = await office(`/reservas?bateriaId=${id}&status=todas`); } catch (e) { $('#corpoBateria').innerHTML = `<div class="vazio"><b>Não deu para carregar as reservas</b><span>${esc(e.message)}</span><button class="btn sec peq" style="margin-top: var(--kib-espaco-1)" data-reabrir="${id}">Tentar de novo</button></div>`; return; }
-    if (A.sel !== id) return;
+    try { reservas = await office(`/reservas?bateriaId=${id}&status=todas`); } catch (e) { if (pedido !== detalhe || !g.isConnected) return; g.querySelector('#corpoBateria').innerHTML = `<div class="vazio"><b>Não deu para carregar as reservas</b><span>${esc(e.message)}</span><button class="btn sec peq" style="margin-top: var(--kib-espaco-1)" data-reabrir="${id}">Tentar de novo</button></div>`; return; }
+    if (A.sel !== id || pedido !== detalhe || !g.isConnected) return;
     reservas = reservas.filter((r) => r.status !== 'cancelada');
     let gruposReserva = [];
-    try { gruposReserva = await office(`/grupos?bateriaId=${id}`); } catch { gruposReserva = []; }
-    if (A.sel !== id) return;
+    try { gruposReserva = await office(`/grupos?bateriaId=${id}`); } catch (e) { if (pedido !== detalhe || !g.isConnected) return; g.querySelector('#corpoBateria').innerHTML = `<div class="vazio" role="alert"><b>Não foi possível conferir os grupos</b><span>${esc(e.message)}</span><button class="btn sec" data-reabrir="${id}">Tentar novamente</button></div>`; return; }
+    if (A.sel !== id || pedido !== detalhe || !g.isConnected) return;
     const doGrupo = new Map();
     gruposReserva.forEach((gr, gi) => gr.pilotos.forEach((p) => doGrupo.set(p.inscricaoId, { cor: CORG[gi % 6], nome: p.nome })));
     const avulsas = reservas.filter((r) => !doGrupo.has(r.id));
@@ -684,7 +706,7 @@ TELAS.agenda = async (tela) => {
     const assentos = Array.from({ length: Math.max(1, +b.vagas || 12) }, (_, i) => { const r = ordenadas[i]; const dg = r && doGrupo.get(r.id); const nomeA = dg ? (dg.nome || r.cliente) : r && r.cliente; return r ? `<span class="vaga ocupada" style="background: ${dg ? dg.cor : cores.get(r.responsavel || r.cliente)}" title="${esc(nomeA)}">${esc(iniciais(nomeA))}</span>` : `<span class="vaga" title="Vaga ${i + 1} livre">${i + 1}</span>`; }).join('');
     const tipoAtual = b.reservaFechada ? 'fechada' : (b.autoAtendimento === false || b.autoAtendimento === 0) ? 'bloqueada' : 'aberta';
     const tipoHtml = st === 'fim' ? '' : `<section class="secao"><span class="titulo">Quem pode reservar este horário${dica("Escolha quem pode ocupar este horário: qualquer pessoa (site, totem e Recepção), só o grupo que já reservou, ou só a Recepção.", "quem pode reservar este horário")}</span><span class="tiposBat">${[['aberta', 'Vagas abertas', 'livre', 'site, totem e Recepção'], ['fechada', 'Bateria fechada', 'fechada', 'só o grupo, sai do site'], ['bloqueada', 'Bloqueada', 'bloq', 'só a Recepção vende']].map(([v, t, tq, dd]) => `<button class="hov" data-tipo-bat="${v}" aria-pressed="${tipoAtual === v}" style="${tipoAtual === v ? (tq === 'livre' ? 'background: var(--kib-cor-superficie-padrao)' : TIPOS[tq].fundo) + '; box-shadow: inset 0 0 0 2px ' + (tq === 'livre' ? 'var(--kib-cor-texto-apoio)' : TIPOS[tq].cor) : 'background: var(--fundo); color: var(--tinta2)'}"><span style="display: flex; align-items: center; gap: var(--kib-espaco-meio); font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 700"><span class="amostra" style="width: 10px; height: 10px; ${amostra(tq, true)}"></span>${t}</span><span style="font-size: var(--kib-fonte-tamanho-pequeno); opacity: .8">${dd}</span></button>`).join('')}</span></section>`;
-    const prontoTotem = (r) => !!(r.documento && r.peso && r.telefone);
+    const prontoTotem = (r) => !!(r.documento && r.email && r.peso && r.telefone);
     const cartoes = [...grupos.entries()].map(([resp, lista]) => {
       const pagos = lista.filter((r) => r.pago).length, prontos = lista.filter(prontoTotem).length, total = lista.reduce((a, r) => a + (+r.total || 0), 0), pagoValor = lista.filter((r) => r.pago).reduce((a, r) => a + (+r.total || 0), 0);
       const tel = lista[0].telefone, cor = cores.get(resp);
@@ -693,7 +715,7 @@ TELAS.agenda = async (tela) => {
       return `<div class="cartaoGrupo">
         <span class="linha gap-1"><span class="avatar m" style="background: ${cor}">${esc(iniciais(resp))}</span><span class="col cresce"><b>${esc(resp)}</b><span class="peq">${lista.length} piloto${lista.length > 1 ? 's' : ''} · ${esc(lista[0].origem || 'Recepção')}${tel ? ' · ' + esc(tel) : ''}</span></span></span>
         <span style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--kib-espaco-1)">
-          <span class="col gap-meio"><span style="display: flex; flex-wrap: wrap; gap: 2px var(--kib-espaco-1); font-size: var(--kib-fonte-tamanho-pequeno)"><span class="peq" title="CPF, peso e telefone preenchidos">Prontos para o totem</span><b class="empurra">${prontos} de ${lista.length}</b></span><span class="barra" style="height: 5px"><span style="width: ${Math.round(prontos / lista.length * 100)}%; background: ${prontos === lista.length ? 'var(--kib-cor-status-ok)' : 'var(--kib-cor-estado-aviso-solido)'}"></span></span></span>
+          <span class="col gap-meio"><span style="display: flex; flex-wrap: wrap; gap: 2px var(--kib-espaco-1); font-size: var(--kib-fonte-tamanho-pequeno)"><span class="peq" title="CPF, e-mail, peso e telefone preenchidos">Prontos para o totem</span><b class="empurra">${prontos} de ${lista.length}</b></span><span class="barra" style="height: 5px"><span style="width: ${Math.round(prontos / lista.length * 100)}%; background: ${prontos === lista.length ? 'var(--kib-cor-status-ok)' : 'var(--kib-cor-estado-aviso-solido)'}"></span></span></span>
           <span class="col gap-meio"><span style="display: flex; flex-wrap: wrap; gap: 2px var(--kib-espaco-1); font-size: var(--kib-fonte-tamanho-pequeno)"><span class="peq">Pago</span><b class="empurra">${brlCurto(pagoValor)} de ${brlCurto(total)}</b></span><span class="barra" style="height: 5px"><span style="width: ${total ? Math.round(pagoValor / total * 100) : 0}%; background: ${pagos === lista.length ? 'var(--kib-cor-status-ok)' : 'var(--kib-cor-estado-aviso-solido)'}"></span></span></span>
         </span>
         <div class="listaPilotos">${lista.map((r) => `<div><span class="avatar p" style="background: ${r.pago && prontoTotem(r) ? 'var(--kib-cor-status-ok)' : cor}" aria-hidden="true">${esc(iniciais(r.cliente))}</span><span class="col cresce"><span class="trunc peso-semibold">${esc(r.cliente)}</span><span class="peq">${esc(r.documento || 'sem CPF')}${r.peso ? ' · ' + r.peso + ' kg' : ' · sem peso'}${r.idade != null ? ' · ' + r.idade + ' anos' : ''}</span></span>${r.aprovada ? '' : `<button class="btn peq aviso" data-aprovar="${r.id}">Aprovar</button>`}<span class="chip ${r.pago ? 'verde' : 'laranja'}">${r.pago ? 'pago' : 'falta ' + brlCurto(r.total)}</span></div>`).join('')}</div>
@@ -701,44 +723,50 @@ TELAS.agenda = async (tela) => {
       </div>`;
     }).join('');
     const nGrupos = grupos.size + gruposReserva.length;
-    $('#corpoBateria').innerHTML = `<section class="secao"><span class="titulo">Vagas<span style="margin-left: auto; font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 600; color: ${st === 'fim' ? 'var(--mudo)' : tp === 'fechada' || tp === 'bloq' ? 'var(--tinta2)' : +b.disponiveis ? 'var(--okTxt)' : 'var(--erroTxt)'}">${st === 'fim' ? b.inscritos + ' correram' : tp === 'fechada' ? 'fechada: fora do site e do totem' : tp === 'bloq' ? 'bloqueada: só a Recepção vende' : b.disponiveis + ' de ' + b.vagas + ' livres no site e no totem'}</span></span><div class="vagasGrade">${assentos}</div><span class="peq">Cada quadrado é uma vaga. Os karts saem no sorteio do tablet, na hora da bateria.</span></section>
+    $('#corpoBateria').innerHTML = `<section class="secao"><span class="titulo">Vagas<span style="margin-left: auto; font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 600; color: ${st === 'fim' ? 'var(--mudo)' : tp === 'fechada' || tp === 'bloq' ? 'var(--tinta2)' : +b.disponiveis ? 'var(--okTxt)' : 'var(--erroTxt)'}">${st === 'fim' ? b.inscritos + ' inscritos' : tp === 'fechada' ? 'fechada: fora do site e do totem' : tp === 'bloq' ? 'bloqueada: só a Recepção vende' : b.disponiveis + ' de ' + b.vagas + ' livres no site e no totem'}</span></span><div class="vagasGrade">${assentos}</div><span class="peq">Cada quadrado é uma vaga. Os karts saem no sorteio do tablet, na hora da bateria.</span></section>
       ${tipoHtml}
-      <section class="secao"><span class="titulo">Reservas<span class="peq" style="margin-left: auto; font-weight: 500">${reservas.length ? `${reservas.length} piloto${reservas.length > 1 ? 's' : ''} em ${nGrupos} ${nGrupos > 1 ? 'grupos' : 'grupo'}` : ''}</span></span>${Grupo.cartoes(gruposReserva)}${cartoes ? (gruposReserva.length ? '<span class="peq" style="font-weight: 700; margin-top: var(--kib-espaco-meio)">Outras reservas (Recepção, totem e site)</span>' : '') + cartoes : ''}${!reservas.length ? `<span class="peq">Nenhuma reserva ainda.${st !== 'fim' && +b.disponiveis > 0 && tp !== 'bloq' ? ' Use “Nova reserva” abaixo.' : ''}</span>` : ''}</section>
+      <section class="secao"><span class="titulo">Reservas<span class="peq" style="margin-left: auto; font-weight: 500">${reservas.length ? `${reservas.length} piloto${reservas.length > 1 ? 's' : ''} em ${nGrupos} ${nGrupos > 1 ? 'grupos' : 'grupo'}` : ''}</span></span>${Grupo.cartoes(gruposReserva)}${cartoes ? (gruposReserva.length ? '<span class="peq" style="font-weight: 700; margin-top: var(--kib-espaco-meio)">Outras reservas (Recepção, totem e site)</span>' : '') + cartoes : ''}${!reservas.length ? `<span class="peq">Nenhuma reserva ainda.${st !== 'fim' && +b.disponiveis > 0 && tp !== 'bloq' && !b.reservaFechada && b.status === 'aberta' ? ' Use “Nova reserva” abaixo.' : ''}</span>` : ''}</section>
       ${b.observacao ? `<section class="secao"><span class="titulo">Observação</span><span style="white-space: pre-line; line-height: 1.5">${esc(b.observacao)}</span></section>` : ''}`;
     if (typeof AgendaAcoes !== 'undefined') AgendaAcoes.gaveta({ b, reservas, st, tp });
   };
 
   /** Nova reserva pelo cabeçalho: escolhe dia, quantos pilotos e o horário; depois abre a reserva do grupo. */
   const escolherHorario = async (anterior = null, rascAnt = null) => {
-    const E = { dia: anterior ? anterior.dia : (A.vista === 'dia' && A.base >= hojeIso() ? A.base : hojeIso()), n: anterior ? anterior.n : 2, lista: [], carregando: true };
+    const E = { dia: anterior ? anterior.dia : (A.base >= hojeIso() ? A.base : hojeIso()), n: anterior ? anterior.n : 2, lista: [], carregando: true, consulta: 0 };
     const m = modal('<div class="esqueleto" style="height: 360px; margin: var(--kib-espaco-denso-20)"></div>', 'Nova reserva: escolher dia e horário');
     m.style.maxWidth = '640px';
     const desenhar = () => {
-      const validas = E.lista.filter((b) => situacaoBateria(b) !== 'fim' && tipoDe(b) !== 'bloq' && !b.reservaFechada);
-      const dias = Array.from({ length: 14 }, (_, k) => somaDias(hojeIso(), k));
+      const validas = E.lista.filter((b) => b.status === 'aberta' && situacaoBateria(b) !== 'fim' && tipoDe(b) !== 'bloq' && !b.reservaFechada);
+      const dias = Array.from({ length: 14 }, (_, k) => somaDias(E.dia, k));
       m.innerHTML = `<div class="modalTopo" style="${TIPOS.reserva.topo}"><span class="col gap-meio"><span class="t-titulo-grande peso-negrito">Nova reserva: que dia e que horário?</span><span style="font-size: var(--kib-fonte-tamanho-corpo); opacity: .85">Só aparecem os horários com vagas para o grupo inteiro.</span></span><button class="fechar hov solto" data-acao="fechar" aria-label="Fechar (Esc)">${svg(IC.fechar, 15, 'var(--kib-cor-texto-principal)', 2.4)}</button></div>
         <div style="display: flex; flex-direction: column; gap: var(--kib-espaco-denso-12); padding: var(--kib-espaco-2) var(--kib-espaco-2) var(--kib-espaco-2)">
-          <div class="diasEscolha" role="listbox" aria-label="Dia">${dias.map((dia) => { const d = deIso(dia); return `<button class="hov ${dia === E.dia ? 'sel' : ''}" data-escolher-dia="${dia}" role="option" aria-selected="${dia === E.dia}" ${d.getDay() === 1 ? 'disabled title="Segunda o kartódromo não abre"' : ''}><span>${dia === hojeIso() ? 'hoje' : DIAS[d.getDay()].slice(0, 3)}</span><b>${d.getDate()}</b></button>`; }).join('')}</div>
+          <label class="campo"><span>Data da reserva</span><input class="entrada" type="date" min="${hojeIso()}" value="${E.dia}" data-escolher-data></label><div class="diasEscolha" role="listbox" aria-label="Dia">${dias.map((dia) => { const d = deIso(dia); return `<button class="hov ${dia === E.dia ? 'sel' : ''}" data-escolher-dia="${dia}" role="option" aria-selected="${dia === E.dia}" ><span>${dia === hojeIso() ? 'hoje' : DIAS[d.getDay()].slice(0, 3)}</span><b>${d.getDate()}</b></button>`; }).join('')}</div>
           <span style="display: flex; align-items: center; gap: var(--kib-espaco-denso-12); flex-wrap: wrap"><b class="t-corpo">Quantos pilotos vão correr?</b><span class="passo"><button type="button" data-escolher-n="-1" aria-label="Um a menos">−</button><span>${E.n}</span><button type="button" data-escolher-n="1" aria-label="Um a mais">+</button></span><span class="peq">dá para mudar depois, na reserva</span></span>
-          <div class="horariosEscolha">${E.carregando ? '<div class="esqueleto" style="height: 180px"></div>' : validas.length ? validas.map((b) => { const l = +b.disponiveis || 0, cabe = l >= E.n, tp = tipoDe(b); return `<button class="hov" data-escolher="${b.id}" ${cabe ? '' : 'disabled'}><b class="mono">${horaDe(b.dataHora)}</b><span class="col" style="flex-grow: 1; min-width: 0"><span class="trunc peso-semibold">${esc(tp === 'livre' ? 'Livre' : tituloBat(b, tp))}</span><span class="peq">${esc(b.produto || b.nome)}${situacaoBateria(b) === 'pista' ? ' · na pista agora' : ''}</span></span><span style="font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 700; color: ${cabe ? 'var(--okTxt)' : 'var(--erroTxt)'}">${cabe ? `${l} ${l === 1 ? 'livre' : 'livres'}` : `só ${l} ${l === 1 ? 'livre' : 'livres'}`}</span></button>`; }).join('') : '<div class="vazio"><b>Nenhum horário com vaga neste dia</b><span>Escolha outro dia acima.</span></div>'}</div>
+          <div class="horariosEscolha">${E.carregando ? '<div class="esqueleto" style="height: 180px"></div>' : validas.length ? validas.map((b) => { const l = +b.disponiveis || 0, cabe = l >= E.n, tp = tipoDe(b); return `<button class="hov" data-escolher="${b.id}" ${cabe ? '' : 'disabled'}><b class="mono">${horaDe(b.dataHora)}</b><span class="col" style="flex-grow: 1; min-width: 0"><span class="trunc peso-semibold">${esc(tp === 'livre' ? 'Livre' : tituloBat(b, tp))}</span><span class="peq">${esc(b.produto || b.nome)}${situacaoBateria(b) === 'prevista' ? ' · no horário previsto' : ''}</span></span><span style="font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 700; color: ${cabe ? 'var(--okTxt)' : 'var(--erroTxt)'}">${cabe ? `${l} ${l === 1 ? 'livre' : 'livres'}` : `só ${l} ${l === 1 ? 'livre' : 'livres'}`}</span></button>`; }).join('') : '<div class="vazio"><b>Nenhum horário com vaga neste dia</b><span>Escolha outro dia acima.</span></div>'}</div>
         </div>`;
     };
     const buscar = async () => {
+      const pedido = ++E.consulta, dia = E.dia;
       E.carregando = true; desenhar();
-      try { E.lista = (await office(`/baterias?status=todas&filtro=entre&data=${E.dia}&ate=${E.dia}`)).sort((x, y) => x.dataHora.localeCompare(y.dataHora)); }
-      catch (er) { E.lista = []; falhou(er); }
+      try { const lista = await office(`/baterias?status=todas&filtro=entre&data=${dia}&ate=${dia}`); if (pedido !== E.consulta || !m.isConnected) return; E.lista = lista.sort((x, y) => x.dataHora.localeCompare(y.dataHora)); }
+      catch (er) { if (pedido !== E.consulta || !m.isConnected) return; E.lista = []; falhou(er); }
       E.carregando = false; desenhar();
     };
+    m.onchange = (e) => { if (e.target.matches('[data-escolher-data]') && e.target.value >= hojeIso()) { E.dia = e.target.value; buscar(); } };
     m.onclick = async (e) => {
       const dd = e.target.closest('[data-escolher-dia]'); if (dd) { E.dia = dd.dataset.escolherDia; buscar(); return; }
       const nn = e.target.closest('[data-escolher-n]'); if (nn) { E.n = Math.max(1, Math.min(40, E.n + +nn.dataset.escolherN)); desenhar(); return; }
       const h = e.target.closest('[data-escolher]');
       if (h) {
         const b = E.lista.find((x) => x.id === +h.dataset.escolher); if (!b) return;
-        if (situacaoBateria(b) === 'pista' && !confirm(`A bateria das ${horaDe(b.dataHora)} já está correndo. Reservar nela mesmo assim?`)) return;
-        A.base = E.dia; if (A.vista === 'lista') A.vista = 'semana';
-        await carregar(); A.sel = b.id; pintar();
-        Grupo.nova(bats.find((x) => x.id === b.id) || b, recarregar, E.n, (rasc) => escolherHorario({ dia: E.dia, n: E.n }, rasc), rascAnt);
+        if (situacaoBateria(b) === 'prevista' && !confirm(`A bateria das ${horaDe(b.dataHora)} já atingiu o horário previsto. Reservar nela mesmo assim?`)) return;
+        const diaEscolhido = E.dia;
+        A.base = diaEscolhido; if (A.vista === 'lista') A.vista = 'semana';
+        if (!await carregar() || !m.isConnected || E.dia !== diaEscolhido) return;
+        const atual = bats.find((x) => x.id === b.id);
+        if (!atual || atual.status !== 'aberta' || atual.reservaFechada || +atual.disponiveis < E.n) { toast('Este horário mudou. Escolha novamente.', true); buscar(); return; }
+        A.sel = b.id; pintar();
+        Grupo.nova(atual, recarregar, E.n, (rasc) => escolherHorario({ dia: diaEscolhido, n: E.n }, rasc), rascAnt);
       }
     };
     buscar();
@@ -747,6 +775,7 @@ TELAS.agenda = async (tela) => {
   const irPara = (n) => { A.base = n === 0 ? hojeIso() : somaDias(A.base, (A.vista === 'dia' ? 1 : 7) * n); A.sel = null; fecharCamada(); carregar(); };
   const mudarVista = (v) => { if (A.vista === v) return; A.vista = v; if (v === 'lista' && A.base < hojeIso()) A.base = hojeIso(); carregar(); };
   tela.addEventListener('click', async (e) => {
+    if (e.target.closest('[data-ag-repetir]')) return carregar();
     if (e.target.closest('[data-nova]')) return escolherHorario();
     const nav = e.target.closest('[data-nav]'); if (nav) return irPara(+nav.dataset.nav);
     const v = e.target.closest('[data-vista]'); if (v) return mudarVista(v.dataset.vista);
@@ -793,7 +822,7 @@ TELAS.agenda = async (tela) => {
   await carregar();
   if (A.sel) abrirBateria(A.sel);
   if (S.irAgendaNova) { S.irAgendaNova = false; escolherHorario(); }
-  repetir(async () => { if (!$('#camada .modal')) await carregar(); }, 45_000);
+  repetir(async () => { if ($('#camada .modal')) { if (typeof Grupo !== 'undefined') await Grupo.refrescar(); } else await recarregar(); }, 30_000);
 };
 
 // ---------- Recepção
@@ -811,7 +840,7 @@ TELAS.recepcao = async (tela) => {
     const d = deIso(R.data);
     $('#diaTxt').textContent = `${R.data === hojeIso() ? 'Hoje' : DIAS[d.getDay()].slice(0, 3)}, ${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
     bats = await office(`/baterias?status=todas&data=${R.data}`);
-    if (!bats.find((b) => b.id === R.bat)) R.bat = (bats.find((b) => situacaoBateria(b) === 'pista') || bats.find((b) => situacaoBateria(b) === 'futura') || bats[0] || {}).id;
+    if (!bats.find((b) => b.id === R.bat)) R.bat = (bats.find((b) => situacaoBateria(b) === 'prevista') || bats.find((b) => situacaoBateria(b) === 'futura') || bats[0] || {}).id;
     pintarBats();
     await carregarPilotos();
   };
@@ -820,7 +849,7 @@ TELAS.recepcao = async (tela) => {
     const vis = bats.filter((b) => !q || `${horaDe(b.dataHora)} ${b.nome} ${b.produto}`.toLowerCase().includes(q));
     const tot = bats.reduce((a, b) => a + +b.inscritos, 0), vagas = bats.reduce((a, b) => a + +b.vagas, 0);
     $('#listaBats').innerHTML = `<div style="padding: var(--kib-espaco-denso-12) var(--kib-espaco-denso-12) var(--kib-espaco-1); display: flex; flex-direction: column; gap: var(--kib-espaco-1)"><div style="display: flex; align-items: baseline"><h2 style="margin: 0; font-size: var(--kib-fonte-tamanho-subtitulo)">Baterias</h2><span class="peq empurra">${tot} de ${vagas} vagas</span></div><label class="buscaCampo">${svg(IC.busca, 13, 'var(--kib-cor-borda-campo)')}<input id="qBat" value="${esc(R.qBat)}" placeholder="Hora ou tipo" aria-label="Filtrar baterias"></label></div>
-      <div style="display: flex; flex-direction: column; gap: 2px; padding: 0 var(--kib-espaco-meio) var(--kib-espaco-1)">${vis.map((b) => { const st = situacaoBateria(b), sel = b.id === R.bat; return `<button class="hov" data-bat="${b.id}" style="display: flex; flex-direction: column; gap: var(--kib-espaco-meio); padding: var(--kib-espaco-1) var(--kib-espaco-1); border: 0; border-radius: var(--kib-raio-botao); text-align: left; background: ${sel ? 'color-mix(in srgb, var(--kib-cor-marca-principal) 9%, transparent)' : 'var(--kib-cor-acao-sobre-principal)'}; ${sel ? 'box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--kib-cor-marca-principal) 45%, transparent)' : ''}"><span style="display: flex; align-items: center; gap: var(--kib-espaco-1); width: 100%"><span class="mono peso-semibold">${horaDe(b.dataHora)}</span><b class="trunc">${esc(b.nome)}</b><span class="chip ${st === 'fim' ? 'cinza' : st === 'pista' ? 'verde' : +b.disponiveis ? 'laranja' : 'azul'} empurra">${st === 'fim' ? 'Finalizada' : st === 'pista' ? 'Na pista' : +b.disponiveis ? 'Com vagas' : 'Lotada'}</span></span><span style="display: flex; align-items: center; gap: var(--kib-espaco-1); width: 100%"><span class="barra" style="flex-grow: 1; height: 5px"><span style="width: ${Math.round(+b.inscritos / Math.max(1, +b.vagas) * 100)}%; background: ${st === 'pista' ? 'var(--kib-cor-status-ok)' : 'var(--kib-cor-marca-principal)'}"></span></span><span class="peq num">${b.inscritos}/${b.vagas}${+b.preReservas ? ' · ' + b.preReservas + ' a aprovar' : ''}</span></span></button>`; }).join('') || '<p class="vazio">Nenhuma bateria.</p>'}</div>`;
+      <div style="display: flex; flex-direction: column; gap: 2px; padding: 0 var(--kib-espaco-meio) var(--kib-espaco-1)">${vis.map((b) => { const st = situacaoBateria(b), sel = b.id === R.bat; return `<button class="hov" data-bat="${b.id}" style="display: flex; flex-direction: column; gap: var(--kib-espaco-meio); padding: var(--kib-espaco-1) var(--kib-espaco-1); border: 0; border-radius: var(--kib-raio-botao); text-align: left; background: ${sel ? 'color-mix(in srgb, var(--kib-cor-marca-principal) 9%, transparent)' : 'var(--kib-cor-acao-sobre-principal)'}; ${sel ? 'box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--kib-cor-marca-principal) 45%, transparent)' : ''}"><span style="display: flex; align-items: center; gap: var(--kib-espaco-1); width: 100%"><span class="mono peso-semibold">${horaDe(b.dataHora)}</span><b class="trunc">${esc(b.nome)}</b><span class="chip ${st === 'fim' ? 'cinza' : st === 'prevista' ? 'verde' : +b.disponiveis ? 'laranja' : 'azul'} empurra">${st === 'fim' ? 'Horário encerrado' : st === 'prevista' ? 'Horário previsto' : +b.disponiveis ? 'Com vagas' : 'Lotada'}</span></span><span style="display: flex; align-items: center; gap: var(--kib-espaco-1); width: 100%"><span class="barra" style="flex-grow: 1; height: 5px"><span style="width: ${Math.round(+b.inscritos / Math.max(1, +b.vagas) * 100)}%; background: ${st === 'prevista' ? 'var(--kib-cor-status-ok)' : 'var(--kib-cor-marca-principal)'}"></span></span><span class="peq num">${b.inscritos}/${b.vagas}${+b.preReservas ? ' · ' + b.preReservas + ' a aprovar' : ''}</span></span></button>`; }).join('') || '<p class="vazio">Nenhuma bateria.</p>'}</div>`;
   };
   const carregarPilotos = async () => {
     const b = bats.find((x) => x.id === R.bat);
@@ -836,7 +865,7 @@ TELAS.recepcao = async (tela) => {
     const filtros = [['Todos', reservas], ['A pagar', aPagar], ['Sem termo', semTermo], ['Pelo site', site], ['A aprovar', aprovar]];
     const q = R.qPil.toLowerCase();
     const lista = filtros[R.filtro][1].filter((r) => !q || `${r.cliente} ${r.kart || ''} ${r.documento || ''}`.toLowerCase().includes(q));
-    $('#pilotos').innerHTML = `<div class="cartaoCab"><span class="col"><h2 class="t-titulo">${esc(b.nome)} · ${horaDe(b.dataHora)}</h2><span class="sub">${esc(b.produto || '')}${b.tracado ? ' · traçado ' + esc(b.tracado) : ''}${b.tipoKart ? ' · ' + esc(b.tipoKart) : ''}</span></span><span class="chip dir ${st === 'fim' ? 'cinza' : st === 'pista' ? 'verde' : 'laranja'}">${st === 'fim' ? 'Finalizada' : st === 'pista' ? 'Na pista' : 'Próxima'}</span></div>
+    $('#pilotos').innerHTML = `<div class="cartaoCab"><span class="col"><h2 class="t-titulo">${esc(b.nome)} · ${horaDe(b.dataHora)}</h2><span class="sub">${esc(b.produto || '')}${b.tracado ? ' · traçado ' + esc(b.tracado) : ''}${b.tipoKart ? ' · ' + esc(b.tipoKart) : ''}</span></span><span class="chip dir ${st === 'fim' ? 'cinza' : st === 'prevista' ? 'verde' : 'laranja'}">${st === 'fim' ? 'Horário encerrado' : st === 'prevista' ? 'Horário previsto' : 'Próxima'}</span></div>
       <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 0 var(--kib-espaco-2); border-radius: var(--kib-raio-cartao); overflow: hidden; background: color-mix(in srgb, var(--kib-cor-texto-principal) 6%, transparent); box-shadow: 0 0 0 1px var(--linha)">${[['Pilotos', `${b.inscritos}/${b.vagas}`, ''], ['Pagos', b.pagos, 'color: var(--okTxt)'], ['A pagar', aPagar.length, aPagar.length ? 'color: var(--erroTxt)' : ''], ['Sem termo', semTermo.length, semTermo.length ? 'color: var(--erroTxt)' : '']].map(([t, v, c]) => `<div class="col" style="gap: 1px; padding: var(--kib-espaco-1) var(--kib-espaco-denso-12); background: var(--sup2)"><span class="peq">${t}</span><span class="num" style="font-size: var(--kib-fonte-tamanho-titulo-grande); font-weight: 700; ${c}">${v}</span></div>`).join('')}</div>
       <div style="display: flex; flex-wrap: wrap; align-items: center; gap: var(--kib-espaco-1); padding: var(--kib-espaco-denso-12) var(--kib-espaco-2) var(--kib-espaco-1)"><div class="filtros">${filtros.map(([t, l], i) => `<button data-filtro="${i}" class="${i === R.filtro ? 'sel' : ''}">${t} <span>${l.length}</span></button>`).join('')}</div><label class="buscaCampo" style="margin-left: auto; width: 220px; max-width: 100%">${svg(IC.busca, 13, 'var(--kib-cor-borda-campo)')}<input id="qPil" value="${esc(R.qPil)}" placeholder="Piloto, kart ou CPF"></label></div>
       <div class="rolagemX"><div style="min-width: 620px"><div class="cabTabela" style="grid-template-columns: 30px minmax(0, 1.7fr) 64px 58px 130px 100px"><span>Nº</span><span>Piloto</span><span class="t-dir">Peso</span><span class="t-dir">Kart</span><span>Pagamento</span><span>Termo</span></div>

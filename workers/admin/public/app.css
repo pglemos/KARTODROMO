@@ -710,7 +710,13 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 var(--kib-espaco-meio)
 .linhaDestino.off { opacity: .6; cursor: not-allowed; }
 .linhaDestino input, .linhaMover input { width: 18px; height: 18px; accent-color: var(--verde); }
 .listaMover { display: grid; gap: var(--kib-espaco-meio); }
-.linhaMover { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: var(--kib-espaco-1); padding: var(--kib-espaco-meio) var(--kib-espaco-1); border-radius: var(--kib-raio-chip); }
+/* nome em largura total (antes os 3 botões espremiam o nome a "M." na gaveta estreita); chip e botões na linha de baixo */
+.linhaMover { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; column-gap: var(--kib-espaco-1); row-gap: var(--kib-espaco-meio); padding: var(--kib-espaco-1); border-radius: var(--kib-raio-chip); border-bottom: 1px solid var(--borda, rgba(0,0,0,.06)); }
+.linhaMover > input { grid-row: 1 / span 2; align-self: start; margin-top: 2px; }
+.linhaMover > .col { grid-column: 2 / 4; }
+.linhaMover > .col .trunc { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+.linhaMover > .chip { grid-column: 2; justify-self: start; }
+.linhaMover > .acoesLinha { grid-column: 3; display: flex; gap: var(--kib-espaco-meio); }
 .linhaMover:hover { background: var(--sup2); }
 @media (max-width: 760px), (pointer: coarse) { .linhaDestino, .linhaMover { min-height: var(--kib-componente-controle-alvo-toque); } .linhaMover .btn { min-height: var(--kib-componente-controle-alvo-toque); } }
 
