@@ -618,7 +618,7 @@ export function ajustarPosicaoComVoltas(session: Session, kart: string, position
   setManualPosition(session, chave, position);
   const competitor = session.competitors.find((c) => c.kart === chave)!;
   removerVoltasEstimadas(competitor);
-  if (position === null || position === 0 || session.type !== 'corrida' || session.startedAt === null) return { voltasAdicionadas: 0 };
+  if (position === null || position === 0 || session.type === 'equalizacao' || session.startedAt === null) return { voltasAdicionadas: 0 };
 
   const fixadas = session.manualPositions ?? {};
   const semEste = { ...session, manualPositions: Object.fromEntries(Object.entries(fixadas).filter(([k]) => k !== chave)) };

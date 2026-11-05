@@ -121,3 +121,15 @@ it('busca o kart da posição anterior em cada volta mesmo quando os pilotos tro
  recuperarVoltas(s, { kart: '1', referencia: '3', quantidade: 2, posicao: 2, now: 130000, id: 'op' });
  expect(s.competitors[0].crossings.slice(1).map(x => [x.lapMs, x.referenciaKart])).toEqual([[60000, '2'], [63000, '3']]);
 });
+
+it('tomada de tempo: kart subido manualmente para o 3o lugar ganha as voltas que faltam', () => {
+  const s = createSession({ id: 'tt', name: 'TOMADA', type: 'classificacao', durationMin: 5, now: 0, competitors: [{ kart: '1', name: 'Ana', customerId: 'a' }, { kart: '2', name: 'Bia', customerId: 'b' }, { kart: '3', name: 'Cid', customerId: 'c' }, { kart: '4', name: 'Duda', customerId: 'd' }] });
+  startSession(s, 1000);
+  const tempos: Record<string, number[]> = { '1': [1000, 61000, 121000, 181000, 241000], '2': [1001, 62000, 123000, 184000, 245000], '3': [1002, 63000, 124000, 185000], '4': [] };
+  for (const [kart, ts] of Object.entries(tempos)) for (const [i, wallMs] of ts.entries()) applyPassing(s, { id: `${kart}-${i}`, kart, wallMs, decoderTimeMs: wallMs });
+  const { voltasAdicionadas } = ajustarPosicaoComVoltas(s, '4', 3);
+  const lapsDe = (k: string) => computeStandings(s, 1000).find((r) => r.kart === k)!.laps;
+  expect(voltasAdicionadas).toBeGreaterThan(0);
+  expect(computeStandings(s, 1000).find((r) => r.kart === '4')!.position).toBe(3);
+  expect(lapsDe('4')).toBe(lapsDe('2'));
+});
