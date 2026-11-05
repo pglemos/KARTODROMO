@@ -132,4 +132,10 @@ it('tomada de tempo: kart subido manualmente para o 3o lugar ganha as voltas que
   expect(voltasAdicionadas).toBeGreaterThan(0);
   expect(computeStandings(s, 1000).find((r) => r.kart === '4')!.position).toBe(3);
   expect(lapsDe('4')).toBe(lapsDe('2'));
+  const r4 = computeStandings(s, 1000).find((r) => r.kart === '4')!;
+  const r3 = computeStandings(s, 1000).find((r) => r.kart === '3')!;
+  expect(r4.bestLapMs).not.toBeNull();
+  expect(r4.bestLapMs!).toBeGreaterThanOrEqual(r3.bestLapMs ?? 0);
+  ajustarPosicaoComVoltas(s, '4', null);
+  expect(computeStandings(s, 1000).find((r) => r.kart === '4')!.bestLapMs).toBeNull();
 });

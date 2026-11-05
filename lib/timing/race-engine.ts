@@ -101,6 +101,8 @@ export type CompetidorDetalhes = {
 export type Competitor = {
   /** o ajuste de posição deu a quadriculada junto com o kart à frente; desfeito ao voltar à ordem automática */
   finalizadoPorAjuste?: boolean;
+  /** Melhor volta fixada pelo ajuste manual de posicao na tomada de tempo (fica entre os karts vizinhos). */
+  melhorVoltaManualMs?: number | null;
   kart: string;
   name: string;
   customerId?: string | null;
@@ -613,11 +615,12 @@ function removerVoltasEstimadas(competitor: Competitor) {
  * As voltas criadas ficam marcadas como estimadas e inválidas, então entram na contagem e no tempo total, mas não
  * na melhor volta nem nos rankings. Refazer o ajuste recalcula; 0 (automática) tira todas. Descer de posição não cria volta.
  */
-export function ajustarPosicaoComVoltas(session: Session, kart: string, position: number | null, trackLengthMeters = 1_000) {
+function ajustarVoltasDaPosicao(session: Session, kart: string, position: number | null, trackLengthMeters = 1_000) {
   const chave = String(kart ?? '').trim();
   setManualPosition(session, chave, position);
   const competitor = session.competitors.find((c) => c.kart === chave)!;
   removerVoltasEstimadas(competitor);
+  competitor.melhorVoltaManualMs = undefined;
   if (position === null || position === 0 || session.type === 'equalizacao' || session.startedAt === null) return { voltasAdicionadas: 0 };
 
   const fixadas = session.manualPositions ?? {};
@@ -704,6 +707,32 @@ export function ajustarPosicaoComVoltas(session: Session, kart: string, position
     competitor.finalizadoPorAjuste = true;
   }
   return { voltasAdicionadas: faltam };
+}
+
+export function ajustarPosicaoComVoltas(session: Session, kart: string, position: number | null, trackLengthMeters = 1_000) {
+  const resultado = ajustarVoltasDaPosicao(session, kart, position, trackLengthMeters);
+  const chave = String(kart ?? '').trim();
+  const competitor = session.competitors.find((c) => c.kart === chave);
+  if (competitor) aplicarMelhorVoltaManual(session, competitor, chave, position, trackLengthMeters);
+  return resultado;
+}
+
+/** Tomada de tempo: o kart subido/descido na mao ganha uma melhor volta entre a dos vizinhos, para a coluna nao ficar vazia. */
+function aplicarMelhorVoltaManual(session: Session, competitor: Competitor, chave: string, position: number | null, trackLengthMeters: number) {
+  competitor.melhorVoltaManualMs = undefined;
+  if (position !== null && position !== 0 && session.type === 'classificacao') {
+    const outras = session.competitors.filter((c) => c.kart !== chave);
+    const melhores = computeStandings({ ...session, competitors: outras, manualPositions: {} }, trackLengthMeters).map((r) => r.bestLapMs).filter((b): b is number => b !== null).sort((a, b) => a - b);
+    const frente = position >= 2 ? melhores[position - 2] : undefined;
+    const atras = melhores[position - 1];
+    const propria = computeStandings({ ...session, competitors: [competitor], manualPositions: {} }, trackLengthMeters)[0]?.bestLapMs ?? null;
+    const dentro = propria !== null && (frente === undefined || propria >= frente) && (atras === undefined || propria <= atras);
+    if (!dentro) {
+      if (frente !== undefined && atras !== undefined) competitor.melhorVoltaManualMs = Math.max(frente + 1, Math.min(atras, Math.round((frente + atras) / 2)));
+      else if (frente !== undefined) competitor.melhorVoltaManualMs = frente + 1;
+      else if (atras !== undefined && atras > 1) competitor.melhorVoltaManualMs = atras - 1;
+    }
+  }
 }
 
 /** Marca a condição da pista da bateria sem depender do traçado selecionado. */
@@ -1147,10 +1176,11 @@ export function computeStandings(session: Session, trackLengthMeters = 1_000): S
     });
 
     validLaps.sort((a, b) => a.lapMs - b.lapMs);
-    const best = validLaps[0]?.lapMs ?? null;
-    const bestN = validLaps[0]?.lapNumber ?? null;
-    const bestWall = validLaps[0]?.wallMs ?? null;
-    const bestCrossing = validLaps[0]?.crossing ?? null;
+    const melhorManual = session.type === 'classificacao' ? c.melhorVoltaManualMs ?? null : null;
+    const best = melhorManual ?? validLaps[0]?.lapMs ?? null;
+    const bestN = melhorManual !== null ? Math.max(1, laps) : validLaps[0]?.lapNumber ?? null;
+    const bestWall = melhorManual !== null ? lastCrossing?.wallMs ?? null : validLaps[0]?.wallMs ?? null;
+    const bestCrossing = melhorManual !== null ? lastCrossing : validLaps[0]?.crossing ?? null;
     const best2nd = validLaps[1]?.lapMs ?? null;
     const best3rd = validLaps[2]?.lapMs ?? null;
 
