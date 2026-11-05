@@ -8,7 +8,7 @@
 //   - TV que alguém trocou para outro app DEPOIS de ligar → respeita até ela ser desligada e ligada de novo.
 // TVs novas são achadas pela rede (SSDP) a cada 30 s; TV não pareada pede ACEITAR no máximo a cada 10 min.
 // Chaves de pareamento em C:\KARTODROMO\segredos\lg-tv\<ip>.json (as mesmas do tv-lg-abrir.mjs, fora do Git).
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import dgram from 'node:dgram';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
@@ -29,9 +29,21 @@ const DESTINOS = (() => {
 // destino por série (TV nova informa), por MAC (TV antiga, ex.: 65UK6540 de 2018 não dá a série) ou por IP
 const paginaDa = (tv) => (DESTINOS[`serie:${tv.serie}`] ?? DESTINOS[`mac:${tv.mac}`] ?? DESTINOS[tv.ip])?.url ?? URL_PLACAR;
 
+const MAC_CACHE_TTL_MS = 10 * 60_000;
+const macCache = new Map();
+
 /** MAC do IP pela tabela ARP do Windows (a TV acabou de responder ao SSDP/SSAP, então está lá). */
-function macDe(ip) {
-  try { return execFileSync('arp', ['-a', ip], { encoding: 'utf8', windowsHide: true }).match(/([0-9a-f]{2}-){5}[0-9a-f]{2}/i)?.[0].toLowerCase() ?? ''; } catch { return ''; }
+async function macDe(ip) {
+  const cached = macCache.get(ip);
+  if (cached && Date.now() - cached.em < MAC_CACHE_TTL_MS) return cached.mac;
+  const mac = await new Promise((resolve) => {
+    execFile('arp', ['-a', ip], { encoding: 'utf8', timeout: 2_000, windowsHide: true }, (err, stdout) => {
+      if (err || !stdout) return resolve('');
+      resolve(stdout.match(/([0-9a-f]{2}-){5}[0-9a-f]{2}/i)?.[0].toLowerCase() ?? '');
+    });
+  });
+  macCache.set(ip, { mac, em: Date.now() });
+  return mac;
 }
 const NO_PLACAR = new Set(['com.webos.app.home', 'com.webos.app.homeconnect', 'com.webos.app.browser', 'com.webos.app.discovery', '']);
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -39,10 +51,10 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (m) => console.log(`${new Date().toLocaleString('pt-BR')} ${m}`);
 const lerChave = (f) => { try { return JSON.parse(readFileSync(f, 'utf8')); } catch { return null; } };
 /** Chave de pareamento do IP; TV que voltou com outro IP (DHCP) é achada pelo MAC guardado — não pede ACEITAR de novo. */
-const chaveDe = (ip) => {
+const chaveDe = async (ip) => {
   const f = join(PASTA, `${ip}.json`);
   if (existsSync(f)) return lerChave(f)?.['client-key'];
-  const mac = existsSync(PASTA) ? macDe(ip) : '';
+  const mac = existsSync(PASTA) ? await macDe(ip) : '';
   if (!mac) return undefined;
   for (const x of readdirSync(PASTA).filter((n) => n.endsWith('.json'))) { const c = lerChave(join(PASTA, x)); if (c?.mac === mac) return c['client-key']; }
   return undefined;
@@ -114,7 +126,7 @@ class Tv {
 
   async conectar() {
     if (this.ws || this.conectando) return;
-    const pareada = !!chaveDe(this.ip);
+    const pareada = !!(await chaveDe(this.ip));
     if (!pareada && Date.now() - this.ultimoPedido < 10 * 60_000) return;
     this.conectando = true;
     try {
@@ -133,7 +145,7 @@ class Tv {
       ws.on('close', () => this.caiu());
       this.ws = ws;
       if (!pareada) this.ultimoPedido = Date.now();
-      const chave = chaveDe(this.ip);
+      const chave = await chaveDe(this.ip);
       const reg = await this.pedir({ type: 'register', payload: { forcePairing: false, pairingType: 'PROMPT', 'client-key': chave, manifest: manifesto } }, 95_000);
       if (reg.type !== 'registered') { log(`${this.ip}: sem controle (${reg.error || reg.type})`); ws.terminate(); return; }
       if (reg.payload?.['client-key'] && reg.payload['client-key'] !== chave) {
@@ -142,7 +154,7 @@ class Tv {
         log(`${this.ip}: pareada`);
       }
       this.serie = (await this.pedir({ type: 'request', uri: 'ssap://system/getSystemInfo' })).payload?.serialNumber ?? '';
-      this.mac = macDe(this.ip);
+      this.mac = await macDe(this.ip);
       // guarda MAC e série junto da chave deste IP (para achar a TV se o IP mudar)
       const arq = join(PASTA, `${this.ip}.json`);
       const salvo = lerChave(arq) ?? { 'client-key': reg.payload?.['client-key'] ?? chave, pareadoEm: new Date().toISOString() };
@@ -229,7 +241,8 @@ const tv = (ip) => { if (!tvs.has(ip)) tvs.set(ip, new Tv(ip)); return tvs.get(i
 if (args.includes('--uma-vez')) {
   const achadas = await procurarTvs();
   const noPlacar = conectadosNoPlacar();
-  log(`TVs: ${[...achadas].map((ip) => `${ip}${noPlacar.has(ip) ? ' (no placar)' : ''}${chaveDe(ip) ? '' : ' (não pareada)'}`).join(', ') || 'nenhuma'}`);
+  const statusTvs = await Promise.all([...achadas].map(async (ip) => `${ip}${noPlacar.has(ip) ? ' (no placar)' : ''}${(await chaveDe(ip)) ? '' : ' (não pareada)'}`));
+  log(`TVs: ${statusTvs.join(', ') || 'nenhuma'}`);
   process.exit(0);
 }
 
@@ -238,10 +251,31 @@ log(`vigia das TVs: placar ${URL_PLACAR}${Object.keys(DESTINOS).length ? ` · ou
 if (existsSync(PASTA)) for (const f of readdirSync(PASTA)) if (/^\d+\.\d+\.\d+\.\d+\.json$/.test(f)) tv(f.slice(0, -5));
 for (const ip of await procurarTvs()) tv(ip);
 
+const SSDP_INTERVALO_DESCONECTADA_MS = 30_000;
+const SSDP_INTERVALO_CONECTADAS_MS = 120_000;
+
+/** Verifica se todas as TVs conhecidas e todas as configuradas em DESTINOS estão conectadas via WebSocket. */
+function todasTvsConectadas() {
+  if (tvs.size === 0) return false;
+  const lista = [...tvs.values()];
+  if (!lista.every((t) => t.ws && t.ws.readyState === WebSocket.OPEN)) return false;
+  for (const chave of Object.keys(DESTINOS)) {
+    const conectada = lista.some((t) =>
+      t.ws && t.ws.readyState === WebSocket.OPEN &&
+      (t.ip === chave || (t.mac && `mac:${t.mac}` === chave) || (t.serie && `serie:${t.serie}` === chave)),
+    );
+    if (!conectada) return false;
+  }
+  return true;
+}
+
 let ciclo = 0;
 for (;;) {
   try {
-    if (ciclo % 10 === 0 && ciclo) for (const ip of await procurarTvs()) tv(ip);        // ~30 s: TVs novas
+    const intervaloSsdpCiclos = todasTvsConectadas()
+      ? Math.round(SSDP_INTERVALO_CONECTADAS_MS / 3000)
+      : Math.round(SSDP_INTERVALO_DESCONECTADA_MS / 3000);
+    if (ciclo && ciclo % intervaloSsdpCiclos === 0) for (const ip of await procurarTvs()) tv(ip); // 120 s se todas conectadas, 30 s se houver desconectada
     await Promise.all([...tvs.values()].map((t) => t.conectar()));                    // 3 s: quem ligou
     if (ciclo % 20 === 0) { const noPlacar = conectadosNoPlacar(); await Promise.all([...tvs.values()].map((t) => t.conferir(noPlacar))); }  // ~60 s
   } catch (e) { log(`erro: ${e.message}`); }

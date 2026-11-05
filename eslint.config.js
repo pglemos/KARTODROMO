@@ -15,6 +15,8 @@ export default tseslint.config(
       '.agents/**',
       '.codex/**',
       'node_modules/**',
+      'mobile/**',
+      'workers/pre-cadastro/referencia-producao/**',
     ],
   },
   {

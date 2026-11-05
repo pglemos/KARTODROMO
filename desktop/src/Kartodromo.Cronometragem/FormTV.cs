@@ -32,10 +32,8 @@ public class FormTV : Form
         FormBorderStyle = FormBorderStyle.None;
         if (!autoteste)
         {
-            // segunda tela (TV) se houver; senao a principal
-            var tela = Screen.AllScreens.FirstOrDefault(s => !s.Primary) ?? Screen.PrimaryScreen;
-            StartPosition = FormStartPosition.Manual;
-            Bounds = tela.Bounds;
+            PosicionarNaSegundaTela();
+            Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
         }
         try { _placar = Config.Get("TvModo", "placar") != "classificacao"; } catch { /* padrao */ }
         KeyDown += (_, e) =>
@@ -48,7 +46,31 @@ public class FormTV : Form
         _leitura.Tick += async (_, _) => await Ler();
         _relogio.Tick += (_, _) => { if (!_placar) Invalidate(); };
         Shown += async (_, _) => { await Ler(); _leitura.Start(); _relogio.Start(); };
-        FormClosed += (_, _) => { _leitura.Stop(); _relogio.Stop(); };
+        FormClosed += (_, _) =>
+        {
+            _leitura.Stop(); _relogio.Stop();
+            if (!_autoteste) Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
+        };
+    }
+
+    void PosicionarNaSegundaTela()
+    {
+        if (_autoteste || IsDisposed) return;
+        try
+        {
+            var tela = Screen.AllScreens.FirstOrDefault(s => !s.Primary) ?? Screen.PrimaryScreen;
+            StartPosition = FormStartPosition.Manual;
+            if (Bounds != tela.Bounds) Bounds = tela.Bounds;
+        }
+        catch (Exception ex) { Diagnostico.Registrar("FormTV.Posicionar", ex); }
+    }
+
+    void OnDisplaySettingsChanged(object sender, EventArgs e)
+    {
+        if (IsHandleCreated && !IsDisposed)
+        {
+            try { BeginInvoke(PosicionarNaSegundaTela); } catch { }
+        }
     }
 
     async Task Ler()

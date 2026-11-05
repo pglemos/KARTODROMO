@@ -189,7 +189,9 @@ public sealed class FormTerminalFechar : CartaoModal
         var fecharTerm = Botao("Fechar terminal", Tokens.Claro.CorTextoPrincipal, Tokens.Primitivo.Branco, true); fecharTerm.SetBounds(L - 22 - 136, 704, 136, 40);
         fecharTerm.Click += (_, _) => Seguro.Rodar(this, async () =>
         {
-            if (Fmt.Centavos(string.IsNullOrWhiteSpace(_proximo.Text) ? "0" : _proximo.Text) is not long valor) { Msg.Aviso(this, "Valor para o próximo turno inválido."); return; }
+            if (Fmt.Centavos(string.IsNullOrWhiteSpace(_proximo.Text) ? "0" : _proximo.Text) is not long valor || valor < 0) { Msg.Aviso(this, "Valor para o próximo turno inválido."); return; }
+            var emCaixa = sumario?.L("dinheiroEmCaixa") ?? 0;
+            if (valor > emCaixa) { Msg.Aviso(this, $"O valor para o próximo turno ({Fmt.Brl(valor)}) não pode ser maior que o dinheiro disponível na gaveta ({Fmt.Brl(emCaixa)})."); _proximo.Focus(); return; }
             if (!Msg.Pergunta(this, "Deseja fechar o terminal?")) return;
             var r = await Sessao.Api.Post("/api/office/caixa/fechar", new { proximoTurnoCentavos = valor });
             Concluido = true; MovimentoId = r.S("id"); DialogResult = DialogResult.OK; Close();
@@ -234,6 +236,13 @@ public sealed class FormCaixaTransacao : DialogoDesign
         {
             if (Fmt.Centavos(_valor.Text) is not long valor || valor <= 0) { Msg.Aviso(this, "Informe um valor maior que zero."); _valor.Focus(); return; }
             if (string.IsNullOrWhiteSpace(_obs.Text)) { Msg.Aviso(this, "Informe a justificativa desta transação."); _obs.Focus(); return; }
+            var emCaixa = caixa["sumario"]?.L("dinheiroEmCaixa") ?? 0;
+            if (_tipo == "sangria" && valor > emCaixa)
+            {
+                Msg.Aviso(this, $"O valor da sangria ({Fmt.Brl(valor)}) não pode ser maior que o dinheiro disponível na gaveta ({Fmt.Brl(emCaixa)}).");
+                _valor.Focus();
+                return;
+            }
             var r = await Sessao.Api.Post("/api/office/caixa/transacao", new { tipo = _tipo, valorCentavos = valor, observacao = _obs.Text.Trim() });
             Msg.Info(this, r.S("mensagem")); DialogResult = DialogResult.OK; Close();
         }));

@@ -1,3 +1,5 @@
+using System.Drawing.Printing;
+using System.Linq;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
@@ -25,7 +27,7 @@ public class Relatorio : CartaoModal
         return _env;
     }
 
-    Relatorio(string titulo, string url) : base(1000, 760)
+    Relatorio(string titulo, string url, int largura = 1000) : base(largura, 760)
     {
         Text = titulo;
         _titulo = titulo;
@@ -108,10 +110,16 @@ public class Relatorio : CartaoModal
             catch (Exception e)
             {
                 Diagnostico.Registrar("relatório/WebView2", e);
-                if (Msg.ErroComRetry(this, "Não foi possível abrir o relatório agora. Verifique a conexão."))
+                // Item 26: Fallback gracioso para o navegador padrão caso WebView2 falhe
+                try
                 {
-                    try { _web.Source = new Uri(url); }
-                    catch (Exception retry) { Diagnostico.Registrar("relatório/WebView2/retry", retry); }
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+                    Avisar("Abrindo relatório no navegador padrão...");
+                }
+                catch (Exception exNav)
+                {
+                    Diagnostico.Registrar("relatório/WebView2/fallback-browser", exNav);
+                    Msg.Aviso(this, $"Não foi possível inicializar o visualizador de relatório (WebView2): {e.Message}\nURL: {url}");
                 }
             }
         };
@@ -260,33 +268,85 @@ public class Relatorio : CartaoModal
         catch (Exception e) { Avisar("Não salvou a planilha: " + e.Message, true); }
     }
 
-    public static void Abrir(IWin32Window dono, string url, string titulo = "Relatório")
+    public static void Abrir(IWin32Window dono, string url, string titulo = "Relatório", int largura = 1000)
     {
-        var f = new Relatorio(titulo, url);
+        var f = new Relatorio(titulo, url, largura);
         f.Show(dono);
     }
+
+    /// <summary>Verifica se uma impressora está instalada e acessível no Windows.</summary>
+    public static bool ImpressoraExiste(string impressora)
+    {
+        if (string.IsNullOrWhiteSpace(impressora)) return false;
+        try
+        {
+            return PrinterSettings.InstalledPrinters.Cast<string>()
+                .Any(p => string.Equals(p, impressora.Trim(), StringComparison.OrdinalIgnoreCase));
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    static readonly SemaphoreSlim _semImpressaoSilenciosa = new(1, 1);
 
     /// <summary>Imprime uma pagina direto na impressora (sem dialogo), ex.: termo no totem.</summary>
     public static async Task ImprimirSilencioso(string url, string impressora = null)
     {
-        using var host = new Form { ShowInTaskbar = false, FormBorderStyle = FormBorderStyle.None, Size = new Size(10, 10), StartPosition = FormStartPosition.Manual, Location = new Point(-2000, -2000) };
-        using var web = new WebView2 { Dock = DockStyle.Fill };
-        host.Controls.Add(web);
-        host.Show();
-        await web.EnsureCoreWebView2Async(await Ambiente());
-        await web.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync("window.print = function(){};");
-        var carregou = new TaskCompletionSource<bool>();
-        web.CoreWebView2.NavigationCompleted += (_, e) => carregou.TrySetResult(e.IsSuccess);
-        web.CoreWebView2.Navigate(url);
-        if (!await carregou.Task) throw new Exception("Falha ao carregar o termo para impressão.");
-        await Task.Delay(600); // imagens (logo) terminarem de desenhar
-        var cfg = web.CoreWebView2.Environment.CreatePrintSettings();
-        cfg.ShouldPrintBackgrounds = true;
-        cfg.ShouldPrintHeaderAndFooter = false;
-        cfg.MarginTop = cfg.MarginBottom = cfg.MarginLeft = cfg.MarginRight = 0;
-        if (!string.IsNullOrWhiteSpace(impressora)) cfg.PrinterName = impressora;
-        var st = await web.CoreWebView2.PrintAsync(cfg);
-        if (st != CoreWebView2PrintStatus.Succeeded) throw new Exception("Impressora indisponível: " + st);
-        host.Close();
+        if (string.IsNullOrWhiteSpace(url))
+            throw new ArgumentException("A URL para impressão não pode ser vazia.", nameof(url));
+
+        if (string.IsNullOrWhiteSpace(impressora))
+            throw new InvalidOperationException("Nenhuma impressora informada para impressão silenciosa. A impressão cega na impressora padrão foi desabilitada.");
+
+        if (!ImpressoraExiste(impressora))
+            throw new InvalidOperationException($"A impressora '{impressora}' não está instalada ou acessível no sistema.");
+
+        await _semImpressaoSilenciosa.WaitAsync();
+        try
+        {
+            using var host = new Form { ShowInTaskbar = false, FormBorderStyle = FormBorderStyle.None, Size = new Size(10, 10), StartPosition = FormStartPosition.Manual, Location = new Point(-2000, -2000) };
+            using var web = new WebView2 { Dock = DockStyle.Fill };
+            host.Controls.Add(web);
+            host.Show();
+            try
+            {
+                await web.EnsureCoreWebView2Async(await Ambiente());
+                await web.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync("window.print = function(){};");
+                var carregou = new TaskCompletionSource<bool>();
+                web.CoreWebView2.NavigationCompleted += (_, e) => carregou.TrySetResult(e.IsSuccess);
+                web.CoreWebView2.Navigate(url);
+
+                var timeout = Task.Delay(10000);
+                var completou = await Task.WhenAny(carregou.Task, timeout);
+                if (completou == timeout || !await carregou.Task)
+                    throw new Exception("Tempo limite ou falha ao carregar o termo para impressão.");
+
+                try
+                {
+                    await web.CoreWebView2.ExecuteScriptAsync(
+                        "new Promise(resolve => { if (document.readyState === 'complete') resolve(); else window.addEventListener('load', () => resolve()); })");
+                }
+                catch { }
+
+                var cfg = web.CoreWebView2.Environment.CreatePrintSettings();
+                cfg.ShouldPrintBackgrounds = true;
+                cfg.ShouldPrintHeaderAndFooter = false;
+                cfg.MarginTop = cfg.MarginBottom = cfg.MarginLeft = cfg.MarginRight = 0;
+                cfg.PrinterName = impressora.Trim();
+                var st = await web.CoreWebView2.PrintAsync(cfg);
+                if (st != CoreWebView2PrintStatus.Succeeded)
+                    throw new Exception($"Impressora '{impressora}' falhou ao imprimir: " + st);
+            }
+            finally
+            {
+                host.Close();
+            }
+        }
+        finally
+        {
+            _semImpressaoSilenciosa.Release();
+        }
     }
 }

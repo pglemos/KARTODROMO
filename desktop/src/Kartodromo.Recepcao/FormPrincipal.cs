@@ -529,42 +529,53 @@ public class FormPrincipal : Form
         return s;
     }
 
+    static readonly HttpClient _pingHttp = new() { Timeout = TimeSpan.FromSeconds(5) };
+    bool _emPing;
+
     void Relogio() { _sbHora.Text = DateTime.Now.ToString("HH:mm · dd/MM/yyyy"); _sbData.Text = ""; }
     async Task Ping()
     {
+        if (_emPing) return;
+        _emPing = true;
         try
         {
-            await Sessao.Api.Get("/healthz");
-            _sbSrv.Text = "● Servidor on-line"; _sbSrv.ForeColor = Tokens.Claro.CorEstadoSucessoTexto;
-            var c = (await Sessao.Api.Get("/api/office/caixa")).AsObject();
-            if (c["aberto"] is JsonObject ab)
+            try
             {
-                var dinheiro = c["sumario"]?.L("dinheiroEmCaixa") ?? 0;
-                var turno = ab.S("turno").Trim();
-                if (!turno.StartsWith("Turno", StringComparison.OrdinalIgnoreCase)) turno = "Turno " + turno;
-                var desde = ab.S("abertoEm") is { Length: >= 16 } ae ? " · desde " + ae.Substring(11, 5) : "";
-                _selo.Definir(true, $"Terminal {ab.S("terminal")} aberto", turno + desde);
+                await Sessao.Api.Get("/healthz");
+                _sbSrv.Text = "● Servidor on-line"; _sbSrv.ForeColor = Tokens.Claro.CorEstadoSucessoTexto;
+                var c = (await Sessao.Api.Get("/api/office/caixa")).AsObject();
+                if (c["aberto"] is JsonObject ab)
+                {
+                    var dinheiro = c["sumario"]?.L("dinheiroEmCaixa") ?? 0;
+                    var turno = ab.S("turno").Trim();
+                    if (!turno.StartsWith("Turno", StringComparison.OrdinalIgnoreCase)) turno = "Turno " + turno;
+                    var desde = ab.S("abertoEm") is { Length: >= 16 } ae ? " · desde " + ae.Substring(11, 5) : "";
+                    _selo.Definir(true, $"Terminal {ab.S("terminal")} aberto", turno + desde);
+                }
+                else
+                {
+                    _selo.Definir(false, "Nenhum terminal aberto", "Clique para abrir o caixa");
+                }
             }
-            else
+            catch
             {
-                _selo.Definir(false, "Nenhum terminal aberto", "Clique para abrir o caixa");
+                _sbSrv.Text = "● Servidor off-line"; _sbSrv.ForeColor = Tokens.Claro.CorEstadoPerigoTexto;
+                _selo.Definir(false, "Terminal indisponível", "Não foi possível consultar o caixa");
             }
+            await PingServico("crono", Config.CronoUrl, _sbCrono);
+            await PingSite(_sbSite);
         }
-        catch
+        finally
         {
-            _sbSrv.Text = "● Servidor off-line"; _sbSrv.ForeColor = Tokens.Claro.CorEstadoPerigoTexto;
-            _selo.Definir(false, "Terminal indisponível", "Não foi possível consultar o caixa");
+            _emPing = false;
         }
-        await PingServico("crono", Config.CronoUrl, _sbCrono);
-        await PingSite(_sbSite);
     }
 
     static async Task PingServico(string nome, string baseUrl, ToolStripStatusLabel label)
     {
         try
         {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
-            using var r = await http.GetAsync(baseUrl.TrimEnd('/') + "/healthz");
+            using var r = await _pingHttp.GetAsync(baseUrl.TrimEnd('/') + "/healthz");
             var online = r.IsSuccessStatusCode;
             label.Text = $"● Cronometragem {(online ? "on-line" : "off-line")}";
             label.ForeColor = online ? Tokens.Claro.CorEstadoSucessoTexto : Tokens.Claro.CorEstadoPerigoTexto;
@@ -576,8 +587,7 @@ public class FormPrincipal : Form
     {
         try
         {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(4) };
-            using var r = await http.GetAsync("https://www.kartodromodebetim.com.br");
+            using var r = await _pingHttp.GetAsync("https://www.kartodromodebetim.com.br");
             var online = r.IsSuccessStatusCode;
             label.Text = $"● Site {(online ? "on-line" : "off-line")}";
             label.Visible = !online;

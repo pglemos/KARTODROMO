@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Minha equipe · Kartódromo de Betim</title>
+<link rel="icon" href="/kib-logo.png">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&amp;family=Geist+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/endurance.css?v=20261021a">
+<style>
+  :root { --verde: #0B7A53; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #F5F5F7; color: #1D1D1F; font-family: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 14px; -webkit-font-smoothing: antialiased; overflow-x: clip; }
+  .mono { font-family: 'Geist Mono', ui-monospace, Consolas, monospace; }
+  main { max-width: 1200px; margin: 0 auto; padding: 16px 16px 48px; display: flex; flex-direction: column; gap: 16px; }
+  header.eq { display: flex; align-items: center; gap: 12px; }
+  header.eq img { width: 44px; height: 44px; border-radius: 12px; background: #111; padding: 6px; }
+  header.eq h1 { margin: 0; font-size: 24px; line-height: 1.1; letter-spacing: -0.02em; }
+  header.eq span { font-size: 12.5px; color: #6E6E73; font-weight: 600; }
+  .placa { margin-left: auto; font-size: 34px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .cartao { border-radius: 18px; background: #FFF; box-shadow: 0 0 0 1px rgba(0,0,0,.05), 0 12px 32px -22px rgba(0,0,0,.3); overflow: hidden; }
+  .cartao h2 { margin: 0; padding: 14px 16px 8px; font-size: 16px; }
+  .corpo { padding: 4px 16px 16px; }
+  .numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+  .numeros div { padding: 10px 12px; border-radius: 12px; background: #F5F5F7; display: flex; flex-direction: column; gap: 2px; }
+  .numeros span { font-size: 12px; font-weight: 600; color: #6E6E73; text-transform: uppercase; letter-spacing: .04em; }
+  .numeros b { font-size: 22px; font-variant-numeric: tabular-nums; }
+  .abas { display: flex; gap: 6px; overflow-x: auto; }
+  .abas button { flex-shrink: 0; height: 40px; padding: 0 14px; border: 0; border-radius: 10px; background: #FFF; box-shadow: 0 0 0 1px rgba(0,0,0,.08); font: inherit; font-weight: 600; }
+  .abas button.sel { background: #1D1D1F; color: #FFF; }
+  .erro { padding: 40px 16px; text-align: center; color: #6E6E73; }
+  .sel-conc { height: 40px; border: 0; border-radius: 10px; background: #F5F5F7; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); font: inherit; font-weight: 600; padding: 0 12px; }
+  .grade2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+</style>
+</head>
+<body>
+<main id="raiz"><p class="erro">Carregando a equipe…</p></main>
+<script src="/endurance-vis.js?v=20261021a"></script>
+<script>
+'use strict';
+(() => {
+  const token = decodeURIComponent(location.pathname.split('/').filter(Boolean).pop() || '');
+  const esc = EV.esc, raiz = document.getElementById('raiz');
+  const guarda = { ler(k) { try { return localStorage.getItem(k); } catch { return null; } }, gravar(k, v) { try { localStorage.setItem(k, v); } catch { /* sem armazenamento */ } } };
+  let aba = guarda.ler('kib-eq-aba') || 'equipe', abertoSel = false, dados = null;
+  const escolhidos = new Set(JSON.parse(guarda.ler('kib-eq-conc-' + token) || '[]'));
+
+  function planejamento(e, a, r) {
+    const minuto = a.sessao && a.sessao.startedAt ? a.sessao.elapsedMs / 60000 : 0;
+    const ateFechar = Math.max(0, r.boxFechaMin - minuto);
+    const faltam = e.paradasFaltando;
+    const custo = r.paradaMinMs / 60000 + 1.2;
+    const sobra = ateFechar - faltam * custo;
+    const stintSug = faltam ? Math.max(0, (sobra) / (faltam + (e.noBox ? 0 : 1))) : null;
+    return `<div class="numeros">
+      <div><span>Paradas válidas</span><b>${e.paradasValidas} de ${r.paradasObrigatorias}</b></div>
+      <div><span>Paradas no total</span><b>${e.paradasTotal} de ${r.paradasMax}</b></div>
+      <div><span>Box fecha em</span><b>${ateFechar ? Math.floor(ateFechar) + ' min' : 'fechado'}</b></div>
+      <div><span>Stint sugerido</span><b>${stintSug != null ? Math.floor(stintSug) + ' min' : '—'}</b></div>
+    </div>
+    <p class="ev-nota" style="margin-top: 10px">${faltam ? `Faltam <b>${faltam}</b> parada(s) obrigatória(s) de no mínimo ${EV.tempo(r.paradaMinMs)}. Elas precisam acontecer antes do box fechar (${r.boxFechaMin} min de prova). Cada uma que faltar no fim tira <b>${r.voltasPorParadaFaltante} voltas</b>.` : 'Paradas obrigatórias cumpridas. Lembre: mais de ' + r.paradasMax + ' paradas no total desclassifica.'} Parada entre ${EV.tempo(r.faixaPunicaoMs)} e ${EV.tempo(r.paradaMinMs - 1)} vale com +${r.punicaoFaixaSeg} s.</p>`;
+  }
+
+  function pintar() {
+    const d = dados, a = d.analise, r = d.regras;
+    const e = a.equipes.find((x) => x.id === d.equipe.id);
+    const meu = d.equipe.numero;
+    let conteudo = '';
+    if (aba === 'equipe') {
+      conteudo = `<div class="grade2">
+        <section class="cartao"><h2>Situação</h2><div class="corpo"><div class="numeros">
+          <div><span>Posição</span><b>${e.desclassificada ? 'DQ' : e.posOficial + 'º'}</b></div><div><span>Na pista</span><b>${e.posPista}º</b></div>
+          <div><span>Voltas</span><b>${e.voltas}</b></div><div><span>Dif. líder</span><b class="mono" style="font-size: 17px">${e.posPista === 1 ? 'Líder' : e.difLiderVoltas ? '+' + e.difLiderVoltas + ' v' : EV.tempo(e.difLiderMs)}</b></div>
+          <div><span>Piloto na pista</span><b style="font-size: 16px">${e.noBox ? '<span class="ev-box">BOX</span>' : esc(e.pilotoAtual || '—')}</b></div><div><span>Kart</span><b>${esc(e.kartAtual || '—')}</b></div>
+          <div><span>Tempo no stint</span><b class="mono" style="font-size: 18px">${e.tempoNoStintMs != null ? EV.relogio(e.tempoNoStintMs) : '—'}</b></div><div><span>Última volta</span><b class="mono ${({ bom: 'ev-bom', medio: 'ev-medio', ruim: 'ev-ruim' })[e.radar] || ''}" style="font-size: 18px; border-radius: 6px">${EV.tempo(e.ultimaMs)}</b></div>
+          <div><span>Média ${r.mediaVoltas}v</span><b class="mono" style="font-size: 18px">${EV.tempo(e.mediaMs)}</b></div><div><span>Melhor</span><b class="mono" style="font-size: 18px">${EV.tempo(e.melhorMs)}</b></div>
+          <div><span>Punições</span><b>${e.punicaoSeg ? '+' + e.punicaoSeg + ' s' : '—'}${e.voltasPerdidas ? ' −' + e.voltasPerdidas + ' v' : ''}</b></div><div><span>Projeção</span><b>${e.posProjecao ? e.posProjecao + 'º' : '—'}</b></div>
+        </div>${e.alertas.length || e.desclassificada ? `<div class="ev-alertas" style="margin-top: 10px">${e.alertas.map((x) => `<span class="ev-al ev-al-${x.nivel}">${esc(x.texto)}</span>`).join('')}${e.desclassificada ? `<span class="ev-al ev-al-grave">${esc(e.motivosDq.join('; '))}</span>` : ''}</div>` : ''}</div></section>
+        <section class="cartao"><h2>Paradas e planejamento</h2><div class="corpo">${planejamento(e, a, r)}${EV.paradasDaEquipe(e, r)}</div></section>
+      </div>
+      <section class="cartao"><h2>Pilotos (pulseira · peso · lastro)</h2><div class="corpo ev-rolar"><table class="ev-tab"><thead><tr><th>Pulseira</th><th class="ev-esq">Piloto</th><th>Peso</th><th>Lastro</th><th>Stints</th><th>Voltas</th><th>Tempo na pista</th><th>Média</th><th>Melhor</th></tr></thead><tbody>
+        ${d.pilotos.map((p) => { const s = d.porPiloto.find((x) => x.piloto === p.nome) || {}; return `<tr><td><span class="ev-pulseira">${p.pulseira}</span></td><td class="ev-esq"><b>${esc(p.nome)}</b>${p.chefe ? ' · chefe' : ''}</td><td>${p.pesoKg != null ? p.pesoKg + ' kg' : '—'}</td><td>${p.lastroKg != null ? p.lastroKg + ' kg' : p.lastroSugerido != null ? '<small>sug. ' + p.lastroSugerido + '</small>' : '—'}</td><td>${s.stints || 0}</td><td>${s.voltas || 0}</td><td class="mono">${s.tempoMs ? EV.relogio(s.tempoMs) : '—'}</td><td class="mono">${EV.tempo(s.mediaMs)}</td><td class="mono">${EV.tempo(s.melhorMs)}</td></tr>`; }).join('')}
+      </tbody></table>
+      ${d.pesagens.length ? `<h4 class="ev-sub">Pesagens</h4><table class="ev-tab"><thead><tr><th>Hora</th><th class="ev-esq">Piloto</th><th>Momento</th><th>Total</th><th>Resultado</th></tr></thead><tbody>${d.pesagens.map((x) => `<tr><td class="mono">${x.em.slice(11, 16)}</td><td class="ev-esq">${esc(x.piloto)}</td><td>${esc(x.momento)}</td><td class="mono">${x.totalKg.toFixed(2)} kg</td><td class="${x.resultado === 'ok' ? 'ev-bom' : x.resultado === 'dq' ? 'ev-ruim' : 'ev-medio'}">${x.resultado === 'ok' ? 'OK' : x.resultado === 'dq' ? 'DQ' : '+' + x.punicaoSeg / 60 + ' min'}</td></tr>`).join('')}</tbody></table>` : ''}
+      ${d.punicoes.length ? `<h4 class="ev-sub">Punições</h4><ul style="margin: 0; padding-left: 18px; line-height: 1.6">${d.punicoes.map((p) => `<li>${p.tipo === 'segundos' ? '+' + p.valor + ' s' : p.tipo === 'voltas' ? '−' + p.valor + ' volta(s)' : p.tipo === 'dq' ? 'DQ' : 'Advertência'} · ${esc(p.motivo)}</li>`).join('')}</ul>` : ''}
+      </div></section>
+      <section class="cartao"><h2>Stints</h2><div class="corpo ev-rolar"><table class="ev-tab"><thead><tr><th>#</th><th class="ev-esq">Piloto</th><th>Kart</th><th>Voltas</th><th>Média</th><th>Melhor</th></tr></thead><tbody>${e.stints.map((s) => `<tr><td>${s.indice}</td><td class="ev-esq">${esc(s.piloto || '—')}${s.emAndamento ? ' <small>(na pista)</small>' : ''}</td><td class="mono">${esc(s.kart || '—')}</td><td>${s.voltas} <small>(${s.voltaIni}-${s.voltaFim})</small></td><td class="mono">${EV.tempo(s.mediaMs)}</td><td class="mono">${EV.tempo(s.melhorMs)}</td></tr>`).join('') || '<tr><td colspan="6">Ainda sem voltas.</td></tr>'}</tbody></table></div></section>`;
+    } else if (aba === 'estrategia') {
+      conteudo = `<section class="cartao"><h2>Ordenação pela média das últimas ${r.mediaVoltas} voltas</h2><div class="corpo"><button class="sel-conc" id="btSel">${abertoSel ? 'Fechar' : '(+) Selecione seus concorrentes'}</button>${abertoSel ? EV.seletorConcorrentes(a, escolhidos) : ''}<div style="height: 10px"></div>${EV.porMedia(a, r, escolhidos, meu)}</div></section>
+        <div class="grade2"><section class="cartao"><h2>Ultrapassagem futura</h2><div class="corpo">${EV.ultrapassagem(a, escolhidos, meu)}</div></section>
+        <section class="cartao"><h2>Projeção final</h2><div class="corpo">${EV.projecao(a, meu)}</div></section></div>
+        <section class="cartao"><h2>Radar do box</h2><div class="corpo">${EV.radar(a, r, meu)}</div></section>`;
+    } else if (aba === 'classificacao') {
+      conteudo = `<section class="cartao"><h2>Classificação</h2><div class="corpo">${EV.classificacao(a, r, meu)}</div></section>`;
+    } else {
+      conteudo = `<section class="cartao"><h2>Tempo das paradas</h2><div class="corpo">${EV.tempoParadas(a, r)}</div></section><section class="cartao"><h2>Stint médio</h2><div class="corpo">${EV.stintMedio(a, r)}</div></section>`;
+    }
+    raiz.innerHTML = `<header class="eq"><img src="/kib-logo.png" alt=""><span style="display: flex; flex-direction: column; gap: 2px"><span>${esc(d.evento.nome)}</span><h1>${esc(d.equipe.nome)}</h1></span><span class="placa">#${esc(meu)}</span></header>
+      ${d.erroCrono ? `<p class="ev-al ev-al-aviso">${esc(d.erroCrono)}</p>` : ''}
+      ${EV.cabecalhoProva(a, r)}
+      <nav class="abas">${[['equipe', 'Minha equipe'], ['estrategia', 'Estratégia'], ['classificacao', 'Classificação'], ['estatisticas', 'Estatísticas']].map(([v, t]) => `<button data-aba="${v}" class="${aba === v ? 'sel' : ''}">${t}</button>`).join('')}</nav>
+      ${conteudo}<p class="ev-nota" style="text-align: center">Atualiza sozinho a cada 5 s · Kartódromo Internacional de Betim</p>`;
+  }
+
+  async function carregar() {
+    try {
+      const r = await fetch('/api/publico/endurance/' + encodeURIComponent(token), { cache: 'no-store' });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'Não deu para carregar.');
+      dados = j;
+      if (!(abertoSel && document.activeElement && document.activeElement.dataset && document.activeElement.dataset.concorrente)) pintar();
+    } catch (err) { if (!dados) raiz.innerHTML = `<p class="erro">${esc(err.message)}</p>`; }
+  }
+  raiz.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-aba]'); if (b) { aba = b.dataset.aba; guarda.gravar('kib-eq-aba', aba); pintar(); }
+    if (e.target.id === 'btSel') { abertoSel = !abertoSel; pintar(); }
+  });
+  raiz.addEventListener('change', (e) => {
+    const n = e.target.dataset && e.target.dataset.concorrente; if (!n) return;
+    e.target.checked ? escolhidos.add(n) : escolhidos.delete(n); guarda.gravar('kib-eq-conc-' + token, JSON.stringify([...escolhidos])); pintar();
+  });
+  carregar();
+  setInterval(() => { if (!document.hidden) carregar(); }, 5000);
+})();
+</script>
+</body>
+</html>

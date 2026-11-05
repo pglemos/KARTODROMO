@@ -222,7 +222,7 @@ export const AVISO_CORRECAO = 'Resultado corrigido: a cronometragem ajustou a cl
 const AVISO_FUNDO = '#FFF4E0'; // design-lint-ignore: cliente de e-mail não lê var(--kib-*)
 const AVISO_TEXTO = '#5C3A00'; // design-lint-ignore: cliente de e-mail não lê var(--kib-*)
 
-export function htmlEmail(ctx: ContextoProva, p: PilotoEmail, logoCid: string | null, aviso?: string) {
+export function htmlEmail(ctx: ContextoProva, p: PilotoEmail, logoCid: string | null, aviso?: string, pdfsAnexados = true) {
   const s = p.standing;
   const total = ctx.classificacao.length;
   const resumo = s
@@ -246,7 +246,7 @@ export function htmlEmail(ctx: ContextoProva, p: PilotoEmail, logoCid: string | 
     <div style="font-size:12px;color:#0B7A53;font-weight:700;letter-spacing:.04em;text-transform:uppercase;">Resultado oficial · ${esc(nomeTipo(ctx.tipo))}</div>
     <h1 style="margin:6px 0 10px;font-size:22px;">Olá, ${esc(primeiroNome(nomeProprio(p.nome)))}!</h1>
     ${aviso ? `<p style="margin:0 0 10px;padding:10px 12px;background:${AVISO_FUNDO};border-radius:10px;font-size:14px;line-height:1.5;color:${AVISO_TEXTO};">${esc(aviso)}</p>` : ''}
-    <p style="margin:0 0 6px;font-size:14px;line-height:1.5;">Obrigado por correr com a gente${ctx.evento ? ` no evento <b>${esc(ctx.evento)}</b>` : ''}. O resultado oficial da prova e o seu volta a volta estão em PDF, anexados neste e-mail.</p>
+    <p style="margin:0 0 6px;font-size:14px;line-height:1.5;">Obrigado por correr com a gente${ctx.evento ? ` no evento <b>${esc(ctx.evento)}</b>` : ''}.${pdfsAnexados ? ' O resultado oficial da prova e o seu volta a volta estão em PDF, anexados neste e-mail.' : ' O resultado oficial e o seu volta a volta estão apresentados abaixo.'}</p>
   </td></tr>
   <tr><td style="padding:10px 24px 4px;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>${cartoes}</tr></table></td></tr>
   <tr><td style="padding:14px 24px 0;"><table role="presentation" cellspacing="0" cellpadding="0" style="font-size:13px;line-height:1.6;">
