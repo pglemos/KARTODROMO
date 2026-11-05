@@ -39,6 +39,7 @@ import {
   startSession,
   tick,
   toggleLapInvalid,
+  updateSessionParameters,
   type Session,
   type SessionType,
 } from '../lib/timing/race-engine';
@@ -723,14 +724,12 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       }
       if (!action && method === 'PATCH') {
         const body = await readBody(req);
-        if (typeof body.name === 'string') s.name = body.name.trim() || s.name;
-        if (s.state === 'preparando') {
-          if (body.type && SESSION_TYPES.has(body.type as SessionType)) s.type = body.type as SessionType;
-          if (body.durationMin !== undefined) s.durationMs = Math.round(Number(body.durationMin) * 60_000);
-          if (body.maxLaps !== undefined) s.maxLaps = Number(body.maxLaps) > 0 ? Number(body.maxLaps) : null;
-        } else if (s.state === 'em_andamento' && body.durationMin !== undefined) {
-          s.durationMs = Math.round(Number(body.durationMin) * 60_000); // estender/encurtar prova em andamento
-        }
+        updateSessionParameters(s, {
+          ...(typeof body.name === 'string' ? { name: body.name } : {}),
+          ...(body.durationMin !== undefined ? { durationMin: Number(body.durationMin) } : {}),
+          ...(body.maxLaps !== undefined ? { maxLaps: body.maxLaps === null ? null : Number(body.maxLaps) } : {}),
+        }, now);
+        if (s.state === 'preparando' && body.type && SESSION_TYPES.has(body.type as SessionType)) s.type = body.type as SessionType;
         if (body.competitors) setCompetitors(s, parseCompetitors(body.competitors));
         if (typeof body.eventId === 'string' || body.eventId === null) s.eventId = body.eventId as string | null;
         if (typeof body.groupId === 'string' || body.groupId === null) s.groupId = body.groupId as string | null;
