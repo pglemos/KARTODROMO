@@ -9,6 +9,7 @@
  *   GET  /api/mobile/v1/ranking/me                carreira do dono da sessão (conta vinculada ao cadastro)
  */
 import { authenticateMobileRequest, type MobileAuthEnv } from './auth';
+import { montarRanking, type LinhaCompleta } from './ranking-data';
 import { receberClientes } from './clientes';
 import { filtrarKarts, type VoltaKart } from './karts';
 
@@ -18,25 +19,42 @@ export interface MobileRankingEnv extends MobileAuthEnv {
   PRE?: R2Bucket;
 }
 
-// foto do piloto (enviada pelo próprio app): JPEG de até 1,5 MB no R2, em fotos-app/<cliente>.jpg
+// foto do piloto (enviada pelo próprio app): imagem de até 1,5 MB no R2, em fotos-app/<cliente>.jpg
 const FOTO_MAX = 1_500_000;
 const fotoChave = (cliente: string) => `fotos-app/${cliente}.jpg`;
+const FOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']);
+
+const MARCAS_HEIF = new Set(['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'mif1', 'msf1']);
+
+/** Identifica a imagem pelos primeiros bytes. `ftyp` sozinho não basta: vídeos MP4 também o têm. */
+export function tipoDaImagem(bytes: Uint8Array): string | null {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  if (bytes.length >= 8 && [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((v, i) => bytes[i] === v)) return 'image/png';
+  if (bytes.length < 12) return null;
+  const texto = (de: number, ate: number) => String.fromCharCode(...bytes.slice(de, ate));
+  if (texto(0, 4) === 'RIFF' && texto(8, 12) === 'WEBP') return 'image/webp';
+  if (texto(4, 8) === 'ftyp' && MARCAS_HEIF.has(texto(8, 12))) return 'image/heic';
+  return null;
+}
 
 async function enviarFoto(request: Request, env: MobileRankingEnv, cliente: string) {
   if (!env.PRE) return json(503, { erro: 'Serviço temporariamente indisponível.' });
-  if (request.headers.get('content-type') !== 'image/jpeg') return json(415, { erro: 'Envie a foto em JPEG.' });
-  if (Number(request.headers.get('content-length') ?? 0) > FOTO_MAX) return json(413, { erro: 'A foto é grande demais.' });
+  const contentType = (request.headers.get('content-type') ?? '').split(';', 1)[0].trim().toLowerCase();
+  if (!FOTO_TYPES.has(contentType)) return json(415, { erro: 'Formato de foto não aceito. Escolha JPEG, PNG, WebP ou HEIC.', codigo: 'UNSUPPORTED_IMAGE' });
+  if (Number(request.headers.get('content-length') ?? 0) > FOTO_MAX) return json(413, { erro: 'A foto é grande demais. Escolha uma imagem de até 1,5 MB.', codigo: 'IMAGE_TOO_LARGE' });
   const bytes = new Uint8Array(await request.arrayBuffer());
-  // começo de todo JPEG: FF D8 FF
-  if (bytes.length < 100 || bytes.length > FOTO_MAX || bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[2] !== 0xff) return json(400, { erro: 'Arquivo de imagem inválido.' });
-  await env.PRE.put(fotoChave(cliente), bytes, { httpMetadata: { contentType: 'image/jpeg' }, customMetadata: { enviadaEm: new Date().toISOString() } });
+  const detectado = tipoDaImagem(bytes);
+  if (bytes.length < 100 || bytes.length > FOTO_MAX || !detectado) return json(400, { erro: 'Arquivo de imagem inválido.', codigo: 'INVALID_IMAGE' });
+  // o tipo gravado vem do conteúdo, não do que o aparelho declarou
+  await env.PRE.put(fotoChave(cliente), bytes, { httpMetadata: { contentType: detectado }, customMetadata: { enviadaEm: new Date().toISOString() } });
   return json(200, { ok: true, versao: Date.now() });
 }
 
 async function lerFoto(env: MobileRankingEnv, cliente: string) {
   const obj = env.PRE ? await env.PRE.get(fotoChave(cliente)) : null;
   if (!obj) return new Response(null, { status: 404, headers: { 'cache-control': 'public, max-age=300' } });
-  return new Response(obj.body, { headers: { 'content-type': 'image/jpeg', 'cache-control': 'public, max-age=300', etag: obj.httpEtag } });
+  const metadata = (obj as R2ObjectBody & { httpMetadata?: { contentType?: string } }).httpMetadata;
+  return new Response(obj.body, { headers: { 'content-type': metadata?.contentType ?? 'image/jpeg', 'cache-control': 'public, max-age=300', etag: obj.httpEtag } });
 }
 
 const json = (status: number, body: unknown, maxAge = 0) => new Response(JSON.stringify(body), {
@@ -53,7 +71,7 @@ function constantTimeEqual(a: string, b: string) {
   return dif === 0;
 }
 
-const CHAVE = /^(ranking|piloto:\d{1,12}|karts:\d{4}-\d{2}-\d{2})$/;
+const CHAVE = /^(ranking|piloto:\d{1,12}|karts:\d{4}-\d{2}-\d{2}|historico:\d{1,20})$/;
 const LIMITE_CORPO = 4_000_000;
 
 // a tabela também é criada aqui (mesmo SQL da migration 0007): o wrangler local não tem permissão de D1
@@ -78,6 +96,12 @@ async function receber(request: Request, env: MobileRankingEnv) {
   const stmts: D1PreparedStatement[] = [];
   for (const it of itens) {
     if (typeof it.chave !== 'string' || !CHAVE.test(it.chave) || it.dados === null || typeof it.dados !== 'object') return json(400, { erro: 'Item inválido.' });
+    if (it.chave.startsWith('historico:')) {
+      const results = (it.dados as Record<string, unknown>).results;
+      if (!Array.isArray(results) || results.length > 500 || results.some((result) => !result || typeof result !== 'object' || Array.isArray(result))) {
+        return json(400, { erro: 'Histórico inválido.' });
+      }
+    }
     stmts.push(env.MOBILE_DB!.prepare(
       'INSERT INTO mobile_ranking(chave, dados, atualizado_em) VALUES (?, ?, ?) ON CONFLICT(chave) DO UPDATE SET dados = excluded.dados, atualizado_em = excluded.atualizado_em',
     ).bind(it.chave, JSON.stringify(it.dados), agora));
@@ -99,23 +123,76 @@ async function ler(env: MobileRankingEnv, chave: string) {
 type Tracado = { nome: string; pilotos: number; linhas: unknown[] };
 type Periodo = { de: string | null; ate: string | null; tracados: Tracado[] };
 
+function categoriaNormalizada(value: unknown) {
+  return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+}
+
+type VoltaDiaria = { id?: string; piloto: string; kart: string; categoria: string | null; tracado: string; dia: string; ms: number | null };
+
+/** Um dia corrompido é ignorado (e registrado) em vez de derrubar o ranking inteiro. */
+export function linhasDosDias(rows: { dados: string; atualizado_em: number }[]) {
+  const linhas = rows.flatMap((row) => {
+    try {
+      const dia = (JSON.parse(row.dados) as { linhas?: VoltaDiaria[] }).linhas;
+      return Array.isArray(dia) ? dia : [];
+    } catch {
+      console.error('mobile-ranking', 'registro diário inválido ignorado');
+      return [];
+    }
+  }).filter((l) => l.ms !== null).map((l) => ({ ...l, nome: l.piloto, ms: l.ms! }));
+  return { linhas, atualizadoEm: Math.max(0, ...rows.map((row) => row.atualizado_em)) };
+}
+
+// O app atualiza a cada 15 s e troca de filtro na hora. Guardar só os dias lidos (e não a resposta) evita reler e
+// reprocessar o banco a cada pedido, sem misturar os filtros.
+const CACHE_DIAS_MS = 30_000;
+const cacheDias = new WeakMap<D1Database, Map<string, { em: number; valor: ReturnType<typeof linhasDosDias> }>>();
+
+async function diasDoRanking(db: D1Database, de: string, ate: string) {
+  const porBanco = cacheDias.get(db) ?? new Map<string, { em: number; valor: ReturnType<typeof linhasDosDias> }>();
+  cacheDias.set(db, porBanco);
+  const chave = `${de}|${ate}`;
+  const guardado = porBanco.get(chave);
+  if (guardado && Date.now() - guardado.em < CACHE_DIAS_MS) return guardado.valor;
+  const { results } = await db.prepare('SELECT dados, atualizado_em FROM mobile_ranking WHERE chave >= ? AND chave <= ? ORDER BY chave')
+    .bind('karts:' + de, 'karts:' + ate).all<{ dados: string; atualizado_em: number }>();
+  const valor = linhasDosDias(results);
+  porBanco.set(chave, { em: Date.now(), valor });
+  return valor;
+}
+
 async function ranking(url: URL, env: MobileRankingEnv) {
   const r = await ler(env, 'ranking');
   if (!r) return json(503, { erro: 'O ranking ainda está sendo preparado. Tente de novo em alguns minutos.' });
   const periodos = (r.dados.periodos ?? {}) as Record<string, Periodo>;
-  const nome = ['semana', 'mes', 'geral'].includes(url.searchParams.get('periodo') ?? '') ? url.searchParams.get('periodo')! : 'semana';
-  const per = periodos[nome] ?? { de: null, ate: null, tracados: [] };
-  const pedido = url.searchParams.get('tracado');
-  const escolhido = per.tracados.find((t) => t.nome === pedido) ?? per.tracados[0] ?? null;
+  const pedidoPeriodo = url.searchParams.get('periodo') ?? 'semana';
+  if (!['dia', 'semana', 'mes', 'geral'].includes(pedidoPeriodo)) return json(400, { erro: 'Período inválido.', codigo: 'INVALID_PERIOD' });
+  const nome = pedidoPeriodo;
+  const per = periodos[nome] ?? periodos.geral ?? { de: null, ate: null, tracados: [] };
+  const diaPedido = url.searchParams.get('dia');
+  const diaValido = diaPedido && /^\d{4}-\d{2}-\d{2}$/.test(diaPedido) && Number.isFinite(Date.parse(`${diaPedido}T12:00:00Z`)) && new Date(`${diaPedido}T12:00:00Z`).toISOString().slice(0, 10) === diaPedido;
+  if (diaPedido && !diaValido) return json(400, { erro: 'Data inválida.', codigo: 'INVALID_DATE' });
+  const dia = diaPedido || null;
+  const categoriaBruta = categoriaNormalizada(url.searchParams.get('categoria'));
+  if (categoriaBruta && categoriaBruta !== 'todos' && categoriaBruta !== 'indoor' && categoriaBruta !== 'super kart' && categoriaBruta !== 'superkart') return json(400, { erro: 'Categoria inválida.', codigo: 'INVALID_CATEGORY' });
+  const categoria = categoriaBruta === 'superkart' ? 'super kart' : categoriaBruta;
+  const registros = await diasDoRanking(env.MOBILE_DB!, per.de ?? '0000-01-01', per.ate ?? '9999-12-31');
+  const diarias = registros.linhas;
+  const diasCompletos = new Set(diarias.map(l => l.dia));
+  const antigas = per.tracados.flatMap(t => (t.linhas as LinhaCompleta[]).map(l => ({ ...l, tracado: t.nome })))
+    .filter(l => !diasCompletos.has(l.dia));
+  const completo = montarRanking([...antigas, ...diarias], url);
+  // Filtros são interativos: cache intermediário fazia dia, traçado e categoria
+  // exibirem a resposta anterior por até um minuto.
   return json(200, {
     periodo: nome,
     de: per.de,
     ate: per.ate,
-    tracados: per.tracados.map((t) => ({ nome: t.nome, pilotos: t.pilotos })),
-    tracado: escolhido?.nome ?? null,
-    linhas: escolhido?.linhas ?? [],
-    atualizadoEm: r.atualizadoEm,
-  }, 60);
+    ...completo,
+    dia,
+    categoria: categoria || null,
+    atualizadoEm: new Date(Math.max(Date.parse(r.atualizadoEm), registros.atualizadoEm)).toISOString(),
+  });
 }
 
 async function piloto(id: string, env: MobileRankingEnv, publico = true) {
@@ -127,7 +204,7 @@ async function piloto(id: string, env: MobileRankingEnv, publico = true) {
 /** sessão do app → cliente vinculado (mesma regra do histórico: só conta vinculada ao cadastro do kartódromo) */
 async function clienteDaSessao(request: Request, env: MobileRankingEnv) {
   const conta = await authenticateMobileRequest(request, env);
-  if (!conta) return null;
+  if (!conta) return json(401, { erro: 'Sua sessão expirou. Entre novamente.', codigo: 'AUTH_REQUIRED' });
   const row = await env.MOBILE_DB!.prepare('SELECT customer_id FROM mobile_identity_links WHERE account_id = ?').bind(conta.id).first<{ customer_id: string }>();
   return row?.customer_id ?? null;
 }
@@ -140,6 +217,7 @@ export async function handleMobileRanking(request: Request, env: MobileRankingEn
     if (p === '/api/mobile/v1/internal/ranking') return request.method === 'POST' ? await receber(request, env) : json(405, { erro: 'Método não permitido.' });
     if (p === '/api/mobile/v1/ranking/me/foto') {
       const cliente = await clienteDaSessao(request, env);
+      if (cliente instanceof Response) return cliente;
       if (!cliente) return json(404, { erro: 'Sua conta ainda não está ligada ao seu cadastro no kartódromo.' });
       if (request.method === 'PUT') return await enviarFoto(request, env, cliente);
       if (request.method === 'DELETE') { await env.PRE?.delete(fotoChave(cliente)); return json(200, { ok: true }); }
@@ -181,6 +259,7 @@ export async function handleMobileRanking(request: Request, env: MobileRankingEn
     }
     if (p === '/api/mobile/v1/ranking/me') {
       const cliente = await clienteDaSessao(request, env);
+      if (cliente instanceof Response) return cliente;
       if (!cliente) return json(404, { erro: 'Sua conta ainda não está ligada ao seu cadastro no kartódromo.' });
       return await piloto(cliente, env, false);
     }

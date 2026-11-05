@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { codigoReserva, idade, validarReserva, type Agenda } from '../workers/pre-cadastro/src/validar';
 import { conciliarPagamentos, criarPedido, liberado, situacaoPedido, syncPedidos, syncResultado, visaoPublica, webhookAsaas, type EnvReservas, type Pedido } from '../workers/pre-cadastro/src/reservas';
 import { hojeBrasilia } from '../workers/pre-cadastro/src/asaas';
-import { descricaoPedido } from '../lib/ops/reserva-online';
+import * as opsDb from '../lib/ops/db';
+import { agendaOnline, descricaoPedido } from '../lib/ops/reserva-online';
 import worker from '../workers/pre-cadastro/src/index';
 
 const HOJE = new Date('2026-10-01T15:00:00Z');
@@ -151,7 +152,22 @@ const pedir = (corpo: unknown, previa = PREVIA) =>
   new Request(`https://reservas.kartodromodebetim.com.br/api/reservas?previa=${previa}`, { method: 'POST', body: JSON.stringify(corpo) });
 const semLimite = async () => false;
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+describe('agenda publicada para reserva mobile', () => {
+  it('envia capacidade total separada das vagas livres', async () => {
+    vi.spyOn(opsDb, 'one').mockResolvedValue({ preco: 14500, nome: 'Locação' } as never);
+    vi.spyOn(opsDb, 'query').mockResolvedValue([{
+      id: 101, inicio: '2026-10-26T12:00', nome: 'BATERIA 12:00', vagas: 20, ocupadas: 12,
+    }] as never);
+
+    const result = await agendaOnline();
+
+    expect(result.horarios).toEqual([{
+      id: 101, inicio: '2026-10-26T12:00', nome: 'BATERIA 12:00', livres: 8, vagasTotais: 20,
+    }]);
+  });
+});
 
 describe('fluxo da reserva no site', () => {
   it('fechado ao público sem RESERVAS_ATIVAS nem prévia', async () => {

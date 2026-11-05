@@ -74,6 +74,7 @@ export function validar(entrada: Record<string, unknown>, hoje = new Date()): { 
   if (peso && !(Number(peso) >= 15 && Number(peso) <= 250)) return { ok: false, erro: 'Peso inválido (em kg).' };
   if (estado && !/^[A-Z]{2}$/.test(estado)) return { ok: false, erro: 'UF inválida.' };
   // obrigatório como no totem: o resultado impresso traz o Instagram de cada piloto (15/10, recepção)
+  if (!String(entrada.instagram ?? '').trim()) return { ok: false, erro: 'O Instagram é obrigatório. Informe o @usuário.' };
   const erroInstagram = erroInstagramCliente(entrada.instagram);
   if (erroInstagram) return { ok: false, erro: erroInstagram.replace(' do piloto', '') };
   if (entrada.lgpd !== true) return { ok: false, erro: 'É preciso aceitar o Termo de Consentimento para Tratamento de Dados Pessoais.' };
@@ -102,7 +103,7 @@ export function validar(entrada: Record<string, unknown>, hoje = new Date()): { 
 
 // ---------------------------------------------------------------- reserva online
 
-export type Horario = { id: number; inicio: string; nome: string; livres: number };
+export type Horario = { id: number; inicio: string; nome: string; livres: number; vagasTotais?: number };
 export type Agenda = { atualizadoEm: string; precoCentavos: number; maxPilotos: number; prazoMin: number; antecedenciaMin: number; horarios: Horario[] };
 /** Cada vaga é de uma pessoa: com 3 vagas, quem compra é o piloto 1 e os outros 2 vêm cadastrados aqui. */
 export type Acompanhante = { nome: string; documento: string; nascimento: string; instagram?: string };

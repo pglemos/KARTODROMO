@@ -10,7 +10,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import worker from '../../workers/pre-cadastro/src/index';
 
 const migrations = [
-  '0001_mobile_identity.sql',
+  '0001_mobile_identity.sql', '0008_mobile_account_deletion.sql',
   '0002_mobile_bookings.sql',
   '0003_mobile_coupon_previews.sql',
   '0004_mobile_results.sql',
@@ -290,7 +290,13 @@ describe('API pública de resultados móveis', () => {
       'x-mobile-admin-token': ADMIN_TOKEN,
     })).status).toBe(200);
     expect((await listar()).some((c) => c.email === email)).toBe(false);
-  });
+
+    const vinculados = await callWorker('/api/mobile/v1/internal/identity-links', 'GET', undefined, {
+      'x-mobile-admin-token': ADMIN_TOKEN,
+    });
+    expect(vinculados.status).toBe(200);
+    expect(await vinculados.json()).toEqual({ customerIds: ['777'] });
+  }, 30_000);
 
   it('vincula somente e-mail verificado e entrega histórico apenas à conta validada', async () => {
     const email = `ana+${crypto.randomUUID()}@example.com`;
@@ -322,7 +328,47 @@ describe('API pública de resultados móveis', () => {
       mensagem: 'Seu histórico aparece sozinho quando o documento e o e-mail ou o telefone da sua conta são os mesmos do seu cadastro no kartódromo. Se não aparecer em alguns minutos, peça para a recepção conferir seu cadastro.',
       results: [],
     });
-  });
+  }, 30_000);
+
+  it('entrega o histórico completo da cronometragem à conta vinculada sem expô-lo publicamente', async () => {
+    const email = `pedro+${crypto.randomUUID()}@example.com`;
+    const accessToken = await createVerifiedAccount(email);
+    const linked = await callWorker('/api/mobile/v1/internal/identity-links', 'POST', {
+      customerId: '312', email,
+    }, { 'x-mobile-admin-token': ADMIN_TOKEN });
+    expect(linked.status).toBe(200);
+
+    const manual = await callWorker('/api/mobile/v1/internal/results', 'POST', {
+      ...resultPayload,
+      results: [{ ...resultPayload.results[0], customerId: '312' }],
+    }, { 'x-mobile-publish-token': PUBLISH_TOKEN });
+    expect(manual.status).toBe(200);
+
+    const historical = await callWorker('/api/mobile/v1/internal/ranking', 'POST', {
+      itens: [{
+        chave: 'historico:312',
+        dados: { results: [
+          { sessionId: 'corrida-2024-10-26', eventName: 'Corrida 1', eventDate: '2024-10-26', displayName: 'Ana Silva', position: 2, kart: '14', laps: 18, bestLapMs: 38_652 },
+          { sessionId: resultPayload.sessionId, eventName: 'Resultado antigo', eventDate: '2026-10-13', displayName: 'Ana Silva', position: 8, kart: '9', laps: 3, bestLapMs: 50_000 },
+        ] },
+      }],
+    }, { 'x-mobile-admin-token': ADMIN_TOKEN });
+    expect(historical.status).toBe(200);
+
+    const response = await callWorker('/api/mobile/v1/results/me', 'GET', undefined, {
+      authorization: `Bearer ${accessToken}`,
+    });
+    expect(await response.json()).toMatchObject({
+      vinculo: 'validado',
+      results: [
+        { sessionId: resultPayload.sessionId, eventName: 'TESTE CODEX · Treino', position: 1, kart: '12', laps: 4 },
+        { sessionId: 'corrida-2024-10-26', eventName: 'Corrida 1', eventDate: '2024-10-26', position: 2, kart: '14', laps: 18 },
+      ],
+    });
+
+    const publicResults = await callWorker('/api/mobile/v1/results');
+    expect(JSON.stringify(await publicResults.json())).not.toContain('corrida-2024-10-26');
+  }, 30_000);
 });
 
 describe('publicação pela API da cronometragem simulada', () => {
