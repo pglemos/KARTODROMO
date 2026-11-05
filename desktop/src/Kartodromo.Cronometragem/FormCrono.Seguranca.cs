@@ -17,7 +17,7 @@ public partial class FormCrono
     {
         if (_gPilotos.CurrentRow == null || _gPilotos.CurrentRow.IsNewRow) { Msg.Aviso(this, "Clique no competidor."); return; }
         if (_pilotosSujos) { Msg.Aviso(this, "Salve a lista de competidores antes de abrir o registro do competidor."); return; }
-        RegistroCompetidorSelecionado();
+        RegistroCompetidorSelecionado("pilotos");
     }
 
     /// <summary>Competidor selecionado na lista de pilotos (passos 4–5) ou, com doResultado, no resultado ao vivo.</summary>
@@ -41,13 +41,14 @@ public partial class FormCrono
     void RegistroCompetidor(int indice)
     {
         if (_sess == null) return;
+        var sessId = _sess.S("id");
         var comps = Crono.Arr(_sess, "competitors");
         if (indice < 0 || indice >= comps.Count) return;
         var c = comps[indice];
         // a bateria e o piloto de quando a janela abriu: é neles que o Gravar grava
         var sessaoId = _sess.S("id");
         var det = c["detalhes"] as JsonObject ?? new JsonObject();
-        using var d = NovoDialogo("Registro de competidor", $"Piloto dentro da prova · {c.S("name")} (kart {c.S("kart")})", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0", "linear-gradient(180deg, #6CB8FF, #1E6FE8)");
+        using var d = NovoDialogo("Registro de competidor", $"Piloto dentro da prova · {nomeOriginal} (kart {kartOriginal})", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0", "linear-gradient(180deg, #6CB8FF, #1E6FE8)");
         string Num(string k) => det[k] is JsonNode n && double.TryParse(n.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v.ToString("0.00", Fmt.Br) : "";
         var categoria = new ListaDesign();
         categoria.Items.Add(new Campos.Item(0, "(sem categoria)"));
@@ -401,7 +402,7 @@ public partial class FormCrono
         d.Abas(ModulosPermissao.Select(x => x.Modulo).ToArray(), i => { modulo = i; Mostrar(); }, modulo);
         perfil.SelectedIndexChanged += (_, _) => Seguro.Rodar(d, Carregar);
         d.Shown += (_, _) => Seguro.Rodar(d, Carregar);
-        d.BotaoRodape("Salvar e fechar", true, () => Seguro.Rodar(d, async () =>
+        btnSalvar = d.BotaoRodape("Salvar e fechar", true, () => Seguro.Rodar(d, async () =>
         {
             var alvo = (perfil.SelectedItem as Campos.Item)?.Id;
             if (perfilCarregado == null || !Equals(perfilCarregado, alvo)) { Msg.Aviso(d, "Aguarde carregar as permissões do perfil escolhido antes de salvar."); return; }

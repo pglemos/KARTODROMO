@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createSession, mesmoPrograma, setCompetitors, type Session } from '../lib/timing/race-engine';
-import { competidoresComSorteio, descricaoModoSorteio, pilotosDoSorteio, validarSorteio } from '../lib/timing/sorteio';
+import { competidoresComSorteio, descricaoModoSorteio, pilotosDoSorteio, validarSorteio, revisaoListaSorteio } from '../lib/timing/sorteio';
 
 const DIA = Date.UTC(2026, 8, 27, 15, 0, 0);
 
@@ -45,6 +45,43 @@ describe('sorteio de karts', () => {
     expect(() => validarSorteio(s, [], karts)).toThrow(/vazio/);
     s.state = 'em_andamento';
     expect(() => validarSorteio(s, [{ indice: 0, kart: '1' }], karts)).toThrow(/já largou/);
+  });
+
+  it('sorteio_rejeita_reordenacao_concorrente: consulta Ana/Bia, reordenar Bia/Ana e enviar revisão antiga; assert 409/nenhuma alteração. Lista intacta aceita; edição de nome/kart invalida revisão', () => {
+    const s = bateria('b', [
+      { kart: '', name: 'Ana', customerId: '10' },
+      { kart: '', name: 'Bia', customerId: '11' },
+    ]);
+    const revisaoOriginal = revisaoListaSorteio(s);
+    expect(revisaoOriginal).toBeDefined();
+
+    // 1. Lista intacta com a revisão correta é aceita
+    expect(() => validarSorteio(s, [{ indice: 0, kart: '4' }, { indice: 1, kart: '5' }], new Set(['4', '5']), revisaoOriginal)).not.toThrow();
+
+    // 2. Reordenação concorrente: Bia/Ana
+    const sReordenada = bateria('b', [
+      { kart: '', name: 'Bia', customerId: '11' },
+      { kart: '', name: 'Ana', customerId: '10' },
+    ]);
+    const revisaoAposReordenacao = revisaoListaSorteio(sReordenada);
+    expect(revisaoAposReordenacao).not.toBe(revisaoOriginal);
+
+    // Enviar atribuição com a revisão antiga contra a sessão reordenada deve lançar erro de conflito
+    expect(() => validarSorteio(sReordenada, [{ indice: 0, kart: '4' }, { indice: 1, kart: '5' }], new Set(['4', '5']), revisaoOriginal)).toThrow(/revisão|conflito|recarregue/i);
+
+    // 3. Edição de nome invalida a revisão
+    const sNomeEditado = bateria('b', [
+      { kart: '', name: 'Ana Paula', customerId: '10' },
+      { kart: '', name: 'Bia', customerId: '11' },
+    ]);
+    expect(revisaoListaSorteio(sNomeEditado)).not.toBe(revisaoOriginal);
+
+    // 4. Edição de kart pré-existente invalida a revisão
+    const sKartEditado = bateria('b', [
+      { kart: '7', name: 'Ana', customerId: '10' },
+      { kart: '', name: 'Bia', customerId: '11' },
+    ]);
+    expect(revisaoListaSorteio(sKartEditado)).not.toBe(revisaoOriginal);
   });
 
   it('aplica o sorteio sem perder o cliente e tira o kart de quem ficou com um número sorteado para outro', () => {

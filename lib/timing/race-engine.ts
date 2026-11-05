@@ -98,6 +98,48 @@ export type CompetidorDetalhes = {
   equipeTransponders?: (string | null)[];
 };
 
+/** Validação rigorosa de campos numéricos de competidor (F21). Vazio/null aceito como null; texto e negativos proibidos se !permiteNegativo. */
+export function parseNumeroOpcional(v: unknown, rotulo: string, permiteNegativo = false): number | null {
+  if (v === '' || v == null) return null;
+  const num = Number(String(v).replace(',', '.'));
+  if (!Number.isFinite(num)) {
+    throw new Error(`Valor inválido no campo ${rotulo}.`);
+  }
+  if (!permiteNegativo && num < 0) {
+    throw new Error(`O campo ${rotulo} não pode ser negativo.`);
+  }
+  return num;
+}
+
+/** Sanitiza detalhes do competidor com validação numérica e suporte a equipeTransponders (F20, F21). */
+export function sanitizarCompetidorDetalhes(d: Record<string, unknown> | undefined): CompetidorDetalhes | undefined {
+  if (!d || typeof d !== 'object') return undefined;
+  const txt = (v: unknown, max = 80) => String(v ?? '').trim().slice(0, max);
+  const equipe = Array.isArray(d.equipe) ? (d.equipe as unknown[]).map((x) => txt(x, 100)).slice(0, 6) : undefined;
+  const equipeTransponders = Array.isArray(d.equipeTransponders)
+    ? (d.equipeTransponders as unknown[]).map((x) => (x == null || String(x).trim() === '' ? null : txt(x, 20))).slice(0, 6)
+    : undefined;
+
+  return {
+    sexo: txt(d.sexo, 20),
+    iniciais: txt(d.iniciais, 6).toUpperCase(),
+    email: txt(d.email, 160),
+    patrocinador: txt(d.patrocinador),
+    clube: txt(d.clube),
+    cidade: txt(d.cidade),
+    estado: txt(d.estado, 4).toUpperCase(),
+    pais: txt(d.pais, 40),
+    box: txt(d.box, 20),
+    peso: parseNumeroOpcional(d.peso, 'peso'),
+    pesoIndumentaria: parseNumeroOpcional(d.pesoIndumentaria, 'pesoIndumentaria'),
+    pesoLastro: parseNumeroOpcional(d.pesoLastro, 'pesoLastro'),
+    pontuacao: parseNumeroOpcional(d.pontuacao, 'pontuacao', true),
+    oculto: Boolean(d.oculto),
+    equipe: equipe ?? [],
+    ...(equipeTransponders !== undefined ? { equipeTransponders } : {}),
+  };
+}
+
 export type Competitor = {
   /** o ajuste de posição deu a quadriculada junto com o kart à frente; desfeito ao voltar à ordem automática */
   finalizadoPorAjuste?: boolean;
@@ -400,6 +442,7 @@ export function setCompetitors(session: Session, list: { kart: string; name: str
     return old;
   });
   // 2ª passada: quem não foi reconhecido pelo piloto herda pelo número do kart (ex.: só corrigiu o nome)
+  const matches = [...pilotoMatches];
   novos.forEach((c, i) => {
     if (matches[i] || !c.kart) return;
     const old = achar((o) => o.kart === c.kart);
@@ -408,6 +451,7 @@ export function setCompetitors(session: Session, list: { kart: string; name: str
 
   session.competitors = novos.map((c, i) => {
     const old = matches[i];
+    const mesmoPiloto = Boolean(pilotoMatches[i]);
     const kartMudou = Boolean(old?.kart && old.kart !== c.kart);
     // Clona as passagens ao mudar de kart. Além de evitar que uma referência antiga seja
     // reaproveitada por engano, registra de qual kart veio cada leitura no histórico.

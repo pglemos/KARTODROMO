@@ -8,6 +8,9 @@ public partial class FormCrono
 {
     /// <summary>Evento mostrado na árvore dos passos 4–5 (o escolhido no passo 1; hoje, por padrão).</summary>
     string _eventoArvore;
+    bool _carregandoCatalogo;
+    string _ultimoEventoId;
+    string _ultimoGrupoId;
 
     // navegação pelo teclado (setas) nos eventos/grupos recarrega o que depende deles; a flag evita que o próprio
     // preenchimento das grades dispare outra carga (recursão)
@@ -89,6 +92,7 @@ public partial class FormCrono
             _gGrupos.Preencher(eventGroups.Select(g => new object[] { g.S("name"), tracado }).ToList(), eventGroups.Cast<object>().ToList());
             if (selectedGroup != null && _gGrupos.Rows.Count > 0 && _gGrupos.ChaveAtual == null) SelecionarLinha(_gGrupos, eventGroups.IndexOf(selectedGroup));
             var groupId = selectedGroup?.S("id") ?? "";
+            _ultimoGrupoId = groupId;
             var groupProofs = _proofs.Where(p => p.S("groupId") == groupId).OrderBy(p => p.I("order")).ToList();
             _tituloProvas.Text = selectedGroup == null ? "Provas" : $"Provas da {selectedGroup.S("name")}";
             string Previsao(JsonObject p) { var d = DateTime.TryParse(selectedEvent?.S("date"), out var dd) ? dd : DateTime.Today; var h = p.S("startAt") is { Length: >= 4 } sa ? sa : (selectedGroup?.S("name") is { } gn && System.Text.RegularExpressions.Regex.Match(gn, @"\d{1,2}:\d{2}") is { Success: true } m ? m.Value : ""); return $"{d:dd/MM} {h}".Trim(); }
@@ -353,7 +357,7 @@ public partial class FormCrono
         if (nome == "Competidor")
         {
             if (_sess == null || Crono.Arr(_sess, "competitors").Count == 0) { Msg.Aviso(this, "Escolha a bateria e clique no competidor (passos 4–5 · Registro de competidores)."); return; }
-            if (_gPilotos.CurrentRow is { IsNewRow: false }) RegistroCompetidorSelecionado(); else RegistroCompetidor(0);
+            if (_gPilotos.CurrentRow is { IsNewRow: false }) RegistroCompetidorSelecionado("pilotos"); else RegistroCompetidor(0);
             return;
         }
         if (nome == "RankingPeso") { RankingPesoDesign(); return; }

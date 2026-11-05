@@ -43,7 +43,31 @@ public partial class FormCrono
     /// <summary>Chamado quando a janela abre: reabre o telão que estava aberto e passa a vigiar a versão publicada.</summary>
     void IniciarAtualizacaoAoVivo()
     {
-        FormClosing += (_, _) => _fechandoPrograma = true;
+        FormClosing += (s, e) =>
+        {
+            if (_fechandoPrograma) return;
+            if (_pilotosSujos)
+            {
+                var nomeBateria = _sess?.S("name") ?? "a bateria atual";
+                var res = MessageBox.Show(
+                    this,
+                    $"Há alterações não salvas na lista de competidores de {nomeBateria}.\n\nDeseja salvar antes de fechar?",
+                    "Alterações não salvas",
+                    MessageBoxButtons.YesNoCancel,
+                    MessageBoxIcon.Question
+                );
+                if (res == DialogResult.Cancel)
+                {
+                    e.Cancel = true;
+                    return;
+                }
+                if (res == DialogResult.Yes)
+                {
+                    try { SalvarPilotos().GetAwaiter().GetResult(); } catch { }
+                }
+            }
+            _fechandoPrograma = true;
+        };
         if (File.Exists(MarcaTv)) AbrirTV();
         _verAtualizacao.Tick += async (_, _) => await VerificarAtualizacao();
         _verAtualizacao.Start();

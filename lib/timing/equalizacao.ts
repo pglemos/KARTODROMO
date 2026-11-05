@@ -398,9 +398,10 @@ export function calcularComAnteriores(s: Session, todas: Iterable<Session>, cfgD
 
 /**
  * Traz para a equalização karts que andaram em outra bateria (as voltas foram cronometradas fora da equalização).
- * Copia as passagens como estão; a bateria de origem não muda. Kart que já tem voltas na equalização fica como está.
+ * Copia apenas as passagens que fisicamente pertenceram ao kart indicado; a bateria de origem não muda.
+ * Kart que já tem voltas na equalização fica como está.
  */
-export function importarKarts(destino: Session, origem: Session, karts: string[]) {
+export function importarKarts(destino: Session, origem: Session, karts: string[], mapa?: Record<string, string>) {
   const importados: { kart: string; piloto: string; voltas: number }[] = [];
   const ignorados: { kart: string; motivo: string }[] = [];
   for (const kart of [...new Set(karts.map((k) => String(k).trim().replace(/^0+(?=\d)/, '')).filter(Boolean))]) {
