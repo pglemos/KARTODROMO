@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Kartodromo.Comum;
 
@@ -167,7 +167,7 @@ public partial class FormCrono : Form
             _leitura.Start();
             _relogio.Start();
             // passagem de kart chega na hora pelo fluxo do serviço; o ciclo de 1 s acima fica de reserva
-            _ouvinte = new OuvinteEstado(Config.CronoUrl + "/api/events", EstadoAoVivo);
+            _ouvinte = new OuvinteEstado(Config.CronoUrl + "/api/events?leve=1", EstadoAoVivo);
             _ouvinte.Iniciar();
             FormClosed += (_, _) => _ouvinte?.Dispose();
             IniciarAtualizacaoAoVivo();
@@ -932,8 +932,49 @@ public partial class FormCrono : Form
         }
     }
 
+    string _painelAtualizarVisto;
+    bool _atualizandoPainel;
+
+    /// <summary>Botão "Atualizar painel": relê o servidor e reenvia tudo. O pedido também vai pelo servidor para o outro PC com painel (ORBITS e CRONO1).</summary>
+    async void AtualizarPainelAgora()
+    {
+        if (_atualizandoPainel) return;
+        _atualizandoPainel = true;
+        _fPainel.Estado = EstadoBotao.Ativo;
+        try
+        {
+            var estado = (await Crono.Api.Get("/api/state"))?.AsObject();
+            if (estado != null) _state = estado;
+            _painel.ForcarAtualizacao();
+            AtualizarPainel();
+            await Crono.Api.Post("/api/painel-led-page", new JsonObject { ["pagina"] = _painel.Pagina, ["atualizar"] = true, ["origem"] = Environment.MachineName });
+            await Task.Delay(1500);
+        }
+        catch (Exception e)
+        {
+            Diagnostico.Registrar("AtualizarPainelAgora", e);
+            _sPainel.Text = "PAINEL LED: SEM RESPOSTA DO SERVIDOR";
+        }
+        finally
+        {
+            _fPainel.Estado = EstadoBotao.Normal;
+            _atualizandoPainel = false;
+        }
+    }
+
     void AplicarPaginaPainelCompartilhada()
     {
+        var pedidoAtualizar = (_state?["painelLed"] as JsonObject)?.S("atualizarEm");
+        if (!string.IsNullOrEmpty(pedidoAtualizar) && pedidoAtualizar != _painelAtualizarVisto)
+        {
+            var primeiraLeitura = _painelAtualizarVisto == null;
+            _painelAtualizarVisto = pedidoAtualizar;
+            if (!primeiraLeitura && _painel.Ativo)
+            {
+                _painel.ForcarAtualizacao();
+                AtualizarPainel();
+            }
+        }
         var compartilhada = (_state?["painelLed"] as JsonObject)?.I("pagina");
         if (compartilhada is null) return;
 
@@ -1080,13 +1121,13 @@ public partial class FormCrono : Form
             || c?.Parent is DataGridView; // controle de edição da célula
     }
 
-    async Task Atualizar()
+    async Task Atualizar(bool jaTemEstado = false)
     {
         if (_ocupado) return;
         _ocupado = true;
         try
         {
-            _state = (await Crono.Api.Get("/api/state"))?.AsObject();
+            if (!jaTemEstado) _state = (await Crono.Api.Get("/api/state"))?.AsObject();
             var focus = _state?["focus"] as JsonObject;
             var correndo = _state.S("runningId");
             // com uma janela aberta (Registro de competidor, Trocar kart, Penalidade...) a tela não pula para a bateria
@@ -1173,6 +1214,9 @@ public partial class FormCrono : Form
     void EstadoAoVivo(JsonObject estado)
     {
         if (IsDisposed || _autoteste != null) return;
+        // o aviso leve não traz a lista de baterias nem as encerradas: aproveita as da última leitura completa
+        foreach (var chave in new[] { "sessions", "lastQualifying", "lastFinished" })
+            if (!estado.ContainsKey(chave) && _state != null && _state.Remove(chave, out var guardado)) estado[chave] = guardado;
         _state = estado;
         int? kartRecente = null;
         if (estado?["recentPassings"] is JsonArray pass && pass.Count > 0 && pass[0] is JsonObject p)
@@ -1183,7 +1227,7 @@ public partial class FormCrono : Form
         if (!_ocupado && DateTime.Now - _telaRapidaEm >= TimeSpan.FromMilliseconds(250))
         {
             _telaRapidaEm = DateTime.Now;
-            _ = Atualizar();
+            _ = Atualizar(jaTemEstado: true);
         }
     }
 

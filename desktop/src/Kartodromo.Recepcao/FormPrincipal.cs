@@ -19,13 +19,16 @@ public class FormPrincipal : Form
     readonly Label _dataTexto = new() { AutoSize = false, Size = new Size(96, 30), TextAlign = ContentAlignment.MiddleCenter, Font = Tokens.FonteNumero(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold), ForeColor = KitVisual.Texto, Cursor = Cursors.Hand };
     readonly Panel _dataCaixa = new() { Size = new Size(152, 34), BackColor = Tokens.Primitivo.Branco };
     readonly Button _acaoTopo = KitVisual.Botao("", true);
-    readonly TextBox _buscaGlobal = new() { BorderStyle = BorderStyle.None, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno), PlaceholderText = "Buscar cliente ou CPF…", AccessibleName = "Buscar cliente ou CPF" };
+    readonly TextBox _buscaGlobal = new() { BorderStyle = BorderStyle.None, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno), AccessibleName = "Buscar cliente ou CPF" };
     readonly Grade _grade = new();
     readonly ToolStripStatusLabel _sbHora = new(), _sbData = new(), _sbSrv = new() { Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno, FontStyle.Bold) }, _sbCrono = new(), _sbSite = new();
     string _grupo = "reservas", _status = "todas";
     string _periodo = "dia";
     JsonObject _filtroBateria, _filtroContaFidelidade;
     Func<List<JsonObject>, ToolStripItem[]> _menuAtual;
+
+    // pinta a janela de uma vez (a tela não pisca ao atualizar as listas)
+    protected override CreateParams CreateParams { get { var cp = base.CreateParams; cp.ExStyle |= 0x02000000; return cp; } }
 
     public FormPrincipal()
     {
@@ -486,6 +489,13 @@ public class FormPrincipal : Form
         q.Margin = Padding.Empty;
         var qBox = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 7, 0, 0), BackColor = busca.BackColor };
         qBox.Controls.Add(q);
+        // texto de ajuda próprio: o PlaceholderText não aparecia sobre o fundo desta barra
+        var dica = new Label { Text = "Buscar cliente ou CPF…", BackColor = busca.BackColor, ForeColor = KitVisual.Secundario, Font = q.Font, Cursor = Cursors.IBeam };
+        void PosicionarDica() => dica.Bounds = new Rectangle(4, qBox.Padding.Top, Math.Max(0, qBox.Width - 4), Math.Max(0, qBox.Height - qBox.Padding.Top));
+        qBox.Resize += (_, _) => PosicionarDica(); PosicionarDica();
+        dica.Click += (_, _) => q.Focus();
+        q.TextChanged += (_, _) => dica.Visible = q.Text.Length == 0;
+        qBox.Controls.Add(dica); dica.BringToFront();
         busca.Controls.Add(qBox); busca.Controls.Add(lupa); busca.Controls.Add(atalho);
         qBox.BringToFront();
         void Buscar()
@@ -683,7 +693,7 @@ public class FormPrincipal : Form
         m.Items.Add(S("&Início",
             I("Config inicial (empresa)", () => Cadastros.Empresa(this), adm),
             new ToolStripSeparator(), G("Segurança", I("Usuário", () => Cadastros.Abrir(this, "usuarios"), adm), I("Trocar minha senha", TrocarSenha)),
-            new ToolStripSeparator(), I("Sair / trocar de usuário", () => Application.Restart()), A(I("Fechar", Close), "Alt+F4")));
+            new ToolStripSeparator(), I("Sair / trocar de usuário", () => InstanciaUnica.FecharEReabrir(this)), A(I("Fechar", Close), "Alt+F4")));
         m.Items.Add(S("&Cadastros",
             I("Empresa", () => Cadastros.Empresa(this), adm), I("Feriados", () => Cadastros.Abrir(this, "feriados")), new ToolStripSeparator(),
             G("POS", I("Turno", () => Cadastros.Abrir(this, "turnos")), I("Terminal", () => Cadastros.Abrir(this, "terminais"))), new ToolStripSeparator(),

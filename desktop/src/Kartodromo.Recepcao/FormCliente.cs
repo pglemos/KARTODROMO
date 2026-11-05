@@ -616,6 +616,7 @@ public class FormCliente : CartaoModal
         }
         catch
         {
+            Msg.Aviso(this, "Não foi possível consultar o CEP (sem internet?).");
             _end.Focus();
         }
     }

@@ -1,3 +1,4 @@
+import { invalidarAbertura, kartLiberadoHoje } from '../lib/app-v1/abertura-frota';
 /**
  * Servico de cronometragem proprio (substitui o LapTime.Server).
  *
@@ -15,8 +16,8 @@
 import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
-import { appendFileSync, closeSync, copyFileSync, cpSync, createWriteStream, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
-import { extname, join, resolve } from 'node:path';
+import { appendFileSync, closeSync, copyFileSync, cpSync, createWriteStream, existsSync, fsyncSync, ftruncateSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { extname, join, relative, resolve, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { format } from 'node:util';
 import { chaveOperadorValida, clienteEhMaquinaOperadora } from '../lib/timing/operator-auth';
@@ -27,6 +28,9 @@ import { mobileApiEndpoint } from '../lib/mobile-api-url';
 import {
   acceptRejected,
   addPenalty,
+  aplicarLargadaUltimo,
+  recuperarVoltas,
+  marcarPassagemManual,
   removePenalty,
   voltaAtualDoKart,
   restartSession,
@@ -52,7 +56,7 @@ import {
   setCompetitors,
   restoreCompetitor,
   setChuva,
-  setManualPosition,
+  ajustarPosicaoComVoltas,
   setCrossingDeleted,
   setCrossingInvalid,
   setRaceFlag,
@@ -81,13 +85,18 @@ import { rankingPorPeso, tituloFaixas, type DadosPiloto } from '../lib/timing/ra
 import { condicaoChuvaPeloTracado, dataBrasilia, historicoDoKart, rankingKarts } from '../lib/timing/ranking-karts';
 import { calcularComAnteriores, retomarEqualizacao, validarFaixasRedutor, type FaixaRedutor, faixasDaRegra, importarKarts, REGRA_PADRAO, regraDa, SISTEMAS_KART, tempoVoltaParaMs, TOLERANCIA_PADRAO_MS, ultimaEqualizacaoPorKart, voltasNasBaterias, type ChecklistKart, type ConfigEqualizacao } from '../lib/timing/equalizacao';
 import { nomeProprio } from '../lib/nomes';
-import { configPublica, enviarEmailSimples, enviarResultado, enviarTeste, lerConfig, salvarConfig, semEmailAosPilotos, traduzirErro, verificarTransporteEmail, type Dependencias, type OpcoesEnvio } from './timing-email';
+import { configPublica, ehErroLimitePorHora, enviarEmailSimples, enviarResultado, enviarTeste, lerConfig, salvarConfig, semEmailAosPilotos, traduzirErro, verificarTransporteEmail, type Dependencias, type OpcoesEnvio } from './timing-email';
 import { usoKartsDaSessao } from '../lib/timing/kart-fisico';
 import { serializeMobilePublication } from '../lib/timing/mobile-results';
 import type { ContextoProva, EmpresaEmail } from '../lib/timing/email-resultado';
 import { quemSaiuDaAgenda } from '../lib/timing/agenda-saida';
 import { competidoresComSorteio, descricaoModoSorteio, ListaMudouError, pilotosDoSorteio, validarSorteio, type Atribuicao } from '../lib/timing/sorteio';
 import { normalizarPaginaPainel, PAINEL_LED_PAGE_SIZE } from '../lib/timing/painel-page';
+import { abrirStore, type AppStore } from '../lib/app-v1/store';
+import { marcarPendentesComoDesconhecidas } from '../lib/app-v1/comandos';
+import { criarModuloApp, type ModuloApp } from '../lib/app-v1/rotas';
+import { ErroLegado } from '../lib/app-v1/operacao';
+import type { Inscricao } from '../lib/app-v1/regras';
 import { assinaturaDoConteudo, conferirChave, extrairChave, filtrarVoltasPorKart, lerHashes, montarTransmissao, montarVoltas, type Transmissao, type VoltasTransmissao } from '../lib/timing/transmissao';
 
 // ---------------------------------------------------------------- config
@@ -116,6 +125,15 @@ const ENV_DECODER_HOST = process.env.TIMING_DECODER_HOST || '192.168.20.171';
 const ENV_DECODER_PROTOCOL: DecoderProtocol = process.env.TIMING_DECODER_PROTOCOL === 'trx' ? 'trx' : 'p3';
 const ENV_DECODER_PORT = Number(process.env.TIMING_DECODER_PORT || (ENV_DECODER_PROTOCOL === 'p3' ? 5403 : 5100));
 const DATA_DIR = resolve(process.env.TIMING_DATA_DIR || join(process.cwd(), 'data', 'timing'));
+// App operacional: só liga com APP_V1_TOKEN_SECRET; sem ele as rotas /api/app/v1/ respondem 503
+let moduloApp: ModuloApp | null = null;
+let storeOperacional: AppStore | null = null;
+const bloqueioKart = (kart: string) => !kartLiberadoHoje(storeOperacional, kart);
+const exigirFrotaLiberada = (s: Session) => {
+  const bloqueado = s.type === 'equalizacao' ? undefined : s.competitors.find(c => bloqueioKart(c.kart));
+  if (bloqueado) throw new Error(`Kart ${bloqueado.kart} bloqueado: peça liberação ao gerente ou responsável pela equalização.`);
+};
+const assinantesApp = new Set<() => void>();
 const SESSIONS_DIR = join(DATA_DIR, 'sessions');
 const JOURNAL_DIR = join(DATA_DIR, 'passagens');
 const TRANSPONDERS_FILE = join(DATA_DIR, 'transponders.json');
@@ -271,6 +289,39 @@ function resolveSessionFilePath(s: Session): string {
   return join(SESSIONS_DIR, `${s.id}.json`);
 }
 
+function caminhoRelativoDeSessao(file: string) {
+  const path = relative(SESSIONS_DIR, file);
+  if (!path || path === '..' || path.startsWith(`..${sep}`)) throw new Error('Caminho de transação de sessão inválido.');
+  return path;
+}
+
+function caminhoDeSessaoDoDiario(path: string) {
+  if (!path || path === '..' || path.startsWith(`..${sep}`)) throw new Error('Caminho de transação de sessão inválido.');
+  const file = resolve(SESSIONS_DIR, path);
+  if (!file.startsWith(`${resolve(SESSIONS_DIR)}${sep}`)) throw new Error('Caminho de transação de sessão inválido.');
+  return file;
+}
+
+function recuperarTransacoesDeGridInterrompidas() {
+  for (const name of readdirSync(DATA_DIR).filter((file) => /^grid-penalty-[\w-]+\.json$/.test(file))) {
+    const journalPath = join(DATA_DIR, name);
+    const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as {
+      version?: number;
+      entries?: { before: Session; oldPath: string; targetPath: string; previousFile: boolean }[];
+    };
+    if (journal.version !== 1 || !Array.isArray(journal.entries) || !journal.entries.length) throw new Error(`Diário de punição de grid inválido: ${name}`);
+    for (const entry of journal.entries) {
+      const oldPath = caminhoDeSessaoDoDiario(entry.oldPath);
+      const targetPath = caminhoDeSessaoDoDiario(entry.targetPath);
+      if (entry.previousFile) writeJsonAtomic(oldPath, entry.before);
+      else if (existsSync(targetPath) && statSync(targetPath).isFile()) unlinkSync(targetPath);
+      if (targetPath !== oldPath && existsSync(targetPath) && statSync(targetPath).isFile()) unlinkSync(targetPath);
+    }
+    unlinkSync(journalPath);
+    log(`transação interrompida de punição de grid revertida (${name})`);
+  }
+}
+
 function loadSessionsFromDisk() {
   const filesToLoad: string[] = [];
   for (const entry of readdirSync(SESSIONS_DIR, { withFileTypes: true })) {
@@ -296,6 +347,7 @@ function loadSessionsFromDisk() {
     }
   }
 }
+recuperarTransacoesDeGridInterrompidas();
 loadSessionsFromDisk();
 
 for (const session of sessions.values()) {
@@ -315,9 +367,15 @@ for (const session of sessions.values()) {
   }
 }
 
+/** O que invalida um comando do app. Passagem de kart fica de fora: senão, em corrida, todo comando daria conflito. */
+function assinaturaDeComando(s: Session) {
+  return JSON.stringify([s.state, s.competitors.map((c) => [c.kart, c.name, c.customerId ?? null, c.autoAdded ? 1 : 0, c.penalidades?.length ?? 0, c.flag ?? null]), s.manualPositions ?? {}, s.type === 'equalizacao' ? s.equalizacao ?? null : null]);
+}
+
 function saveSession(s: Session) {
   const targetPath = resolveSessionFilePath(s);
   try {
+    if (s.type === 'equalizacao') invalidarAbertura(storeOperacional, s.competitors.map(c => c.kart));
     writeJsonAtomic(targetPath, s);
     const previousPath = sessionPaths.get(s.id);
     if (previousPath && previousPath !== targetPath && existsSync(previousPath)) {
@@ -325,9 +383,72 @@ function saveSession(s: Session) {
     }
     sessionPaths.set(s.id, targetPath);
     dirtySessions.delete(s.id);
+    moduloApp?.aoSalvarSessao(s.id, assinaturaDeComando(s));
   } catch (err) {
     dirtySessions.add(s.id);
     log(`ERRO ao gravar bateria ${s.name} (${s.id}) no disco; retentando em segundo plano: ${(err as Error).message}`);
+    throw err;
+  }
+}
+
+function salvarSessoesDoGrid(sessoes: Session[], anteriores: Map<string, Session>) {
+  const entries = sessoes.map((session) => {
+    const before = anteriores.get(session.id);
+    if (!before) throw new Error('Snapshot anterior da bateria ausente.');
+    const oldPath = sessionPaths.get(session.id) ?? resolveSessionFilePath(before);
+    const targetPath = resolveSessionFilePath(session);
+    return {
+      id: session.id,
+      before,
+      oldPath,
+      targetPath,
+      previousFile: existsSync(oldPath) && statSync(oldPath).isFile(),
+    };
+  });
+  const journalPath = join(DATA_DIR, `grid-penalty-${randomUUID()}.json`);
+  writeJsonAtomic(journalPath, {
+    version: 1,
+    entries: entries.map(({ before, oldPath, targetPath, previousFile }) => ({
+      before, oldPath: caminhoRelativoDeSessao(oldPath), targetPath: caminhoRelativoDeSessao(targetPath), previousFile,
+    })),
+  });
+  const written: typeof entries = [];
+  const revised: typeof entries = [];
+  try {
+    for (const entry of entries) {
+      writeJsonAtomic(entry.targetPath, sessoes.find((session) => session.id === entry.id)!);
+      written.push(entry);
+    }
+    for (const entry of entries) {
+      if (entry.oldPath !== entry.targetPath && existsSync(entry.oldPath)) {
+        try { unlinkSync(entry.oldPath); } catch { /* melhor esforço */ }
+      }
+      sessionPaths.set(entry.id, entry.targetPath);
+      dirtySessions.delete(entry.id);
+    }
+    for (const entry of entries) {
+      const session = sessoes.find((candidate) => candidate.id === entry.id)!;
+      moduloApp?.aoSalvarSessao(entry.id, assinaturaDeComando(session));
+      revised.push(entry);
+    }
+    unlinkSync(journalPath);
+  } catch (err) {
+    let rollbackOk = true;
+    for (const entry of [...written].reverse()) {
+      try {
+        if (entry.previousFile) writeJsonAtomic(entry.oldPath, entry.before);
+        else if (existsSync(entry.targetPath) && statSync(entry.targetPath).isFile()) unlinkSync(entry.targetPath);
+        if (entry.targetPath !== entry.oldPath && existsSync(entry.targetPath) && statSync(entry.targetPath).isFile()) unlinkSync(entry.targetPath);
+      } catch { rollbackOk = false; }
+    }
+    for (const entry of entries) {
+      sessions.set(entry.id, entry.before);
+      sessionPaths.set(entry.id, entry.oldPath);
+    }
+    for (const entry of revised) moduloApp?.aoSalvarSessao(entry.id, assinaturaDeComando(entry.before));
+    if (rollbackOk) {
+      try { unlinkSync(journalPath); } catch { /* recuperação no próximo início */ }
+    }
     throw err;
   }
 }
@@ -930,6 +1051,7 @@ function stateView() {
       pageSize: PAINEL_LED_PAGE_SIZE,
       updatedAt: painelLedPage.updatedAt,
       origem: painelLedPage.origem,
+      atualizarEm: painelLedPage.atualizarEm,
     },
   };
 }
@@ -964,7 +1086,7 @@ function setTb50Offset(value: unknown, motivo: string) {
 // controle o mesmo painel sem tentar abrir uma porta serial que não existe nele.
 
 const PAINEL_LED_PAGE_FILE = join(DATA_DIR, 'painel-led-page.json');
-let painelLedPage: { pagina: number; updatedAt: string | null; origem: string } = {
+let painelLedPage: { pagina: number; updatedAt: string | null; origem: string; atualizarEm?: string } = {
   pagina: 0,
   updatedAt: null,
   origem: 'inicialização',
@@ -992,6 +1114,14 @@ function setPainelLedPage(value: unknown, origem: string) {
   };
   try { writeJsonAtomic(PAINEL_LED_PAGE_FILE, painelLedPage); } catch { /* continua em memória */ }
   log(`painel LED COM3: posições ${pagina * PAINEL_LED_PAGE_SIZE + 1}-${(pagina + 1) * PAINEL_LED_PAGE_SIZE} (${painelLedPage.origem})`);
+  scheduleStateBroadcast();
+  return painelLedPage;
+}
+
+// Botão "Atualizar painel" de um PC sem a serial: o app do ORBITS vê o novo atualizarEm e reenvia o painel inteiro.
+function pedirAtualizacaoPainelLed(origem: string) {
+  painelLedPage = { ...painelLedPage, atualizarEm: new Date().toISOString() };
+  log(`painel LED COM3: atualização pedida (${origem.trim().slice(0, 80) || 'cronometragem'})`);
   scheduleStateBroadcast();
   return painelLedPage;
 }
@@ -1212,6 +1342,8 @@ let stateTimer: NodeJS.Timeout | null = null;
 const OCULTOS_NA_INTERNET = new Set(['customerId', 'detalhes', 'activeOperators', 'host', 'port']);
 const jsonPublico = (dados: unknown) => JSON.stringify(dados, (k, v) => (OCULTOS_NA_INTERNET.has(k) ? undefined : v));
 const clientesPublicos = new Set<http.ServerResponse>();
+// Apps da cronometragem (/api/events?leve=1): a cada passagem só o que muda; a lista de baterias eles leem no ciclo normal.
+const clientesLeves = new Set<http.ServerResponse>();
 
 function broadcast(event: string, data: unknown) {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -1233,17 +1365,27 @@ function scheduleStateBroadcast(esperaMs = 150) {
   stateTimerAte = ate;
   stateTimer = setTimeout(() => {
     stateTimer = null;
-    if (clients.size) broadcast('state', stateView());
+    for (const avisar of assinantesApp) { try { avisar(); } catch (err) { log('erro no aviso do app', (err as Error).message); } }
+    if (clients.size || clientesLeves.size) {
+      const estado = stateView();
+      if (clients.size) broadcast('state', estado);
+      if (clientesLeves.size) {
+        const { sessions: _sessions, lastQualifying, lastFinished, ...leve } = estado;
+        const payload = `event: state\ndata: ${JSON.stringify(estado.runningId ? leve : { ...leve, lastQualifying, lastFinished })}\n\n`;
+        for (const res of clientesLeves) res.write(payload);
+      }
+    }
     enviarAosPaineis();
   }, esperaMs);
 }
 
 // cronometro na tela anda mesmo sem passagem
 setInterval(() => {
-  if ((clients.size || clientesPainel.size) && runningSession()) scheduleStateBroadcast();
+  if ((clients.size || clientesLeves.size || clientesPainel.size) && runningSession()) scheduleStateBroadcast();
 }, 1_000);
 setInterval(() => {
   for (const res of clients) res.write(': ping\n\n');
+  for (const res of clientesLeves) res.write(': ping\n\n');
   for (const c of clientesPainel) c.res.write(': ping\n\n');
 }, 15_000);
 
@@ -1468,7 +1610,7 @@ function equalizacaoDetalhe(s: Session) {
   return {
     ...equalizacaoResumo(s),
     config: {
-      metaModo: cfg.metaModo ?? 'referencia', metaFixaMs: cfg.metaFixaMs ?? null, referencias: cfg.referencias ?? [], mecanico: cfg.mecanico ?? '', trackId: s.trackId ?? null,
+      frotas: cfg.frotas, metaModo: cfg.metaModo ?? 'referencia', metaFixaMs: cfg.metaFixaMs ?? null, referencias: cfg.referencias ?? [], mecanico: cfg.mecanico ?? '', trackId: s.trackId ?? null,
       ...(({ nome, ...r }) => ({ regraNome: nome, ...r }))(regraDa(cfg)), aberturas: cfg.aberturas ?? {}, redutorInicialMm: cfg.redutorInicialMm ?? {},
     },
     metaDoTracado: metaVigente(trackIdDa(s), s.startedAt ?? s.createdAt),
@@ -1618,6 +1760,7 @@ const depEmail: Dependencias = {
  * mandavam o resultado em dobro para cada piloto e disputavam os mesmos PDFs temporários.
  */
 const filaEmails = new Map<string, Promise<void>>();
+let filaGlobalEmails: Promise<void> = Promise.resolve();
 // Item 14: Redução do limite de bloqueio de 30 min para 3 min por envio
 const LIMITE_ENVIO_EMAILS_MS = 3 * 60_000;
 const envioATodosAtivo = new Set<string>();
@@ -1676,12 +1819,15 @@ function enviarResultadoEmFila(s: Session, op: OpcoesEnvio) {
     void trabalho.finally(() => clearTimeout(timer)).catch(() => undefined);
     return Promise.race([trabalho, limite]);
   };
-  const anterior = filaEmails.get(s.id) ?? Promise.resolve();
+  const anterior = aTodos
+    ? Promise.all([filaEmails.get(s.id) ?? Promise.resolve(), filaGlobalEmails]).then(() => undefined)
+    : (filaEmails.get(s.id) ?? Promise.resolve());
   const atual = anterior.then(tarefa, tarefa);
   const marca = atual.then(() => undefined, () => undefined);
   // Em timeout, atual já rejeitou mas o trabalho SMTP continua. Mantemos uma trava até sua liquidação real.
   const bloqueio: Promise<void> = Promise.all([marca, iniciou.then(() => trabalhoReal)]).then(() => undefined);
   filaEmails.set(s.id, bloqueio);
+  if (aTodos) filaGlobalEmails = bloqueio;
   void bloqueio.then(() => {
     if (aTodos) envioATodosAtivo.delete(s.id);
     if (filaEmails.get(s.id) === bloqueio) filaEmails.delete(s.id);
@@ -1821,14 +1967,22 @@ function assinaturaResultado(s: Session) {
 setInterval(() => {
   const agora = Date.now();
   const limite = agora - 6 * 3_600_000;
+  const limiteQuota = agora - 36 * 3_600_000;
+  let disparouEmailNesteCiclo = envioATodosAtivo.size > 0;
   for (const s of sessions.values()) {
     const e = s.emailsResultado;
     const fim = s.finishedAt ?? s.createdAt;
-    if (s.state !== 'encerrada' || fim <= limite || emailsAgendados.has(s.id)) continue;
+    const bloqueadoPorQuota = e?.falhas.some((f) => ehErroLimitePorHora(f.erro)) ?? false;
+    if (s.state !== 'encerrada' || fim <= (bloqueadoPorQuota ? limiteQuota : limite) || emailsAgendados.has(s.id)) continue;
     const suprimidoHistorico100Milhas = e?.status === 'sem-email-pilotos' && /100\s*milhas/i.test(`${nomeEventoDa(s)} ${s.name}`);
     const horaRetry = e?.proximaTentativaEm ?? 0;
-    const possuiFalhaTransitoria = e?.falhas.some((f) => !f.permanente) ?? false;
-    if (suprimidoHistorico100Milhas || (e ? (e.status === 'parcial' || e.status === 'falhou') && possuiFalhaTransitoria && e.tentativas < 12 && agora >= horaRetry : fim < agora - 3 * 60_000)) void emailsAoEncerrar(s);
+    const possuiFalhaTransitoria = e?.falhas.some((f) => !f.permanente || ehErroLimitePorHora(f.erro)) ?? false;
+    const statusRetentavel = e?.status === 'parcial' || e?.status === 'falhou' || (e?.status === 'falhou-permanente' && possuiFalhaTransitoria);
+    const maxTentativas = bloqueadoPorQuota ? 60 : 12;
+    if (!disparouEmailNesteCiclo && (suprimidoHistorico100Milhas || (e ? statusRetentavel && possuiFalhaTransitoria && e.tentativas < maxTentativas && agora >= horaRetry : fim < agora - 3 * 60_000))) {
+      disparouEmailNesteCiclo = true;
+      void emailsAoEncerrar(s);
+    }
     if (fim < agora - 3 * 60_000) void publicarNoAppAutomatico(s);
   }
 }, 60_000);
@@ -2162,6 +2316,7 @@ function crossingRows(s: Session) {
     invalid: Boolean(crossing.invalid),
     deleted: Boolean(crossing.deleted),
     source: crossing.source ?? 'decoder',
+    estimada: crossing.estimada ?? false, referenciaKart: crossing.referenciaKart, referenciaPassagem: crossing.referenciaPassagem,
     assigned: Boolean(crossing.originalKart && crossing.originalKart !== competitor.kart),
     rejected: false,
     reason: null as string | null,
@@ -2181,6 +2336,7 @@ function crossingRows(s: Session) {
     invalid: false,
     deleted: false,
     source: 'decoder',
+    estimada: false, referenciaKart: undefined, referenciaPassagem: undefined,
     assigned: false,
     rejected: true,
     reason: r.reason as string | null,
@@ -2353,6 +2509,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
   if (path === '/api/painel-led-page' && (method === 'PUT' || method === 'POST')) {
     const body = await readBody(req);
     try {
+      if (body.atualizar === true) return send(res, 200, pedirAtualizacaoPainelLed(String(body.origem ?? 'cronometragem')));
       return send(res, 200, setPainelLedPage(body.pagina, String(body.origem ?? 'cronometragem')));
     } catch (err) {
       return send(res, 400, { error: (err as Error).message });
@@ -2382,7 +2539,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     });
     const publico = veioDaInternet(req);
     res.write(`event: state\ndata: ${publico ? jsonPublico(stateView()) : JSON.stringify(stateView())}\n\n`);
-    const lista = publico ? clientesPublicos : clients;
+    const lista = publico ? clientesPublicos : url.searchParams.get('leve') === '1' ? clientesLeves : clients;
     lista.add(res);
     req.on('close', () => lista.delete(res));
     return;
@@ -2520,6 +2677,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     if (!s) return send(res, 404, { error: 'Bateria não encontrada.' });
     try {
       const body = await readBody(req);
+      if (s.type !== 'equalizacao' && bloqueioKart(String(body.toKart ?? body.kartNovo ?? '').trim())) return send(res, 409, { error: 'Kart de destino bloqueado pela gestão de frota.' });
       const troca = swapKart(s, {
         fromKart: String(body.fromKart ?? body.kartAtual ?? '').trim(),
         toKart: String(body.toKart ?? body.kartNovo ?? '').trim(),
@@ -2698,8 +2856,21 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     const body = await readBody(req);
     const tid = body.trackId ? String(body.trackId) : null;
     if (tid && !catalog.tracks.some((t) => t.id === tid)) return send(res, 400, { error: 'Traçado não encontrado.' });
+    const frotas: NonNullable<ConfigEqualizacao['frotas']> = {};
+    if (body.frotas != null) {
+      if (typeof body.frotas !== 'object' || Array.isArray(body.frotas)) return send(res, 400, { error: 'Frotas inválidas.' });
+      for (const frota of ['LIGHT', 'SUPER'] as const) {
+        const entrada = (body.frotas as Record<string, { referencias?: unknown; regra?: unknown }>)[frota];
+        if (!entrada) continue;
+        const refs = Array.isArray(entrada.referencias) ? entrada.referencias.map(String) : [];
+        if (!refs.length || refs.length > 3 || refs.some(k => !/^\d+$/.test(k) || !kartsCadastrados().includes(k) || (Number(k) >= 100 ? 'SUPER' : 'LIGHT') !== frota) || !regrasRedutor.some(r => r.id === entrada.regra)) return send(res, 400, { error: `Informe referências e regra válidas para ${frota}.` });
+        frotas[frota] = { ...regraDoPedido({ regra: entrada.regra }), referencias: refs, metaModo: 'referencia' };
+      }
+      if (!Object.keys(frotas).length) return send(res, 400, { error: 'Selecione pelo menos uma frota.' });
+      body.referencias = Object.values(frotas).flatMap(f => f!.referencias ?? []);
+    }
     const referencias = [...new Set((Array.isArray(body.referencias) ? body.referencias : String(body.referencias ?? '').split(/[;, ]+/)).map((k: unknown) => String(k).trim().replace(/^0+(?=\d)/, '')).filter(Boolean))];
-    if (referencias.length > 3) return send(res, 400, { error: 'Use 2 ou 3 karts referência.' });
+    if (referencias.length > (Object.keys(frotas).length ? 6 : 3)) return send(res, 400, { error: 'Use 2 ou 3 karts referência.' });
     if (String(body.metaSeg ?? '').trim() && !tempoVoltaParaMs(body.metaSeg)) return send(res, 400, { error: META_INVALIDA });
     let regra: ReturnType<typeof regraDoPedido>;
     try { regra = regraDoPedido(body); } catch (err) { return send(res, 400, { error: (err as Error).message }); }
@@ -2714,6 +2885,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     s.trackId = tid;
     aplicarCondicaoDoTracado(s);
     s.equalizacao = {
+      ...(Object.keys(frotas).length ? { frotas } : {}),
       referencias, metaModo: body.metaModo === 'fixa' ? 'fixa' : 'referencia', metaFixaMs: tempoVoltaParaMs(body.metaSeg),
       ...regra, mecanico: String(body.mecanico ?? '').trim().slice(0, 80), checklist: {}, aberturas: {}, redutorInicialMm: {},
     };
@@ -2789,11 +2961,11 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
             const atual = resultadoEqualizacao(s).karts.find((k) => k.kart === kart);
             const completos = atual?.blocos.filter((b) => b.completo) ?? [];
             const ultimo = completos[completos.length - 1];
-            const pedido = body.confirmacaoManual as { aberturaMm?: unknown };
+            const pedido = body.confirmacaoManual as { aberturaMm?: unknown; semTeste?: boolean };
             const aberturaMm = milimetros(pedido.aberturaMm);
-            if (!atual || atual.referencia || !ultimo || atual.melhorMs == null || aberturaMm == null || Math.abs(aberturaMm) > 20 || resultadoEqualizacao(s).metaMs == null)
+            if (!atual || atual.referencia || aberturaMm == null || Math.abs(aberturaMm) > 20 || (pedido.semTeste !== true && (!ultimo || atual.melhorMs == null || (atual.metaMs ?? resultadoEqualizacao(s).metaMs) == null)))
               return send(res, 400, { error: 'Para confirmar manualmente, informe um ajuste de até 20 mm para um kart não referência com bloco completo e meta definida nesta equalização.' });
-            confirmacaoManual = { aberturaMm, bloco: ultimo.bloco, confirmadoEm: Date.now(), autor: String(body.autor ?? 'Cronometragem').slice(0, 60) };
+            confirmacaoManual = { aberturaMm, bloco: ultimo?.bloco ?? 0, semTeste: pedido.semTeste === true, voltasNaConfirmacao: atual.voltas, confirmadoEm: Date.now(), autor: String(body.autor ?? 'Cronometragem').slice(0, 60) };
           }
         }
         const entrada = (body.sistemas ?? {}) as Record<string, { status?: string; nota?: string }>;
@@ -2907,7 +3079,9 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     const s = sessions.get(so[1]);
     if (!s) return send(res, 404, { error: 'Bateria não encontrada.' });
     if (method === 'GET') {
-      const pilotos = pilotosDoSorteio(s, sessions.values(), mesmoPrograma);
+      const irmas = new Set(irmasDe(s).map((x) => x.id));
+      const ehDaMesmaBateria = (a: Session, b: Session) => mesmoPrograma(a, b) || (a.id === s.id && irmas.has(b.id)) || (b.id === s.id && irmas.has(a.id));
+      const pilotos = pilotosDoSorteio(s, sessions.values(), ehDaMesmaBateria);
       const pesos = new Map<string, number>();
       const ids = pilotos.map((p) => p.customerId).filter(Boolean).join(',');
       if (ids) {
@@ -2920,7 +3094,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       }
       return send(res, 200, {
         sessao: { id: s.id, name: s.name, type: s.type, state: s.state, createdAt: s.createdAt, eventId: s.eventId ?? null },
-        programa: [...sessions.values()].filter((x) => mesmoPrograma(s, x)).map((x) => ({ id: x.id, name: x.name, state: x.state })),
+        programa: [...sessions.values()].filter((x) => ehDaMesmaBateria(s, x)).map((x) => ({ id: x.id, name: x.name, state: x.state })),
         tipoKart: await tipoKartDa(s),
         karts: kartsCadastrados(),
         pilotos: pilotos.map((p) => ({ ...p, pesoKg: p.customerId ? pesos.get(p.customerId) ?? null : null })),
@@ -2930,6 +3104,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       const body = await readBody(req);
       const atribuicoes = (Array.isArray(body.atribuicoes) ? body.atribuicoes : []) as Atribuicao[];
       try {
+        if (s.type !== 'equalizacao' && atribuicoes.some(a => bloqueioKart(String(a.kart)))) throw new Error('Há kart bloqueado pela gestão de frota no sorteio.');
         validarSorteio(s, atribuicoes, new Set(kartsCadastrados()));
       } catch (err) { return send(res, err instanceof ListaMudouError ? 409 : 400, { error: (err as Error).message }); }
       const nomes = atribuicoes.map((a) => `${s.competitors[Number(a.indice)]?.name ?? '?'} → kart ${a.kart}`);
@@ -2939,8 +3114,8 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       (s.observations ??= []).push({ id: randomUUID(), text: texto, wallMs: Date.now(), author: 'Sorteio', kind: 'system' });
       saveSession(s);
       log(`bateria ${s.name}: ${texto}`);
-      for (const irma of sessions.values()) {
-        if (mesmoPrograma(s, irma) && copiarCompetidores(irma, s)) { saveSession(irma); log(`competidores de ${s.name} copiados para ${irma.name}`); }
+      for (const irma of irmasDe(s)) {
+        if (copiarCompetidores(irma, s)) { saveSession(irma); log(`competidores de ${s.name} copiados para ${irma.name}`); }
       }
       scheduleStateBroadcast();
       return send(res, 200, { ...sessionView(s), gravadoEm: Date.now() });
@@ -2953,28 +3128,46 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     const s = sessions.get(pen[1]);
     if (!s) return send(res, 404, { error: 'Bateria não encontrada.' });
     const kart = decodeURIComponent(pen[2]);
+    let destinos: Session[] = [];
+    let anteriores = new Map<string, Session>();
     try {
       if (method === 'POST') {
         const body = await readBody(req);
         const tipo = String(body.tipo ?? '') === 'tempo' ? 'tempo' : String(body.tipo ?? '') === 'advertencia' ? 'advertencia' : null;
         if (!tipo) return send(res, 400, { error: 'Tipo de penalidade inválido.' });
         const autor = String(body.autor ?? 'Cronometragem').slice(0, 60);
+        destinos = body.infracao === 'largar-ultimo' ? irmasDe(s).filter(x => x.type === 'corrida' && x.state === 'preparando' && mesmoPrograma(s, x)) : [];
+        if (body.infracao === 'largar-ultimo' && (destinos.length !== 1 || !destinos[0].competitors.some(c => { const piloto = s.competitors.find(x => x.kart === kart); return piloto && (piloto.customerId ? piloto.customerId === c.customerId : piloto.name.trim().toLowerCase() === c.name.trim().toLowerCase()); }))) return send(res, 409, { error: 'Não há uma única corrida vinculada e preparada para alterar o grid.' });
+        anteriores = new Map([s, ...destinos].map((session) => [session.id, JSON.parse(JSON.stringify(session)) as Session]));
         const { competitor, penalidade } = addPenalty(s, kart, {
-          id: randomUUID(), tipo, segundos: body.segundos == null ? undefined : Number(String(body.segundos).replace(',', '.')),
+          id: randomUUID(), tipo, infracao: body.infracao == null ? undefined : String(body.infracao), segundos: body.segundos == null ? undefined : Number(String(body.segundos).replace(',', '.')),
           motivo: body.motivo == null ? undefined : String(body.motivo), wallMs: Date.now(), autor,
           // texto padrão: o cronometrista informa só o kart atingido e a curva; a volta é a que o kart está agora
           kartAtingido: body.kartAtingido == null ? undefined : String(body.kartAtingido),
           curva: body.curva == null ? undefined : String(body.curva),
           volta: body.volta == null || body.volta === '' ? undefined : Number(body.volta),
         });
+        for (const destino of destinos) aplicarLargadaUltimo(s, destino);
         registrarObservacao(s, `${penalidade.texto} (${competitor.name})`, autor, 'penalty');
       } else {
         if (!pen[3]) return send(res, 400, { error: 'Informe a penalidade.' });
+        const penalidadeExistente = s.competitors.find((x) => x.kart === kart)?.penalidades?.find((x) => x.id === pen[3]);
+        const piloto = s.competitors.find((x) => x.kart === kart);
+        const chavePiloto = piloto?.customerId ? `id:${piloto.customerId}` : `nome:${piloto?.name.trim().toLowerCase()}`;
+        if (penalidadeExistente?.infracao === 'largar-ultimo' && chavePiloto) {
+          destinos = irmasDe(s).filter(x => x.type === 'corrida' && x.state === 'preparando' && mesmoPrograma(s, x) && x.gridUltimos?.includes(chavePiloto));
+        }
+        anteriores = new Map([s, ...destinos].map((session) => [session.id, JSON.parse(JSON.stringify(session)) as Session]));
         const { competitor, penalidade } = removePenalty(s, kart, pen[3]);
+        if (penalidade.infracao === 'largar-ultimo') for (const destino of destinos) aplicarLargadaUltimo(s, destino);
         registrarObservacao(s, `Retirada de ${competitor.name}: ${penalidade.texto ?? textoPenalidade(penalidade)}`, 'Cronometragem', 'penalty');
       }
-    } catch (err) { return send(res, 400, { error: (err as Error).message }); }
-    saveSession(s);
+      if (destinos.length) salvarSessoesDoGrid([s, ...destinos], anteriores);
+      else saveSession(s);
+    } catch (err) {
+      for (const [id, anterior] of anteriores) sessions.set(id, anterior);
+      return send(res, 400, { error: (err as Error).message });
+    }
     scheduleStateBroadcast();
     return send(res, 200, sessionView(s));
   }
@@ -3010,6 +3203,13 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para consultar destinatários e resultado dos e-mails.' });
         return send(res, 200, s.emailsResultado ?? null);
       }
+      if (action === 'republicar-app' && !m[3] && method === 'POST') {
+        // só nesta máquina: reenvia ao app de clientes depois de corrigir nome ou pilotos de bateria já encerrada
+        if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado.' });
+        publicadosNoApp.delete(s.id);
+        await publicarNoAppAutomatico(s);
+        return send(res, 200, { ok: publicadosNoApp.has(s.id) });
+      }
       if (action === 'emails' && !m[3] && method === 'POST') {
         if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para reenvio de resultados.' });
         // reenvio manual (menu da cronometragem): todos, só um kart, ou o resultado oficial para outro endereço
@@ -3022,7 +3222,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
           if (!lerConfig(EMAIL_FILE).senha && !SIMULATE) return send(res, 400, { error: 'E-mail não configurado: preencha a conta de e-mail do kartódromo em Ferramentas › E-mail dos resultados.' });
           if (envioATodosAtivo.has(s.id)) return send(res, 409, { error: 'O resultado desta bateria já está sendo enviado a todos os pilotos. Aguarde terminar.' });
           // somenteFaltantes: só quem ainda não recebeu; atrasado: abre com o pedido de desculpas (reenvio de 13/10)
-          void enviarResultadoEmFila(s, { automatico: false, somenteFaltantes: body.somenteFaltantes === true, atrasado: body.atrasado === true }).catch((e) => log(`e-mail do resultado de ${s.name}: ${(e as Error).message}`));
+          void enviarResultadoEmFila(s, { automatico: false, somenteFaltantes: body.somenteFaltantes === true, atrasado: body.atrasado === true, aviso: typeof body.aviso === 'string' ? body.aviso.trim().slice(0, 400) : undefined, assinaturaResultado: assinaturaResultado(s) }).catch((e) => log(`e-mail do resultado de ${s.name}: ${(e as Error).message}`));
           return send(res, 202, { emSegundoPlano: true });
         }
         return send(res, 200, await enviarResultadoEmFila(s, { automatico: false, kart, para, organizador: Boolean(para) && body.organizador === true }));
@@ -3060,6 +3260,20 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
           rows = rows.slice(0, limit);
         }
         return send(res, 200, rows);
+      }
+      if (action === 'passings' && ['recover', 'tap'].includes(m[3]) && method === 'POST') {
+        if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para recuperar ou marcar passagens.' });
+        const body = await readBody(req);
+        try {
+          const kart = String(body.kart ?? '').trim();
+          const id = String(body.operationId ?? randomUUID());
+          const resultado = m[3] === 'tap'
+            ? marcarPassagemManual(s, kart, now, id)
+            : recuperarVoltas(s, { kart, referencia: String(body.referencia ?? ''), quantidade: Number(body.quantidade), posicao: Number(body.posicao), now, id });
+          registrarObservacao(s, `${m[3] === 'tap' ? 'Passagem manual ao toque' : `Voltas recuperadas: ${body.quantidade}; posição ${body.posicao}; referência kart ${body.referencia}`} · kart ${kart}. ${String(body.motivo ?? '')}`, String(body.autor ?? 'Cronometragem'), 'system');
+          saveSession(s); scheduleStateBroadcast();
+          return send(res, 200, resultado);
+        } catch (err) { return send(res, 400, { error: (err as Error).message }); }
       }
       if (action === 'passings' && m[3] === 'manual' && method === 'POST') {
         const body = await readBody(req);
@@ -3103,6 +3317,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         };
         const flag = flags[String(body.flag ?? '')];
         if (!flag) return send(res, 400, { error: 'Bandeira inválida.' });
+        if (flag === 'green') exigirFrotaLiberada(s);
         if (flag === 'green' && body.relargar && s.state !== 'preparando') {
           // relargada: as passagens de antes não contam e o cronômetro volta a zero até o 1º kart passar na linha
           relargar(s, now, String(body.autor ?? 'Cronometragem'));
@@ -3145,9 +3360,10 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         const bruto = body.position;
         const limpar = bruto === null || bruto === undefined || String(bruto).trim() === '' || Number(bruto) === 0;
         const position = limpar ? null : Number(bruto);
-        setManualPosition(s, kart, position);
+        const { voltasAdicionadas } = ajustarPosicaoComVoltas(s, kart, position, trackLengthFor(s));
         const autor = String(body.autor ?? 'Cronometragem').slice(0, 60);
-        registrarObservacao(s, limpar ? `Posição automática restaurada · Kart ${kart}` : `Posição manual · Kart ${kart} → P${position}`, autor, limpar ? 'system' : 'manual');
+        const voltasCriadas = voltasAdicionadas > 0 ? ` · ${voltasAdicionadas} volta${voltasAdicionadas === 1 ? '' : 's'} estimada${voltasAdicionadas === 1 ? '' : 's'}` : '';
+        registrarObservacao(s, limpar ? `Posição automática restaurada · Kart ${kart}` : `Posição manual · Kart ${kart} → P${position}${voltasCriadas}`, autor, limpar ? 'system' : 'manual');
         saveSession(s);
         scheduleStateBroadcast();
         return send(res, 200, sessionView(s));
@@ -3203,6 +3419,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         if (!isAuthorizedDestructive(req)) return send(res, 403, { error: 'Acesso não autorizado para reiniciar a bateria.' });
         const body = await readBody(req);
         if (body.largar) {
+          exigirFrotaLiberada(s);
           const other = runningSession();
           if (other && other.id !== s.id) return send(res, 409, { error: `Já existe bateria em andamento: ${other.name}. Encerre ela antes.` });
           relargar(s, now, String(body.autor ?? 'Cronometragem'));
@@ -3213,6 +3430,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
       } else if (action === 'start' && method === 'POST') {
         const other = runningSession();
         if (other && other.id !== s.id) return send(res, 409, { error: `Ja existe bateria em andamento: ${other.name}. Encerre ela antes.` });
+        exigirFrotaLiberada(s);
         startSession(s, now);
         log(`bateria ${s.name}: BANDEIRA VERDE, aguardando o primeiro kart passar na linha`);
         setTb50Offset(0, 'bandeira verde');
@@ -3413,6 +3631,79 @@ function isAuthorizedDestructive(req: http.IncomingMessage): boolean {
   return false;
 }
 
+/** O app usa as mesmas rotas do programa Windows, por dentro: nenhuma regra de prova é duplicada. */
+async function chamarLegadoLocal(metodo: string, caminho: string, corpo?: unknown) {
+  let r: Response;
+  try {
+    r = await fetch(`http://127.0.0.1:${PORT}${caminho}`, {
+      method: metodo, signal: AbortSignal.timeout(20_000),
+      headers: { 'content-type': 'application/json', 'x-client-machine': process.env.COMPUTERNAME ?? '', 'x-timing-key': process.env.TIMING_OPS_KEY ?? '' },
+      ...(corpo === undefined ? {} : { body: JSON.stringify(corpo) }),
+    });
+  } catch (err) {
+    // sem resposta o comando pode ter sido aplicado: fica UNKNOWN, nunca repete sozinho
+    throw Object.assign(new Error((err as Error).message), { desconhecido: true });
+  }
+  const dados = await r.json().catch(() => ({})) as { error?: string };
+  if (!r.ok) throw Object.assign(new ErroLegado(dados.error ?? `Cronometragem respondeu ${r.status}`), { desconhecido: r.status >= 500 });
+  return dados;
+}
+
+async function inscricoesDaRecepcao(agendaId: number): Promise<Inscricao[]> {
+  if (!process.env.OPS_SQL_PASSWORD) {
+    if (SIMULATE && process.env.TIMING_SIM_INSCRICOES_JSON) return JSON.parse(process.env.TIMING_SIM_INSCRICOES_JSON) as Inscricao[];
+    throw new Error('Banco da recepção não configurado.');
+  }
+  const { query } = await import('../lib/ops/db');
+  return await query(`SELECT c.Id clienteId, c.Nome nome, i.Aprovada aprovada, i.Pago pago,
+      CAST(CASE WHEN i.TermoImpressoEm IS NULL THEN 0 ELSE 1 END AS bit) termo,
+      ISNULL(i.PrecoCentavos, p.PrecoCentavos) - i.DescontoCentavos totalCentavos,
+      CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.EnduranceEvento ev WHERE ev.BateriaId = i.BateriaId AND ev.Ativo = 1) THEN 1 ELSE 0 END AS bit) endurance
+    FROM dbo.Inscricao i JOIN dbo.Cliente c ON c.Id = i.ClienteId JOIN dbo.Bateria b ON b.Id = i.BateriaId LEFT JOIN dbo.Produto p ON p.Id = ISNULL(i.ProdutoId, b.ProdutoId)
+    WHERE i.BateriaId = @id AND i.Status <> 'cancelada'`, { id: agendaId }) as Inscricao[];
+}
+
+/** Horários da agenda de hoje para o app; falha na consulta mantém o último resultado. */
+let inicioPorAgenda: ReadonlyMap<string, string> = new Map();
+async function atualizarInicioPorAgenda() {
+  const data = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+  const lista = await opsGet(`/api/baterias?data=${data}`).catch(() => null) as { id?: unknown; inicio?: unknown }[] | null;
+  if (Array.isArray(lista)) inicioPorAgenda = new Map(lista.map((b) => [String(b.id), String(b.inicio ?? '')]));
+}
+void atualizarInicioPorAgenda();
+setInterval(() => void atualizarInicioPorAgenda(), 60_000).unref();
+
+function ligarAppOperacional() {
+  const segredo = process.env.APP_V1_TOKEN_SECRET ?? '';
+  if (!segredo) return;
+  try {
+    const store = abrirStore(join(DATA_DIR, '..', 'app-operacional', 'app.db'));
+    storeOperacional = store;
+    marcarPendentesComoDesconhecidas(store);
+    moduloApp = criarModuloApp({
+      store, segredo, gatewaySegredo: process.env.APP_V1_GATEWAY_SECRET,
+      legado: chamarLegadoLocal,
+      inscricoes: inscricoesDaRecepcao,
+      listarSessoes: sortedSessions,
+      inicioPorAgenda: () => inicioPorAgenda,
+      kartsCadastrados,
+      verSessao: (id) => sessions.get(id),
+      assinarMudancas: (cb) => { assinantesApp.add(cb); return () => assinantesApp.delete(cb); },
+    });
+    log('app operacional ligado');
+  } catch (err) {
+    log('app operacional indisponível', (err as Error).message);
+  }
+}
+ligarAppOperacional();
+let atualizandoTemposGalpao = false;
+setInterval(() => {
+  if (!moduloApp || atualizandoTemposGalpao) return;
+  atualizandoTemposGalpao = true;
+  void moduloApp.atualizarTemposGalpao().catch(err => log('contador do galpão indisponível', (err as Error).message))
+    .finally(() => { atualizandoTemposGalpao = false; });
+}, 10_000).unref();
+
 const server = http.createServer((req, res) => {
   recordOperatorMachine(req);
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
@@ -3424,6 +3715,15 @@ const server = http.createServer((req, res) => {
     }
   }
 
+  // antes do bloqueio de internet: nestas rotas quem decide é o login do usuário, nunca a origem do pedido
+  if (url.pathname.startsWith('/api/app/v1/')) {
+    if (!moduloApp) return send(res, 503, { codigo: 'UNAVAILABLE', erro: 'App operacional indisponível.' });
+    void moduloApp.tratar(req, res, url).catch((err) => {
+      log('erro na API do app', err);
+      if (!res.headersSent) send(res, 500, { codigo: 'SERVER_ERROR', erro: 'Erro interno.' });
+    });
+    return;
+  }
   if (veioDaInternet(req) && !((req.method === 'GET' || req.method === 'HEAD') && isAllowedPublicReadPath(url.pathname))) {
     res.writeHead(403, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
     return res.end(JSON.stringify({ error: 'Acesso só pela rede do kartódromo.' }));

@@ -397,7 +397,13 @@ public class Grade : DataGridView
                 e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.None;
                 var sel = (e.State & DataGridViewElementStates.Selected) != 0;
                 using (var fundo = new SolidBrush(sel ? e.CellStyle.SelectionBackColor : e.CellStyle.BackColor)) e.Graphics.FillRectangle(fundo, e.CellBounds);
-                e.PaintContent(e.CellBounds);
+                if (ComMarcacao && Columns[e.ColumnIndex].Name == "__sel")
+                {
+                    const int lado = 14;
+                    var caixaLinha = new Rectangle(e.CellBounds.X + (e.CellBounds.Width - lado) / 2, e.CellBounds.Y + (e.CellBounds.Height - lado) / 2, lado, lado);
+                    ControlPaint.DrawCheckBox(e.Graphics, caixaLinha, e.Value is true ? ButtonState.Checked : ButtonState.Normal);
+                }
+                else e.PaintContent(e.CellBounds);
                 using (var fina = new Pen(GridColor)) e.Graphics.DrawLine(fina, e.CellBounds.Left, e.CellBounds.Bottom - 1, e.CellBounds.Right, e.CellBounds.Bottom - 1);
                 e.Handled = true;
                 return;
@@ -623,12 +629,14 @@ public class Grade : DataGridView
         if (assinatura == _assinaturaDados && Rows.Count == Visiveis.Count) { _todos = lista; return; }
         _assinaturaDados = assinatura;
         var selIds = Selecionados.Select(x => x.S("id")).ToHashSet();
+        var marcIds = ComMarcacao ? Marcados.Select(x => x.S("id")).ToHashSet() : null;
         _todos = lista;
-        Redesenhar(selIds);
+        Redesenhar(selIds, marcIds);
     }
 
-    void Redesenhar(HashSet<string> selIds = null)
+    void Redesenhar(HashSet<string> selIds = null, HashSet<string> marcIds = null)
     {
+        marcIds ??= ComMarcacao && Columns.Count > 0 ? Marcados.Select(x => x.S("id")).ToHashSet() : null;
         var sortCol = SortedColumn;
         var sortDir = SortOrder;
         // guarda onde a pessoa estava: a lista se atualiza sozinha e não pode voltar para o topo nem perder a linha atual
@@ -642,7 +650,7 @@ public class Grade : DataGridView
         foreach (var o in Visiveis)
         {
             var vals = new List<object>();
-            if (ComMarcacao) vals.Add(false);
+            if (ComMarcacao) vals.Add(marcIds?.Contains(o.S("id")) ?? false);
             vals.AddRange(_cols.Select(c => Valor(o, c)));
             var r = (DataGridViewRow)RowTemplate.Clone();   // molde da tela (altura da linha etc.), como o Rows.Add fazia
             r.CreateCells(this, vals.ToArray());
