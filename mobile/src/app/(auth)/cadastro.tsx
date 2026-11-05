@@ -106,7 +106,7 @@ export default function RegistrationScreen() {
         <Entrada>
           <View style={{ backgroundColor: 'rgba(34,197,94,0.12)', borderWidth: 1, borderColor: palette.neonGreen, borderRadius: 16, padding: 14, marginBottom: 18, gap: 6 }}>
             <Text style={{ color: palette.text, fontWeight: '800', fontSize: 15 }}>🏁 Você já é piloto do kartódromo!</Text>
-            <Text style={[styles.muted, { fontSize: 14, lineHeight: 20 }]}>{existente.email ? <>Para trazer todo o seu histórico de corridas, use o mesmo e-mail do seu cadastro: <Text style={{ color: palette.text, fontWeight: '800' }}>{existente.email}</Text> (ou o mesmo celular).</> : 'Use o mesmo celular do seu cadastro na recepção para trazer todo o seu histórico de corridas.'}</Text>
+            <Text style={[styles.muted, { fontSize: 14, lineHeight: 20 }]}>Todo o seu histórico de corridas aparece sozinho assim que você confirmar o e-mail. {existente.email ? <>Usando o mesmo e-mail do cadastro (<Text style={{ color: palette.text, fontWeight: '800' }}>{existente.email}</Text>) ou o mesmo celular, seus dados pessoais também já vêm preenchidos.</> : 'Usando o mesmo celular do cadastro, seus dados pessoais também já vêm preenchidos.'}</Text>
           </View>
         </Entrada>
       ) : null}

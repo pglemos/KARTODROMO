@@ -51,9 +51,9 @@ describe('configuração de distribuição móvel', () => {
     const expo = readJson<AppConfig>(appJsonPath)?.expo;
     const registration = readFileSync(registrationPath, 'utf8');
     expect(expo?.ios?.bundleIdentifier).toBe('br.com.kartodromobetim.app');
-    expect(expo?.ios?.buildNumber).toBe('1');
+    expect(expo?.ios?.buildNumber).toBe('42');
     expect(expo?.android?.package).toBe('br.com.kartodromobetim.app');
-    expect(expo?.android?.versionCode).toBe(1);
+    expect(expo?.android?.versionCode).toBe(42);
     expect(expo?.icon).toBe('./assets/app-icon.png');
     expect(existsSync(resolve(mobileRoot, 'assets/app-icon.png'))).toBe(true);
     expect(expo?.android?.adaptiveIcon?.foregroundImage).toBe('./assets/adaptive-icon.png');
@@ -114,7 +114,7 @@ describe('configuração de distribuição móvel', () => {
   it('mantém segredos fora da configuração do app', () => {
     const eas = readJson<EasConfig>(easJsonPath);
     const clientConfig = `${readFileSync(appJsonPath, 'utf8')}\n${JSON.stringify(eas ?? {})}`;
-    expect(clientConfig).not.toMatch(/MOBILE_(?:PUBLISH|ADMIN)_TOKEN|ASAAS_API_KEY|RESEND_API_KEY|EXPO_TOKEN/);
+    expect(clientConfig).not.toMatch(/MOBILE_(?:PUBLISH|ADMIN)_TOKEN|STONE_API_KEY|RESEND_API_KEY|EXPO_TOKEN/);
   });
 
   testMonorepo('[monorepo] usa apenas o secret EXPO_TOKEN na automação mobile', () => {

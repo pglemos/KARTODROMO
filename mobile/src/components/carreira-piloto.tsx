@@ -16,6 +16,7 @@ import { Entrada, tap, ListaEsqueleto } from './motion';
 import { BotaoCompartilhar } from './cartao-compartilhar';
 import { RegrasRanking } from './ranking-regras';
 import { useUi } from './theme';
+import { useFloatingTabBarClearance } from './floating-tab-bar';
 import { MobileApiError } from '../api/client';
 import { formatarDia, formatarVolta, rankingApi, type CarreiraPiloto, type PosicaoRanking } from '../features/ranking/api';
 import { categoriaDe, conquistasDe, nomeBonito, xpDe } from '../features/ranking/gamificacao';
@@ -39,7 +40,7 @@ function Cartao({ titulo, children, index = 0 }: { titulo?: string; children: Re
   const k = useK();
   return (
     <Entrada index={index}>
-      <View style={{ backgroundColor: '#0E1211', borderRadius: 16 * k, padding: 23 * k, borderWidth: 1, borderColor: '#1F2422', gap: 18 * k, marginHorizontal: (33 - 16 / k) * k }}>
+      <View style={{ backgroundColor: '#0E1211', borderRadius: 16 * k, padding: 23 * k, borderWidth: 1, borderColor: palette.border, gap: 18 * k, marginHorizontal: (33 - 16 / k) * k }}>
         {titulo ? <Text style={{ color: palette.text, fontSize: 21 * k, fontWeight: '700' }}>{titulo}</Text> : null}
         {children}
       </View>
@@ -69,6 +70,7 @@ const posTexto = (p: PosicaoRanking | null) => (p ? `${p.pos}º de ${p.de}` : '�
 
 export default function CarreiraPilotoTela({ id, aba = false }: { id: string; aba?: boolean }) {
   const { palette, styles } = useUi();
+  const bottomClearance = useFloatingTabBarClearance();
   const { session } = useSession();
   const eu = id === 'eu';
   const [dados, setDados] = useState<CarreiraPiloto | null>(null);
@@ -171,12 +173,13 @@ export default function CarreiraPilotoTela({ id, aba = false }: { id: string; ab
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 140, gap: 14, width: '100%', maxWidth: 640, alignSelf: 'center' }}
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomClearance, gap: 14, width: '100%', maxWidth: 640, alignSelf: 'center' }}
         refreshControl={<RefreshControl refreshing={carregando} onRefresh={() => void carregar()} tintColor={palette.accent} />}>
         <View style={{ marginHorizontal: -16 }}>
           <CarreiraTopo dados={dados} xp={xp} cat={cat} eu={eu} versaoFoto={versaoFoto} enviandoFoto={enviandoFoto} onFoto={menuFoto} />
         </View>
         <View style={{ alignItems: 'flex-end' }}><BotaoCompartilhar dados={dados} xp={xp} cat={cat} versaoFoto={versaoFoto} /></View>
+        {eu ? <Text style={{ color: palette.textMuted, fontSize: 12, lineHeight: 18 }}>A Carreira agrega o histórico do piloto. Resultados lista apenas baterias oficiais publicadas e vinculadas à conta.</Text> : null}
 
         {dados.baterias === 0 && (dados.semanasTop10 || dados.mesesTop10) ? (
           <Cartao titulo="Antes de setembro de 2026" index={2}>
@@ -217,6 +220,7 @@ export default function CarreiraPilotoTela({ id, aba = false }: { id: string; ab
                 </View>
               </View>
             ))}
+            <Text style={{ color: palette.textMuted, fontSize: 12 }}>— significa que ainda não há colocação nesse período.</Text>
           </Cartao>
         ) : null}
 
@@ -342,7 +346,7 @@ export default function CarreiraPilotoTela({ id, aba = false }: { id: string; ab
               <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: i ? 10 : 0, borderTopWidth: i ? 1 : 0, borderTopColor: palette.borderSubtle }}>
                 <Text style={{ color: r.pos <= 3 ? ['#F59E0B', '#C0C7D1', '#CD7F32'][r.pos - 1] : palette.textMuted, fontWeight: '900', fontSize: 18, width: 40, fontVariant: ['tabular-nums'] }}>{r.pos}º</Text>
                 <View style={{ flex: 1 }}>
-                  <Text numberOfLines={1} style={{ color: palette.text, fontWeight: '700' }}>{r.bateria}</Text>
+                  <Text numberOfLines={2} style={{ color: palette.text, fontWeight: '700' }}>{r.bateria}</Text>
                   <Text style={{ color: palette.textMuted, fontSize: 12 }}>{formatarDia(r.dia)} · {r.tipo === 'corrida' ? 'Corrida' : 'Tomada de tempo'} · {r.de} pilotos · Kart {r.kart}</Text>
                 </View>
                 {r.melhor ? <Text style={{ color: palette.textSecondary, fontVariant: ['tabular-nums'] }}>{formatarVolta(r.melhor)}</Text> : null}

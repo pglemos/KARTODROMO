@@ -1,6 +1,6 @@
 import { Link, router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Alert, FlatList, Pressable, ScrollView, TouchableOpacity, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, TouchableOpacity, Text, TextInput, View } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Brand, Icon } from '../../components/brand';
@@ -11,6 +11,7 @@ import { reservationsApi } from '../../features/reservations/api';
 import type { AgendaResponse, CreateReservationInput, ReservationOrder } from '../../features/reservations/schemas';
 import { ActionButton, Field, formatBrl, formatDateTime, InlineError, LoadingMessage, Page, PageHeader, Panel, Notice, useUi } from '../../features/reservations/components';
 import { useSession } from '../../session/provider';
+import { useFloatingTabBarClearance } from '../../components/floating-tab-bar';
 import { SessionBoundary } from '../../session/boundary';
 
 function messageOf(error: unknown) {
@@ -80,59 +81,6 @@ function LoginPrompt({ batteryId }: { batteryId: number | null }) {
   );
 }
 
-function LogoutButton() {
-  const { logout, deleteAccount } = useSession();
-  const { palette } = useUi();
-  const [busy, setBusy] = useState(false);
-
-  async function submit() {
-    setBusy(true);
-    try { await logout(); }
-    catch {
-      Alert.alert('Não foi possível sair', 'Não foi possível apagar a sessão salva neste aparelho.', [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Tentar novamente', onPress: () => void submit() },
-      ]);
-    }
-    finally { setBusy(false); }
-  }
-
-  function promptDeleteAccount() {
-    Alert.alert(
-      'Excluir conta definitivamente',
-      'Tem certeza de que deseja excluir sua conta? Seus dados de cadastro serão apagados permanentemente.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir minha conta',
-          style: 'destructive',
-          onPress: async () => {
-            setBusy(true);
-            try {
-              await deleteAccount();
-              Alert.alert('Conta excluída', 'Sua conta e seus dados foram excluídos com sucesso.');
-            } catch {
-              Alert.alert('Aviso', 'Sua sessão foi encerrada.');
-            } finally {
-              setBusy(false);
-            }
-          },
-        },
-      ],
-    );
-  }
-
-  return (
-    // fica no fim da lista, longe do fluxo de reserva, para ninguém excluir a conta por engano
-    <View style={{ marginTop: 32, gap: 4 }}>
-      <ActionButton label={busy ? 'Encerrando…' : 'Sair da conta'} onPress={() => void submit()} disabled={busy} secondary />
-      <Pressable accessibilityRole="button" onPress={promptDeleteAccount} disabled={busy} style={{ paddingVertical: 14, alignSelf: 'center' }}>
-        <Text style={{ color: palette.danger, fontSize: 14, fontWeight: '600' }}>Excluir minha conta</Text>
-      </Pressable>
-    </View>
-  );
-}
-
 function ReservationList({ orders, loading, error, retry }: {
   orders: ReservationOrder[] | null;
   loading: boolean;
@@ -140,15 +88,17 @@ function ReservationList({ orders, loading, error, retry }: {
   retry: () => void;
 }) {
   const { palette, styles } = useUi();
+  const bottomClearance = useFloatingTabBarClearance();
   return <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-    <FlatList data={orders ?? []} keyExtractor={(order) => order.id} contentContainerStyle={styles.content} refreshing={loading} onRefresh={retry}
-      ListFooterComponent={<LogoutButton />}
+    <FlatList data={orders ?? []} keyExtractor={(order) => order.id} contentContainerStyle={[styles.content, { paddingBottom: bottomClearance }]} refreshing={loading} onRefresh={retry}
       ListHeaderComponent={<>
-        <PageHeader title="Minhas reservas" description="Seus próximos encontros com a pista." />
+        <PageHeader title="Minhas reservas" description="Acompanhe reservas confirmadas e pagamentos pendentes." />
         {loading && !orders ? <LoadingMessage label="Buscando suas reservas…" /> : null}
         {error ? <View style={{ gap: 12 }}><InlineError message={error} /><ActionButton label="Tentar novamente" onPress={retry} secondary /></View> : null}
         {!loading && !error && orders?.length === 0 ? <Panel style={{ gap: 14 }}>
-          <Text style={styles.muted}>Você ainda não tem reservas.</Text>
+          <Text style={styles.muted}>Nenhuma reserva foi encontrada nesta conta.</Text>
+          <Text style={styles.muted}>Reservas aguardando confirmação ou pagamento aparecem aqui. Puxe a lista para atualizar.</Text>
+          <ActionButton label="Atualizar reservas" onPress={retry} secondary />
           <Link href="/(tabs)/agenda" asChild><Pressable accessibilityRole="button" style={styles.action}><Text style={styles.actionText}>Ver agenda</Text></Pressable></Link>
         </Panel> : null}
       </>}
@@ -344,11 +294,11 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
 
         <Caixa x={25} y={345} w={801} h={222} style={{ borderRadius: 22 * k, overflow: 'hidden', borderWidth: 1, borderColor: '#2B302E' }}>
           <Foto fonte={fundos.reservaData} />
-          <Caixa x={20} y={25} w={75} h={72} pointerEvents="none" style={{ borderRadius: 16 * k, backgroundColor: '#10261A', alignItems: 'center', justifyContent: 'center' }}><Icon name="calendar" color={cor.verde} size={40 * k} /></Caixa>
+          <Caixa x={20} y={25} w={75} h={72} pointerEvents="none" style={{ borderRadius: 16 * k, backgroundColor: palette.navActivePill, alignItems: 'center', justifyContent: 'center' }}><Icon name="calendar" color={cor.verde} size={40 * k} /></Caixa>
           <Caixa x={116} y={22} pointerEvents="none">
             <T s={16} c="#C9CFCC" style={{ letterSpacing: 1 * k }}>DATA E HORÁRIO</T>
             <T s={32} p="700" style={{ marginTop: 6 * k, fontVariant: ['tabular-nums'] }}>{formatDateTime(slot.inicio)}</T>
-            <View style={{ alignSelf: 'flex-start', marginTop: 8 * k, height: 24 * k, paddingHorizontal: 14 * k, borderRadius: 7 * k, backgroundColor: '#0E5A2B', justifyContent: 'center' }}>
+            <View style={{ alignSelf: 'flex-start', marginTop: 8 * k, height: 24 * k, paddingHorizontal: 14 * k, borderRadius: 7 * k, backgroundColor: palette.navActivePill, justifyContent: 'center' }}>
               <T s={14} p="700" c="#3BF07F" style={{ letterSpacing: 2 * k }}>{slot.nome.toUpperCase()}</T>
             </View>
           </Caixa>
@@ -379,7 +329,7 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
           {passo(1)}
         </Caixa>
         <Caixa x={497} y={635} w={313} h={103} pointerEvents="none" style={{ borderRadius: 14 * k, backgroundColor: '#0B2A17', borderWidth: 2 * k, borderColor: '#22D865', flexDirection: 'row', alignItems: 'center', paddingLeft: 18 * k, gap: 22 * k, shadowColor: cor.verde, shadowOpacity: 0.5, shadowRadius: 14 * k }}>
-          <View style={{ width: 68 * k, height: 65 * k, borderRadius: 14 * k, backgroundColor: '#134A2A', alignItems: 'center', justifyContent: 'center' }}><Icon name="wallet" color={cor.verde} size={36 * k} /></View>
+          <View style={{ width: 68 * k, height: 65 * k, borderRadius: 14 * k, backgroundColor: palette.navActivePill, alignItems: 'center', justifyContent: 'center' }}><Icon name="wallet" color={cor.verde} size={36 * k} /></View>
           <View>
             <T s={17} c="#D3D8D5" style={{ letterSpacing: 1 * k }}>TOTAL</T>
             <T s={34} p="700" style={{ fontVariant: ['tabular-nums'] }}>{formatBrl(total)}</T>
@@ -520,7 +470,7 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
 
       <View style={{ height: 100 * k, marginTop: 8 * k }}>
         <Toque x={38} y={10} w={777} h={77} rotulo="Ir para o pagamento" onPress={() => { if (!busy && agenda.pagamentoOnline) void submit(); }}
-          style={{ borderRadius: 18 * k, backgroundColor: busy || !agenda.pagamentoOnline ? '#1A6B3A' : '#1ED760', borderWidth: 1.5 * k, borderColor: '#5BF594', flexDirection: 'row', alignItems: 'center', paddingLeft: 66 * k, shadowColor: cor.verde, shadowOpacity: 0.6, shadowRadius: 18 * k, elevation: 10 }}>
+          style={{ borderRadius: 18 * k, backgroundColor: busy || !agenda.pagamentoOnline ? palette.navActivePill : '#1ED760', borderWidth: 1.5 * k, borderColor: palette.neonGreen, flexDirection: 'row', alignItems: 'center', paddingLeft: 66 * k, shadowColor: cor.verde, shadowOpacity: 0.6, shadowRadius: 18 * k, elevation: 10 }}>
           <Icon name="lock" color="#04230F" size={30 * k} />
           <T s={23} p="800" c="#04230F" style={{ marginLeft: 28 * k, letterSpacing: 2 * k }}>{busy ? 'ENVIANDO RESERVA…' : 'IR PARA O PAGAMENTO'}</T>
           <View style={{ marginLeft: 44 * k }}><Icon name="chevron" color="#04230F" size={28 * k} /></View>
@@ -533,9 +483,10 @@ function BookingForm({ agenda, batteryId, accessToken }: { agenda: AgendaRespons
 /** fundo e rolagem da tela de confirmar reserva (o desenho já traz o título) */
 function TelaReserva({ children }: { children: ReactNode }) {
   const topo = useTopo();
+  const bottomClearance = useFloatingTabBarClearance();
   return (
     <Desenho>
-      <ScrollView style={{ flex: 1, backgroundColor: cor.fundo }} contentContainerStyle={{ paddingTop: topo, paddingBottom: 150 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1, backgroundColor: cor.fundo }} contentContainerStyle={{ paddingTop: topo, paddingBottom: bottomClearance }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator accessibilityLabel="Confirmação de reserva rolável">
         {children}
       </ScrollView>
     </Desenho>
@@ -619,7 +570,7 @@ function corStatus(status: ReservationOrder['status']) {
 
 function statusLabel(status: ReservationOrder['status']) {
   return {
-    novo: 'Recebida',
+    novo: 'Aguardando confirmação',
     aguardando_pagamento: 'Aguardando pagamento',
     pago: 'Pagamento recebido',
     confirmado: 'Confirmada',

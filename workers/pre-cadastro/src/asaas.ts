@@ -7,7 +7,7 @@ export type AsaasEnv = { ASAAS_API_KEY?: string; ASAAS_URL?: string };
 
 export const asaasLigado = (env: AsaasEnv) => Boolean(env.ASAAS_API_KEY);
 
-async function chamar<T>(env: AsaasEnv, caminho: string, init: RequestInit = {}): Promise<T> {
+export async function chamar<T>(env: AsaasEnv, caminho: string, init: RequestInit = {}): Promise<T> {
   const base = (env.ASAAS_URL || 'https://api.asaas.com/v3').replace(/\/+$/, '');
   const r = await fetch(base + caminho, {
     ...init,

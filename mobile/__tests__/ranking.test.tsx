@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 
-import RankingScreen from '../src/app/ranking';
+import RankingScreen from '../src/legacy/ranking-screen';
 import { MOCK_DRIVERS } from '../src/mock/kart-data';
 
 const mockPush = jest.fn();

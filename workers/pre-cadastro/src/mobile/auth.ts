@@ -156,17 +156,20 @@ export async function mobileAccountCpf(env: MobileAuthEnv, accountId: string): P
 export async function mobileIdentityCandidates(env: MobileAuthEnv, limit = 50) {
   const context = await createContext(env);
   if (!context) return null;
+  // sem vínculo, ou com vínculo só por CPF (pode subir para 'completo' quando a recepção corrigir e-mail/telefone)
   const { results } = await context.db.prepare(
-    `SELECT a.email_cipher, a.cpf_cipher, a.phone_cipher FROM mobile_accounts a
+    `SELECT a.email_cipher, a.cpf_cipher, a.phone_cipher, l.nivel nivel FROM mobile_accounts a
+       LEFT JOIN mobile_identity_links l ON l.account_id = a.id
       WHERE a.email_verified_at IS NOT NULL
         AND a.deleted_at IS NULL
-        AND NOT EXISTS (SELECT 1 FROM mobile_identity_links l WHERE l.account_id = a.id)
-      ORDER BY a.email_verified_at DESC LIMIT ?`,
-  ).bind(limit).all<{ email_cipher: string; cpf_cipher: string; phone_cipher: string }>();
+        AND (l.account_id IS NULL OR l.nivel = 'cpf')
+      ORDER BY (l.account_id IS NOT NULL), a.email_verified_at DESC LIMIT ?`,
+  ).bind(limit).all<{ email_cipher: string; cpf_cipher: string; phone_cipher: string; nivel: string | null }>();
   return Promise.all(results.map(async (row) => ({
     email: await decrypt(context, row.email_cipher),
     cpf: await decrypt(context, row.cpf_cipher),
     phone: await decrypt(context, row.phone_cipher),
+    nivel: row.nivel,
   })));
 }
 
@@ -604,7 +607,23 @@ async function forgotPassword(
   }
   const account = identifier ? await findAccount(context, identifier) : null;
   if (account) await deliverEmail(env, context, account, account.email_verified_at === null ? 'verify' : 'reset');
+  // "esqueci o e-mail": pedido pelo CPF mostra para onde foi (mascarado). Se não for o dele, o app oferece
+  // "errei meu e-mail" (conta não confirmada) ou a recepção. Pelo e-mail continua a resposta genérica.
+  if (account && /^\d{11}$/.test(identifier)) {
+    const email = await decrypt(context, account.email_cipher);
+    return json(202, {
+      mensagem: `Enviamos o link para ${mascararEmail(email)}. Confira também o spam.`,
+      emailMascarado: mascararEmail(email),
+      emailConfirmado: account.email_verified_at !== null,
+    });
+  }
   return json(202, { mensagem: genericMessage });
+}
+
+export function mascararEmail(email: string) {
+  const [usuario, dominio] = email.trim().toLowerCase().split('@');
+  if (!usuario || !dominio) return '•••';
+  return `${usuario.slice(0, Math.min(2, usuario.length - 1) || 1)}•••@${dominio}`;
 }
 
 async function resetPassword(input: Record<string, unknown>, context: CryptoContext) {
@@ -754,8 +773,17 @@ export async function handleMobileAccountEmail(request: Request, env: MobileAcco
 
   const account = await findAccount(context, cpf);
   if (!account) return json(404, { erro: 'Conta não encontrada.' });
-  if (account.email_verified_at !== null) return json(409, { erro: 'A conta já foi confirmada.' });
+  return trocarEmailNaoConfirmado(env, context, account, email);
+}
 
+/**
+ * Troca o e-mail de uma conta que nunca foi confirmada e manda o link de confirmação para o endereço novo.
+ * Usado pela recepção (chave de administração) e pelo próprio cliente (CPF + senha: rota email/corrigir).
+ */
+async function trocarEmailNaoConfirmado(env: MobileAuthEnv, context: CryptoContext, account: AccountRow, email: string) {
+  if (account.email_verified_at !== null) {
+    return json(409, { codigo: 'EMAIL_JA_CONFIRMADO', erro: 'Esta conta já foi confirmada. Entre com seu CPF e senha.' });
+  }
   const emailLookup = await hmac(context, `email:${email}`);
   const other = await context.db.prepare(
     'SELECT id FROM mobile_accounts WHERE email_lookup = ? AND id <> ? LIMIT 1',
@@ -776,7 +804,36 @@ export async function handleMobileAccountEmail(request: Request, env: MobileAcco
   }
 
   await deliverEmail(env, context, { id: account.id, email_cipher: emailCipher }, 'verify');
-  return json(202, { mensagem: genericMessage });
+  return json(202, { mensagem: `Pronto! Enviamos o link de confirmação para ${email}. Confira também o spam.` });
+}
+
+/**
+ * "Errei meu e-mail": o cliente cadastrou um e-mail errado e o link de confirmação nunca chegou.
+ * Prova que é dono da conta com CPF + senha (quem criou a conta sabe a senha) e informa o e-mail certo.
+ * Só para conta ainda não confirmada: conta confirmada já entra com CPF e senha e não perde nada.
+ */
+async function corrigirEmail(request: Request, input: Record<string, unknown>, env: MobileAuthEnv, context: CryptoContext) {
+  if (!mobileEmailConfigured(env)) return json(503, { erro: 'Serviço temporariamente indisponível.' });
+  const cpf = digitos(value(input, 'cpf'));
+  const email = normalizeEmail(value(input, 'email'));
+  const password = value(input, 'password');
+  if (await rateLimited(context, request, 'email-corrigir', cpf)) {
+    return json(429, { erro: 'Muitas tentativas. Aguarde alguns minutos.' });
+  }
+  if (!cpfValido(cpf) || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    return json(400, { erro: 'Informe o CPF da conta e o e-mail certo.' });
+  }
+  if (password.length === 0 || password.length > PASSWORD_MAX) return json(401, { erro: 'CPF ou senha inválidos.' });
+  const account = await findAccount(context, cpf);
+  // mesmo custo com ou sem conta (não revela se o CPF tem conta)
+  const salt = account ? decodeBase64Url(account.password_salt) : new Uint8Array(16);
+  const candidate = await passwordHash(password, salt, account?.password_scheme ?? PASSWORD_SCHEME);
+  let valid = Boolean(account && constantTimeEqual(candidate, account.password_hash));
+  if (!valid && account && password.trim() !== password && password.trim().length >= PASSWORD_MIN) {
+    valid = constantTimeEqual(await passwordHash(password.trim(), salt, account.password_scheme ?? PASSWORD_SCHEME), account.password_hash);
+  }
+  if (!valid || !account || account.deleted_at !== null) return json(401, { erro: 'CPF ou senha inválidos.' });
+  return trocarEmailNaoConfirmado(env, context, account, email);
 }
 
 export async function authenticateMobileRequest(
@@ -844,6 +901,8 @@ export async function handleMobileAuth(request: Request, env: MobileAuthEnv) {
           return json(429, { erro: 'Muitas tentativas. Aguarde alguns minutos.' });
         }
         return await verifyEmail(input, context);
+      case 'email/corrigir':
+        return await corrigirEmail(request, input, env, context);
       case 'password/forgot':
         return await forgotPassword(request, input, env, context);
       case 'password/reset':

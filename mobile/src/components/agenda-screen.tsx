@@ -12,7 +12,6 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { DEMO_MODE } from '../config/features';
 import { formatCentavosToReais, useCartSafe } from '../features/cart/context';
 import { reservationsApi } from '../features/reservations/api';
 import { formatDateTime } from '../features/reservations/components';
@@ -22,14 +21,19 @@ import { Brand } from './brand';
 import { CabecalhoAgenda, CartaoHorario, tipoDe, type TipoHorario } from './agenda-desenho';
 import { Desenho } from './design-kit';
 import { Entrada, tap, ListaEsqueleto } from './motion';
-import { CartModal } from './cart-modal';
 import { FloatingCartBar } from './floating-cart-bar';
 import { SportsIcon } from './sports-icons';
 import { SPORTS_PALETTE } from './theme';
+import { useFloatingTabBarClearance } from './floating-tab-bar';
 
 export interface AgendaScreenProps {
   onAddToCart?: (slot: AgendaSlot, quantity: number) => void;
   slots?: AgendaSlot[];
+}
+
+function ordemData(data: string) {
+  const [dia, mes, ano] = data.split('/').map(Number);
+  return Number.isFinite(ano) && Number.isFinite(mes) && Number.isFinite(dia) ? ano * 10_000 + mes * 100 + dia : 0;
 }
 
 export function AgendaScreen({
@@ -38,13 +42,13 @@ export function AgendaScreen({
 }: AgendaScreenProps) {
   const hookCart = useCartSafe();
   const { session } = useSession();
+  const bottomClearance = useFloatingTabBarClearance(hookCart?.totalQuantity ? 56 : 0);
 
   const [apiSlots, setApiSlots] = useState<AgendaSlot[] | null>(null);
   const [apiError, setApiError] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState(customSlots?.[0]?.date ?? new Date().toLocaleDateString('pt-BR'));
   const [selectedSlot, setSelectedSlot] = useState<AgendaSlot | null>(null);
   const [quantity, setQuantity] = useState(1);
-  const [isCartModalVisible, setIsCartModalVisible] = useState(false);
   const [bookingOnSite, setBookingOnSite] = useState(false);
   const requestVersion = useRef({ version: 0 });
 
@@ -108,7 +112,7 @@ export function AgendaScreen({
   }, [customSlots, loadBackendAgenda]);
 
   const slots = useMemo(() => customSlots ?? apiSlots ?? [], [customSlots, apiSlots]);
-  const dates = [...new Set(slots.map((slot) => slot.date))];
+  const dates = useMemo(() => [...new Set(slots.map((slot) => slot.date))], [slots]);
 
   const filteredSlots = useMemo(() => {
     return slots.filter((s) => s.date === selectedDate);
@@ -117,6 +121,9 @@ export function AgendaScreen({
   const activeSlots = filteredSlots;
   const [tipo, setTipo] = useState<TipoHorario>('bateria');
   const visiveis = useMemo(() => activeSlots.filter((sl) => tipoDe(sl.title) === tipo), [activeSlots, tipo]);
+  const proximaDataComHorarios = useMemo(() => dates
+    .filter((date) => ordemData(date) > ordemData(selectedDate) && slots.some((slot) => slot.date === date && tipoDe(slot.title) === tipo))
+    .sort((a, b) => ordemData(a) - ordemData(b))[0], [dates, selectedDate, slots, tipo]);
 
   const handleOpenSlot = (slot: AgendaSlot) => {
     if (slot.isSoldOut) return;
@@ -159,7 +166,7 @@ export function AgendaScreen({
         <FlatList
           testID="agenda-slots-list"
           style={styles.slotsList}
-          contentContainerStyle={{ paddingBottom: 140 }}
+          contentContainerStyle={{ paddingBottom: bottomClearance }}
           showsVerticalScrollIndicator={false}
           data={visiveis}
           keyExtractor={(slot) => String(slot.id)}
@@ -176,7 +183,15 @@ export function AgendaScreen({
             </View>
           ) : null}
           {!customSlots && apiSlots === null && !apiError && <View style={{ paddingHorizontal: 14 }}><ListaEsqueleto itens={5} altura={92} rotulo="Carregando horários" /></View>}
-          {!apiError && apiSlots !== null && visiveis.length === 0 && <Text style={[styles.statusText, { paddingHorizontal: 20 }]}>{activeSlots.length ? 'Nenhum horário deste tipo nesta data.' : 'Nenhum horário disponível nesta data.'}</Text>}
+          {!apiError && (customSlots || apiSlots !== null) && visiveis.length === 0 ? (
+            <View accessibilityLiveRegion="polite" style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>{activeSlots.length ? `Não há ${tipo} nesta data.` : 'Não há horários nesta data.'}</Text>
+              {activeSlots.length && tipo !== 'bateria' ? <Text style={styles.statusText}>Quer ver as baterias disponíveis para este dia? Toque abaixo para mudar o filtro para Bateria.</Text> : null}
+              {proximaDataComHorarios ? <Text style={styles.statusText}>Próximo dia com {tipo}: {proximaDataComHorarios}.</Text> : null}
+              {activeSlots.length && tipo !== 'bateria' ? <Pressable accessibilityRole="button" accessibilityLabel="Mostrar baterias disponíveis neste dia" style={styles.emptyAction} onPress={() => setTipo('bateria')}><Text style={styles.emptyActionText}>Mostrar baterias disponíveis</Text></Pressable> : null}
+              {proximaDataComHorarios ? <Pressable accessibilityRole="button" accessibilityLabel={`Ver horários de ${proximaDataComHorarios}`} style={styles.emptyAction} onPress={() => setSelectedDate(proximaDataComHorarios)}><Text style={styles.emptyActionText}>Ver próxima data</Text></Pressable> : null}
+            </View>
+          ) : null}
           </CabecalhoAgenda>}
           renderItem={({ item: slot, index }) => {
             const isSoldOut = slot.isSoldOut || slot.availableSlots <= 0;
@@ -369,19 +384,11 @@ export function AgendaScreen({
           </Modal>
         )}
 
-        {/* Carrinho é prévia sem backend: só no modo demonstração. */}
-        {DEMO_MODE && (
-          <>
-            <FloatingCartBar
-              onPress={() => setIsCartModalVisible(true)}
-              bottomOffset={Platform.OS === 'ios' ? 96 : 94}
-            />
-            <CartModal
-              visible={isCartModalVisible}
-              onClose={() => setIsCartModalVisible(false)}
-            />
-          </>
-        )}
+        {/* Fixture legado: não entra no bundle de produção nem reativa o carrinho demonstrativo. */}
+        {process.env.NODE_ENV === 'test' && hookCart ? (
+          <FloatingCartBar onPress={hookCart.openCart} />
+        ) : null}
+
       </View>
     </SafeAreaView>
     </Desenho>
@@ -397,15 +404,19 @@ const condensedFont = Platform.select({
 const styles = StyleSheet.create({
   agendaStatus: { gap: 12, marginBottom: 16 },
   statusText: { color: '#FFFFFF', fontSize: 15 },
+  emptyState: { marginHorizontal: 20, marginTop: 10, padding: 16, gap: 10, borderRadius: 16, backgroundColor: '#0D1110', borderWidth: 1, borderColor: '#262B29' },
+  emptyTitle: { color: '#FFFFFF', fontSize: 17, fontWeight: '800' },
+  emptyAction: { alignSelf: 'flex-start', minHeight: 44, paddingHorizontal: 16, borderRadius: 999, backgroundColor: SPORTS_PALETTE.accent, justifyContent: 'center' },
+  emptyActionText: { color: '#000000', fontWeight: '900' },
   datePill: { minHeight: 74, minWidth: 78, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 16, backgroundColor: '#0D1411', borderWidth: 1, borderColor: '#1C2621', justifyContent: 'center' },
-  datePillSelected: { backgroundColor: '#2BF27A' },
+  datePillSelected: { backgroundColor: SPORTS_PALETTE.accent },
   dayName: { color: '#9CA3AF', fontSize: 12, fontWeight: '800', letterSpacing: 1, textAlign: 'center' },
   dayNumber: { color: '#FFFFFF', fontSize: 17, fontWeight: '800', textAlign: 'center', marginTop: 2 },
   slotHora: { color: '#FFFFFF', fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
   slotRotulo: { color: '#9CA3AF', fontSize: 11, fontWeight: '800', letterSpacing: 1.5, marginTop: 2 },
   vagasTrilho: { height: 6, borderRadius: 3, backgroundColor: '#2A2E35', marginTop: 8, overflow: 'hidden' },
   vagasBarra: { height: 6, borderRadius: 3 },
-  reservarPill: { backgroundColor: '#2BF27A', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10 },
+  reservarPill: { backgroundColor: SPORTS_PALETTE.accent, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10 },
   reservarTexto: { color: '#000000', fontWeight: '800', fontSize: 14 },
   safeArea: {
     flex: 1,
@@ -472,7 +483,7 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   partnerCardTitle: {
-    color: '#E5E7EB',
+    color: SPORTS_PALETTE.textSecondary,
     fontSize: 14,
     fontWeight: '700',
     fontFamily: condensedFont,
@@ -507,7 +518,7 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   slotTitle: {
-    color: '#E5E7EB',
+    color: SPORTS_PALETTE.textSecondary,
     fontSize: 15,
     fontWeight: '700',
     fontFamily: condensedFont,
@@ -572,7 +583,7 @@ const styles = StyleSheet.create({
     padding: 18,
   },
   modalTitle: {
-    color: '#E5E7EB',
+    color: SPORTS_PALETTE.textSecondary,
     fontSize: 16,
     fontWeight: '700',
     fontFamily: condensedFont,
@@ -597,7 +608,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   infoValue: {
-    color: '#E5E7EB',
+    color: SPORTS_PALETTE.textSecondary,
     fontSize: 15,
     fontWeight: '700',
     fontFamily: condensedFont,

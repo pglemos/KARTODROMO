@@ -287,6 +287,32 @@ describe('Office: concorrência de voucher nas vendas presenciais', () => {
     expect(usageSql).toContain('dbo.ReservaOnlineVoucherUso');
     expect(usageSql).toContain("Estado IN ('reservado', 'consumido', 'reembolso_pendente')");
   });
+
+  it('identifica termos pendentes apenas para inscrições que não vieram do totem e não têm termo', async () => {
+    db.one.mockResolvedValueOnce({ id: 12, terminalId: 3 }).mockResolvedValueOnce({ v: 'false' });
+    const statements: { sql: string; params: Record<string, unknown> }[] = [];
+    db.tx.mockImplementation(async (work) => work(async (sql: string, params: Record<string, unknown> = {}) => {
+      statements.push({ sql, params });
+      if (sql.includes('b.Nome bateria')) return [{ Pago: 0, Status: 'reservada', ProdutoId: 1, Nome: 'Piloto', bateria: 'Bateria 19h' }];
+      if (sql.includes('FROM dbo.FormaPagamento')) return [{ Tipo: 'cartao' }];
+      if (sql.includes('INSERT INTO dbo.Venda (')) return [{ id: 999 }];
+      if (sql.includes('SELECT Id id FROM dbo.Inscricao WHERE Id IN')) return [{ id: 102 }];
+      return [];
+    }));
+
+    const res = await call('/vendas', 'POST', {
+      itens: [
+        { descricao: 'Piloto Totem', unitarioCentavos: 1000, inscricaoId: 101 },
+        { descricao: 'Piloto Balcao', unitarioCentavos: 1000, inscricaoId: 102 },
+      ],
+      pagamentos: [{ formaPagamentoId: 1, valorCentavos: 2000 }],
+    });
+
+    expect(res).toMatchObject({ status: 201, body: { id: 999, semTermo: [102], inscricoes: [101, 102] } });
+    const updInscr = statements.filter((s) => s.sql.includes('UPDATE dbo.Inscricao SET Pago = 1'));
+    expect(updInscr).toHaveLength(2);
+    expect(updInscr[0].sql).toContain('TermoImpressoEm = COALESCE(TermoImpressoEm, SYSDATETIME())');
+  });
 });
 
 describe('Office: mover reserva preserva os dados de cobrança', () => {

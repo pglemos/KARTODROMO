@@ -8,7 +8,7 @@ import React from 'react';
 import { Share } from 'react-native';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react-native';
 
-import NoticiaScreen from '../src/app/noticia/[id]';
+import NoticiaScreen from '../src/legacy/noticia/[id]';
 import { NewsCarousel } from '../src/components/news-carousel';
 import {
   getNewsArticleById,

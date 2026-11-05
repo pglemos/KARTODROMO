@@ -41,7 +41,7 @@ Every feature identified during the Survey phase mapped to its assigned mileston
 | F22 | Detalhe da Bateria & Adicionar ao Carrinho | Preço (R$ 110,00), tipo, seletor de quantidade e botão de adicionar | M5 | survey_visual & survey_flows |
 | F23 | Barra Flutuante Global de Carrinho | Barra suspensa reativa ("🛒 CARRINHO \| 1 ITENS - R$ 110,00") acima das tabs | M5 | survey_visual & survey_flows |
 | F24 | Modal do Carrinho & Swipe to Remove | Bottom sheet com lista, gesto de swipe para remover item e recálculo instantâneo | M5 | survey_visual & survey_flows |
-| F25 | Ações de Checkout & Pedido | "CONFIRMAR PEDIDO", "REMOVER TODOS", "CONTINUAR COMPRANDO" e fluxo Pix/Asaas | M5 | survey_codebase & survey_flows |
+| F25 | Ações de Checkout & Pedido | "CONFIRMAR PEDIDO", "REMOVER TODOS", "CONTINUAR COMPRANDO" e fluxo Pix/Stone | M5 | survey_codebase & survey_flows |
 | F26 | Carreira Cabeçalho do Piloto | Avatar com iniciais, nome, badge Lenda, XP (61.251) e pontos (13.112 PTS) | M6 | survey_visual & survey_flows |
 | F27 | Card Eficiência & Estatísticas | Grade 2x3 de Eficiência, card azul Estatísticas Qualificadas (10+ pilotos) e Todas | M6 | survey_visual & survey_flows |
 | F28 | Conquistas Grid & Modal Regras | Grade de 12 badges, tela de conquistas e modal "Como Funciona o Ranking" (50/20/20/10) | M6 | survey_visual & survey_flows |

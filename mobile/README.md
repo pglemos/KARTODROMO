@@ -16,7 +16,7 @@ npm run export
 
 No pacote mobile isolado, os seis testes identificados com `[monorepo]` são ignorados porque conferem arquivos do site e da CI; todas as verificações do aplicativo continuam ativas. No pacote completo, os seis testes também são executados.
 
-O app usa `https://reservas.kartodromodebetim.com.br` por padrão. Para homologação, defina `EXPO_PUBLIC_API_URL` no ambiente local. Não coloque tokens do Worker, chaves Asaas, credenciais de loja ou dados pessoais no cliente.
+O app usa `https://reservas.kartodromodebetim.com.br` por padrão. Para homologação, defina `EXPO_PUBLIC_API_URL` no ambiente local. Não coloque tokens do Worker, chaves Stone, credenciais de loja ou dados pessoais no cliente.
 
 Os perfis EAS `development`, `preview`, `simulator` e `store-preview` usam a homologação `https://kartodromo-mobile-homolog.kartodromo.workers.dev`. O ambiente tem D1/R2 próprios e reservas fechadas. Ver [estado da distribuição](../docs/mobile/distribution-status.md).
 

@@ -70,3 +70,12 @@ Ver [QA e pendências](qa-2026-10-13.md). Persistem homologação das APIs, rese
 - Código publicado na branch `feature/kartodromo-mobile-app`, PR #15 em rascunho: https://github.com/pglemos/KARTODROMO/pull/15.
 - Os artefatos usam homologação isolada; agenda permanece fechada. Não houve publicação pública nem substituição do rascunho v4 no Google Play.
 - iPhone, aparelho físico, GPS medido, e-mail transacional, pagamento real e conexão com a rede do kartódromo continuam com os limites descritos anteriormente.
+
+## Atualização de 04/11/2026 — como testadores instalam
+
+Os links `play.google.com/store/apps/details?id=...` só funcionam para app publicado em produção; produção segue inativa nos dois apps. Os testadores devem entrar pelo link de adesão, logados com o e-mail cadastrado na lista:
+
+- Cliente (`br.com.kartodromobetim.app`), faixa interna, lista **Kartódromo de Betim**: https://play.google.com/apps/internaltest/4701280616259806532
+- Operação (`br.com.kartodromobetim.operacional`), teste fechado Alpha, lista **Testadores Operação**: https://play.google.com/apps/testing/br.com.kartodromobetim.operacional
+
+Depois de aceitar o convite, instalar pelo botão da própria página ou pela Play Store (pode levar alguns minutos para aparecer). `axavierbezerrant@gmail.com` foi adicionado à lista do app cliente em 04/11 (já estava na da Operação).

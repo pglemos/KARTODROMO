@@ -9,7 +9,7 @@ type QuickBookingProps = {
 
 /**
  * Agendamento: desde 01/10/2026 abre a reserva online propria (reservas.kartodromodebetim.com.br, worker
- * workers/pre-cadastro, pagamento Asaas). Antes linkava o MyLapTime, que ficou sem horarios com o LapTime desligado.
+ * workers/pre-cadastro, pagamento Stone). Antes linkava o MyLapTime, que ficou sem horarios com o LapTime desligado.
  *
  * Ate 2026-07-02 esse widget carregava `tools.mylaptime.com.br` num iframe proxeado pelo nosso
  * servidor (`lib/mylaptime-proxy.ts`), reescrevendo os headers/JS deles pra burlar a protecao
