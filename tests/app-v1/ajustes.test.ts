@@ -106,3 +106,12 @@ it('ordem de serviço recusa kart livre, mecânico vazio e transição inválida
  await api.criarOrdemServico(ger, pedido({ kart: '2', motivo: 'motor', mecanico: 'Carlos' }, 'os-transicao'));
  expect(await api.atualizarOrdemServico(ger, 'os-transicao', pedido({ status: 'concluida' }, 'os-pular', 1))).toMatchObject({ status: 'REJECTED', erro: expect.stringMatching(/transição/i) });
 });
+
+it('ordem de serviço com encaminharOficina coloca kart na oficina automaticamente e cria a O.S.', async () => {
+ const { api, store } = setup();
+ const criar = pedido({ kart: '7', motivo: 'Embreagem', mecanico: 'Carlos', encaminharOficina: true }, 'os-encaminhar', 0);
+ const r = await api.criarOrdemServico(ger, criar);
+ expect(r.status).toBe('APPLIED');
+ expect(store.db.prepare('SELECT estado, motivo FROM karts_fora WHERE kart = ?').get('7')).toMatchObject({ estado: 'oficina', motivo: 'Embreagem' });
+ expect(api.ordensServico().ordens).toEqual([expect.objectContaining({ id: 'os-encaminhar', kart: '7', motivo: 'Embreagem', mecanico: 'Carlos', status: 'aberta' })]);
+});

@@ -61,7 +61,8 @@ CREATE TABLE IF NOT EXISTS aulas (id TEXT PRIMARY KEY, instrutor TEXT NOT NULL, 
 CREATE TABLE IF NOT EXISTS ordens_servico (
   id TEXT PRIMARY KEY, kart TEXT NOT NULL, motivo TEXT NOT NULL, mecanico TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('aberta','em_execucao','concluida','cancelada')),
-  criadaEm TEXT NOT NULL, criadaPor TEXT NOT NULL, atualizadaEm TEXT NOT NULL, atualizadaPor TEXT NOT NULL, observacao TEXT
+  criadaEm TEXT NOT NULL, criadaPor TEXT NOT NULL, atualizadaEm TEXT NOT NULL, atualizadaPor TEXT NOT NULL, observacao TEXT,
+  codigo TEXT, chassi TEXT, concluidaEm TEXT, concluidaPor TEXT, servicoRealizado TEXT
 );
 CREATE TABLE IF NOT EXISTS revisoes (sessionId TEXT PRIMARY KEY, revisao INTEGER NOT NULL, assinatura TEXT);
 `;
@@ -75,6 +76,12 @@ export function abrirStore(caminho: string, abrir: Abrir = abrirNativo): AppStor
     db.exec(ESQUEMA);
     if (!(db.prepare('PRAGMA table_info(karts_sem_teste)').all() as { name: string }[]).some(c => c.name === 'ajusteMm')) db.exec('ALTER TABLE karts_sem_teste ADD COLUMN ajusteMm REAL');
     if (!(db.prepare('PRAGMA table_info(karts_fora)').all() as { name: string }[]).some(c => c.name === 'estado')) db.exec("ALTER TABLE karts_fora ADD COLUMN estado TEXT NOT NULL DEFAULT 'oficina' CHECK (estado IN ('oficina', 'equalizar'))");
+    const colsOS = (db.prepare('PRAGMA table_info(ordens_servico)').all() as { name: string }[]).map(c => c.name);
+    if (!colsOS.includes('codigo')) db.exec('ALTER TABLE ordens_servico ADD COLUMN codigo TEXT');
+    if (!colsOS.includes('chassi')) db.exec('ALTER TABLE ordens_servico ADD COLUMN chassi TEXT');
+    if (!colsOS.includes('concluidaEm')) db.exec('ALTER TABLE ordens_servico ADD COLUMN concluidaEm TEXT');
+    if (!colsOS.includes('concluidaPor')) db.exec('ALTER TABLE ordens_servico ADD COLUMN concluidaPor TEXT');
+    if (!colsOS.includes('servicoRealizado')) db.exec('ALTER TABLE ordens_servico ADD COLUMN servicoRealizado TEXT');
   } catch (err) {
     throw new StoreIndisponivel(`Armazenamento transacional indisponível: ${(err as Error).message}`);
   }

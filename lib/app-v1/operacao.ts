@@ -284,19 +284,31 @@ export function criarOperacao(d: DepsOperacao) {
       if (!fn) throw new ErroApp(400, 'INVALID_REQUEST', 'Comando inválido.');
       if (acao === 'finalizar' || acao === 'reabrir') exigeMotivo(b);
       return roda(q, 'equalizacao.gerir', b, id, `equalization-${acao}`, async () => {
-        // finalizada guarda a meta do resultado: só reabrindo para mudar qualquer coisa
-        if (acao !== 'reabrir' && acao !== 'finalizar' && (await d.legado('GET', base) as { finalizadaEm?: number | null }).finalizadaEm) throw new ErroApp(409, 'STATE_CONFLICT', 'Equalização finalizada: reabra antes de alterar.');
+        // finalizada guarda a meta e regras do resultado: só reabrindo para mudar parâmetros da sessão ou importar voltas
+        const info = (await d.legado('GET', base)) as { finalizadaEm?: number | null };
+        const permiteFinalizada = acao === 'checklist' || acao === 'redutor' || acao === 'abertura';
+        if (acao !== 'reabrir' && acao !== 'finalizar' && !permiteFinalizada && info.finalizadaEm) {
+          throw new ErroApp(409, 'STATE_CONFLICT', 'Equalização finalizada: reabra antes de alterar.');
+        }
         if (acao === 'checklist' && pl.confirmacaoMm != null && pl.semTeste === true) {
           const estado = (d.store.db.prepare('SELECT estado FROM karts_fora WHERE kart = ?').get(kart) as { estado?: string } | undefined)?.estado;
-          if (estado !== 'equalizar') throw new ErroApp(403, 'FORBIDDEN', 'Só confirme sem teste um kart encaminhado para Equalizar.');
+          const podeLiberarOficina = q.perfil === 'GERENCIA';
+          if (estado === 'oficina' && !podeLiberarOficina) throw new ErroApp(403, 'FORBIDDEN', 'Kart na oficina por manutenção: não pode ser liberado por equalização sem teste.');
         }
         const r = await fn() as { importados?: unknown; ignorados?: unknown };
         if (acao === 'checklist' && pl.confirmacaoMm != null && pl.semTeste === true) {
           d.store.transacao(() => {
             const estadoAtual = (d.store.db.prepare('SELECT estado FROM karts_fora WHERE kart = ?').get(kart) as { estado?: string } | undefined)?.estado;
-            if (estadoAtual !== 'equalizar') throw new ErroApp(403, 'FORBIDDEN', 'O kart deixou de estar encaminhado para Equalizar.');
+            const podeLiberarOficina = q.perfil === 'GERENCIA';
+            if (estadoAtual === 'oficina' && !podeLiberarOficina) throw new ErroApp(403, 'FORBIDDEN', 'Kart na oficina por manutenção: não pode ser liberado por equalização sem teste.');
             d.store.db.prepare('INSERT OR REPLACE INTO karts_sem_teste (kart, sessionId, autor, em) VALUES (?, ?, ?, ?)').run(kart, id, q.usuario, new Date().toISOString());
-            d.store.db.prepare('DELETE FROM karts_fora WHERE kart = ?').run(kart);
+            if (estadoAtual === 'equalizar' || (estadoAtual === 'oficina' && podeLiberarOficina)) d.store.db.prepare('DELETE FROM karts_fora WHERE kart = ?').run(kart);
+            d.store.subirRevisao('frota');
+          });
+        }
+        if (acao === 'checklist' && pl.confirmacaoMm === null) {
+          d.store.transacao(() => {
+            d.store.db.prepare('DELETE FROM karts_sem_teste WHERE kart = ? AND sessionId = ?').run(kart, id);
             d.store.subirRevisao('frota');
           });
         }
@@ -412,17 +424,41 @@ export function criarOperacao(d: DepsOperacao) {
       const kart = texto(p.kart, 4); const motivo = texto(p.motivo, 200); const mecanico = texto(p.mecanico, 80);
       if (!/^[0-9]{1,4}$/.test(kart) || !motivo || !mecanico) throw new ErroApp(400, 'INVALID_REQUEST', 'Informe kart, defeito e mecânico responsável.');
       return roda(q, 'manutencao.gerir', b, 'manutencao', 'work-order-create', async () => {
+        const chassiRow = d.store.db.prepare('SELECT chassi FROM karts_chassi WHERE kart = ?').get(kart) as { chassi: string } | undefined;
+        const chassiInformado = texto(p.chassi, 80);
+        const chassi = chassiInformado || chassiRow?.chassi || null;
+        if (chassiInformado && chassiInformado !== chassiRow?.chassi) {
+          d.store.db.prepare('INSERT OR REPLACE INTO karts_chassi (kart, chassi, atualizadoPor, atualizadoEm) VALUES (?, ?, ?, ?)').run(kart, chassiInformado, q.usuario, new Date().toISOString());
+          d.store.subirRevisao('frota');
+        }
         const bloqueio = d.store.db.prepare('SELECT estado FROM karts_fora WHERE kart = ?').get(kart) as { estado: string } | undefined;
-        if (bloqueio?.estado !== 'oficina') throw new Error('A ordem de serviço exige que o kart esteja na aba Oficina.');
+        if (p.encaminharOficina === true) {
+          if (bloqueio?.estado !== 'oficina') {
+            d.store.db.prepare("INSERT OR REPLACE INTO karts_fora (kart, motivo, usuario, em, estado) VALUES (?, ?, ?, ?, 'oficina')")
+              .run(kart, motivo, q.usuario, new Date().toISOString());
+            d.store.subirRevisao('frota');
+          }
+        } else if (bloqueio?.estado !== 'oficina') {
+          throw new Error('A ordem de serviço exige que o kart esteja na aba Oficina.');
+        }
         const ativa = d.store.db.prepare("SELECT id FROM ordens_servico WHERE kart = ? AND status IN ('aberta','em_execucao')").get(kart);
         if (ativa) throw new Error('Este kart já tem uma ordem de serviço aberta.');
+
+        const numKart = kart.padStart(3, '0');
+        const numChassi = chassi ? (chassi.replace(/\D/g, '').slice(-3) || chassi.slice(0, 3)).padStart(3, '0') : '000';
+        let codigo = `OS-${numKart}${numChassi}`;
+        const totalExistente = (d.store.db.prepare('SELECT COUNT(*) as c FROM ordens_servico WHERE codigo = ?').get(codigo) as { c: number } | undefined)?.c ?? 0;
+        if (totalExistente > 0) {
+          codigo = `${codigo}-${totalExistente + 1}`;
+        }
+
         const agora = new Date().toISOString();
         d.store.transacao(() => {
-          d.store.db.prepare('INSERT INTO ordens_servico (id, kart, motivo, mecanico, status, criadaEm, criadaPor, atualizadaEm, atualizadaPor, observacao) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-            .run(String(b.operationId), kart, motivo, mecanico, 'aberta', agora, q.usuario, agora, q.usuario, texto(p.observacao, 500) || null);
+          d.store.db.prepare('INSERT INTO ordens_servico (id, codigo, kart, chassi, motivo, mecanico, status, criadaEm, criadaPor, atualizadaEm, atualizadaPor, observacao) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            .run(String(b.operationId), codigo, kart, chassi, motivo, mecanico, 'aberta', agora, q.usuario, agora, q.usuario, texto(p.observacao, 500) || null);
           d.store.subirRevisao('manutencao');
         });
-        return { id: b.operationId };
+        return { id: b.operationId, codigo };
       });
     },
     async atualizarOrdemServico(q: Identidade, id: string, b: Record<string, unknown>) {
@@ -436,9 +472,30 @@ export function criarOperacao(d: DepsOperacao) {
         if (!permitida.includes(status)) throw new Error('Transição inválida para esta ordem de serviço.');
         const mecanico = texto(p.mecanico, 80);
         if (p.mecanico !== undefined && !mecanico) throw new ErroApp(400, 'INVALID_REQUEST', 'Informe o mecânico responsável.');
+        const servicoRealizado = texto(p.servicoRealizado, 1000) || texto(p.observacao, 1000) || null;
+        const agora = new Date().toISOString();
         d.store.transacao(() => {
-          d.store.db.prepare('UPDATE ordens_servico SET status = ?, mecanico = COALESCE(?, mecanico), observacao = COALESCE(?, observacao), atualizadaEm = ?, atualizadaPor = ? WHERE id = ?')
-            .run(status, p.mecanico === undefined ? null : mecanico, p.observacao === undefined ? null : texto(p.observacao, 500), new Date().toISOString(), q.usuario, id);
+          d.store.db.prepare(`
+            UPDATE ordens_servico
+            SET status = ?,
+                mecanico = COALESCE(?, mecanico),
+                servicoRealizado = COALESCE(?, servicoRealizado),
+                observacao = COALESCE(?, observacao),
+                concluidaEm = CASE WHEN ? = 'concluida' THEN ? ELSE concluidaEm END,
+                concluidaPor = CASE WHEN ? = 'concluida' THEN ? ELSE concluidaPor END,
+                atualizadaEm = ?,
+                atualizadaPor = ?
+            WHERE id = ?
+          `).run(
+            status,
+            p.mecanico === undefined ? null : mecanico,
+            servicoRealizado,
+            p.observacao === undefined ? null : texto(p.observacao, 500),
+            status, agora,
+            status, q.usuario,
+            agora, q.usuario,
+            id
+          );
           d.store.subirRevisao('manutencao');
         });
         return { id };

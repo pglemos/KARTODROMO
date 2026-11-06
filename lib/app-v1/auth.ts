@@ -30,7 +30,7 @@ const CAPACIDADES: Record<Perfil, ReadonlySet<string>> = {
   RECEPCAO: new Set([...LEITURA, 'aulas.aceitar']),
   OPERACAO: new Set(OPERACAO),
   GERENCIA: new Set([...OPERACAO, 'usuarios.gerir', 'auditoria.global', 'equalizacao.gerir', 'frota.liberar', 'aulas.aceitar', 'manutencao.gerir']),
-  EQUALIZACAO: new Set([...LEITURA, 'equalizacao.gerir', 'frota.gerir', 'frota.liberar']),
+  EQUALIZACAO: new Set([...LEITURA, 'equalizacao.gerir', 'frota.gerir', 'frota.liberar', 'manutencao.gerir']),
 };
 
 export function pode(perfil: Perfil, capacidade: string): boolean {

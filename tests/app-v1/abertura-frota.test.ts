@@ -51,7 +51,7 @@ describe('abertura diária da frota', () => {
   });
   it('ordem de serviço ativa impede exceção mesmo após remoção do bloqueio de frota', async () => {
     const c = montar();
-    c.store.db.prepare('INSERT INTO ordens_servico VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run('os', '1', 'Freio', 'TESTE CODEX', 'aberta', c.agora().toISOString(), 'TESTE CODEX', c.agora().toISOString(), 'TESTE CODEX', null);
+    c.store.db.prepare('INSERT INTO ordens_servico (id, kart, motivo, mecanico, status, criadaEm, criadaPor, atualizadaEm, atualizadaPor, observacao) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run('os', '1', 'Freio', 'TESTE CODEX', 'aberta', c.agora().toISOString(), 'TESTE CODEX', c.agora().toISOString(), 'TESTE CODEX', null);
     expect((await c.enviar('excecao', { karts: ['1'] }, gerente)).status).toBe('REJECTED');
     expect(c.abertura.resumo().karts[0].estado).toBe('bloqueado');
   });
@@ -68,5 +68,56 @@ describe('abertura diária da frota', () => {
     expect((await c.enviar('excecao', { karts: ['99'] }, gerente)).status).toBe('REJECTED');
     expect((await c.enviar('escala', { data: '2026-11-07', operador: 'TESTE CODEX' }, gerente)).status).toBe('APPLIED');
     expect(c.abertura.resumo().escala).toEqual([{ dia: '2026-11-07', operador: 'TESTE CODEX' }]);
+  });
+
+  it('permite conferência em lote (Check list finalizado) e ciclo a cada 2 e 4 baterias', async () => {
+    const c = montar();
+    // 1 etapa e 4 etapa: conferir karts 1 e 2 em lote na abertura
+    const resAbertura = await c.enviar('conferir', {
+      karts: ['1', '2'],
+      itens: ['freioAcelerador', 'calibragemPneus', 'pneusLonados', 'correnteEngraxada'],
+      ciclo: 'abertura',
+    });
+    expect(resAbertura.status).toBe('APPLIED');
+    expect(c.abertura.resumo().aguardando).toBe(2);
+
+    // Ciclo a cada 2 baterias: exige pneus lonados
+    const res2Bat = await c.enviar('conferir', {
+      karts: ['1'],
+      itens: ['pneusLonados'],
+      ciclo: 'cada_2_baterias',
+    });
+    expect(res2Bat.status).toBe('APPLIED');
+
+    // Ciclo a cada 4 baterias: exige pneus lonados + corrente engraxada
+    const res4BatIncompleto = await c.enviar('conferir', {
+      karts: ['1'],
+      itens: ['pneusLonados'],
+      ciclo: 'cada_4_baterias',
+    });
+    expect(res4BatIncompleto.status).toBe('REJECTED');
+
+    const res4BatCompleto = await c.enviar('conferir', {
+      karts: ['1'],
+      itens: ['pneusLonados', 'correnteEngraxada'],
+      ciclo: 'cada_4_baterias',
+    });
+    expect(res4BatCompleto.status).toBe('APPLIED');
+  });
+
+  it('aponta defeito por exceção (Etapa 3) encaminhando kart para oficina e retirando do galpão', async () => {
+    const c = montar();
+    const resDefeito = await c.enviar('defeito', {
+      kart: '1',
+      motivo: 'Pneu lonado',
+    });
+    expect(resDefeito.status).toBe('APPLIED');
+
+    // Kart 1 está na oficina por defeito
+    const fora = c.store.db.prepare('SELECT kart, motivo, estado FROM karts_fora WHERE kart = ?').get('1') as { kart: string; motivo: string; estado: string };
+    expect(fora).toBeDefined();
+    expect(fora.motivo).toBe('Pneu lonado');
+    expect(fora.estado).toBe('oficina');
+    expect(c.abertura.resumo().karts[0].estado).toBe('bloqueado');
   });
 });

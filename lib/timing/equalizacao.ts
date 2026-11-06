@@ -483,15 +483,40 @@ export function compararHistorico(sessoes: Iterable<Session>, p: { kart: string;
   if (!/^\d+$/.test(p.kart) || !/^\d+$/.test(p.referencia) || p.kart === p.referencia || (Number(p.kart) >= 100) !== (Number(p.referencia) >= 100)) throw new Error('Escolha dois karts diferentes da mesma frota.');
   const desde = p.now - 15 * 86400000;
   const tempos = (kart: string) => {
-    const voltas: { lapMs: number; em: number; sessaoId: string; passagemId?: string }[] = [];
+    let totalVoltas = 0;
+    const melhorPorPiloto = new Map<string, { lapMs: number; em: number; sessaoId: string; passagemId?: string; pilotoId: string; piloto?: string }>();
+    const todasRestantes: { lapMs: number; em: number; sessaoId: string; passagemId?: string; pilotoId: string; piloto?: string }[] = [];
+
     for (const s of sessoes) {
       if (s.state === 'cancelada' || (s.trackId ?? null) !== (p.trackId ?? null)) continue;
       for (const c of s.competitors) for (const [i, x] of c.crossings.entries()) {
         if (i === 0 || kartFisicoDaPassagem(c, x) !== kart || kartFisicoDaPassagem(c, c.crossings[i - 1]) !== kart) continue;
-        if (x.lapMs != null && Number.isFinite(x.lapMs) && x.lapMs >= s.minLapMs && !x.deleted && !x.invalid && !x.estimada && x.source !== 'manual' && x.wallMs >= desde && x.wallMs <= p.now) voltas.push({ lapMs: x.lapMs, em: x.wallMs, sessaoId: s.id, passagemId: x.id });
+        if (x.lapMs != null && Number.isFinite(x.lapMs) && x.lapMs >= s.minLapMs && !x.deleted && !x.invalid && !x.estimada && x.source !== 'manual' && x.wallMs >= desde && x.wallMs <= p.now) {
+          totalVoltas++;
+          const pilotoId = c.customerId?.trim() || c.name?.trim() || `comp-${c.kart}-${s.id}`;
+          const item = { lapMs: x.lapMs, em: x.wallMs, sessaoId: s.id, passagemId: x.id, pilotoId, piloto: c.name?.trim() || undefined };
+          const anterior = melhorPorPiloto.get(pilotoId);
+          if (!anterior || x.lapMs < anterior.lapMs) {
+            if (anterior) todasRestantes.push(anterior);
+            melhorPorPiloto.set(pilotoId, item);
+          } else {
+            todasRestantes.push(item);
+          }
+        }
       }
     }
-    return { numero: kart, amostra: voltas.length, voltas: voltas.sort((a,b) => a.lapMs - b.lapMs || b.em - a.em).slice(0, 5) };
+
+    // Melhores voltas de cada piloto distinto, ordenadas da mais rápida para a mais lenta
+    const principais = [...melhorPorPiloto.values()].sort((a, b) => a.lapMs - b.lapMs || b.em - a.em).slice(0, 5);
+
+    // Se houver menos de 5 pilotos diferentes, completa as vagas restantes até 5
+    let voltasFinal = principais;
+    if (principais.length < 5) {
+      todasRestantes.sort((a, b) => a.lapMs - b.lapMs || b.em - a.em);
+      voltasFinal = [...principais, ...todasRestantes.slice(0, 5 - principais.length)];
+    }
+
+    return { numero: kart, amostra: totalVoltas, voltas: voltasFinal };
   };
   // Materializa uma vez para permitir iteradores consumíveis nas duas consultas.
   sessoes = [...sessoes];
