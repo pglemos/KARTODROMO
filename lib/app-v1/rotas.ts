@@ -2,7 +2,7 @@ import { semBateriasPassadas } from './regras';
 import { timingSafeEqual } from 'node:crypto';
 import type http from 'node:http';
 import { writeTimingEvent } from '../timing/sse';
-import { autenticar, bloquearUsuario, criarUsuario, login, LoginRecusado, pode, renovar, sair, trocarSenha, type AuthCtx, type Identidade, type Perfil } from './auth';
+import { autenticar, bloquearUsuario, criarUsuario, atualizarUsuario, excluirUsuario, login, LoginRecusado, pode, renovar, sair, trocarSenha, type AuthCtx, type Identidade, type Perfil } from './auth';
 import { consultarOperacao, ErroApp } from './comandos';
 import { criarOperacao, type Legado } from './operacao';
 import type { Inscricao } from './regras';
@@ -216,6 +216,30 @@ export function criarModuloApp(d: DepsApp): ModuloApp {
       const b = await lerCorpo(req);
       try { bloquearUsuario(ctx, m[1], b.bloqueado !== false); } catch (e) { throw new ErroApp(404, 'NOT_FOUND', (e as Error).message); }
       return enviar(res, 200, { ok: true });
+    }
+    m = /^users\/([\w.-]+)\/delete$/.exec(caminho);
+    if (m && metodo === 'POST') {
+      exige('usuarios.gerir');
+      try { excluirUsuario(ctx, m[1], quem.usuarioId); } catch (e) { throw new ErroApp(400, 'INVALID_REQUEST', (e as Error).message); }
+      return enviar(res, 200, { ok: true });
+    }
+    m = /^users\/([\w.-]+)$/.exec(caminho);
+    if (m && metodo === 'DELETE') {
+      exige('usuarios.gerir');
+      try { excluirUsuario(ctx, m[1], quem.usuarioId); } catch (e) { throw new ErroApp(400, 'INVALID_REQUEST', (e as Error).message); }
+      return enviar(res, 200, { ok: true });
+    }
+    if (m && (metodo === 'PUT' || metodo === 'PATCH' || metodo === 'POST')) {
+      exige('usuarios.gerir');
+      const b = await lerCorpo(req);
+      try {
+        const u = await atualizarUsuario(ctx, m[1], {
+          nome: b.nome !== undefined ? String(b.nome) : undefined,
+          perfil: b.perfil !== undefined ? String(b.perfil) as Perfil : undefined,
+          novaSenha: b.novaSenha || b.senha ? String(b.novaSenha || b.senha) : undefined,
+        });
+        return enviar(res, 200, { ok: true, usuario: u });
+      } catch (e) { throw new ErroApp(400, 'INVALID_REQUEST', (e as Error).message); }
     }
     if (caminho === 'auth/password' && metodo === 'POST') {
       const b = await lerCorpo(req);

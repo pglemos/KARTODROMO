@@ -67,7 +67,7 @@ function emitir(ctx: AuthCtx, sessaoId: string, expiraAbsoluto: number): Tokens 
 }
 
 export async function criarUsuario(ctx: AuthCtx, u: { usuario: string; nome: string; perfil: Perfil; senha: string }) {
-  if (u.senha.length < 10) throw new Error('A senha precisa de pelo menos 10 caracteres.');
+  if (u.senha.length < 6) throw new Error('A senha precisa de pelo menos 6 caracteres.');
   if (!(u.perfil in CAPACIDADES)) throw new Error('Perfil inválido.');
   const id = randomUUID();
   const senhaHash = await gerarHash(u.senha);
@@ -151,7 +151,7 @@ export function autenticar(ctx: AuthCtx, header: unknown): Identidade | null {
 }
 
 export async function trocarSenha(ctx: AuthCtx, usuarioId: string, atual: string, nova: string, sessaoAtual: string) {
-  if (nova.length < 10) throw new LoginRecusado('A senha nova precisa de pelo menos 10 caracteres.');
+  if (nova.length < 6) throw new LoginRecusado('A senha nova precisa de pelo menos 6 caracteres.');
   const u = ctx.store.db.prepare('SELECT senhaHash FROM usuarios WHERE id = ?').get(usuarioId) as { senhaHash: string } | undefined;
   if (!u || !await senhaConfere(atual, u.senhaHash)) throw new LoginRecusado('Senha atual incorreta.');
   const hash = await gerarHash(nova);
@@ -164,4 +164,51 @@ export async function trocarSenha(ctx: AuthCtx, usuarioId: string, atual: string
 export function bloquearUsuario(ctx: AuthCtx, usuario: string, bloqueado: boolean) {
   const r = ctx.store.db.prepare('UPDATE usuarios SET bloqueado = ? WHERE usuario = ?').run(bloqueado ? 1 : 0, usuario.trim().toLowerCase());
   if (!r.changes) throw new Error('Usuário não encontrado.');
+}
+
+export async function atualizarUsuario(ctx: AuthCtx, usuarioAlvo: string, dados: { nome?: string; perfil?: Perfil; novaSenha?: string }) {
+  const nomeUsuario = usuarioAlvo.trim().toLowerCase();
+  const u = ctx.store.db.prepare('SELECT id, usuario, nome, perfil FROM usuarios WHERE usuario = ?').get(nomeUsuario) as { id: string; usuario: string; nome: string; perfil: Perfil } | undefined;
+  if (!u) throw new Error('Usuário não encontrado.');
+  if (dados.perfil && !(dados.perfil in CAPACIDADES)) throw new Error('Perfil inválido.');
+  if (dados.novaSenha && dados.novaSenha.length < 6) throw new Error('A senha precisa de pelo menos 6 caracteres.');
+
+  const novoNome = dados.nome !== undefined ? dados.nome.trim() : u.nome;
+  const novoPerfil = dados.perfil !== undefined ? dados.perfil : u.perfil;
+  const novaSenhaHash = dados.novaSenha ? await gerarHash(dados.novaSenha) : null;
+
+  ctx.store.transacao(() => {
+    if (novaSenhaHash) {
+      ctx.store.db.prepare('UPDATE usuarios SET nome = ?, perfil = ?, senhaHash = ? WHERE id = ?')
+        .run(novoNome, novoPerfil === 'EQUALIZACAO' ? 'OPERACAO' : novoPerfil, novaSenhaHash, u.id);
+      ctx.store.db.prepare('UPDATE sessoes SET revogadaEm = ? WHERE usuarioId = ? AND revogadaEm IS NULL')
+        .run(agoraDe(ctx), u.id);
+    } else {
+      ctx.store.db.prepare('UPDATE usuarios SET nome = ?, perfil = ? WHERE id = ?')
+        .run(novoNome, novoPerfil === 'EQUALIZACAO' ? 'OPERACAO' : novoPerfil, u.id);
+    }
+
+    if (novoPerfil === 'EQUALIZACAO') {
+      ctx.store.db.prepare('INSERT OR REPLACE INTO perfis_especiais (usuarioId, perfil) VALUES (?, ?)').run(u.id, novoPerfil);
+    } else {
+      ctx.store.db.prepare('DELETE FROM perfis_especiais WHERE usuarioId = ?').run(u.id);
+    }
+  });
+
+  return { id: u.id, usuario: u.usuario, nome: novoNome, perfil: novoPerfil };
+}
+
+export function excluirUsuario(ctx: AuthCtx, usuarioAlvo: string, quemEstaExcluindoId?: string) {
+  const nomeUsuario = usuarioAlvo.trim().toLowerCase();
+  const u = ctx.store.db.prepare('SELECT id, usuario FROM usuarios WHERE usuario = ?').get(nomeUsuario) as { id: string; usuario: string } | undefined;
+  if (!u) throw new Error('Usuário não encontrado.');
+  if (quemEstaExcluindoId && u.id === quemEstaExcluindoId) {
+    throw new Error('Não é permitido excluir o próprio usuário logado.');
+  }
+
+  ctx.store.transacao(() => {
+    ctx.store.db.prepare('DELETE FROM perfis_especiais WHERE usuarioId = ?').run(u.id);
+    ctx.store.db.prepare('DELETE FROM sessoes WHERE usuarioId = ?').run(u.id);
+    ctx.store.db.prepare('DELETE FROM usuarios WHERE id = ?').run(u.id);
+  });
 }
