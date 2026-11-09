@@ -13,7 +13,7 @@ public static class Acoes
     {
         var pre = sel.Where(r => !r.B("aprovada") && r.S("status") != "cancelada").ToList();
         if (!Msg.Pergunta(f, $"Deseja aprovar a pré-reserva? ({pre.Count})")) return;
-        foreach (var r in pre) await Api.Post($"/api/office/reservas/{r.S("id")}/aprovar");
+        foreach (var r in pre) await Api.PostAsync($"/api/office/reservas/{r.S("id")}/aprovar");
         f.Recarregar();
     });
 
@@ -27,7 +27,7 @@ public static class Acoes
     {
         var c = FormPesquisarCliente.Escolher(f, $"Alterar Cliente — {r.S("cliente")}");
         if (c == null) return;
-        var x = await Api.Post($"/api/office/reservas/{r.S("id")}/alterar-cliente", new { clienteId = c.L("id") });
+        var x = await Api.PostAsync($"/api/office/reservas/{r.S("id")}/alterar-cliente", new { clienteId = c.L("id") });
         Msg.Info(f, x.S("mensagem"));
         f.Recarregar();
     });
@@ -38,41 +38,137 @@ public static class Acoes
         if (j.ShowDialog(f) == DialogResult.OK) f.Recarregar();
     }
 
+    public static void MoverClientes(FormPrincipal f, IReadOnlyList<JsonObject> sel)
+    {
+        if (sel == null || sel.Count == 0) return;
+        using var j = new FormMoverCliente(sel);
+        if (j.ShowDialog(f) == DialogResult.OK) f.Recarregar();
+    }
+
+    public static void MovimentarGrupoErrado(FormPrincipal f, JsonObject r) => Seguro.Rodar(f, async () =>
+    {
+        var batId = r.S("bateriaId");
+        var resId = r.L("id");
+        if (string.IsNullOrEmpty(batId) || resId is null) return;
+
+        var grupos = await Api.ListaAsync($"/api/office/grupos?bateriaId={batId}");
+        JsonObject grupo = null;
+        JsonObject piloto = null;
+
+        foreach (var gr in grupos)
+        {
+            if (gr["pilotos"] is JsonArray pilotos)
+            {
+                foreach (var item in pilotos)
+                {
+                    if (item is JsonObject p && p.L("inscricaoId") == resId)
+                    {
+                        grupo = gr;
+                        piloto = p;
+                        break;
+                    }
+                }
+            }
+            if (grupo != null) break;
+        }
+
+        if (grupo == null || piloto == null)
+        {
+            Msg.Info(f, $"O cliente {r.S("cliente")} não faz parte de nenhum grupo nesta bateria (já é uma reserva individual).");
+            return;
+        }
+
+        if (piloto.B("responsavel"))
+        {
+            Msg.Aviso(f, $"O cliente {r.S("cliente")} é o responsável principal do grupo {grupo.S("codigo")}. Para desvinculá-lo, altere o responsável ou cancele o grupo.");
+            return;
+        }
+
+        var resp = MessageBox.Show(f,
+            $"O cliente {r.S("cliente")} está cadastrado no grupo {grupo.S("codigo")} (Responsável: {grupo.S("responsavel")}).\n\n" +
+            $"Deseja desvinculá-lo do grupo para colocá-lo SOZINHO nesta bateria?\n\n" +
+            $"• Sim: Colocar SOZINHO nesta bateria (libera a vaga no grupo para o verdadeiro amigo)\n" +
+            $"• Não: Transferir para outro grupo ativo da data\n" +
+            $"• Cancelar: Desistir",
+            "Movimentar cliente de grupo errado", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+
+        if (resp == DialogResult.Cancel) return;
+
+        if (resp == DialogResult.Yes)
+        {
+            var x = await Api.PostAsync($"/api/office/grupos/{grupo.S("id")}/pilotos/{piloto.S("id")}/desvincular", new { destino = "sozinho" });
+            Msg.Info(f, x.S("mensagem") is { Length: > 0 } msg ? msg : "Participante desvinculado com sucesso!");
+            f.Recarregar();
+            return;
+        }
+
+        if (resp == DialogResult.No)
+        {
+            var dataBase = r.D("dataHora")?.Date ?? DateTime.Today;
+            var dataStr = Fmt.Iso(dataBase);
+            var outrosGrupos = (await Api.ListaAsync($"/api/office/grupos?de={dataStr}&ate={dataStr}"))
+                .Where(gr => gr.S("id") != grupo.S("id") && gr.S("status") == "ativa").ToList();
+
+            if (outrosGrupos.Count == 0)
+            {
+                Msg.Aviso(f, "Não foram encontrados outros grupos ativos nesta data para transferência.");
+                return;
+            }
+
+            using var fEsc = new FormEscolherGrupo(outrosGrupos);
+            if (fEsc.ShowDialog(f) == DialogResult.OK && fEsc.GrupoSelecionado is { } novoGrupo)
+            {
+                var x = await Api.PostAsync($"/api/office/grupos/{grupo.S("id")}/pilotos/{piloto.S("id")}/desvincular", new { destino = "outro_grupo", novoGrupoId = novoGrupo.L("id") });
+                Msg.Info(f, x.S("mensagem") is { Length: > 0 } msg ? msg : "Participante transferido para o novo grupo com sucesso!");
+                f.Recarregar();
+            }
+        }
+    });
+
     public static void ImprimirTermo(IWin32Window dono, IEnumerable<string> ids) => Seguro.Rodar(dono as Control, async () =>
     {
         var lista = ids.ToList();
         if (lista.Count == 0) return;
-        // na recepção (TM-T20 configurada) vários termos vão um por trabalho de impressão:
-        // a térmica corta o papel no fim de cada trabalho, então juntos saíam emendados
-        if (lista.Count > 1 && Config.Get("ImpressoraTermos", "") is { Length: > 0 } impressora)
+
+        var destino = FormEscolherImpressoraTermo.Pedir(dono, lista.Count);
+        if (destino == null || destino.Modo == ModoDestinoTermo.Cancelar) return;
+
+        if (destino.Modo == ModoDestinoTermo.Visualizar)
         {
-            var feitos = 0;
-            foreach (var id in lista)
-            {
-                var link = await Api.Get("/api/office/termo-link?ids=" + id);
-                await Relatorio.ImprimirSilencioso(Api.BaseUrl + link.S("url"), impressora);
-                feitos++;
-            }
-            Msg.Info(dono, $"{feitos} termos enviados para a {impressora}, um de cada vez (a impressora corta entre eles).");
+            var r = await Api.GetAsync("/api/office/termo-link?ids=" + string.Join(",", lista));
+            Relatorio.Abrir(dono, Api.BaseUrl + r.S("url"), "Termo de Responsabilidade");
             (dono as FormPrincipal)?.Recarregar();
             return;
         }
-        var r = await Api.Get("/api/office/termo-link?ids=" + string.Join(",", lista));
-        Relatorio.Abrir(dono, Api.BaseUrl + r.S("url"), "Termo de Responsabilidade");
+
+        // na impressora térmica cada termo vai em um trabalho de impressão para cortar o papel entre eles
+        var feitos = 0;
+        foreach (var id in lista)
+        {
+            var link = await Api.GetAsync("/api/office/termo-link?ids=" + id);
+            await Relatorio.ImprimirSilencioso(Api.BaseUrl + link.S("url"), destino.NomeImpressora);
+            feitos++;
+        }
+        Msg.Info(dono, $"{feitos} termo(s) enviado(s) para a impressora '{destino.NomeImpressora}'.");
         (dono as FormPrincipal)?.Recarregar();
     });
 
     public static void ExcluirReservas(FormPrincipal f, List<JsonObject> sel) => Seguro.Rodar(f, async () =>
     {
-        if (sel.Any(r => r.B("pago"))) { Msg.Aviso(f, "Não é permitido excluir reservas pagas!"); return; }
-        if (!Msg.Pergunta(f, sel.Count > 1 ? "Deseja realmente excluir as reservas agendadas?" : "Deseja realmente excluir a reserva agendada?")) return;
-        foreach (var r in sel) await Api.Delete($"/api/office/reservas/{r.S("id")}");
+        if (!Msg.Pergunta(f, sel.Count > 1 ? "Excluir as reservas e liberar as vagas? Pagamentos serão mantidos no histórico, sem reembolso automático." : "Excluir a reserva e liberar a vaga? O pagamento será mantido no histórico, sem reembolso automático.")) return;
+        foreach (var r in sel) await Api.DeleteAsync($"/api/office/reservas/{r.S("id")}");
         f.Recarregar();
     });
 
     public static void StatusBateria(FormPrincipal f, List<JsonObject> sel, string status) => Seguro.Rodar(f, async () =>
     {
-        foreach (var b in sel) await Api.Post($"/api/office/baterias/{b.S("id")}/status", new { status });
+        foreach (var b in sel) await Api.PostAsync($"/api/office/baterias/{b.S("id")}/status", new { status });
+        f.Recarregar();
+    });
+
+    public static void TotemBateria(FormPrincipal f, List<JsonObject> sel, bool mostrar) => Seguro.Rodar(f, async () =>
+    {
+        foreach (var b in sel) await Api.PostAsync($"/api/office/baterias/{b.S("id")}/totem", new { autoAtendimento = mostrar });
         f.Recarregar();
     });
 
@@ -85,7 +181,7 @@ public static class Acoes
         var falhas = new List<string>();
         foreach (var b in sel)
         {
-            try { await Api.Delete($"/api/office/baterias/{b.S("id")}"); }
+            try { await Api.DeleteAsync($"/api/office/baterias/{b.S("id")}"); }
             catch (ApiException e)
             {
                 falhas.Add($"{b.S("nome")} ({Fmt.DmyHm(b.S("dataHora"))}) — {e.Message}");
@@ -103,7 +199,7 @@ public static class Acoes
     public static void Manutencao(FormPrincipal f, List<JsonObject> sel, bool realizada) => Seguro.Rodar(f, async () =>
     {
         if (sel.Count == 0) return;
-        await Api.Post("/api/office/manutencoes/marcar", new { ids = sel.Select(r => r.L("id")).ToArray(), realizada });
+        await Api.PostAsync("/api/office/manutencoes/marcar", new { ids = sel.Select(r => r.L("id")).ToArray(), realizada });
         f.Recarregar();
     });
 }
@@ -118,7 +214,12 @@ public static class Relatorios
 
     public static void Participantes(Form dono, JsonObject bateriaSelecionada, DateTime data)
     {
-        if (bateriaSelecionada != null && bateriaSelecionada["id"] != null) { new FormListaParticipantes(bateriaSelecionada).ShowDialog(dono); return; }
+        if (bateriaSelecionada != null && bateriaSelecionada["id"] != null)
+        {
+            using var f = new FormListaParticipantes(bateriaSelecionada);
+            if (f.ShowDialog(dono) == DialogResult.OK && dono is FormPrincipal principal) principal.Recarregar();
+            return;
+        }
         Abrir(dono, "participantes", data);
     }
 
@@ -192,7 +293,7 @@ public class FormRelatoriosOffice : DialogoDesign
         BotaoRodape("Cancelar", false, Close);
         Load += (_, _) => Seguro.Rodar(this, async () =>
         {
-            var terms = await Sessao.Api.Lista("/api/office/cad/terminais");
+            var terms = await Sessao.Api.ListaAsync("/api/office/cad/terminais");
             _terminal.Items.AddRange(terms.Where(t => t.B("ativo")).Select(t => (object)new Campos.Item(t.L("id") ?? 0, t.S("nome"), t)).ToArray());
         });
     }
@@ -213,7 +314,9 @@ public class FormRelatoriosOffice : DialogoDesign
     string Q => $"de={Fmt.Iso(_de.Value)}&ate={Fmt.Iso(_ate.Value)}" + (Campos.IdDe(_terminal) is long t && t > 0 ? $"&terminal={t}" : "");
 
     /// <summary>Endereço do relatório escolhido (null quando ainda falta escolher na lista).</summary>
-    async Task<string> Url()
+    Task<string> Url() => UrlAsync();
+
+    async Task<string> UrlAsync()
     {
         if (!_de.Valida || !_ate.Valida) { Msg.Aviso(this, "Informe as datas do período (dd/mm/aaaa)."); return null; }
         if (_ate.Value < _de.Value) { Msg.Aviso(this, "A data final deve ser igual ou depois da inicial."); return null; }
@@ -236,7 +339,7 @@ public class FormRelatoriosOffice : DialogoDesign
             case "fechamento":
             {
                 _tituloJanela = "Fechamento de Caixa";
-                var movs = await api.Lista("/api/office/movimentos");
+                var movs = await api.ListaAsync("/api/office/movimentos");
                 var term = (_terminal.SelectedItem as Campos.Item) is { Id: > 0 } ti ? ti.Texto : null;
                 var lista = movs.Where(m => m.D("abertoEm") is DateTime a && a.Date >= _de.Value.Date && a.Date <= _ate.Value.Date && (term == null || m.S("terminal") == term)).ToList();
                 if (lista.Count == 0) { Msg.Aviso(this, "Nenhum caixa aberto nesse período" + (term != null ? $" no terminal {term}." : ".")); return null; }
@@ -249,7 +352,7 @@ public class FormRelatoriosOffice : DialogoDesign
             case "participantes":
             {
                 _tituloJanela = "Lista de Participantes";
-                var bats = await api.Lista($"/api/office/baterias?status=todas&filtro=dia&data={Fmt.Iso(_de.Value)}");
+                var bats = await api.ListaAsync($"/api/office/baterias?status=todas&filtro=dia&data={Fmt.Iso(_de.Value)}");
                 if (bats.Count == 0) { Msg.Aviso(this, $"Nenhuma bateria em {_de.Value:dd/MM/yyyy}."); return null; }
                 var agora = DateTime.Now;
                 MostrarEscolha($"Baterias de {_de.Value:dd/MM/yyyy}", [new("Hora", 80), new("Bateria", 360), new("Produto", 280), new("Inscritos", 90, Direita: true)], bats,
@@ -260,7 +363,7 @@ public class FormRelatoriosOffice : DialogoDesign
             case "crono-resultados":
             {
                 _tituloJanela = "Resultado";
-                var js = await Sessao.Api.Lista($"/api/office/crono/sessoes?de={Fmt.Iso(_de.Value)}&ate={Fmt.Iso(_ate.Value)}");
+                var js = await Sessao.Api.ListaAsync($"/api/office/crono/sessoes?de={Fmt.Iso(_de.Value)}&ate={Fmt.Iso(_ate.Value)}");
                 if (js.Count == 0) { Msg.Aviso(this, "Nenhuma corrida cronometrada nesse período."); return null; }
                 MostrarEscolha("Escolha a prova", [new("Início", 120), new("Prova", 460), new("Situação", 120), new("Pilotos", 80, Direita: true)], js,
                     x => [DataCrono(x).ToString("dd/MM HH:mm"), x.S("name"), x.S("state") switch { "encerrada" => "Encerrada", "em_andamento" => "Em andamento", var st => st }, x.S("competitors")],
@@ -285,7 +388,8 @@ public class FormRelatoriosOffice : DialogoDesign
         {
             var bat = _itensEscolha.First(b => b.S("id") == url[14..]);
             var dono = Owner; Close();
-            new FormListaParticipantes(bat).ShowDialog(dono);
+            using var f = new FormListaParticipantes(bat);
+            if (f.ShowDialog(dono) == DialogResult.OK && dono is FormPrincipal principal) principal.Recarregar();
             return;
         }
         var janela = Owner ?? this; var titulo = _tituloJanela ?? "Relatório";
@@ -332,7 +436,7 @@ public class FormEditarReserva : DialogoDesign
         {
             var c = FormPesquisarCliente.Escolher(this, $"Alterar cliente — {r.S("cliente")}");
             if (c == null) return;
-            await Sessao.Api.Post($"/api/office/reservas/{r.S("id")}/alterar-cliente", new { clienteId = c.L("id") });
+            await Sessao.Api.PostAsync($"/api/office/reservas/{r.S("id")}/alterar-cliente", new { clienteId = c.L("id") });
             cliente.Text = c.S("nome");
             termo.Checked = false;
             Msg.Info(this, "Cliente alterado.");
@@ -402,8 +506,8 @@ public class FormEditarReserva : DialogoDesign
             var body = new JsonObject { ["observacao"] = obs.Text.Trim(), ["kart"] = kart.Text.Trim(), ["peso"] = pesoTexto };
             if (!pago && Campos.IdDe(prod) is long pid) body["produtoId"] = pid;
             body["termo"] = termo.Checked;
-            await Sessao.Api.Put($"/api/office/reservas/{r.S("id")}", body);
-            if (aprovada.Checked && !r.B("aprovada")) await Sessao.Api.Post($"/api/office/reservas/{r.S("id")}/aprovar");
+            await Sessao.Api.PutAsync($"/api/office/reservas/{r.S("id")}", body);
+            if (aprovada.Checked && !r.B("aprovada")) await Sessao.Api.PostAsync($"/api/office/reservas/{r.S("id")}/aprovar");
             DialogResult = DialogResult.OK; Close();
         }));
         BotaoRodape("Cancelar", false, Close);
@@ -417,33 +521,72 @@ public class FormMoverCliente : DialogoDesign
     readonly TabelaDesign _t;
     List<JsonObject> _baterias = [];
 
-    public FormMoverCliente(JsonObject r) : base("Mover cliente para outra bateria", $"{r.S("cliente")} · " + (r.D("dataHora")?.Date == DateTime.Today ? $"hoje na {r.S("reserva")}" : $"na {r.S("reserva")} · {PecasDesign.DiaMes(r.S("dataHora"))}"),
+    public FormMoverCliente(JsonObject r, JsonObject grupo = null) : this([r], grupo) { }
+
+    public FormMoverCliente(IReadOnlyList<JsonObject> reservas, JsonObject grupo = null) : base(
+        grupo is not null ? "Mover grupo para outra bateria" : reservas.Count > 1 ? $"Mover {reservas.Count} participantes para outra bateria" : "Mover cliente para outra bateria",
+        grupo is not null ? $"Grupo {grupo.S("codigo")} · {grupo.I("n")} participantes · {Fmt.DmyHm(reservas[0].S("dataHora"))}"
+            : reservas.Count > 1 ? $"{reservas.Count} clientes selecionados · {PecasDesign.DiaMes(reservas[0].S("dataHora"))}"
+            : $"{reservas[0].S("cliente")} · " + (reservas[0].D("dataHora")?.Date == DateTime.Today ? $"hoje na {reservas[0].S("reserva")}" : $"na {reservas[0].S("reserva")} · {PecasDesign.DiaMes(reservas[0].S("dataHora"))}"),
         PecasDesign.Tile(Color.FromArgb(255, 179, 64), Color.FromArgb(245, 124, 0), "seta"))
     {
         _t = SecaoTabelaDesign("Escolha a nova bateria");
         _t.Selecionavel = true; _t.MaxLinhas = 8;
         _t.Colunas(new("", 0.45f), new("Bateria", 4.2f), new("Produto", 3.6f), new("Vagas livres", 1.2f, Direita: true));
-        var paga = r.B("pago");
-        Nota(paga
-            ? "O pagamento segue junto. O termo será invalidado e precisa ser impresso/assinado novamente. Só baterias com o mesmo produto e preço."
-            : "Produto e preço seguem a bateria escolhida. O termo será invalidado; se o produto mudar, o desconto atual será removido.");
+        var vagasNecessarias = grupo?.I("n") ?? reservas.Count;
+        Nota(grupo is not null
+            ? $"O grupo inteiro ({vagasNecessarias} participantes) será movido. O servidor confere vagas, serviço, tipo de kart e pagamentos."
+            : reservas.Any(r => r.B("pago"))
+                ? "O pagamento segue junto. O servidor confere se a bateria oferece o mesmo serviço e tipo de kart. O termo será invalidado e precisa ser impresso/assinado novamente."
+                : "Produto e preço seguem a bateria escolhida. O termo será invalidado; se o produto mudar, o desconto atual será removido.");
 
-        BotaoRodape("Mover", true, () => Seguro.Rodar(this, async () =>
+        BotaoRodape(grupo is null ? (reservas.Count > 1 ? $"Mover {reservas.Count} clientes" : "Mover") : "Mover grupo", true, () => Seguro.Rodar(this, async () =>
         {
             if (_t.Selecionada < 0 || _t.Selecionada >= _baterias.Count) { Msg.Aviso(this, "Selecione a nova bateria."); return; }
-            var x = await Sessao.Api.Post($"/api/office/reservas/{r.S("id")}/mover", new { bateriaId = _baterias[_t.Selecionada].L("id") });
-            Msg.Info(this, x.S("mensagem"));
+            var novaBateriaId = _baterias[_t.Selecionada].L("id");
+            if (grupo is not null)
+            {
+                var x = await Sessao.Api.PostAsync($"/api/office/grupos/{grupo.S("id")}/mover", new { bateriaId = novaBateriaId });
+                Msg.Info(this, x.S("mensagem") is { Length: > 0 } msg ? msg : "Grupo movido com sucesso.");
+            }
+            else
+            {
+                var sucessos = 0;
+                List<string> erros = [];
+                foreach (var r in reservas)
+                {
+                    try
+                    {
+                        await Sessao.Api.PostAsync($"/api/office/reservas/{r.S("id")}/mover", new { bateriaId = novaBateriaId });
+                        sucessos++;
+                    }
+                    catch (Exception ex)
+                    {
+                        erros.Add($"{r.S("cliente")}: {ex.Message}");
+                    }
+                }
+                if (erros.Count > 0)
+                {
+                    Msg.Aviso(this, $"Movidos: {sucessos} de {reservas.Count}.\n\nFalhas:\n" + string.Join("\n", erros));
+                }
+                else
+                {
+                    Msg.Info(this, sucessos > 1 ? $"{sucessos} participantes movidos com sucesso." : "Cliente movido com sucesso.");
+                }
+            }
             DialogResult = DialogResult.OK; Close();
         }));
         BotaoRodape("Cancelar", false, Close);
 
         Load += (_, _) => Seguro.Rodar(this, async () =>
         {
-            var lista = await Sessao.Api.Lista($"/api/office/baterias?status=abertas&filtro=apartir&data={Fmt.Iso(DateTime.Today)}");
-            _baterias = lista.Where(b => b.S("id") != r.S("bateriaId") && b.I("disponiveis") > 0
-                    && (!paga || (b.L("produtoId") == r.L("produtoId") && b.L("preco") == r.L("preco"))))
+            var dataBase = reservas[0].D("dataHora")?.Date ?? DateTime.Today;
+            var dataFiltro = Fmt.Iso(dataBase < DateTime.Today ? dataBase : DateTime.Today);
+            var lista = await Sessao.Api.ListaAsync($"/api/office/baterias?status=todas&filtro=apartir&data={dataFiltro}");
+            var atualId = reservas[0].S("bateriaId");
+            _baterias = lista.Where(b => b.S("id") != atualId && b.S("status") != "cancelada" && b.I("disponiveis") >= vagasNecessarias)
                 .OrderBy(b => b.S("dataHora")).ToList();
-            _t.Linhas(_baterias.Select(b => new[] { "", $"{b.S("nome")} · {PecasDesign.DiaMes(b.S("dataHora"))}", b.S("produto"), b.I("disponiveis").ToString() }));
+            _t.Linhas(_baterias.Select(b => new[] { "", $"{b.S("nome")} · {PecasDesign.DiaMes(b.S("dataHora"))}{(b.S("status") == "fechada" ? " (Fechada)" : "")}", b.S("produto"), b.I("disponiveis").ToString() }));
             _t.Selecionar(-1); // sem escolha pronta: "Mover" com a 1ª já marcada levava o cliente para a bateria errada
         });
     }
@@ -458,12 +601,150 @@ public class FormListaParticipantes : DialogoDesign
     {
         var batId = bateria.S("id");
         var tabela = SecaoTabelaDesign(null);
+        tabela.Selecionavel = true;
+        tabela.AccessibleDescription = "Selecione uma pessoa para mover a reserva ou excluir a vaga da bateria.";
         tabela.Colunas(new("Kart", 60), new("Participante", 520), new("Idade", 60, Direita: true), new("Peso", 70, Direita: true), new("Pago", 60, Marca: true), new("Termo", 60, Marca: true));
         tabela.MaxLinhas = 13;
         tabela.Vazio = "Nenhum participante nesta bateria ainda.";
         tabela.Linhas([]);
         var info = TextoRodape("Carregando…");
         List<JsonObject> participantes = [];
+        var gruposPorReserva = new Dictionary<long, (JsonObject Grupo, JsonObject Piloto)>();
+        var gruposCarregados = false;
+        Button mover = null, excluir = null, desvincular = null;
+
+        JsonObject ReservaSelecionada() => tabela.Selecionada >= 0 && tabela.Selecionada < participantes.Count ? participantes[tabela.Selecionada] : null;
+        (JsonObject Grupo, JsonObject Piloto)? GrupoDaReserva(JsonObject reserva) => reserva?.L("id") is long id && gruposPorReserva.TryGetValue(id, out var grupo) ? grupo : null;
+        void AtualizarAcoes()
+        {
+            var reserva = ReservaSelecionada();
+            mover.Enabled = excluir.Enabled = gruposCarregados && reserva != null;
+            mover.Text = "Mover participante";
+            var grupo = GrupoDaReserva(reserva);
+            var ehMembroGrupo = gruposCarregados && grupo is { } g && !g.Piloto.B("responsavel");
+            if (desvincular != null)
+            {
+                desvincular.Visible = ehMembroGrupo;
+                desvincular.Enabled = ehMembroGrupo;
+            }
+        }
+        void DesvincularGrupo()
+        {
+            var reserva = ReservaSelecionada();
+            if (reserva is null || !gruposCarregados) return;
+            var grupo = GrupoDaReserva(reserva);
+            if (grupo is not { } g) return;
+
+            Seguro.Rodar(this, async () =>
+            {
+                var resp = MessageBox.Show(this,
+                    $"O participante {reserva.S("cliente")} faz parte do grupo {g.Grupo.S("codigo")}.\n\n" +
+                    $"Deseja desvinculá-lo do grupo para colocá-lo SOZINHO nesta mesma bateria?\n\n" +
+                    $"• Sim: Colocar SOZINHO nesta bateria (libera a vaga no grupo {g.Grupo.S("codigo")} para outro amigo)\n" +
+                    $"• Não: Transferir para outro grupo\n" +
+                    $"• Cancelar: Voltar",
+                    "Movimentar cliente de grupo", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+
+                if (resp == DialogResult.Cancel) return;
+
+                if (resp == DialogResult.Yes)
+                {
+                    var x = await Sessao.Api.PostAsync($"/api/office/grupos/{g.Grupo.S("id")}/pilotos/{g.Piloto.S("id")}/desvincular", new { destino = "sozinho" });
+                    Msg.Info(this, x.S("mensagem") is { Length: > 0 } msg ? msg : "Participante desvinculado com sucesso!");
+                    DialogResult = DialogResult.OK;
+                    Close();
+                    return;
+                }
+
+                if (resp == DialogResult.No)
+                {
+                    var dataBase = bateria.D("dataHora")?.Date ?? DateTime.Today;
+                    var dataStr = Fmt.Iso(dataBase);
+                    var outrosGrupos = (await Sessao.Api.ListaAsync($"/api/office/grupos?de={dataStr}&ate={dataStr}"))
+                        .Where(gr => gr.S("id") != g.Grupo.S("id") && gr.S("status") == "ativa").ToList();
+
+                    if (outrosGrupos.Count == 0)
+                    {
+                        Msg.Aviso(this, "Não foram encontrados outros grupos ativos nesta data para transferência.");
+                        return;
+                    }
+
+                    using var fEsc = new FormEscolherGrupo(outrosGrupos);
+                    if (fEsc.ShowDialog(this) == DialogResult.OK && fEsc.GrupoSelecionado is { } novoGrupo)
+                    {
+                        var x = await Sessao.Api.PostAsync($"/api/office/grupos/{g.Grupo.S("id")}/pilotos/{g.Piloto.S("id")}/desvincular", new { destino = "outro_grupo", novoGrupoId = novoGrupo.L("id") });
+                        Msg.Info(this, x.S("mensagem") is { Length: > 0 } msg ? msg : "Participante transferido para o novo grupo com sucesso!");
+                        DialogResult = DialogResult.OK;
+                        Close();
+                    }
+                }
+            });
+        }
+        void MoverReserva()
+        {
+            var reserva = ReservaSelecionada();
+            if (reserva is null || !gruposCarregados) return;
+            var grupo = GrupoDaReserva(reserva);
+            JsonObject grupoParaMover = null;
+            if (grupo is { } g)
+            {
+                var resp = MessageBox.Show(this,
+                    $"O participante {reserva.S("cliente")} faz parte do grupo {g.Grupo.S("codigo")}.\n\n" +
+                    $"• Sim: mover APENAS {reserva.S("cliente")} (ele será desvinculado do grupo)\n" +
+                    $"• Não: mover o grupo INTEIRO ({g.Grupo.I("n")} participantes)\n" +
+                    $"• Cancelar: desistir",
+                    "Mover participante de grupo", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+                if (resp == DialogResult.Cancel) return;
+                if (resp == DialogResult.No) grupoParaMover = g.Grupo;
+                else if (!g.Piloto.B("responsavel"))
+                {
+                    var mesmabat = MessageBox.Show(this,
+                        $"Deseja manter {reserva.S("cliente")} SOZINHO nesta mesma bateria?\n\n" +
+                        $"• Sim: Manter nesta mesma bateria como reserva avulsa\n" +
+                        $"• Não: Escolher outra bateria",
+                        "Manter na bateria atual?", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                    if (mesmabat == DialogResult.Yes)
+                    {
+                        Seguro.Rodar(this, async () =>
+                        {
+                            var x = await Sessao.Api.PostAsync($"/api/office/grupos/{g.Grupo.S("id")}/pilotos/{g.Piloto.S("id")}/desvincular", new { destino = "sozinho" });
+                            Msg.Info(this, x.S("mensagem") is { Length: > 0 } msg ? msg : "Participante desvinculado com sucesso!");
+                            DialogResult = DialogResult.OK;
+                            Close();
+                        });
+                        return;
+                    }
+                }
+            }
+            using var f = new FormMoverCliente(reserva, grupoParaMover);
+            if (f.ShowDialog(this) == DialogResult.OK) { DialogResult = DialogResult.OK; Close(); }
+        }
+        void ExcluirReserva()
+        {
+            var reserva = ReservaSelecionada();
+            if (reserva is null || !gruposCarregados) return;
+            var grupo = GrupoDaReserva(reserva);
+            Seguro.Rodar(this, async () =>
+            {
+                string caminho;
+                string confirmacao;
+                if (grupo is { } vinculo)
+                {
+                    caminho = $"/api/office/grupos/{vinculo.Grupo.S("id")}/pilotos/{vinculo.Piloto.S("id")}";
+                    confirmacao = $"Excluir a vaga de {reserva.S("cliente")} do grupo {vinculo.Grupo.S("codigo")}? A vaga será liberada. Cadastro e pagamentos serão mantidos no histórico, sem reembolso automático.";
+                }
+                else
+                {
+                    caminho = $"/api/office/reservas/{reserva.S("id")}";
+                    confirmacao = $"Excluir a reserva de {reserva.S("cliente")}? A vaga será liberada. Cadastro e pagamentos serão mantidos no histórico, sem reembolso automático.";
+                }
+                if (!Msg.Pergunta(this, confirmacao)) return;
+                await Sessao.Api.DeleteAsync(caminho);
+                Msg.Info(this, "Reserva excluída com sucesso.");
+                DialogResult = DialogResult.OK; Close();
+            });
+        }
+
         BotaoRodape("Imprimir lista", true, () => Relatorio.Abrir(this, Sessao.Api.UrlComToken("/relatorio/participantes?bateria=" + batId), "Lista de Participantes"));
         BotaoRodape("Fechar", false, Close);
         BotaoRodape("Imprimir termos pendentes", false, () =>
@@ -472,18 +753,82 @@ public class FormListaParticipantes : DialogoDesign
             if (pendentes.Count == 0) { Msg.Info(this, "Todos os termos já foram assinados."); return; }
             Acoes.ImprimirTermo(this, pendentes);
         });
+        mover = BotaoRodape("Mover reserva", false, MoverReserva);
+        desvincular = BotaoRodape("Grupo errado / Colocar sozinho", false, DesvincularGrupo);
+        excluir = BotaoRodape("Excluir reserva", false, ExcluirReserva);
+        mover.Enabled = excluir.Enabled = desvincular.Enabled = false;
+        desvincular.Visible = false;
+        tabela.SelecaoMudou += AtualizarAcoes;
 
         Load += (_, _) => Seguro.Rodar(this, async () =>
         {
-            var res = await Sessao.Api.Lista($"/api/office/reservas?bateriaId={batId}");
+            var tRes = Sessao.Api.ListaAsync($"/api/office/reservas?bateriaId={batId}");
+            var tGrupos = Sessao.Api.ListaAsync($"/api/office/grupos?bateriaId={batId}");
+            await Task.WhenAll(tRes, tGrupos);
+
+            var res = await tRes;
             participantes = res.Where(r => r.S("status") != "cancelada").OrderBy(r => int.TryParse(r.S("kart"), out var k) ? k : 999).ThenBy(r => r.S("cliente")).ToList();
+            try
+            {
+                var grupos = await tGrupos;
+                foreach (var grupo in grupos)
+                    if (grupo["pilotos"] is JsonArray pilotos)
+                        foreach (var item in pilotos)
+                            if (item is JsonObject piloto && piloto.L("inscricaoId") is long inscricaoId)
+                                gruposPorReserva[inscricaoId] = (grupo, piloto);
+                gruposCarregados = true;
+            }
+            catch { info.Text = "Vínculos de grupo indisponíveis; mover e excluir estão desativados."; }
             static string Peso(JsonObject p) => decimal.TryParse(p.S("peso"), NumberStyles.Number, CultureInfo.InvariantCulture, out var kg) && kg > 0 ? kg.ToString("0.#", Fmt.Br) : "—";
             tabela.Linhas(participantes.Select(p => new[]
             {
                 p.S("kart") is { Length: > 0 } k ? k.PadLeft(2, '0') : "—", p.S("cliente") + (p.S("responsavel") is { Length: > 0 } rsp && p.I("idade") is > 0 and < 18 ? $" (menor · resp. {rsp.Split(' ')[0]})" : ""),
                 p.I("idade") > 0 ? p.I("idade").ToString() : "—", Peso(p), p.B("pago") ? "1" : "0", p.B("termo") ? "1" : "0",
             }));
-            info.Text = $"{participantes.Count} participantes · {participantes.Count(p => p.B("pago"))} pagos · {participantes.Count(p => p.B("termo"))} termos assinados";
+            info.Text = $"{participantes.Count} participantes · {participantes.Count(p => p.B("pago"))} pagos · {participantes.Count(p => p.B("termo"))} termos assinados"
+                + (gruposCarregados ? "" : " · vínculos de grupo indisponíveis; ações desativadas");
+            AtualizarAcoes();
         });
+    }
+}
+
+/// <summary>Escolha do grupo de destino para transferir cliente cadastrado por engano.</summary>
+public class FormEscolherGrupo : DialogoDesign
+{
+    readonly TabelaDesign _t;
+    readonly List<JsonObject> _grupos;
+    public JsonObject GrupoSelecionado { get; private set; }
+
+    public FormEscolherGrupo(List<JsonObject> grupos) : base(
+        "Transferir para outro grupo",
+        "Escolha o grupo de destino da data",
+        PecasDesign.Tile(Color.FromArgb(108, 184, 255), Color.FromArgb(30, 111, 232), "grupo"))
+    {
+        _grupos = grupos;
+        _t = SecaoTabelaDesign("Grupos ativos");
+        _t.Selecionavel = true;
+        _t.MaxLinhas = 8;
+        _t.Colunas(new("Código", 1.8f), new("Responsável", 4.2f), new("Horário", 2.0f), new("Pilotos", 1.5f, Direita: true));
+        _t.Linhas(_grupos.Select(g => new[]
+        {
+            g.S("codigo"),
+            g.S("responsavel"),
+            Fmt.Hm(g.S("inicio")),
+            $"{g.I("cadastrados")}/{g.I("n")}"
+        }));
+        _t.Selecionar(0);
+
+        BotaoRodape("Transferir", true, () =>
+        {
+            if (_t.Selecionada < 0 || _t.Selecionada >= _grupos.Count)
+            {
+                Msg.Aviso(this, "Selecione o grupo de destino.");
+                return;
+            }
+            GrupoSelecionado = _grupos[_t.Selecionada];
+            DialogResult = DialogResult.OK;
+            Close();
+        });
+        BotaoRodape("Cancelar", false, Close);
     }
 }
