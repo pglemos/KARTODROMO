@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
+using System.Threading.Tasks;
 using Kartodromo.Comum;
 
 namespace Kartodromo.Recepcao;
@@ -13,7 +14,7 @@ public static class Acoes
     {
         var pre = sel.Where(r => !r.B("aprovada") && r.S("status") != "cancelada").ToList();
         if (!Msg.Pergunta(f, $"Deseja aprovar a pré-reserva? ({pre.Count})")) return;
-        foreach (var r in pre) await Api.PostAsync($"/api/office/reservas/{r.S("id")}/aprovar");
+        await Task.WhenAll(pre.Select(r => Api.PostAsync($"/api/office/reservas/{r.S("id")}/aprovar")));
         f.Recarregar();
     });
 
@@ -156,19 +157,19 @@ public static class Acoes
     public static void ExcluirReservas(FormPrincipal f, List<JsonObject> sel) => Seguro.Rodar(f, async () =>
     {
         if (!Msg.Pergunta(f, sel.Count > 1 ? "Excluir as reservas e liberar as vagas? Pagamentos serão mantidos no histórico, sem reembolso automático." : "Excluir a reserva e liberar a vaga? O pagamento será mantido no histórico, sem reembolso automático.")) return;
-        foreach (var r in sel) await Api.DeleteAsync($"/api/office/reservas/{r.S("id")}");
+        await Task.WhenAll(sel.Select(r => Api.DeleteAsync($"/api/office/reservas/{r.S("id")}")));
         f.Recarregar();
     });
 
     public static void StatusBateria(FormPrincipal f, List<JsonObject> sel, string status) => Seguro.Rodar(f, async () =>
     {
-        foreach (var b in sel) await Api.PostAsync($"/api/office/baterias/{b.S("id")}/status", new { status });
+        await Task.WhenAll(sel.Select(b => Api.PostAsync($"/api/office/baterias/{b.S("id")}/status", new { status })));
         f.Recarregar();
     });
 
     public static void TotemBateria(FormPrincipal f, List<JsonObject> sel, bool mostrar) => Seguro.Rodar(f, async () =>
     {
-        foreach (var b in sel) await Api.PostAsync($"/api/office/baterias/{b.S("id")}/totem", new { autoAtendimento = mostrar });
+        await Task.WhenAll(sel.Select(b => Api.PostAsync($"/api/office/baterias/{b.S("id")}/totem", new { autoAtendimento = mostrar })));
         f.Recarregar();
     });
 
@@ -179,14 +180,13 @@ public static class Acoes
             : sel.Count == 1 ? $"Deseja excluir definitivamente a bateria atual?\n{sel[0].S("nome")} {Fmt.DmyHm(sel[0].S("dataHora"))}" : $"Deseja excluir as {sel.Count} baterias selecionadas?";
         if (!Msg.Pergunta(f, txt)) return;
         var falhas = new List<string>();
-        foreach (var b in sel)
+        var tarefas = sel.Select(async b =>
         {
-            try { await Api.DeleteAsync($"/api/office/baterias/{b.S("id")}"); }
-            catch (ApiException e)
-            {
-                falhas.Add($"{b.S("nome")} ({Fmt.DmyHm(b.S("dataHora"))}) — {e.Message}");
-            }
-        }
+            try { await Api.DeleteAsync($"/api/office/baterias/{b.S("id")}"); return (bateria: b, erro: (string)null); }
+            catch (ApiException e) { return (bateria: b, erro: $"{b.S("nome")} ({Fmt.DmyHm(b.S("dataHora"))}) — {e.Message}"); }
+        });
+        foreach (var (bateria, erro) in await Task.WhenAll(tarefas))
+            if (erro is { Length: > 0 }) falhas.Add(erro);
         if (falhas.Count > 0)
         {
             var msg = $"{falhas.Count} bateria(s) não puderam ser excluídas:\n\n" + string.Join("\n", falhas.Take(8));

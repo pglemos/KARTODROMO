@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using System.Threading.Tasks;
 using Kartodromo.Comum;
 
 namespace Kartodromo.Recepcao;
@@ -10,7 +11,8 @@ static class Program
     {
         var args = Environment.GetCommandLineArgs();
         ApplicationConfiguration.Initialize();
-        if (Atualizacao.TratarInicioAsync("Recepcao", args, instanciaUnica: true).GetAwaiter().GetResult()) return;
+        // A interface e o WebView2 devem continuar na thread STA de entrada.
+        if (Task.Run(() => Atualizacao.TratarInicioAsync("Recepcao", args, instanciaUnica: true)).GetAwaiter().GetResult()) return;
         KitVisual.Instalar();
         Forma.Icones = VisualPrincipal.Icone;
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
@@ -60,15 +62,16 @@ public static class Sessao
     public static bool Admin => Usuario.B("admin");
     public static string Nome => Usuario.S("nome");
 
-    public static async Task CarregarApoio() => Apoio = (await Api.Get("/api/office/apoio")).AsObject();
+    public static async Task CarregarApoioAsync() => Apoio = (await Api.GetAsync("/api/office/apoio")).AsObject();
+    public static Task CarregarApoio() => CarregarApoioAsync();
 
     public static List<JsonObject> Lista(string k) => Apoio?[k] is JsonArray a ? a.OfType<JsonObject>().ToList() : [];
     public static string Param(string k) => Apoio?["parametros"]?[k]?.GetValue<string>();
     public static bool ParamSim(string k, bool padrao) => Param(k) is { } v ? v == "true" : padrao;
 
     public static Campos.Item[] Produtos(bool soAtivos = true) =>
-        Lista("produtos").Where(p => !soAtivos || p.B("ativo")).Select(p => new Campos.Item(p.L("id") ?? 0, $"{p.S("nome")} — {Fmt.Brl(p.L("preco"))}", p)).ToArray();
-    public static Campos.Item[] Tracados() => Lista("tracados").Select(t => new Campos.Item(t.L("id") ?? 0, t.S("nome"), t)).ToArray();
-    public static Campos.Item[] Formas() => Lista("formas").Select(f => new Campos.Item(f.L("id") ?? 0, f.S("nome"), f)).ToArray();
-    public static Campos.Item[] Padroes() => Lista("padroes").Select(p => new Campos.Item(p.L("id") ?? 0, p.S("nome"), p)).ToArray();
+        [.. Lista("produtos").Where(p => !soAtivos || p.B("ativo")).Select(p => new Campos.Item(p.L("id") ?? 0, $"{p.S("nome")} — {Fmt.Brl(p.L("preco"))}", p))];
+    public static Campos.Item[] Tracados() => [.. Lista("tracados").Select(t => new Campos.Item(t.L("id") ?? 0, t.S("nome"), t))];
+    public static Campos.Item[] Formas() => [.. Lista("formas").Select(f => new Campos.Item(f.L("id") ?? 0, f.S("nome"), f))];
+    public static Campos.Item[] Padroes() => [.. Lista("padroes").Select(p => new Campos.Item(p.L("id") ?? 0, p.S("nome"), p))];
 }

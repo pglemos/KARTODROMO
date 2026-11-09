@@ -543,7 +543,9 @@ public class FormPrincipal : Form
     bool _emPing;
 
     void Relogio() { _sbHora.Text = DateTime.Now.ToString("HH:mm · dd/MM/yyyy"); _sbData.Text = ""; }
-    async Task Ping()
+    Task Ping() => PingAsync();
+
+    async Task PingAsync()
     {
         if (_emPing) return;
         _emPing = true;
@@ -551,9 +553,9 @@ public class FormPrincipal : Form
         {
             try
             {
-                await Sessao.Api.Get("/healthz");
+                await Sessao.Api.GetAsync("/healthz");
                 _sbSrv.Text = "● Servidor on-line"; _sbSrv.ForeColor = Tokens.Claro.CorEstadoSucessoTexto;
-                var c = (await Sessao.Api.Get("/api/office/caixa")).AsObject();
+                var c = (await Sessao.Api.GetAsync("/api/office/caixa")).AsObject();
                 if (c["aberto"] is JsonObject ab)
                 {
                     var dinheiro = c["sumario"]?.L("dinheiroEmCaixa") ?? 0;
@@ -572,8 +574,10 @@ public class FormPrincipal : Form
                 _sbSrv.Text = "● Servidor off-line"; _sbSrv.ForeColor = Tokens.Claro.CorEstadoPerigoTexto;
                 _selo.Definir(false, "Terminal indisponível", "Não foi possível consultar o caixa");
             }
-            await PingServico("crono", Config.CronoUrl, _sbCrono);
-            await PingSite(_sbSite);
+            await Task.WhenAll(
+                PingServicoAsync("crono", Config.CronoUrl, _sbCrono),
+                PingSiteAsync(_sbSite)
+            );
         }
         finally
         {
@@ -581,7 +585,9 @@ public class FormPrincipal : Form
         }
     }
 
-    static async Task PingServico(string nome, string baseUrl, ToolStripStatusLabel label)
+    static Task PingServico(string nome, string baseUrl, ToolStripStatusLabel label) => PingServicoAsync(nome, baseUrl, label);
+
+    static async Task PingServicoAsync(string nome, string baseUrl, ToolStripStatusLabel label)
     {
         try
         {
@@ -593,7 +599,9 @@ public class FormPrincipal : Form
         catch { label.Text = "● Cronometragem · off-line"; label.ForeColor = Tokens.Claro.CorEstadoPerigoTexto; }
     }
 
-    static async Task PingSite(ToolStripStatusLabel label)
+    static Task PingSite(ToolStripStatusLabel label) => PingSiteAsync(label);
+
+    static async Task PingSiteAsync(ToolStripStatusLabel label)
     {
         try
         {
@@ -878,7 +886,7 @@ public class FormPrincipal : Form
         if (cliente == null) return;
         Seguro.Rodar(this, async () =>
         {
-            var r = await Sessao.Api.Post("/api/office/fidelidade/contas", new { clienteId = cliente.L("id") });
+            var r = await Sessao.Api.PostAsync("/api/office/fidelidade/contas", new { clienteId = cliente.L("id") });
             if (r?["existente"]?.GetValue<bool>() == true) Msg.Info(this, $"{cliente.S("nome")} já tem conta de fidelidade.");
             Recarregar();
         });
@@ -893,7 +901,7 @@ public class FormPrincipal : Form
         if (string.IsNullOrWhiteSpace(motivo)) return;
         Seguro.Rodar(this, async () =>
         {
-            await Sessao.Api.Post($"/api/office/fidelidade/contas/{conta.S("id")}/ajustes", new { pontos, motivo = motivo.Trim(), idempotencyKey = "aj-" + Guid.NewGuid().ToString("N") });
+            await Sessao.Api.PostAsync($"/api/office/fidelidade/contas/{conta.S("id")}/ajustes", new { pontos, motivo = motivo.Trim(), idempotencyKey = "aj-" + Guid.NewGuid().ToString("N") });
             Recarregar();
         });
     }
@@ -902,7 +910,7 @@ public class FormPrincipal : Form
     {
         var ativar = !conta.B("ativo");
         if (!Msg.Pergunta(this, ativar ? $"Reativar a conta de fidelidade de {conta.S("nome")}?" : $"Desativar a conta de fidelidade de {conta.S("nome")}?\nOs vouchers de fidelidade dela também serão desativados.")) return;
-        Seguro.Rodar(this, async () => { await Sessao.Api.Put($"/api/office/fidelidade/contas/{conta.S("id")}", new { ativo = ativar }); Recarregar(); });
+        Seguro.Rodar(this, async () => { await Sessao.Api.PutAsync($"/api/office/fidelidade/contas/{conta.S("id")}", new { ativo = ativar }); Recarregar(); });
     }
 
     void AtivarVoucher(JsonObject v)
@@ -911,8 +919,8 @@ public class FormPrincipal : Form
         if (!Msg.Pergunta(this, ativar ? $"Reativar o voucher {v.S("codigo")}?" : $"Desativar o voucher {v.S("codigo")}?\nO código para de valer no caixa (o histórico de uso continua).")) return;
         Seguro.Rodar(this, async () =>
         {
-            if (ativar) await Sessao.Api.Put($"/api/office/vouchers/{v.S("id")}", new { ativo = true });
-            else await Sessao.Api.Enviar(HttpMethod.Delete, $"/api/office/vouchers/{v.S("id")}");
+            if (ativar) await Sessao.Api.PutAsync($"/api/office/vouchers/{v.S("id")}", new { ativo = true });
+            else await Sessao.Api.DeleteAsync($"/api/office/vouchers/{v.S("id")}");
             Recarregar();
         });
     }
@@ -932,7 +940,7 @@ public class FormPrincipal : Form
         j.BotaoRodape(acao == "pagar" ? "Confirmar pagamento" : "Confirmar estorno", true, () => Seguro.Rodar(j, async () =>
         {
             if (acao == "estornar" && string.IsNullOrWhiteSpace(motivo.Text)) { Msg.Aviso(j, "Informe o motivo do estorno."); return; }
-            await Sessao.Api.Post($"/api/office/parceiros/comissoes/{c.S("id")}/{acao}", new { idempotencyKey = chave, formaPagamentoId = Campos.IdDe(forma), motivo = motivo.Text.Trim() });
+            await Sessao.Api.PostAsync($"/api/office/parceiros/comissoes/{c.S("id")}/{acao}", new { idempotencyKey = chave, formaPagamentoId = Campos.IdDe(forma), motivo = motivo.Text.Trim() });
             j.Close();
             Recarregar();
         }));
@@ -1001,11 +1009,14 @@ public class FormPrincipal : Form
                 _menuAtual = MenuReservas;
                 if (_status == "pendentes" && _filtroBateria == null)
                 {
-                    var pre = await Sessao.Api.Lista("/api/office/reservas?status=aprovar&" + Periodo());
-                    var aguardando = await Sessao.Api.Lista("/api/office/reservas?status=pendentes&" + Periodo());
+                    var tPre = Sessao.Api.ListaAsync("/api/office/reservas?status=aprovar&" + Periodo());
+                    var tAguardando = Sessao.Api.ListaAsync("/api/office/reservas?status=pendentes&" + Periodo());
+                    await Task.WhenAll(tPre, tAguardando);
+                    var pre = await tPre;
+                    var aguardando = await tAguardando;
                     rows = pre.Concat(aguardando).DistinctBy(r => r.S("id")).ToList();
                 }
-                else rows = await Sessao.Api.Lista($"/api/office/reservas?status={_status}&" + (_filtroBateria != null ? $"bateriaId={_filtroBateria.S("id")}" : Periodo()));
+                else rows = await Sessao.Api.ListaAsync($"/api/office/reservas?status={_status}&" + (_filtroBateria != null ? $"bateriaId={_filtroBateria.S("id")}" : Periodo()));
                 break;
             case "baterias":
                 _grade.Colunas([
@@ -1014,7 +1025,7 @@ public class FormPrincipal : Form
                     new("responsavel", "Responsável", Largura: 170), new("status", "Situação", Largura: 80, Valor: r => r.S("status") == "aberta" ? "Aberta" : "Fechada"), new("autoAtendimento", "Totem", TipoCol.Bool)]);
                 _grade.CorLinha = r => r.S("status") == "fechada" ? Color.Gray : null;
                 _menuAtual = MenuBaterias;
-                rows = await Sessao.Api.Lista($"/api/office/baterias?status={_status}&{Periodo()}");
+                rows = await Sessao.Api.ListaAsync($"/api/office/baterias?status={_status}&{Periodo()}");
                 break;
             case "vendas":
                 _grade.Colunas([
@@ -1027,7 +1038,7 @@ public class FormPrincipal : Form
                     new("motivo", "Motivo"), new("observacao", "Observação")]);
                 _grade.CorLinha = r => r.B("cancelada") ? Color.Silver : null;
                 _menuAtual = MenuVendas;
-                rows = await Sessao.Api.Lista($"/api/office/vendas?status={_status}&{Periodo()}");
+                rows = await Sessao.Api.ListaAsync($"/api/office/vendas?status={_status}&{Periodo()}");
                 break;
             case "oficina":
                 _grade.Colunas([
@@ -1044,7 +1055,7 @@ public class FormPrincipal : Form
                     return limite <= 0 ? null : uso >= limite ? Tokens.Claro.CorEstadoPerigoTexto : uso >= limite * 0.8 ? Tokens.Claro.CorEstadoAvisoTexto : null; // 80%, igual ao "A realizar"
                 };
                 _menuAtual = MenuOficina;
-                rows = await Sessao.Api.Lista($"/api/office/manutencoes?status={_status}");
+                rows = await Sessao.Api.ListaAsync($"/api/office/manutencoes?status={_status}");
                 break;
             case "vouchers":
                 if (_status == "uso")
@@ -1060,7 +1071,7 @@ public class FormPrincipal : Form
                     Item("Editar voucher", () => Seguro.Rodar(this, async () => { if (await FormVoucher.Editar(this, sel[0])) Recarregar(); }), sel.Count == 1, "Enter"),
                     Item(sel.Count == 1 && !sel[0].B("ativo") ? "Reativar voucher" : "Desativar voucher", () => AtivarVoucher(sel[0]), sel.Count == 1),
                     new ToolStripSeparator(), Exportar("vouchers")];
-                rows = await Sessao.Api.Lista(_status == "uso" ? "/api/office/vouchers/uso" : "/api/office/vouchers");
+                rows = await Sessao.Api.ListaAsync(_status == "uso" ? "/api/office/vouchers/uso" : "/api/office/vouchers");
                 break;
             case "fidelidade":
                 if (_status == "contas")
@@ -1068,14 +1079,14 @@ public class FormPrincipal : Form
                     _grade.Colunas(new("nome", "Conta", Largura: 260), new("documento", "Documento", Largura: 150), new("baterias", "Baterias", TipoCol.Inteiro), new("saldo", "Pontos", TipoCol.Inteiro),
                         new("transacoes", "Transações", TipoCol.Inteiro), new("criadaEm", "Desde", TipoCol.Data), new("ativo", "Ativa", TipoCol.Bool));
                     _grade.CorLinha = r => r.B("ativo") ? null : Color.Gray;
-                    rows = await Sessao.Api.Lista("/api/office/fidelidade/contas");
+                    rows = await Sessao.Api.ListaAsync("/api/office/fidelidade/contas");
                 }
                 else
                 {
                     _grade.Colunas(new("dataHora", "Data/Hora", TipoCol.DataHora), new("conta", "Conta", Largura: 240), new("tipo", "Tipo", Largura: 90), new("motivo", "Descrição", Largura: 300),
                         new("pontos", "Pontos", TipoCol.Inteiro), new("saldoApos", "Saldo após", TipoCol.Inteiro), new("usuario", "Usuário", Largura: 120));
                     _grade.CorLinha = r => (r.L("pontos") ?? 0) < 0 ? Tokens.Claro.CorEstadoPerigoTexto : null;
-                    rows = await Sessao.Api.Lista(_filtroContaFidelidade != null
+                    rows = await Sessao.Api.ListaAsync(_filtroContaFidelidade != null
                         ? $"/api/office/fidelidade/contas/{_filtroContaFidelidade.S("id")}/transacoes?{Periodo()}"
                         : $"/api/office/fidelidade/transacoes?{Periodo()}");
                 }
@@ -1100,15 +1111,15 @@ public class FormPrincipal : Form
                     Item("Ver as reservas desta bateria", () => Selecionar("reservas:todas", new JsonObject { ["id"] = sel[0].L("bateriaId"), ["nome"] = sel[0].S("bateria"), ["dataHora"] = sel[0].S("inicio") }), sel.Count == 1),
                     Item("Resolver pagamento recebido", () => Seguro.Rodar(this, async () =>
                     {
-                        string? resolucao = Msg.Pergunta(this, $"O reembolso do pedido {sel[0].S("codigo")} de {sel[0].S("cliente")} já foi confirmado pela Asaas?")
+                        string resolucao = Msg.Pergunta(this, $"O reembolso do pedido {sel[0].S("codigo")} de {sel[0].S("cliente")} já foi confirmado pela Asaas?")
                             ? "reembolso_confirmado"
                             : Msg.Pergunta(this, "O cliente já foi remarcado para outra bateria?") ? "remarcado" : null;
                         if (resolucao is null) return;
-                        await Sessao.Api.Post($"/api/office/reservas-online/{sel[0].S("id")}/resolver", new { resolucao });
+                        await Sessao.Api.PostAsync($"/api/office/reservas-online/{sel[0].S("id")}/resolver", new { resolucao });
                         Recarregar();
                     }), sel.Count == 1 && sel[0].S("status") == "pago_sem_vaga"),
                     new ToolStripSeparator(), Exportar("reservas-online")];
-                rows = await Sessao.Api.Lista($"/api/office/reservas-online?status={_status}" + (_status == "atencao" ? "" : "&" + Periodo()));
+                rows = await Sessao.Api.ListaAsync($"/api/office/reservas-online?status={_status}" + (_status == "atencao" ? "" : "&" + Periodo()));
                 break;
             case "parceiros":
                 if (_status == "lista")
@@ -1118,7 +1129,7 @@ public class FormPrincipal : Form
                         new("comissaoPendenteCentavos", "A pagar (R$)", TipoCol.Dinheiro), new("comissaoPagaCentavos", "Pago (R$)", TipoCol.Dinheiro),
                         new("contato", "Contato", Largura: 160), new("ativo", "Ativo", TipoCol.Bool));
                     _grade.CorLinha = r => r.B("ativo") ? null : Color.Gray;
-                    rows = await Sessao.Api.Lista("/api/office/parceiros");
+                    rows = await Sessao.Api.ListaAsync("/api/office/parceiros");
                 }
                 else
                 {
@@ -1127,7 +1138,7 @@ public class FormPrincipal : Form
                         new("situacao", "Situação", Largura: 90, Valor: r => r.S("situacao") switch { "paga" => "Paga", "estornada" => "Estornada", _ => "Pendente" }),
                         new("metodoPagamento", "Pago com", Largura: 110), new("pagoEm", "Pago em", TipoCol.DataHora));
                     _grade.CorLinha = r => r.S("situacao") == "estornada" ? Color.Gray : r.S("situacao") == "pendente" ? Tokens.Claro.CorEstadoAvisoTexto : null;
-                    rows = await Sessao.Api.Lista($"/api/office/parceiros/comissoes?status={(_status == "pagas" ? "pagas" : "todas")}&{Periodo()}");
+                    rows = await Sessao.Api.ListaAsync($"/api/office/parceiros/comissoes?status={(_status == "pagas" ? "pagas" : "todas")}&{Periodo()}");
                 }
                 _menuAtual = _status == "lista" ? sel => [
                     Item("+ Novo parceiro", () => Cadastros.Abrir(this, "parceiros")),
@@ -1147,58 +1158,63 @@ public class FormPrincipal : Form
         _grade.Carregar(rows);
         AtualizarResumo(rows);
         Totais();
-        try { await AtualizarContadores(); } catch { }
+        try { await AtualizarContadoresAsync(rows); } catch { }
     }
 
-    async Task AtualizarContadores()
+    Task AtualizarContadores() => AtualizarContadoresAsync();
+
+    async Task AtualizarContadoresAsync(List<JsonObject> rowsAtuais = null)
     {
         var queryData = Periodo();
-        {
-            var all = await Sessao.Api.Lista("/api/office/reservas?status=todas&" + queryData);
-            var ativas = all.Where(r => r.S("status") != "cancelada").ToList();
-            SetarContagem("reservas:aprovar", ativas.Count(r => !r.B("aprovada")));
-            SetarContagem("reservas:aprovadas", ativas.Count(r => r.B("aprovada")));
-            SetarContagem("reservas:pendentes", ativas.Count(r => !r.B("pago")));
-            SetarContagem("reservas:canceladas", all.Count(r => r.S("status") == "cancelada"));
-            SetarContagem("reservas:todas", all.Count);
-        }
-        {
-            var all = await Sessao.Api.Lista("/api/office/baterias?status=todas&" + queryData);
-            SetarContagem("baterias:abertas", all.Count(r => r.S("status") == "aberta"));
-            SetarContagem("baterias:fechadas", all.Count(r => r.S("status") == "fechada"));
-            SetarContagem("baterias:todas", all.Count);
-        }
-        {
-            // reservas online: "Precisa de atenção" sempre visível (pago sem vaga não pode passar batido)
-            var atencao = await Sessao.Api.Lista("/api/office/reservas-online?status=atencao");
-            SetarContagem("online:atencao", atencao.Count);
-            var online = await Sessao.Api.Lista("/api/office/reservas-online?status=todas&" + queryData);
-            SetarContagem("online:pagas", online.Count(r => r.S("status") is "pago" or "resolvido"));
-            SetarContagem("online:todas", online.Count);
-        }
-        {
-            var man = await Sessao.Api.Lista("/api/office/manutencoes?status=todas");
-            SetarContagem("oficina:arealizar", man.Count(PrecisaManutencao));
-            SetarContagem("oficina:realizadas", man.Count(r => r.B("realizada")));
-            SetarContagem("oficina:todas", man.Count);
-        }
+        var reusarReservas = rowsAtuais != null && _grupo == "reservas" && _status == "todas" && _filtroBateria == null;
+        var reusarBaterias = rowsAtuais != null && _grupo == "baterias" && _status == "todas";
+        var reusarOnlineTodas = rowsAtuais != null && _grupo == "online" && _status == "todas";
+        var reusarOnlineAtencao = rowsAtuais != null && _grupo == "online" && _status == "atencao";
+        var reusarOficina = rowsAtuais != null && _grupo == "oficina" && _status == "todas";
+
+        var tReservas = reusarReservas ? Task.FromResult(rowsAtuais) : Sessao.Api.ListaAsync("/api/office/reservas?status=todas&" + queryData);
+        var tBaterias = reusarBaterias ? Task.FromResult(rowsAtuais) : Sessao.Api.ListaAsync("/api/office/baterias?status=todas&" + queryData);
+        var tAtencao = reusarOnlineAtencao ? Task.FromResult(rowsAtuais) : Sessao.Api.ListaAsync("/api/office/reservas-online?status=atencao");
+        var tOnline = reusarOnlineTodas ? Task.FromResult(rowsAtuais) : Sessao.Api.ListaAsync("/api/office/reservas-online?status=todas&" + queryData);
+        var tMan = reusarOficina ? Task.FromResult(rowsAtuais) : Sessao.Api.ListaAsync("/api/office/manutencoes?status=todas");
+
+        await Task.WhenAll(tReservas, tBaterias, tAtencao, tOnline, tMan);
+
+        var allReservas = await tReservas;
+        var ativas = allReservas.Where(r => r.S("status") != "cancelada").ToList();
+        SetarContagem("reservas:aprovar", ativas.Count(r => !r.B("aprovada")));
+        SetarContagem("reservas:aprovadas", ativas.Count(r => r.B("aprovada")));
+        SetarContagem("reservas:pendentes", ativas.Count(r => !r.B("pago")));
+        SetarContagem("reservas:canceladas", allReservas.Count(r => r.S("status") == "cancelada"));
+        SetarContagem("reservas:todas", allReservas.Count);
+
+        var allBaterias = await tBaterias;
+        SetarContagem("baterias:abertas", allBaterias.Count(r => r.S("status") == "aberta"));
+        SetarContagem("baterias:fechadas", allBaterias.Count(r => r.S("status") == "fechada"));
+        SetarContagem("baterias:todas", allBaterias.Count);
+
+        var atencao = await tAtencao;
+        SetarContagem("online:atencao", atencao.Count);
+        var online = await tOnline;
+        SetarContagem("online:pagas", online.Count(r => r.S("status") is "pago" or "resolvido"));
+        SetarContagem("online:todas", online.Count);
+
+        var man = await tMan;
+        SetarContagem("oficina:arealizar", man.Count(PrecisaManutencao));
+        SetarContagem("oficina:realizadas", man.Count(r => r.B("realizada")));
+        SetarContagem("oficina:todas", man.Count);
+
         if (_grupo == "vendas")
         {
-            var all = await Sessao.Api.Lista("/api/office/vendas?status=todas&" + queryData);
+            var reusarVendas = rowsAtuais != null && _status == "todas";
+            var all = reusarVendas ? rowsAtuais : await Sessao.Api.ListaAsync("/api/office/vendas?status=todas&" + queryData);
             SetarContagem("vendas:liquidadas", all.Count(r => !r.B("cancelada") && (r.L("estorno") ?? 0) == 0));
             SetarContagem("vendas:canceladas", all.Count(r => r.B("cancelada") || (r.L("estorno") ?? 0) > 0));
             SetarContagem("vendas:todas", all.Count);
         }
-        else if (_grupo == "oficina")
-        {
-            var all = await Sessao.Api.Lista("/api/office/manutencoes?status=todas");
-            SetarContagem("oficina:arealizar", all.Count(PrecisaManutencao));
-            SetarContagem("oficina:realizadas", all.Count(r => r.B("realizada")));
-            SetarContagem("oficina:todas", all.Count);
-        }
         else if (_grupo == "vouchers")
         {
-            var all = await Sessao.Api.Lista(_status == "uso" ? "/api/office/vouchers/uso" : "/api/office/vouchers");
+            var all = rowsAtuais ?? await Sessao.Api.ListaAsync(_status == "uso" ? "/api/office/vouchers/uso" : "/api/office/vouchers");
             SetarContagem("vouchers:lista", all.Count);
             SetarContagem("vouchers:uso", all.Count);
         }
@@ -1219,7 +1235,7 @@ public class FormPrincipal : Form
 
     /// <summary>Situação da reserva em palavras (a etiqueta colorida sai em VisualPrincipal.PintarCelulas).</summary>
     internal static object SituacaoReserva(JsonObject r) =>
-        r.S("status") == "cancelada" ? "Cancelada" : r.B("pago") ? "Paga" : r["aprovada"] != null && !r.B("aprovada") ? "Pré-reserva" : "A pagar";
+        r.S("status") == "cancelada" ? "Cancelada" : r["aprovada"] != null && !r.B("aprovada") ? "Pré-reserva" : r.B("pago") ? "Paga" : "A pagar";
 
     /// <summary>Controle da oficina que pede atenção: não realizado e vencido ou com 80% do limite de horas.</summary>
     static bool PrecisaManutencao(JsonObject r) =>
@@ -1323,10 +1339,11 @@ public class FormPrincipal : Form
         var algumCanc = sel.Any(r => r.S("status") == "cancelada");
         return [
             Item("Aprovar (cobrar)", () => Caixa.CheckoutDeReservas(this, sel), sel.Count > 0 && !algumPago && !algumCanc, "F9"),
-            Item("Aprovar pré-reserva (sem pagamento)", () => Acoes.AprovarPre(this, sel), sel.Any(r => !r.B("aprovada") && r.S("status") != "cancelada"), "Ctrl+A"),
+            Item("Aprovar pré-reserva", () => Acoes.AprovarPre(this, sel), sel.Any(r => !r.B("aprovada") && r.S("status") != "cancelada"), "Ctrl+A"),
             Item("Editar reserva", () => Acoes.EditarReserva(this, sel[0]), umaSo, "Enter"),
             Item("Alterar cliente", () => Acoes.AlterarCliente(this, sel[0]), umaSo && !algumCanc),
-            Item("Mover cliente", () => Acoes.MoverCliente(this, sel[0]), umaSo && !algumCanc),
+            Item(sel.Count > 1 ? $"Mover {sel.Count} clientes" : "Mover cliente", () => Acoes.MoverClientes(this, sel), sel.Count > 0 && !algumCanc),
+            Item("Grupo errado / Movimentar de grupo", () => Acoes.MovimentarGrupoErrado(this, sel[0]), umaSo && !algumCanc),
             new ToolStripSeparator(),
             Item("Imprimir termo", () => Acoes.ImprimirTermo(this, sel.Select(r => r.S("id"))), sel.Count > 0, "Ctrl+P"),
             Item("Imprimir ticket", () => Relatorio.Abrir(this, Sessao.Api.UrlComToken("/relatorio/ticket?ids=" + string.Join(",", sel.Select(r => r.S("id")))), "Ticket")),
@@ -1346,12 +1363,18 @@ public class FormPrincipal : Form
             new ToolStripSeparator(),
             Item("Abrir bateria", () => Acoes.StatusBateria(this, sel, "aberta"), sel.Any(b => b.S("status") == "fechada")),
             Item("Fechar bateria", () => Acoes.StatusBateria(this, sel, "fechada"), sel.Any(b => b.S("status") == "aberta")),
+            Item("Mostrar no totem", () => Acoes.TotemBateria(this, sel, true), sel.Any(b => !b.B("autoAtendimento"))),
+            Item("Ocultar no totem", () => Acoes.TotemBateria(this, sel, false), sel.Any(b => b.B("autoAtendimento"))),
             new ToolStripSeparator(),
             Item("Editar bateria", () => { if (new FormBateria(sel[0]).ShowDialog(this) == DialogResult.OK) Recarregar(); }, umaSo, "Enter"),
             Item("Incluir cliente", () => { if (new FormIncluirCliente(sel[0]).ShowDialog(this) == DialogResult.OK) Recarregar(); }, umaSo, "Ins"),
             Item("Ver reservas", () => Selecionar("reservas:todas", sel[0]), umaSo),
             new ToolStripSeparator(),
-            Item("Lista de participantes", () => new FormListaParticipantes(sel[0]).ShowDialog(this), umaSo),
+            Item("Lista de participantes", () =>
+            {
+                using var f = new FormListaParticipantes(sel[0]);
+                if (f.ShowDialog(this) == DialogResult.OK) Recarregar();
+            }, umaSo),
             new ToolStripSeparator(),
             Exportar("baterias"),
             new ToolStripSeparator(),
