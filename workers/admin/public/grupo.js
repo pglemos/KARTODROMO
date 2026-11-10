@@ -81,7 +81,7 @@ const Grupo = (() => {
     estado = { b, g: null, rasc: null, aoMudar, reg: { valor: '', quem: '', forma: 'Pix' } };
     const ctx = estado;
     ctx.janela = modal('<div class="esqueleto" style="height: 420px; margin: var(--kib-espaco-denso-20)"></div>'); ctx.janela.style.maxWidth = '1140px';
-    try { const g = await office(`/grupos/${grupoId}?conferir=1`); if (!ativo(ctx)) return; ctx.g = g; pintar(); } catch (e) { if (ativo(ctx)) { falhou(e); fecharCamada(); } }
+    try { const g = await office(`/grupos/${grupoId}`); if (!ativo(ctx)) return; ctx.g = g; pintar(); } catch (e) { if (ativo(ctx)) { falhou(e); fecharCamada(); } }
   }
 
   // rascunho da reserva nova: sobrevive a recarregar a página (sessionStorage, por bateria); some ao salvar ou descartar

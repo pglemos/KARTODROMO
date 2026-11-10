@@ -506,8 +506,17 @@ export async function conferirCobrancas(log: Log, grupoId?: number): Promise<num
   return pagas;
 }
 
+const conferenciaGrupo = new Map<number, number>();
+/** Abrir/atualizar a reserva só lê a caixa de entrada do webhook (1 chamada barata). O Asaas em si é conferido a cada minuto pelo ciclo do servidor e pelo botão "Conferir no Asaas". */
+function conferirEmSegundoPlano(id: number): void {
+  const agora = Date.now();
+  if (agora - (conferenciaGrupo.get(id) ?? 0) < 20_000) return;
+  conferenciaGrupo.set(id, agora);
+  void puxarPagamentosDiretoDoAsaas(console.log, id, true).catch(() => 0);
+}
+
 /** Puxa pagamentos recebidos diretamente da API do Asaas e notificações de webhook. */
-export async function puxarPagamentosDiretoDoAsaas(log: Log, grupoId?: number): Promise<number> {
+export async function puxarPagamentosDiretoDoAsaas(log: Log, grupoId?: number, soWebhook = false): Promise<number> {
   if (!siteUrl() || !siteChave()) return 0;
   let novos = 0;
   const gruposAfetados = new Set<number>();
@@ -575,8 +584,8 @@ export async function puxarPagamentosDiretoDoAsaas(log: Log, grupoId?: number): 
     log(`aviso webhook grupos: ${(e as Error).message}`);
   }
 
-  // 2. Consulta direta de pagamentos recebidos no Asaas hoje e ontem
-  try {
+  // 2. Consulta direta de pagamentos recebidos no Asaas hoje e ontem (rede de segurança; só no ciclo de 1 min)
+  if (!soWebhook) try {
     const ontem = new Date(Date.now() - 3 * 3600_000 - 86400_000).toISOString().slice(0, 10);
     const pagas = (await site(`/api/sync/asaas/pagamentos?de=${ontem}`).catch(() => [])) as Array<{
       id: string; status: string; value: number; billingType: string; externalReference?: string; description?: string;
@@ -981,12 +990,9 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
   if ((m = path.match(/^\/grupos\/(\d+)$/))) {
     const id = Number(m[1]);
     if (method === 'GET') {
-      const conferir = url.searchParams.get('conferir') === '1';
-      const temAguardando = await one<{ n: number }>(`SELECT COUNT(*) n FROM dbo.ReservaGrupoCobranca WHERE GrupoId = @id AND Status = 'aguardando'`, { id });
-      if (conferir || (temAguardando && temAguardando.n > 0)) {
-        await conferirCobrancas(console.log, id).catch(() => 0);
-        await puxarPagamentosDiretoDoAsaas(console.log, id).catch(() => 0);
-      }
+      // O Asaas avisa por webhook: não consultamos o Asaas a cada abertura. Só drenamos a caixa do webhook em segundo plano;
+      // o ciclo de 1 min e o botão "Conferir no Asaas" cobrem o que o webhook perder.
+      conferirEmSegundoPlano(id);
       send(200, await grupo(id));
       return true;
     }
