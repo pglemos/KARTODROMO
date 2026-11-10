@@ -90,13 +90,85 @@
   #pronto p { color: var(--suave); margin: 0 auto 8px; max-width: 460px; }
   .totem { margin: 18px auto 0; max-width: 440px; text-align: left; background: var(--fundo); border: 1px solid var(--linha); border-radius: var(--raio); padding: 16px 18px; color: var(--suave); }
   .totem b { color: var(--verde); }
-  .pagar { margin: 16px auto 18px; max-width: 460px; padding: 16px 18px; border: 1px solid var(--verde); border-radius: var(--raio); background: var(--verde-fundo); text-align: left; }
+  label { font-size: 14px; }
+  .legenda { margin: 0 0 12px; font-size: 14.5px; color: var(--apagado); }
+  .progresso { position: sticky; top: 0; z-index: 7; display: flex; align-items: center; gap: 12px; margin: 0 0 14px; padding: 10px 14px; background: rgba(3,5,4,.94); border: 1px solid var(--linha); border-radius: var(--raio); backdrop-filter: blur(8px); }
+  .progresso .trilho { flex: 1; height: 6px; background: rgba(255,255,255,.12); border-radius: 3px; overflow: hidden; }
+  .progresso .trilho i { display: block; height: 100%; width: 0; background: var(--verde); transition: width .25s ease; }
+  .progresso span { font: 600 15px/1.2 var(--corpo); color: var(--texto); white-space: nowrap; }
+  .enviar { position: sticky; bottom: 10px; z-index: 6; box-shadow: 0 12px 28px rgba(0,0,0,.65); }
+  .seg button { min-height: 44px; }
+  .seg button:focus-visible { box-shadow: var(--foco); }
+  .termo { min-height: 44px; padding: 6px 0; }
+  .termo input { width: 28px; height: 28px; }
+  .msg-campo { margin: 6px 0 0; font: 600 14.5px/1.3 var(--corpo); color: var(--erro); display: flex; gap: 6px; align-items: flex-start; }
+  .msg-campo::before { content: "!"; flex: none; width: 18px; height: 18px; margin-top: 1px; border-radius: 50%; background: var(--erro); color: var(--fundo); font: 700 13px/18px var(--corpo); text-align: center; }
+  input[aria-invalid="true"] { border-color: var(--erro); }
+  .passos span.atual { color: var(--verde); }
+  .passos span.feito { color: var(--suave); }
+  .passos span.feito::after { content: " ✓"; color: var(--verde); }
+  .corrigir { display: block; margin: 16px auto 0; background: none; border: 0; color: var(--suave); text-decoration: underline; font: 600 15.5px var(--corpo); min-height: 44px; cursor: pointer; }
+  .pagar { margin: 16px auto 18px; max-width: 480px; padding: 18px; border: 1px solid var(--verde); border-radius: var(--raio); background: var(--verde-fundo); text-align: left; }
   .pagar[hidden] { display: none; }
-  .pagar p { margin: 0 0 10px; color: var(--texto); }
+  #pronto .pagar p, .pagar p { margin: 0 0 10px; max-width: none; color: var(--texto); text-align: left; }
   .pagar b { color: var(--verde); }
-  .pagar .valor { font: 400 38px/1.1 var(--titulo); color: var(--texto); }
-  .pagar a.botao { display: block; text-align: center; padding: 15px 18px; background: var(--verde); color: var(--tinta); font: 400 20px/1.1 var(--titulo); text-transform: uppercase; text-decoration: none; border-radius: var(--raio); }
-  .pagar .estado { margin: 10px 0 0; font-size: 15px; color: var(--suave); }
+  #pronto .pagar .valor, .pagar .valor { font: 400 56px/1 var(--titulo); color: #fff; margin: 0 0 14px; }
+  .pagar a.botao { display: block; text-align: center; padding: 16px 18px; min-height: 56px; background: var(--verde); color: var(--tinta); font: 400 19px/1.2 var(--titulo); letter-spacing: .02em; text-transform: uppercase; text-decoration: none; border-radius: var(--raio); }
+  .pagar a.botao:focus-visible { box-shadow: var(--foco); }
+  #pronto .pagar .estado, .pagar .estado { margin: 12px 0 0; font-size: 15.5px; color: var(--suave); }
+  .pagar ol { margin: 14px 0 0; padding-left: 20px; color: var(--suave); font-size: 15.5px; }
+  .pagar ol li { margin-bottom: 4px; }
+  .pagar .link { background: none; border: 0; padding: 0; min-height: 44px; color: var(--verde); font: 600 16px var(--corpo); text-decoration: underline; cursor: pointer; }
+  .pagar.previa { max-width: none; margin: 4px 0 14px; }
+  #pronto.pagando .ok { width: 48px; height: 48px; margin-bottom: 10px; }
+  #pronto.pagando .ok svg { width: 24px; height: 24px; }
+  #pronto h2 { text-wrap: balance; }
+  #ajudaPag { max-width: 480px; margin: 12px auto 0; text-align: left; }
+  #ajudaPag a { color: var(--verde); }
+  @media (forced-colors: active) { :focus-visible { outline: 2px solid Highlight; } input[aria-invalid="true"] { border: 2px solid Mark; } }
+  html { scroll-padding-top: 76px; scroll-padding-bottom: 100px; }
+  label { line-height: 1.5; padding: 2px 0; }
+  .cartao h2 { line-height: 1.2; }
+  summary { min-height: 44px; display: flex; align-items: center; }
+  details a { display: inline-block; padding: 12px 2px; line-height: 1.3; }
+  .banner-grupo span { min-height: 64px; }
+  .progresso .progir { flex: none; min-height: 36px; padding: 0 12px; border: 1px solid var(--verde); border-radius: var(--raio); background: transparent; color: var(--verde); font: 600 14.5px var(--corpo); cursor: pointer; }
+  .progresso .progir[hidden] { display: none; }
+  #pronto .ok.relogio { border-color: var(--linha-forte); background: rgba(255,255,255,.05); }
+  #pronto .ok.relogio svg { stroke: var(--suave); }
+  .pagar .contexto { font-size: 15.5px; color: var(--suave); margin: 0 0 8px; }
+  .nao-sou { display: inline-block; margin-top: 6px; padding: 10px 0; min-height: 44px; background: none; border: 0; color: var(--verde); font: 600 15px var(--corpo); text-decoration: underline; cursor: pointer; }
+  a.secundario { display: block; margin: 12px auto 0; max-width: 480px; text-align: center; padding: 14px 18px; min-height: 52px; border: 1px solid var(--verde); border-radius: var(--raio); color: var(--verde); font: 400 17px/1.3 var(--titulo); letter-spacing: .02em; text-transform: uppercase; text-decoration: none; }
+  @media (max-width: 520px) {
+    .topo { padding: 16px 16px 56px; }
+    .topo .logo { width: min(210px, 56vw); margin-bottom: 12px; }
+    .topo p { font-size: 16px; }
+  }
+  .corrigir[hidden], a.secundario[hidden] { display: none; }
+  html { scroll-padding-top: 88px; }
+  .progresso .progir { min-height: 44px; }
+  .corrigir { border: 1px solid var(--linha-forte); border-radius: var(--raio); padding: 0 18px; color: var(--texto); text-decoration: none; }
+  #pronto.pagando .totem { display: none; }
+  details summary { justify-content: space-between; }
+  details summary::-webkit-details-marker { display: none; }
+  details summary::after { content: "▾"; color: var(--verde); font-size: 18px; transition: transform .15s; }
+  details[open] summary::after { transform: rotate(180deg); }
+  .rodape a { display: inline-block; padding: 12px 4px; color: var(--verde); }
+  main { padding-bottom: 130px; }
+  .msg-campo { scroll-margin-bottom: 120px; }
+  .termo { padding: 10px 0; }
+  .passos span { font-size: 14px; }
+  .pagar .link { display: block; width: 100%; margin-top: 12px; border: 1px solid var(--linha-forte); border-radius: var(--raio); text-decoration: none; color: var(--texto); }
+  .nota { margin: 8px 0 0; text-align: center; font-size: 14.5px; color: var(--apagado); }
+  #ajudaPag p { line-height: 1.5; margin: 6px 0 4px; }
+  #ajudaPag a.secundario { margin: 8px 0 4px; max-width: none; }
+  .dia { margin: 18px auto 0; max-width: 480px; text-align: left; background: var(--fundo); border: 1px solid var(--linha); border-radius: var(--raio); padding: 16px 18px; }
+  .dia h3 { margin: 0 0 10px; font: 400 18px/1.2 var(--titulo); text-transform: uppercase; letter-spacing: .03em; color: var(--verde); }
+  .dia ul { margin: 0; padding-left: 20px; color: var(--texto); }
+  .dia li { margin-bottom: 8px; line-height: 1.45; }
+  .dia .end { margin: 12px 0 0; color: var(--suave); font-size: 15.5px; }
+  .dia a.secundario { max-width: none; margin-top: 12px; }
+  #pronto.pagando .dia { display: none; }
 </style>
 </head>
 <body>
@@ -104,20 +176,22 @@
   <img class="logo" src="/kib-logo-escuro.png" alt="Kartódromo Internacional de Betim" width="720" height="200">
   <h1>Faça seu cadastro <em>antes de chegar</em></h1>
   <p>Preencha uma vez aqui. No kartódromo, é só digitar seu CPF no totem de autoatendimento e escolher a bateria.</p>
-  <div class="passos"><span>1 · Cadastro aqui</span><span>2 · CPF no totem</span><span>3 · Pista!</span></div>
+  <div class="passos" id="passos"><span>1 · Cadastro aqui</span><span>2 · CPF no totem</span><span>3 · Pista!</span></div>
 </header>
 
 <main>
+  <div class="progresso" id="progresso"><div class="trilho" role="progressbar" aria-label="Preenchimento do cadastro" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="progBarra"></i></div><span id="progTxt">Faltam 14 itens</span><button type="button" class="progir" id="progIr">Ver o que falta</button></div>
   <div class="banner-grupo" id="bannerGrupo" style="display:none">
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
     <div>
-      <strong>Reserva em grupo vinculada!</strong>
-      <span id="grupoTexto">Preencha seus dados completos. Sua vaga será confirmada e o termo de responsabilidade sairá impresso com todos os dados na recepção.</span>
+      <strong id="grupoTitulo">Reserva em grupo vinculada!</strong>
+      <span id="grupoTexto">Preencha seus dados completos. O termo de responsabilidade sai impresso na recepção.</span>
     </div>
   </div>
 
   <form id="form" novalidate autocomplete="on">
     <div class="erro" id="erro" role="alert"></div>
+    <p class="legenda"><span class="obrig" aria-hidden="true">*</span> campo obrigatório</p>
 
     <section class="cartao">
       <h2><span class="n">1</span>Documento</h2>
@@ -137,55 +211,55 @@
 
     <section class="cartao">
       <h2><span class="n">2</span>Contato</h2>
-      <p class="sub">Celular e e-mail obrigatórios para avisos da reserva e envio do resultado com seus tempos.</p>
+      <p class="sub">Para avisos da reserva e o resultado com seus tempos.</p>
       <div class="grade">
         <div class="c3"><label for="telefone">Celular (WhatsApp) <span class="obrig">*</span></label><input id="telefone" name="tel" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="(31) 90000-0000" required></div>
         <div class="c3"><label for="email">E-mail <span class="obrig">*</span></label><input id="email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="voce@email.com" required></div>
-        <div class="c6"><label for="instagram">Instagram <span class="obrig">*</span></label><input id="instagram" name="instagram" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="@seuusuario" maxlength="80" required></div>
+        <div class="c6"><label for="instagram">Instagram <span class="obrig">*</span></label><input id="instagram" name="instagram" enterkeyhint="next" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="@seuusuario" maxlength="80" required></div>
       </div>
     </section>
 
     <section class="cartao">
       <h2><span class="n">3</span>Sobre você</h2>
-      <p class="sub">Data de nascimento e peso obrigatórios para segurança na pista e equilíbrio dos karts.</p>
+      <p class="sub">Segurança na pista e equilíbrio dos karts.</p>
       <div class="grade">
         <div class="c3"><label for="nascimento">Data de nascimento <span class="obrig">*</span></label><input id="nascimento" inputmode="numeric" autocomplete="bday" placeholder="DD/MM/AAAA" required></div>
-        <div class="c3"><label for="peso">Peso (kg) <span class="obrig">*</span></label><input id="peso" inputmode="decimal" placeholder="Ex.: 72" required></div>
+        <div class="c3"><label for="peso">Peso (kg) <span class="obrig">*</span> <span class="op">(20 a 250)</span></label><input id="peso" inputmode="decimal" autocomplete="off" enterkeyhint="next" placeholder="Ex.: 72" required></div>
       </div>
     </section>
 
     <section class="cartao">
       <h2><span class="n">4</span>Endereço completo</h2>
-      <p class="sub">Obrigatório para o termo de responsabilidade impresso na recepção. Digite o CEP para preencher automaticamente.</p>
+      <p class="sub">Para o termo impresso. Digite o CEP e o resto se preenche.</p>
       <div class="grade">
         <div class="c2"><label for="cep">CEP <span class="obrig">*</span></label><input id="cep" inputmode="numeric" autocomplete="postal-code" placeholder="00000-000" required></div>
         <div class="c4"><label for="endereco">Rua / Endereço <span class="obrig">*</span></label><input id="endereco" autocomplete="address-line1" placeholder="Nome da rua ou avenida" required></div>
-        <div class="c2"><label for="numero">Número <span class="obrig">*</span></label><input id="numero" inputmode="numeric" placeholder="Número ou S/N" required></div>
+        <div class="c2"><label for="numero">Número <span class="obrig">*</span></label><input id="numero" inputmode="text" autocomplete="off" enterkeyhint="next" placeholder="Número ou S/N" required></div>
         <div class="c4"><label for="complemento">Complemento <span class="op">(opcional)</span></label><input id="complemento" autocomplete="address-line2" placeholder="Apto, bloco, etc."></div>
-        <div class="c3"><label for="bairro">Bairro <span class="obrig">*</span></label><input id="bairro" placeholder="Bairro" required></div>
+        <div class="c2"><label for="bairro">Bairro <span class="obrig">*</span></label><input id="bairro" autocomplete="address-level3" placeholder="Bairro" required></div>
         <div class="c2"><label for="cidade">Cidade <span class="obrig">*</span></label><input id="cidade" autocomplete="address-level2" placeholder="Cidade" required></div>
-        <div class="c1" style="grid-column: span 1"><label for="estado">UF <span class="obrig">*</span></label><input id="estado" maxlength="2" autocapitalize="characters" autocomplete="address-level1" placeholder="MG" required></div>
+        <div class="c2"><label for="estado">UF <span class="obrig">*</span></label><input id="estado" maxlength="2" autocapitalize="characters" autocomplete="address-level1" placeholder="MG" required></div>
       </div>
     </section>
 
     <section class="cartao">
-      <h2><span class="n">5</span>Menores que vão correr com você</h2>
+      <h2><span class="n">5</span>Menores com você</h2>
       <p class="sub">Opcional. Filhos ou menores sob sua responsabilidade.</p>
       <div id="menores"></div>
       <button type="button" class="btn2" id="addMenor">+ Adicionar menor</button>
     </section>
 
     <section class="cartao">
-      <label class="termo"><input type="checkbox" id="lgpd"><span>Li e concordo com o Termo de Consentimento para Tratamento de Dados Pessoais.</span></label>
+      <label class="termo"><input type="checkbox" id="lgpd"><span>Li e concordo com o Termo de Consentimento para Tratamento de Dados Pessoais. <span class="obrig">*</span></span></label>
       <details><summary>Ler o termo</summary>
         <p>Ao se cadastrar, você autoriza o Kartódromo Internacional de Betim a tratar seus dados pessoais (nome, documento, contato, data de nascimento, peso e endereço) para identificar você nas baterias e corridas, emitir o termo de responsabilidade, registrar tempos e resultados, cumprir obrigações legais e entrar em contato sobre suas reservas.</p>
         <p>Os dados ficam armazenados nos sistemas do kartódromo e não são vendidos a terceiros. Você pode pedir a qualquer momento, na recepção, acesso, correção ou exclusão dos seus dados, nos termos da Lei nº 13.709/2018 (LGPD).</p>
       </details>
-      <div class="oculto" aria-hidden="true"><label>Site<input id="site" tabindex="-1" autocomplete="off"></label></div>
+      <div class="oculto" aria-hidden="true" inert><label>Site<input id="site" tabindex="-1" autocomplete="off"></label></div>
     </section>
 
     <button class="enviar" id="enviar" type="submit">Concluir cadastro</button>
-    <p class="rodape">O termo de responsabilidade é assinado no kartódromo, no dia da corrida.</p>
+    <p class="rodape">Você assina o termo de responsabilidade na recepção, no dia da corrida, já com seus dados impressos.<br>Dúvidas? <a href="https://wa.me/5531998842898" rel="noopener">WhatsApp (31) 99884-2898</a></p>
   </form>
 
   <section class="cartao" id="pronto" aria-live="polite">
@@ -195,8 +269,24 @@
     <div class="pagar" id="pagarCaixa" hidden></div>
     <div class="totem">
       <p style="margin:0 0 6px"><b>Quando chegar ao kartódromo:</b></p>
-      <p style="margin:0" id="prontoInstrucao">1. Vá ao totem de autoatendimento ou à recepção.<br>2. Digite seu <b id="prontoDoc">CPF</b> (ou e-mail).<br>3. Confira seus dados e retire seu termo completo na recepção.</p>
+      <p style="margin:0" id="prontoInstrucao">1. Vá ao totem de autoatendimento ou à recepção.<br>2. Digite seu <b id="prontoDoc">CPF</b> (ou e-mail).<br>3. Confira seus dados e assine o termo na recepção.</p>
     </div>
+    <section class="dia" id="diaCorrida" aria-labelledby="diaTitulo">
+      <h3 id="diaTitulo">No dia da corrida</h3>
+      <ul>
+        <li><b>Chegue pelo menos 1 hora antes</b> do horário da sua bateria.</li>
+        <li><b>Calçado fechado</b> é obrigatório.</li>
+        <li><b>Para correr:</b> idade mínima de 14 anos, altura acima de 1,50 m e peso acima de 50 kg.</li>
+        <li><b>Menor de idade:</b> traga o documento do menor e do responsável. O responsável assina o termo.</li>
+      </ul>
+      <p class="end">Avenida Adutora Várzea das Flores, 477 · Itacolomi, Betim - MG, 32672-586</p>
+      <a class="secundario" href="https://maps.app.goo.gl/PvXUGXEMDeXDYKJBA" target="_blank" rel="noopener">Como chegar</a>
+    </section>
+    <button type="button" class="corrigir" id="corrigir">Corrigir meus dados</button>
+    <details id="ajudaPag" hidden><summary>Problema com o pagamento?</summary>
+      <p>Se a página de pagamento não abrir ou o Pix não confirmar, fale com a recepção. Seu cadastro já está salvo.</p>
+      <a class="secundario" href="https://wa.me/5531998842898" rel="noopener">WhatsApp (31) 99884-2898</a>
+    </details>
   </section>
 </main>
 
@@ -240,8 +330,8 @@
     banner.className = 'banner-busca sucesso';
     banner.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00e676" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
       <div>
-        <strong>Cadastro localizado!</strong>
-        <span>Dados de <b>${c.nome || 'piloto'}</b> preenchidos automaticamente. Você pode alterar qualquer informação antes de concluir.</span>
+        <strong>Você já tem cadastro aqui</strong>
+        <span>Preenchemos seus dados. Confira e altere o que precisar antes de concluir.</span><button type="button" class="nao-sou">Não sou eu: limpar</button>
       </div>`;
 
     if (c.tipoDocumento && c.tipoDocumento !== tipo) {
@@ -316,6 +406,7 @@
     const d = dig(raw);
     const isEmail = raw.includes('@');
     if (isEmail ? raw.length < 5 : (d.length < 5 && raw.length < 5)) return;
+    if (!isEmail && tipo === 'CPF' && !cpfOk(raw)) return;
     const chaveCache = isEmail ? raw.toLowerCase() : (d || raw.toUpperCase());
     if (cacheClientes.has(chaveCache)) {
       aplicarCliente(cacheClientes.get(chaveCache));
@@ -443,39 +534,197 @@
     const banner = $('bannerGrupo');
     if (banner) banner.style.display = 'flex';
   }
-  const esc = (s) => String(s ?? '').replace(/[<>&"]/g, '');
+  const esc = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, '');
   const brl = (c) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const quando = (s) => { const d = new Date(String(s).slice(0, 16) + ':00-03:00'); return isNaN(d) ? '' : d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' }) + ' às ' + String(s).slice(11, 16); };
+  const de = (g) => g.modo === 'individual' ? 'da sua vaga' : g.modo === 'sinal' ? 'do sinal do grupo' : 'do grupo todo';
+  const oque = (g) => g.modo === 'individual' ? 'a sua vaga' : g.modo === 'sinal' ? 'o sinal do grupo' : 'o grupo todo';
+  let rotuloEnviar = 'Concluir cadastro';
   let grupo = null;
-  if (tokenReserva) fetch('/api/grupo?r=' + encodeURIComponent(tokenReserva)).then((r) => r.ok ? r.json() : null).then((g) => {
-    if (!g || !g.responsavel) return;
+  let pagamentoAtual = null;
+  const chaveSalva = 'pag:' + tokenReserva;
+  const salvar = (v) => { try { if (v) localStorage.setItem(chaveSalva, JSON.stringify(v)); else localStorage.removeItem(chaveSalva); } catch (e) {} };
+  const lerSalvo = () => { try { return JSON.parse(localStorage.getItem(chaveSalva) || 'null'); } catch (e) { return null; } };
+  const topo = { h1: document.querySelector('.topo h1'), p: document.querySelector('.topo p'), passos: $('passos') };
+  const topoOriginal = { h1: topo.h1.innerHTML, p: topo.p.innerHTML, passos: topo.passos.innerHTML };
+  const topoFormulario = () => {
+    if ($('pronto').style.display === 'block') return;
+    topo.h1.innerHTML = topoOriginal.h1;
+    topo.p.innerHTML = grupo && grupo.aCobrarCentavos > 0 ? 'Preencha uma vez aqui e pague no final.' : topoOriginal.p;
+    if (grupo && grupo.aCobrarCentavos > 0) marcarPassos(1); else topo.passos.innerHTML = topoOriginal.passos;
+  };
+  const icone = (relogio) => { const ok = document.querySelector('#pronto .ok'); ok.classList.toggle('relogio', relogio); ok.innerHTML = relogio ? '<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>' : '<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#00e676" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>'; };
+  const marcarPassos = (atual, rotulos) => {
+    const nomes = rotulos || ['1 · Cadastro aqui', '2 · Pagamento', '3 · Pista!'];
+    topo.passos.innerHTML = nomes.map((n, i) => '<span class="' + (i + 1 < atual ? 'feito' : i + 1 === atual ? 'atual' : '') + '"' + (i + 1 === atual ? ' aria-current="step"' : '') + '>' + n + '</span>').join('');
+  };
+
+  // ---- progresso do preenchimento ----
+  const campos = ['documento', 'nome', 'telefone', 'email', 'instagram', 'nascimento', 'peso', 'cep', 'endereco', 'numero', 'bairro', 'cidade', 'estado'];
+  const val = (id) => $(id).value.trim();
+  const dataOk = (dmy) => { const t = iso(dmy); if (!t) return false; const d = new Date(t + 'T12:00:00'); const hoje = new Date(); return !isNaN(d) && d.toISOString().slice(0, 10) === t && d <= hoje && hoje.getFullYear() - d.getFullYear() <= 110; };
+  const regras = {
+    documento: [() => tipo === 'CPF' ? cpfOk(val('documento')) : val('documento').replace(/[^a-zA-Z0-9]/g, '').length >= 5, () => tipo === 'CPF' ? 'CPF inválido. Confira os números.' : 'Informe o ' + (tipo === 'Passaporte' ? 'passaporte' : tipo) + '.'],
+    nome: [() => val('nome').split(/\s+/).length >= 2, () => 'Informe o nome completo (nome e sobrenome).'],
+    telefone: [() => dig(val('telefone')).length >= 10, () => 'Informe o celular com DDD.'],
+    email: [() => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(val('email')), () => 'E-mail inválido. Confira o endereço.'],
+    instagram: [() => { const ig = val('instagram').replace(/^(?:https?:\/\/)?(?:www\.)?instagram\.com\//i, '').replace(/[\/?#].*$/, '').replace(/^@/, '').toLowerCase(); return !!ig && /^[a-z0-9_](?:[a-z0-9_.]{0,28}[a-z0-9_])?$/.test(ig) && ig.indexOf('..') < 0; }, () => 'Informe o @usuário do Instagram (ex.: @andre.silva).'],
+    nascimento: [() => dataOk(val('nascimento')), () => 'Informe uma data válida, como 25/12/1990.'],
+    peso: [() => { const p = Number(val('peso').replace(',', '.')); return Number.isFinite(p) && p >= 20 && p <= 250; }, () => 'Informe o peso em kg, entre 20 e 250 (ex.: 72).'],
+    cep: [() => dig(val('cep')).length === 8, () => 'Informe o CEP com 8 dígitos.'],
+    endereco: [() => !!val('endereco'), () => 'Informe a rua ou avenida.'],
+    numero: [() => !!val('numero'), () => 'Informe o número (ou S/N).'],
+    bairro: [() => !!val('bairro'), () => 'Informe o bairro.'],
+    cidade: [() => !!val('cidade'), () => 'Informe a cidade.'],
+    estado: [() => val('estado').length === 2, () => 'Informe a UF com 2 letras (ex.: MG).'],
+  };
+  const mostrarMsg = (id, texto) => {
+    const el = $(id); let m = $('m-' + id);
+    if (!texto) { if (m) m.remove(); el.removeAttribute('aria-invalid'); el.removeAttribute('aria-describedby'); return; }
+    if (!m) { m = document.createElement('p'); m.className = 'msg-campo'; m.id = 'm-' + id; m.setAttribute('role', 'alert'); el.insertAdjacentElement('afterend', m); }
+    m.textContent = texto; el.setAttribute('aria-invalid', 'true'); el.setAttribute('aria-describedby', 'm-' + id);
+  };
+  const conferir = (id) => { const r = regras[id]; const ok = r[0](); mostrarMsg(id, ok ? '' : r[1]()); return ok; };
+  for (const id of campos) {
+    $(id).addEventListener('blur', () => conferir(id));
+    $(id).addEventListener('input', () => { if ($('m-' + id) && regras[id][0]()) mostrarMsg(id, ''); });
+  }
+  const atualizarProgresso = () => {
+    const feitos = campos.filter((id) => regras[id][0]()).length + ($('lgpd').checked ? 1 : 0);
+    const total = campos.length + 1;
+    const falta = total - feitos;
+    const pct = Math.round(feitos / total * 100);
+    $('progBarra').style.width = pct + '%'; $('progBarra').parentNode.setAttribute('aria-valuenow', String(pct));
+    $('progIr').hidden = falta === 0;
+    const comErro = document.querySelectorAll('.msg-campo').length;
+    $('progTxt').textContent = falta === 0 ? 'Tudo pronto: toque em Concluir' : (falta === 1 ? 'Falta 1 item' : 'Faltam ' + falta + ' itens') + (comErro ? ' · ' + comErro + ' com erro' : '');
+    const bt = $('enviar'); if (!bt.disabled) bt.textContent = falta === 0 ? rotuloEnviar : 'Ver o que falta (' + falta + ')';
+  };
+  $('form').addEventListener('input', atualizarProgresso);
+  $('form').addEventListener('change', atualizarProgresso);
+  const primeiroQueFalta = () => { for (const id of campos) { if (!regras[id][0]()) return id; } return $('lgpd').checked ? null : 'lgpd'; };
+  $('progIr').addEventListener('click', () => { const id = primeiroQueFalta(); if (!id) return; const el = $(id); if (id !== 'lgpd') conferir(id); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus({ preventScroll: true }); });
+  setInterval(() => {
+    atualizarProgresso();
+    for (const id of campos) { const el = $(id); if (el.classList.contains('campo-animado') && val(id) && document.activeElement !== el && !regras[id][0]() && !$('m-' + id)) conferir(id); }
+  }, 1000);
+  // CPF apagado ou alterado: some o aviso de cadastro localizado
+  $('documento').addEventListener('input', () => { const b = $('statusBusca'); if (tipo === 'CPF' && b.classList.contains('sucesso') && !cpfOk($('documento').value)) b.style.display = 'none'; });
+  // 'Não sou eu': limpa o que foi preenchido pela busca
+  $('statusBusca').addEventListener('click', (e) => {
+    if (!e.target.closest('.nao-sou')) return;
+    for (const id of campos) if (id !== 'documento') { $(id).value = ''; mostrarMsg(id, ''); }
+    $('menores').innerHTML = ''; $('statusBusca').style.display = 'none'; cadastroEncontrado = false; atualizarProgresso(); $('nome').focus();
+  });
+  // teclado do celular
+  for (const id of ['email', 'instagram']) { const el = $(id); el.setAttribute('autocapitalize', 'none'); el.setAttribute('autocorrect', 'off'); el.setAttribute('spellcheck', 'false'); }
+  for (const id of ['bairro', 'endereco', 'cidade']) $(id).setAttribute('autocapitalize', 'words');
+  atualizarProgresso();
+
+  // tipo de documento: estado para leitor de tela
+  $('tipoDoc').setAttribute('role', 'group'); $('tipoDoc').setAttribute('aria-label', 'Tipo de documento');
+  const pressionar = () => { for (const x of $('tipoDoc').children) x.setAttribute('aria-pressed', x.classList.contains('sel') ? 'true' : 'false'); };
+  $('tipoDoc').addEventListener('click', pressionar); pressionar();
+
+  // ---- grupo ----
+  const aplicarGrupo = (g) => {
     grupo = g;
     const paga = g.aCobrarCentavos > 0;
+    const sou = g.souResponsavel;
+    $('grupoTitulo').textContent = sou ? 'Você é o responsável pelo grupo' : 'Você está no grupo de ' + g.responsavel;
     const t = $('grupoTexto');
-    if (t) t.innerHTML = 'Grupo do(a) <b>' + esc(g.responsavel) + '</b> · ' + esc(g.bateria || 'Bateria') + ' · ' + quando(g.inicio) + '. ' +
-      (g.souResponsavel && paga ? 'Você é o responsável: preencha o seu cadastro e, no final, pague ' + (g.modo === 'sinal' ? 'o sinal' : 'o grupo todo') + ' (<b>' + brl(g.aCobrarCentavos) + '</b>) por Pix ou cartão. Os convidados só preenchem o cadastro.'
-        : g.souResponsavel ? 'Você é o responsável e o pagamento do grupo já está em dia. Preencha o seu cadastro completo.'
-        : paga ? 'Preencha seu cadastro completo e, no final, pague a sua vaga (<b>' + brl(g.aCobrarCentavos) + '</b>) por Pix ou cartão.'
-        : g.modo !== 'individual' ? 'O pagamento é feito pelo responsável do grupo. Você só precisa preencher o seu cadastro completo.'
+    t.innerHTML = esc(g.bateria || 'Bateria') + ' · ' + quando(g.inicio) + '. ' +
+      (sou && paga ? 'Preencha seu cadastro e, no final, pague ' + oque(g) + ' (' + brl(g.aCobrarCentavos) + ') por Pix ou cartão.' + (g.modo === 'individual' ? '' : ' Os convidados só fazem o cadastro.')
+        : sou ? 'O pagamento do grupo já está em dia. Preencha o seu cadastro.'
+        : paga ? 'Preencha seu cadastro e, no final, pague a sua vaga (' + brl(g.aCobrarCentavos) + ') por Pix ou cartão.'
+        : g.modo !== 'individual' ? 'Quem reservou paga pelo grupo. Você só preenche o seu cadastro.'
         : g.livres <= 0 ? 'Todas as vagas do grupo já têm dono. Faça o cadastro e fale com quem reservou.'
-        : 'Preencha seus dados completos. Sua vaga já está reservada e o termo de responsabilidade sairá impresso na recepção.');
-  }).catch(() => {});
-  const mostrarPagamento = (pg, g) => {
-    const c = $('pagarCaixa');
-    const quem = g && g.responsavel ? ' no grupo do(a) <b>' + esc(g.responsavel) + '</b>' : '';
-    const oQue = grupo && grupo.souResponsavel ? (grupo.modo === 'sinal' ? 'o sinal do grupo' : 'o grupo todo') : 'a sua vaga';
-    if (pg.pago) { c.innerHTML = '<p><b>Pagamento confirmado!</b> Sua vaga' + quem + ' está garantida.</p>'; c.hidden = false; return; }
-    c.innerHTML = '<p>Falta pagar ' + oQue + quem + ':</p><p class="valor">' + brl(pg.valorCentavos) + '</p>' +
-      '<a class="botao" href="' + encodeURI(pg.link) + '" target="_blank" rel="noopener">Pagar agora · Pix ou cartão</a>' +
-      '<p class="estado" id="pagarEstado">Depois de pagar, esta tela confirma sozinha.</p>';
-    c.hidden = false;
-    const t = setInterval(async () => {
-      try {
-        const s = await (await fetch('/api/grupo/pagamento?id=' + encodeURIComponent(pg.id))).json();
-        if (s.pago) { clearInterval(t); c.innerHTML = '<p><b>Pagamento confirmado!</b> Sua vaga' + quem + ' está garantida. No kartódromo, é só digitar seu CPF no totem.</p>'; }
-      } catch {}
-    }, 6000);
+        : 'Preencha seu cadastro. Sua vaga já está reservada.') +
+      (sou ? '' : ' Não é o(a) ' + esc(g.responsavel) + '? Peça o link certo a quem reservou.');
+    if (paga) {
+      rotuloEnviar = 'Concluir e ir para o pagamento';
+      $('enviar').textContent = rotuloEnviar;
+      const previa = document.createElement('div');
+      previa.className = 'pagar previa'; previa.id = 'pagarPrevia';
+      previa.innerHTML = '<p><b>Etapa final · Pagamento ' + de(g) + ': ' + brl(g.aCobrarCentavos) + (g.modo === 'individual' ? ' por piloto' : '') + '</b></p><p class="estado">Na próxima tela você escolhe Pix ou cartão. Use o seu CPF no cadastro.</p>';
+      $('enviar').parentNode.insertBefore(previa, $('enviar'));
+      topoFormulario();
+    }
   };
+  if (tokenReserva) fetch('/api/grupo?r=' + encodeURIComponent(tokenReserva)).then((r) => r.ok ? r.json() : null).then((g) => { if (g && g.responsavel) aplicarGrupo(g); }).catch(() => {});
+
+  // ---- pagamento ----
+  let timerPag = null;
+  const verificar = async (pg, g) => {
+    try {
+      const s = await (await fetch('/api/grupo/pagamento?id=' + encodeURIComponent(pg.id))).json();
+      if (s.pago) { clearInterval(timerPag); confirmarPago(pg, g); return true; }
+      const e = $('pagarEstado'); if (e) e.textContent = 'Verificado às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + '. Ainda não recebemos o pagamento; assim que cair, esta tela atualiza sozinha.';
+    } catch (e) { /* sem rede: tenta de novo no próximo ciclo */ }
+    return false;
+  };
+  const confirmarPago = (pg, g) => {
+    const c = $('pagarCaixa'); const gg = Object.assign({}, g || {}, grupo || {});
+    $('bannerGrupo').style.display = 'none';
+    $('pronto').classList.remove('pagando');
+    icone(false);
+    $('prontoTitulo').textContent = gg.bateria ? esc(gg.bateria) : 'Pagamento confirmado';
+    $('prontoSub').textContent = (gg.inicio ? quando(gg.inicio) + '. ' : '') + 'Pagamento confirmado.';
+    if (gg.inicio && !$('calendario')) {
+      const ini = new Date(String(gg.inicio).slice(0, 16) + ':00-03:00');
+      if (!isNaN(ini)) {
+        const f = (d) => d.toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
+        const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Kartodromo de Betim//cadastro//PT', 'BEGIN:VEVENT', 'UID:' + (pg && pg.id ? pg.id : 'bateria') + '@kartodromodebetim.com.br', 'DTSTAMP:' + f(new Date()), 'DTSTART:' + f(ini), 'SUMMARY:' + (gg.bateria || 'Bateria') + ' no Kartódromo Internacional de Betim', 'LOCATION:Kartódromo Internacional de Betim', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+        const a = document.createElement('a'); a.id = 'calendario'; a.className = 'secundario'; a.textContent = 'Adicionar ao calendário';
+        a.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics); a.download = 'bateria-kartodromo.ics';
+        $('pagarCaixa').insertAdjacentElement('afterend', a);
+      }
+    }
+    c.hidden = true; $('corrigir').hidden = true; document.querySelectorAll('#corrigirNota').forEach((x) => x.remove());
+    if ($('ajudaPag')) { $('ajudaPag').hidden = false; $('ajudaPag').open = false; $('ajudaPag').querySelector('summary').textContent = 'Precisa corrigir algum dado ou de ajuda?'; $('ajudaPag').querySelector('p').textContent = 'Para corrigir um dado depois do pagamento ou tirar uma dúvida, fale com a recepção.'; }
+    topo.h1.innerHTML = 'Vaga <em>garantida</em>'; topo.p.textContent = 'Nos vemos na pista!'; marcarPassos(3);
+    salvar({ pg, g: { responsavel: gg.responsavel, bateria: gg.bateria, inicio: gg.inicio, modo: gg.modo, souResponsavel: gg.souResponsavel }, pago: true });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const mostrarPagamento = (pg, g) => {
+    pagamentoAtual = pg;
+    if (pg.pago) { confirmarPago(pg, g); return; }
+    const c = $('pagarCaixa'); const gg = Object.assign({}, g || {}, grupo || {});
+    $('bannerGrupo').style.display = 'none';
+    $('pronto').classList.add('pagando');
+    icone(true);
+    $('prontoTitulo').textContent = 'Falta pagar';
+    $('prontoSub').textContent = 'Seu cadastro já foi recebido. Pague para garantir a vaga.';
+    const nome1 = (gg.nome || val('nome')).split(/\s+/)[0];
+    $('corrigir').textContent = 'Corrigir meus dados';
+    if (!$('corrigirNota')) { const n = document.createElement('p'); n.id = 'corrigirNota'; n.className = 'nota'; n.textContent = 'Corrigir não altera o valor a pagar.'; $('corrigir').insertAdjacentElement('afterend', n); }
+    topo.h1.innerHTML = 'Quase <em>lá</em>'; topo.p.textContent = 'Leva menos de um minuto.'; marcarPassos(2);
+    const quem = gg.souResponsavel ? '' : (gg.responsavel ? ' no grupo de ' + esc(gg.responsavel) : '');
+    c.innerHTML = (gg.bateria ? '<p class="contexto">' + esc(gg.bateria) + ' · ' + quando(gg.inicio) + (nome1 ? ' · cadastro de ' + esc(nome1) : '') + '</p>' : '') + '<p>Pagamento d' + (gg.modo ? (gg.modo === 'individual' ? 'a sua vaga' : gg.modo === 'sinal' ? 'o sinal do grupo' : 'o grupo todo') : 'a sua vaga') + quem + '</p><p class="valor">' + brl(pg.valorCentavos) + '</p>' +
+      '<a class="botao" href="' + encodeURI(pg.link) + '" target="_blank" rel="noopener">Pagar agora · Pix ou cartão</a>' +
+      '<ol><li>Toque no botão: abre a página de pagamento segura da Asaas.</li><li>Escolha Pix (copie o código) ou cartão.</li><li>Volte aqui: a confirmação aparece sozinha.</li></ol>' +
+      '<p class="estado" id="pagarEstado" role="status">Aguardando o pagamento.</p><button type="button" class="link" id="jaPaguei">Já paguei: verificar agora</button>';
+    c.hidden = false;
+    if ($('ajudaPag')) { $('ajudaPag').hidden = false; $('ajudaPag').open = true; }
+    $('jaPaguei').addEventListener('click', () => verificar(pg, gg));
+    clearInterval(timerPag); timerPag = setInterval(() => verificar(pg, gg), 5000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) verificar(pg, gg); });
+    salvar({ pg, g: { responsavel: gg.responsavel, bateria: gg.bateria, inicio: gg.inicio, modo: gg.modo, souResponsavel: gg.souResponsavel, nome: nome1 }, pago: false });
+  };
+  $('corrigir').addEventListener('click', () => {
+    clearInterval(timerPag);
+    $('pronto').style.display = 'none'; $('pronto').classList.remove('pagando'); $('pagarCaixa').hidden = true; $('form').style.display = ''; $('progresso').style.display = ''; $('bannerGrupo').style.display = 'flex';
+    icone(false); $('corrigir').textContent = 'Corrigir meus dados'; $('corrigir').hidden = false; document.querySelectorAll('#corrigirNota').forEach((x) => x.remove()); document.querySelectorAll('#calendario').forEach((x) => x.remove()); topoFormulario();
+    salvar(null); window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+  // voltou do app do banco com a aba suspensa: retoma o pagamento em aberto
+  const salvo = tokenReserva ? lerSalvo() : null;
+  if (salvo && salvo.pg && salvo.pg.id) {
+    $('form').style.display = 'none'; $('progresso').style.display = 'none'; $('pronto').style.display = 'block';
+    mostrarPagamento(Object.assign({}, salvo.pg, { pago: Boolean(salvo.pago) }), salvo.g);
+    if (!salvo.pago) verificar(salvo.pg, salvo.g);
+  }
+
 
   // Remove classe invalido ao digitar em qualquer campo
   document.querySelectorAll('input').forEach((el) => {
@@ -500,7 +749,7 @@
     const ig = insta.value.trim().replace(/^(?:https?:\/\/)?(?:www\.)?instagram\.com\//i, '').replace(/[\/?#].*$/, '').replace(/^@/, '').toLowerCase();
     if (!ig) return erro('Informe seu Instagram (o @usuário).', insta);
     if (!/^[a-z0-9_](?:[a-z0-9_.]{0,28}[a-z0-9_])?$/.test(ig) || ig.includes('..')) return erro('Instagram inválido. Informe o @usuário (ex.: @andre.silva).', insta);
-    if (!iso(nasc.value)) return erro('Informe a data de nascimento completa (DD/MM/AAAA).', nasc);
+    if (!dataOk(nasc.value)) return erro('Informe uma data de nascimento válida, como 25/12/1990.', nasc);
     const pVal = Number(peso.value.replace(',', '.'));
     if (!peso.value.trim() || !Number.isFinite(pVal) || pVal < 20 || pVal > 250) return erro('Informe seu peso em kg (entre 20 e 250 kg).', peso);
     if (dig(cep.value).length !== 8) return erro('Informe o CEP com 8 dígitos.', cep);
@@ -542,18 +791,23 @@
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.erro || 'Não foi possível enviar agora. Tente de novo.');
       $('form').style.display = 'none';
+      $('progresso').style.display = 'none';
       $('prontoTitulo').textContent = `Tudo certo, ${j.nome || ''}!`.replace(', !', '!');
       if (j.pagamento) mostrarPagamento(j.pagamento, j.grupo);
-      if (tokenReserva) {
-        $('prontoSub').textContent = j.pagamento && !j.pagamento.pago ? 'Seu cadastro foi recebido. Falta só pagar a sua vaga para garanti-la.' : 'Seu cadastro foi recebido e vinculado à sua reserva em grupo.';
-        $('prontoInstrucao').innerHTML = '1. Vá à recepção ou totem de autoatendimento.<br>2. Digite seu <b>' + (tipo === 'Passaporte' ? 'passaporte' : tipo) + '</b>.<br>3. ' + (j.pagamento && !j.pagamento.pago ? 'Pague a sua vaga acima para garanti-la; o termo sairá completo na recepção.' : 'Sua vaga está garantida e seu termo sairá completo na recepção!');
+      if (tokenReserva && !(j.pagamento && !j.pagamento.pago)) {
+        $('prontoSub').textContent = 'Seu cadastro foi recebido e vinculado ao grupo' + (j.grupo ? ' de ' + j.grupo.responsavel + ' · ' + j.grupo.bateria + ' · ' + quando(j.grupo.inicio) : '') + '.';
+        $('prontoInstrucao').innerHTML = '1. Vá à recepção ou totem de autoatendimento.<br>2. Digite seu <b>' + (tipo === 'Passaporte' ? 'passaporte' : tipo) + '</b>.<br>3. Você assina o termo na recepção.';
+      }
+      if (tokenReserva && j.pagamento && !j.pagamento.pago) {
+        $('prontoSub').textContent = 'Seu cadastro já foi recebido. Pague para garantir a vaga.';
+        $('prontoInstrucao').innerHTML = '1. Pague acima por Pix ou cartão.<br>2. No kartódromo, digite seu <b>' + (tipo === 'Passaporte' ? 'passaporte' : tipo) + '</b> no totem.<br>3. Você assina o termo na recepção.';
       }
       $('pronto').style.display = 'block';
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (j.pagamento && !j.pagamento.pago) $('pagarCaixa').scrollIntoView({ behavior: 'smooth', block: 'center' }); else window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (e) {
       erro(e.message, null);
     } finally {
-      btn.disabled = false; btn.textContent = 'Concluir cadastro';
+      btn.disabled = false; btn.textContent = rotuloEnviar;
     }
   });
 })();

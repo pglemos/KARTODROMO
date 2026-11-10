@@ -106,3 +106,12 @@ update-check/
 mobile/tests/appium/screenshots/
 resultados-legends/
 # arquivos AppleDouble do macOS
+
+# temporários de ferramentas (10/11/2026) — podem conter tokens
+/email-*/
+/kib-tokens-*/
+/node-jiti/
+/faClazAobPY2gJ7NpioV3/
+# scripts com senha em texto puro: nunca versionar
+scripts/test_winrm_guigui.py
+scripts/test_wmi.py
