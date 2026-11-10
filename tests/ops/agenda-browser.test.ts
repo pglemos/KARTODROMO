@@ -52,6 +52,16 @@ describe('Agenda: integração real do frontend sem dados de produção',()=>{
   await page.locator('#calendario [data-sel="394"]').first().click();await page.locator('[data-grupo-abrir]').first().click();await page.locator('[data-cancelar-grupo]').waitFor();
   expect(await page.locator('[data-cobrar=""]').count()).toBe(0);expect(await page.locator('#camada').innerText()).toContain('até 25');expect(errors).toEqual([]);await page.close();
  });
+ it('busca cadastro por CPF/nome numa vaga do grupo e vincula puxando os dados do banco',async()=>{
+  let vinc:any=null;
+  await page.route(/\/api\/office\/clientes\?q=/,route=>json(route,[{id:555,nome:'MARIA AMIGA',documento:'111.222.333-44',telefone:'(31) 98888-7777',nascimento:'1990-05-01'}]));
+  await page.route(/\/api\/office\/grupos\/87\/vincular$/,route=>{vinc=JSON.parse(route.request().postData()||'{}');return json(route,{...g,pilotos:g.pilotos.map((p:any,i:number)=>i===1?{...p,nome:'MARIA AMIGA',clienteId:555}:p)});});
+  await page.locator('#calendario [data-sel="394"]').first().click();await page.locator('[data-grupo-abrir]').first().click();await page.locator('[data-cancelar-grupo]').waitFor();
+  await page.locator('[data-buscar-vaga="1"]').click();await page.locator('#qVaga').fill('11122233344');
+  await page.locator('[data-pick-vaga]').first().waitFor();await page.locator('[data-pick-vaga]').first().click();
+  await page.waitForFunction(()=>!document.querySelector('#qVaga'));
+  expect(vinc).toMatchObject({clienteId:555,pilotoId:g.pilotos[1].id,puxarDados:true});expect(errors).toEqual([]);await page.close();
+ });
  it('erro de grupos não vira lista de avulsos',async()=>{
   falhaGrupos=true;await page.locator('#calendario [data-sel="394"]').first().click();await page.locator('#corpoBateria [data-reabrir]').waitFor();
   expect(await page.locator('#corpoBateria').innerText()).toContain('Não foi possível conferir os grupos');expect(await page.locator('[data-ag-mover]').count()).toBe(0);await page.close();

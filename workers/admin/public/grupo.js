@@ -303,6 +303,14 @@ const Grupo = (() => {
     const pilotos = novo ? rasc.pilotos.map((p, i) => ({ ...p, ordem: i + 1, responsavel: i === 0 })) : g.pilotos;
     const pendentes = novo ? [] : g.pilotos.filter((p) => !p.pago);
     const titulo = novo ? 'Quem vai correr?' : `${esc(nomeBonito(g.responsavel))}${g.n > 1 ? ' e mais ' + (g.n - 1) : ''}`;
+    const bvHtml = (i) => {
+      const v = estado.bv; if (!v || v.i !== i) return '';
+      const itens = (v.achados || []).slice(0, 8).map((c) => `<button type="button" class="btn sec" style="justify-content: flex-start; min-height: 44px; text-align: left" data-pick-vaga="${esc(JSON.stringify({ id: c.id, nome: c.nome, telefone: c.telefone || '', nascimento: c.nascimento || '' }))}"><b>${esc(nomeBonito(c.nome))}</b><span class="peq" style="margin-left: 8px">${esc([c.documento, c.telefone, c.nascimento ? 'nasc. ' + c.nascimento.split('-').reverse().join('/') : ''].filter(Boolean).join(' · '))}</span></button>`).join('');
+      return `<div class="buscaVaga" style="grid-column: 1 / -1; padding: var(--kib-espaco-1) var(--kib-espaco-2); background: var(--kib-cor-superficie-suave); border-top: 1px solid var(--kib-cor-borda-sutil); display: flex; flex-direction: column; gap: var(--kib-espaco-1)">
+        <span style="display: flex; gap: var(--kib-espaco-1); align-items: center"><input id="qVaga" class="entrada" style="flex: 1; min-height: 44px" value="${esc(v.q)}" placeholder="CPF, nome ou telefone do piloto ou amigo" aria-label="Buscar cadastro para a vaga ${i + 1}" autocomplete="off"><button type="button" class="btn sec" data-fechar-bv>Fechar</button></span>
+        ${itens || (v.q.trim().length >= 2 ? '<span class="peq">Nenhum cadastro encontrado. Preencha nome e WhatsApp na linha, ou mande o link de cadastro.</span>' : '<span class="peq">Digite pelo menos 2 letras ou 4 números. Ao escolher, nome, WhatsApp e idade vêm do cadastro.</span>')}
+      </div>`;
+    };
     const linhas = pilotos.map((p, i) => {
       const resp = i === 0;
       const respExistente = resp && novo && !!rasc.responsavel;
@@ -337,6 +345,7 @@ const Grupo = (() => {
             ${resp ? `<span class="badgeRespTag" title="Responsável pela reserva">${svg(IC.ok, 10, 'currentColor')} RESPONSÁVEL</span>` : ''}
           </div>
           ${resp && respExistente ? '<span class="peq cor-apoio" style="font-size: 11px; line-height: 1">cliente já cadastrado · <button type="button" class="btn link peq" data-trocar-resp="1" style="font-size: 11px; padding: 0">Trocar</button></span>' : resp && novo ? '<span class="peq cor-apoio" style="font-size: 11px; line-height: 1">cliente novo: só nome e WhatsApp</span>' : ''}
+          ${!resp && !p.clienteId ? `<button type="button" class="btn link peq" style="font-size: 11px; padding: 0; justify-content: flex-start; min-height: 0" data-buscar-vaga="${i}" aria-label="Buscar cadastro do piloto ${i + 1} por CPF, nome ou telefone">${svg(IC.busca, 11)} Buscar cadastro (CPF, nome ou telefone)</button>` : !resp && p.clienteId ? '<span class="peq cor-apoio" style="font-size: 11px; line-height: 1">cadastro puxado do banco</span>' : ''}
         </div>
         ${respExistente ? `<span class="mono peq" style="font-size: 12.5px; color: var(--kib-cor-texto-principal);">${esc(foneVal || '—')}</span>` : `<input class="entrada mono" style="height: 36px; font-size: 12.5px;" value="${esc(foneVal)}" placeholder="(31) 9 0000-0000" inputmode="tel" aria-label="WhatsApp do piloto ${i + 1}" aria-describedby="erroGrupo" data-campo="telefone" data-i="${i}" ${!novo && resp ? 'readonly' : ''}>`}
         <button type="button" class="btnToggleIdade ${p.menor ? 'menor' : 'adulto'}" role="switch" aria-checked="${!!p.menor}" data-menor="${i}" title="${p.menor ? 'Menor de idade (clique para mudar)' : 'Adulto (clique para mudar para Menor)'}"><span style="width: 6px; height: 6px; border-radius: 50%; background: currentColor"></span> ${p.menor ? 'Menor' : 'Adulto'}</button>
@@ -351,7 +360,7 @@ const Grupo = (() => {
           ${!novo && (p.clienteId || p.nome) ? `<button type="button" class="btn sec peq" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; height: 26px; padding: 0 8px; color: var(--kib-cor-marca-principal); border-color: color-mix(in srgb, var(--kib-cor-marca-principal) 30%, transparent); font-weight: 600;" aria-label="Mover participante de grupo ou colocar sozinho" title="Grupo errado / Mover participante (colocar sozinho ou em outro grupo)" data-mover-piloto="${p.id}" data-piloto-nome="${esc(nomeVal || 'Piloto ' + (i + 1))}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg> Mover</button>` : ''}
           <button type="button" class="btnRemoverPiloto hov" aria-label="Tirar o piloto ${i + 1}" title="Tirar piloto da reserva" data-tirar="${i}">${svg(IC.fechar, 13, 'currentColor', 2.2)}</button>
         </div>`}
-      </div>`;
+      </div>${bvHtml(i)}`;
     }).join('');
     const pagamentos = novo ? [] : g.pagamentos.slice().reverse();
     const nomeDe = (pid) => { const p = g && g.pilotos.find((x) => x.id === pid); return p ? (p.nome || 'Piloto ' + p.ordem) : 'Grupo · ' + (g ? g.responsavel : ''); };
@@ -598,6 +607,18 @@ const Grupo = (() => {
       }, 280);
       return;
     }
+    if (t.id === 'qVaga') {
+      const ctx = estado, v = ctx.bv; if (!v) return; v.q = t.value; clearTimeout(tBusca);
+      const q = t.value.trim();
+      tBusca = setTimeout(async () => {
+        if (!ativo(ctx) || !ctx.bv) return;
+        if (q.length < 2) { ctx.bv.achados = []; pintar(); const i = $('#qVaga'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } return; }
+        let achados; try { achados = await office('/clientes?q=' + encodeURIComponent(q)); } catch (er) { if (ativo(ctx)) toast('Não foi possível buscar clientes: ' + er.message, true); return; }
+        if (!ativo(ctx) || !ctx.bv || ctx.bv.q.trim() !== q) return; ctx.bv.achados = achados;
+        pintar(); const i = $('#qVaga'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
+      }, 280);
+      return;
+    }
     if (t.dataset.reg) { estado.reg[t.dataset.reg] = t.value; return; }
     if (t.dataset.campo) {
       if (t.dataset.campo === 'telefone') {
@@ -667,6 +688,16 @@ const Grupo = (() => {
     const ctx = estado; if (ctx.ocupado) return;
     const { g, rasc, b } = ctx;
     if (e.target.closest('[data-grupo-atualizar]')) return refrescar(true);
+    if (el('[data-buscar-vaga]')) { ctx.bv = { i: +el('[data-buscar-vaga]').dataset.buscarVaga, q: '', achados: [] }; pintar(); const qi = $('#qVaga'); if (qi) { qi.focus(); qi.scrollIntoView({ block: 'center' }); } return; }
+    if (el('[data-fechar-bv]')) { ctx.bv = null; pintar(); return; }
+    if (el('[data-pick-vaga]')) {
+      const c = JSON.parse(el('[data-pick-vaga]').dataset.pickVaga), i = ctx.bv ? ctx.bv.i : -1; if (i < 0) return;
+      const menor = c.nascimento ? (new Date(`${c.nascimento}T00:00:00`) > new Date(new Date().setFullYear(new Date().getFullYear() - 18))) : false;
+      ctx.bv = null;
+      if (g) { const p = g.pilotos[i]; await atualizar(() => office(`/grupos/${g.id}/vincular`, { method: 'POST', body: { clienteId: c.id, pilotoId: p.id, puxarDados: true } }), `${nomeBonito(c.nome)} ocupou a vaga ${i + 1}`); }
+      else { rasc.pilotos[i] = { ...rasc.pilotos[i], nome: c.nome, telefone: c.telefone, menor, clienteId: c.id }; guardarRascunho(); pintar(); toast(`${nomeBonito(c.nome)} na vaga ${i + 1}`); }
+      return;
+    }
     if (el('[data-conferir-asaas]')) {
       const btn = el('[data-conferir-asaas]');
       const rotulo = btn.innerHTML;
@@ -842,7 +873,13 @@ const Grupo = (() => {
       x.disabled = true; x.setAttribute('aria-busy', 'true'); x.textContent = 'Salvando…';
       try {
         const pilotos = rasc.pilotos.map((p, i) => (i === 0 ? (rasc.responsavel ? { nome: rasc.responsavel.nome, telefone: rasc.responsavel.telefone, menor: !!p.menor } : { nome: p.nome, telefone: p.telefone, menor: !!p.menor }) : p));
-        const novo = await office('/grupos', { method: 'POST', body: { bateriaId: b.id, ...(rasc.responsavel ? { responsavelId: rasc.responsavel.id } : { responsavelNovo: { nome: rasc.pilotos[0].nome, telefone: rasc.pilotos[0].telefone } }), origem: rasc.origem, modo: rasc.modo, precoCentavos: rasc.preco, sinalPct: rasc.sinalPct, pilotos } });
+        let novo = await office('/grupos', { method: 'POST', body: { bateriaId: b.id, ...(rasc.responsavel ? { responsavelId: rasc.responsavel.id } : { responsavelNovo: { nome: rasc.pilotos[0].nome, telefone: rasc.pilotos[0].telefone } }), origem: rasc.origem, modo: rasc.modo, precoCentavos: rasc.preco, sinalPct: rasc.sinalPct, pilotos } });
+        for (let k = 1; k < rasc.pilotos.length; k++) {
+          const cid = rasc.pilotos[k].clienteId, vaga = novo.pilotos && novo.pilotos[k];
+          if (!cid || !vaga) continue;
+          try { novo = await office(`/grupos/${novo.id}/vincular`, { method: 'POST', body: { clienteId: cid, pilotoId: vaga.id, puxarDados: true } }); }
+          catch (er) { toast(`Vaga ${k + 1}: não deu para vincular o cadastro (${er.message})`, true); }
+        }
         if (!ativo(ctx)) { try { sessionStorage.removeItem(chaveRasc(b)); } catch {} return; }
         guardarRascunho(true); estado.g = novo; estado.rasc = null;
         { const gid = novo.id; toastAcao(`Reserva de ${novo.n} piloto(s) salva · já aparece na Recepção, no site e no totem`, 'Desfazer', async () => { await office(`/grupos/${gid}`, { method: 'DELETE' }); if (ativo(ctx)) { fecharCamada(); estado = null; } toast('Reserva desfeita · vagas liberadas'); }); }

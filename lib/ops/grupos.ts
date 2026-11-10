@@ -300,7 +300,7 @@ async function vagasAguardando(grupoId: number): Promise<VagaLivre[]> {
  * Pode ser repetida sem efeito. Se a pessoa já tinha uma pré-reserva avulsa (totem) na mesma bateria e ainda não paga,
  * essa pré-reserva sai (a vaga do grupo é a dela). Reserva paga duplicada fica para a recepção resolver.
  */
-export async function vincularClienteAoGrupo(grupoId: number, clienteId: number, pilotoId: number | null, log: Log) {
+export async function vincularClienteAoGrupo(grupoId: number, clienteId: number, pilotoId: number | null, log: Log, puxarDados = false) {
   const g = await one<{ bateriaId: number }>(`SELECT BateriaId bateriaId FROM dbo.ReservaGrupo WHERE Id = @g AND Status = 'ativa'`, { g: grupoId });
   if (!g) throw new HttpError(404, 'Reserva em grupo não encontrada.');
   const c = await one<{ id: number }>(`SELECT Id id FROM dbo.Cliente WHERE Id = @c`, { c: clienteId });
@@ -321,9 +321,12 @@ export async function vincularClienteAoGrupo(grupoId: number, clienteId: number,
     for (const o of outras) await run(`UPDATE dbo.Inscricao SET Status = 'cancelada', Pago = 0, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { id: o.Id });
     await run(`UPDATE dbo.Inscricao SET ClienteId = @c, AtualizadoEm = SYSDATETIME() WHERE Id = @i AND Status <> 'cancelada'`, { c: clienteId, i: vaga.inscricaoId });
     await run(
-      `UPDATE p SET ClienteId = @c, CadastroEm = SYSDATETIME(), Nome = COALESCE(NULLIF(p.Nome, ''), c.Nome), Telefone = COALESCE(NULLIF(p.Telefone, ''), c.Telefone)
+      `UPDATE p SET ClienteId = @c, CadastroEm = SYSDATETIME(),
+              Nome = CASE WHEN @puxar = 1 THEN COALESCE(NULLIF(c.Nome, ''), p.Nome) ELSE COALESCE(NULLIF(p.Nome, ''), c.Nome) END,
+              Telefone = CASE WHEN @puxar = 1 THEN COALESCE(NULLIF(c.Telefone, ''), p.Telefone) ELSE COALESCE(NULLIF(p.Telefone, ''), c.Telefone) END,
+              Menor = CASE WHEN @puxar = 1 AND c.Nascimento IS NOT NULL THEN CASE WHEN DATEADD(year, 18, c.Nascimento) > CAST(SYSDATETIME() AS date) THEN 1 ELSE 0 END ELSE p.Menor END
          FROM dbo.ReservaGrupoPiloto p JOIN dbo.Cliente c ON c.Id = @c WHERE p.Id = @id`,
-      { c: clienteId, id: vaga.id },
+      { c: clienteId, id: vaga.id, puxar: puxarDados ? 1 : 0 },
     );
   });
   await limparProvisorios();
@@ -931,7 +934,8 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
   }
   if ((m = path.match(/^\/grupos\/(\d+)\/vincular$/)) && method === 'POST') {
     const b = await req.body();
-    send(200, await vincularClienteAoGrupo(Number(m[1]), int(b.clienteId, 'Cliente'), b.pilotoId ? int(b.pilotoId, 'Vaga') : null, (...a) => console.log(...a)));
+    const rv = await vincularClienteAoGrupo(Number(m[1]), int(b.clienteId, 'Cliente'), b.pilotoId ? int(b.pilotoId, 'Vaga') : null, (...a) => console.log(...a), b.puxarDados === true);
+    send(200, b.puxarDados === true ? await grupo(Number(m[1])) : rv);
     return true;
   }
   if (path === '/grupos' && method === 'POST') {
