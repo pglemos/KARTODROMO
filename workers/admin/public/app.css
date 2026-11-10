@@ -288,11 +288,11 @@ a.chip { text-decoration: none; }
 .bloco2:hover { transform: translateY(-1px); filter: brightness(0.97); }
 .bloco2 .linha1 { display: flex; align-items: center; justify-content: space-between; gap: 4px; width: 100%; }
 .bloco2 .hora { font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 700; flex-shrink: 0; }
-.bloco2 .dirB { margin-left: auto; flex-shrink: 0; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.bloco2 .dirB { margin-left: auto; flex-shrink: 0; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .bloco2 .tituloB { width: 100%; font-size: var(--kib-fonte-tamanho-corpo); font-weight: 700; line-height: 1.25; }
 .bloco2 .aPagarB { font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 600; color: var(--avisoTxt); }
 .bloco2 .barraB { position: absolute; left: 0; bottom: 0; height: 3px; }
-.bloco2 .naPista { padding: 1px 5px; border-radius: 4px; background: var(--kib-cor-estado-perigo-solido); color: var(--kib-cor-acao-sobre-principal); font-size: 9.5px; font-weight: 800; letter-spacing: 0.04em; white-space: nowrap; flex-shrink: 0; }
+.bloco2 .naPista { padding: 1px 5px; border-radius: 4px; background: var(--kib-cor-estado-perigo-solido); color: var(--kib-cor-acao-sobre-principal); font-size: 12px; font-weight: 800; letter-spacing: 0.04em; white-space: nowrap; flex-shrink: 0; }
 .bloco2.livre { padding: var(--kib-espaco-meio) var(--kib-espaco-1); background: var(--kib-cor-superficie-padrao); color: var(--tinta2); box-shadow: inset 0 0 0 1px var(--linha2); }
 .bloco2.livre .dirB { color: var(--okTxt); }
 .bloco2.bloq { background: repeating-linear-gradient(135deg, var(--kib-cor-superficie-lateral) 0 6px, var(--kib-cor-fundo-app) 6px 12px); color: var(--kib-cor-texto-corpo); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--kib-cor-texto-principal) 6%, transparent); }
@@ -746,7 +746,11 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 var(--kib-espaco-meio)
 @media (max-width: 760px) { .agBarraLote { bottom: var(--kib-espaco-1); } .agBarraAcoes { width: 100%; } .agBarraAcoes .btn { flex: 1 1 auto; } }
 
 /* agenda: chip de tipo em texto (estado nunca só por cor) e alvos de 44px também no desktop */
-.bloco2 .tipoB { padding: 0 4px; border-radius: 3px; border: 1px solid currentColor; font-size: 9.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; opacity: .85; }
+.bloco2 .tipoB { padding: 0 4px; border-radius: 3px; border: 1px solid currentColor; font-size: 12px; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; white-space: nowrap; }
 .agendaLayout .btn.peq, .agendaLayout .btn.icone.peq, .agendaLayout .btn.icone { min-height: 44px; }
 .agendaLayout .btn.icone, .agendaLayout .btn.icone.peq { min-width: 44px; }
 .agendaLayout .miniCal button, .agendaLayout #miniCal button { min-height: 44px; height: 44px; }
+
+.agendaLayout .bloco2, .agendaLayout .pistaProx, .agendaLayout .seg button, .agendaLayout .filtroTipo, .agendaLayout .filtroDet > summary, .cabDia, .agendaLayout .linhaDia, .agendaLayout .linhaLado, [data-nav] { min-height: 44px; }
+.agendaLayout .buscaCampo { min-height: 44px; }
+.agendaLayout .buscaCampo input { min-height: 40px; }

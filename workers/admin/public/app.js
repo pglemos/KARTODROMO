@@ -453,7 +453,7 @@ TELAS.visao = async (tela) => {
     const cls = ['bloco2', tp === 'livre' ? 'livre' : tp === 'bloq' ? 'bloq' : '', st === 'fim' ? 'passou' : '', st === 'prevista' ? 'pista' : ''].filter(Boolean).join(' ');
     const titulo = tituloBat(b, tp, true), dir = livresTxt(b, st, tp);
     return `<button class="${cls}" data-ir-bat="${b.id}" style="${tp === 'livre' || tp === 'bloq' ? '' : `${T.fundo}; --faixa: ${T.cor}`}" aria-label="${esc(`${horaDe(b.dataHora)}, ${titulo}, ${T.t}, ${dir}`)}">
-      <span class="linha1"><span class="mono hora">${horaDe(b.dataHora)}</span>${st === 'prevista' ? `<span class="naPista" title="Bateria no horário previsto${dir ? ' · ' + esc(dir) : ''}">NA PISTA</span>` : `<span class="dirB">${dir}</span>`}</span>
+      <span class="linha1"><span class="mono hora">${horaDe(b.dataHora)}</span>${st === 'prevista' ? `<span class="naPista" title="Bateria no horário previsto${dir ? ' · ' + esc(dir) : ''}">NO HORÁRIO</span>` : `<span class="dirB">${dir}</span>`}</span>
       <span class="tituloB trunc">${esc(tp === 'livre' ? 'Livre' : titulo)}</span>${st !== 'fim' && falta(b) && tp !== 'livre' ? `<span class="aPagarB">${pagCurto(b)}</span>` : ''}${tp === 'livre' ? '' : `<span class="barraB" style="width: ${Math.round(Math.min(1, n / vagas) * 100)}%; background: ${T.cheio}"></span>`}</button>`;
   };
   const pintarLinha = () => {
@@ -525,7 +525,7 @@ TELAS.agenda = async (tela) => {
   tela.innerHTML = `${cabecalho('<span class="ponto pulso" style="background: var(--kib-cor-status-ok)"></span><span class="cor-ok">Mesma agenda da Recepção, do site e dos totens</span><span id="atualizado" style="color: var(--mudo2); font-weight: 500"></span>', 'Agenda <span id="periodo" style="font-size: var(--kib-fonte-tamanho-titulo); font-weight: 600; color: var(--mudo); letter-spacing: 0"></span>', `
     <button class="btn prim" data-nova="1" title="Nova reserva (tecla N)">${svg(IC.mais, 14, 'var(--kib-cor-acao-sobre-principal)', 2.6)}Nova reserva<kbd class="atalho" aria-hidden="true">N</kbd></button>
     <div style="display: flex; align-items: center; gap: 2px; height: 40px; box-sizing: border-box; padding: 0 var(--kib-espaco-meio); border-radius: var(--kib-raio-botao); background: var(--kib-cor-superficie-padrao); box-shadow: 0 0 0 1px var(--linha2)"><button class="btn sec peq hov icone peq mudo" data-nav="-1" aria-label="Anterior" title="Anterior (seta para a esquerda)">${svg(IC.esq, 15)}</button><button class="btn sec peq" data-nav="0" title="Voltar para hoje (tecla T)">Hoje</button><button class="btn sec peq hov icone peq mudo" data-nav="1" aria-label="Próximo" title="Próximo (seta para a direita)">${svg(IC.dir, 15)}</button></div>
-    <div class="seg" role="tablist" aria-label="Vista">${[['dia', 'Dia', 'D'], ['semana', 'Semana', 'S'], ['lista', 'Lista', 'L']].map(([v, t, k]) => `<button role="tab" data-vista="${v}" aria-selected="${A.vista === v}" title="${t} (tecla ${k})" class="${A.vista === v ? 'sel' : ''}">${t}</button>`).join('')}</div>`)}
+    <div class="seg" role="tablist" aria-label="Vista">${[['dia', 'Dia', 'D'], ['semana', 'Semana', 'S'], ['lista', 'Lista', 'L']].map(([v, t, k]) => `<button role="tab" data-vista="${v}" aria-selected="${A.vista === v}" title="${t} (tecla ${k})" class="${A.vista === v ? 'sel' : ''}">${t}</button>`).join('')}</div><button class="btn sec icone" data-ajuda-ag aria-haspopup="dialog" aria-label="Atalhos e legenda" title="Atalhos e legenda (tecla ?)">?</button>`)}
   <main class="principal agendaLayout">
     <div class="agendaLado">
       <section class="cartao leve" style="padding: var(--kib-espaco-denso-12)" id="miniCal"></section>
@@ -533,7 +533,7 @@ TELAS.agenda = async (tela) => {
       <section class="cartao leve" id="aPagar"></section>
     </div>
     <span id="avisoVivo" class="sr-only" role="status" aria-live="polite"></span>
-    <section class="cartao agendaCal" id="calendario"><div class="esqueleto" style="height: 600px; margin: var(--kib-espaco-2)"></div></section>
+    <section class="cartao agendaCal" id="calendario"><div class="esqueleto" role="status" aria-label="Carregando a agenda" style="height: 600px; margin: var(--kib-espaco-2)"></div></section>
   </main>`;
   let bats = [];
   let ultimaPista = null, offlineDesde = null, consulta = 0, periodoCarregado = null, detalhe = 0;
@@ -549,7 +549,7 @@ TELAS.agenda = async (tela) => {
     const temConteudo = !!cal.querySelector('.rolagemX, .linhaDia, .cartaoCab, .vazio');
     if (!temConteudo && periodoCarregado !== chavePeriodo) {
       bats = [];
-      cal.innerHTML = '<div class="esqueleto" style="height: 600px; margin: var(--kib-espaco-2)"></div>';
+      cal.innerHTML = '<div class="esqueleto" role="status" aria-label="Carregando a agenda" style="height: 600px; margin: var(--kib-espaco-2)"></div>';
       const ap = $('#aPagar'); if (ap) ap.innerHTML = '';
     }
     try {
@@ -599,7 +599,7 @@ TELAS.agenda = async (tela) => {
       const at = $('#atualizado'); if (at) { at.textContent = ` · sem conexão desde ${offlineDesde}, tentando de novo`; at.style.color = 'var(--avisoTxt)'; }
       if (!bats.length || periodoCarregado !== chavePeriodo) { // período novo que não carregou: não mostra a grade do período anterior
         bats = []; periodoCarregado = null;
-        cal.innerHTML = `<div class="vazio" role="alert"><b>Não foi possível carregar este período</b><span>${esc(e.message)}</span><button class="btn sec" data-ag-repetir>Tentar novamente</button></div>`;
+        cal.innerHTML = `<div class="vazio" role="alert"><b>Não foi possível carregar este período</b><span>Sem internet ou servidor da operação fora do ar. Confira a conexão e tente de novo.</span><button class="btn sec" data-ag-repetir>Tentar novamente</button></div>`;
         const ap = $('#aPagar'); if (ap) ap.innerHTML = '';
       }
       return false;
@@ -635,9 +635,9 @@ TELAS.agenda = async (tela) => {
     const titulo = tituloBat(b, tp, true), dir = livresTxt(b, st, tp);
     const devendo = st !== 'fim' && falta(b) && tp !== 'livre', aPagar = devendo && (urgente(b) || A.sel === b.id) ? `<span class="aPagarB">${pagCurto(b)}</span>` : '';
     const dica = [T.t, titulo, dir, devendo ? pagLongo(b) : ''].filter(Boolean).join(' · ');
-    const chipTipo = ['camp', 'evento', 'bloq'].includes(tp) ? `<span class="tipoB">${T.curto}</span>` : '';
+    const chipTipo = tp !== 'livre' ? `<span class="tipoB">${T.curto}</span>` : '';
     return `<button class="${cls}" data-sel="${b.id}" title="${esc(dica)}" style="${estilo}" aria-label="${esc(`${horaDe(b.dataHora)}, ${titulo}, ${T.t}, ${dir}`)}">
-      <span class="linha1"><span class="mono hora">${horaDe(b.dataHora)}</span>${chipTipo}${st === 'prevista' ? `<span class="naPista" title="Bateria no horário previsto${dir ? ' · ' + esc(dir) : ''}">NA PISTA</span>` : `<span class="dirB">${dir}</span>`}</span>
+      <span class="linha1"><span class="mono hora">${horaDe(b.dataHora)}</span>${chipTipo}${st === 'prevista' ? `<span class="naPista" title="Bateria no horário previsto${dir ? ' · ' + esc(dir) : ''}">NO HORÁRIO</span>` : `<span class="dirB">${dir}</span>`}</span>
       ${tp === 'livre' ? '' : `<span class="tituloB trunc">${esc(titulo)}</span>${aPagar}<span class="barraB" style="width: ${Math.round(Math.min(1, n / vagas) * 100)}%; background: ${T.cheio}"></span>`}</button>`;
   };
 
@@ -651,7 +651,7 @@ TELAS.agenda = async (tela) => {
     const conta = {}; bats.forEach((b) => { const t = tipoDe(b); conta[t] = (conta[t] || 0) + 1; });
     const nOcultos = ORDEM_TIPOS.filter((t) => A.ocultos[t]).length;
     const fHtml = `<details class="filtroDet" ${A.filtroAberto || A.q || nOcultos ? 'open' : ''}><summary><span class="peso-semibold">Filtrar</span><span class="peq cor-apoio">${nOcultos ? `${nOcultos} tipo${nOcultos > 1 ? 's' : ''} oculto${nOcultos > 1 ? 's' : ''}` : A.q ? 'com busca' : 'tudo visível'}</span></summary>${ORDEM_TIPOS.map((t) => { const on = !A.ocultos[t]; return `<button class="hov filtroTipo" data-tipo="${t}" role="switch" aria-checked="${on}"><span class="amostra" style="${amostra(t, on)}">${on ? svg(IC.ok, 10, t === 'livre' || t === 'bloq' ? 'var(--kib-cor-texto-corpo)' : 'var(--kib-cor-acao-sobre-principal)', 3.6) : ''}</span><span style="flex-grow: 1; ${on ? '' : 'color: var(--mudo2)'}">${TIPOS[t].t}</span><span class="peq">${conta[t] || 0}</span></button>`; }).join('')}
-      <label class="buscaCampo" style="margin: var(--kib-espaco-meio) var(--kib-espaco-meio) var(--kib-espaco-meio)">${svg(IC.busca, 13, 'var(--kib-cor-borda-campo)')}<input id="qAg" value="${esc(A.q)}" placeholder="Responsável, KAC, Legends…" aria-label="Filtrar a agenda pelo nome"></label></details>`;
+      <label class="buscaCampo" style="margin: var(--kib-espaco-meio) var(--kib-espaco-meio) var(--kib-espaco-meio)">${svg(IC.busca, 13, 'var(--kib-cor-borda-campo)')}<input id="qAg" type="search" value="${esc(A.q)}" placeholder="Responsável, KAC, Legends…" aria-label="Filtrar a agenda pelo nome"></label></details>`;
     const ftEl = $('#filtrosTipo');
     if (ftEl && ftEl.innerHTML !== fHtml) ftEl.innerHTML = fHtml;
     const cal = $('#calendario');
@@ -944,12 +944,24 @@ TELAS.agenda = async (tela) => {
     }
     const ap = e.target.closest('[data-aprovar]'); if (ap) { ap.disabled = true; try { await office(`/reservas/${ap.dataset.aprovar}/aprovar`, { method: 'POST', body: {} }); toast('Pré-reserva aprovada'); await recarregar(); } catch (er) { falhou(er); ap.disabled = false; } }
   };
+  const ajudaAgenda = () => {
+    const m = modal(`<div style="padding: var(--kib-espaco-3)"><b style="font-size: var(--kib-fonte-tamanho-titulo)">Atalhos e legenda</b>
+      <p class="peq" style="margin: var(--kib-espaco-1) 0 0">Teclas valem fora de campos de texto.</p>
+      <ul style="list-style: none; margin: var(--kib-espaco-2) 0; padding: 0; display: grid; gap: var(--kib-espaco-1)">
+        <li><kbd>N</kbd> nova reserva</li><li><kbd>T</kbd> ir para hoje</li><li><kbd>←</kbd> <kbd>→</kbd> semana ou dia anterior e seguinte</li><li><kbd>D</kbd> <kbd>S</kbd> <kbd>L</kbd> vista Dia, Semana ou Lista</li><li><kbd>Esc</kbd> fecha o painel</li><li><kbd>?</kbd> esta ajuda</li></ul>
+      <div style="display: flex; flex-wrap: wrap; gap: var(--kib-espaco-1) var(--kib-espaco-2)">${ORDEM_TIPOS.map((t) => `<span style="display: inline-flex; align-items: center; gap: var(--kib-espaco-meio)"><span class="amostra" style="${amostra(t, true)}"></span>${TIPOS[t].t}</span>`).join('')}</div>
+      <p class="peq" style="margin: var(--kib-espaco-2) 0 0">“NO HORÁRIO” marca a bateria cujo horário previsto é agora; a corrida real fica na Cronometragem. O valor “faltam R$” aparece no bloco quando a bateria é em até 3 horas; nas outras, passe o mouse.</p>
+      <div class="modalRodape"><button class="btn sec" style="margin-left: auto" data-fechar-ajuda>Fechar</button></div></div>`, 'Atalhos e legenda');
+    m.querySelector('[data-fechar-ajuda]').onclick = () => fecharCamada();
+  };
+  tela.addEventListener('click', (e) => { if (e.target.closest('[data-ajuda-ag]')) ajudaAgenda(); });
   // atalhos de teclado (um ouvinte só no documento; vale enquanto esta tela está aberta)
   S.tela.atalho = (e) => {
     if (e.key === 'Escape') { if (A.sel) { A.sel = null; setTimeout(pintar, 0); } return; }
     if (e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable || $('#camada .modal')) return;
     const k = e.key.toLowerCase();
     if (k === 'n') { e.preventDefault(); escolherHorario(); }
+    else if (e.key === '?') ajudaAgenda();
     else if (k === 't') irPara(0);
     else if (e.key === 'ArrowLeft' && !$('#camada').innerHTML) irPara(-1);
     else if (e.key === 'ArrowRight' && !$('#camada').innerHTML) irPara(1);
