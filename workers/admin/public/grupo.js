@@ -367,6 +367,8 @@ const Grupo = (() => {
       <span class="linha gap-1"><b class="t-corpo">Link de cadastro do grupo</b><span class="chip ${faltamCad.length ? 'laranja' : 'verde'} empurra">${faltamCad.length ? `faltam ${faltamCad.length} de ${g.n}` : 'todos cadastrados'}</span></span>
       <div class="linha-quebra gap-1" style="align-items: center"><input class="entrada peq mono cresce" style="flex: 1 1 280px; min-width: 0" readonly value="${esc(linkDoGrupo(g))}" aria-label="Link de cadastro do grupo" onfocus="this.select()"><button class="btn peq sec" data-copiar-links="1">Copiar</button><button class="btnZapWhatsApp peq" data-enviar-grupo="1">${svg(IC.zap, 13, '#ffffff')} Enviar no WhatsApp</button></div>
       <span class="peq cor-apoio" style="line-height: 1.4">Mande o mesmo link para todo mundo (grupo de WhatsApp, por exemplo). Quem abrir e se cadastrar ocupa a próxima vaga livre${faltamCad.length ? ': ainda faltam ' + esc(faltamCad.map((p) => p.nome || 'piloto ' + p.ordem).join(', ')) : ''}.</span>
+      ${g.linkPainel ? `<span class="linha gap-1" style="margin-top: var(--kib-espaco-1)"><b class="t-corpo">Painel do responsável</b><span class="peq cor-apoio">só para ${esc(primeiro(g.responsavel))}: mostra quem já se cadastrou e pagou</span></span>
+      <div class="linha-quebra gap-1"><button class="btn peq sec" data-copiar-painel="1">Copiar link do painel</button><button class="btnZapWhatsApp peq" data-enviar-painel="1">${svg(IC.zap, 13, '#ffffff')} Enviar ao responsável</button></div>` : ''}
     </div>`;
     const respOk = novo ? respValido(rasc) : true;
     const erroNovo = novo ? faltaResp(rasc) : '';
@@ -737,6 +739,14 @@ const Grupo = (() => {
       return;
     }
     if (el('[data-copiar-links]')) return copiar(linkDoGrupo(g), 'Link do grupo copiado');
+    if (el('[data-copiar-painel]')) return copiar(g.linkPainel, 'Link do painel copiado');
+    if (el('[data-enviar-painel]')) {
+      const msg = `Olá, ${primeiro(g.responsavel)}! Acompanhe aqui o seu grupo no Kartódromo de Betim (${quando(g.inicio)}): quem já fez o cadastro e quem já pagou. Não compartilhe este link, ele é só seu: ${g.linkPainel}`;
+      const fone = g.responsavelTelefone || '';
+      if (!fone) return copiar(msg, 'Sem WhatsApp do responsável: mensagem copiada');
+      window.open(zap(fone, msg), '_blank', 'noopener');
+      return;
+    }
     if (el('[data-enviar-grupo]')) {
       const fone = g.responsavelTelefone || '';
       if (!fone) return copiar(msgGrupo(g), 'Sem WhatsApp do responsável: mensagem com o link copiada');

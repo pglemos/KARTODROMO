@@ -10,7 +10,7 @@
  * Quando um piloto fica coberto, a vaga dele é marcada paga (Inscricao.Pago, como o "pago antecipado" da Recepção).
  * Pagamento feito no caixa da Recepção ou pelo site também conta (a vaga já vem paga).
  */
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import { insertCliente, one, onlyDigits, query, tx, type ClienteInput } from './db';
 import { HttpError, cancelarReserva, exigePodeFecharBateria, exigePermissaoOffice, inscreverN, moverReservas } from './office';
 import type { Sessao } from './auth';
@@ -38,6 +38,9 @@ const fone = (v: unknown) => { const d = onlyDigits(v); return d.length >= 10 ? 
 const codigoNovo = () => 'G' + randomBytes(4).toString('hex').toUpperCase().slice(0, 7);
 const tokenNovo = () => randomBytes(12).toString('base64').replace(/[^A-Za-z0-9]/g, '').slice(0, 16).padEnd(16, 'K');
 export const linkCadastro = (token: string) => `${LINK_CADASTRO}/?r=${token}`;
+/** Chave do painel do organizador: só quem recebe o link do painel vê quem já se cadastrou e pagou (o link do grupo é compartilhado com todos). */
+export const chavePainel = (codigo: string) => createHmac('sha256', process.env.OPS_RECEPCAO_KEY || 'sem-chave').update('painel:' + codigo).digest('base64url').slice(0, 16);
+export const linkPainel = (codigo: string) => `${LINK_CADASTRO}/painel?g=${codigo}&k=${chavePainel(codigo)}`;
 
 type PilotoIn = { nome?: unknown; telefone?: unknown; menor?: unknown };
 
@@ -157,7 +160,7 @@ export function montar(g: GrupoRow, pilotos: Linha[], pagamentos: Linha[], cobra
   const sinal = Math.round(total * (Number(g.sinalPct) || 0) / 100);
   const responsavel = pilotos.find((p) => p.responsavel);
   return {
-    ...g, linkGrupo: responsavel?.token ? linkCadastro(String(responsavel.token)) : null, pilotos: lista, pagamentos: pagamentos.map((pg) => {
+    ...g, linkGrupo: responsavel?.token ? linkCadastro(String(responsavel.token)) : null, linkPainel: linkPainel(String(g.codigo)), pilotos: lista, pagamentos: pagamentos.map((pg) => {
       const p = pilotos.find((p) => Number(p.id) === Number(pg.pilotoId));
       return { ...pg, pilotoNome: p?.nome || p?.clienteNome || null, pilotoCancelado: p?.inscricaoStatus === 'cancelada' };
     }), n, total, pago, falta: Math.max(0, total - pago), sinal,
@@ -1172,6 +1175,16 @@ export async function tipoDaBateria(bateriaId: number, tipo: string, anterior?: 
 // ---------------------------------------------------------------- link único do grupo no site (cadastro + pagamento)
 
 let ultimoResumoSite = '';
+/** O que o organizador vê no painel: totais e cada vaga (primeiro nome, cadastro, pagamento, termo e o link próprio). */
+export function resumoPainel(g: ReturnType<typeof montar>) {
+  return {
+    chave: chavePainel(String(g.codigo)), n: g.n, total: g.total, pago: g.pago, falta: g.falta, pagos: g.pagos, cadastrados: g.cadastrados, prontos: g.prontos,
+    vagas: g.pilotos.map((p) => ({
+      ordem: p.ordem, nome: primeiroNome(String(p.nome ?? '')) || null, responsavel: p.responsavel, menor: p.menor,
+      cadastro: p.cadastro, falta: p.falta, pago: p.pago, termo: p.termo, link: p.link,
+    })),
+  };
+}
 /**
  * Manda ao site o resumo das reservas em grupo ativas: com ele o link do grupo mostra "Grupo do(a) Fulano", a bateria e,
  * se cada um paga o seu, cobra a vaga da pessoa na hora (Asaas) no fim do cadastro. Só reenvia quando algo muda.
@@ -1193,14 +1206,18 @@ export async function publicarGruposNoSite(log: Log) {
        FROM dbo.ReservaGrupoPiloto v LEFT JOIN dbo.Inscricao i ON i.Id = v.InscricaoId AND i.Status <> 'cancelada'
       WHERE v.GrupoId IN (${lista}) AND (v.Responsavel = 1 OR i.Id IS NOT NULL)`,
   );
+  // status por vaga para o painel do organizador (só primeiro nome; o painel só abre com a chave)
+  const completos = await carregarGrupos(`g.Id IN (${lista})`, {}).catch(() => []);
   const grupos = gs.map((g) => {
     const dele = vagas.filter((v) => v.grupoId === g.id);
+    const c = completos.find((x) => Number(x.id) === g.id);
     return {
       id: g.id, sinalPct: Number(g.sinalPct) || 0, pagoCentavos: Number(pagos.find((x) => x.grupoId === g.id)?.pago) || 0,
       // quem paga o grupo (modo único ou sinal): só o link do responsável cobra; os convidados só fazem o cadastro
       responsavelToken: dele.find((v) => Number(v.responsavel) === 1)?.token ?? null,
       tokens: dele.map((v) => v.token).filter(Boolean), codigo: g.codigo, status: g.status, modo: g.modo, precoCentavos: Number(g.preco) || 0,
       bateria: g.bateria, inicio: g.inicio, responsavel: primeiroNome(g.responsavel), livres: dele.reduce((s, v) => s + v.livre, 0),
+      painel: c ? resumoPainel(c) : null,
     };
   });
   const json = JSON.stringify({ grupos });

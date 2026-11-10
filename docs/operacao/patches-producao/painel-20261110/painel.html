@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#030504">
+<title>Seu grupo · Kartódromo Internacional de Betim</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@500;600;700&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --fundo: #030504; --asfalto: #0b100c; --asfalto-2: #111712;
+    --linha: rgba(255,255,255,.10); --linha-forte: rgba(255,255,255,.22);
+    --texto: #f7faf6; --suave: #a8b2aa; --apagado: #7d877f;
+    --neon: #00e676; --neon-fundo: rgba(0,230,118,.10); --neon-borda: rgba(0,230,118,.38); --tinta: #041301;
+    --ambar: #f5c518; --ambar-fundo: rgba(245,197,24,.10);
+    --zap: #20d466;
+    --titulo: 'Anton', Impact, 'Arial Narrow', sans-serif;
+    --corpo: 'Rajdhani', 'Segoe UI', Roboto, Arial, sans-serif;
+    --foco: 0 0 0 2px var(--fundo), 0 0 0 4px var(--neon);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--fundo); color: var(--texto); font: 500 17px/1.5 var(--corpo); -webkit-text-size-adjust: 100%; -webkit-font-smoothing: antialiased; }
+  body { background:
+    radial-gradient(120% 60% at 50% -10%, rgba(0,230,118,.10), transparent 60%),
+    repeating-linear-gradient(90deg, transparent 0 79px, rgba(255,255,255,.018) 79px 80px),
+    var(--fundo); min-height: 100vh; }
+  :focus-visible { outline: none; box-shadow: var(--foco); border-radius: 4px; }
+  button { font: inherit; color: inherit; }
+  .num { font-variant-numeric: tabular-nums; }
+  svg { flex: none; }
+
+  .tela { max-width: 720px; margin: 0 auto; padding: max(18px, env(safe-area-inset-top)) 16px 72px; }
+  .topo { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 18px; border-bottom: 1px solid var(--linha); }
+  .logo { width: 132px; height: auto; display: block; }
+  .codigo { font: 700 12px/1 var(--corpo); letter-spacing: .16em; color: var(--apagado); text-transform: uppercase; }
+
+  /* cabeçalho */
+  .hero { padding: 28px 0 22px; }
+  .rotulo { font: 700 12px/1 var(--corpo); letter-spacing: .18em; text-transform: uppercase; color: var(--neon); margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+  .rotulo::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--neon); }
+  h1 { font: 400 clamp(38px, 10vw, 64px)/.98 var(--titulo); text-transform: uppercase; margin: 0; letter-spacing: .005em; text-wrap: balance; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 14px 0 0; padding: 0; list-style: none; color: var(--suave); font-weight: 600; font-size: 17px; }
+  .meta li { display: inline-flex; align-items: center; gap: 7px; }
+  .meta b { color: var(--texto); font-weight: 700; }
+
+  /* largada: um segmento por piloto */
+  .largada { margin: 6px 0 0; }
+  .largada-topo { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+  .prontos { font: 400 34px/1 var(--titulo); }
+  .prontos small { font: 600 16px/1 var(--corpo); color: var(--suave); margin-left: 6px; letter-spacing: 0; }
+  .estado { font: 700 13px/1 var(--corpo); letter-spacing: .12em; text-transform: uppercase; color: var(--ambar); }
+  .estado.ok { color: var(--neon); }
+  .segs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; height: 12px; }
+  .segs i { border-radius: 2px; background: var(--asfalto-2); border: 1px solid var(--linha); }
+  .segs i.meio { background: repeating-linear-gradient(135deg, var(--ambar) 0 4px, transparent 4px 8px); border-color: rgba(245,197,24,.45); opacity: .85; }
+  .segs i.ok { background: var(--neon); border-color: var(--neon); }
+
+  .placar { display: grid; grid-template-columns: 1fr 1fr 1.3fr; margin: 22px 0 0; border-top: 1px solid var(--linha); border-bottom: 1px solid var(--linha); }
+  .placar div { padding: 14px 0; }
+  .placar div + div { padding-left: 16px; border-left: 1px solid var(--linha); }
+  .placar dt { font: 700 11px/1 var(--corpo); letter-spacing: .16em; text-transform: uppercase; color: var(--apagado); margin-bottom: 8px; }
+  .placar dd { margin: 0; font: 700 26px/1 var(--corpo); }
+  .placar dd small { font-size: 15px; color: var(--apagado); font-weight: 600; }
+  .placar dd.ok { color: var(--neon); }
+
+  /* convite */
+  .convite { margin: 26px 0 0; padding: 18px; border: 1px solid var(--neon-borda); background: linear-gradient(180deg, rgba(0,230,118,.08), rgba(0,230,118,.02)); border-radius: 6px; }
+  .convite h2 { font: 700 20px/1.2 var(--corpo); margin: 0 0 4px; }
+  .convite p { margin: 0 0 14px; color: var(--suave); font-size: 16px; }
+  .link { display: flex; align-items: center; gap: 8px; background: var(--fundo); border: 1px solid var(--linha); border-radius: 4px; padding: 0 0 0 12px; margin-bottom: 10px; min-height: 46px; }
+  .link code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 14px/1 ui-monospace, Consolas, monospace; color: var(--suave); }
+  .botoes { display: grid; grid-template-columns: 1fr; gap: 8px; }
+  .btn { appearance: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 18px; border-radius: 4px; border: 1px solid var(--linha-forte); background: var(--asfalto-2); font: 700 15px/1 var(--corpo); letter-spacing: .06em; text-transform: uppercase; text-decoration: none; color: var(--texto); cursor: pointer; transition: background .15s, border-color .15s, transform .1s; }
+  .btn:hover { border-color: var(--neon); }
+  .btn:active { transform: translateY(1px); }
+  .btn.zap { background: var(--zap); border-color: var(--zap); color: #03140b; }
+  .btn.zap:hover { background: #3be07b; }
+  .copiar { appearance: none; border: 0; border-left: 1px solid var(--linha); background: transparent; color: var(--neon); font: 700 13px/1 var(--corpo); letter-spacing: .1em; text-transform: uppercase; padding: 0 14px; align-self: stretch; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .copiar:hover { background: var(--neon-fundo); }
+
+  /* grid de largada */
+  .secao { display: flex; justify-content: space-between; align-items: baseline; margin: 34px 0 10px; }
+  .secao h2 { font: 400 24px/1 var(--titulo); text-transform: uppercase; margin: 0; letter-spacing: .02em; }
+  .atual { font: 600 13px/1 var(--corpo); color: var(--apagado); display: inline-flex; align-items: center; gap: 6px; }
+  .atual::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--neon); }
+  .grid { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--linha); }
+  .vaga { display: grid; grid-template-columns: 52px 1fr auto; align-items: center; gap: 4px 14px; padding: 14px 0; border-bottom: 1px solid var(--linha); }
+  .pos { font: 400 26px/1 var(--titulo); color: var(--apagado); text-align: left; }
+  .vaga.pronta .pos { color: var(--neon); }
+  .quem { min-width: 0; }
+  .nome { font: 700 19px/1.2 var(--corpo); display: flex; align-items: center; gap: 8px; }
+  .nome.vazio { color: var(--apagado); font-style: normal; }
+  .tag { font: 700 10px/1 var(--corpo); letter-spacing: .14em; text-transform: uppercase; color: var(--tinta); background: var(--neon); padding: 3px 6px; border-radius: 2px; }
+  .tag.menor { background: transparent; color: var(--suave); border: 1px solid var(--linha-forte); }
+  .luzes { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 5px; font-size: 14px; font-weight: 600; color: var(--suave); }
+  .luz { display: inline-flex; align-items: center; gap: 6px; }
+  .luz::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--apagado); }
+  .luz.ok { color: var(--texto); }
+  .luz.ok::before { background: var(--neon); }
+  .luz.pend::before { background: var(--ambar); }
+  .acoes { display: flex; gap: 6px; }
+  .ico { appearance: none; width: 44px; height: 44px; border-radius: 4px; border: 1px solid var(--linha-forte); background: var(--asfalto); display: inline-grid; place-items: center; color: var(--texto); cursor: pointer; text-decoration: none; transition: border-color .15s, background .15s; }
+  .ico:hover { border-color: var(--neon); background: var(--asfalto-2); }
+  .ico.zap { color: var(--zap); }
+  .check { width: 44px; height: 44px; display: grid; place-items: center; color: var(--neon); }
+
+  /* no dia */
+  .dia { margin: 34px 0 0; padding: 18px 0 0; border-top: 1px solid var(--linha); }
+  .dia h2 { font: 700 12px/1 var(--corpo); letter-spacing: .18em; text-transform: uppercase; color: var(--apagado); margin: 0 0 12px; }
+  .dia ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; counter-reset: p; }
+  .dia li { display: grid; grid-template-columns: 28px 1fr; gap: 10px; color: var(--suave); font-size: 16px; counter-increment: p; }
+  .dia li::before { content: counter(p); font: 400 18px/1.3 var(--titulo); color: var(--neon); }
+  .dia li b { color: var(--texto); }
+  .ajuda { margin-top: 18px; display: inline-flex; align-items: center; gap: 8px; color: var(--neon); font-weight: 700; text-decoration: none; }
+  .ajuda:hover { text-decoration: underline; }
+
+  .carregando { padding: 60px 0; color: var(--suave); display: flex; align-items: center; gap: 10px; }
+  .carregando::before { content: ''; width: 16px; height: 16px; border: 2px solid var(--linha-forte); border-top-color: var(--neon); border-radius: 50%; animation: gira .8s linear infinite; }
+  @keyframes gira { to { transform: rotate(360deg); } }
+  .falha { margin: 40px 0; padding: 20px; border: 1px solid rgba(255,107,107,.45); background: rgba(255,107,107,.08); border-radius: 6px; }
+  .falha h2 { font: 400 26px/1.1 var(--titulo); text-transform: uppercase; margin: 0 0 6px; }
+  .falha p { margin: 0 0 14px; color: var(--suave); }
+
+  .toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translate(-50%, 12px); background: var(--neon); color: var(--tinta); font-weight: 700; padding: 12px 18px; border-radius: 4px; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; display: flex; align-items: center; gap: 8px; }
+  .toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (min-width: 560px) {
+    .botoes { grid-template-columns: auto auto; justify-content: start; }
+  }
+  @media (max-width: 420px) {
+    .placar { grid-template-columns: 1fr 1fr; }
+    .placar div:nth-child(3) { grid-column: 1 / -1; padding-left: 0; border-left: 0; border-top: 1px solid var(--linha); }
+    .placar dd { font-size: 24px; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="tela">
+  <header class="topo">
+    <img class="logo" src="/kib-logo-escuro.png" alt="Kartódromo Internacional de Betim" width="720" height="200">
+    <span class="codigo" id="codigo"></span>
+  </header>
+  <main id="app" aria-live="polite"><p class="carregando">Carregando seu grupo…</p></main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<script>
+(() => {
+  const q = new URLSearchParams(location.search);
+  const g = (q.get('g') || '').slice(0, 12), k = (q.get('k') || '').slice(0, 16);
+  const app = document.getElementById('app');
+  const RECEPCAO = '5531998842898';
+  const DIAS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+  const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  const I = {
+    zap: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1s-.5-.1-.7.1-.8 1-1 1.2-.4.2-.7.1a8.2 8.2 0 0 1-2.4-1.5 9 9 0 0 1-1.7-2.1c-.2-.3 0-.5.1-.6l.5-.6.3-.5v-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5h-.6a1.1 1.1 0 0 0-.8.4 3.4 3.4 0 0 0-1 2.5 5.9 5.9 0 0 0 1.2 3.1 13.5 13.5 0 0 0 5.2 4.6c1.9.8 2.7.9 3.6.7a3.1 3.1 0 0 0 2-1.4 2.5 2.5 0 0 0 .2-1.4c-.1-.1-.3-.2-.6-.3zM12 21.8a9.8 9.8 0 0 1-5-1.4l-.4-.2-3.7 1 1-3.6-.2-.4A9.8 9.8 0 1 1 12 21.8zm8.4-18.2A11.8 11.8 0 0 0 1.8 17.9L.1 24l6.3-1.6A11.8 11.8 0 0 0 24 12.2a11.7 11.7 0 0 0-3.6-8.6z"/></svg>',
+    copiar: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>',
+    ok: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>',
+    cal: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+    rel: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    flag: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 21V4m0 0h13l-2 4 2 4H4"/></svg>',
+  };
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const reais = (c) => (Number(c || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: Number(c) % 100 ? 2 : 0 });
+  const dataDe = (iso) => { const [d, h = '00:00'] = String(iso).split('T'); const [a, m, di] = d.split('-').map(Number); const [hh, mm] = h.split(':').map(Number); return new Date(a, m - 1, di, hh, mm); };
+  const diaTxt = (dt) => `${DIAS[dt.getDay()]}, ${dt.getDate()} ${MESES[dt.getMonth()]}`;
+  const horaTxt = (dt) => `${String(dt.getHours()).padStart(2, '0')}h${String(dt.getMinutes()).padStart(2, '0')}`;
+  function contagem(dt) {
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    const alvo = new Date(dt); alvo.setHours(0, 0, 0, 0);
+    const d = Math.round((alvo - hoje) / 864e5);
+    if (d < 0) return 'já passou';
+    if (d === 0) return 'é hoje!';
+    if (d === 1) return 'é amanhã';
+    return `faltam ${d} dias`;
+  }
+  const toast = (t) => { const e = document.getElementById('toast'); e.innerHTML = I.ok + esc(t); e.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove('on'), 2200); };
+  async function copiar(texto, msg) {
+    try { await navigator.clipboard.writeText(texto); toast(msg); }
+    catch { window.prompt('Copie o link:', texto); }
+  }
+  const zap = (texto) => 'https://wa.me/?text=' + encodeURIComponent(texto);
+  const pronta = (d, v) => v.cadastro === 'completo' && (v.pago || !(d.precoCentavos > 0));
+  const meio = (d, v) => !pronta(d, v) && (v.cadastro === 'completo' || v.cadastro === 'incompleto' || v.pago);
+  let dados = null;
+
+  const msgGrupo = (d, dt) => `Bora pro kart! ${diaTxt(dt)} às ${horaTxt(dt)} no Kartódromo de Betim, no grupo de ${d.responsavel}. Faça seu cadastro antes de chegar${d.modo === 'individual' ? ' e pague a sua vaga no final' : ''} (leva 2 minutos): ${d.linkGrupo}`;
+  const msgVaga = (d, v, dt) => `${v.nome ? 'Oi, ' + v.nome + '! ' : ''}Sua vaga no kart está guardada: ${diaTxt(dt)} às ${horaTxt(dt)}, Kartódromo de Betim. Faça seu cadastro antes de chegar: ${v.link}`;
+
+  function luzes(d, v) {
+    const l = [];
+    if (v.cadastro === 'completo') l.push(['ok', 'Cadastro ok']);
+    else if (v.cadastro === 'incompleto') l.push(['pend', 'Falta ' + (v.falta || []).join(', ')]);
+    else l.push(['', 'Sem cadastro']);
+    if (d.precoCentavos > 0) l.push(v.pago ? ['ok', 'Pago'] : ['pend', 'Não pagou']);
+    return l.map(([c, t]) => `<span class="luz ${c}">${esc(t)}</span>`).join('');
+  }
+
+  function render(d) {
+    const dt = dataDe(d.inicio);
+    const todos = d.prontos >= d.n && d.n > 0;
+    const faltam = d.n - d.prontos;
+    document.getElementById('codigo').textContent = 'Reserva ' + d.codigo;
+    document.title = `Grupo de ${d.responsavel} · Kartódromo de Betim`;
+    const segs = d.vagas.map((v) => `<i class="${pronta(d, v) ? 'ok' : meio(d, v) ? 'meio' : ''}"></i>`).join('');
+    const vagas = d.vagas.map((v) => {
+      const ok = pronta(d, v);
+      const precisa = !ok && !v.responsavel && v.link;
+      return `<li class="vaga${ok ? ' pronta' : ''}">
+        <span class="pos num" aria-label="Vaga ${esc(v.ordem)}">P${esc(v.ordem)}</span>
+        <div class="quem">
+          <div class="nome${v.nome ? '' : ' vazio'}">${v.nome ? esc(v.nome) : 'Vaga aberta'}${v.responsavel ? '<span class="tag">você</span>' : ''}${v.menor ? '<span class="tag menor">menor</span>' : ''}</div>
+          <div class="luzes">${luzes(d, v)}</div>
+        </div>
+        ${ok ? `<span class="check" aria-label="Pronto para correr">${I.ok}</span>`
+          : precisa ? `<div class="acoes"><a class="ico zap" href="${esc(zap(msgVaga(d, v, dt)))}" target="_blank" rel="noopener" aria-label="Lembrar ${esc(v.nome || 'vaga ' + v.ordem)} pelo WhatsApp" title="Mandar no WhatsApp">${I.zap}</a><button class="ico" type="button" data-copiar="${esc(v.link)}" data-msg="Link da vaga P${esc(v.ordem)} copiado" aria-label="Copiar link da vaga ${esc(v.ordem)}" title="Copiar link">${I.copiar}</button></div>`
+          : '<span></span>'}
+      </li>`;
+    }).join('');
+    app.innerHTML = `
+      <section class="hero">
+        <p class="rotulo">Painel do organizador</p>
+        <h1>Grupo de ${esc(d.responsavel)}</h1>
+        <ul class="meta">
+          <li>${I.cal}<b>${esc(diaTxt(dt))}</b></li>
+          <li>${I.rel}<b>${esc(horaTxt(dt))}</b></li>
+          <li>${I.flag}${esc(d.bateria)}</li>
+        </ul>
+      </section>
+
+      <section class="largada" aria-label="Pilotos prontos">
+        <div class="largada-topo">
+          <span class="prontos num">${d.prontos}/${d.n}<small>prontos para largar</small></span>
+          <span class="estado${todos ? ' ok' : ''}">${todos ? 'Grid completo' : esc(contagem(dt))}</span>
+        </div>
+        <div class="segs" role="img" aria-label="${d.prontos} de ${d.n} pilotos prontos">${segs}</div>
+        <dl class="placar">
+          <div><dt>Cadastros</dt><dd class="num${d.cadastrados >= d.n ? ' ok' : ''}">${d.cadastrados}<small>/${d.n}</small></dd></div>
+          <div><dt>Pagamentos</dt><dd class="num${d.pagos >= d.n ? ' ok' : ''}">${d.pagos}<small>/${d.n}</small></dd></div>
+          <div><dt>Recebido</dt><dd class="num${d.falta <= 0 ? ' ok' : ''}">${reais(d.pago)} <small>de ${reais(d.total)}</small></dd></div>
+        </dl>
+      </section>
+
+      ${!todos && d.linkGrupo ? `<section class="convite">
+        <h2>${faltam === 1 ? 'Falta 1 piloto' : `Faltam ${faltam} pilotos`}</h2>
+        <p>Mande o link no grupo do WhatsApp. Cada um faz o próprio cadastro${d.modo === 'individual' ? ' e paga a sua vaga' : ''} e já entra na próxima vaga aberta.</p>
+        <div class="link"><code>${esc(d.linkGrupo.replace(/^https:\/\//, ''))}</code><button class="copiar" type="button" data-copiar="${esc(d.linkGrupo)}" data-msg="Link do grupo copiado">${I.copiar}Copiar</button></div>
+        <div class="botoes"><a class="btn zap" href="${esc(zap(msgGrupo(d, dt)))}" target="_blank" rel="noopener">${I.zap}Enviar no WhatsApp</a></div>
+      </section>` : ''}
+
+      <div class="secao"><h2>Grid de largada</h2><span class="atual" id="atual">atualizado às ${new Date(d.atualizadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span></div>
+      <ol class="grid">${vagas}</ol>
+
+      <section class="dia">
+        <h2>No dia da corrida</h2>
+        <ol>
+          <li><span>Chegue <b>1 hora antes</b> da largada.</span></li>
+          <li><span>Cada piloto digita o <b>CPF no totem</b>, o cadastro já estará lá.</span></li>
+          <li><span>O <b>termo de responsabilidade</b> é assinado na recepção. Menores vêm com o responsável.</span></li>
+        </ol>
+        <a class="ajuda" href="https://wa.me/${RECEPCAO}" target="_blank" rel="noopener">${I.zap}Trocar piloto ou horário: fale com a recepção</a>
+      </section>`;
+  }
+  app.addEventListener('click', (e) => { const b = e.target.closest('[data-copiar]'); if (b) copiar(b.dataset.copiar, b.dataset.msg || 'Link copiado'); });
+
+  async function carregar() {
+    try {
+      const r = await fetch(`/api/grupo/painel?g=${encodeURIComponent(g)}&k=${encodeURIComponent(k)}`, { cache: 'no-store' });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.erro || 'Painel não encontrado.');
+      dados = j; render(j);
+    } catch (e) {
+      if (dados) return;
+      app.innerHTML = `<section class="falha" role="alert"><h2>Não deu para abrir o painel</h2><p>${esc(e.message)}</p><a class="btn" href="https://wa.me/${RECEPCAO}" target="_blank" rel="noopener">${I.zap}Falar com a recepção</a></section>`;
+    }
+  }
+  carregar();
+  // o SRVKART atualiza o resumo a cada minuto
+  setInterval(() => { if (document.visibilityState === 'visible') carregar(); }, 60000);
+})();
+</script>
+</body>
+</html>
