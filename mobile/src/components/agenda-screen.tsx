@@ -36,6 +36,8 @@ function ordemData(data: string) {
   return Number.isFinite(ano) && Number.isFinite(mes) && Number.isFinite(dia) ? ano * 10_000 + mes * 100 + dia : 0;
 }
 
+const EMPTY_SLOTS: AgendaSlot[] = [];
+
 export function AgendaScreen({
   onAddToCart,
   slots: customSlots,
@@ -46,7 +48,7 @@ export function AgendaScreen({
 
   const [apiSlots, setApiSlots] = useState<AgendaSlot[] | null>(null);
   const [apiError, setApiError] = useState<string>('');
-  const [selectedDate, setSelectedDate] = useState(customSlots?.[0]?.date ?? new Date().toLocaleDateString('pt-BR'));
+  const [selectedDate, setSelectedDate] = useState(() => customSlots?.[0]?.date ?? new Date().toLocaleDateString('pt-BR'));
   const [selectedSlot, setSelectedSlot] = useState<AgendaSlot | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [bookingOnSite, setBookingOnSite] = useState(false);
@@ -111,7 +113,7 @@ export function AgendaScreen({
     return () => { active = false; requests.version++; };
   }, [customSlots, loadBackendAgenda]);
 
-  const slots = useMemo(() => customSlots ?? apiSlots ?? [], [customSlots, apiSlots]);
+  const slots = customSlots ?? apiSlots ?? EMPTY_SLOTS;
   const dates = useMemo(() => [...new Set(slots.map((slot) => slot.date))], [slots]);
 
   const filteredSlots = useMemo(() => {
@@ -185,10 +187,10 @@ export function AgendaScreen({
           {!customSlots && apiSlots === null && !apiError && <View style={{ paddingHorizontal: 14 }}><ListaEsqueleto itens={5} altura={92} rotulo="Carregando horários" /></View>}
           {!apiError && (customSlots || apiSlots !== null) && visiveis.length === 0 ? (
             <View accessibilityLiveRegion="polite" style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>{activeSlots.length ? `Não há ${tipo} nesta data.` : 'Não há horários nesta data.'}</Text>
-              {activeSlots.length && tipo !== 'bateria' ? <Text style={styles.statusText}>Quer ver as baterias disponíveis para este dia? Toque abaixo para mudar o filtro para Bateria.</Text> : null}
+              <Text style={styles.emptyTitle}>{activeSlots.length > 0 ? `Não há ${tipo} nesta data.` : 'Não há horários nesta data.'}</Text>
+              {activeSlots.length > 0 && tipo !== 'bateria' ? <Text style={styles.statusText}>Quer ver as baterias disponíveis para este dia? Toque abaixo para mudar o filtro para Bateria.</Text> : null}
               {proximaDataComHorarios ? <Text style={styles.statusText}>Próximo dia com {tipo}: {proximaDataComHorarios}.</Text> : null}
-              {activeSlots.length && tipo !== 'bateria' ? <Pressable accessibilityRole="button" accessibilityLabel="Mostrar baterias disponíveis neste dia" style={styles.emptyAction} onPress={() => setTipo('bateria')}><Text style={styles.emptyActionText}>Mostrar baterias disponíveis</Text></Pressable> : null}
+              {activeSlots.length > 0 && tipo !== 'bateria' ? <Pressable accessibilityRole="button" accessibilityLabel="Mostrar baterias disponíveis neste dia" style={styles.emptyAction} onPress={() => setTipo('bateria')}><Text style={styles.emptyActionText}>Mostrar baterias disponíveis</Text></Pressable> : null}
               {proximaDataComHorarios ? <Pressable accessibilityRole="button" accessibilityLabel={`Ver horários de ${proximaDataComHorarios}`} style={styles.emptyAction} onPress={() => setSelectedDate(proximaDataComHorarios)}><Text style={styles.emptyActionText}>Ver próxima data</Text></Pressable> : null}
             </View>
           ) : null}

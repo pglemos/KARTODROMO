@@ -30,7 +30,9 @@ public partial class FormCrono
     }
 
     /// <summary>Falta a bateria de alguma prova do evento escolhido? Busca a lista completa (no máximo a cada 30 s).</summary>
-    async Task GarantirSessoesDoEvento()
+    Task GarantirSessoesDoEvento() => GarantirSessoesDoEventoAsync();
+
+    async Task GarantirSessoesDoEventoAsync(CancellationToken ct = default)
     {
         if (_buscandoSessoesExtras || string.IsNullOrEmpty(_eventoArvore)) return;
         var grupos = _groups.Where(g => g.S("eventId") == _eventoArvore).Select(g => g.S("id")).ToHashSet();
@@ -40,7 +42,7 @@ public partial class FormCrono
         _buscandoSessoesExtras = true;
         try
         {
-            _sessoesExtras = await Crono.Api.Lista("/api/sessions");
+            _sessoesExtras = await Crono.Api.ListaAsync("/api/sessions", ct);
             _sessoesExtrasEm = DateTime.Now;
             MontarArvore();
         }
@@ -48,12 +50,14 @@ public partial class FormCrono
         finally { _buscandoSessoesExtras = false; }
     }
 
-    async Task CarregarCatalogo()
+    Task CarregarCatalogo() => CarregarCatalogoAsync();
+
+    async Task CarregarCatalogoAsync(CancellationToken ct = default)
     {
         _carregandoCatalogo = true;
         try
         {
-            _catalog = (await Crono.Api.Get("/api/catalog"))?.AsObject() ?? new JsonObject();
+            _catalog = (await Crono.Api.GetAsync("/api/catalog", ct))?.AsObject() ?? new JsonObject();
             _events = Crono.Arr(_catalog, "events");
             _groups = Crono.Arr(_catalog, "groups");
             _proofs = Crono.Arr(_catalog, "provas");
@@ -416,38 +420,42 @@ public partial class FormCrono
         return decimal.TryParse(texto, System.Globalization.NumberStyles.Number, cultura, out segundos) && segundos > 0;
     }
 
-    async Task ConfigurarDecoder()
+    Task ConfigurarDecoder() => ConfigurarDecoderAsync();
+
+    async Task ConfigurarDecoderAsync(CancellationToken ct = default)
     {
-        var settings = (await Crono.Api.Get("/api/settings"))?.AsObject() ?? new JsonObject();
-        var atual = settings["decoder"] as JsonObject ?? (await Crono.Api.Get("/api/state"))?["decoder"] as JsonObject ?? new JsonObject();
-        using var dialog = new DialogoDados("Registro de decoder", "Leitor de transponders da pista", new[] {
+        var settings = (await Crono.Api.GetAsync("/api/settings", ct))?.AsObject() ?? new JsonObject();
+        var atual = settings["decoder"] as JsonObject ?? (await Crono.Api.GetAsync("/api/state", ct))?["decoder"] as JsonObject ?? new JsonObject();
+        using var dialog = new DialogoDados("Registro de decoder", "Leitor de transponders da pista", [
             ("Nome", "name", atual.S("name") is { Length: > 0 } n ? n : "TranX (pista)"),
             ("Modelo", "model", atual.S("model") is { Length: > 0 } m ? m : "TranX"),
             ("Protocolo (p3 ou trx)", "protocol", atual.S("protocol") is { Length: > 0 } p ? p : "p3"),
             ("Endereço IP", "host", atual.S("host")),
             ("Porta IP", "port", atual.S("port")),
-        }, new Size(760, 430));
+        ], new Size(760, 430));
         if (dialog.ShowDialog(this) != DialogResult.OK || !dialog.Confirmado) return;
         if (!int.TryParse(dialog.Valor("port"), out var port) || port is < 1 or > 65535) { Msg.Aviso(this, "Informe uma porta entre 1 e 65535."); return; }
         var protocol = dialog.Valor("protocol").Trim().ToLowerInvariant();
         if (protocol is not ("p3" or "trx")) { Msg.Aviso(this, "Informe o protocolo p3 ou trx."); return; }
         var body = new JsonObject { ["name"] = dialog.Valor("name").Trim(), ["model"] = dialog.Valor("model").Trim(),
             ["protocol"] = protocol, ["host"] = dialog.Valor("host").Trim(), ["port"] = port };
-        await Crono.Api.Patch("/api/settings/decoder", body);
+        await Crono.Api.PatchAsync("/api/settings/decoder", body, ct);
         Msg.Info(this, "Conexão do decoder validada e salva.");
     }
 
-    async Task ConfigurarParametros(string nome)
+    Task ConfigurarParametros(string nome) => ConfigurarParametrosAsync(nome);
+
+    async Task ConfigurarParametrosAsync(string nome, CancellationToken ct = default)
     {
-        var settings = (await Crono.Api.Get("/api/settings"))?.AsObject() ?? new JsonObject();
+        var settings = (await Crono.Api.GetAsync("/api/settings", ct))?.AsObject() ?? new JsonObject();
         var crono = nome == "ParamCrono";
         var chave = crono ? "timing" : "system";
         var secao = settings[chave]?.DeepClone().AsObject() ?? new JsonObject();
-        var campos = crono
-            ? new[] { ("Volta mínima (s)", "minimumLapSeconds", secao.S("minimumLapSeconds") is { Length: > 0 } v ? v : "5"),
-                ("Duração padrão (min)", "defaultDurationMin", secao.S("defaultDurationMin") is { Length: > 0 } d ? d : "20") }
-            : new[] { ("Nome da pista", "trackName", secao.S("trackName") is { Length: > 0 } n ? n : "Kartódromo Internacional de Betim"),
-                ("Extensão padrão do traçado (m)", "defaultTrackLengthMeters", secao.S("defaultTrackLengthMeters") is { Length: > 0 } l ? l : "1000") };
+        (string, string, string)[] campos = crono
+            ? [("Volta mínima (s)", "minimumLapSeconds", secao.S("minimumLapSeconds") is { Length: > 0 } v ? v : "5"),
+                ("Duração padrão (min)", "defaultDurationMin", secao.S("defaultDurationMin") is { Length: > 0 } d ? d : "20")]
+            : [("Nome da pista", "trackName", secao.S("trackName") is { Length: > 0 } n ? n : "Kartódromo Internacional de Betim"),
+                ("Extensão padrão do traçado (m)", "defaultTrackLengthMeters", secao.S("defaultTrackLengthMeters") is { Length: > 0 } l ? l : "1000")];
         using var dialog = new DialogoDados(crono ? "Parâmetros da cronometragem" : "Parâmetros do sistema", "Configuração usada ao criar novas provas", campos, new Size(760, 350));
         if (dialog.ShowDialog(this) != DialogResult.OK || !dialog.Confirmado) return;
         if (crono)
@@ -466,7 +474,7 @@ public partial class FormCrono
             secao["trackName"] = dialog.Valor("trackName").Trim();
             secao["defaultTrackLengthMeters"] = metros;
         }
-        await Crono.Api.Patch("/api/settings", new JsonObject { [chave] = secao });
+        await Crono.Api.PatchAsync("/api/settings", new JsonObject { [chave] = secao }, ct);
         Msg.Info(this, "Parâmetros salvos.");
     }
 }
@@ -503,13 +511,25 @@ sealed class FormCatalogoAux : Form
             var b = TemaCrono.Botao(label, primary); b.Click += (_, _) => action(); actions.Controls.Add(b);
         }
         Controls.Add(_grid); Controls.Add(actions); Controls.Add(header);
-        Shown += (_, _) => Seguro.Rodar(this, Carregar);
+        Shown += (_, _) => Seguro.Rodar(this, () => CarregarAsync());
     }
 
-    async Task Carregar()
+    Task Carregar() => CarregarAsync();
+
+    async Task CarregarAsync(CancellationToken ct = default)
     {
-        _records = await Crono.Api.Lista($"/api/catalog/{_entity}");
-        if (_entity == "competitors") _categories = await Crono.Api.Lista("/api/catalog/categories");
+        if (_entity == "competitors")
+        {
+            var recordsTask = Crono.Api.ListaAsync($"/api/catalog/{_entity}", ct);
+            var categoriesTask = Crono.Api.ListaAsync("/api/catalog/categories", ct);
+            await Task.WhenAll(recordsTask, categoriesTask);
+            _records = await recordsTask;
+            _categories = await categoriesTask;
+        }
+        else
+        {
+            _records = await Crono.Api.ListaAsync($"/api/catalog/{_entity}", ct);
+        }
         var rows = _entity == "categories"
             ? _records.Select(x => new object[] { x.S("name"), x.S("color") }).ToList()
             : _entity == "competitors"

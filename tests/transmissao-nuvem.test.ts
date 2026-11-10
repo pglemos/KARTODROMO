@@ -64,7 +64,7 @@ describe('API de transmissão no site (Cloudflare)', () => {
     const resposta = await ler(CHAVE_PARCEIRO);
     expect(resposta.status).toBe(200);
     expect(resposta.headers.get('cache-control')).toContain('no-store');
-    const corpo = await resposta.json();
+    const corpo = (await resposta.json()) as any;
     expect(corpo).toMatchObject({ versao: 1, situacao: 'em-andamento', sinal: 'ao-vivo', bateria: { nome: 'BATERIA 20:00', bandeira: 'verde' } });
     expect(corpo.pilotos[0]).toMatchObject({ kart: '4', nome: 'Ana', melhorVolta: '59.000' });
   });
@@ -78,11 +78,11 @@ describe('API de transmissão no site (Cloudflare)', () => {
     await publicar(retrato());
     esquecerMemoria();
     vi.useFakeTimers({ now: Date.now() + 120_000 });
-    expect((await (await ler(CHAVE_PARCEIRO)).json()).sinal).toBe('sem-sinal');
+    expect(((await (await ler(CHAVE_PARCEIRO)).json()) as any).sinal).toBe('sem-sinal');
   });
 
   it('nada publicado ainda: sem-bateria, sem erro', async () => {
-    expect(await (await ler(CHAVE_PARCEIRO)).json()).toMatchObject({ situacao: 'sem-bateria', pilotos: [] });
+    expect((await (await ler(CHAVE_PARCEIRO)).json()) as any).toMatchObject({ situacao: 'sem-bateria', pilotos: [] });
   });
 
   it('recusa formato errado e responde ao preflight do navegador', async () => {

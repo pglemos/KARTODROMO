@@ -9,37 +9,38 @@ namespace Kartodromo.Cronometragem;
 /// o serviço manda (passagem de kart sai em ~20 ms). Antes a tela e o placar de LED da COM3 só viam a passagem no
 /// próximo ciclo de 1 s. Se a conexão cair, tenta de novo em 2 s; o ciclo de 1 s continua como reserva.
 /// </summary>
-sealed class OuvinteEstado : IDisposable
+sealed class OuvinteEstado(string url, Action<JsonObject> aoReceber) : IDisposable
 {
-    readonly string _url;
-    readonly SynchronizationContext _tela;
-    readonly Action<JsonObject> _aoReceber;
+    readonly string _url = url;
+    readonly SynchronizationContext _tela = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
+    readonly Action<JsonObject> _aoReceber = aoReceber;
     readonly CancellationTokenSource _parar = new();
-    readonly HttpClient _http = new() { Timeout = Timeout.InfiniteTimeSpan };
+    readonly HttpClient _http = CriarClienteHttp();
 
     public bool Conectado { get; private set; }
 
-    public OuvinteEstado(string url, Action<JsonObject> aoReceber)
+    static HttpClient CriarClienteHttp()
     {
-        _url = url;
-        _aoReceber = aoReceber;
-        _tela = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
-        _http.DefaultRequestHeaders.TryAddWithoutValidation("X-Client-Machine", Environment.MachineName);
+        var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+        http.DefaultRequestHeaders.TryAddWithoutValidation("X-Client-Machine", Environment.MachineName);
         if (Config.Get("ChaveCronometragem", "") is { Length: > 0 } chaveCrono)
-            _http.DefaultRequestHeaders.TryAddWithoutValidation("X-Timing-Key", chaveCrono);
+            http.DefaultRequestHeaders.TryAddWithoutValidation("X-Timing-Key", chaveCrono);
+        return http;
     }
 
-    public void Iniciar() => _ = Task.Run(Loop);
+    public void Iniciar() => _ = Task.Run(LoopAsync);
 
-    async Task Loop()
+    public Task Loop() => LoopAsync();
+
+    async Task LoopAsync()
     {
         while (!_parar.IsCancellationRequested)
         {
             try
             {
-                using var resposta = await _http.GetAsync(_url, HttpCompletionOption.ResponseHeadersRead, _parar.Token);
+                using var resposta = await _http.GetAsync(_url, HttpCompletionOption.ResponseHeadersRead, _parar.Token).ConfigureAwait(false);
                 resposta.EnsureSuccessStatusCode();
-                using var fluxo = await resposta.Content.ReadAsStreamAsync(_parar.Token);
+                using var fluxo = await resposta.Content.ReadAsStreamAsync(_parar.Token).ConfigureAwait(false);
                 using var leitor = new StreamReader(fluxo, Encoding.UTF8);
                 Conectado = true;
                 string evento = null;
@@ -48,22 +49,30 @@ sealed class OuvinteEstado : IDisposable
                 while (!_parar.IsCancellationRequested)
                 {
                     var leitura = leitor.ReadLineAsync(_parar.Token).AsTask();
-                    if (await Task.WhenAny(leitura, Task.Delay(40_000, _parar.Token)) != leitura) break;
-                    var linha = await leitura;
+                    if (await Task.WhenAny(leitura, Task.Delay(40_000, _parar.Token)).ConfigureAwait(false) != leitura) break;
+                    var linha = await leitura.ConfigureAwait(false);
                     if (linha == null) break;
                     if (linha.Length == 0)
                     {
                         if (evento == "state" && dados.Length > 0) Entregar(dados.ToString());
-                        evento = null; dados.Clear();
+                        evento = null;
+                        dados.Clear();
                     }
-                    else if (linha.StartsWith("event:")) evento = linha[6..].Trim();
-                    else if (linha.StartsWith("data:")) { if (dados.Length > 0) dados.Append('\n'); dados.Append(linha.AsSpan(5).TrimStart()); }
+                    else if (linha.StartsWith("event:", StringComparison.Ordinal))
+                    {
+                        evento = linha[6..].Trim();
+                    }
+                    else if (linha.StartsWith("data:", StringComparison.Ordinal))
+                    {
+                        if (dados.Length > 0) dados.Append('\n');
+                        dados.Append(linha[5..].TrimStart());
+                    }
                 }
             }
             catch (OperationCanceledException) when (_parar.IsCancellationRequested) { return; }
             catch (Exception) { /* serviço fora ou rede caiu: o ciclo de 1 s segue; tenta de novo abaixo */ }
             Conectado = false;
-            try { await Task.Delay(2_000, _parar.Token); } catch (OperationCanceledException) { return; }
+            try { await Task.Delay(2_000, _parar.Token).ConfigureAwait(false); } catch (OperationCanceledException) { return; }
         }
     }
 
@@ -79,5 +88,6 @@ sealed class OuvinteEstado : IDisposable
     {
         _parar.Cancel();
         _http.Dispose();
+        _parar.Dispose();
     }
 }

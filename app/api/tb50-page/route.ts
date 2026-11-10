@@ -16,7 +16,7 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
-  const body = await request.json().catch(() => ({}));
+  const body = (await request.json().catch(() => ({}))) as { offset?: unknown };
   const state = await writeTb50PageRemote(body?.offset);
   return NextResponse.json({ ...state, store: tb50PageStoreStatus() }, { headers: NO_CACHE_HEADERS });
 }

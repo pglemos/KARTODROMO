@@ -70,18 +70,26 @@ async function chamar(caminho: string, init: RequestInit = {}, timeoutMs = 8000)
  * Dados que vão para o cliente. Quem já tem cadastro só atualiza contato, peso e endereço
  * (nome, documento e nascimento já gravados não mudam por um formulário da internet).
  */
-export function dadosDoCliente(p: PreCadastro, existente: { nascimento: string | null } | null): ClienteInput {
+export function dadosDoCliente(p: PreCadastro, existente: { nascimento: string | null; nome?: string | null } | null): ClienteInput {
   const endereco: ClienteInput = { cep: p.cep, endereco: p.endereco, numero: p.numero, complemento: p.complemento, bairro: p.bairro, cidade: p.cidade, estado: p.estado };
   const contato: ClienteInput = { email: p.email, telefone: p.telefone, peso: p.peso || null, ...(p.instagram ? { instagram: p.instagram } : {}), ...endereco, lgpd: true };
-  if (existente) return { ...contato, ...(existente.nascimento ? {} : { nascimento: p.nascimento }) };
+  if (existente) {
+    const nomeAtual = existente.nome ? existente.nome.trim() : '';
+    const provisorio = !nomeAtual || nomeAtual.startsWith('Amigo ') || nomeAtual.split(/\s+/).length < 2;
+    return {
+      ...contato,
+      ...(provisorio && p.nome ? { nome: p.nome } : {}),
+      ...(existente.nascimento ? {} : { nascimento: p.nascimento }),
+    };
+  }
   return { nome: p.nome, tipoDocumento: p.tipoDocumento, documento: p.documento, nascimento: p.nascimento, ...contato };
 }
 
 /** Grava um pré-cadastro (e os menores dele) em dbo.Cliente. Devolve o id do cliente. */
 export async function gravarPreCadastro(p: PreCadastro, log: Log): Promise<number> {
   const doc = p.chave || onlyDigits(p.documento);
-  const existente = await one<{ id: number; nascimento: string | null }>(
-    `SELECT TOP 1 Id id, CONVERT(varchar(10), Nascimento, 126) nascimento FROM dbo.Cliente
+  const existente = await one<{ id: number; nascimento: string | null; nome: string | null }>(
+    `SELECT TOP 1 Id id, CONVERT(varchar(10), Nascimento, 126) nascimento, Nome nome FROM dbo.Cliente
       WHERE (DocumentoNum = @d OR Documento = @d) AND ResponsavelId IS NULL ORDER BY AtualizadoEm DESC`,
     { d: doc },
   );

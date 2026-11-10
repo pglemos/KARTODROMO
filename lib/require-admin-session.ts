@@ -1,8 +1,9 @@
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { adminCookieName, readAdminSession } from '@/lib/admin-auth';
 
-export async function requireAdminSession(nextPath: string) {
+export const requireAdminSession = cache(async (nextPath: string) => {
   const cookieStore = await cookies();
   const session = readAdminSession(cookieStore.get(adminCookieName())?.value);
 
@@ -11,4 +12,4 @@ export async function requireAdminSession(nextPath: string) {
   }
 
   return session;
-}
+});

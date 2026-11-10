@@ -206,7 +206,8 @@ export function criarAberturaFrota(d: {
               d.store.db.prepare('INSERT OR REPLACE INTO escala_abertura VALUES (?, ?, ?, ?)').run(data, operador, q.usuario, em);
             } else if (acao === 'defeito') {
               // Apontamento de defeito por exceção (Etapa 3)
-              const kart = String(pl.kart ?? pl.karts?.[0] ?? '').trim();
+              const kartsArray = Array.isArray(pl.karts) ? pl.karts : undefined;
+              const kart = String(pl.kart ?? kartsArray?.[0] ?? '').trim();
               const motivoDefeito = String(pl.motivo ?? reason ?? 'Defeito identificado no checklist').trim();
               if (!kart || !d.kartsCadastrados().includes(kart)) throw new Error('Kart não cadastrado.');
               d.store.db.prepare('INSERT OR REPLACE INTO karts_fora (kart, motivo, usuario, em, estado) VALUES (?, ?, ?, ?, ?)').run(kart, motivoDefeito, q.usuario, em, 'oficina');

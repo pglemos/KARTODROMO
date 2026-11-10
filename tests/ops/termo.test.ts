@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { idadeNaData, renderTermoResponsabilidade, type TermoParticipante } from '../../lib/ops/termo';
+import { formatarTituloBateria, idadeNaData, renderTermoResponsabilidade, type TermoParticipante } from '../../lib/ops/termo';
 
 const participante: TermoParticipante = {
   nome: 'Ana Exemplo <Pilota>',
@@ -100,5 +100,48 @@ describe('termo de responsabilidade em bobina', () => {
     expect(html).toContain('RESPONSÁVEL LEGAL');
     expect(html.indexOf('PARTICIPANTE PILOTO')).toBeGreaterThan(html.indexOf('Declaro ter lido'));
     expect(html).not.toMatch(/position:absolute/);
+  });
+
+  it('formata o título da bateria com a hora quando o nome é genérico ou só o horário', () => {
+    expect(formatarTituloBateria('Bateria', '2026-11-05T19:20:00')).toBe('BATERIA 19:20');
+    expect(formatarTituloBateria('bateria', '2026-11-05T19:20:00')).toBe('BATERIA 19:20');
+    expect(formatarTituloBateria(null, '2026-11-05T19:20:00')).toBe('BATERIA 19:20');
+    expect(formatarTituloBateria('19:20', '2026-11-05T19:20:00')).toBe('BATERIA 19:20');
+    expect(formatarTituloBateria('Bateria Fechada', '2026-11-05T20:30:00')).toBe('BATERIA FECHADA');
+  });
+
+  it('renderiza o bloco da bateria e do grupo com destaque e sem outros pilotos', () => {
+    const comGrupo: TermoParticipante = {
+      ...participante,
+      nome: 'Marcus philipe',
+      bateriaNome: 'Bateria',
+      bateriaInicio: '2026-11-05T19:20:00',
+      grupoResponsavel: 'Marcus philipe',
+    };
+    const html = renderTermoResponsabilidade({ empresa, participantes: [comGrupo], impressoEm });
+
+    expect(html).toContain('<div class="bat-titulo">BATERIA 19:20</div>');
+    expect(html).toContain('<div class="bat-grupo">GRUPO DO(A) MARCUS</div>');
+    // Deve ter a linha divisória antes e a linha divisória depois
+    expect(html).toContain('<div class="rule"></div><div class="bateria">');
+    expect(html).toContain('</div><div class="rule rule-legal"></div>');
+    // NUNCA deve listar outros pilotos nem tags de lista ol/ul/li
+    expect(html).not.toContain('<ol>');
+    expect(html).not.toContain('<li>');
+    expect(html).not.toContain('Pilotos desta bateria');
+  });
+
+  it('renderiza o bloco da bateria sem grupo quando não for reserva de grupo', () => {
+    const semGrupo: TermoParticipante = {
+      ...participante,
+      bateriaNome: 'BATERIA 9:50',
+      bateriaInicio: '2026-11-07T09:50:00',
+      grupoResponsavel: null,
+    };
+    const html = renderTermoResponsabilidade({ empresa, participantes: [semGrupo], impressoEm });
+
+    expect(html).toContain('<div class="bat-titulo">BATERIA 9:50</div>');
+    expect(html).not.toContain('<div class="bat-grupo">');
+    expect(html).not.toContain('GRUPO DO(A)');
   });
 });

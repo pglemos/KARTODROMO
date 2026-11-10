@@ -26,8 +26,16 @@ async function requireSession() {
 const cleanSearch = (value: string | null) => value?.trim().replace(/[,%]/g, ' ') ?? '';
 
 export async function GET(request: NextRequest) {
-  if (!(await requireSession())) {
+  const [session, db] = await Promise.all([
+    requireSession(),
+    getCloudflareAdminDb(),
+  ]);
+
+  if (!session) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+  if (!db) {
+    return NextResponse.json({ error: 'cloudflare_d1_not_configured' }, { status: 503 });
   }
 
   const searchParams = request.nextUrl.searchParams;
@@ -38,9 +46,6 @@ export async function GET(request: NextRequest) {
   const q = cleanSearch(searchParams.get('q'));
 
   try {
-    const db = await getCloudflareAdminDb();
-    if (!db) return NextResponse.json({ error: 'cloudflare_d1_not_configured' }, { status: 503 });
-
     const result = await listChampionshipRegistrations(db, {
       evento: evento || null,
       limit,

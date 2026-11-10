@@ -112,7 +112,7 @@ export function TelaoClient({ initialSnapshot = INITIAL_SNAPSHOT }: TelaoClientP
       try {
         const response = await fetch(`/api/telao-layout?_ts=${Date.now()}`, { cache: 'no-store' });
         if (!response.ok) return;
-        const data = await response.json();
+        const data = (await response.json()) as { layout?: unknown };
         if (!stopped) setLayout(normalizeTelaoLayoutConfig(data.layout));
       } catch {
         // Keep the last valid layout if the designer API is temporarily unavailable.

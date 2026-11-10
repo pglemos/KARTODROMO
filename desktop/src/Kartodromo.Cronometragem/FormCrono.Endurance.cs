@@ -23,14 +23,19 @@ public partial class FormCrono
             .OrderBy(v => v.S("piloto")).Select(v => $"{v.S("piloto")} · pulseira {v.S("pulseira")}"));
     }
 
-    async Task AtualizarVinculosEndurance(string agendaId)
+    Task AtualizarVinculosEndurance(string agendaId) => AtualizarVinculosEnduranceAsync(agendaId);
+
+    async Task AtualizarVinculosEnduranceAsync(string agendaId, CancellationToken ct = default)
     {
         _equipesDaAgenda = agendaId;
-        var grid = await Crono.Api.Lista($"/api/agenda/{agendaId}/grid");
-        var info = (await Api.Servidor.Get($"/api/totem/endurance?bateria={agendaId}")) as JsonObject;
+        var gridTask = Crono.Api.ListaAsync($"/api/agenda/{agendaId}/grid", ct);
+        var infoTask = Api.Servidor.GetAsync($"/api/totem/endurance?bateria={agendaId}", ct);
+        await Task.WhenAll(gridTask, infoTask);
+        var grid = await gridTask;
+        var info = (await infoTask) as JsonObject;
         var ids = string.Join(',', grid.Select(p => p.S("clienteId")).Concat(Crono.Arr(_sess, "competitors").Select(p => p.S("customerId")))
             .Where(id => long.TryParse(id, out var n) && n > 0).Distinct());
-        var clientes = ids.Length > 0 ? await Crono.Api.Lista($"/api/clientes?ids={ids}") : [];
+        var clientes = ids.Length > 0 ? await Crono.Api.ListaAsync($"/api/clientes?ids={ids}", ct) : [];
         if (_equipesDaAgenda != agendaId) return;
         _eventoEndurance = info?.L("eventoId") ?? 0;
         _inscricoesEndurance = Crono.Arr(info, "equipes");
@@ -41,13 +46,15 @@ public partial class FormCrono
         });
     }
 
-    async Task EditarInscricoesEndurance()
+    Task EditarInscricoesEndurance() => EditarInscricoesEnduranceAsync();
+
+    async Task EditarInscricoesEnduranceAsync(CancellationToken ct = default)
     {
         if (_eventoEndurance == 0) { Msg.Aviso(this, "Selecione uma prova de campeonato ligada à recepção."); return; }
         if (_pilotosSujos) { Msg.Aviso(this, "Salve as alterações da lista antes de editar os vínculos."); return; }
-        if (!await EntrarComoUsuario()) return;
+        if (!await EntrarComoUsuarioAsync(ct: ct)) return;
         var eventoId = _eventoEndurance;
-        var dados = (await Api.Servidor.Get($"/api/office/endurance/eventos/{eventoId}"))?.AsObject();
+        var dados = (await Api.Servidor.GetAsync($"/api/office/endurance/eventos/{eventoId}", ct))?.AsObject();
         var equipes = Crono.Arr(dados, "equipes");
         var pilotos = equipes.SelectMany(q => Crono.Arr(q, "pilotos")).GroupBy(p => p.S("id")).Select(g => g.First()).OrderBy(p => p.S("nome")).ToList();
         if (pilotos.Count == 0) { Msg.Info(this, "Ainda não há pilotos cadastrados neste campeonato."); return; }
@@ -83,11 +90,11 @@ public partial class FormCrono
             if (nome.Text.Trim().Length == 0) { Msg.Aviso(d, "Informe o nome do piloto."); return; }
             var ids = lista.CheckedItems.Cast<Campos.Item>().Select(q => q.Dados.L("id") ?? 0).ToList();
             if (ids.Count == 0) { Msg.Aviso(d, "Marque pelo menos uma inscrição."); return; }
-            await Api.Servidor.Put($"/api/office/endurance/eventos/{eventoId}/pilotos/{p.S("id")}/inscricoes", new JsonObject {
+            await Api.Servidor.PutAsync($"/api/office/endurance/eventos/{eventoId}/pilotos/{p.S("id")}/inscricoes", new JsonObject {
                 ["nome"] = nome.Text.Trim(), ["equipeIds"] = new JsonArray(ids.Select(id => (JsonNode)JsonValue.Create(id)).ToArray())
             });
             _equipesLidasEm = DateTime.MinValue;
-            d.DialogResult = DialogResult.OK; d.Close(); await Atualizar();
+            d.DialogResult = DialogResult.OK; d.Close(); await AtualizarAsync();
         }));
         d.BotaoRodape("Cancelar", false, d.Close); d.ShowDialog(this);
     }

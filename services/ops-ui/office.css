@@ -53,6 +53,7 @@ a { color:var(--blue); }
 #tree li > .n { display:inline-flex; align-items:center; gap:5px; padding:1px 4px; cursor:default; white-space:nowrap; border:1px dotted transparent; }
 #tree li > .n:hover { background:#e5f1fb; }
 #tree li > .n.sel { background:#0078d7; color:#fff; }
+#tree li > .n.sel .tg { color:#fff; }
 #tree .tg { width:11px; font-size:9px; color:#555; cursor:pointer; }
 .ball { width:14px; height:14px; border-radius:50%; display:inline-block; box-shadow: inset -2px -3px 4px rgba(0,0,0,.25); }
 .ball.y { background: radial-gradient(circle at 35% 30%, #fff6a8, #f2c200 60%, #b98f00); }
@@ -132,3 +133,4 @@ fieldset { border:1px solid #cfcfcf; padding:6px 8px 8px; margin:0 0 8px; } lege
 .msgbox .b .i.q { background:#0067c0; } .msgbox .b .i.w { background:#e0a200; } .msgbox .b .i.e { background:#c42b1c; } .msgbox .b .i.ok { background:#0067c0; }
 .msgbox .f { background:#f0f0f0; padding:10px; display:flex; justify-content:flex-end; gap:8px; } .msgbox .f button { width:72px; }
 .busy { position:fixed; inset:0; z-index:99; cursor:progress; }
+@media (max-width: 760px) { input, select, textarea { font-size:16px; } }

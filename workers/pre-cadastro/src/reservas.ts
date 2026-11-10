@@ -176,9 +176,23 @@ function tokenConfere(recebido: string, esperado: string) {
 /** Aviso da Asaas (pode chegar repetido — só o primeiro "pago" vale). Responde rápido: a Asaas espera 10 s. */
 export async function webhookAsaas(req: Request, env: EnvReservas) {
   if (!tokenConfere(req.headers.get('asaas-access-token') ?? '', env.ASAAS_WEBHOOK_TOKEN ?? '')) return json(401, { erro: 'Não autorizado.' });
-  const corpo = (await req.json().catch(() => ({}))) as { event?: string; payment?: { id?: string; externalReference?: string; billingType?: string } };
+  const corpo = (await req.json().catch(() => ({}))) as { event?: string; payment?: { id?: string; externalReference?: string; billingType?: string; value?: number } };
   const ref = corpo.payment?.externalReference ?? '';
-  if (!corpo.event || !EVENTOS_PAGO.has(corpo.event) || !idValido(ref)) return json(200, { ok: true, ignorado: true });
+  if (!corpo.event || !EVENTOS_PAGO.has(corpo.event)) return json(200, { ok: true, ignorado: true });
+
+  if (ref && String(ref).startsWith('grupo-')) {
+    const payId = corpo.payment?.id || `pay_${Date.now()}`;
+    await env.PRE.put(`grupos/pagos/${payId}.json`, JSON.stringify({
+      asaasId: corpo.payment?.id,
+      externalReference: ref,
+      billingType: corpo.payment?.billingType,
+      value: corpo.payment?.value,
+      pagoEm: new Date().toISOString(),
+    }));
+    return json(200, { ok: true, grupo: true });
+  }
+
+  if (!idValido(ref)) return json(200, { ok: true, ignorado: true });
   const p = await lerPedido(env, ref);
   if (!p) return json(200, { ok: true, ignorado: true });
   if (marcarPago(p, corpo.payment?.id ?? '', corpo.payment?.billingType ?? '')) await gravarPedido(env, p, true);
@@ -235,7 +249,18 @@ export async function conciliarPagamentos(env: EnvReservas, agora = Date.now()) 
   let n = 0;
   try {
     for (const c of await pagasDesde(env, hojeBrasilia(new Date(agora - 2 * 86_400_000)))) {
-      if (!PAGO.has(c.status) || !c.externalReference || !idValido(c.externalReference)) continue;
+      if (!PAGO.has(c.status) || !c.externalReference) continue;
+      if (String(c.externalReference).startsWith('grupo-')) {
+        await env.PRE.put(`grupos/pagos/${c.id}.json`, JSON.stringify({
+          asaasId: c.id,
+          externalReference: c.externalReference,
+          billingType: c.billingType,
+          value: c.value,
+          pagoEm: new Date().toISOString(),
+        }));
+        continue;
+      }
+      if (!idValido(c.externalReference)) continue;
       const p = await lerPedido(env, c.externalReference);
       if (!p) continue;
       // já "pago" no site mas fora da fila (ACEXRJ, 13/10: nunca chegou à recepção) também volta para a fila

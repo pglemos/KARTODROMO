@@ -37,14 +37,16 @@ public class FormNovaBateria : DialogoDesign
         // a nota do design (texto cinza no rodapé do conteúdo) mostra as provas do produto
         static IEnumerable<Control> Todos(Control r) { foreach (Control x in r.Controls) { yield return x; foreach (var y in Todos(x)) yield return y; } }
         _info = Todos(Nota(" ")).OfType<Label>().LastOrDefault() ?? new Label();
-        BotaoRodape("Criar", true, async () => await Criar());
+        BotaoRodape("Criar", true, async () => await CriarAsync());
         BotaoRodape("Cancelar", false, Close);
         _tipo.SelectedIndexChanged += (_, _) => Dur = _tipo.SelectedIndex switch { 1 => 5, 2 => 20, _ => 10 };
-        _agenda.SelectedIndexChanged += async (_, _) => await Escolheu();
-        Load += async (_, _) => await Escolheu();
+        _agenda.SelectedIndexChanged += async (_, _) => await EscolheuAsync();
+        Load += async (_, _) => await EscolheuAsync();
     }
 
-    async Task Escolheu()
+    public Task Escolheu() => EscolheuAsync();
+
+    async Task EscolheuAsync()
     {
         var id = Campos.IdDe(_agenda) ?? 0;
         _prog = [];
@@ -52,7 +54,7 @@ public class FormNovaBateria : DialogoDesign
         if (id == 0) { _info.Text = "Bateria avulsa: informe os karts ou adicione os competidores depois (aba Baterias e Competidores)."; return; }
         var b = (_agenda.SelectedItem as Campos.Item)?.Dados;
         _nome.Text = b?.S("nome") ?? "";
-        try { _prog = await Crono.Api.Lista($"/api/agenda/{id}/programa"); } catch { _prog = []; }
+        try { _prog = await Crono.Api.ListaAsync($"/api/agenda/{id}/programa").ConfigureAwait(true); } catch { _prog = []; }
         _programa.Visible = _prog.Count > 1;
         _info.Text = _prog.Count > 0
             ? "Provas do produto: " + string.Join(" + ", _prog.Select(p => $"{p.S("nome")} ({(p.S("finalizacao") == "voltas" ? p.S("voltasMax") + " voltas" : p.S("tempoMin") + " min")})"))
@@ -67,14 +69,16 @@ public class FormNovaBateria : DialogoDesign
         }
     }
 
-    async Task Criar()
+    public Task Criar() => CriarAsync();
+
+    async Task CriarAsync()
     {
         try
         {
             UseWaitCursor = true;
             var id = Campos.IdDe(_agenda) ?? 0;
             var karts = _karts.Text.Split([' ', ',', ';', '\t'], StringSplitOptions.RemoveEmptyEntries);
-            var grade = id > 0 ? await Crono.Api.Lista($"/api/agenda/{id}/grid") : [];
+            var grade = id > 0 ? await Crono.Api.ListaAsync($"/api/agenda/{id}/grid").ConfigureAwait(true) : [];
             var comps = new JsonArray();
             for (var i = 0; i < grade.Count; i++)
             {
@@ -84,12 +88,13 @@ public class FormNovaBateria : DialogoDesign
             }
             foreach (var k in karts.Skip(grade.Count)) comps.Add(new JsonObject { ["kart"] = k, ["name"] = "" });
             var nome = _nome.Text.Trim().Length > 0 ? _nome.Text.Trim() : "Bateria " + DateTime.Now.ToString("HH:mm");
-            string Tipo(string t) => t is "treino" or "classificacao" or "corrida" ? t : "corrida";
+            static string Tipo(string t) => t is "treino" or "classificacao" or "corrida" ? t : "corrida";
             // a mesma bateria da agenda já foi criada? (acontecia de criar duas vezes e ficar TOMADA/CORRIDA repetidas)
             if (id > 0)
             {
                 var hoje = DateTimeOffset.Now.ToUnixTimeMilliseconds() - (long)DateTime.Now.TimeOfDay.TotalMilliseconds;
-                var jaTem = (await Crono.Api.Lista("/api/sessions")).Where(x => x.S("state") != "cancelada" &&
+                var sessoes = await Crono.Api.ListaAsync("/api/sessions").ConfigureAwait(true);
+                var jaTem = sessoes.Where(x => x.S("state") != "cancelada" &&
                     (x.L("agendaId") == id || ((x.L("createdAt") ?? 0) >= hoje && (x.S("name") == nome || x.S("name").StartsWith(nome + " · "))))).ToList();
                 if (jaTem.Count > 0)
                 {
@@ -109,23 +114,23 @@ public class FormNovaBateria : DialogoDesign
                 foreach (var p in _prog)
                 {
                     var porVoltas = p.S("finalizacao") == "voltas";
-                    var s = await Crono.Api.Post("/api/sessions", new JsonObject
+                    var s = await Crono.Api.PostAsync("/api/sessions", new JsonObject
                     {
                         ["type"] = Tipo(p.S("tipo")), ["name"] = $"{nome} · {p.S("nome")}", ["durationMin"] = porVoltas ? 0 : p.I("tempoMin"),
                         ["maxLaps"] = porVoltas && p.I("voltasMax") > 0 ? p.I("voltasMax") : null, ["minLapSec"] = Min, ["competitors"] = comps.DeepClone(),
                         ["programaId"] = programaId, ["agendaId"] = id > 0 ? id : null,
-                    });
+                    }).ConfigureAwait(true);
                     CriadaId ??= s.S("id");
                 }
             }
             else
             {
                 var tipo = _tipo.SelectedIndex switch { 1 => "classificacao", 2 => "corrida", _ => "treino" };
-                var s = await Crono.Api.Post("/api/sessions", new JsonObject
+                var s = await Crono.Api.PostAsync("/api/sessions", new JsonObject
                 {
                     ["type"] = tipo, ["name"] = nome, ["durationMin"] = Dur, ["maxLaps"] = Voltas > 0 ? Voltas : null,
                     ["minLapSec"] = Min, ["competitors"] = comps, ["agendaId"] = id > 0 ? id : null,
-                });
+                }).ConfigureAwait(true);
                 CriadaId = s.S("id");
             }
             DialogResult = DialogResult.OK;
@@ -137,30 +142,36 @@ public class FormNovaBateria : DialogoDesign
 
 /// <summary>Voltas de um kart, com invalidar/validar (corte de pista, passagem dupla...). Visual padrão (DialogoDesign + Grade):
 /// volta inválida em vermelho e melhor volta em roxo, sempre com a Situação escrita (nunca só a cor).</summary>
-public class FormVoltas : DialogoDesign
+public class FormVoltas(string sessao, string kart) : DialogoDesign("Voltas do kart " + kart, "Duplo clique (ou o botão) invalida ou valida a volta", IconeLista, CorIcone, 620, 640)
 {
     const string IconeLista = "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01";
     const string CorIcone = "linear-gradient(180deg, #5EB6FF, #0A63D6)"; // design-lint-ignore: degradê do ícone (Forma.Tile lê CSS)
-    readonly string _sessao, _kart;
-    readonly Grade _lista;
+    readonly string _sessao = sessao, _kart = kart;
+    readonly Grade _lista = SecaoTabela(null, 420);
 
-    public FormVoltas(string sessao, string kart) : base("Voltas do kart " + kart, "Duplo clique (ou o botão) invalida ou valida a volta", IconeLista, CorIcone, 620, 640)
+    // Construtor secundário para compatibilidade
+    static Grade SecaoTabela(DialogoDesign d, int h) => d == null ? new Grade() : d.SecaoTabela(null, h);
+
+    public FormVoltas(string sessao, string kart, bool _) : this(sessao, kart) { }
+
+    protected override void OnLoad(EventArgs e)
     {
-        _sessao = sessao; _kart = kart;
-        _lista = SecaoTabela(null, 420);
+        base.OnLoad(e);
         _lista.Colunas(new Col("lap", "Volta", TipoCol.Inteiro, 70), new Col("tempo", "Tempo", Largura: 120), new Col("hora", "Hora", Largura: 130), new Col("situacao", "Situação"));
         _lista.CorLinha = r => r.B("invalid") ? Tokens.Claro.CorEstadoPerigoTexto : r.B("melhor") ? Tokens.Claro.CorDominioMelhorVolta : null;
-        _lista.Duplo += async _ => await Alternar();
+        _lista.Duplo += async _ => await AlternarAsync();
         BotaoRodape("Fechar", true, Close);
-        BotaoRodape("Invalidar / validar volta", false, async () => await Alternar());
-        Load += async (_, _) => await Carregar();
+        BotaoRodape("Invalidar / validar volta", false, async () => await AlternarAsync());
+        _ = CarregarAsync();
     }
 
-    async Task Carregar()
+    public Task Carregar() => CarregarAsync();
+
+    async Task CarregarAsync()
     {
         try
         {
-            var todos = await Crono.Api.Lista($"/api/sessions/{_sessao}/laps");
+            var todos = await Crono.Api.ListaAsync($"/api/sessions/{_sessao}/laps").ConfigureAwait(true);
             var c = todos.FirstOrDefault(x => x.S("kart") == _kart);
             if (c?.S("name") is { Length: > 0 } n) Subtitulo.Text = n + " · duplo clique invalida ou valida a volta";
             var melhor = Crono.Arr(c, "laps").Where(l => !l.B("invalid")).Select(l => l.L("lapMs")).Min();
@@ -174,13 +185,15 @@ public class FormVoltas : DialogoDesign
         catch (ApiException e) { Msg.Erro(this, e.Message); }
     }
 
-    async Task Alternar()
+    public Task Alternar() => AlternarAsync();
+
+    async Task AlternarAsync()
     {
         if (_lista.Atual is not { } volta) { Msg.Aviso(this, "Selecione a volta."); return; }
         try
         {
-            await Crono.Api.Post($"/api/sessions/{_sessao}/laps/invalidate", new JsonObject { ["kart"] = _kart, ["lap"] = (int)(volta.L("lap") ?? 0) });
-            await Carregar();
+            await Crono.Api.PostAsync($"/api/sessions/{_sessao}/laps/invalidate", new JsonObject { ["kart"] = _kart, ["lap"] = (int)(volta.L("lap") ?? 0) }).ConfigureAwait(true);
+            await CarregarAsync();
         }
         catch (ApiException e) { Msg.Erro(this, e.Message); }
     }
@@ -212,16 +225,18 @@ public class FormTransponders : DialogoDesign
         var grade = Secao(null, "Para trocar, altere o número do kart; para liberar um transponder, apague o kart. Transponders lidos recentemente sem kart aparecem em vermelho no topo.");
         grade.Controls.Add(_g);
         grade.SetColumnSpan(_g, 6);
-        BotaoRodape("Salvar", true, async () => await Salvar());
+        BotaoRodape("Salvar", true, async () => await SalvarAsync());
         BotaoRodape("Fechar", false, Close);
-        Load += async (_, _) => await Carregar();
+        Load += async (_, _) => await CarregarAsync();
     }
 
-    async Task Carregar()
+    public Task Carregar() => CarregarAsync();
+
+    async Task CarregarAsync()
     {
         try
         {
-            var mapa = (await Crono.Api.Get("/api/transponders")) as JsonObject ?? [];
+            var mapa = (await Crono.Api.GetAsync("/api/transponders").ConfigureAwait(true)) as JsonObject ?? [];
             _original = mapa.ToDictionary(kv => kv.Key, kv => kv.Value?.ToString() ?? "");
             _g.Rows.Clear();
             foreach (var d in _desconhecidos.Where(d => !_original.ContainsKey(d)))
@@ -235,7 +250,9 @@ public class FormTransponders : DialogoDesign
         catch (ApiException e) { Msg.Erro(this, e.Message); }
     }
 
-    async Task Salvar()
+    public Task Salvar() => SalvarAsync();
+
+    async Task SalvarAsync()
     {
         _g.EndEdit();
         try
@@ -249,10 +266,10 @@ public class FormTransponders : DialogoDesign
                 if (raw.Length == 0) continue;
                 _original.TryGetValue(raw, out var antes);
                 if ((antes ?? "") == kart) continue;
-                await Crono.Api.Put("/api/transponders", new JsonObject { ["raw"] = raw, ["kart"] = kart });
+                await Crono.Api.PutAsync("/api/transponders", new JsonObject { ["raw"] = raw, ["kart"] = kart }).ConfigureAwait(true);
                 mudou++;
             }
-            await Carregar();
+            await CarregarAsync();
             Msg.Info(this, mudou == 0 ? "Nada mudou." : $"{mudou} transponder(s) atualizado(s).");
         }
         catch (ApiException e) { Msg.Erro(this, e.Message); }

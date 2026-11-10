@@ -36,10 +36,11 @@ public partial class FormCrono
             if (!TimeSpan.TryParse(texto.Trim(), out var t)) return padrao;
             return new DateTimeOffset(dia.Add(t)).ToUnixTimeMilliseconds();
         }
-        async Task Carregar(bool usarDigitado)
+
+        async Task CarregarAsync(bool usarDigitado, CancellationToken ct = default)
         {
             var q = usarDigitado ? $"?de={ParaMs(inicio.Text, de)}&ate={ParaMs(fim.Text, ate)}" : "";
-            var r = (await Crono.Api.Get($"/api/sessions/{id}/diario{q}"))?.AsObject();
+            var r = (await Crono.Api.GetAsync($"/api/sessions/{id}/diario{q}", ct))?.AsObject();
             de = r?.L("de") ?? 0; ate = r?.L("ate") ?? 0;
             if (!usarDigitado)
             {
@@ -64,18 +65,18 @@ public partial class FormCrono
                 if (!TimeSpan.TryParse(t.Text.Trim(), out var h) || h < TimeSpan.Zero || h >= TimeSpan.FromDays(1)) { Msg.Aviso(d, $"Horário de {rotulo} inválido: use hh:mm:ss (ex.: 20:15:00)."); t.Focus(); return false; }
             return true;
         }
-        conferir.Click += (_, _) => { if (HorariosOk()) Seguro.Rodar(d, () => Carregar(true)); };
-        d.Shown += (_, _) => Seguro.Rodar(d, () => Carregar(false));
+        conferir.Click += (_, _) => { if (HorariosOk()) Seguro.Rodar(d, () => CarregarAsync(true)); };
+        d.Shown += (_, _) => Seguro.Rodar(d, () => CarregarAsync(false));
         d.BotaoRodape("Remontar resultado", true, () => Seguro.Rodar(d, async () =>
         {
             if (!HorariosOk()) return;
             var a = ParaMs(inicio.Text, de); var b = ParaMs(fim.Text, ate);
             if (b <= a) { Msg.Aviso(d, "O fim precisa ser depois do início."); fim.Focus(); return; }
             if (!Msg.Pergunta(d, $"Remontar \"{_sess.S("name")}\" com as passagens de {Hora(a)} a {Hora(b)}?\n\nO resultado passa a valer como oficial (fica registrado nas observações).")) return;
-            await Crono.Api.Post($"/api/sessions/{id}/remontar", new JsonObject { ["de"] = a, ["ate"] = b, ["incluirOutros"] = outros.Checked, ["autor"] = Environment.UserName });
+            await Crono.Api.PostAsync($"/api/sessions/{id}/remontar", new JsonObject { ["de"] = a, ["ate"] = b, ["incluirOutros"] = outros.Checked, ["autor"] = Environment.UserName });
             d.DialogResult = DialogResult.OK; d.Close();
             InvalidarCachePassagens();
-            await Atualizar();
+            await AtualizarAsync();
             Msg.Info(this, "Resultado remontado. Confira a classificação; o e-mail dos pilotos não é enviado sozinho (use Relatórios › Enviar resultado por e-mail).");
         }));
         d.BotaoRodape("Cancelar", false, d.Close);

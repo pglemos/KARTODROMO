@@ -14,13 +14,13 @@ async function requireSession() {
 }
 
 export async function GET(request: NextRequest) {
-  if (!(await requireSession())) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  }
-
   const base = resolveBridgeBase();
   if (!base) {
     return NextResponse.json({ error: 'laptime_bridge_not_configured' }, { status: 503 });
+  }
+
+  if (!(await requireSession())) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
   const targetUrl = `${base}/api/clientes${request.nextUrl.search}`;

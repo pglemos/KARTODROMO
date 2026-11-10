@@ -257,17 +257,20 @@ public class LiveGrid : DataGridView
     static string Identidade(object chave)
     {
         if (chave is not JsonObject registro) return null;
-        foreach (var campo in new[] { "id", "kart", "transponder" })
+        foreach (var campo in (string[])["id", "kart", "transponder"])
             if (registro[campo]?.ToString() is { Length: > 0 } valor) return campo + ":" + valor;
         return null;
     }
 }
 
 /// <summary>Faixa colorida de titulo (ex.: "REGISTRO DE PASSAGENS" em verde, como no LapTime).</summary>
-public class Faixa : Label
+public class Faixa(string texto, Color cor) : Label
 {
-    public Faixa(string texto, Color cor)
+    public Faixa(string texto, Color cor, bool _) : this(texto, cor) { }
+
+    protected override void InitLayout()
     {
+        base.InitLayout();
         Text = texto;
         Dock = DockStyle.Top;
         Height = 24;

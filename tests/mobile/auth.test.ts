@@ -138,7 +138,7 @@ async function call(path: string, body: unknown, headers: Record<string, string>
     },
   );
 
-  return worker.fetch(request, environment as never, { waitUntil: () => undefined });
+  return worker.fetch(request, environment as never, { waitUntil: () => undefined } as any);
 }
 
 function authenticatedRequest(accessToken: unknown) {
@@ -167,7 +167,7 @@ async function changeAccountEmail(body: Record<string, unknown>, token = 'admin-
       body: JSON.stringify(body),
     }),
     environment as never,
-    { waitUntil: () => undefined },
+    { waitUntil: () => undefined } as any,
   );
 }
 

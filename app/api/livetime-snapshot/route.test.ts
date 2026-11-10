@@ -8,6 +8,13 @@ vi.mock('@/lib/livetime/snapshot-service', () => ({
   fetchExternalSnapshot: vi.fn(),
 }));
 
+type SnapshotResponse = {
+  status: string;
+  source: string;
+  message?: string;
+  drivers: Array<{ position: number; kart: string; name: string; time?: string }>;
+};
+
 describe('/api/livetime-snapshot cache handoff', () => {
   beforeEach(() => {
     vi.useRealTimers();
@@ -44,7 +51,7 @@ describe('/api/livetime-snapshot cache handoff', () => {
     await GET(new NextRequest('http://localhost/api/livetime-snapshot?uid=test-session'));
     vi.setSystemTime(new Date('2026-05-09T12:00:09.000Z'));
     const response = await GET(new NextRequest('http://localhost/api/livetime-snapshot?uid=test-session'));
-    const snapshot = await response.json();
+    const snapshot = (await response.json()) as SnapshotResponse;
 
     expect(snapshot.source).toBe('cache');
     expect(snapshot.status).toBe('live');
@@ -77,7 +84,7 @@ describe('/api/livetime-snapshot cache handoff', () => {
     await GET(new NextRequest('http://localhost/api/livetime-snapshot?uid=test-session'));
     vi.setSystemTime(new Date('2026-05-09T12:00:11.000Z'));
     const response = await GET(new NextRequest('http://localhost/api/livetime-snapshot?uid=test-session'));
-    const snapshot = await response.json();
+    const snapshot = (await response.json()) as SnapshotResponse;
 
     expect(snapshot.source).toBe('dom-scraper');
     expect(snapshot.status).toBe('empty');
@@ -88,7 +95,7 @@ describe('/api/livetime-snapshot cache handoff', () => {
     vi.mocked(fetchExternalSnapshot).mockRejectedValueOnce(new Error('fetch failed'));
 
     const response = await GET(new NextRequest('http://localhost/api/livetime-snapshot?uid=test-session'));
-    const snapshot = await response.json();
+    const snapshot = (await response.json()) as SnapshotResponse;
 
     expect(response.status).toBe(200);
     expect(snapshot).toMatchObject({

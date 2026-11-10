@@ -449,10 +449,9 @@ const [activeTab, setActiveTab] = useState<Tab>('inscricoes');
     return () => clearTimeout(handle);
   }, [classificacaoSearchInput]);
 
-  const etapasFiltradas = useMemo(
-    () => etapasRows,
-    [etapasRows],
-  );
+  const etapasFiltradas = etapasRows;
+
+  const formatosMap = useMemo(() => new Map(formatos.map((f) => [f.id, f.nome])), [formatos]);
 
   const campeonatoColumns = useMemo<readonly DataTableColumn<Campeonato>[]>(
     () => [
@@ -467,10 +466,10 @@ const [activeTab, setActiveTab] = useState<Tab>('inscricoes');
       {
         key: 'formato_id',
         label: 'Formato',
-        render: (campeonato) => formatos.find((f) => f.id === campeonato.formato_id)?.nome ?? 'Padrão Betim (default)',
+        render: (campeonato) => (campeonato.formato_id ? formatosMap.get(campeonato.formato_id) : undefined) ?? 'Padrão Betim (default)',
       },
     ],
-    [formatos],
+    [formatosMap],
   );
 
   const formatoColumns = useMemo<readonly DataTableColumn<FormatoCorridaRecord>[]>(

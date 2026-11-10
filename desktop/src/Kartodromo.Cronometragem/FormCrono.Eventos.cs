@@ -36,27 +36,27 @@ public partial class FormCrono
         _gProvas.Columns[0].DefaultCellStyle.Font = _gProvas.Columns[5].DefaultCellStyle.Font = Tokens.FonteNumero(Tokens.Claro.FonteTamanhoPequeno);
         _gProvas.Columns[2].DefaultCellStyle.Font = Tokens.FonteSemibold(Tokens.Claro.FonteTamanhoCorpo);
         _gProvas.RowTemplate.Height = 44;
-        foreach (var g in new[] { _gEventos, _gGrupos, _gProvas }) { g.RowTemplate.Height = g == _gProvas ? 44 : 34; g.DefaultCellStyle.SelectionBackColor = Tokens.Claro.CorAcaoPrincipal; g.DefaultCellStyle.SelectionForeColor = Tokens.Primitivo.Branco; }
+        foreach (var g in (LiveGrid[])[_gEventos, _gGrupos, _gProvas]) { g.RowTemplate.Height = g == _gProvas ? 44 : 34; g.DefaultCellStyle.SelectionBackColor = Tokens.Claro.CorAcaoPrincipal; g.DefaultCellStyle.SelectionForeColor = Tokens.Primitivo.Branco; }
         _gProvas.DefaultCellStyle.SelectionBackColor = Color.FromArgb(226, 239, 234); _gProvas.DefaultCellStyle.SelectionForeColor = TemaCrono.Texto;
         Etiqueta(_gEventos, 0, _ => (Tokens.Claro.CorEstadoInfoFundo, Tokens.Claro.CorEstadoInfoTexto));
         Etiqueta(_gProvas, 1, t => t switch { "Corrida" => (Color.FromArgb(255, 226, 224), Color.FromArgb(161, 29, 20)), "Tomada de tempo" or "Classificatório" => (Tokens.Claro.CorEstadoInfoFundo, Tokens.Claro.CorEstadoInfoTexto), _ => (Color.FromArgb(234, 234, 238), Tokens.Primitivo.Cinza700) });
 
-        _gEventos.CellClick += (_, e) => { if (e.RowIndex >= 0) _ = CarregarCatalogo(); };
-        _gGrupos.CellClick += (_, e) => { if (e.RowIndex >= 0) _ = CarregarCatalogo(); };
+        _gEventos.CellClick += (_, e) => { if (e.RowIndex >= 0) _ = CarregarCatalogoAsync(); };
+        _gGrupos.CellClick += (_, e) => { if (e.RowIndex >= 0) _ = CarregarCatalogoAsync(); };
         _gEventos.SelectionChanged += (_, _) =>
         {
             if (_carregandoCatalogo) return;
             var id = (_gEventos.ChaveAtual as JsonObject)?.S("id");
-            if (!string.IsNullOrEmpty(id) && id != _ultimoEventoId) _ = CarregarCatalogo();
+            if (!string.IsNullOrEmpty(id) && id != _ultimoEventoId) _ = CarregarCatalogoAsync();
         };
         _gGrupos.SelectionChanged += (_, _) =>
         {
             if (_carregandoCatalogo) return;
             var id = (_gGrupos.ChaveAtual as JsonObject)?.S("id");
-            if (!string.IsNullOrEmpty(id) && id != _ultimoGrupoId) _ = CarregarCatalogo();
+            if (!string.IsNullOrEmpty(id) && id != _ultimoGrupoId) _ = CarregarCatalogoAsync();
         };
         _gProvas.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) CriarBateriaDaProva(); };
-        _buscaEvento.TextChanged += (_, _) => _ = CarregarCatalogo();
+        _buscaEvento.TextChanged += (_, _) => _ = CarregarCatalogoAsync();
 
         var busca = new TemaCrono.PainelArredondado { Size = new Size(180, 30), BackColor = Color.FromArgb(239, 239, 240), Raio = 8, Anchor = AnchorStyles.Top | AnchorStyles.Right };
         busca.Paint += (_, e) => Forma.DesenharSvg(e.Graphics, "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5", new RectangleF(9, 8.5f, 13, 13), TemaCrono.Secundario, 2.2f);
@@ -123,14 +123,14 @@ public partial class FormCrono
         _gAgenda.DefaultCellStyle.SelectionBackColor = Tokens.Claro.CorAcaoPrincipal; _gAgenda.DefaultCellStyle.SelectionForeColor = Tokens.Primitivo.Branco;
         _gAgenda.Columns[1].DefaultCellStyle.Font = Tokens.FonteSemibold(Tokens.Claro.FonteTamanhoCorpo);
         var ag = CartaoPasso(0, "Baterias de hoje · recepção", new Label { Text = "Os pilotos inscritos entram sozinhos · dois cliques cria a bateria" }, _gAgenda,
-            [BotaoPeq("Criar bateria com os inscritos", 1, () => NovaBateria(_gAgenda.ChaveAtual as JsonObject)), BotaoPeq("Atualizar", 0, () => Seguro.Rodar(this, CarregarAgenda))]);
+            [BotaoPeq("Criar bateria com os inscritos", 1, () => NovaBateria(_gAgenda.ChaveAtual as JsonObject)), BotaoPeq("Atualizar", 0, () => Seguro.Rodar(this, () => CarregarAgendaAsync()))]);
         // Eventos.dc.html: a coluna 1 é só Eventos. As baterias do dia chegam da recepção como o evento "Baterias dd/mm/aaaa"
         // (grupos = baterias, provas = do produto), montado pelo servidor da cronometragem; o cartão da agenda saiu.
         _ = ag;
         var col1 = ev; ev.Margin = new Padding(0, 0, 14, 0);
         // a recepção vende o tempo todo: a lista se atualiza sozinha a cada 30 s enquanto a aba está aberta
         var relogioAgenda = new System.Windows.Forms.Timer { Interval = 30_000 };
-        relogioAgenda.Tick += (_, _) => { if (_abas.SelectedIndex == 0 && Visible && WindowState != FormWindowState.Minimized) { _ = CarregarAgenda(); _ = CarregarCatalogo(); } };
+        relogioAgenda.Tick += (_, _) => { if (_abas.SelectedIndex == 0 && Visible && WindowState != FormWindowState.Minimized) { _ = CarregarAgendaAsync(); _ = CarregarCatalogoAsync(); } };
         relogioAgenda.Start();
         page.Disposed += (_, _) => relogioAgenda.Dispose();
         grade.Controls.Add(col1, 0, 0); grade.Controls.Add(gr, 1, 0); grade.Controls.Add(pr, 2, 0);

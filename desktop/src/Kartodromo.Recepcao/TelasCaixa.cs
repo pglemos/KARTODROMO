@@ -71,7 +71,7 @@ public sealed class FormTerminalAbrir : CartaoModal
             if (deOutra && !Msg.Pergunta(this, $"Você entrou como {Sessao.Nome} e escolheu o terminal {escolhido}.\n\nEnquanto o seu caixa estiver aberto nele, {escolhido} não aparece para mais ninguém.\n\nAbrir mesmo assim?")) return;
             var texto = string.IsNullOrWhiteSpace(_inicial.Text) ? "0" : _inicial.Text;
             if (Fmt.Centavos(texto) is not long inicial) { Msg.Aviso(this, "Valor de suprimento inicial inválido."); return; }
-            var r = await Sessao.Api.Post("/api/office/caixa/abrir", new { turnoId, terminalId, inicialCentavos = inicial });
+            var r = await Sessao.Api.PostAsync("/api/office/caixa/abrir", new { turnoId, terminalId, inicialCentavos = inicial });
             Registro.Gravar("UltimoTerminal", terminalId.ToString());
             Msg.Info(this, r.S("mensagem"));
             Concluido = true; DialogResult = DialogResult.OK; Close();
@@ -193,7 +193,7 @@ public sealed class FormTerminalFechar : CartaoModal
             var emCaixa = sumario?.L("dinheiroEmCaixa") ?? 0;
             if (valor > emCaixa) { Msg.Aviso(this, $"O valor para o próximo turno ({Fmt.Brl(valor)}) não pode ser maior que o dinheiro disponível na gaveta ({Fmt.Brl(emCaixa)})."); _proximo.Focus(); return; }
             if (!Msg.Pergunta(this, "Deseja fechar o terminal?")) return;
-            var r = await Sessao.Api.Post("/api/office/caixa/fechar", new { proximoTurnoCentavos = valor });
+            var r = await Sessao.Api.PostAsync("/api/office/caixa/fechar", new { proximoTurnoCentavos = valor });
             Concluido = true; MovimentoId = r.S("id"); DialogResult = DialogResult.OK; Close();
         });
         var linhaRodape = new Panel { BackColor = Tokens.Claro.CorBordaSutil, Bounds = new Rectangle(0, 690, L, 1) };
@@ -243,7 +243,7 @@ public sealed class FormCaixaTransacao : DialogoDesign
                 _valor.Focus();
                 return;
             }
-            var r = await Sessao.Api.Post("/api/office/caixa/transacao", new { tipo = _tipo, valorCentavos = valor, observacao = _obs.Text.Trim() });
+            var r = await Sessao.Api.PostAsync("/api/office/caixa/transacao", new { tipo = _tipo, valorCentavos = valor, observacao = _obs.Text.Trim() });
             Msg.Info(this, r.S("mensagem")); DialogResult = DialogResult.OK; Close();
         }));
         BotaoRodape("Cancelar", false, Close);

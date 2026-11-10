@@ -32,7 +32,7 @@
 | **ORBITS** | 192.168.20.249 | CRONOMETRAGEM | Administrador | Repo + builds + deploy. Servidor da cronometragem `:4050`. Orbits 4 (MYLAPS). Painel de LED antigo na **COM3**. Ponte do site `:4010`. |
 | **SRVKART** | 192.168.20.13 | SRVKART | — (servidor) | Servidor da operação `:4060`. SQL Server `SQLEXPRESS` (porta 1433). Banco `KartodromoOps`. |
 | **Recepção** | 192.168.20.53 | DESKTOP-O7IMJLN | `usuario` | App **Recepção**. **Impressora TM-T20X** (fila `TMT20`, compartilhada) + HP LaserJet P1102w. |
-| **Totem 1** | 192.168.20.161 | TOTEN1 (Win10 LTSC) | `KART` | App **Autoatendimento**, tela cheia. **Sem impressora.** |
+| **Totem 1** | 192.168.20.161 | TOTEN1 (Win10 LTSC) | `KART` | App **Autoatendimento**, tela cheia. **Impressora EPSON TM-T20 USB** (porta `ESDPRT001`, impressao local de termos ativada). |
 | **Totem 2** | 192.168.20.69 | DESKTOP-4OR2GFI | `Toten2` | App **Autoatendimento**, tela cheia. **Sem impressora.** |
 | **CRONO1** | 192.168.20.254 | CRONO1 | "Connect Fix" | App Cronometragem (reserva). Era o servidor do LapTime (SQL desinstalado em 23/09). |
 | Decoder | 192.168.20.171 | MYLAPS TranX | — | Porta **5403 = P3 binário** (usada; a mesma do Orbits 4). Porta **5100 = texto TRX** (modo antigo). |

@@ -15,7 +15,7 @@
   .pill { padding:4px 10px; border-radius:var(--kib-raio-pilula); font-weight:700; font-size:13px; }
   .ok { background:var(--kib-cor-estado-sucesso-fundo); color:var(--kib-cor-estado-sucesso-texto); } .bad { background:var(--kib-cor-estado-perigo-fundo); color:var(--kib-cor-estado-perigo-texto); } .warn { background:var(--kib-cor-estado-aviso-fundo); color:var(--kib-cor-estado-aviso-texto); }
   header .spacer { flex:1; }
-  header a { color:var(--kib-cor-texto-link); text-decoration:none; font-weight:600; }
+  header a { color:var(--kib-cor-texto-link); text-decoration:none; font-weight:600; display:inline-flex; align-items:center; min-height:28px; padding:2px 4px; }
   header nav { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; }
   main { display:grid; grid-template-columns: 250px minmax(0,1fr) 320px; gap:12px; padding:12px; min-height:calc(100vh - 50px); }
   @media (max-width: 1200px) { main { grid-template-columns: minmax(0,1fr); } }
@@ -60,6 +60,7 @@
   .hint { font-size:12px; color:var(--muted); margin-top:6px; }
   .laps span { display:inline-block; margin:3px; padding:4px 8px; border-radius:var(--kib-raio-chip); background:var(--kib-cor-superficie-campo); cursor:pointer; font:13px var(--mono); }
   .laps span.inv { text-decoration:line-through; color:var(--kib-cor-estado-perigo-texto); }
+  @media (max-width: 760px) { input, select, textarea { font-size:16px; } }
   @media (prefers-reduced-motion: reduce) { button { transition:none; } }
 </style>
 </head>
@@ -307,7 +308,7 @@ function renderResultsTab() {
     content.innerHTML = `<table><thead><tr><th>Hora</th><th>Transponder</th><th>Kart</th><th>Competidor</th><th>Volta</th><th>Tempo</th><th>Origem</th></tr></thead><tbody>${passingRows.map(p => `<tr><td>${new Date(p.wallMs).toLocaleTimeString('pt-BR')}</td><td>${p.transponder ?? '—'}</td><td class="kart">${esc(p.kart)}</td><td>${esc(p.name)}</td><td>${p.lap ?? '—'}</td><td>${fmt(p.lapMs)}</td><td>${p.source === 'manual' ? 'Manual' : 'Decoder'}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">Nenhuma passagem registrada.</td></tr>'}</tbody></table>`;
   } else {
     const observations = view.observations || [];
-    content.innerHTML = `<div class="row"><input id="observationText" placeholder="Registrar observação da prova"><button class="b-blue" onclick="addObservation()">Salvar observação</button></div><div style="margin-top:10px">${observations.map(item => `<div style="padding:8px 2px;border-bottom:1px solid var(--line)"><strong>${esc(new Date(item.wallMs).toLocaleTimeString('pt-BR'))}</strong> · ${esc(item.text)}</div>`).join('') || '<div class="muted">Nenhuma observação registrada.</div>'}</div>`;
+    content.innerHTML = `<div class="row"><input id="observationText" placeholder="Registrar observação da prova" aria-label="Registrar observação da prova"><button class="b-blue" onclick="addObservation()">Salvar observação</button></div><div style="margin-top:10px">${observations.map(item => `<div style="padding:8px 2px;border-bottom:1px solid var(--line)"><strong>${esc(new Date(item.wallMs).toLocaleTimeString('pt-BR'))}</strong> · ${esc(item.text)}</div>`).join('') || '<div class="muted">Nenhuma observação registrada.</div>'}</div>`;
   }
 }
 
@@ -318,7 +319,7 @@ function renderGrid(list) {
 }
 function addRow(kart = '', name = '', silent) {
   const div = document.createElement('div'); div.className = 'grid-row';
-  div.innerHTML = `<input placeholder="Kart" value="${esc(kart)}"><input placeholder="Nome do piloto" value="${esc(name)}"><button title="remover" onclick="this.parentNode.remove();gridDirty=true">✕</button>`;
+  div.innerHTML = `<input placeholder="Kart" aria-label="Número do kart" value="${esc(kart)}"><input placeholder="Nome do piloto" aria-label="Nome do piloto" value="${esc(name)}"><button title="Remover competidor" aria-label="Remover competidor" onclick="this.parentNode.remove();gridDirty=true">✕</button>`;
   div.querySelectorAll('input').forEach(i => i.addEventListener('input', () => gridDirty = true));
   $('gridRows').appendChild(div);
   if (!silent) { gridDirty = true; div.querySelector('input').focus(); }

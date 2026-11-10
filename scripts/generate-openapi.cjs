@@ -1,0 +1,1516 @@
+/**
+ * Gerador exaustivo da especificação OpenAPI 3.1.0 para o Servidor de Operação (SRVKART :4060).
+ */
+const fs = require('node:fs');
+const path = require('node:path');
+const YAML = require('yaml');
+
+const spec = {
+  openapi: '3.1.0',
+  info: {
+    title: 'Kartódromo Internacional de Betim - Servidor de Operação (SRVKART)',
+    version: '1.0.0',
+    description: 'Especificação OpenAPI 3.1.0 completa da API operacional do Kartódromo Internacional de Betim (SRVKART :4060). Atende os programas nativos Windows de Recepção, Totens de Autoatendimento, Cronometragem (ORBITS/TranX), Painel Web de Gestão e integrações com o site.',
+    license: {
+      name: 'Proprietary',
+      url: 'https://www.kartodromodebetim.com.br',
+    },
+    contact: {
+      name: 'Operação de TI - Kartódromo de Betim',
+      email: 'contato@kartodromodebetim.com.br',
+    },
+  },
+  servers: [
+    {
+      url: 'http://192.168.20.13:4060',
+      description: 'Servidor de Produção SRVKART (Rede Local)',
+    },
+    {
+      url: 'https://ssh.kartodromodebetim.com.br:4060',
+      description: 'Túnel Cloudflare (Auditoria Externa)',
+    },
+  ],
+  tags: [
+    { name: 'Sistema & Diagnóstico', description: 'Monitoramento de integridade e heartbeat' },
+    { name: 'Autenticação', description: 'Emissão e renovação de tokens de operadores' },
+    { name: 'Totem - Autoatendimento', description: 'Fluxo público dos totens de pilotos e cadastro' },
+    { name: 'Recepção - Clientes', description: 'Gestão completa do catálogo de clientes e dependentes' },
+    { name: 'Recepção - Baterias & Grid', description: 'Gestão das baterias, horários, tipos e vagas' },
+    { name: 'Recepção - Reservas', description: 'Inscrições, confirmações e aprovação de reservas' },
+    { name: 'Recepção - Agenda', description: 'Visualização da ocupação diária da pista' },
+    { name: 'Recepção - Caixa & Vendas', description: 'Operações de caixa, sangrias, suprimentos e checkout' },
+    { name: 'Recepção - Oficina & Karts', description: 'Controle de horas de uso e manutenção preventiva de karts' },
+    { name: 'Recepção - Vouchers & Convênios', description: 'Emissão e validação de vouchers promocionais' },
+    { name: 'Recepção - Fidelidade', description: 'Programa de pontos e pontuação de pilotos' },
+    { name: 'Recepção - Parceiros & Comissões', description: 'Gestão de parceiros, comissionamento e acertos' },
+    { name: 'Recepção - Apoio & Configurações', description: 'Tabelas auxiliares, permissões e parâmetros do sistema' },
+    { name: 'Recepção - Impressão Térmica', description: 'Fila de impressão assíncrona para a impressora TM-T20' },
+    { name: 'Recepção - Grupos & Reservas Web', description: 'Gestão de baterias fechadas e grupos com pagamento online' },
+    { name: 'Recepção - Campeonatos & Etapas', description: 'Pontuação, etapas e regras de campeonatos' },
+    { name: 'Recepção - Inscrições 200 Milhas', description: 'Equipes, pilotos e faturamento do campeonato' },
+    { name: 'Recepção - Endurance', description: 'Regras, paradas, pesagens e telemetria de corridas longas' },
+    { name: 'Recepção - Pilotos & Ranking', description: 'Histórico, carreira e tempos por traçado' },
+    { name: 'Recepção - Cronometragem & Resultados', description: 'Consulta de sessões e dados de volta da cronometragem' },
+    { name: 'Cronometragem (Integrado)', description: 'Ponte de comunicação segura com o decoder MYLAPS/ORBITS' },
+    { name: 'Campeonato Site (Integração)', description: 'Endpoints chamados pelo site institucional para inscrições' },
+    { name: 'Público - Endurance', description: 'Página pública do chefe de equipe para acompanhamento de voltas' },
+    { name: 'Termos & Relatórios', description: 'Visualização e impressão de termos assinados e relatórios' },
+    { name: 'Atualizações Desktop', description: 'Distribuição automática de binários para os programas Windows' },
+  ],
+  components: {
+    securitySchemes: {
+      BearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        description: 'Token de sessão HMAC-SHA256 emitido no login da Recepção (/api/login)',
+      },
+      OpsKeyAuth: {
+        type: 'apiKey',
+        in: 'header',
+        name: 'x-ops-key',
+        description: 'Chave pré-compartilhada para comunicação da Cronometragem e do Site com o SRVKART',
+      },
+      TotemClientSignature: {
+        type: 'apiKey',
+        in: 'header',
+        name: 'token',
+        description: 'Assinatura HMAC sha256("cli:" + id) emitida na identificação do totem',
+      },
+      TermoSignature: {
+        type: 'apiKey',
+        in: 'query',
+        name: 's',
+        description: 'Assinatura HMAC sha256("termo:" + ids) para validação do termo impresso',
+      },
+    },
+    schemas: {
+      ErrorResponse: {
+        type: 'object',
+        properties: {
+          error: { type: 'string', example: 'Mensagem explicativa do erro ocorrido.' },
+        },
+        required: ['error'],
+      },
+      HealthResponse: {
+        type: 'object',
+        properties: {
+          ok: { type: 'boolean', example: true },
+          sqlAgora: { type: 'string', example: '2026-11-07T02:49:10' },
+        },
+        required: ['ok', 'sqlAgora'],
+      },
+      LoginRequest: {
+        type: 'object',
+        properties: {
+          login: { type: 'string', example: 'admin' },
+          senha: { type: 'string', example: 'senha123' },
+          termos: { type: 'boolean', example: true },
+        },
+        required: ['login', 'senha', 'termos'],
+      },
+      LoginResponse: {
+        type: 'object',
+        properties: {
+          token: { type: 'string', example: 'eyJ1aWQiOjEsIm5vbWUiOiJBZG1pbiIsImFkbWluIjp0cnVlfQ.signature' },
+          usuario: {
+            type: 'object',
+            properties: {
+              id: { type: 'integer', example: 1 },
+              nome: { type: 'string', example: 'Administrador' },
+              admin: { type: 'boolean', example: true },
+            },
+            required: ['id', 'nome', 'admin'],
+          },
+        },
+        required: ['token', 'usuario'],
+      },
+      TotemConfigResponse: {
+        type: 'object',
+        properties: {
+          empresa: { type: 'string', example: 'KARTODROMO INTERNACIONAL DE BETIM' },
+          mensagem: { type: 'string', example: 'Seja bem-vindo(a) ao Kartódromo!' },
+          imprimirTermo: { type: 'boolean', example: true },
+          consultarCep: { type: 'boolean', example: true },
+          tecladoVirtual: { type: 'boolean', example: false },
+          permitirMenorSemResponsavel: { type: 'boolean', example: true },
+        },
+        required: ['empresa', 'mensagem', 'imprimirTermo'],
+      },
+      TotemIdentificarRequest: {
+        type: 'object',
+        properties: {
+          identificador: { type: 'string', description: 'CPF, RG, Passaporte ou E-mail', example: '12345678900' },
+        },
+        required: ['identificador'],
+      },
+      TotemIdentificarResponse: {
+        type: 'object',
+        properties: {
+          cliente: {
+            type: ['object', 'null'],
+            properties: {
+              id: { type: 'integer', example: 1042 },
+              nome: { type: 'string', example: 'PILOTO TESTE' },
+              tipoDocumento: { type: 'string', example: 'CPF' },
+              documento: { type: 'string', example: '123.456.789-00' },
+              email: { type: 'string', example: 'piloto@exemplo.com' },
+              instagram: { type: 'string', example: '@piloto' },
+              telefone: { type: 'string', example: '(31) 99999-8888' },
+              nascimento: { type: ['string', 'null'], example: '1995-05-12' },
+              temNascimento: { type: 'boolean', example: true },
+              peso: { type: 'string', example: '78' },
+              cep: { type: 'string', example: '32600-000' },
+              endereco: { type: 'string', example: 'Rua Principal, 100, Apto 201' },
+              numero: { type: 'string', example: '100' },
+              complemento: { type: 'string', example: 'Apto 201' },
+              bairro: { type: 'string', example: 'Centro' },
+              cidade: { type: 'string', example: 'Betim' },
+              estado: { type: 'string', example: 'MG' },
+              lgpd: { type: 'boolean', example: true },
+              bloqueado: { type: 'boolean', example: false },
+            },
+          },
+          dependentes: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'integer', example: 2050 },
+                nome: { type: 'string', example: 'PILOTO JUNIOR' },
+                nascimento: { type: 'string', example: '2015-08-10' },
+                token: { type: 'string', example: 'signature-cli-2050' },
+              },
+            },
+          },
+          token: { type: 'string', example: 'signature-cli-1042' },
+        },
+      },
+      TotemCadastroRequest: {
+        type: 'object',
+        properties: {
+          id: { type: ['integer', 'null'], description: 'Id do cliente existente para atualização' },
+          token: { type: ['string', 'null'], description: 'Assinatura cli:{id} caso id seja informado' },
+          responsavelId: { type: ['integer', 'null'], description: 'Id do responsável caso seja menor' },
+          responsavelToken: { type: ['string', 'null'], description: 'Assinatura cli:{responsavelId}' },
+          lgpd: { type: 'boolean', example: true },
+          dados: {
+            type: 'object',
+            properties: {
+              nome: { type: 'string', example: 'NOVO PILOTO' },
+              tipoDocumento: { type: 'string', enum: ['CPF', 'RG', 'PASSAPORTE', 'OUTRO'], example: 'CPF' },
+              documento: { type: 'string', example: '12345678900' },
+              nascimento: { type: 'string', format: 'date', example: '1990-01-15' },
+              email: { type: 'string', format: 'email', example: 'piloto@novo.com' },
+              telefone: { type: 'string', example: '31988887777' },
+              instagram: { type: 'string', example: '@pilotonovo' },
+              peso: { type: ['number', 'string'], example: 75 },
+              cep: { type: 'string', example: '32600000' },
+              endereco: { type: 'string', example: 'Av das Américas' },
+              numero: { type: 'string', example: '500' },
+              complemento: { type: 'string', example: 'Bloco B' },
+              bairro: { type: 'string', example: 'Filadélfia' },
+              cidade: { type: 'string', example: 'Betim' },
+              estado: { type: 'string', example: 'MG' },
+            },
+            required: ['nome', 'nascimento'],
+          },
+        },
+        required: ['dados'],
+      },
+      TotemBateriaItem: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', example: 532 },
+          nome: { type: 'string', example: 'BATERIA 9:15' },
+          inicio: { type: 'string', format: 'date-time', example: '2026-11-07T09:15:00-03:00' },
+          vagas: { type: 'integer', example: 30 },
+          tipoKart: { type: 'string', example: 'light' },
+          ocupadas: { type: 'integer', example: 27 },
+          livres: { type: 'integer', example: 3 },
+          endurance: { type: ['object', 'null'] },
+        },
+        required: ['id', 'nome', 'inicio', 'vagas', 'ocupadas', 'livres'],
+      },
+      TotemInscreverRequest: {
+        type: 'object',
+        properties: {
+          bateriaId: { type: 'integer', example: 532 },
+          bateriaIds: { type: 'array', items: { type: 'integer' }, example: [532] },
+          participantes: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'integer', example: 1042 },
+                token: { type: 'string', example: 'signature-cli-1042' },
+              },
+              required: ['id', 'token'],
+            },
+          },
+          endurance: {
+            type: 'object',
+            properties: {
+              eventoId: { type: 'integer', example: 3 },
+              equipeId: { type: 'integer', example: 12 },
+              equipeIds: { type: 'array', items: { type: 'integer' } },
+            },
+          },
+        },
+        required: ['participantes'],
+      },
+      TotemInscreverResponse: {
+        type: 'object',
+        properties: {
+          inscricoes: { type: 'array', items: { type: 'integer' }, example: [89421] },
+          inicio: { type: 'string', example: '2026-11-07T09:15' },
+          termoUrl: { type: ['string', 'null'], example: '/termo?ids=89421&s=abcd1234' },
+          termoNaRecepcao: { type: 'boolean', example: true },
+          pulseiras: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                nome: { type: 'string' },
+                pulseira: { type: 'integer' },
+                equipe: { type: 'string' },
+              },
+            },
+          },
+        },
+        required: ['inscricoes', 'termoNaRecepcao'],
+      },
+      ClienteOutput: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', example: 1042 },
+          nome: { type: 'string', example: 'MARCELO SILVA' },
+          documento: { type: ['string', 'null'], example: '123.456.789-00' },
+          documentoNum: { type: ['string', 'null'], example: '12345678900' },
+          tipoDocumento: { type: ['string', 'null'], example: 'CPF' },
+          nascimento: { type: ['string', 'null'], example: '1990-05-20' },
+          email: { type: ['string', 'null'], example: 'marcelo@teste.com' },
+          telefone: { type: ['string', 'null'], example: '31999998888' },
+          instagram: { type: ['string', 'null'], example: '@marcelo' },
+          peso: { type: ['number', 'null'], example: 78.5 },
+          cidade: { type: ['string', 'null'], example: 'Betim' },
+          estado: { type: ['string', 'null'], example: 'MG' },
+          bloqueado: { type: 'boolean', example: false },
+          motivoBloqueio: { type: ['string', 'null'] },
+          responsavelId: { type: ['integer', 'null'] },
+          responsavelNome: { type: ['string', 'null'] },
+        },
+        required: ['id', 'nome'],
+      },
+      ClienteInput: {
+        type: 'object',
+        properties: {
+          nome: { type: 'string', example: 'PILOTO COMPLETO' },
+          tipoDocumento: { type: 'string', example: 'CPF' },
+          documento: { type: 'string', example: '12345678900' },
+          nascimento: { type: 'string', format: 'date', example: '1988-10-10' },
+          email: { type: 'string', example: 'piloto@betim.com' },
+          telefone: { type: 'string', example: '31988887777' },
+          instagram: { type: 'string', example: '@piloto' },
+          peso: { type: ['number', 'string'], example: 80 },
+          cep: { type: 'string', example: '32600000' },
+          endereco: { type: 'string', example: 'Rua das Flores' },
+          numero: { type: 'string', example: '123' },
+          complemento: { type: 'string', example: '' },
+          bairro: { type: 'string', example: 'Centro' },
+          cidade: { type: 'string', example: 'Betim' },
+          estado: { type: 'string', example: 'MG' },
+          bloqueado: { type: 'boolean', example: false },
+          motivoBloqueio: { type: 'string', example: '' },
+          responsavelId: { type: ['integer', 'null'] },
+        },
+        required: ['nome'],
+      },
+      BateriaOutput: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', example: 532 },
+          nome: { type: 'string', example: 'BATERIA 9:15' },
+          inicio: { type: 'string', format: 'date-time', example: '2026-11-07T09:15:00-03:00' },
+          tipoKart: { type: 'string', example: 'light' },
+          vagas: { type: 'integer', example: 30 },
+          status: { type: 'string', example: 'aberta' },
+          produtoId: { type: 'integer', example: 1 },
+          produtoNome: { type: 'string', example: 'BATERIA 20 MIN' },
+          precoCentavos: { type: 'integer', example: 12000 },
+          inscritos: { type: 'integer', example: 27 },
+          pagos: { type: 'integer', example: 25 },
+        },
+        required: ['id', 'nome', 'inicio', 'vagas', 'status'],
+      },
+      BateriaCreateInput: {
+        type: 'object',
+        properties: {
+          nome: { type: 'string', example: 'BATERIA EXTRA 20:00' },
+          inicio: { type: 'string', format: 'date-time', example: '2026-11-07T20:00:00-03:00' },
+          vagas: { type: 'integer', example: 30 },
+          produtoId: { type: 'integer', example: 1 },
+          tracadoId: { type: ['integer', 'null'], example: 2 },
+          tipoKart: { type: 'string', example: 'light' },
+          voltaMinimaSeg: { type: 'number', example: 50.5 },
+        },
+        required: ['nome', 'inicio', 'vagas', 'produtoId'],
+      },
+      GerarBateriasInput: {
+        type: 'object',
+        properties: {
+          data: { type: 'string', format: 'date', example: '2026-11-08' },
+          primeira: { type: 'string', example: '09:15' },
+          intervaloMin: { type: 'integer', example: 35 },
+          quantidade: { type: 'integer', example: 15 },
+          vagas: { type: 'integer', example: 30 },
+          produtoId: { type: 'integer', example: 1 },
+          tracadoId: { type: ['integer', 'null'], example: 1 },
+        },
+        required: ['data', 'primeira', 'intervaloMin', 'quantidade', 'produtoId'],
+      },
+      ReservaOutput: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', example: 9812 },
+          bateriaId: { type: 'integer', example: 532 },
+          bateriaNome: { type: 'string', example: 'BATERIA 9:15' },
+          bateriaInicio: { type: 'string', example: '2026-11-07T09:15:00' },
+          clienteId: { type: 'integer', example: 1042 },
+          clienteNome: { type: 'string', example: 'MARCELO SILVA' },
+          kart: { type: ['string', 'null'], example: '14' },
+          pago: { type: 'boolean', example: true },
+          aprovada: { type: 'boolean', example: true },
+          origem: { type: 'string', example: 'totem' },
+          status: { type: 'string', example: 'ativa' },
+          criadoEm: { type: 'string', example: '2026-11-07T02:40:00' },
+        },
+        required: ['id', 'bateriaId', 'clienteId', 'pago', 'aprovada'],
+      },
+      VendaCreateInput: {
+        type: 'object',
+        properties: {
+          clienteId: { type: 'integer', example: 1042 },
+          itens: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                produtoId: { type: 'integer', example: 1 },
+                quantidade: { type: 'integer', example: 1 },
+                unitarioCentavos: { type: 'integer', example: 12000 },
+                totalCentavos: { type: 'integer', example: 12000 },
+                inscricaoId: { type: ['integer', 'null'], example: 9812 },
+              },
+              required: ['produtoId', 'quantidade', 'unitarioCentavos'],
+            },
+          },
+          pagamentos: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                formaId: { type: 'integer', example: 2 },
+                valorCentavos: { type: 'integer', example: 12000 },
+                parcelas: { type: 'integer', example: 1 },
+              },
+              required: ['formaId', 'valorCentavos'],
+            },
+          },
+          descontoCentavos: { type: 'integer', example: 0 },
+          observacao: { type: 'string', example: 'Venda de balcão' },
+        },
+        required: ['clienteId', 'itens', 'pagamentos'],
+      },
+      CaixaStatusOutput: {
+        type: 'object',
+        properties: {
+          aberto: { type: 'boolean', example: true },
+          caixa: {
+            type: ['object', 'null'],
+            properties: {
+              id: { type: 'integer', example: 450 },
+              terminalId: { type: 'integer', example: 1 },
+              usuarioId: { type: 'integer', example: 1 },
+              abertoEm: { type: 'string', example: '2026-11-07T08:00:00' },
+              saldoInicialCentavos: { type: 'integer', example: 20000 },
+              totalEntradasCentavos: { type: 'integer', example: 154000 },
+              totalSaidasCentavos: { type: 'integer', example: 10000 },
+              saldoFinalCentavos: { type: 'integer', example: 164000 },
+            },
+          },
+        },
+        required: ['aberto'],
+      },
+      ImpressaoJobOutput: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', example: 789 },
+          url: { type: 'string', example: '/termo?ids=9812&s=abc123' },
+          titulo: { type: 'string', example: 'Termo de responsabilidade' },
+          origem: { type: 'string', example: 'Totem 1' },
+          tentativa: { type: 'integer', example: 1 },
+        },
+      },
+      CronoGridItem: {
+        type: 'object',
+        properties: {
+          inscricaoId: { type: 'integer', example: 9812 },
+          clienteId: { type: 'integer', example: 1042 },
+          nome: { type: 'string', example: 'MARCELO SILVA' },
+          kart: { type: ['string', 'null'], example: '12' },
+          pago: { type: 'boolean', example: true },
+          aprovada: { type: 'boolean', example: true },
+          equipe: { type: ['string', 'null'] },
+          equipeId: { type: ['integer', 'null'] },
+          pulseira: { type: ['integer', 'null'] },
+        },
+        required: ['inscricaoId', 'clienteId', 'nome', 'pago', 'aprovada'],
+      },
+      CronoUsoKartsInput: {
+        type: 'object',
+        properties: {
+          agendaId: { type: 'integer', description: 'Id da bateria', example: 532 },
+          karts: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                kart: { type: 'string', example: '14' },
+                minutos: { type: 'number', example: 22 },
+              },
+              required: ['kart', 'minutos'],
+            },
+          },
+        },
+        required: ['karts'],
+      },
+      FidelidadeContaOutput: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', example: 15 },
+          clienteId: { type: 'integer', example: 1042 },
+          clienteNome: { type: 'string', example: 'MARCELO SILVA' },
+          saldoPontos: { type: 'integer', example: 450 },
+          atualizadoEm: { type: 'string', example: '2026-11-05T14:30:00' },
+        },
+      },
+      FidelidadeAjusteInput: {
+        type: 'object',
+        properties: {
+          pontos: { type: 'integer', description: 'Quantidade de pontos (+ ou -)', example: 50 },
+          motivo: { type: 'string', example: 'Bônus de corrida de aniversário' },
+        },
+        required: ['pontos', 'motivo'],
+      },
+      ParceiroOutput: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', example: 4 },
+          nome: { type: 'string', example: 'HOTEL BETIM' },
+          tipo: { type: 'string', example: 'hotel' },
+          comissaoPct: { type: 'number', example: 10.0 },
+          chavePix: { type: ['string', 'null'], example: '12345678000199' },
+          ativo: { type: 'boolean', example: true },
+        },
+      },
+      VoucherOutput: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', example: 89 },
+          codigo: { type: 'string', example: 'PROMO20' },
+          descontoCentavos: { type: 'integer', example: 2000 },
+          percentual: { type: 'number', example: 0 },
+          validade: { type: 'string', format: 'date', example: '2026-12-31' },
+          ativo: { type: 'boolean', example: true },
+          utilizado: { type: 'boolean', example: false },
+        },
+      },
+      GrupoOutput: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', example: 34 },
+          codigo: { type: 'string', example: 'GRP-2026-11-07-01' },
+          bateriaId: { type: 'integer', example: 532 },
+          responsavelId: { type: 'integer', example: 1042 },
+          responsavelNome: { type: 'string', example: 'MARCELO SILVA' },
+          modo: { type: 'string', enum: ['individual', 'centralizado'], example: 'individual' },
+          status: { type: 'string', example: 'ativa' },
+          totalVagas: { type: 'integer', example: 15 },
+          vagasPagas: { type: 'integer', example: 12 },
+        },
+      },
+      EnduranceEventoOutput: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', example: 2 },
+          nome: { type: 'string', example: '100 MILHAS DE BETIM' },
+          data: { type: 'string', format: 'date', example: '2026-11-15' },
+          bateriaId: { type: ['integer', 'null'], example: 540 },
+          sessaoCrono: { type: ['string', 'null'], example: 'session-endurance-100' },
+          ativo: { type: 'boolean', example: true },
+          equipes: { type: 'integer', example: 18 },
+          pilotos: { type: 'integer', example: 54 },
+        },
+      },
+    },
+  },
+  paths: {
+    '/healthz': {
+      get: {
+        tags: ['Sistema & Diagnóstico'],
+        summary: 'Verificação de integridade e hora do banco SQL',
+        description: 'Retorna ok:true e a hora corrente do SQL Server (SYSDATETIME em Brasília).',
+        responses: {
+          '200': {
+            description: 'Servidor operacional',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/HealthResponse' } } },
+          },
+        },
+      },
+    },
+    '/updates/{app}/{file}': {
+      get: {
+        tags: ['Atualizações Desktop'],
+        summary: 'Download de manifestos e instaladores dos apps Windows',
+        description: 'Distribuição dos pacotes de atualização para os programas WinForms (Recepcao, Autoatendimento, Cronometragem).',
+        parameters: [
+          { name: 'app', in: 'path', required: true, schema: { type: 'string', enum: ['Recepcao', 'Autoatendimento', 'Cronometragem'] }, example: 'Recepcao' },
+          { name: 'file', in: 'path', required: true, schema: { type: 'string' }, example: 'manifest.json' },
+        ],
+        responses: {
+          '200': { description: 'Arquivo baixado com sucesso' },
+          '404': { description: 'Arquivo não encontrado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+    },
+    '/api/login': {
+      post: {
+        tags: ['Autenticação'],
+        summary: 'Login de operador da Recepção',
+        description: 'Autentica operador contra a tabela dbo.Usuario com scrypt e emite token de 16h.',
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/LoginRequest' } } },
+        },
+        responses: {
+          '200': {
+            description: 'Login bem sucedido',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/LoginResponse' } } },
+          },
+          '400': { description: 'Termos não aceitos ou parâmetros faltando', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '401': { description: 'Credenciais inválidas', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '429': { description: 'Muitas tentativas de login (bloqueio temporário)', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+    },
+    '/api/totem/config': {
+      get: {
+        tags: ['Totem - Autoatendimento'],
+        summary: 'Obter configurações ativas dos totens',
+        description: 'Retorna parâmetros visuais e regras operacionais do totem (mensagem de boas-vindas, teclado virtual, impressão de termo).',
+        responses: {
+          '200': {
+            description: 'Configurações carregadas',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/TotemConfigResponse' } } },
+          },
+        },
+      },
+    },
+    '/api/totem/identificar': {
+      post: {
+        tags: ['Totem - Autoatendimento'],
+        summary: 'Identificação rápida do piloto no totem por CPF, RG ou e-mail',
+        description: 'Busca cliente na base local ou pré-cadastros online e gera token assinado temporário para autoatendimento.',
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/TotemIdentificarRequest' } } },
+        },
+        responses: {
+          '200': {
+            description: 'Resultado da identificação (cliente encontrado ou null)',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/TotemIdentificarResponse' } } },
+          },
+          '400': { description: 'Identificador inválido', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+    },
+    '/api/totem/cadastro': {
+      post: {
+        tags: ['Totem - Autoatendimento'],
+        summary: 'Criar ou atualizar cadastro de cliente/dependente pelo totem',
+        description: 'Valida documento (CPF), termos de consentimento LGPD, campos obrigatórios e persiste em dbo.Cliente.',
+        security: [{ TotemClientSignature: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/TotemCadastroRequest' } } },
+        },
+        responses: {
+          '200': { description: 'Cadastro atualizado com sucesso' },
+          '201': { description: 'Novo cliente criado com sucesso' },
+          '400': { description: 'Dados inválidos ou campos obrigatórios faltando', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '403': { description: 'Token de assinatura inválido ou expirado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '409': { description: 'Documento já cadastrado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+    },
+    '/api/totem/baterias': {
+      get: {
+        tags: ['Totem - Autoatendimento'],
+        summary: 'Listar baterias do dia disponíveis para inscrição no totem',
+        description: 'Retorna baterias de hoje com vagas livres, considerando reservas de grupo pertencentes ao piloto identificado.',
+        parameters: [
+          { name: 'grupo', in: 'query', required: false, schema: { type: 'string' }, description: 'Lista id.token dos membros do grupo' },
+        ],
+        responses: {
+          '200': {
+            description: 'Lista de baterias disponíveis',
+            content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/TotemBateriaItem' } } } },
+          },
+        },
+      },
+    },
+    '/api/totem/endurance': {
+      get: {
+        tags: ['Totem - Autoatendimento'],
+        summary: 'Listar equipes do campeonato Endurance disponíveis para escolha no totem',
+        parameters: [
+          { name: 'bateria', in: 'query', required: true, schema: { type: 'integer' } },
+        ],
+        responses: { '200': { description: 'Lista de equipes e vagas' } },
+      },
+    },
+    '/api/totem/inscrever': {
+      post: {
+        tags: ['Totem - Autoatendimento'],
+        summary: 'Realizar pré-reserva de pilotos nas baterias selecionadas',
+        description: 'Registra inscrições pendentes de aprovação, aloca vagas online de grupos pré-pagos e enfileira termo para impressão na Recepção.',
+        security: [{ TotemClientSignature: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/TotemInscreverRequest' } } },
+        },
+        responses: {
+          '201': {
+            description: 'Inscrições criadas e termo gerado',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/TotemInscreverResponse' } } },
+          },
+          '400': { description: 'Bateria ou participantes inválidos', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '403': { description: 'Token de sessão do piloto expirado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '409': { description: 'Conflito de vagas ou campeonato inválido', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+    },
+    '/api/office/clientes': {
+      get: {
+        tags: ['Recepção - Clientes'],
+        summary: 'Buscar clientes por nome, documento, e-mail ou telefone',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: 'q', in: 'query', required: false, schema: { type: 'string' }, description: 'Termo de busca' },
+        ],
+        responses: {
+          '200': {
+            description: 'Lista de clientes encontrados',
+            content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/ClienteOutput' } } } },
+          },
+          '401': { description: 'Não autorizado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+      post: {
+        tags: ['Recepção - Clientes'],
+        summary: 'Cadastrar novo cliente na Recepção',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/ClienteInput' } } },
+        },
+        responses: {
+          '201': { description: 'Cliente criado com sucesso' },
+          '400': { description: 'Dados inválidos', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '409': { description: 'Documento duplicado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+    },
+    '/api/office/clientes/nav': {
+      get: {
+        tags: ['Recepção - Clientes'],
+        summary: 'Navegação paginada por cursor na tabela de clientes',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: 'depoisDe', in: 'query', schema: { type: 'integer' } },
+          { name: 'ordem', in: 'query', schema: { type: 'string', enum: ['nome', 'id', 'atualizadoEm'] } },
+        ],
+        responses: { '200': { description: 'Página de clientes' } },
+      },
+    },
+    '/api/office/clientes/{id}': {
+      get: {
+        tags: ['Recepção - Clientes'],
+        summary: 'Obter dados completos de um cliente por ID',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        responses: {
+          '200': { description: 'Cliente encontrado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ClienteOutput' } } } },
+          '404': { description: 'Cliente não encontrado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+      put: {
+        tags: ['Recepção - Clientes'],
+        summary: 'Atualizar dados de um cliente existente',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/ClienteInput' } } },
+        },
+        responses: {
+          '200': { description: 'Cliente atualizado com sucesso' },
+          '400': { description: 'Dados inválidos', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '404': { description: 'Cliente não encontrado', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+      delete: {
+        tags: ['Recepção - Clientes'],
+        summary: 'Excluir cadastro de cliente (se não houver vínculos)',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        responses: {
+          '200': { description: 'Cliente excluído com sucesso' },
+          '409': { description: 'Cliente possui histórico de baterias ou vendas', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+    },
+    '/api/office/baterias': {
+      get: {
+        tags: ['Recepção - Baterias & Grid'],
+        summary: 'Listar baterias da data selecionada',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: 'data', in: 'query', required: false, schema: { type: 'string', format: 'date' }, example: '2026-11-07' },
+          { name: 'status', in: 'query', required: false, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': {
+            description: 'Lista de baterias encontradas',
+            content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/BateriaOutput' } } } },
+          },
+        },
+      },
+      post: {
+        tags: ['Recepção - Baterias & Grid'],
+        summary: 'Criar bateria avulsa',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/BateriaCreateInput' } } },
+        },
+        responses: {
+          '201': { description: 'Bateria criada com sucesso' },
+          '400': { description: 'Dados inválidos', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+    },
+    '/api/office/baterias/gerar': {
+      post: {
+        tags: ['Recepção - Baterias & Grid'],
+        summary: 'Gerar grade diária de baterias em lote',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/GerarBateriasInput' } } },
+        },
+        responses: {
+          '201': { description: 'Baterias geradas com sucesso' },
+          '400': { description: 'Parâmetros inválidos', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+    },
+    '/api/office/baterias/fechar-dia': {
+      post: {
+        tags: ['Recepção - Baterias & Grid'],
+        summary: 'Fechar ou cancelar baterias restantes do dia',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { data: { type: 'string', format: 'date' } } } } },
+        },
+        responses: {
+          '200': { description: 'Baterias encerradas com sucesso' },
+          '403': { description: 'Usuário sem permissão de fechar dia', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+    },
+    '/api/office/baterias/{id}': {
+      put: {
+        tags: ['Recepção - Baterias & Grid'],
+        summary: 'Atualizar informações da bateria',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        responses: { '200': { description: 'Bateria atualizada' } },
+      },
+      delete: {
+        tags: ['Recepção - Baterias & Grid'],
+        summary: 'Excluir bateria',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        responses: { '200': { description: 'Bateria excluída' } },
+      },
+    },
+    '/api/office/baterias/{id}/status': {
+      post: {
+        tags: ['Recepção - Baterias & Grid'],
+        summary: 'Alterar status da bateria (aberta, chamada, pista, encerrada)',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { status: { type: 'string' } }, required: ['status'] } } },
+        },
+        responses: { '200': { description: 'Status alterado' } },
+      },
+    },
+    '/api/office/baterias/{id}/incluir': {
+      post: {
+        tags: ['Recepção - Baterias & Grid'],
+        summary: 'Incluir piloto diretamente na bateria',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { clienteId: { type: 'integer' }, kart: { type: 'string' } }, required: ['clienteId'] } } },
+        },
+        responses: { '201': { description: 'Piloto incluído' } },
+      },
+    },
+    '/api/office/baterias/{id}/programa': {
+      get: {
+        tags: ['Recepção - Baterias & Grid'],
+        summary: 'Obter programa de provas e regulamento da bateria',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        responses: { '200': { description: 'Programa de provas' } },
+      },
+    },
+    '/api/office/baterias/{id}/tipo': {
+      post: {
+        tags: ['Recepção - Baterias & Grid'],
+        summary: 'Definir bateria como normal, fechada para grupo ou bloqueada',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { tipo: { type: 'string', enum: ['normal', 'fechada', 'bloqueada'] } }, required: ['tipo'] } } },
+        },
+        responses: { '200': { description: 'Tipo atualizado' } },
+      },
+    },
+    '/api/office/reservas': {
+      get: {
+        tags: ['Recepção - Reservas'],
+        summary: 'Listar inscrições e reservas da recepção',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: 'data', in: 'query', schema: { type: 'string' } },
+          { name: 'bateriaId', in: 'query', schema: { type: 'integer' } },
+          { name: 'status', in: 'query', schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': {
+            description: 'Lista de reservas',
+            content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/ReservaOutput' } } } },
+          },
+        },
+      },
+    },
+    '/api/office/reservas/{id}': {
+      put: {
+        tags: ['Recepção - Reservas'],
+        summary: 'Atualizar dados da reserva (kart atribuído, observações)',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        responses: { '200': { description: 'Reserva atualizada' } },
+      },
+      delete: {
+        tags: ['Recepção - Reservas'],
+        summary: 'Cancelar inscrição/reserva',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        responses: { '200': { description: 'Reserva cancelada' } },
+      },
+    },
+    '/api/office/reservas/{id}/aprovar': {
+      post: {
+        tags: ['Recepção - Reservas'],
+        summary: 'Aprovar pré-reserva feita no totem ou online',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        responses: { '200': { description: 'Reserva aprovada' } },
+      },
+    },
+    '/api/office/reservas/{id}/alterar-cliente': {
+      post: {
+        tags: ['Recepção - Reservas'],
+        summary: 'Transferir a vaga da reserva para outro piloto',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { novoClienteId: { type: 'integer' } }, required: ['novoClienteId'] } } },
+        },
+        responses: { '200': { description: 'Cliente alterado com sucesso' } },
+      },
+    },
+    '/api/office/reservas/{id}/mover': {
+      post: {
+        tags: ['Recepção - Reservas'],
+        summary: 'Mover piloto de bateria',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { novaBateriaId: { type: 'integer' } }, required: ['novaBateriaId'] } } },
+        },
+        responses: { '200': { description: 'Reserva movida com sucesso' } },
+      },
+    },
+    '/api/office/agenda': {
+      get: {
+        tags: ['Recepção - Agenda'],
+        summary: 'Visualizar agenda geral da pista com ocupação',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: 'data', in: 'query', schema: { type: 'string', format: 'date' } },
+          { name: 'dias', in: 'query', schema: { type: 'integer', default: 1 } },
+        ],
+        responses: { '200': { description: 'Grade da agenda' } },
+      },
+    },
+    '/api/office/caixa': {
+      get: {
+        tags: ['Recepção - Caixa & Vendas'],
+        summary: 'Consultar estado atual do caixa do terminal',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          '200': {
+            description: 'Dados do caixa',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/CaixaStatusOutput' } } },
+          },
+        },
+      },
+    },
+    '/api/office/movimentos': {
+      get: {
+        tags: ['Recepção - Caixa & Vendas'],
+        summary: 'Extrato de lançamentos de caixa',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'caixaId', in: 'query', schema: { type: 'integer' } }],
+        responses: { '200': { description: 'Movimentações do caixa' } },
+      },
+    },
+    '/api/office/caixa/abrir': {
+      post: {
+        tags: ['Recepção - Caixa & Vendas'],
+        summary: 'Abrir caixa para início do turno',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { saldoInicialCentavos: { type: 'integer' }, terminalId: { type: 'integer' } }, required: ['saldoInicialCentavos'] } } },
+        },
+        responses: { '200': { description: 'Caixa aberto com sucesso' } },
+      },
+    },
+    '/api/office/caixa/fechar': {
+      post: {
+        tags: ['Recepção - Caixa & Vendas'],
+        summary: 'Fechar caixa e emitir conferência',
+        security: [{ BearerAuth: [] }],
+        responses: { '200': { description: 'Caixa fechado com sucesso' } },
+      },
+    },
+    '/api/office/caixa/transacao': {
+      post: {
+        tags: ['Recepção - Caixa & Vendas'],
+        summary: 'Registrar sangria ou suprimento de caixa',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { tipo: { type: 'string', enum: ['sangria', 'suprimento'] }, valorCentavos: { type: 'integer' }, motivo: { type: 'string' } }, required: ['tipo', 'valorCentavos'] } } },
+        },
+        responses: { '200': { description: 'Lançamento efetuado' } },
+      },
+    },
+    '/api/office/vendas': {
+      get: {
+        tags: ['Recepção - Caixa & Vendas'],
+        summary: 'Listar vendas efetuadas no dia',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'data', in: 'query', schema: { type: 'string', format: 'date' } }],
+        responses: { '200': { description: 'Lista de vendas' } },
+      },
+      post: {
+        tags: ['Recepção - Caixa & Vendas'],
+        summary: 'Efetuar venda (checkout)',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/VendaCreateInput' } } },
+        },
+        responses: { '201': { description: 'Venda finalizada com sucesso' } },
+      },
+    },
+    '/api/office/vendas/{id}': {
+      get: {
+        tags: ['Recepção - Caixa & Vendas'],
+        summary: 'Obter detalhes de uma venda por ID',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        responses: { '200': { description: 'Detalhes da venda' } },
+      },
+    },
+    '/api/office/vendas/{id}/estorno': {
+      post: {
+        tags: ['Recepção - Caixa & Vendas'],
+        summary: 'Estornar venda e cancelar títulos associados',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { motivo: { type: 'string' } } } } },
+        },
+        responses: { '200': { description: 'Venda estornada' } },
+      },
+    },
+    '/api/office/fidelidade/contas': {
+      get: {
+        tags: ['Recepção - Fidelidade'],
+        summary: 'Listar contas de fidelidade e saldos',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          '200': {
+            description: 'Lista de contas',
+            content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/FidelidadeContaOutput' } } } },
+          },
+        },
+      },
+      post: {
+        tags: ['Recepção - Fidelidade'],
+        summary: 'Criar conta de fidelidade para cliente',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { clienteId: { type: 'integer' } }, required: ['clienteId'] } } },
+        },
+        responses: { '201': { description: 'Conta criada' } },
+      },
+    },
+    '/api/office/fidelidade/contas/{id}/ajustes': {
+      post: {
+        tags: ['Recepção - Fidelidade'],
+        summary: 'Lançar crédito ou débito manual de pontos na conta',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/FidelidadeAjusteInput' } } },
+        },
+        responses: { '200': { description: 'Pontos ajustados' } },
+      },
+    },
+    '/api/office/parceiros': {
+      get: {
+        tags: ['Recepção - Parceiros & Comissões'],
+        summary: 'Listar parceiros comerciais cadastrados',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          '200': {
+            description: 'Lista de parceiros',
+            content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/ParceiroOutput' } } } },
+          },
+        },
+      },
+      post: {
+        tags: ['Recepção - Parceiros & Comissões'],
+        summary: 'Cadastrar novo parceiro comercial',
+        security: [{ BearerAuth: [] }],
+        responses: { '201': { description: 'Parceiro cadastrado' } },
+      },
+    },
+    '/api/office/parceiros/comissoes': {
+      get: {
+        tags: ['Recepção - Parceiros & Comissões'],
+        summary: 'Listar comissões acumuladas de parceiros',
+        security: [{ BearerAuth: [] }],
+        responses: { '200': { description: 'Extrato de comissões' } },
+      },
+    },
+    '/api/office/vouchers': {
+      get: {
+        tags: ['Recepção - Vouchers & Convênios'],
+        summary: 'Listar vouchers emitidos',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          '200': {
+            description: 'Lista de vouchers',
+            content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/VoucherOutput' } } } },
+          },
+        },
+      },
+      post: {
+        tags: ['Recepção - Vouchers & Convênios'],
+        summary: 'Emitir novo voucher ou lote promocional',
+        security: [{ BearerAuth: [] }],
+        responses: { '201': { description: 'Voucher emitido' } },
+      },
+    },
+    '/api/office/vouchers/validar': {
+      get: {
+        tags: ['Recepção - Vouchers & Convênios'],
+        summary: 'Validar código de voucher para aplicação no checkout',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'codigo', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Voucher válido' }, '404': { description: 'Voucher inválido ou vencido' } },
+      },
+    },
+    '/api/office/grupos': {
+      get: {
+        tags: ['Recepção - Grupos & Reservas Web'],
+        summary: 'Listar grupos e reservas fechadas',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: 'bateriaId', in: 'query', schema: { type: 'integer' } },
+          { name: 'de', in: 'query', schema: { type: 'string', format: 'date' } },
+          { name: 'ate', in: 'query', schema: { type: 'string', format: 'date' } },
+        ],
+        responses: {
+          '200': {
+            description: 'Lista de grupos',
+            content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/GrupoOutput' } } } },
+          },
+        },
+      },
+      post: {
+        tags: ['Recepção - Grupos & Reservas Web'],
+        summary: 'Criar grupo com link de pagamento e divisão de vagas',
+        security: [{ BearerAuth: [] }],
+        responses: { '201': { description: 'Grupo criado com sucesso' } },
+      },
+    },
+    '/api/office/grupos/pendencias': {
+      get: {
+        tags: ['Recepção - Grupos & Reservas Web'],
+        summary: 'Listar pilotos isolados e vagas pendentes de vinculação em grupos',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'bateriaId', in: 'query', required: true, schema: { type: 'integer' } }],
+        responses: { '200': { description: 'Pendências do grupo' } },
+      },
+    },
+    '/api/office/grupos/{id}/vincular': {
+      post: {
+        tags: ['Recepção - Grupos & Reservas Web'],
+        summary: 'Vincular piloto a uma vaga vaga paga do grupo',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        responses: { '200': { description: 'Piloto vinculado' } },
+      },
+    },
+    '/api/office/endurance/eventos': {
+      get: {
+        tags: ['Recepção - Endurance'],
+        summary: 'Listar campeonatos de Endurance configurados',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          '200': {
+            description: 'Eventos de Endurance',
+            content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/EnduranceEventoOutput' } } } },
+          },
+        },
+      },
+      post: {
+        tags: ['Recepção - Endurance'],
+        summary: 'Criar novo evento de Endurance',
+        security: [{ BearerAuth: [] }],
+        responses: { '201': { description: 'Evento criado' } },
+      },
+    },
+    '/api/office/endurance/eventos/{id}': {
+      get: {
+        tags: ['Recepção - Endurance'],
+        summary: 'Obter regras, equipes, pilotos e status de paradas do Endurance',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        responses: { '200': { description: 'Dados do endurance' } },
+      },
+    },
+    '/api/office/endurance/eventos/{id}/analise': {
+      get: {
+        tags: ['Recepção - Endurance'],
+        summary: 'Telemetria ao vivo, estatísticas de pit-stops e projeção de corrida',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        responses: { '200': { description: 'Telemetria de endurance' } },
+      },
+    },
+    '/api/office/pilotos': {
+      get: {
+        tags: ['Recepção - Pilotos & Ranking'],
+        summary: 'Listar pilotos com paginação, histórico e melhores voltas',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: 'pagina', in: 'query', schema: { type: 'integer', default: 1 } },
+          { name: 'porPagina', in: 'query', schema: { type: 'integer', default: 30 } },
+          { name: 'filtro', in: 'query', schema: { type: 'string', enum: ['todos', 'incompletos', 'aniversariantes'] } },
+        ],
+        responses: { '200': { description: 'Lista de pilotos e estatísticas' } },
+      },
+    },
+    '/api/office/pilotos/{id}': {
+      get: {
+        tags: ['Recepção - Pilotos & Ranking'],
+        summary: 'Consultar histórico de corridas, tempos por traçado e evolução do piloto',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        responses: { '200': { description: 'Carreira do piloto' }, '404': { description: 'Piloto não encontrado' } },
+      },
+    },
+    '/api/office/pilotos/{id}/foto': {
+      get: {
+        tags: ['Recepção - Pilotos & Ranking'],
+        summary: 'Obter foto do piloto em Base64',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        responses: { '200': { description: 'Foto do piloto' }, '404': { description: 'Sem foto cadastrada' } },
+      },
+      put: {
+        tags: ['Recepção - Pilotos & Ranking'],
+        summary: 'Salvar/atualizar foto de perfil do piloto',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        responses: { '200': { description: 'Foto gravada com sucesso' } },
+      },
+    },
+    '/api/office/crono/sessoes': {
+      get: {
+        tags: ['Recepção - Cronometragem & Resultados'],
+        summary: 'Listar sessões registradas no servidor ORBITS :4050',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: 'de', in: 'query', schema: { type: 'string', format: 'date' } },
+          { name: 'ate', in: 'query', schema: { type: 'string', format: 'date' } },
+        ],
+        responses: { '200': { description: 'Lista de sessões' } },
+      },
+    },
+    '/api/office/crono/dados/{sessionId}': {
+      get: {
+        tags: ['Recepção - Cronometragem & Resultados'],
+        summary: 'Obter dados de volta rápida, classificação e Instagram dos competidores',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'sessionId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Resultado da bateria' } },
+      },
+    },
+    '/api/office/impressao/proxima': {
+      get: {
+        tags: ['Recepção - Impressão Térmica'],
+        summary: 'Obter próximo trabalho de impressão da fila (polling do app WinForms Recepção)',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          '200': {
+            description: 'Próximo trabalho a ser impresso na impressora TM-T20 ou objeto vazio caso fila vazia',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ImpressaoJobOutput' } } },
+          },
+        },
+      },
+    },
+    '/api/office/impressao/{id}/feita': {
+      post: {
+        tags: ['Recepção - Impressão Térmica'],
+        summary: 'Confirmar que trabalho de impressão foi concluído com sucesso',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        responses: { '200': { description: 'Trabalho marcado como impresso' } },
+      },
+    },
+    '/api/office/impressao/{id}/falhou': {
+      post: {
+        tags: ['Recepção - Impressão Térmica'],
+        summary: 'Notificar que impressão falhou (retorna para fila)',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        responses: { '200': { description: 'Trabalho reinserido na fila' } },
+      },
+    },
+    '/api/crono/baterias': {
+      get: {
+        tags: ['Cronometragem (Integrado)'],
+        summary: 'Listar baterias da data para a Cronometragem',
+        security: [{ OpsKeyAuth: [] }],
+        parameters: [{ name: 'data', in: 'query', schema: { type: 'string', format: 'date' } }],
+        responses: { '200': { description: 'Lista de baterias' } },
+      },
+    },
+    '/api/crono/baterias/{id}/grid': {
+      get: {
+        tags: ['Cronometragem (Integrado)'],
+        summary: 'Obter grid e alocação de karts da bateria para o software MYLAPS/ORBITS',
+        security: [{ OpsKeyAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        responses: {
+          '200': {
+            description: 'Grid de largada da bateria',
+            content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/CronoGridItem' } } } },
+          },
+        },
+      },
+    },
+    '/api/crono/uso-karts': {
+      post: {
+        tags: ['Cronometragem (Integrado)'],
+        summary: 'Receber minutos de pista de cada kart ao término da bateria',
+        security: [{ OpsKeyAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/CronoUsoKartsInput' } } },
+        },
+        responses: {
+          '200': { description: 'Horas de uso contabilizadas na manutenção' },
+        },
+      },
+    },
+    '/api/crono/empresa': {
+      get: {
+        tags: ['Cronometragem (Integrado)'],
+        summary: 'Obter dados cadastrais da empresa para cabeçalhos de resultados',
+        security: [{ OpsKeyAuth: [] }],
+        responses: { '200': { description: 'Dados cadastrais da empresa' } },
+      },
+    },
+    '/api/crono/clientes': {
+      get: {
+        tags: ['Cronometragem (Integrado)'],
+        summary: 'Obter dados de pilotos para exportação de corrida',
+        security: [{ OpsKeyAuth: [] }],
+        parameters: [{ name: 'ids', in: 'query', required: true, schema: { type: 'string' }, description: 'IDs separados por vírgula' }],
+        responses: { '200': { description: 'Dados dos pilotos' } },
+      },
+    },
+    '/api/campeonato-site/{evento}': {
+      get: {
+        tags: ['Campeonato Site (Integração)'],
+        summary: 'Obter detalhes e status de inscrições abertas para o site institucional',
+        security: [{ OpsKeyAuth: [] }],
+        parameters: [{ name: 'evento', in: 'path', required: true, schema: { type: 'string' }, example: '200-milhas' }],
+        responses: { '200': { description: 'Regras e valores do evento' } },
+      },
+    },
+    '/api/campeonato-site/{evento}/piloto': {
+      post: {
+        tags: ['Campeonato Site (Integração)'],
+        summary: 'Buscar cadastro existente por documento e nascimento para autocompletar no site',
+        security: [{ OpsKeyAuth: [] }],
+        parameters: [{ name: 'evento', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Dados do piloto se encontrado' } },
+      },
+    },
+    '/api/campeonato-site/{evento}/inscricoes': {
+      post: {
+        tags: ['Campeonato Site (Integração)'],
+        summary: 'Criar pré-inscrição de equipe e gerar fatura no Asaas',
+        security: [{ OpsKeyAuth: [] }],
+        parameters: [{ name: 'evento', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '201': { description: 'Inscrição criada com link de pagamento' } },
+      },
+    },
+    '/api/publico/endurance/{token}': {
+      get: {
+        tags: ['Público - Endurance'],
+        summary: 'Página web pública do chefe de equipe do Endurance (só leitura)',
+        parameters: [{ name: 'token', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Dashboard da equipe no endurance', content: { 'text/html': {} } } },
+      },
+    },
+    '/termo': {
+      get: {
+        tags: ['Termos & Relatórios'],
+        summary: 'Visualizar e imprimir Termo de Responsabilidade (80mm)',
+        security: [{ TermoSignature: [] }, { BearerAuth: [] }],
+        parameters: [
+          { name: 'ids', in: 'query', schema: { type: 'string' }, description: 'IDs das inscrições separados por vírgula' },
+          { name: 's', in: 'query', schema: { type: 'string' }, description: 'Assinatura HMAC sha256 do termo' },
+          { name: 'branco', in: 'query', schema: { type: 'string', enum: ['1'] }, description: 'Termo em branco' },
+          { name: 't', in: 'query', schema: { type: 'string' }, description: 'Token de sessão caso termo em branco' },
+        ],
+        responses: {
+          '200': { description: 'Página HTML formatada para bobina térmica de 80mm', content: { 'text/html': {} } },
+          '403': { description: 'Assinatura do termo inválida', content: { 'text/html': {} } },
+        },
+      },
+    },
+    '/relatorio/{tipo}': {
+      get: {
+        tags: ['Termos & Relatórios'],
+        summary: 'Gerar relatório operacional imprimível da Recepção',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: 'tipo', in: 'path', required: true, schema: { type: 'string' }, example: 'fechamento-caixa' },
+          { name: 't', in: 'query', schema: { type: 'string' }, description: 'Token de sessão via query parameter' },
+        ],
+        responses: {
+          '200': { description: 'Relatório renderizado em HTML', content: { 'text/html': {} } },
+        },
+      },
+    },
+  },
+};
+
+
+// Post-processing to satisfy OpenAPI 3.1 & Redocly linter standards
+for (const [p, methods] of Object.entries(spec.paths)) {
+  for (const [m, op] of Object.entries(methods)) {
+    if (typeof op !== 'object' || !op) continue;
+    
+    // 1. Generate clean operationId if missing
+    if (!op.operationId) {
+      const cleanPath = p.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+      op.operationId = m + '_' + cleanPath;
+    }
+
+    // 2. Explicit security: [] if none specified
+    if (!op.security) {
+      op.security = [];
+    }
+
+    // 3. Ensure at least one 4XX response exists
+    const has4xx = Object.keys(op.responses).some(code => code.startsWith('4'));
+    if (!has4xx) {
+      op.responses['400'] = {
+        description: 'Requisição inválida ou parâmetros incorretos',
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/ErrorResponse' }
+          }
+        }
+      };
+    }
+
+    // 4. Ensure 500 response exists
+    if (!op.responses['500']) {
+      op.responses['500'] = {
+        description: 'Erro interno no servidor de operação',
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/ErrorResponse' }
+          }
+        }
+      };
+    }
+  }
+}
+
+const outputYaml = path.resolve(__dirname, '..', 'docs', 'api', 'openapi.yaml');
+const outputJson = path.resolve(__dirname, '..', 'docs', 'api', 'openapi.json');
+
+fs.writeFileSync(outputYaml, YAML.stringify(spec), 'utf8');
+fs.writeFileSync(outputJson, JSON.stringify(spec, null, 2), 'utf8');
+
+console.log(`OpenAPI gerado com sucesso em:\n  - ${outputYaml}\n  - ${outputJson}`);

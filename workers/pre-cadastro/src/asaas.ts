@@ -66,7 +66,18 @@ export const qrPix = (env: AsaasEnv, id: string) => chamar<{ encodedImage: strin
 export const consultar = (env: AsaasEnv, id: string) => chamar<Cobranca>(env, `/payments/${encodeURIComponent(id)}`);
 export const cancelar = (env: AsaasEnv, id: string) => chamar<{ deleted: boolean }>(env, `/payments/${encodeURIComponent(id)}`, { method: 'DELETE' });
 
-export type CobrancaPaga = { id: string; status: string; billingType: string; externalReference?: string | null };
+export type CobrancaPaga = {
+  id: string;
+  status: string;
+  value?: number;
+  netValue?: number;
+  billingType: string;
+  externalReference?: string | null;
+  description?: string;
+  customer?: string;
+  paymentDate?: string;
+  clientPaymentDate?: string;
+};
 
 /** Cobranças pagas desde a data (AAAA-MM-DD): Pix recebido e cartão confirmado/recebido. */
 export async function pagasDesde(env: AsaasEnv, data: string) {

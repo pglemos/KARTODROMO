@@ -261,35 +261,13 @@ public partial class FormCrono
         if (DateTime.Now - _transpLidoEm > TimeSpan.FromSeconds(30))
         {
             _transpLidoEm = DateTime.Now;
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    var mapa = (await Crono.Api.Get("/api/transponders"))?.AsObject();
-                    var inv = new Dictionary<string, string>();
-                    if (mapa != null) foreach (var (raw, kart) in mapa) if (kart != null) inv[kart.ToString()] = raw;
-                    BeginInvoke(() => { _transpPorKart = inv; AtualizarExtrasPilotos(); });
-                }
-                catch (Exception ex) { Diagnostico.Registrar("Competidores.Transponders", ex); }
-            });
+            _ = Task.Run(() => CarregarTranspondersPilotosAsync());
         }
         var faltam = _gPilotos.Rows.Cast<DataGridViewRow>().Where(r => !r.IsNewRow).Select(r => r.Cells["customerId"].Value?.ToString()).Where(id => !string.IsNullOrEmpty(id) && !_clientesInfo.ContainsKey(id)).Distinct().ToList();
         if (faltam.Count > 0 && !_buscandoClientes)
         {
             _buscandoClientes = true;
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    var lista = await Crono.Api.Lista("/api/clientes?ids=" + string.Join(",", faltam));
-                    BeginInvoke(() =>
-                    {
-                        foreach (var id in faltam) _clientesInfo[id] = lista.FirstOrDefault(c => c.S("id") == id) ?? new JsonObject();
-                        _buscandoClientes = false; AtualizarExtrasPilotos();
-                    });
-                }
-                catch { BeginInvoke(() => { foreach (var id in faltam) _clientesInfo[id] = new JsonObject(); _buscandoClientes = false; }); }
-            });
+            _ = Task.Run(() => CarregarClientesPilotosAsync(faltam));
         }
         _preenchendoExtras = true;
         try
@@ -320,6 +298,35 @@ public partial class FormCrono
                 $"Os {total} pilotos desta bateria {(Crono.Arr(_sess, "competitors").Any(c => c.S("customerId").Length > 0) ? "vieram da recepção" : "estão na cronometragem")}. " +
                 (_sess.S("state") == "preparando" ? "Novos pagamentos entram sozinhos até a largada. " : "") +
                 $"Em amarelo: ainda não passou na linha ({Crono.Arr(_sess, "competitors").Count(c => !c.B("passou"))}).";
+    }
+
+    async Task CarregarTranspondersPilotosAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var mapa = (await Crono.Api.GetAsync("/api/transponders", ct))?.AsObject();
+            Dictionary<string, string> inv = [];
+            if (mapa != null) foreach (var (raw, kart) in mapa) if (kart != null) inv[kart.ToString()] = raw;
+            BeginInvoke(() => { _transpPorKart = inv; AtualizarExtrasPilotos(); });
+        }
+        catch (Exception ex) { Diagnostico.Registrar("Competidores.Transponders", ex); }
+    }
+
+    async Task CarregarClientesPilotosAsync(List<string> faltam, CancellationToken ct = default)
+    {
+        try
+        {
+            var lista = await Crono.Api.ListaAsync("/api/clientes?ids=" + string.Join(",", faltam), ct);
+            BeginInvoke(() =>
+            {
+                foreach (var id in faltam) _clientesInfo[id] = lista.FirstOrDefault(c => c.S("id") == id) ?? new JsonObject();
+                _buscandoClientes = false; AtualizarExtrasPilotos();
+            });
+        }
+        catch
+        {
+            BeginInvoke(() => { foreach (var id in faltam) _clientesInfo[id] = new JsonObject(); _buscandoClientes = false; });
+        }
     }
 
     void ExportarPilotos()

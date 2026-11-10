@@ -1,3 +1,4 @@
+import { after } from 'next/server';
 import {
   generateRegistrationProtocol,
   normalizeChampionshipRegistration,
@@ -83,7 +84,9 @@ export async function POST(request: Request) {
     const protocol = generateRegistrationProtocol();
     const row = await createChampionshipRegistration(db, payload, protocol);
 
-    await forwardToWebhook({ ...rawBody, protocol });
+    after(async () => {
+      await forwardToWebhook({ ...rawBody, protocol });
+    });
 
     return jsonResponse({
       ok: true,

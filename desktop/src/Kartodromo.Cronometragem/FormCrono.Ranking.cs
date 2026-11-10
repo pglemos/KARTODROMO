@@ -173,7 +173,9 @@ public partial class FormCrono
 
     static string DiaBr(string iso) => DateTime.TryParse(iso, out var d) ? d.ToString("dd/MM/yyyy") : iso;
 
-    async Task CarregarRankingKarts()
+    Task CarregarRankingKarts() => CarregarRankingKartsAsync();
+
+    async Task CarregarRankingKartsAsync(CancellationToken ct = default)
     {
         if (_rankDe == null) return;
         if (_rankDe.Valida && _rankAte.Valida && _rankDe.Value > _rankAte.Value) { Msg.Aviso(this, "A data inicial é depois da final."); return; }
@@ -190,7 +192,7 @@ public partial class FormCrono
                 _rankTracado.SelectedIndex = Math.Max(0, trilhas.FindIndex(t => t.S("id") == antes) + 1);
             }
             _rankCarregando = false;
-            var lista = await Crono.Api.Lista("/api/ranking-karts?" + FiltroRanking());
+            var lista = await Crono.Api.ListaAsync("/api/ranking-karts?" + FiltroRanking(), ct);
             var kartAntes = (_gRankKarts.ChaveAtual as JsonObject)?.S("kart");
             _gRankKarts.Preencher(lista.Select(r => new object[] {
                 r.I("posicao"), r.S("kart").PadLeft(2, '0'), r.S("melhorPiloto"), DiaBr(r.S("melhorData")), r.S("melhorTracado"), r.B("chuva") ? "Chuva" : "Seca", Crono.Volta(r.L("melhorMs")),
@@ -207,17 +209,19 @@ public partial class FormCrono
                 _gRankKarts.Rows[linha].Selected = true;
             }
             if (lista.Count == 0) { _gHistKart.Preencher([]); _tituloHistorico.Text = "Histórico do kart"; _subHistorico.Text = "Escolha um kart no ranking"; }
-            else if (_gRankKarts.ChaveAtual is JsonObject k) await CarregarHistoricoKart(k.S("kart"));
+            else if (_gRankKarts.ChaveAtual is JsonObject k) await CarregarHistoricoKartAsync(k.S("kart"), ct);
         }
         catch (Exception e) { _subRanking.Text = "Não foi possível carregar o ranking: " + e.Message; }
         finally { _rankCarregando = false; }
     }
 
-    async Task CarregarHistoricoKart(string kart)
+    Task CarregarHistoricoKart(string kart) => CarregarHistoricoKartAsync(kart);
+
+    async Task CarregarHistoricoKartAsync(string kart, CancellationToken ct = default)
     {
         try
         {
-            var lista = await Crono.Api.Lista($"/api/ranking-karts?kart={Uri.EscapeDataString(kart)}&{FiltroRanking()}");
+            var lista = await Crono.Api.ListaAsync($"/api/ranking-karts?kart={Uri.EscapeDataString(kart)}&{FiltroRanking()}", ct);
             _tituloHistorico.Text = $"Histórico do kart {kart.PadLeft(2, '0')}";
             _subHistorico.Text = $"{lista.Count} bateria(s) em {DescricaoPeriodo()} · {CategoriaRanking()} · da mais recente para a mais antiga";
             _gHistKart.Preencher(lista.Select(h => new object[] { DiaBr(h.S("data")), h.S("hora"), h.S("bateria"), Crono.Tipo(h.S("tipo")), h.S("tracado"), h.B("chuva") ? "Chuva" : "Seca", h.S("piloto"), h.I("voltas"), Crono.Volta(h.L("melhorMs")), Crono.Volta(h.L("medianaMs")) }).ToList(), lista.Cast<object>().ToList());

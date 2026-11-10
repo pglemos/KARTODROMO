@@ -33,11 +33,11 @@
 </head>
 <body>
 <div class="bar">
-  <img src="/kib-logo.png" alt="" onerror="this.remove()">
+  <img src="/kib-logo.png" alt="" width="230" height="64" onerror="this.remove()">
   <div class="titulo"><span id="bateria" class="bateria">Sorteio dos karts</span><span id="dica" class="dica">Procure o seu nome e vá direto para o seu kart</span></div>
   <span id="hora" class="hora"></span>
 </div>
-<div id="lista"></div>
+<main id="lista"></main>
 <script>
 // ES5 de propósito (13/10): a TV do sorteio é uma LG de 2018 (navegador Chromium antigo) — nada de const/let, =>, ??,
 // 60_000, async/await, fetch, template literal nem "catch {". Teste: tests/timing-ui-tv-antiga.test.ts.

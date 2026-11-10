@@ -135,10 +135,12 @@ export async function listChampionshipRegistrations(db: AdminD1Database, options
   }
 
   const where = clauses.length ? ` WHERE ${clauses.join(' AND ')}` : '';
-  const count = await db.prepare(`SELECT COUNT(*) AS total FROM ${championshipRegistrationsTable}${where}`).bind(...bindings).first<{ total: number }>();
-  const result = await db.prepare(`SELECT * FROM ${championshipRegistrationsTable}${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`)
-    .bind(...bindings, options.limit, options.offset)
-    .all<RegistrationRow>();
+  const [count, result] = await Promise.all([
+    db.prepare(`SELECT COUNT(*) AS total FROM ${championshipRegistrationsTable}${where}`).bind(...bindings).first<{ total: number }>(),
+    db.prepare(`SELECT * FROM ${championshipRegistrationsTable}${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`)
+      .bind(...bindings, options.limit, options.offset)
+      .all<RegistrationRow>(),
+  ]);
 
   return {
     rows: result.results.map(normalizeStoredRow),

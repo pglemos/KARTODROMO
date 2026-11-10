@@ -4,7 +4,7 @@
  * troca de traçado e toque no piloto abre a carreira dele.
  */
 import { router, type Href } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, FlatList, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -75,7 +75,7 @@ function Podio({ linhas }: { linhas: LinhaRanking[] }) {
   );
 }
 
-function Linha({ l, index }: { l: LinhaRanking; index: number }) {
+const Linha = memo(function Linha({ l, index }: { l: LinhaRanking; index: number }) {
   const { palette } = useUi();
   return (
     <Entrada index={index}>
@@ -92,7 +92,7 @@ function Linha({ l, index }: { l: LinhaRanking; index: number }) {
       </Pressable>
     </Entrada>
   );
-}
+});
 
 export default function RankingReal() {
   const { palette, styles } = useUi();
@@ -127,12 +127,14 @@ export default function RankingReal() {
   const linhas = useMemo(() => (dados?.linhas ?? []).filter((l) => !filtro || l.nome.toLowerCase().includes(filtro)), [dados, filtro]);
   const mostrarPodio = !filtro && linhas.length >= 3;
 
+  const renderLinha = useCallback(({ item, index }: { item: LinhaRanking; index: number }) => <Linha l={item} index={index} />, []);
+
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <FlatList
         data={mostrarPodio ? linhas.slice(3) : linhas}
         keyExtractor={(l) => `${l.pos}-${l.id ?? l.nome}`}
-        renderItem={({ item, index }) => <Linha l={item} index={index} />}
+        renderItem={renderLinha}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24, width: '100%', maxWidth: 640, alignSelf: 'center' }}
         refreshControl={<RefreshControl refreshing={carregando && !!dados} onRefresh={() => void carregar()} tintColor={palette.accent} />}
         keyboardShouldPersistTaps="handled"

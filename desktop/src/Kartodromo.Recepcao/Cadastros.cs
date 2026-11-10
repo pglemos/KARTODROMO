@@ -93,13 +93,13 @@ public class FormParametros : DialogoDesign
         {
             if (_alterados.Count == 0) { Close(); return; }
             var body = new JsonObject(); foreach (var (k, v) in _alterados) body[k] = v;
-            await Sessao.Api.Put("/api/office/parametros", body);
-            await Sessao.CarregarApoio();
+            await Sessao.Api.PutAsync("/api/office/parametros", body);
+            await Sessao.CarregarApoioAsync();
             Msg.Info(this, _alterados.Count == 1 ? "Parâmetro salvo." : $"{_alterados.Count} parâmetros salvos.");
             DialogResult = DialogResult.OK; Close();
         }));
         BotaoRodape("Cancelar", false, Close);
-        Load += (_, _) => Seguro.Rodar(this, async () => { _todos = await Sessao.Api.Lista("/api/office/parametros"); Mostrar(); });
+        Load += (_, _) => Seguro.Rodar(this, async () => { _todos = await Sessao.Api.ListaAsync("/api/office/parametros"); Mostrar(); });
     }
 
     void MontarConfiguracoesExternas()
@@ -188,7 +188,7 @@ public class FormEmpresa : DialogoDesign
         Campo(e1, "Nome", T("nome"), 3); Campo(e1, "CNPJ", T("cnpj", 20), 2); Campo(e1, "Telefone", T("telefone", 40), 1); Campo(e1, "Logomarca", logo, 3, trocar);
         var cep = T("cep", 12);
         var buscar = AcaoCampo("Buscar");
-        buscar.Click += (_, _) => Seguro.Rodar(this, BuscarCep);
+        buscar.Click += (_, _) => Seguro.Rodar(this, BuscarCepAsync);
         var e2 = Secao("Endereço");
         Campo(e2, "CEP", cep, 2, buscar); Campo(e2, "Endereço", T("endereco"), 4); Campo(e2, "Nº", T("numero", 20), 1); Campo(e2, "Bairro", T("bairro", 100), 2);
         Campo(e2, "Cidade", T("cidade", 100), 2); Campo(e2, "Estado", _uf, 1); Campo(e2, "IBGE", T("ibge", 10), 1); Campo(e2, "País", _pais, 2);
@@ -220,11 +220,11 @@ public class FormEmpresa : DialogoDesign
             foreach (var c in aba2) c.Visible = i == 1;
             foreach (var c in aba3) c.Visible = i == 2;
         });
-        BotaoRodape("Salvar e fechar", true, () => Seguro.Rodar(this, Salvar));
+        BotaoRodape("Salvar e fechar", true, () => Seguro.Rodar(this, SalvarAsync));
         BotaoRodape("Cancelar", false, Close);
         Load += (_, _) => Seguro.Rodar(this, async () =>
         {
-            var e = await Sessao.Api.Get("/api/office/empresa");
+            var e = await Sessao.Api.GetAsync("/api/office/empresa");
             foreach (var (k, t) in _t) t.Text = e.S(k);
             _uf.SelectedItem = _uf.Items.Contains(e.S("estado")) ? e.S("estado") : "MG";
             _pais.SelectedItem = _pais.Items.Contains(e.S("pais")) ? e.S("pais") : "Brasil";
@@ -235,9 +235,11 @@ public class FormEmpresa : DialogoDesign
         });
     }
 
-    async Task BuscarCep()
+    Task BuscarCep() => BuscarCepAsync();
+
+    async Task BuscarCepAsync()
     {
-        var cep = new string(_t["cep"].Text.Where(char.IsDigit).ToArray());
+        var cep = new string([.. _t["cep"].Text.Where(char.IsDigit)]);
         if (cep.Length != 8) { Msg.Aviso(this, "Informe o CEP com 8 números."); return; }
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(6) };
         var r = System.Text.Json.Nodes.JsonNode.Parse(await http.GetStringAsync($"https://viacep.com.br/ws/{cep}/json/")) as JsonObject;
@@ -248,7 +250,9 @@ public class FormEmpresa : DialogoDesign
         _t["numero"].Focus();
     }
 
-    async Task Salvar()
+    Task Salvar() => SalvarAsync();
+
+    async Task SalvarAsync()
     {
         if (string.IsNullOrWhiteSpace(_t["nome"].Text)) { Msg.Aviso(this, "Informe o nome da empresa."); return; }
         var body = new JsonObject();
@@ -256,8 +260,8 @@ public class FormEmpresa : DialogoDesign
         body["estado"] = _uf.SelectedItem?.ToString(); body["pais"] = _pais.SelectedItem?.ToString();
         body["politicaReembolso"] = _politica.Text;
         body["horarios"] = string.Join("|", _horas.Select(h => h.Text.Trim()));
-        await Sessao.Api.Put("/api/office/empresa", body);
-        if (_logoBase64 != null) await Sessao.Api.Post("/api/office/empresa/logo", new { nome = _logoNome, base64 = _logoBase64 });
+        await Sessao.Api.PutAsync("/api/office/empresa", body);
+        if (_logoBase64 != null) await Sessao.Api.PostAsync("/api/office/empresa/logo", new { nome = _logoNome, base64 = _logoBase64 });
         Msg.Info(this, "Dados da empresa salvos.");
         DialogResult = DialogResult.OK; Close();
     }
@@ -515,9 +519,11 @@ public class FormCadastro : CartaoModal
         else { _g.Selecionar(x => x.S("id") == _lista[i].S("id")); Mostrar(_lista[i]); }
     }
 
-    void Carregar(string idSel) => Seguro.Rodar(this, async () =>
+    void Carregar(string idSel) => Seguro.Rodar(this, () => CarregarAsync(idSel));
+
+    async Task CarregarAsync(string idSel)
     {
-        _lista = await Sessao.Api.Lista(Base);
+        _lista = await Sessao.Api.ListaAsync(Base);
         if (IsDisposed) return; // janela fechada antes da resposta
         if (Produto) FiltrarProdutos(); else _g.Carregar(_lista);
         var r = _lista.FirstOrDefault(x => x.S("id") == idSel) ?? _lista.FirstOrDefault();
@@ -528,7 +534,7 @@ public class FormCadastro : CartaoModal
             Mostrar(r);
         }
         else { if (Produto) AtualizarCabecalhoProduto(null); SetModo("ver"); }
-    });
+    }
 
     void Mostrar(JsonObject r)
     {
@@ -670,15 +676,19 @@ public class FormCadastro : CartaoModal
         else { _g.Selecionar(x => x.S("id") == r.S("id")); Mostrar(r); }
     }
 
-    void Excluir() => Seguro.Rodar(this, async () =>
+    void Excluir() => Seguro.Rodar(this, ExcluirAsync);
+
+    async Task ExcluirAsync()
     {
         if (_atual == null || !Msg.Pergunta(this, "Deseja excluir definitivamente o registro atual?")) return;
-        var r = await Sessao.Api.Delete($"{Base}/{_atual.S("id")}");
+        var r = await Sessao.Api.DeleteAsync($"{Base}/{_atual.S("id")}");
         if (r?.B("desativado") == true) Msg.Info(this, "Registro em uso: foi desativado em vez de excluído.");
         Carregar(null);
-    });
+    }
 
-    void Gravar() => Seguro.Rodar(this, async () =>
+    void Gravar() => Seguro.Rodar(this, GravarAsync);
+
+    async Task GravarAsync()
     {
         var body = new JsonObject();
         foreach (var c in _def.Campos)
@@ -697,15 +707,17 @@ public class FormCadastro : CartaoModal
                 default: body[c.Chave] = ctl.Text.Trim(); break;
             }
         }
-        var r = _modo == "novo" ? await Sessao.Api.Post(Base, body) : await Sessao.Api.Put($"{Base}/{_atual.S("id")}", body);
+        var r = _modo == "novo" ? await Sessao.Api.PostAsync(Base, body) : await Sessao.Api.PutAsync($"{Base}/{_atual.S("id")}", body);
         Msg.Info(this, "Operação concluída com sucesso.");
         Carregar(r.S("id"));
-    });
+    }
 
     /// <summary>Secao "Item" do Registro de Produto: provas da bateria (Tomada de Tempo 5 min + Corrida 20 min...).</summary>
-    void Provas(JsonObject produto) => Seguro.Rodar(this, async () =>
+    void Provas(JsonObject produto) => Seguro.Rodar(this, () => ProvasAsync(produto));
+
+    async Task ProvasAsync(JsonObject produto)
     {
-        var lista = await Sessao.Api.Lista($"/api/office/cad/provas?produtoId={produto.S("id")}");
+        var lista = await Sessao.Api.ListaAsync($"/api/office/cad/provas?produtoId={produto.S("id")}");
         _extra.Controls.Clear();
         var ordem = Campos.Num(lista.Count + 1, 1, 20); var nome = new TextBox(); var tipo = Campos.Combo(); tipo.Items.AddRange([new Campos.Item(0, "Classificatório", new JsonObject { ["v"] = "classificacao" }), new Campos.Item(1, "Corrida", new JsonObject { ["v"] = "corrida" }), new Campos.Item(2, "Treino", new JsonObject { ["v"] = "treino" })]); tipo.SelectedIndex = 0;
         var fin = Campos.Combo(); fin.Items.AddRange([new Campos.Item(0, "Por tempo", new JsonObject { ["v"] = "tempo" }), new Campos.Item(1, "Por voltas", new JsonObject { ["v"] = "voltas" })]); fin.SelectedIndex = 0;
@@ -747,16 +759,16 @@ public class FormCadastro : CartaoModal
         bIns.Click += (_, _) => Seguro.Rodar(this, async () =>
         {
             if (string.IsNullOrWhiteSpace(nome.Text)) { Msg.Aviso(this, "Informe o nome da prova."); return; }
-            await Sessao.Api.Post("/api/office/cad/provas", new { produtoId = produto.L("id"), ordem = (int)ordem.Value, nome = nome.Text.Trim(), tipo = Cod(tipo), finalizacao = Cod(fin), tempoMin = (int)tempo.Value, voltasMax = (int)voltas.Value });
+            await Sessao.Api.PostAsync("/api/office/cad/provas", new { produtoId = produto.L("id"), ordem = (int)ordem.Value, nome = nome.Text.Trim(), tipo = Cod(tipo), finalizacao = Cod(fin), tempoMin = (int)tempo.Value, voltasMax = (int)voltas.Value });
             Provas(produto);
         });
         bDel.Click += (_, _) => Seguro.Rodar(this, async () =>
         {
             if (gp.Atual == null) { Msg.Aviso(this, "Selecione a prova."); return; }
-            await Sessao.Api.Delete($"/api/office/cad/provas/{gp.Atual.S("id")}");
+            await Sessao.Api.DeleteAsync($"/api/office/cad/provas/{gp.Atual.S("id")}");
             Provas(produto);
         });
-    });
+    }
 
     static Panel CampoProva(string rotulo, Control campo)
     {
@@ -790,7 +802,11 @@ static class VoucherRegras
 {
     public static string NovoCodigo() => "KB" + Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
 
-    public static async Task<bool> Salvar(Form dono, string origem, long? vinculoId, string referencia, string codigo, bool percentual, string valor,
+    public static Task<bool> Salvar(Form dono, string origem, long? vinculoId, string referencia, string codigo, bool percentual, string valor,
+        DateTime ini, DateTime fim, long? produtoId, string usoMax, bool unico, string minimo, string maximo, long? editarId = null, bool? ativo = null) =>
+        SalvarAsync(dono, origem, vinculoId, referencia, codigo, percentual, valor, ini, fim, produtoId, usoMax, unico, minimo, maximo, editarId, ativo);
+
+    public static async Task<bool> SalvarAsync(Form dono, string origem, long? vinculoId, string referencia, string codigo, bool percentual, string valor,
         DateTime ini, DateTime fim, long? produtoId, string usoMax, bool unico, string minimo, string maximo, long? editarId = null, bool? ativo = null)
     {
         if (editarId == null && origem is "fidelidade" or "parceiro" && (vinculoId is not long vid || vid <= 0)) { Msg.Aviso(dono, origem == "fidelidade" ? "Escolha a conta de fidelidade." : "Escolha o parceiro."); return false; }
@@ -811,11 +827,11 @@ static class VoucherRegras
             };
             if (origem is not ("fidelidade" or "parceiro")) corpo["referencia"] = string.IsNullOrWhiteSpace(referencia) ? null : referencia.Trim();
             if (ativo is bool at) corpo["ativo"] = at;
-            await Sessao.Api.Put("/api/office/vouchers/" + idEd, corpo);
+            await Sessao.Api.PutAsync("/api/office/vouchers/" + idEd, corpo);
             Msg.Info(dono, "Voucher alterado.");
             return true;
         }
-        await Sessao.Api.Post("/api/office/vouchers", new
+        await Sessao.Api.PostAsync("/api/office/vouchers", new
         {
             origem, referencia = origem is "fidelidade" or "parceiro" ? null : referencia?.Trim(),
             fidelidadeContaId = origem == "fidelidade" ? vinculoId : null, parceiroId = origem == "parceiro" ? vinculoId : null,
@@ -827,10 +843,12 @@ static class VoucherRegras
         return true;
     }
 
-    public static async Task CarregarVinculos(ListaDesign lista, string origem, JsonObject vinculo)
+    public static Task CarregarVinculos(ListaDesign lista, string origem, JsonObject vinculo) => CarregarVinculosAsync(lista, origem, vinculo);
+
+    public static async Task CarregarVinculosAsync(ListaDesign lista, string origem, JsonObject vinculo)
     {
-        var rows = await Sessao.Api.Lista(origem == "fidelidade" ? "/api/office/fidelidade/contas" : "/api/office/parceiros");
-        var itens = rows.Where(r => r.B("ativo")).Select(r => new Campos.Item(r.L("id") ?? 0, origem == "fidelidade" ? $"{r.S("nome")} · {r.I("saldo"):N0} pontos" : r.S("nome"), r)).ToArray();
+        var rows = await Sessao.Api.ListaAsync(origem == "fidelidade" ? "/api/office/fidelidade/contas" : "/api/office/parceiros");
+        Campos.Item[] itens = [.. rows.Where(r => r.B("ativo")).Select(r => new Campos.Item(r.L("id") ?? 0, origem == "fidelidade" ? $"{r.S("nome")} · {r.I("saldo"):N0} pontos" : r.S("nome"), r))];
         lista.Items.Clear();
         if (itens.Length == 0) { lista.Items.Add(new Campos.Item(0, origem == "fidelidade" ? "Nenhuma conta ativa — abra em Fidelidade › Contas" : "Nenhum parceiro ativo — cadastre em Parceiros")); lista.SelectedIndex = 0; return; }
         lista.Items.AddRange(itens);
@@ -842,7 +860,7 @@ static class VoucherRegras
     {
         var prod = new ListaDesign();
         prod.Items.Add(new Campos.Item(0, "Todos os produtos"));
-        prod.Items.AddRange(Sessao.Lista("produtos").Where(p => p.B("ativo")).Select(p => new Campos.Item(p.L("id") ?? 0, p.S("nome"), p)).ToArray());
+        prod.Items.AddRange([.. Sessao.Lista("produtos").Where(p => p.B("ativo")).Select(p => new Campos.Item(p.L("id") ?? 0, p.S("nome"), p))]);
         prod.SelectedIndex = 0;
         return prod;
     }
@@ -854,11 +872,13 @@ public class FormVoucher : CartaoModal
 {
     public static Form Criar(string origem, JsonObject vinculo = null) => origem == "parceiro" ? new FormVoucherParceiro(vinculo) : new FormVoucher(origem, vinculo);
 
+    public static Task<bool> Editar(Form dono, JsonObject linha) => EditarAsync(dono, linha);
+
     /// <summary>Editar um voucher da lista (qualquer origem): busca os dados completos e abre o mesmo cartão já preenchido.
     /// O vínculo (conta/parceiro) fica como está; o resto muda, inclusive ativar/desativar.</summary>
-    public static async Task<bool> Editar(Form dono, JsonObject linha)
+    public static async Task<bool> EditarAsync(Form dono, JsonObject linha)
     {
-        var v = (await Sessao.Api.Get("/api/office/vouchers/" + linha.S("id"))).AsObject();
+        var v = (await Sessao.Api.GetAsync("/api/office/vouchers/" + linha.S("id"))).AsObject();
         v["vinculoNome"] = linha.S("parceiro") is { Length: > 0 } p ? p : linha.S("conta") is { Length: > 0 } c ? c : linha.S("referencia");
         using var f = new FormVoucher(v.S("origem"), null, v);
         return f.ShowDialog(dono) == DialogResult.OK;

@@ -267,7 +267,7 @@ public partial class FormCrono
         if (string.IsNullOrEmpty(kart)) { Msg.Aviso(this, "Clique no piloto (no resultado ou nas passagens) e depois na bandeira."); return; }
         var atual = _bandeiraPiloto.GetValueOrDefault(kart, "none");
         var nova = atual == flag ? "none" : flag;
-        Seguro.Rodar(this, async () => { await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/flag/{Uri.EscapeDataString(kart)}", new JsonObject { ["flag"] = nova }); await Atualizar(); });
+        Seguro.Rodar(this, async () => { await Crono.Api.PostAsync($"/api/sessions/{_sess.S("id")}/flag/{Uri.EscapeDataString(kart)}", new JsonObject { ["flag"] = nova }); await AtualizarAsync(); });
     }
 
     void ExportarResultado()
@@ -481,7 +481,7 @@ public partial class FormCrono
         _subArvore.Text = _events.FirstOrDefault(e => e.S("id") == _eventoArvore)?.S("name") ?? evento?.S("name") ?? "Selecione uma prova";
         AtualizarExtrasPilotos();
         // aba Equalização aberta: acompanha as voltas ao vivo
-        if (_abas.SelectedIndex == 4) _ = CarregarEqualizacao();
+        if (_abas.SelectedIndex == 4) _ = CarregarEqualizacaoAsync();
     }
 }
 
@@ -729,8 +729,9 @@ public class FaixaPlacar : Control
         new ToolTip().SetToolTip(this, "TELÃO (TB50): 1–20, 21–40, 41–60 (Shift+F8/F9/F10), igual no ORBITS e no CRONO1; volta para 1–20 na bandeira verde.\nPAINEL (COM3): 1–10 (F8), 11–20 (F9), 21–30 (F10). Auto alterna a cada 5 s.");
     }
 
-    Rectangle Botao(int i) => new(6, Height - 34 - (3 - i) * 28, Width - 12, 24);
-    int TopoPainel => Height - 34 - 3 * 28 - 16;
+    int QtdBotoesPainel => Math.Max(3, Math.Min(4, Paginas));
+    Rectangle Botao(int i) => new(6, Height - 34 - (QtdBotoesPainel - i) * (QtdBotoesPainel > 3 ? 24 : 28), Width - 12, QtdBotoesPainel > 3 ? 22 : 24);
+    int TopoPainel => Height - 34 - QtdBotoesPainel * (QtdBotoesPainel > 3 ? 24 : 28) - 16;
     Rectangle BotaoTelao(int i) => new(6, TopoPainel - 4 - (3 - i) * 28, Width - 12, 24);
     int TopoTelao => BotaoTelao(0).Y - 16;
 
@@ -738,7 +739,7 @@ public class FaixaPlacar : Control
     {
         base.OnMouseClick(e);
         for (var i = 0; i < 3; i++) if (BotaoTelao(i).Contains(e.Location) && i < PaginasTelao) { EscolheuPaginaTelao?.Invoke(i); return; }
-        for (var i = 0; i < 3; i++) if (Botao(i).Contains(e.Location) && i < Paginas) { EscolheuPagina?.Invoke(i); return; }
+        for (var i = 0; i < QtdBotoesPainel; i++) if (Botao(i).Contains(e.Location) && i < Paginas) { EscolheuPagina?.Invoke(i); return; }
         if (new Rectangle(6, Height - 30, Width - 12, 24).Contains(e.Location) && Paginas > 1) AlternouAuto?.Invoke();
     }
 
@@ -784,8 +785,8 @@ public class FaixaPlacar : Control
             TextRenderer.DrawText(g, nomesTelao[i], Tokens.FonteSemibold(Tokens.Claro.FonteTamanhoLegenda), r, sel ? Tokens.Primitivo.Branco : Color.FromArgb(ok ? 230 : 90, 255, 255, 255), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
         }
         TextRenderer.DrawText(g, "PAINEL", fMini, new Rectangle(0, TopoPainel, Width, 14), cinza, TextFormatFlags.HorizontalCenter);
-        string[] nomes = ["1–10", "11–20", "21–30"];
-        for (var i = 0; i < 3; i++)
+        string[] nomes = ["1–10", "11–20", "21–30", "31–40"];
+        for (var i = 0; i < QtdBotoesPainel; i++)
         {
             var r = Botao(i); var ok = i < Paginas; var sel = i == Pagina;
             using var pb = Forma.Redondo(r, 7);

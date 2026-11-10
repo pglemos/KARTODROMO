@@ -100,6 +100,18 @@
   input::placeholder { color: var(--apagado); }
   input:focus { border-color: var(--verde); box-shadow: 0 0 0 3px rgba(0,230,118,.18); }
   input.invalido { border-color: var(--erro); box-shadow: 0 0 0 3px rgba(255,122,107,.16); }
+  .banner-busca { display: none; align-items: flex-start; gap: 12px; border-radius: 10px; padding: 12px 14px; margin-top: 10px; font-size: 15px; line-height: 1.4; animation: fadeIn .2s ease-out; }
+  .banner-busca.buscando { display: flex; background: rgba(0,0,0,.03); border: 1px solid var(--linha); color: var(--suave); }
+  .banner-busca.sucesso { display: flex; background: var(--verde-fundo); border: 1px solid var(--verde); color: var(--texto); }
+  .banner-busca.sucesso svg { stroke: var(--verde); flex: none; margin-top: 2px; }
+  .banner-busca.sucesso strong { display: block; font: 400 15px/1.2 var(--titulo); text-transform: uppercase; letter-spacing: .03em; color: var(--verde-escuro); margin-bottom: 2px; }
+  .banner-busca.sucesso span b { color: var(--texto); }
+  .banner-busca.novo { display: flex; background: rgba(0,0,0,.02); border: 1px dashed var(--linha); color: var(--suave); }
+  .spinner-busca { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(0,0,0,.15); border-top-color: var(--verde); border-radius: 50%; animation: girar .6s linear infinite; flex: none; margin-top: 3px; }
+  @keyframes girar { to { transform: rotate(360deg); } }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes glowGreenReserva { 0% { border-color: var(--verde); box-shadow: 0 0 0 4px rgba(0,230,118,.35); background: rgba(0,230,118,.08); } 100% { border-color: var(--linha-forte); box-shadow: none; background: #fff; } }
+  input.campo-animado { animation: glowGreenReserva 1.6s ease-out; }
   .pilotos { display: grid; gap: 10px; margin-top: 12px; }
   /* pagamento */
   .formas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -226,7 +238,11 @@
       <h2><span class="n">4</span>Seus dados</h2>
       <p class="sub">Preencha somente os dados do responsável pelo pagamento.</p>
       <div class="grade">
-        <div class="c6"><label for="documento">CPF</label><input id="documento" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00"></div>
+        <div class="c6">
+          <label for="documento">CPF</label>
+          <input id="documento" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00">
+          <div id="statusBuscaReserva" class="banner-busca" role="status" aria-live="polite"></div>
+        </div>
         <div class="c6"><label for="nome">Nome completo</label><input id="nome" autocomplete="name" autocapitalize="words" placeholder="Como no documento"></div>
         <div class="c3"><label for="telefone">Celular (WhatsApp)</label><input id="telefone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="(31) 90000-0000"></div>
         <div class="c3"><label for="email">E-mail <span class="op">(recibo e resultado)</span></label><input id="email" type="email" inputmode="email" autocomplete="email" placeholder="voce@email.com"></div>
@@ -310,6 +326,120 @@
   mascarar($('documento'), mascaras.CPF); mascarar($('telefone'), mascaras.fone); mascarar($('nascimento'), mascaras.data);
   $('peso').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/[^\d.,]/g, '').slice(0, 5); });
   for (const id of ['nome', 'email', 'instagram']) $(id).addEventListener('input', (e) => e.target.classList.remove('invalido'));
+
+  let ctrlBuscaReserva = null;
+  const cacheClientesReserva = new Map();
+  let cadastroReservaEncontrado = false;
+  let timerBuscaReserva = null;
+
+  async function buscarCadastroReserva(val) {
+    const raw = String(val || '').trim();
+    const d = dig(raw);
+    const isEmail = raw.includes('@');
+    if (isEmail ? raw.length < 5 : (d.length < 5 && raw.length < 5)) return;
+    const chaveCache = isEmail ? raw.toLowerCase() : (d || raw.toUpperCase());
+    if (cacheClientesReserva.has(chaveCache)) {
+      aplicarClienteReserva(cacheClientesReserva.get(chaveCache));
+      return;
+    }
+
+    if (ctrlBuscaReserva) ctrlBuscaReserva.abort();
+    ctrlBuscaReserva = new AbortController();
+
+    const banner = $('statusBuscaReserva');
+    if (banner) {
+      banner.style.display = 'flex';
+      banner.className = 'banner-busca buscando';
+      banner.innerHTML = '<span class="spinner-busca"></span><span>Buscando seu cadastro no kartódromo…</span>';
+    }
+
+    try {
+      const res = await fetch('/api/cliente/identificar', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ identificador: raw }),
+        signal: ctrlBuscaReserva.signal,
+      });
+      if (!res.ok) throw new Error('Falha');
+      const data = await res.json();
+      if (data && data.cliente) {
+        cacheClientesReserva.set(chaveCache, data);
+        aplicarClienteReserva(data);
+      } else if (banner) {
+        banner.className = 'banner-busca novo';
+        banner.innerHTML = '<span>Primeira vez aqui? Complete seus dados abaixo para continuar.</span>';
+        setTimeout(() => { if (banner && banner.classList.contains('novo')) banner.style.display = 'none'; }, 4500);
+      }
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      if (banner) banner.style.display = 'none';
+    }
+  }
+
+  function aplicarClienteReserva(data) {
+    const c = data?.cliente;
+    if (!c) return;
+    cadastroReservaEncontrado = true;
+    const banner = $('statusBuscaReserva');
+    if (banner) {
+      banner.style.display = 'flex';
+      banner.className = 'banner-busca sucesso';
+      banner.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        <div>
+          <strong>Cadastro localizado!</strong>
+          <span>Dados de <b>${c.nome || 'piloto'}</b> preenchidos automaticamente. Você pode atualizar qualquer informação.</span>
+        </div>`;
+    }
+
+    const preencher = (el, val, masc) => {
+      if (!el || val == null) return;
+      const v = String(val).trim();
+      if (!v) return;
+      el.value = masc ? masc(v) : v;
+      el.classList.remove('invalido');
+      el.classList.remove('campo-animado');
+      void el.offsetWidth;
+      el.classList.add('campo-animado');
+    };
+
+    preencher($('nome'), c.nome);
+    preencher($('telefone'), c.telefone, mascaras.fone);
+    preencher($('email'), c.email);
+    if (c.instagram) {
+      let ig = String(c.instagram).trim();
+      if (ig && !ig.startsWith('@')) ig = '@' + ig;
+      preencher($('instagram'), ig);
+    }
+    if (c.nascimento) {
+      let nascBr = String(c.nascimento).trim();
+      if (/^\d{4}-\d{2}-\d{2}/.test(nascBr)) {
+        const [yyyy, mm, dd] = nascBr.slice(0, 10).split('-');
+        nascBr = `${dd}/${mm}/${yyyy}`;
+      }
+      preencher($('nascimento'), nascBr, mascaras.data);
+    }
+    if (c.peso) preencher($('peso'), String(c.peso).replace('.', ','));
+  }
+
+  $('documento').addEventListener('input', (e) => {
+    const d = dig(e.target.value);
+    if (d.length === 11) {
+      clearTimeout(timerBuscaReserva);
+      buscarCadastroReserva(d);
+    }
+  });
+
+  $('documento').addEventListener('blur', (e) => {
+    const d = dig(e.target.value);
+    if (d.length === 11) buscarCadastroReserva(d);
+  });
+
+  $('email').addEventListener('blur', (e) => {
+    if (!cadastroReservaEncontrado && !$('nome').value.trim()) {
+      const em = e.target.value.trim();
+      if (em.includes('@') && em.length >= 6) buscarCadastroReserva(em);
+    }
+  });
 
   const hhmm = (iso) => iso.slice(11, 16);
   const chegada = (iso) => { const [h, m] = hhmm(iso).split(':').map(Number); const t = h * 60 + m - 60; return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };

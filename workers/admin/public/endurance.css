@@ -1,11 +1,11 @@
 /* Endurance (painel e página do chefe de equipe) */
 .ev-topo { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; padding: 14px; border-radius: 18px; color: #FFF;
-  background: radial-gradient(90% 140% at 100% 0%, rgba(255,107,0,.32) 0%, rgba(255,107,0,0) 55%), linear-gradient(135deg, #1C1C1E 0%, #0B0B0C 100%); }
-.ev-relogio { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border-radius: 12px; background: rgba(255,255,255,.06); }
-.ev-relogio span { font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: #A1A1A6; }
-.ev-relogio b { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
-.ev-relogio small { font-size: 12px; color: #A1A1A6; font-weight: 600; }
-.ev-relogio.ev-aberto { background: rgba(52,199,89,.22); } .ev-relogio.ev-fechado { background: rgba(255,69,58,.22); }
+  background: radial-gradient(90% 140% at 100% 0%, rgba(255,107,0,.32) 0%, rgba(255,107,0,0) 55%), linear-gradient(135deg, #1C1C1E 0%, #0B0B0C 100%); background-color: #161618; }
+.ev-relogio { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border-radius: 12px; background: #262629; color: #FFF; }
+.ev-relogio span { font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: #C7C7CC; }
+.ev-relogio b { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: #FFF; }
+.ev-relogio small { font-size: 12px; color: #C7C7CC; font-weight: 600; }
+.ev-relogio.ev-aberto { background: #184D2B; } .ev-relogio.ev-fechado { background: #5C1D19; }
 .ev-barraProva { grid-column: 1 / -1; position: relative; height: 8px; border-radius: 4px; background: rgba(255,255,255,.14); overflow: hidden; }
 .ev-barraProva i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #FF9F0A, #FF6B00); border-radius: 4px; }
 .ev-barraProva em { position: absolute; top: 0; bottom: 0; width: 2px; background: #5EDB7A; }
@@ -57,7 +57,7 @@ span.ev-bom, span.ev-medio, span.ev-ruim { padding: 2px 6px; border-radius: 6px;
 .ev-kartGrande { font-size: 96px; font-weight: 800; line-height: 1; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
 .ev-filas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 .ev-fila { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 14px; background: #F5F5F7; min-height: 120px; }
-.ev-fila h4 { margin: 0 0 4px; font-size: 13px; text-align: center; }
+.ev-fila h3, .ev-fila h4 { margin: 0 0 4px; font-size: 13px; text-align: center; }
 .ev-kartFila { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 10px; border-radius: 10px; background: #FFF; box-shadow: 0 0 0 1px rgba(0,0,0,.06); font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; }
 .ev-kartFila.primeiro { box-shadow: inset 0 0 0 2px #FF6B00; }
 .ev-kartFila button { height: 26px; padding: 0 8px; border: 0; border-radius: 7px; background: rgba(118,118,128,.12); font-size: 12px; font-weight: 600; }

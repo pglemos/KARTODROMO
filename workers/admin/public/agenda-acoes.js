@@ -38,25 +38,36 @@ const AgendaAcoes = (() => {
   async function formBateria(b, diaPadrao) {
     const novo = !b;
     const m = modal('<div class="esqueleto" style="height: 360px; margin: var(--kib-espaco-denso-20)"></div>', novo ? 'Nova bateria' : 'Editar bateria');
-    m.style.maxWidth = '680px';
+    m.style.maxWidth = '760px';
     let ap; try { ap = await carregarApoio(); } catch (e) { falhou(e); return voltar(b && b.id); }
     const produtos = ap.produtos.filter((p) => p.ativo || (b && p.id === b.produtoId));
     const dia = novo ? diaPadrao : b.dataHora.slice(0, 10), hora = novo ? '' : b.dataHora.slice(11, 16);
     const tipo = novo ? 'aberta' : tipoDe(b);
-    m.innerHTML = `<div class="modalTopo"><span class="col" style="gap: var(--kib-espaco-meio)"><span style="font-size: var(--kib-fonte-tamanho-titulo); font-weight: 700">${novo ? 'Nova bateria' : 'Editar bateria'}</span><span class="peq">${novo ? 'Cria um horário na agenda, igual à Recepção' : `${diaExtenso(dia)} · ${hora}`}</span></span></div>
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--kib-espaco-denso-12); padding: var(--kib-espaco-2) var(--kib-espaco-3)">
-        <label class="campo"><span>Nome</span><input class="entrada" id="bNome" maxlength="100" value="${esc(novo ? 'BATERIA' : b.nome || '')}"></label>
-        <label class="campo"><span>Data</span><input class="entrada" id="bData" type="date" value="${dia}"></label>
-        <label class="campo"><span>Hora</span><input class="entrada" id="bHora" type="time" value="${hora}"></label>
-        <label class="campo"><span>Produto</span><select class="entrada" id="bProduto"><option value="">Escolha</option>${produtos.map((p) => `<option value="${p.id}" ${b && p.id === b.produtoId ? 'selected' : ''}>${esc(p.nome)} · ${brl(p.preco)}</option>`).join('')}</select></label>
-        <label class="campo"><span>Vagas (máximo de pilotos)</span><input class="entrada" id="bVagas" type="number" min="1" max="60" inputmode="numeric" value="${novo ? 12 : b.vagas}"></label>
-        <label class="campo"><span>Traçado</span><select class="entrada" id="bTracado"><option value="">Sem traçado</option>${ap.tracados.map((t) => `<option value="${t.id}" ${b && t.id === b.tracadoId ? 'selected' : ''}>${esc(t.nome)}</option>`).join('')}</select></label>
-        <label class="campo"><span>Volta mínima (segundos)</span><input class="entrada" id="bVolta" type="number" min="0" inputmode="numeric" value="${novo ? 5 : b.voltaMinimaSeg ?? 5}"></label>
-        <label class="campo"><span>Quem pode reservar</span><select class="entrada" id="bTipo">${TIPOS_RESERVA.filter(([v]) => podeFechar() || v === 'aberta' || v === tipo).map(([v, t, d]) => `<option value="${v}" ${tipo === v ? 'selected' : ''}>${t} · ${d}</option>`).join('')}</select></label>
-        <label class="campo" style="grid-column: 1 / -1"><span>Observação (opcional)</span><textarea class="entrada" id="bObs" rows="2" maxlength="400" style="height: auto">${esc(novo ? '' : b.observacao || '')}</textarea></label>
-      </div><p class="erroMsg" id="bErro" style="padding: 0 var(--kib-espaco-3)"></p>
-      <div class="modalRodape"><button class="btn sec" style="margin-left: auto" data-ag-voltar>Cancelar</button><button class="btn prim" id="bSalvar">${novo ? 'Criar bateria' : 'Salvar alterações'}</button></div>`;
-    m.querySelector('[data-ag-voltar]').onclick = () => voltar(b && b.id);
+    m.innerHTML = `<div class="modalGrupoTopo">
+      <div class="modalGrupoTopoInfo">
+        <h2 class="modalGrupoTitulo">${novo ? 'Nova bateria' : 'Editar bateria'}</h2>
+        <div class="modalGrupoBadges">
+          <span class="badgeDataBateria">${svg(IC.agenda, 14, 'var(--kib-cor-texto-secundario)')} ${novo ? 'Cria um horário na agenda' : `${diaExtenso(dia)} às ${hora}`}</span>
+          ${novo ? '' : `<span class="badgeNomeBateria">${esc(b.nome || 'BATERIA')}</span>`}
+        </div>
+      </div>
+      <button class="btnFecharModal hov" data-ag-voltar aria-label="Fechar janela" title="Fechar (Esc)">
+        ${svg(IC.fechar, 16, 'currentColor', 2.4)}
+      </button>
+    </div>
+      <div class="gradeFormBateria">
+        <label class="campo" style="grid-column: span 6;"><span>Nome</span><input class="entrada" id="bNome" maxlength="100" value="${esc(novo ? 'BATERIA' : b.nome || '')}" style="height: 38px; font-weight: 600;"></label>
+        <label class="campo" style="grid-column: span 3;"><span>Data</span><input class="entrada" id="bData" type="date" value="${dia}" style="height: 38px;"></label>
+        <label class="campo" style="grid-column: span 3;"><span>Hora</span><input class="entrada" id="bHora" type="time" value="${hora}" style="height: 38px;"></label>
+        <label class="campo" style="grid-column: span 6;"><span>Produto (preço por piloto)</span><select class="entrada" id="bProduto" style="height: 38px;"><option value="">Escolha o produto</option>${produtos.map((p) => `<option value="${p.id}" ${b && p.id === b.produtoId ? 'selected' : ''}>${esc(p.nome)} · ${brl(p.preco)}</option>`).join('')}</select></label>
+        <label class="campo" style="grid-column: span 3;"><span>Vagas (máx. karts)</span><input class="entrada" id="bVagas" type="number" min="1" max="60" inputmode="numeric" value="${novo ? 12 : b.vagas}" style="height: 38px; font-weight: 700;"></label>
+        <label class="campo" style="grid-column: span 3;"><span>Traçado</span><select class="entrada" id="bTracado" style="height: 38px;"><option value="">Sem traçado</option>${ap.tracados.map((t) => `<option value="${t.id}" ${b && t.id === b.tracadoId ? 'selected' : ''}>${esc(t.nome)}</option>`).join('')}</select></label>
+        <label class="campo" style="grid-column: span 8;"><span>Quem pode reservar</span><select class="entrada" id="bTipo" style="height: 38px;">${TIPOS_RESERVA.filter(([v]) => podeFechar() || v === 'aberta' || v === tipo).map(([v, t, d]) => `<option value="${v}" ${tipo === v ? 'selected' : ''}>${t} — ${d}</option>`).join('')}</select></label>
+        <label class="campo" style="grid-column: span 4;"><span>Volta mínima (segundos)</span><input class="entrada" id="bVolta" type="number" min="0" inputmode="numeric" value="${novo ? 5 : b.voltaMinimaSeg ?? 5}" style="height: 38px;"></label>
+        <label class="campo" style="grid-column: 1 / -1"><span>Observação interna (opcional)</span><textarea class="entrada" id="bObs" rows="2" maxlength="400" style="height: auto; resize: vertical;" placeholder="Alguma observação para a equipe">${esc(novo ? '' : b.observacao || '')}</textarea></label>
+      </div><p class="erroMsg" id="bErro" style="padding: 0 24px"></p>
+      <div class="modalRodape" style="padding: 14px 24px; display: flex; align-items: center; justify-content: flex-end; gap: 8px;"><button class="btn sec peq" data-ag-voltar>Cancelar</button><button class="btn prim peq" id="bSalvar">${novo ? 'Criar bateria' : 'Salvar alterações'}</button></div>`;
+    m.querySelectorAll('[data-ag-voltar]').forEach((btn) => btn.onclick = () => voltar(b && b.id));
     m.querySelector('#bNome').focus();
     m.querySelector('#bSalvar').onclick = async () => {
       const erro = (t) => { m.querySelector('#bErro').textContent = t; };
@@ -94,9 +105,9 @@ const AgendaAcoes = (() => {
       if (fechar) await fecharBateria(b); else await abrirBateria(b);
       toastAcao(fechar ? 'Bateria fechada: sai do site e do totem. Quem já reservou continua' : 'Bateria aberta para reservas', 'Desfazer', async () => {
         await restaurar(b);
-        await C.recarregar(); C.abrir(b.id);
+        await C.recarregar(); if (!$('#camada .gaveta')) C.abrir(b.id);
       });
-      await C.recarregar(); C.abrir(b.id);
+      await C.recarregar(); if (!$('#camada .gaveta')) C.abrir(b.id);
     } catch (e) { falhou(e); }
   }
 
@@ -166,7 +177,7 @@ const AgendaAcoes = (() => {
       <div style="display: grid; gap: var(--kib-espaco-denso-12); padding: var(--kib-espaco-2) var(--kib-espaco-3)">
         <label class="campo"><span>Configuração padrão</span><select class="entrada" id="gPadrao"><option value="">Escolha</option>${ap.padroes.map((p) => `<option value="${p.id}">${esc(p.nome)} · ${p.quantidade} baterias a partir das ${esc(p.primeiraHora)}, a cada ${p.intervaloMin} min · ${p.vagas} vagas</option>`).join('')}</select></label>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--kib-espaco-denso-12)"><label class="campo"><span>De</span><input class="entrada" id="gDe" type="date" value="${ini < hojeIso() ? hojeIso() : ini}"></label><label class="campo"><span>Até</span><input class="entrada" id="gAte" type="date" value="${fim}"></label></div>
-        <fieldset style="border: 0; padding: 0; margin: 0"><legend class="peq" style="padding: 0 0 var(--kib-espaco-meio)">Dias da semana</legend><span class="linha-quebra gap-meio">${[3, 4, 5, 6, 0, 1, 2].map((i) => `<label class="chip cinza" style="cursor: pointer"><input type="checkbox" name="gDia" value="${i}" ${i === 1 ? '' : 'checked'} style="accent-color: var(--verde)"> ${SEMANA[i]}</label>`).join('')}</span></fieldset>
+        <fieldset style="border: 0; padding: 0; margin: 0"><legend class="peq" style="padding: 0 0 var(--kib-espaco-meio)">Dias da semana</legend><span class="linha-quebra gap-meio">${[1, 2, 3, 4, 5, 6, 0].map((i) => `<label class="chip cinza" style="cursor: pointer"><input type="checkbox" name="gDia" value="${i}" ${i === 1 ? '' : 'checked'} style="accent-color: var(--verde)"> ${SEMANA[i]}</label>`).join('')}</span></fieldset>
         <label style="display: flex; gap: var(--kib-espaco-1); align-items: center"><input type="checkbox" id="gFeriados" checked style="accent-color: var(--verde)">Pular feriados cadastrados</label>
         <label style="display: flex; gap: var(--kib-espaco-1); align-items: center"><input type="checkbox" id="gExistentes" checked style="accent-color: var(--verde)">Pular horários que já existem (evita duplicar)</label>
         <label style="display: flex; gap: var(--kib-espaco-1); align-items: center"><input type="checkbox" id="gAtivo" checked style="accent-color: var(--verde)">Criar já abertas para reserva</label>
@@ -203,22 +214,38 @@ const AgendaAcoes = (() => {
     if (C.A.sel !== selecao) return;
     const ids = new Set(reservas.map((r) => r.id));
     const inteiros = grupos.filter((g) => g.pilotos.some((p) => ids.has(p.inscricaoId)));
+    let moverGrupoInteiro = false;
     if (inteiros.length) {
       let todas; try { todas = await office(`/reservas?bateriaId=${origem.id}&status=todas`); } catch (e) { falhou(e); return; }
       if (C.A.sel !== selecao) return;
       const incluir = new Set(inteiros.flatMap((g) => g.pilotos.map((p) => p.inscricaoId)));
       const ampliadas = todas.filter((r) => r.status !== 'cancelada' && (ids.has(r.id) || incluir.has(r.id)));
-      if (ampliadas.length > reservas.length && !await confirmar('Mover o grupo inteiro?', `Para manter cadastro, preço e pagamentos juntos, serão movidos ${ampliadas.length} pilotos.`, 'Mover grupo inteiro')) return;
-      reservas = ampliadas;
+      if (ampliadas.length > reservas.length) {
+        if (reservas.length === 1 && typeof Grupo !== 'undefined' && Grupo.moverPiloto) {
+          const r0 = reservas[0];
+          const gr = inteiros[0];
+          const pil = gr.pilotos.find((p) => p.inscricaoId === r0.id);
+          if (pil && !pil.responsavel) {
+            Grupo.moverPiloto(gr, pil, async () => {
+              await C.recarregar();
+              if (!$('#camada .gaveta')) C.abrir(origem.id);
+            });
+            return;
+          }
+        }
+        moverGrupoInteiro = await confirmar('Mover o grupo inteiro?', `Os pilotos selecionados fazem parte de grupo (${ampliadas.length} vagas no total).\n\nClique em 'Mover grupo inteiro' para mover todas as vagas do grupo, ou 'Cancelar' para mover apenas os ${reservas.length} selecionados (eles serão desvinculados do grupo).`, 'Mover grupo inteiro');
+        if (moverGrupoInteiro) reservas = ampliadas;
+      } else {
+        moverGrupoInteiro = true;
+      }
     }
-    const grupoPorInscricao = new Map(inteiros.flatMap((g) => g.pilotos.map((p) => [p.inscricaoId, g.id])));
+    const grupoPorInscricao = moverGrupoInteiro ? new Map(inteiros.flatMap((g) => g.pilotos.map((p) => [p.inscricaoId, g.id]))) : new Map();
     const n = reservas.length, pagas = reservas.filter((r) => r.pago), nome = n === 1 ? reservas[0].cliente : `${n} clientes`;
     const m = modal('', 'Mover cliente'); m.style.maxWidth = '720px';
     let dia = origem.dataHora.slice(0, 10), lista = [], escolhida = null, ocupado = false, consulta = 0;
     const motivo = (b) => {
       if (b.id === origem.id) return 'Bateria atual';
-      if (b.status !== 'aberta' || b.reservaFechada) return 'Bateria fechada';
-      if (b.dataHora < agoraLocal()) return 'Já passou';
+      if (b.status === 'cancelada') return 'Bateria cancelada';
       if ((+b.disponiveis || 0) < reservas.length) return +b.disponiveis ? `Só ${b.disponiveis} ${+b.disponiveis === 1 ? 'vaga' : 'vagas'}` : 'Sem vagas';
       if (b.produtoId == null || b.preco == null) return 'Sem produto/preço';
       if ((inteiros.length || reservas.some((r) => r.pago)) && origem.tipoKart !== b.tipoKart) return 'Reserva paga só vai para o mesmo tipo de kart';
@@ -410,8 +437,16 @@ const AgendaAcoes = (() => {
       if (e.key.toLowerCase() === 'x') alternarLote();
     }, { signal: lote.abort.signal });
     const cal = C.tela.querySelector('#calendario');
-    if (cal) { let raf = 0; lote.obs = new MutationObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(decorar); }); lote.obs.observe(cal, { childList: true, subtree: true }); }
-    decorar();
+    if (cal) {
+      let raf = 0;
+      lote.obs = new MutationObserver(() => {
+        if (!lote.modo) return;
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(decorar);
+      });
+      lote.obs.observe(cal, { childList: true, subtree: true });
+    }
+    if (lote.modo) decorar();
     C.tela.addEventListener('click', (e) => {
       const menu = C.tela.querySelector('.cab .menuMais'); if (menu && menu.open && (!e.target.closest('.menuMais') || e.target.closest('.menuLista button'))) menu.open = false;
       if (e.target.closest('[data-ag-nova-bat]')) return formBateria(null, C.A.base < hojeIso() ? hojeIso() : C.A.base);
@@ -439,7 +474,7 @@ const AgendaAcoes = (() => {
     const erro = (m) => { sec.querySelector('[data-ag-pend-erro]').textContent = m || ''; };
     const vincular = async (clienteId, valor) => {
       const [grupoId, pilotoId] = String(valor).split(':').map(Number); erro('');
-      try { await office(`/grupos/${grupoId}/vincular`, { method: 'POST', body: { clienteId, pilotoId } }); toast('Cadastro vinculado à vaga do grupo'); await C.recarregar(); C.abrir(b.id); }
+      try { await office(`/grupos/${grupoId}/vincular`, { method: 'POST', body: { clienteId, pilotoId } }); toast('Cadastro vinculado à vaga do grupo'); await C.recarregar(); if (!$('#camada .gaveta')) C.abrir(b.id); }
       catch (e) { erro(e.message || String(e)); }
     };
     let tq = null;
@@ -462,10 +497,9 @@ const AgendaAcoes = (() => {
     if (!C || !permitido()) return;
     const g = document.querySelector('#camada .gaveta'); if (!g || +g.dataset.bateria !== b.id) return;
     if (estaFechada(b) && !passou(b)) { const topo = g.querySelector('.gavetaTopo'); if (topo) topo.innerHTML = topo.innerHTML.replace(' · já correu', ' · bateria fechada para reservas'); }
-    if (passou(b)) return;
-    pendenciasGrupo(b, g);
+    if (!passou(b)) pendenciasGrupo(b, g);
     if (!podeFechar()) g.querySelectorAll('[data-tipo-bat="fechada"], [data-tipo-bat="bloqueada"]').forEach((x) => x.remove());
-    if (estaFechada(b)) { const nr = g.querySelector('[data-acao="novaReserva"]'); if (nr) { nr.disabled = true; nr.title = 'Abra a bateria para aceitar novas reservas'; nr.lastChild.textContent = ' Bateria fechada: abra para novas reservas'; } }
+    if (estaFechada(b) || passou(b)) { const nr = g.querySelector('[data-acao="novaReserva"]'); if (nr) { nr.disabled = true; nr.title = passou(b) ? 'Horário já passou' : 'Abra a bateria para aceitar novas reservas'; nr.lastChild.textContent = passou(b) ? ' Bateria já correu: use Mover abaixo' : ' Bateria fechada: abra para novas reservas'; } }
     const rodape = g.lastElementChild;
     if (rodape && !rodape.querySelector('[data-ag-gerenciar]')) {
       const det = document.createElement('details'); det.className = 'menuMais menuCima'; det.setAttribute('data-ag-gerenciar', '');
@@ -483,19 +517,64 @@ const AgendaAcoes = (() => {
       <div class="listaMover">${lista.map((r) => `<label class="linhaMover"><input type="checkbox" data-ag-sel="${r.id}" aria-label="Selecionar ${esc(r.cliente)}"><span class="col" style="min-width: 0"><span class="trunc peso-semibold">${esc(r.cliente)}</span><span class="peq trunc">${esc(r.responsavel && r.responsavel !== r.cliente ? 'responsável ' + r.responsavel : r.origem || 'Recepção')}</span></span><span class="chip ${r.pago ? 'verde' : 'laranja'}">${r.pago ? 'pago' : 'falta ' + brlCurto(r.total)}</span><span class="acoesLinha"><button type="button" class="btn sec peq" data-ag-mover="${r.id}">Mover</button><button type="button" class="btn sec peq" data-ag-edit-cli="${r.clienteId}" aria-label="Editar cadastro de ${esc(r.cliente)}">Editar</button><button type="button" class="btn sec peq" style="color: var(--erroTxt)" data-ag-del-res="${r.id}" aria-label="Excluir a reserva de ${esc(r.cliente)}">Excluir</button></span></label>`).join('')}</div>
       <div class="linha gap-1" style="flex-wrap: wrap"><button type="button" class="btn sec peq" data-ag-sel-todos>Selecionar todos</button><button type="button" class="btn prim peq" data-ag-mover-sel disabled>Mover selecionados</button></div>`;
     corpo.appendChild(sec);
-    let porInsc = {}; office(`/grupos?bateriaId=${b.id}`).then((gs) => { for (const gr of gs || []) for (const p of gr.pilotos || []) if (p.inscricaoId) porInsc[p.inscricaoId] = { grupoId: gr.id, pilotoId: p.id, responsavel: !!p.responsavel }; }).catch(() => undefined);
+    let porInsc = {};
+    office(`/grupos?bateriaId=${b.id}`).then((gs) => {
+      for (const gr of gs || []) {
+        for (const p of gr.pilotos || []) {
+          if (p.inscricaoId) {
+            porInsc[p.inscricaoId] = { grupo: gr, grupoId: gr.id, piloto: p, pilotoId: p.id, responsavel: !!p.responsavel };
+            const linha = sec.querySelector(`[data-ag-sel="${p.inscricaoId}"]`)?.closest('.linhaMover');
+            if (linha) {
+              const colInfo = linha.querySelector('.col');
+              if (colInfo && !colInfo.querySelector('.tagGrupo')) {
+                const tag = document.createElement('span');
+                tag.className = 'tagGrupo peq';
+                tag.style.cssText = 'color: var(--kib-cor-marca-principal); font-weight: 600; display: inline-flex; align-items: center; gap: 4px;';
+                tag.innerHTML = `<span style="width: 6px; height: 6px; border-radius: 50%; background: currentColor;"></span>Grupo ${esc(gr.codigo)}`;
+                colInfo.appendChild(tag);
+              }
+              if (!p.responsavel) {
+                const acoes = linha.querySelector('.acoesLinha');
+                if (acoes && !acoes.querySelector('[data-ag-grupo-mover]')) {
+                  const btn = document.createElement('button');
+                  btn.type = 'button';
+                  btn.className = 'btn sec peq';
+                  btn.style.cssText = 'color: var(--kib-cor-marca-principal); border-color: color-mix(in srgb, var(--kib-cor-marca-principal) 40%, transparent); font-weight: 600;';
+                  btn.setAttribute('data-ag-grupo-mover', p.inscricaoId);
+                  btn.title = 'Entrou no grupo errado? Coloque sozinho ou em outro grupo';
+                  btn.textContent = 'Grupo errado';
+                  acoes.insertBefore(btn, acoes.firstChild);
+                }
+              }
+            }
+          }
+        }
+      }
+    }).catch(() => undefined);
     const excluirReserva = async (r) => {
       const vaga = porInsc[r.id];
-      if (vaga && vaga.responsavel) return toast('Este é o responsável do grupo: para tirar, cancele a reserva inteira em “Abrir reserva”.', true);
-      const ok = await dialogo({ titulo: `Excluir a reserva de ${r.cliente}?`, texto: vaga ? 'A vaga sai do grupo. Se já estiver paga, estorne antes.' : r.pago ? 'Esta reserva está paga: o sistema não deixa excluir. Estorne pela Recepção.' : 'A reserva é cancelada e a vaga volta a ficar livre. O cadastro da pessoa continua.', botoes: [{ rotulo: 'Cancelar', valor: false }, { rotulo: 'Excluir reserva', valor: true, classe: 'perigo-solido' }] });
+      const ok = await dialogo({ titulo: `Excluir a reserva de ${r.cliente}?`, texto: 'A vaga será liberada. O cadastro e os pagamentos serão mantidos no histórico, sem reembolso automático.', botoes: [{ rotulo: 'Cancelar', valor: false }, { rotulo: 'Excluir reserva', valor: true, classe: 'perigo-solido' }] });
       if (!ok) return;
-      try { await office(vaga ? `/grupos/${vaga.grupoId}/pilotos/${vaga.pilotoId}` : `/reservas/${r.id}`, { method: 'DELETE' }); toast('Reserva excluída'); await C.recarregar(); C.abrir(b.id); }
+      try { await office(vaga ? `/grupos/${vaga.grupoId}/pilotos/${vaga.pilotoId}` : `/reservas/${r.id}`, { method: 'DELETE' }); toast('Reserva excluída'); await C.recarregar(); if (!$('#camada .gaveta')) C.abrir(b.id); }
       catch (e) { toast(e.message || String(e), true); }
     };
     const atual = () => [...sec.querySelectorAll('[data-ag-sel]:checked')].map((x) => lista.find((r) => r.id === +x.dataset.agSel));
     const botao = () => { const k = atual().length; const bt = sec.querySelector('[data-ag-mover-sel]'); bt.disabled = !k; bt.textContent = k ? `Mover ${k} ${k === 1 ? 'selecionado' : 'selecionados'}` : 'Mover selecionados'; };
     sec.addEventListener('change', (e) => { if (e.target.matches('[data-ag-sel]')) botao(); });
     sec.addEventListener('click', (e) => {
+      const gm = e.target.closest('[data-ag-grupo-mover]');
+      if (gm) {
+        e.preventDefault();
+        const inscId = +gm.dataset.agGrupoMover;
+        const vaga = porInsc[inscId];
+        if (vaga && typeof Grupo !== 'undefined' && Grupo.moverPiloto) {
+          Grupo.moverPiloto(vaga.grupo, vaga.piloto, async () => {
+            await C.recarregar();
+            if (!$('#camada .gaveta')) C.abrir(b.id);
+          });
+        }
+        return;
+      }
       const ed = e.target.closest('[data-ag-edit-cli]'); if (ed) { e.preventDefault(); fecharCamada(); location.hash = `#/piloto/${ed.dataset.agEditCli}`; return; }
       const dl = e.target.closest('[data-ag-del-res]'); if (dl) { e.preventDefault(); excluirReserva(lista.find((r) => r.id === +dl.dataset.agDelRes)); return; }
       const um = e.target.closest('[data-ag-mover]'); if (um) { e.preventDefault(); mover(b, [lista.find((r) => r.id === +um.dataset.agMover)]); return; }

@@ -52,7 +52,7 @@ export default function PrivacyPage() {
       <article className="mx-auto max-w-3xl">
         <p className="text-sm font-bold uppercase tracking-[0.18em] text-kib-acao">Kartódromo Internacional de Betim</p>
         <h1 className="mt-4 text-4xl font-extrabold tracking-tight sm:text-5xl">Política de privacidade</h1>
-        <p className="mt-4 text-sm text-kib-texto-3">App Kartódromo de Betim · Atualizada em 20 de outubro de 2026</p>
+        <p className="mt-4 text-sm text-kib-texto-2">App Kartódromo de Betim · Atualizada em 20 de outubro de 2026</p>
 
         <aside className="mt-8 rounded-2xl border border-kib-aviso-solido bg-kib-aviso-fundo p-5 text-sm leading-6 text-kib-aviso">
           Esta é uma minuta em revisão. A razão social do controlador, o canal LGPD e os prazos de retenção ainda precisam de confirmação pelo responsável do kartódromo. Não liberar o app nas lojas antes dessa validação.

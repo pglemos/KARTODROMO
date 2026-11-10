@@ -145,7 +145,7 @@ public class FormCliente : CartaoModal
 
         // ---- Principal: 2 colunas de cartões
         var consultar = BotaoCampo("Consultar", ConsultarDocumento);
-        var buscarCep = BotaoCampo("Buscar", BuscarCep);
+        var buscarCep = BotaoCampo("Buscar", () => Seguro.Rodar(this, BuscarCepAsync));
         _dicaDoc.Text = "";
         var docCampo = F("Nº do documento *", _doc, consultar);
         var ident = Grade6(
@@ -165,7 +165,7 @@ public class FormCliente : CartaoModal
         {
             if (_modo == "ver") return;
             var nid = Novo(this);
-            if (nid != null) { var c = (await Api.Get($"/api/office/clientes/{nid}")).AsObject(); _respId = nid; _resp.Text = c.S("nome"); }
+            if (nid != null) { var c = (await Api.GetAsync($"/api/office/clientes/{nid}")).AsObject(); _respId = nid; _resp.Text = c.S("nome"); }
         });
         _resp.PlaceholderText = "Só para menor de 18 anos";
         _resp.ReadOnly = true;
@@ -183,7 +183,59 @@ public class FormCliente : CartaoModal
             (F("Complemento", _compl), 3), (F("Bairro", _bairro), 3),
             (F("Cidade", _cidade), 3), (F("Estado", _uf), 1), (F("IBGE", _ibge), 2));
         var dica = new Label { Text = "Digite o CEP que o endereço, bairro, cidade e estado se preenchem sozinhos.", Dock = DockStyle.Top, Height = 22, ForeColor = KitVisual.Secundario, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoPequeno), BackColor = KitVisual.Cartao };
-        _cep.TextChanged += (_, _) => { if (_modo != "ver" && Fmt.Digitos(_cep.Text).Length == 8 && _cep.Focused) BuscarCep(); };
+        _cep.TextChanged += (_, _) => { if (_modo != "ver" && Fmt.Digitos(_cep.Text).Length == 8 && _cep.Focused) Seguro.Rodar(this, BuscarCepAsync); };
+        _doc.TextChanged += (_, _) =>
+        {
+            if (_modo != "ver" && _doc.Focused)
+            {
+                var d = Fmt.Digitos(_doc.Text);
+                if (_tipoDoc.Text == "CPF" && d.Length == 11 && Fmt.CpfValido(d)) Seguro.Rodar(this, ConsultarDocumentoAsync);
+            }
+        };
+        _doc.Leave += (_, _) =>
+        {
+            if (_modo != "ver")
+            {
+                var d = Fmt.Digitos(_doc.Text);
+                if ((_tipoDoc.Text == "CPF" && d.Length == 11) || (_tipoDoc.Text != "CPF" && _doc.Text.Trim().Length >= 5)) Seguro.Rodar(this, ConsultarDocumentoAsync);
+            }
+        };
+        _fone.Leave += (_, _) =>
+        {
+            if (_modo == "novo" && _atual == null && Fmt.Digitos(_fone.Text).Length >= 10 && _doc.Text.Trim().Length == 0)
+            {
+                Seguro.Rodar(this, async () =>
+                {
+                    var achados = await Api.ListaAsync($"/api/office/clientes?q={Uri.EscapeDataString(Fmt.Digitos(_fone.Text))}&campo=telefone");
+                    var outro = achados.FirstOrDefault();
+                    if (outro?.L("id") is long id)
+                    {
+                        await Mostrar(id);
+                        SetModo("edit");
+                        _dicaDoc.ForeColor = KitVisual.Verde;
+                        _dicaDoc.Text = $"✓ Já cadastrado por celular: {outro.S("nome")} carregado automaticamente.";
+                    }
+                });
+            }
+        };
+        _email.Leave += (_, _) =>
+        {
+            if (_modo == "novo" && _atual == null && _email.Text.Contains('@') && _doc.Text.Trim().Length == 0)
+            {
+                Seguro.Rodar(this, async () =>
+                {
+                    var achados = await Api.ListaAsync($"/api/office/clientes?q={Uri.EscapeDataString(_email.Text.Trim())}&campo=email");
+                    var outro = achados.FirstOrDefault();
+                    if (outro?.L("id") is long id)
+                    {
+                        await Mostrar(id);
+                        SetModo("edit");
+                        _dicaDoc.ForeColor = KitVisual.Verde;
+                        _dicaDoc.Text = $"✓ Já cadastrado por e-mail: {outro.S("nome")} carregado automaticamente.";
+                    }
+                });
+            }
+        };
         var situacao = new Panel { Dock = DockStyle.Top, Height = 110, BackColor = KitVisual.Cartao };
         var lgpdLinha = LinhaChave("Concorda com o uso dos dados (LGPD)", "Obrigatório para correr. O cliente aceita no totem ou aqui.", _lgpd);
         var bloqLinha = LinhaChave("Cliente bloqueado", "Impede novas reservas e aparece como alerta no totem.", _bloq);
@@ -305,27 +357,37 @@ public class FormCliente : CartaoModal
         return p;
     }
 
-    void ConsultarDocumento() => Seguro.Rodar(this, async () =>
+    void ConsultarDocumento() => Seguro.Rodar(this, ConsultarDocumentoAsync);
+
+    async Task ConsultarDocumentoAsync()
     {
         var doc = Fmt.Digitos(_doc.Text);
-        if (doc.Length == 0) { _dicaDoc.Text = "Digite o documento para consultar."; return; }
+        var raw = _doc.Text.Trim();
+        if (doc.Length == 0 && raw.Length == 0) { _dicaDoc.Text = "Digite o documento para consultar."; return; }
         var cpfOk = _tipoDoc.Text != "CPF" || Fmt.CpfValido(doc);
-        var achados = await Api.Lista($"/api/office/clientes?q={Uri.EscapeDataString(doc)}&campo=documento");
+        var q = _tipoDoc.Text == "CPF" && doc.Length == 11 ? doc : raw;
+        var achados = await Api.ListaAsync($"/api/office/clientes?q={Uri.EscapeDataString(q)}&campo=documento");
         var outro = achados.FirstOrDefault(c => c.S("id") != _atual?.S("id"));
-        _dicaDoc.ForeColor = !cpfOk || outro != null ? Tokens.Claro.CorEstadoPerigoTexto : KitVisual.Secundario;
+        if (outro != null && outro.L("id") is long outroId)
+        {
+            await Mostrar(outroId);
+            SetModo("edit");
+            _dicaDoc.ForeColor = KitVisual.Verde;
+            _dicaDoc.Text = $"✓ Já cadastrado: {outro.S("nome")} (cliente {outroId}) carregado automaticamente.";
+            return;
+        }
+        _dicaDoc.ForeColor = !cpfOk ? Tokens.Claro.CorEstadoPerigoTexto : KitVisual.Secundario;
         _dicaDoc.Text = !cpfOk ? "CPF inválido. Confira os números."
-            : outro != null ? $"Já existe: {outro.S("nome")} (cliente {outro.S("id")})."
             : (_tipoDoc.Text == "CPF" ? "CPF válido. " : "") + "Nenhum cliente com esse documento.";
-    });
+    }
 
-    void ImprimirTermo() => Seguro.Rodar(this, async () =>
+    void ImprimirTermo()
     {
         // o termo sai por reserva: usa a reserva mais recente do cliente
         var ultima = (_atual?["historico"] as JsonArray)?.OfType<JsonObject>().FirstOrDefault(h => h.L("id") is long);
         if (ultima == null) { Msg.Aviso(this, "Este cliente ainda não tem reserva. O termo é impresso junto com a reserva."); return; }
-        var link = await Api.Get("/api/office/termo-link?ids=" + ultima.S("id"));
-        Relatorio.Abrir(this, Config.ServidorUrl.TrimEnd('/') + link.S("url"), "Termo de Responsabilidade");
-    });
+        Acoes.ImprimirTermo(this, [ultima.S("id")]);
+    }
 
     // ---------- blocos visuais do design (Cliente.dc.html)
     static System.Drawing.Drawing2D.GraphicsPath Arredondado(Rectangle r, int raio)
@@ -448,9 +510,11 @@ public class FormCliente : CartaoModal
         _bt["mobileLink"].Visible = ro && _podeVincularMobile == true;
     }
 
-    async Task Mostrar(long id)
+    Task Mostrar(long id) => MostrarAsync(id);
+
+    async Task MostrarAsync(long id)
     {
-        var c = await Api.Get($"/api/office/clientes/{id}");
+        var c = await Api.GetAsync($"/api/office/clientes/{id}");
         _atual = c.AsObject();
         _tipoPessoa.SelectedIndex = 0;
         _tipoDoc.SelectedItem = _tipoDoc.Items.Contains(c.S("tipoDocumento")) ? c.S("tipoDocumento") : "CPF";
@@ -473,26 +537,30 @@ public class FormCliente : CartaoModal
         _fin.Text = $"Compras: {f.S("vendas")} · Total: {Fmt.Brl(f.L("total"))} · Última: {Fmt.DmyHm(f.S("ultima"))}{deps}";
         _hist.Carregar(c["historico"] is JsonArray h ? h.OfType<JsonObject>() : []);
         SetModo("ver");
-        await CarregarPermissaoVinculoMobile();
+        await CarregarPermissaoVinculoMobileAsync();
     }
 
-    async Task CarregarPermissaoVinculoMobile()
+    Task CarregarPermissaoVinculoMobile() => CarregarPermissaoVinculoMobileAsync();
+
+    async Task CarregarPermissaoVinculoMobileAsync()
     {
         if (_podeVincularMobile.HasValue) return;
         try
         {
-            var permissao = await Api.Get("/api/office/mobile-permissions/identidade_mobile_vincular");
+            var permissao = await Api.GetAsync("/api/office/mobile-permissions/identidade_mobile_vincular");
             _podeVincularMobile = permissao?.AsObject().B("allowed") == true;
         }
         catch { _podeVincularMobile = false; }
         _bt["mobileLink"].Visible = _modo == "ver" && _podeVincularMobile == true;
     }
 
-    void Navegar(string dir) => Seguro.Rodar(this, async () =>
+    void Navegar(string dir) => Seguro.Rodar(this, () => NavegarAsync(dir));
+
+    async Task NavegarAsync(string dir)
     {
-        var r = await Api.Get($"/api/office/clientes/nav?dir={dir}&id={_atual?.S("id") ?? "0"}");
+        var r = await Api.GetAsync($"/api/office/clientes/nav?dir={dir}&id={_atual?.S("id") ?? "0"}");
         if (r?.L("id") is long id) await Mostrar(id);
-    });
+    }
 
     void Pesquisar()
     {
@@ -531,7 +599,9 @@ public class FormCliente : CartaoModal
         };
     }
 
-    void Salvar() => Seguro.Rodar(this, async () =>
+    void Salvar() => Seguro.Rodar(this, SalvarAsync);
+
+    async Task SalvarAsync()
     {
         if (string.IsNullOrWhiteSpace(_nome.Text)) { Msg.Aviso(this, "Informe o nome."); return; }
         if (ValidacaoCliente.ErroEmail(_email.Text) is string erroEmail) { Msg.Aviso(this, erroEmail); _email.Focus(); return; }
@@ -542,7 +612,7 @@ public class FormCliente : CartaoModal
         {
             try
             {
-                var r = await Api.Post("/api/office/clientes", body);
+                var r = await Api.PostAsync("/api/office/clientes", body);
                 CriadoId = r.L("id");
                 Msg.Sucesso(this, "Cliente criado com sucesso.");
                 if (_soNovo) { DialogResult = DialogResult.OK; Close(); return; }
@@ -553,7 +623,7 @@ public class FormCliente : CartaoModal
                 var d = Fmt.Digitos(_doc.Text);
                 if (Msg.Pergunta(this, $"{e.Message}\n\nDeseja localizar e carregar o cadastro deste documento agora?"))
                 {
-                    var busca = await Api.Lista($"/api/office/clientes?busca={d}");
+                    var busca = await Api.ListaAsync($"/api/office/clientes?busca={d}");
                     if (busca.Count > 0 && busca[0].L("id") is long idExistente)
                     {
                         await Mostrar(idExistente);
@@ -565,21 +635,25 @@ public class FormCliente : CartaoModal
         }
         else
         {
-            await Api.Put($"/api/office/clientes/{_atual.S("id")}", body);
+            await Api.PutAsync($"/api/office/clientes/{_atual.S("id")}", body);
             Msg.Sucesso(this, "Cliente atualizado com sucesso.");
             await Mostrar(_atual.L("id") ?? 0);
         }
-    });
+    }
 
-    void Excluir() => Seguro.Rodar(this, async () =>
+    void Excluir() => Seguro.Rodar(this, ExcluirAsync);
+
+    async Task ExcluirAsync()
     {
         if (_atual == null || !Msg.Pergunta(this, "Deseja excluir definitivamente o registro atual?")) return;
-        await Api.Delete($"/api/office/clientes/{_atual.S("id")}");
+        await Api.DeleteAsync($"/api/office/clientes/{_atual.S("id")}");
         _atual = null;
         Navegar("last");
-    });
+    }
 
-    void VincularIdentidadeMobile() => Seguro.Rodar(this, async () =>
+    void VincularIdentidadeMobile() => Seguro.Rodar(this, VincularIdentidadeMobileAsync);
+
+    async Task VincularIdentidadeMobileAsync()
     {
         if (_atual == null || !long.TryParse(_id.Text, out var customerId) || customerId <= 0) { Msg.Aviso(this, "Selecione um cliente salvo."); return; }
         if (!Msg.Pergunta(this, "Confirma que conferiu a identidade do cliente antes de vincular a conta do app?")) return;
@@ -596,13 +670,15 @@ public class FormCliente : CartaoModal
         dialog.BotaoRodape("Cancelar", false, dialog.Close);
         dialog.ShowDialog(this);
         if (!confirmar) return;
-        await Api.Post("/api/office/mobile-identities/link", new JsonObject { ["customerId"] = customerId, ["email"] = email.Text.Trim() });
+        await Api.PostAsync("/api/office/mobile-identities/link", new JsonObject { ["customerId"] = customerId, ["email"] = email.Text.Trim() });
         Msg.Info(this, "Conta do app vinculada ao cliente.");
-    });
+    }
 
     static readonly HttpClient _cepHttp = new() { Timeout = TimeSpan.FromSeconds(4) };
 
-    async void BuscarCep()
+    void BuscarCep() => Seguro.Rodar(this, BuscarCepAsync);
+
+    async Task BuscarCepAsync()
     {
         var cep = Fmt.Digitos(_cep.Text);
         if (cep.Length != 8) { Msg.Aviso(this, "Informe o CEP com 8 dígitos."); return; }
@@ -681,6 +757,24 @@ public class FormPesquisarCliente : DialogoDesign
         Campo(busca, "Pesquisar", _q, 4);
         Marca(busca, _soAtivos, 2);
         _q.KeyDown += (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; Buscar(); } };
+        System.Windows.Forms.Timer tBusca = null;
+        _q.TextChanged += (_, _) =>
+        {
+            var txt = _q.Text.Trim();
+            var d = Fmt.Digitos(txt);
+            tBusca?.Stop();
+            tBusca?.Dispose();
+            if (txt.Length < 2) return;
+            tBusca = new System.Windows.Forms.Timer { Interval = (d.Length == 11 && Fmt.CpfValido(d)) ? 80 : 300 };
+            tBusca.Tick += (_, _) =>
+            {
+                tBusca.Stop();
+                tBusca.Dispose();
+                tBusca = null;
+                if (!IsDisposed && _q.Text.Trim().Length >= 2) Buscar();
+            };
+            tBusca.Start();
+        };
         _soAtivos.CheckedChanged += (_, _) => Buscar();
 
         _g = SecaoTabela(null, 400);
@@ -707,7 +801,7 @@ public class FormPesquisarCliente : DialogoDesign
         BotaoRodape("+ Novo cliente", false, () => Seguro.Rodar(this, async () =>
         {
             var id = FormCliente.Novo(this, _q.Text);
-            if (id != null) Escolher((await Sessao.Api.Get($"/api/office/clientes/{id}")).AsObject());
+            if (id != null) Escolher((await Sessao.Api.GetAsync($"/api/office/clientes/{id}")).AsObject());
         }));
         BotaoRodape("Cancelar", false, Close);
         AcceptButton = null; // Enter na caixa de busca busca (não seleciona)
@@ -717,11 +811,13 @@ public class FormPesquisarCliente : DialogoDesign
 
     void Escolher(JsonObject r) { Escolhido = r; DialogResult = DialogResult.OK; Close(); }
 
-    void Buscar() => Seguro.Rodar(this, async () =>
+    void Buscar() => Seguro.Rodar(this, BuscarAsync);
+
+    async Task BuscarAsync()
     {
         var q = _q.Text.Trim();
         if (q.Length < 2) return;
-        var r = await Sessao.Api.Lista($"/api/office/clientes?q={Uri.EscapeDataString(q)}&campo=auto");
+        var r = await Sessao.Api.ListaAsync($"/api/office/clientes?q={Uri.EscapeDataString(q)}&campo=auto");
         if (_soAtivos.Checked) r = r.Where(c => !c.B("bloqueado")).ToList();
         var linhas = r.Select(c => new JsonObject
         {
@@ -736,7 +832,7 @@ public class FormPesquisarCliente : DialogoDesign
         _g.Vazio = r.Count == 0 ? $"Nenhum cliente encontrado para \"{q}\".\nConfira a grafia ou use + Novo cliente para cadastrar." : Instrucao;
         _g.Carregar(linhas);
         _lTotal.Text = $"{r.Count} {(r.Count == 1 ? "cliente encontrado" : "clientes encontrados")}";
-    });
+    }
 
     public static JsonObject Escolher(IWin32Window dono, string titulo = "Pesquisar Cliente", string inicial = null)
     {

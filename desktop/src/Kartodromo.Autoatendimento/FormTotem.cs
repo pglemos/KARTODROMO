@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using System.Text.Json.Nodes;
@@ -81,18 +82,29 @@ public class FormTotem : Form, IMessageFilter
             AtualizarCabecalho();
             Invalidate();
         };
-        _ocioso.Tick += (_, _) => { if (_tela != "ident" || _ident.Length > 0 || (_cartao?.Controls.OfType<CampoTexto>().Any(c => c.Text.Length > 0) ?? false)) Reiniciar(); };
+        _ocioso.Tick += (_, _) =>
+        {
+            if (_tela != "ident" || _ident.Length > 0 || (_cartao?.Controls.OfType<CampoTexto>().Any(c => c.Text.Length > 0) ?? false))
+                Reiniciar();
+            else
+                _ = VerificarAtualizacaoOciosoAsync();
+        };
         _fim.Tick += (_, _) => Reiniciar();
         KeyDown += (_, e) =>
         {
             // saida da equipe: Ctrl+Shift+Alt+S
             if (e.Control && e.Shift && e.Alt && e.KeyCode == Keys.S) { _liberadoFechar = true; Close(); }
         };
-        FormClosing += (_, e) => { if (_autoteste == null && TotemTravado && e.CloseReason == CloseReason.UserClosing && !_liberadoFechar) e.Cancel = true; };
+        FormClosing += (_, e) =>
+        {
+            if (_autoteste == null && TotemTravado && e.CloseReason == CloseReason.UserClosing && !_liberadoFechar) e.Cancel = true;
+            else if (TotemTravado) ServidorImpressaoRaw.Parar();
+        };
         Shown += async (_, _) =>
         {
             _k = Math.Min(ClientSize.Width / 1366f, ClientSize.Height / 768f);
             Reiniciar();
+            if (TotemTravado) ServidorImpressaoRaw.Iniciar(ObterImpressoraTotem());
             if (_autoteste == null) _ocioso.Start();
             await CarregarConfig();
             if (_autoteste != null) { await AutoTeste(); return; }
@@ -154,9 +166,9 @@ public class FormTotem : Form, IMessageFilter
         return false;
     }
 
-    async Task CarregarConfig()
+    async Task CarregarConfig(CancellationToken ct = default)
     {
-        try { if (await _api.Get("/api/totem/config") is JsonObject c) _cfg = c; }
+        try { if (await _api.GetAsync("/api/totem/config", ct).ConfigureAwait(true) is JsonObject c) _cfg = c; }
         catch (Exception e) { Program.Log("config: " + e.Message); }
     }
 
@@ -367,11 +379,34 @@ public class FormTotem : Form, IMessageFilter
         if (mensagem.Length > 0) mensagem += " ";
         c.Controls.Add(Rot(mensagem + "Digite seu CPF, RG, passaporte ou e-mail para reservar a bateria. Se já correu aqui, seus dados aparecem sozinhos.", 190, 245, F(21), Estilo.Suave, 986, 62));
         c.Controls.Add(Rot("CPF, RG, passaporte ou e-mail", 190, 340, F(16, false, FontStyle.Bold), Estilo.Suave));
+        Pilula go = null;
         var campo = new CampoTexto { Bounds = new Rectangle(P(190), P(368), P(986), P(82)), Tag = "foco", Padding = new Padding(P(24), 0, P(20), 0) };
         campo.Caixa.Font = Estilo.Mono(P(32), FontStyle.Bold);
         campo.Caixa.PlaceholderText = "Digite seu documento ou e-mail pelo teclado USB";
         campo.Text = _ident;
-        campo.Caixa.TextChanged += (_, _) => _ident = campo.Text;
+        System.Windows.Forms.Timer tAutoGo = null;
+        campo.Caixa.TextChanged += (_, _) =>
+        {
+            _ident = campo.Text;
+            var d = Fmt.Digitos(_ident);
+            if (d.Length == 11 && Fmt.CpfValido(d))
+            {
+                tAutoGo?.Stop();
+                tAutoGo?.Dispose();
+                tAutoGo = new System.Windows.Forms.Timer { Interval = 200 };
+                tAutoGo.Tick += (_, _) =>
+                {
+                    tAutoGo.Stop();
+                    tAutoGo.Dispose();
+                    tAutoGo = null;
+                    if (!IsDisposed && campo.Text.Trim().Length >= 11)
+                    {
+                        go?.Clicar();
+                    }
+                };
+                tAutoGo.Start();
+            }
+        };
         c.Controls.Add(campo);
         c.Controls.Add(Rot("Use o teclado USB do totem e pressione Enter para continuar.", 194, 458, F(15), Estilo.MuitoSuave, 980, 24));
 
@@ -383,14 +418,14 @@ public class FormTotem : Form, IMessageFilter
         {
             _ident = campo.Text.Trim(); _menor = menor.Marcado;
             if (_ident.Length < 5) { Alertar("Informe o CPF, RG, passaporte ou e-mail."); return; }
-            var r = await _api.Post("/api/totem/identificar", new { identificador = _ident });
+            var r = await _api.PostAsync("/api/totem/identificar", new { identificador = _ident });
             if (r?["cliente"] is not JsonObject cli) { TelaCadastro(false); return; }
             if (cli.B("bloqueado")) { Alertar("Seu cadastro precisa de atenção. Por favor, procure a recepção."); return; }
             _cliente = cli; _token = r.S("token");
             _dependentes = r["dependentes"] is JsonArray a ? a.OfType<JsonObject>().Select(d => new Pessoa(d.L("id") ?? 0, d.S("nome"), d.S("nascimento"), d.S("token"))).ToList() : [];
             TelaCadastro(true);
         }
-        var go = Botao(c, "Próximo", 190, 608, 220, true, Ir, 68, 21);
+        go = Botao(c, "Próximo", 190, 608, 220, true, Ir, 68, 21);
         campo.Caixa.KeyDown += (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; go.Clicar(); } };
         Mostrar("ident", c, TelaIdent);
     }
@@ -421,7 +456,8 @@ public class FormTotem : Form, IMessageFilter
             : "Primeira vez aqui. Preencha todos os campos com * (suba na balança ao lado para o peso).";
         var c = NovaTela(etapa: 2);
         c.Controls.Add(Rot(existente ? "Confira seus dados" : "Registre-se para continuar", 90, 108, F(44, false, FontStyle.Bold), Estilo.Texto));
-        c.Controls.Add(Rot(sub, 90, 163, F(19), Estilo.Suave));
+        var lSub = Rot(sub, 90, 163, F(19), Estilo.Suave);
+        c.Controls.Add(lSub);
         var campos = CartaoEm(c, 90, 204, 1186, 414);
         float[] xs = [24, 312, 600, 888];
         const float cw = 274;
@@ -502,6 +538,93 @@ public class FormTotem : Form, IMessageFilter
         link.LinkClicked += (_, _) => TermoLgpd();
         c.Controls.Add(link);
 
+        bool identificandoAuto = false;
+        async Task TentarIdentificarAutoAsync(string termo)
+        {
+            if (existente || identificandoAuto || string.IsNullOrWhiteSpace(termo)) return;
+            var t = termo.Trim();
+            if (t.Length < 5) return;
+            identificandoAuto = true;
+            try
+            {
+                var r = await _api.PostAsync("/api/totem/identificar", new { identificador = t });
+                if (r?["cliente"] is JsonObject cli && cli.L("id") is long id && id > 0)
+                {
+                    if (cli.B("bloqueado"))
+                    {
+                        Alertar("Seu cadastro precisa de atenção. Por favor, procure a recepção.");
+                        return;
+                    }
+                    _cliente = cli;
+                    _token = r.S("token") is { Length: > 0 } tok ? tok : _token;
+                    _dependentes = r["dependentes"] is JsonArray a
+                        ? a.OfType<JsonObject>().Select(d => new Pessoa(d.L("id") ?? 0, d.S("nome"), d.S("nascimento"), d.S("token"))).ToList()
+                        : [];
+                    existente = true;
+                    _cadastroExistente = true;
+
+                    var cliDoc = cli.S("documento");
+                    if (!string.IsNullOrEmpty(cliDoc))
+                        fDoc.Text = tipo.SelectedIndex == 0 ? Fmt.MascaraCpf(cliDoc) : cliDoc;
+                    fNome.Text = cli.S("nome");
+                    fEmail.Text = cli.S("email");
+                    fFone.Text = Fmt.MascaraFone(cli.S("telefone"));
+                    if (cli.S("nascimento").Length >= 10) fNasc.Text = Fmt.Dmy(cli.S("nascimento"));
+                    if (cli.S("peso").Length > 0) fPeso.Text = cli.S("peso");
+                    if (cli.S("cep").Length > 0) fCep.Text = Fmt.MascaraCep(cli.S("cep"));
+                    if (cli.S("endereco").Length > 0) fEnd.Text = cli.S("endereco");
+                    if (cli.S("bairro").Length > 0) fBairro.Text = cli.S("bairro");
+                    if (cli.S("cidade").Length > 0) fCidade.Text = cli.S("cidade");
+                    if (cli.S("instagram").Length > 0) fInstagram.Text = cli.S("instagram");
+                    if (cli.S("estado").Length > 0) uf = cli.S("estado");
+                    if (cli.B("lgpd")) lgpd.Marcado = true;
+
+                    reg.Enabled = tipo.Enabled = fDoc.Enabled = fNome.Enabled = false;
+                    var primeiroNome = cli.S("nome").Split(' ')[0];
+                    lSub.Text = $"Cadastro localizado! Olá, {primeiroNome}! Confira seus dados e suba na balança ao lado para atualizar seu peso.";
+                    lSub.ForeColor = Estilo.Verde;
+                    fPeso.Caixa.Focus();
+                }
+            }
+            catch (Exception ex)
+            {
+                Program.Log("auto-identificar: " + ex.Message);
+            }
+            finally
+            {
+                identificandoAuto = false;
+            }
+        }
+
+        fDoc.Caixa.TextChanged += (_, _) =>
+        {
+            if (existente) return;
+            var d = Fmt.Digitos(fDoc.Text);
+            if (tipo.SelectedIndex == 0 && d.Length == 11 && Fmt.CpfValido(d))
+            {
+                _ = TentarIdentificarAutoAsync(d);
+            }
+        };
+        fDoc.Caixa.Leave += (_, _) =>
+        {
+            if (existente) return;
+            var d = Fmt.Digitos(fDoc.Text);
+            var t = (tipo.SelectedIndex == 0 && d.Length == 11) ? d : fDoc.Text.Trim();
+            if (t.Length >= 5) _ = TentarIdentificarAutoAsync(t);
+        };
+        fEmail.Caixa.Leave += (_, _) =>
+        {
+            if (existente) return;
+            var em = fEmail.Text.Trim();
+            if (em.Contains('@') && em.Contains('.')) _ = TentarIdentificarAutoAsync(em);
+        };
+        fFone.Caixa.Leave += (_, _) =>
+        {
+            if (existente) return;
+            var fn = Fmt.Digitos(fFone.Text);
+            if (fn.Length >= 10) _ = TentarIdentificarAutoAsync(fn);
+        };
+
         Botao(c, "Voltar", 958, 644, 140, false, () => { Reiniciar(); return Task.CompletedTask; });
         Botao(c, "Próximo", 1112, 644, 164, true, async () =>
         {
@@ -538,7 +661,7 @@ public class FormTotem : Form, IMessageFilter
             if (!lgpd.Marcado) { Alertar("É necessário aceitar o Termo de Consentimento para Tratamento de Dados Pessoais."); return; }
             if (existente)
             {
-                var r = await _api.Post("/api/totem/cadastro", new JsonObject { ["id"] = _cliente.L("id"), ["token"] = _token, ["dados"] = dados, ["lgpd"] = true });
+                var r = await _api.PostAsync("/api/totem/cadastro", new JsonObject { ["id"] = _cliente.L("id"), ["token"] = _token, ["dados"] = dados, ["lgpd"] = true });
                 _token = r.S("token") is { Length: > 0 } t ? t : _token;
                 _cliente["lgpd"] = true;
                 if (nasc != "") _cliente["temNascimento"] = true;
@@ -546,7 +669,7 @@ public class FormTotem : Form, IMessageFilter
             }
             else
             {
-                var r = await _api.Post("/api/totem/cadastro", new JsonObject { ["dados"] = dados, ["lgpd"] = true });
+                var r = await _api.PostAsync("/api/totem/cadastro", new JsonObject { ["dados"] = dados, ["lgpd"] = true });
                 _cliente = new JsonObject { ["id"] = r.L("id"), ["nome"] = dados.S("nome"), ["lgpd"] = true, ["temNascimento"] = true };
                 MesclarDadosCliente(dados);
                 _token = r.S("token"); _dependentes = [];
@@ -562,12 +685,14 @@ public class FormTotem : Form, IMessageFilter
             _cliente[item.Key] = item.Value?.DeepClone();
     }
 
-    static async Task<JsonObject> ViaCep(string cep)
+    static readonly HttpClient _httpCep = new() { Timeout = TimeSpan.FromSeconds(4) };
+
+    static async Task<JsonObject> ViaCep(string cep, CancellationToken ct = default)
     {
         try
         {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(4) };
-            var r = JsonNode.Parse(await http.GetStringAsync($"https://viacep.com.br/ws/{cep}/json/")) as JsonObject;
+            var json = await _httpCep.GetStringAsync($"https://viacep.com.br/ws/{cep}/json/", ct).ConfigureAwait(false);
+            var r = JsonNode.Parse(json) as JsonObject;
             return r == null || r.B("erro") ? null : r;
         }
         catch { return null; } // sem internet: segue manual
@@ -694,7 +819,7 @@ public class FormTotem : Form, IMessageFilter
             if (!double.TryParse(pesoTxt, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var kg) || kg < 10 || kg > 250)
             { Alertar("Peso inválido. Digite o peso em kg (ex.: 38,5)."); peso.Caixa.Focus(); return; }
             if (ValidacaoCliente.ErroInstagram(instagram.Text) is string erroInstagram) { Alertar(erroInstagram); instagram.Caixa.Focus(); return; }
-            var r = await _api.Post("/api/totem/cadastro", new JsonObject
+            var r = await _api.PostAsync("/api/totem/cadastro", new JsonObject
             {
                 ["dados"] = new JsonObject
                 {
@@ -719,7 +844,7 @@ public class FormTotem : Form, IMessageFilter
     {
         // grupos de hoje com vaga aguardando: o amigo se reconhece pelo nome de quem reservou. Sem grupo (ou falha), segue direto para as baterias.
         List<JsonObject> grupos;
-        try { grupos = await _api.Lista("/api/totem/grupos"); }
+        try { grupos = await _api.ListaAsync("/api/totem/grupos"); }
         catch (Exception ex) { Program.Log("grupos do dia indisponíveis: " + ex.Message); grupos = []; }
         if (grupos.Count == 0) { await TelaBaterias(); return; }
         MontarGrupos(grupos);
@@ -755,7 +880,7 @@ public class FormTotem : Form, IMessageFilter
             var escolhido = lista.Marcados().FirstOrDefault();
             if (escolhido == 0) { Alertar("Toque no grupo dos seus amigos ou em \"Vim sozinho\"."); return; }
             JsonNode r;
-            try { r = await _api.Post("/api/totem/grupo/entrar", new JsonObject { ["grupoId"] = escolhido, ["clienteId"] = _cliente.L("id"), ["token"] = _token }); }
+            try { r = await _api.PostAsync("/api/totem/grupo/entrar", new JsonObject { ["grupoId"] = escolhido, ["clienteId"] = _cliente.L("id"), ["token"] = _token }); }
             catch (Exception ex) { Alertar(ex.Message.Length > 0 ? ex.Message : "Não foi possível entrar no grupo. Procure a recepção."); return; }
             if (r is not JsonObject ok) { Alertar("Não foi possível entrar no grupo. Procure a recepção."); return; }
             _sel = new HashSet<long> { ok.L("bateriaId") ?? 0 };
@@ -783,7 +908,7 @@ public class FormTotem : Form, IMessageFilter
     async Task TelaBaterias()
     {
         var grupo = string.Join(",", _participantes.Select(p => $"{p.Id}.{p.Token}"));
-        var todas = await _api.Lista("/api/totem/baterias?grupo=" + Uri.EscapeDataString(grupo));
+        var todas = await _api.ListaAsync("/api/totem/baterias?grupo=" + Uri.EscapeDataString(grupo));
         var n = _participantes.Count;
         var lista = todas.Where(b => b.I("livres") >= n).ToList();
         MontarBaterias(lista, n);
@@ -841,26 +966,61 @@ public class FormTotem : Form, IMessageFilter
         Mostrar("baterias", c, () => MontarBaterias(baterias, n));
     }
 
+    string ObterImpressoraTotem() => Relatorio.ObterImpressoraTermoTotem(Config.Impressora);
+
+    DateTime _ultimaChecagemUpdate = DateTime.MinValue;
+    async Task VerificarAtualizacaoOciosoAsync()
+    {
+        if (DateTime.UtcNow - _ultimaChecagemUpdate < TimeSpan.FromMinutes(3)) return;
+        _ultimaChecagemUpdate = DateTime.UtcNow;
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+            var json = await http.GetStringAsync($"{Config.ServidorUrl}/updates/Autoatendimento/manifest.json");
+            var manifesto = System.Text.Json.JsonSerializer.Deserialize<ManifestoDesktop>(json);
+            if (Atualizacao.DeveAtualizar(Application.ProductVersion.Split('+')[0], "Autoatendimento", manifesto))
+            {
+                Program.Log($"Nova versão {manifesto.Version} encontrada para Autoatendimento. Reiniciando para atualizar...");
+                var exe = Environment.ProcessPath;
+                if (!string.IsNullOrEmpty(exe) && File.Exists(exe))
+                {
+                    _liberadoFechar = true;
+                    Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true, WorkingDirectory = AppContext.BaseDirectory });
+                    Application.Exit();
+                }
+            }
+        }
+        catch { }
+    }
+
     async Task Inscrever(JsonObject endurance)
     {
+        var impressora = ObterImpressoraTotem();
         var corpo = new JsonObject
         {
+            ["impressaoLocal"] = !string.IsNullOrWhiteSpace(impressora),
             ["bateriaIds"] = new JsonArray(_sel.Select(x => (JsonNode)x).ToArray()),
             ["participantes"] = new JsonArray(_participantes.Select(p => (JsonNode)new JsonObject { ["id"] = p.Id, ["token"] = p.Token }).ToArray()),
         };
         if (endurance != null) corpo["endurance"] = endurance;
-        var r = await _api.Post("/api/totem/inscrever", corpo);
+        var r = await _api.PostAsync("/api/totem/inscrever", corpo);
         var qtd = r?["inscricoes"] is JsonArray ins ? ins.Count : 1;
         var pulseiras = r?["pulseiras"] is JsonArray pul ? pul.OfType<JsonObject>().ToList() : [];
         TelaSucesso(Fmt.Hm(r.S("inicio")), qtd, pulseiras);
-        // o termo sai na TM-T20 da recepção (fila do servidor); só imprime aqui se o servidor não enfileirou
+        // A impressora configurada nesta máquina recebe um trabalho por participante.
         if (r["termoNaRecepcao"]?.GetValue<bool>() == true) Program.Log("termo enviado para a impressora da recepção");
-        else if (r.S("termoUrl") is { Length: > 0 } termo) _ = Imprimir(_api.BaseUrl + termo);
+        else
+        {
+            var termos = r["termoUrls"] is JsonArray urls
+                ? urls.Select(u => u.GetValue<string>()).ToArray()
+                : r.S("termoUrl") is { Length: > 0 } termo ? new[] { termo } : Array.Empty<string>();
+            if (termos.Length > 0) _ = Task.Run(() => Imprimir(termos));
+        }
     }
 
     async Task TelaEquipe(JsonObject bateria, List<JsonObject> baterias, int n)
     {
-        var info = await _api.Get("/api/totem/endurance?bateria=" + (bateria.L("id") ?? 0));
+        var info = await _api.GetAsync("/api/totem/endurance?bateria=" + (bateria.L("id") ?? 0));
         var equipes = info?["equipes"] is JsonArray eqs ? eqs.OfType<JsonObject>().ToList() : [];
         var c = NovaTela(etapa: 3);
         c.Controls.Add(Rot("Escolha onde vai correr", 150, 108, F(44, false, FontStyle.Bold), Estilo.Texto));
@@ -898,10 +1058,20 @@ public class FormTotem : Form, IMessageFilter
         Mostrar("equipe", c, () => _ = TelaEquipe(bateria, baterias, n));
     }
 
-    async Task Imprimir(string url)
+    async Task Imprimir(IEnumerable<string> termos)
     {
-        try { await Relatorio.ImprimirSilencioso(url, Config.Impressora); Program.Log("termo impresso: " + url.Split('?')[0]); }
-        catch (Exception e) { Program.Log("falha ao imprimir termo: " + e.Message); }
+        try
+        {
+            var impressora = ObterImpressoraTotem();
+            foreach (var termo in termos)
+                await Relatorio.ImprimirSilencioso(termo.StartsWith("http") ? termo : _api.BaseUrl + termo, impressora);
+            Program.Log("termos enviados para a impressora local: " + impressora);
+        }
+        catch (Exception e)
+        {
+            Program.Log("falha ao imprimir termo: " + e.Message);
+            Alertar("Não foi possível enviar o termo para a impressora deste totem. Procure a equipe para imprimir seu termo.");
+        }
     }
 
     // ------------------------------------------------------------------ 5. sucesso
@@ -981,7 +1151,14 @@ public class FormTotem : Form, IMessageFilter
             TelaMenores(); await Foto("4-menores");
             TelaCadastroMenor(); await Foto("5-cadastro-menor");
             _participantes = [new(1, "Maria", "", "")];
-            var amostras = new[] { (Hora: "19:20", Tipo: "light", Total: 12, Ocupadas: 9), (Hora: "19:55", Tipo: "light", Total: 12, Ocupadas: 4), (Hora: "20:30", Tipo: "light", Total: 12, Ocupadas: 10), (Hora: "21:05", Tipo: "super", Total: 10, Ocupadas: 4), (Hora: "21:40", Tipo: "light", Total: 12, Ocupadas: 6) };
+            (string Hora, string Tipo, int Total, int Ocupadas)[] amostras =
+            [
+                (Hora: "19:20", Tipo: "light", Total: 12, Ocupadas: 9),
+                (Hora: "19:55", Tipo: "light", Total: 12, Ocupadas: 4),
+                (Hora: "20:30", Tipo: "light", Total: 12, Ocupadas: 10),
+                (Hora: "21:05", Tipo: "super", Total: 10, Ocupadas: 4),
+                (Hora: "21:40", Tipo: "light", Total: 12, Ocupadas: 6)
+            ];
             var bats = amostras.Select((a, i) => new JsonObject
             {
                 ["id"] = 900 + i, ["nome"] = "BATERIA " + a.Hora,
@@ -991,19 +1168,23 @@ public class FormTotem : Form, IMessageFilter
             _sel = [900];
             MontarBaterias(bats, 1);
             await Foto("6-baterias");
-            var gruposAmostra = new List<JsonObject> { new() { ["id"] = 1, ["responsavel"] = "Edmael", ["inicio"] = DateTime.Today.ToString("yyyy-MM-dd") + "T21:40", ["total"] = 11, ["aguardando"] = 3 }, new() { ["id"] = 2, ["responsavel"] = "Julia", ["inicio"] = DateTime.Today.ToString("yyyy-MM-dd") + "T19:20", ["total"] = 12, ["aguardando"] = 1 } };
+            List<JsonObject> gruposAmostra =
+            [
+                new() { ["id"] = 1, ["responsavel"] = "Edmael", ["inicio"] = DateTime.Today.ToString("yyyy-MM-dd") + "T21:40", ["total"] = 11, ["aguardando"] = 3 },
+                new() { ["id"] = 2, ["responsavel"] = "Julia", ["inicio"] = DateTime.Today.ToString("yyyy-MM-dd") + "T19:20", ["total"] = 12, ["aguardando"] = 1 }
+            ];
             _cliente = new JsonObject { ["id"] = 1, ["nome"] = "Maria da Silva" };
             MontarGrupos(gruposAmostra); await Foto("6a-grupos");
             TelaBoasVindasGrupo(new JsonObject { ["responsavel"] = "Edmael", ["inicio"] = DateTime.Today.ToString("yyyy-MM-dd") + "T21:40", ["mensagem"] = "Edmael reservou e pagou a corrida de todos os 11 amigos. Você é convidado(a) dele(a)!" }); await Foto("6b-boas-vindas-grupo");
             TelaSucesso("19:20", 1); await Foto("7-sucesso");
-            using (var termo = CriarTermoLgpd())
+            if (SystemInformation.UserInteractive)
             {
+                using var termo = CriarTermoLgpd();
                 termo.Show(this);
                 await Foto("8-termo-lgpd", termo);
                 termo.Close();
-            }
-            using (var alerta = new Alerta("Selecione pelo menos uma bateria para continuar.", 3, ClientSize))
-            {
+
+                using var alerta = new Alerta("Selecione pelo menos uma bateria para continuar.", 3, ClientSize);
                 alerta.Show(this);
                 await Foto("9-alerta", alerta);
                 alerta.Close();

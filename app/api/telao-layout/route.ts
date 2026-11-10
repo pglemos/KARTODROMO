@@ -47,7 +47,7 @@ export async function PUT(request: NextRequest) {
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data = (await response.json()) as Record<string, unknown>;
         return NextResponse.json(
           {
             ...data,

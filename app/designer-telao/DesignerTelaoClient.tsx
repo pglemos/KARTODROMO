@@ -224,7 +224,7 @@ export function DesignerTelaoClient() {
     try {
       const response = await fetch(`/api/telao-layout?_ts=${Date.now()}`, { cache: 'no-store' });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
+      const data = (await response.json()) as { layout?: unknown; store?: StoreStatus };
       const nextLayout = normalizeTelaoLayoutConfig(data.layout);
       setLayout(nextLayout);
       setSavedLayout(nextLayout);
@@ -330,7 +330,7 @@ export function DesignerTelaoClient() {
     try {
       const response = await fetch(`/api/telao-layout?_ts=${Date.now()}`, { cache: 'no-store' });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
+      const data = (await response.json()) as { layout?: unknown; store?: StoreStatus };
       const remoteLayout = normalizeTelaoLayoutConfig(data.layout);
       setStore(data.store || {});
       const target = data.store?.remoteEndpoint ? 'servidor local' : 'storage publicado';
@@ -413,7 +413,13 @@ export function DesignerTelaoClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(targetLayout),
       });
-      const data = await response.json().catch(() => ({}));
+      const data = (await response.json().catch(() => ({}))) as {
+        layout?: unknown;
+        store?: StoreStatus;
+        storage?: string;
+        persistent?: boolean;
+        error?: string;
+      };
 
       if (!response.ok) throw new Error(data?.error ? `HTTP ${response.status}: ${data.error}` : `HTTP ${response.status}`);
 
@@ -421,12 +427,12 @@ export function DesignerTelaoClient() {
       const nextLayout = normalizeTelaoLayoutConfig(data.layout);
       setLayout(nextLayout);
       setSavedLayout(nextLayout);
-      setStore(data.store || { storage: data.storage, persistent: data.persistent });
+      setStore(data.store || { storage: data.storage, persistent: Boolean(data.persistent) });
       setHistory([]);
       setFuture([]);
       setJsonText(JSON.stringify(nextLayout, null, 2));
       const verifyResponse = await fetch(`/api/telao-layout?_ts=${Date.now()}`, { cache: 'no-store' });
-      const verifyData = verifyResponse.ok ? await verifyResponse.json() : null;
+      const verifyData = verifyResponse.ok ? ((await verifyResponse.json()) as { layout?: unknown }) : null;
       const verified = verifyData ? sameLayout(nextLayout, normalizeTelaoLayoutConfig(verifyData.layout)) : false;
       const verification = verified ? await verifyTelaoPayload(nextLayout) : { ok: false, hiddenFields: [], driverCount: 0 };
       const target = data.store?.remoteEndpoint ? 'servidor local' : 'storage publicado';

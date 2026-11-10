@@ -136,11 +136,11 @@ TELAS.patrocinadores = async (tela) => {
       <div class="cartao"><span>Em atraso</span><b>${ptRc(soma(atras))}</b><small>${atras.length} cobrança(s) vencida(s)</small></div>
       <div class="cartao"><span>Espaços ocupados</span><b>${ocupados} de ${ativos.length}</b><small>${ativos.length ? `${ativos.length - ocupados} livre(s) para vender` : 'cadastre os espaços'}</small></div></section>
     <div class="pt-dois">
-      <div class="cartao pt-sec" style="padding:16px"><h3>Cobranças dos próximos 30 dias</h3>${atras.length ? `<button class="pt-aviso erro" style="border:0;width:100%;text-align:left;margin-bottom:8px;cursor:pointer" data-aba="cobrancas">${atras.length} em atraso somando ${ptR(soma(atras))} — resolver agora</button>` : ''}
+      <div class="cartao pt-sec" style="padding:16px"><h2>Cobranças dos próximos 30 dias</h2>${atras.length ? `<button class="pt-aviso erro" style="border:0;width:100%;text-align:left;margin-bottom:8px;cursor:pointer" data-aba="cobrancas">${atras.length} em atraso somando ${ptR(soma(atras))} — resolver agora</button>` : ''}
         ${prox.length ? `<ul class="pt-ul">${prox.map((c) => `<li><span><b>${esc(c.empresa_nome)}</b><br><small class="i2-m">${ptData(c.vencimento)} · em ${ptDias(c.vencimento)} dia(s)</small></span><b>${ptR(c.valor)}</b></li>`).join('')}</ul>` : '<p class="i2-m">Nada a vencer nos próximos 30 dias.</p>'}</div>
-      <div class="cartao pt-sec" style="padding:16px"><h3>Contratos vencendo em 30 dias</h3>
+      <div class="cartao pt-sec" style="padding:16px"><h2>Contratos vencendo em 30 dias</h2>
         ${acabando.length ? `<ul class="pt-ul">${acabando.map((c) => `<li><span><b>${esc(c.empresa_nome)}</b><br><small class="i2-m">${esc(c.espaco_nome || c.titulo)}</small></span><b>${ptData(c.data_fim)}${c.renovacao_automatica ? ' · renova' : ''}</b></li>`).join('')}</ul>` : '<p class="i2-m">Nenhum contrato perto do fim.</p>'}</div></div>
-    <div class="cartao pt-sec" style="padding:16px"><h3>Mapa de espaços</h3>${ativos.length ? `<ul class="pt-mapa">${ativos.map((e) => { const c = vig.find((x) => x.espaco_id === e.id); return `<li><span><b>${esc(e.nome)}</b><small class="i2-m">${c ? esc(c.empresa_nome) : PT.tipo[e.tipo]}</small></span><span class="i2-selo ${c ? 'amarelo' : 'verde'}">${c ? 'Ocupado' : 'Livre'}</span></li>`; }).join('')}</ul>` : '<p class="i2-m">Cadastre os outdoors e o pódio na aba Espaços.</p>'}</div>`;
+    <div class="cartao pt-sec" style="padding:16px"><h2>Mapa de espaços</h2>${ativos.length ? `<ul class="pt-mapa">${ativos.map((e) => { const c = vig.find((x) => x.espaco_id === e.id); return `<li><span><b>${esc(e.nome)}</b><small class="i2-m">${c ? esc(c.empresa_nome) : PT.tipo[e.tipo]}</small></span><span class="i2-selo ${c ? 'amarelo' : 'verde'}">${c ? 'Ocupado' : 'Livre'}</span></li>`; }).join('')}</ul>` : '<p class="i2-m">Cadastre os outdoors e o pódio na aba Espaços.</p>'}</div>`;
   };
 
   // ---------------- Contratos

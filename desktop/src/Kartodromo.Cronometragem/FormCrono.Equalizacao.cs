@@ -9,10 +9,12 @@ namespace Kartodromo.Cronometragem;
 /// Regra do redutor (por tipo de kart, editável): a diferença para a referência diz quanto abrir ou fechar, em mm.</summary>
 public partial class FormCrono
 {
-    async Task TestarEditorRedutor()
+    Task TestarEditorRedutor() => TestarEditorRedutorAsync();
+
+    async Task TestarEditorRedutorAsync()
     {
         Directory.CreateDirectory(_autoteste);
-        await CarregarRegrasDoRedutor();
+        await CarregarRegrasDoRedutorAsync();
         _eqRegras = _eqRegras.Where(r => r.S("nome").StartsWith("TESTE CODEX")).ToList();
         if (_eqRegras.Count == 0) throw new Exception("Regra TESTE CODEX não encontrada no simulador.");
         using var timer = new System.Windows.Forms.Timer { Interval = 200 };
@@ -180,15 +182,17 @@ public partial class FormCrono
     static string DiaHora(long? ms) => ms is long w ? DateTimeOffset.FromUnixTimeMilliseconds(w).ToLocalTime().ToString("dd/MM/yyyy HH:mm") : "";
 
     /// <summary>Lista de equalizações (mais recente primeiro) e a escolhida. forcar = recarrega mesmo sem ter passado o intervalo.</summary>
-    async Task CarregarEqualizacao(bool forcar = false)
+    Task CarregarEqualizacao(bool forcar = false) => CarregarEqualizacaoAsync(forcar);
+
+    async Task CarregarEqualizacaoAsync(bool forcar = false, CancellationToken ct = default)
     {
         if (_eqLista == null || _eqCarregando) return;
         if (!forcar && DateTime.Now - _eqLidaEm < TimeSpan.FromSeconds(2)) return;
         _eqCarregando = true;
         try
         {
-            if (_eqRegras == null || forcar) await CarregarRegrasDoRedutor();
-            var resposta = (await Crono.Api.Get("/api/equalizacao"))?.AsObject();
+            if (_eqRegras == null || forcar) await CarregarRegrasDoRedutorAsync(ct);
+            var resposta = (await Crono.Api.GetAsync("/api/equalizacao", ct))?.AsObject();
             var lista = Crono.Arr(resposta, "equalizacoes");
             var escolhida = (_eqLista.SelectedItem as Campos.Item)?.Dados?.S("id") ?? _eq?.S("id");
             var textos = lista.Select(e => $"{DiaHora(e.L("startedAt") ?? e.L("createdAt"))}  ·  {e.S("name")}  ·  {(e.L("finalizadaEm") != null ? "finalizada" : Crono.Estado(e.S("state")).ToLowerInvariant())}").ToList();
@@ -202,7 +206,7 @@ public partial class FormCrono
                 _eqMontandoLista = false;
             }
             var id = (_eqLista.SelectedItem as Campos.Item)?.Dados?.S("id");
-            _eq = string.IsNullOrEmpty(id) ? null : (await Crono.Api.Get($"/api/equalizacao/{id}"))?.AsObject();
+            _eq = string.IsNullOrEmpty(id) ? null : (await Crono.Api.GetAsync($"/api/equalizacao/{id}", ct))?.AsObject();
             _eqLidaEm = DateTime.Now;
             DesenharEqualizacao();
         }
@@ -407,9 +411,11 @@ public partial class FormCrono
     List<JsonObject> RegrasDoRedutor() => _eqRegras is { Count: > 0 } ? _eqRegras
         : [new JsonObject { ["id"] = "kart-indoor", ["nome"] = "Kart Indoor", ["toleranciaMs"] = 200, ["faixaMs"] = 200, ["passoMm"] = 0.1 }];
 
-    async Task CarregarRegrasDoRedutor()
+    Task CarregarRegrasDoRedutor() => CarregarRegrasDoRedutorAsync();
+
+    async Task CarregarRegrasDoRedutorAsync(CancellationToken ct = default)
     {
-        try { _eqRegras = Crono.Arr((await Crono.Api.Get("/api/equalizacao/regras"))?.AsObject(), "regras"); }
+        try { _eqRegras = Crono.Arr((await Crono.Api.GetAsync("/api/equalizacao/regras", ct))?.AsObject(), "regras"); }
         catch { /* serviço antigo ou fora do ar: segue com a regra padrão */ }
     }
 

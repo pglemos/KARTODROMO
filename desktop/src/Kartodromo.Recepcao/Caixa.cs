@@ -10,30 +10,36 @@ public static class Caixa
     static Api Api => Sessao.Api;
 
     /// <summary>Garante terminal aberto (pergunta como o LapTime: "O terminal ainda não foi aberto, deseja abrir agora?").</summary>
-    public static async Task<JsonObject> Garantir(IWin32Window dono)
+    public static Task<JsonObject> Garantir(IWin32Window dono) => GarantirAsync(dono);
+
+    public static async Task<JsonObject> GarantirAsync(IWin32Window dono)
     {
-        var c = (await Api.Get("/api/office/caixa")).AsObject();
+        var c = (await Api.GetAsync("/api/office/caixa")).AsObject();
         if (c["aberto"] is JsonObject) return c;
         if (!Msg.Pergunta(dono, "O terminal ainda não foi aberto, deseja abrir agora?")) return null;
-        if (!await Abrir(dono, c)) return null;
-        return (await Api.Get("/api/office/caixa")).AsObject();
+        if (!await AbrirAsync(dono, c)) return null;
+        return (await Api.GetAsync("/api/office/caixa")).AsObject();
     }
 
-    static async Task<bool> Abrir(IWin32Window dono, JsonObject c)
+    static Task<bool> Abrir(IWin32Window dono, JsonObject c) => AbrirAsync(dono, c);
+
+    static async Task<bool> AbrirAsync(IWin32Window dono, JsonObject c)
     {
-        using var j = new FormTerminalAbrir(c, await TerminaisEmUso());
+        using var j = new FormTerminalAbrir(c, await TerminaisEmUsoAsync());
         j.ShowDialog(dono);
         return j.Concluido;
     }
 
     /// <summary>Terminais com caixa ainda aberto: o servidor não os manda na lista de "Abrir o caixa", e a operadora
     /// precisa saber por que o dela sumiu (alguém abriu nele, ou ficou aberto de ontem).</summary>
-    static async Task<List<(string Terminal, string Usuario, string Desde)>> TerminaisEmUso()
+    static Task<List<(string Terminal, string Usuario, string Desde)>> TerminaisEmUso() => TerminaisEmUsoAsync();
+
+    static async Task<List<(string Terminal, string Usuario, string Desde)>> TerminaisEmUsoAsync()
     {
-        var lista = new List<(string, string, string)>();
+        List<(string Terminal, string Usuario, string Desde)> lista = [];
         try
         {
-            foreach (var m in (await Api.Get("/api/office/movimentos") as JsonArray ?? []).OfType<JsonObject>().Where(m => string.IsNullOrEmpty(m.S("fechadoEm"))))
+            foreach (var m in (await Api.GetAsync("/api/office/movimentos") as JsonArray ?? []).OfType<JsonObject>().Where(m => string.IsNullOrEmpty(m.S("fechadoEm"))))
             {
                 var desde = DateTime.TryParse(m.S("abertoEm"), out var d) ? (d.Date == DateTime.Today ? $"hoje às {d:HH:mm}" : $"desde {d:dd/MM} às {d:HH:mm}") : "sem data";
                 lista.Add((m.S("terminal"), string.IsNullOrEmpty(m.S("usuario")) ? "usuário removido" : m.S("usuario"), desde));
@@ -45,8 +51,8 @@ public static class Caixa
 
     public static void Terminal(FormPrincipal f) => Seguro.Rodar(f, async () =>
     {
-        var c = (await Api.Get("/api/office/caixa")).AsObject();
-        if (c["aberto"] is not JsonObject ab) { if (await Abrir(f, c)) f.Recarregar(); return; }
+        var c = (await Api.GetAsync("/api/office/caixa")).AsObject();
+        if (c["aberto"] is not JsonObject ab) { if (await AbrirAsync(f, c)) f.Recarregar(); return; }
         var s = c["sumario"]?.AsObject() ?? new JsonObject();
         using var j = new FormTerminalFechar(ab, s);
         j.ShowDialog(f);
@@ -55,7 +61,7 @@ public static class Caixa
 
     public static void Transacao(Form f, string tipo) => Seguro.Rodar(f, async () =>
     {
-        var c = await Garantir(f);
+        var c = await GarantirAsync(f);
         if (c == null) return;
         using var j = new FormCaixaTransacao(tipo, c);
         j.ShowDialog(f);
@@ -204,15 +210,19 @@ public class FormCheckout : CartaoModal
         _bat.SelectedIndexChanged += (_, _) => CarregarDisponiveis();
         Load += (_, _) => Seguro.Rodar(this, async () =>
         {
-            var hoje = await Api.Lista($"/api/office/baterias?status=todas&filtro=dia&data={Fmt.Iso(DateTime.Today)}");
+            var tHoje = Api.ListaAsync($"/api/office/baterias?status=todas&filtro=dia&data={Fmt.Iso(DateTime.Today)}");
+            var tCliente = clienteId != null ? Api.GetAsync($"/api/office/clientes/{clienteId}") : Task.FromResult<JsonNode>(null);
+            await Task.WhenAll(tHoje, tCliente);
+
+            var hoje = await tHoje;
             if (bateriaId != null && !hoje.Any(b => b.L("id") == bateriaId))
             {
-                var todas = await Api.Lista($"/api/office/reservas?status=todas&bateriaId={bateriaId}");
+                var todas = await Api.ListaAsync($"/api/office/reservas?status=todas&bateriaId={bateriaId}");
                 if (todas.Count > 0) hoje.Insert(0, new JsonObject { ["id"] = bateriaId, ["nome"] = todas[0].S("reserva"), ["dataHora"] = todas[0].S("dataHora") });
             }
             _bat.Items.Add(new Campos.Item(0, "— sem bateria —"));
             _bat.Items.AddRange(hoje.Select(b => new Campos.Item(b.L("id") ?? 0, $"{Fmt.Hm(b.S("dataHora"))} {b.S("nome")}", b)).ToArray());
-            if (clienteId != null) _cliente = (await Api.Get($"/api/office/clientes/{clienteId}")).AsObject();
+            if (clienteId != null && await tCliente is JsonObject cObj) _cliente = cObj;
             if (bateriaId != null) { Campos.Selecionar(_bat, bateriaId); await CarregarDisponiveisAsync(); Adicionar(_disp.Where(r => reservaIds.Contains(r.L("id") ?? -1)).ToList()); }
             else _bat.SelectedIndex = 0;
             Atualizar();
@@ -564,7 +574,7 @@ public class FormCheckout : CartaoModal
     async Task CarregarDisponiveisAsync()
     {
         var id = Campos.IdDe(_bat);
-        _disp = id is long b && b > 0 ? (await Api.Lista($"/api/office/reservas?status=todas&bateriaId={b}")).Where(r => !r.B("pago") && r.S("status") != "cancelada").ToList() : [];
+        _disp = id is long b && b > 0 ? (await Api.ListaAsync($"/api/office/reservas?status=todas&bateriaId={b}")).Where(r => !r.B("pago") && r.S("status") != "cancelada").ToList() : [];
         Atualizar();
     }
 
@@ -573,7 +583,7 @@ public class FormCheckout : CartaoModal
         foreach (var r in rs)
             if (!_car.Any(c => c.InscricaoId == r.L("id")))
                 _car.Add(new ItemCarrinho { K = _seq++, InscricaoId = r.L("id"), ProdutoId = r.L("produtoId"), Cliente = r.S("cliente"), Produto = r.S("produto"), Unit = r.L("preco") ?? 0, Desc = r.L("desconto") ?? 0 });
-        if (_cliente == null && rs.Count > 0) Seguro.Rodar(this, async () => { _cliente = (await Api.Get($"/api/office/clientes/{rs[0].S("clienteId")}")).AsObject(); Atualizar(); });
+        if (_cliente == null && rs.Count > 0) Seguro.Rodar(this, async () => { _cliente = (await Api.GetAsync($"/api/office/clientes/{rs[0].S("clienteId")}")).AsObject(); Atualizar(); });
         Atualizar();
     }
 
@@ -726,7 +736,7 @@ public class FormCheckout : CartaoModal
         var cod = _codVoucher.Text.Trim();
         if (cod.Length == 0) { Msg.Aviso(this, "Informe o codigo do voucher."); return; }
         if (_voucher != null) { Msg.Aviso(this, "Já existe um voucher aplicado nesta venda. Remova-o primeiro."); return; }
-        var v = await Api.Get("/api/office/vouchers/validar?codigo=" + Uri.EscapeDataString(cod));
+        var v = await Api.GetAsync("/api/office/vouchers/validar?codigo=" + Uri.EscapeDataString(cod));
         var alvo = _car.FirstOrDefault(c => (v.L("produtoId") == null || c.ProdutoId == v.L("produtoId")) && c.Desc == 0);
         if (alvo == null) { Msg.Aviso(this, v.L("produtoId") != null ? "O produto do voucher não está na venda." : "Nenhum produto na venda para aplicar o voucher."); return; }
         if (v.L("pedidoMinimo") is long min && Totais().sub < min) { Msg.Aviso(this, $"Valor do pedido insuficiente. Mínimo exigido: {Fmt.Brl(min)}."); return; }
@@ -780,7 +790,7 @@ public class FormCheckout : CartaoModal
             var pags = new JsonArray();
             foreach (var p in _pags) pags.Add(new JsonObject { ["formaPagamentoId"] = p.forma, ["valorCentavos"] = p.valor });
             var idempotencyKey = Guid.NewGuid().ToString();
-            var r = await Api.Post("/api/office/vendas", new JsonObject { ["clienteId"] = _cliente?.L("id"), ["observacao"] = _obs.Text, ["voucherCodigo"] = _voucher, ["itens"] = itens, ["pagamentos"] = pags, ["idempotencyKey"] = idempotencyKey });
+            var r = await Api.PostAsync("/api/office/vendas", new JsonObject { ["clienteId"] = _cliente?.L("id"), ["observacao"] = _obs.Text, ["voucherCodigo"] = _voucher, ["itens"] = itens, ["pagamentos"] = pags, ["idempotencyKey"] = idempotencyKey });
             Concluido = true;
             if (r.L("troco") is long tr && tr > 0)
             {
@@ -829,7 +839,7 @@ public class FormVenda : DialogoDesign
 
         Load += (_, _) => Seguro.Rodar(this, async () =>
         {
-            var v = await Sessao.Api.Get($"/api/office/vendas/{id}");
+            var v = await Sessao.Api.GetAsync($"/api/office/vendas/{id}");
             Subtitulo.Text = $"Venda {v.S("codigo")} · {v.S("cliente")} · {Fmt.DmyHm(v.S("dataHora"))} · {v.S("usuario")} · {v.S("terminal")}";
             var lista = ((JsonArray)v["itens"]).OfType<JsonObject>().ToList();
             itens.Linhas(lista.Select((i, n) => new[] { i.S("item") is { Length: > 0 } it ? it : (n + 1).ToString(), i.S("descricao"), i.S("quantidade"), Fmt.Dinheiro(i.L("unitario")), Fmt.Dinheiro(i.L("desconto")), Fmt.Dinheiro(i.L("liquido")), i.B("estornado") ? "1" : "0" }));
@@ -871,7 +881,7 @@ public class FormEstorno : DialogoDesign
             if (sel.Count == 0) { Msg.Aviso(this, "Marque os itens a estornar."); return; }
             if (string.IsNullOrWhiteSpace(motivo.Text)) { Msg.Aviso(this, "Informe o motivo do estorno."); motivo.Focus(); return; }
             if (!Msg.Pergunta(this, $"Estornar {Fmt.Brl(sel.Sum(i => i.L("liquido") ?? 0))} dos itens marcados?")) return;
-            var r = await Sessao.Api.Post($"/api/office/vendas/{id}/estorno", new { itemIds = sel.Select(i => i.L("id")).ToArray(), motivo = motivo.Text.Trim() });
+            var r = await Sessao.Api.PostAsync($"/api/office/vendas/{id}/estorno", new { itemIds = sel.Select(i => i.L("id")).ToArray(), motivo = motivo.Text.Trim() });
             Msg.Info(this, $"Estorno de {Fmt.Brl(r.L("estornado"))} registrado. Devolva o valor ao cliente pela mesma forma de pagamento.");
             DialogResult = DialogResult.OK; Close();
         }));
@@ -881,7 +891,7 @@ public class FormEstorno : DialogoDesign
 
         Load += (_, _) => Seguro.Rodar(this, async () =>
         {
-            var v = await Sessao.Api.Get($"/api/office/vendas/{id}");
+            var v = await Sessao.Api.GetAsync($"/api/office/vendas/{id}");
             Subtitulo.Text = $"Venda {v.S("codigo")} · {v.S("cliente")} · {Fmt.DmyHm(v.S("dataHora"))} · terminal {v.S("terminal")}";
             recebido.Text = Fmt.Brl(v.L("recebido")); desconto.Text = Fmt.Brl(v.L("desconto")); troco.Text = Fmt.Brl(v.L("troco"));
             itens = ((JsonArray)v["itens"]).OfType<JsonObject>().Where(i => !i.B("estornado")).ToList();

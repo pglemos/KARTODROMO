@@ -144,15 +144,28 @@ function horaDe(inicio: string | null | undefined) {
   return m ? m[1] + ':' + m[2] : '';
 }
 
-// só o nome da bateria ("BATERIA 19:20") e, se for de grupo, "GRUPO DO(A) EDMAEL"
+export function formatarTituloBateria(nome: string | null | undefined, inicio: string | null | undefined): string {
+  const hora = horaDe(inicio);
+  const n = String(nome ?? '').trim();
+  if (!n || /^bateria$/i.test(n)) {
+    return hora ? `BATERIA ${hora}` : 'BATERIA';
+  }
+  if (/^\d{1,2}:\d{2}$/.test(n)) {
+    return `BATERIA ${n}`;
+  }
+  return n.toLocaleUpperCase('pt-BR');
+}
+
+// só o nome da bateria ("BATERIA 19:20") e, se for de grupo, "GRUPO DO(A) MARCUS" (primeiro nome apenas, em caixa alta)
 function bateriaHtml(participante: TermoParticipante) {
   if (!participante.bateriaNome && !participante.bateriaInicio) return '';
-  const titulo = String(participante.bateriaNome ?? '').trim() || 'BATERIA ' + horaDe(participante.bateriaInicio);
-  const grupo = String(participante.grupoResponsavel ?? '').trim();
+  const titulo = formatarTituloBateria(participante.bateriaNome, participante.bateriaInicio);
+  const grupo = String(participante.grupoResponsavel ?? '').trim().replace(/[.,;]+$/, '');
+  const primeiroNome = (grupo.split(/\s+/)[0] || '').replace(/[.,;]+$/, '');
   return (
     '<div class="rule"></div>' +
     '<div class="bateria"><div class="bat-titulo">' + esc(titulo) + '</div>' +
-    (grupo ? '<div class="bat-grupo">GRUPO DO(A) ' + esc(grupo.toLocaleUpperCase('pt-BR')) + '</div>' : '') +
+    (primeiroNome ? '<div class="bat-grupo">GRUPO DO(A) ' + esc(primeiroNome.toLocaleUpperCase('pt-BR')) + '</div>' : '') +
     '</div>'
   );
 }

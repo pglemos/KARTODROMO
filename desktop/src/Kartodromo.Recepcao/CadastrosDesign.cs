@@ -88,11 +88,26 @@ public static class CadastrosDesign
 
     static string TipoForma(string t) => t switch { "dinheiro" => "Dinheiro", "credito" => "Crédito", "debito" => "Débito", "pix" => "Pix", "voucher" => "Voucher", "outro" => "Outro", _ => t };
 
-    /// <summary>Perfis de acesso (os mesmos da cronometragem: Segurança › Perfil de acesso).</summary>
+    static List<Campos.Item> _perfisCache;
+    static DateTime _perfisValidade;
+
+    public static async Task CarregarPerfisAsync()
+    {
+        try
+        {
+            var lista = await Sessao.Api.ListaAsync("/api/office/cad/perfis");
+            _perfisCache = [.. lista.Select(p => new Campos.Item(p.L("id") ?? 0, p.S("descricao"), p))];
+            _perfisValidade = DateTime.UtcNow.AddMinutes(15);
+        }
+        catch { }
+    }
+
+    /// <summary>Perfis de acesso em cache não-bloqueante (os mesmos da cronometragem: Segurança › Perfil de acesso).</summary>
     static IEnumerable<Campos.Item> Perfis()
     {
-        try { return Task.Run(() => Sessao.Api.Lista("/api/office/cad/perfis")).GetAwaiter().GetResult().Select(p => new Campos.Item(p.L("id") ?? 0, p.S("descricao"), p)).ToList(); }
-        catch { return []; }
+        if (_perfisCache is { Count: > 0 } && DateTime.UtcNow < _perfisValidade) return _perfisCache;
+        if (_perfisCache is null) _ = CarregarPerfisAsync();
+        return _perfisCache ?? [];
     }
 
     static void TrocarSenha(JsonObject usuario)
@@ -105,7 +120,7 @@ public static class CadastrosDesign
         if (conf != nova) { Msg.Aviso(dono, "As senhas não conferem."); return; }
         Seguro.Rodar(dono, async () =>
         {
-            await Sessao.Api.Put($"/api/office/cad/usuarios/{usuario.S("id")}", new { senha = nova });
+            await Sessao.Api.PutAsync($"/api/office/cad/usuarios/{usuario.S("id")}", new { senha = nova });
             Msg.Info(dono, "Senha alterada.");
         });
     }

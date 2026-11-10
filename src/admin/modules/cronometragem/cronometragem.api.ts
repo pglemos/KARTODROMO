@@ -362,9 +362,7 @@ export const importarSnapshot = async (sessaoId: string, snapshot: LiveSnapshot)
     });
 
   if (!payloads.length) throw new Error('O snapshot não contém melhores voltas importáveis.');
-  for (const payload of payloads) {
-    await createVolta(payload);
-  }
+  await Promise.all(payloads.map((payload) => createVolta(payload)));
   return payloads.length;
 };
 
@@ -483,9 +481,7 @@ export const gerarResultados = async (sessaoId: string): Promise<string> => {
   }
 
   try {
-    for (const resultado of resultados) {
-      await apiPost('resultados', resultado);
-    }
+    await Promise.all(resultados.map((resultado) => apiPost('resultados', resultado)));
   } catch (error) {
     await apiDelete(`corridas/${corridaId}`);
     throw error instanceof Error ? error : new Error('Não foi possível inserir os resultados');
@@ -559,13 +555,14 @@ export const recalcularClassificacao = async (campeonatoId: string): Promise<voi
     return atual;
   };
 
-  const porCorrida: Array<{ data: string | null; linhas: ResultadoLinha[] }> = [];
-  for (const corrida of corridas) {
-    const linhas = await apiGet<ResultadoLinha[]>(
-      `resultados?eq_corrida_id=${encodeURIComponent(corrida.id)}`,
-    );
-    porCorrida.push({ data: corrida.data ?? null, linhas });
-  }
+  const porCorrida: Array<{ data: string | null; linhas: ResultadoLinha[] }> = await Promise.all(
+    corridas.map(async (corrida) => {
+      const linhas = await apiGet<ResultadoLinha[]>(
+        `resultados?eq_corrida_id=${encodeURIComponent(corrida.id)}`,
+      );
+      return { data: corrida.data ?? null, linhas };
+    }),
+  );
   const dataMaisRecente = porCorrida.reduce<string | null>((max, item) => {
     if (!item.data) return max;
     return !max || item.data > max ? item.data : max;

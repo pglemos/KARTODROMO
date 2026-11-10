@@ -30,8 +30,8 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
-  const body = await request.json();
-  const items = Array.isArray(body) ? body : body?.items;
+  const body = (await request.json().catch(() => ({}))) as { items?: unknown } | unknown[];
+  const items = Array.isArray(body) ? body : (body as { items?: unknown })?.items;
   const result = await writeTelaoPlaylistRemote({ items });
 
   return NextResponse.json(

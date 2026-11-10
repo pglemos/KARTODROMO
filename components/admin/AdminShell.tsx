@@ -79,6 +79,18 @@ function Navigation({ currentPath, onNavigate }: { currentPath: string; onNaviga
   );
 }
 
+function Brand() {
+  return (
+    <a className="flex items-center gap-2.5 border-b border-kib-borda px-[18px] py-5 no-underline" href="/admin">
+      <span className="admin-brand-mark"><Grid2X2 aria-hidden="true" size={18} /></span>
+      <span>
+        <span className="block text-[11px] font-bold uppercase tracking-[.12em] text-kib-acao">Sistema</span>
+        <strong className="block text-sm font-bold text-kib-texto">Kartódromo Betim</strong>
+      </span>
+    </a>
+  );
+}
+
 export function AdminShell({
   children,
   currentPath,
@@ -145,16 +157,6 @@ export function AdminShell({
       // Theme persistence is progressive enhancement.
     }
   }
-
-  const Brand = () => (
-    <a className="flex items-center gap-2.5 border-b border-kib-borda px-[18px] py-5 no-underline" href="/admin">
-      <span className="admin-brand-mark"><Grid2X2 aria-hidden="true" size={18} /></span>
-      <span>
-        <span className="block text-[11px] font-bold uppercase tracking-[.12em] text-kib-acao">Sistema</span>
-        <strong className="block text-sm font-bold text-kib-texto">Kartódromo Betim</strong>
-      </span>
-    </a>
-  );
 
   return (
     <main className="admin-root" data-theme={theme} data-tema={theme === 'dark' ? 'escuro' : 'claro'}>

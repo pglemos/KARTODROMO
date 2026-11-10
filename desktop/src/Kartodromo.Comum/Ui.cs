@@ -105,7 +105,9 @@ public static class Seguro
 {
     /// <summary>Roda uma ação async sem derrubar o app e oferece recuperação no próprio erro.
     /// <paramref name="silencioso"/>: atualização automática (timer) — não mexe no ponteiro nem abre janela de erro.</summary>
-    public static async void Rodar(Control dono, Func<Task> acao, bool silencioso = false)
+    public static void Rodar(Control dono, Func<Task> acao, bool silencioso = false) => _ = RodarAsync(dono, acao, silencioso);
+
+    public static async Task RodarAsync(Control dono, Func<Task> acao, bool silencioso = false)
     {
         var form = dono?.FindForm();
         var espera = form != null && !silencioso;
@@ -621,11 +623,27 @@ public class Grade : DataGridView
 
     string _assinaturaDados;
 
+    static string AssinaturaRapida(List<JsonObject> lista)
+    {
+        if (lista.Count == 0) return "0";
+        var sb = new System.Text.StringBuilder(lista.Count * 24);
+        sb.Append(lista.Count).Append(':');
+        foreach (var o in lista)
+        {
+            var id = o.S("id");
+            var st = o.S("status");
+            var pg = o.B("pago") ? "1" : "0";
+            var at = o.S("atualizadoEm") is { Length: > 0 } a ? a : o.S("criadoEm");
+            sb.Append(id).Append(',').Append(st).Append(',').Append(pg).Append(',').Append(at).Append(';');
+        }
+        return sb.ToString();
+    }
+
     public void Carregar(IEnumerable<JsonObject> linhas)
     {
         var lista = linhas.ToList();
         // recarga sem mudança nenhuma (o mais comum na sincronização automática): não redesenha, nada pisca nem rola
-        var assinatura = string.Join("\n", lista.Select(o => o.ToJsonString()));
+        var assinatura = AssinaturaRapida(lista);
         if (assinatura == _assinaturaDados && Rows.Count == Visiveis.Count) { _todos = lista; return; }
         _assinaturaDados = assinatura;
         var selIds = Selecionados.Select(x => x.S("id")).ToHashSet();

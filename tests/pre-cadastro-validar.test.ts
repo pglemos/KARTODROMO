@@ -21,7 +21,37 @@ describe('pré-cadastro online', () => {
     expect(validar({ ...base, telefone: '98888-7777' }, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/DDD/) });
     expect(validar({ ...base, nascimento: '2027-01-01' }, HOJE)).toMatchObject({ ok: false });
     expect(validar({ ...base, lgpd: false }, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/Termo/) });
+    expect(validar({ ...base, email: '' }, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/e-mail é obrigatório/i) });
     expect(validar({ ...base, email: 'sem-arroba' }, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/E-mail/) });
+    expect(validar({ ...base, peso: '' }, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/peso é obrigatório/i) });
+    expect(validar({ ...base, peso: '10' }, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/Peso inválido/i) });
+    expect(validar({ ...base, peso: '300' }, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/Peso inválido/i) });
+  });
+
+  it('exige endereço completo (CEP, rua, número, bairro, cidade, UF) para impressão correta do termo', () => {
+    expect(validar({ ...base, cep: '' }, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/CEP é obrigatório/i) });
+    expect(validar({ ...base, cep: '12345' }, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/CEP é obrigatório/i) });
+    expect(validar({ ...base, endereco: '' }, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/endereço é obrigatóri/i) });
+    expect(validar({ ...base, numero: '' }, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/número do endereço é obrigatório/i) });
+    expect(validar({ ...base, bairro: '' }, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/bairro é obrigatório/i) });
+    expect(validar({ ...base, cidade: '' }, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/cidade é obrigatória/i) });
+    expect(validar({ ...base, estado: '' }, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/UF é obrigatória/i) });
+    expect(validar({ ...base, estado: 'MGG' }, HOJE)).toMatchObject({ ok: false, erro: expect.stringMatching(/UF é obrigatória/i) });
+  });
+
+  it('preserva e valida token de reserva em grupo (?r=TOKEN)', () => {
+    const comReserva = validar({ ...base, reserva: 'ic7r9vnsrlMiK9v8' }, HOJE);
+    expect(comReserva.ok).toBe(true);
+    if (comReserva.ok) expect(comReserva.dados.reserva).toBe('ic7r9vnsrlMiK9v8');
+
+    const tokenInvalido = validar({ ...base, reserva: 't!' }, HOJE);
+    expect(tokenInvalido.ok).toBe(false);
+    if (!tokenInvalido.ok) expect(tokenInvalido.erro).toMatch(/Código de reserva inválido/);
+  });
+
+  it('permite omitir endereço e peso quando explicitamente desativado (ex.: reserva online checkout)', () => {
+    const semEndEPeso = validar({ ...base, peso: '', cep: '', endereco: '', numero: '', bairro: '', cidade: '', estado: '' }, HOJE, { exigirEndereco: false, exigirPeso: false });
+    expect(semEndEPeso.ok).toBe(true);
   });
 
   it('Instagram obrigatório e válido, como no totem (sai no resultado impresso)', () => {

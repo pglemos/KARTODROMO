@@ -13,7 +13,7 @@ let base = ''; let porta = 0; const senha = randomBytes(24).toString('hex'); con
 let processo: ChildProcess; let logs = '';
 const req = async (path: string, token?: string, body?: unknown, method = 'POST') => {
  const r = await fetch(base + path, { method: body === undefined ? 'GET' : method, headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
- return { http: r.status, body: await r.json() };
+ return { http: r.status, body: (await r.json()) as any };
 };
 const login = async (usuario: string) => (await req('/api/app/v1/auth/login', undefined, { usuario, senha, deviceId: 'TESTE CODEX' })).body.accessToken as string;
 const comando = async (token: string, id: string, rota: string, payload: object, operationId: string) => {
@@ -39,7 +39,7 @@ beforeAll(async () => {
  writeFileSync(join(data, 'sessions', `${historica.id}.json`), JSON.stringify(historica));
  const store = abrirStore(join(pasta, 'app-operacional', 'app.db'));
  for (const [usuario, perfil] of [['ger', 'GERENCIA'], ['op', 'OPERACAO'], ['rec', 'RECEPCAO']] as const) await criarUsuario({ store, segredo }, { usuario, nome: 'TESTE CODEX', perfil, senha }); store.fechar();
- processo = spawn(join(raiz, 'node_modules', '.bin', 'tsx'), [join(raiz, 'services/timing-server.ts')], { cwd: pasta, env: { NODE_ENV: 'test', PATH: process.env.PATH, HOME: process.env.HOME, TIMING_PORT: String(porta), TIMING_SIMULATE: '1', TIMING_SIM_PORT: '0', TIMING_DECODER_PROTOCOL: 'trx', TIMING_DATA_DIR: data, APP_V1_TOKEN_SECRET: segredo, OPS_URL: 'http://127.0.0.1:9' }, stdio: ['ignore', 'pipe', 'pipe'] });
+ processo = spawn(join(raiz, 'node_modules', '.bin', 'tsx'), [join(raiz, 'services/timing-server.ts')], { cwd: pasta, env: { ...process.env, NODE_ENV: 'test', PATH: process.env.PATH, HOME: process.env.HOME, TIMING_PORT: String(porta), TIMING_SIMULATE: '1', TIMING_SIM_PORT: '0', TIMING_DECODER_PROTOCOL: 'trx', TIMING_DATA_DIR: data, APP_V1_TOKEN_SECRET: segredo, OPS_URL: 'http://127.0.0.1:9' } as NodeJS.ProcessEnv, stdio: ['ignore', 'pipe', 'pipe'] });
  processo.stdout?.on('data', b => { logs += b.toString(); }); processo.stderr?.on('data', b => { logs += b.toString(); });
  for (let i = 0; i < 100; i++) { try { if ((await req('/api/app/v1/me')).http === 401) return; } catch {} if (processo.exitCode != null) throw new Error(`Simulador não iniciou: ${logs}`); await new Promise(r => setTimeout(r, 100)); }
  throw new Error('Simulador não respondeu em 10 segundos.');

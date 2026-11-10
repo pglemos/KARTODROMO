@@ -62,7 +62,11 @@ export function extractDriversFromTable(headers: string[], rows: DomRow[]): Live
 }
 
 function stripLabel(value: string, label: string): string {
-  return clean(value).replace(new RegExp(`^${label}\\s*`, 'i'), '').trim();
+  const cleaned = clean(value);
+  if (cleaned.toLowerCase().startsWith(label.toLowerCase())) {
+    return cleaned.slice(label.length).trimStart();
+  }
+  return cleaned;
 }
 
 function splitKartAndName(value: string): { kart: string; name: string } {

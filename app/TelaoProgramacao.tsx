@@ -68,7 +68,7 @@ export function TelaoProgramacao() {
     try {
       const res = await fetch('/api/tb50-display-mode', { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      const data = (await res.json()) as { auto?: boolean };
       if (typeof data?.auto !== 'boolean') throw new Error('Resposta inválida');
       setAutoMode(data.auto);
     } catch {
@@ -97,7 +97,7 @@ export function TelaoProgramacao() {
     try {
       const res = await fetch('/api/telao-playlist', { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      const data = (await res.json()) as { playlist?: { items?: TelaoPlaylistItem[] } };
       if (!Array.isArray(data?.playlist?.items)) throw new Error('Resposta inválida');
       setItems(data.playlist.items);
     } catch {
@@ -155,7 +155,7 @@ export function TelaoProgramacao() {
     try {
       const res = await fetch('/api/telao-upload', { method: 'POST', body: formData });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      const data = (await res.json()) as { url?: string };
       if (data?.url) patch(id, { source: data.url });
       else throw new Error('Resposta inválida');
     } catch {
@@ -173,7 +173,7 @@ export function TelaoProgramacao() {
         body: JSON.stringify({ items }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      const data = (await res.json()) as { playlist?: { items?: TelaoPlaylistItem[] } };
       setItems(Array.isArray(data?.playlist?.items) ? data.playlist.items : items);
       setMessage({ type: 'ok', text: 'Programação salva.' });
     } catch {

@@ -55,7 +55,7 @@ TELAS.usuarios = async (tela) => {
     const lista = U.usuarios.filter((u) => !q || (u.nome + ' ' + u.login + ' ' + (u.perfil || '')).toLowerCase().includes(q));
     const g = 'minmax(0, 1.3fr) minmax(0, 1.1fr) minmax(0, 1fr) 120px 80px 150px';
     $('#corpo').innerHTML = `<div class="cartaoCab"><span class="col"><h2>${U.usuarios.length} usuários</h2><span class="sub">os mesmos logins do programa Recepção e deste painel</span></span>
-        <input class="entrada" id="busca" placeholder="Buscar nome, login ou perfil" value="${esc(U.q)}" style="max-width: 260px; margin-left: auto"></div>
+        <input class="entrada" id="busca" placeholder="Buscar nome, login ou perfil" aria-label="Buscar nome, login ou perfil" value="${esc(U.q)}" style="max-width: 260px; margin-left: auto"></div>
       <div class="rolagemX"><div style="min-width: 760px"><div class="cabTabela" style="grid-template-columns: ${g}"><span>Nome</span><span>Login</span><span>Perfil</span><span>Último acesso</span><span>Ativo</span><span></span></div>
       ${lista.map((u) => `<div class="linhaTabela" style="grid-template-columns: ${g}; ${u.ativo ? '' : 'opacity: .55'}">
         <b class="trunc">${esc(u.nome)}${u.admin ? ' <span class="chip azul">admin</span>' : ''}${u.id === S.usuario.id ? ' <span class="chip">você</span>' : ''}</b>

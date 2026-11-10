@@ -29,7 +29,7 @@ it('revalida traçado corrigido em bateria antiga mesmo sem mudança de finished
       tracado: 'Traçado 4', tipo: 'corrida', pilotos: [{ cid:'123', nome:'Ana Silva', kart:'14', pos:2, voltas:18, melhor:38652, dq:false }],
     } } }));
     writeFileSync(join(dir, '.env.local'), `OPS_TIMING_URL=http://127.0.0.1:${port}\nMOBILE_IDENTITY_LINK_URL=http://127.0.0.1:${port}/api/mobile/v1/internal/identity-links\nMOBILE_ADMIN_TOKEN=synthetic-test-token\n`);
-    await promisify(execFile)(process.execPath, [resolve('scripts/ops/publicar-karts-app.mjs')], { cwd: dir, env: { PATH: process.env.PATH, NODE_ENV: 'test' } });
+    await promisify(execFile)(process.execPath, [resolve('scripts/ops/publicar-karts-app.mjs')], { cwd: dir, env: { ...process.env, NODE_ENV: 'test' } });
     const ranking = posts.flatMap(post => post.itens).find(item => item.chave.startsWith('karts:'));
     expect(ranking?.dados.linhas).toHaveLength(4);
     expect(ranking?.dados.linhas).toEqual(expect.arrayContaining([expect.objectContaining({ id: '123', kart: '100', categoria: 'Super Kart', tracado: 'Traçado 11 Invertido Chicane', ms: 60000 })]));

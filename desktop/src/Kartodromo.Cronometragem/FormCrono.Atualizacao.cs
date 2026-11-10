@@ -45,17 +45,19 @@ public partial class FormCrono
     {
         FormClosing += (_, _) => _fechandoPrograma = true;
         if (File.Exists(MarcaTv)) AbrirTV();
-        _verAtualizacao.Tick += async (_, _) => await VerificarAtualizacao();
+        _verAtualizacao.Tick += async (_, _) => await VerificarAtualizacaoAsync();
         _verAtualizacao.Start();
     }
 
-    async Task VerificarAtualizacao()
+    Task VerificarAtualizacao() => VerificarAtualizacaoAsync();
+
+    async Task VerificarAtualizacaoAsync(CancellationToken ct = default)
     {
         if (_consultandoVersao || _fechandoPrograma) return;
         _consultandoVersao = true;
         try
         {
-            var texto = await HttpAtualizacao.GetStringAsync($"{Config.ServidorUrl}/updates/Cronometragem/manifest.json");
+            var texto = await HttpAtualizacao.GetStringAsync($"{Config.ServidorUrl}/updates/Cronometragem/manifest.json", ct);
             var manifesto = JsonSerializer.Deserialize<ManifestoDesktop>(texto, JsonAtualizacao);
             _versaoNova = Atualizacao.DeveAtualizar(Application.ProductVersion.Split('+')[0], "Cronometragem", manifesto) ? manifesto.Version : null;
         }

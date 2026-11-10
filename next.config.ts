@@ -57,6 +57,9 @@ const nextConfig: NextConfig = {
     NEXT_PUBLICSUPABASE_ANON_KEY: supabaseAnonKey,
   },
   reactStrictMode: true,
+  experimental: {
+    optimizePackageImports: ['lucide-react'],
+  },
   turbopack: {
     root: process.cwd(),
   },

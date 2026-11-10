@@ -197,6 +197,19 @@ export default function GpsScreen() {
     }
   }
 
+  const renderSessionItem = useCallback(
+    ({ item: session }: { item: (typeof sessions)[number] }) => (
+      <Panel style={{ marginBottom: 12, gap: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><Icon name="timer" color={palette.accent} /><Text style={styles.rowTitle}>Treino pessoal</Text></View>
+        <Text style={{ color: palette.text, fontSize: 15, fontWeight: '800' }}>{new Date(session.startedAt).toLocaleString('pt-BR')}</Text>
+        <Text style={styles.muted}>{session.lapCount} voltas · melhor {formatLap(session.bestLapMs)}</Text>
+        {session.endedAt === null ? <Text style={styles.muted}>Sessão pausada</Text> : null}
+        <ActionButton label="Excluir treino" onPress={() => void removeSession(session.id)} secondary />
+      </Panel>
+    ),
+    [palette.accent, palette.text, removeSession, styles.muted, styles.rowTitle],
+  );
+
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <FlatList data={sessions} keyExtractor={(item) => item.id} contentContainerStyle={styles.content} ListHeaderComponent={<>
@@ -231,15 +244,7 @@ export default function GpsScreen() {
         <Text accessibilityRole="header" style={styles.sectionTitle}>Treinos salvos</Text><Text style={[styles.muted, { marginTop: 8, marginBottom: 16 }]}>Disponíveis somente neste aparelho.</Text>
       </View>
       </>} ListEmptyComponent={<Panel><Text style={styles.muted}>Nenhum treino salvo neste aparelho.</Text></Panel>}
-      renderItem={({ item: session }) => (
-        <Panel key={session.id} style={{ marginBottom: 12, gap: 8 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><Icon name="timer" color={palette.accent} /><Text style={styles.rowTitle}>Treino pessoal</Text></View>
-          <Text style={{ color: palette.text, fontSize: 15, fontWeight: '800' }}>{new Date(session.startedAt).toLocaleString('pt-BR')}</Text>
-          <Text style={styles.muted}>{session.lapCount} voltas · melhor {formatLap(session.bestLapMs)}</Text>
-          {session.endedAt === null ? <Text style={styles.muted}>Sessão pausada</Text> : null}
-          <ActionButton label="Excluir treino" onPress={() => void removeSession(session.id)} secondary />
-        </Panel>
-      )} />
+      renderItem={renderSessionItem} />
     </SafeAreaView>
   );
 }

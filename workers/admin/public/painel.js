@@ -128,7 +128,27 @@ TELAS.campeonatos = async (tela) => {
   tela.addEventListener('click', async (ev) => {
     const t = (s) => ev.target.closest(s);
     let x;
-    if (t('[data-novo-camp]')) { const nome = prompt('Nome do campeonato (ex.: Ultras do Kart):'); if (!nome) return; const temp = prompt('Temporada (ex.: 2026 · 2º semestre):', '2026') || ''; try { camps = await office('/campeonatos', { method: 'POST', body: { nome, temporada: temp, regra: 'categoria' } }); C.sel = camps.find((c) => c.nome === nome.trim())?.id ?? camps[0].id; toast('Campeonato criado'); pintar(); } catch (er) { falhou(er); } return; }
+    if (t('[data-novo-camp]')) {
+      const m = modal(`<div class="modalTopo" style="background: linear-gradient(160deg, var(--kib-cor-borda-sutil), var(--kib-cor-fundo-app))"><span class="col gap-meio"><span class="t-titulo-grande peso-negrito">Novo campeonato</span><span class="peq">Crie um campeonato para apurar etapas, categorias e pontuação.</span></span><button class="fechar hov solto" data-acao="fechar" aria-label="Fechar">${svg(IC.fechar, 15, 'var(--kib-cor-texto-principal)', 2.4)}</button></div>
+        <div style="display: grid; gap: var(--kib-espaco-denso-12); padding: var(--kib-espaco-2)">
+          <label class="campo"><span>Nome do campeonato</span><input class="entrada" id="novoCampNome" placeholder="Ex.: Ultras do Kart" required autofocus></label>
+          <label class="campo"><span>Temporada</span><input class="entrada" id="novoCampTemp" placeholder="Ex.: 2026 · 2º semestre" value="2026"></label>
+          <p class="erroMsg" id="novoCampErro"></p>
+        </div>
+        <div class="modalRodape"><button class="btn sec empurra" data-acao="fechar">Cancelar</button><button class="btn prim" id="salvarNovoCamp">Criar campeonato</button></div>`, 'Novo campeonato');
+      m.style.maxWidth = '520px';
+      $('#salvarNovoCamp', m).onclick = async () => {
+        const nome = $('#novoCampNome', m).value.trim();
+        const temp = $('#novoCampTemp', m).value.trim();
+        if (!nome) { $('#novoCampErro', m).textContent = 'Informe o nome do campeonato.'; return; }
+        try {
+          camps = await office('/campeonatos', { method: 'POST', body: { nome, temporada: temp, regra: 'categoria' } });
+          C.sel = camps.find((c) => c.nome === nome)?.id ?? camps[0].id;
+          toast('Campeonato criado'); fecharCamada(); pintar();
+        } catch (er) { $('#novoCampErro', m).textContent = er.message; }
+      };
+      return;
+    }
     if ((x = t('[data-camp]'))) { C.sel = +x.dataset.camp; C.cat = null; pintar(); return; }
     if ((x = t('[data-cat]'))) { C.cat = x.dataset.cat; pintar(); return; }
     if (t('[data-descartar]')) { C.descartar = !C.descartar; pintar(); return; }
@@ -137,7 +157,11 @@ TELAS.campeonatos = async (tela) => {
     if (t('[data-nova-etapa]')) { novaEtapa(c); return; }
     if ((x = t('[data-regra]'))) { try { camps = await office(`/campeonatos/${c.id}`, { method: 'PUT', body: { regra: x.dataset.regra } }); toast('Regra salva · classificação recalculada'); pintar(); } catch (er) { falhou(er); } return; }
     if ((x = t('[data-oficial]'))) { try { camps = await office(`/campeonatos/${c.id}/etapas/${x.dataset.oficial}`, { method: 'PUT', body: { publicada: x.dataset.v === '1' } }); pintar(); } catch (er) { falhou(er); } return; }
-    if ((x = t('[data-tirar-etapa]'))) { if (!confirm('Tirar esta etapa do campeonato? Os resultados da cronometragem não são apagados.')) return; try { camps = await office(`/campeonatos/${c.id}/etapas/${x.dataset.tirarEtapa}`, { method: 'DELETE' }); pintar(); } catch (er) { falhou(er); } }
+    if ((x = t('[data-tirar-etapa]'))) {
+      const ok = await confirmar('Tirar esta etapa do campeonato?', 'Os resultados da cronometragem não são apagados.', 'Tirar etapa', true);
+      if (!ok) return;
+      try { camps = await office(`/campeonatos/${c.id}/etapas/${x.dataset.tirarEtapa}`, { method: 'DELETE' }); pintar(); } catch (er) { falhou(er); }
+    }
   });
   tela.addEventListener('change', async (ev) => {
     const f = ev.target.dataset.campoCamp; if (!f) return;
@@ -157,66 +181,24 @@ const GRADE_PCS = '64px minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1.5fr) 110px';
 
 TELAS.sistema = async (tela) => {
   tela.innerHTML = `${cabecalho('Sistema · rede 192.168.20.x', 'PCs e sistema')}<main class="principal"><section class="kpis" id="servicos"></section><section class="cartao" id="pcs"><div class="esqueleto" style="height: 300px; margin: var(--kib-espaco-2)"></div></section><section class="cartao leve"><div class="cartaoCab"><span class="col"><h2>Usuários e acessos</h2><span class="sub">criar, editar, excluir e escolher as telas de cada perfil</span></span><a class="btn prim dir" href="#/usuarios">Abrir</a></div></section></main>`;
-  let perfis = [], usuarios = [];
   const carregar = async () => {
     await atualizarConexao();
     const r = S.saude;
     const s = await office('/painel/sinais');
-    if (r) $('#servicos').innerHTML = [['Servidor da operação', 'SRVKART · KartodromoOps', r.ops], ['Cronometragem', 'ORBITS · decoder', r.crono]].map(([t, d, x]) => `<div class="kpi"><span class="rot"><span class="ponto" style="width: 8px; height: 8px; background: ${x.ok ? 'var(--kib-cor-status-ok)' : 'var(--kib-cor-estado-perigo-solido)'}"></span>${t}</span><span class="val t-titulo-grande">${x.ok ? x.ms + ' ms' : 'sem resposta'}</span><span class="peq">${d}</span></div>`).join('')
+    if (!tela.isConnected) return;
+    const srv = $('#servicos', tela), pcs = $('#pcs', tela);
+    if (r && srv) srv.innerHTML = [['Servidor da operação', 'SRVKART · KartodromoOps', r.ops], ['Cronometragem', 'ORBITS · decoder', r.crono]].map(([t, d, x]) => `<div class="kpi"><span class="rot"><span class="ponto" style="width: 8px; height: 8px; background: ${x.ok ? 'var(--kib-cor-status-ok)' : 'var(--kib-cor-estado-perigo-solido)'}"></span>${t}</span><span class="val t-titulo-grande">${x.ok ? x.ms + ' ms' : 'sem resposta'}</span><span class="peq">${d}</span></div>`).join('')
       + `<div class="kpi"><span class="rot">Versões publicadas</span><span class="col" style="gap: var(--kib-espaco-meio); margin-top: var(--kib-espaco-meio)">${Object.entries(s.publicadas || {}).map(([a, v]) => `<span style="display: flex; justify-content: space-between; font-size: var(--kib-fonte-tamanho-corpo)"><span>${NOME_APP[a] || esc(a)}</span><b class="mono">${esc(v || '—')}</b></span>`).join('')}</span></div>`;
     const off = s.pcs.filter((p) => !p.online);
     selo('sistema', off.length ? String(off.length) : '', 'vermelho');
     const progs = (p) => p.apps.length ? p.apps.map((a) => `<span style="display: flex; align-items: center; gap: var(--kib-espaco-meio); flex-wrap: wrap"><b class="t-pequeno">${NOME_APP[a.app] || esc(a.app)}</b><span class="mono t-pequeno">${esc(a.versao || '')}</span>${a.atualizando ? '<span class="chip laranja">atualizando</span>' : '<span class="chip verde">em dia</span>'}<span class="peq">${quandoMin(a.minutos)}</span></span>`).join('')
       : p.totem ? `<span class="peq">Totem em uso ${quandoMin(p.totem.minutos)}</span>` : `<span class="peq">${p.online ? 'nenhum programa pediu atualização desde ' + (s.desde < 60 ? `${s.desde} min` : `${Math.round(s.desde / 60)} h`) : '—'}</span>`;
-    $('#pcs').innerHTML = `<div class="cartaoCab"><span class="col"><h2>Computadores</h2><span class="sub">rede testada pelo SRVKART agora · versão = a publicada, a não ser que o PC esteja baixando a nova</span></span><span class="chip ${off.length ? 'vermelho' : 'verde'} dir">${off.length ? off.length + ' sem resposta' : 'todos respondendo'}</span></div>
+    if (pcs) pcs.innerHTML = `<div class="cartaoCab"><span class="col"><h2>Computadores</h2><span class="sub">rede testada pelo SRVKART agora · versão = a publicada, a não ser que o PC esteja baixando a nova</span></span><span class="chip ${off.length ? 'vermelho' : 'verde'} dir">${off.length ? off.length + ' sem resposta' : 'todos respondendo'}</span></div>
       <div class="rolagemX"><div style="min-width: 780px"><div class="cabTabela" style="grid-template-columns: ${GRADE_PCS}"><span>IP</span><span>Computador</span><span>Função</span><span>Programas · versão · último sinal</span><span>Rede</span></div>
       ${s.pcs.map((p) => `<div class="linhaTabela" style="grid-template-columns: ${GRADE_PCS}"><span class="mono">.${esc(p.ip.split('.').pop())}</span><b class="linha gap-1"><span class="ponto" style="width: 8px; height: 8px; flex-shrink: 0; background: ${p.online ? 'var(--kib-cor-status-ok)' : 'var(--kib-cor-estado-perigo-solido)'}"></span>${esc(p.nome)}</b><span class="peq">${esc(p.papel)}</span><span class="col gap-meio">${progs(p)}</span><span><span class="chip ${p.online ? 'verde' : 'vermelho'}">${p.online ? (p.ms ? p.ms + ' ms' : 'servidor') : 'sem resposta'}</span></span></div>`).join('')}</div></div>
       <p class="peq" style="margin: 0; padding: var(--kib-espaco-denso-12) var(--kib-espaco-2); background: var(--sup2); border-top: 1px solid var(--linha); line-height: 1.5">A Cronometragem pede atualização a cada 3 minutos; Recepção e totem pedem ao abrir. Instalar versão nova e reiniciar programa continuam fora do painel web (só no kartódromo, depois das 21:40). Totens e telão desligados aparecem “sem resposta”.</p>`;
   };
-  const pintarUsuarios = () => {
-    const box = $('#usuarios'); if (!box) return;
-    if (!S.usuario?.admin) { box.innerHTML = `<div class="cartaoCab"><h2>Usuários</h2></div><p class="peq cartao-corpo">Só o administrador vê e muda os usuários.</p>`; return; }
-    box.innerHTML = `<div class="cartaoCab"><span class="col"><h2>Quem entra no sistema</h2><span class="sub">os mesmos usuários do programa Recepção e deste painel · o perfil diz o que cada um pode fazer</span></span><button class="btn prim dir" data-novo-usuario="1">${svg(IC.mais, 14, 'var(--kib-cor-acao-sobre-principal)', 2.6)}Novo usuário</button></div>
-      <div class="rolagemX"><div style="min-width: 640px"><div class="cabTabela" style="grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) 190px 130px 90px"><span>Nome</span><span>Login</span><span>Perfil</span><span>Último acesso</span><span>Ativo</span></div>
-      ${usuarios.map((u) => `<div class="linhaTabela" style="grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) 190px 130px 90px; ${u.ativo ? '' : 'opacity: .55'}"><b class="trunc">${esc(u.nome)}${u.admin ? ' <span class="chip azul">admin</span>' : ''}</b><span class="mono trunc t-pequeno">${esc(u.login)}</span><select class="entrada" style="height: 32px" data-perfil-usuario="${u.id}">${perfis.map((p) => `<option value="${p.id}" ${p.id === u.perfilId ? 'selected' : ''}>${esc(p.descricao)}</option>`).join('')}${u.perfilId ? '' : '<option selected value="">—</option>'}</select><span class="peq">${u.ultimoAcesso ? esc(u.ultimoAcesso.slice(8, 10) + '/' + u.ultimoAcesso.slice(5, 7) + ' ' + u.ultimoAcesso.slice(11, 16)) : 'nunca'}</span><button role="switch" aria-checked="${!!u.ativo}" data-ativo-usuario="${u.id}" style="border: 0; background: transparent; padding: 0"><span class="chave ${u.ativo ? 'on' : ''}"></span></button></div>`).join('')}</div></div>`;
-  };
-  const carregarUsuarios = async () => {
-    if (!$('#usuarios')) return;
-    if (!S.usuario?.admin) return pintarUsuarios();
-    try { [usuarios, perfis] = await Promise.all([office('/cad/usuarios'), office('/cad/perfis')]); pintarUsuarios(); }
-    catch (e) { $('#usuarios').innerHTML = `<div class="cartaoCab"><h2>Usuários</h2></div><p class="erroMsg cartao-corpo">${esc(e.message)}</p>`; }
-  };
-  const novoUsuario = () => {
-    const m = modal(`<div class="modalTopo" style="background: linear-gradient(160deg, var(--kib-cor-borda-sutil), var(--kib-cor-fundo-app))"><span class="col gap-meio"><span class="t-titulo-grande peso-negrito">Novo usuário</span><span class="peq">Entra no programa Recepção e neste painel com o login e a senha abaixo.</span></span><button class="fechar hov solto" data-acao="fechar">${svg(IC.fechar, 15, 'var(--kib-cor-texto-principal)', 2.4)}</button></div>
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--kib-espaco-denso-12); padding: var(--kib-espaco-2) var(--kib-espaco-2)">
-        <label class="campo"><span>Nome</span><input class="entrada" id="uNome" autocomplete="off"></label>
-        <label class="campo"><span>Login (e-mail ou apelido)</span><input class="entrada" id="uLogin" autocomplete="off"></label>
-        <label class="campo"><span>Perfil</span><select class="entrada" id="uPerfil">${perfis.map((p) => `<option value="${p.id}">${esc(p.descricao)}</option>`).join('')}</select></label>
-        <label class="campo"><span>Senha inicial (mín. 6)</span><input class="entrada" id="uSenha" type="password" autocomplete="new-password"></label>
-      </div><p class="erroMsg" id="uErro" style="padding: 0 var(--kib-espaco-2)"></p>
-      <div class="modalRodape"><button class="btn sec empurra" data-acao="fechar">Cancelar</button><button class="btn prim" id="uSalvar">Criar usuário</button></div>`);
-    m.style.maxWidth = '620px';
-    $('#uSalvar').onclick = async () => {
-      try {
-        await office('/cad/usuarios', { method: 'POST', body: { nome: $('#uNome').value, login: $('#uLogin').value, perfilId: Number($('#uPerfil').value) || null, senha: $('#uSenha').value, ativo: true, admin: false } });
-        toast('Usuário criado'); fecharCamada(); carregarUsuarios();
-      } catch (e) { $('#uErro').textContent = e.message; }
-    };
-  };
-  tela.addEventListener('click', async (e) => {
-    if (e.target.closest('[data-novo-usuario]')) return novoUsuario();
-    const a = e.target.closest('[data-ativo-usuario]');
-    if (a) {
-      const u = usuarios.find((x) => x.id === +a.dataset.ativoUsuario);
-      if (u.id === S.usuario?.id && u.ativo) return toast('Você não pode desativar o próprio usuário', true);
-      try { await office(`/cad/usuarios/${u.id}`, { method: 'PUT', body: { ativo: !u.ativo } }); u.ativo = !u.ativo; pintarUsuarios(); toast(u.ativo ? 'Usuário ativado' : 'Usuário desativado: não entra mais'); } catch (er) { falhou(er); }
-    }
-  });
-  tela.addEventListener('change', async (e) => {
-    const s = e.target.closest('[data-perfil-usuario]'); if (!s) return;
-    try { await office(`/cad/usuarios/${s.dataset.perfilUsuario}`, { method: 'PUT', body: { perfilId: Number(s.value) || null } }); toast('Perfil trocado'); carregarUsuarios(); } catch (er) { falhou(er); }
-  });
-  await Promise.all([carregar(), carregarUsuarios()]);
+  await carregar();
   repetir(carregar, 30_000);
 };
 

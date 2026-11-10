@@ -214,9 +214,11 @@ async function list(db: AdminD1Database, resource: ResourceName, url: URL) {
   const limit = Math.min(Math.max(Number(url.searchParams.get('limit') || 500), 1), 1000);
   const offset = Math.max(Number(url.searchParams.get('offset') || 0), 0);
 
-  const countResult = await db.prepare(`SELECT COUNT(*) AS total FROM ${resource}${where}`).bind(...bindings).first<{ total: number }>();
-  const result = await db.prepare(`SELECT * FROM ${resource}${where}${order ? ` ORDER BY ${order} ${direction}` : ''} LIMIT ? OFFSET ?`)
-    .bind(...bindings, limit, offset).all<Row>();
+  const [countResult, result] = await Promise.all([
+    db.prepare(`SELECT COUNT(*) AS total FROM ${resource}${where}`).bind(...bindings).first<{ total: number }>(),
+    db.prepare(`SELECT * FROM ${resource}${where}${order ? ` ORDER BY ${order} ${direction}` : ''} LIMIT ? OFFSET ?`)
+      .bind(...bindings, limit, offset).all<Row>(),
+  ]);
   return { rows: result.results.map((row) => normalizeRow(resource, row)), total: Number(countResult?.total ?? 0) };
 }
 
@@ -234,8 +236,10 @@ async function create(db: AdminD1Database, resource: ResourceName, body: unknown
   if (!keys.length) throw new Error('invalid_payload');
   await db.prepare(`INSERT INTO ${resource} (${keys.join(',')}) VALUES (${keys.map(() => '?').join(',')})`).bind(...keys.map((key) => payload[key])).run();
   if (payload.is_default) await enforceFormatoDefaultUnico(db, resource, String(payload.id));
-  await audit(db, actor, 'create', resource, String(payload.id), payload);
-  const row = await db.prepare(`SELECT * FROM ${resource} WHERE id = ?`).bind(payload.id).first<Row>();
+  const [, row] = await Promise.all([
+    audit(db, actor, 'create', resource, String(payload.id), payload),
+    db.prepare(`SELECT * FROM ${resource} WHERE id = ?`).bind(payload.id).first<Row>(),
+  ]);
   return row ? normalizeRow(resource, row) : null;
 }
 
@@ -249,8 +253,10 @@ async function update(db: AdminD1Database, resource: ResourceName, id: string, b
     .bind(...keys.map((key) => payload[key]), id).run();
   if (!result.meta.changes) throw new Error('record_not_found');
   if (payload.is_default) await enforceFormatoDefaultUnico(db, resource, id);
-  await audit(db, actor, 'update', resource, id, payload);
-  const row = await db.prepare(`SELECT * FROM ${resource} WHERE id = ?`).bind(id).first<Row>();
+  const [, row] = await Promise.all([
+    audit(db, actor, 'update', resource, id, payload),
+    db.prepare(`SELECT * FROM ${resource} WHERE id = ?`).bind(id).first<Row>(),
+  ]);
   return row ? normalizeRow(resource, row) : null;
 }
 

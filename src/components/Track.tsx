@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ArrowLeft, Compass, Flag, Map, MessageSquare, Route, RotateCcw, Timer } from 'lucide-react';
 import { trackLayouts, type TrackVariantKey } from '../data/trackLayouts';
 import AngledButton from './site-ui/AngledButton';
@@ -57,9 +57,10 @@ const Track = () => {
   const visibleTracks = showAll ? filteredTracks : filteredTracks.slice(0, 12);
   const featuredTrack = trackLayouts[0];
 
-  useEffect(() => {
+  const handleTabChange = (tab: TrackFilter) => {
+    setActiveTab(tab);
     setShowAll(false);
-  }, [activeTab]);
+  };
 
   return (
     <section id="pista" className="min-h-screen overflow-hidden bg-ink-950 text-white/80">
@@ -169,7 +170,7 @@ const Track = () => {
               <button
                 key={tab}
                 type="button"
-                onClick={() => setActiveTab(tab)}
+                onClick={() => handleTabChange(tab)}
                 className={`px-4 py-2.5 font-race text-xs italic font-bold uppercase tracking-[0.14em] transition-all duration-300 ${
                   activeTab === tab
                     ? 'bg-primary-400 text-ink-950'

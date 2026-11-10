@@ -1,5 +1,12 @@
-import { readFileSync } from 'node:fs';
-const cfg = readFileSync(process.env.APPDATA + '/xdg.config/.wrangler/config/default.toml', 'utf8');
+import { readFileSync, existsSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+
+const pWin = process.env.APPDATA ? join(process.env.APPDATA, 'xdg.config/.wrangler/config/default.toml') : '';
+const pMac = join(homedir(), 'Library/Preferences/.wrangler/config/default.toml');
+const cfgPath = existsSync(pWin) ? pWin : existsSync(pMac) ? pMac : null;
+if (!cfgPath) throw new Error('default.toml não encontrado');
+const cfg = readFileSync(cfgPath, 'utf8');
 const tok = cfg.match(/oauth_token = "([^"]+)"/)[1];
 const acc = 'e476c4322903cf98849d505ea26f726f';
 const metadata = {

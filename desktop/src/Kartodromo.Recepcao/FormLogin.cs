@@ -122,7 +122,7 @@ public class FormLogin : Form
         _cancelar.Location = new Point(larguraCard - _cancelar.Width, 340);
         KitVisual.AplicarRaio(_entrar, 12);
         KitVisual.AplicarRaio(_cancelar, 12);
-        _entrar.Click += (_, _) => Entrar();
+        _entrar.Click += (_, _) => Seguro.Rodar(this, EntrarAsync);
         _cancelar.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
         card.Controls.AddRange([_entrar, _cancelar]);
 
@@ -142,7 +142,7 @@ public class FormLogin : Form
             _lembrar.Checked = lembrar;
             _login.Text = lembrar ? Registro.Ler("UltimoLogin") : "";
             (string.IsNullOrEmpty(_login.Text) ? _login : _senha).Select();
-            await AtualizarStatus();
+            await AtualizarStatusAsync();
         };
     }
 
@@ -179,11 +179,11 @@ public class FormLogin : Form
         p.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90); p.AddArc(r.Left, r.Bottom - d, d, d, 90, 90); p.CloseFigure(); return p;
     }
 
-    async Task AtualizarStatus()
+    async Task AtualizarStatusAsync()
     {
         try
         {
-            await Sessao.Api.Get("/healthz");
+            await Sessao.Api.GetAsync("/healthz");
             _status.Text = "Servidor SRVKART conectado";
             _status.ForeColor = Tokens.Claro.CorEstadoSucessoTexto;
         }
@@ -194,7 +194,7 @@ public class FormLogin : Form
         }
     }
 
-    async void Entrar()
+    async Task EntrarAsync()
     {
         _msg.Text = "";
         if (!_termos.Checked) { _msg.Text = "É necessário concordar com os termos de uso."; return; }
@@ -203,16 +203,18 @@ public class FormLogin : Form
         {
             UseWaitCursor = true;
             _entrar.Enabled = false;
-            var r = await Sessao.Api.Post("/api/login", new { login = _login.Text.Trim(), senha = _senha.Text, termos = true });
+            var r = await Sessao.Api.PostAsync("/api/login", new { login = _login.Text.Trim(), senha = _senha.Text, termos = true });
             Sessao.Api.Token = r.S("token");
             Sessao.Usuario = r["usuario"]?.AsObject();
-            await Sessao.CarregarApoio();
+            await Sessao.CarregarApoioAsync();
+            await CadastrosDesign.CarregarPerfisAsync();
             Registro.Gravar("LembrarUsuario", _lembrar.Checked ? "true" : "false");
             Registro.Gravar("UltimoLogin", _lembrar.Checked ? _login.Text.Trim() : "");
             DialogResult = DialogResult.OK;
             Close();
         }
         catch (ApiException e) { _msg.Text = e.Message; _senha.SelectAll(); _senha.Focus(); }
+        catch (Exception ex) { Diagnostico.Registrar(this, ex); _msg.Text = "Não foi possível conectar ao servidor. Verifique a rede."; }
         finally { UseWaitCursor = false; _entrar.Enabled = true; }
     }
 }

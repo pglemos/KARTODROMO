@@ -196,7 +196,7 @@ describe('Office: edição de reserva atualiza o peso do cliente', () => {
 });
 
 describe('Office: edição de produto e confirmação do termo', () => {
-  it('atualiza preço, zera desconto de outro produto e invalida o termo anterior', async () => {
+  it('atualiza preço e desconto preservando termo já emitido', async () => {
     const statements: { sql: string; params: Record<string, unknown> }[] = [];
     db.tx.mockImplementation(async (work) => work(async (sql: string, params: Record<string, unknown> = {}) => {
       statements.push({ sql, params });
@@ -211,7 +211,7 @@ describe('Office: edição de produto e confirmação do termo', () => {
     expect(update?.sql).toContain('ProdutoId = @pid');
     expect(update?.sql).toContain('PrecoCentavos = @preco');
     expect(update?.sql).toContain('ELSE 0 END');
-    expect(update?.sql).toContain('TermoImpressoEm = CASE WHEN @produtoOrigem = @pid');
+    expect(update?.sql).not.toContain('TermoImpressoEm =');
     expect(update?.params).toMatchObject({ id: 42, pid: 20, preco: 22000, produtoOrigem: 10 });
   });
 
@@ -311,7 +311,7 @@ describe('Office: concorrência de voucher nas vendas presenciais', () => {
     expect(res).toMatchObject({ status: 201, body: { id: 999, semTermo: [102], inscricoes: [101, 102] } });
     const updInscr = statements.filter((s) => s.sql.includes('UPDATE dbo.Inscricao SET Pago = 1'));
     expect(updInscr).toHaveLength(2);
-    expect(updInscr[0].sql).toContain('TermoImpressoEm = COALESCE(TermoImpressoEm, SYSDATETIME())');
+    expect(updInscr.every((s) => !s.sql.includes('TermoImpressoEm ='))).toBe(true);
   });
 });
 
@@ -351,14 +351,15 @@ describe('Office: mover reserva preserva os dados de cobrança', () => {
     expect(update?.sql).toContain('THEN CASE WHEN DescontoCentavos > @precoDestino THEN @precoDestino');
   });
 
-  it.each([
-    [{ ...reservaPendente, Pago: true }, { ...bateriaDestino, produtoId: 10, preco: 22000 }],
-    [{ ...reservaPendente, Pago: true }, { ...bateriaDestino, produtoId: 20, preco: 17500 }],
-  ])('bloqueia reserva paga quando produto ou preço diverge', async (reserva, destino) => {
-    const { statements, executar } = moverComReserva(reserva, destino);
-
-    await expect(executar()).rejects.toMatchObject({ status: 409, message: expect.stringContaining('mesmo produto e preço') });
+  it('bloqueia reserva paga quando o serviço diverge', async () => {
+    const { statements, executar } = moverComReserva({ ...reservaPendente, Pago: true }, { ...bateriaDestino, produtoId: 20 });
+    await expect(executar()).rejects.toMatchObject({ status: 409, message: expect.stringContaining('mesmo serviço') });
     expect(statements.some((statement) => statement.sql.startsWith('UPDATE dbo.Inscricao'))).toBe(false);
+  });
+  it('preserva tarifa paga mesmo quando a tarifa atual do mesmo produto aumentou', async () => {
+    const { statements, executar } = moverComReserva({ ...reservaPendente, Pago: true }, { ...bateriaDestino, produtoId: 10, preco: 22000 });
+    await expect(executar()).resolves.toMatchObject({status:200});
+    expect(statements.find((s)=>s.sql.startsWith('UPDATE dbo.Inscricao'))?.sql).not.toContain('PrecoCentavos =');
   });
 
   it('permite mover reserva paga mantendo produto e preço, sem reescrever a cobrança', async () => {

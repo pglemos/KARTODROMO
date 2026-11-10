@@ -4,7 +4,7 @@
  * volta mais rápida, abas e a tabela de classificação. Tocar no piloto abre o cockpit no kart dele.
  */
 import { router, type Href } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 
 import { Brand, Icon } from './brand';
@@ -65,7 +65,7 @@ function nomeDe(c: LiveCompetitor) {
 }
 
 /** linha da classificação (75 px de altura no desenho) */
-function Linha({ c, ganhou, rapida, cockpitEnabled }: { c: LiveCompetitor; ganhou: number; rapida: boolean; cockpitEnabled: boolean }) {
+const Linha = memo(function Linha({ c, ganhou, rapida, cockpitEnabled }: { c: LiveCompetitor; ganhou: number; rapida: boolean; cockpitEnabled: boolean }) {
   const k = useK();
   const medalha = MEDALHA[c.position - 1];
   const lider = c.position === 1;
@@ -100,7 +100,7 @@ function Linha({ c, ganhou, rapida, cockpitEnabled }: { c: LiveCompetitor; ganho
       </View>
     </Pressable>
   );
-}
+});
 
 function horaAtualizacao(value?: string) {
   const ms = value ? Date.parse(value) : NaN;
@@ -304,16 +304,12 @@ function Lista({ session, onRefresh, refreshError }: { session: LiveSession; onR
     ? retainExpandedCompetitorPosition(session.competitors, pilotoExpandido, posicaoExpandida)
     : session.competitors, [pilotoExpandido, posicaoExpandida, session.competitors]);
 
-  return (
-    <FlatList
-      style={{ flex: 1, backgroundColor: cor.fundo }}
-      data={linhas}
-      keyExtractor={(c) => c.kartNumber}
-      maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-      renderItem={({ item, index }) => aba === 'pilotos'
-        ? (
-          <View style={{ width: 808 * k, marginLeft: 22 * k, marginBottom: 7 * k }}>
-            <Pressable onPress={() => {
+  const renderCompetitorItem = useCallback(
+    ({ item, index }: { item: LiveCompetitor; index: number }) =>
+      aba === 'pilotos' ? (
+        <View style={{ width: 808 * k, marginLeft: 22 * k, marginBottom: 7 * k }}>
+          <Pressable
+            onPress={() => {
               tap();
               if (pilotoExpandido === item.kartNumber) {
                 setPilotoExpandido(null);
@@ -322,22 +318,56 @@ function Lista({ session, onRefresh, refreshError }: { session: LiveSession; onR
                 setPilotoExpandido(item.kartNumber);
                 setPosicaoExpandida(index);
               }
-            }} accessible accessibilityRole="button" accessibilityState={{ expanded: pilotoExpandido === item.kartNumber }} accessibilityLabel={`${nomeDe(item)}, kart ${item.kartNumber}. Toque para ${pilotoExpandido === item.kartNumber ? 'recolher' : 'ver'} todas as voltas.`}
-              style={({ pressed }) => ({ minHeight: Math.max(70 * k, 48), borderRadius: 12 * k, backgroundColor: '#111615', borderWidth: 1, borderColor: pilotoExpandido === item.kartNumber ? cor.verde : '#1F2422', flexDirection: 'row', alignItems: 'center', paddingLeft: 24 * k, gap: 20 * k, opacity: pressed ? 0.84 : 1 })}>
-              <Icon name="helmet" color={cor.verde} size={32 * k} />
-              <View style={{ flex: 1 }}>
-                <T s={18} f={fonte.tempoBold} linhas={1} adjustsFontSizeToFit minimumFontScale={0.58}>{nomeDe(item)}</T>
-                <T s={15} c="#A9B0AC" linhas={1} adjustsFontSizeToFit minimumFontScale={0.68}>Kart #{item.kartNumber} · {item.category}</T>
-              </View>
-              <T s={16} p="700" c={cor.verde} style={{ marginRight: 26 * k }}>{pilotoExpandido === item.kartNumber ? 'RECOLHER' : 'VOLTAS ›'}</T>
-            </Pressable>
-            {pilotoExpandido === item.kartNumber ? <View accessibilityLabel={`Volta a volta de ${nomeDe(item)}`} style={{ marginTop: 6 * k, padding: 14 * k, borderRadius: 12 * k, backgroundColor: '#0A0E0D', borderWidth: 1, borderColor: '#26352B' }}>
+            }}
+            accessible
+            accessibilityRole="button"
+            accessibilityState={{ expanded: pilotoExpandido === item.kartNumber }}
+            accessibilityLabel={`${nomeDe(item)}, kart ${item.kartNumber}. Toque para ${pilotoExpandido === item.kartNumber ? 'recolher' : 'ver'} todas as voltas.`}
+            style={({ pressed }) => ({
+              minHeight: Math.max(70 * k, 48),
+              borderRadius: 12 * k,
+              backgroundColor: '#111615',
+              borderWidth: 1,
+              borderColor: pilotoExpandido === item.kartNumber ? cor.verde : '#1F2422',
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingLeft: 24 * k,
+              gap: 20 * k,
+              opacity: pressed ? 0.84 : 1,
+            })}
+          >
+            <Icon name="helmet" color={cor.verde} size={32 * k} />
+            <View style={{ flex: 1 }}>
+              <T s={18} f={fonte.tempoBold} linhas={1} adjustsFontSizeToFit minimumFontScale={0.58}>{nomeDe(item)}</T>
+              <T s={15} c="#A9B0AC" linhas={1} adjustsFontSizeToFit minimumFontScale={0.68}>Kart #{item.kartNumber} · {item.category}</T>
+            </View>
+            <T s={16} p="700" c={cor.verde} style={{ marginRight: 26 * k }}>{pilotoExpandido === item.kartNumber ? 'RECOLHER' : 'VOLTAS ›'}</T>
+          </Pressable>
+          {pilotoExpandido === item.kartNumber ? (
+            <View accessibilityLabel={`Volta a volta de ${nomeDe(item)}`} style={{ marginTop: 6 * k, padding: 14 * k, borderRadius: 12 * k, backgroundColor: '#0A0E0D', borderWidth: 1, borderColor: '#26352B' }}>
               <T s={14} p="800" c="#A9B0AC" style={{ letterSpacing: 1 * k }}>VOLTA A VOLTA · {item.lapTimes?.length ?? 0} VOLTAS</T>
-              {item.lapTimes?.length ? item.lapTimes.map((volta) => <View key={volta.number} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 7 * k, borderBottomWidth: 1, borderBottomColor: '#1A221D' }}><T s={17} p="700">VOLTA {volta.number}</T><T s={17} f={fonte.tempo} style={{ fontVariant: ['tabular-nums'] }}>{volta.time}</T></View>) : <T s={15} c="#A9B0AC" style={{ marginTop: 8 * k }}>Nenhuma volta recebida ainda.</T>}
-            </View> : null}
-          </View>
-        )
-        : <Linha c={item} ganhou={movimentos[item.kartNumber] ?? 0} rapida={item.isFastestLap} cockpitEnabled={session.status !== 'CHECKERED'} />}
+              {item.lapTimes?.length ? item.lapTimes.map((volta) => (
+                <View key={volta.number} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 7 * k, borderBottomWidth: 1, borderBottomColor: '#1A221D' }}>
+                  <T s={17} p="700">VOLTA {volta.number}</T>
+                  <T s={17} f={fonte.tempo} style={{ fontVariant: ['tabular-nums'] }}>{volta.time}</T>
+                </View>
+              )) : <T s={15} c="#A9B0AC" style={{ marginTop: 8 * k }}>Nenhuma volta recebida ainda.</T>}
+            </View>
+          ) : null}
+        </View>
+      ) : (
+        <Linha c={item} ganhou={movimentos[item.kartNumber] ?? 0} rapida={item.isFastestLap} cockpitEnabled={session.status !== 'CHECKERED'} />
+      ),
+    [aba, k, movimentos, pilotoExpandido, session.status],
+  );
+
+  return (
+    <FlatList
+      style={{ flex: 1, backgroundColor: cor.fundo }}
+      data={linhas}
+      keyExtractor={(c) => c.kartNumber}
+      maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+      renderItem={renderCompetitorItem}
       contentContainerStyle={{ paddingBottom: bottomClearance }}
       refreshControl={<RefreshControl refreshing={atualizando} tintColor={cor.verde} onRefresh={() => { void atualizar(); }} />}
       ListHeaderComponent={(

@@ -428,17 +428,19 @@ public partial class FormCrono
                 corpo["durationMin"] = int.TryParse(dur.Text, out var x) ? x : 20;
                 corpo["maxLaps"] = int.TryParse(voltas.Text, out var l) ? l : 0;
             }
-            await Crono.Api.Patch($"/api/sessions/{_sess.S("id")}", corpo);
-            d.DialogResult = DialogResult.OK; d.Close(); await Atualizar();
+            await Crono.Api.PatchAsync($"/api/sessions/{_sess.S("id")}", corpo);
+            d.DialogResult = DialogResult.OK; d.Close(); await AtualizarAsync();
         }));
         d.BotaoRodape("Cancelar", false, d.Close);
         d.ShowDialog(this);
     }
 
     /// <summary>Empresa, Parâmetros, Backup, Configurações iniciais e Banner (guardados nas configurações do serviço).</summary>
-    async Task DialogoConfiguracao(string nome)
+    Task DialogoConfiguracao(string nome) => DialogoConfiguracaoAsync(nome);
+
+    async Task DialogoConfiguracaoAsync(string nome, CancellationToken ct = default)
     {
-        var settings = (await Crono.Api.Get("/api/settings"))?.AsObject() ?? new JsonObject();
+        var settings = (await Crono.Api.GetAsync("/api/settings", ct))?.AsObject() ?? new JsonObject();
         JsonObject Sec(string k) => settings[k]?.DeepClone() as JsonObject ?? new JsonObject();
         switch (nome)
         {

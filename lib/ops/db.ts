@@ -15,24 +15,47 @@ let pool: sql.ConnectionPool | null = null;
 export async function getPool(): Promise<sql.ConnectionPool> {
   if (pool?.connected) return pool;
   const env = process.env;
-  pool = await new sql.ConnectionPool({
+  const encrypt = env.OPS_SQL_ENCRYPT === 'true' || env.OPS_SQL_ENCRYPT === '1';
+  const trustServerCertificate = env.OPS_SQL_TRUST_CERT !== 'false' && env.OPS_SQL_TRUST_CERT !== '0';
+  const instanceName = env.OPS_SQL_INSTANCE !== undefined ? env.OPS_SQL_INSTANCE : (env.OPS_SQL_SERVER?.includes('.rds.') ? undefined : 'SQLEXPRESS');
+
+  const config: sql.config = {
     server: env.OPS_SQL_SERVER || '127.0.0.1',
     database: env.OPS_SQL_DATABASE || 'KartodromoOps',
     user: env.OPS_SQL_USER,
     password: env.OPS_SQL_PASSWORD,
-    options: { instanceName: env.OPS_SQL_INSTANCE || 'SQLEXPRESS', encrypt: false, trustServerCertificate: true },
+    options: {
+      ...(instanceName ? { instanceName } : {}),
+      encrypt,
+      trustServerCertificate,
+      enableArithAbort: true,
+    },
     pool: { max: 10, idleTimeoutMillis: 60_000 },
     requestTimeout: 30_000,
-  }).connect();
+    connectionTimeout: 15_000,
+  };
+
+  pool = await new sql.ConnectionPool(config).connect();
   return pool;
 }
 
 type Params = Record<string, unknown>;
 
 export async function query<T = Record<string, unknown>>(text: string, params: Params = {}): Promise<T[]> {
-  const req = (await getPool()).request();
-  for (const [k, v] of Object.entries(params)) req.input(k, v as never);
-  return (await req.query(text)).recordset as T[];
+  try {
+    const req = (await getPool()).request();
+    for (const [k, v] of Object.entries(params)) req.input(k, v as never);
+    return (await req.query(text)).recordset as T[];
+  } catch (err: unknown) {
+    const code = (err as { code?: string })?.code;
+    if (code === 'ECONNCLOSED' || code === 'ECONNRESET' || code === 'ETIMEOUT') {
+      pool = null;
+      const req = (await getPool()).request();
+      for (const [k, v] of Object.entries(params)) req.input(k, v as never);
+      return (await req.query(text)).recordset as T[];
+    }
+    throw err;
+  }
 }
 
 export async function one<T = Record<string, unknown>>(text: string, params: Params = {}): Promise<T | null> {

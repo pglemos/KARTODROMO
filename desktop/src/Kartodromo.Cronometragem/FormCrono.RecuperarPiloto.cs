@@ -3,12 +3,14 @@ using Kartodromo.Comum;
 namespace Kartodromo.Cronometragem;
 public partial class FormCrono
 {
-    async Task TestarRecuperarPiloto()
+    Task TestarRecuperarPiloto() => TestarRecuperarPilotoAsync();
+
+    async Task TestarRecuperarPilotoAsync()
     {
         if (!Config.CronoUrl.Contains(":4150")) throw new Exception("Teste permitido somente no simulador.");
-        _sel = (await Crono.Api.Lista("/api/sessions")).First(s => s.S("name") == "TESTE CODEX RECUPERAR").S("id");
+        _sel = (await Crono.Api.ListaAsync("/api/sessions")).First(s => s.S("name") == "TESTE CODEX RECUPERAR").S("id");
         _fixado = true; _abas.SelectedIndex = 2;
-        await Atualizar();
+        await AtualizarAsync();
         IEnumerable<Control> Todos(Control r) { foreach (Control c in r.Controls) { yield return c; foreach (var x in Todos(c)) yield return x; } }
         var botao = Todos(this).OfType<Button>().Single(b => b.Text == "Recuperar piloto");
         if (!botao.Visible) throw new Exception("Botão de recuperação não apareceu.");
@@ -35,9 +37,9 @@ public partial class FormCrono
     {
         if (_sess == null) return;
         var sessaoId = _sess.S("id");
-        var atual = (await Crono.Api.Get("/api/sessions/" + sessaoId))?.AsObject();
+        var atual = (await Crono.Api.GetAsync("/api/sessions/" + sessaoId))?.AsObject();
         var excluidos = Crono.Arr(atual, "excludedCompetitors");
-        if (excluidos.Count == 0) { await Atualizar(); return; }
+        if (excluidos.Count == 0) { await AtualizarAsync(); return; }
         var escolhido = excluidos[0];
         if (excluidos.Count > 1)
         {
@@ -50,8 +52,8 @@ public partial class FormCrono
             d.BotaoRodape("Cancelar", false, d.Close);
             if (d.ShowDialog(this) != DialogResult.OK || escolhido == null) return;
         }
-        await Crono.Api.Post($"/api/sessions/{sessaoId}/competitors/restore", new JsonObject { ["id"] = escolhido.S("id"), ["autor"] = Environment.UserName });
+        await Crono.Api.PostAsync($"/api/sessions/{sessaoId}/competitors/restore", new JsonObject { ["id"] = escolhido.S("id"), ["autor"] = Environment.UserName });
         InvalidarCachePassagens();
-        await Atualizar();
+        await AtualizarAsync();
     });
 }

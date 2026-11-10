@@ -67,10 +67,10 @@ TELAS.inscricoes = async (tela) => {
       const t = e.target.closest('button'); if (!t) return;
       if (t.dataset.fechar !== undefined) return fecharCamada();
       if (t.dataset.copiar !== undefined) { await navigator.clipboard.writeText(link(i)).catch(() => undefined); return toast('Link copiado.'); }
-      if (t.dataset.delpg) { if (!confirm('Excluir este pagamento lançado?')) return; const n = await agir(() => office(`${base}/pagamentos/${t.dataset.delpg}`, { method: 'DELETE' }), 'Pagamento excluído.'); if (n) trocar(n); }
-      if (t.dataset.delpi) { if (!confirm('Remover este piloto da equipe?')) return; const n = await agir(() => office(`${base}/pilotos/${t.dataset.delpi}`, { method: 'DELETE' }), 'Piloto removido.'); if (n) trocar(n); }
+      if (t.dataset.delpg) { if (!(await confirmar('Excluir este pagamento lançado?', 'Apenas o lançamento manual será removido.', 'Excluir pagamento', true))) return; const n = await agir(() => office(`${base}/pagamentos/${t.dataset.delpg}`, { method: 'DELETE' }), 'Pagamento excluído.'); if (n) trocar(n); }
+      if (t.dataset.delpi) { if (!(await confirmar('Remover este piloto da equipe?', 'O piloto deixará de fazer parte desta inscrição.', 'Remover piloto', true))) return; const n = await agir(() => office(`${base}/pilotos/${t.dataset.delpi}`, { method: 'DELETE' }), 'Piloto removido.'); if (n) trocar(n); }
       if (t.dataset.obs !== undefined) { const n = await agir(() => office(base, { method: 'PUT', body: { equipe: i.equipe, chefeNome: i.chefeNome, chefeTelefone: i.chefeTelefone, chefeEmail: i.chefeEmail, cidade: i.cidade, obsInterna: $('#i2obs').value } }), 'Anotação salva.'); if (n) trocar(n); }
-      if (t.dataset.cancelar !== undefined) { if (!confirm(`Cancelar a inscrição da equipe ${i.equipe}? A fatura em aberto também será cancelada. Valores já pagos precisam ser devolvidos à parte.`)) return; const n = await agir(() => office(`${base}/cancelar`, { method: 'POST', body: {} }), 'Inscrição cancelada.'); if (n) trocar(n); }
+      if (t.dataset.cancelar !== undefined) { if (!(await confirmar(`Cancelar a inscrição da equipe ${i.equipe}?`, 'A fatura em aberto também será cancelada. Valores já pagos precisam ser devolvidos à parte.', 'Cancelar inscrição', true))) return; const n = await agir(() => office(`${base}/cancelar`, { method: 'POST', body: {} }), 'Inscrição cancelada.'); if (n) trocar(n); }
       if (t.dataset.reativar !== undefined) { const n = await agir(() => office(`${base}/reativar`, { method: 'POST', body: {} }), 'Inscrição reativada.'); if (n) trocar(n); }
     });
     g.addEventListener('submit', async (e) => {

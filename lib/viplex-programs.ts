@@ -478,10 +478,12 @@ async function publishHtmlProgram(identifier: string, programName: string, templ
   const workDir = mkdtempSync(/* turbopackIgnore: true */ runtimePath('viplex-cronometragem-'));
   const fileNames = ['schedule_constraint.json', 'play_solution.json', 'playSolutionRelation.json', 'playlist0.json', 'planlist.json'];
 
-  for (const fileName of fileNames) {
-    const content = await downloadViplexFile(`${sourceDir}${fileName}`);
-    writeFileSync(/* turbopackIgnore: true */ join(workDir, fileName), content);
-  }
+  await Promise.all(
+    fileNames.map(async (fileName) => {
+      const content = await downloadViplexFile(`${sourceDir}${fileName}`);
+      writeFileSync(/* turbopackIgnore: true */ join(workDir, fileName), content);
+    }),
+  );
 
   const playlistPath = join(workDir, 'playlist0.json');
   const planlistPath = join(workDir, 'planlist.json');
@@ -538,9 +540,9 @@ async function publishHtmlProgram(identifier: string, programName: string, templ
     throw new Error(start.message || 'viplex_transfer_start_failed');
   }
 
-  for (const file of uploadFiles) {
-    await viplexUploadFile(uploadUrl, file.fileName, file.path);
-  }
+  await Promise.all(
+    uploadFiles.map((file) => viplexUploadFile(uploadUrl, file.fileName, file.path)),
+  );
 
   const duration = Number(playlist.sceneItems?.[0]?.duration || 86400000);
   const width = Number(playlist.width || 2048);
@@ -653,9 +655,9 @@ async function publishFixedStreamProgram(identifier: string, programName: string
   }
 
   const uploadUrl = start.data.appliedInfos.uploadUrl;
-  for (const file of uploadFiles) {
-    await viplexUploadFile(uploadUrl, file.fileName, file.path);
-  }
+  await Promise.all(
+    uploadFiles.map((file) => viplexUploadFile(uploadUrl, file.fileName, file.path)),
+  );
 
   const duration = Number(playlist.sceneItems?.[0]?.duration || 10000);
   const width = Number(playlist.width || 2048);

@@ -21,7 +21,7 @@ public sealed class FormTrocarSenha : DialogoDesign
             if (string.IsNullOrEmpty(atual.Text)) { Msg.Aviso(this, "Informe sua senha atual."); atual.Focus(); return; }
             if (nova.Text.Length < 8) { Msg.Aviso(this, "A senha precisa ter pelo menos 8 caracteres."); nova.Focus(); return; }
             if (nova.Text != confirmar.Text) { Msg.Aviso(this, "As senhas não conferem."); confirmar.SelectAll(); confirmar.Focus(); return; }
-            var r = await Sessao.Api.Post("/api/office/senha", new { senhaAtual = atual.Text, nova = nova.Text });
+            var r = await Sessao.Api.PostAsync("/api/office/senha", new { senhaAtual = atual.Text, nova = nova.Text });
             Msg.Info(this, r.S("mensagem"));
             DialogResult = DialogResult.OK;
             Close();
@@ -54,26 +54,33 @@ public sealed class FormServicosOnline : DialogoDesign
         Campo(g, "QR code do pré-cadastro (o cliente se cadastra no celular antes do totem)", url, 6, qr);
         var dica = new ToolTip();
         foreach (var ck in new[] { _agenda, _lembrete }) ck.Enabled = false;
-        BotaoRodape("Sincronizar agora", true, () => Seguro.Rodar(this, Atualizar));
+        BotaoRodape("Sincronizar agora", true, () => Seguro.Rodar(this, AtualizarAsync));
         BotaoRodape("Fechar", false, Close);
-        Shown += (_, _) => Seguro.Rodar(this, Atualizar);
+        Shown += (_, _) => Seguro.Rodar(this, AtualizarAsync);
         Load += (_, _) => { dica.SetToolTip(_agenda, "Aguardando a situação do servidor"); };
     }
 
-    async Task Atualizar()
+    Task Atualizar() => AtualizarAsync();
+
+    async Task AtualizarAsync()
     {
         var agora = DateTime.Now.ToString("dd/MM HH:mm");
-        var linhas = new List<string[]>();
+        List<string[]> linhas = [];
         JsonObject resp = null;
-        try { resp = (await Sessao.Api.Get("/api/office/servicos-online")).AsObject(); } catch { }
+        var tResp = Sessao.Api.GetAsync("/api/office/servicos-online");
+        var tSite = TestarAsync("https://www.kartodromodebetim.com.br");
+        var tTv = TestarAsync(Config.CronoUrl.TrimEnd('/') + "/healthz");
+
+        try { await Task.WhenAll(tResp, tSite, tTv); } catch { }
+        try { resp = (await tResp).AsObject(); } catch { }
         string Sit(bool? on) => on == true ? "On-line" : on == false ? "Fora do ar" : "Não configurado";
-        var site = await Testar("https://www.kartodromodebetim.com.br");
+        var site = tSite.IsCompletedSuccessfully ? await tSite : null;
         linhas.Add(["Site kartodromodebetim.com.br", Sit(site), site != null ? agora : "—"]);
         var reservas = resp?["servicos"]?.AsArray().OfType<JsonObject>().FirstOrDefault(x => x.S("id") == "reservas-online");
         linhas.Add(["Reservas online (totem e site)", reservas == null ? "Fora do ar" : Sit(reservas["online"]?.GetValue<bool?>()), reservas?.D("verificadoEm") is DateTime dr ? dr.ToString("dd/MM HH:mm") : agora]);
         var wpp = resp?["servicos"]?.AsArray().OfType<JsonObject>().FirstOrDefault(x => x.S("id") == "whatsapp");
         linhas.Add(["WhatsApp (resultados e lembretes)", Sit(wpp?["online"]?.GetValue<bool?>()), wpp?.D("verificadoEm") is DateTime dw ? dw.ToString("dd/MM HH:mm") : "—"]);
-        var tv = await Testar(Config.CronoUrl.TrimEnd('/') + "/healthz");
+        var tv = tTv.IsCompletedSuccessfully ? await tTv : null;
         linhas.Add(["Classificação ao vivo / telão", Sit(tv), tv != null ? "agora" : "—"]);
         if (IsDisposed) return;
         _tabela.Linhas(linhas);
@@ -89,7 +96,9 @@ public sealed class FormServicosOnline : DialogoDesign
         Acao(_lembrete, "enviarLembreteWhatsApp");
     }
 
-    static async Task<bool?> Testar(string url)
+    static Task<bool?> Testar(string url) => TestarAsync(url);
+
+    static async Task<bool?> TestarAsync(string url)
     {
         try
         {

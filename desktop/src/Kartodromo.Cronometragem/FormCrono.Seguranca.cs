@@ -280,14 +280,18 @@ public partial class FormCrono
     // ------------------------------------------------------------------ segurança (usuários, perfis, permissões)
 
     /// <summary>Usuários e perfis ficam no servidor da operação (os mesmos da recepção): pede o login de um administrador uma vez.</summary>
-    async Task<bool> EntrarComoAdministrador() => await EntrarComoUsuario(true);
+    Task<bool> EntrarComoAdministrador() => EntrarComoAdministradorAsync();
 
-    async Task<bool> EntrarComoUsuario(bool somenteAdministrador = false)
+    Task<bool> EntrarComoAdministradorAsync(CancellationToken ct = default) => EntrarComoUsuarioAsync(true, ct);
+
+    Task<bool> EntrarComoUsuario(bool somenteAdministrador = false) => EntrarComoUsuarioAsync(somenteAdministrador);
+
+    async Task<bool> EntrarComoUsuarioAsync(bool somenteAdministrador = false, CancellationToken ct = default)
     {
         if (!string.IsNullOrEmpty(Api.Servidor.Token)) return true;
         if (_autoteste != null && Environment.GetEnvironmentVariable("KARTODROMO_TESTE_ADMIN") is { Length: > 3 } ta && ta.IndexOf(':') > 0)
         {
-            var r0 = await Api.Servidor.Post("/api/login", new JsonObject { ["login"] = ta[..ta.IndexOf(':')], ["senha"] = ta[(ta.IndexOf(':') + 1)..], ["termos"] = true });
+            var r0 = await Api.Servidor.PostAsync("/api/login", new JsonObject { ["login"] = ta[..ta.IndexOf(':')], ["senha"] = ta[(ta.IndexOf(':') + 1)..], ["termos"] = true }, ct);
             Api.Servidor.Token = r0.S("token");
             return true;
         }
@@ -299,7 +303,7 @@ public partial class FormCrono
         var ok = false;
         d.BotaoRodape("Entrar", true, () => Seguro.Rodar(d, async () =>
         {
-            var r = await Api.Servidor.Post("/api/login", new JsonObject { ["login"] = login.Text.Trim(), ["senha"] = senha.Text, ["termos"] = true });
+            var r = await Api.Servidor.PostAsync("/api/login", new JsonObject { ["login"] = login.Text.Trim(), ["senha"] = senha.Text, ["termos"] = true });
             if (r?["usuario"] is not JsonObject u || (somenteAdministrador && !u.B("admin"))) { Msg.Aviso(d, "Esse usuário não é administrador."); return; }
             Api.Servidor.Token = r.S("token"); ok = true; d.Close();
         }));
@@ -310,27 +314,33 @@ public partial class FormCrono
         return ok;
     }
 
-    async Task<List<Campos.Item>> Perfis() => (await Api.Servidor.Lista("/api/office/cad/perfis")).Select(p => new Campos.Item(p.L("id") ?? 0, p.S("descricao"), p)).ToList();
+    Task<List<Campos.Item>> Perfis() => PerfisAsync();
 
-    async Task SegUsuario()
+    async Task<List<Campos.Item>> PerfisAsync(CancellationToken ct = default) => (await Api.Servidor.ListaAsync("/api/office/cad/perfis", ct)).Select(p => new Campos.Item(p.L("id") ?? 0, p.S("descricao"), p)).ToList();
+
+    Task SegUsuario() => SegUsuarioAsync();
+
+    async Task SegUsuarioAsync()
     {
-        if (!await EntrarComoAdministrador()) return;
-        var perfis = await Perfis();
+        if (!await EntrarComoAdministradorAsync()) return;
+        var perfis = await PerfisAsync();
         using var f = new RegistroDesign("Registro de usuário", "Quem pode entrar na cronometragem", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0", "linear-gradient(180deg, #9A9AA0, #4A4A4F)",
             [new("id", "Código", 1, "int"), new("nome", "Nome", 2), new("login", "Usuário", 1), new("senha", "Senha", 1, "password"), new("perfilId", "Perfil de acesso", 1, "lista", Itens: () => perfis), new("ativo", "Ativo", 1, "bool")],
             [new("Código", 90, r => r.S("id")), new("Nome", 0, r => r.S("nome")), new("Usuário", 170, r => r.S("login")), new("Perfil de acesso", 214, r => r.S("perfil"))],
-            FonteReg.Rest(Api.Servidor, "/api/office/cad/usuarios"), ("Permissões", r => { _ = Permissoes(); }))
+            FonteReg.Rest(Api.Servidor, "/api/office/cad/usuarios"), ("Permissões", r => { _ = PermissoesAsync(); }))
         { Nome = "usuário", Padrao = () => new JsonObject { ["ativo"] = true, ["perfilId"] = perfis.FirstOrDefault(p => p.Texto == "Cronometragem")?.Id } };
         f.ShowDialog(this);
     }
 
-    async Task SegPerfil()
+    Task SegPerfil() => SegPerfilAsync();
+
+    async Task SegPerfilAsync()
     {
-        if (!await EntrarComoAdministrador()) return;
+        if (!await EntrarComoAdministradorAsync()) return;
         using var f = new RegistroDesign("Registro de perfil de acesso", "Grupos de permissões dados aos usuários", "M6 11V8a6 6 0 0 1 12 0v3M5 11h14v10H5z", "linear-gradient(180deg, #9A9AA0, #4A4A4F)",
             [new("id", "Código", 1, "int"), new("descricao", "Descrição", 5)],
             [new("Código", 90, r => r.S("id")), new("Descrição", 0, r => r.S("descricao"))],
-            FonteReg.Rest(Api.Servidor, "/api/office/cad/perfis"), ("Permissões", r => { _ = Permissoes(); }))
+            FonteReg.Rest(Api.Servidor, "/api/office/cad/perfis"), ("Permissões", r => { _ = PermissoesAsync(); }))
         { Nome = "perfil", Padrao = () => new JsonObject { ["ativo"] = true } };
         f.ShowDialog(this);
     }
@@ -349,10 +359,12 @@ public partial class FormCrono
         ("App Mobile", ["resultados_publicar_mobile", "identidade_mobile_vincular"]),
     ];
 
-    async Task Permissoes()
+    Task Permissoes() => PermissoesAsync();
+
+    async Task PermissoesAsync()
     {
-        if (!await EntrarComoAdministrador()) return;
-        var perfis = await Perfis();
+        if (!await EntrarComoAdministradorAsync()) return;
+        var perfis = await PerfisAsync();
         if (perfis.Count == 0) { Msg.Aviso(this, "Cadastre um perfil de acesso primeiro."); return; }
         using var d = NovoDialogo("Permissões de acesso", "O que cada perfil pode fazer", "M6 11V8a6 6 0 0 1 12 0v3M5 11h14v10H5z", "linear-gradient(180deg, #9A9AA0, #4A4A4F)");
         var perfil = new ListaDesign(); perfil.Items.AddRange(perfis.ToArray());
@@ -384,12 +396,12 @@ public partial class FormCrono
         // trocar de perfil rápido: a resposta do perfil anterior chegava depois e aparecia (e era salva) no perfil novo
         var versaoCarga = 0;
         object perfilCarregado = null;
-        async Task Carregar()
+        async Task CarregarAsync(CancellationToken ct = default)
         {
             var alvo = (perfil.SelectedItem as Campos.Item)?.Id;
             var versao = ++versaoCarga;
             perfilCarregado = null;
-            var r = (await Api.Servidor.Get($"/api/office/permissoes?perfilId={alvo}"))?.AsObject();
+            var r = (await Api.Servidor.GetAsync($"/api/office/permissoes?perfilId={alvo}", ct))?.AsObject();
             if (versao != versaoCarga) return; // chegou atrasada: outro perfil já foi escolhido
             estado.Clear();
             total.Checked = r?["perfil"]?.AsObject().B("acessoTotal") ?? false;
@@ -399,8 +411,8 @@ public partial class FormCrono
             Mostrar();
         }
         d.Abas(ModulosPermissao.Select(x => x.Modulo).ToArray(), i => { modulo = i; Mostrar(); }, modulo);
-        perfil.SelectedIndexChanged += (_, _) => Seguro.Rodar(d, Carregar);
-        d.Shown += (_, _) => Seguro.Rodar(d, Carregar);
+        perfil.SelectedIndexChanged += (_, _) => Seguro.Rodar(d, () => CarregarAsync());
+        d.Shown += (_, _) => Seguro.Rodar(d, () => CarregarAsync());
         d.BotaoRodape("Salvar e fechar", true, () => Seguro.Rodar(d, async () =>
         {
             var alvo = (perfil.SelectedItem as Campos.Item)?.Id;
@@ -412,7 +424,7 @@ public partial class FormCrono
                     var v = estado.GetValueOrDefault(Chave(m, f)) ?? new bool[6];
                     itens.Add(new JsonObject { ["modulo"] = m, ["funcao"] = f, ["acessar"] = v[0], ["incluir"] = v[1], ["alterar"] = v[2], ["excluir"] = v[3], ["exportar"] = v[4], ["importar"] = v[5] });
                 }
-            await Api.Servidor.Put("/api/office/permissoes", new JsonObject { ["perfilId"] = alvo, ["acessoTotal"] = total.Checked, ["itens"] = itens });
+            await Api.Servidor.PutAsync("/api/office/permissoes", new JsonObject { ["perfilId"] = alvo, ["acessoTotal"] = total.Checked, ["itens"] = itens });
             d.Close();
         }));
         d.BotaoRodape("Cancelar", false, d.Close);

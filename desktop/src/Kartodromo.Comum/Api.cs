@@ -62,7 +62,7 @@ public class Api
 
     public static Api Servidor { get; } = new(Config.ServidorUrl);
 
-    public async Task<JsonNode> Enviar(HttpMethod metodo, string caminho, object corpo = null)
+    public async Task<JsonNode> EnviarAsync(HttpMethod metodo, string caminho, object corpo = null, CancellationToken ct = default)
     {
         using var req = new HttpRequestMessage(metodo, BaseUrl + caminho);
         if (!string.IsNullOrEmpty(Token)) req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Token);
@@ -79,14 +79,14 @@ public class Api
             req.Content = new StringContent(json, Encoding.UTF8, "application/json");
         }
         HttpResponseMessage resp;
-        try { resp = await _http.SendAsync(req); }
+        try { resp = await _http.SendAsync(req, ct).ConfigureAwait(false); }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
         {
             throw new ApiException("Não foi possível falar com o servidor. Verifique a rede e se o servidor está ligado.", 0);
         }
         // o servidor manda um login novo antes do atual vencer (a Recepção fica aberta dias seguidos)
         if (resp.Headers.TryGetValues("X-Novo-Token", out var novos) && novos.FirstOrDefault() is { Length: > 0 } novo) Token = novo;
-        var texto = await resp.Content.ReadAsStringAsync();
+        var texto = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
         JsonNode dados = null;
         try { dados = string.IsNullOrWhiteSpace(texto) ? null : JsonNode.Parse(texto); } catch { /* html / vazio */ }
         if (!resp.IsSuccessStatusCode)
@@ -97,17 +97,27 @@ public class Api
         return dados;
     }
 
-    public Task<JsonNode> Get(string c) => Enviar(HttpMethod.Get, c);
-    public Task<JsonNode> Post(string c, object corpo = null) => Enviar(HttpMethod.Post, c, corpo ?? new { });
-    public Task<JsonNode> Put(string c, object corpo) => Enviar(HttpMethod.Put, c, corpo);
-    public Task<JsonNode> Patch(string c, object corpo) => Enviar(HttpMethod.Patch, c, corpo);
-    public Task<JsonNode> Delete(string c) => Enviar(HttpMethod.Delete, c);
+    public Task<JsonNode> Enviar(HttpMethod metodo, string caminho, object corpo = null) => EnviarAsync(metodo, caminho, corpo);
 
-    public async Task<List<JsonObject>> Lista(string c)
+    public Task<JsonNode> GetAsync(string c, CancellationToken ct = default) => EnviarAsync(HttpMethod.Get, c, ct: ct);
+    public Task<JsonNode> PostAsync(string c, object corpo = null, CancellationToken ct = default) => EnviarAsync(HttpMethod.Post, c, corpo ?? new { }, ct);
+    public Task<JsonNode> PutAsync(string c, object corpo, CancellationToken ct = default) => EnviarAsync(HttpMethod.Put, c, corpo, ct);
+    public Task<JsonNode> PatchAsync(string c, object corpo, CancellationToken ct = default) => EnviarAsync(HttpMethod.Patch, c, corpo, ct);
+    public Task<JsonNode> DeleteAsync(string c, CancellationToken ct = default) => EnviarAsync(HttpMethod.Delete, c, ct: ct);
+
+    public Task<JsonNode> Get(string c) => GetAsync(c);
+    public Task<JsonNode> Post(string c, object corpo = null) => PostAsync(c, corpo);
+    public Task<JsonNode> Put(string c, object corpo) => PutAsync(c, corpo);
+    public Task<JsonNode> Patch(string c, object corpo) => PatchAsync(c, corpo);
+    public Task<JsonNode> Delete(string c) => DeleteAsync(c);
+
+    public async Task<List<JsonObject>> ListaAsync(string c, CancellationToken ct = default)
     {
-        var n = await Get(c);
+        var n = await GetAsync(c, ct).ConfigureAwait(false);
         return n is JsonArray a ? a.Where(x => x is JsonObject).Cast<JsonObject>().ToList() : [];
     }
+
+    public Task<List<JsonObject>> Lista(string c) => ListaAsync(c);
 
     /// <summary>Monta a URL de um relatorio/termo com o token na query (abre no visualizador).</summary>
     public string UrlComToken(string caminho) => BaseUrl + caminho + (caminho.Contains('?') ? "&" : "?") + "t=" + Uri.EscapeDataString(Token ?? "");

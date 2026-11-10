@@ -108,7 +108,7 @@ public sealed class FormRelatoriosCronometragem : DialogoDesign
             _estado.Text = "Consultando a Cronometragem…";
             // A API autenticada do servidor agrega a Cronometragem e usa
             // startedAt/finishedAt/createdAt, nessa ordem, para não perder encerradas.
-            _sessoes = await Sessao.Api.Lista("/api/office/crono/sessoes");
+            _sessoes = await Sessao.Api.ListaAsync("/api/office/crono/sessoes");
             _lista.Carregar(_sessoes);
             _estado.Text = _sessoes.Count == 0 ? "Nenhuma bateria registrada na Cronometragem." : $"{_sessoes.Count} bateria(s) disponíveis para relatório.";
 

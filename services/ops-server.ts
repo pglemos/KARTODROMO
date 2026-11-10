@@ -15,9 +15,9 @@
  */
 import http from 'node:http';
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { pipeline } from 'node:stream';
-import { extname, join, normalize, resolve } from 'node:path';
+import { dirname, extname, join, normalize, resolve } from 'node:path';
 import { caminhoArquivoAtualizacao, tipoConteudoAtualizacao } from '../lib/desktop-updates';
 import { CLIENTE_COLS, insertCliente, isValidCpf, one, onlyDigits, query, updateCliente, type ClienteInput } from '../lib/ops/db';
 import { confereSenha, emiteToken, renovaToken, validaToken } from '../lib/ops/auth';
@@ -29,7 +29,7 @@ import { bateriaDisponivelNoTotem, type TotemBateriaCandidate, TOTEM_BATERIAS_SQ
 import { relatorio } from '../lib/ops/relatorios';
 import { renderTermoResponsabilidade, type TermoParticipante } from '../lib/ops/termo';
 import { buscarPreCadastroAgora, preCadastroLigado, sincronizarPreCadastros } from '../lib/ops/pre-cadastro';
-import { conferirCobrancas, gruposRoutes, publicarGruposNoSite } from '../lib/ops/grupos';
+import { conferirCobrancas, entrarNoGrupoPeloTotem, gruposDoDiaNoTotem, gruposRoutes, publicarGruposNoSite, puxarPagamentosDiretoDoAsaas, vincularPorDados } from '../lib/ops/grupos';
 import { campeonatoOfficeRoutes, campeonatoSiteRoutes, conferirCobrancasCampeonato } from '../lib/ops/campeonato-inscricoes';
 import { painelRoutes, registrarSinal } from '../lib/ops/painel';
 import { enduranceDasBaterias, enduranceRoutes, equipesParaOTotem, paginaDoChefe, vincularNoTotem } from '../lib/ops/endurance';
@@ -208,9 +208,13 @@ async function termoHtml(ids: number[], branco = false) {
       'SELECT c.Nome nome, c.Documento documento, CONVERT(varchar(10), c.Nascimento, 126) nascimento, ' +
         'c.Email email, c.Telefone telefone, c.Cep cep, c.Endereco endereco, c.Numero numero, c.Complemento complemento, ' +
         'c.Bairro bairro, c.Cidade cidade, r.Nome responsavelNome, r.Documento responsavelDocumento, ' +
-        'r.Telefone responsavelTelefone, r.Email responsavelEmail ' +
-        'FROM dbo.Inscricao i JOIN dbo.Cliente c ON c.Id = i.ClienteId ' +
-        'LEFT JOIN dbo.Cliente r ON r.Id = c.ResponsavelId WHERE i.Id IN (' + placeholders + ')',
+        'r.Telefone responsavelTelefone, r.Email responsavelEmail, i.BateriaId bateriaId, b.Nome bateriaNome, ' +
+        'CONVERT(varchar(19), b.Inicio, 126) bateriaInicio, grupo.responsavel grupoResponsavel ' +
+        'FROM dbo.Inscricao i JOIN dbo.Bateria b ON b.Id = i.BateriaId JOIN dbo.Cliente c ON c.Id = i.ClienteId ' +
+        'LEFT JOIN dbo.Cliente r ON r.Id = c.ResponsavelId ' +
+        "OUTER APPLY (SELECT TOP 1 LEFT(LTRIM(rc.Nome), CHARINDEX(' ', LTRIM(rc.Nome) + ' ') - 1) responsavel FROM dbo.ReservaGrupo g JOIN dbo.Cliente rc ON rc.Id = g.ResponsavelId " +
+        "WHERE g.BateriaId = i.BateriaId AND g.Status <> 'cancelada' AND (g.ResponsavelId = i.ClienteId OR EXISTS (SELECT 1 FROM dbo.ReservaGrupoPiloto gp WHERE gp.GrupoId = g.Id AND (gp.InscricaoId = i.Id OR gp.ClienteId = i.ClienteId))) ORDER BY g.Id DESC) grupo " +
+        'WHERE i.Id IN (' + placeholders + ')',
       params,
     ));
     if (participantes.length) {
@@ -230,29 +234,74 @@ async function termoHtml(ids: number[], branco = false) {
 }
 // ---------------------------------------------------------------- fila de impressao da recepcao
 // O totem nao tem impressora: o termo entra nesta fila e o programa da Recepcao (com a TM-T20)
-// pega e imprime em segundos, como o LapTime fazia pelo servidor. Fica so em memoria: um
-// servidor reiniciado perde no maximo os termos das ultimas horas, que a recepcao reimprime.
-type Impressao = { id: number; url: string; titulo: string; origem: string; criadoEm: number; pegoEm?: number; feitaEm?: number; tentativas: number };
-const filaImpressao: Impressao[] = [];
-let seqImpressao = 0;
+// pega e imprime em segundos. A fila em disco preserva os trabalhos durante reinícios.
+type Impressao = { id: number; url: string; titulo: string; origem: string; criadoEm: number; pegoEm?: number; feitaEm?: number; canceladaEm?: number; tentativas: number };
+const arquivoFilaImpressao = join(process.cwd(), '.runtime', 'impressao-fila.json');
+
+function carregarFilaImpressao(): Impressao[] {
+  if (!existsSync(arquivoFilaImpressao)) return [];
+  try {
+    const raw = JSON.parse(readFileSync(arquivoFilaImpressao, 'utf8'));
+    const itens = Array.isArray(raw) ? raw : Array.isArray(raw?.value) ? raw.value : [];
+    let maxId = 0;
+    const lista: Impressao[] = [];
+    for (const item of itens) {
+      if (item && typeof item === 'object' && typeof item.url === 'string') {
+        const id = Number.isFinite(item.id) && item.id > 0 ? Number(item.id) : null;
+        if (id && id > maxId) maxId = id;
+        lista.push({
+          id: id ?? 0,
+          url: String(item.url),
+          titulo: String(item.titulo ?? 'Termo de responsabilidade'),
+          origem: String(item.origem ?? 'totem'),
+          criadoEm: Number.isFinite(item.criadoEm) ? Number(item.criadoEm) : Date.now(),
+          pegoEm: Number.isFinite(item.pegoEm) ? Number(item.pegoEm) : undefined,
+          feitaEm: Number.isFinite(item.feitaEm) ? Number(item.feitaEm) : undefined,
+          canceladaEm: Number.isFinite(item.canceladaEm) ? Number(item.canceladaEm) : undefined,
+          tentativas: Number.isFinite(item.tentativas) ? Number(item.tentativas) : 0,
+        });
+      }
+    }
+    for (const j of lista) {
+      if (j.id <= 0) j.id = ++maxId;
+    }
+    return lista;
+  } catch {
+    return [];
+  }
+}
+
+const filaImpressao: Impressao[] = carregarFilaImpressao();
+let seqImpressao = filaImpressao.reduce((max, j) => (Number.isFinite(j.id) && j.id > max ? j.id : max), 0);
+
+function salvarFilaImpressao() {
+  mkdirSync(dirname(arquivoFilaImpressao), { recursive: true });
+  writeFileSync(arquivoFilaImpressao + '.tmp', JSON.stringify(filaImpressao), { mode: 0o600 });
+  renameSync(arquivoFilaImpressao + '.tmp', arquivoFilaImpressao);
+}
 const IMPRESSAO_VALIDADE_MS = 3 * 60 * 60 * 1000;
 const IMPRESSAO_REENTREGA_MS = 90 * 1000;
 
 function enfileirarImpressao(url: string, titulo: string, origem: string) {
   const agora = Date.now();
   for (let i = filaImpressao.length - 1; i >= 0; i--) if (agora - filaImpressao[i].criadoEm > IMPRESSAO_VALIDADE_MS) filaImpressao.splice(i, 1);
+  if (!Number.isFinite(seqImpressao) || seqImpressao <= 0) {
+    seqImpressao = filaImpressao.reduce((max, j) => (Number.isFinite(j.id) && j.id > max ? j.id : max), 0);
+  }
   const job: Impressao = { id: ++seqImpressao, url, titulo, origem, criadoEm: agora, tentativas: 0 };
   filaImpressao.push(job);
+  salvarFilaImpressao();
   log(`impressao #${job.id} na fila (${titulo}, ${origem})`);
   return job;
 }
 
 function proximaImpressao() {
   const agora = Date.now();
-  const job = filaImpressao.find((j) => !j.feitaEm && agora - j.criadoEm <= IMPRESSAO_VALIDADE_MS && (!j.pegoEm || agora - j.pegoEm > IMPRESSAO_REENTREGA_MS));
+  const job = filaImpressao.find((j) => Number.isFinite(j.id) && j.id > 0 && !j.feitaEm && !j.canceladaEm && j.tentativas < 10 && agora - j.criadoEm <= IMPRESSAO_VALIDADE_MS && (!j.pegoEm || agora - j.pegoEm > IMPRESSAO_REENTREGA_MS));
   if (!job) return null;
   job.pegoEm = agora;
   job.tentativas++;
+  salvarFilaImpressao();
   return job;
 }
 
@@ -262,14 +311,14 @@ function proximaImpressao() {
  * (mesmo que quem pagou não vá correr). Fica só no servidor: o app do totem aprovado não muda.
  */
 const identificadoNoTotem = new Map<string, { id: number; em: number }>();
-const ipDe = (req: http.IncomingMessage) => String(req.socket.remoteAddress ?? '').replace(/^::ffff:/, '');
+const ipDe = (req: http.IncomingMessage) => String(req.socket?.remoteAddress ?? '').replace(/^::ffff:/, '');
 function donoNoTotem(req: http.IncomingMessage) {
   const x = identificadoNoTotem.get(ipDe(req));
   return x && Date.now() - x.em < 15 * 60_000 ? x.id : null;
 }
 
 function origemDe(req: http.IncomingMessage) {
-  const ip = String(req.socket.remoteAddress ?? '').replace(/^::ffff:/, '');
+  const ip = String(req.socket?.remoteAddress ?? '').replace(/^::ffff:/, '');
   return ip === '192.168.20.161' ? 'Totem 1' : ip === '192.168.20.69' ? 'Totem 2' : ip || 'totem';
 }
 
@@ -288,6 +337,17 @@ function enderecoDoTotem(endereco: unknown, numero: unknown, complemento: unknow
 
 async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, path: string): Promise<boolean> {
   const method = req.method ?? 'GET';
+  const getParam = (name: string): string => {
+    const rawUrl = req.url ?? '';
+    const idx = rawUrl.indexOf('?');
+    if (idx === -1) return '';
+    const q = rawUrl.slice(idx + 1);
+    for (const pair of q.split('&')) {
+      const [k, v] = pair.split('=');
+      if (decodeURIComponent(k || '') === name) return decodeURIComponent(v || '').replace(/\+/g, ' ');
+    }
+    return '';
+  };
 
   if (path === '/api/totem/config' && method === 'GET') {
     const p = await parametros();
@@ -303,18 +363,51 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     return true;
   }
 
-  if (path === '/api/totem/identificar' && method === 'POST') {
-    const body = await readBody(req);
-    const raw = String(body.identificador ?? '').trim();
-    if (raw.length < 5) throw new HttpError(400, 'Informe o CPF, RG, passaporte ou e-mail.');
+  if ((path === '/api/totem/identificar' || path === '/api/publico/cliente-busca') && (method === 'POST' || method === 'GET')) {
+    const body = method === 'POST' ? await readBody(req) : {};
+    const raw = String(body.identificador ?? body.documento ?? body.cpf ?? getParam('identificador') ?? getParam('q') ?? getParam('cpf') ?? getParam('documento') ?? '').trim();
+    if (raw.length < 5) throw new HttpError(400, 'Informe o CPF, RG, passaporte, telefone ou e-mail.');
     const isEmail = raw.includes('@');
-    const v = isEmail ? raw.toLowerCase() : onlyDigits(raw) || raw.toUpperCase();
+    const dig = onlyDigits(raw);
+    const v = isEmail ? raw.toLowerCase() : dig || raw.toUpperCase();
     // e-mail digitado com o domínio errado ("gmal.com") acha o cadastro já corrigido, e vice-versa
     const v2 = isEmail ? corrigeEmail(raw) : v;
-    const procurar = () => one<Record<string, unknown>>(
-      `SELECT TOP 1 ${CLIENTE_COLS} FROM dbo.Cliente c WHERE ${isEmail ? 'c.Email IN (@v, @v2)' : '(c.DocumentoNum = @v OR c.Documento = @v)'} ORDER BY CASE WHEN c.ResponsavelId IS NULL THEN 0 ELSE 1 END, c.AtualizadoEm DESC`,
-      { v, v2 },
-    );
+    const procurar = () => {
+      if (isEmail) {
+        return one<Record<string, unknown>>(
+          `SELECT TOP 1 ${CLIENTE_COLS} FROM dbo.Cliente c WHERE c.Email IN (@v, @v2) ORDER BY CASE WHEN c.ResponsavelId IS NULL THEN 0 ELSE 1 END, c.AtualizadoEm DESC`,
+          { v, v2 },
+        );
+      }
+      if (dig && dig.length >= 10) {
+        return one<Record<string, unknown>>(
+          `SELECT TOP 1 ${CLIENTE_COLS} FROM dbo.Cliente c
+            WHERE (c.DocumentoNum = @dig OR c.Documento = @raw OR c.Documento = @dig
+               OR c.TelefoneNum = @dig OR c.Telefone LIKE @phoneLike)
+            ORDER BY CASE WHEN c.DocumentoNum = @dig OR c.Documento = @raw THEN 0 ELSE 1 END,
+                     CASE WHEN c.ResponsavelId IS NULL THEN 0 ELSE 1 END,
+                     c.AtualizadoEm DESC`,
+          { dig, raw, phoneLike: '%' + dig.slice(-8) },
+        );
+      }
+      if (dig && dig.length >= 4) {
+        return one<Record<string, unknown>>(
+          `SELECT TOP 1 ${CLIENTE_COLS} FROM dbo.Cliente c
+            WHERE (c.DocumentoNum = @dig OR c.Documento = @raw OR c.Documento = @dig)
+            ORDER BY CASE WHEN c.ResponsavelId IS NULL THEN 0 ELSE 1 END, c.AtualizadoEm DESC`,
+          { dig, raw },
+        );
+      }
+      const nomeLike = '%' + raw.replace(/\s+/g, '%') + '%';
+      return one<Record<string, unknown>>(
+        `SELECT TOP 1 ${CLIENTE_COLS} FROM dbo.Cliente c
+          WHERE (c.Documento = @raw OR c.Nome COLLATE Latin1_General_CI_AI LIKE @nomeLike)
+          ORDER BY CASE WHEN c.Documento = @raw THEN 0 ELSE 1 END,
+                   CASE WHEN c.ResponsavelId IS NULL THEN 0 ELSE 1 END,
+                   c.AtualizadoEm DESC`,
+        { raw, nomeLike },
+      );
+    };
     let c = await procurar();
     // não achou: pode ter feito o pré-cadastro pelo QR code há pouco (ainda não sincronizado)
     if (!c && (await buscarPreCadastroAgora(raw, log))) c = await procurar();
@@ -329,6 +422,7 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     const txt = (v: unknown) => (v == null ? '' : String(v).trim());
     const num = txt(c.numero);
     const comp = txt(c.complemento);
+    const rua = txt(c.endereco);
     const enderecoCompleto = enderecoDoTotem(c.endereco, c.numero, c.complemento);
 
     send(res, 200, {
@@ -345,12 +439,15 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
         temNascimento: Boolean(c.nascimento),
         peso: c.peso == null ? '' : String(Number(c.peso)),
         cep: txt(c.cep),
+        rua,
         endereco: enderecoCompleto,
         numero: num,
         complemento: comp,
         bairro: txt(c.bairro),
         cidade: txt(c.cidade),
         estado: txt(c.estado),
+        sexo: txt(c.sexo),
+        tipoSanguineo: txt(c.tipoSanguineo),
         lgpd: Boolean(c.lgpdAceiteEm),
         bloqueado: Boolean(c.bloqueado),
       },
@@ -413,6 +510,19 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     return true;
   }
 
+  // "Vim com um grupo": grupos de hoje com vaga aguardando (antes de escolher a bateria) e a entrada do amigo no grupo
+  if (path === '/api/totem/grupos' && method === 'GET') {
+    send(res, 200, await gruposDoDiaNoTotem());
+    return true;
+  }
+  if (path === '/api/totem/grupo/entrar' && method === 'POST') {
+    const body = await readBody(req);
+    const cid = int(body.clienteId, 'Cliente');
+    if (String(body.token ?? '') !== sign(`cli:${cid}`)) throw new HttpError(403, 'Sessão expirada, identifique-se de novo.');
+    send(res, 200, await entrarNoGrupoPeloTotem(int(body.grupoId, 'Grupo'), cid, log));
+    return true;
+  }
+
   if (path === '/api/totem/baterias' && method === 'GET') {
     const rows = await query<TotemBateriaCandidate>(TOTEM_BATERIAS_SQL);
     // ?grupo=id.token,id.token: vagas que o grupo já tem na bateria (as dele e as pagas online pelo responsável)
@@ -422,13 +532,16 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     if (dono && !grupo.includes(dono)) grupo.push(dono);
     const doGrupo = new Map<number, number>();
     if (grupo.length && rows.length) {
-      const lista = grupo.join(',');
+      const bmap: Record<string, unknown> = {};
+      const bIn = rows.map((r, n) => { bmap[`b${n}`] = Number(r.id); return `@b${n}`; }).join(',');
+      const gIn = grupo.map((gId, n) => { bmap[`g${n}`] = gId; return `@g${n}`; }).join(',');
       for (const g of await query<{ b: number; n: number }>(
         `SELECT i.BateriaId b, COUNT(*) n FROM dbo.Inscricao i
-          WHERE i.BateriaId IN (${rows.map((r) => Number(r.id)).join(',')}) AND i.Status <> 'cancelada'
-            AND (i.ClienteId IN (${lista})
-                 OR (i.Origem = 'site' AND i.Pago = 1 AND i.ClienteId IN (SELECT ResponsavelId FROM dbo.Cliente WHERE Id IN (${lista}) AND ResponsavelId IS NOT NULL)))
+          WHERE i.BateriaId IN (${bIn}) AND i.Status <> 'cancelada'
+            AND (i.ClienteId IN (${gIn})
+                 OR (i.Origem = 'site' AND i.Pago = 1 AND i.ClienteId IN (SELECT ResponsavelId FROM dbo.Cliente WHERE Id IN (${gIn}) AND ResponsavelId IS NOT NULL)))
           GROUP BY i.BateriaId`,
+        bmap,
       )) doGrupo.set(g.b, g.n);
     }
     // bateria de endurance (100 Milhas): depois de escolher, o totem pede a equipe e dá o número da pulseira
@@ -503,6 +616,13 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
           if (!termoDoPiloto.has(cid)) termoDoPiloto.set(cid, paga);
           continue;
         }
+        // reserva em grupo da recepção com vaga aguardando cadastro e dado em comum (nome ou WhatsApp): entra na vaga já paga
+        const vagaGrupo = await vincularPorDados(bateriaId, cid, log);
+        if (vagaGrupo) {
+          ids.push(vagaGrupo);
+          if (!termoDoPiloto.has(cid)) termoDoPiloto.set(cid, vagaGrupo);
+          continue;
+        }
         // pre-reserva: aparece em Reservas > Aprovar na recepcao
         const novas = await inscreverN(bateriaId, cid, 1, 'totem', null, null, false);
         ids.push(...novas);
@@ -513,15 +633,19 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
     const p = await parametros();
     log(`totem: ${ids.length} pre-reserva(s) em ${baterias.length} bateria(s)`);
     const imprimir = p['totem.imprimirTermo'] !== 'false';
-    const naRecepcao = imprimir && p['totem.termoNaRecepcao'] !== 'false';
+    const origem = origemDe(req);
+    const ip = (req.socket?.remoteAddress ?? '').replace(/^::ffff:/, '');
+    const isTotem1 = origem === 'Totem 1' || ip === '192.168.20.161';
+    // Se for Totem 1 (ou se solicitou impressaoLocal), NUNCA joga na recepção: imprime direto no totem
+    const naRecepcao = !isTotem1 && imprimir && body.impressaoLocal !== true && p['totem.termoNaRecepcao'] !== 'false';
     // cada termo é um trabalho de impressão separado: a TM-T20 corta o papel no fim de cada trabalho,
     // então vários termos num trabalho só saíam emendados
-    if (naRecepcao) for (const idInscricao of termoDoPiloto.values()) enfileirarImpressao(termoLink([idInscricao]), 'Termo de responsabilidade', origemDe(req));
+    if (naRecepcao) for (const idInscricao of termoDoPiloto.values()) enfileirarImpressao(termoLink([idInscricao]), 'Termo de responsabilidade', origem);
     if (ids.length) {
       const pmap = Object.fromEntries(ids.map((id, n) => ['id' + n, id]));
       await query(`UPDATE dbo.Inscricao SET TermoImpressoEm = COALESCE(TermoImpressoEm, SYSDATETIME()), AtualizadoEm = SYSDATETIME() WHERE Id IN (${ids.map((_, n) => '@id' + n).join(',')})`, pmap).catch(() => undefined);
     }
-    send(res, 201, { inscricoes: ids, inicio: primeira?.inicio, termoUrl: imprimir ? termoLink(ids) : null, termoNaRecepcao: naRecepcao, pulseiras });
+    send(res, 201, { inscricoes: ids, inicio: primeira?.inicio, termoUrl: imprimir ? termoLink(ids) : null, termoUrls: imprimir ? [...termoDoPiloto.values()].map((id) => termoLink([id])) : [], termoNaRecepcao: naRecepcao, pulseiras });
     return true;
   }
 
@@ -545,6 +669,7 @@ async function loginRoute(req: http.IncomingMessage, res: http.ServerResponse) {
   const u = await one<{ id: number; nome: string; hash: string; admin: boolean; ativo: boolean }>(`SELECT Id id, Nome nome, SenhaHash hash, Admin admin, Ativo ativo FROM dbo.Usuario WHERE Login = @login`, { login });
   if (!u || !u.ativo || !confereSenha(senha, u.hash)) {
     const reg = tentativasLogin.get(ip) ?? { n: 0, ate: 0 };
+    if (reg.ate && agora >= reg.ate) { reg.n = 0; reg.ate = 0; }
     reg.n += 1;
     if (reg.n >= 10) reg.ate = agora + 15 * 60_000;
     tentativasLogin.set(ip, reg);
@@ -618,7 +743,7 @@ const server = http.createServer(async (req, res) => {
       if (dadosCrono && method === 'GET') {
         const response = await fetch(`${TIMING_URL}/api/sessions/${encodeURIComponent(dadosCrono[1])}${dadosCrono[2] ?? ''}`, { signal: AbortSignal.timeout(10_000) });
         if (!response.ok) throw new HttpError(response.status === 404 ? 404 : 502, 'Dados da cronometragem indisponíveis.');
-        const data = await response.json();
+        const data = (await response.json()) as (SessaoRelatorio & { competitors?: unknown[]; standings?: unknown[] }) | null;
         if (dadosCrono[2]) return send(res, 200, data);
         if (!data || !Array.isArray(data.competitors) || !Array.isArray(data.standings)) throw new HttpError(502, 'Resultado da cronometragem inválido.');
         const ids = idsClientesRelatorio(data as SessaoRelatorio);
@@ -659,7 +784,12 @@ const server = http.createServer(async (req, res) => {
       if (mi && method === 'POST') {
         const job = filaImpressao.find((j) => j.id === Number(mi[1]));
         if (job && mi[2] === 'feita') { job.feitaEm = Date.now(); log(`impressao #${job.id} impressa na recepcao (${sessao.nome})`); }
-        if (job && mi[2] === 'falhou') { job.pegoEm = undefined; log(`impressao #${job.id} falhou na recepcao, volta pra fila`); }
+        if (job && mi[2] === 'falhou') {
+          job.pegoEm = Date.now();
+          if (job.tentativas >= 10) log(`impressao #${job.id} suspensa apos 10 tentativas falhas (${job.titulo})`);
+          else log(`impressao #${job.id} falhou na recepcao, volta pra fila`);
+        }
+        if (job) salvarFilaImpressao();
         return send(res, 200, { ok: !!job });
       }
       const reqOffice = { method, url, sessao, body: () => readBody(req) };
@@ -737,12 +867,14 @@ const server = http.createServer(async (req, res) => {
         // dados dos pilotos para a lista de competidores da cronometragem (só leitura)
         const ids = String(url.searchParams.get('ids') ?? '').split(',').map(Number).filter((n) => Number.isSafeInteger(n) && n > 0).slice(0, 200);
         if (!ids.length) return send(res, 200, []);
-        const clientes = await query<Record<string, unknown>>(`SELECT Id id, Email email, Cidade cidade, Estado uf, Peso peso, Sexo sexo, Telefone telefone FROM dbo.Cliente WHERE Id IN (${ids.join(',')})`);
+        const pmap = Object.fromEntries(ids.map((id, n) => [`id${n}`, id]));
+        const inClause = ids.map((_, n) => `@id${n}`).join(',');
+        const clientes = await query<Record<string, unknown>>(`SELECT Id id, Email email, Cidade cidade, Estado uf, Peso peso, Sexo sexo, Telefone telefone FROM dbo.Cliente WHERE Id IN (${inClause})`, pmap);
         const vinculos = await query<{ clienteId: number; bateriaId: number; equipeId: number; equipe: string; pulseira: number }>(
           `SELECT p.ClienteId clienteId, ev.BateriaId bateriaId, q.Id equipeId, q.Nome equipe, p.Pulseira pulseira
            FROM dbo.EndurancePilotoInscricao p JOIN dbo.EnduranceEvento ev ON ev.Id = p.EventoId
            JOIN dbo.EnduranceEquipe q ON q.Id = p.EquipeId AND q.EventoId = ev.Id
-           WHERE p.ClienteId IN (${ids.join(',')}) AND p.Ativo = 1 AND ev.Ativo = 1`);
+           WHERE p.ClienteId IN (${inClause}) AND p.Ativo = 1 AND ev.Ativo = 1`, pmap);
         return send(res, 200, clientes.map((c) => ({ ...c, enduranceVinculos: vinculos.filter((v) => v.clienteId === c.id) })));
       }
       m = path.match(/^\/api\/crono\/baterias\/(\d+)\/programa$/);
@@ -827,7 +959,7 @@ if (preCadastroLigado()) {
   setInterval(async () => {
     if (conferindo) return;
     conferindo = true;
-    try { await publicarGruposNoSite(log).catch((e) => log(`grupo: resumo para o site falhou (${(e as Error).message})`)); await conferirCobrancas(log); await conferirCobrancasCampeonato(log); } catch (e) { log(`grupo: conferência das cobranças falhou (${(e as Error).message})`); } finally { conferindo = false; }
+    try { await publicarGruposNoSite(log).catch((e) => log(`grupo: resumo para o site falhou (${(e as Error).message})`)); await conferirCobrancas(log); await puxarPagamentosDiretoDoAsaas(log); await conferirCobrancasCampeonato(log); } catch (e) { log(`grupo: conferência das cobranças falhou (${(e as Error).message})`); } finally { conferindo = false; }
   }, 60_000).unref();
 }
 

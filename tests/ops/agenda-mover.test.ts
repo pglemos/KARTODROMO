@@ -4,17 +4,18 @@ import { describe, expect, it } from 'vitest';
 
 const source = readFileSync(new URL('../../workers/admin/public/agenda-acoes.js', import.meta.url), 'utf8');
 
-function tela(reservas: Record<string, unknown>[], falhaIds: number[] = []) {
+function tela(reservas: Record<string, unknown>[], falhaIds: number[] = [], falhaGrupos = false) {
   const els = new Map<string, { disabled: boolean; value: string; textContent: string; innerHTML: string; onchange?: (event: { target: { name: string; value: string } }) => void; onclick?: () => Promise<void> }>();
   const el = (id: string) => { if (!els.has(id)) els.set(id, { disabled: false, value: '', textContent: '', innerHTML: '' }); return els.get(id)!; };
-  const modal = { style: {}, innerHTML: '', querySelector: el, addEventListener() {} };
-  const chamadas: number[] = [];
+  const modal = { isConnected: true, style: {}, innerHTML: '', querySelector: el, addEventListener() {} };
+  const chamadas: number[] = []; const erros: string[] = [];
   const destino = { id: 8, dataHora: '2099-11-03T19:55', status: 'aberta', disponiveis: 2, produtoId: 11, preco: 17500, tipoKart: 'light' };
   const context = {
     modal: () => modal, esc: String, hojeIso: () => '2099-11-03', horaDe: (s: string) => s.slice(11, 16),
-    deIso: (s: string) => new Date(s), DIAS: [], MESES: [], svg: () => '', IC: {}, brl: String,
-    toast() {}, fecharCamada() {}, testContext: { A: {}, recarregar: async () => {} },
+    agoraMin: () => 0, fmtHm: () => '00:00', deIso: (s: string) => new Date(s), DIAS: [], MESES: [], svg: () => '', IC: {}, brl: String,
+    falhou(e: Error) { erros.push(e.message); }, toast() {}, fecharCamada() {}, testContext: { A: {}, carregar: async () => {}, recarregar: async () => {} },
     office: async (path: string) => {
+      if (path.startsWith('/grupos?')) { if (falhaGrupos) throw new Error('Sem conexão com grupos'); return []; }
       if (path.startsWith('/baterias?')) return [{ ...destino }];
       const id = Number(path.split('/')[2]); chamadas.push(id);
       if (falhaIds.includes(id)) throw new Error('Sem vagas');
@@ -23,10 +24,17 @@ function tela(reservas: Record<string, unknown>[], falhaIds: number[] = []) {
   };
   const api = vm.runInNewContext(source.replace('return { montar, gaveta };', 'C = testContext; return { montar, gaveta, mover };') + '\nAgendaAcoes', context);
   const origem = { id: 7, dataHora: '2099-11-03T19:20', tipoKart: 'light' };
-  return { el, chamadas, destino, abrir: async () => { await api.mover(origem, reservas); await Promise.resolve(); await Promise.resolve(); }, escolher: () => el('#mvLista').onchange!({ target: { name: 'dest', value: '8' } }), mover: () => el('#mvOk').onclick!() };
+  return { el, chamadas, erros, destino, abrir: async () => { await api.mover(origem, reservas); await Promise.resolve(); await Promise.resolve(); }, escolher: () => el('#mvLista').onchange!({ target: { name: 'dest', value: '8' } }), mover: () => el('#mvOk').onclick!() };
 }
 
 describe('Agenda: mover participantes', () => {
+  it('falha ao consultar grupos informa o operador sem abrir movimento incompleto', async () => {
+    const t = tela([{id:1,cliente:'TESTE CODEX',pago:false}], [], true);
+    await expect(t.abrir()).resolves.toBeUndefined();
+    expect(t.erros).toEqual(['Sem conexão com grupos']);
+    expect(t.chamadas).toEqual([]);
+  });
+
   it('oferece outro horário de Light para antecipado pago sem exigir a tarifa atual', async () => {
     const t = tela([{ id: 1, cliente: 'TESTE CODEX', pago: true, produtoId: 4, preco: 14500 }]);
     await t.abrir();

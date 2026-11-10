@@ -6,7 +6,7 @@
 <title>Autoatendimento</title>
 <style>
   /* visual do LapTime Autoatendimento: couro preto, cartao com borda vermelha, fonte condensada */
-  :root { --red:#e2393f; --red2:#b82b30; --card:#17191c; --field:#2b2e33; --fb:#4b4f55; --txt:#e4e4e4; --mut:#c9c9c9; }
+  :root { --red:#d6282e; --red2:#b82b30; --card:#17191c; --field:#2b2e33; --fb:#4b4f55; --txt:#e4e4e4; --mut:#c9c9c9; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html, body { margin:0; height:100%; overflow:hidden; user-select:none; color:var(--txt);
     font-family:"Bahnschrift SemiCondensed", "Bahnschrift", "Barlow Condensed", "Arial Narrow", sans-serif; font-size:17px;
@@ -19,7 +19,7 @@
   .head { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; margin-bottom:22px; }
   h1 { margin:0; font-weight:300; font-size:44px; color:#d6d6d6; letter-spacing:.2px; }
   .sub { color:var(--mut); margin-top:4px; font-size:17px; }
-  .logo { text-align:right; } .logo img { height:52px; display:block; } .logo small { color:#aaa; font-size:12px; }
+  .logo { text-align:right; } .logo img { height:52px; width:auto; display:block; } .logo small { color:#aaa; font-size:12px; }
   label.l { display:block; color:var(--mut); font-size:16px; margin:0 0 6px 16px; }
   input.t, select.t { width:100%; height:46px; background:var(--field); border:2px solid var(--fb); border-radius:10px; color:var(--txt); font:inherit; font-size:17px; padding:0 12px; outline:none; }
   input.t:focus, select.t:focus { border-color:#8b8f95; }
@@ -31,8 +31,8 @@
   button.b { font:inherit; font-size:18px; height:46px; min-width:130px; padding:0 34px; border-radius:26px; cursor:pointer; color:#e8e8e8; background:transparent; border:2px solid var(--red); }
   button.b.pri { background:var(--red); border-color:var(--red); color:#fff; }
   button.b:active { transform:translateY(1px); } button.b:disabled { opacity:.5; }
-  .ck { display:inline-flex; align-items:center; gap:10px; cursor:pointer; color:#dcdcdc; font-size:17px; }
-  .ck input { appearance:none; width:22px; height:22px; border:2px solid #d0d0d0; border-radius:5px; margin:0; display:inline-grid; place-content:center; background:transparent; }
+  .ck { display:inline-flex; align-items:center; gap:10px; cursor:pointer; color:#dcdcdc; font-size:17px; min-height:28px; }
+  .ck input { appearance:none; width:24px; height:24px; border:2px solid #d0d0d0; border-radius:5px; margin:0; display:inline-grid; place-content:center; background:transparent; }
   .ck input:checked { background:var(--red); border-color:var(--red); }
   .ck input:checked::after { content:"✓"; color:#fff; font-size:15px; line-height:1; }
   .ck a { color:#f0e68c; text-decoration:none; }
@@ -55,7 +55,7 @@
 </style>
 </head>
 <body>
-<div class="wrap"><div class="card" id="card"></div></div>
+<main class="wrap"><div class="card" id="card"></div></main>
 <iframe id="printer" title="impressão do termo" style="position:absolute;width:0;height:0;border:0;visibility:hidden"></iframe>
 <script>
 'use strict';
@@ -92,7 +92,7 @@ function cartao(classe, titulo, sub, corpo, acoes) {
   const c = $('card');
   c.className = 'card ' + (classe || '');
   c.innerHTML = `<div class="head"><div><h1>${titulo}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</div>
-    <div class="logo"><img src="/ui/kib-logo.png" alt="Kartódromo Internacional de Betim"><small>autoatendimento</small></div></div>${corpo}${acoes ? `<div class="actions">${acoes}</div>` : ''}`;
+    <div class="logo"><img src="/ui/kib-logo.png" alt="Kartódromo Internacional de Betim" width="187" height="52"><small>autoatendimento</small></div></div>${corpo}${acoes ? `<div class="actions">${acoes}</div>` : ''}`;
   c.scrollTop = 0;
 }
 

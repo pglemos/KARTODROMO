@@ -177,7 +177,7 @@ export async function readTelaoPlaylistFromRemote(): Promise<TelaoPlaylistState>
       signal: controller.signal,
     });
     if (!response.ok) throw new Error(`Playlist HTTP ${response.status}`);
-    const data = await response.json();
+    const data = (await response.json()) as Record<string, unknown>;
     const state = normalizeState(data?.playlist || data, true);
     memoryState = state;
     return state;
@@ -223,7 +223,7 @@ export async function writeTelaoPlaylistRemote(value: unknown): Promise<TelaoPla
       cache: 'no-store',
     });
     if (!response.ok) throw new Error(`Playlist HTTP ${response.status}`);
-    const data = await response.json();
+    const data = (await response.json()) as Record<string, unknown>;
     const state = normalizeState(data?.playlist || data, true);
     memoryState = state;
     return { ...state, remote: true };

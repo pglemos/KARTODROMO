@@ -185,6 +185,27 @@ function ResultsContent() {
     </View>;
   }
 
+  const renderResultItem = useCallback(
+    ({ item, index }: { item: ResultItem; index: number }) => {
+      if (item.kind === 'personal') {
+        const ultimoMeu = index === Math.min(meus.length, historicoTodo ? meus.length : 5) - 1;
+        return <>
+          <ResultRow result={item.result} showEvent />
+          {ultimoMeu && meus.length > 5 ? <View style={{ marginTop: 12 }}>
+            <ActionButton label={historicoTodo ? 'Mostrar só os últimos' : `Ver as ${meus.length} baterias`} onPress={() => setHistoricoTodo(!historicoTodo)} secondary />
+          </View> : null}
+          {ultimoMeu ? publicoTopo() : null}
+        </>;
+      }
+      if (item.kind === 'more') return <View style={{ marginTop: 16 }}><ActionButton label="Ver mais baterias" onPress={() => setMostrar(mostrar + PAGINA)} secondary /></View>;
+      return <>
+        {index === 0 && !meus.length ? publicoTopo() : null}
+        <EventCard index={index} event={item.event} open={aberta === item.event.sessionId} onToggle={() => setAberta(aberta === item.event.sessionId ? null : item.event.sessionId)} />
+      </>;
+    },
+    [aberta, historicoTodo, meus.length, mostrar, publicoTopo],
+  );
+
   return <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
     <FlatList data={items} keyExtractor={(item) => item.key} contentContainerStyle={[styles.content, { paddingBottom: bottomClearance }]} refreshing={publicLoading || personalLoading} onRefresh={() => void load()}
       ListHeaderComponent={<>
@@ -192,23 +213,7 @@ function ResultsContent() {
         {erroCompartilhado ? <View style={{ gap: 12, marginBottom: 16 }}><InlineError message={erroCompartilhado} /><ActionButton label="Tentar novamente" onPress={() => void load()} secondary /></View> : null}
         {history()}
       </>}
-      renderItem={({ item, index }) => {
-        if (item.kind === 'personal') {
-          const ultimoMeu = index === Math.min(meus.length, historicoTodo ? meus.length : 5) - 1;
-          return <>
-            <ResultRow result={item.result} showEvent />
-            {ultimoMeu && meus.length > 5 ? <View style={{ marginTop: 12 }}>
-              <ActionButton label={historicoTodo ? 'Mostrar só os últimos' : `Ver as ${meus.length} baterias`} onPress={() => setHistoricoTodo(!historicoTodo)} secondary />
-            </View> : null}
-            {ultimoMeu ? publicoTopo() : null}
-          </>;
-        }
-        if (item.kind === 'more') return <View style={{ marginTop: 16 }}><ActionButton label="Ver mais baterias" onPress={() => setMostrar(mostrar + PAGINA)} secondary /></View>;
-        return <>
-          {index === 0 && !meus.length ? publicoTopo() : null}
-          <EventCard index={index} event={item.event} open={aberta === item.event.sessionId} onToggle={() => setAberta(aberta === item.event.sessionId ? null : item.event.sessionId)} />
-        </>;
-      }}
+      renderItem={renderResultItem}
       ListFooterComponent={!items.some((i) => i.kind === 'event') ? publicoTopo() : null} />
   </SafeAreaView>;
 

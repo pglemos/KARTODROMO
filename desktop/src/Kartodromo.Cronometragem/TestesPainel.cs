@@ -25,6 +25,12 @@ static class TestesPainel
         // Teste 5: página local publica, página remota não gera eco
         TestarSincronismoPagina();
 
+        // Teste 6: página não deve resetar para 0 em chamadas sucessivas de Atualizar() sem serial ativo
+        TestarNaoResetarPaginaEmAtualizacoesSubsequentes();
+
+        // Teste 7: paginação com até 4 páginas (31 a 40 pilotos)
+        TestarPaginacaoComQuatroPaginas();
+
         Console.WriteLine("=== TODOS OS TESTES PASSARAM COM SUCESSO! ===");
     }
 
@@ -243,5 +249,48 @@ static class TestesPainel
         aplicarRemota!.Invoke(painel, [2]);
         Assert(painel.Pagina == 2, "Página recebida do outro computador deve ser aplicada");
         Assert(paginasPublicadas.SequenceEqual([1]), "Página remota não deve gerar eco para a rede");
+    }
+
+    static void TestarNaoResetarPaginaEmAtualizacoesSubsequentes()
+    {
+        Console.WriteLine("\n-- Teste 6: Painel sem serial ativo NÃO deve resetar página em atualizações sucessivas --");
+        using var painel = new PainelLed();
+        var sessao = CriarSessaoQualificacao(25);
+        painel.Atualizar(sessao);
+        painel.DefinirPagina(1);
+        Assert(painel.Pagina == 1, "Página deve ter mudado para 1 (11 a 20)");
+
+        // Simula ciclo normal de atualizações a cada 1s sem serial
+        for (var i = 0; i < 5; i++)
+        {
+            painel.Atualizar(sessao);
+            Assert(painel.Pagina == 1, $"Página não pode voltar para 0 no tick {i + 1}");
+        }
+
+        painel.DefinirPagina(2);
+        Assert(painel.Pagina == 2, "Página deve ter mudado para 2 (21 a 25)");
+
+        for (var i = 0; i < 5; i++)
+        {
+            painel.Atualizar(sessao);
+            Assert(painel.Pagina == 2, $"Página 2 não pode voltar para 0 no tick {i + 1}");
+        }
+    }
+
+    static void TestarPaginacaoComQuatroPaginas()
+    {
+        Console.WriteLine("\n-- Teste 7: Paginação com 35 pilotos (4 páginas) --");
+        using var painel = new PainelLed();
+        var sessao = CriarSessaoQualificacao(35);
+        painel.Atualizar(sessao);
+        Assert(painel.TotalPilotos == 35, "Total de pilotos deve ser 35");
+        Assert(painel.TotalPaginas == 4, "Total de páginas deve ser 4");
+
+        painel.DefinirPagina(3);
+        Assert(painel.Pagina == 3, "Página 4 (31 a 35) deve ser selecionável");
+
+        var p3 = PainelLed.Montar(sessao, 3, 10, DateTime.Now, out _);
+        Assert(p3.Contains("$SP,1,\"062\""), "Página 4 deve conter piloto 31 na linha física 1");
+        Assert(p3.Contains("$SP,5,\"070\""), "Página 4 deve conter piloto 35 na linha física 5");
     }
 }

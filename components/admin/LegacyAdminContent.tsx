@@ -3,35 +3,24 @@
 import { BrowserRouter } from 'react-router-dom';
 import type { ComponentType } from 'react';
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { LegacyAuthProvider } from '@/src/admin/auth/AuthContext';
-import { AdministrativaPage } from '@/src/admin/modules/administrativa/AdministrativaPage';
-import { CampeonatosPage } from '@/src/admin/modules/campeonatos/CampeonatosPage';
-import { ClientesPage } from '@/src/admin/modules/clientes/ClientesPage';
-import { ClubePage } from '@/src/admin/modules/clube/ClubePage';
-import { CronometragemPage } from '@/src/admin/modules/cronometragem/CronometragemPage';
-import { DashboardPage } from '@/src/admin/modules/dashboard/DashboardPage';
-import { FinanceiraPage } from '@/src/admin/modules/financeira/FinanceiraPage';
-import { EqualizacaoPage } from '@/src/admin/modules/equalizacao/EqualizacaoPage';
-import { LanchonetePage } from '@/src/admin/modules/lanchonete/LanchonetePage';
-import { RecepcaoPage } from '@/src/admin/modules/recepcao/RecepcaoPage';
-import { ReservasPage } from '@/src/admin/modules/reservas/ReservasPage';
-import { ResultadosPage } from '@/src/admin/modules/resultados/ResultadosPage';
 import { ToastProvider } from '@/src/admin/ui/useToast';
 import type { AdminModuleKey } from './navigation';
 
 const legacyPages: Partial<Record<AdminModuleKey, ComponentType>> = {
-  administrativa: AdministrativaPage,
-  campeonatos: CampeonatosPage,
-  clientes: ClientesPage,
-  clube: ClubePage,
-  cronometragem: CronometragemPage,
-  dashboard: DashboardPage,
-  financeira: FinanceiraPage,
-  equalizacao: EqualizacaoPage,
-  lanchonete: LanchonetePage,
-  recepcao: RecepcaoPage,
-  reservas: ReservasPage,
-  resultados: ResultadosPage,
+  administrativa: dynamic(() => import('@/src/admin/modules/administrativa/AdministrativaPage').then((m) => m.AdministrativaPage)),
+  campeonatos: dynamic(() => import('@/src/admin/modules/campeonatos/CampeonatosPage').then((m) => m.CampeonatosPage)),
+  clientes: dynamic(() => import('@/src/admin/modules/clientes/ClientesPage').then((m) => m.ClientesPage)),
+  clube: dynamic(() => import('@/src/admin/modules/clube/ClubePage').then((m) => m.ClubePage)),
+  cronometragem: dynamic(() => import('@/src/admin/modules/cronometragem/CronometragemPage').then((m) => m.CronometragemPage)),
+  dashboard: dynamic(() => import('@/src/admin/modules/dashboard/DashboardPage').then((m) => m.DashboardPage)),
+  financeira: dynamic(() => import('@/src/admin/modules/financeira/FinanceiraPage').then((m) => m.FinanceiraPage)),
+  equalizacao: dynamic(() => import('@/src/admin/modules/equalizacao/EqualizacaoPage').then((m) => m.EqualizacaoPage)),
+  lanchonete: dynamic(() => import('@/src/admin/modules/lanchonete/LanchonetePage').then((m) => m.LanchonetePage)),
+  recepcao: dynamic(() => import('@/src/admin/modules/recepcao/RecepcaoPage').then((m) => m.RecepcaoPage)),
+  reservas: dynamic(() => import('@/src/admin/modules/reservas/ReservasPage').then((m) => m.ReservasPage)),
+  resultados: dynamic(() => import('@/src/admin/modules/resultados/ResultadosPage').then((m) => m.ResultadosPage)),
 };
 
 export function LegacyAdminContent({ moduleKey, sessionEmail }: { moduleKey: AdminModuleKey; sessionEmail: string }) {

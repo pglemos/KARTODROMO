@@ -623,17 +623,18 @@ async function alterarCliente(r) {
   await info(x.mensagem); recarregar();
 }
 async function moverCliente(r) {
-  const lista = await api(`/api/office/baterias?status=abertas&filtro=apartir&data=${hoje()}`);
+  const dataBase = (r.dataHora || hoje()).slice(0, 10);
+  const dataFiltro = dataBase < hoje() ? dataBase : hoje();
+  const lista = await api(`/api/office/baterias?status=todas&filtro=apartir&data=${dataFiltro}`);
   const corpo = h(`<div><p>Mover <b>${esc(r.cliente)}</b> de <b>${esc(r.reserva)} ${fmt.dmyhm(r.dataHora)}</b> para:</p>
-    <label>Bateria destino</label><select id="mvD" style="width:100%">${lista.filter((b) => b.id !== r.bateriaId).map((b) => `<option value="${b.id}">${fmt.dmyhm(b.dataHora)} · ${esc(b.nome)} · ${esc(b.produto || '')} · ${b.disponiveis} vagas</option>`).join('')}</select></div>`);
+    <label>Bateria destino</label><select id="mvD" style="width:100%">${lista.filter((b) => b.id !== r.bateriaId && b.status !== 'cancelada').map((b) => `<option value="${b.id}">${fmt.dmyhm(b.dataHora)} · ${esc(b.nome)} · ${esc(b.produto || '')} · ${b.disponiveis} vagas${b.status === 'fechada' ? ' (Fechada)' : ''}</option>`).join('')}</select></div>`);
   const w = janela({ titulo: 'Mover Cliente para Reserva', largura: 640, corpo, botoes: [['Cancelar', () => w.fechar()], ['Mover', async () => {
     const x = await api(`/api/office/reservas/${r.id}/mover`, { body: { bateriaId: Number($('#mvD', corpo).value) } });
     await info(x.mensagem); w.fechar(); recarregar();
   }, true]] });
 }
 async function excluirReservas(sel) {
-  if (sel.some((r) => r.pago)) return info('Não é permitido excluir reservas pagas!');
-  if (!(await confirmar(sel.length > 1 ? 'Deseja realmente excluir as reservas agendadas?' : 'Deseja realmente excluir a reserva agendada?'))) return;
+  if (!(await confirmar(sel.length > 1 ? 'Excluir as reservas e liberar as vagas? Pagamentos serão mantidos no histórico, sem reembolso automático.' : 'Excluir a reserva e liberar a vaga? O pagamento será mantido no histórico, sem reembolso automático.'))) return;
   for (const r of sel) await api(`/api/office/reservas/${r.id}`, { method: 'DELETE' });
   recarregar();
 }

@@ -14,7 +14,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'admin_auth_not_configured' }, { status: 503 });
   }
 
-  const body = await request.json().catch(() => ({}));
+  const body = (await request.json().catch(() => ({}))) as {
+    email?: string;
+    password?: string;
+    remember?: boolean;
+  };
   const email = String(body?.email || '').trim().toLowerCase();
   const password = String(body?.password || '');
   const remember = body?.remember !== false;

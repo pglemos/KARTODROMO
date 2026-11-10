@@ -230,7 +230,7 @@ describe('consumo atômico e estados do voucher', () => {
     const responses: { status: number; body: unknown }[] = [];
     await officeRoutes({
       method: 'POST', url: new URL('https://ops.local/api/office/reservas-online/5/resolver'),
-      body: async () => ({ resolucao }), sessao: {} as never,
+      body: async () => ({ resolucao }), sessao: {uid:1,nome:'TESTE CODEX',admin:true,exp:Date.now()+60000},
     }, (status, body) => responses.push({ status, body }));
     expect(responses[responses.length - 1]?.status).toBe(200);
     expect(usageState).toBe(estadoEsperado);
@@ -241,7 +241,7 @@ describe('consumo atômico e estados do voucher', () => {
     usageState = 'reembolso_pendente';
     await expect(officeRoutes({
       method: 'POST', url: new URL('https://ops.local/api/office/reservas-online/9/resolver'),
-      body: async () => ({}), sessao: {} as never,
+      body: async () => ({}), sessao: {uid:1,nome:'TESTE CODEX',admin:true,exp:Date.now()+60000},
     }, () => undefined)).rejects.toMatchObject({ status: 400 });
     expect(usageState).toBe('reembolso_pendente');
   });
@@ -252,7 +252,7 @@ describe('consumo atômico e estados do voucher', () => {
     const responses: { status: number; body: unknown }[] = [];
     await officeRoutes({
       method: 'POST', url: new URL('https://ops.local/api/office/reservas-online/10/resolver'),
-      body: async () => ({}), sessao: {} as never,
+      body: async () => ({}), sessao: {uid:1,nome:'TESTE CODEX',admin:true,exp:Date.now()+60000},
     }, (status, body) => responses.push({ status, body }));
     expect(responses[responses.length - 1]).toEqual({ status: 200, body: { ok: true, resolucao: 'resolvido' } });
   });

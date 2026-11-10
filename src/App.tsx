@@ -2,22 +2,25 @@
 
 import { useEffect, useState, type ComponentType } from 'react';
 import { usePathname } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import Home from './site-pages/Home';
-import HistoryPage from './site-pages/HistoryPage';
-import FAQPage from './site-pages/FAQPage';
-import EventsPage from './site-pages/EventsPage';
-import PistaPage from './site-pages/PistaPage';
-import KartLocacaoPage from './site-pages/KartLocacaoPage';
-import ReservasPage from './site-pages/ReservasPage';
-import ChampionshipsPage from './site-pages/ChampionshipsPage';
-import KACPage from './site-pages/KACPage';
-import KACSuperPage from './site-pages/KACSuperPage';
-import TwoHundredMilesPage from './site-pages/TwoHundredMilesPage';
-import FiveHundredMilesPage from './site-pages/FiveHundredMilesPage';
 import Header from './components/Header';
 import Footer from './components/Footer';
-import ClubPage, { type ClubPageKey } from './site-pages/ClubPages';
 import { findPublicRoute, type PublicRouteKey } from './config/publicRoutes';
+import type { ClubPageKey } from './site-pages/ClubPages';
+
+const HistoryPage = dynamic(() => import('./site-pages/HistoryPage'));
+const FAQPage = dynamic(() => import('./site-pages/FAQPage'));
+const EventsPage = dynamic(() => import('./site-pages/EventsPage'));
+const PistaPage = dynamic(() => import('./site-pages/PistaPage'));
+const KartLocacaoPage = dynamic(() => import('./site-pages/KartLocacaoPage'));
+const ReservasPage = dynamic(() => import('./site-pages/ReservasPage'));
+const ChampionshipsPage = dynamic(() => import('./site-pages/ChampionshipsPage'));
+const KACPage = dynamic(() => import('./site-pages/KACPage'));
+const KACSuperPage = dynamic(() => import('./site-pages/KACSuperPage'));
+const TwoHundredMilesPage = dynamic(() => import('./site-pages/TwoHundredMilesPage'));
+const FiveHundredMilesPage = dynamic(() => import('./site-pages/FiveHundredMilesPage'));
+const ClubPage = dynamic(() => import('./site-pages/ClubPages'));
 
 const standardPages: Partial<Record<PublicRouteKey, ComponentType>> = {
   home: Home,

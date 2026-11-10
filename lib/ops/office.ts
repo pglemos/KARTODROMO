@@ -2,12 +2,21 @@
  * API do app da recepcao (replica funcional do LapTime Office).
  * Todas as rotas daqui exigem sessao de usuario (lib/ops/auth.ts).
  */
+import { saldosDasBaterias } from './agenda-financeiro';
 import { pedirVinculoAgora } from './app-mobile';
 import { CLIENTE_COLS, insertCliente, isValidCpf, one, onlyDigits, query, tx, updateCliente, type ClienteInput } from './db';
 import { confereSenha, hashSenha, type Sessao } from './auth';
 import { erroCadastroObrigatorio, erroPesoCliente } from './cadastro-obrigatorio';
 import { mobileApiEndpoint } from '../mobile-api-url';
 import { ENDURANCE_VINCULO_SQL } from './endurance-vinculo';
+
+/** Libera a vaga preservando pagamento, venda e vínculos para consulta e estorno separado. */
+export async function cancelarReserva(id: number) {
+  const r = await one<{ Id: number }>(
+    `UPDATE dbo.Inscricao SET Status = 'cancelada', AtualizadoEm = SYSDATETIME()
+       OUTPUT inserted.Id WHERE Id = @id`, { id });
+  if (!r) throw new HttpError(404, 'Reserva não encontrada.');
+}
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
@@ -97,6 +106,25 @@ export async function podeFecharBateria(sessao: Sessao) {
 }
 export async function exigePodeFecharBateria(sessao: Sessao) {
   if (!(await podeFecharBateria(sessao))) throw new HttpError(403, 'Seu usuário não pode fechar, bloquear nem excluir baterias: o funcionamento precisa continuar normal até o último horário. Chame o administrador.');
+}
+
+/** As mesmas permissões do painel são exigidas na API, inclusive em chamadas diretas. */
+export async function exigePermissaoOffice(sessao: Sessao, path: string, method: string) {
+  if (sessao.admin) return;
+  const telas = /^\/(baterias|grupos)/.test(path) || /^\/reservas\/\d+\/mover/.test(path) ? ['agenda', 'recepcao']
+    : /^\/reservas/.test(path) ? ['agenda', 'recepcao', 'reservas'] : [];
+  if (!telas.length) return;
+  const u = await one<{ ativo: boolean; admin: boolean; perfilId: number | null; acessoTotal: boolean }>(
+    `SELECT u.Ativo ativo, u.Admin admin, u.PerfilId perfilId, p.AcessoTotal acessoTotal
+     FROM dbo.Usuario u LEFT JOIN dbo.Perfil p ON p.Id = u.PerfilId WHERE u.Id = @uid`, { uid: sessao.uid });
+  if (!u?.ativo) throw new HttpError(401, 'Sessão expirada. Entre novamente.');
+  if (u.admin || u.acessoTotal || !u.perfilId) return;
+  const permissoes = await query<{ funcao: string; acessar: boolean; alterar: boolean }>(
+    `SELECT Funcao funcao, Acessar acessar, Alterar alterar FROM dbo.PerfilPermissao WHERE PerfilId = @p AND Modulo = 'Admin Web'`, { p: u.perfilId });
+  // Perfis antigos sem configuração continuam com o acesso contratado; configuração explícita é restritiva.
+  if (!permissoes.length) return;
+  if (!permissoes.some((p) => telas.includes(p.funcao) && p.acessar && (method === 'GET' || p.alterar)))
+    throw new HttpError(403, 'Seu perfil não pode executar esta operação na agenda.');
 }
 
 async function servicosOnline() {
@@ -219,7 +247,7 @@ function periodo(url: URL, col: string) {
 // ---------------------------------------------------------------- consultas de lista (arvore)
 
 const RESERVA_SELECT = `SELECT TOP 5000 i.Id id, i.Pago pago, CONVERT(varchar(16), b.Inicio, 126) dataHora, b.Nome reserva, b.Id bateriaId,
-  c.Id clienteId, c.Nome cliente, endurance.equipe, endurance.equipeId, endurance.pulseira, c.Documento documento, c.Telefone telefone, c.Peso peso, CONVERT(varchar(10), c.Nascimento, 126) nascimento,
+  c.Id clienteId, c.Nome cliente, endurance.equipe, endurance.equipeId, endurance.pulseira, c.Documento documento, c.Email email, c.Telefone telefone, c.Peso peso, CONVERT(varchar(10), c.Nascimento, 126) nascimento,
   CASE WHEN c.Nascimento IS NULL THEN NULL ELSE DATEDIFF(YEAR, c.Nascimento, GETDATE()) - CASE WHEN DATEADD(YEAR, DATEDIFF(YEAR, c.Nascimento, GETDATE()), c.Nascimento) > GETDATE() THEN 1 ELSE 0 END END idade,
   r.Nome responsavel, p.Id produtoId, p.Nome produto, p.Categoria categoria, ISNULL(i.PrecoCentavos, p.PrecoCentavos) preco, i.DescontoCentavos desconto,
   CASE WHEN i.Pago = 1 THEN i.ValorCentavos ELSE ISNULL(i.PrecoCentavos, p.PrecoCentavos) - i.DescontoCentavos END total,
@@ -519,7 +547,7 @@ async function inscreverN(bateriaId: number, clienteId: number, n: number, orige
         `INSERT INTO dbo.Inscricao (BateriaId, ClienteId, Origem, Observacao, ProdutoId, PrecoCentavos, Aprovada, ResponsavelId, Pago, ValorCentavos, Status)
          OUTPUT inserted.Id id VALUES (@bateriaId, @clienteId, @origem, @obs, @produtoId, @preco, @aprovada, @resp, @pago, @valor, @status)`,
         {
-          bateriaId, clienteId: pessoas ? pessoas[k] : clienteId, origem, obs: observacao, produtoId, preco, aprovada: aprovada || pago ? 1 : 0, resp: n > 1 ? clienteId : null,
+          bateriaId, clienteId: pessoas ? pessoas[k] : clienteId, origem, obs: observacao, produtoId, preco, aprovada: (origem === 'site' || origem === 'totem' || origem === 'agendamento') ? 0 : (aprovada ? 1 : 0), resp: n > 1 ? clienteId : null,
           pago: pago ? 1 : 0, valor: pago ? preco : null, status: pago ? 'confirmada' : 'reservada',
         },
       );
@@ -531,6 +559,66 @@ async function inscreverN(bateriaId: number, clienteId: number, n: number, orige
   return opcoes.run ? inscrever(opcoes.run) : tx(inscrever);
 }
 export { inscreverN };
+
+/** O movimento completo do grupo usa uma única transação: nunca fica pela metade. */
+export async function moverReservas(ids: number[], destino: number, grupoId?: number) {
+  await tx(async (run) => {
+    if (grupoId) {
+      const [g] = await run(`SELECT Id FROM dbo.ReservaGrupo WITH (UPDLOCK, HOLDLOCK) WHERE Id = @g AND Status = 'ativa'`, { g: grupoId });
+      if (!g) throw new HttpError(404, 'Reserva em grupo não encontrada.');
+      const membros = await run(`SELECT i.Id id FROM dbo.ReservaGrupoPiloto p JOIN dbo.Inscricao i WITH (UPDLOCK, HOLDLOCK) ON i.Id = p.InscricaoId WHERE p.GrupoId = @g AND i.Status <> 'cancelada' ORDER BY i.Id`, { g: grupoId });
+      ids = membros.map((p) => Number(p.id));
+      if (!ids.length) throw new HttpError(409, 'O grupo não tem reservas ativas.');
+    }
+    for (const id of ids) {
+      if (!grupoId) {
+        const [vinculo] = await run(`SELECT g.Id grupoId FROM dbo.ReservaGrupoPiloto p JOIN dbo.ReservaGrupo g ON g.Id = p.GrupoId WHERE p.InscricaoId = @id AND g.Status = 'ativa'`, { id });
+        if (vinculo) {
+          await run(`UPDATE dbo.ReservaGrupoPiloto SET InscricaoId = NULL WHERE InscricaoId = @id`, { id });
+        }
+      }
+      const [r] = await run(
+        `SELECT i.ClienteId, i.BateriaId, i.Pago, i.Status, ISNULL(i.ProdutoId, b.ProdutoId) produtoId,
+         ISNULL(i.PrecoCentavos, po.PrecoCentavos) preco, i.DescontoCentavos desconto, b.TipoKart tipoKart, po.ServicoLocacao servicoLocacao, po.Categoria categoria, REPLACE(REPLACE(UPPER(po.Nome), N'ANTECIPADO - ', N''), N'BALCÃO - ', N'') servico, po.DuracaoMin duracaoMin FROM dbo.Inscricao i WITH (UPDLOCK, HOLDLOCK) JOIN dbo.Bateria b ON b.Id = i.BateriaId
+         LEFT JOIN dbo.Produto po ON po.Id = ISNULL(i.ProdutoId, b.ProdutoId) WHERE i.Id = @id`,
+        { id },
+      );
+      if (!r) throw new HttpError(404, 'Reserva não encontrada.');
+      if (r.Status === 'cancelada') throw new HttpError(409, 'Não é possível mover uma reserva cancelada.');
+      if (Number(r.BateriaId) === destino) continue;
+      const [d] = await run(
+        `SELECT b.Status, b.Vagas, b.ReservaFechada reservaFechada, b.TipoKart tipoKart, p.ServicoLocacao servicoLocacao, p.Categoria categoria, REPLACE(REPLACE(UPPER(p.Nome), N'ANTECIPADO - ', N''), N'BALCÃO - ', N'') servico, p.DuracaoMin duracaoMin, p.Id produtoId, p.PrecoCentavos preco, (SELECT COUNT(*) FROM dbo.Inscricao x WITH (UPDLOCK, HOLDLOCK) WHERE x.BateriaId = b.Id AND x.Status <> 'cancelada') ocupadas
+         FROM dbo.Bateria b WITH (UPDLOCK, HOLDLOCK) LEFT JOIN dbo.Produto p ON p.Id = b.ProdutoId WHERE b.Id = @destino`,
+        { destino },
+      );
+      if (!d || d.Status === 'cancelada') throw new HttpError(404, 'Bateria destino não encontrada ou cancelada.');
+      if (d.produtoId == null || d.preco == null) throw new HttpError(409, 'A bateria destino precisa ter um produto com preço cadastrado.');
+      // Antecipado e balcão do mesmo serviço mantêm o produto e o valor já pagos.
+      const mesmoServico = Number(d.produtoId) === Number(r.produtoId) || (
+        r.servicoLocacao && d.servicoLocacao && r.categoria && r.categoria === d.categoria
+        && r.servico && r.servico === d.servico
+        && (r.duracaoMin ?? null) === (d.duracaoMin ?? null)
+      );
+      if ((r.Pago || grupoId) && (r.tipoKart !== d.tipoKart || !mesmoServico)) {
+        throw new HttpError(409, 'Reserva paga só pode ser movida para bateria do mesmo serviço e tipo de kart. O produto e o valor já pagos são preservados.');
+      }
+      if ((d.ocupadas as number) >= (d.Vagas as number)) throw new HttpError(409, 'Não há vagas disponíveis na bateria destino.');
+      const [dup] = await run(`SELECT 1 x FROM dbo.Inscricao WHERE BateriaId = @destino AND ClienteId = @c AND Status <> 'cancelada'`, { destino, c: r.ClienteId });
+      if (dup) throw new HttpError(409, 'Já existe uma reserva para este cliente na bateria selecionada.');
+      if (r.Pago || grupoId) {
+        await run(`UPDATE dbo.Inscricao SET BateriaId = @destino, TermoImpressoEm = NULL, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { destino, id });
+      } else {
+        await run(
+          `UPDATE dbo.Inscricao SET BateriaId = @destino, ProdutoId = @produtoDestino, PrecoCentavos = @precoDestino,
+           DescontoCentavos = CASE WHEN @produtoOrigem = @produtoDestino THEN CASE WHEN DescontoCentavos > @precoDestino THEN @precoDestino ELSE DescontoCentavos END ELSE 0 END,
+           TermoImpressoEm = NULL, AtualizadoEm = SYSDATETIME() WHERE Id = @id`,
+          { destino, id, produtoOrigem: r.produtoId, produtoDestino: d.produtoId, precoDestino: d.preco },
+        );
+      }
+    }
+    if (grupoId) await run(`UPDATE dbo.ReservaGrupo SET BateriaId = @destino, AtualizadoEm = SYSDATETIME() WHERE Id = @g`, { destino, g: grupoId });
+  });
+}
 
 // ---------------------------------------------------------------- venda (checkout / receita avulsa)
 
@@ -714,7 +802,7 @@ async function estornar(sessao: Sessao, vendaId: number, body: Record<string, un
       estornouVoucherParceiro ||= Boolean(it.VoucherId);
       await run(`UPDATE dbo.VendaItem SET Estornado = 1, EstornadoEm = SYSDATETIME(), MotivoEstorno = @motivo WHERE Id = @itemId`, { itemId, motivo });
       if (it.InscricaoId) {
-        await run(`UPDATE dbo.Inscricao SET Pago = 0, Status = 'reservada', ValorCentavos = NULL, VendaId = NULL, AtualizadoEm = SYSDATETIME() WHERE Id = @i`, { i: it.InscricaoId });
+        await run(`UPDATE dbo.Inscricao SET Pago = 0, Status = CASE WHEN Status = 'cancelada' THEN 'cancelada' ELSE 'reservada' END, ValorCentavos = NULL, VendaId = NULL, AtualizadoEm = SYSDATETIME() WHERE Id = @i`, { i: it.InscricaoId });
       }
     }
     await run(`UPDATE dbo.VoucherUso SET Estornado = 1 WHERE VendaId = @vendaId AND EXISTS (SELECT 1 FROM dbo.VendaItem vi WHERE vi.VendaId = @vendaId AND vi.VoucherId IS NOT NULL AND vi.Estornado = 1)`, { vendaId });
@@ -744,6 +832,7 @@ async function estornar(sessao: Sessao, vendaId: number, body: Record<string, un
 export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   const { method, url, sessao } = req;
   const path = url.pathname.replace(/^\/api\/office/, '');
+  await exigePermissaoOffice(sessao, path, method);
   let m: RegExpMatchArray | null;
 
   const mobilePermissionRoute = path.match(/^\/mobile-permissions\/([a-z_]+)$/);
@@ -1148,7 +1237,19 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     else if (st === 'fechadas') where.push("b.Status = 'fechada'");
     const per = periodo(url, 'b.Inicio');
     where.push(per.where);
-    send(200, await query(`${BATERIA_SELECT} WHERE ${where.join(' AND ')} ORDER BY b.Inicio`, per.p));
+    const baterias = await query<{ id: number; [key: string]: unknown }>(`${BATERIA_SELECT} WHERE ${where.join(' AND ')} ORDER BY b.Inicio`, per.p);
+    if (!baterias.length) { send(200, []); return true; }
+    const ids = baterias.map((b) => Number(b.id)).join(',');
+    const inscricoes = await query<{ id: number; bateriaId: number; pago: boolean; total: number }>(
+      `SELECT i.Id id, i.BateriaId bateriaId, i.Pago pago,
+        CASE WHEN ISNULL(i.PrecoCentavos, p.PrecoCentavos) - ISNULL(i.DescontoCentavos, 0) < 0 THEN 0
+             ELSE ISNULL(i.PrecoCentavos, p.PrecoCentavos) - ISNULL(i.DescontoCentavos, 0) END total
+       FROM dbo.Inscricao i JOIN dbo.Bateria b ON b.Id = i.BateriaId
+       LEFT JOIN dbo.Produto p ON p.Id = ISNULL(i.ProdutoId, b.ProdutoId)
+       WHERE i.Status <> 'cancelada' AND i.BateriaId IN (${ids})`);
+    const { carregarGrupos } = await import('./grupos');
+    const grupos = await carregarGrupos(`g.Status = 'ativa' AND g.BateriaId IN (${ids})`, {});
+    send(200, saldosDasBaterias(baterias, inscricoes, grupos));
     return true;
   }
   if (path === '/vendas' && method === 'GET') {
@@ -1338,6 +1439,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   // ---------- baterias: acoes
   if (path === '/baterias' && method === 'POST') {
     const b = await req.body();
+    if (b.reservaFechada) await exigePodeFecharBateria(sessao);
     const nome = str(b.nome, 100);
     if (!nome) throw new HttpError(400, 'Insira um nome para a reserva.');
     const inicio = localDateTime(b.inicio);
@@ -1378,6 +1480,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const pularFeriados = b.pularFeriados !== false;
     const pularExistentes = b.pularExistentes !== false;
     const fechada = b.ativo === false ? 1 : 0;
+    if (fechada || !padrao.Online) await exigePodeFecharBateria(sessao);
     let criadas = 0;
     for (let d = new Date(de); d <= ate; d.setDate(d.getDate() + 1)) {
       const data = d.toISOString().slice(0, 10);
@@ -1416,7 +1519,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const inicio = localDateTime(b.inicio);
     if ((atual.pagas as number) > 0 && inicio.slice(0, 10) !== atual.data) throw new HttpError(409, 'Como há reservas pagas, não é possível alterar a data, apenas o horário.');
     const vagas = int(b.vagas, 'Vagas');
-    if ((b.reservaFechada && !atual.rfAtual) || (!b.autoAtendimento && atual.aaAtual) || vagas < Number(atual.vagasAtual)) await exigePodeFecharBateria(sessao);
+    if ((b.reservaFechada && !atual.rfAtual) || vagas < Number(atual.vagasAtual)) await exigePodeFecharBateria(sessao);
     if (vagas < (atual.n as number)) throw new HttpError(409, `O máximo de competidores deve ser maior ou igual ao número de reservas. Número de reservas: ${atual.n}.`);
     const produtoId = int(b.produtoId, 'Produto');
     const cat = await one<{ c: string }>(`SELECT Categoria c FROM dbo.Produto WHERE Id = @produtoId`, { produtoId });
@@ -1437,6 +1540,13 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     const status = b.status === 'fechada' ? 'fechada' : 'aberta';
     if (status === 'fechada') await exigePodeFecharBateria(sessao);
     await query(`UPDATE dbo.Bateria SET Status = @status WHERE Id = @id AND Status <> 'cancelada'`, { status, id: Number(m[1]) });
+    send(200, { ok: true });
+    return true;
+  }
+  if ((m = path.match(/^\/baterias\/(\d+)\/totem$/)) && method === 'POST') {
+    const b = await req.body();
+    const aa = b.autoAtendimento ? 1 : 0;
+    await query(`UPDATE dbo.Bateria SET AutoAtendimento = @aa WHERE Id = @id AND Status <> 'cancelada'`, { aa, id: Number(m[1]) });
     send(200, { ok: true });
     return true;
   }
@@ -1587,58 +1697,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     return true;
   }
   if ((m = path.match(/^\/reservas\/(\d+)\/mover$/)) && method === 'POST') {
-    const id = Number(m[1]);
-    const destino = int((await req.body()).bateriaId, 'Bateria');
-    await tx(async (run) => {
-      const [r] = await run(
-        `SELECT i.ClienteId, i.BateriaId, i.Pago, i.Status, ISNULL(i.ProdutoId, b.ProdutoId) produtoId,
-         ISNULL(i.PrecoCentavos, po.PrecoCentavos) preco, i.DescontoCentavos desconto, b.TipoKart tipoKart, po.ServicoLocacao servicoLocacao, po.Categoria categoria, REPLACE(REPLACE(UPPER(po.Nome), N'ANTECIPADO - ', N''), N'BALCÃO - ', N'') servico, po.DuracaoMin duracaoMin FROM dbo.Inscricao i WITH (UPDLOCK, HOLDLOCK) JOIN dbo.Bateria b ON b.Id = i.BateriaId
-         LEFT JOIN dbo.Produto po ON po.Id = ISNULL(i.ProdutoId, b.ProdutoId) WHERE i.Id = @id`,
-        { id },
-      );
-      if (!r) throw new HttpError(404, 'Reserva não encontrada.');
-      if (r.Status === 'cancelada') throw new HttpError(409, 'Não é possível mover uma reserva cancelada.');
-      if (Number(r.BateriaId) === destino) return;
-      const [d] = await run(
-        `SELECT b.Status, b.Vagas, b.TipoKart tipoKart, p.ServicoLocacao servicoLocacao, p.Categoria categoria, REPLACE(REPLACE(UPPER(p.Nome), N'ANTECIPADO - ', N''), N'BALCÃO - ', N'') servico, p.DuracaoMin duracaoMin, p.Id produtoId, p.PrecoCentavos preco, (SELECT COUNT(*) FROM dbo.Inscricao x WITH (UPDLOCK, HOLDLOCK) WHERE x.BateriaId = b.Id AND x.Status <> 'cancelada') ocupadas
-         FROM dbo.Bateria b WITH (UPDLOCK, HOLDLOCK) LEFT JOIN dbo.Produto p ON p.Id = b.ProdutoId WHERE b.Id = @destino`,
-        { destino },
-      );
-      if (!d || d.Status === 'cancelada') throw new HttpError(404, 'Bateria destino não encontrada.');
-      if (d.produtoId == null || d.preco == null) throw new HttpError(409, 'A bateria destino precisa ter um produto com preço cadastrado.');
-      // Antecipado e balcão do mesmo serviço mantêm o produto e o valor já pagos.
-      const mesmoServico = Number(d.produtoId) === Number(r.produtoId) || (
-        r.servicoLocacao && d.servicoLocacao && r.categoria && r.categoria === d.categoria
-        && r.servico && r.servico === d.servico
-        && (r.duracaoMin ?? null) === (d.duracaoMin ?? null)
-      );
-      if (r.Pago && (r.tipoKart !== d.tipoKart || !mesmoServico)) {
-        throw new HttpError(409, 'Reserva paga só pode ser movida para bateria do mesmo serviço e tipo de kart. O produto e o valor já pagos são preservados.');
-      }
-      if ((d.ocupadas as number) >= (d.Vagas as number)) throw new HttpError(409, 'Não há vagas disponíveis.');
-      if (d.Status !== 'aberta') throw new HttpError(409, 'A bateria destino não está disponível.');
-      const [dup] = await run(`SELECT 1 x FROM dbo.Inscricao WHERE BateriaId = @destino AND ClienteId = @c AND Status <> 'cancelada'`, { destino, c: r.ClienteId });
-      if (dup) throw new HttpError(409, 'Já existe uma reserva para este cliente na bateria selecionada.');
-      if (r.Pago) {
-        await run(`UPDATE dbo.Inscricao SET BateriaId = @destino, TermoImpressoEm = NULL, AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { destino, id });
-      } else {
-        await run(
-          `UPDATE dbo.Inscricao SET BateriaId = @destino, ProdutoId = @produtoDestino, PrecoCentavos = @precoDestino,
-           DescontoCentavos = CASE WHEN @produtoOrigem = @produtoDestino THEN CASE WHEN DescontoCentavos > @precoDestino THEN @precoDestino ELSE DescontoCentavos END ELSE 0 END,
-           TermoImpressoEm = NULL, AtualizadoEm = SYSDATETIME() WHERE Id = @id`,
-          { destino, id, produtoOrigem: r.produtoId, produtoDestino: d.produtoId, precoDestino: d.preco },
-        );
-      }
-      await run(
-        `IF OBJECT_ID('dbo.ReservaGrupoPiloto') IS NOT NULL
-         UPDATE g SET BateriaId = @destino, AtualizadoEm = SYSDATETIME()
-           FROM dbo.ReservaGrupo g
-          WHERE EXISTS (SELECT 1 FROM dbo.ReservaGrupoPiloto p WHERE p.GrupoId = g.Id AND p.InscricaoId = @id)
-            AND NOT EXISTS (SELECT 1 FROM dbo.ReservaGrupoPiloto p JOIN dbo.Inscricao i ON i.Id = p.InscricaoId
-                            WHERE p.GrupoId = g.Id AND i.Status <> 'cancelada' AND i.BateriaId <> @destino)`,
-        { destino, id },
-      );
-    });
+    await moverReservas([Number(m[1])], int((await req.body()).bateriaId, 'Bateria'));
     send(200, { mensagem: 'Cliente movido com sucesso.' });
     return true;
   }
@@ -1660,10 +1719,7 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
   }
   if ((m = path.match(/^\/reservas\/(\d+)$/)) && method === 'DELETE') {
     const id = Number(m[1]);
-    const r = await one<{ Pago: boolean }>(`SELECT Pago FROM dbo.Inscricao WHERE Id = @id`, { id });
-    if (!r) throw new HttpError(404, 'Reserva não encontrada.');
-    if (r.Pago) throw new HttpError(409, 'Não é permitido excluir reservas pagas!');
-    await query(`UPDATE dbo.Inscricao SET Status = 'cancelada', AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { id });
+    await cancelarReserva(id);
     send(200, { mensagem: 'Reserva excluída com sucesso!' });
     return true;
   }
@@ -1679,9 +1735,12 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     if (campo === 'email' || (campo === 'auto' && q.includes('@'))) {
       where = 'c.Email LIKE @q';
       p = { q: q.toLowerCase() + '%' };
+    } else if (campo === 'telefone') {
+      where = '(c.TelefoneNum LIKE @t OR c.Telefone LIKE @raw)';
+      p = { t: '%' + d, raw: '%' + q + '%' };
     } else if (campo === 'documento' || (campo === 'auto' && d.length >= 4 && d.length === q.replace(/[\s.\-()/]/g, '').length)) {
-      where = '(c.DocumentoNum LIKE @d OR c.TelefoneNum LIKE @t)';
-      p = { d: d + '%', t: '%' + d };
+      where = '(c.DocumentoNum LIKE @d OR c.Documento LIKE @raw OR c.TelefoneNum LIKE @t)';
+      p = { d: d + '%', raw: '%' + q + '%', t: '%' + d };
     } else {
       where = 'c.Nome COLLATE Latin1_General_CI_AI LIKE @q';
       p = { q: '%' + q.replace(/\s+/g, '%') + '%' };

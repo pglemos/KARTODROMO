@@ -1,5 +1,7 @@
 using System.Drawing.Printing;
 using System.Linq;
+using System.Net.Sockets;
+using Microsoft.Win32;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
@@ -18,7 +20,9 @@ public class Relatorio : CartaoModal
     public static bool MostrarNaBarra = true;
 
     /// <summary>WebView2 grava perfil numa pasta do usuario (Program Files nao e gravavel).</summary>
-    public static async Task<CoreWebView2Environment> Ambiente()
+    public static Task<CoreWebView2Environment> Ambiente() => AmbienteAsync();
+
+    public static async Task<CoreWebView2Environment> AmbienteAsync()
     {
         if (_env != null) return _env;
         var pasta = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Kartodromo", "WebView2");
@@ -289,20 +293,206 @@ public class Relatorio : CartaoModal
         }
     }
 
+    /// <summary>
+    /// Verifica se uma impressora está disponível e pronta para receber impressões.
+    /// Para impressoras apontadas para portas TCP/IP (ex: totens na rede), valida conectividade no socket RAW (porta 9100).
+    /// </summary>
+    public static bool ImpressoraDisponivel(string nomeImpressora)
+    {
+        if (string.IsNullOrWhiteSpace(nomeImpressora) || !ImpressoraExiste(nomeImpressora))
+            return false;
+
+        try
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                using var kPrinters = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Print\Printers\" + nomeImpressora);
+                var portName = kPrinters?.GetValue("Port") as string;
+                if (!string.IsNullOrWhiteSpace(portName) && portName.StartsWith("IP_", StringComparison.OrdinalIgnoreCase))
+                {
+                    var host = portName.Substring(3);
+                    var port = 9100;
+                    using var kPort = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Print\Monitors\Standard TCP/IP Port\Ports\" + portName);
+                    if (kPort != null)
+                    {
+                        var regHost = kPort.GetValue("HostName") as string;
+                        if (!string.IsNullOrWhiteSpace(regHost)) host = regHost;
+                        port = (kPort.GetValue("PortNumber") as int?) ?? 9100;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(host))
+                    {
+                        using var tcp = new TcpClient();
+                        var ar = tcp.BeginConnect(host, port, null, null);
+                        var wh = ar.AsyncWaitHandle;
+                        try
+                        {
+                            if (!wh.WaitOne(TimeSpan.FromMilliseconds(400), false)) return false;
+                            tcp.EndConnect(ar);
+                            return tcp.Connected;
+                        }
+                        finally
+                        {
+                            wh.Close();
+                        }
+                    }
+                }
+            }
+
+            return true;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Retorna exatamente UMA impressora de totem (Totem 1 ou Totem 2) pronta para uso.
+    /// Nunca imprime nas duas ao mesmo tempo, evitando duplicidades.
+    /// Se uma estiver offline ou em erro, seleciona a outra disponível automaticamente.
+    /// </summary>
+    public static string ObterImpressoraTermoTotem(string preferencia = null)
+    {
+        try
+        {
+            var instaladas = PrinterSettings.InstalledPrinters.Cast<string>().ToList();
+            var totens = instaladas
+                .Where(p => System.Text.RegularExpressions.Regex.IsMatch(p, @"(?i)totem.?\d"))
+                .ToList();
+
+            // 1. Se informou preferência explícita e ela está pronta, usa ela
+            if (!string.IsNullOrWhiteSpace(preferencia))
+            {
+                var match = totens.FirstOrDefault(p => string.Equals(p, preferencia.Trim(), StringComparison.OrdinalIgnoreCase))
+                         ?? totens.FirstOrDefault(p => p.IndexOf(preferencia.Trim(), StringComparison.OrdinalIgnoreCase) >= 0);
+
+                if (match != null && ImpressoraDisponivel(match))
+                    return match;
+            }
+
+            // 2. Se a preferência não está disponível ou não foi especificada, escolhe o primeiro totem online
+            // Ordenação: Totem 2 primeiro (porta 9100 ativa), depois Totem 1
+            foreach (var t in totens.OrderBy(t => t.Contains("2") ? 0 : 1))
+            {
+                if (ImpressoraDisponivel(t))
+                    return t;
+            }
+
+            // 3. Fallback: se nenhum totem de rede estiver online, tenta a preferência original ou impressora térmica padrão
+            return ObterImpressoraTermoPadrao(preferencia);
+        }
+        catch
+        {
+            return preferencia ?? "";
+        }
+    }
+
+    /// <summary>Retorna a impressora padrão para termos: preferência informada, térmica TM-T20 detectada ou padrão do Windows.</summary>
+    public static string ObterImpressoraTermoPadrao(string preferencia = null)
+    {
+        try
+        {
+            var instaladas = PrinterSettings.InstalledPrinters.Cast<string>().ToList();
+
+            // Se há impressoras de totem e a máquina não possui impressora USB local pronta, prioriza os totens disponíveis
+            if (instaladas.Any(p => System.Text.RegularExpressions.Regex.IsMatch(p, @"(?i)totem.?\d")))
+            {
+                var temTermicaLocal = instaladas.Any(p =>
+                    !System.Text.RegularExpressions.Regex.IsMatch(p, @"(?i)totem") &&
+                    System.Text.RegularExpressions.Regex.IsMatch(p, @"(?i)TM.?T20|EPSON|Receipt|Thermal|Termica|POS") &&
+                    ImpressoraDisponivel(p));
+
+                if (!temTermicaLocal)
+                {
+                    var totem = ObterImpressoraTermoTotem(preferencia);
+                    if (!string.IsNullOrWhiteSpace(totem)) return totem;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(preferencia))
+            {
+                var exata = instaladas.FirstOrDefault(p => string.Equals(p, preferencia.Trim(), StringComparison.OrdinalIgnoreCase));
+                if (exata != null && ImpressoraDisponivel(exata)) return exata;
+                var parcial = instaladas.FirstOrDefault(p => p.IndexOf(preferencia.Trim(), StringComparison.OrdinalIgnoreCase) >= 0);
+                if (parcial != null && ImpressoraDisponivel(parcial)) return parcial;
+            }
+
+            // Busca impressoras térmicas típicas (TM-T20, EPSON, Receipt, POS, etc.) disponíveis
+            var termicas = instaladas
+                .Where(p => System.Text.RegularExpressions.Regex.IsMatch(p, @"(?i)TM.?T20|EPSON|Receipt|Thermal|Termica|POS"))
+                .ToList();
+
+            foreach (var t in termicas)
+            {
+                if (ImpressoraDisponivel(t)) return t;
+            }
+
+            // Se houver impressora padrão do sistema instalada
+            var settings = new PrinterSettings();
+            if (settings.IsValid && !string.IsNullOrWhiteSpace(settings.PrinterName) && instaladas.Contains(settings.PrinterName))
+                return settings.PrinterName;
+
+            return termicas.FirstOrDefault() ?? instaladas.FirstOrDefault() ?? "";
+        }
+        catch
+        {
+            return preferencia ?? "";
+        }
+    }
+
     static readonly SemaphoreSlim _semImpressaoSilenciosa = new(1, 1);
 
     /// <summary>Imprime uma pagina direto na impressora (sem dialogo), ex.: termo no totem.</summary>
-    public static async Task ImprimirSilencioso(string url, string impressora = null)
+    public static Task ImprimirSilencioso(string url, string impressora = null) => ImprimirSilenciosoAsync(url, impressora);
+
+    public static async Task ImprimirSilenciosoAsync(string url, string impressora = null)
     {
         if (string.IsNullOrWhiteSpace(url))
             throw new ArgumentException("A URL para impressão não pode ser vazia.", nameof(url));
 
         if (string.IsNullOrWhiteSpace(impressora))
-            throw new InvalidOperationException("Nenhuma impressora informada para impressão silenciosa. A impressão cega na impressora padrão foi desabilitada.");
+            impressora = ObterImpressoraTermoTotem();
+
+        if (string.IsNullOrWhiteSpace(impressora))
+            throw new InvalidOperationException("Nenhuma impressora informada ou detectada para impressão silenciosa.");
 
         if (!ImpressoraExiste(impressora))
-            throw new InvalidOperationException($"A impressora '{impressora}' não está instalada ou acessível no sistema.");
+        {
+            var fallback = ObterImpressoraTermoTotem();
+            if (!string.IsNullOrWhiteSpace(fallback) && ImpressoraExiste(fallback))
+                impressora = fallback;
+            else
+                throw new InvalidOperationException($"A impressora '{impressora}' não está instalada ou acessível no sistema.");
+        }
 
+        try
+        {
+            await ExecutarImpressaoSilenciosa(url, impressora);
+        }
+        catch
+        {
+            // Se falhou e era um Totem, tenta o alternativo apenas se o primário falhou
+            if (System.Text.RegularExpressions.Regex.IsMatch(impressora, @"(?i)totem"))
+            {
+                var instaladas = PrinterSettings.InstalledPrinters.Cast<string>().ToList();
+                var alternativo = instaladas.FirstOrDefault(p =>
+                    System.Text.RegularExpressions.Regex.IsMatch(p, @"(?i)totem.?\d") &&
+                    !string.Equals(p, impressora, StringComparison.OrdinalIgnoreCase) &&
+                    ImpressoraDisponivel(p));
+
+                if (!string.IsNullOrWhiteSpace(alternativo))
+                {
+                    await ExecutarImpressaoSilenciosa(url, alternativo);
+                    return;
+                }
+            }
+            throw;
+        }
+    }
+
+    private static async Task ExecutarImpressaoSilenciosa(string url, string impressora)
+    {
         await _semImpressaoSilenciosa.WaitAsync();
         try
         {

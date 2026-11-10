@@ -16,8 +16,9 @@ async function requireSession() {
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ segments: string[] }> }) {
-  if (!(await requireSession())) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const base = resolveBridgeBase();
+  if (!base) {
+    return NextResponse.json({ error: 'calxpro_bridge_not_configured' }, { status: 503 });
   }
 
   const { segments } = await params;
@@ -26,9 +27,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: 'unknown_calxpro_path' }, { status: 404 });
   }
 
-  const base = resolveBridgeBase();
-  if (!base) {
-    return NextResponse.json({ error: 'calxpro_bridge_not_configured' }, { status: 503 });
+  if (!(await requireSession())) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
   const targetUrl = `${base}/api/calxpro-${slug}${request.nextUrl.search}`;

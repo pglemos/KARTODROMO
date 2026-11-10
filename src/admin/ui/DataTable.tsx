@@ -98,7 +98,7 @@ export const DataTable = <T extends { id: string | number },>({
                 ))
               : rows.map((row) => (
                   <tr
-                    className="border-b border-kib-borda transition-colors last:border-0 hover:bg-kib-campo"
+                    className="border-b border-kib-borda transition-colors last:border-0 hover:bg-kib-campo [content-visibility:auto] [contain-intrinsic-size:0_48px]"
                     key={row.id}
                   >
                     {columns.map((column) => (

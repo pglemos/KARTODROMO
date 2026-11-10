@@ -3,12 +3,20 @@ import type { TelaoField, TelaoLayoutConfig } from '@/lib/telao-layout-config';
 
 const ALL_FIELDS: TelaoField[] = ['position', 'kart', 'name', 'time'];
 
+const FIELD_CLASS_REGEXES: Record<TelaoField, RegExp> = {
+  position: /class="[^"]*\bposition\b/,
+  kart: /class="[^"]*\bkart\b/,
+  name: /class="[^"]*\bname\b/,
+  time: /class="[^"]*\btime\b/,
+};
+
 export function visibleTelaoFields(layout: TelaoLayoutConfig): TelaoField[] {
   return layout.fields.filter((field) => field !== 'name' || layout.nameMode !== 'hidden');
 }
 
 function fieldClassExists(content: string, field: TelaoField): boolean {
-  return new RegExp(`class="[^"]*\\b${field}\\b`).test(content);
+  const re = FIELD_CLASS_REGEXES[field];
+  return re ? re.test(content) : new RegExp(`class="[^"]*\\b${field}\\b`).test(content);
 }
 
 export function payloadMatchesTelaoLayout(payload: unknown, layout: TelaoLayoutConfig): boolean {

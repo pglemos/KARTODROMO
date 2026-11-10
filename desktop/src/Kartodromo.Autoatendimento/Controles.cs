@@ -1,4 +1,4 @@
-﻿using System.Drawing.Drawing2D;
+using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 using Kartodromo.Comum;
 
@@ -24,9 +24,9 @@ public static class Estilo
     public static readonly Color SuperTexto = Tokens.Escuro.ComponenteTotemSuperTexto;
     public static readonly Color Foco = Tokens.Escuro.ComponenteTotemFoco;
 
-    static readonly string Familia = new[] { "Rajdhani", "Bahnschrift SemiCondensed", "Segoe UI Variable Text", "Segoe UI" }
+    static readonly string Familia = ((string[])["Rajdhani", "Bahnschrift SemiCondensed", "Segoe UI Variable Text", "Segoe UI"])
         .First(f => { using var t = new Font(f, 10); return t.Name.Equals(f, StringComparison.OrdinalIgnoreCase); });
-    static readonly string FamiliaMono = new[] { "Cascadia Mono", "Consolas" }
+    static readonly string FamiliaMono = ((string[])["Cascadia Mono", "Consolas"])
         .First(f => { using var t = new Font(f, 10); return t.Name.Equals(f, StringComparison.OrdinalIgnoreCase); });
 
     public static Font F(float tam, bool leve = false, FontStyle st = FontStyle.Regular) => new(Familia, tam, st, GraphicsUnit.Pixel);
@@ -76,24 +76,23 @@ public class TelaCanvas : Panel
 }
 
 /// <summary>Cabeçalho do totem desenhado em uma camada superior estável.</summary>
-public class CabecalhoTotem : Control
+public class CabecalhoTotem(Image logo, int etapa, float escala = 1f, bool donoDaLogo = false) : Control
 {
-    readonly Image _logo;
-    readonly bool _donoDaLogo;
-    float _escala;
-    int _etapa;
-    public CabecalhoTotem(Image logo, int etapa, float escala = 1f, bool donoDaLogo = false)
+    readonly Image _logo = logo;
+    readonly bool _donoDaLogo = donoDaLogo;
+    float _escala = escala;
+    int _etapa = etapa;
+
+    protected override void InitLayout()
     {
-        _logo = logo;
-        _etapa = etapa;
-        _escala = escala;
-        _donoDaLogo = donoDaLogo;
+        base.InitLayout();
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Opaque, true);
         BackColor = Estilo.Fundo;
         TabStop = false;
         AccessibleRole = AccessibleRole.StatusBar;
         AccessibleName = "Progresso do autoatendimento";
     }
+
     public void Atualizar(int etapa, float escala)
     {
         _etapa = etapa;
@@ -296,7 +295,7 @@ public class Marcador : Control
         {
             using var b = new SolidBrush(Estilo.Verde); g.FillPath(b, p);
             using var pen = new Pen(Estilo.Texto, 2.4f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            g.DrawLines(pen, new Point[] { new Point(box.X + 5, box.Y + 11), new Point(box.X + 9, box.Y + 16), new Point(box.X + 17, box.Y + 6) });
+            g.DrawLines(pen, (Point[])[new(box.X + 5, box.Y + 11), new(box.X + 9, box.Y + 16), new(box.X + 17, box.Y + 6)]);
         }
         else { using var pen = new Pen(Tokens.Escuro.ComponenteTotemCheckBorda, 2); g.DrawPath(pen, p); }
         if (Text.Length > 0) TextRenderer.DrawText(g, Text, Font, new Point(32, (Height - Font.Height) / 2), ForeColor);
@@ -393,7 +392,7 @@ public class CampoLista : Control
         TextRenderer.DrawText(g, Text, Font, new Rectangle(12, 0, Width - 40, Height), Enabled ? ForeColor : Estilo.Suave, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
         var cx = Width - 22; var cy = Height / 2;
         using var seta = new Pen(Estilo.Suave, 1.6f);
-        g.DrawLines(seta, new PointF[] { new(cx - 5, cy - 2), new(cx, cy + 3), new(cx + 5, cy - 2) });
+        g.DrawLines(seta, (PointF[])[new(cx - 5, cy - 2), new(cx, cy + 3), new(cx + 5, cy - 2)]);
     }
     protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Invalidate(); }
     protected override void OnKeyDown(KeyEventArgs e)

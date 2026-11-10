@@ -91,8 +91,8 @@ public partial class FormCrono
             if (lista.SelectedIndex < 0 || lista.SelectedIndex >= tem.Count) { Msg.Aviso(d, "Escolha na lista a advertência ou penalidade a retirar."); return; }
             var p = tem[lista.SelectedIndex];
             if (!Msg.Confirmar(d, "Retirar a penalidade?", $"\"{lista.SelectedItem}\" de {comp.S("name")}. O resultado é recalculado.", "Retirar penalidade")) return;
-            await Crono.Api.Delete($"/api/sessions/{_sess.S("id")}/penalties/{Uri.EscapeDataString(kart)}/{p.S("id")}");
-            await Atualizar(); Recarregar();
+            await Crono.Api.DeleteAsync($"/api/sessions/{_sess.S("id")}/penalties/{Uri.EscapeDataString(kart)}/{p.S("id")}");
+            await AtualizarAsync(); Recarregar();
         });
         var g2 = d.Secao("Já recebeu nesta bateria");
         lista.Font = PecasDesign.FonteValor; lista.Anchor = AnchorStyles.Left | AnchorStyles.Right; lista.Margin = new Padding(0, 0, 14, 8);
@@ -114,9 +114,9 @@ public partial class FormCrono
                 { Msg.Aviso(d, "Digite os segundos da penalidade (ex.: 5 ou 2,5)."); segundos.Focus(); return; }
                 corpo["segundos"] = seg;
             }
-            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/penalties/{Uri.EscapeDataString(kart)}", corpo);
+            await Crono.Api.PostAsync($"/api/sessions/{_sess.S("id")}/penalties/{Uri.EscapeDataString(kart)}", corpo);
             d.DialogResult = DialogResult.OK; d.Close();
-            await Atualizar();
+            await AtualizarAsync();
         }));
         d.BotaoRodape("Cancelar", false, d.Close);
         d.ShowDialog(this);
@@ -136,8 +136,8 @@ public partial class FormCrono
             : $"Bandeira preta para {comp.S("name")} (kart {kart})?\n\nEle fica DESCLASSIFICADO e vai para o último lugar no resultado e no relatório.")) return;
         Seguro.Rodar(this, async () =>
         {
-            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/flag/{Uri.EscapeDataString(kart)}", new JsonObject { ["flag"] = tem ? "none" : "black", ["autor"] = Environment.UserName });
-            await Atualizar();
+            await Crono.Api.PostAsync($"/api/sessions/{_sess.S("id")}/flag/{Uri.EscapeDataString(kart)}", new JsonObject { ["flag"] = tem ? "none" : "black", ["autor"] = Environment.UserName });
+            await AtualizarAsync();
         });
     }
 
@@ -149,21 +149,22 @@ public partial class FormCrono
         using var d = NovoDialogo("Reiniciar bateria", _sess.S("name"), "M4 12a8 8 0 1 0 2.3-5.7M4 4v4.5h4.5", "linear-gradient(180deg, #FFB547, #F07A00)", 720, 420);
         d.Secao(null, $"A bateria volta ao começo, como se não tivesse largado: {passagens} passagem(ns), as bandeiras dos pilotos, as advertências e as penalidades são zeradas. Os pilotos e os números dos karts continuam.");
         d.Nota("As passagens não se perdem: continuam no diário e podem ser restauradas. Fica registrado nas observações da bateria.");
-        async Task Rodar(bool largar)
+
+        async Task RodarAsync(bool largar, CancellationToken ct = default)
         {
             if (largar)
             {
                 var aberta = _state?.S("runningId");
                 if (!string.IsNullOrEmpty(aberta) && aberta != _sess.S("id")) { Msg.Aviso(d, "Outra bateria está aberta. Finalize ela antes de largar esta."); return; }
             }
-            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/restart", new JsonObject { ["largar"] = largar, ["autor"] = Environment.UserName });
+            await Crono.Api.PostAsync($"/api/sessions/{_sess.S("id")}/restart", new JsonObject { ["largar"] = largar, ["autor"] = Environment.UserName }, ct);
             d.DialogResult = DialogResult.OK; d.Close();
             if (largar) _fixado = false;
             InvalidarCachePassagens();
-            await Atualizar();
+            await AtualizarAsync(ct: ct);
         }
-        d.BotaoRodape("Reiniciar e dar a verde", true, () => Seguro.Rodar(d, () => Rodar(true)));
-        d.BotaoRodape("Só reiniciar", false, () => Seguro.Rodar(d, () => Rodar(false)));
+        d.BotaoRodape("Reiniciar e dar a verde", true, () => Seguro.Rodar(d, () => RodarAsync(true)));
+        d.BotaoRodape("Só reiniciar", false, () => Seguro.Rodar(d, () => RodarAsync(false)));
         d.BotaoRodape("Cancelar", false, d.Close);
         d.ShowDialog(this);
     }
@@ -174,15 +175,16 @@ public partial class FormCrono
         using var d = NovoDialogo("Bandeira verde", _sess.S("name"), "M5 21V4h11l-2 4 2 4H5", "linear-gradient(180deg, #5EDB7A, #1E9E4A)", 720, 420);
         d.Secao("Relargada", "Zera o tempo e as voltas desta bateria. O cronômetro recomeça quando o 1º kart passar na linha de chegada (as passagens de antes ficam no diário).");
         d.Secao("Só bandeira verde", "Pista liberada depois da amarela ou da vermelha: o tempo e as voltas continuam.");
-        async Task Enviar(bool relargar)
+
+        async Task EnviarAsync(bool relargar, CancellationToken ct = default)
         {
-            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/flag", new JsonObject { ["flag"] = "verde", ["relargar"] = relargar, ["autor"] = Environment.UserName });
+            await Crono.Api.PostAsync($"/api/sessions/{_sess.S("id")}/flag", new JsonObject { ["flag"] = "verde", ["relargar"] = relargar, ["autor"] = Environment.UserName }, ct);
             d.DialogResult = DialogResult.OK; d.Close();
             InvalidarCachePassagens();
-            await Atualizar();
+            await AtualizarAsync(ct: ct);
         }
-        d.BotaoRodape("Relargar (zerar o tempo)", true, () => Seguro.Rodar(d, () => Enviar(true)));
-        d.BotaoRodape("Só bandeira verde", false, () => Seguro.Rodar(d, () => Enviar(false)));
+        d.BotaoRodape("Relargar (zerar o tempo)", true, () => Seguro.Rodar(d, () => EnviarAsync(true)));
+        d.BotaoRodape("Só bandeira verde", false, () => Seguro.Rodar(d, () => EnviarAsync(false)));
         d.BotaoRodape("Cancelar", false, d.Close);
         d.ShowDialog(this);
     }

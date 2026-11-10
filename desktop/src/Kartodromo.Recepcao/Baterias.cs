@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Nodes;
+using System.Text.Json.Nodes;
 using Kartodromo.Comum;
 
 namespace Kartodromo.Recepcao;
@@ -205,7 +205,7 @@ public class FormCriarReservas : DialogoDesign
                 if (string.IsNullOrWhiteSpace(nome.Text)) { Msg.Aviso(this, "Informe o nome da reserva."); nome.Focus(); return; }
                 if (!data.Valida) { Msg.Aviso(this, "Data inválida."); return; }
                 if (!PecasDesign.LerHora(hora, out var hh)) { Msg.Aviso(this, "Hora inválida (use hh:mm)."); hora.Focus(); return; }
-                await Sessao.Api.Post("/api/office/baterias", new
+                await Sessao.Api.PostAsync("/api/office/baterias", new
                 {
                     nome = nome.Text.Trim(), inicio = $"{Fmt.Iso(data.Value)}T{hh:hh\\:mm}", vagas = int.TryParse(vagas.Text, out var v) ? v : 12, produtoId = Campos.IdDe(produto), tracadoId = Campos.IdDe(tracado),
                     voltaMinimaSeg = int.TryParse(volta.Text, out var vm) ? vm : 0, responsavelId = respId, reservaFechada = !aberta.Checked, autoAtendimento = totem.Checked, observacao = obs.Text.Trim(), categoria = categoria.Text,
@@ -229,7 +229,7 @@ public class FormCriarReservas : DialogoDesign
                     var fim = new DateTime(ini.Year, ini.Month, 1).AddMonths(1).AddDays(-1);
                     if (fim > ate) fim = ate;
                     acao.Text = $"Gerando {ini.ToString("MMM/yy", Fmt.Br).Replace(".", "")}…";
-                    var r = await Sessao.Api.Post("/api/office/baterias/gerar", new { padraoId = pid, de = Fmt.Iso(ini), ate = Fmt.Iso(fim), diasSemana = sel, pularFeriados = feriadosCk.Checked, pularExistentes = existentesCk.Checked, ativo = ativo.Checked, soFeriados = soFeriadosCk.Checked });
+                    var r = await Sessao.Api.PostAsync("/api/office/baterias/gerar", new { padraoId = pid, de = Fmt.Iso(ini), ate = Fmt.Iso(fim), diasSemana = sel, pularFeriados = feriadosCk.Checked, pularExistentes = existentesCk.Checked, ativo = ativo.Checked, soFeriados = soFeriadosCk.Checked });
                     criadas += r.I("criadas");
                 }
             }
@@ -251,7 +251,7 @@ public class FormCriarReservas : DialogoDesign
             foreach (var c in abaAvulsa) c.Visible = i == 1;
             acao.Text = i == 0 ? "Gerar reservas" : "Criar reserva";
         });
-        Load += (_, _) => Seguro.Rodar(this, async () => { feriados = await Sessao.Api.Lista("/api/office/cad/feriados"); Previa(); });
+        Load += (_, _) => Seguro.Rodar(this, async () => { feriados = await Sessao.Api.ListaAsync("/api/office/cad/feriados"); Previa(); });
         Previa();
     }
 }
@@ -319,10 +319,10 @@ public class FormBateria : DialogoDesign
 
         var provas = SecaoTabelaDesign("Provas (vêm do produto)");
         provas.Colunas(new("Ordem", 0.9f), new("Prova", 5.2f), new("Tipo", 2.6f), new("Tempo", 1.1f, Direita: true));
-        async Task CarregarProvas()
+        async Task CarregarProvasAsync()
         {
             if (Campos.IdDe(produto) is not long pid) { provas.Linhas([]); return; }
-            var lista = await Sessao.Api.Lista($"/api/office/cad/provas?produtoId={pid}");
+            var lista = await Sessao.Api.ListaAsync($"/api/office/cad/provas?produtoId={pid}");
             provas.Linhas(lista.OrderBy(p => p.I("ordem")).Select(p => new[]
             {
                 p.I("ordem").ToString(), p.S("nome"),
@@ -330,7 +330,7 @@ public class FormBateria : DialogoDesign
                 p.I("tempoMin") > 0 ? $"{p.I("tempoMin")} min" : p.I("voltasMax") > 0 ? $"{p.I("voltasMax")} voltas" : "—",
             }));
         }
-        produto.SelectedIndexChanged += (_, _) => { CategoriaDoProduto(); Seguro.Rodar(this, CarregarProvas); };
+        produto.SelectedIndexChanged += (_, _) => { CategoriaDoProduto(); Seguro.Rodar(this, CarregarProvasAsync); };
 
         BotaoRodape("Salvar", true, () => Seguro.Rodar(this, async () =>
         {
@@ -340,7 +340,7 @@ public class FormBateria : DialogoDesign
             if (!int.TryParse(vagas.Text, out var nVagas) || nVagas < 1) { Msg.Aviso(this, "Informe as vagas (máximo de pilotos)."); return; }
             if (nVagas < b.I("inscritos")) { Msg.Aviso(this, $"A bateria já tem {b.I("inscritos")} inscrito(s). As vagas não podem ficar abaixo disso."); return; }
             int.TryParse(volta.Text, out var nVolta);
-            await Sessao.Api.Put($"/api/office/baterias/{b.S("id")}", new
+            await Sessao.Api.PutAsync($"/api/office/baterias/{b.S("id")}", new
             {
                 nome = nome.Text.Trim(), inicio = $"{Fmt.Iso(data.Value)}T{h.Hours:00}:{h.Minutes:00}", vagas = nVagas, produtoId = Campos.IdDe(produto), tracadoId = Campos.IdDe(tracado),
                 voltaMinimaSeg = nVolta, responsavelId = respId, codigoReserva = b.S("codigoReserva"), reservaFechada = !aberta.Checked, autoAtendimento = totem.Checked,
@@ -351,7 +351,7 @@ public class FormBateria : DialogoDesign
         }));
         BotaoRodape("Cancelar", false, Close);
 
-        Load += (_, _) => Seguro.Rodar(this, CarregarProvas);
+        Load += (_, _) => Seguro.Rodar(this, CarregarProvasAsync);
     }
 }
 
@@ -394,14 +394,14 @@ public class FormIncluirCliente : DialogoDesign
             if (!novo.Checked) return;
             var id = FormCliente.Novo(this);
             if (id == null) { novo.Checked = false; return; }
-            Mostrar((await Sessao.Api.Get($"/api/office/clientes/{id}")).AsObject());
+            Mostrar((await Sessao.Api.GetAsync($"/api/office/clientes/{id}")).AsObject());
         });
 
         BotaoRodape("Reservar", true, () => Seguro.Rodar(this, async () =>
         {
             if (_cli == null) { Msg.Aviso(this, "Selecione um cliente."); return; }
             if (!int.TryParse(n.Text, out var qtd) || qtd < 1) { Msg.Aviso(this, "Informe quantos participantes."); return; }
-            var r = await Sessao.Api.Post($"/api/office/baterias/{b.S("id")}/incluir", new { clienteId = _cli.L("id"), participantes = qtd, observacao = obs.Text.Trim(), produtoId = Campos.IdDe(prod), pagoAntecipado = pago.Checked });
+            var r = await Sessao.Api.PostAsync($"/api/office/baterias/{b.S("id")}/incluir", new { clienteId = _cli.L("id"), participantes = qtd, observacao = obs.Text.Trim(), produtoId = Campos.IdDe(prod), pagoAntecipado = pago.Checked });
             Msg.Info(this, r.S("mensagem"));
             DialogResult = DialogResult.OK; Close();
         }));
@@ -419,6 +419,7 @@ public class FormAgenda : CartaoModal
     DateTime _mes, _dia;
     Dictionary<DateTime, JsonObject> _resumo = [];
     List<JsonObject> _feriados = [];
+    bool _feriadosCarregados;
     List<JsonObject> _baterias = [];
     readonly Label _titulo = new() { AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoDestaque, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, BackColor = DialogoDesign.Fundo };
     readonly Label _ano = new() { AutoSize = true, Font = Tokens.FonteSemibold(Tokens.Claro.FonteTamanhoDestaque), ForeColor = PecasDesign.Cinza, BackColor = DialogoDesign.Fundo };
@@ -427,7 +428,11 @@ public class FormAgenda : CartaoModal
     readonly Label _semana = new() { AutoSize = true, Font = Tokens.FonteSemibold(Tokens.Claro.FonteTamanhoPequeno), ForeColor = DialogoDesign.VerdePrincipal, BackColor = Tokens.Primitivo.Branco };
     readonly Label _data = new() { AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoTituloGrande, FontStyle.Bold), ForeColor = PecasDesign.CorTexto, BackColor = Tokens.Primitivo.Branco };
     readonly Label _resumoDia = new() { AutoSize = true, Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo), ForeColor = PecasDesign.Cinza, BackColor = Tokens.Primitivo.Branco };
+    readonly Label _statusSinc = new() { AutoSize = false, Size = new Size(340, 18), Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoLegenda), ForeColor = PecasDesign.Cinza, BackColor = Tokens.Primitivo.Branco, AutoEllipsis = true, Text = "Sincronizando baterias…" };
     readonly BateriasDia _lista = new();
+    readonly System.Windows.Forms.Timer _timerSinc = new() { Interval = 10_000 };
+    bool _carregando, _recarregarPendente;
+    DateTime? _ultimaSinc, _falhaSincDesde;
 
     public FormAgenda() : base(1340, 820)
     {
@@ -441,18 +446,27 @@ public class FormAgenda : CartaoModal
         // ---------- lado direito (380, branco)
         var lado = new Panel { Dock = DockStyle.Right, Width = 380, BackColor = Tokens.Primitivo.Branco };
         lado.Paint += (_, e) => { using var p = new Pen(Tokens.Claro.CorBordaSutil); e.Graphics.DrawLine(p, 0, 0, 0, lado.Height); };
-        var topo = new Panel { Dock = DockStyle.Top, Height = 92, BackColor = Tokens.Primitivo.Branco };
+        var topo = new Panel { Dock = DockStyle.Top, Height = 112, BackColor = Tokens.Primitivo.Branco };
         _semana.Location = new Point(18, 18); _data.Location = new Point(15, 33); _resumoDia.Location = new Point(18, 66);
+        _statusSinc.Location = new Point(18, 90);
         var x = Botao("✕", CinzaBotao, PecasDesign.CorTexto); x.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo); x.Size = new Size(30, 30); x.Location = new Point(380 - 18 - 30, 18);
         x.Resize += (_, _) => Forma.AplicarRaio(x, 8); Forma.AplicarRaio(x, 8); x.Click += (_, _) => Close();
-        topo.Controls.AddRange([_semana, _data, _resumoDia, x]);
+        topo.Controls.AddRange([_semana, _data, _resumoDia, _statusSinc, x]);
         var rod = new Panel { Dock = DockStyle.Bottom, Height = 67, BackColor = Tokens.Primitivo.Branco };
         rod.Paint += (_, e) => { using var p = new Pen(Tokens.Claro.CorBordaSutil); e.Graphics.DrawLine(p, 0, 0, rod.Width, 0); };
         var bLista = Botao("Lista de participantes", CinzaBotao, PecasDesign.CorTexto); bLista.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo);
         var bCriar = Botao("+ Criar reservas", DialogoDesign.VerdePrincipal, Tokens.Primitivo.Branco, true); bCriar.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo, FontStyle.Bold);
         bLista.SetBounds(16, 14, 170, 38); bCriar.SetBounds(194, 14, 170, 38);
         foreach (var b in new[] { bLista, bCriar }) { b.Resize += (_, _) => Forma.AplicarRaio(b, 10); Forma.AplicarRaio(b, 10); }
-        bLista.Click += (_, _) => { if (_lista.Atual is { } bat) new FormListaParticipantes(bat).ShowDialog(this); else Msg.Aviso(this, "Escolha a bateria na lista."); };
+        bLista.Click += (_, _) =>
+        {
+            if (_lista.Atual is { } bat)
+            {
+                using var f = new FormListaParticipantes(bat);
+                if (f.ShowDialog(this) == DialogResult.OK) Recarregar();
+            }
+            else Msg.Aviso(this, "Escolha a bateria na lista.");
+        };
         bCriar.Click += (_, _) => { using var f = new FormCriarReservas(); if (f.ShowDialog(this) == DialogResult.OK) Recarregar(); };
         rod.Controls.AddRange([bLista, bCriar]);
         _lista.Dock = DockStyle.Fill;
@@ -503,7 +517,14 @@ public class FormAgenda : CartaoModal
 
         Controls.Add(esq); Controls.Add(lado);
         esq.BringToFront();
-        Load += (_, _) => Ir(_mes);
+        _timerSinc.Tick += (_, _) =>
+        {
+            if (Visible && WindowState != FormWindowState.Minimized &&
+                (Form.ActiveForm is null || Form.ActiveForm == this) && !_carregando)
+                Ir(_mes, silencioso: true);
+        };
+        Load += (_, _) => { Ir(_mes); _timerSinc.Start(); };
+        FormClosed += (_, _) => _timerSinc.Dispose();
     }
 
     protected override void OnLoad(EventArgs e)
@@ -518,36 +539,85 @@ public class FormAgenda : CartaoModal
     }
 
     void Recarregar() => Ir(_mes);
+    void CarregarDia() => Ir(_mes);
 
-    void Ir(DateTime mes) => Seguro.Rodar(this, async () =>
+    void AtualizarStatusSinc(bool falhou)
     {
-        _mes = mes;
-        if (_dia.Month != mes.Month || _dia.Year != mes.Year) _dia = mes.Year == DateTime.Today.Year && mes.Month == DateTime.Today.Month ? DateTime.Today : mes;
-        _titulo.Text = Fmt.Br.TextInfo.ToTitleCase(mes.ToString("MMMM", Fmt.Br)); _ano.Text = mes.Year.ToString();
-        var r = await Api.Lista("/api/office/agenda?mes=" + mes.ToString("yyyy-MM"));
-        if (_feriados.Count == 0) try { _feriados = await Api.Lista("/api/office/cad/feriados"); } catch { }
-        _resumo = r.Where(x => x.D("dia") != null).ToDictionary(x => x.D("dia")!.Value.Date, x => x);
-        _cal.Mostrar(mes, _dia, _resumo, d => _feriados.Any(f => f.D("data") is DateTime fd && (fd.Date == d || f.B("recorrente") && fd.Month == d.Month && fd.Day == d.Day)));
-        await CarregarDiaAsync();
-    });
-
-    void CarregarDia() => Seguro.Rodar(this, CarregarDiaAsync);
-
-    async Task CarregarDiaAsync()
-    {
-        _baterias = (await Api.Lista($"/api/office/baterias?status=todas&filtro=dia&data={Fmt.Iso(_dia)}")).Where(b => b.S("status") != "cancelada").OrderBy(b => b.S("dataHora")).ToList();
-        if (IsDisposed) return;
-        MostrarDia();
+        if (falhou) _falhaSincDesde ??= DateTime.Now;
+        else { _ultimaSinc = DateTime.Now; _falhaSincDesde = null; }
+        _statusSinc.Text = _falhaSincDesde is DateTime erro
+            ? $"Falha de sincronização desde {erro:HH:mm:ss}; tentando novamente"
+            : _ultimaSinc is DateTime ok ? $"Sincronizada às {ok:HH:mm:ss}" : "Sincronizando baterias…";
+        _statusSinc.ForeColor = _falhaSincDesde.HasValue ? Tokens.Claro.CorEstadoPerigoTexto : DialogoDesign.VerdePrincipal;
     }
 
-    void MostrarDia()
+    void Ir(DateTime mes, bool silencioso = false)
     {
+        _mes = mes;
+        if (_carregando) { _recarregarPendente = true; return; }
+        _recarregarPendente = false;
+        Seguro.Rodar(this, async () =>
+        {
+            if (_carregando) { _recarregarPendente = true; return; }
+            _carregando = true;
+            var falhou = false;
+            try
+            {
+                var mesConsulta = _mes;
+                if (_dia.Month != mesConsulta.Month || _dia.Year != mesConsulta.Year)
+                    _dia = mesConsulta.Year == DateTime.Today.Year && mesConsulta.Month == DateTime.Today.Month ? DateTime.Today : mesConsulta;
+                var diaConsulta = _dia;
+                var bateriaSelecionada = _lista.Atual?.S("id");
+                _titulo.Text = Fmt.Br.TextInfo.ToTitleCase(mesConsulta.ToString("MMMM", Fmt.Br)); _ano.Text = mesConsulta.Year.ToString();
+                var tResumo = Api.ListaAsync("/api/office/agenda?mes=" + mesConsulta.ToString("yyyy-MM"));
+                var tFeriados = !_feriadosCarregados ? Api.ListaAsync("/api/office/cad/feriados") : Task.FromResult(_feriados);
+                var tBaterias = Api.ListaAsync($"/api/office/baterias?status=todas&filtro=dia&data={Fmt.Iso(diaConsulta)}");
+
+                await Task.WhenAll(tResumo, tFeriados, tBaterias);
+
+                var resumo = await tResumo;
+                if (!_feriadosCarregados && tFeriados.IsCompletedSuccessfully)
+                {
+                    _feriados = await tFeriados;
+                    _feriadosCarregados = true;
+                }
+                var baterias = (await tBaterias)
+                    .Where(b => b.S("status") != "cancelada").OrderBy(b => b.S("dataHora")).ToList();
+                if (IsDisposed) return;
+                if (mesConsulta != _mes || diaConsulta != _dia) { _recarregarPendente = true; return; }
+                _resumo = resumo.Where(x => x.D("dia") != null).ToDictionary(x => x.D("dia")!.Value.Date, x => x);
+                _baterias = baterias;
+                _cal.Mostrar(mesConsulta, diaConsulta, _resumo, d => _feriados.Any(f => f.D("data") is DateTime fd && (fd.Date == d || f.B("recorrente") && fd.Month == d.Month && fd.Day == d.Day)));
+                MostrarDia(bateriaSelecionada);
+                AtualizarStatusSinc(false);
+            }
+            catch
+            {
+                falhou = true;
+                if (!IsDisposed) AtualizarStatusSinc(true);
+                throw;
+            }
+            finally
+            {
+                _carregando = false;
+                if (!falhou && _recarregarPendente && !IsDisposed)
+                {
+                    _recarregarPendente = false;
+                    Ir(_mes, silencioso: true);
+                }
+            }
+        }, silencioso);
+    }
+
+    void MostrarDia(string bateriaSelecionada = null)
+    {
+        bateriaSelecionada ??= _lista.Atual?.S("id");
         _semana.Text = _dia.ToString("dddd", Fmt.Br).ToUpperInvariant();
         _data.Text = _dia.ToString("d 'de' MMMM", Fmt.Br);
         var visiveis = _soComReservas.Checked ? _baterias.Where(b => b.I("inscritos") > 0 || b.D("dataHora") >= DateTime.Now.AddMinutes(-40)).ToList() : _baterias;
         var pil = _baterias.Sum(b => b.I("inscritos")); var pre = _baterias.Sum(b => b.I("preReservas"));
         _resumoDia.Text = _baterias.Count == 0 ? "Nenhuma bateria neste dia" : $"{_baterias.Count} {(_baterias.Count == 1 ? "bateria" : "baterias")} · {pil} pilotos" + (pre > 0 ? $" · {pre} {(pre == 1 ? "pré-reserva" : "pré-reservas")}" : "");
-        _lista.Mostrar(visiveis);
+        _lista.Mostrar(visiveis, bateriaSelecionada);
     }
 
     void MenuBateria(JsonObject b, Point onde)
@@ -555,17 +625,27 @@ public class FormAgenda : CartaoModal
         var m = new ContextMenuStrip { Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo) };
         m.Items.Add("Incluir cliente", null, (_, _) => { using var f = new FormIncluirCliente(b); f.ShowDialog(this); CarregarDia(); });
         m.Items.Add("Editar bateria", null, (_, _) => { using var f = new FormBateria(b); if (f.ShowDialog(this) == DialogResult.OK) Recarregar(); });
-        m.Items.Add("Lista de participantes", null, (_, _) => new FormListaParticipantes(b).ShowDialog(this));
+        m.Items.Add("Lista de participantes", null, (_, _) =>
+        {
+            using var f = new FormListaParticipantes(b);
+            if (f.ShowDialog(this) == DialogResult.OK) Recarregar();
+        });
         m.Items.Add(new ToolStripSeparator());
         var fechada = b.S("status") == "fechada";
         m.Items.Add(fechada ? "Abrir bateria" : "Fechar bateria", null, (_, _) => Seguro.Rodar(this, async () =>
         {
-            await Api.Post($"/api/office/baterias/{b.S("id")}/status", new { status = fechada ? "aberta" : "fechada" });
+            await Api.PostAsync($"/api/office/baterias/{b.S("id")}/status", new { status = fechada ? "aberta" : "fechada" });
+            CarregarDia();
+        }));
+        var noTotem = b.B("autoAtendimento");
+        m.Items.Add(noTotem ? "Ocultar no totem" : "Mostrar no totem", null, (_, _) => Seguro.Rodar(this, async () =>
+        {
+            await Api.PostAsync($"/api/office/baterias/{b.S("id")}/totem", new { autoAtendimento = !noTotem });
             CarregarDia();
         }));
         m.Items.Add("Imprimir termos da bateria", null, (_, _) => Seguro.Rodar(this, async () =>
         {
-            var res = (await Api.Lista($"/api/office/reservas?bateriaId={b.S("id")}")).Where(r => r.S("status") != "cancelada").Select(r => r.S("id")).ToList();
+            var res = (await Api.ListaAsync($"/api/office/reservas?bateriaId={b.S("id")}")).Where(r => r.S("status") != "cancelada").Select(r => r.S("id")).ToList();
             if (res.Count == 0) { Msg.Aviso(this, "A bateria não tem reservas."); return; }
             Acoes.ImprimirTermo(this, res);
         }));
@@ -576,19 +656,21 @@ public class FormAgenda : CartaoModal
 
     /// <summary>Feriado decidido depois de abrir a agenda: cancela as baterias do dia sem ninguém inscrito
     /// (as que já têm reserva ficam, para a recepção avisar os clientes).</summary>
-    void FecharDia(DateTime dia) => Seguro.Rodar(this, async () =>
+    void FecharDia(DateTime dia) => Seguro.Rodar(this, () => FecharDiaAsync(dia));
+
+    async Task FecharDiaAsync(DateTime dia)
     {
-        var lista = (await Api.Lista($"/api/office/baterias?status=todas&filtro=dia&data={Fmt.Iso(dia)}")).Where(b => b.S("status") != "cancelada").ToList();
+        var lista = (await Api.ListaAsync($"/api/office/baterias?status=todas&filtro=dia&data={Fmt.Iso(dia)}")).Where(b => b.S("status") != "cancelada").ToList();
         if (lista.Count == 0) { Msg.Info(this, $"{dia:dd/MM/yyyy} já não tem baterias."); return; }
         var comReserva = lista.Count(b => b.I("inscritos") + b.I("preReservas") > 0);
         var texto = $"Fechar {dia.ToString("dddd, dd/MM/yyyy", Fmt.Br)}?\n\n{lista.Count - comReserva} de {lista.Count} baterias serão canceladas (as que não têm ninguém inscrito)."
             + (comReserva > 0 ? $"\n\n{comReserva} {(comReserva == 1 ? "bateria tem reserva e continua" : "baterias têm reserva e continuam")}: avise os clientes e mova-os antes de cancelar." : "")
             + "\n\nPara não gerar de novo nesse dia, cadastre-o em Cadastros › Feriados.";
         if (!Msg.Pergunta(this, texto)) return;
-        var r = await Api.Post("/api/office/baterias/fechar-dia", new { data = Fmt.Iso(dia) });
+        var r = await Api.PostAsync("/api/office/baterias/fechar-dia", new { data = Fmt.Iso(dia) });
         Msg.Info(this, $"{r.I("canceladas")} baterias canceladas." + (r.I("mantidas") > 0 ? $" {r.I("mantidas")} com reserva continuam." : ""));
         Recarregar();
-    });
+    }
 }
 
 /// <summary>‹ Hoje › (segmentado cinza, "Hoje" branco).</summary>
@@ -802,12 +884,19 @@ class BateriasDia : Control
         AccessibleDescription = "Use as setas para selecionar uma bateria, Enter para abrir e Shift+F10 para ações.";
     }
 
-    public void Mostrar(List<JsonObject> itens)
+    public void Mostrar(List<JsonObject> itens, string idSelecionado = null)
     {
-        _itens = itens; _topo = 0;
+        var topoAnterior = _topo;
+        _itens = itens;
         AccessibleName = itens.Count == 0 ? "Baterias do dia, nenhuma" : $"Baterias do dia, {itens.Count} disponíveis";
-        var agora = DateTime.Now;
-        _sel = itens.FindIndex(b => b.D("dataHora") is DateTime d && d.AddMinutes(35) >= agora);
+        _sel = idSelecionado is null ? -1 : itens.FindIndex(b => b.S("id") == idSelecionado);
+        if (_sel >= 0) _topo = Math.Clamp(topoAnterior, 0, Math.Max(0, itens.Count * (Alt + Esp) - Height));
+        else
+        {
+            _topo = 0;
+            var agora = DateTime.Now;
+            _sel = itens.FindIndex(b => b.D("dataHora") is DateTime d && d.AddMinutes(35) >= agora);
+        }
         Invalidate();
     }
 

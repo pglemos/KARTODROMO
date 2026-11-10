@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Kartodromo.Comum;
 
@@ -72,6 +72,7 @@ public partial class FormCrono : Form
     readonly Button _btnPag1 = new();
     readonly Button _btnPag2 = new();
     readonly Button _btnPag3 = new();
+    readonly Button _btnPag4 = new();
     readonly CheckBox _chkPainelAuto = new();
     readonly Button _btnPainelConfig = new();
 
@@ -134,7 +135,7 @@ public partial class FormCrono : Form
         _abas.BringToFront();
         _passos.Selecionado = _abas.SelectedIndex;
 
-        _leitura.Tick += async (_, _) => await Atualizar();
+        _leitura.Tick += async (_, _) => await AtualizarAsync();
         _relogio.Tick += (_, _) => Relogio();
         KeyDown += (_, e) =>
         {
@@ -149,6 +150,7 @@ public partial class FormCrono : Form
             else if (e.KeyCode == Keys.F8) { e.Handled = true; _chkPainelAuto.Checked = false; _painel.AutoAvanco = false; _painel.DefinirPagina(0); AtualizarBotoesPainel(); }
             else if (e.KeyCode == Keys.F9) { e.Handled = true; if (_painel.TotalPaginas >= 2) { _chkPainelAuto.Checked = false; _painel.AutoAvanco = false; _painel.DefinirPagina(1); AtualizarBotoesPainel(); } }
             else if (e.KeyCode == Keys.F10) { e.Handled = true; if (_painel.TotalPaginas >= 3) { _chkPainelAuto.Checked = false; _painel.AutoAvanco = false; _painel.DefinirPagina(2); AtualizarBotoesPainel(); } }
+            else if (e.KeyCode == Keys.F12) { e.Handled = true; if (_painel.TotalPaginas >= 4) { _chkPainelAuto.Checked = false; _painel.AutoAvanco = false; _painel.DefinirPagina(3); AtualizarBotoesPainel(); } }
             else if (e.KeyCode == Keys.Insert) { e.Handled = true; IncluirPassagem(); }
             // Delete digitando num campo apaga texto; só fora de campo de texto é "excluir passagem"
             // Delete com a grade de observações em foco exclui a observação (não a passagem)
@@ -158,10 +160,9 @@ public partial class FormCrono : Form
         };
         Shown += async (_, _) =>
         {
-            await Atualizar();
-            await CarregarAgenda();
-            await CarregarCatalogo();
-            if (_autoteste != null) { await AutoTeste(); return; }
+            await AtualizarAsync();
+            await Task.WhenAll(CarregarAgendaAsync(), CarregarCatalogoAsync());
+            if (_autoteste != null) { await AutoTesteAsync(); return; }
             // sem bateria na pista, abre na agenda da recepção (é de lá que se cria a próxima bateria com os pilotos)
             if (string.IsNullOrEmpty(_state?.S("runningId"))) _abas.SelectedIndex = 0;
             _leitura.Start();
@@ -820,6 +821,7 @@ public partial class FormCrono : Form
         ConfigurarBotaoPagina(_btnPag1, "1º ao 10º (F8)", 0);
         ConfigurarBotaoPagina(_btnPag2, "11º ao 20º (F9)", 1);
         ConfigurarBotaoPagina(_btnPag3, "21º ao 30º (F10)", 2);
+        ConfigurarBotaoPagina(_btnPag4, "31º ao 40º (F12)", 3);
 
         _chkPainelAuto.Text = "Alternar auto (5s)";
         _chkPainelAuto.AutoSize = true;
@@ -863,6 +865,7 @@ public partial class FormCrono : Form
         flowRight.Controls.Add(_btnPag1);
         flowRight.Controls.Add(_btnPag2);
         flowRight.Controls.Add(_btnPag3);
+        flowRight.Controls.Add(_btnPag4);
         flowRight.Controls.Add(_chkPainelAuto);
         flowRight.Controls.Add(_btnPainelConfig);
 
@@ -936,18 +939,20 @@ public partial class FormCrono : Form
     bool _atualizandoPainel;
 
     /// <summary>Botão "Atualizar painel": relê o servidor e reenvia tudo. O pedido também vai pelo servidor para o outro PC com painel (ORBITS e CRONO1).</summary>
-    async void AtualizarPainelAgora()
+    void AtualizarPainelAgora() => Seguro.Rodar(this, AtualizarPainelAgoraAsync);
+
+    async Task AtualizarPainelAgoraAsync()
     {
         if (_atualizandoPainel) return;
         _atualizandoPainel = true;
         _fPainel.Estado = EstadoBotao.Ativo;
         try
         {
-            var estado = (await Crono.Api.Get("/api/state"))?.AsObject();
+            var estado = (await Crono.Api.GetAsync("/api/state"))?.AsObject();
             if (estado != null) _state = estado;
             _painel.ForcarAtualizacao();
             AtualizarPainel();
-            await Crono.Api.Post("/api/painel-led-page", new JsonObject { ["pagina"] = _painel.Pagina, ["atualizar"] = true, ["origem"] = Environment.MachineName });
+            await Crono.Api.PostAsync("/api/painel-led-page", new JsonObject { ["pagina"] = _painel.Pagina, ["atualizar"] = true, ["origem"] = Environment.MachineName });
             await Task.Delay(1500);
         }
         catch (Exception e)
@@ -1003,11 +1008,12 @@ public partial class FormCrono : Form
             _lPainelBadge.Text = "PAINEL LED DESLIGADO";
             _lPainelStatus.Text = "Clique em \"Config\" para selecionar a porta serial (ex.: COM3)";
             _lPainelStatus.ForeColor = TemaCrono.Secundario;
-            _btnPag1.Enabled = _btnPag2.Enabled = _btnPag3.Enabled = false;
+            _btnPag1.Enabled = _btnPag2.Enabled = _btnPag3.Enabled = _btnPag4.Enabled = false;
             _chkPainelAuto.Enabled = false;
             EstilizarBotaoPag(_btnPag1, false);
             EstilizarBotaoPag(_btnPag2, false);
             EstilizarBotaoPag(_btnPag3, false);
+            EstilizarBotaoPag(_btnPag4, false);
             return;
         }
 
@@ -1058,11 +1064,14 @@ public partial class FormCrono : Form
         _btnPag1.Enabled = true;
         _btnPag2.Enabled = totalPaginas >= 2;
         _btnPag3.Enabled = totalPaginas >= 3;
+        _btnPag4.Enabled = totalPaginas >= 4;
+        _btnPag4.Visible = totalPaginas >= 4 || totalPilotos > 30;
         _chkPainelAuto.Enabled = totalPaginas > 1;
 
         EstilizarBotaoPag(_btnPag1, paginaAtual == 0);
         EstilizarBotaoPag(_btnPag2, paginaAtual == 1 && _btnPag2.Enabled);
         EstilizarBotaoPag(_btnPag3, paginaAtual == 2 && _btnPag3.Enabled);
+        EstilizarBotaoPag(_btnPag4, paginaAtual == 3 && _btnPag4.Enabled);
     }
 
     static void EstilizarBotaoPag(Button btn, bool ativo)
@@ -1121,13 +1130,15 @@ public partial class FormCrono : Form
             || c?.Parent is DataGridView; // controle de edição da célula
     }
 
-    async Task Atualizar(bool jaTemEstado = false)
+    Task Atualizar(bool jaTemEstado = false) => AtualizarAsync(jaTemEstado);
+
+    async Task AtualizarAsync(bool jaTemEstado = false, CancellationToken ct = default)
     {
         if (_ocupado) return;
         _ocupado = true;
         try
         {
-            if (!jaTemEstado) _state = (await Crono.Api.Get("/api/state"))?.AsObject();
+            if (!jaTemEstado) _state = (await Crono.Api.GetAsync("/api/state", ct))?.AsObject();
             var focus = _state?["focus"] as JsonObject;
             var correndo = _state.S("runningId");
             // com uma janela aberta (Registro de competidor, Trocar kart, Penalidade...) a tela não pula para a bateria
@@ -1137,13 +1148,13 @@ public partial class FormCrono : Form
             if ((!_fixado || _sel == null) && !(janelaAberta && _sel != null)) _sel = correndo.Length > 0 ? correndo : focus?.S("id") ?? _sel;
             if (_sel != null)
             {
-                _sess = focus != null && focus.S("id") == _sel ? focus : (await Crono.Api.Get("/api/sessions/" + _sel))?.AsObject();
+                _sess = focus != null && focus.S("id") == _sel ? focus : (await Crono.Api.GetAsync("/api/sessions/" + _sel, ct))?.AsObject();
                 var somaVoltas = (_sess?["standings"] as JsonArray)?.OfType<JsonObject>().Sum(s => (long)s.I("laps") + (s.L("lastCrossingWallMs") ?? 0)) ?? 0;
                 var ultPassId = (_state?["recentPassings"] as JsonArray)?.FirstOrDefault()?["id"]?.ToString() ?? "";
                 var assinatura = $"{_sel}:{_sess?.I("passingsCount")}:{_sess?.I("rejectedCount")}:{_sess?.L("updatedAt")}:{_sess?.S("state")}:{_sess?.S("currentFlag")}:{ultPassId}:{somaVoltas}";
                 if (_laps == null || _sel != _lapsSessaoId || assinatura != _lapsAssinatura || DateTime.Now - _lapsLidoEm >= TimeSpan.FromSeconds(3))
                 {
-                    _laps = await Crono.Api.Lista($"/api/sessions/{_sel}/passings");
+                    _laps = await Crono.Api.ListaAsync($"/api/sessions/{_sel}/passings", ct);
                     _lapsSessaoId = _sel;
                     _lapsAssinatura = assinatura;
                     _lapsLidoEm = DateTime.Now;
@@ -1231,9 +1242,11 @@ public partial class FormCrono : Form
         }
     }
 
-    async Task CarregarAgenda()
+    Task CarregarAgenda() => CarregarAgendaAsync();
+
+    async Task CarregarAgendaAsync(CancellationToken ct = default)
     {
-        try { _agenda = await Crono.Api.Lista("/api/agenda"); }
+        try { _agenda = await Crono.Api.ListaAsync("/api/agenda", ct); }
         catch (ApiException e) { _agenda = []; _gAgenda.Preencher([new object[] { "", "Agenda indisponível: " + e.Message, "", "", "" }]); return; }
         _gAgenda.Preencher(_agenda.Select(b => new object[] { Fmt.Hm(b.S("inicio")), b.S("nome"), b.S("tipoKart") == "super" ? "Super" : "Light", b.I("inscritos"), b.I("pagos") }).ToList(), _agenda.Cast<object>().ToList());
         // sem nada escolhido: já deixa marcada a bateria da hora (a mais recente que já começou com inscritos, senão a próxima)
@@ -1476,7 +1489,9 @@ public partial class FormCrono : Form
         if (f.ShowDialog(this) == DialogResult.OK && f.CriadaId != null) { Selecionar(f.CriadaId); _abas.SelectedIndex = 1; }
     }
 
-    async Task SalvarPilotos()
+    Task SalvarPilotos() => SalvarPilotosAsync();
+
+    async Task SalvarPilotosAsync(CancellationToken ct = default)
     {
         if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
         _gPilotos.EndEdit();
@@ -1506,19 +1521,21 @@ public partial class FormCrono : Form
             comps.Add(new JsonObject { ["kart"] = kart, ["name"] = nome, ["customerId"] = string.IsNullOrEmpty(cid) ? null : cid, ["category"] = string.IsNullOrEmpty(category) ? null : category });
         }
         // grava na bateria de onde a lista foi carregada (a digitada), não na que estiver selecionada agora
-        await Crono.Api.Patch("/api/sessions/" + (_pilotosDe ?? _sess.S("id")), new JsonObject { ["competitors"] = comps });
+        await Crono.Api.PatchAsync("/api/sessions/" + (_pilotosDe ?? _sess.S("id")), new JsonObject { ["competitors"] = comps }, ct);
         _pilotosSujos = false;
         InvalidarCachePassagens();
-        await Atualizar();
+        await AtualizarAsync(ct: ct);
         Msg.Info(this, "Competidores salvos.");
     }
 
-    async Task PuxarAgenda()
+    Task PuxarAgenda() => PuxarAgendaAsync();
+
+    async Task PuxarAgendaAsync(CancellationToken ct = default)
     {
         if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
         var ag = AgendaDaBateria(_sess);
         if (ag == null) { Msg.Aviso(this, "Não achei a bateria da recepção com o mesmo horário desta prova. Crie a bateria pela agenda (passos 1–3 › Da agenda…)."); return; }
-        var grid = await Crono.Api.Lista($"/api/agenda/{ag.S("id")}/grid");
+        var grid = await Crono.Api.ListaAsync($"/api/agenda/{ag.S("id")}/grid", ct);
         if (grid.Count == 0) { Msg.Aviso(this, "Essa bateria da agenda não tem inscritos."); return; }
         var existentes = _gPilotos.Rows.Cast<DataGridViewRow>().Where(r => !r.IsNewRow).Select(r => r.Cells[2].Value?.ToString()).ToHashSet();
         foreach (var g in grid.Where(g => !existentes.Contains(g.S("clienteId")))) _gPilotos.Rows.Add(g.S("kart"), g.S("nome"), g.S("clienteId"), g.S("categoria"));
@@ -1542,12 +1559,14 @@ public partial class FormCrono : Form
         return _agenda.FirstOrDefault(a => a.S("nome").Equals(sessao.S("name").Split('·')[0].Trim(), StringComparison.OrdinalIgnoreCase)) ?? _gAgenda.ChaveAtual as JsonObject;
     }
 
-    async Task Invalidar(string kart, int lap)
+    Task Invalidar(string kart, int lap) => InvalidarAsync(kart, lap);
+
+    async Task InvalidarAsync(string kart, int lap, CancellationToken ct = default)
     {
         if (_sess == null) return;
-        await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/laps/invalidate", new JsonObject { ["kart"] = kart, ["lap"] = lap });
+        await Crono.Api.PostAsync($"/api/sessions/{_sess.S("id")}/laps/invalidate", new JsonObject { ["kart"] = kart, ["lap"] = lap }, ct);
         InvalidarCachePassagens();
-        await Atualizar();
+        await AtualizarAsync(ct: ct);
     }
 
     void Voltas(string kart)
@@ -1606,31 +1625,33 @@ public partial class FormCrono : Form
     // ------------------------------------------------------------------ autoteste
 
     /// <summary>Confere que a ordenação da aba 4–5 (Competidor e Nº) não é desfeita pelas atualizações ao vivo. Só lê do servidor.</summary>
-    async Task TesteOrdenacao()
+    Task TesteOrdenacao() => TesteOrdenacaoAsync();
+
+    async Task TesteOrdenacaoAsync()
     {
-        var log = new List<string>();
+        List<string> log = [];
         try
         {
-            await Atualizar();
+            await AtualizarAsync();
             var sessao = Crono.Arr(_state, "sessions").OrderByDescending(x => x.I("competitors")).FirstOrDefault();
             if (sessao == null) { log.Add("pendente: nenhuma bateria"); return; }
             Selecionar(sessao.S("id"));
             _abas.SelectedIndex = 1; _tabsCompetidor.SelectedIndex = 0;
-            for (var i = 0; i < 10 && _gPilotos.Rows.Cast<DataGridViewRow>().Count(r => !r.IsNewRow) < 2; i++) { await Atualizar(); await Task.Delay(300); }
+            for (var i = 0; i < 10 && _gPilotos.Rows.Cast<DataGridViewRow>().Count(r => !r.IsNewRow) < 2; i++) { await AtualizarAsync(); await Task.Delay(300); }
             List<string> Coluna(int c) => _gPilotos.Rows.Cast<DataGridViewRow>().Where(r => !r.IsNewRow).Select(r => r.Cells[c].Value?.ToString() ?? "").ToList();
             log.Add($"bateria {sessao.S("name")}: {Coluna(1).Count} competidores; ordem do servidor: {string.Join(" | ", Coluna(1).Take(6))}");
             var cmp = StringComparer.Create(Fmt.Br, System.Globalization.CompareOptions.IgnoreCase | System.Globalization.CompareOptions.IgnoreNonSpace);
             _gPilotos.Sort(_gPilotos.Columns["name"], System.ComponentModel.ListSortDirection.Ascending);
-            for (var i = 0; i < 5; i++) { await Atualizar(); await Task.Delay(700); }
+            for (var i = 0; i < 5; i++) { await AtualizarAsync(); await Task.Delay(700); }
             var nomes = Coluna(1);
             var esperado = nomes.Where(n => n.Length > 0).OrderBy(n => n, cmp).Concat(nomes.Where(n => n.Length == 0)).ToList();
             log.Add((nomes.SequenceEqual(esperado) ? "OK" : "ERRO") + $" Competidor A-Z continua depois de 5 atualizações: {string.Join(" | ", nomes.Take(6))}");
             _gPilotos.Sort(_gPilotos.Columns["name"], System.ComponentModel.ListSortDirection.Descending);
-            for (var i = 0; i < 3; i++) { await Atualizar(); await Task.Delay(700); }
+            for (var i = 0; i < 3; i++) { await AtualizarAsync(); await Task.Delay(700); }
             nomes = Coluna(1);
             log.Add((nomes.Where(n => n.Length > 0).SequenceEqual(nomes.Where(n => n.Length > 0).OrderByDescending(n => n, cmp)) ? "OK" : "ERRO") + $" Competidor Z-A: {string.Join(" | ", nomes.Take(4))}");
             _gPilotos.Sort(_gPilotos.Columns["kart"], System.ComponentModel.ListSortDirection.Ascending);
-            for (var i = 0; i < 3; i++) { await Atualizar(); await Task.Delay(700); }
+            for (var i = 0; i < 3; i++) { await AtualizarAsync(); await Task.Delay(700); }
             var karts = Coluna(0).Where(k => long.TryParse(k, out _)).Select(long.Parse).ToList();
             log.Add((karts.SequenceEqual(karts.OrderBy(k => k)) ? "OK" : "ERRO") + $" Nº em ordem numérica: {string.Join(" ", karts.Take(12))}");
         }
@@ -1638,12 +1659,14 @@ public partial class FormCrono : Form
         finally { File.WriteAllLines(Path.Combine(_autoteste, "log.txt"), log); Close(); }
     }
 
-    async Task AutoTeste()
+    Task AutoTeste() => AutoTesteAsync();
+
+    async Task AutoTesteAsync()
     {
         Directory.CreateDirectory(_autoteste);
         if (Environment.GetEnvironmentVariable("KARTODROMO_TESTE") == "recuperar") { await TestarRecuperarPiloto(); return; }
         if (Environment.GetEnvironmentVariable("KARTODROMO_TESTE") == "redutor") { await TestarEditorRedutor(); return; }
-        if (Environment.GetEnvironmentVariable("KARTODROMO_TESTE") == "ordenacao") { await TesteOrdenacao(); return; }
+        if (Environment.GetEnvironmentVariable("KARTODROMO_TESTE") == "ordenacao") { await TesteOrdenacaoAsync(); return; }
         var foraDaTela = Environment.GetEnvironmentVariable("KARTODROMO_TESTE") == "telas";
         if (foraDaTela) Msg.Registro = m => File.AppendAllText(Path.Combine(_autoteste, "log.txt"), m + Environment.NewLine); // avisos no log, nenhuma caixa na tela
         var focoAntes = GetForegroundWindow();

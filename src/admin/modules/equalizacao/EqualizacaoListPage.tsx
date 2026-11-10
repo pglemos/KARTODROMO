@@ -168,9 +168,12 @@ export const EqualizacaoListPage = () => {
     });
   }, [categoryFilter, karts, search, stateFilter]);
 
-  useEffect(() => {
+  const [prevFilterKey, setPrevFilterKey] = useState('');
+  const currentFilterKey = `${categoryFilter}:${stateFilter}:${search}`;
+  if (prevFilterKey !== currentFilterKey) {
+    setPrevFilterKey(currentFilterKey);
     setPage(0);
-  }, [categoryFilter, search, stateFilter]);
+  }
 
   const pageKarts = filteredKarts.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const historyByKart = useMemo(
@@ -326,7 +329,7 @@ export const EqualizacaoListPage = () => {
                 const state = equalizationState(kart.media_equalizacao_ms, kart.numero);
                 const summary = historyByKart.get(historyKey(kart.numero));
                 return (
-                  <tr className="border-b border-kib-borda last:border-0 hover:bg-kib-campo" key={kart.id}>
+                  <tr className="border-b border-kib-borda last:border-0 hover:bg-kib-campo [content-visibility:auto] [contain-intrinsic-size:0_56px]" key={kart.id}>
                     <td className="px-4 py-3">
                       <Link className="block min-w-32" href={`/admin/equalizacao/${encodeURIComponent(kart.id)}`}>
                         <strong className="block text-sm font-semibold text-kib-texto">Kart {kart.numero}</strong>

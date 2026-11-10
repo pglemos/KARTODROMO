@@ -15,12 +15,12 @@ public partial class FormCrono
         var chuva = !_sess.B("chuva");
         Seguro.Rodar(this, async () =>
         {
-            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/weather", new JsonObject
+            await Crono.Api.PostAsync($"/api/sessions/{_sess.S("id")}/weather", new JsonObject
             {
                 ["chuva"] = chuva,
                 ["autor"] = Environment.UserName,
             });
-            await Atualizar();
+            await AtualizarAsync();
         });
     }
 
@@ -37,7 +37,7 @@ public partial class FormCrono
         if (_sess.S("state") is not ("em_andamento" or "bandeira_final")) { Msg.Aviso(this, "A prova precisa estar em andamento para receber uma bandeira."); return; }
         var confirm = cor is "vermelha" or "quadriculada";
         if (confirm && !Msg.Pergunta(this, cor == "vermelha" ? "Dar bandeira vermelha e pausar o cronômetro?" : "Dar bandeira quadriculada e encerrar cada kart na próxima passagem?")) return;
-        Seguro.Rodar(this, async () => { await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/flag", new JsonObject { ["flag"] = flag }); InvalidarCachePassagens(); await Atualizar(); });
+        Seguro.Rodar(this, async () => { await Crono.Api.PostAsync($"/api/sessions/{_sess.S("id")}/flag", new JsonObject { ["flag"] = flag }); InvalidarCachePassagens(); await AtualizarAsync(); });
     }
 
     void LimparPassagens()
@@ -45,7 +45,7 @@ public partial class FormCrono
         if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
         if (!_laps.Any(p => !p.B("deleted"))) { Msg.Info(this, "Não há passagens para limpar."); return; }
         if (!Msg.Pergunta(this, $"Limpar as passagens da bateria “{_sess.S("name")}”? Elas ficarão no diário e poderão ser restauradas.")) return;
-        Seguro.Rodar(this, async () => { await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/passings/clear"); InvalidarCachePassagens(); await Atualizar(); });
+        Seguro.Rodar(this, async () => { await Crono.Api.PostAsync($"/api/sessions/{_sess.S("id")}/passings/clear"); InvalidarCachePassagens(); await AtualizarAsync(); });
     }
 
     void CorrigirPassagem(string acao, bool acima = false)
@@ -59,13 +59,13 @@ public partial class FormCrono
         if (!Msg.Pergunta(this, pergunta)) return;
         Seguro.Rodar(this, async () =>
         {
-            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/passings/actions", new JsonObject {
+            await Crono.Api.PostAsync($"/api/sessions/{_sess.S("id")}/passings/actions", new JsonObject {
                 ["action"] = acao,
-                ["ids"] = new JsonArray(JsonValue.Create(passagem.S("id"))),
+                ["ids"] = new JsonArray([JsonValue.Create(passagem.S("id"))]),
                 ["aboveId"] = acima ? passagem.S("id") : null,
             });
             InvalidarCachePassagens();
-            await Atualizar();
+            await AtualizarAsync();
         });
     }
 
@@ -77,13 +77,13 @@ public partial class FormCrono
     void AtribuirPassagem()
     {
         if (_sess == null || _gPass.ChaveAtual is not JsonObject passagem) { Msg.Aviso(this, "Selecione uma passagem para atribuir."); return; }
-        using var dialog = new DialogoDados("Atribuir passagem", "Escolha o número e o nome do competidor", new[] { ("Número do kart", "kart", passagem.S("kart")), ("Competidor", "name", passagem.S("name")) }, new Size(680, 300));
+        using var dialog = new DialogoDados("Atribuir passagem", "Escolha o número e o nome do competidor", [("Número do kart", "kart", passagem.S("kart")), ("Competidor", "name", passagem.S("name"))], new Size(680, 300));
         if (dialog.ShowDialog(this) != DialogResult.OK || !dialog.Confirmado) return;
         Seguro.Rodar(this, async () =>
         {
-            await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/passings/{passagem.S("id")}/assign", new JsonObject { ["kart"] = dialog.Valor("kart"), ["name"] = dialog.Valor("name") });
+            await Crono.Api.PostAsync($"/api/sessions/{_sess.S("id")}/passings/{passagem.S("id")}/assign", new JsonObject { ["kart"] = dialog.Valor("kart"), ["name"] = dialog.Valor("name") });
             InvalidarCachePassagens();
-            await Atualizar();
+            await AtualizarAsync();
         });
     }
 
@@ -91,7 +91,7 @@ public partial class FormCrono
     {
         if (_sess == null || _gPass.ChaveAtual is not JsonObject passagem) { Msg.Aviso(this, "Selecione uma passagem."); return; }
         if (!passagem.B("assigned")) { Msg.Aviso(this, "Esta passagem não tem atribuição para cancelar."); return; }
-        Seguro.Rodar(this, async () => { await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/passings/{passagem.S("id")}/unassign"); InvalidarCachePassagens(); await Atualizar(); });
+        Seguro.Rodar(this, async () => { await Crono.Api.PostAsync($"/api/sessions/{_sess.S("id")}/passings/{passagem.S("id")}/unassign"); InvalidarCachePassagens(); await AtualizarAsync(); });
     }
 
     void BandeiraPiloto(string flag)
@@ -100,29 +100,33 @@ public partial class FormCrono
         var row = _gPilotos.CurrentRow;
         var kart = row?.Cells[0].Value?.ToString();
         if (string.IsNullOrWhiteSpace(kart)) { Msg.Aviso(this, "Selecione um competidor."); return; }
-        Seguro.Rodar(this, async () => { await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/flag/{Uri.EscapeDataString(kart)}", new JsonObject { ["flag"] = flag }); await Atualizar(); });
+        Seguro.Rodar(this, async () => { await Crono.Api.PostAsync($"/api/sessions/{_sess.S("id")}/flag/{Uri.EscapeDataString(kart)}", new JsonObject { ["flag"] = flag }); await AtualizarAsync(); });
     }
 
-    async Task AdicionarObservacao()
+    Task AdicionarObservacao() => AdicionarObservacaoAsync();
+
+    async Task AdicionarObservacaoAsync(CancellationToken ct = default)
     {
         if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
         var text = !string.IsNullOrWhiteSpace(_txtObservacaoAoVivo.Text) ? _txtObservacaoAoVivo.Text.Trim() : _txtObservacao.Text.Trim();
         if (text.Length == 0) { Msg.Aviso(this, "Escreva a observação da prova."); return; }
-        await Crono.Api.Post($"/api/sessions/{_sess.S("id")}/observations", new JsonObject { ["text"] = text, ["author"] = Environment.UserName });
+        await Crono.Api.PostAsync($"/api/sessions/{_sess.S("id")}/observations", new JsonObject { ["text"] = text, ["author"] = Environment.UserName }, ct);
         _txtObservacao.Text = ""; _txtObservacaoAoVivo.Text = "";
-        await Atualizar();
+        await AtualizarAsync(ct: ct);
     }
 
     /// <summary>Exclui a observação selecionada na grade (aba Observações). Pergunta antes; fica registrado no log do servidor.</summary>
-    async Task ExcluirObservacao(LiveGrid grade)
+    Task ExcluirObservacao(LiveGrid grade) => ExcluirObservacaoAsync(grade);
+
+    async Task ExcluirObservacaoAsync(LiveGrid grade, CancellationToken ct = default)
     {
         if (_sess == null) { Msg.Aviso(this, "Selecione uma bateria."); return; }
         if (grade.ChaveAtual is not JsonObject o || o.S("id").Length == 0) { Msg.Aviso(this, "Clique na observação que quer excluir."); return; }
         var sessaoId = _sess.S("id");
         var texto = o.S("text");
         if (!Msg.Confirmar(this, "Excluir esta observação?", $"{Crono.Hora(o.L("wallMs"))}  {texto}\n\nEla sai do resultado e dos relatórios.", "Excluir observação")) return;
-        await Crono.Api.Delete($"/api/sessions/{sessaoId}/observations/{Uri.EscapeDataString(o.S("id"))}?autor={Uri.EscapeDataString(Environment.UserName)}");
-        await Atualizar();
+        await Crono.Api.DeleteAsync($"/api/sessions/{sessaoId}/observations/{Uri.EscapeDataString(o.S("id"))}?autor={Uri.EscapeDataString(Environment.UserName)}", ct);
+        await AtualizarAsync(ct: ct);
     }
 
     /// <summary>Corrige a posição quando um sensor deixa de marcar um kart.

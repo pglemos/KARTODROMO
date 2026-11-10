@@ -1178,21 +1178,27 @@ let ultimoResumoSite = '';
  */
 export async function publicarGruposNoSite(log: Log) {
   if (!siteUrl() || !siteChave()) return 0;
-  const gs = await query<{ id: number; codigo: string; modo: string; preco: number; status: string; bateria: string; inicio: string; responsavel: string }>(
-    `SELECT g.Id id, g.Codigo codigo, g.Modo modo, g.PrecoCentavos preco, g.Status status, b.Nome bateria, CONVERT(varchar(16), b.Inicio, 126) inicio, r.Nome responsavel
+  const gs = await query<{ id: number; codigo: string; modo: string; preco: number; sinalPct: number; status: string; bateria: string; inicio: string; responsavel: string }>(
+    `SELECT g.Id id, g.Codigo codigo, g.Modo modo, g.PrecoCentavos preco, g.SinalPct sinalPct, g.Status status, b.Nome bateria, CONVERT(varchar(16), b.Inicio, 126) inicio, r.Nome responsavel
        FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId JOIN dbo.Cliente r ON r.Id = g.ResponsavelId
       WHERE g.Status = 'ativa' AND b.Inicio > DATEADD(hour, -2, SYSDATETIME())`,
   );
   if (!gs.length) return 0;
   const lista = gs.map((g) => g.id).join(',');
-  const vagas = await query<{ grupoId: number; token: string; livre: number }>(
-    `SELECT v.GrupoId grupoId, v.Token token, CASE WHEN v.ClienteId IS NULL AND v.Responsavel = 0 AND i.Id IS NOT NULL THEN 1 ELSE 0 END livre
+  const pagos = await query<{ grupoId: number; pago: number }>(
+    `SELECT GrupoId grupoId, SUM(ValorCentavos) pago FROM dbo.ReservaGrupoPagamento WHERE GrupoId IN (${lista}) AND Cancelado = 0 GROUP BY GrupoId`,
+  );
+  const vagas = await query<{ grupoId: number; token: string; livre: number; responsavel: number }>(
+    `SELECT v.GrupoId grupoId, v.Token token, v.Responsavel responsavel, CASE WHEN v.ClienteId IS NULL AND v.Responsavel = 0 AND i.Id IS NOT NULL THEN 1 ELSE 0 END livre
        FROM dbo.ReservaGrupoPiloto v LEFT JOIN dbo.Inscricao i ON i.Id = v.InscricaoId AND i.Status <> 'cancelada'
       WHERE v.GrupoId IN (${lista}) AND (v.Responsavel = 1 OR i.Id IS NOT NULL)`,
   );
   const grupos = gs.map((g) => {
     const dele = vagas.filter((v) => v.grupoId === g.id);
     return {
+      id: g.id, sinalPct: Number(g.sinalPct) || 0, pagoCentavos: Number(pagos.find((x) => x.grupoId === g.id)?.pago) || 0,
+      // quem paga o grupo (modo único ou sinal): só o link do responsável cobra; os convidados só fazem o cadastro
+      responsavelToken: dele.find((v) => Number(v.responsavel) === 1)?.token ?? null,
       tokens: dele.map((v) => v.token).filter(Boolean), codigo: g.codigo, status: g.status, modo: g.modo, precoCentavos: Number(g.preco) || 0,
       bateria: g.bateria, inicio: g.inicio, responsavel: primeiroNome(g.responsavel), livres: dele.reduce((s, v) => s + v.livre, 0),
     };

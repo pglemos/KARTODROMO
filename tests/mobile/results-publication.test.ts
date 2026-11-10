@@ -141,7 +141,7 @@ async function callWorker(path: string, method = 'GET', body?: unknown, headers:
     headers: { ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...headers },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
-  return worker.fetch(request, env as never, { waitUntil: () => undefined });
+  return worker.fetch(request, env as never, { waitUntil: () => undefined } as any);
 }
 
 function verificationToken() {

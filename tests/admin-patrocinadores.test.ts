@@ -25,6 +25,8 @@ describe('admin web: patrocinadores', () => {
       new URL(`https://admin.example.test/api/patro/${caminho}`),
     );
 
+  const jsonDe = async <T = any>(res: Response | Promise<Response>): Promise<T> => ((await (await res).json()) as T);
+
   beforeEach(async () => {
     mf = new Miniflare({ compatibilityDate: '2026-06-26', modules: true, script: 'export default { fetch() { return new Response("ok") } }', d1Databases: ['KARTODROMO_ADMIN_DB'] });
     const d1 = await mf.getD1Database('KARTODROMO_ADMIN_DB');
@@ -61,37 +63,37 @@ describe('admin web: patrocinadores', () => {
   });
 
   it('cadastra empresa, espaço e contrato, gera cobranças sem duplicar e dá baixa', async () => {
-    const empresa = await (await chamar('empresas', 'POST', { nome: 'TESTE CODEX Marca', ativo: true })).json();
-    const espaco = await (await chamar('espacos', 'POST', { nome: 'Outdoor 1', tipo: 'outdoor', valor_tabela: 1500, ativo: true })).json();
+    const empresa = await jsonDe(chamar('empresas', 'POST', { nome: 'TESTE CODEX Marca', ativo: true }));
+    const espaco = await jsonDe(chamar('espacos', 'POST', { nome: 'Outdoor 1', tipo: 'outdoor', valor_tabela: 1500, ativo: true }));
     const criado = await chamar('contratos', 'POST', {
       empresa_id: empresa.id, espaco_id: espaco.id, titulo: 'TESTE CODEX', status: 'ativo', valor: 1500, recorrencia: 'mensal',
       dia_vencimento: 10, data_inicio: '2020-01-01', data_fim: '2020-03-31',
     });
     expect(criado.status).toBe(201);
-    const contrato = await criado.json();
+    const contrato = await jsonDe(criado);
 
-    expect(await (await chamar(`contratos/${contrato.id}/cobrancas`, 'POST', {})).json()).toEqual({ geradas: 3, total: 3 });
-    expect(await (await chamar(`contratos/${contrato.id}/cobrancas`, 'POST', {})).json()).toEqual({ geradas: 0, total: 3 });
+    expect(await jsonDe(chamar(`contratos/${contrato.id}/cobrancas`, 'POST', {}))).toEqual({ geradas: 3, total: 3 });
+    expect(await jsonDe(chamar(`contratos/${contrato.id}/cobrancas`, 'POST', {}))).toEqual({ geradas: 0, total: 3 });
 
-    const dados = await (await chamar('tudo')).json();
+    const dados = await jsonDe(chamar('tudo'));
     expect(dados.cobrancas).toHaveLength(3);
     expect(dados.cobrancas.every((c: { status: string }) => c.status === 'atrasado')).toBe(true);
     expect(dados.contratos[0]).toMatchObject({ empresa_nome: 'TESTE CODEX Marca', espaco_nome: 'Outdoor 1' });
 
     const baixa = await chamar(`cobrancas/${dados.cobrancas[0].id}`, 'PATCH', { status: 'pago', pago_em: '2020-02-10', forma_pagamento: 'Pix' });
     expect(baixa.status).toBe(200);
-    expect((await (await chamar('tudo')).json()).cobrancas.filter((c: { status: string }) => c.status === 'pago')).toHaveLength(1);
+    expect((await jsonDe(chamar('tudo'))).cobrancas.filter((c: { status: string }) => c.status === 'pago')).toHaveLength(1);
   });
 
   it('não deixa dois contratos ativos no mesmo espaço e período, e rejeita campos desconhecidos', async () => {
-    const e1 = await (await chamar('empresas', 'POST', { nome: 'TESTE CODEX A' })).json();
-    const e2 = await (await chamar('empresas', 'POST', { nome: 'TESTE CODEX B' })).json();
-    const espaco = await (await chamar('espacos', 'POST', { nome: 'Pódio', tipo: 'podio' })).json();
+    const e1 = await jsonDe(chamar('empresas', 'POST', { nome: 'TESTE CODEX A' }));
+    const e2 = await jsonDe(chamar('empresas', 'POST', { nome: 'TESTE CODEX B' }));
+    const espaco = await jsonDe(chamar('espacos', 'POST', { nome: 'Pódio', tipo: 'podio' }));
     const base = { espaco_id: espaco.id, status: 'ativo', valor: 100, recorrencia: 'mensal', dia_vencimento: 5, data_inicio: '2026-01-01', data_fim: '2026-12-31' };
     expect((await chamar('contratos', 'POST', { ...base, empresa_id: e1.id, titulo: 'A' })).status).toBe(201);
     const conflito = await chamar('contratos', 'POST', { ...base, empresa_id: e2.id, titulo: 'B', data_inicio: '2026-06-01' });
     expect(conflito.status).toBe(409);
-    expect((await conflito.json()).error).toContain('TESTE CODEX A');
+    expect((await jsonDe(conflito)).error).toContain('TESTE CODEX A');
     expect((await chamar('contratos', 'POST', { ...base, empresa_id: e2.id, titulo: 'C', data_inicio: '2027-01-01', data_fim: null })).status).toBe(201);
     expect((await chamar('empresas', 'POST', { nome: 'X', injetado: 'DROP TABLE x' })).status).toBe(400);
   });
@@ -106,7 +108,7 @@ describe('admin web: patrocinadores', () => {
       { OPS_URL: OPS, KARTODROMO_ADMIN_DB: db }, new URL('https://admin.example.test/api/patro/arquivos'),
     );
     expect(enviado.status).toBe(201);
-    const { id } = await enviado.json();
+    const { id } = await jsonDe(enviado);
     const lido = await chamar(`arquivos/${id}`);
     expect(lido.headers.get('content-type')).toBe('application/pdf');
     expect(new Uint8Array(await lido.arrayBuffer())).toEqual(bytes);

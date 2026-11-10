@@ -23,10 +23,10 @@ public class FonteReg
     /// <summary>API REST padrão: GET base, POST base, PUT base/id, DELETE base/id.</summary>
     public static FonteReg Rest(Api api, string url) => new()
     {
-        Listar = () => api.Lista(url),
-        Incluir = b => api.Post(url, b),
-        Alterar = (r, b) => api.Put($"{url}/{r.S("id")}", b),
-        Excluir = r => api.Delete($"{url}/{r.S("id")}"),
+        Listar = () => api.ListaAsync(url),
+        Incluir = b => api.PostAsync(url, b),
+        Alterar = (r, b) => api.PutAsync($"{url}/{r.S("id")}", b),
+        Excluir = r => api.DeleteAsync($"{url}/{r.S("id")}"),
     };
 }
 
@@ -120,10 +120,10 @@ public class RegistroDesign : CartaoModal
         _acoes.Location = new Point(nav.Right + 8, 13); _acoes.Size = new Size(700, 34);
         Acao("+ Novo", Forma.Verde, Tokens.Primitivo.Branco, true, Novo);
         Acao("Editar", BotaoCinza, PecasDesign.CorTexto, false, Editar);
-        Acao("Excluir", BotaoCinza, Vermelho, false, Excluir);
+        Acao("Excluir", BotaoCinza, Vermelho, false, () => Seguro.Rodar(this, ExcluirAsync));
         Acao("Cancelar", BotaoCinza, PecasDesign.CorTexto, false, Cancelar);
         Acao("Imprimir", BotaoCinza, PecasDesign.CorTexto, false, Imprimir);
-        Acao("Importar", BotaoCinza, PecasDesign.CorTexto, false, Importar);
+        Acao("Importar", BotaoCinza, PecasDesign.CorTexto, false, () => Seguro.Rodar(this, ImportarAsync));
         Acao("Exportar", BotaoCinza, PecasDesign.CorTexto, false, Exportar);
         foreach (var (texto, acao) in extras) Acao(texto, BotaoCinza, PecasDesign.CorTexto, false, () => { if (_atual != null) acao(_atual); });
         var gravar = Botao("Gravar e fechar", Forma.Verde, Tokens.Primitivo.Branco, true); gravar.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo, FontStyle.Bold);
@@ -131,7 +131,7 @@ public class RegistroDesign : CartaoModal
         var fecharRod = Botao("Fechar", BotaoCinza, PecasDesign.CorTexto); fecharRod.Font = Tokens.Fonte(Tokens.Claro.FonteTamanhoCorpo);
         fecharRod.Size = new Size(TextRenderer.MeasureText("Fechar", fecharRod.Font).Width + 32, 34); fecharRod.Location = new Point(gravar.Left - 8 - fecharRod.Width, 12);
         foreach (var b in new[] { gravar, fecharRod }) { b.Resize += (_, _) => Forma.AplicarRaio(b, 9); Forma.AplicarRaio(b, 9); }
-        gravar.Click += (_, _) => Gravar(true);
+        gravar.Click += (_, _) => Seguro.Rodar(this, () => GravarAsync(true));
         fecharRod.Click += (_, _) => Close();
         _acoes.Width = fecharRod.Left - 8 - _acoes.Left;
         // com botões extras (ex.: "Permissões") a fileira não pode passar por baixo do "Fechar": aperta o espaço de cada botão
@@ -151,7 +151,7 @@ public class RegistroDesign : CartaoModal
         _faixa.Dock = DockStyle.Top; cab.SendToBack(); meio.BringToFront();
         KeyDown += (_, e) =>
         {
-            if (e.Control && e.KeyCode == Keys.S) { e.SuppressKeyPress = true; Gravar(false); }
+            if (e.Control && e.KeyCode == Keys.S) { e.SuppressKeyPress = true; Seguro.Rodar(this, () => GravarAsync(false)); }
             else if (e.Control && e.KeyCode == Keys.N) { e.SuppressKeyPress = true; Novo(); }
             else if (e.Control && e.KeyCode == Keys.F) { e.SuppressKeyPress = true; _busca.Focus(); }
         };
@@ -161,7 +161,7 @@ public class RegistroDesign : CartaoModal
             if (!_sujo || DialogResult == DialogResult.OK) return;
             var r = Perguntar("Gravar as alterações antes de fechar?", MessageBoxButtons.YesNoCancel);
             if (r == DialogResult.Cancel) e.Cancel = true;
-            else if (r == DialogResult.Yes) { e.Cancel = true; Gravar(true); }
+            else if (r == DialogResult.Yes) { e.Cancel = true; Seguro.Rodar(this, () => GravarAsync(true)); }
         };
     }
 
@@ -435,7 +435,9 @@ public class RegistroDesign : CartaoModal
         else { _sujo = false; Novo(); }
     }
 
-    async void Gravar(bool fechar)
+    void Gravar(bool fechar) => Seguro.Rodar(this, () => GravarAsync(fechar));
+
+    async Task GravarAsync(bool fechar)
     {
         var b = Ler(out var erro);
         if (b == null) { Msg.Aviso(this, erro); return; }
@@ -452,7 +454,9 @@ public class RegistroDesign : CartaoModal
         finally { UseWaitCursor = false; }
     }
 
-    async void Excluir()
+    void Excluir() => Seguro.Rodar(this, ExcluirAsync);
+
+    async Task ExcluirAsync()
     {
         if (_atual == null) { Msg.Aviso(this, "Selecione o registro que quer excluir."); return; }
         if (!Msg.Pergunta(this, "Excluir definitivamente o registro selecionado?")) return;
@@ -512,7 +516,9 @@ public class RegistroDesign : CartaoModal
         Msg.Info(this, $"{_lista.Linhas.Count} registro(s) exportado(s) para {Path.GetFileName(d.FileName)}.");
     }
 
-    async void Importar()
+    void Importar() => Seguro.Rodar(this, ImportarAsync);
+
+    async Task ImportarAsync()
     {
         using var d = new OpenFileDialog { Filter = "Planilha (*.csv)|*.csv|Todos os arquivos|*.*", Title = "Importar " + Nome + "s (mesmas colunas do Exportar)" };
         if (d.ShowDialog(this) != DialogResult.OK) return;

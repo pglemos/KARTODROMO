@@ -96,7 +96,7 @@
     } else {
       conteudo = `<section class="cartao"><h2>Tempo das paradas</h2><div class="corpo">${EV.tempoParadas(a, r)}</div></section><section class="cartao"><h2>Stint médio</h2><div class="corpo">${EV.stintMedio(a, r)}</div></section>`;
     }
-    raiz.innerHTML = `<header class="eq"><img src="/kib-logo.png" alt=""><span style="display: flex; flex-direction: column; gap: 2px"><span>${esc(d.evento.nome)}</span><h1>${esc(d.equipe.nome)}</h1></span><span class="placa">#${esc(meu)}</span></header>
+    raiz.innerHTML = `<header class="eq"><img src="/kib-logo.png" alt="Kartódromo Internacional de Betim" width="44" height="44"><span style="display: flex; flex-direction: column; gap: 2px"><span>${esc(d.evento.nome)}</span><h1>${esc(d.equipe.nome)}</h1></span><span class="placa">#${esc(meu)}</span></header>
       ${d.erroCrono ? `<p class="ev-al ev-al-aviso">${esc(d.erroCrono)}</p>` : ''}
       ${EV.cabecalhoProva(a, r)}
       <nav class="abas">${[['equipe', 'Minha equipe'], ['estrategia', 'Estratégia'], ['classificacao', 'Classificação'], ['estatisticas', 'Estatísticas']].map(([v, t]) => `<button data-aba="${v}" class="${aba === v ? 'sel' : ''}">${t}</button>`).join('')}</nav>

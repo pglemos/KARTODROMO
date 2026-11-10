@@ -288,6 +288,7 @@ sealed class PainelLed : IDisposable
             if (corridaEmAndamento)
             {
                 // Corrida em andamento com bandeira verde: desativa modo grid, limpa classificação salva
+                if (EmModoGrid && (Ativo || EscritorSerial != null)) DefinirPagina(0);
                 _sessaoClassificacao = null;
                 EmModoGrid = false;
                 sessaoExibir = sessaoFoco;
@@ -333,25 +334,28 @@ sealed class PainelLed : IDisposable
             SessaoExibidaId = id;
             SessaoExibidaNome = nome;
 
-            // Total de pilotos e páginas
+            // Total de pilotos e páginas: conta todos os pilotos válidos na sessão
             var rawStandings = (sessaoExibir["standings"] as JsonArray ?? []).OfType<JsonObject>();
-            var corrida = sessaoExibir.S("type") == "corrida";
-            TotalPilotos = corrida
-                ? rawStandings.Count(r => r.I("position") > 0 && (r["lastLapMs"] is not null || r.I("laps") > 0 || r["lastCrossingWallMs"] is not null))
-                : rawStandings.Count(r => r.I("position") > 0);
+            TotalPilotos = rawStandings.Count(r => r.I("position") > 0);
+            if (TotalPilotos == 0 && sessaoExibir["competitors"] is JsonArray comps)
+                TotalPilotos = comps.Count;
             TotalPaginas = Math.Max(1, (int)Math.Ceiling(TotalPilotos / (double)Linhas));
 
-            // Auto-avanço de páginas a cada N segundos se ativado
-            if (AutoAvanco && TotalPaginas > 1 && DateTime.Now - _ultimoAvanco >= TimeSpan.FromSeconds(IntervaloAutoAvancoSegundos))
+            // Host ativo com serial: gerencia auto-avanço e avanço por passagem de kart
+            var hostComHardware = Ativo || EscritorSerial != null;
+
+            // Auto-avanço de páginas a cada N segundos se ativado (apenas no host ativo)
+            if (hostComHardware && AutoAvanco && TotalPaginas > 1 && DateTime.Now - _ultimoAvanco >= TimeSpan.FromSeconds(IntervaloAutoAvancoSegundos))
             {
                 DefinirPagina((Pagina + 1) % TotalPaginas);
                 _ultimoAvanco = DateTime.Now;
             }
 
-            if (Pagina >= TotalPaginas) DefinirPagina(Math.Max(0, TotalPaginas - 1));
+            // Clamping só reduz a página localmente se exceder o total (sem disparar eco remoto)
+            if (Pagina >= TotalPaginas) DefinirPaginaInterno(Math.Max(0, TotalPaginas - 1), false);
 
-            // kart que acabou de cruzar a linha: com o Auto marcado, o painel vai direto para a página dele
-            if (AutoAvanco && kartPassou is int kp)
+            // kart que acabou de cruzar a linha: com o Auto marcado, o painel vai direto para a página dele (apenas no host ativo)
+            if (hostComHardware && AutoAvanco && kartPassou is int kp)
             {
                 var linha = rawStandings.FirstOrDefault(r => r.S("kart") is { } k && int.TryParse(k, out var n) && n == kp);
                 var posicao = linha?.I("position") ?? 0;
@@ -364,10 +368,14 @@ sealed class PainelLed : IDisposable
                 }
             }
 
-            // Se mudou a sessão ou mudou a página selecionada, manda $I para limpar o painel físico de LED
-            var mudouSessao = id != _sessaoId;
-            if (mudouSessao) DefinirPagina(0);
+            // Atualiza _sessaoId e _paginaAnterior SEMPRE, antes de qualquer saída antecipada.
+            // Só reinicia na página 0 se a sessão REALMENTE mudou (de uma sessão anterior para outra) E for o host com hardware.
+            var mudouSessao = _sessaoId != null && id != _sessaoId;
+            _sessaoId = id;
+            if (mudouSessao && hostComHardware) DefinirPagina(0);
+
             var mudouPagina = Pagina != _paginaAnterior;
+            _paginaAnterior = Pagina;
 
             if (!Ativo && EscritorSerial == null) { Situacao = "desligado"; Ok = false; return; }
             if (DateTime.Now < _proximaTentativa) return;
@@ -376,8 +384,6 @@ sealed class PainelLed : IDisposable
             if (mudouSessao || mudouPagina)
             {
                 limparAntes = true;
-                _sessaoId = id;
-                _paginaAnterior = Pagina;
                 _enviadas = new string[Linhas]; // painel limpo: tudo precisa ir de novo
             }
             if (_reenviarTudo) { _reenviarTudo = false; _enviadas = new string[Linhas]; }
@@ -447,7 +453,7 @@ sealed class PainelLed : IDisposable
     /// Público para teste.</summary>
     public static (List<string> posicoes, string rodape) MontarQuadro(JsonObject sessao, int pagina, int linhas, DateTime agora)
     {
-        var posicoes = new List<string>();
+        List<string> posicoes = [];
         if (sessao == null) return (posicoes, "");
         Montar(sessao, pagina, linhas, agora, out _, posicoes, out var rodape);
         return (posicoes, rodape);

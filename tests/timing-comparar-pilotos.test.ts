@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { compararHistorico } from '../lib/timing/equalizacao';
-import type { Session } from '../lib/timing/types';
+import type { Session } from '../lib/timing/race-engine';
 
 describe('Comparação histórica de karts por melhor volta de cada piloto', () => {
   it('seleciona a melhor volta de cada piloto diferente em vez de repetir o mesmo piloto 5 vezes', () => {
@@ -20,6 +20,7 @@ describe('Comparação histórica de karts por melhor volta de cada piloto', () 
           kart: '55',
           name: 'Piloto Rapido',
           customerId: 'cust-piloto-1',
+          finished: true,
           crossings: [
             { id: 'p1-0', wallMs: now - 700000, decoderTimeMs: 0, lapMs: null, source: 'decoder' },
             { id: 'p1-1', wallMs: now - 650000, decoderTimeMs: 50000, lapMs: 50000, source: 'decoder' }, // melhor do piloto 1: 50.000
@@ -33,6 +34,7 @@ describe('Comparação histórica de karts por melhor volta de cada piloto', () 
           kart: '55',
           name: 'Piloto Dois',
           customerId: 'cust-piloto-2',
+          finished: true,
           crossings: [
             { id: 'p2-0', wallMs: now - 400000, decoderTimeMs: 0, lapMs: null, source: 'decoder' },
             { id: 'p2-1', wallMs: now - 350000, decoderTimeMs: 50500, lapMs: 50500, source: 'decoder' }, // melhor do piloto 2: 50.500
@@ -43,6 +45,7 @@ describe('Comparação histórica de karts por melhor volta de cada piloto', () 
           kart: '55',
           name: 'Piloto Tres',
           customerId: 'cust-piloto-3',
+          finished: true,
           crossings: [
             { id: 'p3-0', wallMs: now - 250000, decoderTimeMs: 0, lapMs: null, source: 'decoder' },
             { id: 'p3-1', wallMs: now - 200000, decoderTimeMs: 51200, lapMs: 51200, source: 'decoder' }, // melhor do piloto 3: 51.200
@@ -52,6 +55,7 @@ describe('Comparação histórica de karts por melhor volta de cada piloto', () 
           kart: '25',
           name: 'Referencia',
           customerId: 'cust-ref',
+          finished: true,
           crossings: [
             { id: 'ref-0', wallMs: now - 150000, decoderTimeMs: 0, lapMs: null, source: 'decoder' },
             { id: 'ref-1', wallMs: now - 100000, decoderTimeMs: 49000, lapMs: 49000, source: 'decoder' },

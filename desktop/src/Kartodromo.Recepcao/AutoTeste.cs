@@ -64,17 +64,17 @@ public static class AutoTeste
         var eventos = new List<string>();
         try
         {
-            var acesso = await Sessao.Api.Post("/api/login", new { login, senha, termos = true });
+            var acesso = await Sessao.Api.PostAsync("/api/login", new { login, senha, termos = true });
             Sessao.Api.Token = acesso.S("token");
             Sessao.Usuario = acesso["usuario"]!.AsObject();
-            await Sessao.CarregarApoio();
+            await Sessao.CarregarApoioAsync();
             Msg.Registro = m => eventos.Add(m);
             Application.ThreadException += (_, e) => eventos.Add("EXCECAO: " + e.Exception.GetType().Name + ": " + e.Exception.Message);
             var principal = new FormPrincipal { WindowState = FormWindowState.Normal, ClientSize = new Size(1920, 1009), StartPosition = FormStartPosition.Manual, Location = new Point(-4000, 0), ShowInTaskbar = false, ConfirmarSaida = false };
             principal.Show();
             await Esperar(1800);
             var titulo = typeof(FormPrincipal).GetField("_titulo", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(principal) as Control;
-            string[] proibidos = ["sair", "fechar", "excluir", "aprovar pré", "abrir bateria", "marcar", "estornar", "registrar pagamento", "desativar", "reativar", "ajustar pontos", "exportar", "termo", "imprimir ticket", "imprimir comprovante"];
+            string[] proibidos = ["sair", "fechar", "excluir", "aprovar pré", "abrir bateria", "mostrar no totem", "ocultar no totem", "marcar", "estornar", "registrar pagamento", "desativar", "reativar", "ajustar pontos", "exportar", "termo", "imprimir ticket", "imprimir comprovante"];
             var n = 0;
 
             async Task Clicar(string onde, Action acao)
@@ -194,10 +194,10 @@ public static class AutoTeste
         Directory.CreateDirectory(pasta);
         Log.Clear();
 
-        var acesso = await Sessao.Api.Post("/api/login", new { login, senha, termos = true });
+        var acesso = await Sessao.Api.PostAsync("/api/login", new { login, senha, termos = true });
         Sessao.Api.Token = acesso.S("token");
         Sessao.Usuario = acesso["usuario"]!.AsObject();
-        await Sessao.CarregarApoio();
+        await Sessao.CarregarApoioAsync();
         Msg.Registro = m => Log.Add(m);
 
         using (var telaLogin = new FormLogin { WindowState = FormWindowState.Normal, ClientSize = new Size(1440, 900), StartPosition = FormStartPosition.Manual, Location = new Point(ForaDaTela ? -4000 : 0, 0), ShowInTaskbar = !ForaDaTela })
@@ -257,12 +257,12 @@ public static class AutoTeste
             await CliqueNoMenu(principal, "reservas:todas");
         }
 
-        var caixa = (await Sessao.Api.Get("/api/office/caixa")).AsObject();
+        var caixa = (await Sessao.Api.GetAsync("/api/office/caixa")).AsObject();
         var aberto = caixa["aberto"] as JsonObject;
         var sumario = caixa["sumario"] as JsonObject;
-        var baterias = await Sessao.Api.Lista($"/api/office/baterias?status=todas&filtro=dia&data={Fmt.Iso(DateTime.Today)}");
-        var reservasApi = await Sessao.Api.Lista("/api/office/reservas?status=todas&filtro=todas");
-        var vendasApi = await Sessao.Api.Lista("/api/office/vendas?status=todas&filtro=todas");
+        var baterias = await Sessao.Api.ListaAsync($"/api/office/baterias?status=todas&filtro=dia&data={Fmt.Iso(DateTime.Today)}");
+        var reservasApi = await Sessao.Api.ListaAsync("/api/office/reservas?status=todas&filtro=todas");
+        var vendasApi = await Sessao.Api.ListaAsync("/api/office/vendas?status=todas&filtro=todas");
         var reservas = reservasApi.Where(r => r.S("cliente").StartsWith("TESTE CODEX", StringComparison.OrdinalIgnoreCase)).ToList();
         var vendas = vendasApi.Where(r => r.S("cliente").StartsWith("TESTE CODEX", StringComparison.OrdinalIgnoreCase)).ToList();
         if (reservaIdTeste > 0) reservas = reservas.Where(r => r.L("id") == reservaIdTeste).ToList();
@@ -270,11 +270,11 @@ public static class AutoTeste
         if (ForaDaTela && vendas.Count == 0) vendas = vendasApi.Where(v => !v.B("cancelada")).Take(1).ToList(); // só abre para ver, nada é gravado
         if (ForaDaTela && reservas.Count == 0) // idem: Editar reserva e Mover cliente só abrem e fecham
         {
-            var hoje = await Sessao.Api.Lista($"/api/office/reservas?status=todas&filtro=dia&data={Fmt.Iso(DateTime.Today)}");
+            var hoje = await Sessao.Api.ListaAsync($"/api/office/reservas?status=todas&filtro=dia&data={Fmt.Iso(DateTime.Today)}");
             reservas = (hoje.Count > 0 ? hoje : reservasApi).Where(r => r.S("status") != "cancelada").OrderBy(r => r.B("pago")).Take(1).ToList();
         }
         if (ForaDaTela && movimentoIdTeste == 0) // relatório de fechamento do último caixa (só leitura)
-            movimentoIdTeste = (await Sessao.Api.Lista("/api/office/movimentos")).OrderByDescending(m => m.S("abertoEm")).FirstOrDefault()?.L("id") ?? 0;
+            movimentoIdTeste = (await Sessao.Api.ListaAsync("/api/office/movimentos")).OrderByDescending(m => m.S("abertoEm")).FirstOrDefault()?.L("id") ?? 0;
         var bateriaId = reservas.FirstOrDefault()?.L("bateriaId");
         var bateria = baterias.FirstOrDefault(b => b.L("id") == bateriaId) ?? baterias.OrderByDescending(b => b.I("inscritos")).FirstOrDefault();
 
@@ -533,12 +533,12 @@ public static class AutoTeste
     {
         Directory.CreateDirectory(pasta);
         Log.Clear();
-        var acesso = await Sessao.Api.Post("/api/login", new { login, senha, termos = true });
+        var acesso = await Sessao.Api.PostAsync("/api/login", new { login, senha, termos = true });
         Sessao.Api.Token = acesso.S("token");
         Sessao.Usuario = acesso["usuario"]!.AsObject();
-        await Sessao.CarregarApoio();
+        await Sessao.CarregarApoioAsync();
         Msg.Registro = m => Log.Add(m);
-        var baterias = await Sessao.Api.Lista($"/api/office/baterias?status=todas&filtro=dia&data={Fmt.Iso(DateTime.Today)}");
+        var baterias = await Sessao.Api.ListaAsync($"/api/office/baterias?status=todas&filtro=dia&data={Fmt.Iso(DateTime.Today)}");
         var b = baterias.OrderByDescending(x => x.I("inscritos")).FirstOrDefault();
         if (b == null) { Log.Add("pendente: sem bateria hoje"); File.WriteAllLines(Path.Combine(pasta, "log.txt"), Log); return; }
         Log.Add("bateria: " + b.ToJsonString());
@@ -568,7 +568,7 @@ public static class AutoTeste
             Log.Add("OK " + nome);
         }
         await Foto(new FormIncluirCliente(b), "incluir-cliente");
-        var reservas = await Sessao.Api.Lista($"/api/office/reservas?status=todas&filtro=dia&data={Fmt.Iso(DateTime.Today)}");
+        var reservas = await Sessao.Api.ListaAsync($"/api/office/reservas?status=todas&filtro=dia&data={Fmt.Iso(DateTime.Today)}");
         var r = reservas.FirstOrDefault(x => !x.B("pago")) ?? reservas.FirstOrDefault();
         if (r != null) { await Foto(new FormEditarReserva(r), "editar-reserva"); await Foto(new FormMoverCliente(r), "mover-cliente"); }
         else Log.Add("pendente: sem reserva hoje");
@@ -580,10 +580,10 @@ public static class AutoTeste
     {
         Directory.CreateDirectory(pasta);
         Log.Clear();
-        var acesso = await Sessao.Api.Post("/api/login", new { login, senha, termos = true });
+        var acesso = await Sessao.Api.PostAsync("/api/login", new { login, senha, termos = true });
         Sessao.Api.Token = acesso.S("token");
         Sessao.Usuario = acesso["usuario"]!.AsObject();
-        await Sessao.CarregarApoio();
+        await Sessao.CarregarApoioAsync();
         Msg.Registro = m => Log.Add(m);
         var antes = GetForegroundWindow();
         var principal = new FormPrincipal { WindowState = FormWindowState.Normal, StartPosition = FormStartPosition.Manual, Location = new Point(-4000, 0), ClientSize = new Size(1440, 860), ConfirmarSaida = false, ShowInTaskbar = false };
@@ -630,7 +630,7 @@ public static class AutoTeste
     {
         Directory.CreateDirectory(pasta);
         Log.Clear();
-        var acesso = await Sessao.Api.Post("/api/login", new { login, senha, termos = true });
+        var acesso = await Sessao.Api.PostAsync("/api/login", new { login, senha, termos = true });
         Sessao.Api.Token = acesso.S("token");
         Sessao.Usuario = acesso["usuario"]!.AsObject();
         var focoAntes = GetForegroundWindow();
@@ -830,10 +830,10 @@ public static class AutoTeste
         Log.Clear();
         try
         {
-            var acesso = await Sessao.Api.Post("/api/login", new { login, senha, termos = true });
+            var acesso = await Sessao.Api.PostAsync("/api/login", new { login, senha, termos = true });
             Sessao.Api.Token = acesso.S("token");
             Sessao.Usuario = acesso["usuario"]!.AsObject();
-            await Sessao.CarregarApoio();
+            await Sessao.CarregarApoioAsync();
             Msg.Registro = m => Log.Add(m);
             Msg.Responder = t => gravar && t.StartsWith("Gerar as baterias", StringComparison.Ordinal);
             Application.ThreadException += (_, e) => Log.Add("EXCECAO: " + e.Exception.GetType().Name + ": " + e.Exception.Message);

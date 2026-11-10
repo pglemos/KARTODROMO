@@ -50,6 +50,15 @@ vi.mock('@/lib/tb50-page-store', () => ({
   readTb50PageFromRemote: vi.fn(async () => ({ offset: 0, updatedAt: null, persistent: true })),
 }));
 
+type TelaoResponse = {
+  css?: string;
+  content?: string;
+  header?: string;
+  finalRedirect?: boolean;
+  contentUsable?: boolean;
+  page?: unknown;
+};
+
 describe('/placar-telao-tb50 layout selection', () => {
   beforeEach(() => {
     vi.useRealTimers();
@@ -65,7 +74,7 @@ describe('/placar-telao-tb50 layout selection', () => {
 
   it('uses the saved designer layout when no layout is requested', async () => {
     const response = await GET(new NextRequest('http://localhost/placar-telao-tb50?demo=true&_format=json'));
-    const data = await response.json();
+    const data = (await response.json()) as TelaoResponse;
 
     expect(data.css).toContain('grid-template-columns:repeat(2,minmax(0,1fr))');
     expect(data.css).toContain('background:#123456');
@@ -77,7 +86,7 @@ describe('/placar-telao-tb50 layout selection', () => {
 
   it('treats the legacy standard layout parameter as the saved designer layout', async () => {
     const response = await GET(new NextRequest('http://localhost/placar-telao-tb50?demo=true&_format=json&layout=standard-30'));
-    const data = await response.json();
+    const data = (await response.json()) as TelaoResponse;
 
     expect(data.css).toContain('grid-template-columns:repeat(2,minmax(0,1fr))');
     expect(data.css).toContain('background:#123456');
@@ -99,7 +108,7 @@ describe('/placar-telao-tb50 layout selection', () => {
     });
 
     const response = await GET(new NextRequest('http://localhost/placar-telao-tb50?_format=json'));
-    const data = await response.json();
+    const data = (await response.json()) as TelaoResponse;
 
     expect(data.header).toBe('');
     expect(data.content).not.toContain('final-race-stage');
@@ -123,7 +132,7 @@ describe('/placar-telao-tb50 layout selection', () => {
     });
 
     const response = await GET(new NextRequest('http://localhost/placar-telao-tb50?_format=json'));
-    const data = await response.json();
+    const data = (await response.json()) as TelaoResponse;
 
     expect(data.finalRedirect).toBe(true);
     expect(data.header).toBe('');
@@ -158,7 +167,7 @@ describe('/placar-telao-tb50 layout selection', () => {
     });
 
     const response = await GET(new NextRequest('http://localhost/placar-telao-tb50?final=live&_format=json'));
-    const data = await response.json();
+    const data = (await response.json()) as TelaoResponse;
 
     expect(data.finalRedirect).toBe(false);
     expect(data.content).toContain('class="cards"');
@@ -195,7 +204,7 @@ describe('/placar-telao-tb50 layout selection', () => {
     await GET(new NextRequest('http://localhost/placar-telao-tb50?_format=json'));
     vi.setSystemTime(new Date('2026-05-09T12:00:08.000Z'));
     const response = await GET(new NextRequest('http://localhost/placar-telao-tb50?_format=json'));
-    const data = await response.json();
+    const data = (await response.json()) as TelaoResponse;
 
     expect(data.finalRedirect).toBe(true);
     expect(data.content).toContain('final-race-frame-stage');
@@ -215,7 +224,7 @@ describe('/placar-telao-tb50 layout selection', () => {
     });
 
     const response = await GET(new NextRequest('http://localhost/placar-telao-tb50?_format=json'));
-    const data = await response.json();
+    const data = (await response.json()) as TelaoResponse;
 
     expect(data.finalRedirect).toBe(false);
     expect(data.contentUsable).toBe(false);
@@ -258,7 +267,7 @@ describe('/placar-telao-tb50 layout selection', () => {
     await GET(new NextRequest('http://localhost/placar-telao-tb50?_format=json'));
     vi.setSystemTime(new Date('2026-05-12T12:00:09.000Z'));
     const response = await GET(new NextRequest('http://localhost/placar-telao-tb50?_format=json'));
-    const data = await response.json();
+    const data = (await response.json()) as TelaoResponse;
 
     expect(data.finalRedirect).toBe(false);
     expect(data.contentUsable).toBe(true);
@@ -285,7 +294,7 @@ describe('/placar-telao-tb50 layout selection', () => {
     });
 
     const response = await GET(new NextRequest('http://localhost/placar-telao-tb50?_format=json'));
-    const data = await response.json();
+    const data = (await response.json()) as TelaoResponse;
 
     expect(data.finalRedirect).toBe(false);
     expect(data.content).not.toContain('final-race-frame-stage');
@@ -306,7 +315,7 @@ describe('/placar-telao-tb50 layout selection', () => {
     });
 
     const response = await GET(new NextRequest('http://localhost/placar-telao-tb50?_format=json'));
-    const data = await response.json();
+    const data = (await response.json()) as TelaoResponse;
 
     expect(data.page).toMatchObject({ offset: 10, start: 11, end: 12 });
     expect(data.content).toContain('211');
@@ -329,7 +338,7 @@ describe('/placar-telao-tb50 layout selection', () => {
     });
 
     const response = await GET(new NextRequest('http://localhost/placar-telao-tb50?_format=json'));
-    const data = await response.json();
+    const data = (await response.json()) as TelaoResponse;
 
     expect(data.page).toMatchObject({ offset: 0, start: 1, end: 2 });
     expect(data.content).toContain('16');
@@ -339,7 +348,7 @@ describe('/placar-telao-tb50 layout selection', () => {
 
   it('supports final preview mode with demo results', async () => {
     const response = await GET(new NextRequest('http://localhost/placar-telao-tb50?_format=json&final=true'));
-    const data = await response.json();
+    const data = (await response.json()) as TelaoResponse;
 
     expect(data.header).toBe('');
     expect(data.finalRedirect).toBe(true);
@@ -367,7 +376,7 @@ describe('/placar-telao-tb50 layout selection', () => {
     });
 
     const response = await GET(new NextRequest('http://localhost/placar-telao-tb50?_format=json&final=real'));
-    const data = await response.json();
+    const data = (await response.json()) as TelaoResponse;
 
     expect(data.header).toBe('');
     expect(data.finalRedirect).toBe(true);
@@ -410,7 +419,7 @@ describe('/placar-telao-tb50 layout selection', () => {
     });
 
     const response = await GET(new NextRequest('http://localhost/placar-telao-tb50?_format=json&final=real'));
-    const data = await response.json();
+    const data = (await response.json()) as TelaoResponse;
 
     expect(data.finalRedirect).toBe(false);
     expect(data.content).toContain('class="cards"');
@@ -430,7 +439,7 @@ describe('/placar-telao-tb50 layout selection', () => {
     });
 
     const response = await GET(new NextRequest('http://localhost/placar-telao-tb50?_format=json'));
-    const data = await response.json();
+    const data = (await response.json()) as TelaoResponse;
 
     expect(data.header).toBe('');
     expect(data.finalRedirect).toBe(true);
@@ -457,7 +466,7 @@ describe('/placar-telao-tb50 layout selection', () => {
     });
 
     const response = await GET(new NextRequest('http://localhost/placar-telao-tb50?_format=json'));
-    const data = await response.json();
+    const data = (await response.json()) as TelaoResponse;
 
     expect(data.finalRedirect).toBe(false);
     expect(data.content).toContain('class="cards"');
@@ -490,7 +499,7 @@ describe('/placar-telao-tb50 layout selection', () => {
     await GET(new NextRequest('http://localhost/placar-telao-tb50?_format=json'));
     vi.setSystemTime(new Date('2026-05-09T12:00:09.000Z'));
     const response = await GET(new NextRequest('http://localhost/placar-telao-tb50?_format=json'));
-    const data = await response.json();
+    const data = (await response.json()) as TelaoResponse;
 
     expect(data.content).toContain('201');
     expect(data.content).toContain('202');
@@ -527,7 +536,7 @@ describe('/placar-telao-tb50 layout selection', () => {
     await GET(new NextRequest('http://localhost/placar-telao-tb50?_format=json'));
     vi.setSystemTime(new Date('2026-05-09T12:00:08.000Z'));
     const response = await GET(new NextRequest('http://localhost/placar-telao-tb50?_format=json'));
-    const data = await response.json();
+    const data = (await response.json()) as TelaoResponse;
 
     expect(data.finalRedirect).toBe(false);
     expect(data.content).toContain('201');
@@ -560,7 +569,7 @@ describe('/placar-telao-tb50 layout selection', () => {
     await GET(new NextRequest('http://localhost/placar-telao-tb50?_format=json'));
     vi.setSystemTime(new Date('2026-05-09T12:00:11.000Z'));
     const response = await GET(new NextRequest('http://localhost/placar-telao-tb50?_format=json'));
-    const data = await response.json();
+    const data = (await response.json()) as TelaoResponse;
 
     expect(data.content).not.toContain('201');
     expect(data.content).not.toContain('202');

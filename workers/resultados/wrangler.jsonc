@@ -1,0 +1,28 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "kartodromo-resultados",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "observability": { "enabled": true },
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "MOBILE_DB",
+      "database_name": "kartodromo-mobile",
+      "database_id": "922619d4-519b-4047-aaca-3b86c7b707c4"
+    }
+  ],
+  "routes": [
+    { "pattern": "resultados.kartodromodebetim.com.br", "custom_domain": true }
+  ],
+  "vars": {
+    "CRONO_URL": "https://crono.kartodromodebetim.com.br",
+    "OPS_URL": "https://ops.kartodromodebetim.com.br"
+  }
+}

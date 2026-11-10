@@ -75,16 +75,16 @@ public partial class FormCrono
         situacao.Linhas([]);
         var info = d.TextoRodape("");
 
-        async Task Carregar()
+        async Task CarregarAsync(CancellationToken ct = default)
         {
-            var e = (await Crono.Api.Get($"/api/sessions/{id}/emails")) as JsonObject;
+            var e = (await Crono.Api.GetAsync($"/api/sessions/{id}/emails", ct)) as JsonObject;
             if (d.IsDisposed) return;
             if (e == null)
             {
                 situacao.Vazio = encerrada ? "Nenhum envio registrado para esta prova (o envio automático começou a valer agora)." : "A prova ainda não foi finalizada: o resultado vai sozinho ao finalizar.";
                 situacao.Linhas([]); info.Text = ""; return;
             }
-            var linhas = new List<string[]>();
+            List<string[]> linhas = [];
             var rotuloAceite = e.S("aceite") switch
             {
                 "aceito-pelo-relay" => "Aceito pelo relay",
@@ -115,31 +115,31 @@ public partial class FormCrono
         {
             if (!encerrada) { Msg.Aviso(d, "Finalize a prova antes de enviar o resultado."); return; }
             if (!Msg.Pergunta(d, $"Mandar o resultado de novo para todos os pilotos de {nomeBateria} que têm e-mail?")) return;
-            var antes = ((await Crono.Api.Get($"/api/sessions/{id}/emails")) as JsonObject)?.L("atualizadoEm") ?? 0;
-            await Crono.Api.Post($"/api/sessions/{id}/emails", new { });
+            var antes = ((await Crono.Api.GetAsync($"/api/sessions/{id}/emails")) as JsonObject)?.L("atualizadoEm") ?? 0;
+            await Crono.Api.PostAsync($"/api/sessions/{id}/emails", new { });
             info.Text = "Enviando… (um e-mail com PDF por piloto)";
             for (var i = 0; i < 90 && !d.IsDisposed; i++)
             {
                 await Task.Delay(2000);
-                var e = (await Crono.Api.Get($"/api/sessions/{id}/emails")) as JsonObject;
+                var e = (await Crono.Api.GetAsync($"/api/sessions/{id}/emails")) as JsonObject;
                 if ((e?.L("atualizadoEm") ?? 0) > antes) break;
             }
-            await Carregar();
+            await CarregarAsync();
         }));
         if (kartSel != null)
             d.BotaoRodape($"Só o kart {kartSel}", false, () => Seguro.Rodar(d, async () =>
             {
                 if (!encerrada) { Msg.Aviso(d, "Finalize a prova antes de enviar o resultado."); return; }
-                var r = (await Crono.Api.Post($"/api/sessions/{id}/emails", new { kart = kartSel }))?.AsObject();
+                var r = (await Crono.Api.PostAsync($"/api/sessions/{id}/emails", new { kart = kartSel }))?.AsObject();
                 Msg.Info(d, r?.S("mensagemEntrega") ?? $"O servidor aceitou o resultado para {pilotoSel} (kart {kartSel}); a chegada na caixa não foi confirmada.");
-                await Carregar();
+                await CarregarAsync();
             }));
         d.BotaoRodape("Para outro e-mail…", false, () => Seguro.Rodar(d, async () =>
         {
             if (!encerrada) { Msg.Aviso(d, "Finalize a prova antes de enviar o resultado."); return; }
             var para = Prompt.Pedir(d, "Mandar o resultado oficial desta prova para qual e-mail?", "", "Enviar resultado");
             if (string.IsNullOrWhiteSpace(para)) return;
-            var r = (await Crono.Api.Post($"/api/sessions/{id}/emails", new { para = para.Trim() }))?.AsObject();
+            var r = (await Crono.Api.PostAsync($"/api/sessions/{id}/emails", new { para = para.Trim() }))?.AsObject();
             Msg.Info(d, r?.S("mensagemEntrega") ?? $"O servidor aceitou o resultado para {para.Trim()}; a chegada na caixa não foi confirmada.");
         }));
         // Tabajara: um e-mail só com o resultado oficial e o volta a volta de todos os pilotos (num PDF), para o organizador divulgar
@@ -149,12 +149,12 @@ public partial class FormCrono
             var para = Prompt.Pedir(d, "E-mail do organizador (recebe o resultado oficial e o volta a volta de todos os pilotos, para divulgar):", "", "Enviar ao organizador");
             if (string.IsNullOrWhiteSpace(para)) return;
             info.Text = "Enviando ao organizador… (gerando o volta a volta de todos)";
-            var r = (await Crono.Api.Post($"/api/sessions/{id}/emails", new { para = para.Trim(), organizador = true }))?.AsObject();
+            var r = (await Crono.Api.PostAsync($"/api/sessions/{id}/emails", new { para = para.Trim(), organizador = true }))?.AsObject();
             info.Text = "";
             Msg.Info(d, $"Resultado oficial e volta a volta de todos os pilotos enviados para {para.Trim()}." + (r?.S("mensagemEntrega") is { Length: > 0 } m ? $"\n\n{m}" : ""));
         }));
         d.BotaoRodape("Configurar…", false, () => { d.Close(); ConfigurarEmail(); });
-        d.Load += (_, _) => Seguro.Rodar(d, Carregar);
+        d.Load += (_, _) => Seguro.Rodar(d, () => CarregarAsync());
         d.ShowDialog(this);
     }
 }

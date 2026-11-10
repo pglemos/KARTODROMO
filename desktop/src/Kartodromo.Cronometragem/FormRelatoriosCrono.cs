@@ -252,8 +252,8 @@ public sealed class FormRelatoriosCrono : Form
         for (var i = 0; i < 7; i++)
             tableTipos.RowStyles.Add(new RowStyle(SizeType.Absolute, 33f));
 
-        var radios = new[]
-        {
+        RadioButton[] radios =
+        [
             _rbOficiais,
             _rbSemVelocidade,
             _rbComTempoMedio,
@@ -267,7 +267,7 @@ public sealed class FormRelatoriosCrono : Form
             _rbGrid2Dir,
             _rbGrid3Esq,
             _rbGrid3Dir
-        };
+        ];
 
         var row = 0;
         var col = 0;
@@ -498,39 +498,39 @@ public sealed class FormRelatoriosCrono : Form
         return partes.Length > 0 ? partes[0] : nomeCompleto;
     }
 
-    string ObterSlugTipo()
+    string ObterSlugTipo() => true switch
     {
-        if (_rbSemVelocidade.Checked) return "sem_velocidade";
-        if (_rbComTempoMedio.Checked) return "com_tempo_medio";
-        if (_rbOrdemChegada.Checked) return "ordem_chegada";
-        if (_rbOrdemChegadaCat.Checked) return "ordem_chegada_categoria";
-        if (_rbPassagens.Checked) return "passagens";
-        if (_rbVoltaAVolta.Checked) return "volta_a_volta";
-        if (_rbMapaVoltas.Checked) return "mapa_voltas";
-        if (_rbMapaProva.Checked) return "mapa_prova";
-        if (_rbGrid2Esq.Checked) return "grid_2col_esq";
-        if (_rbGrid2Dir.Checked) return "grid_2col_dir";
-        if (_rbGrid3Esq.Checked) return "grid_3col_esq";
-        if (_rbGrid3Dir.Checked) return "grid_3col_dir";
-        return "resultados_oficiais";
-    }
+        _ when _rbSemVelocidade.Checked => "sem_velocidade",
+        _ when _rbComTempoMedio.Checked => "com_tempo_medio",
+        _ when _rbOrdemChegada.Checked => "ordem_chegada",
+        _ when _rbOrdemChegadaCat.Checked => "ordem_chegada_categoria",
+        _ when _rbPassagens.Checked => "passagens",
+        _ when _rbVoltaAVolta.Checked => "volta_a_volta",
+        _ when _rbMapaVoltas.Checked => "mapa_voltas",
+        _ when _rbMapaProva.Checked => "mapa_prova",
+        _ when _rbGrid2Esq.Checked => "grid_2col_esq",
+        _ when _rbGrid2Dir.Checked => "grid_2col_dir",
+        _ when _rbGrid3Esq.Checked => "grid_3col_esq",
+        _ when _rbGrid3Dir.Checked => "grid_3col_dir",
+        _ => "resultados_oficiais",
+    };
 
-    string ObterTituloRelatorio()
+    string ObterTituloRelatorio() => true switch
     {
-        if (_rbSemVelocidade.Checked) return "Resultados Oficiais (Sem Vel. Média)";
-        if (_rbComTempoMedio.Checked) return "Resultados Oficiais (Com Tempo Médio)";
-        if (_rbOrdemChegada.Checked) return "Resultados Oficiais (Ordem de Chegada)";
-        if (_rbOrdemChegadaCat.Checked) return "Resultados Oficiais (Ordem de Chegada por Categoria)";
-        if (_rbPassagens.Checked) return "Relatório de Passagens";
-        if (_rbVoltaAVolta.Checked) return "Relatório Volta a Volta";
-        if (_rbMapaVoltas.Checked) return "Mapa de Voltas";
-        if (_rbMapaProva.Checked) return "Mapa de Prova";
-        if (_rbGrid2Esq.Checked) return "Grid de Largada (2 Colunas - Esq)";
-        if (_rbGrid2Dir.Checked) return "Grid de Largada (2 Colunas - Dir)";
-        if (_rbGrid3Esq.Checked) return "Grid de Largada (3 Colunas - Esq)";
-        if (_rbGrid3Dir.Checked) return "Grid de Largada (3 Colunas - Dir)";
-        return "Resultados Oficiais";
-    }
+        _ when _rbSemVelocidade.Checked => "Resultados Oficiais (Sem Vel. Média)",
+        _ when _rbComTempoMedio.Checked => "Resultados Oficiais (Com Tempo Médio)",
+        _ when _rbOrdemChegada.Checked => "Resultados Oficiais (Ordem de Chegada)",
+        _ when _rbOrdemChegadaCat.Checked => "Resultados Oficiais (Ordem de Chegada por Categoria)",
+        _ when _rbPassagens.Checked => "Relatório de Passagens",
+        _ when _rbVoltaAVolta.Checked => "Relatório Volta a Volta",
+        _ when _rbMapaVoltas.Checked => "Mapa de Voltas",
+        _ when _rbMapaProva.Checked => "Mapa de Prova",
+        _ when _rbGrid2Esq.Checked => "Grid de Largada (2 Colunas - Esq)",
+        _ when _rbGrid2Dir.Checked => "Grid de Largada (2 Colunas - Dir)",
+        _ when _rbGrid3Esq.Checked => "Grid de Largada (3 Colunas - Esq)",
+        _ when _rbGrid3Dir.Checked => "Grid de Largada (3 Colunas - Dir)",
+        _ => "Resultados Oficiais",
+    };
 
     void GerarRelatorio()
     {

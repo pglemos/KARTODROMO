@@ -81,6 +81,42 @@ function LoginPrompt({ batteryId }: { batteryId: number | null }) {
   );
 }
 
+const MESES = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'] as const;
+
+function OrderItemCard({ order, palette }: { order: ReservationOrder; palette: ReturnType<typeof useUi>['palette'] }) {
+  const formattedDate = formatDateTime(order.inicio);
+  const monthNum = Number(formattedDate.slice(3, 5)) - 1;
+  const monthLabel = monthNum >= 0 && monthNum < 12 ? MESES[monthNum] : '';
+  const dayLabel = formattedDate.slice(0, 2);
+  const timeLabel = formattedDate.split(' · ')[1] ?? '';
+  const statusColor = corStatus(order.status);
+  const statusText = statusLabel(order.status);
+
+  return (
+    <Link href={{ pathname: '/reservations/[id]', params: { id: order.id } }} asChild>
+      <TouchableOpacity activeOpacity={0.75} accessibilityRole="link" accessibilityLabel={`${order.descricao ?? 'Reserva'}, ${formattedDate}, ${statusText}`}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, marginBottom: 10, borderRadius: 20, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border }}>
+        <View style={{ width: 58, borderRadius: 14, backgroundColor: palette.surfaceElevated, alignItems: 'center', paddingVertical: 8 }}>
+          <Text style={{ color: palette.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>{monthLabel}</Text>
+          <Text style={{ color: palette.text, fontSize: 24, fontWeight: '900', lineHeight: 28 }}>{dayLabel}</Text>
+          <Text style={{ color: palette.textMuted, fontSize: 12, fontVariant: ['tabular-nums'] }}>{timeLabel}</Text>
+        </View>
+        <View style={{ flex: 1, gap: 4 }}>
+          <Text numberOfLines={1} style={{ color: palette.text, fontSize: 16, fontWeight: '800' }}>{order.descricao ?? 'Reserva em processamento'}</Text>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            <Text style={{ color: palette.textMuted, fontSize: 13 }}>{order.codigo}</Text>
+            <Text style={{ color: palette.textMuted, fontSize: 13 }}>· {order.valorCentavos === null ? 'valor em confirmação' : formatBrl(order.valorCentavos)}</Text>
+          </View>
+          <View style={{ alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: statusColor + '26' }}>
+            <Text style={{ color: statusColor, fontSize: 12, fontWeight: '800' }}>{statusText}</Text>
+          </View>
+        </View>
+        <Icon name="chevron" color={palette.muted} size={18} />
+      </TouchableOpacity>
+    </Link>
+  );
+}
+
 function ReservationList({ orders, loading, error, retry }: {
   orders: ReservationOrder[] | null;
   loading: boolean;
@@ -89,6 +125,12 @@ function ReservationList({ orders, loading, error, retry }: {
 }) {
   const { palette, styles } = useUi();
   const bottomClearance = useFloatingTabBarClearance();
+
+  const renderOrderItem = useCallback(
+    ({ item: order }: { item: ReservationOrder }) => <OrderItemCard order={order} palette={palette} />,
+    [palette],
+  );
+
   return <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
     <FlatList data={orders ?? []} keyExtractor={(order) => order.id} contentContainerStyle={[styles.content, { paddingBottom: bottomClearance }]} refreshing={loading} onRefresh={retry}
       ListHeaderComponent={<>
@@ -102,25 +144,7 @@ function ReservationList({ orders, loading, error, retry }: {
           <Link href="/(tabs)/agenda" asChild><Pressable accessibilityRole="button" style={styles.action}><Text style={styles.actionText}>Ver agenda</Text></Pressable></Link>
         </Panel> : null}
       </>}
-      renderItem={({ item: order }) => <Link href={{ pathname: '/reservations/[id]', params: { id: order.id } }} asChild>
-        <TouchableOpacity activeOpacity={0.75} accessibilityRole="link" accessibilityLabel={`${order.descricao ?? 'Reserva'}, ${formatDateTime(order.inicio)}, ${statusLabel(order.status)}`}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, marginBottom: 10, borderRadius: 20, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border }}>
-          {/* data em destaque, como um bilhete */}
-          <View style={{ width: 58, borderRadius: 14, backgroundColor: palette.surfaceElevated, alignItems: 'center', paddingVertical: 8 }}>
-            <Text style={{ color: palette.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>{formatDateTime(order.inicio).slice(3, 5) ? ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'][Number(formatDateTime(order.inicio).slice(3, 5)) - 1] ?? '' : ''}</Text>
-            <Text style={{ color: palette.text, fontSize: 24, fontWeight: '900', lineHeight: 28 }}>{formatDateTime(order.inicio).slice(0, 2)}</Text>
-            <Text style={{ color: palette.textMuted, fontSize: 12, fontVariant: ['tabular-nums'] }}>{formatDateTime(order.inicio).split(' · ')[1] ?? ''}</Text>
-          </View>
-          <View style={{ flex: 1, gap: 4 }}>
-            <Text numberOfLines={1} style={{ color: palette.text, fontSize: 16, fontWeight: '800' }}>{order.descricao ?? 'Reserva em processamento'}</Text>
-            <View style={{ flexDirection: 'row', gap: 6 }}><Text style={{ color: palette.textMuted, fontSize: 13 }}>{order.codigo}</Text><Text style={{ color: palette.textMuted, fontSize: 13 }}>· {order.valorCentavos === null ? 'valor em confirmação' : formatBrl(order.valorCentavos)}</Text></View>
-            <View style={{ alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: corStatus(order.status) + '26' }}>
-              <Text style={{ color: corStatus(order.status), fontSize: 12, fontWeight: '800' }}>{statusLabel(order.status)}</Text>
-            </View>
-          </View>
-          <Icon name="chevron" color={palette.muted} size={18} />
-        </TouchableOpacity>
-      </Link>} />
+      renderItem={renderOrderItem} />
   </SafeAreaView>;
 }
 

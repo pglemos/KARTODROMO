@@ -1,0 +1,142 @@
+[
+  {
+    "testId": "API1-01",
+    "name": "Acesso direto a Cliente por ID sem Bearer Token",
+    "category": "API1:2023 BOLA",
+    "status": 401,
+    "expected": 401,
+    "passed": true,
+    "severity": "High",
+    "details": "Endpoint protegido por validação de sessão."
+  },
+  {
+    "testId": "API1-02",
+    "name": "Validação de Assinatura HMAC no Termo (/termo?ids=1,2&s=fake)",
+    "category": "API1:2023 BOLA",
+    "status": 403,
+    "expected": 403,
+    "passed": true,
+    "severity": "High",
+    "details": "Assinatura inválida rejeitada com HTTP 403."
+  },
+  {
+    "testId": "API1-03",
+    "name": "Atualização de Cadastro com Assinatura Adulterada no Totem",
+    "category": "API1:2023 BOLA",
+    "status": 403,
+    "expected": 403,
+    "passed": true,
+    "severity": "High",
+    "details": "Tentativa de alteração com token adulterado bloqueada com HTTP 403."
+  },
+  {
+    "testId": "API2-01",
+    "name": "Autenticação com Token Bearer Forjado / HMAC Inválido",
+    "category": "API2:2023 Broken Auth",
+    "status": 401,
+    "expected": 401,
+    "passed": true,
+    "severity": "Critical",
+    "details": "Token forjado rejeitado corretamente com HTTP 401."
+  },
+  {
+    "testId": "API2-02",
+    "name": "Rejeição de Credenciais Inválidas no Login",
+    "category": "API2:2023 Broken Auth",
+    "status": 401,
+    "expected": 401,
+    "passed": true,
+    "severity": "Medium",
+    "details": "Credencial inválida recusada com HTTP 401."
+  },
+  {
+    "testId": "API3-01",
+    "name": "Mass Assignment no Totem (Envio de propriedades privilegiadas)",
+    "category": "API3:2023 Mass Assignment",
+    "status": 400,
+    "expected": "400|409|201",
+    "passed": true,
+    "severity": "Medium",
+    "details": "Servidor respondeu HTTP 400. No código insertCliente, apenas colunas explícitas são inseridas no banco."
+  },
+  {
+    "testId": "API3-02",
+    "name": "Exposição Excessiva de Dados (Busca inexistente no Totem)",
+    "category": "API3:2023 Data Exposure",
+    "status": 200,
+    "expected": 200,
+    "passed": true,
+    "severity": "Low",
+    "details": "CPF inexistente devolve cliente:null sem vazar metadados."
+  },
+  {
+    "testId": "API4-01",
+    "name": "Proteção contra Payload Gigante (readBody > 1MB)",
+    "category": "API4:2023 Resource Consumption",
+    "status": 413,
+    "expected": 413,
+    "passed": true,
+    "severity": "Medium",
+    "details": "Corpo acima de 1MB rejeitado com HTTP 413 (\"Corpo grande demais.\")."
+  },
+  {
+    "testId": "API5-01",
+    "name": "Acesso à Cronometragem sem Header x-ops-key",
+    "category": "API5:2023 BFLA",
+    "status": 401,
+    "expected": 401,
+    "passed": true,
+    "severity": "Critical",
+    "details": "Acesso bloqueado com HTTP 401 (\"Chave inválida.\")."
+  },
+  {
+    "testId": "API5-02",
+    "name": "Acesso à Rota Legada /api/baterias sem x-ops-key",
+    "category": "API5:2023 BFLA",
+    "status": 401,
+    "expected": 401,
+    "passed": true,
+    "severity": "High",
+    "details": "Rota legada devidamente protegida com HTTP 401."
+  },
+  {
+    "testId": "API7-01",
+    "name": "Prevenção de Path Traversal / SSRF em /relatorio/crono/:id",
+    "category": "API7:2023 SSRF",
+    "status": 401,
+    "expected": "401|404",
+    "passed": true,
+    "severity": "High",
+    "details": "Regex restritiva impede caracteres de path traversal."
+  },
+  {
+    "testId": "API8-01",
+    "name": "Cabeçalhos HTTP de Proteção (X-Content-Type-Options, X-Frame-Options)",
+    "category": "API8:2023 Misconfig",
+    "status": 200,
+    "expected": "Presentes",
+    "passed": false,
+    "severity": "Low",
+    "details": "Cabeçalhos ausentes. Detectado: {\"nosniff\":false,\"frameOptions\":false,\"hsts\":false}"
+  },
+  {
+    "testId": "API9-01",
+    "name": "Prevenção de Path Traversal na Distribuição de Updates",
+    "category": "API9:2023 Inventory / LFI",
+    "status": 404,
+    "expected": 404,
+    "passed": true,
+    "severity": "High",
+    "details": "caminhoArquivoAtualizacao sanitiza path e bloqueia subida de diretórios (HTTP 404)."
+  },
+  {
+    "testId": "API10-01",
+    "name": "Disponibilidade e isolamento de dependências externas",
+    "category": "API10:2023 Unsafe Consumption",
+    "status": 200,
+    "expected": 200,
+    "passed": true,
+    "severity": "Low",
+    "details": "Serviço responde sem depender de APIs externas síncronas bloqueantes."
+  }
+]

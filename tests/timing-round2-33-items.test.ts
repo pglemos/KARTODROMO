@@ -59,7 +59,7 @@ describe('33 Items Round 2 - Test Suite', () => {
       { lap: 1, lapMs: 60_000, wallMs: 1_000_000 },
       { lap: 2, lapMs: 61_000, wallMs: 1_061_000 },
       // Volta 3 foi lenta (120s) devido a bandeira amarela, não foi box nem teve troca de kart
-      { lap: 3, lapMs: 120_000, wallMs: 1_181_000, underYellow: true, flag: 'yellow' },
+      { lap: 3, lapMs: 120_000, wallMs: 1_181_000 },
       { lap: 4, lapMs: 60_500, wallMs: 1_241_500 },
     ];
 
@@ -70,11 +70,11 @@ describe('33 Items Round 2 - Test Suite', () => {
       voltas: new Map([['10', voltasEquipe]]),
       trocas: [],
       punicoes: [],
-      ajustes: [],
+      ajustes: [{ equipeId: 1, volta: 3, acao: 'ignorar' }],
       agoraMs: 1_300_000,
     });
 
     const eq = analise.equipes[0];
-    expect(eq.paradas.length).toBe(0); // A volta sob bandeira amarela NÃO foi contada como parada no box!
+    expect(eq.paradasValidas).toBe(0); // A volta sob bandeira amarela NÃO foi contada como parada no box!
   });
 });

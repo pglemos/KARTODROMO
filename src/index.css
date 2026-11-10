@@ -7,10 +7,19 @@
      antigo em Vite, nunca eram carregadas e saíram (fase 8 do design system). */
   html {
     scroll-behavior: smooth;
+    overflow-x: clip;
   }
   
   body {
     @apply bg-white text-zinc-800 overflow-x-clip;
+  }
+
+  @media (max-width: 767px) {
+    input:not([type='checkbox']):not([type='radio']),
+    select,
+    textarea {
+      font-size: max(16px, 1rem);
+    }
   }
 
   a,

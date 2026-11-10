@@ -25,25 +25,27 @@ public static class AgenteImpressao
         Situacao = existe ? "Termos do totem: " + _impressora : "Impressora dos termos não encontrada";
         if (!existe) return;
         var t = new System.Windows.Forms.Timer { Interval = 3000 };
-        t.Tick += async (_, _) => await Rodada(dono);
+        t.Tick += async (_, _) => await RodadaAsync(dono);
         dono.FormClosed += (_, _) => { t.Stop(); t.Dispose(); };
         t.Start();
     }
 
-    static async Task Rodada(Form dono)
+    static Task Rodada(Form dono) => RodadaAsync(dono);
+
+    static async Task RodadaAsync(Form dono)
     {
         if (_ocupado || dono.IsDisposed || DateTime.Now < _pausaAte) return;
         _ocupado = true;
         try
         {
-            var job = await Sessao.Api.Get("/api/office/impressao/proxima") as JsonObject;
+            var job = await Sessao.Api.GetAsync("/api/office/impressao/proxima") as JsonObject;
             if (_ultimoErro != null) { Situacao = "Termos do totem: " + _impressora; Log("agente voltou a falar com o servidor"); }
             _ultimoErro = null;
             if (job?.L("id") is not long id) return;
             try
             {
                 await Relatorio.ImprimirSilencioso(Sessao.Api.BaseUrl + job.S("url"), _impressora);
-                await Sessao.Api.Post($"/api/office/impressao/{id}/feita");
+                await Sessao.Api.PostAsync($"/api/office/impressao/{id}/feita");
                 Situacao = $"Último termo do {job.S("origem")} impresso às {DateTime.Now:HH:mm}";
                 Log($"#{id} impresso ({job.S("origem")})");
             }
@@ -52,7 +54,7 @@ public static class AgenteImpressao
                 Situacao = "Falha ao imprimir termo: " + e.Message;
                 Log($"#{id} FALHOU: {e.Message}");
                 _pausaAte = DateTime.Now.AddSeconds(20); // impressora sem papel/desligada: tenta de novo daqui a pouco
-                try { await Sessao.Api.Post($"/api/office/impressao/{id}/falhou"); } catch { }
+                try { await Sessao.Api.PostAsync($"/api/office/impressao/{id}/falhou"); } catch { }
             }
         }
         catch (Exception e)

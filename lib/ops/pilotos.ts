@@ -119,10 +119,10 @@ const tk = (b: BateriaCrono, p: Corrida) => p.t ?? comCategoria(b.tracado, catDo
 const nomeCategoria = (c: string | null | undefined) => { const s = String(c ?? '').replace(/^cat-/i, '').trim(); return /super\s*kart/i.test(s) ? 'Super Kart' : /indoor/i.test(s) ? 'Indoor' : s ? s.charAt(0).toUpperCase() + s.slice(1) : null; };
 const chaveNome = (n: string) => n.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 
-async function timing(caminho: string) {
+async function timing<T = Record<string, unknown>>(caminho: string): Promise<T> {
   const r = await fetch(TIMING_URL + caminho, { signal: AbortSignal.timeout(15_000) });
   if (!r.ok) throw new Error(`cronometragem HTTP ${r.status}`);
-  return r.json();
+  return (await r.json()) as T;
 }
 
 /** Lê as baterias encerradas que ainda não estão no índice (de 3 em 3, para não pesar no ORBITS). */
@@ -144,7 +144,17 @@ export function atualizarIndice(log?: (m: string) => void): Promise<void> {
       for (let i = 0; i < faltam.length; i += 3) {
         await Promise.all(faltam.slice(i, i + 3).map(async (s) => {
           try {
-            const d = await timing(`/api/sessions/${encodeURIComponent(s.id)}`);
+            const d = await timing<{
+              name?: string;
+              type?: string;
+              createdAt: number;
+              startedAt?: number;
+              finishedAt?: number | null;
+              chuva?: boolean;
+              track?: { id?: string | null; name?: string };
+              competitors?: { kart: string; name: string; customerId: string | null; category: string | null; autoAdded: boolean }[];
+              standings?: { position: number; kart: string; name: string; laps: number; bestLapMs: number | null; desclassificado?: boolean }[];
+            }>(`/api/sessions/${encodeURIComponent(s.id)}`);
             const comps = (d.competitors ?? []) as { kart: string; name: string; customerId: string | null; category: string | null; autoAdded: boolean }[];
             const pilotos: Corrida[] = [];
             for (const r of (d.standings ?? []) as { position: number; kart: string; name: string; laps: number; bestLapMs: number | null; desclassificado?: boolean }[]) {
@@ -154,7 +164,7 @@ export function atualizarIndice(log?: (m: string) => void): Promise<void> {
             }
             const inicio = d.startedAt ?? d.createdAt;
             const tracado = String(d.track?.name ?? 'Traçado principal');
-            indice[s.id] = { id: s.id, nome: String(d.name ?? '').split(' · ')[0] || d.name, tipo: d.type, dia: diaSp(inicio), inicio, fim: d.finishedAt ?? null, chuva: d.chuva === true || chuvaNoNome(tracado), trackId: d.track?.id ?? null, tracado: tracadoBase(tracado), pilotos };
+            indice[s.id] = { id: s.id, nome: String(d.name ?? '').split(' · ')[0] || d.name || '', tipo: d.type || '', dia: diaSp(inicio), inicio, fim: d.finishedAt ?? null, chuva: d.chuva === true || chuvaNoNome(tracado), trackId: d.track?.id ?? null, tracado: tracadoBase(tracado), pilotos };
             mudou = true;
           } catch (e) { log?.(`pilotos: bateria ${s.id} não foi lida (${(e as Error).message})`); }
         }));
@@ -529,7 +539,8 @@ export async function pilotosRoutes(req: Req, send: Res): Promise<boolean> {
     const resumo = carreiras().get(cid) ?? null;
     const duplicado = (await duplicadosDe([id])).get(id) ?? null;
     const validos = meusAntigos.filter((y) => valeNoRanking(y.tracado, y.ms));
-    const laptimeResumo = validos.length ? { meses: porMes.size, melhorPos: Math.min(...validos.map((y) => y.pos)), vitorias: new Set(validos.filter((y) => y.pos === 1).map((y) => y.tipo + y.periodo + y.tracado)).size } : null;
+    const melhorPos = validos.reduce((min, y) => Math.min(min, y.pos), Infinity);
+    const laptimeResumo = validos.length ? { meses: porMes.size, melhorPos: Number.isFinite(melhorPos) ? melhorPos : null, vitorias: new Set(validos.filter((y) => y.pos === 1).map((y) => y.tipo + y.periodo + y.tracado)).size } : null;
     send(200, { cliente: c, hoje, resumo, tracados, principal, evolucao, laptime, semanasTop, laptimeResumo, duplicado, corridas: corridas.slice(0, 200), totalCorridas: corridas.length, dependentes, financeiro, desde: Object.values(indice).reduce((a, b) => (!a || b.dia < a ? b.dia : a), '' as string) || null });
     return true;
   }
@@ -630,19 +641,22 @@ export async function rankingPublicoParaApp() {
   const periodos: Record<string, { de: string | null; ate: string | null; tracados: { nome: string; pilotos: number; linhas: unknown[] }[] }> = {};
   for (const [nome, p] of Object.entries(per)) {
     const tracados = tracadosComTempos(p).sort((a, b) => b.pilotos - a.pilotos);
+    const listaTracados: { nome: string; pilotos: number; linhas: unknown[] }[] = [];
+    for (const t of tracados) {
+      const todas = ranking(t.nome, p);
+      const doc: PosicoesTracado = { periodo: nome, tracado: t.nome, de: todas.length, pos: {} };
+      for (const l of todas) if (l.cid) doc.pos[l.cid] = l.pos;
+      posicoes[`posicoes:${nome}:${slugTracado(t.nome)}`] = doc;
+      for (const l of todas) if (l.cid) {
+        if (!nomes.has(l.cid)) nomes.set(l.cid, l.nome);
+        const porPer = pos.get(l.cid) ?? {}; (porPer[nome] ??= {})[t.nome] = { pos: l.pos, de: todas.length }; pos.set(l.cid, porPer);
+      }
+      listaTracados.push({ nome: t.nome, pilotos: todas.length, linhas: todas.slice(0, TOP).map((l) => ({ pos: l.pos, id: l.cid, nome: l.nome, ms: l.ms, kart: l.kart || null, dia: l.dia, categoria: l.categoria })) });
+      await new Promise<void>((r) => setImmediate(r)); // cede o loop entre traçados
+    }
     periodos[nome] = {
       de: p.de, ate: p.ate,
-      tracados: tracados.map((t) => {
-        const todas = ranking(t.nome, p);
-        const doc: PosicoesTracado = { periodo: nome, tracado: t.nome, de: todas.length, pos: {} };
-        for (const l of todas) if (l.cid) doc.pos[l.cid] = l.pos;
-        posicoes[`posicoes:${nome}:${slugTracado(t.nome)}`] = doc;
-        for (const l of todas) if (l.cid) {
-          if (!nomes.has(l.cid)) nomes.set(l.cid, l.nome);
-          const porPer = pos.get(l.cid) ?? {}; (porPer[nome] ??= {})[t.nome] = { pos: l.pos, de: todas.length }; pos.set(l.cid, porPer);
-        }
-        return { nome: t.nome, pilotos: todas.length, linhas: todas.slice(0, TOP).map((l) => ({ pos: l.pos, id: l.cid, nome: l.nome, ms: l.ms, kart: l.kart || null, dia: l.dia, categoria: l.categoria })) };
-      }),
+      tracados: listaTracados,
     };
   }
 
@@ -652,7 +666,7 @@ export async function rankingPublicoParaApp() {
   for (let ib = 0; ib < bateriasIndice.length; ib++) {
     const b = bateriasIndice[ib];
     const validos = b.pilotos.filter((p) => p.melhor && !p.dq);
-    const maisRapida = validos.length ? Math.min(...validos.map((p) => p.melhor!)) : null;
+    const maisRapida = validos.reduce<number | null>((min, p) => (min === null || p.melhor! < min ? p.melhor! : min), null);
     for (const p of b.pilotos) {
       if (!p.cid) continue;
       nomes.set(p.cid, p.nome);

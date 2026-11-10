@@ -3,48 +3,73 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Pré-cadastro · Kartódromo Internacional de Betim</title>
-<meta name="description" content="Faça seu cadastro antes de chegar. No kartódromo é só digitar o CPF no totem.">
+<title>Cadastro & Pagamento de Vaga · Kartódromo Internacional de Betim</title>
+<meta name="description" content="Faça seu cadastro e pague sua vaga com confirmação imediata. No kartódromo é só digitar o CPF no totem.">
 <meta name="theme-color" content="#030504">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Rajdhani:wght@500;600;700&display=swap">
 <link rel="icon" href="/icone.png">
 <style>
-  /* Tokens da marca (os mesmos do site e da reserva online): fundo preto, verde neon, Anton nos títulos. */
   :root {
     color-scheme: dark;
     --fundo: #030504; --fundo-2: #070b08; --cartao: #0b100c; --cartao-2: #111712;
     --linha: rgba(255,255,255,.12); --linha-forte: rgba(255,255,255,.24);
     --texto: #f7faf6; --suave: #a8b2aa; --apagado: #6b746d;
-    --verde: #00e676; --verde-fundo: rgba(0,230,118,.10); --tinta: #03140b;
+    --verde: #00e676; --verde-fundo: rgba(0,230,118,.10); --verde-brilho: rgba(0,230,118,.25); --tinta: #03140b;
     --erro: #ff7a6b; --erro-fundo: rgba(255,122,107,.12);
+    --amarelo: #ffd54f; --amarelo-fundo: rgba(255,213,79,.12);
     --titulo: 'Anton', Impact, 'Arial Narrow', sans-serif; --corpo: 'Rajdhani', 'Segoe UI', Roboto, Arial, sans-serif;
-    --raio: 4px; --foco: 0 0 0 2px var(--fundo), 0 0 0 4px var(--verde);
-    --chanfro: polygon(5% 0, 100% 0, 95% 100%, 0 100%);
+    --raio: 6px; --foco: 0 0 0 2px var(--fundo), 0 0 0 4px var(--verde);
+    --chanfro: polygon(4% 0, 100% 0, 96% 100%, 0 100%);
   }
   * { box-sizing: border-box; font-synthesis-weight: none; }
   html, body { margin: 0; background: var(--fundo); color: var(--texto); font: 500 17px/1.5 var(--corpo); -webkit-text-size-adjust: 100%; -webkit-font-smoothing: antialiased; }
   :focus-visible { outline: none; box-shadow: var(--foco); }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
-  .topo { background: radial-gradient(120% 90% at 50% 0%, rgba(0,230,118,.16) 0%, rgba(0,230,118,0) 60%), var(--fundo-2); border-bottom: 1px solid var(--linha); color: var(--texto); padding: 26px 18px 70px; }
-  .topo .logo { display: block; width: min(300px, 76vw); height: auto; margin: 0 auto 20px; }
-  .topo h1 { font: 400 clamp(30px, 8.4vw, 50px)/1 var(--titulo); text-transform: uppercase; margin: 0 auto 10px; max-width: 640px; text-align: center; text-wrap: balance; }
+
+  .topo { background: radial-gradient(120% 90% at 50% 0%, rgba(0,230,118,.16) 0%, rgba(0,230,118,0) 60%), var(--fundo-2); border-bottom: 1px solid var(--linha); color: var(--texto); padding: 24px 16px 54px; }
+  .topo .logo { display: block; width: min(280px, 72vw); height: auto; margin: 0 auto 16px; }
+  .topo h1 { font: 400 clamp(26px, 7vw, 44px)/1.05 var(--titulo); text-transform: uppercase; margin: 0 auto 8px; max-width: 640px; text-align: center; text-wrap: balance; }
   .topo h1 em { font-style: normal; color: var(--verde); }
-  .topo p { margin: 0 auto; max-width: 560px; text-align: center; color: var(--suave); font-size: 17px; text-wrap: balance; }
-  .passos { display: flex; justify-content: center; gap: 8px; margin: 18px auto 0; flex-wrap: wrap; max-width: 640px; }
-  .passos span { font: 400 13px/1 var(--titulo); text-transform: uppercase; letter-spacing: .06em; color: var(--texto); }
-  .passos span + span::before { content: "›"; margin: 0 10px 0 2px; color: var(--verde); }
-  main { max-width: 680px; margin: -46px auto 0; padding: 0 14px 44px; }
-  .cartao { background: linear-gradient(180deg, var(--cartao-2), var(--cartao)); border: 1px solid var(--linha); border-radius: var(--raio); padding: 22px 18px; margin-bottom: 14px; }
+  .topo p { margin: 0 auto; max-width: 540px; text-align: center; color: var(--suave); font-size: 16px; text-wrap: balance; }
+
+  /* Stepper / Indicador de passos mobile-first */
+  .stepper { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 18px auto 0; max-width: 540px; }
+  .step { display: flex; align-items: center; gap: 6px; font: 600 13px/1 var(--corpo); text-transform: uppercase; letter-spacing: .06em; color: var(--apagado); padding: 6px 10px; border-radius: 999px; background: rgba(255,255,255,.03); border: 1px solid transparent; transition: all .2s; }
+  .step-num { width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,.1); color: var(--suave); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; font-family: var(--titulo); }
+  .step.ativo { color: var(--verde); border-color: rgba(0,230,118,.3); background: var(--verde-fundo); }
+  .step.ativo .step-num { background: var(--verde); color: var(--tinta); }
+  .step.concluido { color: var(--texto); }
+  .step.concluido .step-num { background: rgba(0,230,118,.2); color: var(--verde); }
+  .step-sep { width: 14px; height: 2px; background: var(--linha); }
+  @media (max-width: 480px) {
+    .step-label { display: none; }
+    .step { padding: 4px 6px; }
+    .step.ativo .step-label { display: inline; font-size: 12px; }
+  }
+
+  main { max-width: 680px; margin: -36px auto 0; padding: 0 14px 44px; }
+  .cartao { background: linear-gradient(180deg, var(--cartao-2), var(--cartao)); border: 1px solid var(--linha); border-radius: var(--raio); padding: 20px 18px; margin-bottom: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
   .cartao h2 { font: 400 20px/1.05 var(--titulo); text-transform: uppercase; letter-spacing: .02em; margin: 0 0 4px; display: flex; align-items: center; gap: 12px; }
   .cartao h2 .op { font-family: var(--corpo); text-transform: none; font-size: 15px; color: var(--apagado); letter-spacing: 0; }
   .cartao h2 .n { width: 28px; height: 28px; background: var(--verde); color: var(--tinta); font: 400 15px/1 var(--titulo); display: inline-flex; align-items: center; justify-content: center; flex: none; clip-path: var(--chanfro); }
-  .cartao .sub { color: var(--suave); font-size: 15.5px; margin: 0 0 16px 40px; }
+  .cartao .sub { color: var(--suave); font-size: 15px; margin: 0 0 16px 40px; }
+
+  /* Faixa de Grupo */
+  .grupo { border-color: rgba(0,230,118,.35); background: linear-gradient(180deg, rgba(0,230,118,.12), rgba(0,230,118,.04)); }
+  .grupo-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+  .grupo-tag { display: inline-flex; align-items: center; gap: 5px; background: var(--verde); color: var(--tinta); font: 700 12px/1 var(--titulo); text-transform: uppercase; letter-spacing: .05em; padding: 4px 8px; border-radius: 3px; }
+  .grupo h2 { margin: 0; font-family: var(--titulo); font-size: 24px; color: var(--texto); letter-spacing: .02em; line-height: 1.1; }
+  .grupo-info { margin: 6px 0 0; color: var(--suave); font-size: 15.5px; }
+  .grupo-info b { color: var(--verde); }
+  .grupo-atalho { margin-top: 12px; padding: 10px 12px; background: rgba(0,230,118,.12); border: 1px dashed rgba(0,230,118,.35); border-radius: var(--raio); display: none; align-items: center; justify-content: space-between; gap: 8px; }
+  .grupo-atalho-btn { background: var(--verde); color: var(--tinta); border: 0; font: 700 13px/1 var(--titulo); text-transform: uppercase; padding: 8px 12px; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+
   .grade { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px 12px; }
   .grade > div { min-width: 0; }
   .c6 { grid-column: span 6; } .c4 { grid-column: span 4; } .c3 { grid-column: span 3; } .c2 { grid-column: span 2; }
   @media (max-width: 520px) { .c3, .c4 { grid-column: span 6; } .c2 { grid-column: span 3; } }
-  label { display: block; font: 400 13px/1.2 var(--titulo); text-transform: uppercase; letter-spacing: .06em; color: var(--suave); margin: 0 0 7px; }
+  label { display: block; font: 400 13px/1.2 var(--titulo); text-transform: uppercase; letter-spacing: .06em; color: var(--suave); margin: 0 0 6px; }
   label .op { font-family: var(--corpo); text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--apagado); }
   input, select { width: 100%; min-width: 0; height: 50px; border: 1px solid var(--linha-forte); border-radius: var(--raio); padding: 0 14px; font: 500 17px var(--corpo); color: var(--texto); background: var(--fundo); outline: none; transition: border-color .15s, box-shadow .15s; -webkit-appearance: none; appearance: none; }
   input::placeholder { color: var(--apagado); }
@@ -55,51 +80,111 @@
   .seg button.sel { background: var(--verde); color: var(--tinta); }
   .menor { border: 1px solid var(--linha); border-radius: var(--raio); padding: 14px; margin-bottom: 10px; position: relative; background: var(--fundo); }
   .menor .tirar { position: absolute; top: 4px; right: 4px; width: 44px; height: 44px; border: 0; background: none; color: var(--suave); font-size: 24px; line-height: 1; cursor: pointer; }
-  .btn2 { width: 100%; min-height: 50px; border: 1px dashed var(--linha-forte); border-radius: var(--raio); background: transparent; font: 400 15px/1 var(--titulo); text-transform: uppercase; letter-spacing: .05em; color: var(--verde); cursor: pointer; }
-  .termo { display: flex; gap: 12px; align-items: flex-start; font: 500 16px/1.45 var(--corpo); text-transform: none; letter-spacing: 0; color: var(--texto); }
+  .btn2 { width: 100%; min-height: 48px; border: 1px dashed var(--linha-forte); border-radius: var(--raio); background: transparent; font: 400 15px/1 var(--titulo); text-transform: uppercase; letter-spacing: .05em; color: var(--verde); cursor: pointer; }
+  .termo { display: flex; gap: 12px; align-items: flex-start; font: 500 16px/1.4 var(--corpo); text-transform: none; letter-spacing: 0; color: var(--texto); }
   .termo input { width: 24px; height: 24px; flex: none; margin: 1px 0 0; accent-color: var(--verde); -webkit-appearance: checkbox; appearance: auto; }
-  details { margin-top: 10px; background: var(--fundo); border: 1px solid var(--linha); border-radius: var(--raio); padding: 11px 14px; font-size: 15.5px; color: var(--suave); }
+  details { margin-top: 10px; background: var(--fundo); border: 1px solid var(--linha); border-radius: var(--raio); padding: 11px 14px; font-size: 15px; color: var(--suave); }
   summary { cursor: pointer; font: 400 14px/1.3 var(--titulo); text-transform: uppercase; letter-spacing: .05em; color: var(--verde); }
-  .enviar { width: 100%; min-height: 60px; border: 0; background: var(--verde); color: var(--tinta); font: 400 20px/1.1 var(--titulo); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; padding: 12px 34px; clip-path: var(--chanfro); }
-  .enviar:hover:not(:disabled) { background: #33ff99; }
-  .enviar:disabled { background: #1b3a29; color: #7fa68f; }
+  .enviar { width: 100%; min-height: 60px; border: 0; background: var(--verde); color: var(--tinta); font: 400 20px/1.1 var(--titulo); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; padding: 14px 24px; clip-path: var(--chanfro); margin-top: 10px; transition: transform .1s, background .15s; }
+  .enviar:hover:not(:disabled) { background: #33ff99; transform: translateY(-1px); }
+  .enviar:disabled { background: #1b3a29; color: #7fa68f; cursor: not-allowed; }
   .erro { display: none; background: var(--erro-fundo); border: 1px solid rgba(255,122,107,.4); color: var(--erro); border-radius: var(--raio); padding: 12px 14px; margin-bottom: 14px; font-weight: 600; }
-  .rodape { text-align: center; color: var(--apagado); font-size: 14.5px; margin-top: 18px; }
+  .rodape { text-align: center; color: var(--apagado); font-size: 14px; margin-top: 16px; }
   .oculto { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
-  #pronto { display: none; text-align: center; padding: 34px 20px 28px; }
-  #pronto .ok { width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 16px; background: var(--verde-fundo); border: 1px solid rgba(0,230,118,.4); display: flex; align-items: center; justify-content: center; }
-  #pronto .ok svg { stroke: var(--verde); }
-  #pronto h2 { font: 400 32px/1.05 var(--titulo); margin: 0 0 8px; justify-content: center; }
-  #pronto p { color: var(--suave); margin: 0 auto 8px; max-width: 460px; }
-  .totem { margin: 18px auto 0; max-width: 440px; text-align: left; background: var(--fundo); border: 1px solid var(--linha); border-radius: var(--raio); padding: 16px 18px; color: var(--suave); }
-  .totem b { color: var(--verde); }
-  .grupo { border-color: var(--verde); background: var(--verde-fundo); }
-  .grupo h2 { margin: 0 0 6px; font-family: var(--titulo); font-weight: 400; letter-spacing: .02em; font-size: 26px; line-height: 1.15; }
-  .grupo p { margin: 0; color: var(--suave); }
-  .grupo b, .pagar b { color: var(--verde); }
-  .pagar { margin: 14px 0 18px; padding: 16px 18px; border: 1px solid var(--verde); border-radius: var(--raio); background: var(--verde-fundo); text-align: left; }
-  .pagar p { margin: 0 0 10px; }
-  .pagar .valor { font-family: var(--titulo); font-size: 34px; color: var(--texto); line-height: 1.1; }
-  .pagar a.botao { display: block; text-align: center; padding: 14px 18px; background: var(--verde); color: var(--tinta); font-weight: 700; font-size: 19px; text-decoration: none; border-radius: var(--raio); }
-  .pagar .estado { margin: 10px 0 0; font-size: 15px; color: var(--suave); }
+
+  /* ETAPA 2 - PAGAMENTO DA VAGA (MOBILE-FIRST) */
+  #etapaPagamento { display: none; }
+  .card-pagamento { border-color: rgba(0,230,118,.35); background: linear-gradient(180deg, #111a13 0%, var(--cartao) 100%); }
+  .resumo-box { background: rgba(0,0,0,.35); border: 1px solid var(--linha); border-radius: var(--raio); padding: 16px; margin-bottom: 20px; }
+  .resumo-linha { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.05); font-size: 15.5px; }
+  .resumo-linha:last-child { border-bottom: 0; padding-top: 10px; margin-top: 4px; }
+  .resumo-linha .label { color: var(--suave); }
+  .resumo-linha .val { font-weight: 700; color: var(--texto); }
+  .resumo-linha.destaque .val { font-family: var(--titulo); font-size: 32px; color: var(--verde); line-height: 1; }
+
+  /* Botão Pix Copia e Cola Gigante */
+  .pix-acao-box { text-align: center; margin: 18px 0; }
+  .btn-pix { width: 100%; min-height: 60px; border: 0; background: var(--verde); color: var(--tinta); font: 700 20px/1.1 var(--titulo); text-transform: uppercase; letter-spacing: .03em; border-radius: var(--raio); cursor: pointer; padding: 14px 20px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 4px 20px var(--verde-brilho); transition: all .15s; }
+  .btn-pix:hover { background: #33ff99; transform: translateY(-1px); }
+  .btn-pix.copiado { background: #00c853; color: #fff; box-shadow: 0 0 25px rgba(0,200,83,.5); }
+  .btn-pix svg { width: 24px; height: 24px; flex: none; }
+
+  .alerta-copiado { display: none; background: var(--verde-fundo); border: 1px solid rgba(0,230,118,.35); color: var(--verde); border-radius: var(--raio); padding: 12px 14px; margin-top: 10px; font-weight: 600; font-size: 15px; text-align: center; }
+
+  /* Caixa com código Pix textual */
+  .pix-raw-box { margin-top: 14px; text-align: left; }
+  .pix-raw-box summary { font-size: 13.5px; color: var(--suave); }
+  .pix-raw-text { width: 100%; height: 74px; background: var(--fundo); border: 1px solid var(--linha-forte); border-radius: var(--raio); color: #889988; font: 400 12px/1.35 monospace; padding: 10px; resize: none; margin-top: 6px; word-break: break-all; }
+
+  /* QR Code */
+  .pix-qr-area { text-align: center; margin: 20px 0 16px; padding: 16px; background: rgba(0,0,0,.3); border-radius: var(--raio); border: 1px solid var(--linha); }
+  .pix-qr-area h3 { font: 400 16px/1.1 var(--titulo); text-transform: uppercase; letter-spacing: .05em; color: var(--suave); margin: 0 0 12px; }
+  .pix-qr-img-wrap { display: inline-block; padding: 12px; background: #fff; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.5); }
+  .pix-qr-img { display: block; width: 180px; height: 180px; object-fit: contain; }
+  .pix-qr-instrucao { margin: 10px 0 0; font-size: 14px; color: var(--suave); }
+
+  /* Radar de Confirmação em Tempo Real */
+  .radar-card { background: rgba(0,230,118,.06); border: 1px solid rgba(0,230,118,.25); border-radius: var(--raio); padding: 14px 16px; display: flex; align-items: center; gap: 14px; margin: 18px 0; }
+  .radar-pulse { width: 16px; height: 16px; border-radius: 50%; background: var(--verde); position: relative; flex: none; }
+  .radar-pulse::after { content: ''; position: absolute; top: -4px; left: -4px; right: -4px; bottom: -4px; border-radius: 50%; border: 2px solid var(--verde); animation: pulso 1.6s infinite; }
+  @keyframes pulso { 0% { transform: scale(.7); opacity: 1; } 100% { transform: scale(2.2); opacity: 0; } }
+  .radar-text { font-size: 14.5px; color: var(--texto); line-height: 1.35; }
+  .radar-text b { color: var(--verde); }
+
+  /* Cartão de Crédito Alternativo */
+  .cartao-alt { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--linha); text-align: center; }
+  .cartao-alt p { margin: 0 0 10px; font-size: 14.5px; color: var(--suave); }
+  .btn-cartao { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 18px; border: 1px solid var(--linha-forte); border-radius: var(--raio); color: var(--texto); text-decoration: none; font: 600 15px/1 var(--corpo); text-transform: uppercase; letter-spacing: .04em; background: rgba(255,255,255,.03); transition: all .15s; }
+  .btn-cartao:hover { border-color: var(--verde); color: var(--verde); background: var(--verde-fundo); }
+
+  /* ETAPA 3 - CONFIRMAÇÃO / SUCESSO */
+  #etapaConfirmado { display: none; text-align: center; padding: 34px 20px 28px; }
+  .ok-badge { width: 88px; height: 88px; border-radius: 50%; margin: 0 auto 16px; background: var(--verde-fundo); border: 2px solid var(--verde); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 30px var(--verde-brilho); }
+  .ok-badge svg { stroke: var(--verde); }
+  #etapaConfirmado h2 { font: 400 34px/1.05 var(--titulo); text-transform: uppercase; margin: 0 0 10px; color: var(--verde); }
+  #etapaConfirmado .msg-sub { color: var(--suave); font-size: 17px; margin: 0 auto 18px; max-width: 480px; }
+  .box-totem { margin: 20px auto 0; max-width: 460px; text-align: left; background: var(--fundo); border: 1px solid rgba(0,230,118,.35); border-radius: var(--raio); padding: 18px 20px; color: var(--suave); }
+  .box-totem h3 { font: 400 18px/1.1 var(--titulo); text-transform: uppercase; letter-spacing: .04em; color: var(--verde); margin: 0 0 8px; }
+  .box-totem ol { margin: 0; padding-left: 20px; font-size: 16px; line-height: 1.5; color: var(--texto); }
+  .box-totem li { margin-bottom: 6px; }
+  .box-totem b { color: var(--verde); }
 </style>
 </head>
 <body>
 <header class="topo">
   <img class="logo" src="/kib-logo-escuro.png" alt="Kartódromo Internacional de Betim" width="720" height="200">
-  <h1>Faça seu cadastro <em>antes de chegar</em></h1>
-  <p>Preencha uma vez aqui. No kartódromo, é só digitar seu CPF no totem de autoatendimento e escolher a bateria.</p>
-  <div class="passos"><span>1 · Cadastro aqui</span><span>2 · CPF no totem</span><span>3 · Pista!</span></div>
+  <h1 id="topoTitulo">Faça seu cadastro <em>antes de chegar</em></h1>
+  <p id="topoSub">Preencha uma vez aqui. No kartódromo, é só digitar seu CPF no totem de autoatendimento.</p>
+  <div class="stepper">
+    <div class="step ativo" id="step1"><span class="step-num">1</span><span class="step-label">Cadastro</span></div>
+    <div class="step-sep"></div>
+    <div class="step" id="step2"><span class="step-num">2</span><span class="step-label">Pagamento</span></div>
+    <div class="step-sep"></div>
+    <div class="step" id="step3"><span class="step-num">3</span><span class="step-label">Pista</span></div>
+  </div>
 </header>
 
 <main>
-  <section class="cartao grupo" id="grupoFaixa" hidden aria-live="polite"></section>
+  <!-- Faixa de aviso quando acessado por link de grupo (?r=TOKEN) -->
+  <section class="cartao grupo" id="grupoFaixa" hidden aria-live="polite">
+    <div class="grupo-header">
+      <span class="grupo-tag">🏎️ Vaga em Grupo</span>
+      <h2 id="grupoTitulo">Grupo de Kart</h2>
+    </div>
+    <p class="grupo-info" id="grupoInfo">Carregando detalhes da bateria...</p>
+    <div class="grupo-atalho" id="grupoAtalho">
+      <span id="grupoAtalhoTexto">Já preencheu seus dados antes?</span>
+      <button type="button" class="grupo-atalho-btn" id="btnAtalhoPagamento">Ver Pagamento ›</button>
+    </div>
+  </section>
+
+  <!-- FORMULÁRIO DE CADASTRO (ETAPA 1) -->
   <form id="form" novalidate autocomplete="on">
     <div class="erro" id="erro" role="alert"></div>
 
     <section class="cartao">
       <h2><span class="n">1</span>Documento</h2>
-      <p class="sub">É com ele que o totem encontra seu cadastro.</p>
+      <p class="sub">É com ele que o totem encontra seu cadastro e sua vaga.</p>
       <div class="grade">
         <div class="c6"><div class="seg" id="tipoDoc">
           <button type="button" class="sel" data-v="CPF">CPF</button><button type="button" data-v="RG">RG</button><button type="button" data-v="Passaporte">Passaporte</button>
@@ -111,34 +196,34 @@
 
     <section class="cartao">
       <h2><span class="n">2</span>Contato</h2>
-      <p class="sub">Para avisos da reserva. O resultado com seus tempos chega no e-mail.</p>
+      <p class="sub">Para avisos da reserva e envio do resultado dos seus tempos.</p>
       <div class="grade">
         <div class="c3"><label for="telefone">Celular (WhatsApp)</label><input id="telefone" name="tel" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="(31) 90000-0000" required></div>
-        <div class="c3"><label for="email">E-mail <span class="op">(recebe o resultado da corrida)</span></label><input id="email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="voce@email.com"></div>
-        <div class="c6"><label for="instagram">Instagram <span class="op">(sai junto com seu nome no resultado da bateria)</span></label><input id="instagram" name="instagram" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="@seuusuario" maxlength="80" required></div>
+        <div class="c3"><label for="email">E-mail <span class="op">(resultado da corrida)</span></label><input id="email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="voce@email.com" required></div>
+        <div class="c6"><label for="instagram">Instagram <span class="op">(sai na bateria e redes)</span></label><input id="instagram" name="instagram" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="@seuusuario" maxlength="80" required></div>
       </div>
     </section>
 
     <section class="cartao">
       <h2><span class="n">3</span>Sobre você</h2>
-      <p class="sub">O peso ajuda a equilibrar os karts.</p>
+      <p class="sub">O peso é usado para equilibrar os karts e garantir competitividade.</p>
       <div class="grade">
         <div class="c3"><label for="nascimento">Data de nascimento</label><input id="nascimento" inputmode="numeric" autocomplete="bday" placeholder="DD/MM/AAAA" required></div>
-        <div class="c3"><label for="peso">Peso (kg) <span class="op">(equilibra os karts)</span></label><input id="peso" inputmode="decimal" placeholder="Ex.: 72"></div>
+        <div class="c3"><label for="peso">Peso (kg) <span class="op">(equilibra os karts)</span></label><input id="peso" inputmode="decimal" placeholder="Ex.: 75" required></div>
       </div>
     </section>
 
     <section class="cartao">
       <h2><span class="n">4</span>Endereço</h2>
-      <p class="sub">Digite o CEP e o resto se preenche sozinho.</p>
+      <p class="sub">Digite o CEP e o endereço se preenche automaticamente.</p>
       <div class="grade">
         <div class="c2"><label for="cep">CEP</label><input id="cep" inputmode="numeric" autocomplete="postal-code" placeholder="00000-000"></div>
-        <div class="c4"><label for="endereco">Rua</label><input id="endereco" autocomplete="address-line1"></div>
-        <div class="c2"><label for="numero">Número</label><input id="numero" inputmode="numeric"></div>
+        <div class="c4"><label for="endereco">Rua</label><input id="endereco" autocomplete="address-line1" required></div>
+        <div class="c2"><label for="numero">Número</label><input id="numero" inputmode="numeric" required></div>
         <div class="c4"><label for="complemento">Complemento <span class="op">(opcional)</span></label><input id="complemento" autocomplete="address-line2"></div>
-        <div class="c3"><label for="bairro">Bairro</label><input id="bairro"></div>
-        <div class="c2"><label for="cidade">Cidade</label><input id="cidade" autocomplete="address-level2"></div>
-        <div class="c1" style="grid-column: span 1"><label for="estado">UF</label><input id="estado" maxlength="2" autocapitalize="characters" autocomplete="address-level1"></div>
+        <div class="c3"><label for="bairro">Bairro</label><input id="bairro" required></div>
+        <div class="c2"><label for="cidade">Cidade</label><input id="cidade" autocomplete="address-level2" required></div>
+        <div class="c1" style="grid-column: span 1"><label for="estado">UF</label><input id="estado" maxlength="2" autocapitalize="characters" autocomplete="address-level1" required></div>
       </div>
     </section>
 
@@ -158,18 +243,91 @@
       <div class="oculto" aria-hidden="true"><label>Site<input id="site" tabindex="-1" autocomplete="off"></label></div>
     </section>
 
-    <button class="enviar" id="enviar" type="submit">Concluir pré-cadastro</button>
-    <p class="rodape">O termo de responsabilidade é assinado no kartódromo, no dia da corrida.</p>
+    <button class="enviar" id="enviar" type="submit">Concluir cadastro e avançar ›</button>
+    <p class="rodape">O termo de responsabilidade de pista é assinado no kartódromo, no dia da corrida.</p>
   </form>
 
-  <section class="cartao" id="pronto" aria-live="polite">
-    <div class="ok"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#00e676" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
-    <h2 id="prontoTitulo">Tudo certo!</h2>
-    <div class="pagar" id="pagarCaixa" hidden></div>
-    <p>Seu pré-cadastro foi recebido.</p>
-    <div class="totem">
-      <p style="margin:0 0 6px"><b>Quando chegar ao kartódromo:</b></p>
-      <p style="margin:0">1. Vá ao totem de autoatendimento.<br>2. Digite seu <b id="prontoDoc">CPF</b> (ou e-mail).<br>3. Confira seus dados e escolha a bateria.</p>
+  <!-- ETAPA 2 - PAGAMENTO DA VAGA (MOBILE-FIRST) -->
+  <section class="cartao card-pagamento" id="etapaPagamento" aria-live="polite">
+    <div style="text-align:center; margin-bottom: 16px;">
+      <span class="grupo-tag" style="background:#00e676; color:#03140b;">Etapa 2 · Pagamento da Vaga</span>
+      <h2 style="font-size: 28px; justify-content: center; margin-top: 8px;" id="pagamentoPilotoNome">Conclua o pagamento</h2>
+      <p style="color:var(--suave); margin:4px 0 0;">Pague agora via Pix com confirmação instantânea para garantir sua vaga na bateria.</p>
+    </div>
+
+    <div class="resumo-box">
+      <div class="resumo-linha"><span class="label">🏎️ Kartódromo</span><span class="val">Bateria Oficial Betim</span></div>
+      <div class="resumo-linha"><span class="label">📅 Bateria</span><span class="val" id="resumoBateria">—</span></div>
+      <div class="resumo-linha"><span class="label">👤 Piloto</span><span class="val" id="resumoPiloto">—</span></div>
+      <div class="resumo-linha" id="resumoGrupoLinha"><span class="label">👥 Grupo</span><span class="val" id="resumoGrupo">—</span></div>
+      <div class="resumo-linha destaque"><span class="label">Valor da Vaga:</span><span class="val" id="resumoValor">R$ 0,00</span></div>
+    </div>
+
+    <!-- Botão Principal: Pix Copia e Cola -->
+    <div class="pix-acao-box" id="blocoPix">
+      <button type="button" class="btn-pix" id="btnCopiarPix">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        <span id="btnCopiarPixTexto">Copiar código Pix</span>
+      </button>
+      <div class="alerta-copiado" id="alertaPixCopiado">
+        ✓ <b>Código Pix copiado!</b> Abra o app do seu banco, escolha <b>Pix Copia e Cola</b> e pague.
+      </div>
+
+      <details class="pix-raw-box">
+        <summary>Ver código Pix por extenso</summary>
+        <textarea id="pixPayload" class="pix-raw-text" readonly onclick="this.select()"></textarea>
+      </details>
+    </div>
+
+    <!-- QR Code Pix -->
+    <div class="pix-qr-area" id="blocoQrCode" hidden>
+      <h3>Ou pague escaneando o QR Code</h3>
+      <div class="pix-qr-img-wrap">
+        <img class="pix-qr-img" id="pixQrImg" src="" alt="QR Code Pix Betim">
+      </div>
+      <p class="pix-qr-instrucao">Aponte a câmera do aplicativo do seu banco</p>
+    </div>
+
+    <!-- Radar de detecção em tempo real -->
+    <div class="radar-card" id="radarPagamento">
+      <div class="radar-pulse"></div>
+      <div class="radar-text">
+        <b>Aguardando pagamento...</b><br>
+        Assim que você pagar no app do banco, esta tela confirma automaticamente em poucos segundos!
+      </div>
+    </div>
+
+    <!-- Opção Cartão de Crédito -->
+    <div class="cartao-alt" id="blocoCartao">
+      <p>Prefere pagar com cartão de crédito?</p>
+      <a href="#" target="_blank" rel="noopener" class="btn-cartao" id="btnCartaoLink">
+        💳 Pagar com Cartão de Crédito (Asaas)
+      </a>
+    </div>
+  </section>
+
+  <!-- ETAPA 3 - CONFIRMAÇÃO & PISTA -->
+  <section class="cartao" id="etapaConfirmado" aria-live="polite">
+    <div class="ok-badge">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+    </div>
+    <h2 id="confirmadoTitulo">Pagamento Confirmado!</h2>
+    <p class="msg-sub" id="confirmadoSub">Sua vaga está garantida na pista e já vinculada no sistema em tempo real.</p>
+
+    <div class="resumo-box" style="text-align:left; max-width:460px; margin: 0 auto 16px;">
+      <div class="resumo-linha"><span class="label">Status:</span><span class="val" style="color:var(--verde);">🟢 PAGO COM SUCESSO</span></div>
+      <div class="resumo-linha"><span class="label">Piloto:</span><span class="val" id="confPiloto">—</span></div>
+      <div class="resumo-linha"><span class="label">Bateria:</span><span class="val" id="confBateria">—</span></div>
+      <div class="resumo-linha"><span class="label">Grupo:</span><span class="val" id="confGrupo">—</span></div>
+    </div>
+
+    <div class="box-totem">
+      <h3>🏁 No dia da corrida no Kartódromo:</h3>
+      <ol>
+        <li>Vá direto a qualquer <b>totem de autoatendimento</b> na recepção.</li>
+        <li>Digite seu <b id="confDoc">CPF</b> na tela do totem.</li>
+        <li>O totem emitirá sua pulseira de pista e seu kart estará pronto para acelerar!</li>
+      </ol>
     </div>
   </section>
 </main>
@@ -179,21 +337,43 @@
   const $ = (id) => document.getElementById(id);
   const aberto = Date.now();
   let tipo = 'CPF';
-  const reserva = /^[A-Za-z0-9]{10,24}$/.test(new URLSearchParams(location.search).get('r') || '') ? new URLSearchParams(location.search).get('r') : '';
+  const urlParams = new URLSearchParams(location.search);
+  const reserva = /^[A-Za-z0-9]{10,24}$/.test(urlParams.get('r') || '') ? urlParams.get('r') : '';
   const brl = (c) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  const quando = (s) => { const d = new Date(String(s).slice(0, 16) + ':00-03:00'); return isNaN(d) ? '' : d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' }) + ' às ' + String(s).slice(11, 16); };
-  let grupo = null;
-  if (reserva) fetch('/api/grupo?r=' + reserva).then((r) => r.ok ? r.json() : null).then((g) => {
-    if (!g || !g.responsavel) return;
-    grupo = g;
-    const f = $('grupoFaixa');
-    const paga = g.modo === 'individual' && g.precoCentavos > 0;
-    f.innerHTML = '<h2>Grupo do(a) ' + g.responsavel.replace(/[<>&]/g, '') + '</h2><p>' + (g.bateria || 'Bateria').replace(/[<>&]/g, '') + ' · ' + quando(g.inicio) + '. ' +
-      (g.livres > 0 ? (paga ? 'Preencha seu cadastro completo e, no final, pague a sua vaga (<b>' + brl(g.precoCentavos) + '</b>) por Pix ou cartão.' : 'Preencha seu cadastro completo: sua vaga no grupo já fica no seu nome.')
-        : 'Todas as vagas do grupo já têm dono. Faça o cadastro e fale com quem reservou.') + '</p>';
-    f.hidden = false;
-  }).catch(() => {});
+  const quando = (s) => {
+    const d = new Date(String(s).slice(0, 16) + ':00-03:00');
+    return isNaN(d) ? '' : d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' }) + ' às ' + String(s).slice(11, 16);
+  };
   const dig = (v) => v.replace(/\D/g, '');
+
+  let grupo = null;
+  let cobrancaAtiva = null;
+  let intervalPolling = null;
+
+  function setStep(num) {
+    $('step1').className = 'step ' + (num === 1 ? 'ativo' : 'concluido');
+    $('step2').className = 'step ' + (num === 2 ? 'ativo' : (num > 2 ? 'concluido' : ''));
+    $('step3').className = 'step ' + (num === 3 ? 'ativo' : '');
+  }
+
+  // Carrega informações do grupo se tiver ?r=
+  if (reserva) {
+    fetch('/api/grupo?r=' + reserva).then((r) => r.ok ? r.json() : null).then((g) => {
+      if (!g || !g.responsavel) return;
+      grupo = g;
+      const f = $('grupoFaixa');
+      const paga = g.modo === 'individual' && g.precoCentavos > 0;
+      $('grupoTitulo').textContent = 'Grupo do(a) ' + g.responsavel;
+      $('grupoInfo').innerHTML = (g.bateria || 'Bateria').replace(/[<>&]/g, '') + ' · ' + quando(g.inicio) + '.<br>' +
+        (paga ? 'Cadastre-se abaixo e pague a sua vaga individual (<b>' + brl(g.precoCentavos) + '</b>) por Pix instantâneo.'
+              : 'Cadastre seus dados para garantir sua vaga na bateria.');
+      f.hidden = false;
+      if (paga) {
+        $('enviar').textContent = 'Avançar para o Pagamento (' + brl(g.precoCentavos) + ') ›';
+      }
+    }).catch(() => {});
+  }
+
   const mascaras = {
     CPF: (v) => dig(v).slice(0, 11).replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2'),
     fone: (v) => { const d = dig(v).slice(0, 11); return d.length <= 2 ? d.replace(/^(\d{1,2})/, '($1') : d.length <= 6 ? d.replace(/^(\d{2})(\d+)/, '($1) $2') : d.length <= 10 ? d.replace(/^(\d{2})(\d{4})(\d+)/, '($1) $2-$3') : d.replace(/^(\d{2})(\d{5})(\d+)/, '($1) $2-$3'); },
@@ -202,7 +382,7 @@
   };
   const mascarar = (el, f) => el.addEventListener('input', () => { el.value = f(el.value); el.classList.remove('invalido'); });
 
-  // tipo de documento
+  // Tipo de documento
   $('tipoDoc').addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
     tipo = b.dataset.v;
@@ -212,16 +392,35 @@
     d.inputMode = tipo === 'CPF' ? 'numeric' : 'text';
     d.placeholder = tipo === 'CPF' ? '000.000.000-00' : tipo === 'RG' ? 'MG-12.345.678' : 'AB123456';
     d.value = tipo === 'CPF' ? mascaras.CPF(d.value) : d.value;
-    $('prontoDoc').textContent = tipo === 'Passaporte' ? 'passaporte' : tipo;
   });
-  $('documento').addEventListener('input', (e) => { if (tipo === 'CPF') e.target.value = mascaras.CPF(e.target.value); e.target.classList.remove('invalido'); });
+
+  // Checagem de CPF para agilizar fluxo de quem já começou
+  $('documento').addEventListener('input', (e) => {
+    if (tipo === 'CPF') e.target.value = mascaras.CPF(e.target.value);
+    e.target.classList.remove('invalido');
+    const cpfLimpo = dig(e.target.value);
+    if (cpfLimpo.length === 11 && reserva) {
+      fetch('/api/grupo/status?r=' + reserva + '&doc=' + cpfLimpo)
+        .then((r) => r.ok ? r.json() : null)
+        .then((res) => {
+          if (res && res.temCobranca && res.pagamento) {
+            $('grupoAtalho').style.display = 'flex';
+            $('grupoAtalhoTexto').innerHTML = 'Encontramos seu cadastro! Vaga: <b>' + (res.pagamento.pago ? 'PAGA' : 'Aguardando Pagamento') + '</b>';
+            $('btnAtalhoPagamento').onclick = () => {
+              mostrarPagamento(res.pagamento, grupo || res.grupo, res.dados?.nome || $('nome').value);
+            };
+          }
+        }).catch(() => {});
+    }
+  });
+
   mascarar($('telefone'), mascaras.fone);
   mascarar($('nascimento'), mascaras.data);
   mascarar($('cep'), mascaras.cep);
   $('peso').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/[^\d.,]/g, '').slice(0, 5); });
   $('estado').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase(); });
 
-  // CEP → endereço (ViaCEP)
+  // Busca CEP via ViaCEP
   $('cep').addEventListener('input', async (e) => {
     const c = dig(e.target.value); if (c.length !== 8) return;
     try {
@@ -235,13 +434,13 @@
     } catch {}
   });
 
-  // menores
+  // Menores
   const addMenor = () => {
     const d = document.createElement('div');
     d.className = 'menor';
     d.innerHTML = `<button type="button" class="tirar" aria-label="Remover">×</button>
-      <div class="grade"><div class="c6"><label>Nome completo do menor</label><input class="mNome" autocapitalize="words"></div>
-      <div class="c3"><label>Data de nascimento</label><input class="mNasc" inputmode="numeric" placeholder="DD/MM/AAAA"></div>
+      <div class="grade"><div class="c6"><label>Nome completo do menor</label><input class="mNome" autocapitalize="words" required></div>
+      <div class="c3"><label>Data de nascimento</label><input class="mNasc" inputmode="numeric" placeholder="DD/MM/AAAA" required></div>
       <div class="c3"><label>Documento <span class="op">(opcional)</span></label><input class="mDoc"></div></div>`;
     mascarar(d.querySelector('.mNasc'), mascaras.data);
     d.querySelector('.tirar').onclick = () => d.remove();
@@ -258,22 +457,131 @@
   };
   const cpfOk = (v) => { const d = dig(v); if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false; for (const t of [9, 10]) { let s = 0; for (let i = 0; i < t; i++) s += +d[i] * (t + 1 - i); if (((s * 10) % 11) % 10 !== +d[t]) return false; } return true; };
 
-  function mostrarPagamento(pg, g) {
-    const c = $('pagarCaixa');
-    const quem = g && g.responsavel ? ' no grupo do(a) <b>' + g.responsavel.replace(/[<>&]/g, '') + '</b>' : '';
-    if (pg.pago) { c.innerHTML = '<p><b>Pagamento confirmado!</b> Sua vaga' + quem + ' está garantida.</p>'; c.hidden = false; return; }
-    c.innerHTML = '<p>Falta pagar a sua vaga' + quem + ':</p><p class="valor">' + brl(pg.valorCentavos) + '</p>' +
-      '<a class="botao" href="' + encodeURI(pg.link) + '" target="_blank" rel="noopener">Pagar agora · Pix ou cartão</a>' +
-      '<p class="estado" id="pagarEstado">Depois de pagar, esta tela confirma sozinha.</p>';
-    c.hidden = false;
-    const t = setInterval(async () => {
-      try {
-        const s = await (await fetch('/api/grupo/pagamento?id=' + encodeURIComponent(pg.id))).json();
-        if (s.pago) { clearInterval(t); c.innerHTML = '<p><b>Pagamento confirmado!</b> Sua vaga' + quem + ' está garantida. No kartódromo, é só digitar seu CPF no totem.</p>'; }
-      } catch {}
-    }, 6000);
+  // ETAPA 2: MOSTRAR PAGAMENTO
+  function mostrarPagamento(pg, g, nomePiloto) {
+    cobrancaAtiva = pg;
+    if (intervalPolling) clearInterval(intervalPolling);
+
+    // Se já estiver pago, vai direto para a confirmação
+    if (pg.pago) {
+      mostrarConfirmacao(pg, g, nomePiloto);
+      return;
+    }
+
+    setStep(2);
+    $('form').style.display = 'none';
+    $('etapaConfirmado').style.display = 'none';
+    $('etapaPagamento').style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    $('pagamentoPilotoNome').textContent = 'Vaga de ' + (nomePiloto || 'Piloto');
+    $('resumoPiloto').textContent = nomePiloto || 'Piloto';
+    $('resumoBateria').textContent = g && g.bateria ? (g.bateria + ' · ' + quando(g.inicio)) : 'Bateria Kart Betim';
+    $('resumoValor').textContent = brl(pg.valorCentavos);
+    if (g && g.responsavel) {
+      $('resumoGrupo').textContent = g.responsavel;
+      $('resumoGrupoLinha').style.display = 'flex';
+    } else {
+      $('resumoGrupoLinha').style.display = 'none';
+    }
+
+    // Pix Payload e QR Code
+    if (pg.pix && pg.pix.payload) {
+      $('pixPayload').value = pg.pix.payload;
+      $('btnCopiarPix').disabled = false;
+      $('btnCopiarPixTexto').textContent = 'Copiar código Pix';
+      $('btnCopiarPix').classList.remove('copiado');
+      $('alertaPixCopiado').style.display = 'none';
+
+      // QR Code Image
+      if (pg.pix.encodedImage) {
+        $('pixQrImg').src = 'data:image/png;base64,' + pg.pix.encodedImage;
+        $('blocoQrCode').hidden = false;
+      } else {
+        $('blocoQrCode').hidden = true;
+      }
+    } else {
+      $('blocoPix').style.display = 'none';
+    }
+
+    // Link para Cartão de Crédito
+    if (pg.link) {
+      $('btnCartaoLink').href = pg.link;
+      $('blocoCartao').style.display = 'block';
+    } else {
+      $('blocoCartao').style.display = 'none';
+    }
+
+    // Inicia Polling em tempo real
+    iniciarPollingPagamento(pg.id, g, nomePiloto);
   }
 
+  // Copiar código Pix com 1 toque
+  $('btnCopiarPix').addEventListener('click', async () => {
+    const payload = $('pixPayload').value;
+    if (!payload) return;
+    let copiou = false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(payload);
+        copiou = true;
+      }
+    } catch {}
+    if (!copiou) {
+      try {
+        $('pixPayload').focus();
+        $('pixPayload').select();
+        $('pixPayload').setSelectionRange(0, 99999);
+        copiou = document.execCommand('copy');
+      } catch {}
+    }
+    if (copiou) {
+      if (navigator.vibrate) navigator.vibrate([40, 60, 40]);
+      $('btnCopiarPix').classList.add('copiado');
+      $('btnCopiarPixTexto').textContent = '✓ Código Pix copiado!';
+      $('alertaPixCopiado').innerHTML = '✓ <b>Código Pix copiado!</b> Abra o app do seu banco, escolha <b>Pix Copia e Cola</b> e pague.';
+      $('alertaPixCopiado').style.display = 'block';
+    } else {
+      $('pixPayload').focus();
+      $('pixPayload').select();
+      $('btnCopiarPixTexto').textContent = 'Selecione e copie o código:';
+      $('alertaPixCopiado').innerHTML = 'Toque e segure no código abaixo para copiar:';
+      $('alertaPixCopiado').style.display = 'block';
+    }
+  });
+
+  // Polling em tempo real a cada 3 segundos
+  function iniciarPollingPagamento(payId, g, nomePiloto) {
+    if (intervalPolling) clearInterval(intervalPolling);
+    intervalPolling = setInterval(async () => {
+      try {
+        const resp = await fetch('/api/grupo/pagamento?id=' + encodeURIComponent(payId));
+        if (!resp.ok) return;
+        const dados = await resp.json();
+        if (dados.pago) {
+          clearInterval(intervalPolling);
+          if (navigator.vibrate) navigator.vibrate([80, 100, 80]);
+          mostrarConfirmacao(cobrancaAtiva, g, nomePiloto);
+        }
+      } catch {}
+    }, 3000);
+  }
+
+  // ETAPA 3: CONFIRMAÇÃO & PISTA
+  function mostrarConfirmacao(pg, g, nomePiloto) {
+    setStep(3);
+    $('form').style.display = 'none';
+    $('etapaPagamento').style.display = 'none';
+    $('etapaConfirmado').style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    $('confPiloto').textContent = nomePiloto || $('nome').value || 'Piloto';
+    $('confBateria').textContent = g && g.bateria ? (g.bateria + ' (' + quando(g.inicio) + ')') : 'Bateria Oficial Betim';
+    $('confGrupo').textContent = g && g.responsavel ? g.responsavel : 'Reserva individual';
+    $('confDoc').textContent = tipo === 'CPF' ? 'CPF' : tipo;
+  }
+
+  // SUBMIT DO FORMULÁRIO (ETAPA 1)
   $('form').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     $('erro').style.display = 'none';
@@ -282,12 +590,11 @@
     if (tipo === 'CPF' && !cpfOk(doc.value)) return erro('CPF inválido. Confira os números.', doc);
     if (nome.value.trim().split(/\s+/).length < 2) return erro('Informe o nome completo.', nome);
     if (dig(fone.value).length < 10) return erro('Informe o celular com DDD.', fone);
-    if (email.value && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.value.trim())) return erro('E-mail inválido.', email);
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email.value.trim())) return erro('Informe seu e-mail.', email);
     const ig = insta.value.trim().replace(/^(?:https?:\/\/)?(?:www\.)?instagram\.com\//i, '').replace(/[\/?#].*$/, '').replace(/^@/, '').toLowerCase();
     if (!ig) return erro('Informe seu Instagram (o @usuário).', insta);
     if (!/^[a-z0-9_](?:[a-z0-9_.]{0,28}[a-z0-9_])?$/.test(ig) || ig.includes('..')) return erro('Instagram inválido. Informe o @usuário (ex.: @andre.silva).', insta);
     if (!iso(nasc.value)) return erro('Informe a data de nascimento (DD/MM/AAAA).', nasc);
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.value.trim())) return erro('Informe seu e-mail.', email);
     const kg = Number($('peso').value.replace(',', '.'));
     if (!(kg >= 20 && kg <= 250)) return erro('Informe seu peso em kg (entre 20 e 250).', $('peso'));
     if (!$('endereco').value.trim()) return erro('Informe a rua do seu endereço.', $('endereco'));
@@ -295,6 +602,7 @@
     if (!$('bairro').value.trim()) return erro('Informe o bairro.', $('bairro'));
     if (!$('cidade').value.trim()) return erro('Informe a cidade.', $('cidade'));
     if (reserva && grupo && grupo.modo === 'individual' && tipo !== 'CPF') return erro('Para pagar a vaga pelo link do grupo, use o CPF.', doc);
+
     const menores = [...document.querySelectorAll('.menor')].map((m) => ({ nome: m.querySelector('.mNome').value, nascimento: iso(m.querySelector('.mNasc').value), documento: m.querySelector('.mDoc').value, el: m }))
       .filter((m) => m.nome.trim() || m.nascimento);
     for (const m of menores) {
@@ -303,7 +611,7 @@
     }
     if (!$('lgpd').checked) return erro('Para continuar, aceite o Termo de Consentimento para Tratamento de Dados Pessoais.', null);
 
-    const btn = $('enviar'); btn.disabled = true; btn.textContent = 'Enviando…';
+    const btn = $('enviar'); btn.disabled = true; btn.textContent = 'Processando cadastro…';
     try {
       const r = await fetch('/api/pre-cadastro', {
         method: 'POST', headers: { 'content-type': 'application/json' },
@@ -316,15 +624,21 @@
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.erro || 'Não foi possível enviar agora. Tente de novo.');
-      $('form').style.display = 'none';
-      $('prontoTitulo').textContent = `Tudo certo, ${j.nome || ''}!`.replace(', !', '!');
-      $('pronto').style.display = 'block';
-      if (j.pagamento) mostrarPagamento(j.pagamento, j.grupo);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // Se gerou pagamento, avança para a Etapa 2 de Pagamento
+      if (j.pagamento) {
+        mostrarPagamento(j.pagamento, j.grupo || grupo, nome.value);
+      } else {
+        // Se não tem pagamento (ex.: reserva paga pelo responsável), vai direto para a confirmação
+        mostrarConfirmacao(null, j.grupo || grupo, nome.value);
+      }
     } catch (e) {
       erro(e.message, null);
     } finally {
-      btn.disabled = false; btn.textContent = 'Concluir pré-cadastro';
+      btn.disabled = false;
+      btn.textContent = reserva && grupo && grupo.modo === 'individual' && grupo.precoCentavos > 0
+        ? 'Avançar para o Pagamento (' + brl(grupo.precoCentavos) + ') ›'
+        : 'Concluir cadastro e avançar ›';
     }
   });
 })();

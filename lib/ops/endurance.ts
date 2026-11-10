@@ -180,7 +180,7 @@ export async function enduranceDasBaterias(bateriaIds: number[]) {
   if (!bateriaIds.length) return new Map<number, { eventoId: number; nome: string }>();
   const lista = bateriaIds.filter((b) => Number.isInteger(b)).join(',') || '0';
   const rows = await query<{ bateriaId: number; eventoId: number; nome: string }>(`SELECT BateriaId bateriaId, Id eventoId, Nome nome FROM dbo.EnduranceEvento WHERE Ativo = 1 AND BateriaId IN (${lista})`).catch(() => []);
-  return new Map(rows.map((r) => [r.bateriaId, { eventoId: r.eventoId, nome: r.nome }]));
+  return new Map(rows.map((r) => [r.bateriaId, { eventoId: r.eventoId, nome: r.nome }] as const));
 }
 
 export async function equipesParaOTotem(bateriaId: number) {
@@ -196,7 +196,7 @@ export async function equipesParaOTotem(bateriaId: number) {
 /** Chamado pelo /api/totem/inscrever quando a bateria é de endurance: liga cada participante à equipe e dá a pulseira. */
 export async function vincularNoTotem(eventoId: number, equipeId: number | number[], clienteIds: number[]) {
   const ev = await evento(eventoId);
-  const dados=[];
+  const dados: Array<{ clienteId: number; nome: string; origem: string }> = [];
   for (const cid of [...new Set(clienteIds.map(id=>idDe(id,'Piloto')))]) {
     const c = await one<{ nome: string }>(`SELECT Nome nome FROM dbo.Cliente WHERE Id = @id`, { id: cid });
     if(!c) throw new HttpError(404,'Piloto não encontrado.');
@@ -218,14 +218,15 @@ export async function paginaDoChefe(token: string) {
   if (esperado.length !== recebido.length || !timingSafeEqual(esperado, recebido)) throw new HttpError(404, 'Link inválido.');
   const { analise: a, regras, erroCrono } = await analise(ev);
   const pilotos = (await pilotosDo(ev.id)).filter((p) => p.equipeId === eq.id);
-  const pesagens = (await pesagensDo(ev.id)).filter((x) => pilotos.some((p) => p.id === x.pilotoId));
+  const pilotoMap = new Map(pilotos.map((p) => [p.id, p.nome]));
+  const pesagens = (await pesagensDo(ev.id)).filter((x) => pilotoMap.has(x.pilotoId));
   const punicoes = (await punicoesDo(ev.id)).filter((p) => p.equipeId === eq.id);
   return {
     evento: { id: ev.id, nome: ev.nome, data: ev.data }, regras, erroCrono,
     equipe: { id: eq.id, nome: eq.nome, numero: eq.numero, chefeNome: eq.chefeNome },
     pilotos: pilotos.map((p) => ({ nome: p.nome, pulseira: p.pulseira, pesoKg: p.pesoKg, lastroKg: p.lastroKg, chefe: p.chefe, lastroSugerido: p.pesoKg != null ? lastroNecessario(p.pesoKg, regras).lastroKg : null })),
-    pesagens: pesagens.map((x) => ({ ...x, piloto: pilotos.find((p) => p.id === x.pilotoId)?.nome ?? '' })),
-    punicoes: punicoes.map(({ usuario: _u, ...p }) => p),
+    pesagens: pesagens.map((x) => ({ ...x, piloto: pilotoMap.get(x.pilotoId) ?? '' })),
+    punicoes: punicoes.map(({ usuario: _u, ...p }) => { void _u; return p; }),
     analise: a,
     porPiloto: porPiloto(a).filter((x) => x.equipeId === eq.id),
   };
@@ -243,7 +244,7 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
   if (path === '/endurance/eventos' && method === 'GET') {
     send(200, await query(`SELECT ${EVENTO_COLS}, (SELECT COUNT(*) FROM dbo.EnduranceEquipe q WHERE q.EventoId = e.Id) equipes,
       (SELECT COUNT(*) FROM dbo.EndurancePiloto p WHERE p.EventoId = e.Id AND p.Ativo = 1) pilotos FROM dbo.EnduranceEvento e ORDER BY Ativo DESC, Data DESC, Id DESC`)
-      .then((l) => l.map(({ segredo: _s, ...x }) => ({ ...x, regras: lerRegras(x.regras as string) }))));
+      .then((l) => l.map(({ segredo: _s, ...x }) => { void _s; return { ...x, regras: lerRegras(x.regras as string) }; })));
     return true;
   }
   if (path === '/endurance/eventos' && method === 'POST') {
@@ -266,6 +267,7 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
   if (!resto && method === 'GET') {
     const [equipes, pilotos, filas, trocas, pesagens, punicoes, ajustes] = await Promise.all([equipesDo(ev.id), pilotosDo(ev.id), filasDo(ev.id), trocasDo(ev.id), pesagensDo(ev.id), punicoesDo(ev.id), ajustesDo(ev.id)]);
     const { segredo: _s, ...semSegredo } = ev;
+    void _s;
     send(200, {
       evento: { ...semSegredo, regras }, filas, trocas, pesagens, punicoes, ajustes,
       equipes: equipes.map((q) => ({ ...q, token: tokenEquipe(ev, q.id), pilotos: pilotos.filter((p) => p.equipeId === q.id) })),
@@ -331,7 +333,7 @@ export async function enduranceRoutes(req: Req, send: Res): Promise<boolean> {
       method: 'PATCH', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(8_000),
       body: JSON.stringify({ competitors: equipes.map((q) => ({ kart: q.numero, name: q.nome })), semEmailPilotos: true, ...(b.tipo === 'corrida' ? { durationMin: regras.duracaoMin } : {}) }),
     });
-    if (!r.ok) throw new HttpError(502, `A cronometragem recusou (${(await r.json().catch(() => ({}))).error ?? r.status}).`);
+    if (!r.ok) throw new HttpError(502, `A cronometragem recusou (${((await r.json().catch(() => ({}))) as { error?: string }).error ?? r.status}).`);
     await query(b.tipo === 'tomada' ? `UPDATE dbo.EnduranceEvento SET SessaoTomada = @s WHERE Id = @id` : `UPDATE dbo.EnduranceEvento SET SessaoCrono = @s WHERE Id = @id`, { s: sessaoId, id: ev.id });
     send(200, { ok: true, equipes: equipes.length, avisos });
     return true;

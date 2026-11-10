@@ -125,6 +125,7 @@ async function calcularPedidoOnline(input: CouponInput, read: ReadOne, lock: boo
   const codigo = String(input.codigo ?? '').trim().toUpperCase();
   const documento = onlyDigits(input.documento);
   if (!(quantidade >= 1 && quantidade <= c.maxPilotos) || (codigo && !isValidCpf(documento))) throw new HttpError(400, 'Dados do cupom inválidos.');
+  if (codigo && !/^[A-Z0-9_-]{1,40}$/.test(codigo)) throw new HttpError(400, 'Voucher não encontrado.');
 
   const baterias = c.produtosBateria.map(Number).filter((id) => Number.isSafeInteger(id) && id > 0).join(',') || '0';
   const bateria = await read(
@@ -145,7 +146,6 @@ async function calcularPedidoOnline(input: CouponInput, read: ReadOne, lock: boo
   const brutoCentavos = preco * quantidade;
   if (!Number.isSafeInteger(brutoCentavos)) throw new HttpError(400, 'Valor da reserva inválido.');
   if (!codigo) return { brutoCentavos, descontoCentavos: 0, totalCentavos: brutoCentavos, voucherId: null, clienteId: clienteId ?? 0, nome: String(bateria.nome), inicio: String(bateria.inicio) };
-  if (!/^[A-Z0-9_-]{1,40}$/.test(codigo)) throw new HttpError(400, 'Voucher não encontrado.');
 
   const cliente = clienteId ?? Number((await read(
     `SELECT TOP 1 Id id FROM dbo.Cliente WHERE (DocumentoNum = @doc OR Documento = @doc) AND ResponsavelId IS NULL ORDER BY AtualizadoEm DESC`,
@@ -248,7 +248,7 @@ export async function reservarPedido(p: PedidoSite, log: Log): Promise<Resultado
         true,
         clienteId,
       );
-      const inscricoes = await inscreverN(Number(p.bateriaId), clienteId, n, 'site', null, obs, true, { produtoId: c.produtoVenda, clientes: pessoas, run });
+      const inscricoes = await inscreverN(Number(p.bateriaId), clienteId, n, 'site', null, obs, false, { produtoId: c.produtoVenda, clientes: pessoas, run });
       await run(
         `INSERT INTO dbo.ReservaOnline (PedidoId, Codigo, ClienteId, BateriaId, Quantidade, ValorCentavos, Status, Forma, InscricaoIds, Pilotos, ExpiraEm)
          VALUES (@pedido, @codigo, @cliente, @bateria, @n, @valor, 'aguardando', @forma, @insc, @pilotos, DATEADD(minute, @prazo, SYSDATETIME()))`,
@@ -299,7 +299,7 @@ export async function confirmarPagamento(p: PedidoSite, log: Log): Promise<Resul
     // pagou depois do prazo e não deu para devolver as mesmas linhas: segura de novo se ainda houver, para as MESMAS pessoas
     const canceladas = await query<{ ClienteId: number }>(`SELECT ClienteId FROM dbo.Inscricao WHERE Id IN (${insc.join(',') || '0'}) AND Status = 'cancelada' ORDER BY Id`);
     try {
-      const novas = await inscreverN(r.BateriaId, r.ClienteId, r.Quantidade - ativas.length, 'site', null, `Reserva online ${r.Codigo} (paga após o prazo)`, true, { produtoId: configOnline().produtoVenda, clientes: canceladas.length === r.Quantidade - ativas.length ? canceladas.map((x) => x.ClienteId) : undefined });
+      const novas = await inscreverN(r.BateriaId, r.ClienteId, r.Quantidade - ativas.length, 'site', null, `Reserva online ${r.Codigo} (paga após o prazo)`, false, { produtoId: configOnline().produtoVenda, clientes: canceladas.length === r.Quantidade - ativas.length ? canceladas.map((x) => x.ClienteId) : undefined });
       insc = [...ativas.map((a) => a.Id), ...novas];
     } catch (e) {
       await tx(async (run) => {
@@ -312,7 +312,7 @@ export async function confirmarPagamento(p: PedidoSite, log: Log): Promise<Resul
   }
   const unit = Math.round(r.ValorCentavos / Math.max(1, r.Quantidade));
   await tx(async (run) => {
-    await run(`UPDATE dbo.Inscricao SET Pago = 1, ValorCentavos = @unit, Status = 'confirmada', Aprovada = 1, AtualizadoEm = SYSDATETIME() WHERE Id IN (${insc.join(',')})`, { unit });
+    await run(`UPDATE dbo.Inscricao SET Pago = 1, ValorCentavos = @unit, Status = 'confirmada', AtualizadoEm = SYSDATETIME() WHERE Id IN (${insc.join(',')})`, { unit });
     await run(`UPDATE dbo.ReservaOnline SET Status = 'pago', InscricaoIds = @insc, AsaasPagamentoId = @asaas, PagoEm = SYSDATETIME(), Forma = @forma WHERE Id = @id`, { id: r.Id, insc: insc.join(','), asaas: p.pagamento?.asaasId ?? null, forma });
     await run(`UPDATE dbo.ReservaOnlineVoucherUso SET Estado = 'consumido' WHERE PedidoId = @pedido AND Estado IN ('reservado', 'reembolso_pendente')`, { pedido: p.id });
   });

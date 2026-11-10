@@ -66,7 +66,7 @@ export async function readTelaoLayoutConfigFromRemote(): Promise<TelaoLayoutConf
 
     if (!response.ok) throw new Error(`Layout HTTP ${response.status}`);
 
-    const data = await response.json();
+    const data = (await response.json()) as Record<string, unknown>;
     const config = normalizeTelaoLayoutConfig(data?.layout || data);
     memoryConfig = config;
     return config;

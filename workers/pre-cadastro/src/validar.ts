@@ -21,6 +21,8 @@ export type PreCadastro = {
   estado: string;
   menores: Menor[];
   lgpd: true;
+  /** Link da reserva em grupo (?r=TOKEN): vincula a inscrição da bateria a esta pessoa */
+  reserva?: string;
 };
 
 export const digitos = (v: unknown) => String(v ?? '').replace(/\D/g, '');
@@ -54,7 +56,13 @@ export function chaveDocumento(tipo: string, documento: string) {
   return tipo === 'Passaporte' && !d ? documento.toUpperCase().replace(/[^A-Z0-9]/g, '') : d;
 }
 
-export function validar(entrada: Record<string, unknown>, hoje = new Date()): { ok: true; dados: PreCadastro } | { ok: false; erro: string } {
+export function validar(
+  entrada: Record<string, unknown>,
+  hoje = new Date(),
+  opcoes?: { exigirEndereco?: boolean; exigirPeso?: boolean },
+): { ok: true; dados: PreCadastro } | { ok: false; erro: string } {
+  const exigirEndereco = opcoes?.exigirEndereco ?? true;
+  const exigirPeso = opcoes?.exigirPeso ?? true;
   const tipo = (['CPF', 'RG', 'Passaporte'] as const).find((t) => t === entrada.tipoDocumento) ?? 'CPF';
   const documento = txt(entrada.documento, 40);
   const nome = txt(entrada.nome, 120);
@@ -62,22 +70,49 @@ export function validar(entrada: Record<string, unknown>, hoje = new Date()): { 
   const telefone = txt(entrada.telefone, 25);
   const nascimento = txt(entrada.nascimento, 10);
   const peso = txt(entrada.peso, 6).replace(',', '.');
-  const estado = txt(entrada.estado, 2).toUpperCase();
+  const cep = digitos(entrada.cep).slice(0, 8);
+  const endereco = txt(entrada.endereco, 150);
+  const numero = txt(entrada.numero, 20);
+  const complemento = txt(entrada.complemento, 80);
+  const bairro = txt(entrada.bairro, 80);
+  const cidade = txt(entrada.cidade, 80);
+  const estado = String(entrada.estado ?? '').trim().toUpperCase();
+  const reserva = txt(entrada.reserva, 40);
 
   if (!documento) return { ok: false, erro: `Informe o ${tipo === 'Passaporte' ? 'passaporte' : tipo}.` };
   if (tipo === 'CPF' && !cpfValido(documento)) return { ok: false, erro: 'CPF inválido. Confira os números.' };
   if (tipo !== 'CPF' && chaveDocumento(tipo, documento).length < 5) return { ok: false, erro: `${tipo} inválido.` };
   if (nome.split(' ').length < 2) return { ok: false, erro: 'Informe o nome completo.' };
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return { ok: false, erro: 'E-mail inválido.' };
+  if (!email) return { ok: false, erro: 'O e-mail é obrigatório.' };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return { ok: false, erro: 'E-mail inválido.' };
   if (digitos(telefone).length < 10) return { ok: false, erro: 'Informe o celular com DDD.' };
   if (!dataValida(nascimento, hoje)) return { ok: false, erro: 'Data de nascimento inválida.' };
-  if (peso && !(Number(peso) >= 15 && Number(peso) <= 250)) return { ok: false, erro: 'Peso inválido (em kg).' };
-  if (estado && !/^[A-Z]{2}$/.test(estado)) return { ok: false, erro: 'UF inválida.' };
+  if (exigirPeso) {
+    if (!peso) return { ok: false, erro: 'O peso é obrigatório (em kg).' };
+    const pesoNum = Number(peso);
+    if (!Number.isFinite(pesoNum) || pesoNum < 20 || pesoNum > 250) return { ok: false, erro: 'Peso inválido (em kg).' };
+  } else if (peso) {
+    const pesoNum = Number(peso);
+    if (!Number.isFinite(pesoNum) || pesoNum < 20 || pesoNum > 250) return { ok: false, erro: 'Peso inválido (em kg).' };
+  }
+
+  if (exigirEndereco) {
+    if (cep.length !== 8) return { ok: false, erro: 'O CEP é obrigatório (8 dígitos).' };
+    if (!endereco) return { ok: false, erro: 'A rua/endereço é obrigatória.' };
+    if (!numero) return { ok: false, erro: 'O número do endereço é obrigatório.' };
+    if (!bairro) return { ok: false, erro: 'O bairro é obrigatório.' };
+    if (!cidade) return { ok: false, erro: 'A cidade é obrigatória.' };
+    if (!estado || !/^[A-Z]{2}$/.test(estado)) return { ok: false, erro: 'A UF é obrigatória (ex.: MG).' };
+  } else {
+    if (estado && !/^[A-Z]{2}$/.test(estado)) return { ok: false, erro: 'UF inválida.' };
+  }
+
   // obrigatório como no totem: o resultado impresso traz o Instagram de cada piloto (15/10, recepção)
   if (!String(entrada.instagram ?? '').trim()) return { ok: false, erro: 'O Instagram é obrigatório. Informe o @usuário.' };
   const erroInstagram = erroInstagramCliente(entrada.instagram);
   if (erroInstagram) return { ok: false, erro: erroInstagram.replace(' do piloto', '') };
   if (entrada.lgpd !== true) return { ok: false, erro: 'É preciso aceitar o Termo de Consentimento para Tratamento de Dados Pessoais.' };
+  if (reserva && !/^[A-Za-z0-9_-]{8,32}$/.test(reserva)) return { ok: false, erro: 'Código de reserva inválido.' };
 
   const menoresBrutos = Array.isArray(entrada.menores) ? entrada.menores.slice(0, 10) : [];
   const menores: Menor[] = [];
@@ -94,9 +129,9 @@ export function validar(entrada: Record<string, unknown>, hoje = new Date()): { 
     ok: true,
     dados: {
       tipoDocumento: tipo, documento, nome, email, instagram: normalizarInstagram(entrada.instagram), telefone, nascimento, peso,
-      cep: digitos(entrada.cep).slice(0, 8), endereco: txt(entrada.endereco, 150), numero: txt(entrada.numero, 20),
-      complemento: txt(entrada.complemento, 80), bairro: txt(entrada.bairro, 80), cidade: txt(entrada.cidade, 80), estado,
+      cep, endereco, numero, complemento, bairro, cidade, estado: estado.slice(0, 2),
       menores, lgpd: true,
+      ...(reserva ? { reserva } : {}),
     },
   };
 }
@@ -137,7 +172,7 @@ export function validarReserva(entrada: Record<string, unknown>, agenda: Agenda 
   const forma = entrada.forma === 'pix' || entrada.forma === 'cartao' ? entrada.forma : null;
   if (!forma) return { ok: false, erro: 'Escolha Pix ou cartão.' };
   if (entrada.politica !== true) return { ok: false, erro: 'Para reservar, aceite a Política de Cancelamento, Reagendamento e Reembolso.' };
-  const v = validar({ ...entrada, tipoDocumento: 'CPF' }, hoje);
+  const v = validar({ ...entrada, tipoDocumento: 'CPF' }, hoje, { exigirEndereco: false, exigirPeso: false });
   if (!v.ok) return v;
   if (idade(v.dados.nascimento, hoje) < 18) return { ok: false, erro: 'A reserva precisa ser feita por um adulto (18 anos ou mais), que é o responsável pelo pagamento.' };
   // cada vaga é de uma pessoa diferente: quem compra ocupa uma vaga se for pilotar (padrão); cada outra vaga precisa do

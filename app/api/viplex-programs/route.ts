@@ -45,7 +45,7 @@ async function proxyRemote(request: NextRequest, endpoint: string) {
       cache: 'no-store',
       signal: controller.signal,
     });
-    const data = await response.json().catch(() => ({}));
+    const data = (await response.json().catch(() => ({}))) as { error?: unknown } & Record<string, unknown>;
 
     if (request.method === 'GET' && !response.ok) {
       return NextResponse.json(

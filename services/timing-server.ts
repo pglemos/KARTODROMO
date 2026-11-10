@@ -16,7 +16,7 @@ import { invalidarAbertura, kartLiberadoHoje } from '../lib/app-v1/abertura-frot
 import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
-import { appendFileSync, closeSync, copyFileSync, cpSync, createWriteStream, existsSync, fsyncSync, ftruncateSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, copyFileSync, cpSync, createWriteStream, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { extname, join, relative, resolve, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { format } from 'node:util';
@@ -722,6 +722,7 @@ function relargar(s: Session, now: number, autor: string) {
   startSession(s, now);
   registrarObservacao(s, 'Relargada: bandeira verde de novo, o cronômetro recomeça no primeiro kart que passar na linha (passagens anteriores continuam no diário)', autor);
   setTb50Offset(0, 'relargada');
+  setPainelLedPage(0, 'relargada');
 }
 
 /** "19:55" da prova da agenda (ordem do dia); sem prova, a hora de criação. */
@@ -1105,6 +1106,17 @@ try {
 function setPainelLedPage(value: unknown, origem: string) {
   const pagina = normalizarPaginaPainel(value);
   if (pagina === painelLedPage.pagina && painelLedPage.updatedAt) return painelLedPage;
+
+  // Proteção contra resets espúrios: se a página foi alterada recentemente (< 4s) por outro terminal,
+  // ignora pedido de reset para página 0 vindo de máquina diferente.
+  if (pagina === 0 && painelLedPage.pagina !== 0 && painelLedPage.updatedAt) {
+    const decorridoMs = Date.now() - new Date(painelLedPage.updatedAt).getTime();
+    if (decorridoMs < 4000 && origem.trim() !== painelLedPage.origem.trim()) {
+      log(`painel LED COM3: ignorando reset espúrio para pág 0 de ${origem} (${decorridoMs}ms após pág ${painelLedPage.pagina} por ${painelLedPage.origem})`);
+      return painelLedPage;
+    }
+  }
+
   painelLedPage = {
     pagina,
     updatedAt: new Date().toISOString(),
@@ -1369,6 +1381,7 @@ function scheduleStateBroadcast(esperaMs = 150) {
       if (clients.size) broadcast('state', estado);
       if (clientesLeves.size) {
         const { sessions: _sessions, lastQualifying, lastFinished, ...leve } = estado;
+        void _sessions;
         const payload = `event: state\ndata: ${JSON.stringify(estado.runningId ? leve : { ...leve, lastQualifying, lastFinished })}\n\n`;
         for (const res of clientesLeves) res.write(payload);
       }
@@ -1623,10 +1636,10 @@ function equalizacaoDetalhe(s: Session) {
 
 const OPS_URL = process.env.OPS_URL || 'http://192.168.20.13:4060';
 
-async function opsGet(path: string) {
+async function opsGet<T = unknown>(path: string): Promise<T> {
   const r = await fetch(OPS_URL + path, { headers: { 'x-ops-key': process.env.OPS_RECEPCAO_KEY || '' }, signal: AbortSignal.timeout(6000) });
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error((data as { error?: string }).error || `Servidor da operacao respondeu ${r.status}`);
+  const data = (await r.json().catch(() => ({}))) as T & { error?: string };
+  if (!r.ok) throw new Error(data.error || `Servidor da operacao respondeu ${r.status}`);
   return data;
 }
 
@@ -3432,6 +3445,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
         startSession(s, now);
         log(`bateria ${s.name}: BANDEIRA VERDE, aguardando o primeiro kart passar na linha`);
         setTb50Offset(0, 'bandeira verde');
+        setPainelLedPage(0, 'bandeira verde');
       } else if (action === 'checkered' && method === 'POST') {
         setRaceFlag(s, 'checkered', now);
       } else if (action === 'close' && method === 'POST') {
@@ -3507,8 +3521,8 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     let grade: { nome?: string; clienteId?: unknown; kart?: string }[];
     let programa: { nome?: string; tipo?: string; tempoMin?: number; finalizacao?: string; voltasMax?: number; voltaMinimaSeg?: number; trackId?: string | null }[] = [];
     try {
-      grade = await opsGet(`/api/crono/baterias/${agendaId}/grid`);
-      try { programa = await opsGet(`/api/crono/baterias/${agendaId}/programa`); } catch { programa = []; }
+      grade = await opsGet<typeof grade>(`/api/crono/baterias/${agendaId}/grid`);
+      try { programa = await opsGet<typeof programa>(`/api/crono/baterias/${agendaId}/programa`); } catch { programa = []; }
     } catch (err) { return send(res, 502, { error: `Agenda indisponível: ${(err as Error).message}` }); }
     if (!Array.isArray(grade) || !grade.length) return send(res, 400, { error: 'Essa bateria da agenda não tem inscritos.' });
     if (!Array.isArray(programa)) programa = [];
@@ -3590,6 +3604,8 @@ const LEITURA_PELA_INTERNET = new Set([
 function isAllowedPublicReadPath(pathname: string): boolean {
   if (LEITURA_PELA_INTERNET.has(pathname)) return true;
   if (/^\/api\/sessions\/[\w-]+\/laps$/.test(pathname)) return true;
+  if (/^\/api\/sessions(?:\/[\w-]+)?$/.test(pathname)) return true;
+  if (/^\/resultado\/[\w-]+$/.test(pathname)) return true;
   return false;
 }
 

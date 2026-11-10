@@ -111,7 +111,7 @@ export async function readTb50PageFromRemote(): Promise<Tb50PageState> {
       signal: controller.signal,
     });
     if (!response.ok) throw new Error(`Page HTTP ${response.status}`);
-    const data = await response.json();
+    const data = (await response.json()) as Record<string, unknown>;
     const state = normalizeState(data?.page || data, true);
     memoryState = state;
     return state;
@@ -166,7 +166,7 @@ export async function writeTb50PageRemote(offset: unknown): Promise<Tb50PageStat
       cache: 'no-store',
     });
     if (!response.ok) throw new Error(`Page HTTP ${response.status}`);
-    const data = await response.json();
+    const data = (await response.json()) as Record<string, unknown>;
     const state = normalizeState(data?.page || data, true);
     memoryState = state;
     return { ...state, remote: true };
