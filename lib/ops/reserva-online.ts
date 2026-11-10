@@ -513,7 +513,8 @@ export async function sincronizarReservasOnline(log: Log) {
   emParalelo('historicos', () => publicarHistoricosVinculados(log), log, (e) => `app: histórico indisponível agora (${e.message})`);
   emParalelo('clientes-app', () => publicarClientesDoApp(log), log, (e) => `app: cadastros indisponíveis agora (${e.message})`);
   emParalelo('perfil-app', () => sincronizarPerfisDoApp(log), log, (e) => `app: perfil indisponível agora (${e.message})`);
-  const pedidos = (await chamar('/api/sync/pedidos')) as PedidoSite[];
+  // a Cloudflare às vezes leva 15+ s para responder (fila vazia): 10 s gerava ~1 falha por minuto no log. Não sobrepõe (trava 'ocupado').
+  const pedidos = (await chamar('/api/sync/pedidos', {}, 25_000)) as PedidoSite[];
   const resultados: Resultado[] = [];
   for (const p of pedidos) {
     try {
