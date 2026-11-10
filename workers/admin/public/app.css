@@ -760,3 +760,6 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 var(--kib-espaco-meio)
 .btn.icone, .btn.icone.peq { min-width: 44px; }
 .buscaCampo { min-height: 44px; }
 .buscaCampo .btn { min-height: 44px; min-width: 44px; margin: -4px -8px -4px 0; border: 0; background: transparent; }
+
+/* gaveta aberta no desktop: empurra o conteúdo em vez de cobrir sábado/domingo, botões e legenda */
+@media (min-width: 1100px) { body:has(#camada .gaveta) .conteudo { margin-right: 450px; transition: margin-right .15s ease; } }
