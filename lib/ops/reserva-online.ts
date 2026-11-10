@@ -366,9 +366,11 @@ export async function confirmarPagamento(p: PedidoSite, log: Log): Promise<Resul
   // cada vaga recebe a sua parte do valor pago, na proporção do preço dela (Happy Hour: primeira vez R$ 89,90, as outras R$ 99,90)
   const linhasPreco = await query<{ Id: number; PrecoCentavos: number | null }>(`SELECT Id, PrecoCentavos FROM dbo.Inscricao WHERE Id IN (${insc.join(',') || '0'}) ORDER BY Id`);
   const valores = dividirValor(r.ValorCentavos, linhasPreco.map((l) => Number(l.PrecoCentavos ?? 0)));
+  const unit = Math.round(r.ValorCentavos / Math.max(1, r.Quantidade));
   await tx(async (run) => {
-    for (const [k, l] of linhasPreco.entries()) {
-      await run(`UPDATE dbo.Inscricao SET Pago = 1, ValorCentavos = @valor, Status = 'confirmada', AtualizadoEm = SYSDATETIME() WHERE Id = @id`, { id: l.Id, valor: valores[k] });
+    await run(`UPDATE dbo.Inscricao SET Pago = 1, ValorCentavos = @unit, Status = 'confirmada', AtualizadoEm = SYSDATETIME() WHERE Id IN (${insc.join(',')})`, { unit });
+    if (linhasPreco.length === insc.length && new Set(linhasPreco.map((l) => l.PrecoCentavos)).size > 1) {
+      for (const [k, l] of linhasPreco.entries()) await run(`UPDATE dbo.Inscricao SET ValorCentavos = @valor WHERE Id = @id`, { id: l.Id, valor: valores[k] });
     }
     await run(`UPDATE dbo.ReservaOnline SET Status = 'pago', InscricaoIds = @insc, AsaasPagamentoId = @asaas, PagoEm = SYSDATETIME(), Forma = @forma WHERE Id = @id`, { id: r.Id, insc: insc.join(','), asaas: p.pagamento?.asaasId ?? null, forma });
     await run(`UPDATE dbo.ReservaOnlineVoucherUso SET Estado = 'consumido' WHERE PedidoId = @pedido AND Estado IN ('reservado', 'reembolso_pendente')`, { pedido: p.id });
