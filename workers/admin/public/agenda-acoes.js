@@ -128,7 +128,12 @@ const AgendaAcoes = (() => {
     const ok = m.querySelector('#xOk'); if (!ok) return;
     ok.onclick = async () => {
       ok.disabled = true;
-      try { await office(`/baterias/${b.id}`, { method: 'DELETE' }); toast('Bateria excluída'); C.A.sel = null; fecharCamada(); await C.carregar(); }
+      try {
+        await office(`/baterias/${b.id}`, { method: 'DELETE' });
+        if (n === 0) toastAcao('Bateria excluída', 'Desfazer', async () => { try { await office(`/baterias/${b.id}/restaurar`, { method: 'POST', body: { status: b.status === 'fechada' ? 'fechada' : 'aberta' } }); toast('Bateria restaurada'); await C.carregar(); } catch (e) { falhou(e); } });
+        else toast('Bateria excluída. As reservas dela foram canceladas');
+        C.A.sel = null; fecharCamada(); await C.carregar();
+      }
       catch (e) { m.querySelector('#xErro').textContent = e.message; ok.disabled = false; }
     };
   }
@@ -161,8 +166,18 @@ const AgendaAcoes = (() => {
     m.querySelector('#fdOk').onclick = async () => {
       const ok = m.querySelector('#fdOk'); ok.disabled = true;
       try {
-        const r = await office('/baterias/fechar-dia', { method: 'POST', body: { data: m.querySelector('#fdData').value } });
-        toast(`${r.canceladas} ${r.canceladas === 1 ? 'bateria cancelada' : 'baterias canceladas'}${r.mantidas ? ` · ${r.mantidas} com reserva continuam` : ''}`);
+        const dia = m.querySelector('#fdData').value;
+        const antes = await office(`/baterias?status=todas&filtro=entre&data=${dia}&ate=${dia}`).catch(() => []);
+        const alvos = antes.filter((x) => x.status !== 'cancelada' && !(+x.inscritos));
+        const r = await office('/baterias/fechar-dia', { method: 'POST', body: { data: dia } });
+        const msg = `${r.canceladas} ${r.canceladas === 1 ? 'bateria cancelada' : 'baterias canceladas'}${r.mantidas ? ` · ${r.mantidas} com reserva continuam` : ''}`;
+        if (r.canceladas && alvos.length) toastAcao(msg, 'Desfazer', async () => {
+          const falhas = [];
+          for (const x of alvos) { try { await office(`/baterias/${x.id}/restaurar`, { method: 'POST', body: { status: x.status === 'fechada' ? 'fechada' : 'aberta' } }); } catch (e) { falhas.push(e.message); } }
+          if (falhas.length) toast(`Restaurei parte do dia. Falhou: ${falhas[0]}`, true); else toast('Dia reaberto');
+          await C.carregar();
+        });
+        else toast(msg);
         C.A.sel = null; fecharCamada(); await C.carregar();
       } catch (e) { m.querySelector('#fdErro').textContent = e.message; ok.disabled = false; }
     };
@@ -294,18 +309,26 @@ const AgendaAcoes = (() => {
     m.querySelector('#mvOk').onclick = async () => {
       const alvo = lista.find((b) => b.id === escolhida); if (ocupado || !alvo || motivo(alvo)) return;
       ocupado = true; m.querySelector('#mvOk').disabled = true; m.querySelector('#mvErro').textContent = '';
-      const falhas = [], pendentes = []; let feitas = 0;
+      const falhas = [], pendentes = [], feitosPath = []; let feitas = 0;
       const processados = new Set();
       for (const r of reservas) {
         const grupoId = grupoPorInscricao.get(r.id);
         if (grupoId && processados.has(grupoId)) continue;
         if (grupoId) processados.add(grupoId);
         const membros = grupoId ? reservas.filter((x) => grupoPorInscricao.get(x.id) === grupoId) : [r];
-        try { await office(grupoId ? `/grupos/${grupoId}/mover` : `/reservas/${r.id}/mover`, { method: 'POST', body: { bateriaId: alvo.id } }); feitas += membros.length; }
+        try { const rota = grupoId ? `/grupos/${grupoId}/mover` : `/reservas/${r.id}/mover`; await office(rota, { method: 'POST', body: { bateriaId: alvo.id } }); feitosPath.push(rota); feitas += membros.length; }
         catch (e) { pendentes.push(...membros); falhas.push(`${r.cliente}: ${e.message}`); }
       }
       ocupado = false;
-      if (!falhas.length) { toast(feitas === 1 ? 'Cliente movido' : `${feitas} clientes movidos`); C.A.sel = origem.id; fecharCamada(); await C.recarregar(); return; }
+      if (!falhas.length) {
+        toastAcao(feitas === 1 ? 'Cliente movido' : `${feitas} clientes movidos`, 'Desfazer', async () => {
+          const erros = [];
+          for (const rota of feitosPath) { try { await office(rota, { method: 'POST', body: { bateriaId: origem.id } }); } catch (e) { erros.push(e.message); } }
+          if (erros.length) toast(`Não deu para devolver tudo: ${erros[0]}`, true); else toast('Movimento desfeito');
+          await C.recarregar();
+        });
+        C.A.sel = origem.id; fecharCamada(); await C.recarregar(); return;
+      }
       m.querySelector('#mvErro').textContent = (feitas ? `${feitas} movido(s). Não deu para mover: ` : 'Não foi possível mover: ') + falhas.join(' · ');
       reservas = pendentes; alvo.disponiveis = Math.max(0, Number(alvo.disponiveis) - feitas); pintar();
       if (feitas) await C.carregar().catch(() => undefined);

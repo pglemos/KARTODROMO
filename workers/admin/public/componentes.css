@@ -150,7 +150,6 @@ kbd.atalho { margin-left: var(--kib-espaco-1); padding: 0 var(--kib-espaco-meio)
   .navItem, .buscaBtn, .fechar, .passo button, .btn.icone, .btn.icone.peq, .btn.link, .btn.link.peq, .dicaDet > summary { min-height: 44px; min-width: 44px; }
   kbd.atalho { display: none; }
 }
-@media (max-width: 480px) { [data-vista="semana"] { display: none; } }
 
 /* ---------- diálogo próprio (confirmar / escolher forma): por cima da janela aberta */
 .veuTopo { position: fixed; inset: 0; z-index: 400; display: flex; align-items: center; justify-content: center; background: var(--kib-cor-sobreposicao); padding: var(--kib-espaco-2); }

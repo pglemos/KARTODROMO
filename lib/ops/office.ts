@@ -1535,6 +1535,21 @@ export async function officeRoutes(req: Req, send: Res): Promise<boolean> {
     send(200, { ok: true });
     return true;
   }
+  if ((m = path.match(/^\/baterias\/(\d+)\/restaurar$/)) && method === 'POST') {
+    // desfazer de "excluir bateria" e "fechar o dia": só volta uma bateria cancelada que continua sem nenhuma reserva ativa
+    await exigePodeFecharBateria(sessao);
+    const id = Number(m[1]);
+    const b = await req.body();
+    const status = b.status === 'fechada' ? 'fechada' : 'aberta';
+    const ativas = await one<{ n: number }>(`SELECT COUNT(*) n FROM dbo.Inscricao WHERE BateriaId = @id AND Status <> 'cancelada'`, { id });
+    if ((ativas?.n ?? 0) > 0) throw new HttpError(409, 'Esta bateria já tem reservas: não dá para restaurar.');
+    const r = await one<{ n: number }>(
+      `UPDATE dbo.Bateria SET Status = @status OUTPUT 1 n WHERE Id = @id AND Status = 'cancelada'`, { status, id },
+    );
+    if (!r) throw new HttpError(409, 'A bateria não está cancelada.');
+    send(200, { ok: true });
+    return true;
+  }
   if ((m = path.match(/^\/baterias\/(\d+)\/status$/)) && method === 'POST') {
     const b = await req.body();
     const status = b.status === 'fechada' ? 'fechada' : 'aberta';

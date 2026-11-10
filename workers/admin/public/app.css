@@ -764,3 +764,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 var(--kib-espaco-meio)
 /* gaveta aberta no desktop: empurra o conteúdo em vez de cobrir sábado/domingo, botões e legenda */
 @media (min-width: 1100px) { body:has(#camada .gaveta) .conteudo { margin-right: 450px; transition: margin-right .15s ease; } }
 @media (min-width: 1100px) { body:has(#camada .gaveta) .agendaLado { display: none; } body:has(#camada .gaveta) .semana2 { min-width: 820px; } }
+
+/* barra do Selecionar: centralizada na área de conteúdo (sem invadir a barra lateral) */
+@media (min-width: 761px) { .agBarraLote { left: calc(50% + 109px); } }
+/* Semana também no celular: a grade rola na horizontal em vez de espremer as colunas */
+@media (max-width: 760px) { #calendario .semana2 { min-width: 720px; } #calendario .rolagemX { overflow-x: auto; -webkit-overflow-scrolling: touch; } }
