@@ -57,6 +57,7 @@ new MutationObserver(() => {
 
 document.addEventListener('keydown', (e) => {
   if (e.key !== '?' || !S.token || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  if (/^#\/agenda/.test(location.hash)) return; // na agenda a tecla ? abre a ajuda da própria agenda
   location.hash = '#/ajuda';
 });
 

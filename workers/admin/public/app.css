@@ -754,3 +754,9 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 var(--kib-espaco-meio)
 .agendaLayout .bloco2, .agendaLayout .pistaProx, .agendaLayout .seg button, .agendaLayout .filtroTipo, .agendaLayout .filtroDet > summary, .cabDia, .agendaLayout .linhaDia, .agendaLayout .linhaLado, [data-nav] { min-height: 44px; }
 .agendaLayout .buscaCampo { min-height: 44px; }
 .agendaLayout .buscaCampo input { min-height: 40px; }
+
+/* alvos de 44px no painel inteiro (sidebar, cabeçalho e agenda) */
+.navItem, .buscaBtn, .btn, .btn.peq, .btn.icone, .btn.icone.peq, .seg button, #qAg { min-height: 44px; }
+.btn.icone, .btn.icone.peq { min-width: 44px; }
+.buscaCampo { min-height: 44px; }
+.buscaCampo .btn { min-height: 44px; min-width: 44px; margin: -4px -8px -4px 0; border: 0; background: transparent; }
