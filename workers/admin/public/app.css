@@ -716,7 +716,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 var(--kib-espaco-meio)
 .linhaMover > .col { grid-column: 2 / 4; }
 .linhaMover > .col .trunc { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 .linhaMover > .chip { grid-column: 2; justify-self: start; }
-.linhaMover > .acoesLinha { grid-column: 3; display: flex; gap: var(--kib-espaco-meio); }
+.linhaMover > .acoesLinha { grid-column: 2 / 4; grid-row: 3; display: flex; flex-wrap: wrap; justify-content: flex-start; gap: var(--kib-espaco-meio); }
 .linhaMover:hover { background: var(--sup2); }
 @media (max-width: 760px), (pointer: coarse) { .linhaDestino, .linhaMover { min-height: var(--kib-componente-controle-alvo-toque); } .linhaMover .btn { min-height: var(--kib-componente-controle-alvo-toque); } }
 
@@ -746,7 +746,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 var(--kib-espaco-meio)
 @media (max-width: 760px) { .agBarraLote { bottom: var(--kib-espaco-1); } .agBarraAcoes { width: 100%; } .agBarraAcoes .btn { flex: 1 1 auto; } }
 
 /* agenda: chip de tipo em texto (estado nunca só por cor) e alvos de 44px também no desktop */
-.bloco2 .tipoB { padding: 0 4px; border-radius: 3px; border: 1px solid currentColor; font-size: 12px; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; white-space: nowrap; }
+.bloco2 .tipoB { margin-right: 4px; padding: 0 4px; border-radius: 3px; border: 1px solid currentColor; font-size: 12px; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; white-space: nowrap; }
 .agendaLayout .btn.peq, .agendaLayout .btn.icone.peq, .agendaLayout .btn.icone { min-height: 44px; }
 .agendaLayout .btn.icone, .agendaLayout .btn.icone.peq { min-width: 44px; }
 .agendaLayout .miniCal button, .agendaLayout #miniCal button { min-height: 44px; height: 44px; }

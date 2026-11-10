@@ -635,10 +635,10 @@ TELAS.agenda = async (tela) => {
     const titulo = tituloBat(b, tp, true), dir = livresTxt(b, st, tp);
     const devendo = st !== 'fim' && falta(b) && tp !== 'livre', aPagar = devendo && (urgente(b) || A.sel === b.id) ? `<span class="aPagarB">${pagCurto(b)}</span>` : '';
     const dica = [T.t, titulo, dir, devendo ? pagLongo(b) : ''].filter(Boolean).join(' · ');
-    const chipTipo = tp !== 'livre' ? `<span class="tipoB">${T.curto}</span>` : '';
+    const chipTipo = ['camp', 'evento'].includes(tp) ? `<span class="tipoB">${T.curto}</span>` : ''; // fechada/bloqueada já dizem o estado em texto
     return `<button class="${cls}" data-sel="${b.id}" title="${esc(dica)}" style="${estilo}" aria-label="${esc(`${horaDe(b.dataHora)}, ${titulo}, ${T.t}, ${dir}`)}">
-      <span class="linha1"><span class="mono hora">${horaDe(b.dataHora)}</span>${chipTipo}${st === 'prevista' ? `<span class="naPista" title="Bateria no horário previsto${dir ? ' · ' + esc(dir) : ''}">NO HORÁRIO</span>` : `<span class="dirB">${dir}</span>`}</span>
-      ${tp === 'livre' ? '' : `<span class="tituloB trunc">${esc(titulo)}</span>${aPagar}<span class="barraB" style="width: ${Math.round(Math.min(1, n / vagas) * 100)}%; background: ${T.cheio}"></span>`}</button>`;
+      <span class="linha1"><span class="mono hora">${horaDe(b.dataHora)}</span>${st === 'prevista' ? `<span class="naPista" title="Bateria no horário previsto${dir ? ' · ' + esc(dir) : ''}">NO HORÁRIO</span>` : `<span class="dirB">${dir}</span>`}</span>
+      ${tp === 'livre' ? '' : `<span class="tituloB trunc">${chipTipo}${esc(titulo)}</span>${aPagar}<span class="barraB" style="width: ${Math.round(Math.min(1, n / vagas) * 100)}%; background: ${T.cheio}"></span>`}</button>`;
   };
 
   const pintar = () => {
