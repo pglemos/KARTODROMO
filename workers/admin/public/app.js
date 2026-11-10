@@ -597,7 +597,7 @@ TELAS.agenda = async (tela) => {
       // sem conexão: a tela antiga continua, mas o aviso fica claro e a próxima tentativa é automática (a cada 30 s)
       if (!offlineDesde) offlineDesde = new Date().toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' });
       const at = $('#atualizado'); if (at) { at.textContent = ` · sem conexão desde ${offlineDesde}, tentando de novo`; at.style.color = 'var(--avisoTxt)'; }
-      if (!bats.length) {
+      if (!bats.length || periodoCarregado !== chavePeriodo) { // período novo que não carregou: não mostra a grade do período anterior
         bats = []; periodoCarregado = null;
         cal.innerHTML = `<div class="vazio" role="alert"><b>Não foi possível carregar este período</b><span>${esc(e.message)}</span><button class="btn sec" data-ag-repetir>Tentar novamente</button></div>`;
         const ap = $('#aPagar'); if (ap) ap.innerHTML = '';
@@ -633,9 +633,11 @@ TELAS.agenda = async (tela) => {
     const cls = ['bloco2', tp === 'livre' ? 'livre' : tp === 'bloq' ? 'bloq' : '', st === 'fim' ? 'passou' : '', st === 'prevista' ? 'pista' : '', A.sel === b.id ? 'sel' : '', estaFechada(b) ? 'agFechada' : ''].filter(Boolean).join(' ');
     const estilo = tp === 'livre' || tp === 'bloq' ? '' : `${T.fundo}; --faixa: ${T.cor}`;
     const titulo = tituloBat(b, tp, true), dir = livresTxt(b, st, tp);
-    const aPagar = st !== 'fim' && falta(b) && tp !== 'livre' ? `<span class="aPagarB">${pagCurto(b)}</span>` : '';
-    return `<button class="${cls}" data-sel="${b.id}" style="${estilo}" aria-label="${esc(`${horaDe(b.dataHora)}, ${titulo}, ${T.t}, ${dir}`)}">
-      <span class="linha1"><span class="mono hora">${horaDe(b.dataHora)}</span>${st === 'prevista' ? `<span class="naPista" title="Bateria no horário previsto${dir ? ' · ' + esc(dir) : ''}">NA PISTA</span>` : `<span class="dirB">${dir}</span>`}</span>
+    const devendo = st !== 'fim' && falta(b) && tp !== 'livre', aPagar = devendo && (urgente(b) || A.sel === b.id) ? `<span class="aPagarB">${pagCurto(b)}</span>` : '';
+    const dica = [T.t, titulo, dir, devendo ? pagLongo(b) : ''].filter(Boolean).join(' · ');
+    const chipTipo = ['camp', 'evento', 'bloq'].includes(tp) ? `<span class="tipoB">${T.curto}</span>` : '';
+    return `<button class="${cls}" data-sel="${b.id}" title="${esc(dica)}" style="${estilo}" aria-label="${esc(`${horaDe(b.dataHora)}, ${titulo}, ${T.t}, ${dir}`)}">
+      <span class="linha1"><span class="mono hora">${horaDe(b.dataHora)}</span>${chipTipo}${st === 'prevista' ? `<span class="naPista" title="Bateria no horário previsto${dir ? ' · ' + esc(dir) : ''}">NA PISTA</span>` : `<span class="dirB">${dir}</span>`}</span>
       ${tp === 'livre' ? '' : `<span class="tituloB trunc">${esc(titulo)}</span>${aPagar}<span class="barraB" style="width: ${Math.round(Math.min(1, n / vagas) * 100)}%; background: ${T.cheio}"></span>`}</button>`;
   };
 
@@ -676,7 +678,7 @@ TELAS.agenda = async (tela) => {
       }).join('');
       const colunasCss = dias.map((dia) => (bats.some((b) => b.dataHora.startsWith(dia)) ? 'minmax(0, 1fr)' : 'minmax(0, .45fr)')).join(' ');
       novoHtml = `${faixaPista()}<div class="rolagemX"><div class="semana2"><div class="linhaSemana cabSemana" style="grid-template-columns: ${colunasCss}">${cab}</div><div class="linhaSemana" style="grid-template-columns: ${colunasCss}">${colunas}</div></div></div>
-        <div class="legendaAg"><span><span class="amostra" style="${amostra('livre', true)}"></span>Livre para reservar</span><span><span class="amostra" style="background: var(--kib-cor-agenda-reserva-fundo); box-shadow: inset 3px 0 0 var(--kib-cor-estado-aviso-solido)"></span>Com reserva, evento ou campeonato</span><span><span class="amostra" style="box-shadow: inset 0 0 0 2px var(--kib-cor-estado-perigo-solido)"></span>Horário previsto agora</span><span class="atalhos">Atalhos: <kbd>N</kbd> nova reserva · <kbd>T</kbd> hoje · <kbd>←</kbd><kbd>→</kbd> semana · <kbd>D</kbd><kbd>S</kbd><kbd>L</kbd> vista · <kbd>Esc</kbd> fecha</span></div>`;
+        <div class="legendaAg">${ORDEM_TIPOS.map((t) => `<span><span class="amostra" style="${amostra(t, true)}"></span>${TIPOS[t].t}</span>`).join('')}<span><span class="amostra" style="box-shadow: inset 0 0 0 2px var(--kib-cor-estado-perigo-solido)"></span>Horário previsto agora</span><span class="atalhos">Atalhos: <kbd>N</kbd> nova reserva · <kbd>T</kbd> hoje · <kbd>←</kbd><kbd>→</kbd> semana · <kbd>D</kbd><kbd>S</kbd><kbd>L</kbd> vista · <kbd>Esc</kbd> fecha</span></div>`;
     } else if (A.vista === 'dia') {
       const todos = bats.filter((b) => b.dataHora.startsWith(A.base)), doDia = filtrar(todos);
       const d = deIso(A.base), ins = todos.reduce((a, b) => a + (+b.inscritos || 0), 0);

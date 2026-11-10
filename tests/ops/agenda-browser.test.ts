@@ -48,7 +48,7 @@ describe('Agenda: integração real do frontend sem dados de produção',()=>{
   expect(await page.locator('[data-acao="novaReserva"]').count()).toBe(0);expect(errors).toEqual([]);await page.close();
  });
  it('não oferece cobrança de sinal zero e calcula capacidade líquida do grupo',async()=>{
-  await page.route('**/api/office/grupos/87',route=>json(route,{...g,disponiveis:10}));
+  await page.route(/\/api\/office\/grupos\/87(\?.*)?$/,route=>json(route,{...g,disponiveis:10}));
   await page.locator('#calendario [data-sel="394"]').first().click();await page.locator('[data-grupo-abrir]').first().click();await page.locator('[data-cancelar-grupo]').waitFor();
   expect(await page.locator('[data-cobrar=""]').count()).toBe(0);expect(await page.locator('#camada').innerText()).toContain('até 25');expect(errors).toEqual([]);await page.close();
  });
@@ -92,7 +92,7 @@ describe('Agenda: integração real do frontend sem dados de produção',()=>{
  });
  it('atualiza o grupo aberto sem trocar o contexto da janela',async()=>{
   await page.locator('#calendario [data-sel="394"]').first().click();await page.locator('[data-grupo-abrir]').first().click();await page.locator('[data-grupo-atualizar]').waitFor();
-  await page.route('**/api/office/grupos/87',route=>json(route,{...g,pago:14500,falta:203000}));
+  await page.route(/\/api\/office\/grupos\/87(\?.*)?$/,route=>json(route,{...g,pago:14500,falta:203000}));
   await page.locator('[data-grupo-atualizar]').click();await page.waitForTimeout(100);expect(await page.locator('#camada').innerText()).toContain('2.030');expect(errors).toEqual([]);await page.close();
  });
  it('repetição após falha de resposta mantém chave de recebimento',async()=>{

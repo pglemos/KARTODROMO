@@ -744,3 +744,9 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 var(--kib-espaco-meio)
 .agBarraAcoes { display: flex; flex-wrap: wrap; gap: var(--kib-espaco-meio); }
 @media (pointer: coarse) { #calendario .bloco2, #calendario .linhaDia, #calendario .pistaProx { min-height: var(--kib-componente-controle-alvo-toque); } .agBarraAcoes .btn { min-height: var(--kib-componente-controle-alvo-toque); } }
 @media (max-width: 760px) { .agBarraLote { bottom: var(--kib-espaco-1); } .agBarraAcoes { width: 100%; } .agBarraAcoes .btn { flex: 1 1 auto; } }
+
+/* agenda: chip de tipo em texto (estado nunca só por cor) e alvos de 44px também no desktop */
+.bloco2 .tipoB { padding: 0 4px; border-radius: 3px; border: 1px solid currentColor; font-size: 9.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; opacity: .85; }
+.agendaLayout .btn.peq, .agendaLayout .btn.icone.peq, .agendaLayout .btn.icone { min-height: 44px; }
+.agendaLayout .btn.icone, .agendaLayout .btn.icone.peq { min-width: 44px; }
+.agendaLayout .miniCal button, .agendaLayout #miniCal button { min-height: 44px; height: 44px; }
