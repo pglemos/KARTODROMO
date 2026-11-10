@@ -1014,7 +1014,8 @@ public class FormTotem : Form, IMessageFilter
             var termos = r["termoUrls"] is JsonArray urls
                 ? urls.Select(u => u.GetValue<string>()).ToArray()
                 : r.S("termoUrl") is { Length: > 0 } termo ? new[] { termo } : Array.Empty<string>();
-            if (termos.Length > 0) _ = Task.Run(() => Imprimir(termos));
+            // precisa rodar na thread da tela (STA): o WebView2 que imprime o termo falha com RPC_E_CHANGED_MODE em thread do pool
+            if (termos.Length > 0) _ = Imprimir(termos);
         }
     }
 
