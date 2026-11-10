@@ -10,7 +10,7 @@
  * Quando um piloto fica coberto, a vaga dele é marcada paga (Inscricao.Pago, como o "pago antecipado" da Recepção).
  * Pagamento feito no caixa da Recepção ou pelo site também conta (a vaga já vem paga).
  */
-import { createHmac, randomBytes } from 'node:crypto';
+import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { insertCliente, one, onlyDigits, query, tx, type ClienteInput } from './db';
 import { HttpError, cancelarReserva, exigePodeFecharBateria, exigePermissaoOffice, inscreverN, moverReservas } from './office';
 import type { Sessao } from './auth';
@@ -1175,6 +1175,12 @@ export async function tipoDaBateria(bateriaId: number, tipo: string, anterior?: 
 // ---------------------------------------------------------------- link único do grupo no site (cadastro + pagamento)
 
 let ultimoResumoSite = '';
+/** sha256 de "cpf:<11 dígitos>" ou "fone:<últimos 8 dígitos>" (o worker calcula igual com o que a pessoa digitou). */
+export function hashContato(tipo: 'cpf' | 'fone', v: unknown) {
+  const d = onlyDigits(v);
+  const base = tipo === 'cpf' ? (d.length === 11 ? d : '') : d.length >= 8 ? d.slice(-8) : '';
+  return base ? createHash('sha256').update(`${tipo}:${base}`).digest('hex') : null;
+}
 /** O que o organizador vê no painel: totais e cada vaga (primeiro nome, cadastro, pagamento, termo e o link próprio). */
 export function resumoPainel(g: ReturnType<typeof montar>) {
   return {
@@ -1191,8 +1197,9 @@ export function resumoPainel(g: ReturnType<typeof montar>) {
  */
 export async function publicarGruposNoSite(log: Log) {
   if (!siteUrl() || !siteChave()) return 0;
-  const gs = await query<{ id: number; codigo: string; modo: string; preco: number; sinalPct: number; status: string; bateria: string; inicio: string; responsavel: string }>(
-    `SELECT g.Id id, g.Codigo codigo, g.Modo modo, g.PrecoCentavos preco, g.SinalPct sinalPct, g.Status status, b.Nome bateria, CONVERT(varchar(16), b.Inicio, 126) inicio, r.Nome responsavel
+  const gs = await query<{ id: number; codigo: string; modo: string; preco: number; sinalPct: number; status: string; bateria: string; inicio: string; responsavel: string; respDoc: string | null; respFone: string | null }>(
+    `SELECT g.Id id, g.Codigo codigo, g.Modo modo, g.PrecoCentavos preco, g.SinalPct sinalPct, g.Status status, b.Nome bateria, CONVERT(varchar(16), b.Inicio, 126) inicio, r.Nome responsavel,
+            r.Documento respDoc, r.Telefone respFone
        FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId JOIN dbo.Cliente r ON r.Id = g.ResponsavelId
       WHERE g.Status = 'ativa' AND b.Inicio > DATEADD(hour, -2, SYSDATETIME())`,
   );
@@ -1218,6 +1225,8 @@ export async function publicarGruposNoSite(log: Log) {
       tokens: dele.map((v) => v.token).filter(Boolean), codigo: g.codigo, status: g.status, modo: g.modo, precoCentavos: Number(g.preco) || 0,
       bateria: g.bateria, inicio: g.inicio, responsavel: primeiroNome(g.responsavel), livres: dele.reduce((s, v) => s + v.livre, 0),
       painel: c ? resumoPainel(c) : null,
+      // o link do grupo é o do responsável e vai para todo mundo: o site só cobra o grupo inteiro de quem tem o CPF (ou o celular) dele
+      respDocHash: hashContato('cpf', g.respDoc), respFoneHash: hashContato('fone', g.respFone),
     };
   });
   const json = JSON.stringify({ grupos });

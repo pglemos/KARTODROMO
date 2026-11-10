@@ -19,3 +19,12 @@ O link do grupo (`?r=`) continua o mesmo, compartilhado com todos. Por isso o pa
 4. Publicar o admin.
 
 Se o worker for publicado antes do SRVKART, o painel responde 404 até o primeiro resumo novo chegar.
+
+## Correção da cobrança pelo link do grupo (10/11, 16h)
+O link do grupo é o token do responsável e vai para todos. Nos modos `unico` e `sinal`, quem se cadastrasse por ele
+recebia a cobrança do grupo inteiro. Agora o SRVKART manda `respDocHash`/`respFoneHash` (sha256 de `cpf:<11>` / `fone:<últimos 8>`)
+e o worker (`worker-responsavel.mjs`) só cobra quando o CPF (ou, sem CPF, o celular) é do responsável. O `GET /api/grupo` não
+anuncia cobrança do grupo antes do envio.
+
+Bundle no ar = `worker-responsavel.mjs(worker-painel.mjs(index-antes-painel.js))`. Para reverter, suba `index-antes-painel.js`.
+No SRVKART ficaram as cópias `grupos.antes-painel.ts` (original) e `grupos.antes-resp.ts` (só com o painel).

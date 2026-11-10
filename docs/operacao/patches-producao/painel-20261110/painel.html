@@ -66,6 +66,9 @@
   .placar dd { margin: 0; font: 700 26px/1 var(--corpo); }
   .placar dd small { font-size: 15px; color: var(--apagado); font-weight: 600; }
   .placar dd.ok { color: var(--neon); }
+  .placar dd.pend { color: var(--ambar); font-size: 22px; }
+  .vaga > .btn.mini { grid-column: 2 / -1; justify-self: start; margin-top: 6px; }
+  .btn.mini { min-height: 40px; padding: 0 12px; font-size: 13px; border-color: var(--ambar); color: var(--ambar); }
 
   /* convite */
   .convite { margin: 26px 0 0; padding: 18px; border: 1px solid var(--neon-borda); background: linear-gradient(180deg, rgba(0,230,118,.08), rgba(0,230,118,.02)); border-radius: 6px; }
@@ -184,11 +187,13 @@
     catch { window.prompt('Copie o link:', texto); }
   }
   const zap = (texto) => 'https://wa.me/?text=' + encodeURIComponent(texto);
-  const pronta = (d, v) => v.cadastro === 'completo' && (v.pago || !(d.precoCentavos > 0));
+  // cada um paga o seu: pronto = cadastro + pagamento; responsável paga tudo (ou sinal): pronto = cadastro, o pagamento é do grupo
+  const porVaga = (d) => d.modo === 'individual' && d.precoCentavos > 0;
+  const pronta = (d, v) => v.cadastro === 'completo' && (v.pago || !porVaga(d));
   const meio = (d, v) => !pronta(d, v) && (v.cadastro === 'completo' || v.cadastro === 'incompleto' || v.pago);
   let dados = null;
 
-  const msgGrupo = (d, dt) => `Bora pro kart! ${diaTxt(dt)} às ${horaTxt(dt)} no Kartódromo de Betim, no grupo de ${d.responsavel}. Faça seu cadastro antes de chegar${d.modo === 'individual' ? ' e pague a sua vaga no final' : ''} (leva 2 minutos): ${d.linkGrupo}`;
+  const msgGrupo = (d, dt) => `Bora pro kart! ${diaTxt(dt)} às ${horaTxt(dt)} no Kartódromo de Betim, no grupo de ${d.responsavel}. Faça seu cadastro antes de chegar${porVaga(d) ? ' e pague a sua vaga no final' : ''} (leva 2 minutos): ${d.linkGrupo}`;
   const msgVaga = (d, v, dt) => `${v.nome ? 'Oi, ' + v.nome + '! ' : ''}Sua vaga no kart está guardada: ${diaTxt(dt)} às ${horaTxt(dt)}, Kartódromo de Betim. Faça seu cadastro antes de chegar: ${v.link}`;
 
   function luzes(d, v) {
@@ -196,20 +201,23 @@
     if (v.cadastro === 'completo') l.push(['ok', 'Cadastro ok']);
     else if (v.cadastro === 'incompleto') l.push(['pend', 'Falta ' + (v.falta || []).join(', ')]);
     else l.push(['', 'Sem cadastro']);
-    if (d.precoCentavos > 0) l.push(v.pago ? ['ok', 'Pago'] : ['pend', 'Não pagou']);
+    if (porVaga(d)) l.push(v.pago ? ['ok', 'Pago'] : ['pend', 'Não pagou']);
     return l.map(([c, t]) => `<span class="luz ${c}">${esc(t)}</span>`).join('');
   }
 
   function render(d) {
     const dt = dataDe(d.inicio);
-    const todos = d.prontos >= d.n && d.n > 0;
-    const faltam = d.n - d.prontos;
+    const prontos = d.vagas.filter((v) => pronta(d, v)).length;
+    const todos = prontos >= d.n && d.n > 0;
+    const faltam = d.n - prontos;
+    const grupoPago = d.falta <= 0;
     document.getElementById('codigo').textContent = 'Reserva ' + d.codigo;
     document.title = `Grupo de ${d.responsavel} · Kartódromo de Betim`;
     const segs = d.vagas.map((v) => `<i class="${pronta(d, v) ? 'ok' : meio(d, v) ? 'meio' : ''}"></i>`).join('');
     const vagas = d.vagas.map((v) => {
       const ok = pronta(d, v);
       const precisa = !ok && !v.responsavel && v.link;
+      const euFalta = v.responsavel && v.cadastro !== 'completo' && v.link;
       return `<li class="vaga${ok ? ' pronta' : ''}">
         <span class="pos num" aria-label="Vaga ${esc(v.ordem)}">P${esc(v.ordem)}</span>
         <div class="quem">
@@ -217,6 +225,7 @@
           <div class="luzes">${luzes(d, v)}</div>
         </div>
         ${ok ? `<span class="check" aria-label="Pronto para correr">${I.ok}</span>`
+          : euFalta ? `<a class="btn mini" href="${esc(v.link)}">Completar meu cadastro</a>`
           : precisa ? `<div class="acoes"><a class="ico zap" href="${esc(zap(msgVaga(d, v, dt)))}" target="_blank" rel="noopener" aria-label="Lembrar ${esc(v.nome || 'vaga ' + v.ordem)} pelo WhatsApp" title="Mandar no WhatsApp">${I.zap}</a><button class="ico" type="button" data-copiar="${esc(v.link)}" data-msg="Link da vaga P${esc(v.ordem)} copiado" aria-label="Copiar link da vaga ${esc(v.ordem)}" title="Copiar link">${I.copiar}</button></div>`
           : '<span></span>'}
       </li>`;
@@ -234,20 +243,21 @@
 
       <section class="largada" aria-label="Pilotos prontos">
         <div class="largada-topo">
-          <span class="prontos num">${d.prontos}/${d.n}<small>prontos para largar</small></span>
+          <span class="prontos num">${prontos}/${d.n}<small>prontos para largar</small></span>
           <span class="estado${todos ? ' ok' : ''}">${todos ? 'Grid completo' : esc(contagem(dt))}</span>
         </div>
-        <div class="segs" role="img" aria-label="${d.prontos} de ${d.n} pilotos prontos">${segs}</div>
+        <div class="segs" role="img" aria-label="${prontos} de ${d.n} pilotos prontos">${segs}</div>
         <dl class="placar">
           <div><dt>Cadastros</dt><dd class="num${d.cadastrados >= d.n ? ' ok' : ''}">${d.cadastrados}<small>/${d.n}</small></dd></div>
-          <div><dt>Pagamentos</dt><dd class="num${d.pagos >= d.n ? ' ok' : ''}">${d.pagos}<small>/${d.n}</small></dd></div>
+          ${porVaga(d) ? `<div><dt>Pagamentos</dt><dd class="num${d.pagos >= d.n ? ' ok' : ''}">${d.pagos}<small>/${d.n}</small></dd></div>`
+            : `<div><dt>Pagamento</dt><dd class="${grupoPago ? 'ok' : 'pend'}">${grupoPago ? 'Em dia' : d.modo === 'sinal' ? 'Sinal' : 'Pendente'}</dd></div>`}
           <div><dt>Recebido</dt><dd class="num${d.falta <= 0 ? ' ok' : ''}">${reais(d.pago)} <small>de ${reais(d.total)}</small></dd></div>
         </dl>
       </section>
 
       ${!todos && d.linkGrupo ? `<section class="convite">
         <h2>${faltam === 1 ? 'Falta 1 piloto' : `Faltam ${faltam} pilotos`}</h2>
-        <p>Mande o link no grupo do WhatsApp. Cada um faz o próprio cadastro${d.modo === 'individual' ? ' e paga a sua vaga' : ''} e já entra na próxima vaga aberta.</p>
+        <p>Mande o link no grupo do WhatsApp. Cada um faz o próprio cadastro${porVaga(d) ? ' e paga a sua vaga' : ''} e já entra na próxima vaga aberta.${porVaga(d) ? '' : ' Eles não pagam nada: o pagamento do grupo é com você.'}</p>
         <div class="link"><code>${esc(d.linkGrupo.replace(/^https:\/\//, ''))}</code><button class="copiar" type="button" data-copiar="${esc(d.linkGrupo)}" data-msg="Link do grupo copiado">${I.copiar}Copiar</button></div>
         <div class="botoes"><a class="btn zap" href="${esc(zap(msgGrupo(d, dt)))}" target="_blank" rel="noopener">${I.zap}Enviar no WhatsApp</a></div>
       </section>` : ''}
