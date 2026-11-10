@@ -505,7 +505,7 @@ export async function sumarioMovimento(movId: number) {
  */
 type OpsRun = (text: string, params?: Record<string, unknown>) => Promise<Record<string, unknown>[]>;
 
-async function inscreverN(bateriaId: number, clienteId: number, n: number, origem: string, uid: number | null, observacao: string | null, aprovada = true, opcoes: { produtoId?: number | null; pago?: boolean; clientes?: number[]; run?: OpsRun; vagaDoGrupo?: boolean } = {}) {
+async function inscreverN(bateriaId: number, clienteId: number, n: number, origem: string, uid: number | null, observacao: string | null, aprovada = true, opcoes: { produtoId?: number | null; pago?: boolean; clientes?: number[]; run?: OpsRun; vagaDoGrupo?: boolean; precos?: number[] } = {}) {
   const pessoas = opcoes.clientes?.length ? opcoes.clientes : null;
   if (pessoas) n = pessoas.length;
   const inscrever = async (run: OpsRun) => {
@@ -547,7 +547,7 @@ async function inscreverN(bateriaId: number, clienteId: number, n: number, orige
         `INSERT INTO dbo.Inscricao (BateriaId, ClienteId, Origem, Observacao, ProdutoId, PrecoCentavos, Aprovada, ResponsavelId, Pago, ValorCentavos, Status)
          OUTPUT inserted.Id id VALUES (@bateriaId, @clienteId, @origem, @obs, @produtoId, @preco, @aprovada, @resp, @pago, @valor, @status)`,
         {
-          bateriaId, clienteId: pessoas ? pessoas[k] : clienteId, origem, obs: observacao, produtoId, preco, aprovada: (origem === 'site' || origem === 'totem' || origem === 'agendamento') ? 0 : (aprovada ? 1 : 0), resp: n > 1 ? clienteId : null,
+          bateriaId, clienteId: pessoas ? pessoas[k] : clienteId, origem, obs: observacao, produtoId, preco: opcoes.precos?.[k] ?? preco, aprovada: (origem === 'site' || origem === 'totem' || origem === 'agendamento') ? 0 : (aprovada ? 1 : 0), resp: n > 1 ? clienteId : null,
           pago: pago ? 1 : 0, valor: pago ? preco : null, status: pago ? 'confirmada' : 'reservada',
         },
       );
