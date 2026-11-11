@@ -389,7 +389,7 @@ input[type="checkbox"], input[type="radio"] {
   align-items: center;
   gap: 3px;
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: var(--kib-raio-chip);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -424,12 +424,12 @@ input[type="checkbox"], input[type="radio"] {
   color: var(--kib-cor-texto-principal);
 }
 .btnToggleIdade.menor {
-  background: #f3e8ff;
-  color: #6b21a8;
-  border-color: #d8b4fe;
+  background: var(--kib-roxo-fundo);
+  color: var(--kib-roxo-texto);
+  border-color: var(--kib-roxo-borda);
 }
 .btnToggleIdade.menor:hover {
-  background: #e9d5ff;
+  background: var(--kib-roxo-fundo-2);
 }
 
 /* Status Pill Chips no Totem e Pagamento */
@@ -446,13 +446,13 @@ input[type="checkbox"], input[type="radio"] {
 }
 .chipTotemStatus.completo {
   background: #e8f5ee;
-  color: #1c6b35;
-  border: 1px solid #b7ebc7;
+  color: var(--kib-sucesso-texto-escuro);
+  border: 1px solid var(--kib-sucesso-borda);
 }
 .chipTotemStatus.incompleto {
-  background: #fff4e0;
-  color: #9a5b00;
-  border: 1px solid #ffd591;
+  background: var(--kib-aviso-fundo-claro);
+  color: var(--kib-aviso-texto-escuro);
+  border: 1px solid var(--kib-aviso-borda);
 }
 .chipTotemStatus.aguardando {
   background: var(--kib-cor-superficie-campo);
@@ -472,18 +472,18 @@ input[type="checkbox"], input[type="radio"] {
 }
 .chipPgStatus.pago {
   background: #e8f5ee;
-  color: #1c6b35;
-  border: 1px solid #b7ebc7;
+  color: var(--kib-sucesso-texto-escuro);
+  border: 1px solid var(--kib-sucesso-borda);
 }
 .chipPgStatus.falta {
-  background: #fef2f2;
-  color: #b91c1c;
+  background: var(--kib-perigo-fundo-claro);
+  color: var(--kib-perigo-texto-escuro);
   border: 1px solid #fecaca;
 }
 .chipPgStatus.parcial {
-  background: #fff4e0;
-  color: #9a5b00;
-  border: 1px solid #ffd591;
+  background: var(--kib-aviso-fundo-claro);
+  color: var(--kib-aviso-texto-escuro);
+  border: 1px solid var(--kib-aviso-borda);
 }
 .chipPgStatus.aguardando {
   background: var(--kib-cor-superficie-campo);
@@ -500,7 +500,7 @@ input[type="checkbox"], input[type="radio"] {
   font-weight: 700;
   background: #15803d;
   border: 1px solid #15803d;
-  color: #ffffff !important;
+  color: var(--kib-branco) !important;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -508,15 +508,15 @@ input[type="checkbox"], input[type="radio"] {
   transition: all 0.15s ease;
 }
 .btnCobrarSumario:hover {
-  background: #166534;
-  border-color: #166534;
+  background: var(--kib-sucesso-texto-escuro);
+  border-color: var(--kib-sucesso-texto-escuro);
 }
 
 /* Botão WhatsApp Compartilhar Link */
 .btnZapWhatsApp {
   height: 32px;
   background: #25d366;
-  color: #ffffff !important;
+  color: var(--kib-branco) !important;
   font-size: 12px;
   font-weight: 700;
   display: inline-flex;
@@ -529,7 +529,7 @@ input[type="checkbox"], input[type="radio"] {
   transition: background 0.15s ease;
 }
 .btnZapWhatsApp:hover {
-  background: #20bd5a;
+  background: var(--kib-whatsapp);
 }
 
 /* Grade Responsiva Form Bateria */
@@ -566,8 +566,8 @@ input[type="checkbox"], input[type="radio"] {
   transition: all 0.15s ease;
 }
 .btnRemoverPiloto:hover {
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--kib-perigo-fundo-claro);
+  color: var(--kib-perigo-texto-escuro);
 }
 
 /* Botão Mover / Grupo Errado */
@@ -634,7 +634,7 @@ input[type="checkbox"], input[type="radio"] {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #ffffff;
+  background: var(--kib-branco);
 }
 
 /* Cards Financeiros Lado a Lado */
@@ -675,17 +675,17 @@ input[type="checkbox"], input[type="radio"] {
   font-size: 11.5px;
   font-weight: 500;
   padding: 3px 8px;
-  border-radius: 5px;
-  background: #fee2e2;
+  border-radius: var(--kib-raio-chip);
+  background: var(--kib-perigo-fundo-claro);
   color: #991b1b;
-  border: 1px solid #fca5a5;
+  border: 1px solid var(--kib-perigo-borda);
   white-space: nowrap;
 }
 .chipPilotoPendenteMais {
   font-size: 11.5px;
   font-weight: 600;
   padding: 3px 8px;
-  border-radius: 5px;
+  border-radius: var(--kib-raio-chip);
   background: var(--kib-cor-superficie-campo);
   color: var(--kib-cor-texto-secundario);
   border: 1px solid var(--kib-cor-borda-sutil);

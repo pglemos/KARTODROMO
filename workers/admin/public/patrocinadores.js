@@ -45,7 +45,7 @@ async function ptBlob(id) {
   return r.blob();
 }
 
-/** Troca <img data-arq="ID"> pela imagem baixada com o login (o navegador não manda o token em <img>). */
+/** Troca <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-arq="ID"> pela imagem baixada com o login (o navegador não manda o token em <img>). */
 function ptImagens(raiz) {
   raiz.querySelectorAll('img[data-arq]').forEach(async (img) => {
     try { img.src = URL.createObjectURL(await ptBlob(img.dataset.arq)); } catch { img.remove(); }
@@ -59,7 +59,7 @@ const ptCampo = (c, v) => {
   if (c.t === 'check') return `<label class="campo${larga}" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="${id}" ${v[c.k] ? 'checked' : ''}><span style="font-size:14px;color:inherit">${esc(c.r)}</span></label>`;
   if (c.t === 'arquivo') {
     const doc = !c.img;
-    return `<div class="campo larga"><span>${esc(c.r)}</span><div class="pt-arq" data-arq-campo="${c.k}"><div class="pt-logo">${val && !doc ? `<img data-arq="${esc(val)}" alt="">` : val ? 'PDF' : '+'}</div>
+    return `<div class="campo larga"><span>${esc(c.r)}</span><div class="pt-arq" data-arq-campo="${c.k}"><div class="pt-logo">${val && !doc ? `<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-arq="${esc(val)}" alt="">` : val ? 'PDF' : '+'}</div>
       <div>${val ? (doc ? `<a href="#" data-abrir="${esc(val)}">Abrir arquivo anexado</a>` : 'Imagem anexada') : esc(c.dica || 'Nenhum arquivo enviado')}</div>
       <button type="button" class="btn sec peq" data-env="${c.k}">${val ? 'Trocar' : 'Enviar'}</button>${val ? `<button type="button" class="btn perigo peq" data-rem="${c.k}">Remover</button>` : ''}</div>
       <input type="file" hidden id="${id}-f" accept="${c.img ? 'image/png,image/jpeg,image/webp,image/gif' : 'application/pdf,.docx'}"></div>`;
@@ -115,7 +115,7 @@ TELAS.patrocinadores = async (tela) => {
   const carregar = async () => { D = await api('/patro/tudo'); };
   await carregar();
   const emp = (id) => D.empresas.find((e) => e.id === id);
-  const logo = (e) => `<div class="pt-logo">${e.logo_arquivo_id ? `<img data-arq="${esc(e.logo_arquivo_id)}" alt="">` : esc((e.nome || '?')[0].toUpperCase())}</div>`;
+  const logo = (e) => `<div class="pt-logo">${e.logo_arquivo_id ? `<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-arq="${esc(e.logo_arquivo_id)}" alt="">` : esc((e.nome || '?')[0].toUpperCase())}</div>`;
   const busca = (itens, campos) => { const t = P.q.trim().toLowerCase(); return t ? itens.filter((i) => campos.some((c) => String(i[c] ?? '').toLowerCase().includes(t))) : itens; };
   const vazio = (t, s) => `<div class="vazio"><b>${t}</b><span>${s}</span></div>`;
 
@@ -193,7 +193,7 @@ TELAS.patrocinadores = async (tela) => {
   const espacos = () => `<div class="i2-filtros"><span class="i2-m" style="flex:1">Outdoors, placas, pódio e outros pontos de exposição. Livre/Ocupado vem dos contratos ativos.</span><button class="btn prim" data-novo="espacos">+ Novo espaço</button></div>
     ${D.espacos.length ? `<div class="pt-grade">${D.espacos.map((e) => {
       const c = D.contratos.find((x) => x.espaco_id === e.id && ptVigente(x));
-      return `<div class="cartao pt-card ${e.ativo ? '' : 'off'}" style="padding:0;overflow:hidden"><div class="pt-foto">${e.foto_arquivo_id ? `<img data-arq="${esc(e.foto_arquivo_id)}" alt="">` : 'Sem foto'}</div>
+      return `<div class="cartao pt-card ${e.ativo ? '' : 'off'}" style="padding:0;overflow:hidden"><div class="pt-foto">${e.foto_arquivo_id ? `<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-arq="${esc(e.foto_arquivo_id)}" alt="">` : 'Sem foto'}</div>
         <div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px"><div class="pt-topo"><div><b>${esc(e.nome)}</b><small class="i2-m">${PT.tipo[e.tipo]}${e.localizacao ? ' · ' + esc(e.localizacao) : ''}</small></div><span class="i2-selo ${c ? 'amarelo' : 'verde'}">${c ? 'Ocupado' : 'Livre'}</span></div>
         <div style="font-size:13px">${e.dimensoes ? `${esc(e.dimensoes)}<br>` : ''}${c ? `${esc(c.empresa_nome)} até ${c.data_fim ? ptData(c.data_fim) : 'prazo indeterminado'}` : 'Disponível para contrato'}</div>
         <div class="pt-rodape"><b>${e.valor_tabela ? ptR(e.valor_tabela) + ' (tabela)' : 'Sem valor de tabela'}</b><span><button data-edit="espacos" data-id="${e.id}">Editar</button> · <button class="del" data-del="espacos" data-id="${e.id}">Excluir</button></span></div></div></div>`;

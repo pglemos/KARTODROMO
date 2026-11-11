@@ -471,7 +471,7 @@ TELAS.ranking = async (tela) => {
   tela.innerHTML = `<a href="javascript:void(0)" onclick="event.preventDefault(); const t=document.getElementById('tabelaRank'); if(t){ t.scrollIntoView({behavior:'smooth'}); t.focus(); }" class="pularLink" id="linkPularRank">Pular para o ranking</a>
   ${cabecalho(
     'Clientes · tempos oficiais sem chuva · Indoor e Super Kart separados',
-    'Ranking <span id="perRank" style="font-size: var(--kib-fonte-tamanho-titulo); font-weight: 600; color: #4b5563; letter-spacing: 0"></span>',
+    'Ranking <span id="perRank" style="font-size: var(--kib-fonte-tamanho-titulo); font-weight: 600; color: var(--kib-cinza-600); letter-spacing: 0"></span>',
     `<div class="barraAcoesRank">
        <div class="buscaWrap">
          <label class="buscaCampo buscaRank">
@@ -553,9 +553,9 @@ TELAS.ranking = async (tela) => {
     const navPer = R.periodo === 'geral' ? '' : `<span class="navPeriodo" role="navigation" aria-label="Navegação de datas"><button class="btn sec icone" data-ref="${esc(p.anterior || '')}" aria-label="${R.periodo === 'mes' ? 'Mês anterior' : 'Semana anterior'}" title="${R.periodo === 'mes' ? 'Mês anterior' : 'Semana anterior'}" ${p.anterior ? '' : 'disabled'}>${svg(IC.esq, 14)}</button>${R.ref ? `<button class="btn sec" data-ref="" aria-label="${R.periodo === 'mes' ? 'Voltar para o mês atual' : 'Voltar para a semana atual'}">${R.periodo === 'mes' ? 'Mês atual' : 'Semana atual'}</button>` : ''}<button class="btn sec icone" data-ref="${esc(p.proximo || '')}" aria-label="${R.periodo === 'mes' ? 'Próximo mês' : 'Próxima semana'}" title="${p.proximo ? (R.periodo === 'mes' ? 'Próximo mês' : 'Próxima semana') : (R.periodo === 'mes' ? 'Você já está no mês mais recente' : 'Você já está na semana mais recente')}" ${p.proximo ? '' : 'disabled'}>${svg(IC.dir, 14)}</button></span>`;
 
     const avisoGeral = dados.antigo
-      ? `<div class="avisoAntigo" role="note"><span aria-hidden="true">${svg(IC.sistema, 14, '#1e40af')}</span><span>Período antigo: só havia os 10 primeiros de cada faixa de peso no arquivo original.</span></div>`
+      ? `<div class="avisoAntigo" role="note"><span aria-hidden="true">${svg(IC.sistema, 14, 'var(--kib-info-texto-escuro)')}</span><span>Período antigo: só havia os 10 primeiros de cada faixa de peso no arquivo original.</span></div>`
       : dados.comAntigo
-      ? `<div class="avisoAntigo" role="note"><span aria-hidden="true">${svg(IC.sistema, 14, '#1e40af')}</span><span>O geral reúne a cronometragem nova, as corridas de setembro e o ranking antigo desde jan/2025.</span></div>`
+      ? `<div class="avisoAntigo" role="note"><span aria-hidden="true">${svg(IC.sistema, 14, 'var(--kib-info-texto-escuro)')}</span><span>O geral reúne a cronometragem nova, as corridas de setembro e o ranking antigo desde jan/2025.</span></div>`
       : '';
 
     const podioHtml = L.length && !q

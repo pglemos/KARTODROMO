@@ -359,3 +359,58 @@
     --kib-movimento-duracao-lento: 0ms;
   }
 }
+
+/* Paleta fixa de superfície clara: neutros, impressão, estados claros e Endurance.
+   Valores fixos nos dois temas; nasceram literais em app.css, componentes.css e endurance.css. */
+:root {
+  --kib-cinza-50: #f5f5f7;
+  --kib-cinza-100: #e5e7eb;
+  --kib-cinza-300: #c7c7cc;
+  --kib-cinza-500: #6b7280;
+  --kib-cinza-600: #4b5563;
+  --kib-cinza-700: #374151;
+  --kib-cinza-800: #1f2937;
+  --kib-cinza-900: #111827;
+  --kib-branco: #ffffff;
+  --kib-foco-anel: #00875a;
+  --kib-info-fundo-claro: #eff6ff;
+  --kib-info-borda: #bfdbfe;
+  --kib-info-texto-escuro: #1e40af;
+  --kib-acao-info: #0a63d6;
+  --kib-roxo-fundo: #f3e8ff;
+  --kib-roxo-fundo-2: #e9d5ff;
+  --kib-roxo-texto: #6b21a8;
+  --kib-roxo-borda: #d8b4fe;
+  --kib-sucesso-fundo-claro: #c6f2d9;
+  --kib-sucesso-borda: #b7ebc7;
+  --kib-sucesso-texto-escuro: #166534;
+  --kib-aviso-fundo-claro: #fff4e0;
+  --kib-aviso-borda: #ffd591;
+  --kib-aviso-texto-escuro: #6b4000;
+  --kib-perigo-fundo-claro: #fee2e2;
+  --kib-perigo-borda: #fca5a5;
+  --kib-perigo-texto-escuro: #8f1f18;
+  --kib-whatsapp: #20bd5a;
+  --kib-ev-laranja: #ff6b00;
+  --kib-ev-laranja-escuro: #e8590c;
+  --kib-ev-ambar: #ff9f0a;
+  --kib-ev-ambar-topo: #ffb547;
+  --kib-ev-marcador: #5edb7a;
+  --kib-ev-box: #ff1f1f;
+  --kib-ev-grave: #ff453a;
+  --kib-ev-aberto: #184d2b;
+  --kib-ev-fechado: #5c1d19;
+  --kib-ev-minha: #cfe0ff;
+  --kib-ev-medio-fundo: #fff59d;
+  --kib-ev-medio-texto: #5c4a00;
+  --kib-ev-painel-1: #0b0b0c;
+  --kib-ev-painel-2: #161618;
+  --kib-ev-painel-3: #1c1c1e;
+  --kib-cinza-ios: #767680;
+  --kib-cinza-neutro: #7f7f7f;
+  --kib-fonte-tamanho-relogio: 20px;
+  --kib-fonte-tamanho-tabela: 14px;
+  --kib-fonte-tamanho-bola: 30px;
+  --kib-fonte-tamanho-kart-m: 72px;
+  --kib-fonte-tamanho-kart-g: 96px;
+}

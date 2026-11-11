@@ -902,6 +902,21 @@ export async function gruposRoutes(req: Req, send: Res): Promise<boolean> {
     send(200, { ok: true });
     return true;
   }
+  // aviso no topo da reserva online (reservas.kartodromodebetim.com.br): texto curto, tom info/alerta e validade opcional
+  if (path === '/aviso-reserva') {
+    if (method === 'GET') {
+      const r = siteUrl() ? await fetch(siteUrl() + '/api/aviso', { signal: AbortSignal.timeout(10_000) }).catch(() => null) : null;
+      send(200, r && r.ok ? await r.json() : null);
+      return true;
+    }
+    if (method === 'PUT') {
+      await exigePodeFecharBateria(sessao);
+      const b = await req.body();
+      const r = await site('/api/sync/aviso', { method: 'PUT', body: JSON.stringify({ texto: txt(b.texto, 400) ?? '', tom: b.tom === 'alerta' ? 'alerta' : 'info', ate: txt(b.ate, 30) }) });
+      send(200, r.aviso ?? null);
+      return true;
+    }
+  }
   if (!path.startsWith('/grupos')) return false;
   await exigePermissaoOffice(sessao, path, method);
 

@@ -206,7 +206,7 @@ async function montarApp() {
     <a href="#/visao" class="marca"><span class="logo"><img src="/kib-logo.png" alt="Kartódromo Internacional de Betim"></span><span class="col"><b class="t-corpo">Kartódromo de Betim</b><span class="peq">Painel administrativo</span></span></a>
     <button class="buscaBtn ocultarCelular hov" data-acao="busca">${svg(IC.busca, 14, 'var(--kib-cor-texto-apoio)')}<span>Buscar cliente, CPF, tela…</span></button>
     <nav class="grupos" aria-label="Módulos">${NAV.map((g) => ({ ...g, itens: g.itens.filter(([id]) => podeTela(id)) })).filter((g) => g.itens.length).map((g) => `<div class="grupo"><span class="grupo-titulo">${g.t}</span>${g.itens.map(([id, t, ic, cor]) => `
-      <a href="#/${id}" class="navItem hov ${id === rota ? 'atual' : ''}" ${id === rota ? 'aria-current="page"' : ''}><span class="tile" style="background: ${cor}">${svg(ic, 13, 'var(--kib-cor-superficie-padrao)', 2.3)}</span><span class="cresce">${t}</span><span id="selo-${id}"></span></a>`).join('')}</div>`).join('')}</nav>
+      <a href="#/${id}" aria-label="${esc(t)}" class="navItem hov ${id === rota ? 'atual' : ''}" ${id === rota ? 'aria-current="page"' : ''}><span class="tile" style="background: ${cor}">${svg(ic, 13, 'var(--kib-cor-superficie-padrao)', 2.3)}</span><span class="cresce">${t}</span><span id="selo-${id}"></span></a>`).join('')}</div>`).join('')}</nav>
     <div class="rodapeLateral ocultarCelular">
       <div class="estadoCard" id="estadoConexao"><span style="display: flex; align-items: center; gap: var(--kib-espaco-1); font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 600; color: var(--mudo)"><span class="ponto" style="background: var(--kib-cor-borda-forte)"></span>Conferindo conexão…</span></div>
       <div class="usuario"><span class="avatar m" style="background: var(--kib-cor-estado-info-solido); font-size: var(--kib-fonte-tamanho-corpo)">${esc(iniciais(u.nome))}</span>
@@ -359,13 +359,14 @@ function abrirBusca() {
 const TELAS = {};
 
 // ---------- Visão geral
+const kartTxt = (v) => (v ? String(v).charAt(0).toUpperCase() + String(v).slice(1) : '');
 const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
 TELAS.visao = async (tela) => {
   const hoje = hojeIso();
   const d = deIso(hoje);
   const nomeU = (S.usuario?.nome || '').split(' ')[0];
   const h = agoraMin();
-  const saud = h < 12 * 60 ? 'Bom dia' : h < 18 * 60 ? 'Boa tarde' : 'Boa noite';
+  const saud = h < 5 * 60 ? 'Boa noite' : h < 12 * 60 ? 'Bom dia' : h < 18 * 60 ? 'Boa tarde' : 'Boa noite';
   tela.innerHTML = `${cabecalho(`${DIAS[d.getDay()][0].toUpperCase() + DIAS[d.getDay()].slice(1)}, ${d.getDate()} de ${MESES[d.getMonth()]}<span id="atualizadoV" style="color: var(--mudo2); font-weight: 500"></span>`, `${saud}, ${esc(nomeU)}`, `<a href="#/agenda" class="btn branco">Abrir agenda</a><button class="btn prim" data-nova-reserva="1">${svg(IC.mais, 14, 'var(--kib-cor-acao-sobre-principal)', 2.6)}Nova reserva</button>`)}
   <main class="principal">
     <section id="pendencias" aria-live="polite"><div class="esqueleto" style="height: 56px"></div></section>
@@ -384,14 +385,14 @@ TELAS.visao = async (tela) => {
     const restantes = bats.filter((b) => situacaoBateria(b) !== 'fim');
     const itens = [];
     const atencao = online.filter((o) => o.status === 'pago_sem_vaga');
-    if (atencao.length) itens.push(['vermelho', `${plural(atencao.length, 'reserva do site paga', 'reservas do site pagas')} sem vaga`, 'O horário lotou depois do pagamento: devolva o dinheiro ou remarque com o cliente.', 'Resolver', '#/reservas']);
-    if (S.saude && !S.saude.ops.ok) itens.push(['vermelho', 'Servidor da operação sem resposta', 'Recepção, totem e site podem não estar gravando. Veja o SRVKART.', 'Ver PCs', '#/sistema']);
-    if (S.saude && !S.saude.crono.ok) itens.push(['vermelho', 'Cronometragem sem resposta', 'O placar e os resultados não estão chegando do ORBITS.', 'Ver PCs', '#/sistema']);
-    if (aprovar.length) itens.push(['laranja', `${plural(aprovar.length, 'pré-reserva do totem', 'pré-reservas do totem')} para aprovar`, 'Os pilotos estão esperando a confirmação da Recepção.', 'Aprovar', '#/recepcao']);
+    if (atencao.length) itens.push(['vermelho', `${plural(atencao.length, 'reserva do site paga', 'reservas do site pagas')} sem vaga`, 'O horário lotou depois do pagamento. Devolva o dinheiro ou remarque com o cliente.', 'Ver reservas', '#/reservas']);
+    if (S.saude && !S.saude.ops.ok) itens.push(['vermelho', 'Servidor da operação sem resposta', 'A Recepção, os totens e o site podem não estar gravando. Confira o SRVKART na tela Sistema.', 'Ver estado dos PCs', '#/sistema']);
+    if (S.saude && !S.saude.crono.ok) itens.push(['vermelho', 'Cronometragem sem resposta', 'O placar e os resultados não estão chegando do ORBITS. Confira a conexão na tela Sistema.', 'Ver estado dos PCs', '#/sistema']);
+    if (aprovar.length) itens.push(['laranja', `${plural(aprovar.length, 'pré-reserva do totem', 'pré-reservas do totem')} para aprovar`, 'Os pilotos estão esperando a Recepção confirmar.', 'Aprovar na Recepção', '#/recepcao']);
     if (!abertos.length && restantes.length) itens.push(['laranja', 'Nenhum caixa aberto', `Abra o caixa no programa da Recepção antes da bateria das ${horaDe(restantes[0].dataHora)}.`, 'Ver Recepção', '#/recepcao']);
     const devendo = restantes.filter((b) => falta(b) > 0 && urgente(b));
     if (devendo.length === 1) { const b = devendo[0]; itens.push(['laranja', `${tituloBat(b)} · ${horaDe(b.dataHora)} ainda não pagou tudo`, `${plural(falta(b), 'piloto sem pagar', 'pilotos sem pagar')}${+b.preco ? ' · falta ' + brl(faltaValor(b)) : ''}`, 'Ver na agenda', `bat:${b.id}`]); }
-    else if (devendo.length > 1) itens.push(['laranja', `${devendo.length} baterias das próximas 3 horas com piloto sem pagar`, `${devendo.map((b) => `${horaDe(b.dataHora)} ${tituloBat(b)}`).join(' · ')}${devendo.some((b) => +b.preco) ? ' · falta ' + brl(devendo.reduce((x, b) => x + faltaValor(b), 0)) : ''}`, 'Ver quem falta', 'lista']);
+    else if (devendo.length > 1) itens.push(['laranja', `${devendo.length} baterias das próximas 3 horas com piloto sem pagar`, `${devendo.map((b) => `${horaDe(b.dataHora)} ${tituloBat(b)}`).join(' · ')}${devendo.some((b) => +b.preco) ? ' · falta ' + brl(devendo.reduce((x, b) => x + faltaValor(b), 0)) : ''}`, 'Ver lista na agenda', 'lista']);
     const el = $('#pendencias');
     if (!itens.length) { el.innerHTML = `<div class="tudoEmDia">${svg(IC.ok, 16, 'var(--kib-cor-estado-sucesso-texto)', 2.8)}<b>Tudo em dia</b><span>nenhuma pendência agora</span></div>`; return; }
     el.innerHTML = `<div class="cartao pendencias"><div class="cartaoCab"><h2>Precisa de você agora</h2><span class="selo ${itens.some((i) => i[0] === 'vermelho') ? 'vermelho' : 'laranjaS'}" style="margin-left: 0">${itens.length}</span></div>
@@ -412,8 +413,8 @@ TELAS.visao = async (tela) => {
     $('#kpis').innerHTML = [
       kpi('Pilotos hoje', insc, `de ${vagas} vagas · ${Math.round(oc * 100)}% ocupado`, '#/agenda', `<span class="barra" role="img" aria-label="${Math.round(oc * 100)}% das vagas ocupadas"><span style="width: ${Math.min(100, Math.round(oc * 100))}%; background: ${oc > .8 ? 'var(--kib-cor-estado-perigo-solido)' : oc > .5 ? 'var(--kib-cor-agenda-reserva-cheio)' : 'var(--kib-cor-categoria-verde-base)'}"></span></span>`),
       kpi('Recebido hoje', brlCurto(recebidoCaixa + recebidoOnline), `caixa ${brlCurto(recebidoCaixa)} · site ${brlCurto(recebidoOnline)} (${plural(pagasOnline.length, 'reserva', 'reservas')})`, '#/reservas'),
-      kpi('A receber hoje', devendo.length ? brlCurto(aReceber) : 'Nada', devendo.length ? `${plural(devendo.length, 'bateria', 'baterias')} com piloto sem pagar${jaCorreram ? ` (${jaCorreram} já ${jaCorreram === 1 ? 'tem horário encerrado' : 'têm horário encerrado'})` : ''}` : 'todos os pilotos de hoje pagaram', '#/agenda', '', devendo.length && temUrgente ? 'color: var(--avisoTxt)' : ''),
-      kpi('Baterias', bats.length ? `${feitas} de ${bats.length}` : '—', naPista ? `${esc(tituloBat(naPista))} no horário previsto` : prox ? `próxima às ${horaDe(prox.dataHora)}` : bats.length ? 'horários previstos encerrados' : 'sem baterias hoje', '#/recepcao', bats.length ? segmentos : ''),
+      kpi('A receber hoje', devendo.length ? brlCurto(aReceber) : 'Nada', devendo.length ? `${plural(devendo.length, 'bateria', 'baterias')} com piloto sem pagar${jaCorreram ? ` (${jaCorreram} já ${jaCorreram === 1 ? 'passou do horário' : 'passaram do horário'})` : ''}` : 'todos os pilotos de hoje pagaram', '#/agenda', '', devendo.length && temUrgente ? 'color: var(--avisoTxt)' : ''),
+      kpi('Baterias encerradas', bats.length ? `${feitas} de ${bats.length}` : '—', naPista ? `${esc(tituloBat(naPista))} no horário previsto` : prox ? `próxima às ${horaDe(prox.dataHora)}` : bats.length ? 'horários previstos encerrados' : 'sem baterias hoje', '#/recepcao', bats.length ? segmentos : ''),
     ].join('');
   };
 
@@ -422,14 +423,14 @@ TELAS.visao = async (tela) => {
     const prontos = rs ? rs.filter((r) => r.status !== 'cancelada' && prontoTotem(r)).length : null;
     const ini = hm(horaDe(b.dataHora)), falt = ini - agoraMin();
     const quando = situacaoBateria(b) === 'prevista' ? '<span class="chip solido-ok sem-sinal">Horário previsto agora</span>' : `<span class="chip cinza">${rotulo}${falt > 0 && falt < 180 ? ` · em ${falt} min` : ''}</span>`;
-    const sub = [generico(b.nome) ? '' : b.nome, b.produto, b.tipoKart].filter(Boolean).filter((x) => x !== tituloBat(b, tp)).map(esc).join(' · ');
+    const sub = [generico(b.nome) ? '' : b.nome, b.produto, kartTxt(b.tipoKart)].filter(Boolean).filter((x) => x !== tituloBat(b, tp)).map(esc).join(' · ');
     return `<div class="painelBat">
       <span style="display: flex; align-items: center; gap: var(--kib-espaco-1); flex-wrap: wrap">${quando}<span class="mono peq cor-corpo">${horaDe(b.dataHora)}–${fmtHm(ini + 35)}</span></span>
       <span class="col" style="gap: 2px"><b style="font-size: var(--kib-fonte-tamanho-titulo); letter-spacing: -0.01em">${esc(tp === 'livre' ? 'Horário livre' : tituloBat(b, tp))}</b>${sub ? `<span class="peq">${sub}</span>` : ''}</span>
       <span class="numerosBat">
         <span><b>${n}</b><span>de ${vagas} pilotos</span></span>
         <span><b style="color: ${n && pagos < n ? 'var(--avisoTxt)' : 'var(--tinta)'}">${pagos}</b><span>pagos${n && pagos < n && +b.preco ? ` · faltam ${brlCurto(faltaValor(b))}` : ''}</span></span>
-        <span><b style="color: ${prontos !== null && prontos < n ? 'var(--avisoTxt)' : 'var(--tinta)'}">${prontos === null ? '—' : prontos}</b><span>prontos p/ totem</span></span>
+        <span><b style="color: ${prontos !== null && prontos < n ? 'var(--avisoTxt)' : 'var(--tinta)'}">${prontos === null ? '—' : prontos}</b><span title="Documento, e-mail, peso e telefone preenchidos">com cadastro completo para o totem</span></span>
       </span>
       <span style="display: flex; gap: var(--kib-espaco-1); flex-wrap: wrap; margin-top: auto"><a class="btn sec peq" href="#/recepcao" data-ir-recepcao="${b.id}">Ver pilotos</a><button class="btn sec peq" data-ir-bat="${b.id}">Abrir na agenda</button></span>
     </div>`;
@@ -453,13 +454,13 @@ TELAS.visao = async (tela) => {
     const cls = ['bloco2', tp === 'livre' ? 'livre' : tp === 'bloq' ? 'bloq' : '', st === 'fim' ? 'passou' : '', st === 'prevista' ? 'pista' : ''].filter(Boolean).join(' ');
     const titulo = tituloBat(b, tp, true), dir = livresTxt(b, st, tp);
     return `<button class="${cls}" data-ir-bat="${b.id}" style="${tp === 'livre' || tp === 'bloq' ? '' : `${T.fundo}; --faixa: ${T.cor}`}" aria-label="${esc(`${horaDe(b.dataHora)}, ${titulo}, ${T.t}, ${dir}`)}">
-      <span class="linha1"><span class="mono hora">${horaDe(b.dataHora)}</span>${st === 'prevista' ? `<span class="naPista" title="Bateria no horário previsto${dir ? ' · ' + esc(dir) : ''}">NO HORÁRIO</span>` : `<span class="dirB">${dir}</span>`}</span>
+      <span class="linha1"><span class="mono hora">${horaDe(b.dataHora)}</span>${st === 'prevista' ? `<span class="naPista" title="Bateria prevista para agora${dir ? ' · ' + esc(dir) : ''}">PREVISTA AGORA</span>` : `<span class="dirB">${dir}</span>`}</span>
       <span class="tituloB trunc">${esc(tp === 'livre' ? 'Livre' : titulo)}</span>${st !== 'fim' && falta(b) && tp !== 'livre' ? `<span class="aPagarB">${pagCurto(b)}</span>` : ''}${tp === 'livre' ? '' : `<span class="barraB" style="width: ${Math.round(Math.min(1, n / vagas) * 100)}%; background: ${T.cheio}"></span>`}</button>`;
   };
   const pintarLinha = () => {
     const el = $('#linhaDia');
     if (!bats.length) { el.innerHTML = `<div class="cartaoCab"><h2>Linha do dia</h2></div><div class="vazio"><b>Sem baterias hoje</b><span>${d.getDay() === 1 ? 'Segunda o kartódromo não abre.' : 'Dia fechado ou grade ainda não gerada.'}</span></div>`; return; }
-    el.innerHTML = `<div class="cartaoCab"><span class="col"><h2>Linha do dia</h2><span class="sub">toque numa bateria para abrir na agenda</span></span><span class="dir legendaCurta"><span><span class="amostra" style="${amostra('livre', true)}"></span>livre</span><span><span class="amostra" style="background: var(--kib-cor-agenda-reserva-fundo); box-shadow: inset 3px 0 0 var(--kib-cor-estado-aviso-solido)"></span>com reserva ou evento</span><span><span class="amostra" style="box-shadow: inset 0 0 0 2px var(--kib-cor-estado-perigo-solido)"></span>no horário previsto</span></span></div>
+    el.innerHTML = `<div class="cartaoCab"><span class="col"><h2>Linha do dia</h2><span class="sub">selecione uma bateria para abrir na agenda</span></span><span class="dir legendaCurta"><span><span class="amostra" style="${amostra('livre', true)}"></span>livre</span><span><span class="amostra" style="background: var(--kib-cor-agenda-reserva-fundo); box-shadow: inset 3px 0 0 var(--kib-cor-estado-aviso-solido)"></span>com reserva ou evento</span><span><span class="amostra" style="box-shadow: inset 0 0 0 2px var(--kib-cor-estado-perigo-solido)"></span>prevista para agora</span></span></div>
       <div class="rolagemX cartao-corpo" id="rolaLinha"><div class="linhaBlocos">${bats.map(blocoDia).join('')}</div></div>`;
     const foco = el.querySelector('.bloco2.pista') || el.querySelector('.bloco2:not(.passou)'), rola = $('#rolaLinha');
     if (foco && rola) rola.scrollLeft = Math.max(0, foco.offsetLeft - rola.offsetLeft - 160);
@@ -496,11 +497,11 @@ TELAS.visao = async (tela) => {
       const min = largou ? Math.max(0, Math.round((Date.now() - largou.getTime()) / 60000)) : null;
       if (!corre && !pil.length) { el.innerHTML = `<div class="placarVazio"><span class="chip" style="background: color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 10%, transparent); color: var(--kib-cor-borda-sutil)">CRONOMETRAGEM</span><b>Nenhuma bateria no horário previsto</b><span>O placar aparece aqui quando a próxima largar.</span></div>`; return; }
       el.innerHTML = `<div style="display: flex; flex-direction: column; gap: var(--kib-espaco-meio); padding: var(--kib-espaco-2) var(--kib-espaco-2) var(--kib-espaco-1)">
-          <span class="linha gap-1"><span class="chip" style="background: ${corre ? 'color-mix(in srgb, var(--kib-cor-status-ok) 20%, transparent)' : 'color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 10%, transparent)'}; color: ${corre ? 'var(--kib-cor-categoria-verde-topo)' : 'var(--kib-cor-borda-sutil)'}; letter-spacing: .05em">${corre ? '<span class="ponto pulso" style="background: var(--kib-cor-categoria-verde-topo)"></span>AO VIVO' : 'ÚLTIMA BATERIA'}</span>${largou ? `<span style="font-size: var(--kib-fonte-tamanho-pequeno); color: var(--kib-cor-icone-suave)">${corre ? `largou às ${largou.toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' })} · há ${min} min` : `largou às ${largou.toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' })}`}</span>` : ''}</span>
+          <span style="display: flex; align-items: center; flex-wrap: wrap; gap: var(--kib-espaco-1)"><span class="chip" style="background: ${corre ? 'color-mix(in srgb, var(--kib-cor-status-ok) 20%, transparent)' : 'color-mix(in srgb, var(--kib-cor-acao-sobre-principal) 10%, transparent)'}; color: ${corre ? 'var(--kib-cor-categoria-verde-topo)' : 'var(--kib-cor-borda-sutil)'}; letter-spacing: .05em">${corre ? '<span class="ponto pulso" style="background: var(--kib-cor-categoria-verde-topo)"></span>AO VIVO' : 'ÚLTIMA BATERIA'}</span>${largou ? `<span style="font-size: var(--kib-fonte-tamanho-pequeno); color: var(--kib-cor-icone-suave)">${corre ? `largou às ${largou.toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' })} · há ${min} min` : `largou às ${largou.toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' })}`}</span>` : ''}</span>
           <h2 style="margin: 0; font-size: var(--kib-fonte-tamanho-subtitulo); font-weight: 700">${esc(s.eventName || 'Bateria')}</h2></div>
         <div class="linha cabPlacar"><span>Pos</span><span>Kart</span><span>Piloto</span><span class="t-dir">Melhor volta</span></div>
         ${pil.map((p, i) => `<div class="linha"><span style="font-size: var(--kib-fonte-tamanho-subtitulo); font-weight: 700; color: ${i < 3 ? 'var(--kib-cor-categoria-amarelo-topo)' : 'var(--kib-cor-acao-sobre-principal)'}">${esc(p.position)}</span><span class="kartE">${esc(p.kart)}</span><span class="trunc peso-semibold">${esc(p.name)}</span><span class="mono" style="text-align: right; font-size: var(--kib-fonte-tamanho-corpo)">${esc(p.time || '—')}</span></div>`).join('') || '<div style="padding: var(--kib-espaco-denso-12) var(--kib-espaco-denso-20); color: var(--kib-cor-icone-suave)">Largou agora: ninguém completou volta ainda.</div>'}`;
-    } catch (e) { if (!tela.isConnected) return; el.innerHTML = `<div class="placarVazio"><b>Cronometragem sem resposta</b><span>${esc(e.message)}</span><a href="#/sistema">Ver PCs e sistema${svg(IC.dir, 14, 'var(--kib-cor-categoria-verde-topo)', 2.4)}</a></div>`; }
+    } catch (e) { if (!tela.isConnected) return; el.innerHTML = `<div class="placarVazio"><b>Cronometragem sem resposta</b><span>O placar tenta de novo a cada 5 segundos. Detalhe: ${esc(e.message)}</span><a href="#/sistema">Ver estado dos PCs${svg(IC.dir, 14, 'var(--kib-cor-categoria-verde-topo)', 2.4)}</a></div>`; }
   };
 
   tela.addEventListener('click', (e) => {
@@ -636,7 +637,7 @@ TELAS.agenda = async (tela) => {
     const dica = [T.t, titulo, dir, devendo ? pagLongo(b) : ''].filter(Boolean).join(' · ');
     const chipTipo = ['camp', 'evento'].includes(tp) ? `<span class="tipoB">${T.curto}</span>` : ''; // fechada/bloqueada já dizem o estado em texto
     return `<button class="${cls}" data-sel="${b.id}" title="${esc(dica)}" style="${estilo}" aria-label="${esc(`${horaDe(b.dataHora)}, ${titulo}, ${T.t}, ${dir}`)}">
-      <span class="linha1"><span class="mono hora">${horaDe(b.dataHora)}</span>${st === 'prevista' ? `<span class="naPista" title="Bateria no horário previsto${dir ? ' · ' + esc(dir) : ''}">NO HORÁRIO</span>` : `<span class="dirB">${dir}</span>`}</span>
+      <span class="linha1"><span class="mono hora">${horaDe(b.dataHora)}</span>${st === 'prevista' ? `<span class="naPista" title="Bateria prevista para agora${dir ? ' · ' + esc(dir) : ''}">PREVISTA AGORA</span>` : `<span class="dirB">${dir}</span>`}</span>
       ${tp === 'livre' ? '' : `<span class="tituloB trunc">${chipTipo}${esc(titulo)}</span>${aPagar}<span class="barraB" style="width: ${Math.round(Math.min(1, n / vagas) * 100)}%; background: ${T.cheio}"></span>`}</button>`;
   };
 
@@ -766,7 +767,7 @@ TELAS.agenda = async (tela) => {
         <span style="display: flex; align-items: center; gap: var(--kib-espaco-meio); font-size: var(--kib-fonte-tamanho-pequeno); font-weight: 700; letter-spacing: .05em; text-transform: uppercase"><span class="amostra" style="${amostra(tp, true)}"></span>${T.t}</span>
         <span style="padding-right: var(--kib-espaco-5); font-size: var(--kib-fonte-tamanho-titulo-grande); font-weight: 700; letter-spacing: -0.015em">${esc(titulo === 'Livre' ? 'Horário livre' : titulo)}</span>
         <span style="font-size: var(--kib-fonte-tamanho-corpo); opacity: .85">${DIAS[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]} · ${horaDe(b.dataHora)} às ${fmtHm(hm(horaDe(b.dataHora)) + 35)}${st === 'prevista' ? ' · no horário previsto' : st === 'fim' ? ' · horário encerrado' : ''}</span>
-        <span style="font-size: var(--kib-fonte-tamanho-pequeno); opacity: .8">${[b.nome, b.produto, tracadoTxt(b.tracado), b.tipoKart].filter(Boolean).map(esc).join(' · ')}</span></div>
+        <span style="font-size: var(--kib-fonte-tamanho-pequeno); opacity: .8">${[b.nome, b.produto, tracadoTxt(b.tracado), kartTxt(b.tipoKart)].filter(Boolean).map(esc).join(' · ')}</span></div>
         <div class="gavetaCorpo" id="corpoBateria"><div class="esqueleto" style="height: 120px"></div><div class="esqueleto" style="height: 200px"></div></div>
         <div style="display: flex; gap: var(--kib-espaco-1); padding: var(--kib-espaco-denso-12) var(--kib-espaco-2); background: var(--kib-cor-superficie-padrao); border-top: 1px solid var(--linha2)">${st !== 'fim' && +b.disponiveis > 0 && tp !== 'bloq' && !b.reservaFechada && b.status === 'aberta' ? `<button class="btn prim cresce" data-acao="novaReserva">${svg(IC.mais, 14, 'var(--kib-cor-acao-sobre-principal)', 2.6)}Nova reserva · ${b.disponiveis} ${+b.disponiveis === 1 ? 'vaga' : 'vagas'}</button>` : `<a class="btn sec cresce" href="#/recepcao">Abrir na Recepção</a>`}</div>`, `Bateria das ${horaDe(b.dataHora)}: ${titulo}`);
       g.dataset.bateria = id;
@@ -949,7 +950,7 @@ TELAS.agenda = async (tela) => {
       <ul style="list-style: none; margin: var(--kib-espaco-2) 0; padding: 0; display: grid; gap: var(--kib-espaco-1)">
         <li><kbd>N</kbd> nova reserva</li><li><kbd>T</kbd> ir para hoje</li><li><kbd>←</kbd> <kbd>→</kbd> semana ou dia anterior e seguinte</li><li><kbd>D</kbd> <kbd>S</kbd> <kbd>L</kbd> vista Dia, Semana ou Lista</li><li><kbd>Esc</kbd> fecha o painel</li><li><kbd>?</kbd> esta ajuda</li></ul>
       <div style="display: flex; flex-wrap: wrap; gap: var(--kib-espaco-1) var(--kib-espaco-2)">${ORDEM_TIPOS.map((t) => `<span style="display: inline-flex; align-items: center; gap: var(--kib-espaco-meio)"><span class="amostra" style="${amostra(t, true)}"></span>${TIPOS[t].t}</span>`).join('')}</div>
-      <p class="peq" style="margin: var(--kib-espaco-2) 0 0">“NO HORÁRIO” marca a bateria cujo horário previsto é agora; a corrida real fica na Cronometragem. O valor “faltam R$” aparece no bloco quando a bateria é em até 3 horas; nas outras, passe o mouse.</p>
+      <p class="peq" style="margin: var(--kib-espaco-2) 0 0">“PREVISTA AGORA” marca a bateria cujo horário previsto é agora; a corrida real fica na Cronometragem. O valor “faltam R$” aparece no bloco quando a bateria é em até 3 horas; nas outras, passe o mouse.</p>
       <div class="modalRodape"><button class="btn sec" style="margin-left: auto" data-fechar-ajuda>Fechar</button></div></div>`, 'Atalhos e legenda');
     m.querySelector('[data-fechar-ajuda]').onclick = () => fecharCamada();
   };

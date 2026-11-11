@@ -7,6 +7,7 @@
 const AgendaAcoes = (() => {
   let C = null; // { tela, A, bats(), recarregar(), carregar(), abrir(id) }
   let apoio = null;
+  const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
   const SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
   const permitido = () => podeTela('agenda', 'alterar');
   // usuários sem permissão de fechar: o servidor recusa (403) e a tela nem oferece fechar, bloquear, excluir ou fechar o dia
@@ -80,7 +81,7 @@ const AgendaAcoes = (() => {
       if (!(vagas >= 1)) return erro('Informe as vagas (pelo menos 1).');
       if (!novo && !podeFechar() && vagas < Number(b.vagas)) return erro('Seu usuário não pode diminuir as vagas de uma bateria. Chame o administrador.');
       if (!podeFechar() && m.querySelector('#bTipo').value !== 'aberta' && m.querySelector('#bTipo').value !== tipo) return erro('Seu usuário não pode fechar nem bloquear baterias.');
-      if (!novo && vagas < b.inscritos) return erro(`A bateria já tem ${b.inscritos} inscrito(s). As vagas não podem ficar abaixo disso.`);
+      if (!novo && vagas < b.inscritos) return erro(`A bateria já tem ${plural(b.inscritos, 'inscrito', 'inscritos')}. As vagas não podem ficar abaixo disso.`);
       const corpo = {
         nome, inicio: `${data}T${h}`, vagas, produtoId, tracadoId: Number(m.querySelector('#bTracado').value) || null,
         voltaMinimaSeg: Math.max(0, Math.floor(Number(m.querySelector('#bVolta').value) || 0)), observacao: m.querySelector('#bObs').value.trim() || null,
@@ -135,6 +136,29 @@ const AgendaAcoes = (() => {
         C.A.sel = null; fecharCamada(); await C.carregar();
       }
       catch (e) { m.querySelector('#xErro').textContent = e.message; ok.disabled = false; }
+    };
+  }
+
+  // ------------------------------------------------------------------ aviso no topo da reserva online
+  async function avisoReserva() {
+    const m = modal('', 'Aviso da reserva online'); m.style.maxWidth = '560px';
+    m.innerHTML = `<div class="modalTopo"><span class="col" style="gap: var(--kib-espaco-meio)"><span style="font-size: var(--kib-fonte-tamanho-titulo); font-weight: 700">Aviso da reserva online</span><span class="peq">Faixa no topo de reservas.kartodromodebetim.com.br. Deixe em branco para tirar.</span></span></div>
+      <div style="padding: var(--kib-espaco-2) var(--kib-espaco-3); display: grid; gap: var(--kib-espaco-denso-12)">
+        <label class="campo"><span>Texto (até 400 caracteres)</span><textarea class="entrada" id="avTexto" rows="3" maxlength="400" placeholder="Ex.: Sábado (15/11) a pista fecha às 14h para o 500 Milhas."></textarea></label>
+        <label class="campo"><span>Cor</span><select class="entrada" id="avTom"><option value="info">Verde (informação)</option><option value="alerta">Amarelo (atenção)</option></select></label>
+        <label class="campo"><span>Mostrar até (opcional)</span><input class="entrada" id="avAte" type="datetime-local"></label>
+        <div id="avErro" class="peq" style="color: var(--kib-cor-estado-perigo-texto)" role="alert"></div>
+      </div>
+      <div class="modalRodape"><button class="btn sec" style="margin-left: auto" data-ag-voltar>Cancelar</button><button class="btn prim" id="avOk">Salvar aviso</button></div>`;
+    m.querySelector('[data-ag-voltar]').onclick = () => fecharCamada();
+    try { const a = await office('/aviso-reserva'); if (a && m.isConnected) { m.querySelector('#avTexto').value = a.texto || ''; m.querySelector('#avTom').value = a.tom === 'alerta' ? 'alerta' : 'info'; } } catch (e) { /* sem aviso no ar */ }
+    m.querySelector('#avOk').onclick = async () => {
+      const ok = m.querySelector('#avOk'); ok.disabled = true;
+      const ate = m.querySelector('#avAte').value;
+      try {
+        const r = await office('/aviso-reserva', { method: 'PUT', body: { texto: m.querySelector('#avTexto').value, tom: m.querySelector('#avTom').value, ate: ate ? new Date(ate).toISOString() : null } });
+        fecharCamada(); toast(r ? 'Aviso publicado na reserva online' : 'Aviso retirado da reserva online');
+      } catch (e) { m.querySelector('#avErro').textContent = e.message; ok.disabled = false; }
     };
   }
 
@@ -329,7 +353,7 @@ const AgendaAcoes = (() => {
         });
         C.A.sel = origem.id; fecharCamada(); await C.recarregar(); return;
       }
-      m.querySelector('#mvErro').textContent = (feitas ? `${feitas} movido(s). Não deu para mover: ` : 'Não foi possível mover: ') + falhas.join(' · ');
+      m.querySelector('#mvErro').textContent = (feitas ? `${plural(feitas, 'movido', 'movidos')}. Não deu para mover: ` : 'Não foi possível mover: ') + falhas.join(' · ');
       reservas = pendentes; alvo.disponiveis = Math.max(0, Number(alvo.disponiveis) - feitas); pintar();
       if (feitas) await C.carregar().catch(() => undefined);
     };
@@ -408,12 +432,12 @@ const AgendaAcoes = (() => {
         m.querySelector('#lOk').disabled = true;
         const r = await executar();
         if (!r.erros.length) { toastAcao(`${r.feitas} ${r.feitas === 1 ? 'bateria fechada' : 'baterias fechadas'}`, 'Desfazer', desfazerLote(alvo, true)); fecharCamada(); await C.carregar(); decorar(); return; }
-        m.querySelector('#lErro').textContent = `${r.feitas} fechada(s). Não deu para fechar: ${r.erros.join(' · ')}`; await C.carregar(); decorar();
+        m.querySelector('#lErro').textContent = `${plural(r.feitas, 'fechada', 'fechadas')}. Não deu para fechar: ${r.erros.join(' · ')}`; await C.carregar(); decorar();
       };
       return;
     }
     const r = await executar();
-    if (r.erros.length) toast(`${r.feitas} aberta(s). Falhou: ${r.erros.join(' · ')}`, true);
+    if (r.erros.length) toast(`${plural(r.feitas, 'aberta', 'abertas')}. Falhou: ${r.erros.join(' · ')}`, true);
     else toastAcao(`${r.feitas} ${r.feitas === 1 ? 'bateria aberta' : 'baterias abertas'} para reservas`, 'Desfazer', desfazerLote(alvo, false));
     await C.carregar(); decorar();
   }
@@ -436,7 +460,7 @@ const AgendaAcoes = (() => {
     const caixa = document.createElement('span');
     caixa.style.display = 'contents';
     caixa.innerHTML = `<button class="btn sec" data-ag-selecionar aria-pressed="false" title="Escolher várias baterias para abrir ou fechar (tecla X)">Selecionar</button>
-      <details class="menuMais"><summary class="btn sec" aria-label="Ações de bateria: nova, gerar, fechar o dia">Baterias</summary><div class="menuLista menuDir"><button type="button" data-ag-nova-bat>Nova bateria…</button><button type="button" data-ag-gerar>Gerar baterias do mês…</button>${podeFechar() ? '<button type="button" data-ag-fechar-dia>Fechar o dia (feriado)…</button>' : ''}</div></details>`;
+      <details class="menuMais"><summary class="btn sec" aria-label="Ações de bateria: nova, gerar, fechar o dia">Baterias</summary><div class="menuLista menuDir"><button type="button" data-ag-nova-bat>Nova bateria…</button><button type="button" data-ag-gerar>Gerar baterias do mês…</button>${podeFechar() ? '<button type="button" data-ag-fechar-dia>Fechar o dia (feriado)…</button><button type="button" data-ag-aviso>Aviso da reserva online…</button>' : ''}</div></details>`;
     acoes.prepend(caixa);
     lote.abort = new AbortController();
     // modo seleção: o clique numa bateria marca em vez de abrir a gaveta (captura, antes do app.js)
@@ -475,6 +499,7 @@ const AgendaAcoes = (() => {
       if (e.target.closest('[data-ag-nova-bat]')) return formBateria(null, C.A.base < hojeIso() ? hojeIso() : C.A.base);
       if (e.target.closest('[data-ag-gerar]')) return gerar();
       if (e.target.closest('[data-ag-fechar-dia]')) return fecharDia();
+      if (e.target.closest('[data-ag-aviso]')) return avisoReserva();
     });
   }
 

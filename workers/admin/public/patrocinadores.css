@@ -15,8 +15,8 @@
 .pt-rodape { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; border-top: 1px solid rgba(0,0,0,0.08); padding-top: 10px; font-size: 13px; }
 .pt-rodape button, .pt-rodape a { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: var(--verde); cursor: pointer; text-decoration: none; }
 .pt-rodape .del { color: var(--erroTxt); }
-.pt-aviso { background: #FFF0CC; color: #8A5A00; border-radius: 10px; padding: 8px 12px; font-size: 13px; font-weight: 600; }
-.pt-aviso.erro { background: #FFE3E0; color: #A3231A; }
+.pt-aviso { background: var(--kib-aviso-fundo-claro); color: var(--kib-aviso-texto-escuro); border-radius: var(--kib-raio-botao); padding: 8px 12px; font-size: 13px; font-weight: 600; }
+.pt-aviso.erro { background: var(--kib-perigo-fundo-claro); color: var(--kib-perigo-texto-escuro); }
 .pt-lista { padding: 0; }
 .pt-linha { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 14px 16px; border-bottom: 1px solid rgba(0,0,0,0.08); }
 .pt-linha:last-child { border-bottom: 0; }

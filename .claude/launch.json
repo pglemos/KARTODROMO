@@ -14,7 +14,15 @@
     {
       "name": "acesso-testadores",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["wrangler", "dev", "-c", "workers/acesso-testadores/wrangler.jsonc", "--port", "8799", "--local"],
+      "runtimeArgs": [
+        "wrangler",
+        "dev",
+        "-c",
+        "workers/acesso-testadores/wrangler.jsonc",
+        "--port",
+        "8799",
+        "--local"
+      ],
       "port": 8799
     },
     {
@@ -27,6 +35,16 @@
         "4174"
       ],
       "port": 4174
+    },
+    {
+      "name": "reservas-dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "--config",
+        "apps/reservas/vite.config.ts"
+      ],
+      "port": 5180
     }
   ]
 }
