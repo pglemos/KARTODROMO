@@ -34,3 +34,9 @@ Bundle no ar: `worker-termo(worker-aviso(worker-responsavel(worker-painel(index-
 Para montar: `cp index-antes-painel.js base.js` e, em seguida, rode `worker-painel.mjs base.js`, `worker-responsavel.mjs base-painel.js`, `worker-aviso.mjs base-painel-resp.js` e `worker-termo.mjs base-painel-resp-aviso.js`. Por último, publique com `subir.mjs base-painel-resp-aviso-termo.js`.
 - **Termo:** o SRVKART (`lib/ops/termo-online.ts`) publica o mesmo texto da impressão em `PUT /api/sync/termo`, com versão = hash do texto. O cadastro mostra o texto, pede o aceite e permite recusar o uso de imagem. O aceite vai para `dbo.ClienteTermoAceite` (migração 0019). O painel do grupo mostra "Termos X/Y". A assinatura impressa na recepção continua.
 - Se o texto mudar (`data/ops/termo.txt`), muda a versão. Quem estiver com a página aberta recebe 409 e é avisado para recarregar.
+
+## Painel v2: liberar vaga (11/11)
+O organizador libera no painel a vaga de quem desistiu. Fluxo: `POST /api/grupo/painel/acao` grava o pedido na fila do R2 (`grupos/acoes/`). A cada minuto, o SRVKART (`aplicarAcoesDoPainel` → `liberarVagaPeloOrganizador`) aplica e confirma.
+- A vaga volta a ficar aberta e a inscrição continua a mesma, no cadastro provisório "Amigo N".
+- O pedido é recusado (e o motivo aparece no painel por 1 hora) quando: a vaga é do responsável; o termo já foi impresso ou o kart já está definido; a vaga foi paga pela própria pessoa no modo "cada um paga o seu"; ou falta menos de 1 hora para a bateria.
+- Bundle no ar: `worker-acoes.mjs` aplicado sobre `base-painel-resp-aviso-termo.js`.

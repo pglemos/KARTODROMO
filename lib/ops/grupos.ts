@@ -150,7 +150,7 @@ export function montar(g: GrupoRow, pilotos: Linha[], pagamentos: Linha[], cobra
     const cadastro = (p.clienteId || p.responsavel) && !falta.length ? 'completo' : p.cadastroEm || p.clienteId ? 'incompleto' : p.linkEnviadoEm ? 'enviado' : 'pendente';
     return {
       id: p.id, ordem: p.ordem, nome: p.nome || p.clienteNome || null, telefone: p.telefone || p.clienteTelefone || null, menor: Boolean(p.menor), responsavel: Boolean(p.responsavel),
-      clienteId: p.clienteId ?? (p.responsavel ? g.responsavelId : null), inscricaoId: p.inscricaoId, kart: p.kart ?? null, termo: Boolean(p.termoEm) || Boolean(p.termoOnline), termoOnline: Boolean(p.termoOnline),
+      clienteId: p.clienteId ?? (p.responsavel ? g.responsavelId : null), inscricaoId: p.inscricaoId, kart: p.kart ?? null, termo: Boolean(p.termoEm) || Boolean(p.termoOnline), termoOnline: Boolean(p.termoOnline), termoImpresso: Boolean(p.termoEm),
       link: linkCadastro(String(p.token)), linkEnviadoEm: p.linkEnviadoEm, cadastroEm: p.cadastroEm, cadastro, falta: cadastro === 'completo' ? [] : falta,
       pago: ok, pagoNoCaixa: fora, valorPago: Math.min(Math.round(dela), preco), falta_centavos: Math.max(0, Math.round(preco - dela)),
       cobranca: cobrancas.find((c) => c.pilotoId === p.id && c.status === 'aguardando') ?? null,
@@ -1214,6 +1214,8 @@ export function resumoPainel(g: ReturnType<typeof montar>) {
     vagas: g.pilotos.map((p) => ({
       ordem: p.ordem, nome: primeiroNome(String(p.nome ?? '')) || null, responsavel: p.responsavel, menor: p.menor,
       cadastro: p.cadastro, falta: p.falta, pago: p.pago, termo: p.termo, link: p.link,
+      // o organizador pode liberar esta vaga pelo painel (mesmas regras de liberarVagaPeloOrganizador)
+      podeLiberar: !p.responsavel && (p.cadastro === 'completo' || p.cadastro === 'incompleto') && !p.termoImpresso && !p.kart && !(g.modo === 'individual' && p.pago),
     })),
   };
 }
@@ -1261,6 +1263,56 @@ export async function publicarGruposNoSite(log: Log) {
   ultimoResumoSite = json;
   log(`grupo: resumo de ${grupos.length} reserva(s) em grupo enviado ao site`);
   return grupos.length;
+}
+
+// ---------------------------------------------------------------- ações do organizador pelo painel (/painel no site)
+
+type AcaoPainel = { key: string; codigo: string; acao: string; ordem: number; em?: string };
+
+/**
+ * O organizador liberou uma vaga no painel (a pessoa desistiu): a vaga volta a ser "Amigo N" e o link do grupo a ocupa de novo.
+ * A Inscricao continua a mesma (a bateria não perde a vaga nem o pagamento do grupo). Recusa vaga paga por conta própria,
+ * vaga com termo impresso ou kart, e baterias que começam em menos de 1 hora (aí é com a recepção).
+ */
+export async function liberarVagaPeloOrganizador(codigo: string, ordem: number, log: Log): Promise<string | null> {
+  return await tx(async (run) => {
+    const [g] = await run(`SELECT g.Id id, g.ResponsavelId responsavelId, g.Modo modo, b.Inicio inicio, CASE WHEN b.Inicio < DATEADD(hour, 1, SYSDATETIME()) THEN 1 ELSE 0 END perto
+      FROM dbo.ReservaGrupo g WITH (UPDLOCK, HOLDLOCK) JOIN dbo.Bateria b ON b.Id = g.BateriaId WHERE g.Codigo = @c AND g.Status = 'ativa'`, { c: codigo });
+    if (!g) return 'grupo não encontrado';
+    if (Number(g.perto)) return 'bateria começa em menos de 1 hora';
+    const [p] = await run(`SELECT p.Id id, p.Responsavel responsavel, p.ClienteId clienteId, p.InscricaoId inscricaoId, i.Pago pago, p.PagoPeloGrupo pagoPeloGrupo, i.TermoImpressoEm termo, i.Kart kart
+      FROM dbo.ReservaGrupoPiloto p WITH (UPDLOCK, HOLDLOCK) LEFT JOIN dbo.Inscricao i ON i.Id = p.InscricaoId
+      WHERE p.GrupoId = @g AND p.Ordem = @o AND (i.Id IS NULL OR i.Status <> 'cancelada')`, { g: g.id, o: ordem });
+    if (!p) return 'vaga não encontrada';
+    if (p.responsavel) return 'vaga do responsável';
+    if (p.termo || p.kart) return 'piloto já passou pela recepção';
+    // cada um paga o seu: vaga paga é dinheiro da pessoa (reembolso/troca na recepção); nos outros modos o pagamento é do grupo
+    if (g.modo === 'individual' && p.pago) return 'vaga já paga pela pessoa (reembolso é com a recepção)';
+    const [cli] = p.clienteId ? await run(`SELECT Origem origem, Documento documento FROM dbo.Cliente WHERE Id = @c`, { c: p.clienteId }) : [];
+    if (!p.clienteId || (cli && cli.origem === 'grupo' && !cli.documento)) return null; // já estava aberta
+    const prov = await cadastroDaVaga(run, Number(g.responsavelId), ordem, null, null);
+    if (p.inscricaoId) await run(`UPDATE dbo.Inscricao SET ClienteId = @c, AtualizadoEm = SYSDATETIME() WHERE Id = @i`, { c: prov, i: p.inscricaoId });
+    // igual às vagas ainda não ocupadas: o grupo não aponta para ninguém e a inscrição fica no cadastro provisório "Amigo N"
+    await run(`UPDATE dbo.ReservaGrupoPiloto SET ClienteId = NULL, Nome = NULL, Telefone = NULL, CadastroEm = NULL, LinkEnviadoEm = NULL WHERE Id = @p`, { p: p.id });
+    log(`grupo ${g.id}: organizador liberou a vaga ${ordem} pelo painel (cliente ${p.clienteId} saiu)`);
+    return null;
+  });
+}
+
+/** Busca no site as ações pedidas no painel do organizador, aplica e confirma (chamado a cada minuto). */
+export async function aplicarAcoesDoPainel(log: Log) {
+  if (!siteUrl() || !siteChave()) return 0;
+  const acoes = (await site('/api/sync/grupos/acoes')) as unknown as { acoes?: AcaoPainel[] };
+  const feitas: { key: string; erro: string | null }[] = [];
+  for (const a of acoes.acoes ?? []) {
+    let erro: string | null = 'ação desconhecida';
+    try { if (a.acao === 'liberar' && /^G[0-9A-F]{4,11}$/.test(a.codigo) && Number.isInteger(a.ordem)) erro = await liberarVagaPeloOrganizador(a.codigo, a.ordem, log); }
+    catch (e) { erro = (e as Error).message; }
+    if (erro) log(`grupo ${a.codigo}: ação do painel '${a.acao}' na vaga ${a.ordem} recusada (${erro})`);
+    feitas.push({ key: a.key, erro });
+  }
+  if (feitas.length) { await site('/api/sync/grupos/acoes', { method: 'POST', body: JSON.stringify({ feitas }) }); ultimoResumoSite = ''; }
+  return feitas.length;
 }
 
 /** A pessoa pagou (ou vai pagar) a vaga no fim do cadastro pelo link do grupo: a cobrança passa a ser da vaga que ficou com ela. */
