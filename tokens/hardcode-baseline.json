@@ -35,8 +35,14 @@
       "css-rgb-hsl": 1,
       "css-font-family": 4
     },
+    "app/error.tsx": {
+      "tw-paleta-crua": 1
+    },
     "app/favicon.ico/route.ts": {
       "css-hex": 3
+    },
+    "app/global-error.tsx": {
+      "tw-paleta-crua": 5
     },
     "app/placar-telao-tb50/route.ts": {
       "css-hex": 11,
@@ -56,6 +62,10 @@
       "css-hex": 7,
       "css-rgb-hsl": 20,
       "css-font-family": 1
+    },
+    "app/resultados/ResultadosClient.tsx": {
+      "tw-arbitrario": 107,
+      "tw-paleta-crua": 45
     },
     "components/admin/AdminDashboard.tsx": {
       "tw-arbitrario": 3
@@ -155,7 +165,7 @@
       "cs-cor-literal": 5
     },
     "desktop/src/Kartodromo.Recepcao/Acoes.cs": {
-      "cs-cor-literal": 4
+      "cs-cor-literal": 6
     },
     "desktop/src/Kartodromo.Recepcao/Baterias.cs": {
       "cs-cor-literal": 7,
@@ -167,7 +177,7 @@
       "cs-fonte": 4
     },
     "desktop/src/Kartodromo.Recepcao/Caixa.cs": {
-      "cs-cor-literal": 20,
+      "cs-cor-literal": 18,
       "cs-cor-nomeada": 3,
       "cs-fonte": 5
     },
@@ -243,8 +253,8 @@
       "css-font-family": 2
     },
     "services/timing-ui/tv.html": {
-      "css-hex": 60,
-      "css-rgb-hsl": 35,
+      "css-hex": 64,
+      "css-rgb-hsl": 44,
       "css-font-family": 1
     },
     "src/admin/modules/administrativa/AdministrativaPage.tsx": {
