@@ -61,14 +61,14 @@ jobs:
       - name: Sem cor/fonte nova fora dos tokens
         run: npm run lint:design
 
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
       - name: Unit tests
         run: npm test
 
       - name: Build Next.js
         run: npm run build
-
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
 
       - name: Start production server
         run: |
