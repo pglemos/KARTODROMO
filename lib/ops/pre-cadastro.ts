@@ -6,6 +6,7 @@
 import { insertCliente, one, onlyDigits, updateCliente, type ClienteInput } from './db';
 import { registrarCobrancaDoLink, vincularCadastroDoLink } from './grupos';
 import { registrarPreCadastro } from './painel';
+import { gravarAceiteTermo, type AceiteTermo } from './termo-online';
 
 export type PreCadastro = {
   key: string;
@@ -30,6 +31,8 @@ export type PreCadastro = {
   menores: { nome: string; nascimento: string; documento: string }[];
   /** Link da reserva em grupo (painel web): a vaga do grupo passa para o nome desta pessoa. */
   reserva?: string;
+  /** Termo de responsabilidade aceito no cadastro online (versão do texto, data, autorização de imagem). */
+  termo?: AceiteTermo;
 };
 
 type Log = (...args: unknown[]) => void;
@@ -103,6 +106,7 @@ export async function gravarPreCadastro(p: PreCadastro, log: Log): Promise<numbe
     log(`pré-cadastro: cliente novo ${id} pelo site`);
   }
   registrarPreCadastro(p.nome, !existente, !!p.reserva);
+  await gravarAceiteTermo(id, p.termo, log).catch((e) => log(`termo: aceite do cliente ${id} não gravado (${(e as Error).message})`));
   for (const m of p.menores ?? []) {
     const filho = await one<{ id: number }>(
       `SELECT TOP 1 Id id FROM dbo.Cliente WHERE ResponsavelId = @r AND UPPER(LTRIM(RTRIM(Nome))) = UPPER(@n)`,

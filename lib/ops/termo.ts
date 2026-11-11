@@ -120,6 +120,12 @@ function dataImpressao(date: Date, cidade: string) {
   return cidade.toLocaleUpperCase('pt-BR') + ', ' + data + ', às ' + hora;
 }
 
+/** Texto do termo em parágrafos (o mesmo da impressão), para o aceite online no cadastro. */
+export function paragrafosDoTermo(empresa: string, textoPersonalizado?: string): { titulo?: string; texto: string }[] {
+  if (textoPersonalizado?.trim()) return textoPersonalizado.split(/\n\s*\n/).map((t) => ({ texto: t.replace(/\s*\n\s*/g, ' ').trim() })).filter((p) => p.texto);
+  return DEFAULT_SECTIONS.map((s) => ({ ...(s.titulo ? { titulo: s.titulo } : {}), texto: s.texto(empresa) }));
+}
+
 function renderLegal(empresa: string, textoPersonalizado?: string) {
   if (textoPersonalizado?.trim()) {
     return textoPersonalizado

@@ -81,7 +81,8 @@ export async function carregarGrupos(where: string, params: Record<string, unkno
             p.InscricaoId inscricaoId, p.Token token, p.PagoPeloGrupo pagoPeloGrupo, CONVERT(varchar(16), p.LinkEnviadoEm, 126) linkEnviadoEm,
             CONVERT(varchar(16), p.CadastroEm, 126) cadastroEm, i.Pago inscricaoPaga, i.Status inscricaoStatus, i.VendaId vendaId, i.Origem inscricaoOrigem,
             i.TermoImpressoEm termoEm, i.Kart kart,
-            c.Nome clienteNome, c.Documento documento, c.Email email, c.Peso peso, c.Telefone clienteTelefone
+            c.Nome clienteNome, c.Documento documento, c.Email email, c.Peso peso, c.Telefone clienteTelefone,
+            CASE WHEN EXISTS (SELECT 1 FROM dbo.ClienteTermoAceite ta WHERE ta.ClienteId = c.Id) THEN 1 ELSE 0 END termoOnline
        FROM dbo.ReservaGrupoPiloto p
        LEFT JOIN dbo.Inscricao i ON i.Id = p.InscricaoId
        LEFT JOIN dbo.ReservaGrupo rg ON rg.Id = p.GrupoId
@@ -149,7 +150,7 @@ export function montar(g: GrupoRow, pilotos: Linha[], pagamentos: Linha[], cobra
     const cadastro = (p.clienteId || p.responsavel) && !falta.length ? 'completo' : p.cadastroEm || p.clienteId ? 'incompleto' : p.linkEnviadoEm ? 'enviado' : 'pendente';
     return {
       id: p.id, ordem: p.ordem, nome: p.nome || p.clienteNome || null, telefone: p.telefone || p.clienteTelefone || null, menor: Boolean(p.menor), responsavel: Boolean(p.responsavel),
-      clienteId: p.clienteId ?? (p.responsavel ? g.responsavelId : null), inscricaoId: p.inscricaoId, kart: p.kart ?? null, termo: Boolean(p.termoEm),
+      clienteId: p.clienteId ?? (p.responsavel ? g.responsavelId : null), inscricaoId: p.inscricaoId, kart: p.kart ?? null, termo: Boolean(p.termoEm) || Boolean(p.termoOnline), termoOnline: Boolean(p.termoOnline),
       link: linkCadastro(String(p.token)), linkEnviadoEm: p.linkEnviadoEm, cadastroEm: p.cadastroEm, cadastro, falta: cadastro === 'completo' ? [] : falta,
       pago: ok, pagoNoCaixa: fora, valorPago: Math.min(Math.round(dela), preco), falta_centavos: Math.max(0, Math.round(preco - dela)),
       cobranca: cobrancas.find((c) => c.pilotoId === p.id && c.status === 'aguardando') ?? null,
@@ -1209,7 +1210,7 @@ export function hashContato(tipo: 'cpf' | 'fone', v: unknown) {
 /** O que o organizador vê no painel: totais e cada vaga (primeiro nome, cadastro, pagamento, termo e o link próprio). */
 export function resumoPainel(g: ReturnType<typeof montar>) {
   return {
-    chave: chavePainel(String(g.codigo)), n: g.n, total: g.total, pago: g.pago, falta: g.falta, pagos: g.pagos, cadastrados: g.cadastrados, prontos: g.prontos,
+    chave: chavePainel(String(g.codigo)), n: g.n, termos: g.pilotos.filter((p) => p.termo).length, total: g.total, pago: g.pago, falta: g.falta, pagos: g.pagos, cadastrados: g.cadastrados, prontos: g.prontos,
     vagas: g.pilotos.map((p) => ({
       ordem: p.ordem, nome: primeiroNome(String(p.nome ?? '')) || null, responsavel: p.responsavel, menor: p.menor,
       cadastro: p.cadastro, falta: p.falta, pago: p.pago, termo: p.termo, link: p.link,

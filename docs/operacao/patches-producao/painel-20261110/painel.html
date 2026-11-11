@@ -59,7 +59,7 @@
   .segs i.meio { background: repeating-linear-gradient(135deg, var(--ambar) 0 4px, transparent 4px 8px); border-color: rgba(245,197,24,.45); opacity: .85; }
   .segs i.ok { background: var(--neon); border-color: var(--neon); }
 
-  .placar { display: grid; grid-template-columns: 1fr 1fr 1.3fr; margin: 22px 0 0; border-top: 1px solid var(--linha); border-bottom: 1px solid var(--linha); }
+  .placar { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; grid-template-columns: none; margin: 22px 0 0; border-top: 1px solid var(--linha); border-bottom: 1px solid var(--linha); }
   .placar div { padding: 14px 0; }
   .placar div + div { padding-left: 16px; border-left: 1px solid var(--linha); }
   .placar dt { font: 700 11px/1 var(--corpo); letter-spacing: .16em; text-transform: uppercase; color: var(--apagado); margin-bottom: 8px; }
@@ -135,8 +135,10 @@
     .botoes { grid-template-columns: auto auto; justify-content: start; }
   }
   @media (max-width: 420px) {
-    .placar { grid-template-columns: 1fr 1fr; }
-    .placar div:nth-child(3) { grid-column: 1 / -1; padding-left: 0; border-left: 0; border-top: 1px solid var(--linha); }
+    .placar { grid-auto-flow: row; grid-template-columns: 1fr 1fr; }
+    .placar div:nth-child(odd) { padding-left: 0; border-left: 0; }
+    .placar div:nth-child(n+3) { border-top: 1px solid var(--linha); }
+    .placar div:last-child:nth-child(odd) { grid-column: 1 / -1; padding-left: 0; border-left: 0; }
     .placar dd { font-size: 24px; }
   }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
@@ -202,10 +204,16 @@
     else if (v.cadastro === 'incompleto') l.push(['pend', 'Falta ' + (v.falta || []).join(', ')]);
     else l.push(['', 'Sem cadastro']);
     if (porVaga(d)) l.push(v.pago ? ['ok', 'Pago'] : ['pend', 'Não pagou']);
+    if (v.termo) l.push(['ok', 'Termo aceito']); else if (v.cadastro === 'completo') l.push(['', 'Termo na recepção']);
     return l.map(([c, t]) => `<span class="luz ${c}">${esc(t)}</span>`).join('');
   }
 
   function render(d) {
+    if (!d.n) {
+      document.getElementById('codigo').textContent = 'Reserva ' + d.codigo;
+      app.innerHTML = `<section class="falha" role="status"><h2>Grupo de ${esc(d.responsavel)}</h2><p>Este grupo ainda não tem vagas na bateria. A recepção está ajustando a reserva; fale com ela se precisar.</p><a class="btn" href="https://wa.me/${RECEPCAO}" target="_blank" rel="noopener">${I.zap}Falar com a recepção</a></section>`;
+      return;
+    }
     const dt = dataDe(d.inicio);
     const prontos = d.vagas.filter((v) => pronta(d, v)).length;
     const todos = prontos >= d.n && d.n > 0;
@@ -248,6 +256,7 @@
         </div>
         <div class="segs" role="img" aria-label="${prontos} de ${d.n} pilotos prontos">${segs}</div>
         <dl class="placar">
+          ${d.termos != null ? `<div><dt>Termos</dt><dd class="num${d.termos >= d.n ? ' ok' : ''}">${d.termos}<small>/${d.n}</small></dd></div>` : ''}
           <div><dt>Cadastros</dt><dd class="num${d.cadastrados >= d.n ? ' ok' : ''}">${d.cadastrados}<small>/${d.n}</small></dd></div>
           ${porVaga(d) ? `<div><dt>Pagamentos</dt><dd class="num${d.pagos >= d.n ? ' ok' : ''}">${d.pagos}<small>/${d.n}</small></dd></div>`
             : `<div><dt>Pagamento</dt><dd class="${grupoPago ? 'ok' : 'pend'}">${grupoPago ? 'Em dia' : d.modo === 'sinal' ? 'Sinal' : 'Pendente'}</dd></div>`}
