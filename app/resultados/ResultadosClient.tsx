@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import Header from '@/src/components/Header';
 import Footer from '@/src/components/Footer';
-import { Search, Trophy, Timer, Calendar, FileText, Printer, QrCode, ArrowLeft, CheckCircle2, ChevronRight, X, AlertCircle, Eye, Flag, User, Copy, Check, ExternalLink } from 'lucide-react';
+import { Search, Trophy, Timer, Calendar, FileText, Printer, QrCode, ArrowLeft, ChevronRight, X, AlertCircle, Eye, Flag, User, Copy, Check, ExternalLink } from 'lucide-react';
 
 interface PodiumItem {
   posicao: number;
@@ -31,6 +31,15 @@ interface BateriaSummary {
   } | null;
   podio: PodiumItem[];
 }
+
+interface IdentResult {
+  total: number;
+  tipo?: string;
+  kart?: string | number;
+  piloto?: { nome?: string };
+}
+
+const mensagemDeErro = (err: unknown, padrao: string) => (err instanceof Error && err.message ? err.message : padrao);
 
 interface StandingRow {
   posicao: number;
@@ -93,19 +102,19 @@ export function ResultadosClient() {
   const [data, setData] = useState<string>('');
   const [baterias, setBaterias] = useState<BateriaSummary[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<'all' | 'tomada' | 'corrida'>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   // Selected session & driver
   const [selectedBateria, setSelectedBateria] = useState<BateriaDetail | null>(null);
-  const [loadingBateria, setLoadingBateria] = useState<boolean>(false);
+  const [, setLoadingBateria] = useState<boolean>(false);
   const [inSessionFilter, setInSessionFilter] = useState<string>('');
 
   // Lap-by-lap telemetry
   const [selectedDriverLaps, setSelectedDriverLaps] = useState<DriverTelemetry | null>(null);
-  const [loadingLaps, setLoadingLaps] = useState<boolean>(false);
+  const [, setLoadingLaps] = useState<boolean>(false);
 
   // QR modal & Sheet preview modal
   const [qrModalOpen, setQrModalOpen] = useState<boolean>(false);
@@ -113,7 +122,7 @@ export function ResultadosClient() {
   const [previewSheet, setPreviewSheet] = useState<{ url: string; title: string } | null>(null);
 
   // Identification banner
-  const [identResult, setIdentResult] = useState<any>(null);
+  const [identResult, setIdentResult] = useState<IdentResult | null>(null);
 
   // Initial load & URL query handling
   useEffect(() => {
@@ -135,6 +144,8 @@ export function ResultadosClient() {
         handleIdentify(qParam);
       }
     });
+    // Carga inicial: roda uma vez, ao abrir a página.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchBaterias = async (targetDate: string) => {
@@ -143,10 +154,10 @@ export function ResultadosClient() {
     try {
       const res = await fetch(`${API_BASE}/api/baterias?data=${encodeURIComponent(targetDate)}`);
       if (!res.ok) throw new Error('Falha ao carregar as baterias da data.');
-      const json = (await res.json()) as any;
+      const json = (await res.json()) as { baterias?: BateriaSummary[] };
       setBaterias(json.baterias || []);
-    } catch (err: any) {
-      setError(err.message || 'Erro ao carregar baterias.');
+    } catch (err) {
+      setError(mensagemDeErro(err, 'Erro ao carregar baterias.'));
     } finally {
       setLoading(false);
     }
@@ -164,7 +175,7 @@ export function ResultadosClient() {
         body: JSON.stringify({ identificador: term.trim() }),
       });
       if (res.ok) {
-        const json = (await res.json()) as any;
+        const json = (await res.json()) as IdentResult;
         if (json.total > 0) {
           setIdentResult(json);
         } else {
@@ -188,8 +199,8 @@ export function ResultadosClient() {
       if (kartToHighlight) {
         handleOpenLaps(sessionId, kartToHighlight);
       }
-    } catch (err: any) {
-      alert(`Erro: ${err.message}`);
+    } catch (err) {
+      alert(`Erro: ${mensagemDeErro(err, 'falha inesperada')}`);
     } finally {
       setLoadingBateria(false);
     }
@@ -200,12 +211,12 @@ export function ResultadosClient() {
     try {
       const res = await fetch(`${API_BASE}/api/bateria/${encodeURIComponent(sessionId)}/voltas?kart=${encodeURIComponent(kart)}`);
       if (!res.ok) throw new Error('Não foi possível carregar as voltas.');
-      const json = (await res.json()) as any;
+      const json = (await res.json()) as { pilotos?: DriverTelemetry[] };
       const driverData = json.pilotos?.[0] || null;
       setSelectedDriverLaps(driverData);
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (err: any) {
-      alert(`Erro: ${err.message}`);
+    } catch (err) {
+      alert(`Erro: ${mensagemDeErro(err, 'falha inesperada')}`);
     } finally {
       setLoadingLaps(false);
     }

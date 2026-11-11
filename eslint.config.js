@@ -33,6 +33,7 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': 'off',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
     },
   },
   {
@@ -48,6 +49,13 @@ export default tseslint.config(
         ...globals.browser,
         ...globals.node,
       },
+    },
+  },
+  {
+    // Testes e scripts de operação usam dados simulados e respostas de API sem tipo.
+    files: ['tests/**/*.{ts,tsx}', 'scripts/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
 );

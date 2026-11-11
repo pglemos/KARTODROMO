@@ -5,7 +5,6 @@ describe('Aprovação de reservas online / site', () => {
     // Simula a lógica de aprovação de inscreverN
     const origem = 'site';
     const aprovadaPassada = true;
-    const pago = true;
     const aprovadaFinal = (origem === 'site' || origem === 'totem' || origem === 'agendamento') ? 0 : (aprovadaPassada ? 1 : 0);
     expect(aprovadaFinal).toBe(0);
   });

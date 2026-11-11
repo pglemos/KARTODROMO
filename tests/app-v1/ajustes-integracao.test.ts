@@ -2,7 +2,7 @@ import { beforeAll, afterAll, it, expect } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { resolve, join } from 'node:path';
+import { join } from 'node:path';
 import net from 'node:net';
 import { randomBytes } from 'node:crypto';
 import { abrirStore } from '../../lib/app-v1/store';
@@ -41,7 +41,7 @@ beforeAll(async () => {
  for (const [usuario, perfil] of [['ger', 'GERENCIA'], ['op', 'OPERACAO'], ['rec', 'RECEPCAO']] as const) await criarUsuario({ store, segredo }, { usuario, nome: 'TESTE CODEX', perfil, senha }); store.fechar();
  processo = spawn(join(raiz, 'node_modules', '.bin', 'tsx'), [join(raiz, 'services/timing-server.ts')], { cwd: pasta, env: { ...process.env, NODE_ENV: 'test', PATH: process.env.PATH, HOME: process.env.HOME, TIMING_PORT: String(porta), TIMING_SIMULATE: '1', TIMING_SIM_PORT: '0', TIMING_DECODER_PROTOCOL: 'trx', TIMING_DATA_DIR: data, APP_V1_TOKEN_SECRET: segredo, OPS_URL: 'http://127.0.0.1:9' } as NodeJS.ProcessEnv, stdio: ['ignore', 'pipe', 'pipe'] });
  processo.stdout?.on('data', b => { logs += b.toString(); }); processo.stderr?.on('data', b => { logs += b.toString(); });
- for (let i = 0; i < 100; i++) { try { if ((await req('/api/app/v1/me')).http === 401) return; } catch {} if (processo.exitCode != null) throw new Error(`Simulador não iniciou: ${logs}`); await new Promise(r => setTimeout(r, 100)); }
+ for (let i = 0; i < 100; i++) { try { if ((await req('/api/app/v1/me')).http === 401) return; } catch { /* servidor ainda subindo: tenta de novo */ } if (processo.exitCode != null) throw new Error(`Simulador não iniciou: ${logs}`); await new Promise(r => setTimeout(r, 100)); }
  throw new Error('Simulador não respondeu em 10 segundos.');
 }, 20000);
 afterAll(async () => { if (processo && processo.exitCode == null) { processo.kill('SIGTERM'); await new Promise<void>(r => processo.once('exit', () => r())); } rmSync(pasta, { recursive: true, force: true }); });

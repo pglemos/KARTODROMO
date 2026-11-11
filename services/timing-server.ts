@@ -1,4 +1,4 @@
-import { invalidarAbertura, kartLiberadoHoje } from '../lib/app-v1/abertura-frota';
+import { invalidarAbertura } from '../lib/app-v1/abertura-frota';
 /**
  * Servico de cronometragem proprio (substitui o LapTime.Server).
  *

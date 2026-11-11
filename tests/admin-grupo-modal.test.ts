@@ -5,7 +5,7 @@ describe('Admin - Modal de Reserva em Grupo (UI/UX Pro Max)', () => {
     String(n || '')
       .trim()
       .toLowerCase()
-      .replace(/(^|[\s'\(\[\-])([\p{L}])/gu, (_, a, b) => a + b.toUpperCase())
+      .replace(/(^|[\s'([-])([\p{L}])/gu, (_, a, b) => a + b.toUpperCase())
       .replace(/\s(Da|De|Do|Das|Dos|E)(?=\s)/g, (x) => x.toLowerCase());
 
   const formatarTelefone = (v: string) => {

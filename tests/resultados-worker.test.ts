@@ -129,7 +129,7 @@ function createMockD1(rows: any[] = []) {
   return {
     prepare: vi.fn((sql: string) => ({
       ...handler(sql),
-      bind: vi.fn((...args: any[]) => handler(sql)),
+      bind: vi.fn(() => handler(sql)),
     })),
   } as any;
 }

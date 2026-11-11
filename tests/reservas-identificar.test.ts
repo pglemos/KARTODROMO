@@ -21,7 +21,7 @@ describe('funções de máscara e conversão de dados do auto-preenchimento de r
 
   const mascaraData = (v: string) => {
     if (!v) return '';
-    let s = String(v).trim();
+    const s = String(v).trim();
     if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
       const [y, m, d] = s.slice(0, 10).split('-');
       return `${d}/${m}/${y}`;
@@ -59,7 +59,7 @@ describe('funções de máscara e conversão de dados do auto-preenchimento de r
 
   it('higieniza e adiciona @ no Instagram', () => {
     const formatarInsta = (ig: string) => {
-      let s = String(ig || '').trim().replace(/^https?:\/\/(?:www\.)?instagram\.com\//i, '').replace(/[/?#].*$/, '').replace(/^@/, '');
+      const s = String(ig || '').trim().replace(/^https?:\/\/(?:www\.)?instagram\.com\//i, '').replace(/[/?#].*$/, '').replace(/^@/, '');
       return s ? '@' + s.toLowerCase() : '';
     };
 

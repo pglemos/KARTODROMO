@@ -21,7 +21,7 @@ try {
   const p = await chamar('POST', `/endurance/eventos/${id}/pilotos`, { equipeId: b, nome: 'Piloto Quatro' });
   console.log('pulseira nova', p.pulseira);
   await chamar('POST', `/endurance/eventos/${id}/pilotos`, { equipeId: a, nome: 'Piloto Cinco' });
-  try { await chamar('POST', `/endurance/eventos/${id}/pilotos`, { equipeId: a, nome: 'Piloto Seis' }); console.log('ERRO: deixou 4 pilotos'); } catch (e) { console.log('4º piloto recusado ok'); }
+  try { await chamar('POST', `/endurance/eventos/${id}/pilotos`, { equipeId: a, nome: 'Piloto Seis' }); console.log('ERRO: deixou 4 pilotos'); } catch { console.log('4º piloto recusado ok'); }
   console.log('pesagem inicial', await chamar('POST', `/endurance/eventos/${id}/pesagens`, { pulseira: 1, momento: 'inicial', balancaKg: 78.4 }));
   console.log('pesagem parada', await chamar('POST', `/endurance/eventos/${id}/pesagens`, { pulseira: 1, momento: 'parada', balancaKg: 99.2 }));
   console.log('consulta pulseira', (await chamar('GET', `/endurance/eventos/${id}/pulseira/1`)).lastroSugerido);

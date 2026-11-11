@@ -122,7 +122,6 @@ describe('confiabilidade e segurança do email', () => {
     const dir = dirs[dirs.length - 1];
     salvarConfig(file, { ...CONFIG_PADRAO, host: 'smtp.invalid', porta: 587, usuario: 'teste@example.invalid', senha: 'TESTE CODEX', anexarPdf: true });
     const { session, context } = fixtureEnvio(dir);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mensagem capturada do nodemailer
     const capturadas: any[] = [];
     let pdfsGerados = 0;
     const result = await enviarResultado(session, file, {
