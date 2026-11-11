@@ -3,7 +3,10 @@
 Base: auditorias de 10/11 ([público](granja-viana-reservas-2026-11-10.md), [logado](granja-viana-auditoria-logado-2026-11-10.md)).
 Status: ✅ no ar · 🔶 parcial · ⬜ falta.
 
-## Bloqueio técnico principal
+## Front da reserva reconstruído (11/11)
+Fonte em `apps/reservas` (Vite + React). `npx vite build --config apps/reservas/vite.config.ts` gera em `reservas-deploy/dist`, e `cd reservas-deploy && npx wrangler deploy` publica. Para voltar ao bundle antigo, troque o `index.html` pelo que aponta para `index-campos-20261110.js` (os arquivos continuam em `dist`).
+
+## Bloqueio técnico (resolvido)
 O site `reservas.kartodromodebetim.com.br` só existe como **bundle compilado** em `reservas-deploy/dist/booking-assets/index-campos-20261110.js`. Esse bundle é React minificado, com 286 KB.
 - O código-fonte **não está** no repositório nem em `~/PROJETOS`.
 - Qualquer item marcado [R] abaixo depende de **reconstruir o front da reserva com código-fonte** no repo (ex.: `apps/reservas`, Vite + React, com o mesmo visual).
@@ -23,11 +26,11 @@ O site `reservas.kartodromodebetim.com.br` só existe como **bundle compilado** 
 | 7 | Termo de responsabilidade aceito online, versionado, com validade | impresso na recepção | cadastro + SRVKART | ⬜ |
 | 8 | PDF do termo com dados do cliente | impressão na recepção (`lib/ops/termo.ts`) | SRVKART | 🔶 |
 | 9 | Pagamento bloqueado até todos aceitarem o termo (bateria aberta com grupo) | — | reserva [R] + cadastro | ⬜ (decisão de negócio: pode travar venda) |
-| 10 | Aviso operacional editável (faixa no topo) | — | reserva [R] + cadastro + admin | ⬜ |
-| 11 | Vagas restantes por horário | — | reserva [R] + API | ⬜ |
+| 10 | Aviso operacional editável (faixa no topo) | — | reserva [R] + cadastro + admin | ✅ |
+| 11 | Vagas restantes por horário | — | reserva [R] + API | ✅ |
 | 12 | Selo bateria aberta/fechada | — | reserva [R] | ⬜ |
-| 13 | Ocultar horários indisponíveis | — | reserva [R] | ⬜ |
-| 14 | Compartilhar link da data (`?data=`) | — | reserva [R] | ⬜ |
+| 13 | Ocultar horários indisponíveis | — | reserva [R] | ✅ |
+| 14 | Compartilhar link da data (`?data=`) | — | reserva [R] | ✅ |
 | 15 | Limite de vagas por CPF por horário | CPF único por piloto | API | 🔶 |
 | 16 | Voucher / cupom no checkout | migração 0010 existe | reserva [R] + API | 🔶 |
 | 17 | Desconto por quantidade (KGV: 40% na taxa a partir de 10) | — | API + reserva [R] | ⬜ (definir regra de preço) |
@@ -43,7 +46,7 @@ O site `reservas.kartodromodebetim.com.br` só existe como **bundle compilado** 
 | 27 | Banner de cookies LGPD (aceitar / recusar não essenciais) | — | reserva [R] + cadastro | ⬜ |
 | 28 | Versão em inglês | — | reserva [R] + cadastro + painel | ⬜ |
 | 29 | Bateria fechada empresarial, sem cobrança imediata (faturamento) | recepção | SRVKART + admin | ⬜ |
-| 30 | Mensagens de erro específicas (timeout, sessão, servidor) | 🔶 | reserva [R] | 🔶 |
+| 30 | Mensagens de erro específicas (timeout, sessão, servidor) | 🔶 | reserva [R] | ✅ |
 
 ## Ordem proposta
 1. **Reconstruir o front da reserva com fonte no repo** (pré-requisito de 9–14, 16–18, 21, 25, 27, 28, 30), com a mesma API e o mesmo visual. Deploy pelo `kartodromo-reservas-2026`.
