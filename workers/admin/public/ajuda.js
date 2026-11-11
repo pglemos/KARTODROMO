@@ -67,6 +67,13 @@ const GUIAS = [
     <p>O painel mostra a mesma agenda da Recepção, do site e dos totens. Tudo que você muda aqui aparece nos outros na hora.</p>
     <ol><li>Entre com seu usuário e senha e aceite os termos.</li><li>Comece pela <b>Visão geral</b>: o quadro “Precisa de você agora” lista o que está pendente.</li><li>Use a <b>Agenda</b> para ver e criar reservas.</li><li>Troque sua senha com a administração se achar que alguém a viu.</li></ol>
     <button class="btn prim" data-rever-tour="1">Rever o tour de boas-vindas</button>` },
+  { id: 'visao', t: 'Como ler a Visão geral', corpo: () => `
+    <p>A Visão geral se atualiza sozinha. Leia de cima para baixo: o que pede ação vem primeiro.</p>
+    <ul><li><b>Precisa de você agora</b>: lista só o que está pendente (reserva do site paga sem vaga, servidor ou cronometragem sem resposta, pré-reservas do totem para aprovar, caixa fechado e baterias das próximas 3 horas com piloto sem pagar). Quando não sobra nada, aparece “Tudo em dia”.</li>
+    <li><b>Os quatro números</b>: <i>Pilotos hoje</i> (inscritos e vagas), <i>Recebido hoje</i> (caixa mais site), <i>A receber hoje</i> (o que falta pagar em todas as baterias do dia, inclusive as que já passaram do horário) e <i>Baterias encerradas</i> (as que já passaram do horário previsto). Verde quer dizer completo; âmbar quer dizer que falta algo.</li>
+    <li><b>Agora e a seguir</b>: a bateria do horário atual e as próximas. “Com cadastro completo para o totem” conta os pilotos que já têm documento, e-mail, peso e telefone.</li>
+    <li><b>Placar</b>: tempos e posições vêm da cronometragem. O painel só mostra e atualiza a cada 5 segundos.</li>
+    <li><b>Linha do dia</b>: cada bloco é uma bateria. “Prevista agora” marca a bateria cujo horário é agora; a corrida de verdade aparece na cronometragem.</li></ul>` },
   { id: 'agendar', t: 'Agendar por telefone', corpo: () => `
     <ol><li>Agenda → <b>Nova reserva</b> (ou tecla N).</li><li>Escolha o dia, o horário e a quantidade de pilotos. Só aparecem horários com vagas para o grupo inteiro.</li><li>Busque o <b>responsável</b> por nome, CPF ou telefone. Se não existir, ele faz o cadastro pelo link e aparece na busca.</li><li>Marque <b>Chegou por</b>: WhatsApp, Telefone, Recepção ou Site. Isso ajuda a medir de onde vêm as reservas.</li><li>Preencha os outros pilotos (nome e WhatsApp, se souber). Quem ficar sem nome completa pelo próprio link.</li><li>Marque pilotos <b>Menores</b> como “Menor”.</li><li>Escolha como o grupo vai pagar e salve. Deixe ligado “mostrar os links de cadastro” para mandar no WhatsApp.</li></ol>
     <p class="peq">Para mudar um horário já reservado, abra a bateria na Agenda e use as opções da reserva.</p>` },

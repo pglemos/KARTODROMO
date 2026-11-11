@@ -367,7 +367,7 @@ TELAS.visao = async (tela) => {
   const nomeU = (S.usuario?.nome || '').split(' ')[0];
   const h = agoraMin();
   const saud = h < 5 * 60 ? 'Boa noite' : h < 12 * 60 ? 'Bom dia' : h < 18 * 60 ? 'Boa tarde' : 'Boa noite';
-  tela.innerHTML = `${cabecalho(`${DIAS[d.getDay()][0].toUpperCase() + DIAS[d.getDay()].slice(1)}, ${d.getDate()} de ${MESES[d.getMonth()]}<span id="atualizadoV" style="color: var(--mudo2); font-weight: 500"></span>`, `${saud}, ${esc(nomeU)}`, `<a href="#/agenda" class="btn branco">Abrir agenda</a><button class="btn prim" data-nova-reserva="1">${svg(IC.mais, 14, 'var(--kib-cor-acao-sobre-principal)', 2.6)}Nova reserva</button>`)}
+  tela.innerHTML = `${cabecalho(`${DIAS[d.getDay()][0].toUpperCase() + DIAS[d.getDay()].slice(1)}, ${d.getDate()} de ${MESES[d.getMonth()]}<span id="atualizadoV" style="color: var(--mudo2); font-weight: 500"></span>`, nomeU ? `${saud}, ${esc(nomeU)}` : saud, `<a href="#/agenda" class="btn branco">Abrir agenda</a><button class="btn prim" data-nova-reserva="1">${svg(IC.mais, 14, 'var(--kib-cor-acao-sobre-principal)', 2.6)}Nova reserva</button>`)}
   <main class="principal">
     <section id="pendencias" aria-live="polite"><div class="esqueleto" style="height: 56px"></div></section>
     <section class="kpis kpis4" id="kpis">${'<div class="esqueleto" style="height: 112px"></div>'.repeat(4)}</section>
@@ -376,6 +376,7 @@ TELAS.visao = async (tela) => {
       <section class="placar" id="emPista" style="flex: 1 1 360px; min-width: 0"><div style="padding: var(--kib-espaco-2); color: var(--kib-cor-icone-suave)">Carregando a cronometragem…</div></section>
     </div>
     <section class="cartao" id="linhaDia"><div class="esqueleto" style="height: 150px; margin: var(--kib-espaco-2)"></div></section>
+    <p class="peq" style="margin: 0; text-align: center"><a href="#/ajuda" data-ajuda-visao="1">Como ler esta tela</a></p>
   </main>`;
   const irAgenda = (b) => { S.irAgenda = { dia: b.dataHora.slice(0, 10), id: b.id }; location.hash = '#/agenda'; };
   const prontoTotem = (r) => !!(r.documento && r.email && r.peso && r.telefone);
@@ -386,15 +387,15 @@ TELAS.visao = async (tela) => {
     const itens = [];
     const atencao = online.filter((o) => o.status === 'pago_sem_vaga');
     if (atencao.length) itens.push(['vermelho', `${plural(atencao.length, 'reserva do site paga', 'reservas do site pagas')} sem vaga`, 'O horário lotou depois do pagamento. Devolva o dinheiro ou remarque com o cliente.', 'Ver reservas', '#/reservas']);
-    if (S.saude && !S.saude.ops.ok) itens.push(['vermelho', 'Servidor da operação sem resposta', 'A Recepção, os totens e o site podem não estar gravando. Confira o SRVKART na tela Sistema.', 'Ver estado dos PCs', '#/sistema']);
-    if (S.saude && !S.saude.crono.ok) itens.push(['vermelho', 'Cronometragem sem resposta', 'O placar e os resultados não estão chegando do ORBITS. Confira a conexão na tela Sistema.', 'Ver estado dos PCs', '#/sistema']);
+    if (S.saude && S.saude.ops && !S.saude.ops.ok) itens.push(['vermelho', 'Servidor da operação sem resposta', 'A Recepção, os totens e o site podem não estar gravando. Confira o SRVKART na tela Sistema.', 'Ver estado dos PCs', '#/sistema']);
+    if (S.saude && S.saude.crono && !S.saude.crono.ok) itens.push(['vermelho', 'Cronometragem sem resposta', 'O placar e os resultados não estão chegando do ORBITS. Confira a conexão na tela Sistema.', 'Ver estado dos PCs', '#/sistema']);
     if (aprovar.length) itens.push(['laranja', `${plural(aprovar.length, 'pré-reserva do totem', 'pré-reservas do totem')} para aprovar`, 'Os pilotos estão esperando a Recepção confirmar.', 'Aprovar na Recepção', '#/recepcao']);
     if (!abertos.length && restantes.length) itens.push(['laranja', 'Nenhum caixa aberto', `Abra o caixa no programa da Recepção antes da bateria das ${horaDe(restantes[0].dataHora)}.`, 'Ver Recepção', '#/recepcao']);
     const devendo = restantes.filter((b) => falta(b) > 0 && urgente(b));
     if (devendo.length === 1) { const b = devendo[0]; itens.push(['laranja', `${tituloBat(b)} · ${horaDe(b.dataHora)} ainda não pagou tudo`, `${plural(falta(b), 'piloto sem pagar', 'pilotos sem pagar')}${+b.preco ? ' · falta ' + brl(faltaValor(b)) : ''}`, 'Ver na agenda', `bat:${b.id}`]); }
     else if (devendo.length > 1) itens.push(['laranja', `${devendo.length} baterias das próximas 3 horas com piloto sem pagar`, `${devendo.map((b) => `${horaDe(b.dataHora)} ${tituloBat(b)}`).join(' · ')}${devendo.some((b) => +b.preco) ? ' · falta ' + brl(devendo.reduce((x, b) => x + faltaValor(b), 0)) : ''}`, 'Ver lista na agenda', 'lista']);
     const el = $('#pendencias');
-    if (!itens.length) { el.innerHTML = `<div class="tudoEmDia">${svg(IC.ok, 16, 'var(--kib-cor-estado-sucesso-texto)', 2.8)}<b>Tudo em dia</b><span>nenhuma pendência agora</span></div>`; return; }
+    if (!itens.length) { el.innerHTML = `<div class="tudoEmDia">${svg(IC.ok, 16, 'var(--kib-cor-estado-sucesso-texto)', 2.8)}<b>Tudo em dia</b><span>bandeira verde: nenhuma pendência agora</span></div>`; return; }
     el.innerHTML = `<div class="cartao pendencias"><div class="cartaoCab"><h2>Precisa de você agora</h2><span class="selo ${itens.some((i) => i[0] === 'vermelho') ? 'vermelho' : 'laranjaS'}" style="margin-left: 0">${itens.length}</span></div>
       ${itens.map(([nivel, t, dd, botao, alvo]) => `<div class="pendencia ${nivel}"><span class="col" style="flex: 1 1 260px; gap: 2px"><b>${esc(t)}</b><span class="peq" style="line-height: 1.45">${esc(dd)}</span></span>${alvo === 'lista' ? `<button class="btn sec peq" data-ir-lista="1">${botao}</button>` : alvo.startsWith('bat:') ? `<button class="btn ${nivel === 'vermelho' ? 'perigo' : 'sec'} peq" data-ir-bat="${alvo.slice(4)}">${botao}</button>` : `<a class="btn ${nivel === 'vermelho' ? 'perigo' : 'sec'} peq" href="${alvo}">${botao}</a>`}</div>`).join('')}</div>`;
   };
@@ -412,8 +413,8 @@ TELAS.visao = async (tela) => {
     const segmentos = `<span class="segmentos" role="img" aria-label="${feitas} baterias terminadas de ${bats.length}">${bats.map((b) => { const st = situacaoBateria(b); return `<span class="${st}"></span>`; }).join('')}</span>`;
     $('#kpis').innerHTML = [
       kpi('Pilotos hoje', insc, `de ${vagas} vagas · ${Math.round(oc * 100)}% ocupado`, '#/agenda', `<span class="barra" role="img" aria-label="${Math.round(oc * 100)}% das vagas ocupadas"><span style="width: ${Math.min(100, Math.round(oc * 100))}%; background: ${oc > .8 ? 'var(--kib-cor-estado-perigo-solido)' : oc > .5 ? 'var(--kib-cor-agenda-reserva-cheio)' : 'var(--kib-cor-categoria-verde-base)'}"></span></span>`),
-      kpi('Recebido hoje', brlCurto(recebidoCaixa + recebidoOnline), `caixa ${brlCurto(recebidoCaixa)} · site ${brlCurto(recebidoOnline)} (${plural(pagasOnline.length, 'reserva', 'reservas')})`, '#/reservas'),
-      kpi('A receber hoje', devendo.length ? brlCurto(aReceber) : 'Nada', devendo.length ? `${plural(devendo.length, 'bateria', 'baterias')} com piloto sem pagar${jaCorreram ? ` (${jaCorreram} já ${jaCorreram === 1 ? 'passou do horário' : 'passaram do horário'})` : ''}` : 'todos os pilotos de hoje pagaram', '#/agenda', '', devendo.length && temUrgente ? 'color: var(--avisoTxt)' : ''),
+      kpi('Recebido hoje', brlCurto(recebidoCaixa + recebidoOnline), `caixa ${brlCurto(recebidoCaixa)} · site ${brlCurto(recebidoOnline)} (${plural(pagasOnline.length, 'reserva', 'reservas')})`, '#/reservas', '', recebidoCaixa + recebidoOnline > 0 ? 'color: var(--okTxt)' : ''),
+      kpi('A receber hoje', devendo.length ? brlCurto(aReceber) : 'Nada', devendo.length ? `${plural(devendo.length, 'bateria', 'baterias')} com piloto sem pagar${jaCorreram ? ` (${jaCorreram} já ${jaCorreram === 1 ? 'passou do horário' : 'passaram do horário'})` : ''}` : 'todos os pilotos de hoje pagaram', '#/agenda', '', !devendo.length ? 'color: var(--okTxt)' : temUrgente ? 'color: var(--avisoTxt)' : ''),
       kpi('Baterias encerradas', bats.length ? `${feitas} de ${bats.length}` : '—', naPista ? `${esc(tituloBat(naPista))} no horário previsto` : prox ? `próxima às ${horaDe(prox.dataHora)}` : bats.length ? 'horários previstos encerrados' : 'sem baterias hoje', '#/recepcao', bats.length ? segmentos : ''),
     ].join('');
   };
@@ -426,11 +427,11 @@ TELAS.visao = async (tela) => {
     const sub = [generico(b.nome) ? '' : b.nome, b.produto, kartTxt(b.tipoKart)].filter(Boolean).filter((x) => x !== tituloBat(b, tp)).map(esc).join(' · ');
     return `<div class="painelBat">
       <span style="display: flex; align-items: center; gap: var(--kib-espaco-1); flex-wrap: wrap">${quando}<span class="mono peq cor-corpo">${horaDe(b.dataHora)}–${fmtHm(ini + 35)}</span></span>
-      <span class="col" style="gap: 2px"><b style="font-size: var(--kib-fonte-tamanho-titulo); letter-spacing: -0.01em">${esc(tp === 'livre' ? 'Horário livre' : tituloBat(b, tp))}</b>${sub ? `<span class="peq">${sub}</span>` : ''}</span>
+      <span class="col" style="gap: 2px; min-width: 0; overflow-wrap: anywhere"><b style="font-size: var(--kib-fonte-tamanho-titulo); letter-spacing: -0.01em">${esc(tp === 'livre' ? 'Horário livre' : tituloBat(b, tp))}</b>${sub ? `<span class="peq">${sub}</span>` : ''}</span>
       <span class="numerosBat">
         <span><b>${n}</b><span>de ${vagas} pilotos</span></span>
-        <span><b style="color: ${n && pagos < n ? 'var(--avisoTxt)' : 'var(--tinta)'}">${pagos}</b><span>pagos${n && pagos < n && +b.preco ? ` · faltam ${brlCurto(faltaValor(b))}` : ''}</span></span>
-        <span><b style="color: ${prontos !== null && prontos < n ? 'var(--avisoTxt)' : 'var(--tinta)'}">${prontos === null ? '—' : prontos}</b><span title="Documento, e-mail, peso e telefone preenchidos">com cadastro completo para o totem</span></span>
+        <span><b style="color: ${n && pagos < n ? 'var(--avisoTxt)' : n ? 'var(--okTxt)' : 'var(--tinta)'}">${pagos}</b><span>pagos${n && pagos < n && +b.preco ? ` · faltam ${brlCurto(faltaValor(b))}` : ''}</span></span>
+        <span><b style="color: ${prontos !== null && prontos < n ? 'var(--avisoTxt)' : prontos !== null && n ? 'var(--okTxt)' : 'var(--tinta)'}">${prontos === null ? '—' : prontos}</b><span title="Documento, e-mail, peso e telefone preenchidos">com cadastro completo para o totem</span></span>
       </span>
       <span style="display: flex; gap: var(--kib-espaco-1); flex-wrap: wrap; margin-top: auto"><a class="btn sec peq" href="#/recepcao" data-ir-recepcao="${b.id}">Ver pilotos</a><button class="btn sec peq" data-ir-bat="${b.id}">Abrir na agenda</button></span>
     </div>`;
@@ -441,7 +442,7 @@ TELAS.visao = async (tela) => {
     const el = $('#agoraSeguir');
     if (!foco.length) {
       const inscritos = bats.reduce((a, b) => a + (+b.inscritos || 0), 0), amanha = somaDias(hoje, deIso(somaDias(hoje, 1)).getDay() === 1 ? 2 : 1);
-      el.innerHTML = `<div class="cartaoCab"><h2>Agora e a seguir</h2></div><div class="fimDoDia"><b>${bats.length ? 'Os horários previstos de hoje terminaram' : 'Sem baterias hoje'}</b><span class="peq t-corpo">${bats.length ? `${plural(inscritos, 'piloto inscrito', 'pilotos inscritos')} em ${plural(bats.length, 'bateria', 'baterias')}.` : d.getDay() === 1 ? 'Segunda o kartódromo não abre.' : 'Dia fechado ou grade ainda não gerada.'}</span><span style="display: flex; gap: var(--kib-espaco-1); flex-wrap: wrap; margin-top: var(--kib-espaco-meio)"><button class="btn sec peq" data-ir-dia="${amanha}">Ver ${amanha === somaDias(hoje, 1) ? 'amanhã' : 'terça'} na agenda</button><button class="btn sec peq" data-nova-reserva="1">Nova reserva</button></span></div>`;
+      el.innerHTML = `<div class="cartaoCab"><h2>Agora e a seguir</h2></div><div class="fimDoDia"><b>${bats.length ? 'Bandeirada final: os horários previstos de hoje terminaram' : 'Sem baterias hoje'}</b><span class="peq t-corpo">${bats.length ? `${plural(inscritos, 'piloto inscrito', 'pilotos inscritos')} em ${plural(bats.length, 'bateria', 'baterias')}.` : d.getDay() === 1 ? 'Segunda o kartódromo não abre.' : 'Dia fechado ou grade ainda não gerada.'}</span><span style="display: flex; gap: var(--kib-espaco-1); flex-wrap: wrap; margin-top: var(--kib-espaco-meio)"><button class="btn sec peq" data-ir-dia="${amanha}">Ver ${amanha === somaDias(hoje, 1) ? 'amanhã' : 'terça'} na agenda</button><button class="btn sec peq" data-nova-reserva="1">Nova reserva</button></span></div>`;
       return;
     }
     const rs = await Promise.all(foco.map(([b]) => (+b.inscritos ? office(`/reservas?bateriaId=${b.id}&status=todas`).catch(() => null) : Promise.resolve([]))));
@@ -466,16 +467,30 @@ TELAS.visao = async (tela) => {
     if (foco && rola) rola.scrollLeft = Math.max(0, foco.offsetLeft - rola.offsetLeft - 160);
   };
 
+  let ultimaOk = '';
   const carregar = async () => {
-    const [bs, online, aprovar, movs] = await Promise.all([
-      office(`/baterias?status=todas&data=${hoje}`),
-      office(`/reservas-online?status=todas&data=${hoje}`).catch(() => []),
-      office(`/reservas?status=aprovar&filtro=apartir&data=${hoje}`).catch(() => []),
-      office('/movimentos').catch(() => []),
-    ]);
-    bats = bs.filter((b) => b.dataHora.startsWith(hoje)).sort((x, y) => x.dataHora.localeCompare(y.dataHora));
+    let bs, online, aprovar, movs;
+    try {
+      [bs, online, aprovar, movs] = await Promise.all([
+        office(`/baterias?status=todas&data=${hoje}`),
+        office(`/reservas-online?status=todas&data=${hoje}`).catch(() => []),
+        office(`/reservas?status=aprovar&filtro=apartir&data=${hoje}`).catch(() => []),
+        office('/movimentos').catch(() => []),
+      ]);
+    } catch (e) {
+      if (!tela.isConnected || !$('#kpis')) return;
+      const at = $('#atualizadoV');
+      // já tinha dados na tela: mantém e avisa que estão velhos
+      if (ultimaOk) { if (at) at.textContent = ` · sem conexão, dados das ${ultimaOk}`; return; }
+      // primeira carga falhou: tira os esqueletos e mostra como tentar de novo
+      $('#pendencias').innerHTML = `<div class="cartao pendencias"><div class="pendencia vermelho"><span class="col" style="flex: 1 1 260px; gap: 2px"><b>Não consegui carregar as baterias de hoje</b><span class="peq" style="line-height: 1.45">Confira a internet do computador. Detalhe: ${esc(e.message)}</span></span><button class="btn perigo peq" data-recarregar="1">Tentar de novo</button></div></div>`;
+      ['#kpis', '#agoraSeguir', '#linhaDia'].forEach((s) => { const x = $(s); if (x) x.innerHTML = ''; });
+      return;
+    }
+    bats = (Array.isArray(bs) ? bs : []).filter((b) => b && typeof b.dataHora === 'string' && b.dataHora.startsWith(hoje)).sort((x, y) => x.dataHora.localeCompare(y.dataHora));
     if (!$('#kpis')) return;
-    const at = $('#atualizadoV'); if (at) at.textContent = ` · atualizado às ${new Date().toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' })}`;
+    ultimaOk = new Date().toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' });
+    const at = $('#atualizadoV'); if (at) at.textContent = ` · atualizado às ${ultimaOk}`;
     const abertos = movs.filter((m) => !m.fechadoEm);
     selo('recepcao', aprovar.length ? String(aprovar.length) : '', 'vermelho');
     const nAt = online.filter((o) => o.status === 'pago_sem_vaga').length; selo('reservas', nAt ? String(nAt) : '', 'vermelho');
@@ -485,8 +500,10 @@ TELAS.visao = async (tela) => {
     await pintarAgora();
   };
 
+  let vivoOcupado = false;
   const vivo = async () => {
-    const el = $('#emPista', tela); if (!el) return;
+    const el = $('#emPista', tela); if (!el || vivoOcupado) return;
+    vivoOcupado = true;
     try {
       const s = await api('/crono/ao-vivo');
       if (!tela.isConnected) return;
@@ -502,16 +519,19 @@ TELAS.visao = async (tela) => {
         <div class="linha cabPlacar"><span>Pos</span><span>Kart</span><span>Piloto</span><span class="t-dir">Melhor volta</span></div>
         ${pil.map((p, i) => `<div class="linha"><span style="font-size: var(--kib-fonte-tamanho-subtitulo); font-weight: 700; color: ${i < 3 ? 'var(--kib-cor-categoria-amarelo-topo)' : 'var(--kib-cor-acao-sobre-principal)'}">${esc(p.position)}</span><span class="kartE">${esc(p.kart)}</span><span class="trunc peso-semibold">${esc(p.name)}</span><span class="mono" style="text-align: right; font-size: var(--kib-fonte-tamanho-corpo)">${esc(p.time || '—')}</span></div>`).join('') || '<div style="padding: var(--kib-espaco-denso-12) var(--kib-espaco-denso-20); color: var(--kib-cor-icone-suave)">Largou agora: ninguém completou volta ainda.</div>'}`;
     } catch (e) { if (!tela.isConnected) return; el.innerHTML = `<div class="placarVazio"><b>Cronometragem sem resposta</b><span>O placar tenta de novo a cada 5 segundos. Detalhe: ${esc(e.message)}</span><a href="#/sistema">Ver estado dos PCs${svg(IC.dir, 14, 'var(--kib-cor-categoria-verde-topo)', 2.4)}</a></div>`; }
+    finally { vivoOcupado = false; }
   };
 
   tela.addEventListener('click', (e) => {
+    if (e.target.closest('[data-ajuda-visao]')) { S.ajuda = { guia: 'visao' }; return; }
+    if (e.target.closest('[data-recarregar]')) { $('#pendencias').innerHTML = '<div class="esqueleto" style="height: 56px"></div>'; carregar(); return; }
     if (e.target.closest('[data-nova-reserva]')) { S.irAgendaNova = true; location.hash = '#/agenda'; return; }
     const dd = e.target.closest('[data-ir-dia]'); if (dd) { S.agenda = { ...(S.agenda || { ocultos: {}, q: '' }), vista: 'dia', base: dd.dataset.irDia, sel: null }; location.hash = '#/agenda'; return; }
     if (e.target.closest('[data-ir-lista]')) { S.agenda = { ...(S.agenda || { ocultos: {}, q: '' }), vista: 'lista', base: hoje, sel: null }; location.hash = '#/agenda'; return; }
     const b = e.target.closest('[data-ir-bat]'); if (b) { const x = bats.find((y) => y.id === +b.dataset.irBat); if (x) irAgenda(x); return; }
     const rc = e.target.closest('[data-ir-recepcao]'); if (rc) S.irBateria = +rc.dataset.irRecepcao;
   });
-  await atualizarConexao();
+  await atualizarConexao().catch(() => {});
   await carregar();
   vivo();
   repetir(carregar, 30_000); repetir(vivo, 5_000); repetir(atualizarConexao, 60_000);
