@@ -306,3 +306,54 @@ describe('estreante pelo link do grupo paga o preço de primeira vez', () => {
     f.mockRestore();
   });
 });
+
+describe('cupom do amigo no link do grupo', () => {
+  const corpo = {
+    tipoDocumento: 'CPF', documento: '529.982.247-25', nome: 'Maria da Silva', email: 'maria@exemplo.com', instagram: '@maria.silva', telefone: '(31) 98888-7777',
+    nascimento: '1990-05-20', peso: '62', cep: '32600000', endereco: 'Rua A', numero: '10', bairro: 'Centro', cidade: 'Betim', estado: 'MG', lgpd: true, reserva: 'TOKENAMIGO01',
+  };
+  const simular = (resposta: Record<string, unknown>) => {
+    const ops: unknown[] = []; const pagamentos: { value: number }[] = [];
+    const f = vi.spyOn(globalThis, 'fetch').mockImplementation(async (u, init) => {
+      const url = String(u);
+      if (url.includes('/api/totem/grupo-preco')) { ops.push(JSON.parse(String(init?.body))); return new Response(JSON.stringify(resposta), { status: 200 }); }
+      if (url.includes('/customers?')) return new Response(JSON.stringify({ data: [{ id: 'cus_1' }] }), { status: 200 });
+      if (url.endsWith('/payments') && init?.method === 'POST') { pagamentos.push(JSON.parse(String(init.body))); return new Response(JSON.stringify({ id: 'pay_cupom123', invoiceUrl: 'https://www.asaas.com/i/cupom123' }), { status: 200 }); }
+      return new Response('{}', { status: 200 });
+    });
+    return { ops, pagamentos, f };
+  };
+  const enviar = (cupom?: string) => chamar('/api/pre-cadastro', { method: 'POST', body: JSON.stringify({ ...corpo, ...(cupom ? { cupom } : {}), t: Date.now() - 10_000 }) });
+
+  it('cupom válido: SRVKART recebe o código, a cobrança sai com desconto e o cupom vai para o SRVKART no cadastro', async () => {
+    await publicar([grupo({ precoCentavos: 14500 })]);
+    env.ASAAS_API_KEY = 'x';
+    const { ops, pagamentos, f } = simular({ precoCentavos: 13050, primeiraVez: false, cupom: { codigo: 'AMIGO10', descontoCentavos: 1450 } });
+    const b = await (await enviar(' amigo10 ')).json() as { pagamento?: { valorCentavos: number; cupom?: unknown } };
+    expect(ops[0]).toMatchObject({ token: 'TOKENAMIGO01', cupom: 'AMIGO10' });
+    expect(pagamentos[0].value).toBe(130.5);
+    expect(b.pagamento).toMatchObject({ valorCentavos: 13050, cupom: { codigo: 'AMIGO10', descontoCentavos: 1450 } });
+    expect(JSON.parse(env.PRE.mem.get('pendentes/52998224725.json')!).cobranca).toMatchObject({ valorCentavos: 13050, cupom: { codigo: 'AMIGO10' } });
+    f.mockRestore();
+  });
+
+  it('cupom recusado: preço normal e o motivo aparece para a pessoa', async () => {
+    await publicar([grupo({ precoCentavos: 14500 })]);
+    env.ASAAS_API_KEY = 'x';
+    const { pagamentos, f } = simular({ precoCentavos: 14500, primeiraVez: false, cupom: null, erroCupom: 'Voucher expirado.' });
+    const b = await (await enviar('VELHO')).json() as { pagamento?: { erroCupom?: string } };
+    expect(pagamentos[0].value).toBe(145);
+    expect(b.pagamento?.erroCupom).toBe('Voucher expirado.');
+    f.mockRestore();
+  });
+
+  it('cupom que zera a vaga: preço normal (a Asaas não cobra R$ 0), usar na recepção', async () => {
+    await publicar([grupo({ precoCentavos: 14500 })]);
+    env.ASAAS_API_KEY = 'x';
+    const { pagamentos, f } = simular({ precoCentavos: 0, primeiraVez: false, cupom: { codigo: 'CORTESIA', descontoCentavos: 14500 } });
+    const b = await (await enviar('CORTESIA')).json() as { pagamento?: { erroCupom?: string } };
+    expect(pagamentos[0].value).toBe(145);
+    expect(b.pagamento?.erroCupom).toMatch(/recepção/);
+    f.mockRestore();
+  });
+});

@@ -11,7 +11,7 @@
  * Pagamento feito no caixa da Recepção ou pelo site também conta (a vaga já vem paga).
  */
 import { createHash, createHmac, randomBytes } from 'node:crypto';
-import { precoPrimeiraVezDoGrupo } from './reserva-online';
+import { precoPrimeiraVezDoGrupo, reservarCupomDoLink } from './reserva-online';
 import { insertCliente, one, onlyDigits, query, tx, type ClienteInput } from './db';
 import { HttpError, cancelarReserva, exigePodeFecharBateria, exigePermissaoOffice, inscreverN, moverReservas } from './office';
 import type { Sessao } from './auth';
@@ -1403,7 +1403,12 @@ export async function registrarCobrancaDoLink(token: string, clienteId: number, 
   if (!vaga) { log(`grupo: cobrança ${asaasId} do link sem vaga para o cliente ${clienteId} (conferir na recepção)`); return false; }
   // estreante pelo link pagou o preço de primeira vez: a vaga passa a valer esse preço (só o valor configurado é aceito)
   const valorCob = Math.round(Number(cob.valorCentavos) || 0);
-  if (valorCob > 0) {
+  const cupom = (cob as { cupom?: { codigo?: unknown } }).cupom;
+  if (valorCob > 0 && cupom && /^[A-Z0-9_-]{1,40}$/.test(String(cupom.codigo ?? ''))) {
+    const cli = await one<{ documento: string | null }>(`SELECT Documento documento FROM dbo.Cliente WHERE Id = @c`, { c: clienteId });
+    const vale = await reservarCupomDoLink({ asaasId, grupoId: vaga.grupoId, pilotoId: vaga.id, clienteId, documento: onlyDigits(cli?.documento), codigo: String(cupom.codigo), valorCobrado: valorCob }, log);
+    if (vale) await query(`UPDATE dbo.ReservaGrupoPiloto SET PrecoCentavos = @v WHERE Id = @p`, { v: vale, p: vaga.id });
+  } else if (valorCob > 0) {
     const pv = await precoPrimeiraVezDoGrupo(vaga.grupoId);
     if (pv && valorCob === pv) await query(`UPDATE dbo.ReservaGrupoPiloto SET PrecoCentavos = @v WHERE Id = @p AND PrecoCentavos IS NULL`, { v: pv, p: vaga.id });
   }

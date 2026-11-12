@@ -279,6 +279,13 @@
       <div class="oculto" aria-hidden="true" inert><label>Site<input id="site" tabindex="-1" autocomplete="off"></label></div>
     </section>
 
+    <section class="cartao" id="cupomGrupo" hidden>
+      <h2>Cupom de desconto <span class="op">(opcional)</span></h2>
+      <p class="sub">Tem um cupom? O desconto já sai no valor da sua vaga.</p>
+      <label for="cupomCod">Código do cupom</label>
+      <input id="cupomCod" autocomplete="off" autocapitalize="characters" maxlength="40" style="text-transform:uppercase">
+    </section>
+
     <button class="enviar" id="enviar" type="submit">Concluir cadastro</button>
     <p class="rodape">No dia da corrida, a recepção confere seus dados e você assina o termo impresso.<br>Dúvidas? <a href="https://wa.me/5531998842898" rel="noopener">WhatsApp (31) 99884-2898</a></p>
   </form>
@@ -661,6 +668,7 @@
   const aplicarGrupo = (g) => {
     grupo = g;
     const paga = g.aCobrarCentavos > 0;
+    if (paga) $('cupomGrupo').hidden = false;
     const sou = g.souResponsavel;
     $('grupoTitulo').textContent = sou ? 'Você é o responsável pelo grupo' : 'Você está no grupo de ' + g.responsavel;
     const t = $('grupoTexto');
@@ -756,6 +764,8 @@
     topo.h1.innerHTML = 'Quase <em>lá</em>'; topo.p.textContent = 'Leva menos de um minuto.'; marcarPassos(2);
     const quem = gg.souResponsavel ? '' : (gg.responsavel ? ' no grupo de ' + esc(gg.responsavel) : '');
     c.innerHTML = (gg.bateria ? '<p class="contexto">' + esc(gg.bateria) + ' · ' + quando(gg.inicio) + (nome1 ? ' · cadastro de ' + esc(nome1) : '') + '</p>' : '') + '<p>Pagamento d' + (gg.modo ? (gg.modo === 'individual' ? 'a sua vaga' : gg.modo === 'sinal' ? 'o sinal do grupo' : 'o grupo todo') : 'a sua vaga') + quem + '</p><p class="valor">' + brl(pg.valorCentavos) + '</p>' +
+      (pg.cupom ? '<p>Cupom <b>' + esc(pg.cupom.codigo) + '</b>: desconto de ' + brl(pg.cupom.descontoCentavos) + '.</p>' : '') +
+      (pg.erroCupom ? '<p class="msg-campo">' + esc(pg.erroCupom) + '</p>' : '') +
       '<a class="botao" href="/api/pagar?forma=pix&id=' + encodeURIComponent(pg.id) + '" target="_blank" rel="noopener">Pagar com Pix</a>' +
       '<a class="botao" style="margin-top:10px;background:transparent;color:var(--texto);border:1px solid var(--linha-forte)" href="/api/pagar?forma=cartao&id=' + encodeURIComponent(pg.id) + '" target="_blank" rel="noopener">Pagar com cartão</a>' +
       '<ol><li>Toque em Pix ou cartão: abre a página de pagamento segura da Asaas.</li><li>No Pix, copie o código no app do banco.</li><li>Volte aqui: a confirmação aparece sozinha.</li></ol>' +
@@ -843,7 +853,7 @@
           menores: menores.map(({ el, ...m }) => m),
           reserva: tokenReserva || undefined,
           termo: TERMO && $('aceiteTermo').checked ? { versao: TERMO.versao, aceito: true, imagem: !$('naoImagem').checked } : undefined,
-          lgpd: true, site: $('site').value, t: aberto,
+          lgpd: true, site: $('site').value, t: aberto, cupom: ($('cupomCod').value || '').trim().toUpperCase().replace(/\s/g, '') || undefined,
         }),
       });
       const j = await r.json().catch(() => ({}));

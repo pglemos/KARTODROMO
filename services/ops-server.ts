@@ -38,7 +38,7 @@ import { painelRoutes, registrarSinal } from '../lib/ops/painel';
 import { enduranceDasBaterias, enduranceRoutes, equipesParaOTotem, paginaDoChefe, vincularNoTotem } from '../lib/ops/endurance';
 import { ENDURANCE_VINCULO_SQL } from '../lib/ops/endurance-vinculo';
 import { atualizarIndice as atualizarIndicePilotos, pilotosRoutes } from '../lib/ops/pilotos';
-import { precoDaVagaPeloLink, publicarAgenda, sincronizarReservasOnline, vagaOnlineDoGrupo } from '../lib/ops/reserva-online';
+import { acertarCuponsDosGrupos, precoDaVagaPeloLink, publicarAgenda, sincronizarReservasOnline, vagaOnlineDoGrupo } from '../lib/ops/reserva-online';
 import { syncTimingTracks } from '../lib/ops/tracado-sync';
 import { selecionarSessoesParaRelatorio, type ReceptionTimingSession } from '../lib/timing/reception-crono-reports';
 
@@ -369,7 +369,7 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
   // preço da vaga de quem entra pelo link do grupo (estreante paga o de primeira vez): o site pergunta ao gerar a cobrança
   if (path === '/api/totem/grupo-preco' && method === 'POST') {
     const body = await readBody(req);
-    const r = await precoDaVagaPeloLink(String(body.token ?? ''), String(body.cpf ?? ''));
+    const r = await precoDaVagaPeloLink(String(body.token ?? ''), String(body.cpf ?? ''), String(body.cupom ?? ''));
     if (!r) throw new HttpError(404, 'Grupo não encontrado.');
     send(res, 200, r);
     return true;
@@ -987,7 +987,7 @@ if (preCadastroLigado()) {
     conferindo = true;
     await publicarTermoNoSite(TERMO_FILE, log).catch((e) => log(`termo: publicação no site falhou (${(e as Error).message})`));
     if (await aplicarAcoesDoPainel(log).catch((e) => { log(`grupo: ações do painel falharam (${(e as Error).message})`); return 0; })) { /* o resumo abaixo já sai atualizado */ }
-    try { await enviarLembretesDosGrupos(log).catch((e) => log(`grupo: lembretes falharam (${(e as Error).message})`)); await soltarVagasNaoPagasDoSite(log).catch((e) => log(`grupo: soltar vagas não pagas falhou (${(e as Error).message})`)); await publicarGruposNoSite(log).catch((e) => log(`grupo: resumo para o site falhou (${(e as Error).message})`)); await conferirCobrancas(log); await puxarPagamentosDiretoDoAsaas(log); await conferirCobrancasCampeonato(log); } catch (e) { log(`grupo: conferência das cobranças falhou (${(e as Error).message})`); } finally { conferindo = false; }
+    try { await acertarCuponsDosGrupos().catch((e) => log(`grupo: acerto dos cupons falhou (${(e as Error).message})`)); await enviarLembretesDosGrupos(log).catch((e) => log(`grupo: lembretes falharam (${(e as Error).message})`)); await soltarVagasNaoPagasDoSite(log).catch((e) => log(`grupo: soltar vagas não pagas falhou (${(e as Error).message})`)); await publicarGruposNoSite(log).catch((e) => log(`grupo: resumo para o site falhou (${(e as Error).message})`)); await conferirCobrancas(log); await puxarPagamentosDiretoDoAsaas(log); await conferirCobrancasCampeonato(log); } catch (e) { log(`grupo: conferência das cobranças falhou (${(e as Error).message})`); } finally { conferindo = false; }
   }, 60_000).unref();
 }
 

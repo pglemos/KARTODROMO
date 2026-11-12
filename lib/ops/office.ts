@@ -682,9 +682,11 @@ async function criarVenda(sessao: Sessao, body: Record<string, unknown>) {
       const [usos] = await run(
         `SELECT
            (SELECT COUNT(*) FROM dbo.VoucherUso WHERE VoucherId = @id AND Estornado = 0)
-           + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso WHERE VoucherId = @id AND Estado IN ('reservado', 'consumido', 'reembolso_pendente')) n,
+           + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso WHERE VoucherId = @id AND Estado IN ('reservado', 'consumido', 'reembolso_pendente'))
+           + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso WHERE VoucherId = @id AND Estado IN ('reservado', 'consumido')) n,
            (SELECT COUNT(*) FROM dbo.VoucherUso WHERE VoucherId = @id AND ClienteId = @cli AND Estornado = 0)
-           + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso WHERE VoucherId = @id AND ClienteId = @cli AND Estado IN ('reservado', 'consumido', 'reembolso_pendente')) doCliente`,
+           + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso WHERE VoucherId = @id AND ClienteId = @cli AND Estado IN ('reservado', 'consumido', 'reembolso_pendente'))
+           + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso WHERE VoucherId = @id AND ClienteId = @cli AND Estado IN ('reservado', 'consumido')) doCliente`,
         { id: v.Id, cli: clienteId },
       );
       if (v.UsoUnico && (usos.n as number) > 0) throw new HttpError(400, 'Voucher já utilizado.');

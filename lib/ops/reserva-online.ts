@@ -197,7 +197,19 @@ async function calcularPedidoOnline(input: CouponInput, read: ReadOne, lock: boo
   const base = { voucherId: null, clienteId: clienteId ?? 0, produtoId, precos, nome: String(bateria.nome), inicio: String(bateria.inicio) };
   if (!codigo) return { ...base, brutoCentavos, descontoCentavos: 0, totalCentavos: brutoCentavos };
 
-  const cliente = clienteId ?? Number((await read(
+  const v = await avaliarVoucher({ codigo, documento, clienteId, produtoId, brutoCentavos }, read, lock);
+  return { ...base, brutoCentavos, descontoCentavos: v.descontoCentavos, totalCentavos: brutoCentavos - v.descontoCentavos, voucherId: v.voucherId, clienteId: v.clienteId };
+}
+
+/**
+ * Regras do cupom (as mesmas da reserva online e do link do grupo): ativo, parceiro/fidelidade ativos, vigência, produto,
+ * limite de uso total e por cliente (recepção + site + link do grupo) e pedido mínimo. Devolve o desconto em centavos.
+ */
+export async function avaliarVoucher(
+  e: { codigo: string; documento: string; clienteId?: number; produtoId: number; brutoCentavos: number }, read: ReadOne, lock: boolean,
+): Promise<{ voucherId: number; descontoCentavos: number; clienteId: number }> {
+  const { codigo, documento, produtoId, brutoCentavos } = e;
+  const cliente = e.clienteId ?? Number((await read(
     `SELECT TOP 1 Id id FROM dbo.Cliente WHERE (DocumentoNum = @doc OR Documento = @doc) AND ResponsavelId IS NULL ORDER BY AtualizadoEm DESC`,
     { doc: documento },
   ))?.id ?? 0);
@@ -218,9 +230,11 @@ async function calcularPedidoOnline(input: CouponInput, read: ReadOne, lock: boo
   const usos = await read(
     `SELECT
        (SELECT COUNT(*) FROM dbo.VoucherUso u WHERE u.VoucherId = @voucher AND u.Estornado = 0)
-       + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso o WHERE o.VoucherId = @voucher AND o.Estado IN ('reservado', 'consumido', 'reembolso_pendente')) n,
+       + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso o WHERE o.VoucherId = @voucher AND o.Estado IN ('reservado', 'consumido', 'reembolso_pendente'))
+       + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso gv WHERE gv.VoucherId = @voucher AND gv.Estado IN ('reservado', 'consumido')) n,
        (SELECT COUNT(*) FROM dbo.VoucherUso u WHERE u.VoucherId = @voucher AND u.ClienteId = @cliente AND u.Estornado = 0)
-       + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso o WHERE o.VoucherId = @voucher AND o.ClienteId = @cliente AND o.Estado IN ('reservado', 'consumido', 'reembolso_pendente')) doCliente`,
+       + (SELECT COUNT(*) FROM dbo.ReservaOnlineVoucherUso o WHERE o.VoucherId = @voucher AND o.ClienteId = @cliente AND o.Estado IN ('reservado', 'consumido', 'reembolso_pendente'))
+       + (SELECT COUNT(*) FROM dbo.ReservaGrupoVoucherUso gv WHERE gv.VoucherId = @voucher AND gv.ClienteId = @cliente AND gv.Estado IN ('reservado', 'consumido')) doCliente`,
     { voucher: voucher.Id, cliente },
   );
   if (voucher.UsoUnico && Number(usos?.n ?? 0) > 0) throw new HttpError(400, 'Voucher já utilizado.');
@@ -234,7 +248,7 @@ async function calcularPedidoOnline(input: CouponInput, read: ReadOne, lock: boo
     : Number(voucher.Valor);
   if (voucher.DescontoMaximoCentavos) descontoCentavos = Math.min(descontoCentavos, Number(voucher.DescontoMaximoCentavos));
   descontoCentavos = Math.min(Math.max(0, descontoCentavos), brutoCentavos);
-  return { ...base, brutoCentavos, descontoCentavos, totalCentavos: brutoCentavos - descontoCentavos, voucherId: Number(voucher.Id), clienteId: cliente };
+  return { voucherId: Number(voucher.Id), descontoCentavos, clienteId: cliente };
 }
 
 export async function previsualizarVoucherOnline(input: CouponInput) {
@@ -588,7 +602,7 @@ export async function sincronizarReservasOnline(log: Log) {
  * "cada um paga o seu"): estreante paga o preço de primeira vez do produto da bateria, quando houver e for menor.
  * Chamado pelo site na hora de gerar a cobrança (POST /api/totem/grupo-preco). Devolve só o valor.
  */
-export async function precoDaVagaPeloLink(token: string, cpf: string): Promise<{ precoCentavos: number; primeiraVez: boolean } | null> {
+export async function precoDaVagaPeloLink(token: string, cpf: string, cupom = ''): Promise<{ precoCentavos: number; primeiraVez: boolean; cupom?: { codigo: string; descontoCentavos: number } | null; erroCupom?: string } | null> {
   if (!/^[A-Za-z0-9]{10,24}$/.test(token) || !isValidCpf(onlyDigits(cpf))) return null;
   const c = configOnline();
   const g = await one<{ preco: number; produtoId: number | null }>(
@@ -598,10 +612,60 @@ export async function precoDaVagaPeloLink(token: string, cpf: string): Promise<{
   );
   if (!g) return null;
   const cheio = Number(g.preco) || 0;
-  const pv = c.primeiraVez[produtoDaBateria(Number(g.produtoId), c)];
-  if (!pv || pv >= cheio) return { precoCentavos: cheio, primeiraVez: false };
-  const [novo] = await primeiraVez([cpf], (sql, params) => one(sql, params));
-  return { precoCentavos: novo ? pv : cheio, primeiraVez: Boolean(novo) };
+  const produto = produtoDaBateria(Number(g.produtoId), c);
+  const pv = c.primeiraVez[produto];
+  const novo = pv && pv < cheio ? (await primeiraVez([cpf], (sql, params) => one(sql, params)))[0] : false;
+  const base = novo ? pv : cheio;
+  const codigo = String(cupom ?? '').trim().toUpperCase();
+  if (!/^[A-Z0-9_-]{1,40}$/.test(codigo)) return { precoCentavos: base, primeiraVez: Boolean(novo) };
+  // cupom do amigo (12/11/2026): mesmas regras da reserva online, sobre o preço da vaga dele
+  try {
+    const v = await avaliarVoucher({ codigo, documento: onlyDigits(cpf), produtoId: produto, brutoCentavos: base }, (sql, params) => one(sql, params), false);
+    return { precoCentavos: base - v.descontoCentavos, primeiraVez: Boolean(novo), cupom: { codigo, descontoCentavos: v.descontoCentavos } };
+  } catch (e) {
+    if (e instanceof HttpError) return { precoCentavos: base, primeiraVez: Boolean(novo), cupom: null, erroCupom: e.message };
+    throw e;
+  }
+}
+
+/**
+ * Cupom usado na cobrança do link do grupo: reserva o uso (conta no limite do voucher) e confere o valor cobrado.
+ * Devolve o preço que a vaga passa a valer, ou null se o cupom não vale mais (a vaga fica com o preço normal).
+ */
+export async function reservarCupomDoLink(o: { asaasId: string; grupoId: number; pilotoId: number; clienteId: number; documento: string; codigo: string; valorCobrado: number }, log: Log): Promise<number | null> {
+  const ja = await one<{ Id: number }>(`SELECT Id FROM dbo.ReservaGrupoVoucherUso WHERE AsaasId = @a`, { a: o.asaasId });
+  if (ja) return o.valorCobrado;
+  const g = await one<{ preco: number; produtoId: number | null }>(`SELECT g.PrecoCentavos preco, b.ProdutoId produtoId FROM dbo.ReservaGrupo g JOIN dbo.Bateria b ON b.Id = g.BateriaId WHERE g.Id = @id`, { id: o.grupoId });
+  if (!g) return null;
+  const c = configOnline();
+  const produto = produtoDaBateria(Number(g.produtoId), c);
+  const bases = [Number(g.preco) || 0, c.primeiraVez[produto]].filter((x): x is number => Number(x) > 0);
+  try {
+    return await tx(async (run) => {
+      const read: ReadOne = async (sql, params) => (await run(sql, params))[0] ?? null;
+      for (const base of bases) {
+        const v = await avaliarVoucher({ codigo: o.codigo, documento: o.documento, clienteId: o.clienteId, produtoId: produto, brutoCentavos: base }, read, true);
+        if (base - v.descontoCentavos !== o.valorCobrado) continue;
+        await run(`INSERT INTO dbo.ReservaGrupoVoucherUso (AsaasId, GrupoId, PilotoId, VoucherId, ClienteId, DescontoCentavos, Estado) VALUES (@a, @g, @p, @v, @c, @d, 'reservado')`,
+          { a: o.asaasId, g: o.grupoId, p: o.pilotoId, v: v.voucherId, c: o.clienteId, d: v.descontoCentavos });
+        log(`grupo ${o.grupoId}: cupom ${o.codigo} reservado na cobrança ${o.asaasId} (desconto ${brl(v.descontoCentavos)})`);
+        return o.valorCobrado;
+      }
+      log(`grupo ${o.grupoId}: cupom ${o.codigo} da cobrança ${o.asaasId} não confere com o valor cobrado (${brl(o.valorCobrado)})`);
+      return null;
+    });
+  } catch (e) {
+    log(`grupo ${o.grupoId}: cupom ${o.codigo} da cobrança ${o.asaasId} recusado (${(e as Error).message})`);
+    return null;
+  }
+}
+
+/** Cupom de cobrança paga vira consumido; de cobrança vencida/cancelada volta a valer (liberado). Roda a cada ciclo. */
+export async function acertarCuponsDosGrupos() {
+  await query(`UPDATE u SET Estado = 'consumido' FROM dbo.ReservaGrupoVoucherUso u
+    WHERE u.Estado = 'reservado' AND EXISTS (SELECT 1 FROM dbo.ReservaGrupoPagamento pg WHERE pg.AsaasId = u.AsaasId AND pg.Cancelado = 0)`);
+  await query(`UPDATE u SET Estado = 'liberado' FROM dbo.ReservaGrupoVoucherUso u
+    WHERE u.Estado = 'reservado' AND EXISTS (SELECT 1 FROM dbo.ReservaGrupoCobranca c WHERE c.AsaasId = u.AsaasId AND c.Status IN ('vencida', 'cancelada'))`);
 }
 
 /** Valor de primeira vez configurado para o produto da bateria do grupo (para conferir o que o site cobrou). */

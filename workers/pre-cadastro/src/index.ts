@@ -71,14 +71,14 @@ async function receber(req: Request, env: Env) {
   if (grupo && grupo.modo === 'individual' && grupo.precoCentavos > 0 && grupo.livres > 0) {
     if (v.dados.tipoDocumento !== 'CPF') return json(400, { erro: 'Para pagar a vaga pelo link do grupo, use o CPF.' });
     // sem o Asaas (fora do ar ou cota estourada, 12/11/2026) o cadastro não pode se perder: salva e a vaga é paga depois
-    try { pagamento = await cobrancaDoLink(env, reserva!, chave, v.dados, grupo); }
+    try { pagamento = await cobrancaDoLink(env, reserva!, chave, v.dados, grupo, String((corpo as Record<string, unknown>).cupom ?? '').trim().toUpperCase().slice(0, 40)); }
     catch (e) { console.error('cobrança do link', (e as Error).message); pagamentoFalhou = true; }
   }
   // termo de responsabilidade aceito no cadastro (texto publicado pelo SRVKART)
   const aceite = await aceiteDoCadastro(env, corpo as Record<string, unknown>, req.headers.get('cf-connecting-ip'));
   if (aceite.erro) return json(409, { erro: aceite.erro });
   const registro = { chave, recebidoEm: new Date().toISOString(), ...v.dados, ...(reserva ? { reserva } : {}), ...(aceite.termo ? { termo: aceite.termo } : {}),
-    ...(pagamento ? { cobranca: { id: pagamento.id, link: pagamento.link, valorCentavos: pagamento.valorCentavos } } : {}) };
+    ...(pagamento ? { cobranca: { id: pagamento.id, link: pagamento.link, valorCentavos: pagamento.valorCentavos, ...(pagamento.cupom ? { cupom: pagamento.cupom } : {}) } } : {}) };
   // um cadastro por documento: se a pessoa enviar de novo, vale o último
   await env.PRE.put(`pendentes/${chave}.json`, JSON.stringify(registro), { httpMetadata: { contentType: 'application/json' } });
   return json(201, { ok: true, nome: v.dados.nome.split(' ')[0],
@@ -98,7 +98,7 @@ function faltaNoCadastro(d: PreCadastro) {
 }
 
 type GrupoDoLink = { tokens: string[]; status: string; codigo: string; responsavel: string; bateria: string; inicio: string; modo: string; precoCentavos: number; livres: number };
-type CobrancaDoLink = { id: string; link: string; valorCentavos: number; pago?: boolean };
+type CobrancaDoLink = { id: string; link: string; valorCentavos: number; pago?: boolean; cupom?: { codigo: string; descontoCentavos: number } | null; erroCupom?: string };
 let cacheGrupos: { em: number; lista: GrupoDoLink[] } | null = null;
 /** Resumo das reservas em grupo ativas (o SRVKART manda a cada minuto em /api/sync/grupos). */
 async function grupoDoLink(env: Env, token: string) {
@@ -136,27 +136,34 @@ async function situacaoCobranca(env: Env, id: string): Promise<{ pago: boolean; 
  * Preço da vaga de quem entra pelo link (estreante paga o de primeira vez da bateria, 12/11/2026): o SRVKART sabe se o
  * CPF já correu. Sem resposta em 3,5 s, vale o preço do grupo (nunca cobra a mais; o desconto só é aceito se for menor).
  */
-async function precoDaVaga(env: Env, token: string, cpf: string, cheio: number) {
+async function precoDaVaga(env: Env, token: string, cpf: string, cheio: number, cupom = ''): Promise<{ valor: number; cupom: { codigo: string; descontoCentavos: number } | null; erroCupom?: string }> {
   try {
     const ops = ((env as { OPS_URL?: string }).OPS_URL || 'https://ops.kartodromodebetim.com.br').replace(/\/+$/, '');
-    const r = await fetch(`${ops}/api/totem/grupo-preco`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token, cpf: digitos(cpf) }), signal: AbortSignal.timeout(3500) });
-    if (!r.ok) return cheio;
-    const v = Math.round(Number(((await r.json()) as { precoCentavos?: number }).precoCentavos));
-    return v > 0 && v <= cheio ? v : cheio;
-  } catch { return cheio; }
+    const r = await fetch(`${ops}/api/totem/grupo-preco`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token, cpf: digitos(cpf), ...(cupom ? { cupom } : {}) }), signal: AbortSignal.timeout(3500) });
+    if (!r.ok) return { valor: cheio, cupom: null, ...(cupom ? { erroCupom: 'Não deu para conferir o cupom agora. A vaga ficou pelo preço normal.' } : {}) };
+    const j = (await r.json()) as { precoCentavos?: number; cupom?: { codigo?: string; descontoCentavos?: number } | null; erroCupom?: string };
+    const v = Math.round(Number(j.precoCentavos));
+    if (!(v >= 0 && v <= cheio)) return { valor: cheio, cupom: null };
+    // a Asaas não cobra R$ 0: cupom que zera a vaga é usado na recepção
+    if (v === 0) return { valor: cheio, cupom: null, erroCupom: 'Este cupom cobre a vaga toda: use-o na recepção. Aqui a vaga ficou pelo preço normal.' };
+    const cup = j.cupom && /^[A-Z0-9_-]{1,40}$/.test(String(j.cupom.codigo)) ? { codigo: String(j.cupom.codigo), descontoCentavos: Math.round(Number(j.cupom.descontoCentavos) || 0) } : null;
+    return { valor: v, cupom: cup, ...(j.erroCupom ? { erroCupom: String(j.erroCupom).slice(0, 160) } : {}) };
+  } catch { return { valor: cheio, cupom: null, ...(cupom ? { erroCupom: 'Não deu para conferir o cupom agora. A vaga ficou pelo preço normal.' } : {}) }; }
 }
 
 /** Uma cobrança por pessoa no grupo (o mesmo CPF reenviando reaproveita a que está aberta). */
-async function cobrancaDoLink(env: Env, token: string, chave: string, d: PreCadastro, g: NonNullable<Awaited<ReturnType<typeof grupoDoLink>>>): Promise<CobrancaDoLink> {
+async function cobrancaDoLink(env: Env, token: string, chave: string, d: PreCadastro, g: NonNullable<Awaited<ReturnType<typeof grupoDoLink>>>, cupom = ''): Promise<CobrancaDoLink> {
   const k = `grupo-pag/${token}/${chave}.json`;
-  const valor = await precoDaVaga(env, token, d.documento, Number(g.precoCentavos));
+  const preco = await precoDaVaga(env, token, d.documento, Number(g.precoCentavos), cupom);
+  const valor = preco.valor;
+  const extra = { cupom: preco.cupom, ...(preco.erroCupom ? { erroCupom: preco.erroCupom } : {}) };
   const antiga = await env.PRE.get(k);
   if (antiga) {
     const a = await antiga.json<CobrancaDoLink>();
     try {
       const s = await situacaoCobranca(env, a.id);
       if (s.pago) return { ...a, pago: true };
-      if (s.status === 'PENDING' && Number(a.valorCentavos) === valor) return { ...a, pago: false };
+      if (s.status === 'PENDING' && Number(a.valorCentavos) === valor) return { ...a, ...extra, pago: false };
     } catch { /* cobrança antiga sumiu: cria outra */ }
   }
   const dados = { nome: d.nome, cpf: digitos(d.documento), email: d.email, celular: digitos(d.telefone), referencia: `grupo-${g.codigo}` };
@@ -176,7 +183,7 @@ async function cobrancaDoLink(env: Env, token: string, chave: string, d: PreCada
       externalReference: `grupo-${g.codigo}-${chave}`.slice(0, 100),
     }),
   });
-  const r: CobrancaDoLink = { id: cob.id, link: cob.invoiceUrl, valorCentavos: valor, pago: false };
+  const r: CobrancaDoLink = { id: cob.id, link: cob.invoiceUrl, valorCentavos: valor, pago: false, ...extra };
   await env.PRE.put(k, JSON.stringify(r), { httpMetadata: { contentType: 'application/json' } });
   return r;
 }
