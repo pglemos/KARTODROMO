@@ -139,7 +139,7 @@ async function situacaoCobranca(env: Env, id: string): Promise<{ pago: boolean; 
 async function precoDaVaga(env: Env, token: string, cpf: string, cheio: number) {
   try {
     const ops = ((env as { OPS_URL?: string }).OPS_URL || 'https://ops.kartodromodebetim.com.br').replace(/\/+$/, '');
-    const r = await fetch(`${ops}/api/publico/grupo-preco`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token, cpf: digitos(cpf) }), signal: AbortSignal.timeout(3500) });
+    const r = await fetch(`${ops}/api/totem/grupo-preco`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token, cpf: digitos(cpf) }), signal: AbortSignal.timeout(3500) });
     if (!r.ok) return cheio;
     const v = Math.round(Number(((await r.json()) as { precoCentavos?: number }).precoCentavos));
     return v > 0 && v <= cheio ? v : cheio;

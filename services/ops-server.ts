@@ -367,7 +367,7 @@ async function totemRoutes(req: http.IncomingMessage, res: http.ServerResponse, 
   }
 
   // preço da vaga de quem entra pelo link do grupo (estreante paga o de primeira vez): o site pergunta ao gerar a cobrança
-  if (path === '/api/publico/grupo-preco' && method === 'POST') {
+  if (path === '/api/totem/grupo-preco' && method === 'POST') {
     const body = await readBody(req);
     const r = await precoDaVagaPeloLink(String(body.token ?? ''), String(body.cpf ?? ''));
     if (!r) throw new HttpError(404, 'Grupo não encontrado.');

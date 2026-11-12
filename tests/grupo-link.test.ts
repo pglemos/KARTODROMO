@@ -263,7 +263,7 @@ describe('estreante pelo link do grupo paga o preço de primeira vez', () => {
     const pagamentos: { value: number; billingType: string }[] = [];
     const f = vi.spyOn(globalThis, 'fetch').mockImplementation(async (u, init) => {
       const url = String(u);
-      if (url.includes('/api/publico/grupo-preco')) {
+      if (url.includes('/api/totem/grupo-preco')) {
         if (precoOps === 'fora') throw new Error('timeout');
         return new Response(JSON.stringify({ precoCentavos: precoOps, primeiraVez: true }), { status: 200 });
       }

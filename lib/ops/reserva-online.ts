@@ -586,7 +586,7 @@ export async function sincronizarReservasOnline(log: Log) {
 /**
  * Preço da vaga de quem entra pelo link do grupo (12/11/2026, decisão 5 do dono: primeira vez vale por piloto também no
  * "cada um paga o seu"): estreante paga o preço de primeira vez do produto da bateria, quando houver e for menor.
- * Chamado pelo site na hora de gerar a cobrança (POST /api/publico/grupo-preco). Devolve só o valor.
+ * Chamado pelo site na hora de gerar a cobrança (POST /api/totem/grupo-preco). Devolve só o valor.
  */
 export async function precoDaVagaPeloLink(token: string, cpf: string): Promise<{ precoCentavos: number; primeiraVez: boolean } | null> {
   if (!/^[A-Za-z0-9]{10,24}$/.test(token) || !isValidCpf(onlyDigits(cpf))) return null;
