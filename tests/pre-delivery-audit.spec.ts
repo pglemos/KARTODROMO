@@ -196,6 +196,10 @@ test.describe('pre-delivery checklist', () => {
       for (const path of paths) {
         await page.goto(`${baseUrl}${path}`, { waitUntil: 'domcontentloaded' });
         await waitForRenderedPage(page);
+        // animações de entrada (deslizar de lado) passam da borda por uns 300 ms; o html já corta com overflow-x: clip,
+        // então só vale medir depois que elas terminam
+        await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running' || a.effect?.getComputedTiming().iterations === Infinity), undefined, { timeout: 5_000 }).catch(() => undefined);
+        await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), { timeout: 3_000 }).toBeLessThanOrEqual(2).catch(() => undefined);
         const result = await auditPage(page);
         const expectedCanonical = new URL(path, canonicalOrigin).href;
 

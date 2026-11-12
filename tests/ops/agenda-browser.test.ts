@@ -98,7 +98,7 @@ describe('Agenda: integração real do frontend sem dados de produção',{ timeo
   await page.locator('[data-nova]').click();await page.locator('[data-escolher="394"]').click();await page.locator('[data-menor="0"]').waitFor();
   await page.locator('[data-campo="nome"][data-i="0"]').fill('TESTE CODEX');await page.locator('[data-campo="telefone"][data-i="0"]').fill('31999999999');
   await page.locator('[data-menor="0"]').click();await page.locator('[data-salvar-grupo]').click();await page.locator('[data-cancelar-grupo]').waitFor();
-  expect(enviado?.pilotos[0].menor).toBe(true);expect(errors).toEqual([]);await page.close();
+  await expect.poll(()=>enviado?.pilotos[0].menor,{timeout:10_000}).toBe(true);expect(errors).toEqual([]);await page.close();
  });
  it('atualiza o grupo aberto sem trocar o contexto da janela',async()=>{
   await page.locator('#calendario [data-sel="394"]').first().click();await page.locator('[data-grupo-abrir]').first().click();await page.locator('[data-grupo-atualizar]').waitFor();
